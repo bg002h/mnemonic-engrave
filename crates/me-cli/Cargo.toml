@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 description = "Convert m-format constellation strings (md1/mk1) into NFC NDEF payloads for SeedHammer II; refuses secret ms1."
 license = "MIT"
+repository = "https://github.com/bg002h/mnemonic-engrave"
+homepage = "https://github.com/bg002h/mnemonic-engrave"
+readme = "README.md"
+keywords = ["bitcoin", "nfc", "seedhammer", "backup", "bech32"]
+categories = ["command-line-utilities", "cryptography::cryptocurrencies"]
 
 [[bin]]
 name = "me"
