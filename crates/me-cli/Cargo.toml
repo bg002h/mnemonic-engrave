@@ -1,0 +1,24 @@
+[package]
+name = "mnemonic-engrave"
+version = "0.1.0"
+edition = "2021"
+description = "Convert m-format constellation strings (md1/mk1) into NFC NDEF payloads for SeedHammer II; refuses secret ms1."
+license = "MIT"
+
+[[bin]]
+name = "me"
+path = "src/main.rs"
+
+[lib]
+name = "mnemonic_engrave"
+path = "src/lib.rs"
+
+[dependencies]
+md-codec = "0.36"
+mk-codec = "0.4"
+clap = { version = "4", features = ["derive"] }
+zeroize = "1.8"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
