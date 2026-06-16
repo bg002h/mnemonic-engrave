@@ -327,6 +327,10 @@ mod tests {
     const MK1_A: &str = "mk1qpzg69pqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3kx98j76m4mjlwphf";
     const MK1_B: &str =
         "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x";
+    // A second complete 2-chunk mk1 set (different chunk_set_id than MK1_A/MK1_B).
+    const MK1_C: &str = "mk1qpydzkpqqsqupllwqr02m0h0qvzg3vs7zqsrqq4g4z52329g4z52329g4z52329g4z52329g4z52329g4z52329g4qpy6m8lr3sdrxkguwax";
+    const MK1_D: &str =
+        "mk1qpydzkppfdkdzdssxt9fh54wh8vsp2jdghv74kq2e9prxaxy2xnj2ng8vm68nf54c0vrdlfrgjzpd";
     const MS1: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
 
     #[test]
@@ -390,6 +394,52 @@ mod tests {
         // ms1 reminder is last.
         assert!(matches!(m.plates.last().unwrap().kind, PlateKind::Ms1));
         assert!(m.ms1_required);
+    }
+
+    // Spec §10 #2 — one unchunked md1 + TWO distinct mk1 sets (different chunk_set_id).
+    #[test]
+    fn multi_set_two_distinct_mk1_cards() {
+        let input = lines(&[MD1_UNCHUNKED, MK1_A, MK1_B, MK1_C, MK1_D]);
+        let m = run_bundle(&input).unwrap();
+        // Two mk1 sets (both set-verified), the unchunked md1 is bch-only (not a set).
+        assert_eq!(m.sets.len(), 2, "expected 2 mk1 sets, got {:?}", m.sets);
+        assert!(m.sets.iter().all(|s| s.kind == Kind::Mk1));
+        assert!(m.sets.iter().all(|s| s.integrity == Integrity::SetVerified));
+        // Distinct chunk_set_ids, one of them MK1_A/B's 0x12345.
+        assert!(m.sets.iter().any(|s| s.chunk_set_id == "0x12345"));
+        assert_ne!(m.sets[0].chunk_set_id, m.sets[1].chunk_set_id);
+        // 1 md1 + 2 + 2 mk1 chunks + 1 ms1 reminder = 6 plates.
+        assert_eq!(m.wallet_plates, 6);
+        assert_eq!(m.plates.len(), 6);
+        assert!(matches!(m.plates.last().unwrap().kind, PlateKind::Ms1));
+    }
+
+    // Spec §10 #6 — two mk1 chunks with MISMATCHED chunk_set_id presented together:
+    // each forms an incomplete 1-of-2 group → exit 4 (distinct from the same-id
+    // cross_chunk_hash case in test #7).
+    #[test]
+    fn foreign_mismatched_set_ids_fail() {
+        // MK1_A is index 0/2 of set 0x12345; MK1_C is index 0/2 of a different set.
+        let input = lines(&[MK1_A, MK1_C]);
+        assert!(matches!(
+            run_bundle(&input),
+            Err(BundleError::SetIncompleteMk(..))
+        ));
+    }
+
+    // Spec §10 #9 — pristine policy through the full run_bundle pipeline (not just parse_line).
+    #[test]
+    fn run_bundle_rejects_corrupted_mk1() {
+        let mut bad = MK1_B.to_string();
+        let last = bad.pop().unwrap();
+        bad.push(if last == 'q' { 'p' } else { 'q' });
+        assert!(matches!(
+            run_bundle(&bad),
+            Err(BundleError::Validate(
+                _,
+                crate::validate::ValidateError::MkCorrected(_)
+            ))
+        ));
     }
 
     #[test]
