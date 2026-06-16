@@ -4,7 +4,15 @@ Low/nit items deferred from architect reviews (per the iterative-architect-revie
 
 ## Open
 
-_(none)_
+> These are **cycle-sized** items (bigger than architect-review nits) — each warrants its own brainstorm → spec → plan → R0 → implement pass when picked up.
+
+- **`me-crates-io-publish`** — Publish `me` to crates.io. First: verify the bin/crate name is free (`cargo search me` / crates.io); if `me` is taken, ship as `mnemonic-engrave` with `me` as a local alias only. Then a first versioned release (0.1.0/0.1.1) with a `CHANGELOG.md`, the `[package]` metadata (`repository`, `homepage`, `keywords`, `categories`), and `cargo publish --dry-run` green. Depends on the published `md-codec 0.36` / `mk-codec 0.4`. SemVer: initial release.
+
+- **`me-bundle-preview-layer`** — The deferred host-side **bundle orchestration** (v1 non-goal in `design/SPEC_seedhammer_engrave.md` §2). A wallet backup = a *set* of plates: `md1` policy + `mk1` xpub chunk(s) + `ms1` secret (typed on-device, never via the tool). Build a manifest + guided per-plate workflow ("plate 1/N: md1 — push via NFC & engrave; … ms1 — type on device") and optionally a faithful plate preview (could reuse SeedHammer's Go `engrave`/`backup` libs host-side). Larger feature; its own spec→plan→R0 cycle. Honors the per-string model (a multi-chunk `mk1` = multiple plates).
+
+- **`firmware-deferred-formal-reviews`** — Run the formal opus-architect **subagent** reviews that were done as *inline self-reviews* because Agent-API dispatch was failing (500/529) for the back half of the 2026-06-16 session: (a) PR2 (#35) final whole-diff review (`codex32/mdmk.go` + gui scanner/engrave); (b) the converter-polish plan-R0 (`design/agent-reports/me-converter-polish-plan-R0-selfreview.md`). Do once subagent dispatch recovers; fold any C/I, persist verbatim to `design/agent-reports/`.
+
+- **`seedhammer-upstream-prs-tracking`** — Track the two open upstream PRs to `seedhammer/seedhammer`: **#34** (re-enable on-device CODEX32 entry) and **#35** (BCH-validated md1/mk1 engraving). Respond to maintainer feedback; mirror any requested changes back. **If declined or stalled:** pursue the fork-fallback — stand up a `seedhammer-fork` sibling repo and document the "Set custom boot key" path (program a 2nd RP2350 OTP boot-key slot via picotool to run own-signed firmware on a locked SH2; "Advanced · irreversible" — per https://gangleri42.github.io/seedhammer/).
 
 ## Resolved
 
