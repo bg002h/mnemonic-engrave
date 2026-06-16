@@ -44,6 +44,16 @@ fn echo_prints_validated_string_to_stderr() {
     let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
     assert!(stderr.contains("validated md1:"), "stderr: {stderr}");
     assert!(stderr.contains(MD1_VALID), "stderr: {stderr}");
+    // stdout stays binary/encoded NDEF only: the echo must never bleed onto it.
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    assert!(
+        !stdout.contains("validated"),
+        "echo leaked to stdout: {stdout}"
+    );
+    assert!(
+        !stdout.contains(MD1_VALID),
+        "input leaked to stdout: {stdout}"
+    );
 }
 
 #[test]

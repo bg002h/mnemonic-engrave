@@ -62,18 +62,25 @@ fn run() -> i32 {
         return EXIT_USAGE;
     }
 
-    // Capture the plate-budget flag and (with --echo) the validated string
-    // before the input is dropped.
+    // Capture the plate-budget flag before the input is dropped.
     let too_long = mnemonic_engrave::exceeds_plate_budget(&input);
-    let echo_line = if cli.echo {
+
+    let result = convert(&input);
+
+    // Build the --echo line ONLY on the success path, where the input is a
+    // verified PUBLIC md1/mk1 string. Building it before convert() (or on the
+    // refusal path) would copy an ms1 secret into a heap String that escapes
+    // the Zeroizing scrub of `input` — so the allocation must be unreachable
+    // for ms1. We still wrap it in Zeroizing as belt-and-suspenders against any
+    // future reordering of the refusal guard.
+    let echo_line: Option<Zeroizing<String>> = if cli.echo && result.is_ok() {
         let s = input.trim();
         let label = if s.starts_with("mk1") { "mk1" } else { "md1" };
-        Some(format!("me: validated {label}: {s}"))
+        Some(Zeroizing::new(format!("me: validated {label}: {s}")))
     } else {
         None
     };
 
-    let result = convert(&input);
     drop(input); // Zeroizing scrubs the input buffer here
 
     let bytes = match result {
@@ -91,8 +98,8 @@ fn run() -> i32 {
     if too_long {
         eprintln!("me: warning: input is long; it may exceed one plate (the device will reject with ErrTooLarge if so)");
     }
-    if let Some(line) = echo_line {
-        eprintln!("{line}");
+    if let Some(line) = &echo_line {
+        eprintln!("{}", line.as_str());
     }
 
     // Emit per the selected output mode. Human guidance -> stderr only.

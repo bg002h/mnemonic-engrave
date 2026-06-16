@@ -8,13 +8,14 @@ Low/nit items deferred from architect reviews (per the iterative-architect-revie
 
 - **`me-bundle-preview-layer`** — The deferred host-side **bundle orchestration** (v1 non-goal in `design/SPEC_seedhammer_engrave.md` §2). A wallet backup = a *set* of plates: `md1` policy + `mk1` xpub chunk(s) + `ms1` secret (typed on-device, never via the tool). Build a manifest + guided per-plate workflow ("plate 1/N: md1 — push via NFC & engrave; … ms1 — type on device") and optionally a faithful plate preview (could reuse SeedHammer's Go `engrave`/`backup` libs host-side). Larger feature; its own spec→plan→R0 cycle. Honors the per-string model (a multi-chunk `mk1` = multiple plates).
 
-- **`firmware-deferred-formal-reviews`** — formal opus-architect **subagent** reviews to replace the inline self-reviews forced by the 2026-06-16 Agent-API outage:
-  - **(a) PR2 (#35) final whole-diff review — DONE 2026-06-16.** Agents recovered; the formal review caught 1 Important (md1/mk1 lowercase-only) + 3 Minor that the inline self-review had missed; folded in `6ab12c0` (PR #35 updated), R1 **GREEN** (`design/agent-reports/firmware-pr2-mdmk-final-review-R{0,1}.md`).
-  - **(b) STILL OPEN** — a formal subagent review of the **converter-polish diff** (`5086119`, only inline-self-reviewed). Agents are back, so runnable anytime; fold any C/I, persist verbatim to `design/agent-reports/`.
-
 - **`seedhammer-upstream-prs-tracking`** — Track the two open upstream PRs to `seedhammer/seedhammer`: **#34** (re-enable on-device CODEX32 entry) and **#35** (BCH-validated md1/mk1 engraving). Respond to maintainer feedback; mirror any requested changes back. **If declined or stalled:** pursue the fork-fallback — stand up a `seedhammer-fork` sibling repo and document the "Set custom boot key" path (program a 2nd RP2350 OTP boot-key slot via picotool to run own-signed firmware on a locked SH2; "Advanced · irreversible" — per https://gangleri42.github.io/seedhammer/).
 
 ## Resolved
+
+### Deferred formal subagent reviews — RESOLVED 2026-06-16
+Both formal opus-architect **subagent** reviews deferred during the 2026-06-16 Agent-API outage (which had forced inline self-reviews) were run after agents recovered:
+- **(a) PR2 (#35) final whole-diff review — DONE.** Caught 1 Important (md1/mk1 lowercase-only) + 3 Minor the inline self-review missed; folded in seedhammer `6ab12c0` (PR #35 updated), R1 **GREEN** (`design/agent-reports/firmware-pr2-mdmk-final-review-R{0,1}.md`).
+- **(b) converter-polish diff (`5086119`) review — DONE.** R0 caught 1 Important (I-1: with `--echo`, the input was copied into an un-zeroized heap `String` *before* `convert()`, so `--echo --in <ms1-file>` left the secret un-scrubbed on the ms1-refusal path — defeating nit 4's defense-in-depth) + 1 Nit (N-1: echo test lacked a stdout-purity assertion). Folded: `echo_line` now built only when `cli.echo && result.is_ok()` and wrapped in `Zeroizing<String>`; echo test now asserts stdout stays binary-only. R1 **GREEN** (`design/agent-reports/me-converter-polish-final-review-R{0,1}.md`).
 
 ### Converter (`me`) polish cycle — RESOLVED 2026-06-16 (commit `5086119`)
 All five nits from the converter execution review (`design/agent-reports/me-converter-execution-review.md`) were cleared in one PATCH cycle (spec `design/SPEC_me_converter_polish.md`, plan `design/IMPLEMENTATION_PLAN_me_converter_polish.md`):
