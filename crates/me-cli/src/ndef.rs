@@ -64,6 +64,10 @@ pub fn encode_text_tlv(text: &str) -> Result<Vec<u8>, NdefError> {
 /// Minimal decoder mirroring SeedHammer's reader: unwrap the NDEF TLV, parse a
 /// single well-known Text record, return the UTF-8 text. Used for the
 /// round-trip self-test; `None` on any structural mismatch.
+///
+/// Intentionally handles only the 1-byte TLV length form and does NOT check the
+/// `0xFE` terminator — it only needs to round-trip `me`'s own bounded output,
+/// which never uses the 3-byte length form. Not a general-purpose NDEF parser.
 pub fn decode_text_tlv(bytes: &[u8]) -> Option<String> {
     if bytes.len() < 2 || bytes[0] != TLV_NDEF {
         return None;

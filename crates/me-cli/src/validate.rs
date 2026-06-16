@@ -50,7 +50,7 @@ pub fn validate(fmt: Format, s: &str) -> Result<(), ValidateError> {
             }
             Ok(())
         }
-        Format::Ms => panic!("validate() called on ms1 — must be refused before validation"),
+        Format::Ms => unreachable!("ms1 is refused before validation"),
     }
 }
 

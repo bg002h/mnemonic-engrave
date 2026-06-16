@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use mnemonic_engrave::{convert, ConvertError};
-use zeroize::Zeroize;
+use zeroize::Zeroizing;
 
 /// Convert a public constellation string (md1/mk1) to an NFC NDEF payload.
 /// Reads the string from stdin (or --in). Refuses secret ms1.
@@ -27,6 +27,10 @@ struct Cli {
     /// Print the NDEF bytes as base64 on stdout.
     #[arg(long, conflicts_with_all = ["hex", "out"])]
     base64: bool,
+    /// On success, echo the validated md1/mk1 string to stderr (for pasting
+    /// into a phone NFC-writer app). Off by default.
+    #[arg(long)]
+    echo: bool,
 }
 
 const EXIT_OK: i32 = 0;
@@ -41,10 +45,13 @@ fn main() {
 fn run() -> i32 {
     let cli = Cli::parse();
 
-    let mut input = String::new();
+    // Read into a Zeroizing buffer so the input (incl. read_to_string's
+    // allocation, which a secret could reach via --in) is scrubbed on drop —
+    // defense-in-depth on top of the ms1 refusal.
+    let mut input = Zeroizing::new(String::new());
     if let Some(path) = &cli.r#in {
         match std::fs::read_to_string(path) {
-            Ok(s) => input = s,
+            Ok(s) => *input = s, // moves the buffer into the Zeroizing wrapper
             Err(e) => {
                 eprintln!("me: cannot read {}: {e}", path.display());
                 return EXIT_USAGE;
@@ -55,11 +62,19 @@ fn run() -> i32 {
         return EXIT_USAGE;
     }
 
-    // Capture the plate-budget flag before zeroizing the input buffer.
+    // Capture the plate-budget flag and (with --echo) the validated string
+    // before the input is dropped.
     let too_long = mnemonic_engrave::exceeds_plate_budget(&input);
+    let echo_line = if cli.echo {
+        let s = input.trim();
+        let label = if s.starts_with("mk1") { "mk1" } else { "md1" };
+        Some(format!("me: validated {label}: {s}"))
+    } else {
+        None
+    };
 
     let result = convert(&input);
-    input.zeroize(); // scrub the input buffer regardless of outcome
+    drop(input); // Zeroizing scrubs the input buffer here
 
     let bytes = match result {
         Ok(b) => b,
@@ -75,6 +90,9 @@ fn run() -> i32 {
 
     if too_long {
         eprintln!("me: warning: input is long; it may exceed one plate (the device will reject with ErrTooLarge if so)");
+    }
+    if let Some(line) = echo_line {
+        eprintln!("{line}");
     }
 
     // Emit per the selected output mode. Human guidance -> stderr only.

@@ -18,13 +18,20 @@ func main() {
 	}
 	mr := ndef.NewMessageReader(byteReader(in))
 	rr := ndef.NewRecordReader(mr)
+	var out []byte
 	buf := make([]byte, 4096)
-	n, err := rr.Read(buf)
-	if err != nil && err != io.EOF {
-		fmt.Fprintln(os.Stderr, "ndef:", err)
-		os.Exit(1)
+	for {
+		n, err := rr.Read(buf)
+		out = append(out, buf[:n]...)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "ndef:", err)
+			os.Exit(1)
+		}
 	}
-	os.Stdout.Write(buf[:n])
+	os.Stdout.Write(out)
 }
 
 // byteReader adapts a []byte to the io.Reader the ndef package expects.

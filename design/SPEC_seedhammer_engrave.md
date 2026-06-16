@@ -75,7 +75,7 @@ The `chunk_index`/`total_chunks`/`chunk_set_id` live **inside** the BCH-covered 
 - **Input:** exactly one constellation string via **stdin** or `--in <file>` (never a positional argv secret).
 - **Validation:** depend on `md-codec` / `mk-codec` / `ms-codec` to **fully parse and verify** the string — classify HRP, verify the BCH checksum, and reliably identify `ms1`. A malformed `md1`/`mk1` is rejected before it can be engraved.
 - **Behavior by HRP:**
-  - `md1` / `mk1`: write the NDEF message bytes (§6) to `--out <file>` (default) or stdout via `--stdout`; the canonical validated string (for pasting into a phone NFC-writer app) and any guidance go to **stderr**, so binary output and human text never collide on the same stream. Optional `--hex` / `--base64` make the NDEF safe to print on stdout directly.
+  - `md1` / `mk1`: write the NDEF message bytes (§6) to `--out <file>` (default) or stdout via `--stdout`; any guidance goes to **stderr**, never stdout, so binary output and human text never collide; the canonical validated string (for pasting into a phone NFC-writer app) is echoed to stderr **only when `--echo` is given**. Optional `--hex` / `--base64` make the NDEF safe to print on stdout directly.
   - `ms1`: **refuse**, exit non-zero, print the RF-risk explanation + on-device-entry instructions.
   - unknown HRP / failed checksum: error naming the problem.
 - **Length guard:** warn when a string is long enough to risk overflowing the plate with a QR (firmware still backstops via `ErrTooLarge`).

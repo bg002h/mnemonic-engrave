@@ -32,3 +32,28 @@ fn missing_output_mode_is_usage_error() {
         .assert()
         .code(2);
 }
+
+#[test]
+fn echo_prints_validated_string_to_stderr() {
+    let assert = Command::cargo_bin("me")
+        .unwrap()
+        .args(["--hex", "--echo"])
+        .write_stdin(MD1_VALID)
+        .assert()
+        .success();
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+    assert!(stderr.contains("validated md1:"), "stderr: {stderr}");
+    assert!(stderr.contains(MD1_VALID), "stderr: {stderr}");
+}
+
+#[test]
+fn no_echo_by_default() {
+    let assert = Command::cargo_bin("me")
+        .unwrap()
+        .args(["--hex"])
+        .write_stdin(MD1_VALID)
+        .assert()
+        .success();
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+    assert!(!stderr.contains("validated"), "unexpected echo: {stderr}");
+}
