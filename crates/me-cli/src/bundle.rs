@@ -154,6 +154,118 @@ pub fn parse_line(s: &str) -> Result<Parsed, BundleError> {
     }
 }
 
+use std::collections::BTreeMap;
+
+/// Validate the public strings of one or more wallet backups and build a manifest.
+/// Pure: no I/O. Refuses ms1. See `design/SPEC_me_bundle_phaseA.md`.
+pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
+    let raw: Vec<&str> = input
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
+    if raw.is_empty() {
+        return Err(BundleError::Empty);
+    }
+    // Refuse ms1 BEFORE validating ANY line (spec §4.2 / m-1): a classify-only
+    // pre-scan, so no line's content is BCH-validated if an ms1 is present.
+    for line in &raw {
+        if classify::classify(line) == Ok(Format::Ms) {
+            return Err(BundleError::RefusedSecret);
+        }
+    }
+    let parsed: Vec<Parsed> = raw.iter().map(|l| parse_line(l)).collect::<Result<_, _>>()?;
+
+    // Partition: unchunked md1 (each its own bch-only plate), chunked md1 groups,
+    // mk1 groups — keyed by chunk_set_id. BTreeMap keeps a deterministic order.
+    let mut md1_singles: Vec<String> = Vec::new();
+    let mut md1_groups: BTreeMap<u32, Vec<(u8, String)>> = BTreeMap::new();
+    let mut mk1_groups: BTreeMap<u32, Vec<(u8, String)>> = BTreeMap::new();
+    for p in parsed {
+        match p {
+            Parsed::Md1Single { s } => md1_singles.push(s),
+            Parsed::Md1Chunk { s, chunk_set_id, index, .. } => {
+                md1_groups.entry(chunk_set_id).or_default().push((index, s));
+            }
+            Parsed::Mk1Chunk { s, chunk_set_id, index, .. } => {
+                mk1_groups.entry(chunk_set_id).or_default().push((index, s));
+            }
+        }
+    }
+
+    let mut sets: Vec<SetEntry> = Vec::new();
+    let mut plates: Vec<PlateEntry> = Vec::new();
+
+    // 1) Unchunked md1 policy plates (bch-only).
+    for s in &md1_singles {
+        plates.push(PlateEntry {
+            plate: 0, of: 0, kind: PlateKind::Md1,
+            string: Some(s.clone()),
+            chunk_set_id: None, chunk_index: None,
+            integrity: Integrity::BchOnly,
+        });
+    }
+
+    // 2) Chunked md1 sets.
+    for (id, mut chunks) in md1_groups {
+        chunks.sort_by_key(|(i, _)| *i);
+        let refs: Vec<&str> = chunks.iter().map(|(_, s)| s.as_str()).collect();
+        md_codec::chunk::reassemble(&refs)
+            .map_err(|e| BundleError::SetIncompleteMd(fmt_chunk_set_id(id), e))?;
+        let total = chunks.len() as u8;
+        sets.push(SetEntry { kind: Kind::Md1, chunk_set_id: fmt_chunk_set_id(id), total, integrity: Integrity::SetVerified });
+        for (idx, s) in &chunks {
+            plates.push(PlateEntry {
+                plate: 0, of: 0, kind: PlateKind::Md1,
+                string: Some(s.clone()),
+                chunk_set_id: Some(fmt_chunk_set_id(id)), chunk_index: Some(*idx),
+                integrity: Integrity::SetVerified,
+            });
+        }
+    }
+
+    // 3) mk1 key-card sets.
+    for (id, mut chunks) in mk1_groups {
+        chunks.sort_by_key(|(i, _)| *i);
+        let refs: Vec<&str> = chunks.iter().map(|(_, s)| s.as_str()).collect();
+        mk_codec::decode(&refs)
+            .map_err(|e| BundleError::SetIncompleteMk(fmt_chunk_set_id(id), e))?;
+        let total = chunks.len() as u8;
+        sets.push(SetEntry { kind: Kind::Mk1, chunk_set_id: fmt_chunk_set_id(id), total, integrity: Integrity::SetVerified });
+        for (idx, s) in &chunks {
+            plates.push(PlateEntry {
+                plate: 0, of: 0, kind: PlateKind::Mk1Chunk,
+                string: Some(s.clone()),
+                chunk_set_id: Some(fmt_chunk_set_id(id)), chunk_index: Some(*idx),
+                integrity: Integrity::SetVerified,
+            });
+        }
+    }
+
+    // 4) Trailing ms1 reminder.
+    plates.push(PlateEntry {
+        plate: 0, of: 0, kind: PlateKind::Ms1,
+        string: None, chunk_set_id: None, chunk_index: None,
+        integrity: Integrity::Na,
+    });
+
+    // Renumber plate/of now that the full ordered set is known.
+    let total_plates = plates.len();
+    for (i, p) in plates.iter_mut().enumerate() {
+        p.plate = i + 1;
+        p.of = total_plates;
+    }
+
+    Ok(Manifest {
+        tool: "me",
+        version: env!("CARGO_PKG_VERSION"),
+        wallet_plates: total_plates,
+        ms1_required: true,
+        sets,
+        plates,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,5 +312,48 @@ mod tests {
         let last = bad.pop().unwrap();
         bad.push(if last == 'q' { 'p' } else { 'q' });
         assert!(matches!(parse_line(&bad), Err(BundleError::Validate(..))));
+    }
+
+    fn lines(v: &[&str]) -> String { v.join("\n") }
+
+    #[test]
+    fn happy_path_md1_plus_2chunk_mk1() {
+        let input = lines(&[MD1_UNCHUNKED, MK1_A, MK1_B]);
+        let m = run_bundle(&input).unwrap();
+        // 1 md1 (bch-only) + 2 mk1 chunks + 1 ms1 reminder = 4 plates.
+        assert_eq!(m.wallet_plates, 4);
+        assert_eq!(m.plates.len(), 4);
+        // Unchunked md1 is bch-only and NOT in sets[].
+        assert!(m.sets.iter().all(|s| s.kind != Kind::Md1));
+        assert_eq!(m.sets.len(), 1); // just the mk1 set
+        assert_eq!(m.sets[0].chunk_set_id, "0x12345");
+        assert_eq!(m.sets[0].total, 2);
+        // ms1 reminder is last.
+        assert!(matches!(m.plates.last().unwrap().kind, PlateKind::Ms1));
+        assert!(m.ms1_required);
+    }
+
+    #[test]
+    fn reordered_mk1_chunks_still_verify() {
+        let input = lines(&[MK1_B, MK1_A]); // reversed
+        let m = run_bundle(&input).unwrap();
+        assert_eq!(m.sets[0].integrity, Integrity::SetVerified);
+    }
+
+    #[test]
+    fn dropped_mk1_chunk_fails() {
+        let input = lines(&[MK1_A]); // total=2, only 1 supplied
+        assert!(matches!(run_bundle(&input), Err(BundleError::SetIncompleteMk(..))));
+    }
+
+    #[test]
+    fn empty_input_is_usage_error() {
+        assert!(matches!(run_bundle("   \n  \n"), Err(BundleError::Empty)));
+    }
+
+    #[test]
+    fn ms1_anywhere_refuses_early() {
+        let input = lines(&[MK1_A, MS1, MK1_B]);
+        assert!(matches!(run_bundle(&input), Err(BundleError::RefusedSecret)));
     }
 }
