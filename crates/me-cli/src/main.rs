@@ -3,7 +3,7 @@
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use mnemonic_engrave::{convert, ConvertError};
 use zeroize::Zeroizing;
 
@@ -31,6 +31,21 @@ struct Cli {
     /// into a phone NFC-writer app). Off by default.
     #[arg(long)]
     echo: bool,
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Validate a wallet backup's public strings and emit a plate manifest + checklist.
+    Bundle {
+        /// Read newline-separated public strings from this file instead of stdin.
+        #[arg(long, value_name = "FILE")]
+        r#in: Option<PathBuf>,
+        /// Write the manifest JSON to this file instead of stdout.
+        #[arg(long, value_name = "FILE")]
+        manifest: Option<PathBuf>,
+    },
 }
 
 const EXIT_OK: i32 = 0;
@@ -44,6 +59,10 @@ fn main() {
 
 fn run() -> i32 {
     let cli = Cli::parse();
+
+    if let Some(Command::Bundle { r#in, manifest }) = &cli.command {
+        return run_bundle_cli(r#in.as_ref(), manifest.as_ref());
+    }
 
     // Read into a Zeroizing buffer so the input (incl. read_to_string's
     // allocation, which a secret could reach via --in) is scrubbed on drop —
@@ -122,6 +141,49 @@ fn run() -> i32 {
         eprintln!("me: choose an output mode: --out <file>, --stdout, --hex, or --base64");
         return EXIT_USAGE;
     }
+    EXIT_OK
+}
+
+fn run_bundle_cli(in_path: Option<&PathBuf>, manifest_path: Option<&PathBuf>) -> i32 {
+    let mut input = Zeroizing::new(String::new());
+    if let Some(path) = in_path {
+        match std::fs::read_to_string(path) {
+            Ok(s) => *input = s,
+            Err(e) => {
+                eprintln!("me: cannot read {}: {e}", path.display());
+                return EXIT_USAGE;
+            }
+        }
+    } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
+        eprintln!("me: cannot read stdin: {e}");
+        return EXIT_USAGE;
+    }
+
+    let manifest = match mnemonic_engrave::bundle::run_bundle(&input) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("me: {e}");
+            return e.exit_code();
+        }
+    };
+
+    let json = match serde_json::to_string_pretty(&manifest) {
+        Ok(j) => j,
+        Err(e) => {
+            eprintln!("me: cannot serialize manifest: {e}");
+            return EXIT_USAGE;
+        }
+    };
+    if let Some(path) = manifest_path {
+        if let Err(e) = std::fs::write(path, json.as_bytes()) {
+            eprintln!("me: cannot write {}: {e}", path.display());
+            return EXIT_USAGE;
+        }
+        eprintln!("me: wrote manifest to {}", path.display());
+    } else {
+        println!("{json}");
+    }
+    eprint!("{}", manifest.checklist());
     EXIT_OK
 }
 
