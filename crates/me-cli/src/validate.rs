@@ -94,6 +94,9 @@ mod tests {
         let mut bad = MK1_VALID.to_string();
         let last = bad.pop().unwrap();
         bad.push(if last == 'q' { 'p' } else { 'q' });
-        assert!(matches!(validate(Format::Mk, &bad), Err(ValidateError::MkCorrected(_))));
+        assert!(matches!(
+            validate(Format::Mk, &bad),
+            Err(ValidateError::MkCorrected(_))
+        ));
     }
 }

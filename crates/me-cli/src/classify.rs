@@ -24,8 +24,12 @@ pub enum ClassifyError {
 impl std::fmt::Display for ClassifyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ClassifyError::NoSeparator => write!(f, "not a bech32 string (no '1' separator / empty HRP)"),
-            ClassifyError::UnknownHrp(h) => write!(f, "unrecognized HRP '{h}' (expected md, mk, or ms)"),
+            ClassifyError::NoSeparator => {
+                write!(f, "not a bech32 string (no '1' separator / empty HRP)")
+            }
+            ClassifyError::UnknownHrp(h) => {
+                write!(f, "unrecognized HRP '{h}' (expected md, mk, or ms)")
+            }
         }
     }
 }
@@ -65,7 +69,10 @@ mod tests {
 
     #[test]
     fn rejects_unknown_and_malformed() {
-        assert_eq!(classify("xx1qqqq"), Err(ClassifyError::UnknownHrp("xx".into())));
+        assert_eq!(
+            classify("xx1qqqq"),
+            Err(ClassifyError::UnknownHrp("xx".into()))
+        );
         assert_eq!(classify("noseparator"), Err(ClassifyError::NoSeparator));
         assert_eq!(classify("1leadingsep"), Err(ClassifyError::NoSeparator));
     }

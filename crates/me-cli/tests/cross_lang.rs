@@ -20,6 +20,10 @@ fn rust_ndef_parses_in_seedhammer_go_reader() {
         .expect("go must be installed and firmware/ndef-roundtrip present");
     child.stdin.take().unwrap().write_all(&ndef).unwrap();
     let out = child.wait_with_output().unwrap();
-    assert!(out.status.success(), "go harness failed: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "go harness failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8(out.stdout).unwrap(), input);
 }

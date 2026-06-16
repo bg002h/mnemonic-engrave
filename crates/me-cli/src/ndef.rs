@@ -18,7 +18,9 @@ pub enum NdefError {
 impl std::fmt::Display for NdefError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NdefError::TooLong(n) => write!(f, "payload too long for a short NDEF record: {n} bytes"),
+            NdefError::TooLong(n) => {
+                write!(f, "payload too long for a short NDEF record: {n} bytes")
+            }
         }
     }
 }

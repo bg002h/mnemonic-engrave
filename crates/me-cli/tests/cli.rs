@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use std::io::Write;
 
 const MD1_VALID: &str = "md1yqpqqxqq8xtwhw4xwn4qh";
 const MS1: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
