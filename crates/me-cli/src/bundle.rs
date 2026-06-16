@@ -356,4 +356,86 @@ mod tests {
         let input = lines(&[MK1_A, MS1, MK1_B]);
         assert!(matches!(run_bundle(&input), Err(BundleError::RefusedSecret)));
     }
+
+    #[test]
+    fn duplicate_mk1_chunk_index_fails() {
+        // MK1_A twice (same chunk_index 0) → reassembly dup detection.
+        let input = lines(&[MK1_A, MK1_A]);
+        assert!(matches!(run_bundle(&input), Err(BundleError::SetIncompleteMk(..))));
+    }
+
+    #[test]
+    fn cross_chunk_hash_mismatch_fails() {
+        // MK1_A (set 0x12345, index 0) + MK1_B2 (a DIFFERENT card's index-1 chunk
+        // re-encoded at chunk_set_id 0x12345). Each chunk is individually pristine
+        // but the cross-chunk hash disagrees. See plan note for vector construction.
+        let mk1_b2 = foreign_index1_same_setid();
+        let input = lines(&[MK1_A, &mk1_b2]);
+        assert!(matches!(run_bundle(&input), Err(BundleError::SetIncompleteMk(..))));
+    }
+
+    #[test]
+    fn md1_chunked_set_verifies_and_drop_fails() {
+        let chunks = chunked_md1_vector(); // ≥2 md1 strings of one set
+        assert!(chunks.len() >= 2, "need a multi-chunk md1 vector");
+        let ok = lines(&chunks.iter().map(String::as_str).collect::<Vec<_>>());
+        let m = run_bundle(&ok).unwrap();
+        assert!(m.sets.iter().any(|s| s.kind == Kind::Md1 && s.integrity == Integrity::SetVerified));
+        // Drop the last chunk → incomplete.
+        let partial = lines(&chunks[..chunks.len() - 1].iter().map(String::as_str).collect::<Vec<_>>());
+        assert!(matches!(run_bundle(&partial), Err(BundleError::SetIncompleteMd(..))));
+    }
+
+    // A 2-chunk mk1 set with chunk_set_id 0x12345 where index-1 chunk is from a
+    // DIFFERENT KeyCard re-encoded at the same chunk_set_id → CrossChunkHashMismatch.
+    // Built via the public encode API (mirrors mk-codec's pipeline perturbation tests).
+    fn foreign_index1_same_setid() -> String {
+        // Decode the genuine other-card single string into a KeyCard, re-encode it at
+        // 0x12345, and take its index-1 chunk. The other card must itself be ≥2 chunks.
+        // Implementer: source a second multi-chunk mk1 set from mk-codec v0.1.json (the
+        // second "strings" fixture) and return its index-1 string, then rewrite its
+        // chunk_set_id symbols to 0x12345 via mk_codec::encode_with_chunk_set_id on the
+        // decoded KeyCard. Concretely:
+        let other = [
+            "mk1qpydzkpqqsqupllwqr02m0h0qvzg3vs7zqsrqq4g4z52329g4z52329g4z52329g4z52329g4z52329g4z52329g4qpy6m8lr3sdrxkguwax",
+            "mk1qpydzkppfdkdzdssxt9fh54wh8vsp2jdghv74kq2e9prxaxy2xnj2ng8vm68nf54c0vrdlfrgjzpd",
+        ];
+        let card = mk_codec::decode(&other).expect("decode other card");
+        let re = mk_codec::encode_with_chunk_set_id(&card, 0x12345).expect("re-encode");
+        re.into_iter().nth(1).expect("index-1 chunk")
+    }
+
+    // A multi-chunk md1 set, built from md-codec's OWN public multi-chunk descriptor
+    // (verbatim from md-codec tests/bch_adversarial.rs::multi_chunk_descriptor — fully
+    // public types) and `split`. Hermetic, deterministic; `split` yields ≥4 md1 chunks.
+    fn chunked_md1_vector() -> Vec<String> {
+        use md_codec::origin_path::{OriginPath, PathComponent, PathDecl, PathDeclPaths};
+        use md_codec::tag::Tag;
+        use md_codec::tlv::TlvSection;
+        use md_codec::tree::{Body, Node};
+        use md_codec::use_site_path::UseSitePath;
+        use md_codec::Descriptor;
+
+        let paths = (0..6u32)
+            .map(|c| OriginPath {
+                components: (0..15u32)
+                    .map(|i| PathComponent { hardened: true, value: c * 100 + i + 1 })
+                    .collect(),
+            })
+            .collect();
+        let d = Descriptor {
+            n: 6,
+            path_decl: PathDecl { n: 6, paths: PathDeclPaths::Divergent(paths) },
+            use_site_path: UseSitePath::standard_multipath(),
+            tree: Node {
+                tag: Tag::Wsh,
+                body: Body::Children(vec![Node {
+                    tag: Tag::SortedMulti,
+                    body: Body::MultiKeys { k: 2, indices: (0..6).collect() },
+                }]),
+            },
+            tlv: TlvSection::new_empty(),
+        };
+        md_codec::chunk::split(&d).expect("split multi-chunk descriptor into md1 chunks")
+    }
 }
