@@ -75,9 +75,19 @@ pub enum Parsed {
     /// Unchunked single md1 — its own bch-only plate, no set.
     Md1Single { s: String },
     /// One chunk of a (possibly size-1) chunked md1 set.
-    Md1Chunk { s: String, chunk_set_id: u32, total: u8, index: u8 },
+    Md1Chunk {
+        s: String,
+        chunk_set_id: u32,
+        total: u8,
+        index: u8,
+    },
     /// One chunk of an mk1 key card.
-    Mk1Chunk { s: String, chunk_set_id: u32, total: u8, index: u8 },
+    Mk1Chunk {
+        s: String,
+        chunk_set_id: u32,
+        total: u8,
+        index: u8,
+    },
 }
 
 /// Classify, refuse ms1, pristine-validate, and extract chunk metadata for one line.
@@ -94,16 +104,22 @@ pub fn parse_line(s: &str) -> Result<Parsed, BundleError> {
         Format::Mk => {
             let decoded = mk_codec::string_layer::decode_string(s)
                 .map_err(|e| BundleError::Validate(s.to_string(), ValidateError::Mk(e)))?;
-            let (hdr, _) =
-                mk_codec::string_layer::header::StringLayerHeader::from_5bit_symbols(decoded.data())
-                    .map_err(|e| BundleError::Validate(s.to_string(), ValidateError::Mk(e)))?;
+            let (hdr, _) = mk_codec::string_layer::header::StringLayerHeader::from_5bit_symbols(
+                decoded.data(),
+            )
+            .map_err(|e| BundleError::Validate(s.to_string(), ValidateError::Mk(e)))?;
             use mk_codec::string_layer::header::StringLayerHeader as H;
             // `StringLayerHeader` is #[non_exhaustive] (mk-codec) — an external
             // crate MUST include a wildcard arm or this fails to compile (E0004).
             // The `_` arm covers SingleString and any future non-chunked variant:
             // none has a chunk_set_id to group by, so all are unsupported here.
             match hdr {
-                H::Chunked { chunk_set_id, total_chunks, chunk_index, .. } => Ok(Parsed::Mk1Chunk {
+                H::Chunked {
+                    chunk_set_id,
+                    total_chunks,
+                    chunk_index,
+                    ..
+                } => Ok(Parsed::Mk1Chunk {
                     s: s.to_string(),
                     chunk_set_id,
                     total: total_chunks,
@@ -174,7 +190,10 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
             return Err(BundleError::RefusedSecret);
         }
     }
-    let parsed: Vec<Parsed> = raw.iter().map(|l| parse_line(l)).collect::<Result<_, _>>()?;
+    let parsed: Vec<Parsed> = raw
+        .iter()
+        .map(|l| parse_line(l))
+        .collect::<Result<_, _>>()?;
 
     // Partition: unchunked md1 (each its own bch-only plate), chunked md1 groups,
     // mk1 groups — keyed by chunk_set_id. BTreeMap keeps a deterministic order.
@@ -184,10 +203,20 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     for p in parsed {
         match p {
             Parsed::Md1Single { s } => md1_singles.push(s),
-            Parsed::Md1Chunk { s, chunk_set_id, index, .. } => {
+            Parsed::Md1Chunk {
+                s,
+                chunk_set_id,
+                index,
+                ..
+            } => {
                 md1_groups.entry(chunk_set_id).or_default().push((index, s));
             }
-            Parsed::Mk1Chunk { s, chunk_set_id, index, .. } => {
+            Parsed::Mk1Chunk {
+                s,
+                chunk_set_id,
+                index,
+                ..
+            } => {
                 mk1_groups.entry(chunk_set_id).or_default().push((index, s));
             }
         }
@@ -199,9 +228,12 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     // 1) Unchunked md1 policy plates (bch-only).
     for s in &md1_singles {
         plates.push(PlateEntry {
-            plate: 0, of: 0, kind: PlateKind::Md1,
+            plate: 0,
+            of: 0,
+            kind: PlateKind::Md1,
             string: Some(s.clone()),
-            chunk_set_id: None, chunk_index: None,
+            chunk_set_id: None,
+            chunk_index: None,
             integrity: Integrity::BchOnly,
         });
     }
@@ -213,12 +245,20 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         md_codec::chunk::reassemble(&refs)
             .map_err(|e| BundleError::SetIncompleteMd(fmt_chunk_set_id(id), e))?;
         let total = chunks.len() as u8;
-        sets.push(SetEntry { kind: Kind::Md1, chunk_set_id: fmt_chunk_set_id(id), total, integrity: Integrity::SetVerified });
+        sets.push(SetEntry {
+            kind: Kind::Md1,
+            chunk_set_id: fmt_chunk_set_id(id),
+            total,
+            integrity: Integrity::SetVerified,
+        });
         for (idx, s) in &chunks {
             plates.push(PlateEntry {
-                plate: 0, of: 0, kind: PlateKind::Md1,
+                plate: 0,
+                of: 0,
+                kind: PlateKind::Md1,
                 string: Some(s.clone()),
-                chunk_set_id: Some(fmt_chunk_set_id(id)), chunk_index: Some(*idx),
+                chunk_set_id: Some(fmt_chunk_set_id(id)),
+                chunk_index: Some(*idx),
                 integrity: Integrity::SetVerified,
             });
         }
@@ -231,12 +271,20 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         mk_codec::decode(&refs)
             .map_err(|e| BundleError::SetIncompleteMk(fmt_chunk_set_id(id), e))?;
         let total = chunks.len() as u8;
-        sets.push(SetEntry { kind: Kind::Mk1, chunk_set_id: fmt_chunk_set_id(id), total, integrity: Integrity::SetVerified });
+        sets.push(SetEntry {
+            kind: Kind::Mk1,
+            chunk_set_id: fmt_chunk_set_id(id),
+            total,
+            integrity: Integrity::SetVerified,
+        });
         for (idx, s) in &chunks {
             plates.push(PlateEntry {
-                plate: 0, of: 0, kind: PlateKind::Mk1Chunk,
+                plate: 0,
+                of: 0,
+                kind: PlateKind::Mk1Chunk,
                 string: Some(s.clone()),
-                chunk_set_id: Some(fmt_chunk_set_id(id)), chunk_index: Some(*idx),
+                chunk_set_id: Some(fmt_chunk_set_id(id)),
+                chunk_index: Some(*idx),
                 integrity: Integrity::SetVerified,
             });
         }
@@ -244,8 +292,12 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
 
     // 4) Trailing ms1 reminder.
     plates.push(PlateEntry {
-        plate: 0, of: 0, kind: PlateKind::Ms1,
-        string: None, chunk_set_id: None, chunk_index: None,
+        plate: 0,
+        of: 0,
+        kind: PlateKind::Ms1,
+        string: None,
+        chunk_set_id: None,
+        chunk_index: None,
         integrity: Integrity::Na,
     });
 
@@ -273,7 +325,8 @@ mod tests {
     const MD1_UNCHUNKED: &str = "md1yqpqqxqq8xtwhw4xwn4qh";
     // A real 2-chunk mk1 set, chunk_set_id 74565 = 0x12345 (mk-codec v0.1.json).
     const MK1_A: &str = "mk1qpzg69pqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3kx98j76m4mjlwphf";
-    const MK1_B: &str = "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x";
+    const MK1_B: &str =
+        "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x";
     const MS1: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
 
     #[test]
@@ -293,7 +346,11 @@ mod tests {
     fn parses_mk1_chunk_with_set_id() {
         let p = parse_line(MK1_A).unwrap();
         match p {
-            Parsed::Mk1Chunk { chunk_set_id, total, .. } => {
+            Parsed::Mk1Chunk {
+                chunk_set_id,
+                total,
+                ..
+            } => {
                 assert_eq!(chunk_set_id, 0x12345);
                 assert_eq!(total, 2);
             }
@@ -314,7 +371,9 @@ mod tests {
         assert!(matches!(parse_line(&bad), Err(BundleError::Validate(..))));
     }
 
-    fn lines(v: &[&str]) -> String { v.join("\n") }
+    fn lines(v: &[&str]) -> String {
+        v.join("\n")
+    }
 
     #[test]
     fn happy_path_md1_plus_2chunk_mk1() {
@@ -343,7 +402,10 @@ mod tests {
     #[test]
     fn dropped_mk1_chunk_fails() {
         let input = lines(&[MK1_A]); // total=2, only 1 supplied
-        assert!(matches!(run_bundle(&input), Err(BundleError::SetIncompleteMk(..))));
+        assert!(matches!(
+            run_bundle(&input),
+            Err(BundleError::SetIncompleteMk(..))
+        ));
     }
 
     #[test]
@@ -354,14 +416,20 @@ mod tests {
     #[test]
     fn ms1_anywhere_refuses_early() {
         let input = lines(&[MK1_A, MS1, MK1_B]);
-        assert!(matches!(run_bundle(&input), Err(BundleError::RefusedSecret)));
+        assert!(matches!(
+            run_bundle(&input),
+            Err(BundleError::RefusedSecret)
+        ));
     }
 
     #[test]
     fn duplicate_mk1_chunk_index_fails() {
         // MK1_A twice (same chunk_index 0) → reassembly dup detection.
         let input = lines(&[MK1_A, MK1_A]);
-        assert!(matches!(run_bundle(&input), Err(BundleError::SetIncompleteMk(..))));
+        assert!(matches!(
+            run_bundle(&input),
+            Err(BundleError::SetIncompleteMk(..))
+        ));
     }
 
     #[test]
@@ -371,7 +439,10 @@ mod tests {
         // but the cross-chunk hash disagrees. See plan note for vector construction.
         let mk1_b2 = foreign_index1_same_setid();
         let input = lines(&[MK1_A, &mk1_b2]);
-        assert!(matches!(run_bundle(&input), Err(BundleError::SetIncompleteMk(..))));
+        assert!(matches!(
+            run_bundle(&input),
+            Err(BundleError::SetIncompleteMk(..))
+        ));
     }
 
     #[test]
@@ -380,10 +451,21 @@ mod tests {
         assert!(chunks.len() >= 2, "need a multi-chunk md1 vector");
         let ok = lines(&chunks.iter().map(String::as_str).collect::<Vec<_>>());
         let m = run_bundle(&ok).unwrap();
-        assert!(m.sets.iter().any(|s| s.kind == Kind::Md1 && s.integrity == Integrity::SetVerified));
+        assert!(m
+            .sets
+            .iter()
+            .any(|s| s.kind == Kind::Md1 && s.integrity == Integrity::SetVerified));
         // Drop the last chunk → incomplete.
-        let partial = lines(&chunks[..chunks.len() - 1].iter().map(String::as_str).collect::<Vec<_>>());
-        assert!(matches!(run_bundle(&partial), Err(BundleError::SetIncompleteMd(..))));
+        let partial = lines(
+            &chunks[..chunks.len() - 1]
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+        );
+        assert!(matches!(
+            run_bundle(&partial),
+            Err(BundleError::SetIncompleteMd(..))
+        ));
     }
 
     // A 2-chunk mk1 set with chunk_set_id 0x12345 where index-1 chunk is from a
@@ -419,19 +501,28 @@ mod tests {
         let paths = (0..6u32)
             .map(|c| OriginPath {
                 components: (0..15u32)
-                    .map(|i| PathComponent { hardened: true, value: c * 100 + i + 1 })
+                    .map(|i| PathComponent {
+                        hardened: true,
+                        value: c * 100 + i + 1,
+                    })
                     .collect(),
             })
             .collect();
         let d = Descriptor {
             n: 6,
-            path_decl: PathDecl { n: 6, paths: PathDeclPaths::Divergent(paths) },
+            path_decl: PathDecl {
+                n: 6,
+                paths: PathDeclPaths::Divergent(paths),
+            },
             use_site_path: UseSitePath::standard_multipath(),
             tree: Node {
                 tag: Tag::Wsh,
                 body: Body::Children(vec![Node {
                     tag: Tag::SortedMulti,
-                    body: Body::MultiKeys { k: 2, indices: (0..6).collect() },
+                    body: Body::MultiKeys {
+                        k: 2,
+                        indices: (0..6).collect(),
+                    },
                 }]),
             },
             tlv: TlvSection::new_empty(),
