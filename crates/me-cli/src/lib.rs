@@ -2,6 +2,7 @@
 //! into NFC NDEF payloads for SeedHammer II. Refuses the secret ms1.
 
 pub mod classify;
+pub mod manifest;
 pub mod ndef;
 pub mod validate;
 
