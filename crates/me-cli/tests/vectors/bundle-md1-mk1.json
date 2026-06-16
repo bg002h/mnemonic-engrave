@@ -1,0 +1,47 @@
+{
+  "tool": "me",
+  "version": "x.y.z",
+  "wallet_plates": 4,
+  "ms1_required": true,
+  "sets": [
+    {
+      "kind": "mk1",
+      "chunk_set_id": "0x12345",
+      "total": 2,
+      "integrity": "set-verified"
+    }
+  ],
+  "plates": [
+    {
+      "plate": 1,
+      "of": 4,
+      "kind": "md1",
+      "string": "md1yqpqqxqq8xtwhw4xwn4qh",
+      "integrity": "bch-only"
+    },
+    {
+      "plate": 2,
+      "of": 4,
+      "kind": "mk1-chunk",
+      "string": "mk1qpzg69pqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3kx98j76m4mjlwphf",
+      "chunk_set_id": "0x12345",
+      "chunk_index": 0,
+      "integrity": "set-verified"
+    },
+    {
+      "plate": 3,
+      "of": 4,
+      "kind": "mk1-chunk",
+      "string": "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x",
+      "chunk_set_id": "0x12345",
+      "chunk_index": 1,
+      "integrity": "set-verified"
+    },
+    {
+      "plate": 4,
+      "of": 4,
+      "kind": "ms1",
+      "integrity": "n/a"
+    }
+  ]
+}

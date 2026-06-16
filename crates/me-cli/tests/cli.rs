@@ -131,3 +131,20 @@ fn existing_converter_still_works_without_subcommand() {
         .assert()
         .success();
 }
+
+#[test]
+fn bundle_manifest_golden() {
+    let assert = Command::cargo_bin("me")
+        .unwrap()
+        .arg("bundle")
+        .write_stdin(format!("{MD1_VALID}\n{MK1_A}\n{MK1_B}\n"))
+        .assert()
+        .success();
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let mut v: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    // Normalize the version so a routine bump doesn't break the golden (spec m-4).
+    v["version"] = serde_json::Value::String("x.y.z".into());
+    let golden = include_str!("vectors/bundle-md1-mk1.json");
+    let expected: serde_json::Value = serde_json::from_str(golden).unwrap();
+    assert_eq!(v, expected);
+}
