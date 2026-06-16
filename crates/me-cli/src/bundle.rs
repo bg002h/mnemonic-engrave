@@ -69,14 +69,136 @@ impl std::fmt::Display for BundleError {
 }
 impl std::error::Error for BundleError {}
 
+/// One classified, pristine-validated input string, with chunk metadata extracted.
+#[derive(Debug)]
+pub enum Parsed {
+    /// Unchunked single md1 — its own bch-only plate, no set.
+    Md1Single { s: String },
+    /// One chunk of a (possibly size-1) chunked md1 set.
+    Md1Chunk { s: String, chunk_set_id: u32, total: u8, index: u8 },
+    /// One chunk of an mk1 key card.
+    Mk1Chunk { s: String, chunk_set_id: u32, total: u8, index: u8 },
+}
+
+/// Classify, refuse ms1, pristine-validate, and extract chunk metadata for one line.
+pub fn parse_line(s: &str) -> Result<Parsed, BundleError> {
+    let s = s.trim();
+    let fmt = classify::classify(s).map_err(|e| BundleError::Classify(s.to_string(), e))?;
+    if fmt == Format::Ms {
+        return Err(BundleError::RefusedSecret);
+    }
+    // Per-string PRISTINE validation BEFORE any reassembly (reuses the converter).
+    validate::validate(fmt, s).map_err(|e| BundleError::Validate(s.to_string(), e))?;
+
+    match fmt {
+        Format::Mk => {
+            let decoded = mk_codec::string_layer::decode_string(s)
+                .map_err(|e| BundleError::Validate(s.to_string(), ValidateError::Mk(e)))?;
+            let (hdr, _) =
+                mk_codec::string_layer::header::StringLayerHeader::from_5bit_symbols(decoded.data())
+                    .map_err(|e| BundleError::Validate(s.to_string(), ValidateError::Mk(e)))?;
+            use mk_codec::string_layer::header::StringLayerHeader as H;
+            // `StringLayerHeader` is #[non_exhaustive] (mk-codec) — an external
+            // crate MUST include a wildcard arm or this fails to compile (E0004).
+            // The `_` arm covers SingleString and any future non-chunked variant:
+            // none has a chunk_set_id to group by, so all are unsupported here.
+            match hdr {
+                H::Chunked { chunk_set_id, total_chunks, chunk_index, .. } => Ok(Parsed::Mk1Chunk {
+                    s: s.to_string(),
+                    chunk_set_id,
+                    total: total_chunks,
+                    index: chunk_index,
+                }),
+                _ => Err(BundleError::Mk1SingleString(s.to_string())),
+            }
+        }
+        Format::Md => {
+            let (bytes, bit_count) = md_codec::codex32::unwrap_string(s)
+                .map_err(|e| BundleError::Validate(s.to_string(), ValidateError::Md(e)))?;
+            // DEVIATION (md-codec 0.36): `ChunkHeader::read` reads its 4-bit
+            // version from the *top* 4 bits of the first 5-bit symbol, whereas a
+            // single (non-chunked) `Header` packs version in the *low* 4 bits with
+            // divergent_paths in bit 4 — so on a pristine single md1 string
+            // `ChunkHeader::read` spuriously returns `WireVersionMismatch{got:2}`
+            // instead of `ChunkHeaderChunkedFlagMissing` (see SPEC §2.5 doc note in
+            // md-codec chunk.rs). The canonical chunked/single discriminator md-codec
+            // itself uses is bit 0 of the first 5-bit symbol (`symbols.first() & 0x01`,
+            // chunk.rs `decode_with_corrections`). So check that flag first; only call
+            // `ChunkHeader::read` when the chunked flag is set. Behavior is unchanged.
+            let mut probe = md_codec::bitstream::BitReader::with_bit_limit(&bytes, bit_count);
+            let chunked_flag = probe
+                .read_bits(5)
+                .map(|sym| sym & 0x01 != 0)
+                .unwrap_or(false);
+            if !chunked_flag {
+                return Ok(Parsed::Md1Single { s: s.to_string() });
+            }
+            let mut r = md_codec::bitstream::BitReader::with_bit_limit(&bytes, bit_count);
+            match md_codec::chunk::ChunkHeader::read(&mut r) {
+                Ok(h) => Ok(Parsed::Md1Chunk {
+                    s: s.to_string(),
+                    chunk_set_id: h.chunk_set_id,
+                    total: h.count,
+                    index: h.index,
+                }),
+                Err(md_codec::Error::ChunkHeaderChunkedFlagMissing) => {
+                    Ok(Parsed::Md1Single { s: s.to_string() })
+                }
+                Err(md_codec::Error::WireVersionMismatch { .. }) => {
+                    Err(BundleError::Md1WireVersion(s.to_string()))
+                }
+                Err(e) => Err(BundleError::Md1HeaderRead(s.to_string(), e)),
+            }
+        }
+        Format::Ms => unreachable!("ms1 refused above"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const MD1_UNCHUNKED: &str = "md1yqpqqxqq8xtwhw4xwn4qh";
+    // A real 2-chunk mk1 set, chunk_set_id 74565 = 0x12345 (mk-codec v0.1.json).
+    const MK1_A: &str = "mk1qpzg69pqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3kx98j76m4mjlwphf";
+    const MK1_B: &str = "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x";
+    const MS1: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
 
     #[test]
     fn exit_codes_match_spec() {
         assert_eq!(BundleError::Empty.exit_code(), 2);
         assert_eq!(BundleError::RefusedSecret.exit_code(), 3);
         assert_eq!(BundleError::Mk1SingleString("mk1x".into()).exit_code(), 4);
+    }
+
+    #[test]
+    fn parses_unchunked_md1_as_bch_only() {
+        let p = parse_line(MD1_UNCHUNKED).unwrap();
+        assert!(matches!(p, Parsed::Md1Single { .. }));
+    }
+
+    #[test]
+    fn parses_mk1_chunk_with_set_id() {
+        let p = parse_line(MK1_A).unwrap();
+        match p {
+            Parsed::Mk1Chunk { chunk_set_id, total, .. } => {
+                assert_eq!(chunk_set_id, 0x12345);
+                assert_eq!(total, 2);
+            }
+            _ => panic!("expected Mk1Chunk"),
+        }
+    }
+
+    #[test]
+    fn refuses_ms1_line() {
+        assert!(matches!(parse_line(MS1), Err(BundleError::RefusedSecret)));
+    }
+
+    #[test]
+    fn rejects_corrupted_mk1() {
+        let mut bad = MK1_B.to_string();
+        let last = bad.pop().unwrap();
+        bad.push(if last == 'q' { 'p' } else { 'q' });
+        assert!(matches!(parse_line(&bad), Err(BundleError::Validate(..))));
     }
 }
