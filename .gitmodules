@@ -1,0 +1,3 @@
+[submodule "seedhammer"]
+	path = third_party/seedhammer
+	url = https://github.com/seedhammer/seedhammer.git
