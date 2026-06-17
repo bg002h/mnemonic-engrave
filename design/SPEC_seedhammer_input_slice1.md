@@ -44,14 +44,14 @@ Ships as **one focused, signed + DCO commit/PR, rebased on `upstream/main`**.
 
 **Behavior:** the title shows `Word N of 24` (e.g. `Word 7 of 24`), replacing the static "Input Words".
 **Where:** `inputWordsFlow` title render (~`gui.go:612`). `selected` and `len(mnemonic)` are already in scope.
-**Implementation:** format `"Word %d of %d", selected+1, len(mnemonic)` into the existing title layout. Pure render change; no logic/state change.
+**Implementation:** use the existing `layoutTitlef(ctx, dims.X, th.Text, "Word %d of %d", selected+1, len(mnemonic))` (`gui.go:1520`) — do not `fmt.Sprintf` into `layoutTitle`. Pure render change; no logic/state change.
 **Edge cases:** none — `selected` is always a valid `0..len-1` index inside the flow.
 
 ### 4.2 Change 2 — Remaining-match count
 
 **Behavior:** while typing a word, show the count of still-matching BIP-39 words (e.g. `12 matches`) near the fragment box. Shown only once ≥1 character is typed (avoid a meaningless "2048 matches" on an empty fragment). When the word is complete (`nvalid==1`), the count reads `1 match`.
 **Where:** `inputWordsFlow` render path; data source is `nvalid` from `updateValidBIP39Keys` (`gui.go:869`), already computed each keystroke and in scope (`gui.go:552`).
-**Implementation:** render a small label (reuse an existing text style) adjacent to the predicted-word box. Guard: `if len(kbd.Fragment) > 0 { show "<nvalid> match[es]" }`. Pluralize ("1 match" vs "N matches").
+**Implementation:** render a small label (reuse an existing text style) adjacent to the predicted-word box; ensure it does not disturb the `longest`/`widestWord`-based centering of the word box (`gui.go:548,589-602`). Guard: `if len(kbd.Fragment) > 0 { show "<nvalid> match[es]" }`. Pluralize ("1 match" vs "N matches"). In the 12-word last-word state the count reflects the **candidate-scoped** `nvalid` (§4.4), not the full-wordlist count.
 **Edge cases:** empty fragment → no count. This is presentation only; it does not alter the existing key-dimming.
 
 ### 4.3 Change 3 — Button3 primary-action consistency
@@ -70,7 +70,7 @@ Ships as **one focused, signed + DCO commit/PR, rebased on `upstream/main`**.
 
 **Implementation notes:** verify no other code path relies on Button3-types-key. The change is uniform across the three flows. The PR description must explicitly call out that Button3 no longer commits a key on the keyboard (Center still does) — it removes a convenience binding.
 
-**Edge cases:** the D-pad Center commit path is unchanged and remains the keyboard's commit affordance for button-only navigation.
+**Edge cases:** the D-pad Center commit path is unchanged and remains the keyboard's commit affordance for button-only navigation. Note `inputSLIP39Flow` is currently dead code (called only from commented-out `gui.go:1894`), so its Button3 change is correct-by-inspection — no test exercises it.
 
 ### 4.4 Change 4 — Last-word checksum assistance (both seed lengths)
 
@@ -80,23 +80,31 @@ Ships as **one focused, signed + DCO commit/PR, rebased on `upstream/main`**.
 ```go
 // LastWordCandidates returns every word that, placed in the final slot,
 // yields a checksum-valid mnemonic given the already-filled earlier words.
-// prefix must be a Mnemonic whose first len(prefix)-1 words are all set
-// (>= 0); the final slot is ignored. Returns 1 candidate for a 24-word
-// mnemonic and 128 for a 12-word one. Returns nil if any earlier word is
-// unset (-1) or the length is unsupported.
+// It operates on a copy and does NOT mutate prefix. It returns nil if
+// len(prefix)%3 != 0 (matching Valid's own guard) or if ANY of the first
+// len(prefix)-1 words is unset (< 0) or out of range (>= NumWords).
+// Otherwise it returns 1 candidate for a 24-word mnemonic and 128 for a
+// 12-word one. The final slot of prefix is ignored.
 func LastWordCandidates(prefix Mnemonic) []Word
 ```
-**Implementation:** for each candidate `w` in `0..2047`, set the last slot to `w` and test `m.Valid()`; collect those that pass. O(2048) `Valid()` calls (one SHA-256 each) — trivially fast. Place next to `ChecksumWord`/`checksum` (`bip39/bip39.go:120-186`). Pure Go; unit-tested independently (no GUI). (An optimized bit-twiddling version is possible but unnecessary.)
+**Implementation (order is load-bearing):**
+1. **Guard first, before any `Valid()` call.** Return nil if `len(prefix)%3 != 0`; scan `prefix[:len(prefix)-1]` and return nil if any word is `< 0` or `>= NumWords`. This ordering is mandatory: `Valid()`→`splitMnemonic` (`bip39/bip39.go:149-154`) does `ent.Or(ent, big.NewInt(int64(w)))` per word, so a `-1` word produces garbage/negative entropy rather than a clean rejection — brute-forcing on `Valid()` alone would be nondeterministic on a `-1`-bearing prefix.
+2. **Clone:** `m := slices.Clone(prefix)` — never mutate the caller's live `mnemonic` (whose last slot is `-1` and must stay `-1` until accept).
+3. For `w` in `0..NumWords-1`, set `m[last]=w` and collect `w` where `m.Valid()`. O(NumWords) SHA-256 — trivially fast.
 
-**UI integration in `inputWordsFlow`** — only when `selected == len(mnemonic)-1` AND all earlier words are set (else fall back to today's behavior):
-- Compute `cands := bip39.LastWordCandidates(mnemonic)` once on entering the last word (and recompute if an earlier word changes via Edit).
-- **24-word (`len(cands)==1`):** present the single valid word as the completed prediction immediately — the user sees it in the word box and presses accept (Button3). No typing required. (Do not silently auto-commit; require the accept press so the user sees the word.)
-- **12-word (`len(cands)==128`):** restrict the keyboard's valid-key mask to letters that can extend toward one of the 128 candidate word labels — a candidate-set-scoped variant of `updateValidBIP39Keys` (same 32-bit mask mechanism, `gui.go:884,921-930`), so any word the user completes is checksum-valid. Match-count (Change 2) then reflects the candidate subset.
+Place next to `ChecksumWord`/`checksum` (`bip39/bip39.go:120-186`). Pure Go; unit-tested independently (no GUI). (An optimized bit-twiddling version is possible but unnecessary.)
+
+**UI integration in `inputWordsFlow`** (`gui.go:539`). The flow has **no "entered a word" hook** — `selected` advances inside the accept loop (`gui.go:570-578`), a single invocation from `newInputFlow` (`gui.go:1882`, `selected=0`) walks 0→last in one call, and the review-screen Edit re-enters via `inputWordsFlow(..., s.selected)` (`gui.go:1955`). So drive the last-word logic off the **current frame state**, not an entry event:
+
+- **Per-frame rule:** if `selected == len(mnemonic)-1`, use the candidate path; else the normal full-wordlist path.
+- **Memoize `cands`:** compute `cands := bip39.LastWordCandidates(mnemonic)` when the flow first observes `selected == len(mnemonic)-1`, and recompute only when `selected` changes or an earlier word was edited — cache it; do **not** run the `NumWords`-`Valid()` loop every frame. If `cands == nil` (an earlier slot is unset), fall back to the normal full keyboard.
+- **24-word (`len(cands)==1`):** on entering the last-word state, **pre-seed** `kbd.Fragment = bip39.LabelFor(cands[0])` and mark it complete, so the OK nav button (Button3) lights immediately with no typing — the user sees the word and presses accept. Backspace works via the existing `'⌫'` handling (`gui.go:1032-1034`); if the user backspaces/diverges from the candidate, **revert that slot to the normal full-wordlist** `updateValidBIP39Keys`/`completeBIP39Word` path (a wrong final word is then caught by the Confirm backstop). Do **not** silently auto-commit; require the accept press.
+- **12-word (`len(cands)==128`):** use a **candidate-scoped** completion+mask path — do **not** reuse the unmodified `completeBIP39Word`/`updateValidBIP39Keys`, because `completeBIP39Word`'s exact-full-label clause (`gui.go:866`) would otherwise accept a real BIP-39 word that is **not** one of the 128 candidates → checksum-invalid, defeating Change 4. Define a small helper that, given the candidate set (`[]Word`) and the current fragment: (a) builds the valid-key 32-bit mask by OR-clearing, for each candidate `w` whose `bip39.LabelFor(w)` has the fragment as a prefix, the bit for the next letter `LabelFor(w)[len(frag)]` (same mask mechanism as `updateValidKeys`, `gui.go:921-930`); (b) computes `nvalid` as the count of candidates still matching the fragment; (c) reports complete when `nvalid==1` **or** the fragment exactly equals a *candidate's* label (a candidate, not any full-wordlist label). Match-count (Change 2) shows this candidate-scoped `nvalid`.
 - **Words 1..N−1:** unchanged — normal full-wordlist `updateValidBIP39Keys` + `completeBIP39Word`.
 
 **Backstop (architect I3):** this does **not** remove the `SeedScreen.Confirm` `mnemonic.Valid()` check (`gui.go:1973`). A transcription error in words 1..N−1 still produces an invalid checksum caught there. Change 4 eliminates the last-word-typo error class only.
 
-**Edge cases:** if the user reaches the last word with an earlier slot unset (e.g. via the review screen's Edit on a partial mnemonic), `LastWordCandidates` returns nil → fall back to the normal full keyboard. The 24-word predicted-word must still be backspaceable/replaceable (the user can clear it and type a different word, which then won't validate — handled by the existing flow + the Confirm backstop).
+**Edge cases:** reaching the last word with an earlier slot unset (e.g. Edit on a partial mnemonic) → `LastWordCandidates` returns nil → normal full keyboard. **Invalidate the `cands` cache** whenever `selected` changes or an earlier word is edited (the memoization rule above). The 24-word pre-seeded word is backspaceable via the existing `'⌫'` handling, and diverging from it reverts the slot to the normal path (per the 24-word bullet).
 
 ## 5. Error handling
 
@@ -108,9 +116,9 @@ All Slice-1 behavior is exercisable by the existing host harness (`go test ./gui
 - **`bip39.LastWordCandidates`** (pure unit): a known 23-word prefix → `len==1` and the result completes a `Valid()` 24-word mnemonic; a known 11-word prefix → `len==128`, every candidate completes a `Valid()` 12-word mnemonic; an incomplete prefix → `nil`.
 - **Progress title:** drive partial entry, assert `ExtractText` contains `Word 7 of 24` (case-insensitive `uiContains` is fine).
 - **Match count:** type a prefix, assert the expected `N matches` text; assert nothing shown on empty fragment.
-- **Button3 accept:** drive accept via `click(Button3)`; assert the word is committed and `selected` advances. Assert the keyboard still commits the focused key via Center. (Update the existing `TestWordKeyboardScreen` which currently clicks Button2, `gui_test.go:281`.)
+- **Button3 accept:** drive accept via `click(Button3)`; assert the word is committed and `selected` advances. Assert the keyboard still commits the focused key via Center. **Update both Button2-accept test sites** (the only two in the tree): `TestWordKeyboardScreen` (`gui_test.go:281`) and `TestInputSeedCodex32` (`gui/codex32_input_test.go:31`, plus its comments at :29) — both must switch `click(Button2)` → `click(Button3)`, or they hang to timeout.
 - **24-word last word:** enter 23 valid words, reach the last word, assert the single candidate is shown and accept finishes a valid seed.
-- **12-word last word:** enter 11 valid words, assert the keyboard valid-key set is restricted (a letter that starts no checksum-valid word is disabled) and a completed last word yields `Valid()`.
+- **12-word last word:** derive the fixture from `LastWordCandidates` — take a known 11-word valid prefix, compute its 128 candidates, then assert a specific letter that begins **none** of the candidates (at the empty fragment) is disabled while a candidate-prefix letter is enabled, the candidate-scoped count is shown, and a completed last word yields `Valid()`. Also assert a full-wordlist word that is **not** a candidate does not light accept (closes the I2 hole).
 
 No coordinate-tap helper is needed in Slice 1 (tap-the-box deferred). Manual on-device QA is a nice-to-have but not required for merge.
 
