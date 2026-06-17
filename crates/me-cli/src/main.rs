@@ -45,6 +45,14 @@ enum Command {
         /// Write the manifest JSON to this file instead of stdout.
         #[arg(long, value_name = "FILE")]
         manifest: Option<PathBuf>,
+        /// Render each public plate to an image in this directory via the
+        /// `me-preview` sidecar. If the sidecar is missing, previews are
+        /// skipped (a note is printed) and the manifest is still emitted.
+        #[arg(long, value_name = "DIR")]
+        preview: Option<PathBuf>,
+        /// With --preview, render PNG instead of SVG.
+        #[arg(long, requires = "preview")]
+        png: bool,
     },
 }
 
@@ -60,8 +68,14 @@ fn main() {
 fn run() -> i32 {
     let cli = Cli::parse();
 
-    if let Some(Command::Bundle { r#in, manifest }) = &cli.command {
-        return run_bundle_cli(r#in.as_ref(), manifest.as_ref());
+    if let Some(Command::Bundle {
+        r#in,
+        manifest,
+        preview,
+        png,
+    }) = &cli.command
+    {
+        return run_bundle_cli(r#in.as_ref(), manifest.as_ref(), preview.as_ref(), *png);
     }
 
     // Read into a Zeroizing buffer so the input (incl. read_to_string's
@@ -144,7 +158,12 @@ fn run() -> i32 {
     EXIT_OK
 }
 
-fn run_bundle_cli(in_path: Option<&PathBuf>, manifest_path: Option<&PathBuf>) -> i32 {
+fn run_bundle_cli(
+    in_path: Option<&PathBuf>,
+    manifest_path: Option<&PathBuf>,
+    preview_dir: Option<&PathBuf>,
+    png: bool,
+) -> i32 {
     let mut input = Zeroizing::new(String::new());
     if let Some(path) = in_path {
         match std::fs::read_to_string(path) {
@@ -159,13 +178,21 @@ fn run_bundle_cli(in_path: Option<&PathBuf>, manifest_path: Option<&PathBuf>) ->
         return EXIT_USAGE;
     }
 
-    let manifest = match mnemonic_engrave::bundle::run_bundle(&input) {
+    let mut manifest = match mnemonic_engrave::bundle::run_bundle(&input) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("me: {e}");
             return e.exit_code();
         }
     };
+
+    // Phase B: optional plate previews via the `me-preview` sidecar. Without
+    // --preview this block is skipped entirely → byte-for-byte Phase A output.
+    if let Some(dir) = preview_dir {
+        if let Some(code) = wire_previews(&mut manifest, dir, png) {
+            return code; // a non-zero outcome (version mismatch / render fail).
+        }
+    }
 
     let json = match serde_json::to_string_pretty(&manifest) {
         Ok(j) => j,
@@ -185,6 +212,79 @@ fn run_bundle_cli(in_path: Option<&PathBuf>, manifest_path: Option<&PathBuf>) ->
     }
     eprint!("{}", manifest.checklist());
     EXIT_OK
+}
+
+/// Wire `--preview` into the manifest, rendering each public plate via the
+/// `me-preview` sidecar.
+///
+/// Returns:
+///   - `None` to continue (the common case): either previews were rendered, or
+///     the sidecar is absent and we degrade gracefully (note on stderr, exit 0).
+///   - `Some(code)` to stop now with that exit code: a version mismatch or a
+///     render/write failure (both `EXIT_USAGE` = 2 per the CLI contract).
+fn wire_previews(
+    manifest: &mut mnemonic_engrave::manifest::Manifest,
+    dir: &std::path::Path,
+    png: bool,
+) -> Option<i32> {
+    use mnemonic_engrave::manifest::PlateKind;
+    use mnemonic_engrave::preview;
+
+    // Discover the sidecar. Absent → graceful degrade (note, exit 0).
+    let sidecar = match preview::locate_sidecar() {
+        Some(p) => p,
+        None => {
+            eprintln!("me: preview skipped (install me-preview)");
+            return None;
+        }
+    };
+
+    // Version-gate: the sidecar must match this crate's version exactly.
+    let expected = env!("CARGO_PKG_VERSION");
+    match preview::sidecar_version(&sidecar) {
+        Ok(found) if found == expected => {}
+        Ok(found) => {
+            eprintln!(
+                "me: me-preview version mismatch: sidecar is {found:?}, expected {expected:?}; \
+                 refusing to render (install the matching me-preview)"
+            );
+            return Some(EXIT_USAGE);
+        }
+        Err(e) => {
+            eprintln!("me: cannot determine me-preview version: {e}");
+            return Some(EXIT_USAGE);
+        }
+    }
+
+    // The output directory must exist and be writable.
+    if !dir.is_dir() {
+        eprintln!(
+            "me: preview directory {} is not a writable directory",
+            dir.display()
+        );
+        return Some(EXIT_USAGE);
+    }
+
+    // Render each PUBLIC plate; ms1 is never rendered (no secret leaves `me`).
+    for plate in manifest.plates.iter_mut() {
+        if plate.kind == PlateKind::Ms1 {
+            continue;
+        }
+        let Some(string) = plate.string.as_deref() else {
+            continue;
+        };
+        match preview::render_plate(&sidecar, string, dir, plate.plate, png) {
+            Ok(path) => {
+                eprintln!("me: rendered plate {} → {path}", plate.plate);
+                plate.preview = Some(path);
+            }
+            Err(e) => {
+                eprintln!("me: {e}");
+                return Some(EXIT_USAGE);
+            }
+        }
+    }
+    None
 }
 
 /// Minimal standard base64 (no padding-free shortcuts); avoids a dep for one use.

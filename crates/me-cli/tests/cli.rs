@@ -6,6 +6,9 @@ const MK1_A: &str = "mk1qpzg69pqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at
 const MK1_B: &str =
     "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x";
 
+/// The crate version the sidecar must match (env at compile time).
+const CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[test]
 fn md1_hex_to_stdout() {
     let mut cmd = Command::cargo_bin("me").unwrap();
@@ -147,4 +150,242 @@ fn bundle_manifest_golden() {
     let golden = include_str!("vectors/bundle-md1-mk1.json");
     let expected: serde_json::Value = serde_json::from_str(golden).unwrap();
     assert_eq!(v, expected);
+}
+
+// ---------------------------------------------------------------------------
+// Task 9: `me bundle --preview <DIR>` wiring (hermetic — fake `me-preview`).
+//
+// These tests stand up a tiny shell-script `me-preview` in a temp dir and put
+// that dir FIRST on PATH. They never build the real Go sidecar (that's the
+// Task 10 cross-lang test). Unix-only because the fake is a /bin/sh script;
+// the `me` test binary lives in target/debug, which has no `me-preview`, so
+// PATH-only discovery is deterministic.
+// ---------------------------------------------------------------------------
+
+#[cfg(unix)]
+mod preview {
+    use super::*;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::{Path, PathBuf};
+
+    fn unique_dir(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!(
+            "me-bundle-preview-{tag}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// Write an executable fake `me-preview` into `dir`.
+    /// - `--version` echoes `me-preview <version_line>`.
+    /// - `render` writes a stub SVG to `--out` and echoes `mode text`.
+    fn write_fake(dir: &Path, version_line: &str) {
+        let path = dir.join("me-preview");
+        let script = format!(
+            "#!/bin/sh\n\
+             if [ \"$1\" = \"--version\" ]; then\n\
+             \techo 'me-preview {version_line}'\n\
+             \texit 0\n\
+             fi\n\
+             if [ \"$1\" = \"render\" ]; then\n\
+             \tout=\"\"\n\
+             \twhile [ \"$#\" -gt 0 ]; do\n\
+             \t\tif [ \"$1\" = \"--out\" ]; then out=\"$2\"; fi\n\
+             \t\tshift\n\
+             \tdone\n\
+             \tcat > /dev/null\n\
+             \tprintf '<svg/>' > \"$out\"\n\
+             \techo 'mode text'\n\
+             \texit 0\n\
+             fi\n\
+             exit 1\n"
+        );
+        fs::write(&path, script).unwrap();
+        let mut perms = fs::metadata(&path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&path, perms).unwrap();
+    }
+
+    fn input() -> String {
+        format!("{MD1_VALID}\n{MK1_A}\n{MK1_B}\n")
+    }
+
+    #[test]
+    fn matched_version_renders_and_sets_preview_exit_0() {
+        let bindir = unique_dir("match-bin");
+        write_fake(&bindir, CRATE_VERSION);
+        let outdir = unique_dir("match-out");
+
+        let assert = Command::cargo_bin("me")
+            .unwrap()
+            .env("PATH", &bindir) // only the fake is discoverable
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .write_stdin(input())
+            .assert()
+            .success();
+
+        let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON");
+        // 4 plates: md1, mk1-chunk, mk1-chunk, ms1. Public ones get a preview;
+        // ms1 must NOT.
+        let plates = v["plates"].as_array().unwrap();
+        assert_eq!(plates.len(), 4);
+        for p in plates {
+            if p["kind"] == "ms1" {
+                assert!(
+                    p.get("preview").is_none(),
+                    "ms1 must never be rendered: {p}"
+                );
+            } else {
+                let prev = p["preview"].as_str().expect("public plate has preview");
+                assert!(prev.ends_with(".svg"), "svg path expected: {prev}");
+                assert!(Path::new(prev).is_file(), "preview file written: {prev}");
+            }
+        }
+        // Exactly 3 svg files (md1 + 2 mk1; not ms1).
+        let svgs = fs::read_dir(&outdir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map(|x| x == "svg").unwrap_or(false))
+            .count();
+        assert_eq!(svgs, 3, "one svg per public plate, none for ms1");
+
+        fs::remove_dir_all(&bindir).ok();
+        fs::remove_dir_all(&outdir).ok();
+    }
+
+    #[test]
+    fn png_flag_renders_png() {
+        let bindir = unique_dir("png-bin");
+        write_fake(&bindir, CRATE_VERSION);
+        let outdir = unique_dir("png-out");
+
+        let assert = Command::cargo_bin("me")
+            .unwrap()
+            .env("PATH", &bindir)
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .arg("--png")
+            .write_stdin(input())
+            .assert()
+            .success();
+        let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        let first = v["plates"][0]["preview"].as_str().unwrap();
+        assert!(first.ends_with(".png"), "png path expected: {first}");
+
+        fs::remove_dir_all(&bindir).ok();
+        fs::remove_dir_all(&outdir).ok();
+    }
+
+    #[test]
+    fn mismatched_version_exit_2() {
+        let bindir = unique_dir("mismatch-bin");
+        write_fake(&bindir, "0.0.0-not-the-crate-version");
+        let outdir = unique_dir("mismatch-out");
+
+        Command::cargo_bin("me")
+            .unwrap()
+            .env("PATH", &bindir)
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .write_stdin(input())
+            .assert()
+            .code(2)
+            .stderr(predicates::str::contains("version"));
+
+        fs::remove_dir_all(&bindir).ok();
+        fs::remove_dir_all(&outdir).ok();
+    }
+
+    #[test]
+    fn absent_sidecar_degrades_exit_0_with_note_and_manifest() {
+        // An empty bin dir on PATH (no me-preview) -> locate_sidecar() == None.
+        let bindir = unique_dir("absent-bin");
+        let outdir = unique_dir("absent-out");
+
+        let assert = Command::cargo_bin("me")
+            .unwrap()
+            .env("PATH", &bindir)
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .write_stdin(input())
+            .assert()
+            .success(); // graceful degrade -> exit 0
+        let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+        assert!(
+            stderr.contains("preview skipped"),
+            "expected skip note: {stderr}"
+        );
+        // Manifest still emitted on stdout, with NO preview keys.
+        let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&stdout).expect("manifest still emitted");
+        for p in v["plates"].as_array().unwrap() {
+            assert!(
+                p.get("preview").is_none(),
+                "no previews when sidecar absent: {p}"
+            );
+        }
+
+        fs::remove_dir_all(&bindir).ok();
+        fs::remove_dir_all(&outdir).ok();
+    }
+
+    #[test]
+    fn no_preview_flag_is_byte_for_byte_phase_a() {
+        // With a fake present on PATH but WITHOUT --preview, output must match
+        // Phase A exactly (no preview keys, no sidecar invocation).
+        let bindir = unique_dir("noflag-bin");
+        write_fake(&bindir, CRATE_VERSION);
+
+        let assert = Command::cargo_bin("me")
+            .unwrap()
+            .env("PATH", &bindir)
+            .arg("bundle")
+            .write_stdin(input())
+            .assert()
+            .success();
+        let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+        let mut v: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        v["version"] = serde_json::Value::String("x.y.z".into());
+        let golden = include_str!("vectors/bundle-md1-mk1.json");
+        let expected: serde_json::Value = serde_json::from_str(golden).unwrap();
+        assert_eq!(v, expected, "no --preview must be byte-for-byte Phase A");
+
+        fs::remove_dir_all(&bindir).ok();
+    }
+
+    #[test]
+    fn unwritable_preview_dir_exit_2() {
+        // --preview pointing at a non-existent / unwritable dir: the matched
+        // sidecar's render fails -> exit 2.
+        let bindir = unique_dir("unwritable-bin");
+        write_fake(&bindir, CRATE_VERSION);
+        let missing = unique_dir("unwritable-parent").join("does-not-exist");
+        // `missing` parent exists but the dir itself does not -> render's --out
+        // path is in a missing dir; the fake's `> "$out"` fails -> non-zero.
+
+        Command::cargo_bin("me")
+            .unwrap()
+            .env("PATH", &bindir)
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&missing)
+            .write_stdin(input())
+            .assert()
+            .code(2);
+
+        fs::remove_dir_all(&bindir).ok();
+    }
 }

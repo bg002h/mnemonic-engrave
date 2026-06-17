@@ -142,14 +142,21 @@ pub fn render_plate(
     // Pipe the public string to the sidecar's stdin, then close it so the
     // sidecar's io.ReadAll returns. Drop the handle (close) before waiting to
     // avoid a deadlock if the sidecar's stdout/stderr buffers fill.
+    //
+    // A `BrokenPipe` here means the sidecar exited before consuming stdin (e.g.
+    // it bailed on a bad flag). That is NOT our failure to report — fall through
+    // to `wait_with_output` so the child's real exit status + stderr surface as
+    // a `Render` error instead of masking it with the write's EPIPE.
     {
         let mut stdin = child
             .stdin
             .take()
             .expect("stdin was requested via Stdio::piped()");
-        stdin
-            .write_all(string.as_bytes())
-            .map_err(PreviewError::Spawn)?;
+        match stdin.write_all(string.as_bytes()) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {}
+            Err(e) => return Err(PreviewError::Spawn(e)),
+        }
         // stdin dropped here -> EOF on the sidecar's stdin.
     }
 
@@ -173,6 +180,48 @@ mod tests {
     /// True if `p`'s file name is exactly the platform sidecar name.
     fn has_sidecar_name(p: &Path) -> bool {
         p.file_name() == Some(OsStr::new(sidecar_filename().as_str()))
+    }
+
+    /// Retry a closure while it fails with `ETXTBSY` ("Text file busy").
+    ///
+    /// Writing then immediately exec'ing a script can race with the kernel's
+    /// view of the file across parallel test threads — `execve` returns ETXTBSY
+    /// (os error 26). This is a *test-harness* artifact (production `me-preview`
+    /// is an already-installed binary, never one we just wrote), so a short
+    /// bounded retry keeps the hermetic fakes reliable under `cargo test`'s
+    /// parallel runner.
+    fn retry_txtbsy<T, E, F>(mut f: F) -> Result<T, E>
+    where
+        F: FnMut() -> Result<T, E>,
+        E: IsTxtBusy,
+    {
+        let mut last = f();
+        // Up to ~5s of retries: ETXTBSY is transient (it clears once every write
+        // fd to the executable is closed), so a bounded backoff always wins.
+        for _ in 0..500 {
+            match last {
+                Err(ref e) if e.is_txt_busy() => {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                    last = f();
+                }
+                other => return other,
+            }
+        }
+        last
+    }
+
+    trait IsTxtBusy {
+        fn is_txt_busy(&self) -> bool;
+    }
+    impl IsTxtBusy for io::Error {
+        fn is_txt_busy(&self) -> bool {
+            self.kind() == io::ErrorKind::ExecutableFileBusy
+        }
+    }
+    impl IsTxtBusy for PreviewError {
+        fn is_txt_busy(&self) -> bool {
+            matches!(self, PreviewError::Spawn(e) if e.kind() == io::ErrorKind::ExecutableFileBusy)
+        }
     }
 
     /// Build a tiny executable shell script that mimics the sidecar's
@@ -246,7 +295,7 @@ mod tests {
     fn sidecar_version_parses_prefix() {
         let dir = tmpdir("ver");
         let p = write_fake_sidecar(&dir, "me-preview 1.2.3");
-        let v = sidecar_version(&p).unwrap();
+        let v = retry_txtbsy(|| sidecar_version(&p)).unwrap();
         assert_eq!(v, "1.2.3");
         fs::remove_dir_all(&dir).ok();
     }
@@ -257,7 +306,7 @@ mod tests {
         // A plain `go build` (no -ldflags) prints `me-preview ` with empty ver.
         let dir = tmpdir("ver-empty");
         let p = write_fake_sidecar(&dir, "me-preview ");
-        let v = sidecar_version(&p).unwrap();
+        let v = retry_txtbsy(|| sidecar_version(&p)).unwrap();
         assert_eq!(v, "");
         fs::remove_dir_all(&dir).ok();
     }
@@ -269,7 +318,8 @@ mod tests {
         let p = write_fake_sidecar(&dir, "me-preview 0.3.0");
         let out_dir = dir.join("out");
         fs::create_dir_all(&out_dir).unwrap();
-        let got = render_plate(&p, "md1yqpqqxqq8xtwhw4xwn4qh", &out_dir, 2, false).unwrap();
+        let got = retry_txtbsy(|| render_plate(&p, "md1yqpqqxqq8xtwhw4xwn4qh", &out_dir, 2, false))
+            .unwrap();
         let want = out_dir.join("plate-2.svg");
         assert_eq!(got, want.to_string_lossy());
         assert!(want.is_file(), "render must write the --out file");
@@ -286,7 +336,7 @@ mod tests {
         let p = write_fake_sidecar(&dir, "me-preview 0.3.0");
         let out_dir = dir.join("out");
         fs::create_dir_all(&out_dir).unwrap();
-        let got = render_plate(&p, "md1x", &out_dir, 1, true).unwrap();
+        let got = retry_txtbsy(|| render_plate(&p, "md1x", &out_dir, 1, true)).unwrap();
         assert!(got.ends_with("plate-1.png"), "png ext expected: {got}");
         fs::remove_dir_all(&dir).ok();
     }
@@ -302,8 +352,11 @@ mod tests {
         let mut perms = fs::metadata(&path).unwrap().permissions();
         perms.set_mode(0o755);
         fs::set_permissions(&path, perms).unwrap();
-        let err = render_plate(&path, "md1x", &dir, 1, false).unwrap_err();
-        assert!(matches!(err, PreviewError::Render { .. }));
+        let err = retry_txtbsy(|| render_plate(&path, "md1x", &dir, 1, false)).unwrap_err();
+        assert!(
+            matches!(err, PreviewError::Render { .. }),
+            "expected Render, got {err:?}"
+        );
         fs::remove_dir_all(&dir).ok();
     }
 }
