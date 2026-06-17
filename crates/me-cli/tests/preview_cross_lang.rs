@@ -70,7 +70,11 @@ fn build_real_sidecar(dir: &Path) {
         .status()
         .expect("spawn `go build` for me-preview");
     assert!(status.success(), "go build me-preview failed");
-    assert!(out.is_file(), "me-preview not produced at {}", out.display());
+    assert!(
+        out.is_file(),
+        "me-preview not produced at {}",
+        out.display()
+    );
 }
 
 #[test]
@@ -142,7 +146,10 @@ fn real_sidecar_renders_public_plates_only() {
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().map(|x| x == "svg").unwrap_or(false))
         .count();
-    assert_eq!(svgs_on_disk, 3, "one SVG file per public plate, none for ms1");
+    assert_eq!(
+        svgs_on_disk, 3,
+        "one SVG file per public plate, none for ms1"
+    );
 
     std::fs::remove_dir_all(&bindir).ok();
     std::fs::remove_dir_all(&outdir).ok();
