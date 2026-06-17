@@ -25,7 +25,7 @@
 | `bip39/bip39.go` | BIP-39 representation/validation | **Add** `LastWordCandidates` (pure helper) |
 | `bip39/bip39_test.go` | bip39 unit tests | **Add** `TestLastWordCandidates` |
 | `gui/gui.go` | on-device flows + keyboard widget | **Modify** `Keyboard.Update` (free Button3); `inputWordsFlow`/`inputCodex32Flow`/`inputSLIP39Flow` (OK→Button3); `inputWordsFlow` (progress title, match count, last-word path); **add** `updateValidCandidateKeys`, `completeCandidateWord` |
-| `gui/gui_test.go` | gui tests | **Update** `TestWordKeyboardScreen` (Button2→Button3); **add** `TestWordFlowProgressTitle`, `TestWordFlowMatchCount`, `TestUpdateValidCandidateKeys`, `TestCompleteCandidateWord`, `TestWordFlowLastWord24` |
+| `gui/gui_test.go` | gui tests | **Update** `TestWordKeyboardScreen` (Button2→Button3); **add** `TestWordFlowProgressTitle`, `TestWordFlowMatchCount`, `TestUpdateValidCandidateKeys`, `TestCompleteCandidateWord`, `TestWordFlowLastWord24`, `TestWordFlowLastWord12` |
 | `gui/codex32_input_test.go` | codex32 entry test | **Update** `TestInputSeedCodex32` (Button2→Button3) |
 
 ---
