@@ -32,6 +32,36 @@ echo "ms1..."                   | me --stdout
 
 Input is read from **stdin** (or `--in <file>`) — never a positional argument, so a secret can't leak into `ps`/shell history. NDEF bytes go to stdout (`--stdout` / `--hex` / `--base64`) or `--out <file>`; all human-readable text goes to **stderr**.
 
+## Verifying releases
+
+Release archives (`mnemonic-engrave-<tag>-<os>-<arch>.tar.gz` / `.zip`) bundle
+`me` + the `me-preview` sidecar and are published with a `SHA256SUMS` file that
+is [minisign](https://jedisct1.github.io/minisign/)-signed (`SHA256SUMS.minisig`).
+The signing public key is pinned here (and shipped in every archive as
+`minisign.pub`):
+
+```
+untrusted comment: minisign public key CA39ECB257009A0F
+RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW
+```
+
+To verify a download:
+
+```sh
+# 1. Verify the checksum file's signature against the pinned public key:
+minisign -Vm SHA256SUMS -P RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW
+
+# 2. Verify the binaries against the now-trusted checksums:
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+(Step 1 is equivalent to `minisign -Vm SHA256SUMS -p minisign.pub` using the
+bundled key file.) Key rotation is an explicit, auditable change to this section.
+
+**Supported platforms (v0.3.0):** linux `amd64`/`arm64`, macOS `amd64`/`arm64`,
+windows `amd64`. **windows/arm64 is not supported in v0.3.0** (no
+GitHub-hosted runner; cross-MSVC is impractical).
+
 ## The constellation
 
 - [`md-codec`](https://github.com/bg002h/descriptor-mnemonic) — wallet descriptors / policies (`md1`).

@@ -1,0 +1,359 @@
+name: release
+
+# Tag-triggered signed release (spec §10). A `v*` tag builds every target,
+# assembles per-platform archives bundling `me` + `me-preview` + minisign.pub +
+# THIRD_PARTY_LICENSES + a verify note, writes SHA256SUMS, and minisign-signs it.
+# Pull requests run the SAME build matrix as a `build-only` dry-run (no signing,
+# no assemble) so cross-compile breakage is caught off-tag.
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+# Pinned toolchains (spec §10.5 — never `latest`/`stable`). `go 1.25.10` matches
+# the seedhammer submodule's go.mod; the Rust toolchain is a concrete dated
+# stable for reproducibility.
+env:
+  GO_VERSION: '1.25.10'
+  RUST_TOOLCHAIN: '1.85.0'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # me-preview (Go): ALL targets cross-compiled from ONE ubuntu runner.
+  # CGO_ENABLED=0 keeps it pure-Go (the only CGO in the seedhammer tree is the
+  # tinygo/rp2350 OTP driver, which is unreachable here).
+  # ---------------------------------------------------------------------------
+  go-build:
+    name: build me-preview (all targets)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Extract version from Cargo.toml
+        id: ver
+        run: |
+          VERSION="$(grep -m1 '^version' crates/me-cli/Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "me-preview version: $VERSION"
+
+      - name: Cross-compile me-preview for all targets
+        working-directory: preview
+        env:
+          CGO_ENABLED: '0'
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          build() {
+            local goos="$1" goarch="$2" ext="${3:-}"
+            echo "==> $goos/$goarch"
+            GOOS="$goos" GOARCH="$goarch" go build \
+              -trimpath \
+              -ldflags="-s -w -X main.version=${VERSION}" \
+              -o "dist/me-preview-${goos}-${goarch}${ext}" .
+          }
+          build linux  amd64
+          build linux  arm64
+          build darwin amd64
+          build darwin arm64
+          build windows amd64 .exe
+
+      - name: Verify baked-in version (lockstep)
+        working-directory: preview
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          GOT="$(./dist/me-preview-linux-amd64 --version)"
+          echo "got: $GOT"
+          test "$GOT" = "me-preview ${VERSION}"
+
+      - name: Upload me-preview artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: me-preview-binaries
+          path: preview/dist/me-preview-*
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # me (Rust): 3-runner matrix. ubuntu builds native x86_64 + cross aarch64;
+  # macos builds both apple targets via `rustup target add`; windows builds msvc.
+  # windows/arm64 is omitted (no GitHub-hosted runner) — documented in README.
+  # ---------------------------------------------------------------------------
+  rust-build:
+    name: build me (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            use_cross: false
+          - name: linux-aarch64
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            use_cross: true
+          - name: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            use_cross: false
+          - name: macos-x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            use_cross: false
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            use_cross: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross --locked --version 0.2.5
+
+      - name: Build (cross)
+        if: matrix.use_cross
+        env:
+          RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=.
+        run: cross build --release --target ${{ matrix.target }} -p mnemonic-engrave
+
+      - name: Build (cargo, unix)
+        if: ${{ !matrix.use_cross && runner.os != 'Windows' }}
+        env:
+          RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=.
+        run: cargo build --release --target ${{ matrix.target }} -p mnemonic-engrave
+
+      - name: Build (cargo, windows)
+        if: ${{ !matrix.use_cross && runner.os == 'Windows' }}
+        env:
+          RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=.
+        run: cargo build --release --target ${{ matrix.target }} -p mnemonic-engrave
+
+      - name: Stage binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp "target/${{ matrix.target }}/release/me.exe" "dist/me-${{ matrix.target }}.exe"
+          else
+            cp "target/${{ matrix.target }}/release/me" "dist/me-${{ matrix.target }}"
+          fi
+
+      - name: Upload me artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: me-${{ matrix.target }}
+          path: dist/me-*
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Assemble + sign (tag only). Downloads every binary, builds per-platform
+  # archives, writes SHA256SUMS, minisign-signs it, and attaches everything to
+  # the GitHub release.
+  # ---------------------------------------------------------------------------
+  assemble:
+    name: assemble + sign + release
+    needs: [go-build, rust-build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Resolve tag + version
+        id: meta
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="$(grep -m1 '^version' crates/me-cli/Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Install minisign
+        run: sudo apt-get update && sudo apt-get install -y minisign
+
+      - name: Generate THIRD_PARTY_LICENSES
+        working-directory: preview
+        run: |
+          set -euo pipefail
+          GONUM_DIR="$(go list -m -f '{{.Dir}}' gonum.org/v1/gonum)"
+          QR_DIR="$(go list -m -f '{{.Dir}}' github.com/seedhammer/kortschak-qr)"
+          OUT="${GITHUB_WORKSPACE}/THIRD_PARTY_LICENSES"
+          {
+            echo "THIRD-PARTY LICENSES"
+            echo "===================="
+            echo
+            echo "me and me-preview are MIT-licensed (see LICENSE). me-preview"
+            echo "statically links the following third-party Go modules, whose"
+            echo "license texts are reproduced below as required."
+            echo
+            echo "================================================================"
+            echo "github.com/seedhammer/kortschak-qr (BSD-3-Clause)"
+            echo "================================================================"
+            cat "${QR_DIR}/LICENSE"
+            echo
+            echo "================================================================"
+            echo "gonum.org/v1/gonum (BSD-3-Clause)"
+            echo "================================================================"
+            cat "${GONUM_DIR}/LICENSE"
+            echo
+            echo "---- gonum bundled third-party licenses ----"
+            echo
+            for f in "${GONUM_DIR}"/THIRD_PARTY_LICENSES/*; do
+              echo "-------- $(basename "$f") --------"
+              cat "$f"
+              echo
+            done
+            echo "================================================================"
+            echo "github.com/seedhammer/seedhammer (Unlicense / public domain)"
+            echo "================================================================"
+            cat "${GITHUB_WORKSPACE}/third_party/seedhammer/LICENSE"
+          } > "$OUT"
+          echo "wrote $OUT ($(wc -l < "$OUT") lines)"
+
+      - name: Assemble per-platform archives
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.meta.outputs.tag }}"
+          OUT="release"
+          mkdir -p "$OUT"
+
+          # Verify note bundled into every archive.
+          cat > VERIFY.txt <<'EOF'
+          Verifying this release
+          ======================
+
+          1. Verify the checksum file's minisign signature against the pinned
+             public key (also in the project README):
+
+               minisign -Vm SHA256SUMS -P RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW
+
+             (or, equivalently, `minisign -Vm SHA256SUMS -p minisign.pub`)
+
+          2. Verify the binaries against the (now-trusted) checksums:
+
+               sha256sum -c SHA256SUMS --ignore-missing
+
+          windows/arm64 is unsupported in this release.
+          EOF
+
+          # (rust_target, go_os, go_arch, archive_os, archive_arch, ext)
+          pack() {
+            local rust_target="$1" go_os="$2" go_arch="$3" a_os="$4" a_arch="$5" ext="$6"
+            local stage="stage-${a_os}-${a_arch}"
+            mkdir -p "$stage"
+            local me_src me_dst pv_src pv_dst
+            if [ "$ext" = ".exe" ]; then
+              me_src="artifacts/me-${rust_target}/me-${rust_target}.exe"
+              pv_src="artifacts/me-preview-binaries/me-preview-${go_os}-${go_arch}.exe"
+              cp "$me_src" "$stage/me.exe"
+              cp "$pv_src" "$stage/me-preview.exe"
+            else
+              me_src="artifacts/me-${rust_target}/me-${rust_target}"
+              pv_src="artifacts/me-preview-binaries/me-preview-${go_os}-${go_arch}"
+              cp "$me_src" "$stage/me"
+              cp "$pv_src" "$stage/me-preview"
+              chmod +x "$stage/me" "$stage/me-preview"
+            fi
+            cp minisign.pub THIRD_PARTY_LICENSES VERIFY.txt "$stage/"
+
+            local base="mnemonic-engrave-${TAG}-${a_os}-${a_arch}"
+            if [ "$ext" = ".exe" ]; then
+              (cd "$stage" && zip -q -r "../${OUT}/${base}.zip" .)
+            else
+              tar -C "$stage" -czf "${OUT}/${base}.tar.gz" .
+            fi
+            echo "packed ${base}"
+          }
+
+          pack x86_64-unknown-linux-gnu  linux   amd64 linux   amd64 ""
+          pack aarch64-unknown-linux-gnu linux   arm64 linux   arm64 ""
+          pack x86_64-apple-darwin       darwin  amd64 macos   amd64 ""
+          pack aarch64-apple-darwin      darwin  arm64 macos   arm64 ""
+          pack x86_64-pc-windows-msvc    windows amd64 windows amd64 .exe
+
+      - name: Write SHA256SUMS
+        working-directory: release
+        run: |
+          set -euo pipefail
+          sha256sum mnemonic-engrave-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Write minisign secret key to a temp file
+        id: minisign_key
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          KEYFILE="$(mktemp)"
+          printf '%s\n' "$MINISIGN_SECRET_KEY" > "$KEYFILE"
+          echo "keyfile=$KEYFILE" >> "$GITHUB_OUTPUT"
+
+      - name: Sign SHA256SUMS with minisign
+        working-directory: release
+        env:
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_SECRET_KEY_PASSWORD }}
+          KEYFILE: ${{ steps.minisign_key.outputs.keyfile }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$MINISIGN_PASSWORD" | \
+            minisign -S -s "$KEYFILE" -m SHA256SUMS \
+              -t "mnemonic-engrave ${TAG} SHA256SUMS"
+          minisign -Vm SHA256SUMS -P RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW
+
+      - name: Remove minisign secret key
+        if: always()
+        env:
+          KEYFILE: ${{ steps.minisign_key.outputs.keyfile }}
+        run: rm -f "$KEYFILE"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'release/mnemonic-engrave-*'
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/mnemonic-engrave-*
+            release/SHA256SUMS
+            release/SHA256SUMS.minisig
