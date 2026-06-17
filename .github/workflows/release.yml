@@ -216,8 +216,14 @@ jobs:
         working-directory: preview
         run: |
           set -euo pipefail
+          # The assemble job is a fresh runner with no warm module cache, so the
+          # deps must be downloaded before `go list -m -f '{{.Dir}}'` can report a
+          # non-empty .Dir (otherwise it returns "" and `cat "/LICENSE"` fails).
+          go mod download
           GONUM_DIR="$(go list -m -f '{{.Dir}}' gonum.org/v1/gonum)"
           QR_DIR="$(go list -m -f '{{.Dir}}' github.com/seedhammer/kortschak-qr)"
+          # Fail loudly (not via a confusing `cat: /LICENSE`) if a dir is empty.
+          [ -n "$GONUM_DIR" ] && [ -n "$QR_DIR" ] || { echo "::error::module dir empty (GONUM_DIR='$GONUM_DIR' QR_DIR='$QR_DIR') — go mod download did not populate the cache"; exit 1; }
           OUT="${GITHUB_WORKSPACE}/THIRD_PARTY_LICENSES"
           {
             echo "THIRD-PARTY LICENSES"
