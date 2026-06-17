@@ -5,6 +5,7 @@ pub mod bundle;
 pub mod classify;
 pub mod manifest;
 pub mod ndef;
+pub mod preview;
 pub mod validate;
 
 use classify::{ClassifyError, Format};
