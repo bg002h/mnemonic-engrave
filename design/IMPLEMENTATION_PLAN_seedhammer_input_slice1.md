@@ -41,10 +41,11 @@ The PR must be a clean Slice-1-only diff, so branch off `upstream/main` (NOT the
 Run:
 ```bash
 cd /scratch/code/shibboleth/seedhammer
+git remote get-url upstream || git remote add upstream https://github.com/seedhammer/seedhammer.git
 git fetch -q upstream
 git checkout -b feat/bip39-entry-polish upstream/main
 ```
-Expected: `Switched to a new branch 'feat/bip39-entry-polish'`.
+Expected: `Switched to a new branch 'feat/bip39-entry-polish'`. (The `||` guard adds the `upstream` remote if a fresh clone lacks it.)
 
 - [ ] **Step 2: Set commit identity (signed + DCO author)**
 
@@ -52,9 +53,10 @@ Run:
 ```bash
 git config user.name "Brian Goss"
 git config user.email "goss.brian@gmail.com"
-git config commit.gpgsign   # expect: true
+git config --get commit.gpgsign   # must print: true
+git config commit.gpgsign true    # idempotent: guarantees signing if it was unset
 ```
-Commit with `-s` (DCO sign-off) on every task.
+Commit with `-s` (DCO sign-off) on every task; the fork has `commit.gpgsign=true` so commits are SSH-signed.
 
 - [ ] **Step 3: Verify a clean baseline**
 
@@ -207,8 +209,11 @@ to:
 		click(&ctx.Router, Button3)
 ```
 
-In `gui/codex32_input_test.go`, `TestInputSeedCodex32` (~:29-31), change the comment + button:
+In `gui/codex32_input_test.go`, `TestInputSeedCodex32`, change **only the keypad-confirm line** (`click(&ctx.Router, Button2)` at ~:31) and its comment (~:29). **Leave the menu line at ~:28** (`click(&ctx.Router, Down, Down, Button3)` — that Button3 is the `ChoiceScreen` "choose" button) **unchanged.** After the edit, lines ~:28-31 read:
 ```go
+	// Menu: move the selection 0 -> 2 (CODEX32) with two Down presses, confirm
+	// with Button3 (the ChoiceScreen "choose" button).
+	click(&ctx.Router, Down, Down, Button3)
 	// Keypad: type the share, then confirm with Button3 (OK).
 	runes(&ctx.Router, share)
 	click(&ctx.Router, Button3)
@@ -411,7 +416,11 @@ Replace it with (capture the word-box offset, then add a count label below it):
 				noun = "match"
 			}
 			cl, csz := widget.Labelf(&ctx.B, ctx.Styles.word, th.Text, "%d %s", nvalid, noun)
-			countOp = cl.Offset(image.Pt((dims.X-csz.X)/2, wordOff.Y+longest.Y+8))
+			countY := wordOff.Y + longest.Y + 8
+			if lim := top.Max.Y - csz.Y; countY > lim { // clamp so the count never overlaps the keyboard
+				countY = lim
+			}
+			countOp = cl.Offset(image.Pt((dims.X-csz.X)/2, countY))
 		}
 ```
 Then add `countOp` to the frame's layer list. Find the `ctx.Frame(op.Layer(...))` at the end of the loop (~:619-625):
@@ -505,8 +514,11 @@ func TestCompleteCandidateWord(t *testing.T) {
 			break
 		}
 	}
-	if _, ok := completeCandidateWord(cands, bip39.LabelFor(nonCand), 1); ok {
-		t.Errorf("non-candidate word %q completed but must not", bip39.LabelFor(nonCand))
+	// The hole is: completing a NON-candidate to itself. Completing a fragment
+	// to a *different* candidate (when the non-candidate label is a proper
+	// prefix of one) is correct, so assert specifically on `w == nonCand`.
+	if w, ok := completeCandidateWord(cands, bip39.LabelFor(nonCand), 1); ok && w == nonCand {
+		t.Errorf("non-candidate word %q completed to itself but must not", bip39.LabelFor(nonCand))
 	}
 }
 
@@ -650,12 +662,52 @@ func TestWordFlowLastWord24(t *testing.T) {
 		}
 	}
 }
+
+func TestWordFlowLastWord12(t *testing.T) {
+	v := validMnemonic(12)
+
+	// Candidate count visible on entering the last word (empty fragment).
+	{
+		ctx := NewContext(newPlatform())
+		m := make(bip39.Mnemonic, 12)
+		copy(m, v)
+		m[11] = -1 // last slot unset; first 11 are valid
+		frame, quit := runUI(ctx, func() {
+			inputWordsFlow(ctx, &descriptorTheme, m, 11)
+		})
+		content, ok := frame()
+		quit()
+		if !ok {
+			t.Fatal("no frame at last word")
+		}
+		if !uiContains(content, "128 matches") {
+			t.Errorf("expected %q at last word; got %q", "128 matches", content)
+		}
+	}
+
+	// Typing the correct last word commits it (only candidate-extending keys
+	// are enabled, so the target — itself a candidate — is fully typable).
+	{
+		ctx := NewContext(newPlatform())
+		m := make(bip39.Mnemonic, 12)
+		copy(m, v)
+		m[11] = -1
+		want := v[11]
+		runes(&ctx.Router, bip39.LabelFor(want))
+		click(&ctx.Router, Button3)
+		inputWordsFlow(ctx, &descriptorTheme, m, 11)
+		if m[11] != want {
+			t.Errorf("last word committed %d (%q), want %d (%q)",
+				m[11], bip39.LabelFor(m[11]), want, bip39.LabelFor(want))
+		}
+	}
+}
 ```
 
 - [ ] **Step 7: Run to verify failure**
 
-Run: `go test ./gui/ -run TestWordFlowLastWord24 -v`
-Expected: FAIL — the count shows the full-wordlist match count (not `8 matches`) because the last-word path isn't wired yet. (The commit sub-test may already pass via the normal path; the count sub-test must fail.)
+Run: `go test ./gui/ -run TestWordFlowLastWord -v`  (matches both `…12` and `…24`)
+Expected: FAIL — the count shows the full-wordlist match count (not `8 matches`/`128 matches`) because the last-word path isn't wired yet. (The commit sub-tests may already pass via the normal path; the count sub-tests must fail.)
 
 - [ ] **Step 8: Wire the candidate path into `inputWordsFlow`**
 
@@ -744,8 +796,8 @@ to:
 
 - [ ] **Step 9: Run to verify pass**
 
-Run: `go test ./gui/ -run TestWordFlowLastWord24 -v`
-Expected: PASS — `8 matches` shown at the last word; the correct last word commits.
+Run: `go test ./gui/ -run TestWordFlowLastWord -v`  (both `…12` and `…24`)
+Expected: PASS — `8 matches` (24-word) / `128 matches` (12-word) shown at the last word; the correct last word commits in each.
 
 - [ ] **Step 10: Run the full suites + vet + gofmt**
 
@@ -796,7 +848,7 @@ git diff --stat upstream/main...HEAD       # expect: bip39/bip39.go(+_test), gui
 - §4.3 Button3 across all three flows + both test sites → Task 2 ✓
 - §4.4 `LastWordCandidates` (8/128, guard, clone) → Task 1; candidate-scoped completion/mask + memoized per-frame routing keyed on `selected==len-1` → Task 5 ✓
 - §5 backstop `mnemonic.Valid()` retained → unchanged in `SeedScreen.Confirm` (no task modifies it) ✓
-- §6 tests: `LastWordCandidates` unit (8/128/nil/non-mutation) → Task 1; both Button2→Button3 updates → Task 2; progress/match-count → Tasks 3/4; candidate completion incl. non-candidate-rejection (I2) + mask → Task 5a; 24-word `8 matches`+commit → Task 5b ✓
+- §6 tests: `LastWordCandidates` unit (8/128/nil/non-mutation) → Task 1; both Button2→Button3 updates → Task 2; progress/match-count → Tasks 3/4; candidate completion incl. non-candidate-rejection (I2) + mask → Task 5a; 24-word `8 matches`+commit AND 12-word `128 matches`+commit → Task 5b ✓
 - §7 no version bump → none made ✓
 
 **2. Placeholder scan:** none — every step has concrete code/commands.
