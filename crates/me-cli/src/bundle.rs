@@ -235,6 +235,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
             chunk_set_id: None,
             chunk_index: None,
             integrity: Integrity::BchOnly,
+            preview: None,
         });
     }
 
@@ -260,6 +261,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
                 chunk_set_id: Some(fmt_chunk_set_id(id)),
                 chunk_index: Some(*idx),
                 integrity: Integrity::SetVerified,
+                preview: None,
             });
         }
     }
@@ -286,6 +288,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
                 chunk_set_id: Some(fmt_chunk_set_id(id)),
                 chunk_index: Some(*idx),
                 integrity: Integrity::SetVerified,
+                preview: None,
             });
         }
     }
@@ -299,6 +302,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         chunk_set_id: None,
         chunk_index: None,
         integrity: Integrity::Na,
+        preview: None,
     });
 
     // Renumber plate/of now that the full ordered set is known.

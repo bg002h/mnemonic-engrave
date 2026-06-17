@@ -50,6 +50,10 @@ pub struct PlateEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chunk_index: Option<u8>,
     pub integrity: Integrity,
+    /// Path to the rendered preview image (Phase B), set by `me bundle --preview`.
+    /// `None` (the default / Phase A) omits the field entirely.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview: Option<String>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -120,6 +124,7 @@ mod tests {
             chunk_set_id: None,
             chunk_index: None,
             integrity: Integrity::BchOnly,
+            preview: None,
         };
         let j = serde_json::to_value(&p).unwrap();
         assert_eq!(j["kind"], "md1");
@@ -129,6 +134,32 @@ mod tests {
             "unchunked md1 must omit chunk_set_id"
         );
         assert!(j.get("chunk_index").is_none());
+    }
+
+    #[test]
+    fn preview_some_serializes_key_none_omits() {
+        let with = PlateEntry {
+            plate: 1,
+            of: 2,
+            kind: PlateKind::Md1,
+            string: Some("md1xyz".into()),
+            chunk_set_id: None,
+            chunk_index: None,
+            integrity: Integrity::BchOnly,
+            preview: Some("out/plate-1.svg".into()),
+        };
+        let j = serde_json::to_value(&with).unwrap();
+        assert_eq!(j["preview"], "out/plate-1.svg");
+
+        let without = PlateEntry {
+            preview: None,
+            ..with
+        };
+        let j = serde_json::to_value(&without).unwrap();
+        assert!(
+            j.get("preview").is_none(),
+            "None preview must omit the field (Phase A golden unaffected)"
+        );
     }
 
     #[test]
@@ -167,6 +198,7 @@ mod tests {
                     chunk_set_id: Some("0x12345".into()),
                     chunk_index: Some(0),
                     integrity: Integrity::SetVerified,
+                    preview: None,
                 },
                 PlateEntry {
                     plate: 2,
@@ -176,6 +208,7 @@ mod tests {
                     chunk_set_id: Some("0x12345".into()),
                     chunk_index: Some(1),
                     integrity: Integrity::SetVerified,
+                    preview: None,
                 },
                 PlateEntry {
                     plate: 3,
@@ -185,6 +218,7 @@ mod tests {
                     chunk_set_id: None,
                     chunk_index: None,
                     integrity: Integrity::Na,
+                    preview: None,
                 },
             ],
         };
