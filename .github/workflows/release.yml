@@ -57,6 +57,9 @@ jobs:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
+          # Warm the module cache once (kortschak-qr, gonum) so a dep-fetch
+          # problem fails fast here rather than mid-matrix (resolves review m-2).
+          go mod download
           mkdir -p dist
           build() {
             local goos="$1" goarch="$2" ext="${3:-}"

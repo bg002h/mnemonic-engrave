@@ -212,8 +212,48 @@ mod preview {
         fs::set_permissions(&path, perms).unwrap();
     }
 
+    /// Like `write_fake` but `render` fails non-zero (e.g. a string that fits no
+    /// plate). `--version` still matches, so we exercise the RENDER-failure path.
+    fn write_fake_render_fail(dir: &Path, version_line: &str) {
+        let path = dir.join("me-preview");
+        let script = format!(
+            "#!/bin/sh\n\
+             if [ \"$1\" = \"--version\" ]; then\n\
+             \techo 'me-preview {version_line}'\n\
+             \texit 0\n\
+             fi\n\
+             if [ \"$1\" = \"render\" ]; then\n\
+             \techo 'string fits no plate' >&2\n\
+             \texit 1\n\
+             fi\n\
+             exit 1\n"
+        );
+        fs::write(&path, script).unwrap();
+        let mut perms = fs::metadata(&path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&path, perms).unwrap();
+    }
+
     fn input() -> String {
         format!("{MD1_VALID}\n{MK1_A}\n{MK1_B}\n")
+    }
+
+    // Spec §6: a sidecar RENDER failure (string fits no plate) → exit 4 (invalid
+    // input), NOT 2. Version matches; only the render step fails.
+    #[test]
+    fn render_failure_exit_4() {
+        let bindir = unique_dir("renderfail-bin");
+        write_fake_render_fail(&bindir, CRATE_VERSION);
+        let outdir = unique_dir("renderfail-out");
+        Command::cargo_bin("me")
+            .unwrap()
+            .env("PATH", &bindir)
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .write_stdin(input())
+            .assert()
+            .code(4);
     }
 
     #[test]

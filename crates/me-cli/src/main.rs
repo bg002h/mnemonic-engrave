@@ -220,8 +220,10 @@ fn run_bundle_cli(
 /// Returns:
 ///   - `None` to continue (the common case): either previews were rendered, or
 ///     the sidecar is absent and we degrade gracefully (note on stderr, exit 0).
-///   - `Some(code)` to stop now with that exit code: a version mismatch or a
-///     render/write failure (both `EXIT_USAGE` = 2 per the CLI contract).
+///   - `Some(code)` to stop now: version mismatch / unreadable version / non-dir
+///     target → `EXIT_USAGE` (2); a sidecar RENDER failure (bad input, e.g. a
+///     string that fits no plate) → `EXIT_INVALID` (4) per spec §6; a Spawn/IO
+///     failure (couldn't run the sidecar) → `EXIT_USAGE` (2).
 fn wire_previews(
     manifest: &mut mnemonic_engrave::manifest::Manifest,
     dir: &std::path::Path,
@@ -280,7 +282,13 @@ fn wire_previews(
             }
             Err(e) => {
                 eprintln!("me: {e}");
-                return Some(EXIT_USAGE);
+                // Spec §6: a sidecar RENDER failure (e.g. a string that fits no
+                // plate) is an invalid-input outcome → exit 4. A Spawn/IO failure
+                // (couldn't run the sidecar) is an environment/usage error → exit 2.
+                return Some(match e {
+                    preview::PreviewError::Render { .. } => EXIT_INVALID,
+                    _ => EXIT_USAGE,
+                });
             }
         }
     }
