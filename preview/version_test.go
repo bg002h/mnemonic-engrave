@@ -98,10 +98,14 @@ func TestRenderModeForced(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("render --mode text exit = %d, want 0 (stderr: %s)", code, errBuf.String())
 	}
-	// The forced mode is echoed to stdout (after the SVG since out=-,
-	// mode line goes to stdout too); check the stderr-free, non-zero stdout.
-	if !strings.Contains(out.String(), "mode text") {
-		t.Fatalf("expected 'mode text' in stdout, got:\n%s", out.String())
+	// With --out -, the SVG payload streams to stdout and the mode line goes
+	// to stderr (so stdout stays a clean, pipeable SVG). The forced mode is
+	// reported as "mode text".
+	if !strings.Contains(out.String(), "<svg") {
+		t.Fatalf("expected SVG on stdout, got:\n%s", out.String())
+	}
+	if !strings.Contains(errBuf.String(), "mode text") {
+		t.Fatalf("expected 'mode text' on stderr, got:\n%s", errBuf.String())
 	}
 }
 

@@ -108,7 +108,15 @@ func runRender(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	fmt.Fprintln(stdout, "mode", chosenMode)
+	// Report the chosen mode. When the payload goes to a real file, the mode
+	// line goes to stdout (the contract the `me` Rust caller parses). When
+	// `--out -` streams the payload itself to stdout, emit the mode line to
+	// stderr instead so the stdout stream stays a clean, pipeable SVG/PNG.
+	modeSink := stdout
+	if *out == "-" {
+		modeSink = stderr
+	}
+	fmt.Fprintln(modeSink, "mode", chosenMode)
 	return 0
 }
 
