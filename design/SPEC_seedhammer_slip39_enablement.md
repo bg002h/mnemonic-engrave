@@ -64,13 +64,69 @@ type Share struct {
 // non-nil error (a classifiable sentinel) on any failure.
 func ParseShare(mnemonic string) (Share, error)
 ```
-Decode: words → 10-bit indices (via the existing wordlist) → bitstream; fields at the SLIP-0039 offsets (id 15b, ext 1b, iterationExp 4b, groupIndex 4b, groupThreshold 4b, groupCount 4b, memberIndex 4b, memberThreshold 4b, then the padded share value, then the 30-bit/3-word checksum). Thresholds/counts are stored as value−1 (decode `+1`). Reject ≠20 words (256-bit/33-word → a clear "256-bit not supported" sentinel; plate-fit unvalidated). Error sentinels (private) + a `Describe`-style classifier for the GUI: bad checksum, not in wordlist, wrong length, unsupported size. **Pure, host-testable against the official vectors.**
+Decode (order matters — R0 M4): (1) split the mnemonic; reject ≠20 words (256-bit/33-word → a clear "256-bit not supported" sentinel; plate-fit unvalidated); (2) map each word → its 10-bit index via an **exact** wordlist lookup (the in-package `index` map — NOT `ClosestWord`'s fuzzy match; an unknown word → not-in-wordlist sentinel); (3) pack indices → bitstream; (4) **extract the `ext` bit (bit 15) FIRST**, then verify RS1024 with `cs = "shamir"`(ext=0)/`"shamir_extendable"`(ext=1) → bad-checksum sentinel on mismatch; (5) decode the header fields at the SLIP-0039 offsets (id 15b, ext 1b, iterationExp 4b, groupIndex 4b, groupThreshold 4b, groupCount 4b, memberIndex 4b, memberThreshold 4b; then the 130-bit padded share value = 2 zero pad-bits + 128-bit value; then the 30-bit/3-word checksum — totals 200 bits = 20×10). Thresholds/counts are stored as value−1 (decode `+1`). Error sentinels (private) + a `Describe`-style classifier for the GUI: bad checksum, not in wordlist, wrong length, unsupported size. **Pure, host-testable against the official vectors.** `Share.Mnemonic` = the 20 input words (for verbatim engrave).
 
-### 4.2 C2 — gui re-enablement
+### 4.2 C2 — gui re-enablement (the dormant code is STALE — do NOT uncomment verbatim; use the concrete substitutions below)
 
-- **Menu:** change `gui.go:1983` to `Choices: []string{"12 WORDS", "24 WORDS", "CODEX32", "SLIP-39"}`.
-- **Entry (`case 3:`):** re-enable, fixing the package reference to the `slip39words` alias: `m := emptySLIP39Mnemonic(20); ok := inputSLIP39Flow(ctx, th, m, 0); if !ok { continue }; share, err := slip39words.ParseShare(<words→string>); if err != nil { <ErrorScreen with the classifier label>; continue }; return share, true`. (`inputSLIP39Flow` returns the entered `slip39words.Mnemonic`; convert to the space-joined word string `ParseShare` expects, or have `ParseShare` accept the `Mnemonic` — settle in the plan.)
-- **Engrave (`case slip39.Share:`):** re-enable as `case slip39words.Share:` → confirm (C3) → `backup.EngraveSeed` with the share's 20 words (verbatim), title from the parsed metadata (e.g. `"SLIP-39 <id> #<member+1>/<memberThreshold>"`), mirroring the dormant branch's title intent. The `maximumLength = 20` guard stays (128-bit only).
+The dormant blocks were written against an old API and will NOT compile as-is (R0 C1/C2/I1/I2/I3): they call `scan.Words() (w, err)` (the new `Share` has `Mnemonic []string`, no `Words()`), a stale 3-arg `.Engrave(ctx, ops, &engraveTheme)` (real signature is 2-arg `Engrave(ctx, th)`), a 20-char title that overflows `backup.MaxTitleLen=18`, and `fmt.Sprintf` while `gui.go` does not import `"fmt"`. Apply these exact substitutions:
+
+- **Import:** add `"fmt"` to `gui/gui.go`'s import block (used by the title; alternatively build the title with `strconv` — the plan picks one).
+- **Menu (`gui.go:1983`):** `Choices: []string{"12 WORDS", "24 WORDS", "CODEX32", "SLIP-39"}`. (The `ChoiceScreen` lead text "Choose number of words" becomes slightly loose with a 4th non-word-count option — acceptable; M3.)
+- **Entry (`case 3:`, `gui.go:2002-2019`):** re-enable; the dormant block already builds the space-joined word string and calls `ParseShare` — the only fixes are the alias (`slip39.ParseShare` → `slip39words.ParseShare`) and surfacing errors:
+  ```go
+  case 3:
+      m := emptySLIP39Mnemonic(20)
+      if !inputSLIP39Flow(ctx, th, m, 0) {
+          continue
+      }
+      words := make([]string, len(m))
+      for i, w := range m {
+          words[i] = slip39words.LabelFor(w)
+      }
+      share, err := slip39words.ParseShare(strings.Join(words, " "))
+      if err != nil {
+          showError(ctx, th, slip39words.Describe(err)) // dismissible ErrorScreen, then re-loop
+          continue
+      }
+      return share, true
+  ```
+  (`inputSLIP39Flow(ctx, th, m, 0) bool` fills `m slip39words.Mnemonic`; the words are joined into the space-separated string `ParseShare` consumes — this is exactly the dormant conversion, so **R0 I3 is resolved by keeping `ParseShare(string)` per §4.1** (string is also what the official vectors are, so it test-gates trivially). Confirm `gui.go` imports `"strings"` — if not, add it with `"fmt"`.)
+- **Engrave:** route through a helper that ALWAYS returns `true` (recognized), mirroring Cycle-A1's `engraveCodex32` so a cancel/fit-failure never falls to the caller's `scanUnknownFormat` ("Unknown format") path:
+  ```go
+  case slip39words.Share:
+      return engraveSLIP39(ctx, th, scan)
+  ```
+  ```go
+  func engraveSLIP39(ctx *Context, th *Colors, scan slip39words.Share) bool {
+      if !confirmSLIP39Flow(ctx, th, scan) { // C3; Back → recognized, declined
+          return true
+      }
+      seedDesc := backup.Seed{
+          Mnemonic:     scan.Mnemonic, // verbatim; ParseShare guaranteed 20 words
+          ShortestWord: slip39words.ShortestWord,
+          LongestWord:  slip39words.LongestWord,
+          Title:        fmt.Sprintf("%d #%d/%d", scan.Identifier, scan.MemberIndex+1, scan.MemberThreshold), // <=18 chars (max "32767 #16/16" = 12); R0 I1
+          Font:         constant.Font,
+      }
+      params := ctx.Platform.EngraverParams()
+      seedSide, err := backup.EngraveSeed(params, seedDesc)
+      if err != nil {
+          showError(ctx, th, "too large") // recognized but unfittable; still return true below
+          return true
+      }
+      plate, err := toPlate(seedSide, params)
+      if err != nil {
+          showError(ctx, th, "too large")
+          return true
+      }
+      for {
+          if NewEngraveScreen(ctx, plate).Engrave(ctx, &engraveTheme) { // 2-arg; R0 C2
+              return true
+          }
+      }
+  }
+  ```
+  The dormant `const maximumLength = 20` + `len(w) > maximumLength` guard is DROPPED — `ParseShare` already restricts to 20-word/128-bit (a 33-word share is rejected at entry with the unsupported-size sentinel). `showError` is a small dismissible-`ErrorScreen` helper (reuse Cycle-B's `showCodex32Error` pattern, or a shared `showError(ctx, th, msg)`).
 
 ### 4.3 C3 — pre-engrave confirm
 
@@ -82,7 +138,7 @@ A light confirm screen modeled on `confirmCodex32Flow` (Back=Button1 / Engrave=B
 
 ## 6. Testing (host: `go test ./slip39/... ./gui/...`)
 
-- **C1 (pure, highest value):** `slip39` table tests against the **official SLIP-0039 vectors** (`trezor/python-shamir-mnemonic/vectors.json`): every 20-word mnemonic in a *valid* vector set `ParseShare`-OK with the expected decoded metadata (id, thresholds, member index — cross-checked against the vector's known structure, e.g. a 1-of-1 set has group/member thresholds 1); a checksum-corrupted mnemonic (flip one word) → bad-checksum sentinel; a 33-word share → unsupported-size sentinel; a non-wordlist word → not-in-wordlist sentinel; RS1024 verified for both `ext==0`/`ext==1` customization strings. Embed a small fixed set of official 20-word vectors in the test.
+- **C1 (pure, highest value):** `slip39` table tests against the **official SLIP-0039 vectors** (`trezor/python-shamir-mnemonic/vectors.json`): every 20-word mnemonic in a *valid* vector set `ParseShare`-OK with the expected decoded metadata; a checksum-corrupted mnemonic (flip one word) → bad-checksum sentinel; a 33-word share → unsupported-size sentinel; a non-wordlist word → not-in-wordlist sentinel; RS1024 verified for both `ext==0`/`ext==1` customization strings. **Concrete anchor vector (R0 M2):** the existing `backup_test.go` SLIP-39 fixture share (id **7945**, a 1-of-1 single-group share) → assert `Identifier==7945, GroupThreshold==1, GroupCount==1, MemberIndex==0, MemberThreshold==1`. Embed a couple more official 20-word vectors (e.g. `vectors.json` entry 1) with their decoded fields computed from the bits; since `vectors.json` exposes only the master secret, the plan must precompute the expected header fields per embedded vector (from the mnemonic bits or a reference impl) and hard-code them in the assertions.
 - **C2/C3 (gui, `runUI`+`ExtractText`+`uiContains`):** drive the menu to SLIP-39 (index 3), enter a valid 20-word share, assert the confirm shows the id/member info and the share engraves; assert an invalid share (bad checksum) surfaces the error label. Keep all codex32 (A1/B) + BIP-39 guard tests green.
 
 ## 7. Versioning / commits
@@ -96,6 +152,9 @@ Firmware version `-ldflags`-injected (no source bump; next tag would be a MINOR 
 - **128-bit / 20-word only** (matches the dormant `emptySLIP39Mnemonic(20)`; 256-bit/33-word plate-fit is unvalidatable without hardware → deferred).
 - **Keypad entry only**; NFC SLIP-39 stays disabled (sensitive material hand-typed, consistent with codex32/ms1 posture).
 - **Confirm screen added** (C3) — addresses the maintainer's "not polished" objection, mirrors codex32 A1.
+- **`inputSLIP39Flow`'s static "Input Words" title is kept** as-is for Tier 1 (R0 M1) — functional; a dynamic "Word N of 20" progress title (à la BIP-39's `inputWordsFlow`) is a deferred nice-to-have, not in this cycle.
+
+**R0 OUTCOME (2026-06-18):** R0 = RED (2 Critical / 3 Important) — the dormant code was stale (`scan.Words()`, 3-arg `.Engrave`, 20-char title > `MaxTitleLen=18`, missing `fmt` import, §4.1/§4.2 `ParseShare`-input contradiction). All folded above with concrete substitutions (§4.2) + the engrave routed through an always-`true` `engraveSLIP39` helper (avoids the A1 "Unknown format"-on-cancel pitfall) + RS1024 decode-ordering pinned (§4.1) + a concrete anchor vector (§6). Re-dispatched R1.
 
 ## 9. Process note
 
