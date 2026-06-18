@@ -59,9 +59,9 @@ recover shape (`gui/codex32_polish.go`) as the structural template.
 
 | File | Change |
 |---|---|
-| `gui/slip39_polish.go` | `slip39ConfirmAction` enum + Recover button (Button2 drain); `recoverSLIP39Flow` (two-level roster + passphrase); `slip39LengthPick`; the §3 hold-to-confirm + §5.4 fingerprint; engrave dispatch → `backupWalletFlow`. Add `bip39` + `slip39words.Combine`/`ConsistentShares` use. |
-| `gui/slip39_polish_test.go` | recover-flow + roster + passphrase + widened-length + Button2-drain-no-hang tests. |
-| `gui/gui.go` | `inputSLIP39Flow` gains a `title string` param; menu `case 3:` adds the word-count picker + passes the title; no new imports (`bip39`/`fmt`/`slip39words` already imported). |
+| `gui/slip39_polish.go` | `slip39ConfirmAction` enum + Recover button (Button2 drain); `recoverSLIP39Flow` (two-level roster + `selectForCombine` + passphrase); `slip39LengthPick`; the §3 hold-to-confirm + §5.4 fingerprint; engrave dispatch → `backupWalletFlow`. **New imports: `bip39` AND `github.com/btcsuite/btcd/chaincfg/v2`** (the §5.4 fingerprint calls `masterFingerprintFor(m, &chaincfg.MainNetParams, "")`); + `slip39words.Combine`/`ConsistentShares` use. |
+| `gui/slip39_polish_test.go` | recover-flow + roster + `selectForCombine` unit + multi-group + passphrase + widened-length + Button2-drain-no-hang tests. |
+| `gui/gui.go` | `inputSLIP39Flow` gains a `title string` param (param-izes the hard-coded `"Input Words"` title literal at `gui.go:868`); menu `case 3:` calls `slip39LengthPick` then passes the title; **no new imports** (`bip39`/`fmt`/`strings`/`chaincfg`/`slip39words` already imported there). |
 
 **Unchanged (reused, must stay green):** `slip39/` (D1 crypto), `codex32/`, `backup/`,
 `bip39/`, `gui/passphrase_keyboard.go`, `gui.go`'s `backupWalletFlow`/`masterFingerprintFor`
@@ -89,7 +89,7 @@ func TestConfirmSLIP39MultiOffersRecover(t *testing.T) {
 	// A share from a 2-of-3 set (memberThreshold>1) must offer Recover (Button2).
 	s := parseFixtureShare(t, /* a 2-of-3 share, mt>1 */)
 	ctx := NewContext(newPlatform())
-	click(&ctx.Router, Down, Button2) // Button2 = Recover
+	click(&ctx.Router, Button2) // Button2 = Recover (no list to navigate; M2: no spurious Down)
 	got := confirmSLIP39Flow(ctx, &descriptorTheme, s)
 	if got != slip39Recover {
 		t.Errorf("multi-share confirm: got %v want slip39Recover", got)
@@ -141,7 +141,10 @@ const (
 
 ## Task 2: Widen share entry (all lengths) — word-count picker + `inputSLIP39Flow` title param
 
-**Files:** `gui/gui.go`. Resolves R0 I1 + the Cycle-C all-lengths followup.
+**Files:** `gui/gui.go` (the `inputSLIP39Flow` title param + the menu `case 3:` picker call)
+and `gui/slip39_polish.go` (define `slip39LengthPick` there — same package, keeps the
+`fmt`/`ChoiceScreen` helper beside the other SLIP-39 flow funcs; M4). Resolves R0 I1 of the
+spec + the Cycle-C all-lengths followup.
 
 - [ ] **Step 1: Failing test** (in `slip39_polish_test.go`): drive the menu/entry for a 33-word
   share via the length pick and assert it parses (or, if menu-driving is heavy, unit-test the
@@ -161,9 +164,9 @@ func TestSLIP39LengthPick33(t *testing.T) {
 - [ ] **Step 2:** Run → FAIL.
 
 - [ ] **Step 3: Implement.**
-  1. Add `title string` as the LAST param of `inputSLIP39Flow` (in `gui.go:796`); render it via
-     the existing title path (replace the current fixed SLIP-39 title with `title`). Update the
-     sole existing call site signature.
+  1. Add `title string` as the LAST param of `inputSLIP39Flow` (in `gui.go:796`); param-ize the
+     hard-coded title literal `"Input Words"` (`gui.go:868`) to render `title` instead (M5).
+     Update the sole existing call site signature (menu `case 3:`).
   2. Add `slip39LengthPick(ctx, th) int` — a `ChoiceScreen` titled "Words on your share?" with
      choices `["20 (128-bit)", "33 (256-bit)", "23 (160-bit)", "27 (192-bit)", "30 (224-bit)"]`
      returning the chosen count; default index 0 (20). (Cancel → return 0 / sentinel; menu
@@ -187,15 +190,31 @@ two-level (SPEC §5.3).
 
 ```go
 func TestRecoverSLIP39(t *testing.T) {
-	// idx 3 = 2-of-3 single-group. Enter 2 shares; expect the recovered bip39.Mnemonic.
+	// idx 3 = 2-of-3 single-group. Enter the 2nd share, SKIP the passphrase (empty).
+	// CRITICAL (plan-R0 C1): with an EMPTY passphrase the recovered secret is the
+	// empty-passphrase value, NOT the "TREZOR" corpus value. Verified empirically
+	// against D1 Combine: pp="" -> 61cf4d6c0d8a07d8c2fd3cff22432664;
+	// pp="TREZOR" -> b43ceb7e57a0ea8766221624d01b0864. This test drives Skip, so:
 	first := parseFixtureShare(t, vec3Share(t, 0))
 	ctx := NewContext(newPlatform())
-	// queue: type share-1's words + accept, then the passphrase "Skip", etc. (drive via runUI)
-	// assert recoverSLIP39Flow returns ok and a mnemonic whose entropy == idx-3 master.
-	m, ok := driveRecover(t, ctx, first /* + queued events */)
+	// queue: type share-1's words + accept, then choose "Skip" at the passphrase prompt.
+	m, ok := driveRecover(t, ctx, first /* + queued events, passphrase=Skip */)
+	if !ok { t.Fatal("recover failed") }
+	if hexOfEntropy(m) != "61cf4d6c0d8a07d8c2fd3cff22432664" {
+		t.Errorf("recovered entropy (empty passphrase) mismatch: %s", hexOfEntropy(m))
+	}
+}
+
+func TestRecoverSLIP39Passphrase(t *testing.T) {
+	// Same 2 shares but TYPE "TREZOR" at the passphrase prompt (drive the Slice-2
+	// PassphraseKeyboard) → the canonical corpus secret. Proves the SLIP-39
+	// passphrase feeds the Feistel decrypt and changes the result.
+	first := parseFixtureShare(t, vec3Share(t, 0))
+	ctx := NewContext(newPlatform())
+	m, ok := driveRecover(t, ctx, first /* + queued events, passphrase="TREZOR" */)
 	if !ok { t.Fatal("recover failed") }
 	if hexOfEntropy(m) != "b43ceb7e57a0ea8766221624d01b0864" {
-		t.Errorf("recovered entropy mismatch: %s", hexOfEntropy(m))
+		t.Errorf("recovered entropy (TREZOR) mismatch: %s", hexOfEntropy(m))
 	}
 }
 
@@ -210,36 +229,64 @@ func TestRecoverSLIP39BackoutRecognized(t *testing.T) {
 - [ ] **Step 2:** Run → FAIL.
 
 - [ ] **Step 3: Implement** `recoverSLIP39Flow(ctx, th, first slip39words.Share) (bip39.Mnemonic, bool)`:
-  1. `shares := []slip39words.Share{first}`. `GT := first.GroupThreshold`, `gc := first.GroupCount`,
-     word-len `L := len(first.Mnemonic)`.
-  2. **Sufficiency** = exactly `GT` distinct group indices each holding exactly its
-     `MemberThreshold` shares. Maintain a roster: `byGroup map[int][]slip39words.Share`; a group
-     is *satisfied* when `len==mt`. Loop while `satisfied < GT`:
-     - Build a title showing progress: `fmt.Sprintf("Group %d · share %d/%d · %d/%d groups",
-       …)` and the count still needed. Allocate `emptySLIP39Mnemonic(L)`; `inputSLIP39Flow(ctx,
-       th, m, 0, title)`. Back → `return nil, false`.
-     - `ParseShare`; eager `slip39words.ConsistentShares(append(shares, cand))` →
-       `showError(ctx, th, "SLIP-39", slip39words.Describe(err))` + continue (re-prompt). Reject
-       a duplicate `(GroupIndex, MemberIndex)` (ConsistentShares covers it). Append on success;
-       update roster.
-     - **Stop exactly at sufficiency** (don't over-collect — `Combine`'s exact-count rule would
-       error): once `satisfied == GT`, break and offer Continue.
-     - **Dead-end affordance:** if the user has entered shares but cannot reach `GT` satisfied
-       groups with what they hold, offer a "Start over / Cancel" path (e.g. Back unwinds).
-  3. **High-e gate (§5.6):** if `first.IterationExp >= 4`, show a `ConfirmWarningScreen` with the
+  1. `GT := first.GroupThreshold`; word-len `L := len(first.Mnemonic)`. Maintain a roster
+     `byGroup map[int][]slip39words.Share` seeded with `first`. A group is *satisfied* when it
+     holds exactly its `MemberThreshold` distinct members; `satisfied()` counts satisfied groups.
+  2. **Collection loop** while `satisfied() < GT`:
+     - Title shows live progress: `fmt.Sprintf("Group %d · %d/%d · %d/%d groups done", …)`.
+       Allocate `emptySLIP39Mnemonic(L)`; `inputSLIP39Flow(ctx, th, m, 0, title)`. Back →
+       `return nil, false`.
+     - `ParseShare(cand)`; eager `slip39words.ConsistentShares(append(allShares(byGroup), cand))`
+       → `showError(…, slip39words.Describe(err))` + continue. ConsistentShares covers id/ext/
+       iterExp/groupThr/groupCount/value-len + duplicate `(GroupIndex, MemberIndex)`.
+     - **Reject a share whose group is ALREADY satisfied** (would over-fill it; `Combine` needs
+       exactly memberThreshold): `showError(…, "that group is already complete")` + continue. So
+       no group ever exceeds its `MemberThreshold`.
+     - Append `cand` to `byGroup[cand.GroupIndex]`.
+  3. **(I1 — the assembly rule.)** When `satisfied() == GT`, build the `Combine` input from
+     **exactly the GT satisfied groups' members** — prune any partially-filled / extra group that
+     lingers in the roster (e.g. a lone share from a wrong pile). Factor this into a pure,
+     unit-testable helper:
+     ```go
+     // selectForCombine returns the flattened members of exactly groupThreshold
+     // satisfied groups (a group is satisfied when it holds exactly its
+     // MemberThreshold members), dropping partial/extra groups. ok=false if fewer
+     // than groupThreshold groups are satisfied.
+     func selectForCombine(byGroup map[int][]slip39words.Share, groupThreshold int) (shares []slip39words.Share, ok bool)
+     ```
+     Pass `selectForCombine(byGroup, GT)`'s result to `Combine`, NOT the raw accumulation. (A
+     flat slice with a stray partial group makes `Combine` return `errInsufficientShares` on a
+     genuinely-sufficient pile — the bug plan-R0 I1 caught; the single-group idx-3 fixture cannot
+     surface it, hence the unit test + the multi-group GUI test in Step 1bis below.)
+     - **Dead-end affordance:** Back at any collection prompt unwinds/cancels recovery
+       (`return nil, false`) — the user re-enters from the share they hold.
+  4. **High-e gate (§5.6):** if `first.IterationExp >= 4`, `ConfirmWarningScreen` with the
      estimated wait; abort on cancel.
-  4. **Optional SLIP-39 passphrase (§5.5):** a `ChoiceScreen` "SLIP-39 passphrase? (NOT a BIP-39
-     passphrase)" default **Skip** (index 0) with the warning "A wrong passphrase silently
-     recovers a different seed." If entered, use a fresh `NewPassphraseKeyboard` (Slice 2) →
-     `pass`. Skip → `pass = ""`.
-  5. Show a "Recovering…" frame; `secret, err := slip39words.Combine(shares, []byte(pass))`. On
-     error → `showError(ctx, th, "SLIP-39", slip39words.Describe(err))`; return `nil, false`. On
-     success: `m := bip39.New(secret)`; `slip39words`-side already wiped its internals; wipe the
-     local `secret` slice; return `m, true`.
+  5. **Optional SLIP-39 passphrase (§5.5):** a `ChoiceScreen` "SLIP-39 passphrase? (NOT a BIP-39
+     passphrase)" default **Skip** (index 0), warning "A wrong passphrase silently recovers a
+     different seed." If entered, a fresh `NewPassphraseKeyboard` (Slice 2) → `pass`; Skip → `""`.
+  6. "Recovering…" frame; `secret, err := slip39words.Combine(sel, []byte(pass))`. Error →
+     `showError(…, slip39words.Describe(err))`; `return nil, false`. Success: `m := bip39.New(secret)`;
+     wipe the local `secret` slice; `return m, true`.
 
-- [ ] **Step 4:** Run → PASS; vet/gofmt clean. (Drive via `runUI` + queued `ctx.Router` events,
-  mirroring `gui/codex32_polish_test.go`'s recover tests.)
-- [ ] **Step 5: Commit** → `feat: slip39 two-level recover flow (roster + optional passphrase)`.
+- [ ] **Step 1bis (I1 coverage): unit-test `selectForCombine`** directly (no GUI drive needed):
+  (a) a single satisfied group → its members; (b) a stray partial group present alongside GT
+  satisfied groups → pruned, returns only the GT groups' members and `ok=true`; (c) fewer than
+  GT satisfied → `ok=false`. Plus a **multi-group GUI happy-path** test using a D1 fixture with
+  a real group threshold (the `group(2-of-3 over 2-of-3 groups, GT=2)` topology in
+  `slip39/testdata/slip39_fixtures.json`) round-tripping to its `secret_hex`.
+
+- [ ] **Step 4:** Run → PASS; vet/gofmt clean. **Test-driving note (M1):** `inputSLIP39Flow`
+  accepts each word only on `Button3` after the typed prefix is unambiguous (`completeSLIP39Word`
+  → complete when `nvalid==1` or an exact match; `gui.go:821-839,963`). So `driveRecover` must,
+  per word, `runes(&ctx.Router, <disambiguating prefix>)` then `click(&ctx.Router, Button3)` —
+  ~20 (or 33) words × (runes+Button3) per share. Build a `driveShare(t, ctx, mnemonic string)`
+  helper that emits the right per-word prefix+accept sequence (derive the shortest unambiguous
+  prefix per word from the wordlist); reuse it across the recover tests. Budget TDD time for
+  this — it is the heaviest part of D2's tests. `parseFixtureShare`/`vec3Share`/`hexOfEntropy`
+  are small helpers (ParseShare+Fatal; load a mnemonic from `slip39/testdata/slip39_vectors.json`
+  / `slip39_fixtures.json`; `hex.EncodeToString(m.Entropy())`).
+- [ ] **Step 5: Commit** → `feat: slip39 two-level recover flow (roster + selectForCombine + passphrase)`.
 
 ---
 
@@ -266,8 +313,9 @@ func TestEngraveSLIP39RecoverToBackup(t *testing.T) {
        as a BIP-39 seed. Correct only for backups made from a BIP-39 phrase / this toolkit. A
        Trezor/other SLIP-39 wallet backup would engrave the WRONG seed."* Cancel → `continue`.
     2. **§5.4 fingerprint display:** compute `mfp, _ := masterFingerprintFor(m, &chaincfg.MainNetParams, "")`;
-       show a screen *"Fingerprint %08X — confirm against your records before engraving"*
-       (`fmt.Sprintf("%08X", mfp)`); a Back here → `continue`, Engrave/OK → proceed.
+       show a screen *"Fingerprint %.8X — confirm against your records before engraving"*
+       (`fmt.Sprintf("%.8X", mfp)` — match `backupWalletFlow`'s `%.8X` format, M3); a Back here →
+       `continue`, Engrave/OK → proceed.
     3. `backupWalletFlow(ctx, th, m)` (reuses Slice-3 confirm → optional BIP-39 passphrase →
        fingerprint choice → SeedQR+words engrave). Then `return true`.
 
@@ -302,8 +350,16 @@ func TestEngraveSLIP39RecoverToBackup(t *testing.T) {
   the commit/PR notes) — NOT assumed.
 - Recover offered only for multi-share (`MemberThreshold>1 || GroupThreshold>1`); Button2 always
   drained (no-hang); Back always returns `true` (recognized) in the engrave dispatch.
-- Two-level roster stops EXACTLY at `GT` satisfied groups (no over-collection); dead-end has a
-  start-over/cancel path; subsequent shares sized to `len(first.Mnemonic)`.
+- Two-level roster stops EXACTLY at `GT` satisfied groups; a share for an already-satisfied
+  group is rejected (no over-fill); the `Combine` input is built by `selectForCombine` =
+  exactly the GT satisfied groups' members (partial/extra groups pruned — plan-R0 I1), proven
+  by the `selectForCombine` unit test (incl. the stray-partial-group case) + a multi-group GUI
+  round-trip; dead-end has a cancel path; subsequent shares sized to `len(first.Mnemonic)`.
+- The `TestRecoverSLIP39` Skip-path assertion is the EMPTY-passphrase secret
+  (`61cf…2664`), and the TREZOR-path test asserts `b43c…0864` (plan-R0 C1 — empirically
+  verified the two differ).
+- `slip39_polish.go` imports both `bip39` and `chaincfg/v2` (the §5.4 fingerprint); `gui.go`
+  gains no new import.
 - The §3 acknowledgement is a hold-to-confirm BEFORE engrave; the §5.4 fingerprint is shown
   before engrave; the SLIP-39 passphrase prompt defaults to Skip with the silent-wrong-seed
   warning and is labeled distinctly from the BIP-39 25th-word passphrase.
