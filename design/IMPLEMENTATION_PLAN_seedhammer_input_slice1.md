@@ -26,7 +26,7 @@
 | `bip39/bip39_test.go` | bip39 unit tests | **Add** `TestLastWordCandidates` |
 | `gui/gui.go` | on-device flows + keyboard widget | **Modify** `Keyboard.Update` (free Button3); `inputWordsFlow`/`inputCodex32Flow`/`inputSLIP39Flow` (OK→Button3); `inputWordsFlow` (progress title, match count, last-word path); **add** `updateValidCandidateKeys`, `completeCandidateWord` |
 | `gui/gui_test.go` | gui tests | **Update** `TestWordKeyboardScreen` (Button2→Button3); **add** `TestWordFlowProgressTitle`, `TestWordFlowMatchCount`, `TestUpdateValidCandidateKeys`, `TestCompleteCandidateWord`, `TestWordFlowLastWord24`, `TestWordFlowLastWord12` |
-| `gui/codex32_input_test.go` | codex32 entry test | **Update** `TestInputSeedCodex32` (Button2→Button3) |
+| ~~`gui/codex32_input_test.go`~~ | — | **N/A on the `upstream/main` base** (this test exists only on the fork; not touched — see the Task 2 base-reconciliation note) |
 
 ---
 
@@ -196,7 +196,9 @@ git commit -s -m "bip39: add LastWordCandidates (checksum-valid final words)"
 
 **Files:**
 - Modify: `gui/gui.go` — `Keyboard.Update` (:952 filter, :1009 case), `inputWordsFlow` (:543), `inputCodex32Flow` (:626), `inputSLIP39Flow` (:688)
-- Test: `gui/gui_test.go` (:281), `gui/codex32_input_test.go` (:31)
+- Test: `gui/gui_test.go` (:281 — `TestWordKeyboardScreen`)
+
+> **⚠ Base-branch reconciliation (added during implementation, 2026-06-17).** This branch builds from `upstream/main`, where the CODEX32 menu option is commented out and `gui/codex32_input_test.go` does NOT exist (it lives only on the fork). **Every reference in this Task 2 to `TestInputSeedCodex32` / `gui/codex32_input_test.go` is VOID on this base.** The implemented Task 2 touches only `gui/gui.go` + `gui/gui_test.go`, updates only `TestWordKeyboardScreen`, and changes `inputCodex32Flow`'s `okBtn` as dead-code-by-inspection (re-enabling CODEX32 = the separate, declined PR #34 — out of scope). The actual shipped commit (`8f9e17c`) touches exactly those two files. See the spec §4.3 base-reconciliation note.
 
 - [ ] **Step 1: Update the two existing tests to expect Button3 (the failing test)**
 
