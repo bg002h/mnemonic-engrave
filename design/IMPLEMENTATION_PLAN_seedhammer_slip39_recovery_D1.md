@@ -719,10 +719,10 @@ func ConsistentShares(shares []Share) error {
 
 ## Task 6: vectors, Rust-fixture round-trips, negatives, panic-safety, scrub
 
-**Files:** Create `slip39/testdata/slip39_vectors.json`, `slip39/testdata/slip39_fixtures.json`,
-Task 6 adds ONLY `slip39/testdata/slip39_fixtures.json` + the round-trip/negative/panic/scrub
-tests. The testdata vectors file + loader helpers (`vectorShare`/`vectorShares`/`vectorSecretHex`)
-were created in Task 0; `hexEq` lives in `combine_test.go` (Task 5).
+**Files:** Create `slip39/testdata/slip39_fixtures.json` + `slip39/vectors_test.go`'s
+round-trip/negative/panic/scrub tests. Task 6 adds ONLY those. The testdata vectors file
+(`slip39_vectors.json`) + loader helpers (`vectorShare`/`vectorShares`/`vectorSecretHex`) were
+created in Task 0; `hexEq` lives in `combine_test.go` (Task 5).
 
 - [ ] **Step 1:** `slip39/testdata/slip39_vectors.json` + the loader helpers were created in
   **Task 0 Steps 3–4** (front-loaded per plan-R0 I1). Confirm they exist and that Tasks 3/5
