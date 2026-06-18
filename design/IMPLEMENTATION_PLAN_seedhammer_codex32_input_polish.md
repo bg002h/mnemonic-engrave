@@ -10,7 +10,9 @@
 
 **Base:** fork `main` `3c4d3d3` (A0 — Slice 1's BIP-39 polish — already merged). Branch `feat/codex32-input-polish`. Fork-side only; **no upstream PR**.
 
-**Spec:** `design/SPEC_seedhammer_codex32_input_polish.md` (R0 GREEN — `design/agent-reports/seedhammer-codex32-polish-spec-review-R0.md`). This plan must itself pass the opus-architect R0 gate (0C/0I) before any code.
+**Spec:** `design/SPEC_seedhammer_codex32_input_polish.md` (R0 GREEN — `design/agent-reports/seedhammer-codex32-polish-spec-review-R0.md`).
+
+**PLAN R0 GATE: PASSED (GREEN — 0C/0I at R1).** R0 caught a real build bug (Task 4 unused-import compile failure, IMP-2) → folded; R1 verified the fold + zero new findings. Reviews persisted verbatim to `design/agent-reports/seedhammer-codex32-polish-plan-review-R{0,1}.md`. Cleared for implementation.
 
 **Build order (architect-recommended):** C1 (Tasks 1–3) → C2/C3 (Task 4) → C4 (Task 5) → C5 (Task 6). C5 is last so it and C2/C3 don't both edit `inputCodex32Flow` in overlapping tasks.
 
