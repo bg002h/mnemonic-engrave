@@ -395,9 +395,9 @@ func decodeValue(valueWords []int, padBits, valueBytes int) ([]byte, bool) {
      `errUnsupportedSize` case.
 
 - [ ] **Step 4:** Run `…/go test ./slip39/ -run 'TestParseShare|TestDescribe'` → PASS.
-  vet/gofmt clean. (Provide `vectorShare`/`errorsIs` helpers — Task 6 adds the JSON loader;
-  for this task, inline the idx-3 and idx-9 mnemonics as string literals if Task 6 hasn't
-  landed yet, then dedupe in Task 6.)
+  `go vet ./slip39/`, `gofmt -l slip39/share.go slip39/share_test.go` clean. (The loader
+  helpers + `testdata/slip39_vectors.json` already exist from Task 0 — load all shares via
+  `vectorShare`; do NOT hand-type any mnemonic literal.)
 - [ ] **Step 5: Commit** → `feat: slip39 share value extraction + all valid lengths + group-threshold check`.
 
 ---
@@ -720,7 +720,9 @@ func ConsistentShares(shares []Share) error {
 ## Task 6: vectors, Rust-fixture round-trips, negatives, panic-safety, scrub
 
 **Files:** Create `slip39/testdata/slip39_vectors.json`, `slip39/testdata/slip39_fixtures.json`,
-`slip39/vectors_test.go`. Also the test helpers (`vectorShare`/`vectorShares`/`hexEq`/`errorsIs`).
+Task 6 adds ONLY `slip39/testdata/slip39_fixtures.json` + the round-trip/negative/panic/scrub
+tests. The testdata vectors file + loader helpers (`vectorShare`/`vectorShares`/`vectorSecretHex`)
+were created in Task 0; `hexEq` lives in `combine_test.go` (Task 5).
 
 - [ ] **Step 1:** `slip39/testdata/slip39_vectors.json` + the loader helpers were created in
   **Task 0 Steps 3–4** (front-loaded per plan-R0 I1). Confirm they exist and that Tasks 3/5
@@ -777,7 +779,7 @@ func ConsistentShares(shares []Share) error {
 - Generator is **3** (gf256 test pins the AES inverse pair); Feistel is `[3,2,1,0]`→`R||L`;
   salt is `"shamir"||be16(id)`/empty; digest compared with `subtle.ConstantTimeCompare`.
 - `ParseShare` accepts {20,23,27,30,33}; `errUnsupportedSize` fully removed (no dangling refs);
-  `share_test.go` 256-bit-rejection assertions inverted.
+  the old `errUnsupportedSize` 256-bit-reject test + its `Describe` case DELETED (not flipped).
 - Panic-safety test present and green; no `gfInv(0)`/dup-x path reachable from `Combine` input.
 - `Share` gained `Value` but the GUI guards stay green.
 - Signed + DCO + Brian Goss on every commit.
