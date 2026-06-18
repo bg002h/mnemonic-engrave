@@ -47,11 +47,70 @@ length widening + the structural check change.
 
 ---
 
-## Task 0: Worktree
+## Task 0: Worktree + testdata + loader helpers (front-loaded per plan-R0 I1)
+
+> **I1 fold (plan-R0):** to eliminate the inline-crypto-literal transcription-risk class (an
+> R0 reviewer caught a fabricated idx-3 mnemonic), ALL crypto test vectors are loaded from a
+> single `testdata/slip39_vectors.json` copied VERBATIM from upstream — **no crypto mnemonic
+> or secret literal is ever hand-typed into a test.** Use `errors.Is` directly (no `errorsIs`
+> wrapper — minor M2).
 
 - [ ] **Step 1:** From `/scratch/code/shibboleth/seedhammer` (fork `main` @ `20fa4c4`):
   `git worktree add /scratch/code/shibboleth/seedhammer-wt-slip39-d1 -b feat/slip39-recovery-crypto 20fa4c4`
 - [ ] **Step 2:** Baseline green: `cd /scratch/code/shibboleth/seedhammer-wt-slip39-d1 && /home/bcg/.local/go/bin/go test ./slip39/ ./gui/ ./bip39/` → all pass.
+- [ ] **Step 3: Create `slip39/testdata/slip39_vectors.json` by copying VERBATIM** the needed
+  entries from the upstream official vectors (raw:
+  `https://raw.githubusercontent.com/trezor/python-shamir-mnemonic/master/vectors.json`).
+  Do NOT hand-type mnemonics — fetch the file and extract the entries. Required indices (the
+  4-tuple `[desc, [mnemonics], master_hex, xprv]` shape preserved): positives **0, 3, 17, 35,
+  42**; negatives **1, 4, 5, 9, 12, 13**. (All valid vectors use passphrase `"TREZOR"`.)
+- [ ] **Step 4: Add the loader helpers** in `slip39/vectors_test.go`:
+
+```go
+package slip39
+
+import (
+	"encoding/json"
+	"os"
+	"testing"
+)
+
+type slip39Vector struct {
+	Desc      string
+	Mnemonics []string
+	MasterHex string
+}
+
+func loadVectors(t *testing.T) []slip39Vector {
+	t.Helper()
+	b, err := os.ReadFile("testdata/slip39_vectors.json")
+	if err != nil {
+		t.Fatalf("read vectors: %v", err)
+	}
+	var raw [][]json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatalf("parse vectors: %v", err)
+	}
+	out := make([]slip39Vector, len(raw))
+	for i, e := range raw {
+		_ = json.Unmarshal(e[0], &out[i].Desc)
+		_ = json.Unmarshal(e[1], &out[i].Mnemonics)
+		_ = json.Unmarshal(e[2], &out[i].MasterHex)
+	}
+	return out
+}
+
+// vectorShares returns all mnemonics of official vector index idx.
+func vectorShares(t *testing.T, idx int) []string { return loadVectors(t)[idx].Mnemonics }
+
+// vectorShare returns share `share` of official vector index idx.
+func vectorShare(t *testing.T, idx, share int) string { return loadVectors(t)[idx].Mnemonics[share] }
+
+// vectorSecretHex returns the expected master-secret hex of vector idx ("" if invalid).
+func vectorSecretHex(t *testing.T, idx int) string { return loadVectors(t)[idx].MasterHex }
+```
+  `hexEq(b []byte) string { return hex.EncodeToString(b) }` lives in `combine_test.go`
+  (Task 5). All crypto tests reference these — **no inline mnemonic/secret literals anywhere.**
 
 ---
 
@@ -251,37 +310,40 @@ func interpolateSecretAt(points []bytePoint, x byte) []byte {
 Current `ParseShare` (read it: `slip39/share.go:81-122`) decodes the header into a `uint64`,
 verifies RS1024, and returns the `Share` WITHOUT a value. Extend it.
 
-- [ ] **Step 1: Failing test** — add to `slip39/share_test.go` (and INVERT the old 256-bit
-  rejection per SPEC M4):
+- [ ] **Step 1: Failing test** — add to `slip39/share_test.go`. **All shares come from the
+  testdata loader (Task 0) — NO inline mnemonic literals (plan-R0 I1).**
 
 ```go
 func TestParseShareExtractsValue(t *testing.T) {
-	// A known-valid 128-bit (20-word) official vector share (idx 3, share 0).
-	const m = "shadow pistol academic always adequate wildlife fancy gross oasis cylinder mustard faded picture sister enchant wisdom flavor brave little gather"
-	s, err := ParseShare(m)
+	s, err := ParseShare(vectorShare(t, 3, 0)) // official idx 3, 128-bit/20-word
 	if err != nil {
 		t.Fatalf("ParseShare: %v", err)
 	}
 	if len(s.Value) != 16 {
 		t.Errorf("Value len=%d want 16 (128-bit)", len(s.Value))
 	}
+	// Long path: idx 35 is 256-bit/33-word.
+	s32, err := ParseShare(vectorShare(t, 35, 0))
+	if err != nil {
+		t.Fatalf("ParseShare(33-word): %v", err)
+	}
+	if len(s32.Value) != 32 {
+		t.Errorf("Value len=%d want 32 (256-bit)", len(s32.Value))
+	}
 }
 
 func TestParseShareGroupThresholdExceedsCount(t *testing.T) {
-	// Official vector idx 9 — "greater group threshold than group counts".
-	// (full mnemonic copied from slip39_vectors.json in testdata)
-	s := vectorShare(t, 9, 0) // helper loads testdata; see Task 6
-	_, err := ParseShare(s)
-	if !errorsIs(err, errGroupThresholdExceedsCount) {
+	_, err := ParseShare(vectorShare(t, 9, 0)) // official idx 9 — group thr > count
+	if !errors.Is(err, errGroupThresholdExceedsCount) {
 		t.Errorf("want errGroupThresholdExceedsCount, got %v", err)
 	}
 }
 ```
 
-> NOTE to implementer: if a clean 33-word vector share is easier to pin the long path, also
-> add a `len(s.Value)==32` assertion using official vector idx 35 share 0. Remove the existing
-> `share_test.go` assertion that a 33-word share returns `errUnsupportedSize` and the
-> `Describe` `"256-bit not supported"` case (they no longer hold).
+> NOTE to implementer (plan-R0 M3): **DELETE** (do not flip-to-expect-nil) the existing
+> `slip39/share_test.go` assertion that a 33-word input returns `errUnsupportedSize` (it fed
+> junk `"duckling"×33` which now fails RS1024, not parses clean) and the `Describe`
+> `{errUnsupportedSize, "256-bit not supported"}` case — the symbol is removed.
 
 - [ ] **Step 2:** Run → FAIL (`s.Value` undefined / 33-word still rejected).
 
@@ -290,11 +352,11 @@ func TestParseShareGroupThresholdExceedsCount(t *testing.T) {
      `errGroupThresholdExceedsCount = errors.New("slip39: group threshold exceeds count")`.
      **Remove** `errUnsupportedSize`.
   2. Add field `Value []byte` to `Share` (after `Mnemonic`).
-  3. Replace the `switch len(fields)` length gate with: accept any word count in
-     {20,23,27,30,33}; else `errWrongLength`. (Equivalently: `valueWords := len(fields)-7`;
-     require `len(fields) >= 20` and `padBits := (10*valueWords)%16 <= 8` and the resulting
-     `valueBytes` ∈ {16,20,24,28,32}; else `errWrongLength`/`errBadPadding` per share.rs
-     ordering.)
+  3. Replace the `switch len(fields)` length gate with the **explicit** accepted set (M4 —
+     canonical form): accept word count ∈ {20,23,27,30,33}; else `errWrongLength`. Then derive
+     `valueWords := len(fields)-7`, `padBits := (10*valueWords)%16` (always ≤8 for these five),
+     `valueBytes := (10*valueWords-padBits)/8` ∈ {16,20,24,28,32}. **Also delete the now-unused
+     `wordsShort`/`wordsLong` consts (`share.go:31-32`) — plan-R0 M1.**
   4. After the RS1024 check and header decode, add the structural check (port `share.rs:248-256`):
      `if groupCount < groupThreshold { return Share{}, errGroupThresholdExceedsCount }`
      (compute these from the header BEFORE building the struct).
@@ -660,19 +722,21 @@ func ConsistentShares(shares []Share) error {
 **Files:** Create `slip39/testdata/slip39_vectors.json`, `slip39/testdata/slip39_fixtures.json`,
 `slip39/vectors_test.go`. Also the test helpers (`vectorShare`/`vectorShares`/`hexEq`/`errorsIs`).
 
-- [ ] **Step 1: Copy the chosen official vectors** into `slip39/testdata/slip39_vectors.json`
-  from `trezor/python-shamir-mnemonic/vectors.json`: at minimum idx 0,3,17,35,42 (positives)
-  and 1,4,5,9,12,13 (negatives). Tuple shape `[desc,[mnemonics],master_hex,xprv]`.
+- [ ] **Step 1:** `slip39/testdata/slip39_vectors.json` + the loader helpers were created in
+  **Task 0 Steps 3–4** (front-loaded per plan-R0 I1). Confirm they exist and that Tasks 3/5
+  already load from them; nothing to copy here.
 
 - [ ] **Step 2: Generate intermediate-length fixtures** into `slip39/testdata/slip39_fixtures.json`
-  via the Rust oracle (reproducible; document the command in a header comment of the JSON or a
-  `testdata/GEN.md`). Run from `mnemonic-toolkit`: a small `cargo test`-driven or `examples/`
-  harness calling `slip39_split` over master-secret lengths {16,20,24,28,32} × topologies
-  {1-of-1, 2-of-3, group(2-of-3 over 2 of 3 groups)} with a FIXED `ChaCha20Rng` seed +
-  fixed identifier (the env-var test wedge `MNEMONIC_SLIP39_TEST_RNG`/
-  `MNEMONIC_SLIP39_TEST_IDENTIFIER` exists for exactly this), emitting `{secret_hex, passphrase,
-  mnemonics[]}` per case. **This is the only path that covers 23/27/30-word shares** (the
-  static corpus doesn't). Commit the generated JSON; do NOT port `split` into the firmware.
+  via the Rust oracle (reproducible). The toolkit's deterministic test wedge lives in the CLI
+  layer (`MNEMONIC_SLIP39_TEST_RNG` 32-byte-hex seed + `MNEMONIC_SLIP39_TEST_IDENTIFIER`); a
+  seeded `slip39_split` call achieves the same. Generate over master-secret lengths
+  {16,20,24,28,32} × topologies {1-of-1, 2-of-3, group(2-of-3 over 2-of-3 groups)} with FIXED
+  seed + identifier, emitting `{secret_hex, passphrase, mnemonics[]}` per case. Document the
+  exact regeneration command in `slip39/testdata/GEN.md`. **This is the only path that covers
+  the 23/27/30-word (160/192/224-bit) shares** (the static corpus has only 128/256-bit). Note
+  `extendable` is hardcoded `false` on the CLI wedge path, so ext=1 coverage comes from
+  official idx 42 (Step 3), not fixtures. Commit the generated JSON; do NOT port `split` into
+  the firmware (test-fixtures only).
 
 - [ ] **Step 3: Positive round-trip test** (vectors + fixtures): for each, parse all shares,
   `Combine` a threshold subset, assert the recovered hex == expected. Include the idx-3
@@ -705,6 +769,10 @@ func ConsistentShares(shares []Share) error {
 - Every vector/negative/length from SPEC §7 has a test; the 23/27/30-word lengths come from
   the Rust-generated fixtures (the static corpus lacks them) — and that gap is NOT silently
   skipped.
+- **No inline crypto literals (plan-R0 I1):** every share mnemonic and master-secret hex in a
+  test comes from `testdata/slip39_vectors.json` (verbatim upstream) or `slip39_fixtures.json`
+  (Rust-generated) via the loader helpers — `grep` the test files for hand-typed 20+-word
+  strings and `[0-9a-f]{32}` literals → none (except the loader/testdata).
 - No `math/big` in any new file (`grep -rn 'math/big' slip39/` → only the unchanged… none).
 - Generator is **3** (gf256 test pins the AES inverse pair); Feistel is `[3,2,1,0]`→`R||L`;
   salt is `"shamir"||be16(id)`/empty; digest compared with `subtle.ConstantTimeCompare`.
