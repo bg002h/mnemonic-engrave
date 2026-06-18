@@ -12,6 +12,20 @@ Low/nit items deferred from architect reviews (per the iterative-architect-revie
 
 ## Resolved
 
+### `seedhammer-seedxor` — DONE 2026-06-18 (fork `main` `04a1e95`)
+On-device **Coldcard Seed XOR combine**: a `SEED XOR` input-menu entry → pick N (2–5) → pick
+part length (12/18/24) → enter N parts → XOR their BIP-39 entropy → recovered seed →
+`backupWalletFlow`. New pure `seedxor` package (`Combine`, port of
+`mnemonic_toolkit::seed_xor_combine`; no `math/big`), strictly N-of-N, Coldcard-interop lengths
+only (load-bearing `{16,24,32}`-byte guard). Safety: a **mandatory "no built-in check"
+fingerprint gate** (Seed XOR has no auth tag) + a per-part `isMnemonicComplete && Valid()` panic
+guard; no interpretation fork (result is unambiguously a BIP-39 seed). `inputWordsFlow` gained an
+additive `title` param (empty = unchanged). **Completes the on-device recovery suite: BIP-39 /
+codex32 / SLIP-39 / Seed XOR.** Recon `cycle-prep-recon-seedxor.md`; architect consult +
+spec R0→R1 + plan R0→R1 + whole-diff execution review all GREEN (vectors authenticated vs
+Coldcard `docs/seed-xor.md` + `testing/test_seed_xor.py`); reviews in
+`design/agent-reports/seedhammer-seedxor-*`. SPLIT remains out of scope (no on-device CSPRNG).
+
 ### `seedhammer-slip39-recovery-trezor-routing` — DONE 2026-06-18 (fork `main` `bc63caa`)
 Shipped the two-way post-recovery fork (the rescope of `-verbatim-hex`; architect consult
 `design/agent-reports/seedhammer-slip39-verbatim-hex-design-consult.md` found verbatim-hex is a
