@@ -228,25 +228,28 @@ func TestInputMStarMK1(t *testing.T) {
 }
 ```
 
-Append to `gui/codex32_polish_test.go` a recovery-rejection test (typing an md1 during codex32 share recovery is rejected):
+Append to `gui/codex32_polish_test.go` a recovery-rejection test (typing an md1 during codex32 share recovery is rejected). **Event sequence matters (plan-R0 C-1):** the md1 is a *valid* string, so `inputCodex32Flow` OKs it on the first Button3 (returning `mdmkText`); `recoverCodex32Flow`'s type-assert then rejects it via `showCodex32Error` (a modal dismissed by **Button3**); a final Button1 backs out. Omitting the modal-dismiss Button3 hangs the test.
 ```go
 // During codex32 share recovery, entering a non-codex32 (md/mk) string is
 // rejected — recovery is ms-share-only. (Phase B caller-ripple guard.)
 func TestRecoverRejectsNonCodex32(t *testing.T) {
-	// shareA is a valid ms share with threshold ≥2 (reuse the recover test's share).
-	shareA := mustCodex32(t, recoverShareA) // same helper/const the recover tests use
+	// A valid ms share with threshold ≥2 (mirrors TestRecoverCodex32's setup).
+	shareA, err := codex32.New("MS12NAMEA320ZYXWVUTSRQPNMLKJHGFEDCAXRPP870HKKQRM")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
 	ctx := NewContext(newPlatform())
-	// Enter an md1 string for "share 2", then Back out of recovery.
+	// Enter a VALID md1 for "share 2": OK it (Button3 → mdmkText), the
+	// type-assert rejects it with a modal (dismissed by Button3), then Back
+	// (Button1) exits recovery.
 	runes(&ctx.Router, "md1yqpqqxqq8xtwhw4xwn4qh")
-	// (the md1 is rejected with a modal; dismiss it, then Back)
-	click(&ctx.Router, Button3, Button1)
+	click(&ctx.Router, Button3, Button3, Button1) // OK md1 → dismiss modal → Back
 	_, ok := recoverCodex32Flow(ctx, &descriptorTheme, shareA)
 	if ok {
 		t.Fatal("recovery must not accept a non-codex32 entry")
 	}
 }
 ```
-If `recoverShareA`/`mustCodex32` don't already exist, mirror the existing `TestRecoverCodex32` setup (it constructs a valid share via `codex32.New`); reuse its exact share literal and construction. The key assertion is that an md1 entry does not advance the share set.
 
 - [ ] **Step 2: Run — expect FAIL (compile: `inputCodex32Flow` returns `codex32.String`, tests want `mdmkText`)**
 
@@ -551,7 +554,8 @@ Add (replacing the Task 2 stub if used):
 func confirmCorrectionFlow(ctx *Context, th *Colors, res codex32.CorrectionResult, hrp string) bool {
 	lines := make([]string, 0, len(res.Edits)+2)
 	for _, e := range res.Edits {
-		// 1-based position for the human comparing against their card.
+		// e.Pos is a full-string rune index (HRP + the '1' separator included);
+		// +1 makes it 1-based for the human comparing against their source card.
 		lines = append(lines, fmt.Sprintf("pos %d: %c → %c", e.Pos+1, rune(e.Was), rune(e.Now)))
 	}
 	if hrp == "ms" {
@@ -609,24 +613,26 @@ Expected: PASS. (If `TestInputMStarFixMD1` fails because the specific 1-char sub
 Append to `gui/codex32_input_test.go`:
 ```go
 // An uncorrectable (>4-error) entry: pressing Fix? shows the "no fix" modal and
-// returns to editing — it never fabricates a correction. We assert the run does
-// not terminate with a value via the Fix path alone (Back exits).
+// returns to editing — it never fabricates a correction. **Event sequence
+// (plan-R0 C-2):** Fix → dismiss modal → Back out of the ENTRY (returns
+// (nil,false)) → Back out of the MENU (the menu loops on ok=false, so a second
+// Button1 is required to make newInputFlow return). Omitting the second Back
+// hangs on the re-rendered ChoiceScreen.
 func TestInputMStarFixUncorrectable(t *testing.T) {
-	// 5 substitutions in an md1 — beyond t=4.
+	// 5 substitutions in an md1 — beyond t=4; codex32.Correct returns (_,false).
 	const corrupted = "md1zzzzzxqq8xtwhw4xwn4qh"
 	ctx := NewContext(newPlatform())
-	click(&ctx.Router, Down, Down, Button3)
+	click(&ctx.Router, Down, Down, Button3) // menu -> M*1 STRING -> entry
 	runes(&ctx.Router, corrupted)
-	click(&ctx.Router, Button3) // Fix? -> "no fix" modal
-	click(&ctx.Router, Button3) // dismiss the modal
-	click(&ctx.Router, Button1) // Back out of the entry
+	// Fix? -> "no fix" modal -> dismiss -> Back(entry) -> Back(menu).
+	click(&ctx.Router, Button3, Button3, Button1, Button1)
 	obj, ok := newInputFlow(ctx, &descriptorTheme)
 	if ok {
 		t.Fatalf("uncorrectable entry must not yield a value, got %v (%T)", obj, obj)
 	}
 }
 ```
-(If 5 specific substitutions happen to be a bogus-but-valid recovery, the re-verify either rejects them — `ok=false`, the modal path — or yields a *different* valid md1 the user would reject; either way the run does not silently return the original. Choose 5 positions spread across the data part. The decoder's own `TestCorrectFiveErrorsNotSilentOriginal` already proves the non-silent contract; this test asserts the GUI surfaces it as "no fix" or a rejectable diff.)
+(The decoder's own `TestCorrectFiveErrorsNotSilentOriginal` proves the non-silent contract; this asserts the GUI surfaces an uncorrectable string as "no fix" and never auto-returns it. The chosen literal deterministically yields `(_,false)` — the modal path.)
 
 - [ ] **Step 6: Run the full gui + codex32 suite + vet + gofmt**
 
