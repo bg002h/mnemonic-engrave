@@ -46,8 +46,8 @@ type PassphraseKeyboard struct {
 
 func NewPassphraseKeyboard(ctx *Context) *PassphraseKeyboard
 func (k *PassphraseKeyboard) Update(ctx *Context) bool        // drains input; returns true while it consumed events
-func (k *PassphraseKeyboard) Layout(ctx *Context, th *Colors) (op.Op, image.Point) // readout + active page + function row
-func (k *PassphraseKeyboard) Clear()                          // reset Fragment/page/cursor (NOT revealed→stays default-masked? reset to masked)
+func (k *PassphraseKeyboard) Layout(ctx *Context, th *Colors) (op.Op, image.Point) // readout + active page + function row; the returned image.Point is the COMBINED extent (readout height + grid), so the Slice-3 flow places the whole widget as one block (R0 M-6)
+func (k *PassphraseKeyboard) Clear()                          // reset Fragment="", page=0, cursor to center, AND revealed=false (re-mask — R0 M-1)
 ```
 The API mirrors `Keyboard` so Slice 3 wires it into a flow (title + Back/OK nav) exactly like `inputCodex32Flow` wires `Keyboard`.
 
@@ -61,13 +61,28 @@ A normal key stores its literal rune `r`; **`rune()` appends `string(r)` with NO
 
 ### 4.3 Function row (shared across pages)
 
-A bottom row of special keys, rendered by a short text label / icon (not a single ASCII glyph):
-- **page-cycle** — cycles `0→1→2→0`; its cap shows the *target* page (`"ABC"` on the lowercase page, `"?123"` on UPPER, `"abc"` on symbols — exact labels finalized in the plan).
-- **space** — appends `' '`; cap a short label (e.g. `"space"`).
-- **reveal** — toggles `revealed`; cap toggles between a "show"/"hide" label (ASCII text — no eye-icon dependency).
+A bottom row of special keys, present identically on all 3 pages (so navigation/layout is uniform):
+- **page-cycle** — cycles `0→1→2→0`; cap shows the *target* page: `"ABC"` (on the lowercase page) / `"?123"` (on UPPER) / `"abc"` (on symbols).
+- **space** — appends `' '`; cap `"space"`.
+- **reveal** — toggles `revealed`; cap `"show"` when masked / `"hide"` when revealed.
 - **backspace** — `⌫` via `assets.KeyBackspace` (reuse the existing asset); deletes the last rune of `Fragment`.
 
-Special keys are a `keyboardKey`-like cell with a `label string` (and an action discriminator) instead of a single `r`; the standalone `Layout` renders them via `widget.Labelf("%s", label)` (or the backspace image), and `Update` dispatches their action. D-pad nav + touch + `Center`-commit work for them as for normal keys.
+**Key representation (R0 I-2 — committed):** the widget defines its OWN private cell struct (NOT the shared `keyboardKey`), e.g.
+```go
+type ppAction int
+const (ppRune ppAction = iota; ppBackspace; ppPageCycle; ppSpace; ppReveal)
+type ppKey struct {
+	r        rune        // the literal char (ppRune only; case as-stored)
+	label    string      // multi-char cap for special keys ("ABC"/"space"/"show"…)
+	action   ppAction
+	disabled bool
+	pos      image.Point
+	clk      Clickable
+}
+```
+All three page grids are `[][]ppKey` sharing the SAME function row as their last row, stored in the active page's `keys [][]ppKey` slice — so the existing D-pad `Up/Down` (iterate rows) + `Left/Right` (within a row) traversal naturally crosses from the letter rows into the function row, exactly as the shared `Keyboard` does. **`Valid(k ppKey)`:** `ppBackspace` → `Fragment != ""`; `ppRune`/`ppPageCycle`/`ppSpace`/`ppReveal` → `!k.disabled` (always true here — nothing is disabled in this widget). **`Layout` dispatch:** `ppRune` → `widget.Labelf(..., "%c", k.r)` (NO `ToUpper`); `ppBackspace` → the `assets.KeyBackspace` image; the rest → `widget.Labelf(..., "%s", k.label)`. **`Update` dispatch** on `Center`/click/Valid: `ppRune`→append `string(r)`; `ppSpace`→append `' '`; `ppBackspace`→trim last rune; `ppPageCycle`→`page=(page+1)%3` + re-seed the cursor; `ppReveal`→toggle `revealed`.
+
+**Function-row cell sizing (R0 M-2/M-3):** the special-key caps (`"?123"`,`"space"`,`"show"`) are wider than a single `poppins.Bold25` glyph cell. The function row is laid out with its own per-cell widths sized to each label (`ctx.Styles.keyboard.Measure(math.MaxInt, label)` + `keyPadX`), independent of the fixed-width letter cells — not forced into the letter-row cell width. Reuse `keyPadX`/`keyPadY`/`keyCornerRadius`/`keyLineWidth` (`gui.go:871-876`).
 
 ### 4.4 Masked entry readout
 
@@ -75,7 +90,9 @@ Above the key grid, render the entry: when `!revealed`, `strings.Repeat("*", utf
 
 ### 4.5 Input (case-honoring)
 
-`Update` handles the same three modalities as `Keyboard` — touch (`clk.Clicked` per visible key, gated on validity), D-pad (`Left/Right`/`Up/Down` nav skipping invalid keys) + `Center` (commit cursor key), and `RuneEvent` — **but RuneEvent does NOT `ToLower`**: a typed rune is matched/committed as-is (so a physical/host keyboard and the test harness preserve case). Backspace valid iff `Fragment` non-empty.
+`Update` handles the same three modalities as `Keyboard` — touch (`clk.Clicked` per visible key, gated on validity), D-pad (`Left/Right`/`Up/Down` nav skipping invalid keys) + `Center` (commit cursor key), and `RuneEvent`. Backspace valid iff `Fragment` non-empty.
+
+**RuneEvent — case-honoring, CROSS-PAGE search, no auto-switch (R0 I-1 — committed):** a typed rune is committed AS-IS (no `ToLower`, no `ToUpper`), matched against ALL three pages' `ppRune` keys (not just the active page) — so `'A'` (only on the UPPER page) commits even while page 0 is active, and `'1'`/`'!'` (symbols page) likewise. The committed rune is appended to `Fragment` with its literal case; the **active page is NOT switched** (the display only changes via the page-cycle key). A rune not present on any page (e.g. a non-ASCII char outside the pages) is ignored. This makes `runes(&ctx.Router, "Ab1!")` → `Fragment == "Ab1!"` work directly and is the natural "just type the char" behavior for a host/physical keyboard. (Touch/D-pad entry is inherently page-scoped — you can only click/navigate to keys on the visible page — so case there is driven by switching pages, which the click-based tests in §6 exercise.)
 
 ## 5. Error handling / backstops
 
@@ -84,12 +101,14 @@ Pure UI widget — no crypto, no secret derivation (Slice 3 does that). It only 
 ## 6. Testing (host: `go test ./gui/...`)
 
 Drive the widget directly (no flow) via `runUI` + `frame()` + `uiContains`, `runes`/`click`/`press`:
-- **Case preservation:** enter `"Ab1!"` (lowercase 'a' on page 0, then page-cycle to UPPER for 'B'? — drive via explicit key clicks/page-switches since `runes` interacts with the RuneEvent path) → assert `Fragment == "Ab1!"` (NOT uppercased).
+- **Case preservation via RuneEvent (cross-page):** `runes(&ctx.Router, "Ab1!")` → assert `Fragment == "Ab1!"` (NOT uppercased) — exercises the cross-page case-honoring RuneEvent path (§4.5).
+- **Case preservation via touch/clicks:** on page 0 click `'a'`; page-cycle to UPPER, click `'B'`; page-cycle to symbols, click `'1'` then `'!'` → assert `Fragment == "aB1!"` — proves page-scoped click entry preserves the page's literal case.
 - **Page cycle:** click the page-cycle key, assert the active page changed (e.g. after two cycles the symbols page is active and `'1'` is a present/valid key; the letter rows are gone).
 - **Mask/reveal:** with a non-empty Fragment, assert the readout renders `"****"`-style masking (`uiContains(content, "****")`) when masked; click reveal; assert the cleartext appears; click again; masked again.
 - **Space + backspace:** space appends `' '`; backspace removes the last rune.
 - **RuneEvent case-honoring:** `runes(&ctx.Router, "Ab")` → `Fragment == "Ab"` (proves no ToLower/ToUpper).
 - Standalone — no flow consumer. The shared-`Keyboard` guard tests (`TestWordKeyboardScreen`, `TestInputSeedCodex32`, SLIP-39, `TestWordFlow*`) must stay green (untouched type).
+- **Test note (R0 M-4):** the space glyph (U+0020) renders with no pixels, so `ExtractText` does not collect it; `uiContains` also strips spaces from its needle — so a revealed `Fragment` containing spaces still matches its space-stripped cleartext. Benign; don't chase a missing-space "bug" in the extracted text.
 
 ## 7. Versioning / commits
 
