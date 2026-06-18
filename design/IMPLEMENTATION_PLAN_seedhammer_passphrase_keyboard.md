@@ -10,7 +10,7 @@
 
 **Base:** fork `main` `06b57f3`. Branch `feat/passphrase-keyboard`. Fork-side only; no upstream PR.
 
-**Spec:** `design/SPEC_seedhammer_passphrase_keyboard.md` (R0 GREEN at R1). **PLAN GATE:** must pass the opus plan R0 gate (0C/0I) before any code.
+**Spec:** `design/SPEC_seedhammer_passphrase_keyboard.md` (R0 GREEN at R1). **PLAN R0 GATE: PASSED (GREEN — 0C/0I at R1)** — R0 caught 2 compile-fatal unused imports (C-1/C-2) + the backspace margin (I-1) + the vestigial adjust param (I-2); all folded. `design/agent-reports/seedhammer-passphrase-keyboard-plan-review-R{0,1}.md`. Cleared for implementation.
 
 **Reused primitives (verbatim from `06b57f3`):** consts `keyPadX=3,keyPadY=4,keyCornerRadius=3,keyLineWidth=1,cornerRadius=5` (`gui.go:49-57`), `leadingSize=44` (`theme.go:43`); `mulAlpha` (`gui.go:1274`), `theme.inactiveMask=0x55` (`theme.go`); `assets.KeyBackspace` (`*alpha4.Image`); `widget.Label(buf,st,col,txt)`, `widget.Labelf(buf,st,col,fmt,…)`, `widget.Labelw(buf,st,width,col,txt)`; `op.Input/.Clip`, `op.Color`, `op.Compose`, `op.Mask`, `op.RoundedRect2`, `op.RoundedOutline2`, `op.Layer`, `(op.Op).Offset`; `InputTracker.Next(ctx, filters…)`, `ButtonFilter`/`RuneFilter`, `Event.AsButton()/AsRune()`, consts `Up/Down/Left/Right/Center` (`event.go:19-32`); `Clickable.Clicked`; `ctx.Styles.keyboard` (poppins.Bold25), `ctx.Styles.word` (comfortaa.Bold17), `ctx.Styles.body`; `ctx.Platform.DisplaySize()`. Test harness: `NewContext(newPlatform())`, `runUI`, `uiContains`, `descriptorTheme`, `runes`/`click`/`press(&ctx.Router, …)`.
 
