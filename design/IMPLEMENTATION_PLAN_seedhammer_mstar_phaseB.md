@@ -6,7 +6,9 @@
 
 **Architecture:** Rework `inputCodex32Flow` from codex32/ms-only to HRP-aware: per-frame validation dispatched by parsed HRP (`New`/`ValidMD`/`ValidMK`), HRP-aware length windows + status + feedback (suppressing the codex32-share-schema `ParsePrefix` errors for md/mk), and a return type of `any` (`codex32.String` for ms, `mdmkText` for md/mk) that the existing `engraveObjectFlow` already routes. Add a Button3 "Fix?" affordance (shown when complete-but-invalid-in-window) that runs `codex32.Correct` and gates acceptance behind a new diff-confirm screen whose **universal anchor is the per-position diff** (the `id·thr·share` header line is ms-only).
 
-**Tech Stack:** Go (host `go test ./gui/... ./codex32/...`) + TinyGo (`pico-plus2`; the Phase A CI job already covers `codex32`). Spec: `design/SPEC_seedhammer_mstar_correction.md` §4 (GREEN R1). Base: fork `main` `3342165` (Phase A merged).
+**Tech Stack:** Go (host `go test ./gui/... ./codex32/...`) + TinyGo (`pico-plus2`; the Phase A CI job already covers `codex32`). Spec: `design/SPEC_seedhammer_mstar_correction.md` §4 (GREEN R1). Base: fork `main` `7975742` (Phase A + the gf1024 gofmt fix).
+
+**Gate status:** **GREEN (plan R0→R1, 0C/0I)** — the opus architect built + ran this plan's production code + tests off the base; R0 found 2 Critical (both in the plan's own test event sequences — hangs), folded + re-run-verified at R1 (button counts proven exact). Reviews: `design/agent-reports/seedhammer-mstar-correction-phaseB-plan-review-R{0,1}.md`. Cleared for single-implementer TDD.
 
 ---
 
@@ -53,10 +55,10 @@ Unchanged/reused: `engraveObjectFlow`, `mdmkFlow`/`validateMdmk`, `engraveCodex3
 
 ```bash
 cd /scratch/code/shibboleth/seedhammer
-git worktree add -b feat/mstar-typed-entry ../seedhammer-wt-mstar-b 3342165
+git worktree add -b feat/mstar-typed-entry ../seedhammer-wt-mstar-b 7975742
 cd ../seedhammer-wt-mstar-b
 ```
-Expected: worktree on `feat/mstar-typed-entry` at `3342165`.
+Expected: worktree on `feat/mstar-typed-entry` at `7975742` (Phase A + the gf1024 gofmt fix).
 
 - [ ] **Step 2: Verify clean baseline**
 
