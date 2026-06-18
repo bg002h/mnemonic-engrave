@@ -12,7 +12,7 @@
 
 **Spec:** `design/SPEC_seedhammer_codex32_multishare_recovery.md` (R0 GREEN at R1 — `design/agent-reports/seedhammer-codex32-multishare-spec-review-R{0,1}.md`).
 
-**PLAN GATE:** this plan must pass the opus-architect R0 gate (0C/0I) before any code.
+**PLAN R0 GATE: PASSED (GREEN — 0C/0I at R1).** R0 caught a real test-hang (C1: undrained Button2 blocks the event queue) + a missing-import bug (I1) → folded; R1 verified via a full EventRouter trace. Reviews: `design/agent-reports/seedhammer-codex32-multishare-plan-review-R{0,1}.md`. Cleared for implementation.
 
 **Build order:** B1a (Task 1) → B1b (Task 2) → B2/B3 (Task 3, atomic — the `confirmCodex32Flow` signature change couples the GUI pieces).
 
@@ -464,8 +464,7 @@ func TestRecoverCodex32Mismatch(t *testing.T) {
 }
 ```
 
-- [ ] **Step 10: Run to verify they fail** — Run: `/home/bcg/.local/go/bin/go test ./gui/ -run 'TestRecoverCodex32'`
-Expected: FAIL — `recoverCodex32Flow` exists (Step 8) but `engraveCodex32` and the `engraveObjectFlow` rewrite are not done; these tests call `recoverCodex32Flow` directly so they should actually PASS once Step 8 compiles. **If Step 8 compiled, run them now and expect PASS** (they validate the Step-8 code). Proceed to Step 11 regardless.
+- [ ] **Step 10: (Do NOT run tests yet — the package is mid-refactor.)** After Step 7 changed `confirmCodex32Flow`'s signature to the enum, `engraveObjectFlow` (`gui.go:1841`, still using the old `bool`) does **not** compile until Step 11 rewires it. So `go test ./gui/` between Steps 7 and 11 is a compile error, not a clean test result. These `TestRecoverCodex32*` tests (which exercise `recoverCodex32Flow` directly) are verified at **Step 13** (full suite) once Step 11 makes the package build. Proceed to Step 11. (Task 3 is atomic — write Steps 5,7,8,9,11,12 together, verify at Step 13, commit at Step 15.)
 
 - [ ] **Step 11: Refactor `engraveObjectFlow` into `engraveCodex32`** — in `gui/gui.go`, replace the entire `case codex32.String:` block (`gui.go:1841-1854`) with:
 
