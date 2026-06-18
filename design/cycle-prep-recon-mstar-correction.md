@@ -137,6 +137,51 @@ Rust golden vectors — the high-risk, authoritative-bound piece, own R0/review/
    field) vs the Rust's carryless-multiply.
 5. **Decomposition + per-phase gating** confirmation.
 
+## 11. Architect-panel synthesis — LOCKED decisions (2026-06-18, 3 lenses)
+
+Panel (crypto-security / firmware-resource / design-decomposition) persisted verbatim to
+`design/agent-reports/seedhammer-mstar-correction-panel-*`. Unanimous: **proceed, decomposed and
+ms1-scoped, with a non-skippable safety model.** Locked decisions for the spec:
+
+- **Decompose, strict A→B, each its own gate.** **Phase A** = a pure, parameterized `codex32`
+  decoder package (GF(1024) + syndromes→Berlekamp-Massey→Chien→Forney→**mandatory re-verify**,
+  subs-only, **unique-within-radius or return nothing**), TDD against **Rust-generated parity
+  vectors**, **merged DORMANT** (no caller — the SLIP-39-D1 precedent; covers all three m\*1 by
+  construction). **Phase B** = the suggest→confirm UX on the typed ms1/codex32 path. B calls A's
+  API, so A must land first.
+- **Build `Gf1024{lo,hi}` on the fork's audited GF(32) `fe.Mul`** (~0 new tables, no `math/big`,
+  no 128-bit; decoder internals `uint8`/`uint16`, `uint64` only at the residue boundary).
+- **The three-layer safety model is MANDATORY (Critical if violated):** (1) decoder-internal
+  guards (`deg(Λ)>4`/root-count/bad-magnitude → reject — port faithfully); (2) **re-verify after
+  apply**; (3) **human confirmation of the resulting string, never auto-apply.** Re-verify does
+  NOT close the residual "wrong-but-valid" hole (a >t-error string can decode to a *different
+  valid* codeword that re-checksums clean) — only the human gate does, and only if framed right.
+- **The confirm gate must show the DIFF, not the blob:** per-position `pos N: 'x'→'y'` (≤4 lines)
+  + the decoded header fields (`id · thr · share`) as the human-checkable anchor — the Seed-XOR-
+  fingerprint discipline (you can't eyeball a high-entropy string, but you CAN check a 1–2-char
+  edit against your card). A **new** screen (NOT `confirmCodex32Flow`, whose Button3 engraves);
+  Button2-drain; accept → replace fragment → re-validate through the **existing** `New`/OK path;
+  reject → keep editing.
+- **Run the decoder ON-DEMAND, never per-keystroke:** a "Fix?" affordance shown only when the
+  string is **complete-but-invalid-in-a-valid-length-window** (mirrors `codex32Feedback`'s
+  suppress-until-window discipline); a mid-typed prefix would yield flickering garbage.
+- **Suppress entirely** when the decoder returns nothing, or the re-verify fails, or the
+  correction isn't unique within radius — show the existing "bad checksum", let the user re-type.
+  **No multi-candidate / "A or B?" for secret material.**
+- **Subs-only for v1.** Erasures (`?`/wrong-case → erasure) need marking-UX + a damaged-plate
+  re-read path that doesn't exist; the forced-uppercase, b/i/o-dimmed keypad makes substitutions
+  the only realistic error anyway. Keep the BM core erasure-amenable; defer the path.
+- **Per-code-constant integrity:** ONE source of truth — the decode path consumes the
+  verifier's existing parity-tested `residue ⊕ target` (no second copy of `POLYMOD_INIT`/targets/
+  hi-lo). Pin with **Rust-generated vectors only**, plus a **negative cross-constant test** (an
+  `ms1` string must NOT "correct-and-verify" under the `md` constants) and the field self-tests
+  (β order 93, γ order 1023, generator roots) as build-time conformance. Add
+  `tinygo build -target=pico-plus2` of `codex32` to CI (the Slice-1 lesson).
+- **Scope v1 = the typed ms1/codex32 path.** Phase A's decoder covers all three m\*1, but md/mk
+  arrive only over (error-free) NFC, so their *correction* is moot until a **typed md/mk entry
+  path** exists — net-new GUI with no current user → **deferred FOLLOWUP**, not built in v1.
+  (Erasure UX likewise deferred.) ← the one scope point surfaced to the user.
+
 ## 10. TDD oracle
 The constellation's BCH-correction integration tests (`ms/md/mk-codec .../tests/bch_decode.rs`,
 `bch_all_lengths.rs`, `bch_adversarial.rs` — corrupt-then-correct with known positions/magnitudes)
