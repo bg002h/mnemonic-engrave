@@ -92,9 +92,12 @@ Algorithm (port of `seed_xor_combine`, `seed_xor.rs:161`): require `len(parts) >
 (`errTooFewParts`); take `e0 := parts[0].Entropy()`; require `len(e0) ∈ {16,24,32}`
 (`errBadLength` — the §2.3 interop guard, rejecting 20/28); for each later part require
 `len(Entropy()) == len(e0)` (`errMismatchedLengths`); XOR all entropies byte-wise into `out`;
-`m := bip39.New(out)` (safe — length validated); `wipe(out)`; return `m`. (`bip39.Mnemonic.Entropy()`
-panics on an invalid mnemonic — callers pass only entry-validated/parsed mnemonics, so it's safe;
-the unit tests parse from vectors.) `Describe(err)` for the GUI.
+`m := bip39.New(out)` (safe — length validated); `wipe(out)`; return `m`. **Panic-safety
+(I1):** `bip39.Mnemonic.Entropy()` panics on an *invalid* mnemonic, so `Combine` must only ever
+receive valid parts. This is NOT assumed — it is *enforced* by the §4.2 flow's per-part
+`isMnemonicComplete && Valid()` guard before a part is collected (the GUI's `inputWordsFlow` can
+return a partial slice on Back), and by the unit tests parsing from checksum-valid vectors.
+`Describe(err)` for the GUI.
 
 ### 4.2 GUI combine flow — `gui/seedxor_polish.go`
 
@@ -109,8 +112,19 @@ the unit tests parse from vectors.) `Describe(err)` for the GUI.
   1. `n := seedXORPartCount(...)`; `0` → `(nil,false)`.
   2. `nwords := seedXORPartLength(...)`; `0` → `(nil,false)`. `L = nwords`.
   3. Collect `n` parts: for `i in 0..n`, `m := emptyBIP39Mnemonic(L)`;
-     `inputWordsFlow(ctx, th, m, 0, title="Part i of n")` (so every part is exactly `L` words —
-     mismatched length is structurally impossible). Back at any prompt → `(nil,false)`.
+     `inputWordsFlow(ctx, th, m, 0)` — the **real** signature (no title, no return value; it fills
+     the pre-sized `m` and returns when full OR returns a *partially-filled* slice on Back). **I1
+     back-out + panic guard (the only data path into the crypto):** after each return, validate
+     the part — `if !isMnemonicComplete(m) || !m.Valid() { return nil, false }` (reuse
+     `isMnemonicComplete` gui.go:~2185 + `bip39.Mnemonic.Valid()` bip39.go:~107). A partial fill
+     (Back) or any non-valid part **aborts the whole flow** (never collected) — so only
+     checksum-valid `L`-word parts reach `seedxor.Combine`/`Entropy()`, which otherwise panics on
+     an invalid mnemonic. Every part is exactly `L` words (pre-sized), so length-mismatch is
+     structurally impossible. **Per-part progress title:** add a `title string` param to
+     `inputWordsFlow` mirroring the SLIP-39/codex32 precedent (`inputSLIP39Flow`/`inputCodex32Flow`
+     already take one); pass `"Part i of n"` here, and update the two existing callers (the 12/24
+     menu entry gui.go:~2025 and the `SeedScreen` edit gui.go:~2102) to pass their current title —
+     an additive, behavior-preserving change (see §7).
   4. `seed, err := seedxor.Combine(parts)`; on err → `showError(ctx, th, "Seed XOR",
      seedxor.Describe(err))` + `(nil,false)` (defensive — the pre-sized entry should make
      `errMismatchedLengths` unreachable; keep it for defense-in-depth).
@@ -146,13 +160,16 @@ words)"; `errMismatchedLengths` → "all parts must be the same length". Unknown
 
 ## 6. TDD (Coldcard vectors + toolkit G1 byte-pin as oracle)
 
-- **`seedxor` unit (pure):** embed the captured Coldcard vectors (24-word 3-part →
-  `silent toe … indoor`; 12-word 3-part → `cannon … trade`) as `testdata`; assert
-  `Combine(parts) == expected` and **order-independence** (shuffle parts → same result). Add the
-  toolkit **G1 byte-pin** relation as a cross-check. Negatives: <2 parts → `errTooFewParts`;
-  mixed 12+24 → `errMismatchedLengths`; a 15/21-word (20/28-byte) part → `errBadLength` (the §2.3
-  interop guard). (Cross-check option: the toolkit's `tests/lib_seed_xor.rs` / Coldcard
-  `testing/test_seed_xor.py` vectors.)
+- **`seedxor` unit (pure):** **(M1)** the Coldcard phrase vectors are NOT a pre-existing
+  copyable artifact (the `silent toe … indoor` 24-word / `cannon … trade` 12-word phrases live
+  only in the recon/consult prose) — the implementer must **re-derive them from an authoritative
+  source** (Coldcard `testing/test_seed_xor.py` / `testing/xor.py`, or regenerate via the toolkit
+  CLI / a Coldcard device) and persist them under `seedxor/testdata/` with the source cited. Then
+  assert `Combine(parts) == expected`, **(M2)** **order-independence** (shuffle parts → same
+  result — authored fresh; XOR commutativity, no toolkit test to port), and pin against the
+  toolkit **G1 byte-pin** + **G2 round-trip** arithmetic (`tests/lib_seed_xor.rs`) as the
+  independent oracle. Negatives: <2 parts → `errTooFewParts`; mixed 12+24 → `errMismatchedLengths`;
+  a 15/21-word (20/28-byte) part → `errBadLength` (the §2.3 interop guard).
 - **GUI:** `TestCombineSeedXOR` (drive N parts via the `driveShare`-style helper → assert the
   recovered mnemonic's fingerprint screen + that `backupWalletFlow` is reached);
   `TestSeedXORFingerprintMandatory` (the gate is on the only success path; Back → no engrave);
@@ -171,7 +188,7 @@ words)"; `errMismatchedLengths` → "all parts must be the same length". Unknown
 | `seedxor/seedxor_test.go` + `seedxor/testdata/` | **new** — Coldcard/toolkit vectors + negatives. |
 | `gui/seedxor_polish.go` | **new** — `seedXORPartCount`, `seedXORPartLength`, `combineSeedXORFlow`, `confirmSeedXORFingerprint`. |
 | `gui/seedxor_polish_test.go` | **new** — combine flow + mandatory-gate + no-hang tests. |
-| `gui/gui.go` | **modify** — add `"SEED XOR"` to the input `ChoiceScreen` + its `case` (returns `bip39.Mnemonic`); no new dispatch, no new import beyond what's present. |
+| `gui/gui.go` | **modify** — add `"SEED XOR"` to the input `ChoiceScreen` + its `case` (returns `bip39.Mnemonic`); no new dispatch, no new import. **+ add a `title string` param to `inputWordsFlow`** (I1) and pass the existing title at the two current callers (the 12/24 menu entry ~`:2025` and the `SeedScreen` edit ~`:2102`) — additive, behavior-preserving. |
 
 **Unchanged (reused, must stay green):** `bip39/` (`Entropy`/`New`), `backupWalletFlow`/
 `masterFingerprintFor`/`SeedScreen.Confirm`, `codex32/`, `slip39/`, `backup/`.
