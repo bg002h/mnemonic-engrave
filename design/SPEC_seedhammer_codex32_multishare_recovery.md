@@ -45,6 +45,11 @@ Crypto already exists and is BIP-93-conformant (`Interpolate` + `String.Seed()`)
 // (k shares) — use it to validate shares as they are collected. Returns the same
 // sentinels Interpolate uses (errMismatched{Length,HRP,Threshold,ID},
 // errRepeatedIndex), so Describe maps them. A set of 0 or 1 share is consistent.
+//
+// PRECONDITION (R0 I1): every share MUST already be New-valid — ConsistentShares
+// calls the unexported parts(), which PANICS on a malformed String. Callers must
+// only pass strings that passed New without error (the keypad gates the OK button
+// on New==nil, so recoverCodex32Flow upholds this). State this in the godoc.
 func ConsistentShares(shares []String) error
 ```
 Implemented over `parts()` (HRP/threshold/id/shareIdx) + `len(s.s)` (length) + pairwise distinct-index — the **same comparisons `Interpolate`'s pass-1 makes**, minus the count check. **`Interpolate` is NOT modified** (it keeps its own internal checks as defense-in-depth at recovery time; whether to refactor it to call `ConsistentShares` is an R0 call — default: leave it untouched to keep the proven crypto path intact, accept the small duplication).
@@ -66,11 +71,20 @@ func confirmCodex32Flow(ctx *Context, th *Colors, scan codex32.String) codex32Co
 ```
 - For an **unshared secret** (`Unshared`): show only Back / Engrave (as A1 does today).
 - For a **share** (index ≠ S): show Back / **Recover** (Button2) / Engrave, and replace the dead-end "engraves THIS share, not a recovered seed" note with an actionable one ("Recover to reconstruct the secret from k shares").
+- **Title branch (M1):** `confirmCodex32Flow` currently hardcodes the title `"Confirm Codex32 Share"`. Branch it on `Unshared` → `"Confirm Codex32 Secret"` (so the re-confirm of a *recovered* unshared secret isn't mistitled "Share").
 
 New `recoverCodex32Flow(ctx, th, first codex32.String) (codex32.String, bool)`:
-- `k := ParsePrefix(first.String()).Threshold` (known from the first share's header). Seed the set with `first`.
+- Derive k from the first share, with a defensive guard (**R0 I2** — `Fields.Threshold` is only meaningful when `ThresholdKnown`; a `New`-valid share guarantees `ThresholdKnown==true` and `Threshold ∈ [2,9]`, but make it self-documenting):
+  ```go
+  f, _ := codex32.ParsePrefix(first.String())
+  if !f.ThresholdKnown || f.Threshold < 2 { // unreachable for a New-valid share; defensive
+  	return codex32.String{}, false
+  }
+  k := f.Threshold
+  ```
+  Seed the set with `first`.
 - Loop collecting shares until `len(shares) == k` (exactly k — §8): each iteration shows a "Share i of k · id NAME" header (clone `inputWordsFlow`'s `layoutTitlef` counter) and calls `inputCodex32Flow` for the next share. After each entry:
-  - the entered string must be `New`-valid (the keypad already gates the OK button on `New==nil`) **and** a share (index ≠ S) — reject a second unshared secret;
+  - the entered string must be `New`-valid (the keypad already gates the OK button on `New==nil`) **and** a share (index ≠ S); **reject a second unshared secret** via `ParsePrefix(cand).Unshared` with an explicit `ErrorScreen` message **"enter a share, not the secret"** (M4 — do NOT reuse the generic "bad share index" label, which would misdescribe it);
   - run `codex32.ConsistentShares(append(shares, cand))`; on error, show an `ErrorScreen` with `codex32.Describe(err)` (e.g. "mismatched id", "repeated share") and discard the candidate (stay on the same step);
   - on success, append.
 - Allow **Back** to remove the last share / exit to the original share's confirm (return `(_, false)`).
@@ -105,7 +119,7 @@ func engraveCodex32(ctx *Context, th *Colors, scan codex32.String) bool {
 	}
 }
 ```
-The recovered secret (index S) re-enters the same confirm, which now shows "Unshared secret (S) · id NAME" and offers only Engrave/Back — then engraves **verbatim** via the unchanged `backupSeedStringFlow`. **No change to `Split()`, the engrave path, or `Interpolate`.**
+The recovered secret (index S) re-enters the same confirm, which now shows "Unshared secret (S) · id NAME" and offers only Engrave/Back — then engraves **verbatim** via the unchanged `backupSeedStringFlow`. **No change to `Split()`, the engrave path, or `Interpolate`.** (M5: `scan.Split()` here is used **only for `id`** — its threshold and index returns are discarded, so `Split()`'s threshold-0→1 remap is irrelevant on this path; this matches A1's existing engrave behavior exactly.)
 
 ## 5. Error handling / backstops
 
@@ -115,6 +129,8 @@ The recovered secret (index S) re-enters the same confirm, which now shows "Unsh
 
 - **B1 (pure, highest value):** `codex32` table tests for `ConsistentShares` over BIP-93 vector share sets — a consistent set (e.g. vector-2 shares `MS12NAMEA…` + `MS12NAMEC…`) → nil; a set differing in id/threshold/length → the matching sentinel; a repeated index → `errRepeatedIndex`; 0/1-share sets → nil. `Describe` returns the new labels for each cross-share sentinel.
 - **B2/B3 (gui, `runUI`+`ExtractText`+`uiContains`):** drive `recoverCodex32Flow` (or `engraveObjectFlow`) with vector-2 share A as the first share + `runes(shareC)` + accepts: assert the collector renders "Share 2 of 2", that a mismatched candidate (e.g. a different-id share) surfaces "mismatched id", and that recovery yields the secret — assert the post-recovery confirm shows "Unshared secret" (the recovered `MS12NAMES…`). Assert that an unshared secret entered first shows **no** Recover option. Keep `TestInputSeedCodex32`/`TestWordKeyboardScreen` + all A1 tests green.
+  - **Multi-screen driving (M3):** these flows span several screens, so the test advances `frame()` step-by-step (queue the runes/clicks for the next screen, call `frame()` to render+assert, repeat) — not the single "queue everything then one `frame()`" shape. Where a step pre-queues all input (as `TestInputSeedCodex32` does), document that the assertion is on the terminal frame.
+  - **Long-code engrave (M2):** a recovered secret can be a long code (125–127 chars, 256-bit, threshold ≥ 2). The existing `backupSeedStringFlow`/`EngraveSeedString` path handles it (math checked: `ngroups=⌈127/10⌉=13 ≤ maxCol1=16`), but there is no existing golden engrave test for a long codex32 string. Add a `backup`-level test (or a gui assertion) engraving a 127-char codex32 secret to close the gap — recommended, not a GREEN blocker.
 
 ## 7. Versioning / commits
 
