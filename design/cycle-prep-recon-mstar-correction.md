@@ -177,10 +177,17 @@ ms1-scoped, with a non-skippable safety model.** Locked decisions for the spec:
   `ms1` string must NOT "correct-and-verify" under the `md` constants) and the field self-tests
   (β order 93, γ order 1023, generator roots) as build-time conformance. Add
   `tinygo build -target=pico-plus2` of `codex32` to CI (the Slice-1 lesson).
-- **Scope v1 = the typed ms1/codex32 path.** Phase A's decoder covers all three m\*1, but md/mk
-  arrive only over (error-free) NFC, so their *correction* is moot until a **typed md/mk entry
-  path** exists — net-new GUI with no current user → **deferred FOLLOWUP**, not built in v1.
-  (Erasure UX likewise deferred.) ← the one scope point surfaced to the user.
+- **Scope v1 = ALL m\*1, typed entry + correction (USER DECISION 2026-06-18 — overrode the
+  panel's ms1-only recommendation).** Phase A's decoder already covers all three; Phase B adds a
+  **typed md/mk entry** so md1/mk1 correction is reachable on-device too, not just ms1. The
+  panel's ms1-only was a cost-benefit call (md/mk arrive only over error-free NFC, no current
+  typed user); the user wants full all-m\*1 typed correction. **Cleanest realization:** md1/mk1
+  are codex32-family bech32 strings → the existing codex32 keypad charset serves all three, so
+  Phase B becomes an **HRP-dispatched typed-entry**: the user types `ms1…`/`md1…`/`mk1…`; validate
+  per parsed HRP (`codex32.New` for ms1, `ValidMD`/`ValidMK` for md/mk); the shared decoder
+  corrects per-HRP via the same suggest→confirm gate; engrave routes by type (`engraveCodex32`
+  for ms1, `mdmkFlow` for md/mk — the existing `engraveObjectFlow` dispatch). Erasure UX still
+  deferred (subs-only v1).
 
 ## 10. TDD oracle
 The constellation's BCH-correction integration tests (`ms/md/mk-codec .../tests/bch_decode.rs`,
