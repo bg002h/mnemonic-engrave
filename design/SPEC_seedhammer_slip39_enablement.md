@@ -85,12 +85,13 @@ The dormant blocks were written against an old API and will NOT compile as-is (R
       }
       share, err := slip39words.ParseShare(strings.Join(words, " "))
       if err != nil {
-          showError(ctx, th, slip39words.Describe(err)) // dismissible ErrorScreen, then re-loop
+          showError(ctx, th, "Invalid SLIP-39 share", slip39words.Describe(err)) // dismissible, then re-loop
           continue
       }
       return share, true
   ```
-  (`inputSLIP39Flow(ctx, th, m, 0) bool` fills `m slip39words.Mnemonic`; the words are joined into the space-separated string `ParseShare` consumes — this is exactly the dormant conversion, so **R0 I3 is resolved by keeping `ParseShare(string)` per §4.1** (string is also what the official vectors are, so it test-gates trivially). Confirm `gui.go` imports `"strings"` — if not, add it with `"fmt"`.)
+  (`inputSLIP39Flow(ctx, th, m, 0) bool` fills `m slip39words.Mnemonic`; the words are joined into the space-separated string `ParseShare` consumes — this is exactly the dormant conversion, so **R0 I3 is resolved by keeping `ParseShare(string)` per §4.1** (string is also what the official vectors are, so it test-gates trivially). `gui.go` **already imports `"strings"`** (`gui.go:14`); only `"fmt"` needs adding — R1 m1.)
+- **Error modal helper (R1 m2):** `showError(...)` above is a NEW small helper to add (Cycle-B's `showCodex32Error` hard-codes the title `"Invalid share"`, so don't reuse it directly): `func showError(ctx *Context, th *Colors, title, msg string)` running the standard dismissible `ErrorScreen` loop (`&ErrorScreen{Title: title, Body: msg}`; `for !ctx.Done { d, ok := errScr.Layout(ctx, th, dims); if ok { return }; ctx.Frame(op.Layer(d, <background>)) }`). Call it `showError(ctx, th, "Invalid SLIP-39 share", slip39words.Describe(err))` at entry and `showError(ctx, th, "Too large", "Share doesn't fit a plate.")` in the engrave helper.
 - **Engrave:** route through a helper that ALWAYS returns `true` (recognized), mirroring Cycle-A1's `engraveCodex32` so a cancel/fit-failure never falls to the caller's `scanUnknownFormat` ("Unknown format") path:
   ```go
   case slip39words.Share:
@@ -111,12 +112,12 @@ The dormant blocks were written against an old API and will NOT compile as-is (R
       params := ctx.Platform.EngraverParams()
       seedSide, err := backup.EngraveSeed(params, seedDesc)
       if err != nil {
-          showError(ctx, th, "too large") // recognized but unfittable; still return true below
+          showError(ctx, th, "Too large", "Share doesn't fit a plate.") // recognized but unfittable
           return true
       }
       plate, err := toPlate(seedSide, params)
       if err != nil {
-          showError(ctx, th, "too large")
+          showError(ctx, th, "Too large", "Share doesn't fit a plate.")
           return true
       }
       for {
@@ -138,7 +139,8 @@ A light confirm screen modeled on `confirmCodex32Flow` (Back=Button1 / Engrave=B
 
 ## 6. Testing (host: `go test ./slip39/... ./gui/...`)
 
-- **C1 (pure, highest value):** `slip39` table tests against the **official SLIP-0039 vectors** (`trezor/python-shamir-mnemonic/vectors.json`): every 20-word mnemonic in a *valid* vector set `ParseShare`-OK with the expected decoded metadata; a checksum-corrupted mnemonic (flip one word) → bad-checksum sentinel; a 33-word share → unsupported-size sentinel; a non-wordlist word → not-in-wordlist sentinel; RS1024 verified for both `ext==0`/`ext==1` customization strings. **Concrete anchor vector (R0 M2):** the existing `backup_test.go` SLIP-39 fixture share (id **7945**, a 1-of-1 single-group share) → assert `Identifier==7945, GroupThreshold==1, GroupCount==1, MemberIndex==0, MemberThreshold==1`. Embed a couple more official 20-word vectors (e.g. `vectors.json` entry 1) with their decoded fields computed from the bits; since `vectors.json` exposes only the master secret, the plan must precompute the expected header fields per embedded vector (from the mnemonic bits or a reference impl) and hard-code them in the assertions.
+- **C1 (pure, highest value):** `slip39` table tests against the **official SLIP-0039 vectors** (`trezor/python-shamir-mnemonic/vectors.json`): every 20-word mnemonic in a *valid* vector set `ParseShare`-OK with the expected decoded metadata; a checksum-corrupted mnemonic (flip one word) → bad-checksum sentinel; a 33-word share → unsupported-size sentinel; a non-wordlist word → not-in-wordlist sentinel; RS1024 verified for both `ext==0`/`ext==1` customization strings.
+- **Concrete anchor vector (R1 C1 — corrected):** write a NEW test in `slip39/share_test.go` (note: `backup_test.go`'s `TestSLIP39` is an engrave golden-image test — it never calls `ParseShare`, and its title literal `"7945 #1 1/1"` is a hand-written display string, **NOT** a decoded field; do not assert against it). Use the same `vectors.json` "valid mnemonic without sharing (128 bits)" share (`"duckling enlarge academic academic agency result length solution fridge kidney coal piece deal husband erode duke ajar critical decision keyboard"`). Robust assertions for this 1-of-1 single-group share: `GroupThreshold==1, GroupCount==1, MemberIndex==0, MemberThreshold==1`. Its **decoded `Identifier` is 10027**, not 7945 — `(wordIndex(0)<<10 | wordIndex(1)) >> 5 = (313<<10 | 360) >> 5 = 320872 >> 5 = 10027` (the top 15 bits, above the 1-bit ext + 4-bit iteration exponent). **The plan MUST precompute each embedded vector's expected header fields against an independent reference (the `trezor/python-shamir-mnemonic` decoder), NOT any display string, and hard-code the verified values** — `vectors.json` exposes only the master secret, so the header fields are computed, and the 7945-vs-10027 discrepancy is exactly the trap this note guards against.
 - **C2/C3 (gui, `runUI`+`ExtractText`+`uiContains`):** drive the menu to SLIP-39 (index 3), enter a valid 20-word share, assert the confirm shows the id/member info and the share engraves; assert an invalid share (bad checksum) surfaces the error label. Keep all codex32 (A1/B) + BIP-39 guard tests green.
 
 ## 7. Versioning / commits
