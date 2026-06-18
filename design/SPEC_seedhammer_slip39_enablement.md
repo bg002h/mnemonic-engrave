@@ -156,6 +156,8 @@ Firmware version `-ldflags`-injected (no source bump; next tag would be a MINOR 
 - **Confirm screen added** (C3) — addresses the maintainer's "not polished" objection, mirrors codex32 A1.
 - **`inputSLIP39Flow`'s static "Input Words" title is kept** as-is for Tier 1 (R0 M1) — functional; a dynamic "Word N of 20" progress title (à la BIP-39's `inputWordsFlow`) is a deferred nice-to-have, not in this cycle.
 
+**SPEC R0 GATE: PASSED (GREEN — 0C/0I at R4).** Loop R0→R4 (reviews persisted to design/agent-reports/seedhammer-slip39-spec-review-R{0..4}.md): caught stale dormant code (R0), the anchor-vector identifier saga settled at 7945 verified vs the fork wordlist (R1/R2), and the uppercase-normalization sentence (R3). Cleared for implementation.
+
 **R0 OUTCOME (2026-06-18):** R0 = RED (2 Critical / 3 Important) — the dormant code was stale (`scan.Words()`, 3-arg `.Engrave`, 20-char title > `MaxTitleLen=18`, missing `fmt` import, §4.1/§4.2 `ParseShare`-input contradiction). All folded above with concrete substitutions (§4.2) + the engrave routed through an always-`true` `engraveSLIP39` helper (avoids the A1 "Unknown format"-on-cancel pitfall) + RS1024 decode-ordering pinned (§4.1) + a concrete anchor vector (§6). Re-dispatched R1.
 
 ## 9. Process note
