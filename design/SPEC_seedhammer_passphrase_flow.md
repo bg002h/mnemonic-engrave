@@ -194,6 +194,8 @@ Firmware `-ldflags`-injected (additive optional UX → a MINOR bump at the next 
 - **Threading is 3 signatures** (`deriveMasterKey`, `masterFingerprintFor`, `engraveSeed`); the `Confirm` validity check keeps `password=""`. Add `"fmt"` to `gui.go` imports for `%.8X` (or use the existing string path — plan decides).
 - No `PassphraseKeyboard`/shared-`Keyboard`/`backup`/`bip39` changes.
 
+**SPEC R0 GATE: PASSED (GREEN — 0C/0I at R1).** R0 caught the phantom helper (C-1), ChoiceScreen state-reuse (C-2), the invalid switch skeleton (I-3), the fmt import (I-1), and back-state ambiguity (I-4); all folded, R1 verified compile-accurate. Reviews: `design/agent-reports/seedhammer-passphrase-flow-spec-review-R{0,1}.md`. Cleared for implementation.
+
 ## 9. Process note
 
 Per project standard: this spec MUST pass the opus-architect **R0 gate to 0C/0I before any code** (fold → persist verbatim to `design/agent-reports/` → re-dispatch until GREEN). Then plan → plan R0 → single-implementer subagent TDD → mandatory whole-diff adversarial execution review. Proceeding autonomously (user directive). Completes the input-UX 3-slice arc (and "c and 2 & 3").
