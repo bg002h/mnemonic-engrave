@@ -8,7 +8,9 @@
 
 **Tech Stack:** Go (host `go test ./gui/... ./codex32/...`) + TinyGo (`pico-plus2`; the Phase A CI job already covers `codex32`). Spec: `design/SPEC_seedhammer_mstar_correction.md` §4 (GREEN R1). Base: fork `main` `7975742` (Phase A + the gf1024 gofmt fix).
 
-**Gate status:** **GREEN (plan R0→R1, 0C/0I)** — the opus architect built + ran this plan's production code + tests off the base; R0 found 2 Critical (both in the plan's own test event sequences — hangs), folded + re-run-verified at R1 (button counts proven exact). Reviews: `design/agent-reports/seedhammer-mstar-correction-phaseB-plan-review-R{0,1}.md`. Cleared for single-implementer TDD.
+**Gate status:** **GREEN (plan R0→R1, 0C/0I)** — the opus architect built + ran this plan's production code + tests off the base; R0 found 2 Critical (both in the plan's own test event sequences — hangs), folded + re-run-verified at R1 (button counts proven exact). Reviews: `design/agent-reports/seedhammer-mstar-correction-phaseB-plan-review-R{0,1}.md`.
+
+**SHIPPED:** Phase B merged to fork `main` `384547d` (no-ff, signed+DCO), pushed `bg002h`. Whole-diff execution review **GREEN (0C/0I)** (`design/agent-reports/seedhammer-mstar-correction-phaseB-execution-review.md`): full suite green + 50× stress no-hang, zero transcription drift, no constructible confirm-gate bypass (two re-verifies + the human diff gate), all §2 invariants hold; 2 cosmetic test-comment minors folded (`a23bcc8`). **This completes the m\*1 correction cycle (Phase A decoder + Phase B GUI).** All three m\*1 are now typeable + correctable + engravable on-device.
 
 ---
 
