@@ -20,7 +20,7 @@ Button3-accept already comes from A0 (the merge). Fork-side; the spec goes throu
 
 ## 2. Scope
 
-**In:** C1 (codex32 package API additions) + C2–C5 (gui). **Out:** multi-share recovery (Cycle B); long-code gate widening; `Split()` changes; `mdmk.go`. **Files:** `codex32/codex32.go` (+ `codex32/*_test.go`), `gui/gui.go` (`inputCodex32Flow` only), `gui/codex32_input_test.go`. The shared `Keyboard` widget is touched only via the codex32 keyboard instance (C5) — **`TestWordKeyboardScreen` (BIP-39) must stay green** as the no-cross-contamination guard.
+**In:** C1 (codex32 package API additions) + C2–C5 (gui). **Out:** multi-share recovery (Cycle B); long-code gate widening; `Split()` changes; `mdmk.go`. **Files:** `codex32/codex32.go` (+ `codex32/*_test.go`); `gui/gui.go` — `inputCodex32Flow` (C2/C3/C5) **and** the `engraveObjectFlow` `case codex32.String:` block at `:1819` (C4's pre-engrave confirm — see §4.4); `gui/codex32_input_test.go` (+ `gui/gui_test.go` if a regression test lands there). The shared `Keyboard` widget is touched only via the codex32 keyboard instance (C5) — **`TestWordKeyboardScreen` (BIP-39) must stay green** as the no-cross-contamination guard.
 
 ## 3. Background — the flow (post-A0 anchors on `3c4d3d3`)
 
@@ -73,6 +73,8 @@ func ParsePrefix(frag string) (Fields, error)
 ```
 Determinability (data part = everything after the first `1`, via `splitHRP`): HRP on `1` (validate `ms`/`MS` case-folded); `Threshold = data[0]` at len≥1 (valid ∈ {0,2–9}; `1` → "bad threshold"); `Identifier = data[1:5]` at len≥5 (bech32 chars via `feFromRune`); `ShareIndex = data[5]` at len≥6 (enforce threshold-0 ⇒ index `s`/`S`); payload/checksum never split. Detect mixed case (moot via the force-uppercasing keypad but honest for a package API). Pure, host-testable.
 
+**Timing/edge clarification (architect MINOR-3):** before the first `1` is typed, `splitHRP` returns `("", whole)`, so `HRP == ""` and `Threshold/Identifier/ShareIndex` are all `…Known == false` (the pre-`1` chars are HRP candidates, not data — no field/threshold error is emitted yet). The threshold-0 ⇒ index-`s`/`S` rule is determinable **only at len≥6** (it needs both `data[0]=='0'` and `data[5]`); a lone leading `0` between len 1 and 5 is **not** yet a "bad share index" error. C2's eager-error tests must respect this (no premature share-index error before len≥6).
+
 ### 4.2 C2 — error-class feedback (`inputCodex32Flow`)
 
 Per `kbd.Update` iteration, call `codex32.New` and `codex32.ParsePrefix` **once each** and thread the results (no redundant calls in the layout block). Show feedback under the entry, timed to determinability:
@@ -96,8 +98,11 @@ Plus a live field line from `ParsePrefix.Fields`: `"id ABCD · thr 2 · share C"
 |   MS12ABCDC W5N4...                  |
 +--------------------------------------+
 ```
+**Layout-fit (architect MINOR-2):** these are TWO new text lines (status + field) stacked above the fragment box, in a band that today holds only the fragment. `inputWordsFlow` fits exactly one extra count line and clamps it so it never overlaps the keyboard (the `countY`-clamp pattern near `gui.go:645-648`). The implementer MUST reuse that same clamp for **both** new lines; if the two lines don't fit the ~240px band cleanly, merge status+fields onto fewer rows. Tests assert on `ExtractText` content regardless of pixel position, so fit is a visual-QA refinement, not a correctness gate.
 
 ### 4.4 C4 — pre-engrave confirmation screen
+
+**Site (architect MINOR-1):** implement the confirm screen in the **`engraveObjectFlow` `case codex32.String:` block at `gui/gui.go:1819`**, before it hands off to `backupSeedStringFlow` — NOT inside `inputCodex32Flow` (which stays input-only). This block already has the accepted `codex32.String` in hand, mirrors the `descriptorFlow`/`SeedScreen.Confirm` pattern, and is the natural pre-engrave checkpoint. (§2's Files list is widened accordingly.)
 
 After accept, before engraving, show a confirm screen (mirrors `SeedScreen.Confirm`). **Branch on the RAW share index from `ParsePrefix`, NOT `Split()`** (`Split()` remaps threshold 0→1 and would mislabel an unshared secret as "1-of-1"):
 - index `s`/`S` (Unshared) → `"Unshared secret (S) · id ABCD"` (no threshold number).
@@ -146,3 +151,5 @@ Firmware version is `-ldflags`-injected (no source bump). Commits on `feat/codex
 ## 9. Process note
 
 Per project standard: this spec MUST pass the opus-architect **R0 gate to 0C/0I before any code** (fold → persist verbatim to `design/agent-reports/` → re-dispatch until GREEN). Implementation = single subagent per task (C1 first) + two-stage review, then a mandatory whole-diff adversarial execution review.
+
+**R0 OUTCOME (2026-06-17): GREEN — 0 Critical / 0 Important.** Persisted verbatim to `design/agent-reports/seedhammer-codex32-polish-spec-review-R0.md`. The three non-blocking Minors (C4 confirm site + §2 Files widening; C3 two-line clamp; `ParsePrefix` pre-`1`/threshold-0 timing) are folded above (§2, §4.1c, §4.3, §4.4). Architect verdict: *"Proceed to implementation"* — order C1 → C2/C3/C4 → C5. **Spec is past R0; awaiting the user's spec-review gate before writing-plans.**
