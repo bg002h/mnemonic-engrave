@@ -8,6 +8,8 @@
 
 **Tech Stack:** Go (host `go test`) + TinyGo (`pico-plus2`, 32-bit int, no `math/big`/128-bit, fixed-size stack arrays in the hot path). Spec: `design/SPEC_seedhammer_mstar_correction.md` (GREEN R1). Base: fork `04a1e95`.
 
+**Gate status:** **GREEN (R0, 0C/0I)** — the opus architect materialized this plan's code + tests and executed them against the real fork sources (200k-iteration BM differential, exhaustive orientation sweep, dispatch-boundary equivalence). Review verbatim: `design/agent-reports/seedhammer-mstar-correction-phaseA-plan-review-R0.md`. The 3 minors are folded (MINOR-1 the `rune(...)` wrap, MINOR-2 positive control, MINOR-3 hard ValidMD assert). Cleared for single-implementer TDD.
+
 ---
 
 ## Source-of-truth facts (verified against current source by the recon fan-out)
@@ -325,7 +327,7 @@ func corruptAt(t *testing.T, s string, dataPos int, mask fe) string {
 	if !ok {
 		t.Fatalf("bad seed char %q at %d", r[abs], abs)
 	}
-	r[abs] = (orig.Add(mask)).rune()
+	r[abs] = rune((orig.Add(mask)).rune()) // (fe).rune() returns byte
 	return string(r)
 }
 
@@ -871,11 +873,12 @@ func TestCorrectSuppressesUncorrectable(t *testing.T) {
 	if _, ok := Correct(tvMD1); ok {
 		t.Error("a valid string must not yield a correction")
 	}
-	// Random garbage of a valid length must not produce a phantom fix.
+	// Random garbage of a valid length may fail (expected) — but if Correct
+	// ever claims a fix, the mandatory re-verify means it MUST be md-valid
+	// (MINOR-3: a phantom, non-verifying "fix" is a hard failure).
 	garbage := "md1" + strings.Repeat("q", len(tvMD1)-3-1) + "p"
-	if _, ok := Correct(garbage); ok {
-		// Allowed to fail; must NOT claim a re-verifying correction it can't have.
-		t.Log("garbage unexpectedly 'corrected' — verify re-verify gate")
+	if res, ok := Correct(garbage); ok && !ValidMD(res.Corrected) {
+		t.Errorf("Correct returned a non-re-verifying fix: %q", res.Corrected)
 	}
 }
 
@@ -902,18 +905,23 @@ func TestNegativeCrossConstant(t *testing.T) {
 		coeffs[i] = eng.residue[n-1-i] ^ eng.target[n-1-i]
 	}
 	pos, mags, ok := decodeErrors(coeffs, len(data), betaGf1024, regularJStart)
-	if !ok {
-		return // good: no correction under the wrong constants
+	if ok {
+		// If it did "decode", applying it must NOT yield an md-valid string.
+		r := []rune(corrupted)
+		for i, k := range pos {
+			abs := 3 + k
+			orig, _ := feFromRune(r[abs])
+			r[abs] = rune((orig.Add(mags[i])).rune()) // (fe).rune() returns byte
+		}
+		if ValidMD("md" + string(r)[2:]) {
+			t.Fatal("ms data cross-validated under md constants")
+		}
 	}
-	// If it did "decode", applying it must NOT yield an md-valid string.
-	r := []rune(corrupted)
-	for i, k := range pos {
-		abs := 3 + k
-		orig, _ := feFromRune(r[abs])
-		r[abs] = (orig.Add(mags[i])).rune()
-	}
-	if ValidMD("md" + string(r)[2:]) {
-		t.Fatal("ms data cross-validated under md constants")
+	// Positive control (MINOR-2): the SAME corrupted ms1 string MUST correct
+	// under its own (ms) constants — so this test isn't merely vacuous.
+	res, ok := Correct(corrupted)
+	if !ok || res.Corrected != tvMS1Short {
+		t.Fatalf("ms1 should self-correct under ms constants: ok=%v got=%q", ok, res.Corrected)
 	}
 }
 
