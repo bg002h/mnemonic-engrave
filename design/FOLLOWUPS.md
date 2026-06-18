@@ -8,9 +8,31 @@ Low/nit items deferred from architect reviews (per the iterative-architect-revie
 
 - **`seedhammer-upstream-prs-tracking`** — Track the two open upstream PRs to `seedhammer/seedhammer`: **#34** (re-enable on-device CODEX32 entry) and **#35** (BCH-validated md1/mk1 engraving). Respond to maintainer feedback; mirror any requested changes back. **If declined or stalled:** pursue the fork-fallback — stand up a `seedhammer-fork` sibling repo and document the "Set custom boot key" path (program a 2nd RP2350 OTP boot-key slot via picotool to run own-signed firmware on a locked SH2; "Advanced · irreversible" — per https://gangleri42.github.io/seedhammer/).
 
-- **`seedhammer-slip39-cycleC-all-lengths`** — Widen the **Cycle C** SLIP-39 single-share entry+engrave to support **all valid SLIP-39 share lengths**, not just 20-word/128-bit. Today `slip39/share.go` hard-rejects 33-word shares (`errUnsupportedSize`, `share.go:85-86`) and caps at `wordsShort=20`. The constellation aligns SLIP-39 master secrets to BIP-39 entropy sizes `{16,20,24,28,32}` B → 20/33-word (and intermediate) shares, so single-share entry should accept the full set (matching Cycle D's recovery scope, decided 2026-06-18). Small: lift the length gate in `ParseShare` + the entry-flow word-count expectation + tests. Best done alongside or just after Cycle D (shares the length-validation code).
+- **`seedhammer-slip39-recovery-verbatim-hex`** — Optional engrave of a recovered SLIP-39 master secret as **verbatim hex** (not BIP-39 words), for **Trezor-native** SLIP-39 backups where the master secret is the BIP-32 seed *directly* (verified: `from_seed(MS)` == the official vector's `bip32_xprv`), NOT BIP-39 entropy. Cycle D engraves the BIP-39 seed plate under the constellation's "MS = BIP-39 entropy" convention, gated behind an on-device hold-to-confirm acknowledgement; a verbatim-hex option would *support* the Trezor-native case instead of excluding it. Cycle-sized: a post-recovery artifact choice (BIP-39 plate vs hex+QR via `backup.SeedString`). Surfaced by the Cycle-D crypto-security architect lens (2026-06-18).
+
+- **`seedhammer-slip39-hwsha`** — Add an RP2350 **hardware-SHA-256 `machine` driver** for the SLIP-39 Feistel/PBKDF2 round function. TinyGo currently uses pure-Go `crypto/sha256` (~4000–7000 cyc/block), so high-iteration-exponent recovery is slow (e=15 ≈ 5–8.5 h; e=0/1 ≈ 0.5–1.9 s is fine). The chip has an idle SHA accelerator (121 cyc/block, ~33–58× faster) that would cut e=15 to ~9 min. Only worth it if high-e backups become a real target; v1 ships software PBKDF2 + an e≥4 warn-confirm gate. Caveat: the SHA block defaults to Secure-Privileged with a bootrom `LOCK_SHA_256` — real integration cost. Surfaced by the Cycle-D firmware-resource architect lens (2026-06-18).
 
 ## Resolved
+
+### `seedhammer-slip39-cycleC-all-lengths` — RESOLVED-BY-D2 2026-06-18
+Cycle D Phase D1 widened `slip39.ParseShare` to accept all valid SLIP-39 share lengths
+({20,23,27,30,33} words → {16,20,24,28,32} B; dropped `errUnsupportedSize`/`wordsShort`/
+`wordsLong`), and Phase D2 added a **word-count picker** to the menu `case 3:` single-share
+entry (`inputSLIP39Flow` gained a variable length). So the single-share verbatim entry+engrave
+path now accepts all lengths, not just 20-word/128-bit — exactly this followup's ask. Shipped
+on fork `main` `9db3fd2`.
+
+### `seedhammer-slip39-recovery` (Cycle D) — DONE 2026-06-18 (fork `main` `9db3fd2`)
+On-device SLIP-0039 secret recovery. **D1** (`f0092d5`): in-tree Go port of
+`mnemonic_toolkit::slip39` — GF(256) field, Lagrange, 4-round Feistel decrypt, two-level
+`Combine`, share-value extraction; no `math/big`; TDD vs official vectors + Rust-`split`-
+generated intermediate-length fixtures. **D2** (`9db3fd2`): GUI recover flow — Recover button,
+all-length entry, two-level roster + `selectForCombine`, optional SLIP-39 passphrase, the
+entropy-interpretation hold-to-confirm + always-on fingerprint display, engrave via
+`backupWalletFlow`. Full gated pipeline (spec R0→R1 + 4-lens architect panel; D1 plan R0→R2,
+D2 plan R0→R1; both impl + whole-diff execution review GREEN 0C/0I). Reviews:
+`design/agent-reports/seedhammer-slip39-recovery-*`. Two follow-ons filed above
+(`-verbatim-hex`, `-hwsha`).
 
 ### `me-bundle-preview-sidecar` — Phase B DONE 2026-06-16 (v0.3.0)
 Shipped the faithful host-side **plate preview** + the signed cross-platform release-CI. The `me-preview` (Go) sidecar (`preview/`) pins **UPSTREAM seedhammer v1.4.2** via a git submodule (`third_party/seedhammer` @ `713aee2`) and renders ONLY a validated public string → `engrave.Engraving` → SVG (optional `--png`):
