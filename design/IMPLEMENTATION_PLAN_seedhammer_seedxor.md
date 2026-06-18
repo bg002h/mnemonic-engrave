@@ -52,12 +52,18 @@ Unchanged (reused, must stay green): `bip39/`, `backupWalletFlow`/`masterFingerp
 **Files:** `seedxor/seedxor.go`, `seedxor/seedxor_test.go`, `seedxor/testdata/vectors.json`.
 Port of `mnemonic_toolkit::seed_xor::seed_xor_combine`.
 
-- [ ] **Step 1: testdata.** Create `seedxor/testdata/vectors.json` by copying the Coldcard
-  published vectors **verbatim from the authoritative source** — Coldcard `docs/seed-xor.md`
-  (raw: `https://raw.githubusercontent.com/Coldcard/firmware/master/docs/seed-xor.md`) and/or
-  `testing/test_seed_xor.py` (M1 — these are NOT in our repos; fetch + cite source in a
-  `testdata/SOURCE.md`). At minimum the doc's 24-word 3-part vector (→ `silent toe meat … indoor`)
-  and the 12-word 3-part vector (→ `cannon opinion … trade`). Shape: `[{words:N, parts:[…], result:…}]`.
+- [ ] **Step 1: testdata.** Create `seedxor/testdata/vectors.json` from **two** sources:
+  (1) **offline oracle (plan-R0 M-1, primary):** the toolkit's in-repo G1 byte-pin / G2 round-trip
+  relations (`mnemonic-toolkit/.../tests/lib_seed_xor.rs`) — reproducible without network; use
+  these as the authoritative correctness anchor.
+  (2) **Coldcard interop cross-check:** copy the published vectors **verbatim** from Coldcard
+  `docs/seed-xor.md` (raw: `https://raw.githubusercontent.com/Coldcard/firmware/master/docs/seed-xor.md`)
+  / `testing/test_seed_xor.py` (NOT in our repos — fetch + cite in `testdata/SOURCE.md`): at
+  minimum the 24-word 3-part (→ `silent toe meat … indoor`) and 12-word 3-part (→ `cannon
+  opinion … trade`). Shape: `[{words:N, parts:[…], result:…}]`. (If the network fetch is
+  unavailable at impl time, the offline toolkit oracle + a locally-regenerated toolkit-CLI
+  round-trip fixture still fully exercise `Combine`; do NOT block on the fetch — note any
+  deferred interop vector.)
 
 - [ ] **Step 2: Failing test** (`seedxor/seedxor_test.go`): load each vector, parse parts +
   result via `bip39` (a `parseM(t, s)` helper), assert `Combine(parts) == result`, and
@@ -147,21 +153,32 @@ func Describe(err error) string {
 
 ---
 
-## Task 2: `inputWordsFlow` gains a `title` param (additive, I1)
+## Task 2: `inputWordsFlow` gains a `title` param (additive — plan-R0 I-1/I-2)
 
-**Files:** `gui/gui.go`. Mirror `inputSLIP39Flow`'s title handling (read it for the exact layout).
+**Files:** `gui/gui.go`, `gui/gui_test.go`. **Read first:** `inputWordsFlow` (`gui.go:580`)
+renders a **dynamic** title `layoutTitlef(ctx, dims.X, th.Text, "Word %d of %d", selected+1,
+len(mnemonic))` (`gui.go:701`), pinned by `TestWordFlowProgressTitle` (`gui_test.go:498`,
+asserts `"Word 1 of 24"`). `inputSLIP39Flow` (`gui.go:868`) by contrast renders ONLY a free-form
+`layoutTitle(..., title)` and no word-position line.
 
-- [ ] **Step 1:** Change `func inputWordsFlow(ctx, th, mnemonic, selected int)` →
+- [ ] **Step 1: Signature + precise render contract.** Change to
   `func inputWordsFlow(ctx, th, mnemonic bip39.Mnemonic, selected int, title string)`. Render
-  `title` as the screen title exactly as `inputSLIP39Flow` does (read `gui.go:796`+). If
-  `inputWordsFlow` has no distinct screen title today, an empty `title` must render identically
-  to current behavior.
-- [ ] **Step 2:** Update the two existing callers to pass the **current** effective title so
-  behavior is unchanged: `gui.go:2025` (the 12/24 menu) and `gui.go:2102` (the `SeedScreen`
-  edit). (Determine the current title by reading `inputWordsFlow`; pass it explicitly. Likely `""`.)
-- [ ] **Step 3:** Run `…/go test ./gui/` → the existing wallet-backup / SeedScreen / EngraveScreen
-  tests stay green (proves behavior-preserving). vet/gofmt clean.
-- [ ] **Step 4: Commit** → `refactor: inputWordsFlow takes a title param (additive; no behavior change)`.
+  contract (truly additive):
+  - **`title == ""` → render the EXISTING `layoutTitlef("Word %d of %d", selected+1,
+    len(mnemonic))` line byte-identically** (current behavior; `TestWordFlowProgressTitle` stays
+    green).
+  - **`title != ""` → render `layoutTitle(ctx, dims.X, th.Text, title)`** in place of the
+    word-position line (i.e. like `inputSLIP39Flow` — the caller-supplied context replaces
+    "Word N of M"; this is the established SLIP-39 share-entry behavior).
+- [ ] **Step 2: Update ALL 10 call sites** (plan-R0 I-2 — adding a param is a hard compile error
+  otherwise). Pass `""` at every existing site to preserve behavior:
+  - `gui/gui.go`: `:2025` (12/24 menu), `:2102` (SeedScreen edit).
+  - `gui/gui_test.go`: `:285, :491, :507, :604, :625, :642, :662, :681`.
+  (The new Seed XOR caller in Task 3 passes `"Part i of n"`.)
+- [ ] **Step 3:** Run `…/go test ./gui/` — it must **build** (all 10 sites updated) and the
+  existing wallet-backup / SeedScreen / EngraveScreen / `TestWordFlowProgressTitle` tests stay
+  green (proves the empty-title path is byte-identical). vet/gofmt clean.
+- [ ] **Step 4: Commit** → `refactor: inputWordsFlow takes a title param (additive; empty=unchanged)`.
 
 ---
 
@@ -299,8 +316,9 @@ func combineSeedXORFlow(ctx *Context, th *Colors) (bip39.Mnemonic, bool) {
   Button2-drained; a recovered seed cannot reach `backupWalletFlow` without it.
 - The **I1 per-part `isMnemonicComplete && Valid()` guard** is present before every part is
   collected — no `Entropy()` panic path; Back/partial aborts the flow.
-- `inputWordsFlow`'s title param is additive — the 12/24 menu + SeedScreen-edit behavior is
-  unchanged (existing tests green).
+- `inputWordsFlow`'s title param is additive — `title==""` renders the existing `"Word N of M"`
+  byte-identically (`TestWordFlowProgressTitle` green); ALL 10 call sites updated (2 in `gui.go`,
+  8 in `gui_test.go`) so `./gui/` compiles; Seed XOR passes `"Part i of n"`.
 - Menu returns a `bip39.Mnemonic` → existing dispatch; no new `engraveObjectFlow` case; no new
   `gui.go` import.
 - No interpretation fork / hold-to-confirm (Seed XOR result is unambiguously a BIP-39 seed).
