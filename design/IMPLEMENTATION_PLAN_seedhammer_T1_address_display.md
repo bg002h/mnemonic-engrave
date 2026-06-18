@@ -8,6 +8,8 @@
 
 **Tech Stack:** Go (host `go test ./gui/... ./address/...`) + TinyGo (`pico-plus2`; existing CI job). Spec (GREEN R1): `design/SPEC_seedhammer_T1_address_display.md`. Base: fork `main` `384547d`.
 
+**Gate status:** **GREEN (plan R0, 0C/0I)** — the opus architect materialized this plan's exact code and RAN it: `BenchmarkAllocs` = 0 B/op 0 allocs/op (`TestAllocs` PASS), all 4 plan tests pass verbatim, engrave path byte-identical, fixtures exact + valid. Review: `design/agent-reports/seedhammer-T1-address-plan-review-R0.md`. Cleared for single-implementer TDD. (Fold the R0 M-2: also add a `Supported=false` inertness regression test.)
+
 ---
 
 ## Source-of-truth facts (verified against `384547d`)
