@@ -10,7 +10,7 @@
 
 **Base:** fork `main` `9b0a02c`. Branch `feat/slip39-entry-engrave`. Fork-side only; no upstream PR.
 
-**Spec:** `design/SPEC_seedhammer_slip39_enablement.md` (R0 GREEN at R4). **PLAN GATE:** must pass the opus plan R0 gate (0C/0I) before any code.
+**Spec:** `design/SPEC_seedhammer_slip39_enablement.md` (R0 GREEN at R4). **PLAN R0 GATE: PASSED (GREEN — 0C/0I, first round)** — `design/agent-reports/seedhammer-slip39-plan-review-R0.md`. Cleared for implementation.
 
 **Pre-verified test vectors** (computed by the recon's scratch decoder against the fork wordlist; RS1024 self-checked):
 - **duckling** (valid, ext=0, `shamir`): `"duckling enlarge academic academic agency result length solution fridge kidney coal piece deal husband erode duke ajar critical decision keyboard"` → `Identifier=7945, Extendable=false, GroupThreshold=1, GroupCount=1, MemberIndex=0, MemberThreshold=1`.
