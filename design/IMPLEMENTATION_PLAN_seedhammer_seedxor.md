@@ -33,7 +33,7 @@ end messages with `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthrop
 | `seedxor/seedxor_test.go` + `seedxor/testdata/` | new — Coldcard/toolkit vectors + negatives + order-independence. |
 | `gui/seedxor_polish.go` | new — `seedXORPartCount`, `seedXORPartLength`, `combineSeedXORFlow`, `confirmSeedXORFingerprint`. |
 | `gui/seedxor_polish_test.go` | new — combine flow + mandatory-gate + no-hang + error-path tests. |
-| `gui/gui.go` | modify — add `title string` to `inputWordsFlow` (additive); update the 2 callers; add `"SEED XOR"` to `newInputFlow`'s `ChoiceScreen` + `case 4`. |
+| `gui/gui.go` | modify — add `title string` to `inputWordsFlow` (additive); update all 10 callers (2 in gui.go + 8 in gui_test.go; enumerated in Task 2); add `"SEED XOR"` to `newInputFlow`'s `ChoiceScreen` + `case 4`. |
 
 Unchanged (reused, must stay green): `bip39/`, `backupWalletFlow`/`masterFingerprintFor`/
 `SeedScreen`, `codex32/`, `slip39/`, `backup/`.
