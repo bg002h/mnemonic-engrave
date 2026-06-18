@@ -1,6 +1,6 @@
 # SPEC — T1: on-device receive/change address display (descriptor case)
 
-**Status:** draft for the opus-architect R0 gate.
+**Status:** R0 folded (I-1 0-alloc gate + M-1 paging + M-2 custom-children test); for the R1 gate. R0 review: `design/agent-reports/seedhammer-T1-address-spec-review-R0.md`.
 **Roadmap:** `design/RECON_seedhammer_constellation_terminal.md` (cycle **T1**, the foundation).
 **Base:** fork `main` `384547d`. Fork-side only (no upstream PR).
 
@@ -26,7 +26,8 @@ Let the operator **verify, on-device, which addresses a descriptor controls** be
 ## 2. Invariants (R0 must verify each)
 
 1. **Display-only, public, deterministic.** Addresses are derived from the descriptor's **public** keys (xpub/childated pubkeys) via `address.Receive/Change`; nothing secret is touched, nothing is engraved or sent over NFC in T1. No CSPRNG. (Address derivation is `secp256k1` CKDpub — public.)
-2. **Gate on `address.Supported(desc)`.** The address-view affordance is shown **only** when `address.Supported(desc)` is true (i.e. `Receive(desc,0)` does not return `errUnsupported`). For a template/placeholder descriptor with no concrete keys, or an unsupported script, the affordance is hidden — never a crash, never a blank screen.
+2. **Gate on `address.Supported(desc)` — computed ONCE, never per-frame.** The address-view affordance is shown **only** when `address.Supported(desc)` is true (i.e. `Receive(desc,0)` does not return `errUnsupported`). For a template/placeholder descriptor with no concrete keys, or an unsupported script, the affordance is hidden — never a crash, never a blank screen. **`Supported` calls `Receive(desc,0)`, which runs secp256k1 child derivation + string formatting (allocating + non-trivial), so it MUST be computed once** (cached on the `DescriptorScreen` struct, or computed before the `for !ctx.Done` loop in `Confirm`) and **never inside the per-frame loop** — see invariant 6.
+6. **Zero-allocation hot path preserved (R0-caught).** `DescriptorScreen.Confirm`'s frame loop is a strict **0-allocation** path gated by `gui_test.go`'s `TestAllocs`/`BenchmarkAllocs` (which drive `ds.Confirm`). The address-view affordance must NOT add per-frame allocations: the `Supported` check is hoisted (invariant 2), and the new `descriptorAddressFlow` is a **separate** screen (its own loop, entered on Button2) so its per-index `Receive/Change` allocations never run on `Confirm`'s frame path. `TestAllocs`/`BenchmarkAllocs` MUST stay green (the modified `Confirm` returns to 0 alloc/op; the address-list screen is not part of the benchmarked set).
 3. **Errors are surfaced, not swallowed.** If `Receive`/`Change` returns an error for a supported type at some index (e.g. a key derivation edge), show a readable message and return to the confirm screen — never hang, never engrave as a side effect.
 4. **No regression to the engrave path.** The existing `descriptorFlow` confirm→engrave behavior is unchanged when the user does not open the address view; adding the affordance must not alter the Plate/engrave result. Button-event draining must follow the established idiom (no queue-head block — the multishare/Fix? R0-C1 lesson).
 5. **Network honesty.** The address string reflects the descriptor's key network (`Key.Network`); mainnet vs testnet is whatever the descriptor encodes (the `address` pkg already errors on a multisig mixing networks — surface that).
@@ -45,13 +46,13 @@ Let the operator **verify, on-device, which addresses a descriptor controls** be
 ## 4. Design
 
 ### 4.1 The address-view affordance
-On `DescriptorScreen.Confirm`'s review screen, add a secondary nav affordance (e.g. **Button2**, `assets.IconRight` or `IconInfo`) **shown only when `address.Supported(desc)`**. Pressing it opens the address-list screen (§4.2); returning from it comes back to the confirm screen unchanged (the existing Back/engrave buttons behave as before). Button2 is **drained every frame** even when the affordance is hidden (avoid the queue-head-block idiom).
+On `DescriptorScreen.Confirm`'s review screen, add a secondary nav affordance on the **free Button2** (`DescriptorScreen.Confirm` currently binds only Button1=Back and Button3=Confirm; Button2 is free — mirror the gated-Button2 idiom of `confirmCodex32Flow`/`recoverCodex32Flow`/seedxor), icon `assets.IconRight` (or `IconInfo`), **shown only when `Supported` is true**. `Supported` is computed **once** — store it on the `DescriptorScreen` struct (set when the descriptor is assigned) or compute it before the `for !ctx.Done` loop; do **NOT** call `address.Supported`/`Receive` inside the frame loop (invariant 2/6, the 0-alloc gate). Pressing Button2 opens the address-list screen (§4.2); returning comes back to the confirm screen unchanged (Back/engrave behave as before). Button2 is **drained every frame** even when the affordance is hidden (queue-head-block idiom).
 
 ### 4.2 The address-list screen `descriptorAddressFlow(ctx, th, desc)`
 A new screen that displays the descriptor's addresses:
 - **Title:** "Receive addresses" / "Change addresses" (toggled).
 - **Body:** a short list (default the first **5** indices) — each line `i: <address>` from `address.Receive(desc, i)` (or `Change` when toggled). Addresses are bech32/base58 strings; wrap/clip to the display width (mirror the codex32 field-line/label rendering).
-- **Controls:** Button1 = Back (to the confirm screen); a toggle (e.g. **Button2**) = switch receive⇄change; a page-forward (e.g. **Center/Button3** or Up/Down nav) = next 5 indices (index window `start..start+4`, `start += 5`; clamp/stop at a sane cap, e.g. 50, to bound the loop). Drain all bound buttons every frame.
+- **Controls (pinned):** Button1 = Back (to the confirm screen); **Button2 = toggle receive⇄change**; **Button3 = page-forward** next 5 indices — Button3 is free on THIS screen (only the confirm screen uses Button3 for engrave). Index window `start..start+4`; `start += 5` on page-forward; **hard cap `start+5 ≤ 50`** (stop advancing at index 50 — bounds the loop and keeps display sane). Avoid Up/Down `Clickable`s here (they auto-repeat — `widget.go`), which complicates deterministic paging; use the discrete Button3 press. Drain all bound buttons every frame.
 - On a per-index `Receive/Change` error, show `showError(ctx, th, "Address", <msg>)` and stay on the list (or fall back to Back) — never hang.
 - **Pure display:** no engrave, no NFC, no state mutation of the descriptor.
 
@@ -75,9 +76,10 @@ Unchanged/reused: the `address` package (crypto, tested), `nonstandard`, `bip380
 ## 6. TDD
 
 - **`address.Supported` gating:** a supported descriptor (single-sig wpkh + a sortedmulti, from `address_test.go` vectors) → affordance shown; an unsupported/placeholder descriptor → affordance hidden, confirm/engrave unaffected.
-- **Address rendering:** drive `descriptorAddressFlow` (direct-call/`runUI`) on a known descriptor and assert the displayed receive[0..n]/change[0..n] strings match `address.Receive/Change` (golden values from `address/address_test.go`).
-- **Toggle + paging:** receive⇄change switches the list; page-forward advances the index window; bounds clamp.
+- **Address rendering:** drive `descriptorAddressFlow` (direct-call/`runUI`) on a known descriptor and assert the displayed receive[0..n]/change[0..n] strings match `address.Receive/Change` (golden values from `address/address_test.go`). **Include at least one custom-children descriptor** (e.g. the `/1234/<5;6>/*` vector in `address_test.go`) so the receive vs change toggle is genuinely distinguished (default keys use `<0;1>/*` → receive=branch-0, change=branch-1; the test must assert receive≠change, not index-0-vs-index-0).
+- **Toggle + paging:** Button2 switches receive⇄change; Button3 advances the index window by 5; the cap at 50 clamps (no advance past index 50).
 - **No-hang / no-regression:** button-drain idiom holds; the descriptor confirm→engrave path is byte-identical when the address view isn't opened (existing `TestEngraveScreen`/descriptor tests stay green).
+- **0-allocation gate (R0 IMPORTANT-1):** `TestAllocs`/`BenchmarkAllocs` (`gui_test.go`) MUST stay green — the modified `DescriptorScreen.Confirm` is 0 alloc/op (the `Supported` gate is hoisted out of the frame loop; the address-list screen is a separate, non-benchmarked flow). Run them explicitly.
 - Host: `go test ./gui/... ./address/...`; `go vet`; `gofmt -l`. TinyGo `pico-plus2` build (CI) compiles the new gui code (and now imports `address`).
 
 ---
