@@ -97,17 +97,17 @@ func TestPassphraseKeyboardConstruction(t *testing.T) {
 package gui
 
 import (
-	"fmt"
 	"image"
 	"math"
 	"strings"
 	"unicode/utf8"
 
 	"seedhammer.com/gui/assets"
-	"seedhammer.com/gui/layout"
 	"seedhammer.com/gui/op"
 	"seedhammer.com/gui/widget"
 )
+// (R0 C-1/C-2: NO "fmt" — Layout uses widget.Labelf, not stdlib fmt; NO
+// "seedhammer.com/gui/layout" — this widget references no layout.* symbol.)
 
 // Passphrase keyboard pages (case-preserving, printable-ASCII).
 const (
@@ -226,7 +226,7 @@ func ppKeyExtent(ctx *Context, key ppKey, cell image.Point) image.Point {
 	switch key.action {
 	case ppBackspace:
 		b := assets.KeyBackspace.Bounds()
-		return image.Pt(b.Dx(), cell.Y)
+		return image.Pt(b.Min.X*2+b.Dx(), cell.Y) // R0 I-1: include the Min.X margin (matches NewKeyboard gui.go:868)
 	default:
 		lbl := key.label
 		if lbl == "" {
@@ -359,7 +359,7 @@ func (k *PassphraseKeyboard) commit(key ppKey) {
 func (k *PassphraseKeyboard) keys() [][]ppKey { return k.pages[k.page] }
 
 func (k *PassphraseKeyboard) Update(ctx *Context) bool {
-	k.adjust(true)
+	k.adjust()
 	cur := k.keys()
 	for i, row := range cur {
 		for j := range row {
@@ -419,7 +419,7 @@ func (k *PassphraseKeyboard) moveCol(d int) {
 		next = (next + d + len(row)) % len(row)
 		if k.Valid(row[next]) {
 			k.col = next
-			k.adjust(true)
+			k.adjust()
 			return
 		}
 		if next == k.col { // full loop, none valid (shouldn't happen)
@@ -435,7 +435,7 @@ func (k *PassphraseKeyboard) moveRow(d int) {
 	for {
 		next = (next + d + n) % n
 		if k.adjustCol(next) {
-			k.adjust(true)
+			k.adjust()
 			return
 		}
 		if next == k.row {
@@ -445,10 +445,10 @@ func (k *PassphraseKeyboard) moveRow(d int) {
 }
 
 // adjust / adjustCol: same nearest-valid-key logic as Keyboard (gui.go:1157-1209),
-// over the ACTIVE page's grid (k.keys()), using ppKey.pos. Backspace is gated by
-// Valid (Fragment-empty), so when allowBackspace is irrelevant here — Valid already
-// excludes an empty-Fragment backspace.
-func (k *PassphraseKeyboard) adjust(allowBackspace bool) {
+// over the ACTIVE page's grid (k.keys()), using ppKey.pos. No allowBackspace param
+// (R0 I-2): Valid already excludes an empty-Fragment backspace, so the shared
+// keyboard's allowBackspace plumbing is vestigial here.
+func (k *PassphraseKeyboard) adjust() {
 	rows := k.keys()
 	dist := int(1e6)
 	current := rows[k.row][k.col].pos
@@ -496,7 +496,7 @@ func (k *PassphraseKeyboard) adjustCol(row int) bool {
 }
 ```
 
-> Note vs the shared `Keyboard`: `adjust` here uses the active page's grid and gates only on `Valid` (the empty-Fragment backspace is already excluded by `Valid`, so the `allowBackspace` plumbing collapses — keep the param for signature parity but it is unused; or drop it). The plan author may simplify `adjust`'s signature to `adjust()` since `allowBackspace` is vestigial.
+> Note vs the shared `Keyboard`: `adjust` here uses the active page's grid and gates only on `Valid` (the empty-Fragment backspace is already excluded by `Valid`). The `allowBackspace` param is dropped (R0 I-2) — `adjust()` has no parameter; all call sites are `k.adjust()`.
 
 - [ ] **Step 4: Run to verify it passes** — `/home/bcg/.local/go/bin/go test ./gui/ -run 'TestPassphraseRuneEntryCrossPage|TestPassphraseActions|TestPassphraseKeyboardConstruction'`
 Expected: PASS.
@@ -543,10 +543,8 @@ func passphraseFrame(t *testing.T, drive func(r *EventRouter)) string {
 		for !ctx.Done {
 			for k.Update(ctx) {
 			}
-			dims := ctx.Platform.DisplaySize()
-			op, _ := k.Layout(ctx, &descriptorTheme)
-			_ = dims
-			ctx.Frame(op)
+			fop, _ := k.Layout(ctx, &descriptorTheme) // 'fop' not 'op' — avoid shadowing the op package (R0 M-1)
+			ctx.Frame(fop)
 		}
 	})
 	defer quit()
@@ -668,11 +666,9 @@ func (k *PassphraseKeyboard) Layout(ctx *Context, th *Colors) (op.Op, image.Poin
 	full := op.Layer(content, readoutOp.Offset(image.Pt((combined.X-readoutSz.X)/2, 0)))
 	return full, combined
 }
-
-var _ = layout.Rectangle{} // layout import retained for parity with sibling widgets; remove if unused
 ```
 
-> Remove the `var _ = layout.Rectangle{}` and the `layout` import if the implementer finds `layout` genuinely unused (the readout/grid math above uses only `image`/`op`/`widget`). Keep imports minimal & gofmt-clean.
+> No `layout` import (R0 C-2): the readout/grid math uses only `image`/`op`/`widget`/`math`/`strings`/`utf8`/`assets`. Keep imports minimal & gofmt-clean — the final file imports exactly: `image`, `math`, `strings`, `unicode/utf8`, `seedhammer.com/gui/assets`, `.../op`, `.../widget`.
 
 - [ ] **Step 4: Run to verify it passes** — `/home/bcg/.local/go/bin/go test ./gui/ -run TestPassphraseMaskReveal`
 Expected: PASS — masked `****`, no cleartext leak; revealed shows `ab1!`.
@@ -680,14 +676,10 @@ Expected: PASS — masked `****`, no cleartext leak; revealed shows `ab1!`.
 - [ ] **Step 5: Page-cycle render test** — append + run:
 ```go
 func TestPassphrasePageCycleRender(t *testing.T) {
-	// After two page-cycles (lower→UPPER→symbols), the readout area + a digit key
-	// '1' (symbols page) is rendered; the lowercase 'q' cap is gone.
-	c := passphraseFrame(t, func(r *EventRouter) {
-		// Drive the page-cycle via the action by sending the page key through D-pad
-		// is fiddly; instead this test toggles via two Runeless cycles using a helper.
-		// Simplest robust assertion: render page 2 directly.
-	})
-	_ = c
+	// Render the symbols page (page 2) directly and assert its content: a digit key
+	// '1' (symbols page) + the page-cycle cap "abc" are rendered. (Driving the
+	// page-cycle key itself via D-pad is exercised by TestPassphraseActions'
+	// commit(ppPageCycle); this test covers the per-page render.)
 	ctx := NewContext(newPlatform())
 	k := NewPassphraseKeyboard(ctx)
 	k.page = 2
