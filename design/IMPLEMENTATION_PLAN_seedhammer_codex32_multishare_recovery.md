@@ -314,7 +314,11 @@ func confirmCodex32Flow(ctx *Context, th *Colors, scan codex32.String) codex32Co
 		if backBtn.Clicked(ctx) {
 			return codex32Back
 		}
-		if !f.Unshared && recoverBtn.Clicked(ctx) {
+		// Always drain Button2 — even for an unshared secret, where Recover is not
+		// offered — so an unconsumed event cannot block the router queue head in a
+		// direct-call (non-runUI) context. Act on it only for a share. (R0 C1)
+		recoverClicked := recoverBtn.Clicked(ctx)
+		if !f.Unshared && recoverClicked {
 			return codex32Recover
 		}
 		if engraveBtn.Clicked(ctx) {
@@ -470,7 +474,14 @@ Expected: FAIL — `recoverCodex32Flow` exists (Step 8) but `engraveCodex32` and
 		return engraveCodex32(ctx, th, scan)
 ```
 
-and add the helper (place it in `gui/codex32_polish.go`, appended after `recoverCodex32Flow`):
+and add the helper (place it in `gui/codex32_polish.go`, appended after `recoverCodex32Flow`). **First add to `gui/codex32_polish.go`'s import block (R0 I1 — `engraveCodex32` needs them; the other codex32 helpers do not):**
+
+```go
+	"seedhammer.com/backup"
+	"seedhammer.com/font/constant"
+```
+
+then append:
 
 ```go
 // engraveCodex32 confirms a codex32 string and engraves it verbatim. A share may
