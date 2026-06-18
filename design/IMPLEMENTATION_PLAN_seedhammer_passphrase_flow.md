@@ -19,7 +19,7 @@
 | File | Responsibility | Tasks |
 |---|---|---|
 | `gui/gui.go` *(modify)* | T1: `deriveMasterKey`+`masterFingerprintFor` gain `password`; 3 call sites pass `""`. T2: `engraveSeed(…, mfp uint32)`; `passphraseFlow`; `showSeedError`; rewrite `backupWalletFlow`; add `"fmt"` import. | 1,2 |
-| `gui/*_test.go` *(modify)* | T1: both-fingerprints threading test. T2: `passphraseFlow` + fingerprint-choice tests. | 1,2 |
+| `gui/*_test.go` *(modify)* | T1: both-fingerprints threading test. T2: `passphraseFlow` + fingerprint-choice tests; add `"fmt"` import (used by `TestEngraveFingerprintChoiceMapping`). | 1,2 |
 | `backup/`, `bip39/`, `bip32/`, `gui/passphrase_keyboard.go` *(unchanged — must stay green)* | bare-fp golden `TestSeed*`; the keyboard widget. | guard |
 
 **Commit hygiene:** explicit paths. Signed + DCO: `git commit -S -s` (fall back to `-s` if signing unavailable, say so).
@@ -145,7 +145,7 @@ func TestPassphraseFlow(t *testing.T) {
 
 - [ ] **Step 2: Run to verify it fails** — `/home/bcg/.local/go/bin/go test ./gui/ -run 'TestPassphraseFlow'` → FAIL (`undefined: passphraseFlow`).
 
-- [ ] **Step 3: Add the `"fmt"` import** to `gui/gui.go`'s import block (it currently lacks `"fmt"`).
+- [ ] **Step 3: Add the `"fmt"` import** to the import block of BOTH `gui/gui.go` AND `gui/gui_test.go` (both currently lack `"fmt"`; `gui.go` needs it for the fingerprint-choice labels in `backupWalletFlow`, and `gui_test.go` needs it for `fmt.Sprintf("%.8X", …)` in `TestEngraveFingerprintChoiceMapping` — Step 8).
 
 - [ ] **Step 4: Add `passphraseFlow`** — append to `gui/gui.go` exactly the spec §4.2 body:
 
