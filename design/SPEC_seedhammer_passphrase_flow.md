@@ -95,6 +95,25 @@ func passphraseFlow(ctx *Context, th *Colors) (string, bool) {
 
 ### 4.3 S3 — `backupWalletFlow` wiring (the seam)
 
+**Imports (R0 I-1):** add `"fmt"` to `gui/gui.go`'s import block (it currently imports `"strings"` but NOT `"fmt"`). Use `fmt.Sprintf("%.8X", mfp)` for the fingerprint hex — identical to `backup.go:182`'s render format.
+
+**New helper `showSeedError` (R0 C-1 — the spec's earlier `showSeedErr` was phantom).** Factor the EXISTING inline error loop from `backupWalletFlow` (`gui.go:1896-1905`) into a named helper, and call it from all error sites (this also DRYs the original engrave-error path):
+```go
+func showSeedError(ctx *Context, th *Colors, ss *SeedScreen, mnemonic bip39.Mnemonic, err error) {
+	errScr := NewErrorScreen(err)
+	for !ctx.Done {
+		dims := ctx.Platform.DisplaySize()
+		d, dismissed := errScr.Layout(ctx, th, dims)
+		if dismissed {
+			return
+		}
+		main := ss.Draw(ctx, th, dims, mnemonic)
+		ctx.Frame(op.Layer(d, main))
+	}
+}
+```
+
+**Complete, compilable `backupWalletFlow`** (R0 I-3 — the prior `switch (int,bool)` skeleton was invalid Go; this is the real control structure. R0 C-2 — both `ChoiceScreen`s are allocated FRESH each outer iteration so `choice` defaults to index 0 = the safe default):
 ```go
 func backupWalletFlow(ctx *Context, th *Colors, mnemonic bip39.Mnemonic) {
 	ss := new(SeedScreen)
@@ -102,33 +121,54 @@ func backupWalletFlow(ctx *Context, th *Colors, mnemonic bip39.Mnemonic) {
 		if !ss.Confirm(ctx, th, mnemonic) {
 			return
 		}
-		mfp, err := masterFingerprintFor(mnemonic, &chaincfg.MainNetParams, "") // bare
+		mfp, err := masterFingerprintFor(mnemonic, &chaincfg.MainNetParams, "") // bare (won't fail post-Confirm)
 		if err != nil {
-			showSeedErr(ctx, th, ss, mnemonic, err) // existing ErrorScreen pattern
+			showSeedError(ctx, th, ss, mnemonic, err)
 			continue
 		}
-		// Optional passphrase + fingerprint choice.
-		switch (&ChoiceScreen{Title: "Passphrase", Lead: "Add a BIP-39 passphrase?", Choices: []string{"Skip", "Add passphrase"}}).Choose(ctx, th); ... {
-		// index 0 (Skip) or Back → keep the bare mfp.
-		// index 1 (Add passphrase) →
+		// Optional passphrase. Fresh ChoiceScreen each iteration (choice defaults to 0=Skip).
+		ppChoice := &ChoiceScreen{Title: "Passphrase", Lead: "Add a BIP-39 passphrase?", Choices: []string{"Skip", "Add passphrase"}}
+		if sel, ok := ppChoice.Choose(ctx, th); ok && sel == 1 {
+			if pass, ok := passphraseFlow(ctx, th); ok && pass != "" {
+				passFp, err := masterFingerprintFor(mnemonic, &chaincfg.MainNetParams, pass)
+				if err != nil {
+					showSeedError(ctx, th, ss, mnemonic, err)
+					continue
+				}
+				fpChoice := &ChoiceScreen{
+					Title: "Engrave fingerprint",
+					Choices: []string{
+						"No passphrase " + fmt.Sprintf("%.8X", mfp),    // index 0 = safer default
+						"Passphrase " + fmt.Sprintf("%.8X", passFp),
+					},
+				}
+				sel, ok := fpChoice.Choose(ctx, th)
+				if !ok {
+					continue // Back from fp choice → re-Confirm (see note below)
+				}
+				if sel == 1 {
+					mfp = passFp
+				}
+			}
 		}
-		// (see flow below)
 		plate, err := engraveSeed(ctx.Platform.EngraverParams(), mnemonic, mfp)
-		…
+		if err != nil {
+			showSeedError(ctx, th, ss, mnemonic, err)
+			continue
+		}
 		if NewEngraveScreen(ctx, plate).Engrave(ctx, &engraveTheme) {
 			return
 		}
 	}
 }
 ```
-Concrete flow (the plan nails the exact control structure; this is the design):
-1. `ss.Confirm` true → compute `mfp = fp(m,"")`.
-2. `ChoiceScreen{Choices: ["Skip", "Add passphrase"]}.Choose`. If `Back` (`!ok`) → loop (re-Confirm). If index 0 (Skip) → keep bare `mfp`, go to engrave.
-3. If index 1 (Add passphrase): `pass, ok := passphraseFlow(ctx, th)`. If `!ok` (Back) → re-show the "Passphrase" choice (or loop to Confirm). If `pass == ""` → treat as Skip (keep bare `mfp`).
-4. Else compute `passFp = fp(m, pass)`; show a 2-row `ChoiceScreen{Title:"Engrave fingerprint", Choices: ["No passphrase  " + hex(mfp), "Passphrase  " + hex(passFp)]}`. **Bare option first (index 0) = the safer default.** If `Back` → re-show passphrase entry. Else set `mfp` to the chosen fingerprint (`mfp` for index 0, `passFp` for index 1).
-5. `engraveSeed(params, m, mfp)` → engrave. (`hex(x) = fmt.Sprintf("%.8X", x)` — matches the plate's render format.)
 
-`fmt` IS already imported in `gui.go`? (Recon: `gui.go` imports `"strings"` but NOT `"fmt"`. So the `%.8X` formatting needs `"fmt"` — add it to `gui.go`'s imports, OR use `strconv`/the existing `engrave.String` path. The plan picks one; cleanest is to add `"fmt"`.)
+**Back-navigation semantics (R0 I-4, M-7 — stated explicitly):**
+- Back from the "Add passphrase?" choice (`!ok`) → falls through with the bare `mfp` (no passphrase) → goes straight to `engraveSeed`. (NOT a re-Confirm — Skip and Back are equivalent here: both mean "no passphrase".)
+- Back from `passphraseFlow` (`!ok`) → same as Skip: bare `mfp` → engrave.
+- Back from the fingerprint choice (`!ok`) → `continue` the outer loop → re-Confirm (consistent with the existing back-from-engrave behavior). **The entered passphrase is discarded** — `passphraseFlow` re-creates a fresh `PassphraseKeyboard` (zeroed `Fragment`); there is no API to pre-fill it, and re-typing is the intended (and security-clean) behavior.
+
+(Note the corrected back-from-"Add passphrase?" semantics: my earlier "re-Confirm" was an unnecessary friction; Skip≡Back-here≡no-passphrase is cleaner. Only the fingerprint-choice Back re-Confirms, matching the engrave-back loop.)
 
 ## 5. Error handling / security
 
@@ -137,8 +177,9 @@ The passphrase lives only in `passphraseFlow`'s `PassphraseKeyboard.Fragment` an
 ## 6. Testing (host: `go test ./gui/...`)
 
 - **S1 (threading):** `masterFingerprintFor(m, &chaincfg.MainNetParams, "")` equals today's value AND differs from `masterFingerprintFor(m, …, "pass")` for a known mnemonic (the two fingerprints are distinct). `deriveMasterKey(m, net, "")` unchanged behavior. The bare-fp golden tests (`backup_test.go`) stay green.
-- **S2 (`passphraseFlow`):** via `runUI` — drive `NewPassphraseKeyboard` with `runes("Ab1!")` + `click(Button3)` → returns `("Ab1!", true)`; `click(Button1)` → `("", false)`; empty + Button3 → `("", true)`.
+- **S2 (`passphraseFlow`):** via `runUI` (the real harness at `gui_test.go:466`, used throughout the codex32/slip39/passphrase tests — R0 M-2's "no runUI" was mistaken) — drive `passphraseFlow` with `runes(&ctx.Router, "Ab1!")` + `click(&ctx.Router, Button3)` → returns `("Ab1!", true)`; `click(Button1)` → `("", false)`; empty + Button3 → `("", true)`.
 - **S3 (wiring + choice):** the fingerprint-choice maps index→fingerprint correctly (index 0 → bare, index 1 → passphrase). Drive the 2-row `ChoiceScreen` (`Down` + `Button3`) and assert the chosen `mfp` is the passphrase fp; assert the readout shows both 8-hex fingerprints. An empty passphrase entered at step 3 → engrave path uses the bare `mfp` (choice skipped). Keep `TestWordKeyboardScreen`/`TestInputSeedCodex32`/SLIP-39/codex32/`TestSeed*` green. (Driving the full `Confirm→choice→passphrase→choice→engrave` E2E is heavy; component-test `passphraseFlow` + the fingerprint-choice + the `masterFingerprintFor` threading, and rely on build + the unchanged bare-path golden for the no-passphrase regression.)
+- **Label-width (R0 M-4):** the fingerprint-choice labels (`"No passphrase " + 8-hex` ≈ 23 chars) render via `ChoiceScreen.Draw`'s `widget.Label` at `ctx.Styles.button`; verify they fit the 480-px display in a `runUI` render assertion. If they overflow, the plan shortens them (e.g. drop "passphrase" → "Bare <hex>" / "Pass <hex>", or stack label+hex on two lines). Not a correctness blocker; a layout QA item.
 
 ## 7. Versioning / commits
 
