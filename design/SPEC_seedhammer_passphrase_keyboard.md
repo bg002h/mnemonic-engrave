@@ -80,9 +80,9 @@ type ppKey struct {
 	clk      Clickable
 }
 ```
-All three page grids are `[][]ppKey` sharing the SAME function row as their last row, stored in the active page's `keys [][]ppKey` slice — so the existing D-pad `Up/Down` (iterate rows) + `Left/Right` (within a row) traversal naturally crosses from the letter rows into the function row, exactly as the shared `Keyboard` does. **`Valid(k ppKey)`:** `ppBackspace` → `Fragment != ""`; `ppRune`/`ppPageCycle`/`ppSpace`/`ppReveal` → `!k.disabled` (always true here — nothing is disabled in this widget). **`Layout` dispatch:** `ppRune` → `widget.Labelf(..., "%c", k.r)` (NO `ToUpper`); `ppBackspace` → the `assets.KeyBackspace` image; the rest → `widget.Labelf(..., "%s", k.label)`. **`Update` dispatch** on `Center`/click/Valid: `ppRune`→append `string(r)`; `ppSpace`→append `' '`; `ppBackspace`→trim last rune; `ppPageCycle`→`page=(page+1)%3` + re-seed the cursor; `ppReveal`→toggle `revealed`.
+All three page grids are `[][]ppKey` sharing the SAME function row as their last row, stored in the active page's `keys [][]ppKey` slice — so the existing D-pad `Up/Down` (iterate rows) + `Left/Right` (within a row) traversal naturally crosses from the letter rows into the function row, exactly as the shared `Keyboard` does. **`Valid(k ppKey)`:** `ppBackspace` → `Fragment != ""`; `ppRune`/`ppPageCycle`/`ppSpace`/`ppReveal` → `!k.disabled` (always true here — nothing is disabled in this widget). **`Layout` dispatch:** `ppRune` → `widget.Labelf(..., "%c", k.r)` (NO `ToUpper`); `ppBackspace` → the `assets.KeyBackspace` image; the rest → `widget.Labelf(..., "%s", k.label)`. **`Update` dispatch** on `Center`/click/Valid: `ppRune`→append `string(r)`; `ppSpace`→append `' '`; `ppBackspace`→trim last rune; `ppPageCycle`→`page=(page+1)%3` + re-seed the cursor to the new page's center (per `Keyboard.Clear`: `row=len(keys)/2`, `col=len(keys[row])/2`); `ppReveal`→toggle `revealed`.
 
-**Function-row cell sizing (R0 M-2/M-3):** the special-key caps (`"?123"`,`"space"`,`"show"`) are wider than a single `poppins.Bold25` glyph cell. The function row is laid out with its own per-cell widths sized to each label (`ctx.Styles.keyboard.Measure(math.MaxInt, label)` + `keyPadX`), independent of the fixed-width letter cells — not forced into the letter-row cell width. Reuse `keyPadX`/`keyPadY`/`keyCornerRadius`/`keyLineWidth` (`gui.go:871-876`).
+**Function-row cell sizing (R0 M-2/M-3):** the special-key caps (`"?123"`,`"space"`,`"show"`) are wider than a single `poppins.Bold25` glyph cell. The function row is laid out with its own per-cell widths sized to each label (`ctx.Styles.keyboard.Measure(math.MaxInt, label)` + `keyPadX`), independent of the fixed-width letter cells — not forced into the letter-row cell width. Reuse `keyPadX`/`keyPadY`/`keyCornerRadius`/`keyLineWidth` (declared `gui.go:49-57`; applied in `NewKeyboard` ~`:871-876`).
 
 ### 4.4 Masked entry readout
 
@@ -122,6 +122,8 @@ Firmware `-ldflags`-injected (no source bump; additive widget). Commits on `feat
 - **Mask with `*`** (font-safe; `•` is absent from poppins) + a reveal-toggle key; masked by default.
 - **Widget-only**: no flow, no `MnemonicSeed`/`password` threading, no fingerprint logic (all Slice 3). No upstream PR.
 - Symbol-page exact charset, special-key labels, and space-key rendering finalized in the plan (all glyphs font-present).
+
+**SPEC R0 GATE: PASSED (GREEN — 0C/0I at R1).** R0 caught the RuneEvent-model contradiction (I-1) + the under-specified function-row key model (I-2) + 6 minors; all folded, R1 verified clean (+2 doc-precision fixes). Reviews: `design/agent-reports/seedhammer-passphrase-keyboard-spec-review-R{0,1}.md`. Cleared for implementation.
 
 ## 9. Process note
 
