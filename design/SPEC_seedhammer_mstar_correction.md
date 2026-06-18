@@ -1,7 +1,8 @@
 # SPEC — SeedHammer m*1 BCH error-correction (suggest → confirm)
 
-**Status:** R0 findings folded (I-1/I-2/I-3 + M-1/M-3); for the opus-architect R1 gate. R0 review
-verbatim: `design/agent-reports/seedhammer-mstar-correction-spec-review-R0.md`.
+**Status:** **GREEN (R1, 0C/0I)** — cleared the opus-architect gate after folding R0 (I-1/I-2/I-3 +
+M-1/M-3). Reviews verbatim: `design/agent-reports/seedhammer-mstar-correction-spec-review-{R0,R1}.md`.
+Next: Phase A plan → its own R0 gate.
 **Base:** fork `main` `04a1e95`. Fork-side only (no upstream PR).
 **Recon:** `design/cycle-prep-recon-mstar-correction.md` (`47c9ad7`; recon-time source SHA `04a1e95`).
 **Architect panel (decisions locked here):** `design/agent-reports/seedhammer-mstar-correction-panel-{crypto-security,firmware-resource,design-decomposition}.md`.
