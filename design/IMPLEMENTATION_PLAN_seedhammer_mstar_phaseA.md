@@ -8,7 +8,9 @@
 
 **Tech Stack:** Go (host `go test`) + TinyGo (`pico-plus2`, 32-bit int, no `math/big`/128-bit, fixed-size stack arrays in the hot path). Spec: `design/SPEC_seedhammer_mstar_correction.md` (GREEN R1). Base: fork `04a1e95`.
 
-**Gate status:** **GREEN (R0, 0C/0I)** — the opus architect materialized this plan's code + tests and executed them against the real fork sources (200k-iteration BM differential, exhaustive orientation sweep, dispatch-boundary equivalence). Review verbatim: `design/agent-reports/seedhammer-mstar-correction-phaseA-plan-review-R0.md`. The 3 minors are folded (MINOR-1 the `rune(...)` wrap, MINOR-2 positive control, MINOR-3 hard ValidMD assert). Cleared for single-implementer TDD.
+**Gate status:** **GREEN (R0, 0C/0I)** — the opus architect materialized this plan's code + tests and executed them against the real fork sources (200k-iteration BM differential, exhaustive orientation sweep, dispatch-boundary equivalence). Review verbatim: `design/agent-reports/seedhammer-mstar-correction-phaseA-plan-review-R0.md`. The 3 minors are folded (MINOR-1 the `rune(...)` wrap, MINOR-2 positive control, MINOR-3 hard ValidMD assert).
+
+**SHIPPED:** Phase A merged dormant to fork `main` `3342165` (no-ff, signed+DCO), pushed `bg002h`. Whole-diff execution review GREEN (0C/0I; 1 doc minor folded — `Edit.Pos` is a rune index): `design/agent-reports/seedhammer-mstar-correction-phaseA-execution-review.md`. 38 tests pass / 0 fail; TinyGo `pico-plus2` build wired into `test.yml` (covers `codex32` via `cmd/controller`). **Next: Phase B** (HRP-dispatched typed entry + suggest→confirm "Fix?" gate) — its own spec→R0→plan→R0→TDD→exec-review cycle.
 
 ---
 
