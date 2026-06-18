@@ -347,6 +347,9 @@ type Fields struct {
 // validity authority.
 func ParsePrefix(frag string) (Fields, error) {
 	var f Fields
+	// When splitHRP finds no '1', it returns ("", frag) — so `data` aliases the
+	// ENTIRE input in that case. We early-return below before touching `data`,
+	// so no field is read from the not-yet-data prefix.
 	hrp, data := splitHRP(frag)
 	// Case consistency (HRP + data) is determinable at any length.
 	if err := checkCase(frag); err != nil {
@@ -356,6 +359,9 @@ func ParsePrefix(frag string) (Fields, error) {
 		// No '1' separator yet: the typed chars are HRP candidates, not data.
 		return f, nil
 	}
+	// HRP is recorded for display, not independently rejected: New is the
+	// authority and surfaces a wrong HRP as a checksum mismatch (it folds the
+	// HRP into the checksum), so ParsePrefix stays consistent with New.
 	f.HRP = hrp
 
 	// Threshold: data[0] at len>=1 (∈ {0,2..9}; '1' and non-digits are invalid).
@@ -382,6 +388,9 @@ func ParsePrefix(frag string) (Fields, error) {
 
 	// Share index: data[5] at len>=6; bech32; threshold-0 ⇒ index s/S.
 	if len(data) >= 6 {
+		// data[5] is a byte; rune(byte) is the codepoint for ASCII (all valid
+		// bech32 is ASCII). Non-ASCII bytes (128..255) make feFromRune return
+		// false below → "invalid character", never a panic.
 		idx := rune(data[5])
 		if _, ok := feFromRune(idx); !ok {
 			return f, fmt.Errorf("codex32: %w", errInvalidCharacter)
@@ -517,19 +526,16 @@ Expected: FAIL — `undefined: codex32StatusLine` (compile error).
 
 - [ ] **Step 3: Write the helpers** — `gui/codex32_polish.go`
 
+> **Import discipline (R0 IMP-2):** this step's helpers use ONLY `fmt`, `strings`, and `seedhammer.com/codex32`. Use exactly the import block below — Go rejects unused imports, so do NOT add the GUI subpackage imports here. Task 5 Step 3 expands this block (adding `image`, `assets`, `layout`, `op`, `widget`) when `confirmCodex32Flow` is appended.
+
 ```go
 package gui
 
 import (
 	"fmt"
-	"image"
 	"strings"
 
 	"seedhammer.com/codex32"
-	"seedhammer.com/gui/assets"
-	"seedhammer.com/gui/layout"
-	"seedhammer.com/gui/op"
-	"seedhammer.com/gui/widget"
 )
 
 // codex32StatusLine returns the window-aware length readout for an in-progress
@@ -585,10 +591,8 @@ func codex32Feedback(frag string, perr, nerr error) string {
 }
 ```
 
-> Note: this file's imports (`assets`, `layout`, `op`, `widget`) are used by Task 5/6 additions to the same file; if a task is implemented in isolation, drop the unused imports and re-add them when the later task lands (Go rejects unused imports). The simplest path is to implement Tasks 4→5→6 in sequence in this one file.
-
 - [ ] **Step 4: Run to verify the helpers pass** — Run: `/home/bcg/.local/go/bin/go test ./gui/ -run 'TestCodex32StatusLine|TestCodex32FieldLine|TestCodex32Feedback'`
-Expected: PASS. (If the build fails on unused `assets`/`layout`/`op`/`widget` imports, temporarily comment them until Step 5 uses them — Step 5 wires `inputCodex32Flow` which uses `op`/`widget`/`layout`/`image`.)
+Expected: PASS. (`gui/codex32_polish.go` at this point imports only `fmt`/`strings`/`codex32` — no unused-import build error.)
 
 - [ ] **Step 5: Write the failing integration test** — append to `gui/codex32_polish_test.go`
 
@@ -799,6 +803,24 @@ func TestConfirmCodex32Share(t *testing.T) {
 Expected: FAIL — `undefined: confirmCodex32Flow`.
 
 - [ ] **Step 3: Implement `confirmCodex32Flow`** — append to `gui/codex32_polish.go`
+
+First, **expand the import block** at the top of `gui/codex32_polish.go` (R0 IMP-2) to add the GUI imports `confirmCodex32Flow` needs — the block becomes:
+
+```go
+import (
+	"fmt"
+	"image"
+	"strings"
+
+	"seedhammer.com/codex32"
+	"seedhammer.com/gui/assets"
+	"seedhammer.com/gui/layout"
+	"seedhammer.com/gui/op"
+	"seedhammer.com/gui/widget"
+)
+```
+
+Then append:
 
 ```go
 // confirmCodex32Flow shows a pre-engrave review of a (New-valid) codex32 share
