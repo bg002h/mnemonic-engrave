@@ -8,6 +8,8 @@ Low/nit items deferred from architect reviews (per the iterative-architect-revie
 
 - **`seedhammer-upstream-prs-tracking`** — Track the two open upstream PRs to `seedhammer/seedhammer`: **#34** (re-enable on-device CODEX32 entry) and **#35** (BCH-validated md1/mk1 engraving). Respond to maintainer feedback; mirror any requested changes back. **If declined or stalled:** pursue the fork-fallback — stand up a `seedhammer-fork` sibling repo and document the "Set custom boot key" path (program a 2nd RP2350 OTP boot-key slot via picotool to run own-signed firmware on a locked SH2; "Advanced · irreversible" — per https://gangleri42.github.io/seedhammer/).
 
+- **`seedhammer-slip39-cycleC-all-lengths`** — Widen the **Cycle C** SLIP-39 single-share entry+engrave to support **all valid SLIP-39 share lengths**, not just 20-word/128-bit. Today `slip39/share.go` hard-rejects 33-word shares (`errUnsupportedSize`, `share.go:85-86`) and caps at `wordsShort=20`. The constellation aligns SLIP-39 master secrets to BIP-39 entropy sizes `{16,20,24,28,32}` B → 20/33-word (and intermediate) shares, so single-share entry should accept the full set (matching Cycle D's recovery scope, decided 2026-06-18). Small: lift the length gate in `ParseShare` + the entry-flow word-count expectation + tests. Best done alongside or just after Cycle D (shares the length-validation code).
+
 ## Resolved
 
 ### `me-bundle-preview-sidecar` — Phase B DONE 2026-06-16 (v0.3.0)
