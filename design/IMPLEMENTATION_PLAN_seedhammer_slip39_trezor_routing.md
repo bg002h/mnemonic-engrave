@@ -64,13 +64,17 @@ artifact, no new screen type (reuse `ChoiceScreen`). The `engraveSLIP39Verbatim`
 
 ```go
 func TestEngraveSLIP39RecoverForkVerbatim(t *testing.T) {
-	// After recovery, choose the "Trezor / other — engrave shares verbatim" arm.
-	// Assert: engraveSLIP39Verbatim path (the first share's words plate), NOT
-	// backupWalletFlow, and NO recovered-fingerprint screen shown.
+	// After recovery, choose the "engrave shares verbatim" arm (sel==1).
 	// Drive: ...confirm Recover → driveShare(2nd share) → Skip passphrase →
-	// at the fork ChoiceScreen, select the verbatim choice (Down→Button3) ...
-	// Assert a frame shows the verbatim share Title (id #m/t), and the run never
-	// renders "Recovered Fingerprint".
+	// at the fork ChoiceScreen select the verbatim choice (Down→Button3)...
+	// POSITIVE assertion (C2 fold): the verbatim path reaches the EngraveScreen —
+	// pumpUntil a frame renders "Insert a blank plate" (or "Engrave Plate").
+	// NOTE: the verbatim share Title (id #m/t) is engraving GEOMETRY inside
+	// backup.Seed, NOT rendered as on-screen label text, so do NOT assert it.
+	// NEGATIVE assertions (these uniquely separate the verbatim arm from the
+	// BIP-39 arm — both eventually reach an EngraveScreen): the run NEVER renders
+	// "Recovered Fingerprint" AND never the BIP-39 SeedScreen ("Word 1 of" / the
+	// recovered words), confirming engraveSLIP39Verbatim ran, not backupWalletFlow.
 }
 
 func TestEngraveSLIP39RecoverForkBIP39(t *testing.T) {
@@ -97,10 +101,15 @@ func TestEngraveSLIP39RecoverForkBack(t *testing.T) {
 ```go
 choice := &ChoiceScreen{
 	Title: "Recovered Seed",
-	Lead:  "These shares can be read two ways — pick the wallet that made them:",
+	// The Lead IS width-wrapped (widget.Labelw) — put the explanation here.
+	Lead: "How was this backup made? A BIP-39 phrase / this toolkit recovers as a " +
+		"seed. A Trezor or other SLIP-39 wallet should engrave its shares verbatim.",
+	// I1 fold: ChoiceScreen choice buttons are SINGLE-LINE (widget.Label, NOT
+	// wrapped), so keep them short — comparable to the shipped slip39LengthPick /
+	// passphrase choices. Detail lives in the Lead above.
 	Choices: []string{
-		"BIP-39 seed (this toolkit / from a phrase)",
-		"Trezor / other — engrave shares",
+		"BIP-39 seed",    // sel == 0 (default)
+		"Engrave shares", // sel == 1
 	},
 }
 sel, ok := choice.Choose(ctx, th)
@@ -126,9 +135,13 @@ if !confirmSLIP39Fingerprint(ctx, th, mfp) {
 backupWalletFlow(ctx, th, m)
 return true
 ```
-  Verify the labels fit the 480px display (wrap is fine; keep choice strings short — the
-  `ChoiceScreen` renders multi-line). If `holdToConfirm`/the `ack` `ConfirmWarningScreen` /
-  `assets.IconHammer` become unused after the rewrite, drop the dead refs (vet/gofmt clean).
+  The short choice strings above fit the 480px single-line button width (only the `Lead`
+  wraps). **C1 fold — dead-ref cleanup is narrow:** remove ONLY the local `ack`
+  `ConfirmWarningScreen` literal inside `engraveRecoveredSLIP39` (it's replaced by the
+  `ChoiceScreen`). Do **NOT** remove `holdToConfirm`, the `ConfirmWarningScreen` type, or the
+  `assets` import — all remain in use (the high-iteration-exponent gate in `recoverSLIP39Flow`
+  at `slip39_polish.go:256-261`, and `assets` at `:121,432`). After the edit, `go vet ./gui/`
+  + `gofmt -l gui/` must be clean with NO import removal.
 
 - [ ] **Step 4:** Run → PASS; `go vet ./gui/`, `gofmt -l gui/` clean. The shipped guards
   (`TestConfirmSLIP39*`, `TestRecoverSLIP39*`, `TestEngraveSLIP39BackoutRecognized`, codex32,
@@ -141,7 +154,9 @@ return true
 
 **Files:** `README.md` (fork) — the existing "About this fork" section.
 
-- [ ] **Step 1:** Add one line under the SLIP-39 feature note:
+- [ ] **Step 1:** The fork README "About this fork" currently lists only CODEX32 and md1/mk1
+  (no SLIP-39 bullet yet, MINOR-1). Add a SLIP-39-recovery line as its OWN item under that
+  section:
   > *Recovering a SLIP-39 backup: this device engraves the recovered seed as BIP-39 words for
   > backups made from a BIP-39 phrase / the `mnemonic` toolkit. For a Trezor or other
   > SLIP-39 wallet backup, choose "engrave shares" to engrave your share words verbatim, or
@@ -160,6 +175,12 @@ return true
 - `engraveRecoveredSLIP39` gained `scan`; the one caller passes it; no other caller exists.
 - No hex / `SeedString` artifact added (architect: no restore path). `engraveSLIP39Verbatim`/
   `confirmSLIP39Fingerprint`/`backupWalletFlow`/`masterFingerprintFor` bodies unchanged.
-- Dead refs from the removed hold-ack (`holdToConfirm`, the `ack` screen, unused `assets`/icon)
-  cleaned; vet/gofmt clean; no new `gui.go` import.
+- ONLY the local `ack` literal is removed; `holdToConfirm` / `ConfirmWarningScreen` / the
+  `assets` import STAY (still used by the high-e gate at `:256-261` and `:121,432`); vet/gofmt
+  clean with no import removal; no new `gui.go` import.
+- The verbatim-arm test's positive assertion targets the EngraveScreen text ("Insert a blank
+  plate"/"Engrave Plate"), NOT the share Title (which is engraving geometry, never rendered);
+  negatives assert "Recovered Fingerprint" and the BIP-39 SeedScreen are never seen.
+- Choice buttons are single-line and short ("BIP-39 seed" / "Engrave shares"); the explanation
+  is in the wrapped Lead.
 - Signed + DCO + Brian Goss; existing guards green.
