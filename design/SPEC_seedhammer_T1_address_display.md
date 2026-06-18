@@ -1,6 +1,6 @@
 # SPEC — T1: on-device receive/change address display (descriptor case)
 
-**Status:** R0 folded (I-1 0-alloc gate + M-1 paging + M-2 custom-children test); for the R1 gate. R0 review: `design/agent-reports/seedhammer-T1-address-spec-review-R0.md`.
+**Status:** **GREEN (R1, 0C/0I)** — cleared the opus gate after folding R0 (I-1 0-alloc hoist + M-1 paging + M-2 custom-children) and the R1 MINOR-1 nav-construction steer (fixed-literal + `StyleNone`, not codex32's append). Reviews: `design/agent-reports/seedhammer-T1-address-spec-review-{R0,R1}.md`. Next: the T1 plan → plan R0.
 **Roadmap:** `design/RECON_seedhammer_constellation_terminal.md` (cycle **T1**, the foundation).
 **Base:** fork `main` `384547d`. Fork-side only (no upstream PR).
 
@@ -46,7 +46,11 @@ Let the operator **verify, on-device, which addresses a descriptor controls** be
 ## 4. Design
 
 ### 4.1 The address-view affordance
-On `DescriptorScreen.Confirm`'s review screen, add a secondary nav affordance on the **free Button2** (`DescriptorScreen.Confirm` currently binds only Button1=Back and Button3=Confirm; Button2 is free — mirror the gated-Button2 idiom of `confirmCodex32Flow`/`recoverCodex32Flow`/seedxor), icon `assets.IconRight` (or `IconInfo`), **shown only when `Supported` is true**. `Supported` is computed **once** — store it on the `DescriptorScreen` struct (set when the descriptor is assigned) or compute it before the `for !ctx.Done` loop; do **NOT** call `address.Supported`/`Receive` inside the frame loop (invariant 2/6, the 0-alloc gate). Pressing Button2 opens the address-list screen (§4.2); returning comes back to the confirm screen unchanged (Back/engrave behave as before). Button2 is **drained every frame** even when the affordance is hidden (queue-head-block idiom).
+On `DescriptorScreen.Confirm`'s review screen, add a secondary nav affordance on the **free Button2** (`DescriptorScreen.Confirm` currently binds only Button1=Back and Button3=Confirm; Button2 is free), icon `assets.IconRight` (or `IconInfo`), **shown only when `Supported` is true**. `Supported` is computed **once** — store it on the `DescriptorScreen` struct (set when the descriptor is assigned) or compute it before the `for !ctx.Done` loop; do **NOT** call `address.Supported`/`Receive` inside the frame loop (invariant 2/6, the 0-alloc gate).
+
+**0-alloc-safe nav construction (R1 MINOR-1 — do NOT copy the codex32/seedxor `append`-chain idiom here):** `DescriptorScreen.Confirm` IS in the `BenchmarkAllocs`/`TestAllocs` set (codex32's confirm is not), so the per-frame `[]NavButton{…}` passed to `layoutNavigation` must stay a **fixed (non-escaping) composite literal** — `layoutNavigation` only ranges over `btns` and never stores it (`gui.go:1723,1788-1800`), so a fixed 3-element literal is stack-allocatable exactly like today's 2-element one. To make the 3rd button **conditional** without an `append` (which can heap-allocate and would break the gate), keep all three in the fixed literal and set the address button's `Style = StyleNone` when `!supported` (`layoutNavigation` renders `StyleNone` as the empty `op.Op{}`, `gui.go:1726-1728`); its `Clickable` is still constructed and **drained every frame** even when hidden (queue-head-block idiom). Acting on the Button2 click is gated on `supported`.
+
+Pressing Button2 (when supported) opens the address-list screen (§4.2); returning comes back to the confirm screen unchanged (Back/engrave behave as before).
 
 ### 4.2 The address-list screen `descriptorAddressFlow(ctx, th, desc)`
 A new screen that displays the descriptor's addresses:
