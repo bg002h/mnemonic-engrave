@@ -323,7 +323,7 @@ func TestDecodePayloadAST(t *testing.T) {
   - **`Body` variants** as Go interface `body` with structs: `childrenBody{children []node}`, `variableBody{k uint8; children []node}`, `multiKeysBody{k uint8; indices []uint8}`, `trBody{isNums bool; keyIndex uint8; tree *node}`, `keyArgBody{index uint8}`, `hash256Body [32]byte`, `hash160Body [20]byte`, `timelockBody uint32`, `emptyBody struct{}` (9 variants, `tree.rs:16-73`). `node{tag tag; body body}`.
   - **`readVarint(r)`** — port of `varint.rs:44-56`.
   - **`pathComponent{hardened bool; value uint32}`, `readPathComponent`, `originPath{components []pathComponent}`, `readOriginPath` (depth 4b), `pathDecl{n uint8; shared *originPath; divergent []originPath}`, `readPathDecl(r, divergent bool)` (n=read(5)+1)** — port of `origin_path.rs:34-39,68-76,133-146`; `maxPathComponents=15`.
-  - **`alternative{hardened bool; value uint32}`, `useSitePath{multipath []alternative; wildcardHardened bool}`, `readUseSitePath`** — port of `use_site_path.rs:98-116`; `minAltCount=2`.
+  - **`alternative{hardened bool; value uint32}`, `useSitePath{hasMultipath bool; multipath []alternative; wildcardHardened bool}`, `readUseSitePath`** — port of `use_site_path.rs:98-116`; `minAltCount=2`. NOTE (R0-M2): include `hasMultipath bool` — Rust models multipath as `Option<Vec<Alternative>>`, so a bare `[]alternative` can't distinguish `None` (bare `*`) from `Some([])`; `validateMultipathConsistency` + `useSiteString` need the distinction.
   - **`readNode(r, kiw)` / `readNodeDepth(r, kiw, depth)`** — port of `tree.rs:187-328` (the per-tag bit layout: KeyArg reads `kiw` bits; unary/binary/andor recurse; multi-family `k-1(5),n-1(5),n×index(kiw)` with `k>n`→`errKGreaterThanN`; thresh `k-1,n-1,n children`; tr `is_nums(1)[,keyIndex(kiw)]has_tree(1)[,tree]`; after/older 32b; sha256/hash256 32B; hash160/ripemd160/rawpkh 20B; false/true empty). `maxDecodeDepth=128` → `errDepthExceeded`.
   - **`descriptor{n uint8; pathDecl pathDecl; useSite useSitePath; tree node; tlv tlvSection}`** + **`decodePayload(b []byte, totalBits int) (*descriptor, error)`** — port of `decode.rs:15-54` (Header→PathDecl→UseSitePath→`kiw := 32 - bits.LeadingZeros32(uint32(pd.n-1))`→readNode→root-tag allow-list `{Sh,Wsh,Wpkh,Pkh,Tr}` else `errOperatorContext`→`readTLV`). NOTE: validators (Task 4) are appended after the TLV read in the FINAL `decodePayload`; in this task `decodePayload` stops after TLV (validators added in Task 4).
   - **`header{version uint8; divergentPaths bool}`, `readHeader(r)`** — port of `header.rs:38-50` (5b; version must==4 else `errWireVersion`).
@@ -460,7 +460,7 @@ import (
 
 func TestMD1DisplayFlowPaging(t *testing.T) {
 	ctx := NewContext(newPlatform())
-	tpl := md.Template{N: 2, Root: md.ScriptWsh, Policy: md.PolicyMulti, K: 2, M: 2,
+	tpl := md.Template{N: 2, Root: md.ScriptWsh, Policy: md.PolicyMulti, K: 2, M: 2, Renderable: true,
 		Keys: []md.KeyOrigin{{Index: 0, Fingerprint: "deadbeef", OriginPath: "m/48'/0'/0'/2'", UseSite: "<0;1>/*"},
 			{Index: 1, Fingerprint: "cafebabe", OriginPath: "m/48'/0'/0'/2'", UseSite: "<0;1>/*"}}}
 	frame, quit := runUI(ctx, func() { md1DisplayFlow(ctx, &descriptorTheme, tpl) })
@@ -593,6 +593,7 @@ func md1Summary(tpl md.Template) []string {
 /home/bcg/.local/go/bin/go test ./gui/ ./md/ ./codex32/ -v 2>&1 | tail -50
 /home/bcg/.local/go/bin/go test -run TestAllocs ./gui/
 ```
+- [ ] **Step 4b: gofmt** (R0-M1): `/home/bcg/.local/go/bin/gofmt -w md/md.go gui/md1_inspect.go gui/mk1_inspect_test.go` — the `isBody()` receiver-line alignment in `md/md.go` and the trailing blank line left by editing `TestMdmkFlowMD1NoInspect` out of `mk1_inspect_test.go` need a gofmt pass; confirm `gofmt -l` is then empty.
 - [ ] **Step 5: Commit:** `git add gui/md1_inspect.go gui/md1_inspect_test.go gui/gui.go gui/mk1_inspect_test.go md/md.go` then signed commit `gui: md1 Inspect-descriptor decode→display in mdmkFlow (T2c)`.
 
 ---
