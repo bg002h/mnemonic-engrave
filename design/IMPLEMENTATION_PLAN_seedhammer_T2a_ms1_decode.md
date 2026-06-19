@@ -8,6 +8,8 @@
 
 **Tech Stack:** Go (`go test ./codex32/ ./gui/ ./bip39/`) + TinyGo (CI). Spec (GREEN R1): `design/SPEC_seedhammer_T2a_ms1_decode.md`. Base: fork `main` `68e6ead`.
 
+**Gate:** plan R0 (1C/1I) — the architect built+ran the code (decoder + display + the Japanese vector reproduced from the live Rust encoder all verified). Folded: **C-1** the "Show secret" affordance is gated on `f.Unshared` **AND `DecodeMS1` succeeding** (a plain BIP-93 unshared secret isn't a decodable m-format ms1 → affordance hidden, Button2 inert → preserves `TestConfirmCodex32UnsharedNoRecover`, no hang); **I-1** Step-4 edits now quote the exact `codex32_polish.go:98-122` anchors; **M-1** added a 24-word paging test. R0 review: `design/agent-reports/seedhammer-T2a-ms1-plan-review-R0.md`. Re-dispatching R1.
+
 ---
 
 ## Source-of-truth facts (verified `68e6ead`; layout R0-confirmed vs ms-codec)
@@ -314,7 +316,45 @@ func TestConfirmShowSecretGate(t *testing.T) {
 		t.Fatal("Button2 did not open the secret view on the unshared secret")
 	}
 }
+
+// 24-word secret (32B entropy) spans multiple pages → paging must not skip a
+// word (the T1 measure-and-advance lesson). Observe each page, then advance.
+func TestMS1DecodeFlowPaging24Words(t *testing.T) {
+	const ms1 = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqcwugpdxtfme2w" // entr 32B zero → 24 words
+	s := mustCodex32T(t, ms1)
+	_, _, entropy, err := codex32.DecodeMS1(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := bip39.New(entropy)
+	want := make(map[string]bool) // word labels for indices 0,11,23 (first/mid/last)
+	for _, i := range []int{0, 11, 23} {
+		want[bip39.LabelFor(m[i])] = false
+	}
+	ctx := NewContext(newPlatform())
+	frame, quit := runUI(ctx, func() { ms1DecodeFlow(ctx, &descriptorTheme, s) })
+	for i := 0; i < 40; i++ {
+		c, ok := frame()
+		if !ok {
+			break
+		}
+		for w := range want {
+			// match the "N WORD" line form; the word label is unique enough
+			if uiContains(c, w) {
+				want[w] = true
+			}
+		}
+		click(&ctx.Router, Button3) // advance one page AFTER observing
+	}
+	quit()
+	for w, seen := range want {
+		if !seen {
+			t.Errorf("word %q never shown — paging skipped it", w)
+		}
+	}
+}
 ```
+(Note: `abandon`-heavy zero-entropy mnemonics repeat words; this asserts the first/mid/last *positions'* labels each appear at some page. If label-repetition makes the assertion ambiguous, match the full `"N LABEL"` line instead — the index prefix disambiguates.)
 
 - [ ] **Step 2: Run — expect FAIL** (`ms1DecodeFlow` undefined): `go test ./gui/ -run 'TestMS1Decode|TestConfirmShowSecret' 2>&1 | tail`
 
@@ -416,36 +456,68 @@ func ms1DecodeFlow(ctx *Context, th *Colors, scan codex32.String) {
 ```
 (`shown` is recomputed each frame from the precomputed `lines` — cheap, no crypto; `pageBtn` advances by the count just shown, so no line is skipped. If `len(lines)` fits on one page, page-forward wraps to top. `wipeBytes` is the slip39 scrub helper.)
 
-- [ ] **Step 4: Modify `confirmCodex32Flow`** (`gui/codex32_polish.go`) — Button2 = "Show secret" when `f.Unshared`
+- [ ] **Step 4: Modify `confirmCodex32Flow`** (`gui/codex32_polish.go`) — Button2 = "Show secret" ONLY when the unshared secret is a decodable m-format ms1
 
-Replace the recover-click handling + the nav-append:
+The "Show secret" affordance is gated on **`f.Unshared` AND `DecodeMS1` succeeding** (spec §2.7, plan-R0 C-1). This is the load-bearing fix: a plain BIP-93 unshared secret (e.g. the `ms10tests…` test vector) is NOT a decodable m-format ms1 (`Seed()[0]` ∉ {0x00,0x02}), so for it the affordance is hidden and Button2 stays inert — which **preserves the existing `TestConfirmCodex32UnsharedNoRecover`** and avoids a "can't decode" message on a button press.
+
+**(a)** Immediately after the three `Clickable` declarations (`gui/codex32_polish.go:98-100`) and BEFORE the `for !ctx.Done {` loop (`:101`), add the once-computed gate:
+```go
+	// "Show secret" is offered only for an unshared secret that actually decodes
+	// as an m-format ms1 (a plain BIP-93 secret is not decodable). Probe once.
+	_, _, _, msErr := codex32.DecodeMS1(scan)
+	showSecret := f.Unshared && msErr == nil
+```
+
+**(b)** Replace the EXACT recover-click block (`gui/codex32_polish.go:108-111`):
 ```go
 		recoverClicked := recoverBtn.Clicked(ctx)
-		if recoverClicked {
-			if f.Unshared {
-				ms1DecodeFlow(ctx, th, scan) // display-only "Show secret" sub-flow
-				continue
-			}
+		if !f.Unshared && recoverClicked {
 			return codex32Recover
 		}
 ```
+with:
 ```go
-		navBtns := []NavButton{{Clickable: backBtn, Style: StyleSecondary, Icon: assets.IconBack}}
-		if f.Unshared {
+		recoverClicked := recoverBtn.Clicked(ctx) // always drained (queue-head idiom)
+		switch {
+		case showSecret && recoverClicked:
+			ms1DecodeFlow(ctx, th, scan) // display-only "Show secret" sub-flow
+			continue
+		case !f.Unshared && recoverClicked:
+			return codex32Recover
+		}
+```
+
+**(c)** Replace the EXACT nav-append block (`gui/codex32_polish.go:116-122`):
+```go
+		navBtns := []NavButton{
+			{Clickable: backBtn, Style: StyleSecondary, Icon: assets.IconBack},
+		}
+		if !f.Unshared {
+			navBtns = append(navBtns, NavButton{Clickable: recoverBtn, Style: StyleSecondary, Icon: assets.IconRight})
+		}
+		navBtns = append(navBtns, NavButton{Clickable: engraveBtn, Style: StylePrimary, Icon: assets.IconHammer})
+```
+with:
+```go
+		navBtns := []NavButton{
+			{Clickable: backBtn, Style: StyleSecondary, Icon: assets.IconBack},
+		}
+		switch {
+		case showSecret:
 			navBtns = append(navBtns, NavButton{Clickable: recoverBtn, Style: StyleSecondary, Icon: assets.IconInfo}) // Show secret
-		} else {
+		case !f.Unshared:
 			navBtns = append(navBtns, NavButton{Clickable: recoverBtn, Style: StyleSecondary, Icon: assets.IconRight}) // Recover
 		}
 		navBtns = append(navBtns, NavButton{Clickable: engraveBtn, Style: StylePrimary, Icon: assets.IconHammer})
 ```
-(Keep the rest of `confirmCodex32Flow` — title/lines/Back/engrave/render — unchanged. `recoverBtn` is still drained every frame. `confirmCodex32Flow` is NOT alloc-gated, so the `append` nav is fine.)
+(Keep the rest of `confirmCodex32Flow` — title/lines/Back/engrave/render — unchanged. `recoverBtn` is still drained every frame. `confirmCodex32Flow` is NOT in `BenchmarkAllocs`, so the `append` nav is fine. The `f.Unshared`-non-decodable case now appends NO middle button, exactly as before the change.)
 
 - [ ] **Step 5: Run — expect PASS** + no regressions:
 ```bash
 go test ./gui/ -run 'TestMS1Decode|TestConfirmShowSecret|TestConfirmCodex32|TestRecoverCodex32' -v
 go test ./codex32/ ./gui/ ./bip39/
 ```
-Expected: PASS. (Existing `TestConfirmCodex32*`/`TestRecoverCodex32*` stay green — shares still get Recover on Button2; only the unshared-secret Button2 changed to Show-secret.)
+Expected: PASS. **`TestConfirmCodex32UnsharedNoRecover` stays green** because its `ms10tests…` secret is plain BIP-93 (not m-format) → `showSecret=false` → Button2 inert, identical to today. Shares still get Recover on Button2; the new `TestConfirmShowSecretGate` uses a decodable `entr` secret so its Button2 opens the decode view.
 
 - [ ] **Step 6: Commit**
 ```bash
@@ -475,6 +547,6 @@ An unshared ms1 secret can be decoded + displayed on-device (English words / non
 
 ## Self-review (vs spec)
 - §1 decode + display (English words / non-English name+hex) → Tasks 1+2. ✔
-- §2.1 SECRET display-only + scrub → `wipeBytes(entropy)`, no NFC/engrave. ✔ §2.2 mnem byte surfaced → language branch always shows the name. ✔ §2.3 layout (prefix byte, Rust-sourced vectors incl. non-English) → Task 1 test. ✔ §2.4 reuse-not-port → DecodeMS1 = `Seed()`+slice+`bip39.New`. ✔ §2.5 length/prefix refusal + panic-guard → `TestDecodeMS1Refusal` + the {16..32} switch before `bip39.New`. ✔ §2.7 unshared-only gate → Button2 gated on `f.Unshared`. ✔
+- §2.1 SECRET display-only + scrub → `wipeBytes(entropy)`, no NFC/engrave. ✔ §2.2 mnem byte surfaced → language branch always shows the name. ✔ §2.3 layout (prefix byte, Rust-sourced vectors incl. non-English) → Task 1 test. ✔ §2.4 reuse-not-port → DecodeMS1 = `Seed()`+slice+`bip39.New`. ✔ §2.5 length/prefix refusal + panic-guard → `TestDecodeMS1Refusal` + the {16..32} switch before `bip39.New`. ✔ §2.7 gate (unshared AND `DecodeMS1` succeeds) → Button2 gated on `showSecret`; a non-m-format unshared secret keeps Button2 inert (preserves the existing test). ✔
 - §4 GUI hook (Button2-when-Unshared, measure-and-advance display) → Task 2. ✔ §6 TDD → Tasks 1/2/3. ✔
 No placeholders: vectors are the exact Rust-sourced strings (entr v0.1.json, mnem-English mnem.rs:144, mnem-Japanese Rust-encoder-captured). Types (`codex32.String`, `DecodeMS1`, `bip39.Mnemonic`) consistent across tasks.
