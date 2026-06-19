@@ -40,7 +40,7 @@ Let an operator **inspect** what a set of `mk1` chunk strings decodes to — acc
 ## 3. Source facts (verified against `mnemonic-key/crates/mk-codec`; see recon for full citations)
 
 ### 3.1 Sizing → always chunked
-`SINGLE_STRING_LONG_BYTES = 56` (`consts.rs:33`); `XPUB_COMPACT_BYTES = 73` (`consts.rs:53`); emit decision `bytecode.len() <= 56 ? single : chunked` (`pipeline.rs:73`). Min real bytecode ≥ 80 B (`pipeline.rs:354` "smallest valid bytecode = 80 bytes > 56-byte single-string capacity") → unreachable single-string.
+`SINGLE_STRING_LONG_BYTES = 56` (`consts.rs:33`); `XPUB_COMPACT_BYTES = 73` (`consts.rs:53`); emit decision `bytecode.len() <= 56 ? single : chunked` (`pipeline.rs:73`). Min real bytecode ≥ 80 B (`pipeline.rs:352` "smallest valid bytecode = 80 bytes > 56-byte single-string capacity") → unreachable single-string.
 
 ### 3.2 Bytecode layout (`bytecode/encode.rs:7-11`, `decode.rs:19-54`)
 `header(1) | stub_count(1,≥1) | stubs(4×N) | [origin_fp(4) iff header bit2] | origin_path(var) | xpub_compact(73)`.
