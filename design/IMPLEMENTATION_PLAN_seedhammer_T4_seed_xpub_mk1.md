@@ -220,6 +220,11 @@ func TestDeriveXpubFlow_StubWarningShown(t *testing.T) {
 func TestTwoStagePicker(t *testing.T) {
 	// stage1 (6 script types) → stage2 (2 networks) → resolves to the expected bip32.Path.
 	// Assert the 6-entry stage-1 ChoiceScreen renders all entries (no clip) — R1-M5.
+	// R1-M3 (test-authoring caveat — NOT a device issue): the default GUI test harness
+	// is 240×240, SMALLER than the real 480×320 device, so a height/no-clip assertion
+	// would false-FAIL at 240 (and `uiContains` matches clipped text anyway). Drive this
+	// no-clip assertion at EXPLICIT 480×320 dims (size the router/ops to the device), not
+	// the harness default. The 6-entry picker is proven to fit the device (height 168 ≤ 232).
 }
 ```
 - [ ] **Step 2: Run — expect FAIL.**
