@@ -112,6 +112,7 @@ func TestEncodeRoundTrip(t *testing.T) {
   - `assembleMK1(dataSyms)`: choose regular(13)/long(15) so `len(dataSyms)+checksumLen` lands in `ValidMK`'s bracket ([14,93] reg / [96,108] long); `cksum := mkChecksum(dataSyms, n)`; render `"mk1" + each (dataSyms‖cksum) sym via fe.rune()` (lowercase).
   - `mkChecksum(dataSyms, n)` (**C-1**): `e := &engine{generator: gen(n), residue: unpackSyms(0, mdmkPolymodInitLo, n), target: unpackSyms(tHi, tLo, n)}` (gen/targets = short vs long per n); `e.inputHRP("mk"); e.inputData(render(dataSyms)); e.inputTarget()`; return `e.residue`. (All these are package-`codex32` internals — so `Encode`'s checksum helper lives in **package `codex32`** as a new exported `MKChecksumSymbols(dataSyms []byte, long bool) []byte` (mirror of `MKDataSymbols`), and `mk.Encode` calls it. Pure-stdlib.)
   - `top20(b)`: `h := sha256.Sum256(b); return uint32(h[0])<<12 | uint32(h[1])<<4 | uint32(h[2])>>4`.
+- [ ] **Step 3b: Add a golden-vector ROUND-TRIP test (R0-I1 — NOT byte-equality).** The `mk_test.go` golden vectors use arbitrary explicit chunk_set_ids, NOT a SHA-derived csid, so byte-identical re-emission is impossible (and the decoder doesn't validate the csid value). Gate golden parity on **decode→re-encode→re-decode**: for each of the 7 `mk_test.go` golden strings sets, `c1 := Decode(golden); strs := Encode(c1); for each chunk assert ValidMK; c2 := Decode(strs); assert c1 == c2`. (Covers fp-present, 3-stub, explicit-path `0xFE`, testnet, long cards.) Do NOT assert `strs == golden`.
 - [ ] **Step 4: Run — expect PASS:** `/home/bcg/.local/go/bin/go test ./mk/ ./codex32/ -run 'TestEncode|TestMK|TestDecode' -v 2>&1 | tail -30`
 - [ ] **Step 5: Commit** (signed+DCO+author+trailer, per the convention below).
 
@@ -154,14 +155,18 @@ func deriveAccountXpub(m bip39.Mnemonic, passphrase string, net *chaincfg.Params
 	k := master
 	for _, c := range path {
 		next, derr := k.Derive(c)
-		k.Zero() // scrub master + each intermediate (R0-I1)
+		k.Zero() // scrub master + each intermediate (spec §2.5; Derive returns fresh buffers, no aliasing)
 		if derr != nil { return "", 0, derr }
 		k = next
 	}
 	acct, err := k.Neuter() // public-only
-	k.Zero()
-	if err != nil { return "", 0, err }
-	return acct.String(), masterFP, nil
+	if err != nil { k.Zero(); return "", 0, err }
+	// R0-C1 (CRITICAL): Neuter ALIASES k's chainCode/parentFP/pubKey by reference —
+	// so serialize the xpub BEFORE zeroing k, else acct.String() reads zeroed buffers
+	// and emits a silently-wrong-but-valid xpub (the WRONG key on a permanent backup).
+	xpub = acct.String()
+	k.Zero() // now safe — scrubs the final private account key
+	return xpub, masterFP, nil
 }
 ```
 - [ ] **Step 4: Run — expect PASS.** (Source the golden xpub from a standard BIP-84 test vector for the chosen test seed.)
