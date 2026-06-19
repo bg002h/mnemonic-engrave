@@ -1,6 +1,6 @@
 # SPEC — T2a: on-device ms1 decode→display (entropy / BIP-39 words + mnem language + inspect)
 
-**Status:** **GREEN (R1, 0C/0I).** R0 (0C/3I) byte-CONFIRMED the m-format layout vs ms-codec source + 4 Rust vectors; folded I-1 (prefix-vs-tag rename) · I-2 (Rust-sourced non-English vector) · I-3 (unshared-only gate) · M-1/M-2. R1 (0C/1I) closed all but a residual §4.1 comment-rename + §6 cite → fixed + grep-verified mechanically (a 2-word doc fix, no design change; full architect re-dispatch skipped as disproportionate). Reviews: `design/agent-reports/seedhammer-T2a-ms1-spec-review-{R0,R1}.md`. Next: the T2a plan → plan R0.
+**Status:** **GREEN (R1, 0C/0I).** R0 (0C/3I) byte-CONFIRMED the m-format layout vs ms-codec source + 4 Rust vectors; folded I-1 (prefix-vs-tag rename) · I-2 (Rust-sourced non-English vector) · I-3 (unshared-only gate) · M-1/M-2. R1 (0C/1I) closed all but a residual §4.1 comment-rename + §6 cite → fixed + grep-verified mechanically (a 2-word doc fix, no design change; full architect re-dispatch skipped as disproportionate). **SHIPPED to fork `main` `4d02021` (pushed `bg002h`).** Whole-diff exec review GREEN 0C/0I. Reviews: `design/agent-reports/seedhammer-T2a-ms1-{spec-review-R0,spec-review-R1,plan-review-R0,plan-review-R1,execution-review}.md`. **T2a DONE** (first of the T2 decode-display tier).
 **Roadmap:** `design/RECON_seedhammer_constellation_terminal.md` (tier T2) · cycle-prep: `design/cycle-prep-recon-T2-decode-display.md`.
 **Base:** fork `main` `68e6ead`. Fork-side only (no upstream PR).
 
