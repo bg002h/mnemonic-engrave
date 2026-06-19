@@ -84,7 +84,7 @@ Index variation (abandon master, 12 words): `idx 0` = the 12-word child above; `
 
 **Modify:**
 - `gui/gui.go` — the 8 lockstep sites (enum `:147-154`, dispatch `:1492-1514`, left-wrap `:1640-1643`, right-wrap `:1644-1652`, title `:1666-1678`, `npage` `:1852`, `layoutMainPlates` `:1860-1867`, `npages` `:1871`).
-- `gui/singlesig_program_test.go`, `gui/bundle_program_test.go`, `gui/derive_xpub_program_test.go` — repoint the carousel-upper-bound comments/assertions (the wrap boundary moves one program later).
+- `gui/singlesig_program_test.go`, `gui/bundle_program_test.go`, `gui/derive_xpub_program_test.go` — repoint the carousel-upper-bound references (the wrap boundary moves one program later). NOTE (m3): the only ASSERTION that breaks in `gui/singlesig_program_test.go` is `TestEngraveSingleSigLeftWrap` (one `"Multisig"`→`"BIP-85"`); `TestEngraveSingleSigProgramNavigable` stays green (it stops at Multisig, still position 4). `bundle_program_test.go` and `derive_xpub_program_test.go` are comment-only (their assertions stop short of the wrap boundary). The full wrap-boundary repoint (both `Navigable` + `LeftWrap`) only applies to `gui/multisig_program_test.go`.
 
 ---
 
@@ -590,28 +590,54 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Test: `gui/bip85_test.go`
 
 **Interfaces:**
-- Consumes: `ConfirmWarningScreen`, `ConfirmNo`/`ConfirmYes`, `assets.IconHammer`.
+- Consumes (production): `ConfirmWarningScreen`, `ConfirmNo`/`ConfirmYes`, `assets.IconHammer`.
+- Consumes (test harness): `testing/synctest` (`synctest.Test`), `runUI` (`gui_test.go:467`), `pumpUntil` (`slip39_polish_test.go:329`), `click` (`event_test.go:42`).
 - Produces: `childSeedWarning(ctx *Context, th *Colors) bool` — shows the MANDATORY hold-to-confirm warning that this engraves a CHILD SEED; returns `true` only on a held confirm, `false` on Back/cancel/Done. Mirrors `stubZeroWarning` (`gui/derive_xpub.go:237`).
 
 - [ ] **Step 4.1: Write the failing test.**
 
-Append to `gui/bip85_test.go`. This drives the warning screen through the UI harness; a Back (Button1) must return `false` (abort).
+Append to `gui/bip85_test.go`. This drives the warning screen through the UI harness; a Back (Button1) must drive `ConfirmWarningScreen.Layout` to `ConfirmNo`, so `childSeedWarning` returns `false` (abort) and the flow goroutine returns.
+
+This test mirrors `TestDescriptorAddressFlowBackExits` (`gui/address_polish_test.go:77-92`): keep the `frame` handle, render the warning, `click(Button1)` to abort, then pump `frame()` until the flow goroutine returns (the iterator ends), then assert the captured result is `false` NON-vacuously (the goroutine actually ran `childSeedWarning` to completion and returned `false`). Because `childSeedWarning` only advances on `ctx.Frame` yields, the `frame()` pumping is REQUIRED — a bare `click()` without pumping would leave the warning goroutine blocked on its first yield and the test would pass vacuously. Wrapped in `synctest.Test` to match every shipped flow test.
 
 ```go
-// TestChildSeedWarningAbort: pressing Back at the warning returns false (abort)
-// — no engrave proceeds. Mirrors the stub-0 warning abort behavior.
+// TestChildSeedWarningAbort: pressing Back (Button1) at the child-seed warning
+// drives ConfirmWarningScreen.Layout -> ConfirmNo, so childSeedWarning returns
+// false (abort) and no engrave proceeds. The flow goroutine must actually reach
+// and dismiss the warning (NON-vacuous): we keep the frame handle, render the
+// warning, click Back, pump frames until the goroutine returns, then assert it
+// returned false and that it ran to completion. Mirrors TestDescriptorAddressFlowBackExits.
 func TestChildSeedWarningAbort(t *testing.T) {
-	ctx := NewContext(newPlatform())
-	var got bool
-	_, quit := runUI(ctx, func() { got = childSeedWarning(ctx, &descriptorTheme) })
-	defer quit()
-	click(&ctx.Router, Button1) // Back
-	quit()
-	if got {
-		t.Fatal("childSeedWarning returned true after Back; want false (abort)")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		ctx := NewContext(newPlatform())
+		var got bool
+		done := false
+		frame, quit := runUI(ctx, func() {
+			got = childSeedWarning(ctx, &descriptorTheme)
+			done = true
+		})
+		defer quit()
+		// Render the warning before driving it (the goroutine blocks on its first
+		// ctx.Frame yield until pumped).
+		if c, ok := pumpUntil(frame, "Child Seed", 16); !ok {
+			t.Fatalf("child-seed warning not shown; got %q", c)
+		}
+		click(&ctx.Router, Button1) // Back -> ConfirmNo
+		// Pump until the warning goroutine returns (the iterator ends).
+		for i := 0; i < 16 && !done; i++ {
+			frame()
+		}
+		if !done {
+			t.Fatal("childSeedWarning did not return after Back")
+		}
+		if got {
+			t.Fatal("childSeedWarning returned true after Back; want false (abort)")
+		}
+	})
 }
 ```
+
+**Helpers/imports for this test:** `synctest.Test` (`testing/synctest`), `pumpUntil` (`gui/slip39_polish_test.go:329`), `runUI`/`click`/`Button1`/`NewContext`/`newPlatform`/`descriptorTheme` (all existing in the `gui` test package). Add `"testing/synctest"` to `gui/bip85_test.go`'s imports.
 
 - [ ] **Step 4.2: Run to verify it fails.**
 
@@ -694,78 +720,114 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Test: `gui/bip85_test.go`
 
 **Interfaces:**
-- Consumes: `seedEntryFlow`, `passphraseFlow`, `ChoiceScreen`, `bip85ParamPickFlow` (Task 3), `deriveBip85Child` (Task 1), `childSeedWarning` (Task 4), `engraveBip85Child` (Task 2), `NewEngraveScreen(...).Engrave`, `showError`, `engraveTheme`.
+- Consumes (production): `seedEntryFlow`, `passphraseFlow`, `ChoiceScreen`, `bip85ParamPickFlow` (Task 3), `deriveBip85Child` (Task 1), `childSeedWarning` (Task 4), `engraveBip85Child` (Task 2), `NewEngraveScreen(...).Engrave`, `showError`, `engraveTheme`.
+- Consumes (test harness): `testing/synctest` (`synctest.Test`/`synctest.Wait`), `time`+`confirmDelay` (`gui/gui.go:269`), `runUI` (`gui_test.go:467`), `pumpUntil` (`slip39_polish_test.go:329`), `chooseEntry` (`derive_xpub_test.go:21`), `driveWords` (`seedxor_polish_test.go:24`), `abandonAboutPhrase` (`derive_xpub_test.go:14`), `click`/`press` (`event_test.go:42,57`), `newEngraver`/`newPlatform` (+`p.engraver`/`p.wakeups`/`e.closes`, `gui_test.go:336-337,452-465,242-275`).
 - Produces:
   - `var bip85SeedHook func(master, child bip39.Mnemonic)` — test-only seam (nil in production) to observe BOTH mnemonics for the scrub assertion. Mirrors `singleSigSeedHook` (`gui/singlesig.go:28`).
   - `bip85DeriveFlow(ctx *Context, th *Colors)` — the program entry point: typed master (`seedEntryFlow`, NEVER scan) → optional passphrase → param picker → derive → warning → engrave. A top-level `defer` scrubs BOTH the master AND the child mnemonic on every exit. Dispatched from the carousel in Task 6.
 
 - [ ] **Step 5.1: Write the failing scrub test.**
 
-Append to `gui/bip85_test.go`. This drives the full flow via the UI harness up to the warning, then aborts at the warning and asserts BOTH the master and the child slices are zeroed on exit.
+Append to `gui/bip85_test.go`. This MIRRORS `TestEngraveSingleSigFlowSeedScrubbed` (`gui/singlesig_flow_test.go:117-154`) EXACTLY for the structure: `synctest.Test` wrapper, `frame, quit := runUI(...)` (keep the `frame` handle), install the seed hook, type the abandon master, drive the param pickers, confirm the warning, let the engrave job complete, drain frames until the flow goroutine returns, then assert BOTH captured slices are zeroed. The engrave-completion portion mirrors `TestEngraveScreen` (`gui/gui_test.go:242-275`): install a `testEngraver`, click to the connect step, `press(Button3)` + `time.Sleep(confirmDelay)` to hold-confirm, pump until `<-e.closes`, then `click(Button3)` + `synctest.Wait()` so `NewEngraveScreen(...).Engrave` returns `true` and the flow returns.
+
+The hook captures the slice HEADERS of the master and child while they are still non-nil (the hook fires synchronously right after `child = c`, see Step 5.3). The flow's top-level `defer` then zeroes those same backing arrays on return; the test reads their CONTENTS after the goroutine has returned (after the final drain), by which point the scrub defer has run.
 
 ```go
-// TestBip85DeriveFlow_ScrubsBothMnemonics drives the flow to the child-seed
-// warning, aborts there, and asserts BOTH the master and the derived child
-// mnemonic []Word slices are zeroed on exit (I-3: two secrets to scrub).
+// TestBip85DeriveFlow_ScrubsBothMnemonics drives the FULL flow: type the abandon
+// master, pick the child params (12 words, index 0), confirm the child-seed
+// warning, and let the engrave complete; then it asserts BOTH the master and the
+// derived child mnemonic []Word slices are zeroed on exit (I-3: two secrets to
+// scrub). Mirrors TestEngraveSingleSigFlowSeedScrubbed (the seed-hook + zeroed-
+// slice pattern) plus TestEngraveScreen (the connect/hold-confirm/complete dance).
 func TestBip85DeriveFlow_ScrubsBothMnemonics(t *testing.T) {
-	ctx := NewContext(newPlatform())
-	var master, child bip39.Mnemonic
-	bip85SeedHook = func(m, c bip39.Mnemonic) { master, child = m, c }
-	defer func() { bip85SeedHook = nil }()
+	synctest.Test(t, func(t *testing.T) {
+		var master, child bip39.Mnemonic
+		bip85SeedHook = func(m, c bip39.Mnemonic) { master, child = m, c }
+		defer func() { bip85SeedHook = nil }()
 
-	_, quit := runUI(ctx, func() { bip85DeriveFlow(ctx, &descriptorTheme) })
-	defer quit()
+		e := newEngraver()
+		p := newPlatform()
+		p.engraver = e
+		ctx := NewContext(p)
+		done := false
+		frame, quit := runUI(ctx, func() {
+			bip85DeriveFlow(ctx, &descriptorTheme)
+			done = true
+		})
+		defer quit()
+		frame()
 
-	// Master entry: pick 12 words, then type the abandon-about phrase.
-	chooseWords(t, ctx, 12)               // master word-count ChoiceScreen
-	driveWords(&ctx.Router, abandonAboutPhrase())
-	// Passphrase: Skip (default index 0).
-	clickChoose(&ctx.Router)
-	// Param picker: word count = 12 (index 0), index = 0 (index 0).
-	clickChoose(&ctx.Router) // word count
-	clickChoose(&ctx.Router) // child index
-	// Child-seed warning: abort.
-	click(&ctx.Router, Button1)
-	quit()
-
-	if master == nil || child == nil {
-		t.Fatal("hook never observed both mnemonics")
-	}
-	for i, w := range master {
-		if w != 0 {
-			t.Fatalf("master[%d] = %d, not scrubbed", i, w)
+		// Master entry: word-count picker -> 12 words (choice 0), then type the
+		// abandon-about phrase. (seedEntryFlow's master count is []int{12,24};
+		// default index 0 = 12 words, so confirm with Button3.)
+		click(&ctx.Router, Button3) // 12 WORDS
+		frame()
+		driveWords(&ctx.Router, abandonAboutPhrase())
+		// Passphrase prompt: Skip (choice 0).
+		if c, ok := pumpUntil(frame, "Passphrase", 160); !ok {
+			t.Fatalf("did not reach the passphrase prompt; got %q", c)
 		}
-	}
-	for i, w := range child {
-		if w != 0 {
-			t.Fatalf("child[%d] = %d, not scrubbed", i, w)
+		click(&ctx.Router, Button3) // Skip
+		frame()
+		// Param picker: word count = 12 (index 0), child index = 0 (index 0).
+		// chooseEntry queues the Down presses, pumps a frame, confirms, pumps again.
+		chooseEntry(frame, &ctx.Router, 0) // word count 12
+		chooseEntry(frame, &ctx.Router, 0) // child index 0
+		// Child-seed warning: hold Button3 to confirm (ConfirmYes).
+		if c, ok := pumpUntil(frame, "Child Seed", 160); !ok {
+			t.Fatalf("did not reach the child-seed warning; got %q", c)
 		}
-	}
+		press(&ctx.Router, Button3) // hold to confirm
+		frame()
+		time.Sleep(confirmDelay)
+		frame()
+		// Engrave screen: click to the connect step, hold to start engraving.
+		click(&ctx.Router, Button3, Button3, Button3)
+		press(&ctx.Router, Button3) // hold connect
+		frame()
+		time.Sleep(confirmDelay)
+		// Pump until the engrave job closes (completes).
+	loop:
+		for {
+			frame()
+			select {
+			case <-e.closes:
+				break loop
+			case <-p.wakeups:
+			}
+		}
+		click(&ctx.Router, Button3) // dismiss the success screen -> Engrave returns true
+		synctest.Wait()
+		// Drain remaining frames until the flow goroutine returns and the scrub
+		// defer has run.
+		for i := 0; i < 32 && !done; i++ {
+			frame()
+		}
+		if !done {
+			t.Fatal("bip85DeriveFlow did not return after a completed engrave")
+		}
+		if master == nil || child == nil {
+			t.Fatal("hook never observed both mnemonics")
+		}
+		for i, w := range master {
+			if w != 0 {
+				t.Fatalf("master[%d] = %d, not scrubbed on exit (I-3)", i, w)
+			}
+		}
+		for i, w := range child {
+			if w != 0 {
+				t.Fatalf("child[%d] = %d, not scrubbed on exit (I-3)", i, w)
+			}
+		}
+	})
 }
 ```
 
-This test uses three helpers that already exist or are trivial wrappers around the harness. `abandonAboutPhrase()` and `driveWords` exist (`gui/derive_xpub_test.go:14,132`). `chooseWords`, `clickChoose`, and `descriptorTheme`/`runUI`/`click`/`NewContext`/`newPlatform` are existing test helpers in the `gui` package; if `chooseWords`/`clickChoose` do not yet exist, add them to `gui/bip85_test.go` as:
+**Helpers/imports for this test (all confirmed present in the `gui` test package):** `synctest.Test`/`synctest.Wait` (`testing/synctest`), `time.Sleep` + `confirmDelay` (`gui/gui.go:269`), `runUI` (`gui_test.go:467`), `pumpUntil` (`slip39_polish_test.go:329`), `chooseEntry(frame, &ctx.Router, down)` (`derive_xpub_test.go:21`), `driveWords` (`seedxor_polish_test.go:24`), `abandonAboutPhrase` (`derive_xpub_test.go:14`), `click`/`press` (`event_test.go:42,57`), `newEngraver`/`newPlatform` + `p.engraver`/`p.wakeups`/`e.closes` (`gui_test.go:336-337,452-465,242-275`), `descriptorTheme` (`theme.go:47`). Add `"testing/synctest"` and `"time"` to `gui/bip85_test.go`'s imports. **No new `chooseWords`/`clickChoose` wrappers are needed — `chooseEntry` is the shipped ChoiceScreen driver (m1).**
 
-```go
-// clickChoose presses the ChoiceScreen confirm button (Button3) once.
-// NOTE: click's signature is func click(r *EventRouter, bs ...Button) (gui/event_test.go:42);
-// ctx.Router is an EventRouter, so pass &ctx.Router.
-func clickChoose(r *EventRouter) { click(r, Button3) }
-
-// chooseWords selects the given word count on the master/child word-count
-// ChoiceScreen by pressing Down (n-1)/6 times etc. The master picker is
-// []int{12,24}; for 12 the default (index 0) is already selected, so just
-// confirm. (Used for the abandon master, which is 12 words.)
-func chooseWords(t *testing.T, ctx *Context, n int) {
-	t.Helper()
-	if n != 12 {
-		t.Fatalf("chooseWords only supports 12 in this test, got %d", n)
-	}
-	clickChoose(&ctx.Router)
-}
-```
-
-> NOTE for the implementer: verify `Router`, `click`, `Button3`, `Down`, `driveWords`, `abandonAboutPhrase`, `descriptorTheme`, `runUI`, `NewContext`, `newPlatform` resolve in the `gui` test package (they are used across `gui/*_test.go`). If `click`'s signature differs (it takes `*Router` per `gui/multisig_program_test.go`'s `click(&ctx.Router, Right)`), match it exactly. If a needed helper is genuinely absent, prefer reusing the existing one over inventing a new name.
+> NOTE for the implementer: if the harness sequence drifts (the flow times out or a `pumpUntil` misses its marker), re-read the two precedents — `gui/singlesig_flow_test.go:117-154` (seed-hook + zeroed-slice) and `gui/gui_test.go:242-275` (the engrave connect/hold/complete dance) — and align the click/`frame()` sequence to match the actual screen titles. Do NOT weaken the scrub assertion (the zeroed-slice checks) to make the test pass.
+>
+> ONE button-state subtlety: `press(r, Button3)` (`event_test.go:57`) sends ONLY a Pressed-down event (no release), so after the warning's `press(Button3)`+`time.Sleep(confirmDelay)` reaches `ConfirmYes`, Button3 is still logically held when the engrave screen opens. `TestEngraveScreen` has no preceding warning, so it starts from a released button. If the engrave-screen drive (`click(Button3, Button3, Button3)`) does not advance because the harness sees a still-held button, release it first with `click(&ctx.Router, Button3)` (a press/release pair re-establishes the transition) BEFORE the connect clicks, then proceed. This is a mechanical alignment, not a change to the scrub assertion.
 
 - [ ] **Step 5.2: Run to verify it fails.**
 
@@ -803,6 +865,10 @@ func bip85DeriveFlow(ctx *Context, th *Colors) {
 	}
 	var child bip39.Mnemonic
 	// Scrub BOTH secrets on EVERY exit path (I-3). child is nil until derived.
+	// This is the ONLY scrub defer and (being registered first) runs LAST/LIFO,
+	// so it zeroes both backing arrays after every other defer. The test's
+	// bip85SeedHook (called synchronously below, after child = c) holds the slice
+	// headers and reads their contents AFTER the flow returns and this defer ran.
 	defer func() {
 		for i := range master {
 			master[i] = 0
@@ -811,10 +877,6 @@ func bip85DeriveFlow(ctx *Context, th *Colors) {
 			child[i] = 0
 		}
 	}()
-	if bip85SeedHook != nil {
-		// Re-report after derive so the test observes both slices (see below).
-		defer func() { bip85SeedHook(master, child) }()
-	}
 
 	// Optional passphrase ON THE MASTER.
 	passphrase := ""
@@ -836,6 +898,13 @@ func bip85DeriveFlow(ctx *Context, th *Colors) {
 			continue
 		}
 		child = c
+		// Test-only seam: observe BOTH mnemonics synchronously while they are
+		// non-nil. nil in production. The captured slice headers alias the backing
+		// arrays the top-level scrub defer zeroes on exit (mirrors
+		// singleSigSeedHook, gui/singlesig.go:36-38 — observed-then-scrubbed).
+		if bip85SeedHook != nil {
+			bip85SeedHook(master, child)
+		}
 
 		// Unskippable child-seed warning before any engrave.
 		if !childSeedWarning(ctx, th) {
@@ -868,22 +937,12 @@ func bip85DeriveFlow(ctx *Context, th *Colors) {
 }
 ```
 
-> NOTE on the hook ordering: the `defer bip85SeedHook(master, child)` runs AFTER the scrub `defer` is registered but BEFORE it executes (defers are LIFO; the hook defer is registered second so it runs first — observing the slices, then the scrub defer zeroes them). That is WRONG for the test, which must see the slices AFTER scrubbing. Fix by registering the scrub defer to run LAST and the hook to capture references early: the test captures `master`/`child` by closure reference at call time (the hook stores the slice headers), and reads their CONTENTS after `quit()` — by which point ALL defers (including the scrub) have run. So the hook only needs to hand the test the slice references once they are non-nil. Simplify: drop the second defer and call the hook synchronously right after `child = c`:
-
-Replace the `if bip85SeedHook != nil { defer ... }` block with NOTHING at that location, and instead add — immediately after `child = c` in the loop:
-
-```go
-		if bip85SeedHook != nil {
-			bip85SeedHook(master, child)
-		}
-```
-
-The test stores the slice HEADERS (which alias the flow's backing arrays); the scrub `defer` then zeroes those same arrays on exit, and the test reads the contents after `quit()`. This matches how `singleSigSeedHook` is used (`gui/singlesig.go:36-38`, observed-then-scrubbed).
+> NOTE on the hook ordering (the design above already does this correctly): the `bip85SeedHook` is called SYNCHRONOUSLY right after `child = c` (NOT via a `defer`), and there is exactly ONE `defer` — the top-level scrub — registered first so it runs LAST/LIFO. The hook hands the test the master/child slice HEADERS while they are non-nil; the scrub defer then zeroes those same backing arrays on exit; the test reads the contents AFTER the flow goroutine returns (after the final `frame()` drain), by which point the scrub defer has run. This is exactly how `singleSigSeedHook` is used (`gui/singlesig.go:36-38`, observed-synchronously-then-scrubbed). A `defer bip85SeedHook(...)` would observe the slices BEFORE the scrub defer ran (LIFO) and defeat the test — do NOT use a defer for the hook.
 
 - [ ] **Step 5.4: Run to verify it passes.**
 
 Run: `cd /scratch/code/shibboleth/seedhammer-t7b && export PATH=$PATH:/home/bcg/.local/go/bin && go test ./gui/ -run 'TestBip85DeriveFlow_ScrubsBothMnemonics' -v`
-Expected: PASS. If the test times out or the harness sequence is off, re-read `gui/derive_xpub_test.go` (the `driveWords` + ChoiceScreen driving precedent) and align the click sequence; do NOT weaken the scrub assertion.
+Expected: PASS — the flow drives to a completed engrave, returns, and both the captured master and child slices are zeroed. If the test times out or the harness sequence is off, re-read the two precedents — `gui/singlesig_flow_test.go:117-154` (seed-hook + zeroed-slice) and `gui/gui_test.go:242-275` (engrave connect/hold/complete) — and align the `click`/`frame()` sequence to the actual screen titles; do NOT weaken the scrub assertion.
 
 - [ ] **Step 5.5: Commit.**
 
@@ -905,7 +964,8 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `gui/gui.go` (8 sites)
-- Modify: `gui/singlesig_program_test.go`, `gui/bundle_program_test.go`, `gui/derive_xpub_program_test.go` (repoint comments/assertions)
+- Modify: `gui/multisig_program_test.go` (repoint BOTH `Navigable` + `LeftWrap` wrap-boundary assertions)
+- Modify: `gui/singlesig_program_test.go` (repoint ONLY `TestEngraveSingleSigLeftWrap`, one `"Multisig"`→`"BIP-85"`), `gui/bundle_program_test.go`, `gui/derive_xpub_program_test.go` (comment-only — their assertions stop short of the wrap boundary)
 - Create: `gui/bip85_program_test.go`
 
 **Interfaces:**
@@ -1268,12 +1328,12 @@ No `TBD`/`TODO`/"handle edge cases"/"similar to Task N"/bare prose-without-code.
 - `bip85DeriveFlow(ctx, th)` — Task 5, dispatched Task 6 (`case bip85Derive: bip85DeriveFlow(ctx, th)`). ✓
 - `masterFingerprintFor(...) (uint32, error)` — two-value, err propagated in Task 2. ✓ `engraveSeed(params, m, mfp) (Plate, error)`, `Plate{Duration, Spline}` (Spline NOT a slice — never `len()`'d). ✓
 - `bip85WordChoices`/`bip85IndexChoices`/`validBip85Words`/`bip85SeedHook` — consistent names across Tasks 1/3/5/7. ✓
-- Imports per file: `gui/bip85.go` ends with `errors, fmt, hdkeychain, chaincfg/v2, bip39, bip85, engrave, gui/assets, gui/op` (built up across Tasks 1/2/4); `gui/bip85_test.go` needs `testing, bip39, chaincfg/v2`. ✓
+- Imports per file: `gui/bip85.go` ends with `errors, fmt, hdkeychain, chaincfg/v2, bip39, bip85, engrave, gui/assets, gui/op` (built up across Tasks 1/2/4); `gui/bip85_test.go` needs `testing, testing/synctest, time, bip39, chaincfg/v2` (`testing/synctest` for the Task-4 + Task-5 flow-test wrappers, `time` for `time.Sleep(confirmDelay)` in the Task-5 engrave-completion drive). ✓
 
 ### Spec ambiguity resolved (flag for plan R0)
 
 - **Engrave assertion granularity.** The spec §5.4 says "assert built from the CHILD mnemonic, not the master" and "plate's `MasterFingerprint` == …". The fork's `Plate.Spline` is an opaque `bspline.Curve` (a func), so the engraved PLATE cannot be byte-inspected for the words in a unit test. I resolved this by asserting on the engrave INPUTS: the test computes the child's own fp and the master's fp independently and asserts `engraveBip85Child` returns the child's fp (not the master's), plus a pinned concrete golden (`0x02e8bff2`). This is faithful to I-5 (the fp is what `engraveSeed` stamps at `gui.go:475`) without depending on opaque curve internals. **Plan-R0 should confirm this input-level assertion satisfies §5.4** — if R0 wants an on-plate words assertion, the only available seam is `engraveSeed`'s `err==nil` plus the fp, which this plan already covers; there is no public reader for the engraved words on a `Plate`.
-- **Task 5 UI-harness click sequence.** The exact `chooseWords`/`clickChoose`/`driveWords` sequence depends on test helpers in `gui/*_test.go` whose precise signatures the implementer must confirm against `gui/derive_xpub_test.go` / `gui/multisig_program_test.go`. The plan pins the precedent files and instructs reuse-over-invention; if the harness cannot deterministically reach the warning, the scrub assertion must NOT be weakened — instead align the click sequence. This is the trickiest mechanical risk and is flagged for plan-R0.
+- **Task 5 UI-harness click sequence.** The full drive (master entry → passphrase → param picker → warning hold → engrave complete → return) is built against TWO shipped precedents verbatim: `gui/singlesig_flow_test.go:117-154` (the `synctest.Test` wrapper + seed-hook + `frame`/`driveWords`/`pumpUntil` + zeroed-slice assertion) and `gui/gui_test.go:242-275` (the engrave connect/`press(Button3)`+`time.Sleep(confirmDelay)`/`<-e.closes`/`synctest.Wait` completion dance), using the shipped `chooseEntry` ChoiceScreen driver (no invented `chooseWords`/`clickChoose`). If the harness cannot deterministically reach a screen, the scrub assertion (zeroed slices) must NOT be weakened — instead align the `click`/`frame()` sequence to the actual screen titles. This is the trickiest mechanical risk and is flagged for plan-R0.
 
 ---
 
