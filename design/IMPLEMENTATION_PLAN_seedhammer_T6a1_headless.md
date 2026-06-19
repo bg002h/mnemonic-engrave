@@ -4,7 +4,7 @@
 
 **Goal:** The HEADLESS wire-format core of T6a — a byte-faithful single-sig **wallet-policy** md1 encoder, the net-new ms1 encoder, and the deterministic verify-bundle comparator — so the byte-lock-risky work is gated + proven before any GUI (T6a-2).
 
-**Architecture:** `md.EncodeSingleSig` builds a wallet-policy `*descriptor` (n=1, pubkeys+fp TLV, explicit origin) for 4 script shapes inside package `md` and calls the shipped `split`/`encodeMD1String`. `codex32.EncodeMS1` wraps `codex32.NewSeed` with the correct ms1 entr payload. The comparator deterministically re-derives + diffs. All three are headless + golden/round-trip-gated.
+**Architecture:** `md.EncodeSingleSig` builds a wallet-policy `*descriptor` (n=1, pubkeys+fp TLV, explicit origin) for 4 script shapes inside package `md` and calls the shipped `split` (CHUNKED — a single-sig wallet-policy payload is 81 bytes > the 320-bit single-string cap, so md1 is always chunked; `encodeMD1String` is NOT used). `codex32.EncodeMS1` wraps `codex32.NewSeed` with the correct ms1 entr payload. The comparator deterministically re-derives + diffs. All three are headless + golden/round-trip-gated.
 
 **Tech stack:** Go (host tests via `/home/bcg/.local/go/bin/go`; TinyGo-safe). Module `seedhammer.com`.
 
