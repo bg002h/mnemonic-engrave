@@ -27,7 +27,7 @@ T6 = the constellation flagship: from ONE hand-typed seed, derive + engrave the 
 ### Phase B (GUI)
 - A new top-level `program` inserted BEFORE `qaProgram` (R0-M4; 8 lockstep sites: enum `gui/gui.go:147-151`, dispatch `:1491-1497`, wrap bound `:1634-1641`, title+layout arms `:1662-1664`, `npage`/`npages` derived consts `:1840,1859`, nav-test `gui/derive_xpub_program_test.go`) — BOTH the title arm (no blank fail-open) AND the layout arm present.
 - **Typed seed entry ONLY (R0-I4/D12, Critical):** the T6a program calls `seedEntryFlow` (as `deriveXpubFlow` does, `gui/derive_xpub.go:106-107`); it contains NO `act.scan`→derive path. (`assembleScan` CAN parse a bip39 mnemonic + codex32 secret from NFC — `gui/scan.go:60-69` — the footgun; T6a must never route a scanned object into derivation.)
-- **Wallet-type PICK LIST (USER requirement):** the user chooses the wallet type from a list of the **4 single-sig types** — BIP-44 `pkh`, BIP-49 `sh(wpkh)`, BIP-84 `wpkh`, BIP-86 `tr` (key-path). **Mainnet-only (R0-I5):** drop the "× network" axis — the md1/restore-doc stack is mainnet-locked (`gui/md1_expand.go:61`, matching #10b); testnet is a follow-on.
+- **Wallet-type PICK LIST (USER requirement, refined 2026-06-19):** the user chooses the wallet type, with **BIP-84 `wpkh` (native segwit) as the DEFAULT** (the primary one-tap choice on the first screen); the other three single-sig types — BIP-44 `pkh` (legacy), BIP-49 `sh(wpkh)` (nested segwit), BIP-86 `tr` (taproot key-path) — sit behind an **"Advanced"** submenu. All 4 are reachable; the common case (BIP-84) is the default so the operator isn't forced to understand script types. **Mainnet-only (R0-I5):** drop the "× network" axis — the md1/restore-doc stack is mainnet-locked (`gui/md1_expand.go:61`, matching #10b); testnet is a follow-on. (UX detail only — `EncodeSingleSig` (T6a-1) supports all 4 shapes regardless; this affects only the T6a-2 GUI surfacing.)
 - Derive the 3 legs (ms1 via `EncodeMS1`; mk1 via T4 `deriveAccountXpub`+`mk.Encode`; md1 via `EncodeSingleSig`), the GUI caller converting the base58 xpub → (chainCode, compressedPubkey) + fp uint32→[4]byte for `EncodeSingleSig`.
 - **Watch-only / skip-ms1 mode** (user option-1): full → engrave ms1+mk1+md1; watch-only → mk1+md1 only.
 - **Engrave:** synthesize `[]bundleCard` from the derived strings + reuse T5 `bundleEngrave` (`gui/bundle_flow.go:327`, `[]bundleCard`-driven, verbatim, "Card X of Y · Plate P of Q", set-abort). Completion message variants (R0-M1): full → "ms1 engraved"; watch-only → DO show the ms1 hand-engrave reminder.
@@ -59,7 +59,7 @@ T6 = the constellation flagship: from ONE hand-typed seed, derive + engrave the 
 - **A4 — verify comparator:** deterministic re-derive vs a correct set → PASS; a mutated xpub/descriptor/entropy → FAIL naming the field.
 ### Phase B
 - **B1 — derive parity:** abandon-test seed at m/84'/0'/0' → mk1 == T4's known card; md1 (wpkh wallet-policy over that xpub) round-trips; ms1 decodes to the original entropy.
-- **B2 — pick list:** the wallet-type list offers exactly the 4 single-sig types; selecting each drives the correct `EncodeSingleSig` script shape; mainnet-only (no network axis).
+- **B2 — pick list:** BIP-84 `wpkh` is the DEFAULT (selectable in one step on the first screen); the other three (pkh/sh-wpkh/tr) are reached via the "Advanced" submenu; selecting each drives the correct `EncodeSingleSig` script shape; mainnet-only (no network axis).
 - **B3 — watch-only:** full → 3 cards; watch-only → 2 (mk1+md1), ms1 reminder shown; full → "ms1 engraved" message.
 - **B4 — verify-bundle flow:** correct read-back → PASS; mutated → FAIL; ms1 hand-typed (never NFC), mk1/md1 NFC.
 - **B5 — restore doc:** fp + descriptor + first recv/change addr match; greps clean of xprv.
@@ -74,7 +74,7 @@ T6 = the constellation flagship: from ONE hand-typed seed, derive + engrave the 
 - **I-5:** `.Neuter()` — no private material serialized/displayed/engraved/NFC'd.
 - **I-6:** verify-bundle deterministic (fp + xpub + path + md1-exact-string + ms1-entropy → PASS/FAIL); mk1/md1 NFC, ms1 hand-typed.
 - **I-7:** restore doc display-only (+optional NFC), no secret.
-- **I-8:** the pick list offers ONLY the 4 single-sig types; mainnet-only.
+- **I-8:** the wallet-type picker offers ONLY the 4 single-sig types, with **BIP-84 `wpkh` as the default** and the other three (pkh/sh-wpkh/tr) behind an "Advanced" submenu; mainnet-only. (GUI/T6a-2 only; the encoder supports all 4.)
 - **I-9:** new `program` coherent across all 8 lockstep sites (before `qaProgram`, both arms, no panic, nav-test updated); `TestAllocs` intact.
 - **I-10 (no-regression):** single-card flows, `deriveXpubFlow`, `backupWalletFlow`, T5 `bundleFlow`/`bundleEngrave`, codecs byte-unchanged.
 
