@@ -1,6 +1,6 @@
 # SPEC — T2a: on-device ms1 decode→display (entropy / BIP-39 words + mnem language + inspect)
 
-**Status:** R0 folded (I-1 prefix-vs-tag rename · I-2 non-English vector provenance · I-3 unshared-only gate · M-1/M-2); for the R1 gate. The load-bearing m-format layout was R0-CONFIRMED against ms-codec source + 4 Rust-sourced vectors. R0 review: `design/agent-reports/seedhammer-T2a-ms1-spec-review-R0.md`.
+**Status:** **GREEN (R1, 0C/0I).** R0 (0C/3I) byte-CONFIRMED the m-format layout vs ms-codec source + 4 Rust vectors; folded I-1 (prefix-vs-tag rename) · I-2 (Rust-sourced non-English vector) · I-3 (unshared-only gate) · M-1/M-2. R1 (0C/1I) closed all but a residual §4.1 comment-rename + §6 cite → fixed + grep-verified mechanically (a 2-word doc fix, no design change; full architect re-dispatch skipped as disproportionate). Reviews: `design/agent-reports/seedhammer-T2a-ms1-spec-review-{R0,R1}.md`. Next: the T2a plan → plan R0.
 **Roadmap:** `design/RECON_seedhammer_constellation_terminal.md` (tier T2) · cycle-prep: `design/cycle-prep-recon-T2-decode-display.md`.
 **Base:** fork `main` `68e6ead`. Fork-side only (no upstream PR).
 
@@ -51,7 +51,8 @@ Let the operator **decode a hand-typed ms1 secret on-device and see what it hold
 A small decoder — `codex32` package (new file, m-format-specific, sibling to `mdmk.go`) OR gui-side; the plan pins — exposing roughly:
 ```
 // MStarSecret holds the decoded m-format ms1 payload (the plan pins exact shape).
-//   Tag (entr/mnem); Language (0..9, 0=English); Entropy []byte (16..32, BIP-39 length).
+//   Prefix (entr=0x00 / mnem=0x02 — the Seed()[0] byte, NOT the id/Tag);
+//   Language (0..9, 0=English); Entropy []byte (16..32, BIP-39 length).
 func DecodeMS1(s String) (prefix, language int, entropy []byte, err error)
 ```
 - Take `s.Seed()`; require `len ≥ 2`; **`data[0]` = the prefix byte** (`entr`=0x00 / `mnem`=0x02 — §2.3-confirmed; NOT the codex32 id/Tag, which is `"entr"` for both); for `mnem`, `data[1]` = language, entropy = `data[2:]`; for `entr`, entropy = `data[1:]`. Validate `len(entropy) ∈ {16,20,24,28,32}`. Unknown prefix / bad length → error (§2.5). `language` is the raw byte (0..9; >9 → error per ms-codec `payload.rs:77`).
@@ -84,7 +85,7 @@ Unchanged/reused: `codex32` BCH/string layer, `bip39`, `SeedScreen`, the ms1 eng
 - **English display:** decode an English ms1 → the rendered frame shows the expected `bip39.New(entropy).String()` words.
 - **Non-English display:** a `mnem` lang≥1 → frame shows the language name + entropy hex + the "words not shown" note, and does NOT show English words.
 - **Validation:** unknown prefix byte / non-BIP-39 length → clean error message, no panic, no `bip39.New` on bad length.
-- **Inspect:** unshared-secret vs share-k-of-N line correct (reuse/verify `confirmCodex32Flow`/`Split`).
+- **Inspect:** unshared-secret vs share-k-of-N line correct (reuse/verify `confirmCodex32Flow`/`ParsePrefix`/`Fields`).
 - **No regression:** ms1 engrave path unchanged; codex32/bip39/gui suites green. `go test ./codex32/ ./gui/ ./bip39/`.
 
 ## 7. Process
