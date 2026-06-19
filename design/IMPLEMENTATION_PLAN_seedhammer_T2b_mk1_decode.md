@@ -205,16 +205,12 @@ func TestFiveBitToBytes(t *testing.T) {
 // (family_token "mk-codec 0.2").
 package mk
 
+// Task 2 imports ONLY what Task 2's code uses (Go rejects unused imports).
+// Task 3 expands this block to the full set when it appends Decode/reassemble.
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 
-	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil/v2/hdkeychain"
 	"seedhammer.com/codex32"
 )
 
@@ -494,7 +490,8 @@ func TestDecodeNegative(t *testing.T) {
 			if err == nil {
 				t.Fatalf("Decode(%s): want error, got Card %+v", c.name, card)
 			}
-			if card != (Card{}) {
+			// Card has a slice field ([][4]byte) → not comparable; check fields.
+			if card.Network != "" || card.Path != "" || card.Fingerprint != "" || card.Xpub != "" || len(card.Stubs) != 0 {
 				t.Fatalf("Decode(%s): want zero Card on error, got %+v", c.name, card)
 			}
 		})
@@ -502,7 +499,22 @@ func TestDecodeNegative(t *testing.T) {
 }
 ```
 - [ ] **Step 2: Run — expect FAIL** (`Decode` undefined): `/home/bcg/.local/go/bin/go test ./mk/ -run TestDecode 2>&1 | tail`
-- [ ] **Step 3: Implement** — append to `mk/mk.go`:
+- [ ] **Step 3a: Expand the `mk/mk.go` import block** to the full set the appended code uses:
+```go
+import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil/v2/hdkeychain"
+	"seedhammer.com/codex32"
+)
+```
+- [ ] **Step 3b: Implement** — append to `mk/mk.go`:
 ```go
 const (
 	fingerprintFlagMask   = 0x04
@@ -860,23 +872,13 @@ func TestHasMKPrefix(t *testing.T) {
 }
 ```
 - [ ] **Step 2: Run — expect FAIL** (`mk1Gatherer` undefined): `/home/bcg/.local/go/bin/go test ./gui/ -run 'TestMK1Gatherer|TestHasMKPrefix' 2>&1 | tail`
-- [ ] **Step 3: Implement the gatherer + helpers** — create `gui/mk1_inspect.go` with this prefix (the flows are added in Tasks 5–6):
+- [ ] **Step 3: Implement the gatherer + helpers** — create `gui/mk1_inspect.go` with this prefix (the flows are added in Tasks 5–6). **Import only what this task's code uses — Go rejects unused imports; Tasks 5/6 expand the block incrementally:**
 ```go
 package gui
 
 import (
-	"errors"
-	"fmt"
-	"image"
-	"io"
-	"log"
 	"strings"
-	"time"
 
-	"seedhammer.com/gui/assets"
-	"seedhammer.com/gui/layout"
-	"seedhammer.com/gui/op"
-	"seedhammer.com/gui/widget"
 	"seedhammer.com/mk"
 )
 
@@ -946,7 +948,7 @@ func (g *mk1Gatherer) collected() []string {
 	return out
 }
 ```
-(Imports `fmt`/`image`/`io`/`log`/`time`/`assets`/`layout`/`op`/`widget` are unused until Tasks 5–6; if `go build` complains before then, add a `var _ = …` — but implement Tasks 5–6 in the same branch before the Task 6 build/commit, so they resolve. To keep Task 4 self-compiling, temporarily import only `strings` + `seedhammer.com/mk`, and add the rest in Task 5.)
+**Import staging (per the R0 build check):** Task 4 = `strings` + `seedhammer.com/mk`. Task 5 expands to add `fmt`, `image`, `seedhammer.com/gui/assets`, `seedhammer.com/gui/layout`, `seedhammer.com/gui/op`, `seedhammer.com/gui/widget`. Task 6 expands to add `errors`, `io`, `log`, `time`. Each task's intermediate file must compile with exactly the imports its code uses.
 - [ ] **Step 4: Run — expect PASS:** `/home/bcg/.local/go/bin/go test ./gui/ -run 'TestMK1Gatherer|TestHasMKPrefix' -v`
 - [ ] **Step 5: Commit:**
 ```bash
@@ -1010,7 +1012,21 @@ func TestMK1DisplayFlowBackExits(t *testing.T) {
 }
 ```
 - [ ] **Step 2: Run — expect FAIL** (`mk1DisplayFlow` undefined): `/home/bcg/.local/go/bin/go test ./gui/ -run TestMK1DisplayFlow 2>&1 | tail`
-- [ ] **Step 3: Implement** — append to `gui/mk1_inspect.go` (and ensure all imports listed in Task 4's block are now present):
+- [ ] **Step 3a: Expand the `gui/mk1_inspect.go` import block** to add what the display flow uses:
+```go
+import (
+	"fmt"
+	"image"
+	"strings"
+
+	"seedhammer.com/gui/assets"
+	"seedhammer.com/gui/layout"
+	"seedhammer.com/gui/op"
+	"seedhammer.com/gui/widget"
+	"seedhammer.com/mk"
+)
+```
+- [ ] **Step 3b: Implement** — append to `gui/mk1_inspect.go`:
 ```go
 // mk1DisplayFlow shows the decoded mk1 account metadata for verification. Read-
 // only: no engrave, no NFC, no mutation. Measure-and-advance paging (the T1
@@ -1109,7 +1125,8 @@ func TestMK1GatherFlowBackNoReader(t *testing.T) {
 	if _, fok := frame(); fok {
 		t.Fatal("mk1GatherFlow did not exit on Back")
 	}
-	if ok || card != (mk.Card{}) {
+	// mk.Card has a slice field → not comparable; check fields.
+	if ok || card.Xpub != "" || card.Path != "" || len(card.Stubs) != 0 {
 		t.Fatalf("Back should yield (zero, false); got ok=%v card=%+v", ok, card)
 	}
 }
@@ -1128,9 +1145,45 @@ func TestMdmkFlowMK1ShowsInspect(t *testing.T) {
 		t.Errorf("mk1 chooser missing Inspect key; got %q", content)
 	}
 }
+
+func TestMdmkFlowMD1NoInspect(t *testing.T) {
+	// §2.5/§2.9: an md1 string keeps the engrave-only flow (no Inspect).
+	// validateMdmk only QR-encodes + lays out (no BCH re-check), so an
+	// md1-prefixed literal exercises the isMK==false branch directly.
+	p := newPlatform()
+	p.engraver = newEngraver()
+	ctx := NewContext(p)
+	frame, quit := runUI(ctx, func() { mdmkFlow(ctx, &descriptorTheme, mdmkText("md1qqqqqqpqqzgr3hq2v")) })
+	defer quit()
+	content, ok := frame()
+	if !ok {
+		t.Fatal("mdmkFlow(md1) produced no frame")
+	}
+	if uiContains(content, "Inspect key") {
+		t.Errorf("md1 chooser must NOT offer Inspect; got %q", content)
+	}
+}
 ```
-- [ ] **Step 2: Run — expect FAIL** (`mk1GatherFlow` undefined): `/home/bcg/.local/go/bin/go test ./gui/ -run 'TestMK1GatherFlow|TestMdmkFlowMK1' 2>&1 | tail`
-- [ ] **Step 3a: Implement `mk1GatherFlow`** — append to `gui/mk1_inspect.go`:
+- [ ] **Step 2: Run — expect FAIL** (`mk1GatherFlow` undefined): `/home/bcg/.local/go/bin/go test ./gui/ -run 'TestMK1GatherFlow|TestMdmkFlow' 2>&1 | tail`
+- [ ] **Step 3a: Expand the `gui/mk1_inspect.go` import block** to its final set (adds the scanner-goroutine imports):
+```go
+import (
+	"errors"
+	"fmt"
+	"image"
+	"io"
+	"log"
+	"strings"
+	"time"
+
+	"seedhammer.com/gui/assets"
+	"seedhammer.com/gui/layout"
+	"seedhammer.com/gui/op"
+	"seedhammer.com/gui/widget"
+	"seedhammer.com/mk"
+)
+```
+- [ ] **Step 3b: Implement `mk1GatherFlow`** — append to `gui/mk1_inspect.go`:
 ```go
 // mk1GatherFlow collects a complete mk1 chunk set via NFC, starting from the
 // first scanned chunk, then decodes and returns the Card. It owns its own
@@ -1248,7 +1301,7 @@ func decodeGathered(ctx *Context, th *Colors, g *mk1Gatherer) (mk.Card, bool) {
 	return card, true
 }
 ```
-- [ ] **Step 3b: Modify `mdmkFlow`** in `gui/gui.go` — replace the EXACT current function:
+- [ ] **Step 3c: Modify `mdmkFlow`** in `gui/gui.go` — replace the EXACT current function:
 ```go
 // mdmkFlow lets the operator pick an engraving variant for an md1/mk1 string
 // and engrave it, mirroring descriptorFlow.
@@ -1342,6 +1395,6 @@ git -c commit.gpgsign=true commit -S -s -m "gui: mk1 multi-chunk gather + Inspec
 - md1 path byte-identical (no Inspect); mk1 shows Inspect; alloc gate (`TestAllocs`) passes; vet/gofmt clean.
 
 ## Self-review (vs spec)
-- §2.1 gather mandatory → Tasks 4/6. §2.2 wire-exact incl. chunk_index verbatim → Task 2 header + Task 3 reassembly; TestParseHeader's index-1 assertion is the R0-C1 guard. §2.3 xpub reconstruction (childNum raw u32) → Task 3 reconstructXpub. §2.4 read-only → Tasks 5/6 (no engrave/NFC). §2.5 no regression → Task 6 md1-identical + TestMdmkFlowMK1ShowsInspect. §2.6 alloc gate → Task 7. §2.7 no secrets → no scrub anywhere. §2.8 full reject set → Task 3 decode + Task 3 negatives. §2.9 HRP discrimination → hasMKPrefix. §2.10 paging tail → TestMK1DisplayFlowPaging. §6 vectors V1–V7 clean + negative layering → Task 3.
+- §2.1 gather mandatory → Tasks 4/6. §2.2 wire-exact incl. chunk_index verbatim → Task 2 header + Task 3 reassembly; TestParseHeader's index-1 assertion is the R0-C1 guard. §2.3 xpub reconstruction (childNum raw u32) → Task 3 reconstructXpub. §2.4 read-only → Tasks 5/6 (no engrave/NFC). §2.5 no regression → Task 6 md1-identical branch + TestMdmkFlowMK1ShowsInspect (Inspect present for mk1) + TestMdmkFlowMD1NoInspect (absent for md1). §2.6 alloc gate → Task 7. §2.7 no secrets → no scrub anywhere. §2.8 full reject set → Task 3 decode + Task 3 negatives. §2.9 HRP discrimination → hasMKPrefix. §2.10 paging tail → TestMK1DisplayFlowPaging. §6 vectors V1–V7 clean + negative layering → Task 3.
 - No placeholders; every step has runnable code/commands. Type names consistent across tasks (`mk.Card`, `mk.Header`, `mk1Gatherer`, `gatherStatus`).
 - **R0 gate next:** this plan MUST pass an opus-architect R0 to 0C/0I before any code; fold → persist verbatim to `design/agent-reports/` → re-dispatch until GREEN.
