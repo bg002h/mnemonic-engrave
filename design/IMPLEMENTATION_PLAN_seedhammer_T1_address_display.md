@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go (host `go test ./gui/... ./address/...`) + TinyGo (`pico-plus2`; existing CI job). Spec (GREEN R1): `design/SPEC_seedhammer_T1_address_display.md`. Base: fork `main` `384547d`.
 
-**Gate status:** **GREEN (plan R0, 0C/0I)** — the opus architect materialized this plan's exact code and RAN it: `BenchmarkAllocs` = 0 B/op 0 allocs/op (`TestAllocs` PASS), all 4 plan tests pass verbatim, engrave path byte-identical, fixtures exact + valid. Review: `design/agent-reports/seedhammer-T1-address-plan-review-R0.md`. Cleared for single-implementer TDD. (Fold the R0 M-2: also add a `Supported=false` inertness regression test.)
+**Gate status:** plan R0 GREEN (code ran: `TestAllocs` 0 allocs/op, all tests pass), implemented (`f6df823`,`979aadd`), then the **execution review caught a real paging defect** — fixed-count paging silently drops off-screen indices for wrapping long addresses (P2WSH multisig ~3 of 5 on 480×320). **AMENDED:** `descriptorAddressFlow` now uses **measure-and-advance** (Task 1, gap-free; spec §4.2) + a no-skipped-indices regression test (both single-sig and long-address fixtures). Re-gated as a combined spec+plan amendment R0 (`design/agent-reports/seedhammer-T1-address-paging-fix-review-R0.md`). The `Confirm` wiring (Task 2) + the R0 M-2 inertness test are unchanged and already implemented. Reviews: `…-plan-review-R0.md`.
 
 ---
 
@@ -140,8 +140,47 @@ func TestDescriptorAddressFlowBackExits(t *testing.T) {
 		t.Fatal("Back did not exit descriptorAddressFlow")
 	}
 }
+
+// The load-bearing regression (R1-exec defect): measure-and-advance paging must
+// never silently drop an index off-screen. Page forward across enough pages to
+// cover indices 0..7 and assert EVERY address appears — for both a single-sig
+// fixture (more fit/page) and a long-address P2WSH fixture (fewer fit/page).
+func TestDescriptorAddressFlowNoSkippedIndices(t *testing.T) {
+	for _, descStr := range []string{descWPKH, descCustomChildren} {
+		d := loadTestDesc(t, descStr)
+		seen := make(map[string]bool)
+		for i := uint32(0); i < 8; i++ {
+			a, err := address.Receive(d, i)
+			if err != nil {
+				t.Fatalf("%s: Receive(%d): %v", descStr, i, err)
+			}
+			seen[a] = false
+		}
+		ctx := NewContext(newPlatform())
+		// Up to 8 page-forwards (worst case 1 address/page still reaches idx 7).
+		click(&ctx.Router, Button3, Button3, Button3, Button3, Button3, Button3, Button3, Button3)
+		frame, quit := runUI(ctx, func() { descriptorAddressFlow(ctx, &descriptorTheme, d) })
+		for i := 0; i < 60; i++ {
+			c, ok := frame()
+			if !ok {
+				break
+			}
+			for a := range seen {
+				if uiContains(c, a) {
+					seen[a] = true
+				}
+			}
+		}
+		quit()
+		for a, ok := range seen {
+			if !ok {
+				t.Errorf("%s: address %q was never viewable — paging skipped it", descStr, a)
+			}
+		}
+	}
+}
 ```
-(`uiContains`/`runUI`/`click`/`newPlatform`/`descriptorTheme` are the existing harness, used identically by `TestRecoverCodex32Mismatch`. Assertions compare against `address.Receive/Change` computed in-test — tied to the pkg, not hardcoded address literals.)
+(`uiContains`/`runUI`/`click`/`newPlatform`/`descriptorTheme` are the existing harness, used identically by `TestRecoverCodex32Mismatch`. Assertions compare against `address.Receive/Change` computed in-test — tied to the pkg, not hardcoded address literals. `TestDescriptorAddressFlowNoSkippedIndices` is the regression that locks the measure-and-advance fix: every index 0..7 must surface across pages on both the short-address and long-address fixtures.)
 
 - [ ] **Step 2: Run — expect FAIL** (`descriptorAddressFlow` undefined): `go test ./gui/ -run TestDescriptorAddressFlow 2>&1 | tail`
 
@@ -161,25 +200,42 @@ import (
 	"seedhammer.com/gui/widget"
 )
 
-const (
-	addrPageSize = 5
-	addrMaxStart = 50 // do not advance the window's start past this
-)
+const addrMaxIndex = 49 // show indices 0..49; bounds the paging loop
 
 // descriptorAddressFlow displays the descriptor's receive/change addresses for
 // on-device verification. Display-only: no engrave, no NFC, no mutation. The
-// caller opens this only when address.Supported(desc). Addresses are recomputed
-// only on entry and on toggle/page events (off any hot path). (T1 / spec §4.2.)
+// caller opens this only when address.Supported(desc).
+//
+// Long bech32 addresses wrap across several rows, so this MEASURES each line and
+// renders only the indices that FIT the content height, paging forward by the
+// count actually shown — gap-free, so no index is ever dropped off-screen (spec
+// §4.2). Recomputes only on entry / toggle / page (off any hot path; Measure
+// emits no draw ops). dims is stable for the flow's lifetime.
 func descriptorAddressFlow(ctx *Context, th *Colors, desc *bip380.Descriptor) {
 	backBtn := &Clickable{Button: Button1}
 	toggleBtn := &Clickable{Button: Button2}
 	pageBtn := &Clickable{Button: Button3}
+
+	dims := ctx.Platform.DisplaySize()
+	lineWidth := dims.X - 2*8
+	screen := layout.Rectangle{Max: dims}
+	_, content := screen.CutTop(leadingSize)
+	content, _ = content.CutBottom(leadingSize)
+	contentTop := content.Min.Y + 8
+	contentBottom := content.Max.Y
+
 	start := uint32(0)
 	change := false
 	var lines []string
+	shown := 0
+	// recompute fills `lines` with the addresses that fit, starting at `start`:
+	// the first index is included unconditionally (guarantees ≥1 shown + forward
+	// progress); each subsequent index only while it fits the content height.
 	recompute := func() bool {
 		lines = lines[:0]
-		for i := uint32(0); i < addrPageSize; i++ {
+		shown = 0
+		y := contentTop
+		for i := uint32(0); start+i <= addrMaxIndex; i++ {
 			idx := start + i
 			var a string
 			var err error
@@ -192,7 +248,17 @@ func descriptorAddressFlow(ctx *Context, th *Colors, desc *bip380.Descriptor) {
 				showError(ctx, th, "Address", err.Error())
 				return false
 			}
-			lines = append(lines, fmt.Sprintf("%d: %s", idx, a))
+			line := fmt.Sprintf("%d: %s", idx, a)
+			sz := ctx.Styles.body.Measure(lineWidth, "%s", line)
+			if i > 0 && y+sz.Y > contentBottom { // always include the first
+				break
+			}
+			lines = append(lines, line)
+			y += sz.Y + 6
+			shown++
+			if y > contentBottom { // a further line cannot fit
+				break
+			}
 		}
 		return true
 	}
@@ -211,14 +277,14 @@ func descriptorAddressFlow(ctx *Context, th *Colors, desc *bip380.Descriptor) {
 			}
 		}
 		if pageBtn.Clicked(ctx) {
-			if start+addrPageSize <= addrMaxStart {
-				start += addrPageSize
+			// Advance by the count shown (gap-free), bounded by addrMaxIndex.
+			if start+uint32(shown) <= addrMaxIndex {
+				start += uint32(shown)
 				if !recompute() {
 					return
 				}
 			}
 		}
-		dims := ctx.Platform.DisplaySize()
 		title := "Receive addresses"
 		if change {
 			title = "Change addresses"
@@ -229,13 +295,10 @@ func descriptorAddressFlow(ctx *Context, th *Colors, desc *bip380.Descriptor) {
 			{Clickable: pageBtn, Style: StylePrimary, Icon: assets.IconRight},
 		}...)
 		titleOp, _ := layoutTitle(ctx, dims.X, th.Text, title)
-		screen := layout.Rectangle{Max: dims}
-		_, content := screen.CutTop(leadingSize)
-		content, _ = content.CutBottom(leadingSize)
 		body := make([]op.Op, 0, len(lines))
-		y := content.Min.Y + 8
+		y := contentTop
 		for _, ln := range lines {
-			lbl, sz := widget.Labelw(&ctx.B, ctx.Styles.body, dims.X-2*8, th.Text, ln)
+			lbl, sz := widget.Labelw(&ctx.B, ctx.Styles.body, lineWidth, th.Text, ln)
 			body = append(body, lbl.Offset(image.Pt((dims.X-sz.X)/2, y)))
 			y += sz.Y + 6
 		}
@@ -245,7 +308,7 @@ func descriptorAddressFlow(ctx *Context, th *Colors, desc *bip380.Descriptor) {
 	}
 }
 ```
-(If `showError` mid-`recompute` causes re-entrancy concerns with the frame loop, the implementer may instead set a `derr` and handle it at the top of the main loop — but `showError` is a self-contained modal that returns on dismiss, matching the slip39/menu usage, so calling it inline then returning is acceptable. Keep whichever the tests show works; do not engrave or mutate.)
+(`recompute`'s `Measure` height and the render's `Labelw` height agree — same style, width, and text — so the lines that recompute admits fit exactly as rendered. `showError` mid-`recompute` is the self-contained modal pattern from slip39/menu — returning after it is non-re-entrant; do not engrave or mutate. dims/content computed once: `DisplaySize` is fixed on SH.)
 
 - [ ] **Step 4: Run — expect PASS**: `go test ./gui/ -run TestDescriptorAddressFlow -v`
 
@@ -392,6 +455,6 @@ Expected: all PASS; vet clean (the pre-existing `gui/op/draw_test.go` go1.26 not
 ## Self-review (vs spec)
 - §1 scope (descriptor case, single-sig+sortedmulti, receive/change, paging) → `descriptorAddressFlow`. ✔
 - §2 inv.1 display-only/public/deterministic → no engrave/NFC/mutation; recompute only on event. ✔ inv.2/6 Supported hoisted + 0-alloc gate → Task 2 + Step 5. ✔ inv.3 errors surfaced → `showError`+return. ✔ inv.4 no engrave regression → engrave branch byte-identical. ✔ inv.5 network honesty → `address` pkg handles it. ✔
-- §4.1 fixed-literal + StyleNone (not append) → Task 2 Step 3. ✔ §4.2 Button1/2/3 + cap 50 → Task 1. ✔
+- §4.1 fixed-literal + StyleNone (not append) → Task 2 Step 3. ✔ §4.2 Button1/2/3 + **measure-and-advance (gap-free, no-skip) + cap at index 49** → Task 1 (`descriptorAddressFlow` + `TestDescriptorAddressFlowNoSkippedIndices`). ✔
 - §6 TDD incl. custom-children (receive≠change) + TestAllocs gate → Tasks 1/2/3. ✔
 No placeholders: the fixture constants are the exact public vectors from `address/address_test.go` (the wpkh + `/1234/<5;6>/*` rows), and the affordance test asserts against `address.Receive` computed in-test. Types (`*bip380.Descriptor`, `address.Supported/Receive/Change`, `NavButton`/`StyleNone`) are consistent across tasks.
