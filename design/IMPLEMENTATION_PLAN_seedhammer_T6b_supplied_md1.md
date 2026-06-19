@@ -12,6 +12,8 @@
 
 **Contract:** This plan implements exactly `design/SPEC_seedhammer_T6b_supplied_md1.md` (in the mnemonic-engrave repo) §2 IN scope, §5 acceptance gate, and §6 invariants I-1..I-11. R0-round-1 file:line citations are in `design/agent-reports/seedhammer-T6b-spec-R0-round1.md`.
 
+**Status:** ✅ **Plan R0 GREEN (0C/0I)** — agent `a592176d3eee7b54b` independently RAN Go probes at HEAD 072461a confirming every pinned golden (fixture decode, abandon-seed @1-only match, stub `0x7b716421`, both addresses, mk1 round-trip, `bundle.Verify(b,b)==nil`); persisted to `design/agent-reports/seedhammer-T6b-plan-R0-round0.md`. **Cleared for single-implementer TDD.** Three non-blocking R0 Minors to apply opportunistically during implementation: **(m-1)** in Task 1.5, after the guard test passes, record the decoded @0/@2 foreign pubkeys (`hex(keys[0].Xpub)` / `hex(keys[2].Xpub)`) as a comment in `gui/multisig_testhelpers_test.go` so the vendored fixture's foreign keys are documented for future reproduction; **(m-2)** in Task 7, write `gui/multisig_restore.go` with ONLY the minimal imports it actually uses (`seedhammer.com/address`, `seedhammer.com/md`, + render deps) — do NOT ship the `var ( _ = image.Pt; ... )` placeholder block; **(m-3)** the `cardMS1` clause in `extractSuppliedMd1` is disclosed defensive dead code (gather never emits `cardMS1`) — keep it, no action.
+
 ---
 
 ## Verified facts (confirmed against fork HEAD 072461a — do not re-derive)
