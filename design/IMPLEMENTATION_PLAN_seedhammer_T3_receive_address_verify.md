@@ -133,7 +133,10 @@ func Find(desc *bip380.Descriptor, candidate string, gap uint32) (chain int, ind
 		gap = addrFindMaxGap
 	}
 	net := desc.Keys[0].Network
-	want, derr := DecodeAddress(candidate, net)
+	// NOTE: within package `address`, the btcd parser github.com/btcsuite/btcd/address/v2
+	// is imported under its own name `address`, so this is `address.DecodeAddress`
+	// (a bare `DecodeAddress` is undefined here — R1-M1).
+	want, derr := address.DecodeAddress(candidate, net)
 	if derr != nil {
 		return 0, 0, false, ErrAddrUnparseable
 	}
