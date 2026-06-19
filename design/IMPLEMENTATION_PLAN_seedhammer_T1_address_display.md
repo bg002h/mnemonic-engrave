@@ -157,9 +157,10 @@ func TestDescriptorAddressFlowNoSkippedIndices(t *testing.T) {
 			seen[a] = false
 		}
 		ctx := NewContext(newPlatform())
-		// Up to 8 page-forwards (worst case 1 address/page still reaches idx 7).
-		click(&ctx.Router, Button3, Button3, Button3, Button3, Button3, Button3, Button3, Button3)
 		frame, quit := runUI(ctx, func() { descriptorAddressFlow(ctx, &descriptorTheme, d) })
+		// Observe the entry page BEFORE advancing (else index 0 is paged over
+		// before frame 0 renders). Advance one page per observed frame; 60 frames
+		// covers idx 0..7 even at the worst case of 1 address/page.
 		for i := 0; i < 60; i++ {
 			c, ok := frame()
 			if !ok {
@@ -170,6 +171,7 @@ func TestDescriptorAddressFlowNoSkippedIndices(t *testing.T) {
 					seen[a] = true
 				}
 			}
+			click(&ctx.Router, Button3) // advance AFTER observing this page
 		}
 		quit()
 		for a, ok := range seen {
