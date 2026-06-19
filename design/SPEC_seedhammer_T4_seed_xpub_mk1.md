@@ -1,0 +1,83 @@
+# SPEC — T4: hand-typed seed → account xpub → engrave as mk1 (watch-only steel backup)
+
+> Cycle T4 of the "SeedHammer as air-gapped constellation terminal" roadmap.
+> Recon: `design/cycle-prep-recon-T4-seed-xpub-mk1.md` (both protocol + fork facts verified vs `mnemonic-key/crates/mk-codec` + fork `a4d669d`).
+> Base: fork `a4d669d` (T3 merged). Fork-side only; no upstream PR.
+> **USER DECISION (2026-06-19):** emit mk1; when a policy id can't be derived (always, in T4's no-policy scenario), **warn on screen and set the policy-id stub to `0x00000000`** (`stub_count=1`).
+
+## 1. Goal & scope
+Let an operator create a **watch-only steel backup** on the air-gapped device: hand-type a BIP-39 seed (SECRET), pick a standard derivation path, the device derives the **account xpub** (PUBLIC) and engraves it as an **mk1 key card**. The seed never leaves the device; only the public xpub (wrapped in mk1) is engraved. Deterministic; no CSPRNG.
+
+### In scope (T4)
+- **Phase A (headless):** an **mk1 ENCODER** (`mk.Encode`) — the reverse of T2b's decoder: bytecode encode (header/stub_count/stubs/[fp]/path/compact-73) + compact-73-from-xpub + path encode (std-table indicator / `0xFE` explicit) + chunk split (always ≥2 chunks) + per-chunk BCH checksum generation + a **deterministic** chunk_set_id (no CSPRNG). Plus an **account-xpub derivation helper** (mnemonic+passphrase+path → account xpub + parentFP/chaincode/pubkey), composing the in-tree `MnemonicSeed`→`NewMaster`→`bip32.Derive`→`.Neuter`, with the seed buffer scrubbed after use.
+- **Phase B (GUI):** a new top-level flow (own `program`) — reuse the existing seed-word entry (typed, SECRET) → a **standard-path picker** (the 14 mk-codec paths; paged or two-stage to fit the display) → derive → encode mk1 (stub = `0x00000000`) → a **mandatory "not bound to a wallet policy" warning** (operator-acknowledged) → **multi-plate engrave sequencing** (a 2-chunk card = 2 plates, "plate 1 of N"…).
+- An optional pre-engrave display of the derived xpub + path + fingerprint for operator verification (read-only).
+
+### Out of scope (explicit)
+- **Real policy-id stubs / policy binding.** T4 has no wallet-policy input, so the stub is always `0x00000000` with a warning (USER DECISION). A future "cosigner key-card" cycle could take an md1 policy and derive a real stub (the `mk-cli` `derive_stub_from_md1` model).
+- **Seed/mnemonic GENERATION** (no CSPRNG — HW-blocked) and **engraving the seed/private key** (that is `backupWalletFlow`'s job; T4 emits ONLY the public xpub).
+- **Multisig descriptor authoring**; **NFC emission of anything** (no NFC writer exists).
+- Non-standard / arbitrary derivation paths beyond the 14-entry standard set (the `0xFE` explicit-path encoder is implemented for completeness/round-trip but the picker offers only the standard set).
+
+## 2. Invariants (R0 MUST verify each — Critical if violated)
+1. **2.1 Encoder round-trips through the shipped decoder.** For every `KeyCard` T4 builds, `mk.Decode(mk.Encode(card)) == card` (network, path, fingerprint, stubs, xpub). This is the load-bearing correctness gate (no separate Go encoder to diff against; the shipped `mk.Decode` + the `mk/mk_test.go` golden vectors are the oracle). Verified headless.
+2. **2.2 Wire-faithful encode vs mk-codec.** bytecode layout, compact-73 (incl. the encode invariant **xpub depth == path component count AND child_number == terminal path component**, else reject), path encode (std-table indicator for the 14 paths; `0xFE`+LEB128 otherwise), chunk split (`SINGLE_STRING_LONG_BYTES=56` → always chunked here; `CHUNKED_FRAGMENT_LONG_BYTES=53`; stream = `bytecode‖SHA-256(bytecode)[0..4]`; 8-symbol chunked headers with `total_chunks-1`/verbatim `chunk_index`), and per-chunk BCH (regular/long generator + mk1 targets + `POLYMOD_INIT`) MUST match `mk-codec`. The emitted chunks MUST each pass the fork's `ValidMK`.
+3. **2.3 Fully deterministic — no CSPRNG.** Every step (seed→master→account xpub→compact-73→bytecode→chunk_set_id→BCH) is deterministic. The **chunk_set_id is derived deterministically** (e.g. top-20-bits of `SHA-256(bytecode)`), NEVER from randomness (the device has no app CSPRNG). Same seed+path → identical mk1 card (golden-vector pinnable).
+4. **2.4 Stub-0 + mandatory warning (USER DECISION).** With no policy input, `mk.Encode` sets `stub_count=1`, `policy_id_stubs=[[0,0,0,0]]`. The GUI MUST show a prominent, **operator-acknowledged** warning before engraving that the card carries a placeholder stub and is NOT bound to a wallet policy. (A 0-value stub is structurally valid — `stub_count` is 1, not 0 — and decodes via `mk.Decode`.)
+5. **2.5 Security spine — seed is SECRET, only the public xpub is emitted.** The seed is entered typed-only (never NFC; there is no NFC writer). The derivation MUST `.Neuter()` so NO xprv/private material is ever serialized or engraved. The flow MUST NOT call `engraveSeed`/`backup.EngraveSeed`. The engraved output is the xpub-wrapped mk1 only. The 64-byte PBKDF2 seed buffer MUST be scrubbed (`wipeBytes`) after the master key is derived.
+6. **2.6 Multi-plate engrave is correct and complete.** A 2-chunk (N-chunk) mk1 engraves as N plates, sequenced with clear "plate i of N" UX; the operator engraves each in turn; NONE is skipped or duplicated; the set of engraved chunks reassembles (via `mk.Decode`) back to the card. (Net-new — only single-plate engrave exists today.)
+7. **2.7 Path picker yields the correct account xpub.** The picker offers the 14 standard paths (or a curated/two-stage subset); the selected path drives `bip32.Derive`; the engraved card's decoded path equals the picked path; mainnet/testnet networks handled.
+8. **2.8 No regression.** `backupWalletFlow` (seed engrave), the descriptor/decode/verify cycles (T1/T2/T3), and `mdmkFlow`'s existing single-string engrave path are unchanged. The new flow is additive (own `program`). Alloc gate (`StartScreen.Flow`/`DescriptorScreen.Confirm`) untouched; new T4 screens are not alloc-gated.
+9. **2.9 No panic / total.** Encoder + derivation handle every input without panic (e.g. an unsupported path, a derivation failure → typed error, not panic).
+
+## 3. Source facts (verified; citations in the recon)
+- No mk1 encoder in the fork (`mk/mk.go` decode-only); encoder = reverse of `decodeBytecode`/`decodePath`/`reconstructXpub`. `codex32.NewSeed` (codex32.go:279-383) is a working 5-bit-pack + BCH-gen + string-assembly template; mk1 BCH targets/`POLYMOD_INIT` in `codex32/mdmk.go`; `mk.reassemble` is the chunk counterpart.
+- mk-codec: `encode.rs:24` (stub≥1), `:38-48` (depth/child invariant), `:55-67` (bytecode order); `xpub_compact.rs:8-15`; `path.rs:38-98`; `chunk.rs:50-93`/`pipeline.rs:72-105` (split; `encode_with_chunk_set_id` deterministic; csid value not validated by decoder, only consistency). 1-stub card ≈ 84 B → always 2 chunks.
+- Derivation: `bip39.MnemonicSeed` (`bip39.go:217`), `deriveMasterKey`→`hdkeychain.NewMaster` (`gui.go:190`), `bip32.Derive`+`.Neuter` (`bip32/bip32.go:43-53`), `bip32.Fingerprint`. Compose template: `fillDescriptor` (`gui_test.go:292-327`). All deterministic.
+- 14 standard paths: `mk-codec path.rs:38-55` (mainnet 0x01-0x07 / testnet 0x11-0x17).
+- Seed entry: `newInputFlow`/`inputWordsFlow` (`gui.go:2068`/`582`), typed-only, BIP-39 completion + last-word checksum. Engrave: `validateMdmk`/`mdmkFlow` (`gui.go:1891`/`1933`) — single plate only; **no multi-chunk engrave sequencing exists**. `program` enum + `uiFlow` dispatch (`gui.go:145`/`1476`). `wipeBytes` scrub (`slip39_polish.go:330`). No NFC writer (`Platform` has only `NFCReader()`).
+
+## 4. Design
+### 4.1 Phase A — `mk.Encode` + derivation (headless)
+```go
+// In package mk (sibling to the decoder):
+func Encode(card Card) ([]string, error)   // → the mk1 chunk strings (≥2); reverse of Decode
+```
+`Encode` builds: compact-73 from the card's xpub (validate the depth/child invariant vs `card.Path`); the path bytes (std-table indicator for a standard path, else `0xFE`+count+LEB128); the bytecode (`header | stub_count | stubs | [fp] | path | compact73`); the cross-chunk stream (`bytecode‖SHA-256(bytecode)[0..4]`); split into 53-byte fragments; per chunk emit the 8-symbol chunked header (version, type=chunked, **deterministic** `chunk_set_id = top20(SHA-256(bytecode))`, `total_chunks-1`, `chunk_index`) + the fragment, 5-bit-packed; generate the per-chunk BCH checksum (regular/long per length) via the `codex32` engine + mk1 targets; assemble each `mk1…` string. Reuse the `codex32.NewSeed` packing/checksum pattern. **`Card` for T4:** `{Network, Path (the picked standard path), Fingerprint (master FP, hex), Stubs: [][4]byte{{0,0,0,0}}, Xpub (the derived account xpub base58)}`.
+
+Derivation helper (package `bip32` or a `gui` helper beside `deriveMasterKey`):
+```go
+func DeriveAccountXpub(m bip39.Mnemonic, passphrase string, net *chaincfg.Params, path bip32.Path) (xpub string, parentFP uint32, err error)
+```
+`seed := bip39.MnemonicSeed(m, passphrase)` → `defer wipeBytes(seed)` → `master := hdkeychain.NewMaster(seed, net)` → `acct := bip32.Derive(master, path)` (already `.Neuter`ed) → serialize the xpub + fingerprint. NEVER serialize the private key.
+
+### 4.2 Phase B — GUI flow (`gui/derive_xpub.go`, new `program`)
+New top-level `program` (parallel to `backupWallet`), selected on `StartScreen`. Flow:
+1. **Seed entry** — reuse `newInputFlow`/`inputWordsFlow` → SECRET `bip39.Mnemonic` (+ optional `passphraseFlow`).
+2. **Path picker** — the 14 standard paths via a paged `ChoiceScreen` (copy `mk1DisplayFlow`'s measure-and-advance) OR a two-stage picker (script-type → network). Yields `(path, net)`.
+3. **Derive** — `DeriveAccountXpub(...)`; scrub the seed buffer.
+4. **Verify display (optional, read-only)** — show network / path / fingerprint / the account xpub (measure-and-advance, mirror `mk1DisplayFlow`).
+5. **Stub-0 warning (mandatory, §2.4)** — a screen stating the card will carry a placeholder policy stub (`00000000`) and is NOT bound to a wallet policy; operator must acknowledge (confirm) to proceed (or Back to cancel).
+6. **Encode + engrave** — `strings := mk.Encode(card)`; for each chunk plate, **multi-plate engrave sequencing**: present "Plate i of N", engrave via `validateMdmk`+`NewEngraveScreen` (reuse the single-plate engrave core per chunk), advance to i+1 until all N done; Back/abort handled cleanly. The seed is never engraved.
+
+### 4.3 Multi-plate engrave (net-new, §2.6)
+A loop over `mk.Encode`'s N chunk strings: each chunk → `validateMdmk(params, chunkString)` → a plate-variant `ChoiceScreen` (or default TEXT+QR) → `NewEngraveScreen(ctx, plate).Engrave(...)`; track progress "Plate i of N"; the operator engraves each plate in turn (N physical plates for an N-chunk card). The shipped `mk.Decode` of the N engraved strings MUST reassemble to the card (the round-trip invariant 2.1 covers the encode side; an integration test covers gather-back if feasible).
+
+## 5. File manifest (indicative; plan pins)
+- **Create** `mk/encode.go` (+ `encode_test.go`) — `mk.Encode` + the deterministic chunk_set_id + bytecode/path/compact-73 encode + chunk split + BCH gen (reusing `codex32` machinery).
+- **Create/Modify** `bip32/` (or a `gui` helper) (+ test) — `DeriveAccountXpub` (+ seed scrub).
+- **Create** `gui/derive_xpub.go` (+ test) — the new flow: path picker, stub-0 warning, derive, encode, multi-plate engrave sequencing.
+- **Modify** `gui/gui.go` — new `program` enum value + `StartScreen`/`uiFlow` dispatch; the multi-plate engrave helper (or in `derive_xpub.go`).
+
+## 6. TDD
+- **Encoder round-trip (load-bearing, headless):** for each standard path + a representative account xpub, `card → mk.Encode → mk.Decode → assert == card`; assert each emitted chunk passes `codex32.ValidMK`; assert ≥2 chunks; assert deterministic (same input → identical strings across runs). Cross-check ≥1 against a `mk/mk_test.go` golden vector (decode the golden strings → re-encode that card → re-decode → same Card; OR if a golden card's csid is known, byte-equality). Assert the encode invariant rejects an xpub whose depth/child disagree with the path.
+- **Derivation (headless, deterministic):** mnemonic+path → expected account xpub (golden vector, e.g. a BIP-39 test vector seed → known xpub at m/84'/0'/0'); confirm `.Neuter` (no xprv); confirm seed-buffer scrub (best-effort).
+- **Stub-0:** `mk.Encode` with no policy → decoded Stubs == `[[0,0,0,0]]`, stub_count 1.
+- **GUI:** the new flow reaches the path picker, the stub-0 warning is shown + requires acknowledge, the derive→encode→engrave-sequence runs (drive via `runUI`/`click`); the warning is NOT skippable; mk1/seed never cross-contaminate (no `engraveSeed` call on this path); `TestAllocs` unaffected; `backupWalletFlow` unchanged.
+- **Multi-plate:** N-chunk card → N plate steps ("Plate i of N"); all engraved; the N strings reassemble via `mk.Decode` to the card.
+
+## 7. Process
+- **R0 gate (mandatory, this doc):** opus-architect to 0C/0I before code. Fold → persist verbatim to `design/agent-reports/seedhammer-T4-*-R*.md` → re-dispatch until GREEN.
+- Then `IMPLEMENTATION_PLAN_seedhammer_T4_seed_xpub_mk1.md` → its own R0 (materialize + build/run; the encoder round-trip + derivation goldens are the proofs). Phase A (encoder + derivation, round-trip-GREEN) before Phase B (GUI).
+- Single-implementer TDD in a worktree off `a4d669d`. Commits signed (`-S`) + DCO (`-s`), author "Brian Goss <goss.brian@gmail.com>", trailer `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`. Explicit-path staging.
+- Mandatory whole-diff adversarial execution review (fuzz `mk.Encode`/`DeriveAccountXpub` for panics; re-prove round-trip; **verify NO seed/xprv is ever engraved or emitted** — the security-spine check; verify the stub-0 warning is unskippable) → merge no-ff → push `bg002h`.
