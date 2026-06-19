@@ -1,6 +1,6 @@
 # SPEC — T1: on-device receive/change address display (descriptor case)
 
-**Status:** GREEN at R1, then **AMENDED post-implementation** (§4.2/§6): the execution review caught a real defect — fixed-count paging silently drops off-screen indices for wrapping long addresses (P2WSH multisig: only ~3 of 5 fit on 480×320). §4.2 now mandates **measure-and-advance** paging (gap-free, no-skip). Re-gated as a combined spec+plan amendment R0. Reviews: `design/agent-reports/seedhammer-T1-address-spec-review-{R0,R1}.md` + `…-paging-fix-review-R0.md`.
+**Status:** GREEN at R1, then **AMENDED post-implementation** (§4.2/§6): the execution review caught a real defect — fixed-count paging silently drops off-screen indices for wrapping long addresses (P2WSH multisig: only ~3 of 5 fit on 480×320). §4.2 now mandates **measure-and-advance** paging (gap-free, no-skip). Re-gated as a combined spec+plan amendment R0→R1 **GREEN** (the corrected no-skip test passes on the measure-and-advance impl and fails on the old fixed-page impl for the right reasons; TestAllocs 0; Task 2 untouched). Reviews: `design/agent-reports/seedhammer-T1-address-spec-review-{R0,R1}.md` + `…-paging-fix-review-{R0,R1}.md`. Next: apply the amendment to the branch + the canonical exec review.
 **Roadmap:** `design/RECON_seedhammer_constellation_terminal.md` (cycle **T1**, the foundation).
 **Base:** fork `main` `384547d`. Fork-side only (no upstream PR).
 
