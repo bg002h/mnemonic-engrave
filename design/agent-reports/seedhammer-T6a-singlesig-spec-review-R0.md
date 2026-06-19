@@ -1,0 +1,169 @@
+# R0 GATE REVIEW — SPEC_seedhammer_T6a_singlesig_flagship.md (opus architect)
+
+**Date:** 2026-06-19
+**Reviewer role:** mandatory pre-implementation R0 gate (most security-sensitive tier; derives from the live seed; introduces NEW public API on a Rust-golden-byte-locked package).
+**SPEC under review:** `design/SPEC_seedhammer_T6a_singlesig_flagship.md`
+**Sources verified @:** fork `e4013a8` (`/scratch/code/shibboleth/seedhammer`); Rust md-codec v0.36.0 @ `c85cd49` (`/scratch/code/shibboleth/descriptor-mnemonic`); ms-codec v0.4.4 (`/scratch/code/shibboleth/mnemonic-secret`); mnemonic-toolkit (`/scratch/code/shibboleth/mnemonic-toolkit`).
+
+---
+
+## VERDICT: NOT GREEN
+
+**4 Critical, 5 Important, 6 Minor.** The dominant finding is that the spec's stated `EncodeSingleSig` AST and its PRIMARY acceptance gate (§5.1) are wire-INCORRECT and internally contradictory: the vendored goldens it proposes to test against (`wpkh_basic`/`pkh_basic`/`tr_keyonly`) are ALL **template-only** (no key material), whereas a real "from one seed" single-sig md1 MUST be a **wallet-policy descriptor** carrying a Pubkeys TLV (and, to match the toolkit, a Fingerprints TLV + explicit origin). The spec also mis-models the `tr` body, omits the BIP-49 `sh(wpkh)` shape entirely, and the ms1 leg recipe is wrong on three counts (prefix byte, `id` value, language). These are byte-fidelity and round-trip-correctness defects on permanent steel — they must be fixed before any code.
+
+The architecture (new program, watch-only, re-type verify, restore-doc, engrave reuse, lockstep) is sound and the security spine is on the right track; the failures are concentrated in the wire-format spec for the two NET-NEW encoders.
+
+---
+
+## CRITICAL FINDINGS
+
+### C1 — `EncodeSingleSig` AST is wire-INCORRECT: a real single-sig md1 is a WALLET-POLICY descriptor (Pubkeys TLV), not the template-only shape the spec describes; and the proposed goldens carry no key material.
+
+**Spec location:** §1 line 10, §2 line 15 ("one pubkey TLV from the account xpub"), §3 line 31 (`descriptor{n:1, tree:node{tag,body:keyArgBody{0}}, tlv:{one pubkey}}`), §5.1, I-1.
+
+The spec's prose intermittently says "one pubkey TLV", but its **acceptance gate §5.1** pins parity to the vendored goldens `wpkh_basic`/`pkh_basic`/`tr_keyonly`, and those goldens are **template-only** — every one has `"pubkeys": null`:
+
+- `md/testdata/vectors/wpkh_basic.descriptor.json`: `tlv` = all null; `path_decl` = `Shared, "m"` (EMPTY origin); `bytes.hex` = `2002001800` (5 bytes — a bare template skeleton, no key).
+- `pkh_basic`, `tr_keyonly`: same — all `"pubkeys": null`, empty origin.
+- Verified there is **NO** key-bearing golden in EITHER tree: every `*.descriptor.json` in `md/testdata/vectors/` and `descriptor-mnemonic/crates/md-codec/tests/vectors/` decodes to `pubkeys: null` (the only non-null TLV anywhere is `wsh_with_fingerprints` which is `fingerprints`-only, still `pubkeys: null`).
+
+The Rust codec draws the line explicitly: `Descriptor::is_wallet_policy()` returns true **iff** `pubkeys` is `Some(non-empty)` (`md-codec/src/encode.rs:50-52`). A bare template (`wpkh(@0/<0;1>/*)`) is NOT a usable standalone policy backup — it has no key. A "from one seed" md1 card MUST carry the concrete account xpub or it is worthless on steel.
+
+The **authoritative shape of a concrete single-sig md1** is the toolkit's own bundle synthesizer, `mnemonic-toolkit/crates/mnemonic-toolkit/src/synthesize.rs:140-155`:
+
+```rust
+path_decl: PathDecl { n, paths: PathDeclPaths::Shared(origin_path) }, // EXPLICIT origin (template.md_origin_path)
+tlv: TlvSection {
+    fingerprints: Some(vec![(0, fp_bytes)]),  // PRESENT
+    pubkeys:      Some(vec![(0, xpub_65)]),    // PRESENT
+    origin_path_overrides: None,
+}
+```
+
+…which matches the integration fixture `cell_7_wpkh_full()` (`md-codec/tests/wallet_policy.rs:190-204`): `path_decl.shared = bip84_path()`, `tlv.fingerprints = Some([(0,fp)])`, `tlv.pubkeys = Some([(0, xpub_65)])`. The minimal in-package reference is `singlesigWithPubkey` (`md/validate_test.go:29-40`).
+
+**Consequences:**
+- The spec's §5.1 PRIMARY gate is unsatisfiable as written — you cannot "build the descriptor from the golden's account key" because the goldens have no account key, and `EncodeSingleSig` (which embeds a Pubkeys TLV) produces a DIFFERENT, longer string than any template-only golden.
+- Cross-tool parity (the whole point of the byte-lock) and verify-bundle exact-string-match break, because the device would emit a non-toolkit-matching wire.
+
+**Exact fix:**
+1. Specify `EncodeSingleSig` to build a **wallet-policy** descriptor: `n=1`, `pathDecl{n:1, shared:&originPath{<the BIP path>}}`, `useSite = <0;1>/* (hasMultipath, alts {0},{1}, wildcard unhardened)`, the script tree (see C2), and `tlv` with **`pubPresent:true, pubkeys:[{idx:0, xpub:[65]byte}]`** plus the fingerprint decision in C3.
+2. Replace the §5.1 gate. The template-only goldens cannot serve. Use ONE of: (a) **vendor NEW key-bearing goldens** generated by the toolkit/Rust `encode_md1_string(cell_7_wpkh_full-equivalent)` for each of the 4 script types, with concrete (`make_xpub`-style) xpub bytes, and assert byte-exact parity; OR (b) since no such golden ships, make the PRIMARY gate a **Rust-vs-Go cross-encoder differential**: build the identical AST in both, assert `encode_md1_string` byte-equality, for wpkh/pkh/tr/sh-wpkh × {with-fp, without-fp}. Either way the gate must exercise a Pubkeys-bearing descriptor.
+3. Keep the round-trip leg (`DecodeChunks`/`Decode` → expand → assert the embedded xpub/fp/origin/script) — it is the on-curve safety net (the encoder does NOT validate the pubkey; only decode does, see C4-context M-note).
+
+---
+
+### C2 — `tr` single-sig body is `trBody`, NOT `keyArgBody`; and BIP-49 `sh(wpkh)` is omitted and is NOT a uniform "one keyArgBody" shape.
+
+**Spec location:** §2 line 15 / §3 line 31 (`tree=node{tag: tagWpkh/tagPkh/tagTr, body: keyArgBody{0}}`); I-8 (the 4-type picker incl. "BIP-49 sh-wpkh").
+
+The spec asserts all three (and implicitly the 4th) tags share `keyArgBody{0}`. Source says otherwise:
+
+- **`tr` key-path** = `trBody{isNums:false, keyIndex:0, tree:nil}` — NOT `keyArgBody`. Go: decode arm `md/md.go:432-457` (reads `is_nums`, then `key_index`, then `has_tree`), body type `md/md.go:114-118`, encode arm `md/encode.go:203-214`, canonicalize `md/canonicalize.go:108-119`. Rust: `tr_keypath_at_0()` `md-codec/tests/wallet_policy.rs:152-161` = `Body::Tr{is_nums:false, key_index:0, tree:None}`. The golden `tr_keyonly.descriptor.json` confirms: `"body":{"kind":"Tr","data":{"is_nums":false,"key_index":0,"tree":null}}`. A `keyArgBody{0}` under `tagTr` would mis-encode (`writeNode`'s `tr` arm reads a `trBody`, not a `keyArgBody`) and is structurally impossible — the body interface dispatch in `writeNode` (`encode.go:160-229`) would hit the `keyArgBody` arm and emit the wrong bit layout for a `tr` node.
+- **`tr` IS key-path-only-representable** (review item: yes): with `tree:nil` (no TapTree) it is a pure key-path output and `canonical_origin` maps it to `m/86'/0'/0'` (`canonical_origin.rs:51-54`). No taproot script-tree handling is needed for T6a. Good — but the body must be `trBody`, not `keyArgBody`.
+- **BIP-49 `sh(wpkh)`** is NOT a single-`keyArgBody` node at all. It is `node{tag:tagSh, body:childrenBody{[node{tag:tagWpkh, body:keyArgBody{0}}]}}` (valid tree: root allow-list `md/md.go:848-849` permits `tagSh`; the `sh` child arm `md/md.go:346-351` wraps one child; the toolkit walks `sh(wpkh(@0/<0;1>/*))` at `parse_descriptor.rs:1491-1492`). Crucially, **`canonical_origin` returns `None` for `sh(wpkh)`** (only `sh(wsh(multi))` has a canonical origin — `canonical_origin.rs:63-75`; the catch-all `:76-77` returns None). So BIP-49 **REQUIRES an explicit `path_decl.shared = [49'/0'/0']`** on the wire or `validateExplicitOriginRequired` rejects it (`md/md.go:1030-1066`, Rust `validate.rs:182-207`).
+
+**Exact fix:** Specify three distinct tree builders keyed by script:
+- `pkh` → `node{tagPkh, keyArgBody{0}}`
+- `wpkh` → `node{tagWpkh, keyArgBody{0}}`
+- `tr` (key-path) → `node{tagTr, trBody{isNums:false, keyIndex:0, tree:nil}}`
+- `sh-wpkh` → `node{tagSh, childrenBody{[node{tagWpkh, keyArgBody{0}}]}}`
+
+and make the origin-path emission mandatory & explicit for ALL four (see C3), which also covers the BIP-49 explicit-origin requirement.
+
+---
+
+### C3 — Origin-path + fingerprint emission is unspecified, so the md1 wire is non-deterministic vs the toolkit — breaking cross-tool parity and verify-bundle exact-match.
+
+**Spec location:** §2 line 15 ("the origin path"), §4 (no statement on fp TLV), I-6 (verify-bundle uses "descriptor (md1 string exact-match)"), §6 I-1 ("canonicalization included").
+
+There are TWO wire-divergent ways to encode the same logical single-sig descriptor, and the spec does not lock either:
+
+1. **Origin path placement.** It can live in `path_decl.shared` (the toolkit's choice — `synthesize.rs:145-147`, `cell_7_wpkh_full` uses `bip84_path()`), OR be elided to an empty `path_decl.shared` and rely on the decoder's canonical-origin fallback (the minimal `singlesigWithPubkey` uses `shared:&originPath{}`). These produce **different bytes**. For BIP-49 the elided form is INVALID (C2).
+2. **Fingerprint TLV.** The toolkit ALWAYS emits `fingerprints: Some([(0, fp)])` (`synthesize.rs:153`, `cell_7_wpkh_full:201`). The minimal `singlesigWithPubkey` omits it (`fpPresent:false`). Different bytes again.
+
+Because verify-bundle's parity for the descriptor is **md1-string exact-match** (I-6, §5.4), the device MUST emit BYTE-IDENTICALLY to whatever produced the engraved card. For the constellation to interoperate (the whole reason md is byte-locked to Rust goldens), `EncodeSingleSig` must match the **toolkit's** canonical output.
+
+**Exact fix:** Lock `EncodeSingleSig` to the toolkit's form (`synthesize.rs:140-155`): **explicit `path_decl.shared` = the full BIP origin path** (`[44'/0'/0']`, `[49'/0'/0']`, `[84'/0'/0']`, `[86'/0'/0']` for mainnet account 0; coin-type 1' for testnet if testnet is in scope — see I3/M5), **AND `fingerprints: Some([(0, fp_bytes)])`**, **AND `pubkeys: Some([(0, xpub_65)])`**. State in I-1 that parity is against the toolkit's wallet-policy output, not the template-only goldens, and that canonicalize is identity for n=1 (see Ruling (a)).
+
+---
+
+### C4 — ms1 derivation recipe is wrong on three counts (prefix byte, `id` value, language), producing an INVALID ms1 that fails `DecodeMS1` and verify-bundle round-trip.
+
+**Spec location:** §2 line 17, §3 line 32, biggest-risk #4, I-6 ("ms1 entropy", "wordlist language"). Architect consult D4 / build-recon #3 repeat the same wrong recipe.
+
+The spec (and both recons) say: ms1 = `codex32.NewSeed("ms", 0, id, 'S', entropy)` with `id` "a fixed deterministic value — R0 to lock; e.g. derived from the fingerprint or a constant", passing the bare `entropy`. Every clause is wrong per the fork's own ms1 codec:
+
+- **The `data` argument is NOT bare entropy.** The codex32 payload's first byte is an ms-codec prefix discriminator: `0x00` (entr → `[0x00][entropy]`) or `0x02` (mnem → `[0x02][language][entropy]`). Source: `codex32/mspayload.go:5-12` ("The prefix is the FIRST byte of the codex32 data payload (Seed()[0])"), decoder `DecodeMS1` `codex32/mspayload.go:34-60`, ms-codec `envelope.rs:186-218`/`consts.rs`. The fork's own test builds it as `NewSeed("ms", 0, "entr", 's', append([]byte{prefix}, entropy...))` (`codex32/mspayload_test.go:54-58`). Passing bare entropy yields a string whose `Seed()[0]` is the first entropy byte → `DecodeMS1` returns `errMSBadPrefix` (or, by accident, a wrong-language mnem) → verify-bundle round-trip (§5.2) and ms1 readback (§5.4) FAIL.
+- **The `id` is the FIXED literal `"entr"`, not fingerprint-derived.** `mspayload.go:6-7`: the 4-char id/Tag "is `entr` for both entr and mnem secrets." Confirmed in every wire vector (`mspayload_test.go:25-29`: `ms10entrs...`) and the refusal helper (`mspayload_test.go:54`: `"entr"`). It is metadata in the BCH-protected header; it does NOT affect the recovered entropy (`Seed()` ignores it), but it IS part of the engraved string, so for verify-bundle exact-match it must be deterministic = the constant `"entr"`. The spec's "derived from the fingerprint" is incorrect and would make the ms1 non-reproducible. (Collision-irrelevance is moot — it is a constant.)
+- **Share index is `'s'` (lowercase), per the vectors** (`mspayload_test.go:54`, all vectors `...entrs...`); the spec writes `'S'`. `feFromRune` upper/lowercases to match HRP case (`codex32.go:264-275`), so `'S'` with lowercase hrp `"ms"` will be normalized — but spec must state the canonical lowercase `'s'` to avoid a case-mismatch ambiguity, and to match the goldens byte-for-byte.
+- **Language is lost in the entr path.** The `0x00` entr payload carries NO language byte. The spec's I-6 lists "wordlist language" as a verify-bundle parity field and §5.2 asserts ms1 "decodes ... back to the original entropy + wordlist language". For a non-English seed this is **only** possible via the `0x02` mnem prefix (`[0x02][language][entropy]`, `mspayload.go:10`, `MSLanguageNames` `:22-26`). The spec must choose: (i) entr-only (English-only / language-agnostic, drop "wordlist language" from the parity set and document the restore caveat), or (ii) mnem-prefix carrying the language byte (preserves language; the fork ships only the English wordlist for *word display*, `ms1_decode.go:31-44`, but can still carry/compare the language byte). Given the fork is English-wordlist-only on-device, entr (English) is the pragmatic lock, but the spec must say so and reconcile I-6/§5.2.
+
+**Exact fix:** Specify ms1 as `codex32.NewSeed("ms", 0, "entr", 's', payload)` where `payload = append([]byte{0x00}, entropy...)` for English/entr (and document language handling per the (i)/(ii) decision). Add the missing **encode-side glue is NET-NEW** to the build inventory: there is NO `EncodeMS1` in the fork (only `DecodeMS1`); §3/§5 currently imply `NewSeed` alone suffices. Verify `DecodeMS1(EncodeMS1(entropy))` round-trips entropy (+ language) as the ms1 acceptance leg, and that the readback in verify-bundle compares the recovered entropy bytes (not the string, since the operator hand-types ms1 and the device re-derives).
+
+---
+
+## IMPORTANT FINDINGS
+
+### I1 — §5.1 acceptance gate is internally contradictory; replace it (depends on C1).
+
+**Spec location:** §5.1, biggest-risk #1, gate-reminder §9.
+
+§5.1 says "for each single-sig golden (`wpkh_basic`/`pkh_basic`/`tr_keyonly`) … building the descriptor from the golden's account key → equals the golden md1 string". As established (C1) those goldens have no account key and are template-only. As written, the gate either (a) tests a template-only `EncodeSingleSig` (wrong product — a keyless card) or (b) is impossible. **Fix:** rewrite per C1's fix #2 (vendor key-bearing goldens from the toolkit, or a Rust↔Go differential), explicitly over wallet-policy descriptors. State the golden provenance (toolkit `encode_md1_string` @ a pinned SHA) and the vendoring discipline, mirroring #10a.
+
+### I2 — `EncodeSingleSig` input plumbing (base58 xpub → 65 bytes, fp uint32 → [4]byte) is unspecified; the proposed signature elides it.
+
+**Spec location:** §2 line 15 (`EncodeSingleSig(accountXpub *bip380.Key-or-equiv, script ScriptKind)`), §3 line 31.
+
+`deriveAccountXpub` returns the account xpub as a **base58 string** + `masterFP uint32` (`gui/derive.go:19,50-52`). The md1 Pubkeys TLV needs `[65]byte = chainCode[32] ‖ compressedPubkey[33]` (`md/md.go:509-512`, `idxPub.xpub`), and the Fingerprints TLV needs `[4]byte` (`md/md.go:505-508`). So `EncodeSingleSig` (or a thin adapter) must re-parse the base58 xpub (e.g. `hdkeychain.NewKeyFromString` → `.ECPubKey().SerializeCompressed()` for the 33B pubkey + the 32B chain code accessor) and convert the fp `uint32 → [4]byte`. None of this is in the spec. **Fix:** specify the exported signature concretely (recommend taking the already-parsed components: `EncodeSingleSig(chainCode [32]byte, compressedPubkey [33]byte, fp [4]byte, originPath []pathComponent, script ScriptKind) ([]string, error)`, or accept a `*bip380.Key` and document the field mapping), and state where the base58→bytes conversion lives (the GUI caller vs inside the adapter). Confirm the chosen input avoids re-introducing private material.
+
+### I3 — Per-leg scrub schedule is directionally right but imprecise on the entropy/seed/mnemonic boundaries and the ms1 string residual.
+
+**Spec location:** §4 (D11), I-3, biggest-risk #2.
+
+Verified spine facts: `deriveAccountXpub` internally derives `seed = MnemonicSeed(m,passphrase)` and scrubs the seed + master + each intermediate `*ExtendedKey`, capturing `masterFP` BEFORE zeroing (`gui/derive.go:20-52`; the R0-C1 serialize-before-Zero ordering is real and load-bearing). The caller still holds the root-secret `bip39.Mnemonic` (`[]Word`) across all legs; the existing pattern zeros it on flow return (`gui/derive_xpub.go:106-115`). For T6a the additional secret is the ms1 **entropy** buffer from `m.Entropy()` (`bip39/bip39.go:158`, returns a fresh `[]byte`; **panics if the mnemonic is invalid** — gate on validity first). The spec correctly flags entropy + seed co-residency. Gaps to tighten:
+
+- The spec says "re-zero seed after the LAST consumer (restore-doc address derivation)". But `deriveAccountXpub` already scrubs its internal seed before returning; the restore-doc derives addresses from the **public xpub / `*bip380.Descriptor`**, NOT the seed (`gui/md1_expand.go:60-77` + `address.Receive/Change` are xpub-only). So the "seed held through restore-doc" framing is inaccurate — the seed never reaches restore-doc. The **mnemonic** (`[]Word`) is the buffer that legitimately spans entropy→ms1 + xpub→mk1, and its last consumer is the LAST derivation, not the restore-doc. **Fix:** restate D11 precisely: (a) entropy `defer wipeBytes` immediately after `EncodeMS1`/`NewSeed`; (b) seed/master/intermediates are scrubbed inside `deriveAccountXpub` (reuse, no new handling); (c) the mnemonic `[]Word` zeroed after the last derivation leg (md1 build does NOT need the mnemonic — it needs the public xpub — so the mnemonic's last consumer is the mk1 xpub derive + the entropy extraction); (d) restore-doc is fully public, no secret to scrub there.
+- **Acknowledge the un-wipeable ms1 string residual:** `NewSeed` builds via `strings.Builder` whose immutable `.String()` (`codex32.go:363,374,382`) bears the secret until GC — same residual already accepted for ms1 display (`ms1_decode.go` doc-comment). State it as an accepted limitation, consistent with the shipped posture.
+
+### I4 — Typed-only-seed enforcement (D12) names the right footgun but the spec gives no concrete mechanism/test wiring.
+
+**Spec location:** §3 line 33, §4 (D12), I-2, §5.6, biggest-risk #3.
+
+The footgun is real and confirmed: `assembleScan` parses a `bip39.Mnemonic` (and a `codex32.New` secret) from NFC (`gui/scan.go:60-64,69`). The T6a program MUST take the typed `seedEntryFlow` (used by `deriveXpubFlow`, `gui/derive_xpub.go:106-107`), never route an `act.scan` object into derivation. The spec asserts this but: (a) does not name the exact dispatch site to constrain (the program's `uiFlow`/`StartScreen` arm, cf. `gui/gui.go:1491-1497,1662-1664`); (b) §5.6's test "asserts the T6a flow never routes a scanned object to derivation" is stated but not given a falsifiable shape. **Fix:** specify that the T6a program calls `seedEntryFlow` for seed intake and contains NO `act.scan`→derive path; verify-bundle's ms1 readback is HAND-TYPED (`codex32` typed entry, T2a), and mk1/md1 readback is NFC (PUBLIC). Add a concrete test: a structural/grep assertion that the T6a flow function references `seedEntryFlow` and not `scan`/`assembleScan` for the secret, plus a behavioral test that a scanned `bip39.Mnemonic` cannot reach the derive entrypoint. (The bundle channel already refuses ms1 over NFC — `clsMs1Refuse`/`bundle.go:70` — reuse that posture for the ms1 leg.)
+
+### I5 — Network scope conflict: spec offers a "× network" picker, but the md1/restore stack is mainnet-only.
+
+**Spec location:** §2 line 19 ("the 4 single-sig types … × network"), I-8.
+
+The from-xpub descriptor build is hard-locked to mainnet (`gui/md1_expand.go:61` "D1: mainnet-only", `address` derivation via `chaincfg.MainNetParams`). If T6a offers testnet in the picker, the md1 origin path must use coin-type `1'` (e.g. `m/84'/1'/0'`) and the restore-doc address derivation needs testnet params — neither is wired, and the toolkit's `md_origin_path` is network-parameterized (`template.rs`). **Fix:** either (a) lock T6a to mainnet-only (drop "× network", matching the rest of the fork) — recommended for this cycle; or (b) explicitly scope testnet in and add the testnet origin-path + address-param plumbing to the build inventory and acceptance gate. Do not leave "× network" unqualified.
+
+---
+
+## RULINGS (as required)
+
+**(a) `EncodeSingleSig` AST/wire faithfulness + signature — REJECTED as specified.** The stated AST is wrong for `tr` (must be `trBody`, not `keyArgBody` — C2), omits `sh(wpkh)`'s wrapper shape and its mandatory explicit origin (C2), and most importantly describes a **template-only** descriptor while a real single-sig backup is a **wallet-policy** descriptor (Pubkeys TLV + Fingerprints TLV + explicit `path_decl.shared` origin, per toolkit `synthesize.rs:140-155`) — C1, C3. **Canonicalize for n=1 IS effectively a no-op** (verified): a single `@0` yields `firstOccurrences=[0]`, `perm=[0]`, hitting the identity fast-path (`md/canonicalize.go:53-63`); but `EncodeSingleSig` still routes through `encodePayload`→`canonicalize` (`md/encode.go:373-374`), which is correct and required (do not bypass it). **Building the unexported `*descriptor` inside package `md` is the right home** — the `body` interface's `isBody()` is unexported (`md/md.go:103`) so the AST is unconstructible elsewhere; an exported `md.EncodeSingleSig` calling `split`/`encodeMD1String` is the correct minimal surface. The encoder does NOT validate the pubkey on-curve (only decode does — `md/validate_test.go:71-77`); the spec's round-trip leg is the necessary safety net (keep it). **Signature** must be made concrete (I2). Fix C1+C2+C3+I2, then this can pass.
+
+**(b) Per-leg scrub schedule completeness — INCOMPLETE/IMPRECISE (I3).** Directionally correct (entropy, seed, master, intermediates, mnemonic, fp-before-zero, verify re-type) but mis-attributes the seed's last consumer to the restore-doc (the restore-doc is public/xpub-only; the seed never reaches it) and omits the `m.Entropy()` panic-on-invalid gate and the accepted ms1 string residual. Restate precisely per I3.
+
+**(c) Typed-only-seed vs the scan.go footgun — SOUND INTENT, UNDER-SPECIFIED MECHANISM (I4).** The footgun (`gui/scan.go:60-69`) and the typed-entry remedy (`seedEntryFlow`) are correct; the spec must name the dispatch constraint and give the test a falsifiable shape.
+
+**(d) ms1 `id` determinism — WRONG (C4).** The `id` is the FIXED literal `"entr"` (`codex32/mspayload.go:6-7`, all vectors), NOT fingerprint-derived. Additionally the payload needs the `0x00`/`0x02` prefix byte and the share index is `'s'`. Lock `NewSeed("ms", 0, "entr", 's', [0x00 ‖ entropy])` and reconcile the language-parity claim.
+
+**(e) Whether to split T6a further — RECOMMEND SPLIT at the headless/GUI boundary.** Given that the two NET-NEW encoders (`EncodeSingleSig` wallet-policy wire + the ms1 encode glue) are exactly where this review found 4 Criticals, isolate them: **T6a-1 (headless):** `md.EncodeSingleSig` (4 script shapes, wallet-policy wire, golden/differential parity, fuzz) + the ms1 encode glue (`EncodeMS1`/prefix+id+language) + the verify-bundle deterministic comparator. **T6a-2 (GUI):** the new program (8-site lockstep), typed seed entry, the 4-type picker, derive-all-3, watch-only mode, engrave reuse, verify-bundle flow, restore-doc screen. This mirrors the #10a/#10b precedent, lets T6a-1 carry its own focused R0 on the wire format (the byte-lock risk) before any GUI work, and keeps the security-spine review scoped. The author's lean (split at headless/GUI if not reviewable whole) is endorsed → split.
+
+---
+
+## MINORS (non-blocking; fold opportunistically)
+
+- **M1 — engrave reuse is sound.** `bundleEngrave(ctx,th,[]bundleCard)` is `[]bundleCard`-driven, not scan-bound (`gui/bundle_flow.go:327`); `bundleCard.strings` are verbatim (`gui/bundle.go:29-37`). Synthesizing cards from derived strings is feasible. Confirm the T6 completion message replaces `bundleMs1ReminderText` (which assumes ms1 hand-engraved separately, `bundle_flow.go:374`) — full mode: "ms1 engraved"; watch-only mode: DO show the reminder. The spec already notes this (§2 line 20); just lock the two message variants in the gate.
+- **M2 — restore-doc is feasible and clean.** From-xpub `*bip380.Descriptor` build (`gui/md1_expand.go:60-77`) + `address.Receive/Change` (`address/address.go:20-24`) are public-only; greps-clean-of-xprv is enforceable (`.Neuter` already used in `deriveAccountXpub`). No new crypto. Display-only + optional NFC (D9) is sound.
+- **M3 — verify-bundle determinism confirmed.** mk1 (`mk.Encode`) is deterministic (csid from bytecode SHA, not RNG — `mk/encode.go:31-33,236-237`); md1 (`encodeMD1String`/`split`) is deterministic; exact-string-match is valid for both — PROVIDED the encoders match the toolkit (C3). State that ms1 is compared on recovered ENTROPY bytes (hand-typed → re-derived), not string identity, unless id+prefix+share-index are fully pinned (C4) in which case string-match also holds.
+- **M4 — program lockstep surface is real.** Inserting before `qaProgram` touches: the enum (`gui/gui.go:147-151`), the dispatch switch (`:1491-1497`), the start-screen wrap bound (`:1634-1641`), the title/layout arms (`:1662-1664`), the `npage`/`npages` derived consts (`:1840,1859`), and the nav-test (`gui/derive_xpub_program_test.go`). "8-site" is a fair count; enumerate the exact sites in the plan and keep `TestAllocs` + the T4/T5 byte-unchanged assertions (I-10).
+- **M5 — origin path depth/value encoding.** When specifying `path_decl.shared`, note the hardened components use `pathComponent{hardened:true, value:N}` (e.g. 84,0,0), depth ≤ 15 (`md/encode.go:90-93`); the in-band-hardening `bip32.Path` convention (`+hdkeychain.HardenedKeyStart`) is for the *expand/display* side (`md/expand.go:148-160`), NOT the raw `pathComponent` the encoder consumes — don't conflate the two representations in the plan.
+- **M6 — biggest-risk #6 (no hardware).** Real; the deterministic-recompute verify-bundle + golden/differential parity mitigate it for correctness, but the multi-leg derive→engrave→verify UX remains unvalidated on-device. Carry as a known residual, not a blocker.
+
+---
+
+## What GREEN requires
+Fold C1–C4 (the wire format for both NET-NEW encoders) + I1–I5; restate D11 (I3); concretize the `EncodeSingleSig` signature (I2) and the typed-only test (I4); resolve the network scope (I5); and adopt the T6a-1/T6a-2 split (Ruling e). Re-persist this review's folded successor verbatim and re-dispatch R0 after every fold (folds can drift). No code before 0C/0I.
