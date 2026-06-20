@@ -1,6 +1,14 @@
 # SPEC — SeedHammer II T6c **Phase B**: on-device multisig policy PICKER (the "choose" half)
 
-**Status:** DRAFT — awaiting opus R0 gate (must reach 0C/0I before any IMPLEMENTATION_PLAN or code).
+**Status:** ✅ R0 GREEN (0C/0I) — agent `a71fac556ac5e728c`; review `design/agent-reports/seedhammer-T6c-phaseB-spec-R0-round0.md`. Cleared for the implementation plan (its own R0).
+
+**USER DECISIONS (2026-06-20, post-R0 — resolve the 2 flagged product ambiguities; the 4 architect-defaultable ones are LOCKED as recommended):**
+- **(#3 ordering) USER-PICKS self-slot `@S`** — the Build flow includes a bounded `ChoiceScreen` (`@0..@{n-1}`) for which slot is the operator's own key; gathered cosigners fill the remaining slots in gather order. (NOT the architect's self-`@0` default.)
+- **(#5 fingerprints) USER CHOOSES at build time** — a bounded `ChoiceScreen` "Include key fingerprints? No / Yes"; the policy is kept HOMOGENEOUS (all slots same presence: Omit → no fp TLVs anywhere; Include → every slot's master fp). The choice affects the WalletPolicyId (Phase A: fp-absent `7b716421…` vs fp-present `639cabcf…`); show the resulting stub so the operator can match their coordinator. **A3 byte-match test MUST drive the Omit (fp-absent) path to reproduce the `7b716421…` T6b fixture (R0-M4).**
+- **LOCKED architect defaults:** templates = offer all 3 sortedmulti wrappers (`wsh`/`sh(wsh)`/`sh`), highlight `wsh` (#1); n ∈ 2..5, k ∈ 1..n (#2); `OriginShared` only, divergent deferred (#4); enforce self-key derived at the policy's shared origin (#6).
+- 4 R0 Minors (M1 mixed-fp clarity — now bounded by the homogeneous rule; M2 citation drift; M3 `originmode-errmsg`; M4 A3 fp-absent replay) fold into the IMPLEMENTATION_PLAN.
+
+**(superseded) Status:** DRAFT — awaiting opus R0 gate (must reach 0C/0I before any IMPLEMENTATION_PLAN or code).
 **Author:** single spec author (T6c-B).
 **Date:** 2026-06-19.
 **Scope class:** internal Go fork feature (firmware `gui/` package). NOT a `me` CLI surface; NOT a `md/` wire change (that was Phase A, shipped). GUI-heavy, hardware-UNvalidated.
