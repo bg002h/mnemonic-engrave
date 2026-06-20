@@ -1,5 +1,7 @@
 # cycle-prep recon — 2026-06-20 — constellation-template-only-engraving
 
+> **⚠ SUPERSEDED 2026-06-20** — this recon was scoped **single-sig-only** because at recon time the constellation supported only single-sig templates. Toolkit **v0.60.0** (`6de53879`) has since shipped **multisig / general** template completion (#28 phase 2) with a parallel permutation-search recompose engine, so the fork cycle is now unblocked for single-sig **and** non-taproot multisig. **Use the refreshed recon: `design/cycle-prep-recon-seedhammer-template-engrave.md`.** Kept for history.
+
 **Design repo (mnemonic-engrave) SHA at recon time:** `2ea6769` (branch `master`)
 **Sync state:** clean working tree; no untracked files at recon start.
 **This is a MULTI-REPO recon** (a fork-side firmware cycle that depends on constellation-side changes). Repos verified at PRIMARY SOURCE:
