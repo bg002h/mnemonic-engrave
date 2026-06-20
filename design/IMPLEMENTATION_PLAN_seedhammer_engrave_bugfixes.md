@@ -1,6 +1,6 @@
 # IMPLEMENTATION PLAN — SeedHammer II engraving-subsystem bug fixes (3 confirmed)
 
-> **Status:** ready for its own R0 gate. Single-author per project policy. Derived from the **GREEN** spec `design/SPEC_seedhammer_engrave_bugfixes.md` (R0 `a07f08aed3b2a9615`, 0C/0I) and bug-hunt `design/agent-reports/seedhammer-engrave-bughunt.md`.
+> **Status:** R0 GREEN (0C/0I) — plan R0 `a2e8d8ddfe491c06b` (round 0), persisted at `design/agent-reports/seedhammer-engrave-bugfixes-plan-R0-round0.md`; reviewer applied every diff and reproduced every FAIL→PASS in a throwaway worktree (BUG-1 wrap 1.84e19, BUG-2 dim37/41 panics, BUG-3 golden 16276/16277 mismatches, N=23 golden byte-identical f907eea↔fixed). 2 non-blocking Minors folded as implementer notes below. Cleared for single-implementer TDD. Single-author per project policy. Derived from the **GREEN** spec `design/SPEC_seedhammer_engrave_bugfixes.md` (R0 `a07f08aed3b2a9615`, 0C/0I) and bug-hunt `design/agent-reports/seedhammer-engrave-bughunt.md`.
 > **Every code block in this plan was compiled and run** in a throwaway worktree off `f907eea` (now removed); each test was verified to FAIL on `f907eea` and PASS after its fix, and the legacy goldens were verified byte-identical.
 
 ## Goal
@@ -81,6 +81,8 @@ Go 1.26 (module declares 1.25). Packages: `seedhammer.com/engrave`, `seedhammer.
 >     commit -S -s -m "<subject>" -m "<body>" \
 >     -m "Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 > ```
+
+> **⚠ Plan-R0 Minor-2 — execute the bugs in STRICT task order, one commit each before starting the next bug's tests.** `backup/backup_test.go` is staged in BOTH the BUG-2 and BUG-3 commits (different hunks). If you write all tests up front, the BUG-2 commit would capture BUG-3 test code too. So: finish + COMMIT BUG-1, then BUG-2 (write its tests → fix → commit), then BUG-3 (write its tests → fix → commit). Do NOT pre-author later bugs' tests.
 
 ---
 
@@ -535,7 +537,9 @@ Go 1.26 (module declares 1.25). Packages: `seedhammer.com/engrave`, `seedhammer.
   ```
   Expect (verified): `--- PASS` (the formula oracle is correct: pfsN=24696, 17/16, no overlap, in bounds).
 
-> **Why two tests:** `TestSLIP39LargeGeometry` is a human-readable pin of the chosen geometry (`pfsN==24696` + no-overlap + in-bounds), but it asserts the test's own formula so it cannot fail on buggy production code. `TestSLIP39Large` is the **byte-exact fail-on-buggy gate**: its committed golden is generated under the fixed code, and the buggy `f907eea` plan differs in thousands of knots. Both are required by the spec (acceptance #1).
+> **Why two tests:** `TestSLIP39LargeGeometry` is a human-readable pin of the chosen geometry (`pfsN==24696` + no-overlap + in-bounds), but it asserts the test's own formula so it cannot fail on buggy production code. `TestSLIP39Large` is the **byte-exact fail-on-buggy gate**: its committed golden is generated under the fixed code, and the buggy `f907eea` plan differs in thousands of knots. Both are required by the spec (acceptance #1). The byte-exact golden + the N=23 byte-identical cross-check (Task 3.5) already prove production correctness; the geometry oracle is a readable secondary pin.
+>
+> **Plan-R0 Minor-1 (OPTIONAL belt-and-suspenders, implementer's discretion):** to make the no-overlap check independent of the test-local formula too, `TestSLIP39LargeGeometry` MAY additionally measure col-1/col-2 y-ranges from the *emitted* plan — `slices.Collect(engrave.PlanEngraving(conf, side))`, band knots by `Ctrl.X` (col-1 at x≈10mm, col-2 at x≈44mm), and assert max(col-2 y) ≤ max(col-1 y). Not required (the golden is the gate); skip if it adds noise.
 
 ### Task 3.3 — Implement the `frontSideSeed` rework
 
