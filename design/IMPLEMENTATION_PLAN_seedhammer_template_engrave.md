@@ -1,6 +1,6 @@
 # SeedHammer Template-Engrave — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` to execute this plan task-by-task (single implementer per task + two-stage review). Steps use checkbox (`- [ ]`) syntax. **Gate:** this plan must pass an opus-architect R0 (0C/0I) BEFORE any code. **Plan-R0 history:** round 0 = NOT GREEN (4C/4I) → all 8 folded (this is DRAFT v2); re-dispatch round 1.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` to execute this plan task-by-task (single implementer per task + two-stage review). Steps use checkbox (`- [ ]`) syntax. **Gate:** this plan must pass an opus-architect R0 (0C/0I) BEFORE any code. **Plan-R0 history:** round 0 = NOT GREEN (4C/4I) → all 8 folded (DRAFT v2); round 1 = ✅ **GREEN (0C/0I)** + NIT (real symbol names `Reassemble`/`split`) folded. **Plan clears R0 → implementation.** Reviews `design/agent-reports/seedhammer-template-engrave-plan-R0-round{0,1}.md`.
 
 **Goal:** Add opt-in on-device wallet-policy TEMPLATE engraving (keyless md1) to the SeedHammer fork — default stays full-policy; engrave + verify cover any admissible md1; on-device display is honest-minimal for shapes the device can't classify.
 
@@ -151,7 +151,8 @@ func FormAwareStub(d *descriptor) ([4]byte, error) {
     return WalletDescriptorTemplateIdStub(d)
 }
 func FormAwareStubChunks(strs []string) ([4]byte, error) {
-    d, err := reassembleToDescriptor(strs) // I1: the Reassemble-based decode (md/chunk.go:207) WalletPolicyIDStubChunks uses
+    // mirror WalletPolicyIDStubChunks's decode exactly: Reassemble(strs) (md/chunk.go:207) → *descriptor
+    d, err := Reassemble(strs) // adapt to *descriptor as WalletPolicyIDStubChunks does (NIT: real symbol, not a coined wrapper)
     if err != nil { return [4]byte{}, err }
     return FormAwareStub(d)
 }
@@ -181,7 +182,7 @@ toolkit bundle --md1-form=template ... > md/testdata/template/example5_11key.tmp
 // StripToTemplate decodes a full md1, nulls pubkeys+fingerprints, conditionally elides
 // origin (only when canonicalOrigin(tree) is present — C1), and re-emits the keyless md1.
 func StripToTemplate(md1Chunks []string) ([]string, error) {
-    d, err := reassembleToDescriptor(md1Chunks) // I1: via Reassemble (md/chunk.go:207), the path WalletPolicyIDStubChunks uses
+    d, err := Reassemble(md1Chunks) // I1: the decode WalletPolicyIDStubChunks uses (md/chunk.go:207) → *descriptor (real symbol)
     if err != nil { return nil, err }
     d.tlv.pubkeys = nil; d.tlv.pubPresent = false        // pubkeys axis
     d.tlv.fingerprints = nil; d.tlv.fpPresent = false    // C1: MUST clear fpPresent too, else errEmptyTLVEncode (encode.go:271-273)
@@ -191,7 +192,7 @@ func StripToTemplate(md1Chunks []string) ([]string, error) {
         d.pathDecl.shared = &empty
         d.pathDecl.divergent = nil   // header divergent bit recomputes on re-emit
     } // else: KEEP source origins (no canonical origin — e.g. §5 general policy)
-    return splitToChunks(d) // encodePayload-backed; same chunker the encoders use
+    return split(d) // md/chunk.go:121 — encodePayload-backed; the chunker the encoders use (real symbol)
 }
 ```
 - [ ] **Step 5:** Run → PASS (all fixtures byte-identical; §5 keeps origins).
