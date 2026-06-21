@@ -43,7 +43,7 @@ Backed by 3 parallel primary-source investigations (verbatim reports in `design/
 - **Engrave + verify breadth = essentially free** (the codec is shape-complete for these).
 - **Visual display breadth = expensive** — rendering arbitrary miniscript / depth-≥2 taptrees on-device needs a `to_miniscript.rs`-equivalent renderer the fork lacks (**L**-sized; would become the bulk of the cycle).
 
-→ **OPEN-DECISION-1 (for the user, then fold into the SPEC + R0):** how broad must on-device DISPLAY be, given engrave+verify already cover any admissible md1? Pending answer; does not change the verdict above (no prerequisite md-codec cycle).
+→ **OPEN-DECISION-1 — RESOLVED 2026-06-20 (user): option 3 — minimal display now, broad renderer deferred.** Ship engrave+verify for ANY admissible md1 now (the load-bearing part), with full on-device display ONLY for the shapes the fork already renders (single-sig, wsh/sh(wsh) multi & sortedmulti); unrenderable shapes (general miniscript, depth-≥2 taptrees) get a generic safe summary + template-id under the loud experimental warning. File a FOLLOWUP for the broad `to_miniscript.rs`-equivalent renderer + taproot-multisig display. Does not change the verdict above (no prerequisite md-codec cycle).
 
 ## Net recommendation
 1. **Do not run a separate "update fork md-codec" cycle.** The codec is ready for the load-bearing paths; the v0.36→0.37 skew is a tiny orthogonal hardening (S) that can ride along or wait.
