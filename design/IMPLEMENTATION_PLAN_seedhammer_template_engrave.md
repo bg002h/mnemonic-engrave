@@ -1,6 +1,6 @@
 # SeedHammer Template-Engrave — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` to execute this plan task-by-task (single implementer per task + two-stage review). Steps use checkbox (`- [ ]`) syntax. **Gate:** this plan must pass an opus-architect R0 (0C/0I) BEFORE any code.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` to execute this plan task-by-task (single implementer per task + two-stage review). Steps use checkbox (`- [ ]`) syntax. **Gate:** this plan must pass an opus-architect R0 (0C/0I) BEFORE any code. **Plan-R0 history:** round 0 = NOT GREEN (4C/4I) → all 8 folded (this is DRAFT v2); re-dispatch round 1.
 
 **Goal:** Add opt-in on-device wallet-policy TEMPLATE engraving (keyless md1) to the SeedHammer fork — default stays full-policy; engrave + verify cover any admissible md1; on-device display is honest-minimal for shapes the device can't classify.
 
@@ -25,8 +25,8 @@
 | `gui/singlesig_derive.go` | mint site (`:67`) → form-aware | Modify |
 | `gui/multisig_derive.go` | mint site (`:42`) → form-aware | Modify |
 | `md/encode_multisig.go` | mint site (`:158`, `WalletPolicyIDStub(d)`) → form-aware | Modify |
-| `gui/singlesig.go` (+ flow) | single-sig template opt-in ChoiceScreen + warning + estimate + complex/depth consent | Modify |
-| `gui/multisig.go` (+ build flow) | multisig-BUILD template opt-in; supply path stays full-policy/verbatim | Modify |
+| `gui/singlesig.go` → `engraveSingleSigFlow` (:30) | single-sig template opt-in ChoiceScreen + warning + estimate (PolicySingle only — no complex/depth here, I3) | Modify |
+| `gui/multisig_build.go` → `buildMultisigPolicyFlow` (:38) | multisig-BUILD template opt-in + complex/depth consent + N keyless cosigner stubs; supply path untouched (D1) | Modify |
 | `md/testdata/template/*` | golden vectors from `toolkit bundle --md1-form=template` + the §5 fixture | **Create** |
 
 ---
@@ -82,19 +82,19 @@ func isWalletPolicy(d *descriptor) bool {
 
 **Files:** Modify `md/template_id.go`; Test `md/template_id_test.go`.
 
-**Reference:** mirror `md/walletpolicyid.go:30-64` STRUCTURE but: (a) **NO `canonicalize(d)`** (R0 pin #1 — Rust `compute_wallet_descriptor_template_id` does not canonicalize; rely on the decode-side canonical invariant `validatePlaceholderUsage`); (b) preimage = `use_site_path ‖ writeNode(tree) ‖ UseSitePathOverrides-TLV` with **NO keys/fingerprints** (this is what makes it key-independent — Rust `identity.rs:71-104`); (c) kiw from `d.n`; (d) carry the `d.pathDecl.n == d.n` guard (`errPathDeclNMismatch`) **inside** this function (it bypasses `encodePayload` where that guard normally lives, `encode.go:401`).
+**Reference (C2 — build the preimage from the FORWARD serializers; do NOT clone `WalletPolicyId` and delete its `canonicalize`):** `walletpolicyid.go:30-64` is `WalletPolicyId`'s per-@N-record preimage — a DIFFERENT, key-dependent computation that will NOT yield `b02b4403…`. Construct the WDT-Id preimage `useSitePath ‖ writeNode(tree) ‖ UseSitePathOverrides-TLV` DIRECTLY via the forward serializers `writeUseSitePath` / `writeNode` / the use-site-override branch of `writeTLVSection`, matching Rust `identity.rs:71-104` byte-for-byte. Properties: (a) **NO `canonicalize(d)`** (R0 pin #1 — Rust WDT-Id does not canonicalize; rely on the decode-side canonical invariant `validatePlaceholderUsage`); (b) **NO keys/fingerprints** in the preimage (this is what makes it key-independent); (c) kiw from `d.n`; (d) carry the `d.pathDecl.n == d.n` guard (`errPathDeclNMismatch`) **inside** this function (it bypasses `encodePayload` where that guard normally lives, `encode.go:401`).
 
 - [ ] **Step 1: Failing golden test.** WDT-Id of a keyless `wsh(sortedmulti(2,@0,@1,@2))` template → `b02b4403…` (full 16 bytes from `md-cli`/`mk-cli`); origin-invariant (default vs `--path bip84` vs `m/48'/0'/0'/2'` → identical); distinct per (script,k,N,use-site). Generate the expected bytes:
 ```bash
-# in descriptor-mnemonic @ 54dd765:
-cargo run -q -p md-cli -- identity --template 'wsh(sortedmulti(2,@0,@1,@2))' --path m/48h/0h/0h/2h   # → b02b4403...
+# generate via the md CLI (I4 — it's `md inspect`, NOT `identity --template`):
+md inspect <keyless wsh-sortedmulti(2,@0,@1,@2) template md1>   # WalletDescriptorTemplateId field → b02b44037119e6b6fd1d82f61aa17e21
 ```
 ```go
 func TestWalletDescriptorTemplateId_Golden(t *testing.T) {
     d := mustDecodeDesc(t, keylessWshSortedmulti2of3)
     got, err := WalletDescriptorTemplateId(d)
     if err != nil { t.Fatal(err) }
-    want := mustHex16(t, "b02b4403...")   // full 16B from md-cli
+    want := mustHex16(t, "b02b44037119e6b6fd1d82f61aa17e21")   // full 16B golden (plan-R0 confirmed, I4)
     if got != want { t.Fatalf("WDT-Id = %x, want %x", got, want) }
 }
 func TestWalletDescriptorTemplateId_OriginInvariant(t *testing.T) { /* id under 3 origins identical */ }
@@ -112,8 +112,8 @@ func WalletDescriptorTemplateId(d *descriptor) ([16]byte, error) {
     var w bitWriter
     if err := writeUseSitePath(&w, d.useSite); err != nil { return [16]byte{}, err }
     if err := writeNode(&w, d.tree, width); err != nil { return [16]byte{}, err }
-    // append the UseSitePathOverrides TLV iff present, matching identity.rs preimage rule
-    // ... (mirror walletpolicyid.go override handling, byte-for-byte vs identity.rs)
+    // append the UseSitePathOverrides TLV iff present, via the use-site-override branch of
+    // writeTLVSection, byte-for-byte vs identity.rs:71-104 (NOT cloned from walletpolicyid.go)
     sum := sha256.Sum256(w.intoBytes())
     var id [16]byte; copy(id[:], sum[:16]); return id, nil
 }
@@ -151,7 +151,7 @@ func FormAwareStub(d *descriptor) ([4]byte, error) {
     return WalletDescriptorTemplateIdStub(d)
 }
 func FormAwareStubChunks(strs []string) ([4]byte, error) {
-    d, err := decodeChunksToDescriptor(strs) // reuse the same decode WalletPolicyIDStubChunks uses
+    d, err := reassembleToDescriptor(strs) // I1: the Reassemble-based decode (md/chunk.go:207) WalletPolicyIDStubChunks uses
     if err != nil { return [4]byte{}, err }
     return FormAwareStub(d)
 }
@@ -165,7 +165,7 @@ func FormAwareStubChunks(strs []string) ([4]byte, error) {
 
 **Files:** Create `md/template_strip.go`; Test `md/template_strip_test.go`; golden vectors `md/testdata/template/*`.
 
-**Mutations (match `synthesize.rs:1158-1283`):** `tlv.pubkeys = nil`; `tlv.fingerprints = nil`; **origin: elide ONLY when `canonicalOrigin(d.tree)` returns ok (C1 — `md.go:1097`); KEEP source origins otherwise** (eliding a no-canonical-origin policy → decode-rejected `MissingExplicitOrigin`). Re-emit via `encodePayload` / `encodeMD1String` (shape-general).
+**Mutations (match `synthesize.rs:1158-1283`):** `tlv.pubkeys = nil` + `tlv.pubPresent = false`; `tlv.fingerprints = nil` + **`tlv.fpPresent = false` (C1 — present-but-empty → `errEmptyTLVEncode`, `encode.go:271-273`; this is the I1 bug on the fingerprints axis)**; **origin: elide the PATH-DECL (`pathDecl.shared = &empty; pathDecl.divergent = nil`, matching `synthesize.rs:1196` `path_decl.paths = Shared(empty)`; the header divergent bit recomputes on re-emit — C3) ONLY when `canonicalOrigin(d.tree)` returns ok (`md.go:1097`); KEEP source origins otherwise** (eliding a no-canonical-origin policy → decode-rejected `MissingExplicitOrigin`). Re-emit via `encodePayload` / `encodeMD1String` (shape-general).
 
 - [ ] **Step 1: Generate golden vectors** from the toolkit @ `6de53879`:
 ```bash
@@ -181,12 +181,16 @@ toolkit bundle --md1-form=template ... > md/testdata/template/example5_11key.tmp
 // StripToTemplate decodes a full md1, nulls pubkeys+fingerprints, conditionally elides
 // origin (only when canonicalOrigin(tree) is present — C1), and re-emits the keyless md1.
 func StripToTemplate(md1Chunks []string) ([]string, error) {
-    d, err := decodeChunksToDescriptor(md1Chunks); if err != nil { return nil, err }
-    d.tlv.pubkeys = nil; d.tlv.pubPresent = false
-    d.tlv.fingerprints = nil
+    d, err := reassembleToDescriptor(md1Chunks) // I1: via Reassemble (md/chunk.go:207), the path WalletPolicyIDStubChunks uses
+    if err != nil { return nil, err }
+    d.tlv.pubkeys = nil; d.tlv.pubPresent = false        // pubkeys axis
+    d.tlv.fingerprints = nil; d.tlv.fpPresent = false    // C1: MUST clear fpPresent too, else errEmptyTLVEncode (encode.go:271-273)
     if _, ok := canonicalOrigin(d.tree); ok {
-        // elide: set the shared/use-site origin to the empty/canonical form (mirror synthesize.rs:1185-1198)
-    } // else: KEEP source origins (general policy, e.g. §5)
+        // C3: elide the PATH-DECL (matches synthesize.rs:1196 `path_decl.paths = Shared(empty)`):
+        empty := originPath{}        // shared, zero components
+        d.pathDecl.shared = &empty
+        d.pathDecl.divergent = nil   // header divergent bit recomputes on re-emit
+    } // else: KEEP source origins (no canonical origin — e.g. §5 general policy)
     return splitToChunks(d) // encodePayload-backed; same chunker the encoders use
 }
 ```
@@ -214,39 +218,39 @@ func StripToTemplate(md1Chunks []string) ([]string, error) {
 
 ---
 
-## Task 6 — GUI: single-sig template opt-in + warning + estimate + complex/depth consent (S4 / S5 / S6)
+## Task 6 — GUI: single-sig template opt-in + warning + estimate (S4 / S6)
 
-**Files:** Modify `gui/singlesig.go` (+ its engrave flow); Test the host GUI harness (mirror existing `gui/*_test.go` patterns).
+**Files:** Modify `gui/singlesig.go` → `engraveSingleSigFlow` (:30, I2); Test the host GUI harness (mirror existing `gui/*_test.go` patterns).
 
-- [ ] **Step 1: Failing test.** Default lands on full-policy (byte-identical engrave to today). Selecting "Template-only" → shows the warning + estimate strings, then engraves `StripToTemplate(builtMD1)` + the form-aware single mk1 stub. For a `classifyPolicy`→`PolicyComplex` shape (taproot depth-2 single-key path is N/A here; use the complex fixture if reachable single-sig) the confirm screen shows `{family, slot-count N, template-id}` (assert strings). Depth-≥2 shows the EXPERIMENTAL warning naming ">13.1.0 / PR #953".
+- [ ] **Step 1: Failing test.** Default lands on full-policy (byte-identical engrave to today). Selecting "Template-only" → shows the warning + estimate strings, then engraves `StripToTemplate(builtMD1)` + the form-aware single mk1 stub. Single-sig always classifies `PolicySingle` (depth-0: pkh/wpkh/sh(wpkh)/tr(@0)) → full type is shown. **The complex/depth consent + the depth-≥2 EXPERIMENTAL gate are exercised in Task 7 (multisig/general), NOT here — I3 (a single key has no taptree and no `PolicyComplex` shape).**
 - [ ] **Step 2:** Run → FAIL.
-- [ ] **Step 3: Implement.** Inner `ChoiceScreen` on `engraveSingleSig` (no new `program` → no `gui/gui.go:164` trip). Full = today's path verbatim. Template = strip + warning (S4 mockup) + estimate (S6: sortedmulti→none / ordered→N! @6.9/7.4µs; the harmonized N→time table) + the complex/depth consent (S5). Surface `Template.N` for the slot-count line.
+- [ ] **Step 3: Implement.** Inner `ChoiceScreen` on `engraveSingleSigFlow` (no new `program` → no `gui/gui.go:164` trip — I2). Full = today's path verbatim. Template = `StripToTemplate` + warning (S4 mockup) + estimate (S6: sortedmulti→none / ordered→N! @6.9/7.4µs; the harmonized N→time table) + the form-aware single mk1 stub.
 - [ ] **Step 4:** Run → PASS. Confirm the full-policy default path is byte-identical (golden pin).
-- [ ] **Step 5: Commit** — "feat(gui): single-sig template opt-in + warning/estimate/consent".
+- [ ] **Step 5: Commit** — "feat(gui): single-sig template opt-in + warning/estimate".
 
 ---
 
-## Task 7 — GUI: multisig-BUILD template opt-in; supply stays verbatim (S4 / N1)
+## Task 7 — GUI: multisig-BUILD template opt-in + complex/depth consent; supply stays verbatim (S4 / S5 / C3 / N1)
 
-**Files:** Modify `gui/multisig.go` (+ the on-device BUILD flow). **Do NOT touch** `supplyMultisigPolicyFlow` / `allSlotsHaveXpub` (`gui/multisig_supply.go:72`) — it stays full-policy-only (D1).
+**Files:** Modify `gui/multisig_build.go` → `buildMultisigPolicyFlow` (:38, I2). **Do NOT touch** `supplyMultisigPolicyFlow` / `allSlotsHaveXpub` (`gui/multisig_supply.go:72`) — it stays full-policy-only (D1).
 
-- [ ] **Step 1: Failing test.** On the multisig on-device **BUILD** path, selecting Template-only → engraves `StripToTemplate(builtMD1)` + N keyless cosigner mk1 stubs, each rooting on the one WDT-Id (form-aware, C2); the bundle passes the device's own readback verify. The **supply** path is unchanged (full-policy; a keyless template supplied there is NOT accepted by the seed-cross-match flow — it has no xpub to match). A SUPPLIED template bundle (md1 + N keyless mk1) engraved via `bundleFlow`/`bundleEngrave` (`gui/bundle_flow.go:24,327`) verbatim verifies via the form-aware binding (N1: engrave-verbatim, bind-at-verify split).
+- [ ] **Step 1: Failing test.** On the multisig on-device **BUILD** path, selecting Template-only → engraves `StripToTemplate(builtMD1)` + N keyless cosigner mk1 stubs, each rooting on the one WDT-Id (form-aware, C2); the bundle passes the device's own readback verify. **Complex/depth consent (I3 — reachable only here):** a `classifyPolicy`→`PolicyComplex` shape (general miniscript / multi-leaf taptree) shows the honest-minimal confirm `{script family, key-slot count `Template.N`, template-id}` (assert strings — DD7/C3); a **depth-≥2** taptree additionally shows the EXPERIMENTAL warning naming ">13.1.0 / PR #953" (S5). The **supply** seed-cross-match path is unchanged (full-policy; a keyless template has no xpub to match). A SUPPLIED template bundle (md1 + N keyless mk1) engraved via `bundleFlow`/`bundleEngrave` (`gui/bundle_flow.go:24,327`) verbatim verifies via the form-aware binding (N1: engrave-verbatim, bind-at-verify split).
 - [ ] **Step 2:** Run → FAIL.
-- [ ] **Step 3: Implement.** Add the opt-in ChoiceScreen on the multisig BUILD path only; reuse `StripToTemplate` + the form-aware mint (Task 5). Leave the supply flow + `allSlotsHaveXpub` untouched.
+- [ ] **Step 3: Implement.** Add the opt-in ChoiceScreen + the complex/depth consent screens on `buildMultisigPolicyFlow` only; reuse `StripToTemplate` + the form-aware mint (Task 5). Surface `Template.N` for the slot-count line. Leave the supply flow + `allSlotsHaveXpub` untouched.
 - [ ] **Step 4:** Run → PASS; supply-flow regression byte-identical.
-- [ ] **Step 5: Commit** — "feat(gui): multisig-BUILD template opt-in (supply path unchanged, D1)".
+- [ ] **Step 5: Commit** — "feat(gui): multisig-BUILD template opt-in + complex/depth consent (supply unchanged, D1)".
 
 ---
 
-## Task 8 — Refusals at the correct layer (S5)
+## Task 8 — Refusals at the correct layer (S5 / C4 — NEW code, NOT assertion-only)
 
-**Files:** Modify the template-parser / derive-address paths as needed; Tests.
+**Files:** Create `templateEngraveShapeGuard(d)` (in `md/` + called from the template-engrave GUI entry); Tests. **C4: the fork does NOT currently refuse `tr(sortedmulti_a)` / `sortedmulti`-in-combinator** — `validateTapScriptTree` PERMITS `multi_a`/`sortedmulti_a` tap leaves; they are "display-only, never verified" at the address layer, not refused at parse. So this task ADDS refusal code on the TEMPLATE-ENGRAVE path (the default full-policy path is unchanged per the `default-unchanged` invariant).
 
-- [ ] **Step 1: Failing test.** `tr(sortedmulti_a)` + `sortedmulti`-in-combinator → refused at the **template parser** with a clear message; **hardened use-site** → refused at the **derive/address** path (`HardenedPublicDerivation`-equivalent), NOT at the template parser (a `/*'`/`/N'/` template still encodes/strips fine).
-- [ ] **Step 2:** Run → FAIL (or confirm existing refusals already cover; if so, this task is assertion-only).
-- [ ] **Step 3: Implement / assert** the refusals at the right layer with clear messages.
+- [ ] **Step 1: Failing test.** A `tr(sortedmulti_a)` template and a `sortedmulti`-in-combinator template on the template-engrave opt-in → **refused with a clear message** (recovery impossible with shipped toolkit). These currently ENGRAVE → RED. **Hardened use-site** (`/*'` or fixed `/N'/`) → still encodes/strips fine (assert it strips) but is refused at the **derive/address** path; confirm whether the fork's address derivation already errors on hardened-use-site (assert) — else add it there, NOT at the template parser.
+- [ ] **Step 2:** Run → FAIL (the refused shapes engrave today).
+- [ ] **Step 3: Implement.** `templateEngraveShapeGuard(d)` detects from the decoded tree tags `tr(…sortedmulti_a…)` and `sortedmulti` nested under any combinator, and refuses before engrave on the template path (Tasks 6/7 call it at the opt-in confirm). Hardened use-site stays a derive/address-layer refusal.
 - [ ] **Step 4:** Run → PASS.
-- [ ] **Step 5: Commit** — "feat: template refusals at correct layer (tr(sortedmulti_a)/combinator/hardened-use-site)".
+- [ ] **Step 5: Commit** — "feat: template-path refusals for tr(sortedmulti_a)/combinator-sortedmulti (C4); hardened-use-site at derive/address".
 
 ---
 
@@ -270,8 +274,10 @@ A single independent opus-architect **whole-diff adversarial execution review** 
 - **M1:** estimate provenance — 6.9 µs/perm (policyID), 7.4 µs/perm (first address), 24-core i7-13700 @ 5.3 GHz, Rust toolkit `permutation_search.rs` (full N! enumeration, no pruning).
 - **M3:** the §5 11-key general-miniscript wallet is vendored as a concrete golden fixture in Task 4.
 
-## Open for plan-R0 to rule on
-- Is the WDT-Id preimage's UseSitePathOverrides-TLV inclusion rule reproduced exactly vs `identity.rs:71-104` (the one byte-order subtlety not fully shown above)?
-- Is `decodeChunksToDescriptor` the right existing entry the chunks-based stub helpers already use (confirm the exact decode path so `FormAwareStubChunks` matches `WalletPolicyIDStubChunks`'s decode)?
-- Task 6/7 GUI test reachability of a `PolicyComplex` single-sig vs multisig fixture (where to assert the honest-minimal consent screen).
-- Does Task 8 find the refusals already present (assertion-only) or needing new code?
+## Resolved by plan-R0 round 0 (verdict NOT GREEN 4C/4I → folded; review `design/agent-reports/seedhammer-template-engrave-plan-R0-round0.md`)
+- **WDT-Id preimage / override-TLV byte order:** CONFIRMED correct vs `identity.rs:71-104` — build from the FORWARD serializers, NOT by editing `WalletPolicyId` (C2). Full golden = `b02b44037119e6b6fd1d82f61aa17e21` (I4).
+- **Decode entry:** it's `Reassemble` (`md/chunk.go:207`), not the phantom `decodeChunksToDescriptor` (I1).
+- **`PolicyComplex` reachability:** only on multisig/general → the honest-minimal + depth-≥2 consent is asserted in Task 7, not single-sig Task 6 (I3).
+- **Task 8 needs NEW refusal code** — the fork does NOT currently refuse `tr(sortedmulti_a)`/combinator-`sortedmulti` (C4).
+- **Also folded:** C1 (`fpPresent=false` in strip), C3 (elide the path-decl `shared=&empty; divergent=nil`), I2 (real flow names `engraveSingleSigFlow:30` / `buildMultisigPolicyFlow:38`).
+- Toolkit pin staleness (`6de53879` vs HEAD `2f5d088`) is benign — `synthesize.rs` byte-identical.
