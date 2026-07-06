@@ -180,3 +180,34 @@ Touches: `crates/me-cli/Cargo.toml`, `Cargo.lock`, `crates/me-cli/src/lib.rs`.
 
 Touches: `crates/me-cli/src/validate.rs`, `crates/me-cli/src/lib.rs` (tests),
 `crates/me-cli/tests/cli.rs`.
+
+---
+
+## Step 6 (B1) — golden corpus + NDEF boundary (done)
+
+- **Vectors generated with the BUMPED codecs:** max-valid md1 (93-symbol cap, 96 chars) via a
+  scratch crate pinned `md-codec = "=0.40.0"`, `wrap_payload(&[0xA5;50], 400)` (80 data + 13
+  checksum = 93 symbols) → `md15kj6tfd9…uguh8nmgfllzz`; 0.40 `unwrap_string` confirmed it is
+  accepted (93 == cap). `.ndef` goldens produced by the actual `me --stdout` binary (bumped
+  codecs) for md1-max, mk1-short (existing 80-char MK1_B), mk1-chunk (existing 111-char MK1_A);
+  `md1-short.ndef` kept. md1-max.ndef is 104 bytes: `03 65 D1 01 61 54 00 <96 text> FE`.
+- **golden.rs:** VECTORS table asserts `convert(input) == include_bytes!(…)` for all 4 vectors
+  (`all_vectors_match_golden_ndef`); original `md1_short_matches_golden` retained. Alphabet
+  union test `vectors_cover_the_full_bech32_alphabet`: verified the 4 vectors' data parts cover
+  ALL 32 bech32 symbols (`qpzry9x8gf2tvdw0s3jn54khce6mua7l`) — no extra vector needed.
+- **ndef.rs boundary units:** `ndef_boundary_249_char_text_encodes_with_1byte_len` pins
+  `out[1] == 0xFE` (message len 254, 1-byte TLV form) + the 7-byte header prefix
+  `03 FE D1 01 FA 54 00`; `ndef_boundary_250_char_text_is_too_long` pins
+  `encode_text_tlv(250×'a') == Err(TooLong(255))`.
+- **Perturb-then-revert fail-first (additive pins — per Constraints):**
+  - tlv_wrap guard `>= 0xFF` → `> 0xFF`: the 250-char boundary test went RED (`TooLong` not
+    raised); reverted, boundary tests green.
+  - flipped 1 byte of `md1-max.ndef`: `all_vectors_match_golden_ndef` went RED (`golden
+    mismatch for md1-max`); restored from backup, sha verified.
+  - appended `b` (uncovered) to the required alphabet: union test went RED (`not covered:
+    ['b']`); reverted.
+- Full suite green after all reverts: lib 50 (+2 ndef boundary), golden 3 (+2), cli 22,
+  cross_lang 1, preview_cross_lang 1 → exit 0.
+
+Touches: `crates/me-cli/src/ndef.rs`, `crates/me-cli/tests/golden.rs`,
+`crates/me-cli/tests/vectors/{md1-max,mk1-short,mk1-chunk}.ndef` (new).

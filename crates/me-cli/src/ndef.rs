@@ -131,4 +131,31 @@ mod tests {
         let big = "a".repeat(255);
         assert_eq!(text_record(&big), Err(NdefError::TooLong(255)));
     }
+
+    // B1/F6: NDEF TLV short-record 255-boundary. A 249-char text is the largest
+    // that still fits the 1-byte TLV length form; a `>=`→`>` mutation of the
+    // tlv_wrap guard would emit a 0xFF length byte that SeedHammer's reader
+    // treats as the 3-byte-length escape → device misparse. Byte-pin both sides.
+    #[test]
+    fn ndef_boundary_249_char_text_encodes_with_1byte_len() {
+        let text = "a".repeat(249);
+        let out = encode_text_tlv(&text).expect("249-char text must encode");
+        // TLV length byte (= NDEF message length) is 254 = 0xFE, still the 1-byte
+        // form (< 0xFF), so the reader does NOT take the 3-byte-length escape.
+        assert_eq!(out[1], 0xFE);
+        // Byte-pinned TLV + NDEF Text-record header prefix:
+        // 03  FE  D1  01  FA(=250 payload)  54('T')  00(status)
+        assert_eq!(&out[..7], &[0x03, 0xFE, 0xD1, 0x01, 0xFA, 0x54, 0x00]);
+        // terminator still present.
+        assert_eq!(*out.last().unwrap(), 0xFE);
+        assert_eq!(decode_text_tlv(&out).as_deref(), Some(text.as_str()));
+    }
+
+    #[test]
+    fn ndef_boundary_250_char_text_is_too_long() {
+        let text = "a".repeat(250);
+        // text_record fits (payload 251 ≤ 255) but the 255-byte message overflows
+        // the 1-byte TLV length form → TooLong, fail-closed.
+        assert_eq!(encode_text_tlv(&text), Err(NdefError::TooLong(255)));
+    }
 }
