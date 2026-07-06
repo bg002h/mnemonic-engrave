@@ -301,3 +301,36 @@ Touches: `preview/params_test.go`.
 - Full suite green: lib 54 (+4), cli 23, cross_lang 1, golden 3, preview_cross_lang 1 → exit 0.
 
 Touches: `crates/me-cli/src/bundle.rs` (tests only).
+
+---
+
+## Step 11 — full verification (done)
+
+- **11.1 cargo `--locked` (go on PATH + `ME_REQUIRE_GO=1`):** 54 lib + 23 cli + 1 cross_lang
+  (11 internal oracle round-trips) + 3 golden + 1 preview_cross_lang = all green, **ZERO skips**
+  (no "skipping" note — the differential oracles ran for real). exit 0.
+- **11.2 go:** `go test ./...` in `preview/` → ok; `go build ./... && go test ./...` in
+  `firmware/ndef-roundtrip/` → build ok, no test files.
+- **11.3 clean-clone hermeticity:** `git clone --recurse-submodules -b me-testing-hardening`
+  into `me-impl-scratch/clean-clone` (submodule at pinned 713aee2; the out-of-repo
+  `seedhammer-ref-v1.4.2` genuinely ABSENT relative to the clone). Full suite +
+  `ME_REQUIRE_GO=1` + go tests all GREEN there — proving the A4 repoint made the Go oracle
+  hermetic (would have failed pre-A4).
+- **11.4 end-to-end real sidecar:** built me-preview (`-X main.version=0.3.0`, `--version` ==
+  `me-preview 0.3.0`) + release `me`; `me bundle --preview <out> --manifest …` on
+  md1+MK1_A+MK1_B → **exit 0**, 3 SVGs (plate-1 md1, plate-2/3 mk1 chunks), **NO plate-4** (ms1
+  never rendered). plate-1.svg has `<svg` + `<path`, `viewBox … 431224 200868` and
+  `stroke-width="1920"` (matches the params geometry golden + strokeWidth). manifest: public
+  plates carry `preview`, ms1 carries none. Exit codes reconfirmed: ms1→3, empty→2.
+- **11.5 negative re-probes — all fail closed:**
+  - `msx10entrs…cj9sxraq34v7f` bundle → exit 4, stderr = `cannot classify input: unrecognized
+    HRP 'msx' …` — secret body ABSENT (A1 redaction holds end-to-end).
+  - 94-symbol over-length md1 → exit 4, `invalid md1 string: string has 94 symbols; … caps a
+    string at 93` (A2).
+  - interior-`-` md1 → exit 4, `non-canonical md1: interior separator '-' at byte 8 …` (A3).
+- Stray `firmware/ndef-roundtrip/ndefroundtrip` binary from `go build ./...` removed; tree
+  clean. (NOTE for reviewer: that binary is not in `.gitignore` — harmless in ephemeral CI but
+  a local papercut; left unchanged to stay within plan scope.)
+
+Steps 0–11 COMPLETE, all green. Branch left for the mandatory Step 12 adversarial execution
+review. No STOP conditions were hit at any step.
