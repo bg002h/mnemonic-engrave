@@ -14,6 +14,14 @@ pub enum ValidateError {
     /// symbol(s). We refuse non-pristine input rather than engrave a string
     /// that needed repair (the converter engraves the input verbatim).
     MkCorrected(usize),
+    /// md1 string is non-canonical: it contains a `-` (anywhere) or interior
+    /// whitespace (A3/F4). md-codec's `unwrap_string` strips these before BCH
+    /// verification, but the converter engraves the raw (trimmed) input
+    /// verbatim — so the stray byte would be embedded in the NDEF payload though
+    /// the checksum never covered it. Refused fail-closed. Carries only the
+    /// offending char + its byte position (in the trimmed string); NEVER the
+    /// input body.
+    MdNonCanonical { ch: char, pos: usize },
 }
 
 impl std::fmt::Display for ValidateError {
@@ -25,6 +33,12 @@ impl std::fmt::Display for ValidateError {
                 f,
                 "mk1 string is not pristine: it required {n} BCH correction(s) — fix the input \
                  rather than engrave a string that needed repair"
+            ),
+            ValidateError::MdNonCanonical { ch, pos } => write!(
+                f,
+                "non-canonical md1: interior separator {ch:?} at byte {pos} — md1 must contain \
+                 no '-' and no interior whitespace (the converter engraves the string verbatim \
+                 and the checksum does not cover stripped separators)"
             ),
         }
     }
@@ -40,9 +54,23 @@ impl std::error::Error for ValidateError {}
 /// `Format::Ms` must never reach this function (it is refused before validation).
 pub fn validate(fmt: Format, s: &str) -> Result<(), ValidateError> {
     match fmt {
-        Format::Md => md_codec::codex32::unwrap_string(s)
-            .map(|_| ())
-            .map_err(ValidateError::Md),
+        Format::Md => {
+            // A3/F4: refuse non-canonical md1 BEFORE the BCH verify. The caller
+            // (convert/parse_line) has already `str::trim`ed `s`, so any remaining
+            // whitespace is interior. Canonical = no '-' anywhere and no interior
+            // whitespace (same `char::is_whitespace` predicate as `str::trim` and
+            // md-codec's strip step). Refusal — not canonicalization — because
+            // silent stripping would emit bytes the user never supplied, and
+            // canonicalize-then-emit would need the semantics to land in md-codec
+            // first (Rust-primary rule).
+            if let Some((pos, ch)) = s.char_indices().find(|(_, c)| c.is_whitespace() || *c == '-')
+            {
+                return Err(ValidateError::MdNonCanonical { ch, pos });
+            }
+            md_codec::codex32::unwrap_string(s)
+                .map(|_| ())
+                .map_err(ValidateError::Md)
+        }
         Format::Mk => {
             let decoded = mk_codec::string_layer::decode_string(s).map_err(ValidateError::Mk)?;
             if decoded.corrections_applied != 0 {

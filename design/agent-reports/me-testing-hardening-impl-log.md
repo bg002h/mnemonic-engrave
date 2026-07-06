@@ -154,3 +154,29 @@ Touches: `crates/me-cli/src/bundle.rs`, `crates/me-cli/tests/cli.rs`.
   preview_cross_lang 1 → all green, exit 0.
 
 Touches: `crates/me-cli/Cargo.toml`, `Cargo.lock`, `crates/me-cli/src/lib.rs`.
+
+---
+
+## Step 5 (A3) — refuse non-canonical md1 (done)
+
+- **Fail-first (6 tests failed for the right reason; 1 positive-guard passed pre-impl):**
+  - lib.rs convert-level: `refuses_noncanonical_md1_interior_dash`/`_space`/`_newline` and
+    `noncanonical_md1_error_names_char_and_byte_position` all FAILED (convert returned Ok —
+    md-codec stripped the separator and BCH-passed, then convert emitted the raw bytes).
+  - cli.rs exit-code: `convert_refuses_interior_separator_md1_exit_4` and
+    `bundle_refuses_interior_separator_md1_exit_4_no_leak` FAILED (exit 0, not 4).
+  - `clean_md1_trailing_newline_is_byte_identical` PASSED pre-impl (guard must not regress it).
+- **Fix (single shared admission path — `validate::validate`, NOT convert/parse_line):** added
+  a `Format::Md`-gated check that runs BEFORE `unwrap_string`: if the (already-trimmed) string
+  contains any `char::is_whitespace()` or `-`, return the new `ValidateError::MdNonCanonical
+  { ch, pos }` (offending char + byte position; never the input body). Display:
+  `non-canonical md1: interior separator '-' at byte 8 — md1 must contain no '-' and no
+  interior whitespace …`. mk1 arm untouched (mk-codec already rejects these as InvalidChar).
+- **Ordering note:** the canonical check runs before `unwrap_string`, so `OVERLEN_MD1` (no
+  separators) still passes the canonical check and hits `StringSymbolCountOutOfRange` — Step 4's
+  test unaffected.
+- All 8 Step-5 tests pass. `md1-short` golden + every prior test still green. Full suite:
+  lib 48 (+5), cli 22 (+2), cross_lang 1, golden 1, preview_cross_lang 1 → exit 0.
+
+Touches: `crates/me-cli/src/validate.rs`, `crates/me-cli/src/lib.rs` (tests),
+`crates/me-cli/tests/cli.rs`.

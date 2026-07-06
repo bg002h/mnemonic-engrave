@@ -113,6 +113,39 @@ fn bundle_ms1_refused_exit_3() {
         .stderr(predicates::str::contains("CODEX32"));
 }
 
+// A3/F4: interior separators ('-' or whitespace) in an otherwise-valid md1 are
+// stripped by md-codec before BCH but engraved verbatim by convert() — refuse
+// fail-closed. Convert path AND single-line bundle path both exit 4; the bundle
+// path must not echo the input body (composes with the Step 3 canary).
+#[test]
+fn convert_refuses_interior_separator_md1_exit_4() {
+    for bad in ["md1yqpqq-xqq8xtwhw4xwn4qh", "md1yqpqq xqq8xtwhw4xwn4qh"] {
+        Command::cargo_bin("me")
+            .unwrap()
+            .arg("--stdout")
+            .write_stdin(bad)
+            .assert()
+            .code(4);
+    }
+}
+
+#[test]
+fn bundle_refuses_interior_separator_md1_exit_4_no_leak() {
+    for bad in ["md1yqpqq-xqq8xtwhw4xwn4qh", "md1yqpqq xqq8xtwhw4xwn4qh"] {
+        let assert = Command::cargo_bin("me")
+            .unwrap()
+            .arg("bundle")
+            .write_stdin(bad)
+            .assert()
+            .code(4);
+        let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+        assert!(
+            !stderr.contains(bad),
+            "bundle leaked non-canonical md1 body: {stderr}"
+        );
+    }
+}
+
 // A1/F1: an ms1 secret with a 1-typo HRP (`msx1…`) dodges the exact-HRP ms1
 // refusal (classified as an unknown HRP) — the error MUST NOT echo the intact
 // codex32 secret body to stderr (shell scrollback / 2>logfile / CI logs).

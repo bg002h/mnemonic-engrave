@@ -100,6 +100,51 @@ mod tests {
         );
     }
 
+    // A3/F4: md-codec's unwrap_string leniently STRIPS interior '-'/whitespace
+    // before BCH-verify, but convert() engraves the raw (trimmed) input verbatim
+    // — so a stray interior separator gets embedded in the NDEF payload though
+    // the checksum never covered it. Refuse such non-canonical md1 fail-closed.
+    #[test]
+    fn refuses_noncanonical_md1_interior_dash() {
+        let r = convert("md1yqpqq-xqq8xtwhw4xwn4qh");
+        assert!(r.is_err(), "interior '-' in md1 must be refused");
+        assert!(matches!(r, Err(ConvertError::Validate(_))));
+    }
+
+    #[test]
+    fn refuses_noncanonical_md1_interior_space() {
+        let r = convert("md1yqpqq xqq8xtwhw4xwn4qh");
+        assert!(r.is_err(), "interior space in md1 must be refused");
+        assert!(matches!(r, Err(ConvertError::Validate(_))));
+    }
+
+    #[test]
+    fn refuses_noncanonical_md1_interior_newline() {
+        // Interior newline is not leading/trailing, so trim() leaves it — convert
+        // path only (the bundle path line-splits before validating, per R0 N2).
+        let r = convert("md1yqpqq\nxqq8xtwhw4xwn4qh");
+        assert!(r.is_err(), "interior newline in md1 must be refused");
+        assert!(matches!(r, Err(ConvertError::Validate(_))));
+    }
+
+    #[test]
+    fn noncanonical_md1_error_names_char_and_byte_position() {
+        // '-' sits at byte offset 8 in "md1yqpqq-…" (md1yqpqq == 8 ASCII bytes).
+        let msg = format!("{}", convert("md1yqpqq-xqq8xtwhw4xwn4qh").unwrap_err());
+        assert!(msg.contains("'-'"), "should name the offending char: {msg}");
+        assert!(msg.contains("byte 8"), "should name the byte position: {msg}");
+    }
+
+    #[test]
+    fn clean_md1_trailing_newline_is_byte_identical() {
+        // Positive regression guard (A3 acceptance b): a trailing '\n' (typical
+        // stdin pipe) is trimmed; the refusal must NOT fire on post-trim-clean
+        // input, and the emitted bytes are identical with or without it.
+        let without = convert("md1yqpqqxqq8xtwhw4xwn4qh").unwrap();
+        let with = convert("md1yqpqqxqq8xtwhw4xwn4qh\n").unwrap();
+        assert_eq!(without, with, "trailing newline must not change output");
+    }
+
     #[test]
     fn converts_md1_to_ndef() {
         let bytes = convert(MD1_VALID).unwrap();
