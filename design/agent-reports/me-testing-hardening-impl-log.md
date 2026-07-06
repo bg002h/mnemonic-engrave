@@ -211,3 +211,24 @@ Touches: `crates/me-cli/src/validate.rs`, `crates/me-cli/src/lib.rs` (tests),
 
 Touches: `crates/me-cli/src/ndef.rs`, `crates/me-cli/tests/golden.rs`,
 `crates/me-cli/tests/vectors/{md1-max,mk1-short,mk1-chunk}.ndef` (new).
+
+---
+
+## Step 7 (B2) — differential decode through the real reader (done)
+
+- **cross_lang.rs rewritten into a table** driven by an `oracle_decode()` helper that runs
+  `firmware/ndef-roundtrip` (`go run .`, bytes on stdin — as today, now hermetic via A4):
+  - (1) all 4 convert-level goldens (md1-short, md1-max, mk1-short, mk1-chunk): `convert()` →
+    oracle → assert `decoded == input`.
+  - (2) NDEF-layer synthetic texts at lengths {1, 63, 64, 96, 111, 248, 249}: `encode_text_tlv`
+    → oracle → positional compare. Synthetic = varied ASCII pattern so truncation/reordering is
+    caught, not just length.
+  - Honors `ME_REQUIRE_GO` (same guard as Step 2). No golden asserted only via me's own
+    `decode_text_tlv`. 11 oracle invocations run in ~0.9s (go build cache).
+- **Perturb-then-revert liveness:** flipped the last emitted text byte in `ndef::text_record`
+  (`*b ^= 1`) → cross_lang went RED (`convert-golden round-trip mismatch`); reverted, suite
+  green.
+- Full suite green: cross_lang 1 (now 11 internal round-trips), rest unchanged (lib 50, cli 22,
+  golden 3, preview_cross_lang 1) → exit 0.
+
+Touches: `crates/me-cli/tests/cross_lang.rs`.
