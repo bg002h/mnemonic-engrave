@@ -53,9 +53,10 @@ impl std::fmt::Display for BundleError {
             ),
             // A1/F1: NEVER interpolate the raw input string (`s`) here — a
             // mangled-HRP ms1 (`msx1…`) would print its intact secret body to
-            // stderr. Mirror ConvertError: show only the underlying error `e`,
-            // whose own text is metadata-only (HRP prefix / single offending
-            // char + position / bit counts — verified against the codec sources).
+            // stderr. Mirror ConvertError: show only the underlying error `e`.
+            // Codec error text is metadata-only EXCEPT mk-codec's InvalidHrp
+            // (carries an input substring), which ValidateError's own Display
+            // redacts before it reaches here.
             BundleError::Classify(_, e) => write!(f, "cannot classify input: {e}"),
             BundleError::Validate(_, e) => write!(f, "invalid input string: {e}"),
             BundleError::Mk1SingleString(_) => {
@@ -359,6 +360,14 @@ mod tests {
             BundleError::Md1HeaderRead(
                 CANARY.into(),
                 md_codec::Error::ChunkHeaderChunkedFlagMissing,
+            ),
+            // Codec PASS-THROUGH surface (exec-review L1/L2): mk-codec's
+            // InvalidHrp carries an input substring — on the no-`1`-separator
+            // branch the ENTIRE lowercased input. Unreachable via
+            // classify-routed flow, but Display must redact it regardless.
+            BundleError::Validate(
+                CANARY.into(),
+                ValidateError::Mk(mk_codec::Error::InvalidHrp(CANARY.into())),
             ),
         ];
         for e in &variants {

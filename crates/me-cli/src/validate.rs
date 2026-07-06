@@ -28,6 +28,14 @@ impl std::fmt::Display for ValidateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ValidateError::Md(e) => write!(f, "invalid md1 string: {e}"),
+            // mk-codec's InvalidHrp variant carries an input substring — and on
+            // the no-`1`-separator branch (mk-codec bch.rs decode_string) the
+            // ENTIRE lowercased input. Unreachable here via the classify-routed
+            // flow, but never echo it (A1/F1 redaction invariant); every other
+            // mk-codec variant is metadata-only.
+            ValidateError::Mk(mk_codec::Error::InvalidHrp(_)) => {
+                write!(f, "invalid mk1 string: invalid or missing HRP")
+            }
             ValidateError::Mk(e) => write!(f, "invalid mk1 string: {e}"),
             ValidateError::MkCorrected(n) => write!(
                 f,

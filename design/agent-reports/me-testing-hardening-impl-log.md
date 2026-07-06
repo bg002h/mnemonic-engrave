@@ -334,3 +334,22 @@ Touches: `crates/me-cli/src/bundle.rs` (tests only).
 
 Steps 0–11 COMPLETE, all green. Branch left for the mandatory Step 12 adversarial execution
 review. No STOP conditions were hit at any step.
+
+## Fold: exec-review round 0 (L1/L2/N1) — controller inline fold, 2026-07-06
+
+Exec review verdict was GREEN (0C/0I) with 2 Low + 1 Nit; folded inline per the
+tight-implementation convention (no new implementer):
+
+- **L1+L2 (redaction gap in codec pass-through):** `mk_codec::Error::InvalidHrp(String)`
+  echoes an input substring — on the no-`1`-separator branch (mk-codec 0.4.1
+  bch.rs:668 `InvalidHrp(s_lower.clone())`) the ENTIRE lowercased input. Unreachable
+  via the classify-routed me flow, but the A1/F1 invariant must not depend on that.
+  TDD: extended the B8 canary test with a
+  `BundleError::Validate(_, ValidateError::Mk(InvalidHrp(CANARY)))` variant — RED
+  (`Display leaked the input body`) — then redacted at the `ValidateError::Mk` Display
+  arm (`invalid or missing HRP`, no payload) — GREEN. Also corrected the bundle.rs
+  Display comment that overclaimed "codec text is metadata-only (verified)".
+- **N1:** added `ndefroundtrip` (Go build artifact) to `.gitignore`.
+
+Note for the record: the earlier Step-3 log claim that mk-codec error Display is
+metadata-only was inaccurate for exactly this InvalidHrp variant (exec review L1).

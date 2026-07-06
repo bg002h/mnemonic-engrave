@@ -2,3 +2,6 @@
 **/*.rs.bk
 Cargo.lock.orig
 .DS_Store
+
+# Go build artifact (firmware/ndef-roundtrip)
+ndefroundtrip
