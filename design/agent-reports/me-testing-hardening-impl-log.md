@@ -119,3 +119,38 @@ Touches: `crates/me-cli/tests/cross_lang.rs`, `crates/me-cli/tests/preview_cross
   cli 20 (+2 leak), cross_lang 1, golden 1, preview_cross_lang 1 → all green, exit 0.
 
 Touches: `crates/me-cli/src/bundle.rs`, `crates/me-cli/tests/cli.rs`.
+
+---
+
+## Step 4 (A2) — codec bumps, fail-closed admission (done)
+
+- **Over-length fixture (captured BEFORE the bump):** scratch crate
+  `/scratch/code/shibboleth/me-impl-scratch/fixture-gen` pinned to `md-codec = "=0.36.0"`,
+  ran `md_codec::codex32::wrap_payload(&vec![0xA5u8; 51], 405)` (405 bits = 81 data symbols;
+  +13 checksum = 94 codex32 symbols, one past the 93-symbol regular-code cap). Result
+  (deterministic): `md15kj6tfd9…zfqq6yyhmu3j8` (97 chars, 94 symbols after `md1`). Generator
+  confirmed 0.36 `unwrap_string` ADMITS it (bit_count=405) — i.e. the F5 over-length bug.
+  Embedded as `OVERLEN_MD1` literal in `lib.rs` tests.
+- **Fail-first (on 0.36):** `refuses_overlength_md1` asserted `convert(OVERLEN_MD1).is_err()`
+  and FAILED for the right reason — `over-length (94-symbol) md1 must be refused` (0.36
+  admitted it).
+- **Bump:** `crates/me-cli/Cargo.toml` `md-codec = "0.40"` (caret; SPEC Open-Q4 keeps caret
+  ranges, no `=` pin), `mk-codec` left `"0.4"` (caret already permits 0.4.1).
+  `cargo update -p md-codec -p mk-codec` → md-codec 0.36.0→0.40.0, mk-codec 0.4.0→0.4.1
+  ("10 unchanged dependencies"; only the 2 codecs moved).
+- **STOP-condition check (two symptoms — NEITHER triggered):**
+  - (a) Goldens byte-identical: `md1-short.ndef` sha256 `b551af76…` and `bundle-md1-mk1.json`
+    sha256 `a728117687…` UNCHANGED before/after; `golden.rs::md1_short_matches_golden` and
+    `cli.rs::bundle_manifest_golden` both still pass.
+  - (b) No previously-passing mk1/md1 admission test newly failed. The mk-codec 0.4.0→0.4.1
+    "live risk" (a previously-valid fixture newly rejected) did NOT materialize — all mk1
+    fixtures (accepts_valid_mk1, parses_mk1_chunk_with_set_id, happy_path, multi_set,
+    reordered, cross_chunk_hash, dropped/duplicate chunk, md1_chunked_set) still green.
+- New test now PASSES on 0.40. The fail-closed path is `ConvertError::Validate(ValidateError::Md(
+  md_codec::Error::StringSymbolCountOutOfRange { symbols: 94, max: 93 }))` — Display:
+  `invalid md1 string: string has 94 symbols; the codex32 regular code caps a string at 93`
+  (assertion `contains("symbols") && contains("caps")` passed).
+- Full `cargo test` with go + `ME_REQUIRE_GO=1`: lib 43 (+1), cli 20, cross_lang 1, golden 1,
+  preview_cross_lang 1 → all green, exit 0.
+
+Touches: `crates/me-cli/Cargo.toml`, `Cargo.lock`, `crates/me-cli/src/lib.rs`.

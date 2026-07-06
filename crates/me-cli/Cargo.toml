@@ -19,7 +19,7 @@ name = "mnemonic_engrave"
 path = "src/lib.rs"
 
 [dependencies]
-md-codec = "0.36"
+md-codec = "0.40"
 mk-codec = "0.4"
 clap = { version = "4", features = ["derive"] }
 zeroize = "1.8"
