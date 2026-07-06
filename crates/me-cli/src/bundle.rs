@@ -555,6 +555,114 @@ mod tests {
         ));
     }
 
+    // ---- B6 (F17): md1 chunk-discriminator drift guards -------------------
+    //
+    // parse_line's md1 branch discriminates single vs chunked via bit 0 of the
+    // first 5-bit symbol (`symbols.first() & 0x01`), then reads a ChunkHeader.
+    // These fixtures pin every REACHABLE/OBSERVABLE parse_line arm plus the funds
+    // -relevant single-chunk-of-multichunk case; a direct codec-level test pins
+    // the ChunkHeaderChunkedFlagMissing arm (unreachable via parse_line, so a
+    // parse_line fixture for it would be vacuous — see plan-R0 I1).
+
+    /// A BCH-valid md1 whose first 5-bit symbol has the chunked flag SET (bit 0)
+    /// but a WRONG version nibble (0, not `WF_REDESIGN_VERSION`=4). parse_line's
+    /// probe therefore treats it as chunked and `ChunkHeader::read` rejects the
+    /// version → `BundleError::Md1WireVersion`. Built via the bumped codec's own
+    /// `wrap_payload` (hermetic; first symbol 0b00001).
+    fn md1_wireversion_fixture() -> String {
+        let mut payload = vec![0u8; 13];
+        payload[0] = 0x08; // top-5 payload bits = 00001 → version 0, chunked 1
+        md_codec::codex32::wrap_payload(&payload, 100).expect("wrap_payload")
+    }
+
+    #[test]
+    fn parse_line_md1_chunk_extracts_metadata() {
+        let chunks = chunked_md1_vector();
+        assert!(chunks.len() >= 2, "need a multi-chunk md1 vector");
+        match parse_line(&chunks[0]).unwrap() {
+            Parsed::Md1Chunk { total, index, .. } => {
+                assert!(total >= 2, "multi-chunk total");
+                assert_eq!(index, 0, "first chunk is index 0");
+            }
+            other => panic!("expected Md1Chunk, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn single_chunk_of_multichunk_md1_is_incomplete_not_lone_plate() {
+        // The funds-relevant case: one chunk of a known multi-chunk md1 must NOT
+        // be accepted as a lone Md1Single plate — parse_line sees a chunk, and
+        // run_bundle refuses the incomplete set.
+        let chunks = chunked_md1_vector();
+        assert!(chunks.len() >= 2);
+        assert!(
+            matches!(parse_line(&chunks[0]).unwrap(), Parsed::Md1Chunk { .. }),
+            "a chunk of a multi-chunk set must not parse as Md1Single"
+        );
+        assert!(matches!(
+            run_bundle(&chunks[0]),
+            Err(BundleError::SetIncompleteMd(..))
+        ));
+    }
+
+    #[test]
+    fn parse_line_md1_wrong_wire_version_rejected() {
+        let s = md1_wireversion_fixture();
+        assert!(matches!(
+            parse_line(&s),
+            Err(BundleError::Md1WireVersion(_))
+        ));
+    }
+
+    // Direct codec-level drift guard: pin the md-codec chunk discriminator the
+    // bundle probe relies on, independent of parse_line. (a) v4+chunked=1 parses;
+    // (b) v4+flag-clear → ChunkHeaderChunkedFlagMissing (the arm parse_line never
+    // reaches); (c) wrong-version+flag-clear → WireVersionMismatch FIRST (version
+    // check precedes the flag check); (d) the chunked flag is bit 0 of the first
+    // 5-bit symbol — the exact bit `parse_line` masks with `& 0x01`.
+    #[test]
+    fn md_codec_chunk_discriminator_behaviour_is_pinned() {
+        use md_codec::bitstream::{BitReader, BitWriter};
+        use md_codec::chunk::ChunkHeader;
+        use md_codec::Header;
+
+        // Full 37-bit chunk header wire: [version:4][chunked:1][set_id:20][count-1:6][index:6].
+        fn wire(version: u8, chunked: u64) -> Vec<u8> {
+            let mut w = BitWriter::new();
+            w.write_bits(u64::from(version & 0b1111), 4);
+            w.write_bits(chunked, 1);
+            w.write_bits(0, 20);
+            w.write_bits(0, 6);
+            w.write_bits(0, 6);
+            assert_eq!(w.bit_len(), 37);
+            w.into_bytes()
+        }
+
+        // (a) version=4, chunked=1 → Ok.
+        let ok = wire(Header::WF_REDESIGN_VERSION, 1);
+        let h = ChunkHeader::read(&mut BitReader::new(&ok)).expect("v4 + chunked=1 parses");
+        assert_eq!(h.version, Header::WF_REDESIGN_VERSION);
+
+        // (b) version=4, chunked=0 → ChunkHeaderChunkedFlagMissing.
+        let miss = wire(Header::WF_REDESIGN_VERSION, 0);
+        assert!(matches!(
+            ChunkHeader::read(&mut BitReader::new(&miss)),
+            Err(md_codec::Error::ChunkHeaderChunkedFlagMissing)
+        ));
+
+        // (c) version!=4, chunked=0 → WireVersionMismatch (version precedes flag).
+        let wrongver = wire(0, 0);
+        assert!(matches!(
+            ChunkHeader::read(&mut BitReader::new(&wrongver)),
+            Err(md_codec::Error::WireVersionMismatch { got: 0 })
+        ));
+
+        // (d) chunked flag = bit 0 of the first 5-bit symbol (version=4 → 0b0100x):
+        //     chunked=1 → 0b01001=9 (bit0 set); chunked=0 → 0b01000=8 (bit0 clear).
+        assert_eq!(BitReader::new(&ok).read_bits(5).unwrap() & 0x01, 1);
+        assert_eq!(BitReader::new(&miss).read_bits(5).unwrap() & 0x01, 0);
+    }
+
     // A 2-chunk mk1 set with chunk_set_id 0x12345 where index-1 chunk is from a
     // DIFFERENT KeyCard re-encoded at the same chunk_set_id → CrossChunkHashMismatch.
     // Built via the public encode API (mirrors mk-codec's pipeline perturbation tests).

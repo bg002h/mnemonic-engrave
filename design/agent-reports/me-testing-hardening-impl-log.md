@@ -269,3 +269,35 @@ Touches: `crates/me-cli/tests/cli.rs`.
 - go.sum unchanged (tmc2209 is inside the local-replace seedhammer.com module).
 
 Touches: `preview/params_test.go`.
+
+---
+
+## Step 10 (B6) — chunk-discriminator drift guards (done)
+
+- **Layout studied (md-codec 0.40 chunk.rs):** first 5-bit symbol MSB-first is
+  `[v3][v2][v1][v0][chunked]`; `ChunkHeader::read` reads 4-bit version (≠4 →
+  `WireVersionMismatch`), THEN the 1-bit chunked flag (clear → `ChunkHeaderChunkedFlagMissing`).
+  So the chunked flag == bit 0 of the symbol — exactly `parse_line`'s `& 0x01` probe.
+- **parse_line fixtures (reachable/observable arms):**
+  - `parse_line_md1_chunk_extracts_metadata` (Md1Chunk, via `chunked_md1_vector()`).
+  - `single_chunk_of_multichunk_md1_is_incomplete_not_lone_plate` (funds-relevant:
+    parse_line → Md1Chunk, run_bundle → `SetIncompleteMd`, NOT a lone accepted plate).
+  - `parse_line_md1_wrong_wire_version_rejected` (Md1WireVersion): fixture built in-test via the
+    bumped codec's `wrap_payload(&payload, 100)` with `payload[0]=0x08` → first symbol `0b00001`
+    (chunked flag set, version nibble 0). De-risked via scratch probe: unwrap OK,
+    first symbol=1 (bit0=1), `ChunkHeader::read` → `WireVersionMismatch{got:0}`.
+  - Md1Single already covered by the existing `parses_unchunked_md1_as_bch_only`.
+- **Direct codec-level drift guard** `md_codec_chunk_discriminator_behaviour_is_pinned`:
+  builds 37-bit chunk-header wires with `BitWriter` and pins ChunkHeader::read: (a) v4+chunked=1
+  → Ok; (b) v4+flag-clear → `ChunkHeaderChunkedFlagMissing` (the arm parse_line never reaches);
+  (c) wrong-version+flag-clear → `WireVersionMismatch` FIRST; (d) chunked flag == bit 0 of the
+  first symbol. This pins the `ChunkHeaderChunkedFlagMissing` behavior directly (a parse_line
+  fixture for it would be vacuous — plan-R0 I1). Plan-R0's "ChunkHeader::read byte-identical
+  0.36↔0.40" held: the fixture/guard needed no adaptation for the bump.
+- **Perturb-then-revert fail-first (flip a discriminator bit):** changed the parse_line probe
+  `sym & 0x01` → `sym & 0x02` → all three parse_line fixtures went RED
+  (Md1Chunk/Md1WireVersion/single-chunk misrouted to Md1Single); the direct codec-level test
+  correctly stayed green (it exercises ChunkHeader::read, not the probe). Reverted, suite green.
+- Full suite green: lib 54 (+4), cli 23, cross_lang 1, golden 3, preview_cross_lang 1 → exit 0.
+
+Touches: `crates/me-cli/src/bundle.rs` (tests only).
