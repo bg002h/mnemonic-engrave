@@ -251,3 +251,21 @@ Touches: `crates/me-cli/tests/cross_lang.rs`.
 - Full suite green: cli 23 (+1), lib 50, cross_lang 1, golden 3, preview_cross_lang 1 → exit 0.
 
 Touches: `crates/me-cli/tests/cli.rs`.
+
+---
+
+## Step 9 (B5) — device-constant drift guard (Go) (done)
+
+- **Host-compilability confirmed:** `go vet seedhammer.com/driver/tmc2209` from `preview/` →
+  VET_OK (the only tinygo-tagged file in that package is `uart.go`; `uart_pio.go` + the pio
+  `config.go` it imports are untagged and stdlib-only).
+- **Values:** `tmc2209.Microsteps == 1<<8 == 256`; `200/8*256 == 6400 == mm`;
+  `mm*3/10 == 1920 == strokeWidth`.
+- **params_test.go `TestDeviceConstantsMatchDriver`:** asserts `mm == 200/8*tmc2209.Microsteps`
+  and `strokeWidth == mm*3/10`, importing `seedhammer.com/driver/tmc2209` so a submodule
+  constant bump fails the build.
+- **Perturb-then-revert fail-first:** set `mm = 6401` in params.go → guard went RED
+  (`mm drift: mm=6401 but 200/8*tmc2209.Microsteps=6400`); reverted, `go test ./...` green.
+- go.sum unchanged (tmc2209 is inside the local-replace seedhammer.com module).
+
+Touches: `preview/params_test.go`.

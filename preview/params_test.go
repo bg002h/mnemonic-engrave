@@ -4,8 +4,22 @@ import (
 	"testing"
 
 	"seedhammer.com/bspline"
+	"seedhammer.com/driver/tmc2209"
 	"seedhammer.com/engrave"
 )
+
+// B5 (F12): the replicated SH2 device constants must track the SeedHammer
+// submodule's OWN driver, so a submodule constant bump (e.g. tmc2209.Microsteps)
+// fails this build instead of silently drifting the geometry golden. mm is
+// 200/8 full-steps-per-mm × Microsteps; strokeWidth is 0.3 mm.
+func TestDeviceConstantsMatchDriver(t *testing.T) {
+	if got, want := mm, 200/8*tmc2209.Microsteps; got != want {
+		t.Fatalf("mm drift: mm=%d but 200/8*tmc2209.Microsteps=%d (replicated params stale)", got, want)
+	}
+	if got, want := strokeWidth, mm*3/10; got != want {
+		t.Fatalf("strokeWidth drift: strokeWidth=%d but mm*3/10=%d", got, want)
+	}
+}
 
 // MD1_REF is a fixed reference string; its engraved geometry bbox is a stable
 // proxy for "params unchanged". Use the Phase A vector.
