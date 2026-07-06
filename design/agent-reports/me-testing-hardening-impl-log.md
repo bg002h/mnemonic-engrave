@@ -33,3 +33,25 @@ lands.
   Available upstream: `md-codec 0.40.0`, `mk-codec 0.4.1` (Step 4 bumps).
 
 Baseline recorded. Proceeding to Step 1.
+
+---
+
+## Step 1 (A4) — hermetic Go oracle (done)
+
+- **Fail-first:** copied the worktree tree (firmware/, third_party/, preview/) into a
+  scratch clone at `/scratch/code/shibboleth/me-impl-scratch/hermetic-clone/`, whose parent
+  lacks `seedhammer-ref-v1.4.2`. `go build ./...` in `firmware/ndef-roundtrip` failed for the
+  RIGHT reason:
+  `main.go:10:2: seedhammer.com@v0.0.0: replacement directory ../../../seedhammer-ref-v1.4.2 does not exist`
+- **Fix:** `firmware/ndef-roundtrip/go.mod` replace →
+  `../../third_party/seedhammer` (mirrors `preview/go.mod`). `go mod tidy` produced no
+  go.sum (only dep is the local seedhammer.com replace, pseudo-version v0.0.0, no checksums —
+  same as before the change; matches the pre-existing absence of go.sum in firmware/).
+- **Verify hermetic:** with the fixed go.mod, `go build ./...` in the scratch clone (ref path
+  still absent, submodule present at `third_party/`) → HERMETIC_BUILD_OK; the round-trip
+  decode of the md1-short NDEF via `go run .` returned `md1yqpqqxqq8xtwhw4xwn4qh` (submodule
+  reader ≡ old ref reader for this input).
+- Full `cargo test --locked` with go on PATH: 62 passed, `cross_lang.rs::rust_ndef_parses_in_seedhammer_go_reader`
+  now resolves through the submodule and passes.
+
+Touches: `firmware/ndef-roundtrip/go.mod`.
