@@ -55,3 +55,35 @@ Baseline recorded. Proceeding to Step 1.
   now resolves through the submodule and passes.
 
 Touches: `firmware/ndef-roundtrip/go.mod`.
+
+---
+
+## Step 2 (A5 + F3) — CI test gating (done)
+
+- **Fail-first (F3 vacuous pass):** with `go` absent from PATH and `ME_REQUIRE_GO=1`,
+  `cargo test --test cross_lang` currently PASSED (`rust_ndef_parses_in_seedhammer_go_reader ... ok`)
+  — the differential oracle silently no-oped. That is the bug.
+- **Fix (test code):** added a `go_required()` helper (`ME_REQUIRE_GO == "1"`) to BOTH skip
+  sites — `tests/cross_lang.rs` and `tests/preview_cross_lang.rs`. When the toolchain is
+  missing, `assert!(!go_required(), …)` now hard-fails instead of returning.
+  - (a) go absent + `ME_REQUIRE_GO=1` → both tests FAIL (panic, exit 101):
+    `ME_REQUIRE_GO=1 but \`go\` is not on PATH: …`.
+  - (b) go absent + var unset → skip note + pass (unchanged local behavior).
+  - (c) go present + `ME_REQUIRE_GO=1` → run for real + pass.
+- **Fix (CI):** added a `test` job to `.github/workflows/release.yml`:
+  `actions/checkout@v4` `submodules: true`, Rust (`dtolnay/rust-toolchain@master`) + Go
+  (`actions/setup-go@v5`) in the SAME job, `env: ME_REQUIRE_GO: '1'`; steps
+  `cargo test --locked`, `go test ./...` in `preview/`, `go build ./... && go test ./...` in
+  `firmware/ndef-roundtrip/`. Extended `on.push.branches: [master]` (R0 L2 trigger
+  reconciliation). Wired `assemble.needs: [test, go-build, rust-build]` so a red suite blocks
+  tag publish (F2).
+- Validated with **actionlint** (installed): "no findings".
+- **Branch-protection carry-forward (repo setting, NOT YAML — USER ACTION):** blocking a red
+  PR from *merging* needs a GitHub branch-protection rule marking `test` as a required status
+  check. The implementer cannot set this; must be flagged at handoff / in the PR description.
+  Without it, F2's "red suite can merge" is only half-closed (tag publish IS gated by `needs:`
+  regardless).
+- Full `cargo test --locked` with go on PATH + `ME_REQUIRE_GO=1`: 62 passed, exit 0.
+
+Touches: `crates/me-cli/tests/cross_lang.rs`, `crates/me-cli/tests/preview_cross_lang.rs`,
+`.github/workflows/release.yml`.

@@ -31,6 +31,13 @@ fn go_available() -> bool {
     StdCommand::new("go").arg("version").output().is_ok()
 }
 
+/// `true` iff `ME_REQUIRE_GO=1` — CI sets this so a missing Go toolchain is a
+/// HARD FAILURE (the real-sidecar round-trip must not silently no-op, F3) rather
+/// than a skip. Locally-unset behavior is unchanged (skip note + pass).
+fn go_required() -> bool {
+    std::env::var("ME_REQUIRE_GO").map(|v| v == "1").unwrap_or(false)
+}
+
 /// A unique scratch directory under the system temp dir.
 fn unique_dir(tag: &str) -> PathBuf {
     let d = std::env::temp_dir().join(format!(
@@ -80,6 +87,12 @@ fn build_real_sidecar(dir: &Path) {
 #[test]
 fn real_sidecar_renders_public_plates_only() {
     if !go_available() {
+        assert!(
+            !go_required(),
+            "ME_REQUIRE_GO=1 but `go` is not on PATH: the me-preview cross-language \
+             round-trip cannot run (install Go + init the seedhammer submodule, or unset \
+             ME_REQUIRE_GO)"
+        );
         eprintln!("skipping cross-language preview round-trip: `go` is not on PATH");
         return;
     }

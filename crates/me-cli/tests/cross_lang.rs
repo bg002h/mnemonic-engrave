@@ -2,13 +2,26 @@ use mnemonic_engrave::convert;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+/// `true` iff `ME_REQUIRE_GO=1` — CI sets this so a missing Go toolchain is a
+/// HARD FAILURE (the differential oracle must not silently no-op) rather than a
+/// skip (F3). Locally-unset behavior is unchanged (skip note + pass).
+fn go_required() -> bool {
+    std::env::var("ME_REQUIRE_GO").map(|v| v == "1").unwrap_or(false)
+}
+
 /// Cross-language anchor (spec §9): NDEF emitted by the converter, parsed by
 /// SeedHammer's own Go `nfc/ndef` reader, must round-trip to the exact input.
 /// Auto-skips when the Go toolchain is unavailable (e.g. CI without Go) so the
-/// suite stays green everywhere; runs for real wherever `go` is on PATH.
+/// suite stays green everywhere UNLESS `ME_REQUIRE_GO=1`, in which case a missing
+/// `go` fails hard; runs for real wherever `go` is on PATH.
 #[test]
 fn rust_ndef_parses_in_seedhammer_go_reader() {
     if Command::new("go").arg("version").output().is_err() {
+        assert!(
+            !go_required(),
+            "ME_REQUIRE_GO=1 but `go` is not on PATH: the cross-language NDEF oracle \
+             cannot run (install Go + init the seedhammer submodule, or unset ME_REQUIRE_GO)"
+        );
         eprintln!("skipping cross-language round-trip: `go` is not on PATH");
         return;
     }
