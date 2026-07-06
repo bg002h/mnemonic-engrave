@@ -232,3 +232,22 @@ Touches: `crates/me-cli/src/ndef.rs`, `crates/me-cli/tests/golden.rs`,
   golden 3, preview_cross_lang 1) → exit 0.
 
 Touches: `crates/me-cli/tests/cross_lang.rs`.
+
+---
+
+## Step 8 (B3) — ms1-refusal table (done)
+
+- **cli.rs `ms1_refusal_table`:** over {lowercase, UPPERCASE, mixed-case `Ms1`,
+  whitespace-padded, bad-checksum} ms1 — run BOTH `me --stdout` (convert) and `me bundle`;
+  plus ms1 at first/middle/last bundle line (surrounded by valid md1/mk1). Each asserts: exit 3
+  (RefusedSecret), stderr contains the `CODEX32` refusal hallmark, stderr NEVER contains the
+  secret body. "No decode of the ms payload" is asserted via the error TYPE — exit 3
+  (RefusedSecret, HRP-only pre-scan) vs exit 4 (a validate/decode error); the bad-checksum ms1
+  yielding exit 3 proves refusal precedes any BCH decode.
+- **Perturb-then-revert fail-first (additive coverage, per Constraints):** changed classify's
+  `"ms" => Ok(Format::Ms)` to return `UnknownHrp` → the table went RED
+  (`lowercase via ["--stdout"]: expected exit 3 … stderr=… unrecognized HRP 'ms'`); reverted,
+  suite green.
+- Full suite green: cli 23 (+1), lib 50, cross_lang 1, golden 3, preview_cross_lang 1 → exit 0.
+
+Touches: `crates/me-cli/tests/cli.rs`.

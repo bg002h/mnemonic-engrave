@@ -191,6 +191,84 @@ fn bundle_corrupted_mk1_does_not_leak_full_string() {
     );
 }
 
+// B3 (F16): ms1 must be refused across case-folding, whitespace padding, a bad
+// checksum (refusal is HRP-only — NO decode of the secret payload), and at every
+// bundle line position. Exit 3 / RefusedSecret on BOTH convert and bundle; the
+// secret body is NEVER echoed to stderr (regression insurance for the Step 3 A1
+// redaction). "No decode" is asserted via the error TYPE (exit 3 = RefusedSecret,
+// not exit 4 = a validate/decode error), not timing.
+#[test]
+fn ms1_refusal_table() {
+    fn run(args: &[&str], stdin: &str) -> (i32, String) {
+        let mut cmd = Command::cargo_bin("me").unwrap();
+        for a in args {
+            cmd.arg(a);
+        }
+        let assert = cmd.write_stdin(stdin.to_string()).assert();
+        let out = assert.get_output();
+        (
+            out.status.code().unwrap_or(-1),
+            String::from_utf8_lossy(&out.stderr).to_string(),
+        )
+    }
+
+    const BODY: &str = "0entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
+    let lc = format!("ms1{BODY}");
+    let uc = lc.to_uppercase();
+    let uc_body = BODY.to_uppercase();
+    let mixed = format!("Ms1{BODY}");
+    let padded = format!("  \t{lc}\n ");
+    // Bad checksum: flip the last body char. Still refused (HRP-only pre-scan),
+    // proving refusal precedes any BCH decode of the secret.
+    let mut bad = lc.clone();
+    let last = bad.pop().unwrap();
+    bad.push(if last == 'q' { 'p' } else { 'q' });
+    let bad_marker = bad["ms1".len()..].to_string();
+
+    // (label, input, secret marker that must NOT appear in stderr)
+    let single: Vec<(&str, String, String)> = vec![
+        ("lowercase", lc.clone(), BODY.to_string()),
+        ("uppercase", uc, uc_body),
+        ("mixed-case", mixed, BODY.to_string()),
+        ("whitespace-padded", padded, BODY.to_string()),
+        ("bad-checksum", bad, bad_marker),
+    ];
+
+    for (label, input, marker) in &single {
+        for mode in [["--stdout"].as_slice(), ["bundle"].as_slice()] {
+            let (code, stderr) = run(mode, input);
+            assert_eq!(
+                code, 3,
+                "{label} via {mode:?}: expected exit 3 (RefusedSecret); stderr={stderr}"
+            );
+            assert!(
+                stderr.contains("CODEX32"),
+                "{label} via {mode:?}: refusal message missing: {stderr}"
+            );
+            assert!(
+                !stderr.contains(marker.as_str()),
+                "{label} via {mode:?}: leaked secret body: {stderr}"
+            );
+        }
+    }
+
+    // ms1 at first / middle / last bundle line, surrounded by valid public lines.
+    let positions = [
+        ("first", format!("{lc}\n{MD1_VALID}\n{MK1_B}")),
+        ("middle", format!("{MD1_VALID}\n{lc}\n{MK1_B}")),
+        ("last", format!("{MD1_VALID}\n{MK1_B}\n{lc}")),
+    ];
+    for (label, input) in &positions {
+        let (code, stderr) = run(&["bundle"], input);
+        assert_eq!(code, 3, "bundle ms1 {label}: expected exit 3; stderr={stderr}");
+        assert!(stderr.contains("CODEX32"), "bundle ms1 {label}: {stderr}");
+        assert!(
+            !stderr.contains(BODY),
+            "bundle ms1 {label}: leaked secret body: {stderr}"
+        );
+    }
+}
+
 #[test]
 fn bundle_dropped_chunk_exit_4_no_stdout() {
     let assert = Command::cargo_bin("me")
