@@ -87,3 +87,35 @@ Touches: `firmware/ndef-roundtrip/go.mod`.
 
 Touches: `crates/me-cli/tests/cross_lang.rs`, `crates/me-cli/tests/preview_cross_lang.rs`,
 `.github/workflows/release.yml`.
+
+---
+
+## Step 3 (A1 + B8) — redact bundle error paths (done)
+
+- **External-fact verification (per CLAUDE.md):** confirmed against the extracted codec
+  sources (both current 0.36/0.4.0 AND bumped 0.40.0/0.4.1) that `md_codec::Error` and
+  `mk_codec::Error` Display are metadata-only. Scanned every `#[error("…")]`: they interpolate
+  at most numeric indices/counts, a hex id, an HRP prefix, or a SINGLE offending char
+  (`character {c:?} not in codex32 alphabet`, `invalid character {ch} at position {position}`).
+  The wrapped `{0}` String variants (`Codex32DecodeError`, `BchUncorrectable`,
+  `ChunkedHeaderMalformed`) are constructed from fixed descriptive text
+  (e.g. "BCH checksum verification failed", "total_chunks = 0"), NEVER the raw input. So
+  showing only the inner `e` (as ConvertError already does, and the audit accepted as
+  hardened) is safe.
+- **Fail-first (3 tests, all failed for the right reason — real leaks reproduced):**
+  - `bundle.rs` unit `no_bundle_error_display_leaks_the_input_body` (B8): Display of
+    `Classify`/`Validate`/`Md1HeaderRead` with a `CANARY_SECRET_BODY` input leaked it, e.g.
+    `cannot classify 'CANARY_SECRET_BODY': unrecognized HRP 'zz' …`.
+  - `cli.rs` `bundle_msx1_mangled_hrp_does_not_leak_secret_body`: `me bundle` on
+    `msx10entrs…cj9sxraq34v7f` printed
+    `me: cannot classify 'msx10entrs…cj9sxraq34v7f': …` — the intact codex32 secret body.
+  - `cli.rs` `bundle_corrupted_mk1_does_not_leak_full_string`: a 1-flip mk1 printed
+    `me: invalid string 'mk1qpz…q': mk1 string is not pristine …` — the full string.
+- **Fix:** `bundle.rs` Display arms `Classify`/`Validate`/`Md1HeaderRead` now drop the `{s}`
+  input interpolation and show only the underlying `e` (bounded metadata), mirroring
+  ConvertError. `Mk1SingleString`/`Md1WireVersion` already redacted (`_`); `SetIncomplete*`
+  carry a bounded `fmt_chunk_set_id` (not raw input) and are left as-is.
+- All 3 tests now pass. Full `cargo test` with go + `ME_REQUIRE_GO=1`: lib 42 (+1 B8),
+  cli 20 (+2 leak), cross_lang 1, golden 1, preview_cross_lang 1 → all green, exit 0.
+
+Touches: `crates/me-cli/src/bundle.rs`, `crates/me-cli/tests/cli.rs`.

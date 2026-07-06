@@ -113,6 +113,51 @@ fn bundle_ms1_refused_exit_3() {
         .stderr(predicates::str::contains("CODEX32"));
 }
 
+// A1/F1: an ms1 secret with a 1-typo HRP (`msx1…`) dodges the exact-HRP ms1
+// refusal (classified as an unknown HRP) — the error MUST NOT echo the intact
+// codex32 secret body to stderr (shell scrollback / 2>logfile / CI logs).
+#[test]
+fn bundle_msx1_mangled_hrp_does_not_leak_secret_body() {
+    const MSX1: &str = "msx10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
+    // Everything after the mangled `msx1` HRP is the intact secret codex32 body.
+    const SECRET_BODY: &str = "0entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
+    let assert = Command::cargo_bin("me")
+        .unwrap()
+        .arg("bundle")
+        .write_stdin(MSX1)
+        .assert()
+        .code(4); // classify failure → invalid/integrity exit
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+    assert!(
+        !stderr.contains(SECRET_BODY),
+        "leaked ms1 secret body to stderr: {stderr}"
+    );
+    assert!(
+        !stderr.contains(MSX1),
+        "leaked full mangled input line to stderr: {stderr}"
+    );
+}
+
+// A1/F1: a corrupted (non-pristine) mk1 must not have its full string echoed to
+// stderr on the bundle error path (the convert path was hardened; bundle regressed).
+#[test]
+fn bundle_corrupted_mk1_does_not_leak_full_string() {
+    let mut bad = MK1_B.to_string();
+    let last = bad.pop().unwrap();
+    bad.push(if last == 'q' { 'p' } else { 'q' });
+    let assert = Command::cargo_bin("me")
+        .unwrap()
+        .arg("bundle")
+        .write_stdin(bad.clone())
+        .assert()
+        .code(4);
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+    assert!(
+        !stderr.contains(&bad),
+        "leaked corrupted mk1 full string to stderr: {stderr}"
+    );
+}
+
 #[test]
 fn bundle_dropped_chunk_exit_4_no_stdout() {
     let assert = Command::cargo_bin("me")

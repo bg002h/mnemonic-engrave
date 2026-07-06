@@ -51,13 +51,18 @@ impl std::fmt::Display for BundleError {
                 "refusing to process ms1 over this tool: ms1 is secret seed entropy — \
                  enter it by hand on the device (New > Input Seed > CODEX32), never via NFC/this tool"
             ),
-            BundleError::Classify(s, e) => write!(f, "cannot classify '{s}': {e}"),
-            BundleError::Validate(s, e) => write!(f, "invalid string '{s}': {e}"),
+            // A1/F1: NEVER interpolate the raw input string (`s`) here — a
+            // mangled-HRP ms1 (`msx1…`) would print its intact secret body to
+            // stderr. Mirror ConvertError: show only the underlying error `e`,
+            // whose own text is metadata-only (HRP prefix / single offending
+            // char + position / bit counts — verified against the codec sources).
+            BundleError::Classify(_, e) => write!(f, "cannot classify input: {e}"),
+            BundleError::Validate(_, e) => write!(f, "invalid input string: {e}"),
             BundleError::Mk1SingleString(_) => {
                 write!(f, "mk1 SingleString header: unsupported for bundle (no chunk_set_id)")
             }
             BundleError::Md1WireVersion(_) => write!(f, "unsupported md1 wire version"),
-            BundleError::Md1HeaderRead(s, e) => write!(f, "cannot read md1 chunk header for '{s}': {e}"),
+            BundleError::Md1HeaderRead(_, e) => write!(f, "cannot read md1 chunk header: {e}"),
             BundleError::SetIncompleteMk(id, e) => {
                 write!(f, "mk1 set {id} is incomplete/inconsistent: {e}")
             }
@@ -336,6 +341,34 @@ mod tests {
     const MK1_D: &str =
         "mk1qpydzkppfdkdzdssxt9fh54wh8vsp2jdghv74kq2e9prxaxy2xnj2ng8vm68nf54c0vrdlfrgjzpd";
     const MS1: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
+
+    // B8 (F1): every BundleError arm that carries the raw INPUT string must
+    // redact it in Display (bounded metadata only), mirroring ConvertError. We
+    // inject a marker where the raw input would go and assert Display never
+    // echoes it. `SetIncompleteMk`/`SetIncompleteMd` are intentionally excluded:
+    // their first field is a tool-derived `fmt_chunk_set_id(id)` (bounded hex
+    // metadata), never the raw input, and Display legitimately shows it.
+    #[test]
+    fn no_bundle_error_display_leaks_the_input_body() {
+        const CANARY: &str = "CANARY_SECRET_BODY";
+        let variants: Vec<BundleError> = vec![
+            BundleError::Classify(CANARY.into(), ClassifyError::UnknownHrp("zz".into())),
+            BundleError::Validate(CANARY.into(), ValidateError::MkCorrected(2)),
+            BundleError::Mk1SingleString(CANARY.into()),
+            BundleError::Md1WireVersion(CANARY.into()),
+            BundleError::Md1HeaderRead(
+                CANARY.into(),
+                md_codec::Error::ChunkHeaderChunkedFlagMissing,
+            ),
+        ];
+        for e in &variants {
+            let shown = format!("{e}");
+            assert!(
+                !shown.contains(CANARY),
+                "BundleError Display leaked the input body: {shown:?}"
+            );
+        }
+    }
 
     #[test]
     fn exit_codes_match_spec() {
