@@ -267,6 +267,35 @@ fn wire_previews(
         return Some(EXIT_USAGE);
     }
 
+    // Fail-closed (F8): refuse a dir that already holds foreign `plate-*` artifacts
+    // (e.g. higher-index plates from a prior run) so they can't mix into this
+    // manifest. We refuse rather than delete — never clobber a user file that
+    // happens to match. Scanned once, here, before any render; the loop's own
+    // writes below are not re-scanned.
+    match std::fs::read_dir(dir) {
+        Ok(entries) => {
+            for entry in entries.flatten() {
+                if let Some(name) = entry.file_name().to_str() {
+                    if is_plate_artifact(name) {
+                        eprintln!(
+                            "me: preview directory {} already contains plate artifacts \
+                             (e.g. {name}); use an empty/clean directory",
+                            dir.display()
+                        );
+                        return Some(EXIT_USAGE);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "me: cannot scan preview directory {}: {e}",
+                dir.display()
+            );
+            return Some(EXIT_USAGE);
+        }
+    }
+
     // Render each PUBLIC plate; ms1 is never rendered (no secret leaves `me`).
     for plate in manifest.plates.iter_mut() {
         if plate.kind == PlateKind::Ms1 {
@@ -293,6 +322,13 @@ fn wire_previews(
         }
     }
     None
+}
+
+/// True if `name` is a preview plate artifact this tool writes: a `plate-` prefix
+/// AND a `.svg`/`.png` extension. Used by the F8 dirty-dir scan. Fail-closed: it
+/// must not over-match unrelated files (`notes.txt`, `plate.txt`, `plateau.svg`).
+fn is_plate_artifact(name: &str) -> bool {
+    name.starts_with("plate-") && (name.ends_with(".svg") || name.ends_with(".png"))
 }
 
 /// Write `bytes` to `path`, creating/truncating it with owner-only permissions.
@@ -346,4 +382,23 @@ fn base64_encode(data: &[u8]) -> String {
         });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_plate_artifact;
+
+    // A1/F8: is_plate_artifact must match the tool's own plate names and the
+    // `plate-.svg` edge (a plate-artifact form), but never over-match near-misses.
+    #[test]
+    fn is_plate_artifact_classifies_near_miss_set() {
+        // Matches (a plate artifact this tool writes, or the accepted edge form).
+        assert!(is_plate_artifact("plate-2.svg"));
+        assert!(is_plate_artifact("plate-1.png"));
+        assert!(is_plate_artifact("plate-.svg")); // edge: accept — it IS the form.
+        // Near-misses that must NOT match.
+        assert!(!is_plate_artifact("notes.txt")); // no prefix, no ext.
+        assert!(!is_plate_artifact("plate.txt")); // no `plate-`, wrong ext.
+        assert!(!is_plate_artifact("plateau.svg")); // no `-` after `plate`.
+    }
 }

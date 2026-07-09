@@ -483,6 +483,46 @@ mod preview {
         fs::remove_dir_all(&outdir).ok();
     }
 
+    // A1/F8: rendering into a dir that already holds a foreign `plate-*` artifact
+    // (e.g. a higher-index plate from a prior run) must refuse fail-closed with
+    // exit 2, render nothing, and never delete the pre-existing file. Version is
+    // matched so control reaches the dirty-dir scan past the locate/version gates.
+    #[test]
+    fn dirty_preview_dir_refused_exit_2() {
+        let bindir = unique_dir("dirty-bin");
+        write_fake(&bindir, CRATE_VERSION);
+        let outdir = unique_dir("dirty-out");
+        // A stale plate from a "prior run" with more plates than this one.
+        fs::write(outdir.join("plate-9.svg"), "stale").unwrap();
+
+        let assert = Command::cargo_bin("me")
+            .unwrap()
+            .env("PATH", &bindir)
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .write_stdin(input())
+            .assert()
+            .code(2);
+        let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+        assert!(
+            stderr.contains(&outdir.display().to_string()),
+            "refusal must name the dir: {stderr}"
+        );
+        // No render happened (plate-1 not written) and the stale file survives.
+        assert!(
+            !outdir.join("plate-1.svg").is_file(),
+            "must not render into a dirty dir"
+        );
+        assert!(
+            outdir.join("plate-9.svg").is_file(),
+            "must not delete the pre-existing foreign file"
+        );
+
+        fs::remove_dir_all(&bindir).ok();
+        fs::remove_dir_all(&outdir).ok();
+    }
+
     #[test]
     fn mismatched_version_exit_2() {
         let bindir = unique_dir("mismatch-bin");

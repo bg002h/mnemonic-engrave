@@ -43,3 +43,27 @@ Scratch target dir (outside the worktree): `/scratch/code/shibboleth/me-cycleA-s
 0 skips. `cargo clippy --all-targets -- -D warnings` clean.
 
 ---
+
+## Step A1 (F8) — refuse a preview dir containing foreign `plate-*` artifacts
+
+**Tests written first (RED):**
+- Rust integration `cli.rs::preview::dirty_preview_dir_refused_exit_2` — pre-seeds
+  `plate-9.svg` in the outdir, version-matched fake, expects exit 2 + message names the
+  dir + no `plate-1.svg` rendered + stale file survives. Failure line (today):
+  `Unexpected return code, failed var == 2 … code=0` (renders into the dirty dir).
+- Rust unit `main.rs::tests::is_plate_artifact_classifies_near_miss_set` — red by
+  non-existence (`is_plate_artifact` undefined).
+
+**Change (`crates/me-cli/src/main.rs`):**
+- New pure helper `is_plate_artifact(name) -> bool` = `plate-` prefix AND `.svg`/`.png`
+  suffix. Classifies the R0 near-miss set: `plate-2.svg`/`plate-1.png`/`plate-.svg` → true;
+  `notes.txt`/`plate.txt`/`plateau.svg` → false.
+- `wire_previews`: after the `dir.is_dir()` gate and BEFORE the render loop, `read_dir`
+  the target; if any entry name `is_plate_artifact`, refuse with `EXIT_USAGE` (2), naming
+  the dir — never deletes. A `read_dir` error also refuses (EXIT_USAGE). Scanned once;
+  the loop's own writes are not re-scanned (no self-collision).
+
+**Final counts after A1:** Go ok. Rust = 87 passed (lib 54 + main 1 + cli 27 + cross_lang 1
++ golden 3 + preview_cross_lang 1), 0 skips. Clippy clean.
+
+---
