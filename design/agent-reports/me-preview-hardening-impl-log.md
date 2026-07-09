@@ -114,3 +114,37 @@ begins `<svg` at byte 0); `matched_version_renders_and_sets_preview_exit_0` /
 0 skips. `cargo clippy --all-targets -- -D warnings` clean.
 
 ---
+
+## Final verification (whole diff)
+
+- `ME_REQUIRE_GO=1 cargo test --locked` (worktree root) → **90 passed, 0 failed, 0 skips**
+  (lib 56, main 1, cli 28, cross_lang 1, golden 3, preview_cross_lang 1). Baseline was 82;
+  +8 net new (A3 +3 Rust, A1 +2 Rust, A2 +3 Rust; 3 existing tests migrated in place).
+- `go test -count=1 ./...` in `preview/` → ok (includes the new `TestWriteOutPermIsOwnerOnly`).
+- `cargo clippy --all-targets -- -D warnings` → clean.
+
+**Manual e2e** (real `me` + real version-matched `me-preview 0.3.0` built with
+`-ldflags -X main.version=0.3.0`, on `md1yqpqqxqq8xtwhw4xwn4qh` + MK1_A + MK1_B):
+1. Fresh-dir `me bundle --preview <dir> --manifest <dir>/manifest.json` → **exit 0**;
+   `plate-1/2/3.svg` + `manifest.json` all written at **mode 600** (`-rw-------`).
+2. Re-run into the now-dirty dir → **exit 2**, refusal:
+   `me: preview directory <dir> already contains plate artifacts (e.g. plate-1.svg);
+   use an empty/clean directory`. No plate overwritten.
+3. `me --out wallet.ndef` (convert path) → exit 0, NDEF file at **mode 600**.
+
+## Notes for the post-impl reviewer
+
+- **A2 signature gate is format-specific** (keyed on `render_plate`'s `png` bool), per R0 N2.
+  A leading UTF-8 BOM before `<?xml`/`<svg` would false-reject, but the pinned sidecar emits
+  none (`render_svg.go` writes `<svg` at byte 0); documented in a code comment. Not a defect
+  for the pinned submodule.
+- **A3 mode binds on CREATE only** (R0 L3): overwriting a pre-existing world-readable
+  NDEF/manifest keeps its old mode. Accepted residual, documented on `write_private`.
+- `write_private` uses `OpenOptions .write.create.truncate` + `#[cfg(unix)] .mode(0o600)`;
+  non-unix compiles the same options without `.mode` (cfg-guarded no-op — R0 OQ4). Only
+  Unix was exercised here.
+- The I2 overwrite-shrink guard passes today with `fs::write` too (that already truncates);
+  its teeth were verified out-of-band by removing `.truncate(true)` (test then fails at the
+  byte-identity assertion) and restoring.
+- Go `writeOut` perm test asserts on `writeOut` directly (not the shell-fake Rust e2e),
+  per R0 L2.
