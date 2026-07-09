@@ -125,7 +125,10 @@ func writeOut(path string, payload []byte, stdout io.Writer) error {
 		_, err := stdout.Write(payload)
 		return err
 	}
-	return os.WriteFile(path, payload, 0o644)
+	// F10: previews depict md1/mk1 material — write owner-only so at-rest copies
+	// are not world/group-readable on a multi-user host. os.WriteFile truncates.
+	// (Perm bits are near-inert on Windows, matching the Rust cfg-guarded side.)
+	return os.WriteFile(path, payload, 0o600)
 }
 
 func trimTrailingNewline(s string) string {

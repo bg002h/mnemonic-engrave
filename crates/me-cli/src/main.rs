@@ -137,7 +137,7 @@ fn run() -> i32 {
 
     // Emit per the selected output mode. Human guidance -> stderr only.
     if let Some(path) = &cli.out {
-        if let Err(e) = std::fs::write(path, &bytes) {
+        if let Err(e) = write_private(path, &bytes) {
             eprintln!("me: cannot write {}: {e}", path.display());
             return EXIT_USAGE;
         }
@@ -202,7 +202,7 @@ fn run_bundle_cli(
         }
     };
     if let Some(path) = manifest_path {
-        if let Err(e) = std::fs::write(path, json.as_bytes()) {
+        if let Err(e) = write_private(path, json.as_bytes()) {
             eprintln!("me: cannot write {}: {e}", path.display());
             return EXIT_USAGE;
         }
@@ -293,6 +293,32 @@ fn wire_previews(
         }
     }
     None
+}
+
+/// Write `bytes` to `path`, creating/truncating it with owner-only permissions.
+///
+/// F10 (D5-2): NDEF and manifest artifacts embed/depict md1/mk1 material, so on a
+/// multi-user host their at-rest copies must not be world/group-readable. Under
+/// Unix we create the file at mode `0o600`; on other platforms we fall back to the
+/// same create+truncate semantics without a mode (mode bits differ there — the
+/// threat model is POSIX). `.truncate(true)` is load-bearing: it preserves
+/// `std::fs::write`'s behavior so a shrinking overwrite (a smaller manifest over a
+/// larger one) can't leave trailing stale bytes → invalid JSON.
+///
+/// Note: `0o600` binds on CREATE. Overwriting a pre-existing world-readable file
+/// keeps its old mode — accepted residual (NDEF/manifest targets are user-named;
+/// preview targets are forced-fresh by the dirty-dir refusal).
+fn write_private(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::fs::OpenOptions;
+    let mut opts = OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    let mut f = opts.open(path)?;
+    f.write_all(bytes)
 }
 
 /// Minimal standard base64 (no padding-free shortcuts); avoids a dep for one use.

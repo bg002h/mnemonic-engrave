@@ -585,3 +585,119 @@ mod preview {
         fs::remove_dir_all(&bindir).ok();
     }
 }
+
+// ---------------------------------------------------------------------------
+// A3 (F10): restrictive permissions on written artifacts, plus the I2
+// truncate-semantics regression guard. Unix-only (mode bits are POSIX; on
+// Windows the write path is a cfg-guarded no-op).
+// ---------------------------------------------------------------------------
+
+#[cfg(unix)]
+mod perms {
+    use super::*;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::PathBuf;
+
+    fn unique_dir(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!(
+            "me-perms-{tag}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    // After `me --out f.ndef`, the NDEF file must be owner-only (no group/other).
+    #[test]
+    fn ndef_out_file_is_owner_only() {
+        let dir = unique_dir("ndef");
+        let out = dir.join("wallet.ndef");
+        Command::cargo_bin("me")
+            .unwrap()
+            .arg("--out")
+            .arg(&out)
+            .write_stdin(MD1_VALID)
+            .assert()
+            .success();
+        let mode = fs::metadata(&out).unwrap().permissions().mode();
+        assert_eq!(mode & 0o077, 0, "NDEF --out must be owner-only, got {mode:o}");
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // After `me bundle --manifest m.json`, the manifest must be owner-only.
+    #[test]
+    fn manifest_file_is_owner_only() {
+        let dir = unique_dir("manifest");
+        let out = dir.join("m.json");
+        Command::cargo_bin("me")
+            .unwrap()
+            .arg("bundle")
+            .arg("--manifest")
+            .arg(&out)
+            .write_stdin(format!("{MD1_VALID}\n{MK1_A}\n{MK1_B}\n"))
+            .assert()
+            .success();
+        let mode = fs::metadata(&out).unwrap().permissions().mode();
+        assert_eq!(mode & 0o077, 0, "manifest must be owner-only, got {mode:o}");
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // I2 regression guard: overwriting a large manifest with a smaller one to the
+    // same path must leave no trailing stale bytes (write_private preserves
+    // fs::write's truncate). Assert byte-identity with a fresh write of the same
+    // small bundle, and that the result is still valid JSON.
+    #[test]
+    fn manifest_overwrite_shrink_no_trailing_bytes() {
+        let dir = unique_dir("shrink");
+        let path = dir.join("m.json");
+        // Large: md1 + 2 mk1 chunks -> 4 plates.
+        Command::cargo_bin("me")
+            .unwrap()
+            .arg("bundle")
+            .arg("--manifest")
+            .arg(&path)
+            .write_stdin(format!("{MD1_VALID}\n{MK1_A}\n{MK1_B}\n"))
+            .assert()
+            .success();
+        let large_len = fs::metadata(&path).unwrap().len();
+        // Smaller, overwritten onto the same path: md1 alone -> md1 + ms1 reminder.
+        Command::cargo_bin("me")
+            .unwrap()
+            .arg("bundle")
+            .arg("--manifest")
+            .arg(&path)
+            .write_stdin(MD1_VALID)
+            .assert()
+            .success();
+        let overwritten = fs::read(&path).unwrap();
+        // Fresh write of the same small bundle for a byte-for-byte oracle.
+        let fresh = dir.join("fresh.json");
+        Command::cargo_bin("me")
+            .unwrap()
+            .arg("bundle")
+            .arg("--manifest")
+            .arg(&fresh)
+            .write_stdin(MD1_VALID)
+            .assert()
+            .success();
+        let fresh_bytes = fs::read(&fresh).unwrap();
+        assert!(
+            (overwritten.len() as u64) < large_len,
+            "small manifest should be shorter than the large one it overwrote \
+             (small={}, large={large_len})",
+            overwritten.len()
+        );
+        assert_eq!(
+            overwritten, fresh_bytes,
+            "overwrite left trailing stale bytes (missing truncate)"
+        );
+        serde_json::from_slice::<serde_json::Value>(&overwritten)
+            .expect("overwritten manifest must be valid JSON (no trailing bytes)");
+        fs::remove_dir_all(&dir).ok();
+    }
+}
