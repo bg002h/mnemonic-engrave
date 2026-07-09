@@ -67,3 +67,50 @@ Scratch target dir (outside the worktree): `/scratch/code/shibboleth/me-cycleA-s
 + golden 3 + preview_cross_lang 1), 0 skips. Clippy clean.
 
 ---
+
+## Step A2 (F9) — validate sidecar output before recording a preview
+
+**Tests written first (RED — validation not yet implemented, render_plate still Ok):**
+- `preview.rs::tests::render_plate_rejects_empty_output` — fake exits 0 writing a 0-byte
+  `--out`; expects `EmptyOutput`. Failure: `.unwrap_err()` panic at `preview.rs:393`
+  (got Ok).
+- `preview.rs::tests::render_plate_rejects_garbage_output` — fake writes `garbage`;
+  expects `EmptyOutput`. Failure: `.unwrap_err()` panic at `preview.rs:409` (got Ok).
+- `cli.rs::preview::empty_sidecar_output_exit_4` — real CLI, fake writes 0-byte out;
+  expects exit 4. Failure: `Unexpected return code, failed var == 4 … code=0`.
+
+**Change:**
+- `preview.rs`: new `PreviewError::EmptyOutput { path, reason }` variant + its exhaustive
+  `Display` arm. New `validate_render_output(out_path, png)` called after the
+  `status.success()` check in `render_plate`: `metadata` must show a non-empty regular
+  file; then a **bounded 512-byte prefix** read (`File::read` into a fixed `[u8; 512]`)
+  must carry the format signature — PNG magic `89 50 4E 47 0D 0A 1A 0A` for png, or (svg)
+  `<svg`/`<?xml` after trimming leading ASCII whitespace (`trim_leading_ascii_ws`). Added
+  `Read` to the `std::io` import. The check is **format-specific** (keyed on `render_plate`'s
+  `png` bool — R0 N2's intended reading).
+- `main.rs` `wire_previews` (R0 L1): added `PreviewError::EmptyOutput { .. } => EXIT_INVALID`
+  arm so the new error maps to exit 4, not the default `_ => EXIT_USAGE` (2).
+
+**Mandatory I1 existing-test migration (part of A2, keeps the suite green):**
+- `preview.rs::write_fake_sidecar`: `cat > "$out"` (raw echo) → parse `--format`, drain
+  stdin to `/dev/null`, write `<svg/>` (svg) or `printf '\211PNG\r\n\032\n'` (png = the
+  exact 8-byte PNG magic).
+- `preview.rs::render_plate_writes_file_and_returns_path`: dropped the
+  `body == raw_string` assertion (inherently incompatible with signature validation);
+  now asserts path returned + file written + non-empty + `starts_with("<svg")`.
+- `preview.rs::render_plate_png_uses_png_extension`: unchanged body (extension-only);
+  now also clears validation because the migrated fake writes PNG magic.
+- `cli.rs::write_fake`: same format-aware migration so the `--png` run
+  (`png_flag_renders_png`) writes PNG magic instead of `<svg/>` → clears validation.
+
+**Independent-sweep confirmation:** the real cross-lang test
+`preview_cross_lang.rs::real_sidecar_renders_public_plates_only` stays green (real SVG
+begins `<svg` at byte 0); `matched_version_renders_and_sets_preview_exit_0` /
+`no_preview_flag_*` stay green (migrated fake still writes `<svg/>` for svg). Exactly the
+3 R0-named tests were migrated; no 4th broke.
+
+**Final counts after A2:** Go `go test ./...` ok. Rust `ME_REQUIRE_GO=1 cargo test --locked`
+= 90 passed (lib 56 + main 1 + cli 28 + cross_lang 1 + golden 3 + preview_cross_lang 1),
+0 skips. `cargo clippy --all-targets -- -D warnings` clean.
+
+---

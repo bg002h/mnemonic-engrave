@@ -316,6 +316,10 @@ fn wire_previews(
                 // (couldn't run the sidecar) is an environment/usage error → exit 2.
                 return Some(match e {
                     preview::PreviewError::Render { .. } => EXIT_INVALID,
+                    // A render that produced no usable artifact (empty/garbage
+                    // output) is an invalid outcome, same class as a render
+                    // failure → exit 4 (the default `_` would map it to 2).
+                    preview::PreviewError::EmptyOutput { .. } => EXIT_INVALID,
                     _ => EXIT_USAGE,
                 });
             }

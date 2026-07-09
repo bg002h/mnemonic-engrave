@@ -4,7 +4,7 @@
 //! here — this module only locates the binary, confirms it matches our version,
 //! and shells out per plate.
 
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -19,6 +19,9 @@ pub enum PreviewError {
     Spawn(io::Error),
     /// The sidecar ran but exited non-zero (e.g. a string that fits no plate).
     Render { code: Option<i32>, stderr: String },
+    /// The sidecar exited 0 but the `--out` file is missing, empty, or lacks the
+    /// expected SVG/PNG signature — i.e. it produced no usable render (F9).
+    EmptyOutput { path: String, reason: String },
     /// The sidecar's `--version` output could not be parsed.
     VersionParse(String),
 }
@@ -32,6 +35,9 @@ impl std::fmt::Display for PreviewError {
                     .map(|c| c.to_string())
                     .unwrap_or_else(|| "signal".into());
                 write!(f, "me-preview render failed (exit {c}): {}", stderr.trim())
+            }
+            PreviewError::EmptyOutput { path, reason } => {
+                write!(f, "me-preview produced no usable render at {path}: {reason}")
             }
             PreviewError::VersionParse(s) => {
                 write!(f, "cannot parse me-preview --version output: {s:?}")
@@ -168,7 +174,65 @@ pub fn render_plate(
         });
     }
 
+    // F9: exit 0 is necessary but not sufficient — a sidecar that wrote nothing or
+    // garbage would otherwise yield a "recorded-valid" preview. Confirm the --out
+    // file is a non-empty regular file whose leading bytes carry the format
+    // signature (bounded prefix read — never the whole ~150 KB render).
+    validate_render_output(&out_path, png)?;
+
     Ok(out_path.to_string_lossy().into_owned())
+}
+
+/// The SVG/PNG signature gate for `render_plate` (F9). Errs with `EmptyOutput` if
+/// `out_path` is missing, empty, not a regular file, or lacks the expected
+/// signature for the requested format. Reads only a bounded 512-byte prefix into
+/// a fixed buffer.
+fn validate_render_output(out_path: &Path, png: bool) -> Result<(), PreviewError> {
+    let empty = |reason: String| PreviewError::EmptyOutput {
+        path: out_path.to_string_lossy().into_owned(),
+        reason,
+    };
+    let meta =
+        std::fs::metadata(out_path).map_err(|e| empty(format!("cannot stat output: {e}")))?;
+    if !meta.is_file() {
+        return Err(empty("output is not a regular file".into()));
+    }
+    if meta.len() == 0 {
+        return Err(empty("output is empty".into()));
+    }
+    let mut buf = [0u8; 512];
+    let n = {
+        let mut f = std::fs::File::open(out_path)
+            .map_err(|e| empty(format!("cannot reopen output: {e}")))?;
+        f.read(&mut buf)
+            .map_err(|e| empty(format!("cannot read output: {e}")))?
+    };
+    let prefix = &buf[..n];
+    let ok = if png {
+        // PNG magic: 89 50 4E 47 0D 0A 1A 0A.
+        prefix.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    } else {
+        // SVG: after trimming leading ASCII whitespace, begins with `<svg` or the
+        // XML prolog `<?xml`. (A leading UTF-8 BOM would defeat this, but the
+        // pinned sidecar emits none — render_svg.go writes `<svg` at byte 0.)
+        let t = trim_leading_ascii_ws(prefix);
+        t.starts_with(b"<svg") || t.starts_with(b"<?xml")
+    };
+    if ok {
+        Ok(())
+    } else {
+        let fmt = if png { "png" } else { "svg" };
+        Err(empty(format!("output is not a valid {fmt} render")))
+    }
+}
+
+/// Trim leading ASCII whitespace from a byte slice (no allocation).
+fn trim_leading_ascii_ws(b: &[u8]) -> &[u8] {
+    let mut i = 0;
+    while i < b.len() && b[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    &b[i..]
 }
 
 #[cfg(test)]
@@ -227,7 +291,52 @@ mod tests {
     /// Build a tiny executable shell script that mimics the sidecar's
     /// `--version` and `render` contract, placed at `dir/me-preview`.
     /// `version_line` is echoed verbatim for `--version`.
+    ///
+    /// `render` drains stdin then writes a format-appropriate signature stub to
+    /// `--out` — `<svg/>` for `--format svg`, the 8-byte PNG magic for
+    /// `--format png` — so its output passes `render_plate`'s F9 signature gate.
     fn write_fake_sidecar(dir: &Path, version_line: &str) -> PathBuf {
+        let path = dir.join(sidecar_filename());
+        let script = format!(
+            "#!/bin/sh\n\
+             if [ \"$1\" = \"--version\" ]; then\n\
+             \techo '{version_line}'\n\
+             \texit 0\n\
+             fi\n\
+             if [ \"$1\" = \"render\" ]; then\n\
+             \tout=\"\"\n\
+             \tfmt=\"\"\n\
+             \twhile [ \"$#\" -gt 0 ]; do\n\
+             \t\tif [ \"$1\" = \"--out\" ]; then out=\"$2\"; fi\n\
+             \t\tif [ \"$1\" = \"--format\" ]; then fmt=\"$2\"; fi\n\
+             \t\tshift\n\
+             \tdone\n\
+             \tcat > /dev/null\n\
+             \tif [ \"$fmt\" = \"png\" ]; then\n\
+             \t\tprintf '\\211PNG\\r\\n\\032\\n' > \"$out\"\n\
+             \telse\n\
+             \t\tprintf '<svg/>' > \"$out\"\n\
+             \tfi\n\
+             \techo 'mode text'\n\
+             \texit 0\n\
+             fi\n\
+             exit 1\n"
+        );
+        fs::write(&path, script).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&path).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&path, perms).unwrap();
+        }
+        path
+    }
+
+    /// Build a fake sidecar whose `render` drains stdin then runs `render_body`
+    /// (a shell snippet with `$out` bound to the `--out` path) and exits 0. Used
+    /// to simulate a sidecar that "succeeds" while writing empty/garbage output.
+    fn write_fake_sidecar_render(dir: &Path, version_line: &str, render_body: &str) -> PathBuf {
         let path = dir.join(sidecar_filename());
         let script = format!(
             "#!/bin/sh\n\
@@ -241,8 +350,8 @@ mod tests {
              \t\tif [ \"$1\" = \"--out\" ]; then out=\"$2\"; fi\n\
              \t\tshift\n\
              \tdone\n\
-             \tcat > \"$out\"\n\
-             \techo 'mode text'\n\
+             \tcat > /dev/null\n\
+             \t{render_body}\n\
              \texit 0\n\
              fi\n\
              exit 1\n"
@@ -323,9 +432,14 @@ mod tests {
         let want = out_dir.join("plate-2.svg");
         assert_eq!(got, want.to_string_lossy());
         assert!(want.is_file(), "render must write the --out file");
-        // The fake `cat > out` writes the piped string verbatim.
+        // The migrated fake writes a format-appropriate signature stub (not the
+        // raw string). The file must be a non-empty SVG that clears the F9 gate.
         let body = fs::read_to_string(&want).unwrap();
-        assert_eq!(body, "md1yqpqqxqq8xtwhw4xwn4qh");
+        assert!(!body.is_empty(), "render output must be non-empty");
+        assert!(
+            body.starts_with("<svg"),
+            "expected an SVG signature, got: {body:?}"
+        );
         fs::remove_dir_all(&dir).ok();
     }
 
@@ -338,6 +452,39 @@ mod tests {
         fs::create_dir_all(&out_dir).unwrap();
         let got = retry_txtbsy(|| render_plate(&p, "md1x", &out_dir, 1, true)).unwrap();
         assert!(got.ends_with("plate-1.png"), "png ext expected: {got}");
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // F9: a sidecar that exits 0 but writes a 0-byte --out file produced no usable
+    // render -> EmptyOutput (not a silently-recorded valid preview).
+    #[cfg(unix)]
+    #[test]
+    fn render_plate_rejects_empty_output() {
+        let dir = tmpdir("render-empty");
+        let p = write_fake_sidecar_render(&dir, "me-preview 0.3.0", ": > \"$out\"");
+        let out_dir = dir.join("out");
+        fs::create_dir_all(&out_dir).unwrap();
+        let err = retry_txtbsy(|| render_plate(&p, "md1x", &out_dir, 1, false)).unwrap_err();
+        assert!(
+            matches!(err, PreviewError::EmptyOutput { .. }),
+            "expected EmptyOutput, got {err:?}"
+        );
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // F9: a sidecar that exits 0 writing bytes with no SVG/PNG signature -> EmptyOutput.
+    #[cfg(unix)]
+    #[test]
+    fn render_plate_rejects_garbage_output() {
+        let dir = tmpdir("render-garbage");
+        let p = write_fake_sidecar_render(&dir, "me-preview 0.3.0", "printf 'garbage' > \"$out\"");
+        let out_dir = dir.join("out");
+        fs::create_dir_all(&out_dir).unwrap();
+        let err = retry_txtbsy(|| render_plate(&p, "md1x", &out_dir, 1, false)).unwrap_err();
+        assert!(
+            matches!(err, PreviewError::EmptyOutput { .. }),
+            "expected EmptyOutput, got {err:?}"
+        );
         fs::remove_dir_all(&dir).ok();
     }
 

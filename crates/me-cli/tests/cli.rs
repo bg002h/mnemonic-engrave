@@ -340,7 +340,9 @@ mod preview {
 
     /// Write an executable fake `me-preview` into `dir`.
     /// - `--version` echoes `me-preview <version_line>`.
-    /// - `render` writes a stub SVG to `--out` and echoes `mode text`.
+    /// - `render` writes a format-appropriate signature stub to `--out` (`<svg/>`
+    ///   for svg, the 8-byte PNG magic for png) and echoes `mode text`, so its
+    ///   output clears `render_plate`'s F9 signature gate under both formats.
     fn write_fake(dir: &Path, version_line: &str) {
         let path = dir.join("me-preview");
         let script = format!(
@@ -351,12 +353,18 @@ mod preview {
              fi\n\
              if [ \"$1\" = \"render\" ]; then\n\
              \tout=\"\"\n\
+             \tfmt=\"\"\n\
              \twhile [ \"$#\" -gt 0 ]; do\n\
              \t\tif [ \"$1\" = \"--out\" ]; then out=\"$2\"; fi\n\
+             \t\tif [ \"$1\" = \"--format\" ]; then fmt=\"$2\"; fi\n\
              \t\tshift\n\
              \tdone\n\
              \tcat > /dev/null\n\
-             \tprintf '<svg/>' > \"$out\"\n\
+             \tif [ \"$fmt\" = \"png\" ]; then\n\
+             \t\tprintf '\\211PNG\\r\\n\\032\\n' > \"$out\"\n\
+             \telse\n\
+             \t\tprintf '<svg/>' > \"$out\"\n\
+             \tfi\n\
              \techo 'mode text'\n\
              \texit 0\n\
              fi\n\
@@ -390,8 +398,58 @@ mod preview {
         fs::set_permissions(&path, perms).unwrap();
     }
 
+    /// Like `write_fake` but `render` exits 0 while writing a 0-byte `--out` file
+    /// (a sidecar that "succeeds" but produced nothing). `--version` still matches.
+    fn write_fake_empty_output(dir: &Path, version_line: &str) {
+        let path = dir.join("me-preview");
+        let script = format!(
+            "#!/bin/sh\n\
+             if [ \"$1\" = \"--version\" ]; then\n\
+             \techo 'me-preview {version_line}'\n\
+             \texit 0\n\
+             fi\n\
+             if [ \"$1\" = \"render\" ]; then\n\
+             \tout=\"\"\n\
+             \twhile [ \"$#\" -gt 0 ]; do\n\
+             \t\tif [ \"$1\" = \"--out\" ]; then out=\"$2\"; fi\n\
+             \t\tshift\n\
+             \tdone\n\
+             \tcat > /dev/null\n\
+             \t: > \"$out\"\n\
+             \techo 'mode text'\n\
+             \texit 0\n\
+             fi\n\
+             exit 1\n"
+        );
+        fs::write(&path, script).unwrap();
+        let mut perms = fs::metadata(&path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&path, perms).unwrap();
+    }
+
     fn input() -> String {
         format!("{MD1_VALID}\n{MK1_A}\n{MK1_B}\n")
+    }
+
+    // Spec §A2/F9: a sidecar that exits 0 but writes a 0-byte --out file must NOT
+    // yield a recorded preview. render_plate errs (EmptyOutput) -> wire_previews
+    // maps it to exit 4 and records no preview path.
+    #[test]
+    fn empty_sidecar_output_exit_4() {
+        let bindir = unique_dir("empty-bin");
+        write_fake_empty_output(&bindir, CRATE_VERSION);
+        let outdir = unique_dir("empty-out");
+        Command::cargo_bin("me")
+            .unwrap()
+            .env("PATH", &bindir)
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .write_stdin(input())
+            .assert()
+            .code(4);
+        fs::remove_dir_all(&bindir).ok();
+        fs::remove_dir_all(&outdir).ok();
     }
 
     // Spec §6: a sidecar RENDER failure (string fits no plate) → exit 4 (invalid
