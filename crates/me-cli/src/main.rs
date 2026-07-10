@@ -232,8 +232,17 @@ fn wire_previews(
     use mnemonic_engrave::manifest::PlateKind;
     use mnemonic_engrave::preview;
 
+    // Explicit opt-in: `ME_PREVIEW_BIN` names a specific sidecar binary and takes
+    // precedence over co-located discovery. Read it here in the wrapper (before the
+    // version gate) so `locate_in` stays pure. (D1: a set-but-missing path falls
+    // through to graceful degrade; D2 upgrades that to a fail-loud EXIT_USAGE.)
+    let explicit_env = std::env::var_os("ME_PREVIEW_BIN")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from);
+    let explicit = explicit_env.as_deref().filter(|p| p.is_file());
+
     // Discover the sidecar. Absent → graceful degrade (note, exit 0).
-    let sidecar = match preview::locate_sidecar() {
+    let sidecar = match preview::locate_sidecar(explicit) {
         Some(p) => p,
         None => {
             eprintln!("me: preview skipped (install me-preview)");

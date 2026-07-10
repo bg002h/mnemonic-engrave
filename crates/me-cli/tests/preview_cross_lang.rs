@@ -101,21 +101,12 @@ fn real_sidecar_renders_public_plates_only() {
     build_real_sidecar(&bindir);
     let outdir = unique_dir("out");
 
-    // Discovery: `me` looks next to its own exe first, then on $PATH. The `me`
-    // test binary lives in target/debug (no sidecar there), so prepend `bindir`
-    // to PATH and let discovery find the real sidecar on $PATH.
-    let path = match std::env::var_os("PATH") {
-        Some(p) => {
-            let mut paths = vec![bindir.clone()];
-            paths.extend(std::env::split_paths(&p));
-            std::env::join_paths(paths).unwrap()
-        }
-        None => bindir.clone().into_os_string(),
-    };
-
+    // Discovery is co-located-only + the explicit `ME_PREVIEW_BIN` opt-in (F11).
+    // The `me` test binary lives in target/debug (no co-located sidecar there), so
+    // point `ME_PREVIEW_BIN` at the real sidecar we just built into `bindir`.
     let assert = Command::cargo_bin("me")
         .unwrap()
-        .env("PATH", &path)
+        .env("ME_PREVIEW_BIN", bindir.join(sidecar_name()))
         .arg("bundle")
         .arg("--preview")
         .arg(&outdir)
