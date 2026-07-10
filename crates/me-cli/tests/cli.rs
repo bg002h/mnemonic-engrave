@@ -749,13 +749,11 @@ mod preview {
 
     #[test]
     fn unwritable_preview_dir_exit_2() {
-        // --preview pointing at a non-existent / unwritable dir: the matched
-        // sidecar's render fails -> exit 2.
+        // --preview pointing at a non-existent dir: `wire_previews`' `!dir.is_dir()`
+        // gate refuses it with EXIT_USAGE(2) before any render is attempted.
         let bindir = unique_dir("unwritable-bin");
         write_fake(&bindir, CRATE_VERSION);
         let missing = unique_dir("unwritable-parent").join("does-not-exist");
-        // `missing` parent exists but the dir itself does not -> render's --out
-        // path is in a missing dir; the fake's `> "$out"` fails -> non-zero.
 
         Command::cargo_bin("me")
             .unwrap()
