@@ -71,3 +71,55 @@ TDD teeth — perturb-then-revert (each: edit src, run the one property, observe
 | P6 | drop first text byte in `decode_text_record` | `p6_… FAILED` — round-trip `left != right` |
 
 All perturbations reverted; clean `--test prop` re-run → 6 passed.
+
+## Step C2 — cargo-fuzz crate (local/deep, nightly, NOT CI-built)
+
+Files added / changed:
+- `crates/me-cli/fuzz/Cargo.toml` — package `mnemonic-engrave-fuzz`, `libfuzzer-sys 0.4`
+  + path dep on `mnemonic-engrave`, its OWN empty `[workspace]` table (self-detach; R0
+  L2), two `[[bin]]` targets.
+- `crates/me-cli/fuzz/fuzz_targets/fuzz_convert.rs` — `assert_convert_no_panic` +
+  `assert_convert_ms_refused`.
+- `crates/me-cli/fuzz/fuzz_targets/fuzz_run_bundle.rs` — `assert_run_bundle_no_panic` +
+  `assert_bundle_ms_line_refused` + `assert_manifest_strings_trace`.
+- Both targets `#[path = "../../tests/support/invariants.rs"] mod invariants;` — the SAME
+  shared file the proptest layer uses (`#[allow(dead_code)]` since each target uses a
+  subset). CI residual (nightly-only, not CI-built) stated in each target's header comment
+  and justified by the proptest layer covering every invariant (R0 L4).
+- `crates/me-cli/fuzz/Cargo.lock` — the fuzz workspace's OWN lock (committed; contains
+  libfuzzer-sys/arbitrary, isolated from root).
+- Root `Cargo.toml` — `exclude = ["crates/me-cli/fuzz"]` (belt-and-suspenders).
+- `.gitignore` — `/crates/me-cli/fuzz/{corpus,artifacts,target}` (R0 N2).
+
+**Isolation proof (the highest-risk executability check, R0 L2):**
+- Regenerated root lock after the fuzz wiring → `git diff --stat Cargo.lock` **empty**
+  (root lock unchanged).
+- `grep -iE 'libfuzzer|arbitrary' Cargo.lock` (root) → **NONE**.
+- `cargo tree` (root) → **NO** libfuzzer-sys / arbitrary.
+- `cargo metadata --no-deps` workspace packages = `['mnemonic-engrave']` only —
+  `mnemonic-engrave-fuzz` is NOT a workspace member.
+- The fuzz crate's OWN `fuzz/Cargo.lock` DOES contain libfuzzer-sys/arbitrary (4 entries)
+  → the nightly deps live only in the detached fuzz workspace.
+→ stable `cargo test --locked` at the root can never pull the nightly fuzz deps.
+
+**Build + smoke (nightly available locally):**
+- `cargo +nightly fuzz build --fuzz-dir crates/me-cli/fuzz` → both targets compiled
+  (release, libFuzzer + ASan), `Finished` in ~72s.
+- `cargo +nightly fuzz run … fuzz_convert -- -runs=2000` → `Done 2000 runs`, cov 105,
+  **no crash/panic/leak**.
+- `cargo +nightly fuzz run … fuzz_run_bundle -- -runs=2000` → `Done 2000 runs`, cov 216,
+  **no crash/panic/leak**.
+- Runtime `corpus/`, `target/` confirmed git-ignored (`!!`).
+
+## Final verification (all GREEN)
+
+- `env PATH=…go… ME_REQUIRE_GO=1 cargo test --locked` (root) → **88** real tests, all pass
+  (baseline 82 + prop 6): lib 54 + cli 23 + cross_lang 1 + golden 3 + preview_cross_lang 1
+  + prop 6. (Go differential tests ran for real, not skipped.)
+- `cargo test --locked` does NOT pull libfuzzer-sys (proven via the tree/lock check above).
+- `cargo clippy --all-targets --locked -- -D warnings` (workspace; fuzz excluded) → clean
+  (exit 0). Confirms `tests/support/invariants.rs` in a SUBDIR is NOT a spurious 0-test
+  target (R0 L1): it compiles only via prop.rs's `#[path]` include, where all 6 checkers
+  are used → no dead_code.
+- `go test ./...` in `preview/` → ok.
+- nightly + cargo-fuzz 0.13.2 available → fuzz build + smoke succeeded (recorded above).
