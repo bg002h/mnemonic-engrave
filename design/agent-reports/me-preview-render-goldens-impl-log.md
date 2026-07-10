@@ -59,4 +59,3 @@ One section per step: test written, failure line (right-reason), change, counts.
      Reverted.
 - All reverts confirmed clean (`git diff` empty for both prod files vs their
   committed/HEAD state); full preview suite green; `go vet` clean.
-</content>
