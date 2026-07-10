@@ -85,3 +85,23 @@ also fails loud — the "does not point to an existing file" wording is accurate
 
 **Green.** `ME_REQUIRE_GO=1 cargo test --locked` → **103 passed, 0 failed, 0 ignored**
 (D1 102 + 1). `cargo clippy --all-targets -- -D warnings` → clean.
+
+## Step D3 — documentation
+
+- `locate_sidecar` doc comment: already rewritten in D1 (the stale "Each entry on
+  `$PATH`" bullet is gone; it now states discovery is co-located-only, spells out the
+  F11 security rationale — "$PATH is deliberately NOT searched … so a future editor does
+  not restore the fallback" — and points a non-standard install at `ME_PREVIEW_BIN`).
+  No further change needed here.
+- `--preview` clap help (main.rs): replaced "If the sidecar is missing…" with the
+  discovery contract — sidecar found only alongside `me`, `$PATH` not searched, explicit
+  `ME_PREVIEW_BIN=/path/to/me-preview` for non-standard installs, still degrades if
+  absent.
+- README: added a **Plate previews** subsection under Usage — states co-located-only
+  discovery, "does not search `$PATH`", the `ME_PREVIEW_BIN` opt-in (with an example),
+  graceful skip, and the set-but-missing exit-2 error.
+
+No test asserts on help/README text (verified), so this step is doc-only.
+
+**Green.** `ME_REQUIRE_GO=1 cargo test --locked` → **103 passed, 0 failed, 0 ignored**.
+`cargo clippy --all-targets -- -D warnings` → clean.

@@ -46,8 +46,11 @@ enum Command {
         #[arg(long, value_name = "FILE")]
         manifest: Option<PathBuf>,
         /// Render each public plate to an image in this directory via the
-        /// `me-preview` sidecar. If the sidecar is missing, previews are
-        /// skipped (a note is printed) and the manifest is still emitted.
+        /// `me-preview` sidecar. The sidecar is discovered only alongside the `me`
+        /// executable (release archives ship them together) — `$PATH` is not
+        /// searched. For a non-standard install, point at it explicitly with
+        /// `ME_PREVIEW_BIN=/path/to/me-preview`. If no sidecar is found, previews
+        /// are skipped (a note is printed) and the manifest is still emitted.
         #[arg(long, value_name = "DIR")]
         preview: Option<PathBuf>,
         /// With --preview, render PNG instead of SVG.
