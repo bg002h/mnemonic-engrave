@@ -105,3 +105,46 @@ No test asserts on help/README text (verified), so this step is doc-only.
 
 **Green.** `ME_REQUIRE_GO=1 cargo test --locked` → **103 passed, 0 failed, 0 ignored**.
 `cargo clippy --all-targets -- -D warnings` → clean.
+
+## Final verification
+
+- `ME_REQUIRE_GO=1 cargo test --locked` (root, submodule initialized) →
+  **103 passed, 0 failed, 0 ignored** (baseline 96 + 7 new: 5 `locate_in` unit,
+  `planted_path_sidecar_ignored`, `set_but_missing_me_preview_bin_exit_2`). Zero skips.
+- `cargo clippy --all-targets -- -D warnings` → clean.
+- `go test ./...` in `preview/` → `ok  mnemonic-engrave/preview` (still green).
+
+**Manual e2e** (scratch harness outside the worktree: a copy of `me` at `appdir/me`, a
+fake `me-preview` that prints `me-preview 0.3.0` and writes a valid SVG; input =
+md1 + 2×mk1). All four recorded:
+1. Co-located `appdir/me-preview` present, no `ME_PREVIEW_BIN`, `$PATH` clean →
+   **exit 0**, 3 plates rendered ("rendered plate 1/2/3"), 3 preview keys, 3 SVGs on disk.
+2. Co-located removed, the fake planted on `$PATH` only → **exit 0**, "me: preview
+   skipped (install me-preview)", 0 SVGs, 0 preview keys — the `$PATH` binary is NOT used.
+3. `ME_PREVIEW_BIN=<the pathbin fake>` (co-located still absent) → **exit 0**, renders
+   3 plates again.
+4. `ME_PREVIEW_BIN=/nonexistent/me-preview` → **exit 2**, distinct message:
+   `me: ME_PREVIEW_BIN=/nonexistent/me-preview does not point to an existing file (set
+   it to the me-preview binary, or unset it for co-located discovery)`.
+
+Scratch harness cleaned up after recording.
+
+## For the post-impl reviewer
+
+- **D1/D2 split of the env read.** The `ME_PREVIEW_BIN` *success/None* read landed in D1
+  (it is the prerequisite for the mandated D1 test migration — those tests can only be
+  green once an existing `ME_PREVIEW_BIN` is honored); D2 upgraded only the set-but-missing
+  case from graceful-`None` to fail-loud `EXIT_USAGE(2)`. Both live in `wire_previews`
+  (the wrapper), before the version gate; `locate_in` remains pure. Net behavior at HEAD is
+  exactly the spec's D2 contract.
+- **Empty `ME_PREVIEW_BIN` is treated as unset** (`.filter(|v| !v.is_empty())`) — a
+  spec-silent edge; chosen as least-surprising (conventional POSIX path-var semantics). Not
+  a set-but-missing error.
+- **`is_file()` also rejects a directory** → a `ME_PREVIEW_BIN` pointing at a dir also
+  fails loud; the "does not point to an existing file" wording is accurate for both cases.
+- **Survivors left correct:** `absent_sidecar_degrades…` keeps its `$PATH` line (now moot
+  for discovery) and gained `.env_remove("ME_PREVIEW_BIN")` + a refreshed comment;
+  `no_preview_flag_is_byte_for_byte_phase_a` is fully untouched (locate never runs there).
+- **Cycle-A surface undisturbed:** the dirty-dir refusal, `EmptyOutput`/F9 gate, and the
+  None graceful-degrade all still run strictly after the new env-read/locate step (verified
+  green by `dirty_preview_dir_refused_exit_2`, `empty_sidecar_output_exit_4`).
