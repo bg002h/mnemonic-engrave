@@ -311,11 +311,13 @@ fn bundle_manifest_golden() {
 // ---------------------------------------------------------------------------
 // Task 9: `me bundle --preview <DIR>` wiring (hermetic — fake `me-preview`).
 //
-// These tests stand up a tiny shell-script `me-preview` in a temp dir and put
-// that dir FIRST on PATH. They never build the real Go sidecar (that's the
-// Task 10 cross-lang test). Unix-only because the fake is a /bin/sh script;
-// the `me` test binary lives in target/debug, which has no `me-preview`, so
-// PATH-only discovery is deterministic.
+// These tests stand up a tiny shell-script `me-preview` in a temp dir and point
+// `me` at it via the explicit `ME_PREVIEW_BIN` opt-in (F11: discovery is
+// co-located-only + this env var; `$PATH` is no longer searched). They never build
+// the real Go sidecar (that's the Task 10 cross-lang test). Unix-only because the
+// fake is a /bin/sh script; the `me` test binary lives in target/debug, which has
+// no co-located `me-preview`, so discovery is deterministic (only ME_PREVIEW_BIN,
+// where set, or the absence path).
 // ---------------------------------------------------------------------------
 
 #[cfg(unix)]
@@ -441,7 +443,7 @@ mod preview {
         let outdir = unique_dir("empty-out");
         Command::cargo_bin("me")
             .unwrap()
-            .env("PATH", &bindir)
+            .env("ME_PREVIEW_BIN", bindir.join("me-preview"))
             .arg("bundle")
             .arg("--preview")
             .arg(&outdir)
@@ -461,7 +463,7 @@ mod preview {
         let outdir = unique_dir("renderfail-out");
         Command::cargo_bin("me")
             .unwrap()
-            .env("PATH", &bindir)
+            .env("ME_PREVIEW_BIN", bindir.join("me-preview"))
             .arg("bundle")
             .arg("--preview")
             .arg(&outdir)
@@ -478,7 +480,7 @@ mod preview {
 
         let assert = Command::cargo_bin("me")
             .unwrap()
-            .env("PATH", &bindir) // only the fake is discoverable
+            .env("ME_PREVIEW_BIN", bindir.join("me-preview")) // only the vouched fake is discoverable
             .arg("bundle")
             .arg("--preview")
             .arg(&outdir)
@@ -524,7 +526,7 @@ mod preview {
 
         let assert = Command::cargo_bin("me")
             .unwrap()
-            .env("PATH", &bindir)
+            .env("ME_PREVIEW_BIN", bindir.join("me-preview"))
             .arg("bundle")
             .arg("--preview")
             .arg(&outdir)
@@ -555,7 +557,7 @@ mod preview {
 
         let assert = Command::cargo_bin("me")
             .unwrap()
-            .env("PATH", &bindir)
+            .env("ME_PREVIEW_BIN", bindir.join("me-preview"))
             .arg("bundle")
             .arg("--preview")
             .arg(&outdir)
@@ -589,7 +591,7 @@ mod preview {
 
         Command::cargo_bin("me")
             .unwrap()
-            .env("PATH", &bindir)
+            .env("ME_PREVIEW_BIN", bindir.join("me-preview"))
             .arg("bundle")
             .arg("--preview")
             .arg(&outdir)
@@ -604,13 +606,16 @@ mod preview {
 
     #[test]
     fn absent_sidecar_degrades_exit_0_with_note_and_manifest() {
-        // An empty bin dir on PATH (no me-preview) -> locate_sidecar() == None.
+        // No ME_PREVIEW_BIN opt-in and no co-located sidecar (the `me` test binary
+        // in target/debug has none) -> locate_sidecar() == None -> graceful degrade.
+        // env_remove guards against an ambient ME_PREVIEW_BIN in the runner's env.
         let bindir = unique_dir("absent-bin");
         let outdir = unique_dir("absent-out");
 
         let assert = Command::cargo_bin("me")
             .unwrap()
             .env("PATH", &bindir)
+            .env_remove("ME_PREVIEW_BIN")
             .arg("bundle")
             .arg("--preview")
             .arg(&outdir)
@@ -633,6 +638,88 @@ mod preview {
         }
 
         fs::remove_dir_all(&bindir).ok();
+        fs::remove_dir_all(&outdir).ok();
+    }
+
+    // F11 (behavioral closure lock): a version-MATCHED `me-preview` planted ONLY on
+    // $PATH — with NO co-located sidecar and NO ME_PREVIEW_BIN opt-in — must be
+    // IGNORED. Co-located-only discovery no longer walks $PATH, so `me` degrades
+    // gracefully (exit 0, "preview skipped", no preview keys) instead of piping the
+    // public payload to an ambient $PATH binary. Red before D1 (the old $PATH arm
+    // finds + runs the fake -> previews present); green after.
+    #[test]
+    fn planted_path_sidecar_ignored() {
+        let bindir = unique_dir("planted-bin");
+        write_fake(&bindir, CRATE_VERSION); // a valid fake, reachable ONLY via $PATH
+        let outdir = unique_dir("planted-out");
+
+        let assert = Command::cargo_bin("me")
+            .unwrap()
+            .env("PATH", &bindir) // the fake is discoverable only on $PATH
+            .env_remove("ME_PREVIEW_BIN") // and there is no explicit opt-in
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .write_stdin(input())
+            .assert()
+            .success(); // co-located-only + no opt-in -> graceful degrade, exit 0
+        let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+        assert!(
+            stderr.contains("preview skipped"),
+            "a $PATH-only sidecar must be ignored -> skip note: {stderr}"
+        );
+        // The $PATH fake never ran: manifest carries no preview keys and nothing was
+        // written into the output dir.
+        let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&stdout).expect("manifest still emitted");
+        for p in v["plates"].as_array().unwrap() {
+            assert!(
+                p.get("preview").is_none(),
+                "a $PATH-only sidecar must not render: {p}"
+            );
+        }
+        assert!(
+            !outdir.join("plate-1.svg").is_file(),
+            "a $PATH-only sidecar must write nothing"
+        );
+
+        fs::remove_dir_all(&bindir).ok();
+        fs::remove_dir_all(&outdir).ok();
+    }
+
+    // F11/D2: an explicit ME_PREVIEW_BIN that names a path which does not exist is a
+    // fail-loud usage error (EXIT_USAGE 2) with a distinct message naming the env var
+    // and the path — NOT a silent graceful-degrade and NOT a fall-back to co-located
+    // discovery. The user vouched for a specific binary that isn't there.
+    #[test]
+    fn set_but_missing_me_preview_bin_exit_2() {
+        let outdir = unique_dir("missing-bin-out");
+        let missing = unique_dir("missing-bin-parent").join("no-such-me-preview");
+
+        let assert = Command::cargo_bin("me")
+            .unwrap()
+            .env("ME_PREVIEW_BIN", &missing)
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .write_stdin(input())
+            .assert()
+            .code(2);
+        let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+        assert!(
+            stderr.contains("ME_PREVIEW_BIN"),
+            "error must name the env var: {stderr}"
+        );
+        assert!(
+            stderr.contains(&missing.display().to_string()),
+            "error must name the missing path: {stderr}"
+        );
+        // It must NOT have silently degraded (no skip note) or rendered.
+        assert!(
+            !stderr.contains("preview skipped"),
+            "set-but-missing must fail loud, not degrade: {stderr}"
+        );
+
         fs::remove_dir_all(&outdir).ok();
     }
 
@@ -662,17 +749,15 @@ mod preview {
 
     #[test]
     fn unwritable_preview_dir_exit_2() {
-        // --preview pointing at a non-existent / unwritable dir: the matched
-        // sidecar's render fails -> exit 2.
+        // --preview pointing at a non-existent dir: `wire_previews`' `!dir.is_dir()`
+        // gate refuses it with EXIT_USAGE(2) before any render is attempted.
         let bindir = unique_dir("unwritable-bin");
         write_fake(&bindir, CRATE_VERSION);
         let missing = unique_dir("unwritable-parent").join("does-not-exist");
-        // `missing` parent exists but the dir itself does not -> render's --out
-        // path is in a missing dir; the fake's `> "$out"` fails -> non-zero.
 
         Command::cargo_bin("me")
             .unwrap()
-            .env("PATH", &bindir)
+            .env("ME_PREVIEW_BIN", bindir.join("me-preview"))
             .arg("bundle")
             .arg("--preview")
             .arg(&missing)

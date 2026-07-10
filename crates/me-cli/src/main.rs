@@ -46,8 +46,11 @@ enum Command {
         #[arg(long, value_name = "FILE")]
         manifest: Option<PathBuf>,
         /// Render each public plate to an image in this directory via the
-        /// `me-preview` sidecar. If the sidecar is missing, previews are
-        /// skipped (a note is printed) and the manifest is still emitted.
+        /// `me-preview` sidecar. The sidecar is discovered only alongside the `me`
+        /// executable (release archives ship them together) — `$PATH` is not
+        /// searched. For a non-standard install, point at it explicitly with
+        /// `ME_PREVIEW_BIN=/path/to/me-preview`. If no sidecar is found, previews
+        /// are skipped (a note is printed) and the manifest is still emitted.
         #[arg(long, value_name = "DIR")]
         preview: Option<PathBuf>,
         /// With --preview, render PNG instead of SVG.
@@ -232,8 +235,29 @@ fn wire_previews(
     use mnemonic_engrave::manifest::PlateKind;
     use mnemonic_engrave::preview;
 
-    // Discover the sidecar. Absent → graceful degrade (note, exit 0).
-    let sidecar = match preview::locate_sidecar() {
+    // Explicit opt-in: `ME_PREVIEW_BIN` names a specific sidecar binary and takes
+    // precedence over co-located discovery. Read it here in the wrapper (before the
+    // version gate) so `locate_in` stays pure. A set-but-missing path is a FAIL-LOUD
+    // usage error (EXIT_USAGE): the user vouched for a specific binary that isn't
+    // there, so silently degrading — or falling back to exe-adjacent — would be
+    // surprising. (An empty value is treated as unset.)
+    let explicit_env = std::env::var_os("ME_PREVIEW_BIN")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from);
+    if let Some(p) = &explicit_env {
+        if !p.is_file() {
+            eprintln!(
+                "me: ME_PREVIEW_BIN={} does not point to an existing file \
+                 (set it to the me-preview binary, or unset it for co-located discovery)",
+                p.display()
+            );
+            return Some(EXIT_USAGE);
+        }
+    }
+
+    // Discover the sidecar. `explicit_env`, if set, is now known to exist and takes
+    // precedence; otherwise co-located-only. Absent → graceful degrade (note, exit 0).
+    let sidecar = match preview::locate_sidecar(explicit_env.as_deref()) {
         Some(p) => p,
         None => {
             eprintln!("me: preview skipped (install me-preview)");

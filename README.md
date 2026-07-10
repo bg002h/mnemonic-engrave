@@ -32,6 +32,22 @@ echo "ms1..."                   | me --stdout
 
 Input is read from **stdin** (or `--in <file>`) — never a positional argument, so a secret can't leak into `ps`/shell history. NDEF bytes go to stdout (`--stdout` / `--hex` / `--base64`) or `--out <file>`; all human-readable text goes to **stderr**.
 
+### Plate previews
+
+`me bundle --preview <DIR>` renders each public plate to an SVG (or PNG, with
+`--png`) via the `me-preview` sidecar. For safety the sidecar is discovered
+**only alongside the `me` executable** — release archives ship the two together —
+and `me` **does not search `$PATH`** for it, so a `me-preview` planted on `$PATH`
+can never be handed your public payload or write into the preview directory. For a
+non-standard install, point at the sidecar explicitly:
+
+```sh
+ME_PREVIEW_BIN=/path/to/me-preview me bundle --preview ./plates
+```
+
+If no sidecar is found, previews are skipped (a note is printed) and the manifest
+is still emitted. A set-but-missing `ME_PREVIEW_BIN` is a hard error (exit 2).
+
 ## Verifying releases
 
 Release archives (`mnemonic-engrave-<tag>-<os>-<arch>.tar.gz` / `.zip`) bundle

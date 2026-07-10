@@ -56,39 +56,47 @@ fn sidecar_filename() -> String {
     }
 }
 
-/// Locate the `me-preview` sidecar.
+/// Pure discovery-precedence over already-known candidate paths (first hit wins):
+///   1. `explicit` — an operator-vouched path (e.g. from `ME_PREVIEW_BIN`). Its
+///      existence is the caller's responsibility; it is returned verbatim.
+///   2. `exe_dir` — the directory of the current executable, where release
+///      archives ship `me` and `me-preview` side by side (the trusted layout).
 ///
-/// Discovery order (first hit wins):
-///   1. The directory containing the current executable (release archives ship
-///      `me` and `me-preview` side by side, so this is the trusted/default path).
-///   2. Each entry on `$PATH`.
-///
-/// Returns `None` if neither finds an existing file — the caller then degrades
-/// gracefully (prints a "preview skipped" note and exits 0).
-pub fn locate_sidecar() -> Option<PathBuf> {
-    let name = sidecar_filename();
-
-    // 1) Next to the current executable.
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let cand = dir.join(&name);
-            if cand.is_file() {
-                return Some(cand);
-            }
+/// It consults NO `$PATH` and reads NO environment, so an attacker-writable `$PATH`
+/// entry can never be auto-selected. Returns `None` when neither yields a file.
+fn locate_in(exe_dir: Option<&Path>, explicit: Option<&Path>) -> Option<PathBuf> {
+    // 1) An explicit opt-in wins (existence already confirmed by the caller).
+    if let Some(p) = explicit {
+        return Some(p.to_path_buf());
+    }
+    // 2) Next to the current executable.
+    if let Some(dir) = exe_dir {
+        let cand = dir.join(sidecar_filename());
+        if cand.is_file() {
+            return Some(cand);
         }
     }
-
-    // 2) On $PATH.
-    if let Some(path) = std::env::var_os("PATH") {
-        for dir in std::env::split_paths(&path) {
-            let cand = dir.join(&name);
-            if cand.is_file() {
-                return Some(cand);
-            }
-        }
-    }
-
     None
+}
+
+/// Locate the `me-preview` sidecar for the running `me`.
+///
+/// Thin wrapper over the pure [`locate_in`]: it supplies the current executable's
+/// directory as the co-located search dir and forwards `explicit` (an
+/// operator-vouched path, e.g. from `ME_PREVIEW_BIN`, whose existence the caller
+/// has already checked).
+///
+/// Discovery is co-located-only: `$PATH` is deliberately NOT searched. Auto-reaching
+/// for the first `me-preview` on an ambient, possibly attacker-writable `$PATH` would
+/// hand it the public md1/mk1 payload and let it write into the preview dir (F11), so
+/// the only auto-discovered location is the trusted exe-adjacent one. A non-standard
+/// install is served by the explicit `ME_PREVIEW_BIN` opt-in instead. Returns `None`
+/// when no sidecar is found — the caller degrades gracefully (prints a "preview
+/// skipped" note, exits 0).
+pub fn locate_sidecar(explicit: Option<&Path>) -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok();
+    let exe_dir = exe.as_deref().and_then(Path::parent);
+    locate_in(exe_dir, explicit)
 }
 
 /// Run `<sidecar> --version` and return the parsed semver string.
@@ -505,5 +513,74 @@ mod tests {
             "expected Render, got {err:?}"
         );
         fs::remove_dir_all(&dir).ok();
+    }
+
+    // --- D1 (F11): the pure discovery-precedence helper `locate_in`. It consults
+    // NO `$PATH` and reads NO env — the `ME_PREVIEW_BIN` read + existence check live
+    // in the wrapper (`wire_previews`). Its only inputs are the two candidate paths.
+
+    /// Touch an empty file named exactly `me-preview` in `dir`; return its path.
+    fn touch_co_located(dir: &Path) -> PathBuf {
+        let p = dir.join(sidecar_filename());
+        fs::write(&p, b"").unwrap();
+        p
+    }
+
+    // (b) explicit None + exe_dir holds the co-located sidecar -> exe-adjacent hit
+    // (the co-located happy path, otherwise uncovered by integration tests).
+    #[test]
+    fn locate_in_exe_adjacent_hit() {
+        let dir = tmpdir("locate-exe");
+        let want = touch_co_located(&dir);
+        assert_eq!(locate_in(Some(&dir), None), Some(want));
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // (c) explicit None + exe_dir present but no file -> None. `$PATH` is never
+    // consulted, so a planted `$PATH` binary can never turn this into `Some`.
+    #[test]
+    fn locate_in_exe_adjacent_miss_is_none() {
+        let dir = tmpdir("locate-miss");
+        assert_eq!(locate_in(Some(&dir), None), None);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // (c) explicit None + exe_dir None -> None.
+    #[test]
+    fn locate_in_no_exe_dir_is_none() {
+        assert_eq!(locate_in(None, None), None);
+    }
+
+    // (a) explicit set wins over a present exe-adjacent sidecar (precedence). The
+    // explicit path need not even share the sidecar name — the user vouched for it.
+    #[test]
+    fn locate_in_explicit_wins_over_exe_adjacent() {
+        let exe_dir = tmpdir("locate-prec-exe");
+        let _co = touch_co_located(&exe_dir); // a co-located sidecar ALSO present
+        let explicit_dir = tmpdir("locate-prec-explicit");
+        let explicit = explicit_dir.join("custom-me-preview");
+        fs::write(&explicit, b"").unwrap();
+        assert_eq!(
+            locate_in(Some(&exe_dir), Some(&explicit)),
+            Some(explicit.clone())
+        );
+        fs::remove_dir_all(&exe_dir).ok();
+        fs::remove_dir_all(&explicit_dir).ok();
+    }
+
+    // (d) explicit is returned verbatim WITHOUT a re-check — existence is the
+    // wrapper's responsibility — so it wins even when exe_dir has no sidecar.
+    #[test]
+    fn locate_in_explicit_returned_verbatim() {
+        let explicit_dir = tmpdir("locate-verbatim");
+        let explicit = explicit_dir.join("some-me-preview");
+        fs::write(&explicit, b"").unwrap();
+        let empty = tmpdir("locate-verbatim-empty");
+        assert_eq!(
+            locate_in(Some(&empty), Some(&explicit)),
+            Some(explicit.clone())
+        );
+        fs::remove_dir_all(&explicit_dir).ok();
+        fs::remove_dir_all(&empty).ok();
     }
 }
