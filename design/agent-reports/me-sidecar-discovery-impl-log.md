@@ -62,3 +62,26 @@ deterministic").
 **Green.** `ME_REQUIRE_GO=1 cargo test --locked` → **102 passed, 0 failed, 0 ignored**
 (96 baseline + 5 `locate_in` unit + 1 `planted_path` integration; migration is net-zero
 on count). `cargo clippy --all-targets -- -D warnings` → clean.
+
+## Step D2 — `ME_PREVIEW_BIN` set-but-missing = fail-loud `EXIT_USAGE(2)`
+
+**TDD red first.** `set_but_missing_me_preview_bin_exit_2` (cli.rs `mod preview`) — set
+`ME_PREVIEW_BIN` to a non-existent path → expect exit 2 + a distinct message naming both
+`ME_PREVIEW_BIN` and the path, and NO "preview skipped" note. Confirmed RED against D1
+(D1 degraded gracefully: "preview skipped", exit 0).
+
+**Implementation.** In `wire_previews`, upgraded the D1 env-read block: after reading
+`ME_PREVIEW_BIN` (empty → unset), if the value is set and `!is_file()`, print
+`me: ME_PREVIEW_BIN=<path> does not point to an existing file (…)` and `return
+Some(EXIT_USAGE)` — strictly BEFORE the version gate, the `dir.is_dir()` check, the
+Cycle-A dirty-dir scan, and the render loop (R1-N5: the fail-loud branch lives in
+`wire_previews`, which returns `Option<i32>`, NOT in the `Option`-returning `locate_in`).
+When set-and-existing, the path is forwarded to `locate_sidecar` as `explicit` and still
+flows through the UNCHANGED version gate. Cycle-A logic (None graceful-degrade,
+EmptyOutput, dirty-dir refusal) untouched.
+
+Note: `is_file()` is false for a directory too, so `ME_PREVIEW_BIN` pointing at a dir
+also fails loud — the "does not point to an existing file" wording is accurate for both.
+
+**Green.** `ME_REQUIRE_GO=1 cargo test --locked` → **103 passed, 0 failed, 0 ignored**
+(D1 102 + 1). `cargo clippy --all-targets -- -D warnings` → clean.

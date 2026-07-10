@@ -234,15 +234,27 @@ fn wire_previews(
 
     // Explicit opt-in: `ME_PREVIEW_BIN` names a specific sidecar binary and takes
     // precedence over co-located discovery. Read it here in the wrapper (before the
-    // version gate) so `locate_in` stays pure. (D1: a set-but-missing path falls
-    // through to graceful degrade; D2 upgrades that to a fail-loud EXIT_USAGE.)
+    // version gate) so `locate_in` stays pure. A set-but-missing path is a FAIL-LOUD
+    // usage error (EXIT_USAGE): the user vouched for a specific binary that isn't
+    // there, so silently degrading — or falling back to exe-adjacent — would be
+    // surprising. (An empty value is treated as unset.)
     let explicit_env = std::env::var_os("ME_PREVIEW_BIN")
         .filter(|v| !v.is_empty())
         .map(std::path::PathBuf::from);
-    let explicit = explicit_env.as_deref().filter(|p| p.is_file());
+    if let Some(p) = &explicit_env {
+        if !p.is_file() {
+            eprintln!(
+                "me: ME_PREVIEW_BIN={} does not point to an existing file \
+                 (set it to the me-preview binary, or unset it for co-located discovery)",
+                p.display()
+            );
+            return Some(EXIT_USAGE);
+        }
+    }
 
-    // Discover the sidecar. Absent → graceful degrade (note, exit 0).
-    let sidecar = match preview::locate_sidecar(explicit) {
+    // Discover the sidecar. `explicit_env`, if set, is now known to exist and takes
+    // precedence; otherwise co-located-only. Absent → graceful degrade (note, exit 0).
+    let sidecar = match preview::locate_sidecar(explicit_env.as_deref()) {
         Some(p) => p,
         None => {
             eprintln!("me: preview skipped (install me-preview)");

@@ -687,6 +687,42 @@ mod preview {
         fs::remove_dir_all(&outdir).ok();
     }
 
+    // F11/D2: an explicit ME_PREVIEW_BIN that names a path which does not exist is a
+    // fail-loud usage error (EXIT_USAGE 2) with a distinct message naming the env var
+    // and the path — NOT a silent graceful-degrade and NOT a fall-back to co-located
+    // discovery. The user vouched for a specific binary that isn't there.
+    #[test]
+    fn set_but_missing_me_preview_bin_exit_2() {
+        let outdir = unique_dir("missing-bin-out");
+        let missing = unique_dir("missing-bin-parent").join("no-such-me-preview");
+
+        let assert = Command::cargo_bin("me")
+            .unwrap()
+            .env("ME_PREVIEW_BIN", &missing)
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .write_stdin(input())
+            .assert()
+            .code(2);
+        let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+        assert!(
+            stderr.contains("ME_PREVIEW_BIN"),
+            "error must name the env var: {stderr}"
+        );
+        assert!(
+            stderr.contains(&missing.display().to_string()),
+            "error must name the missing path: {stderr}"
+        );
+        // It must NOT have silently degraded (no skip note) or rendered.
+        assert!(
+            !stderr.contains("preview skipped"),
+            "set-but-missing must fail loud, not degrade: {stderr}"
+        );
+
+        fs::remove_dir_all(&outdir).ok();
+    }
+
     #[test]
     fn no_preview_flag_is_byte_for_byte_phase_a() {
         // With a fake present on PATH but WITHOUT --preview, output must match
