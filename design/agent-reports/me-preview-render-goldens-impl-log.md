@@ -36,4 +36,27 @@ One section per step: test written, failure line (right-reason), change, counts.
 - **Green:** `render_png_test.go:198: pixel-mass: disc=62702 hairline=12919 ratio=4.85x`
   (≈5×, matches R0 estimate). Full preview suite PASS; `go vet` clean.
 - **Measured pixel-mass ratio: 4.85× (disc 62702 vs hairline 12919 black px).**
+
+## Step B2 — render goldens (over the corrected disc-brush output)
+
+- **New `render_golden_test.go`** — `TestRenderGoldens` over MD1_REF (mode
+  text+qr): pins (a) SHA-256 of the whole SVG string, (b) exact M/C command
+  counts (`strings.Count(svg,"M "/"C ")`), (c) SHA-256 of the DECODED RGBA pixel
+  buffer `img.Pix` (Route A: renderPNG → png.Decode → assert *image.RGBA → hash
+  Pix — toolchain-stable, no production seam; R0 I1), (d) total black-pixel mass
+  (drift-guard like wantDx/wantDy; N4). `-update` flag registered ONCE at package
+  level, logs paste-ready values.
+- **Captured via `-update`:**
+  - `svgGolden = e1d0311f…499b`
+  - `pngPixGolden = 5d7d153b…368a`
+  - `mCountGolden = 2132`, `cCountGolden = 2578`, `blackCountGolden = 62702`
+- **Round-trip green** without `-update`. **Determinism: 3× runs identical (all ok).**
+- **Teeth proven (perturb-then-revert):**
+  1. Swap SVG `if line` → `if !line`: `SVG hash drift` + M/C swap to 2578/2132. Reverted.
+  2. Drop `dt==0` skip (`&& false`): `SVG hash drift` + counts 3158/3688. Reverted.
+  3. `discRadius` → `r+1`: `PNG decoded-pixel hash drift` + black mass 76049 vs 62702;
+     SVG assertions did NOT fire (PNG golden independently catches raster regressions).
+     Reverted.
+- All reverts confirmed clean (`git diff` empty for both prod files vs their
+  committed/HEAD state); full preview suite green; `go vet` clean.
 </content>
