@@ -137,7 +137,7 @@ fn run() -> i32 {
 
     // Emit per the selected output mode. Human guidance -> stderr only.
     if let Some(path) = &cli.out {
-        if let Err(e) = std::fs::write(path, &bytes) {
+        if let Err(e) = write_private(path, &bytes) {
             eprintln!("me: cannot write {}: {e}", path.display());
             return EXIT_USAGE;
         }
@@ -202,7 +202,7 @@ fn run_bundle_cli(
         }
     };
     if let Some(path) = manifest_path {
-        if let Err(e) = std::fs::write(path, json.as_bytes()) {
+        if let Err(e) = write_private(path, json.as_bytes()) {
             eprintln!("me: cannot write {}: {e}", path.display());
             return EXIT_USAGE;
         }
@@ -267,6 +267,35 @@ fn wire_previews(
         return Some(EXIT_USAGE);
     }
 
+    // Fail-closed (F8): refuse a dir that already holds foreign `plate-*` artifacts
+    // (e.g. higher-index plates from a prior run) so they can't mix into this
+    // manifest. We refuse rather than delete — never clobber a user file that
+    // happens to match. Scanned once, here, before any render; the loop's own
+    // writes below are not re-scanned.
+    match std::fs::read_dir(dir) {
+        Ok(entries) => {
+            for entry in entries.flatten() {
+                if let Some(name) = entry.file_name().to_str() {
+                    if is_plate_artifact(name) {
+                        eprintln!(
+                            "me: preview directory {} already contains plate artifacts \
+                             (e.g. {name}); use an empty/clean directory",
+                            dir.display()
+                        );
+                        return Some(EXIT_USAGE);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "me: cannot scan preview directory {}: {e}",
+                dir.display()
+            );
+            return Some(EXIT_USAGE);
+        }
+    }
+
     // Render each PUBLIC plate; ms1 is never rendered (no secret leaves `me`).
     for plate in manifest.plates.iter_mut() {
         if plate.kind == PlateKind::Ms1 {
@@ -287,12 +316,49 @@ fn wire_previews(
                 // (couldn't run the sidecar) is an environment/usage error → exit 2.
                 return Some(match e {
                     preview::PreviewError::Render { .. } => EXIT_INVALID,
+                    // A render that produced no usable artifact (empty/garbage
+                    // output) is an invalid outcome, same class as a render
+                    // failure → exit 4 (the default `_` would map it to 2).
+                    preview::PreviewError::EmptyOutput { .. } => EXIT_INVALID,
                     _ => EXIT_USAGE,
                 });
             }
         }
     }
     None
+}
+
+/// True if `name` is a preview plate artifact this tool writes: a `plate-` prefix
+/// AND a `.svg`/`.png` extension. Used by the F8 dirty-dir scan. Fail-closed: it
+/// must not over-match unrelated files (`notes.txt`, `plate.txt`, `plateau.svg`).
+fn is_plate_artifact(name: &str) -> bool {
+    name.starts_with("plate-") && (name.ends_with(".svg") || name.ends_with(".png"))
+}
+
+/// Write `bytes` to `path`, creating/truncating it with owner-only permissions.
+///
+/// F10 (D5-2): NDEF and manifest artifacts embed/depict md1/mk1 material, so on a
+/// multi-user host their at-rest copies must not be world/group-readable. Under
+/// Unix we create the file at mode `0o600`; on other platforms we fall back to the
+/// same create+truncate semantics without a mode (mode bits differ there — the
+/// threat model is POSIX). `.truncate(true)` is load-bearing: it preserves
+/// `std::fs::write`'s behavior so a shrinking overwrite (a smaller manifest over a
+/// larger one) can't leave trailing stale bytes → invalid JSON.
+///
+/// Note: `0o600` binds on CREATE. Overwriting a pre-existing world-readable file
+/// keeps its old mode — accepted residual (NDEF/manifest targets are user-named;
+/// preview targets are forced-fresh by the dirty-dir refusal).
+fn write_private(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::fs::OpenOptions;
+    let mut opts = OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    let mut f = opts.open(path)?;
+    f.write_all(bytes)
 }
 
 /// Minimal standard base64 (no padding-free shortcuts); avoids a dep for one use.
@@ -320,4 +386,23 @@ fn base64_encode(data: &[u8]) -> String {
         });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_plate_artifact;
+
+    // A1/F8: is_plate_artifact must match the tool's own plate names and the
+    // `plate-.svg` edge (a plate-artifact form), but never over-match near-misses.
+    #[test]
+    fn is_plate_artifact_classifies_near_miss_set() {
+        // Matches (a plate artifact this tool writes, or the accepted edge form).
+        assert!(is_plate_artifact("plate-2.svg"));
+        assert!(is_plate_artifact("plate-1.png"));
+        assert!(is_plate_artifact("plate-.svg")); // edge: accept — it IS the form.
+        // Near-misses that must NOT match.
+        assert!(!is_plate_artifact("notes.txt")); // no prefix, no ext.
+        assert!(!is_plate_artifact("plate.txt")); // no `plate-`, wrong ext.
+        assert!(!is_plate_artifact("plateau.svg")); // no `-` after `plate`.
+    }
 }
