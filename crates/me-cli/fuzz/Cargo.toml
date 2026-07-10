@@ -1,0 +1,39 @@
+[package]
+name = "mnemonic-engrave-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.mnemonic-engrave]
+path = ".."
+
+# SELF-DETACH from the root workspace (R0 L2): this empty `[workspace]` table makes
+# the fuzz crate its OWN workspace root with its OWN `fuzz/Cargo.lock`, so the
+# nightly-only fuzz deps (libfuzzer-sys / arbitrary) NEVER enter the root
+# resolution — stable `cargo test --locked` at the repo root is unaffected. The
+# root Cargo.toml ALSO `exclude`s this path (belt-and-suspenders).
+[workspace]
+
+# cargo-fuzz builds these in release with libFuzzer sanitizer coverage.
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "fuzz_convert"
+path = "fuzz_targets/fuzz_convert.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_run_bundle"
+path = "fuzz_targets/fuzz_run_bundle.rs"
+test = false
+doc = false
+bench = false

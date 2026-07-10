@@ -5,3 +5,9 @@ Cargo.lock.orig
 
 # Go build artifact (firmware/ndef-roundtrip)
 ndefroundtrip
+
+# cargo-fuzz generated artifacts (nightly-only fuzz crate; not CI-built). The fuzz
+# crate source + its own fuzz/Cargo.lock ARE committed; these runtime dirs are not.
+/crates/me-cli/fuzz/corpus
+/crates/me-cli/fuzz/artifacts
+/crates/me-cli/fuzz/target
