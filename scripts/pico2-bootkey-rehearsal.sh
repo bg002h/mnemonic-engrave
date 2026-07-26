@@ -129,6 +129,11 @@ otp_field() {
   local sel="$1" out v
   out="$(picotool otp get -n "$sel" 2>&1)" || die "OTP read failed for $sel:
 $out"
+  # CRIT1 is RBIT-8 and BOOT_FLAGS1 is RBIT-3; an inconsistent redundant read
+  # must not be parsed as a clean value.
+  printf '%s' "$out" | grep -qi 'WARNING' \
+    && die "picotool reported a warning reading $sel (redundant rows disagree or ECC invalid):
+$out"
   v="$(printf '%s\n' "$out" | grep -iE '^[[:space:]]*field ' | tail -1 \
        | sed -E 's/.*=[[:space:]]*//' | tr -d '[:space:]' | tr 'A-F' 'a-f')"
   [ -n "$v" ] || die "could not parse a field value for $sel from picotool output:
@@ -210,12 +215,29 @@ assert_stock_or_die() {
   ok "all four boot-key slots empty (all 16 rows each, parser validated)"
 }
 
+# Page-lock rows are ecc=false in picotool's table, so they must be read WITHOUT
+# -e and kept at full 24 bits: a genuinely locked page would decode as
+# ECC-invalid and be misreported as a read warning rather than as "LOCKED",
+# and masking to 16 bits would discard the third lock copy in bits 23:16.
+read_row_raw24() {
+  local sel="$1" out v
+  out="$(picotool otp get -n "$sel" 2>&1)" || die "OTP read failed for $sel:
+$out"
+  v="$(printf '%s\n' "$out" | grep -oiE '^[[:space:]]*VALUE 0x[0-9a-f]+' | tail -1 \
+       | grep -oiE '0x[0-9a-f]+' | sed 's/^0[xX]//' | tr 'A-F' 'a-f')"
+  [ -n "$v" ] || die "could not parse a VALUE line for row $sel:
+$out"
+  printf '%06x' $(( 16#$v & 0xffffff ))
+}
+
 check_page_locks() {
-  local l
+  local l v
   for l in PAGE1_LOCK0 PAGE1_LOCK1 PAGE2_LOCK0 PAGE2_LOCK1; do
-    local v; v="$(read_row "$l")"
+    v="$(read_row_raw24 "$l")"
     [ $((16#$v)) -eq 0 ] \
-      || die "$l is non-zero (0x$v) -- OTP pages are LOCKED. No further boot key can be added to this device."
+      || die "$l is non-zero (0x$v) -- OTP pages are LOCKED.
+No further boot key can be added to this device, and this procedure is
+impossible on it. STOP."
   done
   ok "OTP page locks clear (PAGE1/PAGE2) -- boot-key rows are writable"
 }
@@ -272,16 +294,32 @@ free slot instead; this one is permanently unusable."
   ok "slot $slot readback matches the expected hash across all 16 rows"
 }
 
-# flash_and_ask <image> <question>
-flash_and_ask() {
-  local img="$1" question="$2"
-  run picotool load --verify "$img"
-  run picotool reboot
-  [ "$EXECUTE" -eq 1 ] || return 0
-  printf '\n\033[1m%s\033[0m [y/n]: ' "$question"
+# Flashing and judging are SEPARATE on purpose. Folding them together (as an
+# `if flash_and_ask ...` condition) disabled `set -e` for the whole body, so a
+# failed `picotool load` fell through to the prompt: the operator saw no blink
+# BECAUSE NOTHING WAS FLASHED, answered "n", and a rejection test reported PASS.
+
+# flash_image <image> -- dies on any flash/reboot failure.
+flash_image() {
+  local img="$1"
+  if [ "$EXECUTE" -ne 1 ]; then
+    printf '\033[90m  [dry-run] picotool load --verify %s && picotool reboot\033[0m\n' "$img"
+    return 0
+  fi
+  [ -f "$img" ] || die "image not found: $img"
+  printf '\033[33m  $ picotool load --verify %s\033[0m\n' "$img"
+  picotool load --verify "$img" || die "FLASH FAILED for $img.
+Nothing was written to the board, so no boot verdict can be drawn. Fix the
+flash (board connected? in BOOTSEL? image valid?) and re-run this phase."
+  picotool reboot || die "REBOOT FAILED after flashing $img -- no verdict can be drawn."
+}
+
+# ask_blink <question> -> prints "yes" | "no" | "skip"  ("skip" only in dry-run)
+ask_blink() {
+  if [ "$EXECUTE" -ne 1 ]; then printf 'skip'; return 0; fi
+  printf '\n\033[1m%s\033[0m [y/n]: ' "$1" >&2
   read -r a
-  [ "$a" = "y" ] || return 1
-  return 0
+  case "$a" in y|Y) printf 'yes' ;; *) printf 'no' ;; esac
 }
 
 sign_image() {
@@ -336,16 +374,31 @@ case "$PHASE" in
   info "Reproduces cmd/controller/platform_sh2.go:510-518 on the Pico:"
   info "  AddBootKey(factory key) + EnableSecureBoot()"
   require_board
-  assert_stock_or_die
-
   [ -f "$WORKDIR/factory-key.pem" ] || die "factory-key.pem missing -- run phase 0"
 
-  hdr "1a -- build and validate the OTP json (no writes yet)"
-  make_otp_json "$WORKDIR/factory-key.pem" 0 "$WORKDIR/factory-otp.json"
+  # Resume support: aborting at the SET-VALID confirm leaves slot 0 burned but
+  # not valid. That board is fine to continue on, but a plain stock-check would
+  # tell the operator to throw it away.
+  SLOT0="$(read_slot 0)"
+  EXPECT0="$(key_hash "$WORKDIR/factory-key.pem")"
+  KV0="$(otp_field BOOT_FLAGS1.KEY_VALID)"
+  RESUME=0
+  if [ "$SLOT0" = "$EXPECT0" ] && [ $((16#$KV0)) -eq 0 ]; then
+    RESUME=1
+    warn "Slot 0 already holds this factory key but is NOT yet valid."
+    warn "Resuming a previously aborted phase 1 -- skipping the burn, going to verify."
+  else
+    assert_stock_or_die
+  fi
 
-  hdr "1b -- burn the key hash into slot 0"
-  confirm BURN-FACTORY
-  run picotool otp load "$WORKDIR/factory-otp.json"
+  if [ "$RESUME" -eq 0 ]; then
+    hdr "1a -- build and validate the OTP json (no writes yet)"
+    make_otp_json "$WORKDIR/factory-key.pem" 0 "$WORKDIR/factory-otp.json"
+
+    hdr "1b -- burn the key hash into slot 0"
+    confirm BURN-FACTORY
+    run picotool otp load "$WORKDIR/factory-otp.json"
+  fi
 
   hdr "1c -- verify all 16 rows BEFORE setting the valid bit"
   if [ "$EXECUTE" -eq 1 ]; then verify_slot_or_die 0 "$WORKDIR/factory-key.pem"
@@ -395,19 +448,26 @@ case "$PHASE" in
 
   hdr "3a -- an image signed with YOUR key (not yet burned)"
   run sign_image "$WORKDIR/blinky-mykey.uf2" "$WORKDIR/my-key.pem"
-  if flash_and_ask "$WORKDIR/blinky-mykey.uf2" "Did the LED blink (2 short + 1 long)?"; then
-    die "REJECTION FAILED: a your-key-signed image RAN on a board where your key
+  flash_image "$WORKDIR/blinky-mykey.uf2"
+  case "$(ask_blink 'Did the LED blink (2 short + 1 long)?')" in
+    skip) info "[dry-run] would REQUIRE no blink here" ;;
+    yes)  die "REJECTION FAILED: a your-key-signed image RAN on a board where your key
 is not a valid boot key. Secure boot is not being enforced. Do not continue,
-and do not trust phase 1's seal."
-  fi
-  ok "your-key-signed image was rejected, as it must be"
+and do not trust phase 1's seal." ;;
+    no)   ok "your-key-signed image was rejected, as it must be" ;;
+  esac
 
   hdr "3b -- an unsigned image"
-  run sh -c "( cd '$SEEDHAMMER_DIR' && go run seedhammer.com/cmd/picosign sign -clear '$WORKDIR/blinky-unsigned.uf2' )"
-  if flash_and_ask "$WORKDIR/blinky-unsigned.uf2" "Did the LED blink?"; then
-    die "REJECTION FAILED: an UNSIGNED image ran. Secure boot is not enforced."
-  fi
-  ok "unsigned image was rejected"
+  # The freshly built blinky has no SIGNATURE section at all (sign-firmware.sh
+  # is what adds one), so it is ALREADY unsigned -- running `picosign sign
+  # -clear` on it fails with "missing SIGNATURE section" and would abort the
+  # phase. Flash it as-is.
+  flash_image "$WORKDIR/blinky-unsigned.uf2"
+  case "$(ask_blink 'Did the LED blink?')" in
+    skip) info "[dry-run] would REQUIRE no blink here" ;;
+    yes)  die "REJECTION FAILED: an UNSIGNED image ran. Secure boot is not enforced." ;;
+    no)   ok "unsigned image was rejected" ;;
+  esac
 
   ok_done "prove the sealed board rejects untrusted images -- the precondition for phases 5/6 meaning anything."
   ;;
@@ -456,14 +516,39 @@ and do not trust phase 1's seal."
   [ -f "$WORKDIR/blinky-mykey.uf2" ] || die "no phase-3 image found -- run phase 3 first so this is a true A/B"
 
   info "Re-flashing the SAME your-key-signed image phase 3 proved was rejected."
-  if flash_and_ask "$WORKDIR/blinky-mykey.uf2" "Did the LED blink (2 short + 1 long)?"; then
-    ok "ACCEPTED after the key burn -- reject->accept across one OTP write."
-    ok "The signing chain and the OTP procedure are both proven on real silicon."
-  else
-    die "Your key is burned and valid, but your signed image still will not boot.
+  flash_image "$WORKDIR/blinky-mykey.uf2"
+  case "$(ask_blink 'Did the LED blink (2 short + 1 long)?')" in
+    skip) info "[dry-run] would REQUIRE a blink here" ;;
+    yes)  ok "ACCEPTED after the key burn -- reject->accept across one OTP write."
+          ok "The signing chain and the OTP procedure are both proven on real silicon." ;;
+    no)   die "Your key is burned and valid, but your signed image still will not boot.
 Something in the signing chain is wrong -- investigate before touching the
 SeedHammer II. See sign-firmware.sh and note M3 (possible high-s signature):
-re-sign once to get a fresh nonce before concluding the chain is broken."
+re-sign once to get a fresh nonce before concluding the chain is broken." ;;
+  esac
+
+  # F11(d): boot acceptance so far is only ever shown with a tiny TinyGo image.
+  # The real firmware has a different block structure, so prove IT is accepted
+  # too. It cannot run on a Pico (no SeedHammer peripherals), so the acceptance
+  # signal is negative: a REJECTED secure-boot image returns to BOOTSEL, an
+  # accepted one does not.
+  FW_REAL="$(ls -1 "$SEEDHAMMER_DIR"/seedhammerii-*.uf2 2>/dev/null | head -1 || true)"
+  if [ -n "$FW_REAL" ]; then
+    hdr "5b -- the REAL fork firmware, signed with your key"
+    run cp "$FW_REAL" "$WORKDIR/fw-mykey.uf2"
+    run sign_image "$WORKDIR/fw-mykey.uf2" "$WORKDIR/my-key.pem"
+    flash_image "$WORKDIR/fw-mykey.uf2"
+    info "Expect NO blink (it has no LED code) and NO SeedHammer UI (no hardware)."
+    case "$(ask_blink 'Did the board REAPPEAR as a BOOTSEL drive (i.e. was the image rejected)?')" in
+      skip) info "[dry-run] would REQUIRE the board NOT to fall back to BOOTSEL" ;;
+      yes)  die "The real firmware image was REJECTED (board fell back to BOOTSEL) even
+though the blinky was accepted. The signing chain does not generalise to the
+2.4MB image -- investigate before touching the SeedHammer II." ;;
+      no)   ok "real firmware accepted by the bootrom (hangs on missing hardware, as expected)" ;;
+    esac
+  else
+    warn "No seedhammerii-*.uf2 found in $SEEDHAMMER_DIR -- skipping 5b."
+    warn "F11(d) unproven: acceptance shown only for the small blinky image."
   fi
   ok_done "confirm the previously-rejected image now boots."
   ;;
@@ -477,13 +562,14 @@ re-sign once to get a fresh nonce before concluding the chain is broken."
   cp "$WORKDIR/blinky.uf2" "$WORKDIR/blinky-factory.uf2"
   run sign_image "$WORKDIR/blinky-factory.uf2" "$WORKDIR/factory-key.pem"
 
-  if flash_and_ask "$WORKDIR/blinky-factory.uf2" "Did the LED blink?"; then
-    ok "Both keys boot. Leaving SeedHammer's slot valid really does preserve the fallback."
-  else
-    die "A factory-key-signed image no longer boots on a dual-trust board.
+  flash_image "$WORKDIR/blinky-factory.uf2"
+  case "$(ask_blink 'Did the LED blink?')" in
+    skip) info "[dry-run] would REQUIRE a blink here" ;;
+    yes)  ok "Both keys boot. Leaving SeedHammer's slot valid really does preserve the fallback." ;;
+    no)   die "A factory-key-signed image no longer boots on a dual-trust board.
 The recovery path assumed by the runbook does not hold. STOP -- do not perform
-this procedure on the SeedHammer II."
-  fi
+this procedure on the SeedHammer II." ;;
+  esac
   ok_done "confirm the factory key still boots alongside yours."
   ;;
 

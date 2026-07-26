@@ -128,8 +128,12 @@ ok "signature verifies against the image digest"
 # in the image: a DER->raw conversion bug (r/s order, padding) would otherwise
 # pass every offline check and only fail on the device.
 EMB="$(picosign extract "$IMG" | tr -d '\n' | tr 'A-F' 'a-f')"
+# asn1parse strips leading zero bytes, so an r or s with a zero high byte prints
+# fewer than 64 hex digits (~1 signature in 128). Left-pad each half to 32 bytes
+# rather than silently skipping the comparison.
 RS="$(openssl asn1parse -inform DER -in "$WORK/sig.der" 2>/dev/null \
-      | grep -oiE ':[0-9A-F]{64}$' | tr -d ':' | tr 'A-F' 'a-f' | tr -d '\n')"
+      | grep -oiE ':[0-9A-F]+$' | tr -d ':' | tr 'A-F' 'a-f' \
+      | while read -r half; do printf '%064s' "$half" | tr ' ' '0'; done)"
 [ -n "$EMB" ] || die "could not extract the embedded signature"
 if [ -n "$RS" ] && [ ${#RS} -eq 128 ]; then
   [ "$EMB" = "$RS" ] || die "embedded signature does not match the DER r||s bytes:
