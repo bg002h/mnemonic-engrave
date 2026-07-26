@@ -38,6 +38,10 @@ WORKDIR="${WORKDIR:-./rehearsal-work}"
 EXECUTE=0
 PHASE=""
 
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# The seedhammer fork provides cmd/picosign, used by scripts/sign-firmware.sh.
+SEEDHAMMER_DIR="${SEEDHAMMER_DIR:-$(cd "$REPO_ROOT/../seedhammer" 2>/dev/null && pwd || true)}"
+
 die()  { printf '\n\033[31mFAIL:\033[0m %s\n' "$*" >&2; exit 1; }
 ok()   { printf '\033[32m  PASS:\033[0m %s\n' "$*"; }
 
@@ -232,30 +236,28 @@ case "$PHASE" in
 4)
   hdr "Phase 4 -- sign an image with YOUR key and confirm it boots (retryable)"
   info "Nothing here touches OTP. Get it wrong as often as you need."
-  info "Use any small RP2350 UF2 that has a SIGNATURE section (picotool seal creates one)."
 
-  FW="${FW:-$WORKDIR/test.uf2}"
-  [ -f "$FW" ] || die "set FW=<path to a test .uf2>, or build one first"
+  # Default payload: the rehearsal blinky. Its LED pattern (2 short + 1 long) is
+  # the eyes-on proof that the bootrom ACCEPTED a self-signed image -- a rejected
+  # image never reaches main(). Build it for the PLAIN Pico 2: on the Pico 2 W the
+  # LED sits behind the CYW43 chip and machine.LED does nothing.
+  FW="${FW:-$WORKDIR/blinky.uf2}"
+  if [ ! -f "$FW" ]; then
+    info "building the rehearsal blinky (-target pico2)"
+    run sh -c "cd '$REPO_ROOT/scripts/rehearsal-blinky' && tinygo build -o '$FW' -target pico2 -opt 2 ."
+    [ "$EXECUTE" -eq 1 ] && { [ -f "$FW" ] || die "blinky build produced no image"; }
+  fi
 
-  PUB=$(openssl ec -in "$WORKDIR/my-key.pem" -pubout -conv_form compressed \
-        -outform DER 2>/dev/null | tail -c 33 | xxd -p -c 33)
-  info "compressed pubkey: $PUB"
+  info "Signing + PROVING the signature offline via scripts/sign-firmware.sh."
+  info "That script asserts the digest is unchanged after embedding the signature"
+  info "(i.e. the signature is outside the hashed region) and verifies the"
+  info "signature against the digest with openssl before anything is flashed."
+  run sh -c "SEEDHAMMER_DIR='$SEEDHAMMER_DIR' '$REPO_ROOT/scripts/sign-firmware.sh' '$FW' '$WORKDIR/my-key.pem'"
 
-  info "ORDERING MATTERS: the signed hash covers the block INCLUDING the public key"
-  info "but excluding the signature, so the real pubkey must be embedded before hashing."
-  run go run seedhammer.com/cmd/picosign sign -pubkey "$PUB" \
-      -sig "$(printf '0%.0s' {1..128})" "$FW"
-  run sh -c "go run seedhammer.com/cmd/picosign hash '$FW' > '$WORKDIR/digest.bin'"
-  run openssl pkeyutl -sign -inkey "$WORKDIR/my-key.pem" \
-      -in "$WORKDIR/digest.bin" -out "$WORKDIR/sig.der"
-  run sh -c "go run seedhammer.com/cmd/picosign sign -pubkey '$PUB' \
-      -sig \"\$(xxd -p -c 256 '$WORKDIR/sig.der')\" -sigfmt der '$FW'"
-
-  info "Expect exactly TWO metadata blocks; three means it was sealed twice -- rebuild."
-  picotool info -a "$FW" || true
-
+  info "picotool should report 'signature: verified' above."
   run picotool load --verify "$FW"
   run picotool reboot
+  info "PASS = the LED blinks 2-short-then-1-long. No blink = image rejected."
   ok_done "flash your self-signed image; if the board runs it, the sign chain is proven end-to-end."
   ;;
 
@@ -265,20 +267,19 @@ case "$PHASE" in
   info "This proves that leaving SeedHammer's slot valid preserves your fallback to"
   info "official firmware. If this fails, do not proceed on the real device."
 
-  FW="${FW:-$WORKDIR/test.uf2}"
-  PUB=$(openssl ec -in "$WORKDIR/factory-key.pem" -pubout -conv_form compressed \
-        -outform DER 2>/dev/null | tail -c 33 | xxd -p -c 33)
+  # Re-sign a FRESH copy of the blinky with the factory key. Use a copy so the
+  # your-key-signed image from phase 4 survives for comparison.
+  SRC="${FW:-$WORKDIR/blinky.uf2}"
+  [ -f "$SRC" ] || die "no blinky image at $SRC -- run phase 4 first"
+  FACFW="$WORKDIR/blinky-factory-signed.uf2"
+  run cp "$SRC" "$FACFW"
 
-  run go run seedhammer.com/cmd/picosign sign -pubkey "$PUB" \
-      -sig "$(printf '0%.0s' {1..128})" "$FW"
-  run sh -c "go run seedhammer.com/cmd/picosign hash '$FW' > '$WORKDIR/digest2.bin'"
-  run openssl pkeyutl -sign -inkey "$WORKDIR/factory-key.pem" \
-      -in "$WORKDIR/digest2.bin" -out "$WORKDIR/sig2.der"
-  run sh -c "go run seedhammer.com/cmd/picosign sign -pubkey '$PUB' \
-      -sig \"\$(xxd -p -c 256 '$WORKDIR/sig2.der')\" -sigfmt der '$FW'"
-  run picotool load --verify "$FW"
+  run sh -c "SEEDHAMMER_DIR='$SEEDHAMMER_DIR' '$REPO_ROOT/scripts/sign-firmware.sh' '$FACFW' '$WORKDIR/factory-key.pem'"
+  run picotool load --verify "$FACFW"
   run picotool reboot
 
+  info "PASS = the LED still blinks. Both your key and the factory key boot,"
+  info "so leaving SeedHammer's slot valid really does preserve the fallback."
   ok_done "flash a factory-signed image; if it also boots, the recovery path is confirmed."
   ;;
 

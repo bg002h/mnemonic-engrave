@@ -54,13 +54,31 @@ Do not skip it.
 ## Prerequisites
 
 - **Toolchain.** None of `nix`, `go`, `tinygo`, `picotool` are installed on the
-  current workstation (checked 2026-07-26). Nix is the gate — the flake pins
-  TinyGo 0.41.1, picotool, the RPi openocd fork, and Go. Install Nix with flakes,
-  then `nix develop` in the fork gives you everything.
-- **A rehearsal board.** A Pico 2 or Pico Plus 2 (~$5). The firmware targets
-  `-target pico-plus2` — *the same silicon*. Do the whole OTP dance there first.
-  A mistake costs $5 instead of a SeedHammer II boot slot.
+  current workstation. ✅ **RESOLVED 2026-07-26** — Nix installed; `nix develop`
+  in the fork provides picotool **2.2.0-a4**, TinyGo **0.41.1**, the RPi openocd
+  fork, and Go 1.26.
+  **Use the official nixos.org Nix, NOT `pacman -S nix`** — the CachyOS
+  `cachyos-extra-v3/nix` build segfaults on every invocation (libstdc++ static
+  init → glibc `__newlocale` → `operator delete[]` into `libmimalloc.so.3`).
+  Same version 2.35.1 from upstream works fine.
+- **A rehearsal board.** A plain **Pico 2** (~$5) — *not* a Pico 2 W as the
+  primary: on the W the LED sits behind the CYW43 chip, so the rehearsal blinky
+  gives no visible pass signal. Package (RP2350A vs B) is irrelevant here; the
+  OTP layout is identical, and our firmware cannot run meaningfully on any Pico
+  anyway. Do the whole OTP dance there first — a mistake costs $5 instead of a
+  SeedHammer II boot slot. See `scripts/pico2-bootkey-rehearsal.sh`.
 - **USB-C cable.** No debug probe is required; everything is PICOBOOT over USB.
+
+> **Reproducible build confirmed (2026-07-26).** A local
+> `env VERSION=66d3121691ecf325b35e44285c1b2e7cf5250cce nix run .#build-firmware`
+> produced an image byte-identical to the CI artifact for the same commit —
+> sha256 `0e576b452f641168a42c28339845a568e5a3ac920d670fb7bef024ccf4c4f9dc`.
+> The firmware you sign is verifiably the artifact CI built from a readable
+> commit, not something only your machine can produce.
+>
+> Note `VERSION` must be pinned to the commit SHA to match CI; `build-firmware`
+> otherwise defaults to `git describe`, and the version string is compiled in via
+> `-ldflags`. In fish use `env VERSION=… nix run …` (fish has no `VAR=val cmd`).
 
 ---
 
@@ -144,25 +162,43 @@ hash is computed. `picosign sign` writes pubkey+signature as one 128-byte region
 (`cmd/picosign/main.go:119-165`), so the sequence is: embed pubkey with a dummy
 signature → hash → sign the hash → embed the real signature.
 
+**Use the script — it proves the result rather than assuming it:**
+
 ```sh
-FW=seedhammerii-<version>.uf2
-PUB=$(openssl ec -in my-key.pem -pubout -conv_form compressed -outform DER \
-      | tail -c 33 | xxd -p -c 33)
-
-# 5a. Embed the real pubkey with a placeholder signature.
-go run seedhammer.com/cmd/picosign sign -pubkey "$PUB" \
-   -sig "$(printf '0%.0s' {1..128})" "$FW"
-
-# 5b. Extract the digest (raw bytes on stdout) and sign it.
-go run seedhammer.com/cmd/picosign hash "$FW" > digest.bin
-openssl pkeyutl -sign -inkey my-key.pem -in digest.bin -out sig.der
-
-# 5c. Embed the real signature.
-go run seedhammer.com/cmd/picosign sign -pubkey "$PUB" \
-   -sig "$(xxd -p -c 256 sig.der)" -sigfmt der "$FW"
-
-picotool info -a "$FW"    # expect exactly TWO metadata blocks
+cd /scratch/code/shibboleth/seedhammer
+nix develop --command ../mnemonic-engrave/scripts/sign-firmware.sh \
+    seedhammerii-<version>.uf2 my-key.pem
 ```
+
+`scripts/sign-firmware.sh` runs the sequence above and then does two things the
+raw commands cannot:
+
+1. **Asserts the digest is unchanged** after embedding the signature. That is
+   the ordering assumption made testable — if the digest moved, the signature
+   would be inside the hashed region and *no* signature could ever verify.
+2. **Verifies the signature against the digest with openssl**, offline. Combined
+   with `picotool info -a` reporting `signature: verified`, you know the image is
+   correctly signed *before* flashing, instead of learning it from a device that
+   refuses to boot.
+
+✅ **Validated 2026-07-26** end-to-end on both branches — a freshly built blinky
+(no SIGNATURE section → seal path) and the real 2.4 MB firmware image (section
+already present). Both reached `signature: verified`.
+
+<details>
+<summary>The underlying sequence, for reference</summary>
+
+`picosign sign` writes pubkey+signature as one 128-byte region
+(`cmd/picosign/main.go:119-165`), and the signed hash covers the block including
+the public key but excluding the signature — hence: embed pubkey with a dummy
+signature → hash → sign the hash → embed the real signature → expect exactly TWO
+metadata blocks (three means the image was sealed twice; rebuild).
+
+Note the hex helper: `nix develop` *prepends* to PATH rather than purging it, so
+`xxd` in ad-hoc commands silently resolves to the host `/usr/bin/xxd` and is not
+provided by the devshell. The script uses `od` from nix coreutils instead, so it
+does not depend on host tooling.
+</details>
 
 Three metadata blocks means the image got sealed twice — rebuild from step 4.
 
@@ -207,9 +243,23 @@ Revoking is permanent and removes that path.
 
 ## Open items to resolve before executing
 
-1. **Rehearse the entire flow on a Pico 2 / Pico Plus 2 first.** Non-negotiable.
-2. **Re-verify** the community guide's `picotool` invocations against the RP2350
-   datasheet and your installed picotool version — flag/field names have shifted
-   across picotool releases.
-3. Decide whether to build from the fork `main` merge commit `66d3121`
-   (upstream v1.4.3 + our features) or to tag a fork release first.
+1. ⬜ **Rehearse the entire flow on a plain Pico 2 first.** Non-negotiable.
+   Boards ordered 2026-07-26 (one Pico 2 + one Pico 2 W as spare); run
+   `scripts/pico2-bootkey-rehearsal.sh` phases 0→5 to completion. Remember the
+   board is *consumed* — a full run burns 2 of its 4 slots and seals it.
+2. ✅ **RESOLVED 2026-07-26 — picotool field names verified** against the
+   installed **picotool 2.2.0-a4** (`picotool otp list`):
+   `CRIT1.SECURE_BOOT_ENABLE` = bit 0; `BOOT_FLAGS1.KEY_VALID` = bits 0-3;
+   `BOOT_FLAGS1.KEY_INVALID` = bits 8-11; `BOOTKEY0_0` at row `0x0080`
+   (16 rows per key). `KEY_VALID` being 4 bits independently corroborates
+   4 boot-key slots, matching `driver/otp/otp.go:15` `NumBootKeySlots = 4` and
+   the `BOOTKEY0_0 = 0x080` constant at `otp.go:20`. The names used throughout
+   this runbook are correct for this picotool version.
+3. ⬜ Decide whether to build from the fork `main` merge commit `66d3121`
+   (upstream v1.4.3 + our features, CI-green and reproducible) or to tag a fork
+   release first.
+4. ⬜ **Still unverified on real hardware:** that a sealed device accepts OTP
+   writes to a spare slot. Our code read says yes (`driver/otp/` never writes
+   page locks, `DEBUG_DISABLE`, or `KEY_INVALID`), and the community guide agrees
+   — but this is the one assumption the whole procedure rests on and it has never
+   been executed. Rehearsal **phase 2** is precisely this test; do not skip it.
