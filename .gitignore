@@ -11,3 +11,8 @@ ndefroundtrip
 /crates/me-cli/fuzz/corpus
 /crates/me-cli/fuzz/artifacts
 /crates/me-cli/fuzz/target
+
+# Working dir for scripts/pico2-bootkey-rehearsal.sh. Contains secp256k1 PRIVATE
+# KEYS (the boot-signing keys) and generated OTP json. NEVER commit this.
+rehearsal-work/
+*-key.pem
