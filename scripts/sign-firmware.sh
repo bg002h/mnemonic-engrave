@@ -37,6 +37,11 @@ IMG="${1:-}"; KEY="${2:-}"
 [ -n "$IMG" ] && [ -n "$KEY" ] || die "usage: $0 <image.uf2> <key.pem>"
 [ -f "$IMG" ] || die "no such image: $IMG"
 [ -f "$KEY" ] || die "no such key: $KEY"
+# Absolute paths are mandatory: picosign runs after `cd $SEEDHAMMER_DIR`, so a
+# relative image path would resolve against the fork and fail -- and step 1
+# would misread that failure as "no SIGNATURE section" and re-seal the input.
+IMG="$(realpath "$IMG")"
+KEY="$(realpath "$KEY")"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SEEDHAMMER_DIR="${SEEDHAMMER_DIR:-$(cd "$REPO_ROOT/../seedhammer" 2>/dev/null && pwd || true)}"
@@ -64,15 +69,23 @@ openssl ec -in "$KEY" -noout -text 2>/dev/null | grep -qi 'secp256k1\|ASN1 OID: 
 ok "key is secp256k1"
 
 hdr "1 -- ensure the image has a SIGNATURE section"
-if ! picosign hash "$IMG" >/dev/null 2>&1; then
+# Distinguish "no SIGNATURE section" from every other failure. Treating any
+# error as "needs sealing" would silently re-seal a good image with a throwaway
+# key, producing a double-sealed 3-metadata-block file.
+if HASH_ERR="$(picosign hash "$IMG" 2>&1 >/dev/null)"; then
+  ok "SIGNATURE section already present"
+elif printf '%s' "$HASH_ERR" | grep -qiE 'missing SIGNATURE section|missing HASH_DEF item'; then
   info "no SIGNATURE section; sealing with a throwaway key to create the structure"
   openssl ecparam -name secp256k1 -genkey -noout -out "$WORK/seal.pem"
-  picotool seal --sign --clear --quiet "$IMG" "$WORK/sealed.uf2" "$WORK/seal.pem"
+  picotool seal --sign --clear --quiet "$IMG" "$WORK/sealed.uf2" "$WORK/seal.pem" \
+    || die "picotool seal failed"
   cp "$WORK/sealed.uf2" "$IMG"
   picosign sign -clear "$IMG"
   ok "SIGNATURE section created and zeroed"
 else
-  ok "SIGNATURE section already present"
+  die "picosign could not read $IMG (this is NOT a missing-signature-section error,
+so the image has deliberately been left untouched):
+$HASH_ERR"
 fi
 
 hdr "2 -- embed the real public key (with a placeholder signature)"
@@ -111,10 +124,34 @@ openssl pkeyutl -verify -pubin -inkey "$WORK/pub.pem" \
   || die "signature does NOT verify against the image digest -- do not flash"
 ok "signature verifies against the image digest"
 
-hdr "7 -- structural check"
-BLOCKS="$(picotool info -a "$IMG" 2>/dev/null | grep -ci 'metadata block' || true)"
-picotool info -a "$IMG" 2>&1 | head -20
-info "a doubly-sealed image shows THREE metadata blocks; rebuild if so"
+# The check above validates the sig.der FILE. Confirm the bytes actually landed
+# in the image: a DER->raw conversion bug (r/s order, padding) would otherwise
+# pass every offline check and only fail on the device.
+EMB="$(picosign extract "$IMG" | tr -d '\n' | tr 'A-F' 'a-f')"
+RS="$(openssl asn1parse -inform DER -in "$WORK/sig.der" 2>/dev/null \
+      | grep -oiE ':[0-9A-F]{64}$' | tr -d ':' | tr 'A-F' 'a-f' | tr -d '\n')"
+[ -n "$EMB" ] || die "could not extract the embedded signature"
+if [ -n "$RS" ] && [ ${#RS} -eq 128 ]; then
+  [ "$EMB" = "$RS" ] || die "embedded signature does not match the DER r||s bytes:
+  embedded: $EMB
+  from DER: $RS
+A DER->raw conversion bug would pass the openssl check above but fail on device."
+  ok "embedded signature bytes match the DER r||s conversion"
+else
+  info "could not normalise DER for byte comparison; relying on picotool's verdict below"
+fi
+
+hdr "7 -- structural check (asserted, not merely printed)"
+INFO="$(picotool info -a "$IMG" 2>&1)"
+printf '%s\n' "$INFO" | grep -iE 'image type|signature|metadata block'
+BLOCKS="$(printf '%s' "$INFO" | grep -ci 'metadata block' || true)"
+[ "$BLOCKS" -eq 2 ] \
+  || die "expected exactly 2 metadata blocks, found $BLOCKS.
+Three means the image was sealed twice -- rebuild from source and re-sign."
+ok "exactly 2 metadata blocks"
+printf '%s' "$INFO" | grep -qi 'signature: *verified' \
+  || die "picotool does not report 'signature: verified' for this image -- do not flash"
+ok "picotool independently reports: signature verified"
 
 hdr "RESULT"
 ok "$IMG is signed by $KEY and the signature is proven valid offline."

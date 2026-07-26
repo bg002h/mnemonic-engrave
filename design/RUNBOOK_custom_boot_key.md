@@ -89,53 +89,88 @@ near the hammerhead) while connecting USB.
 
 ```sh
 picotool info
-picotool otp get CRIT1.SECURE_BOOT_ENABLE
-picotool otp get BOOT_FLAGS1.KEY_VALID
-for k in BOOTKEY0_0 BOOTKEY1_0 BOOTKEY2_0 BOOTKEY3_0; do
-  echo "--- $k ---"; picotool otp get -e "$k"
+picotool otp get -n CRIT1.SECURE_BOOT_ENABLE
+picotool otp get -n BOOT_FLAGS1.KEY_VALID
+for i in $(seq 0 15); do picotool otp get -n -e "BOOTKEY0_$i"; done   # slot 0
+for s in 1 2 3; do for i in $(seq 0 15); do picotool otp get -n -e "BOOTKEY${s}_$i"; done; done
+
+# Are the OTP pages locked? This is the ONLY read-only way to learn whether a
+# second boot key can ever be added. Page 1 covers CRIT1/BOOT_FLAGS1; page 2
+# covers BOOTKEY0-3.
+for l in PAGE1_LOCK0 PAGE1_LOCK1 PAGE2_LOCK0 PAGE2_LOCK1; do
+  picotool otp get -n -e "$l"
 done
 ```
 
-**Expected on a stock sealed unit:** `SECURE_BOOT_ENABLE` set; `KEY_VALID` = `0x1`
-(slot 0 only); slot 0 holding `c8314536d6af61ac2e62e5991e3e4711629c54696ba8c4af08965a1d319a473b`;
-slots 1–3 all zero.
+Read field values from the `field ... = <hex>` line, **not** from `VALUE 0x…` —
+`VALUE` is the whole 24-bit row and includes unrelated bits (e.g. `KEY_INVALID`
+sits in the same row as `KEY_VALID`).
 
-**STOP and reassess if:** more than one slot is valid, slots 1–3 are non-zero, any
-OTP write returns "not permitted", or slot 0's hash does not match the constant at
-`platform_sh2.go:70`. Any of those invalidates the assumptions above.
+**Expected on a stock sealed unit:** `SECURE_BOOT_ENABLE` = 1; `KEY_VALID` = `0x1`
+(slot 0 only); slot 0 holding `c8314536d6af61ac2e62e5991e3e4711629c54696ba8c4af08965a1d319a473b`
+(each row is two bytes, **low byte first**, so byte-swap each row when
+reassembling); slots 1–3 all zero; **all four page-lock rows zero**.
+
+**STOP and reassess if:** more than one slot is valid, slots 1–3 are non-zero,
+slot 0's hash does not match the constant at `platform_sh2.go:70`, or **any
+page-lock row is non-zero** — a locked page means no further boot key can ever be
+added to this device and the whole procedure is impossible.
+
+> Note the page-lock check is *necessary but not sufficient*: picotool discovers
+> most lock conditions only at write time (its own source carries a
+> `// todo pre-check page lock`). The first genuine proof that a sealed device
+> accepts a spare-slot write is the write itself, in step 2 — which is why the
+> Pico rehearsal must be completed first.
 
 ## Step 2 — Generate your key and burn its hash (IRREVERSIBLE)
 
 ```sh
 openssl ecparam -name secp256k1 -genkey -noout -out my-key.pem
-openssl ec -in my-key.pem -pubout -out my-pubkey.pem
+# Or encrypted at rest -- this key gates firmware for a device holding your
+# backups, and it must survive for the life of the machine:
+#   openssl ec -in my-key.pem -aes256 -out my-key.enc.pem
 ```
 
 Back `my-key.pem` up now — losing it means you can never sign another firmware
 update for this device, and you'd be left with only SeedHammer's official
-releases (which is why step 6 exists as a *don't*).
+releases (which is why step 7 exists as a *don't*).
 
-Have picotool compute the hash — **never hand-compute it.** It must be SHA-256 of
-the **uncompressed 64-byte X‖Y** public key, not the 33-byte compressed form.
+The value burned into OTP is SHA-256 of the **uncompressed 64-byte X‖Y** public
+key — not the 33-byte compressed form. **Never hand-compute or hand-verify it.**
+Compute it two independent ways and require them to agree:
 
 ```sh
-picotool seal --sign placeholder.elf discard.elf my-key.pem my-otp.json
-rm discard.elf
+# (a) independently, with openssl
+openssl ec -in my-key.pem -pubout -conv_form uncompressed -outform DER \
+  | tail -c 64 | sha256sum
+
+# (b) what picotool will actually burn (seal needs a REAL RP2350 image --
+#     there is no such thing as a 'placeholder.elf')
+picotool seal --sign --quiet seedhammerii-<version>.uf2 /tmp/discard.uf2 \
+  my-key.pem my-otp-raw.json
+jq -r '.bootkey0[]' my-otp-raw.json | awk '{printf "%02x",$1}'; echo
 ```
 
-Edit `my-otp.json` down to *only* your slot, renaming `bootkey0` → `bootkey1`.
-Delete the `boot_flags1` and `crit1` entries — the valid bit comes later, after
-verification.
+Then reduce the json to *only* your slot — scripted, not hand-edited, and
+asserted before it is ever loaded:
 
 ```sh
+jq '{bootkey1: .bootkey0}' my-otp-raw.json > my-otp.json   # keep ONLY the key
+jq -e 'has("crit1") or has("boot_flags1")' my-otp.json && echo "REFUSE: would seal early"
 picotool otp load my-otp.json
-picotool otp get -e BOOTKEY1_0 BOOTKEY1_1 ... BOOTKEY1_15   # verify all 16 rows
 ```
 
-**Verify every row before proceeding.** Each row holds two bytes, low byte first.
-If any row disagrees, **stop** — the slot is not yet marked valid, so the device
-still boots official firmware normally, and you can move to slot 2 instead. You
-have three slots; treat each as one attempt.
+Dropping `crit1`/`boot_flags1` is not cosmetic: loading the unedited file would
+set the key hash **and** `KEY_VALID` **and** `SECURE_BOOT_ENABLE` in a single
+shot, sealing the device before a single row had been verified.
+
+**Then verify all 16 rows mechanically, before the valid bit.** Do not eyeball
+byte-swapped hex. `scripts/pico2-bootkey-rehearsal.sh` contains `read_slot()` /
+`verify_slot_or_die()`, which read all 16 rows, byte-swap, reassemble, and
+compare against the openssl-derived hash — use that same code here. If it
+mismatches, **stop**: the slot is not yet valid, so the device still boots
+normally, and you can move to slot 2. You have three slots; treat each as one
+attempt.
 
 ## Step 3 — Mark the slot valid (IRREVERSIBLE)
 
@@ -245,8 +280,13 @@ Revoking is permanent and removes that path.
 
 1. ⬜ **Rehearse the entire flow on a plain Pico 2 first.** Non-negotiable.
    Boards ordered 2026-07-26 (one Pico 2 + one Pico 2 W as spare); run
-   `scripts/pico2-bootkey-rehearsal.sh` phases 0→5 to completion. Remember the
+   `scripts/pico2-bootkey-rehearsal.sh` phases 0→6 to completion. Remember the
    board is *consumed* — a full run burns 2 of its 4 slots and seals it.
+   **Phase 3 (negative control) is not optional:** it proves the sealed board
+   *rejects* an image signed with a not-yet-burned key. Only then does the same
+   image booting in phase 5 — after the key burn, the single variable — prove
+   anything. Skipping it means a board that was never really sealed would sail
+   through with a green result.
 2. ✅ **RESOLVED 2026-07-26 — picotool field names verified** against the
    installed **picotool 2.2.0-a4** (`picotool otp list`):
    `CRIT1.SECURE_BOOT_ENABLE` = bit 0; `BOOT_FLAGS1.KEY_VALID` = bits 0-3;
@@ -262,4 +302,19 @@ Revoking is permanent and removes that path.
    writes to a spare slot. Our code read says yes (`driver/otp/` never writes
    page locks, `DEBUG_DISABLE`, or `KEY_INVALID`), and the community guide agrees
    — but this is the one assumption the whole procedure rests on and it has never
-   been executed. Rehearsal **phase 2** is precisely this test; do not skip it.
+   been executed.
+   **Correction (2026-07-26):** an earlier draft claimed rehearsal phase 2 was
+   this test. It is not — phase 2 only *reads* (page locks + slot state), and a
+   read cannot prove writability. The first genuine sealed-board write is
+   rehearsal **phase 4**, which is itself irreversible. Page locks are a
+   necessary-not-sufficient precheck; run them on the SH2 in step 1, and accept
+   that the definitive answer only arrives at the moment of the real write.
+5. ✅ **RESOLVED 2026-07-26 — the official-firmware fallback is real.** Verified
+   offline against `seedhammerii-v1.4.3.uf2`: `picotool info -a` reports
+   `signature: verified`, and SHA-256 of its embedded uncompressed pubkey is
+   `c8314536…319a473b`, matching `signKeyHash` (`platform_sh2.go:70`); its
+   X-coordinate also matches the flake's `copy-signature` constant. Official
+   releases ship signed by the slot-0 key, so leaving slot 0 valid genuinely
+   preserves a bootable recovery path. (Note our *own* build ships with a zeroed
+   signature by design — `picosign sign -clear` — so it is not evidence either
+   way about upstream releases.)
