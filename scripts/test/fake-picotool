@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+#
+# fake-picotool -- stateful RP2350 simulator for scripts/test/run-e2e.sh.
+# Simulates OTP against $OTPSTATE so the whole boot-key plan can be exercised
+# without hardware. Pure-file operations (seal, info -a <file>) delegate to the
+# real picotool via $REAL_PICOTOOL so signing stays genuine.
+#
+# NOT a substitute for the Pico 2 rehearsal: it models the OTP state machine,
+# not the RP2350 bootrom. It cannot tell you whether a signature is accepted.
+#
+# Stateful RP2350 simulator. Device ops are simulated against $OTPSTATE;
+# pure-file ops (seal, info -a <file>) delegate to the real picotool.
+REAL="${REAL_PICOTOOL:-$(command -v -p picotool 2>/dev/null || true)}"
+[ -n "$REAL" ] && [ "$REAL" != "$0" ] || REAL=""
+S="${OTPSTATE:?OTPSTATE not set}"
+[ -f "$S" ] || { echo "SB=0" > "$S"; echo "KV=0" >> "$S"; echo "KI=0" >> "$S"; }
+get() { local v; v="$(grep "^$1=" "$S" | tail -1 | cut -d= -f2-)"; printf '%s' "${v:-0}"; }
+set_() { grep -v "^$1=" "$S" > "$S.t"; echo "$1=$2" >> "$S.t"; mv "$S.t" "$S"; }
+emit_row() { printf 'ROW 0x%04x: OTP_DATA_%s (ECC)\nVALUE 0x%06x\n' 0 "$2" "$1"; }
+
+case "$1" in
+  version) echo "picotool v2.2.0-a4 (stub)"; exit 0 ;;
+  seal)    exec "$REAL" "$@" ;;
+  info)
+    # file inspection -> real picotool; device query -> simulated
+    for a in "$@"; do case "$a" in *.uf2) exec "$REAL" "$@";; esac; done
+    if [ "$(get BOOTED)" = "1" ]; then exit 1; fi   # ran an image => not in BOOTSEL
+    echo "Program Information"; echo " target chip:  RP2350"; exit 0 ;;
+  load)   set_ BOOTED 0; echo "Loading into Flash: [==] 100%"; exit 0 ;;
+  reboot)
+    # Simulate the bootrom: if secure boot on, only a valid-key-signed image runs.
+    set_ BOOTED "$(get PENDING_OK)"; exit 0 ;;
+  otp) shift ;;
+  *) exit 0 ;;
+esac
+
+case "$1" in
+  get) shift ;;
+  load)
+    J="$(eval echo \$$#)"; J="${@: -1}"
+    slot=$(jq -r 'keys[0]' "$J" | sed 's/bootkey//')
+    val=$(jq -r ".\"bootkey$slot\"[]" "$J" | awk '{printf "%02x",$1}')
+    set_ "SLOT$slot" "$val"; echo "Writing OTP"; exit 0 ;;
+  set)
+    shift; [ "$1" = "-s" ] && shift
+    f="$1"; v="$2"
+    case "$f" in
+      BOOT_FLAGS1.KEY_VALID) set_ KV $(printf '%x' $(( 0x$(get KV) | $v )) ) ;;
+      CRIT1.SECURE_BOOT_ENABLE) set_ SB 1 ;;
+    esac
+    echo "OTP set"; exit 0 ;;
+esac
+
+# reads
+while [ "$1" = "-n" ] || [ "$1" = "-e" ]; do shift; done
+sel="$1"
+case "$sel" in
+  CRIT1.SECURE_BOOT_ENABLE) printf 'ROW 0x0040: OTP_DATA_CRIT1 (CRIT)\nVALUE 0x%06x\n  field SECURE_BOOT_ENABLE (bit 0) = %s\n' "$(get SB)" "$(get SB)"; exit 0 ;;
+  BOOT_FLAGS1.KEY_VALID)   printf 'ROW 0x004b: OTP_DATA_BOOT_FLAGS1 (RBIT-3)\nVALUE 0x%06x\n  field KEY_VALID (bits 0-3) = %s\n' "0x$(get KV)" "$(get KV)"; exit 0 ;;
+  BOOT_FLAGS1.KEY_INVALID) printf 'ROW 0x004b: OTP_DATA_BOOT_FLAGS1 (RBIT-3)\nVALUE 0x000000\n  field KEY_INVALID (bits 8-11) = 0\n'; exit 0 ;;
+  CHIPID*) emit_row 0 "$sel"; exit 0 ;;
+  PAGE*)   emit_row 0 "$sel"; exit 0 ;;
+  BOOTKEY*)
+    n=$(echo "$sel" | sed 's/BOOTKEY\([0-9]\)_.*/\1/'); i=$(echo "$sel" | sed 's/.*_//')
+    hex="$(get SLOT$n)"; [ -n "$hex" ] || hex=$(printf '0%.0s' $(seq 1 64))
+    off=$(( i * 4 )); b0=${hex:$off:2}; b1=${hex:$((off+2)):2}
+    printf 'ROW 0x0080: OTP_DATA_%s (ECC)\nVALUE 0x00%s%s\n' "$sel" "$b1" "$b0"; exit 0 ;;
+esac
+emit_row 0 "$sel"; exit 0
