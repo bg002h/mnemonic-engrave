@@ -45,6 +45,19 @@
 # Phases 3/5/6 flash the board, so they need --execute to do anything real,
 # even though they never write OTP.
 #
+# SH2 MODES (the real SeedHammer II -- all READ ONLY, no --execute needed):
+#   ./pico2-bootkey-rehearsal.sh --sh2-precheck
+#   ./pico2-bootkey-rehearsal.sh --sh2-verify-slot 1 --key /abs/sh2-boot-key.pem
+#   ./pico2-bootkey-rehearsal.sh --make-otp-json --key K --slot 1 --out F   (no device)
+#
+# These exist because the phases above deliberately REFUSE the SeedHammer II
+# (CHIPID pin + slot-0 tripwire), which had left the runbook instructing the
+# operator to use verification code the script would not run against the real
+# device -- so the actual procedure fell back to eyeballing byte-swapped hex.
+# The SH2 modes invert the tripwire (they REQUIRE SeedHammer's key in slot 0)
+# and contain no write path at all; the irreversible writes stay in the runbook,
+# in the operator's hands.
+#
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -84,14 +97,24 @@ confirm() {
   [ "$reply" = "$word" ] || die "aborted at operator confirmation"
 }
 
+MODE=""; SH2_SLOT=""; SH2_KEY=""; JSON_OUT=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --phase)   PHASE="${2:-}"; shift 2 ;;
-    --execute) EXECUTE=1; shift ;;
+    --phase)          PHASE="${2:-}"; shift 2 ;;
+    --execute)        EXECUTE=1; shift ;;
+    --sh2-precheck)   MODE="sh2-precheck"; shift ;;
+    --sh2-verify-slot) MODE="sh2-verify-slot"; SH2_SLOT="${2:-}"; shift 2 ;;
+    --make-otp-json)  MODE="make-otp-json"; shift ;;
+    --key)            SH2_KEY="${2:-}"; shift 2 ;;
+    --slot)           SH2_SLOT="${2:-}"; shift 2 ;;
+    --out)            JSON_OUT="${2:-}"; shift 2 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
-[ -n "$PHASE" ] || die "specify --phase <0..6>"
+[ -n "$PHASE" ] || [ -n "$MODE" ] || die "specify --phase <0..6>, or an SH2 mode:
+  --sh2-precheck                       read-only survey of the SeedHammer II (runbook step 1)
+  --sh2-verify-slot N --key <key.pem>  read-only slot readback (runbook step 2's gate)
+  --make-otp-json --key <key.pem> --slot N --out <file>   no device access at all"
 
 for t in picotool openssl sha256sum; do
   command -v "$t" >/dev/null || die "$t not found -- run inside 'nix develop' in the seedhammer fork"
@@ -315,16 +338,170 @@ flash (board connected? in BOOTSEL? image valid?) and re-run this phase."
 }
 
 # ask_blink <question> -> prints "yes" | "no" | "skip"  ("skip" only in dry-run)
+#
+# REPROMPTS until the answer is literally y or n. Defaulting a stray Enter to
+# "no" was dangerous: "no" is the PASSING answer for both negative controls
+# (3a/3b) and for 5b, so a mistyped or absent-minded response silently produced
+# the exact false proof this rehearsal exists to prevent.
 ask_blink() {
   if [ "$EXECUTE" -ne 1 ]; then printf 'skip'; return 0; fi
-  printf '\n\033[1m%s\033[0m [y/n]: ' "$1" >&2
-  read -r a
-  case "$a" in y|Y) printf 'yes' ;; *) printf 'no' ;; esac
+  local a
+  while true; do
+    printf '\n\033[1m%s\033[0m [y/n]: ' "$1" >&2
+    read -r a || die "no answer given (stdin closed) -- cannot draw a verdict"
+    case "$a" in
+      y|Y|yes|YES) printf 'yes'; return 0 ;;
+      n|N|no|NO)   printf 'no';  return 0 ;;
+      *) printf '  answer y or n exactly -- this verdict is load-bearing.\n' >&2 ;;
+    esac
+  done
+}
+
+# bootsel_present -> "yes" | "no" | "skip"
+# Machine answer for 5b: after a reboot, a device still reachable by picotool is
+# sitting in BOOTSEL, i.e. the bootrom REJECTED the image. A device that ran the
+# image is not enumerable this way. Removes the one prompt where y meant failure.
+bootsel_present() {
+  if [ "$EXECUTE" -ne 1 ]; then printf 'skip'; return 0; fi
+  sleep 3
+  if picotool info >/dev/null 2>&1; then printf 'yes'; else printf 'no'; fi
 }
 
 sign_image() {
   SEEDHAMMER_DIR="$SEEDHAMMER_DIR" "$REPO_ROOT/scripts/sign-firmware.sh" "$1" "$2"
 }
+
+# --------------------------------------------------------------------------
+# SH2 MODES (read-only)
+#
+# The rehearsal phases deliberately REFUSE the SeedHammer II: require_board pins
+# the rehearsal Pico's CHIPID and the slot-0 tripwire rejects any board holding
+# SeedHammer's production key. That is correct for the phases -- but it left the
+# runbook telling the operator to "use read_slot/verify_slot_or_die here" against
+# a device the script would not touch, so the real procedure fell back to
+# eyeballing byte-swapped hex: exactly the Critical the rehearsal was built to
+# eliminate. These modes close that gap.
+#
+# They invert the tripwire (they REQUIRE SeedHammer's key in slot 0) and contain
+# no write path whatsoever -- no otp load, no otp set, no picotool load. The
+# irreversible writes stay in the operator's hands, in the runbook.
+# --------------------------------------------------------------------------
+
+sh2_require_seedhammer() {
+  local slot0 cid
+  picotool info >/dev/null 2>&1 || die "no board visible -- is the SeedHammer II in BOOTSEL?"
+  picotool info | grep -qi 'rp2350' || die "not an RP2350 device"
+  slot0="$(read_slot 0)"
+  [ "$slot0" = "$SH_SIGNKEY_HASH" ] || die "This is NOT a SeedHammer II.
+Slot 0 holds: $slot0
+Expected:     $SH_SIGNKEY_HASH  (signKeyHash, platform_sh2.go:70)
+These modes are for the real device only. If you meant the rehearsal Pico, use
+--phase instead. UNPLUG EVERY OTHER RP2350 BOARD before continuing."
+  ok "slot 0 holds SeedHammer's production key -- this is a SeedHammer II"
+  cid="$(chipid)"
+  if [ -f "$WORKDIR/sh2-chipid.txt" ]; then
+    [ "$cid" = "$(cat "$WORKDIR/sh2-chipid.txt")" ] || die "WRONG DEVICE.
+  pinned at --sh2-precheck: $(cat "$WORKDIR/sh2-chipid.txt")
+  connected now:            $cid
+A consumed rehearsal Pico can answer with plausible-looking values. Unplug it."
+    ok "device identity matches the one pinned at --sh2-precheck ($cid)"
+  else
+    printf '%s' "$cid" > "$WORKDIR/sh2-chipid.txt"
+    ok "pinned SeedHammer II CHIPID $cid for later steps"
+  fi
+}
+
+# Refuse any key that came out of the rehearsal (I7): rehearsal-work/ is
+# documented as disposable, so burning a throwaway key's hash into the SH2 would
+# strand the slot the moment that directory is deleted.
+reject_rehearsal_key() {
+  local key="$1" h p
+  h="$(key_hash "$key")"
+  for p in "$WORKDIR"/factory-key.pem "$WORKDIR"/my-key.pem "$WORKDIR"/third-party-key.pem; do
+    [ -f "$p" ] || continue
+    [ "$h" != "$(key_hash "$p")" ] || die "REFUSING: $key is a REHEARSAL key ($(basename "$p")).
+Rehearsal keys live in a directory documented as disposable. Burning one into the
+SeedHammer II would permanently strand that slot the moment it is deleted.
+Generate a distinct, backed-up key (e.g. sh2-boot-key.pem) for the real device."
+  done
+  ok "key is not one of the rehearsal keys"
+}
+
+case "$MODE" in
+  make-otp-json)
+    hdr "make-otp-json (no device access)"
+    [ -n "$SH2_KEY" ] && [ -n "$SH2_SLOT" ] && [ -n "$JSON_OUT" ] \
+      || die "usage: --make-otp-json --key <key.pem> --slot <N> --out <file.json>"
+    [ -f "$SH2_KEY" ] || die "no such key: $SH2_KEY"
+    reject_rehearsal_key "$SH2_KEY"
+    make_otp_json "$SH2_KEY" "$SH2_SLOT" "$JSON_OUT"
+    ok "wrote $JSON_OUT for slot $SH2_SLOT"
+    info "Load it with:  picotool otp load $JSON_OUT"
+    info "Then GATE the valid bit on:  $0 --sh2-verify-slot $SH2_SLOT --key $SH2_KEY"
+    exit 0 ;;
+
+  sh2-precheck)
+    hdr "SeedHammer II precheck (READ ONLY -- runbook step 1)"
+    sh2_require_seedhammer
+
+    SB="$(otp_field CRIT1.SECURE_BOOT_ENABLE)"
+    [ $((16#$SB & 1)) -eq 1 ] || die "SECURE_BOOT_ENABLE is 0x$SB -- expected set on a retail unit.
+Do not proceed; the device is not in the state this procedure assumes."
+    ok "secure boot enabled"
+
+    KV="$(otp_field BOOT_FLAGS1.KEY_VALID)"
+    [ $((16#$KV)) -eq 1 ] || die "KEY_VALID is 0x$KV, expected exactly 0x1 (slot 0 only).
+More than one key is already valid, or slot 0 is not the valid one. STOP."
+    ok "exactly one valid boot key (slot 0)"
+
+    KI="$(otp_field BOOT_FLAGS1.KEY_INVALID)"
+    [ $((16#$KI)) -eq 0 ] || die "KEY_INVALID is 0x$KI -- a boot key has been REVOKED on this device. STOP."
+    ok "no boot key revoked"
+
+    for s in 1 2 3; do
+      v="$(read_slot $s)"
+      [ "$v" = "$(printf '0%.0s' $(seq 1 64))" ] \
+        || die "spare slot $s is NOT empty (0x$v) -- this device has been modified before. STOP."
+    done
+    ok "spare slots 1-3 all empty (all 16 rows each)"
+
+    check_page_locks
+
+    # F11(c) / follow-up bootkey-rehearsal-fidelity-residue: CRIT1 is 8-way and
+    # BOOT_FLAGS1 3-way redundant. Read the raw copies individually so a partial
+    # write is visible; read_row_raw24 dies on any unreadable row.
+    hdr "Redundant-row raw readback (CRIT1 x8, BOOT_FLAGS1 x3)"
+    for r in 0x040 0x041 0x042 0x043 0x044 0x045 0x046 0x047; do
+      printf '  CRIT1 copy %s = 0x%s\n' "$r" "$(read_row_raw24 "$r")"
+    done
+    for r in 0x04b 0x04c 0x04d; do
+      printf '  BOOT_FLAGS1 copy %s = 0x%s\n' "$r" "$(read_row_raw24 "$r")"
+    done
+    info "All CRIT1 copies should agree, and all BOOT_FLAGS1 copies should agree."
+    info "picotool prints a WARNING on any disagreement; none above means consistent."
+
+    hdr "RESULT"
+    ok "SeedHammer II is in the expected retail state and its OTP pages are writable."
+    info "Proceed to runbook step 2. Nothing was written."
+    exit 0 ;;
+
+  sh2-verify-slot)
+    hdr "SeedHammer II slot readback (READ ONLY -- gates runbook step 3)"
+    [ -n "$SH2_SLOT" ] && [ -n "$SH2_KEY" ] \
+      || die "usage: --sh2-verify-slot <N> --key <key.pem>"
+    [ -f "$SH2_KEY" ] || die "no such key: $SH2_KEY"
+    sh2_require_seedhammer
+    reject_rehearsal_key "$SH2_KEY"
+    verify_slot_or_die "$SH2_SLOT" "$SH2_KEY"
+    hdr "RESULT"
+    ok "Slot $SH2_SLOT matches $SH2_KEY across all 16 rows."
+    info "ONLY NOW is it safe to set the valid bit (runbook step 3)."
+    info "That write is irreversible; re-read this line before typing it."
+    exit 0 ;;
+
+  "") : ;;
+  *) die "unknown mode: $MODE" ;;
+esac
 
 case "$PHASE" in
 
@@ -538,13 +715,16 @@ re-sign once to get a fresh nonce before concluding the chain is broken." ;;
     run cp "$FW_REAL" "$WORKDIR/fw-mykey.uf2"
     run sign_image "$WORKDIR/fw-mykey.uf2" "$WORKDIR/my-key.pem"
     flash_image "$WORKDIR/fw-mykey.uf2"
-    info "Expect NO blink (it has no LED code) and NO SeedHammer UI (no hardware)."
-    case "$(ask_blink 'Did the board REAPPEAR as a BOOTSEL drive (i.e. was the image rejected)?')" in
-      skip) info "[dry-run] would REQUIRE the board NOT to fall back to BOOTSEL" ;;
-      yes)  die "The real firmware image was REJECTED (board fell back to BOOTSEL) even
-though the blinky was accepted. The signing chain does not generalise to the
-2.4MB image -- investigate before touching the SeedHammer II." ;;
-      no)   ok "real firmware accepted by the bootrom (hangs on missing hardware, as expected)" ;;
+    info "Expect NO blink (no LED code) and NO SeedHammer UI (no hardware)."
+    info "Verdict is taken from picotool, not from you -- 'accepted but hung' and"
+    info "'operator did not look' are indistinguishable by eye on a headless Pico."
+    case "$(bootsel_present)" in
+      skip) info "[dry-run] would REQUIRE the board NOT to be in BOOTSEL after reboot" ;;
+      yes)  die "The real firmware image was REJECTED -- the board is back in BOOTSEL
+(picotool can still see it) even though the blinky was accepted. The signing
+chain does not generalise to the 2.4MB image. Investigate before touching the
+SeedHammer II." ;;
+      no)   ok "real firmware accepted by the bootrom (picotool can no longer see the board)" ;;
     esac
   else
     warn "No seedhammerii-*.uf2 found in $SEEDHAMMER_DIR -- skipping 5b."
@@ -557,6 +737,18 @@ though the blinky was accepted. The signing chain does not generalise to the
   hdr "Phase 6 -- FALLBACK CONTROL: factory-signed images must STILL boot"
   info "This is what runbook step 7 ('do not revoke slot 0') depends on."
   require_board
+
+  # Preconditions, mirroring phases 4/5. Without them this phase fails OPEN: on a
+  # board where phase 1 never took, the blinky boots because secure boot is off,
+  # and this phase would record "both keys boot" -- a false proof of the very
+  # recovery path the runbook's step 7 and Recovery section rest on.
+  SB="$(otp_field CRIT1.SECURE_BOOT_ENABLE)"
+  [ $((16#$SB & 1)) -eq 1 ] || die "secure boot is NOT enabled (0x$SB).
+A blink here would prove nothing -- any image boots on an unsealed board.
+Run phases 1 and 2 first."
+  KV="$(otp_field BOOT_FLAGS1.KEY_VALID)"
+  [ $((16#$KV)) -eq 3 ] || die "KEY_VALID is 0x$KV, expected 0x3 (slot 0 + slot 1) -- run phase 4 first"
+  ok "preconditions hold: sealed board, dual trust"
 
   [ -f "$WORKDIR/factory-key.pem" ] || die "factory-key.pem missing"
   cp "$WORKDIR/blinky.uf2" "$WORKDIR/blinky-factory.uf2"

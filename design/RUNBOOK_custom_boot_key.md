@@ -5,6 +5,20 @@
 signing key (confirmed 2026-07-26 — the device's home screen does *not* show the
 `(UNLOCKED)` suffix).
 
+> ### Run every command block here inside `bash`, not fish
+>
+> Your login shell is fish, where `for … do … done` and `if … then … fi` are
+> **hard syntax errors** — a pasted block executes *nothing*, and a partially
+> pasted one can run a destructive command with its guard silently missing.
+> Start each session with:
+>
+> ```sh
+> cd /scratch/code/shibboleth/seedhammer && nix develop   # this drops you into bash
+> ```
+>
+> The `--sh2-*` invocations below are single commands and are fish-safe, but the
+> habit should be uniform.
+
 > **Read this first.** Steps 1–3 write to **one-time-programmable** memory. They
 > cannot be undone, reverted, or cleared — not by SeedHammer, not by Raspberry
 > Pi, not by anyone. Steps 4–6 (build, sign, flash) touch only flash and are
@@ -87,105 +101,112 @@ Do not skip it.
 Enter BOOTSEL: hold the white firmware button (underside of the control board,
 near the hammerhead) while connecting USB.
 
-```sh
-picotool info
-picotool otp get -n CRIT1.SECURE_BOOT_ENABLE
-picotool otp get -n BOOT_FLAGS1.KEY_VALID
-for i in $(seq 0 15); do picotool otp get -n -e "BOOTKEY0_$i"; done   # slot 0
-for s in 1 2 3; do for i in $(seq 0 15); do picotool otp get -n -e "BOOTKEY${s}_$i"; done; done
+**Unplug every other RP2350 board first** — especially the consumed rehearsal
+Pico. A wrong-but-plausible device answers these reads with exactly the values
+you expect to see.
 
-# Are the OTP pages locked? This is the ONLY read-only way to learn whether a
-# second boot key can ever be added. Page 1 covers CRIT1/BOOT_FLAGS1; page 2
-# covers BOOTKEY0-3.
-for l in PAGE1_LOCK0 PAGE1_LOCK1 PAGE2_LOCK0 PAGE2_LOCK1; do
-  picotool otp get -n -e "$l"
-done
+```sh
+cd /scratch/code/shibboleth/seedhammer
+nix develop --command \
+  ../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh --sh2-precheck
 ```
 
-Read field values from the `field ... = <hex>` line, **not** from `VALUE 0x…` —
-`VALUE` is the whole 24-bit row and includes unrelated bits (e.g. `KEY_INVALID`
-sits in the same row as `KEY_VALID`).
+`--sh2-precheck` is **read-only** — it contains no `otp load`, no `otp set`, no
+`picotool load`. It asserts, and STOPs on any failure:
 
-**Expected on a stock sealed unit:** `SECURE_BOOT_ENABLE` = 1; `KEY_VALID` = `0x1`
-(slot 0 only); slot 0 holding `c8314536d6af61ac2e62e5991e3e4711629c54696ba8c4af08965a1d319a473b`
-(each row is two bytes, **low byte first**, so byte-swap each row when
-reassembling); slots 1–3 all zero; **all four page-lock rows zero**.
+- slot 0 holds `c8314536…319a473b` (`signKeyHash`, `platform_sh2.go:70`) — i.e.
+  this really is a SeedHammer II, and the official-firmware recovery path is intact
+- it **pins this device's CHIPID**, which step 2 and step 3 re-check
+- `SECURE_BOOT_ENABLE` = 1, `KEY_VALID` = `0x1` (slot 0 only), `KEY_INVALID` = 0
+- spare slots 1–3 empty across **all 16 rows each**
+- all four page-lock rows zero, read **without `-e`** at full 24 bits (these rows
+  are `ecc=false`; an ECC read of a genuinely locked page decodes invalid and
+  masks away the third lock copy — the gate would be ambiguous exactly when it
+  matters)
+- raw redundant-row readback of `CRIT1` (×8) and `BOOT_FLAGS1` (×3), so a partial
+  write is visible
 
-**STOP and reassess if:** more than one slot is valid, slots 1–3 are non-zero,
-slot 0's hash does not match the constant at `platform_sh2.go:70`, or **any
-page-lock row is non-zero** — a locked page means no further boot key can ever be
-added to this device and the whole procedure is impossible.
+It is the same `read_slot` / `verify_slot_or_die` / `check_page_locks` code the
+Pico rehearsal exercises — deliberately, so the tool used here is the tool the
+rehearsal proved. **Do not hand-verify byte-swapped hex.**
 
-> Note the page-lock check is *necessary but not sufficient*: picotool discovers
-> most lock conditions only at write time (its own source carries a
+> The page-lock check is *necessary but not sufficient*: picotool discovers most
+> lock conditions only at write time (its own source carries a
 > `// todo pre-check page lock`). The first genuine proof that a sealed device
 > accepts a spare-slot write is the write itself, in step 2 — which is why the
 > Pico rehearsal must be completed first.
 
 ## Step 2 — Generate your key and burn its hash (IRREVERSIBLE)
 
+**Name the real key distinctly from any rehearsal key.** The rehearsal generates
+its own `my-key.pem` inside `rehearsal-work/`, a directory this project documents
+as disposable — burning that key's hash here would strand the slot the moment it
+is deleted. The SH2 tooling refuses any key matching a rehearsal key, but don't
+rely on that; use a different name and back it up.
+
 ```sh
-openssl ecparam -name secp256k1 -genkey -noout -out my-key.pem
-# Or encrypted at rest -- this key gates firmware for a device holding your
-# backups, and it must survive for the life of the machine:
-#   openssl ec -in my-key.pem -aes256 -out my-key.enc.pem
+cd /scratch/code/shibboleth/seedhammer
+openssl ecparam -name secp256k1 -genkey -noout -out $PWD/sh2-boot-key.pem
+# Encrypted at rest is better -- this key gates firmware for a device holding
+# your backups and must survive for the life of the machine:
+#   openssl ec -in sh2-boot-key.pem -aes256 -out sh2-boot-key.enc.pem
 ```
 
-Back `my-key.pem` up now — losing it means you can never sign another firmware
-update for this device, and you'd be left with only SeedHammer's official
+Back it up **now**, off this machine. Losing it means you can never sign another
+firmware update for this device and are left with only SeedHammer's official
 releases (which is why step 7 exists as a *don't*).
 
-The value burned into OTP is SHA-256 of the **uncompressed 64-byte X‖Y** public
-key — not the 33-byte compressed form. **Never hand-compute or hand-verify it.**
-Compute it two independent ways and require them to agree:
+Build the firmware **now**, before the irreversible steps — `picotool seal` needs
+a real RP2350 image, and you do not want to discover a missing file mid-procedure:
 
 ```sh
-# (a) independently, with openssl
-openssl ec -in my-key.pem -pubout -conv_form uncompressed -outform DER \
-  | tail -c 64 | sha256sum
-
-# (b) what picotool will actually burn (seal needs a REAL RP2350 image --
-#     there is no such thing as a 'placeholder.elf')
-picotool seal --sign --quiet seedhammerii-<version>.uf2 /tmp/discard.uf2 \
-  my-key.pem my-otp-raw.json
-jq -r '.bootkey0[]' my-otp-raw.json | awk '{printf "%02x",$1}'; echo
+env VERSION=$(git rev-parse HEAD) nix run .#build-firmware
 ```
 
-Then reduce the json to *only* your slot — scripted, not hand-edited, and
-asserted before it is ever loaded:
+Generate and validate the OTP json (this touches **no device**):
 
 ```sh
-jq '{bootkey1: .bootkey0}' my-otp-raw.json > my-otp.json   # keep ONLY the key
-# Guard must ABORT, not merely print -- `&& echo ...` still falls through to the
-# load on the next line.
-if jq -e 'has("crit1") or has("boot_flags1")' my-otp.json >/dev/null; then
-  echo "REFUSE: json would seal the device before any row is verified"; exit 1
-fi
-picotool otp load my-otp.json
+nix develop --command ../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh \
+  --make-otp-json --key $PWD/sh2-boot-key.pem --slot 1 --out $PWD/my-otp.json
 ```
 
-Better still: use `scripts/pico2-bootkey-rehearsal.sh`'s `make_otp_json`, which
-performs this transform and asserts single-key / correct slot / 32 entries / no
-`crit1`+`boot_flags1` / byte-equality with the openssl-derived hash before the
-file is ever loaded.
+That asserts, before the file can ever be loaded: exactly one top-level key, the
+correct slot, 32 entries, no `crit1`/`boot_flags1`, and byte-equality with an
+independently openssl-derived hash. Dropping `crit1`/`boot_flags1` is not
+cosmetic — loading the raw `picotool seal` output would set the key hash **and**
+`KEY_VALID` **and** `SECURE_BOOT_ENABLE` in one shot, sealing the device before a
+single row had been verified.
 
-Dropping `crit1`/`boot_flags1` is not cosmetic: loading the unedited file would
-set the key hash **and** `KEY_VALID` **and** `SECURE_BOOT_ENABLE` in a single
-shot, sealing the device before a single row had been verified.
+Now the first irreversible write:
 
-**Then verify all 16 rows mechanically, before the valid bit.** Do not eyeball
-byte-swapped hex. `scripts/pico2-bootkey-rehearsal.sh` contains `read_slot()` /
-`verify_slot_or_die()`, which read all 16 rows, byte-swap, reassemble, and
-compare against the openssl-derived hash — use that same code here. If it
-mismatches, **stop**: the slot is not yet valid, so the device still boots
-normally, and you can move to slot 2. You have three slots; treat each as one
-attempt.
+```sh
+picotool otp load $PWD/my-otp.json
+```
 
-## Step 3 — Mark the slot valid (IRREVERSIBLE)
+## Step 3 — Verify, then mark the slot valid (IRREVERSIBLE)
+
+**The verification is the gate. It is mechanical, and it is not optional.**
+
+```sh
+nix develop --command ../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh \
+  --sh2-verify-slot 1 --key $PWD/sh2-boot-key.pem
+```
+
+Read-only. It re-checks the pinned CHIPID (so a different board cannot answer for
+your SeedHammer), re-confirms slot 0 still holds SeedHammer's key, then reads all
+16 rows of slot 1, byte-swaps, reassembles, and requires an exact match against
+the openssl-derived hash. It is the same code the Pico rehearsal proves in phases
+1c and 4c.
+
+**If it mismatches, STOP.** The slot is not yet valid, so the device still boots
+normally — move to slot 2 (`--slot 2`, then `0x4` below). You have three slots;
+treat each as one attempt.
+
+Only once it passes:
 
 ```sh
 picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x2   # slot 1 (slot 2 = 0x4, slot 3 = 0x8)
-picotool otp get BOOT_FLAGS1.KEY_VALID          # expect 0x3 — slot 0 AND slot 1
+picotool otp get -n BOOT_FLAGS1.KEY_VALID       # expect field = 3 (slot 0 AND slot 1)
 ```
 
 Use `otp set -s` (OR-in), never `otp load`, for this field — `otp load` attempts
@@ -211,7 +232,7 @@ signature → hash → sign the hash → embed the real signature.
 ```sh
 cd /scratch/code/shibboleth/seedhammer
 nix develop --command ../mnemonic-engrave/scripts/sign-firmware.sh \
-    seedhammerii-<version>.uf2 my-key.pem
+    $PWD/seedhammerii-<version>.uf2 $PWD/sh2-boot-key.pem
 ```
 
 `scripts/sign-firmware.sh` runs the sequence above and then does two things the
@@ -251,12 +272,30 @@ Nothing here touches OTP. Get it wrong as many times as you need.
 ## Step 6 — Flash
 
 ```sh
-picotool load --verify "$FW"
+picotool load --verify $PWD/seedhammerii-<version>.uf2
 picotool reboot
 ```
 
 **Expected result:** normal startup screen, with `(UNLOCKED)` appended to the
 version line.
+
+> ### If it does NOT boot — do NOT burn another slot
+>
+> Step 3's readback already **proved** the burned hash is correct, so a boot
+> failure here is a **signing or image** problem, not a slot problem. Those are
+> retryable at zero OTP cost:
+>
+> 1. Re-run step 5 to produce a **fresh signature** (a new ECDSA nonce). Whether
+>    the RP2350 bootrom rejects high-`s` signatures is not verifiable from this
+>    repo; if it does, roughly half of all signatures fail this way and a re-sign
+>    fixes it. An intermittent pattern across re-signs points here.
+> 2. Re-flash and reboot.
+> 3. Official SeedHammer firmware remains bootable throughout — flash a release
+>    UF2 to get a working machine back while you debug.
+>
+> The Recovery section's "move to the next free slot" advice applies **only** when
+> step 3's verification actually failed. Burning a second slot for a boot failure
+> that step 3 passed will consume your spares without fixing anything.
 
 **That suffix is expected and is not a failure.** `isSecureBootEnabled()`
 (`platform_sh2.go:712-741`) returns true only when secure boot is on **and**
@@ -268,9 +307,12 @@ attestation as a quick integrity indicator; budget for that.
 
 ## Step 7 — DO NOT revoke SeedHammer's key
 
-The community guide offers a final `picotool otp set -s BOOT_FLAGS1.KEY_INVALID 0x1`
-to disable slot 0. **Don't.** Leaving it valid keeps official SeedHammer releases
-bootable, which is your only recovery path if a fork build ever fails to start.
+The community guide offers a final `otp set` on `BOOT_FLAGS1.KEY_INVALID` to
+revoke slot 0. **Don't** — and the exact command is deliberately not written out
+here, because it is the single most destructive line in this document and there
+is no reason for it to sit in your paste buffer. Leaving slot 0 valid keeps
+official SeedHammer releases bootable, which is your only recovery path if a fork
+build ever fails to start.
 Revoking is permanent and removes that path.
 
 ---
@@ -279,11 +321,13 @@ Revoking is permanent and removes that path.
 
 - **Fork firmware won't boot / bad signature** → re-enter BOOTSEL and flash an
   official `seedhammerii-vX.Y.Z.uf2`. Works as long as step 7 was respected.
-- **Wrong hash burned into a slot** → that slot is dead forever. Move to the next
-  free slot (you start with three). The device is unaffected until a valid bit is
-  set.
-- **Lost `my-key.pem`** → you can no longer sign updates for your slot. Official
-  firmware still boots. Burn a fresh key into the next slot.
+- **Wrong hash burned into a slot** — *i.e. `--sh2-verify-slot` actually FAILED* →
+  that slot is dead forever. Move to the next free slot (you start with three).
+  The device is unaffected until a valid bit is set. **This does not apply to a
+  boot failure after a passing verification** — see step 6, which is a re-signable
+  problem and must not cost you a slot.
+- **Lost `sh2-boot-key.pem`** → you can no longer sign updates for your slot.
+  Official firmware still boots. Burn a fresh key into the next slot.
 
 ## Open items to resolve before executing
 
