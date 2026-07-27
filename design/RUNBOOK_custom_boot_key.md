@@ -188,6 +188,7 @@ picotool otp load $PWD/my-otp.json
 **The verification is the gate. It is mechanical, and it is not optional.**
 
 ```sh
+cd /scratch/code/shibboleth/seedhammer
 nix develop --command ../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh \
   --sh2-verify-slot 1 --key $PWD/sh2-boot-key.pem
 ```
