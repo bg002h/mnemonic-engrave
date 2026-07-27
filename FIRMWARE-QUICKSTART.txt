@@ -26,10 +26,13 @@ common "device not found".
 
 PERMISSIONS — do this once, or picotool will not see the device:
 
-    sudo tee /etc/udev/rules.d/99-picotool.rules <<'EOF'
-    SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", MODE="0660", TAG+="uaccess"
-    EOF
-    sudo udevadm control --reload-rules && sudo udevadm trigger
+    printf 'SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", MODE="0660", TAG+="uaccess"\n' | sudo tee /etc/udev/rules.d/99-picotool.rules
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger
+
+(One line, no heredoc -- safe to paste in BOTH fish and bash. An indented
+heredoc silently fails in bash with exit status 0, writing junk filenames into
+the current directory and never reloading the rules.)
 
 (uaccess grants the logged-in user access rather than opening the device to
 everyone. Unplug and replug the board afterwards.)
@@ -87,7 +90,17 @@ CONSUMED: a full run burns 2 of its 4 OTP slots and permanently seals it.
     $R --phase 6 --execute      # factory key must STILL boot (fallback proof)
 
 Phase 3 is not optional. Without it a blinking LED in phase 5 proves nothing —
-an unsealed board boots anything. Drop --execute on any phase for a dry run.
+an unsealed board boots anything.
+
+Run section 0 FIRST: phase 5b signs and flashes the real 2.4MB firmware, and it
+is the only proof that acceptance generalises beyond the 33KB blinky. Without a
+built seedhammerii-*.uf2 in the fork, phase 5 now refuses rather than skipping.
+
+IF ANY PHASE FAILS, THE REHEARSAL IS NOT GREEN. Do not touch the engraver.
+
+Dry runs: drop --execute to preview a phase. Safe on 0/1/2/4; on 3/5/6 it only
+prints. Keep rehearsal-work/ until section 3 is COMPLETE — it holds the keys
+that the SH2 tooling checks yours against.
 
 
 3. REAL SEEDHAMMER II — THE IRREVERSIBLE PART
@@ -95,37 +108,114 @@ an unsealed board boots anything. Drop --execute on any phase for a dry run.
 UNPLUG THE PICO FIRST. A consumed rehearsal board answers with plausible values.
 BOOTSEL = hold the white button under the control board while plugging in USB.
 
+STAGE YOUR RECOVERY IMAGE BEFORE YOU START. It is the safety net this whole
+procedure is priced on, and you do not want to be downloading firmware at 2am
+with a machine that will not boot:
+
+    gh release download v1.4.3 --repo seedhammer/seedhammer --pattern '*.uf2' \
+      --dir ~/.sh2
+    picotool info -a ~/.sh2/seedhammerii-v1.4.3.uf2 | grep -i signature
+    # must say "signature: verified"
+
+STABILITY: an interruption during (d) costs a slot outright — re-running
+`otp load` on a half-written slot FAILS (the bootrom refuses to rewrite a
+programmed ECC row). Short cable, straight into the machine, no hub, laptop on
+AC with sleep disabled, and do not touch the bench during (d) and (f).
+
     R=../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh
 
-  a) Survey (read-only; refuses anything that isn't a SeedHammer II):
+  a) MANDATORY GATE — run first, read every line (read-only):
         $R --sh2-precheck
 
-  b) Make and back up your key. Name it distinctly from the rehearsal keys:
-        openssl ecparam -name secp256k1 -genkey -noout -out $PWD/sh2-boot-key.pem
-     Lose this and you can never sign another update for this machine.
+     It asserts, and STOPs on any failure:
+       * slot 0 holds SeedHammer's key -> this really is an SH2, and the
+         official-firmware recovery path is intact
+       * SECURE_BOOT_ENABLE = 1, KEY_VALID = 0x1, KEY_INVALID = 0
+       * spare slots 1-3 empty across ALL 16 rows each
+       * all four page-lock rows zero -- the ONLY read-only way to learn
+         whether a second key can ever be added. Non-zero = this procedure is
+         impossible on this device.
+       * CRIT1/BOOT_FLAGS1 redundant copies consistent
+     It also PINS this device's CHIPID, which (e) and (g) re-check. Skipping (a)
+     silently downgrades that wrong-device check.
+
+     ANY FAIL HERE IS A FACT ABOUT YOUR DEVICE, NOT A TOOL BUG.
+     Do not run (b)-(g). Go read the runbook.
+
+  b) Make and back up your key -- OUTSIDE every git repo:
+
+        mkdir -p ~/.sh2 && chmod 700 ~/.sh2
+        openssl ecparam -name secp256k1 -genkey -noout -out ~/.sh2/sh2-boot-key.pem
+        chmod 600 ~/.sh2/sh2-boot-key.pem
+
+     NOT inside the seedhammer fork. Its .gitignore covers only
+     seedhammerii-*.uf2 and _artifacts, its remote is PUBLIC, and one `git add
+     -A` would publish a permanently valid boot key for the machine that
+     engraves your seed backups. OTP cannot be un-burned.
+
+     Record the fingerprint so you can always tell which key is which:
+        openssl ec -in ~/.sh2/sh2-boot-key.pem -pubout -conv_form uncompressed \
+          -outform DER | tail -c 64 | sha256sum
+
+     Back it up NOW, off this machine (encrypted: `openssl ec -in
+     ~/.sh2/sh2-boot-key.pem -aes256 -out sh2-boot-key.enc.pem`). Lose it and
+     you can never sign another update for this machine.
+
+     NEVER re-run this step. If the file is missing later, you have LOST the
+     key -- stop and read the runbook's Recovery section. Generating a second
+     key silently gives you two files that sign differently.
 
   c) Build the OTP json (touches no device; asserts the hash two ways):
-        $R --make-otp-json --key $PWD/sh2-boot-key.pem --slot 1 --out $PWD/my-otp.json
+        $R --make-otp-json --key ~/.sh2/sh2-boot-key.pem --slot 1 --out ~/.sh2/my-otp.json
 
   d) FIRST IRREVERSIBLE WRITE — burn the hash:
-        picotool otp load $PWD/my-otp.json
+        picotool otp load ~/.sh2/my-otp.json
 
-  e) THE GATE. Read-only, compares all 16 rows. If this fails, STOP and use
-     slot 2 — the slot is not valid yet, the machine still boots normally:
-        $R --sh2-verify-slot 1 --key $PWD/sh2-boot-key.pem
+  e) THE GATE. Read-only, compares all 16 rows:
+        $R --sh2-verify-slot 1 --key ~/.sh2/sh2-boot-key.pem
 
-  f) SECOND IRREVERSIBLE WRITE — only after (e) passes:
-        picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x2      # slot 2 = 0x4, slot 3 = 0x8
-        picotool otp get -n BOOT_FLAGS1.KEY_VALID          # expect field = 3
+     IF THIS FAILS: the slot is not valid yet, so the machine still boots
+     normally. Move to slot 2 by re-running the WHOLE sequence with 2:
+        $R --make-otp-json --key ~/.sh2/sh2-boot-key.pem --slot 2 --out ~/.sh2/my-otp-2.json
+        picotool otp load ~/.sh2/my-otp-2.json
+        $R --sh2-verify-slot 2 --key ~/.sh2/sh2-boot-key.pem
+     ...then use 0x4 in (f) and 2 in (g). You get three attempts total
+     (slots 1, 2, 3). Do NOT jump straight to (f) with a different value --
+     that would validate a slot you never burned.
+
+  f) SECOND IRREVERSIBLE WRITE — only after (e) passes, and only for the slot
+     (e) just verified:
+        picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x2   # slot 1. slot 2 -> 0x4, slot 3 -> 0x8
+     Use `otp set -s` (OR-in), never `otp load`, for this field -- otp load
+     attempts to clear bits and will fail.
+
+  g) CLOSE THE LOOP — verify the write actually landed (read-only):
+        $R --sh2-verify-valid 1 --key ~/.sh2/sh2-boot-key.pem
+
+     A bare `picotool otp get` is NOT enough here: an interrupted redundant
+     write can print the expected value alongside a WARNING and still be
+     degraded. This mode fails closed on that, checks KEY_VALID is exactly
+     0x1|slot-bit (slot 1 -> 3, slot 2 -> 5, slot 3 -> 9), KEY_INVALID is 0,
+     and all three BOOT_FLAGS1 copies agree.
+
+     If KEY_VALID reads LOW, the write was interrupted -- just re-run the
+     identical (f) command. It only sets bits, so repeating it is safe. Do NOT
+     burn another slot and do NOT start re-signing.
 
 
 4. SIGN AND UPLOAD (repeatable forever, zero OTP cost)
 --------------------------------------------------------------------------------
     env VERSION=$(git rev-parse HEAD) nix run .#build-firmware
+    FW=$PWD/seedhammerii-$(git rev-parse HEAD).uf2
     nix develop --command ../mnemonic-engrave/scripts/sign-firmware.sh \
-        $PWD/seedhammerii-<version>.uf2 $PWD/sh2-boot-key.pem
-    picotool load --verify $PWD/seedhammerii-<version>.uf2
+        $FW ~/.sh2/sh2-boot-key.pem
+    picotool load --verify ${FW%.uf2}.signed.uf2
     picotool reboot
+
+sign-firmware.sh writes a NEW file (<img>.signed.uf2) and never touches its
+input — so the unsigned build keeps matching CI, and a stray tab-complete onto
+the official release cannot destroy your recovery image (it refuses that
+outright). Flash the .signed.uf2, not the input.
 
 sign-firmware.sh proves the signature offline before you flash: it asserts the
 digest is unchanged after embedding the signature, verifies it with openssl,

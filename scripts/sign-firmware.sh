@@ -40,8 +40,16 @@ IMG="${1:-}"; KEY="${2:-}"
 # Absolute paths are mandatory: picosign runs after `cd $SEEDHAMMER_DIR`, so a
 # relative image path would resolve against the fork and fail -- and step 1
 # would misread that failure as "no SIGNATURE section" and re-seal the input.
-IMG="$(realpath "$IMG")"
+IMG_IN="$(realpath "$IMG")"
 KEY="$(realpath "$KEY")"
+
+# Never mutate the input. Earlier versions signed in place, which meant one
+# tab-complete onto the official seedhammerii-vX.Y.Z.uf2 -- which sits untracked
+# in the same directory as the fork build -- silently destroyed the only local
+# copy of the recovery image, and ended with a green "signature proven valid".
+OUT="${OUT:-${IMG_IN%.uf2}.signed.uf2}"
+cp "$IMG_IN" "$OUT"
+IMG="$OUT"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SEEDHAMMER_DIR="${SEEDHAMMER_DIR:-$(cd "$REPO_ROOT/../seedhammer" 2>/dev/null && pwd || true)}"
@@ -67,6 +75,22 @@ info "fork:  $SEEDHAMMER_DIR"
 openssl ec -in "$KEY" -noout -text 2>/dev/null | grep -qi 'secp256k1\|ASN1 OID: secp256k1' \
   || die "key is not secp256k1 -- RP2350 secure boot requires secp256k1"
 ok "key is secp256k1"
+
+hdr "0b -- refuse to re-sign an official SeedHammer release"
+# The official release is the ONLY recovery path if a fork build fails to boot.
+# Signing over it would be silent and green.
+SH_SIGNKEY_HASH="c8314536d6af61ac2e62e5991e3e4711629c54696ba8c4af08965a1d319a473b"
+# `|| true`: an unsigned image has no "public key:" line, so grep exits 1 and
+# pipefail would abort the script at a guard that should simply not apply.
+EXIST_PUB="$(picotool info -a "$IMG" 2>/dev/null | grep -iE '^ *public key:' | awk '{print $NF}' | tr 'A-F' 'a-f' || true)"
+if [ -n "$EXIST_PUB" ] && [ "${#EXIST_PUB}" -eq 128 ]; then
+  EXIST_HASH="$(printf '%s' "$EXIST_PUB" | xxd -r -p 2>/dev/null | sha256sum | cut -d' ' -f1)"
+  [ "$EXIST_HASH" != "$SH_SIGNKEY_HASH" ] || die "REFUSING: $IMG_IN is an OFFICIAL SeedHammer release
+(its embedded key hashes to $SH_SIGNKEY_HASH == signKeyHash).
+Signing over it would destroy your only local recovery image. Keep it untouched
+and sign your own build instead."
+  ok "not an official SeedHammer release"
+fi
 
 hdr "1 -- ensure the image has a SIGNATURE section"
 # Distinguish "no SIGNATURE section" from every other failure. Treating any
@@ -159,5 +183,6 @@ ok "picotool independently reports: signature verified"
 
 hdr "RESULT"
 ok "$IMG is signed by $KEY and the signature is proven valid offline."
+info "input left untouched: $IMG_IN"
 info "Flash with:  picotool load --verify $IMG && picotool reboot"
 info "It will only BOOT on a device whose OTP holds a valid slot for this key."

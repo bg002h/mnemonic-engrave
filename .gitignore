@@ -16,3 +16,7 @@ ndefroundtrip
 # KEYS (the boot-signing keys) and generated OTP json. NEVER commit this.
 rehearsal-work/
 *-key.pem
+
+# SH2 CHIPID pin + procedure state. KEEP until the SeedHammer procedure is done;
+# unlike rehearsal-work/ this is not disposable. Never committed.
+sh2-state/

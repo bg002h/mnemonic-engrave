@@ -145,12 +145,21 @@ is deleted. The SH2 tooling refuses any key matching a rehearsal key, but don't
 rely on that; use a different name and back it up.
 
 ```sh
-cd /scratch/code/shibboleth/seedhammer
-openssl ecparam -name secp256k1 -genkey -noout -out $PWD/sh2-boot-key.pem
+mkdir -p ~/.sh2 && chmod 700 ~/.sh2
+openssl ecparam -name secp256k1 -genkey -noout -out ~/.sh2/sh2-boot-key.pem
+chmod 600 ~/.sh2/sh2-boot-key.pem
 # Encrypted at rest is better -- this key gates firmware for a device holding
 # your backups and must survive for the life of the machine:
-#   openssl ec -in sh2-boot-key.pem -aes256 -out sh2-boot-key.enc.pem
+#   openssl ec -in ~/.sh2/sh2-boot-key.pem -aes256 -out ~/.sh2/sh2-boot-key.enc.pem
 ```
+
+> **Not inside any git repo.** The seedhammer fork's `.gitignore` covers only
+> `seedhammerii-*.uf2` and `_artifacts`, and its remote is **public**. A key
+> generated there is one `git add -A` from being published — and a published
+> boot key that is permanently valid on your engraver cannot be un-burned.
+> Record its fingerprint (`openssl ec -in ~/.sh2/sh2-boot-key.pem -pubout
+> -conv_form uncompressed -outform DER | tail -c 64 | sha256sum`) so you can
+> always tell it apart from a rehearsal key.
 
 Back it up **now**, off this machine. Losing it means you can never sign another
 firmware update for this device and are left with only SeedHammer's official
@@ -167,7 +176,7 @@ Generate and validate the OTP json (this touches **no device**):
 
 ```sh
 nix develop --command ../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh \
-  --make-otp-json --key $PWD/sh2-boot-key.pem --slot 1 --out $PWD/my-otp.json
+  --make-otp-json --key ~/.sh2/sh2-boot-key.pem --slot 1 --out ~/.sh2/my-otp.json
 ```
 
 That asserts, before the file can ever be loaded: exactly one top-level key, the
@@ -180,8 +189,20 @@ single row had been verified.
 Now the first irreversible write:
 
 ```sh
-picotool otp load $PWD/my-otp.json
+picotool otp load ~/.sh2/my-otp.json
 ```
+
+> **This is the one command with an unrecoverable interruption window.** It
+> programs 16 rows; an interruption leaves rows `0..k` burned and the rest
+> blank, and **re-running it cannot repair that** — the bootrom refuses any
+> write to an already-programmed ECC row, identical value or not. That slot is
+> then spent. `--sh2-verify-slot` below detects the state correctly, but the
+> only remedy is the next free slot.
+>
+> So before running it: short cable straight into the machine, no hub, laptop on
+> AC with sleep disabled, and don't touch the bench until step 3 completes.
+> Note also that `otp load` prints no "verified" confirmation of its own — the
+> absence of output is not success, which is why step 3 is mandatory.
 
 ## Step 3 — Verify, then mark the slot valid (IRREVERSIBLE)
 
@@ -190,7 +211,7 @@ picotool otp load $PWD/my-otp.json
 ```sh
 cd /scratch/code/shibboleth/seedhammer
 nix develop --command ../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh \
-  --sh2-verify-slot 1 --key $PWD/sh2-boot-key.pem
+  --sh2-verify-slot 1 --key ~/.sh2/sh2-boot-key.pem
 ```
 
 Read-only. It re-checks the pinned CHIPID (so a different board cannot answer for
@@ -207,8 +228,30 @@ Only once it passes:
 
 ```sh
 picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x2   # slot 1 (slot 2 = 0x4, slot 3 = 0x8)
-picotool otp get -n BOOT_FLAGS1.KEY_VALID       # expect field = 3 (slot 0 AND slot 1)
 ```
+
+Then **close the loop with the read-only post-write check** — not a bare
+`picotool otp get`:
+
+```sh
+cd /scratch/code/shibboleth/seedhammer
+nix develop --command ../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh \
+  --sh2-verify-valid 1 --key ~/.sh2/sh2-boot-key.pem
+```
+
+`otp set` writes all three redundant `BOOT_FLAGS1` copies in **one** PICOBOOT
+command. An interruption inside it can leave 2 of 3 programmed — at which point
+picotool's majority vote prints **the value you expected** alongside a
+`(WARNING - REDUNDANT ROWS AREN'T EQUAL)`, so a bare `otp get` passes while the
+redundancy protecting "trust your key" is permanently degraded.
+`--sh2-verify-valid` fails closed on that warning, requires `KEY_VALID` to be
+exactly `0x1 | slot-bit` (slot 1 → `3`, slot 2 → `5`, slot 3 → `9`), requires
+`KEY_INVALID == 0`, and requires all three copies to agree.
+
+**If `KEY_VALID` reads low, the write was interrupted.** Re-run the identical
+`otp set -s` command — it only ever *sets* bits, so repeating it is safe and
+costs nothing. Do **not** burn another slot, and do **not** start re-signing:
+step 3's readback already proved your hash is correct.
 
 Use `otp set -s` (OR-in), never `otp load`, for this field — `otp load` attempts
 to clear bits and will fail.
@@ -233,7 +276,7 @@ signature → hash → sign the hash → embed the real signature.
 ```sh
 cd /scratch/code/shibboleth/seedhammer
 nix develop --command ../mnemonic-engrave/scripts/sign-firmware.sh \
-    $PWD/seedhammerii-<version>.uf2 $PWD/sh2-boot-key.pem
+    $PWD/seedhammerii-$(git rev-parse HEAD).uf2 ~/.sh2/sh2-boot-key.pem
 ```
 
 `scripts/sign-firmware.sh` runs the sequence above and then does two things the
@@ -273,7 +316,7 @@ Nothing here touches OTP. Get it wrong as many times as you need.
 ## Step 6 — Flash
 
 ```sh
-picotool load --verify $PWD/seedhammerii-<version>.uf2
+picotool load --verify $PWD/seedhammerii-$(git rev-parse HEAD).uf2
 picotool reboot
 ```
 
@@ -286,10 +329,13 @@ version line.
 > failure here is a **signing or image** problem, not a slot problem. Those are
 > retryable at zero OTP cost:
 >
-> 1. Re-run step 5 to produce a **fresh signature** (a new ECDSA nonce). Whether
->    the RP2350 bootrom rejects high-`s` signatures is not verifiable from this
->    repo; if it does, roughly half of all signatures fail this way and a re-sign
->    fixes it. An intermittent pattern across re-signs points here.
+> 1. Re-run step 5 and re-flash. **Note what this is NOT:** the RP2350 bootrom
+>    performs no ECDSA canonicality check — verified against
+>    `raspberrypi/pico-bootrom-rp2350` (`arm8_sig.c` into the pinned `sweet-b`
+>    commit, whose only scalar test is `0 < k < n`). Roughly half of all openssl
+>    signatures are high-`s` (measured: 53.2% of 500) and they verify fine. A
+>    boot failure here is **never** a high-`s` artifact — look at real causes:
+>    wrong key, wrong image, a corrupted UF2, or the metadata-block count.
 > 2. Re-flash and reboot.
 > 3. Official SeedHammer firmware remains bootable throughout — flash a release
 >    UF2 to get a working machine back while you debug.

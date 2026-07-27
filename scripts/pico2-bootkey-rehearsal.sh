@@ -48,6 +48,7 @@
 # SH2 MODES (the real SeedHammer II -- all READ ONLY, no --execute needed):
 #   ./pico2-bootkey-rehearsal.sh --sh2-precheck
 #   ./pico2-bootkey-rehearsal.sh --sh2-verify-slot 1 --key /abs/sh2-boot-key.pem
+#   ./pico2-bootkey-rehearsal.sh --sh2-verify-valid 1 --key /abs/sh2-boot-key.pem
 #   ./pico2-bootkey-rehearsal.sh --make-otp-json --key K --slot 1 --out F   (no device)
 #
 # These exist because the phases above deliberately REFUSE the SeedHammer II
@@ -64,6 +65,12 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Anchored to the repo, NOT the cwd: cross-phase state (keys, CHIPID, images)
 # must not silently vanish when the operator runs from a different directory.
 WORKDIR="${WORKDIR:-$REPO_ROOT/rehearsal-work}"
+# SH2 state lives OUTSIDE rehearsal-work/. Every document teaches that the
+# rehearsal directory is disposable ("the board is CONSUMED"), so a `git clean
+# -xdf` or a tidy-up would silently delete the SeedHammer's CHIPID pin and the
+# rehearsal keys that reject_rehearsal_key compares against -- turning two
+# safety checks into no-ops that still print PASS.
+SH2_DIR="${SH2_DIR:-$REPO_ROOT/sh2-state}"
 SEEDHAMMER_DIR="${SEEDHAMMER_DIR:-$(cd "$REPO_ROOT/../seedhammer" 2>/dev/null && pwd || true)}"
 EXECUTE=0
 PHASE=""
@@ -104,6 +111,7 @@ while [ $# -gt 0 ]; do
     --execute)        EXECUTE=1; shift ;;
     --sh2-precheck)   MODE="sh2-precheck"; shift ;;
     --sh2-verify-slot) MODE="sh2-verify-slot"; SH2_SLOT="${2:-}"; shift 2 ;;
+    --sh2-verify-valid) MODE="sh2-verify-valid"; SH2_SLOT="${2:-}"; shift 2 ;;
     --make-otp-json)  MODE="make-otp-json"; shift ;;
     --key)            SH2_KEY="${2:-}"; shift 2 ;;
     --slot)           SH2_SLOT="${2:-}"; shift 2 ;;
@@ -113,7 +121,8 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$PHASE" ] || [ -n "$MODE" ] || die "specify --phase <0..6>, or an SH2 mode:
   --sh2-precheck                       read-only survey of the SeedHammer II (runbook step 1)
-  --sh2-verify-slot N --key <key.pem>  read-only slot readback (runbook step 2's gate)
+  --sh2-verify-slot N --key <key.pem>  read-only slot readback (gates runbook step 3)
+  --sh2-verify-valid N --key <key.pem> read-only post-write check (closes step 3)
   --make-otp-json --key <key.pem> --slot N --out <file>   no device access at all"
 
 for t in picotool openssl sha256sum; do
@@ -124,6 +133,14 @@ case "$PHASE" in
   0|3|4|5|6)
     command -v tinygo >/dev/null || die "tinygo not found -- run inside 'nix develop'"
     command -v go     >/dev/null || die "go not found -- run inside 'nix develop'" ;;
+esac
+# make_otp_json seals a real RP2350 image, so --make-otp-json needs a builder
+# too. Discovering that mid-SeedHammer-procedure as "blinky build failed" is
+# exactly the improvisation these modes exist to remove.
+case "$MODE" in
+  make-otp-json)
+    command -v tinygo >/dev/null || die "tinygo not found -- run inside 'nix develop'"
+    command -v jq     >/dev/null || die "jq not found -- run inside 'nix develop'" ;;
 esac
 [ -n "$SEEDHAMMER_DIR" ] && [ -d "$SEEDHAMMER_DIR" ] \
   || die "set SEEDHAMMER_DIR to the seedhammer fork (provides cmd/picosign)"
@@ -363,10 +380,21 @@ ask_blink() {
 # image is not enumerable this way. Removes the one prompt where y meant failure.
 bootsel_present() {
   if [ "$EXECUTE" -ne 1 ]; then printf 'skip'; return 0; fi
-  sleep 3
-  if picotool info >/dev/null 2>&1; then printf 'yes'; else printf 'no'; fi
+  # Poll rather than sampling once: a REJECTED board that re-enumerates slowly
+  # (hubs, some xHCI stacks) would miss a single 3s check and be scored as
+  # "accepted" -- failing open on the only automated verdict in the rehearsal.
+  # Require sustained absence before concluding the image ran.
+  local i misses=0
+  for i in $(seq 1 15); do
+    if picotool info >/dev/null 2>&1; then printf 'yes'; return 0; fi
+    misses=$((misses+1)); sleep 1
+  done
+  printf 'no'
 }
 
+# sign_image <image> <key> -> produces <image-without-.uf2>.signed.uf2
+# sign-firmware.sh deliberately never mutates its input, so callers must flash
+# the .signed.uf2 it produces, NOT the original.
 sign_image() {
   SEEDHAMMER_DIR="$SEEDHAMMER_DIR" "$REPO_ROOT/scripts/sign-firmware.sh" "$1" "$2"
 }
@@ -387,6 +415,15 @@ sign_image() {
 # irreversible writes stay in the operator's hands, in the runbook.
 # --------------------------------------------------------------------------
 
+require_spare_slot() {
+  case "${1:-}" in
+    1|2|3) ;;
+    0) die "slot 0 is SeedHammer's PRODUCTION key and the entire recovery path.
+It must never be written. Use slot 1, 2 or 3." ;;
+    *) die "slot must be 1, 2 or 3 (got '${1:-}')" ;;
+  esac
+}
+
 sh2_require_seedhammer() {
   local slot0 cid
   picotool info >/dev/null 2>&1 || die "no board visible -- is the SeedHammer II in BOOTSEL?"
@@ -398,16 +435,26 @@ Expected:     $SH_SIGNKEY_HASH  (signKeyHash, platform_sh2.go:70)
 These modes are for the real device only. If you meant the rehearsal Pico, use
 --phase instead. UNPLUG EVERY OTHER RP2350 BOARD before continuing."
   ok "slot 0 holds SeedHammer's production key -- this is a SeedHammer II"
+  mkdir -p "$SH2_DIR"
   cid="$(chipid)"
-  if [ -f "$WORKDIR/sh2-chipid.txt" ]; then
-    [ "$cid" = "$(cat "$WORKDIR/sh2-chipid.txt")" ] || die "WRONG DEVICE.
-  pinned at --sh2-precheck: $(cat "$WORKDIR/sh2-chipid.txt")
+  if [ -f "$SH2_DIR/sh2-chipid.txt" ]; then
+    [ "$cid" = "$(cat "$SH2_DIR/sh2-chipid.txt")" ] || die "WRONG DEVICE.
+  pinned at --sh2-precheck: $(cat "$SH2_DIR/sh2-chipid.txt")
   connected now:            $cid
 A consumed rehearsal Pico can answer with plausible-looking values. Unplug it."
     ok "device identity matches the one pinned at --sh2-precheck ($cid)"
-  else
-    printf '%s' "$cid" > "$WORKDIR/sh2-chipid.txt"
+  elif [ "$MODE" = "sh2-precheck" ]; then
+    printf '%s' "$cid" > "$SH2_DIR/sh2-chipid.txt"
     ok "pinned SeedHammer II CHIPID $cid for later steps"
+  else
+    # Only --sh2-precheck may create the pin. Letting a later mode create it
+    # would silently downgrade the wrong-device check to a first-time pin and
+    # still print PASS.
+    die "no SeedHammer II pinned ($SH2_DIR/sh2-chipid.txt is missing).
+Run --sh2-precheck first; it is what establishes the device identity that this
+mode re-checks. If you deleted $SH2_DIR mid-procedure, re-run --sh2-precheck --
+it is read-only -- but be aware it will refuse a device that is already part-way
+through (see its message for what to do)."
   fi
 }
 
@@ -415,16 +462,30 @@ A consumed rehearsal Pico can answer with plausible-looking values. Unplug it."
 # documented as disposable, so burning a throwaway key's hash into the SH2 would
 # strand the slot the moment that directory is deleted.
 reject_rehearsal_key() {
-  local key="$1" h p
+  local key="$1" h p seen=0
+  if [ "${ALLOW_UNCHECKED_KEY:-0}" = "1" ]; then
+    warn "ALLOW_UNCHECKED_KEY=1 -- rehearsal-key check SKIPPED by request"
+    return 0
+  fi
   h="$(key_hash "$key")"
   for p in "$WORKDIR"/factory-key.pem "$WORKDIR"/my-key.pem "$WORKDIR"/third-party-key.pem; do
     [ -f "$p" ] || continue
+    seen=$((seen+1))
     [ "$h" != "$(key_hash "$p")" ] || die "REFUSING: $key is a REHEARSAL key ($(basename "$p")).
 Rehearsal keys live in a directory documented as disposable. Burning one into the
 SeedHammer II would permanently strand that slot the moment it is deleted.
 Generate a distinct, backed-up key (e.g. sh2-boot-key.pem) for the real device."
   done
-  ok "key is not one of the rehearsal keys"
+  # Printing PASS after comparing against nothing is exactly the false-green
+  # this guard exists to prevent.
+  [ "$seen" -gt 0 ] || die "CANNOT CHECK: no rehearsal keys found in $WORKDIR.
+This guard compares your key against the rehearsal keys, and there are none to
+compare against -- so it can neither confirm nor deny that $key is a throwaway.
+Keep rehearsal-work/ until the SeedHammer procedure is complete. If the
+rehearsal is genuinely finished and the directory is gone, satisfy yourself by
+hand that this key is the one you generated for the real device and backed up,
+then re-run with ALLOW_UNCHECKED_KEY=1."
+  ok "key is not one of the $seen rehearsal key(s) on disk"
 }
 
 case "$MODE" in
@@ -433,6 +494,7 @@ case "$MODE" in
     [ -n "$SH2_KEY" ] && [ -n "$SH2_SLOT" ] && [ -n "$JSON_OUT" ] \
       || die "usage: --make-otp-json --key <key.pem> --slot <N> --out <file.json>"
     [ -f "$SH2_KEY" ] || die "no such key: $SH2_KEY"
+    require_spare_slot "$SH2_SLOT"
     reject_rehearsal_key "$SH2_KEY"
     make_otp_json "$SH2_KEY" "$SH2_SLOT" "$JSON_OUT"
     ok "wrote $JSON_OUT for slot $SH2_SLOT"
@@ -451,7 +513,14 @@ Do not proceed; the device is not in the state this procedure assumes."
 
     KV="$(otp_field BOOT_FLAGS1.KEY_VALID)"
     [ $((16#$KV)) -eq 1 ] || die "KEY_VALID is 0x$KV, expected exactly 0x1 (slot 0 only).
-More than one key is already valid, or slot 0 is not the valid one. STOP."
+
+If you are PART-WAY THROUGH this procedure, that is expected and not a fault --
+--sh2-precheck describes a pristine retail unit only. Use
+    --sh2-verify-valid <slot> --key <your key>
+to check a device whose slot is already burned.
+
+Otherwise: more than one key is already valid on a device you believed pristine.
+STOP and find out why."
     ok "exactly one valid boot key (slot 0)"
 
     KI="$(otp_field BOOT_FLAGS1.KEY_INVALID)"
@@ -461,7 +530,14 @@ More than one key is already valid, or slot 0 is not the valid one. STOP."
     for s in 1 2 3; do
       v="$(read_slot $s)"
       [ "$v" = "$(printf '0%.0s' $(seq 1 64))" ] \
-        || die "spare slot $s is NOT empty (0x$v) -- this device has been modified before. STOP."
+        || die "spare slot $s is NOT empty (0x$v).
+
+If YOU burned it earlier in this procedure, that is expected -- use
+    --sh2-verify-slot $s --key <your key>     (before the valid bit)
+    --sh2-verify-valid $s --key <your key>    (after it)
+rather than --sh2-precheck, which describes a pristine unit only.
+
+Otherwise this device has been modified by someone else. STOP."
     done
     ok "spare slots 1-3 all empty (all 16 rows each)"
 
@@ -485,10 +561,60 @@ More than one key is already valid, or slot 0 is not the valid one. STOP."
     info "Proceed to runbook step 2. Nothing was written."
     exit 0 ;;
 
+  sh2-verify-valid)
+    hdr "SeedHammer II post-write verification (READ ONLY -- closes runbook step 3)"
+    [ -n "$SH2_SLOT" ] && [ -n "$SH2_KEY" ] \
+      || die "usage: --sh2-verify-valid <N> --key <key.pem>"
+    require_spare_slot "$SH2_SLOT"
+    [ -f "$SH2_KEY" ] || die "no such key: $SH2_KEY"
+    sh2_require_seedhammer
+    reject_rehearsal_key "$SH2_KEY"
+
+    # The hash rows (this also re-proves step 2 held).
+    verify_slot_or_die "$SH2_SLOT" "$SH2_KEY"
+
+    # The valid bit itself. otp_field dies on any picotool WARNING, which the
+    # bare `picotool otp get` in earlier drafts did not -- a 2-of-3 redundant
+    # write prints the EXPECTED value alongside a warning, so the naive check
+    # passed while leaving BOOT_FLAGS1 permanently degraded.
+    WANT=$(( 1 | (1 << SH2_SLOT) ))
+    KV="$(otp_field BOOT_FLAGS1.KEY_VALID)"
+    if [ $((16#$KV)) -ne "$WANT" ]; then
+      die "KEY_VALID is 0x$KV, expected 0x$(printf '%x' "$WANT") (slot 0 + slot $SH2_SLOT).
+If it reads LOWER than expected, the redundant write was INTERRUPTED partway.
+That is recoverable and costs nothing: re-run the identical
+    picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x$(printf '%x' $((1 << SH2_SLOT)))
+It only ever SETS bits, so repeating it is safe. Do NOT burn another slot, and
+do NOT start re-signing -- your key hash is already proven correct above."
+    fi
+    ok "KEY_VALID is 0x$KV (slot 0 + slot $SH2_SLOT)"
+
+    KI="$(otp_field BOOT_FLAGS1.KEY_INVALID)"
+    [ $((16#$KI)) -eq 0 ] || die "KEY_INVALID is 0x$KI -- a key has been revoked. STOP."
+    ok "no key revoked"
+
+    # All three BOOT_FLAGS1 copies must agree. A degraded-but-voting-correctly
+    # row is exactly what the old bare check could not see.
+    A="$(read_row_raw24 0x04b)"; B="$(read_row_raw24 0x04c)"; C="$(read_row_raw24 0x04d)"
+    if [ "$A" != "$B" ] || [ "$B" != "$C" ]; then
+      die "BOOT_FLAGS1 redundant copies DISAGREE: 0x$A / 0x$B / 0x$C.
+picotool's majority vote may still report the right value, but the redundancy
+protecting the bit that says 'trust your key' is degraded. Re-run the identical
+`otp set -s` (set-bits only, safe to repeat) and re-check."
+    fi
+    ok "all three BOOT_FLAGS1 copies agree (0x$A)"
+
+    hdr "RESULT"
+    ok "Slot $SH2_SLOT is burned, verified, valid, and its flag rows are consistent."
+    info "The OTP work is COMPLETE. Everything from here (build, sign, flash) is"
+    info "freely retryable and costs no slots."
+    exit 0 ;;
+
   sh2-verify-slot)
     hdr "SeedHammer II slot readback (READ ONLY -- gates runbook step 3)"
     [ -n "$SH2_SLOT" ] && [ -n "$SH2_KEY" ] \
       || die "usage: --sh2-verify-slot <N> --key <key.pem>"
+    require_spare_slot "$SH2_SLOT"
     [ -f "$SH2_KEY" ] || die "no such key: $SH2_KEY"
     sh2_require_seedhammer
     reject_rehearsal_key "$SH2_KEY"
@@ -620,12 +746,16 @@ case "$PHASE" in
   require_board
 
   build_blinky
-  cp "$WORKDIR/blinky.uf2" "$WORKDIR/blinky-mykey.uf2"
-  cp "$WORKDIR/blinky.uf2" "$WORKDIR/blinky-unsigned.uf2"
+  # These MUST be guarded by run(): unguarded, a dry run of phase 3 (which the
+  # quickstart invites as a read-only way to preview a phase) overwrote the
+  # signed image phase 5 depends on with an unsigned copy, turning the positive
+  # control into a false FAIL on a board whose OTP was already spent.
+  run cp "$WORKDIR/blinky.uf2" "$WORKDIR/blinky-mykey.uf2"
+  run cp "$WORKDIR/blinky.uf2" "$WORKDIR/blinky-unsigned.uf2"
 
   hdr "3a -- an image signed with YOUR key (not yet burned)"
   run sign_image "$WORKDIR/blinky-mykey.uf2" "$WORKDIR/my-key.pem"
-  flash_image "$WORKDIR/blinky-mykey.uf2"
+  flash_image "$WORKDIR/blinky-mykey.signed.uf2"
   case "$(ask_blink 'Did the LED blink (2 short + 1 long)?')" in
     skip) info "[dry-run] would REQUIRE no blink here" ;;
     yes)  die "REJECTION FAILED: a your-key-signed image RAN on a board where your key
@@ -690,10 +820,22 @@ and do not trust phase 1's seal." ;;
 
   KV="$(otp_field BOOT_FLAGS1.KEY_VALID)"
   [ $((16#$KV)) -eq 3 ] || die "KEY_VALID is 0x$KV, expected 0x3 -- run phase 4 first"
-  [ -f "$WORKDIR/blinky-mykey.uf2" ] || die "no phase-3 image found -- run phase 3 first so this is a true A/B"
+  [ -f "$WORKDIR/blinky-mykey.signed.uf2" ] || die "no phase-3 SIGNED image found -- run phase 3 --execute first so this is a true A/B"
+  # "Present" is not "signed by your key". Assert the artifact is the same signed
+  # image phase 3 proved was rejected, or the A/B claim is unfounded.
+  MYPUB="$(openssl ec -in "$WORKDIR/my-key.pem" -pubout -conv_form uncompressed \
+           -outform DER 2>/dev/null | tail -c 64 | od -An -v -tx1 | tr -d ' \n' | tr 'A-F' 'a-f')"
+  IMGPUB="$(picotool info -a "$WORKDIR/blinky-mykey.signed.uf2" 2>/dev/null \
+            | grep -iE '^ *public key:' | awk '{print $NF}' | tr 'A-F' 'a-f' || true)"
+  [ -n "$IMGPUB" ] && [ "$IMGPUB" = "$MYPUB" ] || die "the phase-3 image is NOT signed by my-key.pem.
+A dry run of phase 3, or a rebuild, has replaced it. Re-run phase 3 --execute so
+phase 5 tests the SAME artifact phase 3 proved was rejected."
+  picotool info -a "$WORKDIR/blinky-mykey.signed.uf2" 2>/dev/null | grep -qi 'signature: *verified' \
+    || die "the phase-3 image does not carry a verified signature -- re-run phase 3 --execute"
+  ok "phase-3 image is intact and signed by your key (true A/B)"
 
   info "Re-flashing the SAME your-key-signed image phase 3 proved was rejected."
-  flash_image "$WORKDIR/blinky-mykey.uf2"
+  flash_image "$WORKDIR/blinky-mykey.signed.uf2"
   case "$(ask_blink 'Did the LED blink (2 short + 1 long)?')" in
     skip) info "[dry-run] would REQUIRE a blink here" ;;
     yes)  ok "ACCEPTED after the key burn -- reject->accept across one OTP write."
@@ -709,12 +851,25 @@ re-sign once to get a fresh nonce before concluding the chain is broken." ;;
   # too. It cannot run on a Pico (no SeedHammer peripherals), so the acceptance
   # signal is negative: a REJECTED secure-boot image returns to BOOTSEL, an
   # accepted one does not.
-  FW_REAL="$(ls -1 "$SEEDHAMMER_DIR"/seedhammerii-*.uf2 2>/dev/null | head -1 || true)"
-  if [ -n "$FW_REAL" ]; then
+  FW_REAL="$(ls -1 "$SEEDHAMMER_DIR"/seedhammerii-*.uf2 2>/dev/null | grep -v '\.signed\.uf2$' | head -1 || true)"
+  if [ -z "$FW_REAL" ] && [ "${ACCEPT_BLINKY_ONLY:-0}" = "1" ]; then
+    warn "ACCEPT_BLINKY_ONLY=1 -- skipping 5b by request."
+    warn "Acceptance is proven for the 33KB blinky ONLY, not the real firmware."
+    FW_REAL="__skip__"
+  fi
+  if [ "$FW_REAL" = "__skip__" ]; then :
+  elif [ -n "$FW_REAL" ]; then
     hdr "5b -- the REAL fork firmware, signed with your key"
     run cp "$FW_REAL" "$WORKDIR/fw-mykey.uf2"
     run sign_image "$WORKDIR/fw-mykey.uf2" "$WORKDIR/my-key.pem"
-    flash_image "$WORKDIR/fw-mykey.uf2"
+    info "The board is RUNNING the phase-5 image now, so it has LEFT BOOTSEL."
+    info "Re-enter BOOTSEL: hold BOOTSEL while replugging USB. (The blinky has no"
+    info "USB stack, so picotool cannot reset it for you.)"
+    if [ "$EXECUTE" -eq 1 ]; then
+      printf '\n\033[1mPress Enter once the board is back in BOOTSEL...\033[0m '
+      read -r _ || true
+    fi
+    flash_image "$WORKDIR/fw-mykey.signed.uf2"
     info "Expect NO blink (no LED code) and NO SeedHammer UI (no hardware)."
     info "Verdict is taken from picotool, not from you -- 'accepted but hung' and"
     info "'operator did not look' are indistinguishable by eye on a headless Pico."
@@ -727,8 +882,16 @@ SeedHammer II." ;;
       no)   ok "real firmware accepted by the bootrom (picotool can no longer see the board)" ;;
     esac
   else
-    warn "No seedhammerii-*.uf2 found in $SEEDHAMMER_DIR -- skipping 5b."
-    warn "F11(d) unproven: acceptance shown only for the small blinky image."
+    die "NO REAL FIRMWARE FOUND in $SEEDHAMMER_DIR (seedhammerii-*.uf2).
+
+Phase 5b is the ONLY proof that the real 2.4MB image -- not just the 33KB
+blinky -- is accepted by the bootrom. Skipping it silently would hand you a
+green rehearsal whose acceptance evidence covers the wrong artifact.
+
+Build it first:
+    cd $SEEDHAMMER_DIR && env VERSION=\$(git rev-parse HEAD) nix run .#build-firmware
+then re-run this phase. (Set ACCEPT_BLINKY_ONLY=1 to proceed deliberately
+without that proof -- but then say so in your notes.)"
   fi
   ok_done "confirm the previously-rejected image now boots."
   ;;
@@ -751,10 +914,10 @@ Run phases 1 and 2 first."
   ok "preconditions hold: sealed board, dual trust"
 
   [ -f "$WORKDIR/factory-key.pem" ] || die "factory-key.pem missing"
-  cp "$WORKDIR/blinky.uf2" "$WORKDIR/blinky-factory.uf2"
+  run cp "$WORKDIR/blinky.uf2" "$WORKDIR/blinky-factory.uf2"
   run sign_image "$WORKDIR/blinky-factory.uf2" "$WORKDIR/factory-key.pem"
-
-  flash_image "$WORKDIR/blinky-factory.uf2"
+  info "If phase 5 left the board running an image, re-enter BOOTSEL first."
+  flash_image "$WORKDIR/blinky-factory.signed.uf2"
   case "$(ask_blink 'Did the LED blink?')" in
     skip) info "[dry-run] would REQUIRE a blink here" ;;
     yes)  ok "Both keys boot. Leaving SeedHammer's slot valid really does preserve the fallback." ;;
