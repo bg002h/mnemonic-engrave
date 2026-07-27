@@ -1,0 +1,105 @@
+FIRMWARE QUICKSTART — build, test, and upload signed firmware
+=============================================================
+Condensed card. Full detail + rationale: design/RUNBOOK_custom_boot_key.md
+Read that before the first real run. This is a reminder, not a substitute.
+
+Every command below runs in BASH, from the fork's nix devshell:
+
+    cd /scratch/code/shibboleth/seedhammer && nix develop
+
+(Your login shell is fish; multi-line bash blocks are syntax errors there.)
+
+
+0. BUILD + PROVE REPRODUCIBLE                                    [safe, anytime]
+--------------------------------------------------------------------------------
+    env VERSION=$(git rev-parse HEAD) nix run .#build-firmware
+    sha256sum seedhammerii-$(git rev-parse HEAD).uf2
+
+Compare against the CI artifact for the same commit (Actions > "Build image").
+A match proves your toolchain reproduces CI bit-for-bit. VERSION must be the
+raw SHA — CI uses that, and the version string is compiled in.
+
+Known-good: 66d3121... -> 0e576b452f641168a42c28339845a568e5a3ac920d670fb7bef024ccf4c4f9dc
+
+
+1. HOST-SIDE TESTS                                               [safe, anytime]
+--------------------------------------------------------------------------------
+    CGO_ENABLED=0 go test ./...                  # fork: gui, codex32, md, mk, ...
+    nix develop --command tinygo build -size full -o /dev/null \
+      -target pico-plus2 -stack-size 16kb -gc precise -opt 2 -scheduler tasks \
+      ./cmd/controller                           # real device-target compile
+
+CI runs both on every push; they are the authoritative gate.
+
+
+2. REHEARSE ON A PICO 2 — DO THIS BEFORE THE ENGRAVER, ONCE
+--------------------------------------------------------------------------------
+Plain Pico 2 (not the W — its LED is behind the wireless chip). The board is
+CONSUMED: a full run burns 2 of its 4 OTP slots and permanently seals it.
+
+    R=../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh
+    $R --phase 0                # inventory, pin board, make keys, build payload
+    $R --phase 1 --execute      # seal it (mimics a factory SeedHammer)  DESTRUCTIVE
+    $R --phase 2                # verify sealed + page locks
+    $R --phase 3 --execute      # NEGATIVE CONTROL — images must be REJECTED
+    $R --phase 4 --execute      # burn your key                          DESTRUCTIVE
+    $R --phase 5 --execute      # same image must now be ACCEPTED (+5b real firmware)
+    $R --phase 6 --execute      # factory key must STILL boot (fallback proof)
+
+Phase 3 is not optional. Without it a blinking LED in phase 5 proves nothing —
+an unsealed board boots anything. Drop --execute on any phase for a dry run.
+
+
+3. REAL SEEDHAMMER II — THE IRREVERSIBLE PART
+--------------------------------------------------------------------------------
+UNPLUG THE PICO FIRST. A consumed rehearsal board answers with plausible values.
+BOOTSEL = hold the white button under the control board while plugging in USB.
+
+    R=../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh
+
+  a) Survey (read-only; refuses anything that isn't a SeedHammer II):
+        $R --sh2-precheck
+
+  b) Make and back up your key. Name it distinctly from the rehearsal keys:
+        openssl ecparam -name secp256k1 -genkey -noout -out $PWD/sh2-boot-key.pem
+     Lose this and you can never sign another update for this machine.
+
+  c) Build the OTP json (touches no device; asserts the hash two ways):
+        $R --make-otp-json --key $PWD/sh2-boot-key.pem --slot 1 --out $PWD/my-otp.json
+
+  d) FIRST IRREVERSIBLE WRITE — burn the hash:
+        picotool otp load $PWD/my-otp.json
+
+  e) THE GATE. Read-only, compares all 16 rows. If this fails, STOP and use
+     slot 2 — the slot is not valid yet, the machine still boots normally:
+        $R --sh2-verify-slot 1 --key $PWD/sh2-boot-key.pem
+
+  f) SECOND IRREVERSIBLE WRITE — only after (e) passes:
+        picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x2      # slot 2 = 0x4, slot 3 = 0x8
+        picotool otp get -n BOOT_FLAGS1.KEY_VALID          # expect field = 3
+
+
+4. SIGN AND UPLOAD (repeatable forever, zero OTP cost)
+--------------------------------------------------------------------------------
+    env VERSION=$(git rev-parse HEAD) nix run .#build-firmware
+    nix develop --command ../mnemonic-engrave/scripts/sign-firmware.sh \
+        $PWD/seedhammerii-<version>.uf2 $PWD/sh2-boot-key.pem
+    picotool load --verify $PWD/seedhammerii-<version>.uf2
+    picotool reboot
+
+sign-firmware.sh proves the signature offline before you flash: it asserts the
+digest is unchanged after embedding the signature, verifies it with openssl,
+checks the embedded bytes match, requires exactly 2 metadata blocks, and
+requires picotool to report "signature: verified".
+
+Expect "(UNLOCKED)" on the version line afterwards. That is CORRECT — the
+firmware only reports "locked" when SeedHammer's key is the sole valid one.
+Secure boot is still enforcing; it now trusts two keys.
+
+TWO RULES:
+  * NEVER revoke SeedHammer's slot-0 key. It is your only recovery path —
+    official releases are signed by it (verified), so you can always flash a
+    stock UF2 to get a working machine back.
+  * If firmware does not boot but step (e) passed, the hash is PROVEN correct.
+    It is a signing problem — re-sign (fresh nonce) and re-flash.
+    DO NOT burn another slot.
