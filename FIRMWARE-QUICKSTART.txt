@@ -53,7 +53,48 @@ Once that works unprivileged, --phase 0 (Pico) and --sh2-precheck (SeedHammer)
 will too. Both are read-only and refuse the wrong board.
 
 
-0. BUILD + PROVE REPRODUCIBLE                                    [safe, anytime]
+0a. RUN THIS FIRST — TODAY. READ-ONLY SURVEY OF YOUR SEEDHAMMER
+--------------------------------------------------------------------------------
+Do this before the Pico arrives, before building anything, before reading the
+rest of this card. It writes NOTHING.
+
+    cd /scratch/code/shibboleth/seedhammer && nix develop
+    ../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh --sh2-precheck
+
+Put the SeedHammer in BOOTSEL first (section 00). Unplug every other RP2350.
+
+WHY THIS FIRST, AND WHY IT IS SAFE
+  The mode contains no otp load, no otp set, no picotool load -- it reads about
+  70 OTP rows and stops. Nothing it does is irreversible, and it refuses any
+  device that is not a SeedHammer II.
+
+WHAT IT BUYS YOU, TODAY
+  1. It retires the biggest unknown in this whole procedure. Whether your retail
+     unit has OTP page locks -- or any other unexpected factory provisioning --
+     decides whether a second boot key can EVER be added. Non-zero page locks
+     mean this procedure is impossible on your device, and reading them is the
+     only way to find out short of an irreversible write. Better to learn that
+     now than mid-burn.
+  2. It is the first time this tooling meets real picotool output. The OTP
+     parsers were written from picotool's source and tested against stubs
+     written from that same reading -- circular by construction. Real output
+     breaks that circle. They fail CLOSED, so a parsing problem shows up as a
+     loud error, not a wrong answer.
+  3. It confirms the udev rule works on the machine that matters.
+
+IF IT FAILS
+  Read the message. It distinguishes "your device is not in the expected state"
+  (a fact -- stop, go read the runbook) from a tool problem. Either way you have
+  lost nothing: no OTP was touched. Fix and re-run; it is idempotent apart from
+  writing the CHIPID pin to sh2-state/.
+
+IF IT PASSES
+  Your device is in the expected retail state, its OTP pages are writable, and
+  its identity is pinned for later steps. Nothing else here becomes urgent --
+  the Pico rehearsal is still mandatory before anything irreversible.
+
+
+0b. BUILD + PROVE REPRODUCIBLE                                   [safe, anytime]
 --------------------------------------------------------------------------------
     env VERSION=$(git rev-parse HEAD) nix run .#build-firmware
     sha256sum seedhammerii-$(git rev-parse HEAD).uf2
@@ -92,7 +133,7 @@ CONSUMED: a full run burns 2 of its 4 OTP slots and permanently seals it.
 Phase 3 is not optional. Without it a blinking LED in phase 5 proves nothing —
 an unsealed board boots anything.
 
-Run section 0 FIRST: phase 5b signs and flashes the real 2.4MB firmware, and it
+Run section 0b FIRST: phase 5b signs and flashes the real 2.4MB firmware, and it
 is the only proof that acceptance generalises beyond the 33KB blinky. Without a
 built seedhammerii-*.uf2 in the fork, phase 5 now refuses rather than skipping.
 
@@ -124,7 +165,9 @@ AC with sleep disabled, and do not touch the bench during (d) and (f).
 
     R=../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh
 
-  a) MANDATORY GATE — run first, read every line (read-only):
+  a) MANDATORY GATE — read every line (read-only). You should already have run
+     this back in section 0a; run it again now, immediately before the writes,
+     so the state you are about to act on is the state you just read:
         $R --sh2-precheck
 
      It asserts, and STOPs on any failure:

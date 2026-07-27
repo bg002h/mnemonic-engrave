@@ -98,6 +98,16 @@ Do not skip it.
 
 ## Step 1 — Verify device state (READ ONLY, do this first)
 
+> **Run this the day you get the machine — not the day you burn OTP.** It writes
+> nothing, and it is the only way to learn, short of an irreversible write,
+> whether your retail unit carries OTP page locks or other factory provisioning
+> that would make this whole procedure impossible. It is also the first time the
+> OTP parsers meet real picotool output rather than stubs derived from the same
+> source reading they were written from — they fail closed, so a mismatch is a
+> loud error, not a wrong answer. See `FIRMWARE-QUICKSTART.txt` section 0a.
+> Re-run it again immediately before step 2, so the state you act on is the
+> state you just read.
+
 Enter BOOTSEL: hold the white firmware button (underside of the control board,
 near the hammerhead) while connecting USB.
 
