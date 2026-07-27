@@ -156,9 +156,18 @@ asserted before it is ever loaded:
 
 ```sh
 jq '{bootkey1: .bootkey0}' my-otp-raw.json > my-otp.json   # keep ONLY the key
-jq -e 'has("crit1") or has("boot_flags1")' my-otp.json && echo "REFUSE: would seal early"
+# Guard must ABORT, not merely print -- `&& echo ...` still falls through to the
+# load on the next line.
+if jq -e 'has("crit1") or has("boot_flags1")' my-otp.json >/dev/null; then
+  echo "REFUSE: json would seal the device before any row is verified"; exit 1
+fi
 picotool otp load my-otp.json
 ```
+
+Better still: use `scripts/pico2-bootkey-rehearsal.sh`'s `make_otp_json`, which
+performs this transform and asserts single-key / correct slot / 32 entries / no
+`crit1`+`boot_flags1` / byte-equality with the openssl-derived hash before the
+file is ever loaded.
 
 Dropping `crit1`/`boot_flags1` is not cosmetic: loading the unedited file would
 set the key hash **and** `KEY_VALID` **and** `SECURE_BOOT_ENABLE` in a single
