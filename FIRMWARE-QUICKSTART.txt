@@ -10,6 +10,46 @@ Every command below runs in BASH, from the fork's nix devshell:
 (Your login shell is fish; multi-line bash blocks are syntax errors there.)
 
 
+00. CONNECTING A BOARD (do the udev step once, before you need it)
+--------------------------------------------------------------------------------
+Both boards enter BOOTSEL the same way: hold a button WHILE plugging in USB,
+release when a USB drive appears.
+
+    Pico 2           BOOTSEL button (the only button on the board)   micro-USB
+                     — the official Pico 2 is NOT USB-C
+    SeedHammer II    white firmware button, underside of the control  USB-C
+                     board near the hammerhead
+
+Both then enumerate as an RP2350 in BOOTSEL, USB vendor ID 2e8a. The SeedHammer's
+volume is labelled SHII. USE A DATA CABLE — charge-only cables are the most
+common "device not found".
+
+PERMISSIONS — do this once, or picotool will not see the device:
+
+    sudo tee /etc/udev/rules.d/99-picotool.rules <<'EOF'
+    SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", MODE="0660", TAG+="uaccess"
+    EOF
+    sudo udevadm control --reload-rules && sudo udevadm trigger
+
+(uaccess grants the logged-in user access rather than opening the device to
+everyone. Unplug and replug the board afterwards.)
+
+DO NOT work around missing permissions by running the rehearsal script under
+sudo. It writes keys and state into rehearsal-work/; as root those land
+root-owned and the next unprivileged phase breaks partway through — possibly
+between two OTP writes. For a one-off check only, use an absolute path, since
+sudo does not inherit the nix PATH:
+
+    sudo $(which picotool) info
+
+Verify the connection:
+
+    picotool info                # should report an RP2350
+
+Once that works unprivileged, --phase 0 (Pico) and --sh2-precheck (SeedHammer)
+will too. Both are read-only and refuse the wrong board.
+
+
 0. BUILD + PROVE REPRODUCIBLE                                    [safe, anytime]
 --------------------------------------------------------------------------------
     env VERSION=$(git rev-parse HEAD) nix run .#build-firmware
