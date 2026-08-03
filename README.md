@@ -85,6 +85,19 @@ GitHub-hosted runner; cross-MSVC is impractical).
 - [`ms-codec`](https://github.com/bg002h/mnemonic-secret) — secret entropy (`ms1`, BIP-93 codex32).
 - **`mnemonic-engrave`** (this repo) — engrave the bundle onto SeedHammer II.
 
+## Custom firmware tooling
+
+`scripts/` also carries the tooling for running self-built firmware on a retail
+SeedHammer II — `pico2-bootkey-rehearsal.sh` (rehearsal phases plus read-only
+device checks) and `sign-firmware.sh` (signs a UF2 and proves the signature
+offline before it reaches hardware), with a hardware-free regression harness in
+`scripts/test/`.
+
+The **procedure** those scripts implement is documented in the firmware fork:
+[bg002h/seedhammer → `docs/custom-firmware.md`](https://github.com/bg002h/seedhammer/blob/main/docs/custom-firmware.md).
+It burns your own boot key into an OTP slot and is **irreversible** — read it
+before running anything here.
+
 ## License
 
 Dual-licensed, at your option, under either the [MIT License](LICENSE) or the
