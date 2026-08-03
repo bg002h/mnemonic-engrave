@@ -268,6 +268,18 @@ key_hash() {
   printf '%s' "$h"
 }
 
+# require_rp2350_bootsel: liveness + identity probe.
+# Deliberately NOT `picotool info | grep RP2350`: on a board with empty flash
+# picotool prints "Program Information / none" and the chip name never appears,
+# so that test rejected a brand-new Pico 2 -- the primary rehearsal board.
+# Reading CHIPID proves presence, BOOTSEL, and RP2350 in one step.
+require_rp2350_bootsel() {
+  chipid || die "cannot read CHIPID -- no RP2350 in BOOTSEL, or picotool has no
+USB permission. Check: lsusb | grep 2e8a  (want 2e8a:000f), and that your udev
+rule is numbered BELOW 73 (see the runbook prerequisites)."
+  ok "RP2350 in BOOTSEL, CHIPID $CHIPID_HEX"
+}
+
 CHIPID_HEX=""
 chipid() {
   local out=""
@@ -548,8 +560,7 @@ It must never be written. Use slot 1, 2 or 3." ;;
 
 sh2_require_seedhammer() {
   local slot0 cid
-  picotool info >/dev/null 2>&1 || die "no board visible -- is the SeedHammer II in BOOTSEL?"
-  picotool info | grep -qi 'rp2350' || die "not an RP2350 device"
+  require_rp2350_bootsel
   read_slot 0; slot0="$SLOT_HEX"
   [ "$slot0" = "$SH_SIGNKEY_HASH" ] || die "This is NOT a SeedHammer II.
 Slot 0 holds: $slot0
@@ -777,9 +788,7 @@ case "$PHASE" in
   hdr "Phase 0 -- inventory, board pinning, and prep (READ ONLY + local builds)"
   info "Put the board in BOOTSEL: hold BOOTSEL while connecting USB."
 
-  picotool info >/dev/null 2>&1 || die "board not visible -- is it in BOOTSEL mode?"
-  picotool info | grep -qi 'rp2350' || die "not an RP2350 board -- wrong hardware for this rehearsal"
-  ok "RP2350 detected"
+  require_rp2350_bootsel
 
   hdr "Current state"
   picotool otp get CRIT1.SECURE_BOOT_ENABLE || die "cannot read CRIT1.SECURE_BOOT_ENABLE (check 'picotool otp list')"
