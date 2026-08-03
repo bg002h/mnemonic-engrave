@@ -218,7 +218,20 @@ key_hash() {
     | tail -c 64 | sha256sum | cut -d' ' -f1
 }
 
-chipid() { local i out=""; for i in 0 1 2 3; do out="${out}$(read_row "CHIPID$i")"; done; printf '%s' "$out"; }
+chipid() {
+  local i out=""
+  for i in 0 1 2 3; do out="${out}$(read_row "CHIPID$i")"; done
+  # CHIPID is factory-programmed and unique; all-zeros means an unprogrammed
+  # part or a simulator. Never pin or compare against it -- a stale all-zero
+  # pin left by a test would make the real device look like the wrong device.
+  case "$out" in
+    0000000000000000) die "CHIPID reads all zeros.
+That is not a real RP2350 identity -- it means an unprogrammed part, or that
+picotool is talking to a simulator rather than hardware. Refusing to pin or
+trust this identity." ;;
+  esac
+  printf '%s' "$out"
+}
 
 # require_board: refuse to act on any board other than the one phase 0 saw.
 require_board() {

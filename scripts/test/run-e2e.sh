@@ -38,6 +38,10 @@ export REAL_PICOTOOL="$(command -v picotool)"
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 export WORKDIR="$TMP/work"; mkdir -p "$WORKDIR"
+# Isolate SH2 state too, or the harness pins a fake all-zero CHIPID into the
+# REAL sh2-state/ and the next run against the actual SeedHammer dies "WRONG
+# DEVICE" -- a tampering-shaped alarm caused entirely by a test.
+export SH2_DIR="$TMP/sh2-state"; mkdir -p "$SH2_DIR"
 export PATH="$HERE:$PATH"            # fake-picotool shadows the real one
 ln -sf "$HERE/fake-picotool" "$HERE/picotool" 2>/dev/null || true
 trap 'rm -f "$HERE/picotool"; rm -rf "$TMP"' EXIT
@@ -108,7 +112,7 @@ run_phase "phase 0 must FAIL on an already-sealed board" expect-fail "" --phase 
 hdr "C. SH2 modes against a simulated retail SeedHammer II"
 export OTPSTATE="$TMP/sh2.state"
 printf 'SB=1\nKV=1\nKI=0\nSLOT0=%s\n' "$SH_HASH" > "$OTPSTATE"
-rm -f "$WORKDIR/sh2-chipid.txt"
+rm -f "$SH2_DIR/sh2-chipid.txt"
 
 run_phase "--sh2-precheck on a retail unit" expect-pass "" --sh2-precheck
 openssl ecparam -name secp256k1 -genkey -noout -out "$TMP/sh2-boot-key.pem" 2>/dev/null
