@@ -46,14 +46,31 @@ export PATH="$HERE:$PATH"            # fake-picotool shadows the real one
 ln -sf "$HERE/fake-picotool" "$HERE/picotool" 2>/dev/null || true
 trap 'rm -f "$HERE/picotool"; rm -rf "$TMP"' EXIT
 
+# Set EXPECT_OUT before a call to also require a pattern in the output. Exit
+# code alone is not enough: a die is a die, so a test could pass while the code
+# took the WRONG branch -- and finding I2's entire defect was which message
+# printed. Cleared after each use.
+EXPECT_OUT=""
 run_phase() { # run_phase <desc> <expect-pass|expect-fail> <input> <args...>
   local desc="$1" expect="$2" input="$3"; shift 3
-  local out rc
+  local out rc want="$EXPECT_OUT"; EXPECT_OUT=""
   out="$(printf '%s' "$input" | "$R" "$@" 2>&1)"; rc=$?
+  local codeok=0
   if [ "$expect" = "expect-pass" ]; then
-    [ $rc -eq 0 ] && ok "$desc" || { bad "$desc (exit $rc)"; printf '%s\n' "$out" | tail -4; }
+    [ $rc -eq 0 ] && codeok=1 || { bad "$desc (exit $rc)"; printf '%s\n' "$out" | tail -4; }
   else
-    [ $rc -ne 0 ] && ok "$desc (correctly refused)" || bad "$desc — SHOULD HAVE FAILED"
+    [ $rc -ne 0 ] && codeok=1 || bad "$desc — SHOULD HAVE FAILED"
+  fi
+  [ "$codeok" -eq 1 ] || return 0
+  if [ -n "$want" ]; then
+    if printf '%s' "$out" | grep -qiE "$want"; then
+      ok "$desc [matched /$want/]"
+    else
+      bad "$desc — exit code right but output did NOT match /$want/"
+      printf '%s\n' "$out" | tail -6
+    fi
+  else
+    [ "$expect" = "expect-pass" ] && ok "$desc" || ok "$desc (correctly refused)"
   fi
 }
 
@@ -139,6 +156,7 @@ run_phase "phase 1 refuses a SeedHammer II" expect-fail $'BURN-FACTORY\n' --phas
 hdr "D. --sh2-verify-valid (post-write gate)"
 
 # Before the valid bit is set, it must refuse.
+EXPECT_OUT="missing bits|INTERRUPTED"
 run_phase "--sh2-verify-valid FAILS before the valid bit is set" expect-fail "" \
   --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem"
 
@@ -146,6 +164,15 @@ picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x2 >/dev/null 2>&1
 run_phase "--sh2-verify-valid passes once KEY_VALID is 0x3" expect-pass "" \
   --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem"
 state_is KV 3
+
+# The 3-copy comparison must DISCRIMINATE, not pass vacuously (the stub used to
+# return 0x000000 for every copy row). Run it here, while KEY_VALID is still
+# exactly 0x3 -- after the extra-bit case below it would die on that instead.
+export DEGRADE_BOOT_FLAGS1=1
+EXPECT_OUT="redundant copies DISAGREE"
+run_phase "--sh2-verify-valid catches degraded BOOT_FLAGS1 redundancy" expect-fail "" \
+  --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem"
+unset DEGRADE_BOOT_FLAGS1
 
 # Wrong key must fail even with the valid bit correctly set.
 run_phase "--sh2-verify-valid FAILS with the wrong key" expect-fail "" \
@@ -157,15 +184,41 @@ run_phase "--sh2-verify-valid FAILS for a slot that was never burned" expect-fai
 
 # An EXTRA valid bit is not an interrupted write and must not be reported as one.
 picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x4 >/dev/null 2>&1
+EXPECT_OUT="bits set that should NOT be"
 run_phase "--sh2-verify-valid FAILS on an unexpected extra valid bit" expect-fail "" \
   --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem"
 
+# ...and a key that LIVES in rehearsal-work/ must be refused on path, not just hash.
+cp "$TMP/sh2-boot-key.pem" "$WORKDIR/stray-key.pem"
+EXPECT_OUT="lives inside"
+run_phase "--make-otp-json refuses a key stored in rehearsal-work/" expect-fail "" \
+  --make-otp-json --key "$WORKDIR/stray-key.pem" --slot 3 --out "$TMP/stray.json"
+rm -f "$WORKDIR/stray-key.pem"
+
+# An unreadable key must NOT be misreported as a curve problem.
+cp "$TMP/sh2-boot-key.pem" "$TMP/bad.pem"; printf 'garbage' > "$TMP/bad.pem"
+EXPECT_OUT="NOT a curve problem"
+run_phase "--make-otp-json distinguishes an unreadable key from a wrong curve" expect-fail "" \
+  --make-otp-json --key "$TMP/bad.pem" --slot 3 --out "$TMP/bad.json"
+
 # --sh2-verify-slot must refuse once the slot is already valid (its advice would be wrong).
+EXPECT_OUT="ALREADY marked valid"
 run_phase "--sh2-verify-slot refuses an already-valid slot" expect-fail "" \
   --sh2-verify-slot 1 --key "$TMP/sh2-boot-key.pem"
 
+# CRIT1's 8-copy comparison, on a fresh pristine retail state -- the earlier
+# cases leave KEY_VALID poisoned, and precheck would die on that first.
+export OTPSTATE="$TMP/sh2-crit.state"
+printf 'SB=1\nKV=1\nKI=0\nSLOT0=%s\n' "$SH_HASH" > "$OTPSTATE"
+rm -f "$SH2_DIR/sh2-chipid.txt"
+export DEGRADE_CRIT1=1
+EXPECT_OUT="CRIT1's 8 redundant copies DISAGREE"
+run_phase "--sh2-precheck catches degraded CRIT1 redundancy" expect-fail "" --sh2-precheck
+unset DEGRADE_CRIT1
+
 hdr "E. key and curve guards"
 openssl ecparam -name prime256v1 -genkey -noout -out "$TMP/p256.pem" 2>/dev/null
+EXPECT_OUT="NOT a secp256k1 key"
 run_phase "--make-otp-json REFUSES a non-secp256k1 (P-256) key" expect-fail "" \
   --make-otp-json --key "$TMP/p256.pem" --slot 1 --out "$TMP/p256.json"
 openssl ecparam -name secp384r1 -genkey -noout -out "$TMP/p384.pem" 2>/dev/null

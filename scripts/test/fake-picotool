@@ -64,6 +64,17 @@ case "$sel" in
   BOOT_FLAGS1.KEY_VALID)   printf 'ROW 0x004b: OTP_DATA_BOOT_FLAGS1 (RBIT-3)\nVALUE 0x%06x\n  field KEY_VALID (bits 0-3) = %s\n' "0x$(get KV)" "$(get KV)"; exit 0 ;;
   BOOT_FLAGS1.KEY_INVALID) printf 'ROW 0x004b: OTP_DATA_BOOT_FLAGS1 (RBIT-3)\nVALUE 0x000000\n  field KEY_INVALID (bits 8-11) = 0\n'; exit 0 ;;
   CHIPID*) i="${sel#CHIPID}"; emit_row $(( 0xC0DE + i )) "$sel"; exit 0 ;;
+  # BOOT_FLAGS1 redundant copies (rows 0x04b/0x04c/0x04d) and CRIT1 copies
+  # (0x040-0x047). Served from state so the 3-way / 8-way comparisons are real.
+  # Set DEGRADE_BOOT_FLAGS1=1 or DEGRADE_CRIT1=1 to make one copy disagree.
+  0x04b|0x04c|0x04d)
+    v="$(get KV)"
+    [ "$sel" = "0x04d" ] && [ "${DEGRADE_BOOT_FLAGS1:-0}" = "1" ] && v=0
+    emit_row $(( 16#${v:-0} )) "BOOT_FLAGS1"; exit 0 ;;
+  0x040|0x041|0x042|0x043|0x044|0x045|0x046|0x047)
+    v="$(get SB)"
+    [ "$sel" = "0x047" ] && [ "${DEGRADE_CRIT1:-0}" = "1" ] && v=0
+    emit_row $(( 16#${v:-0} )) "CRIT1"; exit 0 ;;
   PAGE*)   emit_row 0 "$sel"; exit 0 ;;
   BOOTKEY*)
     n=$(echo "$sel" | sed 's/BOOTKEY\([0-9]\)_.*/\1/'); i=$(echo "$sel" | sed 's/.*_//')

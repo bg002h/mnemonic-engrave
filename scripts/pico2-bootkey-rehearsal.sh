@@ -252,8 +252,19 @@ read_slot() {
 # This is what the RP2350 stores in a boot-key slot. Computed independently of
 # picotool so the two can be cross-checked.
 key_hash() {
-  local f full h
-  openssl ec -in "$1" -noout -text 2>/dev/null | grep -qi 'ASN1 OID: secp256k1' \
+  local f full h errtxt
+  [ -f "$1" ] || die "key_hash: no such key file: $1"
+  [ -r "$1" ] || die "key_hash: $1 exists but is not readable by you.
+(Owned by another user? A root-owned file left by running something under sudo?)"
+  # Discriminate 'openssl cannot read this at all' from 'wrong curve'. Collapsing
+  # both into 'not secp256k1' sends the operator off regenerating a perfectly
+  # good key when the real fault is permissions, a passphrase, or a bad format.
+  errtxt="$(openssl ec -in "$1" -noout -text 2>&1 >/dev/null)" || die "key_hash: openssl cannot read $1 as an EC private key.
+This is NOT a curve problem -- do not regenerate yet. openssl said:
+$errtxt
+(Passphrase-protected? Wrong file? A public key rather than a private one?)"
+  printf '%s' "$errtxt" | grep -qi 'ASN1 OID: secp256k1' \
+    || openssl ec -in "$1" -noout -text 2>/dev/null | grep -qi 'ASN1 OID: secp256k1' \
     || die "key_hash: $1 is NOT a secp256k1 key.
 RP2350 secure boot requires secp256k1. EVERY EC curve yields a 64-byte slice
 that looks superficially valid, so without this check a P-256 or P-384 key would
@@ -272,7 +283,7 @@ any signature you could produce -- permanently spending a slot."
   [ "$full" = "04" ] \
     || { rm -f "$f"; die "key_hash: public key is not uncompressed (leading byte 0x$full, expected 0x04)"; }
   # The OTP value is sha256 over X||Y -- the 64 bytes AFTER the 0x04 prefix.
-  h="$(tail -c 64 "$f" | sha256sum | cut -d' ' -f1)"
+  h="$(tail -c 64 "$f" | sha256sum | cut -d' ' -f1)" || { rm -f "$f"; die "key_hash: hashing failed for $1"; }
   rm -f "$f"
   [ ${#h} -eq 64 ] || die "key_hash: sha256 produced ${#h} chars for $1"
   printf '%s' "$h"
@@ -611,6 +622,18 @@ reject_rehearsal_key() {
     return 0
   fi
   h="$(key_hash "$key")"
+  # Path check first: rehearsal-work/ is documented as disposable, so a key that
+  # lives there is unsafe regardless of whether its hash matches a known one.
+  local kreal wreal
+  kreal="$(realpath "$key" 2>/dev/null || printf '%s' "$key")"
+  wreal="$(realpath "$WORKDIR" 2>/dev/null || printf '%s' "$WORKDIR")"
+  case "$kreal" in
+    "$wreal"/*) die "REFUSING: $key lives inside $WORKDIR.
+That directory is documented as disposable -- deleting it after the rehearsal
+would strand the OTP slot this key is burned into. Move the key somewhere
+permanent (e.g. ~/.sh2/) and back it up before using it." ;;
+  esac
+
   local ph
   for p in "$WORKDIR"/factory-key.pem "$WORKDIR"/my-key.pem "$WORKDIR"/third-party-key.pem; do
     [ -f "$p" ] || die "CANNOT CHECK: $(basename "$p") is missing from $WORKDIR.
