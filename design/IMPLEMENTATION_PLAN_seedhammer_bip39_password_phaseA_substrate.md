@@ -231,6 +231,36 @@ For the new glyphs:
 - **Descenders** (`g j p q y`): down to **y9 only** — 1 unit. This is D5, and it is deliberate.
 - **Symbols:** follow the vertical extent of the nearest existing symbol; `#` spans y2→y8, `,` and `.` sit at the baseline.
 
+#### Reference letterforms — do not start from a blank page
+
+Single-stroke lowercase is a solved design problem. The **Hershey fonts**
+(Dr. A. V. Hershey, US Naval Weapons Laboratory, c. 1967) are public-domain
+vector fonts built for plotters and engravers, with full lowercase and symbol
+coverage, and they are available as SVG through the Inkscape *Hershey Text*
+extension and several SVG/JSON repackagings. Hershey Sans / Simplex is the
+closest in spirit to `constant`.
+
+**Use them as a visual reference and redraw in house style — do not import
+coordinate data.** Three reasons, in order of importance:
+
+1. **Monospace.** Hershey is proportional. This font requires a single uniform
+   advance (`engrave.go:1216-1218`), and the plate's "position implies index"
+   property (spec §4) depends on it. Every glyph would need re-spacing into a
+   6-unit cell regardless.
+2. **Metrics.** Hershey uses its own coordinate space; everything needs rescaling
+   to em 9 / cap 6 / x-height 4 / baseline y8.
+3. **Provenance.** This repository is released under the **Unlicense** — public
+   domain. The original Hershey data is public domain, but common redistributions
+   attach a "credit the author, do not sell the data" note. Redrawing from visual
+   reference avoids inheriting any such term into an Unlicense codebase. **Do not
+   copy glyph coordinates from a source whose licence is anything other than
+   public domain** — SIL OFL fonts in particular are incompatible, since OFL
+   requires derivatives stay OFL.
+
+If any reference material is consulted closely enough that redrawing feels like
+transcription, stop and record what was used, so the licence question can be
+settled deliberately rather than by accident.
+
 #### Acceptance criteria (all enforced by tests in this task)
 
 1. All 95 printable ASCII plus `0x1F` decode.
