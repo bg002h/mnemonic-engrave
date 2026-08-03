@@ -1,8 +1,10 @@
 # SPEC — Engrave BIP-39 Password (SeedHammer II fork)
 
-**Status:** draft, pending R0 architect gate (0C/0I) — no implementation may begin
-before GREEN. This feature is **risk-set** under `CLAUDE.md` clause (b): it
-handles secret material that guards funds.
+**Status:** **R0 GATE GREEN (0C/0I) as of 2026-08-03** — implementation may begin.
+Three rounds: fable (2C/6I) → opus (0C/4I) → sonnet verification (GREEN). This
+feature is **risk-set** under `CLAUDE.md` clause (b): it handles secret material
+that guards funds, so the post-implementation adversarial execution review over
+the whole diff is **mandatory and non-deferrable**.
 
 **Repo:** `bg002h/seedhammer` (fork). Tooling/design docs live in
 `bg002h/mnemonic-engrave`.
@@ -354,7 +356,7 @@ panic, each affecting whichever instance is being built:
   (`cmd/vectorfont/main.go:425-427`) — verified, all 52 current glyphs have
   advance 600. This also underwrites §4's "position implies index" property.
 
-**Font-authoring trap (`engrave.go:1288-1295`):** `paddedString` uses
+**Font-authoring trap (`engrave.go:1294-1296`):** `paddedString` uses
 `inf.Start != (bezier.Point{})` as its sentinel for "this glyph has a leading
 move segment". Every current glyph keeps X ∈ [100, 500], so the origin is never
 hit. A new glyph whose first engraved point sits exactly at the origin — very
@@ -746,3 +748,24 @@ anywhere, since inserting shifts the numeric value of every later program.
   requirement → §3.2.1), M1 (Go strings cannot be wiped → §5.3 rewritten),
   M2 (QR size is variable → §4.2), M3 (generator cannot address a control
   codepoint → §3.3), N1 (cite drift → fixed).
+- **R0 round 1** — opus architect, `design/agent-reports/seedhammer-engrave-bip39-password-spec-R0-round1.md`.
+  **NOT GREEN (0C/4I).** Both round-0 Criticals verified closed. All four new
+  findings were in material the round-0 fold itself added. Folded: I1 (reaching
+  QR v6 needs three sites, not one — `constantTimeQRModules` returns 0 for
+  unlisted dims and that 0 propagates into both the size check and the
+  constant-time loop; its maxima are fuzz-derived and must stay so → §3.5.2),
+  I2 (the margin-band relocation reproduced the overflow in the other direction:
+  3 lines × 3 mm = 9 mm against a 7 mm band → §4.3 splits across both bands with
+  a normative ≤2-lines and ≤64 mm budget), I3 (widening the shared
+  `constantAlphabet` would move `center`/`startEndDist` for *every* constant-time
+  string and break existing goldens, making §7 unsatisfiable — a **separate**
+  instance is now the default, not the retreat → §3.5.1), I4 (the check table was
+  again incomplete: **five** checks, two firing at construction, implying the mark
+  sorts first and that glyphs+alphabet land in one commit → §3.4, §3.5.1.1),
+  M1 (case-only confusables → §3.2.1), N1 (cite → fixed), N2 (no glyph may start
+  at the origin → §3.5.1.1). The user's fingerprint 4-and-4 grouping was folded in
+  the same pass.
+- **R0 round 2** — sonnet verification, `design/agent-reports/seedhammer-engrave-bip39-password-spec-R0-round2.md`.
+  **GREEN (0C/0I).** All seven round-1 fixes verified against source; three
+  consistency checks pass. Two nits (a one-line cite drift and this history being
+  a round behind) fixed inline. **Gate closed — implementation may begin.**
