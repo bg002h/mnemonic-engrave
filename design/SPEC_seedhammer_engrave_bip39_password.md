@@ -184,8 +184,19 @@ text where a single misread character silently opens a different wallet, with no
 checksum to catch it.
 
 Adding lowercase creates collisions that the current uppercase-only font never
-had. At minimum: `l`/`1`/`I`, `0`/`O`/`o`, `'`/`` ` ``, `;`/`:`, `,`/`.`,
-`8`/`B`, `5`/`S`, `2`/`Z`, `9`/`g`, `u`/`v`, `rn`/`m`.
+had. Two distinct classes:
+
+**Cross-character collisions** — at minimum `l`/`1`/`I`, `0`/`O`/`o`,
+`'`/`` ` ``, `;`/`:`, `,`/`.`, `8`/`B`, `5`/`S`, `2`/`Z`, `9`/`g`, `u`/`v`,
+`rn`/`m`.
+
+**Case-only collisions — the class this feature actually creates:**
+`C/c O/o S/s U/u V/v W/w X/x Z/z K/k`. These letters have the *same stroke path*
+in upper and lower case, distinguished **by size alone** (cap height 6 units vs
+x-height ~4). D5 fixes the metrics, so they are same-shape-by-construction unless
+the author deliberately differentiates them. On a case-sensitive plate with no
+checksum, `C` read as `c` is a different wallet. This class needs the most
+attention precisely because it is the least visible on screen.
 
 Every pair above must be **visually distinct at engraved size** — slashed or
 dotted zero, serifed `I`, flagged `1`, based `l`, and so on; the exact
@@ -240,25 +251,37 @@ explain precisely:
 | ASCII the face cannot decode | **must be unreachable** after the font work — asserted, not assumed |
 | ASCII not in `constantAlphabet` | **must be unreachable** after §3.5 — asserted, not assumed |
 
-**This gate is load-bearing, and there are THREE independent charset checks on
-the path, not one.** All three must be satisfied or the device panics mid-flow,
-potentially mid-plate:
+**This gate is load-bearing, and there are FIVE charset checks on the path, not
+one.** Every one must be satisfied or the device panics:
 
-| # | Check | Site | Panic |
-|---|---|---|---|
-| 1 | `face.Decode(r)` | `engrave/engrave.go:1363` | `engrave.go:1365` |
-| 2 | `ConstantStringer` alphabet lookup | `engrave/engrave.go:1282` | `engrave.go:1286` |
-| 3 | uniform-advance assertion | `engrave/engrave.go:1217` | `engrave.go:1218` |
+| # | Check | Site | Panic | When |
+|---|---|---|---|---|
+| 1 | `face.Decode(r)` | `engrave.go:1363` | `:1365` | engrave |
+| 2 | `ConstantStringer` alphabet lookup | `engrave.go:1282` | `:1286` | engrave |
+| 3 | uniform advance | `engrave.go:1216` | `:1218` | construction |
+| 4 | alphabet in ascending codepoint order | `engrave.go:1208` | `:1210` | construction |
+| 5 | every alphabet rune decodes in the face | `engrave.go:1213` | `:1215` | construction |
 
-Check 2 is **independent of the face** — it is a binary search over
-`constantAlphabet`, not a `Decode` call. Extending the font alone therefore does
-**not** make the engrave path safe; see §3.5. An earlier draft of this spec
-claimed `ValidatePassphrase` was the only thing between input and a panic. That
-was **false**, and is corrected here.
+Check 2 is **independent of the face** — a binary search over the alphabet, not a
+`Decode` call — so extending the font alone does **not** make the engrave path
+safe (§3.5). Checks 3–5 fire at **construction**, meaning a badly-formed alphabet
+takes down whichever `ConstantStringer` is being built; see §3.5.1.1 for the
+ordering and atomicity constraints that follow.
 
-`ValidateFingerprint` accepts the empty string (the field is optional), otherwise
-requires exactly 8 hex digits, case-insensitive, normalised to uppercase for
-engraving.
+Two earlier drafts of this spec understated this table — first claiming
+`ValidatePassphrase` was the sole gate, then naming three checks. Both were
+**false**. The count is five, and the two construction-time checks were the ones
+most easily missed because they never fire during normal operation.
+
+`ValidateFingerprint` accepts the empty string (the field is optional). Otherwise
+it accepts 8 hex digits **with optional internal whitespace**, and normalises to
+a canonical form: whitespace stripped, uppercased, exactly 8 characters.
+
+**The canonical stripped form is the only stored and compared value; the 4-and-4
+grouping (§4.3) is presentation only.** Stating this explicitly because a split
+between stored and rendered form is exactly where an off-by-one or a
+double-normalisation bug hides. Entry, storage, plate rendering and any future
+comparison all agree on the canonical 8 characters.
 
 ---
 
@@ -274,7 +297,7 @@ for the passphrase or its QR.
 That is a requirement with prerequisites, both of which are **in scope for this
 feature**:
 
-### 3.5.1 `constantAlphabet` must be extended
+### 3.5.1 A SEPARATE passphrase alphabet and `ConstantStringer` instance
 
 ```go
 const constantAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"  // engrave.go:750
@@ -285,20 +308,58 @@ symbol would panic at `engrave.go:1286` *even after the font work*, because that
 check does not consult the face. **Essentially every real passphrase would crash
 the machine.**
 
-Extend it to all 95 printable ASCII plus the visible-space mark.
+**The shared `constantAlphabet` MUST NOT be widened.** Add a second alphabet
+constant and construct a **separate `ConstantStringer` instance** for the
+passphrase plate.
 
-**Prerequisite already satisfied:** `ConstantStringer` panics on a variable-width
-font (`engrave.go:1218`), but `cmd/vectorfont` emits a single uniform advance for
-every glyph (`cmd/vectorfont/main.go:425-427`), so the extended alphabet stays
-fixed-width by construction. This also underwrites §4's "position implies index"
-property.
+This is not a cost optimisation — it is what keeps D5's guarantee true.
+`NewConstantStringer` derives **three** values from its alphabet, not one
+(`engrave.go:1224-1235`): `runeDuration`, `startEndDist`
+(`ManhattanDist(bounds.Min, bounds.Max)`), and `center` (their midpoint), where
+`bounds` accumulates the path start/end of **every glyph in the alphabet**. All
+52 current glyphs have control-Y in `[-600, 0]`, so `bounds.Max.Y` is exactly 0
+today. D5 puts descenders **below the baseline**, so a single `g`, `j`, `p`, `q`
+or `y` whose stroke begins or ends at the tail pushes `bounds.Max.Y` positive —
+moving `center` and `startEndDist` for **every constant-time string the machine
+engraves**. Those feed the data-independent start/park positions
+(`engrave.go:1274`, `:1319`) and `padDur`/`advDur`/`centerDur` (`:1277-1279`),
+and `golden.CompareBSpline` compares tick timings as well as control points
+(`internal/golden/golden.go:72-75`).
 
-**Cost to be measured, not assumed:** `ConstantStringer` pads every rune to the
-duration of the longest one. Widening the alphabet from 36 to 96 glyphs can only
-raise that maximum, slowing *all* constant-time engraving — including seed
-plates. The implementation must measure the change in `runeDuration` and report
-it; if the regression is material, the fix is a **separate** `ConstantStringer`
-instance for the passphrase alphabet rather than widening the shared one.
+So widening the shared alphabet would change the goldens for **every existing
+plate type** — seed, SLIP-39, codex32 — making §7's byte-identical-goldens
+requirement unsatisfiable and inviting a `-update` that discards the only
+evidence D5's "existing output provably unaffected" rests on. The engraved
+artwork would be unchanged; the *plan and the guard* would not be. A separate
+instance avoids all of it at no cost.
+
+### 3.5.1.1 Constraints on the passphrase alphabet
+
+`NewConstantStringer` enforces three things at **construction** time, each a
+panic, each affecting whichever instance is being built:
+
+- **Ascending codepoint order** (`engrave.go:1208-1210`, `panic("unsorted
+  alphabet")`) — the rune lookup is a `sort.Find` binary search
+  (`engrave.go:1282`). The visible-space mark lives at a control codepoint
+  (§3.3), so it sorts **first**, not appended at the end. The alphabet is a
+  single ascending string: `<mark>` then `0x20`–`0x7E`.
+- **Every alphabet rune must decode in the face** (`engrave.go:1213-1215`,
+  `panic("unsupported rune")`). Therefore **the glyph authoring (§3.2) and the
+  alphabet definition must land in the same commit.** Defining a 96-character
+  alphabet before the 44 glyphs exist panics at construction — and because
+  construction happens for seed plates too if the shared constant is touched,
+  a mis-staged change could brick existing plate types.
+- **Uniform advance** (`engrave.go:1216-1218`, `panic("variable width font")`).
+  Already satisfied: `cmd/vectorfont` emits one advance for every glyph
+  (`cmd/vectorfont/main.go:425-427`) — verified, all 52 current glyphs have
+  advance 600. This also underwrites §4's "position implies index" property.
+
+**Font-authoring trap (`engrave.go:1288-1295`):** `paddedString` uses
+`inf.Start != (bezier.Point{})` as its sentinel for "this glyph has a leading
+move segment". Every current glyph keeps X ∈ [100, 500], so the origin is never
+hit. A new glyph whose first engraved point sits exactly at the origin — very
+plausible for `_` — would take the wrong branch. **No new glyph may start at
+(0,0).**
 
 ### 3.5.2 `ConstantQR` must reach version 6
 
@@ -306,19 +367,45 @@ instance for the passphrase alphabet rather than widening the shared one.
 if dim > 33 { return nil, fmt.Errorf("engrave: constant QR size too large: %d", dim) }
 ```
 
-`bitmapForQRStatic` supports versions 1–4 only (dims 21/25/29/33)
-(`engrave/engrave.go:406-413`). A 100-character passphrase needs **37 modules**,
-so the QR layout in §4.2 **cannot be engraved at all** by the constant-time
-primitive as it stands. Measured boundary: ≤78 bytes → 33 modules (works),
-≥79 bytes → 37 modules (hard error).
+The constant-time QR path supports versions 1–4 only (dims 21/25/29/33). A
+100-character passphrase needs **37 modules**, so the QR layout in §4.2 **cannot
+be engraved at all** as things stand. Measured boundary: ≤78 bytes → 33 modules
+(works), ≥79 bytes → 37 modules (hard error). 78 is exact — it is QR v4-L's byte
+capacity.
 
-Extend `bitmapForQRStatic` to versions 5 and 6 (dims 37 and 41).
+**Reaching version 6 requires THREE changes, not one:**
+
+| # | Site | Change |
+|---|---|---|
+| 1 | `ConstantQR` guard, `engrave.go:406-413` | relax `dim > 33` |
+| 2 | `bitmapForQRStatic`, `engrave.go:384-401` | add dims 37, 41 |
+| 3 | `constantTimeQRModules`, `engrave.go:349-365` | add module maxima for 37, 41 |
+
+**Site 3 is the hard one and is easy to miss.** It is a hardcoded switch that
+returns `0` for any unlisted dim (`:363-364`), and `0` propagates: `ConstantQR`
+reads it at `:430` and rejects at `:479`, and `ConstantQRCmd.Engrave` re-reads it
+at `:641` to drive the constant-time loop `for range nmod` (`:649`). Relaxing the
+guard and extending the bitmap **without** site 3 leaves every version-5/6 QR
+still failing.
+
+Nor is site 3 mechanical. Its values are documented in-repo as *"maximum numbers
+found through fuzzing… Add a bit more to account for outliers not yet found"*
+(`:350-352`), and each simultaneously sets the failure threshold **and** the
+engraving duration for every QR of that size. Too small → content-dependent
+engrave-time failures; too large → every QR of that size gets slower. **The
+version-5/6 maxima must be derived by extending the existing fuzz corpus
+(`engrave/testdata/fuzz`), not estimated.** Fail-closed behaviour is preserved
+either way: `:479` errors rather than truncating.
+
+*(Verified: v5/v6 dims are 37/41, each takes exactly one alignment marker at
+`(dim-9, dim-9)`, so the `case 25, 29, 33:` line extends cleanly; `newBitmap`
+panics only above width 64, so 41 is safe.)*
 
 Falling back to `engrave.QR` is **rejected**: it would engrave a secret with
 content-dependent timing, silently dropping a property that seeds get. If the
-extension proves infeasible, the correct retreat is to **cap the passphrase at 78
-characters when QR is enabled** — a user-visible limit, not a silent security
-downgrade.
+fuzz-derivation proves impractical, the correct retreat is to **cap the
+passphrase at 78 characters when QR is enabled** — a user-visible limit, not a
+silent security downgrade.
 
 ---
 
@@ -376,20 +463,48 @@ says so before the user opts in.
 Rendered at `plateSmallFontSize` (3 mm). Both fingerprint lines are **omitted
 entirely when blank** — an empty label is worse than no label.
 
+Fingerprints are engraved **grouped 4-and-4** (`A1B2 C3D4`, not `A1B2C3D4`).
+Eight unbroken hex digits invite a dropped or doubled character when transcribed;
+the gap halves that. The separator is a **plain space, never the visible-space
+mark** — the mark means "a literal space in the passphrase", and hex is `0-9A-F`
+so a gap cannot be misread as a digit. The contrast reinforces the convention
+rather than muddying it. An implementer must not "helpfully" apply the mark here.
+
+**Placement (mandatory), with a per-band line budget:**
+
+| Band | Contents | Lines |
+|---|---|---|
+| Top (10 mm) | `SEED FP:` , `EXPECTED COMB FP:` | ≤ 2 |
+| Bottom (10 mm) | `<mark> = SPACE` legend, `FINGERPRINTS TYPED, NOT VERIFIED` | ≤ 2 |
+
 ```
-<mark> = SPACE                     <- legend, see below
-SEED FP:          A1B2C3D4
-EXPECTED COMB FP: 5E6F7A8B
-FINGERPRINTS TYPED, NOT VERIFIED
+        SEED FP:  A1B2 C3D4                 <- top band
+EXPECTED COMB FP:  5E6F 7A8B
+
+        [ passphrase text block, and QR if enabled ]
+
+        <mark> = SPACE                       <- bottom band
+   FINGERPRINTS TYPED, NOT VERIFIED
 ```
 
-**Placement (mandatory):** metadata goes in the 10 mm margin bands, **not** the
-usable area — matching existing practice, where the master fingerprint and title
-are placed in exactly those bands (`backup/backup.go:123-130, 153-161`).
-Fingerprints and legend in the top band, footer in the bottom band, horizontally
-centred to clear the corner screw holes. The §4.1/§4.2 height budgets account for
-the text block and QR **only**; putting metadata in the usable area overflows the
-plate at full length (60 mm text + ~9 mm metadata + `metaMargin` > 65 mm usable).
+Metadata goes in the 10 mm margin bands, **not** the usable area — matching
+existing practice, where the master fingerprint and title sit in exactly those
+bands (`backup/backup.go:123-130, 153-161`). The §4.1/§4.2 height budgets cover
+the text block and QR **only**.
+
+**The two-line-per-band cap is normative, not stylistic.** A band offers
+`innerMargin` 10 mm − `outerMargin` 3 mm = **7 mm** of engraveable height
+(`backup.go:46-47`). Three 3 mm lines need 9 mm and run off the plate edge;
+existing practice places exactly one line per band and already reaches y ≈ 2.7 mm.
+Two lines (6 mm) fit with margin to spare. Splitting fingerprints to the top and
+legend+footer to the bottom is what makes the worst case — both fingerprints
+present **and** a space in the passphrase — fit at all.
+
+**Width:** all lines are horizontally centred. The longest,
+`FINGERPRINTS TYPED, NOT VERIFIED` (32 chars × 2.0 mm advance = 64 mm), spans
+x ∈ [10.5, 74.5] and clears the 10 mm corner screw-hole bands by 0.5 mm. That
+margin is thin enough to pin explicitly: **no metadata line may exceed 64 mm**,
+asserted by the §7 worst-case fit test.
 
 **The legend is required whenever the passphrase contains a space**, and is
 engraved using the real mark glyph so the reader is matching shapes, not
@@ -441,7 +556,9 @@ existing `ppPageCycleLabel` cycle generalises).
      - keyboard MUST be extended to all 32 symbols (see 5.0)
 2. Seed Fingerprint  (optional, skippable)
      - warning: typed, not verified
+     - displayed grouped 4-and-4, matching the plate
 3. Expected Combined Fingerprint  (optional, skippable)
+     - displayed grouped 4-and-4, matching the plate
      - warning: typed, not verified; a wrong passphrase yields a
        COMPLETELY DIFFERENT WALLET, not an error
 4. QR code?  (default no)
@@ -558,8 +675,13 @@ anywhere, since inserting shifts the numeric value of every later program.
   a wallet as different bytes. Silent either way.
 - **Worst-case layout fit:** 100 characters **+ QR + both fingerprints + legend +
   footer** simultaneously, asserting nothing exceeds the usable area, nothing
-  lands on a corner screw hole, and blocks do not overlap. The partial case
-  (text only) is what let the metadata overflow go unnoticed.
+  lands on a corner screw hole, and blocks do not overlap. Specifically assert
+  the §4.3 budgets: **≤ 2 lines per margin band** and **no metadata line wider
+  than 64 mm**. The partial case (text only) is what let the metadata overflow go
+  unnoticed the first time, and the three-lines-in-one-band error the second.
+- **Fingerprint canonicalisation:** input with and without internal spaces, mixed
+  case, produces an identical stored value; the engraved form is grouped 4-and-4;
+  and the separator is a plain `0x20`, **not** the visible-space mark.
 - **QR size variability:** assert the layout is correct for 33-, 37- and
   41-module codes, not just the 37 worst case.
 - **Validation:** table-driven over empty / 100 / 101 chars / non-ASCII / control
@@ -601,8 +723,8 @@ anywhere, since inserting shifts the numeric value of every later program.
 | O2 | Confirm `program` enum values are not persisted | implementation |
 | O3 | Final visible-space mark shape (must not resemble any real glyph) | font authoring |
 | O4 | Exact legend + footer wording, once measured at 3 mm in the margin bands | layout |
-| O5 | Measure `ConstantStringer.runeDuration` regression from widening `constantAlphabet` 36 → 96; if material, use a separate instance rather than widening the shared one (§3.5.1) | implementation |
-| O6 | Confirm `bitmapForQRStatic` extension to versions 5–6 is feasible; if not, cap the passphrase at 78 chars when QR is enabled — **never** silently fall back to non-constant-time `engrave.QR` (§3.5.2) | implementation |
+| O5 | Confirm the separate passphrase `ConstantStringer` leaves existing goldens byte-identical (§3.5.1). If the shared alphabet is ever widened instead, `runeDuration`, `startEndDist` AND `center` must all be measured, and §7 must name which goldens change and why | implementation |
+| O6 | Derive version-5/6 module maxima for `constantTimeQRModules` by extending the fuzz corpus (`engrave/testdata/fuzz`) — NOT by estimation — and confirm all three §3.5.2 sites change together. If impractical, cap the passphrase at 78 chars when QR is enabled; **never** fall back to non-constant-time `engrave.QR` | implementation |
 
 **O2 note:** the R0 review already verified this — `m.prog` is runtime-only and
 `gui/saver` persists nothing program-related. Expect it to close trivially.
