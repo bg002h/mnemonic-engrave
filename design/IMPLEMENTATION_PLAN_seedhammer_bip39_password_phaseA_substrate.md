@@ -83,7 +83,7 @@ Add `t.Skip` guarded by an env var so CI stays green until Task 3 lands:
 	}
 ```
 
-Import `"os"`. Task 3's final step deletes this skip.
+Import `"os"`. **Insert this between the loop and the `len(missing) > 0` error block** — Go's testing package treats a test that reports an error and *then* skips as FAILED, so placing it after the `Errorf` yields FAIL rather than the SKIP Step 4 expects. Task 3's final step deletes this skip.
 
 - [ ] **Step 4: Verify it now skips rather than fails**
 
@@ -223,6 +223,32 @@ Existing uppercase occupies **x-width 4 with 1 unit side bearing, y2→y8** (cap
 <polyline id="A" class="st0" points="1,5 5,5 5,8 5,3 4,2 2,2 1,3 1,8 "/>
 ```
 
+#### THE SLOT RULE — read before touching the SVG
+
+**Document order assigns each glyph's cell, not its drawn coordinates.**
+`parseChars` (`cmd/vectorfont/main.go:414-428`) walks glyph elements in order and
+does `offx -= adv` after each, so **the k-th glyph element (0-based) is normalised
+against `x ∈ [6k, 6k+6)`**. The x-values you draw matter only *relative to that
+cell*. Metrics markers are skipped by id and consume no slot; space is synthetic
+and has no element at all.
+
+Two consequences, both load-bearing:
+
+- The SVG holds **51 glyph elements**, so `dash` is slot 50 at x 300–306 — exactly
+  the `viewBox` width (`51 × 6 = 306`). **The next free slot is 51, at x 306–312.**
+- **Append after `dash`, before the metrics markers. Never insert mid-file, never
+  reorder.** Adding lowercase alphabetically after `Z` — the natural instinct —
+  shifts the normalisation of *every subsequent existing glyph* and silently
+  corrupts existing plate output.
+
+What does **not** save you: a glyph drawn in the wrong cell still has the uniform
+advance, still decodes, and still passes every mechanical test in this task. Only
+the eyeball loop catches it. (A wrong *insertion point* is caught by Step 9's
+goldens; a wrongly-placed *new* glyph is not.)
+
+**Cross-check after every batch:** `viewBox` width must equal `306 + 6N` after
+appending N glyphs. All 44 appended → `570`.
+
 Note the pen never lifts — a single polyline is one continuous stroke, and doubling back (`5,5 5,8 5,3`) is how the existing font draws a crossbar without a second path. Match that idiom.
 
 For the new glyphs:
@@ -263,7 +289,14 @@ settled deliberately rather than by accident.
 
 #### Acceptance criteria (all enforced by tests in this task)
 
-1. All 95 printable ASCII plus `0x1F` decode.
+1. All 95 printable ASCII plus `0x1F` decode. **`0x1F` needs its own assertion** — `TestPrintableASCIICoverage` spans `0x20`–`0x7E` only and both rule tests `continue` on `!ok`, so a forgotten `space_mark` sails through this task and surfaces only as a construction panic in Task 4. Add to `coverage_test.go`:
+   ```go
+   func TestSpaceMarkPresent(t *testing.T) {
+       if _, _, ok := Font.Decode(0x1F); !ok {
+           t.Fatal("visible-space mark (0x1F) missing from the face")
+       }
+   }
+   ```
 2. Every glyph advance is exactly 600 (post-`-scale 100`).
 3. No glyph's first engraved point is (0,0).
 4. Confusable pairs are visually distinct — checked by eye, see below.
@@ -282,11 +315,13 @@ Suggested conventions (author's discretion, but pick and apply consistently): sl
 The generator can round-trip to SVG for visual checking:
 
 ```bash
-cd /scratch/code/shibboleth/seedhammer
+cd /scratch/code/shibboleth/seedhammer/font/constant
 nix develop --command go run seedhammer.com/cmd/vectorfont \
   -package constant -scale 100 -dump /tmp/font-dump.svg \
-  font/constant/constant.svg constant
+  constant.svg constant
 ```
+
+**Run from `font/constant`, not the repo root.** `run()` (`cmd/vectorfont/main.go:88-94`) writes `<name>.go` and `<name>.bin` to the **current directory**. From the root it litters `./constant.go` and `./constant.bin` there while `font/constant/`'s real outputs go stale — so a `go test ./font/constant/` mid-loop judges the *old* binary and reports that your edits didn't take. From `font/constant` the same command refreshes the real outputs, which is what you want anyway. (`nix develop` searches upward for the flake, so it resolves fine from a subdirectory.)
 
 Open `/tmp/font-dump.svg`. This is the loop: edit `constant.svg` → regenerate → look → adjust. Run it once now against the unmodified font to confirm the loop works before drawing anything.
 
@@ -357,19 +392,26 @@ func TestNoGlyphStartsAtOrigin(t *testing.T) {
 Run: `nix develop --command go test ./font/constant/ -run 'TestUniformAdvance|TestNoGlyphStartsAtOrigin' -v`
 Expected: PASS (52 existing glyphs already satisfy both). This proves the tests work before they have new glyphs to judge.
 
+Be clear on what `TestUniformAdvance` is worth: `parseChars` assigns `meta.Advance` to *every* glyph, so per-glyph variance is impossible by construction. It guards the `advance` **marker line** against edits, which the global constraints already forbid. Keep it as a cheap tripwire — `TestNoGlyphStartsAtOrigin` is the one doing real work.
+
 - [ ] **Step 4: Author the 26 lowercase glyphs**
 
-Append to `constant.svg` before the metrics markers (`height`/`advance`/`baseline` at the end). Place each glyph at the next free x-slot and widen the `viewBox` width accordingly.
+**Append** after `dash` and before the metrics markers — never insert mid-file (see the slot rule). Widen the `viewBox` by 6 per glyph.
 
-Two worked examples in house style, as **starting points to refine in the loop** — not final coordinates:
+Two worked examples in house style, as **starting points to refine in the loop** — not final coordinates. Assuming `o` is appended first (slot 51, x 306–312) and `p` second (slot 52, x 312–318):
 
 ```xml
-<!-- o : x-height bowl, y4-y8. Octagonal to keep stroke count low. -->
-<polyline id="o" class="st0" points="289,5 290,4 292,4 293,5 293,7 292,8 290,8 289,7 289,5 "/>
+<!-- o : x-height bowl, y4-y8, with flattened sides and a different stroke
+     origin so it does NOT reduce to the existing O at smaller scale. -->
+<polyline id="o" class="st0" points="307,5 307,7 308,8 310,8 311,7 311,5 310,4 308,4 307,5 "/>
 
 <!-- p : descender to y9 (1 unit, per D5), bowl y4-y7. -->
-<polyline id="p" class="st0" points="295,9 295,4 298,4 299,5 299,6 298,7 295,7 "/>
+<polyline id="p" class="st0" points="313,9 313,4 316,4 317,5 317,6 316,7 313,7 "/>
 ```
+
+**A trap these examples exist to make concrete:** the *obvious* `o` — the octagon `307,5 308,4 310,4 311,5 311,7 310,8 308,8 307,7 307,5` — is the **exact stroke path of the existing `O`** (`85,3 86,2 88,2 89,3 89,7 88,8 86,8 85,7 85,3`) at reduced height. That is the `O`/`o` case-only confusable in its purest form, manufactured by construction and invisible on screen at full size. The version above changes the stroke origin and flattens the sides deliberately.
+
+**Apply that scrutiny to every letter in the case-only list.** The naive lowercase is usually just the capital, shrunk — which is precisely the failure mode.
 
 Regenerate and inspect after every few glyphs rather than all 26 at once.
 
@@ -537,14 +579,16 @@ Add a benchmark comparing both stringers' `runeDuration`:
 
 ```go
 func TestPassphraseStringerTiming(t *testing.T) {
-	shared := NewConstantStringer(constant.Font, testParams(), 4*mmTest)
-	pass := NewPassphraseStringer(constant.Font, testParams(), 4*mmTest)
+	shared := NewConstantStringer(constant.Font, params(), 4*mm)
+	pass := NewPassphraseStringer(constant.Font, params(), 4*mm)
 	t.Logf("shared runeDuration=%d  passphrase runeDuration=%d", shared.runeDuration, pass.runeDuration)
 	t.Logf("shared center=%v  passphrase center=%v", shared.center, pass.center)
 }
 ```
 
-Run it and **record both numbers in the commit message**. This closes O5: the shared values must be identical to their pre-change values, and the passphrase ones are simply reported.
+Run it and **record both numbers in the commit message**.
+
+**What actually proves O5 is Step 5's goldens, not these numbers.** No baseline for the shared stringer is captured before Task 3, so "identical to its pre-change value" is not directly checkable. The real evidence is structural: existing glyph splines are byte-unchanged (append-only edits, deterministic regeneration) and every existing golden passes without `-update`. This log records the passphrase instance's cost; it does not prove the shared one's invariance.
 
 - [ ] **Step 7: Commit**
 
@@ -573,7 +617,7 @@ O5 measurements: shared runeDuration <N> (unchanged), passphrase <M>."
 **This task's deliverable is an answer, not necessarily a feature.** It decides whether Phase B's passphrase cap is 100 characters with QR, or 78.
 
 **Files:**
-- Modify: `engrave/engrave_test.go` — `FuzzConstantQR` (`:427-454`)
+- Modify: `engrave/engrave_test.go` — `FuzzConstantQR` (`:426-453`)
 - Modify (only if the answer is yes): `engrave/engrave.go` at `:349-365`, `:384-401`, `:406-413`
 - Create: `design/agent-reports/` — no; record the finding in the plan's Phase B input instead
 
@@ -587,9 +631,37 @@ Run: `nix develop --command sed -n '349,365p' engrave/engrave.go`
 
 `constantTimeQRModules` returns a per-dimension **maximum module count**, documented as *"maximum numbers found through fuzzing… Add a bit more to account for outliers not yet found"* with `const extra = 5`. It sets both the failure threshold (`:479`) and the engraving duration (`:641`, `:649`). Too small → content-dependent failures. Too large → every QR of that size engraves slower.
 
-- [ ] **Step 2: Extend the fuzz target to reach versions 5 and 6**
+- [ ] **Step 2: Make a PROVISIONAL extension first — the fuzzer cannot observe v5/v6 otherwise**
 
-`FuzzConstantQR` currently truncates entropy to 40 bytes (`:432-434`), which never produces a 37-module code. Raise the cap and record observed module counts:
+**Order matters here and is counter-intuitive.** You cannot measure first and
+extend second: `ConstantQR` rejects `dim > 33` at `:408-413` *before* any module
+counting, and even past that guard `constantTimeQRModules` returns 0, tripping the
+`len(modules) > nmod` error at `:479`. `FuzzConstantQR` calls `t.Fatalf` on any
+`ConstantQR` error (`engrave/engrave_test.go:439-441`, `:449-451`), so a fuzz run
+over larger inputs dies within seconds as a "crasher" having measured nothing.
+
+Make the extension provisional and permissive, then measure through it:
+
+1. Raise the guard at `:408` from `dim > 33` to `dim > 41`.
+2. In `bitmapForQRStatic` (`:384-401`), extend the alignment-marker case to
+   `case 25, 29, 33, 37, 41:` — v5 and v6 each take exactly one alignment
+   pattern at `(dim-9, dim-9)`, the same rule the existing cases follow.
+   (`newBitmap` panics only above width 64, so 41 is safe.)
+3. In `constantTimeQRModules` (`:349-365`), add a deliberately generous
+   provisional bound so nothing is rejected while measuring:
+
+```go
+	case 37, 41:
+		// PROVISIONAL: replaced with the fuzz-derived maximum in Step 4.
+		// dims*dims can never be exceeded, so nothing is rejected while
+		// measuring. This value MUST NOT ship -- it would make every v5/v6
+		// QR engrave for absurdly long.
+		return dims * dims
+```
+
+- [ ] **Step 3: Make the fuzz target measure instead of dying**
+
+Two changes to `FuzzConstantQR` (`engrave/engrave_test.go:426-453`):
 
 ```go
 	if m := 120; len(entropy) > m {
@@ -597,53 +669,103 @@ Run: `nix develop --command sed -n '349,365p' engrave/engrave.go`
 	}
 ```
 
-and inside, after each `qr.Encode`, log `qrc.Size` and the module count so a corpus run reports the distribution.
+and, at **both** `ConstantQR` call sites, treat oversize as out-of-scope rather
+than a crash, and log what was observed:
 
-- [ ] **Step 3: Run the fuzzer long enough to be meaningful**
+```go
+		cmd, err := ConstantQR(qrc)
+		if err != nil {
+			if qrc.Size > 41 {
+				return // beyond the supported range; not a failure
+			}
+			t.Fatalf("entropy: %x: %v", entropy, err)
+		}
+		t.Logf("dim=%d modules=%d", qrc.Size, len(cmd.plan))
+```
+
+**Why the skip is required, not merely tidy:** at 120 bytes the `qr.Q` branch
+produces v8/v9 (dims 49/53), which even a successful v5/v6 extension must reject.
+Without the skip, the Q branch `Fatalf`s forever and the corpus fills with
+permanent false crashers.
+
+Adjust `len(cmd.plan)` to whatever field actually holds the module list — read
+`ConstantQRCmd` first.
+
+- [ ] **Step 4: Fuzz with a decidable stopping rule**
 
 ```bash
 nix develop --command go test ./engrave/ -run FuzzConstantQR -fuzz FuzzConstantQR -fuzztime 10m
 ```
 
-Record the maximum module count observed for dims 37 and 41.
+**Convergence criterion, decided in advance:** record the running per-dim maximum
+for dims 37 and 41. Converged means **no new maximum for either dim during the
+final 5 minutes**. Sanity ceiling: a maximum approaching `dim²` minus the static
+feature modules means the measurement is wrong, not that the code is slow.
 
-- [ ] **Step 4: Decide, and record the decision explicitly**
+Record both maxima. If it has not converged, run longer before deciding — an
+under-measured maximum produces engrave-time refusals, never a wrong plate, but
+it produces them unpredictably.
 
-- **If the maxima converge** (the fuzzer stops finding higher counts well before the time limit): extend all three sites — the `dim > 33` guard, `bitmapForQRStatic`'s switch (v5/v6 take one alignment marker each at `(dim-9, dim-9)`; `newBitmap` is safe to width 64), and `constantTimeQRModules` with the derived maxima plus `extra`.
-- **If they do not converge**, or the derived duration makes QR engraving unacceptably slow: **stop**. Phase B caps the passphrase at 78 characters when QR is enabled — QR v4-L's exact byte capacity. Falling back to non-constant-time `engrave.QR` is **forbidden** (spec §3.5.2): it would engrave a secret with content-dependent timing.
+- [ ] **Step 5: Decide, and record the decision**
 
-Write the outcome into `design/SPEC_seedhammer_engrave_bip39_password.md` §9 as O6's resolution, with the observed numbers.
+- **If converged:** replace the provisional `dims * dims` with the observed
+  maxima plus the existing `extra = 5`, matching how v1–v4 were derived.
+- **If not converged, or the resulting duration is unacceptable:** **revert the
+  whole provisional extension** and record that Phase B caps the passphrase at
+  **78 characters when QR is enabled** — QR v4-L's exact byte capacity. Falling
+  back to non-constant-time `engrave.QR` is **forbidden** (spec §3.5.2): it would
+  engrave a secret with content-dependent timing.
 
-- [ ] **Step 5: If extending — verify fail-closed behaviour survives**
+Either way, write the outcome and the observed numbers into
+`design/SPEC_seedhammer_engrave_bip39_password.md` §9 as O6's resolution.
 
-Add a test asserting a 41-module QR either engraves correctly or returns an error, and **never** truncates:
+The philosophy here is sound and worth stating plainly: fuzz-derived maxima plus
+`extra`, backed by the fail-closed error at `:479`, is exactly how the existing
+v1–v4 constants were produced. An underestimate yields a refusal, never a wrong
+plate.
+
+- [ ] **Step 6: Verify fail-closed behaviour survives**
 
 ```go
 func TestConstantQRLargeVersionsFailClosed(t *testing.T) {
-	long := strings.Repeat("Xy7#", 30) // 120 bytes -> v6-ish
+	long := strings.Repeat("Xy7#", 30) // 120 bytes -> v6, dim 41
 	c, err := qr.Encode(long, qr.L)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd, err := ConstantQR(c)
-	if err != nil {
-		t.Skipf("v%d not supported, Phase B uses the 78-char cap: %v", c.Size, err)
+	if c.Size != 41 {
+		t.Fatalf("expected dim 41, got %d", c.Size)
 	}
-	if cmd == nil {
-		t.Fatal("ConstantQR returned nil without an error -- truncation, not fail-closed")
+	if _, err := ConstantQR(c); err != nil {
+		t.Skipf("v6 unsupported; Phase B uses the 78-char cap: %v", err)
 	}
 }
 ```
 
-- [ ] **Step 6: Run the full suite and commit**
+`ConstantQR` never returns `(nil, nil)` — the fail-closed mechanism is the error
+at `:479`, so asserting a non-nil command adds nothing. An error here is a
+legitimate outcome, not a failure.
+
+- [ ] **Step 7: Run the full suite, then commit — TWO commits, TWO repos**
 
 ```bash
 nix develop --command go test ./... 2>&1 | grep -v "no test files"
-git add engrave/engrave.go engrave/engrave_test.go \
-        ../mnemonic-engrave/design/SPEC_seedhammer_engrave_bip39_password.md
-git commit -s -m "feat(engrave): <extend constant QR to v5/v6 | record O6 as the 78-char cap>
+```
 
-<observed fuzz maxima and the reasoning>"
+The engraving change and the spec's O6 record live in **different git
+repositories**; a single `git add` spanning both fails with
+`fatal: ... is outside repository`.
+
+```bash
+# 1. in /scratch/code/shibboleth/seedhammer
+git add engrave/engrave.go engrave/engrave_test.go
+git commit -s -m "<extend constant QR to v5/v6 | revert: record O6 as the 78-char cap>
+
+<observed per-dim maxima, convergence evidence, and the reasoning>"
+
+# 2. in /scratch/code/shibboleth/mnemonic-engrave
+git add design/SPEC_seedhammer_engrave_bip39_password.md
+git commit -m "spec: resolve O6 -- <outcome>"
 ```
 
 ---
@@ -676,3 +798,38 @@ Phase B may not begin until all of these hold:
 - [ ] Mandatory post-implementation adversarial execution review over the whole Phase A diff (risk-set work, `CLAUDE.md`) — **non-deferrable**.
 
 **Still open after Phase A, by design:** O1, the hardware legibility check. Lowercase has never been engraved on this machine, and screen inspection is not a substitute for looking at cut metal. That gate belongs to the feature, not the substrate.
+
+---
+
+## Plan review history
+
+- **Round 0** — fable architect, `design/agent-reports/seedhammer-bip39-password-phaseA-plan-review-round0.md`.
+  **NOT GREEN (2C/2I + 5M/3N).** Folded:
+  - **C1** — the plan taught that drawn x-coordinates choose a glyph's cell. They
+    do not: `parseChars` assigns slots by **document order** (`offx -= adv`), so
+    both worked examples landed 17 units outside their cells and would have passed
+    every mechanical test while engraving in the wrong place. The slot rule is now
+    stated explicitly, append-only is mandated, the examples are corrected to
+    slots 51/52, and a `viewBox == 306 + 6N` cross-check added.
+  - **C2** — Task 5 measured before extending, but `ConstantQR` rejects `dim > 33`
+    *before* counting modules and `FuzzConstantQR` `Fatalf`s on the error, so the
+    10-minute run would have died in seconds having observed nothing. Reordered to
+    provisional-extension-first, with a skip for out-of-range dims (without which
+    the `qr.Q` branch fails permanently at v8/v9) and a decidable convergence
+    criterion.
+  - **I1** — the dump command ran from the repo root, littering `constant.go`/
+    `constant.bin` there while the real outputs went stale, so a mid-loop test
+    would judge the old binary. Now runs from `font/constant`.
+  - **I2** — Task 5's `git add` spanned two repositories and is fatal. Split.
+  - **M1** skip placement (fail-then-skip is FAIL in Go), **M2** `params()`/`mm`
+    not `testParams()`/`mmTest`, **M3** nothing asserted `0x1F` decodes,
+    **M4** O5's proof is the goldens not the logged numbers, **M5** the worked `o`
+    was the existing `O`'s exact stroke path — the case-only confusable
+    anti-pattern, now used as the cautionary example, **N1** `TestUniformAdvance`
+    is a marker guard not a per-glyph check, **N2** unreachable `nil` branch,
+    **N3** cite drift.
+
+  Verified clean by the same review: every load-bearing citation, all four
+  proposed test files compiling against the real APIs, the 96-rune ascending
+  alphabet literal, the `newConstantStringer` extraction being behaviour-
+  preserving, task ordering, the staging note, and the TDD RED steps.
