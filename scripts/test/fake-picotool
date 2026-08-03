@@ -51,8 +51,13 @@ case "$1" in
     echo "OTP set"; exit 0 ;;
 esac
 
-# reads
-while [ "$1" = "-n" ] || [ "$1" = "-e" ]; do shift; done
+# reads -- real picotool accepts MANY selectors in one call and prints a
+# ROW/VALUE pair for each, in order. Emulate that.
+while [ "$1" = "-n" ] || [ "$1" = "-e" ] || [ "$1" = "-r" ]; do shift; done
+if [ $# -gt 1 ]; then
+  for sel in "$@"; do "$0" otp get -n -e "$sel"; done
+  exit 0
+fi
 sel="$1"
 case "$sel" in
   CRIT1.SECURE_BOOT_ENABLE) printf 'ROW 0x0040: OTP_DATA_CRIT1 (CRIT)\nVALUE 0x%06x\n  field SECURE_BOOT_ENABLE (bit 0) = %s\n' "$(get SB)" "$(get SB)"; exit 0 ;;

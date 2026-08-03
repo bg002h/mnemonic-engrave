@@ -204,16 +204,45 @@ $out"
   printf '%04x' $(( 16#$v & 0xffff ))
 }
 
-# read_slot <n> -> 64 hex chars: the 32-byte key hash in slot n.
-# Each row holds two bytes, LOW BYTE FIRST, so each row's 4 hex digits are
-# byte-swapped on reassembly.
+# read_rows <selector...> -> sets ROWVALS to space-separated 4-hex-digit values,
+# one per requested row, in order.
+#
+# ONE picotool invocation for all rows, deliberately. Querying a single row that
+# is part of a sequence ("Part 2/4") can print NOTHING with exit 0 -- observed on
+# real hardware for CHIPID1, where the row is readable but only when requested
+# alongside its siblings. A per-row loop silently lost it.
+#
+# Sets a global instead of printing: `die` inside $(...) exits only the
+# subshell, so a fail-closed guard called via command substitution was not
+# actually closed.
+ROWVALS=""
+read_rows() {
+  local out want=$# got
+  out="$(picotool otp get -n -e "$@" 2>&1)" || die "OTP read failed for: $*
+$out"
+  printf '%s' "$out" | grep -qi 'WARNING' \
+    && die "picotool reported a warning reading: $*
+$out"
+  ROWVALS="$(printf '%s\n' "$out" | grep -oiE '^[[:space:]]*VALUE 0x[0-9a-f]+' \
+             | grep -oiE '0x[0-9a-f]+' | sed 's/^0[xX]//' | tr 'A-F' 'a-f' \
+             | while read -r v; do printf '%04x ' $(( 16#$v & 0xffff )); done)"
+  got="$(printf '%s' "$ROWVALS" | wc -w)"
+  [ "$got" -eq "$want" ] || die "expected $want row values for '$*', parsed $got.
+picotool output was:
+$out"
+}
+
+# read_slot <n> -> sets SLOT_HEX to 64 hex chars (the 32-byte key hash).
+# Each row holds two bytes, LOW BYTE FIRST, so each row is byte-swapped.
+SLOT_HEX=""
 read_slot() {
-  local n="$1" i row out=""
-  for i in $(seq 0 15); do
-    row="$(read_row "BOOTKEY${n}_${i}")"
-    out="${out}${row:2:2}${row:0:2}"
-  done
-  printf '%s' "$out"
+  local n="$1" i sels="" v
+  for i in $(seq 0 15); do sels="$sels BOOTKEY${n}_${i}"; done
+  # shellcheck disable=SC2086
+  read_rows $sels
+  SLOT_HEX=""
+  for v in $ROWVALS; do SLOT_HEX="${SLOT_HEX}${v:2:2}${v:0:2}"; done
+  [ ${#SLOT_HEX} -eq 64 ] || die "slot $n reassembled to ${#SLOT_HEX} hex chars, expected 64"
 }
 
 # key_hash <key.pem> -> sha256 of the UNCOMPRESSED 64-byte X||Y pubkey.
@@ -224,9 +253,11 @@ key_hash() {
     | tail -c 64 | sha256sum | cut -d' ' -f1
 }
 
+CHIPID_HEX=""
 chipid() {
-  local i out=""
-  for i in 0 1 2 3; do out="${out}$(read_row "CHIPID$i")"; done
+  local out=""
+  read_rows CHIPID0 CHIPID1 CHIPID2 CHIPID3
+  for v in $ROWVALS; do out="${out}${v}"; done
   # CHIPID is factory-programmed and unique; all-zeros means an unprogrammed
   # part or a simulator. Never pin or compare against it -- a stale all-zero
   # pin left by a test would make the real device look like the wrong device.
@@ -236,7 +267,8 @@ That is not a real RP2350 identity -- it means an unprogrammed part, or that
 picotool is talking to a simulator rather than hardware. Refusing to pin or
 trust this identity." ;;
   esac
-  printf '%s' "$out"
+  [ ${#out} -eq 16 ] || die "CHIPID reassembled to ${#out} hex chars, expected 16"
+  CHIPID_HEX="$out"
 }
 
 # require_board: refuse to act on any board other than the one phase 0 saw.
@@ -244,7 +276,7 @@ require_board() {
   local pinned cur
   [ -f "$WORKDIR/board-chipid.txt" ] || die "no pinned board -- run phase 0 first"
     pinned="$(cat "$WORKDIR/board-chipid.txt")"
-  cur="$(chipid)"
+  chipid; cur="$CHIPID_HEX"
   [ "$cur" = "$pinned" ] || die "WRONG BOARD.
   pinned (phase 0): $pinned
   connected now:    $cur
@@ -252,7 +284,7 @@ Refusing to touch a board this rehearsal did not inventory."
   ok "board identity matches phase 0 ($cur)"
 
   # Independent tripwire: never write to a real SeedHammer II.
-  local slot0; slot0="$(read_slot 0)"
+  local slot0; read_slot 0; slot0="$SLOT_HEX"
   [ "$slot0" != "$SH_SIGNKEY_HASH" ] \
     || die "SLOT 0 HOLDS SEEDHAMMER'S PRODUCTION KEY -- this is a real SeedHammer II.
 This script is for the throwaway rehearsal board ONLY. Disconnect it now."
@@ -267,7 +299,7 @@ assert_stock_or_die() {
   [ $((16#$kv)) -eq 0 ] || die "KEY_VALID is already 0x$kv -- a boot key is already valid. Get a FRESH board."
   ok "no boot key marked valid"
   for i in 0 1 2 3; do
-    slot="$(read_slot $i)"
+    read_slot "$i"; slot="$SLOT_HEX"
     [ "$slot" = "$(printf '0%.0s' $(seq 1 64))" ] \
       || die "boot-key slot $i is not empty (0x$slot) -- board already used. Get a FRESH board."
   done
@@ -290,16 +322,54 @@ $out"
 }
 
 check_page_locks() {
-  local l v
+  # Page-lock rows are NOT simply "zero = fine". Each is a byte replicated
+  # 3-way (majority-vote encoded) with three 2-bit permission fields, per
+  # picotool's own OTP table (generated from the RP2350 datasheet):
+  #
+  #   LOCK_S  (bits 0-1)  0x0 = page fully accessible by SECURE software
+  #   LOCK_NS (bits 2-3)  0x0/0x1 = Non-secure may read (0x1 = NS read-only)
+  #   LOCK_BL (bits 4-5)  0x0 = bootloader permits user reads AND writes
+  #
+  # picotool/PICOBOOT acts as SECURE software, so only LOCK_S and LOCK_BL gate
+  # us. A retail SeedHammer II ships with 0x040404 -- i.e. LOCK_NS=1, merely
+  # restricting Non-secure software to reads. An earlier version of this
+  # function required all-zero and would have declared that device permanently
+  # unusable. Verified against real hardware 2026-08-03.
+  local l v b0 b1 b2 maj i bit lock_s lock_ns lock_bl
   for l in PAGE1_LOCK0 PAGE1_LOCK1 PAGE2_LOCK0 PAGE2_LOCK1; do
     v="$(read_row_raw24 "$l")"
-    [ $((16#$v)) -eq 0 ] \
-      || die "$l is non-zero (0x$v) -- OTP pages are LOCKED.
-No further boot key can be added to this device, and this procedure is
-impossible on it. STOP."
+    b0=$(( 16#$v & 0xff )); b1=$(( (16#$v >> 8) & 0xff )); b2=$(( (16#$v >> 16) & 0xff ))
+    # Majority-vote the three copies bit by bit.
+    maj=0
+    for i in 0 1 2 3 4 5 6 7; do
+      bit=$(( ((b0>>i)&1) + ((b1>>i)&1) + ((b2>>i)&1) ))
+      [ "$bit" -ge 2 ] && maj=$(( maj | (1<<i) ))
+    done
+    [ "$b0" = "$b1" ] && [ "$b1" = "$b2" ] \
+      || warn "$l copies disagree (0x$(printf %02x $b0)/0x$(printf %02x $b1)/0x$(printf %02x $b2)); using majority 0x$(printf %02x $maj)"
+
+    case "$l" in
+      PAGE1_LOCK1|PAGE2_LOCK1)
+        lock_s=$((  maj & 0x3 ));  lock_ns=$(( (maj >> 2) & 0x3 )); lock_bl=$(( (maj >> 4) & 0x3 ))
+        [ "$lock_s" -eq 0 ] || die "$l: LOCK_S=$lock_s -- Secure software may NOT write this page.
+picotool writes as Secure software, so no further boot key can be added to this
+device. This procedure is impossible on it. STOP."
+        [ "$lock_bl" -eq 0 ] || die "$l: LOCK_BL=$lock_bl -- the bootloader does not permit user writes
+to this page. No further boot key can be added. STOP."
+        info "$l = 0x$v (LOCK_S=$lock_s writable, LOCK_BL=$lock_bl writable, LOCK_NS=$lock_ns)"
+        ;;
+      *)
+        # PAGE*_LOCK0 carries KEY_R/KEY_W/NO_KEY_STATE. Non-zero here means a
+        # hardware key is required for access, which we cannot supply.
+        [ $((maj)) -eq 0 ] || die "$l = 0x$v -- this page requires a hardware OTP key for access
+(KEY_R/KEY_W/NO_KEY_STATE non-zero). This procedure cannot proceed. STOP."
+        info "$l = 0x$v (no key required)"
+        ;;
+    esac
   done
-  ok "OTP page locks clear (PAGE1/PAGE2) -- boot-key rows are writable"
+  ok "OTP page permissions allow Secure writes -- boot-key rows are writable"
 }
+
 
 # build_blinky: the phase-4 payload AND the seal input for phases 1/4.
 # picotool seal requires a real RP2350 image, so there is no 'placeholder.elf'.
@@ -344,7 +414,7 @@ make_otp_json() {
 verify_slot_or_die() {
   local slot="$1" key="$2" expect got
   expect="$(key_hash "$key")"
-  got="$(read_slot "$slot")"
+  read_slot "$slot"; got="$SLOT_HEX"
   [ "$got" = "$expect" ] || die "SLOT $slot READBACK MISMATCH -- DO NOT SET THE VALID BIT.
   expected: $expect
   read:     $got
@@ -447,7 +517,7 @@ sh2_require_seedhammer() {
   local slot0 cid
   picotool info >/dev/null 2>&1 || die "no board visible -- is the SeedHammer II in BOOTSEL?"
   picotool info | grep -qi 'rp2350' || die "not an RP2350 device"
-  slot0="$(read_slot 0)"
+  read_slot 0; slot0="$SLOT_HEX"
   [ "$slot0" = "$SH_SIGNKEY_HASH" ] || die "This is NOT a SeedHammer II.
 Slot 0 holds: $slot0
 Expected:     $SH_SIGNKEY_HASH  (signKeyHash, platform_sh2.go:70)
@@ -455,7 +525,7 @@ These modes are for the real device only. If you meant the rehearsal Pico, use
 --phase instead. UNPLUG EVERY OTHER RP2350 BOARD before continuing."
   ok "slot 0 holds SeedHammer's production key -- this is a SeedHammer II"
   mkdir -p "$SH2_DIR"
-  cid="$(chipid)"
+  chipid; cid="$CHIPID_HEX"
   if [ -f "$SH2_DIR/sh2-chipid.txt" ]; then
     [ "$cid" = "$(cat "$SH2_DIR/sh2-chipid.txt")" ] || die "WRONG DEVICE.
   pinned at --sh2-precheck: $(cat "$SH2_DIR/sh2-chipid.txt")
@@ -547,7 +617,7 @@ STOP and find out why."
     ok "no boot key revoked"
 
     for s in 1 2 3; do
-      v="$(read_slot $s)"
+      read_slot "$s"; v="$SLOT_HEX"
       [ "$v" = "$(printf '0%.0s' $(seq 1 64))" ] \
         || die "spare slot $s is NOT empty (0x$v).
 
@@ -667,7 +737,7 @@ case "$PHASE" in
   check_page_locks
 
   hdr "Pinning this physical board"
-  CID="$(chipid)"
+  chipid; CID="$CHIPID_HEX"
   printf '%s' "$CID" > "$WORKDIR/board-chipid.txt"
   ok "CHIPID $CID recorded -- later phases refuse any other board"
 
@@ -701,7 +771,7 @@ case "$PHASE" in
   # Resume support: aborting at the SET-VALID confirm leaves slot 0 burned but
   # not valid. That board is fine to continue on, but a plain stock-check would
   # tell the operator to throw it away.
-  SLOT0="$(read_slot 0)"
+  read_slot 0; SLOT0="$SLOT_HEX"
   EXPECT0="$(key_hash "$WORKDIR/factory-key.pem")"
   KV0="$(otp_field BOOT_FLAGS1.KEY_VALID)"
   RESUME=0
