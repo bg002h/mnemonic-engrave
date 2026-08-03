@@ -907,7 +907,22 @@ case "$PHASE" in
   hdr "3a -- an image signed with YOUR key (not yet burned)"
   run sign_image "$WORKDIR/blinky-mykey.uf2" "$WORKDIR/my-key.pem"
   flash_image "$WORKDIR/blinky-mykey.signed.uf2"
+  # Machine corroboration, free: a REJECTED image falls back to BOOTSEL, so
+  # picotool can still see the board. An ACCEPTED blinky has no USB stack and
+  # disappears. This cross-checks the operator's answer rather than trusting it.
+  bootsel_present
+  case "$BOOTSEL_ANSWER" in
+    yes)  info "picotool still sees the board -> it fell back to BOOTSEL (rejected)" ;;
+    no)   warn "picotool can NO LONGER see the board -- that means an image is RUNNING." ;;
+    skip) : ;;
+    *) die "unreachable verdict: BOOTSEL_ANSWER='$BOOTSEL_ANSWER'" ;;
+  esac
   ask_blink 'Did the LED blink (2 short + 1 long)?'
+  if [ "$BLINK_ANSWER" = "no" ] && [ "$BOOTSEL_ANSWER" = "no" ]; then
+    die "CONTRADICTION: you report no blink, but picotool cannot see the board --
+which means something IS running. Do not record this as a rejection. Re-enter
+BOOTSEL and re-run phase 3; if it repeats, secure boot is not being enforced."
+  fi
   case "$BLINK_ANSWER" in
     skip) info "[dry-run] would REQUIRE no blink here" ;;
     yes)  die "REJECTION FAILED: a your-key-signed image RAN on a board where your key
