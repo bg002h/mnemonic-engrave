@@ -17,8 +17,20 @@ release when a USB drive appears.
 
     Pico 2           BOOTSEL button (the only button on the board)   micro-USB
                      — the official Pico 2 is NOT USB-C
-    SeedHammer II    white firmware button, underside of the control  USB-C
-                     board near the hammerhead
+    SeedHammer II    the button on the control board (observed 2026-08-03  USB-C
+                     to be labelled "reset"; the manual calls it the
+                     firmware button). Hold it while plugging in.
+
+Only the instant of power-up matters -- you do not need to keep holding it.
+
+DON'T GUESS FROM THE LABEL. Verify empirically:
+
+    lsusb | grep 2e8a          # want: 2e8a:000f ... RP2350 Boot
+    picotool info              # want: "target chip: RP2350"
+
+2e8a:000f IS the bootrom's BOOTSEL device ID -- normally-booted firmware cannot
+present it, and picotool cannot read OTP unless you are in BOOTSEL. If both of
+those work, you are in, whatever the button is called.
 
 Both then enumerate as an RP2350 in BOOTSEL, USB vendor ID 2e8a. The SeedHammer's
 volume is labelled SHII. USE A DATA CABLE — charge-only cables are the most

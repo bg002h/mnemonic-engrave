@@ -117,8 +117,16 @@ Do not skip it.
 > Re-run it again immediately before step 2, so the state you act on is the
 > state you just read.
 
-Enter BOOTSEL: hold the white firmware button (underside of the control board,
-near the hammerhead) while connecting USB.
+Enter BOOTSEL: hold the button on the control board while connecting USB. (The
+manual calls it the firmware button; on the unit used here, 2026-08-03, it is
+physically labelled **reset**. Only the moment of power-up matters — there is no
+need to keep holding it.)
+
+**Confirm you are actually in BOOTSEL rather than trusting the label:** `lsusb`
+must show `2e8a:000f ... RP2350 Boot`, and `picotool info` must report
+`target chip: RP2350`. That device ID *is* the bootrom's BOOTSEL identity —
+normally-booted firmware cannot present it, and OTP is unreadable outside
+BOOTSEL. Both succeeding is proof.
 
 **Unplug every other RP2350 board first** — especially the consumed rehearsal
 Pico. A wrong-but-plausible device answers these reads with exactly the values
