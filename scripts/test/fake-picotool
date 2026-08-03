@@ -63,7 +63,7 @@ case "$sel" in
   CRIT1.SECURE_BOOT_ENABLE) printf 'ROW 0x0040: OTP_DATA_CRIT1 (CRIT)\nVALUE 0x%06x\n  field SECURE_BOOT_ENABLE (bit 0) = %s\n' "$(get SB)" "$(get SB)"; exit 0 ;;
   BOOT_FLAGS1.KEY_VALID)   printf 'ROW 0x004b: OTP_DATA_BOOT_FLAGS1 (RBIT-3)\nVALUE 0x%06x\n  field KEY_VALID (bits 0-3) = %s\n' "0x$(get KV)" "$(get KV)"; exit 0 ;;
   BOOT_FLAGS1.KEY_INVALID) printf 'ROW 0x004b: OTP_DATA_BOOT_FLAGS1 (RBIT-3)\nVALUE 0x000000\n  field KEY_INVALID (bits 8-11) = 0\n'; exit 0 ;;
-  CHIPID*) i="${sel#CHIPID}"; emit_row $(( 0xC0DE + i )) 0000 "$sel"; exit 0 ;;
+  CHIPID*) i="${sel#CHIPID}"; emit_row $(( 0xC0DE + i )) "$sel"; exit 0 ;;
   PAGE*)   emit_row 0 "$sel"; exit 0 ;;
   BOOTKEY*)
     n=$(echo "$sel" | sed 's/BOOTKEY\([0-9]\)_.*/\1/'); i=$(echo "$sel" | sed 's/.*_//')

@@ -198,9 +198,14 @@ AC with sleep disabled, and do not touch the bench during (d) and (f).
          official-firmware recovery path is intact
        * SECURE_BOOT_ENABLE = 1, KEY_VALID = 0x1, KEY_INVALID = 0
        * spare slots 1-3 empty across ALL 16 rows each
-       * all four page-lock rows zero -- the ONLY read-only way to learn
-         whether a second key can ever be added. Non-zero = this procedure is
-         impossible on this device.
+       * OTP page PERMISSIONS allow Secure writes -- the only read-only way to
+         learn whether a second key can ever be added. Note these rows are NOT
+         expected to be zero: a retail SeedHammer II reads
+         PAGE1_LOCK1 = PAGE2_LOCK1 = 0x040404, which decodes to LOCK_S=0
+         (Secure may write), LOCK_BL=0 (bootloader permits writes) and
+         LOCK_NS=1 (Non-secure restricted to reads). That is normal. Only
+         LOCK_S or LOCK_BL being non-zero, or KEY_R/KEY_W set in the LOCK0
+         rows, means the procedure is impossible on this device.
        * CRIT1/BOOT_FLAGS1 redundant copies consistent
      It also PINS this device's CHIPID, which (e) and (g) re-check. Skipping (a)
      silently downgrades that wrong-device check.

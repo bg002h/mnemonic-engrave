@@ -188,21 +188,6 @@ $out"
   printf '%s' "$v"
 }
 
-# read_row <selector> -> exactly 4 hex digits (low 16 bits of the row)
-read_row() {
-  local sel="$1" out v
-  out="$(picotool otp get -n -e "$sel" 2>&1)" || die "OTP read failed for $sel:
-$out"
-  printf '%s' "$out" | grep -qi 'WARNING' \
-    && die "picotool reported a warning reading $sel (invalid ECC or unequal redundant rows):
-$out"
-  v="$(printf '%s\n' "$out" | grep -oiE '^[[:space:]]*VALUE 0x[0-9a-f]+' | tail -1 \
-       | grep -oiE '0x[0-9a-f]+' | sed 's/^0[xX]//' | tr 'A-F' 'a-f')"
-  [ -n "$v" ] || die "could not parse a VALUE line for row $sel from picotool output:
-$out"
-  # VALUE is the 24-bit raw row; ECC-corrected data occupies the low 16 bits.
-  printf '%04x' $(( 16#$v & 0xffff ))
-}
 
 # read_rows <selector...> -> sets ROWVALS to space-separated 4-hex-digit values,
 # one per requested row, in order.
@@ -230,6 +215,24 @@ $out"
   [ "$got" -eq "$want" ] || die "expected $want row values for '$*', parsed $got.
 picotool output was:
 $out"
+  # picotool returns rows ASCENDING-SORTED with silent dedup (its filter_otp
+  # builds a std::map keyed by row) -- NOT in request order. Positional mapping
+  # is therefore only valid for distinct ascending selectors. Verify the row
+  # names it echoed match what we asked for, in order, rather than assume it.
+  local names
+  names="$(printf '%s\n' "$out" | grep -oiE '^ROW 0x[0-9a-f]+: OTP_DATA_[A-Z0-9_]+' \
+           | sed -E 's/.*OTP_DATA_//')"
+  [ "$(printf '%s\n' "$names" | wc -l)" -eq "$want" ] \
+    || die "parsed $(printf '%s\n' "$names" | wc -l) ROW names for '$*', expected $want"
+  local k=1 sel
+  for sel in "$@"; do
+    [ "$(printf '%s\n' "$names" | sed -n "${k}p")" = "$sel" ] \
+      || die "picotool returned rows in an unexpected order.
+  requested position $k: $sel
+  received:            $(printf '%s\n' "$names" | sed -n "${k}p")
+Positional mapping is unsafe here; refusing to guess which value is which."
+    k=$((k+1))
+  done
 }
 
 # read_slot <n> -> sets SLOT_HEX to 64 hex chars (the 32-byte key hash).
@@ -249,8 +252,20 @@ read_slot() {
 # This is what the RP2350 stores in a boot-key slot. Computed independently of
 # picotool so the two can be cross-checked.
 key_hash() {
-  openssl ec -in "$1" -pubout -conv_form uncompressed -outform DER 2>/dev/null \
-    | tail -c 64 | sha256sum | cut -d' ' -f1
+  local der h
+  der="$(openssl ec -in "$1" -pubout -conv_form uncompressed -outform DER 2>/dev/null \
+         | tail -c 64 | od -An -v -tx1 | tr -d ' \n')" \
+    || die "key_hash: openssl failed on $1"
+  # 64 bytes = 128 hex chars. Without this, an unreadable PEM yields sha256 of
+  # the empty string (e3b0c442...) -- a deterministic WRONG value in a path that
+  # decides what gets burned into OTP.
+  [ ${#der} -eq 128 ] || die "key_hash: could not extract a 64-byte public key from $1
+(got ${#der} hex chars). Is it a valid secp256k1 private key?"
+  # No xxd: `nix develop` prepends rather than purges PATH, so xxd would
+  # silently resolve to a host binary the devshell does not provide.
+  h="$(openssl ec -in "$1" -pubout -conv_form uncompressed -outform DER 2>/dev/null \
+       | tail -c 64 | sha256sum | cut -d' ' -f1)"
+  printf '%s' "$h"
 }
 
 CHIPID_HEX=""
@@ -359,11 +374,17 @@ to this page. No further boot key can be added. STOP."
         info "$l = 0x$v (LOCK_S=$lock_s writable, LOCK_BL=$lock_bl writable, LOCK_NS=$lock_ns)"
         ;;
       *)
-        # PAGE*_LOCK0 carries KEY_R/KEY_W/NO_KEY_STATE. Non-zero here means a
-        # hardware key is required for access, which we cannot supply.
-        [ $((maj)) -eq 0 ] || die "$l = 0x$v -- this page requires a hardware OTP key for access
-(KEY_R/KEY_W/NO_KEY_STATE non-zero). This procedure cannot proceed. STOP."
-        info "$l = 0x$v (no key required)"
+        # PAGE*_LOCK0: KEY_W (bits 0-2), KEY_R (bits 3-5), NO_KEY_STATE (bit 6).
+        # Only KEY_R/KEY_W gate us -- they demand a hardware OTP key we cannot
+        # supply. NO_KEY_STATE only matters once a key is registered, so it is
+        # informational; a bare all-zero test here would STOP on a harmless
+        # device, the same shape as the page-lock bug that nearly killed this.
+        local key_w=$(( maj & 0x7 )) key_r=$(( (maj >> 3) & 0x7 )) nokey=$(( (maj >> 6) & 0x1 ))
+        [ "$key_r" -eq 0 ] && [ "$key_w" -eq 0 ] \
+          || die "$l = 0x$v -- this page requires a hardware OTP key (KEY_R=$key_r KEY_W=$key_w).
+We cannot supply one. This procedure cannot proceed on this device. STOP."
+        [ "$nokey" -eq 0 ] || warn "$l: NO_KEY_STATE=1 (informational; no key is registered)"
+        info "$l = 0x$v (KEY_R=0 KEY_W=0 -- no hardware key required)"
         ;;
     esac
   done
@@ -449,16 +470,22 @@ flash (board connected? in BOOTSEL? image valid?) and re-run this phase."
 # "no" was dangerous: "no" is the PASSING answer for both negative controls
 # (3a/3b) and for 5b, so a mistyped or absent-minded response silently produced
 # the exact false proof this rehearsal exists to prevent.
+# Sets BLINK_ANSWER to yes|no|skip. Deliberately NOT a $(...)-called function:
+# its die would exit only the subshell, and a case with no default then skipped
+# the verdict silently and let the phase print its success banner.
+BLINK_ANSWER=""
 ask_blink() {
-  if [ "$EXECUTE" -ne 1 ]; then printf 'skip'; return 0; fi
+  BLINK_ANSWER=""
+  if [ "$EXECUTE" -ne 1 ]; then BLINK_ANSWER="skip"; return 0; fi
   local a
   while true; do
-    printf '\n\033[1m%s\033[0m [y/n]: ' "$1" >&2
-    read -r a || die "no answer given (stdin closed) -- cannot draw a verdict"
+    printf '\n\033[1m%s\033[0m [y/n]: ' "$1"
+    read -r a || die "no answer given (stdin closed) -- cannot draw a verdict.
+This verdict is load-bearing; refusing to guess."
     case "$a" in
-      y|Y|yes|YES) printf 'yes'; return 0 ;;
-      n|N|no|NO)   printf 'no';  return 0 ;;
-      *) printf '  answer y or n exactly -- this verdict is load-bearing.\n' >&2 ;;
+      y|Y|yes|YES) BLINK_ANSWER="yes"; return 0 ;;
+      n|N|no|NO)   BLINK_ANSWER="no";  return 0 ;;
+      *) printf '  answer y or n exactly -- this verdict is load-bearing.\n' ;;
     esac
   done
 }
@@ -467,18 +494,24 @@ ask_blink() {
 # Machine answer for 5b: after a reboot, a device still reachable by picotool is
 # sitting in BOOTSEL, i.e. the bootrom REJECTED the image. A device that ran the
 # image is not enumerable this way. Removes the one prompt where y meant failure.
+BOOTSEL_ANSWER=""
 bootsel_present() {
-  if [ "$EXECUTE" -ne 1 ]; then printf 'skip'; return 0; fi
+  BOOTSEL_ANSWER=""
+  if [ "$EXECUTE" -ne 1 ]; then BOOTSEL_ANSWER="skip"; return 0; fi
   # Poll rather than sampling once: a REJECTED board that re-enumerates slowly
   # (hubs, some xHCI stacks) would miss a single 3s check and be scored as
   # "accepted" -- failing open on the only automated verdict in the rehearsal.
   # Require sustained absence before concluding the image ran.
-  local i misses=0
+  local i
   for i in $(seq 1 15); do
-    if picotool info >/dev/null 2>&1; then printf 'yes'; return 0; fi
-    misses=$((misses+1)); sleep 1
+    if picotool info >/dev/null 2>&1; then
+      info "picotool sees the board after ${i}s -- it is in BOOTSEL (image rejected)"
+      BOOTSEL_ANSWER="yes"; return 0
+    fi
+    sleep 1
   done
-  printf 'no'
+  info "picotool could not see the board for 15s -- it is running the image"
+  BOOTSEL_ANSWER="no"
 }
 
 # sign_image <image> <key> -> produces <image-without-.uf2>.signed.uf2
@@ -636,14 +669,34 @@ Otherwise this device has been modified by someone else. STOP."
     # BOOT_FLAGS1 3-way redundant. Read the raw copies individually so a partial
     # write is visible; read_row_raw24 dies on any unreadable row.
     hdr "Redundant-row raw readback (CRIT1 x8, BOOT_FLAGS1 x3)"
+    # Compared here, not eyeballed. Raw row-number reads resolve without a
+    # register match, so picotool takes the no-redundancy path and can NEVER
+    # print a disagreement warning -- an earlier version told the operator it
+    # would, which was assurance the tool cannot give. Plain assignments (not
+    # printf arguments) so a failed read's `die` actually halts.
+    FIRST=""; MISMATCH=0
     for r in 0x040 0x041 0x042 0x043 0x044 0x045 0x046 0x047; do
-      printf '  CRIT1 copy %s = 0x%s\n' "$r" "$(read_row_raw24 "$r")"
+      V="$(read_row_raw24 "$r")"
+      printf '  CRIT1 copy %s = 0x%s\n' "$r" "$V"
+      [ -n "$FIRST" ] || FIRST="$V"
+      [ "$V" = "$FIRST" ] || MISMATCH=1
     done
+    [ "$MISMATCH" -eq 0 ] || die "CRIT1's 8 redundant copies DISAGREE (see above).
+The hardware majority-votes these, so the device may still behave correctly, but
+a critical boot flag with degraded redundancy on a machine you are about to
+modify is not something to proceed past. STOP."
+    ok "all 8 CRIT1 copies agree (0x$FIRST)"
+
+    FIRST=""; MISMATCH=0
     for r in 0x04b 0x04c 0x04d; do
-      printf '  BOOT_FLAGS1 copy %s = 0x%s\n' "$r" "$(read_row_raw24 "$r")"
+      V="$(read_row_raw24 "$r")"
+      printf '  BOOT_FLAGS1 copy %s = 0x%s\n' "$r" "$V"
+      [ -n "$FIRST" ] || FIRST="$V"
+      [ "$V" = "$FIRST" ] || MISMATCH=1
     done
-    info "All CRIT1 copies should agree, and all BOOT_FLAGS1 copies should agree."
-    info "picotool prints a WARNING on any disagreement; none above means consistent."
+    [ "$MISMATCH" -eq 0 ] || die "BOOT_FLAGS1's 3 redundant copies DISAGREE (see above).
+This is the row holding KEY_VALID/KEY_INVALID. STOP."
+    ok "all 3 BOOT_FLAGS1 copies agree (0x$FIRST)"
 
     hdr "RESULT"
     ok "SeedHammer II is in the expected retail state and its OTP pages are writable."
@@ -845,12 +898,14 @@ case "$PHASE" in
   hdr "3a -- an image signed with YOUR key (not yet burned)"
   run sign_image "$WORKDIR/blinky-mykey.uf2" "$WORKDIR/my-key.pem"
   flash_image "$WORKDIR/blinky-mykey.signed.uf2"
-  case "$(ask_blink 'Did the LED blink (2 short + 1 long)?')" in
+  ask_blink 'Did the LED blink (2 short + 1 long)?'
+  case "$BLINK_ANSWER" in
     skip) info "[dry-run] would REQUIRE no blink here" ;;
     yes)  die "REJECTION FAILED: a your-key-signed image RAN on a board where your key
 is not a valid boot key. Secure boot is not being enforced. Do not continue,
 and do not trust phase 1's seal." ;;
     no)   ok "your-key-signed image was rejected, as it must be" ;;
+    *) die "unreachable verdict: BLINK_ANSWER='$BLINK_ANSWER' matched no case -- refusing to continue" ;;
   esac
 
   hdr "3b -- an unsigned image"
@@ -859,10 +914,12 @@ and do not trust phase 1's seal." ;;
   # -clear` on it fails with "missing SIGNATURE section" and would abort the
   # phase. Flash it as-is.
   flash_image "$WORKDIR/blinky-unsigned.uf2"
-  case "$(ask_blink 'Did the LED blink?')" in
+  ask_blink 'Did the LED blink?'
+  case "$BLINK_ANSWER" in
     skip) info "[dry-run] would REQUIRE no blink here" ;;
     yes)  die "REJECTION FAILED: an UNSIGNED image ran. Secure boot is not enforced." ;;
     no)   ok "unsigned image was rejected" ;;
+    *) die "unreachable verdict: BLINK_ANSWER='$BLINK_ANSWER' matched no case -- refusing to continue" ;;
   esac
 
   ok_done "prove the sealed board rejects untrusted images -- the precondition for phases 5/6 meaning anything."
@@ -925,7 +982,8 @@ phase 5 tests the SAME artifact phase 3 proved was rejected."
 
   info "Re-flashing the SAME your-key-signed image phase 3 proved was rejected."
   flash_image "$WORKDIR/blinky-mykey.signed.uf2"
-  case "$(ask_blink 'Did the LED blink (2 short + 1 long)?')" in
+  ask_blink 'Did the LED blink (2 short + 1 long)?'
+  case "$BLINK_ANSWER" in
     skip) info "[dry-run] would REQUIRE a blink here" ;;
     yes)  ok "ACCEPTED after the key burn -- reject->accept across one OTP write."
           ok "The signing chain and the OTP procedure are both proven on real silicon." ;;
@@ -933,6 +991,7 @@ phase 5 tests the SAME artifact phase 3 proved was rejected."
 Something in the signing chain is wrong -- investigate before touching the
 SeedHammer II. See sign-firmware.sh and note M3 (possible high-s signature):
 re-sign once to get a fresh nonce before concluding the chain is broken." ;;
+    *) die "unreachable verdict: BLINK_ANSWER='$BLINK_ANSWER' matched no case -- refusing to continue" ;;
   esac
 
   # F11(d): boot acceptance so far is only ever shown with a tiny TinyGo image.
@@ -962,13 +1021,15 @@ re-sign once to get a fresh nonce before concluding the chain is broken." ;;
     info "Expect NO blink (no LED code) and NO SeedHammer UI (no hardware)."
     info "Verdict is taken from picotool, not from you -- 'accepted but hung' and"
     info "'operator did not look' are indistinguishable by eye on a headless Pico."
-    case "$(bootsel_present)" in
+    bootsel_present
+    case "$BOOTSEL_ANSWER" in
       skip) info "[dry-run] would REQUIRE the board NOT to be in BOOTSEL after reboot" ;;
       yes)  die "The real firmware image was REJECTED -- the board is back in BOOTSEL
 (picotool can still see it) even though the blinky was accepted. The signing
 chain does not generalise to the 2.4MB image. Investigate before touching the
 SeedHammer II." ;;
       no)   ok "real firmware accepted by the bootrom (picotool can no longer see the board)" ;;
+      *) die "unreachable verdict: BOOTSEL_ANSWER='$BOOTSEL_ANSWER' matched no case -- refusing to continue" ;;
     esac
   else
     die "NO REAL FIRMWARE FOUND in $SEEDHAMMER_DIR (seedhammerii-*.uf2).
@@ -1007,12 +1068,14 @@ Run phases 1 and 2 first."
   run sign_image "$WORKDIR/blinky-factory.uf2" "$WORKDIR/factory-key.pem"
   info "If phase 5 left the board running an image, re-enter BOOTSEL first."
   flash_image "$WORKDIR/blinky-factory.signed.uf2"
-  case "$(ask_blink 'Did the LED blink?')" in
+  ask_blink 'Did the LED blink?'
+  case "$BLINK_ANSWER" in
     skip) info "[dry-run] would REQUIRE a blink here" ;;
     yes)  ok "Both keys boot. Leaving SeedHammer's slot valid really does preserve the fallback." ;;
     no)   die "A factory-key-signed image no longer boots on a dual-trust board.
 The recovery path assumed by the runbook does not hold. STOP -- do not perform
 this procedure on the SeedHammer II." ;;
+    *) die "unreachable verdict: BLINK_ANSWER='$BLINK_ANSWER' matched no case -- refusing to continue" ;;
   esac
   ok_done "confirm the factory key still boots alongside yours."
   ;;

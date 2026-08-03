@@ -146,12 +146,24 @@ nix develop --command \
 - it **pins this device's CHIPID**, which step 2 and step 3 re-check
 - `SECURE_BOOT_ENABLE` = 1, `KEY_VALID` = `0x1` (slot 0 only), `KEY_INVALID` = 0
 - spare slots 1–3 empty across **all 16 rows each**
-- all four page-lock rows zero, read **without `-e`** at full 24 bits (these rows
-  are `ecc=false`; an ECC read of a genuinely locked page decodes invalid and
-  masks away the third lock copy — the gate would be ambiguous exactly when it
-  matters)
+- OTP page **permissions** allow Secure writes. These rows are read **without
+  `-e`** at full 24 bits (they are `ecc=false`, and an ECC read would mask away
+  the third lock copy). **They are not expected to be zero:** a retail
+  SeedHammer II reads `PAGE1_LOCK1 = PAGE2_LOCK1 = 0x040404` — a byte replicated
+  3-way, decoding to `LOCK_S=0` ("page is fully accessible by Secure software"),
+  `LOCK_BL=0` ("bootloader permits user reads and writes") and `LOCK_NS=1`
+  (Non-secure restricted to reads). picotool writes as Secure software, so that
+  state is fully writable. Only `LOCK_S`/`LOCK_BL` non-zero, or `KEY_R`/`KEY_W`
+  set in the `LOCK0` rows, disqualifies the device. *(An earlier draft demanded
+  all-zero and would have declared a working retail unit permanently unusable —
+  caught on real hardware 2026-08-03.)*
 - raw redundant-row readback of `CRIT1` (×8) and `BOOT_FLAGS1` (×3), so a partial
   write is visible
+
+> **Never send the NFC `lock-boot` debug command to this unit.** It is the
+> factory provisioning path (`gui/gui.go:1626` → `LockBoot()`). It cannot waste
+> a boot-key slot — `AddBootKey` returns the existing slot on an exact match —
+> but it burns white-label OTP rows for no benefit.
 
 It is the same `read_slot` / `verify_slot_or_die` / `check_page_locks` code the
 Pico rehearsal exercises — deliberately, so the tool used here is the tool the
