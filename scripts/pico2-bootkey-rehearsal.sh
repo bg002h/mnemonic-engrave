@@ -252,19 +252,29 @@ read_slot() {
 # This is what the RP2350 stores in a boot-key slot. Computed independently of
 # picotool so the two can be cross-checked.
 key_hash() {
-  local der h
-  der="$(openssl ec -in "$1" -pubout -conv_form uncompressed -outform DER 2>/dev/null \
-         | tail -c 64 | od -An -v -tx1 | tr -d ' \n')" \
-    || die "key_hash: openssl failed on $1"
-  # 64 bytes = 128 hex chars. Without this, an unreadable PEM yields sha256 of
-  # the empty string (e3b0c442...) -- a deterministic WRONG value in a path that
-  # decides what gets burned into OTP.
-  [ ${#der} -eq 128 ] || die "key_hash: could not extract a 64-byte public key from $1
-(got ${#der} hex chars). Is it a valid secp256k1 private key?"
-  # No xxd: `nix develop` prepends rather than purges PATH, so xxd would
-  # silently resolve to a host binary the devshell does not provide.
-  h="$(openssl ec -in "$1" -pubout -conv_form uncompressed -outform DER 2>/dev/null \
-       | tail -c 64 | sha256sum | cut -d' ' -f1)"
+  local f full h
+  openssl ec -in "$1" -noout -text 2>/dev/null | grep -qi 'ASN1 OID: secp256k1' \
+    || die "key_hash: $1 is NOT a secp256k1 key.
+RP2350 secure boot requires secp256k1. EVERY EC curve yields a 64-byte slice
+that looks superficially valid, so without this check a P-256 or P-384 key would
+pass --make-otp-json AND --sh2-verify-slot, get burned into OTP, and never match
+any signature you could produce -- permanently spending a slot."
+
+  # Capture the point ONCE and hash exactly the bytes that were validated, so
+  # what is asserted is what is burned.
+  f="$(mktemp)"
+  openssl ec -in "$1" -pubout -conv_form uncompressed -outform DER 2>/dev/null \
+    | tail -c 65 > "$f" || { rm -f "$f"; die "key_hash: openssl failed on $1"; }
+  # secp256k1 uncompressed point: exactly 65 bytes, 0x04 || X(32) || Y(32).
+  [ "$(stat -c%s "$f")" -eq 65 ] \
+    || { rm -f "$f"; die "key_hash: expected a 65-byte uncompressed point from $1, got $(stat -c%s "$f") bytes"; }
+  full="$(od -An -v -tx1 -N1 "$f" | tr -d ' \n')"
+  [ "$full" = "04" ] \
+    || { rm -f "$f"; die "key_hash: public key is not uncompressed (leading byte 0x$full, expected 0x04)"; }
+  # The OTP value is sha256 over X||Y -- the 64 bytes AFTER the 0x04 prefix.
+  h="$(tail -c 64 "$f" | sha256sum | cut -d' ' -f1)"
+  rm -f "$f"
+  [ ${#h} -eq 64 ] || die "key_hash: sha256 produced ${#h} chars for $1"
   printf '%s' "$h"
 }
 
@@ -601,10 +611,19 @@ reject_rehearsal_key() {
     return 0
   fi
   h="$(key_hash "$key")"
+  local ph
   for p in "$WORKDIR"/factory-key.pem "$WORKDIR"/my-key.pem "$WORKDIR"/third-party-key.pem; do
-    [ -f "$p" ] || continue
+    [ -f "$p" ] || die "CANNOT CHECK: $(basename "$p") is missing from $WORKDIR.
+This guard compares your key against ALL THREE rehearsal keys; with one absent it
+cannot tell you whether $key is a throwaway. Keep rehearsal-work/ intact until
+the SeedHammer procedure is complete, or re-run with ALLOW_UNCHECKED_KEY=1 if you
+have satisfied yourself by hand."
+    # Plain assignment, NOT a substitution inside [ ]: as a test ARGUMENT a
+    # failing $(...) does not propagate under set -e, so key_hash's die was
+    # swallowed and the comparison silently ran against an empty string.
+    ph="$(key_hash "$p")"
     seen=$((seen+1))
-    [ "$h" != "$(key_hash "$p")" ] || die "REFUSING: $key is a REHEARSAL key ($(basename "$p")).
+    [ "$h" != "$ph" ] || die "REFUSING: $key is a REHEARSAL key ($(basename "$p")).
 Rehearsal keys live in a directory documented as disposable. Burning one into the
 SeedHammer II would permanently strand that slot the moment it is deleted.
 Generate a distinct, backed-up key (e.g. sh2-boot-key.pem) for the real device."
@@ -733,9 +752,18 @@ This is the row holding KEY_VALID/KEY_INVALID. STOP."
     WANT=$(( 1 | (1 << SH2_SLOT) ))
     KV="$(otp_field BOOT_FLAGS1.KEY_VALID)"
     if [ $((16#$KV)) -ne "$WANT" ]; then
-      die "KEY_VALID is 0x$KV, expected 0x$(printf '%x' "$WANT") (slot 0 + slot $SH2_SLOT).
-If it reads LOWER than expected, the redundant write was INTERRUPTED partway.
-That is recoverable and costs nothing: re-run the identical
+      GOT=$(( 16#$KV )); EXTRA=$(( GOT & ~WANT )); MISSING=$(( WANT & ~GOT ))
+      if [ "$EXTRA" -ne 0 ]; then
+        die "KEY_VALID is 0x$KV, expected 0x$(printf '%x' "$WANT").
+It has bits set that should NOT be: 0x$(printf '%x' "$EXTRA").
+This is NOT an interrupted write, and re-running \`otp set -s\` cannot fix it --
+that only ever SETS bits. Some other slot has been marked valid. Stop and work
+out which, and why, before doing anything else."
+      fi
+      die "KEY_VALID is 0x$KV, expected 0x$(printf '%x' "$WANT") (slot 0 + slot $SH2_SLOT);
+missing bits 0x$(printf '%x' "$MISSING").
+A LOW value means the redundant write was INTERRUPTED partway. That is
+recoverable and costs nothing: re-run the identical
     picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x$(printf '%x' $((1 << SH2_SLOT)))
 It only ever SETS bits, so repeating it is safe. Do NOT burn another slot, and
 do NOT start re-signing -- your key hash is already proven correct above."
@@ -771,6 +799,17 @@ protecting the bit that says 'trust your key' is degraded. Re-run the identical
     [ -f "$SH2_KEY" ] || die "no such key: $SH2_KEY"
     sh2_require_seedhammer
     reject_rehearsal_key "$SH2_KEY"
+    # This gate's failure text promises "the slot is not yet valid, so the device
+    # still boots normally" -- assert that rather than asserting it.
+    KV="$(otp_field BOOT_FLAGS1.KEY_VALID)"
+    if [ $(( 16#$KV & (1 << SH2_SLOT) )) -ne 0 ]; then
+      die "slot $SH2_SLOT is ALREADY marked valid (KEY_VALID=0x$KV).
+This mode is the gate BEFORE the valid bit is set; running it now cannot tell you
+anything you can still act on, and its failure advice ('move to the next slot')
+would be wrong. If you are checking a completed burn, use
+    --sh2-verify-valid $SH2_SLOT --key $SH2_KEY"
+    fi
+    ok "slot $SH2_SLOT is not yet valid -- this gate can still protect you"
     verify_slot_or_die "$SH2_SLOT" "$SH2_KEY"
     hdr "RESULT"
     ok "Slot $SH2_SLOT matches $SH2_KEY across all 16 rows."

@@ -293,6 +293,15 @@ digest is unchanged after embedding the signature, verifies it with openssl,
 checks the embedded bytes match, requires exactly 2 metadata blocks, and
 requires picotool to report "signature: verified".
 
+JUDGE THE BOOT ON MACHINE POWER, NOT ON THE LAPTOP. Init() runs
+monitorPowerSupply BEFORE it configures the LCD (platform_sh2.go:224-251); it
+demands a 20-28V USB-PD contract and on failure calls rebootIntoBOOTSEL()
+(platform_sh2.go:428-441), by design for the "plugged into a flashing computer"
+case. On a laptop port that cannot source 20V, correctly signed firmware that
+the bootrom ACCEPTED still shows a dark screen and re-enumerates as RP2350 Boot
+-- identical to a rejection. Unplug from the computer and power the machine
+normally before judging anything.
+
 Expect "(UNLOCKED)" on the version line afterwards. That is CORRECT — the
 firmware only reports "locked" when SeedHammer's key is the sole valid one.
 Secure boot is still enforcing; it now trusts two keys.

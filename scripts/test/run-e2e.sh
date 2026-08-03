@@ -134,6 +134,58 @@ run_phase "--sh2-verify-slot FAILS with the wrong key" expect-fail "" \
 run_phase "phase 0 refuses a SeedHammer II" expect-fail "" --phase 0
 run_phase "phase 1 refuses a SeedHammer II" expect-fail $'BURN-FACTORY\n' --phase 1 --execute
 
+# --sh2-verify-valid: the post-write gate. Previously ZERO coverage -- not on
+# hardware, not here -- despite gating the last irreversible step.
+hdr "D. --sh2-verify-valid (post-write gate)"
+
+# Before the valid bit is set, it must refuse.
+run_phase "--sh2-verify-valid FAILS before the valid bit is set" expect-fail "" \
+  --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem"
+
+picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x2 >/dev/null 2>&1
+run_phase "--sh2-verify-valid passes once KEY_VALID is 0x3" expect-pass "" \
+  --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem"
+state_is KV 3
+
+# Wrong key must fail even with the valid bit correctly set.
+run_phase "--sh2-verify-valid FAILS with the wrong key" expect-fail "" \
+  --sh2-verify-valid 1 --key "$TMP/wrong.pem"
+
+# Wrong slot: slot 2 was never burned, so both hash and valid-bit are wrong.
+run_phase "--sh2-verify-valid FAILS for a slot that was never burned" expect-fail "" \
+  --sh2-verify-valid 2 --key "$TMP/sh2-boot-key.pem"
+
+# An EXTRA valid bit is not an interrupted write and must not be reported as one.
+picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x4 >/dev/null 2>&1
+run_phase "--sh2-verify-valid FAILS on an unexpected extra valid bit" expect-fail "" \
+  --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem"
+
+# --sh2-verify-slot must refuse once the slot is already valid (its advice would be wrong).
+run_phase "--sh2-verify-slot refuses an already-valid slot" expect-fail "" \
+  --sh2-verify-slot 1 --key "$TMP/sh2-boot-key.pem"
+
+hdr "E. key and curve guards"
+openssl ecparam -name prime256v1 -genkey -noout -out "$TMP/p256.pem" 2>/dev/null
+run_phase "--make-otp-json REFUSES a non-secp256k1 (P-256) key" expect-fail "" \
+  --make-otp-json --key "$TMP/p256.pem" --slot 1 --out "$TMP/p256.json"
+openssl ecparam -name secp384r1 -genkey -noout -out "$TMP/p384.pem" 2>/dev/null
+run_phase "--make-otp-json REFUSES a non-secp256k1 (P-384) key" expect-fail "" \
+  --make-otp-json --key "$TMP/p384.pem" --slot 1 --out "$TMP/p384.json"
+
+# reject_rehearsal_key must fail CLOSED when it has nothing to compare against.
+mv "$WORKDIR/my-key.pem" "$WORKDIR/my-key.pem.bak"
+run_phase "--make-otp-json refuses when a rehearsal key is missing" expect-fail "" \
+  --make-otp-json --key "$TMP/sh2-boot-key.pem" --slot 3 --out "$TMP/x3.json"
+mv "$WORKDIR/my-key.pem.bak" "$WORKDIR/my-key.pem"
+
+# ...and the documented escape hatch must work.
+mv "$WORKDIR/my-key.pem" "$WORKDIR/my-key.pem.bak"
+export ALLOW_UNCHECKED_KEY=1
+run_phase "ALLOW_UNCHECKED_KEY=1 overrides it deliberately" expect-pass "" \
+  --make-otp-json --key "$TMP/sh2-boot-key.pem" --slot 3 --out "$TMP/x3.json"
+unset ALLOW_UNCHECKED_KEY
+mv "$WORKDIR/my-key.pem.bak" "$WORKDIR/my-key.pem"
+
 # ...and the SH2 modes must refuse anything that is not one.
 export OTPSTATE="$TMP/pico.state"
 run_phase "--sh2-precheck refuses a non-SeedHammer board" expect-fail "" --sh2-precheck

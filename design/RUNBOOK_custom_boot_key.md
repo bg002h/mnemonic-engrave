@@ -107,6 +107,23 @@ Do not skip it.
 
 ## Step 1 — Verify device state (READ ONLY, do this first)
 
+> **Honest status of these gates.** `--sh2-precheck` has been run against your
+> actual SeedHammer and passed. `--sh2-verify-slot` and `--sh2-verify-valid`
+> have **not** — they refuse any board without SeedHammer's key in slot 0, so the
+> Pico could not exercise them, and they need a burned spare slot that does not
+> exist yet. Their underlying reader (`read_slot` / `verify_slot_or_die`) *is*
+> hardware-proven, via rehearsal phases 1c and 4c, and the wrappers are covered
+> by 39 offline checks — but their success path will run for the first time on
+> your machine. Every failure mode they have is a `die` costing zero OTP, so the
+> risk is being stalled at a gate, not being misled past one.
+>
+> **Free hardening before step 2:** run
+> `--sh2-verify-slot 1 --key ~/.sh2/sh2-boot-key.pem` against the still-pristine
+> device. It must die with `SLOT 1 READBACK MISMATCH` showing all-zeros against
+> your hash. That exercises the entire wrapper chain on the real machine, with
+> only the final comparison differing from the post-burn success path. (Ignore
+> its "permanently unusable" wording in this context — nothing has been burned.)
+
 > **Run this the day you get the machine — not the day you burn OTP.** It writes
 > nothing, and it is the only way to learn, short of an irreversible write,
 > whether your retail unit carries OTP page locks or other factory provisioning
@@ -240,6 +257,14 @@ picotool otp load ~/.sh2/my-otp.json
 >
 > So before running it: short cable straight into the machine, no hub, laptop on
 > AC with sleep disabled, and don't touch the bench until step 3 completes.
+>
+> **Prefer a non-PD 5 V source for the burn** — a USB-A port with an A-to-C
+> cable. The SeedHammer puts an AP33772S USB-PD sink between the connector and
+> the system (`platform_sh2.go:211`); PD renegotiation or a hard reset can drop
+> VBUS with no firmware involvement while the chip sits in BOOTSEL. A USB-A
+> source has no PD state machine at all, and reproduces the electrical
+> conditions under which the Pico rehearsal succeeded. This device already
+> logged one `device descriptor read/64, error -71` during enumeration.
 > Note also that `otp load` prints no "verified" confirmation of its own — the
 > absence of output is not success, which is why step 3 is mandatory.
 
@@ -299,7 +324,10 @@ to clear bits and will fail.
 
 ```sh
 cd /scratch/code/shibboleth/seedhammer
-nix run .#build-firmware        # → seedhammerii-<version>.uf2
+env VERSION=$(git rev-parse HEAD) nix run .#build-firmware
+# → seedhammerii-$(git rev-parse HEAD).uf2
+# VERSION must be pinned: without it build-firmware falls back to `git describe`
+# and produces a filename steps 5 and 6 will not find.
 ```
 
 ## Step 5 — Sign with your key (retryable)
@@ -355,12 +383,30 @@ Nothing here touches OTP. Get it wrong as many times as you need.
 ## Step 6 — Flash
 
 ```sh
-picotool load --verify $PWD/seedhammerii-$(git rev-parse HEAD).uf2
+FW=$PWD/seedhammerii-$(git rev-parse HEAD).uf2
+picotool load --verify ${FW%.uf2}.signed.uf2      # the SIGNED file, not the input
 picotool reboot
 ```
 
-**Expected result:** normal startup screen, with `(UNLOCKED)` appended to the
-version line.
+> ### Judge the boot on MACHINE power, never on the laptop
+>
+> `Init()` runs `monitorPowerSupply` **before** it configures the LCD
+> (`cmd/controller/platform_sh2.go:224-251`). That code demands a 20–28 V USB-PD
+> contract and, on failure, calls `rebootIntoBOOTSEL()`
+> (`platform_sh2.go:428-441`) — deliberately, for exactly the "plugged into a
+> flashing computer" case.
+>
+> So on a laptop port that cannot source 20 V, **correctly signed firmware that
+> the bootrom ACCEPTED still gives you a dark screen and a device that
+> re-enumerates as `RP2350 Boot`** — pixel-identical to a signature rejection.
+>
+> After `picotool reboot`: **unplug from the computer and power the machine from
+> its normal supply before judging anything.** A dark screen while tethered means
+> nothing. This also means the Pico rehearsal's "still enumerable = rejected"
+> reasoning does **not** transfer to the SeedHammer.
+
+**Expected result (on machine power):** normal startup screen, with `(UNLOCKED)`
+appended to the version line.
 
 > ### If it does NOT boot — do NOT burn another slot
 >
@@ -368,6 +414,11 @@ version line.
 > failure here is a **signing or image** problem, not a slot problem. Those are
 > retryable at zero OTP cost:
 >
+> 0. **Did you flash the `.signed.uf2`?** `sign-firmware.sh` never modifies its
+>    input — it writes a new file. Flashing the build output directly flashes an
+>    image whose signature `build-firmware` deliberately zeroed, which cannot
+>    boot on a sealed device. And **did you judge it on machine power?** See the
+>    box above.
 > 1. Re-run step 5 and re-flash. **Note what this is NOT:** the RP2350 bootrom
 >    performs no ECDSA canonicality check — verified against
 >    `raspberrypi/pico-bootrom-rp2350` (`arm8_sig.c` into the pinned `sweet-b`
@@ -417,7 +468,12 @@ Revoking is permanent and removes that path.
 
 ## Open items to resolve before executing
 
-1. ⬜ **Rehearse the entire flow on a plain Pico 2 first.** Non-negotiable.
+1. ✅ **DONE 2026-08-03 — the Pico 2 rehearsal was executed and passed, phases
+   0→6.** See `design/REHEARSAL_RESULT_2026-08-03.md`. Board CHIPID
+   `bf2ff20ad60f66d3`, consumed as designed. The reject→accept A/B held on real
+   silicon, the real 2.4 MB firmware was accepted, and the factory key still
+   booted afterwards. *(Original text follows.)* Rehearse the entire flow on a
+   plain Pico 2 first. Non-negotiable.
    Boards ordered 2026-07-26 (one Pico 2 + one Pico 2 W as spare); run
    `scripts/pico2-bootkey-rehearsal.sh` phases 0→6 to completion. Remember the
    board is *consumed* — a full run burns 2 of its 4 slots and seals it.
@@ -437,8 +493,14 @@ Revoking is permanent and removes that path.
 3. ⬜ Decide whether to build from the fork `main` merge commit `66d3121`
    (upstream v1.4.3 + our features, CI-green and reproducible) or to tag a fork
    release first.
-4. ⬜ **Still unverified on real hardware:** that a sealed device accepts OTP
-   writes to a spare slot. Our code read says yes (`driver/otp/` never writes
+4. ✅ **RESOLVED 2026-08-03 on real silicon.** A sealed board DOES accept OTP
+   writes to a spare slot: rehearsal phase 4 burned slot 1 on a board sealed in
+   phase 1, `KEY_VALID` went 0x1 → 0x3, and the 16-row readback matched. This was
+   the load-bearing assumption of the entire procedure and it is now demonstrated
+   rather than inferred — on a Pico, not on the SeedHammer, but the SeedHammer's
+   page permissions were confirmed identical by `--sh2-precheck`.
+   *(Original text follows.)* Still unverified on real hardware: that a sealed
+   device accepts OTP writes to a spare slot. Our code read says yes (`driver/otp/` never writes
    page locks, `DEBUG_DISABLE`, or `KEY_INVALID`), and the community guide agrees
    — but this is the one assumption the whole procedure rests on and it has never
    been executed.
