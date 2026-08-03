@@ -146,7 +146,13 @@ esac
   || die "set SEEDHAMMER_DIR to the seedhammer fork (provides cmd/picosign)"
 
 mkdir -p "$WORKDIR"
-[ "$EXECUTE" -eq 1 ] || printf '\n\033[90m(dry-run -- nothing will be written; add --execute to arm)\033[0m\n'
+# SH2 modes are read-only by construction; there is no armed variant, so the
+# "add --execute to arm" banner would be actively misleading there.
+if [ -n "$MODE" ]; then
+  printf '\n\033[90m(read-only mode -- this cannot write to the device)\033[0m\n'
+elif [ "$EXECUTE" -ne 1 ]; then
+  printf '\n\033[90m(dry-run -- nothing will be written; add --execute to arm)\033[0m\n'
+fi
 
 # --------------------------------------------------------------------------
 # OTP helpers.

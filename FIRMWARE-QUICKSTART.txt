@@ -26,9 +26,20 @@ common "device not found".
 
 PERMISSIONS — do this once, or picotool will not see the device:
 
-    printf 'SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", MODE="0660", TAG+="uaccess"\n' | sudo tee /etc/udev/rules.d/99-picotool.rules
+    printf 'SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", MODE="0660", TAG+="uaccess"\n' | sudo tee /etc/udev/rules.d/60-picotool.rules
     sudo udevadm control --reload-rules
     sudo udevadm trigger
+
+THE FILENAME NUMBER MATTERS. systemd's /usr/lib/udev/rules.d/73-seat-late.rules
+is what turns TAG+="uaccess" into an ACL for your login session, and udev
+processes rule files in SORT ORDER. A file named 99-* sets the tag AFTER 73 has
+already run, so the ACL is never applied and picotool reports "appears to be in
+BOOTSEL mode, but picotool was unable to connect". Anything below 73 works;
+60- is conventional. If you already created a 99- file, delete it.
+
+Check it worked -- your user must appear in the ACL:
+    ls -l /dev/bus/usb/*/*        # find the 2e8a device's node
+    getfacl /dev/bus/usb/001/NNN  # expect a user:<you>:rw- entry
 
 (One line, no heredoc -- safe to paste in BOTH fish and bash. An indented
 heredoc silently fails in bash with exit status 0, writing junk filenames into

@@ -82,6 +82,15 @@ Do not skip it.
   anyway. Do the whole OTP dance there first — a mistake costs $5 instead of a
   SeedHammer II boot slot. See `scripts/pico2-bootkey-rehearsal.sh`.
 - **USB-C cable.** No debug probe is required; everything is PICOBOOT over USB.
+- **udev rule, numbered BELOW 73.** picotool needs USB access:
+  `/etc/udev/rules.d/60-picotool.rules` containing
+  `SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", MODE="0660", TAG+="uaccess"`.
+  The number is load-bearing: systemd's `73-seat-late.rules` is what converts
+  `TAG+="uaccess"` into an ACL for your session, and udev processes files in
+  sort order — a `99-` file tags the device too late and the ACL never appears.
+  The symptom is picotool saying the device *"appears to be in BOOTSEL mode, but
+  picotool was unable to connect"*. Verify with `getfacl` on the device node:
+  you should see a `user:<you>:rw-` entry.
 
 > **Reproducible build confirmed (2026-07-26).** A local
 > `env VERSION=66d3121691ecf325b35e44285c1b2e7cf5250cce nix run .#build-firmware`
