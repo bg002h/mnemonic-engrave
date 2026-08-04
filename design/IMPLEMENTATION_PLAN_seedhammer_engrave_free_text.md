@@ -2,7 +2,7 @@
 
 > **For agentic workers:** implement task-by-task, test-first. Steps use `- [ ]`.
 
-**Status:** rev 1 — plan R0 round 0 folded (2C/6I). Awaiting re-review.
+**Status:** rev 2 — plan R0 rounds 0 (2C/6I) and 1 (0C/3I) folded. Awaiting re-review.
 **Spec:** `design/SPEC_seedhammer_engrave_free_text.md` — **GREEN, R0 closed (rev 2)**.
 Read §5 before writing anything; the whole feature turns on it.
 
@@ -267,10 +267,25 @@ func MaxCharsAt(params engrave.Params, fontMM float32, text string, qr bool) int
 ```
 
       `widthAt` composes §5.1's band predicate with the QR narrowing and the
-      caller's plate-row offset. **`Fit` returns an `error`**: `qr.Encode` fails
-      at **2954 bytes and above** (measured; fine at 2953), and D2.2 accepts
-      keystrokes without limit, so that input is reachable. Never ignore it — a
-      nil `*qr.Code` dereferences in a live per-keystroke path.
+      caller's plate-row offset.
+
+- [ ] **C1.2a — ONE encoding call site**, shared by all four consumers, so the
+      failure mode is defined once and the engraved artifact is the same object
+      that was measured:
+
+```go
+// qrFor returns the code the plate will carry, or nil when want is false.
+// qr.Encode fails at 2954 bytes and above (measured; fine at 2953), and the Text
+// field is deliberately uncapped (D2.2), so that input is REACHABLE on a live
+// per-keystroke path. Every caller must handle err; none may dereference a nil
+// *qr.Code.
+func qrFor(text string, want bool) (*qr.Code, error)
+```
+
+      `Fit` returns an `error`. **`Admissible` returns `ok=false` on an encode
+      failure** — with `linesAvail` still meaningful so the readout keeps working
+      — and **`MaxCharsAt` returns 0**. Neither may panic. Test all three at 2954
+      bytes with the QR on.
 - [ ] **C1.3 — QR size comes from `qr.Encode(text, qr.L).Size`.** Never a length
       table. Tests: 106 lower→37, 106 upper→33, 106 digit→29, 114 upper→**33**,
       114 upper + one lowercase→**41** (two versions from one keystroke).
@@ -281,10 +296,6 @@ func MaxCharsAt(params engrave.Params, fontMM float32, text string, qr bool) int
 - [ ] **C1.6 — admission is anchored at 3.0mm** with both rows reserved
       unconditionally and the QR as chosen. Test that entering a title afterwards
       never invalidates already-accepted text.
-- [ ] **C1.7 — the 18-character cap holds at every rung:** a title and a footer at
-      the cap sit inside `[innerMargin, plateSize − innerMargin]`. Use true ink
-      bounds and the worst-case glyph `W`. At 6.0mm the slack is ~0.62mm — this
-      test is tight by design.
 - [ ] **C1.8 — refusal figure computed live**, not from a constant: at 3.0mm with
       a 700-character text, dropping the QR frees **640**.
 - [ ] **C1.9 — mutation-verify:** anchor admission at the fitted size instead of
@@ -389,6 +400,31 @@ func TestConfirmLinesEqualWrapText(t *testing.T)
       names the live figure.
 - [ ] **D2.8 — mutation-verify** each of the above.
 - [ ] **D2.9 — commit.**
+
+### Task D2a — build the plate *(added: round 1 found `EngraveFreeText` had no caller)*
+
+**Files:** `gui/freetext_flow.go` (modify), `gui/freetext_flow_test.go` (modify)
+
+Nothing in Phase D called `EngraveFreeText`, and nothing produced its `*qr.Code`.
+Mirror the established wiring: `gui/passphrase_flow.go`'s `ppBuildPlate` (`:532`)
+feeding `NewEngraveScreen(ctx, plate).Engrave(...)` (`:645`).
+
+- [ ] **D2a.1 — failing test:** the engrave step produces a plate whose lines are
+      exactly `WrapText`'s output at the size the **confirm screen displayed** —
+      binding the approved layout to the engraved one end to end, not just on
+      screen.
+- [ ] **D2a.2 — implement** `ftBuildPlate(params, text, title, footer string, qr bool) (Plate, error)`:
+      call `Fit` for `(fontMM, lines)`, call **`qrFor`** for the code (the same
+      helper the fit used — never a second, differently-parameterised encode),
+      then `backup.EngraveFreeText(params, fontMM, title, lines, footer, qrc)`,
+      then `toPlate`. Propagate every error; the flow shows the §6 refusal rather
+      than engraving.
+- [ ] **D2a.3 — mutation-verify:** re-encode the QR at a different ECC level in
+      the builder than the fit measured — D2a.1 must go red, because the module
+      count and therefore the line widths change.
+- [ ] **D2a.4 — the QR carries the Text only**, asserted at module level here too:
+      the fit path and the build path must produce byte-identical codes.
+- [ ] **D2a.5 — commit.**
 
 ### Task D3 — menu integration
 
