@@ -1100,6 +1100,23 @@ each. **Seed FP `DEADBEEF`, Expected Comb FP `CAFEBABE`.** Enable the QR, engrav
 `DEAD BEEF` / `CAFE BABE`. They are obviously synthetic, so the plate labels
 itself a proof rather than resembling a backup.)
 
+**Arithmetic, stated so the two counts reconcile:**
+
+| | |
+|---|---|
+| Alphabet | **96** runes = `0x1F` (mark) + 95 printable (`0x20`–`0x7E`) |
+| Typed | all **95** printable, one each |
+| Engraved *as themselves* | **94** — `0x21`–`0x7E`; the 95th, `0x20`, is substituted |
+| Substituted | `0x20` → `0x1F`, **1** mark |
+| **Text block total** | 94 + 1 = **95 distinct glyphs** = 96 − 1 |
+| Missing from the text block | `0x20` itself — never cut, because it was substituted away |
+| Supplied by the bands | a **real `0x20`**, in `DEAD BEEF` and the footer's word gaps |
+| **Plate total** | **96** — every alphabet rune represented |
+
+So "94" counts printable characters engraved as themselves, and "95" counts
+distinct glyphs in the text block. They are consistent: 94 + mark = 95 = 96 − 1.
+The fingerprints are what close the last one.
+
 What it proves:
 - every one of the 44 new glyphs actually cuts
 - the **4.5 mm** QR-layout size (5 rows × 20)
