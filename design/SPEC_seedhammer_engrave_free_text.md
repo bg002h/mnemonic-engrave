@@ -1,6 +1,6 @@
 # SPEC — Engrave Text (free-text plate), SeedHammer II fork
 
-Status: **DRAFT rev 1 — R0 round 0 folded (3C/10I), awaiting re-review.**
+Status: **DRAFT rev 2 — R0 rounds 0 (3C/10I) and 1 (1C/4I) folded, awaiting re-review.**
 No code before 0C/0I. Date: 2026-08-04. Target: `bg002h/seedhammer`, program slot **3**.
 
 ---
@@ -27,8 +27,22 @@ The QR encodes **the Text field and nothing else**. A scanner must return exactl
 what the operator believes it will.
 
 Title and footer occupy plate-absolute rows 0 and `LinesPerPlate-1`. Both are
-screw-hole rows (§5.1), so their limit is `charsPerLine − 2·holeChars` — the UI
-must enforce that number, not `charsPerLine`.
+screw-hole rows (§5.1), so the geometric limit is `charsPerLine − 2·holeChars` —
+but that evaluates to **18/20/24/26/30/36** down the ladder, and the engraved
+rung is not known while the title is being typed.
+
+**Therefore title and footer are capped at 18 characters, unconditionally** — the
+6.0mm figure, the tightest rung. A rung-relative cap is rejected: anchoring it at
+3.0mm (36) lets a short text auto-fit at 6.0mm carrying a title that row cannot
+hold, and **`toPlate` does not catch it**. Measured, a centered 20-character
+title at 6.0mm inks `x[7.127, 77.962]`mm, crossing both screw-hole bands
+(`[3,10]` and `[75,82]`) while every check passes — a silently wrong plate.
+Enforcing at the *current* rung is no better: deleting text raises the rung and
+retroactively invalidates an already-entered title, the case §6 and §12.1 exist
+to rule out.
+
+§11 pins that a title at the cap sits inside `[innerMargin, plateSize −
+innerMargin]` at **every** rung.
 
 The title is engraved **verbatim**. `backup.TitleString`
 (`backup/backup.go:49-61`) MUST NOT be used: it silently upper-cases and
@@ -64,9 +78,25 @@ is the first entry at which the whole composition fits.**
 | 3.4 | 38×23 | 834 | 774 | 678 |
 | 3.0 | 44×26 | 1104 | 1032 | 897 |
 
-¹ **Cumulative** — includes title and footer. At a 37-module QR, **`QRScale = 2`**
-(§8). At the codebase's other precedent, scale 3, the same column is
-`197 268 357 488 636 831`.
+¹ **Geometry only, at a hypothetical 37-module QR — NOT an attainable capacity.**
+Cumulative with title+footer, `QRScale = 2` (§8). At scale 3 the same geometry is
+`161 228 309 436 576 759`.
+
+**The QR encodes the Text (§2), so this column is unreachable**: 37 modules is
+v5-L, at most 106 bytes, and no text of the column's own length produces one.
+Measured true maxima, solving the fixed point text↔QR:
+
+| Size | lowercase | uppercase |
+|---|---|---|
+| 6.0 | 178 | 195 |
+| 5.0 | 230 | 255 |
+| 4.4 | 284 | 318 |
+| 3.8 | 367 | 398 |
+| 3.4 | 429 | 501 |
+| 3.0 | 520 | 616 |
+
+These vary with content, so the implementation MUST solve for them by iteration
+(§6), never read them from this table.
 
 `charWidth` derives from the font, not the stroke, so the Plain grid is identical
 at `0.3*mm` and at `mm/3`. **Only the QR columns move with stroke width** — and
@@ -88,8 +118,14 @@ both.
 
 ```go
 // WrapText lays out s into engraved lines at a fixed pitch.
-// widthAt gives the usable character count of plate-absolute line i and MUST
-// return >= 1 for every i < maxLines; WrapText asserts this.
+//
+// widthAt is indexed by OUTPUT line (0 = the first line WrapText emits), NOT by
+// plate row. The caller supplies the plate-row offset inside the closure: the
+// free-text plate passes i+1 when a title occupies row 0; the descriptor callers
+// pass their paragraph's own base. Getting this wrong puts the first text line
+// on the title's row, or makes the fit check and the engraving disagree by one.
+// widthAt MUST return >= 1 for every output line 0 <= i < maxLines; WrapText
+// asserts this.
 // Returns ok=false if the composition needs more than maxLines lines; callers
 // MUST NOT engrave a false result.
 func WrapText(s string, widthAt func(line int) int, maxLines int) (lines []string, ok bool)
@@ -139,10 +175,12 @@ instead and are not additionally inset on the QR side — reproducing
 4. **Overlong-token fallback.** A word longer than `widthAt(i)` that is alone at
    the start of a line is character-broken at exactly `widthAt(i)`; the remainder
    continues on the next line. An xpub or URL must not deadlock the wrap.
-5. **The space rule, stated once.** A break consumes exactly the run of spaces at
-   the break point. Runs *not* at a break — including leading runs — are
-   preserved verbatim, so a plate may be a table. **A line never ends in a
-   space.**
+5. **The space rule, stated once, in precedence order.** (a) A break consumes
+   exactly the run of spaces at the break point. (b) Runs *not* at a break —
+   including a block's leading indent — are preserved verbatim, so a plate may be
+   a table. (c) Trailing spaces are then stripped from every emitted line, which
+   resolves the collision: a line whose whole content would be a space run is
+   emitted **empty**, and rule (c) always wins over (b) at end of line.
 6. Return `(partial, false)` the moment the line count would exceed `maxLines`,
    including mid-token.
 
@@ -163,7 +201,7 @@ confirm screen.
 **The QR's module count is obtained by calling `qr.Encode(text, qr.L)` and
 reading `.Size`. Never from a length table.** `qr.Encode` is mode-adaptive:
 measured, 106 lowercase chars → 37 modules, 106 uppercase → 33, 106 digits → 29;
-alphanumeric boundaries are 26/48/78/115/155. A 114-char uppercase string is 37
+alphanumeric boundaries are 26/48/78/115/155. A 114-char uppercase string is **33**
 modules and **one appended lowercase letter takes it to 41 — two version steps
 from one keystroke.** A byte-boundary table is simultaneously too pessimistic for
 uppercase and blind to the double step.
@@ -231,22 +269,35 @@ and BIP-85 index entry, and `ValidatePassphrase` rejects `'\n'` with
 `ErrNonASCII` — an unconditional key would give the passphrase program a key that
 silently fails at OK.
 
-Measured: adding a fifth function-row key keeps `TestPassphraseKeyboardStaysOnPanel`
-green, so panel fit is not the constraint. The tests that **do** break, and must
-be updated, are **`TestPassphraseKeyboardConstruction`** (asserts exactly four
-function-row keys, reveal at index 2) and
-**`TestPassphraseRevealKeyFitsBothLabels`**.
+**No existing keyboard test changes.** Measured on the opt-in design
+(`newPPKeyboard(ctx, newline bool)`, `NewPassphraseKeyboard`→false,
+`NewTextKeyboard`→true): the whole `gui` suite exits 0, because every existing
+test constructs `NewPassphraseKeyboard`, which is unchanged.
+
+In particular **`TestPassphraseKeyboardConstruction` MUST NOT be modified.** Its
+assertion that the shared function row has *exactly four* keys is precisely the
+guard that catches a newline key leaking into `NewAddressKeyboard` or BIP-85
+index entry. Rev 1 told the implementer to update it — that would disable the
+guard for a change that does not need it. (Round 0's measurement was taken under
+the *unconditional* design this section rejects: appended at index 4 only
+`TestPassphraseKeyboardConstruction` fails; both fail only if inserted before
+index 2.)
+
+Instead, add **new** construction and reachability tests for the free-text
+variant. The newline key is **appended to the end of the function row**, so the
+reveal key keeps index 2 — asserted at `passphrase_keyboard_test.go:200`.
 
 ### 7.2 Menu integration
 
-Insert after `engravePassphrase`. `bip85Derive` MUST remain last. Three sites are
-keyed in lockstep and all three must be updated together
-(`gui/gui.go:146-168`, `:1868`, `:1891-1899`, `:1902`):
+Insert after `engravePassphrase`. `bip85Derive` MUST remain last. **Two sites
+need hand-editing** (`gui/gui.go:146-168`, `:1891-1899`):
 
 1. the program enum,
-2. `npage` / `npages = int(bip85Derive)+1`,
-3. `layoutMainPlates`' case list — which **panics** on a program it does not
+2. `layoutMainPlates`' case list — which **panics** on a program it does not
    list.
+
+`npage` / `npages` are `int(bip85Derive)+1` (`:1868`, `:1902`) and update
+themselves, provided `bip85Derive` stays last.
 
 The pager goes from 7 to 8 dots, widening `(sz.X+space)*npages-space`. §11
 requires a start-screen panel-fit assertion at 8 dots.
@@ -258,7 +309,8 @@ requires a start-screen panel-fit assertion at 8 dots.
   is a screw-hole row, and full-width centering pushes a long title into the
   screw-hole band.
 - **Text** — the remaining rows.
-- **Footer** — plate row `LinesPerPlate-1`, absolute, not "after the text".
+- **Footer** — plate row `LinesPerPlate-1`, absolute, not "after the text";
+  **centered in the same inset span as the title**, for symmetry.
 - **QR** — right-hand side, 2mm border, text reflowing beside it; upstream
   `EngraveText` placement. **`QRScale = 2`**, normative: 0.6mm modules against the
   0.9mm every other plate uses, chosen because §4's capacity column depends on it
@@ -286,6 +338,9 @@ From `Gangleri42/seedhammer` (Unlicense; verified separately):
 1. **14 glyphs** into `font/sh/sh.svg`: `& \ | ^ $ = ! \` % + ? " ~ _`
 2. **`FontSizes`, `CharsPerLine`, `LinesPerPlate`, `fixedCharWidth`,
    `const plateSize`, `Text.FontSize`** in `backup/backup.go`.
+   **`Text.FontSize == 0` MUST fall back to `plateFontSizeUR`** — every existing
+   caller constructs `Text` without the field, so this fallback is exactly what
+   keeps the three `text-*` goldens byte-identical.
 
 **MUST NOT be taken** — the same file's diff also reworks *seed* plates
 (`stringColumn` signature, `.SourceOrder()` on titles, a `largeN` rebalance) and
@@ -322,9 +377,18 @@ symbols and glyphs taken.
 - Capacity tests run at `StrokeWidth = 0.3*mm`; a test at `mm/3` with a 33-module
   QR reproduces §4's column falsely and is forbidden.
 - §4.1's 82mm vertical and 81.8mm horizontal bounds.
-- Keyboard: `TestPassphraseKeyboardConstruction` and
-  `TestPassphraseRevealKeyFitsBothLabels` updated; the newline key absent from
-  address verification and BIP-85; every keyboard rune decodes in `font/sh`.
+- **A title and a footer at the 18-character cap sit inside
+  `[innerMargin, plateSize − innerMargin]` at EVERY rung** — the 6.0mm rung is the
+  binding one, where 20 characters already cross both screw-hole bands while
+  `toPlate` passes.
+- The refusal's "dropping the QR frees N characters" is computed from a live
+  encode, not a constant: at 3.0mm with a 700-character text the true figure is
+  640, where §4's geometry column would suggest ~135.
+- Keyboard: **no existing test modified** — `TestPassphraseKeyboardConstruction`'s
+  "exactly four function-row keys" stays as the anti-leak guard. New construction
+  and reachability tests for the free-text variant; the newline key absent from
+  address verification and BIP-85; the reveal key still at index 2; every rune the
+  keyboard can emit decodes in `font/sh`.
 - Start screen fits at 8 pager dots.
 - **Every fix verified by mutation.** A green suite proves nothing until the code
   is broken and the suite goes red.
