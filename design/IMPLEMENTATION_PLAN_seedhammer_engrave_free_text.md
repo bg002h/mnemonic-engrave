@@ -2,7 +2,8 @@
 
 > **For agentic workers:** implement task-by-task, test-first. Steps use `- [ ]`.
 
-**Status:** rev 3 — plan R0 rounds 0 (2C/6I), 1 (0C/3I), 2 (0C/2I) folded. Awaiting re-review.
+**Status: GREEN — plan R0 CLOSED (rev 3).** Rounds 0 (2C/6I), 1 (0C/3I) and
+2 (0C/2I) folded; round 3 returned 0C/0I. **Implementation may begin.**
 **Spec:** `design/SPEC_seedhammer_engrave_free_text.md` — **GREEN, R0 closed (rev 2)**.
 Read §5 before writing anything; the whole feature turns on it.
 
