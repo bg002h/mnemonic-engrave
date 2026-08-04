@@ -696,7 +696,12 @@ silent security downgrade.
 
 ## 4. Plate layout
 
-Plate is 85 × 85 mm; `innerMargin` 10 mm, `outerMargin` 3 mm; stroke 0.3 mm.
+Plate is 85 × 85 mm; `innerMargin` 10 mm, `outerMargin` 3 mm; **stroke
+0.3333 mm** (`StrokeWidth = mm/3`, `engrave/engrave_test.go:114` and
+`cmd/controller/platform_sh2.go:403`).
+
+**Correction, 2026-08-03 (found by Phase C).** Earlier drafts used 0.3 mm and
+every derived figure inherited an ~11% understatement.
 The passphrase is laid out one **10-character group per row**, reusing the
 existing column machinery — position implies index, and there are **no
 intra-row gaps** to be confused with the visible-space mark.
@@ -725,9 +730,13 @@ gives 33, as does any byte-mode passphrase ≤78 characters. Layout must therefo
 **centre the QR within a reserved 37-module envelope** rather than assume a fixed
 size, and tests must not assert exactly 37.
 
-At the worst case, 37 modules is **33.3 mm** at the standard `qrScale = 3`. Text
-and QR cannot both be full size (40 + 33.3 = 73 mm > 65 mm usable), so the text
-reflows:
+At the worst case, 37 modules is **37.0 mm** at the standard `qrScale = 3` — the
+module pitch is `3 × 0.3333 = 1.000 mm` exactly, not the 0.9 mm an earlier draft
+assumed. Text and QR cannot both be full size, so the text reflows:
+
+**Measured fit (Phase C):** 22.5 mm text + 2 mm gap + 37.0 mm QR = **61.5 mm**
+inside the 65 mm usable area. It fits, but the slack is **3.5 mm, not ~7 mm**.
+Do not spend that budget without re-measuring.
 
 - **5 rows × 20 characters**, em **≈ 4.5 mm**, QR beneath
 - x-height ≈ 2.0 mm ≈ **6.7 stroke widths**
