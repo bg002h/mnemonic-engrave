@@ -1094,7 +1094,11 @@ already the precedent for a non-navigable test path.
 #### Plate A — every glyph, QR on
 
 Passphrase: **all 95 printable ASCII in codepoint order**, `0x20`–`0x7E`, one
-each. Type it, enable the QR, engrave.
+each. **Seed FP `DEADBEEF`, Expected Comb FP `CAFEBABE`.** Enable the QR, engrave.
+
+(Both fingerprints are valid hex, canonicalise unchanged, and render as
+`DEAD BEEF` / `CAFE BABE`. They are obviously synthetic, so the plate labels
+itself a proof rather than resembling a backup.)
 
 What it proves:
 - every one of the 44 new glyphs actually cuts
@@ -1104,6 +1108,12 @@ What it proves:
   cannot distinguish them — it draws `_` for both, since `0x1F` is an
   engraving-face glyph the GUI's bitmap fonts cannot render. The plate is
   supposed to. **This plate is the test of whether that is true.**
+- **The mark versus a GENUINE space, also side by side.** A passphrase can never
+  engrave a literal `0x20` — §3.3 substitutes the mark for every space. But the
+  metadata bands *do* engrave real spaces: the fingerprint grouping
+  (`DEAD BEEF`) and the footer's word gaps. So the text block shows the mark and
+  the bands show real spaces, on one plate, in one session. That is the 96th
+  alphabet rune and the comparison no screen can show.
 - at 95 characters the QR is **dim 37**, the worst case. Scan it, and check the
   decoded string is byte-identical including the space.
 
