@@ -3,9 +3,9 @@
 **Status:** **AMENDED 2026-08-03, pending re-gate.** The original spec reached
 R0 GREEN (0C/0I) over three rounds, but Phase A Task 4 then hit a construction
 panic none of them found (`timeConstantPath` requires single-run glyphs). §3.5.0
-amends the design with per-run quantization and an accepted timing disclosure;
-that amendment is **normative security behaviour and needs its own R0 pass**
-before implementation resumes. Phase A Tasks 1-3 are complete and unaffected.
+amends the design with per-run quantization and an accepted timing disclosure.
+**R0 round 0 on the amendment: NOT GREEN (2C/4I) — all findings folded
+2026-08-03, pending re-review.** Phase A Tasks 1-3 are complete and unaffected.
 
 **Original status:** R0 GATE GREEN (0C/0I) as of 2026-08-03 — implementation may begin.
 Three rounds: fable (2C/6I) → opus (0C/4I) → sonnet verification (GREEN). This
@@ -265,12 +265,14 @@ one.** Every one must be satisfied or the device panics:
 
 | # | Check | Site | Panic | When |
 |---|---|---|---|---|
-| 1 | `face.Decode(r)` | `engrave.go:1363` | `:1365` | engrave |
-| 2 | `ConstantStringer` alphabet lookup | `engrave.go:1282` | `:1286` | engrave |
-| 3 | uniform advance | `engrave.go:1216` | `:1218` | construction |
-| 4 | alphabet in ascending codepoint order | `engrave.go:1208` | `:1210` | construction |
-| 5 | every alphabet rune decodes in the face | `engrave.go:1213` | `:1215` | construction |
+| 1 | `face.Decode(r)` — **metadata path only**; the passphrase's decode gate is `paddedString`'s `panic("unreachable")` | `engrave.go:1388` | `:1390` | engrave |
+| 2 | `ConstantStringer` alphabet lookup | `engrave.go:1309` | `:1313` | engrave |
+| 3 | uniform advance | `engrave.go:1241` | `:1243` | construction |
+| 4 | alphabet in ascending codepoint order | `engrave.go:1233` | `:1235` | construction |
+| 5 | every alphabet rune decodes in the face | `engrave.go:1238` | `:1240` | construction |
 | 6 | each glyph is ONE continuous engrave run | `engrave.go:1178` | `:1181` | construction |
+| 7 | a padded block is fully consumed before the next | `engrave.go:1076` | `:1077` | **engrave** |
+| 8 | a block's actual duration ≤ its pad target | `engrave.go:1073` | `:1075` | **engrave** |
 
 Check 2 is **independent of the face** — a binary search over the alphabet, not a
 `Decode` call — so extending the font alone does **not** make the engrave path
@@ -284,7 +286,13 @@ Three earlier drafts of this spec understated this table — first claiming
 A Task 4 tried to build the alphabet for real, having survived three spec review
 rounds and a plan review; §3.5.0 amends the design around it.
 
-**This table lists six KNOWN checks. It does not claim to be exhaustive.** Three
+**Checks 7-8 fire at ENGRAVE time, not construction** — so they survive a green
+test suite and crash the device mid-plate. §3.5.0's zero-run case is an instance
+of check 7. Related engrave-time panics in the same routine: `delay during
+spline` (`:1052-1054`), `unaligned delay` (`:1098-1100`), and `paddedString`'s
+`unclamped spline` (`:1322`).
+
+**This table lists eight KNOWN checks. It does not claim to be exhaustive.** Three
 successive drafts asserted completeness and three were wrong, all in the same
 direction — construction-time invariants that never fire during normal operation
 and are therefore invisible until an alphabet exercises them. Treat any new panic
@@ -339,7 +347,7 @@ travelling between disjoint parts engraves a visible connector. So:
 | | Glyphs | |
 |---|---|---|
 | Reducible | `x` `#` `*` `$` | parts intersect; retraceable, as uppercase `X` already is |
-| Reducible with redesign | `%` | only if the dots are moved to touch the slash |
+| **Resolved** | `%` | redrawn 2026-08-03: full-height slash with the top-left box joined at its top edge; bottom box detached. **3 parts -> 2**, validated visually. Max k = 2 holds. |
 | **Irreducible** | `=` `"` | parallel disjoint bars, no shared point |
 | **Irreducible** | `i` `j` `!` `:` `;` `?` | the detached dot *is* the glyph — join it and `i` becomes `l` |
 
@@ -354,64 +362,128 @@ alphabet; a k-part glyph emits k padded runs and costs k units.
 This reuses the existing padding machinery rather than inventing a second timing
 model — it is a smaller change than padding per-glyph totals would be.
 
+#### Required code changes (normative)
+
+The amendment is **not** a drop-in reuse of the existing machinery. Four changes
+are required, three of which are invariants:
+
+- **(i)** `timeConstantPath` (`engrave.go:1170-1189`) returns one `constantPlan`
+  **per run**; `constantRune.Info` (`:786`) becomes a slice.
+- **(ii)** `newConstantStringer`'s bounds accumulation (`:1247-1250`) must cover
+  **every run's** start and end, not the first start and last end —
+  `startEndDist` and `center` bound every padded move (`:1294-1296`).
+- **(iii)** `paddedString` must split the spline at run boundaries. The boundary
+  is encoded as a `Line`-flag flip **inside a shared clamped control-point
+  triple** (measured on `:`: the run-1 end triple is flagged T,T,F, the run-2
+  start triple F,F,T). The existing `for range 3 { spline.Next() }` skip
+  (`:1320-1324`) does **not** generalise. §3.5.1.1's "no glyph may start at
+  (0,0)" now applies to **every run's** start.
+- **(iv)** `dot.X` advances once per **glyph**, not per run (`:1336`). Getting
+  this wrong breaks §4's "position implies index" and draws the plate wrong.
+
+Each run's `Delay` denominator must equal that run's flush duration exactly, or
+`timeScaler` panics `unaligned delay` (`:1099`) or `scale already in effect`
+(`:1077`).
+
 **Reduce k before quantizing.** The five reducible glyphs above MUST be redrawn
 as single strokes. `#` and `*` are 4 parts today, so an un-redrawn `#` would cost
 **4 units**. After the redraw, max k = 2 and the worst case is bounded at `2L`.
 
-#### Zero-run glyphs — space MUST cost one unit
+**Budget constraint (I2).** The redraws convert pen-up moves into retraced
+engraving, which is slower per unit distance and adds retraced length. Measured
+`runeDuration` is **181080 ticks**, set by `8`. A single-stroke `$` must retrace
+much of the S to reach its bar and could plausibly exceed that — becoming the new
+`runeDuration` and inflating the cost of **all 96 glyphs**, since every run is
+padded to it. **The redrawn glyphs MUST NOT become the longest single run.**
+Re-measure `runeDuration` after the redraws and restate the worst case in
+absolute time; `2L` is expressed in a unit the redraw can itself inflate.
 
-`0x20` is a **blank advance**: no SVG element, no knots, **zero engrave runs**.
-Under the per-glyph model it still costs a full unit (an empty engrave plus full
-`Delay` padding). Under per-run quantization, zero runs would naively cost
-**zero time**, making spaces free and disclosing them exactly.
+#### Zero-run glyphs — the mechanism, not the outcome
 
-**Rule: `k = max(runs, 1)`.** A glyph with no runs emits one empty padded run.
-Space therefore costs one unit, as it does today.
+**Corrected after R0 round 0 (C2). The earlier rule `k = max(runs, 1)` was
+justified by a behaviour that does not exist, and implemented literally it
+panics.**
 
-Note this is not merely defensive bookkeeping — without it the scheme would leak
-more than the disclosure below admits, because `T` would count non-space
-characters only.
+`0x20` has advance 600 and an **empty spline** (`cmd/vectorfont/main.go:331-333`
+sets `Index[' '] = Glyph{Advance: meta.Advance}`; Start = End = 0). It does **not**
+"cost one unit today": `paddedString` would emit `Delay(0, runeDuration)`
+(`engrave.go:1328`) followed by **no knots at all**, leaving `timeScaler` holding
+`rem = runeDuration`, so the next `DelayMove` trips `Reset`'s `if s.rem > 0`
+guard and panics **`scale already in effect`** (`:1076-1078`). The `denom == 0`
+special case (`:1093-1095`) rescues a zero-*distance* move, which still emits
+knots — not a zero-*knot* spline. This was measured, not reasoned.
 
-**Related, and worth stating so an implementer does not "optimise" it away:** the
-engraved passphrase never actually contains `0x20`. §3.3 translates every space
-to the visible-space mark at `0x1F` (a normal single-run glyph, cost 1) before
-layout. `0x20` is nonetheless present in the passphrase alphabet — the alphabet
-is all 95 printable ASCII by construction — so `NewConstantStringer` builds a
-plan for it at construction time and the `max(runs, 1)` rule must hold there
-regardless of whether it is ever engraved. Do not remove `0x20` from the alphabet
-to dodge this; validation accepts spaces in input, and the alphabet is the
-contract.
+Note the failure mode: that panic fires at **engrave** time, not construction.
+Construction succeeds, §7's alphabet test passes, and the device crashes
+mid-plate.
 
-#### The accepted disclosure
+**The rule:** for a glyph with zero runs, emit a single
+`DelayMove(conf, totalDur + runeDuration, pen, dot)` and **no** separate `Delay`,
+so the move's own knots absorb the whole unit and the `denom == 0` path applies
+correctly.
 
-Engraving time becomes **content-dependent**, which today's property forbids.
-Stated exactly:
+**Two assertions are required, because this path is currently unreachable and
+will stay untested otherwise:**
+
+1. A construction-time assertion that no alphabet rune has zero runs unless the
+   `DelayMove` path above is taken.
+2. `0x20` **must never reach the stringer.** §3.3 translates every space to the
+   `0x1F` mark before layout, which is what masks this today — an invariant the
+   earlier draft never named as load-bearing while simultaneously forbidding
+   `0x20`'s removal from the alphabet. State it as load-bearing.
+
+#### The accepted disclosure — stated at ROW granularity
+
+**Corrected after R0 round 0 (C1). An earlier draft stated this per plate and was
+wrong by roughly 10×; the user re-accepted against the statement below.**
+
+The passphrase is **not** engraved as one padded call. §4 lays it out as
+10-character rows through `stringColumn` (`backup/backup.go:268-276`), which
+issues **one `ConstantStringer.String` call per row**. Each call is bookended by
+blocks whose durations differ from the intra-row `advDur` — an unpadded `Move`
+(`engrave.go:1292`), a `centerDur` opening block (`:1296-1297`), a `padDur`
+closing block (`:1343`). **Rows are therefore separable in the tick stream.**
+
+And every full row is exactly 10 characters — that is §4's "position implies
+index" property, deliberately chosen. So `L_row` is **public by construction**.
+
+What an observer actually recovers:
 
 ```
-T = m·1 + n·2 = L + n
+T_row = 10 + n_row        ->    n_row = T_row - 10     EXACTLY, per row
 ```
 
-`L` = passphrase length, `n` = count of two-part glyphs, `T` = observed units.
+- `n_row` — the number of two-run glyphs (`= " i j ! : ; ?`) in that decade —
+  is disclosed **exactly**, for **every row**. A 100-character passphrase yields
+  ten precise counts, not one aggregate.
+- `L` is disclosed to within the final row, from the row count alone.
+- No side knowledge is required. The layout supplies what the earlier draft
+  claimed an attacker would have to obtain independently.
 
-- An observer measures **only `T`** — a blend. Extracting `n` requires already
-  knowing `L`; extracting `L` requires already knowing `n`.
-- With neither, they learn `L ∈ [T/2, T]`. **Today's scheme leaks `L` exactly**,
-  so in the no-side-knowledge case this discloses *less* about length.
-- The genuine violation: two passphrases of **equal length** can differ in
-  duration. An attacker who knows `L`, can time the machine, and gains from
-  learning how many of `= " i j ! : ; ?` are present (8 of 95 characters) learns
-  that much.
+**This is accepted** (user decision, 2026-08-03, against this corrected
+statement). The attack still requires physical proximity to an air-gapped device
+the owner controls, timing resolution fine enough to segment rows, and yields a
+per-decade count over 8 of 95 characters. Rejected alternatives: engraving the
+whole passphrase through a single padded call (restores aggregate-only
+observability but requires reworking §4's row layout), dropping the eight glyphs
+(breaks D3), and uniform k-unit padding (fully constant, doubles engraving time).
 
-**This is accepted** (user decision, 2026-08-03). The attack requires physical
-proximity to an air-gapped device the owner controls, plus independent knowledge
-of the length, to recover a weak statistic. Rejected alternatives: dropping the
-eight glyphs (breaks D3's all-95-ASCII guarantee), and uniform k-unit padding for
-every glyph (fully constant, but doubles engraving time to conceal a signal that
-motion already reveals to any observer able to resolve individual pen-lifts).
+**`PaddedString` loses a stronger guarantee (I4).** `paddedString` runs exactly
+`longest` slots regardless of content, repeating runes to fill
+(`engrave.go:1303-1338`), which today makes a `PaddedString` call's duration
+independent of the string *including its length within `[shortest, longest]`* —
+the property seed plates rely on and `TestConstantWords` asserts. Under per-run,
+`T = Σ k(rune at slot)` depends on content and on which runes get repeated.
+**`PaddedString` MUST NOT be used with a multi-run alphabet**; the passphrase
+path uses `String`. (This also means "today leaks `L` exactly" is true only of
+the `String` path — on the `PaddedString` path today's scheme leaks nothing.)
 
-#### Consequences for §3.4
+**Do not restate this as an aggregate.** Any future edit that reintroduces
+"an observer measures only `T`" is reintroducing C1.
 
-§3.4's table must gain a sixth row — `timeConstantPath` / `engrave.go:1181` /
+#### Consequences for §3.4 (applied)
+
+§3.4's table gained a sixth row — `timeConstantPath` / `engrave.go:1181` /
 "broken path" / construction — and drop its claim of completeness. Two earlier
 drafts of that table were wrong in the same direction; the count is now six
 *known* checks, and the table should say so rather than assert exhaustiveness a
@@ -820,6 +892,18 @@ anywhere, since inserting shifts the numeric value of every later program.
 - **Existing-output invariance:** goldens for current plate types must be
   byte-identical after the font change, and `ConstantStringer`'s `runeDuration`
   regression (§3.5.1) must be measured and reported.
+- **Per-run timing (§3.5.0) — the amendment's normative behaviour, currently
+  unguarded:** (a) two passphrases of equal length with equal per-row multi-run
+  counts must produce **identical** `ProfileSpline` output — the weakened form of
+  `TestConstantWords` (`engrave/engrave_test.go:192-215`), which asserts
+  `refProf.Equal(prof)` across all BIP-39 words and is exactly the assertion
+  per-run quantization weakens; (b) per-run blocks are uniform, so no *position*
+  leak arises within a row; (c) the disclosure bound itself — `T_row = 10 +
+  n_row` — holds for constructed worst cases.
+- **Zero-run path (§3.5.0):** engrave a string containing a zero-run glyph
+  through the real plate path and assert no panic. §7's existing no-panic bullet
+  does **not** cover this, because §3.3 strips `0x20` before layout — so the test
+  must exercise the stringer directly.
 
 ---
 
