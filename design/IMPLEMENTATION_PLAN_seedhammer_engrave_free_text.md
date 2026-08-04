@@ -2,6 +2,7 @@
 
 > **For agentic workers:** implement task-by-task, test-first. Steps use `- [ ]`.
 
+**Status:** rev 1 — plan R0 round 0 folded (2C/6I). Awaiting re-review.
 **Spec:** `design/SPEC_seedhammer_engrave_free_text.md` — **GREEN, R0 closed (rev 2)**.
 Read §5 before writing anything; the whole feature turns on it.
 
@@ -11,7 +12,14 @@ title and footer.
 
 **Architecture:** one wrapping function (`backup.WrapText`) serves three callers
 — the confirm screen, the engraver, and the fit check. `EngraveText` is refactored
-to consume pre-wrapped lines. Everything else is assembly.
+to wrap internally. A **new** `backup.EngraveFreeText` lays out the free-text
+plate: title, wrapped body, footer, QR, at the fitted size.
+
+**"Everything else is assembly" was wrong** and round 0 caught it: there is no
+existing code that engraves a title on a text plate. The nearest pattern
+(`backup/backup.go:153-160`, `:242-249`) centers on the **full plate width** and
+calls `strings.ToUpper` — precisely the silently-wrong plate spec §2 measured. Do
+not copy it.
 
 **Tech stack:** Go (TinyGo target), `nix develop --command go test ./...`.
 
@@ -79,18 +87,24 @@ func TestSHCoversPrintableASCII(t *testing.T) {
 - [ ] **A1.4 — regenerate** in a throwaway worktree:
       `cd font/sh && nix develop --command go generate ./...`
 - [ ] **A1.5 — run A1.1; expect PASS.** Then `nix develop --command go test ./...`; expect exit 0.
-- [ ] **A1.6 — render and eyeball.** `cmd/vectorfont -dump` the result and confirm
-      the 14 new glyphs look like the rest of the face.
-- [ ] **A1.7 — assert no existing glyph moved.** New test:
+- [ ] **A1.6 — render and eyeball.** `-dump` takes an OUTPUT path and the tool
+      still needs its two positional args:
+      `nix develop --command go run seedhammer.com/cmd/vectorfont -package sh -scale 1000 -dump /tmp/sh-dump.svg sh.svg sh`
+      then `rsvg-convert` it. Confirm the 14 new glyphs match the face.
+- [ ] **A1.7 — assert no existing glyph moved, by DUMP COMPARISON.** An empty Go
+      test passes, so do not ship a stub. Before A1.3, dump every existing glyph:
 
-```go
-// The import must be purely additive: an existing glyph's outline changing
-// would silently alter every descriptor plate ever engraved.
-func TestSHExistingGlyphsUnchanged(t *testing.T) {
-	// Pin a sample of pre-import advances/segment counts captured before A1.3.
-	// (Capture them in A1.2 and paste here — do not compute from the new font.)
-}
+```sh
+# capture BEFORE the import
+nix develop --command go run seedhammer.com/cmd/vectorfont -package sh -scale 1000 \
+  -dump /tmp/sh-before.svg font/sh/sh.svg sh
 ```
+
+      After A1.4, dump again to `/tmp/sh-after.svg` and assert that every
+      `<path id=…>` present in *before* is byte-identical in *after* — additions
+      only. A shell/py check committed as `font/sh/import-check.md` with both
+      dumps' hashes is sufficient; the standing guard thereafter is A1.5's golden
+      run, since all three `text-*` goldens engrave with `sh.Font`.
 
 - [ ] **A1.8 — PROVENANCE.md.** Add under *Imports*: source repo, exact commit,
       the 14 glyph ids, licence (Unlicense), obligations (none). State that the
@@ -115,8 +129,22 @@ The riskiest phase: it touches descriptor plates, which have goldens.
       `CharsPerLine` → 22/26/30/34/38/44, `LinesPerPlate` → 13/15/17/20/23/26.
 - [ ] **B1.2 — run; expect FAIL** (symbols undefined).
 - [ ] **B1.3 — add** `const plateSize = 85`, `FontSizes`, `CharsPerLine`,
-      `LinesPerPlate`, `fixedCharWidth` exactly as spec §10 lists. Add
-      `Text.FontSize float32`.
+      `LinesPerPlate`, and `Text.FontSize float32`. `fixedCharWidth` is the
+      private helper the other two share — spec §10 names it but gives no body:
+
+```go
+// fixedCharWidth is the character advance at fontSize machine units, assuming a
+// fixed-width face. Verified: every font/sh advance is 4000 with
+// Metrics{Ascent:5000, Height:6700}, so 'W' is exact for all glyphs.
+func fixedCharWidth(fnt *vector.Face, fontSize int) int {
+	w, _, ok := fnt.Decode('W')
+	if !ok {
+		panic("W not in font")
+	}
+	return int(float32(w*fontSize) / float32(fnt.Metrics().Height))
+}
+```
+
 - [ ] **B1.4 — `FontSize == 0` falls back to `plateFontSizeUR`.** Test it
       explicitly: this is what keeps the `text-*` goldens identical.
 - [ ] **B1.5 — run; expect PASS**, full suite exit 0, goldens unmoved.
@@ -127,7 +155,10 @@ The riskiest phase: it touches descriptor plates, which have goldens.
 **Files:** `backup/wrap.go` (new), `backup/wrap_test.go` (new)
 
 Signature and semantics are spec §5 verbatim. `widthAt` is indexed by **output
-line**; the caller supplies the plate-row offset.
+line**; the caller supplies the plate-row offset. For the descriptor path that
+offset is **not row-aligned** — paragraphs after the first advance `offy` by
+`lineno*fontSize + 1mm` (`backup/backup.go:363-367`) — so the closure must
+capture `offy` in **device units**, not as a row index.
 
 - [ ] **B2.1 — failing tests, one per rule.** At minimum:
 
@@ -162,20 +193,40 @@ this is the point)
 - [ ] **B3.1 — failing test:** the three `text-*` goldens must be byte-identical
       after the refactor. They already exist; the test is that they still pass
       **without `-update`**.
-- [ ] **B3.2 — refactor.** `EngraveText` takes pre-wrapped lines. The descriptor
-      and mdmk callers (`gui/gui.go:455`, `:1969`) keep an **unbounded** path —
-      their TEXT+QR → TEXT-ONLY → QR-ONLY fallback depends on `toPlate`
-      rejecting overflow, and bolting a `maxLines` refusal in would silently
-      change it.
+- [ ] **B3.2 — refactor, keeping the geometry PRIVATE.** `EngraveText` keeps its
+      current signature and its private locals (`charWidth`, `holeChars`,
+      `holeLines`, `charPerLine`, `charPerQRLine`, `qrLines`, `offy`) and calls
+      `WrapText` **internally** via a `widthAt` closure. Do **not** change the
+      signature to accept `lines []string`: that forces every one of those
+      golden-critical derivations to be reconstructed at `gui/gui.go:455` and
+      `:1969`, with no home for the arithmetic. Round 0 measured both readings —
+      only this one keeps the goldens.
+      The descriptor and mdmk callers keep an **unbounded** path; their
+      TEXT+QR → TEXT-ONLY → QR-ONLY fallback depends on `toPlate` rejecting
+      overflow, and bolting a `maxLines` refusal in would silently change it.
+
+- [ ] **B3.2a — EMPTY TEXT MUST ENGRAVE ZERO LINES.** Both callers build a
+      QR-ONLY variant with `Text: ""` (`gui/gui.go:443`, `:1959`) and it is
+      golden-covered (`TestText` case 3, `text-2-shards-1.bin`). Today zero lines
+      triggers the `len(p.Text) == 0` branch that **centers** the QR. Spec §5.2's
+      empty-block rule makes `WrapText("")` return **one** empty line — that rule
+      serves the free-text plate **only**. So: special-case `len(p.Text) == 0`
+      before wrapping, and keep the centering test keyed to the **original text**,
+      never to `len(lines)`.
+      Measured: keying it to `len(lines)` fails `TestText/2-shards-1` with
+      45281/45282 knot mismatches and displaces the QR by (6.450, 2.300)mm at
+      production stroke. Add a test asserting the QR-ONLY paragraph still centers.
 - [ ] **B3.3 — the line-producing path must reproduce `n` bit-for-bit**, including
       `if n < 1 { n = 1 }` (`backup/backup.go:341-343`). Descriptor text contains
       no spaces, so greedy fill plus break-at-exactly-`widthAt(i)` reduces to the
       existing `txt[:n]` — that equivalence is why the goldens survive. Pin it:
 
 ```go
-// The refactor is only safe because descriptor text has no spaces. If that ever
-// changes, the goldens move and this test says why.
-func TestDescriptorTextHasNoSpaces(t *testing.T)
+// The refactor is only safe because descriptor text contains neither spaces NOR
+// newlines: a space would change the greedy fill, and a '\n' would split into
+// blocks under spec 5.2 rule 1, whereas today engrave.String handles '\n'
+// inside a sliced chunk. Measured: both golden inputs have zero of each.
+func TestDescriptorTextHasNoSpacesOrNewlines(t *testing.T)
 ```
 
 - [ ] **B3.4 — run full suite; expect exit 0 and zero golden churn**
@@ -199,10 +250,27 @@ suite exit 0.
       (6.0 → `[0 1 12]` … 3.0 → `[0 1 2 24 25]`), `holeChars` 2/3/3/4/4/4, and
       §4's Plain (274…1104) and +title+footer (238…1032) columns at production
       stroke.
-- [ ] **C1.2 — implement** `Fit(params, text, title, footer string, qr bool) (fontMM float32, lines []string, ok bool)`,
-      trying `FontSizes` largest-first and returning the first that fits.
+- [ ] **C1.2 — implement THREE entry points.** `Fit` alone cannot answer the
+      questions C1.6/C1.8/D2.3/D2.7 ask:
+
+```go
+// Fit: the largest rung whose layout holds the composition.
+func Fit(params engrave.Params, text, title, footer string, qr bool) (fontMM float32, lines []string, err error)
+
+// Admissible: spec 6's anchor -- 3.0mm, QR as chosen, BOTH title and footer rows
+// reserved whether or not they are used. linesAvail is defined even when ok is
+// false, so the UI can show "lines used / lines available" over capacity.
+func Admissible(params engrave.Params, text, title, footer string, qr bool) (linesUsed, linesAvail int, ok bool)
+
+// MaxCharsAt: capacity solver behind the refusal message's live figure.
+func MaxCharsAt(params engrave.Params, fontMM float32, text string, qr bool) int
+```
+
       `widthAt` composes §5.1's band predicate with the QR narrowing and the
-      caller's plate-row offset.
+      caller's plate-row offset. **`Fit` returns an `error`**: `qr.Encode` fails
+      at **2954 bytes and above** (measured; fine at 2953), and D2.2 accepts
+      keystrokes without limit, so that input is reachable. Never ignore it — a
+      nil `*qr.Code` dereferences in a live per-keystroke path.
 - [ ] **C1.3 — QR size comes from `qr.Encode(text, qr.L).Size`.** Never a length
       table. Tests: 106 lower→37, 106 upper→33, 106 digit→29, 114 upper→**33**,
       114 upper + one lowercase→**41** (two versions from one keystroke).
@@ -224,8 +292,41 @@ suite exit 0.
       table. Each must turn the suite red.
 - [ ] **C1.10 — commit.**
 
+### Task C2 — the free-text plate engraver *(added: round 0 found nothing engraved it)*
+
+**Files:** `backup/freetext.go` (new), `backup/freetext_test.go` (new),
+`backup/testdata/freetext-*.bin` (new goldens)
+
+```go
+// EngraveFreeText lays out the free-text plate per spec 8. title and footer are
+// engraved VERBATIM -- never through TitleString, which upper-cases and
+// truncates at 18 -- and are centered in the INSET SPAN, not the full width.
+func EngraveFreeText(params engrave.Params, fontMM float32,
+	title string, lines []string, footer string, qrc *qr.Code) engrave.Engraving
+```
+
+- [ ] **C2.1 — failing tests.** Title on plate row 0, footer on row
+      `LinesPerPlate-1`, body between them, QR right-hand side at `QRScale = 2`.
+- [ ] **C2.2 — centering is in the inset span** `[holeChars*charWidth,
+      width − holeChars*charWidth]`. **Do not copy `backup/backup.go:153-160`** —
+      it centers on the full plate width, which spec §2 measured as the
+      silently-wrong plate: a 20-char title at 6.0mm inks `x[7.127, 77.962]`mm,
+      crossing both screw-hole bands while every check passes.
+- [ ] **C2.3 — title and footer engraved verbatim.** Mutation: route either
+      through `TitleString` — a lowercase title must go red.
+- [ ] **C2.4 — the 18-char cap holds at EVERY rung** (moved here from C1.7, which
+      had no code under test): a title and footer at the cap sit inside
+      `[innerMargin, plateSize − innerMargin]`. Use true ink bounds via
+      `bspline.Measure` and the worst-case glyph `W`. Slack at 6.0mm is ~0.62mm —
+      tight by design.
+- [ ] **C2.5 — new goldens** for a representative plate with and without a QR.
+      New goldens are permitted; existing ones are not to move.
+- [ ] **C2.6 — mutation-verify:** center on full width (C2.4 must fire), drop the
+      footer row, place the QR at `QRScale = 3`.
+- [ ] **C2.7 — commit.**
+
 **Exit criteria:** every number in spec §4 and §5.1 pinned by a test at production
-stroke; mutations killed.
+stroke; the free-text plate has its own engraver and goldens; mutations killed.
 
 ---
 
@@ -244,6 +345,10 @@ stroke; mutations killed.
       reachable by touch on every page at `sh2DisplaySize`.
 - [ ] **D1.3 — implement** `newPPKeyboard(ctx, newline bool)`;
       `NewPassphraseKeyboard` passes `false`, `NewTextKeyboard` passes `true`.
+      **Label the key `"nl"`** (measured 285px row, against a 480px panel;
+      `"enter"` 329 and `"return"` 342 also fit). **Do not use `"↵"`** — it
+      measures **0px** in `ctx.Styles.keyboard`, giving an 8px tap target that a
+      synthetic touch test would still pass.
 - [ ] **D1.4 — run; expect PASS and the whole existing gui suite exit 0 with zero
       existing test files touched.** If any existing test needed changing, the
       design is wrong — stop and re-read §7.1.
@@ -287,19 +392,43 @@ func TestConfirmLinesEqualWrapText(t *testing.T)
 
 ### Task D3 — menu integration
 
-**Files:** `gui/gui.go` (modify), `gui/start_screen_touch_test.go` (modify)
+**Files:** `gui/gui.go` (modify) and **six** existing test files, measured — not
+one. Inserting the program renumbers hardcoded Right-press counts in:
+`gui/start_screen_touch_test.go`, plus the files holding
+`TestBip85DeriveProgramNavigable`, `TestEngraveBundleProgramNavigable`,
+`TestEngraveXpubProgramNavigable`, `TestEngraveMultisigProgramNavigable`,
+`TestEngraveSingleSigProgramNavigable`.
+**The only permitted edit is the navigation index / expected title — never the
+assertion.** This is the one sanctioned exception to D1.4's "if an existing test
+needs changing, stop".
 
 - [ ] **D3.1 — failing test:** eight programs reachable **by touch**, the new one
       third, and the start screen fits at 8 pager dots at `sh2DisplaySize`.
       Touch, not synthesized `ButtonEvent`s — five of six programs were once
       unreachable on hardware while every button-driven test passed.
-- [ ] **D3.2 — two sites need hand-editing** (§7.2): the program enum, and
-      `layoutMainPlates`' case list, which **panics** on a program it does not
-      list. `npage`/`npages` are `int(bip85Derive)+1` and update themselves —
+- [ ] **D3.2 — FOUR sites need hand-editing**, measured (spec §7.2 undercounted):
+      1. the program enum (`gui/gui.go:147-158`),
+      2. the flow dispatch `switch act.prog` (`:1506-1533`) — **no default**, so a
+         missing case falls through with `obj == nil` into
+         `engraveObjectFlow(ctx, th, nil)`,
+      3. the title switch (`:1676-1691`) — no default, so a missing case renders a
+         blank title,
+      4. `layoutMainPlates`' case list (`:1893`), which **panics** on a program it
+         does not list.
+      `npage`/`npages` are `int(bip85Derive)+1` and update themselves —
       `bip85Derive` MUST remain last.
+
+- [ ] **D3.2a — press OK on the new entry.** D3.1 proves the program is
+      *reachable in the carousel*; D2 drives the flow directly. Neither selects it
+      from the menu. Without this test the feature can ship with a **dead menu
+      item and a fully green suite**. Assert on a string only the free-text flow
+      renders.
 - [ ] **D3.3 — run; expect PASS**, full suite exit 0.
-- [ ] **D3.4 — mutation-verify:** omit the program from `layoutMainPlates` → panic;
-      insert it after `bip85Derive` → pager/enum drift.
+- [ ] **D3.4 — mutation-verify:** omit the program from `layoutMainPlates` →
+      panic; omit the flow-dispatch case → D3.2a fails (not a panic — it silently
+      enters `engraveObjectFlow` with a nil object); omit the title case → blank
+      title. Note inserting after `bip85Derive` trips the compile-time guard at
+      `gui/gui.go:168` — a **build failure**, not pager drift.
 - [ ] **D3.5 — commit.**
 
 ### Task D4 — safety copy
