@@ -966,7 +966,7 @@ anywhere, since inserting shifts the numeric value of every later program.
 |---|---|---|
 | O1 | Hardware legibility check of lowercase at 4.5 mm and 6 mm em, **including every confusable pair enumerated in §3.2.1** | before feature is called done |
 | O2 | Confirm `program` enum values are not persisted | implementation |
-| O3 | Final visible-space mark shape (must not resemble any real glyph) | font authoring |
+| O3 | ~~Final visible-space mark shape~~ **RESOLVED 2026-08-03.** Low bar at `y9` with a central spike to `y6`. Replaced an earlier form that was the *identical shape* to `u` (both an open-top box, differing only in height and depth) — the worst collision available, since misreading the mark as a letter silently yields a different wallet. User reviewed the rendered glyph in running text and in the legend line and confirmed the low position: it reads as a floor mark between characters, which is where transcription actually happens. It sits visibly below the uppercase legend text as a result; accepted. | closed |
 | O4 | Exact legend + footer wording, once measured at 3 mm in the margin bands | layout |
 | O5 | Confirm the separate passphrase `ConstantStringer` leaves existing goldens byte-identical (§3.5.1). If the shared alphabet is ever widened instead, `runeDuration`, `startEndDist` AND `center` must all be measured, and §7 must name which goldens change and why | implementation |
 | O6 | Derive version-5/6 module maxima for `constantTimeQRModules` by extending the fuzz corpus (`engrave/testdata/fuzz`) — NOT by estimation — and confirm all three §3.5.2 sites change together. If impractical, cap the passphrase at 78 chars when QR is enabled; **never** fall back to non-constant-time `engrave.QR` | implementation |
