@@ -248,7 +248,7 @@ engraver:
 
 ```go
 func ValidatePassphrase(s string) error   // typed errors, see below
-func ValidateFingerprint(s string) error  // "" ok; else exactly 8 hex digits
+func ValidateFingerprint(s string) (canonical string, err error)  // "" ok; else 8 hex digits
 ```
 
 `ValidatePassphrase` rejects, with a distinct error for each so the UI can
