@@ -260,19 +260,19 @@ explain precisely:
 | ASCII the face cannot decode | **must be unreachable** after the font work — asserted, not assumed |
 | ASCII not in `constantAlphabet` | **must be unreachable** after §3.5 — asserted, not assumed |
 
-**This gate is load-bearing, and there are FIVE charset checks on the path, not
-one.** Every one must be satisfied or the device panics:
+**This gate is load-bearing, and it is not the only check on the path.** Eight
+are known — six charset checks and two timing checks: Every one must be satisfied or the device panics:
 
 | # | Check | Site | Panic | When |
 |---|---|---|---|---|
-| 1 | `face.Decode(r)` — **metadata path only**; the passphrase's decode gate is `paddedString`'s `panic("unreachable")` | `engrave.go:1388` | `:1390` | engrave |
-| 2 | `ConstantStringer` alphabet lookup | `engrave.go:1309` | `:1313` | engrave |
-| 3 | uniform advance | `engrave.go:1241` | `:1243` | construction |
-| 4 | alphabet in ascending codepoint order | `engrave.go:1233` | `:1235` | construction |
-| 5 | every alphabet rune decodes in the face | `engrave.go:1238` | `:1240` | construction |
-| 6 | each glyph is ONE continuous engrave run | `engrave.go:1178` | `:1181` | construction |
+| 1 | `face.Decode(r)` — **metadata path only**; the passphrase's decode gate is `paddedString`'s `panic("unreachable")` | `engrave.go:1386` | `:1388` | engrave |
+| 2 | `ConstantStringer` alphabet lookup | `engrave.go:1305` | `:1309` | engrave |
+| 3 | uniform advance | `engrave.go:1240` | `:1241` | construction |
+| 4 | alphabet in ascending codepoint order | `engrave.go:1232` | `:1233` | construction |
+| 5 | every alphabet rune decodes in the face | `engrave.go:1237` | `:1238` | construction |
+| 6 | each glyph is ONE continuous engrave run | `engrave.go:1180` | `:1181` | construction |
 | 7 | a padded block is fully consumed before the next | `engrave.go:1076` | `:1077` | **engrave** |
-| 8 | a block's actual duration ≤ its pad target | `engrave.go:1073` | `:1075` | **engrave** |
+| 8 | a block's actual duration ≤ its pad target | `engrave.go:1073` | `:1074` | **engrave** |
 
 Check 2 is **independent of the face** — a binary search over the alphabet, not a
 `Decode` call — so extending the font alone does **not** make the engrave path
@@ -381,11 +381,19 @@ are required, three of which are invariants:
 - **(iv)** `dot.X` advances once per **glyph**, not per run (`:1336`). Getting
   this wrong breaks §4's "position implies index" and draws the plate wrong.
 
+- **(v)** `maxDur` (`:1255`) must iterate the per-run slice, not a single plan.
+
 Each run's `Delay` denominator must equal that run's flush duration exactly, or
 `timeScaler` panics `unaligned delay` (`:1099`) or `scale already in effect`
 (`:1077`).
 
-**Reduce k before quantizing.** The five reducible glyphs above MUST be redrawn
+**The intra-glyph, inter-run move MUST be padded to `advDur`** — the same target
+as an inter-glyph move. This is normative, not an implementation detail: pad it
+to anything else and the leak upgrades from a per-row *count* to the per-row
+*positions* of the eight multi-run glyphs, which is materially worse than what
+§3.5.0 accepts. §7(b) pins the observable property; this pins the mechanism.
+
+**Reduce k before quantizing.** The four reducible glyphs above (`x # * $`) MUST be redrawn
 as single strokes. `#` and `*` are 4 parts today, so an un-redrawn `#` would cost
 **4 units**. After the redraw, max k = 2 and the worst case is bounded at `2L`.
 
@@ -450,15 +458,41 @@ index" property, deliberately chosen. So `L_row` is **public by construction**.
 What an observer actually recovers:
 
 ```
-T_row = 10 + n_row        ->    n_row = T_row - 10     EXACTLY, per row
+T_row = rowLen + n_row    ->    n_row = T_row - rowLen   EXACTLY, per row
 ```
+
+`rowLen` is **10** in the no-QR layout (§4.1) and **20** in the QR layout (§4.2).
+Do not hard-code 10: an earlier draft did, and it was wrong for one of the two
+normative layouts.
 
 - `n_row` — the number of two-run glyphs (`= " i j ! : ; ?`) in that decade —
   is disclosed **exactly**, for **every row**. A 100-character passphrase yields
   ten precise counts, not one aggregate.
-- `L` is disclosed to within the final row, from the row count alone.
+- **`L` is disclosed EXACTLY** — not merely "to within the final row". The park
+  position at the end of a `String` call is length-dependent
+  (`mid2 := longest + shortest - 1; dot = Pt(mid2*advDist/2, baseline)`,
+  `engrave.go:1340-1341`), the move *to* park is padded, but the **next**
+  element's approach move is **not** (`:1292`). Its duration is therefore a
+  function of the preceding row's character count — which for the final partial
+  row hands over `L_last`, and with it `n_last`. This is consistent with §3.5.0's
+  own note that the `String` path leaks `L` exactly.
 - No side knowledge is required. The layout supplies what the earlier draft
   claimed an attacker would have to obtain independently.
+- **The legend leaks one content bit.** §4.3 engraves the `<mark> = SPACE`
+  legend *conditionally* — "whenever the passphrase contains a space". It is a
+  large, positionally distinct, non-constant-time block, so its presence or
+  absence tells a timing-only observer **whether the passphrase contains at
+  least one space**.
+- **With QR enabled, the QR discloses a length bracket and a charset class.**
+  Module count varies (33 / 37) with byte length *and* with whether the
+  passphrase falls inside QR's alphanumeric subset (§4.2). `ConstantQR` is
+  constant-time *given* a version, but the version is selected from the content
+  and engrave duration scales with it.
+
+The last three items are **pre-existing** `String`/layout behaviour, not created
+by per-run quantization, and none is larger in kind than what is accepted above.
+They are enumerated because this section is titled "what an observer actually
+recovers" and carries a standing instruction not to under-state.
 
 **This is accepted** (user decision, 2026-08-03, against this corrected
 statement). The attack still requires physical proximity to an air-gapped device
@@ -474,8 +508,12 @@ observability but requires reworking §4's row layout), dropping the eight glyph
 independent of the string *including its length within `[shortest, longest]`* —
 the property seed plates rely on and `TestConstantWords` asserts. Under per-run,
 `T = Σ k(rune at slot)` depends on content and on which runes get repeated.
-**`PaddedString` MUST NOT be used with a multi-run alphabet**; the passphrase
-path uses `String`. (This also means "today leaks `L` exactly" is true only of
+**`PaddedString` MUST NOT be called with `shortest != longest` on a multi-run
+alphabet.** (Phrasing it as "do not use `PaddedString`" is self-defeating —
+`String` *is* `PaddedString(yield, txt, n, n)`, `engrave.go:1272-1275`.) Per this
+spec's own asserted-not-assumed doctrine this needs a **guard**, not a prose
+prohibition: set a `hasMultiRun` flag at construction and panic in `PaddedString`
+when `shortest != longest`. (This also means "today leaks `L` exactly" is true only of
 the `String` path — on the `PaddedString` path today's scheme leaks nothing.)
 
 **Do not restate this as an aggregate.** Any future edit that reintroduces
@@ -483,7 +521,7 @@ the `String` path — on the `PaddedString` path today's scheme leaks nothing.)
 
 #### Consequences for §3.4 (applied)
 
-§3.4's table gained a sixth row — `timeConstantPath` / `engrave.go:1181` /
+§3.4's table gained rows 6-8 — `timeConstantPath` / `engrave.go:1181` /
 "broken path" / construction — and drop its claim of completeness. Two earlier
 drafts of that table were wrong in the same direction; the count is now six
 *known* checks, and the table should say so rather than assert exhaustiveness a
@@ -898,12 +936,15 @@ anywhere, since inserting shifts the numeric value of every later program.
   `TestConstantWords` (`engrave/engrave_test.go:192-215`), which asserts
   `refProf.Equal(prof)` across all BIP-39 words and is exactly the assertion
   per-run quantization weakens; (b) per-run blocks are uniform, so no *position*
-  leak arises within a row; (c) the disclosure bound itself — `T_row = 10 +
-  n_row` — holds for constructed worst cases.
-- **Zero-run path (§3.5.0):** engrave a string containing a zero-run glyph
-  through the real plate path and assert no panic. §7's existing no-panic bullet
-  does **not** cover this, because §3.3 strips `0x20` before layout — so the test
-  must exercise the stringer directly.
+  leak arises within a row; (c) the disclosure bound itself — `T_row = rowLen +
+  n_row`, for **both** `rowLen = 10` (§4.1) and `rowLen = 20` (§4.2) — holds for
+  constructed worst cases.
+- **Zero-run path (§3.5.0):** exercise the stringer **directly** with a zero-run
+  glyph — the real plate path cannot reach it, because §3.3 strips `0x20` before
+  layout, which is also why §7's existing no-panic bullet does not cover it.
+  Assert **both** that it does not panic **and** that the slot costs exactly
+  `advDur + runeDuration`, identical to a one-run slot. No-panic alone does not
+  test the C2 mechanism's normative content.
 
 ---
 
