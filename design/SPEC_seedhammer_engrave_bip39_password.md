@@ -1,6 +1,8 @@
 # SPEC — Engrave BIP-39 Password (SeedHammer II fork)
 
-**Status:** **AMENDED 2026-08-03, pending re-gate.** The original spec reached
+**Status:** **R0 GREEN (0C/0I) — spec and amendment both gated. Implementation in progress.**
+
+**Prior status:** AMENDED 2026-08-03, pending re-gate. The original spec reached
 R0 GREEN (0C/0I) over three rounds, but Phase A Task 4 then hit a construction
 panic none of them found (`timeConstantPath` requires single-run glyphs). §3.5.0
 amends the design with per-run quantization and an accepted timing disclosure.
@@ -969,7 +971,7 @@ anywhere, since inserting shifts the numeric value of every later program.
 | O3 | ~~Final visible-space mark shape~~ **RESOLVED 2026-08-03.** Low bar at `y9` with a central spike to `y6`. Replaced an earlier form that was the *identical shape* to `u` (both an open-top box, differing only in height and depth) — the worst collision available, since misreading the mark as a letter silently yields a different wallet. User reviewed the rendered glyph in running text and in the legend line and confirmed the low position: it reads as a floor mark between characters, which is where transcription actually happens. It sits visibly below the uppercase legend text as a result; accepted. | closed |
 | O4 | Exact legend + footer wording, once measured at 3 mm in the margin bands | layout |
 | O5 | Confirm the separate passphrase `ConstantStringer` leaves existing goldens byte-identical (§3.5.1). If the shared alphabet is ever widened instead, `runeDuration`, `startEndDist` AND `center` must all be measured, and §7 must name which goldens change and why | implementation |
-| O6 | Derive version-5/6 module maxima for `constantTimeQRModules` by extending the fuzz corpus (`engrave/testdata/fuzz`) — NOT by estimation — and confirm all three §3.5.2 sites change together. If impractical, cap the passphrase at 78 chars when QR is enabled; **never** fall back to non-constant-time `engrave.QR` | implementation |
+| O6 | ~~Derive v5/v6 module maxima~~ **RESOLVED 2026-08-03 (fork `c530e07`).** Constant-time QR extended to **v5 (dim 37) only**; `constantTimeQRModules(37) = 664 + 20`. v6 is unreachable — ECC-L is pinned and v5-L carries to 106 chars, measured (78→dim 33, 79→37, 106→37, 107→41), so the 100-char cap has 6 chars of headroom. Maxima derived by fuzzing (18.5M executions / 32 min / 0 crashes), not estimated. Buffer is 20 not 5 because dim 37 measured 0.485 of dims² against a 0.376→0.498 monotone trend, i.e. likely slightly under. Cost: +22% engrave time on QR plates. The 78-char fallback is NOT needed. | closed |
 
 **O2 note:** the R0 review already verified this — `m.prog` is runtime-only and
 `gui/saver` persists nothing program-related. Expect it to close trivially.
