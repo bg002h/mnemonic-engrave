@@ -45,3 +45,42 @@ Worst case (dim 37, legend+footer): 2 mm above the envelope, bottom band ~1.75 m
 - **Menu wiring, wipe discipline, and the toPlate seam** (full plan runs at `ppBuildPlate` before the engrave screen with a bounds check, so layout overflow fails closed pre-metal).
 
 **All three Importants share one shape: a fold recorded as done whose guard does not bite.** Each has a small mechanical fix. Nothing found requires design change.
+
+---
+
+## FOLD RECORD (2026-08-03, commit `868bf3c`)
+
+**I1 — FIXED.** Drain changed to `engrave.PlanEngraving(conf, eng)` for both QR states.
+Verified by *reachability* mutation: `panic()` at the top of `PlanEngraving` now fails the
+test, proving the planner is reached.
+
+**I2 — FIXED.** The vacuous test was replaced with one that drives the real flow: back up two
+steps from Confirm, walk forward, require every value to survive. Verified by both mutations
+the old test slept through — dropping the fingerprint re-seed, and dropping the QR opt-in
+restore — each now fails with a specific message.
+
+**I3 — FIXED, and the finding was UNDERSTATED.** Writing the missing test showed the fix it
+cited was a **no-op**. The keyboard block is bottom-aligned (`Max.Y - size.Y`) and `CutTop`
+leaves `Max.Y` unchanged, so reserving the counter's band never moved the block. Measured at
+480×320, revealed: `n=70 → blockTop 46` (band ends 67), `n=90/100/101 → blockTop 27` (content
+starts 44). **The occlusion 2119e67 described was still fully present after the commit that
+claimed to fix it** — counter covered from ~70 characters, title too past ~90, exactly as its
+own message predicted. A reservation in the caller cannot constrain a child whose height
+varies. `PassphraseKeyboard` now takes `MaxHeight` and clamps the readout to the height that
+exists, keeping the tail, by binary search over allocation-free `Measure`. Verified by three
+mutations: unbounded flow, deleted clamp, and a degenerate clamp that empties the readout.
+
+*A fourth mutation initially SURVIVED* — `uiContains(content, "W")` matched the keyboard's own
+key caps rather than the readout. Tightened to a 10-rune run. Noted because it is the same
+false-pass shape as the findings themselves, caught only by mutating.
+
+**M1, M2 — FILED**, both owned by O1, in `design/FOLLOWUPS.md`.
+
+**N1, N2, N3 — FIXED** (comment corrections; guard enforces 37 not 41, the 78-char fallback
+was never built, descenders-move-center is false on this face).
+
+**Also folded:** the QR-ignores-fingerprints guard the review was blocking, asserted at module
+level rather than by decoding. Verified by appending the fingerprints to the encoded string —
+the QR jumps from dim 25 to 29 and the test fails.
+
+Full suite green **by exit status**, 61 packages, build clean, no golden changed.
