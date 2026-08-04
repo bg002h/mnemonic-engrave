@@ -2,7 +2,7 @@
 
 > **For agentic workers:** implement task-by-task, test-first. Steps use `- [ ]`.
 
-**Status:** rev 2 — plan R0 rounds 0 (2C/6I) and 1 (0C/3I) folded. Awaiting re-review.
+**Status:** rev 3 — plan R0 rounds 0 (2C/6I), 1 (0C/3I), 2 (0C/2I) folded. Awaiting re-review.
 **Spec:** `design/SPEC_seedhammer_engrave_free_text.md` — **GREEN, R0 closed (rev 2)**.
 Read §5 before writing anything; the whole feature turns on it.
 
@@ -254,8 +254,11 @@ suite exit 0.
       questions C1.6/C1.8/D2.3/D2.7 ask:
 
 ```go
-// Fit: the largest rung whose layout holds the composition.
-func Fit(params engrave.Params, text, title, footer string, qr bool) (fontMM float32, lines []string, err error)
+// Fit: the largest rung whose layout holds the composition. It returns the QR
+// CODE ITSELF, not just its size, so the artifact engraved is the very object
+// the fit measured -- there is exactly one encode per composition, and no caller
+// can re-encode with different parameters and disagree.
+func Fit(params engrave.Params, text, title, footer string, qr bool) (fontMM float32, lines []string, qrc *qr.Code, err error)
 
 // Admissible: spec 6's anchor -- 3.0mm, QR as chosen, BOTH title and footer rows
 // reserved whether or not they are used. linesAvail is defined even when ok is
@@ -270,8 +273,11 @@ func MaxCharsAt(params engrave.Params, fontMM float32, text string, qr bool) int
       caller's plate-row offset.
 
 - [ ] **C1.2a — ONE encoding call site**, shared by all four consumers, so the
-      failure mode is defined once and the engraved artifact is the same object
-      that was measured:
+      failure mode is defined once. **`qrFor` stays unexported**: it is called
+      only from inside package `backup`, and `Fit` hands its result out. An
+      unexported identifier is invisible across packages regardless of
+      qualification, so `backup.qrFor` from `gui` would not compile — and the
+      codebase never calls an unexported `backup` symbol from `gui`.
 
 ```go
 // qrFor returns the code the plate will carry, or nil when want is false.
@@ -409,21 +415,36 @@ Nothing in Phase D called `EngraveFreeText`, and nothing produced its `*qr.Code`
 Mirror the established wiring: `gui/passphrase_flow.go`'s `ppBuildPlate` (`:532`)
 feeding `NewEngraveScreen(ctx, plate).Engrave(...)` (`:645`).
 
-- [ ] **D2a.1 — failing test:** the engrave step produces a plate whose lines are
-      exactly `WrapText`'s output at the size the **confirm screen displayed** —
-      binding the approved layout to the engraved one end to end, not just on
-      screen.
+- [ ] **D2a.1 — add a test seam first.** `Plate` is `{Duration, Spline}` — stroke
+      geometry carrying **no text** — so nothing can be extracted from it, and
+      comparing two `Fit` calls is trivially true by determinism. Add a
+      package-level hook mirroring `passphraseSecretHook`:
+
+```go
+// freetextPlateHook receives exactly what EngraveFreeText was handed. nil in
+// production. Without it there is no way to bind the layout the operator
+// APPROVED to the one that was ENGRAVED: the confirm screen is inspectable via
+// op.Drawer.ExtractText, a bspline.Curve is not.
+var freetextPlateHook func(fontMM float32, title string, lines []string, footer string, qrc *qr.Code)
+```
+
+- [ ] **D2a.1a — failing test:** drive the real flow to Engrave, then assert the
+      captured `lines` and `fontMM` equal what the **confirm screen displayed**,
+      and that `title`/`footer` are the entered values verbatim. This is the
+      end-to-end half of §5's invariant; D2.1 covers only the on-screen half.
 - [ ] **D2a.2 — implement** `ftBuildPlate(params, text, title, footer string, qr bool) (Plate, error)`:
-      call `Fit` for `(fontMM, lines)`, call **`qrFor`** for the code (the same
-      helper the fit used — never a second, differently-parameterised encode),
-      then `backup.EngraveFreeText(params, fontMM, title, lines, footer, qrc)`,
-      then `toPlate`. Propagate every error; the flow shows the §6 refusal rather
-      than engraving.
-- [ ] **D2a.3 — mutation-verify:** re-encode the QR at a different ECC level in
-      the builder than the fit measured — D2a.1 must go red, because the module
-      count and therefore the line widths change.
-- [ ] **D2a.4 — the QR carries the Text only**, asserted at module level here too:
-      the fit path and the build path must produce byte-identical codes.
+      one call to `Fit` yields `(fontMM, lines, qrc)`; pass all three straight to
+      `backup.EngraveFreeText(params, fontMM, title, lines, footer, qrc)`, then
+      `toPlate`. **Never encode a second time** — `Fit`'s code IS the artifact, so
+      the fit path and the build path cannot disagree by construction. Propagate
+      every error; the flow shows the §6 refusal rather than engraving.
+- [ ] **D2a.3 — mutation-verify:** hand `EngraveFreeText` a re-wrapped `lines`
+      instead of `Fit`'s, or a different `fontMM` — **D2a.1a** must go red. (Not
+      D2a.1: `ftBuildPlate` passes `lines` through unmodified, so a builder-side
+      encode change would alter only `qrc`.)
+- [ ] **D2a.4 — the QR carries the Text only**, asserted at **module level in
+      package `backup`** — where `qrFor` is visible — against the code
+      `EngraveFreeText` receives. A `gui` test cannot reach `qrFor`.
 - [ ] **D2a.5 — commit.**
 
 ### Task D3 — menu integration
