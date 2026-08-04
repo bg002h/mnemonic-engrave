@@ -521,7 +521,7 @@ the `String` path — on the `PaddedString` path today's scheme leaks nothing.)
 
 #### Consequences for §3.4 (applied)
 
-§3.4's table gained rows 6-8 — `timeConstantPath` / `engrave.go:1181` /
+§3.4's table gained rows 6-8 and dropped its completeness claim; it now lists eight known checks — `timeConstantPath` / `engrave.go:1181` /
 "broken path" / construction — and drop its claim of completeness. Two earlier
 drafts of that table were wrong in the same direction; the count is now six
 *known* checks, and the table should say so rather than assert exhaustiveness a
@@ -534,7 +534,7 @@ const constantAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"  // engrave.go:7
 ```
 
 36 characters — uppercase and digits only. Every lowercase letter and every new
-symbol would panic at `engrave.go:1286` *even after the font work*, because that
+symbol would panic at `engrave.go:1309` *even after the font work*, because that
 check does not consult the face. **Essentially every real passphrase would crash
 the machine.**
 
@@ -568,23 +568,23 @@ instance avoids all of it at no cost.
 `NewConstantStringer` enforces three things at **construction** time, each a
 panic, each affecting whichever instance is being built:
 
-- **Ascending codepoint order** (`engrave.go:1208-1210`, `panic("unsorted
+- **Ascending codepoint order** (`engrave.go:1232-1233`, `panic("unsorted
   alphabet")`) — the rune lookup is a `sort.Find` binary search
-  (`engrave.go:1282`). The visible-space mark lives at a control codepoint
+  (`engrave.go:1305`). The visible-space mark lives at a control codepoint
   (§3.3), so it sorts **first**, not appended at the end. The alphabet is a
   single ascending string: `<mark>` then `0x20`–`0x7E`.
-- **Every alphabet rune must decode in the face** (`engrave.go:1213-1215`,
+- **Every alphabet rune must decode in the face** (`engrave.go:1237-1238`,
   `panic("unsupported rune")`). Therefore **the glyph authoring (§3.2) and the
   alphabet definition must land in the same commit.** Defining a 96-character
   alphabet before the 44 glyphs exist panics at construction — and because
   construction happens for seed plates too if the shared constant is touched,
   a mis-staged change could brick existing plate types.
-- **Uniform advance** (`engrave.go:1216-1218`, `panic("variable width font")`).
+- **Uniform advance** (`engrave.go:1240-1241`, `panic("variable width font")`).
   Already satisfied: `cmd/vectorfont` emits one advance for every glyph
   (`cmd/vectorfont/main.go:425-427`) — verified, all 52 current glyphs have
   advance 600. This also underwrites §4's "position implies index" property.
 
-**Font-authoring trap (`engrave.go:1294-1296`):** `paddedString` uses
+**Font-authoring trap (`engrave.go:1319`):** `paddedString` uses
 `inf.Start != (bezier.Point{})` as its sentinel for "this glyph has a leading
 move segment". Every current glyph keeps X ∈ [100, 500], so the origin is never
 hit. A new glyph whose first engraved point sits exactly at the origin — very
