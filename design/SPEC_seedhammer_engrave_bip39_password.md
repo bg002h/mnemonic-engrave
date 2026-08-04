@@ -1028,7 +1028,7 @@ anywhere, since inserting shifts the numeric value of every later program.
 
 | # | Item | Owning phase |
 |---|---|---|
-| O1 | Hardware legibility check of lowercase at 4.5 mm and 6 mm em, **including every confusable pair enumerated in §3.2.1** | before feature is called done |
+| O1 | Hardware legibility — **procedure below (§9.1)**. Two plates, both via the production passphrase flow; no test-only program needed | before the feature is called done |
 | O2 | Confirm `program` enum values are not persisted | implementation |
 | O3 | ~~Final visible-space mark shape~~ **RESOLVED 2026-08-03.** Low bar at `y9` with a central spike to `y6`. Replaced an earlier form that was the *identical shape* to `u` (both an open-top box, differing only in height and depth) — the worst collision available, since misreading the mark as a letter silently yields a different wallet. User reviewed the rendered glyph in running text and in the legend line and confirmed the low position: it reads as a floor mark between characters, which is where transcription actually happens. It sits visibly below the uppercase legend text as a result; accepted. | closed |
 | O4 | Exact legend + footer wording, once measured at 3 mm in the margin bands | layout |
@@ -1076,3 +1076,55 @@ anywhere, since inserting shifts the numeric value of every later program.
   **GREEN (0C/0I).** All seven round-1 fixes verified against source; three
   consistency checks pass. Two nits (a one-line cite drift and this history being
   a round behind) fixed inline. **Gate closed — implementation may begin.**
+
+### 9.1 O1 — the test-engraving procedure
+
+O1 said "inspect by eye" without saying what to inspect. Two plates, **both cut
+through the real passphrase flow** — the production path is better evidence than
+a synthetic font proof, because it tests what a user actually gets.
+
+**No eighth menu program is needed**, and one would be a poor idea: it would
+touch the `program` enum's lockstep sites again, add a permanent menu entry for
+a one-time check, and ship test scaffolding in production firmware. If a
+repeatable font proof is ever wanted — e.g. for
+`seedhammer-engraving-font-swap` — extend the existing hidden `qaProgram`
+(reached by the debug command `FOREVERLAURA!`, `gui/gui.go:1629`), which is
+already the precedent for a non-navigable test path.
+
+#### Plate A — every glyph, QR on
+
+Passphrase: **all 95 printable ASCII in codepoint order**, `0x20`–`0x7E`, one
+each. Type it, enable the QR, engrave.
+
+What it proves:
+- every one of the 44 new glyphs actually cuts
+- the **4.5 mm** QR-layout size (5 rows × 20)
+- the legend renders (the string contains a space)
+- **`_` versus the space mark, side by side on metal.** The confirm screen
+  cannot distinguish them — it draws `_` for both, since `0x1F` is an
+  engraving-face glyph the GUI's bitmap fonts cannot render. The plate is
+  supposed to. **This plate is the test of whether that is true.**
+- at 95 characters the QR is **dim 37**, the worst case. Scan it, and check the
+  decoded string is byte-identical including the space.
+
+#### Plate B — confusables, QR off
+
+Passphrase: `Il1 O0o Kk Ss Uu Vv Ww Xx Zz Cc 9g rn m ,. :; '` + backtick.
+
+Renders at the full **6 mm** no-QR size, which is the *best* case — if a pair is
+ambiguous here it is worse on Plate A.
+
+Judge, in order of known risk:
+1. **`K` vs `k`** — flagged weakest by the font's own author: `k` has an
+   ascender, so both are full height and only the spur and arm span differ.
+2. The **case-only class** — `C/c O/o S/s U/u V/v W/w X/x Z/z`, where the
+   convention is chamfered uppercase against rectilinear lowercase.
+3. `I`/`l`/`1`, `O`/`0`/`o`, `,`/`.`, `:`/`;`, `'`/`` ` ``, `9`/`g`, `rn`/`m`.
+4. **Descenders** — `g j p q y` get one unit (D5). Check they read at all.
+
+#### The verdict this produces
+
+A failure here is **font work plus a re-review**, not a tweak. Record which
+pairs fail and at which size; a pair that fails at 6 mm fails everywhere, while
+one that fails only at 4.5 mm might be answered by capping the QR layout's
+length rather than redrawing.
