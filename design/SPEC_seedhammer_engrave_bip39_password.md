@@ -467,8 +467,14 @@ T_row = rowLen + n_row    ->    n_row = T_row - rowLen   EXACTLY, per row
 Do not hard-code 10: an earlier draft did, and it was wrong for one of the two
 normative layouts.
 
-- `n_row` — the number of two-run glyphs (`= " i j ! : ; ?`) in that decade —
-  is disclosed **exactly**, for **every row**. A 100-character passphrase yields
+- `n_row = Σ(kᵢ − 1)` over the row — **not** a count of two-run glyphs. Measured
+  partition on the real face (2796b2b): `k=2` for the **ten** glyphs
+  `! " $ % : ; = ? i j`; `k=0` for `0x20` (never engraved, §3.3 substitutes the
+  mark); everything else `k=1`. An earlier draft named an eight-glyph set that
+  was wrong in both directions — it omitted `$` and `%`, and included `x`, since
+  redrawn to a single stroke. **If any glyph ever exceeds k=2 the coefficient
+  grows accordingly**, e.g. a k=4 glyph contributes 3.
+- `n_row` is disclosed **exactly**, for **every row**. A 100-character passphrase yields
   ten precise counts, not one aggregate.
 - **`L` is disclosed EXACTLY** — not merely "to within the final row". The park
   position at the end of a `String` call is length-dependent
@@ -545,25 +551,34 @@ constant and construct a **separate `ConstantStringer` instance** for the
 passphrase plate.
 
 This is not a cost optimisation — it is what keeps D5's guarantee true.
-`NewConstantStringer` derives **three** values from its alphabet, not one
+`NewConstantStringer` derives **three** values from its alphabet
 (`engrave.go:1224-1235`): `runeDuration`, `startEndDist`
 (`ManhattanDist(bounds.Min, bounds.Max)`), and `center` (their midpoint), where
-`bounds` accumulates the path start/end of **every glyph in the alphabet**. All
-52 current glyphs have control-Y in `[-600, 0]`, so `bounds.Max.Y` is exactly 0
-today. D5 puts descenders **below the baseline**, so a single `g`, `j`, `p`, `q`
-or `y` whose stroke begins or ends at the tail pushes `bounds.Max.Y` positive —
-moving `center` and `startEndDist` for **every constant-time string the machine
-engraves**. Those feed the data-independent start/park positions
-(`engrave.go:1274`, `:1319`) and `padDur`/`advDur`/`centerDur` (`:1277-1279`),
-and `golden.CompareBSpline` compares tick timings as well as control points
-(`internal/golden/golden.go:72-75`).
+`bounds` accumulates the path start/end of **every glyph in the alphabet**.
 
-So widening the shared alphabet would change the goldens for **every existing
-plate type** — seed, SLIP-39, codex32 — making §7's byte-identical-goldens
-requirement unsatisfiable and inviting a `-update` that discards the only
-evidence D5's "existing output provably unaffected" rests on. The engraved
-artwork would be unchanged; the *plan and the guard* would not be. A separate
-instance avoids all of it at no cost.
+**Measured on the real face (Phase A Task 4, 2796b2b) — the operative value is
+`startEndDist`, not `center`:**
+
+| | shared | passphrase |
+|---|---|---|
+| `center` | `{7111,-8533}` | `{7111,-8533}` — **identical** |
+| `startEndDist` | 17066 | **22755** |
+| `runeDuration` | 533764 | 572245 |
+
+An earlier draft of this section led with descenders pushing `bounds.Max.Y`
+positive and thereby moving `center` "for every constant-time string the machine
+engraves". **That does not happen on this face** — no glyph's path start or end
+reaches below the accumulated box, so `center` is unchanged. The claim was
+plausible and unmeasured; it is corrected here.
+
+The separate instance is still **required**, for the reason that survives
+measurement: `startEndDist` grows by a third, and it feeds `padDur`, `advDur` and
+`centerDur` (`:1277-1279`). Widening the shared alphabet would change the timing
+of every seed, SLIP-39 and codex32 plate, and `golden.CompareBSpline` compares
+tick timings as well as control points (`internal/golden/golden.go:72-75`). So
+§7's byte-identical-goldens requirement would be unsatisfiable, inviting an
+`-update` that discards the only evidence for D5. A separate instance avoids all
+of it at no cost.
 
 ### 3.5.1.1 Constraints on the passphrase alphabet
 
