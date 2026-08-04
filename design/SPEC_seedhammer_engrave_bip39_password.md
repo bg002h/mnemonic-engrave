@@ -1,3 +1,29 @@
+**Budget constraint (I2) — RESOLVED 2026-08-03, measured and accepted.** The
+redraws convert pen-up moves into retraced engraving, which is slower per unit
+distance and adds retraced length, so a redrawn glyph can become the longest
+single run and inflate `runeDuration` — which pads **all 96 glyphs**.
+
+**That is exactly what happened.** The single-stroke `#` (`5f667dd`) overtook `8`:
+
+| | pre-redraw (`2796b2b`) | post-redraw (HEAD) |
+|---|---|---|
+| `runeDuration` | 533 764, set by `8` | **572 245, set by `#`** |
+| one padded unit (`runeDuration + advDur`) | 615 558 ticks = 3.206 s | **654 039 ticks = 3.406 s** |
+
+An earlier draft of this clause said the redrawn glyphs **MUST NOT** become the
+longest single run. **That is superseded**: the measured 7.2% is accepted (user
+decision, 2026-08-03). The trade is +0.200 s per slot — about +20 s on a
+100-character passphrase at k=1, +40 s at the 2L worst case — against `#` at k=1,
+which is what makes max k = 2 and the disclosure bound hold at all.
+
+**Worst case in absolute time, as this clause requires:** `2L × 654 039` ticks at
+192 000 ticks/s = **681 s (11.4 min)** for L = 100.
+
+**The identity of the `runeDuration`-setting glyph is now PINNED by test**, not
+logged. `TestPassphraseStringerTiming` only `t.Logf`s aggregates and disclaims
+proving anything, which is why this regression reached a review instead of a
+failing build. Any future font edit that inflates the unit must fail a test.
+
 # SPEC — Engrave BIP-39 Password (SeedHammer II fork)
 
 **Status:** **R0 GREEN (0C/0I) — spec and amendment both gated. Implementation in progress.**
@@ -133,10 +159,19 @@ produces — including seed backups already in the field — and trips the
 geometry-golden drift-guard in the `me-preview` sidecar. Not worth better
 letterforms.
 
-Keeping the metrics confines the entire change to codepoints that previously had
-no glyph, which makes existing output **provably** unaffected: no string the
-device can engrave today contains a lowercase letter or any of the 17 added
-symbols.
+Keeping the metrics confines the change to codepoints that previously had no
+glyph — **plus three pre-existing glyphs, enumerated here because an earlier
+draft's blanket claim was false**: `#` (`5f667dd`, the accepted golden
+exception), `*` (`381364a`, mandated by §3.5.0's reduce-k clause), and `@`
+(`2c2f569`, artwork changed on user request).
+
+Existing output is nonetheless unaffected, **verified by reachability audit
+rather than asserted**: `constant.Font` reaches engraved output through exactly
+three constructions — `gui/gui.go:486` (seed plate, empty title),
+`gui/slip39_polish.go:492` (`"%d #%d/%d"`), and `gui/codex32_polish.go:229`
+(bech32 id) — none of which can contain `*` or `@`; `backup.TitleString` has no
+production callers; and text plates use `sh.Font`, not `constant.Font`. Only the
+SLIP-39 titles reach `#`, which is the documented exception.
 
 At the passphrase plate's font size a 1-unit descender is ~0.67 mm against a
 0.3 mm stroke — a little over two stroke widths. Shallow but legible. Marked
@@ -556,14 +591,17 @@ This is not a cost optimisation — it is what keeps D5's guarantee true.
 (`ManhattanDist(bounds.Min, bounds.Max)`), and `center` (their midpoint), where
 `bounds` accumulates the path start/end of **every glyph in the alphabet**.
 
-**Measured on the real face (Phase A Task 4, 2796b2b) — the operative value is
-`startEndDist`, not `center`:**
+**Measured on the real face — the operative value is `startEndDist`, not
+`center`.** Note the two `runeDuration` columns are from **different commits**: an
+earlier draft attributed both to `2796b2b`, which made the passphrase alphabet
+look structurally costlier when in fact the two were **identical** until the `#`
+redraw at `5f667dd` (see I2 above).
 
 | | shared | passphrase |
 |---|---|---|
 | `center` | `{7111,-8533}` | `{7111,-8533}` — **identical** |
 | `startEndDist` | 17066 | **22755** |
-| `runeDuration` | 533764 | 572245 |
+| `runeDuration` | 533764 (`2796b2b`, set by `8`) | **572245** (`5f667dd`, set by `#`) |
 
 An earlier draft of this section led with descenders pushing `bounds.Max.Y`
 positive and thereby moving `center` "for every constant-time string the machine
