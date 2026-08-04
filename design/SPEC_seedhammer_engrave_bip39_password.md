@@ -1,6 +1,13 @@
 # SPEC — Engrave BIP-39 Password (SeedHammer II fork)
 
-**Status:** **R0 GATE GREEN (0C/0I) as of 2026-08-03** — implementation may begin.
+**Status:** **AMENDED 2026-08-03, pending re-gate.** The original spec reached
+R0 GREEN (0C/0I) over three rounds, but Phase A Task 4 then hit a construction
+panic none of them found (`timeConstantPath` requires single-run glyphs). §3.5.0
+amends the design with per-run quantization and an accepted timing disclosure;
+that amendment is **normative security behaviour and needs its own R0 pass**
+before implementation resumes. Phase A Tasks 1-3 are complete and unaffected.
+
+**Original status:** R0 GATE GREEN (0C/0I) as of 2026-08-03 — implementation may begin.
 Three rounds: fable (2C/6I) → opus (0C/4I) → sonnet verification (GREEN). This
 feature is **risk-set** under `CLAUDE.md` clause (b): it handles secret material
 that guards funds, so the post-implementation adversarial execution review over
@@ -263,6 +270,7 @@ one.** Every one must be satisfied or the device panics:
 | 3 | uniform advance | `engrave.go:1216` | `:1218` | construction |
 | 4 | alphabet in ascending codepoint order | `engrave.go:1208` | `:1210` | construction |
 | 5 | every alphabet rune decodes in the face | `engrave.go:1213` | `:1215` | construction |
+| 6 | each glyph is ONE continuous engrave run | `engrave.go:1178` | `:1181` | construction |
 
 Check 2 is **independent of the face** — a binary search over the alphabet, not a
 `Decode` call — so extending the font alone does **not** make the engrave path
@@ -270,10 +278,17 @@ safe (§3.5). Checks 3–5 fire at **construction**, meaning a badly-formed alph
 takes down whichever `ConstantStringer` is being built; see §3.5.1.1 for the
 ordering and atomicity constraints that follow.
 
-Two earlier drafts of this spec understated this table — first claiming
-`ValidatePassphrase` was the sole gate, then naming three checks. Both were
-**false**. The count is five, and the two construction-time checks were the ones
-most easily missed because they never fire during normal operation.
+Three earlier drafts of this spec understated this table — first claiming
+`ValidatePassphrase` was the sole gate, then three checks, then five. All were
+**false**. Check 6 (`timeConstantPath`'s "broken path") was found only when Phase
+A Task 4 tried to build the alphabet for real, having survived three spec review
+rounds and a plan review; §3.5.0 amends the design around it.
+
+**This table lists six KNOWN checks. It does not claim to be exhaustive.** Three
+successive drafts asserted completeness and three were wrong, all in the same
+direction — construction-time invariants that never fire during normal operation
+and are therefore invisible until an alphabet exercises them. Treat any new panic
+found in this path as expected rather than surprising, and add it here.
 
 `ValidateFingerprint` accepts the empty string (the field is optional). Otherwise
 it accepts 8 hex digits **with optional internal whitespace**, and normalises to
@@ -298,6 +313,109 @@ for the passphrase or its QR.
 
 That is a requirement with prerequisites, both of which are **in scope for this
 feature**:
+
+### 3.5.0 Multi-run glyphs — per-run quantization (AMENDMENT, 2026-08-03)
+
+**Discovered during Phase A Task 4, after this spec reached R0 GREEN.** There is
+a **fourth** construction-time panic, which §3.4's table (which claims five) and
+three review rounds all missed:
+
+```go
+case engraving && !engrave:
+    panic("broken path")        // engrave/engrave.go:1181, in timeConstantPath
+```
+
+`NewConstantStringer` runs `timeConstantPath` over every glyph in its alphabet,
+and that routine **asserts each glyph is ONE continuous engrave run** — pen down
+once, never lifted. It was invisible until now because `constantAlphabet` is
+digits-plus-uppercase and contains no multi-part glyph. The passphrase alphabet
+contains **13**: `:` `#` `*` (pre-existing) and `i` `j` `x` `!` `"` `$` `%` `;`
+`=` `?` (added in Phase A).
+
+**Redrawing cannot fully solve it.** A glyph collapses to one stroke *iff its
+parts form a connected figure* — retracing an existing edge is free, but
+travelling between disjoint parts engraves a visible connector. So:
+
+| | Glyphs | |
+|---|---|---|
+| Reducible | `x` `#` `*` `$` | parts intersect; retraceable, as uppercase `X` already is |
+| Reducible with redesign | `%` | only if the dots are moved to touch the slash |
+| **Irreducible** | `=` `"` | parallel disjoint bars, no shared point |
+| **Irreducible** | `i` `j` `!` `:` `;` `?` | the detached dot *is* the glyph — join it and `i` becomes `l` |
+
+Eight glyphs cannot be single-stroke at any price.
+
+#### The rule
+
+**Each engrave RUN is padded to `runeDuration`, exactly as each glyph is today.**
+`runeDuration` becomes the maximum duration of any single *run* across the
+alphabet; a k-part glyph emits k padded runs and costs k units.
+
+This reuses the existing padding machinery rather than inventing a second timing
+model — it is a smaller change than padding per-glyph totals would be.
+
+**Reduce k before quantizing.** The five reducible glyphs above MUST be redrawn
+as single strokes. `#` and `*` are 4 parts today, so an un-redrawn `#` would cost
+**4 units**. After the redraw, max k = 2 and the worst case is bounded at `2L`.
+
+#### Zero-run glyphs — space MUST cost one unit
+
+`0x20` is a **blank advance**: no SVG element, no knots, **zero engrave runs**.
+Under the per-glyph model it still costs a full unit (an empty engrave plus full
+`Delay` padding). Under per-run quantization, zero runs would naively cost
+**zero time**, making spaces free and disclosing them exactly.
+
+**Rule: `k = max(runs, 1)`.** A glyph with no runs emits one empty padded run.
+Space therefore costs one unit, as it does today.
+
+Note this is not merely defensive bookkeeping — without it the scheme would leak
+more than the disclosure below admits, because `T` would count non-space
+characters only.
+
+**Related, and worth stating so an implementer does not "optimise" it away:** the
+engraved passphrase never actually contains `0x20`. §3.3 translates every space
+to the visible-space mark at `0x1F` (a normal single-run glyph, cost 1) before
+layout. `0x20` is nonetheless present in the passphrase alphabet — the alphabet
+is all 95 printable ASCII by construction — so `NewConstantStringer` builds a
+plan for it at construction time and the `max(runs, 1)` rule must hold there
+regardless of whether it is ever engraved. Do not remove `0x20` from the alphabet
+to dodge this; validation accepts spaces in input, and the alphabet is the
+contract.
+
+#### The accepted disclosure
+
+Engraving time becomes **content-dependent**, which today's property forbids.
+Stated exactly:
+
+```
+T = m·1 + n·2 = L + n
+```
+
+`L` = passphrase length, `n` = count of two-part glyphs, `T` = observed units.
+
+- An observer measures **only `T`** — a blend. Extracting `n` requires already
+  knowing `L`; extracting `L` requires already knowing `n`.
+- With neither, they learn `L ∈ [T/2, T]`. **Today's scheme leaks `L` exactly**,
+  so in the no-side-knowledge case this discloses *less* about length.
+- The genuine violation: two passphrases of **equal length** can differ in
+  duration. An attacker who knows `L`, can time the machine, and gains from
+  learning how many of `= " i j ! : ; ?` are present (8 of 95 characters) learns
+  that much.
+
+**This is accepted** (user decision, 2026-08-03). The attack requires physical
+proximity to an air-gapped device the owner controls, plus independent knowledge
+of the length, to recover a weak statistic. Rejected alternatives: dropping the
+eight glyphs (breaks D3's all-95-ASCII guarantee), and uniform k-unit padding for
+every glyph (fully constant, but doubles engraving time to conceal a signal that
+motion already reveals to any observer able to resolve individual pen-lifts).
+
+#### Consequences for §3.4
+
+§3.4's table must gain a sixth row — `timeConstantPath` / `engrave.go:1181` /
+"broken path" / construction — and drop its claim of completeness. Two earlier
+drafts of that table were wrong in the same direction; the count is now six
+*known* checks, and the table should say so rather than assert exhaustiveness a
+third time.
 
 ### 3.5.1 A SEPARATE passphrase alphabet and `ConstantStringer` instance
 
