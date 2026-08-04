@@ -13,7 +13,7 @@ needs the user's hands (flash + engrave), not more analysis.**
 | Fork repo | `/scratch/code/shibboleth/seedhammer`, branch `main` @ `cd2cbd5`, **in sync with `origin/main`** |
 | Remote | `git@github.com:bg002h/seedhammer.git` — **PUBLIC** |
 | Planning docs | `/scratch/code/shibboleth/mnemonic-engrave/design/` (this file, `FOLLOWUPS.md`, `SPEC_*`, `IMPLEMENTATION_PLAN_*`, `agent-reports/`) |
-| Boot key | `~/.sh2/sh2-boot-key.pem`, mode 600, **outside all repos**. Fingerprint `846aa289f2f317e55ff03f90555132302842cff2f68ee45712834a25d64cabb4` |
+| Boot key | `~/.sh2/sh2-boot-key.pem`, mode 600, **outside all repos**. Its fingerprint is in `~/.sh2/sh2-boot-key.fingerprint` — read it from there, never paste it into a repo file |
 | Recovery image | `~/.sh2/recovery/seedhammerii-v1.4.3.uf2` |
 | `picotool` | `/nix/store/j7pl045ik6yb73zvq3n9a52j85d2qnig-picotool-2.2.0-a4/bin/picotool` (not on PATH) |
 
@@ -89,8 +89,7 @@ Filed in `design/FOLLOWUPS.md` with owning phases:
   string the device shows. A `fork-v0.1.0` tag was created and **deliberately
   retagged away** for introducing a second, conflicting number.
 - **The boot key must never be committed.** `flake.nix` contains an upstream
-  `dummy_pem` that trips naive "BEGIN EC PRIVATE KEY" greps — it is not the boot
-  key.
+  `dummy_pem` whose PEM header trips naive secret greps — it is not the boot key.
 - **`-update` on an existing golden is forbidden** (one documented exception:
   three `slip39-*`). New goldens are fine.
 - **The signed `.uf2` boots only on this user's device.** Publish it for
@@ -156,7 +155,7 @@ nix run .#build-firmware                     # -> seedhammerii-v0.0.0-g<sha>.uf2
 /scratch/code/shibboleth/mnemonic-engrave/scripts/sign-firmware.sh <img>.uf2 ~/.sh2/sh2-boot-key.pem
 # then ALWAYS verify the key link before flashing:
 $PT info -a <img>.signed.uf2 | awk '/[Pp]ublic key:/{print $NF}' | head -1 | xxd -r -p | sha256sum
-# must equal 846aa289f2f317e55ff03f90555132302842cff2f68ee45712834a25d64cabb4
+# must equal:  awk '{print $1}' ~/.sh2/sh2-boot-key.fingerprint
 gh release create fork-v0.0.0-g<sha> --repo bg002h/seedhammer ...
 ```
 Note `gh` resolves to **upstream** `seedhammer/seedhammer` without
