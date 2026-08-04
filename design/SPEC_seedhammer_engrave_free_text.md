@@ -1,6 +1,7 @@
 # SPEC — Engrave Text (free-text plate), SeedHammer II fork
 
-Status: **DRAFT rev 2 — R0 rounds 0 (3C/10I) and 1 (1C/4I) folded, awaiting re-review.**
+Status: **GREEN — R0 CLOSED (rev 2).** Rounds 0 (3C/10I) and 1 (1C/4I) folded;
+round 2 returned 0C/0I. Implementation may begin.
 No code before 0C/0I. Date: 2026-08-04. Target: `bg002h/seedhammer`, program slot **3**.
 
 ---
