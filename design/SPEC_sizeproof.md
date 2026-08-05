@@ -881,11 +881,20 @@ does. Without that test 5.400 mm would not be enough either.
    characters" measures a different plate the day the fixture text changes case;
    (c) `EngraveFitted` draws at `f.qrAt.Y` and `EngraveText` at its local
    placement's `Y` — now assertable, because §2.3 gives `Fitted` the field to
-   carry and neither engraver computes a y of its own; (d) §2.1.1's guards fire
-   **where that table puts them** — the two caller-bug invariants panic in
-   `EngraveFitted`, and `qrAt.Bottom > plateHeight - margin` comes back as an
-   ERROR from `fitBlocksAt`/`FitSized`. A test that accepts a panic for the third
-   would pass against exactly the mid-flow crash §2.1.1 exists to avoid.
+   carry and neither engraver computes a y of its own; (d) `qrAt.Bottom >
+   plateHeight - margin` comes back as an ERROR from `fitBlocksAt`/`FitSized`,
+   not as a panic — a test that accepts a panic here would pass against exactly
+   the mid-flow crash §2.1.1 exists to avoid.
+
+   **Not tested, by decision (operator, 2026-08-05): the QR on a multi-size
+   plate.** `QR != nil` with `Mixed` is unreachable through every entry point —
+   `FitSized` has no QR parameter and `fitBlocksAt` never sets `Mixed` — so
+   testing it means hand-building an illegal `Fitted` to watch a panic fire on a
+   state no caller can produce. §2.1.1's guard STAYS as a defensive assertion for
+   a future constructor; it is deliberately unpinned, which is recorded here
+   rather than left to look like an oversight. Every QR assertion above is on a
+   UNIFORM-size plate, including (b)'s two-block fixture — that one is the
+   mixed-FACE shipped-plate regression from round 1, not a multi-size test.
 8. **Footer and last body row are disjoint on a MIXED plate with a 3.8 mm
    footer**, where §2.4's two formulas do not cancel, and a composition one row
    too tall for its title+footer is refused. Replaces the previous draft's "no
