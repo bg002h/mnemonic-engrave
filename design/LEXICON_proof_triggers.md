@@ -46,7 +46,7 @@ and the rungs genuinely differ — *"FRONT: 5.0mm and 3.8mm"* against
 
 | trigger | program | proves | parameter | faces | content | size |
 |---|---|---|---|---|---|---|
-| `PASSPROOF!` | passphrase | the passphrase plate | — | constant | pattern + fingerprints | plate default |
+| `FONTPROOF!` | passphrase | the passphrase plate | — | constant | pattern + fingerprints | plate default |
 | `TEXTPROOF!` | free text | `font/sh` | — | sh | full pattern | 3.0 mm (auto-fit) |
 | `CONSTPROOF!` | free text | `font/constant` | — | constant | full pattern | 3.0 mm (auto-fit) |
 | `BOTHPROOF!` | free text | both faces | rung | sh + constant | full pattern | 3.0 mm (auto-fit) |
@@ -63,9 +63,10 @@ half, and defaulting to one would let a slip cut the wrong side.
    root, not a new parameter on an old one.
 2. **A parameter slot holds one kind of value.** `FontSizes` rungs for
    `BOTHPROOF!`; sides for `SIZEPROOF!`.
-3. **Roots differ at the first character.** `T`, `C`, `B`, `S`, `P` — so a
-   mistyped root matches nothing and stays ordinary text. (Matching is by exact
-   string, so this is defence in depth rather than the mechanism.)
+3. **Roots differ at the first character.** Shipped today: `F`, `T`, `C`, `B`,
+   `S` — so a mistyped root matches nothing and stays ordinary text. (Matching
+   is by exact string, so this is defence in depth rather than the mechanism.)
+   The rename below turns the `F` into a `P` and preserves the property.
 4. **A parameterised root is a strict prefix of its own parameterised forms and
    of nothing else.** `SIZEPROOF!` prefixes `SIZEPROOF!FRONT`; it must prefix no
    other root. Parameterised roots must never be marked `Sizeable` unless their
