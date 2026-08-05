@@ -1,6 +1,8 @@
 # IMPLEMENTATION PLAN — `SIZEPROOF!`
 
-Status: **P0, awaiting R0.** Author: controller session, 2026-08-05.
+Status: **P1, folding plan R0 round 0 (RED, 0C/4I).** Author: controller session,
+2026-08-05. Review persisted at
+`design/agent-reports/sizeproof-plan-R0-round0.md`.
 Spec: `design/SPEC_sizeproof.md` @ R5, **R0 GREEN (0C/0I) at round 4**.
 
 This is a **sequencing** document. It adds no design: every "what" lives in the
@@ -28,43 +30,94 @@ the thing that phase changed.
   refresh. This is the load-bearing property of the entire change: the spec's
   claim is that the general path reproduces the special case exactly, and the
   goldens are the only thing that can falsify it.
-- **Review:** opus + sonnet two-lane on the whole diff after P5, per the
-  operator's 2026-08-05 choice. **fable stays unspent** — nothing here is
-  irreversible, funds-touching, or normative-codec; the OTP write is long done.
+- **Review:** opus + sonnet two-lane on the whole diff **after P6** (§3), per the
+  operator's 2026-08-05 choice. There is no P5 checkpoint review; P6 carries
+  §7.3's composition pins and the §7.19 mutation pass, which is exactly the
+  content a whole-diff review should see. **fable stays unspent** — nothing here
+  is irreversible, funds-touching, or normative-codec; the OTP write is long done.
 
 ## 1. Phases
 
 Ordered so the goldens stay green at every boundary. Each phase is a commit.
 
-### P1 — the data carriers. No behaviour change.
+### P1 — the data carriers.
 
-`Block.SizeMM` (§2.2); `Fitted` gains `Mixed`, `Sizes`, `TitleSizeMM`,
-`FooterSizeMM`, `qrAt` (§2.3); **both** legacy constructors populate them —
-`fitBlocksAt` and `EngraveFreeText` (§2.3). Guards added: `len(Sizes) !=
-len(Lines)`, the size/string invariant, and §2.1.1's two panics.
+`Block.SizeMM` (§2.2). **`qrPlacement` and `qrPlaceAt` (§2.1)** — the type must
+land here, not in P2, because `Fitted` declares a field of it in this phase.
+`Fitted` gains `Mixed`, `Sizes`, `TitleSizeMM`, `FooterSizeMM`, `qrAt` (§2.3);
+**both** legacy constructors populate them — `fitBlocksAt` and `EngraveFreeText`
+(§2.3). Guards added: `len(Sizes) != len(Lines)`, the size/string invariant,
+§2.1.1's **two panics** *and* its third row, the `qrAt.Bottom <= plateHeight -
+margin` **ERROR return** from `fitBlocksAt`.
 
-Nothing reads the new fields yet. `EngraveFitted` still walks rows.
+`textLayout` still takes `(qrc, qrScale)`; nothing narrows against the placement
+yet. `EngraveFitted` still walks rows.
+
+**Two existing fixtures must move with this phase.** P1 is not the inert pure
+addition an earlier draft of this plan claimed — both bypass the legacy
+constructors and hand-build a `Fitted`:
+
+- `backup/blocks_test.go:406-417` — `mk` returns a `Fitted` with `Lines` and
+  `Faces` and no `Sizes`, then engraves it twice **with no `recover`**. The new
+  guard fails the test outright, so P1 cannot close whole-suite-green without
+  this. It gains `Sizes`; **its per-row-inset assertions keep their exact form**,
+  because it is the only existing pin on the property §2.5's `at(0)` rewrite
+  endangers in P3.
+- `backup/blocks_test.go:296-309` — same omission, but it already defers a
+  `recover`, so it stays green and silently stops testing what it names. It gains
+  a correctly-sized `Sizes`, and **the `Faces` guard is evaluated before the
+  `Sizes` guard** so it keeps isolating the face map. §7.19's mutation pass is
+  scoped to tests *added* in P1-P6 and would not catch this one.
+
+Audit for any other hand-built `Fitted{}` in `backup` outside the two
+constructors. The three GUI literals the spec names
+(`gui/freetext_flow_test.go:564, 893, 928`) are confirmed safe: all three flow
+into `ftConfirmBody`/`ftConfirmSummary` and never reach `EngraveFitted`, so
+`:893`'s `QR` with no placement does not trip §2.1.1's first panic.
 
 **Gate:** §7.1 (every golden, byte for byte) · §7.15 (the `Sizes` guard panics).
 
-*Why first:* it is pure addition, so a moved golden here means the constructors
-were filled wrong, with nothing else in the diff to hide behind.
+*Why first:* apart from the two fixtures above it is pure addition, so a moved
+golden here means the constructors were filled wrong, with nothing else in the
+diff to hide behind.
 
 ### P2 — the QR placement. Extraction, not redesign.
 
-`qrPlacement` + `qrPlaceAt` (§2.1); `textLayout` takes a `*qrPlacement` and
-`lineLayout` carries `qrTop`/`qrBottom`; `EngraveFitted` reads `f.qrAt` and
-`EngraveText` its own local. Every producer keeps the anchor it has today
-(§2.1's producer table) — **including `AdmissibleBlocks`, whose `anchorY` is
-`outerMargin` while §2.4 will give it a different `start`.**
+`textLayout` takes a `*qrPlacement` in place of `(qrc, qrScale)`; `lineLayout`
+carries `qrTop`/`qrBottom` instead of `holeLines`/`qrLines`; `EngraveFitted`
+reads `f.qrAt` and `EngraveText` its own local. Every producer keeps the anchor
+it has today (§2.1's producer table) — **including `AdmissibleBlocks`, whose
+`anchorY` is `outerMargin` while §2.4 will give it a different `start`.**
+
+**The signature change forces four more sites into this same commit**, two of
+which this plan otherwise attributes to later phases. They are compiler-forced,
+so nothing can go silently wrong — but they are named here so the diff is not a
+surprise: `wrapBlocks` (`fit.go:150`) and `faceLayouts.at` (`fit.go:327`) thread
+a `*qrPlacement` instead of a `*qr.Code`, which makes `MaxCharsAtBlocks` a
+placement producer in P2 rather than P3, all still at `anchorY = outerMargin`,
+one placement per plate.
+
+Three test fixtures move too, and **their assertions and numbers are preserved
+exactly**: `backup/engravetext_test.go:159-196` builds a `lineLayout` literal
+with `holeLines: 2, qrLines: 19` and is the current pin for the `n < 1` clamp —
+it is re-expressed in `qrTop`/`qrBottom` with the same clamp numbers;
+`backup/freetext_test.go:195-197` and `:289` recompute the QR's y from
+`lay.holeLines`/`lay.qrLines` and read the placement instead. A pin rewritten in
+the same commit that changes its subject is where coverage quietly weakens.
 
 Row indexing is UNCHANGED in this phase. The band is expressed in absolute y and
 is measured to agree with the row-index predicate on every row at every rung, so
 this phase should be behaviour-identical by construction.
 
+**Also written here, but gated at P3: §7.7(b)**, the two-block-plus-QR fixture.
+It is cheap to build now and **passes vacuously in P2** — every block still lays
+out at `baseY = outerMargin`, so block 2's window is right whatever the
+implementer does. Pin its code by MODULE COUNT, not text length (§7.7(b)).
+
 **Gate:** §7.1 · §7.7(a) the band equivalence at all six rungs · §7.7(c) both
-engravers read the stored placement · §7.7(d) the `Bottom` check is an ERROR
-from the fit, not a panic.
+engravers read the stored placement · §7.7(d), **`fitBlocksAt` half only** — the
+`FitSized` half is vacuous by §2.7 (`qrAt` is always nil there) and is recorded
+as such rather than scheduled into P4.
 
 ### P3 — the y budget and the running y.
 
@@ -74,14 +127,26 @@ from the fit, not a panic.
 `limit` is read off the footer. `EngraveFitted` accumulates y and reads `at(0)`
 per row (§2.5). `faceLayouts` is deleted (§2.6).
 
-**Gate:** §7.1 · §7.2 rows are cut at the sizes claimed · §7.8 footer and last
-body row disjoint on a MIXED plate with a 3.8 mm footer · §7.11 the unbounded
-callers still report untruncated counts · **§7.20 `AdmissibleBlocks`' verdict
-does not move, with `useQR` true and false, plus the `MaxCharsAtBlocks` pin.**
+**Gate:** §7.1 · §7.2 rows are cut at the sizes claimed · **§7.7(b) a two-block
+plate with a QR wraps block 2 at the code's own budget, and no body ink enters
+the code box** · §7.8 footer and last body row disjoint on a MIXED plate with a
+3.8 mm footer · §7.11 the unbounded callers still report untruncated counts ·
+**§7.20 `AdmissibleBlocks`' verdict does not move, with `useQR` true and false,
+plus the `MaxCharsAtBlocks` pin.**
 
-*This is the phase that broke twice in review.* Both round-2's I2 and round-3's
-I2 live here, and both were invisible to the compiler and to every golden —
-`int` to `int`, right shape, wrong meaning. §7.20 is the only thing that fails.
+*This is the phase that broke twice in review, and it is where §7.7(b) earns its
+keep.* P3 is the phase that gives each block its own running-y `baseY` **and**
+indexes rows from 0 within the block — precisely the combination in which
+reaching for a block-relative row index re-creates §2.1's measured
+12-columns-vs-36-columns defect and engraves body ink across the code. No
+shipped golden is a multi-block QR plate, so nothing else in this gate can see
+it: §7.2 is row sizes, §7.8 the footer band, §7.11 the unbounded callers, §7.20
+the admission counts. Written in P2 where it is cheap, **RED-then-green here.**
+
+Round-2's I2 also lands here whole. Round-3's I2 is split: its design half is P2's
+(the `AdmissibleBlocks` anchor), and only its PIN — §7.20 with `useQR` — closes
+here. Both were invisible to the compiler and to every golden: `int` to `int`,
+right shape, wrong meaning.
 
 ### P4 — `FitSized`, and mixed plates become real.
 
@@ -95,10 +160,12 @@ no-footer path gives `limit == plateHeight - margin`.
 
 ### P5 — the GUI surface, the triggers, and the previews.
 
-Every row of §3's table; `ftPlan.Blocks`' part-count predicate and its corrected
-doc comment (§3.1); the `SIZEPROOF!FRONT`/`BACK` entries with `TextQR: ""` and
-their `Side` (§4); `ftProofOutcomeFor`'s per-proof footer; `fittedPreviewAt`
-through `ftFitAt`; `cmd/plateview`'s two entries.
+Every **GUI and preview** row of §3's table — the backup-package rows close
+earlier: `EngraveFreeText` in P1, `AdmissibleBlocks`/`rowFaces`/
+`MaxCharsAtBlocks` in P2-P3. Plus `ftPlan.Blocks`' part-count predicate and its
+corrected doc comment (§3.1); the `SIZEPROOF!FRONT`/`BACK` entries with
+`TextQR: ""` and their `Side` (§4); `ftProofOutcomeFor`'s per-proof footer;
+`fittedPreviewAt` through `ftFitAt`; `cmd/plateview`'s two entries.
 
 **Gate:** §7.10 end-to-end through `freetextPlateHook` · **§7.13 all four edit
 shapes plus the synthetic `[2,1,1]` plan** · §7.16 both proofs need the whole
