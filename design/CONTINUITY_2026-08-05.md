@@ -21,6 +21,12 @@ GitHub release.
 R0 run twice, **still RED**. No code has been written and none may be until R0
 is 0C/0I.
 
+> **SUPERSEDED 2026-08-05, later the same day.** The R2 fold in §2 is DONE
+> (`9680a64`), round 2 ran (`17ffb1d`, RED 0C/5I), and the R3 fold is done
+> (`38b7a84`). Round 3 is the open gate. §3's measured facts have two
+> corrections, marked inline below. Read `design/SPEC_sizeproof.md` — it is the
+> current artifact and supersedes §2 and §3 of this file wherever they differ.
+
 ## 2. THE IMMEDIATE NEXT TASK — R2 fold
 
 Fold round 1's findings into `design/SPEC_sizeproof.md`, then re-dispatch R0.
@@ -73,10 +79,22 @@ Limit 82.00 mm (`plateSize - outerMargin`). Titles are 13 and 16 chars against
 
 Other settled measurements:
 
-- **A title makes the FRONT roomier** (3.60 mm) than no title (2.40 mm): it
-  pushes the `sh@5.0` block below the screw-hole band and buys back a row.
-- **The band affects only the FIRST block.** Everything below the top band takes
-  `ceil(95/CharsPerLine)` rows exactly.
+- **A title makes the FRONT roomier** (3.60 mm) than no title (2.40 mm): it buys
+  back a row. ~~It pushes the `sh@5.0` block below the screw-hole band.~~
+  **CORRECTED 2026-08-05 (R2/R3 measurement):** it does not. `sh@5.0` starts at
+  6.800 mm titled and 3.000 mm untitled, and BOTH are inside the 10 mm band —
+  its first row is narrowed either way (`[20 …]`). What the title moves is the
+  SECOND row, from 8.000 mm to 11.800 mm, which clears. The inversion is also
+  **front-only**: the untitled back has 5.400 mm of spare against the titled
+  2.400 mm.
+- ~~**The band affects only the FIRST block.** Everything below the top band
+  takes `ceil(95/CharsPerLine)` rows exactly.~~ **FALSE — corrected 2026-08-05.**
+  The BOTTOM band bites too, and on both sides it lands inside the LAST block:
+  measured budgets are `[31 31 31 25]` for `const@3.8` on the front and
+  `[39 31 31]` for `const@3.0` on the back. Neither narrowing changes a row
+  count in this composition, so the totals stand — but that is a **measured
+  coincidence, not a rule**, which is why `SPEC_sizeproof.md` §7.3 pins the
+  per-row budgets and not just the row counts.
 - For a uniform plate, a running sum of `params.F(size)` and
   `margin + row*fontSize` are **exactly equal** — every rung converts exactly at
   MM=6400. So no golden moves, **provided the accumulator is in device units**.
