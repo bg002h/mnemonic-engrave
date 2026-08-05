@@ -46,7 +46,7 @@ and the rungs genuinely differ — *"FRONT: 5.0mm and 3.8mm"* against
 
 | trigger | program | proves | parameter | faces | content | size |
 |---|---|---|---|---|---|---|
-| `FONTPROOF!` | passphrase | the passphrase plate | — | constant | pattern + fingerprints | plate default |
+| `PASSPROOF!` | passphrase | the passphrase plate | — | constant | pattern + fingerprints | plate default |
 | `TEXTPROOF!` | free text | `font/sh` | — | sh | full pattern | 3.0 mm (auto-fit) |
 | `CONSTPROOF!` | free text | `font/constant` | — | constant | full pattern | 3.0 mm (auto-fit) |
 | `BOTHPROOF!` | free text | both faces | rung | sh + constant | full pattern | 3.0 mm (auto-fit) |
@@ -63,10 +63,9 @@ half, and defaulting to one would let a slip cut the wrong side.
    root, not a new parameter on an old one.
 2. **A parameter slot holds one kind of value.** `FontSizes` rungs for
    `BOTHPROOF!`; sides for `SIZEPROOF!`.
-3. **Roots differ at the first character.** Shipped today: `F`, `T`, `C`, `B`,
+3. **Roots differ at the first character.** Shipped today: `P`, `T`, `C`, `B`,
    `S` — so a mistyped root matches nothing and stays ordinary text. (Matching
    is by exact string, so this is defence in depth rather than the mechanism.)
-   The rename below turns the `F` into a `P` and preserves the property.
 4. **A parameterised root is a strict prefix of its own parameterised forms and
    of nothing else.** `SIZEPROOF!` prefixes `SIZEPROOF!FRONT`; it must prefix no
    other root. Parameterised roots must never be marked `Sizeable` unless their
@@ -77,9 +76,15 @@ half, and defaulting to one would let a slip cut the wrong side.
    continues with the trigger exactly as typed. This already holds and must
    keep holding.
 
-## Open: rename `FONTPROOF!` to `PASSPROOF!`
+## DONE 2026-08-05: renamed `FONTPROOF!` to `PASSPROOF!`
 
-`FONTPROOF!` is the shipped name of the passphrase program's proof. It breaks
+Shipped in the fork as `6d57681` on branch `passproof-rename`, its own commit as
+this entry required. Full suite green, and the trigger literal is mutation-checked
+— restoring `FONTPROOF!` fails two tests, so the constant is pinned by the prompt
+copy rather than passing vacuously. The reasoning that decided it, kept because
+the rule it exercises (rule 1) will be applied again:
+
+`FONTPROOF!` was the shipped name of the passphrase program's proof. It broke
 rule 1 twice over: it names no axis, and it is distinguished from `TEXTPROOF!`
 only by living in another program. "Font" and "text" are near-synonyms; the two
 triggers load different fields in different programs, and `FONTPROOF!` cuts in
@@ -90,6 +95,11 @@ This is not theoretical. The operator referred to the free-text proof as
 passphrase program instead.
 
 `PASSPROOF!` names its program, differs from every other root at the first
-character, and obeys rule 1. **Not yet done** — it changes shipped behaviour and
-is the operator's call. Do it as its own small change, never folded into other
-work.
+character, and obeys rule 1.
+
+One thing the rename did NOT change, deliberately: the prompt's title stays
+`Test Pattern`. `uiContains` lowercases its needle and strips spaces, so a title
+of "Pass Proof" would be matched by a keyboard readout showing `PASSPROOF!` —
+exactly the false positive the old name had, in the same shape. Any "the prompt
+did not appear" assertion still has to match prompt-body copy (`ppProofShown`
+uses "REPLACES ALL THREE"), never the title.
