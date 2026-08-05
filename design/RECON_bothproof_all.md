@@ -59,44 +59,92 @@ the 95-character sweep, and the height they cost (usable plate height is
 all six rungs is 98.2 mm (sh) or 107.0 mm (const), still over. Dropping the QR,
 confusables and prose does not help: none of them are in this arithmetic.
 
-## 4. The resolution — DEAL the alphabet out, do not repeat it
+## 4. DECIDED — two sides of one plate, five rungs, full sweep each
 
-The operator's insight (2026-08-05): rather than showing all 95 characters at
-each rung, split the alphabet **across** rungs — first N characters at 6.0, the
-next N at 5.0, and so on. Each character then appears once, and every rung is
-still represented.
+Settled with the operator 2026-08-05, after working through the options in §5.
 
-Measured, both faces, characters per rung:
+| side | content | height | spare |
+|---|---|---|---|
+| **front** | `5.0 @95` + `3.8 @95` | 71.6 mm | 7.4 mm |
+| **back** | `4.4 @95` + `3.4 @95` + `3.0 @95` | 73.6 mm | 5.4 mm |
+
+**475 characters on one plate**: the complete 95-character sweep, in both faces,
+at every rung from 3.0 to 5.0. No QR, no confusable table, no prose.
+
+Two decisions carry the design:
+
+**Use both sides.** The firmware needs no concept of a "side" -- it is two plate
+programs and an operator flip. This is what turns an impossible one-sided
+problem into a comfortable two-sided one, and it doubles the proof yield per
+piece of steel, which matters because plates are scarce.
+
+**Drop the 6.0 mm rung.** Its full sweep alone costs 60 mm of the 79 available,
+so it consumes a whole side by itself and forces every other rung to be trimmed.
+Dropping it is what lets the remaining five carry the FULL sweep with real
+margin. 6.0 mm is also the rung whose legibility was never in doubt.
+
+### Deliberately NOT taken
+
+- **A 6.0 mm header doubling as the big-size sample.** A header is one row, so a
+  6.0 mm one costs 6 mm and would give a 6.0 mm specimen without spending 60. It
+  fits -- front goes to 77.6 mm -- but that leaves **1.4 mm of spare, under half
+  a row at that size**. This pattern is rebuilt whenever a glyph changes, and
+  auto-fit is all-or-nothing: a side sitting at 77.6 of 79 is refused outright by
+  the next edit rather than engraved slightly smaller. Revisit once the layout
+  code exists and it can be rendered. If it is taken, make the header text carry
+  interesting glyphs (`SH+CONST ALL 0O1lI| =f`) so it is a specimen and not just
+  a label.
+- **All six rungs.** Needs three sides across two plates: `5.0 @95` + `4.4 @88`
+  (75.8 mm), `3.8/3.4/3.0 @95` (65.0 mm), and `6.0 @95` alone (60.0 mm). Costs a
+  second plate and trims 4.4 to 88 of 95 characters, for one rung nobody doubts.
+
+## 5. The options that were measured, and why they lost
+
+Rather than showing all 95 characters at each rung, the alphabet can be DEALT
+across rungs -- first N characters at 6.0, the next N at 5.0, and so on -- so
+each character appears once. Measured, both faces:
 
 | composition | height | characters |
 |---|---|---|
-| 32/32/31 at 6.0/5.0/4.4 only (as proposed) | 61.6 mm | 95 |
-| **big 16/16/16 + small 32/32/31** | **55.0 mm** | **143** |
+| 32/32/31 at 6.0/5.0/4.4 only | 61.6 mm | 95 |
+| big 16/16/16 + small 32/32/31 | 55.0 mm | 143 |
 | 24 per rung, all six | 68.2 mm | 144 |
-| 16 per rung, all six (alphabet exactly once) | 51.2 mm | 95 |
+| 16 per rung, all six | 51.2 mm | 95 |
 | 8 per rung, all six | 51.2 mm | 48 |
 | 32 per rung, all six | 85.8 mm | OVER |
-| 32/32/31 big + small rungs dealt the same | 85.8 mm | OVER |
 
-Note the two rows that both read 51.2 mm: at 8 characters per rung every rung
-still costs two rows (one per face), so halving the characters buys nothing.
-**Row count, not character count, is what consumes the plate** — which is why
-the big rungs are so expensive and why giving the SMALL rungs the larger share
-is nearly free.
+All of these lost to the two-sided plan, which carries **475** characters rather
+than 95-144. Dealing the alphabet out is only necessary while the plate is
+one-sided.
 
-**Recommended: big 16/16/16 + small 32/32/31, 55.0 mm.** It puts the most
-characters where legibility is actually in doubt, leaves 24 mm of margin against
-the auto-fit-is-all-or-nothing fragility, and covers all six rungs.
+Two measurements worth keeping, because they are counter-intuitive:
 
-## 5. Open questions
+**8 characters cost exactly what 16 do.** At every rung, 8 characters still needs
+one row per face, and so does 16 -- 51.2 mm either way. **Row count consumes the
+plate, not character count.** Below one row per face you are paying for empty
+row. At 4.4 mm you get 26 characters for the price of 8, because 26 is where
+`font/constant` needs a second row.
 
-1. **Which characters go to which rung?** Codepoint order is the obvious deal,
-   but it clusters punctuation at the big end and letters at the small end. An
-   interleaved deal would put a mix at every rung — worth deciding deliberately,
-   since the plate exists to compare glyphs.
-2. **Does each rung need a label?** The size is visually obvious once the rungs
-   differ, but a plate found later has no other record. The mixed-plate rule
-   already learned this: see `ftProofFooterFaceMap`.
-3. **Trigger name.** `BOTHPROOF!ALL` collides with nothing — the rung suffix
-   parser accepts only strings that parse as a rung in `FontSizes`, so `ALL`
-   currently matches nothing and stays ordinary text.
+**Removing the title and footer saves nothing here.** The 79 mm budget is
+`85 - 2x3 mm` outer margin and every figure counts sweep rows only. A title and
+footer each cost one row at the size of the block they border (`bodyRows` in
+`backup/fit.go`), so the question is whether to ADD them, not whether to remove
+them.
+
+## 6. Open questions
+
+1. **Which characters go to which side?** Both sides carry the complete sweep at
+   every rung they hold, so this is not a dealing question any more -- but the
+   two sides need to be distinguishable once cut. Codepoint order is the obvious
+   sweep order and is what the shipped patterns use.
+2. **How is each side identified?** With no header, a side found later has no
+   record of which rungs it carries. The rung sizes are visually obvious in
+   relation to each other but not absolutely. See the "deliberately not taken"
+   note above.
+3. **Trigger names.** One trigger per side is needed, since they are two plate
+   programs: `BOTHPROOF!ALL` and something for the second side. The rung suffix
+   parser accepts only strings parsing as a rung in `FontSizes`, so `ALL` matches
+   nothing today and stays ordinary text.
+4. **Does engraving the back risk the front?** Unmeasured, and not a firmware
+   question -- whether a cut face is marked or misregistered by the holder when
+   flipped is something only a real plate answers.
