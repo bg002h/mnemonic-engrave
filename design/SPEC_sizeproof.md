@@ -1,12 +1,13 @@
 # SPEC — `SIZEPROOF!`: per-row sizing and the two-sided size-ladder plate
 
-Status: **R3, folding R0 round 2 (RED, 0C/5I).** Author: controller session,
+Status: **R4, folding R0 round 3 (RED, 0C/2I).** Author: controller session,
 2026-08-05. Reviews persisted at
 `design/agent-reports/bothproof-all-spec-R0-round0.md` (6C/8I),
-`design/agent-reports/sizeproof-spec-R0-round1.md` (1C/6I) and
-`design/agent-reports/sizeproof-spec-R0-round2.md` (0C/5I). Round 0's six
-Criticals, round 1's Critical and round 1's six Importants are all confirmed
-fixed and are not revisited here.
+`design/agent-reports/sizeproof-spec-R0-round1.md` (1C/6I),
+`design/agent-reports/sizeproof-spec-R0-round2.md` (0C/5I) and
+`design/agent-reports/sizeproof-spec-R0-round3.md` (0C/2I). Round 0's six
+Criticals, round 1's Critical and six Importants, and all thirteen round-2 items
+are confirmed fixed and are not revisited here.
 
 Risk-set work: changes plate **layout and admission**, and `font/constant`
 plates carry seeds and passphrases. No code before R0 is 0C/0I.
@@ -30,13 +31,16 @@ not "measure more", it is that a blanket claim of having measured is itself a
 claim, and inherited numbers are the ones that survive re-drafting unchecked.
 §2.6 now carries the measurement and the derivation.
 
-**A second-order lesson from round 2, which the five Importants all share:** the
-spec repeatedly described what the code does from a doc comment or from an
-adjacent function rather than from the code, and was wrong each time.
-`ftPlan.Blocks` does not collapse the way §3 claimed; `wrapBlocks`' existing
-callers do not translate the way §2.4 assumed; two size-reading sites were
-missing from a table introduced as complete. Where this document states what
-shipped code does, it now cites the line and has been checked against it.
+**A second-order lesson from rounds 2 and 3, which every Important since round 1
+shares:** the spec repeatedly described what the code does from a doc comment,
+from an adjacent function, or from a partial trace, rather than from the code —
+and was wrong each time. `ftPlan.Blocks` does not collapse the way R2's §3
+claimed; `wrapBlocks`' existing callers do not translate the way R2's §2.4
+assumed; two size-reading sites were missing from a table introduced as complete;
+and R3's replacement predicate for the first of those was traced only over
+DELETED newlines, so it was blind to inserted ones. Where this document now
+states what shipped code does, it cites the line, and the behaviours that decide
+something are given as measured tables (§1.1, §3.1) rather than as prose.
 
 ---
 
@@ -204,8 +208,25 @@ isQRLine := l.qrTop <= y && y < l.qrBottom
 
 | caller | `anchorY` | why |
 |---|---|---|
-| free text — `wrapBlocks`, `EngraveFitted`, `MaxCharsAtBlocks`, `rowFaces` | `params.I(outerMargin)` | one code on one plate, at the plate's top margin, whatever block a row belongs to |
+| free text — `fitBlocksAt`, `EngraveFitted`, `MaxCharsAtBlocks`, `rowFaces` | `params.I(outerMargin)` | one code on one plate, at the plate's top margin, whatever block a row belongs to |
+| **`AdmissibleBlocks`** (`fit.go:262-281`) | **`params.I(outerMargin)`** | **the same. It encodes its own code (`fit.go:269`) and so builds its own placement — see the warning below** |
 | descriptor — `EngraveText` | that paragraph's `offy` | the code belongs to the paragraph and moves with it |
+
+**`AdmissibleBlocks`' `start` and its `anchorY` are deliberately DIFFERENT
+values, and this is the one place in the change where that is true.** §2.4 gives
+it `start = params.I(outerMargin) + params.F(size)`, because it reserves a title
+ROW unconditionally; its `anchorY` is `params.I(outerMargin)`, because the title
+row moves the first row of TEXT, not the CODE. Reusing `start` — the value §2.4
+hands this exact function, and the nearest one in scope — shifts the whole QR
+band down by one row, so the rows at both band edges swap `charPerLine` for
+`charPerQRLine`, `len(l)` moves, and `linesUsed`/`ok` change. That verdict gates
+OK on the text step *and* the confirm step (`freetext_flow.go:195`) for ordinary
+QR-carrying operator plates — the path seeds and passphrases take — so an
+admissible plate is refused, or an inadmissible one accepted, with the readout
+disagreeing with the fit. §7.20 pins it with a QR and without.
+
+Checked: with `anchorY = params.I(outerMargin)` the new predicate reduces to
+`holeLines <= 1+j < holeLines+qrLines`, term for term today's `lay.at(1+i)`.
 
 `EngraveText`'s QR-ONLY special case (`backup.go:390-393`: empty text centres the
 code) is unchanged and stays in `EngraveText` — it is a placement override, not a
@@ -225,26 +246,35 @@ door, in `ftBuildPlate`, with a plate clamped in the machine.
 
 So `Fitted` carries the resolved placement in an unexported field (§2.3), set by
 `fitBlocksAt` and by `EngraveFreeText`, left nil by `FitSized`. Unexported is
-right: the only `Fitted` literals outside the package are two GUI test fixtures
+right: the only `Fitted` literals outside the package are three GUI test fixtures
 (`gui/freetext_flow_test.go:564, 893, 928`) that feed the readout and never
-engrave, and a literal that set `QR` without a placement must fail loudly rather
+engrave — including `:893`, which sets `QR` with no placement — and a literal
+that set `QR` without a placement and then engraved it must fail loudly rather
 than draw a code at a y nobody computed.
 
 ### 2.1.1 The QR guards
 
-Three invariants, enforced in `EngraveFitted` beside the `Faces` and `Sizes`
-guards, because each one is a silent wrong plate rather than a visible error:
+Three invariants. **Where each is enforced matters as much as what it says**,
+because `EngraveFitted` is reached from `ftBuildPlate`
+(`freetext_flow.go:643-651`) only AFTER the confirm screen: a check that belongs
+at the fit but lives in the engraver is a panic mid-flow with a plate clamped in
+the machine — C5's failure mode, arriving from the guard meant to prevent it.
 
-- `(QR == nil) == (placement == nil)` — a code with no placement, or a placement
-  with no code, is a caller bug.
-- **`QR != nil` implies `!Mixed`** — the band is quantised by a single `fontSize`
-  via `qrLines`, so a plate that mixes sizes has no single band. §2.7 makes this
-  structurally true for `FitSized` (no QR parameter at all), and this guard is
-  what makes it true for every other constructor. Without it, the mixed-size and
-  QR features compose into the divide-by-zero above.
-- the placement's `Bottom <= plateHeight - margin`, so a code that would run off
-  the plate is refused at the fit rather than by `toPlate` after the operator has
-  approved it.
+| invariant | enforced at | why there |
+|---|---|---|
+| `(QR == nil) == (qrAt == nil)` | `EngraveFitted`, panic | a caller bug with no operator-facing meaning; there is no correct plate to fall back to |
+| **`QR != nil` implies `!Mixed`** | `EngraveFitted`, panic | same; and `FitSized` (§2.7) makes it structurally true rather than checked |
+| `qrAt.Bottom <= plateHeight - margin` | **`fitBlocksAt`/`FitSized`, error return**; re-asserted in `EngraveFitted` as a defensive panic | it is a property of the COMPOSITION, so it is refusable before the operator approves anything |
+
+The second is the load-bearing one: the band is quantised by a single `fontSize`
+via `qrLines`, so a plate that mixes sizes has no single band. Without it the
+mixed-size and QR features compose into the divide-by-zero above.
+
+The third is unreachable from any shipped fit — measured, violating it at 3.0 mm
+needs roughly a 108-module code, i.e. a text over 1000 bytes, on a plate that
+holds about 247 characters beside such a code, so `FitBlocks` refuses first. It
+is stated anyway because "unreachable" is a property of today's rungs and today's
+`freeTextQRScale`, not of the arithmetic.
 
 **Measured equivalence (§7.7 pins it):** for every rung, with
 `anchorY = outerMargin`, the plate-absolute predicate and the row-index predicate
@@ -296,7 +326,17 @@ legacy branch: every hand-built `Fitted` literal — including `EngraveFreeText`
 the constructor the load-bearing goldens run through — leaves it false, and false
 must mean "one size everywhere", which is what those literals are.
 
-**`EngraveFreeText` must populate the new fields** (round 2 Minor). It builds a
+**Both legacy constructors must populate the new fields** (round 2 and round 3
+Minors). `fitBlocksAt` (`fit.go:224-241`) is the one every `FitBlocks` and
+`FitBlocksAt` plate goes through — every ordinary operator plate — so with §2.3's
+guards implemented literally and its `Fitted` literal left as it is,
+`len(Sizes) == 0 != len(Lines)` panics on the first golden and any titled plate
+panics on the `TitleSizeMM` invariant. It fills `Sizes` with `len(lines)` copies
+of `size`, sets `TitleSizeMM`/`FooterSizeMM` to `size` when the corresponding
+string is non-empty and 0 otherwise, leaves `Mixed` false, and sets `qrAt` from
+`qrPlaceAt` at `anchorY = outerMargin` when there is a code.
+
+`EngraveFreeText` needs the same treatment. It builds a
 `Fitted` literal (`freetext.go:103-113`) and is the path every load-bearing
 golden takes, so with §2.3's guards implemented literally and the literal left as
 it is, `len(Sizes) == 0 != len(Lines)` panics on the first golden and any
@@ -363,14 +403,20 @@ if title != "" {
 }
 limit := plateHeight - margin
 if footer != "" {
-    // The footer's OWN top y. LinesPerPlate is unreachable with a 0 size
-    // because this branch tests the STRING; see §2.3's invariant.
-    limit = margin + (LinesPerPlate(params, footerSizeMM)-1)*params.F(footerSizeMM)
+    // footerY is the footer's OWN top y, and §2.5 engraves the footer at this
+    // same expression. LinesPerPlate is unreachable with a 0 size because this
+    // branch tests the STRING; see §2.3's invariant.
+    footerY := margin + (LinesPerPlate(params, footerSizeMM)-1)*params.F(footerSizeMM)
+    limit = footerY
 }
 ```
 
-A block's row is admitted iff its BOTTOM is `<= limit`. **`limit` is the only
-name for this quantity; `maxY` is not used.** The branches are shown as branches
+A block's row is admitted iff its BOTTOM is `<= limit`. **`limit` is the name of
+the budget's lower end; `maxY` is not used.** `footerY` names the footer's own
+top y, which the footer branch assigns to `limit` and §2.5 engraves at — one
+expression, two readers, so the row the body is refused above and the row the
+footer is cut on cannot be two different rows. With no footer there is no
+`footerY`, and `limit` is the bottom margin. The branches are shown as branches
 rather than as a formula with a trailing comment, because the no-footer path is
 the one §5 mandates for BOTH ladder plates and a reader who takes the formula
 literally recomputes round 1's I2 divide-by-zero.
@@ -532,7 +578,7 @@ five-rung survey and received one rung. Every one of these must change:
 | site | change |
 |---|---|
 | `ftFaceRun` (`gui/freetext_flow.go:56`) | gains `SizeMM float32` |
-| `ftPlan.Blocks` (`freetext_flow.go:107`) | stamps each block with its run's size, and **clears every `SizeMM` when `len(out) != len(p.Runs)`** (§3.1); stale doc comment corrected |
+| `ftPlan.Blocks` (`freetext_flow.go:107`) | stamps each block with its run's size, and **clears every `SizeMM` unless the text's PART count equals the plan's declared count** (§3.1); stale doc comment corrected |
 | `ftProof` (`gui/freetext_proof.go:367`) | gains `Side string`; both ladder entries carry `TextQR: ""` |
 | `ftProofOutcome` (`freetext_proof.go:511`) | carries the plan (which now carries the sizes), not a single rung |
 | `ftRungLabel` (`freetext_proof.go:531`) | must NOT print "3.0mm" for a ladder — reads the plan's rungs |
@@ -550,10 +596,23 @@ five-rung survey and received one rung. Every one of these must change:
 | `proofPreview` (`gui/preview.go:111-132`) | goes through `ftProofOutcomeFor` instead of hardcoding `ftProofFooter` at line 130 |
 | **`fittedPreviewAt` (`gui/preview.go:149`)** | **routes through `ftFitAt`, not `backup.FitBlocks`/`FitBlocksAt` directly** |
 | `previewBuilders` | two entries; `-size` must not re-fit a ladder plate at one rung |
-| `sizeLabel` (`cmd/plateview/main.go:98`) | prints the range for a mixed plate; `0.0mm` stays a defect |
+| `ftProofLoader` (`freetext_proof.go:656-672`) | writes `*size = out.SizeMM`; the ladder proofs are not `Sizeable`, so this is **0** — see below |
+| `sizeLabel` (`cmd/plateview/main.go:98-103`) | its zero branch prints **"fixed layout"**, not `0.0mm`; a `Mixed` plate must print the range instead |
 
-**A reader that prints `0.0mm` is a defect, not a fallback.** The readout and the
-confirm screen are what the operator approves.
+**A reader that prints `0.0mm` is a defect, not a fallback** — at `ftSizeLabel`
+and `ftConfirmSummary`, where that is the literal symptom. At `cmd/plateview`'s
+`sizeLabel` the same defect shows as **"fixed layout"**, because its zero branch
+has its own string; a test written against §7.18 must assert on the string that
+site actually produces. The readout and the confirm screen are what the operator
+approves.
+
+**The ladder's rung is 0, and both routing rules depend on it.** The ladder
+proofs are not `Sizeable` (§4), so `ftProofForTrigger` returns rung 0,
+`ftProofOutcome.SizeMM` is 0, and `ftProofLoader` writes 0 into the flow's `size`
+(`freetext_proof.go:670`). That is what makes §3.1's revert reach `FitBlocks` —
+"no block carries a size" is only half of it — and what keeps the UN-edited
+`SIZEPROOF!FRONT`/`BACK` path from tripping the rule below, under which a
+non-zero `size` together with sized blocks is an error rather than a plate.
 
 **`ftFitAt`'s routing order matters** (round 2 Nit). It tests `size != 0` first
 today and calls `FitBlocksAt`, which ignores `Block.SizeMM` by §2.2/§2.7 — and it
@@ -591,8 +650,17 @@ plans** (round 2's I1). Read from the code (`freetext_flow.go:107-135`):
 > `Blocks` emits `min(parts, runs)` blocks, the last run absorbing the remainder.
 > It collapses to ONE block only when the text has exactly one `'\n'`-part.
 
-Traced against the BACK plan's six runs: 6 parts → 6 blocks; **5 parts → 5
-blocks**; 1 part → 1 block, carrying run 0's face.
+Measured against the BACK plan's six runs — the numbers are the probe's, not a
+reading:
+
+| parts | blocks | `len(out) == len(Runs)`? | what comes out |
+|---|---|---|---|
+| 1 | 1 | no | run 0's face |
+| 2 | 2 | no | runs 0-1 |
+| 5 | 5 | no | runs 0-4; **run 5 never emitted** |
+| 6 | 6 | **yes** | the ladder |
+| 7 | 6 | **yes** | runs 0-4 one part each, **run 5 absorbs two** |
+| 8 | 6 | **yes** | runs 0-4 one part each, **run 5 absorbs three** |
 
 So the previous draft's two cases were both wrong, and it missed the dangerous
 one entirely:
@@ -612,24 +680,59 @@ one entirely:
   other — round 1's I1 class, in the section that folded round 1's I1.
 
 **Decided: any shape-mismatched edit reverts the WHOLE plate to uniform
-auto-fit.** `ftPlan.Blocks` clears `SizeMM` on every block it emits whenever
-`len(out) != len(p.Runs)`. So:
+auto-fit.** The decision stands; R3's *predicate* for it did not.
 
-- **Exact shape (`len(out) == len(p.Runs)`) → the ladder is KEPT.** The plate is
-  cut at those sizes, or refused if the edit no longer fits. Reverting here would
-  be C6 wearing a different hat: an operator fixing a typo would silently receive
-  a one-rung plate. A refusal is visible; a size change is not.
-- **Any other shape → uniform auto-fit.** No block carries a size, `ftFitAt`
-  routes to `FitBlocks`, and the plate is an ordinary free-text plate.
+R3 wrote that predicate as `len(out) != len(p.Runs)`, which detects a DELETED
+newline and is blind to an INSERTED one: at 7 and 8 parts the table above shows
+`len(out) == len(p.Runs)` still holds, so the guard reports "exact shape" and the
+ladder is kept (round 3's I1). What the operator then gets is worse than the
+partial ladder this section rejects. Split the first sweep across two lines —
+the text keyboard has a newline key — and every part lands one run late:
+`sh-a` in `sh`@4.4 correctly, `sh-b` in **`const`**@4.4, the const@4.4 sweep in
+**`sh`**@3.4, and so on, with run 5 absorbing both remaining sweeps so the
+**`sh`@3.0 rung is absent entirely**. A plate titled `BACK 4.4+3.4+3.0` whose
+bands are engraved in the faces they do not name. The confirm screen cannot
+expose it: it reads the rungs from `Fitted.Sizes` (§3), and all six rungs are
+present, exactly as expected.
+
+**The predicate is on the PART COUNT, not on the block count.** A plan whose runs
+carry sizes must declare `Blocks` on every run (the ladders declare 1 each), and
+`ftPlan.Blocks` clears `SizeMM` on every block it emits unless
+
+```go
+len(strings.Split(text, "\n")) == declaredParts   // sum of every run's Blocks
+```
+
+Block count cannot carry this, because the final run absorbs the remainder
+(`freetext_flow.go:116-117`) and so pins `len(out)` at `len(p.Runs)` for every
+part count at or above it. The part count is the quantity that actually has to
+match, and it is the one the operator can see in the field.
+
+The clearing is scoped to `SizeMM` alone, so face behaviour is untouched:
+`ftPlanBoth` and `ftBothPlanFor` carry no sizes today, which makes this a no-op
+for every shipped plan.
+
+So:
+
+- **Exact part count → the ladder is KEPT.** The plate is cut at those sizes, or
+  refused if the edit no longer fits. Reverting here would be C6 wearing a
+  different hat: an operator fixing a typo would silently receive a one-rung
+  plate. A refusal is visible; a size change is not.
+- **Any other part count, fewer OR more → uniform auto-fit.** No block carries a
+  size, `ftFitAt` routes to `FitBlocks`, and the plate is an ordinary free-text
+  plate.
 
 The alternative — cut the partial ladder and rely on the confirm screen naming
-the surviving rungs — was rejected. The rung that goes missing is always the
-LAST run, which on both sides is the smallest and the one the proof exists to
-answer; the title is a separate field the operator has no reason to have edited;
+the surviving rungs — was rejected. On a DELETED newline the rung that goes
+missing is always the LAST run, which on both sides is the smallest and the one
+the proof exists to answer. On an INSERTED one the confirm screen does not even
+have the information: six rungs are reported and six rungs are cut, in the wrong
+faces. The title is a separate field the operator has no reason to have edited,
 and steel is permanent while the confirm screen is a glance. A plate that proves
-less than its own title claims is worse than a plate that reverts visibly.
+something other than what its own title claims is worse than a plate that reverts
+visibly.
 
-All three shapes are tested (§7.13).
+All four shapes are tested (§7.13).
 
 `freetext_flow.go:107`'s doc comment is stale for any plan with more than two
 runs and is corrected as part of this change, whether or not its wording is what
@@ -735,8 +838,11 @@ does. Without that test 5.400 mm would not be enough either.
    characters" measures a different plate the day the fixture text changes case;
    (c) `EngraveFitted` draws at `f.qrAt.Y` and `EngraveText` at its local
    placement's `Y` — now assertable, because §2.3 gives `Fitted` the field to
-   carry and neither engraver computes a y of its own; (d) §2.1.1's three guards
-   each panic when violated, including `QR != nil` with `Mixed`.
+   carry and neither engraver computes a y of its own; (d) §2.1.1's guards fire
+   **where that table puts them** — the two caller-bug invariants panic in
+   `EngraveFitted`, and `qrAt.Bottom > plateHeight - margin` comes back as an
+   ERROR from `fitBlocksAt`/`FitSized`. A test that accepts a panic for the third
+   would pass against exactly the mid-flow crash §2.1.1 exists to avoid.
 8. **Footer and last body row are disjoint on a MIXED plate with a 3.8 mm
    footer**, where §2.4's two formulas do not cancel, and a composition one row
    too tall for its title+footer is refused. Replaces the previous draft's "no
@@ -748,13 +854,16 @@ does. Without that test 5.400 mm would not be enough either.
 11. **Unbounded `wrapBlocks` callers still report untruncated counts.**
 12. **Titles fit `MaxTitleLen`, fit the inset span of their own face and size,
     and decode in `TitleFace`.**
-13. **The edit path, all THREE shapes** (§3.1), against the six-run BACK plan:
-    (a) 6 parts — exact shape — keeps the ladder, and is refused rather than
-    re-fitted when the edit no longer fits; (b) **5 parts — the partial edit —
-    reverts to uniform auto-fit and does NOT cut a five-rung plate missing
-    `const@3.0`**; (c) 1 part — full collapse — reverts. Assert on the resolved
-    `Fitted.Sizes`, not on the block list, so the test fails if `ftFitAt` routes
-    a sizeless composition to `FitSized` anyway.
+13. **The edit path, all FOUR shapes** (§3.1), against the six-run BACK plan:
+    (a) 6 parts — exact — keeps the ladder, and is refused rather than re-fitted
+    when the edit no longer fits; (b) **5 parts — a deleted newline — reverts,
+    and does NOT cut a five-rung plate missing `const@3.0`**; (c) **7 parts — an
+    inserted newline — reverts, and does NOT cut a six-rung plate with every
+    band one run late and `sh@3.0` absent**; (d) 1 part — full collapse —
+    reverts. (c) is the one `len(out) != len(p.Runs)` was blind to, so a test
+    that omits it re-admits round 3's I1. Assert on the resolved `Fitted.Sizes`
+    and `Fitted.Faces`, not on the block list: the block list is what looked
+    right in the failing case.
 14. **The size/string invariant** (§2.3): `FitSized` refuses a title with a zero
     size and a footer with a zero size; and `FitSized`/`EngraveFitted` on the
     no-footer path do not panic and produce `limit == plateHeight - margin`.
@@ -782,11 +891,17 @@ does. Without that test 5.400 mm would not be enough either.
     uniformly.
 19. **Every one mutation-tested.** Four false-passing tests reached review across
     the last two cycles; assume more will try.
-20. **`AdmissibleBlocks`' verdict does not move** (§2.4). Pin `linesUsed` and
-    `ok` at 3.0 mm in `sh` for a text sitting exactly at capacity, and for one
-    line over. This is the assertion that fails if the `start` translation is
-    carried over as the literal `1`, which nothing else — not a golden, not a
-    compile — would catch.
+20. **`AdmissibleBlocks`' verdict does not move** (§2.4, §2.1). Pin `linesUsed`
+    and `ok` at 3.0 mm in `sh` for a text sitting exactly at capacity and for one
+    line over, **with `useQR = true` as well as false**. The no-QR case is the
+    one that fails if the `start` translation is carried over as the literal `1`;
+    the QR case is the one that fails if the placement is anchored at `start`
+    instead of `outerMargin` (§2.1). Neither a golden nor the compiler catches
+    either. Pin `MaxCharsAtBlocks` the same way for a mixed-block composition
+    whose face boundary falls on a screw-hole row, so `rowFaces`' `0` →
+    `params.I(outerMargin)` translation cannot be skipped silently:
+    `TestMaxCharsAtBlocksCountsEachRowInItsOwnFace` asserts only a loose bracket
+    and passes with the boundary row shifted.
 
 ## 8. Non-goals
 
