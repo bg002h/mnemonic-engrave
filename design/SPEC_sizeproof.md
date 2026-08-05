@@ -1,13 +1,22 @@
 # SPEC — `SIZEPROOF!`: per-row sizing and the two-sided size-ladder plate
 
-Status: **R4, folding R0 round 3 (RED, 0C/2I).** Author: controller session,
-2026-08-05. Reviews persisted at
-`design/agent-reports/bothproof-all-spec-R0-round0.md` (6C/8I),
-`design/agent-reports/sizeproof-spec-R0-round1.md` (1C/6I),
-`design/agent-reports/sizeproof-spec-R0-round2.md` (0C/5I) and
-`design/agent-reports/sizeproof-spec-R0-round3.md` (0C/2I). Round 0's six
-Criticals, round 1's Critical and six Importants, and all thirteen round-2 items
-are confirmed fixed and are not revisited here.
+Status: **R5 — R0 GREEN (0 Critical / 0 Important) at round 4.**
+Author: controller session, 2026-08-05.
+
+The gate ran five times. Reviews persisted verbatim, each before its fold:
+
+| round | verdict | reviewers |
+|---|---|---|
+| 0 (`bothproof-all-spec-R0-round0.md`) | RED 6C/8I | opus |
+| 1 (`sizeproof-spec-R0-round1.md`) | RED 1C/6I | opus |
+| 2 (`sizeproof-spec-R0-round2.md`) | RED 0C/5I | opus + sonnet, opus synthesis |
+| 3 (`sizeproof-spec-R0-round3.md`) | RED 0C/2I | opus + sonnet, opus synthesis |
+| 4 (`sizeproof-spec-R0-round4.md`) | **GREEN 0C/0I** | opus + sonnet, opus synthesis — **both lanes GREEN independently** |
+
+Every finding from rounds 0-3 is folded. Round 4's six Minors and Nits are folded
+inline in this revision; a 0C/0I re-review closes the loop and does not earn
+another round. **Nothing here is re-opened by later work** — the next artifact is
+an implementation plan, which carries its own R0 gate.
 
 Risk-set work: changes plate **layout and admission**, and `font/constant`
 plates carry seeds and passphrases. No code before R0 is 0C/0I.
@@ -61,7 +70,9 @@ QR, no confusable table, no prose, **no footer** (§5). 6.0 mm is absent by
 decision.
 
 The two sides are **two independent plate programs and an operator flip.** The
-firmware gains no concept of a side.
+firmware gains no RELATIONSHIP between them — no pairing, no flip prompt, no
+ordering, no notion that one plate has another side. It does gain a `Side` LABEL
+the prompt prints (§4), which is a string, not a model.
 
 ### 1.1 The measurement
 
@@ -206,11 +217,20 @@ isQRLine := l.qrTop <= y && y < l.qrBottom
 
 **The anchor is the CALLER's decision and each keeps the one it has:**
 
-| caller | `anchorY` | why |
+**Placement PRODUCERS** — the functions that call `qrPlaceAt` and choose an
+anchor:
+
+| producer | `anchorY` | why |
 |---|---|---|
-| free text — `fitBlocksAt`, `EngraveFitted`, `MaxCharsAtBlocks`, `rowFaces` | `params.I(outerMargin)` | one code on one plate, at the plate's top margin, whatever block a row belongs to |
+| free text — `fitBlocksAt`, `EngraveFreeText`, `MaxCharsAtBlocks`, `rowFaces` | `params.I(outerMargin)` | one code on one plate, at the plate's top margin, whatever block a row belongs to |
 | **`AdmissibleBlocks`** (`fit.go:262-281`) | **`params.I(outerMargin)`** | **the same. It encodes its own code (`fit.go:269`) and so builds its own placement — see the warning below** |
+| `FitSized` | — | no QR at all (§2.7); leaves `qrAt` nil |
 | descriptor — `EngraveText` | that paragraph's `offy` | the code belongs to the paragraph and moves with it |
+
+**Placement CONSUMERS** — `EngraveFitted` reads `f.qrAt` and calls `qrPlaceAt`
+**never**. It is not in the table above and must not choose an anchor: it
+receives only `Fitted`, and re-deriving there is the second derivation this
+section exists to abolish (see below).
 
 **`AdmissibleBlocks`' `start` and its `anchorY` are deliberately DIFFERENT
 values, and this is the one place in the change where that is true.** §2.4 gives
@@ -567,6 +587,13 @@ Validation, all of it returning an error rather than laying out:
 as `fitBlocksAt` does. `FitBlocks` and `FitBlocksAt` are untouched and continue
 to ignore `Block.SizeMM` (§2.2).
 
+`FitSized` sets `Sizes` from the resolved per-block sizes, computes `Mixed` by
+§2.3's rule, and sets `SizeMM` to the common value when `!Mixed` and 0 otherwise.
+Every ladder composition is genuinely mixed, so the degenerate case never arises
+in this flow — but `FitSized` is a public entry point and all-3.0 blocks with a
+3.0 title are legal, whereupon hardcoding `Mixed: true, SizeMM: 0` would put
+`0.0mm` on the readout, the defect §3 bolds.
+
 ## 3. The GUI surface — the whole path, not just the prompt
 
 R0's C6: nothing carries per-block sizes from the trigger to the fit, so the
@@ -597,6 +624,8 @@ five-rung survey and received one rung. Every one of these must change:
 | **`fittedPreviewAt` (`gui/preview.go:149`)** | **routes through `ftFitAt`, not `backup.FitBlocks`/`FitBlocksAt` directly** |
 | `previewBuilders` | two entries; `-size` must not re-fit a ladder plate at one rung |
 | `ftProofLoader` (`freetext_proof.go:656-672`) | writes `*size = out.SizeMM`; the ladder proofs are not `Sizeable`, so this is **0** — see below |
+| **`ftProofOutcomeFor` (`freetext_proof.go:519-526`)** | **its fallback hardcodes `Footer: ftProofFooter` for every non-`Sizeable` proof, which is both ladders. `ftProof` gains `Footer string`, defaulting to `ftProofFooter` and EMPTY for the two ladder entries; the resolver returns `p.Footer`** |
+| `ftProofReplaces` (`freetext_proof.go:538`) | with an empty footer it renders "Footer becomes ." — say "the Footer is CLEARED" instead |
 | `sizeLabel` (`cmd/plateview/main.go:98-103`) | its zero branch prints **"fixed layout"**, not `0.0mm`; a `Mixed` plate must print the range instead |
 
 **A reader that prints `0.0mm` is a defect, not a fallback** — at `ftSizeLabel`
@@ -647,8 +676,20 @@ R2 described this from `ftPlan.Blocks`' doc comment, which says the text
 the two-run plans shipped today and **false for the four- and six-run ladder
 plans** (round 2's I1). Read from the code (`freetext_flow.go:107-135`):
 
-> `Blocks` emits `min(parts, runs)` blocks, the last run absorbing the remainder.
-> It collapses to ONE block only when the text has exactly one `'\n'`-part.
+> Each NON-FINAL run takes `min(Blocks, remaining)` parts and the walk stops as
+> soon as the parts run out; the FINAL run takes whatever is left. So
+> `len(out) == len(p.Runs)` only once every non-final run's declared share has
+> been satisfied.
+
+`min(parts, runs)` is **not** the rule — that generalisation, and "it collapses
+to ONE block only at one part", hold for the all-`Blocks: 1` ladders and are
+false for the shipped two-run `ftPlanBoth`, whose first run declares
+`ftProofBothSplit` and so swallows everything at any part count at or below it
+(pinned already by `gui/freetext_flow_test.go:1134-1141`). The measured table
+below is the normative statement; the prose above is its summary, and
+`freetext_flow.go:107`'s corrected doc comment takes the table's rule, not the
+summary. Writing a tidy generalisation into that comment is how R2 was misled in
+the first place.
 
 Measured against the BACK plan's six runs — the numbers are the probe's, not a
 reading:
@@ -778,8 +819,10 @@ in — measured: 13 <= 26 columns at `sh` 3.8 mm, 16 <= 36 at `sh` 3.0 mm.
 | BACK | 79.600 | 78.000 (3.0 mm) | 1.600 mm |
 
 The ladder proofs therefore pass an EMPTY footer and **must not inherit
-`ftProofFooter`** — not from `ftProofOutcomeFor`, and not from `proofPreview`'s
-hardcoded literal (§3).
+`ftProofFooter`** — not from `ftProofOutcomeFor`'s fallback, and not from
+`proofPreview`'s hardcoded literal. §3's table names the mechanism for both: a
+per-proof `Footer` field, empty on the two ladder entries. Getting this wrong is
+a visible refusal (`FitSized` rejects both plates), not wrong steel.
 
 On the back's 2.400 mm: acceptable **only because §7.3 pins each side's per-block
 row count, per-row budgets and total height**. The hazard is discrete — a glyph
@@ -864,6 +907,15 @@ does. Without that test 5.400 mm would not be enough either.
     that omits it re-admits round 3's I1. Assert on the resolved `Fitted.Sizes`
     and `Fitted.Faces`, not on the block list: the block list is what looked
     right in the failing case.
+    **Plus a synthetic sized plan with runs `[2, 1, 1]`**, where
+    `declaredParts == 4` but `len(p.Runs) == 3`: sizes survive at 4 parts and
+    clear at 3 and 5. Both ladders have one block per run, so
+    `declaredParts == len(p.Runs)` for every real fixture and none of (a)-(d)
+    can tell the specified predicate from a `len(p.Runs)`-based one — including
+    under §7.19's mutation pass. Assert too that every run of every SIZED plan
+    declares `Blocks >= 1` and that a sized plan has more than one run, since
+    `ftPlan.Blocks`' single-run early return (`freetext_flow.go:109-111`)
+    bypasses the split and would never clear a one-run sized plan's sizes.
 14. **The size/string invariant** (§2.3): `FitSized` refuses a title with a zero
     size and a footer with a zero size; and `FitSized`/`EngraveFitted` on the
     no-footer path do not panic and produce `limit == plateHeight - margin`.
@@ -907,7 +959,11 @@ does. Without that test 5.400 mm would not be enough either.
 
 - The 6.0 mm rung.
 - Generalising auto-fit to mixed sizes; `FitBlocks` stays as it is.
-- Any notion of plate sides in firmware.
+- Any RELATIONSHIP between the two sides in firmware — no pairing, no flip
+  prompt, no ordering, no "the other side of this plate". `ftProof.Side` is a
+  label the prompt prints (§4) and nothing more; dropping it in the name of this
+  non-goal re-admits R0's I5, since both sides prove identical faces and
+  `Plan.Name()` cannot tell them apart.
 - A QR on these plates — `FitSized` has no parameter for one (§2.7).
 - Rendering both sides as one image in `cmd/plateview`; two invocations.
 - The `FONTPROOF!` → `PASSPROOF!` rename; its own change, operator's call.
