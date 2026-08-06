@@ -215,3 +215,30 @@ never dropping a QR automatically.
 
 Deliberately NOT folded into the whole-diff fix, which is narrow by design and
 must not grow at the final gate.
+
+### `sizeproof-admission-count-at-its-own-rungs` — OPEN, owning phase: next change touching admission
+
+The "proper" fix the whole-diff review recommended and the controller declined at
+the final gate, in favour of the narrow `admitQR := useQR && !ftSizedBlocks(blocks)`
+landed in `c9cc4db`.
+
+`AdmissibleBlocks` lays a composition out **uniformly at `FontSizes`' smallest
+rung** — the 3.0 mm anchor spec `SPEC_sizeproof.md` §6 pins deliberately, because
+reserving unconditionally is what makes admission monotone. For a size ladder
+that anchor describes a different plate from the one `FitSized` cuts, so the
+readout's line count and the refusal's figures are about neither the plate nor a
+bound on it:
+
+- front: admission reports **12 of 24** used while `FitSized` lays out **16 rows**;
+- back: admission reports **18 of 24** while `FitSized` lays out **20**;
+- an edited ladder that genuinely overflows its own rungs is refused by
+  `FitSized` while admission still says `ok` with room to spare — the refusal's
+  numbers contradict the refusal (whole-diff review, Minor #3).
+
+Nothing wrong is engraved: the verdict is correct in both directions after
+`c9cc4db`, only the figures mislead. Fixing it means counting a sized
+composition at its own rungs, which changes `AdmissibleBlocks`' contract —
+guarded by `TestAdmissibleBlocksVerdictDoesNotMove`'s three measured cases, which
+**must not move for uniform plates**. That is why it was not done at the gate.
+
+Do it in the same change that reworks admission, not before.
