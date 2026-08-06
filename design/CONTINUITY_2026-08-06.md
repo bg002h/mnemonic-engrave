@@ -77,10 +77,17 @@ What to read, in order:
 ### What was flashed
 
 ```
-test-e4-a125-j1300.signed.uf2   (untracked in the seedhammer repo root)
+/scratch/code/shibboleth/seedhammer/test-e4-a125-j1300.signed.uf2
 sha256 daf4100e490ede04fa598451e494309dfca1ce84bd418e42d84465963d62639f
 engraving 4 mm/s · acceleration 125 · jerk 1300   (from 8 / 250 / 2600)
 ```
+
+⚠️ **That file is UNTRACKED and deliberately so** — it is a build output, and the
+fork is kept clean for upstream PRs, so it must not be committed. **A `git clean`
+in the seedhammer tree destroys it**, and with it the only copy of the firmware
+currently on the machine. It is reproducible (build `d7155b9` with the three
+motion constants halved, then sign), but not for free. If the tree needs cleaning,
+move it out first.
 
 Both source files were reverted after the build; both trees are clean of it.
 Estimated plate time ~21m22s against 19m15s for the half-speed-only plate (+11%).
@@ -177,7 +184,7 @@ Ordered by what unblocks what.
 - **Nothing pins the machine's actual engraving speed.** Four independent copies
   of `engravingSpeed = 8 * mm` exist and goldens use test-local ones, so a
   firmware speed change moves no test. Real gap.
-- **Push.** `mnemonic-engrave` has 15 unpushed commits (all docs + one script); `seedhammer` has 1
+- **Push.** `mnemonic-engrave` has 18 unpushed commits (all docs + one script); `seedhammer` has 1
   (`d7155b9`) on `main`.
 
 ## 6. Standing constraints
@@ -204,7 +211,7 @@ Ordered by what unblocks what.
 
 | | |
 | --- | --- |
-| `mnemonic-engrave` | clean, 12 unpushed, HEAD `3d90722` |
+| `mnemonic-engrave` | clean, 18 unpushed, HEAD `edc39bd` |
 | `seedhammer` | `main`, HEAD `d7155b9`, 1 unpushed; `test-e4-a125-j1300.signed.uf2` untracked |
 | `seedhammer-wt-glyphcleanup` | `constant-glyph-cleanup` @ `b9b7831`, merged to main, clean |
 
