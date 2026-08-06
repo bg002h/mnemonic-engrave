@@ -260,6 +260,28 @@ The measured cost is smaller than expected: `SIZEPROOF!BACK` goes from ~14m28s t
 ~19m15s, **+33%, not +100%**, because travel moves are unchanged at 30 mm/s and
 short strokes never reach the top feed anyway.
 
+**THE MATRIX SO FAR, and it does not order simply.** Three of four cells cut:
+
+| | dot texture | retrace widening |
+|---|---|---|
+| soft @ 8 mm/s | **best** — least evident | worst |
+| hard @ 8 mm/s | worst | (this is where the wiggle was first seen) |
+| hard @ 4 mm/s | middling | **best** |
+| **soft @ 4 mm/s** | **NOT YET CUT** | **NOT YET CUT** |
+
+The two defects respond to material in OPPOSITE directions. Hard steel resists
+the plastic flow that widens a retraced groove, so it wins there; soft steel
+absorbs each blow more smoothly, so the dots blend and it wins on texture. The
+operator: retrace widening is better on the slow hard plate than on the fast soft
+one, while the dot effect is least evident on the fast soft one.
+
+**Cut the missing cell before designing the setting.** It decides whether slow
+feed is a HARD-STEEL treatment or simply better everywhere — and if it is better
+everywhere, the feature may not be soft/hard at all but a single slower default,
+or a fine/fast choice orthogonal to material. The half-speed firmware
+(`v0.0.0-gd7155b9-dirty`) is already flashed, so this costs one plate and no
+reflash.
+
 **Nothing else blocks it.** Nobody has yet cut a plate at a
 slower engraving feed to confirm that slowing down is even the fix. If a slower
 feed does not clean up the entry wiggle and the truncation, the answer is a
