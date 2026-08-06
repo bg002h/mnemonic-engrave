@@ -53,6 +53,46 @@ In order:
      110-unit standard. Pinned in `TestInkClearsTheNextGlyph` so it cannot get
      worse. Still open.
 
+   ### 3.0 THE DIAGONAL WIGGLE IS THE MACHINE — DO NOT REDRAW FOR IT
+
+   **Measured on engraved steel, 2026-08-06 (SIZEPROOF!BACK).** Operator's
+   observation, and it is a complete diagnosis on its own:
+
+   | glyph | wiggles? | axes moving |
+   |---|---|---|
+   | `<` `>` `v` `^` `/` `\` | **yes** | both |
+   | `\|` | no | one (vertical) |
+   | `-` `_` | no | one (horizontal) |
+
+   **Single-axis motion is clean; two-axis motion ripples.** On one axis the
+   microstep positional error lies *along* the direction of travel, so it is a
+   speed variation and the line stays straight. On a diagonal both axes carry
+   independent error and the *difference* is perpendicular to the path.
+
+   Numbers: 25 full steps/mm, so one full step is **0.040 mm**, and microstep
+   error is periodic with the full step — about **33 cycles along a 1.33 mm
+   arm**, a fine ripple rather than a bend. A microstep is 0.16 µm, far too
+   small to see, so the ripple is the *error*, not the resolution.
+
+   **Two hypotheses were ruled out by this, and both looked plausible:**
+
+   - *Not* the tripled control points. `constant.svg` stores 3 vertices for `<`
+     and the compiled font stores **9** — each vertex tripled, which is what
+     makes a cubic B-spline pass through a point and turn a sharp corner rather
+     than rounding it. But `|` is tripled too and is clean.
+   - *Not* the geometry. The planned path was measured at **0.0004 mm** from
+     straight — a tenth of a step.
+
+   **So no glyph edit fixes it.** `< > v ^ / \` do not need redrawing, and a
+   round spent "fixing" `<` would have shown no change on steel. Same class as
+   §4.1's slant, which was also measured to be the machine and not the drawing.
+
+   Mitigation, if ever wanted, is machine-side: slower feed on diagonals, or
+   *lower* microstepping with current tuned for it — 1/16 with good current
+   control can land more accurately than 1/256, because the error is in the
+   current vector, not the arithmetic. Filed as
+   `seedhammer-diagonal-microstep-ripple`.
+
    ### 3.1 THE OPENING-UP RULES (operator, 2026-08-05) — read before any glyph
 
    1. **Parallel lines below a floor separation read as ONE THICK LINE.** Adding

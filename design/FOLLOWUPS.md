@@ -128,6 +128,31 @@ guarded by `TestAdmissibleBlocksVerdictDoesNotMove`'s three measured cases, whic
 Do it in the same change that reworks admission, not before.
 
 
+### `seedhammer-diagonal-microstep-ripple` — OPEN, owning phase: machine-side tuning, not font work
+
+**Measured on engraved steel 2026-08-06.** Diagonal strokes carry a fine ripple;
+axis-aligned strokes do not. Operator's readings from SIZEPROOF!BACK: `< > v ^ /
+\` all wiggle, `|` does not, `-` and `_` do not. The discriminator is **how many
+axes move**, not the glyph.
+
+On one axis the microstep positional error lies along the direction of travel and
+shows only as a speed variation. On a diagonal both axes carry independent error
+and the difference is perpendicular to the path. At 25 full steps/mm one full
+step is 0.040mm, and the error is periodic with the full step — roughly 33 cycles
+along a 1.33mm arm.
+
+**Ruled out, with measurements, so they are not re-investigated:** it is not the
+tripled control points (`|` has them and is clean — the tripling is what makes a
+cubic B-spline turn a sharp corner instead of rounding it), and it is not the
+planned geometry (measured 0.0004mm from straight, a tenth of a step).
+
+**Do NOT redraw glyphs for this.** Cross-ref §4.1's slant, which was also
+measured to be the machine rather than the drawing. Mitigation is machine-side:
+slower feed on diagonals, or lower microstepping with the current tuned for it —
+1/16 with good current control can land more accurately than 1/256, since the
+error is in the current vector rather than the arithmetic. Unquantified; nobody
+has measured the ripple's amplitude, only seen it.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
