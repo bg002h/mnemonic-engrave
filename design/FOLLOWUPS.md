@@ -194,6 +194,50 @@ different engraving feed — under (b) the period moves, under (a) it does not.
 also measured to be the machine rather than the drawing. Nobody has measured the
 ripple's amplitude or period yet, only seen it.
 
+### `seedhammer-soft-hard-material-setting` — OPEN, owning phase: its own gated cycle, AFTER the feed test
+
+**Operator's idea, 2026-08-06, prompted by the two plates.** One engraving speed
+does not suit both materials: the same firmware and toolpath cut clean on soft
+steel and shows entry wiggle plus `^`-style end truncation on stainless. See
+[[seedhammer-diagonal-ripple-on-stainless]] for the evidence.
+
+**Name them `soft` / `hard`, not `carbon steel` / `stainless`** (operator). That
+names the property that actually drives the behaviour — cutting force against
+hardness — so brass, titanium or a mystery alloy still fall into a bucket the
+operator can pick. Naming two alloys implies the machine knows which one is on
+the bed, and it does not.
+
+**DO NOT BUILD IT UNTIL THE FEED TEST IS DONE.** Nobody has yet cut a plate at a
+slower engraving feed to confirm that slowing down is even the fix. If a slower
+feed does not clean up the entry wiggle and the truncation, the answer is a
+different tool or a lead-in, not a speed setting, and the whole feature is aimed
+at the wrong thing.
+
+**Why this is a gated cycle rather than an inline change:**
+
+- `EngravingSpeed` is a compile-time constant in TWO places —
+  `cmd/controller/platform_sh2.go` (the original, `tinygo && rp`) and
+  `internal/sh2/params.go` (the host copy). `TestParamsMatchTheMachine` parses
+  the former and fails on divergence, so the pair is already guarded; making the
+  value runtime-selectable has to keep that guard meaningful.
+- **Every golden pins TIMING, not just geometry.** `knotsCloseEnough` compares
+  `k1.T == k2.T` exactly. Changing the engraving speed moves the T value of every
+  knot on every plate, so all 16 backup goldens plus the SIZEPROOF pair move. The
+  default setting must therefore keep today's speed EXACTLY, with the second
+  setting covered by its own tests, or the whole golden corpus has to be
+  re-recorded for a change nobody has judged.
+- **It touches the constant-time model.** `runeDuration`, `advDur`, `padDur` and
+  `centerDur` are all derived from the stepper config. Within one plate they
+  scale together, so the `T_row <= 2L` disclosure bound survives — but
+  `TestPassphraseRuneDurationPin` pins an absolute tick count and would need one
+  per setting. Anything touching that model is risk-set work.
+
+**Design question left open:** what should actually differ. Slower feed is the
+obvious lever and changes timing only. But the defects are at stroke ENTRY and
+EXIT, not distributed, so a dwell at the start or a slight overrun at the end may
+fix them at far less cost in plate time — and an overrun changes the toolpath,
+hence the plate, hence the goldens, in a way a speed change does not.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
