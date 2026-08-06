@@ -342,11 +342,32 @@ down in or before that phase, not batched to the end.
 1. Two-lane adversarial review over the whole diff (opus + sonnet), R0 =
    plan correctness. Non-deferrable — it is what catches implementation-introduced
    regressions TDD misses. Persist verbatim to `design/agent-reports/`.
-2. Merge to fork `main`.
-3. Cut a release carrying **both** this and the un-flashed BIP-39 password work
+2. **On a passing review, MERGE EVERYTHING TO `main`.** Standing operator
+   directive, 2026-08-05: *"When we pass review, merge everything to
+   master/main."* No further confirmation needed — a green review IS the
+   authorisation.
+
+   The branches are a clean linear stack, so **one merge carries both**:
+
+   ```
+   sizeproof         f666c1f (P4) → 5e3d16e (P3) → acda504 (P2) → 5b2f1b2 (P1)
+   passproof-rename  6d57681   the PASSPROOF! rename
+   main              3c3a2ad
+   ```
+
+   Merge `sizeproof` into `main`; that brings the rename with it. Do **not**
+   cherry-pick or re-merge `passproof-rename` separately — it is already an
+   ancestor. Delete both branches and the `seedhammer-wt-sizeproof` worktree
+   after the merge lands.
+3. Cut a release carrying this **and** the un-flashed BIP-39 password work
    already on `main`, so one flash gets the operator everything
-   (operator's choice, 2026-08-05).
+   (operator's choice, 2026-08-05). Tag as `fork-v0.0.0-g<sha>` per the previous
+   release, build the `.uf2`, attach it to the GitHub release.
 4. The operator flashes and engraves. Reading the plates is its own cycle.
+
+**Gate discipline still applies to step 2.** "Merge on pass" is authorisation for
+a GREEN review, not a licence to merge past an open Critical or Important. A RED
+review is folded and re-run first, exactly as every gate in this cycle has been.
 
 ## 4. Out of scope here
 
