@@ -55,6 +55,14 @@ In order:
 
    ### 3.0 THE DIAGONAL WIGGLE IS THE MACHINE — DO NOT REDRAW FOR IT
 
+   **CORRECTED 2026-08-06, same day it was written.** There are TWO engraved
+   plates — soft steel and stainless — cut from the same firmware and toolpath,
+   and **only the stainless ripples**. That damages the microstep explanation
+   below: microstep error is a property of the motor and driver and would appear
+   in both. See `seedhammer-diagonal-ripple-on-stainless` in FOLLOWUPS for the
+   two surviving hypotheses and the loupe test that separates them. The axis
+   pattern below is still sound; the *cause* is not settled.
+
    **Measured on engraved steel, 2026-08-06 (SIZEPROOF!BACK).** Operator's
    observation, and it is a complete diagnosis on its own:
 

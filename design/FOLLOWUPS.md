@@ -128,30 +128,47 @@ guarded by `TestAdmissibleBlocksVerdictDoesNotMove`'s three measured cases, whic
 Do it in the same change that reworks admission, not before.
 
 
-### `seedhammer-diagonal-microstep-ripple` — OPEN, owning phase: machine-side tuning, not font work
+### `seedhammer-diagonal-ripple-on-stainless` — OPEN, owning phase: machine-side, not font work
 
-**Measured on engraved steel 2026-08-06.** Diagonal strokes carry a fine ripple;
-axis-aligned strokes do not. Operator's readings from SIZEPROOF!BACK: `< > v ^ /
-\` all wiggle, `|` does not, `-` and `_` do not. The discriminator is **how many
-axes move**, not the glyph.
+**Measured on engraved steel, 2026-08-06, and the diagnosis was CORRECTED once
+already — read the correction before theorising.**
 
-On one axis the microstep positional error lies along the direction of travel and
-shows only as a speed variation. On a diagonal both axes carry independent error
-and the difference is perpendicular to the path. At 25 full steps/mm one full
-step is 0.040mm, and the error is periodic with the full step — roughly 33 cycles
-along a 1.33mm arm.
+Observation 1, from SIZEPROOF!BACK: diagonal strokes ripple, axis-aligned ones do
+not. `< > v ^ / \` wiggle; `|`, `-` and `_` do not. The discriminator is how many
+axes move, not the glyph.
 
-**Ruled out, with measurements, so they are not re-investigated:** it is not the
-tripled control points (`|` has them and is clean — the tripling is what makes a
-cubic B-spline turn a sharp corner instead of rounding it), and it is not the
-planned geometry (measured 0.0004mm from straight, a tenth of a step).
+Observation 2, which arrived later and **overturns the first explanation**: there
+are TWO plates, one soft steel and one stainless, cut from the same firmware and
+the same toolpath. **Only the stainless shows it.**
 
-**Do NOT redraw glyphs for this.** Cross-ref §4.1's slant, which was also
-measured to be the machine rather than the drawing. Mitigation is machine-side:
-slower feed on diagonals, or lower microstepping with the current tuned for it —
-1/16 with good current control can land more accurately than 1/256, since the
-error is in the current vector rather than the arithmetic. Unquantified; nobody
-has measured the ripple's amplitude, only seen it.
+**The first explanation was microstep positional error, and it is now doubtful on
+its own.** That error is a property of the motor and driver; it would be present
+in both cuts. Same path, same steppers, different result means the difference is
+not in the motion planning. Recorded here rather than deleted because it fit the
+axis evidence perfectly and will look attractive again to the next reader.
+
+**Also ruled out, with measurements:** not the tripled control points (`|` has
+them and is clean — the tripling is what makes a cubic B-spline turn a sharp
+corner rather than rounding it); not the planned geometry (0.0004 mm from
+straight, a tenth of a step); not speed (on `<` the LOWER half is measurably
+slower, 0.2001 against 0.2362 mean, and it is the upper that wiggles); and not
+the start of the run (`<` and `>` wiggle at their start, but `^` starts at the
+bottom-left and wiggles at the END, on the right).
+
+**Two hypotheses survive, and they predict different ripple PERIODS:**
+
+| | mechanism | period | ripples on a 1.33 mm arm | changes with feed? |
+|---|---|---|---|---|
+| **a** | ripple is real in the motion; soft steel burnishes it away, stainless records it | one full step, **0.040 mm** | ~33 | no |
+| **b** | ripple is made by the cut — chatter or stick-slip at the higher force stainless demands | feed ÷ tool-gantry resonance | a handful, ~4–9 | **yes** |
+
+**THE DISCRIMINATING TEST IS CHEAP: count the ripples on one arm under a loupe.**
+About thirty means (a); a handful means (b). Confirm by re-cutting one plate at a
+different engraving feed — under (b) the period moves, under (a) it does not.
+
+**Do NOT redraw glyphs for this either way.** Cross-ref §4.1's slant, which was
+also measured to be the machine rather than the drawing. Nobody has measured the
+ripple's amplitude or period yet, only seen it.
 
 ## Resolved
 
