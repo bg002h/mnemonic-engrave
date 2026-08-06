@@ -22,7 +22,64 @@ In order:
    `sizeproof-back.bin`, driven by `gui/freetext_sizeproof_golden_test.go`. 44
    packages green, **zero existing golden bytes moved**. See §4, whose "87
    glyphs" figure is now corrected by measurement.
-3. **NEXT — tweak `const` glyphs.**
+3. **IN PROGRESS — opening up `const` glyphs. `e` is DONE (`46a1af8`).**
+
+   ### 3.1 THE OPENING-UP RULES (operator, 2026-08-05) — read before any glyph
+
+   1. **Parallel lines below a floor separation read as ONE THICK LINE.** Adding
+      house angles so they **diverge** opens the glyph without harming the
+      obvious parallel nature of the lines.
+   2. **The eye takes the WIDEST part of a gap and projects it across** as
+      though the line were horizontal. It is an illusion — and it is why a wedge
+      reads as open along its whole length while a uniform gap of the same
+      average does not. **Measure the widest sustained gap, never the median or
+      the minimum.** Ranking by "how much of the gap is tight" puts the
+      diagonals of `N`, `V`, `W`, `M` at the top of the work list; they are
+      already wedges and need nothing.
+   3. **The free end sets the direction.** Where one horizontal has a free end
+      and the other does not, the free end is the only one that can move without
+      disturbing what it is attached to, so it moves *away from the mid portion*
+      of the glyph, and the fixed line takes the **opposite** slope so the two
+      diverge. **The fixed END never moves up or down**; where the free end must
+      travel further, **lengthen the vertical at the fixed end** instead.
+   4. **Below the baseline is deliberate and useful, not sloppy.** The
+      alternative — opening the same amount upward — makes short lowercase
+      letters taller and pushes them toward the capitals. Measured: cap height is
+      6 units; splitting the growth across the baseline leaves `e` topping out
+      1.5 units below cap top where opening purely upward leaves 1.0.
+
+   **The floor is 0.60 mm (2 strokes), PROVISIONAL** — the house minimum-feature
+   rule applied to the gap between strokes. Only steel confirms it.
+
+   ### 3.2 Where the face actually stands, measured at 3.0 mm
+
+   `nix develop --command go run ./cmd/glyphtrace -counters` ranks every glyph by
+   widest sustained gap. **Eight glyphs sit at exactly 0.375 mm** — `m Q s # $ a
+   g e` — which is not eight slips but the one separation the face draws parallel
+   horizontal bars at. Worse: `@` 0.050, `W` 0.250, `% w M` 0.350. Then `"` 0.450,
+   `4` 0.475. Nothing reaches the floor until 0.625 mm.
+
+   **No glyph loses a counter at 3.0 mm** — the counter geometry condemns nobody;
+   the channel geometry is the whole problem.
+
+   ### 3.3 The loop
+
+   ```sh
+   go run ./cmd/glyphtrace -glyphs e -cols 1 -o /tmp/e.png   # cell + control points
+   go run ./cmd/glyphtrace -word "the eel sees cheese"       # IN CONTEXT, with baseline
+   go run ./cmd/glyphtrace -counters                         # the ranking
+   ```
+
+   **Always check the word view.** A cell cannot show whether a glyph sits on the
+   line with its neighbours, and that is the question a tilted bottom bar raises.
+
+   **Every glyph edit moves goldens, including backup's frozen sixteen** if the
+   glyph appears in a passphrase. `e` moved `passphrase-0-plain`, `-1-qr` and
+   `-2-no-metadata`; `-3-max-qr` did not, because its passphrase is `"a b"`
+   repeated with no `e` — which is the check that the movement is the glyph and
+   nothing else. Seed, codex32 and SLIP-39 goldens are safe from lowercase edits;
+   they engrave upper case. Re-record with `-run` scoping, **never a bare
+   `-update`**, and confirm `git status` lists only the files you expect.
 
    **THE PROBLEM-GLYPH LIST (operator, 2026-08-05), 16 of them:**
 
