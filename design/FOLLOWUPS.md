@@ -339,27 +339,37 @@ EXIT, not distributed, so a dwell at the start or a slight overrun at the end ma
 fix them at far less cost in plate time — and an overrun changes the toolpath,
 hence the plate, hence the goldens, in a way a speed change does not.
 
-### F-58 — the Accept footer button stopped responding after engraving finished (owning phase: GUI)
+### F-58 — total input wedge on the Footer entry screen, before engraving (owning phase: GUI)
 
-**Observed 2026-08-06**, on the `test-e4-a125-j1300` build. The engraving itself
-**ran to completion**; the machine reached the post-engrave screen and the footer
-**Accept** checkmark did not respond. A reboot cleared it.
+**Observed 2026-08-06**, on the `test-e4-a125-j1300` build, from a cold boot while
+walking the `SIZEPROOF!BACK` workflow. On the **Footer** screen
+(`ftLineEntryFlow`, `gui/freetext_flow.go:705`) the checkmark did not advance to
+the next screen, **and then no button responded at all**. Power cycle was the only
+way out. The workflow ran normally on the retry.
 
-Two wrong diagnoses were recorded before the operator corrected them. Both are
-kept here because each is a trap the next reader can fall into:
+**No engraving took place, so there is no plate and no acceleration/jerk data.**
+The wedge happens several screens before any motion.
+
+Three wrong diagnoses preceded this, each corrected by the operator. Kept because
+each is a trap, and because the pattern itself is the lesson — every one came from
+reasoning ahead of the evidence:
 
 - ❌ *"Driver state carried across the flash."* Impossible. The SH2 has **one**
   USB-C port, shared by BOOTSEL and power. Flashing means it is on the computer;
-  engraving means unplugging it and connecting the high-wattage supply. That
-  disconnection kills power, so **every flash→engrave transition is already a cold
-  boot**. No hypothesis may depend on state surviving it.
-- ❌ *"It hung starting the engrave."* It hung *finishing* one. `engraveDone`'s
-  body text is "Engraving completed successfully", so the plate was cut and the
-  motion path — homing, planning, stepping — is exonerated end to end.
+  engraving means unplugging it for the high-wattage supply. That disconnection
+  kills power, so **every flash→engrave transition is already a cold boot**. No
+  hypothesis may depend on state surviving it.
+- ❌ *"It hung starting the engrave."* No motion was ever commanded.
+- ❌ *"It hung on the post-engrave Accept, so the plate was cut."* Also wrong; the
+  "footer" in question is the **Footer text-entry step of the workflow**, not the
+  footer navigation bar of the engrave screen.
 
-**Therefore the motion parameters are not implicated at all.** Acceleration 125 and
-jerk 1300 produced a complete plate. The fault is downstream of engraving, in input
-handling.
+**The motion parameters remain untested.** Acceleration 125 / jerk 1300 has still
+never driven a plate, and the experiment is outstanding.
+
+**The decisive symptom is that *every* button died, not just the checkmark.** A
+single unresponsive widget would be a widget bug; total input death on a screen
+that still redraws points at the shared input queue.
 
 **Suspected mechanism, NOT proven — a structural hazard that matches the symptom.**
 `EventRouter.Next` (`gui/event.go:266`) is strict head-of-queue: it examines only
@@ -374,32 +384,40 @@ signature**, and it is nondeterministic because it turns on press/release timing
 against an asynchronous state change.
 
 This hazard is already known in this codebase: `gui/codex32_polish.go:316` carries
-the note *"Button2 is drained every frame so it cannot block the queue head."* The
-engrave screen has no equivalent protection.
+the note *"Button2 is drained every frame so it cannot block the queue head."*
+Someone hit this class before and fixed that one screen locally.
 
-Two asymmetries on the engrave screen found while reading, either of which could
-supply the stuck head — both worth fixing regardless of whether they caused this:
+**A second structural fact makes it worse, and it is the sharper of the two: a
+filter is only registered as a SIDE EFFECT of calling `Router.Next`.**
+`EventRouter.Next` begins `r.filters = append(r.filters, filters...)`, so a
+consumer that returns *before* reaching that call registers nothing — and `Reset`,
+which decides what to discard from the filters registered that frame, then judges
+the head against an incomplete picture. `InputTracker.Next` (`gui.go:107`) has
+exactly such an early return: when an arrow key is held it synthesises a repeat
+event and returns **without touching the router**. `PassphraseKeyboard.Update`
+(`passphrase_keyboard.go:248`) has two more, both `return true` mid-drain, and its
+per-key loop is guarded by `k.Valid(*key) && key.clk.Clicked(ctx)` — Go
+short-circuits, so an invalid key never registers its filter at all.
 
-1. `drawNav` (`gui.go:2669`) draws **only** `backBtn` while running and **only**
-   `selectBtn` when done, but the frame loop unconditionally registers filters for
-   *both* in *every* state. Filters are registered for a widget that is not on
-   screen.
-2. In the `default:` branch the select button is consumed **one event per frame**
-   (`if _, ok := selectBtn.Next(ctx); !ok { break }`), not drained in a loop the way
-   `Clicked` drains. Progress depends on the re-wakeup rather than on the frame.
+The Footer screen puts all of that on one screen at once: a keyboard filtering
+arrows, Center and runes, plus two footer `Clickable`s on Button1 and Button3.
 
 **Why it matters beyond the annoyance.** The failure is a *hang*, not an error: no
-report, no timeout, indistinguishable from a machine thinking. It also strands the
-operator on a screen holding a finished plate. On a plate carrying real funds, an
-input path that can wedge with no diagnostic is the wrong failure mode.
+report, no timeout, no way to tell it from a machine thinking. The operator's only
+exit is to cut power. On a workflow that will one day carry a real seed, an input
+path that can wedge with no diagnostic is the wrong failure mode — and the wedge
+arrives with no indication of *what* was lost, so text already entered is suspect.
 
-**Work, when taken up.** Reproduce in a GUI test first — drive `EngraveScreen` to
-`engraveDone` and assert Accept still responds after adversarial input orderings
-(press before the transition and release after, a stray Button2, a held button
-across the state change). The test is the deliverable; a fix without a reproduction
-cannot be shown to have worked, and this defect is too intermittent to confirm by
-hand. Then consider whether `Next` should scan the queue rather than only its head,
-which would remove the whole class rather than this instance.
+**Work, when taken up.** Reproduce in a GUI test first. `ftLineEntryFlow` already
+carries `hookPPWidget("kbd"/"back"/"ok", …)` test hooks, so the screen is drivable
+without hardware. Hunt adversarial orderings against the head-of-queue rule: an
+arrow held across a frame (exercising the synthetic-repeat early return), a
+keystroke landing in the same frame as a checkmark press, a press whose release
+crosses a screen transition. The test is the deliverable — this is too intermittent
+to confirm fixed by hand, and a fix without a reproduction cannot be shown to have
+worked. Then consider whether `Next` should scan the queue rather than only its
+head, and whether filter registration should be explicit rather than a side effect
+of consumption; either removes the whole class rather than this instance.
 
 ## Resolved
 
