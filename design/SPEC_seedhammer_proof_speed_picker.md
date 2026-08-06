@@ -30,17 +30,28 @@ Recon found the machine has **no motion-parameter safety envelope whatsoever**:
 no `StepperConfig.Validate`, no bounds constant, no planner guard. The failure
 modes are not theoretical:
 
-- `EngravingSpeed = 0` or `Jerk = 0` **panics mid-engrave** — integer divide by
-  zero at `engrave/engrave.go:1155` via `bezier/bezier.go:300` — with the needle
-  down and the job in an undefined state.
-- `Acceleration = 0` does not panic; it silently emits motion **faster than its
-  own configured velocity limit**.
+- `EngravingSpeed = 0` and `Jerk = 0` **both panic**, on an integer divide by
+  zero, at **different sites**: `Jerk = 0` at `engrave/engrave.go:1155` via
+  `bezier/bezier.go:300`, and `EngravingSpeed = 0` at `engrave/engrave.go:1117`
+  in `timeScaler.Scale`. Neither is rejected; both crash with the job in an
+  undefined state.
+- `Acceleration = 0` does **not** panic. It silently plans motion at **3× its
+  own configured velocity limit** — measured 153,600 microsteps/s against an
+  `EngravingSpeed` of 51,200 (24.0 mm/s against 8.0). No error, no warning. A
+  silent limit violation is worse than a crash.
 - `Speed` above `TicksPerSecond` is **silently rate-limited, not rejected**
-  (`stepper/stepper.go:49-52` clamps to one microstep per tick and returns no
-  error). Position is lost permanently, so every later stroke on that plate is
-  offset: a wrong glyph in steel, no warning, and a preview that looked right.
-  The shipped config has `Speed == TicksPerSecond` **by coincidence of the
-  constant block**; nothing enforces or documents it.
+  (`stepper/stepper.go:49-53` clamps to ±1 microstep per tick per axis; `fill()`
+  has no return value and `Driver.Knot()` inspects no error, so **no error path
+  exists**). The loss is permanent rather than deferred:
+  `bezier.Interpolator.Step()` returns `true` only for the segment's *fixed*
+  planned tick count and then stops regardless of how far behind the physical
+  position has fallen, so the shortfall is never made up. Every later stroke on
+  that plate is offset — a wrong glyph in steel, no warning, and a preview that
+  looked right. The shipped config has `Speed == TicksPerSecond` **by
+  coincidence of the constant block**; nothing enforces or documents it.
+
+All four verified 2026-08-06 by an independent pass at HEAD `0ce071f`, the two
+runtime claims by driving the real planner rather than by reading.
 
 A fixed list of five values, none of them zero, none of them touching `Speed` or
 `TicksPerSecond`, **cannot reach any of those states**. That is the argument for
@@ -171,9 +182,17 @@ nothing on the finished plate records what it was cut at.
 2. **The speed reaches the motion, not just the label.** Build the same
    composition at 8 and at 1 mm/s and assert `Plate.Duration` differs by
    approximately 8×. *This is the load-bearing test* — everything else could
-   pass with the value plumbed to a label and never to the planner. Recon found
-   the suite is otherwise blind here: all six golden comparisons plan at
-   test-local `8*mm` and **no test in the tree asserts a duration**.
+   pass with the value plumbed to a label and never to the planner.
+
+   The suite is **nearly** blind here, but not entirely: all **five**
+   `golden.CompareBSpline` sites plan at a test-local `engravingSpeed = 8*mm`
+   and never the device's `4*mm`, so no golden can see a feed change — but
+   `TestPassphraseRuneDurationPin`
+   (`engrave/passphrase_alphabet_test.go:463-472`) *does* pin an exact tick
+   count, `wantDuration = 572245`. So this test is the first thing to pin
+   **plate** motion, not the first to pin motion at all. It also means a change
+   that altered the passphrase alphabet's timing would already be caught, which
+   is worth knowing before assuming the net has no threads in it.
 3. **`Speed` and `TicksPerSecond` are untouched** by the override, for every
    entry in the list. Guards the silent-clamp regime of §2.
 4. **Every offered speed is `> 0` and `<= ftSpeedCeiling`**, ranging over the
@@ -211,9 +230,11 @@ and nothing else — becomes directly measurable rather than inferred.
   a convenience.**
 - **`ChoiceScreen` overflow is silent**, not clipped. Five entries is safe;
   test 4 pins it.
-- **The suite cannot currently see motion regressions** — golden comparisons all
-  plan at test-local `8*mm` and none asserts a duration. Test 2 is the first
-  thing in the tree that pins motion at all.
+- **No golden can see a feed change** — all five `golden.CompareBSpline` sites
+  plan at test-local `8*mm`, never the device's `4*mm`, so the plate goldens are
+  structurally decoupled from the machine's actual speed. One duration *is*
+  pinned (`TestPassphraseRuneDurationPin`), so the tree is not wholly blind;
+  test 2 is nonetheless the first pin on plate motion.
 - **Outside the risk set that needs an R0 gate:** fork-native GUI, no normative
   codec behaviour, no Rust counterpart, no irreversible action. Implement and
   verify inline. The funds-safety exposure that *would* have pulled it in — a
