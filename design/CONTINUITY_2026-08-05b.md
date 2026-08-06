@@ -22,12 +22,36 @@ In order:
    `sizeproof-back.bin`, driven by `gui/freetext_sizeproof_golden_test.go`. 44
    packages green, **zero existing golden bytes moved**. See §4, whose "87
    glyphs" figure is now corrected by measurement.
-3. **IN PROGRESS — opening up `const` glyphs. DONE: `e` (`46a1af8`), `a`
-   (`a4f102b` + `2c1020a`).** Both now measure 0.500 mm+ against 0.375 mm before;
-   `a`'s counter reaches **0.600 mm**, the first to meet the floor.
-   **Remaining 13 of the list:** `s z O o 8 @ * & < > ( ) { }`.
+3. **SHIPPED 2026-08-06 — `fork-v0.0.0-g1945251`, merged as `1945251`, flashed.**
+   Release: <https://github.com/bg002h/seedhammer/releases/tag/fork-v0.0.0-g1945251>
+
+   **DONE — nine of the sixteen:** `a e s z * & ( ) < > { } @`.
+   **REMAINING — three:** `O`, `o`, `8`.
    **Do NOT touch `w m M W Q # $ g`** — they measure alongside but the operator
    has scoped this pass to the sixteen (2026-08-05).
+
+   | glyph | before | after |
+   |---|---|---|
+   | `a` | 0.375 | **0.700** |
+   | `e` | 0.375 | **0.675** |
+   | `s` | 0.375 | **0.700** |
+   | `z` | 0.950 | **1.425** |
+   | `@` | 0.050 | **0.375** |
+   | `&` | 0.367 | 0.550 |
+
+   **Three things the next session must not re-derive:**
+
+   - **`@` cannot reach the floor and that is arithmetic, not effort.** A ring
+     nested in a ring needs an inner element of *negative* width at 4 units with
+     a 0.30 mm stroke. It is a spiral now. If `@` matters on a plate, the answer
+     is a larger rung.
+   - **4 units IS the face's maximum glyph width.** Letters span 100–500 of a
+     600-unit advance, leaving 110 units (0.367 mm) between neighbours. `*` and
+     `&` were both widened past it and had to be pulled back — `*` by steepening
+     its diagonals to 48.19° rather than shortening the arms.
+   - **`{` then `}` clears by only 10 font units (0.033 mm)**, against that
+     110-unit standard. Pinned in `TestInkClearsTheNextGlyph` so it cannot get
+     worse. Still open.
 
    ### 3.1 THE OPENING-UP RULES (operator, 2026-08-05) — read before any glyph
 

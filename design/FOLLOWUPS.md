@@ -67,9 +67,9 @@ Low/nit items deferred from architect reviews (per the iterative-architect-revie
 - **`seedhammer-engrave-33word-font-legibility`** — **Residual (non-code, hardware/visual) from the engrave-bugfixes cycle** (BUG-3, shipped fork `main` `3a23dbb` 2026-06-19; bug-issue bg002h/seedhammer#1; spec/plan/exec-review all R0 GREEN — `design/agent-reports/seedhammer-engrave-bugfixes-{spec-R0-round0,plan-R0-round0,exec-review}.md`). The 33-word (256-bit) SLIP-39 verbatim layout (option-a rework) shrinks the plate font to **3.859 mm** (vs the 4.1 mm baseline) to fit 17 rows in column 1; column geometry and engraveability are **proven** (stroke fixed at 0.3 mm → glyph ≈12.9× stroke; 3.86 mm inter-column gap; all rows ⊂ [0,85] mm), so this is NOT a code defect. The only open question is **physical legibility** of the 3.859 mm font on a real engraved plate — a subjective/hardware judgement. SeedHammer already engraves a 24-word plate + QR at finer pitch in the same area, so no blocker is expected. **Action: visually confirm a 33-word plate on hardware before relying on it; if too dense, revisit (a 3rd column was analyzed and rejected — overruns the 85 mm plate at any legible font).** Priority LOW; only affects 33-word SLIP-39 (the other reachable counts {27,30} stay at full 4.1 mm).
 
 
-### `sizeproof-qr-step-must-not-offer-what-it-drops` — OPEN, owning phase: next change touching the QR step
+### `sizeproof-qr-step-must-not-offer-what-it-drops` — ✅ RESOLVED 2026-08-06
 
-**IMPLEMENTED 2026-08-05 on branch `constant-glyph-cleanup` (seedhammer `f466b11`), PENDING MERGE.** Move to Resolved when the branch lands.
+**RESOLVED 2026-08-06 — the branch landed.** Implemented as seedhammer `f466b11`, merged to fork `main` in `1945251` and released as `fork-v0.0.0-g1945251`.
 
 
 **Operator directive 2026-08-05: "Sizeproof must always be without a QR code."**
@@ -97,9 +97,9 @@ never dropping a QR automatically.
 Deliberately NOT folded into the whole-diff fix, which is narrow by design and
 must not grow at the final gate.
 
-### `sizeproof-admission-count-at-its-own-rungs` — OPEN, owning phase: next change touching admission
+### `sizeproof-admission-count-at-its-own-rungs` — ✅ RESOLVED 2026-08-06
 
-**IMPLEMENTED 2026-08-05 on branch `constant-glyph-cleanup` (seedhammer `b2f40b4`), PENDING MERGE.** Move to Resolved when the branch lands.
+**RESOLVED 2026-08-06 — the branch landed.** Implemented as seedhammer `b2f40b4`, merged to fork `main` in `1945251` and released as `fork-v0.0.0-g1945251`.
 
 
 The "proper" fix the whole-diff review recommended and the controller declined at
