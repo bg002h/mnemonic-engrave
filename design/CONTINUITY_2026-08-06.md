@@ -2,7 +2,52 @@
 
 Supersedes `CONTINUITY_2026-08-05b.md`. Written at a context reset.
 
-## 1. Start here
+## 1. FIRST TASK — lengthen the lowercase `z` crossbar
+
+Operator instruction, 2026-08-06: move the crossbar's **starting point left by
+twice the distance it moved last time.**
+
+Last time was `458 → 457.5`, i.e. **0.5 SVG units**. Twice that is **1.0 unit**:
+
+```
+font/constant/constant.svg, the <g id="z"> second polyline
+
+  before   457.5,6 460,6
+  after    456.5,6 460,6
+```
+
+Crossbar length **2.5 → 3.5 units**. Only the start point moves; the right end
+stays at 460 and the diagonal is untouched.
+
+**It fits — exactly, with nothing to spare. Verified before filing.** `z`'s cell
+is 456–462, so the new start is at cell-relative **0.5 units = 50 font units**,
+which is *precisely* the face's existing leftmost ink, currently set by `}`
+(svg x=276.5, also cell-relative 0.5). So `loX` does not move, and the pinned
+neighbour clearance stays at exactly 10 font units:
+
+```
+gap = advance + loX - hiX - stroke = 600 + 50 - 550 - 90 = 10
+```
+
+That was computed from the SVG and reproduces the pinned figure in
+`font/constant/ink_clearance_test.go`, so the arithmetic is sound. **Any further
+left and `TestInkClearsTheNextGlyph` fails** — it pins `gap == 10` exactly. There
+is no margin left in this direction for `z` or anything else.
+
+Two consequences worth seeing before approving the render:
+
+- The crossbar becomes **asymmetric about the diagonal**. It crosses the diagonal
+  at x=459, so the arms go from 1.5 left / 1.0 right to **2.5 left / 1.0 right**.
+- It protrudes **0.5 units left of the glyph body** (the diagonal's left edge is
+  at 457), which is the intended effect — the same effect as last time, doubled.
+
+Process: render options before/after with `scripts/sh-preview-basic -g 'z' -c 3`,
+show them, get approval, then re-record the SIZEPROOF goldens **scoped with
+`-run`** and confirm `git status` lists only the expected files. Check the k-count
+too — `z` is one of the pinned 2-run glyphs in `TestPassphraseRunPartition`, and
+**max k = 2 is a security property**.
+
+## 2. Then: read the accel/jerk plate
 
 **A hard-steel plate carrying the halved-acceleration test has been engraved and
 the operator has read it. Their observations are the input this session is
@@ -59,7 +104,7 @@ the tag. Tag a new release from `d7155b9` if a released artifact is wanted.
 `seedhammerii-v0.0.0-gd7155b9-dirty.signed.uf2`, and the second silently
 overwrote the first.
 
-## 2. The engraving-parameter matrix
+## 3. The engraving-parameter matrix
 
 | | soft steel | hard steel |
 | --- | --- | --- |
@@ -88,7 +133,7 @@ Do not re-test these.
 - **Material alone** — the same plate art differs between the two steels, but
   speed changes the retrace defect on *both*.
 
-## 3. F-58 — the input wedge (parked, deliberately)
+## 4. F-58 — the input wedge (parked, deliberately)
 
 Full entry in `FOLLOWUPS.md`. The operator has parked it; **do not reopen it
 without being asked.** Two things are worth carrying forward:
@@ -110,16 +155,17 @@ a side effect of calling it, so any consumer returning early registers nothing
 and `Reset` then judges the head against an incomplete filter set. The
 reproduction test is the deliverable, not a fix.
 
-## 4. Open work
+## 5. Open work
 
 Ordered by what unblocks what.
 
-- **Read the accel/jerk plate.** §1. Blocking everything else on the wiggle.
+- **Lengthen the `z` crossbar.** §1 — the operator’s first task on resume.
+- **Read the accel/jerk plate.** §2. Blocking everything else on the wiggle.
 - **Cut soft @ 4 mm/s.** Fills the last matrix cell. Decides material-setting vs
   plain speed choice.
 - **Return the machine to stock motion parameters** — build `main` at `d7155b9`
   or later, **not** the `fork-v0.0.0-g1945251` tag, which is a commit behind on
-  glyphs. See the warning in §1. Only needed once the wiggle question is settled;
+  glyphs. See the warning in §2. Only needed once the wiggle question is settled;
   the test build's geometry is current, so plates cut on it are valid.
 - **Three glyphs remain of the sixteen: `O`, `o`, `8`.** The other thirteen
   landed. Scope directive still in force: **only the sixteen** — the operator
@@ -130,10 +176,10 @@ Ordered by what unblocks what.
 - **Nothing pins the machine's actual engraving speed.** Four independent copies
   of `engravingSpeed = 8 * mm` exist and goldens use test-local ones, so a
   firmware speed change moves no test. Real gap.
-- **Push.** `mnemonic-engrave` has 12 unpushed commits; `seedhammer` has 1
+- **Push.** `mnemonic-engrave` has 15 unpushed commits (all docs + one script); `seedhammer` has 1
   (`d7155b9`) on `main`.
 
-## 5. Standing constraints
+## 6. Standing constraints
 
 - **Always `~/bin/sh/sh2-flash`, never picotool by hand.** The build output is
   unsigned and cannot boot; a laptop USB port cannot boot the machine either
@@ -153,7 +199,7 @@ Ordered by what unblocks what.
 - All Go work runs under `nix develop --command`; nix lives at
   `/nix/var/nix/profiles/default/bin`.
 
-## 6. Repo state at the reset
+## 7. Repo state at the reset
 
 | | |
 | --- | --- |
