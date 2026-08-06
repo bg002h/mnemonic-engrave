@@ -282,7 +282,14 @@ P1 implementer, `5b2f1b2`):
    `FitBlocksAt`; that is correct, since the band tightens as `fontSize` drops.
 2. **The per-entry non-zero `Sizes` check.** Spec §2.3 puts it inside the
    size/string invariant and P1 implemented it as a panic; it fires on nothing
-   today. `FitSized` owes the matching **error** return.
+   today. `FitSized` owes the matching **error** return. **Settled at P4, and the
+   debt as written was itself a false-pass slot:** §2.7's rung guard already
+   refuses 0 (0 is not in `FontSizes`), so this check has **no independent
+   verdict** — deleting it changes the message and never the accept/refuse
+   outcome. It is observable only through its wording, so P4 words it as
+   `EngraveFitted`'s panic is (`is sized 0mm`) and the test asserts that
+   substring. The BEHAVIOUR is fully covered by the rung check; only the message
+   is this check's.
 3. **`EngraveFreeText` cannot enforce the `Bottom` bound** — it returns an
    `engrave.Engraving` with no error channel, so that constructor reaches the
    bound only through `EngraveFitted`'s defensive panic. By design per §2.1.1,

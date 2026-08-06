@@ -394,9 +394,18 @@ and `EngraveFitted` panics on it beside the `Faces` and `Sizes` guards. Without
 it `LinesPerPlate(params, 0)` is `height / 0` on the **no-footer case §5
 mandates** — every ladder plate, and every operator plate that skips the Footer
 field — and `Title != "" && TitleSizeMM == 0` puts `centerInset` through
-`textLayout` at fontSize 0. Neither is covered by any golden. §2.4 and §2.5 both
-branch on the STRING being empty, so `LinesPerPlate` is never reached with 0
-even before the guard fires.
+`textLayout` at fontSize 0. Neither is covered by any golden.
+
+**The guard is LOAD-BEARING, not defence in depth — corrected at P4.** An earlier
+draft closed this paragraph with "§2.4 and §2.5 both branch on the STRING being
+empty, so `LinesPerPlate` is never reached with 0 even before the guard fires."
+That holds only for `Footer == ""`. It is **false for `Footer != "" &&
+FooterSizeMM == 0`** — which is precisely the input §7.14 orders `FitSized` to
+refuse. There the string branch IS taken, and `footerRowY` divides by the zero
+size. Measured with the guard deleted: `FitSized` panics with an integer divide
+by zero at `yBudget → footerRowY → LinesPerPlate`, **before laying anything
+out.** A reader who took the old sentence at face value could have removed the
+guard as redundant.
 
 `TitleSizeMM` is explicit because the title sits at the side's **smallest** rung,
 not the first block's size — R0's I1. The first block's rule would give the back
@@ -933,13 +942,21 @@ does. Without that test 5.400 mm would not be enough either.
     declares `Blocks >= 1` and that a sized plan has more than one run, since
     `ftPlan.Blocks`' single-run early return (`freetext_flow.go:109-111`)
     bypasses the split and would never clear a one-run sized plan's sizes.
-14. **The size/string invariant** (§2.3): `FitSized` refuses a title with a zero
-    size and a footer with a zero size; and `FitSized`/`EngraveFitted` on the
-    no-footer path do not panic and produce `limit == plateHeight - margin`.
-    Stated as an observable outcome rather than as "`LinesPerPlate` is never
-    called with 0", which no Go expression can assert without instrumentation
-    this change does not otherwise need — an unfalsifiable item is a false-pass
-    slot, and §7.19 mutation-tests every item here.
+14. **The size/string invariant** (§2.3), **all FOUR combinations** — the
+    invariant is a biconditional, and an earlier draft of this item named only
+    two of them. `FitSized` refuses a title with a zero size, a footer with a
+    zero size, **a title size with no title, and a footer size with no footer**.
+    The second pair is the direction where a size was resolved for a row that
+    does not exist; a test written to the two-case form misses it entirely.
+
+    And the no-footer path lays out, engraves without panicking, and refuses one
+    more row. **Assert that, not `limit == plateHeight - margin`** — this item
+    used to demand the latter while banning its own form in the same breath:
+    `limit` is a local of the unexported `yBudget`, which neither named function
+    returns or exposes, so pinning it means calling `yBudget` directly rather
+    than observing either function "produce" anything. Legal in-package, but it
+    is not the observable outcome the item asks for. An unfalsifiable item is a
+    false-pass slot, and §7.19 mutation-tests every item here.
 15. **The `len(Sizes) != len(Lines)` guard panics** — round 0's I8(e), still
     open after round 1.
 16. **Both ladder proofs report `NeedsWholePlate()`**, the prompt says the QR is
