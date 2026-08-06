@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+#
+# sh2-flash -- build, sign and flash SeedHammer II firmware in one step.
+#
+# The SH2's OTP carries our own boot key (slot 1, burned 2026-08-03), so the
+# RP2350 bootrom will only start images signed by it. The fork's build
+# deliberately ships UNSIGNED -- `build-firmware` ends by zeroing pubkey and
+# signature -- so every image must be signed locally before it can boot. That
+# is the whole reason this script exists: the build output and the flashable
+# artifact are different files, and flashing the wrong one looks exactly like a
+# signature rejection.
+#
+# Usage:
+#   sh2-flash                     build the fork's HEAD, sign it, flash it
+#   sh2-flash IMAGE.uf2           sign IMAGE.uf2 and flash it (no build)
+#   sh2-flash -p                  pick a tag/commit to build, then sign + flash
+#
+# Options:
+#   -p, --pick        choose a version from recent tags and commits
+#   -b, --build-only  build and sign, stop before touching the device
+#   -n, --dry-run     print every step, run none of the ones that write
+#   -y, --yes         skip the pre-flash confirmation
+#   -k, --key PATH    signing key (default $SH2_KEY)
+#   -h, --help
+#
+# Env:
+#   SH2_REPO   the seedhammer fork      (default /scratch/code/shibboleth/seedhammer)
+#   SH2_ENGRAVE  mnemonic-engrave       (default alongside SH2_REPO)
+#   SH2_KEY    boot signing key         (default ~/.sh2/sh2-boot-key.pem)
+#
+set -euo pipefail
+
+SH2_REPO="${SH2_REPO:-/scratch/code/shibboleth/seedhammer}"
+
+# This script lives in mnemonic-engrave/scripts/, next to sign-firmware.sh, so
+# it locates its sibling from ITS OWN path rather than by guessing from
+# SH2_REPO. readlink -f resolves the symlink, so it works the same invoked as
+# ~/bin/sh/sh2-flash or from a checkout. Deriving it from SH2_REPO broke the
+# moment --repo pointed at a worktree, which is where branch work lives.
+SELF="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+SH2_ENGRAVE="${SH2_ENGRAVE:-$(dirname "$SELF")}"
+SH2_KEY="${SH2_KEY:-$HOME/.sh2/sh2-boot-key.pem}"
+
+# The bootrom's own USB identity in BOOTSEL. Seeing this is what proves the
+# device will accept an image; the enclosure label proves nothing.
+BOOTSEL_ID="2e8a:000f"
+
+PICK=0; BUILD_ONLY=0; DRY=0; ASSUME_YES=0; IMAGE=""
+
+c()    { printf '\033[%sm%s\033[0m' "$1" "$2"; }
+hdr()  { printf '\n%s\n' "$(c '1' "== $* ==")"; }
+info() { printf '  %s %s\n' "$(c '36' '..')" "$*"; }
+ok()   { printf '  %s %s\n' "$(c '32' 'OK')" "$*"; }
+warn() { printf '  %s %s\n' "$(c '33' '!!')" "$*"; }
+die()  { printf '\n%s %s\n' "$(c '31' 'FAIL:')" "$*" >&2; exit 1; }
+run()  { if [ "$DRY" = 1 ]; then printf '  %s %s\n' "$(c '35' 'would run:')" "$*"; else "$@"; fi; }
+
+# picotool lives in the fork's devshell, not on PATH. Calling it bare fails at
+# the last step, after signing and after the confirmation -- the worst place.
+devshell() {
+    if [ "$DRY" = 1 ]; then
+        printf '  %s nix develop --command %s\n' "$(c '35' 'would run:')" "$*"
+    else
+        ( cd "$SH2_REPO" && nix develop --command "$@" )
+    fi
+}
+
+usage() { sed -n '3,32p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -p|--pick)       PICK=1 ;;
+        -b|--build-only) BUILD_ONLY=1 ;;
+        -n|--dry-run)    DRY=1 ;;
+        -y|--yes)        ASSUME_YES=1 ;;
+        -k|--key)        shift; SH2_KEY="${1:?--key needs a path}" ;;
+        -h|--help)       usage 0 ;;
+        -*)              die "unknown option: $1 (try --help)" ;;
+        *)               [ -z "$IMAGE" ] || die "only one image may be given"; IMAGE="$1" ;;
+    esac
+    shift
+done
+
+[ "$PICK" = 1 ] && [ -n "$IMAGE" ] && die "--pick builds a version; it cannot also take an image"
+
+# ---------------------------------------------------------------- preflight --
+hdr "Preflight"
+[ -f "$SH2_KEY" ] || die "no signing key at $SH2_KEY
+    Without it nothing can be signed, and an unsigned image cannot boot a
+    device whose OTP carries a boot key. Set SH2_KEY or pass --key."
+ok "signing key present ($SH2_KEY)"
+
+SIGN="$SH2_ENGRAVE/scripts/sign-firmware.sh"
+[ -x "$SIGN" ] || die "signing script not found or not executable: $SIGN"
+ok "signing script present"
+
+# Proven now, not at the flash step. picotool is only in the devshell, and
+# discovering that after signing and after the operator has confirmed is how a
+# missing tool turns into a half-finished procedure.
+if [ "$DRY" = 0 ]; then
+    ( cd "$SH2_REPO" && nix develop --command picotool version >/dev/null 2>&1 ) \
+        || die "picotool is not reachable in $SH2_REPO's devshell"
+fi
+ok "picotool reachable in the devshell"
+
+# A WORKTREE's .git is a FILE, not a directory, so -d rejects every worktree --
+# which is exactly where feature work lives before it merges. Ask git instead.
+git -C "$SH2_REPO" rev-parse --git-dir >/dev/null 2>&1 \
+    || die "not a git repo: $SH2_REPO"
+
+# ------------------------------------------------------------------- source --
+BUILD_DIR="$SH2_REPO"
+CLEANUP_WT=""
+cleanup() { [ -n "$CLEANUP_WT" ] && git -C "$SH2_REPO" worktree remove --force "$CLEANUP_WT" 2>/dev/null || true; }
+trap cleanup EXIT
+
+if [ -z "$IMAGE" ]; then
+    REF="HEAD"
+    if [ "$PICK" = 1 ]; then
+        hdr "Pick a version"
+        mapfile -t CHOICES < <(
+            git -C "$SH2_REPO" for-each-ref --sort=-creatordate --count=8 \
+                --format='%(refname:short)	tag	%(creatordate:short)	%(subject)' refs/tags
+            git -C "$SH2_REPO" log --max-count=10 --format='%h	commit	%as	%s' HEAD
+        )
+        [ "${#CHOICES[@]}" -gt 0 ] || die "nothing to pick from"
+        i=1
+        for line in "${CHOICES[@]}"; do
+            IFS=$'\t' read -r ref kind date subj <<<"$line"
+            printf '  %2d) %-28s %-7s %s  %s\n' "$i" "$ref" "$kind" "$date" "${subj:0:52}"
+            i=$((i + 1))
+        done
+        printf '\n  choice [1-%d]: ' "${#CHOICES[@]}"
+        read -r sel
+        [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -ge 1 ] && [ "$sel" -le "${#CHOICES[@]}" ] \
+            || die "not a valid choice: $sel"
+        REF="$(cut -f1 <<<"${CHOICES[$((sel - 1))]}")"
+        info "selected $REF"
+    fi
+
+    # A non-HEAD build goes in its own worktree. Checking the ref out in place
+    # would move the branch under whatever else is using this checkout, and a
+    # half-switched tree is how you build one commit and believe you built
+    # another.
+    if [ "$REF" != "HEAD" ]; then
+        BUILD_DIR="$(mktemp -d -t sh2-build-XXXXXX)"
+        rmdir "$BUILD_DIR"
+        info "building $REF in a temporary worktree"
+        run git -C "$SH2_REPO" worktree add --detach "$BUILD_DIR" "$REF"
+        CLEANUP_WT="$BUILD_DIR"
+    fi
+
+    hdr "Build"
+    if ! git -C "$BUILD_DIR" diff --quiet HEAD 2>/dev/null; then
+        warn "tree is dirty -- the version string will carry a -dirty suffix"
+        warn "a dirty build is not traceable to any commit; prefer committing first"
+    fi
+    info "$(git -C "$BUILD_DIR" log --oneline -1)"
+    run bash -c "cd '$BUILD_DIR' && nix run .#build-firmware"
+    if [ "$DRY" = 1 ]; then
+        IMAGE="$BUILD_DIR/seedhammerii-DRYRUN.uf2"
+    else
+        # Newest .uf2 the build just produced -- the name embeds the version, so
+        # it is not predictable from here without duplicating the flake's logic.
+        IMAGE="$(find "$BUILD_DIR" -maxdepth 1 -name 'seedhammerii-*.uf2' ! -name '*.signed.uf2' \
+                   -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)"
+        [ -n "$IMAGE" ] || die "build reported success but produced no .uf2"
+    fi
+    ok "built $(basename "$IMAGE")"
+else
+    [ -f "$IMAGE" ] || die "no such image: $IMAGE"
+    IMAGE="$(realpath "$IMAGE")"
+    ok "using $IMAGE"
+fi
+
+# --------------------------------------------------------------------- sign --
+# An input that is ALREADY signed is flashed as-is. Re-signing it is not
+# harmful cryptographically, but it produces a .signed.signed.uf2 and leaves two
+# plausible files on disk with one differing suffix -- and picking the wrong one
+# is the exact failure this script exists to prevent.
+case "$IMAGE" in
+    *.signed.uf2)
+        hdr "Sign"
+        SIGNED="$IMAGE"
+        info "already signed; flashing as-is rather than producing a .signed.signed.uf2"
+        ;;
+    *)
+        hdr "Sign"
+        SIGNED="${IMAGE%.uf2}.signed.uf2"
+        info "sign-firmware.sh proves the signature offline before anything is flashed"
+        devshell "$SIGN" "$IMAGE" "$SH2_KEY"
+        ;;
+esac
+
+if [ "$DRY" = 0 ]; then
+    [ -f "$SIGNED" ] || die "signing reported success but $SIGNED does not exist"
+    # Asserted rather than assumed: whatever path got us here, the thing about to
+    # be flashed must carry a signature picotool itself will vouch for.
+    devshell picotool info -a "$SIGNED" 2>/dev/null | grep -q 'signature:.*verified' \
+        || die "$SIGNED does not carry a signature picotool will verify -- refusing to flash"
+    ok "signature verified on the artifact to be flashed"
+    ok "flashing $(basename "$SIGNED")"
+    printf '     sha256 %s\n' "$(sha256sum "$SIGNED" | cut -d' ' -f1)"
+fi
+
+if [ "$BUILD_ONLY" = 1 ]; then
+    hdr "Stopping before the device (--build-only)"
+    printf '  flash it later with:  %s\n\n' "$(c 1 "sh2-flash $SIGNED")"
+    exit 0
+fi
+
+# -------------------------------------------------------------------- flash --
+hdr "Device"
+# Checked rather than assumed: a device that is merely plugged in looks the same
+# from here as one in BOOTSEL, and picotool's failure on the former is obscure.
+if ! lsusb 2>/dev/null | grep -qi "$BOOTSEL_ID"; then
+    die "no RP2350 in BOOTSEL ($BOOTSEL_ID) on the USB bus.
+    Hold the button on the control board while connecting USB, then re-run.
+    Confirm with: lsusb | grep $BOOTSEL_ID"
+fi
+ok "RP2350 present in BOOTSEL"
+
+if [ "$ASSUME_YES" = 0 ] && [ "$DRY" = 0 ]; then
+    printf '\n  About to flash %s\n' "$(c 1 "$(basename "$SIGNED")")"
+    printf '  to the attached SeedHammer II. Continue? [y/N] '
+    read -r reply
+    case "$reply" in [yY]*) ;; *) die "aborted at the operator's request" ;; esac
+fi
+
+hdr "Flash"
+# The SIGNED file, never $IMAGE. sign-firmware.sh does not modify its input, so
+# $IMAGE still has the zeroed signature the build left in it.
+devshell picotool load --verify "$SIGNED"
+devshell picotool reboot
+
+hdr "Judge the boot on MACHINE power"
+cat <<'EOF'
+  Init() checks for a 20-28 V USB-PD contract BEFORE it configures the LCD, and
+  reboots into BOOTSEL when it does not find one. So on a laptop port,
+  correctly signed firmware that the bootrom ACCEPTED still gives a dark screen
+  and a device that re-enumerates as RP2350 Boot -- indistinguishable from a
+  signature rejection.
+
+  Unplug from this computer and power the machine from its normal supply before
+  judging anything. Expect the startup screen with (UNLOCKED) on the version
+  line; that suffix is expected and is not a failure.
+
+  If it does NOT boot: do NOT burn another OTP slot. The burned hash was already
+  proven correct, so this is a signing or image problem and is retryable at zero
+  OTP cost. See design/RUNBOOK_custom_boot_key.md step 6.
+EOF
+printf '\n'

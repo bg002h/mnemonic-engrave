@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+#
+# sh-preview-basic -- render the standard set of SeedHammer II previews in one
+# step: the two SIZEPROOF! plates, the problem-glyph sheet, a glyph in context,
+# and the counter/channel table.
+#
+# It exists because these five are always run together and never remembered
+# together. Each one answers a different question and the set is only useful
+# whole:
+#
+#   the PLATES        what actually gets cut into steel
+#   the GLYPH SHEET   ink at its true 0.3mm width, and the control points that
+#                     map back to constant.svg
+#   the WORD          whether a glyph sits on the baseline with its neighbours,
+#                     which a cell can never show
+#   the TABLE         which glyphs are still under the floor, ranked
+#
+# Usage:
+#   sh-preview-basic                  render everything to $OUT
+#   sh-preview-basic -o /tmp/look     somewhere else
+#   sh-preview-basic -g 'aes' -w 'bed sees a salad'
+#   sh-preview-basic -s 4.4           at a different rung
+#   sh-preview-basic -p               also render textproof/constproof/bothproof
+#
+# Options:
+#   -o, --out DIR     output directory        (default ~/sh-preview)
+#   -g, --glyphs STR  glyphs for the sheet    (default the sixteen problem ones)
+#   -w, --word STR    the word to set         (default "bed sees a cheese salad")
+#   -s, --size MM     rung for the glyph work (default 3.0, the smallest cut)
+#   -x, --px N        PNG width in pixels     (default 2000)
+#   -p, --proofs      also render the three single-face proof plates
+#   -r, --repo PATH   the seedhammer checkout (default $SH2_REPO)
+#   -h, --help
+#
+# Env:
+#   SH2_REPO   the seedhammer fork  (default /scratch/code/shibboleth/seedhammer)
+#
+set -euo pipefail
+
+SH2_REPO="${SH2_REPO:-/scratch/code/shibboleth/seedhammer}"
+OUT="${OUT:-$HOME/sh-preview}"
+GLYPHS='aeszOo8@*&<>(){}'
+WORD='bed sees a cheese salad'
+SIZE=3.0
+PX=2000
+PROOFS=0
+
+c()    { printf '\033[%sm%s\033[0m' "$1" "$2"; }
+hdr()  { printf '\n%s\n' "$(c '1' "== $* ==")"; }
+info() { printf '  %s %s\n' "$(c '36' '..')" "$*"; }
+ok()   { printf '  %s %s\n' "$(c '32' 'OK')" "$*"; }
+warn() { printf '  %s %s\n' "$(c '33' '!!')" "$*"; }
+die()  { printf '\n%s %s\n' "$(c '31' 'FAIL:')" "$*" >&2; exit 1; }
+
+usage() { sed -n '3,36p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -o|--out)    shift; OUT="${1:?--out needs a path}" ;;
+        -g|--glyphs) shift; GLYPHS="${1:?--glyphs needs a string}" ;;
+        -w|--word)   shift; WORD="${1:?--word needs a string}" ;;
+        -s|--size)   shift; SIZE="${1:?--size needs a number}" ;;
+        -x|--px)     shift; PX="${1:?--px needs a number}" ;;
+        -r|--repo)   shift; SH2_REPO="${1:?--repo needs a path}" ;;
+        -p|--proofs) PROOFS=1 ;;
+        -h|--help)   usage 0 ;;
+        *)           die "unknown argument: $1 (try --help)" ;;
+    esac
+    shift
+done
+
+# ---------------------------------------------------------------- preflight --
+hdr "Preflight"
+
+# NIX IS OFTEN NOT ON PATH, depending on which shell started this. Every command
+# below runs inside the devshell, so finding nix is the difference between the
+# whole script working and every single step failing identically.
+if ! command -v nix >/dev/null 2>&1; then
+    for d in /nix/var/nix/profiles/default/bin "$HOME/.nix-profile/bin"; do
+        [ -x "$d/nix" ] && { PATH="$d:$PATH"; export PATH; break; }
+    done
+fi
+command -v nix >/dev/null 2>&1 || die "nix is not on PATH and was not found in the usual places.
+    Everything here runs in the fork's devshell, so nothing can run without it."
+ok "nix found ($(command -v nix))"
+
+git -C "$SH2_REPO" rev-parse --git-dir >/dev/null 2>&1 \
+    || die "not a git repo: $SH2_REPO  (set SH2_REPO or pass --repo)"
+ok "repo $SH2_REPO @ $(git -C "$SH2_REPO" log --oneline -1 | cut -c1-56)"
+
+# PNG output goes through rsvg-convert. Say so now rather than after four
+# renders have already gone to the wrong format.
+command -v rsvg-convert >/dev/null 2>&1 \
+    || warn "rsvg-convert not on PATH -- PNG conversion will fail; SVG still works"
+
+if ! git -C "$SH2_REPO" diff --quiet HEAD 2>/dev/null; then
+    warn "the tree is dirty -- these previews are of uncommitted work"
+fi
+
+mkdir -p "$OUT"
+ok "writing to $OUT"
+
+dev() { ( cd "$SH2_REPO" && nix develop --command "$@" ); }
+
+# ------------------------------------------------------------------ plates --
+hdr "Plates -- what gets cut into steel"
+for plate in sizeproof-front sizeproof-back; do
+    info "$plate"
+    dev go run ./cmd/plateview -plate "$plate" -px "$PX" -o "$OUT/$plate.png" 2>/dev/null
+    ok "$OUT/$plate.png"
+done
+
+if [ "$PROOFS" = 1 ]; then
+    for plate in textproof constproof bothproof; do
+        info "$plate"
+        dev go run ./cmd/plateview -plate "$plate" -px "$PX" -o "$OUT/$plate.png" 2>/dev/null
+        ok "$OUT/$plate.png"
+    done
+fi
+
+# ------------------------------------------------------------------ glyphs --
+hdr "Glyphs -- ink, control points, and context"
+
+info "glyph sheet: $GLYPHS at ${SIZE}mm"
+dev go run ./cmd/glyphtrace -glyphs "$GLYPHS" -size "$SIZE" -px "$PX" \
+    -label "font/constant at ${SIZE}mm" -o "$OUT/glyphs.png" 2>/dev/null
+ok "$OUT/glyphs.png"
+
+info "in context: \"$WORD\""
+dev go run ./cmd/glyphtrace -word "$WORD" -size "$SIZE" -px "$PX" \
+    -label "in context at ${SIZE}mm" -o "$OUT/word.png" 2>/dev/null
+ok "$OUT/word.png"
+
+# ------------------------------------------------------------------- table --
+hdr "Counters and channels at ${SIZE}mm"
+dev go run ./cmd/glyphtrace -counters -size "$SIZE" >"$OUT/counters.txt" 2>/dev/null
+ok "$OUT/counters.txt"
+
+# The head of the table is the work list, so put it on screen rather than only
+# in a file nobody opens.
+printf '\n'
+sed -n '1,12p' "$OUT/counters.txt" | sed 's/^/    /'
+under=$(awk '/MERGES|tight:/ {n++} END {print n+0}' "$OUT/counters.txt")
+printf '\n'
+info "$under glyph(s) still under the ${SIZE}mm floor -- full table in counters.txt"
+
+hdr "Done"
+for f in "$OUT"/*.png "$OUT"/counters.txt; do
+    [ -e "$f" ] && printf '  %s\n' "$f"
+done
