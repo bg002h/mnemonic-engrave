@@ -506,6 +506,40 @@ once at boot. Harmless while the values are immutable, and the single most
 likely place for a subtle bug the moment they are not. Cross-ref
 `design/SPEC_seedhammer_proof_speed_picker.md` §8.
 
+### F-62 — curving a `font/constant` glyph panics the constant-time passphrase engraver (owning phase: BEFORE any curve lands, and before `O`/`o`/`8` are drawn)
+
+**Found 2026-08-06** by trying it. `~` was redrawn as three cubics; the geometry
+result was excellent — worst lateral dot pile-up fell from 0.0750mm to 0.0073mm,
+a **10x** reduction landing exactly on the `font/sh` reference — and then the
+suite refused it:
+
+```
+panic: unaligned delay
+  engrave.(*timeScaler).Scale   engrave/engrave.go:1126
+  TestPassphraseEngraveAlphabet, TestPassphraseNoPanicOverCharset,
+  TestPassProofBuildsAPlate
+```
+
+`~` is in the **passphrase alphabet**, engraved in CONSTANT TIME so the plate's
+duration cannot leak the passphrase. `timeScaler` stretches each rune to a fixed
+budget; the curved glyph's **19 knots against the polyline's 12** make more
+`Scale` calls, the fractional accumulator rounds differently, and the scaled
+total overruns the budget. **On the device this is a firmware panic mid-plate,
+needle down, for any passphrase containing `~`.**
+
+**So curving the face is not a per-glyph change.** It needs work inside the
+constant-time scaler, and that machinery exists specifically to prevent a timing
+leak — so it is security-sensitive and must not be rushed. Any curve landing
+before it is fixed ships a crash.
+
+Two things worth carrying forward: the fix direction is now **measured rather
+than argued** (see the plate results appended to
+`design/RECON_cusp_dot_pileup.md`), and **`O` is the worst glyph in the face** at
+a 74.9x dot-pitch ratio as a 9-gon — so the constant-time question should be
+settled BEFORE `O`, `o` and `8` are drawn, not after. Cross-ref
+`SPEC_seedhammer_proof_speed_picker.md` section 8, which named this gate as the
+cost of curving the face; it was reached by the glyph rather than by the feature.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)

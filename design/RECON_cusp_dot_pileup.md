@@ -197,3 +197,114 @@ curving anything.
 Order matters: `O`, `o` and `8` are the worst possible candidates to draw as
 polygons, and they are the three still unwritten. **Settle whether the face gets
 curves before they are drawn, not after.**
+
+---
+
+# PLATE RESULTS — 2026-08-06, and what they changed
+
+Cuts 1 and 2 (`constant ~` at 3.0 and 6.0 mm) and cut 3 (`sh ~` at 3.0 mm) were
+made on hard steel, firmware `v0.0.0-g23b171e`, feed 4 mm/s.
+
+## The prediction was wrong in APPEARANCE and right in MECHANISM
+
+I predicted round blobs at the vertices. The operator reports **flat horizontal
+plateaus**:
+
+> the first few dots run near perfectly horizontally for about 1/10th of a mm …
+> then the line is sloped upwards to a flat peak … a flat plateau running
+> horizontally for a distance of maybe 3-4 run-ins, then the line slopes
+> downward to hit a valley that is flat at the bottom about 1-2 run-in lengths.
+
+**Why it is a plateau and not a blob**, which the model did not anticipate: the
+turnaround excursion in y is only ~0.06 mm while the stroke is **0.30 mm**. The
+merged ink's outline is therefore dominated by the STROKE WIDTH, not by where
+the dots are, so it reads as a flat top whose length is
+`(x-span of the slow dots) + one stroke width`.
+
+Simulating the needle directly — sampling the planned path every 25 ms, which is
+literally what lands on the steel — reproduces it:
+
+```
+const ~ 6.0mm, 4mm/s          apex   dots 15,16,17 land inside ~0.01mm
+                                     slow cluster spans 0.075mm in x
+                              valley slow cluster spans 0.011mm in x
+
+predicted flat = span + 0.30mm stroke
+    apex    0.375mm      observed 3-4 run-ins ~= 0.3-0.4mm   MATCH
+    valley  0.31mm       observed 1-2 run-ins ~= 0.1-0.2mm   DOES NOT MATCH
+```
+
+**The apex matches almost exactly; the valley does not.** The plan says both
+flats should be similar and the plate says the valley is about half the apex.
+That asymmetry is unexplained and is recorded as an open discrepancy rather than
+smoothed over.
+
+## The `sh` control is what confirms the mechanism
+
+`sh ~` at 3.0 mm: *"a straight very slightly down sloping line with tiny
+horizontal lines at each end of less than 1 run-in each."*
+
+**Two velocity-zero points, two artefacts, none in the middle.** The zigzag has
+four and shows four. Same machine, same feed, minutes apart — so material,
+clamping and feed are all excluded. The artefact tracks commanded velocity
+minima, which is the model's core claim.
+
+## And it explains the size dependence in the operator's own words
+
+The 3.0 mm plate is *"rather flat with short initial and final segments."* That
+is the prediction: the plateau is **absolute** (~0.375 mm), so it consumes **28%
+of the 3.0 mm glyph's 1.33 mm width** against **14%** of the 6.0 mm glyph's
+2.67 mm. At the small rung the plateaus eat the glyph, which is why it reads as
+flat rather than as a wave.
+
+Corollary, and it matters: **halving acceleration and jerk pushed the wrong
+way.** A slower turnaround means a LONGER dwell and a LONGER plateau. That
+experiment could only have made it worse, which is consistent with the null
+result.
+
+## The curve fix works geometrically — and CANNOT SHIP AS IT STANDS
+
+`~` was redrawn as a `<path>` of three cubics through the same four extremes,
+with horizontal tangents at the peak and valley. Measured through the same dot
+simulation:
+
+```
+                              worst slow-cluster x-span    implied flat
+  ~ 6.0mm polyline (cut)              0.0750mm               0.375mm
+  ~ 6.0mm CURVED                      0.0073mm               0.307mm
+  sh ~ 3.0mm (reference)              0.0000mm               0.300mm
+```
+
+0.300 mm **is** the stroke width, so the plateau is gone and only the stroke
+remains — a **10x** reduction in lateral pile-up, landing on the `sh` reference.
+The knot count went 12 (four tripled points) to 19, i.e. no longer a polygon.
+
+**Then the test suite refused it.** Engraving the curved `~` panics:
+
+```
+panic: unaligned delay
+  engrave.(*timeScaler).Scale   engrave/engrave.go:1126
+  TestPassphraseEngraveAlphabet, TestPassphraseNoPanicOverCharset,
+  TestPassProofBuildsAPlate
+```
+
+`~` is in the **passphrase alphabet**, which is engraved in CONSTANT TIME so the
+plate's duration cannot leak the passphrase. `timeScaler` stretches each rune to
+a fixed budget; the curved glyph's 19 knots make more `Scale` calls, the
+fractional accumulator rounds differently, and the scaled total overruns the
+budget. **On the device that is a firmware panic mid-plate, with the needle
+down, for any passphrase containing `~`.**
+
+Reverted. `constant.svg` and `constant.bin` are back at `23b171e`, 45 packages
+green.
+
+## What this means for the fix
+
+The curve is the right answer and is now measured rather than argued — but it is
+**not a one-glyph change**. It needs work inside the constant-time scaler, which
+is security-sensitive (a timing leak in passphrase engraving is the thing that
+machinery exists to prevent) and must not be rushed.
+
+This is exactly the gate `SPEC_seedhammer_proof_speed_picker.md` section 8 named
+as the cost of curving the face — reached sooner than expected, and by the
+glyph rather than by the feature. Filed as F-62.
