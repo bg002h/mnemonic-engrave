@@ -39,8 +39,21 @@ engraving 4 mm/s · acceleration 125 · jerk 1300   (from 8 / 250 / 2600)
 Both source files were reverted after the build; both trees are clean of it.
 Estimated plate time ~21m22s against 19m15s for the half-speed-only plate (+11%).
 
-**The machine is still running this test build.** Before any real work, reflash
-the release: `~/bin/sh/sh2-flash -p`, pick `fork-v0.0.0-g1945251`.
+**The machine is still running this test build**, and its *glyphs are the newest
+in the tree* — verified by reading the version string out of the artifact itself:
+
+```
+$ strings -a test-e4-a125-j1300.signed.uf2 | grep -oE 'v0\.0\.0-g[0-9a-f]+(-dirty)?'
+v0.0.0-gd7155b9-dirty
+```
+
+`d7155b9` includes the merge `1945251` (nine glyphs opened) **plus** `f`, `z`,
+`W` and `~`. The `-dirty` is only the three motion constants; no geometry.
+
+⚠️ **Do NOT "restore" the release `fork-v0.0.0-g1945251` — it is one commit
+BEHIND on glyphs** and would drop `f`, `z`, `W` and `~`. The correct way back to
+stock motion parameters is a clean build of `main` at `d7155b9` (or later), not
+the tag. Tag a new release from `d7155b9` if a released artifact is wanted.
 
 **Name test artifacts by their config.** Both test builds otherwise produce
 `seedhammerii-v0.0.0-gd7155b9-dirty.signed.uf2`, and the second silently
@@ -104,8 +117,10 @@ Ordered by what unblocks what.
 - **Read the accel/jerk plate.** §1. Blocking everything else on the wiggle.
 - **Cut soft @ 4 mm/s.** Fills the last matrix cell. Decides material-setting vs
   plain speed choice.
-- **Reflash the release** — `~/bin/sh/sh2-flash -p` → `fork-v0.0.0-g1945251`.
-  The machine is on a test build right now.
+- **Return the machine to stock motion parameters** — build `main` at `d7155b9`
+  or later, **not** the `fork-v0.0.0-g1945251` tag, which is a commit behind on
+  glyphs. See the warning in §1. Only needed once the wiggle question is settled;
+  the test build's geometry is current, so plates cut on it are valid.
 - **Three glyphs remain of the sixteen: `O`, `o`, `8`.** The other thirteen
   landed. Scope directive still in force: **only the sixteen** — the operator
   explicitly excluded `w`, `m` and the rest. (`W` was added by later request and
