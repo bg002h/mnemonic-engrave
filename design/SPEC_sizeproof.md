@@ -690,7 +690,13 @@ entries.
 The narrow `admitQR` guard in `c9cc4db` stays as belt-and-braces once this lands:
 the flag can no longer be set, and admission would ignore it anyway.
 
-Ordered by the operator, 2026-08-05, to land **before the release**.
+**DEFERRED (operator, 2026-08-05): this does not block the release.** It is an
+operator-visible UI change, and the release ships without it. What ships is
+correct on both the levels that touch steel — the plate carries no code, and
+every screen reads the fit rather than the flag. What remains is that a tap on
+"Add QR" with a ladder loaded is silently discarded rather than refused out
+loud. Tracked in `FOLLOWUPS.md` as
+`sizeproof-qr-step-must-not-offer-what-it-drops`.
 
 ### 3.2 The confirm screen reads the QR off the FIT, never off `useQR`
 
