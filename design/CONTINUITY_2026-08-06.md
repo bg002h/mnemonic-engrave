@@ -184,7 +184,7 @@ Ordered by what unblocks what.
 - **Nothing pins the machine's actual engraving speed.** Four independent copies
   of `engravingSpeed = 8 * mm` exist and goldens use test-local ones, so a
   firmware speed change moves no test. Real gap.
-- **Push.** `mnemonic-engrave` has 18 unpushed commits (all docs + one script); `seedhammer` has 1
+- **Push.** `mnemonic-engrave` has ~18 unpushed commits (all docs + one script); `seedhammer` has 1
   (`d7155b9`) on `main`.
 
 ## 6. Standing constraints
@@ -211,7 +211,7 @@ Ordered by what unblocks what.
 
 | | |
 | --- | --- |
-| `mnemonic-engrave` | clean, 18 unpushed, HEAD `edc39bd` |
+| `mnemonic-engrave` | clean; every session artifact committed, nothing pushed |
 | `seedhammer` | `main`, HEAD `d7155b9`, 1 unpushed; `test-e4-a125-j1300.signed.uf2` untracked |
 | `seedhammer-wt-glyphcleanup` | `constant-glyph-cleanup` @ `b9b7831`, merged to main, clean |
 
