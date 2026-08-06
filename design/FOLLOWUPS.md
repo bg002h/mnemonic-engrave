@@ -339,34 +339,67 @@ EXIT, not distributed, so a dwell at the start or a slight overrun at the end ma
 fix them at far less cost in plate time — and an overrun changes the toolpath,
 hence the plate, hence the goldens, in a way a speed change does not.
 
-### F-58 — flashing without a power cycle hangs the first engrave (owning phase: hardware/UX)
+### F-58 — the Accept footer button stopped responding after engraving finished (owning phase: GUI)
 
-**Observed 2026-08-06**, immediately after flashing `test-e4-a125-j1300.signed.uf2`:
-the machine hung on the final checkmark press, the one that starts the engraving.
-A reboot cleared it and the same plate then ran on the same firmware.
+**Observed 2026-08-06**, on the `test-e4-a125-j1300` build. The engraving itself
+**ran to completion**; the machine reached the post-engrave screen and the footer
+**Accept** checkmark did not respond. A reboot cleared it.
 
-**It is not the motion parameters.** A plan the planner cannot resolve would hang
-deterministically — identical firmware, identical plate, identical code path. It
-worked after a power cycle with acceleration 125 and jerk 1300 unchanged, so those
-values are exonerated and nothing about the test build needs revisiting.
+Two wrong diagnoses were recorded before the operator corrected them. Both are
+kept here because each is a trap the next reader can fall into:
 
-**Suspected cause, NOT yet confirmed:** `sh2-flash` reboots the RP2350 over USB
-rather than cutting power. The TMC2209 drivers run off the 20–28 V rail and stay
-powered through that reboot, so the MCU restarts cold against stepper drivers that
-are still in whatever state the previous firmware left them. The UART bring-up in
-`driver/tmc2209` is the first thing the OK press needs, which matches the symptom
-exactly. A real power cycle resets both halves together.
+- ❌ *"Driver state carried across the flash."* Impossible. The SH2 has **one**
+  USB-C port, shared by BOOTSEL and power. Flashing means it is on the computer;
+  engraving means unplugging it and connecting the high-wattage supply. That
+  disconnection kills power, so **every flash→engrave transition is already a cold
+  boot**. No hypothesis may depend on state surviving it.
+- ❌ *"It hung starting the engrave."* It hung *finishing* one. `engraveDone`'s
+  body text is "Engraving completed successfully", so the plate was cut and the
+  motion path — homing, planning, stepping — is exonerated end to end.
 
-**Why it matters beyond the annoyance:** the failure is a *hang*, not an error. It
-does not report, does not time out, and looks identical to a machine thinking. On
-a plate carrying real funds that is the wrong failure mode, and the operator has no
-way to tell it from normal operation.
+**Therefore the motion parameters are not implicated at all.** Acceleration 125 and
+jerk 1300 produced a complete plate. The fault is downstream of engraving, in input
+handling.
 
-**Work, if taken up:** confirm the mechanism by flashing and engraving twice, once
-with a power cycle between and once without — the hypothesis predicts only the
-second hangs. Then either bound the UART handshake with a timeout that surfaces a
-readable error, or reset the drivers on init. Until then the operational rule is
-the mitigation: **power-cycle after every flash, before engraving.**
+**Suspected mechanism, NOT proven — a structural hazard that matches the symptom.**
+`EventRouter.Next` (`gui/event.go:266`) is strict head-of-queue: it examines only
+`r.events[0]`, and if the head does not match the filters the *calling widget*
+passed, it returns nothing and leaves the head in place. `EventRouter.Reset`
+(`:281`) discards head events matching **no** filter registered that frame — but an
+event matching a filter that was registered and then *not consumed* is neither
+delivered nor discarded. `Context.Reset` (`gui.go:97`) responds by scheduling an
+immediate wakeup, so the frame loop spins at full rate, redrawing forever, while no
+input is ever processed. **A live screen with dead buttons is exactly this
+signature**, and it is nondeterministic because it turns on press/release timing
+against an asynchronous state change.
+
+This hazard is already known in this codebase: `gui/codex32_polish.go:316` carries
+the note *"Button2 is drained every frame so it cannot block the queue head."* The
+engrave screen has no equivalent protection.
+
+Two asymmetries on the engrave screen found while reading, either of which could
+supply the stuck head — both worth fixing regardless of whether they caused this:
+
+1. `drawNav` (`gui.go:2669`) draws **only** `backBtn` while running and **only**
+   `selectBtn` when done, but the frame loop unconditionally registers filters for
+   *both* in *every* state. Filters are registered for a widget that is not on
+   screen.
+2. In the `default:` branch the select button is consumed **one event per frame**
+   (`if _, ok := selectBtn.Next(ctx); !ok { break }`), not drained in a loop the way
+   `Clicked` drains. Progress depends on the re-wakeup rather than on the frame.
+
+**Why it matters beyond the annoyance.** The failure is a *hang*, not an error: no
+report, no timeout, indistinguishable from a machine thinking. It also strands the
+operator on a screen holding a finished plate. On a plate carrying real funds, an
+input path that can wedge with no diagnostic is the wrong failure mode.
+
+**Work, when taken up.** Reproduce in a GUI test first — drive `EngraveScreen` to
+`engraveDone` and assert Accept still responds after adversarial input orderings
+(press before the transition and release after, a stray Button2, a held button
+across the state change). The test is the deliverable; a fix without a reproduction
+cannot be shown to have worked, and this defect is too intermittent to confirm by
+hand. Then consider whether `Next` should scan the queue rather than only its head,
+which would remove the whole class rather than this instance.
 
 ## Resolved
 
