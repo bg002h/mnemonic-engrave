@@ -188,3 +188,30 @@ All five nits from the converter execution review (`design/agent-reports/me-conv
 
 ### crates.io publish — RESOLVED 2026-06-16
 - **`me-crates-io-publish`** — **`mnemonic-engrave` v0.1.0 published** to crates.io (<https://crates.io/crates/mnemonic-engrave>; `cargo install mnemonic-engrave` → the `me` binary). Added publish metadata (`repository`/`homepage`/`keywords`/`categories`) + a crate-local `README.md` (`9ad758c`); dry-run green; uploaded with a `publish-new`-scoped token. Future versions: bump `version` and `cargo publish` (needs `publish-update` scope).
+
+### `sizeproof-qr-step-must-not-offer-what-it-drops` — OPEN, owning phase: next change touching the QR step
+
+**Operator directive 2026-08-05: "Sizeproof must always be without a QR code."**
+Recorded as a hard invariant in `SPEC_sizeproof.md` §3.0.
+
+Level 1 (the plate cannot carry a code) is structural and holds: `FitSized` has
+no QR parameter. Level 2 (the operator's flag cannot diverge) does NOT hold:
+`ftQRChoiceFlow` (`gui/freetext_flow.go:457`) is a bare two-choice screen with no
+knowledge of what is loaded, and it deliberately preserves a prior opt-in across
+Back. So an operator can load a ladder — whose loader clears the flag with a
+prompt — then press Back and set it again.
+
+That divergence has now produced two defects, one per level of the stack:
+- P5: the confirm screen printed `QR: yes` for a plate with no code.
+- The whole-diff review: admission reserved a QR band, refusing a ladder that
+  fits, with a remedy naming a code the plate cannot carry.
+
+Both were fixed by reading the FIT rather than the flag, which is right and is
+now the rule. What is still open is the flag itself: the QR step should not offer
+a choice it will not honour. When the loaded composition needs the whole plate,
+state that the QR is unavailable for this pattern rather than presenting
+"Add QR" and discarding it — the same honesty `ftRefuse` already applies to
+never dropping a QR automatically.
+
+Deliberately NOT folded into the whole-diff fix, which is narrow by design and
+must not grow at the final gate.

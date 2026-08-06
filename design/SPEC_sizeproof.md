@@ -645,6 +645,43 @@ five-rung survey and received one rung. Every one of these must change:
 | `ftProofReplaces` (`freetext_proof.go:538`) | with an empty footer it renders "Footer becomes ." — say "the Footer is CLEARED" instead |
 | `sizeLabel` (`cmd/plateview/main.go:98-103`) | its zero branch prints **"fixed layout"**, not `0.0mm`; a `Mixed` plate must print the range instead |
 
+### 3.0 INVARIANT: a `SIZEPROOF!` plate NEVER carries a QR
+
+**Operator directive, 2026-08-05: "Sizeproof must always be without a QR code."**
+This is a hard invariant, not a default, and it holds at two levels that must not
+be confused:
+
+1. **The plate cannot carry a code.** Structural, and already true: `FitSized`
+   has no QR parameter (§2.7) and leaves `QR`/`qrAt` nil, so no code exists to
+   engrave whatever any flag says. **Nothing may weaken this** — a future
+   `FitSized` that accepted a code would break the invariant at its root.
+2. **The operator's `useQR` flag must not silently diverge from it.** *Not* true
+   today, and this is the gap that produced the whole-diff review's Important.
+   `ftQRChoiceFlow` (`freetext_flow.go:457`) is a bare two-choice screen that
+   knows nothing about what is loaded, and it deliberately preserves a prior
+   opt-in across Back (`if prior { cs.choice = 1 }`). So the operator can load a
+   ladder — whose loader clears the flag, with a prompt saying so — then press
+   Back and set it again. The plate still carries no code, but the flag now says
+   otherwise, and everything reading the flag instead of the fit goes wrong: the
+   confirm screen did (fixed at P5, §3.2), admission did (fixed after the
+   whole-diff review).
+
+**Ignoring the flag is not sufficient.** Silently discarding a choice the
+operator made is the substitution this program exists to avoid — the same
+reasoning `ftRefuse` already states for never dropping a QR automatically, and
+`ftProofReplaces` for saying "It also REMOVES THE QR" out loud before the
+operator accepts.
+
+**Required:** the QR step must not offer a choice it will not honour. When the
+composition in the text field needs the whole plate, that screen states the QR is
+unavailable for this pattern rather than presenting "Add QR" and discarding it.
+Any code reading `useQR` where the answer is a property of the PLATE must read
+the fit instead — `f.plate.QR != nil` — because the fit is the one object that
+knows.
+
+Filed as a follow-up owned by the phase that next touches the QR step; it is not
+folded into the whole-diff fix, which is deliberately narrow.
+
 ### 3.2 The confirm screen reads the QR off the FIT, never off `useQR`
 
 **Found at P5, and it is a lie on the screen the operator approves.** §2.7 handles
