@@ -339,6 +339,35 @@ EXIT, not distributed, so a dwell at the start or a slight overrun at the end ma
 fix them at far less cost in plate time — and an overrun changes the toolpath,
 hence the plate, hence the goldens, in a way a speed change does not.
 
+### F-58 — flashing without a power cycle hangs the first engrave (owning phase: hardware/UX)
+
+**Observed 2026-08-06**, immediately after flashing `test-e4-a125-j1300.signed.uf2`:
+the machine hung on the final checkmark press, the one that starts the engraving.
+A reboot cleared it and the same plate then ran on the same firmware.
+
+**It is not the motion parameters.** A plan the planner cannot resolve would hang
+deterministically — identical firmware, identical plate, identical code path. It
+worked after a power cycle with acceleration 125 and jerk 1300 unchanged, so those
+values are exonerated and nothing about the test build needs revisiting.
+
+**Suspected cause, NOT yet confirmed:** `sh2-flash` reboots the RP2350 over USB
+rather than cutting power. The TMC2209 drivers run off the 20–28 V rail and stay
+powered through that reboot, so the MCU restarts cold against stepper drivers that
+are still in whatever state the previous firmware left them. The UART bring-up in
+`driver/tmc2209` is the first thing the OK press needs, which matches the symptom
+exactly. A real power cycle resets both halves together.
+
+**Why it matters beyond the annoyance:** the failure is a *hang*, not an error. It
+does not report, does not time out, and looks identical to a machine thinking. On
+a plate carrying real funds that is the wrong failure mode, and the operator has no
+way to tell it from normal operation.
+
+**Work, if taken up:** confirm the mechanism by flashing and engraving twice, once
+with a power cycle between and once without — the hypothesis predicts only the
+second hangs. Then either bound the UART handshake with a timeout that surfaces a
+readable error, or reset the drivers on init. Until then the operational rule is
+the mitigation: **power-cycle after every flash, before engraving.**
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
