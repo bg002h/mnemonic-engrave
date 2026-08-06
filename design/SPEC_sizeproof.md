@@ -645,6 +645,40 @@ five-rung survey and received one rung. Every one of these must change:
 | `ftProofReplaces` (`freetext_proof.go:538`) | with an empty footer it renders "Footer becomes ." — say "the Footer is CLEARED" instead |
 | `sizeLabel` (`cmd/plateview/main.go:98-103`) | its zero branch prints **"fixed layout"**, not `0.0mm`; a `Mixed` plate must print the range instead |
 
+### 3.2 The confirm screen reads the QR off the FIT, never off `useQR`
+
+**Found at P5, and it is a lie on the screen the operator approves.** §2.7 handles
+round 1's I4 entirely at the load moment — both ladder proofs carry
+`TextQR: ""`, so the prompted drop applies and `ftProofLoader` clears `useQR`.
+That is not the end of it. **Back from the Text step returns to the QR screen
+with the plan and the text intact** — the very path §2.1 cites as reachable for
+`BOTHPROOF!` — and re-enabling the QR there leaves `useQR` true while `FitSized`
+still produces no code.
+
+`ftConfirmSummary` printed `ppYesNo(useQR)`, so the operator would approve a
+screen reading **`QR: yes` on a plate that carries none**, together with the
+privacy warning for a code that does not exist. On permanent steel, a confirm
+screen describing a different plate than the one that will be cut is the failure
+this whole program is built to avoid.
+
+**`ftConfirmSummary`, `ftConfirmBody` and `ftConfirmFlow` therefore take no
+`useQR` at all; they read `f.plate.QR`.** This is the same rule the codebase
+already applies to `Faces` and `Sizes` — the fit is the one object, and nothing
+downstream re-derives what it already answered. §7.17 covers it.
+
+Two smaller P5 corrections to this section:
+
+- **`ftProofOutcomeFor`'s rung branch is gated on `Sizeable`.** §3's table names
+  its hardcoded footer but not that the branch calls `ftBothAt` for **any** proof
+  when `rung != 0`. Safe on the device, where only a `Sizeable` proof ever gets a
+  non-zero rung — but `cmd/plateview`'s `-size` is a flag, and §3 routes
+  `proofPreview` through this resolver, so `-plate sizeproof-front -size 4.4`
+  would have returned `BOTHPROOF!`'s plate under the ladder's trigger.
+- **The `sizeLabel` row was half-stale.** Its zero branch already printed
+  "fixed layout"; the real work was the `Mixed` range, which needs
+  `Preview.Sizes` to reach the tool at all. Without that, the zero branch calls a
+  ladder a "fixed layout" — which is `0.0mm` in that tool's own wording.
+
 **A reader that prints `0.0mm` is a defect, not a fallback** — at `ftSizeLabel`
 and `ftConfirmSummary`, where that is the literal symptom. At `cmd/plateview`'s
 `sizeLabel` the same defect shows as **"fixed layout"**, because its zero branch
@@ -962,10 +996,14 @@ does. Without that test 5.400 mm would not be enough either.
 16. **Both ladder proofs report `NeedsWholePlate()`**, the prompt says the QR is
     removed, and loading one with the QR on clears `useQR` before the outcome is
     resolved.
-17. **The confirm screen says what the plate is, and fits.** Two assertions:
+17. **The confirm screen says what the plate is, and fits.** Three assertions:
     (a) the rendered `ftConfirmSummary` for the front NAMES the rungs and
     **never contains "0.0mm"** — the defect §3 bolds, on the one screen the
     operator approves, which a fits-the-panel assertion passes happily;
+    (a2) **it reports the QR from the FIT, not from `useQR`** (§3.2): load a
+    ladder, go Back to the QR screen, re-enable the QR, and the confirm screen
+    must still read `QR: no` and must not carry the privacy warning. This is
+    reachable on shipped firmware and is the one screen the operator approves;
     (b) it fits the real panel, asserted by MEASURING RECTANGLES as
     `ftProofBody`'s test does — `ExtractText` collects runes regardless of
     occlusion, so a label drawn off the panel reads as present.
