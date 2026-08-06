@@ -4,42 +4,43 @@ Supersedes `CONTINUITY_2026-08-05b.md`. Written at a context reset.
 
 ## 1. FIRST TASK — lengthen the lowercase `z` crossbar
 
-Operator instruction, 2026-08-06: move the crossbar's **starting point left by
-twice the distance it moved last time.**
+Operator instruction, 2026-08-06, **final form**: make the crossbar
+**2 units left : 1 unit right** of where it crosses the diagonal.
 
-Last time was `458 → 457.5`, i.e. **0.5 SVG units**. Twice that is **1.0 unit**:
+This SUPERSEDES the operator's earlier "twice last time's distance", which would
+have put the start at 456.5. The ratio governs; the doubled distance does not.
+
+The diagonal's descending segment runs (461,3.5) → (457,8.5). At the crossbar's
+y=6: `t = (6-3.5)/(8.5-3.5) = 0.5`, so `x = 461 + 0.5*(457-461)` = **459**.
+Arms of 2 and 1 about x=459 give:
 
 ```
 font/constant/constant.svg, the <g id="z"> second polyline
 
-  before   457.5,6 460,6
-  after    456.5,6 460,6
+  before   457.5,6 460,6      (1.5 left : 1.0 right)
+  after    457,6   460,6      (2.0 left : 1.0 right)
 ```
 
-Crossbar length **2.5 → 3.5 units**. Only the start point moves; the right end
+Crossbar length **2.5 → 3.0 units**. Only the start point moves; the right end
 stays at 460 and the diagonal is untouched.
 
-**It fits — exactly, with nothing to spare. Verified before filing.** `z`'s cell
-is 456–462, so the new start is at cell-relative **0.5 units = 50 font units**,
-which is *precisely* the face's existing leftmost ink, currently set by `}`
-(svg x=276.5, also cell-relative 0.5). So `loX` does not move, and the pinned
-neighbour clearance stays at exactly 10 font units:
+**Verified before filing — and this version costs no margin at all.** `z`'s cell
+is 456–462, so the new start sits at cell-relative **1.0 unit = 100 font units**.
+The face's leftmost ink is 50 font units (set by `}`, svg x=276.5), so `loX` is
+untouched and the pinned clearance stays at exactly 10 font units:
 
 ```
 gap = advance + loX - hiX - stroke = 600 + 50 - 550 - 90 = 10
 ```
 
-That was computed from the SVG and reproduces the pinned figure in
-`font/constant/ink_clearance_test.go`, so the arithmetic is sound. **Any further
-left and `TestInkClearsTheNextGlyph` fails** — it pins `gap == 10` exactly. There
-is no margin left in this direction for `z` or anything else.
+That reproduces the figure pinned in `font/constant/ink_clearance_test.go`, which
+asserts `gap == 10` exactly. The superseded 456.5 would have spent the face's
+entire remaining left margin; **457 spends none**, and leaves the 0.5-unit
+reserve intact for a future glyph.
 
-Two consequences worth seeing before approving the render:
-
-- The crossbar becomes **asymmetric about the diagonal**. It crosses the diagonal
-  at x=459, so the arms go from 1.5 left / 1.0 right to **2.5 left / 1.0 right**.
-- It protrudes **0.5 units left of the glyph body** (the diagonal's left edge is
-  at 457), which is the intended effect — the same effect as last time, doubled.
+One consequence worth seeing in the render: 457 is **exactly the diagonal's left
+edge**, so the crossbar now starts *flush* with the glyph body rather than inset
+by 0.5 (today) or protruding by 0.5 (the superseded proposal).
 
 Process: render options before/after with `scripts/sh-preview-basic -g 'z' -c 3`,
 show them, get approval, then re-record the SIZEPROOF goldens **scoped with
