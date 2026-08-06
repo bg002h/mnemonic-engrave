@@ -220,12 +220,30 @@ at the wrong thing.
   `internal/sh2/params.go` (the host copy). `TestParamsMatchTheMachine` parses
   the former and fails on divergence, so the pair is already guarded; making the
   value runtime-selectable has to keep that guard meaningful.
-- **Every golden pins TIMING, not just geometry.** `knotsCloseEnough` compares
-  `k1.T == k2.T` exactly. Changing the engraving speed moves the T value of every
-  knot on every plate, so all 16 backup goldens plus the SIZEPROOF pair move. The
-  default setting must therefore keep today's speed EXACTLY, with the second
-  setting covered by its own tests, or the whole golden corpus has to be
-  re-recorded for a change nobody has judged.
+- **Goldens pin timing, but at a TEST-LOCAL speed — CORRECTED 2026-08-06.** An
+  earlier draft of this entry claimed that changing the engraving speed moves
+  every golden. It does not, and the claim was checked by halving the machine
+  speed and running the suite: **45 packages, zero failures.** There are FOUR
+  independent copies of `engravingSpeed = 8 * mm`:
+
+  | copy | who uses it |
+  |---|---|
+  | `cmd/controller/platform_sh2.go:191` | the machine — the ORIGINAL |
+  | `internal/sh2/params.go:27` | host tools: plateview, emu, glyphtrace |
+  | `backup/backup_test.go:35` | the plate goldens |
+  | `engrave/`, `gui/`, `stepper/` `_test.go` | their own suites |
+
+  `knotsCloseEnough` does compare `k1.T == k2.T` exactly, but against the
+  TEST copy, which is independent of the machine's. So the blast radius of a
+  material setting is far smaller than feared: **no golden moves at all.**
+
+- **AND THAT IS ITSELF A GAP.** Nothing pins the machine's actual engraving
+  speed. `TestParamsMatchTheMachine` only checks that the machine's copy and the
+  host copy agree with EACH OTHER, not that either is any particular value, so a
+  change to the machine's speed ships with a green suite.
+  `TestPassphraseRuneDurationPin` looks like it would catch it and does not — it
+  is computed at the test speed too. Worth a pin of its own, whether or not the
+  material setting is built.
 - **It touches the constant-time model.** `runeDuration`, `advDur`, `padDur` and
   `centerDur` are all derived from the stepper config. Within one plate they
   scale together, so the `T_row <= 2L` disclosure bound survives — but
