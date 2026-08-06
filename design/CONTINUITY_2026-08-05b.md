@@ -125,6 +125,45 @@ Also settled and worth not re-deriving:
 - The alphabet's bounding box relocates every plate, and a single-feature glyph
   loses its identity to one scratch. See [[engraving-font-design-rules]].
 
+### 4.1 THE HOUSE ANGLE — 7.125°
+
+`font/constant` has one deliberate off-horizontal angle, and it is a **design
+vocabulary**, not a stray number. **7.125° = atan(0.5 / 4)** — half a unit of
+rise over a four-unit run. Verified 2026-08-05 by computing it, and by reading
+`font/constant/glyph_rules_test.go`.
+
+**Where it came from, which is the part worth keeping.** A slant was observed on
+an engraved plate and looked like design. Measured, the PLANNED path was dead
+flat (`n`'s top bar at y=11379 from x=2844 to x=14222) — **the slant was the
+machine, not the drawing** — and it did not reproduce on `m`, `h` or `r`, so it
+could not be relied on. *"Drawing it in is the only way to have it."*
+
+Who carries it, and in which direction:
+
+| glyph | angle | direction |
+|---|---|---|
+| `n` arch | 7.125° | **rises** left→right (`archLeftY, archRightY = 4.0, 3.5`) |
+| `+` bar | 7.125° | **drops** left→right — the deliberate MIRROR |
+| `f` crossbar | 7.125° | drops left→right |
+| `f` hook | **14.25°** | twice the house angle — the one place it is doubled |
+| `=` bars | 7.153° | 0.25 rise per bar; atan does not add exactly, and a tenth of a degree is the accepted slack |
+| `m`, `h`, `r`, `t` | **flat, and must stay flat** | |
+
+**Two rules that are easy to break by accident:**
+
+1. **`n` and `+` lean APART on purpose.** A reader who learns "sloped arch = `n`"
+   would be misled by a `+` sloping the same way, so the pair diverges rather
+   than agreeing. At 3.0 mm a flat-barred `+` reads as a `t` that lost its foot.
+2. **The siblings must stay flat or the point is lost.** `n` is only distinctive
+   while `m`, `h` and `r` are flat; `+` only while `t` is flat. The tests assert
+   the flatness of the siblings, not just the slope of the carrier.
+
+**The angle is DECODED FROM `n` at test time, never written down as a constant**
+(`glyph_rules_test.go:451`). That is deliberate: flattening `n` while leaving `f`
+alone is then a *test failure* rather than a silent drift apart. **Do not
+"helpfully" extract it into a shared constant** — that would destroy the coupling
+that makes the check work.
+
 ## 5. DONE — the two GUI follow-ups (step 1 of §1 is complete)
 
 Both landed on `constant-glyph-cleanup`, verified by the controller: 44 packages
