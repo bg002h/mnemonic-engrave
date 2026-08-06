@@ -475,6 +475,37 @@ letting auto-fit pick 6.0 mm. A centred title would move with the string's width
 so successive cuts would not be positionally comparable — that is why "don't
 centre it" is load-bearing and not a preference.
 
+### F-61 — `preview/params.go` is a fourth, stale copy of the machine's motion params (owning phase: the next `me` preview cycle)
+
+**Found 2026-08-06** by the synthesis pass of the motion-params recon; all five
+recon agents missed it because it lives outside the fork.
+
+```
+preview/params.go:5   // "Replicated VERBATIM from seedhammer v1.4.2"
+preview/params.go:18  EngravingSpeed: 8 * mm     // the device is now 4 * mm
+```
+
+**Nothing binds it to anything.** The fork has `internal/sh2/params_test.go`'s
+`TestParamsMatchTheMachine` holding its host copy to the device constants; this
+sibling copy has no such test, so it drifted silently the moment `343fb05`
+halved the engraving feed. **`me bundle --preview` therefore understates
+engraving time by roughly 2x today.**
+
+The one-line fix needs a decision first, and it is not derivable from the code:
+should this model **our fork** or **upstream v1.4.2**? Its own comment claims
+verbatim replication from v1.4.2, but the thing it previews is what the
+operator's own machine will cut, and the two have now diverged. Whichever is
+chosen, **it needs a binding test** — the defect is the absence of one, not the
+number.
+
+Note the fork itself carries **three** further copies that are desynchronised by
+construction: `engraverParams` embeds a *copy* of `engraverConf`; homing reads
+`engraverConf` directly, bypassing `EngraverParams()`
+(`cmd/controller/engraver.go:194-196`); and `mjolnir2` latches `TicksPerSecond`
+once at boot. Harmless while the values are immutable, and the single most
+likely place for a subtle bug the moment they are not. Cross-ref
+`design/SPEC_seedhammer_proof_speed_picker.md` §8.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
