@@ -22,7 +22,34 @@ In order:
    `sizeproof-back.bin`, driven by `gui/freetext_sizeproof_golden_test.go`. 44
    packages green, **zero existing golden bytes moved**. See §4, whose "87
    glyphs" figure is now corrected by measurement.
-3. **NEXT — tweak `const` glyphs.** With the goldens in place, every edit shows
+3. **NEXT — tweak `const` glyphs.**
+
+   **THE PROBLEM-GLYPH LIST (operator, 2026-08-05), 16 of them:**
+
+   ```
+   a  e  s  z  O  o  8  @  *  &  <  >  (  )  {  }
+   ```
+
+   Three hazard classes, and they want different fixes: **closed counters that
+   fill in** (`a e o O 8 @ &`), **strokes that lose their identity** (`s z *`),
+   and **six brackets that must stay distinguishable from each other** — note
+   `( )` ink only **0.33 mm wide** at 3.0 mm against `< >` and `{ }` at 1.33 mm,
+   so the mirror pairs are the risk, not the bracket-vs-chevron pairs.
+
+   Measured at 3.0 mm: **all 16 are k=1**, so there is headroom against the max
+   k=2 disclosure bound — but a redraw that splits one into three runs breaks a
+   security property, not an aesthetic one (§4).
+
+   **`cmd/glyphtrace`** renders them: ink at the true 0.3 mm stroke, the
+   centreline, the travels, and the red control points that correspond to
+   `constant.svg` coordinates.
+
+   ```sh
+   nix develop --command go run ./cmd/glyphtrace -o /tmp/glyphs.png
+   nix develop --command go run ./cmd/glyphtrace -glyphs 'a8@&' -size 5.0 -o /tmp/x.png
+   ```
+
+   With the goldens in place, every edit shows
    which glyph moved instead of changing something silently. **The workflow is in
    the test file's own doc comment, and it is not backup/testdata's:** these two
    goldens are *supposed* to move on a glyph edit. Run
