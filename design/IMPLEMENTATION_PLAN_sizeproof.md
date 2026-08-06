@@ -9,9 +9,11 @@ Author: controller session, 2026-08-05.
 | 1 (`sizeproof-plan-R0-round1.md`) | RED 0C/1I/3m/2n | opus + sonnet, opus synthesis |
 | 2 (`sizeproof-plan-R0-round2.md`) | **GREEN 0C/0I** | single opus, scoped to the fold |
 
-Round 2 verified by probe that the §7.7(b) constraint set is **exactly strong
-enough**: it simulated the P3 mutation and confirmed no fixture satisfying all
-four constraints survives it, at every admissible block-1 row count.
+Round 2 verified by probe that the §7.7(b) constraint set is strong enough for
+the fixture it had in mind — but **its "at every admissible block-1 row count"
+was wrong, and P2 corrected it.** See §1's P2 constraint 2. The correction is
+folded; the fixture as committed at `acda504` is stronger than the constraints
+required, and the controller has independently re-run the P3 mutation against it.
 
 (Revisions are `R`n; `P`n means a phase of §1. An earlier draft labelled itself
 "P1", which collided with the phase namespace and read as though implementation
@@ -174,9 +176,20 @@ each of which a natural implementation gets wrong:
    `fitBlocksAt` (legal in-package, and the shape round 2 verified) or pin the
    count the exported path actually yields. Constraint 4 below holds for **every**
    realizable code size, because rows below any band ink full width.
-2. **Block 1 must wrap to at least one row and END ABOVE the band's first row.**
-   Otherwise a block-relative index shifts block 2's window by zero rows and the
-   defect is invisible.
+2. **Block 1 must wrap to at least TWO rows and end above the band's first row**
+   — and the fixture must carry a **per-row budget assertion**, not only
+   constraint 4's rectangle. **Corrected by P2; round 2's claim that any
+   admissible block-1 row count works is FALSE at 89 modules.** The code is
+   centred in its band, and at 3.0 mm the centring offset (21120) exceeds one row
+   (19200), so the code's top edge sits in the band's *second* row. With a 1-row
+   block 1 the band shifts by one, leaving only plate row 3 unnarrowed — and row
+   3's y-range `[76800, 96000)` does **not** intersect the code box starting at
+   97920. Constraint 4 alone therefore passes on the defect.
+   The committed fixture (`acda504`) uses a 2-row block 1 **and** asserts *every
+   row is wrapped at the budget of the plate row it lands on*, which catches a
+   shift of any size at any module count and removes the dependency on that
+   geometric coincidence. **P3's mutation step runs against the fixture AS
+   COMMITTED, never a re-derived one.**
 3. **Block 2's text must FILL its budget on every row it spans** — a spaceless
    run, as `mixedBlocks`/`fillRows` already build. A wrong budget must produce
    INK, not merely permit it; short words leave the extra columns empty and the
@@ -231,9 +244,17 @@ sail through unnoticed until §7.19 at P6 — three phases of committed work lat
 
 **Its power is demonstrated by pulling §7.19's mutation forward for this ONE
 item.** After P3 is green: temporarily index block 2's rows block-relative
-against `baseY = outerMargin`, confirm **§7.7(b) FAILS**, then revert — from a
-COPY made first, never from the index. **A §7.7(b) that stays green under that
-mutation is a blocking finding, not a passing gate.**
+against `baseY = outerMargin` (`fit.go`'s `widthFor(lay, row)` → `widthFor(lay, 0)`),
+confirm **§7.7(b) FAILS**, then revert — from a COPY made first, never from the
+index. **A §7.7(b) that stays green under that mutation is a blocking finding,
+not a passing gate.**
+
+*Already exercised twice against the fixture as committed:* by P2's implementer
+at authoring time, and independently by the controller at the P2 boundary. Both
+halves go red — `TestTwoBlockQRPlateWrapsBlockTwoAtTheCodesBudget` and
+`TestFreeTextBodyNeverEntersTheQRBox`. P3 re-runs it because P3 is the phase that
+makes the defect *reachable*; the earlier runs prove only that the fixture can
+speak.
 
 Round-2's I2 also lands here whole. Round-3's I2 is split: its design half is P2's
 (the `AdmissibleBlocks` anchor), and only its PIN — §7.20 with `useQR` — closes
