@@ -66,6 +66,62 @@ Low/nit items deferred from architect reviews (per the iterative-architect-revie
 
 - **`seedhammer-engrave-33word-font-legibility`** — **Residual (non-code, hardware/visual) from the engrave-bugfixes cycle** (BUG-3, shipped fork `main` `3a23dbb` 2026-06-19; bug-issue bg002h/seedhammer#1; spec/plan/exec-review all R0 GREEN — `design/agent-reports/seedhammer-engrave-bugfixes-{spec-R0-round0,plan-R0-round0,exec-review}.md`). The 33-word (256-bit) SLIP-39 verbatim layout (option-a rework) shrinks the plate font to **3.859 mm** (vs the 4.1 mm baseline) to fit 17 rows in column 1; column geometry and engraveability are **proven** (stroke fixed at 0.3 mm → glyph ≈12.9× stroke; 3.86 mm inter-column gap; all rows ⊂ [0,85] mm), so this is NOT a code defect. The only open question is **physical legibility** of the 3.859 mm font on a real engraved plate — a subjective/hardware judgement. SeedHammer already engraves a 24-word plate + QR at finer pitch in the same area, so no blocker is expected. **Action: visually confirm a 33-word plate on hardware before relying on it; if too dense, revisit (a 3rd column was analyzed and rejected — overruns the 85 mm plate at any legible font).** Priority LOW; only affects 33-word SLIP-39 (the other reachable counts {27,30} stay at full 4.1 mm).
 
+
+### `sizeproof-qr-step-must-not-offer-what-it-drops` — OPEN, owning phase: next change touching the QR step
+
+**Operator directive 2026-08-05: "Sizeproof must always be without a QR code."**
+Recorded as a hard invariant in `SPEC_sizeproof.md` §3.0.
+
+Level 1 (the plate cannot carry a code) is structural and holds: `FitSized` has
+no QR parameter. Level 2 (the operator's flag cannot diverge) does NOT hold:
+`ftQRChoiceFlow` (`gui/freetext_flow.go:457`) is a bare two-choice screen with no
+knowledge of what is loaded, and it deliberately preserves a prior opt-in across
+Back. So an operator can load a ladder — whose loader clears the flag with a
+prompt — then press Back and set it again.
+
+That divergence has now produced two defects, one per level of the stack:
+- P5: the confirm screen printed `QR: yes` for a plate with no code.
+- The whole-diff review: admission reserved a QR band, refusing a ladder that
+  fits, with a remedy naming a code the plate cannot carry.
+
+Both were fixed by reading the FIT rather than the flag, which is right and is
+now the rule. What is still open is the flag itself: the QR step should not offer
+a choice it will not honour. When the loaded composition needs the whole plate,
+state that the QR is unavailable for this pattern rather than presenting
+"Add QR" and discarding it — the same honesty `ftRefuse` already applies to
+never dropping a QR automatically.
+
+Deliberately NOT folded into the whole-diff fix, which is narrow by design and
+must not grow at the final gate.
+
+### `sizeproof-admission-count-at-its-own-rungs` — OPEN, owning phase: next change touching admission
+
+The "proper" fix the whole-diff review recommended and the controller declined at
+the final gate, in favour of the narrow `admitQR := useQR && !ftSizedBlocks(blocks)`
+landed in `c9cc4db`.
+
+`AdmissibleBlocks` lays a composition out **uniformly at `FontSizes`' smallest
+rung** — the 3.0 mm anchor spec `SPEC_sizeproof.md` §6 pins deliberately, because
+reserving unconditionally is what makes admission monotone. For a size ladder
+that anchor describes a different plate from the one `FitSized` cuts, so the
+readout's line count and the refusal's figures are about neither the plate nor a
+bound on it:
+
+- front: admission reports **12 of 24** used while `FitSized` lays out **16 rows**;
+- back: admission reports **18 of 24** while `FitSized` lays out **20**;
+- an edited ladder that genuinely overflows its own rungs is refused by
+  `FitSized` while admission still says `ok` with room to spare — the refusal's
+  numbers contradict the refusal (whole-diff review, Minor #3).
+
+Nothing wrong is engraved: the verdict is correct in both directions after
+`c9cc4db`, only the figures mislead. Fixing it means counting a sized
+composition at its own rungs, which changes `AdmissibleBlocks`' contract —
+guarded by `TestAdmissibleBlocksVerdictDoesNotMove`'s three measured cases, which
+**must not move for uniform plates**. That is why it was not done at the gate.
+
+Do it in the same change that reworks admission, not before.
+
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
@@ -188,57 +244,3 @@ All five nits from the converter execution review (`design/agent-reports/me-conv
 
 ### crates.io publish — RESOLVED 2026-06-16
 - **`me-crates-io-publish`** — **`mnemonic-engrave` v0.1.0 published** to crates.io (<https://crates.io/crates/mnemonic-engrave>; `cargo install mnemonic-engrave` → the `me` binary). Added publish metadata (`repository`/`homepage`/`keywords`/`categories`) + a crate-local `README.md` (`9ad758c`); dry-run green; uploaded with a `publish-new`-scoped token. Future versions: bump `version` and `cargo publish` (needs `publish-update` scope).
-
-### `sizeproof-qr-step-must-not-offer-what-it-drops` — OPEN, owning phase: next change touching the QR step
-
-**Operator directive 2026-08-05: "Sizeproof must always be without a QR code."**
-Recorded as a hard invariant in `SPEC_sizeproof.md` §3.0.
-
-Level 1 (the plate cannot carry a code) is structural and holds: `FitSized` has
-no QR parameter. Level 2 (the operator's flag cannot diverge) does NOT hold:
-`ftQRChoiceFlow` (`gui/freetext_flow.go:457`) is a bare two-choice screen with no
-knowledge of what is loaded, and it deliberately preserves a prior opt-in across
-Back. So an operator can load a ladder — whose loader clears the flag with a
-prompt — then press Back and set it again.
-
-That divergence has now produced two defects, one per level of the stack:
-- P5: the confirm screen printed `QR: yes` for a plate with no code.
-- The whole-diff review: admission reserved a QR band, refusing a ladder that
-  fits, with a remedy naming a code the plate cannot carry.
-
-Both were fixed by reading the FIT rather than the flag, which is right and is
-now the rule. What is still open is the flag itself: the QR step should not offer
-a choice it will not honour. When the loaded composition needs the whole plate,
-state that the QR is unavailable for this pattern rather than presenting
-"Add QR" and discarding it — the same honesty `ftRefuse` already applies to
-never dropping a QR automatically.
-
-Deliberately NOT folded into the whole-diff fix, which is narrow by design and
-must not grow at the final gate.
-
-### `sizeproof-admission-count-at-its-own-rungs` — OPEN, owning phase: next change touching admission
-
-The "proper" fix the whole-diff review recommended and the controller declined at
-the final gate, in favour of the narrow `admitQR := useQR && !ftSizedBlocks(blocks)`
-landed in `c9cc4db`.
-
-`AdmissibleBlocks` lays a composition out **uniformly at `FontSizes`' smallest
-rung** — the 3.0 mm anchor spec `SPEC_sizeproof.md` §6 pins deliberately, because
-reserving unconditionally is what makes admission monotone. For a size ladder
-that anchor describes a different plate from the one `FitSized` cuts, so the
-readout's line count and the refusal's figures are about neither the plate nor a
-bound on it:
-
-- front: admission reports **12 of 24** used while `FitSized` lays out **16 rows**;
-- back: admission reports **18 of 24** while `FitSized` lays out **20**;
-- an edited ladder that genuinely overflows its own rungs is refused by
-  `FitSized` while admission still says `ok` with room to spare — the refusal's
-  numbers contradict the refusal (whole-diff review, Minor #3).
-
-Nothing wrong is engraved: the verdict is correct in both directions after
-`c9cc4db`, only the figures mislead. Fixing it means counting a sized
-composition at its own rungs, which changes `AdmissibleBlocks`' contract —
-guarded by `TestAdmissibleBlocksVerdictDoesNotMove`'s three measured cases, which
-**must not move for uniform plates**. That is why it was not done at the gate.
-
-Do it in the same change that reworks admission, not before.
