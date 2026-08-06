@@ -46,6 +46,15 @@ the thing that phase changed.
   refresh. This is the load-bearing property of the entire change: the spec's
   claim is that the general path reproduces the special case exactly, and the
   goldens are the only thing that can falsify it.
+- **A fixture that recovers must assert WHICH panic it recovered.** Learned in
+  P1, and it invalidated a requirement this plan had written: P1 told the
+  implementer to order the `Faces` guard before the `Sizes` guard "so the fixture
+  keeps isolating the face map". Mutation-tested, **neither half was observable**
+  — swapping the guard order left the suite green, and shortening the fixture's
+  `Sizes` left it green too, because `defer recover()` accepts *any* panic. The
+  requirement was decoration. It becomes real only with
+  `strings.Contains(msg, "faces")`, and then the combined mutation goes red.
+  Every remaining phase inherits this: `recover() != nil` is not an assertion.
 - **Review:** opus + sonnet two-lane on the whole diff **after P6** (§3), per the
   operator's 2026-08-05 choice. There is no P5 checkpoint review; P6 carries
   §7.3's composition pins and the §7.19 mutation pass, which is exactly the
@@ -235,6 +244,24 @@ right shape, wrong meaning.
 
 `FitSized` (§2.7) with its validation, its `Mixed`/`SizeMM` computation, and nil
 `QR`/`qrAt`.
+
+**Three things P1 landed that P4 owes a matching decision on** (surfaced by the
+P1 implementer, `5b2f1b2`):
+
+1. **`ErrQRTooTall`** is P1's name for §2.1.1 row 3; no earlier artifact named it.
+   P1 checks it **after** the wrap succeeds, so `ErrTooLarge` wins when both would
+   fire and every reachable case returns byte-for-byte what it does today. If
+   `FitSized` refuses before wrapping, the two paths diverge — **make them agree
+   or state why they differ.** Note also that `FitBlocks` loops rungs with
+   `if err != nil { continue }`, so this error is only ever *surfaced* by
+   `FitBlocksAt`; that is correct, since the band tightens as `fontSize` drops.
+2. **The per-entry non-zero `Sizes` check.** Spec §2.3 puts it inside the
+   size/string invariant and P1 implemented it as a panic; it fires on nothing
+   today. `FitSized` owes the matching **error** return.
+3. **`EngraveFreeText` cannot enforce the `Bottom` bound** — it returns an
+   `engrave.Engraving` with no error channel, so that constructor reaches the
+   bound only through `EngraveFitted`'s defensive panic. By design per §2.1.1,
+   and load-bearing: it is the reason that panic is not merely redundant.
 
 **Gate:** §7.5 a block inside the top band is inset, one below it is not · §7.6
 the same face at two sizes on one plate · §7.9 `EngraveFitted` on a `Mixed`
