@@ -69,6 +69,9 @@ Low/nit items deferred from architect reviews (per the iterative-architect-revie
 
 ### `sizeproof-qr-step-must-not-offer-what-it-drops` — OPEN, owning phase: next change touching the QR step
 
+**IMPLEMENTED 2026-08-05 on branch `constant-glyph-cleanup` (seedhammer `f466b11`), PENDING MERGE.** Move to Resolved when the branch lands.
+
+
 **Operator directive 2026-08-05: "Sizeproof must always be without a QR code."**
 Recorded as a hard invariant in `SPEC_sizeproof.md` §3.0.
 
@@ -95,6 +98,9 @@ Deliberately NOT folded into the whole-diff fix, which is narrow by design and
 must not grow at the final gate.
 
 ### `sizeproof-admission-count-at-its-own-rungs` — OPEN, owning phase: next change touching admission
+
+**IMPLEMENTED 2026-08-05 on branch `constant-glyph-cleanup` (seedhammer `b2f40b4`), PENDING MERGE.** Move to Resolved when the branch lands.
+
 
 The "proper" fix the whole-diff review recommended and the controller declined at
 the final gate, in favour of the narrow `admitQR := useQR && !ftSizedBlocks(blocks)`

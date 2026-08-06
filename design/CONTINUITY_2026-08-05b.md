@@ -125,25 +125,45 @@ Also settled and worth not re-deriving:
 - The alphabet's bounding box relocates every plate, and a single-feature glyph
   loses its identity to one scratch. See [[engraving-font-design-rules]].
 
-## 5. In flight right now
+## 5. DONE — the two GUI follow-ups (step 1 of §1 is complete)
 
-**One agent** burning down the two SIZEPROOF GUI follow-ups on
-`constant-glyph-cleanup`, in worktree
-`/scratch/code/shibboleth/seedhammer-wt-glyphcleanup`:
+Both landed on `constant-glyph-cleanup`, verified by the controller: 44 packages
+green, **zero goldens touched**, and `TestAdmissibleBlocksVerdictDoesNotMove`
+byte-for-byte untouched (zero deleted lines in its file).
 
-1. `sizeproof-qr-step-must-not-offer-what-it-drops` — the QR step offers
-   "Add QR" with a ladder loaded and silently discards it. Spec §3.0 is the
-   requirement. Scoped to SIZED compositions; `BOTHPROOF!` deliberately untouched.
-2. `sizeproof-admission-count-at-its-own-rungs` — admission counts a ladder at
-   the 3.0 mm anchor, so the readout says 12/24 where the plate is 16 rows
-   (front) and 18/24 where it is 20 (back). **`AdmissibleBlocks` must not change
-   for non-sized plates** — spec §6 pins the anchor for monotonicity and
-   `TestAdmissibleBlocksVerdictDoesNotMove` guards it. Preferred shape is a
-   sibling `AdmissibleSized`, not a widened `AdmissibleBlocks`.
+- **`f466b11`** — the QR step no longer offers a code it will not honour. With a
+  SIZED composition loaded the screen reads *"This pattern is cut at several
+  sizes and needs the whole plate. It carries no QR and is not machine-readable."*
+  with a single `No QR` button, and the prior opt-in is deliberately not carried
+  in. Unsized is byte-for-byte the old screen. The privacy sentence goes with the
+  offer — it describes a photograph of a code that will not exist.
+- **`b2f40b4`** — new `AdmissibleSized` beside an untouched `AdmissibleBlocks`;
+  `ftEvaluate` routes on `ftSizedBlocks`, the same predicate `ftFitAt` uses.
+  Readout now: front `5.0+3.8mm 16/16 lines` (was `12/24`), back
+  `4.4+3.4+3.0mm 20/20` (was `18/24`). A grown front now refuses with *"needs 17
+  lines and this pattern's own sizes hold 16"* instead of quoting 24.
 
-If that agent is gone when you resume, check
-`git -C /scratch/code/shibboleth/seedhammer-wt-glyphcleanup log --oneline` for
-one or two commits and the worktree's cleanliness before assuming anything.
+`b2f40b4` reverts cleanly on its own if needed.
+
+### The instruction that was impossible — worth remembering
+
+The controller's brief said *"title and footer rows stay reserved unconditionally
+on the sized path too"*, carrying monotonicity over from the uniform case. **That
+is arithmetically impossible and would have refused both shipped ladders:**
+
+| side | spare (§1.1) | smallest rung | |
+|---|---|---|---|
+| FRONT | 3.600 mm | 3.8 mm | short by 0.200 |
+| BACK | 2.400 mm | 3.0 mm | short by 0.600 — and 3.0 is the smallest rung that exists |
+
+Spec §5 already said it from the other side. The implementer found it by MUTATION
+— adding the reservation took the whole ladder flow red — rather than by obeying.
+**The title is reserved; the footer is not**, and the doc comment carries the
+measurement. The monotonicity that matters is intact: neither string is read, so
+entering one cannot move the verdict.
+
+`FOLLOWUPS.md` still lists both as Open, annotated as implemented-pending-merge.
+Move them to Resolved when the branch lands.
 
 ## 6. Flashing — use the script
 
