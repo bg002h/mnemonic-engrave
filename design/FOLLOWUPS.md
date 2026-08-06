@@ -264,23 +264,31 @@ short strokes never reach the top feed anyway.
 
 | | dot texture | retrace widening |
 |---|---|---|
-| soft @ 8 mm/s | **best** — least evident | worst |
-| hard @ 8 mm/s | worst | (this is where the wiggle was first seen) |
+| soft @ 8 mm/s | **best** — least evident | bad |
+| hard @ 8 mm/s | worst | bad — **equally bad**, per the operator |
 | hard @ 4 mm/s | middling | **best** |
 | **soft @ 4 mm/s** | **NOT YET CUT** | **NOT YET CUT** |
 
-The two defects respond to material in OPPOSITE directions. Hard steel resists
-the plastic flow that widens a retraced groove, so it wins there; soft steel
-absorbs each blow more smoothly, so the dots blend and it wins on texture. The
-operator: retrace widening is better on the slow hard plate than on the fast soft
-one, while the dot effect is least evident on the fast soft one.
+**The two defects have DIFFERENT causes, and this is the useful part:**
 
-**Cut the missing cell before designing the setting.** It decides whether slow
-feed is a HARD-STEEL treatment or simply better everywhere — and if it is better
-everywhere, the feature may not be soft/hard at all but a single slower default,
-or a fine/fast choice orthogonal to material. The half-speed firmware
-(`v0.0.0-gd7155b9-dirty`) is already flashed, so this costs one plate and no
-reflash.
+- **Retrace widening is a SPEED effect, not a material one.** It is equally bad
+  on soft and hard at 8 mm/s and good on hard at 4. Material does not enter it.
+- **Dot texture depends on BOTH.** Soft at 8 is best, hard at 8 worst, hard at 4
+  in between.
+
+**So slow feed is very likely better everywhere, and the setting may not be
+soft/hard at all** — it may be a single slower default, or a `fine`/`fast`
+quality choice orthogonal to material. Cutting soft @ 4 mm/s decides it: if that
+cell is best on both counts, there is no material axis, only a speed one. The
+half-speed firmware (`v0.0.0-gd7155b9-dirty`) is already flashed, so it costs one
+plate and no reflash.
+
+**This also bears on the glyph work already done.** `z` and `*` were redrawn this
+session specifically to stop them cutting parts of themselves twice, and `f` was
+left still doing it. If slow feed fixes retrace widening universally, those
+redraws were treating a symptom that a machine setting also treats — they remain
+worth having (fewer passes is less time and less to go wrong) but the urgency of
+chasing the remaining retraces drops sharply.
 
 **Nothing else blocks it.** Nobody has yet cut a plate at a
 slower engraving feed to confirm that slowing down is even the fix. If a slower
