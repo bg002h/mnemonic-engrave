@@ -155,6 +155,30 @@ slower, 0.2001 against 0.2362 mean, and it is the upper that wiggles); and not
 the start of the run (`<` and `>` wiggle at their start, but `^` starts at the
 bottom-left and wiggles at the END, on the right).
 
+**SHARPENED 2026-08-06 by two more readings, and this is the strongest evidence
+yet.** Every reported defect sits at a stroke ENTRY or EXIT — none is distributed
+along the middle of a stroke:
+
+| glyph | run starts | run ends | reported | lands at the |
+|---|---|---|---|---|
+| `` ` `` | top-left | bottom-right | wiggle near top left | **START** |
+| `<` | top-right | bottom-right | wiggle in upper half | **START** |
+| `>` | top-left | bottom-left | wiggle in upper half | **START** |
+| `^` | bottom-left | bottom-right | **truncated** on the right | **END** |
+
+`^` is not wiggly at all — it is cut SHORT. That is a second, distinct defect:
+the cut does not reach the end of the stroke. Its arms are also the shortest in
+the set at 0.94 mm against `<`'s 1.67, so its exit region is the largest fraction
+of a stroke and is where a shortfall would show first.
+
+**This nearly settles it against hypothesis (a).** Microstep error is present at
+every microstep, so it would ripple the whole diagonal evenly; it cannot produce
+a defect confined to the first third of a stroke, nor a truncated end. What fits
+is the tool skating before it bites on hard material, and the cut not fully
+establishing before the stroke ends — both cutting-force effects, both worse in
+stainless, both invisible on an axis-aligned stroke because the deviation would
+lie along the direction of travel rather than across it.
+
 **Two hypotheses survive, and they predict different ripple PERIODS:**
 
 | | mechanism | period | ripples on a 1.33 mm arm | changes with feed? |
