@@ -244,8 +244,12 @@ sail through unnoticed until §7.19 at P6 — three phases of committed work lat
 
 **Its power is demonstrated by pulling §7.19's mutation forward for this ONE
 item.** After P3 is green: temporarily index block 2's rows block-relative
-against `baseY = outerMargin` (`fit.go`'s `widthFor(lay, row)` → `widthFor(lay, 0)`),
-confirm **§7.7(b) FAILS**, then revert — from a COPY made first, never from the
+against `baseY = outerMargin` — **post-P3 that means pinning `wrapBlocks`'
+layout to `textLayout(…, params.I(outerMargin), qrp)` instead of the running
+`y`.** (An earlier draft named `widthFor(lay, row)` → `widthFor(lay, 0)`; that
+is the pre-P3 form of the same defect, and after P3 `widthFor(lay, 0)` is the
+CORRECT call — the block-relative index is right once paired with `baseY = y`.)
+Confirm **§7.7(b) FAILS**, then revert — from a COPY made first, never from the
 index. **A §7.7(b) that stays green under that mutation is a blocking finding,
 not a passing gate.**
 
@@ -311,6 +315,11 @@ Then §7.19: **mutate every test added in P1-P6 and confirm each notices.**
 
 *Why last:* §7.3 is what makes the back's 2.400 mm of spare safe, and it can
 only be written against the real composition, which does not exist until P5.
+
+**Cleanup owned by this phase:** `bodyRows` became dead production code at P3 —
+only tests call it now, one of them directly. P3 deliberately left it rather than
+edit the P2 §7.7(b) fixture, which is pinned as-committed. Delete it here, or
+state why it stays.
 
 ## 2. What closes the phase gate
 

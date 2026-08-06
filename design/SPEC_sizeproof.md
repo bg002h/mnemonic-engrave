@@ -1,7 +1,15 @@
 # SPEC — `SIZEPROOF!`: per-row sizing and the two-sided size-ladder plate
 
-Status: **R5 — R0 GREEN (0 Critical / 0 Important) at round 4.**
-Author: controller session, 2026-08-05.
+Status: **R6 — R0 GREEN (0 Critical / 0 Important) at round 4; one test-plan
+item corrected in flight at P3.** Author: controller session, 2026-08-05.
+
+**§7.20's QR half was a measured false PASS** and is rewritten. Four review
+rounds and six reviewers read it and none caught that the case it prescribed
+cannot fail against the defect it names; P3's implementer found it by sweeping
+900 text lengths against a simulated defect. The correction adds a third case and
+changes no design, so it does not re-open this gate — but it is the clearest
+evidence in this document that **a test item is a claim, and reading one proves
+nothing about whether it can fail.**
 
 The gate ran five times. Reviews persisted verbatim, each before its fold:
 
@@ -952,17 +960,38 @@ does. Without that test 5.400 mm would not be enough either.
     uniformly.
 19. **Every one mutation-tested.** Four false-passing tests reached review across
     the last two cycles; assume more will try.
-20. **`AdmissibleBlocks`' verdict does not move** (§2.4, §2.1). Pin `linesUsed`
-    and `ok` at 3.0 mm in `sh` for a text sitting exactly at capacity and for one
-    line over, **with `useQR = true` as well as false**. The no-QR case is the
-    one that fails if the `start` translation is carried over as the literal `1`;
-    the QR case is the one that fails if the placement is anchored at `start`
-    instead of `outerMargin` (§2.1). Neither a golden nor the compiler catches
-    either. Pin `MaxCharsAtBlocks` the same way for a mixed-block composition
-    whose face boundary falls on a screw-hole row, so `rowFaces`' `0` →
-    `params.I(outerMargin)` translation cannot be skipped silently:
-    `TestMaxCharsAtBlocksCountsEachRowInItsOwnFace` asserts only a loose bracket
-    and passes with the boundary row shifted.
+20. **`AdmissibleBlocks`' verdict does not move** (§2.4, §2.1). **THREE cases at
+    3.0 mm in `sh`, not two** — the two-case form this item carried until P3 was
+    a measured false PASS, corrected below.
+    - **At capacity and one line over, no QR** — pins the `start` translation.
+      Measured: `linesAvail` 24; 1032 `a` → `(24, true)`; 1033 → `(25, false)`.
+      Carrying `start` over as the literal `1` gives `(25, false)` at capacity.
+    - **At capacity and one line over, with a QR** — keeps the verdict pinned on
+      the QR path. Measured: 616 `A` (69 modules) → `(24, true)`; 617 →
+      `(25, false)`.
+    - **A text INSIDE the band, with a QR** — and this is the only case that
+      catches the placement being anchored at `start` instead of `outerMargin`.
+      Measured: 375 `A`, 57 modules → 16 rows.
+
+    **Why the third case is required.** This item used to say "the QR case is the
+    one that fails if the placement is anchored at `start`", prescribing only a
+    text at capacity. That does not hold. Anchoring at `start` slides the band
+    down exactly one row, and at 3.0 mm both edge rows are plain — so the band
+    trades one plain row in at the top for one plain row out at the bottom and
+    **the 24-row total is unchanged**. At capacity both anchors report
+    `(24, true)`; one over, both report `(25, false)`. Swept over 1-900
+    characters in both cases, the two anchors disagree on **207 lengths, none of
+    them at capacity**. Written as it was, the QR half of this item was
+    decorative: it would have passed against the defect it was written to catch.
+
+    Also pin `MaxCharsAtBlocks` for a mixed-block composition whose face boundary
+    falls on a screw-hole row, so `rowFaces`' `0` → `params.I(outerMargin)`
+    translation cannot be skipped silently: measured **1094** characters for an
+    `sh` block filling plate rows 0-23 plus a `constant` block, boundary on row
+    24. `TestMaxCharsAtBlocksCountsEachRowInItsOwnFace` asserts only a loose
+    bracket and passes with the boundary row shifted.
+
+    **Every pin above was verified by mutation, not by passing.**
 
 ## 8. Non-goals
 
