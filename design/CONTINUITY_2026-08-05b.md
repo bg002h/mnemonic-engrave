@@ -58,11 +58,29 @@ Measured composition, pinned by test (`gui/freetext_sizeproof_table_test.go`):
 
 ## 4. READ THIS BEFORE TWEAKING GLYPHS
 
-**`f` had NO test.** The whole glyph could have been replaced with an X-shaped
-scribble and the suite stayed green — plate goldens only cover glyphs their own
-text happens to contain. **Other glyphs almost certainly share the gap**, and
-nothing has measured which. Do the coverage sweep FIRST; a tweak that breaks an
-untested glyph is currently invisible.
+**MEASURED 2026-08-05 — what `font/constant` actually tests.** The branch is
+scoped to `const` only; `sh` is hand-tuned or replaced another time (operator).
+
+*Universal, all 95 runes:* `TestPrintableASCIICoverage` (present at all),
+`TestUniformAdvance` (monospace — `NewConstantStringer` panics otherwise),
+`TestGlyphsStayInTheirCell` (bounding box), `TestNoGlyphStartsAtOrigin`.
+Plus `max k = 2` in `engrave/passphrase_alphabet_test.go`.
+
+*Per-glyph, hand-listed:* `TestSmallFeaturesClearTheStroke` (a written list of
+features, NOT every glyph), the quote ink gap, bowl junctions, `N`'s arch, `+`'s
+arch, `S`'s foot, `=`'s bars, and `f` twice.
+
+**The gap: roughly 87 glyphs have no IDENTITY test.** The universal rules catch
+classes of defect — wrong advance, out of cell, starts at origin — but they do
+NOT catch a shape that is simply wrong while staying in its cell with the right
+advance. `a` drawn as a circle, `m` missing a leg, `3` reversed: all pass today.
+That is what "`f` could have been a scribble" really meant, and it is still true
+of most of the alphabet.
+
+**Cheapest complete fix:** a golden over the `SIZEPROOF!` plates, which ARE the
+full 95-character sweep in both faces. Two artifacts pin every glyph's path at
+once, and they are the same plates being cut in steel, so test and plate agree.
+Do that BEFORE tweaking, or a tweak that breaks a glyph is invisible.
 
 Also settled and worth not re-deriving:
 
@@ -77,9 +95,14 @@ Also settled and worth not re-deriving:
   changes the rendered curve. `#` grew a spurious diagonal and `$`'s bowl
   collapsed to a triangle that way. **Every mechanical test passed on the broken
   glyphs** — advance, decodability, origin — so only the render loop caught it.
-- **`$` is still k=2** (`seedhammer-hash-glyph-still-k4`, mis-titled: `#` was
-  fixed, `$` was not), so spec §3.5.0's `T_row = rowLen + n_row` disclosure bound
-  is currently false as written.
+- **The stroke-count disclosure bound HOLDS and is pinned.** `*`, `x` and `#` are
+  single strokes and `$` is two, so **max k = 2** — which is what
+  `T_row = rowLen + n_row` requires — and `engrave/passphrase_alphabet_test.go`
+  asserts it. (An earlier draft of this file claimed `$` at k=2 broke the bound.
+  It does not: the bound is a MAXIMUM. Corrected 2026-08-05 by reading the test.)
+  **A glyph edit that splits any glyph into three runs breaks a security
+  property, not an aesthetic one** — the bound is what limits what an observer of
+  the machine's motion can infer about the text being cut.
 - The alphabet's bounding box relocates every plate, and a single-feature glyph
   loses its identity to one scratch. See [[engraving-font-design-rules]].
 
