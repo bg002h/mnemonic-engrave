@@ -1,8 +1,13 @@
 # IMPLEMENTATION PLAN — `SIZEPROOF!`
 
-Status: **P1, folding plan R0 round 0 (RED, 0C/4I).** Author: controller session,
-2026-08-05. Review persisted at
-`design/agent-reports/sizeproof-plan-R0-round0.md`.
+Status: **R2** — plan R0 round 0 (RED, 0C/4I/3m/2n) and round 1 (RED, 0C/1I/3m/2n)
+both FOLDED; awaiting re-review. **No implementation has begun.** Author:
+controller session, 2026-08-05. Reviews persisted at
+`design/agent-reports/sizeproof-plan-R0-round0.md` and `-round1.md`.
+
+(Revisions are `R`n; `P`n means a phase of §1. An earlier draft labelled itself
+"P1", which collided with the phase namespace and read as though implementation
+had started.)
 Spec: `design/SPEC_sizeproof.md` @ R5, **R0 GREEN (0C/0I) at round 4**.
 
 This is a **sequencing** document. It adds no design: every "what" lives in the
@@ -47,8 +52,9 @@ land here, not in P2, because `Fitted` declares a field of it in this phase.
 `Fitted` gains `Mixed`, `Sizes`, `TitleSizeMM`, `FooterSizeMM`, `qrAt` (§2.3);
 **both** legacy constructors populate them — `fitBlocksAt` and `EngraveFreeText`
 (§2.3). Guards added: `len(Sizes) != len(Lines)`, the size/string invariant,
-§2.1.1's **two panics** *and* its third row, the `qrAt.Bottom <= plateHeight -
-margin` **ERROR return** from `fitBlocksAt`.
+§2.1.1's **two panics** *and* its third row in both its enforcement points — the
+`qrAt.Bottom <= plateHeight - margin` **ERROR return** from `fitBlocksAt`, plus
+its defensive re-assert as a panic in `EngraveFitted`.
 
 `textLayout` still takes `(qrc, qrScale)`; nothing narrows against the placement
 yet. `EngraveFitted` still walks rows.
@@ -60,9 +66,14 @@ constructors and hand-build a `Fitted`:
 - `backup/blocks_test.go:406-417` — `mk` returns a `Fitted` with `Lines` and
   `Faces` and no `Sizes`, then engraves it twice **with no `recover`**. The new
   guard fails the test outright, so P1 cannot close whole-suite-green without
-  this. It gains `Sizes`; **its per-row-inset assertions keep their exact form**,
-  because it is the only existing pin on the property §2.5's `at(0)` rewrite
-  endangers in P3.
+  this. It gains **`Sizes` = `len(lines)` copies of `size`, equal to `SizeMM`,
+  with `Mixed` false and `TitleSizeMM`/`FooterSizeMM` 0** — its `Title` and
+  `Footer` are empty, so §2.3's invariant requires 0. **Uniform-at-`SizeMM` is
+  the only fill that works**: any other passes the length guard and every
+  assertion today, then silently measures a different row once §2.5's running y
+  lands in P3, because the test's `insetOf` reference is plate-absolute. Its
+  per-row-inset assertions otherwise keep their exact form — it is the only
+  existing pin on the property that rewrite endangers.
 - `backup/blocks_test.go:296-309` — same omission, but it already defers a
   `recover`, so it stays green and silently stops testing what it names. It gains
   a correctly-sized `Sizes`, and **the `Faces` guard is evaluated before the
@@ -77,9 +88,20 @@ into `ftConfirmBody`/`ftConfirmSummary` and never reach `EngraveFitted`, so
 
 **Gate:** §7.1 (every golden, byte for byte) · §7.15 (the `Sizes` guard panics).
 
+**What P1's gate CANNOT see:** a wrong VALUE in `qrPlaceAt`, or in the new error
+return. No consumer reads `qrAt` this phase — `EngraveFitted` still derives the
+code's y from `lay.holeLines`/`lay.qrLines` (`freetext.go:80-85`) — and
+§2.1.1's third row is measured unreachable from any shipped fit. `qrPlaceAt`
+takes no face, so it cannot delegate to `textLayout` and necessarily duplicates
+that derivation; an off-by-one in the `ceil`, or `qrBorder` dropped from
+`KeepOutX`, closes P1 green on every golden. Both are first exercised at P2
+(§7.1, §7.7(a)/(c)/(d)). **P1's guards prove nil-consistency and the `Sizes`
+length, nothing more.**
+
 *Why first:* apart from the two fixtures above it is pure addition, so a moved
-golden here means the constructors were filled wrong, with nothing else in the
-diff to hide behind.
+golden here means the constructor FILLS that feed the existing engraving path
+were wrong, with nothing else in the diff to hide behind. The placement
+arithmetic is not among what the goldens pin here.
 
 ### P2 — the QR placement. Extraction, not redesign.
 
@@ -89,21 +111,26 @@ reads `f.qrAt` and `EngraveText` its own local. Every producer keeps the anchor
 it has today (§2.1's producer table) — **including `AdmissibleBlocks`, whose
 `anchorY` is `outerMargin` while §2.4 will give it a different `start`.**
 
-**The signature change forces four more sites into this same commit**, two of
-which this plan otherwise attributes to later phases. They are compiler-forced,
-so nothing can go silently wrong — but they are named here so the diff is not a
-surprise: `wrapBlocks` (`fit.go:150`) and `faceLayouts.at` (`fit.go:327`) thread
-a `*qrPlacement` instead of a `*qr.Code`, which makes `MaxCharsAtBlocks` a
-placement producer in P2 rather than P3, all still at `anchorY = outerMargin`,
-one placement per plate.
+**The signature change forces more sites into this same commit**, some of which
+this plan otherwise attributes to later phases. They are compiler-forced, so
+nothing can go silently wrong — but they are named here so the diff is not a
+surprise. `wrapBlocks` (`fit.go:147`), `faceLayouts.at` (`fit.go:327`) and
+**`rowFaces` (`fit.go:302`)** thread a `*qrPlacement` instead of a `*qr.Code`,
+which makes **`MaxCharsAtBlocks` and `rowFaces`** placement producers in P2
+rather than P3 — all still at `anchorY = outerMargin`, one placement per plate.
 
-Three test fixtures move too, and **their assertions and numbers are preserved
-exactly**: `backup/engravetext_test.go:159-196` builds a `lineLayout` literal
-with `holeLines: 2, qrLines: 19` and is the current pin for the `n < 1` clamp —
-it is re-expressed in `qrTop`/`qrBottom` with the same clamp numbers;
+Six test fixtures move too, and **their assertions and numbers are preserved
+exactly**. Three read the removed `lineLayout` FIELDS:
+`backup/engravetext_test.go:159-196` builds a `lineLayout` literal with
+`holeLines: 2, qrLines: 19` and is the current pin for the `n < 1` clamp — it is
+re-expressed in `qrTop`/`qrBottom` **with the same clamp numbers**;
 `backup/freetext_test.go:195-197` and `:289` recompute the QR's y from
-`lay.holeLines`/`lay.qrLines` and read the placement instead. A pin rewritten in
-the same commit that changes its subject is where coverage quietly weakens.
+`lay.holeLines`/`lay.qrLines` and read the placement instead. Three more call
+`textLayout` directly and change TYPE only, keeping their arguments and
+assertions identical: `blocks_test.go:30`, `blocks_test.go:393` (`insetOf` —
+which is the P1 pin above, so it is touched in two consecutive phases and must
+survive both), and `fit_test.go:15`. A pin rewritten in the same commit that
+changes its subject is where coverage quietly weakens.
 
 Row indexing is UNCHANGED in this phase. The band is expressed in absolute y and
 is measured to agree with the row-index predicate on every row at every rung, so
@@ -112,7 +139,29 @@ this phase should be behaviour-identical by construction.
 **Also written here, but gated at P3: §7.7(b)**, the two-block-plus-QR fixture.
 It is cheap to build now and **passes vacuously in P2** — every block still lays
 out at `baseY = outerMargin`, so block 2's window is right whatever the
-implementer does. Pin its code by MODULE COUNT, not text length (§7.7(b)).
+implementer does.
+
+That is exactly why its SHAPE has to be written down: it is being authored in a
+phase where nothing can tell a good fixture from a useless one. Four constraints,
+each of which a natural implementation gets wrong:
+
+1. **Pin the code by MODULE COUNT, not text length** (§7.7(b)) — mode selection
+   follows the character set, so "700 characters" is a different plate the day
+   the fixture's case changes.
+2. **Block 1 must wrap to at least one row and END ABOVE the band's first row.**
+   Otherwise a block-relative index shifts block 2's window by zero rows and the
+   defect is invisible.
+3. **Block 2's text must FILL its budget on every row it spans** — a spaceless
+   run, as `mixedBlocks`/`fillRows` already build. A wrong budget must produce
+   INK, not merely permit it; short words leave the extra columns empty and the
+   fixture passes under the defect.
+4. **"No body ink enters the code box" is an intersection with the code's
+   RECTANGLE** — `[qrAt.X, X+Size) x [qrAt.Y, Y+Size)` — **never a plate-wide
+   max-x bound.** Measured at 3.0 mm in `sh` with an 89-module code: the band is
+   plate rows 3-22 at 12 columns against 44 unobstructed, and **row 23 sits below
+   the band and legitimately inks all 44 columns**. A max-x assertion therefore
+   fails on a CORRECT plate, and the natural repair is to weaken it into
+   something the defect also satisfies.
 
 **Gate:** §7.1 · §7.7(a) the band equivalence at all six rungs · §7.7(c) both
 engravers read the stored placement · §7.7(d), **`fitBlocksAt` half only** — the
@@ -141,7 +190,20 @@ reaching for a block-relative row index re-creates §2.1's measured
 12-columns-vs-36-columns defect and engraves body ink across the code. No
 shipped golden is a multi-block QR plate, so nothing else in this gate can see
 it: §7.2 is row sizes, §7.8 the footer band, §7.11 the unbounded callers, §7.20
-the admission counts. Written in P2 where it is cheap, **RED-then-green here.**
+the admission counts.
+
+**§7.7(b) is a REGRESSION pin and cannot be RED before this phase's
+implementation** — §0's TDD rule does not apply to it. At the start of P3 the
+tree is P2's tree, where the item passes vacuously; correct P3 code leaves it
+green; only DEFECTIVE P3 code turns it red. So there is no phase in which it is
+ever observed failing, and a fixture written in a shape that CANNOT fail would
+sail through unnoticed until §7.19 at P6 — three phases of committed work later.
+
+**Its power is demonstrated by pulling §7.19's mutation forward for this ONE
+item.** After P3 is green: temporarily index block 2's rows block-relative
+against `baseY = outerMargin`, confirm **§7.7(b) FAILS**, then revert — from a
+COPY made first, never from the index. **A §7.7(b) that stays green under that
+mutation is a blocking finding, not a passing gate.**
 
 Round-2's I2 also lands here whole. Round-3's I2 is split: its design half is P2's
 (the `AdmissibleBlocks` anchor), and only its PIN — §7.20 with `useQR` — closes
