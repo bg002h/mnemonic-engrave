@@ -17,16 +17,23 @@ In order:
    Verify they landed green before building on them. They are unrelated to
    glyphs; they ride this branch only because the operator wanted them done
    before the glyph work buried them.
-2. **Add a golden over the `SIZEPROOF!` plates — BEFORE any glyph edit.** §4 says
-   why: about 87 glyphs currently have no identity test, so a tweak that breaks
-   one is invisible. The `SIZEPROOF!` plates ARE the 95-character sweep in both
-   faces, so two goldens pin every glyph's path at once, and they are the same
-   plates being cut in steel.
-3. **Then tweak `const` glyphs.** With the golden in place, every edit shows
-   exactly which rows moved instead of changing something silently.
+2. **DONE — the golden over the `SIZEPROOF!` plates.** `2ffb38c` on
+   `constant-glyph-cleanup`: `gui/testdata/sizeproof-front.bin` and
+   `sizeproof-back.bin`, driven by `gui/freetext_sizeproof_golden_test.go`. 44
+   packages green, **zero existing golden bytes moved**. See §4, whose "87
+   glyphs" figure is now corrected by measurement.
+3. **NEXT — tweak `const` glyphs.** With the goldens in place, every edit shows
+   which glyph moved instead of changing something silently. **The workflow is in
+   the test file's own doc comment, and it is not backup/testdata's:** these two
+   goldens are *supposed* to move on a glyph edit. Run
+   `go test ./gui -run TestSizeLadderGoldens -artifacts -outputdir=DIR`, diff the
+   two SVG renders it drops there (the plate now vs. the plate the golden holds),
+   confirm the diff is the edit you meant, then re-record with
+   `go test ./gui -run TestSizeLadderGoldens -update` and commit the `.bin`
+   beside the `constant.svg` change. **Never a bare `go test ./... -update`** —
+   that takes backup's frozen sixteen with it.
 
-**Read §4 before touching a glyph.** Editing before step 2 is how a broken glyph
-ships unnoticed.
+**Read §4 before touching a glyph.**
 
 ## 2. What shipped, and where it is
 
@@ -89,17 +96,40 @@ Plus `max k = 2` in `engrave/passphrase_alphabet_test.go`.
 features, NOT every glyph), the quote ink gap, bowl junctions, `N`'s arch, `+`'s
 arch, `S`'s foot, `=`'s bars, and `f` twice.
 
-**The gap: roughly 87 glyphs have no IDENTITY test.** The universal rules catch
-classes of defect — wrong advance, out of cell, starts at origin — but they do
-NOT catch a shape that is simply wrong while staying in its cell with the right
-advance. `a` drawn as a circle, `m` missing a leg, `3` reversed: all pass today.
-That is what "`f` could have been a scribble" really meant, and it is still true
-of most of the alphabet.
+**The gap, MEASURED 2026-08-05 and CORRECTED.** The "roughly 87 glyphs" figure
+above was read off test names. Measured properly — mutate one glyph, regenerate
+`constant.bin`, run the whole tree — the picture is different in shape and the
+same in conclusion:
 
-**Cheapest complete fix:** a golden over the `SIZEPROOF!` plates, which ARE the
-full 95-character sweep in both faces. Two artifacts pin every glyph's path at
-once, and they are the same plates being cut in steel, so test and plate agree.
-Do that BEFORE tweaking, or a tweak that breaks a glyph is invisible.
+| glyph | caught, before `2ffb38c` |
+|---|---|
+| `Q` uppercase | `engrave.TestConstantFont`, plus backup's seed, codex32 and slip39 plate goldens |
+| `a` lowercase | `backup.TestPassphraseGolden`, and nothing else |
+| `~` asciitilde | **nothing in the tree** |
+| `{` leftcurlybrace | **nothing in the tree** |
+
+The structure behind it: `engrave/testdata/font-constant.bin` sweeps
+`constantAlphabet`, which is `"0123456789A-Z"` — **36 of the face's 96 glyphs** —
+and widening it is forbidden at `engrave/engrave.go:770`. Every other
+`font/constant` glyph was pinned only **incidentally**, by whichever characters
+happened to appear in a plate golden's text: the lowercase letters had one plate
+each and the punctuation had none. **`~` and `{` could have been scribbles.**
+
+`font/sh` is the other way round and was never the problem: `engrave.TestFonts`
+sweeps every rune the face decodes, so `engrave/testdata/font-sh.bin` already
+pinned all 95.
+
+The universal rules catch classes of defect — wrong advance, out of cell, starts
+at origin — but not a shape that is simply wrong while staying in its cell with
+the right advance. `a` drawn as a circle, `m` missing a leg, `3` reversed: all
+passed. That is what "`f` could have been a scribble" really meant.
+
+**Fixed by `2ffb38c`:** goldens over both `SIZEPROOF!` sides, which ARE the full
+95-character sweep in both faces at five rungs. `TestSizeLadderGoldensPinEveryGlyph`
+makes the coverage claim falsifiable rather than prose — every rune either face
+decodes is on the ladder, except the visible-space mark `0x1F`, which no
+free-text plate can carry and which backup's passphrase goldens pin. `0x20` inks
+nothing in either face, so what is pinned for the space is its advance.
 
 Also settled and worth not re-deriving:
 
