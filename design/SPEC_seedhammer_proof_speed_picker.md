@@ -151,11 +151,20 @@ res := newSplineResumer(drv, e.safePoint.Resume(conf))
 ```
 
 The resume-after-interruption path **re-reads the platform config** while the
-spline it is resuming was planned with the flow's. Immutable today, so the two
-cannot disagree; **divergent the moment speed is selectable** — a plate planned
-at 1 mm/s that is paused and resumed would compute its catch-up at 4 mm/s. It is
-a repositioning move rather than a cut, so it is not a wrecked plate, but it is
-wrong and it is invisible until someone pauses a slow plate.
+spline it is resuming was planned with the flow's.
+
+**CORRECTED AFTER IMPLEMENTATION — this is LATENT, not live.** The draft above
+claimed a plate planned at 1 mm/s would compute its catch-up at 4 mm/s. It would
+not. `SafePointer.Resume` plans its leading move with `engrave=false`, and
+`appendLine` then takes `vlim` from **`conf.Speed`, not `conf.EngravingSpeed`**
+(`engrave/engrave.go:1136-1141`) — and this slice never moves `Speed`. With only
+the feed adjustable, the plate's config and the platform's produce **identical**
+catch-up motion. Found by mutation testing: swapping the plate's config for the
+platform's broke no test, and the honest reading was that there was nothing to
+break rather than that a test was missing.
+
+It stops being latent the moment **acceleration, jerk or travel speed** become
+adjustable — the stated upgrade path.
 
 **Fix: the `Plate` carries the `StepperConfig` it was planned with**, and the
 engrave job resumes from that rather than from the platform. This is also the
