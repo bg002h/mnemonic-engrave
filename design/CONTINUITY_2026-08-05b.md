@@ -3,11 +3,30 @@
 Written at a context clear, after the SIZEPROOF! release shipped and flashed.
 Successor to `CONTINUITY_2026-08-05.md`, which is superseded in full.
 
-## 1. THE IMMEDIATE NEXT TASK — tweak glyphs on `constant-glyph-cleanup`
+## 1. THE IMMEDIATE NEXT TASK
 
-That is what the branch was made for. **Read §4 before touching a glyph** — the
-sweep it describes is why the branch exists, and doing glyph edits before it is
-how a broken glyph ships invisibly.
+Everything below happens on branch **`constant-glyph-cleanup`**, in worktree
+`/scratch/code/shibboleth/seedhammer-wt-glyphcleanup`. **Scope decision
+(operator, 2026-08-05): this branch works on `font/constant` ONLY.** `sh` gets
+hand-tuned or replaced another time — it is the aesthetic face and the operator's
+verdict is that it "isn't very pretty", but that is a separate cycle.
+
+In order:
+
+1. **Finish the two GUI follow-ups** — in flight when this was written, see §5.
+   Verify they landed green before building on them. They are unrelated to
+   glyphs; they ride this branch only because the operator wanted them done
+   before the glyph work buried them.
+2. **Add a golden over the `SIZEPROOF!` plates — BEFORE any glyph edit.** §4 says
+   why: about 87 glyphs currently have no identity test, so a tweak that breaks
+   one is invisible. The `SIZEPROOF!` plates ARE the 95-character sweep in both
+   faces, so two goldens pin every glyph's path at once, and they are the same
+   plates being cut in steel.
+3. **Then tweak `const` glyphs.** With the golden in place, every edit shows
+   exactly which rows moved instead of changing something silently.
+
+**Read §4 before touching a glyph.** Editing before step 2 is how a broken glyph
+ships unnoticed.
 
 ## 2. What shipped, and where it is
 
