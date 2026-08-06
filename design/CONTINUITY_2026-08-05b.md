@@ -22,7 +22,12 @@ In order:
    `sizeproof-back.bin`, driven by `gui/freetext_sizeproof_golden_test.go`. 44
    packages green, **zero existing golden bytes moved**. See §4, whose "87
    glyphs" figure is now corrected by measurement.
-3. **IN PROGRESS — opening up `const` glyphs. `e` is DONE (`46a1af8`).**
+3. **IN PROGRESS — opening up `const` glyphs. DONE: `e` (`46a1af8`), `a`
+   (`a4f102b` + `2c1020a`).** Both now measure 0.500 mm+ against 0.375 mm before;
+   `a`'s counter reaches **0.600 mm**, the first to meet the floor.
+   **Remaining 13 of the list:** `s z O o 8 @ * & < > ( ) { }`.
+   **Do NOT touch `w m M W Q # $ g`** — they measure alongside but the operator
+   has scoped this pass to the sixteen (2026-08-05).
 
    ### 3.1 THE OPENING-UP RULES (operator, 2026-08-05) — read before any glyph
 
@@ -47,6 +52,13 @@ In order:
       letters taller and pushes them toward the capitals. Measured: cap height is
       6 units; splitting the growth across the baseline leaves `e` topping out
       1.5 units below cap top where opening purely upward leaves 1.0.
+   5. **A bar attached at BOTH ends is still movable — lengthen its vertical.**
+      `a`'s bottom bar has no free end, and the first pass concluded it could not
+      move. It can: extend the right stem from `y=5..8` to `y=5..8.5` and it
+      carries the corner down with it. This is rule 3's mechanism applied to a
+      *corner* rather than a free end, and it is what took `a`'s counter from
+      0.500 mm to 0.600 mm. **Never conclude a bar is fixed because both ends are
+      attached** — ask which vertical could carry it.
 
    **The floor is 0.60 mm (2 strokes), PROVISIONAL** — the house minimum-feature
    rule applied to the gap between strokes. Only steel confirms it.
