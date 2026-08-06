@@ -679,8 +679,18 @@ Any code reading `useQR` where the answer is a property of the PLATE must read
 the fit instead — `f.plate.QR != nil` — because the fit is the one object that
 knows.
 
-Filed as a follow-up owned by the phase that next touches the QR step; it is not
-folded into the whole-diff fix, which is deliberately narrow.
+**Scope: SIZED compositions.** For a ladder the QR is *structurally* impossible —
+`FitSized` has no parameter for one — so offering the choice can only mislead.
+`BOTHPROOF!` is a different case and is left alone: a code is possible there in
+principle and merely does not fit, which the existing prompted drop and the
+capacity refusal already handle honestly. `ftSizedBlocks` is the reliable signal,
+since the only runs in the codebase carrying a `SizeMM` are the ten ladder
+entries.
+
+The narrow `admitQR` guard in `c9cc4db` stays as belt-and-braces once this lands:
+the flag can no longer be set, and admission would ignore it anyway.
+
+Ordered by the operator, 2026-08-05, to land **before the release**.
 
 ### 3.2 The confirm screen reads the QR off the FIT, never off `useQR`
 
