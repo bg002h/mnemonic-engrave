@@ -21,6 +21,10 @@ GitHub release.
 R0 run twice, **still RED**. No code has been written and none may be until R0
 is 0C/0I.
 
+> **SUPERSEDED IN FULL by `CONTINUITY_2026-08-05b.md`.** SIZEPROOF! shipped,
+> merged, released and flashed; read that file instead. The note below is the
+> earlier partial supersession and is kept only for the trail.
+
 > **SUPERSEDED 2026-08-05, later the same day.** The R2 fold in §2 is DONE
 > (`9680a64`), round 2 ran (`17ffb1d`, RED 0C/5I), and the R3 fold is done
 > (`38b7a84`). Round 3 is the open gate. §3's measured facts have two
