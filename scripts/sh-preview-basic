@@ -20,6 +20,7 @@
 #   sh-preview-basic -o /tmp/look     somewhere else
 #   sh-preview-basic -g 'aes' -w 'bed sees a salad'
 #   sh-preview-basic -s 4.4           at a different rung
+#   sh-preview-basic -g 'fzWw%~' -c 3  a few glyphs, LARGE, with their boxes
 #   sh-preview-basic -p               also render textproof/constproof/bothproof
 #
 # Options:
@@ -28,6 +29,7 @@
 #   -w, --word STR    the word to set         (default "bed sees a cheese salad")
 #   -s, --size MM     rung for the glyph work (default 3.0, the smallest cut)
 #   -x, --px N        PNG width in pixels     (default 2000)
+#   -c, --cols N      glyph cells per row      (default 4)
 #   -p, --proofs      also render the three single-face proof plates
 #   -r, --repo PATH   the seedhammer checkout (default $SH2_REPO)
 #   -h, --help
@@ -43,6 +45,11 @@ GLYPHS='aeszOo8@*&<>(){}'
 WORD='bed sees a cheese salad'
 SIZE=3.0
 PX=2000
+# FEWER COLUMNS MEANS BIGGER GLYPHS. Cell width is set by the caption, not by
+# the glyph, so a five-across sheet at a fixed pixel width draws each glyph
+# small. Three across is about the point where the control points and the two
+# boxes are comfortably readable.
+COLS=4
 PROOFS=0
 
 c()    { printf '\033[%sm%s\033[0m' "$1" "$2"; }
@@ -52,7 +59,7 @@ ok()   { printf '  %s %s\n' "$(c '32' 'OK')" "$*"; }
 warn() { printf '  %s %s\n' "$(c '33' '!!')" "$*"; }
 die()  { printf '\n%s %s\n' "$(c '31' 'FAIL:')" "$*" >&2; exit 1; }
 
-usage() { sed -n '3,36p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+usage() { sed -n '3,39p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -61,6 +68,7 @@ while [ $# -gt 0 ]; do
         -w|--word)   shift; WORD="${1:?--word needs a string}" ;;
         -s|--size)   shift; SIZE="${1:?--size needs a number}" ;;
         -x|--px)     shift; PX="${1:?--px needs a number}" ;;
+        -c|--cols)   shift; COLS="${1:?--cols needs a number}" ;;
         -r|--repo)   shift; SH2_REPO="${1:?--repo needs a path}" ;;
         -p|--proofs) PROOFS=1 ;;
         -h|--help)   usage 0 ;;
@@ -121,9 +129,13 @@ fi
 # ------------------------------------------------------------------ glyphs --
 hdr "Glyphs -- ink, control points, and context"
 
-info "glyph sheet: $GLYPHS at ${SIZE}mm"
-dev go run ./cmd/glyphtrace -glyphs "$GLYPHS" -size "$SIZE" -px "$PX" \
-    -label "font/constant at ${SIZE}mm" -o "$OUT/glyphs.png" 2>/dev/null
+# Each cell carries BOTH boxes: the grey advance cell the glyph is allotted, and
+# the green dashed bounds of the ink it actually uses. They answer different
+# questions and the difference is where the design headroom is.
+info "glyph sheet: $GLYPHS at ${SIZE}mm, $COLS across"
+dev go run ./cmd/glyphtrace -glyphs "$GLYPHS" -size "$SIZE" -px "$PX" -cols "$COLS" \
+    -label "font/constant at ${SIZE}mm -- grey box = advance cell, green dashed = ink bounds" \
+    -o "$OUT/glyphs.png" 2>/dev/null
 ok "$OUT/glyphs.png"
 
 info "in context: \"$WORD\""
