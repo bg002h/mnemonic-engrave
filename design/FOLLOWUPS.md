@@ -527,6 +527,37 @@ budget; the curved glyph's **19 knots against the polyline's 12** make more
 total overruns the budget. **On the device this is a firmware panic mid-plate,
 needle down, for any passphrase containing `~`.**
 
+**CORRECTED 2026-08-06, later the same day — curving does NOT fix the `~`
+plateaus, and this entry originally implied it would.** Three operator nulls
+(halved accel/jerk, lowest feed, soft steel instead of hard) exhausted every
+machine variable, and then the commanded path was measured with timing removed:
+
+```
+const ~ 6.0mm   longest near-horizontal run in the PATH:  0.0000mm
+const ~ 3.0mm   longest near-horizontal run in the PATH:  0.0000mm
+```
+
+**The flats are not in the toolpath at all.** What remains is the **0.30mm
+needle footprint at a direction reversal** — the ink at a vertex is the union of
+overlapping dots, whose top is a flat cap about one tool-width across. That is
+feed-, material- and path-independent, which is exactly why all three
+experiments came back null. A smooth path through the same vertex produces the
+same cap, so **curving `~` buys essentially nothing here.** The earlier
+"0.375mm -> 0.307mm" estimate was computed from the dot-cluster span and does
+not survive the finding that the span is not what makes the flat.
+
+**The lever for `~` is AMPLITUDE, not curvature.** The wave is 0.67mm
+peak-to-peak at 3.0mm against a 0.30mm tool — the caps eat ~45% of it, against
+~22% at 6.0mm. That ratio *is* the size dependence the operator reported, and it
+is the same "two stroke widths minimum feature" wall the font rules already
+name.
+
+**But `O` is a different case, and curving genuinely does help it.** Measured on
+the same pass, `O` carries a **0.667mm** near-horizontal run in its commanded
+geometry — a real flat, because a 9-gon has a horizontal top edge. That one is
+geometry and a curve removes it. So this entry stays open FOR THE ROUND GLYPHS,
+and is withdrawn as a fix for `~`.
+
 **So curving the face is not a per-glyph change.** It needs work inside the
 constant-time scaler, and that machinery exists specifically to prevent a timing
 leak — so it is security-sensitive and must not be rushed. Any curve landing
