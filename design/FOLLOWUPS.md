@@ -179,6 +179,44 @@ establishing before the stroke ends — both cutting-force effects, both worse i
 stainless, both invisible on an axis-aligned stroke because the deviation would
 lie along the direction of travel rather than across it.
 
+**RESULT OF THE HALF-SPEED TEST, 2026-08-06: the wiggle is NOT fixed by feed
+rate.** Firmware built at 4 mm/s instead of 8 (`v0.0.0-gd7155b9-dirty`), flashed,
+`SIZEPROOF!BACK` cut on stainless. The wiggle is "still present and not obviously
+improved". So slowing the cut is not the treatment for this defect.
+
+**THE MACHINE IS A HAMMER — it makes discrete DOTS, not a continuous cut.** This
+was not written down anywhere and it reframes everything below. What looks like a
+line is a row of overlapping hammer blows, and their spacing is feed ÷ strike
+rate.
+
+**`~` is by far the worst, and the operator's description is precise:** near the
+BEGINNING (left) of the middle segment it bends upward, shallowing the slope;
+near the END of that segment it dips slightly; and as a result the final upward
+segment appears truncated because it starts too high. That is the shape of
+FOLLOWING ERROR at a direction change — the tool carrying momentum out of one
+corner and settling onto the next line late.
+
+**Ruled out by measurement, so do not re-investigate:**
+
+- the commanded geometry is exact — 0.0004 mm from straight, a tenth of a step;
+- the corners are genuinely sharp in the command — every vertex of `~`, `<` and
+  `^` is TRIPLED in the compiled font, which is what makes a cubic B-spline turn
+  a corner rather than round it. B-spline rounding is not the cause;
+- feed rate, now tested directly.
+
+**So the deviation is in EXECUTION, not in the path.** The next lever is
+ACCELERATION and JERK, not speed: these glyphs have 0.75–1.67 mm segments, and a
+stroke that short never reaches the top feed at all, so lowering the ceiling
+changes almost nothing about how the tool behaves at a corner. Halving the feed
+lengthened the whole plate by only 33% for exactly this reason.
+
+A tempting correlation that does NOT hold: sharp corners alone do not predict it.
+`W` turns through 153° and was not called out; `~` turns 108° twice and is worst.
+`~` also has the shortest segments in the set, so the tool has least room to
+settle — but a turn-per-run-up ratio ranks `v` worst, and `v` only "wiggles a
+little". Recorded so the next reader does not over-fit to a rule that is not
+there.
+
 **Two hypotheses survive, and they predict different ripple PERIODS:**
 
 | | mechanism | period | ripples on a 1.33 mm arm | changes with feed? |
@@ -207,7 +245,22 @@ hardness — so brass, titanium or a mystery alloy still fall into a bucket the
 operator can pick. Naming two alloys implies the machine knows which one is on
 the bed, and it does not.
 
-**DO NOT BUILD IT UNTIL THE FEED TEST IS DONE.** Nobody has yet cut a plate at a
+**THE FEED TEST IS DONE, 2026-08-06, AND IT REFRAMES THIS FEATURE.** Slower feed
+does NOT fix the diagonal wiggle. What it does, and dramatically, is improve
+ENGRAVING QUALITY on hard steel — the operator: "much much much nicer, because
+the dots of the hammer blows are more closely spaced... slow speed on hard steel
+looks closer to the continuous smooth line effect of the faster speed on soft
+steel." It ALSO much improves the line widening where a path retraces itself.
+
+So the feature is justified, but for a different reason than it was proposed:
+**it is about dot density and finish, not about the wiggle.** The wiggle needs
+acceleration/jerk, which is a separate lever and a separate follow-up.
+
+The measured cost is smaller than expected: `SIZEPROOF!BACK` goes from ~14m28s to
+~19m15s, **+33%, not +100%**, because travel moves are unchanged at 30 mm/s and
+short strokes never reach the top feed anyway.
+
+**Nothing else blocks it.** Nobody has yet cut a plate at a
 slower engraving feed to confirm that slowing down is even the fix. If a slower
 feed does not clean up the entry wiggle and the truncation, the answer is a
 different tool or a lead-in, not a speed setting, and the whole feature is aimed
