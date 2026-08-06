@@ -419,6 +419,62 @@ worked. Then consider whether `Next` should scan the queue rather than only its
 head, and whether filter registration should be explicit rather than a side effect
 of consumption; either removes the whole class rather than this instance.
 
+### F-59 — `font/constant` has no curves, and its cusps pile dots (owning phase: the glyph pass, BEFORE `O`/`o`/`8` are drawn)
+
+**Diagnosed 2026-08-06.** Full workings, with every measurement, in
+`design/RECON_cusp_dot_pileup.md`. Summary:
+
+`font/constant` is **104 polylines, 7 lines, 0 paths** — measured over the whole
+face, **94 of 94 glyphs are all-tripled control points**, i.e. polygons with a
+cusp at every vertex and not one curve anywhere. `font/sh` has 31 curved glyphs.
+`O` in the constant face is a 9-sided polygon; `o` is a pentagon.
+
+The needle fires on a **fixed 25 ms period** (`platform_sh2.go:154`), so dot
+spacing is feed rate x 25 ms and nothing else. The planner spends **equal time per
+knot**, so at a cusp the tool crawls: measured on `~` at 3.0 mm, **1.2 mm/s with
+dots 0.031 mm apart at the corners against 7.8 mm/s and 0.195 mm on the
+straights — a 6.3x swing**, two or three 0.3 mm strikes inside 0.06 mm.
+
+**This explains the null accel/jerk plate.** Halving acceleration and jerk leaves
+the ratio at **6.3x, unchanged**; it only makes everything 26% slower. A motion
+parameter cannot fix a ratio. **The pile is absolute** (~2 dots, set by the needle
+period) while the glyph scales, so it is half the glyph at 3.0 mm and a quarter at
+6.0 mm — the size dependence the operator reported. `|` has the same speed ratio
+and is clean, which sharpens it: **the defect is uneven dot spacing AT A DIRECTION
+CHANGE**, not uneven dot spacing.
+
+**Still unmeasured:** that the piled dots are what the eye reads as the wiggle on
+steel. Geometry and timing say the ink must pile; only a plate says the pile is
+the artefact. Cut the single-character plates (§7 of the recon) before acting.
+
+**The fix this points at** is curves in `constant.svg` — mechanically available
+today, since `cmd/vectorfont`'s `<path>` parsing is face-agnostic and
+`glyph_rules_test.go` does not constrain the primitive. **The gate is the
+constant-time property**: curving changes path length and therefore duration, and
+duration equalisation across `constantAlphabet` is the face's whole purpose.
+`k` is unaffected (it counts pen-lifts) and **max k = 2 stays a security
+property**. Decide before `O`, `o` and `8` are drawn — they are the worst possible
+polygons and the only three left.
+
+### F-60 — single-character test plates, top-left and uncentred (owning phase: every engraving investigation from now on)
+
+**Operator directive, 2026-08-06.** Engraving tests cut **one character at a
+time**, at the **top-left-most position**, **not centred**.
+
+No code change needed: in `backup/freetext.go` the *title* is centred
+(`centerInset`, `:125`) but a *body row* is left-aligned at `margin + offx`
+(`:153`), and with no title the first body row sits at the top margin.
+
+```
+go run ./cmd/plateview -plate freetext -face const -text '~' -size 3.0 -o /tmp/p.png
+```
+
+One glyph, top-left, left-aligned, **~2 s to engrave** against ~21 minutes for a
+full plate. Pass no `-title` and no `-footer`; `-size` pins the rung instead of
+letting auto-fit pick 6.0 mm. A centred title would move with the string's width,
+so successive cuts would not be positionally comparable — that is why "don't
+centre it" is load-bearing and not a preference.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
