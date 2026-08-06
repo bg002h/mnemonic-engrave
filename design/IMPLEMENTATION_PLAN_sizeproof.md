@@ -1,9 +1,17 @@
 # IMPLEMENTATION PLAN — `SIZEPROOF!`
 
-Status: **R2** — plan R0 round 0 (RED, 0C/4I/3m/2n) and round 1 (RED, 0C/1I/3m/2n)
-both FOLDED; awaiting re-review. **No implementation has begun.** Author:
-controller session, 2026-08-05. Reviews persisted at
-`design/agent-reports/sizeproof-plan-R0-round0.md` and `-round1.md`.
+Status: **R3 — R0 GREEN (0 Critical / 0 Important) at round 2. Executable.**
+Author: controller session, 2026-08-05.
+
+| round | verdict | lanes |
+|---|---|---|
+| 0 (`sizeproof-plan-R0-round0.md`) | RED 0C/4I/3m/2n | opus + sonnet, opus synthesis |
+| 1 (`sizeproof-plan-R0-round1.md`) | RED 0C/1I/3m/2n | opus + sonnet, opus synthesis |
+| 2 (`sizeproof-plan-R0-round2.md`) | **GREEN 0C/0I** | single opus, scoped to the fold |
+
+Round 2 verified by probe that the §7.7(b) constraint set is **exactly strong
+enough**: it simulated the P3 mutation and confirmed no fixture satisfying all
+four constraints survives it, at every admissible block-1 row count.
 
 (Revisions are `R`n; `P`n means a phase of §1. An earlier draft labelled itself
 "P1", which collided with the phase namespace and read as though implementation
@@ -20,8 +28,11 @@ the thing that phase changed.
 
 ## 0. Standing constraints
 
-- **Repo:** the fork, `/scratch/code/shibboleth/seedhammer`, branched off `main`
-  @ `6d57681` (which now carries the `PASSPROOF!` rename).
+- **Repo:** the fork, `/scratch/code/shibboleth/seedhammer`. Base is **branch
+  `passproof-rename` @ `6d57681`**, which carries the `PASSPROOF!` rename —
+  *not* `main`, which is still at `3c3a2ad`. The two land together at release
+  (§3.3), so `sizeproof` stacks on the rename rather than duplicating or
+  reverting it.
 - **Worktree:** one, dedicated. `seedhammer-wt-sizeproof`, branch `sizeproof`.
   The primary checkout stays free — a second agent compiling `gui` against a
   half-written `backup` produces `[setup failed]` that reads exactly like a real
@@ -147,14 +158,24 @@ each of which a natural implementation gets wrong:
 
 1. **Pin the code by MODULE COUNT, not text length** (§7.7(b)) — mode selection
    follows the character set, so "700 characters" is a different plate the day
-   the fixture's case changes.
+   the fixture's case changes. **Whatever module count you pin, it need not be
+   89**: measured, an 89-module code is not producible *by* a composition that
+   fits at 3.0 mm — the plate holds ~464 characters beside such a code and the
+   code itself needs ~645 bytes. Either inject the code into the unexported
+   `fitBlocksAt` (legal in-package, and the shape round 2 verified) or pin the
+   count the exported path actually yields. Constraint 4 below holds for **every**
+   realizable code size, because rows below any band ink full width.
 2. **Block 1 must wrap to at least one row and END ABOVE the band's first row.**
    Otherwise a block-relative index shifts block 2's window by zero rows and the
    defect is invisible.
 3. **Block 2's text must FILL its budget on every row it spans** — a spaceless
    run, as `mixedBlocks`/`fillRows` already build. A wrong budget must produce
    INK, not merely permit it; short words leave the extra columns empty and the
-   fixture passes under the defect.
+   fixture passes under the defect. (`fillRows` computes its budgets with
+   `qrc = nil`, so used verbatim it sizes for a no-QR plate. That does not weaken
+   this constraint — spaceless text fills every row but its last whatever the
+   budgets are — it only changes how many rows block 2 spans, which is visible
+   immediately: the fit either lands at 3.0 mm or errors.)
 4. **"No body ink enters the code box" is an intersection with the code's
    RECTANGLE** — `[qrAt.X, X+Size) x [qrAt.Y, Y+Size)` — **never a plate-wide
    max-x bound.** Measured at 3.0 mm in `sh` with an 89-module code: the band is
