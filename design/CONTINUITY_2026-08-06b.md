@@ -62,8 +62,37 @@ QR -> Font -> Size -> Text -> Title -> Footer -> Confirm      7 steps (was 8)
 
 ### Verified on hardware (2026-08-06)
 
-Boots as `v0.0.0-g72e2584`, hash matches, gear reachable, Engraving menu shows
-both parameters, both sub-screens open.
+Boots, hash matches, gear reachable, Engraving menu shows both parameters, both
+sub-screens open. That was tested on `v0.0.0-g72e2584`; **the machine now runs
+`v0.0.0-gc3ceadb`** (sha256 `81e1775e…`), which adds the whole-branch review's
+fixes below.
+
+### The whole-branch review (opus) found three Important issues — all fixed
+
+1. **The "passes reached the plate" test could not fail.** It built its baseline
+   by calling `ftBuildPlate`, the same function the flow uses, so any bug INSIDE
+   `ftBuildPlate` was invisible — `fitted.Passes = passes + 1` left all 46
+   packages green. Operator picks 2, machine cuts 3. Now asserts against the
+   plate the engraver was actually handed, via `freetextPlateHook`.
+2. **32-bit tick overflow.** `Plate.Duration`, bspline's accumulator and
+   `engraveStatus.Completed` were `uint` — 32 bits on the RP2350. THREE proof
+   patterns overflow at 1.0 mm/s x 8 passes (CONSTPROOF! 1.216x MaxUint32).
+   The countdown would show "80:27" for a seven-hour job, then underflow.
+   Widened to 64-bit (+512 bytes flash, measured). A second latent defect fell
+   out: `duration - completed` is unsigned and `completed` legitimately exceeds
+   `duration` after a resume, so it now saturates at `0:00`.
+3. **The gear was drawn on the Title and Footer screens and did nothing** —
+   `ftLineEntryFlow` also built a `NewTextKeyboard` and never called
+   `Settings()`. Now a `NewLineKeyboard` without the key.
+
+Re-reviewed and cleared to ship: the reviewer rebuilt both firmware images with
+TinyGo to confirm the size cost, narrowed all five widened fields back to prove
+the reflection pin fails, and reimplemented the old countdown to confirm the
+strings are identical up to MaxUint32.
+
+**BOTH REPOS ARE PUSHED.** `bg002h/seedhammer` `main` at `c3ceadb` (25 commits),
+`bg002h/mnemonic-engrave` `master` at `3d82ae2` (15 commits). **No tag, no
+release** — the operator withheld those deliberately, pending the plate tests.
 
 ### NOT verified — needs steel, and the operator ran out of plates
 
@@ -160,7 +189,13 @@ it is cheap and it decides the whole shape.
 - **Then** the system-wide promotion (§5), speed and passes split apart.
 - Three glyphs remain of the sixteen: `O`, `o`, `8`. Scope directive still in
   force: **only the sixteen.**
-- `mnemonic-engrave` has ~25 unpushed commits; `seedhammer` has ~15 on `main`.
+- **Both repos are pushed and in sync.** Nothing outstanding to push. Tag and
+  release remain deliberately undone.
+- `F-63` records that strike CURRENT is a third depth lever the firmware cannot
+  reach on this board (`Ichop = 0`, resistor-fixed; the head is gated by a TI
+  DRV8701). `F-64` is the `VOLTPROOF!` idea — engrave the negotiated supply
+  voltage and needle dwell onto the plate so a depth plate documents its own
+  conditions.
 
 ## 7. Standing constraints
 
