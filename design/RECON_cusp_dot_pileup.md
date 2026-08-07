@@ -1,5 +1,46 @@
 # RECON — the wiggle is dot pile-up at commanded cusps
 
+> # RESOLVED 2026-08-06 — MECHANICAL PLAY IN THE Y AXIS
+>
+> **The cause was a loose screw.** The operator found play in the Y axis,
+> tightened it, and the artefact is gone — confirmed by re-cutting the forward
+> and reversed tildes, both now perfect.
+>
+> **Every mechanism proposed in this document is wrong.** The cusps, the dot
+> pile-up at velocity minima, the needle footprint at a direction reversal — all
+> of it. The *measurements* below are still sound and worth keeping: the
+> per-segment speed profiles, the face-wide polygon fact, the needle's fixed
+> 25 ms period, the constant-time panic. It is the causal story built on top of
+> them that failed.
+>
+> **Why every experiment came back null, in hindsight:**
+>
+> | result | reason |
+> | --- | --- |
+> | halved acceleration and jerk | play is a DISTANCE, not a rate |
+> | feed 4 mm/s, then the slowest | same |
+> | soft steel instead of hard | play is in the machine, not the workpiece |
+> | fork, stock and official firmware alike | none of them compensate for it |
+> | **`\|` and `/` perfect** | **a straight stroke never reverses an axis, so it never takes up slack** |
+>
+> **`/` and `|` were the tell and I misread them.** A straight stroke is the one
+> shape that engages no slack; I read their cleanliness as "turns are the
+> problem" and went looking for the cause in the toolpath, where it was never
+> going to be.
+>
+> **The discipline that would have helped:** four independent SOFTWARE variables
+> came back null — feed, acceleration/jerk, material, firmware — and after each
+> one I proposed another software mechanism. Two nulls on independent software
+> parameters should have moved the prior to hardware and kept it there. Instead
+> the hypotheses got more elaborate while the evidence got more uniformly
+> negative.
+>
+> **Consequences recorded elsewhere:** F-59 and F-62 are withdrawn. The 4 mm/s
+> feed change (`343fb05`) was chosen because hard@4 looked better than hard@8 —
+> a comparison made on a machine with a loose screw, so it is worth re-testing
+> at stock 8 mm/s before treating it as settled.
+
+
 **2026-08-06.** Written the session the accel/jerk plate came back null. Every
 number below is measured from the fork at `e39ec30` by planning the glyph through
 `engrave.PlanEngraving` — the same planner the device runs — not read off a doc

@@ -419,7 +419,18 @@ worked. Then consider whether `Next` should scan the queue rather than only its
 head, and whether filter registration should be explicit rather than a side effect
 of consumption; either removes the whole class rather than this instance.
 
-### F-59 — `font/constant` has no curves, and its cusps pile dots (owning phase: the glyph pass, BEFORE `O`/`o`/`8` are drawn)
+### F-59 — WITHDRAWN 2026-08-06: the artefact was Y-axis play, not cusps
+
+**The cause was a loose screw in the Y axis**, found and fixed by the operator;
+both forward and reversed tildes now cut perfectly. Nothing in this entry's
+causal story survives. The *face-wide fact* it records is still true and still
+interesting — `font/constant` is 94 polygons and no curves — but it is not the
+reason for any artefact, and it is not a defect. See the resolution banner in
+`design/RECON_cusp_dot_pileup.md`.
+
+Original entry follows, kept for the record:
+
+### F-59 (withdrawn) — `font/constant` has no curves, and its cusps pile dots (owning phase: the glyph pass, BEFORE `O`/`o`/`8` are drawn)
 
 **Diagnosed 2026-08-06.** Full workings, with every measurement, in
 `design/RECON_cusp_dot_pileup.md`. Summary:
@@ -506,7 +517,17 @@ once at boot. Harmless while the values are immutable, and the single most
 likely place for a subtle bug the moment they are not. Cross-ref
 `design/SPEC_seedhammer_proof_speed_picker.md` §8.
 
-### F-62 — curving a `font/constant` glyph panics the constant-time passphrase engraver (owning phase: BEFORE any curve lands, and before `O`/`o`/`8` are drawn)
+### F-62 — STILL OPEN, but no longer motivated by the artefact: curving a glyph panics the constant-time passphrase engraver
+
+**2026-08-06:** the artefact this was meant to fix turned out to be Y-axis play,
+so there is no longer a reason to curve the face. **The panic itself is real and
+stays filed** — anyone who curves a `font/constant` glyph for any reason will hit
+it, and it is a firmware crash mid-plate with the needle down. Demoted from
+"blocks the fix" to "a trap for a future editor".
+
+Original entry follows:
+
+### F-62 (context withdrawn) — curving a `font/constant` glyph panics the constant-time passphrase engraver (owning phase: BEFORE any curve lands, and before `O`/`o`/`8` are drawn)
 
 **Found 2026-08-06** by trying it. `~` was redrawn as three cubics; the geometry
 result was excellent — worst lateral dot pile-up fell from 0.0750mm to 0.0073mm,
