@@ -935,8 +935,22 @@ input; this is covered by a test vector.
 New subcommand in `crates/me-cli`.
 
 ```
-me seal <payload>... --out payload.uf2 [--iterations N] [--plaintext <record>]...
+me seal <payload>... --out payload.uf2 [--iterations N] [--plaintext <record>]... [--seal-secret]
 ```
+
+**`--seal-secret` is required to encrypt seed material** — an `ms1` record or a
+BIP-39 mnemonic (the two forms of the same secret; `classify` needs a bech32 `1`
+separator, so a bare mnemonic does not present as `ms1`). Without it, `me seal`
+exits `EXIT_REFUSED` and writes nothing.
+
+This is a **best-effort anti-footgun, not a security boundary** (operator
+decision, 2026-08-07). Sealing seed material is a supported operation — §12
+item 6 admits it deliberately. The flag exists so it is never done by *accident*,
+e.g. pasting a whole `mnemonic bundle` output without reading it. The check is
+correspondingly cheap and makes no claim to catch every conceivable encoding of a
+seed; anyone who means to seal one simply passes the flag. **Do not grow it into
+something that claims to be a control**, and do not let the device rely on it —
+§10.2.1's allow-list is where the device's guarantees live.
 
 **There is deliberately no `--addr` flag.** The target address is normative —
 `0x10E00000`, fixed by §5 and read unconditionally by §10.1 — so any other value
@@ -1717,7 +1731,9 @@ the consumer that will parse it.
    be an explicit, recorded decision rather than an accident of the current OTP
    state.
 5. **XIP read form** (§10.1) — settled by a test at implementation time.
-6. **`ms1` admission — RESOLVED 2026-08-07, operator signed off. ADMITTED.**
+6. **`ms1` admission — RESOLVED 2026-08-07, operator signed off. ADMITTED behind
+   `--seal-secret`** (amended 2026-08-07; see §9 for the flag, which also covers
+   a bare BIP-39 mnemonic and is a best-effort guard, not a control).
    The plaintext converter refuses `ms1` by design
    (`crates/me-cli/src/lib.rs:59`). That refusal was a property of the
    *plaintext* path, which had no confidentiality; inside an authenticated

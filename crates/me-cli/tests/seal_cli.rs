@@ -95,6 +95,39 @@ fn refuses_ms1_without_the_opt_in_flag() {
     assert!(!out.exists(), "nothing may be written on the refusal path");
 }
 
+/// F-70: the opt-in covers BOTH forms of the same secret. `classify` needs a
+/// bech32 `1` separator, so it returns `Err(NoSeparator)` on a bare mnemonic —
+/// an `ms1`-only guard missed it entirely and sealed seed entropy with no
+/// ceremony at all.
+///
+/// Best-effort anti-footgun, not a security boundary: assert the accident is
+/// caught and the deliberate path still works.
+#[test]
+fn refuses_a_bip39_mnemonic_without_the_opt_in_flag() {
+    let bacon24 = ["bacon"; 24].join(" ");
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.uf2");
+
+    me().args(["seal", &bacon24, "--out", out.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--seal-secret"))
+        .stderr(predicate::str::contains("BIP-39 mnemonic"));
+    assert!(!out.exists(), "nothing may be written on the refusal path");
+
+    // The deliberate path is unaffected — this is a speed bump, not a wall.
+    me().args([
+        "seal",
+        &bacon24,
+        "--seal-secret",
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .assert()
+    .success();
+    assert!(out.exists(), "--seal-secret must still seal it");
+}
+
 /// A public-only payload prompts for nothing and prints no passphrase (§9).
 #[test]
 fn public_only_payload_prints_no_passphrase() {
