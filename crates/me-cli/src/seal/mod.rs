@@ -403,6 +403,20 @@ mod tests {
             .cloned()
             .collect();
         assert_eq!((public.len(), secret.len()), (12, 3));
+
+        // SPEC §11.4 vector G publishes a §6.6 hash and the Go port (Plan B)
+        // binds to it. `pubhash`'s own literals cover only D and E, whose public
+        // sections hold one card per HRP — G is the only published value over a
+        // MULTI-CARD public section, i.e. the one that moves if record ordering
+        // or the count byte is ever disturbed by the grouping logic.
+        // Value taken from the spec table, not from this implementation's output.
+        let g_refs: Vec<&str> = public.iter().map(|s| s.as_str()).collect();
+        assert_eq!(
+            pubhash::format_hash(&pubhash::public_data_hash(&g_refs, true)),
+            "be11 7b56 9cc4 cd6e b47d 32b6 fd32 ccb8",
+            "vector G's §6.6 hash (SPEC §11.4)"
+        );
+
         let b = seal_deterministic(
             Payload { public, secret },
             100_000,

@@ -34,7 +34,14 @@ fn seals_and_prints_the_passphrase_to_stderr_only() {
     let a = me()
         .args(["seal", MS1, "--seal-secret", "--out", out.to_str().unwrap()])
         .assert()
-        .success();
+        .success()
+        // §9 is "stderr only", and the name of this test claims it. Finding the
+        // words on stderr does not prove they are ONLY there: adding a
+        // `println!` copy alongside the `eprintln!` survived the whole 169-test
+        // suite. `me seal` writes nothing to stdout at all, so assert exactly
+        // that — a stdout copy would land the twelve words in any
+        // `me seal … > log`, pipeline capture or CI artefact.
+        .stdout(predicate::str::is_empty());
     let err = String::from_utf8(a.get_output().stderr.clone()).unwrap();
     let words = passphrase_line(&err).expect("the 12-word passphrase must reach stderr");
     let bytes = std::fs::read(&out).unwrap();
@@ -234,6 +241,91 @@ fn refuses_a_record_carrying_a_cr() {
         "record 2 contains '\\r', which is the record separator",
     ));
     assert!(!out.exists(), "a refused seal must not leave a file behind");
+}
+
+/// THE MIXED SHAPE — `--plaintext` records AND an encrypted payload in one
+/// invocation. This is spec vector D, and it is the **only** shape in which
+/// `run_seal_cli`'s `sealed` argument to `public_data_hash` can be wrong: with
+/// no public section nothing is printed, and with no secret section the flag is
+/// `false` either way.
+///
+/// Before this test, 11 of 11 CLI tests passed either a positional payload or
+/// `--plaintext`, never both. Rewriting the call to
+/// `public_data_hash(&refs, false)` therefore survived the whole 169-test suite
+/// while printing vector E's UNSEALED digest under a "SEALED" banner.
+///
+/// §6.6: the `sealed` byte "is what makes a downgrade visible", and this hash is
+/// the only integrity control an unsealed payload has. A wrong value here is not
+/// a cosmetic slip — the operator writes it down, every honest comparison then
+/// mismatches (teaching them that mismatches are normal), and a ciphertext-strip
+/// produces a payload whose device-displayed hash is exactly what they recorded.
+///
+/// Assert the LITERAL, not just agreement with `me hash --sealed`: the same
+/// self-referential trap that let both destructive UF2 constants mutate freely
+/// (fixed in `4938bf0`) applies to any assertion whose two sides move together.
+#[test]
+fn mixed_payload_prints_the_sealed_hash_not_the_unsealed_one() {
+    let mk1 = "mk1qpz63tpqqsq3dg4m5wdx5fvqqvzg3vs7mpf0rz2j43zpzpxk0rtjkqkhwreqp6hm7qnp3a8wdvtz6t2k4uxu6ykwxcp9vqugfjyx733cf59g";
+    let mk2 = "mk1qpz63tppkeg9pdvqz5744004gvzecsknw6tu25yv3exfhkl6w5zm9e4t24aqdah5585wn3e4xdut8";
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.uf2");
+
+    let a = me()
+        .args([
+            "seal",
+            MS1,
+            "--seal-secret",
+            "--plaintext",
+            mk1,
+            "--plaintext",
+            mk2,
+            "--plaintext",
+            MD1,
+            "--plaintext",
+            MD1B,
+            "--plaintext",
+            MD1C,
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    let err = String::from_utf8(a.get_output().stderr.clone()).unwrap();
+    let lines: Vec<&str> = err.lines().collect();
+    let i = lines
+        .iter()
+        .position(|l| l.starts_with("public data hash ("))
+        .expect("the hash banner line");
+
+    // The banner itself carries the record count and the shape word, which §9
+    // requires to match what the device displays.
+    assert_eq!(
+        lines[i], "public data hash (5 records, SEALED):",
+        "the banner must report 5 public records and the SEALED shape"
+    );
+
+    // Spec §11.4 vector D. The Go port (Plan B) binds to this exact value.
+    assert_eq!(
+        lines[i + 1].trim(),
+        "a26e d22b b747 dfd0 2367 06ad 14c1 9679",
+        "a mixed payload must print the SEALED digest"
+    );
+    // And explicitly NOT vector E's, which is what the downgrade-blind mutant
+    // prints. Pinned separately so the failure names the actual confusion.
+    assert_ne!(
+        lines[i + 1].trim(),
+        "70f3 e35a acf7 47db c40f 8376 91aa 61e0",
+        "printing the UNSEALED digest for a sealed payload disarms §6.6"
+    );
+
+    // Agreement with the operator's own re-derivation months later (§6.6's
+    // whole purpose), on top of the literal.
+    let derived = me()
+        .args(["hash", "--sealed", mk1, mk2, MD1, MD1B, MD1C])
+        .assert()
+        .success();
+    let expect = String::from_utf8(derived.get_output().stdout.clone()).unwrap();
+    assert_eq!(lines[i + 1].trim(), expect.trim());
 }
 
 #[test]
