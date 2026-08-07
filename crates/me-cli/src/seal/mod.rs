@@ -3,5 +3,6 @@
 
 pub mod crypto;
 pub mod passphrase;
+pub mod pubhash;
 pub mod record;
 pub mod wire;
