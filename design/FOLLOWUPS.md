@@ -788,6 +788,31 @@ allow-listing. Route straight to `ftBuildPlate`.
 Subsumes [[F-65]]: a text record could carry "SH2 BOOT KEY" and the 24 words on
 one plate. Related: [[F-58]] (input wedge on the Footer entry screen).
 
+### F-67 — the Go `MDDataSymbols` lacks Rust's 93-symbol codeword cap (owning phase: Plan B, before the public-section decode ships)
+
+**Found by the §6.3 scoped re-review, 2026-08-07.** Rust's
+`md_codec::codex32::unwrap_string` rejects an over-93-symbol codeword
+(`REGULAR_CODE_SYMBOLS_MAX` — "cycle-4 I1: β has order 93, degrees d and d+93
+alias"). The fork's `codex32/mddata.go:15` `MDDataSymbols` has **no such cap**:
+
+```
+data-syms= 80  total-syms= 93  len= 96   MDDataSymbols err=<nil>
+data-syms=496  total-syms=509  len=512   MDDataSymbols err=<nil>
+                                          Rust: StringSymbolCountOutOfRange
+```
+
+So host and device disagree about which records are admissible at §6.4's
+512-byte bound — on the exact function §6.3's decode requirement just made
+normative. Fail-closed in both directions, and **not introduced** by that
+amendment.
+
+**Per the Rust-primary rule this is a CONVERGENCE port, not a leading change:**
+Rust is already correct, so the fix lands in Go only, and the mandatory
+"does the same defect exist in Rust" check is answered — it does not.
+
+Also consider tightening §6.4's 512-byte per-record bound, which is roughly 5×
+wider than any valid md1 codeword.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)

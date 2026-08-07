@@ -427,7 +427,8 @@ runs only on the optional Inspect branch. So a non-conforming sealer — which
 cleartext section, where `picotool save` reaches them with no passphrase at all.
 
 **Hence the DECODE requirement — and it is per CARD SET, not per record.**
-Constellation records are **chunks**. Verified against the real crates:
+Constellation records are **chunks**. Verified against the real crates and the
+real fork packages:
 
 ```
 md1 single chunk  → "chunk set incomplete: got 1 chunks, expected 3"
@@ -437,25 +438,60 @@ mk1 both chunks   → mk_codec::decode(&set)      → Ok
 smuggled entropy  → md_codec::reassemble(&[s])  → "wire-format version mismatch"
 ```
 
-So the device MUST group the public records by card, reassemble each group, and
-decode it; a per-record decode is not merely stricter, it is **impossible** and
-would reject every legitimate payload. A group that fails to reassemble or decode
-rejects the whole payload.
+A per-record decode is not merely stricter — it is **impossible**, and would
+reject every legitimate payload.
+
+#### The grouping key is `(HRP, chunk_set_id)` — NORMATIVE
+
+**Not the HRP alone.** This is the trap, and it is invisible in vectors D and E.
+A 2-of-3 `wsh-sortedmulti` wallet has **three separate `mk1` cards and three
+separate `md1` cards**, each chunked independently. Grouping all six `mk1`
+records into one HRP group and reassembling gives:
+
+```
+mk1 CARD 0 alone (2 chunks)        → Ok
+mk1 ALL SIX as one HRP group       → "received 6 chunks, header declares 2"
+md1 across two wallets             → "chunk set inconsistent (version/csid/count)"
+```
+
+So HRP grouping **rejects every multisig wallet** — the exact shape §6.4's
+"why not 7" section commits to admitting, and the flagship mixed payload
+(`ms1` encrypted, `mk1`+`md1` public). Vectors D and E each carry one card per
+HRP and vector F is `pub_len = 0`, so an HRP-grouping implementation passes all
+of them. **Vector G exists to close that.**
+
+The key is the 20-bit `chunk_set_id` in the chunk header, exposed by
+`md.ParseChunkHeader` and `mk.ParseHeader` on the device and by
+`md_codec::chunk::derive_chunk_set_id` on the host. (The three `mk1` cards of a
+2-of-3 return 852310 / 852311 / 852308.) Every record MUST land in exactly one
+group with no leftovers, and every group MUST reassemble **and** decode.
+
+#### Non-chunked records
+
+The chunked flag is in the same header. A record that is **not** chunked is its
+own card and decodes via the single-string path (`md_codec::decode_md1_string` /
+`md.Decode`); a chunked record joins its `chunk_set_id` group and is
+reassembled. Dispatching on the flag is required because neither path handles
+both forms — `reassemble` on a non-chunked md1 gives
+`wire-format version mismatch: got 2, expected 4`, and `decode`/`md.Decode` on a
+chunked one gives `chunked md1 not supported`. `md_codec::encode_md1_string` is
+a public API that emits the non-chunked form, so this is reachable.
 
 Note the last line: the §6.3 smuggling example is caught by this, which is the
 point.
 
-**Host-side this requires `md-codec >= 0.42`.** The records in §11.4's vectors
-were emitted by `mnemonic` 0.91.0 (md-codec 0.42) and carry md1 wire version 9;
-`me-cli` currently pins md-codec **0.40**, which expects version 4 and rejects
-them with `wire-format version mismatch: got 9, expected 4`. The existing
-converter never noticed because `validate()` only runs the BCH layer
-(`codex32::unwrap_string`), which is version-agnostic. **Implementation MUST bump
-`me-cli` to md-codec 0.42 before the decode requirement can be met at all.** The decoders already exist and are already invoked on the
-Inspect path. This does not make smuggling impossible (an xpub's 32-byte chain
-code is a carrier no classifier can close), and **nothing else in this spec may
-lean on the strong form of the claim**. It does close the accidental and
-defective-sealer cases, which are the realistic ones.
+**No dependency bump is required.** An earlier draft of this amendment claimed
+the records carry "md1 wire version 9" and that `me-cli` MUST move from md-codec
+0.40 to 0.42. **That was false and is recorded here so it is not reintroduced.**
+The records carry version **4** (`md.ParseChunkHeader` →
+`{Version:4 Chunked:true ChunkSetID:398802 TotalChunks:3}`), and 0.40
+reassembles all of them, including a 6-chunk multisig card. The `9` came from a
+single call — `decode_md1_string` (the SINGLE-STRING API) on a CHUNKED record —
+and is `0b01001`: version 4 with the chunked flag, misread as a 5-bit version.
+The granularity diagnosis was right; the version skew attached to it was the
+same error misread a second time. Note also that the device's Go port is
+provenance-pinned to md-codec **0.36.0**, so a host-only bump would widen a real
+host/device gap for no demonstrated reason.
 
 The encrypted section may carry anything — `ms1`, `mk1`, `md1`, a BIP-39
 mnemonic — since it is confidential by construction.
@@ -576,9 +612,12 @@ Normative constraints, all checked before any record is acted on:
   wallets. **Note this is NOT §6.6's `public_record_count`**, which counts the
   public section only; vector D is 5 public of 6 total and the two produce
   different digests.
-- **Public-section records MUST additionally DECODE** (§6.3, §10.2.1) — `md1`
-  via `md.Decode`, `mk1` via the `mk1` decode path. Classification alone is not
-  sufficient: `ValidMD`/`ValidMK` never open the payload.
+- **Public-section records MUST additionally group, reassemble and DECODE as
+  CARD SETS** (§6.3) — grouped by `(HRP, chunk_set_id)`, never by HRP alone.
+  Classification is not sufficient: `ValidMD`/`ValidMK` never open the payload.
+  **Do not cite `md.Decode` here** — it takes a single string and refuses
+  chunked input (`md/md.go:1231`, "refuses chunked md1"), so calling it per
+  record rejects every legitimate payload including vectors D, E and G.
 - **Each record `1..512` bytes.** The longest record in a real bip84 bundle is
   **111 bytes** (canonical); 512 is headroom, not a target.
 - Total still bounded by `ct_len <= 8191` (§6.2). A canonical six-record bip84
@@ -885,9 +924,11 @@ flag would expose a destructive footgun with no legitimate use. If a test seam
 is ever needed it MUST NOT be an operator-facing flag.
 
 - Validates every record (canonical form, lowercase, BCH checksum) and decides
-  its section. A record destined for the **public** section MUST additionally
-  DECODE (§6.3); `me seal` refuses one that does not, so a blob the device will
-  reject never leaves the host.
+  its section. Records destined for the **public** section MUST additionally
+  group by `(HRP, chunk_set_id)`, reassemble and decode (§6.3) — `me seal`
+  refuses a set that does not, so a blob the device will reject never leaves the
+  host. Note `--plaintext` is a per-record flag while the check is per card set,
+  so the grouping happens after all `--plaintext` records are collected.
   **By default every record is encrypted.** `--plaintext <record>` places a
   record in the public section instead; `me seal` MUST refuse to place an `ms1`
   or a BIP-39 mnemonic there (§6.3).
@@ -983,7 +1024,10 @@ settled by a test, not a design question.
    unreadable", stop.
 2. Split the public section into records and allow-list each per §10.2.1. **Any
    record classifying as a secret rejects the whole payload** (§6.3) — this is
-   what stops a seed reaching steel in the clear.
+   what stops a seed reaching steel in the clear. Then **group the records by
+   `(HRP, chunk_set_id)`, and reassemble and decode every group**; a leftover
+   record, or any group that fails, rejects the payload. Non-chunked records are
+   their own card and take the single-string decode path (§6.3).
 3. **If `pub_len > 0`**, compute the §6.6 public-data hash and display it with
    the record count and the sealed/unsealed shape. **Computed from the records
    just parsed — never read from the payload.** If `pub_len == 0`, display
@@ -1051,7 +1095,7 @@ Therefore the unlock flow MUST accept only these classifier results:
 
 | Section | Permitted classification |
 | --- | --- |
-| public | `mdmkText` (via `codex32.ValidMD` / `ValidMK`) **AND it MUST additionally DECODE** — `md1` via `md.Decode`, `mk1` via the `mk1` decode path. A decode failure rejects the payload. |
+| public | `mdmkText` (via `codex32.ValidMD` / `ValidMK`) **AND the records must group by `(HRP, chunk_set_id)` and every group must reassemble and DECODE** (§6.3). A failure in any group rejects the payload. **Not `md.Decode` per record** — that API refuses chunked input and would reject every valid payload. |
 | encrypted | `mdmkText`, a `codex32` secret (`ms1`), or a parsed BIP-39 mnemonic |
 
 **The decode step is not optional and not belt-and-braces.** `ValidMD`/`ValidMK`
@@ -1062,8 +1106,10 @@ third-party sealer can put seed entropy in the cleartext section, where
 `picotool save` reaches it with no passphrase and `mdmkFlow` engraves it
 verbatim.
 
-The allow-list runs **once per record**, and any single failure rejects the
-whole payload (§6.4).
+The allow-list runs **once per record**. The DECODE step is separate and runs
+**once per card group** (§6.3) — the two passes are distinct and neither
+substitutes for the other. Any single failure in either rejects the whole
+payload (§6.4).
 
 Every other classification — explicitly including `debugCommand`,
 `addressText`, and output descriptors — MUST be treated as "payload unreadable".
@@ -1536,6 +1582,32 @@ Header: `4d4e454d424c4f4201010100000186a0f00df00df00df00df00df00df00df00dbeefbee
 Required of F specifically: **all three secret records are offered consecutively,
 before any public plate, and each is zeroed before the next is offered.** An
 implementation that offers only the first passes A–E and fails only here.
+
+#### Vector G — 2-of-3 MIXED, a public section spanning SIX cards
+
+The vector that makes the grouping key testable. D and E carry **one card per
+HRP**, so an implementation grouping by HRP alone passes them; F is
+`pub_len = 0`. G is the first payload whose public section spans several cards
+of the same HRP, and an HRP-grouping implementation fails it with
+`received 6 chunks, header declares 2`.
+
+| Field | Value |
+| --- | --- |
+| public | **12 records** — `mk1` ×6 (three cards, 2 chunks each), `md1` ×6 (three cards) |
+| encrypted | 3 × `ms1` |
+| `pub_len` / `ct_len` | 1125 / 227 |
+| `salt` / `iv` | `abcd`×8 / `1234`×6 |
+| `iterations` | 100000 |
+| derived key | `13a9867c197f242a577fd4c782ae09435bfdf4d4bd61c25db20e93e55988fc89` |
+| tag | `6712131b90654967eae853bad65fd5af` |
+| blob | 1420 bytes, sha256 `483fb482ac7aef0da3fec638de183f8f3bfb35e1b6c0ec4f5b274ec0409908f1` |
+| §6.6 hash | `be11 7b56 9cc4 cd6e b47d 32b6 fd32 ccb8` |
+
+Header: `4d4e454d424c4f4201010100000186a0abcdabcdabcdabcdabcdabcdabcdabcd12341234123412341234123400000465000000e3`
+
+Required of G specifically: **the 12 public records group into six card sets,
+every one reassembles and decodes, and no record is left over.** An
+implementation grouping by HRP alone rejects this payload.
 
 #### Required assertions
 
