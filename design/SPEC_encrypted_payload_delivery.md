@@ -496,14 +496,50 @@ passphrase", which is not the same as "safe".
 
 ### 7.1 Iteration count
 
-Target **~30 seconds** on device. The starting estimate is **450,000**, derived
-from this project's own on-device anchor of ~15,000 PBKDF2-HMAC-SHA256
-iterations/second (`design/SPEC_seedhammer_slip39_recovery.md:273`,
-`design/FOLLOWUPS.md:59`).
+Target **~30 seconds** on device. **Default: 300,000 iterations** → 30.9 s.
 
-**This number MUST be measured on hardware before shipping.** It is a
-starting estimate, not a result. The value travels in the blob, so the host and
-device need not agree at compile time.
+**MEASURED 2026-08-07 on real RP2350 silicon: 9,715 PBKDF2-HMAC-SHA256
+iterations/second** (dkLen=32, 150 MHz, TinyGo with the firmware's own build
+flags: `-stack-size 16kb -gc precise -opt 2 -scheduler tasks`). Harness:
+`cmd/kdfbench` in the fork.
+
+| iters | dkLen | elapsed | iters/sec |
+| --- | --- | --- | --- |
+| 10,000 | 16 | 1.025 s | 9,759 |
+| 50,000 | 16 | 5.022 s | 9,957 |
+| 100,000 | 16 | 10.303 s | 9,705 |
+| 200,000 | 16 | 20.346 s | 9,830 |
+| 10,000 | 32 | 1.032 s | 9,685 |
+| 50,000 | 32 | 5.139 s | 9,730 |
+| 100,000 | 32 | 10.303 s | 9,706 |
+| 200,000 | 32 | 20.586 s | 9,715 |
+
+**The estimate this replaces was 15,000/s — high by 1.54×.** An earlier draft
+defaulted to 450,000 on that basis, which is **46.3 s** on device, not the 30 s
+it claimed. Where the estimate came from is worth recording: an
+`≈` on a *range* in a "responsiveness" section
+(`design/SPEC_seedhammer_slip39_recovery.md:273`, repeated at
+`design/FOLLOWUPS.md:59`), phrased in "SHA-256 blocks" while the derivation read
+it as iterations. Nobody had timed it.
+
+Two things the measurement checks rather than assumes:
+
+- **dkLen 16 vs 32 costs the same** — 9,830 vs 9,715/s, a 1.2% difference. Both
+  are one PBKDF2 block, so the SLIP-39 path (dkLen 8/16) is a valid anchor for
+  our 32-byte key. This was an assumption in the derivation; it now has data.
+- **The rate is linear** across a 20× range (1.0 s to 20.6 s), 9,705–9,957/s, so
+  it is not distorted by fixed overhead at either end.
+
+Consequences for §6.2's bounds: the floor of 100,000 is 10.3 s and the ceiling of
+2,000,000 is 205.9 s — long, but bounded, which is what the no-watchdog argument
+requires.
+
+**Residual caveat:** measured on an RP2350**A** (Pico 2, QFN60); the SeedHammer II
+is an RP2350**B** (QFN80). Same core, same 150 MHz, and PBKDF2 is compute-bound
+with a working set of a few hundred bytes, so the figure should transfer — but
+confirm it on the machine during Plan B before release.
+
+The value travels in the blob, so host and device need not agree at compile time.
 
 ### 7.2 The one-key-one-message invariant
 
@@ -1100,7 +1136,11 @@ the checksum returns the same value.
 
 ## 12. Open items — must close before or during R0
 
-1. **Iteration count** (§7.1) — measured on hardware, not estimated.
+1. **Iteration count — RESOLVED 2026-08-07 by measurement.** 9,715
+   iterations/sec on real RP2350 silicon; default set to **300,000** (30.9 s).
+   The prior 450,000 came from an estimate that was high by 1.54× and would have
+   meant 46 s. See §7.1 for the full table and the residual RP2350A-vs-B caveat,
+   which is the only part still owed — confirm on the machine during Plan B.
 2. **Multi-record payloads — RESOLVED 2026-08-07, bundles are in scope.**
    Operator chose the LF-separated container (§6.4) and the unlock-once session
    model (§10.2.2) over one-blob-per-card. This adds a container parser, a plate

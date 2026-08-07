@@ -1790,9 +1790,9 @@ Add to `enum Command` in `crates/me-cli/src/main.rs`:
         #[arg(long)]
         seal_secret: bool,
 
-        /// PBKDF2 iterations. The default targets ~30 s on device and MUST be
-        /// re-measured on real hardware before release.
-        #[arg(long, default_value_t = 450_000)]
+        /// PBKDF2 iterations. 300,000 = 30.9 s on device, from the measured
+        /// 9,715 iters/sec (SPEC §7.1, measured 2026-08-07 on real RP2350).
+        #[arg(long, default_value_t = 300_000)]
         iterations: u32,
     },
 ```
@@ -1932,7 +1932,7 @@ Record the results in `design/agent-reports/`.
 ## What Plan A does NOT cover
 
 - **All firmware work.** XIP read, header parse on device, the §10.2.1 classifier allow-list, the bundle session and its wipe-on-every-exit rule, the plate list. That is **Plan B**, which binds to the vectors this plan emits and may not lead them (Rust-primary rule).
-- **§12 item 1** — the real PBKDF2 iteration count. The 450,000 default is an estimate derived from this project's own SLIP-39 anchor and MUST be measured on hardware before release.
+- **§12 item 1 is RESOLVED, not deferred.** Measured 2026-08-07 at **9,715 iterations/sec** on real RP2350 silicon (`cmd/kdfbench` in the fork), so the default is **300,000** (30.9 s). The 450,000 an earlier draft carried came from an estimate high by 1.54× and would have meant a 46-second wait. One residual: measured on an RP2350A (Pico 2); confirm on the RP2350B SeedHammer II during Plan B.
 - **§12 item 8** — the session idle-wipe value, which is a firmware concern.
 - **§12 item 3** — MSD drag-and-drop, untested. `picotool load` is the documented path.
 - **`me bundle` integration.** `bundle.rs` returns `BundleError::RefusedSecret` on any `ms1` line. Reconciling that with §12 item 6's admission is deliberate follow-up work: the refusal must be lifted **only** on the sealed path, never on the plaintext NDEF one.
