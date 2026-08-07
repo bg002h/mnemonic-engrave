@@ -592,6 +592,59 @@ settled BEFORE `O`, `o` and `8` are drawn, not after. Cross-ref
 `SPEC_seedhammer_proof_speed_picker.md` section 8, which named this gate as the
 cost of curving the face; it was reached by the glyph rather than by the feature.
 
+### F-63 — the hammer's strike CURRENT is a lever the firmware cannot reach on this board (owning phase: any future depth investigation)
+
+**Recorded 2026-08-06** while asking what the firmware knows about the engraving
+head. It is the third lever on depth, after feed and passes, and it is currently
+fixed in hardware.
+
+**The head is a solenoid driving a needle, gated by a TEXAS INSTRUMENTS DRV8701**
+brushed-DC gate driver — cited by datasheet URL in
+`cmd/controller/engraver.go`'s current-limit block. That is the only vendor part
+named anywhere near the engraver: the package is `driver/mjolnir2`, whose doc
+comment says only *"a driver for the particular engraving hardware in the
+Seedhammer II"*. Every other driver in the tree is a datasheet part number
+(`tmc2209`, `ap33772s`, `clrc663`, `ft6x36`, `ili9488`, `st25r3916`); the
+engraving head gets a myth, because it is SeedHammer's own design.
+
+**The firmware CAN set a pulsed current limit, and on this board it does not.**
+`engraver.go` computes DRV8701 formula (1) — `Vref = Ichop*Av*Rsense + Voff`
+with `Av = 20 V/V`, `Voff = 50 mV`, `Rsense = 5 mΩ`, against `Vmax = 3300 mV` —
+and drives it as a PWM duty on `S_VREF` (GPIO30, PWM7). But:
+
+```go
+// cmd/controller/platform_sh2.go
+Ichop  = 0              // "Disable it by setting it to 0 on production boards."
+P_ADC  = machine.NoPin  // pulse-length ADC input: absent
+S_SENSE = machine.NoPin
+```
+
+`if Ichop > 0` therefore never fires. **The strike current comes from on-board
+resistors**, and the pulse-length ADC (`mjolnir2.Device.PulseADC`) is nil, so
+nothing measures the pulse either. These are development-board hooks that
+production hardware fixes in silicon — which is what this machine is.
+
+**Why it matters.** Strike energy has three inputs and the firmware only reaches
+two of them:
+
+| lever | reachable in firmware? |
+| --- | --- |
+| dot spacing (feed) | yes — `engravingSpeed`, and now the Speed picker |
+| strikes per glyph | yes — the new Passes setting |
+| **energy per strike** | **no** — `needleAct` 4–5 ms is voltage-interpolated and not exposed, and the current limit is resistor-fixed |
+
+So if a depth problem is ever traced past feed and passes, the next lever is a
+**hardware** change, not a firmware one. Worth knowing before anyone spends a
+session looking for it in software — which is exactly the mistake the Y-axis play
+investigation already made once (see the resolution banner in
+`design/RECON_cusp_dot_pileup.md`).
+
+**Related, unfiled:** `needleAct` interpolates 5 ms at minimum PD voltage down to
+4 ms at maximum, a 25% swing in strike dwell decided by what the supply
+negotiates. Nothing displays the negotiated voltage, so it cannot currently be
+read off the machine. That would be a cheap diagnostic if depth is ever in
+question again.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
