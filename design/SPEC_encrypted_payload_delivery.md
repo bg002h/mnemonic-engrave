@@ -907,9 +907,8 @@ hashing something the device would reject.
   false belief the §6.6 downgrade exploits.
 - Runs PBKDF2 and AES-256-GCM, assembles the §6 blob.
 - Emits a `data`-family UF2 (`0xe48bff58`) targeting `0x10E00000`.
-- Prints the 12 words to **stdout only**, never to a file, with a clear
+- Prints the 12 words to **stderr only**, never to a file, with a clear
   instruction to transcribe them and store them apart from the machine.
-  `main.rs:375`.
 
 Loading is a separate, explicit operator step:
 
