@@ -6,22 +6,27 @@ resolution, the engraving-settings feature, the `z` glyph, the 8-vs-4 mm/s
 re-test) is still current and untouched — this feature was worked in parallel
 and did not disturb any of it.
 
-## 1. THE HEADLINE — a new feature, spec GREEN, no code yet
+## 1. THE HEADLINE — spec AND plan both GREEN. Implementation is the next act.
 
 Deliver constellation payloads to the SeedHammer II **over a wire, encrypted**,
-decrypted on-device with a typed passphrase. Spec passed R0 at `00da6a8` after
-**fifteen review rounds across two artifacts**. Nothing is implemented.
+decrypted on-device with a typed passphrase. **Both artifacts have now passed R0
+and the gate is open. Nothing is implemented yet — that is the handoff.**
 
 ```
 86c0445  spec v1  (5 R0 rounds)
-a00d4be  plan A   (2 R0 rounds)  ← NOW 3 REVISIONS STALE, do not build from it
 7b76388  PBKDF2 rate measured on real silicon
 86c0445  spec v2  (mixed public/encrypted, ms1-first, fixed hash)
-381265d  fold 4 Criticals (opus + fable)
-b5e43e1  F-65, F-66 filed
-db7880c  fold round 2
-00da6a8  v2 R0 GREEN
+00da6a8  spec v2 R0 GREEN
+f0ab467  spec CLOSED — confirming pass, 9 rounds total
+2ed2695  scripts/plan-build-gate.sh added
+b946399  fold plan round 4
+36227ad  round 5 report (1 Critical — the fold's own test was dead)
+a3f49cf  fold round 5
+519695b  PLAN A R0 GREEN — 6 rounds  ← BUILD FROM THIS
 ```
+
+**Build from `IMPLEMENTATION_PLAN_encrypted_payload_hostA.md` at `519695b`.** It
+is current with the spec, and every ```rust block in it compiles.
 
 ## 2. WHAT THE FEATURE IS
 
@@ -105,7 +110,8 @@ Fable's verified-sound list, so the next session does not re-derive it:
 
 ## 6. THE FOUR MISTAKES WORTH NOT REPEATING
 
-Fifteen rounds. **Zero findings ever landed in the cryptographic construction.**
+Eighteen persisted rounds (11 spec, 7 plan — counted, not estimated).
+**Zero findings ever landed in the cryptographic construction.**
 Every Critical was in the reasoning around it:
 
 1. **A test vector taken from a tool's display output.** Vector C used
@@ -133,17 +139,34 @@ not only the ones being rewritten — that is how §11.1 nearly deleted its own 
 
 ## 7. WHAT TO DO NEXT, IN ORDER
 
-1. **Rewrite `IMPLEMENTATION_PLAN_encrypted_payload_hostA.md`.** It is 3 spec
-   revisions stale: 48-byte header (now 52), a `payload_kind` byte that no longer
-   exists, 3 vectors (now 6, A–F), `--plaintext` meaning something different in
-   `me hash`, and none of the session/decode/lowercase/hash work. **Do not build
-   from it as it stands.**
-2. **R0 the plan** to 0C/0I. Persist verbatim to `design/agent-reports/`.
-3. **Implement** — ONE agent, own worktree, TDD. The controller folds small
-   review fixes inline rather than spawning more agents.
-4. **Whole-diff adversarial review** — mandatory, non-deferrable.
-5. **Then Plan B** (firmware), which binds to the vectors Plan A emits and may
-   never lead them (Rust-primary rule).
+The R0 gate is **passed**. Steps 1 and 2 of the old list are done.
+
+1. **Implement Plan A** — ONE agent, own worktree, TDD, nine tasks in order. The
+   controller folds small review fixes inline rather than spawning more agents.
+   The plan's Task 9 Step 4 expects **11** `seal_cli` tests; the seal lib is
+   **55**. Both numbers are measured, not estimated.
+2. **Whole-diff adversarial review** — mandatory, non-deferrable. R0 covered plan
+   correctness; this catches implementation-introduced regressions TDD misses.
+3. **Then Plan B** (firmware), which binds to the vectors Plan A emits and may
+   never lead them (Rust-primary rule). **F-68 is owned by Plan B's plan review**
+   — close the build gate's CLI blind spot before that review, not after.
+
+### Process rules added on 2026-08-07 — these are now standing, repo-wide
+
+- **`./scripts/plan-build-gate.sh` runs before any fold is committed.** A fold is
+  authorship and re-earns the gate. Round 3 spent a whole opus round on five
+  compile errors a *fold* introduced.
+- **Persist the review verbatim in its own commit, then fold in a second**, with
+  the gate output in the fold commit's message. Ordering is forced: persist acts
+  on the reviewer's input and precedes the fold; the gate acts on the fold's
+  output and follows it. `b946399` bundled all of it and is the counter-example.
+- **The gate compiles `tests/seal_cli.rs` but cannot run it** (its binary has no
+  `seal` subcommand). That gap cost a Critical in round 5: a test that compiled
+  and could never pass. Until F-68 lands, CLI-test *assertions* need a real run.
+- **Watch the stale-binary trap when mutation-testing.** Restoring with `mv` can
+  leave an mtime older than the artifact, so cargo skips the rebuild and the
+  "restored" run is still the mutant. `touch`, and confirm a `Compiling` line.
+  It fooled round 4 and the controller once each.
 
 ## 8. OPEN ITEMS
 
