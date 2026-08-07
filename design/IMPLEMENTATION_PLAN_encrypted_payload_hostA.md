@@ -23,6 +23,10 @@
 - **Public-section records must reassemble and decode as a CARD SET** (§6.3), not per record.
 - Constants: `MAGIC = b"MNEMBLOB"`, `VERSION = 0x01`, `HEADER_LEN = 52`, `SALT_LEN = 16`, `IV_LEN = 12`, `TAG_LEN = 16`, `iterations ∈ [100_000, 2_000_000]` default **300_000**, `pub_len`/`ct_len` each `≤ 8191`, `record_count ∈ [1, 24]` across both sections.
 - Multi-byte integers are **big-endian**.
+- **MSRV is 1.85.0** (`.github/workflows/*.yml`), but a local toolchain may be
+  much newer — 1.97.0-nightly at the time of writing. A newer API or language
+  feature compiles locally and fails CI. `div_ceil` (1.73) is safe; check
+  anything newer before using it.
 - Secrets wiped with `zeroize` on every path.
 - `cargo fmt` and `cargo clippy -p mnemonic-engrave -- -D warnings` before each commit.
 
@@ -125,14 +129,29 @@ mod tests {
         assert_eq!(unsealed().encode()[9..11], [0x00, 0x00]);
     }
 
+    /// Covers every §6.2 header bound. `reserved`, and the SEALED-shape
+    /// `kdf_id`/`aead_id` checks, are exercised here and nowhere else —
+    /// mutation-proved: deleting all three checks left the other wire tests
+    /// green, because `rejects_nonzero_crypto_fields_when_unsealed` only visits
+    /// offsets 9/10 in the UNSEALED branch.
     #[test]
-    fn rejects_bad_magic_and_version() {
-        let mut b = sealed().encode();
-        b[0] = b'X';
-        assert!(matches!(Header::decode(&b), Err(WireError::BadMagic)));
-        let mut b = sealed().encode();
-        b[8] = 0x02;
-        assert!(matches!(Header::decode(&b), Err(WireError::UnknownVersion(2))));
+    fn rejects_bad_magic_version_reserved_kdf_and_aead() {
+        let cases: &[(usize, u8, &str)] = &[
+            (0, b'X', "magic"), (8, 0x02, "version"), (11, 0x01, "reserved"),
+            (9, 0x02, "kdf_id"), (10, 0x02, "aead_id"),
+        ];
+        for &(off, val, label) in cases {
+            let mut b = sealed().encode();
+            b[off] = val;
+            assert!(Header::decode(&b).is_err(), "{label} = {val:#x} must be refused");
+        }
+        // Pin the variants so a mutation collapsing them into one is caught.
+        let mut b = sealed().encode(); b[11] = 0x01;
+        assert!(matches!(Header::decode(&b), Err(WireError::ReservedNotZero(1))));
+        let mut b = sealed().encode(); b[9] = 0x02;
+        assert!(matches!(Header::decode(&b), Err(WireError::UnknownKdf(2))));
+        let mut b = sealed().encode(); b[10] = 0x02;
+        assert!(matches!(Header::decode(&b), Err(WireError::UnknownAead(2))));
     }
 
     #[test]
@@ -684,8 +703,16 @@ Then replace the check at `validate.rs:74-77` with:
             }
 ```
 
-Run: `cargo test -p mnemonic-engrave --lib validate`
+Run: `cargo test -p mnemonic-engrave --lib`
 Expected: all existing tests still pass — this is a pure extraction.
+
+**Use `--lib`, not `--lib validate`.** The latter matches only
+`validate::tests::*` (4 tests), none of which reach the `Format::Md`
+non-canonical branch this step rewires. The tests that actually cover it —
+`refuses_noncanonical_md1_interior_dash` / `_space` / `_newline` and
+`noncanonical_md1_error_names_char_and_byte_position` — live in `lib.rs`'s root
+`tests` module and would be filtered out, so the step would report green having
+exercised nothing it changed.
 
 - [ ] **Step 2: Wire the module, then write the failing test**
 
@@ -967,14 +994,21 @@ mod tests {
     #[test]
     fn every_byte_of_the_section_affects_the_hash() {
         let base = public_data_hash(&public(), false);
-        for (label, mutate) in [
-            ("first byte", 0usize),
-            ("last byte", public().len() - 1),
-        ] {
+        // §11.4 requires the SECTION's first and last byte, not a record index.
+        // Mutating record[0] and record[4] and popping each one's LAST char
+        // never varies the section's true first byte, so a hash over
+        // `input[1..]` would survive.
+        for label in ["first byte of the section", "last byte of the section"] {
             let mut recs: Vec<String> = public().iter().map(|s| s.to_string()).collect();
-            let r = &mut recs[mutate];
-            let last = r.pop().unwrap();
-            r.push(if last == 'q' { 'p' } else { 'q' });
+            if label.starts_with("first") {
+                let r = &mut recs[0];
+                let c = r.remove(0);
+                r.insert(0, if c == 'm' { 'n' } else { 'm' });
+            } else {
+                let r = recs.last_mut().unwrap();
+                let c = r.pop().unwrap();
+                r.push(if c == 'q' { 'p' } else { 'q' });
+            }
             let refs: Vec<&str> = recs.iter().map(|s| s.as_str()).collect();
             assert_ne!(public_data_hash(&refs, false), base, "{label} must change the hash");
         }
@@ -1158,6 +1192,16 @@ pub fn encode_section(records: &[String]) -> Result<Zeroizing<String>, Container
     if records.is_empty() || records.len() > MAX_RECORDS {
         return Err(ContainerError::RecordCount(records.len()));
     }
+    // §6.4: "No CR. A 0x0D anywhere is a malformed bundle. CRLF is rejected,
+    // not tolerated." `\r` is `char::is_whitespace`, so trimming FIRST would
+    // silently normalise a trailing CR away instead of refusing it. Scan the
+    // UNTRIMMED records before trimming.
+    for (i, r) in records.iter().enumerate() {
+        if let Some(pos) = r.find('\r') {
+            return Err(ContainerError::EmbeddedSeparator {
+                index: i, ch: r[pos..].chars().next().unwrap() });
+        }
+    }
     let trimmed: Vec<&str> = records.iter().map(|r| r.trim()).collect();
     for (i, r) in trimmed.iter().enumerate() {
         if r.is_empty() || r.len() > MAX_RECORD_LEN {
@@ -1289,6 +1333,94 @@ mod tests {
         assert_eq!(sha(&b), "97e059ac91596da711a70197b20a7fec1edbe7992eba6c51751ef062596f1cb6");
     }
 
+    /// §11.1 "Round-trip seal/open" and §11.4 "each vector round-trips to its
+    /// exact records". Pinning blob sha256s alone proves the bytes are STABLE,
+    /// not that they are PARSEABLE — without this the Go port is the first
+    /// consumer to discover a malformed blob, and vector B's whole purpose
+    /// (catching a hardcoded iteration count ON DECRYPT) is only half-realised.
+    fn open_vector(blob: &[u8], expect: &[String]) {
+        let h = wire::Header::decode(blob).expect("header must parse");
+        let split = HEADER_LEN + h.pub_len as usize;
+        let key = crypto::derive_key(&passphrase::normalise(PASS), &h.salt, h.iterations);
+        let pt = crypto::open_bytes(&key, &h.iv, &blob[..split], &blob[split..])
+            .expect("vector must decrypt");
+        assert_eq!(std::str::from_utf8(&pt).unwrap().split('\n').collect::<Vec<_>>(),
+                   expect.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn every_encrypted_vector_round_trips() {
+        let all = bip84();
+        open_vector(&seal_deterministic(
+            Payload { public: vec![], secret: vec![bacon24()] },
+            100_000, salt([0xbe, 0xef]), iv([0xba, 0xc0]), PASS).unwrap(),
+            &[bacon24()]);
+        open_vector(&seal_deterministic(
+            Payload { public: vec![], secret: vec![bacon24()] },
+            100_001, salt([0xbe, 0xef]), iv([0xba, 0xc0]), PASS).unwrap(),
+            &[bacon24()]);
+        open_vector(&seal_deterministic(
+            Payload { public: vec![], secret: all.clone() },
+            100_000, salt([0xbe, 0xad]), iv([0xca, 0xfe]), PASS).unwrap(), &all);
+        open_vector(&seal_deterministic(
+            Payload { public: all[1..].to_vec(), secret: vec![all[0].clone()] },
+            100_000, salt([0xd0, 0x0d]), iv([0xf0, 0x0d]), PASS).unwrap(),
+            &[all[0].clone()]);
+        open_vector(&seal_deterministic(
+            Payload { public: vec![], secret: two_of_three() },
+            100_000, salt([0xf0, 0x0d]), iv([0xbe, 0xef]), PASS).unwrap(),
+            &two_of_three());
+    }
+
+    /// §11.4: "any byte of D's public section flipped → AEAD tag mismatch —
+    /// this is what proves the AAD covers the cleartext section."
+    ///
+    /// Task 2's `open_fails_on_tampered_aad` does NOT prove this: it swaps
+    /// `b"aad-one"` for `b"aad-two"`, which only shows the `Payload{aad}` field
+    /// is wired up. An implementation setting `aad = header` alone would pass it.
+    #[test]
+    fn flipping_a_public_section_byte_fails_the_tag() {
+        let all = bip84();
+        let blob = seal_deterministic(
+            Payload { public: all[1..].to_vec(), secret: vec![all[0].clone()] },
+            100_000, salt([0xd0, 0x0d]), iv([0xf0, 0x0d]), PASS).unwrap();
+        let h = wire::Header::decode(&blob).unwrap();
+        let split = HEADER_LEN + h.pub_len as usize;
+        // First and last byte of the public section.
+        for off in [HEADER_LEN, split - 1] {
+            let mut bad = blob.clone();
+            bad[off] ^= 0x01;
+            let key = crypto::derive_key(&passphrase::normalise(PASS), &h.salt, h.iterations);
+            assert!(crypto::open_bytes(&key, &h.iv, &bad[..split], &bad[split..]).is_err(),
+                "flipping public-section byte {off} must fail the tag");
+        }
+    }
+
+    /// §11.4: `iterations` altered 100000 → 100002 on vector A. **Not 50000** —
+    /// that is rejected by §6.2's floor before any tag work, so it proves
+    /// nothing about the AAD.
+    #[test]
+    fn altering_iterations_in_the_header_fails_the_tag() {
+        let blob = seal_deterministic(
+            Payload { public: vec![], secret: vec![bacon24()] },
+            100_000, salt([0xbe, 0xef]), iv([0xba, 0xc0]), PASS).unwrap();
+        let mut bad = blob.clone();
+        bad[12..16].copy_from_slice(&100_002u32.to_be_bytes());
+        let h = wire::Header::decode(&bad).expect("100002 is inside §6.2's range");
+        let key = crypto::derive_key(&passphrase::normalise(PASS), &h.salt, h.iterations);
+        assert!(crypto::open_bytes(&key, &h.iv, &bad[..HEADER_LEN], &bad[HEADER_LEN..]).is_err());
+    }
+
+    /// §6.4's 1..24 cap is over the TOTAL across both sections — 20 public plus
+    /// 10 secret is legal per-section and illegal combined.
+    #[test]
+    fn refuses_more_than_24_records_across_both_sections() {
+        let all = bip84();
+        let public: Vec<String> = std::iter::repeat(all[3].clone()).take(20).collect();
+        let secret: Vec<String> = std::iter::repeat(all[0].clone()).take(10).collect();
+        assert!(seal(Payload { public, secret }, 300_000).is_err());
+    }
+
     /// Nothing else catches a frozen salt: the round-trip test and every fixed-salt
     /// vector pass under one.
     #[test]
@@ -1299,7 +1431,9 @@ mod tests {
         assert_ne!(a.blob, b.blob);
         assert_ne!(a.blob[16..32], b.blob[16..32], "salt must be fresh");
         assert_ne!(a.blob[32..44], b.blob[32..44], "iv must be fresh");
-        assert_ne!(*a.passphrase, *b.passphrase, "passphrase must be fresh");
+        // Option<Zeroizing<String>> — as_deref(), not `*`, which does not compile.
+        assert_ne!(a.passphrase.as_deref(), b.passphrase.as_deref(),
+            "passphrase must be fresh");
     }
 
     /// Two vectors sharing a (key, iv) pair would be GCM nonce reuse in our own
@@ -1399,7 +1533,6 @@ use rand::RngCore;
 use zeroize::Zeroizing;
 
 use crypto::CryptoError;
-use record::RecordKind;
 use wire::{Header, HEADER_LEN, IV_LEN, MAX_SECTION_LEN, MAX_ITERATIONS, MIN_ITERATIONS, SALT_LEN};
 
 /// What is being sealed. `public` rides in the clear (authenticated via the
@@ -1456,6 +1589,11 @@ impl std::error::Error for SealError {}
 /// one key per message, which is what makes AES-GCM's nonce requirement
 /// structurally unbreakable rather than a procedural promise.
 pub fn seal(payload: Payload, iterations: u32) -> Result<Sealed, SealError> {
+    // Range-check even on the public-only path, which ignores the value: silently
+    // accepting `--iterations 5` teaches the operator the flag is advisory.
+    if !(MIN_ITERATIONS..=MAX_ITERATIONS).contains(&iterations) {
+        return Err(SealError::Iterations(iterations));
+    }
     if payload.secret.is_empty() {
         return Ok(Sealed { blob: seal_public_only(payload.public)?, passphrase: None });
     }
@@ -1565,19 +1703,23 @@ pub(crate) fn seal_deterministic(
 
 /// A secret-section record is a constellation record OR a BIP-39 mnemonic.
 fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
-    if record::validate_record(s).is_ok() {
-        return Ok(());
-    }
+    // Keep the RecordError. It carries the "re-run with --group-size 0"
+    // guidance, which is the remedy for the round-3 Critical — and the SECRET
+    // section is the DEFAULT path, i.e. exactly where an operator pasting
+    // `mnemonic bundle` output lands. Collapsing it into a generic message
+    // loses the one sentence that tells them what to do.
+    let record_err = match record::validate_record(s) {
+        Ok(_) => return Ok(()),
+        Err(e) => e,
+    };
     if passphrase::is_valid(s) {
         return Ok(());
     }
-    Err(SealError::Passphrase(format!(
-        "not a constellation record and not a checksum-valid BIP-39 mnemonic: \
-         {} chars", s.trim().len())))
+    Err(SealError::Record(record_err))
 }
 ```
 
-- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --lib seal`. **If any vector hash mismatches, STOP and reconcile against the spec** — the Go port binds to these bytes.
+- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --lib seal`, expect **52 passed** (8 wire + 5 crypto + 5 passphrase + 7 record + 5 pubhash + 4 container + 16 mod + 2 uf2). **If any vector hash mismatches, STOP and reconcile against the spec** — the Go port binds to these bytes.
 
 - [ ] **Step 5: Commit**
 
@@ -1715,6 +1857,23 @@ const MS1: &str = "ms10entrsqqg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9
 
 fn me() -> Command { Command::cargo_bin("me").unwrap() }
 
+/// Find the generated passphrase on stderr.
+///
+/// **Do NOT match on "a line with 12 whitespace-separated tokens".** Two lines
+/// of `me seal`'s own prose have exactly 12 tokens — the passphrase header
+/// (`passphrase — write this down and store it APART from the machine:`) and
+/// `RECORD THIS WHOLE LINE. The device shows the same value; if it`. A
+/// token-count heuristic returns the header, which made the §2.3 containment
+/// assertion below VACUOUS: it degenerated to `!uf2.contains("passphrase")`,
+/// and a mutation copying the real twelve words into the UF2's padding left the
+/// test GREEN.
+fn passphrase_line(err: &str) -> Option<&str> {
+    err.lines().find(|l| {
+        let w: Vec<&str> = l.split_whitespace().collect();
+        w.len() == 12 && w.iter().all(|t| t.chars().all(|c| c.is_ascii_lowercase()))
+    })
+}
+
 #[test]
 fn seals_and_prints_the_passphrase_to_stderr_only() {
     let dir = tempfile::tempdir().unwrap();
@@ -1722,13 +1881,16 @@ fn seals_and_prints_the_passphrase_to_stderr_only() {
     let a = me().args(["seal", MS1, "--seal-secret", "--out", out.to_str().unwrap()])
         .assert().success();
     let err = String::from_utf8(a.get_output().stderr.clone()).unwrap();
-    let words = err.lines().find(|l| l.split_whitespace().count() == 12)
-        .expect("the 12-word passphrase must reach stderr");
+    let words = passphrase_line(&err).expect("the 12-word passphrase must reach stderr");
     let bytes = std::fs::read(&out).unwrap();
     assert_eq!(bytes.len() % 512, 0);
     // §2.3: the passphrase must never land beside the ciphertext it opens.
-    let first = words.split_whitespace().next().unwrap();
-    assert!(!String::from_utf8_lossy(&bytes).contains(first));
+    // Assert on the LONGEST word: a 3-letter BIP-39 word ("act", "air") has a
+    // ~1-in-30,000 chance of appearing by chance in ~500 random ciphertext
+    // bytes — a flake nobody would diagnose.
+    let longest = words.split_whitespace().max_by_key(|w| w.len()).unwrap();
+    assert!(!String::from_utf8_lossy(&bytes).contains(longest),
+        "no passphrase word may appear in the UF2");
 }
 
 /// §8 / §2.2a: the prohibition is load-bearing. Assert the flag is ABSENT —
@@ -1768,7 +1930,7 @@ fn public_only_payload_prints_no_passphrase() {
                        "--plaintext", MD1C, "--out", out.to_str().unwrap()])
         .assert().success();
     let err = String::from_utf8(a.get_output().stderr.clone()).unwrap();
-    assert!(!err.lines().any(|l| l.split_whitespace().count() == 12),
+    assert!(passphrase_line(&err).is_none(),
         "no passphrase may be printed when nothing is encrypted");
     let b = std::fs::read(&out).unwrap();
     assert_eq!(&b[48..52], &[0, 0, 0, 0], "ct_len must be zero");
@@ -1844,6 +2006,14 @@ Add to `enum Command` in `src/main.rs`:
 
         /// Required to encrypt an ms1 (a seed). Sealing a seed must never be
         /// accidental.
+        ///
+        /// **NOTE: this flag is a deliberate plan-level addition and is NOT in
+        /// the spec.** §9's synopsis omits it and §12 item 6 records `ms1` as
+        /// ADMITTED with no opt-in, so `me seal <ms1> --out x.uf2` — the spec's
+        /// own documented invocation — exits `EXIT_REFUSED` here. That is safer
+        /// than the spec, not looser, but it is a divergence: file a spec
+        /// amendment to §9 and §12 item 6 rather than leaving the two artefacts
+        /// disagreeing.
         #[arg(long)]
         seal_secret: bool,
 
@@ -1888,14 +2058,21 @@ Add early returns in `run()`, after the existing `Command::Bundle` block:
 Add the handlers alongside `run_bundle_cli`:
 
 ```rust
+// `out: &Path`, not `&PathBuf` — clippy::ptr_arg is warn-by-default and the
+// plan's own `-D warnings` gate would reject it. Call sites deref-coerce.
 fn run_seal_cli(
-    payload: &[String], plaintext: &[String], out: &PathBuf,
+    payload: &[String], plaintext: &[String], out: &std::path::Path,
     seal_secret: bool, iterations: u32,
 ) -> i32 {
     use mnemonic_engrave::classify::{classify, Format};
     use mnemonic_engrave::seal::{self, pubhash, Payload};
 
-    let secret: Vec<String> = payload.iter().map(|s| s.trim().to_string()).collect();
+    // Global Constraint: secrets wiped on every path. argv already exposes these
+    // via /proc/$PID/cmdline (inherent to §9's synopsis, filed separately), so
+    // this is defence in depth on the heap copy we control.
+    let secret: Vec<Zeroizing<String>> =
+        payload.iter().map(|s| Zeroizing::new(s.trim().to_string())).collect();
+    let secret: Vec<String> = secret.iter().map(|s| (**s).clone()).collect();
     let public: Vec<String> = plaintext.iter().map(|s| s.trim().to_string()).collect();
     if secret.is_empty() && public.is_empty() {
         eprintln!("me: nothing to seal");
@@ -1963,12 +2140,25 @@ fn run_hash_cli(records: &[String], sealed: bool) -> i32 {
     }
     let trimmed: Vec<String> = records.iter().map(|s| s.trim().to_string()).collect();
     for (i, r) in trimmed.iter().enumerate() {
-        if let Err(e) = record::validate_record(r) {
-            eprintln!("me: record {i}: {e}");
-            return EXIT_INVALID;
+        match record::validate_record(r) {
+            Err(e) => { eprintln!("me: record {i}: {e}"); return EXIT_INVALID; }
+            // §6.3 forbids a secret in the public section, so hashing one would
+            // print a confident value for a payload no device could ever hold.
+            Ok(k) if k.is_secret() => {
+                eprintln!("me: record {i} is secret material; the public-data hash \
+                           covers public records only");
+                return EXIT_INVALID;
+            }
+            Ok(_) => {}
         }
     }
     let refs: Vec<&str> = trimmed.iter().map(|s| s.as_str()).collect();
+    // Same card-set decode `me seal --plaintext` applies, so `me hash` cannot
+    // bless a record list that `me seal` would refuse.
+    if let Err(e) = record::decode_public_set(&refs) {
+        eprintln!("me: {e}");
+        return EXIT_INVALID;
+    }
     println!("{}", pubhash::format_hash(&pubhash::public_data_hash(&refs, sealed)));
     EXIT_OK
 }
@@ -2010,6 +2200,11 @@ Procedure, both rules non-negotiable: **copy the file first** and restore from t
 | per-record decode instead of per-set | `decodes_a_complete_card_set` (would reject a legitimate set) |
 | decode check removed entirely | `refuses_a_bch_valid_but_undecodable_record` |
 | `Header::decode` skips a length bound | `rejects_out_of_range_lengths` |
+| `reserved` / `kdf_id` / `aead_id` checks deleted (sealed shape) | `rejects_bad_magic_version_reserved_kdf_and_aead` — mutation-proved that nothing else catches these |
+| `aad = header` only, dropping the public section | `flipping_a_public_section_byte_fails_the_tag` (the pinned D/E sha256s catch it too, but nothing else tests the §6.1a property itself) |
+| a vector emits an unparseable blob | `every_encrypted_vector_round_trips` — sha256 pins prove the bytes are STABLE, not PARSEABLE |
+| CR normalised away instead of refused | `refuses_embedded_separators_and_bad_lengths` |
+| `--group-size 0` guidance lost on the secret path | `refuses_space_grouped_input_with_an_actionable_message` |
 | unsealed-shape zero checks removed | `rejects_nonzero_crypto_fields_when_unsealed` |
 | `to_uf2` emits family `0xE48BFF59` or pads `0xFF` | `every_block_conforms_not_just_the_first` |
 | `open_bytes` returns plaintext without checking the tag | `open_fails_on_flipped_ciphertext_byte` |
