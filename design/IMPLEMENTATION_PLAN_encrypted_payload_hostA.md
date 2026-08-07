@@ -1860,7 +1860,9 @@ fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
 }
 ```
 
-- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --lib seal`, expect **54 passed** (8 wire + 5 crypto + 5 passphrase + 7 record + 5 pubhash + 4 container + 20 mod). `uf2.rs` does not exist until Task 8; after it, the same command reports **56**. **If any vector hash mismatches, STOP and reconcile against the spec** — the Go port binds to these bytes.
+- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --lib seal`, expect **53 passed** (8 wire + 5 crypto + 5 passphrase + 7 record + 5 pubhash + 4 container + 19 mod). `uf2.rs` does not exist until Task 8; after it, the same command reports **55** — the figure `scripts/plan-build-gate.sh` measures on the assembled module.
+
+**Do not hand-count these.** Three successive attempts to correct this number by arithmetic were each wrong (50/52, then 52/54, then 54/56). Run the gate and read the figure it prints. **If any vector hash mismatches, STOP and reconcile against the spec** — the Go port binds to these bytes.
 
 - [ ] **Step 5: Commit**
 
