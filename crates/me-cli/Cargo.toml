@@ -19,12 +19,18 @@ name = "mnemonic_engrave"
 path = "src/lib.rs"
 
 [dependencies]
-md-codec = "0.40"
+md-codec = "0.42"
 mk-codec = "0.4"
 clap = { version = "4", features = ["derive"] }
 zeroize = "1.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+aes-gcm = "0.10"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+sha2 = "0.10"
+bip39 = "2.2"
+rand = "0.9"
+ms-codec = "0.7"
 
 [dev-dependencies]
 assert_cmd = "2"

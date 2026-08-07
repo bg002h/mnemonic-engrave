@@ -6,6 +6,7 @@ pub mod classify;
 pub mod manifest;
 pub mod ndef;
 pub mod preview;
+pub mod seal;
 pub mod validate;
 
 use classify::{ClassifyError, Format};
