@@ -84,8 +84,30 @@ This list is normative and belongs in operator documentation, not only here.
    screen — the most likely physical state of an unattended mid-session machine,
    and the one that looks safest.
 
-   Defence during a session is **physical custody**, not cryptography. See
-   §2.3's operating rule and the required idle-wipe in §12 item 8.
+   **Narrowed by §10.2.2**: the seed record is wiped as soon as its plate is
+   cut or skipped, so this window is now the first plate — roughly 21 minutes —
+   not the whole session. After that RAM holds public records only. The §10.2.4
+   idle timer guards precisely this window and is absent afterwards.
+
+   Defence during that window is **physical custody**, not cryptography. See
+   §2.3's operating rule.
+
+10. **A public-only payload is not authenticated at all.** With `ct_len == 0`
+    there is no key, therefore no tag (§6.1a). Anyone with brief physical access
+    can replace the blob wholesale, and the device cannot tell. The BCH checksum
+    catches corruption, not substitution: a well-formed `mk1` encoding an
+    attacker's xpub passes every structural check, and the operator engraves a
+    steel backup of a wallet they do not control.
+
+    What stands in its place is the §6.6 hash — an out-of-band check that works
+    **only if the operator actually compares it** — plus the §10.2.3 warning, the
+    fingerprint already shown by `gui/mk1_inspect.go:90`, and the mk1↔md1
+    template binding (`gui/template_engrave.go:16`).
+
+    Scale it honestly: **the existing NFC path has the same weakness**, since a
+    swapped tag does the same thing and carries no warning at all. This is not a
+    regression against today. It *is* weaker than an encrypted payload, which is
+    why `me seal` encrypts by default and plaintext is an explicit opt-in.
 
 ### 2.2a What admitting `ms1` changed (operator sign-off, 2026-08-07)
 
@@ -256,31 +278,56 @@ and may never lead.
 
 All multi-byte integers are **big-endian**.
 
+A payload carries a **public section**, an **encrypted section**, or both.
+
 | Offset | Size | Field | Value / constraint |
 | --- | --- | --- | --- |
 | 0 | 8 | `magic` | ASCII `MNEMBLOB` |
 | 8 | 1 | `version` | `0x01` |
-| 9 | 1 | `kdf_id` | `0x01` = PBKDF2-HMAC-SHA256 |
-| 10 | 1 | `aead_id` | `0x01` = AES-256-GCM |
-| 11 | 1 | `payload_kind` | see §6.3 |
-| 12 | 4 | `iterations` | u32, PBKDF2 iteration count |
-| 16 | 16 | `salt` | fresh CSPRNG bytes, every encryption |
-| 32 | 12 | `iv` | fresh CSPRNG bytes, every encryption |
-| 44 | 4 | `ct_len` | u32, ciphertext length excluding tag |
-| 48 | `ct_len` | `ciphertext` | AES-256-GCM ciphertext |
-| 48+`ct_len` | 16 | `tag` | AES-256-GCM authentication tag |
+| 9 | 1 | `kdf_id` | `0x01` = PBKDF2-HMAC-SHA256; **`0x00` when nothing is encrypted** |
+| 10 | 1 | `aead_id` | `0x01` = AES-256-GCM; **`0x00` when nothing is encrypted** |
+| 11 | 1 | `reserved` | `0x00` |
+| 12 | 4 | `iterations` | u32; **`0` when nothing is encrypted** |
+| 16 | 16 | `salt` | fresh CSPRNG bytes per encryption; **all-zero when nothing is encrypted** |
+| 32 | 12 | `iv` | fresh CSPRNG bytes per encryption; **all-zero when nothing is encrypted** |
+| 44 | 4 | `pub_len` | u32, length of the public section |
+| 48 | 4 | `ct_len` | u32, ciphertext length excluding tag; `0` when nothing is encrypted |
+| 52 | `pub_len` | `public records` | **cleartext**, LF-joined per §6.4 |
+| 52+`pub_len` | `ct_len` | `ciphertext` | AES-256-GCM ciphertext |
+| 52+`pub_len`+`ct_len` | 16 | `tag` | **present only when `ct_len > 0`** |
 
-Header length is 48 bytes. Total blob = `48 + ct_len + 16`.
+Header length is 52 bytes.
 
-**AAD = the full 48-byte header** (offsets 0..48). This binds version, algorithm
-identifiers, payload kind, iteration count, salt, IV and length into the
-authentication tag, so none can be tampered downward.
+- Encrypted (`ct_len > 0`): total = `52 + pub_len + ct_len + 16`.
+- Unencrypted (`ct_len == 0`): total = `52 + pub_len`, **and there is no tag**.
 
 ### 6.1 Blob presence
 
 Erased flash reads `0xFF`. A blob is present iff the first 8 bytes equal
 `MNEMBLOB`. Anything else — including all-`0xFF` — means "no payload", and the
 feature stays invisible in the UI.
+
+### 6.1a AAD — the public records are authenticated, not encrypted
+
+**AAD = the header AND the public section**, i.e. bytes `[0, 52 + pub_len)`.
+
+This is what "Associated Data" in AEAD is for, and it is the whole reason the
+public section can travel in the clear without becoming a funds-loss path. §2.2
+item 4 concedes the blob is attacker-**writable** — it lies outside the signed
+image's `LOAD_MAP`. Without the AAD binding, an attacker with brief physical
+access could swap a `mk1` for one encoding *their* xpub, and the operator would
+engrave a steel backup of a wallet they do not control. With it, altering one
+byte of a public record fails the tag exactly as altering ciphertext does.
+Verified by execution against vector D.
+
+It costs nothing: no second key, no extra primitive, no extra pass.
+
+**But it only works when something is encrypted**, because that is what makes a
+key exist. A payload with `ct_len == 0` has no key, therefore no tag, therefore
+no authentication. See §2.2 item 10 and §6.6 for what stands in its place.
+
+The AAD also binds version, algorithm identifiers, iteration count, salt, IV and
+both lengths, so none can be tampered downward.
 
 ### 6.2 Parameter bounds — checked BEFORE any allocation or KDF work
 
@@ -290,14 +337,20 @@ not an error message. Every field below is validated first, and any violation
 fails closed with "payload unreadable":
 
 - `version == 0x01`
-- `kdf_id == 0x01`, `aead_id == 0x01`
-- `payload_kind ∈ {0x01, 0x02, 0x03, 0x04}`. All four are admitted; `ms1` was
-  signed off by the operator on 2026-08-07 (§12 item 6).
-- `100_000 <= iterations <= 2_000_000`
-- `0 < ct_len <= 8191` — one below the 8 KiB scan buffer, see below
-- `48 + ct_len + 16 <= 65536` (fits the region)
+- `reserved == 0x00`
+- **If `ct_len > 0`** (something is encrypted):
+  `kdf_id == 0x01`, `aead_id == 0x01`, `100_000 <= iterations <= 2_000_000`,
+  `0 < ct_len <= 8191`.
+- **If `ct_len == 0`** (nothing is encrypted): `kdf_id == 0x00`,
+  `aead_id == 0x00`, `iterations == 0`, and `salt` and `iv` **all-zero**.
+  Any non-zero value in those fields is a malformed blob and MUST be rejected —
+  they are meaningless without a key, and accepting junk there would let an
+  attacker stage a downgrade that a later version might honour.
+- `0 <= pub_len <= 8191`
+- `pub_len + ct_len > 0` — an empty payload is malformed
+- `52 + pub_len + ct_len + (16 if ct_len > 0 else 0) <= 65536` (fits the region)
 
-The `ct_len` ceiling is 8191, not 8192, because `gui/scan.go:34` computes
+The `ct_len` and `pub_len` ceilings are 8191, not 8192, because `gui/scan.go:34` computes
 `s.overflow = s.overflow || s.n == len(s.buf)` against an `8*1024` buffer:
 overflow triggers when the buffer is exactly *full*. A payload of exactly 8192
 bytes would pass every bound here, burn the full KDF, authenticate correctly,
@@ -305,18 +358,35 @@ and only then die in the classifier — a spec-legal blob that can never engrave
 
 The length arithmetic MUST be performed in unsigned arithmetic wider than 32
 bits, or be otherwise overflow-checked. TinyGo's `int` is 32-bit on this target,
-so `48 + ct_len + 16` evaluated natively wraps negative for `ct_len` near 2³² and
-would pass a `<= 65536` test. A conforming implementation is protected by the
-separate `ct_len <= 8191` check, but the region-fit check MUST NOT be relied on
-alone — an implementation that "simplified" to it would admit a 4 GiB declared
-length.
+so `52 + pub_len + ct_len + 16` evaluated natively wraps negative when either
+length is near 2³² and would pass a `<= 65536` test. A conforming implementation
+is protected by the separate `<= 8191` checks, but the region-fit check MUST NOT
+be relied on alone — an implementation that "simplified" to it would admit a
+4 GiB declared length.
 
-`ct_len` is authoritative. A UF2 block carries a fixed 256-byte payload, so the
+`pub_len` and `ct_len` are authoritative. A UF2 block carries a fixed 256-byte payload, so the
 written region is the blob followed by padding, followed by undefined sector
-bytes. The device MUST bound the ciphertext by `ct_len` and MUST NOT infer
-length from region contents.
+bytes. The device MUST bound each section by its declared
+length and MUST NOT infer length from region contents.
 
-### 6.3 Payload kinds — and which of these are actually secret
+### 6.3 Which section a record belongs in — and why there is no `payload_kind`
+
+An earlier draft carried a `payload_kind` byte describing the whole payload.
+That stopped working the moment one blob could hold both public and encrypted
+content, so the byte is gone (offset 11 is now `reserved`). **Section placement
+carries the meaning instead, and it does so more strongly.**
+
+The rule is one line:
+
+> **A record in the PUBLIC section MUST NOT classify as `ms1`.**
+
+That is the same mislabelling detector the old kind/content cross-check
+provided, but stronger: the old one caught a header byte disagreeing with its
+content, while this one prevents shipping seed material in the clear at all. It
+is enforced on the **classified content**, never on anything the sealer asserts.
+
+The encrypted section may carry anything — `ms1`, `mk1`, `md1`, a BIP-39
+mnemonic — since it is confidential by construction.
 
 Generating the cards for a real seed makes the distinction plain:
 
@@ -337,25 +407,32 @@ plaintext converter refuses `ms1` (`crates/me-cli/src/lib.rs:59`) precisely
 because that path has no confidentiality. Inside this envelope, that objection
 does not apply — the blob is ciphertext from the moment it leaves the host.
 
-| Value | Kind | Secret? | Classifier route |
+| Record | Secret? | May ride in the PUBLIC section? | Classifier route |
 | --- | --- | --- | --- |
-| `0x01` | UTF-8 constellation string, `md1` or `mk1` | no | codex32 |
-| `0x02` | BIP-39 mnemonic, lowercase, single-space separated | **yes** | bip39 |
-| `0x03` | `ms1` codex32 secret, standalone | **yes** | codex32 |
-| `0x04` | bundle of constellation records — see §6.4 | **if it contains `ms1`** | per record |
+| `md1` — wallet policy | no | yes | `codex32.ValidMD` → `mdmkText` |
+| `mk1` — xpub + origin | no | yes | `codex32.ValidMK` → `mdmkText` |
+| `ms1` — codex32 secret | **yes** | **NO — refuse** | `codex32.New` → secret |
+| BIP-39 mnemonic | **yes** | **NO — refuse** | `bip39.Parse` |
 
 All are forms `gui/scan.go`'s classifier already accepts, so no new engraving
 path is required for any of them.
 
-**`ms1` — standalone (`0x03`) or as a bundle record — is admitted.** This is a
-deliberate reversal of the plaintext converter's refusal
-(`crates/me-cli/src/lib.rs:59`), signed off by the operator 2026-08-07 (§12
-item 6). The refusal was a property of the *plaintext* path, which had no
-confidentiality; inside an authenticated encrypted envelope the objection does
-not carry. The consequence is explicit and accepted: **the machine's flash holds
-encrypted seed material, not merely an encrypted xpub** — see §2.2a.
+**`ms1` inside the encrypted section is admitted**, a deliberate reversal of the
+plaintext converter's refusal (`crates/me-cli/src/lib.rs:59`), signed off by the
+operator 2026-08-07 (§12 item 6). The refusal was a property of the *plaintext*
+path, which had no confidentiality; inside an authenticated encrypted envelope
+the objection does not carry. The consequence is explicit and accepted: **the
+machine's flash holds encrypted seed material, not merely an encrypted xpub** —
+see §2.2a.
 
-### 6.4 Bundle container (`payload_kind = 0x04`) — NORMATIVE
+Note the two halves of that decision are now separable, which is the point of
+the split: `ms1` is admitted **encrypted** and refused **in the clear**.
+
+### 6.4 Record container — NORMATIVE
+
+Both sections use the same encoding. Everything below applies to the public
+section and the encrypted section alike, and the `1..24` record cap is over the
+**total** across both.
 
 A bundle carries the several cards of one wallet in a single blob, so the
 operator unlocks once and then cuts every plate.
@@ -420,11 +497,12 @@ materialises ~8192 slice headers (~98 KB on a 32-bit target), a fifth of the fre
 heap, transiently. Bound each record's length during the same scan.
 
 **Every record is classified and allow-listed independently** per §10.2.1. A
-bundle record MUST classify as `mdmkText` or a `codex32` secret; a BIP-39
-mnemonic inside a bundle is rejected (that is `0x02`'s job, and mixing delivery
-shapes buys nothing). An `ms1` record is admitted per §12 item 6.
+record MUST classify as `mdmkText` or a `codex32` secret; a BIP-39 mnemonic as a
+record is rejected. **In the PUBLIC section a record MUST classify as `mdmkText`
+only** — anything classifying as a secret rejects the whole payload (§6.3). An
+`ms1` record in the ENCRYPTED section is admitted per §12 item 6.
 
-If any record fails any check, **the entire bundle is rejected**. Partial
+If any record fails any check, **the entire payload is rejected**. Partial
 acceptance would leave the operator engraving an incomplete wallet backup while
 believing it complete, which is the worst available outcome.
 
@@ -482,6 +560,55 @@ where a pre-authentication field would belong.
 This is not a licence to trust plaintext blindly: §10.2.1's allow-list still
 applies per record, because "authenticated" means "sealed by whoever knows the
 passphrase", which is not the same as "safe".
+### 6.6 The fixed public-data hash — NORMATIVE
+
+When a payload has no encrypted section it has no key, so nothing authenticates
+it (§6.1a). What stands in place of a tag is an **out-of-band check the attacker
+does not control**: a short, stable hash of the public data that the operator
+compares against a value they recorded themselves.
+
+```
+input   = the public section exactly as it appears on the wire —
+          canonical records, LF-joined, no trailing LF (§6.4)
+digest  = SHA-256(input)
+display = first 8 bytes, lowercase hex, in 4 groups of 4
+
+              68da 1ee5 da08 1b24
+```
+
+**It is COMPUTED, never STORED. There is deliberately no hash field on the
+wire.** A hash carried inside the payload is worthless: an attacker who rewrites
+the records rewrites the hash beside them, and the device displays a value that
+matches the tampered data perfectly. The check works only because the device
+derives the number from the bytes it is actually about to engrave, and the
+operator's copy lives somewhere the attacker cannot reach.
+
+**Why 64 bits and not 32.** The attacker is not inverting the hash — they are
+grinding a *match*. They encode their own xpub, hash it, and repeat until the
+truncation agrees with what the device will show; each candidate costs one child
+derivation. At 32 bits (8 hex) that is seconds on a GPU, and an 8-character
+display would be actively harmful — it would look like verification while being
+defeatable. At 64 bits it is out of reach for this threat model.
+
+**Why the content and not the file.** The blob's bytes change on every seal
+(fresh salt and IV), so a hash over the file would be a new value to write down
+each time — and a check nobody can perform from memory is a check nobody
+performs. Hashing the canonical public records instead makes the value **fixed**:
+independent of salt, IV, iteration count, passphrase, and of whether anything is
+encrypted at all. Record it once and it stays true. Vectors D and E pin exactly
+this — the same five public cards, one payload with an encrypted `ms1` and one
+without, and both MUST display `68da 1ee5 da08 1b24`.
+
+It is order-sensitive, because record order is plate order and that is content.
+
+**Displayed always, not only when unauthenticated.** When a tag exists the hash
+answers a different and still useful question — *which wallet is this?* rather
+than *has this been altered?* — and a check performed every time is a check the
+operator will actually perform.
+
+`me hash <records...>` re-derives the same value from the operator's own cards,
+with no passphrase, no seal operation, and no original file, so the expected
+number can be regenerated months later.
 
 ## 7. Cryptographic construction — NORMATIVE
 
@@ -614,10 +741,23 @@ mis-specified address either overwrites the firmware directly or, past
 flag would expose a destructive footgun with no legitimate use. If a test seam
 is ever needed it MUST NOT be an operator-facing flag.
 
-- Validates the input and sets `payload_kind` per §6.3. `md1`/`mk1` → `0x01`;
-  a 12/15/18/21/24-word BIP-39 mnemonic with a valid checksum → `0x02`; `ms1` →
-  `0x03` (admitted per §12 item 6, kept behind an explicit opt-in flag so that
-  sealing a seed is never accidental); a record list → `0x04`.
+- Validates every record (canonical form, BCH checksum) and decides its section.
+  **By default every record is encrypted.** `--plaintext <record>` places a
+  record in the public section instead; `me seal` MUST refuse to place an `ms1`
+  or a BIP-39 mnemonic there (§6.3).
+- Prints the §6.6 public-data hash whenever a public section exists, in the
+  grouped form, with an instruction to record it.
+- Writes the `.uf2` with mode `0600`, matching `write_private` (`main.rs:375`).
+
+A sibling subcommand re-derives the hash with no passphrase, no seal operation
+and no original file, so the expected value can be regenerated months later:
+
+```
+me hash <record>...        →  68da 1ee5 da08 1b24
+```
+
+It applies §6.4's canonical checks and refuses a non-canonical record rather than
+hashing something the device would reject.
 - **Bundles (`0x04`).** Records are supplied as a list and joined with a single
   LF, no trailing LF. `me seal` MUST enforce **every** §6.4 constraint at seal
   time and refuse rather than emit: canonical unbroken records (no interior
@@ -685,20 +825,33 @@ settled by a test, not a design question.
 
 1. Parse and bound-check the header per §6.2. Any violation → "payload
    unreadable", stop.
-2. Enter the existing 12-word BIP-39 entry flow.
-3. Validate the BIP-39 checksum. Failure → "not a valid passphrase, check the
+2. Split the public section into records and allow-list each per §10.2.1. **Any
+   record classifying as a secret rejects the whole payload** (§6.3) — this is
+   what stops a seed reaching steel in the clear.
+3. Compute the §6.6 public-data hash and display it. **Computed from the records
+   just parsed — never read from the payload.**
+4. **If `ct_len == 0`, stop here: no passphrase is prompted.** Show the
+   unauthenticated warning of §10.2.3 with the hash, require an explicit
+   confirmation, then go to the plate list. Steps 5–8 are skipped entirely.
+5. Enter the existing 12-word BIP-39 entry flow.
+6. Validate the BIP-39 checksum. Failure → "not a valid passphrase, check the
    words", return to entry. No KDF is run.
-4. Run PBKDF2 with a progress indicator. This takes ~30 s and the screen must
-   say so, or the operator will think the machine has hung.
-5. AES-256-GCM open. **Tag mismatch → fail closed**, "wrong passphrase or
-   damaged payload", return to entry. Never emit partial plaintext.
-6. Classify the plaintext via `gui/scan.go`, then **allow-list the result** per
-   §10.2.1 before acting on it. Anything outside the allow-list is "payload
-   unreadable" — fail closed.
-7. Wipe the derived key, the passphrase buffer, and PBKDF2 intermediates on
-   every exit path, following the existing `wipeBytes` pattern
-   (`gui/passphrase_flow.go:605`) and carrying the same honest caveat: TinyGo's
-   GC may copy or retain, so this is defence in depth, not a guarantee.
+7. Run PBKDF2 with a progress indicator. This takes ~31 s (§7.1) and the screen
+   must say so, or the operator will think the machine has hung.
+8. AES-256-GCM open over `AAD = header ‖ public section` (§6.1a). **Tag mismatch
+   → fail closed**, "wrong passphrase or damaged payload", return to entry.
+   Never emit partial plaintext. Note this same check is what authenticates the
+   public records, so a tampered public card fails here too.
+9. Split the decrypted section into records and allow-list each per §10.2.1.
+10. Wipe the derived key, the passphrase buffer, and PBKDF2 intermediates on
+    every exit path, following the existing `wipeBytes` pattern
+    (`gui/passphrase_flow.go:605`) and carrying the same honest caveat: TinyGo's
+    GC may copy or retain, so this is defence in depth, not a guarantee.
+
+**The passphrase prompt is conditional on `ct_len > 0` and nothing else.** A
+public-only payload must never ask for one — there is no key to derive and
+prompting would train the operator to type twelve words at a screen that cannot
+check them.
 
 ### 10.2.1 The classifier allow-list — NORMATIVE, and load-bearing
 
@@ -730,76 +883,126 @@ attacker-*writable*, being outside the signed image's `LOAD_MAP`.
 
 Therefore the unlock flow MUST accept only these classifier results:
 
-| `payload_kind` | Permitted classification |
+| Section | Permitted classification |
 | --- | --- |
-| `0x01` | `mdmkText` (via `codex32.ValidMD` / `ValidMK`) |
-| `0x02` | a parsed BIP-39 mnemonic |
-| `0x03` | a `codex32` secret (`ms1`) |
-| `0x04` | **per record**: `mdmkText` or a `codex32` secret. A BIP-39 mnemonic inside a bundle is rejected. |
+| public | `mdmkText` **only** (via `codex32.ValidMD` / `ValidMK`) |
+| encrypted | `mdmkText`, a `codex32` secret (`ms1`), or a parsed BIP-39 mnemonic |
 
-For `0x04` the allow-list runs **once per record**, and any single failure
-rejects the whole bundle (§6.4).
+The allow-list runs **once per record**, and any single failure rejects the
+whole payload (§6.4).
 
 Every other classification — explicitly including `debugCommand`,
 `addressText`, and output descriptors — MUST be treated as "payload unreadable".
 The check MUST be an allow-list, not a deny-list: a deny-list silently admits
 whatever branch the classifier grows next.
 
-**The classification MUST still be cross-checked against `payload_kind`**, even
-though every kind is now admitted. The device routes on *content*, and
-`codex32.New` (`codex32/codex32.go:98`) accepts secret shares, so a header byte
-does not bind what actually engraves. `payload_kind` is a claim by the sealer,
-not a guarantee.
+**Secrecy is decided by section placement, checked against classified content.**
+`codex32.New` (`codex32/codex32.go:98`) accepts secret shares, so nothing the
+sealer asserts binds what actually engraves — the device must look at the
+content. A record in the public section that classifies as a secret is
+malformed, and rejecting it is what stops a seed being shipped in the clear.
 
-The cross-check is no longer an `ms1` policy gate — it is a **mislabelling
-detector**. A blob whose header says `0x01` (public card) but whose content is
-an `ms1` secret is malformed, and the operator has been told they are engraving
-a public card when they are about to cut a seed onto steel. Reject the mismatch:
-the header and the content must agree about whether this plate is secret.
+### 10.2.2 Session lifecycle — `ms1` first, then wiped
 
-### 10.2.2 Bundle session — unlock once, cut many
+A multi-record payload is engraved over one **session**: unlock once, then cut
+each plate, swapping steel between them.
 
-A `0x04` bundle is engraved over one **session**: unlock once, then cut each
-plate, swapping steel between them.
+**The `ms1` plate is offered FIRST, and the record is wiped either way.**
 
 ```
-unlock ──► [plate list] ──► pick a record ──► engrave ──► back to list
-               │                                              │
-               │◄─────────────── mark cut ────────────────────┘
-               │
-               └──► [Lock] ──► wipe plaintext, return to main menu
+unlock ──► [ ms1 plate ] ──┬── Cut  ──► engrave ──► WIPE ms1
+                           └── Skip ─────────────► WIPE ms1
+                                                     │
+                                                     ▼
+                                   [ plate list: mk1/md1 only ]
+                                   no secret in RAM from here on
+                                                     │
+                                                     └──► [ Lock ] ──► wipe all,
+                                                                       main menu
 ```
 
-- The plate list shows one entry per record, labelled by its **classified**
-  type and index (`ms1`, `mk1 1/2`, `md1 2/3`), not by anything the sealer
-  asserted.
+- The operator may **Cut** or **Skip**; in both cases the `ms1` record leaves
+  RAM before the rest of the session begins. Re-cutting it later requires a
+  fresh unlock.
+- After that point RAM holds **public records only** — an xpub and a wallet
+  policy, which are publishable.
+- The plate list labels each entry by its **classified** type and index
+  (`mk1 1/2`, `md1 2/3`), never by anything the sealer asserted, and never
+  renders a secret record's contents.
 - Records already cut this session are marked. The mark is a **convenience, not
-  a guarantee** — it does not survive a power cut, and the UI must not imply it
+  a guarantee** — it does not survive a power cut and the UI must not imply it
   does.
-- A **Lock** action wipes the plaintext and returns to the main menu. Leaving
-  the bundle flow by any path — including Back — MUST wipe.
-- Wiping follows the existing `wipeBytes` pattern with the same honest caveat as
-  §10.2 step 7: TinyGo's GC may copy or retain, so this is defence in depth,
-  not a guarantee.
+- Leaving the session by **any** path — Lock, Back, an error, `ctx.Done` — MUST
+  wipe. Same `wipeBytes` caveat as §10.2 step 10.
 
-#### The cost, stated plainly
+#### Why this shape, and what it costs
 
-This is a **real weakening of §2.1's first claim** and belongs in the threat
-model, not a footnote. Single-record delivery holds plaintext for one engraving.
-A six-plate bundle at roughly 21 minutes per plate holds decrypted seed material
-in RAM for on the order of **two hours**, across plate swaps, with the machine
-likely unattended for much of it.
+An earlier draft held every record for the whole session. Six plates at roughly
+21 minutes each meant decrypted **seed** material resident in SRAM for about two
+hours, largely unattended — and §2.2 item 9 makes that a live exposure, because
+`debug enable: 1` (measured, §3) lets SWD read SRAM with no passphrase at all.
 
-Re-prompting per plate would shrink that window, at the cost of retyping twelve
-words and eating the ~30 s KDF six times. The operator chose the session model
-(2026-08-07); this records what was traded for it.
+Cutting `ms1` first collapses that from ~2 hours to **one plate**. The remaining
+1.5+ hours carry nothing worth stealing.
 
-Mitigations that cost no re-typing:
+The cost is that the operator loses free choice of plate order for the seed
+card, and a later re-cut needs a fresh unlock — twelve words and a 31-second
+KDF. That is the trade, and it is deliberate (operator decision, 2026-08-07).
 
-- Wipe on **every** exit from the bundle flow, not only on Lock.
-- An idle timeout that wipes and returns to the lock screen — value is §12 item 8.
-- Never render a secret record's contents on the plate list; show type and index
-  only.
+### 10.2.3 The unauthenticated-payload warning — NORMATIVE
+
+Shown when and only when `ct_len == 0`. The operator must confirm before the
+plate list appears.
+
+```
+  ⚠  THIS PAYLOAD IS NOT AUTHENTICATED
+
+  It carries no encrypted data, so there is no key
+  and nothing proves it is the payload you sent.
+  Anyone with physical access could have replaced it.
+
+  Public data hash:
+        68da 1ee5 da08 1b24
+
+  Compare this with the value you recorded.
+
+        [ Matches — continue ]     [ Cancel ]
+```
+
+The wording must not overstate what the hash proves. It is an out-of-band check
+that works **only if the operator actually compares it** against a value they
+hold independently; it is not a signature and the device cannot verify it.
+
+### 10.2.4 Idle wipe — two-phase, NORMATIVE
+
+§10.2.2 changes what a timeout is for. Once `ms1` is gone, RAM holds public
+data, so a timer guarding it would be guarding an xpub — while still firing
+during the legitimate multi-minute pauses of a plate swap, which is the fastest
+way to teach an operator to disable a control.
+
+So the timer is **phase-dependent**:
+
+| Phase | Timer | Rationale |
+| --- | --- | --- |
+| `ms1` in RAM, not engraving | **3 min**, 30 s warning | The operator has just typed twelve words; they are standing there. Reuses the existing `idleTimeout` value (`gui/gui.go:2801`). |
+| Engraving, any plate | **paused** | Never wipe mid-plate, needle down. A plate takes ~21 min of untouched screen and that is not idleness. |
+| After `ms1` cut or skipped | **none** | Public data only. Nothing to protect. |
+
+The warning wakes the screen and any touch resets it, so a present operator is
+never wiped out and an absent one is.
+
+**The timer source is already in use and needs no new machinery**:
+`gui/gui.go:2801` `idleTimeout = 3 * time.Minute`, driven by `time.Now()` and
+`ctx.WakeupAt`/`Platform.AppendEvents` in `Run`'s frame loop. Monotonic elapsed
+time is all this needs; no RTC is involved.
+
+**What it does not do.** Per §2.2 item 9 the attack is physical access plus an
+SWD probe. Against someone who has both and is waiting, three minutes versus
+thirty is close to noise — they need only the window to exist. This timer is a
+backstop against *forgetting*, and the controls that carry the real weight are
+physical custody, Lock being one tap away, and the fact that the secret is gone
+within the first plate. Overstating it would invite leaving the machine when the
+operator should not.
 
 ### 10.3 UI constraints to respect
 
@@ -821,9 +1024,11 @@ Mitigations that cost no re-typing:
   bound to.
 - Round-trip seal/open.
 - Passphrase normalisation (§8.1) byte-exactness.
-- `payload_kind` classification per §6.3: `md1`/`mk1` → `0x01`, a checksum-valid
-  BIP-39 mnemonic → `0x02`, `ms1` → `0x03`, a multi-record bundle → `0x04`. A
-  mislabelled input is refused at seal time, not emitted.
+- Section placement per §6.3: `me seal` refuses to put an `ms1` or a BIP-39
+  mnemonic in the public section, and refuses a non-canonical record anywhere.
+- The §6.6 public-data hash is stable: the same public records yield the same
+  hash across different salts, IVs, iteration counts, and with or without an
+  encrypted section (pinned by vectors D and E, which MUST agree).
 - Rejection of every §6.2 bound violation.
 - UF2 emission field-by-field against §9.1.
 - **Freshness (kills the frozen-salt mutant).** Two `seal` invocations of the
@@ -861,7 +1066,8 @@ Mitigations that cost no re-typing:
   timing or by instrumenting the KDF call, not merely by return value. The case
   set MUST include `ct_len = 0xFFFF_FFF0`, which a 32-bit native-`int` region-fit
   check would wrap negative and accept.
-- `payload_kind` outside `{0x01, 0x02, 0x03, 0x04}` is rejected before the KDF.
+- The §6.2 unencrypted-shape rules are enforced: with `ct_len == 0`, any non-zero
+  `kdf_id`, `aead_id`, `iterations`, `salt` or `iv` is rejected.
 - Tag mismatch yields no plaintext.
 - BIP-39 checksum rejection happens without invoking the KDF.
 - Absent/erased region (all `0xFF`) reports "no payload", not an error.
@@ -870,11 +1076,10 @@ Mitigations that cost no re-typing:
   `Platform.LockBoot` MUST NOT be reached — asserted with a fake/instrumented
   platform that fails the test if `LockBoot` is called, not by return value
   alone. Same for an `addressText` plaintext and an output descriptor.
-- **Kind/content cross-check (mislabelling).** An `ms1` codex32 secret labelled
-  `payload_kind = 0x01` MUST be rejected as malformed — not because `ms1` is
-  forbidden (it is not), but because the header claims a public card while the
-  content is a secret. The reverse — a `mdmkText` labelled `0x03` — MUST also be
-  rejected.
+- **Secret-in-the-clear refusal.** An `ms1` record placed in the PUBLIC section
+  MUST reject the whole payload, and the test MUST confirm nothing was engraved.
+  This is the single most important negative case in the suite: it is what stops
+  a seed reaching steel unencrypted.
 - **Bundle container (§6.4).** Vector C splits into exactly 6 records with the
   stated types and lengths. Each of these MUST reject the **whole** bundle, and
   the test MUST confirm no record was engraved:
@@ -948,6 +1153,13 @@ this: two of the original five mutants survived the entire specified test set.
 | whitespace stripped from records before classifying | §11.2 space-grouped-bundle rejection |
 | **two vectors share a `(key, iv)` pair** | **§11.1 pair-uniqueness assertion** |
 | **wipe omitted on the Back exit path (wipe on Lock only)** | **§11.2 wipe-on-every-exit assertion** |
+| **public section left out of the AAD** | **§11.4 negative: flip a byte of D's public section** — nothing else notices, and the failure mode is an engraved backup of an attacker's wallet |
+| **the §6.6 hash read from the payload instead of computed** | a vector whose stored-hash-shaped bytes disagree with the records; the displayed value must follow the RECORDS |
+| **the §6.6 hash computed over the blob/header rather than the records** | **vectors D and E must display the same hash** — they share public records but differ in salt, IV, key, tag and length |
+| `ms1` accepted in the public section | §11.2 secret-in-the-clear refusal |
+| passphrase prompted when `ct_len == 0` | §11.2 vector E parses with no prompt |
+| `ms1` not wiped after its plate | §11.2 post-plate buffer assertion (§10.2.2) |
+| idle timer runs during engraving | §11.2 timer-paused assertion (§10.2.4) |
 | record count checked after splitting rather than before | §11.2 8191-LF-bytes case, **asserted on allocation count** — the return value is identical under both, so a rejection-only assertion is a guaranteed false PASS |
 | `me seal` emits a record with an interior space or hyphen | §11.1 canonical-record seal-time refusal |
 
@@ -961,130 +1173,101 @@ Procedural rules: assert the substitution matched before running the test (a
 silently-failing `sed` reads exactly like a surviving mutation), and restore
 from a **file copy**, never `git checkout`.
 
-### 11.4 Canonical test vector — `beef` / `bacon`
+### 11.4 Canonical test vectors — `beef` / `bacon`
 
-The normative cross-implementation vector. The Rust implementation produces it;
-the Go port MUST decrypt it to the exact plaintext.
+The normative cross-implementation vectors. The Rust implementation produces
+them; the Go port MUST reproduce them byte-exactly.
 
-**The fixed salt and IV below exist ONLY because a test vector must be
+**The fixed salts and IVs below exist ONLY because a test vector must be
 deterministic. This is the sole exemption from §7.2. Production code MUST NOT
 have a code path that accepts a caller-supplied salt or IV.**
 
-| Field | Value |
-| --- | --- |
-| passphrase | `beef` × 12 (space separated) |
-| plaintext | `bacon` × 24 (space separated), 143 bytes |
-| `payload_kind` | `0x02` (BIP-39 mnemonic) |
-| `iterations` | `100000` (the §6.2 minimum, so tests stay fast and legal) |
-| `salt` | `beefbeefbeefbeefbeefbeefbeefbeef` |
-| `iv` | `bac0bac0bac0bac0bac0bac0` |
-| derived key | `615ad9b781b1ad6105d9dffb135d1bf17ebab286c560f26912ee815836e7ad1e` |
-| tag | `84c39ba137f886a1a8ff835994aca24d` |
-| blob length | 207 bytes (48 header + 143 ciphertext + 16 tag) |
-| blob sha256 | `53d4991a41994089fbbe35e1c576335d8d6e82904ecd531257397d1780e16bb9` |
+Shared inputs: passphrase `beef` × 12 (a checksum-valid 12-word BIP-39 mnemonic
+— see "Why these words" below). Records are the canonical, unbroken forms from
+`mnemonic bundle --group-size 0` for the `bacon`×24 seed.
 
-Full blob:
+| | A | B | C | D | E |
+| --- | --- | --- | --- | --- | --- |
+| shape | all encrypted | all encrypted | all encrypted | **mixed** | **public only** |
+| public records | — | — | — | 5 (mk1×2, md1×3) | 5 (mk1×2, md1×3) |
+| encrypted records | 1 (bacon×24) | 1 (bacon×24) | 6 (full bundle) | 1 (`ms1`) | — |
+| `pub_len` | 0 | 0 | 0 | 396 | 396 |
+| `ct_len` | 143 | 143 | 472 | 75 | **0** |
+| `iterations` | 100000 | **100001** | 100000 | 100000 | **0** |
+| `salt` | `beef`×8 | `beef`×8 | `bead`×8 | `d00d`×8 | all-zero |
+| `iv` | `bac0`×6 | `bac0`×6 | `cafe`×6 | `f00d`×6 | all-zero |
+| blob length | 211 | 211 | 540 | 539 | **448** |
+| tag present | yes | yes | yes | yes | **no** |
 
-```
-0000: 4d4e454d424c4f4201010102000186a0beefbeefbeefbeefbeefbeefbeefbeef
-0020: bac0bac0bac0bac0bac0bac00000008f3d53f36eb6d5933d2fc5f6a555eca293
-0040: 32fc4f611f238b42bb3cffdd6fff3e47b21e13649d104fe215b37f2b8454f777
-0060: d478233321d9638e17c6b68a654abdd47ea80827e1b3c14c23c542ac291ca816
-0080: e65b5a8498ba6311a6fe45b65a93651f9541ef4460c053a494b940a005c67842
-00a0: 5bb2cf4aee8d47737ed527020643e7cbf59d3fca90e418a1e551cfedde831c84
-00c0: c39ba137f886a1a8ff835994aca24d
-```
+Derived keys, tags, and blob digests:
 
-Loadable form: one 512-byte UF2 block, `targetAddr=0x10E00000`,
-`familyID=0xe48bff58`, `payloadSize=256`, sha256
-`c58b684e6d206f599f4a3408e626534af0ce914aa157a93d9e05ab62cc2865fc`. **Payload
-bytes beyond the 207-byte blob are `0x00`** — the sha256 above pins zero
-padding, and `0xFF` padding will not match it.
-
-#### Vector B — same inputs, `iterations = 100001`
-
-Identical to vector A in every field except the iteration count. **MUST decrypt
-successfully.** Its only purpose is to fail any implementation that hardcodes
-the iteration count instead of reading it from the header.
-
-| Field | Value |
-| --- | --- |
-| `iterations` | `100001` |
-| derived key | `003800ae6cec47cd4b34bb264c6bbb1156d806516ad1ab88391e479d14d8776f` |
-| tag | `ad86e19a59d82a8ca1de607e27450990` |
-| blob sha256 | `edcba9c5125060a2ae35dc4e99b9d46030e3672409917e4bf12d95d81d15d4fe` |
-
-```
-0000: 4d4e454d424c4f4201010102000186a1beefbeefbeefbeefbeefbeefbeefbeef
-0020: bac0bac0bac0bac0bac0bac00000008ff1151bdaafc0b11580b448b74e053b95
-0040: 9cfefd9ade8ab990661772534a14bfc618a89dc35fe20bf2298bfa6ecf0b9e82
-0060: 9733cc0f85c30bf7aa3bffddca85c1a627b4e0d78feefc66d638829429553979
-0080: 3a714680d3882e9ed5debca68483241d364eb29af2e0846415603edbf158cfb8
-00a0: 34c362053e61e33663f62c4984249d1d16e34e27b402bad982bf3e3c0546cbad
-00c0: 86e19a59d82a8ca1de607e27450990
-```
-
-Confirmed by execution: a KDF hardcoded to 100000 is **rejected** by vector B,
-while the correct key decrypts it.
-
-Vectors A and B deliberately share a salt and IV. That is safe **because they
-derive different keys** (different iteration counts), and GCM's nonce rule binds
-per key. Holding salt and IV fixed is what isolates the iteration count as the
-single variable, which is the vector's whole purpose.
-
-#### Vector C — bundle, `payload_kind = 0x04`
-
-Six **canonical** records from a real `bip84` bundle for the `bacon`×24 seed
-(`mnemonic bundle --group-size 0`), LF-separated with no trailing LF.
-
-| Field | Value |
-| --- | --- |
-| passphrase | `beef` × 12 (as A and B) |
-| `payload_kind` | `0x04` |
-| `iterations` | `100000` |
-| `salt` | `beadbeadbeadbeadbeadbeadbeadbead` — **distinct from A/B** |
-| `iv` | `cafecafecafecafecafecafe` — **distinct from A/B** |
-| derived key | `19c78c5535ad24349f75fb6ca9a59c939ea885c126cc4909eb2cdc0c26add40e` |
-| tag | `6d41656b6a84aca32e67ecb9b970cc5c` |
-| plaintext | 472 bytes, sha256 `b0f68bacd6b9e91e22da2cb4b5cef0a6b367fda3159fd6a26f1e2724959a04e0` |
-| blob | 536 bytes, sha256 `45c31f0096175da31cbc61a2e11a026b6766a2491da5a90291db1b7c829e2536` |
-
-Header: `4d4e454d424c4f4201010104000186a0beadbeadbeadbeadbeadbeadbeadbeadcafecafecafecafecafecafe000001d8`
-
-Records, in order:
-
-| # | Type | Bytes | Classifies as |
+| | derived key | tag | blob sha256 |
 | --- | --- | --- | --- |
-| 0 | `ms1` | 75 | `codex32.String` (secret) |
-| 1 | `mk1` | 111 | `mdmkText` |
-| 2 | `mk1` | 80 | `mdmkText` |
-| 3 | `md1` | 67 | `mdmkText` |
-| 4 | `md1` | 67 | `mdmkText` |
-| 5 | `md1` | 67 | `mdmkText` |
+| A | `615ad9b781b1ad6105d9dffb135d1bf17ebab286c560f26912ee815836e7ad1e` | `4c425808fc389298761c3905166bea40` | `6707c20e7967e80e4cd4cb6dbe05e681d56c722320aa8213886c05a31e94def0` |
+| B | `003800ae6cec47cd4b34bb264c6bbb1156d806516ad1ab88391e479d14d8776f` | `cf761a295fd66eaeffe235090cba3cbb` | `25fc2eaf950c9455497dc18eea6a93f5a54463a471cd15a4f8f327d13c7fea4c` |
+| C | `19c78c5535ad24349f75fb6ca9a59c939ea885c126cc4909eb2cdc0c26add40e` | `be5bfc2beaf3d91995f5d526e755b505` | `272f45e8ee30c95fdb1804ca54a9ec4b1d8c1358967d88c76312c0f725973ffc` |
+| D | `ac975af49a59f691723d559ed9130bd84df744048776fe1a15905468c7f60a06` | `d971935b5091822833206dd0d70b2b8f` | `6332e2d674322b2af656677cb550754b1ec7691f3df14895a807297712cdcd6a` |
+| E | *(none — no key exists)* | *(none)* | `39b21ef010540d16967bba954bac6e94a888b2811b65df2e829402dc68d1c132` |
 
-**An earlier draft of this vector used the space-grouped display form** —
-records of 89/133/95/80/80/80 bytes totalling 562 — taken straight from
-`mnemonic bundle`'s default `--group-size 5` output. Every one of those records
-classifies as **unknown format** on the device, so the "positive" bundle test
-could never have passed, and the nine negative cases built on it would have been
-vacuous. It was caught at R0 round 3. The lesson is the standing one: never take
-a value from how a tool *prints* it; trace it into the consumer that will parse
-it. The canonical figures above were verified by running the real
-`seedhammer.com/codex32` package against both forms.
+Headers (52 bytes each):
 
-**Vector C's salt and IV differ from A and B by necessity, not style.** With the
-same passphrase and iteration count, reusing A's salt would derive A's exact key
-— and with A's IV that is `(key, nonce)` reuse across two different plaintexts,
-which under GCM leaks the authentication key and enables forgery. This was
-caught during authoring: the first computed vector C did reuse both. The test
-suite MUST assert that **no two shipped vectors share a `(derived key, iv)`
-pair**; that assertion is what catches the same mistake in future vectors.
+```
+A  4d4e454d424c4f4201010100000186a0beefbeefbeefbeefbeefbeefbeefbeef
+   bac0bac0bac0bac0bac0bac0000000000000008f
+B  4d4e454d424c4f4201010100000186a1beefbeefbeefbeefbeefbeefbeefbeef
+   bac0bac0bac0bac0bac0bac0000000000000008f
+C  4d4e454d424c4f4201010100000186a0beadbeadbeadbeadbeadbeadbeadbead
+   cafecafecafecafecafecafe00000000000001d8
+D  4d4e454d424c4f4201010100000186a0d00dd00dd00dd00dd00dd00dd00dd00d
+   f00df00df00df00df00df00d0000018c0000004b
+E  4d4e454d424c4f4201000000000000000000000000000000000000000000000000
+   00000000000000000000000000018c00000000
+```
 
-Vector C's record 0 is an `ms1` secret. Since §12 item 6 was signed off
-(2026-08-07) this is a **positive** vector: all six records decrypt, classify,
-and are engravable. Note that it therefore contains real — if publicly
-known — seed material for the `bacon`×24 test seed, which is why that seed and
-not a private one.
+#### The fixed public-data hash — the property vectors D and E exist to pin
+
+Both D and E carry the same five public cards. D encrypts an `ms1` alongside
+them; E encrypts nothing at all. Their salts, IVs, iteration counts, keys, tags
+and blob digests all differ — and the §6.6 hash is identical:
+
+```
+D  →  68da 1ee5 da08 1b24
+E  →  68da 1ee5 da08 1b24
+
+raw:  68da1ee5da081b24        (first 8 bytes of SHA-256 over the
+                               396-byte canonical public section)
+```
+
+That equality **is** the "fixed" requirement, and a test asserting it is what
+catches an implementation that accidentally hashes the file, the header, or the
+whole blob instead of the canonical public records.
+
+#### Required assertions
+
+Positive: each vector round-trips to its exact records. E parses with **no
+passphrase prompt at all**.
+
+Negative — each MUST fail:
+
+| Case | Expected |
+| --- | --- |
+| passphrase `abandon`×12 | rejected at the BIP-39 checksum, **no KDF run** |
+| passphrase `beef`×11 + `bacon` | rejected at the BIP-39 checksum, **no KDF run** |
+| `iterations` altered to `50000` | AEAD tag mismatch (AAD binding) |
+| any ciphertext byte flipped | AEAD tag mismatch |
+| **any byte of D's public section flipped** | **AEAD tag mismatch** — this is what proves the AAD covers the cleartext section; verified by execution |
+| an `ms1` record placed in the public section | rejected, nothing engraved (§6.3) |
+| E with a non-zero `salt`, `iv`, `iterations`, `kdf_id` or `aead_id` | rejected as malformed (§6.2) |
+| `magic` altered | reported as "no payload", not as an error |
+
+The `beef`×11 + `bacon` case is the important passphrase one: a valid-length
+mnemonic of real words differing in one position, and checksum-**invalid**. A
+gate that passes it is broken.
+
+The two "no KDF run" assertions MUST be enforced by instrumenting or timing the
+KDF call. Asserting only on the return value passes over exactly the defect it
+is meant to catch — an implementation that runs a 31-second KDF before checking
+the checksum returns the same value.
 
 #### Why these words — both checksums are valid, and that is not obvious
 
@@ -1092,39 +1275,27 @@ Verified against `bip39/wordlist.txt` (2048 entries; `beef` = index 160,
 `bacon` = index 138) with a checker self-tested against `abandon`×11+`about`,
 `zoo`×11+`wrong`, `abandon`×23+`art` (accepted) and `abandon`×12 (rejected):
 
-- `beef` × 12 — 128 bits entropy + 4-bit checksum `0000`. **Valid.** A 1-in-16
-  coincidence.
-- `bacon` × 24 — 256 bits entropy + 8-bit checksum `10001010`. **Valid.** A
-  1-in-256 coincidence.
+- `beef` × 12 — 128 bits entropy + 4-bit checksum `0000`. **Valid.** 1-in-16.
+- `bacon` × 24 — 256 bits entropy + 8-bit checksum `10001010`. **Valid.** 1-in-256.
 
 An all-identical mnemonic is normally checksum-invalid; `abandon`×12 is the
-counter-example and is included in the test set as a negative case. Because both
-of these are valid, they exercise the §10.2 step-3 checksum gate positively
-rather than tripping it.
+counter-example and is in the test set as a negative case.
 
-#### Required assertions
+#### Records must be canonical — the round-3 Critical
 
-Positive: the blob decrypts to `bacon`×24 under `beef`×12.
+An earlier draft built these vectors from `mnemonic bundle`'s **display** form
+(`--group-size 5`), records of 89/133/95/80/80/80 bytes. Every one of those
+classifies as **unknown format** on the device — `codex32`'s `inputChar` has no
+mapping for `0x20`:
 
-Negative — each MUST fail, and the first two MUST fail *without invoking the
-KDF*:
+```
+SPACED len= 80  New_err=codex32: invalid character  ValidMD=false ValidMK=false
+CANON  len= 67  New_err=invalid checksum            ValidMD=true  ValidMK=false
+```
 
-| Case | Expected |
-| --- | --- |
-| passphrase `abandon`×12 | rejected at the BIP-39 checksum, no KDF run |
-| passphrase `beef`×11 + `bacon` | rejected at the BIP-39 checksum, no KDF run |
-| `iterations` altered to `50000` in the header | AEAD tag mismatch (AAD binding) |
-| any single ciphertext byte flipped | AEAD tag mismatch |
-| `magic` altered | reported as "no payload", not as an error |
-
-The `beef`×11 + `bacon` case is the important one: it is a valid-length
-mnemonic of real words that differs from the passphrase in one position, and it
-is checksum-**invalid** (confirmed). A checksum gate that passes it is broken.
-
-The two "no KDF run" assertions MUST be enforced by instrumenting or timing the
-KDF call. Asserting only on the return value passes over exactly the defect it
-is meant to catch — an implementation that runs a 30-second KDF before checking
-the checksum returns the same value.
+Canonical lengths are **75, 111, 80, 67, 67, 67**. Regenerate with
+`--group-size 0`. Never take a value from how a tool *prints* it; trace it into
+the consumer that will parse it.
 
 ### 11.5 Hardware
 
@@ -1177,16 +1348,18 @@ the checksum returns the same value.
    24, derived from `bundleReviewFlow`'s paged list (`gui/bundle_flow.go:224`).
    Remaining work is implementation, not decision: the plate list must use the
    paged shape, not `ChoiceScreen`.
-8. **Session idle wipe (§10.2.2) — REQUIRED for v1, value unset.**
-   Per §2.2 item 9 an open session is defended by physical custody alone, and
-   the screensaver does not unwind the flow. A timeout that **wipes and returns
-   to the lock screen** is therefore a v1 control, not an optional extra.
-   The timer source is already identified and in use — `gui.go:2801`
-   `idleTimeout = 3 * time.Minute`, driven by `time.Now()` and
-   `ctx.WakeupAt`/`Platform.AppendEvents` in `Run`'s frame loop. Monotonic
-   elapsed time is all this needs; no RTC is involved. **Only the value is
-   open**, and it must account for legitimate mid-session pauses — a plate swap
-   takes minutes, so 3 minutes is likely too aggressive to reuse verbatim.
+8. **Session idle wipe — RESOLVED 2026-08-07 as a two-phase timer (§10.2.4).**
+   The question dissolved once `ms1` is wiped after its plate (§10.2.2): the
+   long tail of a session holds public data only, so there is nothing for a
+   timeout to guard there. What remains is the narrow window before the seed
+   plate is cut or skipped, which takes a **3-minute** timer with a 30-second
+   warning — the operator has just typed twelve words and is standing at the
+   machine. Paused during engraving; absent afterwards. The timer source was
+   already in use (`gui/gui.go:2801`).
+9. **Public-only payloads are unauthenticated** (§2.2 item 10). Accepted with
+   the §10.2.3 warning and the §6.6 hash; `me seal` encrypts by default so
+   plaintext is a deliberate opt-in. Revisit only if a signing story ever exists
+   for this path.
 
 ## 13. Non-goals
 
