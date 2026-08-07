@@ -60,14 +60,23 @@ mod tests {
             assert_eq!(field(b, 0), 0x0A32_4655, "block {i} magicStart0");
             assert_eq!(field(b, 4), 0x9E5D_5157, "block {i} magicStart1");
             assert_eq!(field(b, 8), 0x0000_2000, "block {i} flags");
-            assert_eq!(field(b, 12), TARGET_ADDR + i as u32 * 256, "block {i} addr");
+            // LITERALS, not TARGET_ADDR / FAMILY_DATA. Asserting a constant
+            // against itself moves both sides of the comparison, so the
+            // assertion holds for every value the constant could take. Measured:
+            // FAMILY_DATA -> 0xE48B_FF59 and TARGET_ADDR -> 0x1000_0000 each
+            // survived the WHOLE 169-test suite with zero failures. Those are
+            // the two constants whose corruption is physically destructive —
+            // 0xE48B_FF59 is `rp2350_arm_s`, the bootable-image family, and
+            // 0x1000_0000 aims the write at the signed firmware. Every other
+            // field here was already literal-pinned; these two were the gap.
+            assert_eq!(field(b, 12), 0x10E0_0000 + i as u32 * 256, "block {i} addr");
             assert_eq!(field(b, 16), 256, "block {i} payloadSize must be 256");
             assert_eq!(field(b, 20), i as u32, "block {i} blockNo");
             assert_eq!(field(b, 24), 3, "block {i} numBlocks");
             assert_eq!(
                 field(b, 28),
-                FAMILY_DATA,
-                "block {i} familyID (data, NOT rp2350_arm_s)"
+                0xE48B_FF58u32,
+                "block {i} familyID (data, NOT rp2350_arm_s 0xE48BFF59)"
             );
             assert_eq!(field(b, 508), 0x0AB1_6F30, "block {i} magicEnd");
         }
