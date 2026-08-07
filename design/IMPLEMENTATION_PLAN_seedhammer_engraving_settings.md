@@ -650,6 +650,7 @@ func TestFlowCarriesPassesToTheEngraver(t *testing.T) {
 	ftOK(h)
 	h.tapWidget("proofYes")
 	h.mustReach("lines")
+	loaded := ftKbd(h).Fragment    // the pattern the loader wrote, for the baseline
 
 	// Tap the gear: it is a KEY in the grid, so it is tapped through the
 	// keyboard's own key bounds, not as a nav button.
@@ -670,9 +671,11 @@ func TestFlowCarriesPassesToTheEngraver(t *testing.T) {
 	if !seen {
 		t.Fatal("the flow never handed a plate to the engraver")
 	}
-	// The same composition at one pass, built directly, is the baseline.
+	// The same composition at one pass is the baseline. Capture the loaded
+	// pattern from the field itself rather than rebuilding it -- ftProofOutcomeFor
+	// is what wrote it, and re-deriving it here would test the test.
 	P := h.ctx.Platform.EngraverParams()
-	one, err := ftBuildPlate(P, &ftPlanConst, ftProofTextFor(t, ftProofTriggerConst), "", "", false, 0, 1)
+	one, err := ftBuildPlate(P, &ftPlanConst, loaded, "", "", false, 0, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -718,8 +721,13 @@ Remove `ftStepSpeed` from the `iota` block and delete its `case` from
 			plate, err := ftBuildPlate(ftParamsAtSpeed(params, speed), plan, text, title, footer, useQR, size, passes)
 ```
 
-Thread `passes` through `ftBuildPlate` onto `Fitted.Passes`, and through
-`ftEvaluate` so the confirm screen's duration estimate reflects it.
+Thread `passes` through **`ftBuildPlate` only**, onto `Fitted.Passes`.
+
+**`ftEvaluate` is deliberately NOT touched.** Passes change how many times a
+glyph is cut, not where anything lands, so the fit is unaffected — and `ftFit`
+carries no duration, the confirm screen showing only `ftWarnTiming`, a warning
+rather than an estimate. Threading it there would have been 23 call-site edits
+for no behaviour. `ftBuildPlate`'s 15 call sites each take a trailing `, 0`.
 
 - [ ] **Step 4: Fix the E2E drivers**
 
