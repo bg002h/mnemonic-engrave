@@ -65,10 +65,9 @@ These are not in the spec and cost real time to rediscover. One is destructive.
   (slot 1). `sha256` of the real `~/.sh2/sh2-boot-key.pem` pubkey is `846aa289…`
   and matches neither. **Sign Pico images with `rehearsal-work/my-key.pem`.**
 - **This kernel has no `cdc_acm`** — not a module, not built in. No `/dev/ttyACM*`
-  ever appears. Read TinyGo serial with
-  `/tmp/…/scratchpad/cdcread.py` (libusb via ctypes; asserts DTR, reads bulk EP
-  `0x83`). Set `argtypes` on **every** libusb call or ctypes truncates the 64-bit
-  handle and segfaults.
+  ever appears. Read TinyGo serial with **`scripts/cdcread.py`** (in this repo;
+  libusb via ctypes; asserts DTR, reads bulk EP `0x83`). Set `argtypes` on
+  **every** libusb call or ctypes truncates the 64-bit handle and segfaults.
 - **`picotool` cannot reboot a running TinyGo app** (no reset interface), and
   `tinygo flash` fails because nothing mounts the MSD volume. Every flash cycle
   costs a **physical replug** holding BOOTSEL.
@@ -132,10 +131,21 @@ Every Critical was in the reasoning around it:
    pure BCH verifiers that never decode, and the fork ships the checksum
    generator, so arbitrary bytes wrap into a record that classifies as public.
 
-And **five tests that could not fail**, including the TDD RED step itself
-reporting green in five of eight plan tasks (an undeclared `.rs` file is not
-compiled). When a normative value changes, **grep every section that asserts it**,
-not only the ones being rewritten — that is how §11.1 nearly deleted its own fix.
+And a long tail of **tests that could not fail**, including the TDD RED step
+itself reporting green in five of eight plan tasks (an undeclared `.rs` file is
+not compiled). When a normative value changes, **grep every section that asserts
+it**, not only the ones being rewritten — that is how §11.1 nearly deleted its
+own fix.
+
+**The sharpest instance, because it happened last and to the person who had just
+written the rule against it:** round 4's fold added `refuses_a_record_carrying_a_cr`
+to close a finding that a mutation row named a manual invocation instead of a
+test. The new test passed a single md1 chunk where the card-set decode demands
+three, so it died on "chunk set incomplete" identically whether the mutation was
+applied or not — it compiled, it was committed, and it could never pass. The
+build gate had been extended *in that same commit* to compile the CLI tests while
+explicitly noting it could not run them. **Naming a blind spot is not closing
+it.** A test is not a killer until you have watched it fail for the right reason.
 
 ## 7. WHAT TO DO NEXT, IN ORDER
 
@@ -194,3 +204,19 @@ The R0 gate is **passed**. Steps 1 and 2 of the old list are done.
 - Insert `FOLLOWUPS.md` entries **before** `## Resolved`. Stage paths explicitly.
 - All Go work runs under `nix develop --command`. `nix` is NOT on the shell PATH
   — use `/nix/var/nix/profiles/default/bin/nix`.
+
+## 10. SESSION STATE AT HANDOFF (2026-08-07)
+
+- **Nothing is pushed.** `master` is **25 commits ahead of `origin/master`**
+  (measured). The whole encrypted-payload cycle — spec, plan, all 18 review
+  reports, the build gate — is local only.
+- **`b946399` will not be split.** It bundles the round-4 report, the fold
+  answering it, the `plan-build-gate.sh` fix and a `CLAUDE.md` edit, which is the
+  counter-example the persist-then-fold rule cites. **User decision 2026-08-07:
+  skip it.** Do not re-raise this; the rule stands for future commits, and the
+  history stays as it is.
+- **Tree is clean.** All scratch work lived under the session scratchpad, which is
+  gone. Everything durable is committed or in `~/.claude/…/memory/`.
+- **`me seal` does not exist yet.** The `me` binary at HEAD has no `seal` or
+  `hash` subcommand — Task 9 adds both. Any CLI invocation from the plan will
+  fail until implementation lands, and that is expected, not a defect.
