@@ -88,7 +88,7 @@ temptation is to edit the JSON.
 **Not** in `tests/`. An integration test under `tests/` is a separate crate and
 sees only `pub` items — `seal_deterministic` is `pub(crate)` (`mod.rs:150`) and
 every fixture (`PASS`, `bacon24()`, `bip84()`, `two_of_three()`, `salt()`, `iv()`)
-lives inside `#[cfg(test)] mod tests` (`mod.rs:241`, `:244`, `:256`, `:263`,
+lives inside `#[cfg(test)] mod tests` (`mod.rs:241`, `:244`, `:253`, `:262`,
 `:808`). An exporter in `tests/emit_vectors.rs` **does not compile**, and the
 shortest fix — making the seam `pub` — is the security regression the Global
 Constraints forbid.
@@ -296,7 +296,10 @@ implementation §6.4 forbids.
 
 - [ ] **Step 1: Failing test**
 
-`SplitSection(b []byte) ([]string, error)`:
+`SplitSection(b []byte) (recs []string, n int, err error)` — **three returns,
+deliberately.** The record count comes back *out of band* so the error itself can
+be a package-level preallocated sentinel; see the allocation note below for why
+that is forced rather than chosen.
 
 - **Count the `0x0A` separators and reject `> MaxRecords-1` BEFORE splitting.**
   A plaintext of 8191 LF bytes satisfies `ct_len <= 8191`; an implementation that
@@ -309,13 +312,33 @@ implementation §6.4 forbids.
 - The `1..=24` cap is over the **TOTAL across both sections**, so the caller
   checks `len(public)+len(secret)`; `SplitSection` cannot see both.
 - The too-many-records error MUST be **distinguishable from "payload
-  unreadable"**, naming the count and the cap.
+  unreadable"**. `SplitSection` returns the preallocated sentinel
+  `ErrTooManyRecords` plus `n`; **the caller (Task 8) composes the message that
+  names the count and the cap**, which is also the only place the cross-section
+  total is known.
 
 **`TestOverlongSectionRejectsBeforeSplitting` must assert
 `testing.AllocsPerRun(...) == 0`** — the number, not a comment saying "O(1)". A
 return-value assertion here is a **guaranteed false PASS**: `bytes.Split`
 performs exactly one allocation and a correct `bytes.Count`-style scan performs
 zero, and both return the same error. Both are "O(1)".
+
+**This is why the error must be a preallocated sentinel, and why the count is a
+separate return value.** Measured, Go 1.26.3 in the fork's dev shell, 8191 LF
+bytes, `testing.AllocsPerRun(100, ...)`:
+
+| error shape | correct | split-first mutant |
+| --- | --- | --- |
+| preallocated sentinel | **0** | **1** |
+| `&CountError{n, max}` | 1 | 2 |
+| `fmt.Errorf("… %d … %d", n, cap)` | 3 | 4 |
+
+Only the sentinel makes `== 0` a true discriminator. Under the struct shape a
+**correct** implementation reports 1 — the same value the sentinel **mutant**
+produces — so the assertion would fail on correct code and the two available
+exits are both wrong: drop the count (violates §11.2's naming rule) or relax the
+threshold, which is exactly the false PASS above. **If you change the error
+shape you MUST re-measure both columns and confirm the mutant is exactly +1.**
 
 - [ ] **Step 2: Run. Step 3: Implement. Step 4: Commit.**
 
@@ -434,8 +457,9 @@ re-litigate it.
 
 ### Task 7: `seal/read.go` — the XIP read at `0x10E00000`
 
-**Files:** create `seal/read.go` (untagged), `seal/read_host.go`,
-`seal/read_tinygo.go`, `seal/read_test.go`
+**Files:** create `seal/read.go` (untagged), `seal/read_host.go`
+(`//go:build !tinygo`), `seal/read_tinygo.go` (`//go:build tinygo`),
+`seal/read_test.go`
 
 **This is the riskiest task in Phase A and the one with no precedent.** Verified:
 there is **no existing "read N bytes from a fixed XIP address" anywhere in this
@@ -453,7 +477,12 @@ Interface `Reader` with `Read() ([]byte, error)`, plus an exported sentinel
 `ErrNoPayload = errors.New("seal: no payload present")` that Phase B matches with
 `errors.Is`. **Not `(nil, nil)`** — that is the shape callers forget to check.
 Host implementation reads a file (so `go test` drives the whole pipeline from
-`vectors.json`); `//go:build tinygo` implementation does the real XIP read.
+`vectors.json`); the `//go:build tinygo` implementation does the real XIP read.
+**`read_host.go` must carry `//go:build !tinygo` explicitly** — Go derives
+implicit constraints only from `_GOOS`/`_GOARCH` filename suffixes, and `_host`
+is neither, so without the tag the firmware build compiles both bodies and fails
+on redeclaration. Host `go test` would stay green and the break would surface
+only at Step 4.
 
 **The `RegionLen` bound lives in an UNTAGGED helper** — `func clampRegion(n int)
 int` in `seal/read.go`, called by both implementations — so a host test can kill
@@ -519,6 +548,11 @@ Then the negatives:
   call count is **0**. Without this the mutant "move the bound checks after
   `DeriveKey`" passes every other test in the plan, just ~31 s slower — and on a
   watchdog-less firmware that is the difference between a refusal and a hang.
+- **`TestTotalRecordCapSpansBothSections`** — 20 public + 5 secret is 25 total and
+  must be refused with the count-naming error. Task 5's 25-record test exercises
+  only the single-section path, so with the caller-side check deleted this split
+  passes everything else (§6.4's cap is normative "across both sections
+  together"; `container.rs:1-3` assigns it to the caller).
 - `ct_len == 0` → **no passphrase is asked for and none is needed** (§10.2 step 4).
   Conditional on `ct_len > 0` and nothing else.
 - `pub_len == 0` → **no hash is produced** (§10.2 step 3). The digest of an empty
@@ -558,7 +592,8 @@ still the mutant.
 | `public_record_count` dropped | the JSON literals (LF-joined records are already injective, so a record-removal test passes under this mutant) |
 | AAD = header only, public section dropped | Task 4's flipped-public-byte test **and** Task 8's reorder test |
 | split before counting separators | `TestOverlongSectionRejectsBeforeSplitting` (**the `AllocsPerRun == 0` assertion**, not the returned error — both paths return the same error) |
-| record-count cap dropped | the 25-record test |
+| record-count cap dropped (single section) | Task 5's 25-record test |
+| cross-section total cap dropped | `TestTotalRecordCapSpansBothSections` — Task 5's test is single-section and does **not** kill this |
 | CR tolerated instead of refused | the container CR test |
 | lowercase check removed | `TestRefusesAnUppercaseRecord` |
 | allow-list → deny-list | `TestPublicSectionRefusesDebugCommand` |
