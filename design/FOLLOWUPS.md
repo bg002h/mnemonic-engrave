@@ -845,6 +845,72 @@ backup can leave an mtime older than the built artifact, so cargo skips the
 rebuild and the "restored" run is still the mutant. `touch` the file. Round 4 hit
 this, and so did the fix verification for this entry.
 
+### F-69 — amend §9 and §12 item 6 for `--seal-secret` (owning phase: before Plan B's plan review; the two artefacts must agree before Go binds to either)
+
+Plan A Task 9 added a `--seal-secret` opt-in that the spec does not have. §9's
+synopsis omits it and §12 item 6 records `ms1` as ADMITTED with no opt-in, so the
+**spec's own documented invocation** — `me seal <ms1> --out x.uf2` — exits
+`EXIT_REFUSED` in the shipped binary. The plan flags this as a deliberate
+divergence (safer than the spec, not looser) and says to file the amendment
+rather than leave the artefacts disagreeing. This is that entry.
+
+Amend the spec to match the implementation; do **not** remove the flag.
+
+### F-70 — the `--seal-secret` guard covers `ms1` only, not a raw BIP-39 mnemonic (owning phase: with F-69, same spec amendment)
+
+Found by the whole-diff review (`design/agent-reports/REVIEW_plan_a_whole_diff_2026-08-07.md`,
+Minor). `main.rs`'s guard is
+`!seal_secret && secret.iter().any(|r| matches!(classify(r), Ok(Format::Ms)))`.
+`classify` on a 24-word mnemonic returns `Err(NoSeparator)` — there is no `1`
+separator — so the guard never fires, while `record_or_mnemonic` explicitly
+admits the mnemonic. Measured:
+
+```
+me seal "bacon … bacon" (×24) --out a.uf2     [no --seal-secret]  → exit 0, 512 bytes written
+me seal <ms1>                 --out a.uf2     [no --seal-secret]  → exit 3, demands the flag
+```
+
+Both inputs are the same seed material. The flag's own doc comment says
+"Required to encrypt an ms1 (a seed). Sealing a seed must never be accidental."
+
+**Not a defect against Plan A** — the plan specifies the `ms1`-only form and the
+code is plan-conformant; the resulting blob is correct and §10.2.1's allow-list
+admits a mnemonic in the encrypted section. It is an inconsistency in what the
+opt-in *means*, so it belongs with F-69's amendment rather than to a code fix
+made in isolation.
+
+### F-71 — Nits from the Plan A whole-diff review (owning phase: ownerless residue; batch whenever `seal` is next touched)
+
+Neither gates anything. Recorded so nobody rediscovers them or "simplifies" one
+away believing a test covers it.
+
+- **`WireError::TooLarge` / the `REGION_LEN` check is unreachable.** With
+  `MAX_SECTION_LEN = 8191` checked first, max `total` is
+  `52 + 8191 + 8191 + 16 = 16450 < 65536`. The code comment says it is deliberate
+  defence-in-depth against a future implementation that drops the section caps.
+  It is correct and it is dead; leave it, but know that no test reaches it.
+- **§11.4's "seal D twice with different salts, assert the hash is unchanged"
+  has no test.** Structurally satisfied — `public_data_hash` takes no salt
+  parameter, so a salt dependency is unrepresentable. The *record-count* half of
+  this Nit was closed by `mixed_payload_prints_the_sealed_hash_not_the_unsealed_one`,
+  which pins the whole banner line.
+
+### F-72 — md-codec 0.40 → 0.42 rode into the Task 1 commit (owning phase: none — historical note, do NOT rewrite)
+
+The review established that **every** md-codec API `seal` uses already exists in
+0.40 (`reassemble`, `decode_md1_string`, `ChunkHeader` + `chunk_set_id` +
+`ChunkHeader::read` with the same signature, `pub mod bitstream`), so the bump
+was never required — the plan itself says so. It nonetheless landed inside
+`84c4591` ("52-byte wire header"), moving 929 source lines across
+`bch/decode/validate/canonicalize` under the pre-existing converter and bundle
+paths in a commit labelled for something else.
+
+No defect: the only visible behavioural change is a tightening (new
+`Error::EmptyOriginOverride`), the safe direction, and `golden`/`cross_lang` are
+green on MSRV. Recorded because it is the exact bundling the standard workflow
+forbids, and — as with `b946399` — **the history stays as it is.** The rule binds
+future commits.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
