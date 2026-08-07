@@ -645,6 +645,62 @@ negotiates. Nothing displays the negotiated voltage, so it cannot currently be
 read off the machine. That would be a cheap diagnostic if depth is ever in
 question again.
 
+### F-64 — `VOLTPROOF!`: engrave the machine's own strike conditions onto the plate (owning phase: the next depth investigation, or whenever engraving settings go system-wide)
+
+**Operator idea, 2026-08-06.** A proof trigger that cuts the negotiated USB-PD
+voltage and the resulting `needleAct` dwell onto the plate itself.
+
+**What it solves.** Strike energy has three inputs and firmware reaches only two
+(F-63). The third — energy per strike — moves with the supply: `needleAct`
+interpolates **5 ms at minimum PD voltage down to 4 ms at maximum**, a 25% swing
+in dwell, and **nothing displays the negotiated voltage anywhere**. So two plates
+cut on two machines, or on one machine across a supply change, are not comparable
+and there is no way to tell. The operator's own machine shipped from a 240 V
+country and runs on 120 V; whether that changes the negotiated contract is
+currently unknowable from the device.
+
+**Why on the PLATE rather than on a screen.** A screen readout is cheaper and
+worth having too, but it is not attached to the evidence. A depth plate that
+carries its own conditions is self-documenting forever — the marks and the
+parameters that produced them stay together, which is exactly what every depth
+comparison this session has lacked. Pair it with the `passes:`/`speed:` values
+and a plate becomes a complete record.
+
+**Grammar fits.** `design/LEXICON_proof_triggers.md`: the root names the AXIS the
+plate proves, and the parameter slot means one kind of thing. `VOLTPROOF!` proves
+the supply axis and needs no parameter.
+
+**What it needs, and this is the real cost.** The GUI cannot currently see the
+voltage. `gui.Platform` (`gui/gui.go`) exposes `LockBoot`, `AppendEvents`,
+`Wakeup`, `Engraver`, `NFCReader`, `EngraverParams`, `DisplaySize`, `Dirty`,
+`NextChunk`, `Features`, `HardwareVersion` — and nothing about power. The
+negotiated voltage lives in `cmd/controller/platform_sh2.go` (`monitorPowerSupply`
+/ `adjustSupplyVoltage`, around :257 and :466), and `needleAct` is computed from
+it inside `cmd/controller/engraver.go`'s `Engraver()`, at engrave time.
+
+So this needs the Platform interface widened by one accessor, plus
+implementations in `cmd/emu/platform.go` and the test platform in
+`gui/gui_test.go`. That is small, but it is an interface change on the surface
+the whole GUI talks to, so it wants a moment's thought rather than being bolted
+on.
+
+**Suggested content**, kept to one line so it fits any rung:
+
+```
+    24.0V  4.4ms  4.0mm/s  x3
+```
+
+voltage, dwell, feed, passes — the four numbers that decide what a mark looks
+like. Deriving dwell in the GUI means duplicating `engraver.go`'s interpolation,
+so prefer exposing the computed `needleAct` rather than recomputing it, or the
+plate will eventually disagree with the machine.
+
+**Cheaper first step if this is ever wanted in a hurry:** put the voltage on the
+START SCREEN beside the version string. No trigger, no plate, no interface
+question beyond the same accessor — and it answers "is my supply
+under-delivering" on every boot. The plate version is the better artefact; the
+start-screen version is the faster diagnostic.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
