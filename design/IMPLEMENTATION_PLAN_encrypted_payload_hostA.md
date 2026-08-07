@@ -27,7 +27,14 @@
   much newer — 1.97.0-nightly at the time of writing. A newer API or language
   feature compiles locally and fails CI. `div_ceil` (1.73) is safe; check
   anything newer before using it.
-- Secrets wiped with `zeroize` on every path.
+- Secrets wiped with `zeroize` where the value is ours to own: the derived key,
+  the passphrase, PBKDF2 intermediates, and `encode_section`'s output. **The
+  record `Vec<String>` is NOT zeroized**, and pretending otherwise was a fold
+  that did not compile and could not reach its goal without threading a
+  zeroizing type through `Payload` and all 18 Task 7 tests. §9 puts these records
+  on argv anyway, so `/proc/$PID/cmdline` already exposes them — the heap copy is
+  not the binding exposure. Say this rather than claim a guarantee that is not
+  delivered.
 - `cargo clippy -p mnemonic-engrave -- -D warnings` before each commit.
 - **`cargo fmt` caveat:** under a nightly rustfmt it reformats pre-existing
   `validate.rs` / `main.rs` / `preview.rs`, which the per-task `git add` lists do
@@ -935,10 +942,12 @@ pub fn decode_public_set(records: &[&str]) -> Result<(), RecordError> {
         groups.entry((hrp, csid, uniq)).or_default().push(r);
     }
     for ((hrp, csid, _), set) in groups {
-        let res = match (hrp, csid) {
-            ('d', Some(_)) => md_codec::reassemble(&set).map(|_| ()),
-            ('d', None) => md_codec::decode_md1_string(set[0]).map(|_| ()),
-            ('k', _) => mk_codec::decode(&set).map(|_| ()),
+        // Stringify INSIDE each arm: md_codec::Error and mk_codec::Error are
+        // different types, so a match unifying them is E0308.
+        let res: Result<(), String> = match (hrp, csid) {
+            ('d', Some(_)) => md_codec::reassemble(&set).map(|_| ()).map_err(|e| e.to_string()),
+            ('d', None) => md_codec::decode_md1_string(set[0]).map(|_| ()).map_err(|e| e.to_string()),
+            ('k', _) => mk_codec::decode(&set).map(|_| ()).map_err(|e| e.to_string()),
             _ => unreachable!("secret records are refused above"),
         };
         res.map_err(|e| RecordError::UndecodableSet(format!("{hrp}-card: {e}")))?;
@@ -1244,9 +1253,7 @@ impl std::error::Error for ContainerError {}
 /// Trim ONCE, then validate and encode the SAME trimmed form. Validating one
 /// string and emitting another is how a trailing space survives to the device,
 /// where `codex32.inputChar` has no mapping for `0x20`.
-/// Generic over `AsRef<str>` so a `Vec<Zeroizing<String>>` can be passed
-/// without cloning the secret into a plain `String` (Global Constraint).
-pub fn encode_section<S: AsRef<str>>(records: &[S]) -> Result<Zeroizing<String>, ContainerError> {
+pub fn encode_section(records: &[String]) -> Result<Zeroizing<String>, ContainerError> {
     if records.is_empty() || records.len() > MAX_RECORDS {
         return Err(ContainerError::RecordCount(records.len()));
     }
@@ -1255,12 +1262,12 @@ pub fn encode_section<S: AsRef<str>>(records: &[S]) -> Result<Zeroizing<String>,
     // silently normalise a trailing CR away instead of refusing it. Scan the
     // UNTRIMMED records before trimming.
     for (i, r) in records.iter().enumerate() {
-        if let Some(pos) = r.as_ref().find('\r') {
+        if let Some(pos) = r.find('\r') {
             return Err(ContainerError::EmbeddedSeparator {
                 index: i, ch: r[pos..].chars().next().unwrap() });
         }
     }
-    let trimmed: Vec<&str> = records.iter().map(|r| r.as_ref().trim()).collect();
+    let trimmed: Vec<&str> = records.iter().map(|r| r.trim()).collect();
     for (i, r) in trimmed.iter().enumerate() {
         if r.is_empty() || r.len() > MAX_RECORD_LEN {
             return Err(ContainerError::RecordTooLong { index: i, len: r.len() });
@@ -1379,7 +1386,10 @@ mod tests {
 
     /// A public section spanning FOUR CARDS: one `md1` card chunked six ways
     /// (csid 841149) plus three `mk1` cards of two chunks each (153720, 153721,
-    /// 153723) — one per cosigner. The only vector that catches an
+    /// 153723) — one per cosigner. Those csids are measured on BOTH sides and
+    /// agree: `mk.ParseHeader` (device) and `StringLayerHeader::from_5bit_symbols`
+    /// (host) return the same values, and the records reproduce byte-identically
+    /// across `mnemonic bundle` runs. The only vector that catches an
     /// implementation grouping by HRP instead of by `(HRP, chunk_set_id)`;
     /// D and E carry one card per HRP, F is `pub_len = 0`.
     ///
@@ -1572,8 +1582,22 @@ mod tests {
 
     /// The guard sits above `seal()`'s public-only early return, so it binds
     /// that path too. Without this case, moving the check below the early
-    /// return leaves all 164 tests green — both other iteration tests take the
+    /// return leaves the suite green — both other iteration tests take the
     /// secret path.
+    /// Kills the mutation that deletes `record_or_mnemonic`'s lowercase check.
+    /// An earlier draft listed the killer as a manual `me seal "BACON …"`
+    /// invocation rather than a test — and deleting the guard left all 166 tests
+    /// green. Every mutation row must name a real test function.
+    #[test]
+    fn refuses_an_uppercase_bip39_mnemonic() {
+        let upper = bacon24().to_uppercase();
+        assert!(matches!(
+            seal_deterministic(
+                Payload { public: vec![], secret: vec![upper] },
+                100_000, salt([0xbe, 0xef]), iv([0xba, 0xc0]), PASS),
+            Err(SealError::Record(record::RecordError::NotLowercase(_)))));
+    }
+
     #[test]
     fn refuses_out_of_range_iterations_on_the_public_only_path() {
         let all = bip84();
@@ -1836,7 +1860,7 @@ fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
 }
 ```
 
-- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --lib seal`, expect **50 passed** (8 wire + 5 crypto + 5 passphrase + 7 record + 5 pubhash + 4 container + 16 mod). `uf2.rs` does not exist until Task 8; after it, the same command reports 52. **If any vector hash mismatches, STOP and reconcile against the spec** — the Go port binds to these bytes.
+- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --lib seal`, expect **54 passed** (8 wire + 5 crypto + 5 passphrase + 7 record + 5 pubhash + 4 container + 20 mod). `uf2.rs` does not exist until Task 8; after it, the same command reports **56**. **If any vector hash mismatches, STOP and reconcile against the spec** — the Go port binds to these bytes.
 
 - [ ] **Step 5: Commit**
 
@@ -2076,6 +2100,28 @@ fn refuses_out_of_range_iterations() {
     }
 }
 
+/// The printed hash MUST describe the blob that was written. Removing the CLI
+/// trim (for the CR rule) made `public` raw argv while the blob's public section
+/// is trimmed — measured: one leading space gave a byte-identical blob and a
+/// different hash, on the only integrity control an unsealed payload has.
+#[test]
+fn printed_hash_matches_me_hash_regardless_of_surrounding_whitespace() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.uf2");
+    let padded = me().args(["seal", "--plaintext", &format!("  {MD1}  "),
+                            "--plaintext", MD1B, "--plaintext", MD1C,
+                            "--out", out.to_str().unwrap()])
+        .assert().success();
+    let err = String::from_utf8(padded.get_output().stderr.clone()).unwrap();
+    let printed = err.lines().find(|l| l.split_whitespace().count() == 8)
+        .expect("the grouped hash line").trim().to_string();
+    let derived = me().args(["hash", "--unsealed", MD1, MD1B, MD1C])
+        .assert().success();
+    let expect = String::from_utf8(derived.get_output().stdout.clone()).unwrap();
+    assert_eq!(printed, expect.trim(),
+        "me seal's printed hash must equal me hash's for the same records");
+}
+
 #[test]
 fn me_hash_reproduces_both_shapes() {
     let mk1 = "mk1qpz63tpqqsq3dg4m5wdx5fvqqvzg3vs7mpf0rz2j43zpzpxk0rtjkqkhwreqp6hm7qnp3a8wdvtz6t2k4uxu6ykwxcp9vqugfjyx733cf59g";
@@ -2191,12 +2237,8 @@ fn run_seal_cli(
     // (§6.4: "no CR anywhere"), and trimming first strips a leading/trailing CR
     // before that check ever sees it — the CLI would normalise where §9 says
     // refuse. `encode_section` trims internally, once, after the CR scan.
-    //
-    // Secrets stay in `Zeroizing` all the way through; `encode_section` is
-    // generic over `AsRef<str>` so no plain-String copy is made.
-    let secret: Vec<Zeroizing<String>> =
-        payload.iter().map(|s| Zeroizing::new(s.clone())).collect();
-    let public: Vec<String> = plaintext.clone();
+    let secret: Vec<String> = payload.to_vec();
+    let public: Vec<String> = plaintext.to_vec();  // &[String] -> Vec<String>
     if secret.is_empty() && public.is_empty() {
         eprintln!("me: nothing to seal");
         return EXIT_USAGE;
@@ -2234,7 +2276,13 @@ fn run_seal_cli(
     // STDERR, always (§2.3).
     eprintln!("me: wrote {} bytes to {}", uf2.len(), out.display());
     if !public.is_empty() {
-        let refs: Vec<&str> = public.iter().map(|s| s.as_str()).collect();
+        // TRIM here. `public` now holds raw argv (the CR fix removed the CLI
+        // trim), but the blob's public section is what `encode_section` emits —
+        // trimmed. Hashing the untrimmed form prints a value the device can
+        // never display: measured, one leading space gives a BYTE-IDENTICAL
+        // blob and a different hash, on the only integrity control an unsealed
+        // payload has. `check_public` and `run_hash_cli` already trim.
+        let refs: Vec<&str> = public.iter().map(|s| s.trim()).collect();
         let h = pubhash::public_data_hash(&refs, sealed.passphrase.is_some());
         eprintln!();
         eprintln!("public data hash ({} records, {}):",
@@ -2287,7 +2335,7 @@ fn run_hash_cli(records: &[String], sealed: bool) -> i32 {
 }
 ```
 
-- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --test seal_cli`, expect 9 passed.
+- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --test seal_cli`, expect 10 passed.
 
 - [ ] **Step 5: Run the whole suite**
 
@@ -2331,9 +2379,10 @@ Procedure, both rules non-negotiable: **copy the file first** and restore from t
 | unsealed-shape zero checks removed | `rejects_nonzero_crypto_fields_when_unsealed` |
 | **grouping by HRP instead of `(HRP, chunk_set_id)`** | **`vector_g_multisig_public_section_spans_six_cards`** — nothing else in the suite has more than one card per HRP in the public section |
 | the combined 1..24 cap deleted | `refuses_more_than_24_records_across_both_sections` — but ONLY in its corrected form; the earlier version passed on a card-set failure and left the mutant alive |
-| uppercase BIP-39 mnemonic emitted | `me seal "BACON …"` must be refused (§11.1 lowercase case) |
+| uppercase BIP-39 mnemonic emitted | **`refuses_an_uppercase_bip39_mnemonic`** — a manual invocation is not a killer; deleting the guard left all 166 tests green |
 | `--iterations` range check moved below the public-only early return | `refuses_out_of_range_iterations_on_the_public_only_path` |
 | CR trimmed at the CLI before the container sees it | §11.2 CLI case: `me seal --plaintext "md1…\r"` must be REFUSED |
+| **printed hash computed over untrimmed argv** | **`printed_hash_matches_me_hash_regardless_of_surrounding_whitespace`** — the blob is byte-identical either way, so only the hash comparison catches it |
 | `to_uf2` emits family `0xE48BFF59` or pads `0xFF` | `every_block_conforms_not_just_the_first` |
 | `open_bytes` returns plaintext without checking the tag | `open_fails_on_flipped_ciphertext_byte` |
 | passphrase generated for a public-only payload | `public_only_payload_prints_no_passphrase` |

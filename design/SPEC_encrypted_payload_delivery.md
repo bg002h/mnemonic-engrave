@@ -483,7 +483,11 @@ key.
 Note `StringLayerHeader` is `#[non_exhaustive]`, so a wildcard match arm is
 mandatory on the host; it MUST fail closed, since an unrecognised header variant
 on this path must never be silently grouped with anything. (The three `mk1` cards of a
-2-of-3 return 852310 / 852311 / 852308.) Every record MUST land in exactly one
+2-of-3 return 153720 / 153721 / 153723 — **measured on both sides and in
+agreement**: `mk.ParseHeader` on the device and
+`StringLayerHeader::from_5bit_symbols` on the host return the same values for the
+same records. An earlier draft printed 852310 / 852311 / 852308, copied out of a
+review report rather than measured.) Every record MUST land in exactly one
 group with no leftovers, and every group MUST reassemble **and** decode.
 
 #### Non-chunked records
