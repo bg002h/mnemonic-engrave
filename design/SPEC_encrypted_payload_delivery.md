@@ -821,7 +821,35 @@ they either hold a 12-word passphrase for that blob or they do not.
 | Component | Choice | Rationale |
 | --- | --- | --- |
 | KDF | **PBKDF2-HMAC-SHA256**, iteration count per §7.1 | Already linked and exercised on-device by the SLIP-39 recovery path (`slip39/feistel.go:50`). Writing scrypt or Argon2 buys −0.8 to +3.6 bits at equal on-device wall clock — under one passphrase character — in exchange for new unaudited crypto on a funds path. Neither fits its own standard's recommended memory here: RFC 9106's *memory-constrained* Argon2id fallback is 64 MiB against ~452 KB free, and at ~256 KiB an RTX 4090's 72 MB L2 holds 288 concurrent working sets, so memory-hardness is paid for and not received. |
-| AEAD | **AES-256-GCM** | Already linked (~52 KB, pulled in by `crypto/ecdsa`'s fips140 dependency, currently uncalled), so **zero marginal flash**. The payload is a few hundred bytes, so ChaCha20's software-speed advantage is irrelevant, and the threat is offline ciphertext attack rather than side-channel. |
+| AEAD | **AES-256-GCM** | Already resident, so **marginal flash is ~1.6 KB** — see the corrected measurement below. The payload is a few hundred bytes, so ChaCha20's software-speed advantage is irrelevant, and the threat is offline ciphertext attack rather than side-channel. |
+
+**Correction, 2026-08-07 — the original rationale here was wrong, and measured
+numbers now replace it.** This row previously read "~52 KB, pulled in by
+`crypto/ecdsa`'s fips140 dependency … zero marginal flash". Both halves were
+unverified and both are false as stated:
+
+- **`crypto/ecdsa` is not the mechanism.** Go 1.25.10's `crypto/ecdsa` never
+  imports `crypto/internal/fips140/aes`, and in the real `cmd/controller` build
+  it contributes **0 bytes of code** — dead-code-eliminated to an 8-byte stub.
+  The actual path is `seedhammer.com/bip39 → crypto/rand →
+  crypto/internal/fips140/drbg → .../fips140/aes` (Go 1.24+'s `crypto/rand` is an
+  AES-CTR-DRBG), plus the FIPS self-test registry: `aes/gcm/cast.go`'s `init()`
+  registers a `fips140.CAST` closure guarded by a runtime `Enabled` var, not a
+  compile-time constant, so the code stays link-reachable while never running.
+- **"Zero marginal flash" overstates it.** Measured by A/B TinyGo builds at
+  `-target pico-plus2 -opt 2`: AES/GCM object code already resident ≈ **20.2 KB**
+  (not 52 KB), and making it *callable* from application code — importing
+  `crypto/aes` + `crypto/cipher`, which are **absent from today's build** —
+  costs ≈ **1.6 KB**. Negligible against 16 MiB of flash at 1.21 MiB current
+  usage (~7.6%), but not literally free.
+
+**The conclusion is unchanged and the choice stands**; only the reasoning behind
+it was wrong. Note also that the ~64 KB the FIPS registry conscripts on first
+PBKDF2-SHA256 use is **already paid** by the existing bip39/slip39 code, so it is
+not a cost of this feature. And there is **no hardware SHA acceleration in play**:
+nothing in the repo touches the RP2350's SHA256 peripheral, and 32-bit ARM falls
+to `sha256block_noasm.go`'s pure-Go `blockGeneric` — which is what the measured
+9,715 iterations/sec of §7.1 already reflects.
 | Key length | 32 bytes | AES-256 |
 | Salt | 16 bytes, fresh per encryption | NIST SP 800-132 §5.1 requires ≥128 random bits |
 | IV | 12 bytes, fresh per encryption | SP 800-38D §8.2.2 RBG construction |
