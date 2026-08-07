@@ -37,3 +37,4 @@ assert_cmd = "2"
 predicates = "3"
 # Property-testing layer (Cycle C / F18). MSRV of all proptest 1.x ≤ 1.85.0 (CI).
 proptest = "1"
+tempfile = "3"
