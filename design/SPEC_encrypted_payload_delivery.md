@@ -463,9 +463,26 @@ So HRP grouping **rejects every multisig wallet** — the exact shape §6.4's
 HRP and vector F is `pub_len = 0`, so an HRP-grouping implementation passes all
 of them. **Vector G exists to close that.**
 
-The key is the 20-bit `chunk_set_id` in the chunk header, exposed by
-`md.ParseChunkHeader` and `mk.ParseHeader` on the device and by
-`md_codec::chunk::derive_chunk_set_id` on the host. (The three `mk1` cards of a
+The key is the 20-bit `chunk_set_id` in the chunk header. **Both accessors below
+are verified operational on a raw, not-yet-grouped record**, which is what this
+requires:
+
+| | md1 | mk1 |
+| --- | --- | --- |
+| **device** | `md.ParseChunkHeader(s)` | `mk.ParseHeader(s)` |
+| **host** | `codex32::unwrap_string` → `bitstream::BitReader::new` → `ChunkHeader::read` → `.chunk_set_id` | `string_layer::decode_string` → `StringLayerHeader::from_5bit_symbols` → `Chunked { chunk_set_id, .. }` |
+
+**Not `md_codec::chunk::derive_chunk_set_id`.** An earlier draft of this
+amendment cited it, and it cannot do the job: its signature is
+`derive_chunk_set_id(id: &Md1EncodingId) -> u32`, and an `Md1EncodingId` is only
+obtainable from `compute_md1_encoding_id(&Descriptor)` — i.e. *after* a group has
+already been reassembled and decoded. It is also md1-only, with no mk1
+counterpart. Following that citation gives a type error, not a working grouping
+key.
+
+Note `StringLayerHeader` is `#[non_exhaustive]`, so a wildcard match arm is
+mandatory on the host; it MUST fail closed, since an unrecognised header variant
+on this path must never be silently grouped with anything. (The three `mk1` cards of a
 2-of-3 return 852310 / 852311 / 852308.) Every record MUST land in exactly one
 group with no leftovers, and every group MUST reassemble **and** decode.
 
