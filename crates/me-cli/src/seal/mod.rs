@@ -6,6 +6,7 @@ pub mod crypto;
 pub mod passphrase;
 pub mod pubhash;
 pub mod record;
+pub mod uf2;
 pub mod wire;
 
 use rand::RngCore;
