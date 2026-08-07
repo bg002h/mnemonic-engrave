@@ -946,18 +946,41 @@ pub fn decode_public_set(records: &[&str]) -> Result<(), RecordError> {
     Ok(())
 }
 
-/// Read the chunk header to get the card identity. `md`/`mk` both expose this;
-/// see §6.3. Returns the HRP discriminant and the chunk-set id, or `None` for a
-/// non-chunked record.
+/// Card identity: the HRP discriminant plus the 20-bit chunk-set id, or `None`
+/// when the record is not chunked (and is therefore its own card).
+///
+/// **Verified against the real crates on vector G's records** — both paths are
+/// public and both distinguish chunked from single-string, which is also what
+/// §6.3's non-chunked dispatch needs.
 fn chunk_key(s: &str, kind: RecordKind) -> Result<(char, Option<u32>), RecordError> {
-    // Implementer: the exact accessor differs per crate — md-codec exposes
-    // `chunk::derive_chunk_set_id` and the header parse; mk-codec exposes its
-    // own header parse. Confirm the names with `cargo doc` and keep the shape:
-    // parse the header, return (hrp_discriminant, Some(csid)) when the chunked
-    // flag is set, else (hrp_discriminant, None).
+    use md_codec::bitstream::BitReader;
+    use md_codec::ChunkHeader;
+    use mk_codec::string_layer::{decode_string, StringLayerHeader};
+
     match kind {
-        RecordKind::Md => Ok(('d', md_chunk_set_id(s)?)),
-        RecordKind::Mk => Ok(('k', mk_chunk_set_id(s)?)),
+        RecordKind::Md => {
+            let (bytes, _bits) = md_codec::codex32::unwrap_string(s)
+                .map_err(|e| RecordError::Invalid(e.to_string()))?;
+            let mut r = BitReader::new(&bytes);
+            // A non-chunked md1 fails the chunked-flag read; that is the signal,
+            // not an error.
+            Ok(('d', ChunkHeader::read(&mut r).ok().map(|h| h.chunk_set_id)))
+        }
+        RecordKind::Mk => {
+            let d = decode_string(s).map_err(|e| RecordError::Invalid(e.to_string()))?;
+            let (h, _) = StringLayerHeader::from_5bit_symbols(d.data())
+                .map_err(|e| RecordError::Invalid(e.to_string()))?;
+            Ok(('k', match h {
+                StringLayerHeader::Chunked { chunk_set_id, .. } => Some(chunk_set_id),
+                StringLayerHeader::SingleString { .. } => None,
+                // StringLayerHeader is #[non_exhaustive], so this arm is
+                // MANDATORY — it will not compile without it. Fail closed: an
+                // unrecognised header variant on a security path must never be
+                // silently grouped with anything.
+                _ => return Err(RecordError::UndecodableSet(
+                    "unrecognised mk1 string-layer header variant".into())),
+            }))
+        }
         RecordKind::Ms => unreachable!("secret records are refused by the caller"),
     }
 }
@@ -1354,9 +1377,15 @@ mod tests {
         assert_eq!(&b[48..52], &[0, 0, 0, 0], "ct_len must be zero");
     }
 
-    /// A public section spanning SIX CARDS. The only vector that catches an
-    /// implementation grouping by HRP instead of by `(HRP, chunk_set_id)` —
+    /// A public section spanning FOUR CARDS: one `md1` card chunked six ways
+    /// (csid 841149) plus three `mk1` cards of two chunks each (153720, 153721,
+    /// 153723) — one per cosigner. The only vector that catches an
+    /// implementation grouping by HRP instead of by `(HRP, chunk_set_id)`;
     /// D and E carry one card per HRP, F is `pub_len = 0`.
+    ///
+    /// The structural rule, verified rather than assumed: **one `mk1` card per
+    /// cosigner, one `md1` card chunked as the policy requires.** An earlier
+    /// draft said "six cards", generalising "three cosigners" onto both halves.
     #[test]
     fn vector_g_multisig_public_section_spans_six_cards() {
         let recs = two_of_three();

@@ -444,8 +444,11 @@ reject every legitimate payload.
 #### The grouping key is `(HRP, chunk_set_id)` — NORMATIVE
 
 **Not the HRP alone.** This is the trap, and it is invisible in vectors D and E.
-A 2-of-3 `wsh-sortedmulti` wallet has **three separate `mk1` cards and three
-separate `md1` cards**, each chunked independently. Grouping all six `mk1`
+A 2-of-3 `wsh-sortedmulti` wallet has **three separate `mk1` cards** — one per
+cosigner — and **one `md1` card chunked six ways**. Measured, not assumed: the 12
+public records group into four cards (`md1` csid 841149 ×6 chunks; `mk1` csids
+153720 / 153721 / 153723, ×2 chunks each). An earlier draft said "three md1
+cards", generalising the cosigner count onto both halves. Grouping all six `mk1`
 records into one HRP group and reassembling gives:
 
 ```
@@ -1583,17 +1586,17 @@ Required of F specifically: **all three secret records are offered consecutively
 before any public plate, and each is zeroed before the next is offered.** An
 implementation that offers only the first passes A–E and fails only here.
 
-#### Vector G — 2-of-3 MIXED, a public section spanning SIX cards
+#### Vector G — 2-of-3 MIXED, a public section spanning FOUR cards
 
 The vector that makes the grouping key testable. D and E carry **one card per
 HRP**, so an implementation grouping by HRP alone passes them; F is
-`pub_len = 0`. G is the first payload whose public section spans several cards
-of the same HRP, and an HRP-grouping implementation fails it with
-`received 6 chunks, header declares 2`.
+`pub_len = 0`. G is the first payload whose public section holds several cards
+of the same HRP (three `mk1`), and an HRP-grouping implementation fails it with
+`received 6 chunks, header declares total_chunks = 2`.
 
 | Field | Value |
 | --- | --- |
-| public | **12 records** — `mk1` ×6 (three cards, 2 chunks each), `md1` ×6 (three cards) |
+| public | **12 records** in **four cards** — `mk1` ×6 (three cards, 2 chunks each), `md1` ×6 (ONE card, 6 chunks) |
 | encrypted | 3 × `ms1` |
 | `pub_len` / `ct_len` | 1125 / 227 |
 | `salt` / `iv` | `abcd`×8 / `1234`×6 |
@@ -1605,7 +1608,7 @@ of the same HRP, and an HRP-grouping implementation fails it with
 
 Header: `4d4e454d424c4f4201010100000186a0abcdabcdabcdabcdabcdabcdabcdabcd12341234123412341234123400000465000000e3`
 
-Required of G specifically: **the 12 public records group into six card sets,
+Required of G specifically: **the 12 public records group into four card sets,
 every one reassembles and decodes, and no record is left over.** An
 implementation grouping by HRP alone rejects this payload.
 
