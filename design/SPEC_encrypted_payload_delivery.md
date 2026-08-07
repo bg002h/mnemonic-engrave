@@ -111,8 +111,8 @@ This list is normative and belongs in operator documentation, not only here.
     **What detects it:** §6.6's `sealed` byte, which makes a stripped payload
     display a different hash, and §10.2.3's warning naming the case explicitly.
     Both require the operator to have recorded the hash **for every payload,
-    including encrypted ones** — which is why §9 prints it always and §6.6 says
-    to record it always.
+    including encrypted ones** — which is why §9 prints it for every payload with a
+    public section, and §6.6 says to record it.
 
 11. **A public-only payload is not authenticated at all.** With `ct_len == 0`
     there is no key, therefore no tag (§6.1a). Anyone with brief physical access
@@ -346,7 +346,7 @@ It costs nothing: no second key, no extra primitive, no extra pass.
 
 **But it only works when something is encrypted**, because that is what makes a
 key exist. A payload with `ct_len == 0` has no key, therefore no tag, therefore
-no authentication. See §2.2 item 10 and §6.6 for what stands in its place.
+no authentication. See §2.2 items 10 and 11, and §6.6, for what stands in its place.
 
 The AAD also binds version, algorithm identifiers, iteration count, salt, IV and
 both lengths, so none can be tampered downward.
@@ -548,8 +548,14 @@ Normative constraints, all checked before any record is acted on:
   construction.
 - **No empty record.** This falls out of the rules above and independently
   rejects `\n\n`, a leading LF, and a trailing LF.
-- **`1 <= record_count <= 24`.** See below — derived from the widget actually
-  used, and sized to admit real multisig wallets.
+- **`1 <= record_count <= 24`**, counted across **both sections together**. See
+  below — derived from the widget actually used, and sized to admit real multisig
+  wallets. **Note this is NOT §6.6's `public_record_count`**, which counts the
+  public section only; vector D is 5 public of 6 total and the two produce
+  different digests.
+- **Public-section records MUST additionally DECODE** (§6.3, §10.2.1) — `md1`
+  via `md.Decode`, `mk1` via the `mk1` decode path. Classification alone is not
+  sufficient: `ValidMD`/`ValidMK` never open the payload.
 - **Each record `1..512` bytes.** The longest record in a real bip84 bundle is
   **111 bytes** (canonical); 512 is headroom, not a target.
 - Total still bounded by `ct_len <= 8191` (§6.2). A canonical six-record bip84
@@ -639,7 +645,7 @@ sealed  = 0x01 if ct_len > 0, else 0x00
 input   = the public section exactly as it appears on the wire —
           canonical LOWERCASE records, LF-joined, no trailing LF (§6.4)
 
-digest  = SHA-256( "MNEMBLOB/pub/v1" ‖ 0x00 ‖ sealed ‖ record_count(u8) ‖ input )
+digest  = SHA-256( "MNEMBLOB/pub/v1" ‖ 0x00 ‖ sealed ‖ public_record_count(u8) ‖ input )
 display = first 16 bytes, lowercase hex, in 8 groups of 4
 
         a26e d22b b747 dfd0 2367 06ad 14c1 9679
@@ -660,7 +666,14 @@ destroys integrity. Binding `sealed` into the digest means a stripped payload
 shows a **different** number. Vectors D and E pin this: same five public records,
 and the hashes now differ.
 
-**2. `record_count` — so a removed record is visible**, not merely a changed one.
+**2. `public_record_count` — so a removed record is visible**, not merely a
+changed one. **This is the count of records in the PUBLIC section, NOT §6.4's
+`1..24` cap, which is the total across both sections.** Vector D is exactly where
+the two diverge — 5 public records, 6 total — and they produce different digests
+(`a26ed22b…` for 5, `c7e152ae…` for 6). A host counting totals and a device
+counting public records would disagree on every mixed payload, producing a
+mismatch on an untampered blob and teaching the operator that mismatches are
+normal.
 
 **3. The domain-separation label**, so this digest can never collide with any
 other SHA-256 use in the system.
@@ -711,7 +724,7 @@ detects the downgrade. When `pub_len == 0` **nothing is displayed**: the digest
 of an empty record set is a constant, and showing the same number on every
 fully-encrypted payload would teach the operator it is furniture.
 
-`me hash --sealed|--plaintext <records...>` re-derives the value from the
+`me hash --sealed|--unsealed <records...>` re-derives the value from the
 operator's own cards, with no passphrase, no seal operation and no original file.
 The shape selector is required and the operator always knows which to pass —
 they either hold a 12-word passphrase for that blob or they do not.
@@ -848,24 +861,28 @@ mis-specified address either overwrites the firmware directly or, past
 flag would expose a destructive footgun with no legitimate use. If a test seam
 is ever needed it MUST NOT be an operator-facing flag.
 
-- Validates every record (canonical form, BCH checksum) and decides its section.
+- Validates every record (canonical form, lowercase, BCH checksum) and decides
+  its section. A record destined for the **public** section MUST additionally
+  DECODE (§6.3); `me seal` refuses one that does not, so a blob the device will
+  reject never leaves the host.
   **By default every record is encrypted.** `--plaintext <record>` places a
   record in the public section instead; `me seal` MUST refuse to place an `ms1`
   or a BIP-39 mnemonic there (§6.3).
 - Prints the §6.6 public-data hash whenever `pub_len > 0`, **exactly as the
   device will display it** — hash, record count and sealed/unsealed — and
   instructs the operator to record that whole line, for every payload including
-  fully-encrypted ones. The shape is part of the recorded artefact: recording
-  16 hex digits alone is recording strictly less than is needed to detect a
-  downgrade.
+  fully-encrypted ones. The shape is part of the recorded artefact: the shape is redundant
+  confirmation — the hex alone already differs between shapes, because `sealed`
+  is inside the digest — but it tells the operator which `me hash` flag to pass
+  when re-deriving.
 - Writes the `.uf2` with mode `0600`, matching `write_private` (`main.rs:375`).
 
 A sibling subcommand re-derives the hash with no passphrase, no seal operation
 and no original file, so the expected value can be regenerated months later:
 
 ```
-me hash --plaintext <record>...  →  70f3 e35a acf7 47db c40f 8376 91aa 61e0
-me hash --sealed    <record>...  →  a26e d22b b747 dfd0 2367 06ad 14c1 9679
+me hash --unsealed <record>...  →  70f3 e35a acf7 47db c40f 8376 91aa 61e0
+me hash --sealed   <record>...  →  a26e d22b b747 dfd0 2367 06ad 14c1 9679
 ```
 
 It applies §6.4's canonical checks and refuses a non-canonical record rather than
@@ -892,7 +909,6 @@ hashing something the device would reject.
 - Emits a `data`-family UF2 (`0xe48bff58`) targeting `0x10E00000`.
 - Prints the 12 words to **stdout only**, never to a file, with a clear
   instruction to transcribe them and store them apart from the machine.
-- Writes the `.uf2` with mode `0600`, matching `write_private` in
   `main.rs:375`.
 
 Loading is a separate, explicit operator step:
@@ -1013,8 +1029,16 @@ Therefore the unlock flow MUST accept only these classifier results:
 
 | Section | Permitted classification |
 | --- | --- |
-| public | `mdmkText` **only** (via `codex32.ValidMD` / `ValidMK`) |
+| public | `mdmkText` (via `codex32.ValidMD` / `ValidMK`) **AND it MUST additionally DECODE** — `md1` via `md.Decode`, `mk1` via the `mk1` decode path. A decode failure rejects the payload. |
 | encrypted | `mdmkText`, a `codex32` secret (`ms1`), or a parsed BIP-39 mnemonic |
+
+**The decode step is not optional and not belt-and-braces.** `ValidMD`/`ValidMK`
+are pure BCH verifiers that never open the payload, and the fork ships the
+checksum generator — so arbitrary bytes wrap into a record that classifies as
+`mdmkText` (§6.3, verified by execution). Without the decode, a defective or
+third-party sealer can put seed entropy in the cleartext section, where
+`picotool save` reaches it with no passphrase and `mdmkFlow` engraves it
+verbatim.
 
 The allow-list runs **once per record**, and any single failure rejects the
 whole payload (§6.4).
@@ -1182,10 +1206,20 @@ Lock being one tap away, and the secrets being gone within the first *N* plates.
 - Round-trip seal/open.
 - Passphrase normalisation (§8.1) byte-exactness.
 - Section placement per §6.3: `me seal` refuses to put an `ms1` or a BIP-39
-  mnemonic in the public section, and refuses a non-canonical record anywhere.
-- The §6.6 public-data hash is stable: the same public records yield the same
-  hash across different salts, IVs, iteration counts, and with or without an
-  encrypted section (pinned by vectors D and E, which MUST agree).
+  mnemonic in the public section, refuses a record that does not DECODE there,
+  and refuses a non-canonical or uppercase record anywhere.
+- **The §6.6 hash, asserted as LITERALS.** D (sealed, 5 public records) =
+  `a26ed22bb747dfd0236706ad14c19679`; E (unsealed, same 5 records) =
+  `70f3e35aacf747dbc40f837691aa61e0`. **They MUST DIFFER** — that inequality is
+  the downgrade detector (§6.6 point 1).
+  An earlier draft required the opposite here ("D and E, which MUST agree"),
+  which is exactly the property the `sealed` byte was added to destroy. The only
+  construction satisfying that agreement is one that omits `sealed`, so an
+  implementer building this suite from the old bullet would have deleted the fix
+  and shipped green.
+- **Stability, correctly scoped:** the same records **and the same shape**,
+  sealed twice with different salts, IVs and iteration counts, MUST yield the
+  same hash. That is the pin; agreement across *shapes* is not.
 - Rejection of every §6.2 bound violation.
 - UF2 emission field-by-field against §9.1.
 - **Freshness (kills the frozen-salt mutant).** Two `seal` invocations of the
@@ -1235,6 +1269,20 @@ Lock being one tap away, and the secrets being gone within the first *N* plates.
   **failed** paths, asserted on the buffers via a fake platform.
 - **The idle timer is paused during engraving** and armed whenever any secret
   record is resident, asserted on the timer state rather than by waiting.
+- **Vector F: all three secret records are offered consecutively, before any
+  public plate, and each is zeroed before the next is offered.** The only
+  multi-secret coverage in the suite; a singular implementation passes A–E.
+- **A BCH-valid but UNDECODABLE `md1` in the public section rejects the payload**
+  (§10.2.1). Construct it the way §6.3 documents — wrap arbitrary bytes and
+  append a correct checksum with the fork's own generator — and assert nothing
+  was engraved.
+- **An uppercase record is refused** (§6.4). `MD1QQQ…` passes `ValidMD`, so
+  without this the same wallet has two spec-legal hashes.
+- **E-shape hash sensitivity.** Flip the first byte, then the last byte, of
+  vector E's public section and assert the **displayed hash changes**. E has no
+  tag, so this is the only test that discriminates a hash covering the whole
+  section from one covering a subset — the AAD flips in §11.4 fire on the tag
+  regardless of what the hash reads.
 - **A public section of 8191 LF bytes** with `ct_len == 0` is rejected on the
   separator count before any split allocates — asserted with `testing.AllocsPerRun`
   bounded to **0** additional allocations. This path needs no passphrase and no
@@ -1331,9 +1379,13 @@ this: two of the original five mutants survived the entire specified test set.
 | **two vectors share a `(key, iv)` pair** | **§11.1 pair-uniqueness assertion** |
 | **wipe omitted on the Back exit path (wipe on Lock only)** | **§11.2 wipe-on-every-exit assertion** |
 | **public section left out of the AAD** | **§11.4 negative: flip a byte of D's public section** — nothing else notices, and the failure mode is an engraved backup of an attacker's wallet |
-| **the §6.6 hash computed over a subset of the public section** (first record, or `pub_len - 1` bytes) | **§11.1/§11.2 literal-value assertion** plus the first-byte and last-byte flip negatives. An agreement-only test cannot kill this |
+| **the §6.6 hash computed over a subset of the public section** (first record, or `pub_len - 1` bytes) | **§11.1/§11.2 literal-value assertion.** NOT the tag-mismatch flips — those fire on the AAD regardless of what the hash covers, so they do not discriminate |
+| **the §6.6 hash unchanged by a public-section edit** | §11.2 E-shape negative: flip the first byte and the last byte of E's public section (no tag exists there) and assert the DISPLAYED HASH changes |
+| **only the first secret record offered** | §11.2 vector F offer-order assertion — nothing else in the suite has more than one secret |
+| **decode check removed from the public section** | §11.2 BCH-valid-but-undecodable `md1` negative |
+| **uppercase record accepted** | §11.1/§11.2 uppercase refusal case |
 | **`sealed` omitted from the hash input** | **vectors D and E must DIFFER** — the downgrade detector |
-| **`record_count` omitted from the hash input** | a 4-record variant of E must hash differently from the 5-record E |
+| **`public_record_count` omitted from the hash input** | §11.1/§11.2 literal-value assertion. NOT "a 4-record variant hashes differently" — LF-joined records are already injective over the record list, so that test passes under the mutant too (verified) |
 | `ms1` accepted in the public section | §11.2 secret-in-the-clear refusal |
 | passphrase prompted when `ct_len == 0` | §11.2 vector E parses with no prompt |
 | `ms1` not wiped after its plate | §11.2 post-plate buffer assertion (§10.2.2) |
@@ -1436,6 +1488,32 @@ it. §11.1 and §11.2 MUST therefore assert the **literal** values above, and
 §11.4's negatives MUST include flipping the **first** and **last** byte of the
 public section — subset and off-by-one mutants survive an agreement test and die
 on those.
+
+#### Vector F — 2-of-3 multisig, THREE secret records
+
+Without this, a singular implementation of §10.2.2 passes the entire suite: A/B
+carry one BIP-39 mnemonic, C has one `ms1` among six records, D has one, E has
+none. Nothing discriminates plural from singular, which is precisely the defect
+§10.2.2 was rewritten to fix.
+
+A real 2-of-3 `wsh-sortedmulti` bundle, all records encrypted:
+
+| Field | Value |
+| --- | --- |
+| records | **15** — `ms1` ×3 (indices 0,1,2), `mk1` ×6, `md1` ×6 |
+| record lengths | 75, 75, 75, 111, 93, 111, 93, 111, 93, 85, 85, 85, 85, 85, 77 |
+| `pub_len` / `ct_len` | 0 / 1353 |
+| `salt` / `iv` | `f00d`×8 / `beef`×6 |
+| `iterations` | 100000 |
+| derived key | `d9bdc86754e222898f0c1dfa7f63b209b5851c11c9a0019e7e45568cf0ad7019` |
+| tag | `660202c75c2ff0fe05bfced46e2b7cdf` |
+| blob | 1421 bytes, sha256 `97e059ac91596da711a70197b20a7fec1edbe7992eba6c51751ef062596f1cb6` |
+
+Header: `4d4e454d424c4f4201010100000186a0f00df00df00df00df00df00df00df00dbeefbeefbeefbeefbeefbeef0000000000000549`
+
+Required of F specifically: **all three secret records are offered consecutively,
+before any public plate, and each is zeroed before the next is offered.** An
+implementation that offers only the first passes A–E and fails only here.
 
 #### Required assertions
 
@@ -1551,7 +1629,7 @@ the consumer that will parse it.
    warning — the operator has just typed twelve words and is standing at the
    machine. Paused during engraving; absent afterwards. The timer source was
    already in use (`gui/gui.go:2801`).
-9. **Public-only payloads are unauthenticated** (§2.2 item 10). Accepted with
+9. **Public-only payloads are unauthenticated** (§2.2 item 11). Accepted with
    the §10.2.3 warning and the §6.6 hash; `me seal` encrypts by default so
    plaintext is a deliberate opt-in. Revisit only if a signing story ever exists
    for this path.
