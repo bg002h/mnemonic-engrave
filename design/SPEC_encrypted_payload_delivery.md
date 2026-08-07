@@ -426,9 +426,32 @@ runs only on the optional Inspect branch. So a non-conforming sealer — which
 §10.2.1 explicitly refuses to assume away — could place secret bytes in the
 cleartext section, where `picotool save` reaches them with no passphrase at all.
 
-**Hence the DECODE requirement.** A record in the public section MUST decode —
-`md1` via `md.Decode`, `mk1` via the `mk1` decode path — and a decode failure
-rejects the payload. The decoders already exist and are already invoked on the
+**Hence the DECODE requirement — and it is per CARD SET, not per record.**
+Constellation records are **chunks**. Verified against the real crates:
+
+```
+md1 single chunk  → "chunk set incomplete: got 1 chunks, expected 3"
+mk1 single chunk  → "received 1 chunks, header declares total_chunks = 2"
+md1 all 3 chunks  → md_codec::reassemble(&set)  → Ok
+mk1 both chunks   → mk_codec::decode(&set)      → Ok
+smuggled entropy  → md_codec::reassemble(&[s])  → "wire-format version mismatch"
+```
+
+So the device MUST group the public records by card, reassemble each group, and
+decode it; a per-record decode is not merely stricter, it is **impossible** and
+would reject every legitimate payload. A group that fails to reassemble or decode
+rejects the whole payload.
+
+Note the last line: the §6.3 smuggling example is caught by this, which is the
+point.
+
+**Host-side this requires `md-codec >= 0.42`.** The records in §11.4's vectors
+were emitted by `mnemonic` 0.91.0 (md-codec 0.42) and carry md1 wire version 9;
+`me-cli` currently pins md-codec **0.40**, which expects version 4 and rejects
+them with `wire-format version mismatch: got 9, expected 4`. The existing
+converter never noticed because `validate()` only runs the BCH layer
+(`codex32::unwrap_string`), which is version-agnostic. **Implementation MUST bump
+`me-cli` to md-codec 0.42 before the decode requirement can be met at all.** The decoders already exist and are already invoked on the
 Inspect path. This does not make smuggling impossible (an xpub's 32-byte chain
 code is a carrier no classifier can close), and **nothing else in this spec may
 lean on the strong form of the claim**. It does close the accidental and
