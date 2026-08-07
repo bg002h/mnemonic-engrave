@@ -6,11 +6,13 @@ resolution, the engraving-settings feature, the `z` glyph, the 8-vs-4 mm/s
 re-test) is still current and untouched — this feature was worked in parallel
 and did not disturb any of it.
 
-## 1. THE HEADLINE — spec AND plan both GREEN. Implementation is the next act.
+## 1. THE HEADLINE — Plan A is BUILT and GREEN. Plan B (firmware) is the next act.
 
 Deliver constellation payloads to the SeedHammer II **over a wire, encrypted**,
-decrypted on-device with a typed passphrase. **Both artifacts have now passed R0
-and the gate is open. Nothing is implemented yet — that is the handoff.**
+decrypted on-device with a typed passphrase. Spec and plan passed R0; **Plan A is
+now implemented, reviewed and green** on `feat/encrypted-payload-hostA`
+(worktree `/scratch/code/shibboleth/me-wt-seal`) — 170 tests, 0 Critical /
+0 Important, **not merged and not pushed**. See §7 for exactly what is done.
 
 ```
 86c0445  spec v1  (5 R0 rounds)
@@ -149,17 +151,45 @@ it.** A test is not a killer until you have watched it fail for the right reason
 
 ## 7. WHAT TO DO NEXT, IN ORDER
 
-The R0 gate is **passed**. Steps 1 and 2 of the old list are done.
+The R0 gate is **passed**. **Steps 1 and 2 below are now also DONE** (2026-08-07,
+same session). Plan B is the live front.
 
-1. **Implement Plan A** — ONE agent, own worktree, TDD, nine tasks in order. The
-   controller folds small review fixes inline rather than spawning more agents.
-   The plan's Task 9 Step 4 expects **11** `seal_cli` tests; the seal lib is
-   **55**. Both numbers are measured, not estimated.
-2. **Whole-diff adversarial review** — mandatory, non-deferrable. R0 covered plan
-   correctness; this catches implementation-introduced regressions TDD misses.
+1. ~~**Implement Plan A**~~ — **DONE**, on branch `feat/encrypted-payload-hostA`
+   in worktree `/scratch/code/shibboleth/me-wt-seal`. One implementer, nine tasks,
+   one commit each. Every pinned vector matched first run. Final suite **170
+   passed, 0 failed** across 9 binaries; clippy `--all-targets -D warnings` clean;
+   `cargo +1.85.0 test --locked` green on MSRV. **Nothing merged, nothing pushed.**
+2. ~~**Whole-diff adversarial review**~~ — **DONE**, `0 Critical`. Verbatim at
+   `design/agent-reports/REVIEW_plan_a_whole_diff_2026-08-07.md`; the fold at
+   `40d2749`; the fold's own verification (0C/0I/0M/0N) at
+   `REVIEW_plan_a_fold_verification_2026-08-07.md`. Loop closed — do not re-run it.
 3. **Then Plan B** (firmware), which binds to the vectors Plan A emits and may
    never lead them (Rust-primary rule). **F-68 is owned by Plan B's plan review**
    — close the build gate's CLI blind spot before that review, not after.
+   **F-69 and F-70 (the `--seal-secret` spec amendment) must land before Go binds
+   to either artefact** — the spec's own documented `me seal <ms1> --out x.uf2`
+   currently exits `EXIT_REFUSED`.
+
+### What Plan A's implementation cost, and the one lesson worth carrying
+
+**Two Criticals, both "a test that cannot fail", neither in the cryptography.**
+The construction was right on the first run — all seven vectors, byte-exact,
+cross-checked against an independent Python reimplementation with 0 mismatches.
+
+1. The Task 8 UF2 test asserted `field(b,28)` against `FAMILY_DATA` and
+   `field(b,12)` against `TARGET_ADDR` — **the constants under test**. Mutating
+   either moves both sides, so `0xE48BFF59` (the bootable-image family) and
+   `0x1000_0000` (aimed at the signed firmware) each survived the whole 169-test
+   suite. Every other field in that test was already literal-pinned.
+2. No CLI test passed both a positional payload **and** `--plaintext`, so the
+   mixed shape — the only one where `run_seal_cli`'s `sealed` argument can be
+   wrong — was unexercised. Forcing it to `false` printed vector E's UNSEALED
+   digest under a `SEALED` banner and survived all 169 tests.
+
+**The rule: an assertion is only a pin if its expected side comes from OUTSIDE
+the code under test** — a spec table, a hand-computed vector, a literal.
+`assert_eq!(f(x), THE_CONST_f_USES)` pins nothing. Both escapes were found by
+mutation and neither by reading.
 
 ### Process rules added on 2026-08-07 — these are now standing, repo-wide
 
@@ -217,6 +247,6 @@ The R0 gate is **passed**. Steps 1 and 2 of the old list are done.
   history stays as it is.
 - **Tree is clean.** All scratch work lived under the session scratchpad, which is
   gone. Everything durable is committed or in `~/.claude/…/memory/`.
-- **`me seal` does not exist yet.** The `me` binary at HEAD has no `seal` or
+- **`me seal` now EXISTS** (2026-08-07) on `feat/encrypted-payload-hostA`, with `me hash`. The plan invocations in this doc all work on that branch; on `master` they still do not, because nothing is merged.
   `hash` subcommand — Task 9 adds both. Any CLI invocation from the plan will
   fail until implementation lands, and that is expected, not a defect.

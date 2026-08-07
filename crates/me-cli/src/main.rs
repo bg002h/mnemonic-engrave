@@ -57,6 +57,64 @@ enum Command {
         #[arg(long, requires = "preview")]
         png: bool,
     },
+
+    /// Encrypt a payload for delivery to SeedHammer II flash.
+    ///
+    /// The passphrase is GENERATED and printed to STDERR — write it down and
+    /// store it apart from the machine. There is deliberately no way to supply
+    /// your own: total strength is the passphrase plus about 20 bits from the
+    /// KDF, and a memorable passphrase does not survive an offline attack on a
+    /// stolen machine.
+    Seal {
+        /// Records to ENCRYPT. Must be canonical: if they came from
+        /// `mnemonic bundle`, use --group-size 0.
+        payload: Vec<String>,
+
+        /// Records to carry in the CLEAR. Authenticated via the AAD when
+        /// something is also encrypted; unauthenticated otherwise. Never an
+        /// ms1 or a BIP-39 mnemonic.
+        #[arg(long = "plaintext")]
+        plaintext: Vec<String>,
+
+        /// Write the UF2 here. Created 0600. REQUIRED — never stdout, because
+        /// the passphrase shares that stream.
+        #[arg(long, required = true)]
+        out: PathBuf,
+
+        /// Required to encrypt an ms1 (a seed). Sealing a seed must never be
+        /// accidental.
+        ///
+        /// **NOTE: this flag is a deliberate plan-level addition and is NOT in
+        /// the spec.** §9's synopsis omits it and §12 item 6 records `ms1` as
+        /// ADMITTED with no opt-in, so `me seal <ms1> --out x.uf2` — the spec's
+        /// own documented invocation — exits `EXIT_REFUSED` here. That is safer
+        /// than the spec, not looser, but it is a divergence: file a spec
+        /// amendment to §9 and §12 item 6 rather than leaving the two artefacts
+        /// disagreeing.
+        #[arg(long)]
+        seal_secret: bool,
+
+        /// PBKDF2 iterations. 300,000 = 30.9 s on device, from the measured
+        /// 9,715 iters/sec (§7.1, measured 2026-08-07 on real RP2350).
+        #[arg(long, default_value_t = 300_000)]
+        iterations: u32,
+    },
+
+    /// Re-derive the §6.6 public-data hash from your own cards.
+    ///
+    /// No passphrase, no seal operation, no original file — so the expected
+    /// value can be regenerated months later and compared against what the
+    /// device displays.
+    Hash {
+        /// The public records, in order.
+        records: Vec<String>,
+        /// The payload was sealed (carries an encrypted section).
+        #[arg(long, conflicts_with = "unsealed")]
+        sealed: bool,
+        /// The payload carries no encrypted section.
+        #[arg(long)]
+        unsealed: bool,
+    },
 }
 
 const EXIT_OK: i32 = 0;
@@ -79,6 +137,29 @@ fn run() -> i32 {
     }) = &cli.command
     {
         return run_bundle_cli(r#in.as_ref(), manifest.as_ref(), preview.as_ref(), *png);
+    }
+
+    if let Some(Command::Seal {
+        payload,
+        plaintext,
+        out,
+        seal_secret,
+        iterations,
+    }) = &cli.command
+    {
+        return run_seal_cli(payload, plaintext, out, *seal_secret, *iterations);
+    }
+    if let Some(Command::Hash {
+        records,
+        sealed,
+        unsealed,
+    }) = &cli.command
+    {
+        if *sealed == *unsealed {
+            eprintln!("me: pass exactly one of --sealed or --unsealed");
+            return EXIT_USAGE;
+        }
+        return run_hash_cli(records, *sealed);
     }
 
     // Read into a Zeroizing buffer so the input (incl. read_to_string's
@@ -214,6 +295,147 @@ fn run_bundle_cli(
         println!("{json}");
     }
     eprint!("{}", manifest.checklist());
+    EXIT_OK
+}
+
+// `out: &Path`, not `&PathBuf` — clippy::ptr_arg is warn-by-default and the
+// plan's own `-D warnings` gate would reject it. Call sites deref-coerce.
+fn run_seal_cli(
+    payload: &[String],
+    plaintext: &[String],
+    out: &std::path::Path,
+    seal_secret: bool,
+    iterations: u32,
+) -> i32 {
+    use mnemonic_engrave::classify::{classify, Format};
+    use mnemonic_engrave::seal::{self, pubhash, Payload};
+
+    // These records are NOT zeroized, per the Global Constraint. §9 puts them on
+    // argv, so /proc/$PID/cmdline already exposes them — the heap copy is not the
+    // binding exposure, and claiming a wipe here would be a guarantee this code
+    // does not deliver.
+    // Do NOT trim here. `encode_section` scans the UNTRIMMED record for `\r`
+    // (§6.4: "no CR anywhere"), and trimming first strips a leading/trailing CR
+    // before that check ever sees it — the CLI would normalise where §9 says
+    // refuse. `encode_section` trims internally, once, after the CR scan.
+    let secret: Vec<String> = payload.to_vec();
+    let public: Vec<String> = plaintext.to_vec(); // &[String] -> Vec<String>
+    if secret.is_empty() && public.is_empty() {
+        eprintln!("me: nothing to seal");
+        return EXIT_USAGE;
+    }
+
+    // §9: ms1 needs the explicit opt-in. Checked on classification, not on
+    // anything the caller asserts.
+    if !seal_secret && secret.iter().any(|r| matches!(classify(r), Ok(Format::Ms))) {
+        eprintln!(
+            "me: refusing to seal ms1 without --seal-secret.\n    \
+             ms1 is seed entropy. Sealing it puts an offline-attackable ciphertext of your \
+             seed into the machine's flash, defended only by the generated passphrase.\n    \
+             Re-run with --seal-secret if that is what you intend."
+        );
+        return EXIT_REFUSED;
+    }
+
+    let sealed = match seal::seal(
+        Payload {
+            public: public.clone(),
+            secret,
+        },
+        iterations,
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("me: {e}");
+            return match e {
+                seal::SealError::Iterations(_) => EXIT_USAGE,
+                _ => EXIT_INVALID,
+            };
+        }
+    };
+
+    let uf2 = seal::uf2::to_uf2(&sealed.blob);
+    if let Err(e) = write_private(out, &uf2) {
+        eprintln!("me: cannot write {}: {e}", out.display());
+        return EXIT_USAGE;
+    }
+
+    // STDERR, always (§2.3).
+    eprintln!("me: wrote {} bytes to {}", uf2.len(), out.display());
+    if !public.is_empty() {
+        // TRIM here. `public` now holds raw argv (the CR fix removed the CLI
+        // trim), but the blob's public section is what `encode_section` emits —
+        // trimmed. Hashing the untrimmed form prints a value the device can
+        // never display: measured, one leading space gives a BYTE-IDENTICAL
+        // blob and a different hash, on the only integrity control an unsealed
+        // payload has. `check_public` and `run_hash_cli` already trim.
+        let refs: Vec<&str> = public.iter().map(|s| s.trim()).collect();
+        let h = pubhash::public_data_hash(&refs, sealed.passphrase.is_some());
+        eprintln!();
+        eprintln!(
+            "public data hash ({} records, {}):",
+            public.len(),
+            if sealed.passphrase.is_some() {
+                "SEALED"
+            } else {
+                "UNSEALED"
+            }
+        );
+        eprintln!("    {}", pubhash::format_hash(&h));
+        eprintln!("RECORD THIS WHOLE LINE. The device shows the same value; if it");
+        eprintln!("differs, the payload has been altered or its encryption removed.");
+    }
+    if let Some(p) = &sealed.passphrase {
+        eprintln!();
+        eprintln!("passphrase — write this down and store it APART from the machine:");
+        eprintln!();
+        eprintln!("    {}", &**p);
+    }
+    eprintln!();
+    eprintln!(
+        "load:  picotool load --verify {}   (machine in BOOTSEL)",
+        out.display()
+    );
+    eprintln!("wipe:  picotool erase -r 0x10E00000 0x10E10000");
+    EXIT_OK
+}
+
+fn run_hash_cli(records: &[String], sealed: bool) -> i32 {
+    use mnemonic_engrave::seal::{pubhash, record};
+    if records.is_empty() {
+        eprintln!("me: no records given");
+        return EXIT_USAGE;
+    }
+    let trimmed: Vec<String> = records.iter().map(|s| s.trim().to_string()).collect();
+    for (i, r) in trimmed.iter().enumerate() {
+        match record::validate_record(r) {
+            Err(e) => {
+                eprintln!("me: record {i}: {e}");
+                return EXIT_INVALID;
+            }
+            // §6.3 forbids a secret in the public section, so hashing one would
+            // print a confident value for a payload no device could ever hold.
+            Ok(k) if k.is_secret() => {
+                eprintln!(
+                    "me: record {i} is secret material; the public-data hash \
+                           covers public records only"
+                );
+                return EXIT_INVALID;
+            }
+            Ok(_) => {}
+        }
+    }
+    let refs: Vec<&str> = trimmed.iter().map(|s| s.as_str()).collect();
+    // Same card-set decode `me seal --plaintext` applies, so `me hash` cannot
+    // bless a record list that `me seal` would refuse.
+    if let Err(e) = record::decode_public_set(&refs) {
+        eprintln!("me: {e}");
+        return EXIT_INVALID;
+    }
+    println!(
+        "{}",
+        pubhash::format_hash(&pubhash::public_data_hash(&refs, sealed))
+    );
     EXIT_OK
 }
 

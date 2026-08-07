@@ -53,6 +53,18 @@ impl std::fmt::Display for ValidateError {
 }
 impl std::error::Error for ValidateError {}
 
+/// First interior separator in a trimmed constellation string, if any.
+/// Canonical = no `-` anywhere and no interior whitespace. Callers must have
+/// trimmed, so any remaining whitespace is interior.
+///
+/// Shared by the NDEF converter (md1 only, historical) and by `seal`, which
+/// applies it to md1/mk1/ms1 alike — a sealed record is engraved verbatim just
+/// as a converted one is.
+pub fn first_noncanonical(s: &str) -> Option<(usize, char)> {
+    s.char_indices()
+        .find(|(_, c)| c.is_whitespace() || *c == '-')
+}
+
 /// Validate one md1/mk1 string at the per-string BCH level, requiring PRISTINE
 /// input. md1 (`unwrap_string`) is a pure verify — any corruption is rejected.
 /// mk1 (`decode_string`) BCH error-CORRECTS up to 4 symbols, so we additionally
@@ -71,8 +83,7 @@ pub fn validate(fmt: Format, s: &str) -> Result<(), ValidateError> {
             // silent stripping would emit bytes the user never supplied, and
             // canonicalize-then-emit would need the semantics to land in md-codec
             // first (Rust-primary rule).
-            if let Some((pos, ch)) = s.char_indices().find(|(_, c)| c.is_whitespace() || *c == '-')
-            {
+            if let Some((pos, ch)) = first_noncanonical(s) {
                 return Err(ValidateError::MdNonCanonical { ch, pos });
             }
             md_codec::codex32::unwrap_string(s)
