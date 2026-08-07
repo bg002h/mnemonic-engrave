@@ -701,6 +701,93 @@ question beyond the same accessor — and it answers "is my supply
 under-delivering" on every boot. The plate version is the better artefact; the
 start-screen version is the faster diagnostic.
 
+### F-65 — back up the SH2 boot signing key (owning phase: after the encrypted-payload cycle ships; NOT during it)
+
+**Operator question, 2026-08-07.** Can the encrypted-payload path carry the
+firmware boot signing key (`~/.sh2/sh2-boot-key.pem`)?
+
+**As specified, no.** `SPEC_encrypted_payload_delivery.md` §6.3 admits exactly
+four record types — `md1`, `mk1`, `ms1`, BIP-39 mnemonic — and §10.2.1's
+allow-list rejects everything else by design. A raw secp256k1 scalar is none of
+them.
+
+**But it works today with zero spec change, and that is the recommendation.**
+The key is a 256-bit secp256k1 scalar; BIP-39 at 256 bits of entropy is
+256 + 8 checksum = 264 bits = **exactly 24 words**, so the scalar encodes
+losslessly as a mnemonic — already an admitted secret record. It then gets the
+correct handling for free: encrypted section, classified secret, offered first
+under §10.2.2, wiped after its plate, covered by §10.2.4's timer.
+
+**Calibrate the effort — this is not seed-class.** Per the operator's own
+`~/.sh2/SEED_HAMMER_OTP_SLOT_USAGE.txt`: slot 0 holds SeedHammer AB's production
+key, slot 1 holds theirs, and **slots 2 and 3 are FREE**. Losing the key costs
+one spare OTP slot, not funds — burn a replacement into slot 2. Worth backing
+up (the slots are one-time and a botched burn wastes one); not worth widening a
+funds-critical spec for.
+
+**The only real gap is labelling.** The plate comes out looking exactly like a
+seed plate, and the sealed-payload path does not expose the Title/Footer fields
+the free-text flow has. Future-you restores an empty wallet and loses an
+afternoon. **Cheapest fix: a companion label plate via the existing free-text
+flow** ("SH2 BOOT KEY / NOT A SEED", ≤18 chars per `ftMaxLineLen`). No spec
+change, no new record kind, no new attack surface.
+
+**Do NOT add a "labelled secret blob" record kind to close this.** That widens
+§10.2.1's allow-list — the surface four review rounds were spent *narrowing*,
+because the classifier's `command: ` branch reaches `Platform.LockBoot()` and
+irreversible OTP writes. Paying that for a key recoverable from a spare slot is
+a bad trade. Revisit only if the label convention proves unworkable in practice.
+
+Superseded by [[F-66]] if that lands, since a plain-text record would carry the
+label and the key on one plate.
+
+### F-66 — carry arbitrary plain text over the sealed payload path (owning phase: its own gated cycle, AFTER the encrypted-payload cycle is GREEN and shipped)
+
+**Operator request, 2026-08-07.** Deliver arbitrary text to the engraver through
+the encrypted-payload path, not just constellation records.
+
+**The device can already engrave free text** — `ftTextEntryFlow`, the whole
+engraving-settings feature (font/size/title/footer/speed/passes). What is
+missing is a way to *deliver* it: `SPEC_encrypted_payload_delivery.md` §6.3
+admits four constellation record types and §10.2.1 fail-closes on everything
+else. Today free text must be typed on the touchscreen.
+
+**The hazard, and why this needs its own gate.** §10.2.1's allow-list exists
+because `gui/scan.go`'s classifier accepts a `command: ` prefix that dispatches
+to `debugCommand`, and `gui/gui.go:1668`'s `lock-boot` case reaches
+`Platform.LockBoot()` → `writeOTPValues()` + `otp.EnableSecureBoot()` +
+`machine.CPUReset()`. **A naive "raw text" record kind reopens that hole
+exactly**, because `command: lock-boot` *is* arbitrary text. This was R0 round 1's
+first Critical and it must not be undone.
+
+**The clean shape, if it is built.** The danger is the classifier's dispatch,
+not the text. A text record should **bypass `scan.go` entirely** — the payload
+kind says "literal text for the free-text flow", the device never classifies it,
+and `debugCommand` is therefore unreachable by construction rather than by
+allow-listing. Route straight to `ftBuildPlate`.
+
+**What that cycle must also settle:**
+- **Constant-time engraving does not apply.** `ftWarnTiming`
+  (`gui/freetext_flow.go:1212`) is explicit: "How long the machine runs depends
+  on what it is cutting, so anyone watching or timing it learns about the text."
+  A *secret* delivered as free text leaks to an observer with a stopwatch. If
+  text records may be secret, that warning must reach the operator; if they may
+  not, that must be enforced.
+- **Where the layout parameters come from** — title, footer, font, size. In the
+  header (authenticated, bound-checked pre-KDF) or typed on the device? Note
+  §6.5's rule: the header is parsed before authentication, so anything there is
+  hostile input.
+- **Plate fit.** The free-text field is uncapped and backstopped only by
+  `backup.ErrTooLarge` / `ftRefuse`; §6.2's `pub_len`/`ct_len` ceilings are 8191
+  while `gui/scan.go`'s buffer overflows at exactly 8192.
+- **Whether text may ride in the PUBLIC section.** §6.3's decode requirement for
+  public records exists because `ValidMD` is a pure BCH verifier that never
+  decodes — arbitrary bytes wrap into a checksum-valid `md1`. Plain text has no
+  decode to require, so the public section would lose its only content check.
+
+Subsumes [[F-65]]: a text record could carry "SH2 BOOT KEY" and the 24 words on
+one plate. Related: [[F-58]] (input wedge on the Footer entry screen).
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
