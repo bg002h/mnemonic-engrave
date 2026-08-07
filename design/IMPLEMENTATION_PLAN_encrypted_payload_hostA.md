@@ -31,7 +31,7 @@
   the passphrase, PBKDF2 intermediates, and `encode_section`'s output. **The
   record `Vec<String>` is NOT zeroized**, and pretending otherwise was a fold
   that did not compile and could not reach its goal without threading a
-  zeroizing type through `Payload` and all 18 Task 7 tests. §9 puts these records
+  zeroizing type through `Payload` and all 19 Task 7 tests. §9 puts these records
   on argv anyway, so `/proc/$PID/cmdline` already exposes them — the heap copy is
   not the binding exposure. Say this rather than claim a guarantee that is not
   delivered.
@@ -615,7 +615,7 @@ mod tests {
     #[test]
     fn rejects_near_miss_and_invalid() {
         assert!(!is_valid("beef beef beef beef beef beef beef beef beef beef beef bacon"));
-        assert!(!is_valid(&"abandon ".repeat(12).trim()));
+        assert!(!is_valid("abandon ".repeat(12).trim()));
         assert!(!is_valid("not even words"));
     }
 
@@ -1195,9 +1195,9 @@ mod tests {
     #[test]
     fn refuses_bad_record_counts() {
         assert!(matches!(encode_section(&[]), Err(ContainerError::RecordCount(0))));
-        let many: Vec<String> = std::iter::repeat(A.to_string()).take(25).collect();
+        let many: Vec<String> = std::iter::repeat_n(A.to_string(), 25).collect();
         assert!(matches!(encode_section(&many), Err(ContainerError::RecordCount(25))));
-        let ok: Vec<String> = std::iter::repeat(A.to_string()).take(24).collect();
+        let ok: Vec<String> = std::iter::repeat_n(A.to_string(), 24).collect();
         assert!(encode_section(&ok).is_ok(), "24 is legal — a 2-of-3 bundle is 15 records");
     }
 
@@ -1315,7 +1315,7 @@ mod tests {
         use sha2::{Digest, Sha256};
         hex(&Sha256::digest(b))
     }
-    fn bacon24() -> String { std::iter::repeat("bacon").take(24).collect::<Vec<_>>().join(" ") }
+    fn bacon24() -> String { std::iter::repeat_n("bacon", 24).collect::<Vec<_>>().join(" ") }
 
     /// The six canonical records of the bip84 bundle for `bacon`×24.
     /// Regenerate with --group-size 0; the default (5) emits a DISPLAY form the
@@ -1397,7 +1397,7 @@ mod tests {
     /// cosigner, one `md1` card chunked as the policy requires.** An earlier
     /// draft said "six cards", generalising "three cosigners" onto both halves.
     #[test]
-    fn vector_g_multisig_public_section_spans_six_cards() {
+    fn vector_g_multisig_public_section_spans_four_cards() {
         let recs = two_of_three();
         let public: Vec<String> = recs.iter().filter(|r| !r.starts_with("ms1")).cloned().collect();
         let secret: Vec<String> = recs.iter().filter(|r| r.starts_with("ms1")).cloned().collect();
@@ -1515,7 +1515,7 @@ mod tests {
     fn refuses_more_than_24_records_across_both_sections() {
         let all = bip84();
         let public = all[1..].to_vec();                                    // 5, decodes
-        let secret: Vec<String> = std::iter::repeat(all[0].clone()).take(20).collect();
+        let secret: Vec<String> = std::iter::repeat_n(all[0].clone(), 20).collect();
         assert!(matches!(
             seal(Payload { public, secret }, 300_000),
             Err(SealError::Container(container::ContainerError::RecordCount(25)))));
@@ -1580,10 +1580,6 @@ mod tests {
             "2M rounds cannot finish that fast — the gate must precede the KDF");
     }
 
-    /// The guard sits above `seal()`'s public-only early return, so it binds
-    /// that path too. Without this case, moving the check below the early
-    /// return leaves the suite green — both other iteration tests take the
-    /// secret path.
     /// Kills the mutation that deletes `record_or_mnemonic`'s lowercase check.
     /// An earlier draft listed the killer as a manual `me seal "BACON …"`
     /// invocation rather than a test — and deleting the guard left all 166 tests
@@ -1598,6 +1594,10 @@ mod tests {
             Err(SealError::Record(record::RecordError::NotLowercase(_)))));
     }
 
+    /// The guard sits above `seal()`'s public-only early return, so it binds
+    /// that path too. Without this case, moving the check below the early
+    /// return leaves the suite green — both other iteration tests take the
+    /// secret path.
     #[test]
     fn refuses_out_of_range_iterations_on_the_public_only_path() {
         let all = bip84();
@@ -2115,13 +2115,41 @@ fn printed_hash_matches_me_hash_regardless_of_surrounding_whitespace() {
                             "--out", out.to_str().unwrap()])
         .assert().success();
     let err = String::from_utf8(padded.get_output().stderr.clone()).unwrap();
-    let printed = err.lines().find(|l| l.split_whitespace().count() == 8)
-        .expect("the grouped hash line").trim().to_string();
+    // Anchor on the banner, NOT on a token count. `load:  picotool load
+    // --verify <path>   (machine in BOOTSEL)` also has exactly 8 whitespace
+    // tokens; `.find()` returns the hash line first only because it happens to
+    // come earlier. A token-count heuristic is precisely what made the §2.3
+    // passphrase assertion vacuous — see `passphrase_line` above.
+    let lines: Vec<&str> = err.lines().collect();
+    let i = lines.iter().position(|l| l.starts_with("public data hash ("))
+        .expect("the hash banner line");
+    let printed = lines[i + 1].trim().to_string();
     let derived = me().args(["hash", "--unsealed", MD1, MD1B, MD1C])
         .assert().success();
     let expect = String::from_utf8(derived.get_output().stdout.clone()).unwrap();
     assert_eq!(printed, expect.trim(),
         "me seal's printed hash must equal me hash's for the same records");
+}
+
+/// Kills the mutation that trims at the CLI before `encode_section` ever sees
+/// the record. Round 4 measured it: rewriting the `plaintext` binding in
+/// `run_seal_cli` to `.map(|s| s.trim().to_string())` makes the CLI ACCEPT a
+/// CR-bearing record — exit 0, UF2 written, blob and hash both correct — and
+/// left the entire suite green — all 168 tests as it stood before this one
+/// existed. §6.4 says CRLF is rejected, not tolerated;
+/// without this test that normative refusal can be deleted with nothing to
+/// notice. The mutation-table row for it previously named a manual `me seal`
+/// invocation, which is not a killer — the same defect round 3 graded C-2.
+#[test]
+fn refuses_a_record_carrying_a_cr() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.uf2");
+    me().args(["seal", "--plaintext", &format!("{MD1}\r"),
+               "--out", out.to_str().unwrap()])
+        .assert().failure()
+        .stderr(predicate::str::contains(
+            "contains '\\r', which is the record separator"));
+    assert!(!out.exists(), "a refused seal must not leave a file behind");
 }
 
 #[test]
@@ -2232,9 +2260,10 @@ fn run_seal_cli(
     use mnemonic_engrave::classify::{classify, Format};
     use mnemonic_engrave::seal::{self, pubhash, Payload};
 
-    // Global Constraint: secrets wiped on every path. argv already exposes these
-    // via /proc/$PID/cmdline (inherent to §9's synopsis, filed separately), so
-    // this is defence in depth on the heap copy we control.
+    // These records are NOT zeroized, per the Global Constraint. §9 puts them on
+    // argv, so /proc/$PID/cmdline already exposes them — the heap copy is not the
+    // binding exposure, and claiming a wipe here would be a guarantee this code
+    // does not deliver.
     // Do NOT trim here. `encode_section` scans the UNTRIMMED record for `\r`
     // (§6.4: "no CR anywhere"), and trimming first strips a leading/trailing CR
     // before that check ever sees it — the CLI would normalise where §9 says
@@ -2337,7 +2366,7 @@ fn run_hash_cli(records: &[String], sealed: bool) -> i32 {
 }
 ```
 
-- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --test seal_cli`, expect 10 passed.
+- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --test seal_cli`, expect 11 passed.
 
 - [ ] **Step 5: Run the whole suite**
 
@@ -2379,11 +2408,11 @@ Procedure, both rules non-negotiable: **copy the file first** and restore from t
 | CR normalised away instead of refused | `refuses_embedded_separators_and_bad_lengths` |
 | `--group-size 0` guidance lost on the secret path | `refuses_space_grouped_input_with_an_actionable_message` |
 | unsealed-shape zero checks removed | `rejects_nonzero_crypto_fields_when_unsealed` |
-| **grouping by HRP instead of `(HRP, chunk_set_id)`** | **`vector_g_multisig_public_section_spans_six_cards`** — nothing else in the suite has more than one card per HRP in the public section |
+| **grouping by HRP instead of `(HRP, chunk_set_id)`** | **`vector_g_multisig_public_section_spans_four_cards`** — nothing else in the suite has more than one card per HRP in the public section |
 | the combined 1..24 cap deleted | `refuses_more_than_24_records_across_both_sections` — but ONLY in its corrected form; the earlier version passed on a card-set failure and left the mutant alive |
 | uppercase BIP-39 mnemonic emitted | **`refuses_an_uppercase_bip39_mnemonic`** — a manual invocation is not a killer; deleting the guard left all 166 tests green |
 | `--iterations` range check moved below the public-only early return | `refuses_out_of_range_iterations_on_the_public_only_path` |
-| CR trimmed at the CLI before the container sees it | §11.2 CLI case: `me seal --plaintext "md1…\r"` must be REFUSED |
+| **CR trimmed at the CLI before the container sees it** | **`refuses_a_record_carrying_a_cr`** — measured in round 4: the mutant's blob and hash are both CORRECT, so only an explicit refusal test catches it; the earlier row named a manual invocation and left the mutant alive across the whole suite |
 | **printed hash computed over untrimmed argv** | **`printed_hash_matches_me_hash_regardless_of_surrounding_whitespace`** — the blob is byte-identical either way, so only the hash comparison catches it |
 | `to_uf2` emits family `0xE48BFF59` or pads `0xFF` | `every_block_conforms_not_just_the_first` |
 | `open_bytes` returns plaintext without checking the tag | `open_fails_on_flipped_ciphertext_byte` |

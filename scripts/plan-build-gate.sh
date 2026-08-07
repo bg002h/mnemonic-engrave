@@ -17,15 +17,24 @@
 #
 # WHAT IT DOES
 #   Extracts the ```rust blocks for the NEW files (src/seal/*.rs,
-#   tests/seal_cli.rs) into a scratch copy of the crate, then builds, tests and
-#   clippies it.
+#   tests/seal_cli.rs) into a scratch copy of the crate, then:
+#     - builds and RUNS the seal lib tests
+#     - COMPILE-CHECKS tests/seal_cli.rs (--no-run)
+#     - clippy, both as the plan's stated gate and --all-targets (informational)
 #
 # WHAT IT DOES NOT DO
-#   src/main.rs and src/validate.rs are MODIFICATIONS to existing files -- the
-#   plan gives fragments (a match arm, an enum variant, a function to insert),
-#   not whole files, so they cannot be assembled mechanically. Those still need
-#   a reviewer's execution pass. The seal module is where every fold has landed,
-#   so this covers the moving surface.
+#   1. src/main.rs and src/validate.rs are MODIFICATIONS to existing files -- the
+#      plan gives fragments (a match arm, an enum variant, a function to insert),
+#      not whole files, so they cannot be assembled mechanically. Those still need
+#      a reviewer's execution pass.
+#   2. tests/seal_cli.rs is COMPILED BUT NOT RUN. It drives the `me` binary
+#      through assert_cmd, and this scratch crate's binary is built from the
+#      UNMODIFIED main.rs -- it has no `seal` subcommand, so every case would
+#      fail at runtime for a reason that says nothing about the plan. Type
+#      errors in the CLI tests are caught here; their ASSERTIONS are not
+#      exercised. That is a reviewer's job.
+#      (Until 2026-08-07 this file was extracted and then never compiled at all,
+#      because steps 5-7 were all `--lib`. Round 4's fold added a test here.)
 #
 # Usage:  scripts/plan-build-gate.sh [path/to/plan.md]
 set -euo pipefail
@@ -146,14 +155,33 @@ else
   echo "   FAIL: see /tmp/plan-gate-build.log"; exit 1
 fi
 
-echo "== 6 -- TEST =="
+echo "== 6 -- TEST (seal lib) =="
 cargo test -p mnemonic-engrave --lib seal 2>&1 | tail -15
 
-echo "== 7 -- CLIPPY =="
+echo "== 6b -- COMPILE-CHECK tests/seal_cli.rs (not run: see header) =="
+if [ -f "$WORK/crates/me-cli/tests/seal_cli.rs" ]; then
+  if cargo test -p mnemonic-engrave --test seal_cli --no-run 2>&1 \
+       | tee /tmp/plan-gate-cli.log | tail -15; then
+    echo "   PASS: the CLI tests compile"
+  else
+    echo "   FAIL: see /tmp/plan-gate-cli.log"; exit 1
+  fi
+else
+  echo "   SKIP: no tests/seal_cli.rs extracted"
+fi
+
+echo "== 7 -- CLIPPY (the plan's stated gate) =="
 cargo clippy -p mnemonic-engrave --lib -- -D warnings 2>&1 | tail -10 \
   && echo "   clippy clean"
 
+echo "== 7b -- CLIPPY --all-targets (informational, does not gate) =="
+cargo clippy -p mnemonic-engrave --all-targets 2>&1 \
+  | grep -E '^(warning|error)' | sort | uniq -c | sort -rn | head -10 \
+  || echo "   none"
+
 echo
 echo "== RESULT =="
-echo "   Note: src/main.rs and src/validate.rs changes are fragments and are NOT"
-echo "   covered here -- a reviewer's execution pass still owns those."
+echo "   NOT covered: src/main.rs and src/validate.rs arrive as fragments, so a"
+echo "   reviewer's execution pass still owns them; and tests/seal_cli.rs is"
+echo "   COMPILED BUT NOT RUN (its binary lacks the seal subcommand here), so its"
+echo "   assertions are unexercised. Type errors caught; behaviour not."
