@@ -28,7 +28,12 @@
   feature compiles locally and fails CI. `div_ceil` (1.73) is safe; check
   anything newer before using it.
 - Secrets wiped with `zeroize` on every path.
-- `cargo fmt` and `cargo clippy -p mnemonic-engrave -- -D warnings` before each commit.
+- `cargo clippy -p mnemonic-engrave -- -D warnings` before each commit.
+- **`cargo fmt` caveat:** under a nightly rustfmt it reformats pre-existing
+  `validate.rs` / `main.rs` / `preview.rs`, which the per-task `git add` lists do
+  not stage — leaving a dirty tree after every commit. Either run
+  `cargo fmt -- --check` and format only new files, or stage the reformat
+  deliberately as its own commit. Do not silently widen the diff.
 
 ---
 
@@ -71,7 +76,9 @@ rand = "0.9"
 ms-codec = "0.7"
 ```
 
-**The md-codec bump is required, not optional.** §6.3's decode requirement cannot be met on 0.40: the vector records carry md1 wire version 9 and 0.40 expects 4 (`wire-format version mismatch: got 9, expected 4`). The existing converter never noticed because `validate()` runs only the version-agnostic BCH layer.
+**The md-codec bump is NOT required, and an earlier draft's justification for it was false.** It is retained only as a routine currency update; if it complicates anything, drop it and stay on 0.40.
+
+The retracted claim: "the vector records carry md1 wire version 9 and 0.40 expects 4". They carry version **4**, and **0.40 reassembles all of them** — verified, including a 6-chunk multisig card, with all 52 seal tests passing pinned to `=0.40.0`. The `9` came from a single call — `decode_md1_string` (the SINGLE-STRING API) on a CHUNKED record — and is `0b01001`: version 4 with the chunked flag, misread as a 5-bit version. The granularity diagnosis was right; the version skew attached to it was the same error misread twice. Note also the device's Go port is provenance-pinned to md-codec **0.36.0**, so a host-only bump widens a real host/device gap.
 
 Run: `cargo test -p mnemonic-engrave`
 Expected: **all existing tests still pass** (verified 2026-08-07: 103 tests, 0 failures under 0.42). If anything fails, stop — a fixture needs regenerating and that is a separate decision.
@@ -900,39 +907,65 @@ pub fn validate_record(s: &str) -> Result<RecordKind, RecordError> {
 /// DECODES. Records are chunks, so this is necessarily a whole-set operation —
 /// a per-record decode rejects every legitimate payload.
 ///
-/// Groups by HRP, then decodes each group:
-///   md1 → `md_codec::reassemble(&set)`
-///   mk1 → `mk_codec::decode(&set)`
+/// **Group by `(HRP, chunk_set_id)`, NEVER by HRP alone.** A 2-of-3
+/// `wsh-sortedmulti` wallet has THREE separate `mk1` cards and three `md1`
+/// cards, each chunked independently. Lumping all six `mk1` records into one
+/// group gives `received 6 chunks, header declares total_chunks = 2` — so HRP
+/// grouping rejects **every multisig wallet**, which is the shape §6.4's
+/// "why not 7" section exists to admit. Vectors D and E carry one card per HRP
+/// and F is `pub_len = 0`, so nothing but vector G catches this.
+///
+/// A record that is NOT chunked is its own card and takes the single-string
+/// path; neither path handles both forms (§6.3).
 pub fn decode_public_set(records: &[&str]) -> Result<(), RecordError> {
-    let mut md: Vec<&str> = Vec::new();
-    let mut mk: Vec<&str> = Vec::new();
-    for r in records {
-        match validate_record(r)? {
-            RecordKind::Md => md.push(r),
-            RecordKind::Mk => mk.push(r),
+    use std::collections::BTreeMap;
+    // key: (hrp, chunk_set_id) — `None` csid means a non-chunked record, which
+    // is its own card, so it gets a unique key via its index.
+    let mut groups: BTreeMap<(char, Option<u32>, usize), Vec<&str>> = BTreeMap::new();
+    for (i, r) in records.iter().enumerate() {
+        let kind = validate_record(r)?;
+        if kind.is_secret() {
             // Guarded by the caller (§6.3 forbids a secret in the public
             // section); reaching here is a caller bug, not a bad payload.
-            RecordKind::Ms => {
-                return Err(RecordError::UndecodableSet(
-                    "a secret record cannot be in the public section".into()))
-            }
+            return Err(RecordError::UndecodableSet(
+                "a secret record cannot be in the public section".into()));
         }
+        let (hrp, csid) = chunk_key(r, kind)?;
+        let uniq = if csid.is_some() { 0 } else { i + 1 };
+        groups.entry((hrp, csid, uniq)).or_default().push(r);
     }
-    if !md.is_empty() {
-        md_codec::reassemble(&md)
-            .map_err(|e| RecordError::UndecodableSet(format!("md1: {e}")))?;
-    }
-    if !mk.is_empty() {
-        mk_codec::decode(&mk)
-            .map_err(|e| RecordError::UndecodableSet(format!("mk1: {e}")))?;
+    for ((hrp, csid, _), set) in groups {
+        let res = match (hrp, csid) {
+            ('d', Some(_)) => md_codec::reassemble(&set).map(|_| ()),
+            ('d', None) => md_codec::decode_md1_string(set[0]).map(|_| ()),
+            ('k', _) => mk_codec::decode(&set).map(|_| ()),
+            _ => unreachable!("secret records are refused above"),
+        };
+        res.map_err(|e| RecordError::UndecodableSet(format!("{hrp}-card: {e}")))?;
     }
     Ok(())
+}
+
+/// Read the chunk header to get the card identity. `md`/`mk` both expose this;
+/// see §6.3. Returns the HRP discriminant and the chunk-set id, or `None` for a
+/// non-chunked record.
+fn chunk_key(s: &str, kind: RecordKind) -> Result<(char, Option<u32>), RecordError> {
+    // Implementer: the exact accessor differs per crate — md-codec exposes
+    // `chunk::derive_chunk_set_id` and the header parse; mk-codec exposes its
+    // own header parse. Confirm the names with `cargo doc` and keep the shape:
+    // parse the header, return (hrp_discriminant, Some(csid)) when the chunked
+    // flag is set, else (hrp_discriminant, None).
+    match kind {
+        RecordKind::Md => Ok(('d', md_chunk_set_id(s)?)),
+        RecordKind::Mk => Ok(('k', mk_chunk_set_id(s)?)),
+        RecordKind::Ms => unreachable!("secret records are refused by the caller"),
+    }
 }
 ```
 
 - [ ] **Step 5: Run tests**
 
-Run: `cargo test -p mnemonic-engrave --lib seal::record && cargo test -p mnemonic-engrave --lib validate`
+Run: `cargo test -p mnemonic-engrave --lib seal::record && cargo test -p mnemonic-engrave --lib`
 Expected: all pass, including the pre-existing `validate` tests.
 
 - [ ] **Step 6: Commit**
@@ -1188,7 +1221,9 @@ impl std::error::Error for ContainerError {}
 /// Trim ONCE, then validate and encode the SAME trimmed form. Validating one
 /// string and emitting another is how a trailing space survives to the device,
 /// where `codex32.inputChar` has no mapping for `0x20`.
-pub fn encode_section(records: &[String]) -> Result<Zeroizing<String>, ContainerError> {
+/// Generic over `AsRef<str>` so a `Vec<Zeroizing<String>>` can be passed
+/// without cloning the secret into a plain `String` (Global Constraint).
+pub fn encode_section<S: AsRef<str>>(records: &[S]) -> Result<Zeroizing<String>, ContainerError> {
     if records.is_empty() || records.len() > MAX_RECORDS {
         return Err(ContainerError::RecordCount(records.len()));
     }
@@ -1197,12 +1232,12 @@ pub fn encode_section(records: &[String]) -> Result<Zeroizing<String>, Container
     // silently normalise a trailing CR away instead of refusing it. Scan the
     // UNTRIMMED records before trimming.
     for (i, r) in records.iter().enumerate() {
-        if let Some(pos) = r.find('\r') {
+        if let Some(pos) = r.as_ref().find('\r') {
             return Err(ContainerError::EmbeddedSeparator {
                 index: i, ch: r[pos..].chars().next().unwrap() });
         }
     }
-    let trimmed: Vec<&str> = records.iter().map(|r| r.trim()).collect();
+    let trimmed: Vec<&str> = records.iter().map(|r| r.as_ref().trim()).collect();
     for (i, r) in trimmed.iter().enumerate() {
         if r.is_empty() || r.len() > MAX_RECORD_LEN {
             return Err(ContainerError::RecordTooLong { index: i, len: r.len() });
@@ -1319,6 +1354,22 @@ mod tests {
         assert_eq!(&b[48..52], &[0, 0, 0, 0], "ct_len must be zero");
     }
 
+    /// A public section spanning SIX CARDS. The only vector that catches an
+    /// implementation grouping by HRP instead of by `(HRP, chunk_set_id)` —
+    /// D and E carry one card per HRP, F is `pub_len = 0`.
+    #[test]
+    fn vector_g_multisig_public_section_spans_six_cards() {
+        let recs = two_of_three();
+        let public: Vec<String> = recs.iter().filter(|r| !r.starts_with("ms1")).cloned().collect();
+        let secret: Vec<String> = recs.iter().filter(|r| r.starts_with("ms1")).cloned().collect();
+        assert_eq!((public.len(), secret.len()), (12, 3));
+        let b = seal_deterministic(
+            Payload { public, secret },
+            100_000, salt([0xab, 0xcd]), iv([0x12, 0x34]), PASS).unwrap();
+        assert_eq!(b.len(), 1420);
+        assert_eq!(sha(&b), "483fb482ac7aef0da3fec638de183f8f3bfb35e1b6c0ec4f5b274ec0409908f1");
+    }
+
     /// THREE secret records. Without this a singular implementation of the
     /// session flow passes A–E and every negative.
     #[test]
@@ -1413,12 +1464,22 @@ mod tests {
 
     /// §6.4's 1..24 cap is over the TOTAL across both sections — 20 public plus
     /// 10 secret is legal per-section and illegal combined.
+    /// §6.4's 1..24 cap is over the TOTAL across both sections.
+    ///
+    /// **The public set must actually DECODE**, or this test passes for the
+    /// wrong reason: an earlier version used 20 copies of one md1 chunk, which
+    /// dies in `check_public` with `chunk set incomplete: got 20 chunks,
+    /// expected 3` long before the cap is reached — and deleting the combined-cap
+    /// check entirely left all 52 tests green. Match the specific error, not
+    /// merely `is_err()`.
     #[test]
     fn refuses_more_than_24_records_across_both_sections() {
         let all = bip84();
-        let public: Vec<String> = std::iter::repeat(all[3].clone()).take(20).collect();
-        let secret: Vec<String> = std::iter::repeat(all[0].clone()).take(10).collect();
-        assert!(seal(Payload { public, secret }, 300_000).is_err());
+        let public = all[1..].to_vec();                                    // 5, decodes
+        let secret: Vec<String> = std::iter::repeat(all[0].clone()).take(20).collect();
+        assert!(matches!(
+            seal(Payload { public, secret }, 300_000),
+            Err(SealError::Container(container::ContainerError::RecordCount(25)))));
     }
 
     /// Nothing else catches a frozen salt: the round-trip test and every fixed-salt
@@ -1478,6 +1539,18 @@ mod tests {
         assert!(matches!(r, Err(SealError::Passphrase(_))));
         assert!(start.elapsed() < std::time::Duration::from_millis(200),
             "2M rounds cannot finish that fast — the gate must precede the KDF");
+    }
+
+    /// The guard sits above `seal()`'s public-only early return, so it binds
+    /// that path too. Without this case, moving the check below the early
+    /// return leaves all 164 tests green — both other iteration tests take the
+    /// secret path.
+    #[test]
+    fn refuses_out_of_range_iterations_on_the_public_only_path() {
+        let all = bip84();
+        assert!(matches!(
+            seal(Payload { public: all[1..].to_vec(), secret: vec![] }, 5),
+            Err(SealError::Iterations(5))));
     }
 
     #[test]
@@ -1612,6 +1685,12 @@ fn check_public(public: &[String]) -> Result<(), SealError> {
         return Ok(());
     }
     for (i, r) in public.iter().enumerate() {
+        // A BIP-39 mnemonic is not a constellation record, so `validate_record`
+        // reports it as non-canonical and suggests `--group-size 0` — which
+        // misdiagnoses it. Check for a mnemonic first and say the real reason.
+        if passphrase::is_valid(r) {
+            return Err(SealError::SecretInPublic(i));
+        }
         if record::validate_record(r).map_err(SealError::Record)?.is_secret() {
             return Err(SealError::SecretInPublic(i));
         }
@@ -1712,6 +1791,15 @@ fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
         Ok(_) => return Ok(()),
         Err(e) => e,
     };
+    // §6.4's all-lowercase rule binds BOTH sections, and §9 says `me seal` must
+    // "refuse rather than emit". `passphrase::is_valid` lowercases via
+    // `normalise` before parsing, so without this check an UPPERCASE mnemonic
+    // validates and is then emitted verbatim by `encode_section` — the device's
+    // case-sensitive parse rejects it and the operator gets "payload
+    // unreadable" after a ~31 s KDF.
+    if let Some(pos) = s.char_indices().find(|(_, c)| c.is_uppercase()).map(|(i, _)| i) {
+        return Err(SealError::Record(record::RecordError::NotLowercase(pos)));
+    }
     if passphrase::is_valid(s) {
         return Ok(());
     }
@@ -1719,7 +1807,7 @@ fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
 }
 ```
 
-- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --lib seal`, expect **52 passed** (8 wire + 5 crypto + 5 passphrase + 7 record + 5 pubhash + 4 container + 16 mod + 2 uf2). **If any vector hash mismatches, STOP and reconcile against the spec** — the Go port binds to these bytes.
+- [ ] **Step 4: Run tests** — `cargo test -p mnemonic-engrave --lib seal`, expect **50 passed** (8 wire + 5 crypto + 5 passphrase + 7 record + 5 pubhash + 4 container + 16 mod). `uf2.rs` does not exist until Task 8; after it, the same command reports 52. **If any vector hash mismatches, STOP and reconcile against the spec** — the Go port binds to these bytes.
 
 - [ ] **Step 5: Commit**
 
@@ -2070,10 +2158,16 @@ fn run_seal_cli(
     // Global Constraint: secrets wiped on every path. argv already exposes these
     // via /proc/$PID/cmdline (inherent to §9's synopsis, filed separately), so
     // this is defence in depth on the heap copy we control.
+    // Do NOT trim here. `encode_section` scans the UNTRIMMED record for `\r`
+    // (§6.4: "no CR anywhere"), and trimming first strips a leading/trailing CR
+    // before that check ever sees it — the CLI would normalise where §9 says
+    // refuse. `encode_section` trims internally, once, after the CR scan.
+    //
+    // Secrets stay in `Zeroizing` all the way through; `encode_section` is
+    // generic over `AsRef<str>` so no plain-String copy is made.
     let secret: Vec<Zeroizing<String>> =
-        payload.iter().map(|s| Zeroizing::new(s.trim().to_string())).collect();
-    let secret: Vec<String> = secret.iter().map(|s| (**s).clone()).collect();
-    let public: Vec<String> = plaintext.iter().map(|s| s.trim().to_string()).collect();
+        payload.iter().map(|s| Zeroizing::new(s.clone())).collect();
+    let public: Vec<String> = plaintext.clone();
     if secret.is_empty() && public.is_empty() {
         eprintln!("me: nothing to seal");
         return EXIT_USAGE;
@@ -2206,6 +2300,11 @@ Procedure, both rules non-negotiable: **copy the file first** and restore from t
 | CR normalised away instead of refused | `refuses_embedded_separators_and_bad_lengths` |
 | `--group-size 0` guidance lost on the secret path | `refuses_space_grouped_input_with_an_actionable_message` |
 | unsealed-shape zero checks removed | `rejects_nonzero_crypto_fields_when_unsealed` |
+| **grouping by HRP instead of `(HRP, chunk_set_id)`** | **`vector_g_multisig_public_section_spans_six_cards`** — nothing else in the suite has more than one card per HRP in the public section |
+| the combined 1..24 cap deleted | `refuses_more_than_24_records_across_both_sections` — but ONLY in its corrected form; the earlier version passed on a card-set failure and left the mutant alive |
+| uppercase BIP-39 mnemonic emitted | `me seal "BACON …"` must be refused (§11.1 lowercase case) |
+| `--iterations` range check moved below the public-only early return | `refuses_out_of_range_iterations_on_the_public_only_path` |
+| CR trimmed at the CLI before the container sees it | §11.2 CLI case: `me seal --plaintext "md1…\r"` must be REFUSED |
 | `to_uf2` emits family `0xE48BFF59` or pads `0xFF` | `every_block_conforms_not_just_the_first` |
 | `open_bytes` returns plaintext without checking the tag | `open_fails_on_flipped_ciphertext_byte` |
 | passphrase generated for a public-only payload | `public_only_payload_prints_no_passphrase` |
