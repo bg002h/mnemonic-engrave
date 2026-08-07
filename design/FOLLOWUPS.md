@@ -813,6 +813,38 @@ Rust is already correct, so the fix lands in Go only, and the mandatory
 Also consider tightening §6.4's 512-byte per-record bound, which is roughly 5×
 wider than any valid md1 codeword.
 
+### F-68 — `plan-build-gate.sh` compiles the CLI tests but never runs them (owning phase: before Plan B's plan review; NOT gating Plan A)
+
+The gate extracts `tests/seal_cli.rs` and, since 2026-08-07, compile-checks it
+with `--no-run`. It cannot run it: the scratch crate's binary is built from the
+UNMODIFIED `main.rs`, which has no `seal` subcommand, so every case would fail
+for a reason that says nothing about the plan.
+
+**This blind spot has cost one Critical already.** Round 5 found that
+`refuses_a_record_carrying_a_cr` — added by the round-4 fold, in the same commit
+that added the compile check — passed a single md1 chunk where the card-set
+decode demands three. It compiled, and failed identically mutated and unmutated.
+An expensive review round found what one `cargo test` would have. The header
+names the gap honestly; naming a gap is not closing it.
+
+**It is mechanically closable.** Rounds 4 and 5 both assembled the full crate by
+inserting Task 9's three `main.rs` fragments verbatim from the plan's fences
+(enum variants, the two early-return blocks, `run_seal_cli`/`run_hash_cli`), then
+built the real `me` binary and ran the suite. If a reviewer can do it from the
+document, so can the script.
+
+**Why this is not gating Plan A:** the plan's correctness was re-verified by hand
+after the fix — 11/11 unmutated, and under the CR-trim mutation exactly one test
+fails, the new one. And once implementation starts the real crate exists, so
+`cargo test` runs everything and the gap closes on its own. It binds again at
+**Plan B's** plan review, where the same extract-and-check pattern recurs against
+Go. Do it before that review, not after.
+
+Watch for the stale-binary trap when mutating: restoring a file with `mv` from a
+backup can leave an mtime older than the built artifact, so cargo skips the
+rebuild and the "restored" run is still the mutant. `touch` the file. Round 4 hit
+this, and so did the fix verification for this entry.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)

@@ -2132,23 +2132,31 @@ fn printed_hash_matches_me_hash_regardless_of_surrounding_whitespace() {
 }
 
 /// Kills the mutation that trims at the CLI before `encode_section` ever sees
-/// the record. Round 4 measured it: rewriting the `plaintext` binding in
-/// `run_seal_cli` to `.map(|s| s.trim().to_string())` makes the CLI ACCEPT a
-/// CR-bearing record — exit 0, UF2 written, blob and hash both correct — and
-/// left the entire suite green — all 168 tests as it stood before this one
-/// existed. §6.4 says CRLF is rejected, not tolerated;
-/// without this test that normative refusal can be deleted with nothing to
-/// notice. The mutation-table row for it previously named a manual `me seal`
-/// invocation, which is not a killer — the same defect round 3 graded C-2.
+/// the record. Rewriting the `plaintext` binding in `run_seal_cli` to
+/// `.map(|s| s.trim().to_string())` makes the CLI ACCEPT a CR-bearing record —
+/// exit 0, UF2 written, blob and hash both correct — and left the entire suite
+/// green. §6.4 says CRLF is rejected, not tolerated; without this test that
+/// normative refusal can be deleted with nothing to notice. The mutation-table
+/// row for it once named a manual `me seal` invocation, which is not a killer —
+/// the same defect round 3 graded C-2.
+///
+/// **Pass the COMPLETE card set.** `MD1`/`MD1B`/`MD1C` are three chunks of one
+/// md1 card, and `check_public` → `decode_public_set` runs BEFORE
+/// `encode_section`'s CR scan. A first version of this test sent `MD1` alone,
+/// so it died on `d-card: chunk set incomplete: got 1 chunks, expected 3`
+/// identically whether the CLI trimmed or not — it could not fail for the right
+/// reason, and could not distinguish the mutant at all. Round 5 caught it by
+/// running the test; the build gate had only COMPILED it.
 #[test]
 fn refuses_a_record_carrying_a_cr() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.uf2");
-    me().args(["seal", "--plaintext", &format!("{MD1}\r"),
+    me().args(["seal", "--plaintext", MD1, "--plaintext", MD1B,
+               "--plaintext", &format!("{MD1C}\r"),
                "--out", out.to_str().unwrap()])
         .assert().failure()
         .stderr(predicate::str::contains(
-            "contains '\\r', which is the record separator"));
+            "record 2 contains '\\r', which is the record separator"));
     assert!(!out.exists(), "a refused seal must not leave a file behind");
 }
 
