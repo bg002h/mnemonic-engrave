@@ -275,6 +275,276 @@ mod tests {
         hexpair.repeat(6).try_into().unwrap()
     }
 
+    // ---------------------------------------------------------------------
+    // The canonical-vector exporter (Plan B Phase A, Task 1).
+    //
+    // It lives HERE, inside `mod tests`, and not under `tests/`: an
+    // integration test is a separate crate and sees only `pub` items, while
+    // `seal_deterministic` is deliberately `pub(crate)` (see its doc comment)
+    // and every fixture below — `PASS`, `bacon24`, `bip84`, `two_of_three`,
+    // `salt`, `iv` — is private to this module. Making the seam `pub` to
+    // satisfy an exporter would destroy the one-key-one-message property.
+    //
+    // Reusing the same fixtures the vector tests use is the point: the INPUTS
+    // cannot drift from the emitted vectors either.
+    // ---------------------------------------------------------------------
+
+    /// One emitted vector. Field order here is the field order in the JSON —
+    /// `serde_json` writes a derived struct in declaration order.
+    #[derive(serde::Serialize)]
+    struct EmittedVector {
+        name: String,
+        /// `null` for the unsealed shape: there is no key, so there is no
+        /// passphrase.
+        passphrase: Option<String>,
+        iterations: u32,
+        salt_hex: String,
+        iv_hex: String,
+        public: Vec<String>,
+        secret: Vec<String>,
+        /// REQUIRED, and taken from the `Header` the exporter built from the
+        /// encoded sections — never re-read from `header_hex`/`blob_hex`. The
+        /// Go parser's binding test asserts against these, and a value
+        /// recovered from the bytes the parser just read cannot fail.
+        pub_len: u32,
+        ct_len: u32,
+        blob_hex: String,
+        blob_sha256: String,
+        header_hex: String,
+        derived_key_hex: Option<String>,
+        tag_hex: Option<String>,
+        /// `null` when `pub_len == 0` — §10.2 step 3 displays nothing then.
+        pubhash_sealed: Option<String>,
+        pubhash_unsealed: Option<String>,
+    }
+
+    #[derive(serde::Serialize)]
+    struct EmittedVectors {
+        note: String,
+        spec: String,
+        vectors: Vec<EmittedVector>,
+    }
+
+    /// The inputs to one vector. `passphrase: None` selects the unsealed shape,
+    /// which is emitted via `seal_public_only`.
+    struct VectorSpec {
+        name: &'static str,
+        passphrase: Option<&'static str>,
+        iterations: u32,
+        salt: [u8; SALT_LEN],
+        iv: [u8; IV_LEN],
+        public: Vec<String>,
+        secret: Vec<String>,
+    }
+
+    const VECTORS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata/seal_vectors.json");
+    const EMIT_CMD: &str =
+        "ME_EMIT_VECTORS=1 cargo test -p mnemonic-engrave --lib seal::tests::emit_vectors";
+
+    fn build_vectors() -> EmittedVectors {
+        let all = bip84();
+        let tot = two_of_three();
+        let g_public: Vec<String> = tot
+            .iter()
+            .filter(|r| !r.starts_with("ms1"))
+            .cloned()
+            .collect();
+        let g_secret: Vec<String> = tot
+            .iter()
+            .filter(|r| r.starts_with("ms1"))
+            .cloned()
+            .collect();
+
+        let specs: Vec<VectorSpec> = vec![
+            VectorSpec {
+                name: "A",
+                passphrase: Some(PASS),
+                iterations: 100_000,
+                salt: salt([0xbe, 0xef]),
+                iv: iv([0xba, 0xc0]),
+                public: vec![],
+                secret: vec![bacon24()],
+            },
+            VectorSpec {
+                name: "B",
+                passphrase: Some(PASS),
+                iterations: 100_001,
+                salt: salt([0xbe, 0xef]),
+                iv: iv([0xba, 0xc0]),
+                public: vec![],
+                secret: vec![bacon24()],
+            },
+            VectorSpec {
+                name: "C",
+                passphrase: Some(PASS),
+                iterations: 100_000,
+                salt: salt([0xbe, 0xad]),
+                iv: iv([0xca, 0xfe]),
+                public: vec![],
+                secret: all.clone(),
+            },
+            VectorSpec {
+                name: "D",
+                passphrase: Some(PASS),
+                iterations: 100_000,
+                salt: salt([0xd0, 0x0d]),
+                iv: iv([0xf0, 0x0d]),
+                public: all[1..].to_vec(),
+                secret: vec![all[0].clone()],
+            },
+            // E is the UNSEALED shape and is emitted via `seal_public_only`,
+            // not `seal_deterministic`: no passphrase, no key, no tag, and
+            // §6.2 requires iterations/salt/iv to be zero.
+            VectorSpec {
+                name: "E",
+                passphrase: None,
+                iterations: 0,
+                salt: [0u8; SALT_LEN],
+                iv: [0u8; IV_LEN],
+                public: all[1..].to_vec(),
+                secret: vec![],
+            },
+            VectorSpec {
+                name: "F",
+                passphrase: Some(PASS),
+                iterations: 100_000,
+                salt: salt([0xf0, 0x0d]),
+                iv: iv([0xbe, 0xef]),
+                public: vec![],
+                secret: tot.clone(),
+            },
+            VectorSpec {
+                name: "G",
+                passphrase: Some(PASS),
+                iterations: 100_000,
+                salt: salt([0xab, 0xcd]),
+                iv: iv([0x12, 0x34]),
+                public: g_public,
+                secret: g_secret,
+            },
+        ];
+
+        let mut vectors = Vec::with_capacity(specs.len());
+        for VectorSpec {
+            name,
+            passphrase: pass,
+            iterations,
+            salt: s,
+            iv: i,
+            public,
+            secret,
+        } in specs
+        {
+            let blob = if secret.is_empty() {
+                seal_public_only(public.clone()).expect("vector must seal")
+            } else {
+                seal_deterministic(
+                    Payload {
+                        public: public.clone(),
+                        secret: secret.clone(),
+                    },
+                    iterations,
+                    s,
+                    i,
+                    pass.expect("a sealed vector needs a passphrase"),
+                )
+                .expect("vector must seal")
+            };
+
+            // Build the header from the ENCODED SECTIONS, independently of the
+            // blob. `pub_len`/`ct_len` must be a claim about what was sealed,
+            // not a re-read of the bytes a parser is about to be tested on.
+            let pubsec = if public.is_empty() {
+                Zeroizing::new(String::new())
+            } else {
+                container::encode_section(&public).expect("public section must encode")
+            };
+            let secsec = if secret.is_empty() {
+                Zeroizing::new(String::new())
+            } else {
+                container::encode_section(&secret).expect("secret section must encode")
+            };
+            let header = Header {
+                iterations,
+                salt: s,
+                iv: i,
+                pub_len: pubsec.len() as u32,
+                ct_len: secsec.len() as u32,
+            };
+
+            let (pubhash_sealed, pubhash_unsealed) = if public.is_empty() {
+                (None, None)
+            } else {
+                let refs: Vec<&str> = public.iter().map(|r| r.as_str()).collect();
+                (
+                    Some(hex(&pubhash::public_data_hash(&refs, true))),
+                    Some(hex(&pubhash::public_data_hash(&refs, false))),
+                )
+            };
+
+            vectors.push(EmittedVector {
+                name: name.to_string(),
+                passphrase: pass.map(|p| p.to_string()),
+                iterations,
+                salt_hex: hex(&s),
+                iv_hex: hex(&i),
+                public,
+                secret,
+                pub_len: header.pub_len,
+                ct_len: header.ct_len,
+                blob_hex: hex(&blob),
+                blob_sha256: sha(&blob),
+                header_hex: hex(&header.encode()),
+                derived_key_hex: pass.map(|p| {
+                    hex(&*crypto::derive_key(
+                        &passphrase::normalise(p),
+                        &s,
+                        iterations,
+                    ))
+                }),
+                tag_hex: if header.ct_len > 0 {
+                    Some(hex(&blob[blob.len() - wire::TAG_LEN..]))
+                } else {
+                    None
+                },
+                pubhash_sealed,
+                pubhash_unsealed,
+            });
+        }
+
+        EmittedVectors {
+            note: format!(
+                "Generated by `{EMIT_CMD}`. Normative source: crates/me-cli/src/seal/. \
+                 Do not hand-edit."
+            ),
+            spec: "SPEC_encrypted_payload_delivery.md".to_string(),
+            vectors,
+        }
+    }
+
+    /// Emits `testdata/seal_vectors.json` under `ME_EMIT_VECTORS=1`; otherwise
+    /// asserts the committed file still matches, so drift in EITHER direction
+    /// fails the suite.
+    #[test]
+    fn emit_vectors() {
+        let json = serde_json::to_string_pretty(&build_vectors()).unwrap() + "\n";
+        if std::env::var("ME_EMIT_VECTORS").as_deref() == Ok("1") {
+            let path = std::path::Path::new(VECTORS_PATH);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, &json).unwrap();
+            return;
+        }
+        let on_disk = std::fs::read_to_string(VECTORS_PATH)
+            .unwrap_or_else(|e| panic!("{VECTORS_PATH}: {e} — regenerate with `{EMIT_CMD}`"));
+        assert!(
+            on_disk == json,
+            "{VECTORS_PATH} is stale ({} bytes on disk, {} generated). \
+             It is generated, never hand-edited: regenerate with `{EMIT_CMD}`.",
+            on_disk.len(),
+            json.len()
+        );
+    }
+
     #[test]
     fn vector_a_bacon24_fully_encrypted() {
         let b = seal_deterministic(
