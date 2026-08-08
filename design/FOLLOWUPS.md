@@ -907,7 +907,7 @@ hardware; it never applied to the SH2 itself, and the owning phase already said
 Task 7 carries the procedure, including the RP2350**B** PBKDF2 rate on the same
 trip. **Not deferrable past B1.**
 
-### F-74 — no build gate covers a Go plan's code fragments (owning phase: before B2's plan review)
+### F-74 — CLOSED 2026-08-08 — a build gate now covers a Go plan's code
 
 `scripts/plan-build-gate.sh` extracts ```rust blocks into a scratch crate and
 builds them. Plan B's documents are **Go**, so every Go fragment in a plan
@@ -925,6 +925,42 @@ package beside the real `gui`/`seal` and runs `go build`. It must state its own
 blind spot the way the Rust one does — fragments that are *modifications* to
 existing files (a new `case` in a switch, a field added to a struct) cannot be
 assembled mechanically and still need a reviewer's execution pass.
+
+**CLOSED 2026-08-08** by `scripts/plan-build-gate-go.sh`, before B2's plan
+review as scheduled. Two tiers, because Go plans are mostly MODIFICATIONS that
+cannot be assembled mechanically:
+
+- **TIER 1 gates.** Blocks anchored to a NEW file are assembled into a scratch
+  copy of the fork and run through `go build` + `go vet`. Real type checking.
+- **TIER 2 is informational.** Every other block is offered to `gofmt -e` under
+  four wrappers (file, func body, struct, interface). Proves SYNTAX, never
+  semantics — and the script says so in its own output.
+
+Verified in BOTH directions, which is the standard this cycle kept finding
+tests failing: a valid whole file exits 0; the same file with `p.NoSuchField`
+exits 1 reporting `p.NoSuchField undefined (type *seal.Payload has no field or
+method NoSuchField)`.
+
+Five things it learned the hard way, all now encoded:
+1. Plans write anchors PATH-FIRST (`` `x.go`, new file ``), not verb-first. The
+   first version matched only verb-first and type-checked NOTHING while
+   reporting success.
+2. It extracted a file and then never compiled it — the exact bug
+   `plan-build-gate.sh` had with `tests/seal_cli.rs`. Now step 3 tests what
+   step 2 actually wrote instead of guessing from mtimes.
+3. Plans omit the `package` clause; it is synthesised from the path.
+4. A block anchored as a new file but containing `...` is a fragment wearing a
+   whole-file label. It is DEMOTED to tier 2 with a message, not failed on.
+5. An anchor must not leak past a heading, or a later unrelated block is
+   assembled into the previous task's file.
+
+It also baselines `go vet` against the unmodified fork, so pre-existing
+findings (`testing.ArtifactDir requires go1.26`) cannot fail a correct plan.
+Failing on correct input gets a gate ignored as fast as crying wolf does.
+
+**On the B1 plan it reports honestly: no whole-file blocks, nothing
+type-checked.** That is a finding about how plans are written — B2 should carry
+COMPLETE files where it can, so tier 1 has something to check.
 
 **Why not in B1:** it is tooling, and bundling tooling into a feature commit is
 the third-commit case the standard workflow separates out. B1 states the gap;
