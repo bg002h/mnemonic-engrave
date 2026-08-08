@@ -1,104 +1,44 @@
-# Encrypted Payload Delivery — Plan B Phase B2a (unlock and the secret session) — Implementation Plan
+# Encrypted Payload Delivery — Plan B Phase B2a-ii (unlock and the secret session) — Implementation Plan
 
-**Status:** DRAFT — R0 round 1 folded, re-review pending. **No code before 0C/0I.**
+**Status:** GREEN for its content. **Inherits the R0 loop below; the split is
+editorial.**
 
 | round | verdict | report |
 | --- | --- | --- |
-| 0 | **1C / 4I / 6M / 3N** — all folded | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round0.md` |
-| 1 | **0C / 2I / 4M / 3N** — all folded; C1's rewrite CONFIRMED sound, no hole opened | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round1.md` |
-| 2 | **0C / 1I / 0M / 2N** — all folded. **GREEN**: the Important was a stale comment, and a comment fold does not re-trigger the gate | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round2.md` |
+| 0 | 1C / 4I / 6M / 3N — all folded | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round0.md` |
+| 1 | 0C / 2I / 4M / 3N — all folded | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round1.md` |
+| 2 | 0C / 1I / 0M / 2N — all folded, **GREEN** | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round2.md` |
 
-**Round 1 found no Critical and confirmed the round-0 fix**, but both its
-Importants were the same shape: **the fold did half of a finding's fix.** M5's
-`NoEdit` guard shipped with a rationale that was false and a test that could not
-fail; I2's second instrument was created and then scheduled by nothing. And
-three of the four Minors were defects in content the round-0 fold **volunteered**
-— the residency claim, a shipped comment, a misquoted call site — none of which
-any finding had asked for.
+**Provenance.** This document and its sibling `…_phaseB2a_i.md` are the two
+halves of `IMPLEMENTATION_PLAN_encrypted_payload_deviceB_phaseB2a.md`, which went
+through the three R0 rounds above and closed GREEN at commit `861c99a`. The task
+numbering is **unchanged** (its sibling holds Tasks 1–3, this file Tasks 4–9) so
+that every finding in those three reports still resolves against a task number.
+Nothing in this document changed with the split.
 
-That is now three phases running. **The rule this feature keeps re-teaching:
-when folding, the fix gets checked because a reviewer anchored it; the
-explanation you add beside it is anchored to nothing and reads as authoritative
-to the next reader.** Treat every factual claim in volunteered context as a new
-assertion needing its own verification, and check that each finding's fix
-reaches *every* consumer the finding named — round 1's M1 and M3 are both a
-symbol corrected in one place and left stale in another.
-
-**Round 2 then caught that same pattern one level down, inside the fold that had
-just recorded it.** Round 1's I1 named *two* locations — "§6b comment and §6c" —
-and the fold corrected §6c while leaving the identical false sentence in §6b's
-whole-file block, which is the copy that ships into `gui/unlock_session.go` as a
-source comment. Round 2 was 0C/1I and that Important was exactly this. **When a
-finding's WHERE field lists more than one location, the fix has more than one
-edit; `grep` the artifact for the old wording before calling it folded.** The
-build gate cannot help here — a comment is not code.
-
-**Round 0's Critical was the plan's own "interpretation" section**, and its
-justification was false rather than merely debatable: the record was held across
-the engrave because the retry prompt supposedly needed it, when `engraveJob`
-holds `plate.Spline` and never reads the record again. The correct design was
-also the simpler one — `clear(rec)` the moment the plate exists — and it needed
-no interpretation of §10.2.2 at all.
-
-**The lesson, stated precisely.** It is not that a "deliberate departure" section
-is wrong to write: B1's plan carried one, and R0 round 0 **checked it and found
-it correct** ("The append-vs-insert argument in 'A deliberate departure…' is
-verified against the real `layoutMainPager`/`layoutMainPlates` dot-fill and wrap
-logic and holds up"). Both sections even closed with the same invitation — *if
-this reasoning is wrong, the task is wrong*. The difference is that B1's
-load-bearing claim about existing behaviour had been **run against the code** and
-this one had not. **Flagging a departure for the reviewer is not a substitute for
-verifying the claim it rests on**; it just tells the reviewer where to spend the
-round you were about to cost them.
-
-Two of the four Importants were **tests that could not fail** — a fixture that
-never reached the code path it was named for, and a mutation table naming a
-counter that no longer sits in the path under test. Both are the same class B1's
-whole-diff review found twice.
-
-**Descends from:** `SPEC_encrypted_payload_delivery.md` §10, which is GREEN and
-normative. This plan implements §10.2 steps 5–9 plus §10.2.2, and closes **F-77**
-and **F-79**. It does **not** restate requirements — where this plan and §10
-disagree, §10 wins and this plan is defective.
-
-**Predecessor:** `IMPLEMENTATION_PLAN_encrypted_payload_deviceB_phaseB1.md`
-(merged, `78949e7`). B1 is the unsealed path with UI; B2a is the half that holds
-a secret.
-
-**Successor:** B2b — §10.2.4's residency-keyed idle wipe, F-80's remaining B2
-item, F-76. **THE FEATURE IS NOT OPERATOR-COMPLETE UNTIL B2b. Do not tag a
-release after B2a.**
+**PREREQUISITE: B2a-i must be merged first.** This phase calls `seal.NewDeriver`
+(Task 3), reads `AdmittedRecord`'s labels on encrypted records (Task 1), and
+takes the payload region from a `seal.Reader` rather than a retained slice
+(Task 2).
 
 ---
 
-## Why the phase boundary is here
+## Why the seam is where it is
 
-B1 was cheap to review because **no secret was ever resident**. B2a is the
-opposite: it is the phase where seed material lives in SRAM, and every task
-below exists either to put it there or to get it out again.
+**B2a-i cannot decrypt. This phase is where seed material becomes resident**, and
+every task below exists either to put it there or to get it out again. Splitting
+there rather than anywhere else in the nine tasks means a reviewer of B2a-i never
+has to reason about residency at all, and a reviewer of this document reasons
+about nothing else.
 
-| | B1 (shipped) | **B2a (this plan)** | B2b |
-| --- | --- | --- | --- |
-| §10.1 detection + menu entry | ✅ | — | — |
-| §10.2 steps 1–3 (`Inspect`, hash) | ✅ | — | — |
-| §10.2 step 4 (`ct_len == 0` warning) | ✅ | — | — |
-| plate list (paged) + engrave public records | ✅ | extended | — |
-| §10.2 steps 5–6 (12 words, checksum gate) | — | ✅ | — |
-| §10.2 step 7 (KDF + progress) | — | ✅ | — |
-| §10.2 steps 8–9 (AEAD open, retry loop) | — | ✅ | — |
-| §10.2.2 secrets-first session lifecycle | — | ✅ | — |
-| **F-77** encrypted-section card grouping | — | ✅ **gating** | — |
-| **F-79** 64 KB retention | — | ✅ | — |
-| §7.1 in-situ KDF rate on RP2350B | — | ✅ | — |
-| §10.2.4 residency-keyed idle wipe | — | — | ✅ |
-| F-80 `layoutMainPager` pixel pin, F-76 | — | — | ✅ |
+**This phase is NOT separable any further.** §10.2.2's session lifecycle ships
+with the unlock that creates it: a build that decrypted but did not offer and
+wipe secrets would leave seed material resident with no lifecycle, which is
+strictly worse than not decrypting. That is `CONTINUITY_2026-08-08.md`'s argument
+for the original B2a/B2b seam and it binds inside B2a just as hard.
 
-**What B2a ships without, and it must be said plainly:** §10.2.4's timer does not
-exist yet. Between the moment a secret record is decrypted and the moment its
-plate leaves the screen, the **only** control on residency is §10.2.2's wipe.
-That is why Task 6 makes the wipe a `defer` registered before anything can
-return, and why the §10.2.2 reading in "The one place this plan interprets the
-spec" below matters more in B2a than it will in B2b.
+> **THE FEATURE IS STILL NOT OPERATOR-COMPLETE AFTER THIS PHASE.** §10.2.4's
+> residency-keyed idle wipe is B2b's. Do not tag a release when this merges.
 
 ---
 
@@ -130,7 +70,6 @@ closed a real fork in the design.
    contradicts §10.2.2 directly.
 
 ---
-
 ## Global Constraints
 
 Phase A's and B1's global constraints carry forward **unchanged** and are not
@@ -213,7 +152,6 @@ is reusable unmodified is one level down: `inputWordsFlow` (`gui/gui.go:641`),
 whose length comes entirely from `len(mnemonic)`. Task 4 uses that.
 
 ---
-
 ## The record is wiped BEFORE the engrave, not after it (R0 round 0, C1)
 
 **An earlier draft of this plan held the secret record across the engrave and
@@ -279,8 +217,12 @@ exist for the duration of the cut. An SWD reader with the machine open during an
 engrave can reconstruct the seed from `plate.Spline` whether or not the record
 buffer is zeroed. What the early wipe removes is the *record*, the *only* copy
 that outlives the plate and the one §10.2.2 names. The unwipeable derived copies
-are **F-83**, they are not closed by this, and no phase of this feature closes
-them — that needs a plate pipeline over `[]byte`.
+are **F-83**, and they are **not a defect awaiting a fix**: the operator accepted
+them as unavoidable on 2026-08-08. The plate must exist in RAM for as long as the
+needle is moving, and a plate pipeline over `[]byte` would relocate the secret
+rather than remove it, because the spline still encodes it. See F-83 in the
+follow-up register for what that means for the threat model, and F-85 for the
+SPEC amendment it owes.
 
 **Consequence for the retry story, stated so Task 9.6 tests the truth:** because
 the job holds the spline, an operator who pauses mid-cut **can resume the same
@@ -291,888 +233,6 @@ strictly better than the alternative: the pause/resume path never had a seed
 record resident to protect.
 
 ---
-
-## Task 1 — F-77: publish the §6.3 grouping for the ENCRYPTED section (GATING)
-
-**Why it gates:** §10.2.2's plate labels are unimplementable without it for any
-multisig payload. `AdmittedRecord.HRP`/`CardIndex`/`CardTotal`/`PlateIndex`/`PlateTotal`
-are populated for `SectionPublic` only, because pass 3 runs only there
-(`seal/record.go:214`). And the encrypted section is full of cards: vector C's
-secret set is `ms1`×1 / `mk1`×2 / `md1`×3, vector F's is `ms1`×3 / `mk1`×6 /
-`md1`×6 — **twelve of vector F's fifteen secret records are cards** (measured
-from `seal/testdata/vectors.json`).
-
-**Reuse `groupRecords`/`cardKey`/`labelCards`. Do NOT re-derive classification in
-`gui`** — that is the two-code-paths divergence `Opener.Inspect`'s doc comment
-exists to prevent, and Task 4a of the B1 plan rejected it for the public section
-on the same grounds.
-
-### 1a. Why this is LABEL-ONLY and must never reject
-
-`decodePublicSet` is **not** extended over the encrypted section, and
-`labelEncryptedCards` swallows a grouping error rather than returning it. Three
-reasons, and the third is the binding one:
-
-1. §10.2.1's table requires DECODE for the **public** section only. The encrypted
-   section's admission surface is `mdmkText`, `ms1`, or a BIP-39 mnemonic, with
-   no decode step.
-2. `cardKey` (`seal/record.go:353`) fails closed for anything that is not an
-   md1/mk1 card, and the encrypted section legitimately carries `ms1` and
-   mnemonics. Grouping the whole section would reject every real payload.
-3. **Rejecting on a grouping failure would change ADMISSION**, which the
-   Rust-primary rule (`CLAUDE.md`) puts in Rust first, with test vectors. Adding
-   *labels* changes no wire format, no identity algorithm, no validation and no
-   admission — it publishes a partition that is already computed. That is
-   plumbing, and the rule does not bind it.
-
-### 1b. The new file
-
-`seal/label_encrypted.go`, new file.
-
-```go
-package seal
-
-// F-77 — §6.3's card grouping, published for the ENCRYPTED section.
-//
-// AdmittedRecord's label fields were populated for SectionPublic only, because
-// pass 3 (decodePublicSet) is the sole place a grouping is computed and it runs
-// only there (record.go:214). But §6.3 admits md1/mk1 into the encrypted
-// section explicitly, and the vectors carry them: vector C's secret set is
-// ms1 x1 / mk1 x2 / md1 x3, vector F's is ms1 x3 / mk1 x6 / md1 x6. Without
-// this, §10.2.2's secret-session plate labels are unimplementable for every
-// multisig payload.
-//
-// LABEL-ONLY, and that is normative here rather than a shortcut:
-//
-//   - It runs over the ClassMDMK SUBSET. cardKey fails closed for anything that
-//     is not an md1/mk1 card, and the encrypted section legitimately carries ms1
-//     and bare mnemonics, so grouping the whole section would reject every real
-//     payload.
-//   - A grouping failure is DISCARDED, not returned. §10.2.1 requires the decode
-//     for the public section only; turning a label failure into a rejection
-//     would change ADMISSION, and admission changes land in Rust first with test
-//     vectors (the Rust-primary rule). Publishing a partition that is already
-//     computed changes no behaviour at all.
-//
-// A record whose card cannot be read therefore keeps its zero label fields, and
-// gui's plateLabel already renders that as "record N" rather than mislabelling
-// it as an md1 (gui/unlock_platelist.go:50-55).
-func labelEncryptedCards(out []AdmittedRecord) {
-	// Stringifying an md1/mk1 copies PUBLIC data by §6.3 — an xpub or a wallet
-	// policy, not key material — which is why the same conversion is already
-	// done unremarked for the public section (record.go:217-220). ms1 and
-	// mnemonic records are never converted here.
-	at := make([]int, 0, len(out))
-	strs := make([]string, 0, len(out))
-	for i, r := range out {
-		if r.Class != ClassMDMK {
-			continue
-		}
-		at = append(at, i)
-		strs = append(strs, string(r.Record))
-	}
-	if len(strs) == 0 {
-		return
-	}
-	g, err := groupRecords(strs)
-	if err != nil {
-		return
-	}
-	// labelCards indexes by position within the slice it is handed, so the
-	// subset is labelled in its own coordinates and scattered back. Reusing it
-	// rather than reimplementing the card/plate arithmetic is the point: two
-	// implementations of "which card is this" is exactly what F-77 exists to
-	// avoid.
-	sub := make([]AdmittedRecord, len(strs))
-	labelCards(sub, g)
-	for j, i := range at {
-		out[i].HRP = sub[j].HRP
-		out[i].CardIndex = sub[j].CardIndex
-		out[i].CardTotal = sub[j].CardTotal
-		out[i].PlateIndex = sub[j].PlateIndex
-		out[i].PlateTotal = sub[j].PlateTotal
-	}
-}
-```
-
-### 1c. The call site — a three-line fragment in `seal/record.go`
-
-Insert immediately after the existing `if section == SectionPublic { … }` block
-(`seal/record.go:214-241`) and before `return out, nil`:
-
-```go
-	// F-77 — pass 3's grouping, published for the encrypted section too. It is
-	// LABEL-ONLY: see labelEncryptedCards. No decode, and no new rejection.
-	if section == SectionEncrypted {
-		labelEncryptedCards(out)
-	}
-```
-
-### 1d. Update `AdmittedRecord`'s doc comment — it currently states the opposite
-
-`seal/record.go:101-112` says the fields are "0 for every record in the encrypted
-section — INCLUDING ClassMDMK ones … See F-77." That sentence is what Task 1
-falsifies. Replace the "and 0 for every record in the encrypted section" clause
-with:
-
-```go
-	// HRP is 'd' (md1) or 'k' (mk1) for a ClassMDMK record in EITHER section,
-	// and 0 for every other record. §6.3 admits md1/mk1 into the encrypted
-	// section explicitly, and vector F's secret set is ms1 x3 / mk1 x6 / md1 x6,
-	// so twelve of its fifteen secret records ARE cards. Grouping the encrypted
-	// section is LABEL-ONLY (labelEncryptedCards): no decode runs there and no
-	// grouping failure rejects a payload. F-77, closed in B2a.
-```
-
-> **Leaving that comment stale is not cosmetic.** It is the sentence a B2b author
-> would read to decide whether a secret record can be labelled, and it would tell
-> them no.
-
-### 1e. Tests first
-
-`seal/label_encrypted_test.go`, new file.
-
-```go
-package seal
-
-import (
-	"testing"
-
-	"seedhammer.com/codex32"
-)
-
-// F-77. The encrypted section's md1/mk1 records must carry the same card
-// labels the public section's do, or §10.2.2's secret-session plate list cannot
-// name a plate on any multisig payload.
-//
-// Vector C is the discriminating fixture on the small side: its secret set is
-// ms1 x1 / mk1 x2 / md1 x3, so it exercises the SUBSET path (an ms1 sits among
-// the cards) as well as the labelling.
-func TestEncryptedSectionCardsAreLabelled(t *testing.T) {
-	v := vectorNamed(t, "C")
-	out, err := AdmitSection(bs(v.Secret), SectionEncrypted)
-	if err != nil {
-		t.Fatalf("admit vector C's secret section: %v", err)
-	}
-	if len(out) != 6 {
-		t.Fatalf("vector C's secret section is %d records, want 6", len(out))
-	}
-	var cards, secrets int
-	for i, r := range out {
-		switch r.Class {
-		case ClassMDMK:
-			cards++
-			if r.HRP != 'd' && r.HRP != 'k' {
-				t.Errorf("record %d is a card with HRP %q, want 'd' or 'k'", i, r.HRP)
-			}
-			if r.PlateTotal < 1 || r.PlateIndex < 1 || r.PlateIndex > r.PlateTotal {
-				t.Errorf("record %d has plate %d/%d, which is not a 1-based index",
-					i, r.PlateIndex, r.PlateTotal)
-			}
-			if r.CardTotal < 1 || r.CardIndex < 1 || r.CardIndex > r.CardTotal {
-				t.Errorf("record %d has card %d/%d, which is not a 1-based index",
-					i, r.CardIndex, r.CardTotal)
-			}
-		case ClassCodex32Secret:
-			secrets++
-			// An ms1 is not a card and must keep its zero label. A non-zero HRP
-			// here would mean the subset filter leaked.
-			if r.HRP != 0 || r.CardIndex != 0 || r.PlateIndex != 0 {
-				t.Errorf("record %d is an ms1 but carries card labels: %+v", i, r)
-			}
-		}
-	}
-	if cards != 5 || secrets != 1 {
-		t.Fatalf("vector C's secret section classified as %d cards + %d secrets, want 5 + 1",
-			cards, secrets)
-	}
-}
-
-// Vector F is the one that discriminates plural from singular: 15 secret
-// records, ms1 x3 / mk1 x6 / md1 x6, with the six mk1 records spanning THREE
-// cosigner cards. A flat mk1 1/6..6/6 conflates them, which is §6.4's
-// incomplete-backup-believed-complete hazard wearing a label.
-func TestEncryptedMultisigCardsAreDistinguishable(t *testing.T) {
-	v := vectorNamed(t, "F")
-	out, err := AdmitSection(bs(v.Secret), SectionEncrypted)
-	if err != nil {
-		t.Fatalf("admit vector F's secret section: %v", err)
-	}
-	if len(out) != 15 {
-		t.Fatalf("vector F's secret section is %d records, want 15", len(out))
-	}
-	seen := make(map[[2]int]bool)
-	var mk int
-	for _, r := range out {
-		if r.Class != ClassMDMK || r.HRP != 'k' {
-			continue
-		}
-		mk++
-		if r.CardTotal != 3 {
-			t.Fatalf("mk1 record reports %d cards of its HRP, want 3", r.CardTotal)
-		}
-		key := [2]int{r.CardIndex, r.PlateIndex}
-		if seen[key] {
-			t.Fatalf("two mk1 records share card %d plate %d — the three cosigner "+
-				"cards have been conflated", r.CardIndex, r.PlateIndex)
-		}
-		seen[key] = true
-	}
-	if mk != 6 {
-		t.Fatalf("vector F carries %d mk1 records, want 6", mk)
-	}
-}
-
-// A record the grouping cannot read must NOT reject the payload: §10.2.1
-// requires the decode for the public section only, and turning a label failure
-// into a rejection would change ADMISSION, which lands in Rust first.
-//
-// THE FIXTURE MUST REACH groupRecords, and an earlier draft of this test did
-// not (R0 round 0, I4): it used a mnemonic-only section, so labelEncryptedCards
-// returned at `len(strs) == 0` and the mutant "return the grouping error instead
-// of discarding it" survived the entire suite.
-//
-// codex32.AssembleMD1(nil) is the fixture that does reach it. Measured against
-// the real packages, not assumed:
-//
-//	assembled          = "md1t7yjcvgk6xetg" (16 bytes)
-//	codex32.ValidMD    = true          -> Classify = ClassMDMK, so it is IN the subset
-//	md.ParseChunkHeader = "md: bit stream truncated"
-//	cardKey            = ErrUndecodableCardSet: record 0: md: bit stream truncated
-//
-// Note the seal package's existing smuggledMD1 fixture CANNOT serve here:
-// md.ParseChunkHeader SUCCEEDS on it ({Version:0 Chunked:false ChunkSetID:0},
-// err=nil), so cardKey returns cleanly and the error path is never taken.
-func TestUnreadableEncryptedCardDoesNotReject(t *testing.T) {
-	v := vectorNamed(t, "C")
-	var realMD1 string
-	for _, r := range v.Secret {
-		if codex32.ValidMD(r) {
-			realMD1 = r
-			break
-		}
-	}
-	if realMD1 == "" {
-		t.Fatal("vector C carries no md1 record; the premise of this test is broken")
-	}
-	broken := codex32.AssembleMD1(make([]byte, 0))
-	if Classify([]byte(broken)) != ClassMDMK {
-		t.Fatalf("the fixture classifies as %v, not a card, so it never reaches the grouping",
-			Classify([]byte(broken)))
-	}
-	if _, err := cardKey(broken, 0); err == nil {
-		t.Fatal("the fixture's card key resolves; it cannot exercise the failure path")
-	}
-
-	out, err := AdmitSection([][]byte{[]byte(broken), []byte(realMD1)}, SectionEncrypted)
-	// (a) a grouping failure must NOT reject.
-	if err != nil {
-		t.Fatalf("a label failure rejected the payload: %v — §10.2.1 requires the "+
-			"decode for the public section only, and this is an ADMISSION change", err)
-	}
-	// (b) every record is still admitted.
-	if len(out) != 2 {
-		t.Fatalf("admitted %d records, want 2", len(out))
-	}
-	// (c) and the whole subset falls back to zero labels rather than to wrong
-	// ones — groupRecords is all-or-nothing, so one unreadable card costs the
-	// labels of every card beside it. gui's plateLabel renders that as
-	// "record N" (gui/unlock_platelist.go:50-55), never as a mislabelled md1.
-	for i, r := range out {
-		if r.HRP != 0 || r.CardIndex != 0 || r.PlateIndex != 0 {
-			t.Errorf("record %d carries a label (%c card %d/%d plate %d/%d) although the "+
-				"grouping failed", i, r.HRP, r.CardIndex, r.CardTotal, r.PlateIndex, r.PlateTotal)
-		}
-	}
-}
-```
-
-### 1f. ONE existing test asserts the opposite, and it must be INVERTED
-
-**`TestEncryptedRecordsCarryNoGrouping` (`seal/grouping_test.go:103`) fails under
-Task 1, by design — measured, not predicted.** Running the plan's own code
-against a scratch tree with the §1c fragment applied, it is the **only** failure
-in the whole `seal` suite, and it fails twelve times:
-
-```
---- FAIL: TestEncryptedRecordsCarryNoGrouping (0.00s)
-    grouping_test.go:118: secret record 3 carries a grouping (k card 1/3 plate 1/2); pass 3 does not run for the encrypted section
-    …
-    grouping_test.go:118: secret record 14 carries a grouping (d card 1/1 plate 6/6); pass 3 does not run for the encrypted section
-```
-
-**Invert it; do not delete it, and do not weaken it.** Its own doc comment says
-what it is for: "That is the trap Phase B2 inherits (F-77), and this test is what
-makes it a measured fact rather than a recollection." It pins a **documented
-gap**, not a requirement — and F-77 is the ticket to close that gap. Closing it
-is what B2a is for.
-
-This is emphatically **not** the "fix the test rather than the code"
-anti-pattern that B1's round-1 fold warned about. The distinction is whether the
-test encodes an *invariant* or a *known deficiency*:
-
-- The ordering constraint next to it — grouping must run **after** the
-  allow-list, because `cardKey` fails closed and
-  `TestPublicSectionRefusesASecret` asserts `ErrRecordNotPermitted` — is an
-  invariant, and Task 1 does not touch it. `labelEncryptedCards` runs after the
-  loop, exactly as pass 3 does.
-- `TestEncryptedRecordsCarryNoGrouping` encodes a deficiency, with the follow-up
-  number that closes it written in its own comment.
-
-The replacement keeps the premise check that gives the test its force — **vector
-F's secret section must hold exactly 12 cards of 15 records**, or the test would
-pass just as green on a payload with no cards at all.
-
-**Steps:**
-
-- [ ] **1.1** Write `seal/label_encrypted_test.go` above. Run
-      `nix develop --command go test ./seal/ -run 'Encrypted'`. Expect FAIL:
-      `undefined: labelEncryptedCards` is not the failure — the tests call
-      `AdmitSection`, so expect *label assertions* to fail with zero HRPs.
-      **Measured, running exactly this:** `record 1 is a card with HRP '\x00',
-      want 'd' or 'k'` … and `vector F carries 0 mk1 records, want 6`.
-- [ ] **1.2** Write `seal/label_encrypted.go`. Add the call site in
-      `seal/record.go`. Update the `AdmittedRecord` doc comment.
-- [ ] **1.3** Invert `TestEncryptedRecordsCarryNoGrouping` per §1f — rename it
-      (`TestEncryptedRecordsCarryTheirGrouping`), assert every `ClassMDMK` record
-      carries a 1-based card/plate identity and every non-card record still
-      carries none, and keep the `cards != 12` premise check.
-- [ ] **1.4** `nix develop --command go test ./seal/`. **Every other Phase A test
-      must pass UNCHANGED** — measured: with the fragment applied and only this
-      one test still in its old form, it is the sole failure in the package.
-      **If a SECOND test needs editing, the change was not additive and Task 1 is
-      wrong.**
-- [ ] **1.5** Mutation check. Apply each, confirm a named test fails, restore
-      from a **file copy** (never `git checkout`), and assert the substitution
-      matched before running — a silently-failing `sed` reads exactly like a
-      surviving mutant.
-
-      | mutant | must be killed by |
-      | --- | --- |
-      | `labelEncryptedCards` body emptied | `TestEncryptedSectionCardsAreLabelled` |
-      | subset filter widened to every record (drop the `ClassMDMK` continue) | **`TestEncryptedSectionCardsAreLabelled`** — vector C's `ms1` reaches `cardKey`, the whole grouping fails, and every label comes back zero. *(An earlier draft named `TestUnreadableEncryptedCardDoesNotReject` "because the section starts rejecting". It does not: the error is discarded by design. R0 round 0, M2.)* |
-      | `labelCards` fed `g.keys` order instead of `g.perRecord` | `TestEncryptedMultisigCardsAreDistinguishable` |
-      | the grouping error returned instead of discarded | `TestUnreadableEncryptedCardDoesNotReject` — **only** with the §1e fixture as corrected; the mnemonic-only version never reached `groupRecords` |
-
-- [ ] **1.6** Commit. `git add seal/label_encrypted.go seal/label_encrypted_test.go seal/record.go seal/grouping_test.go`
-
----
-
-## Task 2 — F-79: retain nothing
-
-`uiFlow` probes once at startup and **holds 65,536 bytes for the GUI's whole
-lifetime** (`gui/gui.go:1541-1546`; `XIPReader.Read` allocates
-`clampRegion(RegionLen)`, `seal/read_tinygo.go:41-52`). §6.2's own caps make the
-largest legal blob `52 + 8191 + 8191 + 16` = **16,450 bytes**, so ~49 KB of it is
-provably erased flash. Measured on the B1 branch: `ram 69300`, ~451 KB free of
-the RP2350B's 520 KB — **~14% of the free heap, held permanently.**
-
-**Payload-present plus a running engrave is the one configuration hardware has
-never exercised**, and `validateMdmk` builds three full plate plans at once. If
-that combination exhausts the heap the failure is an out-of-memory *during* an
-engrave.
-
-### 2a. `Reader` gains a magic-only probe
-
-Fragment, `seal/read.go` — extend the interface (`seal/read.go:27-29`):
-
-```go
-// Reader yields the payload region's bytes. Phase B holds one of these and
-// never learns where the bytes came from.
-type Reader interface {
-	// Probe reports whether the region begins with MNEMBLOB (§6.1). It exists
-	// so §10.1's startup detection costs 8 bytes rather than 64 KB: Read's
-	// result is retained for as long as the caller holds it, and holding the
-	// whole region for the GUI's lifetime is ~14% of free heap (F-79).
-	//
-	// It is deliberately COARSER than Read: present-but-corrupt probes true,
-	// the menu entry appears, and the flow then reports "payload unreadable".
-	// Collapsing the two would hide a tampered payload behind an invisible menu
-	// entry, which is precisely the signal §2.2 item 4 exists to raise.
-	Probe() bool
-	Read() ([]byte, error)
-}
-```
-
-Fragment, `seal/read_tinygo.go` — the probe maps 8 bytes of XIP and copies
-nothing (execute-in-place flash is directly addressable; the copy in `Read`
-exists only because the caller keeps the bytes across a flash write):
-
-```go
-// Probe reads only the magic. unsafe.Slice over XIP is a MAPPING, not a copy,
-// so this allocates nothing at all — which is the whole point of F-79.
-func (XIPReader) Probe() bool {
-	region := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(PayloadAddr))), clampRegion(len(Magic)))
-	return hasMagic(region)
-}
-```
-
-Fragment, `seal/read_host.go`:
-
-```go
-// Probe reads only the magic, matching XIPReader.Probe's cost profile as
-// closely as a file can. An absent or unreadable file is "no payload" (§6.1) —
-// never an error, because on the device the two are indistinguishable.
-func (r FileReader) Probe() bool {
-	f, err := os.Open(r.Path)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-	buf := make([]byte, len(Magic))
-	if _, err := io.ReadFull(f, buf); err != nil {
-		return false
-	}
-	return hasMagic(buf)
-}
-```
-
-### 2b. `uiFlow` retains the reader, not the bytes
-
-Fragment replacing `gui/gui.go:1541-1546`'s `var payload []byte` block:
-
-```go
-	// §10.1 detection. Probed ONCE, here, not per frame: the region cannot
-	// change while the GUI runs (writing it requires picotool and a reboot),
-	// and "absent -> the feature is invisible" is a startup property.
-	//
-	// F-79: the READER is retained, the BYTES are not. XIPReader.Read allocates
-	// the whole 65,536-byte region and at most 16,450 of it can ever be
-	// meaningful (§6.2's caps); holding that for the GUI's lifetime is ~14% of
-	// free heap, and payload-present PLUS a running engrave is the one
-	// configuration hardware has never driven to completion.
-	var payloadReader seal.Reader
-	if r := ctx.Platform.PayloadReader(); r != nil && r.Probe() {
-		payloadReader = r
-	}
-```
-
-`StartScreen.lastNav` is then set from `payloadReader != nil` rather than from
-`payload != nil`, and the dispatch case (`gui/gui.go:1595`, which today reads
-`unlockPayloadFlow(ctx, th, payload)`) becomes
-`unlockPayloadFlow(ctx, th, payloadReader)`.
-
-### 2c. The flow owns the region's lifetime
-
-Fragment, the head of `unlockPayloadFlow` (`gui/unlock_flow.go:25-31`) — the
-signature changes from `blob []byte` to `r seal.Reader`:
-
-```go
-func unlockPayloadFlow(ctx *Context, th *Colors, r seal.Reader) {
-	blob, err := r.Read()
-	if err != nil {
-		// ErrNoPayload here means the region was erased between the startup
-		// probe and now, which takes a picotool run and a reboot. Report it the
-		// same as any unreadable region rather than inventing a third message.
-		showError(ctx, th, unlockTitle, "Payload unreadable.")
-		return
-	}
-	// F-79. The region is this flow's for the duration of the session and
-	// nobody else's. clear() zeroes it rather than merely dropping it: the AAD
-	// and the ciphertext both live in here, and TinyGo will not necessarily
-	// collect it before the engrave that follows needs the heap.
-	//
-	// A CLOSURE, not `defer clear(blob)` (R0 round 0, I1). Deferred call
-	// arguments are evaluated when the defer STATEMENT runs, so `defer
-	// clear(blob)` would capture the slice header here and pin all 65,536 bytes
-	// for the whole flow -- the §5d `blob = nil` would rebind the local and
-	// release nothing, and F-79 would be reported closed while unfixed in
-	// exactly the payload-present-plus-running-engrave configuration Task 9.5
-	// exists to test. The closure reads `blob` at EXIT instead.
-	defer func() { clear(blob) }()
-	var o seal.Opener
-	p, err := o.Inspect(blob)
-```
-
-**And the blob is released before the engrave**, not merely at the end — see
-Task 5, which sets `blob = nil` after `UnlockWithKey` returns, its last use.
-
-### 2d. Tests
-
-Fragment additions to `gui/unlock_program_test.go` and `gui/unlock_flow_test.go`.
-`runUnlock` (`gui/unlock_flow_test.go:17`) currently takes `[]byte`; it takes a
-`seal.Reader` instead, and `payloadReaderFor` (`gui/unlock_program_test.go:88`)
-already produces one from a vector name, so the change is one line per call site.
-
-```go
-// F-79. The startup probe must not read the region: a 64 KB allocation held for
-// the GUI's lifetime is ~14% of free heap, and the menu only needs to know
-// whether MNEMBLOB is there.
-func TestStartupProbesWithoutReadingTheRegion(t *testing.T) {
-	var reads, probes int
-	r := &countingReader{inner: payloadReaderFor(t, "D"), reads: &reads, probes: &probes}
-	p := newPlatform()
-	p.payload = r
-	ctx := NewContext(p)
-	frame, quit := runUI(ctx, func() { uiFlow(ctx, "test") })
-	defer quit()
-	if _, ok := pumpUntil(frame, "Sealed Payload", 32); !ok {
-		t.Fatal("the menu entry never appeared, so the probe did not report present")
-	}
-	if probes == 0 {
-		t.Fatal("startup never probed")
-	}
-	if reads != 0 {
-		t.Fatalf("startup called Read %d times; F-79 requires the region NOT be read "+
-			"until the flow is entered", reads)
-	}
-}
-```
-
-**Steps:**
-
-- [ ] **2.1** Write `countingReader` and `TestStartupProbesWithoutReadingTheRegion`.
-      Run it. Expect FAIL — `reads` is 1 today.
-- [ ] **2.2** Add `Probe()` to the interface and both implementations. Run
-      `nix develop --command go test ./seal/`.
-- [ ] **2.3** Rewire `uiFlow`, `unlockPayloadFlow` and every call site. Update
-      `runUnlock` and the four `gui/unlock_*_test.go` files.
-- [ ] **2.4** `nix develop --command go test ./gui/ ./seal/`.
-- [ ] **2.5** TinyGo device build — `Probe` is the first new `unsafe.Slice` site
-      since B1 and the build is the only thing that compiles it.
-- [ ] **2.6** Commit.
-
----
-
-## Task 3 — the chunked KDF (§10.2 step 7)
-
-**`pbkdf2.Key` is one blocking call.** `seal.DeriveKey` (`seal/crypto.go:43`) has
-no callback, no counter and no cancellation, so ~31 s of the frame loop simply
-does not happen: the screen holds its last frame, touch queues, and the operator
-sees exactly the hang §10.2 step 7 exists to prevent. Nothing in the fork covers
-this — measured: there is no percentage readout and no indeterminate spinner
-anywhere.
-
-**What makes this safe to write rather than reckless:** the derived keys for
-vectors **A, B, C, D, F and G** are in `seal/testdata/vectors.json` as literals.
-A chunked implementation is pinned by six independent cross-implementation
-vectors *and* by direct equality against the `crypto/pbkdf2` call it replaces,
-before anything depends on it. It changes no wire format, no identity algorithm,
-no validation and no admission, so the Rust-primary rule does not bind it —
-the host has no progress bar to build.
-
-### 3a. The arithmetic, so the step size is derived and not guessed
-
-§7.1 measured **9,715 iterations/sec** on RP2350 silicon. At 500 iterations per
-frame that is **51.5 ms** of work between draws, ≈19 frames/sec — comfortably
-above the ~10 fps at which a progress bar reads as motion, and far below the
-~250 ms at which a touch feels unresponsive. 300,000 iterations is 600 frames.
-
-### 3b. The new file
-
-`seal/pbkdf2.go`, new file.
-
-```go
-package seal
-
-import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"hash"
-)
-
-// §7's PBKDF2-HMAC-SHA256, run in SLICES.
-//
-// DeriveKey stays as the one-shot form and is what the vectors pin. This is the
-// same function decomposed so §10.2 step 7's progress indicator can be a real
-// one: crypto/pbkdf2.Key blocks for ~31 s with no callback and no counter, so
-// the frame loop stops dead and the operator sees the hang the step exists to
-// prevent.
-//
-// Two properties make this a decomposition rather than new crypto:
-//
-//   - dkLen == KeyLen == sha256.Size, so RFC 8018's OUTER loop runs exactly
-//     once and the block index is always 1. What is left is the inner
-//     U_i = PRF(P, U_{i-1}) chain and an XOR accumulator — no branching, no
-//     block bookkeeping, nothing to get subtly wrong that a vector cannot see.
-//   - Every vector's derived key is a literal in testdata/vectors.json, and
-//     pbkdf2_test.go asserts BOTH that this reproduces them and that it equals
-//     DeriveKey iteration-for-iteration.
-//
-// It allocates nothing per Step: the HMAC is constructed once and Reset()
-// restores its keyed state, and both buffers are arrays.
-var _ [0]struct{} = [KeyLen - sha256.Size]struct{}{}
-
-// Deriver is one in-progress derivation. The zero value is NOT usable; call
-// NewDeriver.
-type Deriver struct {
-	mac   hash.Hash
-	u     [sha256.Size]byte
-	acc   [sha256.Size]byte
-	done  int
-	total int
-}
-
-// NewDeriver starts a derivation over the §8.1-normalised passphrase.
-//
-// passphrase is []byte and not string DELIBERATELY: it is the caller's buffer
-// and the caller can zero it, which Unlock's string parameter makes impossible.
-// The honest caveat: hmac.New folds the passphrase into an ipad/opad pair
-// inside the hash state, and those are key-equivalent and not reachable to be
-// zeroed. Wipe clears everything this type owns; it cannot clear that. Same
-// defence-in-depth-not-a-guarantee framing as the rest of the firmware.
-func NewDeriver(passphrase, salt []byte, iterations int) *Deriver {
-	if iterations < 1 {
-		// Unreachable behind ParseHeader, which bounds iterations to
-		// [100_000, 2_000_000] before any KDF work (§6.2). Clamped rather than
-		// panicked: on a device a panic is a brick.
-		iterations = 1
-	}
-	d := &Deriver{
-		mac:   hmac.New(sha256.New, passphrase),
-		total: iterations,
-	}
-	// U_1 = PRF(P, S || INT_32_BE(1)). The block index is a literal 1 because
-	// there is exactly one block; see the type comment.
-	d.mac.Write(salt)
-	d.mac.Write([]byte{0, 0, 0, 1})
-	d.mac.Sum(d.u[:0])
-	d.acc = d.u
-	d.done = 1
-	return d
-}
-
-// Step runs at most n further iterations and reports whether the derivation is
-// complete. It never runs past total, so a caller that oversteps is harmless.
-func (d *Deriver) Step(n int) bool {
-	for i := 0; i < n && d.done < d.total; i++ {
-		d.mac.Reset()
-		d.mac.Write(d.u[:])
-		// Sum appends into u's own backing array. Write has already consumed
-		// the previous value, so overwriting it here is correct.
-		d.mac.Sum(d.u[:0])
-		for j := range d.acc {
-			d.acc[j] ^= d.u[j]
-		}
-		d.done++
-	}
-	return d.done >= d.total
-}
-
-// Done and Total drive the progress indicator. Done counts iterations already
-// applied, including the U_1 that NewDeriver performed.
-func (d *Deriver) Done() int  { return d.done }
-func (d *Deriver) Total() int { return d.total }
-
-// Key returns a FRESH copy of the derived key, which the caller owns and MUST
-// zero. It is a copy so that Wipe can be deferred at the point the Deriver is
-// created without zeroing the result out from under the caller — the shape a
-// shared buffer would make impossible to get right.
-//
-// It returns nil while the derivation is incomplete: a partial accumulator is
-// not a short key, it is the wrong key, and returning it would fail as an
-// indistinguishable tag mismatch ~31 s later.
-func (d *Deriver) Key() []byte {
-	if d.done < d.total {
-		return nil
-	}
-	return append([]byte(nil), d.acc[:]...)
-}
-
-// Wipe zeroes everything this Deriver owns. See NewDeriver for what it cannot
-// reach.
-//
-// done is reset so a post-Wipe Key() returns nil rather than 32 zero bytes.
-// crypto.go:47-52 states the rule this obeys: "An all-zero key would be worse --
-// it is a VALID AES key and hides the fault." Not reachable from unlockDerive,
-// where Key()'s result is evaluated before the deferred Wipe runs, but this is a
-// public seam and B2b will hold one of these across a timer.
-func (d *Deriver) Wipe() {
-	clear(d.u[:])
-	clear(d.acc[:])
-	d.mac.Reset()
-	d.done = 0
-}
-```
-
-### 3c. Tests first
-
-`seal/pbkdf2_test.go`, new file.
-
-```go
-package seal
-
-import (
-	"bytes"
-	"encoding/hex"
-	"testing"
-)
-
-// keyed unpacks what a derivation needs from a fixture.
-//
-// Passphrase and DerivedKeyHex are *string on the fixture (seal/vectors_test.go:23,33)
-// because vector E has NEITHER: it encrypts nothing, so no key exists.
-// Returning ok == false rather than dereferencing keeps E in the loop as a
-// deliberate skip instead of a nil panic.
-func keyed(t *testing.T, v vector) (pass, salt, want []byte, ok bool) {
-	t.Helper()
-	if v.Passphrase == nil || v.DerivedKeyHex == nil {
-		return nil, nil, nil, false
-	}
-	return []byte(*v.Passphrase), mustHex(t, v.SaltHex), mustHex(t, *v.DerivedKeyHex), true
-}
-
-// The chunked deriver must be BYTE-IDENTICAL to the one-shot DeriveKey the
-// vectors pin. Asserted against the vector file's derived_key_hex literals
-// rather than against DeriveKey alone, because agreeing with a wrong
-// implementation is not a result.
-func TestDeriverReproducesEveryVectorKey(t *testing.T) {
-	var checked int
-	for _, v := range loadVectors(t) {
-		pass, salt, want, ok := keyed(t, v)
-		if !ok {
-			continue
-		}
-		d := NewDeriver(pass, salt, int(v.Iterations))
-		for !d.Step(1000) {
-		}
-		if got := d.Key(); !bytes.Equal(got, want) {
-			t.Errorf("vector %s: chunked key %s, want %s",
-				v.Name, hex.EncodeToString(got), hex.EncodeToString(want))
-		}
-		d.Wipe()
-		checked++
-	}
-	// Six of the seven vectors carry a key; only E does not. Asserted so a
-	// fixture that silently lost its keys cannot leave this test green while
-	// checking nothing.
-	if checked != 6 {
-		t.Fatalf("checked %d vectors, want 6", checked)
-	}
-}
-
-// The step size must not change the result. A deriver that resynchronised on a
-// block boundary, or that double-counted the U_1 NewDeriver performs, would
-// agree with itself at one step size and disagree at another.
-func TestDeriverIsStepSizeIndependent(t *testing.T) {
-	v := vectorNamed(t, "A")
-	pass, salt, want, ok := keyed(t, v)
-	if !ok {
-		t.Fatal("vector A carries no derived key")
-	}
-	for _, step := range []int{1, 2, 7, 499, 500, 100000, 1 << 20} {
-		d := NewDeriver(pass, salt, int(v.Iterations))
-		for !d.Step(step) {
-		}
-		if got := d.Key(); !bytes.Equal(got, want) {
-			t.Errorf("step %d: key %s, want %s",
-				step, hex.EncodeToString(got), hex.EncodeToString(want))
-		}
-		d.Wipe()
-	}
-}
-
-// Vector B is iterations = 100001 where A is 100000. A deriver that treated the
-// count as a constant, or that was off by one against DeriveKey, passes A and
-// fails here.
-func TestDeriverHonoursTheIterationCount(t *testing.T) {
-	a, b := vectorNamed(t, "A"), vectorNamed(t, "B")
-	if a.Iterations == b.Iterations {
-		t.Fatal("vectors A and B no longer differ in iteration count; this test proves nothing")
-	}
-	pa, sa, wa, oka := keyed(t, a)
-	pb, sb, wb, okb := keyed(t, b)
-	if !oka || !okb {
-		t.Fatal("vectors A and B must both carry a derived key")
-	}
-	da := NewDeriver(pa, sa, int(a.Iterations))
-	for !da.Step(4096) {
-	}
-	db := NewDeriver(pb, sb, int(b.Iterations))
-	for !db.Step(4096) {
-	}
-	if bytes.Equal(da.Key(), db.Key()) {
-		t.Fatal("one iteration of difference produced the same key")
-	}
-	if !bytes.Equal(da.Key(), wa) || !bytes.Equal(db.Key(), wb) {
-		t.Fatal("a derived key does not match its own vector")
-	}
-}
-
-// An incomplete derivation must yield nil, never a partial accumulator. A short
-// key is not a slightly-wrong key: it fails ~31 s later as a tag mismatch
-// indistinguishable from a wrong passphrase.
-func TestDeriverWithholdsAnIncompleteKey(t *testing.T) {
-	v := vectorNamed(t, "A")
-	pass, salt, _, ok := keyed(t, v)
-	if !ok {
-		t.Fatal("vector A carries no derived key")
-	}
-	d := NewDeriver(pass, salt, int(v.Iterations))
-	if d.Step(10) {
-		t.Fatalf("10 of %d iterations reported complete", v.Iterations)
-	}
-	if k := d.Key(); k != nil {
-		t.Fatalf("an incomplete deriver returned a %d-byte key", len(k))
-	}
-	if d.Done() != 11 {
-		t.Fatalf("Done reports %d after NewDeriver's U_1 plus Step(10), want 11", d.Done())
-	}
-}
-
-// Wipe must zero what it owns, and Key's copy must survive it — the property
-// that lets a caller `defer d.Wipe()` at construction.
-func TestDeriverWipeLeavesTheReturnedKeyIntact(t *testing.T) {
-	v := vectorNamed(t, "A")
-	pass, salt, want, ok := keyed(t, v)
-	if !ok {
-		t.Fatal("vector A carries no derived key")
-	}
-	d := NewDeriver(pass, salt, int(v.Iterations))
-	for !d.Step(4096) {
-	}
-	key := d.Key()
-	d.Wipe()
-	if !bytes.Equal(key, want) {
-		t.Fatal("Wipe zeroed the key it had already handed out")
-	}
-	zero := make([]byte, len(d.acc))
-	if !bytes.Equal(d.acc[:], zero) {
-		t.Fatal("Wipe left the accumulator non-zero")
-	}
-	if !bytes.Equal(d.u[:], zero) {
-		t.Fatal("Wipe left the U buffer non-zero")
-	}
-	// A wiped Deriver must not hand out 32 zero bytes: that is a VALID AES key
-	// and it hides the fault (the rule crypto.go:47-52 states for DeriveKey).
-	if k := d.Key(); k != nil {
-		t.Fatalf("Key() after Wipe returned %d bytes, want nil", len(k))
-	}
-}
-```
-
-> **`vector` needs `DerivedKeyHex`, `SaltHex`, `Passphrase` and `Iterations`.**
-> All four already exist on `seal`'s own fixture struct (`seal/vectors_test.go:21-38`).
-> The **`gui`** side's narrower `sealTestVector` (`gui/unlock_program_test.go:37-46`)
-> does **not** carry `passphrase` or `iterations` — Task 5 adds them, and must,
-> because `seal/testdata/README.md:19-24` forbids retyping vector constants
-> ("retyped constants are how a port silently forks").
-
-**Steps:**
-
-- [ ] **3.1** Write `seal/pbkdf2_test.go`. Run
-      `nix develop --command go test ./seal/ -run Deriver`. Expect FAIL:
-      `undefined: NewDeriver`.
-- [ ] **3.2** Write `seal/pbkdf2.go`. Re-run. Expect PASS.
-- [ ] **3.3** Mutation check.
-
-      | mutant | must be killed by |
-      | --- | --- |
-      | `d.done = 1` → `d.done = 0` in `NewDeriver` | `TestDeriverReproducesEveryVectorKey` |
-      | `d.acc[j] ^= d.u[j]` → `d.acc[j] = d.u[j]` | `TestDeriverReproducesEveryVectorKey` |
-      | `d.mac.Write([]byte{0,0,0,1})` → `{0,0,0,0}` | `TestDeriverReproducesEveryVectorKey` |
-      | `d.mac.Reset()` dropped from `Step` | `TestDeriverReproducesEveryVectorKey` |
-      | `Key()` returns `d.acc[:]` instead of a copy | `TestDeriverWipeLeavesTheReturnedKeyIntact` |
-      | `Key()`'s incomplete guard removed | `TestDeriverWithholdsAnIncompleteKey` |
-      | `total` ignored, hardcoded to 100000 | `TestDeriverHonoursTheIterationCount` |
-
-- [ ] **3.4** Timing sanity, on the host, so the step size is not a guess:
-      `nix develop --command go test ./seal/ -run TestDeriverIsStepSizeIndependent -v`
-      and record the wall clock. Record the number; do not describe it.
-- [ ] **3.5** Commit.
-
----
-
 ## Task 4 — the passphrase: twelve words, and the checksum gate BEFORE the KDF
 
 ### 4a. Twelve words, not a 12/24 picker
@@ -2509,8 +1569,24 @@ is unsigned and a hand-flashed image will not boot the machine.
 > `&&`-chain the commands, and read the output *at* it.
 
 ---
-
 ## Gate coverage — state this in the R0 brief
+
+> **RUN THE BUILD GATE WITH A FORK ROOT THAT HAS B2a-i MERGED:**
+> `scripts/plan-build-gate-go.sh <this plan> <fork-with-B2a-i>`.
+>
+> Against the *unmodified* fork tier 1 **fails**, and the failure is not a
+> defect: this document's Go calls `seal.NewDeriver` and reads `AdmittedRecord`'s
+> encrypted-section labels, both of which B2a-i creates. Measured — assembling
+> B2a-i's four whole files plus its `record.go` fragment into a scratch fork and
+> re-running gives `PASS: go build ./gui ./seal clean` and `PASS: go vet
+> introduces nothing new`. Until B2a-i is merged, that is how this gate is run.
+>
+> Two traps met while doing it, recorded so the next person does not rediscover
+> them: the scratch dir is **rebuilt by every gate invocation**, so B2a-i's files
+> must be regenerated before being copied; and `nix develop` prints
+> `warning: Git tree '…' is dirty` on an uncommitted fork root, which the gate
+> reads as a build failure because it treats any output as one. Commit the
+> throwaway tree first.
 
 Both gates apply and **both MUST be run before dispatch and after every fold.**
 
@@ -2621,8 +1697,7 @@ That is the reviewer's execution pass, and it is where the risk now sits.
   failures; `go vet ./gui/` carries one pre-existing diagnostic.
 
 ---
-
-## What B2a does NOT cover
+## What B2a-ii does NOT cover
 
 - **§10.2.4's residency-keyed idle wipe.** B2b. `seal.Payload.SecretsResident()`
   ships in Task 5 as the predicate it will key on, but nothing consults it yet.
@@ -2643,7 +1718,6 @@ That is the reviewer's execution pass, and it is where the risk now sits.
 - **Any release tag.** §10.2.4 is a backstop, not an optional extra.
 
 ---
-
 ## Follow-ups filed by this plan
 
 - **F-81 — WITHDRAWN before it was filed.** It described a residency window
@@ -2663,13 +1737,41 @@ That is the reviewer's execution pass, and it is where the risk now sits.
   to draw. It produces byte-identical output, pinned by six vectors, so the
   Rust-primary rule does not bind it — recorded so a future reader does not
   mistake the asymmetry for drift.
-- **F-83 — the derived plate is not wipeable (owning phase: ownerless residue).**
-  `validateMdmk`, `backup.SeedString`, `engraveSeed` and `toPlate` all copy the
-  record into Go strings and `Plate.Spline`, none of which can be zeroed; the
-  existing `gui/ms1_decode.go:19-20` carries the same caveat for the display
-  path. B2a zeroes the buffers it owns and drops the rest. Closing this properly
-  means a plate pipeline over `[]byte`, which is a much larger change than any
-  phase of this feature.
+- **F-83 — the plate cannot be wiped until the engrave finishes. WITHDRAWN as a
+  follow-up and recorded as an ACCEPTED LIMITATION (operator, 2026-08-08:
+  "the one honest gap is unavoidable").**
+
+  `validateMdmk`, `backup.SeedString`, `engraveSeed` and `toPlate` copy the
+  record into Go strings and into `Plate.Spline`, none of which can be zeroed.
+  `gui/ms1_decode.go:19-20` already carries the same caveat for the display path.
+
+  **It is not a defect to be scheduled, and filing it as one would be dishonest
+  bookkeeping.** The plate is a geometric rendering of the very words being cut
+  into steel; it must exist, in RAM, for as long as the needle is moving. No
+  ordering of wipes can change that, and a plate pipeline over `[]byte` would
+  move the secret rather than remove it — the spline still encodes it. A
+  follow-up that will never be actioned is noise in a register whose whole value
+  is that every open item is real.
+
+  **What is therefore true, stated once so nothing downstream overclaims:**
+  during a secret engrave the seed is recoverable from SRAM by an attacker with
+  physical access and an SWD probe (§2.2 item 9, live because `debug enable: 1`
+  is measured in §3). §10.2.2's wipe removes the **record** — the only copy that
+  outlives the plate — and that is the whole of what it claims. B2a-ii's
+  `clear(rec)` at plate construction is what makes "the record" and "the plate"
+  distinct lifetimes rather than one.
+
+  **Owed to the SPEC, not to the code.** §2.2's "what this does NOT defend
+  against" should carry this limitation in the operator's terms; the spec is
+  GREEN, so that is an amendment, filed as **F-85** with owning phase *before the
+  release tag*. Do not amend it as a side effect of an implementation commit.
+
+- **F-85 — §2.2 does not name the during-engrave residency (owning phase: before
+  the release tag).** See F-83. One paragraph in the SPEC's threat model, in the
+  same register as items 9 and 11, saying that a secret plate's geometry is
+  resident for the duration of its cut and that physical custody is the control.
+  It changes no behaviour and no test; it closes the gap between what the machine
+  does and what the operator has been told.
 
 ### Record defects to fix while touching these files
 
