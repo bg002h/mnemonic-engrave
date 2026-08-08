@@ -16,9 +16,28 @@ numbering is **unchanged** (this file holds Tasks 1–3, its sibling Tasks 4–9
 that every finding in those three reports still resolves against a task number.
 
 **One substantive change came with the split and did NOT inherit that GREEN** —
-Task 3 now folds `DeriveKey` onto the `Deriver` rather than leaving two PBKDF2
-implementations in one package. It is marked **[SPLIT-NEW]** where it appears and
-is the only thing in this document a re-review needs to look at.
+Task 3 folds `DeriveKey` onto the `Deriver` rather than leaving two PBKDF2
+implementations in one package, marked **[SPLIT-NEW]** where it appears. **It has
+since had its own scoped review and is GREEN:**
+
+| review | verdict | report |
+| --- | --- | --- |
+| §3d scoped | **0C / 3I / 2M / 1N** — all folded | `design/agent-reports/encrypted-payload-planB-phaseB2a-i-section3d-review.md` |
+
+All three Importants were against §3d's **arguments**, not its code — the fold
+itself was found arithmetically and lifetime-correct. Two of them are worth
+carrying past this document:
+
+- **A guarantee can migrate without anyone noticing.** `DeriveKey` used to carry
+  its own fail-closed `nil`; the fold deleted it and silently promoted `Key()`'s
+  guard to the only one in `seal` — then asserted it general when it was not. A
+  zero-value `Deriver` reported *complete* and handed out 32 zero bytes, a valid
+  AES key. When a fix removes a check, ask what was relying on it.
+- **"The vectors are the authority" was true and insufficient.** Six vectors is
+  two iteration counts, one salt length and one passphrase length — and that
+  length sits under SHA-256's HMAC block, so the key-hashing path was untested.
+  The stdlib now leaves *production* and stays as a *test* oracle, which costs
+  nothing because `_test.go` is never linked into the firmware.
 
 ---
 
@@ -753,9 +772,9 @@ import (
 
 // §7's PBKDF2-HMAC-SHA256, run in SLICES.
 //
-// DeriveKey stays as the one-shot form and is what the vectors pin. This is the
-// same function decomposed so §10.2 step 7's progress indicator can be a real
-// one: crypto/pbkdf2.Key blocks for ~31 s with no callback and no counter, so
+// DeriveKey (crypto.go) is the one-shot WRAPPER over this type -- there is one
+// implementation of PBKDF2 in this package, not two. This is that primitive
+// decomposed so §10.2 step 7's progress indicator can be a real one: crypto/pbkdf2.Key blocks for ~31 s with no callback and no counter, so
 // the frame loop stops dead and the operator sees the hang the step exists to
 // prevent.
 //
@@ -766,8 +785,12 @@ import (
 //     U_i = PRF(P, U_{i-1}) chain and an XOR accumulator — no branching, no
 //     block bookkeeping, nothing to get subtly wrong that a vector cannot see.
 //   - Every vector's derived key is a literal in testdata/vectors.json, and
-//     pbkdf2_test.go asserts BOTH that this reproduces them and that it equals
-//     DeriveKey iteration-for-iteration.
+//     pbkdf2_test.go asserts that this reproduces all six. It ALSO runs a
+//     differential against crypto/pbkdf2 over input space the vectors do not
+//     reach -- they carry two iteration counts, one salt length and one
+//     passphrase length, and that length is under SHA-256's HMAC block size.
+//     The stdlib left production; it stays as a TEST oracle, which costs no
+//     flash because _test.go is never linked into the firmware.
 //
 // It allocates nothing per Step: the HMAC is constructed once and Reset()
 // restores its keyed state, and both buffers are arrays.
@@ -843,7 +866,14 @@ func (d *Deriver) Total() int { return d.total }
 // not a short key, it is the wrong key, and returning it would fail as an
 // indistinguishable tag mismatch ~31 s later.
 func (d *Deriver) Key() []byte {
-	if d.done < d.total {
+	// `d.total == 0` is the ZERO VALUE, and it must be caught explicitly: with
+	// both fields 0 the `done < total` test is FALSE, so without this clause a
+	// `var d Deriver` reports complete and hands out 32 zero bytes -- a VALID
+	// AES key, which is exactly what crypto.go:47-52 forbids. Measured before
+	// this clause existed: `Step(1000)=true, Key() len=32, allzero=true`.
+	// NewDeriver clamps total >= 1, so this is unreachable through it; Deriver,
+	// Step and Key are all EXPORTED, and B2b holds one across a timer.
+	if d.total == 0 || d.done < d.total {
 		return nil
 	}
 	return append([]byte(nil), d.acc[:]...)
@@ -860,7 +890,12 @@ func (d *Deriver) Key() []byte {
 func (d *Deriver) Wipe() {
 	clear(d.u[:])
 	clear(d.acc[:])
-	d.mac.Reset()
+	// nil on a zero-value Deriver, where an unguarded Reset panics -- and on a
+	// device a panic is a brick. Same reason DeriveKey returns nil rather than
+	// panicking (crypto.go:47-52).
+	if d.mac != nil {
+		d.mac.Reset()
+	}
 	d.done = 0
 }
 ```
@@ -874,6 +909,8 @@ package seal
 
 import (
 	"bytes"
+	"crypto/pbkdf2"
+	"crypto/sha256"
 	"encoding/hex"
 	"testing"
 )
@@ -1019,6 +1056,58 @@ func TestDeriverWipeLeavesTheReturnedKeyIntact(t *testing.T) {
 		t.Fatalf("Key() after Wipe returned %d bytes, want nil", len(k))
 	}
 }
+
+// The ZERO VALUE must fail closed. Deriver, Step and Key are all exported, and
+// B2b holds one across a timer, so `var d Deriver` is reachable state. Measured
+// before Key()'s `d.total == 0` clause existed: Step reported COMPLETE and Key
+// returned 32 zero bytes -- a valid AES key (R0 §3d review, I1).
+func TestZeroValueDeriverFailsClosed(t *testing.T) {
+	var d Deriver
+	if k := d.Key(); k != nil {
+		t.Errorf("zero value yields a %d-byte key, want nil", len(k))
+	}
+	if !d.Step(1000) {
+		t.Error("Step on a zero value should report complete-and-empty, not run")
+	}
+	if k := d.Key(); k != nil {
+		t.Errorf("zero value after Step yields a %d-byte key, want nil", len(k))
+	}
+	// Must not panic: on a device a panic is a brick, and mac is nil here.
+	d.Wipe()
+}
+
+// The DIFFERENTIAL against the stdlib, over the input space the six vectors do
+// NOT reach: they carry two iteration counts, one salt length, and one
+// passphrase length of 59 bytes -- UNDER SHA-256's 64-byte HMAC block, so the
+// key-hashing path is never exercised by them (R0 §3d review, I2).
+//
+// crypto/pbkdf2 leaves production in §3d and stays here. It costs no flash --
+// _test.go is never linked into the firmware -- and it bottoms out in
+// crypto/internal/fips140/pbkdf2, a separate implementation of exactly the
+// layer pbkdf2.go hand-rolls.
+func TestDeriverMatchesTheStdlibAcrossInputSpace(t *testing.T) {
+	for _, iters := range []int{1, 2, 3, 17, 4999, 100_000, 2_000_000} {
+		for _, saltLen := range []int{0, 1, 16, 64, 65} {
+			for _, passLen := range []int{0, 59, 64, 65, 200} {
+				salt := bytes.Repeat([]byte{0xa5}, saltLen)
+				pass := string(bytes.Repeat([]byte{'x'}, passLen))
+				want, err := pbkdf2.Key(sha256.New, pass, salt, iters, KeyLen)
+				if err != nil {
+					t.Fatalf("oracle failed at iters=%d: %v", iters, err)
+				}
+				d := NewDeriver([]byte(pass), salt, iters)
+				for !d.Step(4096) {
+				}
+				if got := d.Key(); !bytes.Equal(got, want) {
+					t.Fatalf("iters=%d saltLen=%d passLen=%d: %s, want %s",
+						iters, saltLen, passLen,
+						hex.EncodeToString(got), hex.EncodeToString(want))
+				}
+				d.Wipe()
+			}
+		}
+	}
+}
 ```
 
 > **`vector` needs `DerivedKeyHex`, `SaltHex`, `Passphrase` and `Iterations`.**
@@ -1073,7 +1162,13 @@ Fold `DeriveKey` onto the `Deriver`, in `seal/crypto.go`:
 // It is the one-shot form of Deriver (pbkdf2.go), and it is a WRAPPER rather
 // than a second implementation: two PBKDF2s in one package must agree forever,
 // and a divergence between them is a wrong key that surfaces as a tag mismatch
-// indistinguishable from a wrong passphrase. The vectors pin the pair.
+// indistinguishable from a wrong passphrase. There is one implementation now,
+// and the vectors pin it.
+//
+// The []byte conversion is an unwipeable copy of the passphrase -- not a
+// regression, the old body handed a string to pbkdf2.Key which copies it the
+// same way, but it is why a caller that wants a ZEROABLE passphrase calls
+// NewDeriver directly with its own buffer, as the device unlock path does.
 //
 // iterations ALWAYS comes from the header — never a constant, or vector B fails.
 func DeriveKey(passphrase string, salt []byte, iterations int) []byte {
@@ -1086,6 +1181,26 @@ func DeriveKey(passphrase string, salt []byte, iterations int) []byte {
 }
 ```
 
+**`seal/crypto.go`'s header comment must be rewritten in the SAME edit** (R0 §3d
+review, M1), or a correct fold leaves it justifying imports the file no longer
+has — and leaves `grep -rn 'crypto/pbkdf2' seal/` returning three hits on
+correct code. Replace its lines 17–22 with:
+
+```go
+// crypto/aes and crypto/cipher were ABSENT from the firmware build before this
+// feature; importing them is what makes AES-GCM callable and costs the measured
+// ~1.6 KB. Nothing else here is new weight: crypto/hmac and crypto/sha256 are
+// already linked and already CALLED by bip85, nonstandard and slip39, and
+// crypto/pbkdf2 stays in the image via bip39 and slip39, which import
+// golang.org/x/crypto/pbkdf2 -- a thin wrapper over it. seal no longer calls it
+// itself: DeriveKey below wraps pbkdf2.go's Deriver, so this package holds ONE
+// PBKDF2. The stdlib remains the differential ORACLE in pbkdf2_test.go, which
+// costs no flash because _test.go is never linked into the firmware.
+```
+
+The old comment's substance survives — dropping the import removes nothing from
+the firmware image, only from this file's import list.
+
 **`crypto/pbkdf2` AND `crypto/sha256` both leave `seal/crypto.go`'s import
 block** — measured, not predicted: dropping only the first fails with
 `"crypto/sha256" imported and not used`, because its sole use in that file was
@@ -1095,15 +1210,41 @@ Two further consequences, both deliberate:
 
 - **The error branch disappears, and with it the `nil` return.** The old body
   returned `nil` on `pbkdf2.Key`'s error — "unreachable with an out-of-range
-  iteration count or key length, and ParseHeader has already excluded both". The
-  `Deriver` cannot fail: it clamps `iterations < 1` and its key length is fixed
-  at `sha256.Size` by a compile-time assertion. `Key()` still returns `nil` on an
-  incomplete derivation, which preserves the property `crypto.go:47-52` argues
-  for — an all-zero key "is a VALID AES key and hides the fault".
-- **The stdlib is no longer an independent cross-check** of the chunked loop.
-  That is acceptable because the authority was never the stdlib: it is the six
-  `derived_key_hex` literals in `testdata/vectors.json`, produced by the Rust
-  implementation, which `TestDeriverReproducesEveryVectorKey` asserts directly.
+  iteration count or key length, and ParseHeader has already excluded both".
+  Through `NewDeriver` the derivation cannot fail: `iterations < 1` is clamped
+  and the key length is fixed at `sha256.Size` by a compile-time assertion. **The
+  fail-closed property now rests entirely on `Key()`, so `Key()` must carry it
+  unconditionally** — it returns `nil` unless the derivation ran to completion,
+  *including* for a zero-value `Deriver`, which is why §3b's guard tests
+  `d.total == 0` and not only `d.done < d.total`. Without that clause a
+  `var d Deriver` reported complete and returned 32 zero bytes — measured — and
+  an all-zero key "is a VALID AES key and hides the fault"
+  (`crypto.go:47-52`). *(R0 §3d review, I1: an earlier draft asserted this as a
+  property of `Key()` when it was only a property of `DeriveKey`.)*
+- **The stdlib leaves PRODUCTION and stays as a TEST oracle.** *(R0 §3d review,
+  I2. An earlier draft said the cross-check was simply given up, "because the
+  authority was never the stdlib". That understated what is lost and overstated
+  what six vectors cover.)*
+
+  Measured from `testdata/vectors.json`, the six keyed vectors are **not** six
+  independent points: two iteration counts (100000, 100001) out of the ~1.9M §6.2
+  admits, **one** salt length (16), and **one** passphrase length (59). And 59 is
+  **under SHA-256's 64-byte HMAC block**, so no vector reaches the key-hashing
+  path a longer §8.1-normalised passphrase would take. They pin the function at
+  one point in input space, six times. That is sufficient against today's
+  `Deriver`, which has no input-dependent branching — it is not sufficient as the
+  answer to *what catches a future edit*. An unroll keyed on `total % k`, a
+  batched inner loop, or a re-key of the `mac` would pass all six and the
+  step-size sweep.
+
+  **Keeping the oracle costs nothing.** `_test.go` files are never linked into
+  the firmware, and `crypto/pbkdf2` remains in the module graph regardless — via
+  `bip39/bip39.go:19` and `slip39/feistel.go:7` → `golang.org/x/crypto/pbkdf2`,
+  a thin wrapper over it. Stdlib `crypto/pbkdf2` bottoms out in
+  `crypto/internal/fips140/pbkdf2`, a genuinely separate implementation of the
+  exact layer §3b hand-rolls — block index, U-chain, XOR accumulator, iteration
+  count — sharing only the SHA-256 compression function. §3c therefore carries a
+  differential.
 
 **The wrapper is a byte-for-byte drop-in, including at the degenerate inputs —
 measured against the old body directly** rather than argued from the vectors:
@@ -1127,10 +1268,23 @@ Two things that check settles, and both were live worries worth retiring:
   one path that still calls `DeriveKey` — is unchanged for every input the wire
   format admits.
 
-- [ ] **3.5** Apply §3d. Run `nix develop --command go test ./seal/` — **every
-      existing vector and crypto test must pass UNCHANGED**; they are what proves
-      the wrapper did not fork the primitive. Confirm `crypto/pbkdf2` no longer
-      appears in `seal`'s imports (`grep -rn 'crypto/pbkdf2' seal/`).
+- [ ] **3.5** Apply §3d, **including the `crypto.go` header-comment rewrite
+      below**. Run `nix develop --command go test ./seal/` — every existing vector
+      and crypto test must pass UNCHANGED.
+
+      **Note what that does and does not prove** (R0 §3d review, M2): after the
+      fold, `crypto_test.go`'s `TestDeriveKeyMatchesTheVectors` and
+      `pbkdf2_test.go`'s `TestDeriverReproducesEveryVectorKey` drive *the same
+      code over the same inputs against the same literals*. They pass unchanged
+      because the fold is correct, and they remain worth keeping as the wrapper's
+      own call-path check — but the count of *independent* vector checks halves
+      without a test being deleted. Do not read four green tests as four
+      independent confirmations.
+
+      Confirm the import is gone with a **quoted** grep — `grep -n '"crypto/pbkdf2"' seal/*.go`
+      — expecting **no output**. The unquoted `grep -rn 'crypto/pbkdf2' seal/`
+      returns 3 hits on a *correct* fold, because `crypto.go`'s header comment
+      names the package in prose (R0 §3d review, M1).
 - [ ] **3.6** Mutation check the wrapper. **`d.Step(iterations - 1)` is NOT a
       mutant** — measured: it survives the whole suite, because `NewDeriver`
       already performed iteration 1, so `Step(total-1)` reaches exactly `total`.
