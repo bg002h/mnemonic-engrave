@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | 0 | **1C / 4I / 6M / 3N** — all folded | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round0.md` |
 | 1 | **0C / 2I / 4M / 3N** — all folded; C1's rewrite CONFIRMED sound, no hole opened | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round1.md` |
+| 2 | **0C / 1I / 0M / 2N** — all folded. **GREEN**: the Important was a stale comment, and a comment fold does not re-trigger the gate | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round2.md` |
 
 **Round 1 found no Critical and confirmed the round-0 fix**, but both its
 Importants were the same shape: **the fold did half of a finding's fix.** M5's
@@ -22,6 +23,15 @@ to the next reader.** Treat every factual claim in volunteered context as a new
 assertion needing its own verification, and check that each finding's fix
 reaches *every* consumer the finding named — round 1's M1 and M3 are both a
 symbol corrected in one place and left stale in another.
+
+**Round 2 then caught that same pattern one level down, inside the fold that had
+just recorded it.** Round 1's I1 named *two* locations — "§6b comment and §6c" —
+and the fold corrected §6c while leaving the identical false sentence in §6b's
+whole-file block, which is the copy that ships into `gui/unlock_session.go` as a
+source comment. Round 2 was 0C/1I and that Important was exactly this. **When a
+finding's WHERE field lists more than one location, the fix has more than one
+edit; `grep` the artifact for the old wording before calling it folded.** The
+build gate cannot help here — a comment is not code.
 
 **Round 0's Critical was the plan's own "interpretation" section**, and its
 justification was false rather than merely debatable: the record was held across
@@ -156,10 +166,12 @@ B2a starts**, so "it went red" means B2a broke it:
   existing `countingKDF` instrument is no longer in the device path at all.
   *(An earlier draft of this bullet said Task 3 added it, and paired that with
   "one real 100,000-iteration derivation would nearly triple the ~12 s gui
-  suite". Both were wrong: the **host** derives 100,000 iterations in tens of
-  milliseconds — the ~31 s of §7.1 is a device figure — so the gui cost is the
-  ≥256 frames `kdfStepIterations` implies, not the KDF. R0 round 0 I2, round 1
-  M1.)*
+  suite". Both were wrong — the ~31 s of §7.1 is a DEVICE figure. Measured on
+  this host rather than argued: `DeriveKey` at 100,000 iterations is **13.1 ms**
+  and at 300,000 is **35.5 ms**; the chunked deriver covers 100,000 in
+  **10.2 ms across 200 `Step` calls, drawing 199 frames**. So the gui cost is
+  the frame pumping, not the KDF, and a test may safely use the §6.2 floor.
+  R0 round 0 I2, round 1 M1.)*
 - **Touch, not buttons, for anything with a keyboard.** `gui/start_screen_touch_test.go:11-23`
   and `gui/passphrase_flow_test.go:19-33` are binding: the SH2 has no directional
   buttons, tests must lay out at `sh2DisplaySize` (`gui/gui_test.go:390`), and a
@@ -1862,10 +1874,10 @@ func sealBlobForTest(t *testing.T, public, secret []string, passphrase string, i
       **never fired**. Task 8's `ct_len == 0` row names this test.
 
       **Budget the frame count.** `unlockDerive` draws one frame per
-      `kdfStepIterations = 500`, so a full 100,000-iteration unlock needs **≥200
-      frames** before the next screen exists. The house idiom is
-      `pumpUntil(frame, want, 32)` — 32 is far too few here and would look like a
-      hang. Pump **≥256**.
+      `kdfStepIterations = 500`. **Measured, not derived: a 100,000-iteration
+      derivation is exactly 200 `Step` calls and 199 drawn frames.** The house
+      idiom is `pumpUntil(frame, want, 32)` — 32 is far too few here and would
+      look like a hang. Pump **≥256**.
 
       A counting `newDeriver` may also return a deriver over a *smaller*
       iteration count to keep a test short — **but only for tests that do not
@@ -2101,9 +2113,9 @@ func unlockEngraveMnemonic(ctx *Context, th *Colors, rec []byte) {
 	// not type-check against the unmodified fork -- the plan's build gate would
 	// fail for a reason that is not a defect. The two-line flip is §6c's, and it
 	// is a reviewer's execution pass rather than a machine-checked one. Do not
-	// ship without it: on a touch-only SH2 a CENTRE TAP opens the word editor,
-	// and editing an authoritative payload seed produces a self-consistent plate
-	// that does not restore the payload's wallet.
+	// ship without it: the edit nav button (Button2, or a tap on its slot) opens
+	// the word editor, and editing an authoritative payload seed produces a
+	// self-consistent plate that does not restore the payload's wallet.
 	ss := new(SeedScreen)
 	if !ss.Confirm(ctx, th, m) {
 		return
@@ -2153,9 +2165,9 @@ Modify `gui/gui.go` — add one field to `SeedScreen` and one guard in `Confirm`
 		}
 ```
 
-at `gui/gui.go:2330`, and the nav slot is skipped as well so the icon disappears.
+at `gui/gui.go:2331`, and the nav slot is skipped as well so the icon disappears.
 **Skipping only the slot does not close the route.** `Filter.matches`
-(`gui/event.go:153-159`) gates a `buttonEvent` on button identity alone, with no
+(`gui/event.go:155-159`) gates a `buttonEvent` on button identity alone, with no
 bounds check, so `editBtn.Clicked(ctx)` keeps consuming `ButtonFilter(Button2)`
 and `ButtonFilter(Center)` whether or not anything was drawn for it.
 
