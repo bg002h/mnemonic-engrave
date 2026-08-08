@@ -81,16 +81,9 @@ enum Command {
         #[arg(long, required = true)]
         out: PathBuf,
 
-        /// Required to encrypt an ms1 (a seed). Sealing a seed must never be
-        /// accidental.
-        ///
-        /// **NOTE: this flag is a deliberate plan-level addition and is NOT in
-        /// the spec.** §9's synopsis omits it and §12 item 6 records `ms1` as
-        /// ADMITTED with no opt-in, so `me seal <ms1> --out x.uf2` — the spec's
-        /// own documented invocation — exits `EXIT_REFUSED` here. That is safer
-        /// than the spec, not looser, but it is a divergence: file a spec
-        /// amendment to §9 and §12 item 6 rather than leaving the two artefacts
-        /// disagreeing.
+        /// Required to encrypt seed material — an ms1 record or a BIP-39
+        /// mnemonic. A best-effort guard so it never happens by accident, not a
+        /// security boundary (§9, §12 item 6).
         #[arg(long)]
         seal_secret: bool,
 
@@ -325,13 +318,16 @@ fn run_seal_cli(
         return EXIT_USAGE;
     }
 
-    // §9: ms1 needs the explicit opt-in. Checked on classification, not on
-    // anything the caller asserts.
-    if !seal_secret && secret.iter().any(|r| matches!(classify(r), Ok(Format::Ms))) {
+    // §9: seed material needs the explicit opt-in. Best-effort anti-footgun, not
+    // a security boundary — it exists so nobody seals a seed by ACCIDENT, not to
+    // stop anyone who means to. Covers ms1 and a bare BIP-39 mnemonic, which are
+    // the same secret; `classify` wants a bech32 `1`, so it misses the mnemonic.
+    let is_seed =
+        |r: &String| matches!(classify(r), Ok(Format::Ms)) || seal::passphrase::is_valid(r);
+    if !seal_secret && secret.iter().any(is_seed) {
         eprintln!(
-            "me: refusing to seal ms1 without --seal-secret.\n    \
-             ms1 is seed entropy. Sealing it puts an offline-attackable ciphertext of your \
-             seed into the machine's flash, defended only by the generated passphrase.\n    \
+            "me: refusing to seal seed material (ms1 or a BIP-39 mnemonic) without \
+             --seal-secret.\n    \
              Re-run with --seal-secret if that is what you intend."
         );
         return EXIT_REFUSED;
@@ -534,10 +530,7 @@ fn wire_previews(
             }
         }
         Err(e) => {
-            eprintln!(
-                "me: cannot scan preview directory {}: {e}",
-                dir.display()
-            );
+            eprintln!("me: cannot scan preview directory {}: {e}", dir.display());
             return Some(EXIT_USAGE);
         }
     }
@@ -646,7 +639,7 @@ mod tests {
         assert!(is_plate_artifact("plate-2.svg"));
         assert!(is_plate_artifact("plate-1.png"));
         assert!(is_plate_artifact("plate-.svg")); // edge: accept — it IS the form.
-        // Near-misses that must NOT match.
+                                                  // Near-misses that must NOT match.
         assert!(!is_plate_artifact("notes.txt")); // no prefix, no ext.
         assert!(!is_plate_artifact("plate.txt")); // no `plate-`, wrong ext.
         assert!(!is_plate_artifact("plateau.svg")); // no `-` after `plate`.
