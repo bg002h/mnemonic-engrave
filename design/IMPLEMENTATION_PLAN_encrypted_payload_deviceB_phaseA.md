@@ -33,9 +33,14 @@ behaviour lands in Rust first, with a vector. Never the reverse.
   host `go` inside the dev shell is 1.26.3 and is NOT the firmware compiler — a
   feature that builds on the host can still fail under TinyGo.
 - **Never a bare `go test ./... -update`.** Scope with `-run`, then `git status`.
-- `cmd/kdfbench` does not build under host `go` (it imports `machine`). A
-  `go test ./...` that reports exactly that one failure is GREEN; anything else
-  is a regression.
+- **Two commands do not build under host `go`** — `cmd/kdfbench` and
+  `cmd/sealread` (Task 7 Step 4's on-target harness). Both import `machine`,
+  which is not in the host standard library, so `go build`/`go vet`/`go test`
+  report `package machine is not in std [setup failed]` for each. A
+  `go test ./...` reporting exactly **those two** failures is GREEN; anything
+  else is a regression. This baseline was ONE failure until `cmd/sealread`
+  landed — if you add another TinyGo-only command, update this line, or the
+  next person treats a real regression as expected noise.
 - **`crypto/aes` and `crypto/cipher` are ABSENT from today's firmware build** —
   measured. Importing them is what makes AES-GCM callable and costs ~1.6 KB.
   `crypto/pbkdf2` and `crypto/sha256` are already linked *and already called*.
