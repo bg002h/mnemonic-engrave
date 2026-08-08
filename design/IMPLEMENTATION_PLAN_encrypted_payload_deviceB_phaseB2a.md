@@ -1,10 +1,26 @@
 # Encrypted Payload Delivery — Plan B Phase B2a (unlock and the secret session) — Implementation Plan
 
-**Status:** DRAFT — R0 not yet run. **No code before 0C/0I.**
+**Status:** DRAFT — R0 round 0 folded, re-review pending. **No code before 0C/0I.**
 
 | round | verdict | report |
 | --- | --- | --- |
-| 0 | — | — |
+| 0 | **1C / 4I / 6M / 3N** — all folded | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round0.md` |
+
+**Round 0's Critical was the plan's own "interpretation" section**, and its
+justification was false rather than merely debatable: the record was held across
+the engrave because the retry prompt supposedly needed it, when `engraveJob`
+holds `plate.Spline` and never reads the record again. The correct design was
+also the simpler one — `clear(rec)` the moment the plate exists — and it needed
+no interpretation of §10.2.2 at all. **The lesson to carry: an "interpretation"
+section is a smell.** Twice now on this feature, prose explaining why a
+requirement could not be met literally has turned out to rest on an unverified
+claim about how existing code behaves, and both times one `grep` would have
+settled it.
+
+Two of the four Importants were **tests that could not fail** — a fixture that
+never reached the code path it was named for, and a mutation table naming a
+counter that no longer sits in the path under test. Both are the same class B1's
+whole-diff review found twice.
 
 **Descends from:** `SPEC_encrypted_payload_delivery.md` §10, which is GREEN and
 normative. This plan implements §10.2 steps 5–9 plus §10.2.2, and closes **F-77**
@@ -156,38 +172,70 @@ whose length comes entirely from `len(mnemonic)`. Task 4 uses that.
 
 ---
 
-## The one place this plan interprets the spec
+## The record is wiped BEFORE the engrave, not after it (R0 round 0, C1)
 
-**§10.2.2 says a failed engrave wipes the record. `EngraveScreen` does not exit
-on failure.** Measured: `Engrave` (`gui/gui.go:2644`) has exactly two `return`
-statements — `return true` at `:2661` (Done + OK) and `return false` at `:2707`.
-An engraver error is captured into `engraveFailed` state (`gui/engraver.go:140-143`)
-and rendered as "Engraving failed.\nHold button to retry." (`gui/gui.go:2789-2791`).
-It never exits on its own.
+**An earlier draft of this plan held the secret record across the engrave and
+wiped it when `EngraveScreen.Engrave` returned, calling that "the one place this
+plan interprets the spec". Both the reading and its stated justification were
+wrong, and this section records why so it is not reintroduced.**
 
-**This plan reads §10.2.2's "wiped as its plate leaves the screen — by any route"
-literally: the wipe fires when `Engrave` RETURNS**, which is Cut-completed,
-Back-pressed (including from `engraveFailed` and from `engraveStopping`), or
-`ctx.Done`. A failed plate therefore keeps its record resident for as long as the
-operator leaves the retry prompt up.
+**The record is not needed once the plate exists.** `NewEngraveScreen(ctx, plate)`
+builds `newEngraverJob(ctx.Platform, plate.Spline, plate.Conf, opts)`
+(`gui/engraver.go:64`), and the engrave loop iterates `e.spline`
+(`gui/engraver.go:170`). **Nothing reads the record bytes after `toPlate` /
+`engraveSeed` returns.** So a retry, a resume, and a re-cut all replay the
+spline — zeroing the record before `Engrave` is entered costs nothing and
+requires no change to `EngraveScreen`. The earlier draft's claim that this "makes
+the retry prompt a lie, because the record it offers to re-cut is already zeroed"
+was simply false.
 
-Why this reading and not the stricter one:
+**And waiting for `Engrave` to return does not satisfy §10.2.2 anyway.** Back
+while the job is running does **not** exit the screen — `gui/gui.go:2651-2656`:
 
-- The stricter reading — wipe the moment the job reports failure — makes the
-  retry prompt a lie, because the record it offers to re-cut is already zeroed.
-  Removing the prompt instead means editing `EngraveScreen`, which every other
-  engrave path in the fork shares.
-- Under §10.2.4 the failed-retry screen is **not** "actively engraving", so B2b's
-  timer arms there and closes the window at three minutes. The two sections
-  compose correctly.
+```go
+		for backBtn.Clicked(ctx) {
+			st := s.job.Status()
+			if st.State != engraveRunning {
+				break frames
+			}
+			s.job.Stop()
+		}
+```
 
-**But B2b's timer does not exist yet.** So B2a ships one unguarded window: a
-failed secret plate, left on screen. It is bounded by the operator being present
-— they must press something to have got there — and it is named here rather than
-discovered later. Filed as **F-81**.
+It calls `Stop()` and keeps rendering; the state settles to `engraveStopped` and
+the screen offers to resume. Only a *second* Back returns. So under the earlier
+reading, the abort-mid-plate path — which §10.2.2 names explicitly as "the
+machine's most ordinary recovery" — left the decrypted seed resident and let the
+operator resume **without a fresh unlock**, which is the exact opposite of the
+price §10.2.2 says is deliberate.
 
-**Reviewer: this is the one place B2a knowingly interprets rather than
-implements. If the reading is wrong, Task 6 is wrong.**
+**Therefore: `clear(rec)` the moment the plate is built.** §10.2.2 is implemented,
+not interpreted. Residency collapses from "the whole ~21-minute cut, plus
+indefinitely on a paused or failed screen" to "the few milliseconds between
+decrypt and plate construction, plus however long the Cut/Skip choice is on
+screen". `unlockSecretPlate`'s `defer` stays as the backstop for every path that
+never reaches a plate at all, and becomes idempotent.
+
+This also matters for B2b: `SecretsResident()` now goes false as the cut starts,
+so §10.2.4's residency key means what it says instead of staying true for the
+entire engrave.
+
+**Do not overclaim what this buys.** The `Plate` still encodes the secret — it is
+a geometric rendering of the very words about to be cut into steel, and it must
+exist for the duration of the cut. An SWD reader with the machine open during an
+engrave can reconstruct the seed from `plate.Spline` whether or not the record
+buffer is zeroed. What the early wipe removes is the *record*, the *only* copy
+that outlives the plate and the one §10.2.2 names. The unwipeable derived copies
+are **F-83**, they are not closed by this, and no phase of this feature closes
+them — that needs a plate pipeline over `[]byte`.
+
+**Consequence for the retry story, stated so Task 9.6 tests the truth:** because
+the job holds the spline, an operator who pauses mid-cut **can resume the same
+plate without re-entering the passphrase**. What needs a fresh unlock is
+re-cutting after *leaving* the engrave screen, when the plate is gone too. That
+is the honest reading of §10.2.2's "re-cutting needs a fresh unlock", and it is
+strictly better than the alternative: the pause/resume path never had a seed
+record resident to protect.
 
 ---
 
@@ -334,7 +382,11 @@ with:
 ```go
 package seal
 
-import "testing"
+import (
+	"testing"
+
+	"seedhammer.com/codex32"
+)
 
 // F-77. The encrypted section's md1/mk1 records must carry the same card
 // labels the public section's do, or §10.2.2's secret-session plate list cannot
@@ -420,24 +472,64 @@ func TestEncryptedMultisigCardsAreDistinguishable(t *testing.T) {
 
 // A record the grouping cannot read must NOT reject the payload: §10.2.1
 // requires the decode for the public section only, and turning a label failure
-// into a rejection would change admission, which lands in Rust first.
+// into a rejection would change ADMISSION, which lands in Rust first.
+//
+// THE FIXTURE MUST REACH groupRecords, and an earlier draft of this test did
+// not (R0 round 0, I4): it used a mnemonic-only section, so labelEncryptedCards
+// returned at `len(strs) == 0` and the mutant "return the grouping error instead
+// of discarding it" survived the entire suite.
+//
+// codex32.AssembleMD1(nil) is the fixture that does reach it. Measured against
+// the real packages, not assumed:
+//
+//	assembled          = "md1t7yjcvgk6xetg" (16 bytes)
+//	codex32.ValidMD    = true          -> Classify = ClassMDMK, so it is IN the subset
+//	md.ParseChunkHeader = "md: bit stream truncated"
+//	cardKey            = ErrUndecodableCardSet: record 0: md: bit stream truncated
+//
+// Note the seal package's existing smuggledMD1 fixture CANNOT serve here:
+// md.ParseChunkHeader SUCCEEDS on it ({Version:0 Chunked:false ChunkSetID:0},
+// err=nil), so cardKey returns cleanly and the error path is never taken.
 func TestUnreadableEncryptedCardDoesNotReject(t *testing.T) {
-	// A BCH-valid md1 that ParseChunkHeader refuses is what §6.3 documents as
-	// constructible; here it is enough that a mixed section with a record whose
-	// card cannot be read still ADMITS, with zero labels on that record.
-	recs := [][]byte{
-		[]byte("bacon bacon bacon bacon bacon bacon bacon bacon bacon bacon bacon " +
-			"bacon bacon bacon bacon bacon bacon bacon bacon bacon bacon bacon bacon bacon"),
+	v := vectorNamed(t, "C")
+	var realMD1 string
+	for _, r := range v.Secret {
+		if codex32.ValidMD(r) {
+			realMD1 = r
+			break
+		}
 	}
-	out, err := AdmitSection(recs, SectionEncrypted)
+	if realMD1 == "" {
+		t.Fatal("vector C carries no md1 record; the premise of this test is broken")
+	}
+	broken := codex32.AssembleMD1(make([]byte, 0))
+	if Classify([]byte(broken)) != ClassMDMK {
+		t.Fatalf("the fixture classifies as %v, not a card, so it never reaches the grouping",
+			Classify([]byte(broken)))
+	}
+	if _, err := cardKey(broken, 0); err == nil {
+		t.Fatal("the fixture's card key resolves; it cannot exercise the failure path")
+	}
+
+	out, err := AdmitSection([][]byte{[]byte(broken), []byte(realMD1)}, SectionEncrypted)
+	// (a) a grouping failure must NOT reject.
 	if err != nil {
-		t.Fatalf("a mnemonic-only encrypted section must admit: %v", err)
+		t.Fatalf("a label failure rejected the payload: %v — §10.2.1 requires the "+
+			"decode for the public section only, and this is an ADMISSION change", err)
 	}
-	if len(out) != 1 || out[0].Class != ClassMnemonic {
-		t.Fatalf("got %d records, first classified %v; want 1 ClassMnemonic", len(out), out[0].Class)
+	// (b) every record is still admitted.
+	if len(out) != 2 {
+		t.Fatalf("admitted %d records, want 2", len(out))
 	}
-	if out[0].HRP != 0 {
-		t.Fatalf("a mnemonic carries HRP %q; labelling leaked outside ClassMDMK", out[0].HRP)
+	// (c) and the whole subset falls back to zero labels rather than to wrong
+	// ones — groupRecords is all-or-nothing, so one unreadable card costs the
+	// labels of every card beside it. gui's plateLabel renders that as
+	// "record N" (gui/unlock_platelist.go:50-55), never as a mislabelled md1.
+	for i, r := range out {
+		if r.HRP != 0 || r.CardIndex != 0 || r.PlateIndex != 0 {
+			t.Errorf("record %d carries a label (%c card %d/%d plate %d/%d) although the "+
+				"grouping failed", i, r.HRP, r.CardIndex, r.CardTotal, r.PlateIndex, r.PlateTotal)
+		}
 	}
 }
 ```
@@ -505,9 +597,9 @@ pass just as green on a payload with no cards at all.
       | mutant | must be killed by |
       | --- | --- |
       | `labelEncryptedCards` body emptied | `TestEncryptedSectionCardsAreLabelled` |
-      | subset filter widened to every record (drop the `ClassMDMK` continue) | `TestUnreadableEncryptedCardDoesNotReject` — `cardKey` fails closed, so the whole section starts rejecting |
+      | subset filter widened to every record (drop the `ClassMDMK` continue) | **`TestEncryptedSectionCardsAreLabelled`** — vector C's `ms1` reaches `cardKey`, the whole grouping fails, and every label comes back zero. *(An earlier draft named `TestUnreadableEncryptedCardDoesNotReject` "because the section starts rejecting". It does not: the error is discarded by design. R0 round 0, M2.)* |
       | `labelCards` fed `g.keys` order instead of `g.perRecord` | `TestEncryptedMultisigCardsAreDistinguishable` |
-      | the grouping error returned instead of discarded | `TestUnreadableEncryptedCardDoesNotReject` |
+      | the grouping error returned instead of discarded | `TestUnreadableEncryptedCardDoesNotReject` — **only** with the §1e fixture as corrected; the mnemonic-only version never reached `groupRecords` |
 
 - [ ] **1.6** Commit. `git add seal/label_encrypted.go seal/label_encrypted_test.go seal/record.go seal/grouping_test.go`
 
@@ -626,7 +718,15 @@ func unlockPayloadFlow(ctx *Context, th *Colors, r seal.Reader) {
 	// nobody else's. clear() zeroes it rather than merely dropping it: the AAD
 	// and the ciphertext both live in here, and TinyGo will not necessarily
 	// collect it before the engrave that follows needs the heap.
-	defer clear(blob)
+	//
+	// A CLOSURE, not `defer clear(blob)` (R0 round 0, I1). Deferred call
+	// arguments are evaluated when the defer STATEMENT runs, so `defer
+	// clear(blob)` would capture the slice header here and pin all 65,536 bytes
+	// for the whole flow -- the §5d `blob = nil` would rebind the local and
+	// release nothing, and F-79 would be reported closed while unfixed in
+	// exactly the payload-present-plus-running-engrave configuration Task 9.5
+	// exists to test. The closure reads `blob` at EXIT instead.
+	defer func() { clear(blob) }()
 	var o seal.Opener
 	p, err := o.Inspect(blob)
 ```
@@ -818,10 +918,17 @@ func (d *Deriver) Key() []byte {
 
 // Wipe zeroes everything this Deriver owns. See NewDeriver for what it cannot
 // reach.
+//
+// done is reset so a post-Wipe Key() returns nil rather than 32 zero bytes.
+// crypto.go:47-52 states the rule this obeys: "An all-zero key would be worse --
+// it is a VALID AES key and hides the fault." Not reachable from unlockDerive,
+// where Key()'s result is evaluated before the deferred Wipe runs, but this is a
+// public seam and B2b will hold one of these across a timer.
 func (d *Deriver) Wipe() {
 	clear(d.u[:])
 	clear(d.acc[:])
 	d.mac.Reset()
+	d.done = 0
 }
 ```
 
@@ -972,6 +1079,11 @@ func TestDeriverWipeLeavesTheReturnedKeyIntact(t *testing.T) {
 	}
 	if !bytes.Equal(d.u[:], zero) {
 		t.Fatal("Wipe left the U buffer non-zero")
+	}
+	// A wiped Deriver must not hand out 32 zero bytes: that is a VALID AES key
+	// and it hides the fault (the rule crypto.go:47-52 states for DeriveKey).
+	if k := d.Key(); k != nil {
+		t.Fatalf("Key() after Wipe returned %d bytes, want nil", len(k))
 	}
 }
 ```
@@ -1157,10 +1269,13 @@ Then modify `seal/open.go` — `Unlock`'s body from its `derive := o.KDF` line
 	return o.UnlockWithKey(blob, p, key)
 ```
 
-with the now-unused `nPub`, `end` and `split` locals removed from `Unlock` (they
-moved into `UnlockWithKey`); the `len(blob) < end` guard and the
-`if !h.Sealed() { return nil }` early return stay in `Unlock`, because `Unlock`'s
-contract is "a payload with nothing encrypted is not an error" while
+with the now-unused `nPub` and `split` locals removed from `Unlock` (they moved
+into `UnlockWithKey`). **`end` stays**, because its `len(blob) < end` guard stays
+— an earlier draft said to remove all three and then kept the guard, which does
+not compile (R0 round 0, M1). The guard is now redundant with `UnlockWithKey`'s,
+deliberately: `Unlock` remains a public entry point and bound-checks its own
+argument. The `if !h.Sealed() { return nil }` early return also stays, because
+`Unlock`'s contract is "a payload with nothing encrypted is not an error" while
 `UnlockWithKey`'s is "you gave me a key for a payload with no ciphertext".
 
 ### 5b. `seal` gains the session predicates §10.2.2 and §10.2.4 both need
@@ -1264,6 +1379,31 @@ var (
 	errUnlockCancelled = errors.New("unlock: cancelled")
 )
 
+// newDeriver is the KDF seam, and it is NOT optional (R0 round 0, I2).
+//
+// §11.2 requires "BIP-39 checksum rejection happens without invoking the KDF"
+// and §11.3 makes both the "checksum check removed" and "KDF run before the
+// checksum gate" mutants mandatory -- each asserted by INSTRUMENTATION, because
+// both orders return the identical error and a return-value assertion is a
+// guaranteed false PASS over exactly the defect.
+//
+// The existing instrument (Opener.KDF, counted by countingKDF in
+// seal/open_test.go:14-20) is no longer in the path: B2a derives through
+// seal.NewDeriver and opens through UnlockWithKey, neither of which consults
+// Opener.KDF. This variable is the replacement, in the same in-file style as
+// unlockEngraveHook and unlockSecretHook. Production is always seal.NewDeriver;
+// a test swaps it and counts.
+var newDeriver = seal.NewDeriver
+
+// unlockPassphraseHook fires when the word-entry screen is ENTERED, and exists
+// for one required negative: §11.2's "Vector E reaches the plate list with the
+// keyboard flow NEVER ENTERED -- asserted by instrumenting the prompt entry
+// point, not by return value. A scripted fake platform will happily feed twelve
+// words into a prompt that should not exist and still reach the plate list, so
+// a return-value assertion reports PASS over exactly the defect." nil in
+// production.
+var unlockPassphraseHook func()
+
 // unlockPassphraseFlow takes §8's twelve words. It returns ok == false only
 // when the operator backs out; a checksum-invalid entry is reported and
 // re-prompted here, because that is a typo and not a decision.
@@ -1273,9 +1413,25 @@ var (
 // does reuse unmodified is inputWordsFlow, whose length is len(mnemonic) and
 // whose title parameter is a documented additive seam.
 func unlockPassphraseFlow(ctx *Context, th *Colors) (bip39.Mnemonic, bool) {
+	if unlockPassphraseHook != nil {
+		unlockPassphraseHook()
+	}
+	// The screen's identity is established HERE, before entry, and the title
+	// passed to inputWordsFlow stays "" (R0 round 0, M4). The title parameter is
+	// an either/or: gui/gui.go:765-770 renders `layoutTitlef("Word %d of %d")`
+	// when it is empty and `layoutTitle(title)` when it is not. Passing
+	// "Passphrase" would REPLACE the only per-word progress on the screen, so
+	// the operator would type twelve words with no idea how many remain, on the
+	// screen that gates a ~31 s KDF. Empty is also what makes §8's "reuses the
+	// existing 12-word seed-entry flow unmodified" literally true, and it keeps
+	// the existing `uiContains(content, "Word 1 of")` negative assertion working.
+	showNotice(ctx, th, unlockTitle,
+		"Enter the 12-word passphrase for this payload.\n\n"+
+			"These words are the payload's passphrase. They are NOT a seed and no "+
+			"wallet is derived from them.")
 	for !ctx.Done {
 		m := emptyBIP39Mnemonic(12)
-		inputWordsFlow(ctx, th, m, 0, "Passphrase")
+		inputWordsFlow(ctx, th, m, 0, "")
 		// inputWordsFlow returns on Back with whatever has been typed, so an
 		// incomplete mnemonic is the ordinary shape of "the operator left".
 		// Treating it as an error would report a typo they did not make.
@@ -1338,7 +1494,10 @@ func unlockKDFLead(done, total int, elapsed time.Duration) string {
 	if done <= 0 || elapsed <= 0 {
 		return "Unlocking. This takes about 30 seconds."
 	}
-	left := time.Duration(int64(elapsed) / int64(done) * int64(total-done))
+	// Multiply BEFORE dividing: `elapsed/done` truncates to whole nanoseconds
+	// first, and on a fast host that rounds to 0 and the screen reads "About 0
+	// seconds left." int64 overflows only past ~10^10 ns of elapsed time.
+	left := time.Duration(int64(elapsed) * int64(total-done) / int64(done))
 	return fmt.Sprintf("Unlocking. About %d seconds left.", int(left.Seconds()+0.5))
 }
 
@@ -1346,7 +1505,7 @@ func unlockKDFLead(done, total int, elapsed time.Duration) string {
 // It returns the derived key, which the CALLER must zero, or ok == false if the
 // operator left.
 func unlockDerive(ctx *Context, th *Colors, h seal.Header, pass []byte) ([]byte, bool) {
-	d := seal.NewDeriver(pass, h.Salt[:], int(h.Iterations))
+	d := newDeriver(pass, h.Salt[:], int(h.Iterations))
 	// Registered before anything can return. Key() hands back a copy, so this
 	// does not zero the result out from under the caller.
 	defer d.Wipe()
@@ -1490,8 +1649,13 @@ Fragment replacing the sealed dead-end (`gui/unlock_flow.go:61-66`):
 		}
 		// F-79: the blob's last use was UnlockWithKey's AAD and ciphertext. Zero
 		// and drop it BEFORE the session, so the engrave that follows does not
-		// run with up to 16 KB of dead region on the heap. The deferred clear at
-		// the top of this function is then a no-op on a nil slice.
+		// run with the region still on the heap. This releases it only because
+		// the deferred clear above is a CLOSURE reading `blob` at exit; a
+		// `defer clear(blob)` would still hold the array (I1).
+		//
+		// Safe because AdmitSection COPIES every record
+		// (seal/record.go:207, `append([]byte(nil), r...)`), so p.Public and
+		// p.Secret do not alias this buffer.
 		clear(blob)
 		blob = nil
 		// §10.2.2 -- every secret record offered FIRST, consecutively, each
@@ -1517,11 +1681,100 @@ four).
   `ppHarness` (`gui/passphrase_flow_test.go:39`) is the closest existing shape,
   but it hooks `passphraseWidgetHook`, which the *word* keyboard does not use;
   clone the harness rather than bending it.
-- **`Opener.KDF` injection for gui tests.** The gui suite is ~12 s today; a real
-  100,000-iteration derivation per test would dominate it. `unlockDerive` takes
-  its iteration count from the header, so gui tests build low-iteration blobs
-  with `sealForTest` (`seal/open_test.go:44`) rather than stubbing the KDF —
-  which keeps the real deriver in the path under test.
+- **`runUnlock` keeps its `[]byte` parameter** and writes the bytes to
+  `t.TempDir()`, handing `unlockPayloadFlow` a `seal.FileReader` over the file.
+  An earlier draft said Task 2's `seal.Reader` change was "one line per call
+  site" using `payloadReaderFor` — it is not: two existing call sites pass blobs
+  no vector name can produce (`gui/unlock_flow_test.go:171-172`,
+  `tc.mangle(sealVectorBlob(t, "E"))`, and `:195`). Writing a temp file inside
+  `runUnlock` makes it genuinely one edit (R0 round 0, N3).
+- **`gui` needs its own sealer, because `sealForTest` is unreachable from it**
+  (R0 round 0, I3). `sealForTest` is unexported in `seal/open_test.go`, and a
+  `_test.go` file is not part of the importable package — no import makes it
+  visible to `package gui`. `gui`'s only blob source today is
+  `payloadReaderFor`/`sealVectorBlob` over the vector file.
+
+  **And no vector can supply Task 7's fixture.** Measured: A(pub 0/sec 1),
+  B(0/1), C(0/6), D(5/1), E(5/0), F(0/15), G(12/3) — C's and F's encrypted cards
+  sit on `pub_len == 0` payloads, and D's and G's encrypted records are `ms1`
+  only. **No vector carries `md1`/`mk1` in BOTH sections**, so `unlockPlates`'
+  `mixed` flag is false for every one of them and the `(sealed)` suffix has no
+  reachable test. Adding an eighth vector is a Rust-primary change and does not
+  belong in B2a.
+
+  So Task 5 adds `gui/seal_fixture_test.go` (below). Note also that the
+  "low-iteration blob" motivation was wrong: the *host* derives 100,000
+  iterations in tens of milliseconds — the ~31 s figure is device-only — so the
+  fixture uses the §6.2 floor and the suite cost is the frame pumping, not the
+  KDF.
+
+`gui/seal_fixture_test.go`, new file.
+
+```go
+package gui
+
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"strings"
+	"testing"
+
+	"seedhammer.com/seal"
+)
+
+// A sealer for package gui.
+//
+// seal's own sealForTest is unexported in a _test.go file, so no import reaches
+// it from here (R0 round 0, I3), and the canonical vectors cannot express every
+// shape B2a must test -- in particular NO vector carries md1/mk1 in BOTH
+// sections, which is the only shape that exercises the plate list's "(sealed)"
+// disambiguation.
+//
+// This is deliberately NOT a second implementation of the format: it composes
+// seal's own Header.Encode and DeriveKey, so a wire-format change breaks it the
+// same way it breaks production. Production has no sealing path and must not
+// grow one -- a device that can seal is a device that can be made to emit a
+// payload (seal/crypto.go:12-16).
+func sealBlobForTest(t *testing.T, public, secret []string, passphrase string, iterations uint32) []byte {
+	t.Helper()
+	pub := []byte(strings.Join(public, "\n"))
+	h := seal.Header{PubLen: uint32(len(pub))}
+	if len(secret) > 0 {
+		pt := []byte(strings.Join(secret, "\n"))
+		h.Iterations = iterations
+		// Fixed salt and IV: a test fixture must be deterministic. §7.2's
+		// one-key-one-message rule is not weakened, because nothing here is
+		// ever a real payload -- and production cannot reach this code at all.
+		for i := range h.Salt {
+			h.Salt[i] = byte(i + 1)
+		}
+		for i := range h.IV {
+			h.IV[i] = byte(i + 0x40)
+		}
+		h.CtLen = uint32(len(pt))
+		hdr := h.Encode()
+		aad := append(append([]byte(nil), hdr[:]...), pub...)
+		key := seal.DeriveKey(seal.NormalisePassphrase(passphrase), h.Salt[:], int(iterations))
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			t.Fatalf("aes: %v", err)
+		}
+		gcm, err := cipher.NewGCM(block)
+		if err != nil {
+			t.Fatalf("gcm: %v", err)
+		}
+		// Seal appends the tag, which is exactly the wire layout (§6).
+		return append(aad, gcm.Seal(nil, h.IV[:], pt, aad)...)
+	}
+	hdr := h.Encode()
+	return append(append([]byte(nil), hdr[:]...), pub...)
+}
+```
+
+> **This fixture is a machine-checked claim, not a sketch.** Task 5.1 asserts it
+> round-trips through `seal.Opener.Inspect` + `UnlockWithKey` before any test
+> depends on it — if `sealBlobForTest` and production disagree about the format,
+> every Task 5–7 test is measuring the fixture rather than the code.
 - **`TestSealedPayloadStopsAtATerminalScreen` (`gui/unlock_flow_test.go:211`)
   asserts the exact behaviour this task removes.** It is replaced, not deleted:
   the new assertion is that a sealed payload reaches the *passphrase* screen and
@@ -1539,6 +1792,19 @@ four).
 - [ ] **5.3** Write the gui tests (checksum gate with a KDF counter; the retry
       loop keeping the hash on screen; cancel never reaching the plate list).
       Expect FAIL.
+
+      **The counter is a test-local swap of `newDeriver`**, restored with
+      `t.Cleanup` in the `unlockEngraveHook` idiom. Assert the count is **0**
+      after a checksum-invalid attempt and **1** after a valid one; a
+      return-value assertion cannot tell those apart.
+
+      **Budget the frame count.** `unlockDerive` draws one frame per
+      `kdfStepIterations = 500`, so a full 100,000-iteration unlock needs **≥200
+      frames** before the next screen exists. The house idiom is
+      `pumpUntil(frame, want, 32)` — 32 is far too few here and would look like a
+      hang. Either pump ≥256 or, better, have the counting `newDeriver` return a
+      deriver over a small iteration count so the test measures the flow rather
+      than the arithmetic (R0 round 0, N1).
 - [ ] **5.4** Write `gui/unlock_kdf.go` and the `unlock_flow.go` fragment.
 - [ ] **5.5** `nix develop --command go test ./gui/ ./seal/`, then the TinyGo
       device build.
@@ -1728,8 +1994,17 @@ func unlockEngraveCodex32(ctx *Context, th *Colors, rec []byte) {
 		showError(ctx, th, unlockTitle, "This record does not fit any plate size.")
 		return
 	}
-	// ONE engrave, then return regardless of the outcome. See the plan's "The
-	// one place this plan interprets the spec".
+	// §10.2.2, and it must be HERE rather than after Engrave returns. The plate
+	// carries the geometry: newEngraverJob holds plate.Spline
+	// (gui/engraver.go:64) and the engrave loop iterates e.spline (:170), so
+	// nothing reads these bytes again. Waiting for Engrave would leave the seed
+	// resident for the whole ~21-minute cut -- and Back while running does NOT
+	// return (gui/gui.go:2651-2656 calls Stop() and keeps rendering), so the
+	// abort-mid-plate path §10.2.2 calls the machine's most ordinary recovery
+	// would leave it resident indefinitely and let the operator resume without
+	// a fresh unlock.
+	clear(rec)
+	// ONE engrave, then return regardless of the outcome.
 	NewEngraveScreen(ctx, plate).Engrave(ctx, &engraveTheme)
 }
 
@@ -1749,6 +2024,15 @@ func unlockEngraveMnemonic(ctx *Context, th *Colors, rec []byte) {
 	// zeroed by the caller's defer; this one is this function's to zero, and
 	// clear() reaches []Word where wipeBytes ([]byte) does not compile.
 	defer clear(m)
+	// §6c FLIPS THIS to &SeedScreen{NoEdit: true}. It is written as the plain
+	// constructor here for one reason: NoEdit is added to SeedScreen by a
+	// FRAGMENT in gui/gui.go, and a whole-file block that referenced it would
+	// not type-check against the unmodified fork -- the plan's build gate would
+	// fail for a reason that is not a defect. The two-line flip is §6c's, and it
+	// is a reviewer's execution pass rather than a machine-checked one. Do not
+	// ship without it: on a touch-only SH2 a CENTRE TAP opens the word editor,
+	// and editing an authoritative payload seed produces a self-consistent plate
+	// that does not restore the payload's wallet.
 	ss := new(SeedScreen)
 	if !ss.Confirm(ctx, th, m) {
 		return
@@ -1768,11 +2052,48 @@ func unlockEngraveMnemonic(ctx *Context, th *Colors, rec []byte) {
 		showError(ctx, th, unlockTitle, "This seed does not fit any plate size.")
 		return
 	}
+	// §10.2.2 — see unlockEngraveCodex32 for why this is before Engrave and not
+	// after. m is zeroed by this function's own defer; rec is seal's buffer.
+	clear(rec)
 	NewEngraveScreen(ctx, plate).Engrave(ctx, &engraveTheme)
 }
 ```
 
-### 6c. Tests — asserted on the BUFFERS, never on a return value
+### 6c. The `SeedScreen` fragment (R0 round 0, M5)
+
+Modify `gui/gui.go` — add one field to `SeedScreen` and one guard in `Confirm`:
+
+```go
+	// NoEdit suppresses the edit affordance. Zero value is EDITABLE, so every
+	// existing caller keeps today's behaviour; only a payload-sourced seed sets
+	// it. For a TYPED seed, editing a word is a typo fix. For an authoritative
+	// one it is corruption, and because Confirm's caller then derives a
+	// fingerprint from whatever is on screen, the resulting plate is internally
+	// self-consistent and does not restore the payload's wallet.
+	NoEdit bool
+```
+
+and where `editBtn` is added to the nav slots, skip it when `s.NoEdit`. Note
+`editBtn` carries `AltButton: Center`, so on a touch-only SH2 a **centre tap**
+opens the editor — this is not a hard-to-reach affordance.
+
+Then flip the one call site in `gui/unlock_session.go`:
+
+```go
+	ss := &SeedScreen{NoEdit: true}
+```
+
+> **These three edits are FRAGMENTS and are therefore unchecked by the build
+> gate** — §6b's whole-file block deliberately writes `new(SeedScreen)` so it
+> type-checks against the unmodified fork. This is the one place in the plan
+> where a whole-file block and a fragment must be applied together to be
+> correct, and it is called out here so it is not half-applied.
+
+**Test:** with `NoEdit` set, tapping the centre of the seed screen does not reach
+word entry; with it clear, it still does (the existing scan-path behaviour, which
+must not regress).
+
+### 6d. Tests — asserted on the BUFFERS, never on a return value
 
 Fragment additions to a new `gui/unlock_session_test.go`. The load-bearing cases,
 each traceable to §11.2:
@@ -1783,7 +2104,8 @@ each traceable to §11.2:
 | **each is zeroed before the next is offered** | **F** | at the moment record *k+1* is offered, record *k*'s buffer reads all-zero |
 | Skip wipes | F | offer → Skip → buffer zero |
 | Back from the Cut/Skip choice wipes | F | offer → Back → buffer zero |
-| **a cancelled engrave wipes** | F | offer → Cut → cancel the engrave → buffer zero |
+| **the buffer is zero WHILE the engrave screen is up** | F | offer → Cut → pump to the engrave screen → assert the record reads all-zero **without leaving it**. This is the assertion that pins the early wipe; every after-the-fact check passes whether the wipe is before or after `Engrave`. |
+| a cancelled engrave leaves nothing | F | offer → Cut → cancel → buffer zero (necessarily true given the row above, asserted anyway because it is §10.2.2's literal bullet) |
 | a mnemonic secret engraves | **A** | reaches `SeedScreen`, then the engrave screen; buffer zero afterwards |
 | `SecretsResident()` is false when the session ends | F | the §10.2.4 predicate B2b will key on |
 | no secret is ever in the plate list | F, C, G | `unlockPlates` contains no `ms1` and no mnemonic |
@@ -1805,9 +2127,9 @@ each traceable to §11.2:
       | mutant | must be killed by |
       | --- | --- |
       | only the first secret offered (`at = at[:1]`) | the vector-F offer-order test — nothing else in the suite has more than one secret |
-      | `defer p.WipeSecretAt(i)` moved to after the `Engrave` call | the cancelled-engrave test |
-      | the wipe keyed on `Engrave` returning true | the Skip test and the cancelled-engrave test |
-      | `IsSecret` widened to include `ClassMDMK` | the "no secret in the plate list" test — vector F's twelve cards would vanish from it |
+      | **`clear(rec)` moved to after `Engrave` returns** | the **resident-during-engrave** test: drive to the engrave screen and assert the buffer is already zero *while it is still on screen*. Nothing else sees it — every after-the-fact assertion passes under both. |
+      | `defer p.WipeSecretAt(i)` deleted entirely | **the Skip test and the Back test**, which return before any plate is built. *(An earlier draft named the cancelled-engrave test; `Engrave` returns on cancel, so a merely-moved defer still runs. R0 round 0, M2.)* |
+      | `IsSecret` widened to include `ClassMDMK` | **the vector-F offer-order test**, which sees 15 offers instead of 3. *(Not the "no secret in the plate list" test: `unlockPlates` filters on `Class != ClassMDMK`, not on `IsSecret`, so the twelve entries stay put. R0 round 0, M2.)* |
       | `IsSecret` narrowed to `ClassCodex32Secret` only | the vector-A mnemonic test |
       | Back from Cut/Skip returns without wiping | the Back test |
 
@@ -1950,7 +2272,29 @@ func unlockPlates(p *seal.Payload) []unlockPlate {
       cards in **both** sections (the `(sealed)` suffix appears and the two
       `mk1 1/2` entries are distinguishable), and the `(cut)` mark appearing after
       a completed engrave and **not** after a cancelled one.
-- [ ] **7.2** Write `gui/unlock_plates.go` and the fragments.
+- [ ] **7.2** Write `gui/unlock_plates.go` and the fragments. **Three consequences
+      an earlier draft left unscheduled** (R0 round 0, M3) — the first two are
+      compile errors, the third is the stale-comment class §1d spends a task
+      fixing:
+
+      1. The **unsealed** call site `gui/unlock_flow.go:73`
+         `unlockPlateListFlow(ctx, th, p.Public)` becomes
+         `unlockPlateListFlow(ctx, th, unlockPlates(p))`. Both paths now build
+         the list the same way, which is also what stops the unsealed path from
+         silently keeping the old labels.
+      2. `gui/unlock_platelist_test.go:126` passes `[]seal.AdmittedRecord` and
+         must pass `[]unlockPlate`.
+      3. `unlockEngraveFlow`'s call-site comment (`gui/unlock_platelist.go:173-181`)
+         says the `string(rec.Record)` conversion is "HARMLESS HERE — B1 holds
+         public data only — and **ACTIVELY WRONG in B2**, where the same call
+         shape on a secret record makes an unwipeable copy". Task 7 deliberately
+         routes **encrypted-section** `md1`/`mk1` through that exact call, which
+         §6.3 says is correct — so as written the comment now tells a B2b reader
+         the opposite of what B2a decided. Rewrite it: the conversion is
+         admissible for `md1`/`mk1` from **either** section, because §6.3 makes
+         them public data wherever they travelled, and remains wrong for
+         anything `seal.IsSecret` admits — which is why the secret session never
+         calls this function.
 - [ ] **7.3** `nix develop --command go test ./gui/`.
 - [ ] **7.4** Mutation check: drop the `(sealed)` suffix → the both-sections test
       fails; mark `cut` on cancel as well as completion → the cancel test fails;
@@ -2020,9 +2364,14 @@ is unsigned and a hand-flashed image will not boot the machine.
 - [ ] **9.5** **Cut one secret plate to completion.** This is the configuration
       F-79 names as never having been exercised: payload present *plus* a running
       engrave. Confirm no out-of-memory.
-- [ ] **9.6** **Cancel a secret plate mid-cut**, then confirm re-cutting requires
-      the twelve words again. That is §10.2.2's stated price, observed rather
-      than assumed.
+- [ ] **9.6** **Cancel a secret plate mid-cut.** Confirm two distinct things,
+      because they differ and an earlier draft of this step asserted only the
+      second and would have observed the opposite:
+      (a) the paused plate **resumes without re-entering the passphrase** — the
+      job holds the spline, and the record was already zeroed when the plate was
+      built; and
+      (b) once you **leave the engrave screen**, re-cutting that record does
+      require the twelve words again. That is §10.2.2's price, observed.
 - [ ] **9.7** Enter a **wrong** passphrase and confirm the message offers both
       readings and keeps the hash on screen.
 - [ ] **9.8** Record the results verbatim in `design/HARDWARE_RESULT_<date>_phaseB2a.md`.
@@ -2092,6 +2441,21 @@ does not need to re-derive any of this:**
    unchanged. That is the measurement behind §1f's claim, and it is why "a
    SECOND failing test means Task 1 is wrong" is a usable tripwire rather than a
    hope.
+4. **§1e's corrected fixture was MUTATION-CHECKED, not merely re-run** (R0 round
+   0, I4). With `labelEncryptedCards` mutated to propagate its grouping error
+   and `AdmitSection` mutated to return it, `TestUnreadableEncryptedCardDoesNotReject`
+   **fails** with exactly the diagnostic it was written to produce:
+
+   ```
+   a label failure rejected the payload: seal: public records do not form a
+   decodable card set: record 0: md: bit stream truncated — §10.2.1 requires the
+   decode for the public section only, and this is an ADMISSION change
+   ```
+
+   The version this replaced passed under that same mutant. Both files were
+   restored from a **file copy**, not `git checkout`, and the substitutions were
+   asserted to have matched before the run — a silently-failing `sed` reads
+   exactly like a surviving mutation.
 
 **What this does NOT prove:** none of the `gui` code was executed. It compiles
 and vets against the real fork — every identifier, signature and type in
@@ -2153,15 +2517,18 @@ That is the reviewer's execution pass, and it is where the risk now sits.
 
 ## Follow-ups filed by this plan
 
-- **F-81 — a FAILED secret plate stays resident while its retry prompt is up
-  (owning phase: B2b, and it closes there by construction).** `EngraveScreen`
-  captures an engraver error into `engraveFailed` state and renders "Hold button
-  to retry"; it never exits on its own. B2a wipes when `Engrave` *returns*, so
-  the record survives until the operator presses Back. §10.2.4's timer arms in
-  that state — the screen is not "actively engraving" — so B2b closes the window
-  at three minutes with no further work. Recorded because B2a ships *before* that
-  timer and the window is therefore unguarded in the shipped build. See "The one
-  place this plan interprets the spec".
+- **F-81 — WITHDRAWN before it was filed.** It described a residency window
+  created by wiping after `Engrave` returned. R0 round 0 (C1) showed that design
+  was both unnecessary and non-conforming, and the plan now wipes at plate
+  construction, so the window does not exist. Recorded as withdrawn rather than
+  deleted so a reader of the R0 report finds its disposition.
+- **F-84 — `SeedScreen` gains `NoEdit` (owning phase: B2a, Task 6).** Not a
+  deferral — it is implemented in Task 6 — but recorded because it changes a
+  screen the NFC scan path also uses. Zero value stays editable, so every
+  existing caller is unaffected by construction; the new field is set only by
+  `unlockEngraveMnemonic`, where editing authoritative payload data would let an
+  operator cut a self-consistent seed plate that does not restore the payload's
+  wallet.
 - **F-82 — `seal.Deriver` has no Rust counterpart (owning phase: ownerless
   residue).** The chunked derivation is device-only: the host has no progress bar
   to draw. It produces byte-identical output, pinned by six vectors, so the
