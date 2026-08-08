@@ -82,6 +82,27 @@ device mismatch would have been real signal rather than a tooling artifact.
 host and on RP2350 silicon.** It also proves the firmware's XIP read returns the
 right 1125 bytes: an aliased or erased read cannot produce a matching digest.
 
+### 4. Present → absent — the entry tracks region state, not a cached menu
+
+The earlier negative path (result 2) ran before any payload had been loaded, so
+it could not distinguish "reads the region correctly" from "never found anything
+to show". This one erases a payload that was **known present on the previous
+boot**.
+
+Verified at the host before the device booted:
+
+```
+BEFORE : 4d 4e 45 4d 42 4c 4f 42 …   MNEMBLOB present
+AFTER  : ff ff ff ff ff ff ff ff …   all 0xFF, erased
+```
+
+which is §6.1 literally — "Erased flash reads 0xFF, which is not [MNEMBLOB]".
+Only the 64 KB payload region was cleared; B1's firmware was untouched.
+
+On the next boot: **entry gone, 8 dots, Engrave Bundle still in slot 5.** So the
+menu entry reflects the region on each start rather than any cached or sticky
+state, and §10.1's probe-once-at-startup is doing what it claims.
+
 ## A transcription scare worth recording
 
 The digest was first reported from the screen as `… 6da**e** …` against the
@@ -103,13 +124,30 @@ compares **extracted text, not pixels**, so no test in this suite can catch a
 mis-drawn glyph. That is how the missing `·` (F-78) survived — it was found by
 measuring width, not by rendering. Folded into F-78.
 
-## Still open on this hardware
+## The RP2350B PBKDF2 rate — deliberately NOT measured here
 
-- **The RP2350B PBKDF2 rate.** §7.1's 9,715 it/s is from an RP2350**A**; this
-  machine is a **B**. `cmd/kdfbench` measures it, but it is a separate TinyGo
-  image, so flashing it replaces B1 and requires a reflash afterwards. Not done
-  in this session.
-- **Present → absent.** The negative path was tested before the payload was
-  loaded, not after erasing it again. The stronger form — erase a *known
-  present* payload and confirm the entry disappears — would rule out any cached
-  or stale menu state. Cheap; worth doing on the next trip.
+§7.1's 9,715 it/s is from an RP2350**A** (Pico 2); this machine is a **B**. The
+plan was to close that with `cmd/kdfbench` on the same trip. **Skipped, operator
+decision 2026-08-07.**
+
+`cmd/kdfbench`'s own header (`cmd/kdfbench/main.go:11-21`) says to run it on a
+Pico 2 / Pico Plus 2 and **NOT** the SeedHammer II, and argues the measurement
+does not need a B at all: PBKDF2 here is compute-bound with a working set of a
+few hundred bytes, so it lives in cache, and the A/B differences are package, pin
+count and flash banking — none of which touch that loop. Same dual Cortex-M33,
+same 150 MHz.
+
+So running it on the SH2 would overwrite B1 and require a reflash to confirm a
+number that should be identical, and running it on a Pico 2 adds nothing, because
+**9,715 it/s already came from a Pico 2**. Continuity §5 was carrying this as an
+open measurement without noticing the tool had already argued it unnecessary.
+
+**It is still owed before release; only the method changed.** SPEC §7.1 is
+amended to confirm it **in situ during Phase B2**, by timing the real unlock KDF
+on the machine — which is the stronger measurement anyway, since it covers what
+the operator actually experiences (~31 s at a progress screen) in the real call
+path rather than a benchmark's idealised loop.
+
+## Nothing else is open on this hardware
+
+All four checks in this document passed. Task 7 is complete.

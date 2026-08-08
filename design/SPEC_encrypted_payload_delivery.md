@@ -897,8 +897,23 @@ requires.
 
 **Residual caveat:** measured on an RP2350**A** (Pico 2, QFN60); the SeedHammer II
 is an RP2350**B** (QFN80). Same core, same 150 MHz, and PBKDF2 is compute-bound
-with a working set of a few hundred bytes, so the figure should transfer — but
-confirm it on the machine during Plan B before release.
+with a working set of a few hundred bytes, so the figure should transfer.
+
+**How this is being confirmed — amended 2026-08-07, operator decision.** The plan
+was to run `cmd/kdfbench` on the machine during Plan B. That is **not** being
+done, for reasons the tool itself states (`cmd/kdfbench/main.go:11-21`): it is
+written to run on a Pico 2 / Pico Plus 2 and **not** the SeedHammer II, and it
+argues the rate transfers precisely because the A/B differences are package, pin
+count and flash banking — none of which touch a cache-resident compute loop.
+Running it on the SH2 would also mean overwriting the application firmware and
+reflashing afterwards, and running it on a Pico 2 adds nothing, since **9,715
+it/s already came from a Pico 2**.
+
+Instead it will be confirmed **in situ during Phase B2**, by timing the real
+unlock KDF on the machine. That is the stronger measurement: it covers the
+number the operator actually experiences (~31 s of waiting at a progress screen),
+in the real call path, on the real part — rather than a benchmark's idealised
+loop. **Still owed before release**; only the method changed, not the obligation.
 
 The value travels in the blob, so host and device need not agree at compile time.
 

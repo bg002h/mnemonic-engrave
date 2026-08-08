@@ -885,10 +885,20 @@ Phase B1 firmware. Full record: `design/HARDWARE_RESULT_2026-08-07_phaseB1.md`.
   which an aliased or erased read cannot produce. First end-to-end proof that
   §6.6 agrees across host and RP2350 silicon.
 
-**Still open on the same hardware:** the RP2350**B** PBKDF2 rate. §7.1's
-9,715 it/s is from an **A**. `cmd/kdfbench` measures it but is a separate
-TinyGo image, so it replaces B1 and needs a reflash after. Tracked in SPEC §12
-residual; grab it on the next trip.
+- Present → absent: a payload known present on the previous boot was erased
+  (host readback confirmed `MNEMBLOB` → all `0xFF`), and the entry disappeared,
+  8 dots, Engrave Bundle still slot 5. So the menu reflects the region at each
+  start rather than any cached state.
+
+**The RP2350B PBKDF2 rate is NOT part of this closure, and is no longer tracked
+as a benchmark run.** `cmd/kdfbench` says to run on a Pico 2 / Pico Plus 2 and
+NOT the SH2, and argues the rate transfers because PBKDF2 here is compute-bound
+and cache-resident while A/B differ only in package, pins and flash banking. Both
+existing figures already come from a Pico 2, so a re-run adds nothing and an SH2
+run costs a firmware overwrite plus reflash. Operator decision 2026-08-07: skip
+it. SPEC §7.1 is amended to confirm the rate **in situ during B2** by timing the
+real unlock KDF — still owed before release, stronger measurement, different
+method.
 
 **UPDATE 2026-08-07 (B1 planning): the SH2 is available, so this closes in B1.**
 The "leave it, do not buy a board" decision above was about not *buying*
