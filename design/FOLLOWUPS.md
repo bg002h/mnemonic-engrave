@@ -930,6 +930,78 @@ assembled mechanically and still need a reviewer's execution pass.
 the third-commit case the standard workflow separates out. B1 states the gap;
 B2 should not have to.
 
+### F-79 — the payload buffer retains 64 KB for the GUI's whole lifetime (owning phase: B2 — fix BEFORE the feature reaches an operator)
+
+`uiFlow` probes once at startup and holds the result (`gui/gui.go:1541-1546`).
+`XIPReader.Read` allocates `clampRegion(RegionLen)` = **65,536 bytes**
+(`seal/read_tinygo.go:41-52`), and that slice lives until the GUI exits.
+
+**At most 16,450 bytes of it can ever be meaningful.** §6.2's own caps make the
+largest legal blob `52 + 8191 + 8191 + 16`, so ~49 KB of what is retained is
+provably erased flash. Measured on the B1 branch: `tinygo build -target
+pico-plus2 -size short ./cmd/controller` reports `ram 69300` — about 451 KB free
+of the RP2350B's 520 KB — so this is **~14% of the free heap, held permanently**,
+whenever a payload is present.
+
+§6.4 already treats a **transient** ~98 KB as a design hazard ("a fifth of the
+free heap"). This one is neither transient nor measured anywhere in the plan.
+
+**Why it is not academic:** payload-present *plus* an engrave actually running is
+the one configuration the 2026-08-07 hardware pass did not drive to completion —
+the recorded checks stop at the §10.2.3 warning. `validateMdmk` builds three full
+plate plans at once. If that combination exhausts the heap, the failure is an
+out-of-memory **during an engrave**, not at boot.
+
+**Fix:** after `Inspect` succeeds, reslice to `HeaderLen + PubLen + CtLen
+(+ TagLen)`. Or hold the `seal.Reader` and re-read on selection instead of
+retaining bytes at all.
+
+Found by the B1 whole-diff review (M-3). Not folded there because it is a
+production change and that fold was deliberately kept test-only, so B1's
+hardware-verified behaviour stayed untouched.
+
+### F-80 — residue from the B1 whole-diff review (owning phase: B2 for the two that touch its surface; ownerless for the rest)
+
+None of these gate. Recorded so they are a grep rather than a recollection.
+Source: `design/agent-reports/encrypted-payload-planB-phaseB1-whole-diff-round0.md`.
+
+- **`layoutMainPager`'s `lastNav` wiring is unpinned** (M-2). `pagerDots`
+  (`gui/unlock_program_test.go:103`) calls `layoutMainPager` directly with a
+  constant, so it measures the function, not the screen. Reverting the draw site
+  (`gui/gui.go:1801`) to a hardcoded `bip85Derive` leaves the suite green —
+  measured. Failure mode is cosmetic: nine programs, eight dots, and on the
+  ninth page no dot is filled at all. Not folded because a real pin needs pixel
+  comparison of drawn frames — dots are not text, and `uiContains` only sees
+  text. **Owning phase: B2**, which touches this screen anyway.
+- **`"Sealed Payload"` is duplicated** as a literal at `gui/gui.go:1792` while
+  `gui/unlock_flow.go:21` declares `const unlockTitle` as "the same string the
+  menu entry carries". One stated invariant, two literals, no compiler link.
+- **Back is drawn with `assets.IconBack`**, which §10.3 says it should *not* read
+  as ("should read as leaving the session, not stepping back one screen"). There
+  is no lock/exit glyph in `gui/assets`, so it needs an asset. Harmless in B1 —
+  nothing is resident — but **B2 relies on this affordance to make "every exit
+  wipes" legible**. Owning phase: B2, with F-78's font work.
+- **`unlockWarnUnauthenticated` formats the digest without checking
+  `p.HasHash`** (`gui/unlock_flow.go:116`), unlike the notice screen. Unreachable
+  today only because `ParseHeader` rejects `pub_len == 0 && ct_len == 0` with
+  `ErrEmpty`. If that bound is relaxed it prints the empty-set constant under a
+  "compare this" instruction. A guard costs nothing.
+- **`groupCards` has no production caller** (`seal/record.go:341`) — it survives
+  as a wrapper for two tests. Either fold them onto `groupRecords` or say in the
+  doc comment that it is test-facing.
+- **`PlateIndex` is positional**, counted in record order by `labelCards`
+  (`seal/record.go:257`), not read from the record's own
+  `ChunkHeader.ChunkIndex`. A chunk-permuted public section is admitted —
+  measured: reversing vector D's five records yields `err=nil, 5 records`.
+  §6.6's "record order is plate order" makes the positional reading defensible,
+  so this is a documentation gap; one line saying which the label means keeps B2
+  from re-deriving it.
+- **§10.2.2's "records already cut this session are marked" is unimplemented and
+  unlisted.** The B1 plan's *What B1 does NOT cover* defers §10.2.2's lifecycle,
+  wiping and §10.2.4 — but not this bullet, which is a property of the plate
+  list, and the plate list is B1. Intended as B2; **owning phase: B2**, recorded
+  so it is not lost between the two.
+
 ### F-78 — "·" has no glyph in the display font, and four shipped screens use it (owning phase: ownerless residue; a font cycle, not a feature cycle)
 
 Measured 2026-08-07 in `gui`, pinned by `TestPlateLabelSeparatorRenders`:
