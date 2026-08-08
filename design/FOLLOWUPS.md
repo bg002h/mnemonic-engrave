@@ -851,6 +851,14 @@ point of use.
 (`__flash_size=16M`, which is why the fork's own build target is `pico-plus2`;
 `pico2-w` does NOT qualify, it `inherits: ["pico2"]` at 4 MB) or the SH2 itself.
 
+**Board chipids now live in one place: `design/HARDWARE_INVENTORY.md`.** Check
+the chipid before every flash — on 2026-08-07 two RP2350s were in BOOTSEL at
+once, and `tinygo flash` / `picotool load` take whichever they find. The bench
+also holds a **Pico 2 W** (`0xb3d19289d3ec3f0e`) that is easy to mistake for the
+rehearsal Pico: same form factor, same 4 MB, but `secure boot: 0` — it runs
+unsigned images — and its LED is not where a Pico 2's is. It does **not**
+qualify for this follow-up.
+
 **Why the residual risk is small but real:** §5's arithmetic fixes the address,
 and the 2026-08-06 hardware validation already showed the SH2 accepts a
 data-family UF2 there byte-exact with the firmware region's sha256 unchanged.
