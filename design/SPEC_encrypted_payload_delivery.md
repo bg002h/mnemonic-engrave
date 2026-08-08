@@ -671,7 +671,7 @@ An earlier draft capped this at 7, derived from `ChoiceScreen`'s no-scroll limit
 here because the error is instructive.
 
 *The premise was wrong.* The fork already ships a paged, arbitrary-length card
-list: `bundleReviewFlow` (`gui/bundle_flow.go:224`) uses
+list: `bundleReviewFlow` (`gui/bundle_flow.go:227`) uses
 `pageBtn := &Clickable{Button: Button2}` to page through any number of cards,
 inside the three-slot nav budget (Back / Page / OK). `ChoiceScreen`'s ~7-entry
 ceiling binds *layout variants per plate* in `bundleEngrave`, not records per
@@ -1322,14 +1322,44 @@ Lock being one tap away, and the secrets being gone within the first *N* plates.
 ### 10.3 UI constraints to respect
 
 - `layoutNavigation` indexes a fixed `[3]int` (`gui/gui.go:1857`) — **a fourth
-  nav affordance panics.** Back / Clear / OK is the whole budget. The bundle
-  plate list must fit Back / Lock / OK exactly.
+  nav affordance panics.** Three slots is the whole budget.
 - `ChoiceScreen` does not scroll and draws over its own title past ~7 entries
   (`gui/gui.go:1455`, pinned by `gui/freetext_speed_test.go:31`). **This bounds
   layout variants per plate, NOT records per bundle** — the distinction that an
   earlier draft got wrong (§6.4). The bundle plate list MUST use
-  `bundleReviewFlow`'s paged shape (`gui/bundle_flow.go:224`), which handles an
+  `bundleReviewFlow`'s paged shape (`gui/bundle_flow.go:227`), which handles an
   arbitrary number of entries within the three-slot nav budget.
+
+#### The plate list's three slots are Back / Page / OK — and Back IS Lock
+
+**Amended 2026-08-07 (Phase B1 design). The two bullets above contradicted each
+other and this resolves it.** An earlier draft of the first bullet required the
+plate list to "fit Back / Lock / OK exactly" while the second required
+`bundleReviewFlow`'s paged shape — and that shape spends a slot on Page
+(`gui/bundle_flow.go:275`: Back / Page / OK). Back + Lock + Page + OK is
+**four** affordances into `ys := [3]int{…}` indexed by `int(clk.Button - Button1)`,
+which is the panic the first bullet exists to prevent. Both requirements could
+not be met as written.
+
+The resolution is not to pick one. **Leaving the session by any route already
+wipes everything** (§10.2.2: "Lock, Back, an error, `ctx.Done`"), so a Lock
+button distinct from Back is a second control performing one action. The plate
+list's nav is therefore:
+
+| slot | affordance | meaning |
+| --- | --- | --- |
+| `Button1` | **Back — and this is Lock** | wipe everything, return to the main menu |
+| `Button2` | Page | advance the paged list, wrapping |
+| `Button3` | OK | engrave the selected plate |
+
+This is strictly stronger than a separate Lock. With two exits the guarantee
+depends on the operator choosing the wiping one; with Back *being* the wipe,
+**every** exit from the plate list wipes, and there is no path an operator can
+take that leaves a secret resident. The label shown to the operator should read
+as leaving the session, not as stepping back one screen.
+
+§10.2.2's flow diagram is unchanged in meaning — its `[ Lock ]` edge is this
+Back.
 
 ## 11. Testing
 
@@ -1780,7 +1810,7 @@ the consumer that will parse it.
    An earlier draft capped this at 7 on a false premise (that no paged list
    widget existed) with a consequence that would have rejected *every* multisig
    wallet — measured at 10 records for 2-of-2 and 15 for 2-of-3. The cap is now
-   24, derived from `bundleReviewFlow`'s paged list (`gui/bundle_flow.go:224`).
+   24, derived from `bundleReviewFlow`'s paged list (`gui/bundle_flow.go:227`).
    Remaining work is implementation, not decision: the plate list must use the
    paged shape, not `ChoiceScreen`.
 8. **Session idle wipe — RESOLVED 2026-08-07 as a two-phase timer (§10.2.4).**
