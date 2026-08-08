@@ -6,12 +6,22 @@
 | --- | --- | --- |
 | 0 | 0C / 4I | `design/agent-reports/encrypted-payload-planB-phaseB1-R0-round0.md` |
 | 1 | 0C / 1I — 3 of 4 FIXED, labelling PARTIAL | `design/agent-reports/encrypted-payload-planB-phaseB1-R0-round1.md` |
+| 2 | 0C / 1I — ordering fix SOUND; defect in a paragraph the round-1 fold volunteered | `design/agent-reports/encrypted-payload-planB-phaseB1-R0-round2.md` |
 
-Round 1's single Important was **authored by round 0's fold**, not by the
-original draft — the fourth consecutive cycle in which that has been the
-dominant pattern (continuity §4). It is folded here, confined to Task 4a;
-round 1 explicitly found nothing else in the fold needing revisiting. A round 2
-is required, scoped to Task 4a alone.
+**B1's implementable content is GREEN at 0C/0I.** Round 2 verified Task 4a's
+ordering fix against the real control flow and closed both open questions —
+`permitted()` admits only `ClassMDMK` publicly, and `groupCards`' key order is
+deterministic (first-seen, not map iteration). Its single Important was against
+a *note to B2*, not against anything an implementer of B1 does; the round-2 fold
+corrects that note and files **F-77**. Per the proportional re-review rule a
+prose/factual fold that changes no task, no logic and no control flow does not
+re-trigger the gate, so **no round 3** — the loop is closed.
+
+**The pattern worth carrying forward:** rounds 1 and 2 each found a defect
+**authored by the previous fold**, and in both cases by content the author
+*volunteered* beyond what the reviewer asked for. Continuity §4 recorded folds as
+the dominant defect source; this cycle sharpens it — the dangerous part of a fold
+is the part nobody requested.
 
 **Descends from:** `SPEC_encrypted_payload_delivery.md` §10, which is GREEN and
 normative. This plan implements §10.2 steps 1–4 plus the plate list and engrave.
@@ -454,10 +464,16 @@ is two chances to disagree about what a card is.
 Add to `AdmittedRecord`:
 
 ```go
-// HRP is 'd' (md1) or 'k' (mk1) for ClassMDMK records, 0 otherwise. It comes
-// from the §6.3 card grouping seal already performs -- the UI must never
-// re-derive it, or the plate list and the decode can disagree about what a
-// record is.
+// HRP is 'd' (md1) or 'k' (mk1) for a ClassMDMK record IN THE PUBLIC SECTION,
+// and 0 for every record in the encrypted section -- INCLUDING ClassMDMK ones,
+// which §6.3 explicitly permits there and which vectors C and F actually
+// carry. That is not a statement about what those records are; it is that
+// pass 3, the only place grouping is computed, runs for SectionPublic alone.
+// See F-77.
+//
+// It comes from the §6.3 card grouping seal already performs -- the UI must
+// never re-derive it, or the plate list and the decode can disagree about what
+// a record is.
 HRP byte
 // CardIndex/CardTotal identify which (HRP, chunk_set_id) card this record
 // belongs to, 1-based, among cards of the SAME HRP. PlateIndex/PlateTotal
@@ -483,12 +499,29 @@ cannot tell which cosigner a plate belongs to, which is §6.4's
 This mirrors the fork's own precedent: `bundlePlatePlan` (`gui/bundle_flow.go:300`)
 carries exactly `cardIdx`/`cardTotal`/`plateIdx`/`plateTotal` for this purpose.
 
-**These fields are populated for `SectionPublic` only.** Pass 3 runs only for the
-public section, so an encrypted-section `AdmittedRecord` carries `HRP == 0` and
-zero indices. That is correct for B1, which never sees a secret record — but B2
-labels secret plates too (§10.2.2), and its records can be `ms1` or a bare
-mnemonic, neither of which is a card at all. **B2 must not assume these fields
-are meaningful for secrets.** Say so at the field, not only here.
+**These fields are populated for `SectionPublic` only, and the reason is NOT
+that secrets aren't cards.**
+
+> **Round 2 correction.** The round-1 fold claimed encrypted-section records "can
+> be `ms1` or a bare mnemonic, neither of which is a card at all." **That is
+> false.** SPEC §6.3 is explicit — "The encrypted section may carry anything —
+> `ms1`, `mk1`, `md1`, a BIP-39 mnemonic". `permitted()` (`seal/record.go:147`)
+> codes it: `if c == ClassMDMK { return true }`, **unconditional**, not gated on
+> section. And it is not theoretical — in `seal/testdata/vectors.json`, vector
+> C's secret set is `ms1`×1 / `mk1`×2 / `md1`×3, and vector F's is `ms1`×3 /
+> `mk1`×6 / `md1`×6. **Twelve of vector F's fifteen secret records are cards.**
+
+The fields are zero for **every** encrypted-section record — `ClassMDMK` ones
+included — for one reason only: **pass 3 is the sole place grouping is computed,
+and it runs only for `SectionPublic`** (`seal/record.go:186`).
+
+**The trap this leaves B2, named properly:** B2 labels secret plates (§10.2.2),
+its secret records routinely *are* `mk1`/`md1` cards needing exactly the
+`mk1 1/2` / `mk1 2/3 · 1/2` labels Task 4a builds — and it will find no grouping
+to reuse, because pass 3 never ran for them. The fix is to extend pass 3's
+grouping over the encrypted section's `ClassMDMK` subset using the same
+`groupCards`/`cardKey`, **not** to re-derive classification in `gui`. Filed as
+**F-77**.
 
 **This is an additive change to a merged Phase A type.** It adds no behaviour and
 no new §6.3 logic — it publishes a grouping that already happens. Phase A's

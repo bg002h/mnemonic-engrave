@@ -892,6 +892,32 @@ assembled mechanically and still need a reviewer's execution pass.
 the third-commit case the standard workflow separates out. B1 states the gap;
 B2 should not have to.
 
+### F-77 — the encrypted section's md1/mk1 cards have no grouping (owning phase: B2 — GATING, it blocks §10.2.2's secret plate labels)
+
+B1's Task 4a surfaces `HRP`/`CardIndex`/`CardTotal`/`PlateIndex`/`PlateTotal` on
+`AdmittedRecord` so the plate list can render §10.2.2's `mk1 1/2` /
+`mk1 2/3 · 1/2` labels. **Those fields are populated for `SectionPublic` only**,
+because pass 3 — `decodePublicSet` → `groupCards`, the sole place grouping is
+computed — runs only for the public section (`seal/record.go:186`).
+
+**And the encrypted section is full of cards.** SPEC §6.3: "The encrypted
+section may carry anything — `ms1`, `mk1`, `md1`, a BIP-39 mnemonic."
+`permitted()` (`seal/record.go:147`) codes it as `if c == ClassMDMK { return
+true }` — unconditional, not gated on section. In `seal/testdata/vectors.json`,
+vector C's secret set is `ms1`×1 / `mk1`×2 / `md1`×3 and vector F's is `ms1`×3 /
+`mk1`×6 / `md1`×6 — **twelve of vector F's fifteen secret records are cards.**
+
+So B2, which must label secret plates, will reach for grouping that was never
+computed for its records. **Extend pass 3's grouping over the encrypted
+section's `ClassMDMK` subset, reusing `groupCards`/`cardKey`.** Do NOT re-derive
+classification in `gui` — that is the two-code-paths divergence
+`Opener.Inspect`'s doc comment exists to prevent, and Task 4a rejects it for the
+public section on exactly the same grounds.
+
+Found by the B1 plan's R0 round 2, against a paragraph a previous fold had
+introduced. Gating for B2 rather than optional: without it §10.2.2's labels are
+unimplementable for any multisig payload.
+
 ### F-76 — inspecting a payload-sourced card (owning phase: B2 or later; NOT B1)
 
 `mk1GatherFlow` (`gui/mk1_inspect.go:156`) and `md1GatherFlow`
