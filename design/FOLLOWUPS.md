@@ -862,6 +862,53 @@ plausible-for-the-wrong-reason results, so it is recorded rather than waved off.
 measured 9,715 it/s is from an RP2350**A** (Pico 2); the SH2 is a **B**. Tracked
 in SPEC §12 residual; grab it whenever a B is flashed.
 
+**UPDATE 2026-08-07 (B1 planning): the SH2 is available, so this closes in B1.**
+The "leave it, do not buy a board" decision above was about not *buying*
+hardware; it never applied to the SH2 itself, and the owning phase already said
+"or the first SH2 session — whichever comes first". `IMPLEMENTATION_PLAN_encrypted_payload_deviceB_phaseB1.md`
+Task 7 carries the procedure, including the RP2350**B** PBKDF2 rate on the same
+trip. **Not deferrable past B1.**
+
+### F-74 — no build gate covers a Go plan's code fragments (owning phase: before B2's plan review)
+
+`scripts/plan-build-gate.sh` extracts ```rust blocks into a scratch crate and
+builds them. Plan B's documents are **Go**, so every Go fragment in a plan
+reaches its reviewer uncompiled — the B1 plan says so in its own gate-coverage
+section rather than letting the brief imply coverage it does not have.
+
+This is not hypothetical. Continuity §4 measured **folds** as the dominant defect
+source this cycle (three of four introduced a defect nobody had looked at), and
+compile errors as a recurring class among them — round 3 of the Plan A review
+burned an entire opus round on five of them, every one a `cargo build` away.
+Plan B has the same exposure with none of the coverage.
+
+**What would close it:** a Go equivalent that extracts fragments into a scratch
+package beside the real `gui`/`seal` and runs `go build`. It must state its own
+blind spot the way the Rust one does — fragments that are *modifications* to
+existing files (a new `case` in a switch, a field added to a struct) cannot be
+assembled mechanically and still need a reviewer's execution pass.
+
+**Why not in B1:** it is tooling, and bundling tooling into a feature commit is
+the third-commit case the standard workflow separates out. B1 states the gap;
+B2 should not have to.
+
+### F-75 — stale `gui/bundle_flow.go:224` citations outside the SPEC (owning phase: ownerless residue)
+
+`bundleReviewFlow` is at `gui/bundle_flow.go:227`; `:224` lands on a comment
+line — ordinary citation decay, and exactly what `plan-cite-gate.sh` exists to
+surface (it resolves `:224` as "ok" and prints the comment, which is the gate's
+stated blind spot working as designed).
+
+Corrected in `SPEC_encrypted_payload_delivery.md` (three occurrences) by the B1
+cycle. Two copies remain in shipped records:
+
+- `design/IMPLEMENTATION_PLAN_encrypted_payload_deviceB_phaseA.md:638`
+- `design/CONTINUITY_2026-08-07b.md:148`
+
+Both are historical artefacts of merged work. Per F-72's precedent they are
+recorded here rather than rewritten — the citation is wrong, the record of what
+was believed at the time is not.
+
 ## Resolved
 
 ### Closed 2026-08-07 — F-67 through F-70 (the encrypted-payload prerequisites)
