@@ -5,12 +5,34 @@ name: release
 # THIRD_PARTY_LICENSES + a verify note, writes SHA256SUMS, and minisign-signs it.
 # Pull requests run the SAME build matrix as a `build-only` dry-run (no signing,
 # no assemble) so cross-compile breakage is caught off-tag.
+# `ci/**` exists so a commit can EARN its required status check BEFORE master
+# points at it. Branch protection on master requires the `test (rust + go)`
+# context, and a status check binds to a COMMIT SHA, not to a branch — but a
+# commit pushed directly to master has no check yet at the moment it is
+# evaluated, so the rule reports "expected" and is bypassed. Every direct push
+# to master has been bypassed for this reason, five in a row; it is a
+# chicken-and-egg in the rule, not a lapse in discipline.
+#
+# With this trigger the fix is to push the SAME SHA to a staging ref first:
+#
+#	git push origin master:refs/heads/ci/staging   # builds this exact SHA
+#	# wait for `test (rust + go)` to go green
+#	git push origin master                          # check already present
+#	git push origin --delete ci/staging
+#
+# `strict: false` on the protection rule means GitHub asks only whether the
+# commit carries a passing context, not whether the branch is up to date, so
+# this satisfies the rule rather than bypassing it.
+#
+# For a `push` event GitHub reads the workflow from THE REF BEING PUSHED, so
+# this trigger takes effect for the very commit that introduces it.
 on:
   push:
     tags:
       - 'v*'
     branches:
       - master
+      - 'ci/**'
   pull_request:
 
 permissions:
