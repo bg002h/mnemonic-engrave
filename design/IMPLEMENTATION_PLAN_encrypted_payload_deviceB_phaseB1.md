@@ -301,9 +301,17 @@ var _ [1]struct{} = [qaProgram - unlockPayload]struct{}{}
    in the repo would catch it.
 
 > **Mutation check (required, per §11.3 and the project standard).** After these
-> pass, break each of the four boundary sites in turn — e.g. revert `:1904` to
-> `int(bip85Derive) + 1` — and confirm a test **fails**. A boundary site whose
-> mutation nothing notices is an unpinned site. Record the four results in the
+> pass, break each of the four boundary sites in turn and confirm a test
+> **fails**. A boundary site whose mutation nothing notices is an unpinned site.
+>
+> **Known: `:1904` is UNPINNABLE, and that is a property of the code.** Measured
+> during implementation — `npage` is read exactly once, by `if npage > 1`, and
+> both 8 and 9 satisfy it, so no observable behaviour depends on its value and
+> the whole `gui` suite stays green with the mutation applied. The *guard* is
+> pinned (forcing `npage := 1` suppresses the arrows and fails eleven tests); the
+> *bound* cannot be until something other than a `> 1` test consumes it. Report
+> it as a surviving mutation rather than inventing a test that appears to cover
+> it — a documented untestable path beats a false claim of coverage. Record the four results in the
 > task's commit message. Continuity §4's most transferable rule applies here
 > directly: an assertion whose expected side is derived from the same constant
 > the code uses pins nothing. Assert **literal 8 and 9**, not
@@ -537,10 +545,19 @@ not positional initialisation — so added fields do not break it. `grep -rn
 counts.** If a test nonetheless needs editing during implementation, the
 ordering above was violated.
 
-**Tests:** vector F (2-of-3, three secret records) and vector G (2-of-3 mixed,
-public section spanning four cards) pin both label rows. Assert the **rendered
-label strings**, not the struct fields — a test that reads back `CardIndex` pins
-the plumbing and not the thing §10.2.2 actually specifies.
+**Tests:** vector **D** (5 public records, one card per HRP) pins the plain
+`mk1 1/2` row; vector **G** (12 public records spanning several cards) pins the
+multi-card row. Assert the **rendered label strings**, not the struct fields — a
+test that reads back `CardIndex` pins the plumbing and not the thing §10.2.2
+actually specifies.
+
+> **Corrected during implementation.** An earlier draft named **vector F** here.
+> F has **`public: 0`** — an entirely empty public section, and 15 secret records
+> (`ms1`×3 / `mk1`×6 / `md1`×6), measured from `seal/testdata/vectors.json`. It
+> cannot pin a *public* label row at all. F is the right vector for asserting
+> that the encrypted section carries **no** grouping (F-77), and it is used there
+> instead. Task 4's own test list already had this right, which is what made the
+> contradiction findable.
 
 **Tests (Task 4):**
 - Vector G — a public section spanning **four cards** — renders across pages and
