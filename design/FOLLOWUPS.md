@@ -820,6 +820,292 @@ green on MSRV. Recorded because it is the exact bundling the standard workflow
 forbids, and — as with `b946399` — **the history stays as it is.** The rule binds
 future commits.
 
+
+### F-79 — the payload buffer retains 64 KB for the GUI's whole lifetime (owning phase: **B2a-i, Task 2** — fix BEFORE the feature reaches an operator)
+
+`uiFlow` probes once at startup and holds the result (`gui/gui.go:1541-1546`).
+`XIPReader.Read` allocates `clampRegion(RegionLen)` = **65,536 bytes**
+(`seal/read_tinygo.go:41-52`), and that slice lives until the GUI exits.
+
+**At most 16,450 bytes of it can ever be meaningful.** §6.2's own caps make the
+largest legal blob `52 + 8191 + 8191 + 16`, so ~49 KB of what is retained is
+provably erased flash. Measured on the B1 branch: `tinygo build -target
+pico-plus2 -size short ./cmd/controller` reports `ram 69300` — about 451 KB free
+of the RP2350B's 520 KB — so this is **~14% of the free heap, held permanently**,
+whenever a payload is present.
+
+§6.4 already treats a **transient** ~98 KB as a design hazard ("a fifth of the
+free heap"). This one is neither transient nor measured anywhere in the plan.
+
+**Why it is not academic:** payload-present *plus* an engrave actually running is
+the one configuration the 2026-08-07 hardware pass did not drive to completion —
+the recorded checks stop at the §10.2.3 warning. `validateMdmk` builds three full
+plate plans at once. If that combination exhausts the heap, the failure is an
+out-of-memory **during an engrave**, not at boot.
+
+**Fix:** after `Inspect` succeeds, reslice to `HeaderLen + PubLen + CtLen
+(+ TagLen)`. Or hold the `seal.Reader` and re-read on selection instead of
+retaining bytes at all.
+
+Found by the B1 whole-diff review (M-3). Not folded there because it is a
+production change and that fold was deliberately kept test-only, so B1's
+hardware-verified behaviour stayed untouched.
+
+### F-80 — residue from the B1 whole-diff review (owning phase: **B2a-ii** for the two the 2026-08-08 decision assigned it; **B2b/ownerless** for the rest)
+
+*(Amended 2026-08-08. CONTINUITY_2026-08-08 §9 said "F-80's two B2 items"; there
+are **three** bullets below carrying an explicit `owning phase: B2`. The operator
+split them that day: the "already cut" marks and the Back-is-Lock affordance go
+to **B2a-ii**; the `layoutMainPager` pixel pin does **not**, because a real pin
+needs a rasterising check, which is F-78's work.)*
+
+None of these gate. Recorded so they are a grep rather than a recollection.
+Source: `design/agent-reports/encrypted-payload-planB-phaseB1-whole-diff-round0.md`.
+
+- **`layoutMainPager`'s `lastNav` wiring is unpinned** (M-2). `pagerDots`
+  (`gui/unlock_program_test.go:103`) calls `layoutMainPager` directly with a
+  constant, so it measures the function, not the screen. Reverting the draw site
+  (`gui/gui.go:1801`) to a hardcoded `bip85Derive` leaves the suite green —
+  measured. Failure mode is cosmetic: nine programs, eight dots, and on the
+  ninth page no dot is filled at all. Not folded because a real pin needs pixel
+  comparison of drawn frames — dots are not text, and `uiContains` only sees
+  text. **Owning phase: B2**, which touches this screen anyway.
+- **`"Sealed Payload"` is duplicated** as a literal at `gui/gui.go:1792` while
+  `gui/unlock_flow.go:21` declares `const unlockTitle` as "the same string the
+  menu entry carries". One stated invariant, two literals, no compiler link.
+- **Back is drawn with `assets.IconBack`**, which §10.3 says it should *not* read
+  as ("should read as leaving the session, not stepping back one screen"). There
+  is no lock/exit glyph in `gui/assets`, so it needs an asset. Harmless in B1 —
+  nothing is resident — but **B2 relies on this affordance to make "every exit
+  wipes" legible**. Owning phase: B2, with F-78's font work.
+- **`unlockWarnUnauthenticated` formats the digest without checking
+  `p.HasHash`** (`gui/unlock_flow.go:116`), unlike the notice screen. Unreachable
+  today only because `ParseHeader` rejects `pub_len == 0 && ct_len == 0` with
+  `ErrEmpty`. If that bound is relaxed it prints the empty-set constant under a
+  "compare this" instruction. A guard costs nothing.
+- **`groupCards` has no production caller** (`seal/record.go:341`) — it survives
+  as a wrapper for two tests. Either fold them onto `groupRecords` or say in the
+  doc comment that it is test-facing.
+- **`PlateIndex` is positional**, counted in record order by `labelCards`
+  (`seal/record.go:257`), not read from the record's own
+  `ChunkHeader.ChunkIndex`. A chunk-permuted public section is admitted —
+  measured: reversing vector D's five records yields `err=nil, 5 records`.
+  §6.6's "record order is plate order" makes the positional reading defensible,
+  so this is a documentation gap; one line saying which the label means keeps B2
+  from re-deriving it.
+- **§10.2.2's "records already cut this session are marked" is unimplemented and
+  unlisted.** The B1 plan's *What B1 does NOT cover* defers §10.2.2's lifecycle,
+  wiping and §10.2.4 — but not this bullet, which is a property of the plate
+  list, and the plate list is B1. Intended as B2; **owning phase: B2**, recorded
+  so it is not lost between the two.
+
+### F-78 — "·" has no glyph in the display font, and four shipped screens use it (owning phase: ownerless residue; a font cycle, not a feature cycle)
+
+Measured 2026-08-07 in `gui`, pinned by `TestPlateLabelSeparatorRenders`:
+
+```
+width("ab") = 22    width("a·b") = 22    width("a|b") = 27
+```
+
+The middot contributes **zero pixels**. Four shipped files render it today:
+
+- `gui/bundle_flow.go:339` — `"Card %d of %d · Plate %d of %d"` → `Card 1 of 3  Plate 1 of 2`
+- `gui/codex32_polish.go:49,182,286` — `id NAME · thr 2 · share C` → double spaces
+- `gui/slip39_polish.go:237`
+- `gui/bundle.go:306`
+
+**Why it has gone unnoticed, and why it still matters.** In all four the
+surrounding *words* carry the meaning, so an invisible separator degrades to a
+double space — sloppy, not wrong. B1's plate list was the first place it would
+have been load-bearing (`mk1 2/3 · 1/2` → `mk1 2/3  1/2`, two fractions with
+nothing saying which is the card), which is why it surfaced there and why B1 uses
+`|` instead (operator decision, 2026-08-07).
+
+**The real fix is the font, not the call sites.** Adding `·` to the display font
+repairs all five places at once and lets B1 return to the separator §10.2.2's
+examples actually use. Note this is the **display** font, not the engraving
+alphabet — the 2-stroke-width minimum-feature rules do not apply.
+
+Not done in B1: it is a font change, and substituting a different character at
+each call site is treating the symptom in four places instead of the cause in
+one.
+
+**Why no test caught it, which is the more general gap.** `uiContains`
+(`gui/gui_test.go:516`) asserts against **extracted text, not pixels** — it
+lowercases the op tree's strings and does a substring match. A glyph that is
+missing, blank, or drawn as the wrong shape is invisible to every screen test in
+this package, because the text was *submitted* correctly regardless of what
+reached the panel. The middot was found by **measuring width**, not by rendering,
+and only because B1 needed to know whether a separator survived to the screen.
+
+A rasterising check would close it: draw each glyph alone and hash the pixels,
+so two characters that draw identically collide even though they compare unequal
+as text. Worth having before any future font edit — a font change is exactly the
+kind of edit whose defects this suite cannot see.
+
+### F-77 — the encrypted section's md1/mk1 cards have no grouping (owning phase: **B2a-i, Task 1** — GATING, it blocks §10.2.2's secret plate labels)
+
+B1's Task 4a surfaces `HRP`/`CardIndex`/`CardTotal`/`PlateIndex`/`PlateTotal` on
+`AdmittedRecord` so the plate list can render §10.2.2's `mk1 1/2` /
+`mk1 2/3 · 1/2` labels. **Those fields are populated for `SectionPublic` only**,
+because pass 3 — `decodePublicSet` → `groupCards`, the sole place grouping is
+computed — runs only for the public section (`seal/record.go:186`).
+
+**And the encrypted section is full of cards.** SPEC §6.3: "The encrypted
+section may carry anything — `ms1`, `mk1`, `md1`, a BIP-39 mnemonic."
+`permitted()` (`seal/record.go:147`) codes it as `if c == ClassMDMK { return
+true }` — unconditional, not gated on section. In `seal/testdata/vectors.json`,
+vector C's secret set is `ms1`×1 / `mk1`×2 / `md1`×3 and vector F's is `ms1`×3 /
+`mk1`×6 / `md1`×6 — **twelve of vector F's fifteen secret records are cards.**
+
+So B2, which must label secret plates, will reach for grouping that was never
+computed for its records. **Extend pass 3's grouping over the encrypted
+section's `ClassMDMK` subset, reusing `groupCards`/`cardKey`.** Do NOT re-derive
+classification in `gui` — that is the two-code-paths divergence
+`Opener.Inspect`'s doc comment exists to prevent, and Task 4a rejects it for the
+public section on exactly the same grounds.
+
+Found by the B1 plan's R0 round 2, against a paragraph a previous fold had
+introduced. Gating for B2 rather than optional: without it §10.2.2's labels are
+unimplementable for any multisig payload.
+
+### F-76 — inspecting a payload-sourced card (owning phase: **after B2b**; NOT B2a)
+
+`mk1GatherFlow` (`gui/mk1_inspect.go:156`) and `md1GatherFlow`
+(`gui/md1_gather.go:79`) prime a fresh gatherer with the single string handed to
+them, and when that alone is not a complete card they open
+`ctx.Platform.NFCReader()` and wait for the operator to tap the remaining
+**physical tags**.
+
+A payload-derived record has no tags. Every chunk is already sitting in
+`p.Public` — the gatherer simply has no way to reach it. So Inspect on a chunked
+payload record strands the operator on a scan-waiting screen, and chunked is the
+ordinary case (single-sig's `md1` alone is 3 records; vector G's is a 6-chunk
+card).
+
+Found by the B1 plan's R0 round 0 (finding 3), which is why B1 composes
+`validateMdmk` + `ChoiceScreen` + `NewEngraveScreen` directly instead of reusing
+`mdmkFlow`. **B1 engraves; it does not inspect.**
+
+**What would close it:** a gatherer that can be primed from an in-memory record
+set rather than only from NFC. The data and the decode both already exist; this
+is plumbing, not new codec behaviour, so the Rust-primary rule does not bind it.
+
+### F-85 — §2.2 does not name the during-engrave residency (owning phase: before the release tag)
+
+SPEC §2.2 lists what this design does **not** defend against. It does not say
+that a secret plate's geometry is resident in SRAM for the whole of its cut, and
+cannot be wiped until the cut ends. See F-83, which records why that is
+unavoidable rather than a defect.
+
+One paragraph, in the same register as items 9 and 11, saying that during a
+secret engrave the seed is recoverable from SRAM by someone with physical access
+and an SWD probe, and that physical custody is the control. It changes no
+behaviour and no test.
+
+**Why it is owed before the tag and not sooner:** the SPEC is GREEN, so this is
+an amendment with its own gate, and amending a normative document as a side
+effect of an implementation commit is exactly the bundling the standard workflow
+separates out. **Why it is owed at all:** §10.2.2's wipe is described to the
+operator as removing the secret, and it removes the *record*. The gap between
+what the machine does and what the operator has been told is the whole subject
+of §2.2.
+
+### F-84 — `SeedScreen` gains `NoEdit` (owning phase: B2a-ii, Task 6 — implemented there, not deferred)
+
+Recorded rather than deferred, because it changes a screen the NFC scan path also
+uses. `SeedScreen.Confirm`'s edit affordance writes `mnemonic[selected]` in
+place; for a **typed** seed that is a typo fix, for a **payload-sourced** one it
+is corruption, and the flow then derives a matching fingerprint and engraves it —
+so the plate is internally self-consistent and does not restore the payload's
+wallet.
+
+Zero value stays editable, so every existing caller is unaffected by
+construction. Found by the B2a plan's R0 round 0 (M5); round 1 (I1) then found
+that the guard must sit on the **click handler**, not the nav layout, because
+`Filter.matches` gates a button event on identity with no bounds check.
+
+### F-83 — the plate cannot be wiped until the engrave finishes — ACCEPTED LIMITATION, not a follow-up (operator, 2026-08-08)
+
+`validateMdmk`, `backup.SeedString`, `engraveSeed` and `toPlate` copy a record
+into Go strings and into `Plate.Spline`, none of which can be zeroed.
+`gui/ms1_decode.go:19-20` already carries the same caveat for the display path.
+
+**Operator decision 2026-08-08: "the one honest gap is unavoidable."** The plate
+*is* the geometry being cut; it must be resident while the needle moves. No
+ordering of wipes changes that, and a plate pipeline over `[]byte` would
+**relocate** the secret rather than remove it, because the spline still encodes
+it. Filing it as work-to-be-done would be dishonest bookkeeping: a register whose
+value is that every open item is real cannot carry one that will never be
+actioned.
+
+**What is therefore true, stated once so nothing downstream overclaims:** during
+a secret engrave the seed is recoverable from SRAM by an attacker with physical
+access and an SWD probe (§2.2 item 9, live because `debug enable: 1` is measured
+in §3). §10.2.2's wipe removes the **record** — the only copy that outlives the
+plate — and that is the whole of what it claims. B2a-ii's `clear(rec)` at plate
+construction is what makes "the record" and "the plate" distinct lifetimes rather
+than one.
+
+The SPEC amendment this owes is **F-85**.
+
+### F-82 — `seal.Deriver` and the folded `DeriveKey` have no Rust counterpart (owning phase: ownerless residue)
+
+The chunked derivation is device-only: the host has no progress bar to draw.
+B2a-i §3d then folds `DeriveKey` onto it, so `seal` no longer calls
+`crypto/pbkdf2` at all while the Rust side still uses its own PBKDF2.
+
+**The Rust-primary rule does not bind it**, and the reason is worth stating
+rather than assuming: the rule binds *normative behaviour* — wire format,
+identity and stub algorithms, validation, admission. A PBKDF2 that produces
+byte-identical output changes none of them. The contract is the six
+`derived_key_hex` literals in `seal/testdata/vectors.json`, produced by Rust,
+which the Go tests assert directly; measured, the fold also agrees with the
+old `crypto/pbkdf2` body byte-for-byte at iterations −1, 0, 1, 2, 3, 999,
+100000 and 100001. Recorded so a future reader does not mistake the asymmetry
+for drift.
+
+### F-75 — stale `gui/bundle_flow.go:224` citations outside the SPEC (owning phase: ownerless residue)
+
+`bundleReviewFlow` is at `gui/bundle_flow.go:227`; `:224` lands on a comment
+line — ordinary citation decay, and exactly what `plan-cite-gate.sh` exists to
+surface (it resolves `:224` as "ok" and prints the comment, which is the gate's
+stated blind spot working as designed).
+
+Corrected in `SPEC_encrypted_payload_delivery.md` (three occurrences) by the B1
+cycle. Two copies remain in shipped records:
+
+- `design/IMPLEMENTATION_PLAN_encrypted_payload_deviceB_phaseA.md:638`
+- `design/CONTINUITY_2026-08-07b.md:148`
+
+Both are historical artefacts of merged work. Per F-72's precedent they are
+recorded here rather than rewritten — the citation is wrong, the record of what
+was believed at the time is not.
+
+## Resolved
+
+### F-81 — WITHDRAWN 2026-08-08 before it was ever open
+
+Filed by the B2a plan's first draft: "a FAILED secret plate stays resident while
+its retry prompt is up." It described a residency window created by wiping the
+record *after* `EngraveScreen.Engrave` returned.
+
+R0 round 0 (C1) showed that design was both **unnecessary and non-conforming** —
+`newEngraverJob` holds `plate.Spline` and nothing reads the record after the
+plate is built, so the record can be zeroed *before* the engrave is entered; and
+waiting for `Engrave` to return did not satisfy §10.2.2 anyway, because Back
+while running does not return, it pauses. The plan now wipes at plate
+construction, so the window this described does not exist.
+
+Recorded as withdrawn rather than deleted, so a reader of that R0 report finds
+its disposition.
+
+
+*(Moved below the marker 2026-08-08. Both were marked CLOSED in their
+headings but still sat in the open list, unlike F-67–F-70 which were moved
+when they closed — the record defect CONTINUITY_2026-08-08 §9 asked to fold
+into the next commit touching this file.)*
+
 ### F-73 — CLOSED 2026-08-07 — the XIP read at the NORMATIVE 0x10E00000 is verified on hardware
 
 **Operator decision 2026-08-07: leave it, do not buy a board for this.** Filed so
@@ -907,6 +1193,7 @@ hardware; it never applied to the SH2 itself, and the owning phase already said
 Task 7 carries the procedure, including the RP2350**B** PBKDF2 rate on the same
 trip. **Not deferrable past B1.**
 
+
 ### F-74 — CLOSED 2026-08-08 — a build gate now covers a Go plan's code
 
 `scripts/plan-build-gate.sh` extracts ```rust blocks into a scratch crate and
@@ -965,189 +1252,6 @@ COMPLETE files where it can, so tier 1 has something to check.
 **Why not in B1:** it is tooling, and bundling tooling into a feature commit is
 the third-commit case the standard workflow separates out. B1 states the gap;
 B2 should not have to.
-
-### F-79 — the payload buffer retains 64 KB for the GUI's whole lifetime (owning phase: B2 — fix BEFORE the feature reaches an operator)
-
-`uiFlow` probes once at startup and holds the result (`gui/gui.go:1541-1546`).
-`XIPReader.Read` allocates `clampRegion(RegionLen)` = **65,536 bytes**
-(`seal/read_tinygo.go:41-52`), and that slice lives until the GUI exits.
-
-**At most 16,450 bytes of it can ever be meaningful.** §6.2's own caps make the
-largest legal blob `52 + 8191 + 8191 + 16`, so ~49 KB of what is retained is
-provably erased flash. Measured on the B1 branch: `tinygo build -target
-pico-plus2 -size short ./cmd/controller` reports `ram 69300` — about 451 KB free
-of the RP2350B's 520 KB — so this is **~14% of the free heap, held permanently**,
-whenever a payload is present.
-
-§6.4 already treats a **transient** ~98 KB as a design hazard ("a fifth of the
-free heap"). This one is neither transient nor measured anywhere in the plan.
-
-**Why it is not academic:** payload-present *plus* an engrave actually running is
-the one configuration the 2026-08-07 hardware pass did not drive to completion —
-the recorded checks stop at the §10.2.3 warning. `validateMdmk` builds three full
-plate plans at once. If that combination exhausts the heap, the failure is an
-out-of-memory **during an engrave**, not at boot.
-
-**Fix:** after `Inspect` succeeds, reslice to `HeaderLen + PubLen + CtLen
-(+ TagLen)`. Or hold the `seal.Reader` and re-read on selection instead of
-retaining bytes at all.
-
-Found by the B1 whole-diff review (M-3). Not folded there because it is a
-production change and that fold was deliberately kept test-only, so B1's
-hardware-verified behaviour stayed untouched.
-
-### F-80 — residue from the B1 whole-diff review (owning phase: B2 for the two that touch its surface; ownerless for the rest)
-
-None of these gate. Recorded so they are a grep rather than a recollection.
-Source: `design/agent-reports/encrypted-payload-planB-phaseB1-whole-diff-round0.md`.
-
-- **`layoutMainPager`'s `lastNav` wiring is unpinned** (M-2). `pagerDots`
-  (`gui/unlock_program_test.go:103`) calls `layoutMainPager` directly with a
-  constant, so it measures the function, not the screen. Reverting the draw site
-  (`gui/gui.go:1801`) to a hardcoded `bip85Derive` leaves the suite green —
-  measured. Failure mode is cosmetic: nine programs, eight dots, and on the
-  ninth page no dot is filled at all. Not folded because a real pin needs pixel
-  comparison of drawn frames — dots are not text, and `uiContains` only sees
-  text. **Owning phase: B2**, which touches this screen anyway.
-- **`"Sealed Payload"` is duplicated** as a literal at `gui/gui.go:1792` while
-  `gui/unlock_flow.go:21` declares `const unlockTitle` as "the same string the
-  menu entry carries". One stated invariant, two literals, no compiler link.
-- **Back is drawn with `assets.IconBack`**, which §10.3 says it should *not* read
-  as ("should read as leaving the session, not stepping back one screen"). There
-  is no lock/exit glyph in `gui/assets`, so it needs an asset. Harmless in B1 —
-  nothing is resident — but **B2 relies on this affordance to make "every exit
-  wipes" legible**. Owning phase: B2, with F-78's font work.
-- **`unlockWarnUnauthenticated` formats the digest without checking
-  `p.HasHash`** (`gui/unlock_flow.go:116`), unlike the notice screen. Unreachable
-  today only because `ParseHeader` rejects `pub_len == 0 && ct_len == 0` with
-  `ErrEmpty`. If that bound is relaxed it prints the empty-set constant under a
-  "compare this" instruction. A guard costs nothing.
-- **`groupCards` has no production caller** (`seal/record.go:341`) — it survives
-  as a wrapper for two tests. Either fold them onto `groupRecords` or say in the
-  doc comment that it is test-facing.
-- **`PlateIndex` is positional**, counted in record order by `labelCards`
-  (`seal/record.go:257`), not read from the record's own
-  `ChunkHeader.ChunkIndex`. A chunk-permuted public section is admitted —
-  measured: reversing vector D's five records yields `err=nil, 5 records`.
-  §6.6's "record order is plate order" makes the positional reading defensible,
-  so this is a documentation gap; one line saying which the label means keeps B2
-  from re-deriving it.
-- **§10.2.2's "records already cut this session are marked" is unimplemented and
-  unlisted.** The B1 plan's *What B1 does NOT cover* defers §10.2.2's lifecycle,
-  wiping and §10.2.4 — but not this bullet, which is a property of the plate
-  list, and the plate list is B1. Intended as B2; **owning phase: B2**, recorded
-  so it is not lost between the two.
-
-### F-78 — "·" has no glyph in the display font, and four shipped screens use it (owning phase: ownerless residue; a font cycle, not a feature cycle)
-
-Measured 2026-08-07 in `gui`, pinned by `TestPlateLabelSeparatorRenders`:
-
-```
-width("ab") = 22    width("a·b") = 22    width("a|b") = 27
-```
-
-The middot contributes **zero pixels**. Four shipped files render it today:
-
-- `gui/bundle_flow.go:339` — `"Card %d of %d · Plate %d of %d"` → `Card 1 of 3  Plate 1 of 2`
-- `gui/codex32_polish.go:49,182,286` — `id NAME · thr 2 · share C` → double spaces
-- `gui/slip39_polish.go:237`
-- `gui/bundle.go:306`
-
-**Why it has gone unnoticed, and why it still matters.** In all four the
-surrounding *words* carry the meaning, so an invisible separator degrades to a
-double space — sloppy, not wrong. B1's plate list was the first place it would
-have been load-bearing (`mk1 2/3 · 1/2` → `mk1 2/3  1/2`, two fractions with
-nothing saying which is the card), which is why it surfaced there and why B1 uses
-`|` instead (operator decision, 2026-08-07).
-
-**The real fix is the font, not the call sites.** Adding `·` to the display font
-repairs all five places at once and lets B1 return to the separator §10.2.2's
-examples actually use. Note this is the **display** font, not the engraving
-alphabet — the 2-stroke-width minimum-feature rules do not apply.
-
-Not done in B1: it is a font change, and substituting a different character at
-each call site is treating the symptom in four places instead of the cause in
-one.
-
-**Why no test caught it, which is the more general gap.** `uiContains`
-(`gui/gui_test.go:516`) asserts against **extracted text, not pixels** — it
-lowercases the op tree's strings and does a substring match. A glyph that is
-missing, blank, or drawn as the wrong shape is invisible to every screen test in
-this package, because the text was *submitted* correctly regardless of what
-reached the panel. The middot was found by **measuring width**, not by rendering,
-and only because B1 needed to know whether a separator survived to the screen.
-
-A rasterising check would close it: draw each glyph alone and hash the pixels,
-so two characters that draw identically collide even though they compare unequal
-as text. Worth having before any future font edit — a font change is exactly the
-kind of edit whose defects this suite cannot see.
-
-### F-77 — the encrypted section's md1/mk1 cards have no grouping (owning phase: B2 — GATING, it blocks §10.2.2's secret plate labels)
-
-B1's Task 4a surfaces `HRP`/`CardIndex`/`CardTotal`/`PlateIndex`/`PlateTotal` on
-`AdmittedRecord` so the plate list can render §10.2.2's `mk1 1/2` /
-`mk1 2/3 · 1/2` labels. **Those fields are populated for `SectionPublic` only**,
-because pass 3 — `decodePublicSet` → `groupCards`, the sole place grouping is
-computed — runs only for the public section (`seal/record.go:186`).
-
-**And the encrypted section is full of cards.** SPEC §6.3: "The encrypted
-section may carry anything — `ms1`, `mk1`, `md1`, a BIP-39 mnemonic."
-`permitted()` (`seal/record.go:147`) codes it as `if c == ClassMDMK { return
-true }` — unconditional, not gated on section. In `seal/testdata/vectors.json`,
-vector C's secret set is `ms1`×1 / `mk1`×2 / `md1`×3 and vector F's is `ms1`×3 /
-`mk1`×6 / `md1`×6 — **twelve of vector F's fifteen secret records are cards.**
-
-So B2, which must label secret plates, will reach for grouping that was never
-computed for its records. **Extend pass 3's grouping over the encrypted
-section's `ClassMDMK` subset, reusing `groupCards`/`cardKey`.** Do NOT re-derive
-classification in `gui` — that is the two-code-paths divergence
-`Opener.Inspect`'s doc comment exists to prevent, and Task 4a rejects it for the
-public section on exactly the same grounds.
-
-Found by the B1 plan's R0 round 2, against a paragraph a previous fold had
-introduced. Gating for B2 rather than optional: without it §10.2.2's labels are
-unimplementable for any multisig payload.
-
-### F-76 — inspecting a payload-sourced card (owning phase: B2 or later; NOT B1)
-
-`mk1GatherFlow` (`gui/mk1_inspect.go:156`) and `md1GatherFlow`
-(`gui/md1_gather.go:79`) prime a fresh gatherer with the single string handed to
-them, and when that alone is not a complete card they open
-`ctx.Platform.NFCReader()` and wait for the operator to tap the remaining
-**physical tags**.
-
-A payload-derived record has no tags. Every chunk is already sitting in
-`p.Public` — the gatherer simply has no way to reach it. So Inspect on a chunked
-payload record strands the operator on a scan-waiting screen, and chunked is the
-ordinary case (single-sig's `md1` alone is 3 records; vector G's is a 6-chunk
-card).
-
-Found by the B1 plan's R0 round 0 (finding 3), which is why B1 composes
-`validateMdmk` + `ChoiceScreen` + `NewEngraveScreen` directly instead of reusing
-`mdmkFlow`. **B1 engraves; it does not inspect.**
-
-**What would close it:** a gatherer that can be primed from an in-memory record
-set rather than only from NFC. The data and the decode both already exist; this
-is plumbing, not new codec behaviour, so the Rust-primary rule does not bind it.
-
-### F-75 — stale `gui/bundle_flow.go:224` citations outside the SPEC (owning phase: ownerless residue)
-
-`bundleReviewFlow` is at `gui/bundle_flow.go:227`; `:224` lands on a comment
-line — ordinary citation decay, and exactly what `plan-cite-gate.sh` exists to
-surface (it resolves `:224` as "ok" and prints the comment, which is the gate's
-stated blind spot working as designed).
-
-Corrected in `SPEC_encrypted_payload_delivery.md` (three occurrences) by the B1
-cycle. Two copies remain in shipped records:
-
-- `design/IMPLEMENTATION_PLAN_encrypted_payload_deviceB_phaseA.md:638`
-- `design/CONTINUITY_2026-08-07b.md:148`
-
-Both are historical artefacts of merged work. Per F-72's precedent they are
-recorded here rather than rewritten — the citation is wrong, the record of what
-was believed at the time is not.
-
-## Resolved
 
 ### Closed 2026-08-07 — F-67 through F-70 (the encrypted-payload prerequisites)
 
