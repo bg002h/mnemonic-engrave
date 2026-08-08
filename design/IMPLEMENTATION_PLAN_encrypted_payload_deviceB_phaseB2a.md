@@ -38,11 +38,18 @@ justification was false rather than merely debatable: the record was held across
 the engrave because the retry prompt supposedly needed it, when `engraveJob`
 holds `plate.Spline` and never reads the record again. The correct design was
 also the simpler one — `clear(rec)` the moment the plate exists — and it needed
-no interpretation of §10.2.2 at all. **The lesson to carry: an "interpretation"
-section is a smell.** Twice now on this feature, prose explaining why a
-requirement could not be met literally has turned out to rest on an unverified
-claim about how existing code behaves, and both times one `grep` would have
-settled it.
+no interpretation of §10.2.2 at all.
+
+**The lesson, stated precisely.** It is not that a "deliberate departure" section
+is wrong to write: B1's plan carried one, and R0 round 0 **checked it and found
+it correct** ("The append-vs-insert argument in 'A deliberate departure…' is
+verified against the real `layoutMainPager`/`layoutMainPlates` dot-fill and wrap
+logic and holds up"). Both sections even closed with the same invitation — *if
+this reasoning is wrong, the task is wrong*. The difference is that B1's
+load-bearing claim about existing behaviour had been **run against the code** and
+this one had not. **Flagging a departure for the reviewer is not a substitute for
+verifying the claim it rests on**; it just tells the reviewer where to spend the
+round you were about to cost them.
 
 Two of the four Importants were **tests that could not fail** — a fixture that
 never reached the code path it was named for, and a mutation table naming a
