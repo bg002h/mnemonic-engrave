@@ -1,10 +1,17 @@
 # Encrypted Payload Delivery — Plan B Phase B1 (device UI, the unsealed path) — Implementation Plan
 
-**Status:** DRAFT — R0 round 0 returned 0C/4I; all four folded (see
-`design/agent-reports/encrypted-payload-planB-phaseB1-R0-round0.md`). **The fold
-is non-trivial** — it adds a Phase A type change (Task 4a), reverses Task 5's
-approach, and adds three test requirements — so it re-earns the gate and a
-round 1 is required. **No code before 0C/0I.**
+**Status:** DRAFT — R0 in progress. **No code before 0C/0I.**
+
+| round | verdict | report |
+| --- | --- | --- |
+| 0 | 0C / 4I | `design/agent-reports/encrypted-payload-planB-phaseB1-R0-round0.md` |
+| 1 | 0C / 1I — 3 of 4 FIXED, labelling PARTIAL | `design/agent-reports/encrypted-payload-planB-phaseB1-R0-round1.md` |
+
+Round 1's single Important was **authored by round 0's fold**, not by the
+original draft — the fourth consecutive cycle in which that has been the
+dominant pattern (continuity §4). It is folded here, confined to Task 4a;
+round 1 explicitly found nothing else in the fold needing revisiting. A round 2
+is required, scoped to Task 4a alone.
 
 **Descends from:** `SPEC_encrypted_payload_delivery.md` §10, which is GREEN and
 normative. This plan implements §10.2 steps 1–4 plus the plate list and engrave.
@@ -412,8 +419,39 @@ per §6.3. A second classifier in the UI is exactly the two-code-paths divergenc
 `Opener.Inspect`'s doc comment exists to prevent ("Do NOT re-implement steps 1-3
 in Phase B").
 
-**Surface it instead.** Add to `AdmittedRecord`, populated by `AdmitSection`
-from the grouping it already computes:
+**Surface it instead** — but **not** where an earlier draft of this plan said.
+
+> **Round 1 correction.** That draft said the fields are "populated by
+> `AdmitSection` from the grouping it already computes." **That data flow does
+> not exist.** `AdmitSection` (`seal/record.go:158`) builds `out` inside the
+> per-record pass-1/pass-2 loop, where there is no grouping at all; the grouping
+> is computed *afterwards*, inside `decodePublicSet` (`seal/record.go:309`),
+> whose signature is `func decodePublicSet(records []string) error` — it calls
+> `groupCards` and **discards `keys` and `groups`**, returning only an error.
+>
+> **Getting the order wrong breaks a green Phase A test.** `cardKey`'s default
+> branch (`seal/record.go:286`) fails closed with `ErrUndecodableCardSet` for
+> anything that is not an md1/mk1 card. `TestPublicSectionRefusesASecret`
+> (`seal/record_test.go:180`) puts a BIP-39 mnemonic in the public section and
+> asserts `errors.Is(err, ErrRecordNotPermitted)`. Group *before* the allow-list
+> and that record reaches `cardKey` first, the sentinel changes, and the test
+> fails — which then invites "fixing" the test rather than the ordering.
+
+**The required ordering, normative for this task:**
+
+1. Pass 1 (lowercase) and pass 2 (classify + allow-list) run **exactly as they do
+   today**, unchanged, over every record. Nothing moves into or before this loop.
+2. Only then compute the grouping — over records already admitted, which in
+   `SectionPublic` are all `ClassMDMK` by construction, so `cardKey`'s
+   fail-closed branch is genuinely unreachable and stays that way.
+3. Backfill the new fields on `out` in a step **after** the loop.
+
+Compute `groupCards` **once**. Either thread `keys`/`groups` out of
+`decodePublicSet` by widening its return type, or have `AdmitSection` call
+`groupCards` itself and pass the result in. Do not call it twice — two callers
+is two chances to disagree about what a card is.
+
+Add to `AdmittedRecord`:
 
 ```go
 // HRP is 'd' (md1) or 'k' (mk1) for ClassMDMK records, 0 otherwise. It comes
@@ -445,10 +483,26 @@ cannot tell which cosigner a plate belongs to, which is §6.4's
 This mirrors the fork's own precedent: `bundlePlatePlan` (`gui/bundle_flow.go:300`)
 carries exactly `cardIdx`/`cardTotal`/`plateIdx`/`plateTotal` for this purpose.
 
+**These fields are populated for `SectionPublic` only.** Pass 3 runs only for the
+public section, so an encrypted-section `AdmittedRecord` carries `HRP == 0` and
+zero indices. That is correct for B1, which never sees a secret record — but B2
+labels secret plates too (§10.2.2), and its records can be `ms1` or a bare
+mnemonic, neither of which is a card at all. **B2 must not assume these fields
+are meaningful for secrets.** Say so at the field, not only here.
+
 **This is an additive change to a merged Phase A type.** It adds no behaviour and
-no new §6.3 logic — it publishes a grouping `AdmitSection` already performs.
-Phase A's vector tests must still pass unchanged; if any needs editing, this
-change is wrong.
+no new §6.3 logic — it publishes a grouping that already happens. Phase A's
+vector tests must pass **unchanged**, and per round 1 that is a live constraint,
+not a formality.
+
+*Machine-checked while folding round 1, so do not re-derive it:* the suite
+contains exactly **one** `AdmittedRecord` composite literal,
+`seal/record_test.go:440`, and it uses **field names** (`{Record: …, Class: …}`),
+not positional initialisation — so added fields do not break it. `grep -rn
+"DeepEqual" seal/*_test.go` returns nothing, so no test compares
+`AdmittedRecord`s structurally either. **The additive change is safe on both
+counts.** If a test nonetheless needs editing during implementation, the
+ordering above was violated.
 
 **Tests:** vector F (2-of-3, three secret records) and vector G (2-of-3 mixed,
 public section spanning four cards) pin both label rows. Assert the **rendered
