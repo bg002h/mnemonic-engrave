@@ -820,7 +820,7 @@ green on MSRV. Recorded because it is the exact bundling the standard workflow
 forbids, and — as with `b946399` — **the history stays as it is.** The rule binds
 future commits.
 
-### F-73 — the XIP read at the NORMATIVE 0x10E00000 is unverified on hardware (owning phase: Phase B's hardware pass, or the first SH2 session — whichever comes first)
+### F-73 — CLOSED 2026-08-07 — the XIP read at the NORMATIVE 0x10E00000 is verified on hardware
 
 **Operator decision 2026-08-07: leave it, do not buy a board for this.** Filed so
 it is tracked rather than remembered.
@@ -869,6 +869,26 @@ plausible-for-the-wrong-reason results, so it is recorded rather than waved off.
 **Also still open, same hardware:** the PBKDF2 rate on an RP2350**B**. §7.1's
 measured 9,715 it/s is from an RP2350**A** (Pico 2); the SH2 is a **B**. Tracked
 in SPEC §12 residual; grab it whenever a B is flashed.
+
+**CLOSED 2026-08-07.** Verified on the SeedHammer II (RP2350B, 16 MB) with
+Phase B1 firmware. Full record: `design/HARDWARE_RESULT_2026-08-07_phaseB1.md`.
+
+- Wrote the payload and read it straight back off the device at `0x10E00000`:
+  magic `MNEMBLOB`, `pub_len=1125` — independently right (12 records = 1114
+  chars + 11 LF), `ct_len=0`, and kdf/aead/iterations all zero per §6.2's
+  unsealed rule. This step is IMPOSSIBLE on the 4 MB Pico, so it is new
+  information rather than a repeat.
+- §10.1 negative path (region erased): entry absent, 8 dots, every other
+  program still reachable, Engrave Bundle unmoved in slot 5.
+- §10.1 positive path: entry present, 9 dots, and the §6.6 hash on screen
+  `fc10 4898 39dc 6da3 8f56 575d 45f7 655b` byte-identical to the host's —
+  which an aliased or erased read cannot produce. First end-to-end proof that
+  §6.6 agrees across host and RP2350 silicon.
+
+**Still open on the same hardware:** the RP2350**B** PBKDF2 rate. §7.1's
+9,715 it/s is from an **A**. `cmd/kdfbench` measures it but is a separate
+TinyGo image, so it replaces B1 and needs a reflash after. Tracked in SPEC §12
+residual; grab it on the next trip.
 
 **UPDATE 2026-08-07 (B1 planning): the SH2 is available, so this closes in B1.**
 The "leave it, do not buy a board" decision above was about not *buying*
@@ -930,6 +950,19 @@ alphabet — the 2-stroke-width minimum-feature rules do not apply.
 Not done in B1: it is a font change, and substituting a different character at
 each call site is treating the symptom in four places instead of the cause in
 one.
+
+**Why no test caught it, which is the more general gap.** `uiContains`
+(`gui/gui_test.go:516`) asserts against **extracted text, not pixels** — it
+lowercases the op tree's strings and does a substring match. A glyph that is
+missing, blank, or drawn as the wrong shape is invisible to every screen test in
+this package, because the text was *submitted* correctly regardless of what
+reached the panel. The middot was found by **measuring width**, not by rendering,
+and only because B1 needed to know whether a separator survived to the screen.
+
+A rasterising check would close it: draw each glyph alone and hash the pixels,
+so two characters that draw identically collide even though they compare unequal
+as text. Worth having before any future font edit — a font change is exactly the
+kind of edit whose defects this suite cannot see.
 
 ### F-77 — the encrypted section's md1/mk1 cards have no grouping (owning phase: B2 — GATING, it blocks §10.2.2's secret plate labels)
 
