@@ -1,6 +1,10 @@
 # Encrypted Payload Delivery — Plan B Phase B1 (device UI, the unsealed path) — Implementation Plan
 
-**Status:** DRAFT — has not yet passed R0. No code before 0C/0I.
+**Status:** DRAFT — R0 round 0 returned 0C/4I; all four folded (see
+`design/agent-reports/encrypted-payload-planB-phaseB1-R0-round0.md`). **The fold
+is non-trivial** — it adds a Phase A type change (Task 4a), reverses Task 5's
+approach, and adds three test requirements — so it re-earns the gate and a
+round 1 is required. **No code before 0C/0I.**
 
 **Descends from:** `SPEC_encrypted_payload_delivery.md` §10, which is GREEN and
 normative. This plan implements §10.2 steps 1–4 plus the plate list and engrave.
@@ -141,12 +145,22 @@ Three implementations must be updated — machine-counted, not estimated:
 | file | returns |
 | --- | --- |
 | `cmd/controller/platform_sh2.go:564` (adjacent to `NFCReader`) | `seal.XIPReader{}` |
-| `cmd/emu/platform.go:189` (adjacent to `NFCReader`) | `seal.FileReader{Path: …}` from a flag, else `nil` |
+| `cmd/emu/platform.go:189` (adjacent to `NFCReader`) | `nil` — see below |
 | `gui/gui_test.go:428` (adjacent to `NFCReader`) | a settable field, default `nil` |
 
-Giving the emulator a real `FileReader` behind a flag is what makes every B1
-screen drivable from `seal/testdata/vectors.json` without hardware. Do not skip
-it; the alternative is that the only way to exercise B1 is to flash.
+**`cmd/emu` returns `nil`. (R0 round 0, finding 4.)** An earlier draft of this
+plan said "`seal.FileReader{Path: …}` from a flag", which cannot work: `cmd/emu`
+is `//go:build js` (`cmd/emu/platform.go:1`), built `GOOS=js GOARCH=wasm` and
+run from a static page through `wasm_exec.js`. There is no `flag.Parse()` in the
+package and `os.Args` carries no real argv under the browser glue, so a
+`flag.String` would compile, run, and **silently never receive a value** — a
+non-failing no-op, which is the worst shape a test affordance can have.
+
+It is also not needed. Task 1d's tests drive B1 through `testPlatform`, not
+through the emulator, so the automated coverage is unaffected. If a browser-side
+payload is ever wanted, the mechanism is a `syscall/js` read of
+`location.search` or a JS global set from the host page — **not** a flag, and
+not in B1.
 
 ### 1b. Detection
 
@@ -199,6 +213,36 @@ The **four boundary sites** — machine-located via
 `layoutMainPager` and `layout` are free functions / methods that do not see
 `StartScreen.lastNav`; thread it as a parameter rather than reaching for a
 package-level variable.
+
+**Changing `layoutMainPager`'s arity means updating its callers, and there are
+exactly TWO. (R0 round 0, finding 1.)** Machine-located with
+`grep -rn "layoutMainPager"` across the whole repo, not just `gui.go`:
+
+| call site | becomes |
+| --- | --- |
+| `gui/gui.go:1736` | `layoutMainPager(&ctx.B, th, m.prog, m.lastNav)` |
+| `gui/text_program_test.go:79` | pass `bip85Derive` as the fourth argument |
+
+The second is an **existing green test**, `TestStartScreenFitsAtEightPagerDots`.
+Passing `bip85Derive` there is behaviourally correct: that test only exercises
+the no-payload state. Missing it is a `go test ./gui/...` build failure that
+would present as a third setup failure and violate this plan's own GREEN
+baseline.
+
+Two more things in that file move in the same commit:
+
+- `gui/text_program_test.go:8-13`'s comment says `bip85Derive` "must stay the
+  last navigable program" and cites `gui.go:168` for the guard. Both go stale
+  when B1 ships — `unlockPayload` becomes last navigable, and the guard is at
+  `gui/gui.go:172`, not `:168`. Update the comment; do not leave a test
+  explaining the opposite of what the code now does.
+- **Add a NINE-dot width test.** The existing test is named
+  `…FitsAtEightPagerDots` and asserts `sz.X <= sh2DisplaySize.X`. The pager is
+  `(sz.X+space)*npages - space` (`gui/gui.go:1938`), so a ninth dot makes it
+  wider, and **nothing currently proves nine fits the panel.** This was not in
+  the R0 report; it was found while folding it. If nine does not fit, that is a
+  Task 1 blocker and the dot pager needs a different treatment at nine —
+  discover it with a test, not on hardware.
 
 The **three additive sites**:
 
@@ -344,19 +388,79 @@ budget of `ys := [3]int{…}` (`gui/gui.go:1857`).
 
 1. It is **selectable**, not read-only — OK engraves the highlighted entry
    (Task 5), where `bundleReviewFlow`'s OK confirms the whole set.
-2. Entries are labelled from `AdmittedRecord.Class` and a 1-based index within
-   that class — `mk1 1/2`, `md1 2/3` (§10.2.2). **Never** from anything the
+2. Entries are labelled per **Task 4a** below — **never** from anything the
    sealer asserted, and the contents are not rendered.
 3. Back is the session exit. In B1 there is nothing to wipe, but the **shape**
    must be right here or B2 inherits a list it cannot extend without a fourth
    nav slot.
 
-**Tests:**
+### Task 4a — surface the card grouping from `seal` (R0 round 0, finding 2)
+
+**`AdmittedRecord.Class` cannot produce §10.2.2's labels, and an earlier draft of
+this plan said it could.** `Classification` has exactly **one** value covering
+both formats — `ClassMDMK` (`seal/record.go:68`) — returned identically for
+`ValidMD` and `ValidMK`. There is no `ClassMD`/`ClassMK` split and
+`AdmittedRecord` carries no other distinguishing field, so a plate list built
+from `Class` alone cannot even print "mk1" versus "md1", let alone §10.2.2's
+`mk1 1/2` / `md1 2/3`.
+
+**Do not re-classify in `gui`.** `seal` already knows: `groupCards`
+(`seal/record.go:241`) builds a `groupKey{hrp byte …}` (`seal/record.go:233`)
+where `hrp` is `'d'` for md1 and `'k'` for mk1, and `cardKey`
+(`seal/record.go:261`) assigns every record to its `(HRP, chunk_set_id)` card
+per §6.3. A second classifier in the UI is exactly the two-code-paths divergence
+`Opener.Inspect`'s doc comment exists to prevent ("Do NOT re-implement steps 1-3
+in Phase B").
+
+**Surface it instead.** Add to `AdmittedRecord`, populated by `AdmitSection`
+from the grouping it already computes:
+
+```go
+// HRP is 'd' (md1) or 'k' (mk1) for ClassMDMK records, 0 otherwise. It comes
+// from the §6.3 card grouping seal already performs -- the UI must never
+// re-derive it, or the plate list and the decode can disagree about what a
+// record is.
+HRP byte
+// CardIndex/CardTotal identify which (HRP, chunk_set_id) card this record
+// belongs to, 1-based, among cards of the SAME HRP. PlateIndex/PlateTotal
+// identify this record within that card.
+CardIndex, CardTotal   int
+PlateIndex, PlateTotal int
+```
+
+**Label rule, which generalises §10.2.2's example rather than contradicting it:**
+
+| case | label |
+| --- | --- |
+| one card of this HRP | `mk1 1/2` — plate index within the card |
+| several cards of this HRP | `mk1 2/3 · 1/2` — card, then plate within it |
+
+§10.2.2's `mk1 1/2` / `md1 2/3` examples are single-sig, where there is exactly
+one card of each HRP, so the first row reproduces them exactly. The second row
+exists because a 2-of-3 is `mk1` ×6 across **three** cards, and a flat
+`mk1 1/6 … 6/6` silently conflates three distinct cosigners — the operator
+cannot tell which cosigner a plate belongs to, which is §6.4's
+"incomplete-backup-believed-complete" hazard wearing a label.
+
+This mirrors the fork's own precedent: `bundlePlatePlan` (`gui/bundle_flow.go:300`)
+carries exactly `cardIdx`/`cardTotal`/`plateIdx`/`plateTotal` for this purpose.
+
+**This is an additive change to a merged Phase A type.** It adds no behaviour and
+no new §6.3 logic — it publishes a grouping `AdmitSection` already performs.
+Phase A's vector tests must still pass unchanged; if any needs editing, this
+change is wrong.
+
+**Tests:** vector F (2-of-3, three secret records) and vector G (2-of-3 mixed,
+public section spanning four cards) pin both label rows. Assert the **rendered
+label strings**, not the struct fields — a test that reads back `CardIndex` pins
+the plumbing and not the thing §10.2.2 actually specifies.
+
+**Tests (Task 4):**
 - Vector G — a public section spanning **four cards** — renders across pages and
   every record is reachable. This is the case that a non-paged `ChoiceScreen`
   would silently truncate at ~7 (`gui/gui.go:1455`).
-- Labels come from `Class`: construct a payload whose records classify as `mk1`
-  and `md1` and assert the rendered labels and their indices.
+- Labels: vector G's `mk1` records span multiple cards, so assert the
+  `mk1 2/3 · 1/2` form, and a single-sig vector for the plain `mk1 1/2` form.
 - Back returns to the main menu from any page.
 
 > **Mutation check.** Replace the paged list with a `ChoiceScreen` and confirm
@@ -371,8 +475,30 @@ The public section is `mk1`/`md1` text by §10.2.1's allow-list, which is exactl
 what `validateMdmk` (`gui/gui.go:1982`) already lays out and what
 `NewEngraveScreen` (`gui/gui.go:2559`) already cuts.
 
-Reuse `mdmkFlow` (`gui/gui.go:2024`) rather than reimplementing: it already
-offers TEXT+QR / TEXT / QR-ONLY and the `md1`/`mk1` inspect paths.
+**Do NOT reuse `mdmkFlow` (`gui/gui.go:2024`). (R0 round 0, finding 3.)** An
+earlier draft of this plan called for it, citing "the `md1`/`mk1` inspect paths"
+as a benefit. They are not a benefit here — they are a dead end.
+
+`mdmkFlow` prepends an "Inspect key" / "Inspect descriptor" choice that calls
+`mk1GatherFlow` (`gui/mk1_inspect.go:156`) or `md1GatherFlow`
+(`gui/md1_gather.go:79`). Both prime a **fresh gatherer** with only the single
+string handed to them, and when that alone is not a complete card — true for
+**every chunked record**, which is the ordinary case — they open
+`ctx.Platform.NFCReader()` (`gui/mk1_inspect.go:163`, `gui/md1_gather.go:87`)
+and wait for the operator to tap the remaining **physical NFC tags**.
+
+A payload-derived record has no tags to tap. The payload already holds every
+chunk in `p.Public`, and the gatherer has no way to reach them. Single-sig's
+`md1` alone is 3 records; vector G's `md1` is one 6-chunk card. So Inspect
+strands the operator on a scan-waiting screen for the common case.
+
+**Compose the three pieces directly instead:** `validateMdmk` → `ChoiceScreen`
+over the returned variant labels → `NewEngraveScreen`. That is `mdmkFlow` minus
+the Inspect branch, and it is what B1 actually needs.
+
+*(Inspecting a payload record is a legitimate thing to want — the data is all
+present, it just needs a gatherer primed from `p.Public` rather than from NFC.
+It is not in B1. Filed as F-76.)*
 
 **The one thing B1 must not inherit from `mdmkFlow`:** it takes `mdmkText`
 (a `string`). B1 holds `AdmittedRecord.Record` as `[]byte` — deliberately, so
@@ -384,8 +510,14 @@ shape on a secret record produces an unwipeable copy.
 > author sees it. Do not add a `String()` helper on `AdmittedRecord` — a helper
 > is an invitation to call it on a secret.
 
-**Tests:** selecting an entry reaches the engrave screen with the record's bytes;
-returning from engrave lands back on the plate list, on the same page.
+**Tests:**
+- Selecting an entry reaches the engrave screen with the record's bytes;
+  returning from engrave lands back on the plate list, **on the same page**.
+- **No path from the plate list reaches `mk1GatherFlow` or `md1GatherFlow`.**
+  Assert with `testPlatform.NFCReader` returning a reader that fails the test if
+  opened. Without this, the Inspect branch can be reintroduced by a later edit
+  and nothing notices — the failure only shows up on a device with an NFC reader
+  attached, which no test has.
 
 ---
 
@@ -494,6 +626,13 @@ What B1 proves that Phase A could not:
   `gui`, `go build` it — would close the same loop `plan-build-gate.sh` closed
   for Rust. Not built in B1: it is tooling, and bundling it into a feature commit
   is the third-commit case the standard workflow separates out.
+- **F-76 — inspecting a payload-sourced card (owning phase: B2 or later; NOT
+  B1).** `mk1GatherFlow`/`md1GatherFlow` prime a gatherer from one string and
+  then wait on NFC for the rest of the chunk set, so they cannot inspect a
+  payload record whose remaining chunks are already in `p.Public`. The data is
+  all present; the gatherer just needs priming from the payload instead of from
+  a tag. Out of B1's scope — B1 engraves, it does not inspect. Found by R0
+  round 0, finding 3.
 - **F-75 — stale `gui/bundle_flow.go:224` citations outside the SPEC (owning
   phase: ownerless residue).** Corrected in `SPEC_encrypted_payload_delivery.md`
   by this cycle. Two stale copies remain, in

@@ -892,6 +892,28 @@ assembled mechanically and still need a reviewer's execution pass.
 the third-commit case the standard workflow separates out. B1 states the gap;
 B2 should not have to.
 
+### F-76 — inspecting a payload-sourced card (owning phase: B2 or later; NOT B1)
+
+`mk1GatherFlow` (`gui/mk1_inspect.go:156`) and `md1GatherFlow`
+(`gui/md1_gather.go:79`) prime a fresh gatherer with the single string handed to
+them, and when that alone is not a complete card they open
+`ctx.Platform.NFCReader()` and wait for the operator to tap the remaining
+**physical tags**.
+
+A payload-derived record has no tags. Every chunk is already sitting in
+`p.Public` — the gatherer simply has no way to reach it. So Inspect on a chunked
+payload record strands the operator on a scan-waiting screen, and chunked is the
+ordinary case (single-sig's `md1` alone is 3 records; vector G's is a 6-chunk
+card).
+
+Found by the B1 plan's R0 round 0 (finding 3), which is why B1 composes
+`validateMdmk` + `ChoiceScreen` + `NewEngraveScreen` directly instead of reusing
+`mdmkFlow`. **B1 engraves; it does not inspect.**
+
+**What would close it:** a gatherer that can be primed from an in-memory record
+set rather than only from NFC. The data and the decode both already exist; this
+is plumbing, not new codec behaviour, so the Rust-primary rule does not bind it.
+
 ### F-75 — stale `gui/bundle_flow.go:224` citations outside the SPEC (owning phase: ownerless residue)
 
 `bundleReviewFlow` is at `gui/bundle_flow.go:227`; `:224` lands on a comment
