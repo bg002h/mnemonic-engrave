@@ -55,13 +55,27 @@ warn() { printf '  %s %s\n' "$(c '33' '!!')" "$*"; }
 die()  { printf '\n%s %s\n' "$(c '31' 'FAIL:')" "$*" >&2; exit 1; }
 run()  { if [ "$DRY" = 1 ]; then printf '  %s %s\n' "$(c '35' 'would run:')" "$*"; else "$@"; fi; }
 
+# `nix` itself is not reliably on PATH. It resolves in an interactive shell
+# (the profile puts it there) and NOT in a non-interactive one -- which is how
+# every agent-driven and CI invocation runs, and is exactly the constraint the
+# project's own docs state: "nix is NOT on PATH -- use
+# /nix/var/nix/profiles/default/bin/nix". Calling it bare made --build-only die
+# in preflight with "picotool is not reachable in <repo>'s devshell", which
+# reads as a broken devshell rather than a missing launcher and sends you
+# debugging the wrong thing entirely.
+#
+# Resolve once, here: prefer whatever is on PATH, fall back to the profile.
+NIX="$(command -v nix 2>/dev/null || true)"
+[ -n "$NIX" ] || NIX=/nix/var/nix/profiles/default/bin/nix
+[ -x "$NIX" ] || die "no usable nix: not on PATH and $NIX is not executable"
+
 # picotool lives in the fork's devshell, not on PATH. Calling it bare fails at
 # the last step, after signing and after the confirmation -- the worst place.
 devshell() {
     if [ "$DRY" = 1 ]; then
         printf '  %s nix develop --command %s\n' "$(c '35' 'would run:')" "$*"
     else
-        ( cd "$SH2_REPO" && nix develop --command "$@" )
+        ( cd "$SH2_REPO" && "$NIX" develop --command "$@" )
     fi
 }
 
@@ -98,8 +112,8 @@ ok "signing script present"
 # discovering that after signing and after the operator has confirmed is how a
 # missing tool turns into a half-finished procedure.
 if [ "$DRY" = 0 ]; then
-    ( cd "$SH2_REPO" && nix develop --command picotool version >/dev/null 2>&1 ) \
-        || die "picotool is not reachable in $SH2_REPO's devshell"
+    ( cd "$SH2_REPO" && "$NIX" develop --command picotool version >/dev/null 2>&1 ) \
+        || die "picotool is not reachable in $SH2_REPO's devshell (nix: $NIX)"
 fi
 ok "picotool reachable in the devshell"
 
@@ -156,7 +170,7 @@ if [ -z "$IMAGE" ]; then
         warn "a dirty build is not traceable to any commit; prefer committing first"
     fi
     info "$(git -C "$BUILD_DIR" log --oneline -1)"
-    run bash -c "cd '$BUILD_DIR' && nix run .#build-firmware"
+    run bash -c "cd '$BUILD_DIR' && '$NIX' run .#build-firmware"
     if [ "$DRY" = 1 ]; then
         IMAGE="$BUILD_DIR/seedhammerii-DRYRUN.uf2"
     else
