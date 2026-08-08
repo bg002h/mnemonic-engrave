@@ -17,13 +17,21 @@
 #
 # WHAT IT DOES
 #   1. `path.go:NNN`  -> file exists? has >= NNN lines? print line NNN.
-#   2. `pkg.Symbol`   -> a `func Symbol`/`type Symbol` exists in package pkg?
+#   2. `pkg.Symbol`   -> a top-level `func`/`type`/`const`/`var Symbol`, or an
+#                        entry inside a grouped `const (` / `var (` block,
+#                        exists in package pkg? Grouped hits print as `ok*`.
 #   3. Reports every unresolvable citation as a FAILURE.
 #
 # WHAT IT DOES NOT DO
 #   It cannot tell you the line SAYS what the plan claims -- only that it exists
 #   and what it contains. Reading the printed line against the claim is still a
 #   reviewer's job. A gate that hides its blind spot is worse than no gate.
+#
+#   The `ok*` (grouped-declaration) pattern is looser than the top-level one: it
+#   matches an INDENTED line beginning with the symbol, which an assignment
+#   inside a function body can also satisfy. The matched line is printed for
+#   exactly that reason. `ok` is a declaration; `ok*` is "a line that looks like
+#   one" -- read it.
 #
 # Usage: scripts/plan-cite-gate.sh <plan.md> [repo-root-for-go-citations]
 set -uo pipefail
@@ -70,11 +78,25 @@ grep -oE '`(md|mk|codex32|seal|bip39|backup|engrave)\.[A-Z][A-Za-z0-9_]*`' "$PLA
       printf '  skip  %-42s (package not in fork yet -- this plan CREATES it)\n' "$pkg.$sym"
       continue
     fi
-    if grep -rqE "^(func|type) (\([^)]*\) )?$sym\b" "$GOREPO/$pkg"/*.go 2>/dev/null; then
-      loc=$(grep -rnE "^(func|type) (\([^)]*\) )?$sym\b" "$GOREPO/$pkg"/*.go | head -1)
+    # Top-level declaration: func, type, const or var at column 0.
+    top="^(func|type|const|var) (\([^)]*\) )?$sym\b"
+    # Grouped declaration: an entry inside a `const (` / `var (` block, which is
+    # indented and therefore invisible to the pattern above. This is how most of
+    # seal's surface is declared -- MaxRecords, ErrTooManyRecords, ClassMDMK --
+    # and until 2026-08-07 every one of them reported a FALSE FAIL. A gate that
+    # cries wolf gets ignored, which is worse than one that stays silent.
+    grouped="^[[:space:]]+$sym([[:space:]]|,|=)"
+    if grep -rqE "$top" "$GOREPO/$pkg"/*.go 2>/dev/null; then
+      loc=$(grep -rnE "$top" "$GOREPO/$pkg"/*.go | head -1)
       printf '  ok    %-42s | %s\n' "$pkg.$sym" "$(echo "$loc" | cut -c1-72)"
+    elif grep -rqE "$grouped" "$GOREPO/$pkg"/*.go 2>/dev/null; then
+      loc=$(grep -rnE "$grouped" "$GOREPO/$pkg"/*.go | head -1)
+      # Labelled distinctly: the grouped pattern is looser than the top-level one
+      # and CAN match an assignment rather than a declaration. The matched line is
+      # printed so that is visible rather than assumed.
+      printf '  ok*   %-42s | %s\n' "$pkg.$sym" "$(echo "$loc" | cut -c1-72)"
     else
-      printf '  FAIL  %-42s no func/type %s in %s/\n' "$pkg.$sym" "$sym" "$pkg"
+      printf '  FAIL  %-42s no func/type/const/var %s in %s/\n' "$pkg.$sym" "$sym" "$pkg"
       echo FAILMARK >> /tmp/.citegate
     fi
   done
