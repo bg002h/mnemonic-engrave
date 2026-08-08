@@ -1,10 +1,27 @@
 # Encrypted Payload Delivery — Plan B Phase B2a (unlock and the secret session) — Implementation Plan
 
-**Status:** DRAFT — R0 round 0 folded, re-review pending. **No code before 0C/0I.**
+**Status:** DRAFT — R0 round 1 folded, re-review pending. **No code before 0C/0I.**
 
 | round | verdict | report |
 | --- | --- | --- |
 | 0 | **1C / 4I / 6M / 3N** — all folded | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round0.md` |
+| 1 | **0C / 2I / 4M / 3N** — all folded; C1's rewrite CONFIRMED sound, no hole opened | `design/agent-reports/encrypted-payload-planB-phaseB2a-R0-round1.md` |
+
+**Round 1 found no Critical and confirmed the round-0 fix**, but both its
+Importants were the same shape: **the fold did half of a finding's fix.** M5's
+`NoEdit` guard shipped with a rationale that was false and a test that could not
+fail; I2's second instrument was created and then scheduled by nothing. And
+three of the four Minors were defects in content the round-0 fold **volunteered**
+— the residency claim, a shipped comment, a misquoted call site — none of which
+any finding had asked for.
+
+That is now three phases running. **The rule this feature keeps re-teaching:
+when folding, the fix gets checked because a reviewer anchored it; the
+explanation you add beside it is anchored to nothing and reads as authoritative
+to the next reader.** Treat every factual claim in volunteered context as a new
+assertion needing its own verification, and check that each finding's fix
+reaches *every* consumer the finding named — round 1's M1 and M3 are both a
+symbol corrected in one place and left stale in another.
 
 **Round 0's Critical was the plan's own "interpretation" section**, and its
 justification was false rather than merely debatable: the record was held across
@@ -133,10 +150,16 @@ B2a starts**, so "it went red" means B2a broke it:
   are already linked (`bip85/bip85.go:20`, `slip39/combine.go:143`); `crypto/aes`
   and `crypto/cipher` were pulled in by Phase A's `seal/crypto.go` at a measured
   ~1.6 KB. Task 3 adds no primitive that is not already resident.
-- **The `gui` test suite must not gain 31 s per test.** `Opener.KDF`
-  (`seal/open.go:24`) is the sanctioned seam; Task 3 adds the equivalent seam for
-  the chunked path. The whole `gui` suite is ~12 s today (measured); one real
-  100,000-iteration derivation would nearly triple it.
+- **The chunked path's KDF seam is `newDeriver`, added in §5c (Task 5)** — not
+  `Opener.KDF`, and not Task 3. B2a derives through `seal.NewDeriver` and opens
+  through `UnlockWithKey`, neither of which consults `Opener.KDF`, so the
+  existing `countingKDF` instrument is no longer in the device path at all.
+  *(An earlier draft of this bullet said Task 3 added it, and paired that with
+  "one real 100,000-iteration derivation would nearly triple the ~12 s gui
+  suite". Both were wrong: the **host** derives 100,000 iterations in tens of
+  milliseconds — the ~31 s of §7.1 is a device figure — so the gui cost is the
+  ≥256 frames `kdfStepIterations` implies, not the KDF. R0 round 0 I2, round 1
+  M1.)*
 - **Touch, not buttons, for anything with a keyboard.** `gui/start_screen_touch_test.go:11-23`
   and `gui/passphrase_flow_test.go:19-33` are binding: the SH2 has no directional
   buttons, tests must lay out at `sh2DisplaySize` (`gui/gui_test.go:390`), and a
@@ -180,8 +203,8 @@ plan interprets the spec". Both the reading and its stated justification were
 wrong, and this section records why so it is not reintroduced.**
 
 **The record is not needed once the plate exists.** `NewEngraveScreen(ctx, plate)`
-builds `newEngraverJob(ctx.Platform, plate.Spline, plate.Conf, opts)`
-(`gui/engraver.go:64`), and the engrave loop iterates `e.spline`
+builds `newEngraverJob(ctx.Platform, plate.Spline, plate.Conf, 0)`
+(`gui/gui.go:2633`), and the engrave loop iterates `e.spline`
 (`gui/engraver.go:170`). **Nothing reads the record bytes after `toPlate` /
 `engraveSeed` returns.** So a retry, a resume, and a re-cut all replay the
 spline — zeroing the record before `Engrave` is entered costs nothing and
@@ -210,15 +233,26 @@ operator resume **without a fresh unlock**, which is the exact opposite of the
 price §10.2.2 says is deliberate.
 
 **Therefore: `clear(rec)` the moment the plate is built.** §10.2.2 is implemented,
-not interpreted. Residency collapses from "the whole ~21-minute cut, plus
-indefinitely on a paused or failed screen" to "the few milliseconds between
-decrypt and plate construction, plus however long the Cut/Skip choice is on
-screen". `unlockSecretPlate`'s `defer` stays as the backstop for every path that
-never reaches a plate at all, and becomes idempotent.
+not interpreted. **The record being cut** stops being resident for the duration of
+its own ~21-minute plate, and for the unbounded time a paused or failed screen
+can sit there. `unlockSecretPlate`'s `defer` stays as the backstop for every path
+that never reaches a plate at all, and becomes idempotent.
 
-This also matters for B2b: `SecretsResident()` now goes false as the cut starts,
-so §10.2.4's residency key means what it says instead of staying true for the
-entire engrave.
+**Be precise about what this does NOT collapse** (R0 round 1, M2). An earlier
+draft of this paragraph claimed residency falls to "the few milliseconds between
+decrypt and plate construction" and that "`SecretsResident()` now goes false as
+the cut starts". **Both are true only for a single-secret payload.**
+`unlockSecretSession` offers secrets one at a time and wipes each as its plate
+leaves, so while plate 1 of 3 is cutting, records 2 and 3 are **untouched and
+resident** — and `SecretsResident` scans all of them. That is exactly what
+§10.2.2's cost paragraph already says: "~21 minutes for single-sig, **~63 for a
+2-of-3**." Vectors F and G each carry three `ms1` records, so this is the
+ordinary multisig case and not an edge one.
+
+The accurate statement, and the one B2b must design its timer against:
+**`SecretsResident()` goes false when the LAST secret's plate is built.** What
+the early wipe removes is one plate's worth of residency at a time — the record
+currently being cut — not the session's.
 
 **Do not overclaim what this buys.** The `Plate` still encodes the secret — it is
 a geometric rendering of the very words about to be cut into steel, and it must
@@ -1771,10 +1805,25 @@ func sealBlobForTest(t *testing.T, public, secret []string, passphrase string, i
 }
 ```
 
-> **This fixture is a machine-checked claim, not a sketch.** Task 5.1 asserts it
-> round-trips through `seal.Opener.Inspect` + `UnlockWithKey` before any test
-> depends on it — if `sealBlobForTest` and production disagree about the format,
-> every Task 5–7 test is measuring the fixture rather than the code.
+> **This fixture is machine-checked, and it was checked before this plan went to
+> a reviewer.** Executed against the real packages, with vector D's five public
+> records and its `ms1`:
+>
+> ```
+> sealed    Inspect ok, pub=5, Sealed()=true, UnlockWithKey ok, secret[0]=codex32 secret
+>           hash = a26e d22b b747 dfd0 2367 06ad 14c1 9679
+> unsealed  Inspect ok, pub=5, Sealed()=false
+>           hash = 70f3 e35a acf7 47db c40f 8376 91aa 61e0
+> ```
+>
+> Those two digests are **vector D's `pubhash_sealed` and vector E's
+> `pubhash_unsealed`, byte for byte** — so `sealBlobForTest` agrees not merely
+> with production but with the normative §11.4 vectors, which is the property
+> that makes it safe to build Task 5–7's assertions on. R0 round 1 reproduced
+> the round-trip independently and additionally confirmed the both-sections
+> shape (public `mk1`×2 + encrypted `ms1`/`mk1`/`md1`, 528 bytes) that no vector
+> can supply. Task 5.1 re-asserts it in the suite so a later edit cannot break it
+> silently.
 - **`TestSealedPayloadStopsAtATerminalScreen` (`gui/unlock_flow_test.go:211`)
   asserts the exact behaviour this task removes.** It is replaced, not deleted:
   the new assertion is that a sealed payload reaches the *passphrase* screen and
@@ -1786,6 +1835,11 @@ func sealBlobForTest(t *testing.T, public, secret []string, passphrase string, i
       (`UnlockWithKey` reproduces `Unlock` on vectors A–D, F, G; `ErrNotSealed`
       on E; `SecretsResident` true after unlock and false after wiping each).
       Run `nix develop --command go test ./seal/`.
+      **Also write `gui/seal_fixture_test.go` and assert it round-trips** through
+      `seal.Opener.Inspect` + `UnlockWithKey` in **both** shapes before any test
+      depends on it (R0 round 1, N3 — §5e assigned this here and this step did
+      not list it). If the fixture and production disagree about the format,
+      every Task 5–7 test measures the fixture instead of the code.
 - [ ] **5.2** Refactor `Unlock` onto `UnlockWithKey`. Re-run — **every existing
       `seal` test must pass unchanged**; they are what proves the refactor did
       not fork the pipeline.
@@ -1798,13 +1852,27 @@ func sealBlobForTest(t *testing.T, public, secret []string, passphrase string, i
       after a checksum-invalid attempt and **1** after a valid one; a
       return-value assertion cannot tell those apart.
 
+      **Also write the vector-E negative here** (R0 round 1, I2). §11.2: "Vector
+      E reaches the plate list with the keyboard flow **NEVER ENTERED** —
+      asserted by instrumenting the prompt entry point, not by return value. A
+      scripted fake platform will happily feed twelve words into a prompt that
+      should not exist and still reach the plate list, so a return-value
+      assertion reports PASS over exactly the defect." Set
+      `unlockPassphraseHook`, drive vector E to the plate list, assert the hook
+      **never fired**. Task 8's `ct_len == 0` row names this test.
+
       **Budget the frame count.** `unlockDerive` draws one frame per
       `kdfStepIterations = 500`, so a full 100,000-iteration unlock needs **≥200
       frames** before the next screen exists. The house idiom is
       `pumpUntil(frame, want, 32)` — 32 is far too few here and would look like a
-      hang. Either pump ≥256 or, better, have the counting `newDeriver` return a
-      deriver over a small iteration count so the test measures the flow rather
-      than the arithmetic (R0 round 0, N1).
+      hang. Pump **≥256**.
+
+      A counting `newDeriver` may also return a deriver over a *smaller*
+      iteration count to keep a test short — **but only for tests that do not
+      need the unlock to SUCCEED** (R0 round 1, N2). The header's count is inside
+      the AAD, so a key derived at a different count fails the tag and the flow
+      can never reach the plate list. That is fine for the three negatives above;
+      it is wrong for Task 7's `(sealed)` test, which needs a real unlock.
 - [ ] **5.4** Write `gui/unlock_kdf.go` and the `unlock_flow.go` fragment.
 - [ ] **5.5** `nix develop --command go test ./gui/ ./seal/`, then the TinyGo
       device build.
@@ -1878,7 +1946,10 @@ import (
 // Why the wipe is keyed on the plate leaving rather than on completion: aborting
 // mid-plate to re-seat shifted steel is the machine's most ordinary recovery,
 // and keying on completion would leave the seed resident in a state nothing
-// guards. Re-cutting then needs a fresh unlock -- twelve words and a ~31 s KDF.
+// guards. Re-cutting then needs a fresh unlock -- twelve words and a ~31 s KDF --
+// ONCE THE ENGRAVE SCREEN IS LEFT. A plate merely PAUSED resumes from the
+// spline: the record was zeroed before the plate reached the screen, so there is
+// nothing left to re-protect.
 // That is the price, it is deliberate (operator, 2026-08-07, reaffirmed
 // 2026-08-08), and it costs no reboot: the sealed blob is untouched in flash.
 
@@ -2073,9 +2144,35 @@ Modify `gui/gui.go` — add one field to `SeedScreen` and one guard in `Confirm`
 	NoEdit bool
 ```
 
-and where `editBtn` is added to the nav slots, skip it when `s.NoEdit`. Note
-`editBtn` carries `AltButton: Center`, so on a touch-only SH2 a **centre tap**
-opens the editor — this is not a hard-to-reach affordance.
+**The guard goes on the CLICK HANDLER, not on the layout** (R0 round 1, I1):
+
+```go
+		if !s.NoEdit && editBtn.Clicked(ctx) {
+			inputWordsFlow(ctx, th, mnemonic, s.selected, "")
+			continue
+		}
+```
+
+at `gui/gui.go:2330`, and the nav slot is skipped as well so the icon disappears.
+**Skipping only the slot does not close the route.** `Filter.matches`
+(`gui/event.go:153-159`) gates a `buttonEvent` on button identity alone, with no
+bounds check, so `editBtn.Clicked(ctx)` keeps consuming `ButtonFilter(Button2)`
+and `ButtonFilter(Center)` whether or not anything was drawn for it.
+
+> **An earlier draft of this section said "on a touch-only SH2 a centre tap opens
+> the editor". That is FALSE and is recorded so it is not reintroduced.**
+> Production on the SH2 emits **only** `gui.PointerEvent`
+> (`cmd/controller/platform_sh2.go:413`); `Center` is a `Button`, and the fork's
+> only producer of one is `cmd/controller/debug_sh2.go:82`, a debug build. A
+> pointer event reaches a `Clickable` solely by hit-test against a drawn
+> `op.Input` region, and `editBtn`'s only region is the nav slot. The **centre**
+> of the seed screen is the word list, which registers its own
+> `op.Input(&ctx.B, &s.words[i])` (`gui/gui.go:2467`) and merely moves the
+> selection.
+>
+> The real affordance is the **edit nav button** — `Button2`, or a tap on its
+> slot. The threat M5 identified is unchanged; only the route was described
+> wrongly.
 
 Then flip the one call site in `gui/unlock_session.go`:
 
@@ -2083,15 +2180,24 @@ Then flip the one call site in `gui/unlock_session.go`:
 	ss := &SeedScreen{NoEdit: true}
 ```
 
-> **These three edits are FRAGMENTS and are therefore unchecked by the build
-> gate** — §6b's whole-file block deliberately writes `new(SeedScreen)` so it
-> type-checks against the unmodified fork. This is the one place in the plan
-> where a whole-file block and a fragment must be applied together to be
-> correct, and it is called out here so it is not half-applied.
+> **These edits are FRAGMENTS and are therefore unchecked by the build gate** —
+> §6b's whole-file block deliberately writes `new(SeedScreen)` so it type-checks
+> against the unmodified fork. This is the one place in the plan where a
+> whole-file block and a fragment must be applied together to be correct, and it
+> is called out here so it is not half-applied.
 
-**Test:** with `NoEdit` set, tapping the centre of the seed screen does not reach
-word entry; with it clear, it still does (the existing scan-path behaviour, which
-must not regress).
+**Test — and the earlier one could not fail** (R0 round 1, I1). It asserted that
+a centre tap does not reach word entry, which is **vacuously true today with no
+change at all**, and its positive control ("with it clear, it still does") could
+never pass. Assert both routes instead:
+
+- with `NoEdit` set, **neither** a tap on the edit nav slot **nor**
+  `press(&ctx.Router, Button2)` reaches word entry;
+- with `NoEdit` clear, **both** still do — this is the existing scan-path
+  behaviour and it must not regress.
+
+The `Button2` half is the one that discriminates a guard on the click handler
+from a guard on the layout.
 
 ### 6d. Tests — asserted on the BUFFERS, never on a return value
 
@@ -2268,8 +2374,10 @@ func unlockPlates(p *seal.Payload) []unlockPlate {
 **Steps:**
 
 - [ ] **7.1** Tests first: vector C (encrypted-only cards reach the list), vector
-      G (public cards span four cards across pages), a `sealForTest` payload with
-      cards in **both** sections (the `(sealed)` suffix appears and the two
+      G (public cards span four cards across pages), a **`sealBlobForTest`**
+      payload with cards in **both** sections — §5e's fixture, not `seal`'s own
+      `sealForTest`, which is unreachable from `package gui` (R0 round 1, M3) —
+      (the `(sealed)` suffix appears and the two
       `mk1 1/2` entries are distinguishable), and the `(cut)` mark appearing after
       a completed engrave and **not** after a cancelled one.
 - [ ] **7.2** Write `gui/unlock_plates.go` and the fragments. **Three consequences
@@ -2320,7 +2428,7 @@ it** — a mutant with no named killer is a gap in the suite, not a passing resu
 | only the first secret record offered | Task 6's vector-F offer-order test |
 | `ms1` not wiped after its plate | Task 6's post-plate buffer assertion |
 | wipe omitted on the Back exit path | Task 6's Back test **and** Task 5's `defer p.Wipe()` |
-| passphrase prompted when `ct_len == 0` | vector E reaches the plate list with the word entry **never entered**, asserted by instrumenting the entry point, not by return value |
+| passphrase prompted when `ct_len == 0` | **Task 5.3's vector-E negative**, which sets `unlockPassphraseHook` and asserts it never fired. Named, not merely described (R0 round 1, I2) — a return-value assertion passes over exactly this defect. |
 | `ms1` accepted in the public section | `seal`'s existing refusal test |
 | idle timer runs during engraving | **B2b** — no timer exists in B2a. Record as deferred, with its owning phase, rather than claiming coverage. |
 
@@ -2391,16 +2499,18 @@ Both gates apply and **both MUST be run before dispatch and after every fold.**
   `pkg.Symbol` in this plan against the real source and prints the line.** Its
   stated blind spot: it cannot tell you the line *says* what the plan claims.
 
-  **It exits 1 on this plan, with exactly two failures, and both are expected:**
+  **It exits 1 on this plan, with exactly three failures, and all three are
+  expected:**
 
   ```
   FAIL  seal.Deriver     no func/type/const/var Deriver in seal/
   FAIL  seal.IsSecret    no func/type/const/var IsSecret in seal/
+  FAIL  seal.NewDeriver  no func/type/const/var NewDeriver in seal/
   ```
 
-  Both are symbols **this plan creates** (Tasks 3 and 5). The gate has a
+  All three are symbols **this plan creates** (Tasks 3 and 5). The gate has a
   `skip` branch for a whole package a plan creates, but not for a new symbol in
-  an existing one. **Any third failure is real.** Every other citation resolves,
+  an existing one. **Any fourth failure is real.** Every other citation resolves,
   including the seven corrected in "Carried-forward citations that have DRIFTED"
   above — each of which the gate reports `ok` while printing a line that does
   **not** say what the stale citation claimed, which is the gate's own blind
