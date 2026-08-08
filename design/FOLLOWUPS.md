@@ -788,6 +788,101 @@ allow-listing. Route straight to `ftBuildPlate`.
 Subsumes [[F-65]]: a text record could carry "SH2 BOOT KEY" and the 24 words on
 one plate. Related: [[F-58]] (input wedge on the Footer entry screen).
 
+### F-71 — Nits from the Plan A whole-diff review (owning phase: ownerless residue; batch whenever `seal` is next touched)
+
+Neither gates anything. Recorded so nobody rediscovers them or "simplifies" one
+away believing a test covers it.
+
+- **`WireError::TooLarge` / the `REGION_LEN` check is unreachable.** With
+  `MAX_SECTION_LEN = 8191` checked first, max `total` is
+  `52 + 8191 + 8191 + 16 = 16450 < 65536`. The code comment says it is deliberate
+  defence-in-depth against a future implementation that drops the section caps.
+  It is correct and it is dead; leave it, but know that no test reaches it.
+- **§11.4's "seal D twice with different salts, assert the hash is unchanged"
+  has no test.** Structurally satisfied — `public_data_hash` takes no salt
+  parameter, so a salt dependency is unrepresentable. The *record-count* half of
+  this Nit was closed by `mixed_payload_prints_the_sealed_hash_not_the_unsealed_one`,
+  which pins the whole banner line.
+
+### F-72 — md-codec 0.40 → 0.42 rode into the Task 1 commit (owning phase: none — historical note, do NOT rewrite)
+
+The review established that **every** md-codec API `seal` uses already exists in
+0.40 (`reassemble`, `decode_md1_string`, `ChunkHeader` + `chunk_set_id` +
+`ChunkHeader::read` with the same signature, `pub mod bitstream`), so the bump
+was never required — the plan itself says so. It nonetheless landed inside
+`84c4591` ("52-byte wire header"), moving 929 source lines across
+`bch/decode/validate/canonicalize` under the pre-existing converter and bundle
+paths in a commit labelled for something else.
+
+No defect: the only visible behavioural change is a tightening (new
+`Error::EmptyOriginOverride`), the safe direction, and `golden`/`cross_lang` are
+green on MSRV. Recorded because it is the exact bundling the standard workflow
+forbids, and — as with `b946399` — **the history stays as it is.** The rule binds
+future commits.
+
+### F-73 — the XIP read at the NORMATIVE 0x10E00000 is unverified on hardware (owning phase: Phase B's hardware pass, or the first SH2 session — whichever comes first)
+
+**Operator decision 2026-08-07: leave it, do not buy a board for this.** Filed so
+it is tracked rather than remembered.
+
+Task 7 Step 4 was run on a Pico 2 and proved the read MECHANISM: a fixed-address
+`unsafe.Slice` compiles under TinyGo 0.41.1, executes on RP2350 silicon, and
+returns byte-exact flash contents, with `ParseHeader` parsing them correctly.
+
+    probe @0x10300000 first 16: 4d 4e 45 4d 42 4c 4f 42 01 00 00 00 00 00 00 00
+    probe header OK — pub_len=203 ct_len=0 sealed=false
+
+`pub_len=203` is independently right (3 records x 67 chars + 2 LF).
+
+**What is NOT covered.** That test ran at `0x10300000`, not at `PayloadAddr`.
+The Pico 2 has **4 MB** of flash (`flash size: 4096K`, measured) and
+`0x10E00000` is **14 MB** in, so the region does not exist on that board:
+
+    ERROR: File size 0x100 starting at 0xe00000 is too big to fit in
+           flash size 0x400000
+
+and an XIP read there silently **aliases** to `0x10200000`. `cmd/sealread`'s
+"no payload at 0x10e00000 — CLEAN state" line is therefore a correct-LOOKING
+answer from the wrong address, and must not be cited as evidence about the
+normative region. The doc comment in `cmd/sealread/main.go` says so at the
+point of use.
+
+**What would close it:** a 16 MB RP2350 part — a **Pico Plus 2**
+(`__flash_size=16M`, which is why the fork's own build target is `pico-plus2`;
+`pico2-w` does NOT qualify, it `inherits: ["pico2"]` at 4 MB) or the SH2 itself.
+
+**Why the residual risk is small but real:** §5's arithmetic fixes the address,
+and the 2026-08-06 hardware validation already showed the SH2 accepts a
+data-family UF2 there byte-exact with the firmware region's sha256 unchanged.
+What is untested is only that a 14 MB offset behaves like a 3 MB one on a part
+where both are in range. Small — but this cycle has twice produced
+plausible-for-the-wrong-reason results, so it is recorded rather than waved off.
+
+**Also still open, same hardware:** the PBKDF2 rate on an RP2350**B**. §7.1's
+measured 9,715 it/s is from an RP2350**A** (Pico 2); the SH2 is a **B**. Tracked
+in SPEC §12 residual; grab it whenever a B is flashed.
+
+## Resolved
+
+### Closed 2026-08-07 — F-67 through F-70 (the encrypted-payload prerequisites)
+
+All four were owed *before* Plan B could let Go bind to either artefact, and all
+four landed that day. Bodies retained verbatim below.
+
+- **F-67** — fixed in the fork, `4192458`: `codex32.ValidMD` now caps md1
+  codewords at 93 symbols, matching md-codec's `REGULAR_CODE_SYMBOLS_MAX`.
+  Convergence port, Go-only (Rust was already correct). Mutation-verified: the
+  cap removed → `TestValidMDRejectsOverLongCodeword` FAILs at n=81 and n=496.
+- **F-68** — closed by `scripts/plan-cite-gate.sh` (`7cdcbfc`), which resolves
+  every `file:line` and `pkg.Symbol` in a plan against real source and prints the
+  line. It was written for Plan B, whose defects are citations rather than code.
+  It caught three of the author's own mis-cited lines on its second run.
+- **F-69 / F-70** — closed in `0ca972a`: `--seal-secret` now covers a bare BIP-39
+  mnemonic as well as `ms1` (`classify` needs a bech32 `1`, so a 24-word phrase
+  returned `Err(NoSeparator)` and sealed with no ceremony), and §9 + §12 item 6
+  document the flag. Framed per operator decision as a **best-effort anti-footgun,
+  not a security boundary**.
+
 ### F-67 — the Go `MDDataSymbols` lacks Rust's 93-symbol codeword cap (owning phase: Plan B, before the public-section decode ships)
 
 **Found by the §6.3 scoped re-review, 2026-08-07.** Rust's
@@ -879,81 +974,7 @@ admits a mnemonic in the encrypted section. It is an inconsistency in what the
 opt-in *means*, so it belongs with F-69's amendment rather than to a code fix
 made in isolation.
 
-### F-71 — Nits from the Plan A whole-diff review (owning phase: ownerless residue; batch whenever `seal` is next touched)
 
-Neither gates anything. Recorded so nobody rediscovers them or "simplifies" one
-away believing a test covers it.
-
-- **`WireError::TooLarge` / the `REGION_LEN` check is unreachable.** With
-  `MAX_SECTION_LEN = 8191` checked first, max `total` is
-  `52 + 8191 + 8191 + 16 = 16450 < 65536`. The code comment says it is deliberate
-  defence-in-depth against a future implementation that drops the section caps.
-  It is correct and it is dead; leave it, but know that no test reaches it.
-- **§11.4's "seal D twice with different salts, assert the hash is unchanged"
-  has no test.** Structurally satisfied — `public_data_hash` takes no salt
-  parameter, so a salt dependency is unrepresentable. The *record-count* half of
-  this Nit was closed by `mixed_payload_prints_the_sealed_hash_not_the_unsealed_one`,
-  which pins the whole banner line.
-
-### F-72 — md-codec 0.40 → 0.42 rode into the Task 1 commit (owning phase: none — historical note, do NOT rewrite)
-
-The review established that **every** md-codec API `seal` uses already exists in
-0.40 (`reassemble`, `decode_md1_string`, `ChunkHeader` + `chunk_set_id` +
-`ChunkHeader::read` with the same signature, `pub mod bitstream`), so the bump
-was never required — the plan itself says so. It nonetheless landed inside
-`84c4591` ("52-byte wire header"), moving 929 source lines across
-`bch/decode/validate/canonicalize` under the pre-existing converter and bundle
-paths in a commit labelled for something else.
-
-No defect: the only visible behavioural change is a tightening (new
-`Error::EmptyOriginOverride`), the safe direction, and `golden`/`cross_lang` are
-green on MSRV. Recorded because it is the exact bundling the standard workflow
-forbids, and — as with `b946399` — **the history stays as it is.** The rule binds
-future commits.
-
-### F-73 — the XIP read at the NORMATIVE 0x10E00000 is unverified on hardware (owning phase: Phase B's hardware pass, or the first SH2 session — whichever comes first)
-
-**Operator decision 2026-08-07: leave it, do not buy a board for this.** Filed so
-it is tracked rather than remembered.
-
-Task 7 Step 4 was run on a Pico 2 and proved the read MECHANISM: a fixed-address
-`unsafe.Slice` compiles under TinyGo 0.41.1, executes on RP2350 silicon, and
-returns byte-exact flash contents, with `ParseHeader` parsing them correctly.
-
-    probe @0x10300000 first 16: 4d 4e 45 4d 42 4c 4f 42 01 00 00 00 00 00 00 00
-    probe header OK — pub_len=203 ct_len=0 sealed=false
-
-`pub_len=203` is independently right (3 records x 67 chars + 2 LF).
-
-**What is NOT covered.** That test ran at `0x10300000`, not at `PayloadAddr`.
-The Pico 2 has **4 MB** of flash (`flash size: 4096K`, measured) and
-`0x10E00000` is **14 MB** in, so the region does not exist on that board:
-
-    ERROR: File size 0x100 starting at 0xe00000 is too big to fit in
-           flash size 0x400000
-
-and an XIP read there silently **aliases** to `0x10200000`. `cmd/sealread`'s
-"no payload at 0x10e00000 — CLEAN state" line is therefore a correct-LOOKING
-answer from the wrong address, and must not be cited as evidence about the
-normative region. The doc comment in `cmd/sealread/main.go` says so at the
-point of use.
-
-**What would close it:** a 16 MB RP2350 part — a **Pico Plus 2**
-(`__flash_size=16M`, which is why the fork's own build target is `pico-plus2`;
-`pico2-w` does NOT qualify, it `inherits: ["pico2"]` at 4 MB) or the SH2 itself.
-
-**Why the residual risk is small but real:** §5's arithmetic fixes the address,
-and the 2026-08-06 hardware validation already showed the SH2 accepts a
-data-family UF2 there byte-exact with the firmware region's sha256 unchanged.
-What is untested is only that a 14 MB offset behaves like a 3 MB one on a part
-where both are in range. Small — but this cycle has twice produced
-plausible-for-the-wrong-reason results, so it is recorded rather than waved off.
-
-**Also still open, same hardware:** the PBKDF2 rate on an RP2350**B**. §7.1's
-measured 9,715 it/s is from an RP2350**A** (Pico 2); the SH2 is a **B**. Tracked
-in SPEC §12 residual; grab it whenever a B is flashed.
-
-## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
 Six cycle-sized items descoped from the funds-safety audit (F8–F18 subset), each run through SPEC → opus R0 gate (0C/0I) → single-implementer TDD → mandatory post-impl adversarial review, merged as PRs #1–#4 and released in `mnemonic-engrave` v0.4.0. Full detail retained per entry.
