@@ -1105,6 +1105,28 @@ Two further consequences, both deliberate:
   `derived_key_hex` literals in `testdata/vectors.json`, produced by the Rust
   implementation, which `TestDeriverReproducesEveryVectorKey` asserts directly.
 
+**The wrapper is a byte-for-byte drop-in, including at the degenerate inputs —
+measured against the old body directly** rather than argued from the vectors:
+
+```
+iterations     -1   0   1   2   3   999   100000   100001
+old == new    yes yes yes yes yes   yes      yes      yes
+```
+
+Two things that check settles, and both were live worries worth retiring:
+
+- **`iterations <= 0` does not diverge.** The concern was that the old body
+  returned `nil` on a `pbkdf2.Key` error while `NewDeriver` clamps to 1, which
+  would swap a fail-closed `nil` for a plausible 32-byte key. Measured:
+  `crypto/pbkdf2.Key` does **not** error there in this Go version — it returns a
+  key, and it is the *same* key the clamp produces. The old contract is preserved
+  exactly, not merely approximated. **Unreachable in production regardless**
+  (§6.2 bounds `iterations` to `[100_000, 2_000_000]` before `Unlock` derives),
+  but `DeriveKey` is exported and tests reach it.
+- **No legal iteration count disagrees**, so `Opener.Unlock`'s behaviour — the
+  one path that still calls `DeriveKey` — is unchanged for every input the wire
+  format admits.
+
 - [ ] **3.5** Apply §3d. Run `nix develop --command go test ./seal/` — **every
       existing vector and crypto test must pass UNCHANGED**; they are what proves
       the wrapper did not fork the primitive. Confirm `crypto/pbkdf2` no longer
