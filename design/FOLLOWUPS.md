@@ -900,6 +900,37 @@ assembled mechanically and still need a reviewer's execution pass.
 the third-commit case the standard workflow separates out. B1 states the gap;
 B2 should not have to.
 
+### F-78 — "·" has no glyph in the display font, and four shipped screens use it (owning phase: ownerless residue; a font cycle, not a feature cycle)
+
+Measured 2026-08-07 in `gui`, pinned by `TestPlateLabelSeparatorRenders`:
+
+```
+width("ab") = 22    width("a·b") = 22    width("a|b") = 27
+```
+
+The middot contributes **zero pixels**. Four shipped files render it today:
+
+- `gui/bundle_flow.go:339` — `"Card %d of %d · Plate %d of %d"` → `Card 1 of 3  Plate 1 of 2`
+- `gui/codex32_polish.go:49,182,286` — `id NAME · thr 2 · share C` → double spaces
+- `gui/slip39_polish.go:237`
+- `gui/bundle.go:306`
+
+**Why it has gone unnoticed, and why it still matters.** In all four the
+surrounding *words* carry the meaning, so an invisible separator degrades to a
+double space — sloppy, not wrong. B1's plate list was the first place it would
+have been load-bearing (`mk1 2/3 · 1/2` → `mk1 2/3  1/2`, two fractions with
+nothing saying which is the card), which is why it surfaced there and why B1 uses
+`|` instead (operator decision, 2026-08-07).
+
+**The real fix is the font, not the call sites.** Adding `·` to the display font
+repairs all five places at once and lets B1 return to the separator §10.2.2's
+examples actually use. Note this is the **display** font, not the engraving
+alphabet — the 2-stroke-width minimum-feature rules do not apply.
+
+Not done in B1: it is a font change, and substituting a different character at
+each call site is treating the symptom in four places instead of the cause in
+one.
+
 ### F-77 — the encrypted section's md1/mk1 cards have no grouping (owning phase: B2 — GATING, it blocks §10.2.2's secret plate labels)
 
 B1's Task 4a surfaces `HRP`/`CardIndex`/`CardTotal`/`PlateIndex`/`PlateTotal` on
