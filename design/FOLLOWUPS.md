@@ -911,6 +911,48 @@ green on MSRV. Recorded because it is the exact bundling the standard workflow
 forbids, and — as with `b946399` — **the history stays as it is.** The rule binds
 future commits.
 
+### F-73 — the XIP read at the NORMATIVE 0x10E00000 is unverified on hardware (owning phase: Phase B's hardware pass, or the first SH2 session — whichever comes first)
+
+**Operator decision 2026-08-07: leave it, do not buy a board for this.** Filed so
+it is tracked rather than remembered.
+
+Task 7 Step 4 was run on a Pico 2 and proved the read MECHANISM: a fixed-address
+`unsafe.Slice` compiles under TinyGo 0.41.1, executes on RP2350 silicon, and
+returns byte-exact flash contents, with `ParseHeader` parsing them correctly.
+
+    probe @0x10300000 first 16: 4d 4e 45 4d 42 4c 4f 42 01 00 00 00 00 00 00 00
+    probe header OK — pub_len=203 ct_len=0 sealed=false
+
+`pub_len=203` is independently right (3 records x 67 chars + 2 LF).
+
+**What is NOT covered.** That test ran at `0x10300000`, not at `PayloadAddr`.
+The Pico 2 has **4 MB** of flash (`flash size: 4096K`, measured) and
+`0x10E00000` is **14 MB** in, so the region does not exist on that board:
+
+    ERROR: File size 0x100 starting at 0xe00000 is too big to fit in
+           flash size 0x400000
+
+and an XIP read there silently **aliases** to `0x10200000`. `cmd/sealread`'s
+"no payload at 0x10e00000 — CLEAN state" line is therefore a correct-LOOKING
+answer from the wrong address, and must not be cited as evidence about the
+normative region. The doc comment in `cmd/sealread/main.go` says so at the
+point of use.
+
+**What would close it:** a 16 MB RP2350 part — a **Pico Plus 2**
+(`__flash_size=16M`, which is why the fork's own build target is `pico-plus2`;
+`pico2-w` does NOT qualify, it `inherits: ["pico2"]` at 4 MB) or the SH2 itself.
+
+**Why the residual risk is small but real:** §5's arithmetic fixes the address,
+and the 2026-08-06 hardware validation already showed the SH2 accepts a
+data-family UF2 there byte-exact with the firmware region's sha256 unchanged.
+What is untested is only that a 14 MB offset behaves like a 3 MB one on a part
+where both are in range. Small — but this cycle has twice produced
+plausible-for-the-wrong-reason results, so it is recorded rather than waved off.
+
+**Also still open, same hardware:** the PBKDF2 rate on an RP2350**B**. §7.1's
+measured 9,715 it/s is from an RP2350**A** (Pico 2); the SH2 is a **B**. Tracked
+in SPEC §12 residual; grab it whenever a B is flashed.
+
 ## Resolved
 
 ### Funds-safety audit follow-ups (`me-*`) — SHIPPED in v0.4.0 (PRs #1–#4, 2026-07-09)
