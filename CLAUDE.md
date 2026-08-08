@@ -22,3 +22,23 @@ This file is auto-loaded by Claude Code when starting a session in this reposito
 - SeedHammer firmware work: planning docs live here; upstream PRs branch off `upstream/main`, commits signed + DCO, authored Brian Goss; keep PRs small and focused.
 - **Rust-primary rule for Go constellation ports** (2026-06-20, standing user directive; project-wide). The fork's Go reimplementations of constellation codecs (`md`, `mk`, `codex32`, `slip39`, `bip39`, `seedxor`, `bip85`) are **strictly downstream** of the primary Rust constellation repos — the Go port may NEVER lead. Any change to their **normative behavior** (wire format, identity/stub algorithms, validation, admission) MUST land **first in the primary Rust repo, with test vectors**, and only then be ported to Go. Bind **semantics**, not line-for-line code (the Go port deliberately omits `rust-miniscript` for TinyGo, so a behavior-faithful Go reimplementation is compliant). **Exempt:** (a) fixes that bring a Go port back into conformance with already-correct Rust (convergence, not leading) — BUT whenever a defect is found in a Go port we **MUST always** check whether the same defect exists in the primary Rust implementation; if it does, it is fixed in Rust **first** (with a test vector) and the Go fix becomes the convergence port; only genuinely Go-only porting errors are fixed in Go directly, and the Rust check is never skipped; (b) fork-native firmware/GUI/UX code with no Rust counterpart. Each ported Go package carries a **provenance pin** (Rust crate + version/SHA it tracks) updated on every sync, so drift is auditable.
 - Stage paths explicitly (no `git add -A`).
+- **Push `master` via the `ci/staging` ref, so the required check is SATISFIED
+  rather than bypassed** (established and verified 2026-08-08). Branch
+  protection requires the `test (rust + go)` context, and a status check binds to
+  a **commit SHA**, not a branch — so a commit pushed straight to `master` has no
+  check when the rule is evaluated, reports "expected", and is bypassed. That
+  happened five times in a row; it is a chicken-and-egg in the rule, not a lapse.
+  `strict: false` on the rule is what makes it fixable — GitHub asks only whether
+  the commit carries a passing context. So let the SHA earn it first:
+
+  ```sh
+  git push origin master:refs/heads/ci/staging   # builds this exact SHA
+  gh run watch <id>                              # wait for test (rust + go)
+  git push origin master                         # no bypass message = satisfied
+  git push origin --delete ci/staging
+  ```
+
+  `.github/workflows/release.yml` builds `ci/**` for this reason and explains it
+  at the trigger. `assemble + sign + release` is gated on `refs/tags/v*`, so a
+  `ci/**` push cannot sign or publish — verified: it reported `skipped`. A push
+  that prints "Bypassed rule violations" means the staging step was missed.
