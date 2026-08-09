@@ -239,3 +239,61 @@ The load-bearing ones: `idleTimeout` is **`gui/gui.go:2879`** (not 2801);
 `NewKeyboard` is **`gui/gui.go:983`**; the `unlockPayload` dispatch is
 **`gui/gui.go:1595`**, its title case **`:1791`**; pass 3's `SectionPublic` gate
 is **`seal/record.go:214`**; `editBtn.Clicked` is **`gui/gui.go:2331`**.
+
+---
+
+## 11. STOPPED AT 1% USAGE — how to resume (2026-08-08)
+
+**Nothing is lost and nothing is half-applied.** Both repos are committed and
+clean; the only thing abandoned was an in-flight review's *findings*.
+
+```
+mnemonic-engrave  master  8ef7a6d   NOT pushed
+seedhammer        main    421dca8   NOT pushed -- B2a-i merged
+seedhammer        feat/encrypted-payload-b2a-ii  3db3bfe  -- B2a-ii, UNREVIEWED
+                  worktree /scratch/code/shibboleth/seedhammer-wt-b2aii, clean
+```
+
+### The one thing outstanding
+
+**B2a-ii is implemented and verified green, but NOT reviewed, and MUST NOT be
+merged until it is.** This is the phase where decrypted seed material is
+resident, with no §10.2.4 backstop. Verified locally: exactly two sanctioned
+`[setup failed]`, `seal` 12.6s / `gui` 16.1s green, vet and gofmt clean, TinyGo
+1307232 flash / 60584 ram (+21568 over baseline — the first phase whose code is
+actually reachable).
+
+### Resume the review with
+
+```
+Workflow({scriptPath: "/home/bcg/.claude/projects/-scratch-code-shibboleth-mnemonic-engrave/e91c4717-45e0-4990-855e-052bfd823fc8/workflows/scripts/b2a-ii-whole-diff-review-wf_ae4a9fd9-bea.js",
+          resumeFromRunId: "wf_ae4a9fd9-bea"})
+```
+
+Completed lenses replay from cache; only unfinished ones re-run. **It was stopped
+deliberately at 1% usage, not by a failure.** If budget is tight, a single-lens
+review satisfies the mandatory-review rule — the fan-out was a quality choice,
+not a requirement.
+
+### Then, in order
+
+1. Persist the review verbatim in its own commit; fold in a second.
+2. Merge B2a-ii to `main` (`--no-ff`, as B2a-i was).
+3. **Task 9 — the hardware pass, operator-run.** Closes §7.1's in-situ RP2350B
+   KDF rate, still owed before release.
+4. B2b — §10.2.4's idle wipe. §9 above carries its verified findings forward.
+5. Push BOTH repos via `ci/staging` per `CLAUDE.md`.
+
+### Carried from B2a-ii's implementation, unreviewed but measured
+
+- 29 of 30 mutants killed. The survivor is the one the plan predicts
+  (`clear(blob)`/`blob = nil` is not test-observable) and instructs recording
+  rather than papering over.
+- Mutation testing found a **one-directional test**: `SecretsResident` ignoring
+  `IsSecret` survived a version that only wiped the cards. Code right, test wrong
+  — the same class as B2a-i's `Probe`.
+- `%` renders as zero pixels in `Styles.progress` — filed as **F-86**, owned by
+  F-78's font cycle.
+- Four declared deviations, none reviewed: commit sequencing of §5d's fragment;
+  `click` rather than `press` in §6c (`Clickable.Next` needs press-then-release);
+  §6d's plate-list row moved to Task 7; the mutation runner left uncommitted.
