@@ -1336,6 +1336,15 @@ judgement call:
 
 ## Task 8 — hardware (operator-run)
 
+> **DO NOT FLASH BEFORE TASK 7 IS GREEN.** Operator instruction, 2026-08-09,
+> given while the SH2 was sitting in BOOTSEL. Task 7 adds no production code,
+> but a surviving mutant is a blocking finding and its fix would land in `gui/`,
+> so flashing earlier risks a wasted cycle on the real machine.
+>
+> **Flash with `~/bin/sh/sh2-flash`, never `picotool` by hand.** The build output
+> is unsigned, and since the boot key was burned to slot 1 (2026-08-03,
+> permanent) the machine will not boot an unsigned image from a laptop port.
+
 **This is the first time `ctx.Done` is ever true on the real machine** (fact 2),
 and the operator accepted that on 2026-08-09 on condition the hardware pass
 covers it.
