@@ -1,13 +1,13 @@
 # Encrypted Payload Delivery — Plan B Phase B2b (§10.2.4's residency-keyed idle wipe) — Implementation Plan
 
-**Status:** DRAFT — R0 not yet run. **No code before 0C/0I.**
+**Status: GREEN — R0 closed 2026-08-09 at round 3 (0C/0I). Implementation may begin.**
 
 | round | verdict | report |
 | --- | --- | --- |
 | 0 | **3C / 5I** — all folded | `agent-reports/…-R0-round0-design.md` (opus, 1C/2I), `…-R0-round0-test-adequacy.md` (sonnet, 2C/3I) |
 | 1 | **0C / 9I** — all folded | `…-R0-round1-fold-rereview.md` (opus, 0C/5I — the fold's own defects), `…-R0-round1-residue-sweep.md` (36-agent workflow, 0C/4I — Tasks 6–8, constraints, follow-up ownership) |
 | 2 | **0C / 3I** — all folded | `…-R0-round2-fold-rereview.md` (opus). Closed the two structural risks by tracing: the deleted tail `ctx.B.Reset()` is genuinely dead, and the removed armed-edge `a.idle.active = false` self-clears |
-| 3 | pending | — |
+| 3 | **0C / 0I — GREEN, loop CLOSED** | `…-R0-round3-fold-rereview.md` (opus). Executed the `flowBound` panic path in a reproduction rather than reasoning about it; type-checked the test package under go1.26. Its 5 Minors and 4 Nits were folded inline, not deferred. |
 
 **Descends from:** `SPEC_encrypted_payload_delivery.md` §10.2.4, **as amended
 2026-08-09** (`0af8f97`). The amendment is a prerequisite, not a footnote: the
@@ -146,12 +146,20 @@ Carried forward unchanged from B2a-ii; the load-bearing ones:
   `SeedScreen.Confirm` are used across the whole firmware; the design's central
   claim is that they need **no change**. If a task finds itself editing one, the
   design is wrong and the task should stop.
-- **No `panic`/`recover` in NON-TEST code.** The fork has none and this plan adds
-  none. The single `panic`/`recover` pair this plan does introduce is
-  `boundedFlow`/`runSession` in `run_harness_test.go`, and it is there because
-  the two alternatives are worse: `t.Fatal` would Goexit through a live
-  iterator, and `t.Errorf`-then-return ends only the current session, letting
-  the very mutant it guards run to the 10-minute timeout.
+- **No `recover` in NON-TEST code.** Measured: the fork has **0** real `recover()`
+  calls outside tests (the one grep hit, `backup/freetext.go:56`, is inside a
+  comment), and this plan adds none. **`panic` is a different matter and the rule
+  does NOT forbid it** — the fork has **129** `panic(` sites in non-test Go, and
+  this plan's own `gui/run_flow.go` block reproduces one verbatim (`panic(err)`
+  in the `draw` closure, carried over unchanged from the existing `Run` body).
+  An earlier draft said "no `panic`/`recover`", which was simply false and would
+  have told the implementer that the gated block violates the plan.
+
+  The one `recover` this plan introduces is `runSession`'s, paired with
+  `boundedFlow`'s `panic(flowBound{})`, **in `run_harness_test.go` only**. It is
+  there because both alternatives are worse: `t.Fatal` would `Goexit` through a
+  live iterator, and `t.Errorf`-then-return ends only the current session,
+  letting the very mutant it guards run to the 10-minute timeout.
 - **No `Platform` change, no signature change.** `cmd/controller` and `cmd/emu`
   are untouched.
 
@@ -464,6 +472,15 @@ func assertDrawn(t *testing.T, drawn []string, str string) {
       point: a test that sleeps past `idleTimeout` inside a `synctest` bubble
       must observe `Run`'s **saver** activate. If it does not, the platform is
       not driving the clock and every later task asserts on nothing.
+
+      > **The discriminator, since a raw `dirties` count is not one.** `Dirty` is
+      > called by the content path (via `draw`) *and* **twice per saver frame**
+      > (`saver.State.Draw` -> `newDraw`, `gui/saver/saver.go:328` and `:353`),
+      > so the total proves nothing. **A saver frame is a `Dirty` with no
+      > following `onDraw`** -- the saver bypasses the op pipeline entirely.
+      > Record the interleaving in `onDirty`/`onDraw` and assert on that
+      > pairing. Use `runSession` here, not `mustFinish`: a parked flow is the
+      > expected outcome, so assert `parked == true` explicitly.
 - [ ] **1.4** `go test ./gui/`, `gofmt`, commit.
 
 ---
@@ -651,7 +668,7 @@ gated whole-file form is Task 4's block.
       | --- | --- | --- | --- |
       | `run_flow.go` | `break // unwind, never exit` | `return` | the restart test — `"SESSION 2"` never drawn. The trailing comment makes this line unique: bare `break` matches 5 sites in this file, one of them the `pl.NextChunk()` chunk walk, where substituting silently truncates every frame |
       | `run_flow.go` | `if wiping {` | delete the whole 3-line statement | a flow that `Frame`s after `Done` (fact 3's two screens) — the wipe becomes a GUI exit, so `"SESSION 2"` never drawn |
-      | `run_flow.go` | `if !wiping {` | `if false {` | the restart test |
+      | `run_flow.go` | `if !wiping {` | `if false {` | `mustFinish`'s cap — this mutant never *exits* the session loop (it is no longer the old "return unconditionally"), so it spins to `maxRunFrames` and fails there rather than by a missing `"SESSION 2"`. The restart property itself is covered by the `break`→`return` row above |
       | `run_flow.go` | `			wiping := false` | hoist above `for {` | the **two-wipe** test — and note this one is caught by `boundedFlow`, not by `maxRunFrames`: the discard guard skips the inner loop, so `yield()` is never called and ticks never increment |
 
 - [ ] **3.4** `go test ./gui/`, TinyGo device build, `gofmt`, commit.
@@ -1051,7 +1068,8 @@ than re-derive them:
       put in its place — because a bare token is not appliable: `break` occurs
       5× in this plan's own blocks (one of them the `pl.NextChunk()` chunk walk,
       where substituting silently truncates every frame), and
-      `if !wiping { return }` occurs 0× as written, being three lines.
+      `if !wiping { return }` occurs 0× as written, being three lines. (6 `break`
+      lines across all blocks; 5 in `run_flow.go`, of which one is a comment.)
 
       | file | anchor (unique) | → replace with | must be killed by |
       | --- | --- | --- | --- |
@@ -1063,6 +1081,7 @@ than re-derive them:
       | `wipe_warning.go` | `	if secs < 0 {` | `if false {` | a **direct unit call** of `wipeWarningOp` with a negative `remaining` — unreachable from `Run`, since `wipeAt.Sub(now)` is only evaluated after `now.Sub(wipeAt) >= 0` is ruled out |
       | `run_flow.go` | `							a.warnBuf.Reset()` | *delete the line* | the buffer test — `warnBufHook` sees `args` growing across warning ticks |
       | `run_flow.go` | `draw(wipeWarningOp(&a.warnBuf, ctx.Styles, &descriptorTheme,` | `&ctx.B` in place of `&a.warnBuf` | the same buffer test — `warnBufHook` reports `a.warnBuf` still `(0, 0)`. **This is A-C1 restored**, so it is the row that matters most |
+      | `run_flow.go` | `ctx.keepAwake` | `false` | step 5.1 — the derivation parks under the saver and `mustFinish` reports the cap. F-93's own mutant; a row rather than prose because Task 7 owns "a list, not a judgement call" |
       | `run_flow.go` | `(ctx.keepAwake && !armed)` | `(ctx.keepAwake)` | step 5.3 — an armed session calling `KeepAwake` must still wipe on time. Anchored on the parenthesised sub-expression because the full `if` line contains `||`, which a markdown table cell cannot carry |
 
 - [ ] **4.4** `go test ./gui/`, device build, `gofmt`, commit.
@@ -1169,14 +1188,14 @@ import "seedhammer.com/bip39"
 var unlockMnemonicParsedHook func(bip39.Mnemonic)
 ```
 
-- [ ] **6.0** Add the call site — `gui/unlock_session.go`, immediately after
-      `defer clear(m)` at `:250`:
+- [ ] **6.0** Add the call site. Modify `gui/unlock_session.go`, immediately
+      after `defer clear(m)` at `:250`:
 
-      ```
-      	if unlockMnemonicParsedHook != nil {
-      		unlockMnemonicParsedHook(m)
-      	}
-      ```
+```go
+	if unlockMnemonicParsedHook != nil {
+		unlockMnemonicParsedHook(m)
+	}
+```
 
       It must come **after** the defer is registered, so the hook hands the test
       the same backing array the defer will zero. Without this step the seam file
@@ -1277,8 +1296,11 @@ Both gates apply and **both MUST be run before dispatch and after every fold.**
   Expected failures: symbols this plan creates (`wipeGuard`, `wipeWarningOp`,
   `runWithFlow`, `RecordsResident`).
 - `scripts/plan-mutation-anchors.py` proves **every mutation-table anchor matches
-  exactly once, in the file its row names** — 15 unique, 0 bad, 2 unresolved
-  (fork-file anchors that cannot resolve until Task 6 adds the call site).
+  exactly once, in the file its row names** — 17 unique, 0 bad, 1 unresolved
+  (fork-file anchors: `unlockMnemonicParsedHook(m)` does not exist until step
+  6.0 adds it, and `defer clear(m)` already exists at `unlock_session.go:250` but
+  the plan quotes that file only as a fragment, so absence from the quote proves
+  nothing).
   **Version 1 of this script had the exact false-PASS it exists to prevent** —
   it graded the longest backticked span, which for one row was a parenthetical
   *context* note rather than the anchor, and reported `ok` for a token matching
@@ -1294,7 +1316,7 @@ Both gates apply and **both MUST be run before dispatch and after every fold.**
   twice — was made unique **in the code**, with a trailing comment that exists
   for exactly that purpose.
 - `scripts/plan-build-gate-go.sh` type-checks **six** whole-file blocks:
-  `gui/run_flow.go` (223 lines), `gui/run_harness_test.go` (210),
+  `gui/run_flow.go` (224 lines), `gui/run_harness_test.go` (231),
   `gui/wipe_warning.go` (61), `gui/wipe_guard.go` (52),
   `gui/unlock_mnemonic_seam.go` (13), `gui/op/buffer_len.go` (9).
 
@@ -1385,6 +1407,7 @@ facts 1–4 above, each confirmed against `a01b666`; `Colors` has no style field
   dissolved by this design.
 - **F-76**, F-80's residue, **F-92** (`tinygo test`), **F-85** and **F-98** (the
   GREEN spec's own amendments and stale cites).
+
 ### The release tag's precondition set — the ONE place this list lives
 
 Previously stated three different ways in this plan, all incomplete, and a bare
