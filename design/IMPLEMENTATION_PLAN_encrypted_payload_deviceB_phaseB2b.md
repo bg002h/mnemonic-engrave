@@ -1142,7 +1142,7 @@ than re-derive them:
       | `run_flow.go` | `armed := ctx.wipe.armed()` | `armed := false` | the wipe test |
       | `run_flow.go` | `a.idle.start = now // row 2: fresh window at cut end` | *delete the line* | the post-cut test — **instant wipe with NO warning**: the clock is ~21 min stale, so `now ≥ wipeAt` already holds and the warning branch is skipped entirely. The trailing comment exists to make this line a UNIQUE anchor — the bare statement occurs twice, and `scripts/plan-mutation-anchors.py` fails the plan if it does |
       | `run_flow.go` | `if armed { // §10.2.4's window: warn, then wipe` | `if false {` | the warning test — the saver draws instead of the warning. The trailing comment disambiguates it from the armed-edge `if armed {` |
-      | `wipe_warning.go` | `const wipeWarningDelay = 30 * time.Second` | `= 0` | the warning-visible test |
+      | `wipe_warning.go` | `const wipeWarningDelay = 30 * time.Second` | `const wipeWarningDelay = 0` | the warning-visible test. **Replace the WHOLE line**, not just the value — an earlier form gave `= 0` alone, which applied literally replaces the const line with a fragment and breaks the build. Still a kill by rule 0, but for the wrong reason and via the wrong path |
       | `wipe_warning.go` | `	if secs < 0 {` | `if false {` | a **direct unit call** of `wipeWarningOp` with a negative `remaining` — unreachable from `Run`, since `wipeAt.Sub(now)` is only evaluated after `now.Sub(wipeAt) >= 0` is ruled out |
       | `run_flow.go` | `							a.warnBuf.Reset()` | *delete the line* | the buffer test — `warnBufHook` sees `args` growing across warning ticks |
       | `run_flow.go` | `draw(wipeWarningOp(&a.warnBuf, ctx.Styles, &descriptorTheme,` | `&ctx.B` in place of `&a.warnBuf` | the same buffer test — `warnBufHook` reports `a.warnBuf` still `(0, 0)`. **This is A-C1 restored**, so it is the row that matters most |
@@ -1361,11 +1361,16 @@ judgement call:
       cover — the shape `plan-build-gate-go.sh` uses.
 - [ ] **7.2** A surviving mutant is **blocking**; so is a match count ≠ 1.
       Record results in the commit.
-- [ ] **7.3** F-96 has a second half — "land it with the phase report if that is
-      still owed". `ls design/agent-reports/ | grep -c b2a-ii` is **11**, all
-      lens reports and **no phase report**, so the runner's row table has no
-      B2a-ii source document. Either write that phase report or amend F-96 to
-      drop the requirement with a reason. Do not leave it silently unmet.
+- [ ] **7.3** **DONE 2026-08-09.** F-96's second half — "land it with the phase
+      report if that is still owed" — is closed by
+      `design/PHASE_REPORT_encrypted_payload_deviceB_phaseB2a_ii.md` (`09996e2`).
+
+      > **The command an earlier draft of this step cited was wrong**, and the
+      > Task 7 implementer caught it: `ls design/agent-reports/ | grep -c b2a-ii`
+      > returns **0**, not 11 — the files are named `phaseB2a-ii` with a capital
+      > B, so a case-sensitive grep never matches. The 11 came from a `-i` run
+      > and was written down without the flag. Exactly the class the cite gate
+      > exists for, in a *command* rather than a citation.
 
 ---
 
