@@ -1303,6 +1303,37 @@ so a non-PD supply is a different boot path.
 Recorded in the B2b plan's "release tag's precondition set", which is now the
 single place that list lives.
 
+### F-101 — `mutation-run.py` is not crash-safe: killed mid-row it leaves a MUTANT in the worktree (owning phase: before the release tag, with F-96's runner)
+
+Hit three times in ten minutes on 2026-08-09 while verifying Task 7. A
+backgrounded run was killed mid-row and left `armed := true` applied in
+`gui/run_flow.go` — the mutant that makes §10.2.4's wipe timer **permanently
+armed**, which would erase secrets during the *public* plate list.
+
+**Why it is more than an annoyance:** the file it leaves behind **compiles**, and
+passes most of the suite. A `git add gui/run_flow.go` at the wrong moment commits
+a funds-safety guard that has been disabled, and the diff is one plausible-looking
+line inside a function nobody re-reads.
+
+**What already works, and is the only reason this surfaced as a refusal rather
+than a false green:** the runner's pre-flight cleanliness check. Its own words —
+*"a mutation's restore would be indistinguishable from a pre-existing change"* —
+so it refused to start on the dirty tree instead of running 16 mutations on top of
+a live mutant and reporting a plausible all-green table.
+
+**Fix:** trap `SIGINT`/`SIGTERM` and restore before exiting; and write a sentinel
+next to the backup recording the in-flight file, so a later invocation can *offer
+to restore it* rather than only refusing. Until then, wrap any invocation in a
+guard that restores unconditionally:
+
+```sh
+trap 'cd $WT && git checkout -- .' EXIT INT TERM
+```
+
+Note the wrapper is only safe because the worktree carries no legitimate
+uncommitted work — the general rule (restore from a file copy, never
+`git checkout`) still stands for anything else.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:

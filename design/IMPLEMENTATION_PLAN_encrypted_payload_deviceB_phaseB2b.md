@@ -1,8 +1,10 @@
 # Encrypted Payload Delivery — Plan B Phase B2b (§10.2.4's residency-keyed idle wipe) — Implementation Plan
 
-**Status: GREEN. Tasks 1–6 implemented, verified and committed
+**Status: GREEN. Tasks 1–7 implemented, verified and committed
 (`fbe31ab`, `aa704b6`, `675ae4e`, `4935bf1`, `237c85f`, `920e1e1` on branch
-`b2b`). **Task 7 next, then flash, then Task 8** — operator-run hardware.**
+`b2b`; the runner at `dd3d4b3` here). **Mutation run, re-verified independently
+by the controller: 16/16 mechanically-applicable rows KILLED, 0 survived, final
+unfiltered suite PASS.** Next: **flash, then Task 8** — operator-run hardware.**
 
 **Device budget, measured at each task** (`.github/workflows/test.yml:29`):
 `a01b666` 1310184/60584 → T1 1310568 → T3 1311536 → T4 1312776 → T5/T6
