@@ -1130,7 +1130,23 @@ shorten the copy to fit `bodyClip.Dy() - 2*scrollFadeDist` **first**, or give
 `Warning` a touch scroll (bind it to `Clickable`s with `op.Input` hit areas, the
 same fix the StartScreen pager took) — then restore the clip.
 
-### F-96 — the §11.3 mutation runner is uncommitted, so the 30-mutant run is reproducible by nobody (owning phase: B2b, which re-runs exactly these rows)
+### F-96 — the §11.3 mutation runner is uncommitted, so the 30-mutant run is reproducible by nobody (owning phase: B2b — **second half CLOSED 2026-08-09**)
+
+> **The phase-report half is DONE:** `design/PHASE_REPORT_encrypted_payload_deviceB_phaseB2a_ii.md`,
+> written 2026-08-09 at the operator's instruction. It consolidates B2a-ii's 11
+> lens verdicts, the §11.3 row table, the whole-phase 30-mutant total (29 killed,
+> 1 predicted survivor), the three rows that first reported a wrong verdict, and
+> the measured green at merge.
+>
+> **It also records what could NOT be recovered.** `3db3bfe` said the runner "is
+> reproduced in the phase report"; the report was never written, so the script is
+> gone — written inline, used, discarded with the tool call. The results survived
+> because they were written into a commit message; the procedure did not.
+> B2a-ii's rows are therefore **not re-runnable as they were**. B2b Task 7's
+> `scripts/mutation-run.py` supersedes it and derives its rows from the plan's own
+> tables, so the check is a command rather than a discipline.
+>
+> The runner half stays open until Task 7 commits.
 
 Found by the B2a-ii whole-diff review, lens 5 M3, and it is a standing-rule
 violation rather than a defect: `CLAUDE.md` says *"when an artifact will be
