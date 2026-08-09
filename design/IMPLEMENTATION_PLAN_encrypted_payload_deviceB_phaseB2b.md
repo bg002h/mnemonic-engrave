@@ -6,7 +6,8 @@
 | --- | --- | --- |
 | 0 | **3C / 5I** — all folded | `agent-reports/…-R0-round0-design.md` (opus, 1C/2I), `…-R0-round0-test-adequacy.md` (sonnet, 2C/3I) |
 | 1 | **0C / 9I** — all folded | `…-R0-round1-fold-rereview.md` (opus, 0C/5I — the fold's own defects), `…-R0-round1-residue-sweep.md` (36-agent workflow, 0C/4I — Tasks 6–8, constraints, follow-up ownership) |
-| 2 | pending | — |
+| 2 | **0C / 3I** — all folded | `…-R0-round2-fold-rereview.md` (opus). Closed the two structural risks by tracing: the deleted tail `ctx.B.Reset()` is genuinely dead, and the removed armed-edge `a.idle.active = false` self-clears |
+| 3 | pending | — |
 
 **Descends from:** `SPEC_encrypted_payload_delivery.md` §10.2.4, **as amended
 2026-08-09** (`0af8f97`). The amendment is a prerequisite, not a footnote: the
@@ -114,9 +115,22 @@ Carried forward unchanged from B2a-ii; the load-bearing ones:
 | `go vet ./gui/` | **exit 1**, only `gui/freetext_sizeproof_golden_test.go:111:13: testing.ArtifactDir requires go1.26 or later` |
 | `go vet ./gui/op/` | **exit 1**, only `gui/op/draw_test.go:176:24: testing.ArtifactDir requires go1.26 or later` — new row, because Task 1 adds `gui/op/buffer_len.go` |
 | `gofmt -l <touched>` | empty |
-| TinyGo device build — the exact command: `nix develop --command tinygo build -o /dev/null -target=pico2-w -size=short ./cmd/controller` | baseline **1310184 flash / 60584 ram** — report the new numbers |
+| TinyGo device build — **run `.github/workflows/test.yml:29` verbatim; do not restate it by hand** | baseline **1310184 flash / 60584 ram** — report the new numbers |
 | `CGO_ENABLED=0 GOARCH=386 go test ./seal/ ./bip39/` | green, **~52 s** (not a hang) |
 
+> **The TinyGo row is a CITATION, not a transcription, and that is deliberate.**
+> An earlier draft of this row spelled the command out as
+> `tinygo build -o /dev/null -target=pico2-w -size=short ./cmd/controller`. It
+> **does not compile** — `cmd/controller/platform_sh2.go:128:19: undefined:
+> machine.GPIO30`, because `pico2-w` is RP2350**A** and the SeedHammer II is
+> RP2350**B** (`pico-plus2`). Even on the right target the numbers could not have
+> matched: the recorded baseline needs `-opt 2 -gc precise -scheduler tasks
+> -stack-size 16kb`, all of which the hand-written version dropped. Verified: the
+> workflow's own line reproduces `1310184 / 60584` exactly. **Tasks 3.4 and 4.4
+> both require this build**, so a broken row blocks two task gates, in the phase
+> whose most expensive finding was a 228 KB buffer growth — this is the only
+> RAM-budget signal there is.
+>
 > **`CGO_ENABLED=0` on the 386 row is load-bearing, not decoration.** Without it
 > the row is **RED at the baseline** — `# runtime/cgo … gnu/stubs-32.h: No such
 > file or directory`, `FAIL seedhammer.com/seal [build failed]` — because a
@@ -132,8 +146,12 @@ Carried forward unchanged from B2a-ii; the load-bearing ones:
   `SeedScreen.Confirm` are used across the whole firmware; the design's central
   claim is that they need **no change**. If a task finds itself editing one, the
   design is wrong and the task should stop.
-- **No `panic`/`recover`.** The fork has no `recover` in non-test code and this
-  plan adds none.
+- **No `panic`/`recover` in NON-TEST code.** The fork has none and this plan adds
+  none. The single `panic`/`recover` pair this plan does introduce is
+  `boundedFlow`/`runSession` in `run_harness_test.go`, and it is there because
+  the two alternatives are worse: `t.Fatal` would Goexit through a live
+  iterator, and `t.Errorf`-then-return ends only the current session, letting
+  the very mutant it guards run to the 10-minute timeout.
 - **No `Platform` change, no signature change.** `cmd/controller` and `cmd/emu`
   are untouched.
 
@@ -314,6 +332,17 @@ const maxRunFrames = 100000
 // mustFinish.
 func runSession(t *testing.T, p *deadlinePlatform, flow func(ctx *Context, version string), onDraw func(o op.Op, text string)) (drawn []string, parked bool) {
 	t.Helper()
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+		if _, ok := r.(flowBound); !ok {
+			panic(r) // a real bug; never swallow it
+		}
+		t.Errorf("test flow exceeded %d iterations without ctx.Done -- Run is "+
+			"discarding every frame (wiping stuck true?)", maxRunFrames)
+	}()
 	r := image.Rectangle{Max: sh2DisplaySize}
 	observe := func(o op.Op) {
 		d := new(op.Drawer)
@@ -361,14 +390,20 @@ func mustFinish(t *testing.T, p *deadlinePlatform, flow func(ctx *Context, versi
 // leaves `wiping` stuck true therefore burns CPU with ZERO ticks and zero fake
 // time, and the cap never trips. The flow is the thing spinning, so bounding
 // the flow is the only cap that survives the guard.
+// It PANICS with a sentinel rather than calling t.Errorf and returning, and the
+// difference is the whole point. Returning ends only the current SESSION: the
+// session loop sees `wiping` still true, builds a fresh Context, and calls the
+// flow again with a fresh counter -- so the mutant this exists to catch runs
+// forever, now emitting an unbounded stream of failures. t.Fatal is barred too,
+// since Goexit through a live iterator is not safe. The panic unwinds
+// runWithFlow entirely and cannot re-enter the session loop; runSession recovers
+// it and turns it into one clean failure.
 func boundedFlow(t *testing.T, body func(ctx *Context) bool) func(*Context, string) {
 	t.Helper()
 	return func(ctx *Context, _ string) {
 		for n := 0; !ctx.Done; n++ {
 			if n > maxRunFrames {
-				t.Errorf("test flow exceeded %d iterations without ctx.Done -- "+
-					"Run is discarding every frame (wiping stuck true?)", maxRunFrames)
-				return
+				panic(flowBound{})
 			}
 			if !body(ctx) {
 				return
@@ -376,6 +411,10 @@ func boundedFlow(t *testing.T, body func(ctx *Context) bool) func(*Context, stri
 		}
 	}
 }
+
+// flowBound is boundedFlow's sentinel. A distinct type so runSession can
+// re-panic anything else rather than swallowing a real bug.
+type flowBound struct{}
 
 // drawnContains reports whether any drawn frame carried str, with uiContains'
 // whitespace-insensitive matching (gui/gui_test.go:516).
@@ -409,8 +448,18 @@ func assertDrawn(t *testing.T, drawn []string, str string) {
       Then `go test ./gui/` must be **unchanged** — a pure move that changes a
       test result is not a pure move.
 - [ ] **1.2** Write the harness. Smoke test: a flow that returns immediately
-      terminates `runSession`; a flow that loops `for !ctx.Done` drawing a label
-      per tick produces frames whose text `assertDrawn` finds.
+      finishes under `mustFinish`; a flow that loops `for !ctx.Done` drawing a
+      label per tick produces frames whose text `assertDrawn` finds.
+
+      > **Entry point is part of each test's assertion, not a detail.** Use
+      > `mustFinish` wherever completion is required — it fails loudly on a park.
+      > Use `runSession` **only** where a park is the expected outcome (step 1.3
+      > and step 4.1's "not armed"), and then **assert on `parked` explicitly**;
+      > a test that ignores the second return value passes vacuously.
+      >
+      > Note `parked` means "hit `maxRunFrames`", not "the flow parked" in
+      > general — the discard-guard spin never reaches the tick counter at all,
+      > which is what `boundedFlow` is for.
 - [ ] **1.3** **Prove the deadline is honoured**, because that is the whole
       point: a test that sleeps past `idleTimeout` inside a `synctest` bubble
       must observe `Run`'s **saver** activate. If it does not, the platform is
@@ -544,13 +593,11 @@ gated whole-file form is Task 4's block.
    that the allocation is irrelevant, and a fresh `Context` needs no argument
    about which fields matter.
 
-2. **The discard guard**, first statement in the range body, before any draw:
-
-```go
-	if wiping {
-		continue
-	}
-```
+2. **The discard guard** — `if wiping { continue }`, the first statement in the
+   range body, before any draw. *(Not repeated as a code block here: Task 4's
+   gated whole file is the single source, and a second copy is a second thing to
+   keep in sync — it also made `if wiping {` match twice, which is precisely the
+   ambiguity `plan-mutation-anchors.py` rejects.)*
 
    **Required, not defensive** (fact 3). On the ordinary walked-away path the
    unwind emits one extra frame; without the guard that iteration reaches
@@ -593,15 +640,18 @@ gated whole-file form is Task 4's block.
       > would false-PASS the `break`→`return` mutant, which is the single most
       > important mutant in this plan.
 
-- [ ] **3.2** Write the changes.
+- [ ] **3.2** Write the changes. **Every flow in Tasks 3–5's tests goes through
+      `boundedFlow`** — an unwrapped flow is what lets the hoist-`wiping` mutant
+      spin forever, because the discard guard means `runSession`'s tick counter
+      never advances and `maxRunFrames` cannot see it.
 - [ ] **3.3** **Mutation checks, and these are the ones that matter.** Each
       names a literal token so Task 7's runner can apply it mechanically:
 
       | file | anchor (unique) | → replace with | must be killed by |
       | --- | --- | --- | --- |
-      | `run_flow.go` | the `break` on the line after `ctx.Done = true` **inside** `if wipeNowHook != nil && wipeNowHook() {` | `return` | the restart test — `"SESSION 2"` never drawn. **Anchor on the enclosing `if`**: a bare `break` matches 5 sites, one of them the `pl.NextChunk()` chunk walk |
-      | `run_flow.go` | the three lines `if wiping {` / `continue` / `}` at the head of `for content := range it {` | *delete all three* | a flow that `Frame`s after `Done` (fact 3's two screens) — the wipe becomes a GUI exit, so `"SESSION 2"` never drawn |
-      | `run_flow.go` | the three lines `if !wiping {` / `return` / `}` at the session-loop tail | `return` unconditionally | the restart test |
+      | `run_flow.go` | `break // unwind, never exit` | `return` | the restart test — `"SESSION 2"` never drawn. The trailing comment makes this line unique: bare `break` matches 5 sites in this file, one of them the `pl.NextChunk()` chunk walk, where substituting silently truncates every frame |
+      | `run_flow.go` | `if wiping {` | delete the whole 3-line statement | a flow that `Frame`s after `Done` (fact 3's two screens) — the wipe becomes a GUI exit, so `"SESSION 2"` never drawn |
+      | `run_flow.go` | `if !wiping {` | `if false {` | the restart test |
       | `run_flow.go` | `			wiping := false` | hoist above `for {` | the **two-wipe** test — and note this one is caught by `boundedFlow`, not by `maxRunFrames`: the discard guard skips the inner loop, so `yield()` is never called and ticks never increment |
 
 - [ ] **3.4** `go test ./gui/`, TinyGo device build, `gofmt`, commit.
@@ -764,8 +814,9 @@ func runWithFlow(pl Platform, version string, flow func(ctx *Context, version st
 		for {
 			ctx := NewContext(pl)
 			a.idle.start = time.Now()
-			// active must be reset too: it gates Router.Events, so a session
-			// that inherited it would silently eat its first tap.
+			// active is reset too. It gates Router.Events, so a session
+			// inheriting it eats that first TICK's events -- one tick, not the
+			// whole session, since the line below recomputes it immediately.
 			a.idle.active = false
 			a.armed = false
 			wiping := false
@@ -878,7 +929,7 @@ func runWithFlow(pl Platform, version string, flow func(ctx *Context, version st
 					if wipeNowHook != nil && wipeNowHook() {
 						wiping = true
 						ctx.Done = true
-						break
+						break // unwind, never exit
 					}
 					idleWakeup := a.idle.start.Add(idleTimeout)
 					idle := now.Sub(idleWakeup) >= 0
@@ -893,7 +944,7 @@ func runWithFlow(pl Platform, version string, flow func(ctx *Context, version st
 						// the screen the saver would otherwise have had, which
 						// is why this is one branch and not a gate on the
 						// saver: they can never both run.
-						if armed {
+						if armed { // §10.2.4's window: warn, then wipe
 							wipeAt := idleWakeup.Add(wipeWarningDelay)
 							if now.Sub(wipeAt) >= 0 {
 								wiping = true
@@ -932,7 +983,7 @@ func runWithFlow(pl Platform, version string, flow func(ctx *Context, version st
 			// earlier draft got it backwards. Context.Frame runs c.B.Reset()
 			// AFTER the callback (gui/gui.go:75), and the wipe path uses
 			// `break`, so the range body completes, yield returns true, the
-			// callback returns, and clear(b.refs) (gui/op/op.go:374) runs on
+			// callback returns, and clear(b.refs) (gui/op/op.go:376) runs on
 			// the last frame drawn -- then again after every discard-guarded
 			// Frame during the unwind. The abandoned Context's buffer is
 			// already zeroed by the time control reaches this line.
@@ -1007,8 +1058,8 @@ than re-derive them:
       | `run_flow.go` | `armed := ctx.wipe.armed()` | `armed := true` | the not-armed test — a wipe on the public plate list |
       | `run_flow.go` | `armed := ctx.wipe.armed()` | `armed := false` | the wipe test |
       | `run_flow.go` | `a.idle.start = now // row 2: fresh window at cut end` | *delete the line* | the post-cut test — **instant wipe with NO warning**: the clock is ~21 min stale, so `now ≥ wipeAt` already holds and the warning branch is skipped entirely. The trailing comment exists to make this line a UNIQUE anchor — the bare statement occurs twice, and `scripts/plan-mutation-anchors.py` fails the plan if it does |
-      | `run_flow.go` | `						if armed {` (inside `if a.idle.active {`) | `if false {` | the warning test — the saver draws instead of the warning |
-      | `run_flow.go` | `const wipeWarningDelay = 30 * time.Second` (in `wipe_warning.go`) | `= 0` | the warning-visible test |
+      | `run_flow.go` | `if armed { // §10.2.4's window: warn, then wipe` | `if false {` | the warning test — the saver draws instead of the warning. The trailing comment disambiguates it from the armed-edge `if armed {` |
+      | `wipe_warning.go` | `const wipeWarningDelay = 30 * time.Second` | `= 0` | the warning-visible test |
       | `wipe_warning.go` | `	if secs < 0 {` | `if false {` | a **direct unit call** of `wipeWarningOp` with a negative `remaining` — unreachable from `Run`, since `wipeAt.Sub(now)` is only evaluated after `now.Sub(wipeAt) >= 0` is ruled out |
       | `run_flow.go` | `							a.warnBuf.Reset()` | *delete the line* | the buffer test — `warnBufHook` sees `args` growing across warning ticks |
       | `run_flow.go` | `draw(wipeWarningOp(&a.warnBuf, ctx.Styles, &descriptorTheme,` | `&ctx.B` in place of `&a.warnBuf` | the same buffer test — `warnBufHook` reports `a.warnBuf` still `(0, 0)`. **This is A-C1 restored**, so it is the row that matters most |
@@ -1118,6 +1169,18 @@ import "seedhammer.com/bip39"
 var unlockMnemonicParsedHook func(bip39.Mnemonic)
 ```
 
+- [ ] **6.0** Add the call site — `gui/unlock_session.go`, immediately after
+      `defer clear(m)` at `:250`:
+
+      ```
+      	if unlockMnemonicParsedHook != nil {
+      		unlockMnemonicParsedHook(m)
+      	}
+      ```
+
+      It must come **after** the defer is registered, so the hook hands the test
+      the same backing array the defer will zero. Without this step the seam file
+      compiles and does nothing, which is how the original F-87 remedy failed.
 - [ ] **6.1** Tests first, one per early return (`:257` `!ss.Confirm`, `:266`
       `masterFingerprintFor` err, `:272` `engraveSeed` err). Each captures `m`
       via `unlockMnemonicParsedHook`, drives that return, and asserts every word
@@ -1164,7 +1227,12 @@ judgement call:
 - **SPEC §11.3's one B2b row** — *"idle timer runs during engraving"*, deferred
   to this phase by B2a-ii's Task 8 because no timer existed then. It is Task
   2.3's `engraveRunning, engraveStopping` row.
-- **Every anchored row in Tasks 2.3, 3.3, 4.3, 5.2–5.3 and 6.2** of this plan.
+- **Every anchored row in Tasks 2.3, 3.3, 4.3 and 6.2** of this plan. Task 5's
+  mutants live in 4.3's table (they target `run_flow.go`), and **step 5.2 is
+  deliberately NOT a row**: "swap the read past `ctx.Reset()`" is a statement
+  *reordering*, not a substitution, so no anchor can express it. It stays a
+  hand-run ordering check, and saying so is the point — an unrunnable row in the
+  table would read as a clean run.
 
 - [ ] **7.1** Write the runner with the row table as data. Re-run every row
       above through it. Print, in the runner's own output, what it does **not**
@@ -1209,10 +1277,18 @@ Both gates apply and **both MUST be run before dispatch and after every fold.**
   Expected failures: symbols this plan creates (`wipeGuard`, `wipeWarningOp`,
   `runWithFlow`, `RecordsResident`).
 - `scripts/plan-mutation-anchors.py` proves **every mutation-table anchor matches
-  exactly once** — 16 unique, 0 duplicate, 0 prose. Committed as a script rather
+  exactly once, in the file its row names** — 15 unique, 0 bad, 2 unresolved
+  (fork-file anchors that cannot resolve until Task 6 adds the call site).
+  **Version 1 of this script had the exact false-PASS it exists to prevent** —
+  it graded the longest backticked span, which for one row was a parenthetical
+  *context* note rather than the anchor, and reported `ok` for a token matching
+  twice; and it searched every fence concatenated, so it never compared an
+  anchor against the file its row named. Both are fixed, and the rule is now
+  structural: **the anchor cell must hold exactly one code span**, context goes
+  in the "killed by" column. Committed as a script rather
   than left as discipline, because the claim "each row names a unique anchor"
-  had already been made and was already false: `break` matches **6** sites in
-  this plan's own blocks, one of them the `pl.NextChunk()` chunk walk where
+  had already been made and was already false: `break` matches **5** sites in
+  `run_flow.go` alone, one of them the `pl.NextChunk()` chunk walk where
   substituting `return` silently truncates every frame. The one anchor that
   could not be made unique by wording — `a.idle.start = now`, which occurs
   twice — was made unique **in the code**, with a trailing comment that exists
@@ -1240,7 +1316,7 @@ configuration — Run's body replaced by the one-line delegation, the `saver`
 import removed — and type-checked that:**
 
 ```
-$ # fork copy + the plan's 5 whole files
+$ # fork copy + the plan's 6 whole files
 $ #   + Context.wipe, Context.keepAwake, KeepAwake(), Reset()'s clear
 $ #   + Run's body REPLACED by `return runWithFlow(pl, version, uiFlow, nil)`
 $ #   + the orphaned "seedhammer.com/gui/saver" import deleted
@@ -1248,15 +1324,14 @@ $ CGO_ENABLED=0 go build ./gui/ ./gui/op/   →  BUILD OK (shipped config)
 $ CGO_ENABLED=0 go vet  ./gui/ ./gui/op/    →  freetext_sizeproof_golden_test.go:111:13
                                                gui/op/draw_test.go:176:24
                                                (both: testing.ArtifactDir requires go1.26)
-$ gofmt -l <all five>                       →  empty
+$ gofmt -l <all six>                        →  empty
 ```
 
-Both vet lines are the recorded baseline. **So the plan's Go type-checks in the
-configuration that actually ships, not merely in the gate's additive one.**
-
-That vet line is the **pre-existing baseline** recorded in "The green criterion"
-above — byte-identical, and the only finding. **So every line of Go in this plan
-type-checks, including the moved `Run` body and the harness.**
+Both vet lines are the **pre-existing baseline** recorded in "The green
+criterion" above — byte-identical, and the only findings. **So every line of Go
+in this plan type-checks, including the moved `Run` body and the harness, in the
+configuration that actually ships rather than merely in the gate's additive
+one.**
 
 - **What remains a reviewer's execution pass:** the TIER-2 fragments (the
   `Context` fields and `KeepAwake`/`Reset`, `Run`'s one-line delegation, the
