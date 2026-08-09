@@ -991,6 +991,36 @@ Found by the B1 plan's R0 round 0 (finding 3), which is why B1 composes
 set rather than only from NFC. The data and the decode both already exist; this
 is plumbing, not new codec behaviour, so the Rust-primary rule does not bind it.
 
+### F-88 — three more seed-equivalent copies on the mnemonic engrave path, two of them unreachable from `gui` (owning phase: B2b)
+
+Found by the I1/M1 fold re-review (D1), after two earlier attempts at this
+inventory were both incomplete.
+
+| copy | where | why it is not fixed here |
+| --- | --- | --- |
+| `sentence []byte` — **the plaintext mnemonic** | `bip39/bip39.go:218-224`, inside `MnemonicSeed` | a local of another package; `gui` cannot reach it. Also orphans `append` reallocations. |
+| the `[]byte` behind `string(seedqr.QR(m))`, and `qr.Code.Bitmap` | `gui/gui.go`'s `engraveSeed` → `kortschak/qr` | the bitmap is a third-party struct field |
+| `engraveSeed`'s `words []string` | `gui/gui.go:516-538` | `clear(words)` is free and in-package — see below |
+
+**The third one carries a correction worth keeping.** An earlier caveat listed
+`words []string` as unwipeable "immutable Go strings". The *strings* are not the
+secret: `bip39.LabelFor` returns substrings of the **public** wordlist. What is
+secret is their **selection and order**, and `clear(words)` destroys that at no
+cost. Reasoning from "it's a string, so it can't be wiped" got the conclusion
+right for the wrong reason, and the wrong reason is what stopped anyone fixing
+the one case that is fixable.
+
+**Owning phase B2b**, with F-87 — both are residency work needing the same
+scrutiny, and `MnemonicSeed`'s scrub is a `bip39` change that wants its own
+review because five other flows call it.
+
+**Not urgent, and the reason is on the record:** every one of these is resident
+only while a plate is being cut, and `plate.Spline` — which **is** the seed
+rendered as geometry — is resident then too and cannot be removed at all (F-83,
+accepted 2026-08-08). Scrubbing these shortens no window that F-83 does not
+already hold open. They are worth doing for the same reason the others were: the
+package's own convention scrubs what it can.
+
 ### F-87 — nothing pins `unlockEngraveMnemonic`'s deferred wipe (owning phase: B2b, with the §10.2.4 timer tests)
 
 Measured during the C1 fold re-review: **deleting `defer clear(m)` leaves the
