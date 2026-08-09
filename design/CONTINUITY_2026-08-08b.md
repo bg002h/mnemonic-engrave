@@ -14,7 +14,7 @@ Its §5 carry-forward and §6 how-to-work still stand except where corrected bel
 
 ```
 mnemonic-engrave  master  a320ba9+  NOT pushed -- 12+ commits ahead of origin
-seedhammer        main    421dca8   NOT pushed -- B2a-i MERGED
+seedhammer        main    a01b666   NOT pushed -- B2a-i AND B2a-ii MERGED
 ```
 
 **Nothing has been pushed this cycle, in either repo.** Push `master` via
@@ -27,7 +27,7 @@ satisfied.
 | Plan B Phase A — device headless core | shipped |
 | Plan B Phase B1 — the unsealed path with UI | shipped, hardware-verified |
 | **Plan B Phase B2a-i** — the headless substrate | **MERGED to `main` at `421dca8`** (unpushed) |
-| **Plan B Phase B2a-ii** — unlock + the secret session | GREEN plan; **implementation IN FLIGHT** |
+| **Plan B Phase B2a-ii** — unlock + the secret session | **MERGED at `a01b666`** (unpushed) |
 | Plan B Phase B2b — residency wipe + residue | not started |
 
 ## 2. THE B2a SPLIT — decided 2026-08-08
@@ -297,3 +297,62 @@ not a requirement.
 - Four declared deviations, none reviewed: commit sequencing of §5d's fragment;
   `click` rather than `press` in §6c (`Clickable.Next` needs press-then-release);
   §6d's plate-list row moved to Task 7; the mutation runner left uncommitted.
+
+
+---
+
+## 12. B2a-ii — MERGED 2026-08-09, and what its review cost and bought
+
+22 commits, 26 files, +5992/−140, merged at `a01b666`. Post-merge `main` green:
+the sanctioned two setup failures, everything else ok; vet, gofmt, `GOARCH=386`
+and `-race` clean; TinyGo **1310184 flash / 60584 ram** (+24520 over B2a-i —
+the first phase whose code the image actually reaches).
+
+**The review found two Criticals, and BOTH were in the plan as well as the code.**
+R0 had cleared that plan over three rounds.
+
+1. **A full copy of the seed lived through the whole cut.** `bip39.Parse`'s
+   `[]Word` was zeroed only on a `defer`, i.e. after `Engrave`. Neither
+   `p.Wipe()` nor `SecretsResident()` could reach a local, so §10.2.4's
+   predicate would have read *false* while the seed was live.
+2. **The KDF progress loop asked for its frame one frame too late.** `Run` reads
+   `ctx.Wakeup` *before* `Reset`, so a `WakeupAt` after `ctx.Frame` governs the
+   NEXT frame — and frame 1 inherited a three-minute idle deadline. The
+   derivation parked at 500/300,000 behind the screensaver: worse than the
+   blocking `pbkdf2.Key` it replaced, and it would have logged ~1,400 it/s into
+   §7.1's closing measurement instead of ~9,715. **An earlier reviewer had
+   explicitly cleared this ordering** — it reasoned about frames 2..N and missed
+   frame 1. Two reviewers disagreed; the source settled it.
+
+**The dominant class was not wrong code — it was tests that could not fail.**
+58 mutants applied, **20 survived**, including six wipe deletions (among them
+`defer clear(plaintext)`, the decrypted record container) and a cancelled unlock
+falling through to the plate list. All now pinned and mutation-checked.
+
+**What the completeness critic added that six lenses did not.** Asking *"what did
+nobody look at"* rather than *"is this correct"*: three changed files had **zero**
+mentions across ten prior reports, and two held Importants. It also measured and
+**retracted two of its own hypotheses**, and ran four modalities nobody had.
+
+**Method notes worth keeping.** Every lens wrote its own report to disk before
+returning — the first fan-out died at 1% usage and took five lenses' work with
+it. Every gating finding got a refute-by-default pass. Two findings were
+**declined after measurement** showed their premise false, and one recorded
+remedy (F-92's) was **corrected after the experiment showed it does not work**.
+
+## 13. WHAT IS OWED NEXT
+
+1. **Task 9 — the hardware pass. Operator-run, outstanding.** Closes §7.1's
+   in-situ RP2350B rate. Note the log line now reports derivation time separately
+   from wall time, which the parking defect would otherwise have corrupted.
+2. **B2b** — §10.2.4's residency wipe, and it inherits three constraints filed
+   during this review, all of which bite before a line of it is written:
+   **F-89** (the timer must UNWIND flows, not just call `p.Wipe()`, *and*
+   `SecretsResident()`'s contract is wrong on the `ms1` arm — the funds-relevant
+   half), **F-93** (the saver still parks a spec-legal derivation above
+   1,748,700 iterations, 13.2% of the legal range), **F-90** (the `ms1` arm is
+   the under-examined one and it is the DEFAULT arm — six of seven vectors).
+3. **Before the tag:** F-85 (§2.2 must name the during-engrave residency) and
+   F-92 (`tinygo test` — see its corrected entry; it is a `flake.nix` + `go:embed`
+   job, not a build-tag edit).
+4. **Push both repos via `ci/staging`.** Neither has been pushed this cycle.
