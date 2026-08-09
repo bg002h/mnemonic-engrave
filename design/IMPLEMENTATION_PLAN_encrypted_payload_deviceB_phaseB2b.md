@@ -1,13 +1,18 @@
 # Encrypted Payload Delivery — Plan B Phase B2b (§10.2.4's residency-keyed idle wipe) — Implementation Plan
 
-**Status: GREEN — R0 closed 2026-08-09 at round 3 (0C/0I). Implementation may begin.**
+**Status: 1 CRITICAL OPEN — GREEN REVOKED 2026-08-09.** Found by the Task 3
+implementer, not by any of the four review rounds:
+`ctx.Done = ctx.Done || !yield(o)` discards a `Done` set from inside the `yield`
+call, so **the wipe never persists**. Fixed in the gated block below; the fix is
+verified by execution but has not yet had an independent look. Tasks 1 and 2 are
+committed and unaffected. **Task 3 does not resume until this is reviewed.**
 
 | round | verdict | report |
 | --- | --- | --- |
 | 0 | **3C / 5I** — all folded | `agent-reports/…-R0-round0-design.md` (opus, 1C/2I), `…-R0-round0-test-adequacy.md` (sonnet, 2C/3I) |
 | 1 | **0C / 9I** — all folded | `…-R0-round1-fold-rereview.md` (opus, 0C/5I — the fold's own defects), `…-R0-round1-residue-sweep.md` (36-agent workflow, 0C/4I — Tasks 6–8, constraints, follow-up ownership) |
 | 2 | **0C / 3I** — all folded | `…-R0-round2-fold-rereview.md` (opus). Closed the two structural risks by tracing: the deleted tail `ctx.B.Reset()` is genuinely dead, and the removed armed-edge `a.idle.active = false` self-clears |
-| 3 | **0C / 0I — GREEN, loop CLOSED** | `…-R0-round3-fold-rereview.md` (opus). Executed the `flowBound` panic path in a reproduction rather than reasoning about it; type-checked the test package under go1.26. Its 5 Minors and 4 Nits were folded inline, not deferred. |
+| 3 | 0C / 0I — closed the loop, but **missed the Critical below** | `…-R0-round3-fold-rereview.md` (opus). Executed the `flowBound` panic path in a reproduction rather than reasoning about it; type-checked the test package under go1.26. Its 5 Minors and 4 Nits were folded inline, not deferred. |
 
 **Descends from:** `SPEC_encrypted_payload_delivery.md` §10.2.4, **as amended
 2026-08-09** (`0af8f97`). The amendment is a prerequisite, not a footnote: the
@@ -36,17 +41,31 @@ source at `a01b666` by the controller, not taken from a report.
    `cmd/controller/main.go:34`, is `for range gui.Run(p, ver) {}` followed by
    `return nil`. Setting `Done` today exits the GUI and the process. **Task 3 is
    what makes it non-terminal.**
-2. **`ctx.Done` has NEVER been true in production.** Its only writer is
+2. **`ctx.Done` has NEVER been true in production.** Its only writer today is
    `ctx.Done = ctx.Done || !yield(op)` (`gui/gui.go:2949`) inside `ctx.Frame`,
    set only when a consumer stops ranging — and neither `cmd/controller` nor
    `cmd/emu` ever stops. **B2b productionises a test-only path.** Operator
    decision 2026-08-09: accepted, with Task 8 exercising it on real hardware.
+
+   **That line cannot survive as written, and this is a CRITICAL the first
+   implementer found after four rounds passed it.** It reads `ctx.Done` *before*
+   calling `yield`, so the wipe's `ctx.Done = true` — set from inside that very
+   call — is discarded when the assignment writes back `staleFalse || !true`.
+   Measured. Task 1's version of `run_flow.go` therefore differs from `gui.go`
+   here, and it is the ONE line in the move that is not verbatim; the gated block
+   below carries the corrected form with the reasoning inline.
 3. **Two screens call `ctx.Frame` once more AFTER `Done` goes true**, by
    fall-through: `SeedScreen.Confirm` (`gui/gui.go:2460`) and
-   `EngraveScreen.Engrave` (`gui/gui.go:2758`). `ctx.Frame` calls `yield`, and
-   **calling `yield` after it has returned false is a range-over-func panic** —
-   a brick on a watchdog-less device. This is why the discard guard in Task 3 is
-   *required*, not defensive.
+   `EngraveScreen.Engrave` (`gui/gui.go:2758`).
+
+   **What that extra frame actually does — stated precisely, because an earlier
+   draft got it wrong.** It does NOT panic: `FrameCallback` returns early once
+   `Done` is true, so `yield` is never called after it returned false. (In the
+   old `||` form the short-circuit did the same job.) The hazard is different and
+   still real: without the discard guard the extra frame reaches
+   `if ctx.Done || !yield() { return }` in the inner loop and executes the
+   **`return`**, converting the wipe into a full GUI exit. The guard in Task 3 is
+   *required*; the reason is the exit, not a panic.
 4. **`Run` has zero test coverage**, and `testPlatform.AppendEvents` ignores its
    deadline, so neither `iter.Pull` nor `synctest` can drive its clock. **Task 1
    is a prerequisite, not a nicety** — every behaviour in Tasks 3–5 is otherwise
@@ -840,7 +859,27 @@ func runWithFlow(pl Platform, version string, flow func(ctx *Context, version st
 
 			it := func(yield func(op.Op) bool) {
 				ctx.FrameCallback = func(o op.Op) {
-					ctx.Done = ctx.Done || !yield(o)
+					// NOT `ctx.Done = ctx.Done || !yield(o)`, which is what
+					// gui.go:2949 has today and what Task 1 moved here
+					// verbatim. That form reads ctx.Done BEFORE calling
+					// yield, so a Done set from INSIDE the call -- exactly
+					// what the wipe does -- is discarded when the assignment
+					// writes back staleFalse || !true. Measured: the flag is
+					// false again by the time Frame returns, so the wipe
+					// never persists. Four review rounds read the line as
+					// "Done is sticky"; it is sticky against a later false,
+					// not against a mutation during the call.
+					//
+					// The early return preserves what the || was silently
+					// also doing: once Done is true, yield is never called
+					// again. An operand swap would fix the clobber and lose
+					// that.
+					if ctx.Done {
+						return
+					}
+					if !yield(o) {
+						ctx.Done = true
+					}
 				}
 				flow(ctx, versionText)
 			}
