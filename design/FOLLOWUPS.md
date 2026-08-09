@@ -991,6 +991,40 @@ Found by the B1 plan's R0 round 0 (finding 3), which is why B1 composes
 set rather than only from NFC. The data and the decode both already exist; this
 is plumbing, not new codec behaviour, so the Rust-primary rule does not bind it.
 
+### F-89 — B2b's idle wipe MUST unwind the flow, not just call `p.Wipe()` (owning phase: B2b — a DESIGN CONSTRAINT, not a defect)
+
+Found by lens 1 pass 3 (M3). Nothing is wrong today; this is a trap laid for the
+phase that has not been written yet, and it is the C1 Critical arriving through a
+different door.
+
+**The shape.** `unlockEngraveMnemonic` holds two copies of the seed: `rec`, which
+lives in `p.Secret[i].Record`, and `m`, which is a **local**. Both are cleared
+before `Engrave` — that is C1's fix. But the function also keeps `defer clear(m)`
+for its three early returns, and a defer only fires when the function **returns**.
+
+So if B2b's §10.2.4 timer fires while a secret flow is on screen and wipes **in
+place** — `p.Wipe()`, or `WipeSecretAt` over the set — then:
+
+```
+rec                 zeroed
+SecretsResident()   false        <- the timer believes it is done
+m                   STILL THE SEED
+```
+
+That is verbatim the state C1 described: a live seed that no wipe in the system
+can reach, with the residency predicate reporting clean. The timer would have
+*created* it rather than closed it.
+
+**The constraint, and it is one line to satisfy:** B2b's idle wipe must cause the
+flow to **unwind** — set `ctx.Done`, or otherwise make the secret flow return —
+so the deferred `clear(m)` runs. Calling `p.Wipe()` without unwinding is
+insufficient and *looks* sufficient, which is what makes it worth a follow-up
+rather than a comment.
+
+**Generalises past `m`:** any local copy in any flow has this property. The rule
+for B2b is that the timer's job is to make flows RETURN, and the wipe is what
+their defers then do — not the other way round.
+
 ### F-88 — three more seed-equivalent copies on the mnemonic engrave path, two of them unreachable from `gui` (owning phase: B2b)
 
 Found by the I1/M1 fold re-review (D1), after two earlier attempts at this
