@@ -1039,6 +1039,12 @@ import (
 // Mirrors unlockEngraveHook, the sanctioned in-file seam.
 var unlockSecretHook func(stage string, idx int, record []byte)
 
+// unlockMnemonicHook observes bip39.Parse's []Word copy at the moment the plate
+// is handed to Engrave. It exists because that copy is a LOCAL: no test could
+// reach it, which is how a live seed passed a green suite once already. nil in
+// production.
+var unlockMnemonicHook func(m bip39.Mnemonic)
+
 // unlockSecretLabel names a secret plate by its CLASSIFIED type and its index
 // among secrets -- never by anything the sealer asserted, and never by
 // rendering the record's contents.
@@ -1170,9 +1176,13 @@ func unlockEngraveMnemonic(ctx *Context, th *Colors, rec []byte) {
 		showError(ctx, th, unlockTitle, "This record is not a readable BIP-39 mnemonic.")
 		return
 	}
-	// bip39.Parse returns a SECOND copy of the secret as []Word. seal's copy is
-	// zeroed by the caller's defer; this one is this function's to zero, and
-	// clear() reaches []Word where wipeBytes ([]byte) does not compile.
+	// bip39.Parse returns a SECOND copy of the secret as []Word -- as complete and
+	// as wipeable as seal's. clear() reaches []Word where wipeBytes ([]byte) does
+	// not compile.
+	//
+	// This defer covers the EARLY RETURNS below, where no plate is ever built. It
+	// is NOT the wipe that matters: see clear(m) beside clear(rec) further down,
+	// and read the warning there before moving either.
 	defer clear(m)
 	// §6c FLIPS THIS to &SeedScreen{NoEdit: true}. It is written as the plain
 	// constructor here for one reason: NoEdit is added to SeedScreen by a
@@ -1203,8 +1213,27 @@ func unlockEngraveMnemonic(ctx *Context, th *Colors, rec []byte) {
 		return
 	}
 	// §10.2.2 — see unlockEngraveCodex32 for why this is before Engrave and not
-	// after. m is zeroed by this function's own defer; rec is seal's buffer.
+	// after. BOTH copies go here, and that is the whole point: rec is seal's
+	// []byte and m is bip39.Parse's independent []Word of the same seed.
+	//
+	// AN EARLIER DRAFT OF THIS PLAN ZEROED m ONLY ON THE DEFER ABOVE, AND THAT
+	// WAS A CRITICAL. A defer fires when the function RETURNS -- after Engrave --
+	// so a full copy of the seed stayed live for the whole ~21-minute cut and
+	// indefinitely on the paused or failed engrave screen: exactly the residency
+	// these two lines exist to remove, on exactly the abort-mid-plate path
+	// §10.2.2 calls the machine's most ordinary recovery. Nothing else could
+	// reach it -- p.Wipe() and §10.2.4's SecretsResident() both scan p.Secret,
+	// not this local -- so the B2b timer condition would read FALSE while the
+	// seed was live. Measured at Engrave entry: len=24, non-zero words=24.
+	//
+	// Three R0 rounds and a scoped review passed over it because every one of
+	// them was watching rec. clear is idempotent, so the defer's double-zero is
+	// free. Found by the B2a-ii whole-diff review, lens 1 C1.
 	clear(rec)
+	clear(m)
+	if unlockMnemonicHook != nil {
+		unlockMnemonicHook(m)
+	}
 	NewEngraveScreen(ctx, plate).Engrave(ctx, &engraveTheme)
 }
 ```

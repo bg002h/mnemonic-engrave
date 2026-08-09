@@ -991,6 +991,29 @@ Found by the B1 plan's R0 round 0 (finding 3), which is why B1 composes
 set rather than only from NFC. The data and the decode both already exist; this
 is plumbing, not new codec behaviour, so the Rust-primary rule does not bind it.
 
+### F-87 — nothing pins `unlockEngraveMnemonic`'s deferred wipe (owning phase: B2b, with the §10.2.4 timer tests)
+
+Measured during the C1 fold re-review: **deleting `defer clear(m)` leaves the
+whole `gui` package green.** No test drives the three early returns —
+Confirm-cancel, the fingerprint error, the `engraveSeed` error — to a point where
+the words are observable, so the defer is unpinned.
+
+**Why this is not urgent and not nothing.** The wipe that carries §10.2.2's
+weight is `clear(m)` beside `clear(rec)`, and that one IS pinned, five ways
+(`TestMnemonicWordsAreZeroWhenThePlateReachesEngrave` — reverting the whole fold
+leaves exactly that one test failing). The defer only covers paths where **no
+plate was ever built**, so the residency window it guards is the few hundred ms
+of a `showError` screen, not a ~21-minute cut.
+
+But the fold's own comment now *justifies keeping the defer*, and an unpinned
+justification is how a later "simplification" removes it — which is the exact
+shape of the Critical this whole thread began with.
+
+**What would close it:** drive each early return with `unlockMnemonicHook` set and
+assert the words are zero after the flow returns. Scheduled to B2b rather than
+now because B2b writes the residency-timer tests anyway, and they need the same
+observability.
+
 ### F-86 — `%` renders as zero pixels in the KDF progress screen (owning phase: with F-78's font cycle)
 
 `unlockDerive` (`gui/unlock_kdf.go`) formats its percentage as `"%d%%"` in
