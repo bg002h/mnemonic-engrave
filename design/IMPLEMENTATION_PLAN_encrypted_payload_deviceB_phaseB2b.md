@@ -1321,6 +1321,19 @@ judgement call:
   hand-run ordering check, and saying so is the point — an unrunnable row in the
   table would read as a clean run.
 
+- [ ] **7.0** **Run each row with `-run`, scoped to the test its own "killed by"
+      cell names, plus `-timeout 300s`** — then **one unfiltered
+      `go test ./gui/ ./gui/op/ ./seal/` at the end**, before the commit.
+
+      The suite is 50–70 s; 17 rows unfiltered is ~17 minutes of waiting for rows
+      that touch one or two tests each. Filtering costs nothing in signal — the
+      row already declares which test must go red. **But a filtered run cannot
+      see collateral damage**, so the final unfiltered run is not optional: it is
+      what proves the mutant broke only what it was supposed to.
+
+      **Never report a filtered count as a suite count.** They look identical in
+      the output and one has already been mis-quoted on this feature (14 stated,
+      25 actual).
 - [ ] **7.1** Write the runner with the row table as data. Re-run every row
       above through it. Print, in the runner's own output, what it does **not**
       cover — the shape `plan-build-gate-go.sh` uses.
