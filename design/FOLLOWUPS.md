@@ -1211,8 +1211,54 @@ linux/amd64**, whose allocator behaves differently from the one the caveat names
 `tinygo build` proves it compiles; it does not prove a byte is where the test
 says it is.
 
-Splitting the `FileReader` cases behind `//go:build !tinygo` makes the modality
-reachable. Owed before the tag, with F-85.
+**AMENDED 2026-08-09 — the fix recorded above is WRONG, measured end to end.**
+The build-tag split is necessary and not sufficient, and it was worth doing the
+experiment rather than the reasoning.
+
+Performed in a throwaway copy: moved the seven `FileReader` tests and
+`TestOpenFromAReader` behind `//go:build !tinygo`, keeping the two `clampRegion`
+tests untagged (they must stay reachable — `read.go`'s own comment says the bound
+lives untagged precisely so a host test can kill the unbounded-read mutant).
+Result: **host `go test ./seal/` still passes (12.1 s)**, so the split is safe —
+and `tinygo test` then fails one layer down, at LINK:
+
+```
+ld.lld: error: undefined symbol: golang.org/x/sys/cpu.cpuid
+ld.lld: error: undefined symbol: golang.org/x/sys/cpu.xgetbv
+```
+
+Those are **amd64 assembly stubs**, reached by a chain that has nothing to do
+with this feature (`go mod why`):
+
+```
+seedhammer.com/address → btcd/chaincfg/v2 → btcd/wire/v2
+                       → golang.org/x/crypto/sha3 → golang.org/x/sys/cpu
+```
+
+TinyGo defaults `tinygo test` to the **host** target, and on amd64 that package's
+CPU-feature detection is assembly TinyGo does not provide. **Note the device
+build is unaffected** — `-target pico-plus2` selects the ARM path and has always
+worked.
+
+**Two further obstacles, both measured, so nobody re-derives the easy answer:**
+
+1. `tinygo targets` does offer emulated targets (`cortex-m-qemu`, `riscv-qemu`)
+   which would dodge the amd64 assembly and be closer to the real part — but
+   **no qemu binary is on `PATH` in the dev shell**, so that route needs a
+   `flake.nix` change first.
+2. Even with an emulator, **three filesystem call sites** in `seal`'s tests read
+   `testdata/vectors.json` from disk. A bare-metal target has no filesystem, so
+   the normative fixtures would have to be `//go:embed`-ed.
+
+**So the realistic closure is narrower than "make the suite run under TinyGo".**
+It is a small TinyGo-buildable target that exercises the claims the caveat
+actually makes — `clear()` reaching the buffer it names, `passphraseBytes`' fixed
+capacity not regrowing, `bip39.Parse`'s `make(…, 0, 24)` — over **embedded**
+fixtures, run under `cortex-m-qemu`. That is a real piece of work with a
+`flake.nix` dependency, not a build-tag edit.
+
+Owed before the tag, with F-85. **Do the split anyway when this is taken up** —
+it is safe, it is a prerequisite, and it costs nothing.
 
 ### F-91 — CLOSED 2026-08-09 — the normative `vectors.json` digest is now asserted
 
