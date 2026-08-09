@@ -1050,7 +1050,17 @@ fixed half is not read as the whole.
 Option 1 is preferred and belongs with F-89, which already has to reconcile a
 residency timer with a saver that does not unwind.
 
-### F-94 — the 64-byte BIP-39 seed and the BIP-32 master key are unpinned, and the seam is cheap (owning phase: B2b, with F-87/F-88)
+### F-94 — the 64-byte BIP-39 seed and the BIP-32 master key are unpinned, and the seam is cheap (owning phase: **B2c**, with F-88; re-assigned from B2b 2026-08-09)
+
+> **Re-assigned B2b → B2c, 2026-08-09.** The B2b plan deferred this to "own
+> cycle", which is **not a later phase — it is no phase**, and
+> `/scratch/code/CLAUDE.md` forbids parking an item on nothing: "an item that
+> binds the current phase, or is scheduled *to* a phase, is not deferrable past
+> its owning phase." Found by the B2b residue sweep (I4). The work is real and
+> is not B2b-sized — F-88's only actionable copy is a `bip39.MnemonicSeed`
+> change that five other flows call and that wants its own review — so it gets a
+> **named successor phase** rather than a silent deferral or a silent scope
+> increase. **B2c is secret-residency cleanup: F-88, F-90 items 1 and 3, F-94.**
 
 Found by the B2a-ii whole-diff review, lens 2 M2 (mutants G28/G29/G30).
 
@@ -1209,7 +1219,18 @@ because every reviewer read it as authoritative.
 Fix is to re-resolve both against the current source and correct or drop them.
 Bundle with F-85's §2.2 amendment so the GREEN spec is opened once, not twice.
 
-### F-99 — §10.2.4 row 1 does not fix WHEN the warning starts, so the hardware pass could ratify an unstated choice (owning phase: B2b Task 8 — blocking, needs operator sign-off BEFORE the hardware run)
+### F-99 — CLOSED 2026-08-09 — §10.2.4 row 1 did not fix WHEN the warning starts
+
+**Closed by `7c3a625`**, operator-approved: §10.2.4 now states that the 30 s is
+**additive** — the warning appears at 3:00 and the wipe fires at 3:30 — and names
+the rejected alternative (warn@2:30/wipe@3:00) so it is not silently re-opened.
+The same commit fixed a markdown defect the 2026-08-09 amendment had introduced:
+the table's third row ("no secret record resident → none") had been orphaned
+below the amendment paragraph, outside the table it belongs to.
+
+B2b Task 8 is unblocked. Original entry follows.
+
+### F-99 (original) — §10.2.4 row 1 does not fix WHEN the warning starts (owning phase: B2b Task 8 — blocking, needed operator sign-off BEFORE the hardware run)
 
 Found by the B2b R0 design lens (opus, round 0). §10.2.4 row 1 reads
 "**3 min**, 30 s warning", which is genuinely ambiguous between:
@@ -1233,6 +1254,38 @@ be folded by the plan author** — it is a normative change to a GREEN spec and
 needs the operator's sign-off, like the 2026-08-09 amendment it sits beside.
 Bundle with F-85 and F-98 only if that happens before Task 8; otherwise it goes
 first, alone, because Task 8 is gated on it.
+
+### F-100 — SPEC §11.5's "confirm firmware reflash preserves the blob" has never been run and is owned by nobody (owning phase: before the release tag, with F-85/F-92/F-98)
+
+Found by the B2b residue sweep, which asked the completeness question "what is
+required before a tag, is named somewhere in the corpus, and appears in NEITHER
+the plan's task list NOR its explicit 'does NOT cover' list" — silence being the
+defect, because an item in neither list has no owner.
+
+SPEC §11.5 requires confirming that **reflashing the firmware preserves the
+payload blob**. Nothing has run it:
+
+- `HARDWARE_RESULT_2026-08-07_phaseB1.md` covered exactly four things — write and
+  read-back at the normative address, §10.1 negative, §10.1 positive + §6.6, and
+  present→absent. Reflash-preservation is not among them. Its closest statement
+  is the **converse**: "Only the 64 KB payload region was cleared; B1's firmware
+  was untouched."
+- B2a-ii's Task 9 does not cover it either — 9.1–9.2 load the payload *after* the
+  firmware.
+- `grep -rn "11\.5\|reflash preserves" design/` finds no plan step and no
+  follow-up.
+
+It matters because the blob's whole value proposition is that it outlives a
+firmware update; if it does not, the feature's storage model is wrong in a way
+no host-side test can reach.
+
+**Secondary, same section:** §11.5 also specifies booting on **PD power**, which
+neither B2b Task 8 nor B2a-ii Task 9 names. `cmd/controller/platform_sh2.go`
+sets `minVoltage = 20_000` and calls `monitorPowerSupply` before display init,
+so a non-PD supply is a different boot path.
+
+Recorded in the B2b plan's "release tag's precondition set", which is now the
+single place that list lives.
 
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
@@ -1326,7 +1379,17 @@ alone and catches nothing about `passphrase`, `iterations`, `public`, `secret`,
 leans on. One test asserting the file digest closes it. *(Measured today: the
 file still matches.)*
 
-### F-90 — the `ms1` engrave arm is the under-examined one, and it is the DEFAULT arm (owning phase: B2b)
+### F-90 — the `ms1` engrave arm is the under-examined one, and it is the DEFAULT arm (owning phase: **B2c** for items 1 and 3, re-assigned from B2b 2026-08-09; item 2 DISSOLVED by B2b)
+
+> **Re-assigned B2b → B2c, 2026-08-09.** The B2b plan deferred this to "own
+> cycle", which is **not a later phase — it is no phase**, and
+> `/scratch/code/CLAUDE.md` forbids parking an item on nothing: "an item that
+> binds the current phase, or is scheduled *to* a phase, is not deferrable past
+> its owning phase." Found by the B2b residue sweep (I4). The work is real and
+> is not B2b-sized — F-88's only actionable copy is a `bip39.MnemonicSeed`
+> change that five other flows call and that wants its own review — so it gets a
+> **named successor phase** rather than a silent deferral or a silent scope
+> increase. **B2c is secret-residency cleanup: F-88, F-90 items 1 and 3, F-94.**
 
 The completeness critic's headline, and it is a distribution-of-attention
 finding rather than a defect.
@@ -1408,7 +1471,17 @@ of seven vectors take. **Fix the predicate's contract before building the timer
 on it**, or B2b inherits a control that is correct only for the arm one vector
 reaches.
 
-### F-88 — three more seed-equivalent copies on the mnemonic engrave path, two of them unreachable from `gui` (owning phase: B2b)
+### F-88 — three more seed-equivalent copies on the mnemonic engrave path, two of them unreachable from `gui` (owning phase: **B2c**, re-assigned from B2b 2026-08-09)
+
+> **Re-assigned B2b → B2c, 2026-08-09.** The B2b plan deferred this to "own
+> cycle", which is **not a later phase — it is no phase**, and
+> `/scratch/code/CLAUDE.md` forbids parking an item on nothing: "an item that
+> binds the current phase, or is scheduled *to* a phase, is not deferrable past
+> its owning phase." Found by the B2b residue sweep (I4). The work is real and
+> is not B2b-sized — F-88's only actionable copy is a `bip39.MnemonicSeed`
+> change that five other flows call and that wants its own review — so it gets a
+> **named successor phase** rather than a silent deferral or a silent scope
+> increase. **B2c is secret-residency cleanup: F-88, F-90 items 1 and 3, F-94.**
 
 Found by the I1/M1 fold re-review (D1), after two earlier attempts at this
 inventory were both incomplete.

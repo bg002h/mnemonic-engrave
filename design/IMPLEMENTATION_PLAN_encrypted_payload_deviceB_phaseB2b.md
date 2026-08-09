@@ -5,7 +5,8 @@
 | round | verdict | report |
 | --- | --- | --- |
 | 0 | **3C / 5I** — all folded | `agent-reports/…-R0-round0-design.md` (opus, 1C/2I), `…-R0-round0-test-adequacy.md` (sonnet, 2C/3I) |
-| 1 | pending re-review of the fold | — |
+| 1 | **0C / 9I** — all folded | `…-R0-round1-fold-rereview.md` (opus, 0C/5I — the fold's own defects), `…-R0-round1-residue-sweep.md` (36-agent workflow, 0C/4I — Tasks 6–8, constraints, follow-up ownership) |
+| 2 | pending | — |
 
 **Descends from:** `SPEC_encrypted_payload_delivery.md` §10.2.4, **as amended
 2026-08-09** (`0af8f97`). The amendment is a prerequisite, not a footnote: the
@@ -19,8 +20,8 @@ in "Facts this plan is built on" and were independently verified by the
 controller before authoring.
 
 **Predecessor:** B2a-ii, merged at `a01b666`. **This phase makes the feature
-operator-complete.** Only after it, plus Task 9's hardware pass and F-85, is a
-release tag defensible.
+operator-complete.** It is *not* the last thing before a tag — see "The release
+tag's precondition set" at the end, which is the single place that list lives.
 
 ---
 
@@ -73,9 +74,18 @@ exactly as it does today.
 | `RecordsResident` rename + **F-87**'s pins | ✅ Task 6 | — |
 | §11.3 mutation rows + **F-96**'s runner | ✅ Task 7 | — |
 | hardware (fact 2's first real firing) | ✅ Task 8 | — |
-| **F-88, F-94** further seed copies | — | own cycle |
-| **F-90** items 1 and 3 (`ms1` inventory, hook) | — | own cycle |
+| **F-88, F-94** further seed copies | — | **B2c** |
+| **F-90** items 1 and 3 (`ms1` inventory, hook) | — | **B2c** |
 | **F-76**, F-80's residue | — | after B2b |
+
+> **"B2c" is a NAMED successor phase, not a synonym for later.** These three
+> were recorded in `FOLLOWUPS.md` as owned by **B2b**, and an earlier draft of
+> this table deferred them to "own cycle" — which is not a later phase, it is no
+> phase, and `/scratch/code/CLAUDE.md` forbids parking an item on nothing. The
+> work is real and is not B2b-sized (F-88's only actionable copy is a
+> `bip39.MnemonicSeed` change five other flows call, wanting its own review), so
+> the three entries were **re-assigned to B2c — secret-residency cleanup — on
+> 2026-08-09**, and say so. Silence was the defect; a named owner is the fix.
 
 **F-90 item 2 is DISSOLVED, not deferred.** The timer keys on the session
 bracket's lifetime, never on `SecretsResident()`, so the predicate's wrong
@@ -102,9 +112,19 @@ Carried forward unchanged from B2a-ii; the load-bearing ones:
 | `CGO_ENABLED=0 go test ./...` | **exit 1**, exactly TWO `[setup failed]`: `cmd/kdfbench`, `cmd/sealread`. A third is a regression. |
 | `go vet ./seal/ ./bip39/` | clean |
 | `go vet ./gui/` | **exit 1**, only `gui/freetext_sizeproof_golden_test.go:111:13: testing.ArtifactDir requires go1.26 or later` |
+| `go vet ./gui/op/` | **exit 1**, only `gui/op/draw_test.go:176:24: testing.ArtifactDir requires go1.26 or later` — new row, because Task 1 adds `gui/op/buffer_len.go` |
 | `gofmt -l <touched>` | empty |
-| TinyGo device build | baseline **1310184 flash / 60584 ram** — report the new numbers |
-| `GOARCH=386 go test ./seal/ ./bip39/` | green |
+| TinyGo device build — the exact command: `nix develop --command tinygo build -o /dev/null -target=pico2-w -size=short ./cmd/controller` | baseline **1310184 flash / 60584 ram** — report the new numbers |
+| `CGO_ENABLED=0 GOARCH=386 go test ./seal/ ./bip39/` | green, **~52 s** (not a hang) |
+
+> **`CGO_ENABLED=0` on the 386 row is load-bearing, not decoration.** Without it
+> the row is **RED at the baseline** — `# runtime/cgo … gnu/stubs-32.h: No such
+> file or directory`, `FAIL seedhammer.com/seal [build failed]` — because a
+> 32-bit cgo toolchain is not installed. It was dropped in transcription from
+> `agent-reports/…-phaseB2a-ii-lens8-completeness.md:241`. A definition of
+> "done" with a permanently red row teaches the implementer that red is
+> expected, which is how a genuine `seal` regression on the **firmware's own
+> word size** gets waved through. Measured both ways before this row was fixed.
 
 ### B2b-specific
 
@@ -154,9 +174,10 @@ riskiest code this phase touches. So Task 1 moves the body:
 `uiFlow` already has the shape `func(*Context, string)`, so it is passed as-is.
 `onDraw` is `nil` in production and never called there.
 
-**The file's FINAL form — after Tasks 3 and 4 — is given in full in Task 4, and
-that is the copy the build gate type-checks.** Task 1's version is that file
-minus the session loop, the discard guard, and the whole `a.wipe` block: a pure
+**The file's FINAL form — after Tasks 3, 4 and 5 — is given in full in Task 4,
+and that is the copy the build gate type-checks.** Task 1's version is that file
+minus the session loop, the discard guard, `wipeNowHook`, the whole `a.armed` /
+warning / wipe block, the `ctx.keepAwake` term and `warnBufHook`: a pure
 move. Reviewers should read Task 4's block as the destination and Task 1 as
 `git diff -M`.
 
@@ -197,6 +218,10 @@ type deadlinePlatform struct {
 	// tickFloor is the minimum fake time one AppendEvents costs. See the
 	// method's comment: without it a derivation freezes the bubble clock.
 	tickFloor time.Duration
+	// dirties counts Dirty calls; onDirty observes them. Together they are the
+	// screensaver's only visibility, and the only un-park seam.
+	dirties int
+	onDirty func(n int)
 }
 
 func newDeadlinePlatform() *deadlinePlatform {
@@ -238,6 +263,19 @@ func (p *deadlinePlatform) AppendEvents(deadline time.Time, evts []Event) []Even
 	return evts
 }
 
+// Dirty counts refreshes and is the ONLY way a test can see the screensaver.
+// saver.State.Draw writes straight to the platform (gui/saver/saver.go:311
+// calls screen.Dirty) and never reaches onDraw, so without this, step 1.3's
+// "must observe Run's saver activate" has nothing to observe. onDirty is also
+// the only same-goroutine seam that can UN-park a parked flow.
+func (p *deadlinePlatform) Dirty(r image.Rectangle) error {
+	p.dirties++
+	if p.onDirty != nil {
+		p.onDirty(p.dirties)
+	}
+	return p.testPlatform.Dirty(r)
+}
+
 // tap queues one physical touch -- press AND release, the pair every existing
 // touch test sends (gui/start_screen_touch_test.go:49).
 func (p *deadlinePlatform) tap() {
@@ -267,9 +305,15 @@ const maxRunFrames = 100000
 // the test goroutine, and the parked flow cannot tap for itself, so
 // "tap during the warning" must call p.tap() from inside the observer. Doing it
 // from another goroutine is a data race.
-func runSession(t *testing.T, p *deadlinePlatform, flow func(ctx *Context, version string), onDraw func(o op.Op, text string)) []string {
+// It returns parked=true instead of failing, because PARKING IS SOMETIMES THE
+// EXPECTED RESULT: the unarmed screensaver legitimately parks the flow forever
+// (the saver branch continues without returning control), and two of this
+// plan's own tests -- step 1.3's saver self-check and step 4.1's "not armed" --
+// exist precisely to observe that. A harness that always t.Fatal'd on a park
+// would fail them unconditionally. Callers that require completion use
+// mustFinish.
+func runSession(t *testing.T, p *deadlinePlatform, flow func(ctx *Context, version string), onDraw func(o op.Op, text string)) (drawn []string, parked bool) {
 	t.Helper()
-	var drawn []string
 	r := image.Rectangle{Max: sh2DisplaySize}
 	observe := func(o op.Op) {
 		d := new(op.Drawer)
@@ -286,10 +330,18 @@ func runSession(t *testing.T, p *deadlinePlatform, flow func(ctx *Context, versi
 			// Stop ranging: yield returns false, Run sets ctx.Done, the flow
 			// unwinds. Never t.Fatal from in here -- that would Goexit through
 			// a live iterator.
+			parked = true
 			break
 		}
 	}
-	if ticks > maxRunFrames {
+	return drawn, parked
+}
+
+// mustFinish is runSession for the common case, where a park is a failure.
+func mustFinish(t *testing.T, p *deadlinePlatform, flow func(ctx *Context, version string), onDraw func(o op.Op, text string)) []string {
+	t.Helper()
+	drawn, parked := runSession(t, p, flow, onDraw)
+	if parked {
 		last := ""
 		if len(drawn) > 0 {
 			last = drawn[len(drawn)-1]
@@ -298,6 +350,31 @@ func runSession(t *testing.T, p *deadlinePlatform, flow func(ctx *Context, versi
 			"(screensaver?). %d frames drawn, last = %q", maxRunFrames, len(drawn), last)
 	}
 	return drawn
+}
+
+// boundedFlow wraps a test flow so it cannot spin forever.
+//
+// maxRunFrames alone is NOT enough, and the gap is specific: ticks are counted
+// in runSession's range body, which is driven by yield() at the top of Run's
+// INNER loop -- but the discard guard (`if wiping { continue }`) is the first
+// statement of the range body and skips that loop entirely. A mutant that
+// leaves `wiping` stuck true therefore burns CPU with ZERO ticks and zero fake
+// time, and the cap never trips. The flow is the thing spinning, so bounding
+// the flow is the only cap that survives the guard.
+func boundedFlow(t *testing.T, body func(ctx *Context) bool) func(*Context, string) {
+	t.Helper()
+	return func(ctx *Context, _ string) {
+		for n := 0; !ctx.Done; n++ {
+			if n > maxRunFrames {
+				t.Errorf("test flow exceeded %d iterations without ctx.Done -- "+
+					"Run is discarding every frame (wiping stuck true?)", maxRunFrames)
+				return
+			}
+			if !body(ctx) {
+				return
+			}
+		}
+	}
 }
 
 // drawnContains reports whether any drawn frame carried str, with uiContains'
@@ -323,8 +400,14 @@ func assertDrawn(t *testing.T, drawn []string, str string) {
 
 **Steps:**
 
-- [ ] **1.1** Do the move (1a). `go test ./gui/` must be **unchanged** — a pure
-      move that changes a test result is not a pure move.
+- [ ] **1.1** Do the move (1a). **Also delete the now-orphaned
+      `"seedhammer.com/gui/saver"` import from `gui/gui.go`** — `saver` is
+      referenced only at `gui/gui.go:2942` and `:3004`, both inside `Run`'s
+      body, so moving that body out leaves the import unused and **package `gui`
+      does not compile**. It is the one line that makes this "pure move" not
+      purely a move, and no gate can catch it (see the blind-spot note below).
+      Then `go test ./gui/` must be **unchanged** — a pure move that changes a
+      test result is not a pure move.
 - [ ] **1.2** Write the harness. Smoke test: a flow that returns immediately
       terminates `runSession`; a flow that loops `for !ctx.Done` drawing a label
       per tick produces frames whose text `assertDrawn` finds.
@@ -429,9 +512,12 @@ Still in `gui/unlock_session.go`, both engrave arms register the job around
       return value.**
 - [ ] **2.2** Write the file and fragments. Nothing reads `armed()` yet, so the
       suite must be otherwise unchanged.
-- [ ] **2.3** Mutation check: delete the `defer func() { ctx.wipe = nil }()` and
-      confirm a test fails — **a bracket that fails to uninstall leaves the timer
-      armed during the public plate list**, which is operator-hostile.
+- [ ] **2.3** **Mutation checks:**
+
+      | file | anchor (unique) | → replace with | must be killed by |
+      | --- | --- | --- | --- |
+      | `unlock_session.go` | `defer func() { ctx.wipe = nil }()` | *delete the line* | 2.1 — a bracket that fails to uninstall leaves the timer **armed during the public plate list**, which is operator-hostile |
+      | `wipe_guard.go` | `		case engraveRunning, engraveStopping:` | `case engraveIdle:` | 2.1's "`armed()` is false while a job runs", and Task 4.1's post-cut test. **This is SPEC §11.3's row "idle timer runs during engraving"** — the one §11.3 row B2b owns, deferred to this phase by B2a-ii's Task 8 because no timer existed then. Task 4's `armed` hardcoded true/false does **not** substitute: under this mutant `armed()` still returns false when `ctx.wipe == nil`, so the not-armed test cannot discriminate it |
 - [ ] **2.4** `go test ./gui/`, `gofmt`, commit.
 
 ---
@@ -511,13 +597,12 @@ gated whole-file form is Task 4's block.
 - [ ] **3.3** **Mutation checks, and these are the ones that matter.** Each
       names a literal token so Task 7's runner can apply it mechanically:
 
-      | mutant | must be killed by |
-      | --- | --- |
-      | `break` → `return` at the wipe | the restart test — `"SESSION 2"` never drawn |
-      | delete `if wiping { continue }` | a flow that `Frame`s after `Done` (fact 3's two screens) — the wipe becomes a GUI exit, so `"SESSION 2"` never drawn |
-      | `if !wiping { return }` → `return` | the restart test |
-      | hoist `wiping := false` out of the session loop | the two-wipe test — session 2's guard is still set, so session 2 draws nothing and `"SESSION 3"` never appears |
-      | delete `ctx.B.Reset()` before looping | a test asserting the abandoned buffer's `refs` are zeroed |
+      | file | anchor (unique) | → replace with | must be killed by |
+      | --- | --- | --- | --- |
+      | `run_flow.go` | the `break` on the line after `ctx.Done = true` **inside** `if wipeNowHook != nil && wipeNowHook() {` | `return` | the restart test — `"SESSION 2"` never drawn. **Anchor on the enclosing `if`**: a bare `break` matches 5 sites, one of them the `pl.NextChunk()` chunk walk |
+      | `run_flow.go` | the three lines `if wiping {` / `continue` / `}` at the head of `for content := range it {` | *delete all three* | a flow that `Frame`s after `Done` (fact 3's two screens) — the wipe becomes a GUI exit, so `"SESSION 2"` never drawn |
+      | `run_flow.go` | the three lines `if !wiping {` / `return` / `}` at the session-loop tail | `return` unconditionally | the restart test |
+      | `run_flow.go` | `			wiping := false` | hoist above `for {` | the **two-wipe** test — and note this one is caught by `boundedFlow`, not by `maxRunFrames`: the discard guard skips the inner loop, so `yield()` is never called and ticks never increment |
 
 - [ ] **3.4** `go test ./gui/`, TinyGo device build, `gofmt`, commit.
 
@@ -544,6 +629,16 @@ import (
 // supplies the 3:00 as a VALUE via idleTimeout; this is the separate 30 s the
 // same row requires and which no existing constant carries.
 const wipeWarningDelay = 30 * time.Second
+
+// warnBufHook reports the warning buffer's size after each warning frame. Nil
+// in production.
+//
+// It exists because A-C1's three mutation rows are otherwise UNWRITABLE:
+// op.Buffer's args/refs are unexported with no accessor (gui/op/op.go:28), and
+// the buffer itself is a field of a closure-local struct in runWithFlow. Without
+// this, "the warning grew ctx.B unboundedly" -- the Critical this phase's most
+// expensive finding was about -- has no test that can fail.
+var warnBufHook func(args, refs int)
 
 // wipeWarningOp draws the warning: one op out, no state touched, so a test can
 // assert on its extracted text without driving Run's clock.
@@ -593,10 +688,32 @@ That block is therefore **extracted into a `draw(op.Op)` closure** and called fr
 both places. It is also the natural home for `onDraw` — which is why the harness
 sees the warning at all.
 
+### One accessor, in the `op` package
+
+`op.Buffer` is `{args []uint32; refs []any}` (`gui/op/op.go:28`) — both
+unexported, no accessor — so **nothing outside package `op` can observe its
+size**. That is what made A-C1's mutation rows unwritable. A method may live in
+any file of its package, so this goes in a new file rather than a fragment, and
+the gate type-checks it.
+
+Create `gui/op/buffer_len.go`:
+
+```go
+package op
+
+// Len reports the buffer's current fill. It exists so a test can assert that a
+// long-lived buffer is not growing across frames -- the defect class behind the
+// §10.2.4 warning's 228 KB accumulation, which was invisible to every other
+// seam because both fields are unexported.
+func (b *Buffer) Len() (args, refs int) {
+	return len(b.args), len(b.refs)
+}
+```
+
 ### The final form of the moved body — and what the gate type-checks
 
 Create `gui/run_flow.go` (Task 1 creates it as a pure move; this is its state
-after Tasks 3 and 4, and the copy `plan-build-gate-go.sh` type-checks):
+after Tasks 3, 4 and 5, and the copy `plan-build-gate-go.sh` type-checks):
 
 ```go
 package gui
@@ -732,13 +849,20 @@ func runWithFlow(pl Platform, version string, flow func(ctx *Context, version st
 						a.armed = armed
 						if armed {
 							// §10.2.4 row 2: a finished cut starts a FRESH
-							// window. Clearing `active` is not cosmetic -- it
-							// gates Router.Events below, so leaving it latched
-							// makes the plate-done screen look live while
-							// silently eating the operator's first tap, at the
-							// end of a 21-minute funds-critical cut.
+							// window. This ONE line is the whole fix: with the
+							// clock reset, `idle` recomputes false on this very
+							// tick and the block below clears a.idle.active by
+							// itself.
+							//
+							// Deliberately NOT also clearing a.idle.active
+							// here. It would only change the edge TICK, and
+							// changing it is worse: `d` still holds the frame
+							// drawn before the saver activated ~18 min ago, in
+							// a different EngraveScreen state, so routing a
+							// touch against it could hit the wrong widget.
+							// Swallowing the edge-tick touch is exactly today's
+							// screensaver-dismissal behaviour.
 							a.idle.start = now
-							a.idle.active = false
 						}
 					}
 					ctx.Reset()
@@ -779,6 +903,14 @@ func runWithFlow(pl Platform, version string, flow func(ctx *Context, version st
 							a.warnBuf.Reset()
 							draw(wipeWarningOp(&a.warnBuf, ctx.Styles, &descriptorTheme,
 								pl.DisplaySize(), wipeAt.Sub(now)))
+							// The only way a test can see WHICH buffer the
+							// warning went into, or that it is not growing:
+							// op.Buffer's fields are unexported and `a` is a
+							// closure local. Nil in production.
+							if warnBufHook != nil {
+								args, refs := a.warnBuf.Len()
+								warnBufHook(args, refs)
+							}
 							ctx.WakeupAt(now.Add(time.Second))
 							continue
 						}
@@ -796,31 +928,54 @@ func runWithFlow(pl Platform, version string, flow func(ctx *Context, version st
 			if !wiping {
 				return
 			}
-			// The ONLY scrubbing the abandoned Context gets: Buffer.Reset runs
-			// clear(b.refs) (gui/op/op.go:374) over the last frame drawn, which
-			// on the SeedScreen path is the twelve words.
-			ctx.B.Reset()
+			// NOTHING to scrub here, and that is worth stating because an
+			// earlier draft got it backwards. Context.Frame runs c.B.Reset()
+			// AFTER the callback (gui/gui.go:75), and the wipe path uses
+			// `break`, so the range body completes, yield returns true, the
+			// callback returns, and clear(b.refs) (gui/op/op.go:374) runs on
+			// the last frame drawn -- then again after every discard-guarded
+			// Frame during the unwind. The abandoned Context's buffer is
+			// already zeroed by the time control reaches this line.
 		}
 	}
 }
 ```
 
-**Fragment, `gui/gui.go`:** `Run`'s body becomes
-`return runWithFlow(pl, version, uiFlow, nil)`.
+**Fragments, `gui/gui.go`:** `Run`'s body becomes
+`return runWithFlow(pl, version, uiFlow, nil)`; the orphaned `saver` import goes
+(step 1.1); and **`Context` gains `wipe *wipeGuard` and `keepAwake bool`, a
+`KeepAwake()` setter, and a `keepAwake` clear in `Reset()`.**
 
-Three properties worth naming, because a reviewer should confirm them rather
+> **The `keepAwake` fragments land HERE, in Task 4, not in Task 5.** The gated
+> block above reads `ctx.keepAwake`, so a Task 4 that shipped without the field
+> would not compile and step 4.4 could never go green. Task 5 supplies the
+> *caller* (`unlockDerive`) and the tests; Task 4 supplies the field it reads.
+
+Four properties worth naming, because a reviewer should confirm them rather
 than re-derive them:
 
-- **`a.wipe.origin` has two sources** — `len(evts) > 0` (the same true
-  last-physical-input signal `a.idle.start` uses) and the `armed` false→true
-  edge. Dropping the second is the "instant wipe the moment a plate finishes"
-  defect.
-- **A tap during the warning cannot activate what is underneath.** The router
-  hit-tests against `d`, which the warning path has just redrawn, and the
-  warning op carries no tags — so the touch refreshes `origin` and nothing else.
-  That is the desired behaviour for a dismissal, not an accident.
-- **When `armed` is false the event loop is byte-identical to today**, including
-  the saver covering a running 21-minute cut.
+- **`a.idle.start` has THREE sources** — `len(evts) > 0` (true physical input),
+  the `armed` false→true edge, and `ctx.keepAwake && !armed`. Dropping the
+  second gives an **instant wipe with no warning at all** the moment a plate
+  finishes: the clock is ~21 min stale, so `now ≥ wipeAt` is already true and
+  the warning branch is never reached. Dropping the `&& !armed` lets a screen
+  postpone a §10.2.4 wipe indefinitely.
+- **A tap during the warning cannot activate what is underneath** — but not for
+  the reason it first appears. `if !a.idle.active { ctx.Router.Events(...) }`
+  skips routing entirely while the warning is up, so the touch refreshes
+  `a.idle.start` and nothing else. (The warning op also carries no tags, but
+  that is belt, not braces.)
+- **The armed edge resets the clock only, NOT `a.idle.active`.** Clearing
+  `active` there would route the edge tick's touch against a `d` last filled
+  before the saver activated ~18 min earlier, in a different `EngraveScreen`
+  state. Swallowing that one touch is exactly today's screensaver-dismissal
+  behaviour, and `a.idle.active` clears by itself on the same tick.
+- **When `armed` is false the event loop matches today, with ONE deliberate
+  exception:** `ctx.keepAwake` is a new third refresh source and `unlockDerive`
+  runs unarmed, so a derivation longer than `idleTimeout` no longer trips the
+  saver. That is F-93's entire point (Task 5) — it is a change, and it is
+  intended. Everything else, including the saver covering a running 21-minute
+  cut, is unchanged.
 
 **Steps:**
 
@@ -841,18 +996,23 @@ than re-derive them:
 - [ ] **4.2** Write the file and fragments.
 - [ ] **4.3** **Mutation checks:**
 
-      | mutant | must be killed by |
-      | --- | --- |
-      | `armed` hardcoded true | the not-armed test — a wipe on the public plate list |
-      | `armed` hardcoded false | the wipe test |
-      | delete `a.idle.start = now` from the armed edge | the post-cut test — instant warning at cut end |
-      | delete `a.idle.active = false` from the armed edge | the post-cut **tap** test — the plate-done screen looks live and eats the tap |
-      | delete `a.idle.active = false` at session head | the post-wipe tap test |
-      | delete the `if armed` inside the idle branch | the warning test — the saver draws instead of the warning |
-      | `wipeWarningDelay` → 0 | the warning-visible test |
-      | delete `secs < 0` clamp | a countdown test at a negative remaining |
-      | delete `a.warnBuf.Reset()` | a test asserting the buffer does not grow across warning ticks |
-      | `&a.warnBuf` → `&ctx.B` | the same buffer-growth test — this is C1 restored |
+      Every row is an **anchored triple** — the unique line to match, and what to
+      put in its place — because a bare token is not appliable: `break` occurs
+      5× in this plan's own blocks (one of them the `pl.NextChunk()` chunk walk,
+      where substituting silently truncates every frame), and
+      `if !wiping { return }` occurs 0× as written, being three lines.
+
+      | file | anchor (unique) | → replace with | must be killed by |
+      | --- | --- | --- | --- |
+      | `run_flow.go` | `armed := ctx.wipe.armed()` | `armed := true` | the not-armed test — a wipe on the public plate list |
+      | `run_flow.go` | `armed := ctx.wipe.armed()` | `armed := false` | the wipe test |
+      | `run_flow.go` | `							a.idle.start = now` (inside `if armed {`) | *delete the line* | the post-cut test — **instant wipe with NO warning**: the clock is ~21 min stale so `now ≥ wipeAt` already holds and the warning branch is skipped |
+      | `run_flow.go` | `						if armed {` (inside `if a.idle.active {`) | `if false {` | the warning test — the saver draws instead of the warning |
+      | `run_flow.go` | `const wipeWarningDelay = 30 * time.Second` (in `wipe_warning.go`) | `= 0` | the warning-visible test |
+      | `wipe_warning.go` | `	if secs < 0 {` | `if false {` | a **direct unit call** of `wipeWarningOp` with a negative `remaining` — unreachable from `Run`, since `wipeAt.Sub(now)` is only evaluated after `now.Sub(wipeAt) >= 0` is ruled out |
+      | `run_flow.go` | `							a.warnBuf.Reset()` | *delete the line* | the buffer test — `warnBufHook` sees `args` growing across warning ticks |
+      | `run_flow.go` | `draw(wipeWarningOp(&a.warnBuf, ctx.Styles, &descriptorTheme,` | `&ctx.B` in place of `&a.warnBuf` | the same buffer test — `warnBufHook` reports `a.warnBuf` still `(0, 0)`. **This is A-C1 restored**, so it is the row that matters most |
+      | `run_flow.go` | `					if len(evts) > 0 \|\| (ctx.keepAwake && !armed) {` | drop `&& !armed` | step 5.3 — an armed session calling `KeepAwake` must still wipe on time |
 
 - [ ] **4.4** `go test ./gui/`, device build, `gofmt`, commit.
 
@@ -871,10 +1031,12 @@ allows up to 2,000,000 iterations, §7.1 measures 9,715 it/s on device, and
 
 **Three parts, and the `Run` side is not optional:**
 
-1. **`Context` gains `keepAwake bool`, a `KeepAwake()` setter, and `Reset()`
-   clears it** — `Reset` is the natural per-tick clear, and `Run` reads the flag
-   **before** calling it. That ordering is load-bearing: reversed, the flag is
-   lost every tick and the task silently does nothing.
+1. **The `Context` field, `KeepAwake()` and `Reset()`'s clear land in TASK 4**,
+   not here — Task 4's gated block reads `ctx.keepAwake`, so Task 4 would not
+   compile without them. What this task adds is the *caller* and the tests.
+   `Run` reads the flag **before** calling `ctx.Reset()`, and that ordering is
+   load-bearing: reversed, the flag is lost every tick and the task silently
+   does nothing.
 2. **`unlockDerive` calls `ctx.KeepAwake()` each slice.**
 3. **`Run` consumes it** — the `(ctx.keepAwake && !armed)` term already present
    in Task 4's gated block. **The `&& !armed` is normative, not caution:** with
@@ -882,10 +1044,18 @@ allows up to 2,000,000 iterations, §7.1 measures 9,715 it/s on device, and
    wipe indefinitely, which the section forbids. `KeepAwake` holds off the
    screensaver and nothing else.
 
-- [ ] **5.1** Test on the harness with the `newDeriver` seam supplying a fake
-      deriver, so slices are instant and the bubble crosses `idleTimeout` in
-      ~18,000 ticks: a derivation longer than `idleTimeout` **completes** and
-      returns its key.
+- [ ] **5.1** Test on the harness, driving the clock with **`p.tickFloor = 1 s`**:
+      a derivation longer than `idleTimeout` **completes** and returns its key.
+
+      > **A fake deriver is NOT available, and the arithmetic decides the test.**
+      > `newDeriver` is `var newDeriver = seal.NewDeriver` returning a *concrete*
+      > `*seal.Deriver` (`gui/unlock_kdf.go:51`), so a test can choose only the
+      > iteration count. Each frame costs `kdfStepIterations = 500` real PBKDF2
+      > iterations (`gui/unlock_kdf.go:26`). At the default 10 ms floor, crossing
+      > `idleTimeout` takes ~18,000 ticks = **9,000,000 iterations — 4.5×
+      > `seal.MaxIterations`** (`seal/wire.go:37`) and far too slow. At a 1 s
+      > floor it is 180 ticks = **90,000 iterations**, which is legal, fast, and
+      > still crosses the 3-minute deadline in the bubble.
 
       > **Why this asserts something.** The mutant — delete the `ctx.keepAwake`
       > term — parks the flow under the saver forever. With `maxRunFrames` the
@@ -913,11 +1083,60 @@ allows up to 2,000,000 iterations, §7.1 measures 9,715 it/s on device, and
   behaviour change. §10.2.4 as amended forbids it as the timer's key; the rename
   stops anyone building the wide reading on it again.
 - **F-87:** nothing pins `unlockEngraveMnemonic`'s deferred `clear(m)` — deleting
-  it leaves the package green, because no test drives the three early returns to
-  an observable point. Drive each with `unlockMnemonicHook` set.
+  it leaves the package green, because no test drives the three early returns
+  (`gui/unlock_session.go:257`, `:266`, `:272`) to an observable point.
 
-- [ ] **6.1** Tests, mutation-checked (delete the defer → the new tests fail).
-- [ ] **6.2** Rename, update callers and docs, commit.
+> **F-87's recorded remedy — "drive each with `unlockMnemonicHook` set" — does
+> NOT work, and Task 6 must not inherit it.** `unlockMnemonicHook` has exactly
+> **one** call site, `gui/unlock_session.go:292`, on the success path *after*
+> `clear(rec)` and `clear(m)`. **No early return reaches it.** The natural test —
+> capture `m` in the hook, range over it asserting zeros — would range over a
+> `nil` slice, assert nothing, and **pass with the defer deleted**. That is the
+> exact false-PASS class this phase has already paid for twice.
+>
+> The exposure is bounded and worth stating so the fix is not over-built: `m` is
+> `bip39.Parse(rec)` of the payload **seed record**, not §8's KDF passphrase, and
+> the window is a `showError` screen, not the ~21-minute cut.
+
+So Task 6 must **add a seam**, in a gated code block.
+
+Create `gui/unlock_mnemonic_seam.go`:
+
+```go
+package gui
+
+import "seedhammer.com/bip39"
+
+// unlockMnemonicParsedHook fires immediately after unlockEngraveMnemonic's
+// `defer clear(m)` is registered, so a test can hold the SAME backing array the
+// defer will zero and assert it was zeroed on every early return.
+//
+// unlockMnemonicHook cannot do this: it has one call site
+// (gui/unlock_session.go:292), on the success path after clear(m), which no
+// early return reaches. A test built on it ranges over nil, asserts nothing,
+// and passes with the defer deleted.
+var unlockMnemonicParsedHook func(bip39.Mnemonic)
+```
+
+- [ ] **6.1** Tests first, one per early return (`:257` `!ss.Confirm`, `:266`
+      `masterFingerprintFor` err, `:272` `engraveSeed` err). Each captures `m`
+      via `unlockMnemonicParsedHook`, drives that return, and asserts every word
+      is zero.
+
+      **Each test MUST assert the hook fired** — `if got == nil { t.Fatal(...) }`
+      — before asserting on its contents. Without that guard the test is
+      vacuous, which is the defect this task exists to fix. The idiom already
+      exists 30 lines away (`gui/unlock_session_test.go:678`,
+      `bip39/bip39_test.go:393`).
+- [ ] **6.2** Mutation checks:
+
+      | file | anchor (unique) | → replace with | must be killed by |
+      | --- | --- | --- | --- |
+      | `unlock_session.go` | `defer clear(m)` | *delete the line* | all three of 6.1's tests |
+      | `unlock_session.go` | `unlockMnemonicParsedHook(m)` | *delete the line* | 6.1's fired-guard — proves the guard is real |
+- [ ] **6.3** Rename `SecretsResident` → `RecordsResident`, update callers and
+      docs, commit. **Do not rewrite the persisted `agent-reports/`** — they are
+      verbatim records of what a reviewer said and are not editable artifacts.
 
 ---
 
@@ -930,8 +1149,33 @@ artifact will be folded repeatedly, commit the extractor as a script so the chec
 is a command, not a thing to remember."* B2a-ii ran ~50 mutants by hand for want
 of it.
 
-- [ ] **7.1** Write the runner; re-run every row this phase owns through it.
-- [ ] **7.2** A surviving mutant is **blocking**. Record results in the commit.
+**§11.3's two procedural rules are normative and MUST be in the runner**, not
+left as discipline:
+
+1. **Assert the substitution matched, exactly once.** §11.3: *"a silently-failing
+   `sed` reads exactly like a surviving mutation."* A match count ≠ 1 is a hard
+   error, never a mutant result. This is why every row above is an anchored
+   triple rather than a bare token.
+2. **Restore from a file copy, never `git checkout`.**
+
+**The rows B2b owns**, so "every row this phase owns" is a list and not a
+judgement call:
+
+- **SPEC §11.3's one B2b row** — *"idle timer runs during engraving"*, deferred
+  to this phase by B2a-ii's Task 8 because no timer existed then. It is Task
+  2.3's `engraveRunning, engraveStopping` row.
+- **Every anchored row in Tasks 2.3, 3.3, 4.3, 5.2–5.3 and 6.2** of this plan.
+
+- [ ] **7.1** Write the runner with the row table as data. Re-run every row
+      above through it. Print, in the runner's own output, what it does **not**
+      cover — the shape `plan-build-gate-go.sh` uses.
+- [ ] **7.2** A surviving mutant is **blocking**; so is a match count ≠ 1.
+      Record results in the commit.
+- [ ] **7.3** F-96 has a second half — "land it with the phase report if that is
+      still owed". `ls design/agent-reports/ | grep -c b2a-ii` is **11**, all
+      lens reports and **no phase report**, so the runner's row table has no
+      B2a-ii source document. Either write that phase report or amend F-96 to
+      drop the requirement with a reason. Do not leave it silently unmet.
 
 ---
 
@@ -964,9 +1208,10 @@ Both gates apply and **both MUST be run before dispatch and after every fold.**
 - `scripts/plan-cite-gate.sh` resolves every `file:line` and `pkg.Symbol`.
   Expected failures: symbols this plan creates (`wipeGuard`, `wipeWarningOp`,
   `runWithFlow`, `RecordsResident`).
-- `scripts/plan-build-gate-go.sh` type-checks four whole-file blocks:
-  `gui/run_flow.go` (204 lines), `gui/run_harness_test.go` (154),
-  `gui/wipe_warning.go` (51), `gui/wipe_guard.go` (51).
+- `scripts/plan-build-gate-go.sh` type-checks **six** whole-file blocks:
+  `gui/run_flow.go` (223 lines), `gui/run_harness_test.go` (210),
+  `gui/wipe_warning.go` (61), `gui/wipe_guard.go` (52),
+  `gui/unlock_mnemonic_seam.go` (13), `gui/op/buffer_len.go` (9).
 
 **The gate has one blind spot in this plan, and it is named here rather than
 discovered by a reviewer.** `Context` gains `wipe *wipeGuard` and
@@ -975,16 +1220,30 @@ as whole files, so `plan-build-gate-go.sh` reports `ctx.wipe undefined` and
 `ctx.keepAwake undefined` and TIER 1 fails. That failure is the gate being
 honest, not the plan being broken.
 
-**The controller therefore applied those fragments by hand and type-checked the
-result — before dispatch, and again after the round-0 fold:**
+**A SECOND blind spot, and it is the more dangerous one: TIER 1 is ADDITIVE.**
+The gate copies the fork and *adds* the plan's files; it never *removes* the old
+`Run` body. So in the gate's scratch tree `gui.go` still uses `saver` and still
+compiles — the gate reports OK on a configuration **that cannot be the shipped
+one**. A gate that hides its own blind spot is worse than no gate, so:
+
+**The controller applied the fragments by hand AND modelled the shipped
+configuration — Run's body replaced by the one-line delegation, the `saver`
+import removed — and type-checked that:**
 
 ```
-$ # fork copy + the plan's 4 files + Context.wipe, Context.keepAwake,
-$ # KeepAwake() and Reset()'s clear
-$ CGO_ENABLED=0 go build ./gui/   →  BUILD OK
-$ CGO_ENABLED=0 go vet  ./gui/    →  freetext_sizeproof_golden_test.go:111:13:
-                                     testing.ArtifactDir requires go1.26 (file is go1.25)
+$ # fork copy + the plan's 5 whole files
+$ #   + Context.wipe, Context.keepAwake, KeepAwake(), Reset()'s clear
+$ #   + Run's body REPLACED by `return runWithFlow(pl, version, uiFlow, nil)`
+$ #   + the orphaned "seedhammer.com/gui/saver" import deleted
+$ CGO_ENABLED=0 go build ./gui/ ./gui/op/   →  BUILD OK (shipped config)
+$ CGO_ENABLED=0 go vet  ./gui/ ./gui/op/    →  freetext_sizeproof_golden_test.go:111:13
+                                               gui/op/draw_test.go:176:24
+                                               (both: testing.ArtifactDir requires go1.26)
+$ gofmt -l <all five>                       →  empty
 ```
+
+Both vet lines are the recorded baseline. **So the plan's Go type-checks in the
+configuration that actually ships, not merely in the gate's additive one.**
 
 That vet line is the **pre-existing baseline** recorded in "The green criterion"
 above — byte-identical, and the only finding. **So every line of Go in this plan
@@ -1042,4 +1301,30 @@ facts 1–4 above, each confirmed against `a01b666`; `Colors` has no style field
   dissolved by this design.
 - **F-76**, F-80's residue, **F-92** (`tinygo test`), **F-85** and **F-98** (the
   GREEN spec's own amendments and stale cites).
-- **A release tag.** Task 8 and F-85 both precede it.
+### The release tag's precondition set — the ONE place this list lives
+
+Previously stated three different ways in this plan, all incomplete, and a bare
+"Task 9" that belongs to a **different plan**. Every item below is checkable:
+
+- [ ] B2b Tasks 1–8 green against the full green criterion above
+- [ ] B2b whole-diff review at **0C/0I**, and merged
+- [ ] **B2a-ii's Task 9** — the in-situ RP2350B KDF rate, closing SPEC §7.1 and
+      the last open item in §12.1. *(It is `IMPLEMENTATION_PLAN_…_phaseB2a_ii.md`
+      Task 9, steps 9.1–9.8 — not a task of this plan, which ends at Task 8.)*
+      **Task 8.1 already unlocks on the real machine, so recording the derivation
+      time in Task 8.5 closes §7.1 for free and makes the two trips one.**
+- [ ] **F-85** — the §2.2 amendment
+- [ ] **F-92** — `tinygo test` cannot build `seal` at all, so the TinyGo wipe
+      caveat this whole feature rests on has never run on the target toolchain
+- [ ] **F-98** — two citations in the GREEN spec do not resolve
+- [ ] **SPEC §11.5's "confirm firmware reflash preserves the blob"** — filed as
+      **F-100** by the residue sweep; owned by nobody until then. B1's hardware
+      run covered four things and this was not among them; its closest statement
+      is the converse ("only the 64 KB payload region was cleared"). §11.5 also
+      specifies booting on **PD power**, which neither Task 8 nor B2a-ii Task 9
+      names.
+- [ ] **Push both repos via `ci/staging`** — neither has been pushed this cycle
+      (`origin/master..master` and `origin/main..HEAD` are both well ahead)
+
+If an item moves, it moves *here*. The "does NOT cover" list above defers work;
+this list gates the tag, and the two must not drift apart.
