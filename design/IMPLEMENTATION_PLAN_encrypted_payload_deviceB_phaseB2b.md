@@ -1,6 +1,8 @@
 # Encrypted Payload Delivery — Plan B Phase B2b (§10.2.4's residency-keyed idle wipe) — Implementation Plan
 
-**Status: GREEN again — the Critical and its consequences are folded and reviewed (2026-08-09).** The Critical — `ctx.Done = ctx.Done || !yield(o)` discarding a
+**Status: GREEN. Tasks 1–3 implemented, verified and committed
+(`fbe31ab`, `aa704b6`, `675ae4e` on branch `b2b`). Task 4 is next — the first
+task that can wipe.** The Critical — `ctx.Done = ctx.Done || !yield(o)` discarding a
 `Done` set from inside the `yield` call, so **the wipe never persists** — was
 found by the Task 3 *implementer*, not by any of the four review rounds. The fix
 was then independently reviewed (`agent-reports/…-critical-fix-review.md`,
@@ -703,7 +705,7 @@ gated whole-file form is Task 4's block.
       | --- | --- | --- | --- |
       | `run_flow.go` | `break // unwind, never exit` | `return` | the restart test — `"SESSION 2"` never drawn. The trailing comment makes this line unique: bare `break` matches 5 sites in this file, one of them the `pl.NextChunk()` chunk walk, where substituting silently truncates every frame |
       | `run_flow.go` | `if !yield(o) {` | revert the whole callback to `ctx.Done = ctx.Done || !yield(o)` | **all three** of 3.1's tests — this is the Critical. Verified killable: before the fix, every one of them failed |
-      | `run_flow.go` | `if !wiping {` | `if false {` | `mustFinish`'s cap — this mutant never *exits* the session loop (it is no longer the old "return unconditionally"), so it spins to `maxRunFrames` and fails there rather than by a missing `"SESSION 2"`. The restart property itself is covered by the `break`→`return` row above |
+      | `run_flow.go` | `if !wiping {` | `if false {` | **the compiler, not a test.** `if !wiping {` is the ONLY reader of `wiping` — verified in both the Task 3 file and the Task 4 block above — so this mutant makes it write-only and Go rejects it with *declared and not used*. A valid kill, and a stronger one, but Task 7's runner must classify **build failure as KILLED**, not as an inconclusive error. Measured during Task 3. The restart property itself stays covered by the `break`→`return` row |
       | `run_flow.go` | `			wiping := false` | hoist above `for {` | the **two-wipe** test — and note this one is caught by `boundedFlow`, not by `maxRunFrames`: the discard guard skips the inner loop, so `yield()` is never called and ticks never increment |
 
 - [ ] **3.4** `go test ./gui/`, TinyGo device build, `gofmt`, commit.
@@ -1291,6 +1293,10 @@ of it.
 **§11.3's two procedural rules are normative and MUST be in the runner**, not
 left as discipline:
 
+0. **A mutant that fails to BUILD is KILLED, not an error.** Go's *declared and
+   not used* catches at least one row here (Task 3.3's `if !wiping {`), and a
+   runner reporting a build failure as inconclusive would show a real kill as a
+   gap — or worse, invite someone to "fix" the mutant until it compiles.
 1. **Assert the substitution matched, exactly once.** §11.3: *"a silently-failing
    `sed` reads exactly like a surviving mutation."* A match count ≠ 1 is a hard
    error, never a mutant result. This is why every row above is an anchored
