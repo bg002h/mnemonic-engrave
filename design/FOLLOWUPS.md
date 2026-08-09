@@ -991,6 +991,39 @@ Found by the B1 plan's R0 round 0 (finding 3), which is why B1 composes
 set rather than only from NFC. The data and the decode both already exist; this
 is plumbing, not new codec behaviour, so the Rust-primary rule does not bind it.
 
+### F-86 — `%` renders as zero pixels in the KDF progress screen (owning phase: with F-78's font cycle)
+
+`unlockDerive` (`gui/unlock_kdf.go`) formats its percentage as `"%d%%"` in
+`ctx.Styles.progress`, which is `poppins.Boldprogress45` — the engrave timer's
+face, which has no `%` glyph. **Measured during B2a-ii implementation:**
+
+```
+width("50")  = 57
+width("50%") = 56      # the % contributes NOTHING, and costs a pixel
+Styles.lead  renders the same string 12px wider — it HAS the glyph
+```
+
+So the operator sees a bare number where the code says a percentage. It is
+**legible rather than wrong** — the lead line beneath reads "About N seconds
+left." and carries the meaning — which is exactly the shape F-78 describes for
+the missing `·`: a glyph whose absence degrades to something merely sloppy, so
+nobody notices.
+
+Pinned by `TestProgressStyleRendersNoPercentSign` so it cannot silently change,
+and the plan's code was kept verbatim rather than edited around it.
+
+**Fix with F-78, not before it.** The real repair is the font — adding the glyph
+to `poppins.Boldprogress45` fixes this and any future numeric readout in that
+face, where substituting a different string at this one call site treats the
+symptom. Note this is the **display** font, not the engraving alphabet, so the
+2-stroke-width minimum-feature rules do not apply.
+
+**The general form, which is the reason to keep filing these:** `uiContains`
+compares extracted **text, not pixels**, so no screen test in `gui` can see a
+missing glyph. Both this and F-78 were found by MEASURING WIDTH. Until F-78's
+rasterising check exists, every new screen in a new face is unverified in exactly
+this way.
+
 ### F-85 — §2.2 does not name the during-engrave residency (owning phase: before the release tag)
 
 SPEC §2.2 lists what this design does **not** defend against. It does not say
