@@ -1311,9 +1311,26 @@ on which button was last pressed:
 
 | Condition | Timer | Rationale |
 | --- | --- | --- |
-| **any** secret record resident, not actively engraving | **3 min**, 30 s warning | The operator has just typed twelve words; they are standing there. Reuses the existing `idleTimeout` value (`gui/gui.go:2801`). |
+| **any** secret record resident, not actively engraving | **3 min**, 30 s warning | The operator has just typed twelve words; they are standing there. Reuses the existing `idleTimeout` value (`gui/gui.go:2932`). |
 | actively engraving, any plate | **paused** | Never wipe mid-plate, needle down. A plate is ~21 min of untouched screen and that is not idleness. |
+
+*(Amended 2026-08-09.)* **"Paused" restarts the window.** When a cut ends —
+completion, stop, or failure — the timer re-arms with a fresh 3:00 measured from
+the cut's end. And **"actively engraving" means the engrave JOB is running**, not
+that the engrave screen is visible: the hold-to-start and plate-done screens are
+**armed**, because they are walk-away states with secrets still held.
 | **no** secret record resident | **none** | Public data only. Nothing to protect. |
+
+**"Resident" is a LIFETIME, not a buffer scan.** *(Amended 2026-08-09.)* A secret
+is resident from the moment the sealed branch populates `p.Secret` until the last
+secret record's plate has left the screen — implemented as the lifetime of the
+secret session — during which the flow still holds copies (`codex32.String`, the
+parsed words, and the plate's **spline closure**, which is an `iter.Seq` over the
+plaintext and not a rendering — §10.2.2 and F-83) that no buffer scan can see.
+`seal.RecordsResident()` measures only seal's own record buffers and **MUST NOT**
+be the timer's key: it reads false from the instant a plate is built, which is
+the start of the most dangerous stretch of the arm six of seven test vectors
+take.
 
 Keying on residency rather than on a Cut/Skip press is what makes the aborted
 engrave safe: cancel a secret plate mid-cut and the record is wiped (§10.2.2),
@@ -1323,10 +1340,23 @@ a button was pressed.
 The warning wakes the screen and any touch resets it, so a present operator is
 never wiped out and an absent one is.
 
-**The timer source is already in use and needs no new machinery**:
-`gui/gui.go:2801` `idleTimeout = 3 * time.Minute`, driven by `time.Now()` and
-`ctx.WakeupAt`/`Platform.AppendEvents` in `Run`'s frame loop. Monotonic elapsed
-time is all this needs; no RTC is involved.
+**The timer VALUE and time source are reused; the timer itself is NEW
+MACHINERY.** *(Amended 2026-08-09. An earlier draft said it "needs no new
+machinery", which was measured false four ways: `Run`'s idle state is
+unreachable from a flow, `Run` can see neither residency nor engrave state, the
+warning collides deterministically with the screensaver on the same tick because
+row 1 reuses the same constant, and `ctx.Done` — the only unwind — had never been
+set in production.)*
+
+`idleTimeout` (`gui/gui.go:2932`) supplies the 3-minute constant, and
+`time.Now()` / `ctx.WakeupAt` / `Platform.AppendEvents` the monotonic clock — no
+RTC. The mechanism is new and lives in `Run`: a residency seam on `Context`
+installed for the secret session's lifetime; a `Run`-drawn warning that takes the
+screensaver's place while the timer is armed (at 3:00 the flow is parked and only
+`Run` has control); and a wipe that **unwinds the flow** by setting `ctx.Done` —
+§10.2.2's existing exit, so every deferred wipe runs — after which `Run` restarts
+the UI at the main menu. **The machine never exits its UI and never needs a power
+cycle**; reopening the session costs the passphrase and the KDF.
 
 **What it does not do.** Per §2.2 item 9 the attack is physical access plus an
 SWD probe. Against someone who has both and is waiting, three minutes versus
@@ -1835,7 +1865,7 @@ the consumer that will parse it.
    plate is cut or skipped, which takes a **3-minute** timer with a 30-second
    warning — the operator has just typed twelve words and is standing at the
    machine. Paused during engraving; absent afterwards. The timer source was
-   already in use (`gui/gui.go:2801`).
+   already in use (`gui/gui.go:2932`).
 9. **Public-only payloads are unauthenticated** (§2.2 item 11). Accepted with
    the §10.2.3 warning and the §6.6 hash; `me seal` encrypts by default so
    plaintext is a deliberate opt-in. Revisit only if a signing story ever exists

@@ -1188,6 +1188,27 @@ Small, real, and NOT foldable from the firmware worktree — every item is in a
   rather than normative behaviour, so the rule's "land in Rust first" does not
   bind. Recorded here only so the gap in `d0baf13`'s own message has a pointer.
 
+### F-98 — two citations in the GREEN spec do not resolve (owning phase: with F-85, before the release tag)
+
+Found while cite-gating the §10.2.4 amendment; **pre-existing, and unchanged by
+it** — the gate reports the same two before and after, verified against
+`git show HEAD:`.
+
+```
+FAIL  checksum.go:132   file has only 89 lines
+FAIL  main.rs:375       file has only 146 lines
+```
+
+Ordinary citation decay, and exactly what `plan-cite-gate.sh` exists to surface.
+It matters more here than in a plan because **`SPEC_encrypted_payload_delivery.md`
+is GREEN and normative**: a reader resolving either citation to check a claim
+lands nowhere, and the spec's own history includes a stale cite
+(`driver/otp/otp_rp2350.go:13`, a `#define`) that survived nine review rounds
+because every reviewer read it as authoritative.
+
+Fix is to re-resolve both against the current source and correct or drop them.
+Bundle with F-85's §2.2 amendment so the GREEN spec is opened once, not twice.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:
