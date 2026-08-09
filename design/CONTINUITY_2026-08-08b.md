@@ -3,8 +3,8 @@
 Supersedes `CONTINUITY_2026-08-08.md` for the **encrypted payload delivery**
 feature. That doc handed off "B2a needs plan + R0 gate". Since then **B2a was
 planned, gated through three R0 rounds to GREEN, and split into B2a-i and
-B2a-ii**, the follow-up register was reconciled, and **B2a-i implementation is
-in flight**.
+B2a-ii**, the follow-up register was reconciled, and **B2a-i was implemented,
+reviewed and merged**. B2a-ii implementation is in flight.
 
 Its §5 carry-forward and §6 how-to-work still stand except where corrected below.
 
@@ -125,7 +125,10 @@ four things the gate could not:
    *equivalent* implementation, because `NewDeriver` performs iteration 1 before
    any `Step`. Shipping it would have had an implementer report a surviving
    mutant against correct code. Real mutants: `Step(iterations-2)`, `Step(1)` —
-   14 failing tests each.
+   **25 failing tests each**, measured unfiltered on the real branch. *(The plan
+   first said 14, which was a `-run`-filtered count stated as if it were the
+   whole suite. A number that does not reproduce is worse than no number — say
+   which command produced it.)*
 4. **A zero-value `Deriver` returned a valid all-zero AES key** and `Wipe()`
    panicked on its nil `mac`. Found by the §3d review, fixed, mutation-checked.
 
