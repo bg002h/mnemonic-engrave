@@ -862,7 +862,7 @@ func runWithFlow(pl Platform, version string, flow func(ctx *Context, version st
 							// touch against it could hit the wrong widget.
 							// Swallowing the edge-tick touch is exactly today's
 							// screensaver-dismissal behaviour.
-							a.idle.start = now
+							a.idle.start = now // row 2: fresh window at cut end
 						}
 					}
 					ctx.Reset()
@@ -1006,13 +1006,13 @@ than re-derive them:
       | --- | --- | --- | --- |
       | `run_flow.go` | `armed := ctx.wipe.armed()` | `armed := true` | the not-armed test — a wipe on the public plate list |
       | `run_flow.go` | `armed := ctx.wipe.armed()` | `armed := false` | the wipe test |
-      | `run_flow.go` | `							a.idle.start = now` (inside `if armed {`) | *delete the line* | the post-cut test — **instant wipe with NO warning**: the clock is ~21 min stale so `now ≥ wipeAt` already holds and the warning branch is skipped |
+      | `run_flow.go` | `a.idle.start = now // row 2: fresh window at cut end` | *delete the line* | the post-cut test — **instant wipe with NO warning**: the clock is ~21 min stale, so `now ≥ wipeAt` already holds and the warning branch is skipped entirely. The trailing comment exists to make this line a UNIQUE anchor — the bare statement occurs twice, and `scripts/plan-mutation-anchors.py` fails the plan if it does |
       | `run_flow.go` | `						if armed {` (inside `if a.idle.active {`) | `if false {` | the warning test — the saver draws instead of the warning |
       | `run_flow.go` | `const wipeWarningDelay = 30 * time.Second` (in `wipe_warning.go`) | `= 0` | the warning-visible test |
       | `wipe_warning.go` | `	if secs < 0 {` | `if false {` | a **direct unit call** of `wipeWarningOp` with a negative `remaining` — unreachable from `Run`, since `wipeAt.Sub(now)` is only evaluated after `now.Sub(wipeAt) >= 0` is ruled out |
       | `run_flow.go` | `							a.warnBuf.Reset()` | *delete the line* | the buffer test — `warnBufHook` sees `args` growing across warning ticks |
       | `run_flow.go` | `draw(wipeWarningOp(&a.warnBuf, ctx.Styles, &descriptorTheme,` | `&ctx.B` in place of `&a.warnBuf` | the same buffer test — `warnBufHook` reports `a.warnBuf` still `(0, 0)`. **This is A-C1 restored**, so it is the row that matters most |
-      | `run_flow.go` | `					if len(evts) > 0 \|\| (ctx.keepAwake && !armed) {` | drop `&& !armed` | step 5.3 — an armed session calling `KeepAwake` must still wipe on time |
+      | `run_flow.go` | `(ctx.keepAwake && !armed)` | `(ctx.keepAwake)` | step 5.3 — an armed session calling `KeepAwake` must still wipe on time. Anchored on the parenthesised sub-expression because the full `if` line contains `||`, which a markdown table cell cannot carry |
 
 - [ ] **4.4** `go test ./gui/`, device build, `gofmt`, commit.
 
@@ -1208,6 +1208,15 @@ Both gates apply and **both MUST be run before dispatch and after every fold.**
 - `scripts/plan-cite-gate.sh` resolves every `file:line` and `pkg.Symbol`.
   Expected failures: symbols this plan creates (`wipeGuard`, `wipeWarningOp`,
   `runWithFlow`, `RecordsResident`).
+- `scripts/plan-mutation-anchors.py` proves **every mutation-table anchor matches
+  exactly once** — 16 unique, 0 duplicate, 0 prose. Committed as a script rather
+  than left as discipline, because the claim "each row names a unique anchor"
+  had already been made and was already false: `break` matches **6** sites in
+  this plan's own blocks, one of them the `pl.NextChunk()` chunk walk where
+  substituting `return` silently truncates every frame. The one anchor that
+  could not be made unique by wording — `a.idle.start = now`, which occurs
+  twice — was made unique **in the code**, with a trailing comment that exists
+  for exactly that purpose.
 - `scripts/plan-build-gate-go.sh` type-checks **six** whole-file blocks:
   `gui/run_flow.go` (223 lines), `gui/run_harness_test.go` (210),
   `gui/wipe_warning.go` (61), `gui/wipe_guard.go` (52),
