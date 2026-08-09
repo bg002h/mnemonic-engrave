@@ -1209,6 +1209,31 @@ because every reviewer read it as authoritative.
 Fix is to re-resolve both against the current source and correct or drop them.
 Bundle with F-85's §2.2 amendment so the GREEN spec is opened once, not twice.
 
+### F-99 — §10.2.4 row 1 does not fix WHEN the warning starts, so the hardware pass could ratify an unstated choice (owning phase: B2b Task 8 — blocking, needs operator sign-off BEFORE the hardware run)
+
+Found by the B2b R0 design lens (opus, round 0). §10.2.4 row 1 reads
+"**3 min**, 30 s warning", which is genuinely ambiguous between:
+
+- **warn @ 3:00, wipe @ 3:30** — the idle timeout starts the warning, and the
+  30 s runs on top. This is what `IMPLEMENTATION_PLAN_..._phaseB2b.md` builds
+  (`wipeAt := idleWakeup.Add(wipeWarningDelay)`), and it reuses `idleTimeout`
+  unchanged, which is the amendment's "the timer VALUE and time source are
+  reused" point.
+- **warn @ 2:30, wipe @ 3:00** — 3 min is the deadline and the warning is the
+  last 30 s of it.
+
+The plan commits explicitly, which is the right thing for a plan to do, but the
+**spec** does not — and Task 8.1 has the operator confirm "the warning at 3:00,
+the wipe at 3:30" on real hardware. A hardware pass that blesses a reading the
+normative text never chose converts an ambiguity into a fait accompli, which is
+precisely how the stale `driver/otp/otp_rp2350.go:13` cite survived nine rounds.
+
+Fix: one amending sentence in §10.2.4 row 1 naming the chosen reading. **Not to
+be folded by the plan author** — it is a normative change to a GREEN spec and
+needs the operator's sign-off, like the 2026-08-09 amendment it sits beside.
+Bundle with F-85 and F-98 only if that happens before Task 8; otherwise it goes
+first, alone, because Task 8 is gated on it.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:
