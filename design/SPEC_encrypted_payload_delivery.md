@@ -1313,13 +1313,22 @@ on which button was last pressed:
 | --- | --- | --- |
 | **any** secret record resident, not actively engraving | **3 min**, 30 s warning | The operator has just typed twelve words; they are standing there. Reuses the existing `idleTimeout` value (`gui/gui.go:2932`). |
 | actively engraving, any plate | **paused** | Never wipe mid-plate, needle down. A plate is ~21 min of untouched screen and that is not idleness. |
+| **no** secret record resident | **none** | Public data only. Nothing to protect. |
 
 *(Amended 2026-08-09.)* **"Paused" restarts the window.** When a cut ends —
 completion, stop, or failure — the timer re-arms with a fresh 3:00 measured from
 the cut's end. And **"actively engraving" means the engrave JOB is running**, not
 that the engrave screen is visible: the hold-to-start and plate-done screens are
 **armed**, because they are walk-away states with secrets still held.
-| **no** secret record resident | **none** | Public data only. Nothing to protect. |
+
+**The 30 s warning is ADDITIVE, not inclusive.** *(Amended 2026-08-09.)* Row 1's
+"3 min" is the deadline for the **warning**, not for the wipe: the warning
+appears at **3:00** of idleness and the wipe fires at **3:30**. `idleTimeout`
+(`gui/gui.go:2932`) is therefore reused *unchanged* as the warning's deadline,
+and the 30 s is a separate constant applied on top of it. The alternative
+reading — warn at 2:30, wipe at 3:00 — is **rejected**: it would require deriving
+a second constant from `idleTimeout` rather than reusing it, and would leave the
+operator less than the 3 minutes row 1's own rationale promises.
 
 **"Resident" is a LIFETIME, not a buffer scan.** *(Amended 2026-08-09.)* A secret
 is resident from the moment the sealed branch populates `p.Secret` until the last
