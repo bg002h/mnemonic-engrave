@@ -113,7 +113,7 @@ Carried forward unchanged from B2a-ii; the load-bearing ones:
 | `CGO_ENABLED=0 go test ./...` | **exit 1**, exactly TWO `[setup failed]`: `cmd/kdfbench`, `cmd/sealread`. A third is a regression. |
 | `go vet ./seal/ ./bip39/` | clean |
 | `go vet ./gui/` | **exit 1**, only `gui/freetext_sizeproof_golden_test.go:111:13: testing.ArtifactDir requires go1.26 or later` |
-| `go vet ./gui/op/` | **exit 1**, only `gui/op/draw_test.go:176:24: testing.ArtifactDir requires go1.26 or later` — new row, because Task 1 adds `gui/op/buffer_len.go` |
+| `go vet ./gui/op/` | **exit 1**, only `gui/op/draw_test.go:176:24: testing.ArtifactDir requires go1.26 or later` — new row from **Task 4** onward, which adds `gui/op/buffer_len.go`. Not applicable to Tasks 1–3, which touch no `op` file |
 | `gofmt -l <touched>` | empty |
 | TinyGo device build — **run `.github/workflows/test.yml:29` verbatim; do not restate it by hand** | baseline **1310184 flash / 60584 ram** — report the new numbers |
 | `CGO_ENABLED=0 GOARCH=386 go test ./seal/ ./bip39/` | green, **~52 s** (not a hang) |
