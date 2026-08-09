@@ -13,20 +13,21 @@ Its §5 carry-forward and §6 how-to-work still stand except where corrected bel
 ## 1. STATE
 
 ```
-mnemonic-engrave  master  3daf929   NOT pushed -- 9 commits ahead of origin
-seedhammer        main    78949e7   unchanged; B2a-i is on a worktree branch
+mnemonic-engrave  master  a320ba9+  NOT pushed -- 12+ commits ahead of origin
+seedhammer        main    421dca8   NOT pushed -- B2a-i MERGED
 ```
 
-**Nothing has been pushed this cycle.** `mnemonic-engrave` carries nine design
-and record commits. Push via `ci/staging` per `CLAUDE.md` when ready.
+**Nothing has been pushed this cycle, in either repo.** Push `master` via
+`ci/staging` per `CLAUDE.md`, or the required check is bypassed rather than
+satisfied.
 
 | | state |
 | --- | --- |
 | Plan A — host `me seal` / `me hash` | shipped |
 | Plan B Phase A — device headless core | shipped |
 | Plan B Phase B1 — the unsealed path with UI | shipped, hardware-verified |
-| **Plan B Phase B2a-i** — the headless substrate | **GREEN plan; implementation IN FLIGHT** |
-| **Plan B Phase B2a-ii** — unlock + the secret session | GREEN plan; not started |
+| **Plan B Phase B2a-i** — the headless substrate | **MERGED to `main` at `421dca8`** (unpushed) |
+| **Plan B Phase B2a-ii** — unlock + the secret session | GREEN plan; **implementation IN FLIGHT** |
 | Plan B Phase B2b — residency wipe + residue | not started |
 
 ## 2. THE B2a SPLIT — decided 2026-08-08
@@ -168,15 +169,43 @@ shares), **F-82** (`seal.Deriver`/`DeriveKey` have no Rust counterpart, and why
 the Rust-primary rule does not bind them). **Withdrawn: F-81** — it described a
 residency window created by the design R0 round 0 rejected.
 
-## 8. IN FLIGHT — B2a-i implementation
+## 8. B2a-i — DONE, and what its review found
 
-Worktree `/scratch/code/shibboleth/seedhammer-wt-b2ai`, branch
-`feat/encrypted-payload-b2a-i`, from `main` @ `78949e7`. One implementer, TDD,
-one commit per task, nothing pushed.
+Merged at `421dca8` (4 commits, 16 files, +848/−85). Post-merge `main` is green:
+the sanctioned two setup failures, `seal` and `gui` passing, TinyGo
+**1285664 flash / 60544 ram** — unchanged, because nothing calls the new code
+until B2a-ii wires it.
 
-**Not yet done, and mandatory before merge:** the independent adversarial
-whole-diff execution review. R0 covered plan correctness; that review is what
-catches implementation-introduced regressions TDD misses.
+**Whole-diff review: 0C / 1I / 2M / 2N**, persisted at
+`agent-reports/…-i-whole-diff-round0.md`, folded in `7b8b8f0`. Plan fidelity was
+confirmed **mechanically** — every whole-file Go block byte-identical to the plan.
+
+Three things from it worth carrying:
+
+- **The Important was a one-directional test.** `Probe()`'s false branch had no
+  coverage: the mutant `return true` left BOTH packages green, unpinning §10.1's
+  normative "absent → invisible". `return false` *was* killed, which is exactly
+  why it read as covered. **A one-directional kill is not a kill.** Fixed by
+  extending `read_test.go`'s absent-payload table so `Probe` and `Read` can never
+  disagree about "present", and re-mutating to prove it now fails.
+- **One finding was DECLINED with evidence**, and the discipline matters: it
+  claimed the §3d fold deleted `DeriveKey`'s fail-closed `nil`. Measured against
+  the old body — `crypto/pbkdf2.Key` returns `err=<nil>` at iterations −1 and 0,
+  so the old body returned a key too. No regression; the proposed "restoration"
+  would have been a new divergence from the stdlib the differential pins.
+- **`-size full` cannot measure F-79.** The 65,536 bytes were a heap allocation,
+  not static RAM. What measures the fix is `reads == 0` at startup.
+
+## 8a. IN FLIGHT — B2a-ii implementation
+
+Worktree `/scratch/code/shibboleth/seedhammer-wt-b2aii`, branch
+`feat/encrypted-payload-b2a-ii`, from `main` @ `421dca8`. One implementer, TDD,
+Tasks 4–8. **Task 9 is the hardware pass and is operator-run**, not agent-run; it
+closes §7.1's in-situ RP2350B KDF measurement.
+
+**Mandatory before merge:** the independent adversarial whole-diff review. This
+is the phase where secrets are resident, so the wipe lifecycle is where that
+review's budget belongs.
 
 ## 9. WHAT COMES AFTER
 
