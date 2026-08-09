@@ -1371,13 +1371,23 @@ inventory were both incomplete.
 | --- | --- | --- |
 | `sentence []byte` — **the plaintext mnemonic** | `bip39/bip39.go:218-224`, inside `MnemonicSeed` | a local of another package; `gui` cannot reach it. Also orphans `append` reallocations. |
 | the `[]byte` behind `string(seedqr.QR(m))`, and `qr.Code.Bitmap` | `gui/gui.go`'s `engraveSeed` → `kortschak/qr` | the bitmap is a third-party struct field |
-| `engraveSeed`'s `words []string` | `gui/gui.go:516-538` | `clear(words)` is free and in-package — see below |
+| `engraveSeed`'s `words []string` | `gui/gui.go:516-538` | **`clear(words)` is NOT free — see the correction below. Do not do it.** |
 
 **The third one carries a correction worth keeping.** An earlier caveat listed
 `words []string` as unwipeable "immutable Go strings". The *strings* are not the
 secret: `bip39.LabelFor` returns substrings of the **public** wordlist. What is
-secret is their **selection and order**, and `clear(words)` destroys that at no
-cost. Reasoning from "it's a string, so it can't be wiped" got the conclusion
+secret is their **selection and order**.
+
+> **THE REMEDY THIS ENTRY ORIGINALLY GAVE — "`clear(words)` destroys that at no
+> cost" — IS FALSE, AND ACTING ON IT WOULD CUT A CORRUPT PLATE.** Measured
+> 2026-08-09: `words` is **captured by `frontSideSeed`'s closure**
+> (`backup/backup.go:214-230`) and read *during* the cut, exactly as
+> `plate.Spline` is (F-83). Clearing it after the plate is built does not scrub a
+> spent buffer — it empties a live one, and the engraver then cuts the wrong
+> thing onto steel. The correct fix, if any, is the same shape as F-83's: there
+> isn't one short of a pipeline that materialises before cutting. **Reasoning
+> from "it's a `[]string`, so `clear` is free" produced a remedy that would have
+> destroyed an operator's backup.** Reasoning from "it's a string, so it can't be wiped" got the conclusion
 right for the wrong reason, and the wrong reason is what stopped anyone fixing
 the one case that is fixable.
 
