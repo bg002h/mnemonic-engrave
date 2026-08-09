@@ -1499,10 +1499,18 @@ into Go strings and into `Plate.Spline`, none of which can be zeroed.
 `gui/ms1_decode.go:19-20` already carries the same caveat for the display path.
 
 **Operator decision 2026-08-08: "the one honest gap is unavoidable."** The plate
-*is* the geometry being cut; it must be resident while the needle moves. No
-ordering of wipes changes that, and a plate pipeline over `[]byte` would
-**relocate** the secret rather than remove it, because the spline still encodes
-it. Filing it as work-to-be-done would be dishonest bookkeeping: a register whose
+must be resident while the needle moves. No ordering of wipes changes that, and a
+plate pipeline over `[]byte` would **relocate** the secret rather than remove it.
+
+> **CORRECTED 2026-08-09 — the MECHANISM recorded here was wrong, and the truth
+> is worse.** This said the plate "*is* the geometry being cut", which implies a
+> materialised buffer that the plaintext was consumed to produce. It is not.
+> `bspline.Curve = iter.Seq[Knot]` (`bspline/bspline.go:22`) is a **lazy
+> iterator**, so `Plate.Spline` holds a **closure over the plaintext**, re-read
+> on every knot for the whole ~21-minute cut. The acceptance stands and the
+> conclusion stands; the reason given for it did not. Found by B2b's recon
+> (`RECON_b2b_idle_timer_surface.md`), and it is the same mechanism that makes
+> F-88's `clear(words)` remedy destructive. Filing it as work-to-be-done would be dishonest bookkeeping: a register whose
 value is that every open item is real cannot carry one that will never be
 actioned.
 
