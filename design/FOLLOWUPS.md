@@ -991,6 +991,192 @@ Found by the B1 plan's R0 round 0 (finding 3), which is why B1 composes
 set rather than only from NFC. The data and the decode both already exist; this
 is plumbing, not new codec behaviour, so the Rust-primary rule does not bind it.
 
+### F-93 — the screensaver still PARKS a spec-legal derivation, and Run has to be the one to stop it (owning phase: B2b, with F-89's unwind)
+
+Found by the B2a-ii whole-diff review, lens 7 M1, and confirmed by measurement
+during the Minor/Nit fold. **This is the residue the Critical's fix does NOT
+close, and it is filed rather than folded because closing it needs a `Run`-side
+change that must be reconciled with §10.2.4's residency timer — F-89's
+territory.**
+
+The C1 fold (`ctx.WakeupAt` before `ctx.Frame`, commit `051d423`) closes the
+frame-1 park, where the derivation inherited the previous screen's
+`idleWakeup` deadline and stalled for the full three minutes at ~0 %. That half
+is fixed and tested.
+
+**What remains.** `Run` refreshes `a.idle.start` only on `len(evts) > 0`, and a
+derivation produces no events. So any derivation longer than `idleTimeout` trips
+the saver, and the saver branch `continue`s **without breaking**, so `ctx.Frame`
+never returns and `d.Step` is never called again. The derivation does not lose
+its progress screen — it **stops**, until a touch.
+
+Computed, not quoted:
+
+| quantity | value |
+| --- | --- |
+| §7.1's measured rate | 9,715 it/s on RP2350 |
+| `idleTimeout` | 180 s |
+| iterations that reach it | 180 × 9,715 = **1,748,700** |
+| §6.2's ceiling | 2,000,000 = **205.9 s** |
+| §7.1's default | 300,000 = 30.9 s |
+| at-risk share of the legal range | 251,301 of 1,900,001 = **13.2 %** |
+
+So it is reachable with a **conforming** blob, not merely a hostile one, and
+`me seal --iterations N` exposes the knob. It also breaks §7.1's own argument
+that 205.9 s is *"long, but bounded, which is what the no-watchdog argument
+requires"* — parked, it is unbounded without operator interaction.
+
+**Severity, stated honestly:** Minor. Bounded, self-healing on a touch, no wrong
+plate, no seed disclosure, and the tamper signal still fires afterwards. But it
+is an operator-facing hang on the one screen §10.2 step 7 exists to keep
+legible, so it is not cosmetic either.
+
+**What is already done:** the §7.1 log line now reports **derivation** time
+separately from wall time, so Task 9.3's number survives any park (it accumulates
+`time.Since` around `d.Step` only). That was the half that could be fixed inside
+`gui`. The code carries a comment at the `WakeupAt` naming this follow-up so the
+fixed half is not read as the whole.
+
+**What closes it,** either:
+
+1. treat an in-progress derivation as activity — a `Run`-side change, and the
+   one that must not be conflated with §10.2.4's residency timer: this is
+   `Run`'s `idleTimeout`, which exists to blank the panel, not to protect a
+   secret; or
+2. bound the ACCEPTED iteration count below what `idleTimeout` allows. That is a
+   normative change to §6.2's range and therefore lands in the Rust primary
+   first, with vectors.
+
+Option 1 is preferred and belongs with F-89, which already has to reconcile a
+residency timer with a saver that does not unwind.
+
+### F-94 — the 64-byte BIP-39 seed and the BIP-32 master key are unpinned, and the seam is cheap (owning phase: B2b, with F-87/F-88)
+
+Found by the B2a-ii whole-diff review, lens 2 M2 (mutants G28/G29/G30).
+
+`3c477b9` added `defer wipeBytes(seed)` to `deriveMasterKey`, `defer mk.Zero()`
+to `masterFingerprintFor`, and zeroing to the `SeedScreen` validity probe's
+discarded key. **All three fixes are right, and every one can be deleted with the
+suite green.**
+
+The reason this is filed rather than folded is scheduling, not difficulty — and
+the record has been corrected accordingly. `gui/unlock_session.go`'s inventory
+used to say these "cannot be [pinned] without unsafe — they are internal to
+functions that return neither". That is **false by the same file's own
+precedent**: `unlockMnemonicHook` pins `m`, also a local, in a function that does
+not return it, with an ordinary package var. A `var deriveSeedHook func([]byte)`
+fired beside `seed := bip39.MnemonicSeed(...)` does the same, with no `unsafe`.
+
+What makes it B2b's rather than B2a-ii's: `deriveMasterKey` and
+`masterFingerprintFor` are **shared funds-path code** that this phase only
+scrubbed in passing. Adding test seams to them widens the diff into
+`bundleWalletFlow` and the seed-entry path, which this phase does not otherwise
+touch.
+
+**Also unpinned, and it stays that way with a reason:** `seal.Classify`'s
+`clear(m)` on the SUCCESS path (mutant G27). `m` is a local in `seal` and the
+allocation seam (`bip39.parseWordsHook`) is unexported in `bip39`, so pinning it
+needs an **exported** seam in a Rust-primary ported package for a
+defence-in-depth wipe. `Parse`'s three ERROR exits — the reachable half, where a
+full near-seed was being orphaned — are pinned in `bip39` itself.
+
+### F-95 — §10.2.3's warning clears the panel by 3 pixels, and its scroll affordance does not exist on this hardware (owning phase: the GUI/font cycle, with F-78 and `seedhammer-warning-scroll-untouchable`)
+
+Found by the B2a-ii whole-diff review, lens 4 MINOR 4. **Pre-existing from B1** —
+the B2a-ii diff does not touch `unlockWarnUnauthenticated`.
+
+Measured twice independently (the reviewer's numbers and the fold's, identical),
+at 480×320 with the real styles:
+
+```
+bodyClip=(6,44)-(423,314)  body=413x257  top=60  bottom=317  panel=320  maxScroll=19
+```
+
+Three facts stack:
+
+1. `Warning.Layout` computes `maxScroll = 19 > 0` — the widget itself believes
+   the last line is scrolled out of view.
+2. Its **only** scroll input is `ButtonFilter(Up)` / `ButtonFilter(Down)`. The
+   SeedHammer II has no directional buttons; `processTouch` emits
+   `PointerEvent` exclusively. So the body is **unscrollable on the machine**.
+3. Nothing is actually cut off today **only because `fadeClip` is a no-op stub**,
+   with the real mask commented out three lines below it. Because it does not
+   clip, the body renders past `bodyClip.Max.Y = 314` to y = 317, inside a
+   320-pixel panel.
+
+The paragraph in that 19-px window is §2.2 item 10's downgrade instruction —
+*"the encrypted part has been REMOVED. Do not continue."* — the single sentence
+that tells the operator to stop.
+
+**What B2a-ii closed:** nothing pinned the fit. `TestUnauthenticatedWarningFitsThePanel`
+now asserts `bodyClip.Min.Y + scrollFadeDist + bodysz.Y <= DisplaySize().Y` at
+every legal record count, and is killed by one extra sentence of copy
+(measured: y=353, 33 px over).
+
+**What is still owed, and the order matters.** Restoring `fadeClip` *without*
+shortening the copy makes this **worse**: it would begin enforcing the 19-px
+overflow the stub currently hides, silently removing the instruction. So either
+shorten the copy to fit `bodyClip.Dy() - 2*scrollFadeDist` **first**, or give
+`Warning` a touch scroll (bind it to `Clickable`s with `op.Input` hit areas, the
+same fix the StartScreen pager took) — then restore the clip.
+
+### F-96 — the §11.3 mutation runner is uncommitted, so the 30-mutant run is reproducible by nobody (owning phase: B2b, which re-runs exactly these rows)
+
+Found by the B2a-ii whole-diff review, lens 5 M3, and it is a standing-rule
+violation rather than a defect: `CLAUDE.md` says *"when an artifact will be
+folded repeatedly, commit the extractor as a script so the check is a command,
+not a thing to remember."*
+
+Commit `3db3bfe`'s message says *"The runner is NOT committed here … It is a
+single self-contained Python file and is reproduced in the phase report."*
+Measured: `ls design/agent-reports/ | grep b2a-ii` returns the lens files and no
+B2a-ii **phase report**, and `scripts/` holds `plan-build-gate.sh`,
+`plan-build-gate-go.sh` and `plan-cite-gate.sh` and no mutation runner. The only
+other mention in the repo, `design/agent-reports/MUTATION_planB_phaseA.md:15`,
+records that the Phase A runner also lived in a scratchpad.
+
+**Why it bites next, specifically.** B2b owns §10.2.4 plus the F-89 unwind — the
+phase most in need of re-running these exact rows — and will re-derive the
+runner with a different notion of "the substitution matched" than the one this
+phase had to fix twice mid-run (rows 6.1/6.5, 6.7).
+
+**Fix:** commit it as `scripts/mutation-run.py` with the row table as data, and
+have it print what it does **not** cover, the same shape as
+`plan-build-gate-go.sh`. Land it with the phase report if that is still owed.
+
+*(The Minor/Nit fold that followed ran its ~20 mutants by hand for this reason,
+each substitution asserted to match exactly once and each file restored from a
+file copy. That is the discipline the script exists to make cheap; doing it by
+hand is what the rule is trying to stop.)*
+
+### F-97 — plan and record corrections owed to the B2a-ii artefacts (owning phase: ownerless residue; do with the phase report)
+
+Small, real, and NOT foldable from the firmware worktree — every item is in a
+`mnemonic-engrave/design/` artefact rather than in code.
+
+- **Two of three gui file line-counts in the plan are wrong** (lens 5 N2a). The
+  plan's "Beyond the gate" section at line 1696 claims *"`gui/unlock_kdf.go`
+  (247 lines), `gui/unlock_session.go` (184) and `gui/unlock_plates.go` (83)"*.
+  Measured with `wc -l` on the plan's own blocks: **291, 237, 83**. Harmless
+  downstream — the shipped files were byte-identical to the blocks the gate
+  compiled — but it is a hand-count where a tool was available, in a GREEN plan,
+  which is the one thing `CLAUDE.md` names by name. Correct them with `wc -l`
+  output or drop the numbers.
+- **Plan §7c's "each frame" clause is wrong, and so is mutation row 7.6**
+  (lens 5 M2's other half). §7c mandates that the plate list *"builds its labels
+  with `unlockPlateLabel(…)` **each frame**"*. It does not, and never did:
+  `relabel()` is called on entry and after each engrave. The in-code comment has
+  been corrected in the firmware; the plan clause and the 7.6 row still say it.
+  The mutant 7.6 actually kills is *"the post-engrave `relabel()` deleted"*.
+- **The Rust-primary check for the `bip39` fold was not recorded** (lens 5 N2b).
+  `d0baf13` fixed a defect found in a ported Go package and the commit does not
+  say the Rust check was made. **This is now discharged, not owed:** the
+  Minor/Nit fold's `bip39` commit records it in full — the same shape exists in
+  `mnemonic-toolkit/vendor/bip39/src/lib.rs`'s `parse_in_normalized`, but as a
+  stack array in a vendored third-party crate, and the change is memory hygiene
+  rather than normative behaviour, so the rule's "land in Rust first" does not
+  bind. Recorded here only so the gap in `d0baf13`'s own message has a pointer.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:
