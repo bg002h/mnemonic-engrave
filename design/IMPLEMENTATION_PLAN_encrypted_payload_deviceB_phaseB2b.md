@@ -1,13 +1,14 @@
 # Encrypted Payload Delivery — Plan B Phase B2b (§10.2.4's residency-keyed idle wipe) — Implementation Plan
 
-**Status: GREEN. Tasks 1–4 implemented, verified and committed
-(`fbe31ab`, `aa704b6`, `675ae4e`, `4935bf1` on branch `b2b`). The machine can now
-wipe. Tasks 5–7 next; Task 8 is operator-run hardware.**
+**Status: GREEN. Tasks 1–6 implemented, verified and committed
+(`fbe31ab`, `aa704b6`, `675ae4e`, `4935bf1`, `237c85f`, `920e1e1` on branch
+`b2b`). **Task 7 next, then flash, then Task 8** — operator-run hardware.**
 
 **Device budget, measured at each task** (`.github/workflows/test.yml:29`):
-`a01b666` 1310184/60584 → T1 1310568 → T3 1311536 → T4 **1312776 flash /
-60584 ram**. **+2592 bytes flash for the whole mechanism; RAM unchanged
-throughout** — which is the point, since A-C1 was a 228 KB heap growth. The Critical — `ctx.Done = ctx.Done || !yield(o)` discarding a
+`a01b666` 1310184/60584 → T1 1310568 → T3 1311536 → T4 1312776 → T5/T6
+**1312808 flash / 60584 ram**. **+2624 bytes flash for the whole feature; RAM
+unchanged at every single task** — which is the point, since A-C1 was a 228 KB
+heap growth. The Critical — `ctx.Done = ctx.Done || !yield(o)` discarding a
 `Done` set from inside the `yield` call, so **the wipe never persists** — was
 found by the Task 3 *implementer*, not by any of the four review rounds. The fix
 was then independently reviewed (`agent-reports/…-critical-fix-review.md`,
@@ -1264,8 +1265,29 @@ var unlockMnemonicParsedHook func(bip39.Mnemonic)
       It must come **after** the defer is registered, so the hook hands the test
       the same backing array the defer will zero. Without this step the seam file
       compiles and does nothing, which is how the original F-87 remedy failed.
-- [ ] **6.1** Tests first, one per early return (`:257` `!ss.Confirm`, `:266`
-      `masterFingerprintFor` err, `:272` `engraveSeed` err). Each captures `m`
+- [ ] **6.1** Tests first — **TWO, not three.** `:257` `!ss.Confirm` and `:272`
+      `engraveSeed` err are testable. **`:266` `masterFingerprintFor` err is
+      CRYPTOGRAPHICALLY UNREACHABLE** and is recorded as such rather than faked.
+
+      > **Why, verified rather than assumed** (implementer 2026-08-09, confirmed
+      > by the controller against source): `bip39.MnemonicSeed` returns
+      > `pbkdf2.Key(..., 64, sha512.New)` — **always exactly 64 bytes**
+      > (`bip39/bip39.go:225`), which is `hdkeychain.MaxSeedBytes` exactly, so the
+      > length check cannot fail. `hdkeychain.NewMaster`'s only other failure is a
+      > <2^-127 event, which the fork's own comment already documents
+      > (`gui/gui.go:253-257`). `ECPubKey()` cannot fail on a key `NewMaster` has
+      > validated.
+      >
+      > Reaching it would mean seaming `masterFingerprintFor`/`deriveMasterKey` —
+      > **shared funds-path code this phase only scrubbed**, and which F-94 owns.
+      > Adding an unreviewed seam there to satisfy a test count is precisely the
+      > trade this project refuses. **A documented untestable path beats a false
+      > claim of coverage.**
+      >
+      > **The pin is not weakened.** `defer clear(m)` covers all three returns, so
+      > two tests kill the mutant. Verified: deleting it fails with
+      > *"word 19 is still 138 after the early return — defer clear(m) did not
+      > run"*. The third path is a coverage gap, not a pin gap. Each captures `m`
       via `unlockMnemonicParsedHook`, drives that return, and asserts every word
       is zero.
 
