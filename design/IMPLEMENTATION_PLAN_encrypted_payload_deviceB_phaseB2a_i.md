@@ -1281,18 +1281,38 @@ Two things that check settles, and both were live worries worth retiring:
       without a test being deleted. Do not read four green tests as four
       independent confirmations.
 
-      Confirm the import is gone with a **quoted** grep — `grep -n '"crypto/pbkdf2"' seal/*.go`
-      — expecting **no output**. The unquoted `grep -rn 'crypto/pbkdf2' seal/`
-      returns 3 hits on a *correct* fold, because `crypto.go`'s header comment
-      names the package in prose (R0 §3d review, M1).
+      **Confirm the import left PRODUCTION with `go list`, not with grep:**
+
+      ```sh
+      go list -f '{{.Imports}}'     ./seal/   # must NOT contain crypto/pbkdf2
+      go list -f '{{.TestImports}}' ./seal/   # MUST contain it -- the oracle
+      ```
+
+      Measured on the finished branch: **0 production imports, 1 test import.**
+
+      **No grep gets this right, and an earlier draft of this step gave two
+      figures that are both wrong.** It said the quoted
+      `grep -n '"crypto/pbkdf2"' seal/*.go` returns nothing and the unquoted
+      `grep -rn` returns 3. Measured: **1 and 6**. The quoted form matches
+      `seal/pbkdf2_test.go`, because §3c's differential *deliberately* imports the
+      stdlib as its oracle; the unquoted form additionally matches prose in two
+      header comments. The figures predate the differential — they were written in
+      the same fold that added it, and not revisited. `go list` distinguishes
+      production from test imports, which is the actual question.
 - [ ] **3.6** Mutation check the wrapper. **`d.Step(iterations - 1)` is NOT a
       mutant** — measured: it survives the whole suite, because `NewDeriver`
       already performed iteration 1, so `Step(total-1)` reaches exactly `total`.
       It is an equivalent implementation, and naming it here would have reported
-      a surviving mutant against correct code. Use a real one: **`d.Step(iterations - 2)`**
-      leaves the derivation one iteration short, so `Key()` returns `nil` and the
-      payload fails closed — measured, **14 tests fail**. `d.Step(1)` likewise
-      fails 14. Record the count.
+      a surviving mutant against correct code — **confirmed on the real branch:
+      0 failures**. Use a real one: **`d.Step(iterations - 2)`** leaves the
+      derivation one iteration short, so `Key()` returns `nil` and the payload
+      fails closed — measured on this fork, **25 top-level tests fail**, and
+      `d.Step(1)` likewise 25.
+
+      **That count is from an unfiltered `go test ./seal/`.** An earlier draft
+      said 14, which was a `-run 'Vector|Derive|Open|Unlock'` run stated as if it
+      were the whole suite — a number that does not reproduce is worse than no
+      number. Record what you actually see, and say which command produced it.
 - [ ] **3.7** Commit.
 
 ---
