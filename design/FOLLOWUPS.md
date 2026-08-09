@@ -1149,7 +1149,18 @@ each substitution asserted to match exactly once and each file restored from a
 file copy. That is the discipline the script exists to make cheap; doing it by
 hand is what the rule is trying to stop.)*
 
-### F-97 — plan and record corrections owed to the B2a-ii artefacts (owning phase: ownerless residue; do with the phase report)
+### F-97 — CLOSED 2026-08-09 — plan and record corrections owed to the B2a-ii artefacts
+
+**Closed the same day it was filed.** It was filed as "NOT foldable from the
+firmware worktree", which was true of the agent that filed it — every item lives
+in `mnemonic-engrave/design/`, which was read-only to it. It was never true of
+the controller. **A follow-up filed because of a sandbox boundary is not a
+deferral, and the register should not carry one.**
+
+The line counts are now `wc -l` output (304 / 237 / 83, measured by the build
+gate) rather than a hand-count; §7c's "each frame" clause and mutation row 7.6
+now say what `relabel()` actually does. The third item was already discharged
+when filed.
 
 Small, real, and NOT foldable from the firmware worktree — every item is in a
 `mnemonic-engrave/design/` artefact rather than in code.
@@ -1203,7 +1214,13 @@ says it is.
 Splitting the `FileReader` cases behind `//go:build !tinygo` makes the modality
 reachable. Owed before the tag, with F-85.
 
-### F-91 — the normative `vectors.json` digest is asserted by nothing (owning phase: ownerless residue)
+### F-91 — CLOSED 2026-08-09 — the normative `vectors.json` digest is now asserted
+
+One test, `TestVectorFileMatchesTheDigestTheREADMERecords` (`seal/vectors_test.go`),
+mutation-checked with a byte no other test can see: one space appended to the
+file's `note` field — touching no vector field — fails it while
+`TestVectorsAreLoadable` stays green. Filed and closed the same day; it was one
+test, not a deferral.
 
 `seal/testdata/README.md:17` records
 `sha256 = 333ac47e7f61d031c995b85510565bfffd86cd1992f09b0230c1484fffd4d4bc` and

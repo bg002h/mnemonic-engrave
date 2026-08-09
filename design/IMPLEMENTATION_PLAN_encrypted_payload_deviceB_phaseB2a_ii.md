@@ -1485,8 +1485,15 @@ func unlockPlates(p *seal.Payload) []unlockPlate {
 ### 7c. `unlock_platelist.go` fragments
 
 - `unlockPlateListFlow` takes `[]unlockPlate` and builds its labels with
-  `unlockPlateLabel(e.rec, e.idx, e.sealed, e.cut)` **each frame**, so the "(cut)"
-  mark appears as soon as a plate completes.
+  `unlockPlateLabel(e.rec, e.idx, e.sealed, e.cut)` **on entry and again after
+  each engrave** (`relabel()`), so the "(cut)" mark appears as soon as a plate
+  completes.
+
+  *An earlier draft said "each frame", and so did mutation row 7.6. Neither was
+  ever true — `relabel()` is called twice, not per frame — and the mutant row 7.6
+  actually kills is "the post-engrave `relabel()` deleted". Corrected in the
+  firmware comment first; corrected here second, which is the wrong order and is
+  why F-97 existed.*
 - `unlockEngraveFlow` returns `bool` (did the plate complete), and the OK branch
   sets `plates[sel].cut = true` on true.
 - The nav's first slot becomes
@@ -1706,7 +1713,7 @@ does not need to re-derive any of this:**
 
 **What this does NOT prove:** none of the `gui` code was executed. It compiles
 and vets against the real fork — every identifier, signature and type in
-`gui/unlock_kdf.go` (247 lines), `gui/unlock_session.go` (184) and
+`gui/unlock_kdf.go` (304 lines), `gui/unlock_session.go` (237) and
 `gui/unlock_plates.go` (83) resolves — but no screen was driven, no frame drawn,
 and no wipe observed. The gui tests in Tasks 5–7 are described, not written.
 That is the reviewer's execution pass, and it is where the risk now sits.
