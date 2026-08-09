@@ -1,11 +1,13 @@
 # Encrypted Payload Delivery — Plan B Phase B2b (§10.2.4's residency-keyed idle wipe) — Implementation Plan
 
-**Status: 1 CRITICAL OPEN — GREEN REVOKED 2026-08-09.** Found by the Task 3
-implementer, not by any of the four review rounds:
-`ctx.Done = ctx.Done || !yield(o)` discards a `Done` set from inside the `yield`
-call, so **the wipe never persists**. Fixed in the gated block below; the fix is
-verified by execution but has not yet had an independent look. Tasks 1 and 2 are
-committed and unaffected. **Task 3 does not resume until this is reviewed.**
+**Status: GREEN again — the Critical and its consequences are folded and reviewed (2026-08-09).** The Critical — `ctx.Done = ctx.Done || !yield(o)` discarding a
+`Done` set from inside the `yield` call, so **the wipe never persists** — was
+found by the Task 3 *implementer*, not by any of the four review rounds. The fix
+was then independently reviewed (`agent-reports/…-critical-fix-review.md`,
+0 findings against the fix itself), which found that it makes the discard guard
+**dead code**; the guard is removed and the property re-pinned on the fix.
+Tasks 1 and 2 are committed; **Task 1's committed code still carries the old
+form, and Task 3 corrects it.**
 
 | round | verdict | report |
 | --- | --- | --- |
@@ -51,21 +53,24 @@ source at `a01b666` by the controller, not taken from a report.
    implementer found after four rounds passed it.** It reads `ctx.Done` *before*
    calling `yield`, so the wipe's `ctx.Done = true` — set from inside that very
    call — is discarded when the assignment writes back `staleFalse || !true`.
-   Measured. Task 1's version of `run_flow.go` therefore differs from `gui.go`
-   here, and it is the ONE line in the move that is not verbatim; the gated block
-   below carries the corrected form with the reasoning inline.
+   Measured. **Task 1 shipped the `||` form verbatim (`fbe31ab`), so the committed
+   code still has the defect** — correcting it is assigned to Task 3 below, and it
+   is the ONE line of Task 1's move that does not survive as written.
 3. **Two screens call `ctx.Frame` once more AFTER `Done` goes true**, by
    fall-through: `SeedScreen.Confirm` (`gui/gui.go:2460`) and
    `EngraveScreen.Engrave` (`gui/gui.go:2758`).
 
-   **What that extra frame actually does — stated precisely, because an earlier
-   draft got it wrong.** It does NOT panic: `FrameCallback` returns early once
-   `Done` is true, so `yield` is never called after it returned false. (In the
-   old `||` form the short-circuit did the same job.) The hazard is different and
-   still real: without the discard guard the extra frame reaches
-   `if ctx.Done || !yield() { return }` in the inner loop and executes the
-   **`return`**, converting the wipe into a full GUI exit. The guard in Task 3 is
-   *required*; the reason is the exit, not a panic.
+   **What that extra frame actually does — stated precisely, because two earlier
+   drafts got it wrong in opposite directions.** `FrameCallback` returns early
+   once `Done` is true, so `yield` is never called after the wipe. Therefore the
+   extra frame **reaches nothing at all**: no panic (the first draft's claim), and
+   it never reaches the inner loop's `return` either (the second draft's claim,
+   which contradicted the sentence above it).
+
+   **Consequence, and it is why this fact still matters:** the discard guard an
+   earlier draft required is **unreachable**, and Task 3 does not add one. What
+   protects this path is the single early return in `FrameCallback` — one site,
+   centrally, rather than a downstream guard no test can exercise.
 4. **`Run` has zero test coverage**, and `testPlatform.AppendEvents` ignores its
    deadline, so neither `iter.Pull` nor `synctest` can drive its clock. **Task 1
    is a prerequisite, not a nicety** — every behaviour in Tasks 3–5 is otherwise
@@ -88,7 +93,7 @@ exactly as it does today.
 | --- | --- | --- |
 | Run-level test harness (fact 4) | ✅ Task 1 | — |
 | the residency seam (`Context.wipe`, the bracket) | ✅ Task 2 | — |
-| the unwind: session loop + discard guard | ✅ Task 3 | — |
+| the unwind: session loop + the `ctx.Done` Critical fix | ✅ Task 3 | — |
 | §10.2.4's timer, warning and wipe | ✅ Task 4 | — |
 | **F-93** the screensaver parking a derivation | ✅ Task 5 | — |
 | `RecordsResident` rename + **F-87**'s pins | ✅ Task 6 | — |
@@ -610,7 +615,8 @@ Still in `gui/unlock_session.go`, both engrave arms register the job around
 ## Task 3 — make `ctx.Done` survivable (the unwind; still nothing sets it)
 
 **This is the task that changes what `ctx.Done` MEANS**, and per fact 2 it is the
-first code to make that path real. Three changes, all in `gui/run_flow.go`; the
+first code to make that path real — which is why it is also where the Critical in
+`ctx.Done`'s own writer gets fixed. Three changes, all in `gui/run_flow.go`; the
 gated whole-file form is Task 4's block.
 
 1. **The session loop.** The body of the returned closure becomes `for { … }`,
@@ -629,13 +635,17 @@ gated whole-file form is Task 4's block.
    that the allocation is irrelevant, and a fresh `Context` needs no argument
    about which fields matter.
 
-2. **The discard guard** — `if wiping { continue }`, the first statement in the
-   range body, before any draw. *(Not repeated as a code block here: Task 4's
-   gated whole file is the single source, and a second copy is a second thing to
-   keep in sync — it also made `if wiping {` match twice, which is precisely the
-   ambiguity `plan-mutation-anchors.py` rejects.)*
+2. **The `FrameCallback` fix** — replace `ctx.Done = ctx.Done || !yield(o)` with
+   the early-return form in the gated block. **This is the Critical**
+   (`agent-reports/…-task3-implementer-critical.md`): the old form reads
+   `ctx.Done` before calling `yield`, so the wipe's own `ctx.Done = true` is
+   discarded and **the wipe never persists**. Task 1 shipped the old form
+   verbatim, so this task is where it is corrected.
 
-   **Required, not defensive** (fact 3). On the ordinary walked-away path the
+   *(There is no discard guard. An earlier draft had one; the fix above makes it
+   unreachable — see fact 3. Deleting it from a tree with the fix applied left
+   the whole `./gui/` suite green, so it was dead code with an unkillable
+   mutation row.)* On the ordinary walked-away path the
    unwind emits one extra frame; without the guard that iteration reaches
    `if ctx.Done || !yield() { return }` and executes the `return`, **converting
    the wipe into a full GUI exit** — the operator's machine stops having a UI as
@@ -676,6 +686,12 @@ gated whole-file form is Task 4's block.
       > would false-PASS the `break`→`return` mutant, which is the single most
       > important mutant in this plan.
 
+      Add an **invariant assertion** to that same test, in place of the
+      discard-guard test an earlier draft called for: **after the wipe fires, no
+      further content frame is drawn in that session** — observable through
+      `onDraw`. That pins the property the dead guard was supposed to provide,
+      without shipping code no test can exercise.
+
 - [ ] **3.2** Write the changes. **Every flow in Tasks 3–5's tests goes through
       `boundedFlow`** — an unwrapped flow is what lets the hoist-`wiping` mutant
       spin forever, because the discard guard means `runSession`'s tick counter
@@ -686,7 +702,7 @@ gated whole-file form is Task 4's block.
       | file | anchor (unique) | → replace with | must be killed by |
       | --- | --- | --- | --- |
       | `run_flow.go` | `break // unwind, never exit` | `return` | the restart test — `"SESSION 2"` never drawn. The trailing comment makes this line unique: bare `break` matches 5 sites in this file, one of them the `pl.NextChunk()` chunk walk, where substituting silently truncates every frame |
-      | `run_flow.go` | `if wiping {` | delete the whole 3-line statement | a flow that `Frame`s after `Done` (fact 3's two screens) — the wipe becomes a GUI exit, so `"SESSION 2"` never drawn |
+      | `run_flow.go` | `if !yield(o) {` | revert the whole callback to `ctx.Done = ctx.Done || !yield(o)` | **all three** of 3.1's tests — this is the Critical. Verified killable: before the fix, every one of them failed |
       | `run_flow.go` | `if !wiping {` | `if false {` | `mustFinish`'s cap — this mutant never *exits* the session loop (it is no longer the old "return unconditionally"), so it spins to `maxRunFrames` and fails there rather than by a missing `"SESSION 2"`. The restart property itself is covered by the `break`→`return` row above |
       | `run_flow.go` | `			wiping := false` | hoist above `for {` | the **two-wipe** test — and note this one is caught by `boundedFlow`, not by `maxRunFrames`: the discard guard skips the inner loop, so `yield()` is never called and ticks never increment |
 
@@ -914,14 +930,16 @@ func runWithFlow(pl Platform, version string, flow func(ctx *Context, version st
 			}
 
 			for content := range it {
-				// The DISCARD GUARD. Two screens call ctx.Frame once more after
-				// Done goes true (gui.go:2460, :2758). Without this, that frame
-				// reaches `if ctx.Done ... return` below and the wipe becomes a
-				// full GUI exit -- the machine loses its UI because the timer
-				// worked.
-				if wiping {
-					continue
-				}
+				// NO DISCARD GUARD HERE, deliberately. An earlier draft had
+				// `if wiping { continue }` to swallow the extra frame the two
+				// fall-through screens emit (gui.go:2460, :2758). The
+				// FrameCallback fix above makes it UNREACHABLE: wiping implies
+				// Done implies no yield implies this body never runs. Measured
+				// -- with the fix in place, deleting the guard left the whole
+				// ./gui/ suite green, including the test named after it.
+				// Dead code in firmware implies a protection that is not
+				// operating; the property is pinned by the FrameCallback
+				// mutation row instead, which is killable.
 				layoutTime := time.Since(startTime)
 				draw(content)
 				drawTime := time.Since(startTime)
