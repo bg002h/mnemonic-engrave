@@ -1,8 +1,13 @@
 # Encrypted Payload Delivery — Plan B Phase B2b (§10.2.4's residency-keyed idle wipe) — Implementation Plan
 
-**Status: GREEN. Tasks 1–3 implemented, verified and committed
-(`fbe31ab`, `aa704b6`, `675ae4e` on branch `b2b`). Task 4 is next — the first
-task that can wipe.** The Critical — `ctx.Done = ctx.Done || !yield(o)` discarding a
+**Status: GREEN. Tasks 1–4 implemented, verified and committed
+(`fbe31ab`, `aa704b6`, `675ae4e`, `4935bf1` on branch `b2b`). The machine can now
+wipe. Tasks 5–7 next; Task 8 is operator-run hardware.**
+
+**Device budget, measured at each task** (`.github/workflows/test.yml:29`):
+`a01b666` 1310184/60584 → T1 1310568 → T3 1311536 → T4 **1312776 flash /
+60584 ram**. **+2592 bytes flash for the whole mechanism; RAM unchanged
+throughout** — which is the point, since A-C1 was a 228 KB heap growth. The Critical — `ctx.Done = ctx.Done || !yield(o)` discarding a
 `Done` set from inside the `yield` call, so **the wipe never persists** — was
 found by the Task 3 *implementer*, not by any of the four review rounds. The fix
 was then independently reviewed (`agent-reports/…-critical-fix-review.md`,
