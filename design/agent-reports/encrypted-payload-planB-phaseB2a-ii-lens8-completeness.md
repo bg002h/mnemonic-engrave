@@ -1,0 +1,417 @@
+# B2a-ii whole-diff review — lens 8: COMPLETENESS CRITIC
+
+**Question:** not "is the code correct" — **what did nobody look at?**
+Scope: `421dca8..HEAD` on `feat/encrypted-payload-b2a-ii`, against
+`SPEC_encrypted_payload_delivery.md` §10.2/§10.2.1/§10.2.2/§10.2.3/§10.3/§11.2
+and the ten prior reports in `design/agent-reports/`.
+
+Method: mechanical. `git diff --numstat 421dca8..HEAD` gives 21 files; each
+basename was grepped against all ten prior reports; every file with a low or
+zero hit count was then opened. Four modalities that had never been executed
+were executed. Two hypotheses I formed were **measured and retracted** — they
+are recorded below as retractions so nobody re-derives them.
+
+---
+
+## 1. Files no lens opened
+
+Grep of every changed basename across all ten reports
+(`lens1-wipe`, `lens1-fold-review`, `lens1-i1m1`, `lens1-pass3`, `lens2`…`lens7`):
+
+| file | diff | mentions across all 10 reports |
+| --- | --- | --- |
+| `gui/unlock_flow_test.go` | +33 / −29 | **0** |
+| `gui/unlock_platelist_test.go` | +9 / −9 | **0** |
+| `gui/unlock_program_test.go` | +6 / −1 | **0** |
+| `gui/seal_fixture_test.go` | +228 | 2, both one-clause asides (lens3:276, lens1-pass3) |
+| `bip39/bip39_test.go` | +29 | 1, a bullet in lens5's "sound" list |
+| `seal/unlock_key_test.go` | +205 | 1, a row in lens2's coverage table |
+
+Everything else was opened by at least three lenses. What the unopened files
+contain:
+
+### C1 — the fixture that three tests trust is self-checked against the one field that cannot see a wire-format error (`gui/seal_fixture_test.go`)
+
+`sealBlobForTest` (:27) is the only new code in the diff that composes
+AES-256-GCM and PBKDF2 by hand. Three tests are built on it, including
+`TestUnlockTooManyRecordsIsNotReportedAsAWrongPassphrase`
+(`unlock_kdf_test.go:691`) and the entire both-sections `(sealed)` shape.
+
+Its self-check, `TestSealBlobForTestAgreesWithTheNormativeVectors` (:83), seals
+vector D's records with vector D's passphrase and iteration count — but with a
+**hardcoded synthetic salt and IV** (`h.Salt[i] = byte(i+1)`, `h.IV[i] =
+byte(i+0x40)`, :36-41), not the vector's `salt_hex` / `iv_hex`. It then asserts
+the §6.6 hash and a round-trip.
+
+§6.6's digest is `SHA-256("MNEMBLOB/pub/v1" ‖ 0x00 ‖ sealed ‖ count ‖ public
+records)`. **It covers neither the salt, nor the IV, nor the ciphertext, nor the
+tag, nor any header field but `sealed` and the public record count.** And the
+round-trip cannot see a layout error either: the fixture calls
+`seal.Header.Encode` and production decodes with the same package, so any
+byte-order or offset error is symmetric and invisible. So "agrees with the
+normative vectors" is currently true of ~19 of the header's 60-odd bytes.
+
+The strongest available check is one parameter away and is not made. **Measured**
+— I ran the fixture's own composition with each vector's `salt_hex`/`iv_hex`
+substituted for the synthetic ones:
+
+```
+vector A: fixture reproduces blob_hex EXACTLY (211 bytes)
+vector B: fixture reproduces blob_hex EXACTLY (211 bytes)
+vector C: fixture reproduces blob_hex EXACTLY (540 bytes)
+vector D: fixture reproduces blob_hex EXACTLY (539 bytes)
+vector F: fixture reproduces blob_hex EXACTLY (1421 bytes)
+vector G: fixture reproduces blob_hex EXACTLY (1420 bytes)
+```
+
+Byte-for-byte, all six sealed vectors. Giving `sealBlobForTest` salt/IV
+parameters and asserting `hex(blob) == v.BlobHex` for all six would bind the
+fixture to the normative Rust output completely, at the cost of two arguments.
+As written, the fixture's agreement claim is far weaker than its comment
+("*so a wire-format change breaks it the same way it breaks production*") reads.
+
+### C2 — `gui` re-decodes the normative vector file with none of `seal`'s integrity pins, and this diff widened what depends on it (`gui/unlock_program_test.go`)
+
+This 7-line diff is the *only* change to the shared vector loader and no lens
+named the file. It adds `Passphrase *string` and `Iterations uint32` to
+`sealTestVector` — which turns that struct into the source of the passphrase and
+iteration count for **every real derivation in the gui suite** (13
+`sealVector(t, …)` call sites, plus `vectorPassphrase`, `unlockedPayload`,
+`TestUnlockDerivesWithARealProgressScreen`'s `v.Iterations`).
+
+`gui.sealVector` (:53) is a second decoder of `seal/testdata/vectors.json`.
+Compare what each pins:
+
+| pin | `seal.loadVectors` | `gui.sealVector` |
+| --- | --- | --- |
+| exactly 7 vectors | yes (`wantVectorNames`) | **no** |
+| names, in order | yes | **no** |
+| `blob_sha256` consistent with `blob_hex` | yes | **no** |
+
+A truncated or reordered `vectors.json` silently shrinks the gui suite; `seal`
+fails loudly. `gui` should call a shared loader or re-assert the same three.
+
+Further out, and this binds both loaders: `seal/testdata/README.md:17` records
+`sha256 = 333ac47e7f61d031c995b85510565bfffd86cd1992f09b0230c1484fffd4d4bc` and
+declares the file **generated by the normative Rust implementation, never
+hand-edited**. Under the Rust-primary rule that digest *is* the binding.
+`grep -rn 333ac47e` over the whole repo returns **exactly one hit: the README
+line itself** — no test, script, or CI step asserts it. `blob_sha256` is an
+*internal* consistency check: it catches editing `blob_hex` alone, and catches
+nothing about `passphrase`, `iterations`, `public`, `secret`, `pubhash_sealed`
+or `pubhash_unsealed` — the six fields this diff newly leans on.
+
+*Measured, not broken today:* `sha256sum seal/testdata/vectors.json` =
+`333ac47e7f61…`, matching the README.
+
+### C3 — the plate-list refactor put a shim between seven existing tests and production (`gui/unlock_platelist_test.go`)
+
+`runPlateList`'s signature changed from `recs []seal.AdmittedRecord` to
+`plates []unlockPlate`, and every existing caller was rewired through
+`asPlates()` (`unlock_plates_test.go:474`), a test-local constructor that
+fabricates `unlockPlate{rec, idx: i}` with `sealed:false, cut:false`.
+
+So `TestPlateListPagesThroughEveryRecord`, `…BackReturnsFromAnyPage`,
+`…OKEngravesTheSelectedRecord`, `…ReturnsToTheSamePageAfterEngrave`,
+`…NeverOpensTheNFCReader`, `…LabelsASingleCardPerHRP` and
+`…LabelsSeveralCardsOfOneHRP` now all drive a hand-built list. The list
+production actually builds — `unlockPlates(p)`, which appends the encrypted
+section's `ClassMDMK` cards and sets `sealed` when both sections carry cards —
+reaches `unlockPlateListFlow` in only two tests
+(`TestPlateListShowsTheSealedSuffixOnDuplicateLabels`,
+`TestPlateListMarksCutAfterACompletedEngraveAndNotAfterACancelledOne`), and
+**neither pages**. A `(sealed)`/`(cut)`-suffixed mixed-section list has never
+been paged, and paging is where `start`/`sel`/`shown` and the per-frame
+`relabel()` interact.
+
+### C4 — the replaced test in `gui/unlock_flow_test.go`
+
+The diff deletes `TestSealedPayloadStopsAtATerminalScreen` and installs
+`TestSealedPayloadReachesThePassphraseAndCancelsToTheMenu`. The replacement is
+scenario-identical to `TestUnlockCancelNeverReachesThePlateList`
+(`unlock_kdf_test.go:652`) — same vectors, same Back-out-of-word-entry, same
+"no plate label appears" assertion. The deleted test's *unique* content ("no
+word entry anywhere in the flow" for a sealed payload) is now structurally
+impossible rather than re-homed. That is fine; nobody checked it.
+
+### C5 — `TestParseNeverGrowsItsResult` pins capacity only (`bip39/bip39_test.go:301`)
+
+The test for the pass-3 fold asserts `cap(got) == 24` for a 12- and a 24-word
+parse. It never asserts `len(got)`. A `Parse` that returned a 24-long
+`Mnemonic` zero-padded to capacity satisfies it. Nit; noted because this is the
+test named for a seed-orphaning fix.
+
+---
+
+## 2. Normative clauses claimed but never traced to code
+
+I traced §10.2 steps 1–10, §10.2.1, §10.2.2, §10.2.3, §10.3 and the §11.2
+bullets B2a-ii owns. **Everything with a live gap was already reported by lenses
+2/3/5** (the six §10.2-step-10 wipes; §11.2's "the derived key and the passphrase
+buffer MUST read as zeroed"; §11.2's "each exit" covered for 1 of 4; the labels
+"rebuilt each frame"). I found no *additional* clause claimed-and-untraced, and
+two I expected to be gaps are not:
+
+- **§10.2 step 3's "if `pub_len == 0`, display nothing" is properly covered** —
+  `unlock_flow_test.go:130-149` drives vector F and asserts both that no "Public
+  data hash" region is drawn *and* that the empty-record-set constant
+  (`seal.FormatHash(seal.PublicDataHash(nil, true))`, computed rather than
+  retyped) never appears. That is the assertion §10.2 step 3's furniture
+  rationale asks for.
+- **§10.3's three-slot nav budget is not exceeded.** Counted:
+  `unlockDerive` draws 1 `NavButton` (`unlock_kdf.go:190`), `unlockPlateListFlow`
+  draws 3 (`unlock_platelist.go:150-160`). Nothing in the diff can reach the
+  `[3]int` panic. Unasserted, but not reachable.
+
+**Retracted after measurement (do not re-open):**
+
+- *Hypothesis:* `unlock_flow.go:104-108`'s "safe because `AdmitSection` COPIES
+  every record, so `p.Public`/`p.Secret` do not alias this buffer" is a
+  load-bearing licence for `clear(blob)` before `unlockSecretSession`, pinned
+  only on the *public* path (`TestUnlockFlowWipesEveryRecordOnExit`'s premise
+  check reads a public record via `unlockEngraveHook`; every session test calls
+  `unlockSecretSession` directly on a payload whose blob was never cleared).
+  *Measured:* I ran the aliasing mutant
+  (`seal/record.go:207` → `AdmittedRecord{Record: r, Class: c}`) and it is
+  **killed by all nine** gui secret-path tests — `unlockedPayload`'s "record %d
+  arrived already zero" premise check fires. Assumption is pinned. Retracted.
+- *Hypothesis:* the mixed-class secret session mislabels. *Measured:* see §4.
+
+---
+
+## 3. Claims every lens assumed rather than verified
+
+**A3.1 — `kdfStepIterations = 500` and "This takes about 30 seconds" rest on a
+§7.1 figure measured on different silicon, and the phase that would close it is
+NOT DONE.** `unlock_kdf.go:20-25` derives 500-iterations-per-frame from "§7.1
+measured 9,715 iterations/sec on RP2350 silicon"; `unlockKDFLead`'s cold-start
+string hardcodes "about 30 seconds". Commit `3db3bfe`'s own message: *"NOT DONE:
+Task 9 is a hardware pass on the physical machine… It closes §7.1's in-situ KDF
+measurement on RP2350B silicon, which no host run can substitute for."* Six
+lenses discussed the progress screen's behaviour; none noted that its two tuning
+constants are inherited from a measurement this phase declares outstanding.
+
+**A3.2 — `unlockEngraveCodex32`'s residency inventory does not exist.** See §5.
+
+**A3.3 — the §11.3 mutation record's coverage is inherited.** `3db3bfe` is an
+empty commit whose deliverable is a table of 11 rows with named killers, and the
+runner is deliberately uncommitted (lens5 filed that). Every lens quoting
+"30 mutants, 29 killed" quoted the commit message. I re-ran one row myself (the
+aliasing mutant above, which is not on the table) and it behaved as the table's
+style claims. No lens re-ran any row on the table.
+
+---
+
+## 4. Modalities never run
+
+Never executed by anyone before this report: **hardware** (Task 9, acknowledged
+open), **TinyGo test**, **any GOARCH but amd64**, **`-race`**, **any iteration
+count but 100,000/100,001**, **a secret section mixing classes**. I ran four of
+the five host-reachable ones.
+
+### M1 — `tinygo test` cannot build this package at all. The target compiler has never executed one line of these tests.
+
+```
+$ tinygo test ./seal/
+seal/open_test.go:508:7: undefined: FileReader
+seal/read_test.go:75:8:  undefined: FileReader        (+7 more)
+FAIL	seedhammer.com/seal	0.000s
+```
+
+`seal.FileReader` lives in `read_host.go` behind `//go:build !tinygo`, and eight
+`_test.go` sites reference it unguarded. So the suite is *structurally*
+unrunnable under TinyGo.
+
+This is the modality that matters most here, because **the wipe caveat repeated
+throughout this diff is specifically a TinyGo claim**: "*TinyGo's GC may copy or
+retain, so this is defence in depth*" (§10.2 step 10, and the caveat block at
+`unlock_session.go:200-230`). Every `clear()`, every escape-analysis assumption,
+`passphraseBytes`' fixed capacity, `bip39.Parse`'s `make(Mnemonic, 0, 24)` — all
+validated only under gc Go on linux/amd64, whose allocator behaves differently
+from the one the caveat names. `tinygo build` proves it compiles, not that a
+byte is where the test says it is. Splitting the `FileReader` cases behind
+`//go:build !tinygo` would make this modality reachable.
+
+### M2 — 32-bit. Run now; clean.
+
+The device is 32-bit (RP2350, Cortex-M33), where `int` is 32 bits — the premise
+of lens6's `int(uint32)` item. Nobody had run it:
+
+```
+$ GOARCH=386 GOOS=linux CGO_ENABLED=0 go test ./seal/ ./bip39/
+ok  	seedhammer.com/seal	51.708s
+ok  	seedhammer.com/bip39	0.085s
+```
+
+Note what this does *not* prove: it proves the existing cases do not wrap, not
+that a wrapping case exists in the suite. It is a one-line CI addition and the
+cheapest standing guard for lens6's finding.
+
+### M3 — `-race`. Run now; clean.
+
+```
+$ CGO_ENABLED=1 go test -race -run 'TestUnlock|TestSecret|TestPlateList|TestSealBlob|TestSealed' ./gui/ ./seal/
+ok  	seedhammer.com/gui   38.841s
+ok  	seedhammer.com/seal   2.300s
+```
+
+Relevant because `runUITouch` runs the flow on a second goroutine against a
+generator, and lens7's Critical is about frame scheduling.
+
+### M4 — the iteration-count range. Only the floor had ever been executed.
+
+`seal.MinIterations = 100_000`, `seal.MaxIterations = 2_000_000`
+(`seal/wire.go:36-37`). Every vector is 100,000 or 100,001; `fixtureIterations`
+is 100,000. **The top 95% of the legal range had never been run through the
+progress screen.** I ran a full unlock at `seal.MaxIterations`:
+
+```
+kdfStepIterations=500  predicted Step calls=4000  predicted frames=3999
+seal: kdf 2000000 iterations in 677.429023ms
+frames=3999  pct first=0 last=99 min=0 max=99 backwards=0
+ETA line: 3999 readings, all 0s          (host artefact — the host KDF is sub-second)
+reached the secret session at 2000000 iterations
+```
+
+Behaviour is correct. Two things it establishes that nobody had:
+
+1. `d.Done()*100/d.Total()` at the maximum is exact and monotone — this is the
+   coupling lens6 flagged as unrecorded, now measured at the bound.
+2. **The iteration count is attacker-controlled and sets the derivation's
+   wall-clock length.** At §7.1's 9,715 it/s, 2,000,000 iterations is **~206
+   seconds**, and at the `~31 s / 100,000` figure the UI copy uses it is
+   **~10 minutes**. Either way it runs past `idleTimeout = 3 min`. That is not a
+   new finding — it is lens7's Critical — but its blast radius was measured only
+   at the floor. Any test of that Critical should use `MaxIterations`, not a
+   vector.
+
+### M5 — a secret section mixing `ClassCodex32Secret` and `ClassMnemonic` has never been constructed.
+
+`unlockSecretLabel`'s own doc says why it matters and why nothing caught the
+across-classes numbering bug: *"No canonical vector mixes the classes (A 0/1,
+B 0/1, C 0/6, D 5/1, E 5/0, F 0/15, G 12/3 — all-ms1 or all-mnemonic), so
+nothing caught it."* Lens2 reported that the pass-3 fold has no test that can
+fail. The sharper point: **the shape itself has never been built**, even though
+this same diff shipped the fixture machinery to build it, and building it is ten
+lines.
+
+I built and ran it — `sealBlobForTest(t, nil, append(C.Secret, A.Secret...),
+fixturePassphrase, fixtureIterations)`, a 7-record encrypted section
+(1×ms1, 5×md1/mk1, 1×mnemonic), driven through `unlockSecretSession`:
+
+```
+record 0 class=codex32 secret secret=true
+record 1..5 class=md1/mk1 card secret=false
+record 6 class=BIP-39 mnemonic secret=true
+offer 0 screen = "SECRETseedmaterialCutthisplateSkipms1"
+offer 1 screen = "SECRETseedmaterialCutthisplateSkipseedwords"
+events=[0 6]   surviving MDMK cards: 5   SecretsResident()=false
+plate list: mk1 1/2, mk1 2/2, md1 1/3, md1 2/3, md1 3/3
+```
+
+**Correct** — per-class naming, both classes offered, both wiped, the five cards
+survive. So this is a coverage gap, not a defect, and the fix is to commit
+roughly the probe above. *Second hypothesis measured and retracted.*
+
+---
+
+## 5. The single most under-examined thing in this diff
+
+**`unlockEngraveCodex32` — the `ms1` arm — got one paragraph of prose where the
+mnemonic arm got three review passes, a per-line residency table and two filed
+follow-ups. It is the arm every canonical vector exercises.**
+
+Count the attention. `unlockEngraveMnemonic` (`unlock_session.go:196-268`) has:
+C1 (early `clear(m)`), I1 (the 64-byte seed, the BIP-32 master key), D1 (the
+caveat rewritten after being wrong **twice**), D2 (`clear(rec)` pinned and
+mutation-checked), F-87 (the deferred wipe, unpinned), F-88 (a three-row
+inventory of `sentence []byte`, the QR bitmap, `words []string`), F-83
+(`plate.Spline` accepted), a dedicated test
+(`TestMnemonicWordsAreZeroWhenThePlateReachesEngrave`) and a dedicated hook
+(`unlockMnemonicHook`, which exists *because* nothing else could reach that
+buffer).
+
+`unlockEngraveCodex32` (`unlock_session.go:140-194`) has: a five-line comment
+that names no copies individually, points at *another file's comment*
+(`gui/ms1_decode.go:19-20`) instead of a follow-up, and says "TinyGo's GC decides
+the rest". No hook. No inventory. No follow-up. It is in no row of F-83/F-86/
+F-87/F-88/F-89.
+
+Read the function and the copies are enumerable in thirty seconds — every one is
+the codex32 **secret share**, i.e. spendable key material:
+
+```go
+s, err := codex32.New(string(rec))   // (1) string(rec) — unwipeable copy of the share
+                                     // (2) whatever codex32.String retains internally
+id, _, _ := s.Split()                // (3) id, a string derived from the share
+plan, err := backup.EngraveSeedString(params, backup.SeedString{
+        Title: id,
+        Seed:  s.String(),           // (4) another string copy
+        Font:  constant.Font,
+})
+plate, err := toPlate(plan, params)  // (5) plan, then plate.Spline — the share as geometry
+clear(rec)                           // seal's buffer, and ONLY seal's buffer
+NewEngraveScreen(ctx, plate).Engrave(ctx, &engraveTheme)
+```
+
+`clear(rec)` zeroes exactly one of six. Copies 1–4 are Go strings on the heap
+for the whole ~21-minute cut and for however long after that TinyGo's GC takes —
+and §10.2.4's residency backstop, the control that would have bounded that
+window, **does not exist yet** (it is B2b). Meanwhile `p.SecretsResident()`
+reads **false** the instant `clear(rec)` runs, because it scans `p.Secret` only
+(`seal/session.go`) — so the predicate B2b will key its timer on already reports
+"nothing to protect" while four string copies of the share are live. Lens3
+raised that predicate's honesty in the abstract ("*SecretsResident()'s comment
+asserts the property B2b's timer will rest on, and that property is not true*");
+nobody connected it to the `ms1` arm specifically, which is where it bites.
+
+This is not merely the under-inventoried arm — it is **the default arm**. Of the
+seven canonical vectors, six carry `ms1` secrets and exactly one (A) carries a
+mnemonic. Both engraving-code shapes the design cites (`bip84` single-sig:
+1×ms1; 2-of-3 `wsh-sortedmulti`: 3×ms1) route entirely through
+`unlockEngraveCodex32`. The scrutiny went to the arm one vector reaches.
+
+**What closes it (all B2b-owned, none blocking this merge):**
+
+1. Write the F-88-equivalent inventory for `unlockEngraveCodex32` — five rows,
+   the code above — and file it. Right now the mnemonic arm's inventory reads as
+   *the* inventory, and D1's finding was precisely that an inventory claiming
+   completeness while being incomplete is worse than none.
+2. Correct `p.SecretsResident()`'s contract, or B2b's timer inherits a predicate
+   that goes false while the share is live on the `ms1` path. This is the one
+   with a funds consequence.
+3. Add an `unlockCodex32Hook` mirroring `unlockMnemonicHook`. The mnemonic hook
+   exists because a local was unreachable and a seed sat live through a whole cut
+   with the suite green (C1). `unlockEngraveCodex32` has the identical structure
+   and no hook.
+
+---
+
+## Verdict
+
+- **Files nobody opened:** 3 with zero mentions (`unlock_flow_test.go`,
+  `unlock_platelist_test.go`, `unlock_program_test.go`), 3 more effectively
+  unexamined (`seal_fixture_test.go` +228, `bip39_test.go`, `unlock_key_test.go`).
+  C1 and C2 are the ones worth acting on.
+- **Normative clauses:** no *additional* untraced clause beyond what lenses 2/3/5
+  filed. §10.2 step 3's `pub_len == 0` suppression and §10.3's nav budget are
+  both fine — checked, not assumed.
+- **Assumed:** the §7.1 tuning constants (measured on other silicon, closing
+  phase open); the `ms1` arm's residency; the §11.3 table's own results.
+- **Modalities:** TinyGo test is *structurally impossible* (M1) — that is the gap.
+  32-bit, `-race` and `MaxIterations` were unrun and are now run, all clean.
+  Mixed-class secrets and a paged production-built plate list remain unrun.
+- **Most under-examined:** the `ms1` engrave arm (§5).
+- **Retracted after measurement:** the `AdmitSection` aliasing assumption is
+  pinned; the mixed-class session labels correctly.
+
+Severity: nothing here is Critical. C1 and C2 read as **Important** to me
+(a fixture asserting far less than it claims, and the normative-vector binding
+being prose); C3 and §5's items 1–3 as **Minor**; C4, C5, M1, M2, M3, M4 and M5
+as coverage/modality gaps with owning phases rather than defects. §5 item 2
+(`SecretsResident()` on the `ms1` path) should be **written into F-89 or filed
+beside it before B2b starts**, because B2b builds on that predicate.
+
+*Probes were run in `/tmp/completeness-1386481`, a copy. The worktree
+`/scratch/code/shibboleth/seedhammer-wt-b2aii` was not written to; the copy is
+deleted.*
