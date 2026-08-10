@@ -1856,24 +1856,39 @@ and each stopped being true without anyone editing the line that claimed it.
 
 Filed by the R0 round-1 fold of `DESIGN_b2b_residency_zeroing.md`.
 
-`SafePointer.history` and `splineResumer.catchup` are **resume state**: their
-lifetime is the job, not the goroutine, because `e.catchup()` re-reads them on
-the operator's hold-to-resume (`gui/gui.go:2747`). The design zeroes them at
-`EngraveScreen.Engrave`'s return, and **only when the job is terminal** — a
-terminal state is the receive on `e.errs`, so the goroutine has provably
-returned and there is no live writer.
+**REVISED after R0 rounds 2 and 3 — the `catchup` half is CLOSED and this entry
+described a placement that no longer exists.**
 
-Two gaps that guard leaves open:
+`SafePointer.history` is **resume state**: its lifetime is the job, not the
+goroutine, because `e.catchup()` re-reads it on the operator's hold-to-resume
+(`gui/gui.go:2747`). It is zeroed at `EngraveScreen.Engrave`'s return via
+`releaseResumeState` → `SafePointer.ClearHistory`, and **only when the job is
+terminal** — a terminal state is the receive on `e.errs`, so `runEngraving` has
+provably returned and there is no live writer.
 
-1. **The wipe path skips it.** If `Engrave` returns while the job is still
-   `engraveRunning` — `ctx.Done`, i.e. §10.2.4 firing mid-cut — the resume state
-   is not zeroed, because zeroing it would race the live goroutine.
+**`splineResumer.catchup` is no longer part of this item.** Round 2's I-A showed
+the job-level placement could never have reached it (`res :=` is a local in
+`runEngraving`, and `s.catchup` is nil by the first resumed knot). It is now
+zeroed by `defer clear(c)` inside `splineResumer.Knot`, where the array is still
+named — and round 3 verified by execution that `SafePointer.Resume` returns a
+NON-ALIASING array, so that clear cannot corrupt `history`.
+
+What remains open:
+
+1. **Two non-terminal returns skip the zeroing**, not one: `Engrave` returning on
+   `ctx.Done` (§10.2.4 firing mid-cut) and the double-Back return in
+   `engraveStopping`, where the goroutine is still winding down. Neither is
+   covered elsewhere — the wipe unwind is `ctx.B.Scrub()` + `Drawer.Release()`
+   and reaches no engrave state. Skipping is still the right call: zeroing under
+   a live goroutine races it, and a wrecked plate is worse than the residue.
 2. **`SafePointer.history` grows by `append`** (`engrave/engrave.go:1683`), so it
-   carries the same outgrown-array class as `op.Buffer`: the tail-clear at
+   carries the same outgrown-array class as `op.Buffer` did: the tail-clear at
    `:1675-1676` reaches only the CURRENT array, and every reallocation before it
-   left a full copy of the knots behind.
+   left a full copy of the knots behind. `ClearHistory` zeroes the current array
+   to cap, so this is bounded to arrays outgrown *during* a single job.
 
-Both are seed-derived geometry. Neither is covered by the design that files them.
+Both remaining halves are seed-derived geometry, and neither is covered by the
+design that files them.
 
 ### F-111 — `knotBuf` unzeroed wherever a plate is built and no cut happens — SUBSUMED by the F-108 design (owning phase: **B2b**)
 

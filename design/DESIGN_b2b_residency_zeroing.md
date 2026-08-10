@@ -775,6 +775,13 @@ alone) do not describe the real buffer either.
   a reviewer should read the four placements as design with a compile check, not
   as verified behaviour — and should note that deleting all four bodies would
   leave the suite just as green.
+- **F-107's SCRUB PLACEMENT is unimplemented**, and the previous version of this
+  list omitted it (round 3). Measured: `.Scrub()` still has exactly one non-test
+  call site, `gui/run_flow.go:245`, byte-identical to untouched b2b. What IS
+  built is the `op.Buffer` funnel — the *mechanism* that makes a scrub reach the
+  outgrown arrays — not the two additional call sites (§The scrub's position)
+  that make it run on a normal exit. **F-107 is therefore half-built: the part
+  that was Critical is done, the part that was the original filing is not.**
 - **Test rows 1 and 5–9 are not written.** Rows 2, 3 and 4 are written and run.
   Rows 7, 8 and 9 did not EXIST before round 2's M-b: two thirds of F-108's
   resolution had no mutation row, and deleting `releaseResumeState`'s body
