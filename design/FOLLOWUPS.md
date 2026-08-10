@@ -1271,7 +1271,18 @@ needs the operator's sign-off, like the 2026-08-09 amendment it sits beside.
 Bundle with F-85 and F-98 only if that happens before Task 8; otherwise it goes
 first, alone, because Task 8 is gated on it.
 
-### F-100 — SPEC §11.5's "confirm firmware reflash preserves the blob" has never been run and is owned by nobody (owning phase: before the release tag, with F-85/F-92/F-98)
+### F-100 — CLOSED 2026-08-09 — SPEC §11.5's "confirm firmware reflash preserves the blob"
+
+**Closed on real hardware the same day it was filed.** Vector F's sealed payload
+was loaded FIRST, the B2b firmware flashed second, and the start screen then
+showed Sealed Payload present with **9 pager dots** (B1 baseline: 8 absent, 9
+present). Recorded in `design/HARDWARE_RESULT_2026-08-09_phaseB2b.md`.
+
+It cost nothing but the ordering — which is why the preflight's fix was to put
+"payload first, firmware second" into Task 8's setup rather than to add a step.
+Original entry follows.
+
+### F-100 (original) — SPEC §11.5's "confirm firmware reflash preserves the blob" has never been run and is owned by nobody
 
 Found by the B2b residue sweep, which asked the completeness question "what is
 required before a tag, is named somewhere in the corpus, and appears in NEITHER
