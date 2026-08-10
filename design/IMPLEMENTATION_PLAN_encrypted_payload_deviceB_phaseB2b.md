@@ -1,10 +1,15 @@
 # Encrypted Payload Delivery — Plan B Phase B2b (§10.2.4's residency-keyed idle wipe) — Implementation Plan
 
-**Status: GREEN. Tasks 1–7 implemented, verified and committed
+**Status: GREEN, PREFLIGHT PASSED (GO-WITH-CHANGES, all blockers folded).
+Tasks 1–7 implemented, verified and committed
 (`fbe31ab`, `aa704b6`, `675ae4e`, `4935bf1`, `237c85f`, `920e1e1` on branch
 `b2b`; the runner at `dd3d4b3` here). **Mutation run, re-verified independently
 by the controller: 16/16 mechanically-applicable rows KILLED, 0 survived, final
-unfiltered suite PASS.** Next: **flash, then Task 8** — operator-run hardware.**
+unfiltered suite PASS.** A pre-hardware preflight (4 lenses + refutation) then
+found **1C/5I, none in the firmware's armed paths** — one seed-residency fix
+landed as `e8e78f0` (`Buffer.Scrub`), and Task 8's procedure was rewritten, most
+importantly because a bare `sh2-flash` would have flashed this phase's PARENT
+commit. Next: **flash, then Task 8** — operator-run hardware.**
 
 **Device budget, measured at each task** (`.github/workflows/test.yml:29`):
 `a01b666` 1310184/60584 → T1 1310568 → T3 1311536 → T4 1312776 → T5/T6
@@ -1378,34 +1383,112 @@ judgement call:
 
 ## Task 8 — hardware (operator-run)
 
-> **DO NOT FLASH BEFORE TASK 7 IS GREEN.** Operator instruction, 2026-08-09,
-> given while the SH2 was sitting in BOOTSEL. Task 7 adds no production code,
-> but a surviving mutant is a blocking finding and its fix would land in `gui/`,
-> so flashing earlier risks a wasted cycle on the real machine.
->
-> **Flash with `~/bin/sh/sh2-flash`, never `picotool` by hand.** The build output
-> is unsigned, and since the boot key was burned to slot 1 (2026-08-03,
-> permanent) the machine will not boot an unsigned image from a laptop port.
+> **DO NOT FLASH BEFORE TASK 7 IS GREEN.** Operator instruction 2026-08-09,
+> given while the SH2 was in BOOTSEL. Task 7 adds no production code, but a
+> surviving mutant is blocking and its fix would land in `gui/`.
 
-**This is the first time `ctx.Done` is ever true on the real machine** (fact 2),
-and the operator accepted that on 2026-08-09 on condition the hardware pass
-covers it.
+**Rewritten 2026-08-09 from the pre-hardware preflight** (`agent-reports/…-preflight-SYNTHESIS.md`,
+GO-WITH-CHANGES, 1C/5I). The earlier version would have **flashed the phase's
+parent commit** and then asked for observations the operator cannot collect.
 
-- [ ] **8.1** Seal vector F, load, unlock, and **walk away**. Confirm the warning
-      at 3:00, the wipe at 3:30, and that the machine **returns to the main menu
-      and is still usable** — not a blank screen, not a reboot.
-- [ ] **8.2** Repeat, touching during the warning: confirm the window resets and
-      no wipe occurs.
-- [ ] **8.3** Start a secret plate and walk away **mid-cut**: confirm **no wipe**
-      while the job runs, and that the 3:00 window restarts from the cut's end.
-- [ ] **8.4** Confirm a re-unlock after a wipe costs the twelve words and the
-      KDF, and that the payload is intact in flash.
-- [ ] **8.5** Record verbatim in `design/HARDWARE_RESULT_<date>_phaseB2b.md`.
+**The operator gets ONE trip. A forgotten measurement is another trip.**
 
-> **Watch what you paste.** Three commit messages in this feature have claimed
-> results that were never checked. Record what the screen showed.
+### Before leaving the desk
 
----
+- [ ] **Payload FIRST, firmware SECOND.** `me seal --seal-secret --iterations 300000
+      --out /tmp/f.uf2` over vector F's **records** (not the `vectors.json`
+      fixture blob), then `picotool load --verify /tmp/f.uf2` in BOOTSEL, **then**
+      the firmware. Confirming *Sealed Payload* still unlocks after that reflash
+      **closes F-100 / SPEC §11.5 for free**.
+- [ ] **Write down the twelve-word passphrase.** `me seal` **generates** it and
+      prints it once to stderr; there is deliberately no way to supply your own,
+      and the device cannot recover it. **It exists only on the host terminal.**
+      Without it Task 8 cannot be completed at all.
+- [ ] **Flash the RIGHT TREE — this is the Critical the preflight found:**
+
+      ```sh
+      SH2_REPO=/scratch/code/shibboleth/seedhammer-b2b ~/bin/sh/sh2-flash
+      ```
+
+      A bare `sh2-flash` defaults to `SH2_REPO=/scratch/code/shibboleth/seedhammer`,
+      which is this phase's **parent** at `a01b666` — `run_flow.go`,
+      `wipe_warning.go` and `wipe_guard.go` do not exist there. **Read the
+      `== Build ==` header: it must print the `b2b` tip. If it prints `a01b666`,
+      STOP.** The worktree must be clean first, or `-dirty` is stamped into the
+      version string.
+- [ ] **Move to the 20–28 V PD supply before judging whether it booted.** A dark
+      screen on USB power is not a signature rejection.
+- [ ] **Plan for three unlocks.** 8.1 ends in a wipe → unlock for 8.2 → 8.3
+      continues in that session → 8.3 sets up 8.4. Each unlock is twelve words on
+      a touch keyboard plus ~31 s of KDF.
+- [ ] **Point a phone at the screen with a stopwatch in frame** for 8.1–8.3.
+
+### 8.1 — the walk-away wipe
+
+"Walk away" means **do not touch the machine** — stand where you can see it.
+
+- [ ] Start the stopwatch at the **release of the last touch**.
+- [ ] **8.1a — the KDF measurement. Do it on the FIRST unlock; it is the only
+      free chance, and it closes §7.1.** Stopwatch from the *Unlocking* screen
+      appearing to it disappearing. Record the `--iterations`, the elapsed
+      seconds, and the quotient; compare to §7.1's 9,715 it/s. **There is no
+      console on this build — the stopwatch IS the measurement.**
+- [ ] Record the reading when **WIPING SECRET DATA** appears — expect **3:00**.
+- [ ] Record the countdown's **first number** — expect **30**.
+- [ ] Record the reading when the screen changes — expect **3:30**.
+- [ ] Record that the change is **instantaneous, with no blank interval**. This is
+      the ONLY thing that distinguishes the unwind from a reboot.
+- [ ] Record the **version string** on the start screen.
+
+### 8.2 — the touch reset, with a duration
+
+*"Confirm the window resets"* is otherwise satisfiable by nothing visibly
+happening over an unstated period — two operators would record different results.
+
+- [ ] Tap **once** while the countdown runs; the warning is replaced by the screen
+      underneath.
+- [ ] **Restart the stopwatch at the tap.** The warning must reappear at **3:00
+      and not before** — a half-reset window fires early, and only this
+      observation distinguishes a working reset from a broken one.
+- [ ] Confirm the dismissing tap **did not activate the control under it** (it is
+      deliberately swallowed while `a.idle.active` is still true).
+
+### 8.3 — the mid-cut plate — READ BEFORE STARTING
+
+- [ ] **The engrave screen is ARMED during plate setup.** §10.2.4 disarms only
+      while the job is *running*. Hold-to-start — where you clamp steel, seat the
+      needle and close the lock — is armed, and closing the lock generates no
+      touch event. **Either set the plate up before unlocking, or touch the
+      screen at least once every three minutes while your hands are in the
+      machine.**
+- [ ] If it fires anyway, **that is the feature working.** Record it — it is real
+      UX signal, and it costs a re-unlock, not a plate.
+- [ ] Confirm **no wipe while the job runs**; record the cut length.
+- [ ] Record **two readings** from the plate-done screen: that the 3:00 window
+      restarts **from the cut's end**, and when the warning appears.
+
+### 8.4 — payload survival, by its observables
+
+*"The payload is intact in flash"* is not something an operator can see — only
+its consequences. **This observation is already available at the first re-unlock
+at the top of 8.2; take it there so it is not lost.**
+
+- [ ] Post-wipe start screen: **Sealed Payload still present**, and the **pager
+      dot count unchanged** (B1 baseline: absent = 8 dots, present = 9).
+- [ ] Re-unlock requires the **twelve words and a full KDF**, and the **§6.6 hash
+      and plate list match 8.1's**.
+- [ ] **Power-cycle** and confirm the entry is still there.
+
+### 8.5 — the record
+
+Write `design/HARDWARE_RESULT_<date>_phaseB2b.md` with, at minimum: the
+`== Build ==` header and StartScreen **version string**; the **KDF** iterations /
+seconds / rate; **8.1's** four readings; **8.2's** reappearance reading and the
+swallowed-tap result; **8.3's** cut length and two plate-done readings; **8.4's**
+three observations; and **anything that surprised you**.
+
+> **Watch what you paste.** Several commit messages in this feature have claimed
+> results that were never run. Record what the screen showed.
 
 ## Gate coverage — state this in the R0 brief
 
