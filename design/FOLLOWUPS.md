@@ -1744,7 +1744,29 @@ Engrave would leave the seed resident for the whole ~21-minute cut."* The
 reasoning was applied to the record and not carried to the geometry, which is the
 other copy of the same secret.
 
-**Smallest fix, provisionally:** zero the spline immediately after `Engrave`
+**RE-SCOPED 2026-08-10, before review — the spline CANNOT be zeroed.** Measured
+rather than assumed:
+
+```
+$ grep -rn "type Curve" bspline/bspline.go
+bspline/bspline.go:22:type Curve = iter.Seq[Knot]
+```
+
+`Plate.Spline` is a **closure**, not a buffer. There is no `clear` to add, and
+the "smallest fix" below **cannot be written as stated**. What survives of this
+finding: the *reference* is already dropped promptly (`plate` is a local and
+`unlockSecretPlate` returns straight after `Engrave`), but the geometry's bytes
+are **unzeroable by construction** and linger as garbage until the allocation is
+reused — TinyGo does not zero on free. That is exactly F-83's original point.
+
+So F-108 becomes: **§10.2.2 claims a wipe-by-any-route guarantee the geometry
+cannot satisfy, and the spec never says so.** Options in
+`design/DESIGN_b2b_residency_zeroing.md` — accept and document (spec amendment,
+no code), or materialise the knots into an ownable buffer that can be zeroed (a
+real engrave-pipeline change, its own cycle). The operator's correction stands;
+its remedy is not a `clear`.
+
+~~**Smallest fix, provisionally:** zero the spline immediately after `Engrave`~~
 returns — the point at which F-83's exemption expires by its own terms. Needs an
 R0 pass rather than an inline patch, because the abort-mid-plate path
 (`gui/gui.go:2651-2656` calls `Stop()` and keeps rendering) means "Engrave
