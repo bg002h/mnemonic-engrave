@@ -87,9 +87,13 @@ enum Command {
         #[arg(long)]
         seal_secret: bool,
 
-        /// PBKDF2 iterations. 300,000 = 30.9 s on device, from the measured
-        /// 9,715 iters/sec (§7.1, measured 2026-08-07 on real RP2350).
-        #[arg(long, default_value_t = 300_000)]
+        /// PBKDF2 iterations. 230,000 = ~31 s on device, from the IN-SITU
+        /// 7,463 iters/sec measured 2026-08-09 on the real machine through the
+        /// unlock flow (Task 8.1a). §7.1's 9,715 it/s is a RAW PBKDF2 figure and
+        /// does not hold in situ: the KDF runs 500 iterations per frame, so
+        /// 300,000 is 600 frames and cost 40.2 s +/- 1 measured -- about 15.5 ms
+        /// per frame of GUI overhead on top of the raw work.
+        #[arg(long, default_value_t = 230_000)]
         iterations: u32,
     },
 
