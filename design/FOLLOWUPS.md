@@ -1531,7 +1531,60 @@ F-106** as well as Task 9.5's own check — see the bench card in
 `design/DESIGN_f106_idle_timer_never_starts.md`. If that warning does **not**
 appear, it is an F-105 defect in its own right and not merely F-106 spilling over.
 
-### F-106 — §10.2.4's timer NEVER STARTS after an unlock unless the operator touches the screen (owning phase: **B2b — CRITICAL, gates the phase**)
+### F-106 — §10.2.4's window runs 2x (6:00, not 3:00): a LATE ARM EDGE lands on the deadline (owning phase: **B2b — CRITICAL, gates the phase**)
+
+**ROOT CAUSE FOUND on hardware 2026-08-10**, build `b2b-idleprobe3` =
+`256b38c`. Full readings and reasoning:
+`design/HARDWARE_RESULT_2026-08-10b_f106_ROOT_CAUSE.md`. The original title
+("never starts unless touched") is **wrong** and is kept above only as history.
+
+**The measurement.** On Cut/Skip, untouched: `idle 0s w151 t770 e162 A!` — armed
+reads TRUE live while the tracked value still disagrees, i.e. **the edge is
+pending**. Three minutes later, at exactly 3:00: `idle 0s w170 t771 e162 A` —
+site **170** (row 2's armed edge) wrote the clock and the `!` cleared. Warning
+then animated at 6:00 and the wipe fired at 6:30.
+
+**`t` advanced by exactly ONE across those three minutes** (770 → 771):
+`AppendEvents` blocks, so the loop was parked and woke once — on the 3:00 idle
+deadline — and that wakeup was consumed processing the pending edge.
+
+**`e` never moved (162 throughout, t770 → t771 → t803).** Zero events arrived.
+So `Pu0,0` is a STALE record of the last real touch, and the phantom-input
+hypothesis — the probe's own first decision row, which requires `e` to climb —
+is **refuted**. (`processTouch`'s dedup at
+`cmd/controller/platform_sh2.go:398-402` compares `tp` even when `touching` is
+false, which is a real latent fragility worth its own item, but it is NOT
+F-106: nothing was generating events at all.)
+
+**Mechanism.** `gui/run_flow.go`'s inner loop samples `armed := ctx.wipe.armed()`
+only AFTER the blocking `AppendEvents` returns. The guard is installed during
+the flow's own execution, so the edge goes pending; nothing wakes the loop on an
+arming change; the next wakeup IS the idle deadline; row 2 then stamps
+`a.idle.start = now` at the exact instant the wipe should have fired, and a full
+fresh window runs. Deterministic 2x.
+
+**The edge is also spurious.** `wipeGuard.armed()` is true as soon as `g != nil`
+with no job running, and at Cut/Skip `g.job` is not set until the `Engrave`
+call — so the FIRST transition is guard installation, not a finished cut, yet
+row 2's "a finished cut starts a FRESH window" is applied to it. Processed on
+arrival it would have been a harmless reset at t~0; **the damage is entirely
+that it lands 3:00 late.**
+
+**Fix is NOT yet written** and needs its own R0 pass — it changes §10.2.4's
+timing on a secrets-residency control. Directions: process the arm edge BEFORE
+the blocking read as well as after (arming can also change during the block when
+a job finishes on the engrave goroutine, so both are needed); and/or seed
+`a.armed` at guard installation so installation is not an edge.
+
+**Trap for the test.** `gui/idle_realclock_diag_test.go` on `b2b` reproduces
+`platform_sh2.go`'s timer structure line for line and the warning lands at
+**3m0s, ticks=2, evtTicks=0** — the host harness does NOT reproduce this bug,
+because its loop wakes often enough that the edge is never pending across the
+deadline. A passing host test proves nothing unless it reproduces the PARKED
+LOOP: a single `AppendEvents` call spanning the whole window.
+
+<details><summary>Original filing (title superseded above)</summary>
+
 
 Measured on hardware 2026-08-10. **Pre-existing, not a regression** — the operator
 confirms every earlier successful test involved an inadvertent touch after
@@ -1637,6 +1690,8 @@ untouched, for 3:30 and see whether the **screensaver** appears. The refresh
 condition is upstream's own (`a01b666` has `if len(evts) > 0` and nothing else),
 so that question is about the base firmware, not this phase — and it halves the
 search either way.
+
+</details>
 
 ### F-107 — the RENDERED seed is scrubbed ONLY on the wipe path; a normal exit leaves the twelve words in `ctx.B` (owning phase: **B2b — CRITICAL**)
 
