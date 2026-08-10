@@ -27,16 +27,20 @@ and 1,567 objects**; a normal exit strands nothing. So the hang is **retention**
 not fragmentation, and **fix B** (reuse the `Context`) is indicated — **not** C,
 which I had been recommending until the numbers came in.
 
-Task 9 (F-105) is implemented at **`749fce7`**. The machine currently runs the
-**diagnostic** build `v0.0.0-ge969839` (branch `b2b-heapprobe`) — **reflash `b2b`
-before any further Task 8 work.**
+Task 9 (F-105) is implemented at **`749fce7`**. **Reflash `b2b` before any
+further Task 8 work** — the machine runs a diagnostic build, not the phase build.
 
 | repo | HEAD | state |
 | --- | --- | --- |
-| `mnemonic-engrave` | `a046056` | **95 commits** unpushed |
-| `seedhammer-b2b` (worktree, branch `b2b`) | `749fce7` | **10 commits** ahead of `a01b666`; clean |
-| `seedhammer-heapprobe` (branch `b2b-heapprobe`) | `e969839` | **DIAGNOSTIC ONLY — never merge. This is what is currently FLASHED.** |
+| `mnemonic-engrave` | `90595d3` | **98 commits** unpushed |
+| `seedhammer-b2b` (worktree, branch `b2b`) | `6b828cf` | **11 commits** ahead of `a01b666`; clean |
+| `seedhammer-idleprobe` (branch `b2b-idleprobe`) | `1da54e1` | **DIAGNOSTIC ONLY — never merge. FLASHED 2026-08-10** as `v0.0.0-g1da54e1`, sha256 `a78f8324…` |
+| `seedhammer-heapprobe` (branch `b2b-heapprobe`) | `e969839` | **DIAGNOSTIC ONLY — never merge.** Was flashed 2026-08-09; superseded by the idle probe |
 | `seedhammer` (main checkout) | `a01b666` | untouched, clean |
+
+**The two diagnostic branches answer different questions and must not be read
+together** — the idle probe allocates a string per frame, so heap numbers taken
+under it are not comparable with 08-09's table.
 
 Pushing goes via `ci/staging` — see `CLAUDE.md`. **Do not push or tag; the phase
 has an open Critical.**
