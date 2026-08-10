@@ -1674,6 +1674,65 @@ hold. Cross-ref R0 round 0's M4 on `frameOp.op.src`/`inputOp.tag` — also an
 enumerated argument rather than a structural one, and also about a copy `Scrub`
 cannot reach. Two findings in one day where residency rested on enumeration.
 
+### F-108 — `plate.Spline` is never zeroed AFTER the cut: F-83 buys the mid-cut window and nothing ends it (owning phase: **B2b — CRITICAL**)
+
+Raised by the operator 2026-08-10, correcting a misreading of F-83 in this
+session: *"after engraving a seed … the corresponding splines/plates may be wiped
+and probably should be wiped immediately if possible."* That is right, and the
+code confirms the gap.
+
+**F-83's exemption is TIME-BOXED and the code says so.** `unlock_session.go:239`:
+
+> `LIVE    plate.Spline, for the duration of the cut. It IS the seed rendered as
+> geometry and must exist while the needle moves. F-83, accepted.`
+
+*"For the duration of the cut"* is the **justification**. **No code ends that
+lifetime when the cut ends.** Measured — there is no `clear` of a plate or a
+spline anywhere in `gui/`:
+
+```
+$ grep -rn "clear(plate\|plate.Spline\|clear(.*Spline" --include="*.go" gui/ | grep -v _test
+gui/unlock_session.go:196:	// carries the geometry: newEngraverJob holds plate.Spline
+gui/unlock_session.go:239://	LIVE    plate.Spline, for the duration of the cut ...
+gui/gui.go:2703:		job: newEngraverJob(ctx.Platform, plate.Spline, plate.Conf, 0),
+```
+
+Three mentions, all of them comments or a constructor. Nothing zeroes it.
+
+**What happens today.** `unlockSecretPlate` builds the plate, runs
+`clear(rec)` — correctly, and *before* `Engrave`, so the record is not resident
+for the ~21-minute cut — then calls `scr.Engrave(...)`. When that returns,
+`plate` goes out of scope. It becomes garbage; it is never zeroed, and TinyGo
+does not zero on free. So **the seed, rendered as geometry, sits in the heap
+after the plate is finished**, for as long as the allocation goes unreused.
+
+The §10.2.4 idle wipe does not help: it unwinds the flow, which drops the
+reference without zeroing it, and `ctx.B.Scrub()` covers the op buffer, not this.
+
+**Why the contrast with `rec` matters.** The same function already demonstrates
+the correct pattern, with a comment explaining exactly why the timing is
+load-bearing: *"it must be HERE rather than after Engrave returns … Waiting for
+Engrave would leave the seed resident for the whole ~21-minute cut."* The
+reasoning was applied to the record and not carried to the geometry, which is the
+other copy of the same secret.
+
+**Smallest fix, provisionally:** zero the spline immediately after `Engrave`
+returns — the point at which F-83's exemption expires by its own terms. Needs an
+R0 pass rather than an inline patch, because the abort-mid-plate path
+(`gui/gui.go:2651-2656` calls `Stop()` and keeps rendering) means "Engrave
+returned" and "the needle stopped" are not the same instant, and zeroing while
+the engrave loop still iterates `e.spline` would corrupt a live cut.
+
+**Not implicated in the 35 K residue** measured the same day: plates are built
+*after* the Cut/Skip choice (`cs.Choose` precedes `toPlate`), and all three
+measurement cycles walked away at that screen, so no plate geometry ever existed
+in them. This is a separate defect on a path those cycles never took.
+
+**Third residency finding in one day that rested on an enumerated or time-boxed
+argument nobody re-checked** — with F-107 and R0 round 0's M4. The pattern is
+worth naming in the phase report: each was individually defensible when written,
+and each stopped being true without anyone editing the line that claimed it.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:
