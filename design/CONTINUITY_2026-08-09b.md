@@ -9,15 +9,31 @@ began and is now only useful for the R0 history.
 Task 8 found a CRITICAL: after §10.2.4's wipe fires, re-entering the sealed
 payload HANGS the device. The wipe itself works perfectly. Nothing is pushed.**
 
-**Update, end of 2026-08-09:** Task 9 (F-105, the in-flight passphrase) is
-implemented at **`749fce7`**, and a **diagnostic firmware is on the machine** —
-`v0.0.0-ge969839` from branch `b2b-heapprobe`, which draws a heap readout on the
-start-screen version line. **The next hardware action is three heap readings, not
-a re-test of Task 8.**
+**UPDATE 2026-08-10 — READ THIS FIRST. There are now TWO hardware Criticals, and
+the newer one outranks everything else in this document.**
+
+**F-106 — §10.2.4's timer NEVER STARTS after an unlock unless the operator
+touches the screen.** Measured, and **pre-existing, not a regression**: every
+earlier "pass" involved an inadvertent touch after unlocking. Unlock and touch
+nothing, and nothing happens — no warning, no wipe, indefinitely, with every
+secret decrypted and resident.
+
+**This defeats the feature's entire purpose** and is strictly worse than the hang:
+the hang is loud, this is silent. **It gates the phase.**
+
+**The heap readings are DONE** and they settled the other Critical — see "MEASURED
+2026-08-10" in `HARDWARE_RESULT_2026-08-09_phaseB2b.md`. The wipe strands **214 KB
+and 1,567 objects**; a normal exit strands nothing. So the hang is **retention**,
+not fragmentation, and **fix B** (reuse the `Context`) is indicated — **not** C,
+which I had been recommending until the numbers came in.
+
+Task 9 (F-105) is implemented at **`749fce7`**. The machine currently runs the
+**diagnostic** build `v0.0.0-ge969839` (branch `b2b-heapprobe`) — **reflash `b2b`
+before any further Task 8 work.**
 
 | repo | HEAD | state |
 | --- | --- | --- |
-| `mnemonic-engrave` | `8d45418` | **92 commits** unpushed |
+| `mnemonic-engrave` | `a046056` | **95 commits** unpushed |
 | `seedhammer-b2b` (worktree, branch `b2b`) | `749fce7` | **10 commits** ahead of `a01b666`; clean |
 | `seedhammer-heapprobe` (branch `b2b-heapprobe`) | `e969839` | **DIAGNOSTIC ONLY — never merge. This is what is currently FLASHED.** |
 | `seedhammer` (main checkout) | `a01b666` | untouched, clean |
@@ -196,7 +212,52 @@ every task in the phase.
 
 **9.5 (hardware) is BLOCKED** until the post-wipe re-entry Critical is closed.
 
-## The next hardware session — do this first
+## F-106 — where to start, because it gates everything
+
+**The schedule is sound; only the START is broken.** Once the window begins it is
+exact — 3:00 and 3:30 to the second, repeatedly, across builds. The arithmetic,
+the warning, the countdown and the unwind all work.
+
+`a.idle.start` has three refresh sources: `len(evts) > 0`, the `armed` false→true
+edge, and `ctx.keepAwake && !armed`. The armed edge is *supposed* to set
+`a.idle.start = now` when the guard installs, so the window should begin at
+session start.
+
+**Check first:** `ctx.keepAwake` is set every slice during the KDF, while the
+guard is not yet installed — so the `&& !armed` gate permits it. Establish exactly
+what clears it, and when, *relative to the guard installing*. If it survives past
+the arm, it would refresh the clock forever while `armed` is false, and a real
+touch would be the only thing that ever changes the state.
+
+**This is host-reproducible.** `gui/run_reentry_test.go` already drives the real
+`uiFlow` through a real unlock and a real wipe at the `Run` level, and
+`gui/run_harness_test.go` can observe every frame. A test that unlocks and then
+**delivers no further events** should show the warning at 3:00 and does not.
+**Write that test before touching any code** — unlike the hang, this one does not
+need hardware.
+
+## The OTHER Critical — the post-wipe hang, now measured
+
+| moment | in use | free | live allocs |
+| --- | --- | --- | --- |
+| fresh boot | 144 K | 301 K | 688 |
+| unlock → **normal** exit | 144 K | 301 K | 688 |
+| unlock → **wipe** | **358 K** | **87 K** | **2255** |
+
+A normal exit returns the heap to its boot state byte-for-byte and
+object-for-object. **A wipe strands 214 KB and 1,567 objects**, leaving 87 KB free
+against a read that needs **64 KiB contiguous**.
+
+**So it is retention, not fragmentation.** 1,567 extra *objects* — not a few large
+buffers — is the signature of a whole session's allocations being held. The open
+question, with its own discriminator, is whether they are **reachable** (a real
+reference leak) or merely **uncollected**: that the allocation *fails* argues for
+reachable, since a failing allocation is exactly when TinyGo would collect.
+
+**Fix B is now indicated.** A had been tempting and would mask this entirely; C
+would treat a symptom and leave the machine one feature from the same wall.
+
+## The hardware protocol, for when it is needed again
 
 The diagnostic build `v0.0.0-ge969839` is already flashed. **Three readings of the
 start-screen version line:**
@@ -220,9 +281,10 @@ never be what gets tested or merged.
 
 ## What is owed, in order
 
-1. **The wipe-inventory report** — read and fold.
-2. **Pick a fix** (A/B/C) and take it through the **R0 loop**. It is a normative
-   change to §6.2-adjacent read logic on a funds path.
+1. **F-106 first** — it gates the phase, it is host-reproducible, and it is the
+   one that silently defeats the feature.
+2. **The hang: implement fix B** and take it through the R0 loop. The measurement
+   has already chosen it; what needs review is *what* is being retained.
 3. **Re-flash and re-run Task 8 from 8.1**, then 8.2, 8.3, 8.4 — none of which
    have been attempted, because all need a working post-wipe re-entry.
 4. Whole-diff review to 0C/0I, then merge.
