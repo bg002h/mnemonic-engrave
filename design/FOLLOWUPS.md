@@ -1852,6 +1852,58 @@ argument nobody re-checked** — with F-107 and R0 round 0's M4. The pattern is
 worth naming in the phase report: each was individually defensible when written,
 and each stopped being true without anyone editing the line that claimed it.
 
+### F-113 — codex32 LONG CODES are admitted, decrypted and offered, then can never be engraved (owning phase: **post-B2b, before the release tag**)
+
+Found 2026-08-10 while answering an operator question about QR codes on sealed
+plates. Measured, not reasoned about.
+
+`codex32.New` (`codex32/codex32.go:41-44`) admits two length bands:
+
+```
+shortCodeMinLength = 48    shortCodeMaxLength = 93
+longCodeMinLength  = 125   longCodeMaxLength  = 127
+```
+
+`backup.EngraveSeedString` builds a QR from the uppercased share
+**unconditionally** and refuses `qrc.Size > 33`. Measured against the real
+encoder with the uppercased bech32 charset:
+
+| share length | admitted by `codex32.New` | QR size | engrave |
+| --- | --- | --- | --- |
+| 48–**90** | yes (short) | 29–33 | **cuts** |
+| **91–93** | yes (short) | 37 | **refused** |
+| **125–127** | yes (**long**) | 41 | **refused** |
+
+So **every codex32 long code, and the top three lengths of the short-code range,
+are unengraveable** — while being perfectly decryptable. A 256-bit seed lands at
+~74 chars → QR size **33**, exactly at the ceiling with zero headroom, so nothing
+above it can ever fit.
+
+**Why this is worth a follow-up rather than a shrug.** The operator learns only
+*after* unlocking and decrypting — the record is admitted by §10.2.1's
+allow-list, offered by the secret session, and then dead-ends. And the message
+they get is **"This record does not fit any plate size."**, which reads as
+*choose a bigger plate*: no plate size helps, because the ceiling is the QR
+encoder, not the plate.
+
+**Two fixes, and the first is the real one:**
+
+1. **Refuse it earlier.** Best on the HOST, in `me seal`, which can reject a
+   record the device could never engrave before the payload is ever written.
+   Failing that, at §10.2.1's allow-list, so the record is never offered.
+2. **Reword the message** to say the record is too large to ENCODE, not to fit a
+   plate.
+
+**Do not fix inline in the B2b residency work** — it touches admission on a funds
+path and deserves its own scope. Note also the Rust-primary rule: if admission
+changes, the normative behaviour lands in the primary Rust crate with test
+vectors first, and the Go port follows.
+
+**Not a residency problem.** The refusal path is one where `toPlate` has already
+filled the knot buffer at build time and no cut ever happens — that geometry IS
+zeroed, by the `defer` inside `planEngraving`'s closure (F-108 item 1), which
+fires on the iterator's exit rather than on a cut.
+
 ### F-110 — an ABANDONED engrave job's resume state is never zeroed (owning phase: **B2b**)
 
 Filed by the R0 round-1 fold of `DESIGN_b2b_residency_zeroing.md`.
