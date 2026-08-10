@@ -17,8 +17,9 @@ a re-test of Task 8.**
 
 | repo | HEAD | state |
 | --- | --- | --- |
-| `mnemonic-engrave` | `33df670` | **85 commits** unpushed |
-| `seedhammer-b2b` (worktree, branch `b2b`) | `484ceb9` | **8 commits** ahead of `a01b666`; one untracked test file from the in-flight audit |
+| `mnemonic-engrave` | `8d45418` | **92 commits** unpushed |
+| `seedhammer-b2b` (worktree, branch `b2b`) | `749fce7` | **10 commits** ahead of `a01b666`; clean |
+| `seedhammer-heapprobe` (branch `b2b-heapprobe`) | `e969839` | **DIAGNOSTIC ONLY — never merge. This is what is currently FLASHED.** |
 | `seedhammer` (main checkout) | `a01b666` | untouched, clean |
 
 Pushing goes via `ci/staging` — see `CLAUDE.md`. **Do not push or tag; the phase
