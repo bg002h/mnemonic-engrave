@@ -1604,6 +1604,34 @@ the only state that can differ is `a.idle.start`, assigned at exactly three site
 oscillating) or **set into the future** (B: a bad `time.Now()` read). One signed
 number on the panel separates them, which is what branch `b2b-idleprobe` draws.
 
+**UPDATED 2026-08-10 (second measurement) — it is not "never starts", it is a
+DOUBLED WINDOW, and it is deterministic.** Three consecutive cycles on
+`b2b-heapprobe2` (fixes C and D), timed from video:
+
+| | measured | expected |
+| --- | --- | --- |
+| Cut/Skip → warning | **6:00** | 3:00 |
+| warning → wipe | **29–30 s** | 30 s |
+
+The second half is exact, so `wipeWarningDelay` and the arithmetic are intact.
+The first half is consistently **2 × `idleTimeout`**. That is what an armed edge
+landing at +3:00 produces: `run_flow.go:170` sets `a.idle.start = now` on the
+false→true transition, putting the warning at +6:00 and the wipe at +6:30 —
+6:29 and 6:30 were measured.
+
+**This probably UNIFIES the original observation.** Yesterday's "4:15 and
+nothing" is exactly what a 6:00 window looks like if you stop waiting at 4:15.
+So the earlier reading — *the timer never starts* — may always have been *the
+window is twice as long*, and this morning's clean 3:00 the outlier rather than
+the norm. **No screensaver at +3:00 is expected and is not a clue**: while armed
+the warning takes the screen the saver would have had; they are one branch and
+can never both run.
+
+**Open:** why `armed()` flips false→true at +3:00 rather than at unlock.
+`b2b-idleprobe3` (the overlay rebased onto fixes C and D, built and green) prints
+the field that decides it — `w170` means the armed edge rewrote the clock,
+`w151` with `e` climbing means an event did.
+
 *Cheapest next step, no flash required:* leave the device on the main screen,
 untouched, for 3:30 and see whether the **screensaver** appears. The refresh
 condition is upstream's own (`a01b666` has `if len(evts) > 0` and nothing else),
@@ -1732,6 +1760,50 @@ in them. This is a separate defect on a path those cycles never took.
 argument nobody re-checked** — with F-107 and R0 round 0's M4. The pattern is
 worth naming in the phase report: each was individually defensible when written,
 and each stopped being true without anyone editing the line that claimed it.
+
+### F-109 — ~35 K in ~81 REACHABLE objects survives every wipe, unidentified (owning phase: **B2b**)
+
+Measured on hardware 2026-08-10 with `b2b-heapprobe2`, which forces
+`runtime.GC()` before every readout — so these are reachable objects, not
+garbage awaiting a sweep.
+
+| | baseline | wipe 1 | wipe 2 | wipe 3 |
+| --- | --- | --- | --- | --- |
+| in use | 127 K | 162 K | 162 K | 162 K |
+| free | 318 K | 283 K | 283 K | 283 K |
+| live allocs | 193 | 274 | 276 | 276 |
+
+**It PLATEAUS.** Cycles 2 and 3 are byte-identical and differ by two objects, so
+this is a one-time ~35 K cost, not a per-wipe leak. No exhaustion, no cliff.
+
+**Fix D is not the answer, and the same run proves it.** `buf 2048/512` — the
+abandoned Buffer's capacities at the moment of abandonment — is
+`2048×4 + 512×8` ≈ **12 KB**, the entire ceiling on what `Drawer.Release` could
+ever recover, and D is already in the measured build so those bytes are already
+back. The 35 K sits on top. R0 round 0's C1 predicted exactly this and was
+conservative: it estimated ~24 KB.
+
+**Why this is not merely a memory-hygiene item** (operator, 2026-08-10: *"for all
+we know that missing 35 K is unwiped secret data, right?"* — correct, and it
+overturns the "bounded, therefore a follow-up" framing I first gave it).
+§10.2.4's guarantee is about **secrets**, not bytes. Bounded ≠ safe. Until the 81
+objects are **named**, this is an open residency question on a funds path.
+
+**Ruled out so far:** plate geometry. Plates are built *after* the Cut/Skip choice
+(`cs.Choose` precedes `toPlate`), and all three cycles walked away at that
+screen, so no spline ever existed in them. See F-108 for the separate defect on
+the path they did not take.
+
+**The measurement that closes it, and it needs no hardware.** `MemStats` can count
+objects but never identify them, so stop asking it. Instead do at the `gui` level
+what `gui/op/release_test.go` now does at the `op` level: drive `runWithFlow`
+through a real unlock and a real wipe, attach `runtime.SetFinalizer` to each
+secret-bearing object — the blob, the decrypted records, the passphrase buffer,
+the parsed words — force collection, and assert **every one is gone**. Anything
+that survives is *named*, not guessed. Note the three traps that test found the
+hard way: `runtime.KeepAlive` the holder or the collector reclaims it and the
+test passes vacuously; two `GC()` calls plus a timeout, not one; and choose the
+canary so it actually enters the structure under test.
 
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
