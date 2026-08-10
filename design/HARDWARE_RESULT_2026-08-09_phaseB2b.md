@@ -71,41 +71,51 @@ both.
       not read. Minor, and only worth a re-run if the countdown text is ever
       suspected.
 
-### 8.1a — the §7.1 in-situ KDF rate — **MEASURED, and it disagrees with the spec**
+### 8.1a — the KDF, and a CORRECTION to my own analysis
 
 | | |
 | --- | --- |
 | iterations | 300,000 |
-| elapsed | **40.2 s ± 1.0** (stopwatch; the film-affected first attempt gave 36 s ± 8 and could not discriminate) |
-| **in-situ rate** | **7,463 it/s** (7,282–7,653) |
-| §7.1 records | 9,715 it/s → predicts 30.9 s |
-| verdict | **9,715 is OUTSIDE the error bar.** 23% slower in situ. |
+| **wall clock, stopwatch** | **40.2 s ± 1.0** |
+| **device's own on-screen estimate** | **38–40 s** — independent, and it agrees |
+| §7.1's `cmd/kdfbench` figure | 9,715 it/s → **30.9 s of DERIVATION** |
 
-**Explained, not merely observed.** The KDF runs `kdfStepIterations = 500` per
-frame, so 300,000 is 600 frames at **67.0 ms** each. Raw PBKDF2 at 9,715 it/s
-accounts for 51.5 ms, leaving **~15.5 ms per frame of GUI overhead** — the
-progress screen, event handling, `WakeupAt`. §7.1's figure is a **raw bench**
-number; the in-situ rate carries ~30% on top. This is the last open item in
-§12.1, and closing it is what Task 8.1a existed for.
+**These do not conflict, and my first reading that they did was WRONG.** §7.1's
+9,715 it/s is a harness measurement of PBKDF2 alone — the time inside `d.Step`.
+Its "300,000 → 30.9 s" is 300,000 ÷ 9,715, i.e. **derivation time**. The
+stopwatch measures **wall clock**, which additionally covers ~600 full-panel
+repaints. Two different quantities.
 
-**Consequences:**
+`gui/unlock_kdf.go:217-229` distinguishes them deliberately and warns about this
+exact mistake:
 
-1. **§7.1's "300,000 = 30.9 s on device" is falsified in situ** — it is ~40 s.
-   The claim appears in the spec, the plan, and the CLI's help text.
-2. **F-93's severity was UNDERSTATED.** The park threshold at the real rate is
-   180 × 7,463 = **1,343,284** iterations, so **34.6%** of the legal 100k–2M
-   range would have hung the pre-Task-5 firmware — not the 13.2% recorded. Task 5
-   fixes it either way, but the affected range is 2.6× wider than believed.
-3. **`me seal`'s default changed 300,000 → 230,000** (`8106f56`) to restore
-   §7.1's ~30 s intent. Security cost is negligible: the passphrase is a
-   *generated* 128-bit BIP-39 mnemonic, and §7.1's own reasoning for the KDF's
-   ~20 bits is about *human-chosen* passphrases worth 25–35 bits.
+> *"§7.1 is closed by … reading the log line below off the real machine … so the
+> line must report the DERIVATION, not the wall clock. Wall time here also covers
+> ~600 full-panel repaints … §7.1's own history is a rate estimate wrong by 1.54×
+> that set the default to 450,000; a parked wall-clock reading would repeat that
+> error larger, and this time with the number 'measured on the real part'."*
 
-**Caveat: one timed sample.** The remaining unlock can corroborate.
+I took a wall reading, computed 7,463 it/s, declared §7.1 falsified, and changed
+`me seal`'s default to 230,000 — reducing the KDF work 23% on a category error.
+**Reverted (`7c4a7b4`); the default is 300,000, as §7.1 specifies.**
 
-**SPEC DRIFT, open:** §7.1 still records 9,715 it/s and a 300,000 default. It is
-GREEN and normative, so the amendment awaits operator approval; until then the
-CLI and the spec disagree by exactly this measurement.
+**What the measurement DOES establish, and it is worth having:**
+
+1. **The operator experiences ~40 s, not 30.9 s.** The spec's headline number is
+   derivation time, and the ~9.3 s of repaint overhead (~15.5 ms across 600
+   frames) is real and not documented anywhere an operator would look. The code
+   comment says §7.1 "separately asks for" this number — *"the number the
+   operator actually experiences"* — and this is it, now measured twice by
+   independent instruments.
+2. **§7.1's in-situ DERIVATION rate is still not measured.** Closing it needs the
+   `log.Printf("seal: kdf %d iterations in %s derived (%s wall)")` line read off
+   the machine, which this build has no console for. **§7.1 remains open.**
+3. **F-93's threshold should use the WALL rate, and that recalculation stands** —
+   parking is a wall-clock phenomenon, since `idleTimeout` is wall time. At
+   ~7,463 it/s wall the park threshold is 180 × 7,463 = **1,343,284** iterations,
+   so **34.6%** of the legal 100k–2M range would have hung pre-Task-5 firmware,
+   not the 13.2% recorded — which was computed from the *derivation* rate and is
+   the same conflation, in the plan, in the other direction.
 
 ## Not yet observed
 - [ ] **8.2** — the touch reset, with a duration
