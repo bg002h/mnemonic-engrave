@@ -184,7 +184,48 @@ stroke of the last glyph, which is not seed-recoverable. **The defect is a
 decision taken on false facts, not a live leak** — but the decision was about to
 be written into the spec.
 
-**Still open for R0 round 1:** the ordering hazard is unchanged and is now the
+### The ordering hazard — proposed resolution
+
+Round 0 left this open and it is the whole remaining difficulty: `Engrave`
+returning and the engrave loop finishing with the knot buffer are **not the same
+instant**. `gui.go:2651-2656` calls `Stop()` and keeps rendering, and the job
+iterates `e.spline` on its own goroutine. Zeroing under a live loop corrupts a
+cut — turning the machine's most ordinary recovery into a ruined plate.
+
+**Resolution: zero inside the engrave goroutine, as its last act, immediately
+before it signals completion.** The signal already exists and is unambiguous:
+
+```
+gui/engraver.go:131-144   Status() reads e.errs, and ONLY then moves the state
+                          to engraveStopped / engraveDone / engraveFailed
+```
+
+The goroutine sends on `e.errs` when it is done with the spline. Anything zeroed
+**before that send** is provably no longer read by the loop, on every exit —
+completion, `Stop()`, and error alike, since all three converge on that send.
+
+**Why not have the caller join and then zero.** `unlockSecretPlate` would have to
+wait for a terminal state after `Engrave` returns, which means either a spin or a
+timeout. A spin risks never terminating on a wedged goroutine, and **a hang on a
+watchdog-less device is a brick** — the same reasoning that already guards
+`WipeSecretAt`'s bounds check three lines from this code. Putting the zeroing
+where the loop's completion is *locally known* removes the synchronisation
+question entirely rather than answering it.
+
+**Cost:** it places a residency concern inside the engraver, which is a layering
+smell. Worth it — the alternative is a cross-goroutine lifetime invariant
+enforced by a comment, which is precisely the failure mode
+[[comments-outlive-their-conditions]] catalogues and which produced F-107 and
+F-108 in the first place.
+
+**What R0 must judge:** whether `e.errs` is genuinely the last read of the
+spline on ALL exits — including `Resume`/`catchup` after an interruption, where
+`splineResumer.catchup` is a second buffer with its own lifetime, and the
+`Status()` restart path at `engraver.go:146-148` which calls `e.Start()` again.
+**A restart that re-reads a zeroed buffer would cut a wrong plate**, which is
+worse than leaving the bytes resident.
+
+**Superseded framing:** the ordering hazard is unchanged and is now the
 whole difficulty. `Engrave` returning and the engrave loop finishing with
 `knotBuf` are not the same instant (`gui.go:2651-2656` calls `Stop()` and keeps
 rendering; the job iterates on its own goroutine). Zeroing under a live loop
