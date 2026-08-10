@@ -223,18 +223,40 @@ edge, and `ctx.keepAwake && !armed`. The armed edge is *supposed* to set
 `a.idle.start = now` when the guard installs, so the window should begin at
 session start.
 
-**Check first:** `ctx.keepAwake` is set every slice during the KDF, while the
-guard is not yet installed — so the `&& !armed` gate permits it. Establish exactly
-what clears it, and when, *relative to the guard installing*. If it survives past
-the arm, it would refresh the clock forever while `armed` is false, and a real
-touch would be the only thing that ever changes the state.
+~~**Check first:** `ctx.keepAwake` is set every slice during the KDF…~~
+~~**This is host-reproducible.** … Write that test before touching any code.~~
 
-**This is host-reproducible.** `gui/run_reentry_test.go` already drives the real
-`uiFlow` through a real unlock and a real wipe at the `Run` level, and
-`gui/run_harness_test.go` can observe every frame. A test that unlocks and then
-**delivers no further events** should show the warning at 3:00 and does not.
-**Write that test before touching any code** — unlike the hang, this one does not
-need hardware.
+**BOTH LEADS ABOVE ARE WRONG — struck 2026-08-10, and left visible rather than
+deleted so the same two are not re-derived.** Full analysis:
+`design/DESIGN_f106_idle_timer_never_starts.md`.
+
+1. **`keepAwake` is out.** It has exactly one caller in the tree —
+   `gui/unlock_kdf.go:327`, the derivation, which is not running on Cut/Skip —
+   and `&& !armed` excludes it there anyway.
+2. **It is NOT host-reproducible, and that test already exists and passes.**
+   `TestRunSealedPayloadReentryAfterWipe/F_idle-wipe_nfc` drives the real
+   `uiFlow` through a real unlock, parks on Cut/Skip, delivers **no** further
+   events, and sees the warning at 3:00 and the wipe at 3:30.
+
+A new opt-in diagnostic (`gui/idle_realclock_diag_test.go`, b2b `6b828cf`) then
+removed the last two host substitutions — real wall-clock time, and an
+`AppendEvents` structured like `platform_sh2.go:369`, reused `*time.Timer`
+included — and came back clean: `warning drawn at 3m0s (ticks=2 evtTicks=0)`,
+`sessions=2` at `3m30s`. **Zero events all run, and the window opened on time.**
+
+**So the search moves to the machine.** The post-touch run proves the mechanism
+works end to end, so the only state that can differ is `a.idle.start`, written at
+exactly three sites (`run_flow.go:48`, `:151`, `:170`). Either it was
+**continuously refreshed** — A1, phantom input, which this panel has a documented
+history of (F-103), or A2, `armed()` oscillating — or it was **set into the
+future** by a bad `time.Now()` read (B). One signed number on the panel separates
+them; branch **`b2b-idleprobe`** draws it, with the site that last wrote it.
+
+**Cheapest next step, and it needs no flash at all:** leave the device on the main
+screen, untouched, for 3:30 and see whether the **screensaver** appears. The
+refresh condition is upstream's own — `a01b666` has `if len(evts) > 0` and nothing
+else — so that is a question about the base firmware, not this phase, and it
+halves the search either way.
 
 ## The OTHER Critical — the post-wipe hang, now measured
 

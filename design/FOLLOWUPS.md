@@ -1539,6 +1539,48 @@ What clears it, and when, relative to the guard installing.
 F-103 (the screen film) and the post-wipe hang — and the second whose earlier
 "pass" was an artifact of how the operator happened to interact with the machine.
 
+**UPDATED 2026-08-10 — the host is exonerated, and two of the leads above are
+dead.** Full analysis in `design/DESIGN_f106_idle_timer_never_starts.md`.
+
+*The `keepAwake` lead is closed.* `ctx.KeepAwake()` has exactly one caller in the
+tree and it is the derivation, which is not running on Cut/Skip; the `&& !armed`
+gate excludes it there besides:
+
+```
+$ grep -rn "KeepAwake()" --include="*.go" . | grep -v _test.go
+gui/unlock_kdf.go:327:		ctx.KeepAwake()
+```
+
+*The "write the failing host test first" lead is closed too* — that test already
+exists and passes. `TestRunSealedPayloadReentryAfterWipe/F_idle-wipe_nfc` drives
+the **real** `uiFlow` through a real unlock, parks on Cut/Skip, delivers **no**
+further events, and sees the warning at 3:00 and the wipe at 3:30.
+
+A new opt-in diagnostic then removed the last two host substitutions at once —
+real wall-clock time, and an `AppendEvents` structured like
+`platform_sh2.go:369` (reused `*time.Timer`, select over timer/wakeup/touch):
+
+```
+    idle_realclock_diag_test.go:142: warning drawn at 3m0s (ticks=2 evtTicks=0)
+    idle_realclock_diag_test.go:165: elapsed=3m30s sessions=2 ticks=32 evtTicks=0 longestDeadline=3m0s
+--- PASS: TestIdleTimerUnderSH2ShapedEventLoop (210.09s)
+```
+
+Zero events across the whole run, and the window opened on time anyway.
+
+*What remains.* Since the post-touch run proves the mechanism works end to end,
+the only state that can differ is `a.idle.start`, assigned at exactly three sites
+(`run_flow.go:48`, `:151`, `:170`). So it was either **continuously refreshed**
+(A1: phantom input, which this panel has a history of — F-103; or A2: `armed()`
+oscillating) or **set into the future** (B: a bad `time.Now()` read). One signed
+number on the panel separates them, which is what branch `b2b-idleprobe` draws.
+
+*Cheapest next step, no flash required:* leave the device on the main screen,
+untouched, for 3:30 and see whether the **screensaver** appears. The refresh
+condition is upstream's own (`a01b666` has `if len(evts) > 0` and nothing else),
+so that question is about the base firmware, not this phase — and it halves the
+search either way.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:
