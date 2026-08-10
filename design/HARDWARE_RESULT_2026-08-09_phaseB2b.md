@@ -77,7 +77,7 @@ both.
 | --- | --- |
 | iterations | 300,000 |
 | **wall clock, stopwatch** | **40.2 s ± 1.0** |
-| **device's own on-screen estimate** | **38–40 s** — independent, and it agrees |
+| **device's own on-screen estimate** | **40 s** — independent instrument, agrees to within tenths |
 | §7.1's `cmd/kdfbench` figure | 9,715 it/s → **30.9 s of DERIVATION** |
 
 **These do not conflict, and my first reading that they did was WRONG.** §7.1's
@@ -101,7 +101,12 @@ I took a wall reading, computed 7,463 it/s, declared §7.1 falsified, and change
 
 **What the measurement DOES establish, and it is worth having:**
 
-1. **The operator experiences ~40 s, not 30.9 s.** The spec's headline number is
+1. **The operator experiences ~40 s, not 30.9 s — established twice, independently.**
+   The stopwatch gave 40.2 s ± 1.0; the device's own self-calibrating estimate
+   displayed **40 s**. That estimate is computed from *this* derivation
+   (`unlockKDFLead`, `gui/unlock_kdf.go:187-204`) rather than read off §7.1, and
+   it extrapolates `elapsed` — which includes the repaints — so it is a **wall**
+   figure too. Two instruments, same quantity, same answer. The spec's headline is
    derivation time, and the ~9.3 s of repaint overhead (~15.5 ms across 600
    frames) is real and not documented anywhere an operator would look. The code
    comment says §7.1 "separately asks for" this number — *"the number the
