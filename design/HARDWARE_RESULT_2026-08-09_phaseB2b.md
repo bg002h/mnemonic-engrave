@@ -42,7 +42,7 @@ both.
       Filed as F-100 by the residue sweep on 2026-08-09 because it was owned by
       nobody; closed the same day, for free, by ordering the setup correctly.
 
-### 8.1 — the walk-away wipe — **PASSES**
+### 8.1 — the walk-away wipe — **PASSES, on every observation**
 
 - [x] **Warning at 3:00.** `WIPING SECRET DATA` appeared on the *Cut this plate /
       Skip* screen, which is armed (guard installed, no engrave job registered).
@@ -58,8 +58,18 @@ both.
 
       So "the unwind IS the wipe" — the claim the phase was built on — holds on
       real hardware.
-- [ ] countdown's first number (expect 30) — *pending*
-- [ ] the reading when the screen changed (expect 3:30) — *pending*
+- [x] **The wipe fired at EXACTLY 3:30.** Operator's stopwatch, restarted at the
+      last touch after the screen film was removed.
+
+      So both deadlines landed on their nominal values with no drift over the
+      3½-minute window: warning at `idleWakeup` = 3:00, wipe at
+      `idleWakeup + wipeWarningDelay` = 3:30. The arithmetic is one clock
+      (`a.idle.start`) plus two constants, and it holds on `time.Now()` with no
+      RTC.
+- [ ] countdown's first number (expect 30) — not separately recorded; the 3:30
+      wipe implies a 30 s warning window, but the *displayed* first number was
+      not read. Minor, and only worth a re-run if the countdown text is ever
+      suspected.
 
 ### 8.1a — the §7.1 in-situ KDF rate — **MEASURED, and it disagrees with the spec**
 
