@@ -1334,6 +1334,47 @@ Note the wrapper is only safe because the worktree carries no legitimate
 uncommitted work — the general rule (restore from a file copy, never
 `git checkout`) still stands for anything else.
 
+### F-102 — `me seal` takes SEED MATERIAL on argv, while every other subcommand reads stdin (owning phase: before the release tag)
+
+Raised by the operator 2026-08-09 while reading Task 8's setup, and measured
+rather than assumed.
+
+**The inconsistency:** the subcommands that *refuse* secrets read from a private
+channel; the one that *requires* `--seal-secret` does not.
+
+| subcommand | input |
+| --- | --- |
+| `me convert` | stdin or `--in` — its doc comment even says *"Refuses secret ms1"* |
+| `me bundle` | file or stdin |
+| **`me seal`** | **`payload: Vec<String>` — argv only** (`crates/me-cli/src/main.rs:71`) |
+
+**Measured exposure on the author's own workstation:**
+
+- `/proc` is mounted with **no `hidepid`**, so `/proc/<pid>/cmdline` is
+  world-readable — any local process can read a running `me seal`'s arguments.
+- `~/.local/share/fish/fish_history` is `-rw-r--r--` and 517 KB. A record typed
+  at the prompt persists there, world-readable, indefinitely.
+
+Vector F is 1354 bytes of `ms1`/`mk1`/`md1` across 15 records — all of it seed
+material by construction, which is precisely what `--seal-secret` exists to gate.
+
+**The irony worth recording:** `--out` is `required = true` and documented
+*"never stdout, because the passphrase shares that stream"* — so the tool guards
+its OUTPUT channel scrupulously and leaves the INPUT channel wide open to `ps`,
+`/proc` and shell history.
+
+**Not a Task 8 problem.** Vector F is a public test fixture; sealing it on argv
+leaks nothing. This binds before anyone seals a REAL seed, which is what a
+tagged release invites.
+
+**Fix:** give `me seal` the same `--in`/stdin path the other subcommands already
+have (newline-separated records, read into a `Zeroizing` buffer, which
+`main.rs:158` already does for `convert`). Keep argv working for fixtures and
+tests. Consider warning to stderr when a secret-classified record arrives via
+argv. The spec is silent — `grep -niE "argv|command.?line|/proc"` over
+`SPEC_encrypted_payload_delivery.md` returns nothing — so §12's threat model
+should gain a line either way.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:
