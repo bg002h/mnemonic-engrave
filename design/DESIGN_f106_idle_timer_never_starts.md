@@ -135,6 +135,44 @@ No flash, no payload, no unlock — and it discriminates:
 Worth the three minutes before building anything: it is the cheapest experiment
 available and it halves the search either way.
 
+## The bench card — three experiments, two of them needing no flash
+
+Run in order. Each one is independently informative, and the first two cost
+nothing but a stopwatch. The machine currently runs the **heap probe** build, so
+experiments 1 and 2 are valid on it as they stand — the idle clock is untouched
+by that build.
+
+**1. Does the screensaver EVER appear?**
+Main screen, no payload flow, do not touch for 3:30.
+
+- *Appears* → the clock advances normally when nothing else is happening. The
+  refresh (or the poisoning) is specific to the unlock path, which bounds the
+  hunt to a short stretch of code.
+- *Never appears* → the clock never advances anywhere, on upstream's own
+  condition. That is A1 at global scale and the next step is the panel.
+
+**2. Does the PASSPHRASE screen's own timer work?**
+Enter Sealed Payload, type two or three words, then stop touching for 3:30.
+Row 4's guard is armed for the whole of `unlockPassphraseFlow`, and the last
+keystroke is a real event, so the window should open 3:00 after it.
+
+- *Warning appears* (it will say **"partly typed passphrase"**, not "seed
+  material") → the clock runs correctly when a genuine touch set it. Phantom
+  input is then not continuous, which weakens A1 and promotes **B**.
+- *No warning* → the clock is held forever on that screen too, and A1 is the
+  answer. This is also, in itself, an F-105 defect worth its own entry.
+
+**3. Flash `b2b-idleprobe` and read the overlay.**
+Only if 1 and 2 have not already settled it. Unlock, do not touch, and read the
+top-left line: `idle <n>s w<site> t<ticks> e<evtTicks> <A|-> <lastEvent>`.
+
+A word on experiment 2 that matters for reading the result: F-106 barely touches
+row 4, because entering a passphrase *is* touching the screen. The operator
+cannot reach that keyboard without generating events, so its window is always set
+by a real touch. Row 1 — the post-unlock walk-away — is the one with no
+guaranteed touch anywhere near it, which is exactly why the defect surfaced there
+and nowhere else.
+
 ## Not a regression, and the base commit proves it
 
 The refresh condition at the base commit `a01b666` — upstream's own `Run`, before

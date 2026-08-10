@@ -1502,6 +1502,35 @@ the guard's whole "resident secret" predicate needs rethinking.
 Worth deciding deliberately: **is the passphrase in-flight seed-equivalent?** It
 derives the key that opens everything, so a reasonable reading is yes.
 
+**FIX LANDED — b2b `749fce7` (Task 9). Hardware validation (Task 9.5) is the only
+part still owed.** Re-verified by reading the shipped code 2026-08-10:
+
+- The bracket is `unlockPassphraseFlow`'s **own lifetime**
+  (`unlock_kdf.go:135-137`), covering both the per-attempt retry and the
+  checksum-retry loop, and it **closes on every return path via `defer` — before
+  `unlockAttemptOnce`, therefore before `unlockDerive`**. That closure is row 5.
+  It is not a flag on `wipeGuard`: arming across the KDF is unsurvivable, since
+  Run's warning branch draws and `continue`s without returning control, so a
+  derivation reaching 3:00 freezes for the full 30 s window and the wipe becomes
+  certain — ~1,343,284 iterations, **34.6% of §6.2's legal range, permanently
+  un-openable on the device**.
+- Every copy is accounted for: `m` is cleared on each exit path inside the flow
+  and again at `unlock_kdf.go:409` after the attempt; `pass` and `key` are both
+  under `defer clear` in `unlockAttemptOnce`. `unlockAttemptOnce` returns before
+  the secret session starts, so the typed words are gone before any record is
+  displayed.
+- The remaining unprotected window is **the derivation itself**, which is row 5
+  as specified rather than a gap.
+
+**Interaction with F-106, which decides how to test this.** F-106 barely affects
+row 4: reaching the passphrase keyboard *requires* touching the screen, so that
+window is always started by a real event. Row 1's post-unlock walk-away has no
+guaranteed touch near it, which is why the defect surfaced there and not here.
+That makes "type two words, stop, wait 3:30" a **discriminating experiment for
+F-106** as well as Task 9.5's own check — see the bench card in
+`design/DESIGN_f106_idle_timer_never_starts.md`. If that warning does **not**
+appear, it is an F-105 defect in its own right and not merely F-106 spilling over.
+
 ### F-106 — §10.2.4's timer NEVER STARTS after an unlock unless the operator touches the screen (owning phase: **B2b — CRITICAL, gates the phase**)
 
 Measured on hardware 2026-08-10. **Pre-existing, not a regression** — the operator
