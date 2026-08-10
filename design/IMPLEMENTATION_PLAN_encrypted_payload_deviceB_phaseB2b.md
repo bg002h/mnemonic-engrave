@@ -115,6 +115,7 @@ exactly as it does today.
 | §11.3 mutation rows + **F-96**'s runner | ✅ Task 7 | — |
 | hardware (fact 2's first real firing) | ✅ Task 8 | — |
 | **F-88, F-94** further seed copies | — | **B2c** |
+| **F-104** four more residue rows, **F-105** the unwiped in-flight passphrase | — | **B2c** |
 | **F-90** items 1 and 3 (`ms1` inventory, hook) | — | **B2c** |
 | **F-76**, F-80's residue | — | after B2b |
 

@@ -1441,6 +1441,62 @@ to actually test.
 Option 2 is the one that makes the guarantee real; note it also affects the
 screensaver, which is upstream code this phase only borrowed.
 
+### F-104 — four MORE members of the unreachable-seed-residue class, two of them on paths nobody had enumerated (owning phase: **B2c**, with F-88/F-90/F-94)
+
+Found by the wipe-inventory audit (fable, 2026-08-09), which was dispatched to
+answer the operator's question *"are we wiping an incorrect portion of memory, or
+have we checked?"*. It found no second `Reset()`-class defect — that part is
+**measured**, see the audit test at `a73191a` — but it did find four residues in
+the accepted F-83/F-88 "unreachable heap garbage" class that **no prior inventory
+recorded**:
+
+1. **`x/crypto/pbkdf2`'s HMAC state**, holding the plaintext mnemonic
+   **XOR-recoverable**. This is inside a dependency, on the funds path, and no
+   wipe reaches it.
+2. **`splitMnemonic`'s `math/big` and `entBytes` residue** — created by the
+   **classifier**, on **every unlock**, and roughly **2,048×** over the passphrase
+   prefix during last-word entry. `entBytes` is the one **zeroable `[]byte`** in
+   this group, so it is the one with a cheap fix.
+3. **The `ms1` arm's per-ranging `ToUpper` copies and its QR** — **missing from
+   F-90's own enumeration**, on the arm F-90 itself calls *"the DEFAULT arm"* that
+   six of seven vectors take.
+4. **Keyboard fragment strings.**
+
+Item 3 is the one that should sting: F-90 exists *because* the `ms1` arm was
+under-examined, and its enumeration was still incomplete. That is F-88's lesson
+recurring — *"a complete inventory that wasn't"* — and it is the reason B2c must
+not simply re-read the existing lists.
+
+**Condition on B2c, from the audit:** B2c must absorb these four rows **and** land
+F-94's seam **first**, because those wipes remain silently deletable until it
+does. Without both, B2c's inventory repeats the same failure a third time.
+
+### F-105 — a typed passphrase is wiped by NOTHING until it is submitted (owning phase: **B2c**; design-boundary, not a bug)
+
+Found by the wipe-inventory audit, 2026-08-09, and the most consequential thing it
+found.
+
+**§10.2.4's bracket opens only AFTER decryption.** `unlockSecretSession` installs
+the residency guard once there are secrets to protect. So on the passphrase entry
+keyboard — *before* unlock — there is no armed timer, and the partial-exit
+`clear(m)` needs a **Back tap that a parked flow never delivers**.
+
+**Consequence.** An operator who types twelve words, is interrupted, and walks
+away leaves the passphrase resident indefinitely, with **the sealed blob sitting
+in flash beside it**. That is exactly the walk-away threat §10.2.4 was built for,
+**one screen too early** — and the screen where the operator is most likely to be
+interrupted, because entering twelve words on a touch keyboard is the longest
+manual step in the flow.
+
+It is a **design boundary**, not a defect: nothing promises this today, and
+§10.2.4's own text scopes the timer to resident *records*. That is why it is filed
+rather than treated as a regression. But the boundary is in the wrong place, and
+the fix is not obviously small — arming before there is anything decrypted means
+the guard's whole "resident secret" predicate needs rethinking.
+
+Worth deciding deliberately: **is the passphrase in-flight seed-equivalent?** It
+derives the key that opens everything, so a reasonable reading is yes.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:
