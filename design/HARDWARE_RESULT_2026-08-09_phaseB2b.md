@@ -216,6 +216,64 @@ lens**, and 16/16 mutation kills did not find this. The post-wipe restart is a
 path **no test exercises on hardware**, and Task 3's own tests drive it only
 through the `wipeNowHook` seam in a host harness.
 
+
+## MEASURED 2026-08-10 — the wipe strands 214 KB and 1,567 objects
+
+Diagnostic build `v0.0.0-ge969839` (branch `b2b-heapprobe`), heap readout on the
+start-screen version line. Three readings, same boot, same payload:
+
+| moment | in use | free | live allocs |
+| --- | --- | --- | --- |
+| fresh boot | 144 K | 301 K | 688 |
+| full unlock → **normal** exit | **144 K** | **301 K** | **688** |
+| full unlock → **wipe** | **358 K** | **87 K** | **2255** |
+
+**A normal exit returns the heap to its boot state byte-for-byte and
+object-for-object.** A full session — unlock, 40 s KDF, 15 records, plate build —
+allocates heavily and is then reclaimed completely. That is the control, and it is
+as clean as a control gets.
+
+**A wipe strands 214 KB and 1,567 objects.**
+
+### This changes the diagnosis
+
+The leading hypothesis was **fragmentation** — enough bytes free, no 64 KiB run
+among them. That is not what the numbers say. **There are only 87 KB free at all**,
+against a `XIPReader.Read` that demands **64 KiB contiguous**. Even laid out
+perfectly that leaves 23 KB of headroom, and with 2,255 live objects scattered
+through the space a contiguous 64 KiB run is implausible.
+
+So the failure is **retention**: the wipe path does not release what a normal exit
+releases. Fragmentation may still be the proximate cause of the failed
+allocation, but it is downstream of a much larger problem.
+
+### What this rules in
+
+- **Fix B** (reuse the `Context` rather than abandoning it) is now indicated, and
+  is no longer merely "treats the trigger" — the trigger *is* the problem.
+- **Fix C** (bounded read, ≤16,450) remains worth doing: at 87 KB free a 16 KiB
+  request would likely succeed where 64 KiB cannot. But it would be **treating a
+  symptom of a 214 KB retention bug**, and shipping it alone would leave the
+  machine one feature away from the same wall.
+- **The `a` count is the sharper signal.** 1,567 extra *objects*, not a few large
+  buffers, is the signature of a whole session's allocations being retained —
+  records, splines, glyph refs — rather than one oversized thing leaking.
+
+### The open question
+
+Whether those 1,567 objects are **reachable** (a genuine reference leak — something
+still holds session 1) or merely **uncollected** (garbage the GC has not run on).
+`MemStats` cannot distinguish them, and it matters:
+
+- **reachable** → a reference is held across the session boundary and must be
+  found. The abandoned `Context`, its `FrameCallback` closure chain, or a
+  conservatively-scanned stack slot are the candidates.
+- **uncollected** → the 64 KiB allocation should itself trigger a GC and succeed,
+  which it demonstrably does not — which argues *for* reachable.
+
+**That the allocation fails at all is evidence the objects are reachable**, since a
+failing allocation is exactly when TinyGo would collect.
+
 ## Not yet observed
 - [ ] **8.2** — the touch reset, with a duration
 - [ ] **8.3** — the mid-cut plate
