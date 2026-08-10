@@ -153,6 +153,47 @@ All three stopped together. That is not three features failing; it is that
 goroutine being gone or blocked. The film explanation does not apply — it was
 removed, and 8.1 subsequently ran perfectly on the same session.
 
+### NARROWED BY EXPERIMENT — the wipe is required
+
+| sequence | result |
+| --- | --- |
+| enter → exit Sealed Payload, repeatedly | **works** |
+| full unlock → **normal** exit → re-enter | **works** |
+| full unlock → **wipe** → re-enter | **HANGS** |
+
+Both control experiments were run on the machine. They **exonerate the NFC
+shutdown deadlock** as the primary cause: `StartScreen.Flow`'s exit defer runs on
+*every* program entry and completed many times without hanging. They also show a
+single 64 KiB alloc/free cycle is not sufficient — entering and exiting the
+payload flow does exactly that.
+
+**So the trigger is what the wipe does that a normal exit does not.** A normal
+exit reuses the same `Context`. **A wipe abandons it and allocates a fresh one**,
+stranding the old `ctx.B` — grown across a full session including the seed
+screen — alongside `a.warnBuf` (grown during the 30 s warning) and `a.mask`.
+Re-entry then asks for **64 KiB contiguous** under `-gc precise`, which is
+**non-moving**.
+
+**This is a design decision of this phase, not an upstream bug.** The plan says:
+*"A fresh `Context`, not a scrubbed one … a wipe is rare enough that the
+allocation is irrelevant."* Round 0 accepted it. That reasoning weighed the
+allocation's **cost** and never considered the **garbage it strands**, nor that a
+non-moving collector plus a 64 KiB contiguous demand makes fragmentation a
+**correctness** issue rather than a performance one.
+
+### The number that reframes the fix
+
+`seal/wire.go:192` records the format's own arithmetic: the largest payload the
+wire format admits is **52 + 8191 + 8191 + 16 = 16,450 bytes**. `XIPReader.Read`
+allocates **65,536** unconditionally — **about 4× more than anything legal can
+occupy**. The 64 KiB contiguous demand is not justified by the format; it is the
+flash *region* size used as an allocation size.
+
+### Superseded hypothesis
+
+An earlier reading here was that `Run` had returned. The **pressed-button frame**
+refutes it: a returned `Run` could not have drawn it.
+
 ### Leading hypothesis, NOT yet confirmed
 
 `Run` **returned** instead of looping. If `ctx.Done` goes true in the restarted
