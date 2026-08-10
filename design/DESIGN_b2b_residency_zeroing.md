@@ -1,6 +1,6 @@
 # Residency zeroing — the rendered seed and the cut plate
 
-**Status:** design, folded through R0 round 1. Written 2026-08-10.
+**Status:** design, folded through R0 round 2. Written 2026-08-10.
 **Owns:** F-107 (`ctx.B` scrubbed only on the wipe path) and F-108 (`plate.Spline`
 never zeroed after the cut). Both B2b.
 
@@ -40,6 +40,16 @@ not still hold the seed.
   A residual we cannot bound is honest to exclude, not to hand-wave.
 - **A compromised firmware image.** Signed boot is the control; a firmware that
   wants the seed does not need our garbage.
+
+**The in-scope adversary's read primitive, named (round 2, N-c).** "Able to run
+code on it or read its RAM" is in tension with excluding compromised firmware,
+since signed boot is largely the control against running code too. The primitive
+this design actually assumes is one of: **a debug/SWD port on a recovered
+board**, **a firmware defect that discloses memory without replacing the image**,
+or **a service path that dumps RAM**. None requires defeating signed boot. The
+trade survives under all three — and under the excluded ones too, since zeroing
+is never worse — but the design should not lean on an adversary it has not
+named.
 
 **What follows for the trade.** The adversary reads memory at some point *after*
 the session ends. So the property that matters is **"no seed-derived bytes remain
@@ -354,55 +364,174 @@ the draft inherited it from.
 Both verified against the code, and both are what make this safe without any
 synchronisation:
 
-- **Every terminal transition in `Status()` happens-after the goroutine
+- **Every terminal transition in `Status()` happens-after `runEngraving`
   returned.** `Status()` moves to `engraveStopped`/`engraveDone`/`engraveFailed`
   only in the branch that *receives* from `e.errs` (`gui/engraver.go:131-144`), and
-  the only send is `errs <- e.runEngraving(...)` after `runEngraving` returns. So
-  wherever the state is terminal, there is no live writer — no join, no spin, no
-  data race.
+  the only send is `errs <- e.runEngraving(...)` after `runEngraving` returns,
+  with its defers — including `d.Close()` — already complete. So wherever the
+  state is terminal there is no live writer of the resume state: no join, no
+  spin, no data race.
+  **Say `runEngraving`, not "the goroutine" (round 2, N-a):** `errs` is buffered
+  with cap 1 and the body is `defer e.pl.Wakeup(); errs <- e.runEngraving(...)`,
+  so after the receive the goroutine may still be inside `Wakeup()`. The safety
+  conclusion is unaffected, but the looser wording would license a future author
+  to add work after the send.
 - **Restart is impossible once `Engrave` returns.** `s.job.Start()` has exactly
   one caller (`gui/gui.go:2747`), inside `EngraveScreen.Engrave`'s own loop. When
   that function returns, the screen is gone and nothing can re-arm the job.
 
 #### The resolution, split three ways
 
-**1. `knotBuf` — zero inside the engrave goroutine, before the send.** Keep
-exactly where the previous draft put it. Safe on *all* exits **including
-restart**, for a reason the draft never recorded: `planEngraving`
-(`engrave/engrave.go:1027-1029`) opens every iteration with
+**Round 2 rejected two of these three placements as UNREACHABLE**, and it was
+right on both. The previous draft told the engrave goroutine to zero a buffer no
+code in `gui` can name, and told a job-level method to zero a slice that is nil
+by then. Both are fixed below by moving the zeroing to where the buffer actually
+lives; **neither needs an API change**, which the previous placements did.
+
+**1. `knotBuf` — zero inside `planEngraving`'s own closure.**
+
+The previous draft said "zero inside the engrave goroutine, before the send".
+**That cannot be written.** `PlanEngraving` allocates the buffer itself
+(`engrave/engrave.go:1018` `knotBuf := make([]bspline.Knot, 0, maxSplineKnots)`)
+and `planEngraving` is unexported; `gui/gui.go:2988` calls the exported form, so
+nothing in `gui` holds a reference to that array. An implementer would have had
+to invent an exported `engrave` API on a shared funds path — or silently drop
+the item while the register recorded F-108 as patched.
+
+Put it where the array is named:
 
 ```go
-spline := knotBuf[:0]
+func planEngraving(knotBuf []bspline.Knot, conf StepperConfig, e Engraving) bspline.Curve {
+	return func(yield func(bspline.Knot) bool) {
+		var ts timeScaler
+		start := bspline.Knot{}
+		spline := knotBuf[:0]
+		// F-108: the knots ARE the seed rendered as geometry. Zero them when the
+		// iterator finishes, on EVERY exit -- completion, an early `return` from
+		// !yield, and the callers that never cut at all (bspline.Measure at build
+		// time, and any path that builds a plate and then backs out).
+		//
+		// Two clears, deliberately. `defer clear(spline[:cap(spline)])` would
+		// bind its argument at DEFER time and so zero whichever array was
+		// current then; the closure form re-reads `spline` and zeroes only the
+		// LAST one. Measured today, the rolling window never reallocates --
+		// high-water cap is exactly 100 (= maxSplineKnots) across 21,360 knots
+		// for a 12-word plate and 32,826 for a 24-word one -- so knotBuf is the
+		// only array and the second clear is dead. It is here anyway because
+		// that is a measurement, not an invariant: appendLine appends an
+		// unbounded run, and if one ever exceeds the cap this keeps working.
+		defer func() {
+			clear(knotBuf[:cap(knotBuf)])
+			if cap(spline) != cap(knotBuf) {
+				clear(spline[:cap(spline)])
+			}
+		}()
+		// unchanged from here: the clamping knots, the `for c := range e` loop
+		// and its yields (engrave/engrave.go:1031-1085).
+		spline = append(spline, start, start)
+		_ = ts
+		_ = yield
+	}
+}
 ```
 
-and rebuilds from the upstream `Engraving`, so a re-range **recomputes** the
-buffer and cannot read what was zeroed. That upstream is intact after
-`clear(rec)` for the reason given above — it closes over `words`, not `rec`. One
-invariant, doing two jobs.
+Safe on *all* exits **including restart**, for a reason the previous draft never
+recorded: the closure opens every iteration with `spline := knotBuf[:0]` and
+rebuilds from the upstream `Engraving`, so a re-range **recomputes** the buffer
+and cannot read what was zeroed. That upstream is intact after `clear(rec)` for
+the reason given above — it closes over `words`, not `rec`. One invariant, doing
+two jobs.
 
-**2. `SafePointer.history` + `splineResumer.catchup` — zero at `Engrave`'s
-return, and only when the job is terminal.** These are **resume state**, not cut
-state: their lifetime is the *job*, not the goroutine. The previous draft's error
-was treating them as cut state.
+**This placement subsumes F-111 and round 2's M-a**, at no extra cost: the
+`ErrTooLarge` return and the ordinary *"insert a plate, then Back before
+starting"* path both build the plate and never cut, and `bspline.Measure` ranges
+the same closure at build time — so the defer fires on all of them, where a
+goroutine-exit hook fires on none.
+
+**Known limitation, stated rather than hidden:** if the window ever reallocated
+*more than once*, the intermediate arrays would be missed — the same
+outgrown-array class as `op.Buffer`, without `op.Buffer`'s funnel. Measured
+unreachable today (high-water 100 = the initial cap, i.e. zero reallocations);
+if that measurement ever changes, this needs the funnel treatment, not a third
+clear.
+
+**2. `SafePointer.history` — zero at `Engrave`'s return, terminal-only.**
+`splineResumer.catchup` is NOT zeroed here; see (2b).
+
+`history` is **resume state**, not cut state: its lifetime is the *job*, not the
+goroutine. The previous draft's error was treating them as cut state.
 
 ```go
 // in EngraveScreen.Engrave, replacing `defer s.job.Stop()`
 defer func() {
 	s.job.Stop()
 	// Resume state outlives the goroutine BY DESIGN -- catchup() re-reads it on
-	// the operator's hold-to-resume (gui.go:2747). It is dead only once this
-	// screen is gone, which is here: Start() has no other caller.
+	// the operator's hold-to-resume (gui/gui.go:2747). It is dead only once this
+	// screen is gone, which is here: Start() has no other caller, and every
+	// Engrave call site constructs a FRESH EngraveScreen (see below).
 	//
-	// Terminal-only: a terminal state is the receive on e.errs, so the
-	// goroutine has provably returned and there is no live writer. If the job
-	// is still running -- Engrave returning because ctx.Done, i.e. the wipe --
-	// skip it and let the wipe do its work, rather than race the goroutine.
+	// Terminal-only: a terminal state is the receive on e.errs, so runEngraving
+	// has provably returned and there is no live writer. If the job is still
+	// running -- Engrave returning because ctx.Done, i.e. the wipe -- this skips
+	// rather than racing the goroutine, and the wipe does NOT cover it either:
+	// the unwind is ctx.B.Scrub() + d.Release() and reaches no engrave state.
+	// That hole is F-110, not a covered case.
 	s.job.releaseResumeState()
 }()
 ```
 
-with `releaseResumeState` zeroing `e.safePoint.history` and the resumer's
-`catchup` when `e.status.State` is terminal, and doing nothing otherwise.
+with `releaseResumeState` zeroing `e.safePoint.history` when `e.status.State` is
+terminal, and doing nothing otherwise.
+
+**"Restart is impossible once `Engrave` returns" is a property of the CALL SITES,
+not of `Engrave`.** Round 2 checked all thirteen non-test sites and every one
+constructs a fresh `EngraveScreen`, hence a fresh `engraveJob` and `SafePointer`,
+per call — including the `for { if …Engrave { return } }` loops. A future flow
+that hoisted `NewEngraveScreen` out of its loop would reintroduce NC1. Recorded
+here because nothing in the code enforces it.
+
+**2b. `splineResumer.catchup` — zero inside `splineResumer.Knot`, not from the
+job.** The previous draft's placement cannot reach it, twice over:
+`res := newSplineResumer(...)` (`gui/engraver.go:168`) is a **local inside
+`runEngraving`** and `engraveJob` has no field for it; and `s.catchup = nil` fires
+on the very first resumed knot (`gui/engraver.go:227`), so a later job-level
+sweep would zero a nil slice while the array itself — a **fresh copy per
+restart**, returned by `e.safePoint.Resume(e.conf)` — stayed unreachable and
+intact. Every restart would leave another one.
+
+Zero it where it is consumed and still named:
+
+```go
+func (s *splineResumer) Knot(k bspline.Knot) (completed uint, cerr error) {
+	if c := s.catchup; c != nil {
+		s.catchup = nil
+		// c is a FRESH copy of the history knots, made per restart by
+		// SafePointer.Resume, and nothing outside this block can reach it. The
+		// defer rather than a clear after the loop: the loop returns early on a
+		// driver error, and that path must zero too. Registered once per job,
+		// not per knot -- the block runs only on the first resumed knot.
+		defer clear(c)
+		// Fast forward until the most recent knot -- body unchanged from
+		// gui/engraver.go:229-237.
+		for _, k := range c {
+			t, err := s.drv.Knot(k)
+			s.progress += int(t)
+			// Don't (double-)count the resuming knots as progress on the
+			// original spline.
+			s.progress -= int(k.T)
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+	// unchanged from here: gui/engraver.go:239-244.
+	t, err := s.drv.Knot(k)
+	s.progress += int(t)
+	p := max(0, s.progress)
+	s.progress -= p
+	return uint(p), err
+}
+```
 
 **3. The `history` tail — free, and always safe.** `engrave/engrave.go:1675-1676` does
 
@@ -421,15 +550,37 @@ still `engraveRunning` — the wipe path — resume state is not zeroed by (2), 
 same outgrown-array class as `op.Buffer` and (3) reaches only the current array.
 Both are **F-110** (below).
 
-### The `ErrTooLarge` path, which the cut-end fix cannot reach (round 0, M3)
+### The paths where a plate is built and no cut ever happens (round 0 M3, round 2 M-a)
 
 `toPlate` → `bspline.Measure` fills the knot buffer at **build** time
 (`gui/gui.go:2988-2989`), so "for the duration of the cut" was never the right
-lifetime bound. On the too-large path (`unlock_session.go:191-193`: `showError`,
-`return`) **the buffer is full and no cut ever happens** — no goroutine, no send,
-and therefore nothing that (1) above can hook. That error return needs its own
-`clear`, or the failure case leaks geometry the success case scrubs. Filed as
-part of **F-111**.
+lifetime bound for *any* caller.
+
+Round 0's M3 named one such path. **Round 2's M-a showed it is not an error path
+at all, and that scoping the fix to the error would have been the defect:**
+
+| path | how it gets there |
+| --- | --- |
+| record too large | `unlock_session.go:191-193` — `showError`, `return` |
+| **plate built, operator Backs out before starting the cut** | `gui/gui.go:2721-2725` — first Back while the state is still idle, `st.State != engraveRunning` → `break frames` |
+| build-time measurement | `bspline.Measure` ranges the same closure with no cut at all |
+
+The middle row is *"insert a blank plate… hold button to start"* followed by
+Back — **an ordinary operator action, not a failure**. On all three there is no
+goroutine and no send, so a cut-end hook fires on none of them, and
+`releaseResumeState`'s terminal-only guard also skips the idle state.
+
+**This is why item (1) moved into `planEngraving`'s closure.** The `defer` fires
+when the *iterator* finishes, so every one of these paths is covered by the same
+line, with no per-path patch and no way to add a fourth path that misses it.
+**F-111 is therefore subsumed and should be closed as part of this design rather
+than implemented separately** — implemented as filed, it would have been an
+`ErrTooLarge`-only patch that left the ordinary path open.
+
+Round 2 measured the residue on these paths at ~10 non-zero knots of the final
+stroke, consistent with round 0's 9, which is why the *severity* stays Important
+rather than Critical: it is not seed-recoverable. The defect is that the code
+would have claimed a coverage it did not have.
 
 ---
 
@@ -463,11 +614,13 @@ asserted. Results in §Gate coverage.
 
 1. **F-107, `gui` — the normal exit scrubs.** Drive `runWithFlow` through a real
    unlock to the seed screen, exit **normally** (no wipe), assert
-   `ctx.B.Residue()` is `(0,0)`. **Assertion point matters** (round 0, M4): it
-   must be taken on the *abandoned* Context after the session defer has run and
-   before any later frame reuses the buffer — the existing
-   `TestWipeScrubsTheAbandonedFrameBuffer` shows the shape. Mutation row: delete
-   `ctx.B.Scrub()` from the session defer.
+   `ctx.B.Residue()` is `(0,0)`. **Assertion point matters** (round 0, M4), and
+   the word for it is not "abandoned" (round 2, N-b): §F-107 spends a paragraph
+   proving a normal exit keeps the SAME Context and the same `op.Buffer`. Only
+   the *harness* ends the run, by bounding the flow so the session return ends
+   it. So: bound the flow, assert after the session defer has run and before any
+   later frame reuses the buffer. Mutation row: delete `ctx.B.Scrub()` from the
+   session defer.
 2. **F-107 outgrown-array class, `gui/op` — the load-bearing one.**
    `TestAppendZeroesTheArgsArrayItOutgrows` / `…TheRefsArrayItOutgrows` hold their
    **own** reference to the array the Buffer is about to outgrow, fill it with a
@@ -476,11 +629,22 @@ asserted. Results in §Gate coverage.
    a mutation leaves intact while the bytes survive. Mutation rows: delete
    `clear(old[:cap(old)])` from each funnel.
 3. **F-107 routing, `gui/op` — a lint, because no behavioural test can catch
-   this.** `TestBufferGrowthIsFunnelled` scans `op.go` for `.args = append(` /
+   this.** `TestBufferGrowthIsFunnelled` scans for `.args = append(` /
    `.refs = append(` outside the two funnel functions. **Measured necessity:**
    reverting one site (`encodeOp`'s header append) to a raw append leaves every
    behavioural test in `gui/op` and `gui` green, because the unrouted array is
    unreachable and unzeroed — the exact failure round 0 graded Critical.
+
+   **What the lint does NOT cover, stated because a gate hiding its blind spot is
+   worse than no gate (round 2, M-c).** As first written it hard-coded
+   `const src = "op.go"`, but `b.args`/`b.refs` are package-visible, so
+   `buffer_len.go`, `draw.go` and `image.go` could append to them unseen. **Fix:
+   walk the package directory rather than one filename.** Even then the textual
+   pattern cannot see a local-alias form —
+   `a := b.args; a = append(a, x); b.args = a`. Measured today, nothing else
+   appends anywhere in the tree, so this is future-proofing rather than a live
+   hole; it is written down so the next reader does not mistake the lint for a
+   proof.
 4. **F-107 reach, `gui`.** `TestSeedFrameReachesTheOutgrownArrayClass` renders a
    real 24-word `SeedScreen` and asserts the frame actually outgrew its arrays,
    failing as **inconclusive** if it did not. It exists because a correctly-zeroed
@@ -495,10 +659,34 @@ asserted. Results in §Gate coverage.
    is unchanged from an un-zeroed run. **Must fail against the previous draft's
    resolution.** This is the row that would have caught NC1, and there was no
    equivalent in the previous draft's test list.
-6. **F-108 knot buffer, `engrave`.** After a full cut, assert
-   `knotBuf[:cap]` is all-zero; and after a *restart*, assert the spline
+6. **F-108 knot buffer, `engrave`.** Range a plate's `Curve` to completion, then
+   assert the buffer is all-zero; and after a *restart*, assert the spline
    re-materialises identically — pinning that zeroing is safe rather than merely
-   done.
+   done. Add a third case that ranges only PART of the curve and breaks early
+   (`!yield`), and one that only calls `bspline.Measure`, since those are the
+   no-cut paths the previous placement missed entirely. Mutation row: delete the
+   `defer` from `planEngraving`'s closure.
+
+7. **F-108 resume state, `gui` — MISSING from the previous draft (round 2, M-b).**
+   Drive a job to a terminal state and exit via Back, then assert
+   `SafePointer.history[:cap]` is all-zero. Without this, **deleting
+   `releaseResumeState`'s body entirely leaves every other row green** — row 5
+   asserts the catch-up motion is *unchanged*, which passes identically whether
+   the method zeroes anything or is a no-op. Mutation row: empty
+   `releaseResumeState`.
+
+8. **F-108 history tail, `engrave` — also MISSING (round 2, M-b).** After a trim
+   at `engrave/engrave.go:1675-1676`, assert `history[rem:cap]` is all-zero. The
+   design calls this piece "free, and always safe" and says it "should land
+   regardless of the rest"; nothing pinned it. Mutation row: delete the
+   tail-clear.
+
+9. **F-108 catchup, `gui` — also MISSING.** Force one restart so the fast-forward
+   loop runs, hold a reference to the array `SafePointer.Resume` returned, and
+   assert it is zero afterwards. This is the row that discriminates the fixed
+   placement from the previous one: against a job-level sweep it fails, because
+   `s.catchup` is already nil and the array is unreachable. Mutation row: delete
+   `defer clear(c)` from `splineResumer.Knot`.
 
 **Deleted from the previous draft (round 0, I5):** the finalizer/lifetime canary
 on the plate, whose stated premise was "*since there are no bytes to check*". The
@@ -526,14 +714,31 @@ go build ./...                    clean (2 pre-existing failures: cmd/kdfbench,
                                   cmd/sealread -- TinyGo-only `machine` import,
                                   identical on untouched b2b)
 go vet ./gui/...                  2 pre-existing diagnostics, identical on b2b
-gofmt -l gui/                     5 files, all pre-existing, none of them mine
-go test ./...                     ok -- gui 41.2s, gui/op 1.6s, seal 16.5s, all pass
+gofmt -l gui/ engrave/            5 files, all pre-existing, none of them mine
+go test ./gui/... ./engrave/ ./seal/   ok -- all pass
 
 tinygo -target pico-plus2 -gc precise -opt 2 -scheduler tasks ./cmd/controller
-  baseline (b2b 3de8aa1)   1313816 flash / 60584 RAM
-  with the funnel          1314344 flash / 60584 RAM
-  delta                       +528 flash /     +0 RAM
+  baseline (b2b 3de8aa1)        1313816 flash / 60584 RAM
+  + the op.Buffer funnel        1314344 flash / 60584 RAM   (+528)
+  + all four F-108 items        1315240 flash / 60584 RAM   (+1424 total)
 ```
+
+**Round 2's three Importants were all "this placement cannot be written". All
+four F-108 items are now WRITTEN, and they build** — which is what actually
+retires those findings, rather than a promise that they could be:
+
+| item | where it landed | reachable? |
+| --- | --- | --- |
+| (1) `knotBuf` | `defer` inside `planEngraving`'s closure, `engrave/engrave.go` | yes — the array is named there |
+| (2) `history` | `engraveJob.releaseResumeState()` → new `SafePointer.ClearHistory()` | yes — `history` is unexported, so the zeroing lives in `engrave` and the abandonment decision in `gui` |
+| (2b) `catchup` | `defer clear(c)` inside `splineResumer.Knot` | yes — `c` is the live local; `s.catchup` is already nil |
+| (3) `history` tail | `clear(s.history[rem:cap])` at the trim | yes — dead by construction |
+
+One API addition was needed and is named rather than hidden: **`SafePointer.ClearHistory()`**,
+because `history` is unexported and the caller that knows the job is abandoned is
+in `gui`. That is one exported method on an existing type, against the previous
+draft's requirement to export a knot-buffer seam from `PlanEngraving` — which is
+the comparison round 2 asked for.
 
 **Mutation rows, executed:**
 
@@ -542,6 +747,7 @@ tinygo -target pico-plus2 -gc precise -opt 2 -scheduler tasks ./cmd/controller
 | delete `clear(old[:cap(old)])` from `appendArgs` | **KILLED** — `TestAppendZeroesTheArgsArrayItOutgrows` |
 | delete `clear(old[:cap(old)])` from `appendRefs` | **KILLED** — `TestAppendZeroesTheRefsArrayItOutgrows` |
 | unroute one site (`encodeOp` header) to a raw `append` | **SURVIVED** all behavioural tests; **KILLED** by `TestBufferGrowthIsFunnelled` |
+| add a raw `append` in `buffer_len.go` (a file the lint's first version never opened) | **KILLED** by the widened lint — the fix for round 2's M-c |
 
 **Measured on a real 24-word `SeedScreen` frame** (`TestMeasureSeedFrameOrphans`):
 
@@ -562,12 +768,26 @@ alone) do not describe the real buffer either.
 
 **What is NOT built, and gates nothing yet:**
 
-- **F-108's zeroing is unimplemented.** Items (1), (2) and (3) of the resolution —
-  `knotBuf` at the goroutine exit, `releaseResumeState` at `Engrave`'s return, the
-  `history` tail-clear — exist as design text only. `releaseResumeState` does not
-  exist in the tree. **This is the part the Critical was in, and it is the part a
-  reviewer must read as design rather than as verified code.**
-- **Test rows 1, 5 and 6 are not written.** Rows 2, 3 and 4 are written and run.
+- **F-108's zeroing BUILDS but is not TESTED.** All four items are applied in the
+  gate worktree and the suite is green — but green here means *"nothing broke"*,
+  not *"the fix works"*: **no test yet asserts that any of the four buffers ends
+  up zero.** Rows 6–9 are what would, and they are unwritten. Until they exist,
+  a reviewer should read the four placements as design with a compile check, not
+  as verified behaviour — and should note that deleting all four bodies would
+  leave the suite just as green.
+- **Test rows 1 and 5–9 are not written.** Rows 2, 3 and 4 are written and run.
+  Rows 7, 8 and 9 did not EXIST before round 2's M-b: two thirds of F-108's
+  resolution had no mutation row, and deleting `releaseResumeState`'s body
+  outright would have left every row green.
+
+**One measurement was taken for this fold and then reverted**, because it needed
+temporary instrumentation (an exported `MaxSplineCapSeen` counter in
+`planEngraving`): the rolling spline window's **high-water capacity is exactly
+100 = `maxSplineKnots`**, across 21,360 knots for a 12-word plate and 32,826 for
+a 24-word one. So the window never reallocates and `knotBuf` is the only array —
+which is why item (1)'s second clear is dead code today and is present anyway.
+The instrumentation is NOT in the gate worktree; re-add it if the number is ever
+doubted.
 - The `unlock_session.go:200` comment correction and the `:245` comment are not
   applied.
 
