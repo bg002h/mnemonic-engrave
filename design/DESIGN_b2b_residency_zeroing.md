@@ -46,47 +46,80 @@ than a seed screen, so the later words survive longest.
 **The exposed path is the common one.** Read your words, press back. The
 protected path — walk away for 3:30 — is the rare one.
 
-### The fix
+### C1 (round 0) — the scrub cannot reach what the buffer outgrew
 
-Scrub when the **secret session** ends, not only when the process-level wipe
-fires. `unlockSecretSession` already brackets exactly that lifetime — it is where
-§10.2.4's guard is installed and removed (`unlock_session.go:87-90`, quoted
-verbatim after an earlier draft misquoted it as two lines and the patch failed to
-apply — the anchor is three):
+**Folded. The round-0 Critical is not a flaw in the proposed fix; it is a defect
+in code B2b already shipped.**
 
-```go
-prev := ctx.wipe
-g := &wipeGuard{}
-ctx.wipe = g
-defer func() { ctx.wipe = prev }()
+`op.Buffer` has no pre-sizing, so `args` grows from nil by doubling, and `Scrub`
+zeroes `b.args[:cap(b.args)]` — **the current array only**. Every reallocation
+orphans an array still holding every rune written before it. The reviewer
+instrumented it and pulled the words back out of a 24-word seed frame:
+
+```
+seed frame len=2387 cap=3392 | reallocated=true
+Residue() after Scrub = (0 args, 0 refs)
+orphan text: "1: ABAN$D2O?NO5<2: ABILI(T-Y85Q3: ABLE#5f4: ABOU(T65…"
 ```
 
-Add the scrub to that same defer, **after** the guard is restored:
+Thirteen words, verbatim and in index order, in an array §10.2.2 declares wiped,
+scored 0 by `Residue()`. **`run_flow.go:245`'s existing wipe-path `Scrub` has the
+same hole**, so moving the call was never going to deliver the property — it
+would have made the normal exit equal to the wipe exit, an equality of two
+incomplete wipes.
+
+**The fix: record what the buffer outgrows, and scrub that too.** Prototyped and
+measured, not proposed:
 
 ```go
-defer func() {
-	ctx.wipe = prev
-	// §10.2.2 wipe-by-ANY-route. The records are cleared by their own
-	// defers; this is the RENDERED copy -- op.Glyph writes every drawn rune
-	// into ctx.B.args, and Buffer.Reset only truncates. Until 2026-08-10
-	// this ran solely on the §10.2.4 wipe path (run_flow.go:245), so an
-	// operator who read their seed and pressed Back left the twelve words in
-	// the backing array. That is the COMMON exit; the wipe is the rare one.
-	ctx.B.Scrub()
-}()
+type Buffer struct {
+	// orphans are backing arrays this Buffer has outgrown. append REPLACES the
+	// array on reallocation and the old one becomes unreachable -- still
+	// holding every rune written into it.
+	orphanArgs [][]uint32
+	orphanRefs [][]any
+	...
+}
+
+// growArgs records the outgoing array before append can replace it.
+func (b *Buffer) growArgs(n int) {
+	if cap(b.args)-len(b.args) < n && cap(b.args) > 0 {
+		b.orphanArgs = append(b.orphanArgs, b.args[:cap(b.args)])
+	}
+}
 ```
 
-**The hazard, and why this is safe here.** `Scrub` zeroes to capacity, so it must
-not run while an op built into `ctx.B` is still going to be drawn.
-`Context.Frame` resets `ctx.B` *after* the frame callback returns
-(`gui.go:88`), and this defer runs when `unlockSecretSession` returns — strictly
-between frames, with the next frame's content not yet built. Same position in the
-frame cycle as the existing `run_flow.go:245` call, which has been running there
-since B2b.
+`Scrub` then clears the orphans as well as the current arrays and drops the list;
+`Residue` counts them, or a reallocated buffer keeps scoring 0 while holding the
+words.
 
-**What it deliberately does not do:** scrub on *every* screen exit. The seed is
-only ever rendered inside the secret session, and a per-screen scrub would zero
-the buffer under ordinary navigation for no gain.
+**The growth surface is bounded and measured** — 9 `args` appends and 3 `refs`
+appends, all in `gui/op/op.go`, so routing them through the recorder is a local
+change and not a discipline anyone must remember.
+
+**Cost:** the orphaned arrays stay reachable until the next `Scrub` instead of
+becoming garbage. That is a deliberate trade — memory retained in exchange for
+memory that can be *wiped* — and it is bounded by the doubling series, ~2× the
+high-water mark.
+
+**Measured on the prototype:** a warm buffer at cap 128 grown to 10,240 records
+**16 orphaned arrays holding 25,054 non-zero words**; after `Scrub`, zero.
+
+### The scrub's position — F-107's original fix, still needed
+
+Round 0 confirmed the placement is **safe** (§(a)): `unlockSecretSession`'s defer
+runs strictly between frames, so no op still to be drawn is zeroed. It is
+necessary but not sufficient — without the orphan fix above it scrubs one array
+out of seventeen.
+
+Round 0 also found the placement **insufficient in scope** (I1): §8's twelve-word
+passphrase is rendered by `unlockPassphraseFlow`, **outside** this bracket, and on
+the give-up routes nothing scrubs at all. So the scrub belongs on **both**
+brackets — the passphrase flow's own defer (which Task 9 already installs for the
+wipe guard) and the secret session's.
+
+And I4: `run_flow.go:245` is **not** subsumed and stays. It covers the wipe path,
+where the Context is abandoned rather than returned through.
 
 ## F-108 — the plate's geometry survives the cut
 
@@ -106,58 +139,58 @@ explains why the timing matters (`unlock_session.go:195-203`): `clear(rec)` runs
 cut. That reasoning was never carried to the geometry, which is the other copy of
 the same secret.
 
-### RESOLVED BEFORE REVIEW: the spline cannot be zeroed at all
+### RE-RESOLVED after round 0 — I WAS WRONG TWICE, and the buffer IS clearable
 
-The previous draft sent R0 a question a tool answers in one grep, which is the
-exact division of labour this project forbids. Answered here instead:
+My first filing said "zero the spline after the cut". I then re-scoped it to
+"impossible, because `Curve = iter.Seq[Knot]` is a closure". **Round 0's I2 shows
+the second answer was as wrong as the first**, and for a worse reason: I stopped
+at the type and never looked at what the closure closes over.
 
-```
-$ grep -rn "type Curve" bspline/bspline.go
-bspline/bspline.go:22:type Curve = iter.Seq[Knot]
-```
+`Curve = iter.Seq[Knot]` is true and **irrelevant**. A closure over an
+already-materialised slice is still a clearable slice, and `engrave.PlanEngraving`
+builds exactly that. Measured by the reviewer: **9 non-zero knots left in
+`knotBuf` after a full cut; `clear(buf[:cap(buf)])` drives it to 0.**
+`planEngraving(knotBuf, conf, e)` already exists as a caller-supplies-the-buffer
+seam, with a doc comment saying so.
 
-`Plate.Spline` is `bspline.Curve` = **`iter.Seq[Knot]`, a closure**. There is no
-buffer to `clear`. **`clearSpline(plate)` cannot be written**, and F-108's fix as
-I first filed it does not exist.
+**Three ownable, zeroable buffers**, none of which the previous draft named:
 
-**So the finding changes shape.** What is true:
+| buffer | where | today |
+| --- | --- | --- |
+| `knotBuf` | `engrave.go:1016-1021` | never zeroed |
+| `SafePointer.history` | `engrave.go:1637` | trimmed by `copy`+reslice at `:1675-1676`, so the tail is never zeroed |
+| `splineResumer.catchup` | `gui/engraver.go:222` | never zeroed |
 
-- The **reference** is already dropped promptly — `plate` is a local, and
-  `unlockSecretPlate` returns immediately after `Engrave`. The lifetime is
-  bounded by the function, not by the session.
-- What is **not** true is that the memory is zeroed. TinyGo does not zero on
-  free, so the geometry — control points that encode the seed — lingers in the
-  heap as garbage until the allocation is reused. That is real residency, and it
-  is exactly F-83's original point: *"a `[]byte` pipeline would relocate the
-  secret rather than remove it, because the spline still encodes it."*
-- The record is separately fine: `clear(rec)` runs **before** `Engrave`, and the
-  spline does not read `rec` during the cut — the geometry was computed into the
-  closure beforehand, which is why that early clear is sound.
+**The genuinely unownable part** is `appendLine`'s per-segment
+`make([]bspline.Knot, len(sc))` (`engrave.go:1146`) — a fresh allocation per
+segment that no caller can reach. *That* is the real argument for accepting a
+residual limitation, and it is the argument the previous draft should have made
+instead of claiming the whole thing was impossible.
 
-**So the operator's correction still stands, but its remedy is not a `clear`.**
-The exemption genuinely is time-boxed to the cut; what expires at the end of the
-cut is the *justification*, and no code needs to change for the reference to
-drop. What remains is that **the bytes are unzeroable by construction**.
+**So both earlier framings are withdrawn:**
 
-**Three honest options, none of them a one-liner:**
+- **Option 1 as written would have amended the spec to assert an impossibility
+  that is measurably not impossible** — on a funds path, in a document future
+  work treats as settled. That is the worst outcome available here.
+- **Option 2 was dismissed on a memory cost that does not exist.** The 100-knot
+  allocation is already made on every `toPlate`: ~1.6 KB on the 32-bit target
+  (`bezier.Point{X,Y int}` = 8 B, `Knot` = 16 B padded).
 
-1. **Accept and document.** The geometry is unzeroable garbage after the cut,
-   bounded by heap reuse. This is what F-83 already accepts *during* the cut; the
-   post-cut window is the part §2.2 never named. Cost: a spec amendment (F-85),
-   not code.
-2. **Materialise the geometry into an ownable buffer** so it CAN be zeroed —
-   plan the knots into a slice the caller owns, iterate that, zero it after. This
-   is the fix that actually removes the secret, and it is a real design change to
-   the engrave pipeline with a memory cost on a device with 283 K free.
-3. **Force reuse.** Allocate the next plate over the same memory. Fragile and
-   unverifiable; listed to be dismissed.
+**Re-scoped fix:** zero `knotBuf`, `SafePointer.history` and
+`splineResumer.catchup` at the end of the cut, and amend §2.2 to name **only**
+the per-segment allocations as residual. The severity grading stands at
+Important rather than Critical: the measured residue is 9 knots of the final
+stroke of the last glyph, which is not seed-recoverable. **The defect is a
+decision taken on false facts, not a live leak** — but the decision was about to
+be written into the spec.
 
-**Recommendation: 1 now, 2 evaluated for a later phase.** Option 1 is honest and
-costs nothing; option 2 is the only one that makes the guarantee true, and it
-deserves its own cycle rather than being smuggled into a residency fix.
-
-**F-108 is therefore re-scoped from "add a missing clear" to "the spec claims a
-wipe-by-any-route guarantee the geometry cannot satisfy, and never says so".**
+**Still open for R0 round 1:** the ordering hazard is unchanged and is now the
+whole difficulty. `Engrave` returning and the engrave loop finishing with
+`knotBuf` are not the same instant (`gui.go:2651-2656` calls `Stop()` and keeps
+rendering; the job iterates on its own goroutine). Zeroing under a live loop
+corrupts a cut. Round 0's M3 sharpens this further: `bspline.Measure` fills the
+knot buffer at **build** time, so "for the duration of the cut" was never the
+right lifetime bound in the first place.
 
 ## Tests that can fail
 
