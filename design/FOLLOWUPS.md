@@ -1502,6 +1502,43 @@ the guard's whole "resident secret" predicate needs rethinking.
 Worth deciding deliberately: **is the passphrase in-flight seed-equivalent?** It
 derives the key that opens everything, so a reasonable reading is yes.
 
+### F-106 — §10.2.4's timer NEVER STARTS after an unlock unless the operator touches the screen (owning phase: **B2b — CRITICAL, gates the phase**)
+
+Measured on hardware 2026-08-10. **Pre-existing, not a regression** — the operator
+confirms every earlier successful test involved an inadvertent touch after
+unlocking, which is why it was invisible until the two were deliberately
+separated.
+
+| sequence | result |
+| --- | --- |
+| unlock → **touch** → wait | warning at **exactly 3:00**, wipe at **exactly 3:30** |
+| unlock → **touch nothing** → wait | **nothing at 4:15** |
+
+**This defeats the feature's entire purpose.** §10.2.4 exists for one scenario —
+unlock, be interrupted, walk away — and that is exactly the scenario with no
+timer. It is strictly worse than the post-wipe hang: the hang is loud and the
+operator knows something is wrong, whereas this is **silent**, and the machine
+looks like it is protecting secrets it is not protecting.
+
+**What is sound:** the schedule. Once started the window is exact — 3:00 and 3:30
+to the second, repeatedly. The arithmetic, the warning, the countdown and the
+unwind all work. The defect is entirely in **when the window begins**.
+
+**Where to look.** `a.idle.start` has three refresh sources:
+`len(evts) > 0`, the `armed` false→true edge, and `ctx.keepAwake && !armed`. The
+armed edge is *supposed* to set `a.idle.start = now` when the guard installs, so
+the window should begin at session start. Either that edge is not firing as
+believed, or something refreshes the clock continuously until a real touch
+arrives.
+
+Worth checking first: `ctx.keepAwake` is set every slice during the KDF, when the
+guard is not yet installed (`armed == false`), so the gate `&& !armed` permits it.
+What clears it, and when, relative to the guard installing.
+
+**This is the third finding in a row that only hardware could produce**, after
+F-103 (the screen film) and the post-wipe hang — and the second whose earlier
+"pass" was an artifact of how the operator happened to interact with the machine.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:

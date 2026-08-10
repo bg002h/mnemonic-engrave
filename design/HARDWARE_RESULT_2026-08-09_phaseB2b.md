@@ -42,7 +42,42 @@ both.
       Filed as F-100 by the residue sweep on 2026-08-09 because it was owned by
       nobody; closed the same day, for free, by ordering the setup correctly.
 
-### 8.1 — the walk-away wipe — **PASSES, on every observation**
+### CRITICAL — the timer NEVER STARTS after an unlock unless the screen is touched
+
+**Measured 2026-08-10, and it is PRE-EXISTING, not a regression.** The operator
+confirms: *"This isn't new behavior. I accidentally touched screen after unlock
+every time before."*
+
+| sequence | result |
+| --- | --- |
+| unlock → **touch** the Cut/Skip screen → wait | warning at **exactly 3:00**, wipe at **exactly 3:30** |
+| unlock → **do not touch anything** → wait | **nothing at 4:15.** No warning, no wipe. |
+
+**This defeats the feature's entire purpose.** §10.2.4 exists for one scenario —
+unlock, be interrupted, walk away — and that is precisely the scenario in which
+no timer runs. An operator who touches nothing after unlocking is protected by
+nothing, indefinitely, with every secret decrypted and resident.
+
+**The timing is exact once it starts**, so the arithmetic and the warning/wipe
+schedule are sound. The defect is entirely in **when the window begins**.
+
+**Candidates, none confirmed** — the idle clock has three refresh sources
+(`len(evts) > 0`, the `armed` false→true edge, `ctx.keepAwake && !armed`), and
+something is either refreshing it continuously or the arm edge is not resetting
+it as intended. Note the edge is *supposed* to set `a.idle.start = now` when the
+guard installs, which should start the window at session start.
+
+### 8.1 — QUALIFIED: it passed, but the window it measured began at a TOUCH
+
+**Not retracted — the readings were real and exact.** But the operator now
+confirms an inadvertent touch after every unlock, so **every 8.1 observation
+measured a touch-started window**, not the walk-away window the step describes.
+The distinction was invisible at the time because the unlock *was* the last touch.
+
+**8.1 must be re-run** once the Critical above is fixed, with the "do not touch
+after unlocking" condition made explicit in the step.
+
+### 8.1 — original record (readings valid, window mis-attributed)
 
 - [x] **Warning at 3:00.** `WIPING SECRET DATA` appeared on the *Cut this plate /
       Skip* screen, which is armed (guard installed, no engrave job registered).
