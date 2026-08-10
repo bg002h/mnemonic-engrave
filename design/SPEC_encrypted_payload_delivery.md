@@ -1313,7 +1313,9 @@ on which button was last pressed:
 | --- | --- | --- |
 | **any** secret record resident, not actively engraving | **3 min**, 30 s warning | The operator has just typed twelve words; they are standing there. Reuses the existing `idleTimeout` value (`gui/gui.go:2932`). |
 | actively engraving, any plate | **paused** | Never wipe mid-plate, needle down. A plate is ~21 min of untouched screen and that is not idleness. |
-| **no** secret record resident | **none** | Public data only. Nothing to protect. |
+| **no** secret record resident **and no passphrase in flight** | **none** | Public data only. Nothing to protect. |
+| **4. a passphrase is being typed** — §10.2 step 5's keyboard, before any unlock | **3 min**, 30 s warning | An in-flight passphrase derives the key that opens everything, so it is **seed-equivalent** (operator ruling 2026-08-09). Twelve words on a touch keyboard is the longest manual step in the flow and the likeliest place to be interrupted — with the sealed blob in flash beside them. |
+| **5. a key derivation is running** — §10.2 step 7 | **paused** | Row 2's rule, same reason: an operation the machine is performing is not idleness, and the operator cannot shorten it. Strictly weaker than row 2 — bounded by §6.2's ceiling (≤ 4:28 at the measured 7,463 it/s wall) and self-terminating, where a cut is ~21 min and needs the operator. |
 
 *(Amended 2026-08-09.)* **"Paused" restarts the window.** When a cut ends —
 completion, stop, or failure — the timer re-arms with a fresh 3:00 measured from
@@ -1348,6 +1350,35 @@ a button was pressed.
 
 The warning wakes the screen and any touch resets it, so a present operator is
 never wiped out and an absent one is.
+
+*(Amended 2026-08-09b.)* **The timer's subject is seed-equivalent material, not
+decrypted records.** As first written this section scoped the timer to resident
+*records*, which left the entry keyboard outside it — nothing has been decrypted
+there. The operator ruled that an in-flight passphrase **is** seed-equivalent: it
+derives the key that opens everything, and the machine holds it beside the sealed
+blob it opens. Rows 4 and 5 are that ruling. Row 4's wipe does exactly what every
+other row's does — `ctx.Done` unwinds the flow, every deferred `clear` runs (the
+typed `[]Word`, §8.1's normalised bytes, the derived key, the Deriver's
+accumulators), and `Run` restarts the UI at the main menu. **Nothing in flash is
+touched and no attempt is consumed**: the payload is exactly as it was, and
+reopening costs the passphrase and the KDF.
+
+**Row 5 is a bound, not a preference.** `Run` parks the flow for the whole 30 s
+warning (`gui/run_flow.go` draws and `continue`s without returning control), so a
+derivation that reaches 3:00 can never finish and the wipe becomes **certain**. At
+the measured wall rate that is every payload above **~1,343,284** iterations —
+**34.6%** of §6.2's legal 100,000–2,000,000 range, permanently un-openable on the
+device. `ctx.KeepAwake()` must **not** be the remedy: "KeepAwake can never
+postpone an armed wipe" is normative (row 2's own guarantee) and is pinned by
+test. Row 5 is implemented as the **passphrase bracket closing before the
+derivation is called**, not as a second flag on the guard.
+
+**The warning must name what is actually at risk.** Row 1's text — *"This machine
+still holds decrypted seed material"* — is **false** under row 4, and telling an
+operator that on a screen they know they have not unlocked is the fastest way to
+teach them the warning is furniture — the same reasoning §10.2 step 3 uses to
+refuse a constant hash. Two texts, one per subject; the countdown, the
+touch-to-keep affordance and the 3:00/3:30 schedule are unchanged.
 
 **The timer VALUE and time source are reused; the timer itself is NEW
 MACHINERY.** *(Amended 2026-08-09. An earlier draft said it "needs no new

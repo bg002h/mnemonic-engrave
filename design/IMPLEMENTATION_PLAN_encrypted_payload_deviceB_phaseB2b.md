@@ -1384,68 +1384,82 @@ judgement call:
 
 ## Task 9 — F-105: arm the wipe during passphrase entry
 
-**Added 2026-08-09 after the hardware pass.** The operator ruled that an
-in-flight passphrase **is seed-equivalent** — it derives the key that opens
-everything — so §10.2.4 leaving it unprotected is a defect, not a boundary.
+**Rewritten 2026-08-09b from its R0 review** (`agent-reports/…-task9-r0.md`,
+**1C/3I**). The first draft's insight was right and its **seam was wrong** in a
+way that would have cost more than the bug it fixed. §10.2.4 is amended
+accordingly (rows 4 and 5).
 
 ### The finding
 
 **A typed passphrase is wiped by nothing until it is submitted.**
-`unlockSecretSession` installs the residency guard only **after decryption**, so
-on the entry keyboard `ctx.wipe` is nil, `armed()` returns false for a nil
-receiver, and **no timer runs at all**. An operator who types twelve words and is
-interrupted leaves them resident indefinitely, with the sealed blob in flash
-beside them — the exact walk-away threat §10.2.4 exists for, one screen too
-early, on the longest manual step in the flow.
+`unlockSecretSession` installs the guard only *after* decryption, so on the entry
+keyboard `ctx.wipe` is nil, `armed()` returns false for a nil receiver, and no
+timer runs. The operator ruled the in-flight passphrase **seed-equivalent** — it
+derives the key that opens everything.
 
-### Why the fix is small — verified, not assumed
+### THE SEAM: bracket `unlockPassphraseFlow` ONLY
 
-The wiping machinery **already works**; only the arming is missing.
+Install and uninstall the `wipeGuard` around **the keyboard flow alone** — *not*
+the sealed flow, and *not* `unlockAttemptOnce`.
 
-- `inputWordsFlow`'s main loop is **`for !ctx.Done`** (`gui/gui.go:671` onward),
-  so it returns when a wipe sets `Done`.
-- `unlockPassphraseFlow` then hits `if !isMnemonicComplete(m)` — true for a
-  partial entry — which **already calls `clear(m)`** and returns.
+**Why not the sealed flow, measured:** it would arm five screens of which only one
+holds anything wipeable, would wipe the §6.6-hash retry screen mid-comparison,
+and — the Critical — **would not exclude the KDF**.
 
-So a wipe during entry would zero the passphrase today, if anything ever set
-`ctx.Done`. **Install the guard earlier and the existing unwind does the rest.**
+> **C1. Arming across the KDF is UNSURVIVABLE, not a UX wrinkle.** `Run`'s warning
+> branch draws and `continue`s **without returning control**, so a derivation that
+> reaches 3:00 is **frozen** for the whole 30 s window and the wipe becomes
+> **certain**. Measured: `derivedOK=false`, 30 warning frames, session restarted.
+> At the hardware-measured **7,463 it/s wall** that is every payload above
+> **1,343,284** iterations — **34.6% of §6.2's legal range, permanently
+> un-openable on the device.**
+>
+> It **cannot** be fixed by letting `KeepAwake` win: "KeepAwake can never postpone
+> an armed wipe" is normative and already pinned by test.
 
-### The change
+The narrow bracket closes **before** the derivation is called, so `ctx.wipe` is
+nil throughout it. §10.2.4 row 5 is that closure — **not** a new flag on
+`armed()`, which needs no change at all. F-93 and Task 5 are untouched.
 
-Install the `wipeGuard` at the top of the **sealed** flow — before passphrase
-entry — rather than only in `unlockSecretSession`, and uninstall it on the same
-defer discipline.
+### What the R0 review SETTLED — do not re-derive
 
-### Three things a reviewer must settle, NOT the implementer
-
-1. **The complete-but-unsubmitted path.** If all twelve words are typed and the
-   operator walks away *before* the KDF, `isMnemonicComplete` is **true**, so the
-   partial-entry `clear(m)` is not the exit taken. Trace where `m` is zeroed on
-   that route — it may be the `!m.Valid()` branch, or it may not be covered.
-   **This is the likeliest hole in an otherwise small fix.**
-2. **Arming across the KDF.** With the guard armed during derivation,
-   `ctx.keepAwake` is ignored (it is gated `&& !armed`), and a derivation longer
-   than `idleTimeout` would show the **wipe warning mid-derivation**. At the
-   300,000 default (~40 s wall) this cannot happen; near §6.2's 2,000,000 ceiling
-   it can. Should `armed()` disarm while a derivation runs, exactly as it does
-   while an engrave job runs? That is the same shape as §10.2.4 row 2 and
-   probably the right answer — but it is a **normative** choice.
-3. **What a wipe with nothing decrypted should DO.** The unwind restarts the UI,
-   which is right. But §10.2.4's text scopes the timer to resident **records**,
-   and there are none yet. **This requires a spec amendment, not just code.**
+- **The complete-but-unsubmitted park does not exist.** `inputWordsFlow` returns
+  on the twelfth word's OK with no `ctx.Frame` in between, and a wipe can only be
+  raised from inside `ctx.Frame`. Measured: a real 12-word entry draws **263
+  frames, ZERO** parked with a complete mnemonic pre-KDF.
+- **The real complete-passphrase window is the KDF screen**, and `m` is already
+  zeroed there by `unlockSealedFlow`'s **unconditional** `clear(m)`
+  (`gui/unlock_kdf.go:384`) — not the `!m.Valid()` branch the first draft guessed
+  at. Verified by a mid-derivation unwind test, mutation-killed.
+- **A wipe with nothing decrypted already behaves correctly**: unwind, zero,
+  restart at the menu, **flash untouched, no attempt consumed**. Only the *scope*
+  was wrong, and §10.2.4 now carries it.
 
 ### Steps
 
-- [ ] **9.1** Settle the three questions above through the R0 loop. **No code
-      first** — question 2 changes what `armed()` means.
-- [ ] **9.2** Amend §10.2.4's scope (operator-approved) so the timer covers an
-      in-flight passphrase, and say why: the passphrase derives the key, so it is
-      seed-equivalent.
-- [ ] **9.3** Tests first, on the harness: a wipe during passphrase entry zeroes
-      the typed words, for **both** a partial and a complete-unsubmitted entry.
-- [ ] **9.4** Implement; mutation rows anchored as usual.
-- [ ] **9.5** Hardware: type six words, walk away, confirm the wipe fires and the
-      machine returns usable.
+- [ ] **9.1** *(done)* §10.2.4 amended — row 3's condition, rows 4 and 5
+      **appended** so existing "row 1 / row 2 / third row" references stay valid,
+      plus three prose paragraphs.
+- [ ] **9.2** **Two warning texts, one per subject.** Row 1's *"This machine still
+      holds decrypted seed material"* is **FALSE** at passphrase entry. Telling an
+      operator that on a screen they know they have not unlocked teaches them the
+      warning is furniture — the same reasoning §10.2 step 3 uses to refuse a
+      constant hash. Countdown, touch-to-keep and the 3:00/3:30 schedule unchanged.
+- [ ] **9.3** Tests first. Lift the R0 report's four checks — they have positive
+      controls and two are already mutation-killed:
+      - a wipe during **partial** entry zeroes the typed words
+      - **`ctx.wipe` is nil for the whole derivation** — the C1 guard
+      - the §6.6-hash notice and the retry screen are **not** armed
+      - the passphrase-entry warning shows the **row-4 text**, not row 1's
+
+      **Do NOT write a "complete-unsubmitted" test** — that state is unreachable
+      and fabricating it would test nothing.
+- [ ] **9.4** Implement. Mutation rows anchored as usual; at minimum, *delete the
+      bracket's uninstall* → the KDF arms → the C1 test fails.
+- [ ] **9.5** **Hardware — BLOCKED until the post-wipe re-entry Critical is
+      closed.** Type six words, walk away, confirm the wipe fires and the machine
+      returns usable. Running it before that Critical is fixed spends a one-trip
+      budget inside a known-broken path.
 
 ## Task 8 — hardware (operator-run)
 
