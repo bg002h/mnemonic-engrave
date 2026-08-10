@@ -1875,7 +1875,7 @@ Two gaps that guard leaves open:
 
 Both are seed-derived geometry. Neither is covered by the design that files them.
 
-### F-111 — `knotBuf` is never zeroed on the `ErrTooLarge` path, where no cut ever happens (owning phase: **B2b**)
+### F-111 — `knotBuf` unzeroed wherever a plate is built and no cut happens — SUBSUMED by the F-108 design (owning phase: **B2b**)
 
 Filed by the R0 round-1 fold of `DESIGN_b2b_residency_zeroing.md`; sharpens round
 0's M3.
@@ -1887,6 +1887,21 @@ lifetime bound. On the too-large path (`gui/unlock_session.go:191-193`:
 send on `e.errs` ever happen — so the design's cut-end zeroing, which hooks the
 goroutine's exit, cannot fire at all. **The failure case leaks geometry the
 success case scrubs.**
+
+**WIDENED, then SUBSUMED — R0 round 2 (M-a).** Filing this as an
+`ErrTooLarge`-only item was itself the defect. `toPlate` fills the buffer at
+build time for **every** plate, so the same hole is open on an ordinary operator
+path — *"insert a blank plate… hold button to start"*, then **Back** before the
+cut starts (`gui/gui.go:2721-2725`: `st.State != engraveRunning` →
+`break frames`) — and on `bspline.Measure`'s build-time range, which never cuts
+at all. Implemented as filed, the patch would have closed the error path and left
+the ordinary one open.
+
+**Now subsumed.** `design/DESIGN_b2b_residency_zeroing.md` item (1) puts the
+zeroing in a `defer` inside `planEngraving`'s own closure, so it fires when the
+ITERATOR finishes: all three paths covered by one line, and no fourth path can be
+added that misses it. **Close this with that design; do not implement it
+separately.** Applied in the gate worktree and building.
 
 ### F-112 — six LEGACY seed-rendering flows sit inside no `Scrub` bracket at all (owning phase: post-B2b, before the release tag)
 
