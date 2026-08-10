@@ -1130,7 +1130,7 @@ shorten the copy to fit `bodyClip.Dy() - 2*scrollFadeDist` **first**, or give
 `Warning` a touch scroll (bind it to `Clickable`s with `op.Input` hit areas, the
 same fix the StartScreen pager took) — then restore the clip.
 
-### F-96 — the §11.3 mutation runner is uncommitted, so the 30-mutant run is reproducible by nobody (owning phase: B2b — **second half CLOSED 2026-08-09**)
+### F-96 — the §11.3 mutation runner is uncommitted, so the 30-mutant run is reproducible by nobody — **CLOSED 2026-08-10** (owning phase: B2b)
 
 > **The phase-report half is DONE:** `design/PHASE_REPORT_encrypted_payload_deviceB_phaseB2a_ii.md`,
 > written 2026-08-09 at the operator's instruction. It consolidates B2a-ii's 11
@@ -1174,6 +1174,18 @@ have it print what it does **not** cover, the same shape as
 each substitution asserted to match exactly once and each file restored from a
 file copy. That is the discipline the script exists to make cheap; doing it by
 hand is what the rule is trying to stop.)*
+
+**CLOSED 2026-08-10 by the B2b follow-up reconciliation sweep.** The entry's own
+text said the runner half "stays open until Task 7 commits". Task 7 committed it:
+`scripts/mutation-run.py` at **`dd3d4b3`** ("tooling: mutation-run.py -- run the
+plan's own §11.3 rows (F-96's runner)"), 26,827 bytes, present in the tree today.
+Both halves are therefore done and the sentence claiming otherwise was stale.
+
+Recorded as its own lesson: this item read OPEN for a week purely because nobody
+re-read it after the commit that satisfied it. Records have been the wronger half
+of this project throughout — see the reconciliation report,
+`design/agent-reports/2026-08-10-b2b-followup-reconciliation.md`.
+
 
 ### F-97 — CLOSED 2026-08-09 — plan and record corrections owed to the B2a-ii artefacts
 
