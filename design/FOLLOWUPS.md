@@ -1610,6 +1610,70 @@ condition is upstream's own (`a01b666` has `if len(evts) > 0` and nothing else),
 so that question is about the base firmware, not this phase — and it halves the
 search either way.
 
+### F-107 — the RENDERED seed is scrubbed ONLY on the wipe path; a normal exit leaves the twelve words in `ctx.B` (owning phase: **B2b — CRITICAL**)
+
+Found 2026-08-10 by an operator question — *"a normal exit reuses the Context, but
+does a normal exit zero secrets?"* — which is a better question than the answer I
+first gave it. My reply said a normal exit "means `runWithFlow` returns outright,
+so the Context, its buffer and the drawer all become garbage together." **That is
+wrong on the device**, and the correction is the finding.
+
+**`ctx.B.Scrub()` has exactly ONE caller**, measured:
+
+```
+$ grep -rn "\.Scrub()" --include="*.go" . | grep -v _test.go
+gui/run_flow.go:245:			ctx.B.Scrub()
+```
+
+and it sits **inside `if !wiping { return }`** — i.e. on the §10.2.4 wipe path
+only.
+
+**The other branch is unreachable in production.** `uiFlow` loops `for !ctx.Done`
+(`gui/gui.go:1612`), and on the device `ctx.Done` is set by exactly one thing: the
+wipe. The `!yield()` route needs the consumer to stop ranging, and
+`cmd/controller/main.go:34` is `for range gui.Run(p, ver) {}`, which never stops.
+So `runWithFlow` never returns on hardware, a UI-level "normal exit" is just the
+flow walking back to the start screen, and **the same `Context` and the same
+`op.Buffer` carry straight on**.
+
+**What that leaves resident.** `Buffer.Reset()` runs per frame and is a
+*truncation*:
+
+```go
+func (b *Buffer) Reset() {
+	b.args = b.args[:0]     // TRUNCATE -- no zeroing
+	clear(b.refs)
+	b.refs = b.refs[:0]
+}
+```
+
+`op.Glyph` encodes every rendered rune into `args`, so — in `Scrub`'s own words,
+written for exactly this hazard — *"on the SeedScreen path the twelve words come
+back VERBATIM AND IN ORDER from the backing array."* On the wipe path `Scrub`
+zeroes them. **On a normal exit nothing does**, and they persist until later
+frames happen to overwrite those indices. A start screen draws far fewer args
+than a seed screen, so the tail — the later words — survives longest.
+
+**Why this is Critical and not Minor.** §10.2.2's guarantee is wipe-by-**any**-
+route. The data structures honour it: `rec`, `m`, the passphrase, the key and the
+blob are each cleared on every exit path. The **rendered** copy is not, and it is
+the one copy the operator's own eyes just confirmed contains their seed. The
+exposed path is also the **common** one — an operator who reads their words and
+presses back, rather than walking away for 3:30 — so the protected case is the
+rare one and the unprotected case is the default.
+
+**Smallest fix, provisionally:** `Scrub` on leaving the secret session, not only
+on the wipe. The bracket already exists — `unlockSecretSession`'s defer — and it
+is where §10.2.4's guard is installed and removed. This needs its own R0 pass
+rather than an inline patch: `Scrub` zeroes to capacity and the buffer is live,
+so the ordering against the next frame's build matters.
+
+**Related, and the same shape:** the `Scrub`-only-on-wipe asymmetry was defended
+in review by an argument about process teardown that this entry shows does not
+hold. Cross-ref R0 round 0's M4 on `frameOp.op.src`/`inputOp.tag` — also an
+enumerated argument rather than a structural one, and also about a copy `Scrub`
+cannot reach. Two findings in one day where residency rested on enumeration.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:
