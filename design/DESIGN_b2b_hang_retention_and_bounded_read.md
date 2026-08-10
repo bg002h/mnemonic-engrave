@@ -80,11 +80,25 @@ package-level `assets.*` images and pointer-free `*Clickable`s.
 fix D "owns" the hang is unsupported, and the earlier retirement of fix B rested
 on exactly that claim.
 
-### Not a secrecy bug
+### Not a secrecy bug — with the part `Scrub` cannot reach stated (round 0 M4)
 
-`imageOp.args` aliases the same array `Scrub` zeroes, so scrubbing reaches what
-the alias can see. **`Scrub` stays regardless:** once an allocation is genuinely
-freed, TinyGo may reissue it without zeroing.
+`imageOp.args` and `imageOp.refs` alias the same arrays `Scrub` zeroes, so
+scrubbing reaches what those aliases can see.
+
+**`Scrub` cannot reach the interface-value COPIES** — `frameOp.op.src` and
+`inputOp.tag` are values held in the Drawer's own backing arrays, not views into
+the Buffer. The conclusion still holds, but by enumeration rather than by
+construction: round 0 resolved all **8** production `op.Input` sites
+(`unlock_platelist.go:152`, `passphrase_keyboard.go:495`, `gui.go:1385, 1567,
+1913, 2027, 2028, 2537`) to `*Clickable`, a pointer-free five-field struct, and
+all **11** `op.Mask` sites to package-level `assets.*` images or
+`*ImageHandle`s. **No secret is reachable through either today** — and because
+that is an enumeration, it is exactly the kind of property a future `op.Input`
+carrying a seed-bearing tag would silently break. `Release`'s `clear` is what
+makes it structural instead.
+
+**`Scrub` stays regardless:** once an allocation is genuinely freed, TinyGo may
+reissue it without zeroing.
 
 ## Fix D — release the drawer's references
 
@@ -180,12 +194,23 @@ func boundBlob(region []byte) (int, error) {
 	if h.Sealed() {
 		total += TagLen
 	}
+	// Defence in depth, and UNREACHABLE today (round 0 M2): clampRegion(RegionLen)
+	// is RegionLen, and total is <= 16,450. Kept for the same reason wire.go:201
+	// keeps its own unreachable total check, and returning ErrTooLarge rather
+	// than ErrTooShort because "does not fit the flash region" is the condition
+	// -- wire.go:78 already owns that name and wire.go:201 already uses it for
+	// exactly this comparison.
 	if total > len(region) {
-		return 0, ErrTooShort
+		return 0, ErrTooLarge
 	}
 	return total, nil
 }
 ```
+
+The reduction is bigger than the worst case suggests (round 0 N3): 16,450 is the
+format's *ceiling*, while the largest real test vector is **1,421 bytes**. So fix
+C's typical saving is ~46×, not 4× — which strengthens F-79's residency argument
+rather than merely satisfying it.
 
 It returns a **length, not a slice**, so it allocates nothing and each reader
 owns its own copy. `ParseHeader` retains nothing from `buf` — `Header`'s fields
