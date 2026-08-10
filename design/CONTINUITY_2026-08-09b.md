@@ -5,9 +5,15 @@ began and is now only useful for the R0 history.
 
 ## One line
 
-**B2b is fully implemented (Tasks 1–7), flashed, and running on the real machine.
+**B2b is implemented (Tasks 1–7 and 9), flashed, and running on the real machine.
 Task 8 found a CRITICAL: after §10.2.4's wipe fires, re-entering the sealed
 payload HANGS the device. The wipe itself works perfectly. Nothing is pushed.**
+
+**Update, end of 2026-08-09:** Task 9 (F-105, the in-flight passphrase) is
+implemented at **`749fce7`**, and a **diagnostic firmware is on the machine** —
+`v0.0.0-ge969839` from branch `b2b-heapprobe`, which draws a heap readout on the
+start-screen version line. **The next hardware action is three heap readings, not
+a re-test of Task 8.**
 
 | repo | HEAD | state |
 | --- | --- | --- |
@@ -166,6 +172,50 @@ Both are "a bare command name resolved to the wrong artifact":
   F-94's deferral to B2c is safe. It will write
   `design/agent-reports/…-wipe-inventory.md` itself and has left
   `gui/wipe_inventory_audit_test.go` untracked in the worktree.
+
+## Task 9 — DONE in code, blocked on hardware
+
+`749fce7` on `b2b`. §10.2.4 amended with **rows 4 and 5** (`c7dbfc7`), rows
+**appended** so existing row references stay valid.
+
+**Its R0 review found a Critical in my first draft** and is worth reading before
+touching it: arming across the KDF is **unsurvivable**, because `Run`'s warning
+branch parks the flow for the whole 30 s window, so a derivation reaching 3:00
+can never finish. That is **34.6% of §6.2's legal iteration range, permanently
+un-openable**. The seam is therefore the **keyboard alone**, closing before the
+derivation — row 5 *is* the bracket's scope, not a flag on `armed()`, which is
+untouched.
+
+Verified by me: green criterion clean, and the C1 mutation (never uninstall the
+bracket) fails with *"ctx.wipe is non-nil on a KDF progress frame … arming here
+would freeze the derivation under the warning and make it unopenable"*.
+
+Device budget after Task 9: **1313928 flash / 60584 ram** — RAM still flat across
+every task in the phase.
+
+**9.5 (hardware) is BLOCKED** until the post-wipe re-entry Critical is closed.
+
+## The next hardware session — do this first
+
+The diagnostic build `v0.0.0-ge969839` is already flashed. **Three readings of the
+start-screen version line:**
+
+1. **fresh boot**, before touching anything
+2. **after a full unlock and a NORMAL exit** (the control)
+3. **after a wipe**, standing on the carousel where you would press checkmark
+
+Reads `heap <inuse>/<total>K free <free>K a<live allocs>`.
+
+- **post-wipe free is LOW** → plain exhaustion; the wipe is not freeing what we
+  assume → fix **B** (reuse the `Context`)
+- **post-wipe free is HIGH and it still hangs** → **fragmentation proven by
+  elimination** → fix **C** (bounded read, ≤16,450 instead of 65,536)
+
+Passphrase for the payload on the device:
+`mosquito neither reopen morning canoe find tiny brand resist satisfy gun ball`
+
+**Then reflash `b2b` before any further Task 8 work** — the diagnostic branch must
+never be what gets tested or merged.
 
 ## What is owed, in order
 

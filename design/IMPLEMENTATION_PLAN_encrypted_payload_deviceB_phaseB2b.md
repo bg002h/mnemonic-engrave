@@ -1,7 +1,8 @@
 # Encrypted Payload Delivery — Plan B Phase B2b (§10.2.4's residency-keyed idle wipe) — Implementation Plan
 
-**Status: GREEN, PREFLIGHT PASSED (GO-WITH-CHANGES, all blockers folded).
-Tasks 1–7 implemented, verified and committed
+**Status: Tasks 1–7 and 9 implemented; ONE CRITICAL OPEN — the device hangs
+re-entering the sealed payload after a wipe (hardware, `HARDWARE_RESULT_2026-08-09`).
+Tasks 1–7 and 9 verified and committed
 (`fbe31ab`, `aa704b6`, `675ae4e`, `4935bf1`, `237c85f`, `920e1e1` on branch
 `b2b`; the runner at `dd3d4b3` here). **Mutation run, re-verified independently
 by the controller: 16/16 mechanically-applicable rows KILLED, 0 survived, final
@@ -1400,7 +1401,18 @@ derives the key that opens everything.
 ### THE SEAM: bracket `unlockPassphraseFlow` ONLY
 
 Install and uninstall the `wipeGuard` around **the keyboard flow alone** — *not*
-the sealed flow, and *not* `unlockAttemptOnce`.
+the sealed flow, and *not* `unlockAttemptOnce`. **Save-and-restore**, so the two
+brackets can never fight:
+
+```go
+	prev := ctx.wipe
+	ctx.wipe = &wipeGuard{subject: wipeWarningSubjectPassphrase}
+	defer func() { ctx.wipe = prev }()
+```
+
+*(Added after implementation: the first draft of this task carried no inline Go at
+all, so the seam existed only in the R0 report — an implementer reading the plan
+alone would have had nothing to build against. Flagged by the implementer.)*
 
 **Why not the sealed flow, measured:** it would arm five screens of which only one
 holds anything wipeable, would wipe the §6.6-hash retry screen mid-comparison,
