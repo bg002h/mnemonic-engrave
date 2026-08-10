@@ -1759,19 +1759,33 @@ finding: the *reference* is already dropped promptly (`plate` is a local and
 are **unzeroable by construction** and linger as garbage until the allocation is
 reused — TinyGo does not zero on free. That is exactly F-83's original point.
 
-So F-108 becomes: **§10.2.2 claims a wipe-by-any-route guarantee the geometry
-cannot satisfy, and the spec never says so.** Options in
-`design/DESIGN_b2b_residency_zeroing.md` — accept and document (spec amendment,
-no code), or materialise the knots into an ownable buffer that can be zeroed (a
-real engrave-pipeline change, its own cycle). The operator's correction stands;
-its remedy is not a `clear`.
+**RE-SCOPED AGAIN 2026-08-10, and the RE-SCOPING ABOVE IS WITHDRAWN — the buffer
+IS clearable.** R0 round 0's I2 measured it: `Curve = iter.Seq[Knot]` is true and
+**irrelevant**, because a closure over an already-materialised slice is still a
+clearable slice, and `engrave.PlanEngraving` builds exactly that. **9 non-zero
+knots survive a full cut in `knotBuf`; `clear(buf[:cap(buf)])` drives it to 0.**
+Three buffers are ownable — `knotBuf`, `SafePointer.history`,
+`splineResumer.catchup` — and only `appendLine`'s per-segment `make`
+(`engrave/engrave.go:1146`) is genuinely unreachable.
+
+So F-108 is **a real defect with a real patch**, not a spec amendment. I was
+wrong twice here: first "zero the spline after the cut", then "impossible,
+because it is a closure". The second was as wrong as the first, and worse — it
+would have written an impossibility into the spec on a funds path. Design and
+resolution in `design/DESIGN_b2b_residency_zeroing.md`; the ordering is split by
+LIFETIME (cut state vs resume state) after R0 round 1 found that zeroing all
+three together cuts a wrong plate on the operator's hold-to-resume.
 
 ~~**Smallest fix, provisionally:** zero the spline immediately after `Engrave`~~
 returns — the point at which F-83's exemption expires by its own terms. Needs an
 R0 pass rather than an inline patch, because the abort-mid-plate path
-(`gui/gui.go:2651-2656` calls `Stop()` and keeps rendering) means "Engrave
-returned" and "the needle stopped" are not the same instant, and zeroing while
-the engrave loop still iterates `e.spline` would corrupt a live cut.
+(`gui/gui.go:2726` calls `Stop()` and keeps rendering) means "Engrave returned"
+and "the needle stopped" are not the same instant, and zeroing while the engrave
+loop still iterates `e.spline` would corrupt a live cut. **The `:2651-2656`
+anchor this entry used is WRONG** — that is `DescriptorScreen.Confirm`'s tail;
+the real sites are `gui/gui.go:2715`, `:2726` and, the one that matters,
+`:2747` `s.job.Start()`. The shipped comment at `gui/unlock_session.go:200`
+carries the same drift.
 
 **Not implicated in the 35 K residue** measured the same day: plates are built
 *after* the Cut/Skip choice (`cs.Choose` precedes `toPlate`), and all three
@@ -1782,6 +1796,65 @@ in them. This is a separate defect on a path those cycles never took.
 argument nobody re-checked** — with F-107 and R0 round 0's M4. The pattern is
 worth naming in the phase report: each was individually defensible when written,
 and each stopped being true without anyone editing the line that claimed it.
+
+### F-110 — an ABANDONED engrave job's resume state is never zeroed (owning phase: **B2b**)
+
+Filed by the R0 round-1 fold of `DESIGN_b2b_residency_zeroing.md`.
+
+`SafePointer.history` and `splineResumer.catchup` are **resume state**: their
+lifetime is the job, not the goroutine, because `e.catchup()` re-reads them on
+the operator's hold-to-resume (`gui/gui.go:2747`). The design zeroes them at
+`EngraveScreen.Engrave`'s return, and **only when the job is terminal** — a
+terminal state is the receive on `e.errs`, so the goroutine has provably
+returned and there is no live writer.
+
+Two gaps that guard leaves open:
+
+1. **The wipe path skips it.** If `Engrave` returns while the job is still
+   `engraveRunning` — `ctx.Done`, i.e. §10.2.4 firing mid-cut — the resume state
+   is not zeroed, because zeroing it would race the live goroutine.
+2. **`SafePointer.history` grows by `append`** (`engrave/engrave.go:1683`), so it
+   carries the same outgrown-array class as `op.Buffer`: the tail-clear at
+   `:1675-1676` reaches only the CURRENT array, and every reallocation before it
+   left a full copy of the knots behind.
+
+Both are seed-derived geometry. Neither is covered by the design that files them.
+
+### F-111 — `knotBuf` is never zeroed on the `ErrTooLarge` path, where no cut ever happens (owning phase: **B2b**)
+
+Filed by the R0 round-1 fold of `DESIGN_b2b_residency_zeroing.md`; sharpens round
+0's M3.
+
+`toPlate` → `bspline.Measure` fills the knot buffer at **build** time
+(`gui/gui.go:2988-2989`), so "for the duration of the cut" was never the right
+lifetime bound. On the too-large path (`gui/unlock_session.go:191-193`:
+`showError`, `return`) the buffer is **full** and no cut, no goroutine and no
+send on `e.errs` ever happen — so the design's cut-end zeroing, which hooks the
+goroutine's exit, cannot fire at all. **The failure case leaks geometry the
+success case scrubs.**
+
+### F-112 — six LEGACY seed-rendering flows sit inside no `Scrub` bracket at all (owning phase: post-B2b, before the release tag)
+
+Filed by the R0 round-1 fold of `DESIGN_b2b_residency_zeroing.md`; round 0's M2.
+
+F-107's fix brackets the B2b secret session and the passphrase flow. Every
+pre-existing flow that renders seed material has **no bracket whatsoever**:
+
+| flow | where |
+| --- | --- |
+| `backupWalletFlow` | `gui/gui.go:2194` |
+| `seedEntryFlow` | `gui/derive_xpub.go:82` |
+| `bip85DeriveFlow` | `gui/bip85.go:269` |
+| `recoverSLIP39Flow` | `gui/slip39_polish.go:229` |
+| `combineSeedXORFlow` | `gui/seedxor_polish.go:40` |
+| `passphraseFlow` | `gui/gui.go:584` |
+
+Measured: `SeedScreen` has exactly one bracketed construction site,
+`gui/unlock_session.go:276`. The outgrown-array zeroing helps these flows for
+free — it is in `op.Buffer` itself — but the CURRENT array is `Scrub`'s job and
+nothing calls `Scrub` on any of these paths. **This is the pre-existing product,
+not B2b**, which is why it is scheduled after the phase rather than inside it —
+but it means "the machine wipes the rendered seed" is not true in general.
 
 ### F-109 — ~35 K in ~81 REACHABLE objects survives every wipe, unidentified (owning phase: **B2b**)
 
