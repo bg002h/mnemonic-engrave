@@ -117,6 +117,59 @@ I took a wall reading, computed 7,463 it/s, declared §7.1 falsified, and change
    not the 13.2% recorded — which was computed from the *derivation* rate and is
    the same conflation, in the plan, in the other direction.
 
+## CRITICAL — the device HANGS re-entering the sealed payload after a wipe
+
+**Observed 2026-08-09, immediately after 8.1's successful wipe.** This is the
+first time the post-wipe restart path has run on hardware, and it is a **hang on
+a watchdog-less device**.
+
+### What happened
+
+1. 8.1's wipe fired at 3:30 and the UI restarted to the home screen — correctly,
+   instantaneously, no blank.
+2. The operator navigated the program carousel to **Sealed Payload (dot #9
+   active)** — so **input and drawing were both alive**.
+3. Pressed the **checkmark** to enter the flow. **Nothing happened.**
+4. **No screensaver at 3:00. None at 3:30. Still unresponsive at 4:00.**
+
+### Screen state, captured before the power-cycle
+
+- Program carousel with navigation arrows and the checkmark button
+- **Program nav dot #9 active** (Sealed Payload)
+- Version line **present and correct** — `v0.0.0-ge8e78f0`, hardware 1.5
+  `(UNLOCKED)`, bottom right; "SeedHammer" bottom left
+- **Nothing responds** — no button, no region of the panel
+- **First** unlock attempt after the wipe
+
+### Why the missing screensaver is the diagnostic, again
+
+The saver, the §10.2.4 timer and touch handling all live in **one goroutine**.
+All three stopped together. That is not three features failing; it is that
+goroutine being gone or blocked. The film explanation does not apply — it was
+removed, and 8.1 subsequently ran perfectly on the same session.
+
+### Leading hypothesis, NOT yet confirmed
+
+`Run` **returned** instead of looping. If `ctx.Done` goes true in the restarted
+session while `wiping` is false, then `if !wiping { return }` exits `runWithFlow`,
+`cmd/controller`'s `for range gui.Run(p, ver) {}` ends, `main` returns — and the
+device is left with the last frame frozen and nothing servicing input. That
+matches every symptom including the frozen-but-correct carousel.
+
+It is consistent with the `FrameCallback` early return added by Task 3: once
+`ctx.Done` is true, `ctx.Frame` returns without yielding, so no further frame is
+ever drawn.
+
+**What is not yet known:** why `ctx.Done` would become true on that transition,
+and whether it reproduces. Recorded as a hypothesis, not a cause.
+
+### What this cost the review process
+
+Four R0 rounds, a 4-lens pre-hardware preflight with a dedicated **brick/hang
+lens**, and 16/16 mutation kills did not find this. The post-wipe restart is a
+path **no test exercises on hardware**, and Task 3's own tests drive it only
+through the `wipeNowHook` seam in a host harness.
+
 ## Not yet observed
 - [ ] **8.2** — the touch reset, with a duration
 - [ ] **8.3** — the mid-cut plate
