@@ -1471,7 +1471,12 @@ not simply re-read the existing lists.
 F-94's seam **first**, because those wipes remain silently deletable until it
 does. Without both, B2c's inventory repeats the same failure a third time.
 
-### F-105 — a typed passphrase is wiped by NOTHING until it is submitted (owning phase: **B2c**; design-boundary, not a bug)
+### F-105 — a typed passphrase is wiped by NOTHING until it is submitted (owning phase: **B2b Task 9** — operator ruling 2026-08-09)
+
+> **OPERATOR RULING 2026-08-09: an in-flight passphrase IS seed-equivalent** — it
+> derives the key that opens everything. That makes this a **defect**, not the
+> design boundary the entry below called it, and it moves from B2c into **B2b as
+> Task 9**. §10.2.4's scope is wrong, not merely narrow, and needs amending.
 
 Found by the wipe-inventory audit, 2026-08-09, and the most consequential thing it
 found.
