@@ -1386,6 +1386,61 @@ argv. The spec is silent — `grep -niE "argv|command.?line|/proc"` over
 `SPEC_encrypted_payload_delivery.md` returns nothing — so §12's threat model
 should gain a line either way.
 
+### F-103 — the PROTECTIVE SCREEN FILM silently disables §10.2.4's wipe, the screensaver, and every idle behaviour (owning phase: **B2c**, and it belongs in the operator docs before any release)
+
+**Observed on real hardware 2026-08-09**, during B2b's Task 8.1, and diagnosed by
+the operator. This is the first thing the hardware pass found, and it is not a
+code defect — the code did exactly what it was told.
+
+**What happened.** Sitting on the *Cut this plate / Skip* screen — which IS armed
+(guard installed, no engrave job registered, so `armed()` is true) — **nothing
+fired at 3:00 or 3:30. At 4:05 the screen was unchanged.**
+
+**The diagnostic that located it in one step:** the **screensaver had not appeared
+either**, then or at any earlier point in the session. Both run off the same
+`a.idle.start` and the same 3:00 `idleTimeout`. So the machine did not believe it
+was idle — which points at the clock being *refreshed*, not at the arming logic.
+While armed, the `ctx.keepAwake` term is gated `&& !armed`, so the only remaining
+refresh source is `len(evts) > 0`.
+
+**The cause: the factory protective screen film was resting on the panel**,
+generating a continuous stream of touch events.
+
+**Why it is worse than it looks.** The idle clock keys on **any event, not on
+effective input**. Panel noise that never resolves to a click — too brief, too
+weak, below the press threshold — still satisfies `len(evts) > 0` and refreshes
+the clock. So the UI remains perfectly usable (the operator unlocked, typed
+twelve words and navigated normally) while **every idle-driven safety behaviour is
+silently and permanently disabled**. There is no indication on screen. Nothing
+logs it. The machine simply never goes idle, forever.
+
+**And the film ships on the device.** An operator who never peels it gets a
+machine on which §10.2.4's wipe — a funds-safety control — does not exist, and
+who has no way to discover that short of timing it.
+
+**PREDICTED.** The pre-hardware preflight listed exactly this in its accepted-risk
+set: *"an object resting on the panel may refresh the clock forever (unmeasured on
+real hardware — free bench check)."* It was recorded as a risk to know about
+rather than a blocker, and the bench check was never run. **The very first
+hardware step hit it.** Worth remembering the next time an accepted risk is cheap
+to actually test.
+
+**Candidate fixes, none of them decided:**
+
+1. **Operator documentation** — "remove the screen film" in the setup runbook.
+   Necessary, and on its own insufficient: it makes a silent funds-safety failure
+   depend on someone reading a document.
+2. **Key the idle clock on EFFECTIVE input rather than any event** — a click, a
+   completed press/release, a router-consumed event — rather than
+   `len(evts) > 0`. This is the real fix and it is a normative change to
+   §10.2.4's "any touch refreshes it", so it needs the R0 loop, not a patch.
+3. **Detect the pathological case** — a panel asserting continuously for far
+   longer than a human touch could plausibly last is itself a signal, and could
+   refuse to count.
+
+Option 2 is the one that makes the guarantee real; note it also affects the
+screensaver, which is upstream code this phase only borrowed.
+
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
 Measured by the completeness critic:
