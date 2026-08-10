@@ -1626,6 +1626,9 @@ Previously stated three different ways in this plan, all incomplete, and a bare
 - [ ] **F-92** — `tinygo test` cannot build `seal` at all, so the TinyGo wipe
       caveat this whole feature rests on has never run on the target toolchain
 - [ ] **F-98** — two citations in the GREEN spec do not resolve
+- [ ] **F-102** — `me seal` takes seed material on **argv**, where every other
+      subcommand reads stdin. Harmless for Task 8's public fixture; binds before
+      anyone seals a real seed, which is what a tag invites
 - [ ] **SPEC §11.5's "confirm firmware reflash preserves the blob"** — filed as
       **F-100** by the residue sweep; owned by nobody until then. B1's hardware
       run covered four things and this was not among them; its closest statement
