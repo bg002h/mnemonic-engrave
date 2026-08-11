@@ -211,6 +211,26 @@ This list is normative and belongs in operator documentation, not only here.
     reaches. The two are the same secret in different clothes, and an operator
     who reads "wiped" as "gone" is wrong for the length of a plate.
 
+14. **Anything the HOST leaks while `me seal` runs.** The device's threat model
+    stops at the UF2. On the workstation that produced it, a record passed on
+    **argv** is public: `/proc/<pid>/cmdline` is world-readable without
+    `hidepid`, `ps` shows it to any local user, and the shell writes it to a
+    history file that outlives the session — measured on the author's own
+    machine, `fish_history` was `-rw-r--r--` and 517 KB.
+
+    `me seal` therefore takes records over a **private channel** — `--in <file>`
+    or stdin, read into a zeroizing buffer, the same path `me convert` and
+    `me bundle` already use. argv still works for fixtures and tests, and warns
+    loudly when what it carries classifies as seed material; it does not refuse,
+    because the leak has already happened by the time the process starts and a
+    hard failure would only teach people to quote their way around it (F-102).
+
+    Not defended: the file you pipe in, your editor's swap file, your shell's
+    history if you `echo` a seed into the pipe yourself, or a compromised host.
+    **`--out` was always careful with the output channel** — required, never
+    stdout, created `0600`, because the passphrase shares that stream. The input
+    channel now matches it.
+
 ### 2.2a What admitting `ms1` changed (operator sign-off, 2026-08-07)
 
 Before this decision the envelope could carry only public constellation data —

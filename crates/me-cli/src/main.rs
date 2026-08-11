@@ -66,9 +66,21 @@ enum Command {
     /// KDF, and a memorable passphrase does not survive an offline attack on a
     /// stolen machine.
     Seal {
-        /// Records to ENCRYPT. Must be canonical: if they came from
-        /// `mnemonic bundle`, use --group-size 0.
+        /// Records to ENCRYPT, on argv. Kept for FIXTURES AND TESTS only.
+        ///
+        /// argv is a public channel: /proc/<pid>/cmdline is world-readable
+        /// without hidepid, `ps` shows it, and a shell records it in history
+        /// that outlives the machine. Prefer --in or stdin for anything real;
+        /// a seed passed here is warned about and cannot be un-leaked (F-102).
         payload: Vec<String>,
+
+        /// Read newline-separated records to ENCRYPT from this file, or from
+        /// stdin when neither this nor argv records are given.
+        ///
+        /// This is the private channel the other subcommands already use, and
+        /// the one to use for real seed material. Read into a Zeroizing buffer.
+        #[arg(long = "in")]
+        in_path: Option<PathBuf>,
 
         /// Records to carry in the CLEAR. Authenticated via the AAD when
         /// something is also encrypted; unauthenticated otherwise. Never an
@@ -137,10 +149,18 @@ fn run() -> i32 {
         plaintext,
         out,
         seal_secret,
+        in_path,
         iterations,
     }) = &cli.command
     {
-        return run_seal_cli(payload, plaintext, out, *seal_secret, *iterations);
+        return run_seal_cli(
+            payload,
+            in_path.as_ref(),
+            plaintext,
+            out,
+            *seal_secret,
+            *iterations,
+        );
     }
     if let Some(Command::Hash {
         records,
@@ -295,6 +315,7 @@ fn run_bundle_cli(
 // plan's own `-D warnings` gate would reject it. Call sites deref-coerce.
 fn run_seal_cli(
     payload: &[String],
+    in_path: Option<&PathBuf>,
     plaintext: &[String],
     out: &std::path::Path,
     seal_secret: bool,
@@ -303,15 +324,51 @@ fn run_seal_cli(
     use mnemonic_engrave::classify::{classify, Format};
     use mnemonic_engrave::seal::{self, pubhash, Payload};
 
-    // These records are NOT zeroized, per the Global Constraint. §9 puts them on
-    // argv, so /proc/$PID/cmdline already exposes them — the heap copy is not the
-    // binding exposure, and claiming a wipe here would be a guarantee this code
-    // does not deliver.
+    // WHERE THE RECORDS COME FROM, and why the zeroizing changed with it
+    // (F-102). This used to read "these records are NOT zeroized ... §9 puts
+    // them on argv, so /proc/$PID/cmdline already exposes them — the heap copy
+    // is not the binding exposure". That reasoning was sound and is now
+    // obsolete: with --in and stdin, a record can arrive over a PRIVATE
+    // channel, and then the heap copy IS the binding exposure. So the private
+    // path reads into a Zeroizing buffer, exactly as `convert` and `bundle` do.
+    //
+    // argv survives for fixtures and tests, and warns when it carries a seed.
+    let mut input = Zeroizing::new(String::new());
+    let from_argv = !payload.is_empty();
+    let secret: Vec<String> = if from_argv {
+        if in_path.is_some() {
+            eprintln!("me: pass records on argv OR via --in, not both");
+            return EXIT_USAGE;
+        }
+        payload.to_vec()
+    } else {
+        if let Some(path) = in_path {
+            match std::fs::read_to_string(path) {
+                Ok(s) => *input = s,
+                Err(e) => {
+                    eprintln!("me: cannot read {}: {e}", path.display());
+                    return EXIT_USAGE;
+                }
+            }
+        } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
+            eprintln!("me: cannot read stdin: {e}");
+            return EXIT_USAGE;
+        }
+        // Split on '\n' ONLY, and do not trim. `encode_section` scans the
+        // UNTRIMMED record for `\r` (§6.4: "no CR anywhere"), so a CRLF file
+        // must be REFUSED rather than silently normalised — §9 says refuse.
+        // Dropping empty lines is not normalisation; a lone "\r" line survives
+        // and is refused, which is the point.
+        input
+            .split('\n')
+            .filter(|l| !l.is_empty())
+            .map(str::to_owned)
+            .collect()
+    };
     // Do NOT trim here. `encode_section` scans the UNTRIMMED record for `\r`
     // (§6.4: "no CR anywhere"), and trimming first strips a leading/trailing CR
     // before that check ever sees it — the CLI would normalise where §9 says
     // refuse. `encode_section` trims internally, once, after the CR scan.
-    let secret: Vec<String> = payload.to_vec();
     let public: Vec<String> = plaintext.to_vec(); // &[String] -> Vec<String>
     if secret.is_empty() && public.is_empty() {
         eprintln!("me: nothing to seal");
@@ -324,6 +381,21 @@ fn run_seal_cli(
     // the same secret; `classify` wants a bech32 `1`, so it misses the mnemonic.
     let is_seed =
         |r: &String| matches!(classify(r), Ok(Format::Ms)) || seal::passphrase::is_valid(r);
+
+    // F-102: argv is a public channel. If a seed came in that way, say so --
+    // once, loudly, and without refusing, because fixtures legitimately use it
+    // and a hard failure would only teach people to quote their way around it.
+    // The leak has already happened by the time this prints; the warning exists
+    // so the operator knows to treat that seed as compromised rather than
+    // discovering it later.
+    if from_argv && secret.iter().any(is_seed) {
+        eprintln!(
+            "me: WARNING -- seed material was passed on the COMMAND LINE.\n    \
+             /proc/<pid>/cmdline is world-readable without hidepid, `ps` shows it, and your\n    \
+             shell has already written it to history. Treat this seed as EXPOSED.\n    \
+             For real seed material use --in <file> or stdin instead."
+        );
+    }
     if !seal_secret && secret.iter().any(is_seed) {
         eprintln!(
             "me: refusing to seal seed material (ms1 or a BIP-39 mnemonic) without \
