@@ -12,7 +12,6 @@ pub mod wire;
 use rand::RngCore;
 use zeroize::Zeroizing;
 
-use crate::classify::{classify, Format};
 use crypto::CryptoError;
 use wire::{Header, HEADER_LEN, IV_LEN, MAX_ITERATIONS, MAX_SECTION_LEN, MIN_ITERATIONS, SALT_LEN};
 
@@ -108,24 +107,26 @@ fn check_public(public: &[String]) -> Result<(), SealError> {
         if passphrase::is_valid(r) {
             return Err(SealError::SecretInPublic(i));
         }
-        // Same reason as the mnemonic check above, and the same shape. An `ms1`
-        // that is ALSO too long to engrave must be reported as a SECRET in the
-        // public section, not as a length problem: §10.2.1a's rule lives inside
-        // `validate_record`, so its error propagates through the `?` below
-        // before `is_secret()` is ever evaluated. Without this, `me seal
-        // --plaintext <91-char ms1>` tells the operator the record is too long
-        // and says nothing about the fact that they were about to ship a seed
-        // in the clear. Both refuse, so nothing leaks -- but the wrong one is
-        // named, and the suppressed one is the one that matters. Go orders
-        // these deliberately; this matches it.
-        if matches!(classify(r), Ok(Format::Ms)) {
-            return Err(SealError::SecretInPublic(i));
-        }
-        if record::validate_record(r)
-            .map_err(SealError::Record)?
-            .is_secret()
-        {
-            return Err(SealError::SecretInPublic(i));
+        // An over-length `ms1` must be reported as a SECRET in the public
+        // section, not as a length problem. §10.2.1a's rule lives inside
+        // `validate_record`, so its error would otherwise propagate before
+        // `is_secret()` is ever evaluated, and the operator would be told the
+        // record is too long while saying nothing about their being one
+        // keystroke from publishing a seed.
+        //
+        // Matching on the ERROR rather than pre-empting the call is what keeps
+        // `validate_record` the classifier: canonical form, case and the real
+        // parse are all still checked. An earlier fold pre-empted it with
+        // `classify(r) == Format::Ms`, which fires on a bare two-character HRP
+        // match -- so `ms1`-prefixed garbage, a space-interrupted string and an
+        // uppercase-but-valid one were all relabelled "secret material",
+        // replacing three accurate diagnoses to fix one. Same defect class as
+        // the one being fixed.
+        match record::validate_record(r) {
+            Ok(k) if k.is_secret() => return Err(SealError::SecretInPublic(i)),
+            Err(record::RecordError::MsTooLong(_)) => return Err(SealError::SecretInPublic(i)),
+            Err(e) => return Err(SealError::Record(e)),
+            Ok(_) => {}
         }
     }
     let refs: Vec<&str> = public.iter().map(|s| s.trim()).collect();
