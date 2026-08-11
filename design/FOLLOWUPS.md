@@ -3531,7 +3531,7 @@ was done about it; per-entry edits are noted against their F-numbers.
 - **Spec citations now name symbols where lines keep decaying.** `idleTimeout`
   had moved 2801 → 2879 → 2932 → 2955.
 
-### F-109 — DOWNGRADED to Minor 2026-08-11 (measured: no secret in the residue; ~12 K of ~74 objects still unnamed) — DOWNGRADE recommended, and the security question is answered
+### F-109 — DOWNGRADE recommended, and the security question is answered
 
 The residue was measured for the first time. **No secret was found in any of
 it**, against controls proving the search detects a secret when present: each
