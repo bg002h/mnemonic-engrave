@@ -1414,8 +1414,8 @@ things that can each move independently: the `qrc.Size > 33` cap and the QR
 error-correction level. (`qrScale` is NOT among them — the boundary is decided
 by `qr.Encode` before `qrScale` is ever read; it changes how big the QR is
 engraved, not which version the string needs.) Measured: at `qr.Q` instead of
-`qr.M` the
-limit drops to **67** — below `EncodeMS1`'s ordinary output — which would reopen
+`qr.M` the limit drops to **67** — below `EncodeMS1`'s ordinary output — which
+would reopen
 this defect silently and reject ordinary seeds. The test MUST re-derive the
 boundary from the real encoder and fail if it is no longer 90/91.
 

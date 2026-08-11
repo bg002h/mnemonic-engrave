@@ -359,14 +359,23 @@ are **visible on shipped screens today** — the `%` is absent for the whole of 
 anything, but they are the two items here most likely to be reported by a user
 on day one.
 
-**One thing this phase does not yet fix, and it needs an answer before the
-tag:** whether it runs *before* or *after* the release tag. Those three items are
-unwiped copies of seed material created **inside** the Sealed Payload flow, on a
-device whose threat model (§2.2 item 2, §2.2 item 9) assumes an attacker with
-physical possession reads SRAM over SWD without a passphrase. If the phase runs
-**after** the tag, the release ships with them open, and §2.2 should say so
-plainly rather than leaving it implied. If **before**, nothing more is needed
-here.
+**ANSWERED 2026-08-10 (operator ruling): this phase runs AFTER the tag, and the
+tag remains `v0.0.0-g<sha>`.**
+
+That version string is doing real work in the decision. `v0.0.0` is not a claim
+of readiness — it marks a build, not a product — so tagging with this phase open
+is not the same as shipping a finished machine with known gaps.
+
+**What still follows.** §2.2 is explicitly *"normative and belongs in operator
+documentation, not only here"*, and the items it already carries are exactly this
+shape: item 9 (an open session's plaintext is SWD-readable), item 12 (other
+programs do not wipe), item 13 (the plate under the needle). A version number is
+not operator documentation, and an operator engraving a real seed does not read
+semver. So §2.2 should gain **one sentence** saying the wipe does not reach every
+copy inside the payload flow, with a pointer to this phase.
+
+One sentence, not the amendment originally proposed — the tag being `v0.0.0`
+removes the urgency, not the honesty.
 
 
 ## Reconciliation — 2026-08-10, on B2b closing
