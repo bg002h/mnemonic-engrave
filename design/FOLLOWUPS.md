@@ -1539,7 +1539,7 @@ argv. The spec is silent — `grep -niE "argv|command.?line|/proc"` over
 `SPEC_encrypted_payload_delivery.md` returns nothing — so §12's threat model
 should gain a line either way.
 
-### F-103 — the PROTECTIVE SCREEN FILM silently disables §10.2.4's wipe, the screensaver, and every idle behaviour (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
+### F-103 — CLOSED 2026-08-11 (post-merge polish: idle clock now keyed on EFFECTIVE input; narrowed, see F-122) — the PROTECTIVE SCREEN FILM silently disables §10.2.4's wipe, the screensaver, and every idle behaviour (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling; the concerns below were raised and the operator decided). Was: B2c, and it belongs in the operator docs before any release.
 
@@ -2561,7 +2561,7 @@ nothing calls `Scrub` on any of these paths. **This is the pre-existing product,
 not B2b**, which is why it is scheduled after the phase rather than inside it —
 but it means "the machine wipes the rendered seed" is not true in general.
 
-### F-109 — ~35 K in ~81 REACHABLE objects survives every wipe, unidentified (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
+### F-109 — DOWNGRADED to Minor 2026-08-11 (measured: no secret in the residue; ~12 K of ~74 objects still unnamed) — ~35 K in ~81 REACHABLE objects survives every wipe, unidentified (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling; the concerns below were raised and the operator decided). Was: the fable whole-diff review of ALL of Phase 2 — operator ruling 2026-08-10.
 
@@ -3531,7 +3531,7 @@ was done about it; per-entry edits are noted against their F-numbers.
 - **Spec citations now name symbols where lines keep decaying.** `idleTimeout`
   had moved 2801 → 2879 → 2932 → 2955.
 
-### F-109 — DOWNGRADE recommended, and the security question is answered
+### F-109 — DOWNGRADED to Minor 2026-08-11 (measured: no secret in the residue; ~12 K of ~74 objects still unnamed) — DOWNGRADE recommended, and the security question is answered
 
 The residue was measured for the first time. **No secret was found in any of
 it**, against controls proving the search detects a secret when present: each
@@ -3641,3 +3641,34 @@ That is the false-PASS class this project otherwise finds by mutation, surfaced
 here by a real fix. It is an argument for fixing cosmetic defects rather than
 carrying them: a bug in the render is also a load-bearing assumption in the
 tests around it.
+
+### F-122 — a flickering touch panel still produces GENUINE edges, so the wipe can still be delayed (owning phase: **post-merge polish and hardening**)
+
+Filed 2026-08-11, out of F-103's fix. **This is the part of F-103 that was
+narrowed rather than closed, and it is filed rather than folded into that entry
+so it cannot be lost behind a CLOSED heading.**
+
+F-103's fix keys the §10.2.4 idle clock on *effective* input — a contact-state
+change on the pointer, a rune, or a button — instead of raw event presence. That
+defeats the measured failure: 100,000 position-only spurious polls now leave the
+clock alone, and the regression test is committed.
+
+**What it does not defeat.** A panel whose contact repeatedly crosses the
+detection threshold — film, moisture, or debris causing the driver to assert and
+de-assert contact — produces real down/up **edges**. Those are indistinguishable
+at this layer from an operator tapping, so they legitimately reset the clock. A
+seed can still be held resident indefinitely by a panel that flickers rather
+than one that merely reports positions.
+
+**Why it was not fixed in the same change.** The remedy is a plausibility bound
+— rate-limiting or debouncing edges that no human could produce. That is a
+**tunable constant inside a funds-safety control**, and picking it blind trades a
+known failure for an unknown one: too tight and a slow deliberate operator gets
+wiped mid-task, which is worse than the defect. The missing input is a **bench
+capture of the real `ft6x36` stream under a protective film** — the same free
+bench check the B2b preflight recorded and never ran. Get the capture, then pick
+the bound from it.
+
+**Operator guidance stands regardless, and is the real mitigation:** with the
+film on, the panel is unusable as *input* anyway. Take it off. The fix only
+ensures the machine wipes rather than holding a seed forever.
