@@ -270,16 +270,23 @@ This list is normative and belongs in operator documentation, not only here.
       The measurement is **host Go, not the device's TinyGo build**, whose GC
       scans stacks conservatively and can retain what host Go frees; that can
       add bytes but cannot un-zero an erased buffer.
-    - **The wipe can silently never run.** §10.2.4's timer fires only when the
-      machine is *idle*, and the idle clock is refreshed by **any** input event,
-      including one that resolves to no actual input. A touch panel reporting
-      spurious readings — from a protective film, moisture, debris, or driver
-      noise — therefore keeps the machine permanently non-idle. The warning
-      branch sits inside the idle branch, so there is **no countdown and no
-      wipe, and no indication that either was skipped** (F-103). Confirmed
-      by test:
-      100,000 spurious polls over ~1000 s produced zero warnings and zero
-      wipes, against a control that warned at 3:00.
+    - **The wipe could be held off forever — FIXED 2026-08-11 (F-103), and
+      NARROWED rather than eliminated.** §10.2.4's timer fires only when the
+      machine is *idle*, and the idle clock used to be refreshed by **any**
+      input event, including one that resolved to no actual input. A touch panel
+      reporting spurious readings — from a protective film, moisture, debris, or
+      driver noise — therefore kept the machine permanently non-idle, and
+      because the warning branch sits inside the idle branch there was **no
+      countdown and no wipe, and no indication that either was skipped**.
+      Confirmed by test at the time: 100,000 spurious polls over ~1000 s
+      produced zero warnings and zero wipes, against a control that warned at
+      3:00 — now a committed regression test rather than a one-off run.
+      The clock is now refreshed only by **effective input**: a contact-state
+      change on the pointer, a rune, or a button. **What remains open:** a panel
+      whose contact repeatedly crosses the detection threshold still produces
+      genuine edges, which still count. A plausibility bound would close it and
+      wants a bench capture of the real `ft6x36` stream under a film, not a
+      guessed constant.
 
     **What to do about it, as an operator of this build:** treat the §10.2.4
     wipe as a convenience, not a control. The control is §2.3's operating rule —
@@ -1645,8 +1652,17 @@ engrave safe: cancel a secret plate mid-cut and the record is wiped (§10.2.2),
 so the third row becomes true because the secret is *actually gone* — not because
 a button was pressed.
 
-The warning wakes the screen and any touch resets it, so a present operator is
+The warning wakes the screen and a touch resets it, so a present operator is
 never wiped out and an absent one is.
+
+*(Amended 2026-08-11, F-103.)* **"Any touch" is now "any EFFECTIVE input"** — a
+contact-state change on the pointer (a down or an up edge), a rune, or a button.
+A position-only move and a camera frame do not reset the clock. Operator-visible
+behaviour is unchanged, because there is no cursor or hover on this hardware: a
+position-only event means the contact point moved *while still held*, and a
+human doing that is mid-drag, always bracketed by edges that do count. The
+change exists because "any event" let a panel reporting spurious readings hold
+the wipe off forever, silently — see §2.2 item 16.
 
 *(Amended 2026-08-09b.)* **The timer's subject is seed-equivalent material, not
 decrypted records.** As first written this section scoped the timer to resident

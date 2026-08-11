@@ -46,14 +46,22 @@ or skipped, with a 3-minute idle timer as a backstop. In the current build:
   on the device's TinyGo build, whose GC scans stacks conservatively and can
   therefore retain what host Go frees.** It cannot un-zero an erased buffer,
   but the device figure is unmeasured.
-- **The idle wipe can silently never run.** The timer only fires when the
-  machine is *idle*, and the idle clock is refreshed by **any** input event —
-  including one that resolves to no actual input. A touch panel reporting
-  spurious readings (protective film, moisture, debris, driver noise) keeps the
-  machine permanently non-idle, so there is **no countdown, no wipe, and no
-  indication that either was skipped**. Measured: 100,000 spurious touch polls
-  over ~1000 s produced zero warnings and zero wipes, against a control that
-  warned at 3:00.
+- **The idle wipe could be held off forever — FIXED 2026-08-11, and narrowed
+  rather than eliminated.** The idle clock used to be refreshed by **any** input
+  event, including one that resolved to no actual input, so a touch panel
+  reporting spurious readings (protective film, moisture, debris, driver noise)
+  kept the machine permanently non-idle: **no countdown, no wipe, and no
+  indication that either was skipped**. Measured at the time: 100,000 spurious
+  polls over ~1000 s produced zero warnings and zero wipes, against a control
+  that warned at 3:00. That experiment is now a committed regression test.
+  The clock is refreshed only by *effective* input — a contact-state change, a
+  rune, or a button. **What remains:** a panel whose contact repeatedly crosses
+  the detection threshold still produces genuine edges, and those still count.
+  Closing that needs a plausibility bound, which wants a bench capture of the
+  real touch stream under a film rather than a guessed constant. **Practical
+  advice is unchanged: take the protective film off.** With it on, the panel is
+  unusable as input regardless; the fix only ensures the machine wipes instead
+  of holding a seed forever.
 
 **What actually protects you, therefore, is physical custody — not the wipe.**
 This device is deliberately debuggable: `debug enable: 1` and
