@@ -348,29 +348,44 @@ the whole file rather than the phase's own list.
 **Closed by this sweep:** F-79, F-105, F-107, F-108, F-111 — each with the
 evidence in its entry.
 
-**OVERDUE — owning phase B2b, and B2b has shipped:** **F-109**. It plateaus
-(one-time ~35 K, no cliff, no exhaustion) so it is not a leak, but the ~81
-reachable objects are **still unidentified** and therefore cannot be ruled
-seed-bearing. B2b was merged and pushed with it open; that is a real gate
-slip and it is recorded here rather than quietly re-parked.
+**WAS OVERDUE, now re-assigned by operator ruling:** **F-109**. Its owning phase
+was B2b, and B2b was merged and pushed with it open — a real gate slip, recorded
+rather than hidden. Ruling 2026-08-10 moves it to **the fable whole-diff review
+of all of Phase 2**, a gate this ruling creates, to run before the release tag.
+That is a venue change rather than a deferral: the item spans three phases, which
+is why three phases of review each left it standing.
 
-**Unrecorded, not undone** — implemented in their owning phase but never marked,
-so each needs one confirming read before it can be closed honestly:
+**THE BURNDOWN LIST — six items, open, owning phase already passed.** Whoever
+opens B2c starts here:
 
-| item | mechanism found in tree |
-| --- | --- |
-| F-77 | `seal/label_encrypted.go` names it explicitly |
-| F-84 | `SeedScreen.NoEdit`, `gui/gui.go:2335` |
-| F-87 | `gui/unlock_session_test.go`, `gui/wipe_inventory_audit_test.go` |
-| F-89 | `wiping = true` unwind at `gui/run_flow.go:265,285` |
-| F-93 | `ctx.KeepAwake()` bracket at `gui/unlock_kdf.go:318-326` |
+| item | owning phase | mechanism visible in tree |
+| --- | --- | --- |
+| F-77 | B2a-i Task 1 (GATING) | `seal/label_encrypted.go` names it explicitly |
+| F-80 | B2a-ii (two of three bullets) | — |
+| F-84 | B2a-ii Task 6 | `SeedScreen.NoEdit`, `gui/gui.go:2335` |
+| F-87 | B2b | `gui/unlock_session_test.go`, `gui/wipe_inventory_audit_test.go` |
+| F-89 | B2b (design constraint) | `wiping = true` unwind, `gui/run_flow.go:265,285` |
+| F-93 | B2b, with F-89's unwind | `ctx.KeepAwake()` bracket, `gui/unlock_kdf.go:318-326` |
 
-A symbol existing is not the same as the finding being addressed — that is a
-presence check, not a behavioural one, which is why these stay open.
+Five of the six look unrecorded rather than undone. They stay OPEN anyway: a
+symbol existing is a presence check, not a behavioural one, and closing on that
+is exactly the evidence this cycle has repeatedly found worthless.
 
-**Parse note for whoever greps this file next:** F-59 is WITHDRAWN and F-83 is an
-ACCEPTED limitation; neither contains the word CLOSED, so a naive `grep -c
-CLOSED` miscounts. F-62 is genuinely still open despite its 2026-08-06 note.
+**This file does not satisfy its own reconciliation contract, and that is a
+finding.** The standard says to record the owning phase in each entry "so
+reconciliation is a grep". It is not, because closure is marked in three
+different places and three different words:
+
+- in the **heading** (F-99: `### F-99 — CLOSED 2026-08-09 — …`),
+- in the **body** (F-106, F-110),
+- or as prose that never says CLOSED at all — F-59 is `WITHDRAWN`, F-83 is an
+  `ACCEPTED` limitation.
+
+Two automated sweeps over this file during the 2026-08-10 audit disagreed with
+each other on F-93 and F-99 for exactly that reason, and a naive `grep -c CLOSED`
+miscounts in both directions. Until closure has one canonical marker in one
+canonical place, every reconciliation here is hand-verified — which is what the
+owning-phase rule exists to avoid. Worth fixing before the release tag.
 
 
 ### F-58 — total input wedge on the Footer entry screen, before engraving (owning phase: GUI)
@@ -2109,7 +2124,34 @@ nothing calls `Scrub` on any of these paths. **This is the pre-existing product,
 not B2b**, which is why it is scheduled after the phase rather than inside it —
 but it means "the machine wipes the rendered seed" is not true in general.
 
-### F-109 — ~35 K in ~81 REACHABLE objects survives every wipe, unidentified (owning phase: **B2b**)
+### F-109 — ~35 K in ~81 REACHABLE objects survives every wipe, unidentified (owning phase: **the fable whole-diff review of ALL of Phase 2** — operator ruling 2026-08-10)
+
+**OPERATOR RULING 2026-08-10 — re-assigned to the fable whole-diff review of all
+of Phase 2.** This item was OVERDUE: its owning phase was B2b, and B2b was
+merged and pushed with it open.
+
+**Why the re-assignment is the right venue and not a re-park.** F-109 is a
+question about the *whole* secret lifecycle — where a decrypted record, its
+rendered form and its plate geometry come to rest across B2a-i's KDF engine,
+B2a-ii's session and B2b's wipe. No single phase's context holds that, which is
+exactly why three phases of review each left it standing. It needs one reviewer
+reading the entire Phase 2 diff at once.
+
+**This ruling CREATES that gate.** Scope: the whole-diff of B2a-i + B2a-ii + B2b
+against the phase's base, at **fable** tier — the single highest-stakes review
+this project reserves for the last gate before an irreversible action, here the
+release tag. It runs **before the tag**, and F-109 is a named must-answer
+question in its brief, not a line item it may note in passing.
+
+**What the review must answer, not merely observe:** identify the ~81 objects.
+Name them. For each, say whether it can hold seed material, ciphertext, a
+rendered secret or plate geometry — and if none can, say what they are instead
+and why the count plateaus at exactly that number. "Probably harmless" is not an
+answer; the entry is open *because* they are unidentified, so a review that
+leaves them unidentified has not closed it.
+
+**Do not tag the release with this open.**
+
 
 Measured on hardware 2026-08-10 with `b2b-heapprobe2`, which forces
 `runtime.GC()` before every readout — so these are reachable objects, not
