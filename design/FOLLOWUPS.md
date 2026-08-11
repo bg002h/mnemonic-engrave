@@ -2262,6 +2262,32 @@ Fixed in `seedhammer` `c38cb6b` to require a needle-DOWN pass.
 
 ### F-113 — codex32 LONG CODES are admitted, decrypted and offered, then can never be engraved (owning phase: **post-B2b, before the release tag**)
 
+**CLOSED 2026-08-10.** Implemented both sides, Rust first per the Rust-primary
+rule. Device: `seedhammer` `b2b` (merge of `f113-ms1-engraveable` @ `f3f866f`) —
+`AdmitSection`'s per-record pass refuses an `ms1` over 90 characters and wipes
+the records already copied; `unlockSealedFlow` gains a case so the operator is
+told the reason rather than *"Payload unreadable."* Host: `mnemonic-engrave`
+`master` (merge of `f113-ms1-engraveable` @ `d8258e9`) — `record::validate_record`,
+with `check_public` reporting an over-length `ms1` in `--plaintext` as a SECRET
+rather than as a length problem.
+
+**The 90 is bound, not written down twice.** `backup.go` gained
+`seedQRLevel`/`seedQRMaxSize` so the derivation test READS `EngraveSeedString`'s
+own constants. Measured: with `qr.M` duplicated in the test, switching the
+function to `qr.Q` left the test green at 90 while the machine would refuse at
+67; after binding, that same change turns it red.
+
+**Gates:** R0 rounds 0–2 on the design (5I → 1I → GREEN), a whole-diff execution
+review on the code (GREEN, 0C/0I, seven mutations re-run by hand), and a focused
+fold review. 16 mutations, 15 killed; the survivor (`wipe(out)` removed) is
+pre-existing and unobservable without `unsafe`, and a test was added that
+discriminates the per-record pass from the post-loop block instead.
+
+**What it does NOT do**, so nobody re-derives it: it changes nothing for
+payloads `me` produced, because `me` cannot emit an `ms1` over 77 characters
+(**F-120**). The band it refuses is reachable only from third-party BIP-93
+tooling. Engraving long codes remains **F-117**/**F-118**.
+
 Found 2026-08-10 while answering an operator question about QR codes on sealed
 plates. Measured, not reasoned about.
 
