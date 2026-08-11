@@ -1545,6 +1545,31 @@ appear, it is an F-105 defect in its own right and not merely F-106 spilling ove
 
 ### F-106 — §10.2.4's window runs 2x (6:00, not 3:00): a LATE ARM EDGE lands on the deadline (owning phase: **B2b — CRITICAL, gates the phase**)
 
+**FIX WRITTEN AND R0-FOLDED 2026-08-10.** Design:
+`design/DESIGN_f106_late_arm_edge.md`. Implementation: worktree
+`seedhammer-f106`, branch `b2b-f106` @ `4b452d3` (off `b2b` @ `3de8aa1`).
+Round 0 report `design/agent-reports/2026-08-10-r0-f106-round0.md` (RED, 1C/2I)
+persisted at `e29d61b`; fold at `62b7917`. Round 1 re-review dispatched.
+
+*The fix:* process the arm edge BEFORE the loop blocks as well as after it. The
+pre-block call is worth a wakeup and is the fix; the post-block call is worth one
+loop turnaround, is not load-bearing, and the code now says so. Engrave-side
+edges are covered by neither call — `pl.Wakeup()` covers those, which the design
+now states and a mutation row now pins.
+
+**STILL OPEN — this entry does not close until hardware confirms it**, because
+the defect is a function of when `platform_sh2.go`'s event source actually
+returns and no host test can settle that. Two readings required, both scheduled
+into the next hardware session:
+1. Cut/Skip untouched → warning at **3:00**, wipe at **3:30** (was 6:00/6:30).
+2. Back mid-cut → warning **3:00 after the head stops** (the `engraveStopping`
+   park, whose only exit is `pl.Wakeup()`).
+
+**Ordering constraint:** F-105's hardware half is confounded while this is open —
+a 2x window changes what "the passphrase was still there" means — so F-106's
+readings come first in the session.
+
+
 **ROOT CAUSE FOUND on hardware 2026-08-10**, build `b2b-idleprobe3` =
 `256b38c`. Full readings and reasoning:
 `design/HARDWARE_RESULT_2026-08-10b_f106_ROOT_CAUSE.md`. The original title
