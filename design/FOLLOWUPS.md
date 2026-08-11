@@ -3485,3 +3485,117 @@ All five nits from the converter execution review (`design/agent-reports/me-conv
 
 ### crates.io publish — RESOLVED 2026-06-16
 - **`me-crates-io-publish`** — **`mnemonic-engrave` v0.1.0 published** to crates.io (<https://crates.io/crates/mnemonic-engrave>; `cargo install mnemonic-engrave` → the `me` binary). Added publish metadata (`repository`/`homepage`/`keywords`/`categories`) + a crate-local `README.md` (`9ad758c`); dry-run green; uploaded with a `publish-new`-scoped token. Future versions: bump `version` and `cargo publish` (needs `publish-update` scope).
+
+## Reconciliation — 2026-08-11, the post-release Phase 2 review round
+
+Six independent reviews ran over the released tree (`me` `v0.5.0` / fork
+`93ee004`), each persisting its own report to `design/agent-reports/` and
+committed verbatim before any fold. Reviewers were briefed to **suggest**
+closures, not perform them. This section records what the round found and what
+was done about it; per-entry edits are noted against their F-numbers.
+
+**Reports:** `phase2-whole-diff-fable.md` · `f109-residue-identification.md` ·
+`followup-triage-suggestions.md` · `phase2-claims-audit.md` ·
+`phase2-rust-side-review.md` · `phase2-spec-conformance.md`
+
+### What the round changed
+
+- **C1 — `me seal` was emitting backups the device cannot open.** FIXED
+  (`ad8f95f`). A BIP-39 mnemonic record was *accepted* on its whitespace-
+  normalised form and *emitted* as supplied; the device splits on a single ASCII
+  space. A double space, TAB, NBSP, VTAB, ideographic space or newline all
+  sealed with exit 0 and were refused on the machine after the ~31 s KDF, shown
+  as §6.4 "payload unreadable" — which §2.2 item 4 teaches the operator to read
+  as **tampering**. New `RecordError::NonCanonicalSpace`, mutation-killed.
+- **F-114 — CLOSED, not a defect.** The machine homes to the plate origin before
+  every run, so the approach line from `bezier.Point{}` is correct. See its
+  entry; pinned by fork `d55c06b`.
+- **F-121 — FILED** out of that closure: the emulator does not home, so it
+  renders a resumed cut the machine would never produce.
+- **F-110 — status corrected.** It was never closed; the error was in
+  `CONTINUITY_2026-08-11.md` and in the brief handed to the triage reviewer,
+  which refuted it from the shipped code's own comments. Now **overdue** and
+  re-assigned to post-merge polish and hardening. Narrowed by fable's M3: the
+  wipe provably cannot fire mid-cut, so one of its bullets describes an
+  unreachable path.
+- **F-68 — closure de-attributed.** Credited to `plan-cite-gate.sh`, which
+  resolves citations; F-68 is that `plan-build-gate.sh` never *runs* the CLI
+  tests, and `:163` still passes `--no-run`.
+- **Released binaries misreported their own version.** `v0.5.0` was tagged with
+  `Cargo.toml` at `0.4.0`, so every published archive prints `me 0.4.0`. Bumped
+  (`00adcf3`). **The published v0.5.0 assets are not retroactively fixed** —
+  whether to re-tag is an operator call.
+- **`bip39`'s `zeroize` feature was off**, so `Mnemonic` was not
+  `ZeroizeOnDrop` — a parsed passphrase dropped in the clear, undercutting the
+  `Zeroizing` wrappers around the same words. FIXED (`24dff51`).
+- **Spec citations now name symbols where lines keep decaying.** `idleTimeout`
+  had moved 2801 → 2879 → 2932 → 2955.
+
+### F-109 — DOWNGRADE recommended, and the security question is answered
+
+The residue was measured for the first time. **No secret was found in any of
+it**, against controls proving the search detects a secret when present: each
+canary scored at its own live instant and **zero at every post-wipe dump**,
+including the `[]bip39.Word` passphrase buffer the harness still referenced.
+
+23,024 B is now named and benign — a write-only display mask (12,480 B), the
+§10.2.4 warning frame's arg/ref buffers (9,472 B, decoded: compile-time
+constant text and package-level singletons over `//go:embed` flash, **zero**
+references to any session object), and the drawer's stacks (1,040 B). A further
+~13.5 K was never residue: `heapLine()` rides `StartScreen.Version`, built
+*before* the first frame, so the baseline and the later readings were not
+comparable. **~12 K across ~74 small objects remains unnamed.**
+
+**Caveat that keeps this open rather than closed:** measured on host Go 1.26.3,
+not the device's TinyGo build, whose `-gc precise` scans stacks conservatively
+and can retain what host Go frees. That can add bytes; it cannot un-zero a
+cleared buffer.
+
+**Suggested:** downgrade to Minor, fix the probe placement rather than the
+memory, and file the genuinely open question this surfaced — whether TinyGo's
+non-releasing `sync.Pool` retains a `fmt`-formatted copy of seed material on the
+**cut** path. That is F-88 territory, not F-109's.
+
+### F-120 — the ledger UNDERSTATES it, with a measured table
+
+It is not a boundary case at 90. The device admits **27** codex32 lengths in
+48–90; `me` admits **10**; **22 diverge**. The reverse set is **empty**, so
+unlike C1 this cannot produce an unopenable backup — every `ms1` that `me`
+emits, the device accepts.
+
+The entry's `[50,56,62,69,75] ∪ [51,58,64,70,77]` is misleading: those are two
+**disjoint tag families** (`entr` v0.1 vs `mnem` v0.2), and an `entr`-tagged
+77-character string is refused while a `mnem`-tagged one at the same length is
+admitted. Also, the "widen `me`" option is not actionable from this repo — the
+narrowing lives in `ms-codec`.
+
+### Still open from this round, not yet folded
+
+- **Rust, Important** — the secret record is freed **unscrubbed**:
+  `Payload.secret` is a plain `Vec<String>`, which undoes part of F-102's fix
+  one line later. Proven with a probing allocator and both controls.
+- **Rust, Important** — `normalise` leaks 3 blocks per call despite returning
+  `Zeroizing`.
+- **Rust, Important** — the **mk1 pristine-BCH guard has no test**; the mutation
+  survived. It is load-bearing for cross-implementation agreement, and the
+  device was confirmed to refuse a BCH-correctable `mk1`.
+- **F-115** — measured blind spot: **68 of 175** file:line-shaped citations in
+  this file use range/comma/slash forms `plan-cite-gate.sh`'s regex never
+  attempts. The gate's silence over this file is therefore not coverage.
+- **F-83** — two copies named by no prior inventory: `stepper.Driver.buf` plus
+  the bezier/bspline motion state (the seed as PIO step words during a cut), and
+  the SH2 LCD DMA chunk buffers (rendered-seed pixels). Both F-83-class,
+  confined to the cut window. Record them here rather than re-deriving later.
+- **F-105** — fable's M4: F-103 defeats **row 4** (the passphrase wipe) exactly
+  as it defeats row 1, so F-105's "CLOSED — hardware" holds only on a machine
+  whose touch panel is quiet. Cross-reference, not a re-opening.
+
+### Triage's closure candidates — evidence recorded, operator decides
+
+Whole entries: **F-75, F-60, F-63, F-72, F-82, F-71**. Bullets: **F-80's
+`HasHash`** (guard now exists, `gui/unlock_flow.go:91`), **F-80's `groupCards`**
+(doc states it is test-facing, `seal/record.go:429-431`, still 0 production
+callers), **F-90 item 2** (subsumed by F-89's rename to `RecordsResident`).
+
+Now **due** rather than closeable, both gating conditions met: **F-65**, **F-66**,
+**F-76** — each waited on "after the cycle ships", and it has.
