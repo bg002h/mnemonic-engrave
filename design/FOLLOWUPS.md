@@ -1279,6 +1279,8 @@ Small, real, and NOT foldable from the firmware worktree — every item is in a
 
 ### F-98 — two citations in the GREEN spec do not resolve (owning phase: with F-85, before the release tag)
 
+**CLOSED 2026-08-10 (`3be5fc8`).** The repaired gate separated the two cases the old one conflated: `checksum.go:132` was AMBIGUOUS, not wrong — the claim is right and it needed `codex32/` prefixing. `main.rs:375` had genuinely decayed and is repointed to `crates/me-cli/src/main.rs:590` (`fn write_private`) with `:597` for the `0o600`. Both verified by the gate printing the resolved line.
+
 Found while cite-gating the §10.2.4 amendment; **pre-existing, and unchanged by
 it** — the gate reports the same two before and after, verified against
 `git show HEAD:`.
@@ -1379,6 +1381,8 @@ single place that list lives.
 
 ### F-101 — `mutation-run.py` is not crash-safe: killed mid-row it leaves a MUTANT in the worktree (owning phase: before the release tag, with F-96's runner)
 
+**CLOSED 2026-08-10 (`ba31e0c`).** An on-disk sentinel written before each mutation and cleared only after the restore verifies, plus handlers for SIGINT/SIGTERM/SIGHUP; `recover_sentinel()` runs BEFORE `preflight_clean()`, because the mutant a kill leaves is exactly what makes preflight refuse. Verified by SENDING the signals (`scripts/test/mutation-run-crashtest.py`): SIGKILL leaves the mutant and the next run restores it; SIGTERM restores in-handler and keeps an honest exit status.
+
 Hit three times in ten minutes on 2026-08-09 while verifying Task 7. A
 backgrounded run was killed mid-row and left `armed := true` applied in
 `gui/run_flow.go` — the mutant that makes §10.2.4's wipe timer **permanently
@@ -1409,6 +1413,8 @@ uncommitted work — the general rule (restore from a file copy, never
 `git checkout`) still stands for anything else.
 
 ### F-102 — `me seal` takes SEED MATERIAL on argv, while every other subcommand reads stdin (owning phase: before the release tag)
+
+**CLOSED 2026-08-10 (`2ed6ac1`).** `me seal` takes `--in <file>` or stdin into a Zeroizing buffer; argv survives for fixtures and warns when it carries seed material. Verified across every channel including CRLF-refused-not-normalised and warn-then-still-refuse without `--seal-secret`. SPEC §2.2 item 14 names the host-side exposure, which the spec had never mentioned.
 
 Raised by the operator 2026-08-09 while reading Task 8's setup, and measured
 rather than assumed.
@@ -1947,6 +1953,8 @@ worth naming in the phase report: each was individually defensible when written,
 and each stopped being true without anyone editing the line that claimed it.
 
 ### F-115 — `plan-cite-gate.sh` resolves citations by BASENAME and takes the first match, including build artefacts (owning phase: **before the release tag**, with F-101's runner work)
+
+**CLOSED 2026-08-10 (`51ff889`).** The resolver prunes `target/`, `.git/` and `node_modules/` alongside `third_party/`, and FAILS as AMBIGUOUS naming every candidate rather than taking the first match. Verified: it now reports `bip380/checksum.go` and `codex32/checksum.go` by name instead of silently choosing the 89-line one.
 
 Found 2026-08-10 while gating the §2.2 item 12 amendment. The gate reported two
 unresolvable citations in `SPEC_encrypted_payload_delivery.md`; both citations
@@ -2513,6 +2521,8 @@ rasterising check exists, every new screen in a new face is unverified in exactl
 this way.
 
 ### F-85 — §2.2 does not name the during-engrave residency (owning phase: before the release tag)
+
+**CLOSED 2026-08-10 (`b6bbae1`).** SPEC §2.2 item 13 names the during-engrave residency, in the same register as item 9, with physical custody as the control — and states its own narrowness explicitly, since the broad reading of F-83 is what cost F-108. §2.3 gains the operator half: do not start a secret cut you will walk away from.
 
 SPEC §2.2 lists what this design does **not** defend against. It does not say
 that a secret plate's geometry is resident in SRAM for the whole of its cut, and
