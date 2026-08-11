@@ -1522,6 +1522,8 @@ screensaver, which is upstream code this phase only borrowed.
 
 ### F-104 — four MORE members of the unreachable-seed-residue class, two of them on paths nobody had enumerated (owning phase: **B2c**, with F-88/F-90/F-94)
 
+**STILL BINDS — checked against SPEC §2.2 item 12 on 2026-08-10 and NOT accepted.** all four: pbkdf2 state via F-88's chain; `splitMnemonic` residue via the classifier on `Inspect` and `UnlockWithKey` and via `unlockPassphraseFlow`'s `LastWordCandidates`; the `ms1` `ToUpper`/QR copies via `unlockEngraveCodex32` → `backup.EngraveSeedString`; keyboard fragments via `unlockPassphraseFlow` → `inputWordsFlow` → `Keyboard.Fragment`. Verified by tracing the call graph whole-tree, not by reading this entry: an earlier pass classified this as legacy-only from entry prose and was wrong. See `design/agent-reports/2026-08-10-b2c-program-boundary-verification.md`.
+
 Found by the wipe-inventory audit (fable, 2026-08-09), which was dispatched to
 answer the operator's question *"are we wiping an incorrect portion of memory, or
 have we checked?"*. It found no second `Reset()`-class defect — that part is
@@ -2415,6 +2417,8 @@ file still matches.)*
 
 ### F-90 — the `ms1` engrave arm is the under-examined one, and it is the DEFAULT arm (owning phase: **B2c** for items 1 and 3, re-assigned from B2b 2026-08-09; item 2 DISSOLVED by B2b)
 
+**STILL BINDS — checked against SPEC §2.2 item 12 on 2026-08-10 and NOT accepted.** `unlockEngraveCodex32` has exactly ONE caller in the whole tree — `unlockSecretPlate`, inside the same bracket. Not mixed. Verified by tracing the call graph whole-tree, not by reading this entry: an earlier pass classified this as legacy-only from entry prose and was wrong. See `design/agent-reports/2026-08-10-b2c-program-boundary-verification.md`.
+
 > **Re-assigned B2b → B2c, 2026-08-09.** The B2b plan deferred this to "own
 > cycle", which is **not a later phase — it is no phase**, and
 > `/scratch/code/CLAUDE.md` forbids parking an item on nothing: "an item that
@@ -2508,6 +2512,8 @@ on it**, or B2b inherits a control that is correct only for the arm one vector
 reaches.
 
 ### F-88 — three more seed-equivalent copies on the mnemonic engrave path, two of them unreachable from `gui` (owning phase: **B2c**, re-assigned from B2b 2026-08-09)
+
+**STILL BINDS — checked against SPEC §2.2 item 12 on 2026-08-10 and NOT accepted.** `unlockEngraveMnemonic` (`gui/unlock_session.go:270`) is inside the `:88-89` wipeGuard bracket and reaches all three copies, directly or via `SeedScreen.Confirm` / `masterFingerprintFor`. Verified by tracing the call graph whole-tree, not by reading this entry: an earlier pass classified this as legacy-only from entry prose and was wrong. See `design/agent-reports/2026-08-10-b2c-program-boundary-verification.md`.
 
 > **Re-assigned B2b → B2c, 2026-08-09.** The B2b plan deferred this to "own
 > cycle", which is **not a later phase — it is no phase**, and
