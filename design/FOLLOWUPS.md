@@ -1467,6 +1467,33 @@ should gain a line either way.
 
 ### F-103 — the PROTECTIVE SCREEN FILM silently disables §10.2.4's wipe, the screensaver, and every idle behaviour (owning phase: **B2c**, and it belongs in the operator docs before any release)
 
+**MECHANISM CONFIRMED 2026-08-10, and the entry is both under- and
+over-stated.** `design/agent-reports/2026-08-10-f103-screen-film-mechanism.md`.
+
+**The mechanism:** `gui/run_flow.go:251` refreshes `a.idle.start` on raw
+`len(evts) > 0`, with no requirement that an event resolve to *effective* input.
+Touch readings that `processTouch`'s exact-equality dedupe fails to suppress keep
+the machine perpetually not-idle; §10.2.4's warning branch is nested inside
+`if a.idle.active`, so a machine that never goes idle never warns. Silent, as the
+entry says. `ctx.keepAwake` is NOT the cause while armed — its term is ANDed with
+`!armed`.
+
+**Host-testable, and tested:** 100,000 distinct spurious touch polls over ~1000 s
+of fake time under `synctest` produced zero warnings and zero wipes, while an
+identical control platform without spurious events warned at ~3:00.
+
+**Under-stated:** this is not about film. ANY source of spurious touch events
+does it — moisture, debris, driver noise.
+
+**Over-stated:** the 2026-08-09 incident's attribution to the film was never
+confirmed with an event counter, the way F-106's phantom-input hypothesis was
+*refuted* by one (`e` stayed 162). The hazard is confirmed live in code; that
+particular incident's cause is plausible and unproven — and F-106 turned out to
+be a different, event-free bug behind an identical-looking symptom.
+
+**Smallest fix:** refresh the idle clock only on input that resolves to a
+state change, or cap how often raw events may refresh it.
+
 **Observed on real hardware 2026-08-09**, during B2b's Task 8.1, and diagnosed by
 the operator. This is the first thing the hardware pass found, and it is not a
 code defect — the code did exactly what it was told.
@@ -1964,6 +1991,26 @@ argument nobody re-checked** — with F-107 and R0 round 0's M4. The pattern is
 worth naming in the phase report: each was individually defensible when written,
 and each stopped being true without anyone editing the line that claimed it.
 
+### F-119 — `backup.go:368`'s comment describes a plate fallback order the code does not implement (owning phase: **with F-78's font cycle**, or whenever the descriptor plate is next touched)
+
+Found 2026-08-10 by R0 round 1 on §10.2.1a, which measured the behaviour after I
+had quoted this comment into a normative spec.
+
+The comment says the descriptor and mdmk callers keep a
+**TEXT+QR → TEXT-ONLY → QR-ONLY** fallback. Measured: **QR-ONLY fails BEFORE
+TEXT-ONLY**, so the order is wrong.
+
+Not a correctness defect in the plate — the variants all exist and the caller
+picks one that fits (`gui/gui.go:2106-2108`). It is a defect in the RECORD, and
+this one propagated: I read it, believed it, and wrote it into
+`SPEC_encrypted_payload_delivery.md` as justification for an admission rule. It
+took an independent reviewer executing the code to catch it.
+
+Textbook [[comments-outlive-their-conditions]]: the comment was likely true when
+written and the ordering changed under it. Fix is to re-derive the order from the
+code and say what it now does, or delete the ordering claim and keep only "these
+variants exist".
+
 ### F-116 — `biptool seed -seedlen` emits codex32 strings this machine cannot engrave, silently (owning phase: **before the release tag**, with F-113)
 
 Found 2026-08-10 by R0 on §10.2.1a, which refuted the claim — mine, stated to
@@ -2324,6 +2371,25 @@ test passes vacuously; two `GC()` calls plus a timeout, not one; and choose the
 canary so it actually enters the structure under test.
 
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
+
+**NARROWED 2026-08-10 — the premise is partly false.** Investigated in
+`design/agent-reports/2026-08-10-f92-tinygo-seal-investigation.md`.
+
+- `bip39.Parse`'s append-orphan guarantee — which `seal.Classify`'s `clear(m)`
+  depends on — is **already verified under the shipping toolchain**:
+  `tinygo test -gc precise ./bip39/` exits 0 today, with no code changes. And
+  every `clear()` in `seal` is GC-independent by construction. The untested
+  surface is smaller than "has never been tested" implies.
+- The failure is **two** failures. `tinygo test ./seal/` fails to COMPILE
+  (`undefined: FileReader`, 8 sites) — a build-tag split, free. Past that it
+  fails at LINK on `golang.org/x/sys/cpu.cpuid/xgetbv`, an external
+  TinyGo/amd64 limitation reached via `record.go`'s `btcd/address` import.
+- **The device build is unaffected** — `pico-plus2` builds clean, exit 0. This
+  is a host-test-toolchain problem, not a firmware one, which lowers its
+  severity considerably.
+
+Recommended route: take the free build-tag split, then run `seal` under
+`tinygo test -target cortex-m-qemu -gc precise` (needs qemu in `flake.nix`).
 
 Measured by the completeness critic:
 
