@@ -3599,3 +3599,21 @@ callers), **F-90 item 2** (subsumed by F-89's rename to `RecordsResident`).
 
 Now **due** rather than closeable, both gating conditions met: **F-65**, **F-66**,
 **F-76** — each waited on "after the cycle ships", and it has.
+
+### Handed back by the seed-residue implementer, 2026-08-11
+
+- **F-104 item 2b (new sub-item)** — `LastWordCandidates`'s
+  `m := make(Mnemonic, len(prefix))` is a one-line zeroable copy of the
+  operator's 11-word prefix, left live. F-104 item 2 names `entBytes`, not this,
+  so the implementer correctly declined to widen a Rust-primary package's diff
+  on its own initiative. Same class, same fix shape, not yet done.
+- **`gofmt -l` is not empty at HEAD** — six files were already unformatted
+  before this phase: `gui/bip85_test.go`, `gui/md1_expand_fuzz_test.go`,
+  `gui/multisig_build_test.go`, `gui/multisig_match.go`,
+  `gui/multisig_testhelpers_test.go`, `md/template_guard_test.go`. Verified by
+  the controller against the tree (the implementer reported five; the sixth is
+  `md/`, outside the directories it was scoped to). None was introduced by this
+  phase. Not fixed immediately only because two implementers were still holding
+  `gui/` worktrees; do it once they merge. **Consequence worth naming:** a
+  dirty `gofmt` baseline means "gofmt is clean" cannot be used as a gate by any
+  future agent, so every one of them has to special-case it.
