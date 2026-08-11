@@ -51,6 +51,13 @@ pub enum RecordError {
         pos: usize,
     },
     NotLowercase(usize),
+    /// A BIP-39 mnemonic whose word separators the device cannot split on.
+    ///
+    /// A SEPARATE variant for the same reason as `MsTooLong`: this record is not
+    /// unreadable, it is intact and spaced in a way the device's parser does not
+    /// accept. Rendering it as §6.4's "payload unreadable" would tell an
+    /// operator holding a perfectly good backup that it had been tampered with.
+    NonCanonicalSpace(usize),
     Unclassifiable(String),
     Invalid(String),
     UndecodableSet(String),
@@ -77,6 +84,14 @@ impl std::fmt::Display for RecordError {
                 f,
                 "record has an uppercase character at byte {pos} — records must be lowercase, \
                  or the same wallet has two different public-data hashes (§6.4)"
+            ),
+            RecordError::NonCanonicalSpace(pos) => write!(
+                f,
+                "mnemonic has a non-canonical word separator at byte {pos} — words must be \
+                 separated by exactly one ASCII space, with none leading or trailing. The \
+                 device splits on a single space and would refuse this backup AFTER the ~31 s \
+                 key derivation, reporting it as unreadable (§6.4). Re-run with the words \
+                 single-spaced."
             ),
             RecordError::Unclassifiable(e) => write!(f, "unrecognised record: {e}"),
             RecordError::Invalid(e) => write!(f, "invalid record: {e}"),

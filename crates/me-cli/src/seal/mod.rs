@@ -246,10 +246,44 @@ fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
     {
         return Err(SealError::Record(record::RecordError::NotLowercase(pos)));
     }
+    // The WHITESPACE half of the argument the uppercase guard above makes.
+    // `normalise` does two things — it lowercases AND it collapses whitespace
+    // via `split_whitespace`, which treats runs, TAB, NBSP and every other
+    // Unicode space as a separator. Only the case half was acted on, so a
+    // mnemonic separated by a double space or a TAB still validates here and is
+    // emitted VERBATIM by `encode_section`. The device splits on a single ASCII
+    // space only (`bip39/bip39.go:289`: `bytes.SplitSeq(buf, []byte(" "))`), so
+    // it refuses the backup after the ~31 s KDF and shows §6.4's "payload
+    // unreadable" — which §2.2 item 4 has taught the operator to read as
+    // tampering. §6.4 requires that a bundle the device will reject never leave
+    // the host, so this belongs on this side.
+    if let Some(pos) = non_canonical_separator(s) {
+        return Err(SealError::Record(record::RecordError::NonCanonicalSpace(pos)));
+    }
     if passphrase::is_valid(s) {
         return Ok(());
     }
     Err(SealError::Record(record_err))
+}
+
+/// Byte offset of the first separator the device's parser could not split on,
+/// or `None` if every word is separated by exactly one ASCII space with none
+/// leading or trailing.
+///
+/// Deliberately NOT `s != *normalise(s)`: that conflates case with spacing and
+/// would report an uppercase mnemonic under a spacing error, losing the guard
+/// above's position and its message.
+fn non_canonical_separator(s: &str) -> Option<usize> {
+    if let Some((i, _)) = s.char_indices().find(|(_, c)| c.is_whitespace() && *c != ' ') {
+        return Some(i);
+    }
+    if s.starts_with(' ') {
+        return Some(0);
+    }
+    if s.ends_with(' ') {
+        return Some(s.len() - 1);
+    }
+    s.find("  ")
 }
 
 #[cfg(test)]
@@ -257,6 +291,54 @@ mod tests {
     use super::*;
 
     const PASS: &str = "beef beef beef beef beef beef beef beef beef beef beef beef";
+
+    /// A checksum-valid 12-word English mnemonic, canonical form.
+    const MNEMONIC: &str =
+        "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+         abandon about";
+
+    /// C1 from the Phase 2 Rust-side review.
+    ///
+    /// `passphrase::is_valid` normalises with `split_whitespace` before parsing,
+    /// which collapses runs AND accepts any Unicode whitespace. `encode_section`
+    /// then emits the record AS SUPPLIED. The device splits on a single ASCII
+    /// space only (`bip39/bip39.go:289`, `bytes.SplitSeq(buf, []byte(" "))`), so
+    /// every one of these seals cleanly and is then refused on the machine after
+    /// a ~31 s KDF — surfaced as §6.4 "payload unreadable", which §2.2 item 4
+    /// has taught the operator to read as TAMPERING.
+    ///
+    /// This is the whitespace half of the argument the uppercase guard above
+    /// already makes; only the case half was acted on.
+    #[test]
+    fn refuses_a_mnemonic_whose_whitespace_the_device_cannot_split() {
+        for (name, sep) in [
+            ("double space", "  "),
+            ("tab", "\t"),
+            ("no-break space", "\u{00a0}"),
+            ("vertical tab", "\u{000b}"),
+            ("ideographic space", "\u{3000}"),
+            ("newline", "\n"),
+        ] {
+            let m = MNEMONIC.replacen(' ', sep, 1);
+            assert!(
+                record_or_mnemonic(&m).is_err(),
+                "{name}: sealed a mnemonic the device cannot parse"
+            );
+        }
+        // Leading and trailing space survive `split_whitespace` too.
+        assert!(record_or_mnemonic(&format!(" {MNEMONIC}")).is_err(), "leading space");
+        assert!(record_or_mnemonic(&format!("{MNEMONIC} ")).is_err(), "trailing space");
+    }
+
+    /// The positive control for the test above: without it, a guard that
+    /// refused EVERY mnemonic would pass and would break the feature outright.
+    #[test]
+    fn still_accepts_a_canonical_mnemonic() {
+        assert!(
+            record_or_mnemonic(MNEMONIC).is_ok(),
+            "canonical single-space mnemonic must still seal"
+        );
+    }
 
     fn hex(b: &[u8]) -> String {
         b.iter().map(|x| format!("{x:02x}")).collect()
