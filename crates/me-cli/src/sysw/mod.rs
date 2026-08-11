@@ -335,6 +335,37 @@ mod tests {
         );
     }
 
+    /// `bound`'s edge. Added because cargo-mutants showed `>` was
+    /// indistinguishable from `>=` and `==`: nothing exercised a blob at exactly
+    /// the region size.
+    #[test]
+    fn a_blob_exactly_filling_the_region_is_legal_and_one_byte_more_is_not() {
+        assert!(
+            bound(vec![0u8; wire::REGION_LEN]).is_ok(),
+            "exactly REGION_LEN fits"
+        );
+        assert_eq!(
+            bound(vec![0u8; wire::REGION_LEN + 1]).unwrap_err(),
+            SyswError::TooLarge(wire::REGION_LEN + 1)
+        );
+    }
+
+    /// `open`'s truncation check. The `<` -> `>` mutant survived because nothing
+    /// handed `open` a blob shorter than its header declares.
+    #[test]
+    fn open_refuses_a_blob_shorter_than_its_header_declares() {
+        let blob = pack(vec![md1()], None, ITER).unwrap();
+        let short = &blob[..blob.len() - 1];
+        assert_eq!(
+            open(short, None).unwrap_err(),
+            SyswError::Wire(wire::WireError::TooShort(short.len()))
+        );
+        assert!(
+            open(&blob, None).is_ok(),
+            "the untruncated blob still opens"
+        );
+    }
+
     #[test]
     fn an_unclassifiable_record_is_refused_with_its_index() {
         assert_eq!(

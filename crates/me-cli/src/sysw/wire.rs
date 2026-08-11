@@ -182,6 +182,99 @@ mod tests {
         assert_eq!(REGION_ADDR as usize % 4096, 0, "sector aligned");
     }
 
+    fn hdr(pub_len: u32, ct_len: u32) -> Header {
+        Header {
+            iterations: if ct_len > 0 { MIN_ITERATIONS } else { 0 },
+            salt: [0; SALT_LEN],
+            iv: [0; IV_LEN],
+            pub_len,
+            ct_len,
+        }
+    }
+
+    /// Boundary tests, every one of them added because cargo-mutants proved the
+    /// suite could not tell `<` from `<=` or `==` here. Hand-written tests
+    /// exercise the middle of a range; generated mutants live on its edges.
+    #[test]
+    fn parse_rejects_a_buffer_one_byte_short_and_accepts_an_exact_one() {
+        let buf = hdr(0, 0).encode();
+        assert_eq!(
+            Header::parse(&buf[..HEADER_LEN - 1]),
+            Err(WireError::TooShort(HEADER_LEN - 1))
+        );
+        assert!(Header::parse(&buf).is_ok(), "exactly HEADER_LEN must parse");
+    }
+
+    /// EACH section length is capped INDEPENDENTLY. This is the `||` -> `&&`
+    /// mutant, and it is the dangerous one: with `&&`, a payload could blow the
+    /// cap on one section as long as the other stayed under it.
+    #[test]
+    fn each_section_length_is_capped_on_its_own() {
+        let max = MAX_SECTION_LEN as u32;
+        assert!(
+            Header::parse(&hdr(max, 0).encode()).is_ok(),
+            "pub_len at the cap is legal"
+        );
+        assert_eq!(
+            Header::parse(&hdr(max + 1, 0).encode()),
+            Err(WireError::SectionTooLong)
+        );
+        assert!(
+            Header::parse(&hdr(0, max).encode()).is_ok(),
+            "ct_len at the cap is legal"
+        );
+        assert_eq!(
+            Header::parse(&hdr(0, max + 1).encode()),
+            Err(WireError::SectionTooLong)
+        );
+        // And one over on EITHER side while the other is fine — what `&&` would let through.
+        assert_eq!(
+            Header::parse(&hdr(max + 1, max).encode()),
+            Err(WireError::SectionTooLong)
+        );
+        assert_eq!(
+            Header::parse(&hdr(max, max + 1).encode()),
+            Err(WireError::SectionTooLong)
+        );
+    }
+
+    #[test]
+    fn iterations_are_bounded_only_when_sealed() {
+        let mut h = hdr(0, 10);
+        h.iterations = MIN_ITERATIONS - 1;
+        assert_eq!(
+            Header::parse(&h.encode()),
+            Err(WireError::Iterations(MIN_ITERATIONS - 1))
+        );
+        h.iterations = MAX_ITERATIONS + 1;
+        assert_eq!(
+            Header::parse(&h.encode()),
+            Err(WireError::Iterations(MAX_ITERATIONS + 1))
+        );
+        h.iterations = MIN_ITERATIONS;
+        assert!(Header::parse(&h.encode()).is_ok());
+        // Unsealed: iterations are 0 and must NOT be range-checked.
+        assert!(Header::parse(&hdr(5, 0).encode()).is_ok());
+    }
+
+    #[test]
+    fn total_len_counts_the_tag_only_when_sealed() {
+        assert_eq!(hdr(7, 0).total_len(), HEADER_LEN + 7);
+        assert_eq!(hdr(7, 9).total_len(), HEADER_LEN + 7 + 9 + TAG_LEN);
+    }
+
+    #[test]
+    fn a_header_round_trips() {
+        let h = Header {
+            iterations: MIN_ITERATIONS,
+            salt: [7; SALT_LEN],
+            iv: [9; IV_LEN],
+            pub_len: 11,
+            ct_len: 13,
+        };
+        assert_eq!(Header::parse(&h.encode()).unwrap(), h);
+    }
+
     /// The measured maximum, so a 24-word passphrase is enterable. Getting this
     /// from `passphrase::MaxLen` (100) would make every long generated
     /// passphrase unopenable — the same host-seals-what-the-device-refuses shape
