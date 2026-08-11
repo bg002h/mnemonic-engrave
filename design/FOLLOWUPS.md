@@ -346,8 +346,18 @@ hence the plate, hence the goldens, in a way a speed change does not.
 `post-release feature`
 
 **`post-merge polish and hardening`** was created by operator ruling 2026-08-10
-to hold the seed-residue work that binds but does not gate the merge: **F-88**,
-**F-90**, **F-104**.
+to hold work that binds but does not gate the merge. It now holds two groups:
+
+- **seed residue** — **F-88**, **F-90**, **F-104** (assigned 2026-08-10)
+- **font and rendering** — **F-78**, **F-86**, **F-95**, **F-119**
+  (assigned 2026-08-10, formerly "the font cycle")
+
+Note within the second group: **F-78** (`·` has no glyph, on four shipped
+screens) and **F-86** (`%` renders as zero pixels in the KDF progress screen)
+are **visible on shipped screens today** — the `%` is absent for the whole of a
+~31-second derivation, which is the machine's longest wait. They do not gate
+anything, but they are the two items here most likely to be reported by a user
+on day one.
 
 **One thing this phase does not yet fix, and it needs an answer before the
 tag:** whether it runs *before* or *after* the release tag. Those three items are
@@ -976,7 +986,9 @@ Source: `design/agent-reports/encrypted-payload-planB-phaseB1-whole-diff-round0.
   list, and the plate list is B1. Intended as B2; **owning phase: B2**, recorded
   so it is not lost between the two.
 
-### F-78 — "·" has no glyph in the display font, and four shipped screens use it (owning phase: ownerless residue; a font cycle, not a feature cycle)
+### F-78 — "·" has no glyph in the display font, and four shipped screens use it (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: ownerless residue; a font cycle, not a feature cycle. Still open; scheduled, not excused.
 
 Measured 2026-08-07 in `gui`, pinned by `TestPlateLabelSeparatorRenders`:
 
@@ -1171,7 +1183,9 @@ needs an **exported** seam in a Rust-primary ported package for a
 defence-in-depth wipe. `Parse`'s three ERROR exits — the reachable half, where a
 full near-seed was being orphaned — are pinned in `bip39` itself.
 
-### F-95 — §10.2.3's warning clears the panel by 3 pixels, and its scroll affordance does not exist on this hardware (owning phase: the GUI/font cycle, with F-78 and `seedhammer-warning-scroll-untouchable`)
+### F-95 — §10.2.3's warning clears the panel by 3 pixels, and its scroll affordance does not exist on this hardware (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: the GUI/font cycle, with F-78 and `seedhammer-warning-scroll-untouchable`. Still open; scheduled, not excused.
 
 Found by the B2a-ii whole-diff review, lens 4 MINOR 4. **Pre-existing from B1** —
 the B2a-ii diff does not touch `unlockWarnUnauthenticated`.
@@ -2013,7 +2027,9 @@ argument nobody re-checked** — with F-107 and R0 round 0's M4. The pattern is
 worth naming in the phase report: each was individually defensible when written,
 and each stopped being true without anyone editing the line that claimed it.
 
-### F-119 — `backup.go:368`'s comment describes a plate fallback order the code does not implement (owning phase: **with F-78's font cycle**, or whenever the descriptor plate is next touched)
+### F-119 — `backup.go:368`'s comment describes a plate fallback order the code does not implement (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: with F-78's font cycle, or whenever the descriptor plate is next touched. Still open; scheduled, not excused.
 
 Found 2026-08-10 by R0 round 1 on §10.2.1a, which measured the behaviour after I
 had quoted this comment into a normative spec.
@@ -2700,7 +2716,9 @@ assert the words are zero after the flow returns. Scheduled to B2b rather than
 now because B2b writes the residency-timer tests anyway, and they need the same
 observability.
 
-### F-86 — `%` renders as zero pixels in the KDF progress screen (owning phase: with F-78's font cycle)
+### F-86 — `%` renders as zero pixels in the KDF progress screen (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: with F-78's font cycle. Still open; scheduled, not excused.
 
 `unlockDerive` (`gui/unlock_kdf.go`) formats its percentage as `"%d%%"` in
 `ctx.Styles.progress`, which is `poppins.Boldprogress45` — the engrave timer's
