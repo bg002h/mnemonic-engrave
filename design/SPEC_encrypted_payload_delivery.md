@@ -231,6 +231,18 @@ This list is normative and belongs in operator documentation, not only here.
     stdout, created `0600`, because the passphrase shares that stream. The input
     channel now matches it.
 
+15. **A codex32 backup of a 512-bit MASTER SEED.** `codex32`'s long form
+    (125–127 characters, a 63–64 byte payload) carries a BIP-32 master seed
+    rather than BIP-39 entropy, and this machine cannot engrave it: the plate's
+    QR would need version 41 against a hard limit of 33. Short codex32 shares
+    above 90 characters are refused for the same reason. §10.2.1a rejects both
+    at admission, so the operator is told before the KDF runs rather than after
+    the seed is decrypted into SRAM.
+
+    Not a wipe or crypto limitation — a plate-geometry one. Nothing in this
+    constellation generates such a string; it can only arrive from third-party
+    BIP-93 tooling.
+
 ### 2.2a What admitting `ms1` changed (operator sign-off, 2026-08-07)
 
 Before this decision the envelope could carry only public constellation data —
@@ -1293,7 +1305,7 @@ Therefore the unlock flow MUST accept only these classifier results:
 | Section | Permitted classification |
 | --- | --- |
 | public | `mdmkText` (via `codex32.ValidMD` / `ValidMK`) **AND the records must group by `(HRP, chunk_set_id)` and every group must reassemble and DECODE** (§6.3). A failure in any group rejects the payload. **Not `md.Decode` per record** — that API refuses chunked input and would reject every valid payload. |
-| encrypted | `mdmkText`, a `codex32` secret (`ms1`), or a parsed BIP-39 mnemonic |
+| encrypted | `mdmkText`, a `codex32` secret (`ms1`), or a parsed BIP-39 mnemonic — and every `ms1` MUST additionally be **engraveable** per §10.2.1a |
 
 **The decode step is not optional and not belt-and-braces.** `ValidMD`/`ValidMK`
 are pure BCH verifiers that never open the payload, and the fork ships the
@@ -1318,6 +1330,50 @@ whatever branch the classifier grows next.
 sealer asserts binds what actually engraves — the device must look at the
 content. A record in the public section that classifies as a secret is
 malformed, and rejecting it is what stops a seed being shipped in the clear.
+
+#### 10.2.1a `ms1` records MUST be engraveable to be admitted — NORMATIVE
+
+**Rule.** A `codex32` secret record longer than **90 characters** MUST be
+rejected at admission, with the same fail-closed treatment as any other
+disallowed classification. The whole payload is refused; no partial unlock.
+
+**Why 90.** `backup.EngraveSeedString` builds the plate's QR from the
+UPPERCASED share and refuses `qrc.Size > 33`. Measured against the real encoder
+(`qr.Encode(strings.ToUpper(s), qr.M)`, uppercased bech32 charset), the boundary
+is exact and sits between 90 and 91:
+
+| share length | QR size | engrave |
+| --- | --- | --- |
+| 40–62 | 29–33 | cuts |
+| 63–**90** | 33 | **cuts** |
+| **91**–122 | 37 | **refused** |
+| 123–127 | 41 | **refused** |
+
+`codex32.New` admits two bands — short `48–93` and long `125–127` — so **both
+bands overhang the engraver**: 91–93 and every long code. This rule covers both,
+which is why it is stated as one length and not as "reject long codes".
+
+**Why at admission and not at the engraver.** Refusing at the engraver means the
+operator has already typed the passphrase, run a ~31-second KDF, and had the
+seed decrypted into SRAM — where §2.2 item 9 says it is readable over SWD —
+before learning the machine cannot cut it. Refusing at admission means the
+payload fails before any key is derived and before any secret is resident. The
+failure is identical; only the exposure differs.
+
+**What this costs, stated plainly.** A long `codex32` string is a 63–64 byte
+payload, and 64 bytes is a **512-bit BIP-32 master seed** — precisely what
+BIP-93 exists to back up. This device therefore cannot carry a master-seed
+codex32 backup, and after this rule it says so at admission rather than at the
+plate. Nothing in this constellation *generates* one: `codex32.EncodeMS1` caps
+entropy at BIP-39 lengths (16/20/24/28/32 bytes) and so tops out at 74
+characters, and it is `NewSeed`'s only non-test caller. A long code can only
+arrive from third-party BIP-93 tooling — which §10.2.1 already assumes exists.
+
+**Ordering (Rust-primary rule).** Admission is normative behaviour, so this
+lands in `me` first, with test vectors at 90/91 and at 124/125/127, and is then
+ported to the device. `me seal` refuses to seal what the device will refuse to
+admit, so the operator meets the limit on their workstation rather than after an
+unlock.
 
 ### 10.2.2 Session lifecycle — every secret record first, then wiped
 
