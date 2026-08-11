@@ -2104,7 +2104,7 @@ assume the two accept sets agree.
 set, widen `me` to BIP-93's ranges, or document the divergence as intended.
 Requires the Rust-primary rule if either codec's admission moves.
 
-### F-121 — the emulator does not HOME, so a resumed cut renders differently there than on the machine (owning phase: **post-merge polish and hardening**)
+### F-121 — CLOSED 2026-08-11 (journeys/simulator: the emulator now homes, because the plate overlay cannot register without it) — the emulator does not HOME, so a resumed cut renders differently there than on the machine (owning phase: **post-merge polish and hardening**)
 
 Filed 2026-08-11, out of the F-114 closure.
 
@@ -2138,6 +2138,35 @@ an inventory of what else `cmd/emu` does not model.
 `homingEngraver` — reset the recorder's position and emit the same
 origin-seeking move — or make the recorder assert that a run begins at the
 origin so the divergence fails loudly instead of rendering plausibly.
+
+**✅ CLOSED 2026-08-11** — the first fix shape, taken while building the
+simulator's plate overlay, which cannot align recorded motion onto planned
+geometry until this is true. `toolpathRecorder.Home()` records the needle-UP
+travel to the origin; `jobRecorder` performs it on the first `Write` of a job
+and again on `Close`, mirroring `homingEngraver`'s two homing points. Both live
+in `cmd/emu/toolpath.go`, which carries no build tag, so the once-per-job state
+machine is host-testable — the wiring previously would have lived in the
+js-only `engraver.go` and been unreachable by `go test`.
+
+**The needle is UP, deliberately.** A needle-DOWN pass through the origin is the
+F-108 signature `Summary.CutsThroughOrigin` exists to detect, so homing that
+recorded the needle's last state would have forged that signature on every
+healthy interrupted plate and made the flag worthless exactly where it is read.
+`TestHomeTravelsWithTheNeedleUp` pins it.
+
+**Measured, before and after.** The seed plate ends at (435840, 220160) =
+**(68.1 mm, 34.4 mm)** on an 85 mm plate; that was the offset a resumed cut
+recorded at. 6/6 mutants killed across `TestHomeReturnsTheHeadToTheOriginBetweenJobs`,
+`TestHomeTravelsWithTheNeedleUp`, `TestHomeAtTheOriginRecordsNothing` and
+`TestJobRecorderHomesOncePerJob`. Confirmed in the browser end to end: cut
+"hello", abort mid-plate, hold to resume — the resumed strokes land on the plan,
+and both the abort and the completion leave the head at (0,0).
+
+One defect was found by these tests and not by reading: the first `Home()`
+cleared `started` in the already-at-origin branch without emitting the pending
+vertex, which **deleted the arrival** of a cut that closes at the origin —
+`path()` appends the live position as a trailing vertex only while `started` is
+set.
 
 ### F-119 — CLOSED 2026-08-11 (post-merge polish: comment corrected against a MEASURED fallback order) — `backup.go:368`'s comment describes a plate fallback order the code does not implement (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 

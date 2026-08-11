@@ -95,6 +95,44 @@ being engraved.**
 Both halves already exist separately. The work is joining them in the emulator,
 not building either from scratch.
 
+## ✅ BUILT 2026-08-11 — fork branch `emu-plate-overlay`
+
+The panel sits **beside** the 480x320 canvas, never on it: `cmd/emu/platform.go`
+says the emulator adds no screens, and a plate view the device does not have
+belongs where nobody can mistake it for firmware.
+
+How the plan reaches the emulator, since nothing below `gui` offered it before:
+`gui.PlateAware` is an **optional** interface an `Engraver` may implement,
+invoked once per job in `runEngraving` right after `pl.Engraver(stall)`. It
+lives behind a `!tinygo` / `tinygo` file pair (`gui/plate_hook.go`,
+`gui/plate_hook_tinygo.go`), so the **firmware image does not contain it**.
+That matters because a spline is seed-derived geometry — F-107/F-108's own
+subject — and the overlay's consumer is JavaScript on a page, outside anything
+Go can wipe. `TestPlateHookIsAbsentFromTheFirmwareBuild` pins that structurally by
+parsing the AST, not the bytes: a comment naming the rule is not a violation of
+it. The hook carries `resumed` (`e.nknots > 0`) so a hold-to-resume keeps the
+recording the single recorder exists to preserve.
+
+Registration is exact **by construction, not by arrangement**: the plan's
+control points and the recorder's integrated step deltas are both microsteps
+from the machine origin. `cmd/emu/plate.go`'s `planPath` emits the layout and
+matches `internal/golden.Vectorize` byte for byte
+(`TestPlanPathMatchesVectorize`), so the overlay cannot drift from what
+`cmd/plateview` shows.
+
+Two hazards found while building, neither of them in the prep note:
+
+- **A plan is an iterator and is not obliged to end.** `gui/qa.go`'s `qaPlan` is
+  literally `for { … }`. Drawing the layout means ranging the whole spline
+  *before* the first step, so an unbounded plan is an unbounded render and the
+  tab never comes back. `maxPlanKnots` bounds it at 100,000 against a widest
+  measured plate of 27,062, and reports `data-truncated`. `qaProgram` is
+  unreachable in `cmd/emu` today only because `NFCReader()` returns nil — a
+  property of the wiring, one feature away from false.
+- **`cmd/emu/build.sh` failed on every rebuild after the first.** It copies
+  `wasm_exec.js` out of `GOROOT`, which under Nix is mode 444 in the store, so
+  the copy landed unwritable. `cp -f`.
+
 ## Half 1 — the final layout is already renderable, before the cut
 
 `cmd/plateview` renders a plate from **the same `FitBlocks` / `EngraveFitted` /
@@ -131,20 +169,36 @@ progress. Exposed to the page by `cmd/emu/toolpath_js.go:47` as
 far" is a filter over it rather than new instrumentation.
 
 `cmd/emu/toolpath.go` deliberately carries **no build tag** so it is
-host-testable; `toolpath_js.go` is the `//go:build js` half. Keep that split —
-`cmd/emu/confinement_test.go` enforces the file-level boundary, and it is
-mutation-tested.
+host-testable; `toolpath_js.go` is the `//go:build js` half. Keep that split.
+**Correction 2026-08-11:** it is not `confinement_test.go` that enforces it —
+that test pins the *sealed payload* boundary, and `toolpath.go` names none of
+its guarded identifiers. What actually pins the split is `toolpath_test.go`,
+which is untagged: verified by mutation, adding `//go:build js` to
+`toolpath.go` fails the host build with four undefined symbols.
 
 ## What to watch
 
-- **`maxVertices` is 200,000** (`cmd/emu/toolpath.go:45`). A full plate can
-  approach that; check the cap before treating `path()` as complete for a live
-  overlay, and decide whether the overlay needs decimation.
+- ~~**`maxVertices` is 200,000**… a full plate can approach that.~~
+  **MEASURED 2026-08-11 and the concern is unfounded.** A full seed plate
+  decodes to **3,440 vertices**, `truncated=false` — 58x headroom against the
+  cap — and `path()` is 60 KB, cheap to poll whole. constproof, the widest
+  plate, is 3,959. No decimation and no incremental API are needed. (The trap
+  the numbers *did* find is elsewhere: a plan is an iterator and `qaPlan` never
+  ends, so rendering a layout up front must be bounded. See `maxPlanKnots`.)
 - **F-121 — the emulator does not home.** The device homes to the plate origin
   before every run (`homingEngraver`); the emulator does not. Any overlay that
   aligns recorded motion to planned geometry must account for that, or a
   resumed cut will render offset against the plan. **This is the trap most
   likely to be hit by this exact task.**
+  **FIXED 2026-08-11, as a prerequisite rather than a neighbour** — the overlay
+  cannot register without it. `toolpathRecorder.Home()` records the needle-UP
+  travel to the origin that `homingEngraver` performs on the first write of
+  every job and again on `Close`; `jobRecorder` holds the once-per-job state,
+  in the untagged file so it is host-testable. Measured before the fix: the
+  seed plate ends at (435840, 220160) = **(68.1 mm, 34.4 mm)** on an 85 mm
+  plate, and that was the offset a resumed cut would have drawn at. Confirmed
+  in the browser: abort mid-"hello", hold to resume, and the resumed strokes
+  land on the plan.
 - The recorder is deliberately **one instance across every job**
   (`cmd/emu/platform.go:185`) so an aborted-and-resumed plate records as one
   motion. A per-plate overlay may want `reset()` at engrave start — changing
