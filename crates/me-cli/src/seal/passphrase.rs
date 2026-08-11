@@ -24,13 +24,40 @@ pub fn generate() -> Zeroizing<String> {
 
 /// §8.1: lowercase, single-space separated, no leading or trailing space. Host
 /// and device MUST produce byte-identical KDF input.
+/// Builds the result directly into ONE `Zeroizing` buffer.
+///
+/// The obvious spelling — `split_whitespace().map(to_lowercase).collect::<Vec<_>>().join(" ")` —
+/// returns a `Zeroizing<String>` while leaving three unscrubbed allocations
+/// behind it: a `String` per lowercased word, the `Vec` collecting them, and the
+/// `join`'s own buffer. All hold the passphrase, and the wrapper reaches none of
+/// them. Measured at 3 leaked blocks per call by the Phase 2 Rust-side review.
+///
+/// The length is counted before allocating so the buffer never grows: a `String`
+/// that reallocates mid-build orphans the partially-written copy, which is the
+/// same defect one level down. Lowercasing can lengthen a character (`İ` becomes
+/// two), so the count cannot be taken from `s.len()`.
 pub fn normalise(s: &str) -> Zeroizing<String> {
-    Zeroizing::new(
-        s.split_whitespace()
-            .map(|w| w.to_lowercase())
-            .collect::<Vec<_>>()
-            .join(" "),
-    )
+    let mut n = 0usize;
+    for (i, w) in s.split_whitespace().enumerate() {
+        if i > 0 {
+            n += 1; // the single ASCII separator
+        }
+        for c in w.chars().flat_map(char::to_lowercase) {
+            n += c.len_utf8();
+        }
+    }
+
+    let mut out = Zeroizing::new(String::with_capacity(n));
+    for (i, w) in s.split_whitespace().enumerate() {
+        if i > 0 {
+            out.push(' ');
+        }
+        for c in w.chars().flat_map(char::to_lowercase) {
+            out.push(c);
+        }
+    }
+    debug_assert_eq!(out.len(), n, "normalise: pre-count disagreed with the build");
+    out
 }
 
 /// Checksum-valid English mnemonic? The device runs this before committing to a
@@ -76,6 +103,32 @@ mod tests {
         ));
         assert!(!is_valid("abandon ".repeat(12).trim()));
         assert!(!is_valid("not even words"));
+    }
+
+    /// The buffer must be sized exactly, so it never grows mid-build and never
+    /// orphans a partially-written copy of the passphrase.
+    ///
+    /// `capacity == len` is the observable form of that: `with_capacity(n)`
+    /// allocates exactly `n`, so if the pre-count were short the push would have
+    /// reallocated and capacity would exceed len.
+    #[test]
+    fn normalise_allocates_exactly_once_and_exactly_enough() {
+        for input in [
+            "abandon abandon about",
+            "  ABANDON\tabandon\u{00a0}about  ",
+            "İ İ",           // lowercasing lengthens this one
+            "ÄÖÜ  ßß\tàé",   // multi-byte, mixed case, runs
+        ] {
+            let out = normalise(input);
+            assert_eq!(
+                out.capacity(),
+                out.len(),
+                "normalise({input:?}) reallocated: capacity {} != len {} -- a grown \
+                 String orphans the partial copy it was holding",
+                out.capacity(),
+                out.len()
+            );
+        }
     }
 
     #[test]
