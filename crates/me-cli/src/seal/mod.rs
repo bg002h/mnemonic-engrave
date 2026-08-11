@@ -23,6 +23,38 @@ pub struct Payload {
     pub secret: Vec<String>,
 }
 
+impl Payload {
+    /// Zero the secret records in place.
+    ///
+    /// Separate from `Drop` so it can be **tested directly**: a test that tried
+    /// to read the buffer after a drop would be reading freed memory, and a
+    /// test that cannot be written soundly tends not to be written at all.
+    pub fn zeroize_secret(&mut self) {
+        use zeroize::Zeroize;
+        for r in &mut self.secret {
+            r.zeroize();
+        }
+        self.secret.zeroize();
+    }
+}
+
+/// `Payload.secret` holds the operator's seed as plain `String`s, and a plain
+/// `Vec<String>` is freed in the clear — which undid part of F-102's fix one
+/// line after it was made. Found by the Phase 2 Rust-side review with a probing
+/// allocator.
+///
+/// KNOWN RESIDUAL, stated rather than implied: this reaches the CURRENT
+/// buffers. Any reallocation during construction — a `push` past capacity, a
+/// `String` grown while being built — orphans an earlier array that nothing can
+/// reach. That is the same unfunnelled-growth class the device side records
+/// against `bip39.Parse`, and closing it needs the records to be built into
+/// pre-sized `Zeroizing` buffers rather than accumulated.
+impl Drop for Payload {
+    fn drop(&mut self) {
+        self.zeroize_secret();
+    }
+}
+
 pub struct Sealed {
     pub blob: Vec<u8>,
     /// `None` when nothing was encrypted — §6.2 forbids crypto fields then, and
@@ -71,15 +103,21 @@ impl std::error::Error for SealError {}
 /// is deliberately no public seam to supply them. One fresh salt per call means
 /// one key per message, which is what makes AES-GCM's nonce requirement
 /// structurally unbreakable rather than a procedural promise.
-pub fn seal(payload: Payload, iterations: u32) -> Result<Sealed, SealError> {
+pub fn seal(mut payload: Payload, iterations: u32) -> Result<Sealed, SealError> {
     // Range-check even on the public-only path, which ignores the value: silently
     // accepting `--iterations 5` teaches the operator the flag is advisory.
     if !(MIN_ITERATIONS..=MAX_ITERATIONS).contains(&iterations) {
         return Err(SealError::Iterations(iterations));
     }
     if payload.secret.is_empty() {
+        // `take` rather than a move: `Payload` implements `Drop` so its secret
+        // records are scrubbed, and a type with `Drop` cannot be moved out of
+        // field-wise. Taking the PUBLIC section costs nothing (it is not secret
+        // and the payload is dead after this) and leaves the drop glue intact.
+        // Cloning here — the compiler's suggestion — would copy the public
+        // records for no reason.
         return Ok(Sealed {
-            blob: seal_public_only(payload.public)?,
+            blob: seal_public_only(std::mem::take(&mut payload.public))?,
             passphrase: None,
         });
     }
@@ -328,6 +366,34 @@ mod tests {
         // Leading and trailing space survive `split_whitespace` too.
         assert!(record_or_mnemonic(&format!(" {MNEMONIC}")).is_err(), "leading space");
         assert!(record_or_mnemonic(&format!("{MNEMONIC} ")).is_err(), "trailing space");
+    }
+
+    /// The secret records must not be freed in the clear.
+    ///
+    /// Asserts on `zeroize_secret` rather than after a drop, because reading a
+    /// buffer after its owner is dropped is reading freed memory — the test
+    /// would be unsound whatever it printed.
+    #[test]
+    fn zeroizes_the_secret_records() {
+        let mut p = Payload {
+            public: vec!["md1public".to_string()],
+            secret: vec![MNEMONIC.to_string(), "ms1secret".to_string()],
+        };
+        // Positive control: the secret really is present first, so a test that
+        // passed because the vector was empty all along cannot masquerade.
+        assert!(
+            p.secret.iter().any(|r| r.contains("abandon")),
+            "control: the payload must hold the secret before it is scrubbed"
+        );
+        p.zeroize_secret();
+        assert!(
+            p.secret.is_empty(),
+            "secret records survive zeroize_secret: {:?}",
+            p.secret.len()
+        );
+        // The public section is untouched — scrubbing must not eat the data the
+        // device needs.
+        assert_eq!(p.public, vec!["md1public".to_string()]);
     }
 
     /// The positive control for the test above: without it, a guard that
