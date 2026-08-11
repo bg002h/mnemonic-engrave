@@ -245,6 +245,45 @@ This list is normative and belongs in operator documentation, not only here.
     encoder cannot produce such a string, but the repo's `biptool seed -seedlen
     64` host tool can, as can third-party BIP-93 tooling.
 
+16. **In the `v0.0.0-g<sha>` build: the wipe does not reach everything, and can
+    be prevented from running at all.** *This item is unlike the rest of §2.2.
+    Items 1–15 are design limitations that will still be true when this machine
+    is finished. This one is a statement about **the build being tagged** — a
+    set of known, open, scheduled defects — and it is written to be **deleted**
+    when they close, not to be lived with. It is here because §2.2 is the list
+    this project extracts operator documentation from, and an operator engraving
+    a real seed does not read version numbers.*
+
+    Two things, and the second matters more:
+
+    - **The wipe does not reach every copy.** §10.2.2 wipes the secret *record*,
+      and the flow makes further copies on the way to a plate — on the mnemonic
+      engrave path, in the key derivation's working state, in the word-splitting
+      and keyboard buffers, and in the uppercased string the plate's QR is built
+      from. Those are not wiped (F-88, F-90, F-94, F-104). Separately, roughly
+      **35 K across ~81 reachable objects survives every wipe and has not been
+      identified** — it may or may not hold seed material; nobody has looked
+      closely enough to say (F-109).
+    - **The wipe can silently never run.** §10.2.4's timer fires only when the
+      machine is *idle*, and the idle clock is refreshed by **any** input event,
+      including one that resolves to no actual input. A touch panel reporting
+      spurious readings — from a protective film, moisture, debris, or driver
+      noise — therefore keeps the machine permanently non-idle. The warning
+      branch sits inside the idle branch, so there is **no countdown and no
+      wipe, and no indication that either was skipped** (F-103). Confirmed
+      by test:
+      100,000 spurious polls over ~1000 s produced zero warnings and zero
+      wipes, against a control that warned at 3:00.
+
+    **What to do about it, as an operator of this build:** treat the §10.2.4
+    wipe as a convenience, not a control. The control is §2.3's operating rule —
+    power the machine down when you are done, and do not leave it unattended
+    with a session open. That was always the primary defence (§2.2 item 9); this
+    item says the backstop behind it is weaker than it appears.
+
+    All of the above is scheduled to the **post-merge polish and hardening**
+    phase, and every deferred item goes to the post-release whole-Phase-2 review.
+
 ### 2.2a What admitting `ms1` changed (operator sign-off, 2026-08-07)
 
 Before this decision the envelope could carry only public constellation data —
