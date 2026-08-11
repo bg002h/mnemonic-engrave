@@ -2138,6 +2138,30 @@ separately.** Applied in the gate worktree and building.
 
 ### F-112 — six LEGACY seed-rendering flows sit inside no `Scrub` bracket at all (owning phase: post-B2b, before the release tag)
 
+**CLOSED 2026-08-10 as ACCEPTED under SPEC §2.2 item 12** (operator ruling
+2026-08-10): §10.2.4's residency wipe and the `Scrub` brackets are scoped to the
+**Sealed Payload program's session**, and all six flows listed here are other
+programs. Their residue is accepted, not a defect.
+
+**Verified, because I twice said the opposite.** I claimed one of the six sat
+inside the payload path and that the entry "needs splitting, not closing". Wrong
+on both counts: `gui/unlock_session.go:276` appears above as the entry's
+*contrast* — the one BRACKETED construction site — not as one of the six. And
+none of the six is reachable from the Sealed Payload program: searched whole-tree
+for each of `backupWalletFlow`, `seedEntryFlow`, `bip85DeriveFlow`,
+`recoverSLIP39Flow`, `combineSeedXORFlow`, `passphraseFlow` and found **0** calls
+from `unlock_session.go`, `unlock_kdf.go` or `unlock_flow.go`.
+
+Note `passphraseFlow` (`gui/gui.go:584`) is the LEGACY BIP-39 passphrase
+keyboard, distinct from `unlockPassphraseFlow` (`gui/unlock_kdf.go:109`), which
+is the sealed-payload one and IS bracketed — §10.2.4 row 4. Two similar names,
+opposite sides of the boundary; worth stating so the next reader does not merge
+them.
+
+**Still true and still worth saying:** "the machine wipes the rendered seed" is
+not true in general. §2.2 item 12 is where that now lives, and §2.3 carries the
+operator-facing half.
+
 Filed by the R0 round-1 fold of `DESIGN_b2b_residency_zeroing.md`; round 0's M2.
 
 F-107's fix brackets the B2b secret session and the passphrase flow. Every
