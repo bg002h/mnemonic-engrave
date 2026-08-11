@@ -191,36 +191,51 @@ paired with an operator-initiated **erase this region**. The erase is a menu
 item the operator chooses — not the automatic wiping machinery decision 2
 rejects — so a warning has something to do besides be dismissed.
 
-### 5.4 The hash is shown on EVERY path — operator ruling 2026-08-11
+### 5.4 Flash-delivered input is digest-verified, once per payload — operator ruling 2026-08-11
 
-**"Hash verify everywhere."** The EPD§6.6 digest is not the plaintext container's
-consolation prize; it is shown, and meant to be compared, on every path that
-delivers a record to a program.
+**"Flash verify user input everywhere. Once per payload."**
 
-| path | what the digest covers | what else covers it |
+Two clauses, and each rules something out.
+
+**"Flash"** scopes this to payloads read from the region. **NFC is NOT covered.**
+A tag carries a bare record with no header and no digest, and manufacturing one
+would mean `me` printing a digest when it writes a tag plus a new
+domain-separation label — `"MNEMBLOB/pub/v1"` cannot be reused over a
+differently-shaped input, which is what that label exists to prevent. That is
+net-new normative work for a transient delivery path, and it is **out of scope
+for this spec**. See §11 for what that means the operator is *not* getting.
+
+**"Everywhere"** means every *program*, not every *variant*: both container
+variants show the digest, and so does every program that consumes from the
+region. The digest is not the plaintext container's consolation prize.
+
+| container | what the digest covers | what else covers it |
 | --- | --- | --- |
-| plaintext container | the whole payload — it is all public section | nothing; the digest is the only integrity |
-| sealed container | the public section and the `sealed` byte | the AEAD tag covers the ciphertext |
-| NFC-delivered record | the record as scanned | nothing |
+| plaintext | the whole payload — it is all public section | nothing; the digest is the only integrity |
+| sealed | the public section and the `sealed` byte | the AEAD tag covers the ciphertext |
 
-Two consequences worth stating rather than discovering:
-
-**For a sealed container the digest and the tag cover different halves**, and
+For a sealed container **the digest and the tag cover different halves**, and
 between them the coverage is complete: EPD§6.6's input is "the public section
 exactly as it appears on the wire", so the ciphertext is outside it and the tag
 is inside the AEAD. Neither is redundant. Showing the digest for sealed payloads
-is what makes the **downgrade** visible to the operator rather than only to the
+is what makes a **downgrade** visible to the operator rather than only to the
 format — which is what the `sealed` byte was bound in for.
 
-**NFC has no container, so this is new work.** A tag carries a bare record with
-no header and no digest. "Everywhere" therefore requires `me` to print an EPD§6.6-
-style digest when it *writes* a tag, and the device to display the digest of
-what it *read*. Without that, there is nothing for the operator to compare
-against and "hash verify everywhere" would be a screen showing a number with no
-counterpart. **Open for R0: whether the NFC digest reuses EPD§6.6's construction
-verbatim over a one-record input, or needs its own domain-separation label.**
-It must not silently reuse `"MNEMBLOB/pub/v1"` if the input shape differs — that
-label exists precisely to stop cross-context collisions.
+**"Once per payload"** fixes the frequency. The operator compares **at load, one
+time**, not once per consuming program. A payload that feeds five programs in a
+session is compared once.
+
+That has a design consequence which must not be left implicit: **the session
+records that this payload's digest was compared**, so downstream screens state
+the fact rather than re-asking. A screen that re-prompts teaches the operator
+that dismissing the prompt is normal — the same disarming effect EPD§6.6 warns
+about when it explains why `public_record_count` had to be bound in ("teaching
+the operator that mismatches are normal, which disarms the single control
+EPD§6.6 exists to be").
+
+**The flag is on the payload, not the record.** Re-reading the region produces a
+new payload identity and therefore a new comparison; consuming a fifth record
+from an already-compared payload does not.
 
 ### 5.5 The overwrite payload — operator ruling 2026-08-11
 
@@ -396,10 +411,12 @@ rather than only on hardware.
    passphrase.
 7. A blob written to the wrong region is refused on magic, not half-parsed.
 8. Structural failures never emit the words "payload unreadable" (§5.2).
-9. The digest is displayed on **every** delivery path — plaintext container,
-   sealed container, and NFC record (§5.4). A path that shows no digest fails.
-10. `me`'s tag-write digest and the device's scan-time digest agree byte for
-    byte over the same record, host and device.
+9. The digest is displayed for **both** container variants and for every
+   program that consumes from the region (§5.4). A program that consumes
+   payload-sourced input without a compared digest fails.
+10. The digest is compared **once per payload**: a second program consuming from
+    the same loaded payload does NOT re-prompt, and re-reading the region DOES.
+    A test that only checks the first consumption cannot tell these apart.
 11. The overwrite payload **fills the region** (§5.5): after writing it, no byte
     of the previous payload remains. A zero-*length* payload must fail this test
     — it is the defect the requirement exists to prevent.
@@ -416,7 +433,7 @@ rather than only on hardware.
 | O2 | Which keyboard the Sealed Payload unlock screen uses — **not verified**; `PassphraseKeyboard` is free-text (`gui.go:640`) but the unlock path was not traced | implementation |
 | O3 | Record class name and encoding for free text | R0 / Rust |
 | O4 | `me` subcommand surface for creating a systemwide payload, and for the §5.5 overwrite payload | R0 |
-| O5 | **The NFC digest's domain-separation label** (§5.4). Reusing `"MNEMBLOB/pub/v1"` over a differently-shaped input is exactly the collision the label exists to prevent | R0 / Rust |
+| ~~O5~~ | ~~NFC digest domain separation~~ — **DISSOLVED 2026-08-11**: the operator scoped digest verification to FLASH, so no NFC digest is specified (§5.4) | — |
 | O6 | Default fill for the overwrite payload. This spec proposes **random**, on the grounds that all-ones is indistinguishable from erased; R0 should challenge that | R0 |
 
 ## 10. Follow-ups filed with this spec
