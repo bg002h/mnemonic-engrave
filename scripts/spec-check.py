@@ -24,9 +24,14 @@ spot is worse than no gate:
     scope list missing device-side work) would NOT be caught by this.
   * The INVARIANTS table is hand-written per spec. A new rule added to the
     document without a line here is unguarded.
-  * Line-number citations are checked for existence and for an expected
-    substring where one is declared; a citation with no declared substring is
-    checked only for the line existing.
+  * Line-number citations are checked for FILE EXISTENCE AND LINE RANGE ONLY.
+    A citation redirected to an unrelated line in the same file passes. R0
+    round 3 mutation-tested this and was right to: the previous version of this
+    very docstring claimed "checked for an expected substring where one is
+    declared", a mechanism check_citations has never implemented. That is a
+    control documented by intent rather than behaviour -- the F-123 mistake --
+    inside the tool written to catch it. EXPECT declares the substrings that
+    ARE checked; anything not listed there gets existence only.
 """
 
 import re
@@ -97,9 +102,24 @@ def check_cross(text, errs):
             errs.append(f"bare §{n} means the OTHER spec — write EPD§{n}")
 
 
+# Citations whose LINE CONTENT is pinned, not merely its existence. A citation
+# not listed here is checked for file+range only -- see the docstring.
+EXPECT = {
+    "gui/derive_xpub.go:82": "func seedEntryFlow",
+    "gui/gui.go:758": "refreshCands",
+    "gui/unlock_kdf.go:168": "Valid",
+    "gui/unlock_kdf.go:359": "Valid",
+    "seal/open.go:76": "func NormalisePassphrase",
+    "seal/wire.go:95": "func (h Header) Sealed",
+    "seal/session.go:17": "ClassCodex32Secret",
+    "gui/passphrase_keyboard.go:76": "func NewPassphraseKeyboard",
+}
+
+
 def check_citations(text, errs, notes):
-    """file.go:NNN citations must resolve to a real line."""
-    seen = 0
+    """file.go:NNN citations must resolve to a real line, and a pinned one must
+    still contain what the spec says it does."""
+    seen = pinned = 0
     for m in re.finditer(r"`((?:[\w./-]+/)?[\w.-]+\.(?:go|rs)):(\d+)`", text):
         rel, ln = m.group(1), int(m.group(2))
         for base in (FORK, REPO, FORK / "gui", FORK / "seal"):
@@ -112,9 +132,48 @@ def check_citations(text, errs, notes):
         lines = p.read_text().split("\n")
         if ln > len(lines):
             errs.append(f"citation {rel}:{ln} — file has only {len(lines)} lines")
-        else:
-            seen += 1
-    notes.append(f"{seen} file:line citations resolved to an existing line")
+            continue
+        seen += 1
+        want = EXPECT.get(f"{rel}:{ln}")
+        if want is not None:
+            pinned += 1
+            if want not in lines[ln - 1]:
+                errs.append(f"citation {rel}:{ln} no longer contains {want!r} — "
+                            f"line reads: {lines[ln-1].strip()[:60]!r}")
+    notes.append(f"{seen} file:line citations resolved; {pinned} pinned to their content")
+
+
+# ------------------------------------------------------- single definition --
+# (term, regex matching a DEFINITIONAL phrasing). Every match must fall inside
+# §12, which is the single source. A match outside it is a second definition --
+# the defect that cost R0 rounds 1, 2 and 3, five partials each time.
+SINGLE_DEF = [
+    ("cliff",
+     r"the cliff (is|means|=)\b"
+     r"|cliff[^.\n]{0,30}\bif and only if\b"
+     r"|(below|above) the cliff[^.\n]{0,25}(iff|means|is defined)"
+     r"|cliff is (a |an )?\w+ (or more|threshold)"),
+    ("compared",
+     r"`?compared`? (is|flag is) (set|satisfied) by (EITHER|either|a|the)"),
+    ("identity",
+     r"[Tt]he identity is `?SHA-256|identity IS the"),
+]
+
+
+def check_single_def(text, errs, notes):
+    """A rule may be DEFINED in exactly one place: §12."""
+    m = re.search(r"^## 12\. ", text, re.M)
+    if not m:
+        errs.append("§12 (normative definitions) missing — nothing owns the rules")
+        return
+    lo = m.start()
+    for term, pat in SINGLE_DEF:
+        outside = [mm for mm in re.finditer(pat, text, re.I) if mm.start() < lo]
+        for mm in outside:
+            line = text[:mm.start()].count("\n") + 1
+            errs.append(f"[{term}] line {line}: a SECOND definition outside §12 — "
+                        f"reference `[{term}]` instead\n      matched: {mm.group(0)[:60]!r}")
+    notes.append(f"{len(SINGLE_DEF)} rules defined once, in §12")
 
 
 def check_tests(text, errs, notes):
@@ -163,6 +222,7 @@ def main():
     check_refs(text, errs)
     check_cross(text, errs)
     check_citations(text, errs, notes)
+    check_single_def(text, errs, notes)
     check_tests(text, errs, notes)
 
     print(f"spec-check: {path}")
