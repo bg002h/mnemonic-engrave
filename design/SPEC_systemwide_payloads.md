@@ -500,6 +500,10 @@ easiest form for a human to compare on a screen. The cost is 2×, against
 `MaxSectionLen` of 8191 — about 4 KB of text, far past what 24 engraved lines
 can hold, so the expansion binds nothing real.
 
+**Decoding is normative too:** a `ClassFreeText` record's body is hex-decoded
+back to UTF-8 before it reaches Engrave Text, and a `ClassPassphrase` body before
+it reaches the KDF. R0 round 6 found journey (b) had no stated step doing this.
+
 **Classification order is normative:** the two prefixes are matched **before**
 the existing sniffers in `Classify`. Free text is the universal fallback — any
 string could be free text — so a sniffer that ran first would claim
@@ -830,8 +834,8 @@ So the deterministic rule an implementer transcribes — **stated in terms of
 mode and giving `me` the opposite answer to §5.6 on a user-supplied
 five-BIP-39-word passphrase:**
 
-> **Secret content + a passphrase that is not `[cliff]`-above ⇒ `me` refuses
-> without the explicit flag.**
+> **Secret content + a passphrase that is not `[cliff]`-above ⇒ `me` prints a
+> warning and proceeds** (§13 D3; it once refused).
 
 `me` prints the strength either way — `"12 words, 132 bits"` or
 `"user-supplied, unmeasured, not `[cliff]`-above"` — the latter being a
@@ -1107,12 +1111,9 @@ rather than only on hardware.
 19. **(R1-C2)** A uniformly generated N-word passphrase is enterable for every
     `N` in 2..24, including every `N % 3 == 0`. Draw many; a test using one
     fixed passphrase passes 1 time in 16 by luck.
-20. **(R1-C4, corrected R3-C1)** A secrets-only sealed payload is consumable
-    **when its passphrase is `[cliff]`-above**, and is NOT consumable when it is
-    below — per `[compared]` (§12.2). The first version of this test asserted
-    the unconditional rule and would have MANDATED the not-`[cliff]`-above bypass rather
-    than merely permitting it. Test 15 asserts no digest is displayed; neither
-    alone is enough.
+20. **(R1-C4, superseded by §13 D1)** A secrets-only sealed payload is
+    consumable whatever its passphrase. This test once asserted the opposite and
+    was mutually unsatisfiable with test 23.
 21. **(R1-I3)** The passphrase buffer never regrows: entering 24 words leaves no
     orphaned copy. Assert on the buffer's identity, not on its contents.
 22. **(§8c)** A `done` press mid-passphrase yields a confirmation naming the

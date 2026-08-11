@@ -169,7 +169,8 @@ SINGLE_DEF = [
 #
 # This does not try to recognise a definition. It makes restating one
 # unwritable: outside §12, the term may appear ONLY in its reference form.
-# No wording evades it, because it never inspects the wording.
+# Measured by R0 round 5 at 3 kills in 11 mutants: it stops a restatement that
+# NAMES the rule, not one that paraphrases it. A safety net, not a guarantee.
 BARE = [
     ("cliff", r"\bcliffs?\b", "[cliff]"),
     ("compared", r"`compared`", "[compared]"),
