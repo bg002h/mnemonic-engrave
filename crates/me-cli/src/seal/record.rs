@@ -3,6 +3,31 @@
 use crate::classify::{classify, Format};
 use crate::validate::first_noncanonical;
 
+/// §10.2.1a — the longest `codex32` secret the SeedHammer II can engrave.
+///
+/// Derived from `backup.EngraveSeedString`, which builds the seed plate's QR
+/// from the UPPERCASED share at error-correction level M and refuses
+/// `qrc.Size > 33`. Measured against the real encoder the boundary is exact and
+/// sits between 90 and 91:
+///
+/// ```text
+///  63–90  → QR size 33 → cuts
+///  91–122 → QR size 37 → refused
+/// 123–127 → QR size 41 → refused
+/// ```
+///
+/// **This is a LITERAL here and cannot be re-derived in Rust — there is no QR
+/// encoder in this crate.** The authority is the Go test
+/// `TestEngraveableLimitIsDerivedFromTheRealQREncoder`
+/// (`backup/engraveable_test.go` in the seedhammer fork), which re-runs
+/// `qr.Encode(strings.ToUpper(s), qr.M)` against the real encoder and fails if
+/// the boundary is no longer 90/91. If that test moves the number, this
+/// constant moves with it. Two things can move it independently: the
+/// `qrc.Size > 33` cap and the error-correction level — measured, at `qr.Q`
+/// instead of `qr.M` the limit drops to 67, which is *below* ordinary
+/// `EncodeMS1` output and would both reopen this defect and reject real seeds.
+pub const MAX_ENGRAVEABLE_MS1_LEN: usize = 90;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecordKind {
     /// md1 — wallet policy. Public.
@@ -21,11 +46,22 @@ impl RecordKind {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RecordError {
-    NonCanonical { ch: char, pos: usize },
+    NonCanonical {
+        ch: char,
+        pos: usize,
+    },
     NotLowercase(usize),
     Unclassifiable(String),
     Invalid(String),
     UndecodableSet(String),
+    /// §10.2.1a — a `codex32` secret the engraver's seed plate cannot hold.
+    ///
+    /// A SEPARATE variant, not an `Invalid`, and that is the requirement rather
+    /// than tidiness: §6.4 renders every other record failure to the operator as
+    /// "payload unreadable", and this record is not unreadable — it is intact
+    /// and too long to cut. Collapsing the two tells an operator with a
+    /// perfectly good backup that it has been tampered with.
+    MsTooLong(usize),
 }
 
 impl std::fmt::Display for RecordError {
@@ -48,6 +84,13 @@ impl std::fmt::Display for RecordError {
                 f,
                 "public records do not form a decodable card set: {e} — a BCH-valid string is \
                  not proof of a real wallet card (§6.3)"
+            ),
+            RecordError::MsTooLong(len) => write!(
+                f,
+                "this codex32 secret is {len} characters; the machine can engrave at most \
+                 {MAX_ENGRAVEABLE_MS1_LEN} (§10.2.1a). The record is INTACT — it is too long \
+                 to cut, not unreadable. `me seal` refuses it here so the device does not \
+                 refuse it after a ~31 s key derivation."
             ),
         }
     }
@@ -84,11 +127,36 @@ pub fn validate_record(s: &str) -> Result<RecordKind, RecordError> {
             }
             Ok(RecordKind::Mk)
         }
-        // ms_codec::decode, NOT decode_with_correction — a seed that needed
-        // repair must be fixed at source, not engraved.
-        Format::Ms => ms_codec::decode(s)
-            .map(|_| RecordKind::Ms)
-            .map_err(|e| RecordError::Invalid(e.to_string())),
+        Format::Ms => {
+            // §10.2.1a, and it MUST run BEFORE `ms_codec::decode`. The crate's
+            // own length gate fires first otherwise, and it reports
+            // `UnexpectedStringLength` — which renders through `Invalid`, i.e.
+            // as §6.4's "payload unreadable". That is precisely the
+            // misdiagnosis this rule exists to remove: the operator's backup is
+            // intact, it is the plate that cannot hold it.
+            //
+            // GATED ON THE BIP-93 PARSE, not on the HRP alone, so `ms1` +
+            // garbage is still reported as invalid rather than as too long.
+            // That mirrors the device, where `Classify` reaches this check only
+            // via `codex32.New`. The parse is attempted only once the length has
+            // already failed, so the ordinary path allocates nothing extra.
+            //
+            // `Codex32String` derives `zeroize::ZeroizeOnDrop` and takes the
+            // `String` by value, so the copy this makes IS scrubbed — on the
+            // success path. On its error path the copy is dropped unscrubbed,
+            // but a string that fails the codex32 checksum is not a seed.
+            let len = s.chars().count();
+            if len > MAX_ENGRAVEABLE_MS1_LEN
+                && ms_codec::codex32::Codex32String::from_string(s.to_string()).is_ok()
+            {
+                return Err(RecordError::MsTooLong(len));
+            }
+            // ms_codec::decode, NOT decode_with_correction — a seed that needed
+            // repair must be fixed at source, not engraved.
+            ms_codec::decode(s)
+                .map(|_| RecordKind::Ms)
+                .map_err(|e| RecordError::Invalid(e.to_string()))
+        }
     }
 }
 
@@ -203,6 +271,135 @@ mod tests {
         "mk1qpz63tppkeg9pdvqz5744004gvzecsknw6tu25yv3exfhkl6w5zm9e4t24aqdah5585wn3e4xdut8",
     ];
     const MS1: &str = "ms10entrsqqg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9q5f042qmrw90mw";
+
+    /// §10.2.1a boundary vectors — REAL BIP-93 codex32 secrets, generated in
+    /// the seedhammer fork rather than hand-written:
+    ///
+    /// ```text
+    /// head -c N /dev/zero | go run ./cmd/biptool seed -seedlen N -id entr
+    /// ```
+    ///
+    /// N = 42, 43, 44, 63, 64 bytes → 90, 91, 93, 125, 127 characters.
+    /// 92 is NOT constructible: a short code is `9 + ceil(8N/5) + 13` characters,
+    /// which steps 90 → 91 → 93. 124 is in the dead zone between codex32's two
+    /// length bands (short 48–93, long 125–127) and `Codex32String::from_string`
+    /// rejects it outright, so it cannot exercise this rule at all.
+    ///
+    /// Each test that uses these asserts their length first — a mistyped vector
+    /// must fail loudly, not silently stop testing the boundary.
+    const MS1_90: &str =
+        "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqutd7mdh2lc8h2";
+    const MS1_91: &str =
+        "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq2uk6ly9a0dmw4";
+    const MS1_93: &str =
+        "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqmtf88e60hz9eu";
+    const MS1_125: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqt042k235w95p5rd";
+    const MS1_127: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqmk6rc3gq4c88nvp";
+
+    /// §10.2.1a: a `codex32` secret longer than the seed plate's QR can hold is
+    /// refused, and refused with its OWN error — not `Invalid`, which is what
+    /// §6.4 renders as "payload unreadable".
+    #[test]
+    fn refuses_an_ms1_longer_than_the_machine_can_engrave() {
+        for (s, want) in [
+            (MS1_91, 91usize),
+            (MS1_93, 93),
+            (MS1_125, 125),
+            (MS1_127, 127),
+        ] {
+            assert_eq!(s.chars().count(), want, "vector is not {want} characters");
+            assert_eq!(
+                validate_record(s),
+                Err(RecordError::MsTooLong(want)),
+                "a {want}-character codex32 secret must be refused by §10.2.1a"
+            );
+        }
+    }
+
+    /// 90 characters is the LAST length `backup.EngraveSeedString` can cut, so
+    /// §10.2.1a must not fire on it.
+    ///
+    /// **HONEST GAP, asserted rather than hidden.** This asserts *not
+    /// `MsTooLong`*, not `Ok`. `ms-codec`'s accept set is the constellation ms1
+    /// v0.1/v0.2 length set — `VALID_STR_LENGTHS` = [50, 56, 62, 69, 75] and
+    /// `VALID_MNEM_STR_LENGTHS` = [51, 58, 64, 70, 77] — so it tops out at 77
+    /// and no 90-character BIP-93 codex32 is a valid *constellation* record at
+    /// all. `me` therefore still refuses this vector, for a separate,
+    /// pre-existing reason that has nothing to do with plate geometry. The
+    /// device's `codex32.New` has no such narrowing, which is why the Go test
+    /// can — and does — assert outright admission at 90.
+    #[test]
+    fn does_not_fire_at_the_ninety_character_boundary() {
+        assert_eq!(MS1_90.chars().count(), 90, "vector is not 90 characters");
+        let got = validate_record(MS1_90);
+        assert_ne!(
+            got,
+            Err(RecordError::MsTooLong(90)),
+            "90 characters still cuts; §10.2.1a must not fire on it"
+        );
+        assert!(
+            matches!(got, Err(RecordError::Invalid(_))),
+            "expected ms-codec's own v0.1 length refusal, got {got:?}"
+        );
+    }
+
+    /// The rejection MUST be distinguishable from "payload unreadable" (§6.4):
+    /// the operator has to learn the record is too long to cut, not that their
+    /// payload is corrupt. Length and classification are authenticated
+    /// plaintext, so naming them leaks nothing.
+    #[test]
+    fn the_too_long_message_names_the_length_and_the_cap() {
+        let msg = RecordError::MsTooLong(127).to_string();
+        assert!(
+            msg.contains("127"),
+            "message must name the actual length: {msg}"
+        );
+        assert!(
+            msg.contains(&MAX_ENGRAVEABLE_MS1_LEN.to_string()),
+            "message must name the cap: {msg}"
+        );
+        assert!(
+            msg.contains("engrave"),
+            "message must say it is an engraving limit: {msg}"
+        );
+    }
+
+    /// `ms1` ONLY — and only when the string really is a codex32 secret.
+    /// `ms1` + garbage must still read as invalid, exactly as it does on the
+    /// device, where `Classify` reaches the length check only through
+    /// `codex32.New`.
+    #[test]
+    fn does_not_fire_on_a_long_non_codex32_ms1_string() {
+        let junk: String = format!("ms1{}", "q".repeat(120));
+        assert_eq!(junk.chars().count(), 123);
+        assert!(
+            !matches!(validate_record(&junk), Err(RecordError::MsTooLong(_))),
+            "a string that is not valid codex32 is unreadable, not too long"
+        );
+    }
+
+    /// Scope: `mdmkText` is deliberately NOT covered (§10.2.1a). md/mk records
+    /// chunk, and their plates have variants; a long one is not the same
+    /// hazard. Nothing here may start rejecting them by length.
+    #[test]
+    fn does_not_cover_md_or_mk_records() {
+        // MK1[0] is over 90 characters and must still be admitted.
+        assert!(MK1[0].chars().count() > MAX_ENGRAVEABLE_MS1_LEN);
+        assert_eq!(validate_record(MK1[0]).unwrap(), RecordKind::Mk);
+    }
+
+    /// The constant is a LITERAL in Rust and this test says so.
+    ///
+    /// There is no QR encoder in this crate, so 90 cannot be re-derived here.
+    /// The authority is the Go test
+    /// `TestEngraveableLimitIsDerivedFromTheRealQREncoder`
+    /// (`backup/engraveable_test.go`, seedhammer fork), which re-runs
+    /// `qr.Encode(strings.ToUpper(s), qr.M)` and fails if the boundary is no
+    /// longer 90/91. Measured there: at `qr.Q` the limit drops to 67.
+    #[test]
+    fn the_cap_is_a_literal_whose_authority_is_the_go_test() {
+        assert_eq!(MAX_ENGRAVEABLE_MS1_LEN, 90);
+    }
 
     #[test]
     fn classifies_each_record_kind() {

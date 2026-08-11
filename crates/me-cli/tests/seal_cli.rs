@@ -95,6 +95,36 @@ fn refuses_ms1_without_the_opt_in_flag() {
     assert!(!out.exists(), "nothing may be written on the refusal path");
 }
 
+/// §10.2.1a end to end: `me seal` refuses to seal what the device will refuse
+/// to admit, and says WHY on the workstation rather than leaving the operator
+/// to meet it after an unlock.
+///
+/// The message must name the length and the cap and must not read as "your
+/// payload is corrupt" — that is §6.4's distinguishability requirement, and the
+/// whole point of the rule. Vector: 43 bytes of entropy → a 91-character
+/// codex32 secret, one character past what the seed plate's QR can hold.
+#[test]
+fn refuses_an_ms1_too_long_for_the_seed_plate() {
+    const MS1_91: &str =
+        "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq2uk6ly9a0dmw4";
+    assert_eq!(MS1_91.chars().count(), 91, "vector is not 91 characters");
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.uf2");
+    me().args([
+        "seal",
+        MS1_91,
+        "--seal-secret",
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("91 characters"))
+    .stderr(predicate::str::contains("at most 90"))
+    .stderr(predicate::str::contains("engrave"));
+    assert!(!out.exists(), "nothing may be written on the refusal path");
+}
+
 /// F-70: the opt-in covers BOTH forms of the same secret. `classify` needs a
 /// bech32 `1` separator, so it returns `Err(NoSeparator)` on a bare mnemonic —
 /// an `ms1`-only guard missed it entirely and sealed seed entropy with no

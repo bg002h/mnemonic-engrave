@@ -107,11 +107,26 @@ fn check_public(public: &[String]) -> Result<(), SealError> {
         if passphrase::is_valid(r) {
             return Err(SealError::SecretInPublic(i));
         }
-        if record::validate_record(r)
-            .map_err(SealError::Record)?
-            .is_secret()
-        {
-            return Err(SealError::SecretInPublic(i));
+        // An over-length `ms1` must be reported as a SECRET in the public
+        // section, not as a length problem. §10.2.1a's rule lives inside
+        // `validate_record`, so its error would otherwise propagate before
+        // `is_secret()` is ever evaluated, and the operator would be told the
+        // record is too long while saying nothing about their being one
+        // keystroke from publishing a seed.
+        //
+        // Matching on the ERROR rather than pre-empting the call is what keeps
+        // `validate_record` the classifier: canonical form, case and the real
+        // parse are all still checked. An earlier fold pre-empted it with
+        // `classify(r) == Format::Ms`, which fires on a bare two-character HRP
+        // match -- so `ms1`-prefixed garbage, a space-interrupted string and an
+        // uppercase-but-valid one were all relabelled "secret material",
+        // replacing three accurate diagnoses to fix one. Same defect class as
+        // the one being fixed.
+        match record::validate_record(r) {
+            Ok(k) if k.is_secret() => return Err(SealError::SecretInPublic(i)),
+            Err(record::RecordError::MsTooLong(_)) => return Err(SealError::SecretInPublic(i)),
+            Err(e) => return Err(SealError::Record(e)),
+            Ok(_) => {}
         }
     }
     let refs: Vec<&str> = public.iter().map(|s| s.trim()).collect();
@@ -969,6 +984,48 @@ mod tests {
             ),
             Err(SealError::SecretInPublic(_))
         ));
+    }
+
+    /// An over-length `ms1` in the PUBLIC section must be reported as a secret,
+    /// not as a length problem.
+    ///
+    /// Both refuse, so nothing leaks either way — this pins WHICH REASON the
+    /// operator is told, and the suppressed one is the one that matters. §10.2.1a's
+    /// length rule lives inside `validate_record`, so its error propagates through
+    /// `check_public`'s `?` before `is_secret()` is ever evaluated. Measured on the
+    /// real binary before the fix:
+    ///
+    ///   "this codex32 secret is 91 characters; the machine can engrave at most 90"
+    ///
+    /// which says nothing about the operator being one keystroke from publishing a
+    /// seed in the clear. After:
+    ///
+    ///   "record 0 is secret material and cannot ride in the public section"
+    ///
+    /// Mutation this pins: delete the `classify(r) == Format::Ms` guard from
+    /// `check_public` — the assertion then sees `SealError::Record` instead.
+    #[test]
+    fn an_overlong_ms1_in_public_is_reported_as_a_secret_not_as_too_long() {
+        // 91 characters: one past §10.2.1a's engraveable limit, and a secret.
+        const MS1_91: &str =
+            "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq2uk6ly9a0dmw4";
+        assert_eq!(MS1_91.len(), 91, "fixture is not 91 characters");
+
+        match seal(
+            Payload {
+                public: vec![MS1_91.to_string()],
+                secret: vec![],
+            },
+            300_000,
+        ) {
+            Err(SealError::SecretInPublic(0)) => {}
+            Err(other) => panic!(
+                "over-length ms1 in --plaintext reported as {other:?}; the operator needs \
+                 to hear that it is a SEED about to ship in the clear, not that it is too \
+                 long"
+            ),
+            Ok(_) => panic!("an ms1 in the public section must be refused"),
+        }
     }
 
     #[test]
