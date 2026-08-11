@@ -207,9 +207,18 @@ mod tests {
     fn pass_round_trips_and_is_prefixed() {
         let secret = "abandon abandon abandon abandon abandon";
         let rec = encode_pass(secret);
-        assert!(rec.starts_with(PASS_PREFIX), "must carry the reserved prefix");
-        assert_ne!(&*rec, PASS_PREFIX, "an empty body is not an encoding of this");
-        assert!(!rec.contains(' '), "the encoded record may not contain a space");
+        assert!(
+            rec.starts_with(PASS_PREFIX),
+            "must carry the reserved prefix"
+        );
+        assert_ne!(
+            &*rec, PASS_PREFIX,
+            "an empty body is not an encoding of this"
+        );
+        assert!(
+            !rec.contains(' '),
+            "the encoded record may not contain a space"
+        );
         assert_eq!(&*decode_text(&rec).unwrap(), secret);
     }
 

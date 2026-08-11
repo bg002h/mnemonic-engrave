@@ -29,6 +29,20 @@ pub const WORDS_MIN: usize = 2;
 pub const WORDS_MAX: usize = 24;
 pub const WORDS_DEFAULT: usize = 12;
 
+pub const VERSION: u8 = 0x01;
+pub const KDF_PBKDF2_SHA256: u8 = 0x01;
+pub const AEAD_AES256GCM: u8 = 0x01;
+pub const HEADER_LEN: usize = 52;
+pub const SALT_LEN: usize = 16;
+pub const IV_LEN: usize = 12;
+pub const TAG_LEN: usize = 16;
+
+/// EPD §6's cap, inherited unchanged: 8191 rather than 8192 because the
+/// device's scan buffer signals overflow when it is exactly FULL.
+pub const MAX_SECTION_LEN: usize = 8191;
+pub const MIN_ITERATIONS: u32 = 100_000;
+pub const MAX_ITERATIONS: u32 = 2_000_000;
+
 /// `passphrase::MaxLen` is 100 and MUST NOT bound this path — applying it would
 /// make every long generated passphrase unenterable, which is the
 /// host-seals-what-the-device-refuses shape that cost this cycle three separate
@@ -36,6 +50,103 @@ pub const WORDS_DEFAULT: usize = 12;
 const _: () = assert!(PASSPHRASE_MAX > 100);
 const _: () = assert!(REGION_LEN.is_multiple_of(4096));
 const _: () = assert!((REGION_ADDR as usize + REGION_LEN) <= 0x10E0_0000);
+
+/// The 52-byte header. EPD §6's layout byte for byte — only the magic differs —
+/// so one decoder's bounds reasoning transfers to the other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Header {
+    /// 0 when nothing is encrypted.
+    pub iterations: u32,
+    pub salt: [u8; SALT_LEN],
+    pub iv: [u8; IV_LEN],
+    pub pub_len: u32,
+    /// 0 when nothing is encrypted — and then there is no tag either.
+    pub ct_len: u32,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum WireError {
+    TooShort(usize),
+    BadMagic,
+    UnknownVersion(u8),
+    UnknownKdf(u8),
+    UnknownAead(u8),
+    SectionTooLong,
+    Iterations(u32),
+}
+
+impl Header {
+    pub fn sealed(&self) -> bool {
+        self.ct_len > 0
+    }
+
+    pub fn encode(&self) -> [u8; HEADER_LEN] {
+        let s = self.sealed();
+        let mut out = [0u8; HEADER_LEN];
+        out[..8].copy_from_slice(&MAGIC);
+        out[8] = VERSION;
+        out[9] = if s { KDF_PBKDF2_SHA256 } else { 0 };
+        out[10] = if s { AEAD_AES256GCM } else { 0 };
+        out[11] = 0; // reserved
+        out[12..16].copy_from_slice(&self.iterations.to_be_bytes());
+        out[16..32].copy_from_slice(&self.salt);
+        out[32..44].copy_from_slice(&self.iv);
+        out[44..48].copy_from_slice(&self.pub_len.to_be_bytes());
+        out[48..52].copy_from_slice(&self.ct_len.to_be_bytes());
+        out
+    }
+
+    /// Parse and bound-check. **Every check runs before any KDF work** — the
+    /// firmware has no active watchdog, so an unbounded iteration count is a
+    /// hang, and both section lengths are attacker-controlled until proven
+    /// otherwise. Nothing below may be used for arithmetic before its bound.
+    pub fn parse(buf: &[u8]) -> Result<Self, WireError> {
+        if buf.len() < HEADER_LEN {
+            return Err(WireError::TooShort(buf.len()));
+        }
+        if buf[..8] != MAGIC {
+            return Err(WireError::BadMagic);
+        }
+        if buf[8] != VERSION {
+            return Err(WireError::UnknownVersion(buf[8]));
+        }
+        let mut salt = [0u8; SALT_LEN];
+        let mut iv = [0u8; IV_LEN];
+        salt.copy_from_slice(&buf[16..32]);
+        iv.copy_from_slice(&buf[32..44]);
+        let h = Header {
+            iterations: u32::from_be_bytes(buf[12..16].try_into().unwrap()),
+            salt,
+            iv,
+            pub_len: u32::from_be_bytes(buf[44..48].try_into().unwrap()),
+            ct_len: u32::from_be_bytes(buf[48..52].try_into().unwrap()),
+        };
+        if h.pub_len as usize > MAX_SECTION_LEN || h.ct_len as usize > MAX_SECTION_LEN {
+            return Err(WireError::SectionTooLong);
+        }
+        if h.sealed() {
+            if buf[9] != KDF_PBKDF2_SHA256 {
+                return Err(WireError::UnknownKdf(buf[9]));
+            }
+            if buf[10] != AEAD_AES256GCM {
+                return Err(WireError::UnknownAead(buf[10]));
+            }
+            if !(MIN_ITERATIONS..=MAX_ITERATIONS).contains(&h.iterations) {
+                return Err(WireError::Iterations(h.iterations));
+            }
+        }
+        Ok(h)
+    }
+
+    /// Total on-wire length, tag included. Safe only AFTER [`Header::parse`],
+    /// which is what proves both lengths are bounded and the sum cannot wrap.
+    pub fn total_len(&self) -> usize {
+        HEADER_LEN
+            + self.pub_len as usize
+            + self.ct_len as usize
+            + if self.sealed() { TAG_LEN } else { 0 }
+    }
+}
 
 #[cfg(test)]
 mod tests {
