@@ -234,14 +234,16 @@ This list is normative and belongs in operator documentation, not only here.
 15. **A codex32 backup of a 512-bit MASTER SEED.** `codex32`'s long form
     (125–127 characters, a 63–64 byte payload) carries a BIP-32 master seed
     rather than BIP-39 entropy, and this machine cannot engrave it: the plate's
-    QR would need version 41 against a hard limit of 33. Short codex32 shares
+    QR would need 41 modules (version 6) against a hard limit of 33 (version 4). Short codex32 shares
     above 90 characters are refused for the same reason. §10.2.1a rejects both
-    at admission, so the operator is told before the KDF runs rather than after
-    the seed is decrypted into SRAM.
+    at admission. `me seal` refuses to seal one, so the operator is told on their
+    workstation; on the device the payload is refused immediately after the KDF
+    rather than at the plate, with a message that names the reason instead of
+    reporting the payload unreadable.
 
-    Not a wipe or crypto limitation — a plate-geometry one. Nothing in this
-    constellation generates such a string; it can only arrive from third-party
-    BIP-93 tooling.
+    Not a wipe or crypto limitation — a plate-geometry one. The device-facing
+    encoder cannot produce such a string, but the repo's `biptool seed -seedlen
+    64` host tool can, as can third-party BIP-93 tooling.
 
 ### 2.2a What admitting `ms1` changed (operator sign-off, 2026-08-07)
 
@@ -1334,8 +1336,24 @@ malformed, and rejecting it is what stops a seed being shipped in the clear.
 #### 10.2.1a `ms1` records MUST be engraveable to be admitted — NORMATIVE
 
 **Rule.** A `codex32` secret record longer than **90 characters** MUST be
-rejected at admission, with the same fail-closed treatment as any other
-disallowed classification. The whole payload is refused; no partial unlock.
+rejected at admission. The payload is refused whole and every record wiped, but
+the rejection **MUST be distinguishable from "payload unreadable"** per §6.4 —
+e.g. *"This payload holds a codex32 secret longer than 90 characters, which this
+machine cannot engrave. Nothing was opened."* The length and the classification
+are authenticated plaintext, so naming them leaks nothing. No partial unlock.
+
+**Where it runs.** In `AdmitSection`'s **per-record pass**, beside the §10.2.1
+allow-list — never in the post-loop section block — and it MUST `wipe()` the
+records already copied before returning, as the allow-list failure paths do.
+Placed in the post-loop block it would leak every `ms1` already copied,
+unreachable to both `Payload.Wipe` and `RecordsResident()`.
+
+**Scope: `ms1` only.** `mdmkText` and BIP-39 mnemonics are deliberately not
+covered. A 24-word mnemonic plate tops out at QR 29, and md/mk plates take a
+different engrave path entirely (`backup.EngraveText`), which caps at QR 37,
+scales modules at 2 stroke widths rather than 3, and degrades TEXT+QR →
+TEXT-ONLY → QR-ONLY rather than failing. `ms1` is the one format that can
+neither chunk nor degrade, which is why it alone needs this rule.
 
 **Why 90.** `backup.EngraveSeedString` builds the plate's QR from the
 UPPERCASED share and refuses `qrc.Size > 33`. Measured against the real encoder
@@ -1353,27 +1371,43 @@ is exact and sits between 90 and 91:
 bands overhang the engraver**: 91–93 and every long code. This rule covers both,
 which is why it is stated as one length and not as "reject long codes".
 
-**Why at admission and not at the engraver.** Refusing at the engraver means the
-operator has already typed the passphrase, run a ~31-second KDF, and had the
-seed decrypted into SRAM — where §2.2 item 9 says it is readable over SWD —
-before learning the machine cannot cut it. Refusing at admission means the
-payload fails before any key is derived and before any secret is resident. The
-failure is identical; only the exposure differs.
+**Why at admission and not at the engraver.** Refusing at admission does **not**
+avoid the KDF — an encrypted record cannot be classified before it is decrypted,
+and `AdmitSection` runs after `Open`. What it buys is twofold: it collapses the
+seed's residency from the whole session to the duration of `AdmitSection`, which
+then wipes every copy it made and builds no plate list; and it produces a
+**precise** diagnosis instead of a false one. Today an over-length record reaches
+the engraver and surfaces as *"Payload unreadable"* after a **successful**
+authentication, telling the operator their payload is corrupt when it is intact.
 
 **What this costs, stated plainly.** A long `codex32` string is a 63–64 byte
 payload, and 64 bytes is a **512-bit BIP-32 master seed** — precisely what
 BIP-93 exists to back up. This device therefore cannot carry a master-seed
 codex32 backup, and after this rule it says so at admission rather than at the
-plate. Nothing in this constellation *generates* one: `codex32.EncodeMS1` caps
-entropy at BIP-39 lengths (16/20/24/28/32 bytes) and so tops out at 74
-characters, and it is `NewSeed`'s only non-test caller. A long code can only
-arrive from third-party BIP-93 tooling — which §10.2.1 already assumes exists.
+plate. The device-facing encoder (`codex32.EncodeMS1`) cannot produce one — it
+caps
+entropy at BIP-39 lengths and tops out at **75** characters. The repo's host tool
+`biptool seed` **can**: `-seedlen` admits 16–64 bytes, and 64 bytes yields a
+127-character long code (`cmd/biptool/main.go:312` calls `codex32.NewSeed`
+directly, bypassing `EncodeMS1`). That tool, and third-party BIP-93 tooling, are
+the only sources.
+
+**90 MUST be pinned by a test, not trusted as a literal.** It is derived from
+three things that can each move independently: `qrScale`, the `qrc.Size > 33`
+cap, and the error-correction level. Measured: at `qr.Q` instead of `qr.M` the
+limit drops to **67** — below `EncodeMS1`'s ordinary output — which would reopen
+this defect silently and reject ordinary seeds. The test MUST re-derive the
+boundary from the real encoder and fail if it is no longer 90/91.
 
 **Ordering (Rust-primary rule).** Admission is normative behaviour, so this
-lands in `me` first, with test vectors at 90/91 and at 124/125/127, and is then
-ported to the device. `me seal` refuses to seal what the device will refuse to
-admit, so the operator meets the limit on their workstation rather than after an
-unlock.
+lands in `me` first — in `record::validate_record`, where record classification
+already happens, not in `me seal`'s argument handling — and is then ported to the
+device. Test vectors: **90** (admitted), **91** and **93** (refused; 92 is not
+constructible), and **125**/**127** (refused). 124 cannot exercise the rule: it
+is in the dead zone `codex32.New` already rejects.
+
+`me seal` refuses to seal what the device will refuse to admit, so the operator
+meets the limit on their workstation rather than after an unlock.
 
 ### 10.2.2 Session lifecycle — every secret record first, then wiped
 
