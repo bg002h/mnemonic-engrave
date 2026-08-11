@@ -158,8 +158,10 @@ This list is normative and belongs in operator documentation, not only here.
     program that reads an encrypted payload does **not** inherit this
     discipline; conversely, anything inside the Sealed Payload session carries
     it regardless of how the bytes arrived. This is not a new constraint on the
-    implementation — it is what `gui/wipe_guard.go` already does, since the
-    guard's lifetime *is* `unlockSecretSession`'s own first and last act.
+    implementation — it is what the program's two `wipeGuard` brackets already
+    do, each installed as its installing function's own first and last act:
+    `unlockSecretSession` for the secret session, and `unlockPassphraseFlow`
+    for the in-flight passphrase.
 
     **What this does NOT license.** Stated narrowly and deliberately, because
     §2.2's other accepted limitation (F-83, the plate under the needle) was
@@ -222,11 +224,13 @@ without the passphrase.
 
 And, per §2.2 item 12: **the machine offers two classes of program, and only one
 of them wipes.** Use **Sealed Payload** for anything you intend to protect. The
-legacy programs — NFC scan, manual word entry, BIP-85, account xpub, SeedXOR, SLIP-39, free text — leave seed material resident with no timer behind them, so with those the
-operating rule is the older one: do not walk away from a powered machine, and
-power it down when you are done. This distinction is **operator-facing** and
-belongs in the documentation, not only here: someone who has watched the machine
-wipe itself in one menu will reasonably assume it does so in all of them.
+legacy programs — NFC scan, manual word entry, BIP-85, account xpub, SeedXOR,
+SLIP-39, free text — leave seed material resident with no timer behind them, so
+with those the operating rule is the older one: do not walk away from a powered
+machine, and power it down when you are done. This distinction is
+**operator-facing** and belongs in the documentation, not only here: someone who
+has watched the machine wipe itself in one menu will reasonably assume it does
+so in all of them.
 
 ## 3. Hardware facts — measured, not assumed
 
