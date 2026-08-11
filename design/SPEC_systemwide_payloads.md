@@ -41,11 +41,18 @@ several overrule a documented prior decision and are marked where they do.
    at load, paired with an operator-initiated erase.
 7. **Verification depth is the operator's choice**, with the full menu, and the
    detection probabilities live in the documentation rather than on the panel.
-8. **`me` offers three passphrase modes** — none, user-supplied, and generated
-   N words (default 12, min 2, max 24). Below the cliff over secret content
-   requires an explicit command-line flag. *This overrules
-   `crates/me-cli/src/seal/passphrase.rs`'s "GENERATED, never user-supplied",
-   deliberately and with the numbers in §6 in view.*
+8. **`me` offers two passphrase modes** — none, and generated N words
+   (default 12, min 2, max 24). Below the cliff over secret content requires an
+   explicit command-line flag. **REVISED 2026-08-11 after R0-C4 showed the
+   device has no entry path for a user-supplied passphrase**
+   (`unlockPassphraseFlow` returns a `bip39.Mnemonic` typed on the WORD
+   keyboard, so free text is unopenable). User-supplied is DROPPED, which
+   restores `crates/me-cli/src/seal/passphrase.rs`'s "GENERATED, never
+   user-supplied" rather than overruling it. Arbitrary N stays: the word
+   keyboard can enter any number of words — it is the mnemonic *checksum* parse
+   that forces 12/15/18/21/24, not the keyboard.
+9. **Verification is never forced.** The operator may bypass it, or assert a
+   by-eye check the device cannot confirm. **Added 2026-08-11 (R0-C3).**
 
 ## 2. What already exists, and what genuinely has to be built
 
@@ -86,18 +93,48 @@ routed, rather than latent and undocumented.
 
 ## 3. Architecture
 
-### 3.1 One seam, not eight
+### 3.1 One shared seam, plus four individual wirings
 
-`seedEntryFlow` (`gui/derive_xpub.go:82`) is called from six sites across five
-programs: `bip85.go:271`, `derive_xpub.go:107`, `singlesig.go:33`,
-`multisig.go:91`, `multisig_build.go:58`, and the two verify re-entries at
-`singlesig_verify.go:67` and `multisig_verify.go:50`.
+**MEASURED, after R0-I4 caught the first draft asserting a count its own list
+contradicted.** `seedEntryFlow` (`gui/derive_xpub.go:82`) has **7 call sites
+across 4 programs**:
 
-Teaching that one function to offer three sources — **Typed / Scanned /
-Payload** — gives five programs the feature at one stroke, with one set of
-tests. `backupWallet`'s `newInputFlow`, plus BIP-39 Password, Engrave Text and
-Engrave Bundle, call the same helper so there is **one admission path, not
-eight**.
+| program | sites |
+| --- | --- |
+| BIP-85 Child Seed | `bip85.go:271` |
+| Account Xpub | `derive_xpub.go:107` |
+| Engrave Single-Sig | `singlesig.go:33`, `singlesig_verify.go:67` |
+| Engrave Multisig | `multisig.go:91`, `multisig_build.go:58`, `multisig_verify.go:50` |
+
+**Two of those 7 sites are verify re-entries, and they are the reason the seam
+cannot simply be widened in place (R0-C1).** `seedEntryFlow` is the FIRST
+statement of both `singleSigVerifyFlow` and `multisigVerifyFlow`, so a widened
+seam offers "Payload" at the verify prompt — and §7.4 forbids exactly that.
+A rule stated only in prose is not a mechanism.
+
+**NORMATIVE: there are two entry points, not one flag.**
+
+```
+seedEntryFlow(ctx, th)            offers Typed / Scanned / Payload
+seedEntryFlowTypedOnly(ctx, th)   offers Typed. No parameter, no source menu.
+```
+
+The verify re-entries call the second. A boolean parameter on one function was
+rejected deliberately: a boolean can be passed wrongly and the wrong value still
+compiles, whereas a verify flow that has no way to name the payload source
+cannot reach it by any argument. The test is then structural — no verify flow
+mentions `seedEntryFlow` — rather than behavioural, which is what R0-C1 showed
+test 1 could not achieve at the store layer alone.
+
+**"One seam, not eight" is therefore false as originally written, and the spec
+says so rather than keeping the slogan.** The seam covers 4 of the 8 programs.
+The other four do not share a helper at all: `backupWallet` uses `newInputFlow`
+(exactly one non-test caller, `gui.go:1704`), and BIP-39 Password, Engrave Text
+and Engrave Bundle each have their own entry path.
+
+So the work is **one shared seam plus four individual wirings**, and each of the
+four gets its own admission test rather than inheriting one. Pretending
+otherwise would have under-scoped the implementation by half the programs.
 
 ### 3.2 The session
 
@@ -213,6 +250,18 @@ reconstruct it:
 - **Sealed Payload is dashes, not blanks** — it is out of scope entirely
   (decision 1), not a program whose every cell happens to be refused.
 
+#### 3.3.2a NFC records go through the SAME function — NORMATIVE (R0-I6)
+
+The table's axis is `(class → program)` and says nothing about where a record
+came from, which left the NFC path — the one §5.4 just removed all integrity
+checking from — outside the single admission function.
+
+**It is not outside it.** An NFC-delivered record is admitted by the same table,
+by class, exactly as a payload-delivered one. Source is not an admission input;
+it is a **flag** input (F3, and F4 below). One function, every path, no
+exceptions — which was the point of §3.3 and which the first draft's tuple
+quietly broke.
+
 #### 3.3.3 The flag rules — NORMATIVE
 
 Evaluated after admission, never as part of it. Each is independent; more than
@@ -222,7 +271,8 @@ one can fire.
 | --- | --- | --- |
 | F1 | admitted class is secret **and** container is plaintext | this secret is unencrypted in flash; offers erase (§5.5) |
 | F2 | admitted class is secret **and** the sealed container's passphrase was below the cliff (§6.2) | this secret is weakly protected |
-| F3 | always, for anything payload-sourced | the source, at the point of use (§3.2) |
+| F3 | always, for anything not typed | the source, at the point of use (§3.2) |
+| F4 | admitted class is secret **and** source is NFC | this secret arrived with **no integrity check at all** — §5.4 scopes digest verification to flash, so nothing stands behind a tag's contents |
 
 ## 4. The flash region
 
@@ -326,6 +376,12 @@ text:<lowercase hex of the UTF-8 bytes>
 pass:<lowercase hex of the UTF-8 bytes>
 ```
 
+**The digest label is `"MNEMSYSW/pub/v1"`, not `"MNEMBLOB/pub/v1"` (R0-M1).**
+EPD§6.6's label exists to stop cross-context collisions, and §4 insists the two
+containers be distinguishable; reusing the label would have made two containers
+the spec separates produce identical digests over identical public sections.
+The construction is otherwise EPD§6.6's, verbatim.
+
 Lowercase hex, not base64 or base32: it is case-insensitive by construction so
 lowercasing cannot destroy it, it contains no space, hyphen or LF, and it is the
 easiest form for a human to compare on a screen. The cost is 2×, against
@@ -339,6 +395,30 @@ string could be free text — so a sniffer that ran first would claim
 prefixes are also **reserved**: a record beginning `text:` or `pass:` that is not
 valid lowercase hex is `ClassUnknown` and refused, never silently treated as
 free text.
+
+#### 5.3.2 The card-set DECODE requirement APPLIES — NORMATIVE (R0-I1)
+
+EPD§6.3's per-card-set decode requirement carries over to this container
+unchanged. Stating it is not a formality: without it the §5.3 flag is **silently
+defeated in exactly the case that matters**.
+
+`ValidMD`/`ValidMK` are **pure BCH verifiers**, so 32 bytes of seed entropy wrap
+into a record that classifies as `ClassMDMK` — not secret, no flag, no offer to
+erase, sitting in cleartext flash where `picotool save` reaches it with no
+passphrase, on a device whose BOOTSEL is enabled by design. EPD measured that
+bypass and closed it with `decodePublicSet`, whose comment names the threat: *"a
+defective or third-party sealer can put seed entropy in the cleartext section."*
+
+**A `ClassMDMK` record that does not REASSEMBLE AND DECODE is refused.** The
+widening in §5.3 admits *declared* secrets; it does not admit undeclared ones.
+
+**And pass 3 must be restructured, not merely permitted through.**
+`AdmitSection`'s pass 3 sends every public record through `cardKey`, whose
+`default` branch fails closed with "record %d is not an md1 or mk1 card".
+Widening `permitted` without touching pass 3 would reject every payload the
+widening was meant to allow. **Pass 3 runs over the `ClassMDMK` subset only.**
+The two passes are coupled and a fold that changed one would have shipped a
+container that admits nothing.
 
 **A plaintext container carrying a secret class is flagged on screen at load**,
 paired with an operator-initiated **erase this region**. The erase is a menu
@@ -363,17 +443,38 @@ for this spec**. See §11 for what that means the operator is *not* getting.
 variants show the digest, and so does every program that consumes from the
 region. The digest is not the plaintext container's consolation prize.
 
-| container | what the digest covers | what else covers it |
-| --- | --- | --- |
-| plaintext | the whole payload — it is all public section | nothing; the digest is the only integrity |
-| sealed | the public section and the `sealed` byte | the AEAD tag covers the ciphertext |
+**CORRECTED after R0-C2 and R0-I2. The first draft was wrong twice here.**
 
-For a sealed container **the digest and the tag cover different halves**, and
-between them the coverage is complete: EPD§6.6's input is "the public section
-exactly as it appears on the wire", so the ciphertext is outside it and the tag
-is inside the AEAD. Neither is redundant. Showing the digest for sealed payloads
-is what makes a **downgrade** visible to the operator rather than only to the
-format — which is what the `sealed` byte was bound in for.
+| container | digest shown? | what the AEAD tag covers |
+| --- | :-: | --- |
+| plaintext (`pub_len > 0`) | yes | no tag exists |
+| sealed, with public records (`pub_len > 0`) | yes | the ciphertext, **and it binds the header and public section as AAD** |
+| sealed, secrets only (`pub_len == 0`) | **NO** | as above |
+
+**There is no digest for a secrets-only sealed payload, and that is EPD's own
+rule, not a gap.** EPD§6.6: *"Displayed whenever `pub_len > 0`, sealed or not…
+When `pub_len == 0` **nothing is displayed**: the digest of an empty record set
+is a constant."* The first draft said the digest is shown for both variants and
+every consuming program — which for the sealed variant's **main case** would
+have displayed one number that every fully-encrypted payload shares. An operator
+comparing it would match every time, against anything.
+
+**And the tag's job was stated wrongly.** EPD§6.1a is normative: *"AAD = the
+header AND the public section."* So the public section is covered **twice**,
+deliberately — cryptographically by the tag and out-of-band by the digest — and
+the first draft's "neither is redundant" was both false and the premise for a
+coverage-is-complete claim that does not hold.
+
+**What the sealed digest is actually for, in one line:** not coverage the tag
+lacks, but **downgrade detection** — visible *before any key exists*, which is
+the one thing an AEAD structurally cannot do.
+
+**The systemwide container's AAD is stated here rather than by reference:**
+`AAD = header ‖ public section`, bytes `[0, HeaderLen + pub_len)`, identical to
+EPD§6.1a. Left implicit, an implementer could bind the ciphertext framing alone
+and reopen the funds-loss path EPD§6.1a exists to close — an attacker swaps an
+`mk1` for one encoding *their* xpub, the tag still verifies, and the operator
+engraves a steel backup of a wallet they do not control.
 
 **"Once per payload"** fixes the frequency. The operator compares **at load, one
 time**, not once per consuming program. A payload that feeds five programs in a
@@ -393,7 +494,16 @@ from an already-compared payload does not.
 
 #### 5.4.1 Payload identity — NORMATIVE
 
-**The identity IS the EPD§6.6 digest — the full 32 bytes, not the 16 displayed.**
+**REVISED after R0-C2.** The first draft made the identity the EPD§6.6 digest.
+That digest **does not exist for a secrets-only sealed payload** (`pub_len == 0`,
+see §5.4), so every such payload would have shared one identity and a swapped
+payload would have inherited the previous one's `compared` flag — a silent
+authentication bypass in exactly the case that carries the seed.
+
+**The identity is `SHA-256("MNEMSYSW/id/v1" ‖ 0x00 ‖ the region bytes as read,
+bounded by the header's declared total)` — the full 32 bytes.** It always
+exists, it is content-derived, and it covers the ciphertext too, which the
+EPD§6.6 digest deliberately does not.
 
 Nothing else is admissible, and the alternatives are worth ruling out by name
 because each looks reasonable and each fails:
@@ -422,7 +532,16 @@ After an engrave that consumed a payload-sourced record, **the device reminds
 the operator to overwrite the region.** A reminder, not an automatic wipe —
 decision 2 stands.
 
-**It is a MAX-LENGTH payload, not a zero-length one.** A zero-length payload
+**It is NOT a container (R0-I5).** The first draft called it a "payload", which
+made it subject to the format's own caps — EPD admits at most 16,450 bytes
+against a 65,536-byte region, so a "max-length payload" would have left **74% of
+the region untouched** and made "fills the region" false and test 12
+unsatisfiable. The overwrite artefact is a **raw region image**: exactly
+`RegionLen` bytes of fill, carrying no magic, no header and no records. It is
+written to the region and is not parseable as a container by design — a reader
+finding it sees no magic and reports "no payload", which is the correct answer.
+
+**It is a FULL-REGION image, not a zero-length payload.** A zero-length payload
 rewrites the header and leaves every byte of the old body sitting in flash,
 which looks like erasure and is not. The overwrite payload fills the region, so
 the previous contents are physically replaced.
@@ -464,7 +583,7 @@ me sysw show   FILE
 | `--allow-weak` | required by §6.2.1 when secret content meets a sub-cliff passphrase. **Refuses with a non-zero exit otherwise** |
 | `--fill` | §5.5; **default `random`** |
 
-`me sysw pack` **prints the EPD§6.6 digest to stderr** in the §6.6 display form,
+`me sysw pack` **prints the digest to stderr** in the EPD§6.6 display form,
 because that is the value the operator writes down and compares on the machine.
 Stderr, not stdout, for the reason `me seal` already prints its passphrase
 there: stdout may be a redirected blob.
@@ -526,33 +645,30 @@ The rule above says "below 5 words (55 bits)". That is measurable for a
 units that only apply to one of the three modes, which left the condition
 undefined for another. This closes it:
 
+**SIMPLIFIED by R0-C4.** The first draft had to define strength for a
+user-supplied passphrase — a mode that turned out to be unopenable on the device
+and has been dropped. With generation the only mode, strength is exact:
+
 | mode | strength | requires the flag over secret content? |
 | --- | --- | --- |
-| generated, N words | **exactly `11 × N` bits** — N words drawn uniformly from the 2048-word list | **iff `N < 5`** |
-| user-supplied | **treated as 0 bits. Not estimated.** | **always** |
+| generated, N words | **exactly `11 × N` bits** — N drawn uniformly from the 2048-word list | **iff `N < 5`** |
 | none | 0 bits | **always** |
-
-**User-supplied is not estimated, and that is the point.** Every estimator for
-human-chosen passphrases is either a dependency with its own failure modes or a
-charset-times-length formula that scores `Tr0ub4dor&3` far above
-`correct horse battery staple` and is wrong about both. The project has already
-written down the honest number: `passphrase.rs` says a human-chosen passphrase
-is "worth 25–35 bits — one rented GPU, minutes." **That entire range is below
-the 55-bit cliff**, so any estimator faithful to it returns "below the cliff" for
-every input. A rule that always fires does not need a measurement to decide when
-to fire, and pretending to measure would invite the operator to argue with the
-number.
 
 So the deterministic rule an implementer transcribes:
 
-> **Secret content + (user-supplied OR no passphrase OR generated with N < 5)
-> ⇒ `me` refuses without the explicit flag.**
+> **Secret content + (no passphrase OR generated with `N < 5`) ⇒ `me` refuses
+> without the explicit flag.**
 
-`me` prints the computed strength either way — `"12 words, 132 bits"` or
-`"user-supplied, unmeasured, treated as below the cliff"` — because decision 8
-says the operator is told, never blocked.
+`me` prints the strength either way — `"12 words, 132 bits"` — because decision
+8 says the operator is told, never blocked.
 
-### 6.3 Consequence: `is_valid` changes
+**Worth recording, because it argues for the gate rather than against it:** the
+metric only became computable once a mode was removed, and that mode was removed
+because a reviewer traced it into the device and found no keyboard behind it. The
+first draft would have shipped a rule whose condition was undefined for a third
+of its inputs.
+
+### 6.3 Consequence: `is_valid` changes, and what replaces the typo screen
 
 `is_valid` is `Mnemonic::parse_in(...).is_ok()` — it accepts only 12/15/18/21/24
 words **with a valid checksum**; a random 12-word draw passes about one time in
@@ -565,6 +681,19 @@ sides move together.
 The passphrase remains "used ONLY as a passphrase: never seed entropy, never
 derives a wallet", so a non-mnemonic word sequence is legitimate here.
 
+**What is LOST, and what replaces it (R0-N1).** `Mnemonic::parse_in` also
+validates the BIP-39 checksum, which today catches a mistyped word *before* the
+~31 s KDF and reports a typo rather than "wrong passphrase". Dropping the
+checksum drops that screen: with arbitrary N there is no checksum to fail, so
+every typo becomes an indistinguishable failed unlock after a half-minute wait.
+
+**Replacement, NORMATIVE:** every entered word is checked against the 2048-word
+list at entry — the word keyboard already does this for seed entry
+(`bip39.ClosestWord`) — so a *non-word* is rejected at the keystroke, before the
+KDF. What is genuinely unrecoverable is a valid word in the wrong place, which no
+checksum-free scheme can catch and which the operator documentation must say
+plainly rather than leave as a surprise after 31 seconds.
+
 ## 7. Verification
 
 **The hash and the plate verify defend opposite ends of the pipeline.** The hash
@@ -575,19 +704,43 @@ Y-axis screw, `EngraverStats` counts stalls because steppers stall, F-83 accepts
 that a plate under the needle cannot be protected, and the font work exists
 because a glyph can lose its identity to one scratch.
 
-### 7.1 When the menu is offered — resolved ambiguity
+### 7.1 The menu is always offered, and never forced — operator ruling 2026-08-11 (R0-C3)
 
-The menu appears when the secret's source is **independently verified**: a
-plaintext container whose hash the operator compared, or a sealed container the
-operator unlocked. **A typed seed keeps today's full re-entry.**
+**REPLACES the first draft, which gated the menu on "the operator compared the
+hash".** R0-C3: the device **cannot observe that**. §5.2 says so itself — the
+machine has no idea what the operator wrote down; it sees a button press. So the
+first draft let a *dismissed* prompt buy a weakened verification, and made one
+defence unlock the other after §7 opens by declaring them independent.
 
-This is narrower than it strictly needs to be, and deliberately so. The
-read-back does the same job for a typed seed — it catches a mis-cut plate either
-way — so the menu *could* apply uniformly. It is scoped to verified sources
-because that is what the operator asked for, and widening a verification
-weakening beyond the case it was requested for is not a decision to make by
-implication. Extending it to typed seeds is **out of scope for this spec** and
-would be its own operator ruling.
+**Operator ruling:** *"User shouldn't be prompted to verify something
+unnecessarily and should be given option to bypass verification or insist
+without proof verification was performed by eye and passed."*
+
+So:
+
+- **The menu is offered regardless of source.** No gate, because there is no
+  gate the device can honestly evaluate.
+- **Bypass is a menu option**, not a hidden escape.
+- **"Read only" is an operator ASSERTION.** The operator declares they checked
+  by eye and it passed; the device records the declaration and does not pretend
+  to have confirmed it.
+
+#### 7.1.1 Verification provenance — NORMATIVE
+
+Because two of the options produce a result the device did not compute, the
+outcome carries its provenance, exactly as a record carries its source (§3.2):
+
+| outcome | meaning |
+| --- | --- |
+| `device-compared (every word)` | the device compared all words |
+| `device-compared (N of M)` | the device compared a subset; §7.3 gives the rate |
+| `operator-asserted` | the operator declared a by-eye check passed |
+| `not verified` | bypassed |
+
+**Nothing may render any of these as the bare word "verified".** An operator
+assertion and a device comparison are different facts, and collapsing them is
+the same over-claim F-123 was filed against — this time about the plate rather
+than the wipe.
 
 ### 7.2 The menu
 
@@ -678,6 +831,9 @@ rather than only on hardware.
    passphrase.
 7. A blob written to the wrong region is refused on magic, not half-parsed.
 8. Structural failures never emit the words "payload unreadable" (§5.2).
+   **The assertion is against `gui`, not `seal` (R0-M2)** — the phrase is a UI
+   string and lives in the flow layer, so a test scoped to `seal` cannot fail
+   and would be a false pass.
 9. The digest is displayed for **both** container variants and for every
    program that consumes from the region (§5.4). A program that consumes
    payload-sourced input without a compared digest fails.
@@ -691,13 +847,27 @@ rather than only on hardware.
     all-ones is byte-identical to an erased region.
 13. The post-engrave overwrite reminder fires after a payload-sourced engrave
     and not after a typed one.
+14. **(R0-I1)** A BCH-valid `md1` carrying non-decodable entropy is refused,
+    asserted against the real `md.Reassemble` — not a hand-built fixture. Test 4
+    cannot catch this: it constructs a record that classifies as secret, and the
+    defect lives entirely in records that do not.
+15. **(R0-C2)** A secrets-only sealed payload (`pub_len == 0`) displays NO
+    digest, and two different such payloads have DIFFERENT identities (§5.4.1).
+    A test asserting only the first half passes on the bypass.
+16. **(R0-C1)** No verify flow can reach a payload-sourced secret — asserted
+    structurally, by no verify flow naming `seedEntryFlow`.
+17. **(R0-C3)** An operator-asserted verification is never rendered as
+    "verified"; the four provenances of §7.1.1 are distinguishable in whatever
+    the flow records and displays.
+18. **(R0-I2)** The systemwide container's AAD is `header ‖ public section`: a
+    payload whose public section is altered after sealing fails to open.
 
 ## 9. Open items
 
 | # | Item | Owner |
 | --- | --- | --- |
 | ~~O1~~ | ~~Flash address~~ — **RESOLVED 2026-08-11: `0x10D00000`** | — |
-| O2 | Which keyboard the Sealed Payload unlock screen uses — **not verified**; `PassphraseKeyboard` is free-text (`gui.go:640`) but the unlock path was not traced | implementation |
+| ~~O2~~ | ~~Which keyboard the unlock screen uses~~ — **RESOLVED by R0-C4**: `unlockPassphraseFlow` returns a `bip39.Mnemonic` on the WORD keyboard. It was a defect, not a question, and it removed a passphrase mode | — |
 | O3 | Record class name and encoding for free text | R0 / Rust |
 | O4 | `me` subcommand surface for creating a systemwide payload, and for the §5.5 overwrite payload | R0 |
 | ~~O5~~ | ~~NFC digest domain separation~~ — **DISSOLVED 2026-08-11**: the operator scoped digest verification to FLASH, so no NFC digest is specified (§5.4) | — |
@@ -717,7 +887,12 @@ rather than only on hardware.
   resting place for secrets that did not previously exist. NFC is transient — a
   tag crosses the reader once; flash persists until overwritten, on a device
   whose SWD port is readable and whose BOOTSEL is enabled by design.
-  **The §5.5 overwrite payload is the mitigation, and it is a REMINDER the
+- **NFC-delivered secrets get no integrity check whatsoever.** §5.4 scopes
+  digest verification to flash, so a tag's contents are admitted on their
+  classification alone — nothing stands behind them, and the operator has
+  nothing to compare. Flag F4 says so on screen at the point of use. This
+  fulfils §5.4's forward reference, which R0-M3 found unfulfilled.
+  **The §5.5 overwrite artefact is the mitigation for the flash case, and it is a REMINDER the
   operator must act on** — not something the machine does for them. A spec that
   counted it as protection would be making the same mistake F-123 was filed
   against: describing a control by its intent rather than by what it does when
