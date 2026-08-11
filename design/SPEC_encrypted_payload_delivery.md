@@ -261,9 +261,15 @@ This list is normative and belongs in operator documentation, not only here.
       engrave path, in the key derivation's working state, in the word-splitting
       and keyboard buffers, and in the uppercased string the plate's QR is built
       from. Those are not wiped (F-88, F-90, F-94, F-104). Separately, roughly
-      **35 K across ~81 reachable objects survives every wipe and has not been
-      identified** — it may or may not hold seed material; nobody has looked
-      closely enough to say (F-109).
+      **12 K across ~74 small objects survives every wipe and is still
+      unidentified** (F-109) — reduced from the ~35 K / ~81 objects this said
+      before 2026-08-11, when the residue was finally measured. **No secret was
+      found in any of it**, against paired controls that prove the search finds
+      a secret when one is present. 23 K is now named and benign, and ~13.5 K
+      was never residue — the probe took its baseline before the first frame.
+      The measurement is **host Go, not the device's TinyGo build**, whose GC
+      scans stacks conservatively and can retain what host Go frees; that can
+      add bytes but cannot un-zero an erased buffer.
     - **The wipe can silently never run.** §10.2.4's timer fires only when the
       machine is *idle*, and the idle clock is refreshed by **any** input event,
       including one that resolves to no actual input. A touch panel reporting

@@ -33,8 +33,19 @@ or skipped, with a 3-minute idle timer as a backstop. In the current build:
   the key-derivation working state, in the word-splitting and keyboard buffers,
   and in the uppercased string the plate's QR is built from. Those are not
   wiped.
-- **~35 KB across ~81 reachable objects survives every wipe and has not been
-  identified.** Nobody has established whether it holds seed material.
+- **~12 KB across ~74 small objects survives every wipe and is still
+  unidentified** — down from ~35 KB / ~81 objects, which is what this said
+  before the residue was measured on 2026-08-11. **No secret was found in any
+  of it.** Six heap dumps per run were scanned for four canaries, with paired
+  controls proving the search finds a secret when one is present; each secret
+  scored at its own live instant and **zero at every post-wipe dump**. Of the
+  original figure, 23 KB is now named and benign (a write-only display mask,
+  the warning frame's text buffers, the drawer's stacks), and ~13.5 KB was
+  never residue at all — the probe took its baseline before the machine's first
+  frame. **Caveat, and it is not a small one: this was measured on host Go, not
+  on the device's TinyGo build, whose GC scans stacks conservatively and can
+  therefore retain what host Go frees.** It cannot un-zero an erased buffer,
+  but the device figure is unmeasured.
 - **The idle wipe can silently never run.** The timer only fires when the
   machine is *idle*, and the idle clock is refreshed by **any** input event —
   including one that resolves to no actual input. A touch panel reporting
