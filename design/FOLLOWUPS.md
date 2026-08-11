@@ -1557,17 +1557,17 @@ loop turnaround, is not load-bearing, and the code now says so. Engrave-side
 edges are covered by neither call — `pl.Wakeup()` covers those, which the design
 now states and a mutation row now pins.
 
-**STILL OPEN — this entry does not close until hardware confirms it**, because
-the defect is a function of when `platform_sh2.go`'s event source actually
-returns and no host test can settle that. Two readings required, both scheduled
-into the next hardware session:
-1. Cut/Skip untouched → warning at **3:00**, wipe at **3:30** (was 6:00/6:30).
-2. Back mid-cut → warning **3:00 after the head stops** (the `engraveStopping`
-   park, whose only exit is `pl.Wakeup()`).
+**CLOSED 2026-08-10 on hardware**, build `v0.0.0-g747cf48`. Both required
+readings green — `design/HARDWARE_RESULT_2026-08-10c_b2b_gate.md`:
 
-**Ordering constraint:** F-105's hardware half is confounded while this is open —
-a 2x window changes what "the passphrase was still there" means — so F-106's
-readings come first in the session.
+1. Cut/Skip untouched → warning **3:00**, wipe **3:30** (was 6:00/6:30). The 2x
+   is gone.
+2. Back mid-cut → warning **3:00 after the head stops**, wipe +30 s. This is the
+   `engraveStopping` park R0 round 0 raised as I2, whose only exit is
+   `pl.Wakeup()`, and the device is the only place it could be settled.
+
+No host test could close this, because the defect is a function of when
+`platform_sh2.go`'s event source actually returns.
 
 
 **ROOT CAUSE FOUND on hardware 2026-08-10**, build `b2b-idleprobe3` =
