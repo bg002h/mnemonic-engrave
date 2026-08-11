@@ -73,13 +73,12 @@ These are already normative and must not be contradicted or quietly softened:
 
 ## Open threads that touch this work
 
-- **The flashed firmware's boot has not been judged.** Hardware carries
-  `v0.0.0-g97e38c1` (flashed 2026-08-11, signature verified, flash verified),
-  but it must be powered from the machine supply before anything is concluded —
-  a laptop port gives a dark screen indistinguishable from a rejected signature.
-  Several journey-visible changes are in that build: the `%` glyph in the KDF
-  progress screen, `|` replacing the invisible `·` on four screens, and a
-  shortened §10.2.3 warning.
+- ~~**The flashed firmware's boot has not been judged.**~~ **RESOLVED
+  2026-08-11 (operator): `v0.0.0-g97e38c1` boots properly on machine power.**
+  So the journey-visible changes in that build are live on the machine and can
+  be walked there, not just in the emulator: the `%` glyph in the KDF progress
+  screen, `|` replacing the invisible `·` on four screens, and a shortened
+  §10.2.3 warning.
 - **`me` is at `v0.5.1`**; `v0.5.0`'s archives self-report `0.4.0` and are left
   as published. If a journey tells an operator to check `me --version`, say
   which answers are expected and what `0.4.0` means.
@@ -132,6 +131,35 @@ Two hazards found while building, neither of them in the prep note:
 - **`cmd/emu/build.sh` failed on every rebuild after the first.** It copies
   `wasm_exec.js` out of `GOROOT`, which under Nix is mode 444 in the store, so
   the copy landed unwritable. `cp -f`.
+
+### What the firmware actually pays for the seam — measured, after the comment lied
+
+The TinyGo stub's comment said the empty `notifyPlate` "costs the device an
+empty call the compiler removes." Nobody had asked the compiler. **It does not
+remove it.** Built at production settings with `VERSION` pinned so the stamp
+could not explain a difference:
+
+| build | sha256 |
+| --- | --- |
+| `97e38c1` — before the hook | `0a379302…` |
+| `71f1d42` — with the hook | `8c4380c4…` |
+| `71f1d42` — with ONLY the `runEngraving` call deleted | `0a379302…` |
+
+The third is byte-identical to the first, so the entire delta is that one call:
+**486,697 bytes across 3,480 of 5,146 UF2 blocks at unchanged total size** —
+code shifting downstream, not code being added.
+
+**The comparison has a control**, because a difference without one proves
+nothing: the same SHA built twice in two different directories gave the
+identical sha256, so the build is byte-reproducible across paths.
+
+The trade still holds — one call to an empty function per *engraving job*,
+against an interface that cannot reach the image at all. Corrected in
+`gui/plate_hook_tinygo.go` (fork `345d79c`). Generalises, and it is this repo's
+own rule turned on its author: **a comment asserting what a compiler did is a
+machine-checkable claim, and this one was checked only because the operator's
+boot report prompted the question "does the machine need a reflash?"** It does
+not: nothing behavioural changed on the device.
 
 ## Half 1 — the final layout is already renderable, before the cut
 

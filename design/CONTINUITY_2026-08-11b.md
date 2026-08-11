@@ -15,7 +15,7 @@ Carries only what cannot be re-derived from the repo.
 | released | **`v0.5.1`** — published, signed, verified; `v0.5.0` left as-is |
 | fork `bg002h/seedhammer` `main` | `97e38c1`, pushed, `Test` + `Build image` green |
 | fork tag | `fork-v0.0.0-g93ee004` (unchanged) |
-| hardware last flashed | **`v0.0.0-g97e38c1`**, flashed 2026-08-11 (sha256 `7a86f9d4…`), boot not yet judged on machine power |
+| hardware last flashed | **`v0.0.0-g97e38c1`**, flashed 2026-08-11 (sha256 `7a86f9d4…`), **boots properly on machine power** (operator, 2026-08-11) |
 
 Rust suite 185 passed / 0 failed. Fork host suite exit 0, 49 ok, 0 FAIL.
 `gofmt -l` (excluding `third_party/`) is **0** — it was 6 all cycle, so
@@ -70,14 +70,15 @@ before its fold. The full record is in `FOLLOWUPS.md`'s
    contain. Verified end-to-end on the **published** artifact, not the source:
    `me --version` → `me 0.5.1`; minisign verifies `SHA256SUMS`; a double-spaced
    mnemonic is refused (exit 4) while the canonical control seals (exit 0).
-2. ~~Hardware has not run any of this.~~ **Flashed 2026-08-11** to
-   `v0.0.0-g97e38c1` — signature verified before writing, flash verify 100%.
-   **Boot has NOT been judged yet**: it must be powered from the machine supply,
-   not a laptop port, because `Init()` reboots into BOOTSEL without a 20–28 V PD
-   contract and that is indistinguishable from a rejected signature. Expect
-   `(UNLOCKED)` on the version line. If it does not boot, **do not burn another
-   OTP slot** — the burned hash is proven; see `RUNBOOK_custom_boot_key.md`
-   step 6.
+2. ~~Hardware has not run any of this.~~ ~~Boot has NOT been judged yet.~~
+   **RESOLVED 2026-08-11 (operator): `v0.0.0-g97e38c1` BOOTS PROPERLY.**
+   Flashed 2026-08-11, signature verified before writing, flash verify 100%,
+   and the bootrom accepts it against the slot-1 key on machine power. The
+   self-signed boot chain is confirmed end to end on this build: sign → flash →
+   boot, with no OTP work left outstanding.
+
+   This closes the last thread carried from the release cycle. Nothing about
+   the machine is now waiting on a judgement.
 3. **Still open:** the closure candidates from triage are recorded, not applied —
    F-75, F-60, F-63, F-72, F-82, F-71, plus three bullets. Each carries a
    one-command check. F-65, F-66 and F-76 are now *due*.
