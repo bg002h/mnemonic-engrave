@@ -389,11 +389,22 @@ first proposed — it is **two**:
 The second is the one that matters most to an operator, because it is not
 "some residue survives" but "the control you are relying on may never run".
 
-**Structural consequence to settle:** the *fable whole-diff review of ALL of
-Phase 2* was created by the 2026-08-10 ruling specifically to hold F-109. With
-F-109 moved here, that gate now has **no assigned items**. It either becomes part
-of this phase as well, or still runs pre-tag on the whole diff on its own merits.
-Nobody has decided which, and it should not be decided by omission.
+**The fable whole-diff review is POST-RELEASE, and that is deliberate**
+(operator ruling 2026-08-10, superseding the earlier "do not tag with F-109
+open"). The order is: **merge → tag → release → fable review.**
+
+Its scope grows rather than shrinks. It receives:
+
+- the **whole Phase 2 diff** — B2a-i + B2a-ii + B2b, read by one reviewer at
+  once, which is the thing no single phase's context could do; and
+- **every deferred follow-up**, with a mandate to **suggest closures**.
+
+*Suggest*, not perform. The reviewer proposes which deferred items its reading
+of the whole diff shows to be already satisfied, subsumed, or not defects; the
+operator decides. That distinction matters because several items in this file
+turned out to be unrecorded-rather-than-undone, and a whole-diff reading is
+exactly the vantage point that can tell those apart — but a reviewer closing its
+own findings would be marking its own homework.
 
 
 ## Reconciliation — 2026-08-10, on B2b closing
@@ -2409,7 +2420,11 @@ and why the count plateaus at exactly that number. "Probably harmless" is not an
 answer; the entry is open *because* they are unidentified, so a review that
 leaves them unidentified has not closed it.
 
-**Do not tag the release with this open.**
+~~**Do not tag the release with this open.**~~ **SUPERSEDED 2026-08-10 by a
+later operator ruling:** the merge, tag and release happen **before** the fable
+review, intentionally. See the phase banner. The tag is `v0.0.0-g<sha>`, which
+marks a build rather than a product, and the fable review moves to
+post-release.
 
 
 Measured on hardware 2026-08-10 with `b2b-heapprobe2`, which forces
