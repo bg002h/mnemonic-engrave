@@ -339,6 +339,40 @@ EXIT, not distributed, so a dwell at the start or a slight overrun at the end ma
 fix them at far less cost in plate time — and an overrun changes the toolpath,
 hence the plate, hence the goldens, in a way a speed change does not.
 
+## Reconciliation — 2026-08-10, on B2b closing
+
+B2b merged and pushed (fork `b2b` `75233b8`). Per the standard, an item whose
+owning phase has passed is **overdue, not deferred**, so this sweep ran against
+the whole file rather than the phase's own list.
+
+**Closed by this sweep:** F-79, F-105, F-107, F-108, F-111 — each with the
+evidence in its entry.
+
+**OVERDUE — owning phase B2b, and B2b has shipped:** **F-109**. It plateaus
+(one-time ~35 K, no cliff, no exhaustion) so it is not a leak, but the ~81
+reachable objects are **still unidentified** and therefore cannot be ruled
+seed-bearing. B2b was merged and pushed with it open; that is a real gate
+slip and it is recorded here rather than quietly re-parked.
+
+**Unrecorded, not undone** — implemented in their owning phase but never marked,
+so each needs one confirming read before it can be closed honestly:
+
+| item | mechanism found in tree |
+| --- | --- |
+| F-77 | `seal/label_encrypted.go` names it explicitly |
+| F-84 | `SeedScreen.NoEdit`, `gui/gui.go:2335` |
+| F-87 | `gui/unlock_session_test.go`, `gui/wipe_inventory_audit_test.go` |
+| F-89 | `wiping = true` unwind at `gui/run_flow.go:265,285` |
+| F-93 | `ctx.KeepAwake()` bracket at `gui/unlock_kdf.go:318-326` |
+
+A symbol existing is not the same as the finding being addressed — that is a
+presence check, not a behavioural one, which is why these stay open.
+
+**Parse note for whoever greps this file next:** F-59 is WITHDRAWN and F-83 is an
+ACCEPTED limitation; neither contains the word CLOSED, so a naive `grep -c
+CLOSED` miscounts. F-62 is genuinely still open despite its 2026-08-06 note.
+
+
 ### F-58 — total input wedge on the Footer entry screen, before engraving (owning phase: GUI)
 
 **Observed 2026-08-06**, on the `test-e4-a125-j1300` build, from a cold boot while
@@ -822,6 +856,8 @@ future commits.
 
 
 ### F-79 — the payload buffer retains 64 KB for the GUI's whole lifetime (owning phase: **B2a-i, Task 2** — fix BEFORE the feature reaches an operator)
+
+**CLOSED 2026-08-10 by fix C** (`b2b` `3de8aa1`, "bound the payload read"). `seal/read_tinygo.go` now allocates `out := make([]byte, n)` with `n` bounded by what the header declares — ~1.4 KB typical, against the 65,536 this entry measured. The 64 KiB `unsafe.Slice` that remains is a view of memory-mapped XIP flash and allocates nothing.
 
 `uiFlow` probes once at startup and holds the result (`gui/gui.go:1541-1546`).
 `XIPReader.Read` allocates `clampRegion(RegionLen)` = **65,536 bytes**
@@ -1485,6 +1521,8 @@ does. Without both, B2c's inventory repeats the same failure a third time.
 
 ### F-105 — a typed passphrase is wiped by NOTHING until it is submitted (owning phase: **B2b Task 9** — operator ruling 2026-08-09)
 
+**CLOSED 2026-08-10 on hardware** — reading 3 of the B2b gate: two words typed at the passphrase keyboard, warning at 3:00, wipe at 3:30. Task 9.5 was the only part still owed. `design/HARDWARE_RESULT_2026-08-10c_b2b_gate.md`.
+
 > **OPERATOR RULING 2026-08-09: an in-flight passphrase IS seed-equivalent** — it
 > derives the key that opens everything. That makes this a **defect**, not the
 > design boundary the entry below called it, and it moves from B2c into **B2b as
@@ -1732,6 +1770,8 @@ search either way.
 
 ### F-107 — the RENDERED seed is scrubbed ONLY on the wipe path; a normal exit leaves the twelve words in `ctx.B` (owning phase: **B2b — CRITICAL**)
 
+**CLOSED 2026-08-10** — implemented on `b2b-residency` (`ctx.B.Scrub()` in both unlock brackets, pinned by `gui/unlock_session_scrub_test.go` and `gui/residency_wiring_test.go`), GREEN through three R0 rounds and a whole-diff review, and confirmed on hardware by reading 4c (abort→resume inside the secret session).
+
 Found 2026-08-10 by an operator question — *"a normal exit reuses the Context, but
 does a normal exit zero secrets?"* — which is a better question than the answer I
 first gave it. My reply said a normal exit "means `runWithFlow` returns outright,
@@ -1795,6 +1835,8 @@ enumerated argument rather than a structural one, and also about a copy `Scrub`
 cannot reach. Two findings in one day where residency rested on enumeration.
 
 ### F-108 — `plate.Spline` is never zeroed AFTER the cut: F-83 buys the mid-cut window and nothing ends it (owning phase: **B2b — CRITICAL**)
+
+**CLOSED 2026-08-10** — the zeroing landed on `b2b-residency` (`planEngraving`'s defer, the `SafePointer.Resume` trim, `splineResumer.Knot`'s `defer clear(c)`, `ClearHistory`, `releaseResumeState`), 11 mutation rows, toolpath byte-identical across 5 plates, and hardware readings 4a/4b/4c showed a resumed cut tracking its interrupted letter exactly.
 
 Raised by the operator 2026-08-10, correcting a misreading of F-83 in this
 session: *"after engraving a seed … the corresponding splines/plates may be wiped
@@ -2015,6 +2057,8 @@ Both remaining halves are seed-derived geometry, and neither is covered by the
 design that files them.
 
 ### F-111 — `knotBuf` unzeroed wherever a plate is built and no cut happens — SUBSUMED by the F-108 design (owning phase: **B2b**)
+
+**CLOSED 2026-08-10 — SUBSUMED by F-108's design and implemented with it.** `planEngraving` zeroes the caller's knot buffer on every exit path, which covers the plate-built-but-never-cut route this entry was filed for.
 
 Filed by the R0 round-1 fold of `DESIGN_b2b_residency_zeroing.md`; sharpens round
 0's M3.
