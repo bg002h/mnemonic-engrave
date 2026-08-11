@@ -51,10 +51,33 @@ grep -oE '`[a-zA-Z0-9_./-]+\.(go|rs):[0-9]+`' "$PLAN" \
       *.rs) root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" ;;
       *)    root="$GOREPO" ;;
     esac
-    # Try the path as given, then search for it by basename.
+    # Try the path as given, then search for it.
+    #
+    # F-115: the search used to be `... -print | head -1`, which picks the FIRST
+    # match and calls it the answer. That resolved `main.rs:375` to a stale
+    # `target/package/mnemonic-engrave-0.1.0/src/main.rs` and `checksum.go:132`
+    # to `bip380/checksum.go` instead of `codex32/`. The noisy half is a wrong
+    # FAIL; the dangerous half is a wrong **ok**, printing a line from a build
+    # artefact as though it were the cited source -- this gate's own failure
+    # mode, occurring inside the gate.
+    #
+    # So: prune build and vendor trees, and REFUSE to choose when a path is
+    # ambiguous. An ambiguous citation is a defect in the citation.
     f="$root/$path"
     if [ ! -f "$f" ]; then
-      f="$(find "$root" -path "$root/third_party" -prune -o -path "*/$path" -print 2>/dev/null | head -1)"
+      matches="$(find "$root" \
+        \( -path "$root/third_party" -o -path "$root/target" -o -path "$root/.git" \
+           -o -path "$root/node_modules" \) -prune -o \
+        -path "*/$path" -print 2>/dev/null)"
+      count="$(printf '%s\n' "$matches" | grep -c . || true)"
+      if [ "${count:-0}" -gt 1 ]; then
+        printf '  FAIL  %-42s AMBIGUOUS: %s files match -- cite a repo-relative path\n' \
+          "$path:$line" "$count"
+        printf '%s\n' "$matches" | sed "s|^$root/|          |"
+        echo FAILMARK >> /tmp/.citegate
+        continue
+      fi
+      f="$(printf '%s\n' "$matches" | head -1)"
     fi
     if [ -z "$f" ] || [ ! -f "$f" ]; then
       printf '  FAIL  %-42s no such file\n' "$path:$line"; echo FAILMARK >> /tmp/.citegate
