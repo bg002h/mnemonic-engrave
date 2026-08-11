@@ -83,3 +83,73 @@ These are already normative and must not be contradicted or quietly softened:
 - **`me` is at `v0.5.1`**; `v0.5.0`'s archives self-report `0.4.0` and are left
   as published. If a journey tells an operator to check `me --version`, say
   which answers are expected and what `0.4.0` means.
+
+---
+
+# First task (operator ruling 2026-08-11): show the plate layout while it cuts
+
+**Extend the simulator to display the final layout of a cut plate at the
+beginning of the engrave, and to indicate on that layout what is currently
+being engraved.**
+
+Both halves already exist separately. The work is joining them in the emulator,
+not building either from scratch.
+
+## Half 1 — the final layout is already renderable, before the cut
+
+`cmd/plateview` renders a plate from **the same `FitBlocks` / `EngraveFitted` /
+`PlanEngraving` calls the firmware makes**, stroked at the production 0.3 mm cut
+width. Its own doc comment is the claim to lean on: *"It is a PREVIEW OF THE
+TOOLPATH, not a drawing of it… What you see is the cut."* Parameters are pinned
+against `cmd/controller/platform_sh2.go` by `internal/sh2`'s own test, so the
+preview cannot silently drift from the machine.
+
+```sh
+go run ./cmd/plateview -list
+go run ./cmd/plateview -plate bothproof -o /tmp/plate.png
+```
+
+The plan is available **before** any step is emitted, which is exactly what
+"at the beginning of engrave" needs. `cmd/plateview` is a host command, so the
+reusable part is the geometry it calls, not the command itself.
+
+## Half 2 — what is currently being engraved is already recorded
+
+`cmd/emu`'s `toolpathRecorder` decodes the driver's **actual step stream** into
+head motion — not the plan, which is what makes it the honest source for
+progress. Exposed to the page by `cmd/emu/toolpath_js.go:47` as
+`window.shToolpath`:
+
+| call | returns |
+| --- | --- |
+| `shToolpath.reset()` | start a fresh recording |
+| `shToolpath.summary(frac)` | JSON digest + anomalies (`Summary`) |
+| `shToolpath.path()` | JSON `[[x,y,needle],…]` |
+| `shToolpath.svg()` | an SVG of the decoded motion |
+
+`path()` already carries the needle flag per vertex, so "what has been cut so
+far" is a filter over it rather than new instrumentation.
+
+`cmd/emu/toolpath.go` deliberately carries **no build tag** so it is
+host-testable; `toolpath_js.go` is the `//go:build js` half. Keep that split —
+`cmd/emu/confinement_test.go` enforces the file-level boundary, and it is
+mutation-tested.
+
+## What to watch
+
+- **`maxVertices` is 200,000** (`cmd/emu/toolpath.go:45`). A full plate can
+  approach that; check the cap before treating `path()` as complete for a live
+  overlay, and decide whether the overlay needs decimation.
+- **F-121 — the emulator does not home.** The device homes to the plate origin
+  before every run (`homingEngraver`); the emulator does not. Any overlay that
+  aligns recorded motion to planned geometry must account for that, or a
+  resumed cut will render offset against the plan. **This is the trap most
+  likely to be hit by this exact task.**
+- The recorder is deliberately **one instance across every job**
+  (`cmd/emu/platform.go:185`) so an aborted-and-resumed plate records as one
+  motion. A per-plate overlay may want `reset()` at engrave start — changing
+  that lifetime would break the abort/resume comparison the recorder exists for,
+  so prefer resetting over re-scoping.
+- `sh-sim` runs any firmware ref in a browser; `cmd/emu/build.sh` and
+  `index.html` are the page. The emulator carries a real sealed test payload and
+  its passphrase **deliberately** (operator ruling) — do not "fix" that.
