@@ -12,6 +12,7 @@ pub mod wire;
 use rand::RngCore;
 use zeroize::Zeroizing;
 
+use crate::classify::{classify, Format};
 use crypto::CryptoError;
 use wire::{Header, HEADER_LEN, IV_LEN, MAX_ITERATIONS, MAX_SECTION_LEN, MIN_ITERATIONS, SALT_LEN};
 
@@ -105,6 +106,19 @@ fn check_public(public: &[String]) -> Result<(), SealError> {
         // reports it as non-canonical and suggests `--group-size 0` — which
         // misdiagnoses it. Check for a mnemonic first and say the real reason.
         if passphrase::is_valid(r) {
+            return Err(SealError::SecretInPublic(i));
+        }
+        // Same reason as the mnemonic check above, and the same shape. An `ms1`
+        // that is ALSO too long to engrave must be reported as a SECRET in the
+        // public section, not as a length problem: §10.2.1a's rule lives inside
+        // `validate_record`, so its error propagates through the `?` below
+        // before `is_secret()` is ever evaluated. Without this, `me seal
+        // --plaintext <91-char ms1>` tells the operator the record is too long
+        // and says nothing about the fact that they were about to ship a seed
+        // in the clear. Both refuse, so nothing leaks -- but the wrong one is
+        // named, and the suppressed one is the one that matters. Go orders
+        // these deliberately; this matches it.
+        if matches!(classify(r), Ok(Format::Ms)) {
             return Err(SealError::SecretInPublic(i));
         }
         if record::validate_record(r)
@@ -969,6 +983,48 @@ mod tests {
             ),
             Err(SealError::SecretInPublic(_))
         ));
+    }
+
+    /// An over-length `ms1` in the PUBLIC section must be reported as a secret,
+    /// not as a length problem.
+    ///
+    /// Both refuse, so nothing leaks either way — this pins WHICH REASON the
+    /// operator is told, and the suppressed one is the one that matters. §10.2.1a's
+    /// length rule lives inside `validate_record`, so its error propagates through
+    /// `check_public`'s `?` before `is_secret()` is ever evaluated. Measured on the
+    /// real binary before the fix:
+    ///
+    ///   "this codex32 secret is 91 characters; the machine can engrave at most 90"
+    ///
+    /// which says nothing about the operator being one keystroke from publishing a
+    /// seed in the clear. After:
+    ///
+    ///   "record 0 is secret material and cannot ride in the public section"
+    ///
+    /// Mutation this pins: delete the `classify(r) == Format::Ms` guard from
+    /// `check_public` — the assertion then sees `SealError::Record` instead.
+    #[test]
+    fn an_overlong_ms1_in_public_is_reported_as_a_secret_not_as_too_long() {
+        // 91 characters: one past §10.2.1a's engraveable limit, and a secret.
+        const MS1_91: &str =
+            "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq2uk6ly9a0dmw4";
+        assert_eq!(MS1_91.len(), 91, "fixture is not 91 characters");
+
+        match seal(
+            Payload {
+                public: vec![MS1_91.to_string()],
+                secret: vec![],
+            },
+            300_000,
+        ) {
+            Err(SealError::SecretInPublic(0)) => {}
+            Err(other) => panic!(
+                "over-length ms1 in --plaintext reported as {other:?}; the operator needs \
+                 to hear that it is a SEED about to ship in the clear, not that it is too \
+                 long"
+            ),
+            Ok(_) => panic!("an ms1 in the public section must be refused"),
+        }
     }
 
     #[test]
