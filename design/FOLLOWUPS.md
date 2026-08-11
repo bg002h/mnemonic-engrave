@@ -3701,3 +3701,57 @@ the bound from it.
 **Operator guidance stands regardless, and is the real mitigation:** with the
 film on, the panel is unusable as *input* anyway. Take it off. The fix only
 ensures the machine wipes rather than holding a seed forever.
+
+### F-123 — the documentation implies the wiping class is meaningfully safer than it is (owning phase: **systemwide payloads**)
+
+Filed 2026-08-11, out of the systemwide-payloads brainstorm. **Operator ruling:
+Sealed Payload is frozen; its documentation is not.**
+
+§2.2 item 12 already draws the line correctly — "the machine offers two classes
+of program, and only one of them wipes" — and tells the operator to "use Sealed
+Payload for anything you intend to protect." That advice was written when the
+wipe was believed to work. The operator's own assessment 2026-08-11 is that the
+sealed-payload program **tries to be secure and fails**: the wipe is incomplete
+by explicit prior decision (§2.2 item 16), F-110 names both halves as open holes
+in the shipped code's own comments, and F-88/F-90/F-104 item 2b are the
+remaining unwipeable-garbage class.
+
+**What is wrong is not the ruling but the inference an operator draws from it.**
+Someone who reads "only one of them wipes" concludes the wiping one is the safe
+one. What actually protects them is **physical custody** — the device is
+deliberately debuggable, SWD readable, BOOTSEL enabled. A wipe that runs and
+leaves residue is not a weaker version of protection; it is a different thing
+from what the sentence implies.
+
+**Fix:** README's security section, §2.2 item 12's operator-facing wording, and
+`SPEC_systemwide_payloads.md` §11 must all say the same thing — the two classes
+differ in *behaviour*, not in whether your funds are safe if the machine is
+taken. Do not soften §2.2 item 12; qualify what it means.
+
+Blocks nothing. Must land before any operator journey documents this, because a
+journey that repeats the current wording propagates the inference.
+
+### F-124 — remedy Sealed Payload's security failures (owning phase: **deferred, a future cycle — operator ruling 2026-08-11**)
+
+Filed 2026-08-11 alongside F-123. **Deliberately deferred, not forgotten.**
+
+The operator's ruling for the systemwide-payloads cycle was "keep it, file a doc
+fix, we will attempt to remedy the security failures at a future date." This
+entry exists so that date has something to be scheduled against, and so the
+decision reads as a deferral rather than as an oversight to a future reviewer.
+
+**The known open items, all already filed:**
+
+- **F-110** — overdue; both halves named as open holes by the shipped code
+  (`gui/engraver.go:126-132`, `engrave/engrave.go:1722-1730`, the latter with a
+  measurement: 4 orphaned arrays → 23 arrays / 119,891 knots).
+- **F-88 / F-90 / F-104 item 2b** — the remaining unwipeable-garbage class, plus
+  the un-inventoried sibling copy in `LastWordCandidates`.
+- **F-109** — downgraded to Minor, but on **host Go, not TinyGo**, which is why
+  it was downgraded rather than closed.
+- **§2.2 item 16** — the wipe is incomplete by explicit prior decision. Revisiting
+  that decision is part of this item, not a precondition for it.
+
+**What this entry must NOT become:** a reason to hold the systemwide-payloads
+cycle. Those programs were always in the non-wiping class (§2.2 item 12); they
+inherit no debt from this. The two are independent.
