@@ -1349,11 +1349,28 @@ Placed in the post-loop block it would leak every `ms1` already copied,
 unreachable to both `Payload.Wipe` and `RecordsResident()`.
 
 **Scope: `ms1` only.** `mdmkText` and BIP-39 mnemonics are deliberately not
-covered. A 24-word mnemonic plate tops out at QR 29, and md/mk plates take a
-different engrave path entirely (`backup.EngraveText`), which caps at QR 37,
-scales modules at 2 stroke widths rather than 3, and degrades TEXT+QR →
-TEXT-ONLY → QR-ONLY rather than failing. `ms1` is the one format that can
-neither chunk nor degrade, which is why it alone needs this rule.
+covered, for two reasons that hold independently:
+
+- **md/mk CHUNK.** A descriptor too long for one record is split across records
+  that reassemble by `(HRP, chunk_set_id)` — §10.2.1 already requires the device
+  to verify that. Length is a solved problem there.
+- **md/mk plates have VARIANTS.** They take a different engrave path
+  (`backup.EngraveText`, which renders its QR through `engrave.QR`) and the
+  caller offers several plate shapes — `gui/gui.go:2106-2108` builds "TEXT + QR"
+  and "QR ONLY" among them — so a plate that does not fit can be replaced by one
+  that does.
+
+`ms1` has neither: a seed share is atomic and cannot be chunked, and
+`backup.EngraveSeedString` has exactly one shape, returning
+*"seed too long to engrave QR"*. That is why it alone needs this rule.
+
+*(An earlier draft of this paragraph asserted that `EngraveText` caps at QR 37,
+scales modules at 2 stroke widths, and degrades in a fixed order. All three were
+measured false in R0 round 1. The seed plate's `dim > 37` cap belongs to
+`engrave.ConstantQR` — the CONSTANT-TIME encoder used because a secret's QR
+pattern must be content-independent — and `EngraveText` does not call it. The
+conclusion above survives; those mechanics did not, and are removed rather than
+corrected because this rule does not depend on them.)*
 
 **Why 90.** `backup.EngraveSeedString` builds the plate's QR from the
 UPPERCASED share and refuses `qrc.Size > 33`. Measured against the real encoder
@@ -1392,9 +1409,12 @@ entropy at BIP-39 lengths and tops out at **75** characters. The repo's host too
 directly, bypassing `EncodeMS1`). That tool, and third-party BIP-93 tooling, are
 the only sources.
 
-**90 MUST be pinned by a test, not trusted as a literal.** It is derived from
-three things that can each move independently: `qrScale`, the `qrc.Size > 33`
-cap, and the error-correction level. Measured: at `qr.Q` instead of `qr.M` the
+**90 MUST be pinned by a test, not trusted as a literal.** It is derived from two
+things that can each move independently: the `qrc.Size > 33` cap and the QR
+error-correction level. (`qrScale` is NOT among them — the boundary is decided
+by `qr.Encode` before `qrScale` is ever read; it changes how big the QR is
+engraved, not which version the string needs.) Measured: at `qr.Q` instead of
+`qr.M` the
 limit drops to **67** — below `EncodeMS1`'s ordinary output — which would reopen
 this defect silently and reject ordinary seeds. The test MUST re-derive the
 boundary from the real encoder and fail if it is no longer 90/91.
