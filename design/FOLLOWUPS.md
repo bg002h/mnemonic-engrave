@@ -904,6 +904,12 @@ hardware-verified behaviour stayed untouched.
 
 ### F-80 — residue from the B1 whole-diff review (owning phase: **B2a-ii** for the two the 2026-08-08 decision assigned it; **B2b/ownerless** for the rest)
 
+**PARTIALLY CLOSED 2026-08-10.** Two of the three bullets are DONE, each killed by an applied mutation:
+- Back-is-Lock: **CLOSED 2026-08-10 — assets.IconDiscard at gui/unlock_platelist.go:179; pixel-pinned by TestPlateListBackIconIsDiscardNotBack, killed by reverting to assets.IconBack.**
+- already-cut marks: **CLOSED 2026-08-10 — " (cut)" mark at gui/unlock_plates.go:59, set on completion only at gui/unlock_platelist.go:116; killed by dropping the cut branch, which fails TestPlateListMarksCutAfterACompletedEngraveAndNotAfterACancelledOne/completed and TestUnlockPlateLabelWrapsPlateLabel.**
+
+The third — the `layoutMainPager` pixel pin — is **correctly still open** and stays with **F-78**'s font cycle, exactly as the 2026-08-08 operator split assigned it: a real pin needs a rasterising check, which is F-78's work. This entry therefore holds one bullet, not three.
+
 *(Amended 2026-08-08. CONTINUITY_2026-08-08 §9 said "F-80's two B2 items"; there
 are **three** bullets below carrying an explicit `owning phase: B2`. The operator
 split them that day: the "already cut" marks and the Back-is-Lock affordance go
@@ -996,6 +1002,8 @@ kind of edit whose defects this suite cannot see.
 
 ### F-77 — the encrypted section's md1/mk1 cards have no grouping (owning phase: **B2a-i, Task 1** — GATING, it blocks §10.2.2's secret plate labels)
 
+**CLOSED 2026-08-10 — labelEncryptedCards at seal/label_encrypted.go:28, wired into AdmitSection at seal/record.go:266-268 and reached from production via seal/unlock_key.go:102; killed by deleting the wiring, which fails TestEncryptedSectionCardsAreLabelled and TestEncryptedMultisigCardsAreDistinguishable.**
+
 B1's Task 4a surfaces `HRP`/`CardIndex`/`CardTotal`/`PlateIndex`/`PlateTotal` on
 `AdmittedRecord` so the plate list can render §10.2.2's `mk1 1/2` /
 `mk1 2/3 · 1/2` labels. **Those fields are populated for `SectionPublic` only**,
@@ -1043,6 +1051,8 @@ set rather than only from NFC. The data and the decode both already exist; this
 is plumbing, not new codec behaviour, so the Rust-primary rule does not bind it.
 
 ### F-93 — the screensaver still PARKS a spec-legal derivation, and Run has to be the one to stop it (owning phase: B2b, with F-89's unwind)
+
+**CLOSED 2026-08-10 — ctx.KeepAwake() at gui/unlock_kdf.go:334, reconciled with F-89 via the "&& !armed" term at gui/run_flow.go:251; killed independently by (a) removing KeepAwake (TestRunKeepAwakeDuringDerivationDoesNotParkUnderTheScreensaver fails, derivation parks under the screensaver) and (b) removing "&& !armed" (TestRunKeepAwakeCannotPostponeAnArmedWipe fails, armed wipe never fires).**
 
 Found by the B2a-ii whole-diff review, lens 7 M1, and confirmed by measurement
 during the Minor/Nit fold. **This is the residue the Critical's fix does NOT
@@ -2396,6 +2406,8 @@ retains; `id` from `Split()`; `s.String()`; `plan`, then `plate.Spline`.
 
 ### F-89 — B2b's idle wipe MUST unwind the flow, not just call `p.Wipe()` (owning phase: B2b — a DESIGN CONSTRAINT, not a defect)
 
+**CLOSED 2026-08-10 — unwind via ctx.Done at gui/run_flow.go:282-288, RecordsResident's narrowed contract at seal/session.go:20-51; killed by removing ctx.Done=true from the armed-wipe branch, which fails TestWipeZeroesEveryPinnedBufferAtRunLevel (both subtests, "the wipe never restarted the session").**
+
 Found by lens 1 pass 3 (M3). Nothing is wrong today; this is a trap laid for the
 phase that has not been written yet, and it is the C1 Critical arriving through a
 different door.
@@ -2490,6 +2502,8 @@ package's own convention scrubs what it can.
 
 ### F-87 — nothing pins `unlockEngraveMnemonic`'s deferred wipe (owning phase: B2b, with the §10.2.4 timer tests)
 
+**NARROWED 2026-08-10, still OPEN.** Verified: 2 of the 3 early returns ARE pinned by applied-mutation testing. The residue is exactly one leg — the `masterFingerprintFor`-error path — which no test covers. That is the whole of what remains; the entry's original framing ("nothing pins it") is no longer accurate and would overstate the work.
+
 Measured during the C1 fold re-review: **deleting `defer clear(m)` leaves the
 whole `gui` package green.** No test drives the three early returns —
 Confirm-cancel, the fingerprint error, the `engraveSeed` error — to a point where
@@ -2567,6 +2581,8 @@ what the machine does and what the operator has been told is the whole subject
 of §2.2.
 
 ### F-84 — `SeedScreen` gains `NoEdit` (owning phase: B2a-ii, Task 6 — implemented there, not deferred)
+
+**CLOSED 2026-08-10 (already recorded as implemented, not deferred, in the entry's own header) — SeedScreen.NoEdit at gui/gui.go:2341,2388,2464, wired at gui/unlock_session.go:291; killed by reverting the production call site to &SeedScreen{}, which fails TestPayloadSeedScreenRefusesEditing.**
 
 Recorded rather than deferred, because it changes a screen the NFC scan path also
 uses. `SeedScreen.Confirm`'s edit affordance writes `mnemonic[selected]` in
