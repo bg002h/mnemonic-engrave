@@ -1946,6 +1946,33 @@ argument nobody re-checked** — with F-107 and R0 round 0's M4. The pattern is
 worth naming in the phase report: each was individually defensible when written,
 and each stopped being true without anyone editing the line that claimed it.
 
+### F-115 — `plan-cite-gate.sh` resolves citations by BASENAME and takes the first match, including build artefacts (owning phase: **before the release tag**, with F-101's runner work)
+
+Found 2026-08-10 while gating the §2.2 item 12 amendment. The gate reported two
+unresolvable citations in `SPEC_encrypted_payload_delivery.md`; both citations
+are **correct** and the gate resolved the wrong file:
+
+| citation | gate resolved | should be |
+| --- | --- | --- |
+| `main.rs:375` | `target/package/mnemonic-engrave-0.1.0/src/main.rs` (146 lines) | `crates/me-cli/src/main.rs` (647 lines) |
+| `checksum.go:132` | `bip380/checksum.go` (89 lines) | `codex32/checksum.go` (170 lines) |
+
+Pre-existing: 2 failures before the amendment and 2 after.
+
+**The false NEGATIVE is the dangerous half.** A wrong-file FAIL is merely noisy —
+someone checks and moves on. But the same basename resolution will report **ok**
+whenever the wrong file happens to be long enough, printing a line from a stale
+`target/` artefact as though it were the cited source. That is the whole failure
+mode the gate exists to prevent, running inside the gate itself: a check that
+looks in the wrong place and returns a clean answer. See the same shape in
+`grep -c CLOSED` over this file, and in `go list -deps ./cmd/controller`
+returning empty because the build constraints excluded everything.
+
+**Smallest fix:** skip `target/`, `third_party/` and any VCS-ignored path; and
+when a basename matches more than one file, **fail as AMBIGUOUS** rather than
+picking one. Prefer a repo-relative citation (`codex32/checksum.go:132`) and
+teach the gate to require one where the basename is not unique.
+
 ### F-114 — a resumed cut approaches its safe point FROM THE ORIGIN, wherever the head actually is (owning phase: **post-B2b, before the release tag**)
 
 Found on hardware 2026-08-10 (reading 4a) while validating F-107/F-108, and it
