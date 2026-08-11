@@ -110,6 +110,12 @@ fn unhex_lower(s: &str) -> Option<Zeroizing<Vec<u8>>> {
     for pair in b.chunks(2) {
         let hi = nibble(pair[0])?;
         let lo = nibble(pair[1])?;
+        // `|` and `^` are EQUIVALENT here and cargo-mutants reports the swap as
+        // missed. It is a true equivalent mutant, not a coverage gap: `hi << 4`
+        // occupies bits 4..7 and `lo` bits 0..3, so the operands never share a
+        // set bit and both operators yield the same byte for every input. Left
+        // as `|` because it states the intent; recorded so the next run does not
+        // spend a round rediscovering it.
         out.push(hi << 4 | lo);
     }
     Some(out)
@@ -189,6 +195,35 @@ mod tests {
         assert!(!Class::Descriptor.is_secret());
         assert!(!Class::Address.is_secret());
         assert!(!Class::Unknown.is_secret());
+    }
+
+    /// `encode_pass` had NO test until cargo-mutants pointed it out: three of its
+    /// mutants — returning an empty string, and returning `"xyzzy"` — all
+    /// survived. My own nine hand-written mutants missed it entirely, because I
+    /// mutated the code I was thinking about and not the function I had written
+    /// and forgotten to exercise. That is the argument for generating mutants
+    /// from the AST rather than from the author's memory.
+    #[test]
+    fn pass_round_trips_and_is_prefixed() {
+        let secret = "abandon abandon abandon abandon abandon";
+        let rec = encode_pass(secret);
+        assert!(rec.starts_with(PASS_PREFIX), "must carry the reserved prefix");
+        assert_ne!(&*rec, PASS_PREFIX, "an empty body is not an encoding of this");
+        assert!(!rec.contains(' '), "the encoded record may not contain a space");
+        assert_eq!(&*decode_text(&rec).unwrap(), secret);
+    }
+
+    /// The two encoders must not be interchangeable: a `pass:` record consumed
+    /// as free text would engrave a passphrase onto a plate.
+    #[test]
+    fn text_and_pass_have_different_prefixes_for_the_same_body() {
+        let body = "hello";
+        assert_ne!(encode_text(body), *encode_pass(body));
+        assert_eq!(
+            decode_body(&encode_text(body)).unwrap().to_vec(),
+            decode_body(&encode_pass(body)).unwrap().to_vec(),
+            "same bytes, different prefix"
+        );
     }
 
     #[test]
