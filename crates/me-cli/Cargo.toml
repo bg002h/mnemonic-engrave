@@ -28,7 +28,11 @@ serde_json = "1"
 aes-gcm = "0.10"
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 sha2 = "0.10"
-bip39 = "2.2"
+# `zeroize` is not decoration: it is what puts `derive(Zeroize, ZeroizeOnDrop)`
+# on `Mnemonic` (bip39 2.2.2 src/lib.rs:178). Without it a parsed passphrase
+# mnemonic is dropped in the clear, which undercuts every `Zeroizing` wrapper
+# this crate puts around the same words. Found by the Phase 2 Rust-side review.
+bip39 = { version = "2.2", features = ["zeroize"] }
 rand = "0.9"
 ms-codec = "0.7"
 
