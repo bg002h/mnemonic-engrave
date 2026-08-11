@@ -339,6 +339,26 @@ EXIT, not distributed, so a dwell at the start or a slight overrun at the end ma
 fix them at far less cost in plate time — and an overrun changes the toolpath,
 hence the plate, hence the goldens, in a way a speed change does not.
 
+## Phases used in this file
+
+`B2a-i` · `B2a-ii` · `B2b` · `B2c` · **`post-merge polish and hardening`** ·
+`before the release tag` · `the fable whole-diff review of ALL of Phase 2` ·
+`post-release feature`
+
+**`post-merge polish and hardening`** was created by operator ruling 2026-08-10
+to hold the seed-residue work that binds but does not gate the merge: **F-88**,
+**F-90**, **F-104**.
+
+**One thing this phase does not yet fix, and it needs an answer before the
+tag:** whether it runs *before* or *after* the release tag. Those three items are
+unwiped copies of seed material created **inside** the Sealed Payload flow, on a
+device whose threat model (§2.2 item 2, §2.2 item 9) assumes an attacker with
+physical possession reads SRAM over SWD without a passphrase. If the phase runs
+**after** the tag, the release ships with them open, and §2.2 should say so
+plainly rather than leaving it implied. If **before**, nothing more is needed
+here.
+
+
 ## Reconciliation — 2026-08-10, on B2b closing
 
 B2b merged and pushed (fork `b2b` `75233b8`). Per the standard, an item whose
@@ -1547,7 +1567,9 @@ to actually test.
 Option 2 is the one that makes the guarantee real; note it also affects the
 screensaver, which is upstream code this phase only borrowed.
 
-### F-104 — four MORE members of the unreachable-seed-residue class, two of them on paths nobody had enumerated (owning phase: **B2c**, with F-88/F-90/F-94)
+### F-104 — four MORE members of the unreachable-seed-residue class, two of them on paths nobody had enumerated (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from B2c)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was B2c. This entry **still binds** — see the traced call graph above; §2.2 item 12 does not accept it — it is now scheduled later, not excused.
 
 **STILL BINDS — checked against SPEC §2.2 item 12 on 2026-08-10 and NOT accepted.** all four: pbkdf2 state via F-88's chain; `splitMnemonic` residue via the classifier on `Inspect` and `UnlockWithKey` and via `unlockPassphraseFlow`'s `LastWordCandidates`; the `ms1` `ToUpper`/QR copies via `unlockEngraveCodex32` → `backup.EngraveSeedString`; keyboard fragments via `unlockPassphraseFlow` → `inputWordsFlow` → `Keyboard.Fragment`. Verified by tracing the call graph whole-tree, not by reading this entry: an earlier pass classified this as legacy-only from entry prose and was wrong. See `design/agent-reports/2026-08-10-b2c-program-boundary-verification.md`.
 
@@ -2501,7 +2523,9 @@ alone and catches nothing about `passphrase`, `iterations`, `public`, `secret`,
 leans on. One test asserting the file digest closes it. *(Measured today: the
 file still matches.)*
 
-### F-90 — the `ms1` engrave arm is the under-examined one, and it is the DEFAULT arm (owning phase: **B2c** for items 1 and 3, re-assigned from B2b 2026-08-09; item 2 DISSOLVED by B2b)
+### F-90 — the `ms1` engrave arm is the under-examined one, and it is the DEFAULT arm (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from B2c)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was B2c. This entry **still binds** — see the traced call graph above; §2.2 item 12 does not accept it — it is now scheduled later, not excused.
 
 **STILL BINDS — checked against SPEC §2.2 item 12 on 2026-08-10 and NOT accepted.** `unlockEngraveCodex32` has exactly ONE caller in the whole tree — `unlockSecretPlate`, inside the same bracket. Not mixed. Verified by tracing the call graph whole-tree, not by reading this entry: an earlier pass classified this as legacy-only from entry prose and was wrong. See `design/agent-reports/2026-08-10-b2c-program-boundary-verification.md`.
 
@@ -2597,7 +2621,9 @@ of seven vectors take. **Fix the predicate's contract before building the timer
 on it**, or B2b inherits a control that is correct only for the arm one vector
 reaches.
 
-### F-88 — three more seed-equivalent copies on the mnemonic engrave path, two of them unreachable from `gui` (owning phase: **B2c**, re-assigned from B2b 2026-08-09)
+### F-88 — three more seed-equivalent copies on the mnemonic engrave path, two of them unreachable from `gui` (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from B2c)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was B2c. This entry **still binds** — see the traced call graph above; §2.2 item 12 does not accept it — it is now scheduled later, not excused.
 
 **STILL BINDS — checked against SPEC §2.2 item 12 on 2026-08-10 and NOT accepted.** `unlockEngraveMnemonic` (`gui/unlock_session.go:270`) is inside the `:88-89` wipeGuard bracket and reaches all three copies, directly or via `SeedScreen.Confirm` / `masterFingerprintFor`. Verified by tracing the call graph whole-tree, not by reading this entry: an earlier pass classified this as legacy-only from entry prose and was wrong. See `design/agent-reports/2026-08-10-b2c-program-boundary-verification.md`.
 
