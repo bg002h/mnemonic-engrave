@@ -2069,6 +2069,41 @@ argument nobody re-checked** — with F-107 and R0 round 0's M4. The pattern is
 worth naming in the phase report: each was individually defensible when written,
 and each stopped being true without anyone editing the line that claimed it.
 
+### F-120 — the device engraves `ms1` strings `me seal` will not seal: two different accept sets (owning phase: **post-merge polish and hardening**)
+
+Surfaced 2026-08-10 by F-113's implementation, which could not write the test it
+was asked for and said so rather than faking it.
+
+`§10.2.1a`'s Rust test cannot demonstrate **"90 characters is admitted"**, because
+`ms-codec` — the *constellation's* `ms1` codec, which `me` uses — has a discrete
+accept set topping out at **77**:
+
+```
+[50, 56, 62, 69, 75]  ∪  [51, 58, 64, 70, 77]
+```
+
+The device's `codex32.New` admits two *ranges*: **48–93** and **125–127**.
+
+So a 90-character BIP-93 codex32 secret is **engraveable by the device and
+unsealable by `me`**. The Rust boundary test asserts *not-`MsTooLong`* rather
+than `Ok`, and says so in its own text rather than implying a pass it did not
+get.
+
+**This is pre-existing and neither side is obviously wrong.** §10.2.1 states the
+device MUST NOT assume a conforming `me` produced the blob, so being more
+permissive than the host tool is deliberate there. And `ms-codec`'s discrete set
+is the constellation's own m-format domain, not BIP-93's.
+
+**But it means §10.2.1a changes nothing for payloads `me` produced** — `me`
+cannot emit an `ms1` over 77 characters, so the 91–93 band it refuses is
+reachable only from third-party tooling. That is consistent with the rule's
+stated purpose and worth writing down, because a future reader will otherwise
+assume the two accept sets agree.
+
+**The design call nobody has made:** narrow the device to the constellation's
+set, widen `me` to BIP-93's ranges, or document the divergence as intended.
+Requires the Rust-primary rule if either codec's admission moves.
+
 ### F-119 — `backup.go:368`'s comment describes a plate fallback order the code does not implement (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: with F-78's font cycle, or whenever the descriptor plate is next touched. Still open; scheduled, not excused.
