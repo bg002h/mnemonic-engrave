@@ -20,3 +20,6 @@ rehearsal-work/
 # SH2 CHIPID pin + procedure state. KEEP until the SeedHammer procedure is done;
 # unlike rehearsal-work/ this is not disposable. Never committed.
 sh2-state/
+
+# Personal Claude Code permissions (machine-local, not a project policy)
+.claude/settings.local.json

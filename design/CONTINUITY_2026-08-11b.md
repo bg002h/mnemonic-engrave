@@ -11,11 +11,11 @@ Carries only what cannot be re-derived from the repo.
 
 | thing | state |
 | --- | --- |
-| `mnemonic-engrave` `master` | `ef574c2`, pushed, `test (rust + go)` green |
-| released | `v0.5.0` (unchanged — see §4) |
+| `mnemonic-engrave` `master` | `5010cbb`, pushed, `test (rust + go)` green |
+| released | **`v0.5.1`** — published, signed, verified; `v0.5.0` left as-is |
 | fork `bg002h/seedhammer` `main` | `97e38c1`, pushed, `Test` + `Build image` green |
 | fork tag | `fork-v0.0.0-g93ee004` (unchanged) |
-| hardware last flashed | `v0.0.0-g747cf48`, validated 2026-08-10 — **now well behind `main`** |
+| hardware last flashed | **`v0.0.0-g97e38c1`**, flashed 2026-08-11 (sha256 `7a86f9d4…`), boot not yet judged on machine power |
 
 Rust suite 185 passed / 0 failed. Fork host suite exit 0, 49 ok, 0 FAIL.
 `gofmt -l` (excluding `third_party/`) is **0** — it was 6 all cycle, so
@@ -61,16 +61,26 @@ before its fold. The full record is in `FOLLOWUPS.md`'s
 
 ## 4. Decisions waiting on the operator
 
-1. **The published `v0.5.0` archives self-report `me 0.4.0`.** The tag was cut
-   with `Cargo.toml` at `0.4.0`. Source is fixed; the *published* artifacts are
-   not, because re-tagging a public release is an outward-facing call. Options:
-   re-tag `v0.5.0`, or let `v0.5.1` carry the correct string.
-2. **Hardware has not run any of this.** The machine is on `g747cf48`; `main` is
-   `97e38c1` with the idle-input change, the font regeneration, and the seed
-   pins on top. The idle change and the `%` glyph are both operator-visible.
-3. **The closure candidates from triage are recorded, not applied** — F-75,
-   F-60, F-63, F-72, F-82, F-71, plus three bullets. Each carries a one-command
-   check. F-65, F-66 and F-76 are now *due* (both gating conditions met).
+1. ~~The published `v0.5.0` archives self-report `me 0.4.0`.~~ **RESOLVED
+   2026-08-11: cut `v0.5.1` rather than re-cutting `v0.5.0`.** Operator ruling —
+   one version string must mean one artifact, and master had since gained the C1
+   Critical, so reusing the tag would have shipped two different binaries (one
+   with a security fix) under one name. `v0.5.0` stays published and keeps
+   self-reporting `0.4.0`, which is *accurate* about what those archives
+   contain. Verified end-to-end on the **published** artifact, not the source:
+   `me --version` → `me 0.5.1`; minisign verifies `SHA256SUMS`; a double-spaced
+   mnemonic is refused (exit 4) while the canonical control seals (exit 0).
+2. ~~Hardware has not run any of this.~~ **Flashed 2026-08-11** to
+   `v0.0.0-g97e38c1` — signature verified before writing, flash verify 100%.
+   **Boot has NOT been judged yet**: it must be powered from the machine supply,
+   not a laptop port, because `Init()` reboots into BOOTSEL without a 20–28 V PD
+   contract and that is indistinguishable from a rejected signature. Expect
+   `(UNLOCKED)` on the version line. If it does not boot, **do not burn another
+   OTP slot** — the burned hash is proven; see `RUNBOOK_custom_boot_key.md`
+   step 6.
+3. **Still open:** the closure candidates from triage are recorded, not applied —
+   F-75, F-60, F-63, F-72, F-82, F-71, plus three bullets. Each carries a
+   one-command check. F-65, F-66 and F-76 are now *due*.
 
 ## 5. What is still open, ranked by what it would cost to be wrong
 
