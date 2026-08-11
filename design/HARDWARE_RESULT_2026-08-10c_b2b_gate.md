@@ -44,17 +44,63 @@ Two words typed at the passphrase keyboard, then left.
 
 Row 4's window starts from a real event, as designed. **Task 9.5 is closed.**
 
-## 4 — F-107/F-108, the abort→resume seam — **NOT YET RUN**
+## 4 — F-107/F-108, the abort→resume seam — **PASS**
 
-See the procedure. Note the correction recorded there: a **finished** plate
-(`engraveDone`) renders a single FORWARD button, not Back
-(`gui/gui.go:2895-2901`), so the earlier instruction to "press Back on the
-finished plate" was wrong.
+### 4a — "Engrave Text", abort mid-cut then hold to resume — PASS
+
+> "head was near origin (top left) but upon resuming went a short distance
+> towards top left and then directly to where it left off. Tracked perfectly
+> with completion of the letter that was interrupted mid-engraving."
+
+**The letter completing perfectly IS the result.** The failure reading 4 exists
+to catch is resume state zeroed while a restart is still reachable, and that
+produces WRONG GEOMETRY, not a residue. Exact tracking through the interruption
+proves `safePoint` and `history` survived F-107/F-108's zeroing.
+
+**The detour toward the origin is correct, pre-existing behaviour**, and it
+corrected a belief of mine rather than revealing a defect —
+`engrave/engrave.go:1664`:
+
+```go
+move = appendLine(move, conf, false, bezier.Point{}, s.safePoint)
+```
+
+`Resume` synthesises its approach FROM the origin, and `appendLine`
+interpolates in absolute coordinates, so the head tracks toward (0,0) before
+running out to the safe point. Needle up, nothing cut. Short here only because
+the work sat near the origin. See **F-114**.
+
+### 4b — abandoned job releases its resume state — PASS
+
+Back out of a paused cut, re-enter the plate: it offers "Insert a blank
+plate… Hold button to start", not "Engraving paused". `releaseResumeState` is
+firing on the abandoned job.
+
+### 4c — abort→resume INSIDE the secret session — PASS, all 5 steps
+
+A real record plate from the sealed payload: start, Back at ~1:00, hold to
+resume, run on, abandon. Session remained coherent, the next plate offered
+normally, and the §10.2.4 window still fired on leaving.
+
+This is the reading 4a/4b could not give: the wipe guard installed around a cut
+with secrets resident, across an abort and a resume.
 
 ## What this closes
 
-- **F-106** — both shapes green on hardware. The follow-up's stated condition
-  for closing was exactly these two readings.
-- **F-105** — Task 9.5, the only part still owed.
+| item | status |
+| --- | --- |
+| **F-106** | CLOSED — both shapes green (readings 1, 2) |
+| **F-105** | CLOSED — Task 9.5 (reading 3) |
+| **F-107 / F-108** | hardware half CLOSED (reading 4) |
+| **F-110** | abandoned-job release confirmed operator-visible (4b) |
 
-`b2b-f106` is clear to merge. `b2b-residency` still waits on reading 4.
+`b2b` fast-forwarded to `747cf48` — **the exact SHA that was flashed and
+tested**, bit for bit, rather than a rebuild of it.
+
+## One correction this session produced
+
+The `cutsThroughOrigin` detector in `cmd/emu` was written as "the path returns
+to the origin", because I believed a dive home was the F-108 signature. Reading
+4a showed that describes the HEALTHY path. No host test could have caught it —
+every test I wrote encoded the same wrong belief. Fixed in `seedhammer`
+`c38cb6b`: the flag now requires the needle to be DOWN.

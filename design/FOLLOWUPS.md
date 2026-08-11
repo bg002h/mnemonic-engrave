@@ -1889,6 +1889,41 @@ argument nobody re-checked** — with F-107 and R0 round 0's M4. The pattern is
 worth naming in the phase report: each was individually defensible when written,
 and each stopped being true without anyone editing the line that claimed it.
 
+### F-114 — a resumed cut approaches its safe point FROM THE ORIGIN, wherever the head actually is (owning phase: **post-B2b, before the release tag**)
+
+Found on hardware 2026-08-10 (reading 4a) while validating F-107/F-108, and it
+is **not** a residency defect — it is pre-existing upstream behaviour that the
+reading happened to expose.
+
+`engrave/engrave.go:1664`:
+
+```go
+move = appendLine(move, conf, false, bezier.Point{}, s.safePoint)
+```
+
+`appendLine` takes `dist := ManhattanDist(s, e)` and interpolates between `s`
+and `e` in **absolute** coordinates. With `s = bezier.Point{}` the synthesised
+catch-up is a line from the machine origin to the safe point, so on resume the
+head tracks toward (0,0) before running out to where it stopped. Observed:
+*"went a short distance towards top left and then directly to where it left
+off"* — short only because that plate's work sat near the origin.
+
+**Not a correctness bug.** The needle is up (`engrave` is `false`), the move
+ends at the right place, and the resumed cut tracked the interrupted letter
+exactly. What it costs is time and traverse wear, scaling with the distance
+from the origin: a plate cut at the far corner resumes by crossing the whole
+work area twice.
+
+**Why it is filed rather than fixed now.** The obvious fix — start the line at
+the head's current position — needs a position the planner does not currently
+have; `SafePointer` tracks geometry, not where the driver is. `stepper.Driver`
+knows (`d.pos`), so the seam exists, but threading it through is a change to
+normative motion behaviour and belongs in its own cycle with test vectors.
+
+**It also corrected a detector.** `cmd/emu`'s toolpath recorder flagged "returns
+to the origin" as the F-108 signature; this is what every healthy resume does.
+Fixed in `seedhammer` `c38cb6b` to require a needle-DOWN pass.
+
 ### F-113 — codex32 LONG CODES are admitted, decrypted and offered, then can never be engraved (owning phase: **post-B2b, before the release tag**)
 
 Found 2026-08-10 while answering an operator question about QR codes on sealed
