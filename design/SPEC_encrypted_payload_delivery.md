@@ -681,7 +681,7 @@ Normative constraints, all checked before any record is acted on:
 - **No space or hyphen inside any record** (see above). A space-grouped record
   rejects the whole payload.
 - **All-lowercase.** The validators accept a consistently-uppercased string
-  (`engine.setCase`, `checksum.go:132`; `verifyMDMK` folds case on the HRP), so
+  (`engine.setCase`, `codex32/checksum.go:132`; `verifyMDMK` folds case on the HRP), so
   without this the same wallet has two spec-legal encodings — and therefore two
   different §6.6 hashes. Verified: `md1qqqsyqcyq5rq…` and `MD1QQQSYQCYQ5RQ…` both
   return `ValidMD = true` and hash differently. This is not hypothetical: the
@@ -1083,7 +1083,8 @@ is ever needed it MUST NOT be an operator-facing flag.
   confirmation — the hex alone already differs between shapes, because `sealed`
   is inside the digest — but it tells the operator which `me hash` flag to pass
   when re-deriving.
-- Writes the `.uf2` with mode `0600`, matching `write_private` (`main.rs:375`).
+- Writes the `.uf2` with mode `0600`, matching `write_private`
+  (`crates/me-cli/src/main.rs:590`, the mode set at `:597`).
 
 A sibling subcommand re-derives the hash with no passphrase, no seal operation
 and no original file, so the expected value can be regenerated months later:
