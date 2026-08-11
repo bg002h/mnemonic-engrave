@@ -41,16 +41,57 @@ several overrule a documented prior decision and are marked where they do.
    at load, paired with an operator-initiated erase.
 7. **Verification depth is the operator's choice**, with the full menu, and the
    detection probabilities live in the documentation rather than on the panel.
-8. **`me` offers two passphrase modes** — none, and generated N words
-   (default 12, min 2, max 24). Below the cliff over secret content requires an
-   explicit command-line flag. **REVISED 2026-08-11 after R0-C4 showed the
-   device has no entry path for a user-supplied passphrase**
-   (`unlockPassphraseFlow` returns a `bip39.Mnemonic` typed on the WORD
-   keyboard, so free text is unopenable). User-supplied is DROPPED, which
-   restores `crates/me-cli/src/seal/passphrase.rs`'s "GENERATED, never
-   user-supplied" rather than overruling it. Arbitrary N stays: the word
-   keyboard can enter any number of words — it is the mnemonic *checksum* parse
-   that forces 12/15/18/21/24, not the keyboard.
+8. **`me` offers three passphrase modes** — none, user-supplied ASCII, and
+   generated N BIP-39 words (`2 ≤ N ≤ 24`, default 12). Below the cliff over
+   secret content requires an explicit command-line flag.
+
+   **This decision was made, reversed, and remade, and the round trip is worth
+   keeping.** R0-C4 found that a user-supplied passphrase had no device entry
+   path, so the mode was dropped. The operator then observed that the blocker is
+   *which keyboard the unlock flow happens to use*, not a missing capability —
+   `NewPassphraseKeyboard` (`gui/passphrase_keyboard.go:76`) is free-text and
+   already exists. So the mode is restored, behind a **keyboard choice**.
+
+8a. **The operator picks the keyboard at unlock: BIP-39 word, or free-text
+    ASCII.** The word keyboard is the default landing, since the generated mode
+    is the common case and twelve words are far easier to type with wordlist
+    completion. Both feed the same `seal.NormalisePassphrase`, so a word
+    passphrase entered on either keyboard produces **byte-identical KDF input**
+    (EPD§8.1) — which is why no header field declares the type. A declared type
+    would be an attacker-flippable byte whose only effect is presenting the
+    wrong keyboard.
+
+8b. **The checksum gate is PER-INVOCATION, not a property of the keyboard.**
+    Operator ruling 2026-08-11, and the root fix for R1-C2. Seed entry keeps the
+    gate; **passphrase entry drops it at every length, 2 through 24.** A
+    passphrase that happens to satisfy the BIP-39 checksum is fine and nothing
+    requires it.
+
+8c. **Variable-length word entry terminates on a `done` key, and the count is
+    confirmed before the KDF.** Operator ruling 2026-08-11.
+
+    Seed entry never needed a terminator because N was known; passphrase entry
+    has no natural end. The `done` key is a **per-instance opt-in on the
+    passphrase instance only**, following the pattern
+    `gui/passphrase_keyboard.go:80` already documents for `NewTextKeyboard`'s
+    newline key — "a PER-INSTANCE opt-in, not a fourth shared page entry,
+    because `PassphraseKeyboard` is also `NewAddressKeyboard` and BIP-85 index
+    entry." An unconditional key would appear where it means nothing.
+
+    **The confirmation is the safety, not the key.** Both a misplaced `done`
+    press and an accept-on-empty-field would silently truncate the passphrase,
+    and the operator would then wait ~31 s for a KDF whose failure is
+    indistinguishable from having typed the wrong words. A `N words — unlock?`
+    screen makes the truncation visible before it costs anything. Variable
+    length introduces a second way to be wrong that looks exactly like the
+    first, and this is what separates them.
+
+    Without this the feature is broken at its default: `gui/gui.go:758`'s
+    `refreshCands` masks the keyboard to `bip39.LastWordCandidates` the moment
+    the cursor reaches the final slot — `gui/unlock_kdf.go:350` calls it "the
+    checksum gate" — so **15 of every 16 uniformly generated 12-word passphrases
+    would be permanently unopenable** (128 valid last words of 2048). Any N
+    divisible by 3 is affected.
 9. **Verification is never forced.** The operator may bypass it, or assert a
    by-eye check the device cannot confirm. **Added 2026-08-11 (R0-C3).**
 
@@ -155,7 +196,9 @@ this store. Two features, two regions, no shared state.
 #### 3.2.1 The store — NORMATIVE
 
 ```
-identity   [32]byte      the full EPD§6.6 digest (§5.4.1)
+identity   [32]byte      the §5.4.1 identity digest. NOT the EPD§6.6
+                         public-data digest, which does not exist when
+                         pub_len == 0 (R1-C3)
 compared   bool          the operator compared the digest for THIS identity
 sealed     bool          which container variant it came from
 weak       bool          sealed, and its passphrase was below the cliff (§6.2.1)
@@ -251,6 +294,13 @@ reconstruct it:
   (decision 1), not a program whose every cell happens to be refused.
 
 #### 3.3.2a NFC records go through the SAME function — NORMATIVE (R0-I6)
+
+**"Source is not an admission input" is about the TABLE, not about §5.4.1's
+`compared` precondition (R1-M1).** The class table is source-blind. The
+`compared` gate is a separate, earlier check on the *payload* — it asks whether
+this payload was authenticated at all, before any record of it is classified.
+An NFC record has no payload and no `compared` gate; it is admitted by class and
+flagged by F4. Two checks, run in order, not one rule contradicting itself.
 
 The table's axis is `(class → program)` and says nothing about where a record
 came from, which left the NFC path — the one §5.4 just removed all integrity
@@ -416,7 +466,13 @@ widening in §5.3 admits *declared* secrets; it does not admit undeclared ones.
 `AdmitSection`'s pass 3 sends every public record through `cardKey`, whose
 `default` branch fails closed with "record %d is not an md1 or mk1 card".
 Widening `permitted` without touching pass 3 would reject every payload the
-widening was meant to allow. **Pass 3 runs over the `ClassMDMK` subset only.**
+widening was meant to allow. **Pass 3 runs over the `ClassMDMK` subset only** — and **the subset must carry
+its ORIGINAL indices** (R1-I2). `groupRecords`/`cardKey`/`labelCards` are
+index-coupled to the full record list (`cardKey` returns `uniq: i + 1`), so
+transcribing "run over the subset" literally — by compacting the subset into a
+fresh slice and re-indexing from zero — backfills plate identity onto the wrong
+records. Filter the *iteration*, never the indices.
+
 The two passes are coupled and a fold that changed one would have shipped a
 container that admits nothing.
 
@@ -517,8 +573,29 @@ because each looks reasonable and each fails:
 
 The session stores `(identity, compared: bool)`. A record is admitted for
 consumption only when `compared` is true for the identity it came from.
-Re-reading the region recomputes the digest; if it differs, the entry is a
+Re-reading the region recomputes the identity; if it differs, the entry is a
 different payload and `compared` starts false.
+
+**`compared` is satisfied by EITHER of two things, and R1-C4 is why this must be
+said (it found the sealed variant's main case unusable and tests 9 and 15
+mutually unsatisfiable):**
+
+| how the payload was authenticated | sets `compared` |
+| --- | --- |
+| the operator compared the displayed EPD§6.6 digest (`pub_len > 0`) | yes |
+| **a successful AEAD open** (`ct_len > 0`) | **yes** |
+
+A secrets-only sealed payload (`pub_len == 0`) displays no digest — EPD§6.6's
+own rule — so there is nothing for the operator to compare. **Opening it is the
+proof.** The AEAD tag authenticates the whole payload under a key only the
+passphrase derives, which is a *cryptographic* guarantee and strictly stronger
+than a human reading sixteen hex digits off a screen. Requiring a comparison
+that cannot happen would have made the sealed variant's principal use
+impossible.
+
+A plaintext payload has no tag, so for it the operator comparison is the only
+route — which is exactly EPD§6.6's own framing of what stands in for a missing
+tag.
 
 **The consequence this closes:** without a content-derived identity, an attacker
 who swaps the region between two consumptions gets their payload treated as
@@ -645,28 +722,68 @@ The rule above says "below 5 words (55 bits)". That is measurable for a
 units that only apply to one of the three modes, which left the condition
 undefined for another. This closes it:
 
-**SIMPLIFIED by R0-C4.** The first draft had to define strength for a
-user-supplied passphrase — a mode that turned out to be unopenable on the device
-and has been dropped. With generation the only mode, strength is exact:
-
 | mode | strength | requires the flag over secret content? |
 | --- | --- | --- |
 | generated, N words | **exactly `11 × N` bits** — N drawn uniformly from the 2048-word list | **iff `N < 5`** |
+| user-supplied ASCII | **treated as 0 bits. Not estimated.** | **always** |
 | none | 0 bits | **always** |
+
+**User-supplied is not estimated, and that is the point.** Every estimator for
+human-chosen passphrases is either a dependency with its own failure modes or a
+charset-times-length formula that scores `Tr0ub4dor&3` far above
+`correct horse battery staple` and is wrong about both. `passphrase.rs` already
+records the honest number — human-chosen is "worth 25–35 bits — one rented GPU,
+minutes" — and **that entire range is below the 55-bit cliff**, so any faithful
+estimator returns the same answer for every input.
+
+**And an estimator here would have to model that CASE IS DISCARDED before
+hashing.** `seal.NormalisePassphrase` is
+`strings.ToLower(strings.Join(strings.Fields(s), " "))` (`seal/open.go:76`), so
+`Tr0ub4dor&3` and `tr0ub4dor&3` are the same passphrase and `a  b` is `a b`.
+That is the *same* mechanism that lets the two keyboards agree byte-for-byte, so
+it cannot be dropped without breaking 8a. It is harmless for generated word
+passphrases, which are already lowercase, and silently weakening for a
+user-chosen mixed-case one — **so it must be stated where the operator chooses
+their own.**
 
 So the deterministic rule an implementer transcribes:
 
-> **Secret content + (no passphrase OR generated with `N < 5`) ⇒ `me` refuses
-> without the explicit flag.**
+> **Secret content + (user-supplied OR no passphrase OR generated with `N < 5`)
+> ⇒ `me` refuses without the explicit flag.**
 
-`me` prints the strength either way — `"12 words, 132 bits"` — because decision
-8 says the operator is told, never blocked.
+`me` prints the strength either way — `"12 words, 132 bits"` or
+`"user-supplied, unmeasured, treated as below the cliff"`.
 
-**Worth recording, because it argues for the gate rather than against it:** the
-metric only became computable once a mode was removed, and that mode was removed
-because a reviewer traced it into the device and found no keyboard behind it. The
-first draft would have shipped a rule whose condition was undefined for a third
-of its inputs.
+#### 6.2.2 Host and device must agree on what is ENTERABLE — NORMATIVE
+
+Three host/device mismatches of the R0-C4 shape — the host seals what the device
+cannot accept — two found by review and one by measurement:
+
+| constraint | value | why |
+| --- | --- | --- |
+| character range | `0x20`–`0x7E` only | `passphrase.ValidatePassphrase` rejects anything else as `ErrNonASCII`; a UTF-8 passphrase would seal and never open |
+| length cap | **≥ 215 bytes**, NOT `MaxLen` | measured: 24 words of 8 characters plus 23 separators is 215, and a 12-word passphrase already reaches 107. `passphrase.MaxLen` is **100** and its own comment calls it "a plate-capacity limit chosen for legibility, not a BIP-39 rule" — it belongs to the engraving program. Applying it here would make every long generated passphrase unenterable |
+| checksum | never required (§8b) | else 15 of 16 default draws are unopenable |
+
+`me` enforces the identical range and cap at creation.
+
+**And the device's buffer must be sized for the maximum, not the default
+(R1-I3).** `passphraseBytes`' capacity was chosen for twelve words. A 24-word
+passphrase regrows it, and the regrow **orphans an unwipeable copy of a
+seed-equivalent secret** — the same defect class as the `secret[:n]` residue
+already in `FOLLOWUPS.md`, and one the operator's 2..24 range creates.
+
+> **The buffer is allocated once at its maximum (≥ 215 bytes) and never
+> regrows.** Identical reasoning to `passphrase.rs`'s `normalise`, which
+> pre-counts precisely so "a `String` that reallocates mid-build orphans the
+> partially-written copy."
+
+#### 6.2.3 What the operator is told
+
+`me` prints, and the device shows before the KDF runs, that a user-supplied
+passphrase is **lowercased and whitespace-collapsed** before hashing. An
+operator who chose a mixed-case passphrase is otherwise never told that half of
+what they chose was discarded.
 
 ### 6.3 Consequence: `is_valid` changes, and what replaces the typo screen
 
@@ -753,7 +870,12 @@ carry the statistics.
 | even words / odd words | half |
 | 6 words | 6, chosen at random |
 | 3 words | 3, chosen at random |
-| read only | none — the operator compares by eye |
+| read only | none — the operator compares by eye, and ASSERTS the result (§7.1.1) |
+| skip | none — verification is **bypassed**; outcome is `not verified` |
+
+The `skip` row is normative and R1-I1 is why: §7.1 calls bypass "a menu option,
+not a hidden escape", and without a row for it §7.1.1's `not verified` outcome
+is unreachable by any path an implementer transcribing this table would build.
 
 #### 7.2.1 Selection — NORMATIVE
 
@@ -855,12 +977,31 @@ rather than only on hardware.
     digest, and two different such payloads have DIFFERENT identities (§5.4.1).
     A test asserting only the first half passes on the bypass.
 16. **(R0-C1)** No verify flow can reach a payload-sourced secret — asserted
-    structurally, by no verify flow naming `seedEntryFlow`.
+    structurally. **The match must be on the identifier, not a substring
+    (R1-N1)**: `seedEntryFlowTypedOnly` contains `seedEntryFlow`, so a
+    `strings.Contains` assertion fails on a correct implementation. Parse the
+    AST and compare `*ast.Ident` names, as `gui/plate_hook_test.go` already
+    does.
 17. **(R0-C3)** An operator-asserted verification is never rendered as
     "verified"; the four provenances of §7.1.1 are distinguishable in whatever
     the flow records and displays.
 18. **(R0-I2)** The systemwide container's AAD is `header ‖ public section`: a
-    payload whose public section is altered after sealing fails to open.
+    payload whose public section is altered after sealing fails to open —
+    **and the alteration must be one that survives the structural checks
+    (R1-M2)**, or the test passes because the payload was refused before the
+    AEAD ran and proves nothing about the AAD. Alter a record to another
+    *valid* record of the same class and length.
+19. **(R1-C2)** A uniformly generated N-word passphrase is enterable for every
+    `N` in 2..24, including every `N % 3 == 0`. Draw many; a test using one
+    fixed passphrase passes 1 time in 16 by luck.
+20. **(R1-C4)** A secrets-only sealed payload is consumable: opening it sets
+    `compared` with no digest shown. Test 15 asserts no digest is displayed;
+    this asserts the records are nonetheless usable. Neither alone is enough.
+21. **(R1-I3)** The passphrase buffer never regrows: entering 24 words leaves no
+    orphaned copy. Assert on the buffer's identity, not on its contents.
+22. **(§8c)** A `done` press mid-passphrase yields a confirmation naming the
+    SHORT count, not the intended one — the truncation is visible before the
+    KDF.
 
 ## 9. Open items
 
@@ -871,7 +1012,7 @@ rather than only on hardware.
 | O3 | Record class name and encoding for free text | R0 / Rust |
 | O4 | `me` subcommand surface for creating a systemwide payload, and for the §5.5 overwrite payload | R0 |
 | ~~O5~~ | ~~NFC digest domain separation~~ — **DISSOLVED 2026-08-11**: the operator scoped digest verification to FLASH, so no NFC digest is specified (§5.4) | — |
-| O6 | Default fill for the overwrite payload. This spec proposes **random**, on the grounds that all-ones is indistinguishable from erased; R0 should challenge that | R0 |
+| ~~O6~~ | ~~Default fill~~ — **DECIDED: `random`** (§5.5, §5.6). Round 0 endorsed it; R1-N2 noted this row still described it as open | — |
 
 ## 10. Follow-ups filed with this spec
 
