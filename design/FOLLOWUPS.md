@@ -2013,6 +2013,17 @@ variants exist".
 
 ### F-116 — `biptool seed -seedlen` emits codex32 strings this machine cannot engrave, silently (owning phase: **before the release tag**, with F-113)
 
+**CLOSED 2026-08-10 — `seedhammer` `c0c958d`.** `warnUnengraveable` in
+`cmd/biptool/main.go` warns on stderr, leaving stdout pipeable. Limits are
+measured, not hardcoded: validity via `codex32.New`, engraveability by the same
+`qr.Encode(ToUpper(s), qr.M)` / `Size > 33` call `backup.EngraveSeedString`
+makes.
+
+Exercising the full `-seedlen` range found **two** failures where I expected
+one — 41–62 bytes produces 94–124 characters, which is codex32's **dead zone**
+and is rejected by `codex32.New` outright. That is unparseable, not merely
+uncuttable, and now gets its own message.
+
 Found 2026-08-10 by R0 on §10.2.1a, which refuted the claim — mine, stated to
 the operator as measured — that nothing in this constellation generates a long
 codex32 code.
@@ -2371,6 +2382,15 @@ test passes vacuously; two `GC()` calls plus a timeout, not one; and choose the
 canary so it actually enters the structure under test.
 
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
+
+**DECLINED 2026-08-10 — operator ruling: "what we have is good enough."**
+Accepted limitation, not a defect to fix before the tag. The evidence that makes
+that reasonable is recorded above and in
+`design/agent-reports/2026-08-10-f92-tinygo-seal-investigation.md`: the DEVICE
+build is clean, `bip39.Parse`'s append-orphan guarantee is already verified under
+`tinygo test -gc precise` today, and every `clear()` in `seal` is GC-independent
+by construction. What remains untested is a host-toolchain gap, not a firmware
+one. Re-open only if the wipe story changes to depend on GC behaviour.
 
 **NARROWED 2026-08-10 — the premise is partly false.** Investigated in
 `design/agent-reports/2026-08-10-f92-tinygo-seal-investigation.md`.
