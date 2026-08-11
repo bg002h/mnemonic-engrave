@@ -115,13 +115,114 @@ code.
 The Sealed Payload program has its **own** session semantics and does not share
 this store. Two features, two regions, no shared state.
 
-### 3.3 Admission is one function
+#### 3.2.1 The store — NORMATIVE
 
-Given `(record class, container variant, requesting program)` it returns admit
-or refuse, with a named reason. Today this logic is spread across
-`engraveObjectFlow`'s type switch and each flow's private assumptions;
-consolidating it is what makes the rest of this reviewable. It is also where a
-future rule goes, and where the tests point.
+```
+identity   [32]byte      the full EPD§6.6 digest (§5.4.1)
+compared   bool          the operator compared the digest for THIS identity
+sealed     bool          which container variant it came from
+weak       bool          sealed, and its passphrase was below the cliff (§6.2.1)
+records    []{class, body}   classified at load, never re-sniffed at use
+```
+
+One entry, not a list: **the store holds at most one payload.** Loading a second
+replaces the first outright. A list would raise "which payload did this record
+come from" at every consumption, and that question has exactly one safe answer
+when there is only ever one.
+
+**Lifetime is the process.** The store is cleared when the firmware restarts and
+at no other time — there is no timer and no idle wipe (decision 2). "Until
+power-off" means precisely that: the machine losing power, or `Init()` rebooting
+it. No flow clears the store on exit, because a flow that cleared it would
+silently reintroduce the per-program KDF that "once per session" exists to
+avoid.
+
+**`records` are classified once, at load.** Re-sniffing at the point of use
+would let one byte string be admitted as one class and consumed as another.
+
+### 3.3 Admission is one function — the table is NORMATIVE
+
+Today this logic is spread across `engraveObjectFlow`'s type switch and each
+flow's private assumptions. Consolidating it is what makes the rest of this
+reviewable, and the table below is the consolidation. **An implementer
+transcribes it; nothing here is left to be derived.**
+
+**First, a simplification that took a wrong turn to find.** The obvious shape is
+a three-axis matrix — `(class, container, program)`. It is the wrong shape. The
+container variant does **not** gate admission: decision 6 says the plaintext
+variant may carry any class the sealed one may. What the container changes is
+whether a **flag** is raised. So:
+
+> **Admission is `(class → program)`. The container variant selects flags, never
+> admission.** Two rules, each testable alone, instead of one matrix with a
+> redundant axis.
+
+#### 3.3.1 Record classes
+
+| class | secret? | source |
+| --- | --- | --- |
+| `ClassMnemonic` | **yes** | exists, `seal/record.go` |
+| `ClassCodex32Secret` | **yes** | exists |
+| `ClassPassphrase` | **yes** | **NEW** (§5.3) |
+| `ClassFreeText` | no | **NEW** (§5.3) |
+| `ClassDescriptor` | no | exists |
+| `ClassMDMK` | no | exists |
+| `ClassAddress` | no | exists |
+
+The secret column **extends `seal/session.go:17`**, which today reads
+`ClassCodex32Secret || ClassMnemonic`. It becomes those two plus
+`ClassPassphrase`. **`ClassFreeText` is NOT secret** even though an operator may
+put anything in it — the class states what the format guarantees, not what a
+human might do, and a class that claimed secrecy it cannot enforce would be the
+same over-claim F-123 was filed against.
+
+#### 3.3.2 The admission table — NORMATIVE
+
+`•` = admitted. Blank = refused with a named reason.
+
+| program | Mnem | Cdx32 | Passph | FreeText | Descr | MDMK | Addr |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| Backup Wallet | • | • | | | | | |
+| BIP-39 Password | | | • | | | | |
+| Engrave Text | | | | • | | | |
+| Account Xpub | • | • | • | | | | |
+| Engrave Bundle | | | | | • | • | |
+| Engrave Single-Sig | • | • | • | | | • | |
+| Engrave Multisig | • | • | • | | • | • | |
+| BIP-85 Child Seed | • | • | • | | | | |
+| *Sealed Payload* | — | — | — | — | — | — | — |
+
+Rows that need their reason recorded, because a reviewer will otherwise have to
+reconstruct it:
+
+- **`ClassPassphrase` is admitted wherever a seed is**, because those programs
+  already take an optional BIP-39 passphrase alongside the mnemonic
+  (`deriveAccountXpub(m, passphrase, …)` at `gui/derive.go:19`,
+  `deriveBip85Child` at `gui/bip85.go:61`, `deriveMultisigLeg` at
+  `gui/multisig_derive.go:32`). Admitting it is matching an existing parameter,
+  not inventing a capability.
+- **Backup Wallet refuses `ClassPassphrase`** because it engraves the mnemonic
+  itself, and the passphrase is deliberately never engraved and never in the QR
+  — the words and the SeedQR are byte-identical with or without one. A
+  passphrase reaching it would have nowhere to go.
+- **`ClassMDMK` is admitted to the two multisig-capable programs** for the
+  supplied-md1 path they already have (`deriveMultisigLeg`'s `suppliedMd1`).
+- **`ClassAddress` is admitted nowhere.** It is consumed only by the
+  verify-address flow, which `engraveObjectFlow` deliberately has no case for
+  (R0-M5). This spec does not change that.
+- **Sealed Payload is dashes, not blanks** — it is out of scope entirely
+  (decision 1), not a program whose every cell happens to be refused.
+
+#### 3.3.3 The flag rules — NORMATIVE
+
+Evaluated after admission, never as part of it. Each is independent; more than
+one can fire.
+
+| # | condition | screen says |
+| --- | --- | --- |
+| F1 | admitted class is secret **and** container is plaintext | this secret is unencrypted in flash; offers erase (§5.5) |
+| F2 | admitted class is secret **and** the sealed container's passphrase was below the cliff (§6.2) | this secret is weakly protected |
+| F3 | always, for anything payload-sourced | the source, at the point of use (§3.2) |
 
 ## 4. The flash region
 
@@ -144,6 +245,14 @@ Measured constraints, from EPD§3 and EPD§5:
 separation is the point**: adjacent regions mean a length bug in either runs
 into the other's data, while a megabyte of unprogrammed flash between them keeps
 an overrun local. ~12.8 MB is unallocated, so the clearance costs nothing.
+
+### 4.1 The magic — NORMATIVE
+
+**8 bytes, ASCII, `MNEMSYSW`.** Eight to match `MNEMBLOB` (`seal/wire.go:25`) so
+both containers present a same-width discriminator at offset 0, and `SYSW` for
+*systemwide*. A reader that finds `MNEMBLOB` at `0x10D00000`, or `MNEMSYSW` at
+`0x10E00000`, **refuses** — it does not attempt to parse a container it
+recognises at the wrong address. See §8.3 test 7.
 
 **A distinct container magic**, not `MNEMBLOB`. Rationale: the operator froze
 Sealed Payload, and widening the format it depends on would unfreeze it through
@@ -185,6 +294,51 @@ fail-closed comment says so). Two changes:
 Both are wire/admission behaviour. Per the Rust-primary rule they land in
 `mnemonic-engrave`'s Rust **with test vectors first**; the fork's Go is a
 behaviour-faithful port and may never lead.
+
+#### 5.3.1 The two new classes collide with EPD§6.4 — and are ENCODED, not exempted
+
+Writing this section specifically is what found the collision, and it is a hard
+one. EPD§6.4 is normative and emphatic:
+
+> "Every record MUST be the canonical, unbroken string — **no interior spaces,
+> no hyphens, no grouping of any kind**."
+
+and it justifies LF as the separator on the grounds that "no constellation
+string contains a newline."
+
+**Both new classes violate both clauses.** `Hello, World!` has spaces.
+`correct horse battery staple` has spaces. And Engrave Text's keyboard carries
+an **`nl` key**, so free text can contain the exact byte used as the record
+separator. EPD§6.6 additionally hashes "canonical **LOWERCASE** records", so any
+encoding must also survive lowercasing.
+
+**The exemption is refused.** Relaxing EPD§6.4 for two classes would weaken the
+rule for all of them, and that rule is load-bearing for a reason EPD states at
+length: `mdmkFlow`/`bundleEngrave` engrave records **verbatim**, so a record
+carrying separator characters the BCH checksum never covered turns a scratch on
+the operator's only copy into silently-absorbed damage rather than a detected
+error.
+
+**So the body is encoded, and the record stays canonical:**
+
+```
+text:<lowercase hex of the UTF-8 bytes>
+pass:<lowercase hex of the UTF-8 bytes>
+```
+
+Lowercase hex, not base64 or base32: it is case-insensitive by construction so
+lowercasing cannot destroy it, it contains no space, hyphen or LF, and it is the
+easiest form for a human to compare on a screen. The cost is 2×, against
+`MaxSectionLen` of 8191 — about 4 KB of text, far past what 24 engraved lines
+can hold, so the expansion binds nothing real.
+
+**Classification order is normative:** the two prefixes are matched **before**
+the existing sniffers in `Classify`. Free text is the universal fallback — any
+string could be free text — so a sniffer that ran first would claim
+`text:...` records whose hex body happened to parse as something else. The
+prefixes are also **reserved**: a record beginning `text:` or `pass:` that is not
+valid lowercase hex is `ClassUnknown` and refused, never silently treated as
+free text.
 
 **A plaintext container carrying a secret class is flagged on screen at load**,
 paired with an operator-initiated **erase this region**. The erase is a menu
@@ -237,6 +391,31 @@ EPD§6.6 exists to be").
 new payload identity and therefore a new comparison; consuming a fifth record
 from an already-compared payload does not.
 
+#### 5.4.1 Payload identity — NORMATIVE
+
+**The identity IS the EPD§6.6 digest — the full 32 bytes, not the 16 displayed.**
+
+Nothing else is admissible, and the alternatives are worth ruling out by name
+because each looks reasonable and each fails:
+
+| candidate | why it fails |
+| --- | --- |
+| a load counter | two different payloads loaded in sequence both get "compared", and the second inherits the first's flag |
+| the region address | constant; every payload ever written shares it |
+| a length or record count | two payloads trivially collide |
+| the **displayed** 16 bytes | a truncation used as an equality key; the full digest costs nothing and is already computed |
+
+The session stores `(identity, compared: bool)`. A record is admitted for
+consumption only when `compared` is true for the identity it came from.
+Re-reading the region recomputes the digest; if it differs, the entry is a
+different payload and `compared` starts false.
+
+**The consequence this closes:** without a content-derived identity, an attacker
+who swaps the region between two consumptions gets their payload treated as
+already verified — the operator would be reassured by a comparison they made
+against different bytes. That is a silent authentication bypass, and it is the
+whole reason identity is specified here rather than left to the implementer.
+
 ### 5.5 The overwrite payload — operator ruling 2026-08-11
 
 After an engrave that consumed a payload-sourced record, **the device reminds
@@ -258,12 +437,47 @@ Notes that belong in the spec rather than in a reviewer's head:
   whether a payload ever existed, and a bug if they want evidence that they
   overwrote deliberately. The three fills are not interchangeable and the
   documentation must say which does what.
-- **Random is the honest default** where the goal is that nothing be inferable
-  from the residue.
+- **Random is the DEFAULT** — decided here rather than left open. Where the goal
+  is that nothing be inferable from the residue, random is the only fill that
+  achieves it, and a default of all-ones would hand the operator deniability
+  they did not ask for while destroying the evidence that they acted. Zeros and
+  ones remain available by flag.
 - This region is **raw XIP NOR with no flash translation layer**, so an
   erase-and-program rewrites the same physical cells. That is a materially
   stronger guarantee than overwriting a file on an SSD, and weaker than a claim
   that the prior contents are unrecoverable by any means. Claim the former only.
+
+### 5.6 The `me` command surface — NORMATIVE
+
+```
+me sysw pack   [--out FILE] [--passphrase-words N | --passphrase-ask | --no-passphrase]
+               [--allow-weak] RECORD...
+me sysw wipe   [--out FILE] [--fill random|zeros|ones]
+me sysw show   FILE
+```
+
+| flag | meaning |
+| --- | --- |
+| `--passphrase-words N` | generate, `2 ≤ N ≤ 24`, **default 12** if no passphrase flag is given |
+| `--passphrase-ask` | prompt for a user-supplied passphrase; **never** taken from argv or an env var, where it would land in shell history and `/proc` |
+| `--no-passphrase` | plaintext container |
+| `--allow-weak` | required by §6.2.1 when secret content meets a sub-cliff passphrase. **Refuses with a non-zero exit otherwise** |
+| `--fill` | §5.5; **default `random`** |
+
+`me sysw pack` **prints the EPD§6.6 digest to stderr** in the §6.6 display form,
+because that is the value the operator writes down and compares on the machine.
+Stderr, not stdout, for the reason `me seal` already prints its passphrase
+there: stdout may be a redirected blob.
+
+**`me sysw show` exists so the operator can re-derive the digest from a file
+they still hold** without a machine, which is what makes the comparison a real
+control rather than a number they must have transcribed correctly the first
+time.
+
+Subcommands sit under `sysw` rather than beside `seal` so that no invocation can
+produce a systemwide container while the operator believes they are producing a
+Sealed Payload one, or vice versa. The two features are frozen apart
+(decision 1); their command surfaces are too.
 
 ## 6. Passphrases
 
@@ -291,7 +505,7 @@ either direction, which is the only property the rule in §6.2 rests on.
 **The cliff is between 4 and 5 words.** A 2-word passphrase is not weak
 protection; it is none — 42 seconds is less time than it takes to type it.
 
-### 6.2 The rule
+### 6.2 The rule — and the metric it needs, which the first draft omitted
 
 **Below 5 words (55 bits) over secret content, `me` requires an explicit
 command-line flag.** Public-only content is unrestricted. `me` always prints
@@ -302,6 +516,41 @@ The warning attaches to the **outcome**, not the mode — so no-password, weak
 password and plaintext are one control rather than three special cases. This is
 consistent: the operator has already permitted unencrypted secrets in flash with
 a flag, and a 2-word passphrase is strictly stronger than that.
+
+#### 6.2.1 How strength is computed — NORMATIVE
+
+The rule above says "below 5 words (55 bits)". That is measurable for a
+*generated* passphrase and **meaningless for a user-supplied one** —
+`correct horse battery staple` has no word count in the wordlist sense and
+`Tr0ub4dor&3` has none at all. The first draft of this spec stated the gate in
+units that only apply to one of the three modes, which left the condition
+undefined for another. This closes it:
+
+| mode | strength | requires the flag over secret content? |
+| --- | --- | --- |
+| generated, N words | **exactly `11 × N` bits** — N words drawn uniformly from the 2048-word list | **iff `N < 5`** |
+| user-supplied | **treated as 0 bits. Not estimated.** | **always** |
+| none | 0 bits | **always** |
+
+**User-supplied is not estimated, and that is the point.** Every estimator for
+human-chosen passphrases is either a dependency with its own failure modes or a
+charset-times-length formula that scores `Tr0ub4dor&3` far above
+`correct horse battery staple` and is wrong about both. The project has already
+written down the honest number: `passphrase.rs` says a human-chosen passphrase
+is "worth 25–35 bits — one rented GPU, minutes." **That entire range is below
+the 55-bit cliff**, so any estimator faithful to it returns "below the cliff" for
+every input. A rule that always fires does not need a measurement to decide when
+to fire, and pretending to measure would invite the operator to argue with the
+number.
+
+So the deterministic rule an implementer transcribes:
+
+> **Secret content + (user-supplied OR no passphrase OR generated with N < 5)
+> ⇒ `me` refuses without the explicit flag.**
+
+`me` prints the computed strength either way — `"12 words, 132 bits"` or
+`"user-supplied, unmeasured, treated as below the cliff"` — because decision 8
+says the operator is told, never blocked.
 
 ### 6.3 Consequence: `is_valid` changes
 
@@ -352,6 +601,24 @@ carry the statistics.
 | 6 words | 6, chosen at random |
 | 3 words | 3, chosen at random |
 | read only | none — the operator compares by eye |
+
+#### 7.2.1 Selection — NORMATIVE
+
+- **`even words` / `odd words`** are 1-indexed over the engraved word list:
+  *even* is words 2, 4, 6, …; *odd* is 1, 3, 5, …. Stated because "even" is
+  ambiguous between the two indexings, and an implementer picking the other one
+  produces a verify that silently checks the complement of what the label says.
+- **`6 words` / `3 words`** are drawn **without replacement**, uniformly, from
+  all positions.
+- **The draw is fresh for every verification attempt.** If the operator fails
+  and retries, a new set is drawn. A fixed set would let a second attempt pass by
+  reciting the same positions, which is a memory test rather than a plate check.
+- **The RNG is the device's CSPRNG**, the same source seed entropy comes from —
+  never a counter, a tick, or a hash of the mnemonic. A predictable draw lets an
+  attacker who controls the plate know which positions go unchecked.
+- **On a 12-word seed, `6 words` and `even words` are equal in strength** (both
+  50%, per §7.3) and both are offered anyway, because removing an option on some
+  seed lengths and not others is a worse surprise than a redundant one.
 
 ### 7.3 Detection rates — for the documentation, not the panel
 
