@@ -47,6 +47,36 @@ slot for any boot failure.
 Record the firmware id (`v0.0.0-g<sha>`) shown on the version screen against
 every reading below.
 
+## Run it in the simulator FIRST
+
+Three of the four readings run in `sh-sim` (`cmd/emu`, a `GOOS=js` build of the
+same `seedhammer.com/gui` the firmware ships), and doing so costs no flash cycle:
+
+```sh
+sh-sim b2b-int        # build cmd/emu from the integration branch, serve it
+```
+
+| reading | simulator | why |
+| --- | --- | --- |
+| 1 — Cut/Skip untouched | **yes** | same `run_flow.go`, and `cmd/emu/platform.go:150` is a real park on `{timer, wakeups, events}` — the same shape as `platform_sh2.go:369-396` |
+| 2 — Back mid-cut | **yes** | `emuEngraver.Write` sleeps 1 ms per write, so a cut has duration to abort, and the mechanism under test — `defer e.pl.Wakeup()` reaching the platform's select — is implemented |
+| 3 — passphrase bracket | **yes** | GUI and timing only |
+| 4 — abort → resume | **sequencing only** | `emuEngraver` accepts the step stream and **discards** it, and `sh-sim`'s own header states the curve is ranged once and never resumed |
+
+Shrink `idleTimeout` in the simulator build to iterate in seconds rather than
+waiting 3:00 per attempt — there is no `synctest` in a browser, the clock is real.
+
+**This does not remove the hardware session.** It changes what a hardware failure
+*means*: with the simulator green, a device that disagrees is telling you
+something about `platform_sh2.go`, TinyGo's runtime, or the machine — which is
+the only residue hardware time is worth spending on. The emulator uses a
+different platform implementation, so a green simulator is strong evidence and
+not proof.
+
+Never settled by the simulator, at any effort: `platform_sh2.go` itself,
+TinyGo `-gc precise` zeroing and every 32-bit memory measurement, and anything
+physical — stepper motion, load, stalls, plate mechanics.
+
 ## Readings
 
 Timings are wall-clock from the stated instant. `idleTimeout` = 3:00,
