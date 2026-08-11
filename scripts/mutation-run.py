@@ -85,9 +85,13 @@ Usage:  scripts/mutation-run.py [plan.md] [worktree]
              /scratch/code/shibboleth/seedhammer checkout, which other work
              depends on and which this script never touches).
 """
+import atexit
 import filecmp
 import importlib.util
+import json
+import os
 import pathlib
+import signal
 import re
 import shlex
 import shutil
@@ -379,6 +383,7 @@ def run_row(row, idx, total, worktree):
     backup_dir = pathlib.Path(tempfile.mkdtemp(prefix="mutation-run-"))
     backup = backup_dir / path.name
     shutil.copy2(path, backup)  # the file-copy restore point; never `git checkout`
+    _mark_inflight(path, backup)  # F-101: on disk, so a KILL is recoverable
     try:
         apply_mutation(path, mode_tuple, row["anchor"])
         print(f"   applied ({mode_tuple[0]}); running: "
@@ -410,11 +415,107 @@ def run_row(row, idx, total, worktree):
         shutil.copy2(backup, path)  # restore from the copy, never git checkout
         if not filecmp.cmp(path, backup, shallow=False):
             print(f"   !! restore verification FAILED for {path} -- worktree may be left dirty !!")
+        _clear_inflight()  # only after the restore has been verified above
         shutil.rmtree(backup_dir, ignore_errors=True)
 
 
 def _indent(s, prefix="      "):
     return "\n".join(prefix + l for l in s.splitlines())
+
+
+# F-101: CRASH SAFETY.
+#
+# run_row's try/finally restores the file, and that is enough for an exception.
+# It is NOT enough for a KILL: SIGKILL cannot be caught at all, and SIGTERM's
+# default action terminates the process without unwinding, so `finally` never
+# runs. Measured 2026-08-09 -- three times in ten minutes a backgrounded run was
+# killed mid-row and left `armed := true` applied in gui/run_flow.go, the mutant
+# that makes §10.2.4's wipe timer permanently armed.
+#
+# What makes that worse than an annoyance: the file left behind COMPILES and
+# passes most of the suite. A `git add` at the wrong moment commits a
+# funds-safety guard that has been disabled, as one plausible line inside a
+# function nobody re-reads.
+#
+# Two mechanisms, because one cannot cover both cases:
+#
+#   SENTINEL   a JSON file written BEFORE the mutation is applied and removed
+#              after the restore verifies. It survives SIGKILL, a power cut and
+#              a reboot, because it is on disk rather than in this process. The
+#              next run finds it and restores from the backup automatically.
+#   HANDLERS   for the signals that CAN be caught (INT, TERM, HUP), restore
+#              immediately rather than making the operator run a recovery.
+#
+# The sentinel is the load-bearing half. Handlers are the courtesy.
+
+SENTINEL = pathlib.Path(tempfile.gettempdir()) / "mutation-run-inflight.json"
+_inflight = {"path": None, "backup": None}
+
+
+def _restore_inflight(reason):
+    """Restore the mutated file if one is applied. Safe to call twice."""
+    path, backup = _inflight.get("path"), _inflight.get("backup")
+    if not path or not backup:
+        return False
+    p, b = pathlib.Path(path), pathlib.Path(backup)
+    if not b.exists():
+        print(f"   !! {reason}: backup {b} is GONE -- {p} may still hold a mutant !!")
+        return False
+    shutil.copy2(b, p)
+    ok = filecmp.cmp(p, b, shallow=False)
+    print(f"   restored {p.name} after {reason}" if ok
+          else f"   !! restore verification FAILED for {p} after {reason} !!")
+    _inflight["path"] = _inflight["backup"] = None
+    SENTINEL.unlink(missing_ok=True)
+    return ok
+
+
+def _mark_inflight(path, backup):
+    _inflight["path"], _inflight["backup"] = str(path), str(backup)
+    SENTINEL.write_text(json.dumps(_inflight))
+
+
+def _clear_inflight():
+    _inflight["path"] = _inflight["backup"] = None
+    SENTINEL.unlink(missing_ok=True)
+
+
+def _install_signal_handlers():
+    def handler(signum, _frame):
+        name = signal.Signals(signum).name
+        print(f"\n!! caught {name} mid-row -- restoring before exit")
+        _restore_inflight(name)
+        # Re-raise with the default action so the exit status is honest.
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        try:
+            signal.signal(sig, handler)
+        except (ValueError, OSError):
+            pass  # not on the main thread, or not supported here
+    atexit.register(lambda: _restore_inflight("interpreter exit"))
+
+
+def recover_sentinel():
+    """Restore a mutant left by a previous run that was killed. Runs BEFORE
+    preflight_clean, because the mutant it recovers is exactly what would make
+    that check refuse to start."""
+    if not SENTINEL.exists():
+        return
+    try:
+        st = json.loads(SENTINEL.read_text())
+    except (OSError, ValueError) as e:
+        sys.exit(f"sentinel {SENTINEL} exists but is unreadable ({e}); a previous run may have "
+                 f"left a MUTANT applied. Inspect the worktree by hand before continuing.")
+    path, backup = st.get("path"), st.get("backup")
+    print(f"!! a previous run was killed with a mutation applied to {path}")
+    if not backup or not pathlib.Path(backup).exists():
+        sys.exit(f"   its backup ({backup}) is gone, so this script cannot restore it.\n"
+                 f"   Restore {path} from git by hand, verify the diff is EMPTY, then delete "
+                 f"{SENTINEL}.")
+    _inflight["path"], _inflight["backup"] = path, backup
+    if not _restore_inflight("a previous run being killed"):
+        sys.exit("   automatic restore failed; fix by hand before running mutations.")
 
 
 def preflight_clean(worktree):
@@ -445,6 +546,12 @@ def main(argv):
     if not (worktree / ".git").exists():
         sys.exit(f"no worktree at {worktree}")
 
+    # F-101: order matters. recover_sentinel BEFORE preflight_clean, because the
+    # mutant a previous kill left behind is exactly what makes preflight refuse
+    # to start -- and refusing with "worktree is dirty" tells the operator
+    # nothing about which line is a live mutant.
+    _install_signal_handlers()
+    recover_sentinel()
     preflight_clean(worktree)
 
     rows = load_rows(plan_path.read_text())
