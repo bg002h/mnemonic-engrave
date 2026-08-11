@@ -5,6 +5,10 @@ operator. No code has been written and none may be until this passes the R0
 gate at 0 Critical / 0 Important (project rule: risk-set work, and this is
 squarely in it — secrets, admission behaviour, eight programs, two repos).
 
+**Reference convention:** `EPD§` means a section of `SPEC_encrypted_payload_delivery.md`; a bare `§` means a section of THIS
+document. The two specs both have a §2.2, a §5.5 and an §8.1, and an
+unqualified number would send a reader to the wrong one.
+
 ## 0. What this is, in one paragraph
 
 Today a secret reaches a SeedHammer II program in exactly one way: the operator
@@ -23,7 +27,7 @@ several overrule a documented prior decision and are marked where they do.
    as shipped. Its security failures are acknowledged and will be remedied at a
    future date — see the two follow-ups filed with this spec.
 2. **The other programs abandon that security model.** No secret-residency
-   wipes, no idle wipe, no §10.2.4 clock. This does not overrule §2.2 item 12;
+   wipes, no idle wipe, no EPD§10.2.4 clock. This does not overrule EPD§2.2 item 12;
    it *extends* it. That item already says "the machine offers two classes of
    program, and only one of them wipes."
 3. **Scope is all eight non-Sealed-Payload programs**: Backup Wallet, BIP-39
@@ -54,9 +58,9 @@ controls that exist and are vectored.
 | Thing | Where | Note |
 | --- | --- | --- |
 | An **unsealed** container variant | `seal/wire.go:95`, `Header.Sealed()` | `ct_len == 0` means no encryption, no tag |
-| The **operator-compared hash** for that case | SPEC_encrypted_payload_delivery §6.6, NORMATIVE | "an out-of-band check the attacker does not control" |
-| A **legible display format** for it | §6.6 | first 16 bytes, 8 groups of 4: `a26e d22b b747 dfd0 2367 06ad 14c1 9679` |
-| **Downgrade detection** | §6.6's `sealed` byte | stripping a sealed payload to plaintext changes the digest; vectors D and E pin it |
+| The **operator-compared hash** for that case | EPD§6.6, NORMATIVE | "an out-of-band check the attacker does not control" |
+| A **legible display format** for it | EPD§6.6 | first 16 bytes, 8 groups of 4: `a26e d22b b747 dfd0 2367 06ad 14c1 9679` |
+| **Downgrade detection** | EPD§6.6's `sealed` byte | stripping a sealed payload to plaintext changes the digest; vectors D and E pin it |
 | **Record classification** | `seal/record.go` | `ClassMnemonic`, `ClassCodex32Secret`, `ClassDescriptor`, `ClassMDMK`, `ClassAddress` |
 | The **secrecy predicate** | `seal/session.go:17` | `ClassCodex32Secret \|\| ClassMnemonic` |
 | **Passphrase generation from a CSPRNG** | `crates/me-cli/src/seal/passphrase.rs` | 12 words / 128 bits, `rand::rng()`, `Zeroizing` |
@@ -121,11 +125,11 @@ future rule goes, and where the tests point.
 
 ## 4. The flash region
 
-**OPEN — the address is a proposal, not a decision.**
+**DECIDED 2026-08-11 (operator): `0x10D00000`–`0x10D10000`**, 64 KiB,
+16 × 4 KiB sectors. Fixed and normative, for the same reason `PayloadAddr` is:
+any other value produces a blob the device never looks at.
 
-Proposed: `0x10D00000`–`0x10D10000`, 64 KiB, 16 × 4 KiB sectors.
-
-Measured constraints, from SPEC_encrypted_payload_delivery §3 and §5:
+Measured constraints, from EPD§3 and EPD§5:
 
 | Fact | Value |
 | --- | --- |
@@ -134,7 +138,7 @@ Measured constraints, from SPEC_encrypted_payload_delivery §3 and §5:
 | Sector `picotool load` touches | `0x10136000` |
 | Sealed Payload region | `0x10E00000`–`0x10E10000` |
 | Must stay clear | top sector `0x10FFF000` (`--abs-block` defaults to `0x10ffff00`) |
-| Hard limit | past `0x11000000` a write wraps to `0x10000000` and destroys the firmware (RP2350 datasheet §5.5.2) |
+| Hard limit | past `0x11000000` a write wraps to `0x10000000` and destroys the firmware (RP2350 datasheet section 5.5.2) |
 
 `0x10D00000` sits a full megabyte below the Sealed Payload region. **The
 separation is the point**: adjacent regions mean a length bug in either runs
@@ -148,7 +152,7 @@ is *rejected* rather than half-understood.
 
 ## 5. The container
 
-Reuses §6.6's hash construction and `seal/record.go`'s classification. Its own
+Reuses EPD§6.6's hash construction and `seal/record.go`'s classification. Its own
 admission rules.
 
 ### 5.1 Sealed variant
@@ -159,13 +163,13 @@ session (§3.2).
 ### 5.2 Plaintext variant
 
 No encryption, therefore no key, therefore no tag, therefore **no
-authentication**. What stands in its place is §6.6's hash: `me` prints it at
+authentication**. What stands in its place is EPD§6.6's hash: `me` prints it at
 creation, the device displays it at load, and **the operator compares**.
 
 **The device never detects a hash mismatch.** It has no idea what the operator
 wrote down. The machine's own failures are structural only — wrong magic, bad
 lengths, records that do not decode — and they get **named reasons, never the
-words "payload unreadable"**, because §2.2 item 4 trains operators to read that
+words "payload unreadable"**, because EPD§2.2 item 4 trains operators to read that
 exact phrase as *tampering*. A wrong file in the region is not an attack and
 must not be reported as one.
 
@@ -186,6 +190,65 @@ behaviour-faithful port and may never lead.
 paired with an operator-initiated **erase this region**. The erase is a menu
 item the operator chooses — not the automatic wiping machinery decision 2
 rejects — so a warning has something to do besides be dismissed.
+
+### 5.4 The hash is shown on EVERY path — operator ruling 2026-08-11
+
+**"Hash verify everywhere."** The EPD§6.6 digest is not the plaintext container's
+consolation prize; it is shown, and meant to be compared, on every path that
+delivers a record to a program.
+
+| path | what the digest covers | what else covers it |
+| --- | --- | --- |
+| plaintext container | the whole payload — it is all public section | nothing; the digest is the only integrity |
+| sealed container | the public section and the `sealed` byte | the AEAD tag covers the ciphertext |
+| NFC-delivered record | the record as scanned | nothing |
+
+Two consequences worth stating rather than discovering:
+
+**For a sealed container the digest and the tag cover different halves**, and
+between them the coverage is complete: EPD§6.6's input is "the public section
+exactly as it appears on the wire", so the ciphertext is outside it and the tag
+is inside the AEAD. Neither is redundant. Showing the digest for sealed payloads
+is what makes the **downgrade** visible to the operator rather than only to the
+format — which is what the `sealed` byte was bound in for.
+
+**NFC has no container, so this is new work.** A tag carries a bare record with
+no header and no digest. "Everywhere" therefore requires `me` to print an EPD§6.6-
+style digest when it *writes* a tag, and the device to display the digest of
+what it *read*. Without that, there is nothing for the operator to compare
+against and "hash verify everywhere" would be a screen showing a number with no
+counterpart. **Open for R0: whether the NFC digest reuses EPD§6.6's construction
+verbatim over a one-record input, or needs its own domain-separation label.**
+It must not silently reuse `"MNEMBLOB/pub/v1"` if the input shape differs — that
+label exists precisely to stop cross-context collisions.
+
+### 5.5 The overwrite payload — operator ruling 2026-08-11
+
+After an engrave that consumed a payload-sourced record, **the device reminds
+the operator to overwrite the region.** A reminder, not an automatic wipe —
+decision 2 stands.
+
+**It is a MAX-LENGTH payload, not a zero-length one.** A zero-length payload
+rewrites the header and leaves every byte of the old body sitting in flash,
+which looks like erasure and is not. The overwrite payload fills the region, so
+the previous contents are physically replaced.
+
+`me` emits it with a chosen fill: **all zeros, all ones, or random.**
+
+Notes that belong in the spec rather than in a reviewer's head:
+
+- **All-ones is the erased state** of NOR flash — an erase sets bits to 1 — so a
+  region written to `0xFF` is indistinguishable from one that was erased and
+  never written. That is a feature if the operator wants deniability about
+  whether a payload ever existed, and a bug if they want evidence that they
+  overwrote deliberately. The three fills are not interchangeable and the
+  documentation must say which does what.
+- **Random is the honest default** where the goal is that nothing be inferable
+  from the residue.
+- This region is **raw XIP NOR with no flash translation layer**, so an
+  erase-and-program rewrites the same physical cells. That is a materially
+  stronger guarantee than overwriting a file on an SSD, and weaker than a claim
+  that the prior contents are unrecoverable by any means. Claim the former only.
 
 ## 6. Passphrases
 
@@ -232,7 +295,7 @@ words **with a valid checksum**; a random 12-word draw passes about one time in
 sixteen. Arbitrary N requires drawing words directly from the wordlist rather
 than via `Mnemonic::from_entropy_in`, and a changed validity rule.
 
-§8.1 requires host and device to produce **byte-identical KDF input**, so both
+EPD§8.1 requires host and device to produce **byte-identical KDF input**, so both
 sides move together.
 
 The passphrase remains "used ONLY as a passphrase: never seed entropy, never
@@ -333,15 +396,28 @@ rather than only on hardware.
    passphrase.
 7. A blob written to the wrong region is refused on magic, not half-parsed.
 8. Structural failures never emit the words "payload unreadable" (§5.2).
+9. The digest is displayed on **every** delivery path — plaintext container,
+   sealed container, and NFC record (§5.4). A path that shows no digest fails.
+10. `me`'s tag-write digest and the device's scan-time digest agree byte for
+    byte over the same record, host and device.
+11. The overwrite payload **fills the region** (§5.5): after writing it, no byte
+    of the previous payload remains. A zero-*length* payload must fail this test
+    — it is the defect the requirement exists to prevent.
+12. Each fill — zeros, ones, random — produces the region it claims to, and
+    all-ones is byte-identical to an erased region.
+13. The post-engrave overwrite reminder fires after a payload-sourced engrave
+    and not after a typed one.
 
 ## 9. Open items
 
 | # | Item | Owner |
 | --- | --- | --- |
-| O1 | **Flash address** — `0x10D00000` is a proposal | operator |
+| ~~O1~~ | ~~Flash address~~ — **RESOLVED 2026-08-11: `0x10D00000`** | — |
 | O2 | Which keyboard the Sealed Payload unlock screen uses — **not verified**; `PassphraseKeyboard` is free-text (`gui.go:640`) but the unlock path was not traced | implementation |
 | O3 | Record class name and encoding for free text | R0 / Rust |
-| O4 | `me` subcommand surface for creating a systemwide payload | R0 |
+| O4 | `me` subcommand surface for creating a systemwide payload, and for the §5.5 overwrite payload | R0 |
+| O5 | **The NFC digest's domain-separation label** (§5.4). Reusing `"MNEMBLOB/pub/v1"` over a differently-shaped input is exactly the collision the label exists to prevent | R0 / Rust |
+| O6 | Default fill for the overwrite payload. This spec proposes **random**, on the grounds that all-ones is indistinguishable from erased; R0 should challenge that | R0 |
 
 ## 10. Follow-ups filed with this spec
 
@@ -357,6 +433,11 @@ rather than only on hardware.
   resting place for secrets that did not previously exist. NFC is transient — a
   tag crosses the reader once; flash persists until overwritten, on a device
   whose SWD port is readable and whose BOOTSEL is enabled by design.
+  **The §5.5 overwrite payload is the mitigation, and it is a REMINDER the
+  operator must act on** — not something the machine does for them. A spec that
+  counted it as protection would be making the same mistake F-123 was filed
+  against: describing a control by its intent rather than by what it does when
+  nobody runs it.
 - It does not claim the operator-compared hash detects tampering unless the
   operator actually compares it.
 - It does not change what protects the operator, which remains **physical
