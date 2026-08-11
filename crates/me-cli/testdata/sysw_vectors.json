@@ -1,0 +1,102 @@
+[
+  {
+    "name": "S-A",
+    "note": "plaintext, one text: record — journey (b)",
+    "records": [
+      "text:48656c6c6f2c20576f726c6421"
+    ],
+    "passphrase": null,
+    "blob": "4d4e454d535953570100000000000000000000000000000000000000000000000000000000000000000000000000001f00000000746578743a3438363536633663366632633230353736663732366336343231",
+    "pub_len": 31,
+    "ct_len": 0,
+    "sealed": false,
+    "digest": "40710d0220ed3195a4ad0ba27c07e1c4",
+    "identity": "77701523b783b59e4824180dd991842b8a87c7a50d3aeb572109231d8f44174c"
+  },
+  {
+    "name": "S-B",
+    "note": "plaintext carrying a SECRET class — F1 flags it, decision 6 permits it",
+    "records": [
+      "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+    ],
+    "passphrase": null,
+    "blob": "4d4e454d535953570100000000000000000000000000000000000000000000000000000000000000000000000000005d000000006162616e646f6e206162616e646f6e206162616e646f6e206162616e646f6e206162616e646f6e206162616e646f6e206162616e646f6e206162616e646f6e206162616e646f6e206162616e646f6e206162616e646f6e2061626f7574",
+    "pub_len": 93,
+    "ct_len": 0,
+    "sealed": false,
+    "digest": "f36e9900a2350b1e1c5fc580262332b9",
+    "identity": "07413e737b629b711cb2c00d7629b04340bad2707b004d69d05e0038184dbb36"
+  },
+  {
+    "name": "S-C",
+    "note": "sealed with pub_len > 0 — a digest exists and is shown",
+    "records": [
+      "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3",
+      "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+    ],
+    "passphrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "blob": "4d4e454d5359535701010100000186a011111111111111111111111111111111222222222222222222222222000000430000005d6d6431667639776a70717071706d366a7a7a717176717064716e66347a7471713467793939747a797a797a647637786839767064777533743764686865736b32746c334f47794c5ab02815676c755337c9fea91fa0b7ba3cd268f5bb9e4afca5e4067d539fc3dc2cb6334a631ec1ac46d03d8656d1559705cef1c4cb45c77aba45d9c2a35f4d0efcb87363eccc09076be30973b72897442143c329ac6e8599ad0e5f6172ec0f8d90a764ccc3d3382e46",
+    "pub_len": 67,
+    "ct_len": 93,
+    "sealed": true,
+    "digest": "e2e1636dd3d333f1466f669088324064",
+    "identity": "8d0854ef9d1576551aabdaf9044628393466a89cdd4c43e2b1a3131438b5eca3"
+  },
+  {
+    "name": "S-D",
+    "note": "sealed, secrets only, pub_len == 0 — NO digest; opening authenticates it",
+    "records": [
+      "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+    ],
+    "passphrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "blob": "4d4e454d5359535701010100000186a011111111111111111111111111111111222222222222222222222222000000000000005d4f47794c5ab02815676c755337c9fea91fa0b7ba3cd268f5bb9e4afca5e4067d539fc3dc2cb6334a631ec1ac46d03d8656d1559705cef1c4cb45c77aba45d9c2a35f4d0efcb87363eccc09076be30973b72897442143c329ac6e8599adfadb782b28f11aeff1529b206776f53d",
+    "pub_len": 0,
+    "ct_len": 93,
+    "sealed": true,
+    "digest": null,
+    "identity": "c7158bf90863a0f43020537b39af31ef3f9c2d701047f3a764e31c2fb6773462"
+  },
+  {
+    "name": "S-E",
+    "note": "sealed under a 2-word passphrase — not [cliff]-above, still opens (§13 D1)",
+    "records": [
+      "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3",
+      "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+    ],
+    "passphrase": "abandon about",
+    "blob": "4d4e454d5359535701010100000186a011111111111111111111111111111111222222222222222222222222000000430000005d6d6431667639776a70717071706d366a7a7a717176717064716e66347a7471713467793939747a797a797a647637786839767064777533743764686865736b32746c33ca7da44aadc17d1c0a74d04b392581fcb0cbc719038dab09d0c916efb1c5b261a96b36f339c228b452059fc22daf199c65c723344611835aee37ea6377aee78f5af65b311470a33eaa9d7b3b3f314e235a0a6332583355197a7feea911c433995808f4f59e48d1b2b51203afb6",
+    "pub_len": 67,
+    "ct_len": 93,
+    "sealed": true,
+    "digest": "e2e1636dd3d333f1466f669088324064",
+    "identity": "d9a1cb18b2b58b44de884090369ec49d8e1819cede487cb94fafe26bc4539268"
+  },
+  {
+    "name": "S-G",
+    "note": "a text: body containing a SPACE and the record SEPARATOR — the case §5.3.1 exists for",
+    "records": [
+      "text:48656c6c6f2c20576f726c64210a7365636f6e64206c696e65"
+    ],
+    "passphrase": null,
+    "blob": "4d4e454d535953570100000000000000000000000000000000000000000000000000000000000000000000000000003700000000746578743a3438363536633663366632633230353736663732366336343231306137333635363336663665363432303663363936653635",
+    "pub_len": 55,
+    "ct_len": 0,
+    "sealed": false,
+    "digest": "5acf9dac89ea136578b8c32dc12749be",
+    "identity": "c0c9edd35d77185b433be808b22d38659fc205e958382d96029b5d9f84a01615"
+  },
+  {
+    "name": "S-I",
+    "note": "a BCH-valid md1 — the smuggling case R0-I1 named lives at the device's decode gate",
+    "records": [
+      "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3"
+    ],
+    "passphrase": null,
+    "blob": "4d4e454d5359535701000000000000000000000000000000000000000000000000000000000000000000000000000043000000006d6431667639776a70717071706d366a7a7a717176717064716e66347a7471713467793939747a797a797a647637786839767064777533743764686865736b32746c33",
+    "pub_len": 67,
+    "ct_len": 0,
+    "sealed": false,
+    "digest": "753c5936da81af0f5df0a7324eb4c83a",
+    "identity": "0b8c8535e6b1fd395d0199e7b133be2993ed8cba8e15ccf1a223c4ba94d0bb8b"
+  }
+]

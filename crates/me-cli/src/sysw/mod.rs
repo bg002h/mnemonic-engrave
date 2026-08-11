@@ -10,10 +10,12 @@
 //! host and device to produce byte-identical KDF input and a second
 //! normalisation would be a second answer to that question.
 
+pub mod coverage;
 pub mod identity;
 pub mod overwrite;
 pub mod pubhash;
 pub mod record;
+pub mod vectors;
 pub mod wire;
 
 use zeroize::Zeroizing;
@@ -105,43 +107,88 @@ pub fn classify(record: &str) -> record::Class {
 /// ciphertext's own framing would let an attacker swap a public record for one
 /// encoding THEIR xpub, with the tag still verifying, and the operator would
 /// engrave a steel backup of a wallet they do not control.
+/// Build a container. `passphrase` `None` produces the unsealed variant.
+///
+/// The AAD is `header ‖ public section` — EPD §6.1a, and spec §5.4 states it for
+/// this container explicitly rather than by reference. Binding only the
+/// ciphertext's own framing would let an attacker swap a public record for one
+/// encoding THEIR xpub, with the tag still verifying, and the operator would
+/// engrave a steel backup of a wallet they do not control.
 pub fn pack(
     records: Vec<String>,
     passphrase: Option<&str>,
     iterations: u32,
 ) -> Result<Vec<u8>, SyswError> {
-    let mut payload = Payload::default();
-    for (i, r) in records.into_iter().enumerate() {
-        match classify(&r) {
-            record::Class::Unknown => return Err(SyswError::Unclassifiable(i)),
-            c if c.is_secret() && passphrase.is_some() => payload.secret.push(Zeroizing::new(r)),
-            _ => payload.public.push(r),
-        }
-    }
-    let pub_bytes = payload.public.join("\n").into_bytes();
-    let mut header = wire::Header {
-        pub_len: pub_bytes.len() as u32,
-        ..Default::default()
-    };
-
-    let Some(pass) = passphrase else {
-        // No `secret.is_empty()` check here: it cannot be non-empty. The match
-        // above only fills `secret` when a passphrase exists, so an unsealed
-        // pack necessarily has everything in `public` — including secret
-        // CLASSES, which decision 6 permits and F1 flags at load. An earlier
-        // draft had a refusal here; it was dead code enforcing a rule §13 had
-        // already demoted.
-        let mut blob = header.encode().to_vec();
-        blob.extend_from_slice(&pub_bytes);
-        return bound(blob);
-    };
-
-    let secret: Vec<&str> = payload.secret.iter().map(|s| s.as_str()).collect();
-    let plaintext = Zeroizing::new(secret.join("\n").into_bytes());
     let mut salt = [0u8; wire::SALT_LEN];
     let mut iv = [0u8; wire::IV_LEN];
     rand::RngCore::fill_bytes(&mut rand::rng(), &mut salt);
     rand::RngCore::fill_bytes(&mut rand::rng(), &mut iv);
+    pack_deterministic(records, passphrase, iterations, salt, iv)
+}
+
+/// [`pack`] with the randomness supplied, so a fixture can be a fixture.
+///
+/// **This is the only implementation**, and that is deliberate. An earlier
+/// version had `pack` and `pack_deterministic` each assemble the blob, and the
+/// unsealed secret-class move was added to one and not the other — so
+/// `pack_deterministic` SILENTLY DROPPED secret records. The vector round-trip
+/// caught it (S-B recovered 0 records of 1). Two implementations of one rule is
+/// the defect shape this whole cycle has been about; there is now one.
+pub fn pack_deterministic(
+    records: Vec<String>,
+    passphrase: Option<&str>,
+    iterations: u32,
+    salt: [u8; wire::SALT_LEN],
+    iv: [u8; wire::IV_LEN],
+) -> Result<Vec<u8>, SyswError> {
+    let (mut payload, mut pub_bytes, mut header) = split(records)?;
+
+    // UNSEALED carries secret classes in the cleartext section — decision 6
+    // permits it and F1 flags it at load. Only the sealed path encrypts them.
+    if passphrase.is_none() && !payload.secret.is_empty() {
+        payload
+            .public
+            .extend(payload.secret.drain(..).map(|z| (*z).clone()));
+        pub_bytes = payload.public.join("\n").into_bytes();
+        header.pub_len = pub_bytes.len() as u32;
+    }
+
+    let Some(pass) = passphrase else {
+        let mut blob = header.encode().to_vec();
+        blob.extend_from_slice(&pub_bytes);
+        return bound(blob);
+    };
+    seal_with(payload, pub_bytes, header, pass, iterations, salt, iv)
+}
+
+fn split(records: Vec<String>) -> Result<(Payload, Vec<u8>, wire::Header), SyswError> {
+    let mut payload = Payload::default();
+    for (i, r) in records.into_iter().enumerate() {
+        match classify(&r) {
+            record::Class::Unknown => return Err(SyswError::Unclassifiable(i)),
+            c if c.is_secret() => payload.secret.push(Zeroizing::new(r)),
+            _ => payload.public.push(r),
+        }
+    }
+    let pub_bytes = payload.public.join("\n").into_bytes();
+    let header = wire::Header {
+        pub_len: pub_bytes.len() as u32,
+        ..Default::default()
+    };
+    Ok((payload, pub_bytes, header))
+}
+
+fn seal_with(
+    payload: Payload,
+    pub_bytes: Vec<u8>,
+    mut header: wire::Header,
+    pass: &str,
+    iterations: u32,
+    salt: [u8; wire::SALT_LEN],
+    iv: [u8; wire::IV_LEN],
+) -> Result<Vec<u8>, SyswError> {
+    let secret: Vec<&str> = payload.secret.iter().map(|s| s.as_str()).collect();
+    let plaintext = Zeroizing::new(secret.join("\n").into_bytes());
     header.iterations = iterations;
     header.salt = salt;
     header.iv = iv;
