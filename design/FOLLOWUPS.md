@@ -2104,6 +2104,41 @@ assume the two accept sets agree.
 set, widen `me` to BIP-93's ranges, or document the divergence as intended.
 Requires the Rust-primary rule if either codec's admission moves.
 
+### F-121 — the emulator does not HOME, so a resumed cut renders differently there than on the machine (owning phase: **post-merge polish and hardening**)
+
+Filed 2026-08-11, out of the F-114 closure.
+
+`cmd/controller` wraps its engraver in a `homingEngraver`
+(`cmd/controller/platform_sh2.go:589`) which homes on the first write, so every
+run — resumes included — begins with the head at the plate origin. **The
+emulator has no such wrapper:** `platform.Engraver` returns a bare
+`&emuEngraver{rec: p.toolpath}` (`cmd/emu/platform.go:185`) whose `Write` only
+records and sleeps (`cmd/emu/engraver.go:35`). It never homes.
+
+So in the simulator the recorded head keeps its position across an abort, while
+`stepper.NewDriver` starts at `(0,0)` — the state the device is never in. Any
+aborted-and-resumed plate therefore records a toolpath the machine would not
+produce.
+
+**Why this matters more than a fidelity nit.** `cmd/emu/platform.go:185`'s own
+comment says the single recorder exists "so a plate that is aborted and resumed
+records as ONE motion — which is the thing being compared". That is precisely
+the comparison the missing homing corrupts. And `CONTINUITY_2026-08-11.md`
+recommended `window.shToolpath` as the instrument for settling F-114's severity:
+had that been used, it would have shown the head failing to arrive and confirmed
+a defect that does not exist on hardware. **The measurement was settled from the
+call graph and a host-side stepper test instead** (fork `d55c06b`), which is why
+the wrong answer was not reached.
+
+Generalises: an emulator that omits a step the device always performs does not
+merely lose detail, it **manufactures evidence for the wrong conclusion**. Worth
+an inventory of what else `cmd/emu` does not model.
+
+**Fix shape:** give the emulator a homing wrapper equivalent to
+`homingEngraver` — reset the recorder's position and emit the same
+origin-seeking move — or make the recorder assert that a run begins at the
+origin so the divergence fails loudly instead of rendering plausibly.
+
 ### F-119 — `backup.go:368`'s comment describes a plate fallback order the code does not implement (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: with F-78's font cycle, or whenever the descriptor plate is next touched. Still open; scheduled, not excused.
@@ -2223,7 +2258,56 @@ when a basename matches more than one file, **fail as AMBIGUOUS** rather than
 picking one. Prefer a repo-relative citation (`codex32/checksum.go:132`) and
 teach the gate to require one where the basename is not unique.
 
-### F-114 — a resumed cut approaches its safe point FROM THE ORIGIN, wherever the head actually is (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
+### F-114 — CLOSED 2026-08-11 — NOT A DEFECT: the machine homes before every run, so the head really is at the origin
+
+**CLOSED 2026-08-11, post-merge polish and hardening.** The premise is false.
+The entry assumed the head is "wherever it actually is" when the synthesised
+approach line executes. It is not: the machine has just **homed to the plate
+origin**, so a line drawn from `bezier.Point{}` starts exactly where the head
+is. Nothing crosses the work area twice, and there is no traverse-wear cost.
+
+The chain, each link read rather than inferred:
+
+| step | evidence |
+| --- | --- |
+| a FRESH `*homingEngraver` is returned per run, `homed=false` | `cmd/controller/platform_sh2.go:589` |
+| `runEngraving` calls `pl.Engraver` once per run, resumes included | `gui/engraver.go:186` |
+| `homingEngraver.Write` homes on the FIRST write, so homing precedes any engraved step reaching the device | `cmd/controller/platform_sh2.go:599` |
+| `home()` drives to the limit switches, resets the driver, then moves to `(originX, originY)` = `(5.0mm, 3.2mm)` — the PLATE origin, i.e. engraving coordinate `(0,0)`; that offset is machine-zero→plate-origin and is consumed inside `home`'s own driver | `cmd/controller/engraver.go:186`, `platform_sh2.go:208` |
+| `runEngraving` then builds a fresh `stepper.NewDriver`, whose `d.pos` is `(0,0)` | `gui/engraver.go:198` |
+
+So `d.pos` and the physical head agree. **The "short distance towards top left"
+in hardware reading 4a was the homing move**, which is intended — not the
+defect this entry was opened for.
+
+**Pinned, because the coupling is invisible.** Nothing in `engrave/` or
+`stepper/` mentions homing, yet `Resume`'s correctness rests entirely on it.
+`stepper/resume_homing_invariant_test.go` (fork `d55c06b`) asserts the homed
+case lands exactly on the safe point, and *reports* the un-homed case rather
+than asserting it, since that state does not occur today:
+
+```
+un-homed at 20,15 mm: cut starts     0,0 steps off the safe point
+un-homed at 60,40 mm: cut starts     0,0 steps off the safe point
+un-homed at 80,60 mm: cut starts 14932,0 steps (2.33,0.00 mm) off
+```
+
+The error appears only past the point where `Driver.fill`'s one-step-per-tick
+catch-up can no longer close the gap within the approach line's own duration.
+If homing is ever removed, made conditional, or moved after the first write, a
+resumed cut silently starts in the wrong place — now a red test rather than a
+ruined plate.
+
+**Correction to the citation below:** the `appendLine` call is at
+`engrave/engrave.go:1667`, not `:1664`.
+
+**Spawned F-121** — the emulator does **not** home, so the simulator was the
+wrong instrument for this question.
+
+---
+
+*Original entry follows, retained because its reasoning is what the closure
+answers.*
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling; the concerns below were raised and the operator decided). Was: post-B2b, before the release tag.
 
@@ -2338,7 +2422,31 @@ filled the knot buffer at build time and no cut ever happens — that geometry I
 zeroed, by the `defer` inside `planEngraving`'s closure (F-108 item 1), which
 fires on the iterator's exit rather than on a cut.
 
-### F-110 — an ABANDONED engrave job's resume state is never zeroed (owning phase: **B2b**)
+### F-110 — an ABANDONED engrave job's resume state is never zeroed (owning phase: **B2b** — OVERDUE, re-assigned 2026-08-11 to **post-merge polish and hardening**)
+
+**STATUS CORRECTION 2026-08-11.** `CONTINUITY_2026-08-11.md` and the brief given
+to the 2026-08-11 triage agent both listed F-110 among the items "closed during
+the cycle". **It is not closed**, and this entry never said it was — the error
+was in the summary, not the ledger. The triage refuted the anchor it was handed,
+which is what an independent reviewer is for. Both halves are still named as
+open F-110 holes *by the shipped code itself*:
+
+- `gui/engraver.go:126-132` — "TWO non-terminal returns skip this, not one …
+  That hole is F-110, not a covered case."
+- `engrave/engrave.go:1722-1730` — "4 orphaned arrays holding 15 knots, rising
+  to 23 arrays / 119,891 knots if the driver reports no progress … That residue
+  is F-110, not something this function covers."
+
+Owning phase B2b has passed, so this is **overdue, not deferred**. Re-assigned
+to post-merge polish and hardening.
+
+**REFINEMENT from the fable whole-Phase-2 review (M3), 2026-08-11 — a positive
+finding.** The §10.2.4 wipe **provably cannot fire mid-cut**: `armed()` is false
+while a job is running or stopping, and `ctx.Done` is wipe-only. So the wipe can
+never strand resume geometry, and the bullet of this entry that describes that
+path is describing something **unreachable**. That narrows the entry; it does
+not close it — the two sites above are reached by the *double-Back* and
+*ctx.Done* returns, not by a mid-cut wipe. Reword rather than close.
 
 Filed by the R0 round-1 fold of `DESIGN_b2b_residency_zeroing.md`.
 
@@ -3147,10 +3255,17 @@ four landed that day. Bodies retained verbatim below.
   codewords at 93 symbols, matching md-codec's `REGULAR_CODE_SYMBOLS_MAX`.
   Convergence port, Go-only (Rust was already correct). Mutation-verified: the
   cap removed → `TestValidMDRejectsOverLongCodeword` FAILs at n=81 and n=496.
-- **F-68** — closed by `scripts/plan-cite-gate.sh` (`7cdcbfc`), which resolves
-  every `file:line` and `pkg.Symbol` in a plan against real source and prints the
-  line. It was written for Plan B, whose defects are citations rather than code.
-  It caught three of the author's own mis-cited lines on its second run.
+- **F-68** — ~~closed by `scripts/plan-cite-gate.sh` (`7cdcbfc`)~~ **NOT CLOSED.
+  Mis-attributed; corrected 2026-08-11 by the deferred-follow-up triage.**
+  `plan-cite-gate.sh` resolves every `file:line` and `pkg.Symbol` in a plan
+  against real source — a different tool for a different problem. F-68 is that
+  **`plan-build-gate.sh` compile-checks the CLI tests but never runs them**, and
+  `scripts/plan-build-gate.sh:163` still passes `--no-run` today, with the
+  script's own header (line 30) still declaring the gap. The cite gate is
+  genuinely useful — it caught three of the author's own mis-cited lines on its
+  second run — but it closes nothing here. Low severity, since the real suite
+  now exists and runs; the *record* was wrong, which is the class this cycle
+  has repeatedly found to be wronger than the code.
 - **F-69 / F-70** — closed in `0ca972a`: `--seal-secret` now covers a bare BIP-39
   mnemonic as well as `ms1` (`classify` needs a bech32 `1`, so a 24-word phrase
   returned `Err(NoSeparator)` and sealed with no ceremony), and §9 + §12 item 6
