@@ -488,6 +488,67 @@ mod tests {
         );
     }
 
+    /// The pristine-only rule for `mk1`: a string the BCH layer had to CORRECT
+    /// must be refused, not silently repaired and engraved.
+    ///
+    /// This guard was uncovered — the mutation that deletes it survived the
+    /// whole suite (Phase 2 Rust-side review). It is load-bearing for
+    /// cross-implementation agreement: the device refuses a BCH-correctable
+    /// `mk1` too, and a host that quietly accepted one would engrave a card the
+    /// machine would not have produced from the same input.
+    ///
+    /// The test SEARCHES for a correctable corruption rather than hard-coding
+    /// one, which makes it its own positive control: if no single-character
+    /// change of the fixture is correctable, the search fails loudly instead of
+    /// passing vacuously, and the vector — not the guard — is what needs
+    /// attention.
+    #[test]
+    fn refuses_an_mk1_the_bch_layer_had_to_correct() {
+        // bech32's charset, minus the four characters it excludes (1, b, i, o).
+        const CHARSET: &[u8] = b"qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+
+        let base = MK1[0];
+        assert!(
+            validate_record(base).is_ok(),
+            "control: the pristine fixture must validate before corrupting it"
+        );
+
+        let mut found = None;
+        'outer: for pos in "mk1".len()..base.len() {
+            for &c in CHARSET {
+                let mut bytes = base.as_bytes().to_vec();
+                if bytes[pos] == c {
+                    continue;
+                }
+                bytes[pos] = c;
+                let cand = String::from_utf8(bytes).expect("ascii substitution stays utf8");
+                if let Ok(d) = mk_codec::string_layer::decode_string(&cand) {
+                    if d.corrections_applied != 0 {
+                        found = Some((cand, d.corrections_applied));
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
+        let (corrupted, n) = found.expect(
+            "no single-character corruption of MK1[0] was BCH-correctable -- the search \
+             found nothing, so this test proves nothing about the guard",
+        );
+        assert!(n > 0, "the search must have found a CORRECTED decode");
+
+        match validate_record(&corrupted) {
+            Err(RecordError::Invalid(msg)) => assert!(
+                msg.contains("not pristine"),
+                "refused, but not as a pristineness failure: {msg}"
+            ),
+            other => panic!(
+                "an mk1 needing {n} BCH correction(s) was not refused: {other:?} -- \
+                 the host would engrave a card the device rejects"
+            ),
+        }
+    }
+
     /// The §6.3 smuggling case: arbitrary bytes wrapped in a BCH-valid md1.
     /// `ValidMD` passes it; the decode must not.
     #[test]
