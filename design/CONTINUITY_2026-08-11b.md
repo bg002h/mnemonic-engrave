@@ -11,7 +11,7 @@ Carries only what cannot be re-derived from the repo.
 
 | thing | state |
 | --- | --- |
-| `mnemonic-engrave` `master` | `5010cbb`, pushed, `test (rust + go)` green |
+| `mnemonic-engrave` `master` | at or after **`v0.5.1`**, pushed, `test (rust + go)` green. Named by TAG, not SHA: a doc cannot cite the commit it lives in — the first attempt was stale the moment it was written, and stale again after the amend that fixed it. |
 | released | **`v0.5.1`** — published, signed, verified; `v0.5.0` left as-is |
 | fork `bg002h/seedhammer` `main` | `97e38c1`, pushed, `Test` + `Build image` green |
 | fork tag | `fork-v0.0.0-g93ee004` (unchanged) |
