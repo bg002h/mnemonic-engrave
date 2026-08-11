@@ -1143,7 +1143,9 @@ fixed half is not read as the whole.
 Option 1 is preferred and belongs with F-89, which already has to reconcile a
 residency timer with a saver that does not unwind.
 
-### F-94 — the 64-byte BIP-39 seed and the BIP-32 master key are unpinned, and the seam is cheap (owning phase: **B2c**, with F-88; re-assigned from B2b 2026-08-09)
+### F-94 — the 64-byte BIP-39 seed and the BIP-32 master key are unpinned, and the seam is cheap (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: B2c, with F-88; re-assigned from B2b 2026-08-09. Scheduled, not excused — same class as F-88/F-90/F-104: seed-equivalent copies inside the payload flow.
 
 > **Re-assigned B2b → B2c, 2026-08-09.** The B2b plan deferred this to "own
 > cycle", which is **not a later phase — it is no phase**, and
@@ -2691,7 +2693,9 @@ accepted 2026-08-08). Scrubbing these shortens no window that F-83 does not
 already hold open. They are worth doing for the same reason the others were: the
 package's own convention scrubs what it can.
 
-### F-87 — nothing pins `unlockEngraveMnemonic`'s deferred wipe (owning phase: B2b, with the §10.2.4 timer tests)
+### F-87 — nothing pins `unlockEngraveMnemonic`'s deferred wipe (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: B2b, with the §10.2.4 timer tests. Scheduled, not excused — the missing test is on unlockEngraveMnemonic, the same path F-88 covers — doing them together reads that path once instead of twice.
 
 **NARROWED 2026-08-10, still OPEN.** Verified: 2 of the 3 early returns ARE pinned by applied-mutation testing. The residue is exactly one leg — the `masterFingerprintFor`-error path — which no test covers. That is the whole of what remains; the entry's original framing ("nothing pins it") is no longer accurate and would overstate the work.
 
