@@ -3755,3 +3755,38 @@ decision reads as a deferral rather than as an oversight to a future reviewer.
 **What this entry must NOT become:** a reason to hold the systemwide-payloads
 cycle. Those programs were always in the non-wiping class (§2.2 item 12); they
 inherit no debt from this. The two are independent.
+
+### F-125 — the restored user-supplied passphrase mode requires amendments to EPD and passphrase.rs, and they are unscheduled (owning phase: **systemwide payloads, before implementation**)
+
+Filed 2026-08-11 out of R0 rounds 3 and 4 on `SPEC_systemwide_payloads.md`,
+which flagged it twice as NOT FIXED. Recording it so the collision is scheduled
+rather than argued about later.
+
+`SPEC_systemwide_payloads.md` decision 8 restores the **user-supplied**
+passphrase mode. Two normative statements elsewhere say it must not exist:
+
+- **`SPEC_encrypted_payload_delivery.md` §2.2 item 1 and §8** forbid it.
+- **`crates/me-cli/src/seal/passphrase.rs`**'s module doc: *"GENERATED, never
+  user-supplied… a human-chosen passphrase is worth 25–35 bits — one rented
+  GPU, minutes. `age` reached the same conclusion and generates 10 words rather
+  than letting the user pick."*
+
+The new spec marks the overrule where it occurs, which §1 requires. **What it
+does not do is amend the documents being overruled**, and a normative MUST NOT
+left standing unqualified is exactly the kind of stale record this project keeps
+being bitten by — the next reader has two documents that disagree and no marker
+saying which is current.
+
+**Not a design question.** The operator ruled; this is bookkeeping with an
+owning phase. Two edits:
+
+1. EPD §2.2 item 1 / §8 gain a qualification: the prohibition holds for the
+   **Sealed Payload** program, and `SPEC_systemwide_payloads.md` §8 governs the
+   systemwide container.
+2. `passphrase.rs`'s module doc gains the same, without weakening its argument —
+   the 25–35 bit figure is still correct and is precisely why `[cliff]` places
+   every user-supplied passphrase below the threshold.
+
+**Must land before implementation**, not after: the first person to read
+`passphrase.rs` while building this will otherwise find a module doc telling
+them the mode they are implementing does not exist.

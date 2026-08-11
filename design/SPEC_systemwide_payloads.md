@@ -144,7 +144,7 @@ routed, rather than latent and undocumented.
 3. **Routing**: records reaching programs other than the engraver (§3).
 4. A **session** that survives across programs until power-off (§3.2).
 5. The **verification-depth menu** (§7).
-6. **`me` passphrase modes** and the cliff flag (§6).
+6. **`me` passphrase modes** and `[cliff]` flag (§6).
 7. An **NFC source for the emulator**, so the new path is testable (§8.2).
 8. **A NEW device unlock flow, and a change to a SHARED one.** R2-I1 asked for
    this and R3-I3 corrected it: forbidding one function is not enough, because
@@ -153,7 +153,15 @@ routed, rather than latent and undocumented.
    | obstacle | where | what it does |
    | --- | --- | --- |
    | `!m.Valid()` | `gui/unlock_kdf.go:168`, `:359` | rejects every `len(m) % 3 != 0` outright |
-   | `refreshCands` → `bip39.LastWordCandidates` | **`gui/gui.go:758`, inside `inputWordsFlow`** | masks the final slot to checksum-valid words |
+   | `refreshCands` → `bip39.LastWordCandidates` | `gui/gui.go:758`, inside `inputWordsFlow` | masks the final slot to checksum-valid words |
+   | **fixed length** | `inputWordsFlow` fills a PRE-SIZED slice | N must be known before entry, so there is nowhere for §8c's `done` to land |
+   | **no terminator** | `gui/gui.go:727` | no key ends entry early |
+   | **no return value** | `gui/gui.go:792` | the flow cannot report how many words were actually entered |
+
+   R4-I2 added the last three: the first table named the two obstacles a
+   reviewer had pointed at and stopped there, which is the same
+   fixed-what-was-named habit this spec keeps being caught by. All five must be
+   addressed or arbitrary-N entry does not work.
 
    So: the systemwide unlock **may not reuse `unlockPassphraseFlow`** (the
    first row), **and `inputWordsFlow` must gain a per-invocation switch for the
@@ -161,7 +169,11 @@ routed, rather than latent and undocumented.
    so it cannot simply be removed. §8b's per-invocation ruling is about
    `refreshCands`, not about `unlockPassphraseFlow`, and naming only the latter
    left the actual blocker in place.
-9. **A per-instance `done` key** on the passphrase keyboard instance (§8c).
+9. **A per-instance `done` key** (§8c) — on the keyboard the WORD path actually
+   builds. R4-I2: the word path constructs `NewKeyboard` (`gui/gui.go:728`), not
+   `PassphraseKeyboard`, so an opt-in added to the latter would appear on the
+   free-text path and never on the one that needs a terminator. The free-text
+   path needs no `done` key at all: it has no word count to end.
 
 ## 3. Architecture
 
@@ -230,7 +242,11 @@ this store. Two features, two regions, no shared state.
 identity   [32]byte      the §5.4.1 identity digest. NOT the EPD§6.6
                          public-data digest, which does not exist when
                          pub_len == 0 (R1-C3)
-compared   bool          the operator compared the digest for THIS identity
+compared   bool          set per `[compared]` (§12.2). NOT "the operator
+                         compared the digest" -- that is only one of the two
+                         routes, and glossing it as the whole rule inside a
+                         NORMATIVE block is how R4-I3 found a second definition
+                         the gate could not see
 sealed     bool          which container variant it came from
 weak       bool          sealed, and its passphrase is NOT `[cliff]`-above
                          (§12.1). Named `weak` for brevity only: `[cliff]` is a
@@ -329,15 +345,15 @@ reconstruct it:
 #### 3.3.2a NFC records go through the SAME function — NORMATIVE (R0-I6)
 
 **"Source is not an admission input" is about the TABLE, not about §5.4.1's
-`compared` precondition (R1-M1).** The class table is source-blind. The
-`compared` gate is a separate, earlier check on the *payload* — it asks whether
+`[compared]` precondition (R1-M1).** The class table is source-blind. The
+`[compared]` gate is a separate, earlier check on the *payload* — it asks whether
 this payload was authenticated at all, before any record of it is classified.
-An NFC record has no payload and no `compared` gate; it is admitted by class and
+An NFC record has no payload and no `[compared]` gate; it is admitted by class and
 flagged by F4.
 
-**The order is NORMATIVE, and §5.4.1 governs (R2-M1): `compared` is checked at
+**The order is NORMATIVE, and §5.4.1 governs (R2-M1): `[compared]` is checked at
 CONSUMPTION**, not before classification. Classification happens once at load
-(§3.2.1) and is independent of authentication; what `compared` gates is whether
+(§3.2.1) and is independent of authentication; what `[compared]` gates is whether
 a classified record may be *handed to a program*. "Before any record of it is
 classified" was loose wording here and is withdrawn.
 
@@ -361,6 +377,7 @@ one can fire.
 | F1 | admitted class is secret **and** container is plaintext | this secret is unencrypted in flash; offers erase (§5.5) |
 | F2 | admitted class is secret **and** the passphrase is not `[cliff]`-above (§12.1) | this secret is weakly protected |
 | F3 | always, for anything not typed | the source, at the point of use (§3.2) |
+| F5 | the payload cannot be consumed at all: secrets-only, and not `[cliff]`-above, so `[compared]` can never be set (§12.2) | this payload cannot be opened for use on this machine; re-create it with five or more BIP-39 words |
 | F4 | admitted class is secret **and** source is NFC | this secret arrived with **no integrity check at all** — §5.4 scopes digest verification to flash, so nothing stands behind a tag's contents |
 
 ## 4. The flash region
@@ -540,7 +557,7 @@ from the region. The digest is not the plaintext container's consolation prize.
 
 **A digest does not always exist.** EPD§6.6 displays one only when
 `pub_len > 0`. A secrets-only sealed payload has none — see the table below and
-§5.4.1's `compared` rule for what authenticates it instead.
+§5.4.1's `[compared]` rule for what authenticates it instead.
 
 **CORRECTED after R0-C2 and R0-I2. The first draft was wrong twice here.**
 
@@ -612,9 +629,9 @@ because each looks reasonable and each fails:
 | the **displayed** 16 bytes | a truncation used as an equality key; the full digest costs nothing and is already computed |
 
 The session stores `(identity, compared: bool)`. A record is admitted for
-consumption only when `compared` is true for the identity it came from.
+consumption only when `[compared]` is true for the identity it came from.
 Re-reading the region recomputes the identity; if it differs, the entry is a
-different payload and `compared` starts false.
+different payload and `[compared]` starts false.
 
 **What sets the flag is defined by `[compared]` (§12.3's neighbour, §12.2).**
 This section states no version of it. R1-C4 is why the rule needs a home at all:
@@ -622,7 +639,7 @@ it found the sealed variant's main case unusable and tests 9 and 15 mutually
 unsatisfiable, because two sections had each answered the question differently.
 
 **The AEAD route is scoped to strong keys, and R2 is why (operator ruling
-2026-08-11).** The first fold said any successful open sets `compared`, on the
+2026-08-11).** The first fold said any successful open sets `[compared]`, on the
 grounds that a cryptographic tag beats a human reading sixteen hex digits. That
 is true only while the key is strong. This spec permits **22 bits** (2 words, 42
 seconds on one GPU) and treats user-supplied as **0 bits** — so an attacker
@@ -632,7 +649,7 @@ proves someone knew the passphrase; that is worth exactly what the passphrase is
 worth.
 
 **Consequence, stated rather than discovered:** a *secrets-only* sealed payload
-under a sub-cliff passphrase **cannot be consumed at all** — it has no digest to
+under a not-`[cliff]`-above passphrase **cannot be consumed at all** — it has no digest to
 compare and no qualifying open. That is the honest outcome. The alternative is a
 payload the machine calls authenticated because someone guessed a two-word
 passphrase in under a minute.
@@ -705,7 +722,7 @@ me sysw show   FILE
 | `--passphrase-words N` | generate, `2 ≤ N ≤ 24`, **default 12** if no passphrase flag is given |
 | `--passphrase-ask` | prompt for a user-supplied passphrase; **never** taken from argv or an env var, where it would land in shell history and `/proc` |
 | `--no-passphrase` | plaintext container |
-| `--allow-weak` | required by §6.2.1 when secret content meets a sub-cliff passphrase. **Refuses with a non-zero exit otherwise** |
+| `--allow-weak` | required by §6.2.1 when secret content meets a not-`[cliff]`-above passphrase. **Refuses with a non-zero exit otherwise** |
 | `--fill` | §5.5; **default `random`** |
 
 `me sysw pack` **prints the digest to stderr** in the EPD§6.6 display form,
@@ -734,7 +751,7 @@ At `seal`'s `MinIterations` (100,000 PBKDF2-SHA256), 2048-word list, expected
 work = half the keyspace. Model: one high-end GPU ≈ 10¹⁰ SHA-256 compressions/s,
 and PBKDF2 costs ~2 compressions per iteration, so ~200,000 per guess ⇒ **~50,000
 guesses/s per GPU**. The rate is an order-of-magnitude model, not a measurement;
-the *shape* — a cliff between 4 and 5 words — survives an order of magnitude in
+the *shape* — a `[cliff]` between 4 and 5 words — survives an order of magnitude in
 either direction, which is the only property the rule in §6.2 rests on.
 
 | words | bits | one GPU | 100 rented GPUs |
@@ -746,7 +763,7 @@ either direction, which is the only property the rule in §6.2 rests on.
 | 6 | 66 | 2.3×10⁷ y | 2.3×10⁵ y |
 | 12 *(default)* | 132 | 1.7×10²⁷ y | 1.7×10²⁵ y |
 
-**Entropy falls off a cliff between 4 and 5 words**, which is where the
+**Entropy falls off a `[cliff]` between 4 and 5 words**, which is where the
 threshold in `[cliff]` (§12.1) came from. A 2-word passphrase is not weak
 protection; it is none — 42 seconds is less time than it takes to type it.
 
@@ -759,7 +776,7 @@ degenerate passphrase sits at zero bits and is `[cliff]`-above.
 **Below 5 words (55 bits) over secret content, `me` requires an explicit
 command-line flag.** Public-only content is unrestricted. `me` always prints
 what the choice bought; the device flags at load when secret material is
-protected by less than the cliff.
+protected by less than `[cliff]`.
 
 The warning attaches to the **outcome**, not the mode — so no-password, weak
 password and plaintext are one control rather than three special cases. This is
@@ -788,7 +805,7 @@ a different question:
 **R3-C2 is why this is stated as deference rather than as a second
 definition.** An earlier version defined the threshold here by mode and bits
 while §12.1 defined it by word count, so `me` would have sealed a user-supplied
-five-word payload as above-cliff while the device refused it as below — a
+five-word payload as above-`[cliff]` while the device refused it as below — a
 permanently unconsumable payload when secrets-only.
 
 **User-supplied is not estimated, and that is the point.** Every estimator for
@@ -811,13 +828,16 @@ passphrases, which are already lowercase, and silently weakening for a
 user-chosen mixed-case one — **so it must be stated where the operator chooses
 their own.**
 
-So the deterministic rule an implementer transcribes:
+So the deterministic rule an implementer transcribes — **stated in terms of
+`[cliff]`, not of mode, because R4-I1 caught this blockquote still gating on
+mode and giving `me` the opposite answer to §5.6 on a user-supplied
+five-BIP-39-word passphrase:**
 
-> **Secret content + (user-supplied OR no passphrase OR generated with `N < 5`)
-> ⇒ `me` refuses without the explicit flag.**
+> **Secret content + a passphrase that is not `[cliff]`-above ⇒ `me` refuses
+> without the explicit flag.**
 
 `me` prints the strength either way — `"12 words, 132 bits"` or
-`"user-supplied, unmeasured, below the cliff"` — the latter being a
+`"user-supplied, unmeasured, not `[cliff]`-above"` — the latter being a
 consequence of `[cliff]` (§12.1), not a separate judgement.
 
 #### 6.2.2 Host and device must agree on what is ENTERABLE — NORMATIVE
@@ -828,7 +848,7 @@ cannot accept — two found by review and one by measurement:
 | constraint | value | why |
 | --- | --- | --- |
 | character range | `0x20`–`0x7E` only | The device's real constraint: `passphrase.ValidatePassphrase` rejects anything else as `ErrNonASCII`, so a UTF-8 passphrase would seal and never open. **The next row rejects the same function's `MaxLen`, and the two are not in tension (R2-N1):** the range is about what entry can represent, while `MaxLen = 100` is by its own comment "a plate-capacity limit chosen for legibility" — a fact about steel, not about typing. Take the constraint that is about entry; reject the one that is about a plate |
-| length cap | **exactly 215 bytes**, host and device | An inequality is not a spec (R2-I3): "≥ 215" on the host and "≥ 215" on the device can be two different numbers — the R0-C4 shape inside the section named after it. 215 is the measured maximum (24 words × 8 characters + 23 separators; a 12-word passphrase already reaches 107), and it bounds the **user-supplied** mode too, which otherwise had no derived bound at all. `passphrase.MaxLen` is 100 and does not apply — see the row above |
+| length cap | **exactly 215 bytes** over the NORMALISED string, host and device | An inequality is not a spec (R2-I3): "≥ 215" on the host and "≥ 215" on the device can be two different numbers — the R0-C4 shape inside the section named after it. 215 is the measured maximum (24 words × 8 characters + 23 separators; a 12-word passphrase already reaches 107), and it bounds the **user-supplied** mode too, which otherwise had no derived bound at all. `passphrase.MaxLen` is 100 and does not apply — see the row above |
 | checksum | never required (§8b) | else 15 of 16 default draws are unopenable |
 
 `me` enforces the identical range and cap at creation.
@@ -1036,7 +1056,7 @@ rather than only on hardware.
 2. A wrong word at any position *included* in a check is caught.
 3. Random word selection is uniform and re-drawn per verification.
 4. A plaintext container carrying a secret class raises the flag.
-5. `me` refuses sub-cliff + secret without the flag, and permits it with.
+5. `me` refuses not-`[cliff]`-above + secret without the flag, and permits it with.
 6. Host and device produce byte-identical KDF input for an arbitrary-N
    passphrase.
 7. A blob written to the wrong region is refused on magic, not half-parsed.
@@ -1046,7 +1066,7 @@ rather than only on hardware.
    and would be a false pass.
 9. The digest is displayed **wherever one exists** (`pub_len > 0`), for every
    program that consumes from the region (§5.4). A program that consumes
-   payload-sourced input without a satisfied `compared` fails. **This test and
+   payload-sourced input without a satisfied `[compared]` fails. **This test and
    test 15 must both pass**: 15 asserts no digest for `pub_len == 0`, and a
    version of this test asserting "always displayed" makes the pair
    unsatisfiable (R2-C1).
@@ -1088,7 +1108,7 @@ rather than only on hardware.
 20. **(R1-C4, corrected R3-C1)** A secrets-only sealed payload is consumable
     **when its passphrase is `[cliff]`-above**, and is NOT consumable when it is
     below — per `[compared]` (§12.2). The first version of this test asserted
-    the unconditional rule and would have MANDATED the sub-cliff bypass rather
+    the unconditional rule and would have MANDATED the not-`[cliff]`-above bypass rather
     than merely permitting it. Test 15 asserts no digest is displayed; neither
     alone is enough.
 21. **(R1-I3)** The passphrase buffer never regrows: entering 24 words leaves no
@@ -1096,6 +1116,10 @@ rather than only on hardware.
 22. **(§8c)** A `done` press mid-passphrase yields a confirmation naming the
     SHORT count, not the intended one — the truncation is visible before the
     KDF.
+23. **(R3-M6)** A secrets-only payload that is not `[cliff]`-above raises F5 and
+    is refused for consumption, with the reason named. Without this the state is
+    reachable and silent: the operator sees a payload that opens and no records
+    they may use.
 
 ## 9. Open items
 
