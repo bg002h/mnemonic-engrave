@@ -52,6 +52,16 @@ several overrule a documented prior decision and are marked where they do.
    `NewPassphraseKeyboard` (`gui/passphrase_keyboard.go:76`) is free-text and
    already exists. So the mode is restored, behind a **keyboard choice**.
 
+   **This overrules a normative MUST NOT, and §1's preamble requires that be
+   marked (R2-I4).** EPD§2.2 item 1 and EPD§8 forbid a user-supplied
+   passphrase, and `crates/me-cli/src/seal/passphrase.rs`'s module doc gives the
+   reason: "GENERATED, never user-supplied… a human-chosen passphrase is worth
+   25–35 bits — one rented GPU, minutes. `age` reached the same conclusion." The
+   operator overrules it deliberately, with §6.1's numbers in view, and §6.2.1
+   prices the mode at **0 bits** so nothing downstream mistakes it for
+   protection. An earlier fold deleted this acknowledgement; it is restored
+   because §1 promises overruled decisions are marked where they occur.
+
 8a. **The operator picks the keyboard at unlock: BIP-39 word, or free-text
     ASCII.** The word keyboard is the default landing, since the generated mode
     is the common case and twelve words are far easier to type with wordlist
@@ -131,6 +141,14 @@ routed, rather than latent and undocumented.
 5. The **verification-depth menu** (§7).
 6. **`me` passphrase modes** and the cliff flag (§6).
 7. An **NFC source for the emulator**, so the new path is testable (§8.2).
+8. **A NEW device unlock flow**, and R2-I1 is why this line exists. The
+   systemwide unlock **may not reuse `unlockPassphraseFlow`**: that flow
+   enforces `!m.Valid()` at `gui/unlock_kdf.go:168` and `:359`, which rejects
+   every `len(m) % 3 != 0` outright — so reusing it reinstates exactly the
+   permanent unopenability §8b was ruled to fix. The new flow carries the
+   keyboard choice (§8a), the ungated word entry (§8b), the `done` key and the
+   count confirmation (§8c).
+9. **A per-instance `done` key** on the passphrase keyboard instance (§8c).
 
 ## 3. Architecture
 
@@ -300,7 +318,13 @@ reconstruct it:
 `compared` gate is a separate, earlier check on the *payload* — it asks whether
 this payload was authenticated at all, before any record of it is classified.
 An NFC record has no payload and no `compared` gate; it is admitted by class and
-flagged by F4. Two checks, run in order, not one rule contradicting itself.
+flagged by F4.
+
+**The order is NORMATIVE, and §5.4.1 governs (R2-M1): `compared` is checked at
+CONSUMPTION**, not before classification. Classification happens once at load
+(§3.2.1) and is independent of authentication; what `compared` gates is whether
+a classified record may be *handed to a program*. "Before any record of it is
+classified" was loose wording here and is withdrawn.
 
 The table's axis is `(class → program)` and says nothing about where a record
 came from, which left the NFC path — the one §5.4 just removed all integrity
@@ -495,9 +519,13 @@ differently-shaped input, which is what that label exists to prevent. That is
 net-new normative work for a transient delivery path, and it is **out of scope
 for this spec**. See §11 for what that means the operator is *not* getting.
 
-**"Everywhere"** means every *program*, not every *variant*: both container
-variants show the digest, and so does every program that consumes from the
-region. The digest is not the plaintext container's consolation prize.
+**"Everywhere"** means every *program*, not every *variant*: **wherever a
+digest exists**, it is shown, and so it is shown to every program that consumes
+from the region. The digest is not the plaintext container's consolation prize.
+
+**A digest does not always exist.** EPD§6.6 displays one only when
+`pub_len > 0`. A secrets-only sealed payload has none — see the table below and
+§5.4.1's `compared` rule for what authenticates it instead.
 
 **CORRECTED after R0-C2 and R0-I2. The first draft was wrong twice here.**
 
@@ -583,7 +611,24 @@ mutually unsatisfiable):**
 | how the payload was authenticated | sets `compared` |
 | --- | --- |
 | the operator compared the displayed EPD§6.6 digest (`pub_len > 0`) | yes |
-| **a successful AEAD open** (`ct_len > 0`) | **yes** |
+| a successful AEAD open **whose passphrase is at or above the cliff** (§6.2.1) | yes |
+| a successful AEAD open under a **sub-cliff or user-supplied** passphrase | **NO** |
+
+**The AEAD route is scoped to strong keys, and R2 is why (operator ruling
+2026-08-11).** The first fold said any successful open sets `compared`, on the
+grounds that a cryptographic tag beats a human reading sixteen hex digits. That
+is true only while the key is strong. This spec permits **22 bits** (2 words, 42
+seconds on one GPU) and treats user-supplied as **0 bits** — so an attacker
+brute-forces the passphrase, produces a payload that opens cleanly, and the flag
+that was supposed to mean "authenticated" is set by the attack itself. A tag
+proves someone knew the passphrase; that is worth exactly what the passphrase is
+worth.
+
+**Consequence, stated rather than discovered:** a *secrets-only* sealed payload
+under a sub-cliff passphrase **cannot be consumed at all** — it has no digest to
+compare and no qualifying open. That is the honest outcome. The alternative is a
+payload the machine calls authenticated because someone guessed a two-word
+passphrase in under a minute.
 
 A secrets-only sealed payload (`pub_len == 0`) displays no digest — EPD§6.6's
 own rule — so there is nothing for the operator to compare. **Opening it is the
@@ -761,8 +806,8 @@ cannot accept — two found by review and one by measurement:
 
 | constraint | value | why |
 | --- | --- | --- |
-| character range | `0x20`–`0x7E` only | `passphrase.ValidatePassphrase` rejects anything else as `ErrNonASCII`; a UTF-8 passphrase would seal and never open |
-| length cap | **≥ 215 bytes**, NOT `MaxLen` | measured: 24 words of 8 characters plus 23 separators is 215, and a 12-word passphrase already reaches 107. `passphrase.MaxLen` is **100** and its own comment calls it "a plate-capacity limit chosen for legibility, not a BIP-39 rule" — it belongs to the engraving program. Applying it here would make every long generated passphrase unenterable |
+| character range | `0x20`–`0x7E` only | The device's real constraint: `passphrase.ValidatePassphrase` rejects anything else as `ErrNonASCII`, so a UTF-8 passphrase would seal and never open. **The next row rejects the same function's `MaxLen`, and the two are not in tension (R2-N1):** the range is about what entry can represent, while `MaxLen = 100` is by its own comment "a plate-capacity limit chosen for legibility" — a fact about steel, not about typing. Take the constraint that is about entry; reject the one that is about a plate |
+| length cap | **exactly 215 bytes**, host and device | An inequality is not a spec (R2-I3): "≥ 215" on the host and "≥ 215" on the device can be two different numbers — the R0-C4 shape inside the section named after it. 215 is the measured maximum (24 words × 8 characters + 23 separators; a 12-word passphrase already reaches 107), and it bounds the **user-supplied** mode too, which otherwise had no derived bound at all. `passphrase.MaxLen` is 100 and does not apply — see the row above |
 | checksum | never required (§8b) | else 15 of 16 default draws are unopenable |
 
 `me` enforces the identical range and cap at creation.
@@ -777,6 +822,24 @@ already in `FOLLOWUPS.md`, and one the operator's 2..24 range creates.
 > regrows.** Identical reasoning to `passphrase.rs`'s `normalise`, which
 > pre-counts precisely so "a `String` that reallocates mid-build orphans the
 > partially-written copy."
+
+#### 6.2.2a Residue on these paths is ACCEPTED, and the no-regrow rule is not a wipe claim (R2-I2)
+
+`seal.NormalisePassphrase` takes and returns a Go `string`
+(`seal/open.go:76`), so the free-text path necessarily holds a seed-equivalent
+passphrase in allocations nothing can scrub — the exact shape `passphraseBytes`
+exists to avoid.
+
+**This is consistent with decision 2, not a violation of it.** These programs
+are the non-wiping class: they leave secret material resident with no timer
+behind them, by the operator's explicit ruling and by EPD§2.2 item 12 before it.
+The spec therefore does **not** claim the passphrase is wiped on these paths,
+and the §6.2.2 no-regrow rule is **not** a wipe guarantee. Its narrower job is
+to avoid a *gratuitous* second copy — one the code would orphan for no reason —
+which is worth having even where the first copy persists.
+
+Anything stronger belongs to F-124, not here. A spec that implied these paths
+scrub would be making F-123's mistake about a different control.
 
 #### 6.2.3 What the operator is told
 
@@ -956,9 +1019,12 @@ rather than only on hardware.
    **The assertion is against `gui`, not `seal` (R0-M2)** — the phrase is a UI
    string and lives in the flow layer, so a test scoped to `seal` cannot fail
    and would be a false pass.
-9. The digest is displayed for **both** container variants and for every
+9. The digest is displayed **wherever one exists** (`pub_len > 0`), for every
    program that consumes from the region (§5.4). A program that consumes
-   payload-sourced input without a compared digest fails.
+   payload-sourced input without a satisfied `compared` fails. **This test and
+   test 15 must both pass**: 15 asserts no digest for `pub_len == 0`, and a
+   version of this test asserting "always displayed" makes the pair
+   unsatisfiable (R2-C1).
 10. The digest is compared **once per payload**: a second program consuming from
     the same loaded payload does NOT re-prompt, and re-reading the region DOES.
     A test that only checks the first consumption cannot tell these apart.
@@ -1008,7 +1074,7 @@ rather than only on hardware.
 | # | Item | Owner |
 | --- | --- | --- |
 | ~~O1~~ | ~~Flash address~~ — **RESOLVED 2026-08-11: `0x10D00000`** | — |
-| ~~O2~~ | ~~Which keyboard the unlock screen uses~~ — **RESOLVED by R0-C4**: `unlockPassphraseFlow` returns a `bip39.Mnemonic` on the WORD keyboard. It was a defect, not a question, and it removed a passphrase mode | — |
+| ~~O2~~ | ~~Which keyboard the unlock screen uses~~ — **RESOLVED**: `unlockPassphraseFlow` returns a `bip39.Mnemonic` on the WORD keyboard and enforces `!m.Valid()`. A defect, not a question. It did NOT remove a passphrase mode (R2-M2) — the mode was restored (§8) and the resolution is a NEW unlock flow (§2.2 item 8) | — |
 | O3 | Record class name and encoding for free text | R0 / Rust |
 | O4 | `me` subcommand surface for creating a systemwide payload, and for the §5.5 overwrite payload | R0 |
 | ~~O5~~ | ~~NFC digest domain separation~~ — **DISSOLVED 2026-08-11**: the operator scoped digest verification to FLASH, so no NFC digest is specified (§5.4) | — |
