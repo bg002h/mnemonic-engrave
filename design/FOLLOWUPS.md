@@ -1962,6 +1962,63 @@ argument nobody re-checked** — with F-107 and R0 round 0's M4. The pattern is
 worth naming in the phase report: each was individually defensible when written,
 and each stopped being true without anyone editing the line that claimed it.
 
+### F-116 — `biptool seed -seedlen` emits codex32 strings this machine cannot engrave, silently (owning phase: **before the release tag**, with F-113)
+
+Found 2026-08-10 by R0 on §10.2.1a, which refuted the claim — mine, stated to
+the operator as measured — that nothing in this constellation generates a long
+codex32 code.
+
+```
+$ head -c 64 /dev/zero | biptool seed -seedlen 64 -id entr
+ms10entrsqqqqq…mk6rc3gq4c88nvp        127 chars
+codex32.New: ADMITTED (long band)
+qr size 41 -> REFUSED (Size > 33)
+```
+
+`cmd/biptool/main.go:312` calls `codex32.NewSeed` directly, bypassing
+`EncodeMS1`'s BIP-39 cap, and `-seedlen` advertises **16–64 bytes** in its own
+flag help. So the tool is *designed* to reach the range the engraver refuses.
+
+**Warn, do NOT cap.** The obvious fix is to reject `-seedlen` above the
+engraveable range, and it is wrong: F-113's own test vectors need a generator for
+125/127-character strings, and this is it. Capping would remove the only way to
+produce the fixtures for the refusal being added. Print to stderr when the output
+exceeds 90 characters, naming the length and that the machine cannot engrave it.
+
+**Why it matters beyond tidiness:** we ship a tool whose output our own engraver
+rejects. That is an inconsistency someone eventually hits and reasonably files as
+a bug against the engraver rather than the generator.
+
+### F-117 — the seed plate cannot engrave a QR above 33 modules, and could reach 37 today (owning phase: **post-release feature**, with F-118)
+
+`backup.EngraveSeedString` refuses `qrc.Size > 33` (v4), while
+`backup.EngraveText` — the md/mk path — already runs at **37** (v5) in
+production, on the same `bitmapForQRStatic` marker table. The difference is
+scale: text plates engrave modules at **2** stroke widths, the seed plate at
+**3** (`backup/backup.go:166`, `qrScale = 3`), so 37 modules is 22.2 mm there
+against 33.3 mm here, on an 85 mm plate.
+
+Raising the seed plate to 37 would close the **91–93** band by engraving it
+rather than refusing it (§10.2.1a). Deliberately NOT a pre-tag change: it alters
+plate geometry, so it re-opens toolpath equivalence and needs a hardware read.
+
+### F-118 — engraving a LONG codex32 share needs QR version 6 support (owning phase: **post-release feature**)
+
+125–127 characters encode to **41 modules (v6)**, past every current limit.
+`bitmapForQRStatic` tabulates position and alignment markers for **21/25/29/33/37
+only**; anything else reaches its `default:` and panics, which is why
+`engrave.ConstantQR` rejects `dim > 37` and says:
+
+> *bitmapForQRStatic tabulates 21/25/29/33/37 only, so rejecting here is what
+> keeps a larger version from reaching its default case and panicking. **Raise
+> both together or not at all.***
+
+So this is not "split the share across plates" — it is extending the QR
+engraver's version support, plus 36.9 mm of QR on an 85 mm plate at the seed
+scale (or 24.6 mm at the text scale, if F-117 lands first). A feature with its
+own spec and hardware validation. §10.2.1a refuses these meanwhile, which is the
+honest interim: a clear message beats a dead end.
+
 ### F-115 — `plan-cite-gate.sh` resolves citations by BASENAME and takes the first match, including build artefacts (owning phase: **before the release tag**, with F-101's runner work)
 
 **CLOSED 2026-08-10 (`51ff889`).** The resolver prunes `target/`, `.git/` and `node_modules/` alongside `third_party/`, and FAILS as AMBIGUOUS naming every candidate rather than taking the first match. Verified: it now reports `bip380/checksum.go` and `codex32/checksum.go` by name instead of silently choosing the 89-line one.
