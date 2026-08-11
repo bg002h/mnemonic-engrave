@@ -284,6 +284,19 @@ This list is normative and belongs in operator documentation, not only here.
     All of the above is scheduled to the **post-merge polish and hardening**
     phase, and every deferred item goes to the post-release whole-Phase-2 review.
 
+    **Where the gap came from**, since a threat-model item that does not say
+    this invites the same gap again. §10.2.4's timer was designed in a single
+    fable-tier consult (`design/CONSULT_b2b_idle_timer_design.md`, 2026-08-09)
+    that the B2b plan was written against. Keying it on the session bracket was
+    right and survives. What it did not do was define *idle* at the level the
+    code implements it — the clock is refreshed by raw event presence — which is
+    F-103. And neither this spec nor that plan ever **enumerated the copies** a
+    decrypted secret spawns downstream of the record: the wipe was specified
+    against the record alone, and every further copy was found afterwards, one
+    at a time. Specifying a wipe without an inventory of what must be wiped is
+    the root cause of F-88, F-90, F-94, F-104 and F-109, and any future wipe
+    requirement in this document should carry that inventory with it.
+
 ### 2.2a What admitting `ms1` changed (operator sign-off, 2026-08-07)
 
 Before this decision the envelope could carry only public constellation data —

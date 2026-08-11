@@ -11,6 +11,88 @@ Bridges the m-format constellation onto a [SeedHammer II](https://seedhammer.com
 > [`design/SPEC_seedhammer_engrave.md`](design/SPEC_seedhammer_engrave.md) for
 > the full, architect-reviewed design and
 > [`design/FOLLOWUPS.md`](design/FOLLOWUPS.md) for open items.
+>
+> **If you intend to engrave a real seed via the encrypted sealed-payload path,
+> read [Security limitation](#security-limitation--the-sealed-payload-wipe-is-incomplete)
+> first — the wipe is incomplete and can be prevented from running.**
+
+## Security limitation — the sealed-payload wipe is INCOMPLETE
+
+**If you use the encrypted sealed-payload path to engrave a real seed, the
+machine does not erase every copy of it, and under some conditions does not
+erase anything at all.** This is a known, open, documented state of the build,
+not a theory. Read this before you put a seed you care about into it.
+
+The design intends that a decrypted secret is wiped as soon as its plate is cut
+or skipped, with a 3-minute idle timer as a backstop. In the current build:
+
+- **Not every copy is wiped.** The wipe removes the secret *record*. Getting a
+  record onto a plate makes further copies — on the mnemonic engrave path, in
+  the key-derivation working state, in the word-splitting and keyboard buffers,
+  and in the uppercased string the plate's QR is built from. Those are not
+  wiped.
+- **~35 KB across ~81 reachable objects survives every wipe and has not been
+  identified.** Nobody has established whether it holds seed material.
+- **The idle wipe can silently never run.** The timer only fires when the
+  machine is *idle*, and the idle clock is refreshed by **any** input event —
+  including one that resolves to no actual input. A touch panel reporting
+  spurious readings (protective film, moisture, debris, driver noise) keeps the
+  machine permanently non-idle, so there is **no countdown, no wipe, and no
+  indication that either was skipped**. Measured: 100,000 spurious touch polls
+  over ~1000 s produced zero warnings and zero wipes, against a control that
+  warned at 3:00.
+
+**What actually protects you, therefore, is physical custody — not the wipe.**
+This device is deliberately debuggable: `debug enable: 1` and
+`secure debug enable: 1` are set, and BOOTSEL is not disabled, so anyone holding
+the machine can read SRAM over SWD with no passphrase. Treat the wipe as a
+convenience. **Power the machine down when you are done, and never leave it
+unattended with a session open.**
+
+Tracked as F-88, F-90, F-94, F-103, F-104 and F-109 in
+[`design/FOLLOWUPS.md`](design/FOLLOWUPS.md), and stated normatively in
+[`design/SPEC_encrypted_payload_delivery.md`](design/SPEC_encrypted_payload_delivery.md)
+§2.2 item 16. All are scheduled to a **post-merge polish and hardening** phase
+that runs *after* the current tag, by explicit decision — the tag is
+`v0.0.0-g<sha>`, which marks a build rather than a product.
+
+### How this got shipped open, recorded plainly
+
+The encrypted-payload feature had a heavy review process: architect loops to
+0 Critical / 0 Important on every design document, mutation testing of the test
+suites, independent whole-diff execution reviews, and hardware validation on the
+real machine. It found and closed real defects — a doubled wipe timer, a
+rendered seed left in the frame buffer, plate geometry never zeroed after a cut,
+an abandoned job's resume state.
+
+It did not produce a complete wipe, and the specific gaps are worth naming
+rather than generalising:
+
+- **§10.2.4's idle wipe was designed in a single top-tier consult**
+  ([`design/CONSULT_b2b_idle_timer_design.md`](design/CONSULT_b2b_idle_timer_design.md),
+  2026-08-09), and the B2b implementation plan was written against it. Keying
+  the timer on the session bracket rather than on a residency predicate was the
+  right call and survives. But that design did not define what *idle* means at
+  the level the code implements it — the clock is refreshed by raw event
+  presence — and that is **F-103**, the defect that lets the wipe silently never
+  run. A one-pass consult on a funds-safety control was thin for what it was
+  carrying.
+- **The same timer shipped a second defect that only hardware found.** The arm
+  edge was processed one wakeup late, so the window ran at double its specified
+  length — 6:00 instead of 3:00, deterministically. No host test caught it;
+  three cycles on the machine did. Fixed.
+- **Neither the spec nor the plan ever enumerated which copies of a decrypted
+  secret exist.** The wipe was specified against the *record*. The copies made
+  downstream of it — engrave path, KDF working state, word-split and keyboard
+  buffers, the uppercased QR string — were discovered afterwards, one at a time,
+  by review and by measurement. That is **F-88, F-90, F-94, F-104**, and the
+  ~35 KB in **F-109** that still has no name.
+
+Those items were found, written down, and then rescheduled rather than fixed,
+and the whole-diff review that reads all three phases at once is deliberately
+scheduled *after* this release. Review effort is not a substitute for the
+remaining work, and this section exists so the gap is visible to anyone using
+the build rather than only to whoever reads the follow-up file.
 
 ## What it does
 
