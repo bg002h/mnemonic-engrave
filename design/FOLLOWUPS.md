@@ -1024,7 +1024,7 @@ Source: `design/agent-reports/encrypted-payload-planB-phaseB1-whole-diff-round0.
   list, and the plate list is B1. Intended as B2; **owning phase: B2**, recorded
   so it is not lost between the two.
 
-### F-78 — "·" has no glyph in the display font, and four shipped screens use it (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
+### F-78 — CLOSED 2026-08-11 (post-merge polish: the display font's index caps at ASCII; substituted '|' at 5 sites) — "·" has no glyph in the display font, and four shipped screens use it (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: ownerless residue; a font cycle, not a feature cycle. Still open; scheduled, not excused.
 
@@ -1181,7 +1181,7 @@ fixed half is not read as the whole.
 Option 1 is preferred and belongs with F-89, which already has to reconcile a
 residency timer with a saver that does not unwind.
 
-### F-94 — the 64-byte BIP-39 seed and the BIP-32 master key are unpinned, and the seam is cheap (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
+### F-94 — CLOSED 2026-08-11 (post-merge polish: the 64-byte seed and BIP-32 master key now pinned) — the 64-byte BIP-39 seed and the BIP-32 master key are unpinned, and the seam is cheap (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: B2c, with F-88; re-assigned from B2b 2026-08-09. Scheduled, not excused — same class as F-88/F-90/F-104: seed-equivalent copies inside the payload flow.
 
@@ -1223,7 +1223,7 @@ needs an **exported** seam in a Rust-primary ported package for a
 defence-in-depth wipe. `Parse`'s three ERROR exits — the reachable half, where a
 full near-seed was being orphaned — are pinned in `bip39` itself.
 
-### F-95 — §10.2.3's warning clears the panel by 3 pixels, and its scroll affordance does not exist on this hardware (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
+### F-95 — CLOSED 2026-08-11 (post-merge polish: warning copy shortened; maxScroll +19 -> -17) — §10.2.3's warning clears the panel by 3 pixels, and its scroll affordance does not exist on this hardware (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: the GUI/font cycle, with F-78 and `seedhammer-warning-scroll-untouchable`. Still open; scheduled, not excused.
 
@@ -2139,7 +2139,7 @@ an inventory of what else `cmd/emu` does not model.
 origin-seeking move — or make the recorder assert that a run begins at the
 origin so the divergence fails loudly instead of rendering plausibly.
 
-### F-119 — `backup.go:368`'s comment describes a plate fallback order the code does not implement (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
+### F-119 — CLOSED 2026-08-11 (post-merge polish: comment corrected against a MEASURED fallback order) — `backup.go:368`'s comment describes a plate fallback order the code does not implement (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: with F-78's font cycle, or whenever the descriptor plate is next touched. Still open; scheduled, not excused.
 
@@ -2910,7 +2910,7 @@ accepted 2026-08-08). Scrubbing these shortens no window that F-83 does not
 already hold open. They are worth doing for the same reason the others were: the
 package's own convention scrubs what it can.
 
-### F-87 — nothing pins `unlockEngraveMnemonic`'s deferred wipe (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
+### F-87 — CLOSED 2026-08-11 (post-merge polish: unlockEngraveMnemonic's third early return pinned) — nothing pins `unlockEngraveMnemonic`'s deferred wipe (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: B2b, with the §10.2.4 timer tests. Scheduled, not excused — the missing test is on unlockEngraveMnemonic, the same path F-88 covers — doing them together reads that path once instead of twice.
 
@@ -2937,7 +2937,7 @@ assert the words are zero after the flow returns. Scheduled to B2b rather than
 now because B2b writes the residency-timer tests anyway, and they need the same
 observability.
 
-### F-86 — `%` renders as zero pixels in the KDF progress screen (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
+### F-86 — CLOSED 2026-08-11 (post-merge polish: '%' added to Boldprogress45's alphabet; 3 tests had relied on it being invisible) — `%` renders as zero pixels in the KDF progress screen (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: with F-78's font cycle. Still open; scheduled, not excused.
 
@@ -3617,3 +3617,27 @@ Now **due** rather than closeable, both gating conditions met: **F-65**, **F-66*
   `gui/` worktrees; do it once they merge. **Consequence worth naming:** a
   dirty `gofmt` baseline means "gofmt is clean" cannot be used as a gate by any
   future agent, so every one of them has to special-case it.
+
+### Post-merge polish and hardening — closures, 2026-08-11
+
+Fork `6fb8442`. Verified by the controller on the MERGED result each time, not
+on the implementer's report: `CGO_ENABLED=0 go test ./...` exit 0, 49 ok, 0 FAIL.
+
+| item | outcome |
+| --- | --- |
+| **F-78** | CLOSED — but **not by the remedy the entry assumed**. `font/bitmap.go`'s binary index caps lookup at ASCII 127, so adding a U+00B7 glyph would mean widening a shared format and regenerating all 8 `.bin` faces. Substituted `|` (B1's precedent) at **five** occurrences; the entry named three. |
+| **F-86** | CLOSED — `%` *is* inside the ASCII index range, so this was the small change F-78 ruled out. Only `boldprogress45.bin` regenerated, +629 B. |
+| **F-95** | CLOSED — by shortening the copy, not by adding touch-scroll. Two blank lines removed, zero words changed; `Warning.Layout`'s own `maxScroll` moves +19 → −17. |
+| **F-119** | CLOSED — comment-only, as anticipated. Fallback order **measured** (TEXT+QR fails at 269 chars, QR-ONLY at 642, TEXT-ONLY last at 646); the code was right. |
+| **F-94** | CLOSED — the 64-byte BIP-39 seed and the BIP-32 master key are pinned via `deriveSeedHook` / `deriveMasterKeyHook`. |
+| **F-87** | CLOSED — `unlockEngraveMnemonic`'s third early return pinned. |
+| **F-104 item 2** | CLOSED — the discarded entropy copies in `bip39` are zeroed. **Item 2b remains open** (see the handback above). |
+
+**The finding worth keeping from this batch:** fixing F-86 **broke three
+unrelated tests** whose regexes had been implicitly relying on `%` rendering as
+zero pixels. They passed for the wrong reason for exactly as long as the bug
+existed, and no amount of reading would have shown it — only the repair could.
+That is the false-PASS class this project otherwise finds by mutation, surfaced
+here by a real fix. It is an argument for fixing cosmetic defects rather than
+carrying them: a bug in the render is also a load-bearing assumption in the
+tests around it.
