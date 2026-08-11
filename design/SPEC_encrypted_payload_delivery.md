@@ -159,9 +159,9 @@ This list is normative and belongs in operator documentation, not only here.
     discipline; conversely, anything inside the Sealed Payload session carries
     it regardless of how the bytes arrived. This is not a new constraint on the
     implementation — it is what the program's two `wipeGuard` brackets already
-    do, each installed as its installing function's own first and last act:
-    `unlockSecretSession` for the secret session, and `unlockPassphraseFlow`
-    for the in-flight passphrase.
+    do: `unlockSecretSession` for the secret session and `unlockPassphraseFlow`
+    for the in-flight passphrase, each armed before its function brings anything
+    sensitive into reach and released on **every** exit path by `defer`.
 
     **What this does NOT license.** Stated narrowly and deliberately, because
     §2.2's other accepted limitation (F-83, the plate under the needle) was
@@ -1376,8 +1376,8 @@ on which button was last pressed:
 Sealed Payload program's session**, not anywhere on the machine. This timer is
 implemented as the lifetime of that program's wipe guards (`gui/wipe_guard.go`
 defines the type) — installed by `unlockSecretSession` for rows 1–3 and by
-`unlockPassphraseFlow` for row 4, each as that function's own first and last
-act — and it makes **no claim** about seed material held by any other program —
+`unlockPassphraseFlow` for row 4, each armed before its function brings anything
+sensitive into reach and released on every exit path — and it makes **no claim** about seed material held by any other program —
 NFC scan, manual word entry, BIP-85, account xpub, SeedXOR, SLIP-39, free text.
 Those may hold plaintext indefinitely with no timer behind them; see
 **§2.2 item 12**, which
