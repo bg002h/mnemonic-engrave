@@ -245,7 +245,7 @@ This list is normative and belongs in operator documentation, not only here.
     encoder cannot produce such a string, but the repo's `biptool seed -seedlen
     64` host tool can, as can third-party BIP-93 tooling.
 
-16. **In the `v0.0.0-g<sha>` build: the wipe does not reach everything, and can
+16. **In the `fork-v0.0.0-g<sha>` build: the wipe does not reach everything, and can
     be prevented from running at all.** *This item is unlike the rest of §2.2.
     Items 1–15 are design limitations that will still be true when this machine
     is finished. This one is a statement about **the build being tagged** — a
@@ -1338,7 +1338,7 @@ if bytes.HasPrefix(buf, []byte(cmdPrefix)) {
         cmd := debugCommand{string(buf[len(cmdPrefix):])}
         return cmd, nil
 }
-// gui/gui.go:1668
+// gui/gui.go:1778
 case "lock-boot":
         if err := ctx.Platform.LockBoot(); err != nil {   // OTP writes + CPUReset
 ```
@@ -1697,7 +1697,7 @@ Lock being one tap away, and the secrets being gone within the first *N* plates.
 
 ### 10.3 UI constraints to respect
 
-- `layoutNavigation` indexes a fixed `[3]int` (`gui/gui.go:1857`) — **a fourth
+- `layoutNavigation` indexes a fixed `[3]int` (`gui/gui.go:1965`) — **a fourth
   nav affordance panics.** Three slots is the whole budget.
 - `ChoiceScreen` does not scroll and draws over its own title past ~7 entries
   (`gui/gui.go:1455`, pinned by `gui/freetext_speed_test.go:31`). **This bounds

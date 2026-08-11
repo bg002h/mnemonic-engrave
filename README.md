@@ -2,12 +2,14 @@
 
 Bridges the m-format constellation onto a [SeedHammer II](https://seedhammer.com) engraving machine: it turns the **public** backup strings — [`md1`](https://github.com/bg002h/descriptor-mnemonic) (wallet descriptor / policy) and [`mk1`](https://github.com/bg002h/mnemonic-key) (xpubs) — into an NFC NDEF payload the device can scan, and **refuses** the secret [`ms1`](https://github.com/bg002h/mnemonic-secret) so seed entropy never travels over RF.
 
-> **Status: converter (`me`) implemented; firmware support pending.**
+> **Status: converter (`me`) released at `v0.5.0`; firmware support shipped.**
 > The host-side converter validates a constellation string with the sibling
 > codecs and emits a TLV-wrapped NDEF Text record for `md1`/`mk1`; `ms1` is
-> refused (enter it by hand on the device's air-gapped CODEX32 keypad). The
-> SeedHammer firmware changes that make the device recognize `md1`/`mk1` are a
-> separate, future workstream. See
+> refused over RF (enter it by hand on the device's air-gapped CODEX32 keypad,
+> or deliver it through the encrypted sealed-payload path below). The SeedHammer
+> firmware that recognizes `md1`/`mk1` is **no longer a future workstream** — it
+> is implemented and released in the fork, together with the encrypted
+> sealed-payload delivery path. See
 > [`design/SPEC_seedhammer_engrave.md`](design/SPEC_seedhammer_engrave.md) for
 > the full, architect-reviewed design and
 > [`design/FOLLOWUPS.md`](design/FOLLOWUPS.md) for open items.
@@ -54,7 +56,7 @@ Tracked as F-88, F-90, F-94, F-103, F-104 and F-109 in
 [`design/SPEC_encrypted_payload_delivery.md`](design/SPEC_encrypted_payload_delivery.md)
 §2.2 item 16. All are scheduled to a **post-merge polish and hardening** phase
 that runs *after* the current tag, by explicit decision — the tag is
-`v0.0.0-g<sha>`, which marks a build rather than a product.
+`fork-v0.0.0-g<sha>`, which marks a build rather than a product.
 
 ### How this got shipped open, recorded plainly
 
@@ -156,8 +158,8 @@ sha256sum -c SHA256SUMS --ignore-missing
 (Step 1 is equivalent to `minisign -Vm SHA256SUMS -p minisign.pub` using the
 bundled key file.) Key rotation is an explicit, auditable change to this section.
 
-**Supported platforms (v0.3.0):** linux `amd64`/`arm64`, macOS `amd64`/`arm64`,
-windows `amd64`. **windows/arm64 is not supported in v0.3.0** (no
+**Supported platforms (v0.5.0):** linux `amd64`/`arm64`, macOS `amd64`/`arm64`,
+windows `amd64`. **windows/arm64 is not supported in v0.5.0** (no
 GitHub-hosted runner; cross-MSVC is impractical).
 
 ## The constellation
