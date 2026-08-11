@@ -61,10 +61,30 @@ sh-sim b2b-int        # build cmd/emu from the integration branch, serve it
 | 1 — Cut/Skip untouched | **yes** | same `run_flow.go`, and `cmd/emu/platform.go:150` is a real park on `{timer, wakeups, events}` — the same shape as `platform_sh2.go:369-396` |
 | 2 — Back mid-cut | **yes** | `emuEngraver.Write` sleeps 1 ms per write, so a cut has duration to abort, and the mechanism under test — `defer e.pl.Wakeup()` reaching the platform's select — is implemented |
 | 3 — passphrase bracket | **yes** | GUI and timing only |
-| 4 — abort → resume | **sequencing only** | `emuEngraver` accepts the step stream and **discards** it, and `sh-sim`'s own header states the curve is ranged once and never resumed |
+| 4 — abort → resume | **motion, yes; steel, no** | `emuEngraver` now DECODES the step stream (`emu-toolpath` branch, `4b68c18`) — see below |
 
 Shrink `idleTimeout` in the simulator build to iterate in seconds rather than
 waiting 3:00 per attempt — there is no `synctest` in a browser, the clock is real.
+
+**Reading 4 in the simulator.** `window.shToolpath` reconstructs where the head
+would actually have gone, decoded from the DMA words the driver emits — so the
+resume comparison is a digest, not an inspection:
+
+```js
+shToolpath.reset()                              // then cut straight through
+a = JSON.parse(shToolpath.summary())
+shToolpath.reset()                              // then Back mid-cut, hold to resume
+b = JSON.parse(shToolpath.summary())
+a.digest === b.digest                           // same motion?
+b.returnsToOrigin                               // must be FALSE
+```
+
+`returnsToOrigin` is the F-108 failure by name: a zeroed `SafePointer.history`
+makes `Resume` feed `appendLine` from a cleared `safePoint`, and the catch-up
+drives home at `T:0`. `shToolpath.svg()` draws it if you want to see it.
+
+This is what the motion *would* be, not what the steel *is*. Stroke depth, burr,
+smear and anything mechanical still need reading 4 on the machine.
 
 **This does not remove the hardware session.** It changes what a hardware failure
 *means*: with the simulator green, a device that disagrees is telling you
