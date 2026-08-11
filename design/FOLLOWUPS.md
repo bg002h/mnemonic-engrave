@@ -348,7 +348,12 @@ hence the plate, hence the goldens, in a way a speed change does not.
 **`post-merge polish and hardening`** was created by operator ruling 2026-08-10
 to hold work that binds but does not gate the merge. It now holds two groups:
 
-- **seed residue** — **F-88**, **F-90**, **F-104** (assigned 2026-08-10)
+- **seed residue** — **F-88**, **F-90**, **F-104**, **F-94**, **F-87**
+- **the wipe's own reliability** — **F-103** (spurious touch input stops
+  §10.2.4 firing *at all*, silently) and **F-109** (~35 K in ~81 reachable
+  objects, unidentified, possibly seed-bearing)
+- **motion** — **F-114**, whose severity is undetermined: efficiency if the
+  resume traverse is motion-profiled, plate integrity if it is not
 - **font and rendering** — **F-78**, **F-86**, **F-95**, **F-119**
   (assigned 2026-08-10, formerly "the font cycle")
 
@@ -371,11 +376,24 @@ documentation, not only here"*, and the items it already carries are exactly thi
 shape: item 9 (an open session's plaintext is SWD-readable), item 12 (other
 programs do not wipe), item 13 (the plate under the needle). A version number is
 not operator documentation, and an operator engraving a real seed does not read
-semver. So §2.2 should gain **one sentence** saying the wipe does not reach every
-copy inside the payload flow, with a pointer to this phase.
+semver. So §2.2 should say, plainly, what the tagged build's wipe does and does not do.
+With F-103 and F-109 now in this phase too, that is more than the single sentence
+first proposed — it is **two**:
 
-One sentence, not the amendment originally proposed — the tag being `v0.0.0`
-removes the urgency, not the honesty.
+1. the wipe does not reach every copy of a secret inside the payload flow
+   (F-88/F-90/F-94/F-104), and ~35 K in ~81 reachable objects survives it
+   unidentified (F-109); and
+2. the wipe **can be prevented from firing at all**, silently, by a touch panel
+   reporting spurious events — no warning, no wipe (F-103).
+
+The second is the one that matters most to an operator, because it is not
+"some residue survives" but "the control you are relying on may never run".
+
+**Structural consequence to settle:** the *fable whole-diff review of ALL of
+Phase 2* was created by the 2026-08-10 ruling specifically to hold F-109. With
+F-109 moved here, that gate now has **no assigned items**. It either becomes part
+of this phase as well, or still runs pre-tag on the whole diff on its own merits.
+Nobody has decided which, and it should not be decided by omission.
 
 
 ## Reconciliation — 2026-08-10, on B2b closing
@@ -1510,7 +1528,9 @@ argv. The spec is silent — `grep -niE "argv|command.?line|/proc"` over
 `SPEC_encrypted_payload_delivery.md` returns nothing — so §12's threat model
 should gain a line either way.
 
-### F-103 — the PROTECTIVE SCREEN FILM silently disables §10.2.4's wipe, the screensaver, and every idle behaviour (owning phase: **B2c**, and it belongs in the operator docs before any release)
+### F-103 — the PROTECTIVE SCREEN FILM silently disables §10.2.4's wipe, the screensaver, and every idle behaviour (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling; the concerns below were raised and the operator decided). Was: B2c, and it belongs in the operator docs before any release.
 
 **MECHANISM CONFIRMED 2026-08-10, and the entry is both under- and
 over-stated.** `design/agent-reports/2026-08-10-f103-screen-film-mechanism.md`.
@@ -2157,7 +2177,9 @@ when a basename matches more than one file, **fail as AMBIGUOUS** rather than
 picking one. Prefer a repo-relative citation (`codex32/checksum.go:132`) and
 teach the gate to require one where the basename is not unique.
 
-### F-114 — a resumed cut approaches its safe point FROM THE ORIGIN, wherever the head actually is (owning phase: **post-B2b, before the release tag**)
+### F-114 — a resumed cut approaches its safe point FROM THE ORIGIN, wherever the head actually is (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling; the concerns below were raised and the operator decided). Was: post-B2b, before the release tag.
 
 Found on hardware 2026-08-10 (reading 4a) while validating F-107/F-108, and it
 is **not** a residency defect — it is pre-existing upstream behaviour that the
@@ -2359,7 +2381,9 @@ nothing calls `Scrub` on any of these paths. **This is the pre-existing product,
 not B2b**, which is why it is scheduled after the phase rather than inside it —
 but it means "the machine wipes the rendered seed" is not true in general.
 
-### F-109 — ~35 K in ~81 REACHABLE objects survives every wipe, unidentified (owning phase: **the fable whole-diff review of ALL of Phase 2** — operator ruling 2026-08-10)
+### F-109 — ~35 K in ~81 REACHABLE objects survives every wipe, unidentified (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
+
+**RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling; the concerns below were raised and the operator decided). Was: the fable whole-diff review of ALL of Phase 2 — operator ruling 2026-08-10.
 
 **OPERATOR RULING 2026-08-10 — re-assigned to the fable whole-diff review of all
 of Phase 2.** This item was OVERDUE: its owning phase was B2b, and B2b was
