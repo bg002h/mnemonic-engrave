@@ -86,12 +86,20 @@ several overrule a documented prior decision and are marked where they do.
     confirmed before the KDF.** Operator ruling 2026-08-11.
 
     Seed entry never needed a terminator because N was known; passphrase entry
-    has no natural end. The `done` key is a **per-instance opt-in on the
-    passphrase instance only**, following the pattern
-    `gui/passphrase_keyboard.go:80` already documents for `NewTextKeyboard`'s
-    newline key — "a PER-INSTANCE opt-in, not a fourth shared page entry,
-    because `PassphraseKeyboard` is also `NewAddressKeyboard` and BIP-85 index
-    entry." An unconditional key would appear where it means nothing.
+    has no natural end.
+
+    **`done` is a SCREEN-LEVEL BUTTON, not a keyboard key** — corrected by R0
+    round 5 (B), which found the earlier wording unbuildable two ways at once.
+    The word path builds `NewKeyboard` (`gui/gui.go:728`), **not**
+    `PassphraseKeyboard`, so an opt-in on the latter would appear on the
+    free-text path and never on the one needing a terminator. And `NewKeyboard`
+    has no opt-in parameter at all, while its `rune()` would feed a `done` rune
+    into `Fragment` and **panic in `bip39.ClosestWord`**.
+
+    So the terminator lives where the existing nav affordances live — beside the
+    back arrow and the checkmark, outside the key grid. That needs no keyboard
+    change, cannot reach `Fragment`, and appears only on the screen that draws
+    it. The free-text path needs no terminator: it has no word count to end.
 
     **The confirmation is the safety, not the key.** Both a misplaced `done`
     press and an accept-on-empty-field would silently truncate the passphrase,
@@ -169,11 +177,10 @@ routed, rather than latent and undocumented.
    so it cannot simply be removed. §8b's per-invocation ruling is about
    `refreshCands`, not about `unlockPassphraseFlow`, and naming only the latter
    left the actual blocker in place.
-9. **A per-instance `done` key** (§8c) — on the keyboard the WORD path actually
-   builds. R4-I2: the word path constructs `NewKeyboard` (`gui/gui.go:728`), not
-   `PassphraseKeyboard`, so an opt-in added to the latter would appear on the
-   free-text path and never on the one that needs a terminator. The free-text
-   path needs no `done` key at all: it has no word count to end.
+9. **A `done` affordance for word entry** (§8c) — a screen-level button beside
+   the existing nav controls, **not** a keyboard key. §8c gives the reason the
+   keyboard route is unbuildable: `NewKeyboard` has no opt-in parameter, and a
+   `done` rune would panic in `bip39.ClosestWord`.
 
 ## 3. Architecture
 
@@ -377,7 +384,6 @@ one can fire.
 | F1 | admitted class is secret **and** container is plaintext | this secret is unencrypted in flash; offers erase (§5.5) |
 | F2 | admitted class is secret **and** the passphrase is not `[cliff]`-above (§12.1) | this secret is weakly protected |
 | F3 | always, for anything not typed | the source, at the point of use (§3.2) |
-| F5 | the payload cannot be consumed at all: secrets-only, and not `[cliff]`-above, so `[compared]` can never be set (§12.2) | this payload cannot be opened for use on this machine; re-create it with five or more BIP-39 words |
 | F4 | admitted class is secret **and** source is NFC | this secret arrived with **no integrity check at all** — §5.4 scopes digest verification to flash, so nothing stands behind a tag's contents |
 
 ## 4. The flash region
@@ -638,21 +644,11 @@ This section states no version of it. R1-C4 is why the rule needs a home at all:
 it found the sealed variant's main case unusable and tests 9 and 15 mutually
 unsatisfiable, because two sections had each answered the question differently.
 
-**The AEAD route is scoped to strong keys, and R2 is why (operator ruling
-2026-08-11).** The first fold said any successful open sets `[compared]`, on the
-grounds that a cryptographic tag beats a human reading sixteen hex digits. That
-is true only while the key is strong. This spec permits **22 bits** (2 words, 42
-seconds on one GPU) and treats user-supplied as **0 bits** — so an attacker
-brute-forces the passphrase, produces a payload that opens cleanly, and the flag
-that was supposed to mean "authenticated" is set by the attack itself. A tag
-proves someone knew the passphrase; that is worth exactly what the passphrase is
-worth.
-
-**Consequence, stated rather than discovered:** a *secrets-only* sealed payload
-under a not-`[cliff]`-above passphrase **cannot be consumed at all** — it has no digest to
-compare and no qualifying open. That is the honest outcome. The alternative is a
-payload the machine calls authenticated because someone guessed a two-word
-passphrase in under a minute.
+**This section once scoped the AEAD route to strong keys. It no longer does —
+see D1 in §13.** The reasoning was sound as security (a tag is worth what the
+passphrase is worth, and this spec permits 22 bits) and wrong as a trade: it
+made `--passphrase-ask` over secret-only records permanently unconsumable. The
+rule now lives in `[compared]` (§12.2) and nowhere else.
 
 A secrets-only sealed payload (`pub_len == 0`) displays no digest — see
 `[digest-shown]` — so there is nothing for the operator to compare. What may
@@ -763,8 +759,8 @@ either direction, which is the only property the rule in §6.2 rests on.
 | 6 | 66 | 2.3×10⁷ y | 2.3×10⁵ y |
 | 12 *(default)* | 132 | 1.7×10²⁷ y | 1.7×10²⁵ y |
 
-**Entropy falls off a `[cliff]` between 4 and 5 words**, which is where the
-threshold in `[cliff]` (§12.1) came from. A 2-word passphrase is not weak
+**Entropy falls off sharply between 4 and 5 words**, which is where §12.1's
+threshold came from. A 2-word passphrase is not weak
 protection; it is none — 42 seconds is less time than it takes to type it.
 
 **But `[cliff]` counts words, not bits.** This table describes what *uniform
@@ -773,8 +769,8 @@ degenerate passphrase sits at zero bits and is `[cliff]`-above.
 
 ### 6.2 The rule — and the metric it needs, which the first draft omitted
 
-**Below 5 words (55 bits) over secret content, `me` requires an explicit
-command-line flag.** Public-only content is unrestricted. `me` always prints
+**Over secret content, a passphrase that is not `[cliff]`-above makes `me`
+print a warning** — it once *refused* without `--allow-weak`; demoted, §13. Public-only content is unrestricted. `me` always prints
 what the choice bought; the device flags at load when secret material is
 protected by less than `[cliff]`.
 
@@ -785,7 +781,8 @@ a flag, and a 2-word passphrase is strictly stronger than that.
 
 #### 6.2.1 How strength is computed — NORMATIVE
 
-The rule above says "below 5 words (55 bits)". That is measurable for a
+An earlier version of the rule above named its own threshold in bits. That was
+measurable for a
 *generated* passphrase and **meaningless for a user-supplied one** —
 `correct horse battery staple` has no word count in the wordlist sense and
 `Tr0ub4dor&3` has none at all. The first draft of this spec stated the gate in
@@ -874,6 +871,11 @@ already in `FOLLOWUPS.md`, and one the operator's 2..24 range creates.
 (`seal/open.go:76`), so the free-text path necessarily holds a seed-equivalent
 passphrase in allocations nothing can scrub — the exact shape `passphraseBytes`
 exists to avoid.
+
+**Scope: this section is about the systemwide paths only** (§8a's free-text
+entry and the §6.2.2 buffer), not about the Sealed Payload program, which is
+frozen and keeps its own residency rules. R4-M8 asked for that clause twice; it
+was missed twice.
 
 **This is consistent with decision 2, not a violation of it.** These programs
 are the non-wiping class: they leave secret material resident with no timer
@@ -1116,10 +1118,10 @@ rather than only on hardware.
 22. **(§8c)** A `done` press mid-passphrase yields a confirmation naming the
     SHORT count, not the intended one — the truncation is visible before the
     KDF.
-23. **(R3-M6)** A secrets-only payload that is not `[cliff]`-above raises F5 and
-    is refused for consumption, with the reason named. Without this the state is
-    reachable and silent: the operator sees a payload that opens and no records
-    they may use.
+23. **(§13)** A secrets-only sealed payload opens and its records are usable
+    **whatever the passphrase** — the demoted rule, asserted so it cannot creep
+    back. An earlier spec refused this case, and R0 round 5 measured that it
+    made `--passphrase-ask` over secret-only records permanently unconsumable.
 
 ## 9. Open items
 
@@ -1171,9 +1173,15 @@ required remembering the rule that had just been forgotten.
 
 So from here: **every rule below is defined HERE and nowhere else.** Any other
 section that needs one references it by name — `[cliff]`, `[compared]` — and
-states no version of its own. `scripts/spec-check.py` enforces that: a
-definitional phrasing found outside this section is a build failure, not a
-review finding.
+states no version of its own.
+
+`scripts/spec-check.py` **helps, and is not sufficient** — R0 round 5 measured
+it at 3 kills in 11 mutants. It forbids the bare governed term, which stops a
+restatement that *names* the rule; it cannot stop one that paraphrases the rule
+without ever writing the word. An earlier version of this paragraph called a
+second definition "a build failure, not a review finding", which was the third
+over-claimed control in this cycle and the same habit F-123 was filed against.
+The gate is a safety net under a discipline, not a replacement for it.
 
 ### 12.1 `[cliff]`
 
@@ -1213,18 +1221,21 @@ The two must never be conflated: bits describe entropy, `[cliff]` counts words.
 
 - **the operator comparing the displayed EPD§6.6 digest**, which exists only
   when `pub_len > 0`; **or**
-- **a successful AEAD open whose passphrase is `[cliff]`-above.**
+- **any successful AEAD open**, whatever the passphrase.
 
-**A sub-cliff open does NOT set it.** A tag proves someone knew the passphrase,
-which is worth exactly what the passphrase is worth — and `[cliff]` admits
-zero-entropy passphrases by design, so the open is forgeable in precisely the
-cases `[cliff]` waves through.
+**DEMOTED 2026-08-11 (operator ruling; see §13).** An earlier version scoped the
+AEAD route to `[cliff]`-above passphrases, so a forgeable open under a weak one
+could not count as authentication. That is a security property and it cost a
+workflow — R0 round 5 measured the consequence, and it is worse than it looks:
+`me sysw pack --passphrase-ask` over secret-only records closes **both** routes
+at once (no digest exists at `pub_len == 0`, and §12.1 puts every user-entered
+non-BIP-39 password below the threshold), so **the very mode decision 8 fought
+to restore produced a payload no device could ever consume** — while `me` exited
+0 and warned nothing.
 
-**Consequence, stated so it is not discovered:** a *secrets-only* sealed payload
-(`pub_len == 0`) under a sub-cliff passphrase **cannot be consumed at all.** It
-has no digest to compare and no qualifying open. That is the honest outcome; the
-alternative is a machine reporting "authenticated" because someone typed
-`abandon` five times.
+The operator's criterion here is workflow, not security. So: an open is an open.
+Flag F2 still tells the operator the payload was weakly protected, and they
+proceed.
 
 ### 12.3 `[identity]`
 
@@ -1255,3 +1266,31 @@ that every such payload would share.
 equal to 8. `passphrase.MaxLen = 100` does **not** apply: its own comment calls
 it "a plate-capacity limit chosen for legibility", a fact about steel rather
 than about entry.
+
+## 13. What was demoted, and why — operator ruling 2026-08-11
+
+**"We don't care much about security for this feature, only look for things that
+block workflow."** Combined with the earlier ruling that this is "the unsafe
+branch to begin with and only modest effort is put in to ensuring safety."
+
+This section exists so a later reader sees **decisions, not drift**. Each row
+was a deliberate security mechanism; each was demoted because its only visible
+effect was to stop an operator doing something.
+
+| # | was | is now | what it cost |
+| --- | --- | --- | --- |
+| D1 | `[compared]` set only by a `[cliff]`-above AEAD open | set by **any** successful open | `me sysw pack --passphrase-ask` over secret-only records produced a payload **no device could ever consume**, with `me` exiting 0 and warning nothing (R0 round 5 A) |
+| D2 | flag F5 + test 23: refuse the unconsumable payload | **deleted** | the state D1 created no longer exists, so the flag that named it has nothing to name |
+| D3 | `me` **refuses** sub-threshold passphrases over secret content without `--allow-weak` | **prints a warning and proceeds** | a refusal at creation for a property the operator has declassified. *This reverses an operator ruling of the same day, on the operator's instruction* |
+
+**What was NOT demoted**, because none of it refuses anything: F2 still warns
+that a payload was weakly protected; F1 still warns that a secret sits
+unencrypted in flash; §6.2.2a still records that residue is accepted; §6.2.2's
+no-regrow buffer is an implementation constraint, not a gate.
+
+**And nothing in the workflow-blocking class was touched.** Payloads that cannot
+be opened, passphrases that cannot be typed, host/device disagreements that make
+an artefact unusable, and §2.2 item 8's obstacle table are the defects every R0
+round from 1 to 5 actually found, and they remain blocking. The demotions above
+are the opposite class: mechanisms that worked exactly as designed and were not
+worth what they cost.
