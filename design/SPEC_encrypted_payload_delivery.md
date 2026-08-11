@@ -1208,7 +1208,7 @@ is ever needed it MUST NOT be an operator-facing flag.
   is inside the digest — but it tells the operator which `me hash` flag to pass
   when re-deriving.
 - Writes the `.uf2` with mode `0600`, matching `write_private`
-  (`crates/me-cli/src/main.rs:590`, the mode set at `:597`).
+  (`crates/me-cli/src/main.rs`), which sets the mode on CREATE.
 
 A sibling subcommand re-derives the hash with no passphrase, no seal operation
 and no original file, so the expected value can be regenerated months later:
@@ -1608,7 +1608,7 @@ this scope note exists to answer.
 
 | Condition | Timer | Rationale |
 | --- | --- | --- |
-| **any** secret record resident, not actively engraving | **3 min**, 30 s warning | The operator has just typed twelve words; they are standing there. Reuses the existing `idleTimeout` value (`gui/gui.go:2932`). |
+| **any** secret record resident, not actively engraving | **3 min**, 30 s warning | The operator has just typed twelve words; they are standing there. Reuses the existing `idleTimeout` value (`gui/gui.go`). |
 | actively engraving, any plate | **paused** | Never wipe mid-plate, needle down. A plate is ~21 min of untouched screen and that is not idleness. |
 | **no** secret record resident **and no passphrase in flight** | **none** | Public data only. Nothing to protect. |
 | **4. a passphrase is being typed** — §10.2 step 5's keyboard, before any unlock | **3 min**, 30 s warning | An in-flight passphrase derives the key that opens everything, so it is **seed-equivalent** (operator ruling 2026-08-09). Twelve words on a touch keyboard is the longest manual step in the flow and the likeliest place to be interrupted — with the sealed blob in flash beside them. |
@@ -1623,7 +1623,7 @@ that the engrave screen is visible: the hold-to-start and plate-done screens are
 **The 30 s warning is ADDITIVE, not inclusive.** *(Amended 2026-08-09.)* Row 1's
 "3 min" is the deadline for the **warning**, not for the wipe: the warning
 appears at **3:00** of idleness and the wipe fires at **3:30**. `idleTimeout`
-(`gui/gui.go:2932`) is therefore reused *unchanged* as the warning's deadline,
+(`gui/gui.go`) is therefore reused *unchanged* as the warning's deadline,
 and the 30 s is a separate constant applied on top of it. The alternative
 reading — warn at 2:30, wipe at 3:00 — is **rejected**: it would require deriving
 a second constant from `idleTimeout` rather than reusing it, and would leave the
@@ -1685,7 +1685,7 @@ warning collides deterministically with the screensaver on the same tick because
 row 1 reuses the same constant, and `ctx.Done` — the only unwind — had never been
 set in production.)*
 
-`idleTimeout` (`gui/gui.go:2932`) supplies the 3-minute constant, and
+`idleTimeout` (`gui/gui.go`) supplies the 3-minute constant, and
 `time.Now()` / `ctx.WakeupAt` / `Platform.AppendEvents` the monotonic clock — no
 RTC. The mechanism is new and lives in `Run`: a residency seam on `Context`
 installed for the secret session's lifetime; a `Run`-drawn warning that takes the
@@ -2202,7 +2202,7 @@ the consumer that will parse it.
    plate is cut or skipped, which takes a **3-minute** timer with a 30-second
    warning — the operator has just typed twelve words and is standing at the
    machine. Paused during engraving; absent afterwards. The timer source was
-   already in use (`gui/gui.go:2932`).
+   already in use (`gui/gui.go`, `idleTimeout`).
 9. **Public-only payloads are unauthenticated** (§2.2 item 11). Accepted with
    the §10.2.3 warning and the §6.6 hash; `me seal` encrypts by default so
    plaintext is a deliberate opt-in. Revisit only if a signing story ever exists
