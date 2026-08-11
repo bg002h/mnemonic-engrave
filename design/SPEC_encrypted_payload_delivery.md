@@ -184,6 +184,33 @@ This list is normative and belongs in operator documentation, not only here.
       already wipes, it keeps wiping; this item governs what may be *left
       undone*, not what may be *undone*.
 
+13. **The plate under the needle, for the whole of its cut.** §10.2.2 wipes a
+    secret record as soon as its plate is cut or skipped, and §10.2.4 wipes on
+    idleness — but neither can touch the plate *currently being engraved*,
+    because that geometry **is** the thing the machine is cutting. A secret
+    plate is roughly 21 minutes, and for all of it the seed is recoverable from
+    SRAM by anyone with physical access and an SWD probe (§3 measured
+    `debug enable: 1` and `secure debug enable: 1` on this device). Zeroing it
+    mid-cut would not protect the seed; it would ruin the plate and still leave
+    the operator holding a half-engraved one.
+
+    Same register as item 9, and the same control: **physical custody**, not
+    cryptography. See §2.3's operating rule.
+
+    **This is narrow, and it has been read too broadly before.** It licenses
+    exactly one thing: the geometry of the plate under the needle, while it is
+    under the needle. It does **not** license plate geometry persisting
+    generally — once a plate is cut its spline is ordinary secret material and
+    is zeroed like any other (F-108). It does not extend to records whose
+    plates are finished, and it does not extend past the cut by so much as a
+    frame.
+
+    **Why §10.2.2's wording matters here.** The operator is told the machine
+    "removes the secret", and what it removes is the *record*. During a cut the
+    seed is also live as **geometry**, which is not a record and which no wipe
+    reaches. The two are the same secret in different clothes, and an operator
+    who reads "wiped" as "gone" is wrong for the length of a plate.
+
 ### 2.2a What admitting `ms1` changed (operator sign-off, 2026-08-07)
 
 Before this decision the envelope could carry only public constellation data —
@@ -221,6 +248,11 @@ And, once bundles exist (§10.2.2): **Lock before leaving the machine — at eve
 plate swap, not only at the end.** A blanked screen is not a locked machine; per
 §2.2 item 9 the screensaver leaves plaintext live in SRAM, where SWD reads it
 without the passphrase.
+
+And, per §2.2 item 13: **a plate in progress is not protected by anything.** The
+wipe timers cannot touch the geometry under the needle, so a ~21-minute secret
+cut is ~21 minutes of physical-custody-only. Do not start one you will walk away
+from.
 
 And, per §2.2 item 12: **the machine offers two classes of program, and only one
 of them wipes.** Use **Sealed Payload** for anything you intend to protect. The
