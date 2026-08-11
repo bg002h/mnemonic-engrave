@@ -200,8 +200,26 @@ the same reason.
 | 5c | `inputWordsFlow` gains the per-invocation checksum switch and a `done` nav button in `Button2` (spec §8b, §8c) |
 | 5d | `backupWallet`'s `newInputFlow`, then BIP-39 Password, Engrave Text, Engrave Bundle |
 
-`inputWordsFlow`'s signature changes — this is the one existing signature that
-must, and every call site is in spec §3.1's table:
+`inputWordsFlow`'s signature changes — the one existing signature that must.
+
+**CORRECTED 2026-08-11 by grep, before stage 5 rather than during it.** An
+earlier draft said "every call site is in spec §3.1's table". That table
+enumerates **`seedEntryFlow`**'s sites; `inputWordsFlow` is a different function
+with different callers. Measured:
+
+| callers | where |
+| --- | --- |
+| 5 non-test | `derive_xpub.go:90`, `seedxor_polish.go:52`, `unlock_kdf.go:160`, `gui.go:2346`, `gui.go:2445` |
+| 8 test | `gui_test.go` ×8 |
+
+**One of them is inside the frozen path.** `unlock_kdf.go:160` is the Sealed
+Payload unlock, which decision 1 froze. Adding an options struct whose zero
+value is today's behaviour touches it mechanically and changes nothing it does —
+but say so at the call site, because "frozen" and "I edited a function it calls"
+must not be reconciled by a future reader guessing.
+
+All five non-test sites are seed or passphrase entry that WANT the checksum, so
+every existing site passes `checksumGate: true`.
 
 ```text
 func inputWordsFlow(ctx *Context, th *Colors, mnemonic bip39.Mnemonic,
