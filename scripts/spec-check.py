@@ -22,8 +22,10 @@ spot is worse than no gate:
   * It cannot find a rule stated in one place and simply ABSENT elsewhere —
     only contradictions between texts it knows to compare. Round 2's I1 (the
     scope list missing device-side work) would NOT be caught by this.
-  * The INVARIANTS table is hand-written per spec. A new rule added to the
-    document without a line here is unguarded.
+  * The INVARIANTS and SINGLE_DEF tables are hand-written and PHRASING-SHAPED.
+    R0 round 4 measured SINGLE_DEF at 1 kill in 5 mutants. They are a safety
+    net, not the mechanism. BARE is the mechanism: it forbids the bare term
+    rather than trying to recognise a definition, so no wording evades it.
   * Line-number citations are checked for FILE EXISTENCE AND LINE RANGE ONLY.
     A citation redirected to an unrelated line in the same file passes. R0
     round 3 mutation-tested this and was right to: the previous version of this
@@ -160,6 +162,38 @@ SINGLE_DEF = [
 ]
 
 
+# ------------------------------------------------------------- bare terms --
+# THE STRUCTURAL CHECK. R0 round 4 measured the phrasing-based check at 1 kill
+# in 5 mutants: a regex over "definitional phrasings" can only catch the
+# phrasings its author imagined, so it can never be structural.
+#
+# This does not try to recognise a definition. It makes restating one
+# unwritable: outside §12, the term may appear ONLY in its reference form.
+# No wording evades it, because it never inspects the wording.
+BARE = [
+    ("cliff", r"\bcliffs?\b", "[cliff]"),
+    ("compared", r"`compared`", "[compared]"),
+    ("identity", r"`identity`", "[identity]"),
+]
+
+
+def check_bare_terms(text, errs, notes):
+    """Outside §12, a governed term may appear only as its [reference]."""
+    m = re.search(r"^## 12\. ", text, re.M)
+    if not m:
+        errs.append("§12 missing — nothing owns the rules")
+        return
+    body = text[:m.start()]
+    for term, pat, ref in BARE:
+        masked = body.replace(ref, "\x00" * len(ref))
+        for mm in re.finditer(pat, masked, re.I):
+            line = masked[:mm.start()].count("\n") + 1
+            errs.append(f"[{term}] line {line}: bare {mm.group(0)!r} outside §12 — "
+                        f"write {ref}. Any prose about it is a second definition "
+                        f"waiting to happen")
+    notes.append(f"{len(BARE)} governed terms appear only as references outside §12")
+
+
 def check_single_def(text, errs, notes):
     """A rule may be DEFINED in exactly one place: §12."""
     m = re.search(r"^## 12\. ", text, re.M)
@@ -178,8 +212,6 @@ def check_single_def(text, errs, notes):
 
 def check_tests(text, errs, notes):
     """Named tests must be numbered without gaps or duplicates."""
-    nums = [int(n) for n in re.findall(r"^(\d+)\. \*\*\(|^(\d+)\. ", text, re.M) and
-            re.findall(r"^(\d+)\. ", text, re.M)]
     sec = re.search(r"### 8\.3 Named tests(.*?)(?=^## )", text, re.M | re.S)
     if not sec:
         errs.append("§8.3 Named tests not found — the test list is unguarded")
@@ -223,6 +255,7 @@ def main():
     check_cross(text, errs)
     check_citations(text, errs, notes)
     check_single_def(text, errs, notes)
+    check_bare_terms(text, errs, notes)
     check_tests(text, errs, notes)
 
     print(f"spec-check: {path}")
