@@ -159,6 +159,53 @@ The reason this is nonetheless a reasonable trade: the alternative delivery
 routes for a seed card are typing 24 words on a touchscreen or sending them in
 the clear over NFC. Neither is better, and the second is worse.
 
+12. **Secrets handled by any program OTHER than Sealed Payload.** §10.2.4's
+    residency wipe, §10.2.2's secrets-first lifecycle and the `Scrub` brackets
+    are scoped to the **Sealed Payload program's session**. Every other program
+    on this machine — NFC scan, manual word entry, BIP-85 derivation, account
+    xpub, SeedXOR, SLIP-39, free text, the backup/inspect screens — may leave
+    seed material resident in SRAM and in the frame buffer with **no wipe at
+    all**, indefinitely, and that is **accepted rather than a defect**.
+
+    *Operator ruling 2026-08-10.* Three things make it defensible:
+
+    - **The alternatives are already worse, and the operator chose one.** As
+      this section says above, the other delivery routes for a seed card are
+      typing 24 words on a touchscreen or sending them **in the clear over
+      NFC**. A wipe bracket downstream of an over-the-air plaintext delivery
+      protects nothing that was ever protected.
+    - **There is a hardened path and it is complete.** Sealed Payload is not a
+      subset of the legacy programs' function — it engraves every `m*` string,
+      so an operator who wants the guarantee never has to give up capability to
+      get it.
+    - **The guarantee is honest about its own edge.** Claiming a machine-wide
+      wipe while five legacy flows leak would be worse than claiming a
+      program-scoped one that holds.
+
+    **The boundary is the PROGRAM, not the data's provenance.** A legacy
+    program that reads an encrypted payload does **not** inherit this
+    discipline; conversely, anything inside the Sealed Payload session carries
+    it regardless of how the bytes arrived. This is not a new constraint on the
+    implementation — it is what `gui/wipe_guard.go` already does, since the
+    guard's lifetime *is* `unlockSecretSession`'s own first and last act.
+
+    **What this does NOT license.** Stated narrowly and deliberately, because
+    §2.2's other accepted limitation (F-83, the plate under the needle) was
+    read far too broadly and cost two follow-ups to unwind:
+
+    - It does not weaken anything **inside** the Sealed Payload session. Every
+      residency finding whose subject sits in `unlockSecretSession` or
+      `unlockPassphraseFlow` still binds in full.
+    - It does not cover the Sealed Payload program's **own** inspect and plate
+      paths. If the operator is in that program, the discipline applies to
+      every screen it reaches.
+    - It is **not** a claim that the legacy programs are secure. It is a claim
+      that they are **not claimed** to be, which is a different and weaker
+      statement, and the operator documentation must carry it as such.
+    - It does not license removing an existing scrub. Where a legacy flow
+      already wipes, it keeps wiping; this item governs what may be *left
+      undone*, not what may be *undone*.
+
 ### 2.3 The operating rule that follows
 
 **The passphrase must never be stored with the machine.** The entire security
@@ -168,6 +215,15 @@ And, once bundles exist (§10.2.2): **Lock before leaving the machine — at eve
 plate swap, not only at the end.** A blanked screen is not a locked machine; per
 §2.2 item 9 the screensaver leaves plaintext live in SRAM, where SWD reads it
 without the passphrase.
+
+And, per §2.2 item 12: **the machine offers two classes of program, and only one
+of them wipes.** Use **Sealed Payload** for anything you intend to protect. The
+legacy programs — NFC scan, manual entry, BIP-85, xpub, SeedXOR, SLIP-39, free
+text — leave seed material resident with no timer behind them, so with those the
+operating rule is the older one: do not walk away from a powered machine, and
+power it down when you are done. This distinction is **operator-facing** and
+belongs in the documentation, not only here: someone who has watched the machine
+wipe itself in one menu will reasonably assume it does so in all of them.
 
 ## 3. Hardware facts — measured, not assumed
 
@@ -1308,6 +1364,17 @@ teach an operator to disable a control.
 
 The timer is therefore keyed on **whether any secret record is resident**, never
 on which button was last pressed:
+
+**SCOPE — read this before the table.** "Resident" means resident **within the
+Sealed Payload program's session**, not anywhere on the machine. This timer is
+implemented as the lifetime of that session's guard (`gui/wipe_guard.go`, whose
+bracket is `unlockSecretSession`'s own first and last act), and it makes **no
+claim** about seed material held by any other program — NFC scan, manual word
+entry, BIP-85, account xpub, SeedXOR, SLIP-39, free text. Those may hold
+plaintext indefinitely with no timer behind them; see **§2.2 item 12**, which
+accepts that explicitly and states what it does not license. A reader who takes
+the table's "any secret record" as machine-wide will file the same follow-ups
+this scope note exists to answer.
 
 | Condition | Timer | Rationale |
 | --- | --- | --- |
