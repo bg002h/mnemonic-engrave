@@ -4533,3 +4533,49 @@ caught a real defect:
 Use `crates/me-cli/testdata/sysw_vectors.json`, padded to a region the way
 `me sysw pack --region` does, so the fixture is the artifact that actually gets
 flashed rather than a hand-built blob.
+
+#### F-145 — PARTIALLY DONE 2026-08-12, and its stated reason was wrong `#mnemonic`
+
+Three tests landed in `seedhammer` `9134ca0`, each mutation-checked. **Correction
+first:** F-145 claimed the gui harness had no Platform fake with a `SyswReader`
+and no region fixture. Both already existed — `testPlatform.sysw` with
+`SyswReader()` (`gui_test.go:343,447`) and `sysw.FileReader`
+(`sysw/read_host.go:9`). The gap was real; the reason given for it was written
+from assumption rather than a grep, which is the same failure the entry above it
+is about.
+
+Covered and proven to fail when the code is broken: the additive property (nil
+reader and probe-false return false, create no session, never call `Read()`),
+boot **SKIP** leaving the machine untouched, and §5.2's "never say unreadable".
+
+Still uncovered, and now blocked on F-146 rather than on fixtures: malformed and
+truncated regions producing no session, unsealed-with-digest in both operator
+directions, and sealed with the right and wrong passphrase.
+
+### F-146 — gui flow outcomes cannot be asserted: `runUITouch` gives the test goroutine no synchronised view (owning phase: **systemwide payloads**) `#mnemonic`
+
+Filed 2026-08-12 from writing F-145's tests, and it is why three of them are
+missing rather than merely unwritten.
+
+`runUITouch` drives a flow as an `iter.Pull` coroutine on another goroutine. A
+test can observe what was DRAWN — `pumpUntil` on frame text works, and is what
+the surviving assertions use — but it cannot reliably observe what the flow
+RETURNED or what it wrote to `ctx`. Reads of a captured variable or of
+`ctx.sysw` from the test goroutine are unsynchronised and can be stale.
+
+**Measured, not deduced.** A mutant that made the malformed-region path build a
+session and return `true` left the test PASSING. The mutation was verified to
+have landed (the first attempt matched nothing and silently "passed" — a
+false-survivor that nearly got recorded as evidence of coverage). Those
+assertions were then deleted rather than kept as decoration.
+
+**What it needs:** a way to run a flow to completion and hand its result back
+with a happens-before edge — a done channel closed by the coroutine and waited
+on by the test, or a harness variant that returns the flow's value. Every gui
+flow test today asserts only on drawn text, so this is not specific to `sysw`:
+**no gui flow's return value or context mutation is under test anywhere.** That
+is a large blind spot on a firmware whose flows decide whether a secret is
+handed to a program.
+
+Do this before F-145's remaining cases; without it they would be written, pass,
+and prove nothing.
