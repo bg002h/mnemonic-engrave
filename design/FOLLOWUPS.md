@@ -4625,3 +4625,53 @@ truncated regions producing no session, unsealed-with-digest in both operator
 directions, sealed with the right and the wrong passphrase). The buffer-contract
 test committed with the C1 fix covers the initialisation defect itself; these
 cover the flow around it.
+
+### F-147 — I claimed `clippy clean` in three commit messages while it was RED, because `cmd && echo OK` prints nothing when cmd fails (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-12. Found by the stage 7/8 implementer, not by me, and confirmed
+by checking out the commit into a worktree and running clippy there:
+
+```
+$ git worktree add /tmp/wt c49199b && cd /tmp/wt
+$ cargo clippy -p mnemonic-engrave --all-targets -- -D warnings
+error: this `repeat().take()` can be written more concisely
+error: could not compile `mnemonic-engrave` (test "sysw_cli")
+exit 101
+```
+
+The offending line is mine — `std::iter::repeat("abandon").take(40)` in the
+passphrase-bounds test added at `b34944d`. So **`b34944d`, `4692e40` and
+`470c43f` all carry a gate claim that was false when written.**
+
+**The mechanism, which is the point.** I verified with
+
+```sh
+cargo clippy … >/dev/null 2>&1 && echo "  clippy clean"
+```
+
+When clippy PASSES this prints a line. When it FAILS it prints **nothing at
+all** — and nothing is what I then failed to notice, because I was looking for
+the presence of a problem rather than the absence of a confirmation. The commit
+was never gated on the exit status; the `&&` only decorated the transcript.
+
+This is [[empty-output-is-not-absence]] pointed at my own tooling, and the exact
+inverse of the `gofmt -l` trap already recorded in
+[[mutation-testing-finds-false-passes]]: there, a command reported by PRINTING
+and exited 0, so `&& echo OK` fired falsely. Here the command reported by
+EXITING, and `&& echo OK` stayed silent. Both end with a false claim in a commit
+message; the tell in each case was output I did not read.
+
+**Fix the habit, not the instance.** Print the exit status unconditionally —
+`cargo clippy …; echo "clippy exit: $?"` — so a failure produces a LINE rather
+than a silence. A verification whose failure mode is "no output" cannot be
+distinguished from one that never ran, which is the same reason
+`SYSW_REQUIRE_VECTORS=1` exists in this repo.
+
+Also note the near-miss it rode in with: at `4692e40` I read `8` from
+`grep -c "test result: ok"` and committed, while a suite was failing further down
+the same run. Counting successes is not checking for failures. Grep for `FAILED`
+across the whole run FIRST, then count passes.
+
+Nothing to fix in the tree — the implementer corrected the lint inside
+`2b570fc`, and HEAD is clean: clippy exit 0, 0 `FAILED`, 10 suites ok, verified
+here.
