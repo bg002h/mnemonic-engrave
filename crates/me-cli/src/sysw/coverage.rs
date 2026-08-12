@@ -37,9 +37,22 @@ pub enum Where {
 
 /// Spec §8.3, test id → where it is discharged. **Every id 1..=23 must appear.**
 pub const COVERAGE: &[(u32, Where)] = &[
-    (1, Where::Device),        // session cache vs verify
-    (2, Where::DeviceUnbuilt("§7 verify flow: no such file in gui/")),
-    (3, Where::DeviceUnbuilt("§7 verify flow: no such file in gui/")),
+    // §7.4, and now asserted against the §7 flow itself: plate_verify.go names
+    // no session identifier at all, so a cached secret has no way to answer a
+    // verification prompt. TestPlateVerifyComparesAgainstTheEngravedMnemonicNotTheSession.
+    (1, Where::Device),
+    // Built by plan stage 12 (gui/plate_verify.go). A wrong word at a CHECKED
+    // position is caught and the failure names the position:
+    // TestPlateVerifyCatchesAWrongWordAtACheckedPosition, with the passing
+    // direction pinned too — a flow reporting every plate wrong would satisfy
+    // the failing case alone.
+    (2, Where::Device),
+    // The draw is uniform and without replacement
+    // (TestPlateVerifyDrawIsUniformAndWithoutReplacement, 20 000 draws), and
+    // FRESH PER ATTEMPT at the flow (TestPlateVerifyRedrawsOnEveryAttempt) —
+    // the second half is where the defect lives, because a correct draw hoisted
+    // out of the retry loop passes the unit test.
+    (3, Where::Device),
     (4, Where::Vector("S-B")), // plaintext + secret class -> F1
     (5, Where::Cli),           // me warns, does not refuse (§13 D3)
     (6, Where::Vector("S-C")), // byte-identical KDF input, arbitrary N
@@ -57,7 +70,13 @@ pub const COVERAGE: &[(u32, Where)] = &[
     (14, Where::Vector("S-J")),
     (15, Where::Vector("S-D")), // pub_len == 0 -> no digest
     (16, Where::Device),        // no verify flow reaches a payload secret
-    (17, Where::DeviceUnbuilt("§7 provenance: no provenance survives take()")),
+    // §7.1.1's four provenances, built by plan stage 12 and asserted over the
+    // RENDERED strings rather than over the enum:
+    // TestVerifyProvenanceIsNeverRenderedAsVerified. The entry previously read
+    // "no provenance survives take()", which was about §3.2's record source and
+    // not about §7.1.1 at all — a verification's provenance is produced by the
+    // verify flow and never travels through the session.
+    (17, Where::Device),
     (18, Where::Unit("every_byte_of_the_aad_is_bound")),
     (19, Where::Vector("S-E")), // generated N enterable for every N
     (20, Where::Vector("S-D")), // secrets-only consumable
