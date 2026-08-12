@@ -4499,3 +4499,37 @@ joins them, because reviewers check the stages against each other and not agains
 "can a user do the thing". A plan for a user-visible feature should state the
 end-to-end journey first and derive stages from it, so a missing stage shows up
 as a broken sentence rather than as an absent row.
+
+### F-145 — `syswLoadFlow` has no test of its own; the gui harness has no Platform fake with a SyswReader (owning phase: **systemwide payloads**) `#mnemonic`
+
+Filed 2026-08-12 with the load flow itself (`seedhammer` `b1fb067`).
+
+The flow that closes F-144 is exercised by nothing. `go test ./gui/` passes and
+would pass just as well if `syswLoadFlow` returned immediately — which is
+uncomfortably close to the failure F-144 was about, arrived at from the other
+direction.
+
+**Why it was not written rather than faked:** the gui harness's `testPlatform`
+returns `nil` from `SyswReader()`, and every existing sysw test drives the
+session by constructing `syswSession` directly and calling `load()`. There is no
+fixture that hands the GUI a region to read, so a test written today would
+either exercise the parts below the flow (already covered) or assert that a nil
+reader is handled (the one branch that needs no help).
+
+**What it owes**, and the order matters — the second is the one that would have
+caught a real defect:
+
+1. a `testPlatform` `SyswReader` returning a fixture region, so the flow can be
+   driven at all;
+2. cases for: **no reader**, **probe false**, **malformed header**, **truncated
+   region** (header declares more than is present), **unsealed with a digest**
+   (operator confirms → compared; operator declines → loaded-but-refusing),
+   **sealed with the right passphrase** (compared via AEAD, no digest prompt
+   when `pub_len == 0`), and **sealed with the wrong one**;
+3. the boot path specifically: **SKIP must leave `ctx.sysw` nil**, and a machine
+   with no payload must see no prompt at all — that is what keeps the feature
+   additive, and it is asserted nowhere.
+
+Use `crates/me-cli/testdata/sysw_vectors.json`, padded to a region the way
+`me sysw pack --region` does, so the fixture is the artifact that actually gets
+flashed rather than a hand-built blob.
