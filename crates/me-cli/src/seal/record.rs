@@ -233,7 +233,13 @@ pub fn decode_public_set(records: &[&str]) -> Result<(), RecordError> {
 /// **Verified against the real crates on vector G's records** — both paths are
 /// public and both distinguish chunked from single-string, which is also what
 /// §6.3's non-chunked dispatch needs.
-fn chunk_key(s: &str, kind: RecordKind) -> Result<(char, Option<u32>), RecordError> {
+/// `pub(crate)` by operator ruling 2026-08-12, carving a VISIBILITY-ONLY
+/// exception into decision 1's freeze on this module. `sysw` needs exactly this
+/// grouping and had been forced to keep a second copy of it; two implementations
+/// of one rule is the defect shape that already cost this module a silent
+/// dropped-secret bug. Nothing about the body, the signature or the emitted
+/// bytes changes, so Sealed Payload's behaviour cannot move.
+pub(crate) fn chunk_key(s: &str, kind: RecordKind) -> Result<(char, Option<u32>), RecordError> {
     use md_codec::bitstream::BitReader;
     use md_codec::ChunkHeader;
     use mk_codec::string_layer::{decode_string, StringLayerHeader};

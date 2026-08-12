@@ -170,39 +170,24 @@ pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
 /// Card identity: the HRP discriminant plus the 20-bit chunk-set id, or `None`
 /// when the record is not chunked (and is therefore its own card).
 ///
-/// A mirror of `seal::record::chunk_key`, which is private to a frozen module.
-/// `None` for the whole result means "this is not a card at all" and is
-/// [`mdmk_unconfirmed`]'s fail-closed arm; `Some((hrp, None))` means "a card that
-/// is not chunked", which is a normal, confirmable state.
+/// DELEGATES to `seal::record::chunk_key`, which the operator made `pub(crate)`
+/// on 2026-08-12 for exactly this. It used to be a hand-copy, and a hand-copy of
+/// a grouping rule is how the two drift.
+///
+/// **The `Ms` arm is NOT delegated, and that is the whole reason this wrapper
+/// exists.** `seal`'s version is `unreachable!()` there — correct for its
+/// caller, which refuses secret records first — but this rule runs over a
+/// payload the DEVICE was handed, so an `ms1` reaching it is a disagreement
+/// between `classify` and `validate_record`, not an impossibility. Delegating
+/// that arm would turn a defensive `None` into a panic on the device.
 fn chunk_key(s: &str, kind: crate::seal::record::RecordKind) -> Option<(char, Option<u32>)> {
     use crate::seal::record::RecordKind;
-    use md_codec::bitstream::BitReader;
-    use md_codec::ChunkHeader;
-    use mk_codec::string_layer::{decode_string, StringLayerHeader};
-
     match kind {
-        RecordKind::Md => {
-            let (bytes, _bits) = md_codec::codex32::unwrap_string(s).ok()?;
-            let mut r = BitReader::new(&bytes);
-            // A non-chunked md1 fails the chunked-flag read; that is the signal,
-            // not an error.
-            Some(('d', ChunkHeader::read(&mut r).ok().map(|h| h.chunk_set_id)))
-        }
-        RecordKind::Mk => {
-            let d = decode_string(s).ok()?;
-            let (h, _) = StringLayerHeader::from_5bit_symbols(d.data()).ok()?;
-            match h {
-                StringLayerHeader::Chunked { chunk_set_id, .. } => Some(('k', Some(chunk_set_id))),
-                StringLayerHeader::SingleString { .. } => Some(('k', None)),
-                // `StringLayerHeader` is `#[non_exhaustive]`, so this arm is
-                // MANDATORY. Fail closed: an unrecognised header variant must
-                // never be silently grouped with anything.
-                _ => None,
-            }
-        }
-        // Reached only if `classify` and `validate_record` ever disagree about
-        // what `MdMk` means. `ms1` is a secret class and not this rule's subject.
         RecordKind::Ms => None,
+        // Every error from `seal`'s version — undecodable string, unrecognised
+        // header variant — means "not groupable", which is this rule's
+        // fail-closed answer. The mapping is total, so no case is lost.
+        _ => crate::seal::record::chunk_key(s, kind).ok(),
     }
 }
 
