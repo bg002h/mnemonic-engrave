@@ -4404,7 +4404,7 @@ code moved to meet it. Sweep the other plan/spec `# expected` one-liners for the
 same class — a criterion nobody runs is a claim, and this project has been bitten
 by claims more often than by code.
 
-### F-142 — the Go suite never runs at the device's word size, so a whole class of defect is invisible to CI (owning phase: **systemwide payloads**) `#mnemonic`
+### F-142 — CLOSED 2026-08-12 — the Go suite never runs at the device's word size, so a whole class of defect is invisible to CI (owning phase: **systemwide payloads**) `#mnemonic`
 
 Filed 2026-08-11 out of the pre-flash conformance Critical, fixed in the fork at
 `74871d3`.
@@ -4421,6 +4421,22 @@ runs at the *builder's* word size. No vector can see a 32-bit wrap, because no
 vector is ever evaluated at 32 bits. The two tests added with the fix say so in
 their own comments rather than implying coverage they do not have: on a 64-bit
 builder they pass before the fix too.
+
+**CLOSED 2026-08-12.** `seedhammer/scripts/test-32bit.sh`, wired into the
+existing CI test job (`3b42405`). It runs `./sysw/` under `GOARCH=386` — which
+both builds AND runs on the host, so the assertion is real — and builds under
+`GOARCH=arm`, the device's actual architecture.
+
+**The blocker was cgo, not the package.** The earlier attempt concluded the
+package "would not cross-build" and stopped; the real error was `runtime/cgo`
+wanting 32-bit glibc headers (`gnu/stubs-32.h`) that a 64-bit devshell does not
+ship. `CGO_ENABLED=0` fixes it outright, and these packages are pure Go. A
+diagnosis abandoned one layer too early cost this a day.
+
+**Proven to bite before it was committed:** with the original `int(...)`
+comparison restored, the amd64 run exits 0 and the script exits 1.
+
+Original analysis follows.
 
 **What to do:** run `go test ./sysw/` for a 32-bit `GOARCH` in CI. `GOARCH=386`
 was tried during the review and the package would not cross-build (dependency,
