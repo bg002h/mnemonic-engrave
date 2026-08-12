@@ -13,6 +13,7 @@
 pub mod coverage;
 pub mod identity;
 pub mod overwrite;
+pub mod passphrase;
 pub mod pubhash;
 pub mod record;
 pub mod vectors;

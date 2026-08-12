@@ -58,6 +58,18 @@ enum Command {
         png: bool,
     },
 
+    /// Build, inspect or overwrite a SYSTEMWIDE payload.
+    ///
+    /// A different container from `seal`, in a different flash region, read by
+    /// a different set of programs — see design/SPEC_systemwide_payloads.md.
+    /// The two surfaces are kept apart on purpose: no invocation should be able
+    /// to produce a systemwide container while the operator believes they are
+    /// producing a Sealed Payload one.
+    Sysw {
+        #[command(subcommand)]
+        cmd: SyswCmd,
+    },
+
     /// Encrypt a payload for delivery to SeedHammer II flash.
     ///
     /// The passphrase is GENERATED and printed to STDERR — write it down and
@@ -122,6 +134,52 @@ enum Command {
     },
 }
 
+#[derive(Subcommand)]
+enum SyswCmd {
+    /// Build a systemwide container.
+    Pack {
+        /// Records, on argv. As with `seal`, argv is a PUBLIC channel — prefer
+        /// --in for anything real.
+        records: Vec<String>,
+        /// Read newline-separated records from this file instead of argv.
+        #[arg(long, value_name = "FILE")]
+        r#in: Option<std::path::PathBuf>,
+        /// Write the blob here instead of stdout.
+        #[arg(long, value_name = "FILE")]
+        out: Option<std::path::PathBuf>,
+        /// Generate a passphrase of N words (2..=24).
+        #[arg(long, value_name = "N", conflicts_with_all = ["passphrase_ask", "no_passphrase"])]
+        passphrase_words: Option<usize>,
+        /// Prompt for a passphrase on the terminal.
+        ///
+        /// Never argv and never an environment variable: argv is world-readable
+        /// via /proc and lands in shell history that outlives the machine.
+        #[arg(long, conflicts_with = "no_passphrase")]
+        passphrase_ask: bool,
+        /// No passphrase — the plaintext variant.
+        #[arg(long)]
+        no_passphrase: bool,
+        /// Accepted and ignored. `me` warns rather than refusing (spec §13 D3);
+        /// kept so existing invocations keep working.
+        #[arg(long)]
+        allow_weak: bool,
+        /// PBKDF2 rounds.
+        #[arg(long, default_value_t = 100_000)]
+        iterations: u32,
+    },
+    /// Emit a full-region overwrite image (spec §5.5).
+    Wipe {
+        #[arg(long, value_name = "FILE")]
+        out: Option<std::path::PathBuf>,
+        /// random (default), zeros, or ones. NOTE: ones is the ERASED state of
+        /// NOR flash, so that region is indistinguishable from one never written.
+        #[arg(long, default_value = "random")]
+        fill: String,
+    },
+    /// Print what a container holds, and its digest.
+    Show { file: std::path::PathBuf },
+}
+
 const EXIT_OK: i32 = 0;
 const EXIT_USAGE: i32 = 2;
 const EXIT_REFUSED: i32 = 3;
@@ -144,6 +202,9 @@ fn run() -> i32 {
         return run_bundle_cli(r#in.as_ref(), manifest.as_ref(), preview.as_ref(), *png);
     }
 
+    if let Some(Command::Sysw { cmd }) = &cli.command {
+        return run_sysw(cmd);
+    }
     if let Some(Command::Seal {
         payload,
         plaintext,
@@ -697,6 +758,239 @@ fn base64_encode(data: &[u8]) -> String {
         });
     }
     out
+}
+
+/// `me sysw` — see design/SPEC_systemwide_payloads.md §5.6.
+fn run_sysw(cmd: &SyswCmd) -> i32 {
+    use mnemonic_engrave::sysw;
+    match cmd {
+        SyswCmd::Pack {
+            records,
+            r#in,
+            out,
+            passphrase_words,
+            passphrase_ask,
+            no_passphrase,
+            allow_weak,
+            iterations,
+        } => {
+            if *allow_weak {
+                eprintln!(
+                    "me: --allow-weak is accepted and ignored; a weak passphrase now warns \
+                     rather than refusing (spec §13 D3)"
+                );
+            }
+            let recs = match read_records(records, r#in.as_ref()) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("me: {e}");
+                    return 2;
+                }
+            };
+
+            // Exactly one passphrase mode. clap enforces mutual exclusion; this
+            // is the "none given" case, and the DEFAULT is to generate rather
+            // than to leave a payload unprotected by omission.
+            let generated;
+            let passphrase: Option<String> = if *no_passphrase {
+                None
+            } else if *passphrase_ask {
+                match rpassword::prompt_password("passphrase: ") {
+                    Ok(p) => Some(p),
+                    Err(e) => {
+                        eprintln!("me: reading the passphrase: {e}");
+                        return 2;
+                    }
+                }
+            } else {
+                let n = passphrase_words.unwrap_or(sysw::wire::WORDS_DEFAULT);
+                match sysw::passphrase::generate(n) {
+                    Ok(p) => {
+                        generated = p;
+                        eprintln!(
+                            "passphrase — write this down and store it APART from the machine:"
+                        );
+                        eprintln!();
+                        eprintln!("    {}", &*generated);
+                        eprintln!();
+                        Some((*generated).clone())
+                    }
+                    Err(e) => {
+                        eprintln!("me: {e:?}");
+                        return 2;
+                    }
+                }
+            };
+
+            // The strength line is printed whatever the choice: the operator is
+            // told, never blocked (spec decision 8).
+            report_strength(passphrase.as_deref(), &recs);
+
+            let blob = match sysw::pack(recs, passphrase.as_deref(), *iterations) {
+                Ok(b) => b,
+                Err(e) => {
+                    eprintln!("me: {}", sysw_error(&e));
+                    return 4;
+                }
+            };
+            print_digest(&blob);
+            emit(&blob, out.as_ref())
+        }
+
+        SyswCmd::Wipe { out, fill } => {
+            let f = match fill.as_str() {
+                "random" => sysw::overwrite::Fill::Random,
+                "zeros" => sysw::overwrite::Fill::Zeros,
+                "ones" => sysw::overwrite::Fill::Ones,
+                other => {
+                    eprintln!("me: unknown --fill {other:?}; want random, zeros or ones");
+                    return 2;
+                }
+            };
+            if f == sysw::overwrite::Fill::Ones {
+                eprintln!(
+                    "me: note — 0xFF is the ERASED state of NOR flash, so this region will be \
+                     indistinguishable from one that was never written"
+                );
+            }
+            emit(&sysw::overwrite::region_image(f), out.as_ref())
+        }
+
+        SyswCmd::Show { file } => {
+            let blob = match std::fs::read(file) {
+                Ok(b) => b,
+                Err(e) => {
+                    eprintln!("me: {}: {e}", file.display());
+                    return 2;
+                }
+            };
+            let h = match sysw::wire::Header::parse(&blob) {
+                Ok(h) => h,
+                Err(e) => {
+                    // NEVER the words "payload unreadable" — spec §5.2: that
+                    // phrase teaches the operator to read a wrong file as
+                    // tampering.
+                    eprintln!("me: not a systemwide container: {e:?}");
+                    return 4;
+                }
+            };
+            println!("sealed:   {}", h.sealed());
+            println!("pub_len:  {}", h.pub_len);
+            println!("ct_len:   {}", h.ct_len);
+            println!(
+                "identity: {}",
+                hex(&sysw::identity::identity(
+                    &blob[..h.total_len().min(blob.len())]
+                ))
+            );
+            print_digest(&blob);
+            0
+        }
+    }
+}
+
+fn hex(b: &[u8]) -> String {
+    b.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+/// The digest goes to STDERR, so `me sysw pack > f.bin` still shows the operator
+/// the number they must compare on the machine.
+fn print_digest(blob: &[u8]) {
+    use mnemonic_engrave::sysw;
+    let Ok(h) = sysw::wire::Header::parse(blob) else {
+        return;
+    };
+    if h.pub_len == 0 {
+        // EPD §6.6: with no public section the digest is a constant every such
+        // payload shares, so there is nothing to compare and none is shown.
+        eprintln!("digest:   none — this payload has no public section");
+        return;
+    }
+    let end = sysw::wire::HEADER_LEN + h.pub_len as usize;
+    let Ok(s) = std::str::from_utf8(&blob[sysw::wire::HEADER_LEN..end]) else {
+        return;
+    };
+    let refs: Vec<&str> = s.split('\n').collect();
+    let d = sysw::pubhash::public_data_hash(&refs, h.sealed());
+    eprintln!("digest:   {}", sysw::pubhash::format_hash(&d));
+}
+
+fn report_strength(passphrase: Option<&str>, records: &[String]) {
+    use mnemonic_engrave::sysw;
+    let secret = records.iter().any(|r| sysw::classify(r).is_secret());
+    let (desc, above) = match passphrase {
+        None => ("no passphrase".to_string(), false),
+        Some(p) => {
+            let n = mnemonic_engrave::seal::passphrase::normalise(p);
+            let above = sysw::cliff_above(&n);
+            let words = n.split_whitespace().count();
+            (format!("{words} words"), above)
+        }
+    };
+    eprintln!(
+        "strength: {desc} — {}",
+        if above {
+            "at or above the threshold"
+        } else {
+            "BELOW the threshold"
+        }
+    );
+    if secret && !above {
+        eprintln!(
+            "me: WARNING — this payload carries secret material with weak or no passphrase \
+             protection. Proceeding (spec §13 D3)."
+        );
+    }
+}
+
+fn read_records(
+    argv: &[String],
+    in_path: Option<&std::path::PathBuf>,
+) -> Result<Vec<String>, String> {
+    if let Some(p) = in_path {
+        let raw = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
+        return Ok(raw
+            .lines()
+            .map(str::to_owned)
+            .filter(|l| !l.is_empty())
+            .collect());
+    }
+    if argv.is_empty() {
+        return Err("no records: pass them on argv or with --in".into());
+    }
+    Ok(argv.to_vec())
+}
+
+fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>) -> i32 {
+    use std::io::Write;
+    let r = match out {
+        Some(p) => std::fs::write(p, bytes).map_err(|e| format!("{}: {e}", p.display())),
+        None => std::io::stdout()
+            .write_all(bytes)
+            .map_err(|e| format!("stdout: {e}")),
+    };
+    match r {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("me: {e}");
+            2
+        }
+    }
+}
+
+fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
+    use mnemonic_engrave::sysw::SyswError as E;
+    match e {
+        E::Unclassifiable(i) => format!(
+            "record {i} is not a form this container can place. Descriptors and \
+             addresses are not yet classifiable here — see sysw::classify"
+        ),
+        E::TooLarge(n) => format!("{n} bytes exceeds the flash region"),
+        E::PassphraseMismatch => "a sealed payload needs a passphrase".into(),
+        E::Crypto => "the passphrase did not open this payload".into(),
+        E::NotUtf8 => "the records are not valid UTF-8".into(),
+        E::Wire(w) => format!("malformed container: {w:?}"),
+    }
 }
 
 #[cfg(test)]
