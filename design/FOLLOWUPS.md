@@ -3862,7 +3862,7 @@ the emulator happened to expose first.
 consumes exactly one tag, so a 25-card bundle cannot be delivered over the
 emulator's NFC source as it stands.
 
-### F-127 — `mk encode --from-md1` cannot read a CHUNKED md1, so a policy large enough to need chunking has no documented route to a key card (owning phase: **operator journeys**) `#mnemonic`
+### F-127 — `mk encode --from-md1` cannot read a CHUNKED md1 (owning phase: **operator journeys**) `#mnemonic`
 
 Filed 2026-08-11 building the pathological-wallet journey
 (`design/journeys/SeedHammer-II-pathological-wallet-journey.pdf`).
@@ -3890,6 +3890,15 @@ comes to 182 data symbols against a cap of 80, so it is not an exotic corner.
 **Workaround, used in the journey:** read the identity out of `md inspect` and
 pass `--policy-id-stub` by hand. That requires knowing F-128, and nothing tells
 an operator either thing.
+
+**DOWNGRADED 2026-08-11 by the adversarial pass.** As filed this said a chunked
+policy has "no documented route to a key card". That clause is false and the
+refuter broke it: `--from-md1` accepts only a *single, unchunked* md1, but the
+stub remains derivable — which is exactly what this journey did, successfully.
+So this is **ergonomics, not a binding failure**: severity Important → **Minor**.
+What stays true, and is the part worth fixing, is that the tool gives the
+operator a hard parse error and no hint that `--policy-id-stub` plus
+`md inspect` is the way through.
 
 ### F-128 — the stub's spec sentence and `mk`'s behaviour name different identities (owning phase: **operator journeys**) `#mnemonic`
 
@@ -4090,6 +4099,11 @@ field layout.
 | 3 | `{@6,@7}` — 2-of-2 | `older(65535)` | bit22 clear → blocks | 65535 blocks ≈ **455 days** |
 | 4 | `{@8}`/`{@9}`/`{@10}` — **1**-of-3 | `older(4255898)` | `0x40F09A`, bit22 set → 61594 × 512 s | **365.00 days** |
 
+(The ~90 days is nominal at the 600 s block target: 455.10 − 365.00 = 90.10 d.
+The block-count side drifts with real hashrate; the time side does not. The
+ordering does not depend on that drift — tier 3 would have to run ~20% fast to
+catch up.)
+
 A degrading vault is supposed to degrade *monotonically*: each tier that
 activates should be weaker than the last, and later. Here the **1-of-3** tier
 opens ~90 days **before** the **2-of-2** tier. From day 365 the wallet is a
@@ -4137,6 +4151,14 @@ vs less than half the steel. **Print the comparison before engraving**, the way
 as REFUSED, which was true of the state it inspected; `--path bip84` — the fix
 recorded in F-129 — makes it validate and produce 26. The 38 and 58 figures are
 unaffected.)
+
+**SCOPED 2026-08-11 by the adversarial pass.** A refuter showed 25/26 also
+reproduces at exit 0 on the *default keyed* path, so "only reachable via a
+refused route" would have been wrong — the three counts above are each real and
+each reachable. The finding is therefore about **an unadvertised 2.2× cost
+spread**, not about one route being broken. A further variant was measured at 23
+md1 → 24 plates under a different origin choice (`m/48'/0'/0'/2'`), which widens
+the spread rather than changing its shape.
 
 ### F-135 — CLOSED on filing: miniscript nesting depth is not a risk for this wallet, with the numbers so nobody re-derives them `#mnemonic`
 
@@ -4258,3 +4280,51 @@ a keyless BIP-388 template does not pay for.
 Fill C6 in with it, including the measured symbol count and the bytecode figure,
 so the next person does not re-discover that the 12-key `multi(5,…)` alternative
 encodes to 13 bytes and one string.
+
+### F-140 — `compare-cost` omits the witnessScript from its wsh column but not the tapleaf from its tr column, inverting the comparison it exists to inform (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11. Raised by the limits lens, survived adversarial refutation with
+its numbers independently reproduced, and the **mechanism re-read at source by me
+before filing**.
+
+`mnemonic compare-cost` is the tool an operator uses to choose between a
+`wsh(...)` and a taproot form of the same policy. For this wallet it reports
+taproot as **+127..+131 vB per input** more expensive. The true delta is
+**+1..+6 vB**. The comparison is not close to right, and it points the wrong way
+for a decision that gets engraved.
+
+**Mechanism — one side counts its script, the other does not.** Verified in the
+fork at `/scratch/code/shibboleth/rust-miniscript-fork`:
+
+- `Wsh::plan_satisfaction` (`src/descriptor/segwitv0.rs:164`) is exactly
+  `self.ms.build_template(provider)` — **no script placeholder is pushed**.
+- the Tr path (`src/descriptor/tr/mod.rs:500-501`) pushes
+  `Placeholder::TapScript(script)` **and** `Placeholder::TapControlBlock(..)`.
+- `Plan::witness_size()` (`src/plan.rs:258`) sums `self.template`, so it silently
+  includes the tapleaf script for tr and silently excludes the witnessScript
+  for wsh.
+- `mnemonic-toolkit` consumes it raw:
+  `crates/mnemonic-toolkit/src/cost/enumerate.rs:267` → `plan.witness_size()`.
+
+For this descriptor the omission is **501 bytes per input** — the 498-byte
+witnessScript plus its 3-byte varint — on every row. Measured plan sizes
+256/184/152/78 against real satisfactions of 757/685/653/579.
+
+**Two things make this worse than an off-by-one.**
+
+1. The tool prints, in its own notes: *"absolute numbers may differ by ±1 from
+   real-tx accounting, **Δ values are correct**"* (`src/cost/mod.rs:173`). The Δ
+   is the one number that is not correct, and the note is what stops a careful
+   operator from checking.
+2. `design/SPEC_compare_cost_v0_26_0.md:213` carries the comment
+   `// includes scriptCode (the witnessScript)` against exactly the call that
+   does not. The spec asserts the property the code lacks — the same
+   record-is-wronger-than-the-code shape this project keeps finding.
+
+**Scope is every wsh descriptor**, not just this one; the error equals the
+witnessScript size, so it is largest for exactly the complex policies the tool is
+most useful for. Fix in `mnemonic-toolkit` (add the script + varint to the wsh
+side), fix the spec comment, and drop or qualify the "Δ values are correct" note
+until it is true. A regression test should compare `witness_size()` against a
+real `get_satisfaction()` for one wsh and one tr descriptor — that single
+assertion would have caught this.
