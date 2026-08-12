@@ -4833,3 +4833,36 @@ Related: the host side already does all of this (`md compile`, `md encode
 --from-policy`), so a design that lets the device CONSUME a host-built policy —
 which is what the systemwide-payload feature now delivers — may be cheaper than
 teaching the panel to author one. Worth weighing before building an editor.
+
+### F-151 — the frame extractor sees text the DEVICE cannot draw, so every wording assertion in `gui/` shares a blind spot (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-12. Found by the operator looking at the panel, and by nothing
+else in this project.
+
+Unloading a payload produced an almost entirely blank white screen carrying only
+the checkmark. Its body was one ~110-character sentence with an em dash and
+backticks. **`TestSyswUnloadFlow` asserted three separate phrases from that body
+and passed**, because `runUITouch`'s extractor reads the text OPS a frame
+contains, not the pixels the device would light. A string the panel renders as
+nothing still "appears" in the harness.
+
+**This is not one bad test.** Every `uiContains` assertion in `gui/` — and there
+are many — proves that a string was *submitted for drawing*, never that it was
+drawn. So the whole class is invisible: over-long bodies that clip, glyphs
+missing from the font, text laid out off-canvas. The suite is green and the
+screen is blank, which is the exact shape of F-144 and of §8c's undrawn `done`
+button, arriving a third time through a different door.
+
+**What would close it**, cheapest first:
+1. assert against the RASTER rather than the op list — `op.Drawer` already
+   renders to a bitmap for the touch tests, so a "this frame is not blank"
+   check (non-background pixel count above a floor) is nearly free and would
+   have caught this exact defect;
+2. a font-coverage check: fail if a string handed to a screen contains a rune
+   the UI face has no glyph for — turns a silent blank into a build error;
+3. a width/height budget on modal bodies, so an over-long string is refused at
+   the call site rather than clipped at draw time.
+
+(1) is the one to do: it is a handful of lines, needs no font work, and converts
+this entire class from invisible to noisy. Until then, **treat every wording
+assertion in `gui/` as evidence about intent and not about the screen.**
