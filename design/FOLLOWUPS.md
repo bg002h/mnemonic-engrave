@@ -4415,3 +4415,31 @@ as unreviewed by machine.
 **Grep the port for the same shape while you are there:** `int(` applied to any
 `uint32` read off the wire. This one was found by a reviewer looking at a
 different question, which is not a repeatable process.
+
+### F-143 — sh2-flash compares the key against a RECORDED fingerprint, not the device's live OTP (owning phase: **post-merge polish and hardening**) `#mnemonic`
+
+Filed 2026-08-12 alongside the fix for the pre-flash flashpath review's I1.
+
+`sh2-flash` now refuses to sign with a key whose fingerprint is not the burned
+one — the check the runbook always described and the script never made. But the
+expected value is a **constant in the script** (`SH2_BOOTKEY_FP`, overridable),
+sourced from `design/HARDWARE_INVENTORY.md`. It answers "is this the key we wrote
+down" and not "is this the key THIS device will boot".
+
+The stronger form is available: `picotool otp get BOOTKEY1_0 … BOOTKEY1_15`
+reads the 32 bytes straight out of the attached unit's OTP, and comparing
+against that makes the check about the hardware in front of you rather than
+about a note. It also fails correctly for a second machine with a different key,
+where the constant needs a manual override nobody will remember.
+
+**Why it was not done in the same change, plainly:** the device had already
+rebooted out of BOOTSEL, so `picotool otp get` could not be run and the exact
+output format could not be confirmed. Writing unverified parsing into a safety
+check is how a check silently starts passing everything — which is precisely the
+failure mode the same change already had to fix twice (an empty `openssl` piped
+into `sha256sum` yields sixty-four valid hex characters, and under `set -e` the
+pipeline's failure killed the script with no message at all).
+
+**Do it with the device in BOOTSEL**, confirm the row format by running it, and
+keep the recorded constant as the fallback for when OTP cannot be read — falling
+back LOUDLY, never silently.
