@@ -94,6 +94,118 @@ pub fn decode_text(record: &str) -> Result<Zeroizing<String>, RecordError> {
     Ok(Zeroizing::new(s.to_owned()))
 }
 
+/// Indices of [`Class::MdMk`] records that are NOT decode-confirmed (spec §12.6).
+///
+/// Groups by `(hrp, chunk_set_id)` exactly as `seal::record::decode_public_set`
+/// does (`crates/me-cli/src/seal/record.rs:192`) — R1-I2: filter the iteration,
+/// never the indices — but REPORTS instead of refusing: an incomplete or
+/// non-decoding group marks its members unconfirmed and returns.
+///
+/// The returned indices are into the CALLER'S slice, whatever else it holds. A
+/// caller that pre-filtered to the `MdMk` records and then reported those
+/// positions would name the wrong record to the operator, which is R1-I2 said
+/// the other way round.
+///
+/// **Why the grouping is duplicated rather than delegated.** `decode_public_set`
+/// answers a different question — "may this whole public section be sealed" — and
+/// its `chunk_key` is private to a FROZEN module (spec decision 1). The rule the
+/// two share is §12.6's grouping, so
+/// [`tests::the_two_walks_agree_wherever_both_have_an_answer`] pins them against
+/// each other instead of leaving the copy unwatched.
+pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
+    use std::collections::BTreeMap;
+
+    // key: (hrp, chunk_set_id, uniq) -> the ORIGINAL indices in that card set.
+    // `uniq` distinguishes non-chunked records, which are each their own card;
+    // giving them all one key would let the first one to decode vouch for the
+    // rest, which is precisely how smuggled entropy would slip through.
+    let mut groups: BTreeMap<(char, Option<u32>, usize), Vec<usize>> = BTreeMap::new();
+    let mut out: Vec<usize> = Vec::new();
+
+    for (i, r) in records.iter().enumerate() {
+        if super::classify(r) != Class::MdMk {
+            continue;
+        }
+        match crate::seal::record::validate_record(r)
+            .ok()
+            .and_then(|kind| chunk_key(r, kind))
+        {
+            Some((hrp, csid)) => {
+                let uniq = if csid.is_some() { 0 } else { i + 1 };
+                groups.entry((hrp, csid, uniq)).or_default().push(i);
+            }
+            // Fail CLOSED. A record whose card identity cannot be read cannot be
+            // grouped, so nothing could ever confirm it.
+            //
+            // REACHABLE, and I first wrote that it was not. `validate_record`
+            // TRIMS before it validates (`seal/record.rs:118`) while the decoders
+            // below are handed the record as given — so ` md1…` classifies
+            // `MdMk` and then fails `unwrap_string` with "does not start with HRP
+            // md1". `decode_public_set` has the same asymmetry and the same
+            // answer, which is why the two walks still agree.
+            // See `a_record_whose_card_identity_cannot_be_read_is_unconfirmed`.
+            None => out.push(i),
+        }
+    }
+
+    for ((hrp, csid, _), idxs) in groups {
+        let set: Vec<&str> = idxs.iter().map(|&i| records[i].as_str()).collect();
+        // The real decoders are the arbiter — semantics-bound, per §12.6. A
+        // BCH verifier is not one: that is the whole point of the rule.
+        let confirmed = match (hrp, csid) {
+            ('d', Some(_)) => md_codec::reassemble(&set).is_ok(),
+            ('d', None) => md_codec::decode_md1_string(set[0]).is_ok(),
+            ('k', _) => mk_codec::decode(&set).is_ok(),
+            _ => false,
+        };
+        if !confirmed {
+            out.extend(idxs);
+        }
+    }
+
+    out.sort_unstable();
+    out
+}
+
+/// Card identity: the HRP discriminant plus the 20-bit chunk-set id, or `None`
+/// when the record is not chunked (and is therefore its own card).
+///
+/// A mirror of `seal::record::chunk_key`, which is private to a frozen module.
+/// `None` for the whole result means "this is not a card at all" and is
+/// [`mdmk_unconfirmed`]'s fail-closed arm; `Some((hrp, None))` means "a card that
+/// is not chunked", which is a normal, confirmable state.
+fn chunk_key(s: &str, kind: crate::seal::record::RecordKind) -> Option<(char, Option<u32>)> {
+    use crate::seal::record::RecordKind;
+    use md_codec::bitstream::BitReader;
+    use md_codec::ChunkHeader;
+    use mk_codec::string_layer::{decode_string, StringLayerHeader};
+
+    match kind {
+        RecordKind::Md => {
+            let (bytes, _bits) = md_codec::codex32::unwrap_string(s).ok()?;
+            let mut r = BitReader::new(&bytes);
+            // A non-chunked md1 fails the chunked-flag read; that is the signal,
+            // not an error.
+            Some(('d', ChunkHeader::read(&mut r).ok().map(|h| h.chunk_set_id)))
+        }
+        RecordKind::Mk => {
+            let d = decode_string(s).ok()?;
+            let (h, _) = StringLayerHeader::from_5bit_symbols(d.data()).ok()?;
+            match h {
+                StringLayerHeader::Chunked { chunk_set_id, .. } => Some(('k', Some(chunk_set_id))),
+                StringLayerHeader::SingleString { .. } => Some(('k', None)),
+                // `StringLayerHeader` is `#[non_exhaustive]`, so this arm is
+                // MANDATORY. Fail closed: an unrecognised header variant must
+                // never be silently grouped with anything.
+                _ => None,
+            }
+        }
+        // Reached only if `classify` and `validate_record` ever disagree about
+        // what `MdMk` means. `ms1` is a secret class and not this rule's subject.
+        RecordKind::Ms => None,
+    }
+}
+
 fn hex_lower(b: &[u8]) -> String {
     b.iter().map(|x| format!("{x:02x}")).collect()
 }
@@ -238,5 +350,234 @@ mod tests {
     #[test]
     fn empty_text_round_trips() {
         assert_eq!(&*decode_text(&encode_text("")).unwrap(), "");
+    }
+
+    // ---------------------------------------------------------------------
+    // `[mdmk-decode]` — spec §12.6, ruled in as §13 D6.
+    //
+    // REAL CARDS, not hand-built fixtures: the reassembler is the arbiter of
+    // what a card set is, so a fixture invented to make a test pass would only
+    // pin my idea of the format. Every string below is lifted verbatim from a
+    // shipped vector, and its chunk header was MEASURED, not assumed:
+    //
+    //   md1fv9wjpq…  chunk_set_id 398802, chunks 0,1,2 of 3   (seal vector D/E)
+    //   md1fe4dazs…  chunk_set_id 841149, chunk  0    of 6    (seal vector G)
+    //   md1yqpqq…    NOT chunked, decodes on its own          (tests/cli.rs)
+    //   mk1qpzg69p…  a complete 2-chunk mk1 set               (tests/prop.rs)
+    //   mk1qpykrep…  chunk 0 of a 2-chunk mk1 set             (seal vector G)
+    // ---------------------------------------------------------------------
+
+    /// Chunk 0 of 3, chunk_set_id 398802. Also the `MD1` every other sysw
+    /// fixture uses — so the whole existing vector set carries an UNCONFIRMED
+    /// record, which is worth knowing.
+    const MD1_A: &str = "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3";
+    const MD1_B: &str = "md1fv9wjpqg0yq82l0czvx85ae43vtfd26hsmngjecmqy44k2pgttqh74qwxlawq374";
+    const MD1_C: &str = "md1fv9wjpqsp2026hh65xpvugtfhd9792zxgunymm0a82pdju6442q0jskj9gzfaqmz";
+    /// Chunk 0 of 6 of a DIFFERENT set — 841149, not 398802.
+    const MD1_OTHER: &str =
+        "md1fe4dazspq3m67zzqqvzrs3pstucnf4ztqz4pk6ujgjycfn6zhs79nmzdp9frd6dzth6asfu2za4mwgfkg6";
+    /// Not chunked at all: its own card, and it decodes.
+    const MD1_SINGLE: &str = "md1yqpqqxqq8xtwhw4xwn4qh";
+    const MK1_A: &str = "mk1qpzg69pqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3kx98j76m4mjlwphf";
+    const MK1_B: &str =
+        "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x";
+    /// Chunk 0 of a 2-chunk mk1 set whose second chunk is absent here.
+    const MK1_LONE: &str = "mk1qpykrepqqspjtpuhfqjc096gykrewjy6dgjcqpcy3zepaggqseet8ky6z2jxm56yh04m5mqslrmueekdmecm0js2h978k03jfvkwz2rxj8r8";
+    const SEED: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+                        abandon abandon about";
+
+    fn recs(ss: &[&str]) -> Vec<String> {
+        ss.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    /// 32 bytes of seed entropy wrapped into a BCH-valid `md1` — the smuggling
+    /// case spec §5.3.2 names, built the way a defective sealer would build it.
+    ///
+    /// This is `[mdmk-decode]`'s DECODE-FAILURE arm, and it is a unit test rather
+    /// than a vector because making one needs the encoder: the vectors file
+    /// carries only records, and this record has to be constructed.
+    ///
+    /// `fill` selects WHICH failure. `0xAB` sets the chunked-flag bit with a
+    /// wrong wire version, which the two implementations reach by different
+    /// routes (both ending at unconfirmed — see `sysw/confirm.go`). `0x01`
+    /// leaves the flag clear, so both take the NON-CHUNKED path and the port
+    /// tests the same grouping arm this one does.
+    fn entropy_smuggled_as_md1(fill: u8) -> String {
+        md_codec::codex32::wrap_payload(&[fill; 32], 32 * 8)
+            .expect("32 bytes must wrap into a codex32 md1 string")
+    }
+
+    #[test]
+    fn a_lone_chunk_of_a_declared_set_is_unconfirmed() {
+        // The set declares 3 chunks and one is present, so nothing reassembles
+        // and §12.6 leaves it unconfirmed. Nothing is REFUSED — that is D6.
+        assert_eq!(mdmk_unconfirmed(&recs(&[MD1_A])), vec![0]);
+    }
+
+    #[test]
+    fn the_complete_set_is_confirmed() {
+        assert_eq!(mdmk_unconfirmed(&recs(&[MD1_A, MD1_B, MD1_C])), Vec::<usize>::new());
+    }
+
+    /// **Group by `(hrp, chunk_set_id)`, never by HRP alone.** Grouping by HRP
+    /// puts four `md1` records in one group, the header declares 3, and a
+    /// COMPLETE set is reported unconfirmed — the R1-I2 shape, and the reason
+    /// §12.6 states the key rather than saying "by card".
+    #[test]
+    fn grouping_is_by_chunk_set_id_not_by_hrp_alone() {
+        assert_eq!(
+            mdmk_unconfirmed(&recs(&[MD1_A, MD1_B, MD1_C, MD1_OTHER])),
+            vec![3],
+            "the complete 398802 set must confirm even beside a stray chunk of 841149"
+        );
+    }
+
+    /// R1-I2 said the other way round: filter the ITERATION, never the indices.
+    /// A walk that collected the `MdMk` records first and reported positions in
+    /// THAT list would name record 0 here, which is the seed.
+    #[test]
+    fn the_indices_are_into_the_callers_list_not_a_filtered_one() {
+        assert_eq!(
+            mdmk_unconfirmed(&recs(&[SEED, encode_text("hi").as_str(), MD1_A])),
+            vec![2]
+        );
+    }
+
+    /// The arm the R0-I1 review named: `ValidMD` is a pure BCH verifier, so seed
+    /// entropy wraps into a record that classifies `MdMk` — not secret, no flag.
+    /// §12.6 is what closes it: the record does not decode, so it is unconfirmed,
+    /// and an unconfirmed record counts as SECRET for flag evaluation.
+    #[test]
+    fn a_bch_valid_md1_carrying_entropy_does_not_decode_and_is_unconfirmed() {
+        let smuggled = entropy_smuggled_as_md1(0xAB);
+        assert_eq!(
+            super::super::classify(&smuggled),
+            Class::MdMk,
+            "the premise: BCH validity alone makes this a non-secret class"
+        );
+        assert!(
+            !Class::MdMk.is_secret(),
+            "…and the class itself claims nothing"
+        );
+        assert_eq!(mdmk_unconfirmed(&recs(&[&smuggled])), vec![0]);
+    }
+
+    /// The non-chunked arm, and the mutant it kills: a walk that gave every
+    /// non-chunked record the SAME group key would decode only the first of them
+    /// and call the rest confirmed. Here the first decodes and the second does
+    /// not, so collapsing the key silently confirms the smuggled entropy.
+    #[test]
+    fn two_non_chunked_md1_records_are_two_cards_not_one() {
+        // 0x01, not 0xAB: this record must take the NON-CHUNKED path, or it
+        // never reaches the grouping and the mutant this test exists for
+        // survives. The Go port's mirror of this test found that the hard way.
+        let bad = entropy_smuggled_as_md1(0x01);
+        assert_eq!(
+            mdmk_unconfirmed(&recs(&[MD1_SINGLE, &bad])),
+            vec![1],
+            "a non-chunked record is its own card; one decoding must not vouch for another"
+        );
+        assert_eq!(
+            mdmk_unconfirmed(&recs(&[&bad, MD1_SINGLE])),
+            vec![0],
+            "and order must not decide it either"
+        );
+        assert_eq!(
+            mdmk_unconfirmed(&recs(&[MD1_SINGLE])),
+            Vec::<usize>::new(),
+            "the one that decodes is confirmed on its own"
+        );
+    }
+
+    #[test]
+    fn mk1_sets_are_walked_the_same_way() {
+        assert_eq!(mdmk_unconfirmed(&recs(&[MK1_A, MK1_B])), Vec::<usize>::new());
+        assert_eq!(mdmk_unconfirmed(&recs(&[MK1_A])), vec![0]);
+        assert_eq!(mdmk_unconfirmed(&recs(&[MK1_LONE])), vec![0]);
+        assert_eq!(
+            mdmk_unconfirmed(&recs(&[MK1_A, MK1_B, MK1_LONE])),
+            vec![2],
+            "two mk1 cards, grouped apart by chunk_set_id"
+        );
+    }
+
+    /// The fail-closed arm, which I had written off as unreachable until I tried
+    /// to build an input for it. `validate_record` trims before validating and
+    /// the decoders do not, so a record with a leading space classifies `MdMk`
+    /// and then has no readable card identity at all. Unconfirmed is the only
+    /// honest answer, and it is the one both walks give.
+    #[test]
+    fn a_record_whose_card_identity_cannot_be_read_is_unconfirmed() {
+        let padded = format!(" {MD1_A}");
+        assert_eq!(
+            super::super::classify(&padded),
+            Class::MdMk,
+            "the premise: the classifier trims and the decoders do not"
+        );
+        assert!(
+            md_codec::codex32::unwrap_string(&padded).is_err(),
+            "…so nothing can read this record's chunk key"
+        );
+        assert_eq!(mdmk_unconfirmed(&recs(&[&padded])), vec![0]);
+        assert!(
+            crate::seal::record::decode_public_set(&[&padded]).is_err(),
+            "and the frozen walk refuses it, which is the same answer"
+        );
+    }
+
+    /// §12.6 is about `ClassMDMK` records and nothing else. A mnemonic is
+    /// already secret by class and a `text:` record is already not; neither is
+    /// this rule's business, and reporting them would double-count.
+    #[test]
+    fn records_of_other_classes_are_never_reported() {
+        assert_eq!(
+            mdmk_unconfirmed(&recs(&[SEED, encode_text("hi").as_str(), "ms1notacard"])),
+            Vec::<usize>::new()
+        );
+        assert_eq!(mdmk_unconfirmed(&[]), Vec::<usize>::new());
+    }
+
+    /// The duplicated grouping, watched. `decode_public_set` refuses what this
+    /// reports, so over a public-only record list the two must agree exactly:
+    /// empty here iff `Ok` there. If the copy ever drifts, this fails rather
+    /// than the device and the host quietly disagreeing about a card set.
+    #[test]
+    fn the_two_walks_agree_wherever_both_have_an_answer() {
+        let smuggled = entropy_smuggled_as_md1(0xAB);
+        let nc = entropy_smuggled_as_md1(0x01);
+        let cases: Vec<Vec<&str>> = vec![
+            vec![MD1_A],
+            vec![MD1_A, MD1_B, MD1_C],
+            vec![MD1_A, MD1_B, MD1_C, MD1_OTHER],
+            vec![MD1_SINGLE],
+            vec![MD1_SINGLE, &smuggled],
+            vec![MD1_SINGLE, &nc],
+            vec![&nc, MD1_SINGLE],
+            vec![MK1_A, MK1_B],
+            vec![MK1_A],
+            vec![MK1_A, MK1_B, MD1_A, MD1_B, MD1_C],
+            vec![MK1_A, MK1_B, MD1_SINGLE],
+        ];
+        let mut agreed_ok = 0;
+        let mut agreed_err = 0;
+        for c in cases {
+            let sealable = crate::seal::record::decode_public_set(&c).is_ok();
+            let confirmed = mdmk_unconfirmed(&recs(&c)).is_empty();
+            assert_eq!(
+                sealable, confirmed,
+                "the two walks disagree about {c:?}: decode_public_set ok={sealable}, \
+                 mdmk_unconfirmed empty={confirmed}"
+            );
+            if sealable {
+                agreed_ok += 1;
+            } else {
+                agreed_err += 1;
+            }
+        }
+        // Agreement on nothing but failures would be agreement by accident.
+        assert!(
+            agreed_ok >= 4 && agreed_err >= 3,
+            "the comparison must exercise both answers: {agreed_ok} ok, {agreed_err} err"
+        );
     }
 }

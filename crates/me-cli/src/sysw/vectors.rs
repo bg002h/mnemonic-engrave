@@ -41,6 +41,16 @@ pub struct Vector {
     pub digest: Option<String>,
     /// `[identity]`, always present.
     pub identity: String,
+    /// `[mdmk-decode]` (§12.6): the indices of the PUBLIC-section records that
+    /// are not decode-confirmed.
+    ///
+    /// **Indices are into the public section, not into `records`.** That is the
+    /// one list both implementations reconstruct identically from `blob` — a
+    /// sealed payload's `records` field is the packing order, which the port
+    /// never sees. It costs nothing: `Class::MdMk` is not a secret class, so
+    /// every `md1`/`mk1` record is in the public section in both variants.
+    #[serde(default)]
+    pub mdmk_unconfirmed: Vec<usize>,
 }
 
 fn hex(b: &[u8]) -> String {
@@ -64,9 +74,17 @@ pub fn generate() -> Vec<Vector> {
             let h = wire::Header::parse(&blob).expect("a packed blob must parse");
             let pub_end = wire::HEADER_LEN + h.pub_len as usize;
             let public = &blob[wire::HEADER_LEN..pub_end];
+            let public_records: Vec<String> = if h.pub_len > 0 {
+                std::str::from_utf8(public)
+                    .expect("public section is utf-8")
+                    .split('\n')
+                    .map(str::to_owned)
+                    .collect()
+            } else {
+                Vec::new()
+            };
             let digest = if h.pub_len > 0 {
-                let s = std::str::from_utf8(public).expect("public section is utf-8");
-                let refs: Vec<&str> = s.split('\n').collect();
+                let refs: Vec<&str> = public_records.iter().map(String::as_str).collect();
                 Some(hex(&pubhash::public_data_hash(&refs, h.sealed())))
             } else {
                 None
@@ -82,6 +100,7 @@ pub fn generate() -> Vec<Vector> {
                 sealed: h.sealed(),
                 digest,
                 identity: hex(&identity::identity(&blob)),
+                mdmk_unconfirmed: super::record::mdmk_unconfirmed(&public_records),
             }
         })
         .collect()
@@ -182,6 +201,55 @@ mod tests {
                 v.name
             );
         }
+    }
+
+    /// `[mdmk-decode]` (§12.6), pinned from the BLOB rather than from the
+    /// `records` field — because the blob is all the Go port gets, and a field
+    /// checked only against the generator would pin nothing the port can reach.
+    ///
+    /// It also guards the guard. A set whose every vector recorded an empty list
+    /// would be passed by an implementation that answers "confirmed" to
+    /// everything, and a set where every `md1` were unconfirmed would be passed
+    /// by one that answers "unconfirmed" to everything. So the assertions below
+    /// demand BOTH answers, and demand them inside ONE payload: only there does
+    /// the `(hrp, chunk_set_id)` grouping have to be right.
+    #[test]
+    fn the_decode_check_is_recomputed_from_the_blob_and_carries_both_answers() {
+        let vs = load();
+        let mut confirmed_beside_unconfirmed = 0;
+        for v in &vs {
+            let blob: Vec<u8> = (0..v.blob.len() / 2)
+                .map(|i| u8::from_str_radix(&v.blob[i * 2..i * 2 + 2], 16).unwrap())
+                .collect();
+            let h = wire::Header::parse(&blob).unwrap();
+            let public: Vec<String> = if h.pub_len > 0 {
+                std::str::from_utf8(&blob[wire::HEADER_LEN..wire::HEADER_LEN + h.pub_len as usize])
+                    .unwrap()
+                    .split('\n')
+                    .map(str::to_owned)
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            assert_eq!(
+                crate::sysw::record::mdmk_unconfirmed(&public),
+                v.mdmk_unconfirmed,
+                "{}: the recorded unconfirmed set is not what the public section yields",
+                v.name
+            );
+            let mdmk = public
+                .iter()
+                .filter(|r| crate::sysw::classify(r) == crate::sysw::record::Class::MdMk)
+                .count();
+            if mdmk > v.mdmk_unconfirmed.len() && !v.mdmk_unconfirmed.is_empty() {
+                confirmed_beside_unconfirmed += 1;
+            }
+        }
+        assert!(
+            confirmed_beside_unconfirmed >= 1,
+            "no vector holds a confirmed card BESIDE an unconfirmed one, so nothing here \
+             can fail an implementation that answers the same way for every record"
+        );
     }
 
     /// R0-C2, as a property of the fixture set rather than of one case: a

@@ -850,6 +850,12 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // The strength line is printed whatever the choice: the operator is
             // told, never blocked (spec decision 8).
             report_strength(passphrase.as_deref(), &recs);
+            // `[mdmk-decode]` (§12.6). Indices are the OPERATOR'S — argv order,
+            // or the order of `--in`'s lines — because that is the list they can
+            // act on. Nothing here refuses: §13 D6 demoted the refusal, and a
+            // single card of a chunked set is exactly what `me bundle`
+            // legitimately produces.
+            report_unconfirmed(&recs);
 
             let blob = match sysw::pack(recs, passphrase.as_deref(), *iterations) {
                 Ok(b) => b,
@@ -959,6 +965,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 hex(&sysw::identity::identity(&blob[..h.total_len()]))
             );
             print_digest(&blob);
+            print_mdmk_confirmation(&blob, &h);
             0
         }
     }
@@ -1000,6 +1007,54 @@ fn print_digest(blob: &[u8]) {
     let refs: Vec<&str> = s.split('\n').collect();
     let d = sysw::pubhash::public_data_hash(&refs, h.sealed());
     eprintln!("digest:   {}", sysw::pubhash::format_hash(&d));
+}
+
+/// `[mdmk-decode]` (§12.6) at pack time: one line per unconfirmed record, then
+/// the container is built anyway.
+///
+/// STDERR, like every other advisory line here, so `me sysw pack > f.bin` still
+/// shows the operator what they are about to flash.
+fn report_unconfirmed(records: &[String]) {
+    for i in mnemonic_engrave::sysw::record::mdmk_unconfirmed(records) {
+        eprintln!(
+            "me: record {i}: an md1/mk1 this tool could not decode; the device will \
+             treat it as a SECRET"
+        );
+    }
+}
+
+/// `me sysw show`: the same rule, stated per record, so the operator can see
+/// which cards the machine will treat as secrets before anything is flashed.
+///
+/// Indices are into the PUBLIC SECTION, which is the list `show` can see — and
+/// the only one that matters, since `Class::MdMk` is not secret and so never
+/// reaches the ciphertext. A sealed payload's secret records stay unread here;
+/// `show` has no passphrase.
+fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header) {
+    use mnemonic_engrave::sysw;
+    if h.pub_len == 0 {
+        return;
+    }
+    let end = sysw::wire::HEADER_LEN + h.pub_len as usize;
+    let Some(section) = blob.get(sysw::wire::HEADER_LEN..end) else {
+        return;
+    };
+    let Ok(s) = std::str::from_utf8(section) else {
+        return;
+    };
+    let records: Vec<String> = s.split('\n').map(str::to_owned).collect();
+    let unconfirmed = sysw::record::mdmk_unconfirmed(&records);
+    for (i, r) in records.iter().enumerate() {
+        if sysw::classify(r) != sysw::record::Class::MdMk {
+            continue;
+        }
+        let state = if unconfirmed.contains(&i) {
+            "unconfirmed — the device will treat it as a SECRET"
+        } else {
+            "confirmed"
+        };
+        println!("record {i}: md1/mk1 — {state}");
+    }
 }
 
 fn report_strength(passphrase: Option<&str>, records: &[String]) {

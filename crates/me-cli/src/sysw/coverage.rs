@@ -50,7 +50,11 @@ pub const COVERAGE: &[(u32, Where)] = &[
     (11, Where::Unit("fills_the_whole_region")),
     (12, Where::Unit("each_fill_is_what_it_says")),
     (13, Where::Dropped("operator ruling 2026-08-12: the reminder is dropped")),
-    (14, Where::Vector("S-I")), // BCH-valid md1, non-decodable entropy
+    // `[mdmk-decode]` (§12.6). Re-pointed 2026-08-12, off S-I: that vector
+    // records only that a BCH-valid md1 packs, and asserted nothing about
+    // confirmation, so the placement was a claim rather than coverage. S-J
+    // carries BOTH answers, which is what makes it able to fail.
+    (14, Where::Vector("S-J")),
     (15, Where::Vector("S-D")), // pub_len == 0 -> no digest
     (16, Where::Device),        // no verify flow reaches a payload secret
     (17, Where::DeviceUnbuilt("§7 provenance: no provenance survives take()")),
@@ -96,7 +100,27 @@ pub const FIXTURE_SALT: [u8; 16] = [0x11; 16];
 pub const FIXTURE_IV: [u8; 12] = [0x22; 12];
 pub const FIXTURE_ITERATIONS: u32 = 100_000;
 
+/// Chunk 0 of 3 of chunk set 398802 — MEASURED, not assumed. It is therefore an
+/// UNCONFIRMED record under `[mdmk-decode]` (§12.6) wherever it appears alone,
+/// which is every vector below except S-J.
 const MD1: &str = "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3";
+/// The other two chunks of set 398802, so S-J can carry a COMPLETE card.
+const MD1_B: &str = "md1fv9wjpqg0yq82l0czvx85ae43vtfd26hsmngjecmqy44k2pgttqh74qwxlawq374";
+const MD1_C: &str = "md1fv9wjpqsp2026hh65xpvugtfhd9792zxgunymm0a82pdju6442q0jskj9gzfaqmz";
+/// Chunk 0 of 6 of a DIFFERENT set, 841149. Beside the complete 398802 set it is
+/// what separates `(hrp, chunk_set_id)` grouping from grouping by HRP alone: an
+/// implementation that lumped all four `md1` records together would report the
+/// complete card as unconfirmed and fail this vector loudly.
+const MD1_OTHER: &str =
+    "md1fe4dazspq3m67zzqqvzrs3pstucnf4ztqz4pk6ujgjycfn6zhs79nmzdp9frd6dzth6asfu2za4mwgfkg6";
+/// Not chunked at all: its own card, and it decodes on its own.
+const MD1_SINGLE: &str = "md1yqpqqxqq8xtwhw4xwn4qh";
+/// A complete 2-chunk `mk1` card (set 74565).
+const MK1_A: &str = "mk1qpzg69pqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3kx98j76m4mjlwphf";
+const MK1_B: &str =
+    "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x";
+/// Chunk 0 of a 2-chunk `mk1` card (set 153721) whose second chunk is absent.
+const MK1_LONE: &str = "mk1qpykrepqqspjtpuhfqjc096gykrewjy6dgjcqpcy3zepaggqseet8ky6z2jxm56yh04m5mqslrmueekdmecm0js2h978k03jfvkwz2rxj8r8";
 const SEED: &str =
     "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 const PASS12: &str =
@@ -145,7 +169,25 @@ pub const VECTORS: &[VectorInput] = &[
         name: "S-I",
         records: &[MD1],
         passphrase: None,
-        note: "a BCH-valid md1 — the smuggling case R0-I1 named lives at the device's decode gate",
+        note: "a BCH-valid md1, alone — it packs and classifies ClassMDMK, and that is ALL this \
+               vector says; §8.3 test 14 moved to S-J, which asserts confirmation",
+    },
+    VectorInput {
+        name: "S-J",
+        records: &[
+            MD1,        // 0 ┐
+            MD1_B,      // 1 ├ chunk set 398802, COMPLETE  -> confirmed
+            MD1_C,      // 2 ┘
+            MD1_OTHER,  // 3   chunk 0 of 6 of set 841149  -> UNCONFIRMED
+            MD1_SINGLE, // 4   not chunked, decodes        -> confirmed
+            MK1_A,      // 5 ┐ chunk set 74565, COMPLETE   -> confirmed
+            MK1_B,      // 6 ┘
+            MK1_LONE,   // 7   chunk 0 of 2 of set 153721  -> UNCONFIRMED
+        ],
+        passphrase: None,
+        note: "`[mdmk-decode]` (§12.6) — both answers in one payload: two complete card sets and \
+               a non-chunked card confirm, two lone chunks do not. Unsealed, so the public \
+               section is the record list in order and the reported indices are unambiguous",
     },
 ];
 
@@ -221,8 +263,15 @@ mod tests {
             "the pub_len == 0 case must have a vector"
         );
         assert!(
-            v.contains(&"S-I"),
-            "the BCH-smuggling case must have a vector"
+            v.contains(&"S-J"),
+            "`[mdmk-decode]` must have a vector — §8.3 test 14"
+        );
+        assert!(
+            !v.contains(&"S-I"),
+            "S-I is no longer REQUIRED by any spec test: it asserted nothing about \
+             confirmation, which is why test 14 moved to S-J. It still ships, and the \
+             golden and round-trip tests still cover it — this pins that the derivation \
+             followed the move rather than the list being hand-edited."
         );
         // Three separate spec tests ride on S-D; it must appear once.
         assert_eq!(v.iter().filter(|n| **n == "S-D").count(), 1);

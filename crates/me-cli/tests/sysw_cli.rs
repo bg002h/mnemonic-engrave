@@ -433,8 +433,7 @@ fn pack_refuses_a_passphrase_the_device_could_not_type() {
 #[test]
 fn pack_enforces_the_passphrase_length_bound() {
     use mnemonic_engrave::sysw;
-    let long = std::iter::repeat("abandon")
-        .take(40)
+    let long = std::iter::repeat_n("abandon", 40)
         .collect::<Vec<_>>()
         .join(" ");
     assert!(long.len() > sysw::wire::PASSPHRASE_MAX);
@@ -444,4 +443,102 @@ fn pack_enforces_the_passphrase_length_bound() {
         }
         other => panic!("an over-long passphrase must be refused, got {other:?}"),
     }
+}
+
+// ---------------------------------------------------------------------------
+// `[mdmk-decode]` (§12.6; §13 D6) at the CLI. It WARNS and proceeds — a test
+// here asserting a non-zero exit would be re-imposing the refusal D6 demoted,
+// which is the direction test expectations drift when nobody asserts the
+// demotion.
+// ---------------------------------------------------------------------------
+
+/// The other two chunks of `MD1`'s set (398802), so a COMPLETE card can be
+/// packed. Measured, not assumed.
+const MD1_B: &str = "md1fv9wjpqg0yq82l0czvx85ae43vtfd26hsmngjecmqy44k2pgttqh74qwxlawq374";
+const MD1_C: &str = "md1fv9wjpqsp2026hh65xpvugtfhd9792zxgunymm0a82pdju6442q0jskj9gzfaqmz";
+
+#[test]
+fn pack_warns_once_per_unconfirmed_record_and_still_succeeds() {
+    // MD1 is chunk 0 of 3, so alone it cannot reassemble and cannot decode.
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", MD1])
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(
+        err.contains("record 0: an md1/mk1 this tool could not decode"),
+        "the warning must name the record by the index the operator gave it: {err}"
+    );
+    assert!(
+        err.contains("SECRET"),
+        "and say what the device will do with it: {err}"
+    );
+}
+
+/// The index is into the OPERATOR'S argv, not into a list filtered to the
+/// md1/mk1 records — R1-I2. With a seed first, the same card is record 1.
+#[test]
+fn the_warning_names_the_record_the_operator_passed() {
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", SEED, MD1])
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(err.contains("record 1: an md1/mk1"), "{err}");
+    assert!(!err.contains("record 0: an md1/mk1"), "{err}");
+}
+
+/// The other direction, which is what makes the test above able to fail: a
+/// complete card set produces no warning at all.
+#[test]
+fn a_complete_card_set_draws_no_warning() {
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", MD1, MD1_B, MD1_C])
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(
+        !err.contains("could not decode"),
+        "a set that reassembles and decodes is confirmed: {err}"
+    );
+}
+
+/// `me sysw show` states the answer per record, so the operator can see which
+/// card the machine will treat as a secret before they flash it.
+#[test]
+fn show_states_confirmed_or_unconfirmed_beside_each_mdmk_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("p.bin");
+    me()
+        .args(["sysw", "pack", "--no-passphrase", MD1, MD1_B, MD1_C, TEXT])
+        .arg("--out")
+        .arg(&f)
+        .assert()
+        .success();
+    let shown = me().args(["sysw", "show"]).arg(&f).assert().success();
+    let out = String::from_utf8_lossy(&shown.get_output().stdout).into_owned();
+    for i in 0..3 {
+        assert!(
+            out.contains(&format!("record {i}: md1/mk1 — confirmed")),
+            "record {i} of a complete set must read confirmed:\n{out}"
+        );
+    }
+    assert!(
+        !out.contains("record 3:"),
+        "the text: record is not ClassMDMK and this rule is not about it:\n{out}"
+    );
+
+    // And the same command over a lone chunk says the opposite.
+    let g = dir.path().join("q.bin");
+    me()
+        .args(["sysw", "pack", "--no-passphrase", TEXT, MD1, "--out"])
+        .arg(&g)
+        .assert()
+        .success();
+    let shown = me().args(["sysw", "show"]).arg(&g).assert().success();
+    let out = String::from_utf8_lossy(&shown.get_output().stdout).into_owned();
+    assert!(
+        out.contains("record 1: md1/mk1 — unconfirmed"),
+        "a lone chunk of a declared set must read unconfirmed:\n{out}"
+    );
 }
