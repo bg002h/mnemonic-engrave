@@ -443,33 +443,41 @@ go build -tags tinygo ./gui/
 
 ---
 
-## Stage 11 — the §5.3.2 erase item (the tree's FIRST flash write)
+## Stage 11 — UNLOAD (spec §13 D10; NOT a flash write)
 
-No package in the fork writes flash today — the grep finds no erase or program
-call outside `third_party/` — so this stage adds the capability, not just a
-menu. That is why it sits late in the order and carries a hardware gate.
+**Rewritten 2026-08-12 by operator ruling D10, which deleted this stage's
+reason for being late and dangerous.** It previously added an `Eraser`, an
+RP2350 flash-range erase behind interrupt masking, a `SyswEraser()` on
+`Platform`, a hardware rehearsal and a RISK-SET classification — because it was
+to be the tree's first flash write. **The firmware now never writes flash.**
+All of that is gone. What remains is a session operation.
+
+The operator may UNLOAD: the loaded records are dropped, and the region at
+`0x10D00000` is untouched. **The word "erase" does not appear on the device**,
+because the bytes are still there and saying otherwise would be a lie the
+operator might act on. Overwriting the region stays a HOST operation
+(`me sysw wipe`), and the unload screen says so.
 
 | item | where |
 | --- | --- |
-| `type Eraser interface { Erase() error }` — sector-erases the whole region to `0xFF`, the erased state (spec §5.5's 2026-08-12 note: the fills belong to `me sysw wipe`). The absolute address stays inside the `_tinygo.go` file, `Reader`'s rule | `sysw/erase.go`, `sysw/erase_tinygo.go` (RP2350 flash-range erase via the TinyGo runtime, interrupts masked — XIP-safety is exactly what the hardware gate below exists to prove), `sysw/erase_host.go` (file-backed, for tests) |
-| `SyswEraser() sysw.Eraser` on `Platform` — nil when the platform cannot write flash, the `SyswReader` contract | `gui/gui.go` (the `Platform` interface), both platform implementations |
-| `func syswEraseFlow(ctx *Context, th *Colors, e sysw.Eraser) bool` — its own confirm ("This permanently erases the payload region." — ERASE / BACK), the erase, then a result screen that states plainly: "Region erased. Records already loaded remain usable until power-off." (spec §3.2.1: lifetime is the process; the erase is about flash, and implying otherwise would claim a wipe decision 2 rejects) | new `gui/sysw_erase.go` |
-| offered where F1 fires — the `syswLoadWarnings` screen gains an ERASE choice when `flagSecretInPlaintext` is present — and from the `loadPayload` carousel entry when `Probe()` is true (LOAD / ERASE / BACK) | `gui/sysw_load.go` |
+| `func syswUnloadFlow(ctx *Context, th *Colors) bool` — confirm (UNLOAD / BACK), drop the session, then a result screen that states plainly what did and did not happen: *"Payload unloaded. It is still in flash — overwrite it from the host with `me sysw wipe`."* | new `gui/sysw_unload.go` |
+| `ctx.sysw = nil`, nothing else. No `Eraser`, no `Platform` method, no `_tinygo.go` file, no flash call anywhere | `gui/sysw_unload.go` |
+| offered from the `loadPayload` carousel entry when a payload is LOADED (UNLOAD / BACK), and alongside the F1 warning where an ERASE choice was planned | `gui/sysw_load.go` |
 
-**Hardware gate, before merge.** Flash-write-while-executing-from-XIP is the
-risk and the emulator cannot carry it. One cheap rehearsal on the real machine:
-write a payload, erase from the menu, `picotool save` the region, assert 64 KiB
-of `0xFF` — the single-character-test-plate principle applied to flash. This
-stage is in the RISK SET (first physically destructive write path): independent
-review before the first real erase, per the project rule; result recorded as a
-`design/HARDWARE_RESULT_*`.
+**No hardware gate, and that is the point of the ruling.** Nothing here is
+irreversible: the flash is not touched, and a session dies at power-off anyway
+(§3.2.1). This stage carries the same risk as any other menu item.
+
+**Do not** add `sysw/erase.go`, `sysw/erase_tinygo.go`, `sysw/erase_host.go`, or
+`SyswEraser()`. If a later cycle wants device-side overwrite it re-earns a
+ruling; D10 is not a deferral, it is a decision.
 
 ### Green
 
 ```sh
-go test ./gui/ ./sysw/           # erase_host path: the region file becomes 0xFF
+go test ./gui/ ./sysw/
 go build -tags tinygo ./gui/ && GOOS=js GOARCH=wasm go build ./cmd/emu/
-# hardware: the rehearsal above, recorded before merge
+grep -rn "Erase\|erase" gui/ sysw/ | grep -v _test   # must find no flash-write path
 ```
 
 ---
