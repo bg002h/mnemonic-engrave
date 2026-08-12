@@ -4789,3 +4789,47 @@ Options, in the order I would try them:
 Not urgent: the walk-through review drove the surrounding journeys by execution
 and they closed. But "the call exists" and "the journey arrives" are different
 claims, and only one of them is currently tested.
+
+### F-150 — the on-device wallet-descriptor builder needs major attention: it dead-ends, assumes one key, and offers none of miniscript (owning phase: **a future cycle — needs its own brainstorm**) `#mnemonic`
+
+Filed 2026-08-12 from the operator's own use of the feature on the machine.
+**These are field observations, reported as given; only the code pointers below
+are mine and only they are verified.**
+
+**1. It dead-ends. `buildMultisigPolicyFlow` fails to deliver a descriptor after
+configuration — a BLANK SCREEN after pressing next.** This is the severe one: the
+operator completes the configuration and gets nothing, with no error to act on. A
+blank screen is the failure mode that teaches an operator the machine is broken
+rather than that an input was wrong, and it is the same shape as this cycle's
+recurring defect — a flow that is built and does not arrive.
+
+**2. It assumes the operator at the console holds only ONE key.** Real
+multisig setups routinely have one person holding several cosigner keys — the
+pathological wallet in `design/journeys/` is exactly that: 11 keys from 3
+masters, all reachable from one seat. A builder that cannot express "I hold @0,
+@1 and @2" cannot build the wallets this project already ships journeys for.
+
+**3. Script types are limited to three, and taproot is absent.**
+`multisigScriptChoices()` (`gui/multisig_build.go:276`) offers exactly
+`wsh (native segwit)`, `sh(wsh) (nested segwit)`, `sh (legacy)`. There is no
+`tr()`, so no taproot wallet can be built on the device at all. Verified by
+reading the function.
+
+**4. No miniscript operators.** `after()`, `older()`, hash locks
+(`sha256`/`hash160`) and the composition operators are unavailable, so every
+timelocked, degrading or hashlocked policy is un-buildable on the machine. Note
+the constellation already handles these end to end on the HOST — the
+pathological wallet uses all four timelock kinds plus a `sha256` hashlock, and
+`md` encodes it — so this is a device-side gap, not a codec one.
+
+**Scope note, and the reason this is filed rather than fixed.** Items 3 and 4
+are not bug fixes; they are a feature. Miniscript on a 480×320 touch panel is a
+design problem (how does an operator compose `and_v(v:older(65535),multi(2,…))`
+by tapping?) and it deserves its own brainstorm before any code. Item 1 is a
+defect and could be fixed on its own; item 2 sits between the two. **Do not fold
+these together** — the dead-end should not wait on the design work.
+
+Related: the host side already does all of this (`md compile`, `md encode
+--from-policy`), so a design that lets the device CONSUME a host-built policy —
+which is what the systemwide-payload feature now delivers — may be cheaper than
+teaching the panel to author one. Worth weighing before building an editor.
