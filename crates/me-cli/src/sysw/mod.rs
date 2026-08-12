@@ -108,13 +108,6 @@ pub fn classify(record: &str) -> record::Class {
 /// ciphertext's own framing would let an attacker swap a public record for one
 /// encoding THEIR xpub, with the tag still verifying, and the operator would
 /// engrave a steel backup of a wallet they do not control.
-/// Build a container. `passphrase` `None` produces the unsealed variant.
-///
-/// The AAD is `header ‖ public section` — EPD §6.1a, and spec §5.4 states it for
-/// this container explicitly rather than by reference. Binding only the
-/// ciphertext's own framing would let an attacker swap a public record for one
-/// encoding THEIR xpub, with the tag still verifying, and the operator would
-/// engrave a steel backup of a wallet they do not control.
 pub fn pack(
     records: Vec<String>,
     passphrase: Option<&str>,
@@ -159,6 +152,15 @@ pub fn pack_deterministic(
         blob.extend_from_slice(&pub_bytes);
         return bound(blob);
     };
+
+    // Checked BEFORE the KDF, not just in `bound`, for two reasons: there is no
+    // point running PBKDF2 for a container we are about to refuse, and the
+    // operator has already been told to write a generated passphrase down. A
+    // refusal that arrives after that ceremony teaches them the note is
+    // worthless.
+    if !(wire::MIN_ITERATIONS..=wire::MAX_ITERATIONS).contains(&iterations) {
+        return Err(SyswError::Wire(wire::WireError::Iterations(iterations)));
+    }
     seal_with(payload, pub_bytes, header, pass, iterations, salt, iv)
 }
 
@@ -208,10 +210,24 @@ fn seal_with(
     bound(blob)
 }
 
+/// The last gate every emitted container passes — both the sealed and unsealed
+/// paths end here.
+///
+/// **The writer must refuse everything the reader refuses.** The pre-flash
+/// review found it did not: `--iterations 5` and an over-long section both
+/// produced a container that `Header::parse` rejects, at exit 0, and
+/// `--region` would then have written that to flash. For a SEALED payload that
+/// is a seed backup nobody can ever open.
+///
+/// The fix is deliberately not a second copy of the reader's bounds — two
+/// copies of one rule is exactly how these drifted apart, and it is the defect
+/// shape this whole module has been fighting. Instead: **run the reader.** Any
+/// future divergence fails here rather than on steel.
 fn bound(blob: Vec<u8>) -> Result<Vec<u8>, SyswError> {
     if blob.len() > wire::REGION_LEN {
         return Err(SyswError::TooLarge(blob.len()));
     }
+    wire::Header::parse(&blob).map_err(SyswError::Wire)?;
     Ok(blob)
 }
 
@@ -383,18 +399,46 @@ mod tests {
         );
     }
 
-    /// `bound`'s edge. Added because cargo-mutants showed `>` was
+    /// `bound`'s SIZE edge. Added because cargo-mutants showed `>` was
     /// indistinguishable from `>=` and `==`: nothing exercised a blob at exactly
     /// the region size.
+    ///
+    /// The fixture was `vec![0u8; N]` until `bound` also began parsing its own
+    /// output (pre-flash review C1). All-zeros has no MAGIC, so it now fails for
+    /// the wrong reason and would no longer pin the boundary. A REAL container
+    /// padded to length keeps the original mutant dead: `Header::parse` reads
+    /// only the header, so trailing bytes are legal, and the size check still
+    /// runs first.
     #[test]
     fn a_blob_exactly_filling_the_region_is_legal_and_one_byte_more_is_not() {
-        assert!(
-            bound(vec![0u8; wire::REGION_LEN]).is_ok(),
-            "exactly REGION_LEN fits"
-        );
+        let real = pack(vec!["text:6869".into()], None, wire::MIN_ITERATIONS).unwrap();
+        let pad_to = |n: usize| {
+            let mut v = real.clone();
+            v.resize(n, 0xFF);
+            v
+        };
+        assert!(bound(pad_to(wire::REGION_LEN)).is_ok(), "exactly REGION_LEN fits");
         assert_eq!(
-            bound(vec![0u8; wire::REGION_LEN + 1]).unwrap_err(),
+            bound(pad_to(wire::REGION_LEN + 1)).unwrap_err(),
             SyswError::TooLarge(wire::REGION_LEN + 1)
+        );
+    }
+
+    /// C1, as a property rather than two cases: whatever `pack` emits, the
+    /// reader accepts. This is the invariant `bound` now enforces by running the
+    /// reader, and it is what makes a writer/reader drift impossible to ship.
+    #[test]
+    fn pack_never_emits_what_the_reader_would_refuse() {
+        for iters in [0, 1, 5, wire::MIN_ITERATIONS - 1, wire::MAX_ITERATIONS + 1] {
+            assert!(
+                pack(vec!["text:6869".into()], Some(PASS), iters).is_err(),
+                "sealed pack accepted out-of-range iterations {iters}"
+            );
+        }
+        let huge: Vec<String> = (0..30).map(|_| format!("text:{}", "61".repeat(400))).collect();
+        assert!(
+            pack(huge, None, wire::MIN_ITERATIONS).is_err(),
+            "pack accepted a section its own parser rejects"
         );
     }
 

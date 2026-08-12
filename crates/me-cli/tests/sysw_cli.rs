@@ -268,6 +268,111 @@ fn region_works_for_a_sealed_payload_too() {
     assert_eq!(out.get_output().stdout.len(), 65_536);
 }
 
+/// Pre-flash fable review, C1. `pack` enforced neither bound its own parser
+/// enforces, so it emitted containers `show` refuses — exit 0 on write, exit 4
+/// on read. With `--region` that becomes a flash-ready image of an unreadable
+/// payload, and for a SEALED one that is a seed backup nobody can ever open.
+///
+/// The rule these pin: **the writer must refuse everything the reader refuses.**
+/// A writer looser than its reader is how permanent media gets a payload that
+/// was never openable.
+#[test]
+fn pack_refuses_iterations_its_own_parser_would_reject() {
+    for n in ["5", "99999", "2000001"] {
+        me().args([
+            "sysw",
+            "pack",
+            "--iterations",
+            n,
+            "--passphrase-words",
+            "12",
+            SEED,
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("iterations"));
+    }
+}
+
+#[test]
+fn pack_accepts_the_iteration_bounds_themselves() {
+    for n in ["100000", "2000000"] {
+        me().args([
+            "sysw",
+            "pack",
+            "--iterations",
+            n,
+            "--passphrase-words",
+            "12",
+            SEED,
+        ])
+        .assert()
+        .success();
+    }
+}
+
+#[test]
+fn pack_refuses_a_section_too_long_for_its_own_parser() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("big.txt");
+    let recs: Vec<String> = (0..30).map(|_| format!("text:{}", "61".repeat(400))).collect();
+    std::fs::write(&f, recs.join("\n")).unwrap();
+    me().args(["sysw", "pack", "--no-passphrase", "--in"])
+        .arg(&f)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("too long"));
+}
+
+/// The property behind both, stated once: anything `pack` writes, `show` reads.
+#[test]
+fn everything_pack_emits_is_readable_by_show() {
+    let dir = tempfile::tempdir().unwrap();
+    for (i, args) in [
+        vec!["--no-passphrase", TEXT],
+        vec!["--no-passphrase", MD1],
+        vec!["--passphrase-words", "12", SEED],
+        vec!["--iterations", "100000", "--passphrase-words", "2", SEED],
+    ]
+    .iter()
+    .enumerate()
+    {
+        let f = dir.path().join(format!("p{i}.bin"));
+        let mut c = me();
+        c.args(["sysw", "pack"]);
+        c.args(args.iter());
+        c.arg("--out").arg(&f).assert().success();
+        me().args(["sysw", "show"])
+            .arg(&f)
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("identity:"));
+    }
+}
+
+/// Pre-flash fable review, I2. `show` printed a plausible identity and THEN
+/// panicked (exit 101) on a container whose header declares more than the file
+/// holds. A panic after a plausible-looking line is the worst shape: the
+/// operator has already read a number that means nothing.
+#[test]
+fn show_on_a_truncated_container_fails_cleanly_without_printing_a_digest() {
+    let dir = tempfile::tempdir().unwrap();
+    let (full, trunc) = (dir.path().join("f.bin"), dir.path().join("t.bin"));
+    me().args(["sysw", "pack", "--no-passphrase", TEXT, "--out"])
+        .arg(&full)
+        .assert()
+        .success();
+    let all = std::fs::read(&full).unwrap();
+    std::fs::write(&trunc, &all[..60.min(all.len())]).unwrap();
+    let out = me().args(["sysw", "show"]).arg(&trunc).assert().failure();
+    let o = out.get_output();
+    assert_ne!(o.status.code(), Some(101), "must not panic");
+    assert!(
+        digest_line(&String::from_utf8_lossy(&o.stderr)).is_none(),
+        "and must not print a digest it cannot compute"
+    );
+}
+
 #[test]
 fn an_unplaceable_record_is_named_with_its_index() {
     me().args(["sysw", "pack", "--no-passphrase", MD1, "not a record"])

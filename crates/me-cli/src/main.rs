@@ -797,6 +797,22 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 }
             };
 
+            // Before the passphrase ceremony, not after: generating a passphrase,
+            // telling the operator to write it down, and THEN refusing the
+            // container teaches them that the note they just made is worthless.
+            let sealing = !*no_passphrase;
+            if sealing
+                && !(sysw::wire::MIN_ITERATIONS..=sysw::wire::MAX_ITERATIONS).contains(iterations)
+            {
+                eprintln!(
+                    "me: --iterations {iterations} is outside {}..={} — a container built with \
+                     it is one no conforming reader will open",
+                    sysw::wire::MIN_ITERATIONS,
+                    sysw::wire::MAX_ITERATIONS
+                );
+                return 4;
+            }
+
             // Exactly one passphrase mode. clap enforces mutual exclusion; this
             // is the "none given" case, and the DEFAULT is to generate rather
             // than to leave a payload unprotected by omission.
@@ -838,7 +854,19 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             let blob = match sysw::pack(recs, passphrase.as_deref(), *iterations) {
                 Ok(b) => b,
                 Err(e) => {
-                    eprintln!("me: {}", sysw_error(&e));
+                    // On the WRITE path "malformed container" is the wrong
+                    // sentence — nothing is malformed, the operator simply gave
+                    // more than a section can hold. Saying it the reader's way
+                    // sends them looking for a corrupt file they do not have.
+                    if e == sysw::SyswError::Wire(sysw::wire::WireError::SectionTooLong) {
+                        eprintln!(
+                            "me: these records are too long for one payload: a section caps at \
+                             {} bytes. Split them across two payloads.",
+                            sysw::wire::MAX_SECTION_LEN
+                        );
+                    } else {
+                        eprintln!("me: {}", sysw_error(&e));
+                    }
                     return 4;
                 }
             };
@@ -911,11 +939,24 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             println!("sealed:   {}", h.sealed());
             println!("pub_len:  {}", h.pub_len);
             println!("ct_len:   {}", h.ct_len);
+
+            // Truncation is decided BEFORE anything derived from the header is
+            // printed. `identity` clamps to what is present, so on a short file
+            // it yields a real-looking 32 bytes for a payload that does not
+            // exist — and the operator would compare it against the machine.
+            if blob.len() < h.total_len() {
+                eprintln!(
+                    "me: this file is {} bytes but its header declares {}; it is truncated. \
+                     No identity or digest is shown, because either would be a number for a \
+                     payload that is not all here.",
+                    blob.len(),
+                    h.total_len()
+                );
+                return 4;
+            }
             println!(
                 "identity: {}",
-                hex(&sysw::identity::identity(
-                    &blob[..h.total_len().min(blob.len())]
-                ))
+                hex(&sysw::identity::identity(&blob[..h.total_len()]))
             );
             print_digest(&blob);
             0
@@ -940,8 +981,20 @@ fn print_digest(blob: &[u8]) {
         eprintln!("digest:   none — this payload has no public section");
         return;
     }
+    // `pub_len` is the FILE's claim about itself, so a truncated container
+    // declares more than it holds and this slice panicked (pre-flash review I2,
+    // exit 101) — after `show` had already printed a plausible-looking identity.
+    // A number the operator has read and cannot use is worse than no number.
     let end = sysw::wire::HEADER_LEN + h.pub_len as usize;
-    let Ok(s) = std::str::from_utf8(&blob[sysw::wire::HEADER_LEN..end]) else {
+    let Some(section) = blob.get(sysw::wire::HEADER_LEN..end) else {
+        eprintln!(
+            "digest:   none — this file is {} bytes but its header declares {end}; it is \
+             truncated, not tampered with",
+            blob.len()
+        );
+        return;
+    };
+    let Ok(s) = std::str::from_utf8(section) else {
         return;
     };
     let refs: Vec<&str> = s.split('\n').collect();
