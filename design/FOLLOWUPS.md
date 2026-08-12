@@ -4675,3 +4675,33 @@ across the whole run FIRST, then count passes.
 Nothing to fix in the tree — the implementer corrected the lint inside
 `2b570fc`, and HEAD is clean: clippy exit 0, 0 `FAILED`, 10 suites ok, verified
 here.
+
+### F-148 — flashing is remote-safe; VERIFYING a flash is not (owning phase: **systemwide payloads, stage 11**) `#mnemonic`
+
+Recorded 2026-08-12 when the operator noted they are remote. Two halves of the
+flash operation have opposite answers, and conflating them is how a remote
+session ends with a machine nobody can judge.
+
+**Flashing is recoverable without hands, and here is why.** `Init()` requires a
+20–28 V USB-PD contract before it configures the LCD, and reboots into BOOTSEL
+when it does not find one. A computer's USB port cannot supply that. So a device
+left plugged into the workstation **returns to BOOTSEL by itself** after every
+boot attempt — observed: it is enumerated as `2e8a:000f` right now, having been
+flashed and booted earlier today. A bad image, a wrong signature and a good image
+all land in the same reachable place. No button press is required, and
+`sh2-flash`'s own notes confirm neither script contains an OTP write, which is
+the only unrecoverable class.
+
+**Verifying is NOT remote-able.** "It boots" can only be judged on the machine's
+normal supply, because on workstation power a correctly signed image is
+indistinguishable from a rejected one — both give a dark screen and a device back
+in BOOTSEL. So a remote flash can be *performed* and cannot be *confirmed*.
+
+**Consequence for stage 11**, the tree's first flash write: its hardware gate has
+a precondition the plan does not yet state — **someone with physical access must
+judge the boot before the result is called good.** Until then the honest status
+is "flashed, unverified", and no follow-on work may assume the image runs.
+
+Practical rule: remote sessions may flash freely as long as the device stays on
+workstation USB, and must record the outcome as UNVERIFIED. Moving it to machine
+power is the verification step and belongs to whoever is in the room.
