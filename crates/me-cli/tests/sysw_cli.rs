@@ -380,3 +380,24 @@ fn an_unplaceable_record_is_named_with_its_index() {
         .failure()
         .stderr(predicate::str::contains("record 1"));
 }
+
+/// Pre-flash conformance review, I3. Rust models "no passphrase" as `None`, so
+/// `Some("")` is a real passphrase here — but the device reads an empty
+/// passphrase as *absence*, so a payload sealed with one can never be opened on
+/// the machine it was made for. Not a strength refusal (those warn and
+/// proceed); an unopenable-artifact refusal.
+#[test]
+fn an_empty_passphrase_is_refused_because_the_device_could_never_open_it() {
+    // `--passphrase-ask` reads the tty, so drive the library-level path the CLI
+    // reaches: whitespace-only normalises to empty too, and must refuse alike.
+    use mnemonic_engrave::sysw;
+    for p in ["", " ", "   \t  "] {
+        assert_eq!(
+            sysw::pack(vec![TEXT.into()], Some(p), 100_000).unwrap_err(),
+            sysw::SyswError::EmptyPassphrase,
+            "passphrase {p:?} normalises to nothing and must be refused"
+        );
+    }
+    // A real one still works, so the check cannot pass by refusing everything.
+    assert!(sysw::pack(vec![TEXT.into()], Some("abandon about"), 100_000).is_ok());
+}

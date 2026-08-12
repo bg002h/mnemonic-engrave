@@ -150,6 +150,40 @@ mod tests {
         }
     }
 
+    /// I5, pre-flash conformance: the artifact actually written to flash is a
+    /// 65536-byte region — container at offset 0, `0xFF` to the end. Every
+    /// vector is a bare blob, so nothing pinned that both sides TRIM to the
+    /// header's declared total before hashing. They agree today; measured. This
+    /// is what keeps them agreeing.
+    ///
+    /// As a property over the whole set rather than one new fixture: a 128 KB
+    /// hex blob in the JSON would pin one payload, this pins all of them.
+    #[test]
+    fn padding_a_vector_to_a_full_region_changes_no_identity_and_no_digest() {
+        for v in load() {
+            let blob: Vec<u8> = (0..v.blob.len() / 2)
+                .map(|i| u8::from_str_radix(&v.blob[i * 2..i * 2 + 2], 16).unwrap())
+                .collect();
+            let mut region = blob.clone();
+            region.resize(wire::REGION_LEN, 0xFF);
+
+            assert_eq!(
+                hex(&identity::identity(&blob)),
+                v.identity,
+                "{}: the bare blob must still match its recorded identity",
+                v.name
+            );
+            let h = wire::Header::parse(&region).expect("a padded region still parses");
+            assert_eq!(
+                hex(&identity::identity(&region[..h.total_len()])),
+                v.identity,
+                "{}: padding to a full region must not move the identity — if this \
+                 fails, the device and the host disagree about every flashed payload",
+                v.name
+            );
+        }
+    }
+
     /// R0-C2, as a property of the fixture set rather than of one case: a
     /// digest exists exactly when `pub_len > 0`.
     #[test]

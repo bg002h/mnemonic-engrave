@@ -1074,6 +1074,11 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
         ),
         E::TooLarge(n) => format!("{n} bytes exceeds the flash region"),
         E::PassphraseMismatch => "a sealed payload needs a passphrase".into(),
+        E::EmptyPassphrase => "an empty passphrase would seal a payload the DEVICE can never \
+                               open: it reads an empty passphrase as none supplied, and there \
+                               is no keystroke for it. Use --no-passphrase for a plaintext \
+                               payload, or supply a real one."
+            .into(),
         E::Crypto => "the passphrase did not open this payload".into(),
         E::NotUtf8 => "the records are not valid UTF-8".into(),
         E::Wire(w) => format!("malformed container: {w:?}"),

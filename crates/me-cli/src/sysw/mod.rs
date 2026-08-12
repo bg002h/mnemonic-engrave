@@ -65,6 +65,10 @@ pub enum SyswError {
     Crypto,
     /// A sealed payload was handed no passphrase, or vice versa.
     PassphraseMismatch,
+    /// The passphrase normalises to nothing. Not a strength judgement — the
+    /// DEVICE reads an empty passphrase as "none supplied", so such a payload
+    /// could never be opened on the machine it is for.
+    EmptyPassphrase,
     NotUtf8,
 }
 
@@ -160,6 +164,19 @@ pub fn pack_deterministic(
     // worthless.
     if !(wire::MIN_ITERATIONS..=wire::MAX_ITERATIONS).contains(&iterations) {
         return Err(SyswError::Wire(wire::WireError::Iterations(iterations)));
+    }
+
+    // NOT a strength rule — those warn and proceed (spec §13 D3), and this must
+    // not be mistaken for one. It is an UNOPENABLE-ARTIFACT rule. Rust models
+    // "no passphrase" as `None`, so `Some("")` is a real passphrase and this
+    // host will happily seal with it and open it again. The device models the
+    // absent passphrase as the empty string (`open.go`), so on the machine an
+    // empty passphrase reads as "none supplied" and the payload can NEVER be
+    // opened — there is no keystroke that expresses it. `--passphrase-ask` plus
+    // a bare Enter reaches this, and normalisation collapses whitespace-only to
+    // the same place.
+    if crate::seal::passphrase::normalise(pass).is_empty() {
+        return Err(SyswError::EmptyPassphrase);
     }
     seal_with(payload, pub_bytes, header, pass, iterations, salt, iv)
 }
