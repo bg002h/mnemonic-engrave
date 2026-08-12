@@ -4443,3 +4443,59 @@ pipeline's failure killed the script with no message at all).
 **Do it with the device in BOOTSEL**, confirm the row format by running it, and
 keep the recorded constant as the fallback for when OTP cannot be read — falling
 back LOUDLY, never silently.
+
+### F-144 — the plan has no stage for the LOAD FLOW, so all six stages are done and the feature is inert (owning phase: **systemwide payloads**) `#mnemonic`
+
+Filed 2026-08-12, from the operator's question after the firmware booted: *why
+does the machine never look?*
+
+**Measured, in `seedhammer` at `b14662a`:**
+
+| symbol | non-test references |
+| --- | --- |
+| `ctx.sysw` — **read** | 7 |
+| `ctx.sysw` — **assigned** | **0** |
+| `sysw.Open` | **0** |
+| `ctx.Platform.SyswReader()` — **called** | **0** |
+
+Both ends of the feature exist and are correct. The region reader is real on the
+controller (`cmd/controller/platform_sh2.go:581`); the session store, admission
+table and flags exist (`gui/sysw_session.go`, `gui/sysw_admit.go`); and the
+consumers are wired and asking (`derive_xpub.go:127,135`, `bundle_flow.go:30`,
+`sysw_session.go:104,112`). **The pipe between them was never laid.** Nothing
+reads the region, opens the container, shows the digest, or fills the session, so
+every consumer takes its `ctx.sysw == nil` branch forever.
+
+**This is a PLAN gap, not an execution gap, and that is why it went unnoticed.**
+All six stages are complete as written. The plan's only mention of `SyswReader`
+is the interface declaration in stage 4's table (`:184`); no stage says *call*
+it. Stage 4 built the reader and the store, stage 5 wired the eight programs to
+consume from the store, stage 6 gave the emulator an NFC source. The step that
+puts something IN the store belongs to no stage.
+
+The spec is not the thing that failed — it specifies the behaviour repeatedly:
+*"the device displays it at load, and the operator compares"* (§:438), *"a
+plaintext container carrying a secret class is flagged on screen at load"*
+(§:545), the `[compared]` gate (§:356), and `seedEntryFlow` offering
+Typed / Scanned / **Payload** (§:209). The plan simply never sequenced it, and
+the plan passed its R0 review to 0C/0I in that state.
+
+**No operator-visible harm today**, which is the one piece of luck here:
+`syswOffer` guards on `ctx.sysw == nil` before drawing anything, so the
+"FROM PAYLOAD" choice is never shown and a machine with no payload behaves
+exactly as it did before. The feature is inert, not broken.
+
+**What the missing stage owes**, from the spec rather than invented: read
+`REGION_ADDR` via `SyswReader()`; `sysw.Open` it; display `[digest-shown]` and
+hold for the operator's `[compared]` confirmation; evaluate flags F1–F4 and show
+them; populate the one-entry session. Plus the decision the plan never had to
+make because it never got here: **when does this run** — at boot, or from a menu
+entry the operator chooses?
+
+**The transferable lesson, which is the reason this entry is long.** Six stages,
+a green R0 gate, every stage's tests passing, and the feature does nothing. A
+plan that enumerates COMPONENTS will pass review while omitting the CALL that
+joins them, because reviewers check the stages against each other and not against
+"can a user do the thing". A plan for a user-visible feature should state the
+end-to-end journey first and derive stages from it, so a missing stage shows up
+as a broken sentence rather than as an absent row.
