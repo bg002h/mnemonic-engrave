@@ -3791,7 +3791,7 @@ owning phase. Two edits:
 `passphrase.rs` while building this will otherwise find a module doc telling
 them the mode they are implementing does not exist.
 
-### F-126 — presenting an NFC tag to a gathering flow FREEZES the emulator, so the path stage 6 exists to open cannot be walked (owning phase: **systemwide payloads**)
+### F-126 — presenting an NFC tag to a gathering flow FREEZES the emulator, so the path stage 6 exists to open cannot be walked (owning phase: **systemwide payloads**) `#mnemonic`
 
 Filed 2026-08-11 while building the operator-journey document, which tried to
 deliver the 25-card bundle over NFC and hung the browser instead.
@@ -3862,7 +3862,7 @@ the emulator happened to expose first.
 consumes exactly one tag, so a 25-card bundle cannot be delivered over the
 emulator's NFC source as it stands.
 
-### F-127 — `mk encode --from-md1` cannot read a CHUNKED md1, so a policy large enough to need chunking has no documented route to a key card (owning phase: **operator journeys**)
+### F-127 — `mk encode --from-md1` cannot read a CHUNKED md1, so a policy large enough to need chunking has no documented route to a key card (owning phase: **operator journeys**) `#mnemonic`
 
 Filed 2026-08-11 building the pathological-wallet journey
 (`design/journeys/SeedHammer-II-pathological-wallet-journey.pdf`).
@@ -3891,7 +3891,7 @@ comes to 182 data symbols against a cap of 80, so it is not an exotic corner.
 pass `--policy-id-stub` by hand. That requires knowing F-128, and nothing tells
 an operator either thing.
 
-### F-128 — the stub's spec sentence and `mk`'s behaviour name different identities (owning phase: **operator journeys**)
+### F-128 — the stub's spec sentence and `mk`'s behaviour name different identities (owning phase: **operator journeys**) `#mnemonic`
 
 Filed 2026-08-11, same run as F-127.
 
@@ -3917,7 +3917,7 @@ wallet's cards from another's.
 two is wrong, then bump the vendored pin. Do not bump the pin first: if the
 rename is real, bumping silently changes the stub every existing key card carries.
 
-### F-129 — `--path` is mandatory for a non-canonical wrapper and flattens divergent origins; which source wins on restore is unpinned (owning phase: **operator journeys**)
+### F-129 — `--path` is mandatory for a non-canonical wrapper and flattens divergent origins; which source wins on restore is unpinned (owning phase: **operator journeys**) `#mnemonic`
 
 Filed 2026-08-11, same run. **A design question, not a defect.**
 
@@ -3937,7 +3937,7 @@ the descriptor card alone would restore eight of eleven keys wrongly.
 an mk1 card's `origin_path` disagree, the card must win. Add a restore vector for
 exactly that disagreement before this shape is recommended to anyone.
 
-#### F-129 — ANSWERED 2026-08-11 by running the round trip
+#### F-129 — ANSWERED 2026-08-11 by running the round trip `#mnemonic`
 
 The precedence question is settled, and in the safe direction: **the mk1 cards
 win; the md1's flattened `--path` never overrides them.** Proven twice by
@@ -3978,7 +3978,7 @@ an operator and a wrong wallet. Keep the check; stop depending on it.
 **Separately, the descriptor text does NOT round-trip byte-for-byte** — see
 F-130. That is a different problem and does not affect the above.
 
-### F-130 — restored xpubs lose their BIP-32 depth/parent/child, so the descriptor and its checksum change (owning phase: **operator journeys**)
+### F-130 — restored xpubs lose their BIP-32 depth/parent/child, so the descriptor and its checksum change (owning phase: **operator journeys**) `#mnemonic`
 
 Filed 2026-08-11 from the same round trip.
 
@@ -4014,3 +4014,226 @@ should carry depth/parent/child (costing bytes on every key card), or a restored
 descriptor is defined as equivalent-not-identical and the checksum is documented
 as not comparable across a round trip. Today neither is written down, so the
 first operator to check a checksum after recovery will think the backup failed.
+
+### F-131 — the engraving checklist tells the operator a recovery rule that is false in BOTH directions (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11 from the miniscript-nesting review of the pathological wallet.
+Verified by running it, not by reading the report that raised it.
+
+```
+$ mnemonic bundle --network mainnet --descriptor-file .examples-build/degrade2.desc
+# Threshold: 3 of 11
+# Recovery: any 3 of 11 signing keys + md1 (template card).
+```
+
+The wallet is not a 3-of-11. It is a four-tier degrading policy with **eight**
+distinct minimal key-sets, each carrying its own timelock, and two of them also
+requiring a hash preimage:
+
+| tier | key-sets | also needs |
+| --- | --- | --- |
+| 1 | `{@0,@1,@2}` | preimage + absolute HEIGHT ≥ 1000000 |
+| 2 | `{@3,@4}` `{@3,@5}` `{@4,@5}` | preimage + absolute TIME ≥ 1893456000 |
+| 3 | `{@6,@7}` | relative 65535 BLOCKS |
+| 4 | `{@8}` `{@9}` `{@10}` | relative TIME (~365 d) |
+
+The printed line is wrong **both ways**, which is what makes it dangerous rather
+than merely imprecise:
+
+- it OVERSTATES — `{@8,@9,@10}` is three of the eleven keys and cannot spend
+  together at all before the tier-4 timelock, and no 3-key set spends tier 1
+  without the preimage;
+- it UNDERSTATES — `{@8}` alone spends after ~365 days, so the wallet is a
+  1-of-3 to an attacker who waits, not a 3-of-11.
+
+An operator sizing their key custody off that line gets the threat model
+backwards. **This is engraved-adjacent output**: it is the checklist a person
+follows while cutting permanent plates.
+
+Fix is not "reword": the summariser is computing a threshold for a shape that
+does not have one. It must either enumerate the key-sets (compare-cost already
+does) or refuse to print a threshold for a non-threshold policy.
+
+### F-132 — the hashlock preimage is required to spend, absent from the backup, and unmentioned by it (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11, same review.
+
+Tiers 1 and 2 are `and_v(v:sha256(H), …)`. Spending either requires revealing
+the 32-byte preimage `X` where `H = sha256(X)`. In the worked example `X =
+sha256("opensessame")`. Measured against the engraved set:
+
+```
+preimage X present in any backup string : 0
+the word "opensessame" present anywhere : 0
+```
+
+Correct — the descriptor commits to `H`, and `H` is what the md1 carries. But
+nothing in the bundle, the checklist, or the plate set records that a secret the
+operator must supply from memory stands between them and **five of the eight**
+key-sets. Lose the word and tiers 1 and 2 are gone; what remains is tier 3
+(`{@6,@7}`, 455 days) and tier 4 (any one of `{@8,@9,@10}`, 365 days).
+
+This is not the codec's bug — a preimage is deliberately not key material and
+arguably should not be engraved next to the policy. The defect is **silence**.
+The bundle should state that the policy contains a hashlock, name which branches
+it gates, and say that the preimage is not in the backup. A backup that omits a
+required factor without saying so is the failure mode this whole project exists
+to prevent.
+
+### F-133 — the relative tiers are INVERTED: the weakest key-set matures ~90 days before the stronger one (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11, same review. Arithmetic verified independently from BIP-68's
+field layout.
+
+| tier | key-set | lock | decoded | matures |
+| --- | --- | --- | --- | --- |
+| 3 | `{@6,@7}` — 2-of-2 | `older(65535)` | bit22 clear → blocks | 65535 blocks ≈ **455 days** |
+| 4 | `{@8}`/`{@9}`/`{@10}` — **1**-of-3 | `older(4255898)` | `0x40F09A`, bit22 set → 61594 × 512 s | **365.00 days** |
+
+A degrading vault is supposed to degrade *monotonically*: each tier that
+activates should be weaker than the last, and later. Here the **1-of-3** tier
+opens ~90 days **before** the **2-of-2** tier. From day 365 the wallet is a
+1-of-3; tier 3 never becomes the operative security floor, because by the time
+it activates a strictly weaker path has been open for three months.
+
+Not a consensus or standardness problem — the script is valid and
+rust-miniscript is silent, correctly, because ordering between disjoint branches
+is not something it models. It is a **policy design defect in the example**, and
+the example is the one the documentation calls "the pathological example" and
+that this project has now engraved into a journey document.
+
+**It is upstream, and the upstream document states both numbers without noticing.**
+`mnemonic-toolkit` Examples §5 lists the tiers in ascending order as a degrading
+vault, and then, a few lines below, spells out the two durations adjacently:
+
+> - `older(65535)` -- relative **blocks**: 65,535 blocks (~455 days). …
+> - `older(4255898)` -- relative **time**: … 61,594 units x 512 s ~= 365 days.
+
+455 then 365, printed one after the other under a table that presents tier 3
+before tier 4. So the defect is in the source example, not in our transcription
+of it. Either swap the two locks or say the inversion is deliberate — and fix it
+where it is authored, in `mnemonic-toolkit`, so the Rust-primary direction holds.
+
+### F-134 — plate count for one wallet ranges 26 → 58 depending on an md1-form flag nobody is told about (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11, same review. All three counts measured.
+
+| route | md1 | mk1 | plates |
+| --- | --- | --- | --- |
+| `md encode --force-chunked --path bip84` (keyless template) + `me bundle` | 3 | 22 | **26** |
+| `mnemonic bundle --descriptor-file --md1-form=template` | 4 | 33 | 38 |
+| `mnemonic bundle --descriptor-file` (default, `--md1-form=policy`) | 24 | 33 | **58** |
+
+Same wallet, same keys, a 2.2× spread in permanent physical plates. The default
+is the most expensive one, because policy-form md1 embeds the keys rather than
+referencing them — defensible, since it makes the descriptor card
+self-sufficient, but it is a large cost chosen silently.
+
+Nothing in the tool tells the operator the trade: self-sufficient descriptor card
+vs less than half the steel. **Print the comparison before engraving**, the way
+`me bundle` already prints the plate checklist.
+
+(Note the first row differs from what the review reported. It measured that path
+as REFUSED, which was true of the state it inspected; `--path bip84` — the fix
+recorded in F-129 — makes it validate and produce 26. The 38 and 58 figures are
+unaffected.)
+
+### F-135 — CLOSED on filing: miniscript nesting depth is not a risk for this wallet, with the numbers so nobody re-derives them `#mnemonic`
+
+Recorded 2026-08-11 so the question stops being re-asked. Measured with
+`miniscript` v13.0.0 from `rust-miniscript-fork`, the crate actually depended on,
+against the real 11-key descriptor:
+
+| property | measured | limit |
+| --- | --- | --- |
+| witnessScript | **498 bytes** | 3600 standardness / 10000 consensus |
+| max_weight_to_satisfy | **756 WU** | — |
+| parse in Segwitv0 context | OK | itself enforces ops ≤ 201 and stack items ≤ 100 |
+| `or_i` nesting depth | ~3 | `MAX_RECURSION_DEPTH = 402` (`src/lib.rs:503`) |
+
+3102 bytes of standardness headroom. `Descriptor::sanity_check()` returns `Ok`,
+and that is stronger than it looks: `segwitv0.rs:57` delegates to
+`Miniscript::sanity_check` (`analyzable.rs:225`), which checks five properties in
+sequence — requires_sig, non-malleable, within_resource_limits, no repeated keys,
+and **no mixed timelocks** (`HeightTimelockCombination`). All five pass, so the
+classic deep-nesting bug — one spend path needing both a height lock and a time
+lock, satisfiable by no single transaction — does not arise here.
+
+BIP-68 encodings verified from the field layout rather than from the docs that
+assert them: `older(65535)` is exactly at the 16-bit ceiling; `older(4255898)` =
+`0x40F09A`, bit 22 set, 61594 × 512 s = 365.00 days. **The repo's warning that
+`older(65536)` masks to zero is correct** — `65536 & 0xFFFF == 0` and bit 22 stays
+clear, so the lock silently becomes *no lock*. One increment from a real wallet.
+
+The real costs of this shape are downstream of Bitcoin entirely: F-127, F-130,
+F-131, F-132, F-134, and `md address` refusing the keys on depth. Depth itself is
+two orders of magnitude from anything that bites.
+
+### F-136 — `md encode` does not auto-chunk, though two places say it does (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11 from the codec lens; **confirmed first-hand** — this is the
+error that stopped the journey build before the review raised it:
+
+```
+$ md encode --group-size 0 '<the 11-key policy>'
+md: codec error: payload is 182 data symbols; the codex32 regular code caps
+    single strings at 80 (use chunked encoding / --force-chunked)
+[exit 1]
+```
+
+The operator has to know to retry with `--force-chunked`. The flag's own help
+calls the behaviour automatic ("Reserved for v0.2; mk-codec auto-dispatches
+today" on the mk side), and the codec docs describe dispatch as automatic. Either
+auto-chunk on overflow or stop describing it as automatic; today the first
+encounter with a large policy is a hard error that reads like the policy is
+unsupported.
+
+### F-137 — the md encoder has no depth guard but the decoder does, so an unrestorable card is expressible (owning phase: **operator journeys**) `#mnemonic`
+
+Raised by the codec lens; **carried on that report's authority — I have not
+re-measured it.** See `design/agent-reports/miniscript-nesting/codec.md` §F5.
+
+The claim: the encode path applies no recursion/depth bound while the decode path
+does. If exact, the failure mode is the worst one a backup tool has — a policy
+that encodes cleanly, engraves onto steel, and then refuses to decode on the way
+back.
+
+**Confirm before acting**, and confirm in this order: (1) does an encodable-but-
+undecodable depth actually exist, or does some earlier bound (payload symbols,
+chunk count) always bite first? (2) if it exists, the guard belongs on the
+ENCODER, since that is the side that can still say no while the plate is blank.
+A decoder-only bound protects the reader and abandons the writer.
+
+### F-138 — the Go port enforces a `Renderable` bound the Rust codec does not (owning phase: **operator journeys**) `#mnemonic`
+
+Raised by the codec lens; **not independently re-measured.** See
+`codec.md` §F6–F7. That report also measured Rust↔Go bounds as otherwise in exact
+lockstep, which is the good news here.
+
+The asymmetry matters under the **Rust-primary rule**: if the fork's Go port
+refuses a policy the Rust codec accepts, then the machine is the one saying no,
+and the constellation's normative behaviour is being set downstream. That is the
+direction the rule exists to forbid.
+
+Two legitimate resolutions, and the choice is a real one: either `Renderable` is
+a genuine constraint of the engraving surface (a plate that cannot be drawn is
+not a policy problem, it is a physics problem) and belongs in Rust with a test
+vector so both sides agree — or it is fork-native GUI logic and should not be
+able to reject a valid card. Decide which; do not leave it implicit.
+
+### F-139 — CORPUS.md §C6 has an answer now (owning phase: **operator journeys**) `#mnemonic`
+
+`descriptor-mnemonic/design/CORPUS.md` §C6 "Pathological deeply-nested
+miniscript (chunking forced)" has stood as an explicit placeholder — its own text
+says the 8-nested-`or_d` form "actually fits single string (45 B)" and that a
+genuine chunking-forcing example would be defined "once the spec is closer to
+fixed". The summary table still reads `C6 | Chunking-forced | TBD`.
+
+The four-tier degrading wallet is that example, measured: **182 data symbols
+against a single-string cap of 80**, forced to 3 chunks. Two 32-byte hash
+literals and four timelock arguments are what get it there — not key count, which
+a keyless BIP-388 template does not pay for.
+
+Fill C6 in with it, including the measured symbol count and the bytecode figure,
+so the next person does not re-discover that the 12-key `multi(5,…)` alternative
+encodes to 13 bytes and one string.
