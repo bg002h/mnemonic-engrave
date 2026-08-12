@@ -3790,3 +3790,149 @@ owning phase. Two edits:
 **Must land before implementation**, not after: the first person to read
 `passphrase.rs` while building this will otherwise find a module doc telling
 them the mode they are implementing does not exist.
+
+### F-126 — presenting an NFC tag to a gathering flow FREEZES the emulator, so the path stage 6 exists to open cannot be walked (owning phase: **systemwide payloads**)
+
+Filed 2026-08-11 while building the operator-journey document, which tried to
+deliver the 25-card bundle over NFC and hung the browser instead.
+
+**Mechanism, in two halves that are individually reasonable.**
+
+`gui/bundle_flow.go` samples `ctx.Platform.NFCReader()` **once**, on flow entry.
+A tag presented afterwards is invisible: the scanner goroutine was never started.
+That much is only awkward — present the tag first and it reads.
+
+The defect is what happens when a tag **is** pending. `cmd/emu/nfc.go`'s source is
+deliberately one-shot ("a real tag crosses the reader once"), so the moment its
+single record is consumed the reader sits permanently at EOF. The scan loop:
+
+```go
+obj, err := s.Scan(r)
+...
+case err == nil || err == io.EOF:      // Status stays 0
+...
+scans <- scan
+wakeup()
+if scan.Status == scanFailed {
+    time.Sleep(1 * time.Second)        // the ONLY yield in the loop
+}
+```
+
+`io.EOF` does not take the `scanFailed` branch, so nothing sleeps and nothing
+blocks. Under Go/wasm — cooperatively scheduled on the browser's single thread —
+a goroutine that never blocks starves the JS event loop outright.
+
+**Observed:** after `shNFC.present(<md1>)` and entering Engrave Bundle, the page
+stopped responding entirely; even navigating the tab away timed out at 60 s and
+the tab had to be destroyed. Entering the same flow with **no** tag pending is
+fine, because `NFCReader()` returns nil and no goroutine runs — which is exactly
+the discriminator that identifies the loop as the cause.
+
+**Why it matters beyond the emulator.** SPEC_systemwide_payloads §8.2 added the
+emulator NFC source specifically so the eight programs' new secret-delivery path
+would be walkable. Today that path is the one path the tool cannot walk. Any
+qualification of NFC screens done in the emulator has been done blind.
+
+**Two separable fixes; the second is the real one.**
+
+1. `nfcSource.reader()` should return a reader that **blocks** rather than
+   reporting EOF once drained — a real reader waiting on a tag does not spin.
+2. The scan loop should yield on **every** iteration, not only on `scanFailed`.
+   A driver that returns instantly is not a hypothetical, and the loop is
+   currently only safe because the hardware reader happens to be slow.
+
+Fix 2 is device code and is where the latent assumption lives; fix 1 alone would
+paper over it.
+
+**All five scan loops share the defect — measured, not assumed.** Every one of
+`bundle_flow.go`, `md1_gather.go`, `mk1_inspect.go`, `verify_address.go` and
+`gui.go:1814` guards exactly one `time.Sleep` behind `scan.Status == scanFailed`
+and has no other yield:
+
+```
+$ for f in gui/{bundle_flow,md1_gather,mk1_inspect,verify_address,gui}.go; do
+    grep -A2 'scan.Status == scanFailed' $f | grep -c time.Sleep; done
+1 1 1 1 1
+```
+
+So the fix belongs in the loop shape, in all five, rather than in whichever one
+the emulator happened to expose first.
+
+**Also worth noting for the journey work:** even once unfrozen, one flow entry
+consumes exactly one tag, so a 25-card bundle cannot be delivered over the
+emulator's NFC source as it stands.
+
+### F-127 — `mk encode --from-md1` cannot read a CHUNKED md1, so a policy large enough to need chunking has no documented route to a key card (owning phase: **operator journeys**)
+
+Filed 2026-08-11 building the pathological-wallet journey
+(`design/journeys/SeedHammer-II-pathological-wallet-journey.pdf`).
+
+Every mk1 key card must carry a 4-byte policy-id stub; `mk encode` refuses
+without one. The only automatic way to obtain it is `--from-md1`. Given a chunk
+of a chunked md1 set it fails:
+
+```
+$ mk encode --xpub xpub6CatWdiZiodmU… --origin-fingerprint 73c5da0a \
+    --origin-path "m/84'/0'/0'" --from-md1 md1fqgpcpqpz3m6jzz… --group-size 0
+error: md1 input rejected: wire-format version mismatch: got 9, expected 4
+[exit 2]
+```
+
+**Cause is a stale vendored copy.** `mnemonic-key/vendor/md-codec` is at
+**0.34.0**; `descriptor-mnemonic/crates/md-codec` is at **0.42.0**. Version 9 is
+the chunked wire form the vendored copy predates. This is precisely what the
+provenance pin exists to catch, and it did not.
+
+**Scope of the blast radius.** Any policy over the single-string cap. The
+journey's wallet — 11 keys, four timelock kinds, two 32-byte hash literals —
+comes to 182 data symbols against a cap of 80, so it is not an exotic corner.
+
+**Workaround, used in the journey:** read the identity out of `md inspect` and
+pass `--policy-id-stub` by hand. That requires knowing F-128, and nothing tells
+an operator either thing.
+
+### F-128 — the stub's spec sentence and `mk`'s behaviour name different identities (owning phase: **operator journeys**)
+
+Filed 2026-08-11, same run as F-127.
+
+`SPEC_mk_v0_1.md` §3.3: *"Each stub is 4 bytes = the top 4 bytes of the
+MD-encoded policy's **WalletPolicyId** — `md_codec::compute_wallet_policy_id`"*,
+and today's `md inspect` prints a field by exactly that name. **`mk` does not use
+it.** Measured on a single-string wallet where `--from-md1` works, so `mk`
+derived the stub itself:
+
+```
+wallet-descriptor-template-id: 726a666305756435b7c52c5b3fc69c41
+wallet-policy-id:              f05e8a1c282f7740bbfd902a759b5577
+policy_id_stubs (mk decode):   726a6663
+```
+
+The stub tracks the **template-id**. Most likely a rename that landed in md-codec
+after 0.34.0 — which would make this F-127's twin rather than an independent bug
+— but as it stands the spec sentence and the binary disagree about which identity
+a key card indexes, and the stub is what a recovering operator uses to tell one
+wallet's cards from another's.
+
+**Resolve in this order:** decide which identity is correct, fix whichever of the
+two is wrong, then bump the vendored pin. Do not bump the pin first: if the
+rename is real, bumping silently changes the stub every existing key card carries.
+
+### F-129 — `--path` is mandatory for a non-canonical wrapper and flattens divergent origins; which source wins on restore is unpinned (owning phase: **operator journeys**)
+
+Filed 2026-08-11, same run. **A design question, not a defect.**
+
+A `wsh(or_i(…))` wrapper has no canonical default derivation path. Without
+`--path`, `md encode` warns, `md decode` PARTIAL-decodes (exit 4 VERIFY-ME) and
+`me bundle` refuses the set — all correct and all clearly signposted. With
+`--path`, everything validates.
+
+But `--path` takes a **single shared** path and its own help says it "flattens
+Divergent mode to Shared". The journey's eleven keys sit at four account indices
+(`84'/0'/0..3'`) across three masters, so the shared value is true for @0–@2 and
+false for @3–@10. The true per-key origin survives on each mk1 card
+(`origin_path` decodes correctly), so the bundle as a whole is not lossy — but
+the descriptor card alone would restore eight of eleven keys wrongly.
+
+**What is missing is a test pinning precedence:** when the md1's shared origin and
+an mk1 card's `origin_path` disagree, the card must win. Add a restore vector for
+exactly that disagreement before this shape is recommended to anyone.
