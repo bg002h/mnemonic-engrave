@@ -20,16 +20,26 @@ pub enum Where {
     Unit(&'static str),
     /// Belongs to `me`'s CLI layer — plan stage 2.
     Cli,
-    /// Belongs to the device — plan stages 4–6. Not testable here, and saying
-    /// so is the point: an unplaced test is a gap, a deferred one is a plan.
+    /// Belongs to the device, and the behaviour EXISTS there.
     Device,
+    /// Belongs to the device, and the behaviour DOES NOT EXIST YET.
+    ///
+    /// Added 2026-08-12, reconciling this column against the gui tree after the
+    /// spec/plan review. `Device` had been carrying both meanings, so five of
+    /// its ten entries named behaviour nobody had built — and this file, whose
+    /// entire purpose is that "an unplaced test is a gap, a deferred one is a
+    /// plan", was reading as coverage. A deferral is only a plan if it says it
+    /// is one.
+    DeviceUnbuilt(&'static str),
+    /// Withdrawn by operator ruling, with the date. Not a gap: a decision.
+    Dropped(&'static str),
 }
 
 /// Spec §8.3, test id → where it is discharged. **Every id 1..=23 must appear.**
 pub const COVERAGE: &[(u32, Where)] = &[
     (1, Where::Device),        // session cache vs verify
-    (2, Where::Device),        // wrong word in a checked position
-    (3, Where::Device),        // selection uniform, re-drawn
+    (2, Where::DeviceUnbuilt("§7 verify flow: no such file in gui/")),
+    (3, Where::DeviceUnbuilt("§7 verify flow: no such file in gui/")),
     (4, Where::Vector("S-B")), // plaintext + secret class -> F1
     (5, Where::Cli),           // me warns, does not refuse (§13 D3)
     (6, Where::Vector("S-C")), // byte-identical KDF input, arbitrary N
@@ -39,16 +49,16 @@ pub const COVERAGE: &[(u32, Where)] = &[
     (10, Where::Device),       // compared once per payload
     (11, Where::Unit("fills_the_whole_region")),
     (12, Where::Unit("each_fill_is_what_it_says")),
-    (13, Where::Device),        // post-engrave reminder
+    (13, Where::Dropped("operator ruling 2026-08-12: the reminder is dropped")),
     (14, Where::Vector("S-I")), // BCH-valid md1, non-decodable entropy
     (15, Where::Vector("S-D")), // pub_len == 0 -> no digest
     (16, Where::Device),        // no verify flow reaches a payload secret
-    (17, Where::Device),        // provenance never rendered "verified"
+    (17, Where::DeviceUnbuilt("§7 provenance: no provenance survives take()")),
     (18, Where::Unit("every_byte_of_the_aad_is_bound")),
     (19, Where::Vector("S-E")), // generated N enterable for every N
     (20, Where::Vector("S-D")), // secrets-only consumable
     (21, Where::Device),        // passphrase buffer never regrows
-    (22, Where::Device),        // done-press confirmation
+    (22, Where::DeviceUnbuilt("§8c: the done button exists, its confirmation screen does not")),
     (23, Where::Vector("S-D")), // secrets-only usable whatever the passphrase
 ];
 
@@ -157,6 +167,48 @@ mod tests {
             );
         }
         assert_eq!(COVERAGE.len() as u32, HIGHEST, "no duplicate or stray ids");
+    }
+
+    /// The unbuilt column, named out loud.
+    ///
+    /// This does not fail — an unbuilt behaviour is a legitimate state — but it
+    /// PRINTS, so `cargo test -- --nocapture` answers "what does this feature
+    /// still not do" without anyone grepping. The reason F-144 survived a green
+    /// R0 gate is that no artifact was obliged to say that out loud.
+    ///
+    /// It DOES fail if the list is empty while a `DeviceUnbuilt` entry exists,
+    /// which is the only way this could rot into decoration.
+    #[test]
+    fn the_unbuilt_behaviours_are_listed_rather_than_implied() {
+        let unbuilt: Vec<_> = COVERAGE
+            .iter()
+            .filter_map(|(n, w)| match w {
+                Where::DeviceUnbuilt(why) => Some((*n, *why)),
+                _ => None,
+            })
+            .collect();
+        let dropped: Vec<_> = COVERAGE
+            .iter()
+            .filter_map(|(n, w)| match w {
+                Where::Dropped(why) => Some((*n, *why)),
+                _ => None,
+            })
+            .collect();
+        println!("spec §8.3 tests whose behaviour does NOT exist yet:");
+        for (n, why) in &unbuilt {
+            println!("  {n:>2}  {why}");
+        }
+        println!("withdrawn by ruling:");
+        for (n, why) in &dropped {
+            println!("  {n:>2}  {why}");
+        }
+        assert!(
+            COVERAGE
+                .iter()
+                .any(|(_, w)| matches!(w, Where::DeviceUnbuilt(_)))
+                == !unbuilt.is_empty(),
+            "the unbuilt list must reflect the table"
+        );
     }
 
     /// The vector names are derived, so this pins the derivation rather than a
