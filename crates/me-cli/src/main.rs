@@ -1014,11 +1014,16 @@ fn print_digest(blob: &[u8]) {
 ///
 /// STDERR, like every other advisory line here, so `me sysw pack > f.bin` still
 /// shows the operator what they are about to flash.
+///
+/// The index is into the records AS GIVEN, and it says so — because `me sysw
+/// show` numbers the PUBLIC SECTION instead, and on a sealed payload the two
+/// diverge: secrets move out of the public section, so argv record 3 can be
+/// public record 1. Renumbering either would be worse than naming both.
 fn report_unconfirmed(records: &[String]) {
     for i in mnemonic_engrave::sysw::record::mdmk_unconfirmed(records) {
         eprintln!(
-            "me: record {i}: an md1/mk1 this tool could not decode; the device will \
-             treat it as a SECRET"
+            "me: record {i}, as given: an md1/mk1 this tool could not decode; the \
+             device will treat it as a SECRET"
         );
     }
 }
@@ -1053,7 +1058,7 @@ fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header
         } else {
             "confirmed"
         };
-        println!("record {i}: md1/mk1 — {state}");
+        println!("public record {i}: md1/mk1 — {state}");
     }
 }
 

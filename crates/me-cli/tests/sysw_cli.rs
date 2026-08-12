@@ -466,8 +466,10 @@ fn pack_warns_once_per_unconfirmed_record_and_still_succeeds() {
         .success();
     let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
     assert!(
-        err.contains("record 0: an md1/mk1 this tool could not decode"),
-        "the warning must name the record by the index the operator gave it: {err}"
+        err.contains("record 0, as given: an md1/mk1 this tool could not decode"),
+        "the warning must name the record by the index the operator gave it, AND say \
+             that is the basis — `me sysw show` numbers the public section instead, and \
+             on a sealed payload the two diverge: {err}"
     );
     assert!(
         err.contains("SECRET"),
@@ -484,8 +486,8 @@ fn the_warning_names_the_record_the_operator_passed() {
         .assert()
         .success();
     let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
-    assert!(err.contains("record 1: an md1/mk1"), "{err}");
-    assert!(!err.contains("record 0: an md1/mk1"), "{err}");
+    assert!(err.contains("record 1, as given: an md1/mk1"), "{err}");
+    assert!(!err.contains("record 0, as given: an md1/mk1"), "{err}");
 }
 
 /// The other direction, which is what makes the test above able to fail: a

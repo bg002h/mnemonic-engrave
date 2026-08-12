@@ -551,6 +551,19 @@ go build -tags tinygo ./gui/ && GOOS=js GOARCH=wasm go build ./cmd/emu/
 
 ## Stage 13 — close the record: carrier-ready cells, and the reconciliation tests
 
+> **CORRECTED 2026-08-12, after implementation.** 13b below says `passphraseFlow`
+> has **four** non-test callers. It has **nine call sites and one definition** —
+> measured, and neither the plan's four nor the "ten" an earlier correction and
+> two shipped comments claimed. The edit as literally written would have given
+> Backup Wallet a class §3.3.2 refuses and let the session answer half of a §7.4
+> verification in both verify flows, which spec test 16 could not have caught
+> because the access sits in `gui.go`. The implementer kept the intent and
+> changed the mechanism — a `syswPassphraseFlow` wrapper called by the five sites
+> in the four admitting programs, plus a test naming the four forbidden callers.
+> §3.3.2 and §7.4 are preserved, verified by grep, by a two-direction guard test,
+> and by walking the journey. The prose below is left as written so the diff
+> against reality stays readable.
+
 ### 13a–13c — admitted cells that already have carriers (spec §3.3.2's reachability note)
 
 | cell | change | where |

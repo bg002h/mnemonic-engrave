@@ -4721,3 +4721,25 @@ is "flashed, unverified", and no follow-on work may assume the image runs.
 Practical rule: remote sessions may flash freely as long as the device stays on
 workstation USB, and must record the outcome as UNVERIFIED. Moving it to machine
 power is the verification step and belongs to whoever is in the room.
+
+### F-149 — stage 12's integration is pinned by AST only; nothing drives a completed engrave into the verify flow (owning phase: **operator journeys / simulator**) `#mnemonic`
+
+Filed 2026-08-12 on the whole-cycle review's recommendation (item 2.3.3), which
+judged it worth a follow-up rather than a log paragraph.
+
+`backupWalletFlow` reaching `plateVerifyFlow` after a COMPLETED engrave is
+asserted structurally — an AST check that the call exists — and by no test that
+runs it. The behavioural pin is feasible today: the harness already has
+`testEngraver`, so a test can drive an engrave to completion and assert the
+verify flow follows.
+
+**Why it matters more than a normal coverage gap.** §7's verify is the last
+thing standing between a mis-cut plate and an operator who believes their backup
+is good. An AST check proves the call is written; it cannot prove the flow
+arrives there with the state it needs, which is exactly the class of defect this
+feature has produced twice — `ctx.sysw` read everywhere and assigned nowhere
+(F-144), and §8c's `done` button built but never drawn.
+
+Not urgent: the walk-through review drove the surrounding journeys by execution
+and they closed. But "the call exists" and "the journey arrives" are different
+claims, and only one of them is currently tested.
