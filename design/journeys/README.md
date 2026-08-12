@@ -68,7 +68,16 @@ The build scripts expect the artifacts beside them (`out/`, `shots/`), which are
 not committed — the PDFs are the deliverable. `shot_server.py` is the receiver
 the emulator page POSTs `canvas.toDataURL()` frames to, which is how the
 screenshots are the device framebuffer exactly rather than a cropped browser
-window.
+window:
+
+```sh
+python3 shot_server.py <out-dir> <port> [allowed-origin]   # origin defaults to
+                                                           # http://127.0.0.1:8731
+```
+
+It accepts frames only from that one origin, and only flat `.png`/`.svg` names
+resolving inside `<out-dir>`. Both restrictions matter — see the module docstring
+for what the first version of it did instead.
 
 Key derivation for the 5-of-12 document uses `cmd/journeykeys` in the
 `seedhammer` fork, which runs the device's own
