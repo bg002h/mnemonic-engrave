@@ -1074,6 +1074,15 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
         ),
         E::TooLarge(n) => format!("{n} bytes exceeds the flash region"),
         E::PassphraseMismatch => "a sealed payload needs a passphrase".into(),
+        E::NotEnterableOnDevice(w) => format!(
+            "the passphrase contains {w:?}, which is not a BIP-39 word. The device \
+             offers only a word keyboard, so a payload sealed with this could never \
+             be opened on it. Use BIP-39 words (2 or more), or --no-passphrase."
+        ),
+        E::PassphraseTooLong(n) => format!(
+            "the normalised passphrase is {n} bytes; the limit is {} (§12.5)",
+            mnemonic_engrave::sysw::wire::PASSPHRASE_MAX
+        ),
         E::EmptyPassphrase => "an empty passphrase would seal a payload the DEVICE can never \
                                open: it reads an empty passphrase as none supplied, and there \
                                is no keystroke for it. Use --no-passphrase for a plaintext \

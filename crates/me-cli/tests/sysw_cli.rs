@@ -401,3 +401,42 @@ fn an_empty_passphrase_is_refused_because_the_device_could_never_open_it() {
     // A real one still works, so the check cannot pass by refusing everything.
     assert!(sysw::pack(vec![TEXT.into()], Some("abandon about"), 100_000).is_ok());
 }
+
+/// Operator ruling 2026-08-12, the cheap-and-narrowing choice: `me` refuses a
+/// passphrase the DEVICE cannot type. Decision 8 allowed ASCII; the device only
+/// ever grew a word keyboard, so an ASCII passphrase seals a payload that can
+/// never be opened on the machine it is for.
+///
+/// Not a strength rule. Two BIP-39 words still pass, still sit below `[cliff]`,
+/// and still only warn — that is decision 8's restored mode and F2's job.
+#[test]
+fn pack_refuses_a_passphrase_the_device_could_not_type() {
+    use mnemonic_engrave::sysw;
+    for p in ["hunter2", "correct horse battery staple", "abandon ABOUT", "abandon 1"] {
+        match sysw::pack(vec![TEXT.into()], Some(p), 100_000) {
+            Err(sysw::SyswError::NotEnterableOnDevice(_)) => {}
+            other => panic!("{p:?} should be refused as un-typeable, got {other:?}"),
+        }
+    }
+    // The wordlist half only — NOT the [cliff] count. Two words remain legal.
+    assert!(sysw::pack(vec![TEXT.into()], Some("abandon about"), 100_000).is_ok());
+}
+
+/// `[passphrase-bounds]` (§12.5) was declared on both sides and enforced on
+/// neither: the constant, a const assertion and an arithmetic test were its only
+/// references.
+#[test]
+fn pack_enforces_the_passphrase_length_bound() {
+    use mnemonic_engrave::sysw;
+    let long = std::iter::repeat("abandon")
+        .take(40)
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(long.len() > sysw::wire::PASSPHRASE_MAX);
+    match sysw::pack(vec![TEXT.into()], Some(&long), 100_000) {
+        Err(sysw::SyswError::PassphraseTooLong(n)) => {
+            assert!(n > sysw::wire::PASSPHRASE_MAX)
+        }
+        other => panic!("an over-long passphrase must be refused, got {other:?}"),
+    }
+}

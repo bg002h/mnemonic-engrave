@@ -69,6 +69,13 @@ pub enum SyswError {
     /// DEVICE reads an empty passphrase as "none supplied", so such a payload
     /// could never be opened on the machine it is for.
     EmptyPassphrase,
+    /// A token the device's keyboard cannot produce. Same class as
+    /// [`SyswError::EmptyPassphrase`]: not about strength, about whether the
+    /// resulting payload can ever be opened on the machine it is for. Carries
+    /// the offending token so the operator is told WHICH word to change.
+    NotEnterableOnDevice(String),
+    /// Normalised passphrase longer than `[passphrase-bounds]` (§12.5) allows.
+    PassphraseTooLong(usize),
     NotUtf8,
 }
 
@@ -175,8 +182,33 @@ pub fn pack_deterministic(
     // opened — there is no keystroke that expresses it. `--passphrase-ask` plus
     // a bare Enter reaches this, and normalisation collapses whitespace-only to
     // the same place.
-    if crate::seal::passphrase::normalise(pass).is_empty() {
+    let normalised = crate::seal::passphrase::normalise(pass);
+    if normalised.is_empty() {
         return Err(SyswError::EmptyPassphrase);
+    }
+
+    // `[passphrase-bounds]` (§12.5), which was DECLARED on both sides and
+    // enforced on neither until now — the constant, a const assertion and an
+    // arithmetic test were its only references.
+    if normalised.len() > wire::PASSPHRASE_MAX {
+        return Err(SyswError::PassphraseTooLong(normalised.len()));
+    }
+
+    // NARROWED by operator ruling 2026-08-12: every token must be a BIP-39
+    // English word. §12.5's character range is 0x20–0x7E, and decision 8
+    // deliberately allowed an ASCII passphrase — but the DEVICE offers only a
+    // word keyboard, so an ASCII passphrase seals a payload that cannot be typed
+    // back in. Given a cheap-and-narrowing choice against building the keyboard,
+    // the operator chose to narrow the host.
+    //
+    // This is deliberately NOT `cliff_above`: that is a word COUNT rule (five or
+    // more) and this is only the wordlist half. Two words remain legal and stay
+    // below the cliff, which is what decision 8 restored and F2 exists to warn
+    // about.
+    for tok in normalised.split_whitespace() {
+        if bip39::Language::English.find_word(tok).is_none() {
+            return Err(SyswError::NotEnterableOnDevice(tok.to_string()));
+        }
     }
     seal_with(payload, pub_bytes, header, pass, iterations, salt, iv)
 }
