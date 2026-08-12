@@ -1,0 +1,184 @@
+########## versions
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md --version
+md 0.13.0
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-key/target/release/mk --version
+mk 0.12.1
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-secret/target/release/ms --version
+ms 0.14.1
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me --version
+me 0.5.1
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me-preview --version
+me-preview 0.5.1
+[exit 0]
+
+########## 1. the wallet policy, from file
+$ cat /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/inputs/wallet-policy.txt
+wsh(multi(5,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*,@6/<0;1>/*,@7/<0;1>/*,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*,@11/<0;1>/*))
+[exit 0]
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode --group-size 0 wsh(multi(5,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*,@6/<0;1>/*,@7/<0;1>/*,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*,@11/<0;1>/*))
+md1ytpqqxpp3zcpydzk0zdt492xzr7r9qxfc
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md bytecode md1ytpqqxpp3zcpydzk0zdt492xzr7r9qxfc
+payload-bits: 100
+payload-bytes: 13
+hex: 22c200182188b0123456789ab0
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1ytpqqxpp3zcpydzk0zdt492xzr7r9qxfc
+template: wsh(multi(5,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*,@6/<0;1>/*,@7/<0;1>/*,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*,@11/<0;1>/*))
+n: 12
+wallet-policy-mode: false
+md1-encoding-id: 1c1c0feba95fef40d5a0e871f2463c52
+wallet-descriptor-template-id: 726a666305756435b7c52c5b3fc69c41
+wallet-policy-id: f05e8a1c282f7740bbfd902a759b5577
+wallet-policy-id-fingerprint: 0xf05e8a1c
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+########## 2. one cosigner key, from file
+$ cat /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/inputs/keys/cosigner-00.xpub
+# cosigner 0 — origin [ae6647ee/48h/0h/0h/2h]
+xpub6F794Lv12fi3eLBDjDYxbbVk5GrvFQrqb8QpYRLbr8dNtmdtogc2o5KiM3pLGd41phXxPw4ytcmwbDYmUfeRGuXE7CniQScVXrYnxz7AJE8
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-key/target/release/mk encode --xpub xpub6F794Lv12fi3eLBDjDYxbbVk5GrvFQrqb8QpYRLbr8dNtmdtogc2o5KiM3pLGd41phXxPw4ytcmwbDYmUfeRGuXE7CniQScVXrYnxz7AJE8 --origin-fingerprint ae6647ee --origin-path m/48'/0'/0'/2' --from-md1 md1ytpqqxpp3zcpydzk0zdt492xzr7r9qxfc --group-size 0
+mk1qpf7f8pqqsqhy6nxvwhxv3lwq5zg3vs76cp0whqh5fkzt3xcf63gqx2q8yj59pn36zmxs9tvvkpfpkahrevs9gswsqp6kz5gtp4sa5t5432d
+mk1qpf7f8ppg9lsn2zdmpda6rg6cm06z68pesf3vlual5lym8g05e8cg79d06tf3jp2agyg8535cn7vl
+note: stdout is watch-only — public keys only, cannot spend
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-key/target/release/mk inspect mk1qpmn4upqqsqhy6nxvwhxv3lwq5zg3vs76cp0whqh5fkzt3xcf63gqx2q8yj59pn36zmxs9tvvkpfpkahrevs9gswsqp6kjy7ztspqdlh2j70 mk1qpmn4uppg9lsn2zdmpda6rg6cm06z68pesf3vlual5lym8g05e8cg79d06tf3jp2z2tjad45qqhap
+xpub:                xpub6F794Lv12fi3eLBDjDYxbbVk5GrvFQrqb8QpYRLbr8dNtmdtogc2o5KiM3pLGd41phXxPw4ytcmwbDYmUfeRGuXE7CniQScVXrYnxz7AJE8
+origin_fingerprint:  ae6647ee
+xpub_fingerprint:    8791855f
+origin_path:         48'/0'/0'/2'
+  component[0]:       48h (hardened)
+  component[1]:       0h (hardened)
+  component[2]:       0h (hardened)
+  component[3]:       2h (hardened)
+policy_id_stubs:     726a6663
+chunks:              2
+  chunk[0]:           long (BCH variant)
+  chunk[1]:           regular (BCH variant)
+note: stdout is watch-only — public keys only, cannot spend
+[exit 0]
+
+########## 3. one seed, from file (SECRET)
+$ cat /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/inputs/seeds/cosigner-00.seed
+ribbon relax cave lock library melody release ranch bird stone fossil plate
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-secret/target/release/ms encode --phrase ribbon relax cave lock library melody release ranch bird stone fossil plate
+ms10e ntrsq zu3dg yngxu pz9fd fkxpd xkfdl fsa39 6kgte j06n7
+word count: 12
+language: english (BIP-39 checksum valid)
+passphrase: not stored in ms1 (record separately if used)
+warning: stdout carries private key material (can spend) — redirect or encrypt (e.g. '> file.txt' or '| age -e ...')
+[exit 0]
+
+########## 4. the bundle: validate + plate manifest + checklist
+$ head -3 /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/inputs/backup-strings.txt
+md1ytpqqxpp3zcpydzk0zdt492xzr7r9qxfc
+mk1qpmn4upqqsqhy6nxvwhxv3lwq5zg3vs76cp0whqh5fkzt3xcf63gqx2q8yj59pn36zmxs9tvvkpfpkahrevs9gswsqp6kjy7ztspqdlh2j70
+mk1qpmn4uppg9lsn2zdmpda6rg6cm06z68pesf3vlual5lym8g05e8cg79d06tf3jp2z2tjad45qqhap
+[exit 0]
+
+$ wc -l /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/inputs/backup-strings.txt
+25 /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/inputs/backup-strings.txt
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me bundle --in /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/inputs/backup-strings.txt --preview /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates --png --manifest /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/manifest.json
+me: rendered plate 1 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-1.png
+me: rendered plate 2 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-2.png
+me: rendered plate 3 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-3.png
+me: rendered plate 4 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-4.png
+me: rendered plate 5 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-5.png
+me: rendered plate 6 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-6.png
+me: rendered plate 7 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-7.png
+me: rendered plate 8 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-8.png
+me: rendered plate 9 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-9.png
+me: rendered plate 10 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-10.png
+me: rendered plate 11 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-11.png
+me: rendered plate 12 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-12.png
+me: rendered plate 13 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-13.png
+me: rendered plate 14 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-14.png
+me: rendered plate 15 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-15.png
+me: rendered plate 16 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-16.png
+me: rendered plate 17 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-17.png
+me: rendered plate 18 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-18.png
+me: rendered plate 19 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-19.png
+me: rendered plate 20 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-20.png
+me: rendered plate 21 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-21.png
+me: rendered plate 22 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-22.png
+me: rendered plate 23 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-23.png
+me: rendered plate 24 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-24.png
+me: rendered plate 25 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/plates/plate-25.png
+me: wrote manifest to /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/manifest.json
+me: backup needs 26 plates (25 public + ms1 on device):
+  plate 1/26  md1 policy  → push via NFC & engrave
+  plate 2/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 3/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 4/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 5/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 6/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 7/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 8/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 9/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 10/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 11/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 12/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 13/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 14/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 15/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 16/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 17/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 18/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 19/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 20/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 21/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 22/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 23/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 24/26  mk1 chunk 1/2  → push via NFC & engrave
+  plate 25/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 26/26  ms1 secret  → TYPE ON DEVICE (New > Input Seed > CODEX32); never via this tool
+[exit 0]
+
+########## 5. NDEF for the descriptor card
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me --in /dev/fd/63 --hex
+0329d1012554006d64317974707171787070337a637079647a6b307a6474343932787a7237723971786663fe
+[exit 0]
+
+########## 5b. and the refusal that matters: ms1 never leaves the machine
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me --in /dev/fd/63 --hex
+me: refusing to emit ms1 over NFC: ms1 is secret seed entropy and must never be transmitted by radio (RF eavesdropping risk). Enter it by hand on the device: New > Input Seed > CODEX32.
+[exit 3]
+
+########## 6. a systemwide payload carrying the public cards
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me sysw pack --no-passphrase md1ytpqqxpp3zcpydzk0zdt492xzr7r9qxfc --out /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/sysw-public.bin
+strength: no passphrase — BELOW the threshold
+digest:   05f3 a2c0 7528 fbf5 03be b78c 2edf 524c
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me sysw show /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey/out/sysw-public.bin
+sealed:   false
+pub_len:  36
+ct_len:   0
+identity: e1af502140b8da818dfb69c5fe380bcb239505fbd0fef621dc967e3eb677fb27
+digest:   05f3 a2c0 7528 fbf5 03be b78c 2edf 524c
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me sysw wipe --fill zeros --out /dev/null
+[exit 0]
+
