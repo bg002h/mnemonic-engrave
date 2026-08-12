@@ -4692,11 +4692,17 @@ Nothing to fix in the tree — the implementer corrected the lint inside
 `2b570fc`, and HEAD is clean: clippy exit 0, 0 `FAILED`, 10 suites ok, verified
 here.
 
-### F-148 — flashing is remote-safe; VERIFYING a flash is not (owning phase: **systemwide payloads, stage 11**) `#mnemonic`
+### F-148 — flashing is remote-safe; VERIFYING a flash is not — FIRST VERIFICATION LANDED 2026-08-12 (owning phase: **systemwide payloads, stage 11**) `#mnemonic`
 
 Recorded 2026-08-12 when the operator noted they are remote. Two halves of the
 flash operation have opposite answers, and conflating them is how a remote
 session ends with a machine nobody can judge.
+
+**The rule was exercised end to end on 2026-08-12 and held.** `ga039c2b` — the
+whole systemwide-payload feature, stages 7–13 — was signed and flashed remotely
+while the operator was away, recorded as FLASHED/UNVERIFIED, and then confirmed
+booting by the operator once physically present. Remote flash, in-room verdict,
+exactly as this entry prescribes. The split is not theoretical.
 
 **Flashing is recoverable without hands, and here is why.** `Init()` requires a
 20–28 V USB-PD contract before it configures the LCD, and reboots into BOOTSEL
