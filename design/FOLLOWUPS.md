@@ -4165,6 +4165,27 @@ assert them: `older(65535)` is exactly at the 16-bit ceiling; `older(4255898)` =
 `older(65536)` masks to zero is correct** — `65536 & 0xFFFF == 0` and bit 22 stays
 clear, so the lock silently becomes *no lock*. One increment from a real wallet.
 
+**Taproot depth, asked separately and answered the same way.** Two unrelated
+axes, both boundaries located by probe rather than cited — I built `tr()`
+descriptors of increasing depth until they flipped:
+
+| axis | deepest accepted | first rejected | error |
+| --- | --- | --- | --- |
+| TapTree Merkle depth (nested `{}`) | **128** | 129 | `maximum Taproot tree depth (128) exceeded` |
+| fragment recursion inside ONE leaf | **400** | 401 | `maximum recursion depth exceeded (max 402, got 403)` |
+
+`TAPROOT_CONTROL_MAX_NODE_COUNT = 128` comes from the `bitcoin` crate and is
+enforced in `descriptor/tr/taptree.rs`; `MAX_RECURSION_DEPTH = 402`
+(`src/lib.rs:503`) is context-agnostic — verified there is no Tap relaxation at
+either enforcement site (`expression/mod.rs:592`, `miniscript/mod.rs:333`).
+
+Practically, **128 is the wall you hit**: adding script paths the normal way
+branches the tree, so the Merkle limit arrives long before a single leaf's own
+fragment could approach 402. The 402 cap only binds a pathologically nested
+fragment inside one leaf. (First probe of this measured nothing, because reusing
+one pubkey trips the repeated-key check before any depth check — worth knowing if
+anyone re-runs it.)
+
 The real costs of this shape are downstream of Bitcoin entirely: F-127, F-130,
 F-131, F-132, F-134, and `md address` refusing the keys on depth. Depth itself is
 two orders of magnitude from anything that bites.
