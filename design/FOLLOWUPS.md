@@ -3936,3 +3936,81 @@ the descriptor card alone would restore eight of eleven keys wrongly.
 **What is missing is a test pinning precedence:** when the md1's shared origin and
 an mk1 card's `origin_path` disagree, the card must win. Add a restore vector for
 exactly that disagreement before this shape is recommended to anyone.
+
+#### F-129 — ANSWERED 2026-08-11 by running the round trip
+
+The precedence question is settled, and in the safe direction: **the mk1 cards
+win; the md1's flattened `--path` never overrides them.** Proven twice by
+refusal, not by inspection —
+
+- supplying a slot as a bare xpub instead of its card: *"non-canonical wrapper
+  requires explicit origin for @2, but none provided"* (exit 1);
+- supplying no cards at all: *"cannot infer the own origin family (no canonical
+  origin, no cosigner mk1, and no --origin)"* (exit 1). `--origin` is single-sig
+  only, so for a multisig the card is the ONLY origin source.
+
+A full restore (3 md1 chunks + 10 cards + the seed for the own slot) exits 0 and
+reproduces all 11 origins exactly, including the divergent account indices the
+descriptor card flattened to one value.
+
+**The residual risk moved to the OWN slot**, the one `--from` fills rather than a
+card. That key IS derived at the flattened shared path. With the own slot at @0
+(true path `84'/0'/0'`) it is right. Asking for the own slot at @3 (true path
+`84'/0'/3'`) derived @0's key instead — and was caught:
+
+```
+error: restore: multisig-template-floor mismatch — derived duplicate cosigner
+keys: supplied keys at positions 0 and 3 are identical
+```
+
+**The guard is real but incidental.** It fires because the mis-derived key
+collides with a slot that was supplied. In this wallet every master happens to
+have an account-0 slot among the eleven, so every possible mis-derivation
+collides and is caught. A wallet where some master's account-0 key is NOT one of
+the slots would mis-derive the own slot into a key nobody supplied — no
+duplicate, no error, **a silently wrong wallet**.
+
+**So the remaining work is narrow:** the own slot should take its path from its
+own mk1 card (or an explicit per-slot origin) rather than from the template's
+shared path, and the duplicate-key check should not be the thing standing between
+an operator and a wrong wallet. Keep the check; stop depending on it.
+
+**Separately, the descriptor text does NOT round-trip byte-for-byte** — see
+F-130. That is a different problem and does not affect the above.
+
+### F-130 — restored xpubs lose their BIP-32 depth/parent/child, so the descriptor and its checksum change (owning phase: **operator journeys**)
+
+Filed 2026-08-11 from the same round trip.
+
+The recovered wallet is the right wallet: for all 11 slots the chain code and
+public key are **byte-identical** to the original, and the policy template
+decodes byte-identical from the three md1 chunks. Child derivation uses only
+those, so addresses are unaffected.
+
+What changes is the xpub *serialization*. Decoded headers, original vs restored:
+
+| | depth | parent fp | child |
+| --- | --- | --- | --- |
+| original @0…@10 | 3 | `7ef32bdb` / `ea517ee5` / `d061c20c` | `0h`…`3h` |
+| restored @0…@10 | **0** | **`00000000`** | **`0`** |
+
+An mk1 card stores the account key's chain code and public key plus the origin
+(fingerprint + path); it does not carry depth/parent/child, so the reconstructed
+xpub is serialized with them zeroed while still annotated `[fp/84'/0'/N']`. The
+origin says depth 3; the key says depth 0.
+
+**Two concrete consequences, both measured:**
+
+- The descriptor checksum changes — `#4ld0crxa` → `#jgulue7j`. An operator who
+  recorded the checksum (the obvious thing to record) sees a mismatch on a
+  correct restore.
+- Tools in this constellation enforce depth. `md address` refuses the restored
+  key outright: *"--key @0: expected depth 4 for this script context, got 0"* —
+  the same check that rejects the ORIGINAL depth-3 keys for this wallet shape,
+  which is worth noting on its own.
+
+**Decide which is true** before changing anything: either the mk1 wire format
+should carry depth/parent/child (costing bytes on every key card), or a restored
+descriptor is defined as equivalent-not-identical and the checksum is documented
+as not comparable across a round trip. Today neither is written down, so the
+first operator to check a checksum after recovery will think the backup failed.
