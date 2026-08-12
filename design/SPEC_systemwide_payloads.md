@@ -62,8 +62,24 @@ several overrule a documented prior decision and are marked where they do.
    protection. An earlier fold deleted this acknowledgement; it is restored
    because §1 promises overruled decisions are marked where they occur.
 
+   **NARROWED 2026-08-12 (operator ruling; §13 D4) — the round trip gained a
+   fourth leg.** The restored mode survives, but every token of a user-supplied
+   passphrase must now be a BIP-39 English word, checked after normalisation
+   (which lowercases). The keyboard-choice premise below did not hold in
+   practice: the device only ever grew the word keyboard, so an ASCII
+   passphrase sealed a payload the machine it was for could never open.
+   Offered cheap-and-narrowing (`me` refuses at `pack`, naming the offending
+   token) against expensive-and-complete (build §8a's free-text keyboard), the
+   operator chose to narrow the host. What did NOT change: two words are still
+   legal, still below `[cliff]`, and still only warn.
+
 8a. **The operator picks the keyboard at unlock: BIP-39 word, or free-text
-    ASCII.** The word keyboard is the default landing, since the generated mode
+    ASCII.** *(SUPERSEDED 2026-08-12 — §13 D4. With every packable passphrase
+    made of wordlist tokens, the word keyboard is the only unlock surface the
+    device needs, and the free-text keyboard — never built — is no longer
+    required. The byte-identical-KDF-input rule below still binds; it is now
+    discharged trivially, because exactly one keyboard exists. The text stands,
+    as §1 keeps its round trips.)* The word keyboard is the default landing, since the generated mode
     is the common case and twelve words are far easier to type with wordlist
     completion. Both normalise through the **same rule** — EPD§8.1's lowercase,
     single-space form — so a word passphrase entered on either keyboard produces
@@ -109,7 +125,7 @@ several overrule a documented prior decision and are marked where they do.
     length introduces a second way to be wrong that looks exactly like the
     first, and this is what separates them.
 
-    Without this the feature is broken at its default: `gui/gui.go:758`'s
+    Without this the feature is broken at its default: `gui/gui.go:817`'s
     `refreshCands` masks the keyboard to `bip39.LastWordCandidates` the moment
     the cursor reaches the final slot — `gui/unlock_kdf.go:350` calls it "the
     checksum gate" — so **15 of every 16 uniformly generated 12-word passphrases
@@ -161,7 +177,7 @@ routed, rather than latent and undocumented.
    | obstacle | where | what it does |
    | --- | --- | --- |
    | `!m.Valid()` | `gui/unlock_kdf.go:168`, `:359` | rejects every `len(m) % 3 != 0` outright |
-   | `refreshCands` → `bip39.LastWordCandidates` | `gui/gui.go:758`, inside `inputWordsFlow` | masks the final slot to checksum-valid words |
+   | `refreshCands` → `bip39.LastWordCandidates` | `gui/gui.go:817`, inside `inputWordsFlow` | masks the final slot to checksum-valid words |
    | **fixed length** | `inputWordsFlow` fills a PRE-SIZED slice | N must be known before entry, so there is nowhere for §8c's `done` to land |
    | **no terminator** | `gui/gui.go:727` | no key ends entry early |
    | **no return value** | `gui/gui.go:792` | the flow cannot report how many words were actually entered |
@@ -187,7 +203,7 @@ routed, rather than latent and undocumented.
 ### 3.1 One shared seam, plus four individual wirings
 
 **MEASURED, after R0-I4 caught the first draft asserting a count its own list
-contradicted.** `seedEntryFlow` (`gui/derive_xpub.go:82`) has **7 call sites
+contradicted.** `seedEntryFlow` (`gui/derive_xpub.go:88`) has **7 call sites
 across 4 programs**:
 
 | program | sites |
@@ -236,9 +252,16 @@ decision 2.
 The store holds **classified records, not a blob**, so a program asks for "a
 mnemonic" and cannot be handed a descriptor by accident.
 
-**Every screen that consumes a record names its source** — `from payload`,
-`from tag`, `typed`. Provenance must never be something established by reading
-code.
+**The screen where a record ENTERS a program names its source** — `from
+payload`, `from tag`, `typed`. Provenance must never be something established
+by reading code. *(SCOPED 2026-08-12, §13 D5. This sentence read "every screen
+that consumes a record" until the journeys review measured what that costs: no
+provenance survives `take()` — `gui/sysw_session.go:71` returns a bare record —
+so naming the source on every downstream screen means reshaping the session to
+carry provenance through the whole engrave pipeline, the same reshaping the
+operator declined for §5.5's reminder and for the same reason. The
+point-of-entry screen needs no reshaping: the flow that accepted the offer
+knows what it accepted.)*
 
 The Sealed Payload program has its **own** session semantics and does not share
 this store. Two features, two regions, no shared state.
@@ -349,7 +372,45 @@ reconstruct it:
 - **Sealed Payload is dashes, not blanks** — it is out of scope entirely
   (decision 1), not a program whose every cell happens to be refused.
 
-#### 3.3.2a NFC records go through the SAME function — NORMATIVE (R0-I6)
+**RULED AT FOLD, 2026-08-12 — the table is the normative RECORD; enforcement is
+per-site and structural (§13 D7).** The journeys review measured the
+implementation: the table is transcribed cell-perfectly into
+`gui/sysw_admit.go`, and its `admits()` has **zero non-test callers** — every
+consumption site instead names exactly one class in its `take`/`syswOffer`
+call, and each named class is a `•` in its program's row (checked cell by
+cell). That is not the drift it looks like; it is the better mechanism, by this
+spec's own §3.1 argument. A run-time `admits()` call at those sites could never
+return false — each site's class is hard-coded and admitted — so wiring it in
+would add a check that cannot fail, while a wrong future site could simply omit
+the call. A call site that has no way to name a refused class cannot reach it
+by any argument. So:
+
+- **The table stays NORMATIVE — as the oracle, not as a function.** A call site
+  naming a class outside its program's row is a defect, and a structural test
+  reconciles every consumption call site against the table (plan stage 13),
+  exactly as test 16 already does for the verify seam. `admits()` remains as
+  the table's transcription and becomes that test's oracle.
+- **"Refused with a named reason" manifests as ABSENCE**: a program never
+  offers a class its row refuses, and the reason lives in this section's
+  notes. No run-time refusal screen exists, because no run-time path can ask.
+- **Reachability, recorded 2026-08-12 so nobody reconstructs it from code:**
+  an admitted cell is a PERMISSION, not a promise that every screen offers it.
+  Cells with no consumption path today: `ClassCodex32Secret` everywhere (the
+  inconsistency below); `ClassPassphrase` at the four seam programs (their
+  optional-passphrase step, `passphraseFlow` at `gui/gui.go:654`, never offers
+  the payload); `ClassMDMK` at Single-Sig and Multisig (the supplied-md1
+  path). Plan stage 13 serves the cells that already have carriers; the plan's
+  journey map names the rest as open.
+- **A spec-internal inconsistency, found by the review and recorded rather than
+  papered over:** §3.1's NORMATIVE seam signature returns `bip39.Mnemonic`,
+  which cannot carry the `ClassCodex32Secret` this table admits to all four
+  seam programs. The cells stand — a codex32 secret IS seed material, and
+  Backup Wallet's typed menu already accepts M*1 strings — but they are
+  unservable until the seam gains a carrier type. That is a design change with
+  its own trade-offs, deliberately not smuggled into a fold; the plan records
+  it as open.
+
+#### 3.3.2a NFC records are admitted by the SAME TABLE — NORMATIVE (R0-I6; mechanism revised 2026-08-12)
 
 **"Source is not an admission input" is about the TABLE, not about §5.4.1's
 `[compared]` precondition (R1-M1).** The class table is source-blind. The
@@ -370,9 +431,12 @@ checking from — outside the single admission function.
 
 **It is not outside it.** An NFC-delivered record is admitted by the same table,
 by class, exactly as a payload-delivered one. Source is not an admission input;
-it is a **flag** input (F3, and F4 below). One function, every path, no
+it is a **flag** input (F3, and F4 below). One TABLE, every path, no
 exceptions — which was the point of §3.3 and which the first draft's tuple
-quietly broke.
+quietly broke. *(Revised 2026-08-12, §13 D7: this rule was first written as
+"one FUNCTION, every path". The rule survives — admission is class-only and
+source-blind — but its mechanism is per-site and structural; §3.3.2's ruling
+says why.)*
 
 #### 3.3.3 The flag rules — NORMATIVE
 
@@ -382,9 +446,17 @@ one can fire.
 | # | condition | screen says |
 | --- | --- | --- |
 | F1 | admitted class is secret **and** container is plaintext | this secret is unencrypted in flash; offers erase (§5.5) |
-| F2 | admitted class is secret **and** the passphrase is not `[cliff]`-above (§12.1) | this secret is weakly protected |
-| F3 | always, for anything not typed | the source, at the point of use (§3.2) |
+| F2 | admitted class is secret **and** the store's `weak` (§3.2.1: sealed, and its passphrase not `[cliff]`-above) | this secret is weakly protected |
+| F3 | always, for anything not typed | the source, at the screen where the record enters the program (§3.2, as scoped 2026-08-12) |
 | F4 | admitted class is secret **and** source is NFC | this secret arrived with **no integrity check at all** — §5.4 scopes digest verification to flash, so nothing stands behind a tag's contents |
+
+Two amendments, 2026-08-12: **F2's condition row omitted `sealed`** — read
+literally it fired on plaintext payloads too, double-flagging beside F1; the
+implementation carries the `sealed` conjunct and §3.2.1's `weak` was always the
+intended condition, so the row now cites it (the code was right, the row was
+stale). And **secrecy in F1, F2 and F4 reads through `[mdmk-decode]` (§12.6)**:
+an unconfirmed `ClassMDMK` record counts as secret — added with the §13 D6
+demotion.
 
 ## 4. The flash region
 
@@ -512,11 +584,12 @@ prefixes are also **reserved**: a record beginning `text:` or `pass:` that is no
 valid lowercase hex is `ClassUnknown` and refused, never silently treated as
 free text.
 
-#### 5.3.2 The card-set DECODE requirement APPLIES — NORMATIVE (R0-I1)
+#### 5.3.2 The card-set DECODE check — now a FLAG, not a refusal (R0-I1; demoted 2026-08-12, §13 D6)
 
-EPD§6.3's per-card-set decode requirement carries over to this container
-unchanged. Stating it is not a formality: without it the §5.3 flag is **silently
-defeated in exactly the case that matters**.
+EPD§6.3's per-card-set decode requirement reaches this container as a **flag
+input**, not as the refusal EPD gives it. Stating it is still not a formality:
+without it the §5.3 flag is **silently defeated in exactly the case that
+matters**.
 
 `ValidMD`/`ValidMK` are **pure BCH verifiers**, so 32 bytes of seed entropy wrap
 into a record that classifies as `ClassMDMK` — not secret, no flag, no offer to
@@ -525,27 +598,50 @@ passphrase, on a device whose BOOTSEL is enabled by design. EPD measured that
 bypass and closed it with `decodePublicSet`, whose comment names the threat: *"a
 defective or third-party sealer can put seed entropy in the cleartext section."*
 
-**A `ClassMDMK` record that does not REASSEMBLE AND DECODE is refused.** The
-widening in §5.3 admits *declared* secrets; it does not admit undeclared ones.
+**The rule is `[mdmk-decode]` (§12.6), and it warns rather than refuses.** A
+`ClassMDMK` record the device cannot positively confirm by reassembling and
+decoding counts as SECRET for flag purposes — F1 fires on it in a plaintext
+container exactly as it would on a mnemonic — and nothing is refused. This
+section said "is refused" until 2026-08-12, and the review that reopened it
+found the refusal was never implemented on either side and its named test (14)
+was placed on a vector that could not exercise it. The demotion is not a
+concession to that gap; it is what §13's ruling forces, twice over. A refusal
+here is a security mechanism whose only visible effect is stopping an operator
+— the class §13 demotes. And transcribed verbatim it would have refused
+payloads this spec means to allow: a single `md1` card of a chunked set — the
+thing `bundleFlow` legitimately seeds with — cannot reassemble alone and
+therefore cannot decode. Under the flag form that card simply warns: the device
+says it could not confirm the record and treats it as a secret, which is the
+honest answer to a question the device genuinely cannot settle. The cost is
+recorded in §13 D6: an innocent partial card set now warns too.
 
-**And pass 3 must be restructured, not merely permitted through.**
-`AdmitSection`'s pass 3 sends every public record through `cardKey`, whose
-`default` branch fails closed with "record %d is not an md1 or mk1 card".
-Widening `permitted` without touching pass 3 would reject every payload the
-widening was meant to allow. **Pass 3 runs over the `ClassMDMK` subset only** — and **the subset must carry
-its ORIGINAL indices** (R1-I2). `groupRecords`/`cardKey`/`labelCards` are
-index-coupled to the full record list (`cardKey` returns `uniq: i + 1`), so
-transcribing "run over the subset" literally — by compacting the subset into a
-fresh slice and re-indexing from zero — backfills plate identity onto the wrong
-records. Filter the *iteration*, never the indices.
+**WITHDRAWN 2026-08-12 — the mechanism text below transcribed `seal`'s
+machinery, which this container never had.** It restructured `AdmitSection`'s
+pass 3; `sysw.Open` has no passes and no `cardKey`, so there was nothing to
+restructure — the review found the paragraph aimed at a function this container
+does not contain. It is kept, quoted, because R1-I2's lesson — filter the
+iteration, never the indices — still binds any future set-wise walk over the
+record list, including `[mdmk-decode]`'s grouping:
 
-The two passes are coupled and a fold that changed one would have shipped a
-container that admits nothing.
+> And pass 3 must be restructured, not merely permitted through.
+> `AdmitSection`'s pass 3 sends every public record through `cardKey`, whose
+> `default` branch fails closed with "record %d is not an md1 or mk1 card".
+> Widening `permitted` without touching pass 3 would reject every payload the
+> widening was meant to allow. Pass 3 runs over the `ClassMDMK` subset only —
+> and the subset must carry its ORIGINAL indices (R1-I2).
+> `groupRecords`/`cardKey`/`labelCards` are index-coupled to the full record
+> list (`cardKey` returns `uniq: i + 1`), so transcribing "run over the subset"
+> literally — by compacting the subset into a fresh slice and re-indexing from
+> zero — backfills plate identity onto the wrong records. Filter the
+> *iteration*, never the indices. The two passes are coupled and a fold that
+> changed one would have shipped a container that admits nothing.
 
 **A plaintext container carrying a secret class is flagged on screen at load**,
 paired with an operator-initiated **erase this region**. The erase is a menu
 item the operator chooses — not the automatic wiping machinery decision 2
-rejects — so a warning has something to do besides be dismissed.
+rejects — so a warning has something to do besides be dismissed. *(The erase
+item is unbuilt as of 2026-08-12 — the device tree has no flash-write path at
+all yet; plan stage 11 owns it.)*
 
 ### 5.4 Flash-delivered input is digest-verified, once per payload — operator ruling 2026-08-11
 
@@ -670,9 +766,17 @@ whole reason identity is specified here rather than left to the implementer.
 
 ### 5.5 The overwrite payload — operator ruling 2026-08-11
 
-After an engrave that consumed a payload-sourced record, **the device reminds
-the operator to overwrite the region.** A reminder, not an automatic wipe —
-decision 2 stands.
+**The post-engrave reminder is WITHDRAWN — operator ruling 2026-08-12 (§13
+D5).** This section opened with: *after an engrave that consumed a
+payload-sourced record, the device reminds the operator to overwrite the
+region.* No provenance survives `take()` (`gui/sysw_session.go:71` returns a
+bare record), so no engrave flow can know its input was payload-sourced — the
+reminder was structurally unbuildable without reshaping the session to carry
+provenance through the whole engrave pipeline, and the operator judged it not
+worth that. Getting rid of a payload is operator-initiated and UNPROMPTED:
+`me sysw wipe` at a host, or §5.3.2's erase item on the device. Decision 2
+stands either way — never an automatic wipe. Spec test 13 is withdrawn with
+this (`coverage.rs` marks it `Dropped`).
 
 **It is NOT a container (R0-I5).** The first draft called it a "payload", which
 made it subject to the format's own caps — EPD admits at most 16,450 bytes
@@ -707,11 +811,18 @@ Notes that belong in the spec rather than in a reviewer's head:
   erase-and-program rewrites the same physical cells. That is a materially
   stronger guarantee than overwriting a file on an SSD, and weaker than a claim
   that the prior contents are unrecoverable by any means. Claim the former only.
+- **The device's §5.3.2 erase item performs a plain sector erase** — the
+  all-ones erased state above. The three chosen fills belong to `me sysw wipe`,
+  at a host: on the device the operator pressed the button themselves, so the
+  deniability/evidence trade the fills exist for does not arise, and an erase
+  physically resets the same cells (previous row). Added 2026-08-12, with plan
+  stage 11.
 
 ### 5.6 The `me` command surface — NORMATIVE
 
 ```
-me sysw pack   [--out FILE] [--passphrase-words N | --passphrase-ask | --no-passphrase]
+me sysw pack   [--out FILE] [--in FILE] [--region] [--iterations N]
+               [--passphrase-words N | --passphrase-ask | --no-passphrase]
                [--allow-weak] RECORD...
 me sysw wipe   [--out FILE] [--fill random|zeros|ones]
 me sysw show   FILE
@@ -720,10 +831,18 @@ me sysw show   FILE
 | flag | meaning |
 | --- | --- |
 | `--passphrase-words N` | generate, `2 ≤ N ≤ 24`, **default 12** if no passphrase flag is given |
-| `--passphrase-ask` | prompt for a user-supplied passphrase; **never** taken from argv or an env var, where it would land in shell history and `/proc` |
+| `--passphrase-ask` | prompt for a user-supplied passphrase; **never** taken from argv or an env var, where it would land in shell history and `/proc`. **Since 2026-08-12 every token must be a BIP-39 English word** (`[passphrase-bounds]`, §12.5; §13 D4) — refused otherwise, naming the offending token |
 | `--no-passphrase` | plaintext container |
-| `--allow-weak` | required by §6.2.1 when secret content meets a not-`[cliff]`-above passphrase. **Refuses with a non-zero exit otherwise** |
+| `--allow-weak` | **accepted and ignored**, kept so existing invocations keep working. §13 D3 demoted the refusal this flag once lifted: `me` warns and proceeds whatever the strength, so there is nothing left for it to gate. *(This row said "refuses with a non-zero exit" until 2026-08-12 — a stale pre-D3 sentence the code never followed; the review caught the row, not the code)* |
+| `--in FILE` | read newline-separated records from FILE instead of argv — argv is a public channel, the same reason `--passphrase-ask` never reads it |
+| `--iterations N` | PBKDF2 rounds, default 100,000 — mirrors `seal` |
+| `--region` | pad the container to a full `REGION_LEN` (65,536-byte) image, tail `0xFF` — the NOR erased state, so the image is byte-for-byte what the sector holds with only the container written. The only form the delivery step below can write |
 | `--fill` | §5.5; **default `random`** |
+
+The last three `pack` flags were **added to this table 2026-08-12**: they
+shipped with the implementation and the journeys review found §5.6 deficient,
+not the code — `--region` is the only delivery mechanism the feature has, and
+this NORMATIVE surface never mentioned it.
 
 `me sysw pack` **prints the digest to stderr** in the EPD§6.6 display form,
 because that is the value the operator writes down and compares on the machine.
@@ -740,10 +859,28 @@ produce a systemwide container while the operator believes they are producing a
 Sealed Payload one, or vice versa. The two features are frozen apart
 (decision 1); their command surfaces are too.
 
+**How the image reaches `0x10D00000` — recorded 2026-08-12, NOT yet rehearsed.**
+The journeys review found the delivery step named nowhere: spec, plan and the
+device's own error string all stop short of the command that writes the region.
+It is:
+
+```sh
+me sysw pack --region --out payload.bin RECORD...
+picotool load --verify -t bin -o 0x10D00000 payload.bin   # machine in BOOTSEL, laptop power
+```
+
+`me sysw wipe --out` emits the same-shaped image for the same second command.
+The `picotool` line is transcribed from its documented surface, not from a
+performed write — EPD delivered a UF2, this container delivers a raw image, and
+the `-t bin -o` form has not yet touched the real machine. **Rehearse it before
+it reaches operator documentation**; if rehearsal shows the raw form
+unreliable, `me sysw pack` grows a UF2 emitter and this paragraph changes.
+
 ## 6. Passphrases
 
 Three modes in `me`: **none**, **user-supplied**, **generated N words** (default
-12, min 2, max 24).
+12, min 2, max 24). Since 2026-08-12 the user-supplied mode is narrowed to
+BIP-39 English words — `[passphrase-bounds]` (§12.5), §13 D4.
 
 ### 6.1 What each length buys
 
@@ -800,7 +937,7 @@ a different question:
 | mode | entropy | `[cliff]`? |
 | --- | --- | --- |
 | generated, N words | exactly `11 × N` bits, drawn uniformly | above iff `N ≥ 5` |
-| user-supplied ASCII | not estimated; see below | **below**, always — its tokens are not wordlist entries |
+| user-supplied (since 2026-08-12: BIP-39 words only, §13 D4) | not estimated; see below | by §12.1's count, exactly as generated. *(The pre-D4 ASCII mode was **below, always** — its tokens were not wordlist entries)* |
 | none | 0 bits | below |
 
 **R3-C2 is why this is stated as deference rather than as a second
@@ -817,7 +954,13 @@ records the honest number — human-chosen is "worth 25–35 bits — one rented
 minutes" — and that entire range is far below what generation buys, so any
 faithful estimator returns the same answer for every input. Under `[cliff]` the
 question does not even arise: a user-supplied ASCII passphrase is below it by
-definition.
+definition. *(CORRECTED 2026-08-12: that last sentence was true of the mode it
+was written against. Since §13 D4 every user-supplied token is a wordlist
+entry, so `[cliff]` follows the count — a user-supplied five-word passphrase is
+above it, and host and device agree for the same reason they agree about
+generated ones: §12.1 is a pure function of the normalised string. The
+no-estimator argument above is untouched; word choice is still human, so the
+entropy is still not estimated.)*
 
 **And an estimator here would have to model that CASE IS DISCARDED before
 hashing.** `seal.NormalisePassphrase` is
@@ -837,9 +980,10 @@ five-BIP-39-word passphrase:**
 > **Secret content + a passphrase that is not `[cliff]`-above ⇒ `me` prints a
 > warning and proceeds** (§13 D3; it once refused).
 
-`me` prints the strength either way — `"12 words, 132 bits"` or
-`"user-supplied, unmeasured, not `[cliff]`-above"` — the latter being a
-consequence of `[cliff]` (§12.1), not a separate judgement.
+`me` prints the strength either way — the normalised word count and which side
+of the threshold it lands on (`strength: 12 words — at or above the threshold`)
+— a consequence of `[cliff]` (§12.1), not a separate judgement, and since §13
+D4 the same computation for every mode.
 
 #### 6.2.2 Host and device must agree on what is ENTERABLE — NORMATIVE
 
@@ -848,11 +992,15 @@ cannot accept — two found by review and one by measurement:
 
 | constraint | value | why |
 | --- | --- | --- |
-| character range | `0x20`–`0x7E` only | The device's real constraint: `passphrase.ValidatePassphrase` rejects anything else as `ErrNonASCII`, so a UTF-8 passphrase would seal and never open. **The next row rejects the same function's `MaxLen`, and the two are not in tension (R2-N1):** the range is about what entry can represent, while `MaxLen = 100` is by its own comment "a plate-capacity limit chosen for legibility" — a fact about steel, not about typing. Take the constraint that is about entry; reject the one that is about a plate |
+| character range | `0x20`–`0x7E` only | The device's real constraint: `passphrase.ValidatePassphrase` rejects anything else as `ErrNonASCII`, so a UTF-8 passphrase would seal and never open. **The next row rejects the same function's `MaxLen`, and the two are not in tension (R2-N1):** the range is about what entry can represent, while `MaxLen = 100` is by its own comment "a plate-capacity limit chosen for legibility" — a fact about steel, not about typing. Take the constraint that is about entry; reject the one that is about a plate. **Subsumed 2026-08-12 by `[passphrase-bounds]`' token rule (§13 D4)**: every token a BIP-39 word, so the live alphabet is lowercase a–z plus the separator; the range stands as the outer bound entry surfaces were sized against |
 | length cap | **exactly 215 bytes** over the NORMALISED string, host and device | An inequality is not a spec (R2-I3): "≥ 215" on the host and "≥ 215" on the device can be two different numbers — the R0-C4 shape inside the section named after it. 215 is the measured maximum (24 words × 8 characters + 23 separators; a 12-word passphrase already reaches 107), and it bounds the **user-supplied** mode too, which otherwise had no derived bound at all. `passphrase.MaxLen` is 100 and does not apply — see the row above |
 | checksum | never required (§8b) | else 15 of 16 default draws are unopenable |
 
-`me` enforces the identical range and cap at creation.
+`me` enforces the identical range and cap at creation. *(Declared on both sides
+and enforced on NEITHER until 2026-08-12 — the journeys review found
+`PASSPHRASE_MAX`'s only references were the constant, a const assertion and an
+arithmetic test, and measurement confirmed it. The cap and §13 D4's token rule
+are now checked at `pack`.)*
 
 **Do not call `passphrase.ValidatePassphrase` on this path.** It bundles the
 range with `MaxLen = 100`, so calling it to get the range imports the cap this
@@ -897,7 +1045,10 @@ scrub would be making F-123's mistake about a different control.
 `me` prints, and the device shows before the KDF runs, that a user-supplied
 passphrase is **lowercased and whitespace-collapsed** before hashing. An
 operator who chose a mixed-case passphrase is otherwise never told that half of
-what they chose was discarded.
+what they chose was discarded. *(The device half is MOOT since §13 D4: the word
+keyboard cannot produce a character normalisation would change. The `me` half
+stands — an operator can still type `Abandon About` at the prompt — and is
+unbuilt as of 2026-08-12.)*
 
 ### 6.3 Consequence: `is_valid` changes, and what replaces the typo screen
 
@@ -991,6 +1142,16 @@ The `skip` row is normative and R1-I1 is why: §7.1 calls bypass "a menu option,
 not a hidden escape", and without a row for it §7.1.1's `not verified` outcome
 is unreachable by any path an implementer transcribing this table would build.
 
+**Scope, stated 2026-08-12 so an implementer does not have to guess.** This
+menu binds the WORD-PLATE verify — a plate whose engraved content is the words
+themselves (Backup Wallet's mnemonic plates). The bundle verifies
+(`singleSigVerifyFlow`, `multisigVerifyFlow`) RE-DERIVE, and a re-derivation
+needs every word: their full re-entry is arithmetic, not a depth this menu
+could relax. Decision 9 still governs them — they are chosen from a menu and
+never forced. As of 2026-08-12 no word-plate verify exists at all (the journeys
+review, J-G: zero hits for this section's labels or provenance strings in the
+device tree); plan stage 12 owns it.
+
 #### 7.2.1 Selection — NORMATIVE
 
 - **`even words` / `odd words`** are 1-indexed over the engraved word list:
@@ -1062,7 +1223,10 @@ rather than only on hardware.
 2. A wrong word at any position *included* in a check is caught.
 3. Random word selection is uniform and re-drawn per verification.
 4. A plaintext container carrying a secret class raises the flag.
-5. `me` refuses not-`[cliff]`-above + secret without the flag, and permits it with.
+5. `me` warns on not-`[cliff]`-above + secret and proceeds, exit 0, flag or no
+   flag; `--allow-weak` is accepted and ignored. *(Read "refuses without the
+   flag" until 2026-08-12 — a §13 D3 leftover in this list; the test asserts
+   the demoted behaviour so the refusal cannot creep back.)*
 6. Host and device produce byte-identical KDF input for an arbitrary-N
    passphrase.
 7. A blob written to the wrong region is refused on magic, not half-parsed.
@@ -1084,12 +1248,21 @@ rather than only on hardware.
     — it is the defect the requirement exists to prevent.
 12. Each fill — zeros, ones, random — produces the region it claims to, and
     all-ones is byte-identical to an erased region.
-13. The post-engrave overwrite reminder fires after a payload-sourced engrave
-    and not after a typed one.
-14. **(R0-I1)** A BCH-valid `md1` carrying non-decodable entropy is refused,
-    asserted against the real `md.Reassemble` — not a hand-built fixture. Test 4
-    cannot catch this: it constructs a record that classifies as secret, and the
-    defect lives entirely in records that do not.
+13. **WITHDRAWN 2026-08-12 (§13 D5)** — was: the post-engrave overwrite
+    reminder fires after a payload-sourced engrave and not after a typed one.
+    The number stays so the 1..23 ids stay stable; `coverage.rs` marks it
+    `Dropped`.
+14. **(R0-I1; demoted §13 D6)** A BCH-valid `md1` carrying non-decodable
+    entropy is UNCONFIRMED under `[mdmk-decode]` (§12.6): it loads, counts as
+    secret for flags — F1 in a plaintext container — and is never refused.
+    Asserted against the real reassembler (`md.Reassemble` in Go, the decoders
+    `decode_public_set` already drives in Rust), not a hand-built fixture; and
+    the confirming direction is pinned too — a decodable set raises nothing.
+    Test 4 cannot catch this: it constructs a record that classifies as secret,
+    and the defect lives entirely in records that do not. *(Until 2026-08-12
+    this test was falsely placed on vector S-I, a VALID `md1` that could not
+    exercise it — the placement passed the every-test-is-placed gate while
+    covering nothing.)*
 15. **(R0-C2)** A secrets-only sealed payload (`pub_len == 0`) displays NO
     digest, and two different such payloads have DIFFERENT identities (§5.4.1).
     A test asserting only the first half passes on the bypass.
@@ -1154,11 +1327,16 @@ rather than only on hardware.
   classification alone — nothing stands behind them, and the operator has
   nothing to compare. Flag F4 says so on screen at the point of use. This
   fulfils §5.4's forward reference, which R0-M3 found unfulfilled.
-  **The §5.5 overwrite artefact is the mitigation for the flash case, and it is a REMINDER the
-  operator must act on** — not something the machine does for them. A spec that
-  counted it as protection would be making the same mistake F-123 was filed
-  against: describing a control by its intent rather than by what it does when
-  nobody runs it.
+  **The §5.5 overwrite artefact is the mitigation for the flash case, and
+  applying it is something the operator must INITIATE — since 2026-08-12
+  nothing even reminds them (§13 D5).** A spec that counted it as protection
+  would be making the same mistake F-123 was filed against: describing a
+  control by its intent rather than by what it does when nobody runs it.
+- **Since §13 D6, a BCH-valid `ClassMDMK` record carrying non-decodable entropy
+  LOADS**: `[mdmk-decode]` (§12.6) flags it as an unconfirmed secret rather
+  than refusing it. An operator who dismisses that warning has stored
+  undeclared seed entropy in cleartext flash. The claim here is the warning,
+  never protection.
 - It does not claim the operator-compared hash detects tampering unless the
   operator actually compares it.
 - It does not change what protects the operator, which remains **physical
@@ -1258,7 +1436,8 @@ that every such payload would share.
 
 | bound | value |
 | --- | --- |
-| character range | `0x20`–`0x7E` |
+| tokens | **every whitespace-separated token of the NORMALISED string is a BIP-39 English word** — narrowed 2026-08-12 (§13 D4) |
+| character range | `0x20`–`0x7E` (since the token rule, implied stronger; retained as the outer bound) |
 | length | **exactly 215 bytes**, host and device, over the NORMALISED string |
 | word count | `2 ≤ N ≤ 24` for the generated mode |
 | checksum | never required, at any length (§8b) |
@@ -1268,7 +1447,38 @@ equal to 8. `passphrase.MaxLen = 100` does **not** apply: its own comment calls
 it "a plate-capacity limit chosen for legibility", a fact about steel rather
 than about entry.
 
-## 13. What was demoted, and why — operator ruling 2026-08-11
+**The token rule was added 2026-08-12, by operator ruling.** The device only
+ever grew a word keyboard, so an ASCII passphrase — legal under decision 8 as
+written — sealed a payload the machine it was for could never open. `me` now
+refuses at `pack`, naming the offending token (one wrong word in twelve is
+useless to hunt otherwise), and the check runs AFTER normalisation, so case
+never causes a refusal. It is deliberately NOT the `[cliff]` predicate: that is
+a word COUNT (§12.1) and this is only its wordlist half. What did NOT change:
+two words are still legal, still below `[cliff]`, and still only warn (F2).
+**Also enforced as of the same date: the 215-byte cap** — both bounds had been
+declared on both sides and enforced on neither, which the journeys review found
+and measurement confirmed. Payloads sealed with an ASCII passphrase before that
+date remain unopenable on the device; the narrowing is at creation, so nothing
+recreates them.
+
+### 12.6 `[mdmk-decode]`
+
+**A `ClassMDMK` record is DECODE-CONFIRMED when the payload's own `ClassMDMK`
+records contain the complete card set it belongs to, and that set reassembles
+and decodes by the format's real decoder** — semantics-bound, per the
+Rust-primary rule: the `md`/`mk` decoders `decode_public_set` already drives in
+the primary Rust crate; `md.Reassemble` and its `mk` sibling in the Go port.
+**Any other outcome — an incomplete set, a reassembly failure, a decode failure
+— leaves the record UNCONFIRMED, and for flag evaluation (§3.3.3) an
+unconfirmed record counts as SECRET.** Nothing is refused: admission (§3.3.2)
+and consumption are untouched.
+
+Added 2026-08-12, demoting §5.3.2's refusal — §13 D6 records what it was and
+what the change cost. Host and device compute it identically for the reason
+`[cliff]` is a pure function: it depends only on the record bytes, never on a
+header field an attacker could flip.
+
+## 13. What was demoted, and why — operator rulings 2026-08-11 and 2026-08-12
 
 **"We don't care much about security for this feature, only look for things that
 block workflow."** Combined with the earlier ruling that this is "the unsafe
@@ -1283,6 +1493,20 @@ effect was to stop an operator doing something.
 | D1 | `[compared]` set only by a `[cliff]`-above AEAD open | set by **any** successful open | `me sysw pack --passphrase-ask` over secret-only records produced a payload **no device could ever consume**, with `me` exiting 0 and warning nothing (R0 round 5 A) |
 | D2 | flag F5 + test 23: refuse the unconsumable payload | **deleted** | the state D1 created no longer exists, so the flag that named it has nothing to name |
 | D3 | `me` **refuses** sub-threshold passphrases over secret content without `--allow-weak` | **prints a warning and proceeds** | a refusal at creation for a property the operator has declassified. *This reverses an operator ruling of the same day, on the operator's instruction* |
+
+**Four more rows, 2026-08-12 — three operator rulings folded from the journeys
+review (`design/agent-reports/journeys-fable-specplan-review.md`), and one
+ruled at the fold itself and marked so.** D4 runs the OPPOSITE direction from
+every other row in this section: it ADDS a refusal. It earns its place because
+what it buys is the one thing this section refuses to trade away — an artifact
+that can actually be consumed.
+
+| # | was | is now | what it cost |
+| --- | --- | --- | --- |
+| D4 (2026-08-12) | decision 8: a user-supplied passphrase may be any printable ASCII | every token must be a BIP-39 English word, checked after normalisation; `me` refuses at `pack`, naming the token — `[passphrase-bounds]` (§12.5) | the free-text mode itself. The device only ever grew a word keyboard, so an ASCII passphrase sealed a payload the machine it was for could never open — the R0-C4 shape, live in shipped code (review J-B′). Narrowing the host was chosen over building §8a's keyboard, which is superseded with it. Unchanged: two words legal, below `[cliff]`, warn-only (F2). Pre-D4 ASCII-sealed payloads stay unopenable on the device |
+| D5 (2026-08-12) | §5.5: after a payload-sourced engrave the device reminds the operator to overwrite the region (test 13); §3.2: EVERY screen that consumes a record names its source | reminder withdrawn, test 13 `Dropped`; §3.2 scoped to the screen where the record enters the program | no provenance survives `take()`, so both required reshaping the session to carry provenance through the engrave pipeline, and the operator judged neither worth it. Erasure stays operator-initiated and is now unprompted: `me sysw wipe`, and §5.3.2's erase item |
+| D6 (2026-08-12) | §5.3.2: a `ClassMDMK` record that does not reassemble-and-decode is REFUSED | `[mdmk-decode]` (§12.6): an unconfirmed record counts as secret for flags, and loads anyway | the refusal — which was never implemented, and transcribed verbatim would have refused the single-card payloads `bundleFlow` legitimately seeds with: a workflow block for a security property, the exact class D1–D3 removed. New cost, accepted: an innocent partial card set now warns |
+| D7 (2026-08-12, ruled at fold) | §3.3.2a: ONE admission function on every path | the §3.3.2 table is the normative oracle; enforcement is per-site — each consumption site hard-codes its one admitted class, and a structural test reconciles every site against the table (plan stage 13) | the run-time funnel. `admits()` has zero production callers, and wired in it could never return false at any existing site — a check that cannot fail — while a wrong future site could omit the call. The RULE (admission is class-only, source-blind) is untouched |
 
 **What was NOT demoted**, because none of it refuses anything: F2 still warns
 that a payload was weakly protected; F1 still warns that a secret sits
