@@ -4247,7 +4247,16 @@ chunk count) always bite first? (2) if it exists, the guard belongs on the
 ENCODER, since that is the side that can still say no while the plate is blank.
 A decoder-only bound protects the reader and abandons the writer.
 
-### F-138 — the Go port enforces a `Renderable` bound the Rust codec does not (owning phase: **operator journeys**) `#mnemonic`
+### F-138 — WITHDRAWN: the Go port does NOT enforce a `Renderable` bound Rust lacks `#mnemonic`
+
+**WITHDRAWN 2026-08-11.** The pre-flash conformance review refuted it by
+measurement: zero hits for `Renderable` in Go `sysw/` and in every Rust crate.
+It exists only in fork-native GUI md-template code, which the Rust-primary rule
+explicitly exempts, and it has nothing to do with this seam. Filed on a report's
+authority without re-measuring, and it was wrong — the entry stays, withdrawn,
+rather than being deleted.
+
+Original text follows.
 
 Raised by the codec lens; **not independently re-measured.** See
 `codec.md` §F6–F7. That report also measured Rust↔Go bounds as otherwise in exact
@@ -4378,3 +4387,31 @@ Gate: `cargo test -p mnemonic-engrave` 190+ pass, `cargo clippy --all-targets
 code moved to meet it. Sweep the other plan/spec `# expected` one-liners for the
 same class — a criterion nobody runs is a claim, and this project has been bitten
 by claims more often than by code.
+
+### F-142 — the Go suite never runs at the device's word size, so a whole class of defect is invisible to CI (owning phase: **systemwide payloads**) `#mnemonic`
+
+Filed 2026-08-11 out of the pre-flash conformance Critical, fixed in the fork at
+`74871d3`.
+
+`ParseHeader` widened the wire's `uint32` lengths to `int` before comparing them
+against `MaxSectionLen`. On the builder that is 64 bits and harmless; on the
+device (Cortex-M33 via tinygo) it is 32 bits, and `pub_len = 0xFFFFFFFF` becomes
+`-1`, slips the cap, and yields `TotalLen() == 67` — a small **positive** length
+the device would have accepted for a payload the host rejects as malformed.
+
+**The bug is fixed. The blind spot is not.** Every test, including the shared
+conformance vectors that exist precisely to stop host and device disagreeing,
+runs at the *builder's* word size. No vector can see a 32-bit wrap, because no
+vector is ever evaluated at 32 bits. The two tests added with the fix say so in
+their own comments rather than implying coverage they do not have: on a 64-bit
+builder they pass before the fix too.
+
+**What to do:** run `go test ./sysw/` for a 32-bit `GOARCH` in CI. `GOARCH=386`
+was tried during the review and the package would not cross-build (dependency,
+not `sysw` itself) — so the work is making that build, or finding another 32-bit
+target that does. Until then, treat every width-dependent conversion in `sysw/`
+as unreviewed by machine.
+
+**Grep the port for the same shape while you are there:** `int(` applied to any
+`uint32` read off the wire. This one was found by a reviewer looking at a
+different question, which is not a repeatable process.
