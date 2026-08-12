@@ -3791,7 +3791,23 @@ owning phase. Two edits:
 `passphrase.rs` while building this will otherwise find a module doc telling
 them the mode they are implementing does not exist.
 
-### F-126 — presenting an NFC tag to a gathering flow FREEZES the emulator, so the path stage 6 exists to open cannot be walked (owning phase: **systemwide payloads**) `#mnemonic`
+### F-126 — CLOSED 2026-08-12 by plan stage 10 — presenting an NFC tag to a gathering flow FREEZES the emulator, so the path stage 6 exists to open cannot be walked (owning phase: **systemwide payloads**) `#mnemonic`
+
+**CLOSED 2026-08-12** by plan stage 10, and by fix 2 as recommended — the loop
+shape, not the reader. The five duplicated scan loops are now one
+`startScanner` (`gui/nfc_scan.go:45`) with a backoff keyed on **idle**, which is
+the EOF case the old guard missed: `scanFailed` was never the condition that
+mattered. 253 lines of duplication went with it. Measured by the implementer:
+4 reads per 150 ms against ~198,000 iterations before.
+
+Verified here rather than taken on report — `startScanner` has six non-test
+callers, covering every original site. Two `scan.Status == scanFailed` lines
+survive: one INSIDE `startScanner`, which is the point of centralising it, and
+one at `derive_xpub.go:230` which is CONSUMER-side message selection inside a
+`select` with a `default`. Neither can spin.
+
+Original analysis follows.
+
 
 Filed 2026-08-11 while building the operator-journey document, which tried to
 deliver the 25-card bundle over NFC and hung the browser instead.
