@@ -4579,3 +4579,49 @@ handed to a program.
 
 Do this before F-145's remaining cases; without it they would be written, pass,
 and prove nothing.
+
+#### F-146 — MISFILED. Corrected 2026-08-12 by the load-flow fable review `#mnemonic`
+
+**The diagnosis was wrong.** I claimed `runUITouch` gives the test goroutine no
+synchronised view because `iter.Pull` runs the flow on another goroutine, and
+concluded that **no gui flow's return value is under test anywhere**. That
+conclusion rested on a wrong premise and is withdrawn.
+
+`iter.Pull`'s `stop()` runs the body to completion and returns only after it —
+verified by the reviewer against the go1.26.3 source and with `-race` clean. The
+happens-before edge I said was missing is there. Assertions placed **after**
+`quit()` do observe the flow's writes, and do kill a reachable mutant.
+
+**The observation was real; both actual causes are mine.** (1) My assertions ran
+*before* `quit()`, so they read values the flow had not yet written — proven with
+a poisoned sentinel. (2) The mutant I used sat in the malformed-region branch,
+which **never executes**: `FileReader.Read()` rejects junk first via
+`boundBlob`, so `ParseHeader` is never reached with that input.
+
+**The lesson, and it is sharper than the one I filed.** I asserted the mutation
+had LANDED — that the text was in the file — and treated that as evidence it had
+RUN. Presence is not execution. A mutation harness must prove the mutated line
+executed, not merely that it was written; otherwise every unreachable mutant
+reads as a surviving one, and unreachable code is exactly where mutants are
+easiest to place by accident. See [[mutation-testing-finds-false-passes]], which
+this extends.
+
+No harness work is needed. The assertions belong after `quit()`.
+
+#### F-145 — NOT BLOCKED, and writing the tests found a Critical `#mnemonic`
+
+The "blocked on F-146" status was wrong, because F-146 was wrong. All five
+remaining cases are writable today with the existing harness, using
+post-`quit()` assertions and the direct-call pre-queued-events idiom already in
+the tree. The reviewer wrote and ran all five.
+
+**Three pass at HEAD. The two sealed ones failed — because they catch C1**, the
+zero-filled passphrase buffer that made every sealed payload unopenable. The
+tests I deferred as unwritable are the tests that would have caught the worst
+defect in the change.
+
+Remaining work is now ordinary: port those five cases in (malformed and
+truncated regions producing no session, unsealed-with-digest in both operator
+directions, sealed with the right and the wrong passphrase). The buffer-contract
+test committed with the C1 fix covers the initialisation defect itself; these
+cover the flow around it.
