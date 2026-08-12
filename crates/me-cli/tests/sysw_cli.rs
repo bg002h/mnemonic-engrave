@@ -412,7 +412,7 @@ fn an_empty_passphrase_is_refused_because_the_device_could_never_open_it() {
 #[test]
 fn pack_refuses_a_passphrase_the_device_could_not_type() {
     use mnemonic_engrave::sysw;
-    for p in ["hunter2", "correct horse battery staple", "abandon ABOUT", "abandon 1"] {
+    for p in ["hunter2", "correct horse battery staple", "abandon 1", "abandon abou"] {
         match sysw::pack(vec![TEXT.into()], Some(p), 100_000) {
             Err(sysw::SyswError::NotEnterableOnDevice(_)) => {}
             other => panic!("{p:?} should be refused as un-typeable, got {other:?}"),
@@ -420,6 +420,11 @@ fn pack_refuses_a_passphrase_the_device_could_not_type() {
     }
     // The wordlist half only — NOT the [cliff] count. Two words remain legal.
     assert!(sysw::pack(vec![TEXT.into()], Some("abandon about"), 100_000).is_ok());
+    // And the check runs AFTER normalisation, which lowercases: "ABOUT" is the
+    // same word, and the device's own keyboard is uppercase. Asserted because my
+    // first version of this test expected the opposite and the test caught me,
+    // not the code.
+    assert!(sysw::pack(vec![TEXT.into()], Some("abandon ABOUT"), 100_000).is_ok());
 }
 
 /// `[passphrase-bounds]` (§12.5) was declared on both sides and enforced on
