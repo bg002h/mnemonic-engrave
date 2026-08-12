@@ -4746,6 +4746,30 @@ arrives there with the state it needs, which is exactly the class of defect this
 feature has produced twice — `ctx.sysw` read everywhere and assigned nowhere
 (F-144), and §8c's `done` button built but never drawn.
 
+**ATTEMPTED 2026-08-12, and the premise is wrong — measured.** The review said a
+behavioural pin was "feasible, the harness has `testEngraver`". It is feasible in
+principle and unaffordable in practice, because `backupWalletFlow` builds a REAL
+seed plate: the engrave screen reports an **11:14** job, and pumping **200,000
+frames took 71 s without completing it**. One test would have more than doubled
+the `./gui/` suite. The attempt was reverted rather than shipped slow or shipped
+failing.
+
+What the attempt DID establish, and it is most of the value: every step up to the
+engrave is drivable and was driven — the seed review screen, the BIP-39
+passphrase offer, and the hold-to-start, all reached in ~2.7 s. **The journey
+arrives at the engrave; only the completion is out of reach.**
+
+**So the work is not "write the test", it is "make a completed engrave cheap".**
+Options, in the order I would try them:
+1. a test seam that lets a plate be substituted — `residency_wiring_test.go`
+   already drives `NewEngraveScreen` with an 8-knot synthetic spline in
+   milliseconds, so the machinery exists; what is missing is a way for
+   `backupWalletFlow` to accept one;
+2. a `testEngraver` that can report the job complete on demand, rather than
+   simulating its duration;
+3. failing both, keep the AST pin and accept the gap KNOWINGLY, which is what
+   this entry now records.
+
 Not urgent: the walk-through review drove the surrounding journeys by execution
 and they closed. But "the call exists" and "the journey arrives" are different
 claims, and only one of them is currently tested.
