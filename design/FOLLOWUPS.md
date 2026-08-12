@@ -4328,3 +4328,53 @@ side), fix the spec comment, and drop or qualify the "Δ values are correct" not
 until it is true. A regression test should compare `witness_size()` against a
 real `get_satisfaction()` for one wsh and one tr descriptor — that single
 assertion would have caught this.
+
+### F-141 — CLOSED on filing: `me sysw pack --region`, because the plan's stage-2 green line was never actually met `#mnemonic`
+
+Found 2026-08-11 by trying to do the thing the feature exists for — put a payload
+on the machine — and discovering there was no command that produces the artifact.
+
+`design/IMPLEMENTATION_PLAN_systemwide_payloads.md:147` states the stage-2 green
+criterion as:
+
+```
+me sysw pack --no-passphrase 'text:...' | wc -c     # 65536
+```
+
+Measured, it was **79**. `pack` emits the container; only `wipe` emitted a full
+`REGION_LEN` image, and `wipe`'s whole purpose is to destroy a payload rather
+than to write one. So the one artifact that can be written to `0x10D00000` had no
+command behind it, and the first person to need it — me, this session — padded it
+by hand in Python.
+
+**Why this got through.** The criterion was a `wc -c` one-liner in a plan nobody
+re-ran after stage 2 landed, and no test asserted it. The stage's own tests
+checked that `wipe` emits 65536 and that `pack` separates blob from digest;
+neither would notice `pack`'s size. A green criterion that is never executed is
+decoration.
+
+**Fixed here, TDD:** three tests written red first
+(`crates/me-cli/tests/sysw_cli.rs`), then `--region`:
+
+- `region_pads_the_container_to_a_flashable_image` — exactly 65536, magic at
+  offset 0, tail all `0xFF`. **`0xFF`, not zeros**: that is the erased state of
+  NOR flash, so the image is byte-for-byte what the sector looks like with only
+  the container written. Zero padding would be a 65 KiB write for nothing.
+- `region_and_container_have_the_same_digest_and_identity` — padding must not
+  move the number the operator compares on screen. It does not, because
+  `identity` bounds itself by the header's declared total.
+- `region_works_for_a_sealed_payload_too` — `--region` says where the bytes go,
+  not what is in them; refusing to seal would make the flashable form the one
+  form a secret cannot take.
+
+Verified the flag reproduces the hand-padded image **byte-identically**, and the
+digest is unchanged from the container form:
+`616f 88f5 bb98 2e84 eb3d 0b5a f3d3 8777`.
+
+Gate: `cargo test -p mnemonic-engrave` 190+ pass, `cargo clippy --all-targets
+-D warnings` clean.
+
+**Left open deliberately:** the plan line at :147 is now correct only because the
+code moved to meet it. Sweep the other plan/spec `# expected` one-liners for the
+same class — a criterion nobody runs is a claim, and this project has been bitten
+by claims more often than by code.

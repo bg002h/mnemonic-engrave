@@ -166,6 +166,14 @@ enum SyswCmd {
         /// PBKDF2 rounds.
         #[arg(long, default_value_t = 100_000)]
         iterations: u32,
+        /// Pad the container out to a full `REGION_LEN` image, ready to write at
+        /// `0x10D00000`.
+        ///
+        /// The tail is `0xFF` — the ERASED state of NOR flash — so the result is
+        /// byte-for-byte what the sector looks like with only the container
+        /// written. Zero-padding would be a WRITE of 65 KiB for nothing.
+        #[arg(long)]
+        region: bool,
     },
     /// Emit a full-region overwrite image (spec §5.5).
     Wipe {
@@ -773,6 +781,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             no_passphrase,
             allow_weak,
             iterations,
+            region,
         } => {
             if *allow_weak {
                 eprintln!(
@@ -833,7 +842,32 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     return 4;
                 }
             };
+            // The digest is computed on the CONTAINER, before any padding. It
+            // must be: `identity` bounds itself by the header's declared total,
+            // so a padded region yields the same number, and the operator has to
+            // see the same value whichever form they wrote.
             print_digest(&blob);
+            if *region {
+                let n = sysw::wire::REGION_LEN;
+                if blob.len() > n {
+                    eprintln!(
+                        "me: container is {} bytes, larger than the {n}-byte region — \
+                         it cannot be written to 0x{:08X}",
+                        blob.len(),
+                        sysw::wire::REGION_ADDR
+                    );
+                    return 4;
+                }
+                let mut img = Zeroizing::new(vec![0xFFu8; n]);
+                img[..blob.len()].copy_from_slice(&blob);
+                eprintln!(
+                    "me: region image — {} bytes of container, padded with 0xFF to {n}; \
+                     write it at 0x{:08X}",
+                    blob.len(),
+                    sysw::wire::REGION_ADDR
+                );
+                return emit(&img, out.as_ref());
+            }
             emit(&blob, out.as_ref())
         }
 

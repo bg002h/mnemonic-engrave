@@ -190,6 +190,84 @@ fn records_can_come_from_a_file_instead_of_argv() {
         .success();
 }
 
+/// The plan's stage-2 green line said `me sysw pack … | wc -c` is 65536. It was
+/// not: `pack` emitted the container and only `wipe` emitted a region, so the
+/// one artifact you can actually write to `0x10D00000` had no command. `--region`
+/// is that command.
+#[test]
+fn region_pads_the_container_to_a_flashable_image() {
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", "--region", TEXT])
+        .assert()
+        .success();
+    let o = &out.get_output().stdout;
+    assert_eq!(o.len(), 65_536, "--region emits exactly one region");
+    assert_eq!(&o[..8], b"MNEMSYSW", "the container is at offset 0");
+    assert!(
+        o[600..].iter().all(|&b| b == 0xFF),
+        "the tail is 0xFF — the ERASED state, so the image is what the sector \
+         looks like with only the container written. Zeros would be a WRITE, \
+         and would wear the flash for nothing."
+    );
+}
+
+/// The padding must not change what the operator compares on screen, or the
+/// region image and the container would be two different payloads.
+#[test]
+fn region_and_container_have_the_same_digest_and_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let (c, r) = (dir.path().join("c.bin"), dir.path().join("r.bin"));
+    for (f, extra) in [(&c, None), (&r, Some("--region"))] {
+        let mut cmd = me();
+        cmd.args(["sysw", "pack", "--no-passphrase"]);
+        if let Some(e) = extra {
+            cmd.arg(e);
+        }
+        cmd.arg(TEXT).arg("--out").arg(f).assert().success();
+    }
+    let show = |f: &std::path::Path| {
+        let a = me().args(["sysw", "show"]).arg(f).assert().success();
+        let o = a.get_output();
+        (
+            String::from_utf8_lossy(&o.stdout).into_owned(),
+            String::from_utf8_lossy(&o.stderr).into_owned(),
+        )
+    };
+    let (co, ce) = show(&c);
+    let (ro, re) = show(&r);
+    assert_eq!(
+        digest_line(&ce),
+        digest_line(&re),
+        "padding must not move the digest"
+    );
+    let id = |s: &str| {
+        s.lines()
+            .find_map(|l| l.strip_prefix("identity: "))
+            .map(str::to_string)
+    };
+    assert_eq!(id(&co), id(&ro), "nor the identity");
+    assert!(id(&co).is_some(), "and one was actually printed");
+}
+
+/// `--region` describes where the bytes go, not what is in them; refusing to
+/// combine it with a sealed payload would make the flashable form the ONE form
+/// a secret cannot take.
+#[test]
+fn region_works_for_a_sealed_payload_too() {
+    let out = me()
+        .args([
+            "sysw",
+            "pack",
+            "--region",
+            "--passphrase-words",
+            "12",
+            SEED,
+        ])
+        .assert()
+        .success();
+    assert_eq!(out.get_output().stdout.len(), 65_536);
+}
+
 #[test]
 fn an_unplaceable_record_is_named_with_its_index() {
     me().args(["sysw", "pack", "--no-passphrase", MD1, "not a record"])
