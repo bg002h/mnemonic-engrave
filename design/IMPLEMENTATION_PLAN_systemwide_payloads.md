@@ -461,6 +461,7 @@ operator might act on. Overwriting the region stays a HOST operation
 | item | where |
 | --- | --- |
 | `func syswUnloadFlow(ctx *Context, th *Colors) bool` — confirm (UNLOAD / BACK), drop the session, then a result screen that states plainly what did and did not happen: *"Payload unloaded. It is still in flash — overwrite it from the host with `me sysw wipe`."* | new `gui/sysw_unload.go` |
+| **The CONFIRM screen states what RELOADING will cost, not just what unloading does** (operator ruling 2026-08-12). Reload is one carousel entry away — `Load Payload` is unconditional and `syswLoadFlow` assigns a fresh session — but `[compared]` (§12.2) must be re-earned every time, so a SEALED payload costs a full passphrase entry and its ~31 s KDF, and an unsealed one a fresh digest comparison. Word it from the loaded payload's own state: sealed → *"You can load it again from the menu. You will need the passphrase."*; unsealed → *"You can load it again from the menu. You will need to compare the digest again."* Someone will unload by accident, and the screen that told them the cost beforehand is the difference between a shrug and a hunt for the passphrase | `gui/sysw_unload.go` |
 | `ctx.sysw = nil`, nothing else. No `Eraser`, no `Platform` method, no `_tinygo.go` file, no flash call anywhere | `gui/sysw_unload.go` |
 | offered from the `loadPayload` carousel entry when a payload is LOADED (UNLOAD / BACK), and alongside the F1 warning where an ERASE choice was planned | `gui/sysw_load.go` |
 
@@ -479,6 +480,10 @@ go test ./gui/ ./sysw/
 go build -tags tinygo ./gui/ && GOOS=js GOARCH=wasm go build ./cmd/emu/
 grep -rn "Erase\|erase" gui/ sysw/ | grep -v _test   # must find no flash-write path
 ```
+
+A test must assert the confirm screen names the passphrase when the loaded
+payload is SEALED and does not when it is not — the wording is the feature here,
+so an assertion that only checks the screen appeared would pass on silence.
 
 ---
 
