@@ -62,7 +62,14 @@ pub const COVERAGE: &[(u32, Where)] = &[
     (19, Where::Vector("S-E")), // generated N enterable for every N
     (20, Where::Vector("S-D")), // secrets-only consumable
     (21, Where::Device),        // passphrase buffer never regrows
-    (22, Where::DeviceUnbuilt("§8c: the done button exists, its confirmation screen does not")),
+    // §8c's count confirmation, built by plan stage 9 alongside the `done`
+    // affordance the reachability of which this entry had assumed: the button's
+    // Clickable and handler existed, but nothing ever drew it, and on a
+    // touch-driven panel an undrawn nav button carries no hit target — so
+    // `done` could not be pressed at all. Discharged by
+    // TestSyswPassphraseDoneConfirmsTheShortCount (gui/sysw_load_test.go),
+    // which taps the slot rather than synthesising the button event.
+    (22, Where::Device),
     (23, Where::Vector("S-D")), // secrets-only usable whatever the passphrase
 ];
 
