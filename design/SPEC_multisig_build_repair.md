@@ -28,10 +28,11 @@ Recorded because the phase boundary decides what is built now and what is
 deliberately not.
 
 1. **Phase 1 (this spec): on-device MULTISIG WALLET DESCRIPTOR generation.**
-   The operator, air-gapped, builds a k-of-n sorted-multisig wallet policy on
-   the device, holding **one or more** of its keys, with the other cosigner keys
-   arriving by NFC or payload. The result is an md1 the operator can engrave and
-   later restore. Nothing exotic: no timelocks, no hashlocks, no composition.
+   The operator builds a k-of-n sorted-multisig wallet policy on the device,
+   holding **one or more** of its keys, with the other cosigner keys arriving
+   **by payload** (§3 — NFC is out of phase 1). The result is an md1 the
+   operator can engrave and later restore. Nothing exotic: no timelocks, no
+   hashlocks, no composition.
 2. **Phase 2 (a subsequent cycle): arbitrary `wsh` or `tr` miniscript policies.**
    The same constructor, generalised so the operator can author policies with
    timelocks, hashlocks and composition operators under either a `wsh` or a `tr`
@@ -67,9 +68,20 @@ Every claim in this section was verified against the source or by running it on
   `Origin []PathComponent`.
 - **Seed-to-key matching already exists.** `gui/multisig_match.go:34`
   `findUserSlot` derives the account xpub from a mnemonic at each key's
-  `OriginPath` and compares chain code ‖ pubkey, reporting `reused []int` when
-  one key occupies several slots. It uses no fingerprints (§4.3 explains why
-  that is the correct choice, not an oversight).
+  `OriginPath` and compares chain code ‖ pubkey. It uses no fingerprints (§4.3
+  explains why that is the correct choice, not an oversight).
+  **`reused []int` does NOT mean "key reuse defect".** Its own doc comment
+  (`gui/multisig_match.go:24-29`) rules the opposite: "`>=2` matches → the SAME
+  seed **legitimately** appears at >=2 cosigner slots under DISTINCT origins…
+  every matched index in `reused` so the caller can **show a notice**." It is a
+  notice for the multi-account shape §4.1 exists to build. Round 0 of this
+  spec inverted that into a refusal; §4.1 and §4.3 now key on the correct
+  discriminator instead.
+- **Payload-sourced seeds already reach this flow.** `gui/multisig_build.go:68`
+  calls `seedEntryFlow`, which routes through `syswSeedPicker` and offers FROM
+  PAYLOAD whenever the session holds `ClassMnemonic`. See §2.2 D-5: the
+  `TYPED-ONLY` comment above that line is stale, and the absence of §4.3's gate
+  is therefore a **live exposure**, not a future one.
 - **The admission table already permits what §5 needs.** SYSW§3.3.2 admits
   `ClassMnemonic`, `ClassCodex32Secret`, `ClassPassphrase`, `ClassDescriptor`
   and `ClassMDMK` to Engrave Multisig. SYSW§3.3.2 states that "an admitted cell
@@ -122,6 +134,33 @@ that tells the operator something false about a correct backup.
 
 **D-4 — wrong title mid-flow.** The Build-policy cosigner gather is titled
 "Engrave Bundle". Observed in the emulator 2026-08-13.
+
+**D-5 — four `TYPED-ONLY` comments describe a mechanism that was retired, and
+one of them guards a live exposure.** Found by the R0 round-0 reviewer;
+**verified independently before folding**. All four cited sites call the
+MULTI-SOURCE `seedEntryFlow`, not `seedEntryFlowTypedOnly`:
+
+```
+gui/bip85.go:271          seedEntryFlow   (comment at :264 says "TYPED-ONLY master (I-3)")
+gui/singlesig.go:33       seedEntryFlow   (comment at :18  says "TYPED-ONLY seed (D12)")
+gui/multisig.go:103       seedEntryFlow   (comment at :24  says "TYPED-ONLY seed (I-7)")
+gui/multisig_build.go:68  seedEntryFlow   (comment at :67  says "TYPED-ONLY self seed (I-SCRUB)")
+```
+
+Only the two **verify** flows use `seedEntryFlowTypedOnly`, and that is
+deliberate and correct (`gui/derive_xpub.go:112-123`: a verify accepting the
+payload source would compare the engrave source against itself and pass
+unconditionally).
+
+This is the `comments-outlive-their-conditions` class, and round 0 of this spec
+walked straight into it — §4.2, §5.2, R-1 and P4 were written from the comments
+rather than from the mechanism, which is precisely what this project's rules
+forbid. Corrected throughout.
+
+**The consequence is a live exposure, not a documentation defect.** A payload
+may carry a `ClassMnemonic` record AND `ClassMDMK` cards; the build flow will
+today take the seed from the payload and cards from the payload, and **nothing
+cross-checks them**. §4.3's gate closes a hole that exists in shipped firmware.
 
 ### 2.3 Why the defects reached hardware — the finding that reorders the plan
 
@@ -227,22 +266,75 @@ Consequences that are themselves normative:
 - **`cosignerFromCard` MUST stop discarding the card's origin** when the policy
   is divergent. Which origin wins — the card's or the flow's — is **RULED in
   §7 R-3**, because the host side has the same question open as F-129.
-- **A seed reused across slots at the SAME origin is a defect, not a
-  configuration.** It produces one key in two slots; a 2-of-3 built that way is
-  a 1-of-2. `findUserSlot` already detects this (`reused []int`) and the
-  constructor MUST refuse it loudly.
+- **A depth-0 cosigner card MUST be refused by a named screen.** mk1 permits
+  `Path == "m"`, which yields zero components and trips
+  `errMultisigEmptyDivergent` (`md/encode_multisig.go:104-106`) in divergent
+  mode. Refusing is correct; falling through to "Couldn't assemble the wallet
+  policy" is not, since §4.3 would rightly call that a silent-ish failure.
+- **The duplicate-key check is over the FINAL SLOT SET, not over seed matches.**
+  **REFUSE iff any two final slots carry an identical 65-byte
+  chain code ‖ pubkey.** That is exact, source-independent, and subsumes every
+  arrival shape — seed+card, card+card, seed+seed. A duplicated key makes a
+  displayed k-of-n a (k−1)-of-(n−1) against its holder: `sortedmulti(2,K,K,X)`
+  is satisfiable by K alone, because two signatures under K validate against the
+  two K entries. On steel, that is quorum degradation the operator cannot see.
+- **The same seed at ≥2 slots under DISTINCT origins is LEGITIMATE and MUST
+  proceed**, with the notice `findUserSlot` already specifies. It is the
+  multi-account wallet this section exists to make buildable. Round 0 of this
+  spec refused it; see §2.1.
+- **The passphrase prompt is PER SEED**, asked at that seed's entry, and the
+  `(seed, passphrase)` pair is the derivation unit everywhere this spec says
+  "seed". One flow-global passphrase applied to N seeds would mint keys the
+  operator can only re-derive with a pairing they never chose — and for a
+  new-seed slot there is no card to cross-check, so no row of §4.3 could catch
+  it. The ms1 backup carries entropy only, never the passphrase, so a wrong
+  binding is invisible in every engraved artifact.
+
+### 4.1a The engrave tail — REQUIRED
+
+§4.1 changes **assembly**. Steps 4–9 of `buildMultisigPolicyFlow`
+(`gui/multisig_build.go:95-168`) are hard-wired to one seed and the locked
+shared origin, and MUST be respecified with it. Round 0 omitted this; the two
+scenarios below are why it is Critical rather than tidy.
+
+1. **Leg derivation MUST use each held slot's DECLARED origin**, never
+   `multisigSharedOrigin()`, once origins can diverge. Otherwise a build holding
+   a slot at `m/48'/0'/1'/2'` engraves an mk1 derived at `m/48'/0'/0'/2'` — a key
+   card asserting membership in a wallet **that does not contain its key**,
+   stub-bound to the policy, on steel.
+2. **One mk1 per held slot**, each at that slot's origin — or an explicit ruling
+   that one leg suffices, with its reason. Silence is not an option.
+3. **In full mode, every distinct master supplied MUST have its ms1 engraved**,
+   or multi-master full mode MUST be refused with a named reason. Today
+   `deriveMultisigLeg` emits one ms1 from the single `mnemonic`. A 3-of-4 where
+   the operator holds three slots across masters A and B would engrave A only;
+   losing B leaves two accessible legs against k=3 — **funds unspendable, from a
+   backup the device labelled "Full (seed + keys)"**. That label is a claim
+   about the steel.
+4. **§4.5's byte comparison MUST extend to the mk1(s) and to ms1 presence.**
+   Comparing only the md1 cannot see either scenario above.
 
 ### 4.2 Seed material lifetime — REQUIRED
 
 `gui/multisig_build.go:67` currently types the self seed once and scrubs it with
 a `defer`. Holding a seed across several slots invalidates that. Therefore:
 
+**These MUSTs govern the flow's WORKING COPIES** — the `bip39.Mnemonic` buffers
+and derivation intermediates — and not the systemwide session's stored record.
+`gui/sysw_session.go:12-18` rules that lifetime explicitly: "LIFETIME IS THE
+PROCESS… No flow clears it on exit, because a flow that did would silently
+reintroduce the per-program KDF that 'once per session' exists to avoid…
+Nothing here claims the records are scrubbed." A flow that scrubbed the session
+record would violate SYSW§3.2.1. §5.3 is the operator-facing statement of that
+residue. Round 0 wrote MUSTs that no compliant implementation could satisfy.
+
 - A seed supplied in this flow MUST be scrubbed on **every** exit path,
   including error and Back, exactly as today.
 - A seed MAY be retained **for the duration of the constructor only**, solely to
   derive further account indices for slots the operator has declared they hold.
-- It MUST NOT outlive the flow, MUST NOT be written anywhere, and MUST NOT be
-  reachable from any other program.
+- The working copies MUST NOT outlive the flow and MUST NOT be written
+  anywhere. (Reachability from another program is a property of the session
+  record, governed by SYSW§3.2.1 above, not of this flow.)
 - A test MUST prove the scrub, and that test MUST be mutation-checked — a scrub
   assertion that cannot fail is the exact false-PASS this project has been burnt
   by (see `design/FOLLOWUPS.md` F-151 and the raster-ink precedent).
@@ -278,8 +370,27 @@ and the build flow **omits it by default** (`gui/multisig_build.go:334`,
 `multisigFpChoices` → "No (omit)" at index 0). A gate keyed on fingerprints
 would therefore be silent on most real payloads.
 
-**When the gate fires.** On **assignment** — wherever the operator has placed
-both a seed and a key into the same slot. It is NOT inferred across unrelated
+**The slot-assignment model — NORMATIVE, and the gate's trigger depends on it.**
+Round 0 said the gate "fires on assignment" while no stage built a step in which
+a slot could hold both a seed and a key, so a literal implementation would have
+shipped a gate that never fires — the operator's requirement silently unmet,
+with tests still green against synthetic assignments. So the model is ruled here
+rather than left to §10:
+
+Every slot `@0..@{n-1}` carries exactly one **source**, chosen by the operator
+and shown on a review screen before assembly:
+
+| source | meaning |
+| --- | --- |
+| `payloadKey(record)` | a cosigner mk1 from the payload |
+| `derived(seedID, account)` | derived from a seed supplied in this flow |
+| `both(seedID, account, record)` | the operator asserts the payload key at this slot **is** theirs, derived from that seed |
+
+`both` is what makes a slot hold a seed *and* a key, and it is the only shape
+that triggers the gate. It exists because it is the case the operator asked
+about: a payload carrying their seed **and** their own key card.
+
+**When the gate fires.** On a `both` slot. It is NOT inferred across unrelated
 material: a payload carrying the operator's seed alongside other people's
 cosigner cards is normal and MUST NOT fail.
 
@@ -287,11 +398,17 @@ cosigner cards is normal and MUST NOT fail.
 
 | condition | result |
 | --- | --- |
-| assigned slot, derivation matches | proceed |
-| assigned slot, derivation does **not** match | **FAIL LOUDLY**, name the slot |
-| assigned slot, ≥2 payload keys match the seed | **FAIL LOUDLY** — key reuse |
+| `both` slot, derivation matches | proceed |
+| `both` slot, derivation does **not** match | **FAIL LOUDLY**, name the slot |
 | a fingerprint IS present and contradicts the derivation | **FAIL LOUDLY** |
-| unassigned keys that do not derive from any seed | normal, no check |
+| any two FINAL slots carry an identical chain code ‖ pubkey | **FAIL LOUDLY** — §4.1's duplicate-key rule |
+| one seed matches ≥2 slots at **distinct** origins | proceed, show the notice — legitimate multi-account |
+| `payloadKey` slots that derive from no supplied seed | normal, no check |
+
+The fourth row replaces round 0's "≥2 payload keys match the seed", which was
+wrong twice over: it refused the legitimate multi-account wallet (§4.1), and it
+required deriving against **unassigned** material, which R-2 forbids — the two
+rules could not both be implemented.
 
 "Fail loudly" means: a named error screen that states which slot, that the key
 and seed disagree, and that nothing was engraved. It MUST NOT be a silent skip,
@@ -325,9 +442,19 @@ the host toolchain accepts. A green unit suite is explicitly NOT sufficient:
 §2.3 is the record of a green suite around a flow nobody could execute.
 
 The walk MUST be automated (a script, not a remembered click sequence) so it
-runs again on the next change, and the produced md1 MUST be compared against
-what the host produces for the same inputs — a byte comparison, not a
-judgement.
+runs again on the next change, and the produced artifacts MUST be compared
+against what the host produces for the same inputs — a byte comparison, not a
+judgement. **From P3 the comparison covers the md1, every mk1, and ms1
+presence** (§4.1a item 4); comparing the md1 alone cannot see a leg derived at
+the wrong origin or a missing master's ms1.
+
+**Named blind spot of the walk.** The on-device verify offer (step 10) reads
+back through `multisigVerifyFlow` → `bundleGatherFlow`, which is NFC-only and
+deliberately payload-refusing (`gui/derive_xpub.go:112-123`: a verify accepting
+the payload source would compare the engrave source against itself and pass
+unconditionally). In phase 1 it is therefore exercisable **only at P5, on
+hardware**. Recorded rather than papered over, and owned by F-158's NFC plan —
+a gate that hides its own blind spot is worse than no gate.
 
 This is the `can-a-user-do-the-thing` rule, made a gate.
 
@@ -401,21 +528,40 @@ seed and key input in the constructor, rather than as a per-flow addition. The
 seam offers the sources admitted for the program and the class (SYSW§3.3.2),
 with typed entry always available.
 
-**In phase 1 the seam has exactly two sources: PAYLOAD and TYPED** (§3). It MUST
-be shaped so NFC is a third source added later without re-opening its call
-sites — that is the whole reason for building it once — but it MUST NOT ship a
-disabled NFC branch, a stubbed source, or a menu entry that cannot be chosen. An
-inert control teaches the operator that controls here may be inert, which is
-expensive on a device whose other buttons cut steel (the same argument
-`gui/multisig_build.go` already makes for the pager it made conditional).
+**Phase 1 BUILDS on two sources: PAYLOAD and TYPED** (§3). It MUST be shaped so
+NFC is a third source added later without re-opening its call sites — that is
+the whole reason for building it once — but it MUST NOT ship a disabled NFC
+branch, a stubbed source, or a menu entry that cannot be chosen. An inert
+control teaches the operator that controls here may be inert, which is expensive
+on a device whose other buttons cut steel.
 
-### 5.2 Retiring TYPED-ONLY — REQUIRED, by explicit ruling
+**RULED — the existing SCAN row is left alone.** `syswSeedPicker`
+(`gui/derive_xpub.go:140-142`) already offers Typed, the payload, **and Scanned
+whenever the hardware reports a reader**. That row works today on real hardware
+and is outside this spec's scope: masking it for the constructor alone would
+re-open the per-flow divergence the shared seam exists to prevent. So phase 1
+neither adds nor removes an NFC source; it **builds and tests against payload
+and typed only**, and §4.5's walks exercise those two. "No inert controls"
+stays true, because the SCAN row is not inert where it appears — it is simply
+not what phase 1 relies on, and F-158 means it cannot be exercised by a test or
+in the emulator regardless.
 
-`TYPED-ONLY` is a named invariant in four places: `gui/bip85.go:264` (`I-3`),
-`gui/singlesig.go:18` (`D12`), `gui/multisig.go:24` (`I-7`), and
-`gui/multisig_build.go:67` (`I-SCRUB`). It MUST be retired **by ruling per
-site**, never eroded flow by flow. This spec rules only `I-SCRUB` (§7 R-1); the
-other three keep their invariant until their own ruling.
+### 5.2 TYPED-ONLY is already retired — the text, not the mechanism, is the work
+
+**Measured, §2.2 D-5.** All four sites call the multi-source `seedEntryFlow`.
+There is no invariant left to retire and no per-site ruling framework to apply:
+round 0 described four comments and mistook them for behaviour.
+
+What remains is therefore smaller and different:
+
+- **The four comments MUST be corrected or deleted** (P2), because a stale
+  safety claim is worse than none — a future reader greps `TYPED-ONLY`, finds
+  four hits, and concludes the payload cannot reach a seed entry.
+- **The gate that SHOULD have accompanied that retirement is what is missing**,
+  and §4.3 is it. State plainly: payload seeds already flow into the build path
+  **without** any seed↔key cross-check. That is the exposure this spec closes.
+- Whether the other three flows want §4.3's gate too is **not ruled here** —
+  they have no key material to cross-check against, so the question is theirs.
 
 ### 5.3 The threat model that ruling must state
 
@@ -437,9 +583,9 @@ to all four seam programs… unservable until the seam gains a carrier type. Tha
 is a design change with its own trade-offs, deliberately not smuggled into a
 fold."
 
-This spec honours that: **phase 1 delivers BIP-39 mnemonics from payload and
-NFC. ms1/codex32 seeds are out of scope** and need the carrier-type change as
-their own stage.
+This spec honours that: **phase 1 delivers BIP-39 mnemonics from the payload.
+ms1/codex32 seeds are out of scope** and need the carrier-type change as their
+own stage.
 
 ## 6. Stages
 
@@ -469,45 +615,94 @@ With no scanning, the payload must supply all of them.
    which `gui/bundle_flow.go:100-103` already argues for: "A separate insertion
    path would be a second way for a card to become part of a bundle, and only
    one of them would have the checks."
-3. Decide what the gather screen becomes when nothing can be scanned — a review
-   of what the payload supplied, not a "Scan a card" prompt. See §10 Q5.
+3. **Filter to mk1 cards.** `ClassMDMK` covers md1 too, and md1 is admitted to
+   this program for the *supply* path. `buildCosignerCards`
+   (`gui/multisig_build.go:254-272`) refuses unless the yield is exactly n−1
+   mk1s and zero md1 — so feeding every MDMK record would hard-fail any payload
+   provisioned for Engrave Multisig at large (an md1 plus cards, or the 11-card
+   constellation set of which this wallet needs a subset), with no on-device
+   remedy. md1 records MUST be ignored here, not fatal.
+4. **Rule the over-supply case:** more matching cards than open slots gets a
+   selection step or a named refusal — not a fall-through.
+5. **Slot order is payload record order, and MUST be shown as `@N` on the review
+   screen.** Order is identity-bearing: `md/encode_multisig.go:13-21` is
+   explicit that "Two callers supplying the same N keys in DIFFERENT orders mint
+   DIFFERENT, both valid, md1 cards with DIFFERENT WalletPolicyId". For
+   sortedmulti the *addresses* are order-independent, so this is identity and
+   coordinator-matching rather than funds — but with scanning gone the order is
+   fixed on the host, and the review screen offers no reorder.
+6. The gather screen becomes a **review of what the payload supplied**, not a
+   "Scan a card" prompt. Ruled here, not deferred (round 0 left it in §10 while
+   a stage depended on it).
 
-**Gate:** an automated test drives `buildMultisigPolicyFlow` from the template
-picker to a completed engrave using **only** a payload, and an emulator walk
-does the same in a browser (§4.5).
+**Gate — the flow is DRIVABLE.** An automated test and an emulator walk carry
+the flow from the template picker to **either** a completed engrave **or** a
+captured reproduction of D-1. Round 0 required a completed engrave here, which
+cannot hold: if D-1 lives on this path P0 can never close, and if it does not,
+P1's "the reproduction test fails on the unfixed code" is unsatisfiable. The
+completed-engrave gate belongs to P1.
 
 ### P1 — the dead end
 
-Reproduce D-1 (now possible), fix it, and assert the fix **rasters** — F-151's
-lesson is that a text assertion cannot see a body that fails to draw. Fix D-4
-(the "Engrave Bundle" title) in the same stage. **Gate:** the reproduction test
-fails on the unfixed code — demonstrated, not assumed.
+Reproduce D-1 (P0 made it reachable), fix it, and assert the fix **rasters** —
+F-151's lesson is that a text assertion cannot see a body that fails to draw.
+Fix D-4 (the "Engrave Bundle" title) in the same stage.
 
-### P2 — nested segwit is nameable
+**Gate:** the reproduction test fails on the unfixed code — demonstrated, not
+assumed — **and** the flow now reaches a completed engrave, by test and by
+emulator walk. If P0 found no D-1 on the payload path, this stage records that
+as its result and keeps the completed-engrave gate; D-1 then belongs to a
+source or shape P0 did not exercise, and that MUST be named rather than closed.
 
-§4.4. Smallest stage; independent of the others.
+### P2 — nested segwit is nameable, and the stale comments go
 
-### P3 — multi-slot self and divergent origins
+§4.4. Plus the four `TYPED-ONLY` comments (§2.2 D-5) corrected or deleted —
+grouped here because both are "the code is right and the text lies", and a
+stale safety claim is the defect class this project has been burnt by three
+times in one day. Smallest stage; independent of the others.
 
-§4.1 and §4.2. `SelfSlot int` becomes a set; `cosignerFromCard` stops discarding
-origins; `OriginDivergent` is used when origins differ. Key reuse refused.
+### P3 — multi-slot self, divergent origins, and the engrave tail
 
-### P4 — the payload as a SEED source, and the consistency gate
+§4.1, §4.1a and §4.2. `SelfSlot int` becomes a set; `cosignerFromCard` stops
+discarding origins; `OriginDivergent` is used when origins differ; the
+duplicate-key check runs over the final slot set; per-seed passphrases.
 
-§4.3 and §5. The source seam; seeds from the payload (P0 already did keys); the
-seed↔key consistency gate; the `I-SCRUB` ruling.
+**And the tail** (§4.1a): leg derivation at each held slot's declared origin,
+the mk1 cardinality ruling, and full-mode ms1 coverage for every distinct
+master. Assembly without the tail engraves a key card for a wallet that does not
+contain its key.
+
+**Gate:** §4.5's byte comparison extended to the mk1(s) and ms1 presence — the
+md1 alone cannot see either failure.
+
+### P4 — the consistency gate and the assignment model
+
+§4.3 and §5. The source seam and the slot-assignment model; the seed↔key
+consistency gate; R-1's ratification.
+
+**Note the ordering constraint:** payload seeds already reach this flow (§2.2
+D-5), so the exposure §4.3 closes is live from today until P4 lands. If that is
+judged unacceptable, the gate moves ahead of P3 — it depends only on the
+assignment model, not on multi-slot support. Flagged for the operator (§10 Q7).
 
 ### P5 — hardware gate
 
 Engrave and restore **both** a `wsh` and an `sh(wsh)` multisig on the machine,
-and verify each against an external coordinator. This confirms software that is
+and verify each against an external coordinator. **At least one build MUST be
+divergent-origin, multi-slot and multi-master** — a shared-origin single-seed
+P5 would pass green around every §4.1a failure. This confirms software that is
 already proven; it is not the first place the flow is executed.
 
 ## 7. Rulings this spec makes
 
-**R-1 — `I-SCRUB` is retired for the Build-policy constructor only.** The self
-seed MAY come from a payload or NFC, subject to §4.2's lifetime rules, §4.3's
-consistency gate and §5.3's threat model. `I-3`, `I-7` and `D12` are untouched.
+**R-1 — `I-SCRUB` is RATIFIED as already retired, and scoped.** It does not
+retire anything: `gui/multisig_build.go:68` already calls the multi-source
+`seedEntryFlow` (§2.2 D-5), so a payload seed reaches the constructor today. The
+ruling is that this behaviour is **correct and intended**, and is now bounded by
+§4.2's lifetime rules, §4.3's consistency gate — which is what was missing — and
+§5.3's threat model. `I-3`, `I-7` and `D12` are equally stale as comments;
+correcting their text is P2's, and ruling their behaviour belongs to whoever
+owns those flows, not to this spec.
 
 **R-2 — the consistency gate fires on assignment, not inference.** §4.3. A
 payload carrying a seed and unrelated cosigner cards is a normal payload.
@@ -593,21 +788,25 @@ safe and the verify-before-funding surface can be retired. Not now.
 hard part, and `node`/`descriptor` can stay unexported if recipes live inside
 `md` — which also keeps `I-VERBATIM` (one md1-bytes producer) intact.
 
-## 10. Open questions for R0
+## 10. Open questions
 
-1. Is P0's isolation likely to find a third cause beyond the two named in §6?
-2. Does R-3 (card origin wins) conflict with any restore path that assumes the
+Round 0's Q1 is void (its stage was NFC-harness work, now out of scope). Q3 and
+Q5 were **ruled** rather than left open, because §4.1/§4.3/P0 all depended on
+them — an open question a stage depends on is a specification hole, not a
+question. Q3 is now §4.3's assignment model; Q5 is P0 item 6.
+
+1. Does R-3 (card origin wins) conflict with any restore path that assumes the
    shared origin, and is a restore test needed inside phase 1 rather than after?
-3. §4.1 allows "another account index of a seed already supplied". Should the
-   account index be operator-chosen or auto-assigned ascending? Auto is simpler
-   and harder to get wrong; operator-chosen matches wallets that already exist.
-4. Does the §4.5 walk belong in CI, given it needs a wasm build and a browser?
-5. With nothing scannable in phase 1, what does the cosigner-gather screen
-   become — a review of what the payload supplied, or does it disappear into the
-   parameter pickers? It currently says "Scan a card, or Done" and is titled
-   "Engrave Bundle" (F-159). Whatever replaces it must not become a screen that
-   NFC has to fight its way back into later.
-6. §3.1 notes phase 1 requires a host to write the payload, so an operator
+   **The R0 reviewer verified R-3 sound and endorsed the restore test as the
+   natural gate for §4.1a's fixes** — so this is now a scheduling question, not
+   a correctness one.
+2. Does the §4.5 walk belong in CI, given it needs a wasm build and a browser?
+3. §3.1 notes phase 1 requires a host to write the payload, so an operator
    cannot build a multisig from the device alone. Is that acceptable for the
    phase-1 milestone, or does it make the later NFC plan a release blocker
    rather than a follow-on?
+4. **New, and the sharpest one.** §2.2 D-5 establishes that payload seeds reach
+   the constructor **today**, with no seed↔key cross-check. §4.3 closes that,
+   but only at P4. Should the gate move ahead of P3 — it depends only on the
+   assignment model — or is the exposure acceptable for the duration, given the
+   feature is behind an EXPERIMENTAL warning and unreleased?
