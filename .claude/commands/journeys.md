@@ -86,8 +86,8 @@ Two corrections to make while in these files:
 
 ## Other candidates, NOT selected
 
-No task is pre-selected — the operator picks. The live candidates, functionality
-before polish:
+These are NOT the next task — the Load Payload journey above is. Listed so a
+later phase can pick them up without re-deriving their state:
 
 - **F-150 — the on-device wallet-descriptor builder.** Operator's words: *needs
   major attention*. It dead-ends (blank screen after Next), assumes the user has
