@@ -2,6 +2,24 @@
 
 Low/nit items deferred from architect reviews (per the iterative-architect-review standard: Critical/Important fixed inline; low/nit recorded here). Promote to a cycle when convenient.
 
+## Phase policy — test infrastructure is POLISH, not functionality (operator ruling, 2026-08-12)
+
+> *"All these checks on the behavior of the code are fantastic but if second tier
+> priority more appropriate for Polish phase rather than functionality phase. If
+> such things are easy, do them… but if they require extensive coding and testing
+> let's save them for v0.0.1."*
+
+**The default owning phase for a test-infrastructure item is `polish / v0.0.1`, not the phase that discovered it.** Discovery and ownership are different things, and I have been conflating them: an item found while doing journeys work is not thereby journeys work.
+
+The split is by **cost**, not by importance:
+
+- **Do it now** — a handful of lines, no new harness, no new abstraction. The F-151 ink floor was this: one file, one helper, one test.
+- **Defer to v0.0.1** — anything needing a new fake, a new build step, a font-metrics model, or its own spec. Extensive coding *about* the code is precisely the second-tier work this ruling names.
+
+Applies to a real bug found *by* such a check too: **the bug is functionality and gets fixed now**; the generalised guard against its whole class is polish. F-151 is exactly that shape — the blank screen was fixed in `ae9fefa` (functionality, shipped, hardware-confirmed), while items (2) and (3) generalise it and are now parked.
+
+Context that makes this the right call: the machine currently does not draw a plate layout during an engrave, and there is no completed-engrave path in the simulator. Functionality gaps that visible outrank hardening the tests that guard what already works.
+
 ## Open
 
 > These are **cycle-sized** items (bigger than architect-review nits) — each warrants its own brainstorm → spec → plan → R0 → implement pass when picked up.
@@ -4744,7 +4762,7 @@ Practical rule: remote sessions may flash freely as long as the device stays on
 workstation USB, and must record the outcome as UNVERIFIED. Moving it to machine
 power is the verification step and belongs to whoever is in the room.
 
-### F-149 — stage 12's integration is pinned by AST only; nothing drives a completed engrave into the verify flow (owning phase: **operator journeys / simulator**) `#mnemonic`
+### F-149 — stage 12's integration is pinned by AST only; nothing drives a completed engrave into the verify flow (owning phase: **polish / v0.0.1**) `#mnemonic`
 
 Filed 2026-08-12 on the whole-cycle review's recommendation (item 2.3.3), which
 judged it worth a follow-up rather than a log paragraph.
@@ -4834,7 +4852,7 @@ Related: the host side already does all of this (`md compile`, `md encode
 which is what the systemwide-payload feature now delivers — may be cheaper than
 teaching the panel to author one. Worth weighing before building an editor.
 
-### F-151 — the frame extractor sees text the DEVICE cannot draw, so every wording assertion in `gui/` shares a blind spot (owning phase: **operator journeys**) `#mnemonic`
+### F-151 — the frame extractor sees text the DEVICE cannot draw, so every wording assertion in `gui/` shares a blind spot (owning phase: **(1) DONE; (2)+(3) polish / v0.0.1**) `#mnemonic`
 
 Filed 2026-08-12. Found by the operator looking at the panel, and by nothing
 else in this project.
@@ -4895,8 +4913,20 @@ no test**, since it reads as coverage of exactly the defect it cannot see —
 constant rather than its subject. Any future `assertFrameHasBody` floor gets
 calibrated the same way, against a restored defect.
 
-(2) and (3) remain open and are still worth doing — an ink floor catches a body
-that vanishes wholesale, not one glyph missing from a face.
+**(2) and (3) RE-FILED to `polish / v0.0.1`, operator ruling 2026-08-12** (see
+the Phase policy at the top of this file). Both need real machinery — (2) a font
+face's coverage set threaded to every call site, (3) a text-metrics model of the
+modal box — and neither guards a defect that is live: the screen they were filed
+against is fixed and hardware-confirmed. An ink floor catches a body that
+vanishes wholesale, which is the failure that actually happened.
+
+**One cheap experiment survives, for whoever picks (2) or (3) up.** `ae9fefa`
+changed *two* variables at once — it shortened the body AND dropped the em dash
+and backticks — so **which one blanked the panel was never isolated**, and the
+ink count cannot say (2652 px either way). That decides which item is even worth
+building: flash a build with the LONG body restored but ASCII-only. Blank →
+length, so (3). Readable → glyphs, so (2). One flash, one look, and it should
+ride along on some other flash rather than earning one.
 
 ### F-152 — selecting "from payload" when one is PRESENT BUT NOT LOADED should launch the loader (owning phase: **a future cycle — needs a spec §3.1 state and one plan stage**) `#mnemonic`
 
