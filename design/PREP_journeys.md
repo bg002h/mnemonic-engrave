@@ -4,7 +4,20 @@ Written 2026-08-11 as a starting map for the next context. It records only what
 would otherwise have to be re-derived; everything else is in
 `CONTINUITY_2026-08-11b.md`, which this does **not** replace.
 
-## The spine: nine programs, in the order the operator pages through them
+## The spine: TEN programs, in the order the operator pages through them
+
+> **Corrected 2026-08-13.** This table said *nine* and omitted `loadPayload`,
+> which was inserted at position 8 when systemwide payloads merged (v0.6.0),
+> after this note was written. Counted from the enum, not by hand:
+>
+> ```sh
+> sed -n '/^type program int/,/^)/p' gui/gui.go | grep -vE '^\s*//|^\s*$' \
+>   | grep -oP '^\t\K\w+' | nl
+> ```
+>
+> Eleven entries, of which `qaProgram` is non-navigable — so ten programs. The
+> note's own advice (read the enum, not the title switch) is what caught it; the
+> failure was that nobody re-ran it after the enum changed.
 
 From `gui/gui.go`'s `program` enum (`:166`) and the titles in
 `StartScreen.draw` (`:1871`) — read from the enum, not from the switch, because
@@ -19,8 +32,9 @@ the switch could omit one silently:
 | 5 | `engraveBundle` | **Engrave Bundle** |
 | 6 | `engraveSingleSig` | **Engrave Single-Sig** |
 | 7 | `engraveMultisig` | **Engrave Multisig** |
-| 8 | `bip85Derive` | **BIP-85 Child Seed** |
-| 9 | `unlockPayload` | **Sealed Payload** |
+| 8 | `loadPayload` | **Load Payload** |
+| 9 | `bip85Derive` | **BIP-85 Child Seed** |
+| 10 | `unlockPayload` | **Sealed Payload** |
 
 Two ordering facts the enum's own comments record, and which a journeys doc
 will trip over if it re-orders anything: `engravePassphrase` and `engraveText`
