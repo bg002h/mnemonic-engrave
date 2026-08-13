@@ -5155,3 +5155,93 @@ and it runs the Chrome headless print itself so the reproduction instructions
 are complete.
 
 **Owned by THIS phase**, not deferred: it is the phase's own toolchain.
+
+---
+
+### F-157 — a nested-segwit multisig is labelled identically to a legacy P2SH one, in the RESTORE DOCUMENT (owning phase: **`SPEC_multisig_build_repair.md` P2**) `#mnemonic`
+
+Filed 2026-08-13 while brainstorming the on-device policy builder. **Measured by
+running the three summary surfaces**, not read:
+
+```
+wsh(sortedmulti)       -> "P2WSH 2-of-3 multisig (sorted)"
+sh(wsh(sortedmulti))   -> "P2SH 2-of-3 multisig (sorted)"
+sh(sortedmulti) legacy -> "P2SH 2-of-3 multisig (sorted)"
+sh(wpkh) BIP-49       -> "P2SH single-key"
+```
+
+The middle two are **byte-identical strings for two wallets that hash to
+different addresses**. `gui/md1_inspect.go:20` `scriptName(k md.ScriptKind)`
+takes only the root kind, so it cannot see `Template.InnerWsh`/`InnerWpkh`.
+
+The codec is not at fault and says so at `md/md.go:1212-1219`: the discriminant
+exists precisely because "they hash to DIFFERENT addresses, so a consumer
+building a `*bip380.Descriptor` MUST use this to pick P2SH_P2WSH vs P2SH and
+never verify one against the other."
+
+Three callers: `gui/md1_inspect.go:58`, **`gui/multisig_restore.go:51` — the
+restore document** — and `gui/bundle.go:315`.
+
+**The engraved steel is correct.** `gui/md1_expand.go:112` honours `InnerWsh`,
+and `deriveMultisigLeg` passes the md1 through verbatim and derives no
+addresses. So this is F-131's shape exactly: a correct backup with a document
+that tells the operator something false about it — and the restore doc is what
+they will read years later, alone.
+
+Fix is small (§4.4 of the spec): `scriptName` takes the whole `Template`, three
+call sites updated together, and a test asserting the three names are pairwise
+distinct — the defect is that two of them are equal.
+
+---
+
+### F-158 — no NFC gather flow can be executed by any test or in the emulator, so half of Build-policy has never run outside the operator's hands (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic`
+
+Filed 2026-08-13. This is the cause behind F-150 item 1 reaching hardware.
+
+Three verified facts:
+
+1. **`cmd/emu` cannot deliver a card to any gather.** Walked in a browser: a
+   valid mk1 presented via `window.shNFC` both BEFORE and AFTER entering the
+   gather left the tally at `md1 descriptors: 0 / mk1 keys: 0`, and **no
+   `nfc scan:` log line ever appeared** — so `gui/nfc_scan.go:45`
+   `startScanner` received `nil` and never polled. Not specific to Build
+   policy; plain Engrave Bundle behaves the same.
+2. **`gui`'s test platform has no reader either** — `gui/gui_test.go:445`
+   returns nil, with the consequence recorded at `gui/bundle_flow.go:96` and
+   `gui/mk1_inspect_test.go:104`.
+3. **The only end-to-end test of the build flow stops at the gather.**
+   `gui/multisig_build_flow_test.go:199`, whose own comment says "with no NFC
+   reader the gather yields zero cards, so a Build flow at n=2 returns on
+   gather Back WITHOUT typing a seed".
+
+A prior session recorded the mechanism at `gui/nfc_scan.go:25-27` — "a screen
+fetches `Platform.NFCReader()` once at entry and `cmd/emu`'s source returns nil
+until a record is pending" — and I rediscovered it empirically before finding
+that note.
+
+**Consequence:** cosigner decode, seed entry, key derivation,
+`assembleBuildPolicy`, the review screen, template consent, the experimental
+warning, engrave, the verify offer and the restore doc have never executed
+anywhere except on the machine, by hand. Every mk1 carrying an xpub is ≥2
+chunks, so a single-shot tag source cannot complete one even in principle.
+
+**Cause not yet isolated** — two candidates, neither confirmed: the one-shot
+`reader()` lifetime versus the once-at-entry acquisition. Isolate before fixing;
+a guess here produces a harness that lies, which is worse than none.
+
+Same family as [[can-a-user-do-the-thing]]: components that each work, joined by
+a step nothing exercises.
+
+---
+
+### F-159 — the Build-policy cosigner gather is titled "Engrave Bundle" (owning phase: **`SPEC_multisig_build_repair.md` P1**) `#mnemonic`
+
+Filed 2026-08-13, observed in the emulator. Inside Engrave Multisig → "Build
+policy", after the five parameter pickers, the cosigner-gather screen's title
+reads **"Engrave Bundle"** — a different program. It is the shared
+`bundleGatherFlow` screen used verbatim, title included.
+
+Cosmetic, but on a device where the operator is being asked to scan keys for a
+wallet they are about to cut into steel, a screen claiming to be a different
+program is exactly the moment to not be ambiguous. Fixed alongside P1's dead-end
+work since both are in that flow.
