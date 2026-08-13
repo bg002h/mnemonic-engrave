@@ -859,7 +859,7 @@ produce a systemwide container while the operator believes they are producing a
 Sealed Payload one, or vice versa. The two features are frozen apart
 (decision 1); their command surfaces are too.
 
-**How the image reaches `0x10D00000` — recorded 2026-08-12, NOT yet rehearsed.**
+**How the image reaches `0x10D00000` — recorded 2026-08-12, REHEARSED 2026-08-12.**
 The journeys review found the delivery step named nowhere: spec, plan and the
 device's own error string all stop short of the command that writes the region.
 It is:
@@ -870,11 +870,20 @@ picotool load --verify -t bin -o 0x10D00000 payload.bin   # machine in BOOTSEL, 
 ```
 
 `me sysw wipe --out` emits the same-shaped image for the same second command.
-The `picotool` line is transcribed from its documented surface, not from a
-performed write — EPD delivered a UF2, this container delivers a raw image, and
-the `-t bin -o` form has not yet touched the real machine. **Rehearse it before
-it reaches operator documentation**; if rehearsal shows the raw form
-unreliable, `me sysw pack` grows a UF2 emitter and this paragraph changes.
+
+This paragraph used to end "**Rehearse it before it reaches operator
+documentation**" — the `-t bin -o` form was transcribed from `picotool`'s
+documented surface rather than performed, because EPD delivered a UF2 and this
+container delivers a raw image. **It has now been performed.** The engraver
+carries a payload written this way, and the device displays the digest
+`me sysw show` prints for it on the host. So the constraint is discharged and
+the command may appear in operator documentation; it does, in
+`design/journeys/SeedHammer-II-load-payload-journey.pdf`.
+
+**Note who is writing.** This is the HOST driving the RP2350 bootrom over USB
+with the machine in BOOTSEL. The firmware never writes flash (§13 D10), and
+nothing here changes that — including `me sysw wipe`, whose output is delivered
+by the same second command. There is no device path to either.
 
 ## 6. Passphrases
 

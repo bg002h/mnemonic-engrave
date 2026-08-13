@@ -137,11 +137,31 @@ enum Command {
 #[derive(Subcommand)]
 enum SyswCmd {
     /// Build a systemwide container.
+    ///
+    /// A record is a BIP-39 mnemonic, an md1/mk1/ms1 string, or one of the two
+    /// prefixed forms — and those two carry their bodies as LOWERCASE HEX.
+    ///
+    /// `text:<hex of the UTF-8 bytes>` is free text.
+    ///
+    /// `pass:<hex of the UTF-8 bytes>` is a BIP-39 passphrase.
+    ///
+    /// To encode one: `printf '%s' 'correct horse battery staple' | xxd -p -c 256`
+    ///
+    /// The prefixes are RESERVED (spec §5.3.1): a body that is not valid
+    /// lowercase hex is refused rather than quietly engraved as free text.
+    /// Records are engraved verbatim and the record separator is LF, so a body
+    /// carrying spaces or newlines would turn a scratch on the operator's only
+    /// copy into silently-absorbed damage.
     Pack {
         /// Records, on argv. As with `seal`, argv is a PUBLIC channel — prefer
         /// --in for anything real.
+        ///
+        /// `text:`/`pass:` bodies are lowercase hex — see the command help.
         records: Vec<String>,
         /// Read newline-separated records from this file instead of argv.
+        ///
+        /// Blank lines are skipped, so a record's index is its position among
+        /// the NON-blank lines, not its line number.
         #[arg(long, value_name = "FILE")]
         r#in: Option<std::path::PathBuf>,
         /// Write the blob here instead of stdout.
