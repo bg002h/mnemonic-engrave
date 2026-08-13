@@ -4997,3 +4997,161 @@ path already ends with the payload loaded.
 questions 1 and 2, and one plan stage carrying the journey — written as a
 journey first, per the plan's own map, so a missing step reads as a broken
 sentence rather than an absent row.
+
+---
+
+### F-153 — `me sysw pack`'s record index is 0-based and unlabelled, and `--in` filters blank lines so it is not a line number either (owning phase: **polish / v0.0.1**) `#mnemonic`
+
+Filed 2026-08-12 writing the Load Payload journey
+(`design/journeys/SeedHammer-II-load-payload-journey.pdf`). Hit on the FIRST
+`me sysw pack` invocation of it.
+
+**The half that is already fixed** (`1538ef0`, this phase): the refusal named a
+cause that had not occurred. `sysw::classify` returns `Class::Unknown` for two
+unrelated situations, and the message described only one of them:
+
+```
+$ me sysw pack --no-passphrase --in records-as-first-written.txt
+me: record 1 is not a form this container can place. Descriptors and
+    addresses are not yet classifiable here — see sysw::classify
+[exit 4]
+```
+
+The record that failed was `pass:correct horse battery staple` — a RESERVED
+prefix whose body is not lowercase hex (§5.3.1). Descriptors and addresses had
+nothing to do with it, and the remedy is one `xxd`. `SyswError::Unclassifiable`
+now carries an `UnknownReason`, and the message names the prefix and the fix.
+
+It deliberately does **not** carry the record. The record most likely to land
+here is a `pass:` one, whose body IS the passphrase, and stderr is scrolled
+back, logged, and pasted into bug reports. Only the prefix is named, and that is
+a `&'static str`. Pinned by
+`a_plain_text_pass_body_is_refused_by_body_and_never_echoed`, mutation-checked:
+with the passphrase spliced into the message the assertion fails with `THE
+PASSPHRASE MUST NOT REACH STDERR`, so it is not passing vacuously.
+
+**The half still open — the index base.** Every operator-facing record number in
+`me sysw` is 0-based and says so nowhere:
+
+| site | prints |
+| --- | --- |
+| `sysw_error` (`Unclassifiable`) | `record {i}` |
+| `report_unconfirmed` | `record {i}, as given` |
+| `print_mdmk_confirmation` | `public record {i}` |
+
+Every text editor, `sed -n 'Np'` and human counts from 1, so on a three-line
+file `record 1` sends the reader to the wrong line — it sent me there.
+`main.rs`'s own comment calls these "the OPERATOR'S" indices, "the list they can
+act on", which is exactly the reading that makes 0-based wrong.
+
+The cheap fix is applied — the messages now say `(records count from 0)`. The
+real fix is not `+1`, and that is why this stays open: **`read_records` filters
+empty lines**, so with `--in` the record index is not the file's line number
+either. A file with a blank line between records makes `record 2` point at line
+4. Making the number a LINE number means carrying line provenance through
+`read_records`, and renumbering touches three print sites plus their tests.
+
+Not deferrable on correctness grounds — the current text is honest — but the
+right answer is a small design decision, not a patch. **v0.0.1**, with the
+question stated: number the records from 1, or report the line they came from?
+
+---
+
+### F-154 — the tenth program's carousel dot is drawn underneath the firmware version line (owning phase: **polish / v0.0.1**) `#mnemonic`
+
+Filed 2026-08-12, same run. **Measured on the framebuffer, not eyeballed** —
+scanning row y=297 of `shots/p09-load-payload-program.png` for near-white runs:
+
+```
+circles (hollow, 12 px):  157–169  174–186  191–203  208–220
+                          225–237  242–254  259–271
+current (filled):         276–288
+next circle would be:     293–305        <- one edge visible at 293
+tenth circle would be:    310–322        <- entirely inside the text
+"Firmware: emu" begins:   305
+```
+
+Eight programs' dots have clear room; the ninth is half-covered and the tenth is
+gone. It was fine at NINE programs, which is why nobody saw it: `loadPayload`
+made ten. The same frame is in every journey document's menu screenshot.
+
+Cosmetic, and it does not mislead — the filled dot is always visible, so the
+operator can still see where they are. But the carousel's whole job is to say
+how many programs there are, and it now under-reports by two.
+
+Fix is a layout question, not a bug: either move the version lines down, shrink
+the dot pitch, or drop the dots past N. Owning phase **polish / v0.0.1** per the
+test-infra/cosmetics rule — this is UI polish found during functionality work.
+
+---
+
+### F-155 — the home screen cannot tell you whether a payload is loaded (owning phase: **systemwide payloads — spec question first**) `#mnemonic`
+
+Filed 2026-08-12, same run. Not cosmetic, and not test infrastructure: the
+thing whose presence is unreported is a **seed in RAM**.
+
+Three different histories, one identical frame — sha256 of the emulator's own
+framebuffer:
+
+```
+f773d610f050ad9983c427635f25df6d80893a8c60ec2cef7efaedc2ab134204  loaded at boot
+f773d610f050ad9983c427635f25df6d80893a8c60ec2cef7efaedc2ab134204  loaded, then unloaded
+f773d610f050ad9983c427635f25df6d80893a8c60ec2cef7efaedc2ab134204  boot offer skipped
+```
+
+So an operator who walks away and comes back — or who hands the machine to
+somebody else — cannot tell from the home screen whether a mnemonic and a
+passphrase are currently live in it. The only way to find out is to enter Load
+Payload and read which two options it offers (`LOAD` / `SKIP` vs `LOAD AGAIN` /
+`UNLOAD`), which is a state query disguised as an action.
+
+**Why this is a spec question before it is a UI one.** The machine already
+refuses to state loaded-ness anywhere else, and there is an argument for that:
+an indicator says "there is a seed here" to anyone who picks the device up.
+That argument is real, and it is the opposite of the argument for the indicator.
+§3.1 should rule it rather than leaving it to whoever draws the home screen.
+
+Note it interacts with **F-152** (selecting "from payload" when one is present
+but unloaded should launch the loader): both are about the operator's model of a
+state the device tracks and does not show.
+
+---
+
+### F-156 — neither published journey can be regenerated by the commands its own README gives (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-12, found while writing the third journey against the convention
+the first two set — the convention turned out not to run.
+
+Three independent breaks, all in the pathological document's pair:
+
+| what | says | is |
+| --- | --- | --- |
+| `transcript_pathological.sh` ×6 | `$W/inputs/…` | the pathological files are in `inputs-pathological/` |
+| `build_pdf_pathological.py` ×3 | `inputs/seeds`, `inputs/keys` | same |
+| `build_pdf_pathological.py:14,66` | `design/journey/build_pdf.py` | there is no `design/journey/`; it is `design/journeys/` |
+| `build_pdf_pathological.py:65` | `keys.json` beside the script | never committed |
+
+`inputs/` today holds the OTHER document's twelve cosigners, so
+`transcript_pathological.sh` does not fail cleanly — it reads
+`inputs/keys/key-00.xpub`, which does not exist, while `inputs/wallet-policy.txt`
+DOES, so it gets partway. The rename happened when the second document was added
+and neither script was run again afterwards.
+
+A fourth, smaller one: the README's *Reproducing* section says
+`python3 build_pdf_pathological.py` produces the PDF. It produces
+`out/journey.html`. The HTML→PDF step is nowhere in the repo; the published PDFs
+were made by a manual pass. `build_pdf.py`'s own last page does document
+`go run ./cmd/journeykeys > keys.json`, so `keys.json`'s provenance is recorded —
+just not where someone following the README would find it.
+
+**Why it matters beyond tidiness.** These documents are the artifact that says
+"nothing here is illustrative". A document that cannot be regenerated cannot be
+re-verified, so the claim degrades to a promise the moment the first correction
+needs folding — which is exactly the situation the twelve corrections above
+created.
+
+`build_pdf_payload.py` is the corrected pattern: it resolves every path it uses,
+and it runs the Chrome headless print itself so the reproduction instructions
+are complete.
+
+**Owned by THIS phase**, not deferred: it is the phase's own toolchain.
