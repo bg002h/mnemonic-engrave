@@ -4866,3 +4866,51 @@ button, arriving a third time through a different door.
 (1) is the one to do: it is a handful of lines, needs no font work, and converts
 this entire class from invisible to noisy. Until then, **treat every wording
 assertion in `gui/` as evidence about intent and not about the screen.**
+
+### F-152 — selecting "from payload" when one is PRESENT BUT NOT LOADED should launch the loader (owning phase: **a future cycle — needs a spec §3.1 state and one plan stage**) `#mnemonic`
+
+Filed 2026-08-13 by operator ruling. Agreed as a feature, deliberately not
+implemented freehand.
+
+**Today** the pickers gate on `ctx.sysw != nil`, so a payload sitting in flash
+that the operator skipped at boot is invisible inside every program. Their route
+back is the `Load Payload` carousel entry, then re-entering the program.
+
+**Wanted:** the picker offers the payload row when one is PRESENT, and choosing
+it runs `syswLoadFlow` inline, then hands over the record.
+
+**The mechanics are cheap.** `SyswReader().Probe()` reads eight bytes, so
+"present but unloaded" is already distinguishable from "absent", and calling the
+load flow from a picker is on the order of thirty lines.
+
+**The design is not, and this is why it is filed rather than written.** Four
+questions no implementer should answer alone:
+
+1. **The loaded payload may not hold the wanted class.** Select "from payload"
+   in BIP-39 Password, the load succeeds, and there is no `pass:` record — the
+   operator has paid a digest comparison, or a passphrase and a ~31 s KDF, for
+   nothing. What does the screen say, and where do they land?
+2. **Declining the digest now UNLOADS** (§13, 2026-08-13). So a decline mid-app
+   drops back to a picker whose payload row has just disappeared — a menu that
+   changes under the operator between one press and the next.
+3. **Nesting.** The load flow draws a digest screen, possibly a passphrase
+   keyboard, and a warnings screen, all INSIDE another program's flow. No other
+   source does that, and the Back semantics through two nested flows are
+   unspecified.
+4. **§3.1's source table does not model this state.** It enumerates what a
+   program OFFERS; "present but unloaded" is a fourth state, and adding it is a
+   spec change before it is a code change.
+
+**Precedent for filing rather than building: F-144.** That was components that
+each worked, joined by a step nobody had specified, and it passed a green R0
+gate while doing nothing. This has the same shape — a picker, a loader, and an
+unwritten seam between them.
+
+**Cost of not having it is low**, which is what makes deferring reasonable: the
+route back is one carousel tap, and LOAD is now the boot default, so the common
+path already ends with the payload loaded.
+
+**What it needs:** a §3.1 state for present-but-unloaded, a §13 ruling for
+questions 1 and 2, and one plan stage carrying the journey — written as a
+journey first, per the plan's own map, so a missing step reads as a broken
+sentence rather than an absent row.
