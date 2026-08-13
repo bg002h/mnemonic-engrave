@@ -23,3 +23,6 @@ sh2-state/
 
 # Personal Claude Code permissions (machine-local, not a project policy)
 .claude/settings.local.json
+
+# cargo-mutants working directories
+mutants.out*/

@@ -7,6 +7,7 @@ pub mod manifest;
 pub mod ndef;
 pub mod preview;
 pub mod seal;
+pub mod sysw;
 pub mod validate;
 
 use classify::{ClassifyError, Format};

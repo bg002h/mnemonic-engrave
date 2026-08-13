@@ -104,6 +104,81 @@ hdr "Preflight"
     device whose OTP carries a boot key. Set SH2_KEY or pass --key."
 ok "signing key present ($SH2_KEY)"
 
+# ---- the key is the RIGHT key ------------------------------------------------
+#
+# Everything downstream proves the image is signed; nothing proved it was signed
+# by the key this device will BOOT. A valid-but-wrong secp256k1 key passes every
+# assertion in sign-firmware.sh and picotool's own `signature: verified`, and
+# then the bootrom rejects it -- giving a dark screen and a device back in
+# BOOTSEL, which is exactly the symptom this script's closing note tells the
+# operator to read as "not a signature problem". So the wrong key produces the
+# most misleading failure available.
+#
+# Checked HERE, before building and signing, so a wrong --key costs a second
+# rather than a full build.
+#
+# The fingerprint is the sha256 of the uncompressed public point's 64 bytes --
+# the same recipe RUNBOOK_custom_boot_key.md gives for recording it, so the two
+# cannot drift into different definitions of "fingerprint".
+#
+# The public point is captured and MEASURED before it is hashed. Piping openssl
+# straight into sha256sum looks equivalent and is not: when openssl fails it
+# emits nothing, and sha256sum of nothing is
+# e3b0c442…b855 -- sixty-four perfectly valid hex characters that pass every
+# shape check a caller could write. The check would then report a WRONG KEY for
+# what is actually an unreadable one, and under `set -e` the pipeline's failure
+# kills the script with no message at all. Both were observed while writing this.
+key_fingerprint() {
+    der_hex=$(openssl ec -in "$1" -pubout -conv_form uncompressed -outform DER 2>/dev/null \
+        | tail -c 64 | xxd -p -c 64) || return 1
+    # 64 bytes of uncompressed point (X‖Y), so 128 hex characters. Anything else
+    # is not a key this can speak for.
+    [ "${#der_hex}" -eq 128 ] || return 1
+    printf '%s' "$der_hex" | xxd -r -p | sha256sum | cut -d' ' -f1
+}
+
+# Slot 1 of this machine's OTP, burned 2026-08-03, permanent.
+# Recorded in design/HARDWARE_INVENTORY.md; override for a different unit.
+: "${SH2_BOOTKEY_FP:=846aa289f2f317e55ff03f90555132302842cff2f68ee45712834a25d64cabb4}"
+
+# `|| KEY_FP=""` because `set -e` would otherwise kill the script the instant
+# key_fingerprint returns non-zero, giving the operator an exit status and no
+# sentence. A safety check that dies silently is indistinguishable from one that
+# passed.
+KEY_FP="$(key_fingerprint "$SH2_KEY")" || KEY_FP=""
+# Fails CLOSED, and the shape is asserted rather than assumed: openssl failing
+# yields an EMPTY string, and an empty string compared against the expected
+# fingerprint is simply "not equal" -- which would look like a mismatch and be
+# reported as the wrong key rather than as a broken check. Both are refusals, so
+# neither is dangerous, but they send the operator to different places.
+if [ ${#KEY_FP} -ne 64 ] || [ -n "$(printf '%s' "$KEY_FP" | tr -d '0-9a-f')" ]; then
+    die "could not compute a fingerprint for the signing key.
+
+      key      $SH2_KEY
+      openssl  produced '$KEY_FP' (expected 64 hex characters)
+
+      This is a broken check, not a wrong key. Refusing either way: signing with
+      a key whose identity cannot be established is how the wrong one gets used."
+fi
+
+if [ "$KEY_FP" != "$SH2_BOOTKEY_FP" ]; then
+    die "this key is NOT the one burned into the device's OTP.
+
+      key   $SH2_KEY
+            $KEY_FP
+      OTP   $SH2_BOOTKEY_FP
+
+      Signing would succeed, picotool would report 'signature: verified', and the
+      bootrom would still refuse the image -- a dark screen and a device in
+      BOOTSEL, indistinguishable from the PD-negotiation case this script warns
+      about at the end. That is why this is refused here rather than discovered
+      there.
+
+      If you are flashing a DIFFERENT SeedHammer II, set SH2_BOOTKEY_FP to its
+      recorded fingerprint (design/HARDWARE_INVENTORY.md)."
+fi
+ok "key matches the burned OTP fingerprint (${KEY_FP%"${KEY_FP#????????}"}…)"
+
 SIGN="$SH2_ENGRAVE/scripts/sign-firmware.sh"
 [ -x "$SIGN" ] || die "signing script not found or not executable: $SIGN"
 ok "signing script present"

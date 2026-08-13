@@ -3790,3 +3790,1079 @@ owning phase. Two edits:
 **Must land before implementation**, not after: the first person to read
 `passphrase.rs` while building this will otherwise find a module doc telling
 them the mode they are implementing does not exist.
+
+### F-126 — CLOSED 2026-08-12 by plan stage 10 — presenting an NFC tag to a gathering flow FREEZES the emulator, so the path stage 6 exists to open cannot be walked (owning phase: **systemwide payloads**) `#mnemonic`
+
+**CLOSED 2026-08-12** by plan stage 10, and by fix 2 as recommended — the loop
+shape, not the reader. The five duplicated scan loops are now one
+`startScanner` (`gui/nfc_scan.go:45`) with a backoff keyed on **idle**, which is
+the EOF case the old guard missed: `scanFailed` was never the condition that
+mattered. 253 lines of duplication went with it. Measured by the implementer:
+4 reads per 150 ms against ~198,000 iterations before.
+
+Verified here rather than taken on report — `startScanner` has six non-test
+callers, covering every original site. Two `scan.Status == scanFailed` lines
+survive: one INSIDE `startScanner`, which is the point of centralising it, and
+one at `derive_xpub.go:230` which is CONSUMER-side message selection inside a
+`select` with a `default`. Neither can spin.
+
+Original analysis follows.
+
+
+Filed 2026-08-11 while building the operator-journey document, which tried to
+deliver the 25-card bundle over NFC and hung the browser instead.
+
+**Mechanism, in two halves that are individually reasonable.**
+
+`gui/bundle_flow.go` samples `ctx.Platform.NFCReader()` **once**, on flow entry.
+A tag presented afterwards is invisible: the scanner goroutine was never started.
+That much is only awkward — present the tag first and it reads.
+
+The defect is what happens when a tag **is** pending. `cmd/emu/nfc.go`'s source is
+deliberately one-shot ("a real tag crosses the reader once"), so the moment its
+single record is consumed the reader sits permanently at EOF. The scan loop:
+
+```go
+obj, err := s.Scan(r)
+...
+case err == nil || err == io.EOF:      // Status stays 0
+...
+scans <- scan
+wakeup()
+if scan.Status == scanFailed {
+    time.Sleep(1 * time.Second)        // the ONLY yield in the loop
+}
+```
+
+`io.EOF` does not take the `scanFailed` branch, so nothing sleeps and nothing
+blocks. Under Go/wasm — cooperatively scheduled on the browser's single thread —
+a goroutine that never blocks starves the JS event loop outright.
+
+**Observed:** after `shNFC.present(<md1>)` and entering Engrave Bundle, the page
+stopped responding entirely; even navigating the tab away timed out at 60 s and
+the tab had to be destroyed. Entering the same flow with **no** tag pending is
+fine, because `NFCReader()` returns nil and no goroutine runs — which is exactly
+the discriminator that identifies the loop as the cause.
+
+**Why it matters beyond the emulator.** SPEC_systemwide_payloads §8.2 added the
+emulator NFC source specifically so the eight programs' new secret-delivery path
+would be walkable. Today that path is the one path the tool cannot walk. Any
+qualification of NFC screens done in the emulator has been done blind.
+
+**Two separable fixes; the second is the real one.**
+
+1. `nfcSource.reader()` should return a reader that **blocks** rather than
+   reporting EOF once drained — a real reader waiting on a tag does not spin.
+2. The scan loop should yield on **every** iteration, not only on `scanFailed`.
+   A driver that returns instantly is not a hypothetical, and the loop is
+   currently only safe because the hardware reader happens to be slow.
+
+Fix 2 is device code and is where the latent assumption lives; fix 1 alone would
+paper over it.
+
+**All five scan loops share the defect — measured, not assumed.** Every one of
+`bundle_flow.go`, `md1_gather.go`, `mk1_inspect.go`, `verify_address.go` and
+`gui.go:1814` guards exactly one `time.Sleep` behind `scan.Status == scanFailed`
+and has no other yield:
+
+```
+$ for f in gui/{bundle_flow,md1_gather,mk1_inspect,verify_address,gui}.go; do
+    grep -A2 'scan.Status == scanFailed' $f | grep -c time.Sleep; done
+1 1 1 1 1
+```
+
+So the fix belongs in the loop shape, in all five, rather than in whichever one
+the emulator happened to expose first.
+
+**Also worth noting for the journey work:** even once unfrozen, one flow entry
+consumes exactly one tag, so a 25-card bundle cannot be delivered over the
+emulator's NFC source as it stands.
+
+### F-127 — `mk encode --from-md1` cannot read a CHUNKED md1 (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11 building the pathological-wallet journey
+(`design/journeys/SeedHammer-II-pathological-wallet-journey.pdf`).
+
+Every mk1 key card must carry a 4-byte policy-id stub; `mk encode` refuses
+without one. The only automatic way to obtain it is `--from-md1`. Given a chunk
+of a chunked md1 set it fails:
+
+```
+$ mk encode --xpub xpub6CatWdiZiodmU… --origin-fingerprint 73c5da0a \
+    --origin-path "m/84'/0'/0'" --from-md1 md1fqgpcpqpz3m6jzz… --group-size 0
+error: md1 input rejected: wire-format version mismatch: got 9, expected 4
+[exit 2]
+```
+
+**Cause is a stale vendored copy.** `mnemonic-key/vendor/md-codec` is at
+**0.34.0**; `descriptor-mnemonic/crates/md-codec` is at **0.42.0**. Version 9 is
+the chunked wire form the vendored copy predates. This is precisely what the
+provenance pin exists to catch, and it did not.
+
+**Scope of the blast radius.** Any policy over the single-string cap. The
+journey's wallet — 11 keys, four timelock kinds, two 32-byte hash literals —
+comes to 182 data symbols against a cap of 80, so it is not an exotic corner.
+
+**Workaround, used in the journey:** read the identity out of `md inspect` and
+pass `--policy-id-stub` by hand. That requires knowing F-128, and nothing tells
+an operator either thing.
+
+**DOWNGRADED 2026-08-11 by the adversarial pass.** As filed this said a chunked
+policy has "no documented route to a key card". That clause is false and the
+refuter broke it: `--from-md1` accepts only a *single, unchunked* md1, but the
+stub remains derivable — which is exactly what this journey did, successfully.
+So this is **ergonomics, not a binding failure**: severity Important → **Minor**.
+What stays true, and is the part worth fixing, is that the tool gives the
+operator a hard parse error and no hint that `--policy-id-stub` plus
+`md inspect` is the way through.
+
+### F-128 — the stub's spec sentence and `mk`'s behaviour name different identities (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11, same run as F-127.
+
+`SPEC_mk_v0_1.md` §3.3: *"Each stub is 4 bytes = the top 4 bytes of the
+MD-encoded policy's **WalletPolicyId** — `md_codec::compute_wallet_policy_id`"*,
+and today's `md inspect` prints a field by exactly that name. **`mk` does not use
+it.** Measured on a single-string wallet where `--from-md1` works, so `mk`
+derived the stub itself:
+
+```
+wallet-descriptor-template-id: 726a666305756435b7c52c5b3fc69c41
+wallet-policy-id:              f05e8a1c282f7740bbfd902a759b5577
+policy_id_stubs (mk decode):   726a6663
+```
+
+The stub tracks the **template-id**. Most likely a rename that landed in md-codec
+after 0.34.0 — which would make this F-127's twin rather than an independent bug
+— but as it stands the spec sentence and the binary disagree about which identity
+a key card indexes, and the stub is what a recovering operator uses to tell one
+wallet's cards from another's.
+
+**Resolve in this order:** decide which identity is correct, fix whichever of the
+two is wrong, then bump the vendored pin. Do not bump the pin first: if the
+rename is real, bumping silently changes the stub every existing key card carries.
+
+### F-129 — `--path` is mandatory for a non-canonical wrapper and flattens divergent origins; which source wins on restore is unpinned (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11, same run. **A design question, not a defect.**
+
+A `wsh(or_i(…))` wrapper has no canonical default derivation path. Without
+`--path`, `md encode` warns, `md decode` PARTIAL-decodes (exit 4 VERIFY-ME) and
+`me bundle` refuses the set — all correct and all clearly signposted. With
+`--path`, everything validates.
+
+But `--path` takes a **single shared** path and its own help says it "flattens
+Divergent mode to Shared". The journey's eleven keys sit at four account indices
+(`84'/0'/0..3'`) across three masters, so the shared value is true for @0–@2 and
+false for @3–@10. The true per-key origin survives on each mk1 card
+(`origin_path` decodes correctly), so the bundle as a whole is not lossy — but
+the descriptor card alone would restore eight of eleven keys wrongly.
+
+**What is missing is a test pinning precedence:** when the md1's shared origin and
+an mk1 card's `origin_path` disagree, the card must win. Add a restore vector for
+exactly that disagreement before this shape is recommended to anyone.
+
+#### F-129 — ANSWERED 2026-08-11 by running the round trip `#mnemonic`
+
+The precedence question is settled, and in the safe direction: **the mk1 cards
+win; the md1's flattened `--path` never overrides them.** Proven twice by
+refusal, not by inspection —
+
+- supplying a slot as a bare xpub instead of its card: *"non-canonical wrapper
+  requires explicit origin for @2, but none provided"* (exit 1);
+- supplying no cards at all: *"cannot infer the own origin family (no canonical
+  origin, no cosigner mk1, and no --origin)"* (exit 1). `--origin` is single-sig
+  only, so for a multisig the card is the ONLY origin source.
+
+A full restore (3 md1 chunks + 10 cards + the seed for the own slot) exits 0 and
+reproduces all 11 origins exactly, including the divergent account indices the
+descriptor card flattened to one value.
+
+**The residual risk moved to the OWN slot**, the one `--from` fills rather than a
+card. That key IS derived at the flattened shared path. With the own slot at @0
+(true path `84'/0'/0'`) it is right. Asking for the own slot at @3 (true path
+`84'/0'/3'`) derived @0's key instead — and was caught:
+
+```
+error: restore: multisig-template-floor mismatch — derived duplicate cosigner
+keys: supplied keys at positions 0 and 3 are identical
+```
+
+**The guard is real but incidental.** It fires because the mis-derived key
+collides with a slot that was supplied. In this wallet every master happens to
+have an account-0 slot among the eleven, so every possible mis-derivation
+collides and is caught. A wallet where some master's account-0 key is NOT one of
+the slots would mis-derive the own slot into a key nobody supplied — no
+duplicate, no error, **a silently wrong wallet**.
+
+**So the remaining work is narrow:** the own slot should take its path from its
+own mk1 card (or an explicit per-slot origin) rather than from the template's
+shared path, and the duplicate-key check should not be the thing standing between
+an operator and a wrong wallet. Keep the check; stop depending on it.
+
+**Separately, the descriptor text does NOT round-trip byte-for-byte** — see
+F-130. That is a different problem and does not affect the above.
+
+### F-130 — restored xpubs lose their BIP-32 depth/parent/child, so the descriptor and its checksum change (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11 from the same round trip.
+
+The recovered wallet is the right wallet: for all 11 slots the chain code and
+public key are **byte-identical** to the original, and the policy template
+decodes byte-identical from the three md1 chunks. Child derivation uses only
+those, so addresses are unaffected.
+
+What changes is the xpub *serialization*. Decoded headers, original vs restored:
+
+| | depth | parent fp | child |
+| --- | --- | --- | --- |
+| original @0…@10 | 3 | `7ef32bdb` / `ea517ee5` / `d061c20c` | `0h`…`3h` |
+| restored @0…@10 | **0** | **`00000000`** | **`0`** |
+
+An mk1 card stores the account key's chain code and public key plus the origin
+(fingerprint + path); it does not carry depth/parent/child, so the reconstructed
+xpub is serialized with them zeroed while still annotated `[fp/84'/0'/N']`. The
+origin says depth 3; the key says depth 0.
+
+**Two concrete consequences, both measured:**
+
+- The descriptor checksum changes — `#4ld0crxa` → `#jgulue7j`. An operator who
+  recorded the checksum (the obvious thing to record) sees a mismatch on a
+  correct restore.
+- Tools in this constellation enforce depth. `md address` refuses the restored
+  key outright: *"--key @0: expected depth 4 for this script context, got 0"* —
+  the same check that rejects the ORIGINAL depth-3 keys for this wallet shape,
+  which is worth noting on its own.
+
+**Decide which is true** before changing anything: either the mk1 wire format
+should carry depth/parent/child (costing bytes on every key card), or a restored
+descriptor is defined as equivalent-not-identical and the checksum is documented
+as not comparable across a round trip. Today neither is written down, so the
+first operator to check a checksum after recovery will think the backup failed.
+
+### F-131 — the engraving checklist tells the operator a recovery rule that is false in BOTH directions (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11 from the miniscript-nesting review of the pathological wallet.
+Verified by running it, not by reading the report that raised it.
+
+```
+$ mnemonic bundle --network mainnet --descriptor-file .examples-build/degrade2.desc
+# Threshold: 3 of 11
+# Recovery: any 3 of 11 signing keys + md1 (template card).
+```
+
+The wallet is not a 3-of-11. It is a four-tier degrading policy with **eight**
+distinct minimal key-sets, each carrying its own timelock, and two of them also
+requiring a hash preimage:
+
+| tier | key-sets | also needs |
+| --- | --- | --- |
+| 1 | `{@0,@1,@2}` | preimage + absolute HEIGHT ≥ 1000000 |
+| 2 | `{@3,@4}` `{@3,@5}` `{@4,@5}` | preimage + absolute TIME ≥ 1893456000 |
+| 3 | `{@6,@7}` | relative 65535 BLOCKS |
+| 4 | `{@8}` `{@9}` `{@10}` | relative TIME (~365 d) |
+
+The printed line is wrong **both ways**, which is what makes it dangerous rather
+than merely imprecise:
+
+- it OVERSTATES — `{@8,@9,@10}` is three of the eleven keys and cannot spend
+  together at all before the tier-4 timelock, and no 3-key set spends tier 1
+  without the preimage;
+- it UNDERSTATES — `{@8}` alone spends after ~365 days, so the wallet is a
+  1-of-3 to an attacker who waits, not a 3-of-11.
+
+An operator sizing their key custody off that line gets the threat model
+backwards. **This is engraved-adjacent output**: it is the checklist a person
+follows while cutting permanent plates.
+
+Fix is not "reword": the summariser is computing a threshold for a shape that
+does not have one. It must either enumerate the key-sets (compare-cost already
+does) or refuse to print a threshold for a non-threshold policy.
+
+### F-132 — the hashlock preimage is required to spend, absent from the backup, and unmentioned by it (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11, same review.
+
+Tiers 1 and 2 are `and_v(v:sha256(H), …)`. Spending either requires revealing
+the 32-byte preimage `X` where `H = sha256(X)`. In the worked example `X =
+sha256("opensessame")`. Measured against the engraved set:
+
+```
+preimage X present in any backup string : 0
+the word "opensessame" present anywhere : 0
+```
+
+Correct — the descriptor commits to `H`, and `H` is what the md1 carries. But
+nothing in the bundle, the checklist, or the plate set records that a secret the
+operator must supply from memory stands between them and **five of the eight**
+key-sets. Lose the word and tiers 1 and 2 are gone; what remains is tier 3
+(`{@6,@7}`, 455 days) and tier 4 (any one of `{@8,@9,@10}`, 365 days).
+
+This is not the codec's bug — a preimage is deliberately not key material and
+arguably should not be engraved next to the policy. The defect is **silence**.
+The bundle should state that the policy contains a hashlock, name which branches
+it gates, and say that the preimage is not in the backup. A backup that omits a
+required factor without saying so is the failure mode this whole project exists
+to prevent.
+
+### F-133 — the relative tiers are INVERTED: the weakest key-set matures ~90 days before the stronger one (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11, same review. Arithmetic verified independently from BIP-68's
+field layout.
+
+| tier | key-set | lock | decoded | matures |
+| --- | --- | --- | --- | --- |
+| 3 | `{@6,@7}` — 2-of-2 | `older(65535)` | bit22 clear → blocks | 65535 blocks ≈ **455 days** |
+| 4 | `{@8}`/`{@9}`/`{@10}` — **1**-of-3 | `older(4255898)` | `0x40F09A`, bit22 set → 61594 × 512 s | **365.00 days** |
+
+(The ~90 days is nominal at the 600 s block target: 455.10 − 365.00 = 90.10 d.
+The block-count side drifts with real hashrate; the time side does not. The
+ordering does not depend on that drift — tier 3 would have to run ~20% fast to
+catch up.)
+
+A degrading vault is supposed to degrade *monotonically*: each tier that
+activates should be weaker than the last, and later. Here the **1-of-3** tier
+opens ~90 days **before** the **2-of-2** tier. From day 365 the wallet is a
+1-of-3; tier 3 never becomes the operative security floor, because by the time
+it activates a strictly weaker path has been open for three months.
+
+Not a consensus or standardness problem — the script is valid and
+rust-miniscript is silent, correctly, because ordering between disjoint branches
+is not something it models. It is a **policy design defect in the example**, and
+the example is the one the documentation calls "the pathological example" and
+that this project has now engraved into a journey document.
+
+**It is upstream, and the upstream document states both numbers without noticing.**
+`mnemonic-toolkit` Examples §5 lists the tiers in ascending order as a degrading
+vault, and then, a few lines below, spells out the two durations adjacently:
+
+> - `older(65535)` -- relative **blocks**: 65,535 blocks (~455 days). …
+> - `older(4255898)` -- relative **time**: … 61,594 units x 512 s ~= 365 days.
+
+455 then 365, printed one after the other under a table that presents tier 3
+before tier 4. So the defect is in the source example, not in our transcription
+of it. Either swap the two locks or say the inversion is deliberate — and fix it
+where it is authored, in `mnemonic-toolkit`, so the Rust-primary direction holds.
+
+### F-134 — plate count for one wallet ranges 26 → 58 depending on an md1-form flag nobody is told about (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11, same review. All three counts measured.
+
+| route | md1 | mk1 | plates |
+| --- | --- | --- | --- |
+| `md encode --force-chunked --path bip84` (keyless template) + `me bundle` | 3 | 22 | **26** |
+| `mnemonic bundle --descriptor-file --md1-form=template` | 4 | 33 | 38 |
+| `mnemonic bundle --descriptor-file` (default, `--md1-form=policy`) | 24 | 33 | **58** |
+
+Same wallet, same keys, a 2.2× spread in permanent physical plates. The default
+is the most expensive one, because policy-form md1 embeds the keys rather than
+referencing them — defensible, since it makes the descriptor card
+self-sufficient, but it is a large cost chosen silently.
+
+Nothing in the tool tells the operator the trade: self-sufficient descriptor card
+vs less than half the steel. **Print the comparison before engraving**, the way
+`me bundle` already prints the plate checklist.
+
+(Note the first row differs from what the review reported. It measured that path
+as REFUSED, which was true of the state it inspected; `--path bip84` — the fix
+recorded in F-129 — makes it validate and produce 26. The 38 and 58 figures are
+unaffected.)
+
+**SCOPED 2026-08-11 by the adversarial pass.** A refuter showed 25/26 also
+reproduces at exit 0 on the *default keyed* path, so "only reachable via a
+refused route" would have been wrong — the three counts above are each real and
+each reachable. The finding is therefore about **an unadvertised 2.2× cost
+spread**, not about one route being broken. A further variant was measured at 23
+md1 → 24 plates under a different origin choice (`m/48'/0'/0'/2'`), which widens
+the spread rather than changing its shape.
+
+### F-135 — CLOSED on filing: miniscript nesting depth is not a risk for this wallet, with the numbers so nobody re-derives them `#mnemonic`
+
+Recorded 2026-08-11 so the question stops being re-asked. Measured with
+`miniscript` v13.0.0 from `rust-miniscript-fork`, the crate actually depended on,
+against the real 11-key descriptor:
+
+| property | measured | limit |
+| --- | --- | --- |
+| witnessScript | **498 bytes** | 3600 standardness / 10000 consensus |
+| max_weight_to_satisfy | **756 WU** | — |
+| parse in Segwitv0 context | OK | itself enforces ops ≤ 201 and stack items ≤ 100 |
+| `or_i` nesting depth | ~3 | `MAX_RECURSION_DEPTH = 402` (`src/lib.rs:503`) |
+
+3102 bytes of standardness headroom. `Descriptor::sanity_check()` returns `Ok`,
+and that is stronger than it looks: `segwitv0.rs:57` delegates to
+`Miniscript::sanity_check` (`analyzable.rs:225`), which checks five properties in
+sequence — requires_sig, non-malleable, within_resource_limits, no repeated keys,
+and **no mixed timelocks** (`HeightTimelockCombination`). All five pass, so the
+classic deep-nesting bug — one spend path needing both a height lock and a time
+lock, satisfiable by no single transaction — does not arise here.
+
+BIP-68 encodings verified from the field layout rather than from the docs that
+assert them: `older(65535)` is exactly at the 16-bit ceiling; `older(4255898)` =
+`0x40F09A`, bit 22 set, 61594 × 512 s = 365.00 days. **The repo's warning that
+`older(65536)` masks to zero is correct** — `65536 & 0xFFFF == 0` and bit 22 stays
+clear, so the lock silently becomes *no lock*. One increment from a real wallet.
+
+**Taproot depth, asked separately and answered the same way.** Two unrelated
+axes, both boundaries located by probe rather than cited — I built `tr()`
+descriptors of increasing depth until they flipped:
+
+| axis | deepest accepted | first rejected | error |
+| --- | --- | --- | --- |
+| TapTree Merkle depth (nested `{}`) | **128** | 129 | `maximum Taproot tree depth (128) exceeded` |
+| fragment recursion inside ONE leaf | **400** | 401 | `maximum recursion depth exceeded (max 402, got 403)` |
+
+`TAPROOT_CONTROL_MAX_NODE_COUNT = 128` comes from the `bitcoin` crate and is
+enforced in `descriptor/tr/taptree.rs`; `MAX_RECURSION_DEPTH = 402`
+(`src/lib.rs:503`) is context-agnostic — verified there is no Tap relaxation at
+either enforcement site (`expression/mod.rs:592`, `miniscript/mod.rs:333`).
+
+Practically, **128 is the wall you hit**: adding script paths the normal way
+branches the tree, so the Merkle limit arrives long before a single leaf's own
+fragment could approach 402. The 402 cap only binds a pathologically nested
+fragment inside one leaf. (First probe of this measured nothing, because reusing
+one pubkey trips the repeated-key check before any depth check — worth knowing if
+anyone re-runs it.)
+
+The real costs of this shape are downstream of Bitcoin entirely: F-127, F-130,
+F-131, F-132, F-134, and `md address` refusing the keys on depth. Depth itself is
+two orders of magnitude from anything that bites.
+
+### F-136 — `md encode` does not auto-chunk, though two places say it does (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11 from the codec lens; **confirmed first-hand** — this is the
+error that stopped the journey build before the review raised it:
+
+```
+$ md encode --group-size 0 '<the 11-key policy>'
+md: codec error: payload is 182 data symbols; the codex32 regular code caps
+    single strings at 80 (use chunked encoding / --force-chunked)
+[exit 1]
+```
+
+The operator has to know to retry with `--force-chunked`. The flag's own help
+calls the behaviour automatic ("Reserved for v0.2; mk-codec auto-dispatches
+today" on the mk side), and the codec docs describe dispatch as automatic. Either
+auto-chunk on overflow or stop describing it as automatic; today the first
+encounter with a large policy is a hard error that reads like the policy is
+unsupported.
+
+### F-137 — the md encoder has no depth guard but the decoder does, so an unrestorable card is expressible (owning phase: **operator journeys**) `#mnemonic`
+
+Raised by the codec lens; **carried on that report's authority — I have not
+re-measured it.** See `design/agent-reports/miniscript-nesting/codec.md` §F5.
+
+The claim: the encode path applies no recursion/depth bound while the decode path
+does. If exact, the failure mode is the worst one a backup tool has — a policy
+that encodes cleanly, engraves onto steel, and then refuses to decode on the way
+back.
+
+**Confirm before acting**, and confirm in this order: (1) does an encodable-but-
+undecodable depth actually exist, or does some earlier bound (payload symbols,
+chunk count) always bite first? (2) if it exists, the guard belongs on the
+ENCODER, since that is the side that can still say no while the plate is blank.
+A decoder-only bound protects the reader and abandons the writer.
+
+### F-138 — WITHDRAWN: the Go port does NOT enforce a `Renderable` bound Rust lacks `#mnemonic`
+
+**WITHDRAWN 2026-08-11.** The pre-flash conformance review refuted it by
+measurement: zero hits for `Renderable` in Go `sysw/` and in every Rust crate.
+It exists only in fork-native GUI md-template code, which the Rust-primary rule
+explicitly exempts, and it has nothing to do with this seam. Filed on a report's
+authority without re-measuring, and it was wrong — the entry stays, withdrawn,
+rather than being deleted.
+
+Original text follows.
+
+Raised by the codec lens; **not independently re-measured.** See
+`codec.md` §F6–F7. That report also measured Rust↔Go bounds as otherwise in exact
+lockstep, which is the good news here.
+
+The asymmetry matters under the **Rust-primary rule**: if the fork's Go port
+refuses a policy the Rust codec accepts, then the machine is the one saying no,
+and the constellation's normative behaviour is being set downstream. That is the
+direction the rule exists to forbid.
+
+Two legitimate resolutions, and the choice is a real one: either `Renderable` is
+a genuine constraint of the engraving surface (a plate that cannot be drawn is
+not a policy problem, it is a physics problem) and belongs in Rust with a test
+vector so both sides agree — or it is fork-native GUI logic and should not be
+able to reject a valid card. Decide which; do not leave it implicit.
+
+### F-139 — CORPUS.md §C6 has an answer now (owning phase: **operator journeys**) `#mnemonic`
+
+`descriptor-mnemonic/design/CORPUS.md` §C6 "Pathological deeply-nested
+miniscript (chunking forced)" has stood as an explicit placeholder — its own text
+says the 8-nested-`or_d` form "actually fits single string (45 B)" and that a
+genuine chunking-forcing example would be defined "once the spec is closer to
+fixed". The summary table still reads `C6 | Chunking-forced | TBD`.
+
+The four-tier degrading wallet is that example, measured: **182 data symbols
+against a single-string cap of 80**, forced to 3 chunks. Two 32-byte hash
+literals and four timelock arguments are what get it there — not key count, which
+a keyless BIP-388 template does not pay for.
+
+Fill C6 in with it, including the measured symbol count and the bytecode figure,
+so the next person does not re-discover that the 12-key `multi(5,…)` alternative
+encodes to 13 bytes and one string.
+
+### F-140 — `compare-cost` omits the witnessScript from its wsh column but not the tapleaf from its tr column, inverting the comparison it exists to inform (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-11. Raised by the limits lens, survived adversarial refutation with
+its numbers independently reproduced, and the **mechanism re-read at source by me
+before filing**.
+
+`mnemonic compare-cost` is the tool an operator uses to choose between a
+`wsh(...)` and a taproot form of the same policy. For this wallet it reports
+taproot as **+127..+131 vB per input** more expensive. The true delta is
+**+1..+6 vB**. The comparison is not close to right, and it points the wrong way
+for a decision that gets engraved.
+
+**Mechanism — one side counts its script, the other does not.** Verified in the
+fork at `/scratch/code/shibboleth/rust-miniscript-fork`:
+
+- `Wsh::plan_satisfaction` (`src/descriptor/segwitv0.rs:164`) is exactly
+  `self.ms.build_template(provider)` — **no script placeholder is pushed**.
+- the Tr path (`src/descriptor/tr/mod.rs:500-501`) pushes
+  `Placeholder::TapScript(script)` **and** `Placeholder::TapControlBlock(..)`.
+- `Plan::witness_size()` (`src/plan.rs:258`) sums `self.template`, so it silently
+  includes the tapleaf script for tr and silently excludes the witnessScript
+  for wsh.
+- `mnemonic-toolkit` consumes it raw:
+  `crates/mnemonic-toolkit/src/cost/enumerate.rs:267` → `plan.witness_size()`.
+
+For this descriptor the omission is **501 bytes per input** — the 498-byte
+witnessScript plus its 3-byte varint — on every row. Measured plan sizes
+256/184/152/78 against real satisfactions of 757/685/653/579.
+
+**Two things make this worse than an off-by-one.**
+
+1. The tool prints, in its own notes: *"absolute numbers may differ by ±1 from
+   real-tx accounting, **Δ values are correct**"* (`src/cost/mod.rs:173`). The Δ
+   is the one number that is not correct, and the note is what stops a careful
+   operator from checking.
+2. `design/SPEC_compare_cost_v0_26_0.md:213` carries the comment
+   `// includes scriptCode (the witnessScript)` against exactly the call that
+   does not. The spec asserts the property the code lacks — the same
+   record-is-wronger-than-the-code shape this project keeps finding.
+
+**Scope is every wsh descriptor**, not just this one; the error equals the
+witnessScript size, so it is largest for exactly the complex policies the tool is
+most useful for. Fix in `mnemonic-toolkit` (add the script + varint to the wsh
+side), fix the spec comment, and drop or qualify the "Δ values are correct" note
+until it is true. A regression test should compare `witness_size()` against a
+real `get_satisfaction()` for one wsh and one tr descriptor — that single
+assertion would have caught this.
+
+### F-141 — CLOSED on filing: `me sysw pack --region`, because the plan's stage-2 green line was never actually met `#mnemonic`
+
+Found 2026-08-11 by trying to do the thing the feature exists for — put a payload
+on the machine — and discovering there was no command that produces the artifact.
+
+`design/IMPLEMENTATION_PLAN_systemwide_payloads.md:147` states the stage-2 green
+criterion as:
+
+```
+me sysw pack --no-passphrase 'text:...' | wc -c     # 65536
+```
+
+Measured, it was **79**. `pack` emits the container; only `wipe` emitted a full
+`REGION_LEN` image, and `wipe`'s whole purpose is to destroy a payload rather
+than to write one. So the one artifact that can be written to `0x10D00000` had no
+command behind it, and the first person to need it — me, this session — padded it
+by hand in Python.
+
+**Why this got through.** The criterion was a `wc -c` one-liner in a plan nobody
+re-ran after stage 2 landed, and no test asserted it. The stage's own tests
+checked that `wipe` emits 65536 and that `pack` separates blob from digest;
+neither would notice `pack`'s size. A green criterion that is never executed is
+decoration.
+
+**Fixed here, TDD:** three tests written red first
+(`crates/me-cli/tests/sysw_cli.rs`), then `--region`:
+
+- `region_pads_the_container_to_a_flashable_image` — exactly 65536, magic at
+  offset 0, tail all `0xFF`. **`0xFF`, not zeros**: that is the erased state of
+  NOR flash, so the image is byte-for-byte what the sector looks like with only
+  the container written. Zero padding would be a 65 KiB write for nothing.
+- `region_and_container_have_the_same_digest_and_identity` — padding must not
+  move the number the operator compares on screen. It does not, because
+  `identity` bounds itself by the header's declared total.
+- `region_works_for_a_sealed_payload_too` — `--region` says where the bytes go,
+  not what is in them; refusing to seal would make the flashable form the one
+  form a secret cannot take.
+
+Verified the flag reproduces the hand-padded image **byte-identically**, and the
+digest is unchanged from the container form:
+`616f 88f5 bb98 2e84 eb3d 0b5a f3d3 8777`.
+
+Gate: `cargo test -p mnemonic-engrave` 190+ pass, `cargo clippy --all-targets
+-D warnings` clean.
+
+**Left open deliberately:** the plan line at :147 is now correct only because the
+code moved to meet it. Sweep the other plan/spec `# expected` one-liners for the
+same class — a criterion nobody runs is a claim, and this project has been bitten
+by claims more often than by code.
+
+### F-142 — CLOSED 2026-08-12 — the Go suite never runs at the device's word size, so a whole class of defect is invisible to CI (owning phase: **systemwide payloads**) `#mnemonic`
+
+Filed 2026-08-11 out of the pre-flash conformance Critical, fixed in the fork at
+`74871d3`.
+
+`ParseHeader` widened the wire's `uint32` lengths to `int` before comparing them
+against `MaxSectionLen`. On the builder that is 64 bits and harmless; on the
+device (Cortex-M33 via tinygo) it is 32 bits, and `pub_len = 0xFFFFFFFF` becomes
+`-1`, slips the cap, and yields `TotalLen() == 67` — a small **positive** length
+the device would have accepted for a payload the host rejects as malformed.
+
+**The bug is fixed. The blind spot is not.** Every test, including the shared
+conformance vectors that exist precisely to stop host and device disagreeing,
+runs at the *builder's* word size. No vector can see a 32-bit wrap, because no
+vector is ever evaluated at 32 bits. The two tests added with the fix say so in
+their own comments rather than implying coverage they do not have: on a 64-bit
+builder they pass before the fix too.
+
+**CLOSED 2026-08-12.** `seedhammer/scripts/test-32bit.sh`, wired into the
+existing CI test job (`3b42405`). It runs `./sysw/` under `GOARCH=386` — which
+both builds AND runs on the host, so the assertion is real — and builds under
+`GOARCH=arm`, the device's actual architecture.
+
+**The blocker was cgo, not the package.** The earlier attempt concluded the
+package "would not cross-build" and stopped; the real error was `runtime/cgo`
+wanting 32-bit glibc headers (`gnu/stubs-32.h`) that a 64-bit devshell does not
+ship. `CGO_ENABLED=0` fixes it outright, and these packages are pure Go. A
+diagnosis abandoned one layer too early cost this a day.
+
+**Proven to bite before it was committed:** with the original `int(...)`
+comparison restored, the amd64 run exits 0 and the script exits 1.
+
+Original analysis follows.
+
+**What to do:** run `go test ./sysw/` for a 32-bit `GOARCH` in CI. `GOARCH=386`
+was tried during the review and the package would not cross-build (dependency,
+not `sysw` itself) — so the work is making that build, or finding another 32-bit
+target that does. Until then, treat every width-dependent conversion in `sysw/`
+as unreviewed by machine.
+
+**Grep the port for the same shape while you are there:** `int(` applied to any
+`uint32` read off the wire. This one was found by a reviewer looking at a
+different question, which is not a repeatable process.
+
+### F-143 — sh2-flash compares the key against a RECORDED fingerprint, not the device's live OTP (owning phase: **post-merge polish and hardening**) `#mnemonic`
+
+Filed 2026-08-12 alongside the fix for the pre-flash flashpath review's I1.
+
+`sh2-flash` now refuses to sign with a key whose fingerprint is not the burned
+one — the check the runbook always described and the script never made. But the
+expected value is a **constant in the script** (`SH2_BOOTKEY_FP`, overridable),
+sourced from `design/HARDWARE_INVENTORY.md`. It answers "is this the key we wrote
+down" and not "is this the key THIS device will boot".
+
+The stronger form is available: `picotool otp get BOOTKEY1_0 … BOOTKEY1_15`
+reads the 32 bytes straight out of the attached unit's OTP, and comparing
+against that makes the check about the hardware in front of you rather than
+about a note. It also fails correctly for a second machine with a different key,
+where the constant needs a manual override nobody will remember.
+
+**Why it was not done in the same change, plainly:** the device had already
+rebooted out of BOOTSEL, so `picotool otp get` could not be run and the exact
+output format could not be confirmed. Writing unverified parsing into a safety
+check is how a check silently starts passing everything — which is precisely the
+failure mode the same change already had to fix twice (an empty `openssl` piped
+into `sha256sum` yields sixty-four valid hex characters, and under `set -e` the
+pipeline's failure killed the script with no message at all).
+
+**Do it with the device in BOOTSEL**, confirm the row format by running it, and
+keep the recorded constant as the fallback for when OTP cannot be read — falling
+back LOUDLY, never silently.
+
+### F-144 — the plan has no stage for the LOAD FLOW, so all six stages are done and the feature is inert (owning phase: **systemwide payloads**) `#mnemonic`
+
+Filed 2026-08-12, from the operator's question after the firmware booted: *why
+does the machine never look?*
+
+**Measured, in `seedhammer` at `b14662a`:**
+
+| symbol | non-test references |
+| --- | --- |
+| `ctx.sysw` — **read** | 7 |
+| `ctx.sysw` — **assigned** | **0** |
+| `sysw.Open` | **0** |
+| `ctx.Platform.SyswReader()` — **called** | **0** |
+
+Both ends of the feature exist and are correct. The region reader is real on the
+controller (`cmd/controller/platform_sh2.go:581`); the session store, admission
+table and flags exist (`gui/sysw_session.go`, `gui/sysw_admit.go`); and the
+consumers are wired and asking (`derive_xpub.go:127,135`, `bundle_flow.go:30`,
+`sysw_session.go:104,112`). **The pipe between them was never laid.** Nothing
+reads the region, opens the container, shows the digest, or fills the session, so
+every consumer takes its `ctx.sysw == nil` branch forever.
+
+**This is a PLAN gap, not an execution gap, and that is why it went unnoticed.**
+All six stages are complete as written. The plan's only mention of `SyswReader`
+is the interface declaration in stage 4's table (`:184`); no stage says *call*
+it. Stage 4 built the reader and the store, stage 5 wired the eight programs to
+consume from the store, stage 6 gave the emulator an NFC source. The step that
+puts something IN the store belongs to no stage.
+
+The spec is not the thing that failed — it specifies the behaviour repeatedly:
+*"the device displays it at load, and the operator compares"* (§:438), *"a
+plaintext container carrying a secret class is flagged on screen at load"*
+(§:545), the `[compared]` gate (§:356), and `seedEntryFlow` offering
+Typed / Scanned / **Payload** (§:209). The plan simply never sequenced it, and
+the plan passed its R0 review to 0C/0I in that state.
+
+**No operator-visible harm today**, which is the one piece of luck here:
+`syswOffer` guards on `ctx.sysw == nil` before drawing anything, so the
+"FROM PAYLOAD" choice is never shown and a machine with no payload behaves
+exactly as it did before. The feature is inert, not broken.
+
+**What the missing stage owes**, from the spec rather than invented: read
+`REGION_ADDR` via `SyswReader()`; `sysw.Open` it; display `[digest-shown]` and
+hold for the operator's `[compared]` confirmation; evaluate flags F1–F4 and show
+them; populate the one-entry session. Plus the decision the plan never had to
+make because it never got here: **when does this run** — at boot, or from a menu
+entry the operator chooses?
+
+**The transferable lesson, which is the reason this entry is long.** Six stages,
+a green R0 gate, every stage's tests passing, and the feature does nothing. A
+plan that enumerates COMPONENTS will pass review while omitting the CALL that
+joins them, because reviewers check the stages against each other and not against
+"can a user do the thing". A plan for a user-visible feature should state the
+end-to-end journey first and derive stages from it, so a missing stage shows up
+as a broken sentence rather than as an absent row.
+
+### F-145 — `syswLoadFlow` has no test of its own; the gui harness has no Platform fake with a SyswReader (owning phase: **systemwide payloads**) `#mnemonic`
+
+Filed 2026-08-12 with the load flow itself (`seedhammer` `b1fb067`).
+
+The flow that closes F-144 is exercised by nothing. `go test ./gui/` passes and
+would pass just as well if `syswLoadFlow` returned immediately — which is
+uncomfortably close to the failure F-144 was about, arrived at from the other
+direction.
+
+**Why it was not written rather than faked:** the gui harness's `testPlatform`
+returns `nil` from `SyswReader()`, and every existing sysw test drives the
+session by constructing `syswSession` directly and calling `load()`. There is no
+fixture that hands the GUI a region to read, so a test written today would
+either exercise the parts below the flow (already covered) or assert that a nil
+reader is handled (the one branch that needs no help).
+
+**What it owes**, and the order matters — the second is the one that would have
+caught a real defect:
+
+1. a `testPlatform` `SyswReader` returning a fixture region, so the flow can be
+   driven at all;
+2. cases for: **no reader**, **probe false**, **malformed header**, **truncated
+   region** (header declares more than is present), **unsealed with a digest**
+   (operator confirms → compared; operator declines → loaded-but-refusing),
+   **sealed with the right passphrase** (compared via AEAD, no digest prompt
+   when `pub_len == 0`), and **sealed with the wrong one**;
+3. the boot path specifically: **SKIP must leave `ctx.sysw` nil**, and a machine
+   with no payload must see no prompt at all — that is what keeps the feature
+   additive, and it is asserted nowhere.
+
+Use `crates/me-cli/testdata/sysw_vectors.json`, padded to a region the way
+`me sysw pack --region` does, so the fixture is the artifact that actually gets
+flashed rather than a hand-built blob.
+
+#### F-145 — PARTIALLY DONE 2026-08-12, and its stated reason was wrong `#mnemonic`
+
+Three tests landed in `seedhammer` `9134ca0`, each mutation-checked. **Correction
+first:** F-145 claimed the gui harness had no Platform fake with a `SyswReader`
+and no region fixture. Both already existed — `testPlatform.sysw` with
+`SyswReader()` (`gui_test.go:343,447`) and `sysw.FileReader`
+(`sysw/read_host.go:9`). The gap was real; the reason given for it was written
+from assumption rather than a grep, which is the same failure the entry above it
+is about.
+
+Covered and proven to fail when the code is broken: the additive property (nil
+reader and probe-false return false, create no session, never call `Read()`),
+boot **SKIP** leaving the machine untouched, and §5.2's "never say unreadable".
+
+Still uncovered, and now blocked on F-146 rather than on fixtures: malformed and
+truncated regions producing no session, unsealed-with-digest in both operator
+directions, and sealed with the right and wrong passphrase.
+
+### F-146 — gui flow outcomes cannot be asserted: `runUITouch` gives the test goroutine no synchronised view (owning phase: **systemwide payloads**) `#mnemonic`
+
+Filed 2026-08-12 from writing F-145's tests, and it is why three of them are
+missing rather than merely unwritten.
+
+`runUITouch` drives a flow as an `iter.Pull` coroutine on another goroutine. A
+test can observe what was DRAWN — `pumpUntil` on frame text works, and is what
+the surviving assertions use — but it cannot reliably observe what the flow
+RETURNED or what it wrote to `ctx`. Reads of a captured variable or of
+`ctx.sysw` from the test goroutine are unsynchronised and can be stale.
+
+**Measured, not deduced.** A mutant that made the malformed-region path build a
+session and return `true` left the test PASSING. The mutation was verified to
+have landed (the first attempt matched nothing and silently "passed" — a
+false-survivor that nearly got recorded as evidence of coverage). Those
+assertions were then deleted rather than kept as decoration.
+
+**What it needs:** a way to run a flow to completion and hand its result back
+with a happens-before edge — a done channel closed by the coroutine and waited
+on by the test, or a harness variant that returns the flow's value. Every gui
+flow test today asserts only on drawn text, so this is not specific to `sysw`:
+**no gui flow's return value or context mutation is under test anywhere.** That
+is a large blind spot on a firmware whose flows decide whether a secret is
+handed to a program.
+
+Do this before F-145's remaining cases; without it they would be written, pass,
+and prove nothing.
+
+#### F-146 — MISFILED. Corrected 2026-08-12 by the load-flow fable review `#mnemonic`
+
+**The diagnosis was wrong.** I claimed `runUITouch` gives the test goroutine no
+synchronised view because `iter.Pull` runs the flow on another goroutine, and
+concluded that **no gui flow's return value is under test anywhere**. That
+conclusion rested on a wrong premise and is withdrawn.
+
+`iter.Pull`'s `stop()` runs the body to completion and returns only after it —
+verified by the reviewer against the go1.26.3 source and with `-race` clean. The
+happens-before edge I said was missing is there. Assertions placed **after**
+`quit()` do observe the flow's writes, and do kill a reachable mutant.
+
+**The observation was real; both actual causes are mine.** (1) My assertions ran
+*before* `quit()`, so they read values the flow had not yet written — proven with
+a poisoned sentinel. (2) The mutant I used sat in the malformed-region branch,
+which **never executes**: `FileReader.Read()` rejects junk first via
+`boundBlob`, so `ParseHeader` is never reached with that input.
+
+**The lesson, and it is sharper than the one I filed.** I asserted the mutation
+had LANDED — that the text was in the file — and treated that as evidence it had
+RUN. Presence is not execution. A mutation harness must prove the mutated line
+executed, not merely that it was written; otherwise every unreachable mutant
+reads as a surviving one, and unreachable code is exactly where mutants are
+easiest to place by accident. See [[mutation-testing-finds-false-passes]], which
+this extends.
+
+No harness work is needed. The assertions belong after `quit()`.
+
+#### F-145 — NOT BLOCKED, and writing the tests found a Critical `#mnemonic`
+
+The "blocked on F-146" status was wrong, because F-146 was wrong. All five
+remaining cases are writable today with the existing harness, using
+post-`quit()` assertions and the direct-call pre-queued-events idiom already in
+the tree. The reviewer wrote and ran all five.
+
+**Three pass at HEAD. The two sealed ones failed — because they catch C1**, the
+zero-filled passphrase buffer that made every sealed payload unopenable. The
+tests I deferred as unwritable are the tests that would have caught the worst
+defect in the change.
+
+Remaining work is now ordinary: port those five cases in (malformed and
+truncated regions producing no session, unsealed-with-digest in both operator
+directions, sealed with the right and the wrong passphrase). The buffer-contract
+test committed with the C1 fix covers the initialisation defect itself; these
+cover the flow around it.
+
+### F-147 — I claimed `clippy clean` in three commit messages while it was RED, because `cmd && echo OK` prints nothing when cmd fails (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-12. Found by the stage 7/8 implementer, not by me, and confirmed
+by checking out the commit into a worktree and running clippy there:
+
+```
+$ git worktree add /tmp/wt c49199b && cd /tmp/wt
+$ cargo clippy -p mnemonic-engrave --all-targets -- -D warnings
+error: this `repeat().take()` can be written more concisely
+error: could not compile `mnemonic-engrave` (test "sysw_cli")
+exit 101
+```
+
+The offending line is mine — `std::iter::repeat("abandon").take(40)` in the
+passphrase-bounds test added at `b34944d`. So **`b34944d`, `4692e40` and
+`470c43f` all carry a gate claim that was false when written.**
+
+**The mechanism, which is the point.** I verified with
+
+```sh
+cargo clippy … >/dev/null 2>&1 && echo "  clippy clean"
+```
+
+When clippy PASSES this prints a line. When it FAILS it prints **nothing at
+all** — and nothing is what I then failed to notice, because I was looking for
+the presence of a problem rather than the absence of a confirmation. The commit
+was never gated on the exit status; the `&&` only decorated the transcript.
+
+This is [[empty-output-is-not-absence]] pointed at my own tooling, and the exact
+inverse of the `gofmt -l` trap already recorded in
+[[mutation-testing-finds-false-passes]]: there, a command reported by PRINTING
+and exited 0, so `&& echo OK` fired falsely. Here the command reported by
+EXITING, and `&& echo OK` stayed silent. Both end with a false claim in a commit
+message; the tell in each case was output I did not read.
+
+**Fix the habit, not the instance.** Print the exit status unconditionally —
+`cargo clippy …; echo "clippy exit: $?"` — so a failure produces a LINE rather
+than a silence. A verification whose failure mode is "no output" cannot be
+distinguished from one that never ran, which is the same reason
+`SYSW_REQUIRE_VECTORS=1` exists in this repo.
+
+Also note the near-miss it rode in with: at `4692e40` I read `8` from
+`grep -c "test result: ok"` and committed, while a suite was failing further down
+the same run. Counting successes is not checking for failures. Grep for `FAILED`
+across the whole run FIRST, then count passes.
+
+Nothing to fix in the tree — the implementer corrected the lint inside
+`2b570fc`, and HEAD is clean: clippy exit 0, 0 `FAILED`, 10 suites ok, verified
+here.
+
+### F-148 — flashing is remote-safe; VERIFYING a flash is not — FIRST VERIFICATION LANDED 2026-08-12 (owning phase: **systemwide payloads, stage 11**) `#mnemonic`
+
+Recorded 2026-08-12 when the operator noted they are remote. Two halves of the
+flash operation have opposite answers, and conflating them is how a remote
+session ends with a machine nobody can judge.
+
+**The rule was exercised end to end on 2026-08-12 and held.** `ga039c2b` — the
+whole systemwide-payload feature, stages 7–13 — was signed and flashed remotely
+while the operator was away, recorded as FLASHED/UNVERIFIED, and then confirmed
+booting by the operator once physically present. Remote flash, in-room verdict,
+exactly as this entry prescribes. The split is not theoretical.
+
+**Flashing is recoverable without hands, and here is why.** `Init()` requires a
+20–28 V USB-PD contract before it configures the LCD, and reboots into BOOTSEL
+when it does not find one. A computer's USB port cannot supply that. So a device
+left plugged into the workstation **returns to BOOTSEL by itself** after every
+boot attempt — observed: it is enumerated as `2e8a:000f` right now, having been
+flashed and booted earlier today. A bad image, a wrong signature and a good image
+all land in the same reachable place. No button press is required, and
+`sh2-flash`'s own notes confirm neither script contains an OTP write, which is
+the only unrecoverable class.
+
+**Verifying is NOT remote-able.** "It boots" can only be judged on the machine's
+normal supply, because on workstation power a correctly signed image is
+indistinguishable from a rejected one — both give a dark screen and a device back
+in BOOTSEL. So a remote flash can be *performed* and cannot be *confirmed*.
+
+**Consequence for stage 11**, the tree's first flash write: its hardware gate has
+a precondition the plan does not yet state — **someone with physical access must
+judge the boot before the result is called good.** Until then the honest status
+is "flashed, unverified", and no follow-on work may assume the image runs.
+
+Practical rule: remote sessions may flash freely as long as the device stays on
+workstation USB, and must record the outcome as UNVERIFIED. Moving it to machine
+power is the verification step and belongs to whoever is in the room.
+
+### F-149 — stage 12's integration is pinned by AST only; nothing drives a completed engrave into the verify flow (owning phase: **operator journeys / simulator**) `#mnemonic`
+
+Filed 2026-08-12 on the whole-cycle review's recommendation (item 2.3.3), which
+judged it worth a follow-up rather than a log paragraph.
+
+`backupWalletFlow` reaching `plateVerifyFlow` after a COMPLETED engrave is
+asserted structurally — an AST check that the call exists — and by no test that
+runs it. The behavioural pin is feasible today: the harness already has
+`testEngraver`, so a test can drive an engrave to completion and assert the
+verify flow follows.
+
+**Why it matters more than a normal coverage gap.** §7's verify is the last
+thing standing between a mis-cut plate and an operator who believes their backup
+is good. An AST check proves the call is written; it cannot prove the flow
+arrives there with the state it needs, which is exactly the class of defect this
+feature has produced twice — `ctx.sysw` read everywhere and assigned nowhere
+(F-144), and §8c's `done` button built but never drawn.
+
+**ATTEMPTED 2026-08-12, and the premise is wrong — measured.** The review said a
+behavioural pin was "feasible, the harness has `testEngraver`". It is feasible in
+principle and unaffordable in practice, because `backupWalletFlow` builds a REAL
+seed plate: the engrave screen reports an **11:14** job, and pumping **200,000
+frames took 71 s without completing it**. One test would have more than doubled
+the `./gui/` suite. The attempt was reverted rather than shipped slow or shipped
+failing.
+
+What the attempt DID establish, and it is most of the value: every step up to the
+engrave is drivable and was driven — the seed review screen, the BIP-39
+passphrase offer, and the hold-to-start, all reached in ~2.7 s. **The journey
+arrives at the engrave; only the completion is out of reach.**
+
+**So the work is not "write the test", it is "make a completed engrave cheap".**
+Options, in the order I would try them:
+1. a test seam that lets a plate be substituted — `residency_wiring_test.go`
+   already drives `NewEngraveScreen` with an 8-knot synthetic spline in
+   milliseconds, so the machinery exists; what is missing is a way for
+   `backupWalletFlow` to accept one;
+2. a `testEngraver` that can report the job complete on demand, rather than
+   simulating its duration;
+3. failing both, keep the AST pin and accept the gap KNOWINGLY, which is what
+   this entry now records.
+
+Not urgent: the walk-through review drove the surrounding journeys by execution
+and they closed. But "the call exists" and "the journey arrives" are different
+claims, and only one of them is currently tested.
+
+### F-150 — the on-device wallet-descriptor builder needs major attention: it dead-ends, assumes one key, and offers none of miniscript (owning phase: **a future cycle — needs its own brainstorm**) `#mnemonic`
+
+Filed 2026-08-12 from the operator's own use of the feature on the machine.
+**These are field observations, reported as given; only the code pointers below
+are mine and only they are verified.**
+
+**1. It dead-ends. `buildMultisigPolicyFlow` fails to deliver a descriptor after
+configuration — a BLANK SCREEN after pressing next.** This is the severe one: the
+operator completes the configuration and gets nothing, with no error to act on. A
+blank screen is the failure mode that teaches an operator the machine is broken
+rather than that an input was wrong, and it is the same shape as this cycle's
+recurring defect — a flow that is built and does not arrive.
+
+**2. It assumes the operator at the console holds only ONE key.** Real
+multisig setups routinely have one person holding several cosigner keys — the
+pathological wallet in `design/journeys/` is exactly that: 11 keys from 3
+masters, all reachable from one seat. A builder that cannot express "I hold @0,
+@1 and @2" cannot build the wallets this project already ships journeys for.
+
+**3. Script types are limited to three, and taproot is absent.**
+`multisigScriptChoices()` (`gui/multisig_build.go:276`) offers exactly
+`wsh (native segwit)`, `sh(wsh) (nested segwit)`, `sh (legacy)`. There is no
+`tr()`, so no taproot wallet can be built on the device at all. Verified by
+reading the function.
+
+**4. No miniscript operators.** `after()`, `older()`, hash locks
+(`sha256`/`hash160`) and the composition operators are unavailable, so every
+timelocked, degrading or hashlocked policy is un-buildable on the machine. Note
+the constellation already handles these end to end on the HOST — the
+pathological wallet uses all four timelock kinds plus a `sha256` hashlock, and
+`md` encodes it — so this is a device-side gap, not a codec one.
+
+**Scope note, and the reason this is filed rather than fixed.** Items 3 and 4
+are not bug fixes; they are a feature. Miniscript on a 480×320 touch panel is a
+design problem (how does an operator compose `and_v(v:older(65535),multi(2,…))`
+by tapping?) and it deserves its own brainstorm before any code. Item 1 is a
+defect and could be fixed on its own; item 2 sits between the two. **Do not fold
+these together** — the dead-end should not wait on the design work.
+
+Related: the host side already does all of this (`md compile`, `md encode
+--from-policy`), so a design that lets the device CONSUME a host-built policy —
+which is what the systemwide-payload feature now delivers — may be cheaper than
+teaching the panel to author one. Worth weighing before building an editor.
+
+### F-151 — the frame extractor sees text the DEVICE cannot draw, so every wording assertion in `gui/` shares a blind spot (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-12. Found by the operator looking at the panel, and by nothing
+else in this project.
+
+Unloading a payload produced an almost entirely blank white screen carrying only
+the checkmark. Its body was one ~110-character sentence with an em dash and
+backticks. **`TestSyswUnloadFlow` asserted three separate phrases from that body
+and passed**, because `runUITouch`'s extractor reads the text OPS a frame
+contains, not the pixels the device would light. A string the panel renders as
+nothing still "appears" in the harness.
+
+**This is not one bad test.** Every `uiContains` assertion in `gui/` — and there
+are many — proves that a string was *submitted for drawing*, never that it was
+drawn. So the whole class is invisible: over-long bodies that clip, glyphs
+missing from the font, text laid out off-canvas. The suite is green and the
+screen is blank, which is the exact shape of F-144 and of §8c's undrawn `done`
+button, arriving a third time through a different door.
+
+**What would close it**, cheapest first:
+1. assert against the RASTER rather than the op list — `op.Drawer` already
+   renders to a bitmap for the touch tests, so a "this frame is not blank"
+   check (non-background pixel count above a floor) is nearly free and would
+   have caught this exact defect;
+2. a font-coverage check: fail if a string handed to a screen contains a rune
+   the UI face has no glyph for — turns a silent blank into a build error;
+3. a width/height budget on modal bodies, so an over-long string is refused at
+   the call site rather than clipped at draw time.
+
+(1) is the one to do: it is a handful of lines, needs no font work, and converts
+this entire class from invisible to noisy. Until then, **treat every wording
+assertion in `gui/` as evidence about intent and not about the screen.**
