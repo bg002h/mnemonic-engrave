@@ -85,7 +85,7 @@ These are already normative and must not be contradicted or quietly softened:
 
 ---
 
-# First task (operator ruling 2026-08-11): show the plate layout while it cuts
+# First task (operator ruling 2026-08-11): show the plate layout while it cuts — ✅ DONE, fork `77774ec`
 
 **Extend the simulator to display the final layout of a cut plate at the
 beginning of the engrave, and to indicate on that layout what is currently
