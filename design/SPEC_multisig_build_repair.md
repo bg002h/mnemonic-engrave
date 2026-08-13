@@ -154,16 +154,57 @@ anywhere except on the operator's machine, by hand.** That is the direct cause
 of D-1 reaching hardware, and it makes drivability the first stage rather than a
 convenience.
 
+**This section diagnoses the problem; it no longer prescribes the fix.** Phase 1
+drops NFC (§3), so drivability is reached through the payload instead, and the
+NFC harness work moves to its own later plan with F-158. §3.1 is the substitute
+route and the evidence that it already exists on both sides.
+
 ## 3. Scope
 
 **In scope (phase 1):** D-1 through D-4; multi-slot self keys with divergent
-origins; payload/NFC as a source for seeds and keys into the constructor; the
-seed↔key consistency gate; emulator drivability; a hardware validation gate.
+origins; **the systemwide payload** as the source for cosigner keys and for
+seeds; the seed↔key consistency gate; emulator drivability; a hardware
+validation gate.
 
-**Out of scope, and may not be smuggled in:** taproot authoring; any miniscript
-operator; the recipe/tree-constructor generalisation (§9); a miniscript type
-checker; `ClassCodex32Secret` as a payload-delivered seed (§5.4); changes to
-Sealed Payload; any change to the md1 wire format.
+**NFC is OUT of phase 1 entirely — operator decision, 2026-08-13.** *"We can
+make NFC a secondary priority and omit it entirely from the first attempt at
+getting user the wallet descriptor abilities. Payload will suffice for now and
+nfc work can come in a separate plan at a later date."*
+
+This is a larger simplification than it looks, and §3.1 records why.
+
+**Also out of scope, and may not be smuggled in:** taproot authoring; any
+miniscript operator; the recipe/tree-constructor generalisation (§9); a
+miniscript type checker; `ClassCodex32Secret` as a payload-delivered seed
+(§5.4); changes to Sealed Payload; any change to the md1 wire format.
+
+### 3.1 Dropping NFC removes the hardest stage, not a feature
+
+§2.3's finding was going to make "build an NFC harness" the first stage,
+because the cosigner gather had no other source. With the payload as the source
+instead, that stage disappears — the seam it needed **already exists on both
+sides**. Verified 2026-08-13:
+
+- **A payload can carry cosigner cards.** `me sysw pack` accepted two mk1 chunks
+  and `me sysw show` reports them as `public record 0: md1/mk1 — confirmed`,
+  `public record 1: md1/mk1 — confirmed`. Chunked cards are ordinary records.
+- **Host tests can supply one.** `gui/gui_test.go:453`
+  `func (p *testPlatform) SyswReader() sysw.Reader { return p.sysw }` — a real,
+  settable field. This is the asymmetry with NFC, whose `NFCReader()` returns
+  nil (`gui/gui_test.go:445`) and is why §2.3 happened.
+- **The emulator can supply one.** `cmd/emu`'s `embeddedSyswReader` is working
+  and was walked end to end on 2026-08-12 for
+  `design/journeys/SeedHammer-II-load-payload-journey.pdf`.
+
+So the flow becomes drivable by a test and in a browser **without touching the
+NFC harness at all**. F-158 stays filed and moves to the later NFC plan; it is
+no longer on this spec's critical path.
+
+**The operator-workflow consequence, stated rather than discovered later:** with
+NFC gone, cosigner keys reach the machine only by payload, which is written from
+a host over USB in BOOTSEL. Building a multisig on the device therefore requires
+a host step in phase 1. That is a real narrowing of the air-gapped story and it
+is reversible — the later NFC plan restores tag-in-hand gathering.
 
 ## 4. Normative requirements
 
@@ -350,7 +391,7 @@ spec's stages generate new test material:
 
 ## 5. Sources for seeds and keys
 
-### 5.1 The generic source seam — REQUIRED
+### 5.1 The source seam — REQUIRED
 
 **Operator directive, 2026-08-13:** *"We eventually want to allow payload and
 NFC everywhere, including typed only."*
@@ -359,6 +400,14 @@ Source selection MUST therefore be built **once**, as one seam used by every
 seed and key input in the constructor, rather than as a per-flow addition. The
 seam offers the sources admitted for the program and the class (SYSW§3.3.2),
 with typed entry always available.
+
+**In phase 1 the seam has exactly two sources: PAYLOAD and TYPED** (§3). It MUST
+be shaped so NFC is a third source added later without re-opening its call
+sites — that is the whole reason for building it once — but it MUST NOT ship a
+disabled NFC branch, a stubbed source, or a menu entry that cannot be chosen. An
+inert control teaches the operator that controls here may be inert, which is
+expensive on a device whose other buttons cut steel (the same argument
+`gui/multisig_build.go` already makes for the pager it made conditional).
 
 ### 5.2 Retiring TYPED-ONLY — REQUIRED, by explicit ruling
 
@@ -397,21 +446,35 @@ their own stage.
 Each stage closes at **0 Critical / 0 Important**, with a green full validation
 suite AND its §4.5 emulator walk.
 
-### P0 — make the flow drivable
+### P0 — the payload supplies the whole cosigner set
 
-Nothing else can be verified until this lands, and it is why D-1 shipped.
+Nothing else can be verified until this lands, and the absence of it is why D-1
+shipped. With NFC out of scope (§3.1) this is small, and it is a capability
+worth having on its own rather than scaffolding.
 
-1. Isolate why `cmd/emu`'s reader is nil at gather entry even when a record was
-   presented first (§2.3 fact 1). Two candidates named, neither confirmed: the
-   one-shot `reader()` lifetime versus the once-at-entry acquisition in
-   `bundleGatherFlow`. **Isolate before fixing** — a guess here becomes a
-   harness that lies.
-2. Give `gui`'s `testPlatform` a tag source that can deliver a **multi-chunk**
-   card, since every mk1 carrying an xpub exceeds a single codex32 string.
-3. Fix `cmd/emu`'s `shNFC` so a presented card reaches a gather.
+Today `gui/multisig_build.go:54` takes **one** card from the payload and expects
+the operator to scan the rest:
+
+> `syswOffer(ctx, th, sysw.ClassMDMK, "First card from where?")` … "the operator
+> keeps scanning the rest — the set is n-1 cards and a source that
+> short-circuited the gather would cap it at whatever the payload held."
+
+With no scanning, the payload must supply all of them.
+
+1. `gui/sysw_session.go:114` `take` returns the **first** matching record and
+   does not consume it, so it cannot yield a second card. Add a `takeAll`-style
+   accessor for a class.
+2. Feed **every** `ClassMDMK` record into `bundleGatherFlow`'s existing
+   `offer()`, so dedup, chunk assembly and validation stay on exactly one path —
+   which `gui/bundle_flow.go:100-103` already argues for: "A separate insertion
+   path would be a second way for a card to become part of a bundle, and only
+   one of them would have the checks."
+3. Decide what the gather screen becomes when nothing can be scanned — a review
+   of what the payload supplied, not a "Scan a card" prompt. See §10 Q5.
 
 **Gate:** an automated test drives `buildMultisigPolicyFlow` from the template
-picker to a completed engrave, and an emulator walk does the same in a browser.
+picker to a completed engrave using **only** a payload, and an emulator walk
+does the same in a browser (§4.5).
 
 ### P1 — the dead end
 
@@ -429,10 +492,10 @@ fails on the unfixed code — demonstrated, not assumed.
 §4.1 and §4.2. `SelfSlot int` becomes a set; `cosignerFromCard` stops discarding
 origins; `OriginDivergent` is used when origins differ. Key reuse refused.
 
-### P4 — payload and NFC as constructor input
+### P4 — the payload as a SEED source, and the consistency gate
 
-§4.3 and §5. The generic source seam; seeds and keys from payload or NFC; the
-consistency gate; the `I-SCRUB` ruling.
+§4.3 and §5. The source seam; seeds from the payload (P0 already did keys); the
+seed↔key consistency gate; the `I-SCRUB` ruling.
 
 ### P5 — hardware gate
 
@@ -475,9 +538,15 @@ Verified on 2026-08-13 by running or by reading the cited line:
   were performed in a browser.
 - §4.6's 54.3 s and its six slowest tests are `go test` output, not estimates.
 
-**Not verified, and flagged as such:** D-1 itself (unreproduced — that is P0's
-purpose); the precise cause of the emulator's nil reader; whether any code path
-outside `gui` consumes `scriptName`.
+- A payload carries mk1 cosigner cards: `me sysw pack` accepted a two-chunk card
+  and `me sysw show` reported both records as `md1/mk1 — confirmed`. Run output.
+- `testPlatform.SyswReader()` returns a settable field, unlike `NFCReader()`.
+
+**Not verified, and flagged as such:** D-1 itself (unreproduced — reproducing it
+is P1's first task, now that P0 makes the flow reachable); whether any code path
+outside `gui` consumes `scriptName`. The precise cause of the emulator's nil NFC
+reader is **deliberately not investigated further here** — it belongs to the
+later NFC plan (F-158), and phase 1 does not depend on it.
 
 **No Rust build gate applies.** This spec's executable content is Go, and
 `scripts/plan-build-gate.sh` extracts ```rust blocks only. The Go claims here
@@ -533,3 +602,12 @@ hard part, and `node`/`descriptor` can stay unexported if recipes live inside
    account index be operator-chosen or auto-assigned ascending? Auto is simpler
    and harder to get wrong; operator-chosen matches wallets that already exist.
 4. Does the §4.5 walk belong in CI, given it needs a wasm build and a browser?
+5. With nothing scannable in phase 1, what does the cosigner-gather screen
+   become — a review of what the payload supplied, or does it disappear into the
+   parameter pickers? It currently says "Scan a card, or Done" and is titled
+   "Engrave Bundle" (F-159). Whatever replaces it must not become a screen that
+   NFC has to fight its way back into later.
+6. §3.1 notes phase 1 requires a host to write the payload, so an operator
+   cannot build a multisig from the device alone. Is that acceptable for the
+   phase-1 milestone, or does it make the later NFC plan a release blocker
+   rather than a follow-on?
