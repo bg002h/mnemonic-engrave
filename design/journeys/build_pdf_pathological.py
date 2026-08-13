@@ -11,7 +11,6 @@ import base64, html, json, os, re, sys
 
 W = os.path.dirname(os.path.abspath(__file__))
 OUT, SHOTS = os.path.join(W, "out"), os.path.join(W, "shots")
-sys.path.insert(0, os.path.join(os.path.dirname(W), "journey"))
 
 
 def b64(p):
@@ -62,8 +61,24 @@ for line in transcript.split("\n"):
 if cur:
     S[cur] = "\n".join(buf).strip("\n")
 
-keys = json.load(open(os.path.join(W, "keys.json")))
-CSS = open(os.path.join(os.path.dirname(W), "journey", "build_pdf.py")).read()
+# Was json.load(open("keys.json")) -- a file that was never committed, so this
+# script could not run at all. The two fields it uses (fingerprint and origin
+# path) are already in the committed key files' header comments, which makes the
+# captions traceable to an input rather than to a vanished artifact.
+def _keys_from_inputs():
+    d = os.path.join(W, "inputs-pathological", "keys")
+    out = []
+    for f in sorted(os.listdir(d)):
+        m = re.search(r"\[([0-9a-f]{8})/([^\]]+)\]", open(os.path.join(d, f)).read())
+        if not m:
+            raise SystemExit(f"{f}: no [fingerprint/path] header -- cannot caption its plates")
+        out.append({"fp": m.group(1), "path": "m/" + m.group(2)})
+    return out
+
+
+keys = _keys_from_inputs()
+# design/journey/ has never existed; the sibling builder is in THIS directory.
+CSS = open(os.path.join(W, "build_pdf.py")).read()
 CSS = CSS.split('CSS = """')[1].split('"""')[0]
 
 P = []
@@ -113,16 +128,16 @@ P.append(f"""
 <div class="page">
 <h2>The input files</h2>
 <h3>The policy</h3>
-{filebox(os.path.join(W,'inputs','wallet-policy.txt'), 'inputs/wallet-policy.txt')}
+{filebox(os.path.join(W,'inputs-pathological','wallet-policy.txt'), 'inputs-pathological/wallet-policy.txt')}
 <h3>The three masters (SECRET — BIP-39 test vectors)</h3>
 <div class="grid2">
-{''.join(filebox(os.path.join(W,'inputs','seeds',f), 'inputs/seeds/'+f)
-         for f in sorted(os.listdir(os.path.join(W,'inputs','seeds'))))}
+{''.join(filebox(os.path.join(W,'inputs-pathological','seeds',f), 'inputs-pathological/seeds/'+f)
+         for f in sorted(os.listdir(os.path.join(W,'inputs-pathological','seeds'))))}
 </div>
 <h3>The eleven keys</h3>
 <div class="grid2">
-{''.join(filebox(os.path.join(W,'inputs','keys',f), 'inputs/keys/'+f)
-         for f in sorted(os.listdir(os.path.join(W,'inputs','keys'))))}
+{''.join(filebox(os.path.join(W,'inputs-pathological','keys',f), 'inputs-pathological/keys/'+f)
+         for f in sorted(os.listdir(os.path.join(W,'inputs-pathological','keys'))))}
 </div>
 </div>
 """)
