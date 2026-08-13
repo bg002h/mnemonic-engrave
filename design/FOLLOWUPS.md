@@ -2,6 +2,28 @@
 
 Low/nit items deferred from architect reviews (per the iterative-architect-review standard: Critical/Important fixed inline; low/nit recorded here). Promote to a cycle when convenient.
 
+## Convention — a follow-up's STATUS lives in its heading
+
+**If an item is closed, answered, withdrawn or partially done, the heading says
+so.** Not the body, not a nested `####` entry, not a paragraph three screens
+down.
+
+The reason is that status gets *counted* far more often than it gets read. Asked
+how many `#mnemonic` items were open, a grep over headings said 24; the real
+number was about 16, because four items recorded their closure somewhere a grep
+could not see. Reconciled 2026-08-12: F-129, F-145 and F-146 had the answer in a
+nested entry, and F-144's fix had shipped without anything being written down at
+all.
+
+Keep the nested entries — they carry the reasoning, and F-145's records that its
+stated reason was wrong, which is worth more than the closure. Just put the
+verdict in the heading too, so the index and the detail agree.
+
+This is the same failure that sent a session rebuilding the finished simulator
+overlay: `PREP_journeys.md`'s heading named the task while its body, forty lines
+below, recorded it built. A heading that describes the work rather than its state
+is a trap for whoever reads only headings — which is everyone, most of the time.
+
 ## Phase policy — test infrastructure is POLISH, not functionality (operator ruling, 2026-08-12)
 
 > *"All these checks on the behavior of the code are fantastic but if second tier
@@ -3960,7 +3982,7 @@ wallet's cards from another's.
 two is wrong, then bump the vendored pin. Do not bump the pin first: if the
 rename is real, bumping silently changes the stub every existing key card carries.
 
-### F-129 — `--path` is mandatory for a non-canonical wrapper and flattens divergent origins; which source wins on restore is unpinned (owning phase: **operator journeys**) `#mnemonic`
+### F-129 — ANSWERED 2026-08-11 (see the nested entry) — `--path` is mandatory for a non-canonical wrapper and flattens divergent origins; which source wins on restore is unpinned (owning phase: **operator journeys**) `#mnemonic`
 
 Filed 2026-08-11, same run. **A design question, not a defect.**
 
@@ -4494,7 +4516,7 @@ pipeline's failure killed the script with no message at all).
 keep the recorded constant as the fallback for when OTP cannot be read — falling
 back LOUDLY, never silently.
 
-### F-144 — the plan has no stage for the LOAD FLOW, so all six stages are done and the feature is inert (owning phase: **systemwide payloads**) `#mnemonic`
+### F-144 — CLOSED 2026-08-12: the load flow was built, shipped in me v0.6.0 / firmware g753f729, and confirmed on the machine — the plan has no stage for the LOAD FLOW, so all six stages are done and the feature is inert (owning phase: **systemwide payloads**) `#mnemonic`
 
 Filed 2026-08-12, from the operator's question after the firmware booted: *why
 does the machine never look?*
@@ -4550,7 +4572,7 @@ joins them, because reviewers check the stages against each other and not agains
 end-to-end journey first and derive stages from it, so a missing stage shows up
 as a broken sentence rather than as an absent row.
 
-### F-145 — `syswLoadFlow` has no test of its own; the gui harness has no Platform fake with a SyswReader (owning phase: **systemwide payloads**) `#mnemonic`
+### F-145 — PARTIALLY DONE 2026-08-12 (see the nested entry) — `syswLoadFlow` has no test of its own; the gui harness has no Platform fake with a SyswReader (owning phase: **systemwide payloads**) `#mnemonic`
 
 Filed 2026-08-12 with the load flow itself (`seedhammer` `b1fb067`).
 
@@ -4602,7 +4624,7 @@ Still uncovered, and now blocked on F-146 rather than on fixtures: malformed and
 truncated regions producing no session, unsealed-with-digest in both operator
 directions, and sealed with the right and wrong passphrase.
 
-### F-146 — gui flow outcomes cannot be asserted: `runUITouch` gives the test goroutine no synchronised view (owning phase: **systemwide payloads**) `#mnemonic`
+### F-146 — MISFILED, withdrawn 2026-08-12 (see the nested entry) — gui flow outcomes cannot be asserted: `runUITouch` gives the test goroutine no synchronised view (owning phase: **systemwide payloads**) `#mnemonic`
 
 Filed 2026-08-12 from writing F-145's tests, and it is why three of them are
 missing rather than merely unwritten.
