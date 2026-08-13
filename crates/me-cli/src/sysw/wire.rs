@@ -48,7 +48,16 @@ pub const MAX_ITERATIONS: u32 = 2_000_000;
 /// host-seals-what-the-device-refuses shape that cost this cycle three separate
 /// defects. A const assertion, so it fails the BUILD rather than a test.
 const _: () = assert!(PASSPHRASE_MAX > 100);
-const _: () = assert!(REGION_LEN.is_multiple_of(4096));
+// `% 4096 == 0`, not `is_multiple_of`: that method is UNSTABLE on the Rust
+// the release workflow builds with, so it compiled here and failed every
+// cross-target job. A local toolchain newer than CI's is a difference the local
+// gates cannot see.
+// clippy on a NEWER toolchain demands `is_multiple_of`; the Rust the release
+// workflow builds with rejects it as unstable. The lint is silenced rather than
+// obeyed because CI is the constraint that matters -- obeying it broke every
+// cross-target build job.
+#[allow(clippy::manual_is_multiple_of)]
+const _: () = assert!(REGION_LEN % 4096 == 0);
 const _: () = assert!((REGION_ADDR as usize + REGION_LEN) <= 0x10E0_0000);
 
 /// The 52-byte header. EPD §6's layout byte for byte — only the magic differs —

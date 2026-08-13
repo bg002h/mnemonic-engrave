@@ -199,7 +199,10 @@ fn hex_lower(b: &[u8]) -> String {
 /// accepted-and-lowercased: EPD §6.6 hashes the record as it appears on the
 /// wire, so two spellings of one body would be two different digests.
 fn unhex_lower(s: &str) -> Option<Zeroizing<Vec<u8>>> {
-    if !s.len().is_multiple_of(2) {
+    // `% 2 != 0` rather than `is_multiple_of` — unstable on CI's Rust.
+    #[allow(clippy::manual_is_multiple_of)]
+    let odd = s.len() % 2 != 0;
+    if odd {
         return None;
     }
     let mut out = Zeroizing::new(Vec::with_capacity(s.len() / 2));
