@@ -59,7 +59,14 @@ pub enum SyswError {
     Wire(wire::WireError),
     /// A record `classify` cannot place. Fails CLOSED: better refused at
     /// creation with a name than mis-filed into the wrong section.
-    Unclassifiable(usize),
+    ///
+    /// Carries WHY, because [`classify`] returns `Unknown` for two unrelated
+    /// situations and the operator's next move differs completely between them.
+    /// A single message naming only one of them sent the reader looking at the
+    /// wrong thing — found writing the Load Payload journey, where a `pass:`
+    /// record with a plain-text body was refused with a sentence about
+    /// descriptors and addresses.
+    Unclassifiable(usize, UnknownReason),
     /// Sections exceed what the region can hold.
     TooLarge(usize),
     Crypto,
@@ -77,6 +84,34 @@ pub enum SyswError {
     /// Normalised passphrase longer than `[passphrase-bounds]` (§12.5) allows.
     PassphraseTooLong(usize),
     NotUtf8,
+}
+
+/// Why [`classify`] could not place a record.
+///
+/// Carries NO operator data, and that is load-bearing rather than tidy: the
+/// record that most often lands here is a `pass:` one, whose body IS the
+/// passphrase. An error message is the last place it may appear — stderr is
+/// logged, scrolled back and pasted into bug reports. Only the reserved prefix
+/// is named, and that is a compile-time constant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnknownReason {
+    /// A reserved prefix (`text:` / `pass:`) whose body is not lowercase hex.
+    /// The prefixes are RESERVED, so this is refused rather than demoted to
+    /// free text — see [`record`]'s module docs for why the bodies are encoded.
+    NonHexBody(&'static str),
+    /// No reserved prefix, not a BIP-39 mnemonic, and not a constellation
+    /// string. This is the case the descriptor/address gap belongs to.
+    Unrecognised,
+}
+
+/// Which reason applies, decided where the record is still in hand.
+fn unknown_reason(record: &str) -> UnknownReason {
+    for prefix in [record::PASS_PREFIX, record::TEXT_PREFIX] {
+        if record.starts_with(prefix) {
+            return UnknownReason::NonHexBody(prefix);
+        }
+    }
+    UnknownReason::Unrecognised
 }
 
 /// Which section a record belongs in.
@@ -217,7 +252,9 @@ fn split(records: Vec<String>) -> Result<(Payload, Vec<u8>, wire::Header), SyswE
     let mut payload = Payload::default();
     for (i, r) in records.into_iter().enumerate() {
         match classify(&r) {
-            record::Class::Unknown => return Err(SyswError::Unclassifiable(i)),
+            record::Class::Unknown => {
+                return Err(SyswError::Unclassifiable(i, unknown_reason(&r)))
+            }
             c if c.is_secret() => payload.secret.push(Zeroizing::new(r)),
             _ => payload.public.push(r),
         }
@@ -511,7 +548,42 @@ mod tests {
     fn an_unclassifiable_record_is_refused_with_its_index() {
         assert_eq!(
             pack(vec![md1(), "not a record".into()], None, ITER),
-            Err(SyswError::Unclassifiable(1))
+            Err(SyswError::Unclassifiable(1, UnknownReason::Unrecognised))
+        );
+    }
+
+    /// The two `Unknown` cases must not collapse to one message. A reserved
+    /// prefix with a plain-text body is the mistake everyone makes first, and
+    /// its remedy — hex-encode the body — has nothing to do with the
+    /// descriptor/address gap the other case is about.
+    #[test]
+    fn a_reserved_prefix_with_a_plain_body_reports_the_body_not_the_gap() {
+        for (prefix, record) in [
+            (record::PASS_PREFIX, "pass:correct horse battery staple"),
+            (record::TEXT_PREFIX, "text:SEEDHAMMER II DEMO PAYLOAD"),
+        ] {
+            assert_eq!(
+                pack(vec![record.into()], None, ITER),
+                Err(SyswError::Unclassifiable(
+                    0,
+                    UnknownReason::NonHexBody(prefix)
+                )),
+                "{record}"
+            );
+        }
+    }
+
+    /// Uppercase hex is not lowercase hex, and §5.3.1 means the lowercase one:
+    /// EPD §6.6 hashes the section lowercased, so accepting uppercase would let
+    /// two spellings of one record produce two digests.
+    #[test]
+    fn an_uppercase_hex_body_is_still_a_non_hex_body() {
+        assert_eq!(
+            pack(vec!["text:5345454448414D4D4552".into()], None, ITER),
+            Err(SyswError::Unclassifiable(
+                0,
+                UnknownReason::NonHexBody(record::TEXT_PREFIX)
+            ))
         );
     }
 

@@ -1022,8 +1022,8 @@ fn print_digest(blob: &[u8]) {
 fn report_unconfirmed(records: &[String]) {
     for i in mnemonic_engrave::sysw::record::mdmk_unconfirmed(records) {
         eprintln!(
-            "me: record {i}, as given: an md1/mk1 this tool could not decode; the \
-             device will treat it as a SECRET"
+            "me: record {i}, as given (records count from 0): an md1/mk1 this tool \
+             could not decode; the device will treat it as a SECRET"
         );
     }
 }
@@ -1128,10 +1128,29 @@ fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>) -> i32 {
 fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
     use mnemonic_engrave::sysw::SyswError as E;
     match e {
-        E::Unclassifiable(i) => format!(
-            "record {i} is not a form this container can place. Descriptors and \
-             addresses are not yet classifiable here — see sysw::classify"
-        ),
+        // Two situations, two remedies, and they are not close: one is "hex
+        // your body", the other is "this tool cannot place that at all". The
+        // first version of this said only the second, so the operator whose
+        // `pass:` body was plain text was told about descriptors and addresses.
+        // Neither branch prints the record — a `pass:` body is a passphrase.
+        E::Unclassifiable(i, why) => {
+            use mnemonic_engrave::sysw::UnknownReason as U;
+            match why {
+                U::NonHexBody(prefix) => format!(
+                    "record {i} (records count from 0) begins `{prefix}`, but its body is \
+                     not lowercase hex. That prefix is RESERVED, so a body it cannot \
+                     decode is refused rather than quietly engraved as free text \
+                     (§5.3.1). Encode the body first:\n      \
+                     printf '%s' 'your text here' | xxd -p -c 256"
+                ),
+                U::Unrecognised => format!(
+                    "record {i} (records count from 0) is not a form this container can \
+                     place: not a BIP-39 mnemonic, not an md1/mk1/ms1 string, and not a \
+                     `text:`/`pass:` record. Descriptors and addresses are not yet \
+                     classifiable here — see sysw::classify"
+                ),
+            }
+        }
         E::TooLarge(n) => format!("{n} bytes exceeds the flash region"),
         E::PassphraseMismatch => "a sealed payload needs a passphrase".into(),
         E::NotEnterableOnDevice(w) => format!(

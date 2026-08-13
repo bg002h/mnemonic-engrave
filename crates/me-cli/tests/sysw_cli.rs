@@ -381,6 +381,44 @@ fn an_unplaceable_record_is_named_with_its_index() {
         .stderr(predicate::str::contains("record 1"));
 }
 
+/// The refusal an operator actually hits: a reserved prefix carrying its body
+/// as plain text. It must say THAT, and it must not print the body.
+///
+/// The body here is a passphrase, which is the whole point — stderr is
+/// scrolled back, logged, and pasted into bug reports. The first version of
+/// this message named neither the prefix nor the body, and instead explained
+/// the descriptor/address gap, which is a different failure with a different
+/// remedy.
+#[test]
+fn a_plain_text_pass_body_is_refused_by_body_and_never_echoed() {
+    let out = me()
+        .args([
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "pass:correct horse battery staple",
+        ])
+        .assert()
+        .failure();
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(
+        err.contains("not lowercase hex"),
+        "the refusal must name the real cause: {err}"
+    );
+    assert!(
+        err.contains("xxd -p"),
+        "and hand over the one-liner that fixes it: {err}"
+    );
+    assert!(
+        !err.contains("correct horse"),
+        "THE PASSPHRASE MUST NOT REACH STDERR: {err}"
+    );
+    assert!(
+        !err.contains("Descriptors and addresses"),
+        "and must not explain the gap that did not apply here: {err}"
+    );
+}
+
 /// Pre-flash conformance review, I3. Rust models "no passphrase" as `None`, so
 /// `Some("")` is a real passphrase here — but the device reads an empty
 /// passphrase as *absence*, so a payload sealed with one can never be opened on
@@ -466,7 +504,7 @@ fn pack_warns_once_per_unconfirmed_record_and_still_succeeds() {
         .success();
     let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
     assert!(
-        err.contains("record 0, as given: an md1/mk1 this tool could not decode"),
+        err.contains("record 0, as given (records count from 0): an md1/mk1 this tool could not decode"),
         "the warning must name the record by the index the operator gave it, AND say \
              that is the basis — `me sysw show` numbers the public section instead, and \
              on a sealed payload the two diverge: {err}"
@@ -474,6 +512,13 @@ fn pack_warns_once_per_unconfirmed_record_and_still_succeeds() {
     assert!(
         err.contains("SECRET"),
         "and say what the device will do with it: {err}"
+    );
+    // The base is stated because it is 0 and every text editor counts from 1.
+    // Writing the Load Payload journey, `record 1` on a three-line file sent me
+    // to the wrong line — the index is real, the reader's assumption is not.
+    assert!(
+        err.contains("records count from 0"),
+        "an unlabelled index is read as 1-based: {err}"
     );
 }
 
@@ -486,8 +531,8 @@ fn the_warning_names_the_record_the_operator_passed() {
         .assert()
         .success();
     let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
-    assert!(err.contains("record 1, as given: an md1/mk1"), "{err}");
-    assert!(!err.contains("record 0, as given: an md1/mk1"), "{err}");
+    assert!(err.contains("record 1, as given (records count from 0): an md1/mk1"), "{err}");
+    assert!(!err.contains("record 0, as given (records count from 0): an md1/mk1"), "{err}");
 }
 
 /// The other direction, which is what makes the test above able to fail: a
