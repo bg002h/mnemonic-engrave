@@ -1,0 +1,9 @@
+# Build artifacts. The PDFs are the deliverable; these are what makes them.
+#
+# Not committed because they are large (framebuffer PNGs and plate renders run
+# to megabytes) and because they are DERIVED -- transcript_*.sh and the emulator
+# regenerate them. Ignored rather than merely uncommitted so a rebuild cannot
+# leave 20 untracked PNGs sitting in `git status`, which is how a 1 MB shots/
+# nearly rode along in an unrelated commit.
+out/
+shots/

@@ -26,3 +26,6 @@ sh2-state/
 
 # cargo-mutants working directories
 mutants.out*/
+
+# Playwright MCP scratch (page snapshots, console logs) — never part of the repo.
+.playwright-mcp/
