@@ -4867,6 +4867,37 @@ button, arriving a third time through a different door.
 this entire class from invisible to noisy. Until then, **treat every wording
 assertion in `gui/` as evidence about intent and not about the screen.**
 
+**(1) DONE 2026-08-12** — `gui/raster_test.go` (fork `c4f50fe`): `runUITouchRaster`
+rasterises each frame through the `op.Drawer` the touch tests already build and
+counts pixels differing from the frame's own corner, and
+`TestUnloadNoticeIsActuallyDrawn` pins the screen that started this.
+
+**With a correction to the recommendation above, which the measurement earned.**
+"Nearly free and would have caught this exact defect" was true only of the
+*second* attempt. The first floor — 2000, reasoned from *"the broken screen drew
+just the checkmark"* — **passed with the original defective body restored.** The
+premise was wrong: the frame was never near-empty. Measured:
+
+| body | ink |
+| --- | --- |
+| original, blank on the device | **2652 px** |
+| the fix | **6688 px** |
+
+So the defect is a body that lays out to *almost* nothing, not to nothing, and
+an ink floor only separates them if it is set from the two real numbers. The
+committed floor is 4000, and it is verified in both directions: exit 1 with the
+original `showNotice` body restored, exit 0 with the fix.
+
+Worth keeping as the general lesson, because this project keeps re-finding it: a
+rasterising test that then asserts a threshold nothing can cross is **worse than
+no test**, since it reads as coverage of exactly the defect it cannot see —
+[[mutation-testing-finds-false-passes]] again, arriving through the assertion's
+constant rather than its subject. Any future `assertFrameHasBody` floor gets
+calibrated the same way, against a restored defect.
+
+(2) and (3) remain open and are still worth doing — an ink floor catches a body
+that vanishes wholesale, not one glyph missing from a face.
+
 ### F-152 — selecting "from payload" when one is PRESENT BUT NOT LOADED should launch the loader (owning phase: **a future cycle — needs a spec §3.1 state and one plan stage**) `#mnemonic`
 
 Filed 2026-08-13 by operator ruling. Agreed as a feature, deliberately not
