@@ -5470,3 +5470,29 @@ belongs to a gated cycle. Worth checking `collected()`'s other consumers in the
 same pass, since it feeds `mk1DisplayFlow` too.
 
 ---
+
+### F-163 — S3's gate is a whole-tree `grep` and S0 already broke it (owning phase: **`SPEC_multisig_build_repair.md` P2/S3**) `#seedhammer`
+
+Filed 2026-08-14 by the parallel-implementation review
+(`design/agent-reports/parallel-implementation-feasibility.md`), controller-verified.
+
+S3's gate line is `grep -rn TYPED-ONLY --include='*.go'` returns **0**. The plan
+measured **9** occurrences on 2026-08-13. On 2026-08-14 S0's own
+`cmd/emu/embed_confinement_test.go` (`3009f22`) added a **10th** — in a comment
+citing `TYPED-ONLY` as the archetype of a hand-maintained list that goes stale.
+Measured now: **10**, in `gui/multisig.go` ×4, `gui/bip85.go` ×2,
+`gui/singlesig.go` ×2, `gui/multisig_build.go` ×1, `cmd/emu/embed_confinement_test.go` ×1.
+
+So S3 can no longer satisfy its own gate without editing a file S0 owns, and the
+two stages never ran concurrently — one agent, one day apart, and they still
+collided. **A whole-tree `grep` is a shared resource**: it makes every stage's
+acceptance depend on every other stage's text.
+
+Fix, when S3 opens: scope the gate to the code it governs —
+`grep -rn TYPED-ONLY --include='*.go' gui/` returns 0 — and have S3 retire the
+`cmd/emu` citation in the same change, since that comment is *about* the phrase
+and reads wrong once the phrase is gone. Do not widen the count and re-measure;
+that repeats the defect one stage later.
+
+Not urgent: S3 has not opened. It is filed rather than fixed because the plan
+text is the thing that needs editing, and the plan is a gated artifact.
