@@ -5,9 +5,10 @@ Date: 2026-08-14. Prerequisite for S0 D6/D7 per the plan's §1a instruction:
 "the previous list followed an author's memory and two of its three tests were
 unwritable."
 
-It happened again. **One of the three tests in the current list is unwritable
-from the BIP it cites**, and the citation is not merely imprecise — the document
-contains no vector of any kind.
+It happened again, at the same rate. **Two of the three tests in the current
+list are unwritable**, for two unrelated reasons: BIP-141 contains no vector of
+any kind, and BIP-383's `wsh(...)` vectors are a descriptor type this codebase
+refuses by design.
 
 ## Provenance
 
@@ -26,8 +27,11 @@ list the 0th, 1st and 2nd scripts.
 - **Addresses published: 0** (`grep -cE '(bc1|tb1|[13][a-km-zA-HJ-NP-Z1-9]{25,34})'` → 0).
   The plan's "not BIP-382, which publishes no addresses" is right about 382, and
   the same is true of 383 — the plan already says so, and it holds.
-- `wsh(multi(...))` vectors exist with `0020…` scriptPubKeys. **Comparing at
-  scriptPubKey is therefore correct and writable.**
+- `wsh(multi(...))` vectors exist with `0020…` scriptPubKeys — so comparing at
+  scriptPubKey is the right *level*. But they are `multi`, not `sortedmulti`,
+  and `bip380` refuses unsorted `multi` by design, so **these particular vectors
+  cannot be run through this codebase at all**. See "The second unwritable test"
+  below.
 - Bare `sortedmulti(...)` vectors exist, including one over two xpubs with three
   derived child scripts — useful, because it exercises sorting *after*
   derivation.
@@ -35,11 +39,12 @@ list the 0th, 1st and 2nd scripts.
 **Gap, and it matters:** `grep -c 'wsh(sortedmulti'` → **0**. BIP-383 publishes
 no `wsh(sortedmulti(...))` vector, and that is precisely the shape this device
 builds (`gui.TestExpandedToDescriptorWshSortedmultiRoundTrip`). The composed
-shape can be covered only by *joining* sources — BIP-67 for the ordering,
-BIP-383 for `wsh()` wrapping and for sorted-key script construction — never by
-quoting one published vector. **A test that claims to check
-`wsh(sortedmulti(...))` against BIP-383 would be claiming more than the document
-supports.**
+shape can be covered only by *joining* what is published to a locally derived
+step — 383's bare `sortedmulti` script as the witnessScript, plus a local
+`sha256` + bech32 wrap — never by quoting one published vector end to end. **A
+test that claims to check `wsh(sortedmulti(...))` against BIP-383 would be
+claiming more than the document supports**, and must label which half is
+derived.
 
 ### BIP-67 — deterministic key ordering
 
