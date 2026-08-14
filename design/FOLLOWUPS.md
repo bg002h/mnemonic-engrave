@@ -5304,3 +5304,50 @@ asserting where it lands — the reviewer wrote one in a scratch worktree and it
 is the thing that would keep this boundary honest.
 
 ---
+
+### F-161 — the GUI stops redrawing during a cut, so `shWaitFor` cannot observe an engrave (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic` `#seedhammer`
+
+Filed 2026-08-14, measured while running S0's smoke walk (the first one that
+ever reached a completed engrave).
+
+**Measured, not inferred.** During `engraveRunning`, with **every page timer
+cleared** so the browser could not be starving the Go scheduler: **0 frames
+drawn across 6 s while 1,020,312 steps executed.** The countdown sat at `16:25`
+for over eight minutes while `shToolpath.summary().steps` climbed at a constant
+~167,000/s. The machine was fine; only the screen was frozen.
+
+**Mechanism.** `reportProgress` (`gui/engraver.go:235`) hands progress to the UI
+through a one-slot channel and **never calls `Wakeup()`**, and nothing in the
+engrave path calls `ctx.WakeupAt` either. The frame loop
+(`gui/run_flow.go:309`) therefore blocks in `AppendEvents(ctx.Wakeup, …)` until
+the *screensaver* deadline or an input event. The countdown ticks only while
+some unrelated thing happens to wake the loop — early in a cut that is the
+hold-to-confirm button's own animation, which is why the screen appears to work
+for the first couple of minutes and then stops.
+
+`reportProgress`'s comment asserts *"In practice the engrave screen collects it
+twice a second"*. **Nothing in this path enforces that cadence**, and the walk
+measured it false. Same family as [[comments-outlive-their-conditions]].
+
+**What it binds right now — §4.5's walk gate.** The harness documents
+`shWaitFor`/`shStep` (polling the TEXT) as *the* way to wait, and `screen_js.go`
+plus `index.html` both say the frame count cannot answer "did the screen
+change". During an engrave the text cannot answer either: it is stale for the
+bulk of a ~20-minute cut, so a walk waiting on `shWaitFor` for
+`"Engraving completed successfully"` times out against a perfectly healthy
+machine. **A walk must key plate progress off `shToolpath` (steps / `planSeq` /
+`strings`) and consult the screen only after motion stalls**, forcing a redraw
+with a harmless tap first. That is how the S0 smoke walk was finally driven.
+
+**The open question needs hardware, so it is filed rather than answered.**
+`cmd/emu/platform.go:219` and `cmd/controller/platform_sh2.go:376` are
+structurally the same — both block until deadline, `Wakeup()`, or input, and
+neither has a free-running periodic tick. So this may not be an emulator
+artifact at all: the device would show a frozen countdown for most of a
+21-minute cut unless touch-controller interrupts happen to wake it. **Confirm on
+the real machine in S6** before deciding whether this is a harness note or a
+firmware defect. If it reproduces on hardware it is not cosmetic — a frozen
+countdown during a cut is indistinguishable from a wedged machine, and the
+operator's documented response to a wedged machine is to power-cycle it, mid-cut.
+
+---
