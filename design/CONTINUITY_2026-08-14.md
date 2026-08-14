@@ -5,19 +5,20 @@ first code. Read this instead of the fifteen reports.
 
 ## Where to start
 
-**S0 deliverable 3, second half: `window.shScreen()`.** Everything else is
-either done or blocked behind it.
+**S0 deliverable 3 is DONE.** The walk harness exists: `shTap`/`shPress`/
+`shRelease`/`shSysw` drive, `shScreen`/`shScreenSeq` read, `shToolpath.strings()`
+reports what was engraved, and `shWaitFor`/`shStep` in `index.html` make the
+correct polling idiom the default one.
 
-The route is settled and the reasoning is not worth re-deriving:
-`Context.FrameCallback` is owned by `gui/run_flow.go`'s run loop, so `cmd/emu`
-must not take it. Add an **optional interface the platform implements**, exactly
-as `gui.PlateAware` already does for the plate overlay — that pattern exists in
-this codebase precisely because the emulator needs to see something the firmware
-does not expose. `shToolpath.strings()` (the engraved md1/mk1/ms1 out of a
-completed walk) reaches the artifacts the same way.
+**Next: an end-to-end browser walk that ENGRAVES.** Everything is wired at both
+ends and nothing has yet joined them in a browser — no walk has cut a
+constellation string and seen it come back out of `shToolpath.strings()`. The
+one concrete blocker found: Engrave Bundle's gather sits on "Scan a card, or
+Done" and `shNFC.present("md1yqpqqxqq8xtwhw4xwn4qh")` left the card count at 0,
+so **find the scan affordance** (or the right tag encoding) first. That is S1's
+gate, and S1 is where it belongs.
 
-This is the **first `gui` package change** of the cycle. Everything before it was
-emulator-only.
+Then S0's remaining deliverables, listed below.
 
 ## State
 
@@ -25,9 +26,9 @@ emulator-only.
 | --- | --- |
 | Spec | `design/SPEC_multisig_build_repair.md` — R0 GREEN |
 | Plan | `design/IMPLEMENTATION_PLAN_multisig_build_repair.md` — R0 GREEN, then four lens reviews + a fact audit reopened it; all folded |
-| Code | fork `main`, three commits: `3009f22`, `3ea08f9`, `10286e4` |
-| Stage | S0, 3 of 8 deliverables |
-| Repos | both clean, both pushed as of the last commit |
+| Code | fork `main`, eight commits: `3009f22`, `3ea08f9`, `10286e4`, `34f7762`, `3c4eb86`, `6b3b453`, `dfbaea6`, `740888d` |
+| Stage | S0, deliverables 1–3 done, 4–8 open |
+| Repos | fork `main` committed and **NOT pushed** — five new commits are local only |
 
 **Do not re-review the plan.** Fifteen rounds have run and the last four found
 what reading could not. The prescription from
@@ -51,13 +52,52 @@ reviewing text, build S0's harness, walk Trace A until it breaks.
 3. **`10286e4`** — `shTap`, `shPress`/`shRelease`, `shSysw("records"|"cards"|
    "none")`. Verified driving the real GUI in a browser (ink 7442 → 9009 →
    14091 across two taps).
+4. **`34f7762`** — `gui.FrameAware`, the first `gui` change of the cycle. An
+   optional interface the platform implements, offered from inside
+   `run_flow.go`'s `draw` so §10.2.4's warning reaches it too. `!tinygo`.
+   **Costs the image ZERO bytes, measured** — three byte-identical builds, with
+   a positive control (a stub with a body moves it 274,110 bytes) so the zero is
+   not a build that ignored the edit. The structural guard is now derived from
+   the tree (`tinygo_split_test.go`) instead of naming one file and one
+   identifier; mutation-checked 7/7.
+5. **`3c4eb86`** — `window.shScreen()` / `shScreenSeq()`, plus `shWaitFor` and
+   `shStep` in `index.html`. **The first automated walk of this firmware**: four
+   screens, boot offer → digest → warnings → keep, each step naming the screen
+   it must reach.
+6. **`6b3b453`** — CI now compiles the emulator. It never did: `go test ./...`
+   builds `main_notjs.go` and touches no `_js.go` file, so the whole harness was
+   checked by nobody. Proven with a deliberate typo — `go test ./cmd/emu/`
+   reported `ok` while the new step failed.
+7. **`dfbaea6`** — `gui.EngravedAware`: which md1/mk1/ms1 each accepted plate
+   carried. **+1,024 bytes of image, +560 code, +16 RAM** — measured, and not
+   free unlike the frame hook.
+8. **`740888d`** — `shToolpath.strings()`, the census.
 
 ## The traps, so nobody pays for them twice
 
 - **A walk without `shScreen()` is a hope, not a walk.** Proven the hard way: the
   primitives work, and a full walk still failed because one mis-timed step made
   every later step a guess. Four consecutive "steps" sat on the same screen
-  unnoticed.
+  unnoticed. **Now fixed** — and the fix corrected two things I had written
+  about it that turned out false when run:
+  - **`shScreenSeq()` moving does NOT mean the screen changed.** `shPress` alone
+    moves it by two, for the button's own pressed state; only the release
+    navigates. So "wait for the count to move" IS the stale read. Poll the
+    **text** (`shWaitFor`), never the count.
+  - **The count cannot tell you a tap missed.** A tap at (5,5), a corner holding
+    nothing, still drew three frames — the GUI redraws on any pointer event.
+    The count answers one question: was anything drawn at all.
+- **Nav buttons are on the RIGHT edge**, not the bottom: `dims.X - 53` with
+  `leadingSize = 44`, so Back ≈ (453, 70) and confirm ≈ (453, 249). The start
+  screen is a carousel of eight programs; its arrows are ≈ (25, 160) and
+  (455, 160).
+- **Never put the engraved string on `gui.Plate`.** It is the obvious way to let
+  a walk report what was cut, and it breaks §10.2.2: `unlock_session.go` clears
+  the decrypted record *before* building the engrave screen precisely because
+  the plate carries only geometry. A string field would hold seed-derived text —
+  unwipeable, since Go strings cannot be zeroed — for the whole ~21-minute cut,
+  and the comment defending that clear would silently have become false. Plates
+  carry an opaque **id**; the string travels on a `!tinygo` hook.
 - **`mk.Decode` returns `m/48h/0h/0h/2h`**, not apostrophe notation. An
   expectation asserting apostrophes failed first.
 - **Never edit `sysw_test_payload.bin`.** Its digest is pinned in
@@ -88,7 +128,7 @@ Both are now in `CLAUDE.md`; this is the short form.
 
 ## Still owed, in order
 
-S0: `shScreen()` + `shToolpath.strings()` (blocked, above) · frame-receiver
+S0: ~~`shScreen()` + `shToolpath.strings()`~~ **done** · frame-receiver
 security · oracle pinning by **source commit** (a `--version` string is
 self-reported and spoofable) · published-BIP vectors — **BIP-383** for
 `wsh(multi(…))` compared at *scriptPubKey*, BIP-67 ordering, BIP-141 for
