@@ -1,5 +1,9 @@
 # Continuity — 2026-08-14, on-device wallet-policy authoring
 
+> **SUPERSEDED by `CONTINUITY_2026-08-14b.md`** (same day, later). Deliverable 3
+> is done and reviewed, and the NFC gap that stopped every gather is fixed. Read
+> the `b` note; this one is kept for the history it records.
+
 Written at the end of a session that ran spec → plan → fifteen review rounds →
 first code. Read this instead of the fifteen reports.
 
