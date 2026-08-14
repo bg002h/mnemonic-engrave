@@ -5496,3 +5496,33 @@ that repeats the defect one stage later.
 
 Not urgent: S3 has not opened. It is filed rather than fixed because the plan
 text is the thing that needs editing, and the plan is a gated artifact.
+
+### F-164 — S0's gate names eight tests; three of them exist under different names, two do not exist (owning phase: **`SPEC_multisig_build_repair.md` S0**) `#seedhammer`
+
+Filed 2026-08-14, found by checking S0's gate against the tree rather than
+against the plan's own prose. Sibling of [F-163]: a gate written in terms that
+have drifted from the code.
+
+The plan's S0 gate is "All eight tests pass." Resolved with
+`git grep -l "func <name>" -- '*_test.go'`:
+
+| plan's name | in the tree |
+| --- | --- |
+| `TestEmbeddedPayloadsAreStructurallyConfined` | **renamed** — `TestEveryEmbeddedPayloadIsStructurallyConfined` (`cmd/emu/embed_confinement_test.go`) |
+| `TestCosignerPayloadCarriesTheTracesCards` | **renamed, and split in two** — `TestSyswCardsPayloadCoversEveryStagesWalk` + `TestSyswCardsPayloadMatchesItsDigest` |
+| `TestWalkHarnessDrivesAndExtracts` | **no test of that name.** The harness itself is done and wired — `shTap`/`shPress`/`shRelease`/`shPace`/`shSysw` (`cmd/emu/walk_js.go:48,63,70,102,112`), `shScreen` (`screen_js.go:48`), `shToolpath` incl. `strings()` (`toolpath_js.go:84,80`) — and the proof is the walk running, not a Go test |
+| `TestBip383SortedMultiScriptMatchesPublishedVectors` | EXISTS (`address/bip_vectors_test.go`) |
+| `TestBip67SortedMultiKeyOrderScriptAndAddress` | EXISTS |
+| `TestBip141NestedSegwitScriptDiffersFromLegacy` | **superseded** by `TestBip143NestedP2wshScriptPubKeyMatchesPublishedVector` — BIP-141 publishes no vectors (`RECON_bip_vectors_S0.md`) |
+| `TestOracleHarnessRefusesVendoredTestdata` | ABSENT — D5 undone |
+| `TestOracleHarnessPinsBySourceCommit` | ABSENT — D5 undone |
+
+So the gate is **6 of 8 satisfied, and only 3 of the 8 names resolve as
+written**. The risk is not that the work is missing — it is that anyone
+checking this gate by grepping the plan's names concludes S0 never happened,
+or writes a duplicate test alongside the one that already covers it.
+
+Fix when S0 closes: rewrite the gate list against the tree, and prefer naming
+the PROPERTY plus the file over a bare test identifier, so a rename does not
+silently invalidate a gate. Do not rename the tests to match the plan — the
+tree's names are better, and the plan is the thing that drifted.
