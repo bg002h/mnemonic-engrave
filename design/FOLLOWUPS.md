@@ -5374,7 +5374,27 @@ loop is fed by the same `WakeupAt` that measurably works here.
 
 ---
 
-### F-162 — `mk1Gatherer.collected()` returns chunks in RANDOM order (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic` `#seedhammer`
+### F-162 — FIXED 2026-08-14 (`88c028e`): `mk1Gatherer.collected()` returned chunks in RANDOM order (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic` `#seedhammer`
+
+**Closed.** The index walk now mirrors `md1Gatherer`, with the doc comment and
+the regression tests md1 got at `3a23dbb`. All four assumptions below were
+verified by reading before the change, and all four held — nothing compares mk1
+positionally (`equalStrings` has one call site and it is MD1), `mk.Decode`
+reassembles by index, `collected()` is only reachable after `complete()`, and
+`ParseHeader` rejects an out-of-range index so the walk cannot read a `""` gap.
+So it was an ordering and labelling defect, never a funds one, exactly as filed.
+
+Tests were written first and confirmed red, mutation-checked by restoring the
+map range, and both assert the *contract* (slot `i` declares `ChunkIndex i`)
+rather than a canonical slice. Acceptance: two consecutive six-plate walks now
+produce identical census order **and** identical per-plate toolpath digests,
+against four different orders in four runs before.
+
+**Firmware-visible**, unlike the rest of that day's emulator work: `gui` is
+compiled into the controller, so the image moved +160 bytes flash
+(1,342,308 → 1,342,468), RAM unchanged.
+
+The original entry follows.
 
 Filed 2026-08-14, found by running S0's Trace A walk three times and noticing the
 census came back differently each time.
