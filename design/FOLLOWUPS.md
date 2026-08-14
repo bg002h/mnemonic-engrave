@@ -5229,6 +5229,33 @@ chunks, so a single-shot tag source cannot complete one even in principle.
 `reader()` lifetime versus the once-at-entry acquisition. Isolate before fixing;
 a guess here produces a harness that lies, which is worse than none.
 
+> **RESOLVED IN PART — 2026-08-14, fork `5374255`.** Isolated, and it was BOTH
+> candidates compounding, not either alone. `bundleGatherFlow` takes
+> `Platform.NFCReader()` once at entry (`gui/bundle_flow.go:110`);
+> `cmd/emu`'s source returned `nil` unless a record was already pending; and
+> `startScanner(ctx, nil)` returns a channel that never delivers
+> (`gui/nfc_scan.go:47`). So a tag presented after entry was unreachable
+> forever, and one presented before arrived exactly once — one card per flow
+> entry, when Trace A needs two and Trace B several.
+>
+> `nfcSource` is now a queue behind a reader that outlives any single tag, with
+> `shNFC.detach()`/`attach()` keeping the genuinely-no-reader state reachable on
+> purpose. Verified in a browser with a discriminator rather than a bare
+> positive: a card presented mid-gather gives "Descriptor added", and
+> re-presenting the same card gives **"Already captured that card."** — the
+> gatherer's own dedupe replying, so the second tag really did cross the reader.
+>
+> **Item 1 of the three above is closed. Items 2 and 3 are NOT** — `gui`'s test
+> platform still returns a nil reader (`gui/gui_test.go:445`), so
+> `gui/multisig_build_flow_test.go:199` still stops at the gather and the build
+> flow still has no end-to-end test on the host. That half stays open under this
+> entry, and it is the half that would catch a regression without a browser.
+>
+> Still true and still blocking a full Trace A walk: a standalone non-chunked
+> mk1 is refused by design (`clsSingleMK1Refuse`, host parity), so the walk needs
+> properly CHUNKED cosigner cards — most likely fed from
+> `sysw_cards_payload.bin` via `shSysw("cards")` rather than hand-presented.
+
 Same family as [[can-a-user-do-the-thing]]: components that each work, joined by
 a step nothing exercises.
 
@@ -5245,3 +5272,35 @@ Cosmetic, but on a device where the operator is being asked to scan keys for a
 wallet they are about to cut into steel, a screen claiming to be a different
 program is exactly the moment to not be ambiguous. Fixed alongside P1's dead-end
 work since both are in that flow.
+
+---
+
+### F-160 — the engraved census cannot see an ms1 cut through the standalone codex32 flows (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic`
+
+Filed 2026-08-14, from the independent false-PASS review of the walk harness
+(`design/agent-reports/walk-harness-false-pass-review.md`, its one Critical).
+
+`shToolpath.strings()` announces a plate only if the string passed through
+`validateMdmk`. Two ms1 paths do not:
+
+- `engraveCodex32` (`gui/codex32_polish.go:218`) → `backupSeedStringFlow`
+- `unlockEngraveCodex32` (`gui/unlock_session.go:186`) → `toPlate` directly
+
+Both carry `Plate.id == 0`, so a cut ms1 lands in `unattributed`,
+indistinguishable from an ordinary seed plate. The census's docs claimed
+"md1/mk1/ms1" in five places; **that overclaim is corrected** in the same fold as
+this entry, and a gate must now treat `unattributed > 0` as "something was cut
+that this census cannot name".
+
+**Does not block S1–S5.** The traces §4.5 gates cut their ms1 through
+`bundleEngrave`, which does pass through `validateMdmk` and IS covered. This
+binds any later gate that engraves an ms1 outside that path.
+
+The fix is not mechanical, which is why it is filed rather than done blind:
+`backupSeedStringFlow` also serves ordinary BIP-39 seed-string backups, which
+must NOT be announced, so extending coverage needs a source-tagged variant. Also
+owed here: an end-to-end test driving `engraveCodex32` to acceptance and
+asserting where it lands — the reviewer wrote one in a scratch worktree and it
+is the thing that would keep this boundary honest.
+
+---
