@@ -171,7 +171,11 @@ Every stage: **tests first**, then implementation, then the gate. Every stage's
 gate includes the §4.5 emulator walk.
 
 **A walk's expected artifact census MUST derive from the recorded input
-tuple, never from what the walk produced.** "Every mk1 and every ms1
+tuple, never from what the walk produced.** And where a stage's walk produces
+**no** artifact — S1 and S3 end at a screen, not an engrave — the census is
+inert, so those walks assert on `shScreen()` text at a named screen instead. A
+gate whose only check cannot fire is not a gate; say which check each stage's
+walk actually runs. "Every mk1 and every ms1
 matched" is vacuously true of a walk that fell over after plate one. The
 script computes how many md1 chunks, mk1s and ms1s the inputs REQUIRE and
 fails when fewer arrive — a partial walk may never satisfy a total gate.
@@ -212,19 +216,32 @@ walk with. S0 is written out here in full for that reason.
    **It must be a second blob, not an edit to the first:** the first's digest is
    pinned in `cmd/emu/sysw_test_payload.go` and photographed in the published
    Load Payload journey PDF, and mutating it makes that document wrong.
+   **It must satisfy EVERY stage's walk, not just S1's.** Enumerated, because
+   getting this wrong reproduces the defect one stage later: S1/S2 need Trace
+   A's two cosigner cards; **S3 needs an `sh(wsh)` build** (its gate asserts
+   `P2SH-P2WSH` reaches the restore doc); **S4 needs a `both`-slot case** — a
+   card whose key genuinely derives from a payload seed, plus a sibling that
+   does not, so the gate can be walked in both directions; S5 needs Trace B's
+   multi-account, multi-master set. Build the inventory from that list.
    **State the record inventory in its provenance comment** — how many mk1
    cards, at which origins, for which traces — so a future reader learns the
    contents without opening the blob. Not stating it is exactly how this
    Critical happened. Expect it to be materially larger than 265 bytes: every
    mk1 carrying an xpub is ≥2 chunks, and Trace B needs several cards.
-3. **A walk harness that can actually drive the emulator.** §4.5 requires the
-   walk be AUTOMATED, and today `cmd/emu` exposes only `window.shNFC` and
-   `window.shToolpath`; input is raw canvas pointer events and **nothing returns
-   an engraved string**, so §4.5's byte comparison has no mechanism. S0 owes:
-   an input-driving API, an artifact-extraction API (the engraved md1/mk1/ms1
-   strings out of a walk), and a `shSysw`-style injection point so a walk can
-   choose which payload it runs against rather than depending on which blob was
-   compiled in.
+3. **A walk harness that can actually drive the emulator — with these shapes,
+   not "an API".** §4.5 requires the walk be AUTOMATED. Today `cmd/emu` exposes
+   only `window.shNFC` and `window.shToolpath`, input is raw canvas pointer
+   events, and **nothing returns an engraved string**, so §4.5's byte comparison
+   has no mechanism. **None of the following exist yet; all are S0's to write:**
+
+   | shape | purpose |
+   | --- | --- |
+   | `window.shTap(x, y)` | drive input at device coordinates, so a walk is a script rather than synthetic pointer events |
+   | `window.shScreen()` | read the current frame's text, so a walk can assert where it is and fail informatively when it is somewhere else |
+   | `shToolpath.strings()` | **the engraved md1/mk1/ms1 strings out of a completed walk** — the mechanism §4.5's byte comparison currently lacks. Reaches the recorder through `gui.PlateAware`, which exists in the emulator build and not the firmware's |
+   | `window.shSysw(blob)` | choose which payload a walk runs against, instead of depending on whichever blob was compiled in |
+
+   A named API is not a buildable deliverable. These four are the deliverable.
 4. **The frame receiver keeps its existing security properties** (§4.6 SAFE):
    pinned to one origin, flat filenames only, resolved-path re-check.
    `design/journeys/shot_server.py` is the precedent and its docstring states
@@ -413,8 +430,9 @@ decodes it" is the weaker relation and does not satisfy this gate.
   the grep is the authority here, and the gate below is keyed to it. Re-run the
   grep before starting — the count is a fact about the tree, not a constant.
 
-**Gate.** Emulator walk shows `P2SH-P2WSH` on the restore doc for an `sh(wsh)`
-build, and **`grep -rn TYPED-ONLY --include='*.go'` returns 0**.
+**Gate.** Emulator walk of an **`sh(wsh)` build** — a shape neither Trace A nor
+Trace B carries, so S0's payload must supply it (S0 deliverable 2) — showing
+`P2SH-P2WSH` on the restore doc, and **`grep -rn TYPED-ONLY --include='*.go'` returns 0**.
 Measured: there are **9** occurrences across 4 files (`gui/multisig.go` ×4,
 `gui/bip85.go` ×2, `gui/singlesig.go` ×2, `gui/multisig_build.go` ×1) — not the
 4 an earlier draft assumed, and **none in the verify flows**, so the previous
@@ -460,12 +478,17 @@ mutation-checked, or this stage ships a check that cannot fire:
    Observe every entered seed through the existing `buildMultisigSeedHook` seam,
    assert zeroed on each exit class, **mutation-checked by deleting one scrub
    site**. Precedent: `TestBip85DeriveFlow_ScrubsBothMnemonics`.
-9. **`TestPerSeedPassphraseBindsToItsOwnSeed`** — §4.1's per-seed passphrase,
+9. **`TestSeedEntryScreensNameTheirSlot`** — with several seeds in one flow,
+   every seed-entry and passphrase screen must say WHICH SLOT it is for.
+   Unlabelled, the operator cannot tell the second seed prompt from a repeat of
+   the first, and a passphrase entered against the wrong slot mints a key no
+   §4.3 row can catch (there is no card to cross-check a new-seed slot against).
+10. **`TestPerSeedPassphraseBindsToItsOwnSeed`** — §4.1's per-seed passphrase,
    which had an implementation bullet and no test. The spec says no §4.3 row can
    catch a violation, so this is the only thing that can: two seeds with
    different passphrases derive two different keys, and a flow-global passphrase
    applied to both must turn it red.
-10. **`TestGateDerivesAtTheCardsOwnOrigin`** — the origin binding, as a
+11. **`TestGateDerivesAtTheCardsOwnOrigin`** — the origin binding, as a
    PROCEED/FAIL pair on one fixture: a `both` slot whose card declares
    `m/48'/0'/1'/2'`.
    **PROCEED** when the key is genuinely derived there.
@@ -490,6 +513,21 @@ mutation-checked, or this stage ships a check that cannot fire:
   authoritative; `account` is bookkeeping; `derived`'s `account` is the BIP-48
   account component.
 
+**The slot-source screen must not speak spec language.** `payloadKey`,
+`derived(seedID, account)` and `both` are names for a data model, not for what
+an operator is choosing. On screen they must read as the decision being made —
+whose key this slot is, and where it came from — or the operator either
+approves a model they have not understood or is alarmed by a distinction that
+does not concern them.
+
+**Every comparison the device asks for must be one the operator can perform.**
+S5's "unambiguous digest" arm and the inherited "match your coordinator" line
+both name checks with no artifact on the other side: the operator has nothing
+to compare a digest against. Either the device shows something their coordinator
+also shows — the descriptor, or the per-slot keys — or the instruction is
+removed. This is the fingerprint defect (A1) one level up, and it is the third
+instance of it in this plan; treat "verify X" as a claim that X is obtainable.
+
 **The gate's FAIL screen must not make silencing it the obvious next move.**
 After a seed↔key mismatch the only route the operator can currently see is
 reassigning that slot to `payloadKey` — which stops the check running rather
@@ -498,6 +536,13 @@ mistyped or wrong-seed passphrase; a card from a different wallet), say plainly
 that reassigning the slot **suppresses the check rather than fixing it**, and
 name the host route. A safety gate whose obvious next action disables it is not
 a gate.
+
+**Tell the operator how many plates before the tail starts, and what the set
+is afterwards.** Trace B cuts 6–9 plates over hours. The operator gets no count
+before committing and no inventory after, so neither they nor the person who
+finds the plates in five years can tell whether the set is complete. A census
+before the engrave and a set inventory on the restore doc — F-131 and F-132 are
+both cases where a restore document's silence cost more than its errors.
 
 **Bound the walk-away.** `wipeGuard` brackets only the unlock session, while
 this flow holds **several masters' seeds** in its registry with no time bound —
@@ -508,7 +553,9 @@ the systemwide surface (SYSW§3.2.1), stated in the restore doc. Silence is the
 one option unavailable — it is a choice nobody made.
 
 **Gate.** Every failing row demonstrated failing. Emulator walk of the `both`
-happy path and of one loud failure.
+happy path and of one loud failure — **a `both` slot is in neither trace, so
+S0's payload must supply the case** (S0 deliverable 2): a card whose key
+genuinely derives from a payload seed, and a sibling that does not.
 
 ---
 
@@ -563,7 +610,11 @@ happy path and of one loud failure.
    than randomness — so re-running the same inputs mints byte-identical plates
    and the operator re-cuts only what is missing. **That property is
    load-bearing and currently unpinned:** assert it, and put the recovery
-   procedure in the restore doc, or an interrupted operator has no route out.
+   procedure where an interrupted operator will actually see it. **Not only the
+   restore doc** — that is printed at the end of a successful run, and an
+   operator whose engrave died never reaches it. The abort screen currently says
+   "discard… start over"; it must instead say that re-running the same inputs
+   reproduces the same plates, so only the missing ones need cutting.
    The emulator's existing `shToolpath` digest-equality check is the tool.
 8. **`TestGateStillFiresAfterOriginsDiverge`** — S4's `TestGateDerivesAtTheCardsOwnOrigin` fixture, re-run
    through the REAL post-rewire flow rather than synthetically: the same `both`
