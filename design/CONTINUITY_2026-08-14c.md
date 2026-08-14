@@ -28,7 +28,8 @@ same.** Verified against authoritative text, `bitcoin/bips` pinned at
    derived. Best vector: the two-xpub one with three derived child scripts — it
    sorts *after* derivation, which is our real path.
 2. `TestBip67SortedMultiKeyOrderScriptAndAddress` — BIP-67 publishes **four**
-   fields per vector (List · Sorted · Script · Address, 5 P2SH addresses), so
+   fields per vector (List · Sorted · Script · Address, 4 vectors and 4 P2SH
+   addresses — this said 5 until D6 enumerated them), so
    assert sorted → script → address end to end, not ordering alone. Vector 2 is
    an already-sorted no-op; vector 3 differs only in final byte and `02`/`03`
    prefix, which is what a naive comparator gets wrong.

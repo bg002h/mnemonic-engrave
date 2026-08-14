@@ -52,8 +52,14 @@ Richer than the plan assumes. Each vector publishes **four** fields:
 
     List (unsorted) · Sorted · Script · Address
 
-- **Addresses published: 5**, P2SH (e.g. `39bgKC7RFbpoCRbtD5KEdkYKtNyhpsNa3Z`,
-  `3CKHTjBKxCARLzwABMu9yD85kvtm7WnMfH`).
+- **Vectors published: 4**, each with one P2SH address, so **4 addresses**
+  (`39bgKC7RFbpoCRbtD5KEdkYKtNyhpsNa3Z`, `3CKHTjBKxCARLzwABMu9yD85kvtm7WnMfH`,
+  `32V85igBri9zcfBRVupVvwK18NFtS37FuD`, `3Q4sF6tv9wsdqu2NtARzNCpQgwifm2rAba`).
+  **Corrected 2026-08-14 during D6's implementation: this said 5.** The `grep
+  -c` behind it counted 26 matching *lines*, not addresses — the regex
+  `[13][a-km-zA-HJ-NP-Z1-9]{25,34}` also matches inside pubkey and script hex,
+  so the count was never the count of addresses. The tests enumerate the
+  vectors and assert `len(vectors) == 4`, so this one is now machine-held.
 - Vector 2 is already sorted ("no action required") — a genuine no-op case.
 - Vector 3 sorts keys differing only in the final byte and in the `02`/`03`
   prefix, which is the case a naive comparator gets wrong.
