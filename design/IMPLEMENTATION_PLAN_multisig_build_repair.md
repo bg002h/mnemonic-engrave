@@ -162,7 +162,10 @@ unattributed oracle is worse than none — it reads as proof.
    test.
 4. **The md vendored-vector re-pin: 0.36.0 → current** (`md/testdata/`).
    **S0 owns this**, stated explicitly because round 0 asked for an owner and an
-   earlier fold dropped the sentence. If it proves larger than S0 should carry it
+   earlier fold dropped the sentence. Its gate line: `go test ./md/` passes
+   against the re-pinned vectors, and `md/testdata/README.md`'s provenance block
+   names the new commit and version — a re-pin whose provenance is not updated
+   is the drift it was meant to end. If it proves larger than S0 should carry it
    becomes its own stage **before S5** — it may not become an unowned assumption
    again.
 
