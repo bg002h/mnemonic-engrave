@@ -5305,50 +5305,72 @@ is the thing that would keep this boundary honest.
 
 ---
 
-### F-161 — the GUI stops redrawing during a cut, so `shWaitFor` cannot observe an engrave (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic` `#seedhammer`
+### F-161 — WITHDRAWN, the claim was wrong: the GUI *does* redraw during a cut, and the refresh degrades with `shPace` (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic` `#seedhammer`
 
-Filed 2026-08-14, measured while running S0's smoke walk (the first one that
-ever reached a completed engrave).
+Filed 2026-08-14 and **corrected the same day.** The original entry claimed the
+GUI stops redrawing during a cut and that *"nothing in the engrave path calls
+`ctx.WakeupAt`"*. **Both are false.** The retraction is kept in full rather than
+deleted, because how the wrong claim was produced is the useful part.
 
-**Measured, not inferred.** During `engraveRunning`, with **every page timer
-cleared** so the browser could not be starving the Go scheduler: **0 frames
-drawn across 6 s while 1,020,312 steps executed.** The countdown sat at `16:25`
-for over eight minutes while `shToolpath.summary().steps` climbed at a constant
-~167,000/s. The machine was fine; only the screen was frozen.
+**What is actually there.** `EngraveScreen.Engrave` (`gui/gui.go`) contains:
 
-**Mechanism.** `reportProgress` (`gui/engraver.go:235`) hands progress to the UI
-through a one-slot channel and **never calls `Wakeup()`**, and nothing in the
-engrave path calls `ctx.WakeupAt` either. The frame loop
-(`gui/run_flow.go:309`) therefore blocks in `AppendEvents(ctx.Wakeup, …)` until
-the *screensaver* deadline or an input event. The countdown ticks only while
-some unrelated thing happens to wake the loop — early in a cut that is the
-hold-to-confirm button's own animation, which is why the screen appears to work
-for the first couple of minutes and then stops.
+```go
+if s.job.Status().State == engraveRunning {
+	// Update progress twice a second.
+	ctx.WakeupAt(time.Now().Add(time.Second / 2))
+}
+```
 
-`reportProgress`'s comment asserts *"In practice the engrave screen collects it
-twice a second"*. **Nothing in this path enforces that cadence**, and the walk
-measured it false. Same family as [[comments-outlive-their-conditions]].
+**And it works.** Measured over 25 s of continuous cutting, the screen refreshed
+at **1.8–2.0 frames/s with the countdown advancing every window** (15:24 →
+15:07). `reportProgress`'s "twice a second" comment, which the original entry
+called false, is exactly right.
 
-**What it binds right now — §4.5's walk gate.** The harness documents
-`shWaitFor`/`shStep` (polling the TEXT) as *the* way to wait, and `screen_js.go`
-plus `index.html` both say the frame count cannot answer "did the screen
-change". During an engrave the text cannot answer either: it is stale for the
-bulk of a ~20-minute cut, so a walk waiting on `shWaitFor` for
-`"Engraving completed successfully"` times out against a perfectly healthy
-machine. **A walk must key plate progress off `shToolpath` (steps / `planSeq` /
-`strings`) and consult the screen only after motion stalls**, forcing a redraw
-with a harmless tap first. That is how the S0 smoke walk was finally driven.
+**How the wrong claim was produced**, since that is the transferable part:
 
-**The open question needs hardware, so it is filed rather than answered.**
-`cmd/emu/platform.go:219` and `cmd/controller/platform_sh2.go:376` are
-structurally the same — both block until deadline, `Wakeup()`, or input, and
-neither has a free-running periodic tick. So this may not be an emulator
-artifact at all: the device would show a frozen countdown for most of a
-21-minute cut unless touch-controller interrupts happen to wake it. **Confirm on
-the real machine in S6** before deciding whether this is a harness note or a
-firmware defect. If it reproduces on hardware it is not cosmetic — a frozen
-countdown during a cut is indistinguishable from a wedged machine, and the
-operator's documented response to a wedged machine is to power-cycle it, mid-cut.
+1. **Absence judged through a truncated pipe.** The `WakeupAt` search was
+   `grep … | head`, and the `Engrave` call sits below the cutoff. The grep
+   *did* find widget.go, unlock_kdf.go and run_flow.go — enough to look like a
+   complete answer. Exactly [[empty-output-is-not-absence]].
+2. **An instrument that caused what it measured.** The load-bearing evidence was
+   "0 frames with **every page timer cleared**, so the browser cannot be the
+   cause" — done by looping `clearInterval(i)` over every id up to a scanned
+   maximum. In a browser `setTimeout` and `setInterval` **share an id space**,
+   and Go's wasm runtime schedules its own goroutine wakeups through
+   `setTimeout`. That sweep therefore cancels the Go scheduler's timer. The step
+   that was supposed to *eliminate* the browser as a cause was the one most
+   likely to have *been* it.
+
+The original 8-minute freeze at `16:25` has **not** been reproduced under clean
+conditions, and no mechanism for it is known. It is not being re-filed on the
+strength of one unrepeatable observation taken with a broken instrument.
+
+**What IS real, and is new — the refresh degrades as `shPace` rises**, measured
+on fresh plates, with and without page pollers:
+
+| pace | frames/s, no pollers | with pollers |
+| --- | --- | --- |
+| 1 | **2.00** | 2.00 |
+| 2048 | 1.38 | 1.31 |
+| 4096 | 0.87 | 1.13 |
+
+Page polling has no measurable effect — the second column is there to retire
+that hypothesis, which was the other half of the original claim. The pace does:
+the engrave goroutine yields less often, so the GUI gets fewer chances to
+service its 500 ms timer. **Emulator-only by construction** — `shPace` does not
+exist on the device — and harmless to an operator, who runs at pace 1 and gets
+the full 2 Hz.
+
+**The walk's design survives, for a weaker reason than originally given.**
+Keying plate progress off `shToolpath` and consulting the screen only after
+motion stalls is still correct: at walk paces the screen refreshes about once a
+second, so a read can be up to ~1 s stale, and `walk_trace_a.js` taps to force a
+redraw before reading. But it is a *staleness* margin, not a frozen screen, and
+`shWaitFor` would in fact have worked given a long enough timeout.
+
+**No hardware question remains.** The original entry asked S6 to check whether
+the device shares the defect. There is no defect to share; the device's frame
+loop is fed by the same `WakeupAt` that measurably works here.
 
 ---
 
