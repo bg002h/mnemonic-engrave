@@ -43,9 +43,18 @@ GOREPO="${2:-/scratch/code/shibboleth/seedhammer}"
 
 fail=0
 echo "== file:line citations =="
-# Backtick-quoted path:line, e.g. `gui/gui.go:1857` or `md/chunk.go:52`
-grep -oE '`[a-zA-Z0-9_./-]+\.(go|rs):[0-9]+`' "$PLAN" \
-  | tr -d '`' | sort -u | while IFS=: read -r path line; do
+# Backtick-quoted path:line, e.g. `gui/gui.go:1857` or `md/chunk.go:52`.
+#
+# RANGES TOO -- `md/encode_multisig.go:104-106`. The pattern used to end at
+# `[0-9]+\``, so a range never matched the trailing backtick and was SILENTLY
+# SKIPPED: not reported, not counted, not failed. A spec carrying 19 range
+# citations passed with "every citation resolves" while none of the 19 had been
+# looked at. That is this gate's own stated failure mode -- hiding a blind spot
+# -- occurring inside the gate, and it was found by a reviewer, not by the gate.
+# The START line is what gets resolved and printed; a reviewer reads the claim
+# against it exactly as for a single-line citation.
+grep -oE '`[a-zA-Z0-9_./-]+\.(go|rs):[0-9]+(-[0-9]+)?`' "$PLAN" \
+  | tr -d '`' | sed 's/-[0-9]*$//' | sort -u | while IFS=: read -r path line; do
     # Go citations resolve against the fork; .rs against this repo.
     case "$path" in
       *.rs) root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" ;;
