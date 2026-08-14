@@ -160,16 +160,24 @@ unattributed oracle is worse than none — it reads as proof.
    either cite where they came from, or replace them with BIP-382 vectors.
    Unattributed expected-addresses are self-agreement wearing the costume of a
    test.
-4. **The fork's own wire re-pin: mk 0.2 → 0.4.x including V19** (`mk/mk.go:5`),
-   and the md vendored vectors 0.36.0 → current. **S0 owns this.** Stated
-   explicitly because round 0 asked for an owner, the previous fold dropped the
-   sentence, and a later note then attributed the re-pin to S0 while S0's
-   deliverables did not contain it — leaving S5 test 6 depending on work no
-   stage had. Without V19 the fork cannot decode a depth-0 mk1 far enough to see
-   `Path == "m"`, so that test cannot be written as specified and M-1's "named
-   screen, not a fall-through" silently degrades into the fall-through the spec
-   rejected. If the re-pin proves larger than S0 should carry it becomes its own
-   stage **before S5** — it may not become an unowned assumption again.
+4. **The md vendored-vector re-pin: 0.36.0 → current** (`md/testdata/`).
+   **S0 owns this**, stated explicitly because round 0 asked for an owner and an
+   earlier fold dropped the sentence. If it proves larger than S0 should carry it
+   becomes its own stage **before S5** — it may not become an unowned assumption
+   again.
+
+   **NOT included, and the reason is worth keeping.** Rounds 0–1 of this plan
+   carried a claim that the fork's `mk` decoder needed a `0.2 → 0.4.x/V19`
+   re-pin before a depth-0 card could be read. **That is false, and it was
+   machine-checked twice** — a round-trip of a `Path == "m"` card through the
+   real encoder at `a10d007`, no code changes, encodes to 2 chunks and decodes
+   back with `Path == "m"` and the xpub intact. The primary's changelog records
+   V19 as "no wire or runtime-behavior change", and the fork's decode path
+   handles depth-0 generically. The claim entered from a **stale comment** —
+   `mk/mk.go:5`'s `// (family_token "mk-codec 0.2")` — and survived three review
+   rounds because every reader, including me, took the comment for the
+   mechanism. Second time this cycle after D-5. Grep the mechanism, not the
+   claim.
 
 **Tests first**
 
@@ -365,11 +373,11 @@ happy path and of one loud failure.
    every other gate in this plan.
 6. `TestDepthZeroCosignerCardIsNamedRefusal` — spec M-1: `Path == "m"` trips
    `errMultisigEmptyDivergent` (`md/encode_multisig.go:104-106`); refuse by a
-   named screen, not a fall-through "Couldn't assemble". **Note the pin seam:**
-   a depth-0 mk1 is the V19 shape the primary added in the 0.4.x line while the
-   fork pins 0.2-era wire (`mk/mk.go:5`), so this test's premise — that the fork
-   decodes the card far enough to see `Path == "m"` — is only sound once S0 deliverable 4's
-   re-pin includes V19.
+   named screen, not a fall-through "Couldn't assemble". **The premise is already
+   sound**, checked rather than assumed: a depth-0 card round-trips through the
+   fork's encoder today (S0 deliverable 4's note), so the flow reaches
+   `errMultisigEmptyDivergent` and this test has something to assert against. No
+   re-pin gates it.
 
 **Implementation**
 
