@@ -75,9 +75,23 @@ violations"), so it works; do not push `master` directly.
   it is why "assume engraving worked" was declined: throwing the stream away
   re-opens the F-121 class where geometry zeroed too early sends the head
   somewhere wrong and leaves no residue.
-- `design/agent-reports/emulator-speedup-measurement.md` — **a sonnet agent was
-  measuring the pace-1 baseline when this session ended.** If the file exists,
-  it has the overall ratio; if not, the measurement never finished.
+- `design/agent-reports/emulator-speedup-measurement.md` — **RESOLVED, and the
+  answer is: it never finished.** The agent parked for ~62 min across two
+  sessions and reached plate 1 plus half of plate 2 before its
+  `browser_evaluate` hit the **1800 s MCP idle timeout**. Wound down
+  deliberately on 2026-08-14 rather than restarted; the report is persisted
+  INCOMPLETE with its two real readings and its estimates labelled as such.
+  **Do not re-run it as-is** — a walk longer than 1800 s cannot survive that
+  call. Launch fire-and-forget (`run(...).then(r => { window.__walk = r })`)
+  and poll from later calls.
+  **The one open question in it is already closed, so do not inherit it.** It
+  flags as an inconsistency that ~1.1e9 six-plate steps inside a 186 s
+  pace-2048 walk is implausible. It is not: throughput from pace 1 to pace 2048
+  scales **~39×, not 2048×**, which is exactly the saturation the same report
+  records two sections later (2048→186 s vs 8192→183 s buys 3 s). The two
+  figures agree. Its arithmetic there is also off — 1.1e9 / 186 s is
+  **5.9e6 steps/s**, not the ~3e7 it states, which would need the cutting to
+  occupy only 37 s of the walk.
 
 **F-162 found and FIXED** (`88c028e`). `mk1Gatherer.collected()` ranged a map
 keyed by ChunkIndex, so a card's plates were cut in a random order and
@@ -108,6 +122,16 @@ the Rust primary), all `collected()` call sites are gated on `complete()`, and
   bust it. Serve on a **fresh port** and check a symbol only the new build has.
 - **Only one browser session exists.** Two agents driving it collide; do not
   start a measurement while another holds it.
+- **A walk that outlives 1800 s dies in the MCP call, not in the emulator.**
+  `browser_evaluate` has an idle timeout; a pace-1 six-plate walk is ~2 h and
+  cannot fit in one call. Launch it fire-and-forget
+  (`run(...).then(r => { window.__walk = r })`) and poll `window.__walk` from
+  later calls. This is what cost the pace-1 baseline two sessions.
+- **A long-running agent must persist INCREMENTALLY, not "as its final
+  action".** The pace-1 agent re-armed a 2-minute timer for ~62 min and wrote
+  nothing, because its task never reached an end for a "final action" to
+  follow. If an agent has been quiet a long time it is parked, not
+  progressing — check whether its output file exists, not its status.
 
 ## Open items
 
