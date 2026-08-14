@@ -302,8 +302,11 @@ scenarios below are why it is Critical rather than tidy.
    a slot at `m/48'/0'/1'/2'` engraves an mk1 derived at `m/48'/0'/0'/2'` — a key
    card asserting membership in a wallet **that does not contain its key**,
    stub-bound to the policy, on steel.
-2. **One mk1 per held slot**, each at that slot's origin — or an explicit ruling
-   that one leg suffices, with its reason. Silence is not an option.
+2. **One mk1 per held slot**, each at that slot's origin. **That is the phase-1
+   rule, ruled here** — a contrary ruling (one leg suffices, because the md1
+   still carries every xpub) is permitted but requires its own recorded reason.
+   Both arms are safe; leaving the choice to the stage would have left §4.5's
+   "every mk1" undefined, and the spec is the document that rules.
 3. **In full mode, every distinct master supplied MUST have its ms1 engraved**,
    or multi-master full mode MUST be refused with a named reason. Today
    `deriveMultisigLeg` emits one ms1 from the single `mnemonic`. A 3-of-4 where
@@ -389,6 +392,17 @@ and shown on a review screen before assembly:
 `both` is what makes a slot hold a seed *and* a key, and it is the only shape
 that triggers the gate. It exists because it is the case the operator asked
 about: a payload carrying their seed **and** their own key card.
+
+**Two bindings, ruled so an implementer cannot pick differently:**
+
+- In a `both` slot the **card's declared origin and key are authoritative**
+  (R-3). The gate derives at that origin. The tuple's `account` is
+  display/bookkeeping only and is an input to nothing — deriving at
+  `m/48'/0'/account'/2'` instead would FAIL LOUDLY on a genuinely-theirs card
+  whose account the operator mis-remembered.
+- In a `derived(seedID, account)` slot, `account` occupies the **BIP-48 account
+  component**: `m/48'/0'/account'/2'`. §4.1a item 1's example implies this;
+  nothing ruled it until now.
 
 **When the gate fires.** On a `both` slot. It is NOT inferred across unrelated
 material: a payload carrying the operator's seed alongside other people's
@@ -609,7 +623,13 @@ With no scanning, the payload must supply all of them.
 
 1. `gui/sysw_session.go:114` `take` returns the **first** matching record and
    does not consume it, so it cannot yield a second card. Add a `takeAll`-style
-   accessor for a class.
+   accessor for a class. **It MUST inherit `take`'s `!loaded || !compared`
+   refusal**, and a mutation-checked test MUST prove the refusal fires — it is a
+   second consumption path, and SYSW§5.4.1 admits a record for consumption only
+   when `[compared]` holds for the identity it came from. Without the guard, an
+   unauthenticated payload's cosigner cards reach the constructor, and with
+   fingerprints omitted by default the review screen cannot surface a swapped
+   key. This is item 2's own hazard — "only one of them would have the checks".
 2. Feed **every** `ClassMDMK` record into `bundleGatherFlow`'s existing
    `offer()`, so dedup, chunk assembly and validation stay on exactly one path —
    which `gui/bundle_flow.go:100-103` already argues for: "A separate insertion
@@ -648,6 +668,15 @@ Reproduce D-1 (P0 made it reachable), fix it, and assert the fix **rasters** —
 F-151's lesson is that a text assertion cannot see a body that fails to draw.
 Fix D-4 (the "Engrave Bundle" title) in the same stage.
 
+**Close the D-2 window while it is open.** P1 makes engraves complete, but
+`cosignerFromCard` keeps discarding card origins until P3 — so in between, a
+cosigner card minted at a non-shared origin is silently stamped
+`m/48'/0'/0'/2'`. Funds-correct (addresses derive from the keys) and restore
+fail-closed, and it is exactly today's shipped D-2 behind the EXPERIMENTAL
+warning — but the comparison is one line, so P1 MUST refuse or warn when a
+gathered card's declared origin differs from the shared origin. An interim
+silence becomes a designed refusal for the cost of an `if`.
+
 **Gate:** the reproduction test fails on the unfixed code — demonstrated, not
 assumed — **and** the flow now reaches a completed engrave, by test and by
 emulator walk. If P0 found no D-1 on the payload path, this stage records that
@@ -683,7 +712,7 @@ consistency gate; R-1's ratification.
 **Note the ordering constraint:** payload seeds already reach this flow (§2.2
 D-5), so the exposure §4.3 closes is live from today until P4 lands. If that is
 judged unacceptable, the gate moves ahead of P3 — it depends only on the
-assignment model, not on multi-slot support. Flagged for the operator (§10 Q7).
+assignment model, not on multi-slot support. Flagged for the operator (§10 Q4).
 
 ### P5 — hardware gate
 
