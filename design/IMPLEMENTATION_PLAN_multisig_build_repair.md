@@ -60,8 +60,10 @@ resolve each oracle to a source commit (build from a pinned checkout, or
 record and check a binary hash) and print that commit, not the version, into
 the gate record. S0 exists so gates are not anchored to something
 untrustworthy, and an unauthenticated self-report is exactly that.
-**The walk script MUST print the oracle versions into every gate record**, so a
-stale oracle is visible rather than silent, and MUST record the full input tuple
+**The walk script MUST print the resolved oracle SOURCE COMMITS into every gate
+record** — not version strings, which are self-reported and therefore spoofable
+(see the pinning rule below) — so a stale or substituted oracle is visible
+rather than silent, and MUST record the full input tuple
 (template, n, k, slot order, fp choice, per-slot origins, seeds) so "same
 inputs" is reproducible rather than remembered.
 
@@ -179,51 +181,99 @@ otherwise — synthetic time via `testing/synctest`, no real sleeps.
 
 ---
 
-### S0 — the oracles
+### S0 — the oracles, and the harness that uses them
 
-Every later gate depends on these, and a gate anchored to a stale or
-unattributed oracle is worse than none — it reads as proof.
+Every later gate leans on S0, and a gate anchored to a stale, unattributed or
+absent oracle reads as proof while proving nothing. **Round-0-through-3 of this
+plan named S0's deliverables without opening any of them**; the journeys and
+spec-coverage lenses then found, independently, that §4.5's walk had nothing to
+walk with. S0 is written out here in full for that reason.
 
-**Deliverables**
+**Deliverables, in order. 1 precedes 2 and the order is load-bearing.**
 
-1. **A pinned-oracle harness.** The walk script resolves the primary toolchain
-   by version, refuses to run against vendored fork testdata, and **prints the
-   resolved oracle versions plus the full input tuple into every gate record**.
-2. **Published-BIP address vectors, vendored with provenance**, in the shape of
-   `md/testdata/README.md` — source repo, commit, path, per-file meaning — and
-   modelled on the existing `bip-test-vector-audit-matrix` reports in
-   `mnemonic-key` / `mnemonic-secret`.
-3. **A provenance header for `address/address_test.go`'s existing fixtures**:
+1. **Make the test-payload confinement guard STRUCTURAL, before adding a second
+   payload.** Today's guard is keyed to a literal:
+   `names := []string{"syswTestPayload", "syswTestDigest", "sysw_test_payload.bin"}`
+   — a hand-maintained list, and hand-maintained lists go stale (this cycle
+   found "the four `TYPED-ONLY` comments" was nine). Adding a fourth name lets
+   the FIFTH blob escape.
+   Derive the protected set from the tree instead: **every `//go:embed` under
+   `cmd/emu` must live in a `//go:build js` file, and its identifiers must not
+   appear outside a small allowed js-only set.** Keep a `checked < 50`-style
+   floor so a misrooted walk cannot pass vacuously.
+   **Mutation proof comes free from deliverable 2:** write the guard, point it
+   at the new unconfined blob, watch it go red, then confine the blob and watch
+   it go green. A shipped SeedHammer II must never boot carrying a payload
+   somebody else packed, so this guard earns a mutation check more than most.
+2. **A SECOND js-only test payload carrying cosigner cards.** `cmd/emu`'s
+   existing blob holds exactly `ClassMnemonic`, `ClassPassphrase`,
+   `ClassFreeText` and **zero `ClassMDMK`** (265 bytes, verified), so no walk can
+   reach a cosigner gather — Trace A halts one screen before D-1.
+   **It must be a second blob, not an edit to the first:** the first's digest is
+   pinned in `cmd/emu/sysw_test_payload.go` and photographed in the published
+   Load Payload journey PDF, and mutating it makes that document wrong.
+   **State the record inventory in its provenance comment** — how many mk1
+   cards, at which origins, for which traces — so a future reader learns the
+   contents without opening the blob. Not stating it is exactly how this
+   Critical happened. Expect it to be materially larger than 265 bytes: every
+   mk1 carrying an xpub is ≥2 chunks, and Trace B needs several cards.
+3. **A walk harness that can actually drive the emulator.** §4.5 requires the
+   walk be AUTOMATED, and today `cmd/emu` exposes only `window.shNFC` and
+   `window.shToolpath`; input is raw canvas pointer events and **nothing returns
+   an engraved string**, so §4.5's byte comparison has no mechanism. S0 owes:
+   an input-driving API, an artifact-extraction API (the engraved md1/mk1/ms1
+   strings out of a walk), and a `shSysw`-style injection point so a walk can
+   choose which payload it runs against rather than depending on which blob was
+   compiled in.
+4. **The frame receiver keeps its existing security properties** (§4.6 SAFE):
+   pinned to one origin, flat filenames only, resolved-path re-check.
+   `design/journeys/shot_server.py` is the precedent and its docstring states
+   why both restrictions are load-bearing. A new harness may not quietly drop
+   them.
+5. **Oracle resolution BY SOURCE COMMIT, not by `--version`.** A version string
+   is self-reported, so a substituted binary spoofs the pin and launders a
+   device defect through every byte-identity gate in this plan. The harness
+   resolves each oracle to a source commit — a pinned checkout, or a recorded
+   and checked binary hash — refuses to run against vendored fork testdata, and
+   **prints the resolved commits plus the full input tuple into every gate
+   record**.
+6. **Published-BIP vectors, vendored with provenance**, in the shape of
+   `md/testdata/README.md` — source repo, commit, path, per-file meaning —
+   modelled on the `bip-test-vector-audit-matrix` reports in `mnemonic-key` /
+   `mnemonic-secret`. **Open the sources and inventory them before writing the
+   test list** (§1a): the previous list followed an author's memory and two of
+   its three tests were unwritable.
+7. **A provenance header for `address/address_test.go`'s existing fixtures**:
    either cite where they came from, or replace them with **BIP-383**
-   scriptPubKey vectors (compared at scriptPubKey, per §1a — **not** BIP-382,
-   which publishes no addresses; an earlier draft said 382 here and the
-   correction two sections above did not reach this line).
-   Unattributed expected-addresses are self-agreement wearing the costume of a
-   test.
-4. **The md vendored-vector re-pin: 0.36.0 → current** (`md/testdata/`).
-   **S0 owns this**, stated explicitly because round 0 asked for an owner and an
-   earlier fold dropped the sentence. Its gate line: `go test ./md/` passes
-   against the re-pinned vectors, and `md/testdata/README.md`'s provenance block
-   names the new commit and version — a re-pin whose provenance is not updated
-   is the drift it was meant to end. If it proves larger than S0 should carry it
-   becomes its own stage **before S5** — it may not become an unowned assumption
-   again.
+   scriptPubKey vectors. Unattributed expected-addresses are self-agreement
+   wearing the costume of a test.
+8. **The md vendored-vector re-pin: 0.36.0 → current** (`md/testdata/`). Its
+   gate line: `go test ./md/` passes against the re-pinned vectors AND
+   `md/testdata/README.md`'s provenance block names the new commit and version.
+   Measured 2026-08-13: 0.36 → 0.42 shows **zero byte drift** across all 30
+   vectors, so this is a **coverage catch-up, not a correctness repair** — the
+   vendored vectors are an older, smaller sample, and a gate accepting them
+   would prove agreement with a subset of ourselves.
 
-   **NOT included, and the reason is worth keeping.** Rounds 0–1 of this plan
-   carried a claim that the fork's `mk` decoder needed a `0.2 → 0.4.x/V19`
-   re-pin before a depth-0 card could be read. **That is false, and it was
-   machine-checked twice** — a round-trip of a `Path == "m"` card through the
-   real encoder at `a10d007`, no code changes, encodes to 2 chunks and decodes
-   back with `Path == "m"` and the xpub intact. The primary's changelog records
-   V19 as "no wire or runtime-behavior change", and the fork's decode path
-   handles depth-0 generically. The claim entered from a **stale comment** —
-   `mk/mk.go:5`'s `// (family_token "mk-codec 0.2")` — and survived three review
-   rounds because every reader, including me, took the comment for the
-   mechanism. Second time this cycle after D-5. Grep the mechanism, not the
-   claim.
+   **NOT included:** rounds 0–1 carried a claim that the fork's `mk` decoder
+   needed a `0.2 → 0.4.x/V19` re-pin before a depth-0 card could be read. It is
+   **false**, machine-checked twice — a `Path == "m"` card round-trips through
+   the real encoder at `a10d007` with no code changes. The claim came from a
+   stale comment (`mk/mk.go:5`) and survived three rounds. Grep the mechanism,
+   not the claim.
 
 **Tests first**
 
+- `TestEmbeddedPayloadsAreStructurallyConfined` — deliverable 1. Discovers every
+  `//go:embed` under `cmd/emu`, requires each in a `//go:build js` file with
+  identifiers unreferenced outside the allowed set, floor against a misrooted
+  walk. **Mutation: the unconfined second blob must turn it red.**
+- `TestCosignerPayloadCarriesTheTracesCards` — the second blob decodes, and
+  carries the mk1 count and origins Trace A and Trace B each need. Pins the
+  inventory so a later shrink cannot silently strand a walk.
+- `TestWalkHarnessDrivesAndExtracts` — the harness can drive input and return an
+  engraved string from a completed walk. Without this, every "byte comparison"
+  in this plan is unimplementable.
 - `TestBip383WshMultiScriptPubKeyMatchesPublishedVectors` — BIP-**383**'s
   `wsh(multi(…))` / `wsh(sortedmulti(…))` vectors through `bip380`, compared at
   **scriptPubKey**. Not addresses: 383 does not publish them.
@@ -231,21 +281,23 @@ unattributed oracle is worse than none — it reads as proof.
   wrong address, silently, and "sorted" is in the name of the thing we build.
 - `TestBip141NestedSegwitScriptDiffersFromLegacy` — BIP-141's P2SH-P2WSH Example
   (scriptPubKey + redeemScript). The address is **derived locally from** that
-  vector, not quoted from it; S0's README must record it at that weaker,
-  honest level. Anchors S3's D-3 fix below the label.
-
-**Before writing any of the three: open the sources and inventory what they
-contain**, and let the test list follow the inventory. The previous test list
-followed an author's memory, and two of its three tests were unwritable.
+  vector, not quoted from it; S0's README records it at that weaker, honest
+  level. Anchors S3's D-3 fix below the label.
 - `TestOracleHarnessRefusesVendoredTestdata` — mutation-checked: point it at
   `md/testdata` and it must fail.
+- `TestOracleHarnessPinsBySourceCommit` — a binary whose self-reported version
+  matches but whose source commit does not must be refused.
 
-**Gate.** The three BIP vector tests pass; the harness prints oracle versions;
-the refusal test is demonstrated failing when pointed at vendored data. **Not
-tier 1** if the harness shells out to the primary binaries — mark it and keep it
-out of the inner loop (§4.6 tier 2).
+**Gate.** All eight tests pass; the confinement mutation is demonstrated red
+then green; the harness prints resolved oracle **commits** and the input tuple
+into the gate record; and **one end-to-end smoke walk drives the emulator to a
+completed engrave and returns the md1 string**. That last clause is the whole
+point of S0 — until a walk can produce an artifact, no later stage's walk gate
+means anything.
 
----
+**Not tier 1** (§4.6): the harness shells out to primary binaries and builds
+wasm. Mark it tier 2 and keep it out of the inner loop.
+
 
 ### S1 — the payload supplies the whole cosigner set
 
@@ -284,6 +336,12 @@ out of the inner loop (§4.6 tier 2).
 - Filter md1 records out before `buildCosignerCards`, which refuses on them.
 - The gather screen becomes a **review of what the payload supplied** (spec P0
   item 6). Title fixed in S2 with the rest of D-4.
+- **Preserve the per-key source seam while replacing its picker.** S1 removes
+  the `syswOffer(…ClassMDMK…)` call, today the only per-key source choice point.
+  Deleting it outright guarantees the later NFC plan must re-open this call site
+  — the one thing §5.1's build-it-once seam exists to prevent. Replace the
+  picker, keep the seam: one place answering "where does this key come from",
+  with payload as its only phase-1 answer.
 
 **Gate.** Trace A reaches the gather with both cards, by test and by emulator
 walk. Then: **either the flow completes an engrave, or D-1 reproduces and is
@@ -402,7 +460,12 @@ mutation-checked, or this stage ships a check that cannot fire:
    Observe every entered seed through the existing `buildMultisigSeedHook` seam,
    assert zeroed on each exit class, **mutation-checked by deleting one scrub
    site**. Precedent: `TestBip85DeriveFlow_ScrubsBothMnemonics`.
-9. **`TestGateDerivesAtTheCardsOwnOrigin`** — the origin binding, as a
+9. **`TestPerSeedPassphraseBindsToItsOwnSeed`** — §4.1's per-seed passphrase,
+   which had an implementation bullet and no test. The spec says no §4.3 row can
+   catch a violation, so this is the only thing that can: two seeds with
+   different passphrases derive two different keys, and a flow-global passphrase
+   applied to both must turn it red.
+10. **`TestGateDerivesAtTheCardsOwnOrigin`** — the origin binding, as a
    PROCEED/FAIL pair on one fixture: a `both` slot whose card declares
    `m/48'/0'/1'/2'`.
    **PROCEED** when the key is genuinely derived there.
@@ -426,6 +489,15 @@ mutation-checked, or this stage ships a check that cannot fire:
 - Bindings per spec M-B: in a `both` slot the card's origin and key are
   authoritative; `account` is bookkeeping; `derived`'s `account` is the BIP-48
   account component.
+
+**The gate's FAIL screen must not make silencing it the obvious next move.**
+After a seed↔key mismatch the only route the operator can currently see is
+reassigning that slot to `payloadKey` — which stops the check running rather
+than resolving the disagreement. The screen MUST name the likely causes (a
+mistyped or wrong-seed passphrase; a card from a different wallet), say plainly
+that reassigning the slot **suppresses the check rather than fixing it**, and
+name the host route. A safety gate whose obvious next action disables it is not
+a gate.
 
 **Bound the walk-away.** `wipeGuard` brackets only the unlock session, while
 this flow holds **several masters' seeds** in its registry with no time bound —
@@ -493,7 +565,7 @@ happy path and of one loud failure.
    load-bearing and currently unpinned:** assert it, and put the recovery
    procedure in the restore doc, or an interrupted operator has no route out.
    The emulator's existing `shToolpath` digest-equality check is the tool.
-8. **`TestGateStillFiresAfterOriginsDiverge`** — S4 test 8's fixture, re-run
+8. **`TestGateStillFiresAfterOriginsDiverge`** — S4's `TestGateDerivesAtTheCardsOwnOrigin` fixture, re-run
    through the REAL post-rewire flow rather than synthetically: the same `both`
    slot declaring `m/48'/0'/1'/2'`, **PROCEED** when honestly derived there and
    **FAIL naming the slot** when not, **mutation-checked the same way**.
@@ -506,6 +578,14 @@ happy path and of one loud failure.
    synthetic. S5 removes that refusal and rewires the origins the gate derives
    against, so S5 is the first stage where the gate runs for real — and if it is
    not re-proven here, S4's proof expires silently.
+
+**The backup must say what is NOT in it.** A BIP-39 passphrase is a required
+spending factor, it is **never engraved**, and neither "Full (seed + keys)" nor
+the restore document mentions it. F-132's device sibling exactly — that finding
+was a hashlock preimage required to spend, absent from the backup and unmentioned
+by it. Where a passphrase was used, the mode label and the restore doc MUST both
+say the backup is incomplete without it. The restore doc is read years later,
+alone, often by someone who was not the operator.
 
 **The EXPERIMENTAL warning must stop teaching a check that cannot check.**
 It currently tells the operator to verify per-slot fingerprints before funding.
@@ -525,13 +605,22 @@ says "discard the engraved plate(s)". Correct for a public plate; for one
 carrying a seed it tells the operator to bin their secret. Nothing distinguishes
 them.
 
-1. **Public plates first, secret plates last**, so most aborts leave only public
-   steel and the window in which a completed seed plate exists shrinks to the
-   set's tail. The ms1-first order is inherited convention, not a ruling, and S5
-   already owns `multisigEngraveCards`' multi-ms1 generalisation.
-2. **For any set containing an ms1 the abort warning says DESTROY, not
-   discard**, for any secret plate already cut. Cards-derived per the existing
-   R0-I2 pattern, so no other flow's call site changes.
+**SHIPS HERE — the wording.** For any set containing an ms1, the abort warning
+says **DESTROY, not discard**, for any secret plate already cut. Not a new
+requirement: "discard the engraved plate(s)" is **wrong today** for a plate
+carrying a seed, so this corrects shipped text — and it is the half that
+prevents the harm, because a warning saying destroy protects the operator
+whatever order the plates came out in. Cards-derived per the existing R0-I2
+pattern, so no other flow's call site changes.
+
+**DEFERRED — the reordering.** "Public plates first, secret last" is a design
+change, not a text fix: it alters what exists in the world at each moment of an
+abort, and it edits `multisigEngraveCards`, shared with `gui/multisig.go:163` —
+a flow this plan does not own. It also rests on "ms1-first is inherited
+convention, not a ruling", which nobody checked, and there is a plausible reason
+for the current order (the seed plate is the longest cut; failing early on it
+beats failing after four public plates). **Filed for the spec, with the
+shared-code impact noted, to earn its own R0.**
 
 **Gate.** Trace B completes: correct descriptor, by test and by emulator walk.
 **The §4.5 comparison extends to every mk1 and to EVERY ms1, byte for byte**
@@ -551,7 +640,12 @@ hand — the build output is unsigned).
 1. Engrave and restore a `wsh` multisig; verify against an external coordinator.
 2. Engrave and restore an `sh(wsh)` multisig; same. Confirms S3 on the plate,
    not just the screen.
-3. **At least one build MUST be divergent-origin, multi-slot and multi-master**
+3. **Confirm the interruption story on hardware.** S5 asserts that re-running
+   the same inputs mints byte-identical plates — the only recovery route an
+   interrupted operator has. Interrupt one real engrave mid-set, re-run, and
+   confirm the re-cut plates match. In software it is deterministic encoders; on
+   the machine it is what a recovery depends on.
+4. **At least one build MUST be divergent-origin, multi-slot and multi-master**
    (§6 P5). A shared-origin single-seed run would pass green around every
    §4.1a failure. **In the same flash cycle, restore master B's mnemonic from
    its engraved ms1 plate** — the ms1 class is the least-gated artifact (C1),
