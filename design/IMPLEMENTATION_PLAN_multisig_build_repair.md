@@ -23,7 +23,7 @@ miniscript) is out of scope by §1.
 | **S0** | the oracles: pinned primary toolchain + published-BIP address vectors | §1a |
 | **S1** | the payload supplies the whole cosigner set | P0 |
 | **S2** | the dead end, the title, the interim origin refusal | P1 |
-| **S3** | nested segwit is nameable; the four stale comments die | P2 |
+| **S3** | nested segwit is nameable; all 9 stale `TYPED-ONLY` comments die | P2 |
 | **S4** | the slot-assignment model + the seed↔key gate | P4 (moved) |
 | **S5** | multi-slot self, divergent origins, **and the engrave tail** | P3 + §4.1a |
 | **S6** | hardware validation | P5 |
@@ -177,7 +177,10 @@ unattributed oracle is worse than none — it reads as proof.
    modelled on the existing `bip-test-vector-audit-matrix` reports in
    `mnemonic-key` / `mnemonic-secret`.
 3. **A provenance header for `address/address_test.go`'s existing fixtures**:
-   either cite where they came from, or replace them with BIP-382 vectors.
+   either cite where they came from, or replace them with **BIP-383**
+   scriptPubKey vectors (compared at scriptPubKey, per §1a — **not** BIP-382,
+   which publishes no addresses; an earlier draft said 382 here and the
+   correction two sections above did not reach this line).
    Unattributed expected-addresses are self-agreement wearing the costume of a
    test.
 4. **The md vendored-vector re-pin: 0.36.0 → current** (`md/testdata/`).
@@ -309,11 +312,16 @@ decodes it" is the weaker relation and does not satisfy this gate.
 - All three callers together: `gui/md1_inspect.go:58`,
   `gui/multisig_restore.go:51`, `gui/bundle.go:315`. Round 1 confirmed
   `scriptName` has no consumers outside `gui`, so that is the complete set.
-- Delete or correct the four `TYPED-ONLY` comments (§2.2 D-5) at
-  `gui/bip85.go:264`, `gui/singlesig.go:18`, `gui/multisig.go:24`,
-  `gui/multisig_build.go:67`. They describe a retired mechanism, and a future
-  reader greps `TYPED-ONLY`, finds four hits, and concludes the payload cannot
-  reach a seed entry.
+- Delete or correct **all 9** `TYPED-ONLY` occurrences (§2.2 D-5). **Measured,
+  not counted from the spec's four cited sites:**
+  `gui/multisig.go` ×4, `gui/bip85.go` ×2, `gui/singlesig.go` ×2,
+  `gui/multisig_build.go` ×1 — and **none in the verify flows**, which are
+  correct by calling `seedEntryFlowTypedOnly` and never used the phrase.
+  They describe a retired mechanism, and a future reader greps `TYPED-ONLY`,
+  finds hits, and concludes the payload cannot reach a seed entry.
+  The spec cites four because four are the *doc-comment* sites it analysed;
+  the grep is the authority here, and the gate below is keyed to it. Re-run the
+  grep before starting — the count is a fact about the tree, not a constant.
 
 **Gate.** Emulator walk shows `P2SH-P2WSH` on the restore doc for an `sh(wsh)`
 build, and **`grep -rn TYPED-ONLY --include='*.go'` returns 0**.
