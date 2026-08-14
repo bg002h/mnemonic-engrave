@@ -5351,3 +5351,80 @@ countdown during a cut is indistinguishable from a wedged machine, and the
 operator's documented response to a wedged machine is to power-cycle it, mid-cut.
 
 ---
+
+### F-162 — `mk1Gatherer.collected()` returns chunks in RANDOM order (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic` `#seedhammer`
+
+Filed 2026-08-14, found by running S0's Trace A walk three times and noticing the
+census came back differently each time.
+
+**The bug, in four lines.** `gui/mk1_inspect.go`:
+
+```go
+g.set[h.ChunkIndex] = s            // offer(): keyed BY INDEX
+
+func (g *mk1Gatherer) collected() []string {
+	out := make([]string, 0, len(g.set))
+	for _, s := range g.set {      // <-- map iteration; Go randomises it
+		out = append(out, s)
+	}
+	return out
+}
+```
+
+The chunk index is the map key and is then thrown away at exactly the point the
+contract says to use it. `bundleCard.strings` documents itself as *"verbatim
+chunk strings **in index order**"* (`gui/bundle.go`).
+
+**Its own sibling shows the intended pattern.** `md1Gatherer.collected()`, same
+struct shape, same purpose, does it correctly:
+
+```go
+for i := 0; i < g.total; i++ { out = append(out, g.set[i]) }
+```
+
+So this is a porting slip, not a design choice.
+
+**Measured, three runs of the identical walk:**
+
+| run | plate order, cards A and B | digests 1–2 |
+| --- | --- | --- |
+| 1 | A c1, A c2, B c1, B c2 | — |
+| 2 | **A c2, A c1**, B c1, B c2 | `ce88ff48…`, `6ec13029…` |
+| 3 | A c1, A c2, **B c2, B c1** | `6ec13029…`, `ce88ff48…` |
+
+Run 3's first two digests are run 2's, swapped — the same physical plates cut in
+a different sequence. Randomisation is per card, as one `mk1Gatherer` per card
+predicts.
+
+**NOT a funds-safety defect, and the Rust check that the standing rule mandates
+is DONE and clean.** `mk-codec`'s `reassemble_from_chunks`
+(`crates/mk-codec/src/string_layer/chunk.rs:109`) states *"Chunks may arrive in
+any order; this function sorts internally"*, concatenates in `chunk_index` order,
+and is pinned by `reassemble_accepts_out_of_order_chunks`. The Go decoder is
+order-tolerant for the same reason, which is why `mk.Decode(collected)` succeeds
+on a shuffled slice and why a restore still works — every plate carries its own
+index. **Go-only porting error; no Rust fix is owed**, so the exemption applies
+and the fix may land in Go directly.
+
+**What it does break:**
+
+1. The screen says "Card 1 of 3 | **Plate 1 of 2**" while engraving an arbitrary
+   chunk. The label is a claim about which chunk this is, and it is wrong half
+   the time.
+2. `bundleCard.strings` violates its documented contract, which anything
+   downstream is entitled to rely on.
+3. **It makes §4.5's byte comparison order-flaky** — the gate S0 exists to
+   build. `engravedRecorder.Strings()` documents order as load-bearing: *"a set
+   that arrives in the wrong order is a different restore than the one the walk
+   asked for."* A later gate comparing ordered output would flake roughly half
+   the time on a 2-chunk card, and more often as chunk counts rise.
+4. `mk.Decode` is fed an unordered slice today. It tolerates that by design; if
+   it ever gained an order assumption this becomes silent corruption.
+
+**Fix**, matching the sibling exactly, plus the test that would have caught it —
+a gather offering chunks out of order must still collect them in index order.
+Deliberately NOT done in the commit that found it: it is funds-adjacent and
+belongs to a gated cycle. Worth checking `collected()`'s other consumers in the
+same pass, since it feeds `mk1DisplayFlow` too.
+
+---
