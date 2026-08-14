@@ -56,20 +56,23 @@ stale oracle is visible rather than silent, and MUST record the full input tuple
 (template, n, k, slot order, fp choice, per-slot origins, seeds) so "same
 inputs" is reproducible rather than remembered.
 
-Comparing against vendored fork testdata **satisfies no gate**. The drift is
-already on disk and measured: the fork's md parity vectors are pinned to
-**v0.36.0** against a primary at **0.42.0**, and `mk/mk.go:5` pins "mk-codec
-0.2" against 0.4.2. The changelogs claim byte-stability across that gap; no
-machine has checked it, and this project's rule is that such claims get
-machine-checked. F-127 is the constellation's own record of what a vendored 0.34
-against a 0.42 primary cost.
+Comparing against vendored fork testdata **satisfies no gate** — but the reason
+is coverage, not corruption, and that distinction was itself an inherited claim
+until it was run. The fork's md parity vectors are pinned to **v0.36.0** against
+a primary at **0.42.0**, and `mk/mk.go:5` pins "mk-codec 0.2" against 0.4.2.
+**Measured 2026-08-13: 0.36 → 0.42 shows ZERO byte drift across all 30 vectors.**
+So "the drift is measured" — which this plan asserted for two rounds — was
+false. The vendored vectors are not wrong; they are simply an old and smaller
+sample, and a gate that accepted them would prove agreement with a subset of
+ourselves. S0 deliverable 4 is a **coverage catch-up, not a correctness
+repair**. F-127 remains the record of what a genuinely divergent pin cost.
 
 **The comparison plane, per artifact — ruled here, before any code:**
 
 | artifact | relation | why not plain string equality |
 | --- | --- | --- |
 | md1 | **full string equality** against the primary's output for the same inputs | deterministic on both sides |
-| mk1 | **(a)** the current primary `mk decode`/`mk inspect` accepts the chunks, **AND (b)** `canonical_payload_bytes` equality | the primary mints a fresh CSPRNG 20-bit `chunk_set_id` per encode with no CLI override, while the fork derives it from the bytecode — so literal equality fails on every honest run. The id is excluded because **the primary randomizes it by design**; this is a ruled property of the format, not a test-time convenience |
+| mk1 | **(a)** the current primary accepts the chunks, **AND (b)** field equality via `mk verify --xpub --origin-fingerprint --origin-path --policy-id-stub`, which RUNS on fork-encoded chunks (checked). `canonical_payload_bytes` is a Rust **library** API with no `mk` CLI surface — there is no `mk bytecode` — so the original wording named a relation nothing could execute | the primary mints a fresh CSPRNG 20-bit `chunk_set_id` per encode with no CLI override, while the fork derives it from the bytecode — so literal equality fails on every honest run. The id is excluded because **the primary randomizes it by design**; this is a ruled property of the format, not a test-time convenience |
 | ms1 | **full string equality** against `ms encode --hex <that master's entropy>` | deterministic; this is C1 |
 
 A `--chunk-set-id` flag on `mk encode` would restore full mk1 string identity.
@@ -87,13 +90,30 @@ cited provenance** — no BIP reference, no source. `bip380/bip380_test.go` has
 two tests, both parsing/compaction, neither citing a BIP. So device address
 derivation is currently self-consistent, not standard-conformant.
 
-| BIP | pins | stage |
-| --- | --- | --- |
-| **67** | deterministic key sorting — the *sorted* in `sortedmulti` | S5 |
-| **382** | `wsh(multi(…))` → address | S2 (Trace A) |
-| **141/143** | P2SH-P2WSH addresses | S3 — anchors D-3 at the address level, not just the label |
-| **32** | derivation at `m/48'/0'/…` | S5 (Trace B's held slots) |
-| **39** | mnemonic → seed | already used (`abandon…about`) |
+| BIP | what it ACTUALLY supplies | assertion level | stage |
+| --- | --- | --- | --- |
+| **383** | `wsh(multi(…))` / `wsh(sortedmulti(…))` vectors | **scriptPubKey**, not address | S2 (Trace A) |
+| **67** | deterministic key sorting | key order | S5 |
+| **141** | P2SH-P2WSH Example: scriptPubKey + redeemScript | address **derived from** a published vector, not quoted from one — S0 must say which | S3 |
+| **39** | mnemonic → seed | seed | already used (`abandon…about`) |
+
+**Corrected 2026-08-13 by the inherited-fact audit, and the correction matters
+more than the table.** The previous version cited **BIP-382** for
+`wsh(multi(…))` — that is **BIP-383**; 382 is `wsh()` alone and contains no
+`multi(`. It also promised **addresses** from 382 and 141/143, which publish
+scriptPubKeys and no addresses, and cited **BIP-32** for `m/48'` derivation,
+which its vectors never touch. **BIP-48 publishes no vectors at all** — its
+Examples table is path semantics with no keys — so no published vector pins
+`m/48'`; S0's provenance README must say so rather than imply one was used.
+
+I wrote that table from memory while adding the oracle whose whole purpose was
+to stop us trusting ourselves. It is the third instance this cycle of a
+plausible, load-bearing, never-executed claim, and the most expensive, because
+S0 is the stage every later gate trusts.
+
+**S0 may not quietly relax to "the tests we could write passed."** That is
+exactly the failure deliverable 3 names about `address_test.go`'s unattributed
+fixtures.
 
 Precedent to model on: `bip341-wallet-test-vectors.json` is already vendored in
 md-codec, BIP-173/350 vectors in the vendored bech32 crate, and both
@@ -184,13 +204,19 @@ unattributed oracle is worse than none — it reads as proof.
 
 **Tests first**
 
-- `TestBip382WshMultiAddressesMatchPublishedVectors` — BIP-382's `wsh(multi(…))`
-  vectors through `bip380` + `address`.
+- `TestBip383WshMultiScriptPubKeyMatchesPublishedVectors` — BIP-**383**'s
+  `wsh(multi(…))` / `wsh(sortedmulti(…))` vectors through `bip380`, compared at
+  **scriptPubKey**. Not addresses: 383 does not publish them.
 - `TestBip67SortedMultiKeyOrder` — BIP-67's ordering vectors. A wrong sort is a
   wrong address, silently, and "sorted" is in the name of the thing we build.
-- `TestBip143NestedSegwitAddressDiffersFromLegacy` — P2SH-P2WSH vs bare P2SH
-  from published vectors. This anchors S3's D-3 fix at the **address** level
-  rather than the label level.
+- `TestBip141NestedSegwitScriptDiffersFromLegacy` — BIP-141's P2SH-P2WSH Example
+  (scriptPubKey + redeemScript). The address is **derived locally from** that
+  vector, not quoted from it; S0's README must record it at that weaker,
+  honest level. Anchors S3's D-3 fix below the label.
+
+**Before writing any of the three: open the sources and inventory what they
+contain**, and let the test list follow the inventory. The previous test list
+followed an author's memory, and two of its three tests were unwritable.
 - `TestOracleHarnessRefusesVendoredTestdata` — mutation-checked: point it at
   `md/testdata` and it must fail.
 
@@ -290,7 +316,13 @@ decodes it" is the weaker relation and does not satisfy this gate.
   reach a seed entry.
 
 **Gate.** Emulator walk shows `P2SH-P2WSH` on the restore doc for an `sh(wsh)`
-build. `grep -rn TYPED-ONLY` returns only the two verify sites, which are true.
+build, and **`grep -rn TYPED-ONLY --include='*.go'` returns 0**.
+Measured: there are **9** occurrences across 4 files (`gui/multisig.go` ×4,
+`gui/bip85.go` ×2, `gui/singlesig.go` ×2, `gui/multisig_build.go` ×1) — not the
+4 an earlier draft assumed, and **none in the verify flows**, so the previous
+gate line ("returns only the two verify sites") was unsatisfiable and its
+premise was wrong. The verify flows are correct because they call
+`seedEntryFlowTypedOnly`; they never used the phrase.
 
 ---
 
