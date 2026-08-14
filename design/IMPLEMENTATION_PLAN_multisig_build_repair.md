@@ -51,6 +51,15 @@ address derivation from published bip test cases."*
 **Oracle 1 — the CURRENT PRIMARY toolchain, byte for byte.** Not the fork's
 vendored testdata, and not whatever binary is on `PATH`. The pins today are
 `md-codec 0.42.x` (or `me`, which pins it), `mk-codec 0.4.2`, `ms-codec 0.7.0`.
+
+**PIN BY SOURCE COMMIT, NOT BY `--version`.** A version string is
+self-reported by the binary, so a substituted tool spoofs the pin and
+launders a device defect through every byte-identity gate in this plan — the
+whole gate spine, defeated by one file on `PATH`. The walk script MUST
+resolve each oracle to a source commit (build from a pinned checkout, or
+record and check a binary hash) and print that commit, not the version, into
+the gate record. S0 exists so gates are not anchored to something
+untrustworthy, and an unauthenticated self-report is exactly that.
 **The walk script MUST print the oracle versions into every gate record**, so a
 stale oracle is visible rather than silent, and MUST record the full input tuple
 (template, n, k, slot order, fp choice, per-slot origins, seeds) so "same
@@ -157,7 +166,15 @@ exists and the reason S6 may not close without rehearsing it on hardware.
 ## 3. Per-stage detail
 
 Every stage: **tests first**, then implementation, then the gate. Every stage's
-gate includes the §4.5 emulator walk. Tests are tier 1 (§4.6) unless named
+gate includes the §4.5 emulator walk.
+
+**A walk's expected artifact census MUST derive from the recorded input
+tuple, never from what the walk produced.** "Every mk1 and every ms1
+matched" is vacuously true of a walk that fell over after plate one. The
+script computes how many md1 chunks, mk1s and ms1s the inputs REQUIRE and
+fails when fewer arrive — a partial walk may never satisfy a total gate.
+
+Tests are tier 1 (§4.6) unless named
 otherwise — synthetic time via `testing/synctest`, no real sleeps.
 
 ---
@@ -248,6 +265,13 @@ out of the inner loop (§4.6 tier 2).
    payload record order, and that the review screen shows it. Order is
    identity-bearing (`md/encode_multisig.go:13-21`).
 6. `TestBuildRefusesMoreCardsThanOpenSlots` — named refusal, not a fall-through.
+7. `TestUnderSupplyRefusalNamesTheHostRoute` — **refusals must speak phase-1
+   language.** Today's tell the operator to *scan* a card, an instruction phase 1
+   removed with NFC. A payload holding 3 of 4 needed cards, or a card whose chunk
+   set is incomplete, must name the only route that exists: rewrite the payload
+   on the host and deliver it again. A refusal prescribing an impossible action
+   is worse than a bare failure — the operator goes looking for a reader that is
+   not there.
 
 **Implementation**
 
@@ -281,7 +305,15 @@ captured as a failing test** (spec P0 gate — round 0's I2).
    differs from the shared origin must not be silently stamped
    `m/48'/0'/0'/2'`. The spec permits refuse OR warn; **this plan picks REFUSE**,
    so the test's name matches its body and the assertion has one arm.
-4. **A raster assertion on whatever D-1 turns out to be.** If the defect is a
+4. **`TestS2RefusesDuplicateKeysBeforeS4`** — the duplicate-key window. **No
+   duplicate check exists anywhere in the code today**, and §4.1's final-slot-set
+   check does not land until S4 — so from S2, which makes engraves complete,
+   until S4 the flow would silently engrave a policy containing the same key
+   twice. That is the quorum degradation §4.1 exists to refuse:
+   `sortedmulti(2,K,K,X)` is spendable by K alone. The interim check is a byte
+   comparison over the assembled slots and depends on nothing S4 introduces, so
+   it costs S2 almost nothing and closes a window that would otherwise ship.
+5. **A raster assertion on whatever D-1 turns out to be.** If the defect is a
    screen whose body does not draw, a text assertion cannot see it — F-151.
    Calibrate the floor against the real defect, measured both ways; F-151's
    first guess of 2000 px passed the defect it was written for.
@@ -358,7 +390,19 @@ mutation-checked, or this stage ships a check that cannot fire:
 7. `TestGateNeverPrintsSeedOrPassphrase` — no failure message contains seed
    words or passphrase text. Mutation-checked by splicing them in; stderr and
    screen text both.
-8. **`TestGateDerivesAtTheCardsOwnOrigin`** — the origin binding, as a
+8. **`TestBuildFlowScrubsEverySeedOnEveryExit`** — **spec §4.2's mandated test,
+   which no stage of this plan had claimed.** `grep -i scrub` over the plan
+   returned zero before this line, while §4.2 is normative REQUIRED and ends "A
+   test MUST prove the scrub, and that test MUST be mutation-checked." Today's
+   single-seed `defer` (`gui/multisig_build.go:75-79`) is sound; S4 and S5
+   replace it with a `seedID`-keyed registry holding several masters and
+   multiply the exits — per-slot seed entry Back, slot review Back, gate FAIL
+   screens, tail abort, `ctx.Done` unwind. A registry missing one exit leaves N
+   masters' seeds in RAM and nothing else would notice.
+   Observe every entered seed through the existing `buildMultisigSeedHook` seam,
+   assert zeroed on each exit class, **mutation-checked by deleting one scrub
+   site**. Precedent: `TestBip85DeriveFlow_ScrubsBothMnemonics`.
+9. **`TestGateDerivesAtTheCardsOwnOrigin`** — the origin binding, as a
    PROCEED/FAIL pair on one fixture: a `both` slot whose card declares
    `m/48'/0'/1'/2'`.
    **PROCEED** when the key is genuinely derived there.
@@ -382,6 +426,14 @@ mutation-checked, or this stage ships a check that cannot fire:
 - Bindings per spec M-B: in a `both` slot the card's origin and key are
   authoritative; `account` is bookkeeping; `derived`'s `account` is the BIP-48
   account component.
+
+**Bound the walk-away.** `wipeGuard` brackets only the unlock session, while
+this flow holds **several masters' seeds** in its registry with no time bound —
+an operator who walks away mid-build leaves them live indefinitely. S4 owns the
+registry, so S4 rules the bound: an idle limit that scrubs and exits, or an
+explicit recorded decision that the build flow is non-wiping like the rest of
+the systemwide surface (SYSW§3.2.1), stated in the restore doc. Silence is the
+one option unavailable — it is a choice nobody made.
 
 **Gate.** Every failing row demonstrated failing. Emulator walk of the `both`
 happy path and of one loud failure.
@@ -431,7 +483,17 @@ happy path and of one loud failure.
   distinct master in full mode.
 - Remove S2's interim foreign-origin refusal, which this stage supersedes.
 
-7. **`TestGateStillFiresAfterOriginsDiverge`** — S4 test 8's fixture, re-run
+7. **`TestReRunMintsByteIdenticalPlates`** — the designed answer to
+   interruption. Trace B's tail is **6–9 plates over hours**; nothing records
+   which were cut, and a power loss loses that state. Recovery is nonetheless
+   possible because **the encoders are deterministic** — no `rand` in `md/`,
+   `mk/` or `codex32/`, and mk's `chunk_set_id` derives from the bytecode rather
+   than randomness — so re-running the same inputs mints byte-identical plates
+   and the operator re-cuts only what is missing. **That property is
+   load-bearing and currently unpinned:** assert it, and put the recovery
+   procedure in the restore doc, or an interrupted operator has no route out.
+   The emulator's existing `shToolpath` digest-equality check is the tool.
+8. **`TestGateStillFiresAfterOriginsDiverge`** — S4 test 8's fixture, re-run
    through the REAL post-rewire flow rather than synthetically: the same `both`
    slot declaring `m/48'/0'/1'/2'`, **PROCEED** when honestly derived there and
    **FAIL naming the slot** when not, **mutation-checked the same way**.
@@ -444,6 +506,32 @@ happy path and of one loud failure.
    synthetic. S5 removes that refusal and rewires the origins the gate derives
    against, so S5 is the first stage where the gate runs for real — and if it is
    not re-proven here, S4's proof expires silently.
+
+**The EXPERIMENTAL warning must stop teaching a check that cannot check.**
+It currently tells the operator to verify per-slot fingerprints before funding.
+Fingerprints are **omitted by default**, and when included they are
+**card-self-declared and unbound to the key** (`mk/mk.go:136,286`) — an attacker
+forges a matching one for free. Meanwhile the pre-engrave review shows **no keys
+at all**, so the operator confirms a policy whose contents they have never seen.
+S5 must: (1) show the per-slot keys, or an unambiguous digest of them, on the
+review screen; (2) rewrite the warning to demand a **key or descriptor
+comparison against an independent source**, and say plainly that a matching
+fingerprint is not verification. The external-coordinator restore at S6 is the
+real backstop, and the warning should name it as such.
+
+**Plate order and abort text — RULED, because today's behaviour instructs seed
+leakage.** Full mode cuts the **ms1 seed plate FIRST**, and the abort warning
+says "discard the engraved plate(s)". Correct for a public plate; for one
+carrying a seed it tells the operator to bin their secret. Nothing distinguishes
+them.
+
+1. **Public plates first, secret plates last**, so most aborts leave only public
+   steel and the window in which a completed seed plate exists shrinks to the
+   set's tail. The ms1-first order is inherited convention, not a ruling, and S5
+   already owns `multisigEngraveCards`' multi-ms1 generalisation.
+2. **For any set containing an ms1 the abort warning says DESTROY, not
+   discard**, for any secret plate already cut. Cards-derived per the existing
+   R0-I2 pattern, so no other flow's call site changes.
 
 **Gate.** Trace B completes: correct descriptor, by test and by emulator walk.
 **The §4.5 comparison extends to every mk1 and to EVERY ms1, byte for byte**
