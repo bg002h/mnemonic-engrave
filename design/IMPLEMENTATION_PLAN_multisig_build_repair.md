@@ -20,6 +20,7 @@ miniscript) is out of scope by §1.
 
 | stage | delivers | spec |
 | --- | --- | --- |
+| **S0** | the oracles: pinned primary toolchain + published-BIP address vectors | §1a |
 | **S1** | the payload supplies the whole cosigner set | P0 |
 | **S2** | the dead end, the title, the interim origin refusal | P1 |
 | **S3** | nested segwit is nameable; the four stale comments die | P2 |
@@ -33,12 +34,79 @@ are still derived at the locked shared origin — a key card asserting membershi
 in a wallet that does not contain its key, on steel. A stage that could close
 green in that state is a stage that ships C2.
 
-**S4 before S5 — the deviation from the spec's numbering, and why.** §10 Q4 asks
-whether §4.3's gate moves ahead of multi-slot work. It is planned here as
-**yes**, on two grounds: the exposure is live today (§2.2 D-5 — payload seeds
-already reach the constructor with no cross-check), and the gate depends only on
-the assignment model, not on multi-slot support. **If the operator rules
-otherwise, swap S4 and S5; nothing else changes.**
+**S4 before S5 — RULED by the operator 2026-08-13** ("Agreed. Safety first."),
+answering §10 Q4. The exposure is live today (§2.2 D-5 — payload seeds already
+reach the constructor with no cross-check) and the gate depends only on the
+assignment model, not on multi-slot support. Recorded as settled so a later
+reader does not reopen it.
+
+## 1a. The oracles — what "correct" is measured against
+
+Operator criterion, 2026-08-13: *"Assess safety by comparing with mnemonic
+constellation output and measure byte identical"*, and *"we can also test
+address derivation from published bip test cases."*
+
+**Three oracles, and they are not interchangeable.**
+
+**Oracle 1 — the CURRENT PRIMARY toolchain, byte for byte.** Not the fork's
+vendored testdata, and not whatever binary is on `PATH`. The pins today are
+`md-codec 0.42.x` (or `me`, which pins it), `mk-codec 0.4.2`, `ms-codec 0.7.0`.
+**The walk script MUST print the oracle versions into every gate record**, so a
+stale oracle is visible rather than silent, and MUST record the full input tuple
+(template, n, k, slot order, fp choice, per-slot origins, seeds) so "same
+inputs" is reproducible rather than remembered.
+
+Comparing against vendored fork testdata **satisfies no gate**. The drift is
+already on disk and measured: the fork's md parity vectors are pinned to
+**v0.36.0** against a primary at **0.42.0**, and `mk/mk.go:5` pins "mk-codec
+0.2" against 0.4.2. The changelogs claim byte-stability across that gap; no
+machine has checked it, and this project's rule is that such claims get
+machine-checked. F-127 is the constellation's own record of what a vendored 0.34
+against a 0.42 primary cost.
+
+**The comparison plane, per artifact — ruled here, before any code:**
+
+| artifact | relation | why not plain string equality |
+| --- | --- | --- |
+| md1 | **full string equality** against the primary's output for the same inputs | deterministic on both sides |
+| mk1 | **(a)** the current primary `mk decode`/`mk inspect` accepts the chunks, **AND (b)** `canonical_payload_bytes` equality | the primary mints a fresh CSPRNG 20-bit `chunk_set_id` per encode with no CLI override, while the fork derives it from the bytecode — so literal equality fails on every honest run. The id is excluded because **the primary randomizes it by design**; this is a ruled property of the format, not a test-time convenience |
+| ms1 | **full string equality** against `ms encode --hex <that master's entropy>` | deterministic; this is C1 |
+
+A `--chunk-set-id` flag on `mk encode` would restore full mk1 string identity.
+**File it, do not build it** — a host-side change with its own cycle.
+
+**Oracle 2 — published BIP test vectors, for ADDRESSES.** Oracle 1 proves two
+implementations agree; it cannot prove both are not wrong the same way. The
+constellation's own journeys found four host-side defects (F-127, F-128, F-130,
+F-140), so "the host said so" is not ground truth. Published vectors are ground
+truth from outside the project.
+
+Measured gap this closes: `address/address_test.go` asserts real derived
+addresses for `pkh`, `wpkh` and `wsh` multisig, but its fixtures carry **no
+cited provenance** — no BIP reference, no source. `bip380/bip380_test.go` has
+two tests, both parsing/compaction, neither citing a BIP. So device address
+derivation is currently self-consistent, not standard-conformant.
+
+| BIP | pins | stage |
+| --- | --- | --- |
+| **67** | deterministic key sorting — the *sorted* in `sortedmulti` | S5 |
+| **382** | `wsh(multi(…))` → address | S2 (Trace A) |
+| **141/143** | P2SH-P2WSH addresses | S3 — anchors D-3 at the address level, not just the label |
+| **32** | derivation at `m/48'/0'/…` | S5 (Trace B's held slots) |
+| **39** | mnemonic → seed | already used (`abandon…about`) |
+
+Precedent to model on: `bip341-wallet-test-vectors.json` is already vendored in
+md-codec, BIP-173/350 vectors in the vendored bech32 crate, and both
+`mnemonic-key` and `mnemonic-secret` carry a `bip-test-vector-audit-matrix`
+agent report. The device side has no equivalent; S0 creates one.
+
+**Oracle 3 — an external coordinator, at S6.** Independent of both. Byte-identity
+plus an external restore is the two-oracle structure the plan's own review
+endorsed.
+
+**Adjudication.** A divergence at any gate is settled **Rust-first**: if the
+primary is wrong it is fixed there with a test vector, and the Go change is the
+convergence port. A divergence against a published BIP vector outranks both.
 
 ## 2. The journeys — the map that keeps a missing stage visible
 
@@ -71,6 +139,44 @@ exists and the reason S6 may not close without rehearsing it on hardware.
 Every stage: **tests first**, then implementation, then the gate. Every stage's
 gate includes the §4.5 emulator walk. Tests are tier 1 (§4.6) unless named
 otherwise — synthetic time via `testing/synctest`, no real sleeps.
+
+---
+
+### S0 — the oracles
+
+Every later gate depends on these, and a gate anchored to a stale or
+unattributed oracle is worse than none — it reads as proof.
+
+**Deliverables**
+
+1. **A pinned-oracle harness.** The walk script resolves the primary toolchain
+   by version, refuses to run against vendored fork testdata, and **prints the
+   resolved oracle versions plus the full input tuple into every gate record**.
+2. **Published-BIP address vectors, vendored with provenance**, in the shape of
+   `md/testdata/README.md` — source repo, commit, path, per-file meaning — and
+   modelled on the existing `bip-test-vector-audit-matrix` reports in
+   `mnemonic-key` / `mnemonic-secret`.
+3. **A provenance header for `address/address_test.go`'s existing fixtures**:
+   either cite where they came from, or replace them with BIP-382 vectors.
+   Unattributed expected-addresses are self-agreement wearing the costume of a
+   test.
+
+**Tests first**
+
+- `TestBip382WshMultiAddressesMatchPublishedVectors` — BIP-382's `wsh(multi(…))`
+  vectors through `bip380` + `address`.
+- `TestBip67SortedMultiKeyOrder` — BIP-67's ordering vectors. A wrong sort is a
+  wrong address, silently, and "sorted" is in the name of the thing we build.
+- `TestBip143NestedSegwitAddressDiffersFromLegacy` — P2SH-P2WSH vs bare P2SH
+  from published vectors. This anchors S3's D-3 fix at the **address** level
+  rather than the label level.
+- `TestOracleHarnessRefusesVendoredTestdata` — mutation-checked: point it at
+  `md/testdata` and it must fail.
+
+**Gate.** The three BIP vector tests pass; the harness prints oracle versions;
+the refusal test is demonstrated failing when pointed at vendored data. **Not
+tier 1** if the harness shells out to the primary binaries — mark it and keep it
+out of the inner loop (§4.6 tier 2).
 
 ---
 
@@ -129,8 +235,10 @@ captured as a failing test** (spec P0 gate — round 0's I2).
    Calibrate the floor against the real defect, measured both ways; F-151's
    first guess of 2000 px passed the defect it was written for.
 
-**Gate.** Trace A completes end to end: engrave, by test and by emulator walk,
-producing an md1 the host accepts byte for byte.
+**Gate.** Trace A completes end to end: engrave, by test and by emulator walk.
+The md1 is compared by **production**, not acceptance: the current primary
+BUILDS an md1 from the same inputs and the strings are equal (§1a). "The host
+decodes it" is the weaker relation and does not satisfy this gate.
 
 ---
 
@@ -222,12 +330,23 @@ happy path and of one loud failure.
    contains.
 4. `TestOneMk1PerHeldSlot` — cardinality, ruled in §4.1a item 2.
 5. `TestFullModeEngravesMs1ForEveryMaster` — **C2's second scenario.** A 3-of-4
-   across masters A and B in full mode engraves both ms1s, or refuses with a
-   named reason. Losing B otherwise leaves two legs against k=3: unspendable,
-   from a backup labelled "Full (seed + keys)".
+   across masters A and B in full mode **engraves both ms1s**. The spec permits
+   a refusal arm; **this plan picks the engrave-both arm**, because a test
+   asserting a disjunction passes on either branch and so cannot be
+   mutation-checked. Losing B otherwise leaves two legs against k=3:
+   unspendable, from a backup labelled "Full (seed + keys)".
+   The test decodes **each** ms1 and compares its entropy to the master it
+   claims. **Mutation:** make the engrave loop capture one mnemonic variable, so
+   both ms1s carry master A's entropy — the test must go red. Without that
+   assertion the bug ships a "Full" backup that is missing a master and passes
+   every other gate in this plan.
 6. `TestDepthZeroCosignerCardIsNamedRefusal` — spec M-1: `Path == "m"` trips
    `errMultisigEmptyDivergent` (`md/encode_multisig.go:104-106`); refuse by a
-   named screen, not a fall-through "Couldn't assemble".
+   named screen, not a fall-through "Couldn't assemble". **Note the pin seam:**
+   a depth-0 mk1 is the V19 shape the primary added in the 0.4.x line while the
+   fork pins 0.2-era wire (`mk/mk.go:5`), so this test's premise — that the fork
+   decodes the card far enough to see `Path == "m"` — is only sound once S0's
+   re-pin includes V19.
 
 **Implementation**
 
@@ -238,9 +357,20 @@ happy path and of one loud failure.
   distinct master in full mode.
 - Remove S2's interim foreign-origin refusal, which this stage supersedes.
 
+7. **`TestGateStillFiresAfterOriginsDiverge`** — the S4 seed↔key gate, re-proven
+   through the REAL flow. S2's interim foreign-origin refusal means a
+   divergent-origin input cannot reach the gate during S4, so every S4 gate test
+   is necessarily synthetic. S5 removes that refusal and rewires the origins the
+   gate derives against — so S5 is the first stage where the gate can be
+   exercised for real, and it MUST be, or S4's proof expires silently.
+
 **Gate.** Trace B completes: correct descriptor, by test and by emulator walk.
-**The §4.5 byte comparison extends to every mk1 and to ms1 presence** — the md1
-alone cannot see either C2 scenario.
+**The §4.5 comparison extends to every mk1 and to EVERY ms1, byte for byte**
+(§1a): each engraved ms1 must equal `ms encode --hex <that master's entropy>`
+from the current primary, and each mk1 must satisfy the two-part mk1 relation.
+"ms1 presence" was this plan's earlier wording and it was a defect, not a
+scoping — the spec's presence requirement is a floor, and byte comparison
+satisfies it a fortiori. The md1 alone cannot see either C2 scenario.
 
 ---
 
@@ -254,7 +384,9 @@ hand — the build output is unsigned).
    not just the screen.
 3. **At least one build MUST be divergent-origin, multi-slot and multi-master**
    (§6 P5). A shared-origin single-seed run would pass green around every
-   §4.1a failure.
+   §4.1a failure. **In the same flash cycle, restore master B's mnemonic from
+   its engraved ms1 plate** — the ms1 class is the least-gated artifact (C1),
+   and a plate nobody has read back is a plate nobody has tested.
 
 **Gate.** All three restore correctly at an external coordinator. This confirms
 software already proven; it is not the first place the flow is executed.
