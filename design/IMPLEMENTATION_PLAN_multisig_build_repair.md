@@ -160,6 +160,16 @@ unattributed oracle is worse than none — it reads as proof.
    either cite where they came from, or replace them with BIP-382 vectors.
    Unattributed expected-addresses are self-agreement wearing the costume of a
    test.
+4. **The fork's own wire re-pin: mk 0.2 → 0.4.x including V19** (`mk/mk.go:5`),
+   and the md vendored vectors 0.36.0 → current. **S0 owns this.** Stated
+   explicitly because round 0 asked for an owner, the previous fold dropped the
+   sentence, and a later note then attributed the re-pin to S0 while S0's
+   deliverables did not contain it — leaving S5 test 6 depending on work no
+   stage had. Without V19 the fork cannot decode a depth-0 mk1 far enough to see
+   `Path == "m"`, so that test cannot be written as specified and M-1's "named
+   screen, not a fall-through" silently degrades into the fall-through the spec
+   rejected. If the re-pin proves larger than S0 should carry it becomes its own
+   stage **before S5** — it may not become an unowned assumption again.
 
 **Tests first**
 
@@ -228,8 +238,9 @@ captured as a failing test** (spec P0 gate — round 0's I2).
 2. `TestBuildGatherIsNotTitledEngraveBundle` — D-4.
 3. `TestBuildRefusesForeignOriginCardBeforeS5` — spec M-E: until S5,
    `cosignerFromCard` still discards origins, so a card whose declared origin
-   differs from the shared origin must be refused or warned, not silently
-   stamped `m/48'/0'/0'/2'`.
+   differs from the shared origin must not be silently stamped
+   `m/48'/0'/0'/2'`. The spec permits refuse OR warn; **this plan picks REFUSE**,
+   so the test's name matches its body and the assertion has one arm.
 4. **A raster assertion on whatever D-1 turns out to be.** If the defect is a
    screen whose body does not draw, a text assertion cannot see it — F-151.
    Calibrate the floor against the real defect, measured both ways; F-151's
@@ -296,6 +307,18 @@ mutation-checked, or this stage ships a check that cannot fire:
 7. `TestGateNeverPrintsSeedOrPassphrase` — no failure message contains seed
    words or passphrase text. Mutation-checked by splicing them in; stderr and
    screen text both.
+8. **`TestGateDerivesAtTheCardsOwnOrigin`** — the origin binding, as a
+   PROCEED/FAIL pair on one fixture: a `both` slot whose card declares
+   `m/48'/0'/1'/2'`.
+   **PROCEED** when the key is genuinely derived there.
+   **FAIL LOUDLY, naming the slot**, when the same card carries a key derived at
+   the shared origin instead.
+   **Mutation: make the gate derive at `multisigSharedOrigin()` instead of the
+   card's declared origin — the PROCEED case must go red.** Without this, a gate
+   wrapper that hardcodes the shared origin passes every other S4 test, because
+   S2's interim refusal makes the two values indistinguishable for the whole of
+   S4. `findUserSlot` is origin-correct by construction (it derives at each key's
+   own `k.OriginPath`); the wrapper built on top of it is new code and is not.
 
 **Implementation**
 
@@ -345,7 +368,7 @@ happy path and of one loud failure.
    named screen, not a fall-through "Couldn't assemble". **Note the pin seam:**
    a depth-0 mk1 is the V19 shape the primary added in the 0.4.x line while the
    fork pins 0.2-era wire (`mk/mk.go:5`), so this test's premise — that the fork
-   decodes the card far enough to see `Path == "m"` — is only sound once S0's
+   decodes the card far enough to see `Path == "m"` — is only sound once S0 deliverable 4's
    re-pin includes V19.
 
 **Implementation**
@@ -357,12 +380,19 @@ happy path and of one loud failure.
   distinct master in full mode.
 - Remove S2's interim foreign-origin refusal, which this stage supersedes.
 
-7. **`TestGateStillFiresAfterOriginsDiverge`** — the S4 seed↔key gate, re-proven
-   through the REAL flow. S2's interim foreign-origin refusal means a
-   divergent-origin input cannot reach the gate during S4, so every S4 gate test
-   is necessarily synthetic. S5 removes that refusal and rewires the origins the
-   gate derives against — so S5 is the first stage where the gate can be
-   exercised for real, and it MUST be, or S4's proof expires silently.
+7. **`TestGateStillFiresAfterOriginsDiverge`** — S4 test 8's fixture, re-run
+   through the REAL post-rewire flow rather than synthetically: the same `both`
+   slot declaring `m/48'/0'/1'/2'`, **PROCEED** when honestly derived there and
+   **FAIL naming the slot** when not, **mutation-checked the same way**.
+   The specificity is the point: "the gate still fires" is satisfiable by
+   `assemble(divergentInput); assertNoError()` — a smoke test that never checks
+   WHICH origin the gate derived against, which is the binding the whole check
+   exists to protect.
+   Why it must be re-proven at all: S2's interim refusal means a divergent-origin
+   input cannot reach the gate during S4, so every S4 gate test is necessarily
+   synthetic. S5 removes that refusal and rewires the origins the gate derives
+   against, so S5 is the first stage where the gate runs for real — and if it is
+   not re-proven here, S4's proof expires silently.
 
 **Gate.** Trace B completes: correct descriptor, by test and by emulator walk.
 **The §4.5 comparison extends to every mk1 and to EVERY ms1, byte for byte**
@@ -388,8 +418,9 @@ hand — the build output is unsigned).
    its engraved ms1 plate** — the ms1 class is the least-gated artifact (C1),
    and a plate nobody has read back is a plate nobody has tested.
 
-**Gate.** All three restore correctly at an external coordinator. This confirms
-software already proven; it is not the first place the flow is executed.
+**Gate.** All three restore correctly at an external coordinator, **and master
+B's mnemonic restores from its ms1 plate**. This confirms software already
+proven; it is not the first place the flow is executed.
 
 ## 4. What is NOT in this plan, deliberately
 
