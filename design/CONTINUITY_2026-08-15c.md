@@ -33,6 +33,51 @@ make absence fatal, appears **nowhere** under `.github/`.
 The enforced layer must have **no skip path at all**; env vars are for the
 opt-**out** direction only.
 
+## S0b IS FOLDED — and the no-skip directive was satisfiable
+
+Four commits on the fork's `main`: `afca974` (C-4 sysw vendoring), `9f792c3`
+(C-1/C-2/C-3), `af00360` (I-1/I-2), `05c5a73` (the no-skip directive).
+
+**Operator directive 2026-08-15: "Don't skip jobs unless I ask."** Applied. The
+opt-out env var and `oracle/optout.go` are **deleted**; the live-oracle checks
+moved behind an `oraclelive` **build tag**, so they **do not exist** in a normal
+build rather than deciding at runtime to skip. Inside the tag, absence is a hard
+`Fatalf`. Run them by name: `./scripts/oracle-live.sh`.
+
+**Controller-verified behaviourally**, not by counting `t.Skip` in source (a
+weaker metric — 10 occurrences remain, almost none reachable). Full suite in a
+no-oracle environment (fake `HOME`, real `GOPATH`/`GOMODCACHE`, `CGO_ENABLED=0`,
+`-count=1 -v`):
+
+    SUITE_EXIT=0 · 0 FAIL · exactly ONE --- SKIP tree-wide:
+    TestIdleTimerUnderSH2ShapedEventLoop  (opt-in SH2_REALCLOCK diagnostic)
+
+That is **22 → 1**, and the one left is a deliberate opt-in 3.5-minute wall-clock
+diagnostic that never gated anything.
+
+**Two corrections to earlier records here:**
+
+- The CI-enforcing byte-identity test is now
+  **`TestAssembledMd1MatchesTheCommittedGolden`**.
+  `TestAssembledMd1MatchesThePrimaryByteForByte` (named in the C-3 addendum) is
+  by design **not present on CI** — it is behind the `oraclelive` tag.
+- **`go vet` and a warm build cache: a warm `GOCACHE` makes `go vet ./...` report
+  exit 0 with NO output for an offending package.** Measured: 6 findings instead
+  of 40 on identical source. That is almost certainly where the long-lived
+  "6 `ArtifactDir`" baseline came from — it was never a miscount, it was a cache
+  artifact. **Pin `GOCACHE` on both sides of any vet comparison.**
+
+**Rulings on the fold's two open items:**
+
+- **F-a is NOT blocking S3.** S3's gate is *"emulator walk showing `P2SH-P2WSH`
+  on the restore doc, and `grep -rn TYPED-ONLY gui/` returns 0"* — no minted gate
+  record. S3 executed both arms. The new `ExpectKind` for built policies is owned
+  by the first stage that must **mint a record for a built policy**, not by S3.
+- **F-i stays.** `oracle/oracle_test.go:267` skips only where symlinks are
+  unavailable — hermetic, never fires on CI or locally (the verification run
+  above shows it did not fire), and hides no Go-vs-Rust gate. Converting it could
+  hard-fail a contributor on an exotic filesystem for no gain.
+
 ## What is IN FLIGHT right now
 
 1. **The S0b fold** — one implementer, main checkout, branch `main`. Repairs
