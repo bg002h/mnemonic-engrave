@@ -16,6 +16,81 @@ device**, holding one or more of its keys, with the remaining cosigner keys
 arriving on a systemwide payload — and engraves it. Phase 2 (arbitrary wsh/tr
 miniscript) is out of scope by §1.
 
+### 0.1 THE GOAL, and the named tiebreaker (operator, 2026-08-15)
+
+> the goal is to let the user do the thing: create wallet policies on the sh2.
+> We want to be permissive on input and expressive on output, speaking loudly
+> when common assumptions must be made (like assuming BIP-assigned origin
+> paths).
+
+**This sentence decides every refuse-vs-permit question in this plan.** It is
+quoted here because until 2026-08-15 it was written nowhere in this document or
+the spec — `grep -in "permissive\|expressive"` over both exited 1 — and the
+consequence is measurable: when the spec offered two arms, the plan repeatedly
+picked the refusal, because a named refusal makes a clean one-armed test.
+Testability is a real value and it is **never** a reason to choose which
+behaviour the product has. F-173 is what that cost: a pre-ruled refusal made
+Trace A, this plan's own flagship acceptance journey, unreachable, and the
+operator's ruling that unstuck it (`0..n`) was **wider than either option
+escalated**.
+
+**The rule, from `design/agent-reports/fable-plan-judgment-2026-08-15.md` §4 —
+"defaults for spelling, never for stakes, and every default is printed."** When
+an input underdetermines the output, run these in order:
+
+1. **Authority.** Is there a default the governing standard states, or a
+   convention universal in deployed practice? If neither, REFUSE and list the
+   explicit forms. A tool never invents a default; permissiveness is applying
+   someone else's decision, not making one.
+2. **Auditability — this is the funds-safety boundary.** Trace where the
+   assumption lands. If it is printed, engraved or displayed in something the
+   operator keeps, a wrong assumption is detectable by reading the output, so it
+   may be assumed. **Permissiveness stops exactly where a wrong assumption would
+   be invisible in every artifact.** The spec already states this boundary
+   verbatim for the per-seed passphrase (§4.1: "a wrong binding is invisible in
+   every engraved artifact") and correctly makes it refuse-shaped. Also
+   permanently on the refuse side: duplicate keys in the final slot set, and a
+   failed `both`-slot derivation.
+3. **Reversibility.** Upstream of an irreversible act (steel, OTP), the
+   assumption must be announced **on the confirmation surface itself**, not in
+   scrollback. If the flow cannot announce at the decision point, refuse.
+4. **All three pass → accept, apply the authority's default, and announce
+   unmissably**: the assumption, its source, the result, and the explicit
+   spelling that overrides it.
+
+**Corollary.** When the spec offers refuse-or-permit and clause 2 does not bite,
+**the permissive arm is the product's arm.** Test shape may then choose the
+phrasing — a one-armed assertion *of the permissive behaviour* — but never the
+arm.
+
+**Worked example, shipped.** `ms derive --template bip48` named no script type.
+The first call refused it, reasoning that BIP-48 registers two. Clause 1 says
+otherwise — BIP-48 states verbatim *"The recommended default for wallets is pay
+to witness script hash `m/48'/0'/0'/2'`"* — and clause 2 is maximal, since the
+script type is printed with the xpub, carried in the mk1 origin path, and shown
+on the restore doc. Reversed in ms-cli 0.16.0: it derives p2wsh and announces
+the assumption on stdout, on stderr, and as `script_type_defaulted` in `--json`.
+An explicitly chosen script type announces nothing — a tool that cries
+"DEFAULT" when the operator chose is a tool whose warnings get ignored.
+
+### 0.2 What may be RULED here, and what may not
+
+`§1a` ruled that mk1's random `chunk_set_id` was "a ruled property of the
+format" and said of the fix "**File it, do not build it**". Execution proved it
+a **conformance bug** in the primary, fixed as mk-codec 0.5.0 (see §1a, now
+corrected). A plan may rule **the relation it will accept**; a claim about
+another system's design intent is a **fact**, not a ruling, and gets this plan's
+own gate treatment. The test is mechanical: **if a sentence could be falsified by
+reading someone else's spec or running someone else's binary, it may not be
+ruled — only cited, and checked.**
+
+### 0.3 This plan is frozen from S1 on
+
+Discoveries go to `FOLLOWUPS.md` and the continuity doc. The plan is edited only
+when a **gate or a ruling** changes. Every defect so far has added inline law
+here, and the archaeology now costs each implementer a full read to find the
+work — while the user still cannot do the thing.
+
 ## 1. Stage order, and the one constraint that forces it
 
 | stage | delivers | spec |
@@ -107,11 +182,32 @@ trusting unverified claims.)
 | artifact | relation | why not plain string equality |
 | --- | --- | --- |
 | md1 | **full string equality** against the primary's output for the same inputs | deterministic on both sides |
-| mk1 | **(a)** the current primary accepts the chunks, **AND (b)** field equality via `mk verify --xpub --origin-fingerprint --origin-path --policy-id-stub`, which RUNS on fork-encoded chunks (checked). `canonical_payload_bytes` is a Rust **library** API with no `mk` CLI surface — there is no `mk bytecode` — so the original wording named a relation nothing could execute | the primary mints a fresh CSPRNG 20-bit `chunk_set_id` per encode with no CLI override, while the fork derives it from the bytecode — so literal equality fails on every honest run. The id is excluded because **the primary randomizes it by design**; this is a ruled property of the format, not a test-time convenience |
+| mk1 | **full string equality** against the primary's output for the same inputs | deterministic on both sides **since 2026-08-15** — see the correction below |
 | ms1 | **full string equality** against `ms encode --hex <that master's entropy>` | deterministic; this is C1 |
 
-A `--chunk-set-id` flag on `mk encode` would restore full mk1 string identity.
-**File it, do not build it** — a host-side change with its own cycle.
+**CORRECTED 2026-08-15 — the row above previously excluded mk1's
+`chunk_set_id` and called the randomization "a ruled property of the format",
+with the instruction "File it, do not build it".** Both were wrong, and the
+first attempt to execute this comparison is what proved it.
+
+`mk encode` drew the id from the OS CSPRNG on every call, so three runs on
+identical inputs emitted three different cards. That was not a property: mk
+SPEC §2.5 already required an encoder to "reuse the same value for all
+subsequent re-encodings of the same card", and a stateless encoder cannot
+honour that from entropy. It was a **conformance bug**, fixed upstream first
+per the Rust-primary rule as **mk-codec 0.5.0** (`mnemonic-key a38a908`), which
+derives the id from the payload — matching md-codec's existing rule and the
+fork's Go port, which had always been deterministic. The published vector corpus
+did not move; all 41 vectors already pinned their ids explicitly.
+
+So mk1 gets the same **full string equality** md1 and ms1 get, and the weakened
+two-part relation is gone. Verified: all six mk1 strings in S0's committed gate
+record re-encode byte-identically through the newly pinned oracle.
+
+The general lesson is §0.2's: a claim about another system's design intent is a
+fact, not a ruling. This plan's own §1a warns that **5 of 22 ungated facts were
+false**; this was a sixth, and it was wearing a ruling's typography while
+instructing the reader not to check it.
 
 **Oracle 2 — published BIP test vectors, for ADDRESSES.** Oracle 1 proves two
 implementations agree; it cannot prove both are not wrong the same way. The
