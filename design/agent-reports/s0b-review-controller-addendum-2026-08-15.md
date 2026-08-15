@@ -88,9 +88,64 @@ leaves one door open.
 
 ---
 
+## C-4 (Critical) — the class is FOUR sites, and its real shape is not "CI lacks Rust"
+
+Running the tree-wide `t.Skip` grep that C-3's method note recommends turns up
+two more, and they change what the class *is*.
+
+**`sysw/conformance_test.go:18`**
+
+```go
+const defaultVectors = "../../mnemonic-engrave/crates/me-cli/testdata/sysw_vectors.json"
+```
+
+The default vectors path points **into a sibling repository, outside the fork**.
+The fork's workflow checks out only the fork, so in CI that path cannot exist.
+The escalation that would turn the skip into a failure —
+`SYSW_REQUIRE_VECTORS=1` → `t.Fatalf` — appears **nowhere under `.github/`**
+(grep: no hits). So the cross-implementation conformance gate skips there, always.
+
+**`gui/sysw_load_test.go:42`** — same vectors, same skip, same never-set
+escalation.
+
+Measured locally: the file exists and is tracked in `mnemonic-engrave`, and
+
+```
+$ go test ./sysw/ -count=1 -v -run Conformance
+=== RUN   TestConformance/S-A … S-B S-C S-D S-E S-G S-I S-J
+--- PASS: TestConformance (0.03s)
+```
+
+Eight vectors pass — **because the sibling repo happens to be checked out beside
+the fork on this machine.**
+
+### The real shape of the class
+
+Not "the Rust toolchain is missing in CI". All four sites share this:
+
+> **Every gate that checks the Go firmware against the Rust primary is skipped on
+> the machine that decides whether a merge lands.**
+
+That is exactly the property the **Rust-primary rule** exists to enforce — the Go
+ports are *strictly downstream* of the Rust constellation repos, normative
+behavior lands in Rust first with test vectors, and the Go side must converge.
+The conformance evidence for that rule is currently produced only on one
+developer's workstation, and nothing on the deciding machine asks for it.
+
+### One thing the `sysw` pair does better, worth copying
+
+Unlike the oracle sites, these two carry an explicit non-silent opt-out
+(`SYSW_REQUIRE_VECTORS=1` → `t.Fatalf`) **and** a vacuity floor (`len(vs) == 0` →
+`t.Fatalf("INCONCLUSIVE: … so this test checks nothing")`). The mechanism for a
+loud opt-out already exists in this repo. It is simply never switched on.
+
+---
+
 ## Method note
 
 Found by grepping `t.Skip` across the whole test surface rather than the reviewed
 diff. The scoping rule that makes reviews proportional is also what let this sit
 in a neighbouring package: **a defect class found in one package is a query to
-run tree-wide**, and running it costs one grep.
+run tree-wide**, and running it costs one grep. C-3 was the first hit of that
+grep; C-4 was the third and fourth, and it was C-4 that showed the class had been
+mis-named after its first instance.
