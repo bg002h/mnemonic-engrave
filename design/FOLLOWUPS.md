@@ -6255,6 +6255,37 @@ package is S3's job and is mostly a matter of choosing which functions draw.
 
 ---
 
+
+**COUNT CORRECTED 2026-08-15, and the correction is a COMMAND rather than a
+number.** This entry said 27, the S2 fold report said 24, the fold review
+re-enumerated 21, and a fourth method gives 40 — four numbers for one fact,
+which is the failure this repo has recorded before: the code was right and the
+record went stale, three times over, because each pass hand-counted a slightly
+different set.
+
+The number is whatever this prints on the day you ask:
+
+    grep -rn '—' gui/*.go cmd/emu/*.go | grep -v _test.go | grep -E '"[^"]*—' | wc -l
+
+**40 as of 2026-08-15.** It over-counts deliberately — it catches every
+production string literal carrying the glyph, including ones that never reach a
+screen — because a guard that misses a real site is worse than one that lists an
+irrelevant one. Narrow it by reading the hits, never by trusting a remembered
+total.
+
+**What is GUARDED is much narrower, and that distinction is the whole reason the
+numbers disagreed.** `TestGatherScreenTextCarriesNoBlankingGlyph`
+(`gui/bundle_gather_refusal_test.go:143`) scans exactly three functions —
+`bundleGatherFlow`, `feedback`, `tally` in `bundle_flow.go` — and those are
+clean (3 literals there today, none blanking; the test passes). It scans
+LITERALS, not raw source, because a v1 that scanned source fired on a comment,
+and a guard that cries wolf gets deleted instead of the glyph.
+`TestStringLiteralScannerCanSee` is the scanner's own mutation proof.
+
+**So S3 inherits: everything the command lists that is not inside those three
+guarded functions.** Two of them are secret-exposure warnings the S2 reviewer
+measured at 2652 px — i.e. currently invisible — which makes them the first
+ones to fix, not the last.
 ### F-180 — the Go cosigner-card roster is in a DIFFERENT order from the emulator payload (owning phase: **`SPEC_multisig_build_repair.md` S4**) `#seedhammer`
 
 Found 2026-08-15 while writing S2's typed-seed walk, by running it:
