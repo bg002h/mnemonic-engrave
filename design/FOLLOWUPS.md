@@ -5985,7 +5985,72 @@ Cross-ref: `TestS0GateHasARecord` demands a record for **S0 only**, so nothing
 is red today — which is exactly why this would go unnoticed until S1's gate.
 
 
-### F-176 — `md` cannot author per-key origins, so S5's divergent md1 byte-comparison has no producer (owning phase: **file upstream NOW; blocks `SPEC_multisig_build_repair.md` S5**, gating) `#seedhammer` `#cross-repo`
+### F-176 — ~~`md` cannot author per-key origins, so S5's divergent md1 byte-comparison has no producer~~ **WITHDRAWN 2026-08-15: the premise is FALSE, measured** (owning phase: **none — nothing blocks S5**) `#seedhammer` `#cross-repo`
+
+**✅ WITHDRAWN 2026-08-15, before any upstream change was made.** The implementer's
+first act was to run the mechanism rather than the three failing invocations
+below, and **`md encode` authors per-key origins today** — not through a flag,
+through the **template placeholder syntax**, which the audit never tried. The
+three measurements in this entry each probed a *different* mechanism and all
+three failures are correct behaviour for what they asked.
+
+Measured against the pinned oracle `md 0.13.0` (commit `5a0a4f41`, the exact
+`oracle/pins.json` pin), reproduction verbatim:
+
+    $ md encode "wsh(sortedmulti(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*))" \
+        --key "@0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf" \
+        --key "@1=xpub6EAMBJLn1jiquajTsNRkZXU1oKnA4WJMNvcz4FRR4QmFKdfHxJVvfRLoysWfcc16AMTR4CoMD8UNjvs9JtbsLeuLwpTczgq8zuuERnp8YZF" \
+        --group-size 0 --force-chunked --json
+
+emits 4 chunks; `md decode --json` on them returns
+`path_decl {tag: "Divergent", data: ["m/48'/0'/0'/2'", "m/48'/0'/1'/2'"]}`,
+each path on the right `@i`; and `md verify … --template … --key @0= --key @1=`
+over the same four strings prints `OK`, exit 0.
+
+**The gate is not merely satisfiable — it is already PROVEN byte-identical.**
+The fork's `md.EncodeMultisig` in `OriginDivergent` mode over the same two
+xpubs and the same two origins emits the **same four strings, character for
+character** (`stub=4cb7f1a8`, 4/4 chunks), so S5's "the primary BUILDS an md1
+from the same inputs and the strings are equal" relation holds today with the
+pinned binary and needs no upstream change, no release, and no re-pin.
+
+Why the entry got it wrong — the mechanism is in `md-cli`'s own source and
+`grep` would have found it: `make_path_decl` (`crates/md-cli/src/parse/template.rs:495-510`)
+emits `PathDeclPaths::Divergent` whenever the per-`@i` inline origins are not
+all equal, and `emit_pathless_advisory`'s doc-comment
+(`crates/md-cli/src/cmd/encode.rs:180-183`) *names the feature in prose*:
+"an inline per-`@N` explicit origin (e.g. `sh(sortedmulti(2,@0/48'/0'/0'/1'/<0;1>/*,…))`)
+with no `--path` FULL-decodes (exit 0)". Three probes of the wrong surface
+(`--key` with a bracketed origin; a concrete-key descriptor; `--help` for a
+flag) plus one probe of a template that *carried no inline origins*
+(`--path` omitted → `Shared "m"`, which is right for that input) read as
+consensus. **Absence of a flag was mistaken for absence of the capability.**
+
+Behaviour of the real mechanism, all measured, so the questions the upstream
+change was going to answer are already answered:
+
+- **`--path` + inline divergent origins:** `--path` wins and flattens to
+  `Shared` — documented on the flag itself
+  (`crates/md-cli/src/main.rs:93-95`: "Override the inferred origin path with a
+  single shared path (flattens Divergent mode to Shared)").
+- **Partial specification** (an origin on `@0`, none on `@1`): accepted; the
+  unspecified `@i` gets a depth-0 empty origin and the encoder emits the
+  pathless advisory on stderr.
+
+**Residual, and it is sugar, not a blocker:** `md encode --origin @i=<path>`
+would be a nicer surface than string-splicing origins into the template, and
+`md`'s FOLLOWUPS may want it on ergonomic grounds. It is **not** gating, has no
+S5 lead time, and costs a cross-repo manual lockstep
+(`mnemonic-toolkit docs/manual/src/40-cli-reference/42-md.md`, gated by
+`tests/lint.sh flag-coverage`) — so it is not worth a release chain on this
+cycle's schedule. **Do not re-file it as gating.**
+
+The recorded fallback (decode-equivalence as a named gate deviation) is
+**moot** and must not be used: full string equality is available.
+
+Original entry preserved below, as the record of how a false premise formed.
+
+---
 
 Filed 2026-08-15 from `design/agent-reports/fable-s1-s6-assumption-audit-2026-08-15.md`. **This is the S0b failure shape caught before it cost a stage** — a gate written against a mechanism that does not exist — and it is the only S5 dependency with external lead time.
 
