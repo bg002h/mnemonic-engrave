@@ -6379,13 +6379,32 @@ irrelevant one. Narrow it by reading the hits, never by trusting a remembered
 total.
 
 **What is GUARDED is much narrower, and that distinction is the whole reason the
-numbers disagreed.** `TestGatherScreenTextCarriesNoBlankingGlyph`
-(`gui/bundle_gather_refusal_test.go:143`) scans exactly three functions —
-`bundleGatherFlow`, `feedback`, `tally` in `bundle_flow.go` — and those are
-clean (3 literals there today, none blanking; the test passes). It scans
-LITERALS, not raw source, because a v1 that scanned source fired on a comment,
-and a guard that cries wolf gets deleted instead of the glyph.
-`TestStringLiteralScannerCanSee` is the scanner's own mutation proof.
+numbers disagreed.** `TestGatherScreenTextCarriesNoBlankingGlyph` scanned exactly
+three functions — `bundleGatherFlow`, `feedback`, `tally` in `bundle_flow.go` —
+and those were clean. It scanned LITERALS, not raw source, because a v1 that
+scanned source fired on a comment, and a guard that cries wolf gets deleted
+instead of the glyph. `TestStringLiteralScannerCanSee` was the scanner's own
+mutation proof.
+
+> **SUPERSEDED 2026-08-15 by S3b, and the line number above was DELIBERATELY
+> DROPPED rather than re-pinned.** That guard and its seven-rune `blankingGlyphs`
+> blocklist are **gone**, subsumed by `TestProductionStringsAreDrawable`, which
+> asks the faces themselves about **every** production string literal in
+> `gui/*.go` — 1790 of them, 0 undrawable — so those three functions are covered
+> as a consequence rather than by being named. What survives in
+> `gui/bundle_gather_refusal_test.go` is the drive/ink test, which is the only
+> thing there that proves a REACHED screen draws ink; a source lookup cannot.
+>
+> The old line-143 citation into that file decayed the moment S3b shrank it from
+> ~210 lines to 104, and `scripts/plan-cite-gate.sh` caught it as *"file has only
+> 104 lines"* — which is the gate working. It is not re-pinned to a new line,
+> because a line number for a deleted test is a second decay waiting to happen;
+> the test **name** is the durable reference.
+>
+> (Nor is the dead citation quoted in this note. Writing it out in backticks —
+> even to explain that it is dead — puts it straight back in front of the
+> parser, which is exactly what happened on the first attempt at this repair and
+> kept the count at 21.)
 
 **So S3 inherits: everything the command lists that is not inside those three
 guarded functions.** Two of them are secret-exposure warnings the S2 reviewer
@@ -6573,3 +6592,46 @@ paid in author confusion and in comments that must be written around the check.
 comment-stripping the F-179 scanner needs. Doing both with one helper is the
 obvious economy. Until then, **do not quote a needle literal in `gui/` source
 comments**, and say so where needles are defined.
+
+### F-185 — a modal's body can scroll off the first frame with no affordance, so a required instruction is present in the string and absent from the screen (owning phase: **`SPEC_multisig_build_repair.md` S5** — with the engrave tail's screens) `#seedhammer`
+
+Found 2026-08-15 by S4's emulator walk, on the screen whose whole purpose is to
+tell an operator what to do about a seed↔key mismatch.
+
+The gate's FAIL body carried all four elements the plan requires — likely causes,
+the statement that reassigning the slot suppresses the check rather than fixing
+it, the slot name, and the host route. The **rendered first frame** ended
+mid-word:
+
+    ...rewritethepayloadonthehostwith
+
+`ErrorScreen`'s body scrolls, and **nothing on the frame says so**. So the host
+route — the one safe action the screen exists to offer — sat below a fold the
+operator has no reason to suspect. S4 trimmed both refusals (606→422 and
+636→478 chars) and pinned the result with a first-frame test.
+
+**Why no Go test caught it, and this is the transferable part.** Every content
+assertion in the package checks the string that was *submitted*, not the pixels
+that were *drawn*. This is the same seam as F-179 — where an undrawable rune
+blanked a whole body while `uiContains` still returned true — arriving by a
+different route: there the text was submitted and not drawn because a glyph was
+missing; here because it was past the viewport. **A string assertion cannot see
+either.** Ink and frame inspection can.
+
+**Two things this does NOT fix, both recorded honestly rather than left implied:**
+
+1. **The new test pins "it draws today", not a margin.** A +65-character mutation
+   still fits on the first frame, so a future edit can re-break it without
+   turning the test red. A margin test would assert the drawn body ends where the
+   source string ends, not merely that a known-good string fits.
+2. **Every other long modal in the firmware carries the same unmeasured
+   exposure.** S4 measured the two screens it owns. Nothing has measured the
+   rest, and no guard exists for the class.
+
+**What to build, not just what to fix.** The class needs the F-179 treatment: a
+check that compares the drawn frame against the source string — or that refuses a
+body longer than the viewport can hold — rather than per-screen trimming done
+each time somebody notices. Scoped to S5 because that is where the engrave tail's
+screens land, and because S5 already owns the "every comparison the device asks
+for must be one the operator can perform" constraint, of which this is the
+rendering half.
