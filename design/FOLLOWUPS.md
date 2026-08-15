@@ -5590,3 +5590,35 @@ by a current primary.
 published/primary corpus and *running* it found something no amount of reading
 would. The first was BIP-141 publishing no vectors at all. Coverage catch-ups
 are not bookkeeping.
+
+### F-167 — D5's gate record carries a seed DIGEST, not seed words: a departure from the plan's text (owning phase: **`SPEC_multisig_build_repair.md` S0, folded at close**) `#seedhammer`
+
+Filed 2026-08-14 alongside the D5 implementation (`1333cc4`), so the departure
+is visible rather than discovered later by someone diffing the plan against the
+code.
+
+The plan's D5 says the harness must record "the full input tuple (template, n,
+k, slot order, fp choice, per-slot origins, **seeds**)" so that "same inputs" is
+reproducible rather than remembered.
+
+**Implemented as `SeedRef{Label, Digest}` instead** — a label naming the seed's
+source (`"payload:card0"`, `"typed:trace-a"`) plus the first 16 hex chars of
+`sha256(words)`. `oracle.NewSeedRef` does not retain the words, and
+`TestGateRecordCarriesCommitsAndTheInputTuple` asserts that no seed word
+reaches the marshalled record.
+
+**Why.** A gate record is written to disk, committed, and pasted into CI logs
+and commit messages. One containing seed words is key material with none of the
+handling that implies. The reproducibility the plan actually asks for —
+proving two runs used the same seed, and being able to re-select a known test
+seed — is fully served by a label plus a digest.
+
+**Not a silent substitution.** It is weaker in exactly one way: a record alone
+can no longer *reconstruct* a run's seed, only identify it. For the walk's
+known test seeds that is no loss, since the label names them. If a future gate
+genuinely needs reconstruction, that is a decision to take deliberately and
+with the handling rules written down, not a default.
+
+**Action at S0 close:** fold this wording into the plan's D5 text so the plan
+and the code agree, or overrule it explicitly. Do not leave the plan saying
+"seeds" while the code records digests.
