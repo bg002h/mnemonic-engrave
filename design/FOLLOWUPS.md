@@ -6165,7 +6165,50 @@ What was wrong was reading it as evidence that the flow was healthy.
 
 ---
 
-### F-179 — an em-dash BLANKS THE WHOLE BODY, and every content assertion in `gui` is blind to it (owning phase: **`SPEC_multisig_build_repair.md` S3** — "the code is right and the text lies"; 6 of the sites FIXED at S2) `#seedhammer`
+### F-179 — an em-dash BLANKS THE WHOLE BODY, and every content assertion in `gui` is blind to it (owning phase: **`SPEC_multisig_build_repair.md` S3b** — re-owned 2026-08-15, was S3; "the code is right and the text lies"; 6 of the sites FIXED at S2) `#seedhammer`
+
+> **ADDENDUM 2026-08-15 — the site list below is stale in BOTH directions, and
+> the class is wider than "em-dash". Read this before working the entry.**
+>
+> Owning phase moved S3 → **S3b**, a stage ruled in on 2026-08-15
+> (`design/agent-reports/operator-rulings-2026-08-15.md` §A; S0b is the
+> precedent). This is re-ownership into an adjacent gated slot, not a deferral:
+> **S4 may not start until S3b closes green.** S3 was kept to its briefed naming
+> fix because F-179 sites sit *inside* the function S3 edits
+> (`gui/md1_inspect.go:58` is S3's caller edit; `:60` and `:65` are F-179 sites
+> in the same `md1Summary`), so the two must be sequential commits by one agent,
+> never parallel writers on one file.
+>
+> **The mechanism, machine-checked — this is the ground truth the entry lacked.**
+> `font/bitmap/bitmap.go:33` sets `indexLen = unicode.MaxASCII`, and `glyphFor`
+> rejects `int(r) >= indexLen` at `:62`. So **every non-ASCII rune is
+> unrenderable on every bitmap face** — not just `—` and `·`. Face choice is
+> therefore immaterial (all six faces `gui` uses share one boundary), and a
+> hand-written blocklist of offending runes is the wrong instrument: the guard
+> must be a **coverage lookup**, which is also why it will not go stale.
+>
+> **Both prior enumerations were em-dash-shaped.** A rune-agnostic scan over
+> `gui/*.go` non-test string literals (comments stripped) finds **28 raw hits**
+> against the entry's 27 and a 2026-08-15 re-derivation's 21. The delta is not
+> line drift — it is four rune classes nobody was looking for:
+>
+>     ✓ U+2713  bundle_flow.go   "%d. %s ✓"        (drawn into the review body)
+>     … U+2026  singlesig_pick, slip39_polish, verify_address, codex32_polish
+>     → U+2192  codex32_polish   "pos %d: %c → %c"
+>     ⌫ U+232B  gui.go           see the false positive below
+>
+> **One confirmed FALSE POSITIVE, and it is load-bearing.** `gui/gui.go`'s
+> `alphabet += "⌫\n"` is a **sentinel rune for the keyboard's backspace key, not
+> drawn text** — `gui.go:1572-1574` special-cases `key.r == '⌫'` and blits
+> `assets.KeyBackspace` as an image. A guard that merely refuses non-ASCII
+> literals will flag it and force a "fix" that breaks the keyboard. **The guard
+> needs a documented exemption for runes that never reach the text path**, and
+> that exemption is itself the sort of hand-maintained list F-163 indicts — so
+> pin it with a test that proves the rune is image-drawn, not with a comment.
+>
+> Net: **27 candidate live sites** at `4b8488e` (28 raw minus the keyboard
+> sentinel), of which 6 are the non-em-dash classes above. **Re-derive at
+> execution time anyway** — S3 lands before S3b and moves line numbers.
 
 Found 2026-08-15 by S2's whole-walk raster floor, on its first run, on the one
 screen that is the operator's last chance to stop.
