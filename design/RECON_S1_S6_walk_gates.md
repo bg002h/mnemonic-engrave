@@ -133,8 +133,9 @@ vendored vectors is agreeing with a subset of ourselves.
     gui/multisig_build.go:54    (Build policy)   <- the one S1 edits
 
 Three production flows, one string. `"Choose engraving"` has six sites
-(`gui/gui.go:2323,2830`, `bundle_flow.go:307`, `derive_xpub.go:461`,
-`unlock_platelist.go:227`). And the gather title is
+(`gui/gui.go:2323`, `gui/gui.go:2830`, `gui/bundle_flow.go:307`,
+`gui/derive_xpub.go:461`, `gui/unlock_platelist.go:227`, and
+`gui/unlock_plates_test.go` waits on it too). And the gather title is
 `layoutTitle(…, "Engrave Bundle")` at `gui/bundle_flow.go:155` — **inside the
 shared gatherer**, so the gather screen says "Engrave Bundle" even when reached
 from Build policy. That is exactly S2's D-4.

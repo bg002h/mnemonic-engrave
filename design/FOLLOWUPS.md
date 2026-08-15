@@ -5622,3 +5622,113 @@ with the handling rules written down, not a default.
 **Action at S0 close:** fold this wording into the plan's D5 text so the plan
 and the code agree, or overrule it explicitly. Do not leave the plan saying
 "seeds" while the code records digests.
+
+### F-168 — the only automated walk is a BUNDLE-ENGRAVE walk, and S0's evidence line calls it Trace A (owning phase: **`SPEC_multisig_build_repair.md` S0, folded at close**) `#seedhammer`
+
+Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md`.
+
+`cmd/emu/walk_trace_a.js` selects exactly two programs — `goTo("LoadPayload")`
+at `:169` and `goTo("EngraveBundle")` at `:180`. `engraveBundle` dispatches to
+`bundleFlow` (`gui/gui.go:1816-1817`). The plan defines Trace A at `:173-177` as
+`Engrave Multisig → Build policy → template → n → k → self-slot → fp → cosigner
+review → seed entry → policy review → form → EXPERIMENTAL → mode → engrave →
+restore doc`. **None of those eleven screens appear in the walk.**
+
+So the file name, its header ("Trace A as a script"), and S0's gate row 3 ("a
+six-plate Trace A run in ~165 s", plan `:355`) all certify a journey that did not
+run. This is F-164 one level up: not a stale identifier, a stale claim about
+*which journey* the evidence came from.
+
+**S0 D3 is not in question.** The shapes it delivered do drive the build flow —
+see §5 of the recon. What is wrong is the label, and the inference every later
+gate draws from it.
+
+**Action at S0 close:** say in one line what journey the script actually walks,
+and correct row 3 so it does not certify Trace A. Carry the recon's I4 across
+too — the census is cumulative for the page session (`cmd/emu/engraved.go`), so
+**one walk per page load** is a standing constraint. It currently fails closed
+twice by accident (`strings.length === plates` is an equality, and
+`oracle.ParseWalk` requires `len(digests) == len(strings)` while `digests` is
+per-run); write it down so a future `>=` does not convert that into a fail-open.
+
+### F-169 — S1–S5 each need their own walk, and none exists; the shared script cannot tell which flow it is in (owning phase: **`SPEC_multisig_build_repair.md` S1**, gating) `#seedhammer`
+
+Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md` (C1, I1).
+
+`buildMultisigPolicyFlow` has one production caller, `gui/multisig.go:55`,
+behind the "Build policy" choice at `gui/multisig.go:45`, dispatched at
+`gui/gui.go:1822-1823`. The existing walk takes the sibling case. Per
+`design/agent-reports/plan-wide-file-touch-matrix.md`, **all five of S1–S5 edit
+`gui/multisig_build.go:39-193`** — so every one of their "by emulator walk"
+clauses is a gate that cannot execute a line of what its stage changed.
+
+**And a walk written by editing this script's `goTo` target would look
+identical.** Every needle it uses is ambiguous: `"First card from where?"` is in
+three production flows (`gui/bundle_flow.go:25`, `gui/multisig.go:76`,
+`gui/multisig_build.go:54`); `"Choose engraving"` has six sites; and the gather
+title is `layoutTitle(…, "Engrave Bundle")` at `gui/bundle_flow.go:155` — inside
+the *shared* gatherer, so it reads "Engrave Bundle" even from Build policy. The
+only program identification in the whole script is the carousel match at entry.
+
+**S1 owns the scaffolding** because it is the first stage that needs it: a walk
+against Build policy, and a **flow-identifying needle that exists in one flow
+only**. After S2 fixes D-4 the gather title becomes that discriminator; before
+then it is a decoy.
+
+### F-170 — the walk asserts a plate COUNT where the plan requires a census derived from the input tuple (owning phase: **`SPEC_multisig_build_repair.md` S1**, gating) `#seedhammer`
+
+Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md` (C3, I3).
+
+    cmd/emu/walk_trace_a.js:274
+    ok: census.strings.length === plates && census.unattributed === 0,
+
+`CARDS` (`:66-76`) holds the exact six strings expected and is used **once**, to
+present chunks at `:198`. It is never compared to the census. A walk that
+engraved six *wrong* strings is green; the header defers the comparison to a
+human ("compare run()'s census against `go run ./cmd/buildpayloadcards`").
+
+The plan's own §3 preamble (`:193-201`) forbids this: *"A walk's expected
+artifact census MUST derive from the recorded input tuple, never from what the
+walk produced… The script computes how many md1 chunks, mk1s and ms1s the inputs
+REQUIRE and fails when fewer arrive."* Measured: no such computation exists, and
+`plates` is a parameter defaulting to `6` (`:151`).
+
+Each stage's plate count differs — Trace A on the build path cuts md1 chunks
+plus the self mk1 plus (in full mode) an ms1, not six mk1 chunks; Trace B is 6–9
+plates (`:757`). So the derivation is not a nicety, it is the only way a
+per-stage walk can have a count at all.
+
+### F-171 — nothing invokes the pinned `md`/`mk`/`ms`, so S2's and S5's byte-comparison gates are unimplemented (owning phase: **`SPEC_multisig_build_repair.md` S2**, gating) `#seedhammer`
+
+Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md` (C4).
+
+S2's gate: *"the current primary BUILDS an md1 from the same inputs and the
+strings are equal"*. S5's: *"each engraved ms1 must equal `ms encode --hex <that
+master's entropy>`"*.
+
+    $ git grep -nE 'exec\.Command\("(md|mk|ms)"|cargo/bin/(md|mk|ms)' -- '*.go'
+    (no production hit)
+
+`oracle` resolves all three to source commits and stops there; as of `88d43c7`
+its only importers are `cmd/gaterecord` and `cmd/emu`'s anchor test, neither of
+which runs an oracle. Both gates are **unimplemented, not merely unrun** — the
+distinction matters because "we'll do it at the gate" assumes a mechanism that
+is not there.
+
+Note `oracle.CheckDataSource` refuses any `testdata` path by design, so the two
+`gui` tests reading `md/testdata/vectors` (`bundle_testdata_test.go:43`,
+`md1_gather_test.go:30`) are fixtures and cannot stand in for this.
+
+### F-172 — S3's restore-doc gate has nothing to read on the template branch (owning phase: **`SPEC_multisig_build_repair.md` S3**) `#seedhammer`
+
+Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md` (I2).
+
+S3's gate is an emulator walk of an `sh(wsh)` build *"showing `P2SH-P2WSH` on the
+restore doc"*. `multisigRestoreDocFlow` does render to a screen
+(`gui/multisig_restore.go:54-58`), so `shScreen()` can read it — **but
+`gui/multisig_build.go:185` skips the restore doc entirely when the operator
+picked the template-only form at `:120-142`.**
+
+So the gate is satisfiable only if that stage's walk picks **"Full policy md1"**,
+and nothing says so. A walk down the other branch reaches the end with the gate's
+subject never drawn, which reads exactly like "the screen did not say it".

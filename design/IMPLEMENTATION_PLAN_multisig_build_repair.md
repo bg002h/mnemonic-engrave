@@ -306,6 +306,28 @@ walk with. S0 is written out here in full for that reason.
    and checked binary hash — refuses to run against vendored fork testdata, and
    **prints the resolved commits plus the full input tuple into every gate
    record**.
+
+   **The record carries a seed DIGEST where this text said "seeds" — ruled
+   2026-08-14, F-167.** `oracle.SeedRef` is a label naming the seed's source
+   plus `sha256(words)` truncated to 16 hex chars; the words are not retained
+   and `TestGateRecordCarriesCommitsAndTheInputTuple` asserts none reaches the
+   marshalled record. A gate record is committed and pasted into CI logs, so one
+   containing seed words is key material with none of the handling that implies.
+   What the clause actually asks for — proving two runs used the same seed, and
+   re-selecting a known test seed — a label plus a digest fully serves. It is
+   weaker in exactly one way, stated rather than buried: a record can identify a
+   run's seed but no longer reconstruct it.
+
+   **And the record is not merely emitted — it is fail-closed.** A command an
+   operator can forget is a gate that passes in silence, and a record from run A
+   can sit beside run B's artifacts unless something binds them. So:
+   `oracle.ParseWalk` refuses anything that is not a completed green walk (no
+   run, no record); the record embeds the walk's census and per-plate digests and
+   the full SHA-256 of the raw `run()` return value written beside it; and
+   `TestS0GateHasARecord` **never skips** — not under `-short`, not without the
+   oracle binaries, not in CI — so absence is a failure rather than a silence.
+   `cmd/gaterecord` is the emitter; `oracle/record.go` is where all three
+   properties live, so they are testable without shelling out.
 6. **Published-BIP vectors, vendored with provenance**, in the shape of
    `md/testdata/README.md` — source repo, commit, path, per-file meaning —
    modelled on the `bip-test-vector-audit-matrix` reports in `mnemonic-key` /
@@ -352,8 +374,27 @@ where it is not, the bullet says so.
   the shapes themselves, not as a Go test: `shTap`/`shPress`/`shRelease`/
   `shPace`/`shSysw` (`cmd/emu/walk_js.go`), `shScreen` (`screen_js.go`),
   `shToolpath` incl. `strings()` (`toolpath_js.go`). **The proof is a completed
-  walk** — a six-plate Trace A run in ~165 s with `unattributed == 0`. Without
-  this, every "byte comparison" in this plan is unimplementable.
+  walk** — six plates in 174 s at pace 2048 with `unattributed == 0`, recorded
+  at `oracle/gaterecords/S0-trace-a.record.json`. Without this, every "byte
+  comparison" in this plan is unimplementable.
+
+  **That walk is a BUNDLE-ENGRAVE walk, not Trace A — corrected 2026-08-14,
+  F-168.** This bullet used to say "a six-plate Trace A run". Measured:
+  `cmd/emu/walk_trace_a.js` selects `LoadPayload` and `EngraveBundle`
+  (`:169`, `:180`), and `engraveBundle` dispatches to `bundleFlow`
+  (`gui/gui.go:1816-1817`) — a different program from the `engraveMultisig` →
+  "Build policy" path §2's Trace A describes, and the one every stage from S1 on
+  actually edits. **What D3 delivered is sound and sufficient; the label was
+  wrong**, and a label is what a later stage reads when it decides its own gate
+  is already met. See `design/RECON_S1_S6_walk_gates.md`, and F-169/F-170 for
+  what each stage's real walk still owes.
+
+  **One walk per page load.** The engraved census is cumulative for the session
+  and deliberately has no reset (`cmd/emu/engraved.go`), so a second walk on one
+  page accumulates the first's plates. It fails closed today —
+  `strings.length === plates` is an equality and `oracle.ParseWalk` requires
+  `len(digests) == len(strings)` while `digests` is per-run — but only because
+  both are strict. Do not relax either to `>=`.
 - **Sorted-multi scripts match BIP-383's published vectors.** ✅
   `TestBip383SortedMultiScriptMatchesPublishedVectors`
   (`address/bip_vectors_test.go`). **Not the `wsh(multi)` vectors the earlier
@@ -375,18 +416,34 @@ where it is not, the bullet says so.
   (`wpkh`) and BIP-86 (`tr`) — ✅
   `TestBip84And86SinglesigAddressesMatchPublishedVectors` — and every vendored
   BIP source matches its recorded SHA-256, ✅ `TestBipVectorSourcesMatchTheirPins`.
-- ❌ **The oracle harness refuses vendored fork testdata** — D5, not yet
-  written. Mutation-check it: point it at `md/testdata` and it must fail.
-- ❌ **The oracle harness pins by source commit, not `--version`** — D5, not yet
-  written. A binary whose self-reported version matches but whose source commit
-  does not must be refused.
+- **The oracle harness refuses vendored fork testdata.** ✅
+  `TestOracleHarnessRefusesVendoredTestdata` (`oracle/oracle_test.go`).
+- **The oracle harness pins by source commit, not `--version`.** ✅
+  `TestOracleHarnessPinsBySourceCommit` — a binary whose self-reported version
+  MATCHES and whose source commit does not is refused, and the test asserts the
+  version genuinely matched so it cannot pass for the wrong reason.
+- **Added by D5's last clause, beyond the original eight: a gate record exists,
+  it cannot be emitted without a green walk, and its absence is a failure.** ✅
+  `TestS0GateHasARecord` + `TestEveryGateRecordOnDiskVerifies`
+  (`oracle/record_test.go`), anchored non-circularly by
+  `TestGateRecordStringsAreRecordsOfTheCardsPayload`
+  (`cmd/emu/gaterecord_anchor_test.go`), which proves each engraved mk1 is a
+  record of the payload the record names — a record and its walk are produced by
+  the same run, so a consistent pair cannot vouch for itself.
 
-**Gate.** All eight properties below hold; the confinement mutation is
+**Gate.** All **eleven** properties below hold; the confinement mutation is
 demonstrated red then green; the harness prints resolved oracle **commits** and
 the input tuple into the gate record; and **one end-to-end smoke walk drives the
-emulator to a completed engrave and returns the md1 string**. That last clause
-is the whole point of S0 — until a walk can produce an artifact, no later
+emulator to a completed engrave and returns the engraved strings**. That last
+clause is the whole point of S0 — until a walk can produce an artifact, no later
 stage's walk gate means anything.
+
+**"and returns the md1 string" was the earlier wording, and it overclaimed.**
+The walk that closed this gate is a bundle engrave: it returns six **mk1**
+strings, and no md1 is produced anywhere in it, because building an md1 is what
+S1–S5 exist to repair. The mechanism the clause is really about —
+`shToolpath.strings()` handing an engraved string back out of a completed walk —
+is delivered and proven either way. F-168.
 
 **Rewritten against the tree on 2026-08-14 — F-164.** This gate used to name
 eight test identifiers, and by the time half the stage was built **only 3 of the
@@ -398,23 +455,38 @@ have concluded the stage never happened, or written a duplicate beside a test
 that already covered it. So the gate now names the **property and its file**,
 with the identifier as a convenience that is allowed to change:
 
+**RE-DERIVED FROM THE TREE at S0 close, 2026-08-14** — as this section's own
+instruction requires, by listing `^func Test` across every file that backs a
+property rather than by editing the previous table in place. Eleven properties,
+not eight: D6 added two and D5's last clause added one.
+
 | # | property | where it lives | state |
 | --- | --- | --- | --- |
-| 1 | every `//go:embed` under `cmd/emu` is structurally confined | `cmd/emu/embed_confinement_test.go` — `TestEveryEmbeddedPayloadIsStructurallyConfined` | ✅ |
-| 2 | the cosigner payload decodes and carries every stage's cards | `cmd/emu/sysw_cards_payload_host_test.go` — `TestSyswCardsPayloadCoversEveryStagesWalk`, `…MatchesItsDigest` | ✅ |
-| 3 | the harness can drive input and return an engraved string | `cmd/emu/walk_js.go` (`shTap`/`shPress`/`shRelease`/`shPace`/`shSysw`), `screen_js.go` (`shScreen`), `toolpath_js.go` (`shToolpath`, incl. `strings()`); proven by the walk completing, not by a Go test | ✅ |
-| 4 | sorted-multi scripts match BIP-383's published vectors | `address/bip_vectors_test.go` | ✅ |
-| 5 | key order, script and address match BIP-67 | `address/bip_vectors_test.go` | ✅ |
-| 6 | P2SH-P2WSH nesting matches BIP-143 | `address/bip_vectors_test.go` — **replaces the BIP-141 test; BIP-141 publishes no vectors at all** (`RECON_bip_vectors_S0.md`) | ✅ |
-| 7 | the oracle harness refuses vendored fork testdata | D5, not yet written | ❌ |
-| 8 | the oracle harness pins by source commit, not `--version` | D5, not yet written | ❌ |
+| 1 | every `//go:embed` under `cmd/emu` is structurally confined | `cmd/emu/embed_confinement_test.go:149` — `TestEveryEmbeddedPayloadIsStructurallyConfined` | ✅ |
+| 2 | the cosigner payload decodes and carries every stage's cards | `cmd/emu/sysw_cards_payload_host_test.go:20` `TestSyswCardsPayloadMatchesItsDigest`; `cmd/emu/sysw_cards_payload_host_test.go:59` `TestSyswCardsPayloadCoversEveryStagesWalk` | ✅ |
+| 3 | the harness can drive input and return an engraved string | `cmd/emu/walk_js.go` (`shTap`/`shPress`/`shRelease`/`shPace`/`shSysw`), `screen_js.go` (`shScreen`), `toolpath_js.go` (`shToolpath`, incl. `strings()`); proven by a walk completing, not by a Go test. **The walk that proved it is a bundle engrave, not Trace A — F-168** | ✅ |
+| 4 | sorted-multi scripts match BIP-383's published vectors | `address/bip_vectors_test.go:164` | ✅ |
+| 5 | key order, script and address match BIP-67 | `address/bip_vectors_test.go:302` | ✅ |
+| 6 | P2SH-P2WSH nesting matches BIP-143 | `address/bip_vectors_test.go:403` — **replaces the BIP-141 test; BIP-141 publishes no vectors at all** (`RECON_bip_vectors_S0.md`) | ✅ |
+| 7 | the singlesig shapes match BIP-84 and BIP-86 | `address/bip_vectors_test.go:576` | ✅ |
+| 8 | every vendored BIP source matches its recorded SHA-256 | `address/bip_vectors_test.go:63` | ✅ |
+| 9 | the oracle harness refuses vendored fork testdata | `oracle/oracle_test.go:118` — `TestOracleHarnessRefusesVendoredTestdata` | ✅ |
+| 10 | the oracle harness pins by source commit, not `--version` | `oracle/oracle_test.go:70` `TestOracleHarnessPinsBySourceCommit`; the real pins resolve the installed binaries at `oracle/oracle_test.go:283` (tier 2) | ✅ |
+| 11 | a gate record exists, cannot be emitted without a green walk, and its ABSENCE is a failure | `oracle/record_test.go:359` `TestS0GateHasARecord`; `oracle/record_test.go:386` `TestEveryGateRecordOnDiskVerifies`; anchored by `cmd/emu/gaterecord_anchor_test.go:31` | ✅ |
 
-Two properties added by D6 beyond the original eight, and they gate too: the
-singlesig shapes match BIP-84/86, and every vendored BIP source matches its
-recorded SHA-256 (`address/bip_vectors_test.go`).
+**Property 11 has EXECUTED and has been SEEN TO FAIL**, which is the discipline
+this plan applies to every other gate. Three mutations against the committed
+record, each red, then green on restore: removing the record → *"S0 has no gate
+record in gaterecords"*; changing one character of the walk file → *"hashes to
+a556d940…, record says fb294b52…"* (the code prints both in FULL; abbreviated
+here only because they differ at the first character); changing one embedded
+plate digest → *"the
+embedded plate digests are not the walk's"*. The second and third are the two
+directions separately — the SHA catches an edited walk, the field-by-field
+comparison catches an edited record.
 
-**When this stage closes, re-derive this table from the tree rather than
-editing it in place.** That is what went stale.
+**Do not edit this table in place next time either.** Re-derive it. That
+instruction is what produced the correction to row 3.
 
 **Not tier 1** (§4.6): the harness shells out to primary binaries and builds
 wasm. Mark it tier 2 and keep it out of the inner loop.
@@ -899,6 +971,16 @@ proven; it is not the first place the flow is executed.
 
 Stated because a gate that hides its blind spot is worse than none:
 
+- **The walk that exists does not drive the flow this plan repairs.** Added
+  2026-08-14 from `RECON_S1_S6_walk_gates.md`, and it is the largest of these.
+  `cmd/emu/walk_trace_a.js` walks `Engrave Bundle`; `buildMultisigPolicyFlow` —
+  which all five of S1–S5 edit — sits behind `Engrave Multisig → Build policy`
+  and is never entered. So **every "by test and by emulator walk" clause from S1
+  on is a hypothesis until that stage writes its own walk** (F-169), derives its
+  plate count and census from its input tuple rather than a literal (F-170), and
+  asserts on a needle that exists in one flow only (F-169, I1). The byte
+  comparison S2 and S5 gate on has no mechanism at all yet: nothing in the tree
+  invokes the pinned `md`/`mk`/`ms` (F-171).
 - The emulator walk drives the real `gui` package but not real hardware: no
   stepper motion, no plate, no NFC. S6 is the only stage that touches those.
 - `plan-cite-gate.sh` proves a cited line exists, not that it says what this
