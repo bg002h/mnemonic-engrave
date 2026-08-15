@@ -13,7 +13,20 @@
 >   `gui/md1_inspect.go` `:58`-vs-`:60,:65` collision inside one function. The
 >   substance that matters is preserved either way: **F-179 is burned down
 >   before S4 starts.**
-> - **Question B is NOT ADOPTED and is NOT AUTHORIZED.** It proposes changing
+> - **Question B is SUPERSEDED BY AN OPERATOR RULING, 2026-08-15:** *"You are not
+>   permitted to bypass, but I am."* The `enforce_admins: false` setting is
+>   **deliberate** — it is the operator's own escape hatch, not a lapse. §B's
+>   central recommendation, flipping `enforce_admins` to true, would remove a
+>   capability the operator intentionally holds, and its supporting argument
+>   ("solo-maintainer is the argument FOR enforcement") is simply **wrong**: it
+>   assumed nobody wanted the hatch. **Do not re-propose the flip.** The
+>   asymmetry is the rule — the constraint binds *agents*, not the human.
+> - **What survives from §B, and it is now a precondition rather than a
+>   nicety:** neither primary's CI builds `ci/**`, so a staged SHA cannot earn a
+>   context there. An agent forbidden to bypass therefore **cannot push to those
+>   repos compliantly at all** until that trigger exists. The `ci/**` triggers
+>   and the per-repo documentation stand; the flip does not.
+> - **Question B's original NOT-AUTHORIZED note, kept for the record.** It proposes changing
 >   security controls on live repositories — flipping `enforce_admins`, editing
 >   branch-protection-gating CI triggers, dropping a `paths:` filter, and a
 >   documented API call that DELETES enforce_admins protection. **No agent can

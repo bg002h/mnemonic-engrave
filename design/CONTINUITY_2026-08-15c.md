@@ -91,17 +91,32 @@ keyboard **sentinel**, image-drawn via `assets.KeyBackspace` at
 literals forces a keyboard-breaking "fix". Net **27 candidates**; re-derive after
 S3 lands, since S3 moves line numbers.
 
-## Open operator decision — NOT actionable by any agent
+## The push bypass — RULED 2026-08-15, and the ruling is an ASYMMETRY
 
-**`enforce_admins` on the two primaries.** Confirmed by API read: `mnemonic-key`
-(`main`) and `mnemonic-secret` (`master`) both have `enforce_admins: false`,
-`strict: false`; neither `CLAUDE.md` documents the `ci/staging` discipline; and
-**neither repo's CI builds `ci/**`**, so flipping enforcement first would wedge
-both. Recommendation with per-repo context names is in
-`design/agent-reports/operator-rulings-2026-08-15.md` §B — **NOT ADOPTED, pending
-a human decision.** That file is written in an operator's voice because the agent
-was briefed that way; it carries a controller header saying so. Do not execute §B
-because you found it in the repo.
+> **"You are not permitted to bypass, but I am."** — operator, 2026-08-15
+
+`enforce_admins: false` on the primaries is **deliberate**: it is the operator's
+own escape hatch. **The constraint binds agents, not the human.**
+
+- **Do NOT propose flipping `enforce_admins`.** It would remove a capability the
+  operator intentionally holds. The argument in
+  `design/agent-reports/operator-rulings-2026-08-15.md` §B — *"solo-maintainer is
+  the argument FOR enforcement"* — is **wrong**, because it assumed nobody wanted
+  the hatch. That file is written in an operator's voice because the agent was
+  briefed that way; its controller header says so, and §B is now superseded.
+- **An agent pushing anywhere uses `ci/staging`, always**, and treats a
+  "Bypassed rule violations" message as a failure to report, never to paper over.
+- **The open consequence, and it is now a precondition rather than a nicety:**
+  confirmed by API read, `mnemonic-key` (`main`) and `mnemonic-secret`
+  (`master`) both have `strict: false`, and **neither repo's CI builds `ci/**`**.
+  So a staged SHA cannot earn a context there, which means an agent forbidden to
+  bypass **cannot push to those two repos compliantly at all**. Adding the
+  `ci/**` trigger — plus documenting each repo's own context names, since a
+  copy-paste of `test (rust + go)` is wrong in both — is what unblocks that.
+  Required contexts, verified: `mnemonic-key` → `build (stable on
+  ubuntu-latest)`; `mnemonic-secret` → `test (ubuntu-latest)`, `clippy`,
+  `test (ms-codec)`, `clippy (ms-codec)`. `mnemonic-secret` also push-filters by
+  `paths:`, which interacts with staging and needs looking at.
 
 ## Traps this session paid for
 
