@@ -6074,7 +6074,7 @@ Filed 2026-08-15. `oracle/pins.json` pins `ms` at commit `ddfa497` / `ms 0.15.0`
 
 Not urgent and deliberately not done in-session: re-pinning is a chain — rebuild, install, re-record `pins.json`, then re-anchor S0's gate record. Per the D5 doctrine that chain needs **no new emulator walk**, because an oracle re-pin cannot reach the device path; `gaterecord -force` over the saved walk is the sanctioned rebuild. Do it when S2 extends the oracle, so the re-anchor happens once rather than twice.
 
-### F-178 — S1's gate has a THIRD outcome: D-1 did not reproduce, and the flow ran to the engrave screen (owning phase: **`SPEC_multisig_build_repair.md` S2**, gating) `#seedhammer`
+### F-178 — S1's gate has a THIRD outcome: D-1 did not reproduce, and the flow ran to the engrave screen (owning phase: **`SPEC_multisig_build_repair.md` S6** — hardware; reassigned 2026-08-15) `#seedhammer`
 
 Filed 2026-08-15 from S1's implementation. **This entry exists because the spec
 demands it**: SPEC P1 says *"If P0 found no D-1 on the payload path, this stage
@@ -6134,3 +6134,31 @@ one of the five unexercised shapes above (2 and 4 are the cheapest), or record
 that it could not and carry the completed-engrave gate alone — which is exactly
 what SPEC P1's own sentence anticipates. **What S2 may not do is treat test 1
 as discharged.**
+
+
+**⚠ RE-READ 2026-08-15, and it inverts this entry's reassurance.** The session
+recorded here as "the flow ran to the engrave screen, every screen drew, no dead
+end" was **assembling a degraded policy**. Machine-checked in
+`design/agent-reports/fable-s2-inheritance-rulings-2026-08-15.md`:
+
+- the S1 walk's selection loop takes the first two payload cards by DEFAULT —
+  A@0 and A@1 — and this hand-drive continued from that session, taking the self
+  seed FROM PAYLOAD, i.e. masterA;
+- `deriveAccountXpub(masterA, multisigSharedOrigin())` yields the byte-identical
+  65-byte cc‖pk as card A@0, and `assembleBuildPolicy` accepts it, returning stub
+  **`4c3c96f1`** — **the stub on this entry's own Policy Review screen**.
+
+So the wallet on those screens is a "2-of-3" in which masterA's acct-0 key sits
+at BOTH @0 (self) and @1, with masterA acct-1 at @2: one master holds the whole
+wallet, and the duplicated key alone satisfies k=2. Every slot rendered
+`(no fp)`, so it is invisible in every artifact.
+
+**Consequences.** S2 may NOT pin these screens as a good-state regression guard —
+they are screens of the defect. D-1's owning phase moves to **S6** (hardware;
+unfalsifiable in the emulator), which is why this entry's header changed. And the
+duplicate-key refusal is not merely "S2-owned": it is **S2's FIRST landing**,
+before any S2 work that completes an engrave, with no hardware engrave of the
+Build path until it is in.
+
+The record of non-reproduction below stands, and is still what SPEC P1 required.
+What was wrong was reading it as evidence that the flow was healthy.
