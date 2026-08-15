@@ -5471,7 +5471,7 @@ same pass, since it feeds `mk1DisplayFlow` too.
 
 ---
 
-### F-163 — S3's gate is a whole-tree `grep` and S0 already broke it (owning phase: **`SPEC_multisig_build_repair.md` P2/S3**) `#seedhammer`
+### F-163 — FIXED 2026-08-14 (`2b7fc96`): S3's gate is a whole-tree `grep` and S0 already broke it (owning phase: **`SPEC_multisig_build_repair.md` P2/S3**) `#seedhammer`
 
 Filed 2026-08-14 by the parallel-implementation review
 (`design/agent-reports/parallel-implementation-feasibility.md`), controller-verified.
@@ -5497,7 +5497,7 @@ that repeats the defect one stage later.
 Not urgent: S3 has not opened. It is filed rather than fixed because the plan
 text is the thing that needs editing, and the plan is a gated artifact.
 
-### F-164 — S0's gate names eight tests; three of them exist under different names, two do not exist (owning phase: **`SPEC_multisig_build_repair.md` S0**) `#seedhammer`
+### F-164 — FIXED 2026-08-14 (`2b7fc96`): S0's gate names eight tests; three of them exist under different names, two do not exist (owning phase: **`SPEC_multisig_build_repair.md` S0**) `#seedhammer`
 
 Filed 2026-08-14, found by checking S0's gate against the tree rather than
 against the plan's own prose. Sibling of [F-163]: a gate written in terms that
@@ -5526,3 +5526,30 @@ Fix when S0 closes: rewrite the gate list against the tree, and prefer naming
 the PROPERTY plus the file over a bare test identifier, so a rename does not
 silently invalidate a gate. Do not rename the tests to match the plan — the
 tree's names are better, and the plan is the thing that drifted.
+
+### F-165 — D4 rescoped: it constrained a receiver no walk reaches (owning phase: **`SPEC_multisig_build_repair.md` S0**) `#seedhammer`
+
+Filed and rescoped in the same change, 2026-08-14 (`2b7fc96`). Third gate this
+day that could not fail, after [F-163] and [F-164].
+
+S0 D4 required "the frame receiver keeps its existing security properties" —
+one pinned origin, flat filenames only, resolved-path re-check. Measured
+(`design/agent-reports/s0-tail-file-sets.md`, controller-verified): the walk
+harness D3 built **posts no frames at all**. `cmd/emu/walk_trace_a.js` makes no
+network call of any kind; the only match for `fetch|XMLHttpRequest|toDataURL|POST`
+in it is the word "fetched" inside a prose comment. Screenshots come from the
+Playwright driver, not from the emulator pushing to a receiver. The only frame
+receiver in either repo is `design/journeys/shot_server.py` — in
+**mnemonic-engrave**, not the fork — used by the manual PDF-journey builder.
+
+So no code change could satisfy or violate D4. Split in the plan into:
+
+- **(a) a standing constraint**, inherited by whichever stage ever adds a frame
+  receiver — that stage owns proving the three properties. Costs S0 nothing.
+- **(b) the real S0 item:** verify `shot_server.py`'s three properties hold
+  *today* rather than trusting its docstring. A read plus a test in
+  mnemonic-engrave; touches no fork file. **Closing D4 means doing (b).**
+
+Pattern worth naming across F-163/164/165: all three were gates whose subject
+had drifted out from under them, and none was found by reading the plan — each
+took running the check. A gate that has never executed is a hypothesis.
