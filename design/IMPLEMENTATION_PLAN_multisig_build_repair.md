@@ -747,6 +747,37 @@ mechanisms 2 and 3 are the half that cannot be exercised anywhere else.
 walk. Then: **either the flow completes an engrave, or D-1 reproduces and is
 captured as a failing test** (spec P0 gate — round 0's I2).
 
+**F-175 RULED (operator, 2026-08-15): on the D-1 arm S1 is RECORDLESS, and its
+substitute is NAMED here so the stage cannot pass with neither.** Measured, not
+reasoned about: `oracle.ParseWalk` refuses an empty census — *"the census is
+empty, so nothing was engraved to anchor to"* — so a walk that ends at a screen
+cannot emit a gate record at all. That is correct behaviour, not a bug: a record
+with no artifacts is bound to nothing.
+
+Note the gate has **two arms** and F-175 bites only one. If the flow completes
+an engrave, S1 produces artifacts and takes a gate record like any other stage.
+
+On the D-1 arm, S1's evidence is exactly these four, all committed:
+
+1. the walk script itself, in `cmd/emu`, driving Build policy;
+2. the **single-site needle** proving which flow it reached
+   (`cmd/emu/needle_test.go` pins uniqueness);
+3. `shNFC.presented() === 0` at the gather — the cards came from the payload,
+   not a reader;
+4. the **captured failing test** that reproduces D-1, which is the arm's whole
+   point.
+
+**A stage may not pass with neither a record nor this substitute.** Rejected
+alternatives, so they are not re-litigated: a record-schema variant that anchors
+a screen assertion (defer until a SECOND artifact-free stage exists — one
+instance does not justify a schema bump and a new definition of "green"), and
+giving S1 an engrave tail (that re-couples S1 to S2 and undoes this plan's own
+staging).
+
+This also reconciles §3's preamble, which already said S1 "asserts on
+`shScreen()` text at a named screen instead" — the preamble was right and the
+record machinery simply could not express it.
+
 ---
 
 ### S2 — the dead end, the title, the interim origin refusal

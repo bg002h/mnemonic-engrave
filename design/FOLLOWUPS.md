@@ -5954,7 +5954,25 @@ Not a defect in S0b: S0b's mechanisms are exercised against S0's record, which
 is what its gate asks for, and its own evidence is committed as tests. It is S1
 that first has to answer this.
 
-**Options, not yet chosen:** (a) a record variant that anchors a screen
+**✅ RULED 2026-08-15 (operator, accepting the fable recommendation): option
+(b) — recordless, with the substitute NAMED, and scoped to the D-1 arm only.**
+Folded into the plan at S1's gate. The key scoping point, which this entry
+missed when filed: S1's gate has **two arms** ("either the flow completes an
+engrave, or D-1 reproduces and is captured as a failing test"), and F-175 bites
+only the second. On the engrave arm S1 produces artifacts and takes a record
+like any other stage.
+
+On the D-1 arm the named substitute is the walk script, the single-site needle,
+`shNFC.presented() === 0`, and the captured failing test — and the plan now says
+a stage may pass with **neither a record nor that substitute** never. Option (a)
+(a schema variant anchoring a screen assertion) waits for a SECOND artifact-free
+stage: one instance does not justify a schema bump plus a new definition of
+"green". Option (c) was rejected outright — an engrave tail re-couples S1 to S2
+and undoes the plan's own staging.
+
+Original options preserved below.
+
+**Options, as filed:** (a) a record variant that anchors a screen
 assertion instead of a census — needs a schema bump and a clear rule for what
 makes such a walk "green"; (b) leave artifact-free stages recordless and say so
 explicitly in the plan, accepting that their evidence is the committed test plus
