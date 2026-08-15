@@ -168,7 +168,16 @@ Emulator: `nix develop --command ./cmd/emu/build.sh`, serve `cmd/emu` on a
 
 Artifact gates before any fold: `scripts/plan-cite-gate.sh <artifact>` and
 `scripts/fold-propagation-check.sh <artifact> <superseded-pattern>...`.
-`FOLLOWUPS.md`'s **17** unresolvable citations are the baseline.
+`FOLLOWUPS.md`'s unresolvable-citation count is a BASELINE, not a target — and
+it is whatever this prints, never a remembered number:
+
+    ./scripts/plan-cite-gate.sh design/FOLLOWUPS.md 2>&1 | grep unresolvable
+
+**20 as of 2026-08-15**, all pre-existing cross-repo `.rs` references plus one
+ambiguous `checksum.go` (two files match; it wants a repo-relative path). It had
+been quoted as "17" in three continuity docs while the real figure drifted —
+the same stale-hand-count disease F-179 carried. Compare before/after by running
+the gate on `git show HEAD~1:design/FOLLOWUPS.md`, not by trusting the prose.
 
 Push `master` here via `ci/staging` (this repo's `CLAUDE.md`); the fork's `main`
 and the primaries push directly.
