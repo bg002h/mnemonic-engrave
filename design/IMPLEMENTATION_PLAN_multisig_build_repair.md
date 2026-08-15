@@ -23,7 +23,7 @@ miniscript) is out of scope by §1.
 | **S0** | the oracles: pinned primary toolchain + published-BIP address vectors | §1a |
 | **S1** | the payload supplies the whole cosigner set | P0 |
 | **S2** | the dead end, the title, the interim origin refusal | P1 |
-| **S3** | nested segwit is nameable; all 9 stale `TYPED-ONLY` comments die | P2 |
+| **S3** | nested segwit is nameable; the stale `TYPED-ONLY` comments in `gui/` die | P2 |
 | **S4** | the slot-assignment model + the seed↔key gate | P4 (moved) |
 | **S5** | multi-slot self, divergent origins, **and the engrave tail** | P3 + §4.1a |
 | **S6** | hardware validation | P5 |
@@ -75,8 +75,11 @@ a primary at **0.42.0**, and `mk/mk.go:5` pins "mk-codec 0.2" against 0.4.2.
 So "the drift is measured" — which this plan asserted for two rounds — was
 false. The vendored vectors are not wrong; they are simply an old and smaller
 sample, and a gate that accepted them would prove agreement with a subset of
-ourselves. S0 deliverable 4 is a **coverage catch-up, not a correctness
+ourselves. S0 deliverable **8** is a **coverage catch-up, not a correctness
 repair**. F-127 remains the record of what a genuinely divergent pin cost.
+(Said "deliverable 4" until 2026-08-14; D4 is the frame receiver, D8 is the md
+re-pin. A misnumbered cross-reference in the paragraph that argues against
+trusting unverified claims.)
 
 **The comparison plane, per artifact — ruled here, before any code:**
 
@@ -101,12 +104,29 @@ cited provenance** — no BIP reference, no source. `bip380/bip380_test.go` has
 two tests, both parsing/compaction, neither citing a BIP. So device address
 derivation is currently self-consistent, not standard-conformant.
 
-| BIP | what it ACTUALLY supplies | assertion level | stage |
+**Table rebuilt 2026-08-14 from the vendored sources, after D6 shipped.** The
+previous version was written from memory, and the recon
+(`RECON_bip_vectors_S0.md`) found two of its three tests unwritable. What is
+below is what the documents contain, verified against `bitcoin/bips` at
+`60f5b33b0a7be3cf09b933d97b78071d684db7d1` and now vendored in
+`address/testdata/bips/` with per-file SHA-256 pins.
+
+| BIP | what it ACTUALLY supplies | assertion level | state |
 | --- | --- | --- | --- |
-| **383** | `wsh(multi(…))` / `wsh(sortedmulti(…))` vectors | **scriptPubKey**, not address | S2 (Trace A) |
-| **67** | deterministic key sorting | key order | S5 |
-| **141** | P2SH-P2WSH Example: scriptPubKey + redeemScript | address **derived from** a published vector, not quoted from one — S0 must say which | S3 |
+| **383** | bare `sortedmulti(…)` over two xpubs, 3 derived child scripts | **script bytes**, quoted; the `wsh` wrap and address are composed and labelled | ✅ delivered in **S0 D6** |
+| **67** | List · Sorted · Script · Address, **4** vectors | all four fields, nothing derived | ✅ **S0 D6** |
+| **143** | §P2SH-P2WSH: scriptPubKey + redeemScript + witnessScript | the nesting chain, quoted | ✅ **S0 D6** |
+| **84** | account zpub + 2 receive + 1 change address | address, quoted | ✅ **S0 D6** |
+| **86** | account xpub + 3 addresses + scriptPubKeys | address **and** scriptPubKey, quoted | ✅ **S0 D6** |
 | **39** | mnemonic → seed | seed | already used (`abandon…about`) |
+| ~~**141**~~ | **nothing.** Publishes no test vectors of any kind; every example is a structural template and `grep -cE '[0-9a-f]{40,}'` over it returns 0 | — | **removed**; BIP-143 replaces it |
+| **44** | nothing — no vectors at all | — | `pkh` has **no published anchor** |
+| **49** | testnet only: `upub` account key, `2Mww8…` address; `ParseExtendedKey` rejects the `upub` version | — | `sh(wpkh)` has **no published anchor** without a SLIP-132 rewrite |
+
+**Two of the seven descriptor shapes this device derives have no external
+anchor at all** — `pkh` and `sh(wpkh)`. That is recorded in
+`address/address_test.go`'s provenance header (D7) so a green suite is not read
+as covering them.
 
 **Corrected 2026-08-13 by the inherited-fact audit, and the correction matters
 more than the table.** The previous version cited **BIP-382** for
@@ -247,6 +267,38 @@ walk with. S0 is written out here in full for that reason.
    `design/journeys/shot_server.py` is the precedent and its docstring states
    why both restrictions are load-bearing. A new harness may not quietly drop
    them.
+
+   **RESCOPED 2026-08-14 — as written this deliverable cannot fail.** Measured
+   (`design/agent-reports/s0-tail-file-sets.md`, controller-verified): the walk
+   harness D3 actually built **posts no frames at all**. `cmd/emu/walk_trace_a.js`
+   makes no network call of any kind — the only match for
+   `fetch|XMLHttpRequest|toDataURL|POST` in it is the word "fetched" inside a
+   prose comment. Screenshots are taken by the driver over Playwright, not by
+   the emulator pushing to a receiver. The only frame receiver in either repo is
+   `design/journeys/shot_server.py` (in **mnemonic-engrave**, not the fork), used
+   by the manual PDF-journey builder and untouched by any walk.
+
+   So this deliverable constrains a component the automated walk does not use,
+   and no code change satisfies or violates it. That is a gate that has never
+   executed, which this project's own rule calls a hypothesis rather than a gate
+   — the same defect as F-163 and F-164, and the third found in this plan on one
+   day.
+
+   **What it becomes.** Two things, split, because they are not the same claim:
+
+   a. **A standing constraint, not a deliverable.** *If* a stage ever adds a
+      frame receiver — an emulator that POSTs frames, a screenshot sink, any
+      host endpoint the wasm can reach — it inherits `shot_server.py`'s three
+      properties, and the stage that adds it owns proving them. Written here so
+      the requirement survives; it costs S0 nothing today.
+   b. **The real S0 item, which is the one worth doing:** `shot_server.py` is
+      the receiver that *does* exist and does run, so **verify its three
+      properties hold today** — one pinned origin, flat filenames only,
+      resolved-path re-check — rather than assuming its docstring. That is a
+      read plus a test in `mnemonic-engrave`, touches no fork file, and is
+      genuinely checkable.
+
+   Do not close D4 by asserting (a). Closing it means doing (b).
 5. **Oracle resolution BY SOURCE COMMIT, not by `--version`.** A version string
    is self-reported, so a substituted binary spoofs the pin and launders a
    device defect through every byte-identity gate in this plan. The harness
@@ -281,36 +333,88 @@ walk with. S0 is written out here in full for that reason.
 
 **Tests first**
 
-- `TestEmbeddedPayloadsAreStructurallyConfined` — deliverable 1. Discovers every
-  `//go:embed` under `cmd/emu`, requires each in a `//go:build js` file with
-  identifiers unreferenced outside the allowed set, floor against a misrooted
-  walk. **Mutation: the unconfined second blob must turn it red.**
-- `TestCosignerPayloadCarriesTheTracesCards` — the second blob decodes, and
-  carries the mk1 count and origins Trace A and Trace B each need. Pins the
-  inventory so a later shrink cannot silently strand a walk.
-- `TestWalkHarnessDrivesAndExtracts` — the harness can drive input and return an
-  engraved string from a completed walk. Without this, every "byte comparison"
-  in this plan is unimplementable.
-- `TestBip383WshMultiScriptPubKeyMatchesPublishedVectors` — BIP-**383**'s
-  `wsh(multi(…))` / `wsh(sortedmulti(…))` vectors through `bip380`, compared at
-  **scriptPubKey**. Not addresses: 383 does not publish them.
-- `TestBip67SortedMultiKeyOrder` — BIP-67's ordering vectors. A wrong sort is a
-  wrong address, silently, and "sorted" is in the name of the thing we build.
-- `TestBip141NestedSegwitScriptDiffersFromLegacy` — BIP-141's P2SH-P2WSH Example
-  (scriptPubKey + redeemScript). The address is **derived locally from** that
-  vector, not quoted from it; S0's README records it at that weaker, honest
-  level. Anchors S3's D-3 fix below the label.
-- `TestOracleHarnessRefusesVendoredTestdata` — mutation-checked: point it at
-  `md/testdata` and it must fail.
-- `TestOracleHarnessPinsBySourceCommit` — a binary whose self-reported version
-  matches but whose source commit does not must be refused.
+**Rewritten 2026-08-14 against the tree — F-164.** Five of the eight names below
+were wishes, not identifiers: as each was implemented it acquired a better name,
+and this list kept the original. It now records what EXISTS, with the identifier
+second and the property first. Where a test is written, its real name is given;
+where it is not, the bullet says so.
 
-**Gate.** All eight tests pass; the confinement mutation is demonstrated red
-then green; the harness prints resolved oracle **commits** and the input tuple
-into the gate record; and **one end-to-end smoke walk drives the emulator to a
-completed engrave and returns the md1 string**. That last clause is the whole
-point of S0 — until a walk can produce an artifact, no later stage's walk gate
-means anything.
+- **Every `//go:embed` under `cmd/emu` is structurally confined** — each in a
+  `//go:build js` file, identifiers unreferenced outside the allowed set, with a
+  floor against a misrooted walk. ✅ `TestEveryEmbeddedPayloadIsStructurallyConfined`
+  (`cmd/emu/embed_confinement_test.go`). **Mutation demonstrated:** the
+  unconfined second blob turned it red.
+- **The cosigner payload decodes and carries every stage's cards** — the mk1
+  count and origins Trace A and Trace B each need, pinned so a later shrink
+  cannot silently strand a walk. ✅ `TestSyswCardsPayloadCoversEveryStagesWalk`
+  plus `TestSyswCardsPayloadMatchesItsDigest`.
+- **The harness drives input and returns an engraved string.** ✅ Delivered as
+  the shapes themselves, not as a Go test: `shTap`/`shPress`/`shRelease`/
+  `shPace`/`shSysw` (`cmd/emu/walk_js.go`), `shScreen` (`screen_js.go`),
+  `shToolpath` incl. `strings()` (`toolpath_js.go`). **The proof is a completed
+  walk** — a six-plate Trace A run in ~165 s with `unattributed == 0`. Without
+  this, every "byte comparison" in this plan is unimplementable.
+- **Sorted-multi scripts match BIP-383's published vectors.** ✅
+  `TestBip383SortedMultiScriptMatchesPublishedVectors`
+  (`address/bip_vectors_test.go`). **Not the `wsh(multi)` vectors the earlier
+  name promised:** `bip380` has no unsorted `multi` by design, and every
+  `wsh(...)` vector in 383 is `multi`, so the named test was unwritable. Uses
+  383's bare `sortedmulti` script as the witnessScript anchor; the `wsh` wrap is
+  composed and labelled.
+- **Key order, script and address match BIP-67** — all four published fields
+  over all four vectors, nothing derived. ✅
+  `TestBip67SortedMultiKeyOrderScriptAndAddress`. A wrong sort is a wrong
+  address, silently, and "sorted" is in the name of the thing we build.
+- **P2SH-P2WSH nesting matches BIP-143 §P2SH-P2WSH.** ✅
+  `TestBip143NestedP2wshScriptPubKeyMatchesPublishedVector`. **Replaces
+  `TestBip141NestedSegwitScriptDiffersFromLegacy`, which was unwritable: BIP-141
+  publishes no vectors at all** — every example is a structural template and
+  `grep -cE '[0-9a-f]{40,}'` over the document returns 0. There was nothing to
+  quote and nothing to derive from. Anchors S3's D-3 fix below the label.
+- **Added by D6, beyond the original eight:** the singlesig shapes match BIP-84
+  (`wpkh`) and BIP-86 (`tr`) — ✅
+  `TestBip84And86SinglesigAddressesMatchPublishedVectors` — and every vendored
+  BIP source matches its recorded SHA-256, ✅ `TestBipVectorSourcesMatchTheirPins`.
+- ❌ **The oracle harness refuses vendored fork testdata** — D5, not yet
+  written. Mutation-check it: point it at `md/testdata` and it must fail.
+- ❌ **The oracle harness pins by source commit, not `--version`** — D5, not yet
+  written. A binary whose self-reported version matches but whose source commit
+  does not must be refused.
+
+**Gate.** All eight properties below hold; the confinement mutation is
+demonstrated red then green; the harness prints resolved oracle **commits** and
+the input tuple into the gate record; and **one end-to-end smoke walk drives the
+emulator to a completed engrave and returns the md1 string**. That last clause
+is the whole point of S0 — until a walk can produce an artifact, no later
+stage's walk gate means anything.
+
+**Rewritten against the tree on 2026-08-14 — F-164.** This gate used to name
+eight test identifiers, and by the time half the stage was built **only 3 of the
+8 names still resolved**: three tests were renamed or split during
+implementation, one was superseded because BIP-141 publishes no vectors, and two
+do not exist yet. Nobody had introduced a defect — the *gate's vocabulary* had
+drifted from the code, and anyone verifying S0 by grepping these names would
+have concluded the stage never happened, or written a duplicate beside a test
+that already covered it. So the gate now names the **property and its file**,
+with the identifier as a convenience that is allowed to change:
+
+| # | property | where it lives | state |
+| --- | --- | --- | --- |
+| 1 | every `//go:embed` under `cmd/emu` is structurally confined | `cmd/emu/embed_confinement_test.go` — `TestEveryEmbeddedPayloadIsStructurallyConfined` | ✅ |
+| 2 | the cosigner payload decodes and carries every stage's cards | `cmd/emu/sysw_cards_payload_host_test.go` — `TestSyswCardsPayloadCoversEveryStagesWalk`, `…MatchesItsDigest` | ✅ |
+| 3 | the harness can drive input and return an engraved string | `cmd/emu/walk_js.go` (`shTap`/`shPress`/`shRelease`/`shPace`/`shSysw`), `screen_js.go` (`shScreen`), `toolpath_js.go` (`shToolpath`, incl. `strings()`); proven by the walk completing, not by a Go test | ✅ |
+| 4 | sorted-multi scripts match BIP-383's published vectors | `address/bip_vectors_test.go` | ✅ |
+| 5 | key order, script and address match BIP-67 | `address/bip_vectors_test.go` | ✅ |
+| 6 | P2SH-P2WSH nesting matches BIP-143 | `address/bip_vectors_test.go` — **replaces the BIP-141 test; BIP-141 publishes no vectors at all** (`RECON_bip_vectors_S0.md`) | ✅ |
+| 7 | the oracle harness refuses vendored fork testdata | D5, not yet written | ❌ |
+| 8 | the oracle harness pins by source commit, not `--version` | D5, not yet written | ❌ |
+
+Two properties added by D6 beyond the original eight, and they gate too: the
+singlesig shapes match BIP-84/86, and every vendored BIP source matches its
+recorded SHA-256 (`address/bip_vectors_test.go`).
+
+**When this stage closes, re-derive this table from the tree rather than
+editing it in place.** That is what went stale.
 
 **Not tier 1** (§4.6): the harness shells out to primary binaries and builds
 wasm. Mark it tier 2 and keep it out of the inner loop.
@@ -393,6 +497,32 @@ captured as a failing test** (spec P0 gate — round 0's I2).
    Calibrate the floor against the real defect, measured both ways; F-151's
    first guess of 2000 px passed the defect it was written for.
 
+**Files this stage touches.** Added 2026-08-14 by the plan-wide file-touch
+audit (`design/agent-reports/plan-wide-file-touch-matrix.md`). **This stage
+previously named ZERO files** — it was the only stage in the plan that did, and
+an implementer had to re-derive the set from prose. Measured, not inferred:
+
+| file | why |
+| --- | --- |
+| `gui/bundle_flow.go` | D-4's title is `layoutTitle(..., "Engrave Bundle")` at `:155`, **inside the shared gatherer** |
+| `gui/multisig.go` `gui/multisig_build.go` `gui/multisig_verify.go` `gui/singlesig_verify.go` | the four external callers of `bundleGatherFlow` |
+| `gui/multisig_build.go` | the D-1 fix, the interim foreign-origin refusal, the interim duplicate-key check, in `assembleBuildPolicy` |
+| `gui/multisig_build_test.go` `gui/multisig_build_flow_test.go` `gui/template_engrave_test.go` | callers of `assembleBuildPolicy`; two assertions at `multisig_build_flow_test.go:239,249` **wait on the literal `"Engrave Bundle"`** and break the moment D-4 lands |
+| `gui/raster_test.go` | test 5's raster floor needs `runUITouchRaster` / `countInk` / `assertFrameHasBody` |
+| `cmd/emu/walk_trace_a.js` | this stage's walk gate, as for every stage |
+
+**The title is not a one-line change.** `bundleGatherFlow` has **five call
+sites** — `gui/bundle_flow.go:29`, `gui/multisig.go:79`,
+`gui/multisig_build.go:57`, `gui/multisig_verify.go:76`,
+`gui/singlesig_verify.go:110` (`git grep -n "bundleGatherFlow(ctx"`, verified
+2026-08-14) — so making the title program-specific edits one shared file and
+four flows that have nothing to do with multisig build. Budget for that, and
+check the other four flows' own screen assertions before changing the shared
+default.
+
+This list is a **lower bound**: new test files this stage creates are not in it,
+because the plan does not name them.
+
 **Gate.** Trace A completes end to end: engrave, by test and by emulator walk.
 The md1 is compared by **production**, not acceptance: the current primary
 BUILDS an md1 from the same inputs and the strings are equal (§1a). "The host
@@ -419,7 +549,9 @@ decodes it" is the weaker relation and does not satisfy this gate.
 - All three callers together: `gui/md1_inspect.go:58`,
   `gui/multisig_restore.go:51`, `gui/bundle.go:315`. Round 1 confirmed
   `scriptName` has no consumers outside `gui`, so that is the complete set.
-- Delete or correct **all 9** `TYPED-ONLY` occurrences (§2.2 D-5). **Measured,
+- Delete or correct **every** `TYPED-ONLY` occurrence in `gui/` (§2.2 D-5) — 9
+  at last measurement, 10 tree-wide including one `cmd/emu` citation; the gate is
+  scoped to `gui/`, see F-163. **Measured,
   not counted from the spec's four cited sites:**
   `gui/multisig.go` ×4, `gui/bip85.go` ×2, `gui/singlesig.go` ×2,
   `gui/multisig_build.go` ×1 — and **none in the verify flows**, which are
@@ -432,13 +564,30 @@ decodes it" is the weaker relation and does not satisfy this gate.
 
 **Gate.** Emulator walk of an **`sh(wsh)` build** — a shape neither Trace A nor
 Trace B carries, so S0's payload must supply it (S0 deliverable 2) — showing
-`P2SH-P2WSH` on the restore doc, and **`grep -rn TYPED-ONLY --include='*.go'` returns 0**.
-Measured: there are **9** occurrences across 4 files (`gui/multisig.go` ×4,
-`gui/bip85.go` ×2, `gui/singlesig.go` ×2, `gui/multisig_build.go` ×1) — not the
-4 an earlier draft assumed, and **none in the verify flows**, so the previous
-gate line ("returns only the two verify sites") was unsatisfiable and its
-premise was wrong. The verify flows are correct because they call
-`seedEntryFlowTypedOnly`; they never used the phrase.
+`P2SH-P2WSH` on the restore doc, and
+**`grep -rn TYPED-ONLY --include='*.go' gui/` returns 0**.
+
+**Gate scoped to `gui/` on 2026-08-14, and the reason is F-163.** The gate was a
+**whole-tree** grep returning 0. Measured when written (2026-08-13): 9
+occurrences across 4 files. Measured now: **10** — S0's own
+`cmd/emu/embed_confinement_test.go:12` added one on 2026-08-14, in a comment
+citing `TYPED-ONLY` as the archetype of a hand-maintained list going stale. One
+agent, one day apart, and two stages collided: S3 could no longer satisfy its
+own gate without editing a file S0 owns.
+
+**A whole-tree grep is a shared resource** — it makes this stage's acceptance
+depend on every other stage's text, including text written after this line. The
+gate is therefore scoped to the directory this stage governs. S3 should still
+retire the `cmd/emu` citation in the same change, because that comment is
+*about* the phrase and reads wrong once the phrase is gone — but as stage work,
+not as a gate condition it cannot control.
+
+Current inventory, and **re-run the grep rather than trusting this list**:
+`gui/multisig.go` ×4, `gui/bip85.go` ×2, `gui/singlesig.go` ×2,
+`gui/multisig_build.go` ×1 (9 in `gui/`), plus the one `cmd/emu` citation.
+**None are in the verify flows** — those call `seedEntryFlowTypedOnly` and never
+used the phrase, so an earlier gate line ("returns only the two verify sites")
+was unsatisfiable and its premise was wrong.
 
 ---
 
@@ -672,6 +821,32 @@ convention, not a ruling", which nobody checked, and there is a plausible reason
 for the current order (the seed plate is the longest cut; failing early on it
 beats failing after four public plates). **Filed for the spec, with the
 shared-code impact noted, to earn its own R0.**
+
+**Files this stage touches.** Added 2026-08-14 by the plan-wide file-touch audit
+(`design/agent-reports/plan-wide-file-touch-matrix.md`). The stage previously
+named three paths and **all three were citations, not edit targets** — zero
+files were declared as being changed by the widest stage in the plan. Measured:
+
+| file | why |
+| --- | --- |
+| `gui/multisig_engrave.go` | `multisigEngraveCards(ms1 string, mk1, md1 []string, full bool)` at `:11` takes **one** ms1 and **one** mk1 set; Trace B needs one mk1 per held slot and one ms1 per master |
+| `gui/multisig.go` | `:163`, the other production caller of that signature — **a flow this plan does not own** |
+| `gui/multisig_engrave_test.go` | `:14,36`, the signature's test |
+| `gui/multisig_build.go` | `SelfSlot int` → a set (`:342`), `cosignerFromCard` (`:437-458`), `assembleBuildPolicy` (`:464-511`), the engrave tail (`:162-168`) |
+| `gui/multisig_restore.go` `gui/multisig_restore_test.go` | the restore doc's slot inventory |
+| `gui/bundle_flow.go` | the DESTROY wording is `bundleAbortWarning` at `:351-356` — **the same file S2 edits** |
+| `gui/multisig_verify.go` | `multisigVerifyFlow(ctx, th, derived bundle.Bundle, full)` at `:49` takes one bundle; several held slots produce several |
+| `gui/multisig_build_test.go` `gui/template_engrave_test.go` | `buildPolicyParams` literals carrying `SelfSlot:` |
+| `cmd/emu/walk_trace_a.js` | this stage's walk gate |
+
+**Correction to this stage's own text.** It says the engrave-order change means
+"no other flow's call site changes". That is true of the *signature* and false
+of the *file*: `gui/bundle_flow.go` is edited by S2 as well, and
+`gui/multisig.go:163` is a caller outside this plan's scope. Do not read the
+original sentence as a scoping guarantee.
+
+Lower bound, as for S2 — new test files are not listed because the plan does not
+name them.
 
 **Gate.** Trace B completes: correct descriptor, by test and by emulator walk.
 **The §4.5 comparison extends to every mk1 and to EVERY ms1, byte for byte**
