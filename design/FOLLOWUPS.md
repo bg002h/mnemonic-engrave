@@ -6073,3 +6073,64 @@ Cross-ref: §1a now rules **full string equality for all three artifact classes*
 Filed 2026-08-15. `oracle/pins.json` pins `ms` at commit `ddfa497` / `ms 0.15.0`, and the installed binary is that build — so the pin is HONEST and internally consistent, and no gate is affected. But `mnemonic-secret` HEAD is now `de593ca` with ms-cli **0.16.0**, whose bare-`bip48` permissiveness is the settled behaviour.
 
 Not urgent and deliberately not done in-session: re-pinning is a chain — rebuild, install, re-record `pins.json`, then re-anchor S0's gate record. Per the D5 doctrine that chain needs **no new emulator walk**, because an oracle re-pin cannot reach the device path; `gaterecord -force` over the saved walk is the sanctioned rebuild. Do it when S2 extends the oracle, so the re-anchor happens once rather than twice.
+
+### F-178 — S1's gate has a THIRD outcome: D-1 did not reproduce, and the flow ran to the engrave screen (owning phase: **`SPEC_multisig_build_repair.md` S2**, gating) `#seedhammer`
+
+Filed 2026-08-15 from S1's implementation. **This entry exists because the spec
+demands it**: SPEC P1 says *"If P0 found no D-1 on the payload path, this stage
+records that as its result and names the source or shape that was not
+exercised, rather than closing silently."* This is that record.
+
+S1's gate as the plan writes it has TWO arms — *"either the flow completes an
+engrave, or D-1 reproduces and is captured as a failing test"* — and **neither
+fired**. S1 does not engrave (plan §3 preamble: it ends at a screen, and F-175
+ruled it recordless on that arm), and D-1 did not appear.
+
+**Measured, by driving the emulator, not by reading the flow.** After
+`walk_build_policy.js` closed green at the seed picker, the remaining screens
+were driven by hand from the same live session. Every screen drew; none was
+blank:
+
+    Input Seed (Where from? -> FROM PAYLOAD)
+    Input Seed: Source: the systemwide payload
+    Add a BIP-39 passphrase? (Skip)
+    Policy Review — Slots @1 and @2 filled from the payload (cards 1 and 2
+      of 4, in payload order). Policy stub: 4c3c96f1 Slots: @0 (no fp) @1 …
+    Which md1? Full policy md1 / Template-only md1
+    EXPERIMENTAL (hold to confirm)
+    Engrave Mode — What to engrave? Full (seed + keys) / Watch-only (keys)
+    Choose engraving  TEXT+QR / TEXT ONLY / QR ONLY   Card 1 of 3 | Plate 1 of 1
+
+So the Build-policy flow, **fed entirely by the payload with zero records across
+the NFC reader**, is drivable from the template picker to the first engrave
+screen. D-1 ("the flow dead-ends: a blank screen after configuration",
+SPEC §2.2) **does not live on the payload path in the emulator.**
+
+**What was NOT exercised, named as the spec requires** — D-1 belongs to one of
+these, and S2 owns finding out which:
+
+1. **The engrave itself.** The drive stops at the engraving-style picker; no
+   plate was cut, `deriveMultisigLeg`/`bundleEngrave` ran only as far as
+   drawing that screen. S2 holds the completed-engrave gate.
+2. **HARDWARE.** D-1 was field-observed on a physical SH2. This was the wasm
+   emulator, whose display, engraver and NFC are all stand-ins. S6 owns
+   hardware validation, and this is the single most likely home for it.
+3. **The NFC-scanned card source.** Deliberately excluded: F-174 makes
+   `shNFC.presented() === 0` mandatory on a stage-gate run, so a scanned-card
+   build is a driver smoke test and was not run here.
+4. **The typed-seed source.** This run took the self seed FROM THE PAYLOAD.
+   The field report says "after configuration", and a keyboard-entered seed is
+   a different amount of state and a different code path
+   (`seedEntryFlowTypedOnly` + `inputWordsFlow`).
+5. **Every shape but one.** The walk drove n=3, k=2, self slot @0,
+   fingerprints omitted, template `wsh`. `sh(wsh)`, `sh`, n ∈ {2,4,5},
+   includeFp, and a non-zero self slot were covered by unit tests but by no
+   walk.
+
+**Consequence for S2, and it is gating.** S2's test 1 is *"the D-1 reproduction
+from S1, promoted to a regression test — it MUST fail on the unfixed code"*.
+There is no reproduction to promote. S2 must therefore either reproduce D-1 in
+one of the five unexercised shapes above (2 and 4 are the cheapest), or record
+that it could not and carry the completed-engrave gate alone — which is exactly
+what SPEC P1's own sentence anticipates. **What S2 may not do is treat test 1
+as discharged.**
