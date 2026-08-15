@@ -1,19 +1,17 @@
-# Continuity — 2026-08-15b: S2 landed, its review is in flight
+# Continuity — 2026-08-15b: S2 is GREEN; next is S3 + the S0b review
 
-Supersedes `CONTINUITY_2026-08-15.md`, which said "S2 is in flight". S2 has
-landed — **five commits, unpushed and UNREVIEWED**. Read this one.
+Supersedes `CONTINUITY_2026-08-15.md`. **Updated at end of day**: S2 has now
+closed **0 Critical / 0 Important** after one review round and one fold, so the
+"review in flight" this doc originally described is DONE. Read this one.
 
 ## THE WORK QUEUE, in order
 
-1. **S2's mandatory independent review** — dispatched and running when this was
-   written. Non-deferrable; the implementer was forbidden to self-review.
-   - **If its report exists** at `design/agent-reports/s2-execution-review-2026-08-15.md`:
-     read it, persist it in its OWN commit, fold findings, re-review scoped to
-     "did the fold fix each finding and introduce no new defect". 0C/0I closes
-     the loop — do not loop for reassurance.
-   - **If it does not exist:** re-dispatch it. The brief is reproduced in
-     "What the S2 review must probe" below.
-2. **Then, in parallel — they are genuinely disjoint:**
+1. **S2 is CLOSED — nothing to do.** Its review found 1 Critical / 2 Important,
+   the fold answered all three, and the scoped re-review returned 0C/0I, which
+   per the standing rule CLOSES the loop. Do not run another round for
+   reassurance. Reports: `s2-execution-review-2026-08-15.md`,
+   `s2-fold-2026-08-15.md`, `s2-fold-review-2026-08-15.md`.
+2. **Start here — these two run in parallel, they are genuinely disjoint:**
    - **S3** (`IMPLEMENTATION_PLAN_multisig_build_repair.md` §3, S3). Not before
      S2 closes: both stages edit `gui/multisig_build.go`, and there is a
      MEASURED S2↔S3 interaction — making origins template-aware before S5 would
@@ -25,9 +23,10 @@ landed — **five commits, unpushed and UNREVIEWED**. Read this one.
      derived census (`oracle/expect.go`, `inputsfile.go`, `CompareCensus`) or the
      needle/NFC gate have a defect that would let a later stage pass wrongly?*
 3. **Push** — dispatch a **sonnet** agent as a matter of course; the operator
-   ruled 2026-08-15 not to ask first. But **do NOT push S2 until its review
-   closes** — the directive is about not asking, not about shipping unreviewed
-   work.
+   ruled 2026-08-15 not to ask first. The rule that held S2 back no longer
+   applies to it (its review closed), but it still applies in general: **do not
+   push a stage whose review has not closed.** The directive is about not
+   asking, not about shipping unreviewed work.
 
 **Reserve fable for the pre-hardware S6 gate** — the first irreversible action.
 Design-level adversarial review of a landed diff is opus's job.
@@ -36,21 +35,22 @@ Design-level adversarial review of a landed diff is opus's job.
 
 | repo | branch | head | unpushed |
 | --- | --- | --- | --- |
-| fork `seedhammer` | `main` | `3ea3ede` | **5 (all of S2)** |
-| `mnemonic-engrave` | `master` | `f4e0920` | 2 |
+| fork `seedhammer` | `main` | `4b8488e` | 6 (S2 + its fold) |
+| `mnemonic-engrave` | `master` | `fb44c4b` | several |
 | `mnemonic-key` | `main` | `3462157` | 0 |
 | `mnemonic-secret` | `master` | `de593ca` | 0 |
 | `mnemonic-toolkit` | `followup/p2wsh-binding-oracle` | `aa5e1ae5` | 0 |
 
-Fork gate at `3ea3ede`: `go test ./...` **51 ok / 0 FAIL / exit 0**, `go vet` 6
-`ArtifactDir` (baseline), `gofmt` clean, tinygo flash **1,354,568** (S1 moved it
-to 1,349,428; S2 added 5,140). `gui/` is reachable from the firmware, so a move
+Fork gate at `4b8488e`: `go test ./...` **51 ok / 0 FAIL / exit 0**, `go vet` 6
+`ArtifactDir` (baseline), `gofmt` clean, tinygo flash **1,354,552** (S1 moved it
+to 1,349,428; S2 to 1,354,568; the fold gave back 16 — its production edits were
+prose). `gui/` is reachable from the firmware, so a move
 is expected — a build failure is not.
 
 ## Stages
 
 S0 ✅ · **S0b** ✅ (review queued) · **S1** ✅ 0C/0I after two folds · **S2** ✅
-landed, review in flight · S3 S4 S5 S6 — not started.
+**0C/0I after one round and one fold** · S3 S4 S5 S6 — not started.
 
 **An operator still cannot build a wallet policy on the device.** S5 is where the
 wallet gets engraved; S3–S4 are its runway.
@@ -84,10 +84,36 @@ this are the same defect.
 That test exists because fable ruled it a standing D-1-class guard that must not
 wait for a reproduction. It found one immediately. **~30 sites remain: F-179.**
 
-## What the S2 review must probe
+## What S2's review found, and how it closed
 
-Recorded so it survives a lost dispatch. Rank Critical/Important/Minor; both
-block.
+Kept because S3 inherits the shape of it, not because S2 is open.
+
+**C1 (Critical) — the "by emulator walk" half of S2's gate was never run**, and
+the reason given was false in both halves: the payload carries a
+`ClassMnemonic`, so both arms are tap-only and no keyboard driver was ever
+needed. The implementer's own words on folding it: *"I had turned 'the route I
+picked is hard' into 'the gate is blocked'."* Both arms are now driven in a
+browser — `[use,use]` reaches the Duplicate key screen naming slots @0 and @1;
+`[skip,skip]` engraves **9 plates, unattributed 0, presented 0**, stub
+`06215ac0`.
+
+The re-review's key confirmation: the walk now **asserts** rather than reaches —
+`ok` is outcome-bound and `unattributed` comes from the emulator's own
+attribution, so nothing driver-supplied can manufacture a pass. **But note the
+walk RECORDS the emulator/oracle stub agreement without ASSERTING it** — that
+agreement is observed, not enforced.
+
+**I1** — the em-dash blanks the WHOLE BODY, not one line, and `uiContains` still
+returns true, so every content assertion in the repo is blind to it. Six sites
+fixed (three more than the review found).
+
+**I2** — a comment claimed a rendered-frame check that did not exist; built.
+
+**The check-order judgment call was RULED SOUND**: keep duplicate-first.
+
+### The probe list, kept for reuse on S3
+
+Rank Critical/Important/Minor; both block.
 
 1. **The duplicate check is the funds-safety deliverable.** Is it reachable from
    EVERY route into `assembleBuildPolicy`, or only the one the walk drives? Find
