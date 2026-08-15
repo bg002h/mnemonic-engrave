@@ -80,6 +80,40 @@ pinned formatter, the formatter *produces* byte-equality instead of threatening
 it, and both exemptions can go. But it is a release-coordination task, not a
 two-line change.
 
+## Option (A) VERIFIED by measurement — 2026-08-15, after the correction
+
+The transitive chain was measured rather than argued. Every number below is a
+real command's output.
+
+1. **Toolkit master ≡ the pinned tag** — `crates/mnemonic-toolkit/src/mlock.rs`
+   on `origin/master` vs `ms-cli-v0.14.1:crates/ms-cli/src/mlock.rs`, modulo
+   comments and blank lines: **0 differing lines.** That is *why* the toolkit's
+   g6 is green today, and it confirms the tag is the unformatted shape.
+2. **Reverting `de593ca` lands exactly on that shape** — a `git revert
+   --no-commit` dry run applied **cleanly** (exit 0, `crates/ms-cli/src/mlock.rs`
+   the only modified file), and the result vs `ms-cli-v0.14.1`'s copy is
+   **0 differences, byte-exact**.
+3. Therefore reverted `ms-cli` master ≡ toolkit master modulo comments, so
+   **`mnemonic-secret`'s g6 goes GREEN**, and since the toolkit is not touched at
+   all, **the toolkit's g6 STAYS GREEN**.
+
+Also confirmed incidentally: the toolkit's feature branch
+`followup/p2wsh-binding-oracle` has an `mlock.rs` **identical** to master's, so
+no in-flight toolkit work is disturbed by leaving that side alone.
+
+**Conclusion: (A) is correct and is a one-commit revert in `mnemonic-secret`.**
+It was held only until the in-flight `ci/staging` push of `d476b77` released that
+repo's working tree — a revert is a tracked-file modification and the push agent
+correctly refuses a dirty tree.
+
+**The residual trap (A) does NOT fix, and it must be filed rather than
+forgotten:** the fmt exemption remains enforced in CI and unreproducible locally,
+so the next bare `cargo fmt --all` re-breaks g6 exactly as it did this time.
+`de593ca`'s own message shows the mechanism — a local `--check` exited 1, which
+read as "the repo is failing its own gate" when it was the exemption working as
+designed. Until either (B) lands or the exemption is encoded in something a
+developer actually runs, this recurs.
+
 ## One more thing not to do
 
 While reworking this I removed `examples.yml`'s push-side `paths:` filter, by
