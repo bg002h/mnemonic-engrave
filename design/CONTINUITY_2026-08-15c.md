@@ -123,13 +123,29 @@ because you found it in the repo.
 
     export PATH="/nix/var/nix/profiles/default/bin:$PATH"
     nix develop --command go test ./...
-    nix develop --command go vet ./...          # 6 ArtifactDir = baseline
+    nix develop --command go vet ./...          # exit 1, 40 findings = baseline
     nix develop --command gofmt -l ./
     nix develop --command tinygo build -size short -o /dev/null -target pico-plus2 \
       -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller
     nix develop --command ./cmd/emu/build.sh    # go test ./... does NOT compile the emulator
 
-Baseline at `4b8488e`: 51 ok / 0 FAIL / exit 0; tinygo flash **1,354,552**.
+Baseline at `4b8488e`, **re-measured on a clean detached worktree, not
+transcribed** — the figure this doc first carried was wrong and had been wrong
+across several continuity docs:
+
+| check | baseline |
+| --- | --- |
+| `go test ./...` | exit 0, **51 ok / 0 FAIL** |
+| `go vet ./...` | **exit 1**, **40 findings** — 7 `ArtifactDir` + 33 `unkeyed fields`, **all in `_test.go`** |
+| `gofmt -l ./` | clean |
+| tinygo flash | **1,354,552** (S3 → 1,354,936, +384) |
+
+`go vet` exiting **1** is the clean state here; a nonzero exit is not a
+regression. The old "6 `ArtifactDir`" both undercounted and omitted the larger
+category outright, and it reached two agent briefs before being measured. Compare
+by **sorted diff against a clean tree**, never against a remembered count — and
+note `nix develop` against a dirty tree adds a `warning: Git tree ... is dirty`
+line that inflates a naive `wc -l`.
 
 No-oracle harness (for proving a gate can fail): fake `HOME` **with real
 `GOPATH`/`GOMODCACHE`** — omit those and Go re-downloads the module cache into
