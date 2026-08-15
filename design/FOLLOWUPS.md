@@ -5983,3 +5983,28 @@ nor a named substitute.
 
 Cross-ref: `TestS0GateHasARecord` demands a record for **S0 only**, so nothing
 is red today — which is exactly why this would go unnoticed until S1's gate.
+
+
+### F-176 — `md` cannot author per-key origins, so S5's divergent md1 byte-comparison has no producer (owning phase: **file upstream NOW; blocks `SPEC_multisig_build_repair.md` S5**, gating) `#seedhammer` `#cross-repo`
+
+Filed 2026-08-15 from `design/agent-reports/fable-s1-s6-assumption-audit-2026-08-15.md`. **This is the S0b failure shape caught before it cost a stage** — a gate written against a mechanism that does not exist — and it is the only S5 dependency with external lead time.
+
+Measured against `md 0.13.0`, three ways, all failing:
+
+- `--key "@0=[fp/48'/0'/0'/2']xpub…"` → `base58check decode` error;
+- a concrete-key descriptor → `template contains no @i placeholders`;
+- `md encode --help` exposes no per-key origin flag at all; omitting `--path` yields `path_decl {tag: Shared, data: "m"}` (via `md decode --json`).
+
+**The codec is fine; the CLI is the gap.** md-codec decodes Divergent correctly — the fork's divergent encode round-trips through `md decode --json` with `tag: "Divergent"` and both paths present. So S5's gate ("the current primary BUILDS an md1 from the same inputs and the strings are equal") is unsatisfiable for Trace B, which is the plan's flagship wallet.
+
+**Decision: file the upstream flag now, Rust-first.** `md encode --origin @i=<path>` (repeatable, pairing with the existing `--key @i=`), landed in `descriptor-mnemonic` with test vectors, then released, then re-pinned in `oracle/pins.json`. Filing costs about an hour; discovering it at S5 costs the stage — and the release + re-pin chain is exactly the lead time that cannot be compressed later.
+
+**Named fallback, if the flag has not landed when S5 arrives:** compare Trace B's md1 by DECODE equivalence (`md decode --json` field-by-field against the input tuple) rather than by string equality, and record that in the gate record as an explicit deviation from §1a's full-string-equality rule. A deviation that is named and recorded is a different thing from a gate quietly downgraded, and only the first is acceptable.
+
+Cross-ref: §1a now rules **full string equality for all three artifact classes**; this is the one place that rule currently cannot be honoured.
+
+### F-177 — the `ms` oracle pin lags the settled ms-cli 0.16.0 (owning phase: **before S2's oracle extension**) `#seedhammer`
+
+Filed 2026-08-15. `oracle/pins.json` pins `ms` at commit `ddfa497` / `ms 0.15.0`, and the installed binary is that build — so the pin is HONEST and internally consistent, and no gate is affected. But `mnemonic-secret` HEAD is now `de593ca` with ms-cli **0.16.0**, whose bare-`bip48` permissiveness is the settled behaviour.
+
+Not urgent and deliberately not done in-session: re-pinning is a chain — rebuild, install, re-record `pins.json`, then re-anchor S0's gate record. Per the D5 doctrine that chain needs **no new emulator walk**, because an oracle re-pin cannot reach the device path; `gaterecord -force` over the saved walk is the sanctioned rebuild. Do it when S2 extends the oracle, so the re-anchor happens once rather than twice.

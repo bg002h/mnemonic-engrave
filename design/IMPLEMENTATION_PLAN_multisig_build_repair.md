@@ -73,6 +73,46 @@ the assumption on stdout, on stderr, and as `script_type_defaulted` in `--json`.
 An explicitly chosen script type announces nothing — a tool that cries
 "DEFAULT" when the operator chose is a tool whose warnings get ignored.
 
+### 0.1a RULED: the BIP-48 script-type origin must be SPOKEN (2026-08-15)
+
+The goal sentence's own flagship example — "using common key paths that are
+assigned by a BIP for a particular script type" — was the one §0.1 violation no
+stage owned. Measured, not inferred:
+
+- `multisigSharedOrigin()` returns `m/48'/0'/0'/2'` **unconditionally**
+  (`gui/multisig_build.go:421-424`), and spec §4.3 M-B bakes `…/2'` into
+  `derived` slots template-blind.
+- BIP-48 assigns **`2'` to native segwit and `1'` to nested segwit**, and
+  registers **nothing** for legacy `sh`. Confirmed through the pinned oracle:
+  `ms derive --template bip48-p2wsh` → `m/48'/0'/0'/2'`,
+  `--template bip48-p2sh-p2wsh` → `m/48'/0'/0'/1'`.
+
+So an `sh(wsh)` build today stamps the NATIVE-segwit path onto steel, and a
+BIP-48-aware coordinator reading that plate derives at the wrong script-type
+path. Nothing in S1–S6 said so.
+
+**Ruling: announce, do not refuse.** §0.1 clause 2 decides it — the origin is
+printed with the xpub, carried in every mk1, and shown on the restore doc, so a
+wrong assumption is detectable by reading the artifacts. That makes it eligible
+to assume, and therefore obligatory to announce.
+
+- **From S2** — the review screen states the origin and its authority:
+  *"Key origins: m/48'/0'/0'/2' — the BIP-48 path for native segwit."*
+  For `sh(wsh)` until S5, append: *"Note: BIP-48 assigns m/48'/0'/0'/1' to
+  nested segwit; this build uses the shared 2' path until per-card origins
+  land."*
+- **From S5** — `sh(wsh)` derived and self slots default to `1'`, and the note
+  becomes *"Key origins follow BIP-48 for nested segwit (script type 1')."*
+  **Not earlier than S5**: making the default template-aware at S2 or S3 would
+  strand S3's walk on S2's interim foreign-origin refusal (measured interaction).
+- **Legacy `sh`, always** — no BIP assigns one, so the device must own the
+  choice out loud: *"No BIP assigns a derivation path for legacy P2SH multisig;
+  using this device's convention m/48'/0'/0'/2'. It is recorded on every
+  artifact."*
+- **An origin the operator supplied** (a payload card's own) announces
+  **nothing** — §0.1's corollary: a tool that cries DEFAULT when the operator
+  chose is a tool whose warnings get ignored.
+
 ### 0.2 What may be RULED here, and what may not
 
 `§1a` ruled that mk1's random `chunk_set_id` was "a ruled property of the
@@ -146,7 +186,10 @@ address derivation from published bip test cases."*
 
 **Oracle 1 — the CURRENT PRIMARY toolchain, byte for byte.** Not the fork's
 vendored testdata, and not whatever binary is on `PATH`. The pins today are
-`md-codec 0.42.x` (or `me`, which pins it), `mk-codec 0.4.2`, `ms-codec 0.7.0`.
+`md-codec 0.42.x` (or `me`, which pins it), `mk-codec 0.5.x`, `ms-codec 0.7.0`.
+**`oracle/pins.json` is the authority on what is actually pinned — not this
+prose.** It carries the commit AND the binary SHA-256 for each oracle; a version
+written here is a convenience that goes stale, as this line did.
 
 **PIN BY SOURCE COMMIT, NOT BY `--version`.** A version string is
 self-reported by the binary, so a substituted tool spoofs the pin and
@@ -1161,7 +1204,10 @@ name them.
 **Gate.** Trace B completes: correct descriptor, by test and by emulator walk.
 **The §4.5 comparison extends to every mk1 and to EVERY ms1, byte for byte**
 (§1a): each engraved ms1 must equal `ms encode --hex <that master's entropy>`
-from the current primary, and each mk1 must satisfy the two-part mk1 relation.
+from the current primary, and each mk1 must be **byte-identical** to it — the
+same full string equality md1 and ms1 get. §1a's weakened two-part relation was
+abolished on 2026-08-15 when mk-codec 0.5.0 made `chunk_set_id` payload-derived;
+this line survived that fold and is corrected here.
 "ms1 presence" was this plan's earlier wording and it was a defect, not a
 scoping — the spec's presence requirement is a floor, and byte comparison
 satisfies it a fortiori. The md1 alone cannot see either C2 scenario.
