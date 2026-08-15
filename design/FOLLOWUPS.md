@@ -5815,7 +5815,34 @@ found to be an inaccurate attestation — it named commit `bf77f89` with version
 `ms 0.14.0`, but that commit's source declares `0.14.1`, so the binary was never
 built from the commit it named.
 
-### F-172 — S3's restore-doc gate has nothing to read on the template branch (owning phase: **`SPEC_multisig_build_repair.md` S3**) `#seedhammer`
+### F-172 — ~~S3's restore-doc gate has nothing to read on the template branch~~ **RESOLVED 2026-08-15 by S3 — but the filed cause was only HALF of it** (owning phase: **`SPEC_multisig_build_repair.md` S3**) `#seedhammer`
+
+> **RESOLUTION 2026-08-15. Read the second cause before citing this entry as
+> closed — closing it on the filed cause alone would put a false record on
+> disk.**
+>
+> The filed cause is real: picking **"Full policy md1"** is *necessary*, because
+> the template-only form skips the restore doc. It is **not sufficient**, and
+> nothing in this entry or in the plan said so.
+>
+> **The second cause, measured while running S3's gate for the first time.**
+> `gui/multisig_restore.go`'s `desc4Display` — the site SPEC §2.2 D-3 and §4.4
+> both name as the one that matters — sits on the **display-only** branch. Every
+> md1 the Build flow authors is bip380-expressible, so a full-policy build lands
+> on the **`expandOK`** branch instead, **where the script type was named nowhere
+> at all**. So the `scriptName` fix the plan describes would have left S3's walk
+> reading a restore doc with no type line — indistinguishable from a broken
+> screen, and a gate that fails for a reason nobody would have diagnosed.
+>
+> Fixed in `7bdd1f3` by putting the type line on **both** branches. The walk then
+> read `Type: P2SH-P2WSH 2-of-3 multisig (sorted)` and passed, with a negative
+> control proving it discriminates.
+>
+> **The lesson, and it is the one this cycle keeps paying for:** the spec named a
+> call site it had *analysed*, not the site the flow *reaches*. Identical shape
+> to "the four `TYPED-ONLY` comments" turning out to be nine. **A gate that has
+> never been run is a hypothesis** — this cost about an hour to find by trying
+> it, and was invisible to every reading before that.
 
 Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md` (I2).
 
@@ -6436,3 +6463,65 @@ walk cuts 9 plates and reaches it. It is a DIFFERENT screen from D-4's (which
 names the gather specifically), and `bundleEngrave` is shared by T5, single-sig
 and the supplied-md1 path as well, so the same parameter-not-rename judgement
 applies and is worth doing once, in the stage that owns the engrave tail.
+
+### F-183 — `assertFrameHasBody`'s floor is calibrated for ONE screen shape but named and worded as general (owning phase: **`SPEC_multisig_build_repair.md` S3b** — with the F-179 raster class) `#seedhammer`
+
+Found 2026-08-15 by S3, which hit it, declined the helper, and rolled its own
+floor rather than lowering the bar to fit.
+
+`gui/raster_test.go:73` sets `const floor = 4000`, and its own comment says why:
+*"CALIBRATED against the real defect rather than guessed. Measured on the unload
+result screen: the body that shipped blank drew 2652 px, the fixed one 6688."*
+For that screen the floor is correct and well-argued.
+
+**The trap is that chrome contributes ink, and the floor does not know which
+chrome.** A screen drawing three nav buttons plus a title renders **5482 px while
+its body is entirely blank** — a figure this cycle has now measured twice
+independently (S2's execution review recorded 4973 ink against the same 5482 px
+blank frame). **5482 > 4000**, so on any such screen `assertFrameHasBody` passes
+a completely blank body.
+
+Currently **latent, not live**: the helper has exactly one caller
+(`gui/raster_test.go:106`, the unload result screen — the very screen it was
+calibrated on), which is correct. What makes it a trap is the generic name and
+the generic failure text, *"a screen with a title AND a body draws far more"*,
+which read as a general-purpose guard. The next author to reuse it on a
+chrome-heavy screen gets a silent false PASS on exactly the F-179 defect the
+helper exists to catch.
+
+S3's own handling is the template for the fix: it measured the blank frame for
+*its* screen shape (5482) and set its floor above it (`buildWalkRasterFloor`,
+6000; measured ink 10762).
+
+**Fix.** Make the floor a required argument derived from the screen's own
+measured blank, or have the helper take a blank-frame baseline and assert
+`ink > blank * k`. A single global constant cannot separate blank from drawn
+across screens with different chrome, and one that silently cannot is worse than
+no helper. Belongs with S3b because it is the same class and the same instrument.
+
+### F-184 — a needle's uniqueness proof counts COMMENTS as production sites (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer`
+
+Found 2026-08-15 by S3, which worked around it and left a comment explaining the
+workaround so the next author does not undo it.
+
+`cmd/emu/needle_test.go` proves a walk needle is single-site by substring match
+over `gui`'s source. The match is blunt: **it counts occurrences in comments as
+production sites.** So quoting a needle string in a comment — the ordinary way to
+explain why a screen says what it says — makes that needle look two-sited and
+costs it its uniqueness proof.
+
+S3 hit this twice: writing `P2SH-P2WSH` into a `gui/` comment broke its own walk
+anchor, and its sweep comment reintroduced the literal `TYPED-ONLY` and failed
+gate arm (a). Both were caught by running the gates, not by reading. There is
+existing precedent for the workaround — `buildCosignerGatherTitle`'s comment
+deliberately does not quote its old title — but nothing states the rule, so it is
+rediscovered by tripping over it.
+
+**Direction is fail-SAFE** (over-counting makes a needle look less unique than it
+is, never more), which is why this is Minor and not Important. The cost is
+paid in author confusion and in comments that must be written around the check.
+
+**Fix.** Strip comments before counting — a Go-aware scan, or the same
+comment-stripping the F-179 scanner needs. Doing both with one helper is the
+obvious economy. Until then, **do not quote a needle literal in `gui/` source
+comments**, and say so where needles are defined.
