@@ -21,6 +21,7 @@ miniscript) is out of scope by §1.
 | stage | delivers | spec |
 | --- | --- | --- |
 | **S0** | the oracles: pinned primary toolchain + published-BIP address vectors | §1a |
+| **S0b** | the walk scaffolding every later gate leans on: build-flow driver, derived census, oracle comparison | §4.5 |
 | **S1** | the payload supplies the whole cosigner set | P0 |
 | **S2** | the dead end, the title, the interim origin refusal | P1 |
 | **S3** | nested segwit is nameable; the stale `TYPED-ONLY` comments in `gui/` die | P2 |
@@ -39,6 +40,26 @@ answering §10 Q4. The exposure is live today (§2.2 D-5 — payload seeds alrea
 reach the constructor with no cross-check) and the gate depends only on the
 assignment model, not on multi-slot support. Recorded as settled so a later
 reader does not reopen it.
+
+**S0b inserted — RULED by the operator 2026-08-14**, answering the review in
+`design/agent-reports/s1-walk-gate-judgement-review.md`. Every stage from S1 on
+gates on an emulator walk of a flow no walk reaches (F-168–F-172), and SPEC §4.5
+is REQUIRED and quotes the operator verbatim, so weakening the clause to "by
+test" was never this plan's to take. S0b owns **only the three mechanisms all
+five stages share**, and owns them here because this is the one point where they
+can be *exercised against a known-correct target* — S0's committed gate record,
+whose six mk1 plates are reproducible from `go run ./cmd/buildpayloadcards`.
+Built at S1 or S2 instead, each mechanism's first execution would also be its
+first verdict. **S0b does NOT own the five per-stage walk scripts**; the build
+flow's tail cannot be walked before the code that makes it walkable exists.
+
+**THE PAYLOAD'S CARD COUNT IS INDEPENDENT OF `n` — RULED by the operator
+2026-08-14**, answering F-173: *"Available key count could be 0 to n."* The
+payload may carry anywhere from **zero to n** cosigner cards, and no stage may
+assume it carries exactly `n-1`. This supersedes the two options F-173 put up
+(per-card accept/skip; run the walks at n=5) with something wider than either —
+it is a property of the design, not a workaround for one payload. See F-173 for
+what it changes in S1's test list.
 
 ## 1a. The oracles — what "correct" is measured against
 
@@ -471,7 +492,7 @@ not eight: D6 added two and D5's last clause added one.
 | # | property | where it lives | state |
 | --- | --- | --- | --- |
 | 1 | every `//go:embed` under `cmd/emu` is structurally confined | `cmd/emu/embed_confinement_test.go:149` — `TestEveryEmbeddedPayloadIsStructurallyConfined` | ✅ |
-| 2 | the cosigner payload decodes and carries every stage's cards | `cmd/emu/sysw_cards_payload_host_test.go:20` `TestSyswCardsPayloadMatchesItsDigest`; `cmd/emu/sysw_cards_payload_host_test.go:59` `TestSyswCardsPayloadCoversEveryStagesWalk` | ✅ |
+| 2 | the cosigner payload decodes and carries every stage's cards | `cmd/emu/sysw_cards_payload_host_test.go:20` `TestSyswCardsPayloadMatchesItsDigest`; `cmd/emu/sysw_cards_payload_host_test.go:59` `TestSyswCardsPayloadCoversEveryStagesWalk` — **"enough cards", never "a usable number": floor only, no ceiling, which is how F-173 got past this gate** | ✅ |
 | 3 | the harness can drive input and return an engraved string | `cmd/emu/walk_js.go` (`shTap`/`shPress`/`shRelease`/`shPace`/`shSysw`), `screen_js.go` (`shScreen`), `toolpath_js.go` (`shToolpath`, incl. `strings()`); proven by a walk completing, not by a Go test. **The walk that proved it is a bundle engrave, not Trace A — F-168** | ✅ |
 | 4 | sorted-multi scripts match BIP-383's published vectors | `address/bip_vectors_test.go:164` | ✅ |
 | 5 | key order, script and address match BIP-67 | `address/bip_vectors_test.go:302` | ✅ |
@@ -500,6 +521,63 @@ instruction is what produced the correction to row 3.
 wasm. Mark it tier 2 and keep it out of the inner loop.
 
 
+### S0b — the walk scaffolding every later gate leans on
+
+**Ruled in on 2026-08-14** (§1). S0 proved a walk can drive the emulator and
+return an engraved string. What it did NOT prove, and what the recon measured,
+is that any walk reaches the flow S1–S5 repair, or that a walk checks *what* was
+engraved rather than *how many*. Both are shared by five stages that cannot run
+in parallel anyway, so building them per-stage buys nothing and costs each stage
+a debut-as-verdict.
+
+**Scope — three mechanisms, and deliberately nothing else.**
+
+1. **A build-flow driver, with a needle that cannot be in the wrong flow**
+   (F-169, F-174). Reaches the cosigner gather via `Engrave Multisig` →
+   `Build policy`, not `Engrave Bundle`. It MUST assert a screen with **exactly
+   one production site** — measured, and re-measure before use rather than
+   trusting this list: `gui/multisig_build.go:300` *"Choose policy type"*,
+   `gui/multisig_build.go:376` *"How many keys (n)?"*,
+   `gui/multisig_build.go:394` *"Which slot is your key?"*, and
+   `gui/multisig.go:44` *"Supply or build a policy?"*. **Not** `Lead: "Which
+   md1?"`, which is two sites (`gui/multisig_build.go:121`,
+   `gui/singlesig.go:94`) and is the decoy a stage author reaches for first.
+   **And it MUST assert `shNFC.present` was called ZERO times** on any
+   stage-gate run — F-174: a gather completed over the emulated reader is green
+   whether or not S1's feature exists, and phase-1 hardware has no reader.
+2. **The census derived from the recorded input tuple** (F-170), replacing
+   `plates = 6`. §3's preamble has required this since it was written and
+   nothing implements it.
+3. **The oracle comparison** (F-171). `oracle` resolves `md`/`mk`/`ms` to source
+   commits and stops; nothing invokes them, so S2's and S5's byte comparisons
+   have no mechanism at all. S0b gives them one.
+
+**Exercised against S0's record, which is the point of doing this here.**
+`oracle/gaterecords/S0-trace-a.record.json` holds six mk1 plates whose expected
+strings are reproducible from `go run ./cmd/buildpayloadcards`. Mechanisms 2 and
+3 are built against it and MUST be seen to fail: mutate one expected string, one
+plate digest and one needle — each red, then green on restore. Same three-way
+proof S0's own record carried.
+
+**NOT in S0b:** the five per-stage walk scripts. Each stage still writes its own,
+because the build flow's tail cannot be walked before the code that makes it
+walkable exists — today the payload seeds one chunk, S3's branch choice is
+F-172, and S4's and S5's screens are not written.
+
+**Gate.** The driver reaches the Build-policy gather and proves it by a
+single-site needle; `shNFC.present` count is zero and that assertion has been
+mutation-checked; the derived census and the oracle comparison both run against
+S0's record and have each been seen to go red. **A mechanism that has not failed
+here does not leave this stage** — that rule is why the stage exists.
+
+**Known cost, stated rather than discovered at S1:** part of the driver will be
+rewritten. The card source moves from the reader to the payload at S1, the needle
+set shifts when S2 fixes D-4, and the census shape changes from six mk1s to md1
+chunks + mk1 + ms1. The driver half is the guessable half and is cheap to fix;
+mechanisms 2 and 3 are the half that cannot be exercised anywhere else.
+
+---
+
 ### S1 — the payload supplies the whole cosigner set
 
 **Tests first**
@@ -518,13 +596,29 @@ wasm. Mark it tier 2 and keep it out of the inner loop.
    payload record order, and that the review screen shows it. Order is
    identity-bearing (`md/encode_multisig.go:13-21`).
 6. `TestBuildRefusesMoreCardsThanOpenSlots` — named refusal, not a fall-through.
+   **Re-scoped by the operator's `0..n` ruling (§1, F-173): the refusal belongs
+   to the ASSEMBLED set, not to the payload feed.** A payload carrying more
+   cards than there are open slots is **normal**, not an error — the delivered
+   one carries four for a 2-of-3 — so over-supply must be resolved by
+   *selection*, and only a selection that still does not fit refuses. Written the
+   old way, this test pins the very behaviour that makes Trace A unreachable.
 7. `TestUnderSupplyRefusalNamesTheHostRoute` — **refusals must speak phase-1
    language.** Today's tell the operator to *scan* a card, an instruction phase 1
    removed with NFC. A payload holding 3 of 4 needed cards, or a card whose chunk
    set is incomplete, must name the only route that exists: rewrite the payload
    on the host and deliver it again. A refusal prescribing an impossible action
    is worse than a bare failure — the operator goes looking for a reader that is
-   not there.
+   not there. **Extend the table to ZERO cards** — the `0..n` ruling makes an
+   empty payload a legitimate input, and a build that dead-ends on it with no
+   named route is the same defect at the other end of the range.
+8. **`TestPayloadCardCountIsIndependentOfN`** — the operator's `0..n` ruling
+   (§1, F-173) as a test, because a ruling with no test is a sentence. Over the
+   product of `n ∈ 2..5` (`multisigNChoices`, `gui/multisig_build.go:310`) and a
+   payload carrying `0..n` cards: every combination either assembles or refuses
+   **by name**, and none falls through. **Mutation:** restore the exact-count
+   refusal on the feed and the n=3 rows must go red — that is the state the
+   payload shipped in, and it made Trace A unreachable while every unit test
+   stayed green.
 
 **Implementation**
 
@@ -534,6 +628,15 @@ wasm. Mark it tier 2 and keep it out of the inner loop.
   `ctx.syswBundleSeed` with every `ClassMDMK` record fed through
   `bundleGatherFlow`'s `offer()`. Do not add a second insertion path:
   `gui/bundle_flow.go:100-103` states why.
+  **Feeding them all is not the same as USING them all — the `0..n` ruling.**
+  The delivered payload carries four cards (`cmd/buildpayloadcards/main.go:53-58`)
+  and `buildCosignerCards(cards, p.N-1)` refuses unless the count matches exactly
+  (`gui/multisig_build.go:268`), so an unconditional feed makes every `n` but 5
+  refuse — Trace A included. S1 owns the resolution: the operator chooses which
+  payload cards fill the open slots, and the exact-count check applies to what
+  they chose. The gather has no per-card decline today — only `dropPending` for
+  an incomplete chunk set (`gui/bundle_flow.go:127`) — so this is new surface,
+  not a parameter change.
 - Filter md1 records out before `buildCosignerCards`, which refuses on them.
 - The gather screen becomes a **review of what the payload supplied** (spec P0
   item 6). Title fixed in S2 with the rest of D-4.

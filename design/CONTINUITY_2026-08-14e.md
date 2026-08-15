@@ -6,30 +6,40 @@ S1–S6 walk-gate audit is written, folded and pushed. Read this one.
 
 ## Where to start
 
-**One ruling is BLOCKED ON THE OPERATOR and everything else waits on it.**
+**Both open decisions are RULED. Build S0b.** Everything below is the reasoning
+that got there; nothing in this file is still waiting on an answer.
 
-### F-173 — the ruling to make first
+### Ruled 2026-08-14 — the two that were open
 
-The review found a Critical that is independent of every walk finding and
-survives all three options below: **Trace A cannot complete on the payload S0
-delivered.** The payload holds nine `ClassMDMK` records forming **four** cards;
-S1's unconditional feed puts all four into `buildCosignerCards(cards, p.N-1)`,
-whose last check is `if len(out) != want` (`gui/multisig_build.go:268`); and
-`n` ranges over 2..5, so `want` ranges over 1..4. **The build refuses for every
-n except 5**, and n=5 is neither trace. S2's "Trace A completes end to end" is
-unsatisfiable with or without a walk.
+**F-173 → *"Available key count could be 0 to n."*** Wider than either option put
+up, and on purpose: it is a property of the design, not a fix for one payload.
+The payload may carry **zero to `n`** cosigner cards and **no stage may assume
+`n-1`**. Consequences are folded — the exact-count check moves from the feed to
+the assembled set, S1's test 6 is re-scoped, test 7 extends to zero, and a new
+test 8 walks the whole `n ∈ 2..5` × `0..n` product. The upper bound being `n`
+rather than `n-1` is deliberate: a payload with a card for every slot includes
+one that may be the operator's own, which is S4's `both` case, and the delivered
+payload already contains that pair (card `A@0` and the lone `ClassMnemonic`,
+both master A).
 
-Two ways out, and it is the operator's call:
+**Scaffolding → create S0b.** Written up as a full stage in the plan, between S0
+and S1, scoped to three shared mechanisms and explicitly not to five walks.
 
-- **(a) per-card accept/skip on the payload feed** — S1 scope, one screen,
-  restores every n, keeps §2's Trace A as written. This looks right.
-- **(b) run the walks at n=5** and restate §2's Trace A shape.
+**Start there.** S0b's own gate is the discipline this cycle keeps re-learning: a
+mechanism that has not been seen to fail does not leave the stage.
+
+### How F-173 was found, and why S0's gate missed it
+
+The payload holds nine `ClassMDMK` records forming **four** cards; S1's
+unconditional feed puts all four into `buildCosignerCards(cards, p.N-1)`, whose
+last check is `if len(out) != want` (`gui/multisig_build.go:268`); `n` ranges
+over 2..5 so `want` ranges over 1..4. The build refused for every n but 5.
 
 S0's gate missed it because `TestSyswCardsPayloadCoversEveryStagesWalk` has a
 `len(mdmk) < 8` floor and **no ceiling** — it gates "enough cards", never "a
-usable number of cards".
+usable number of cards". Two different properties; only the first was asserted.
 
-### The decision that follows it
+### The options as they stood before the ruling
 
 Five stage gates say *"by test and by emulator walk"*, and
 `design/RECON_S1_S6_walk_gates.md` measured that the only walk that exists
@@ -160,15 +170,14 @@ Full report: `design/RECON_S1_S6_walk_gates.md`. Follow-ups F-168–F-172.
 
 ## Open follow-ups
 
-- **F-173** → **RULING FIRST**, before S0b or S1 is scheduled. See above.
+- **F-173** → **RULED** (`0..n`), folded into §1 and S1's tests 6/7/8. S1 owns
+  building to it.
 - **F-168** → S0 (folded; the "one walk per page load" half is a standing note).
-- **F-169, F-170** → S0b if created, else S1, **gating**. The driver + needle and
-  the derived census. F-170 now also owned by **S3** — the preamble exempted it
-  on a false premise, and S3 engraves before its restore doc.
-- **F-171** → S0b if created, else S2, **gating**. The oracle-invoking harness.
+- **F-169, F-170, F-171, F-174** → **S0b**, all four, **gating**. The driver +
+  single-site needle, the zero-`shNFC.present` assertion, the derived census, and
+  the oracle comparison. F-170 is *additionally* owned by **S3** — the preamble
+  exempted it on a false premise, and S3 engraves before its restore doc.
 - **F-172** → S3. Pick "Full policy md1" or the gate reads nothing.
-- **F-174** → S0b/S1, **gating**. Zero `shNFC.present` in a stage-gate build
-  walk, or the gate passes without S1's feature.
 - **F-166** → its own cycle. The fork's md decoder refuses a pathless origin.
 - **F-167** → CLOSED, folded into D5's text at `1d728e8`.
 - F-158 premise STALE; F-160 census gap. Neither blocks.

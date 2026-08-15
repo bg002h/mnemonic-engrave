@@ -5754,7 +5754,7 @@ So the gate is satisfiable only if that stage's walk picks **"Full policy md1"**
 and nothing says so. A walk down the other branch reaches the end with the gate's
 subject never drawn, which reads exactly like "the screen did not say it".
 
-### F-173 — CRITICAL, needs an operator ruling: Trace A cannot complete on the payload S0 delivered, once S1's unconditional payload feed lands (owning phase: **`SPEC_multisig_build_repair.md` — RULING BEFORE S1/S0b IS SCHEDULED**) `#seedhammer`
+### F-173 — RULED 2026-08-14 (`0..n`): Trace A could not complete on the payload S0 delivered, once S1's unconditional payload feed landed (owning phase: **`SPEC_multisig_build_repair.md` S1**) `#seedhammer`
 
 Filed 2026-08-14 from `design/agent-reports/s1-walk-gate-judgement-review.md`
 (C-1), independently re-measured by the controller before filing. **Independent
@@ -5794,14 +5794,40 @@ asserts the payload carries *at least* the cards each stage needs — it has a
 `len(mdmk) < 8` floor and no ceiling. "Enough cards" and "a usable number of
 cards" are different properties, and only the first was ever gated.
 
-**The ruling, and it is the operator's.** Either:
+**RULED by the operator, 2026-08-14: *"Available key count could be 0 to n."***
 
-**(a) the payload feed becomes per-card accept/skip** — S1 scope, one screen,
-restores every n and keeps §2's Trace A as written; or
-**(b) the walks run n=5** and §2's Trace A shape is restated to match.
+Wider than either option put to them (per-card accept/skip; run the walks at
+n=5), and wider on purpose — it is a **property of the design**, not a
+workaround for this payload. **The payload may carry anywhere from zero to `n`
+cosigner cards, and no stage may assume it carries exactly `n-1`.** Folded into
+the plan at §1 as a standing ruling.
 
-(a) looks right and is not mine to take. Silence buys a walk that cannot pass
-and a second discovery round at S2.
+What it changes, each recorded where the old assumption lived:
+
+- **The exact-count check moves from the FEED to the ASSEMBLED set.** Over-supply
+  is *normal* — the delivered payload carries four cards for a 2-of-3 — so it is
+  resolved by **selection**, and only a selection that still does not fit
+  refuses. `buildCosignerCards`'s `if len(out) != want` stays; what reaches it
+  changes.
+- **S1's test 6 `TestBuildRefusesMoreCardsThanOpenSlots` is re-scoped.** Written
+  against the payload feed it pins the very behaviour that makes Trace A
+  unreachable.
+- **S1's test 7 extends to ZERO cards.** An empty payload is now a legitimate
+  input, and a build that dead-ends on it with no named route is the same defect
+  at the other end of the range.
+- **New S1 test 8, `TestPayloadCardCountIsIndependentOfN`** — the ruling as a
+  test, over the product of `n ∈ 2..5` and `0..n` cards, every cell assembling or
+  refusing **by name**. Mutation: restore the feed-side exact-count refusal and
+  the n=3 rows go red.
+- **Upper bound is `n`, not `n-1`, and that is not a typo to correct.** A payload
+  carrying a card for *every* slot includes one that may be the operator's own —
+  which is precisely S4's `both` case (a card whose key derives from a payload
+  seed). The delivered payload already contains that pair: card `A@0` and the
+  single `ClassMnemonic`, both master A. S4 should read this ruling as
+  confirming its model rather than as a new case.
+
+No stage may close having assumed `n-1`. **Everything below is the record of how
+it was found; the ruling above is what binds.**
 
 ### F-174 — a stage-gate build walk must assert ZERO `shNFC.present` calls (owning phase: **`SPEC_multisig_build_repair.md` S0b/S1**, gating) `#seedhammer`
 
