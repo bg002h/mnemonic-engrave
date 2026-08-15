@@ -113,6 +113,36 @@ to assume, and therefore obligatory to announce.
   **nothing** — §0.1's corollary: a tool that cries DEFAULT when the operator
   chose is a tool whose warnings get ignored.
 
+### 0.1b RULED: payload and keyboard are the primary data entry (2026-08-15)
+
+**Operator ruling.** The SH2 **has** NFC hardware — the ST25R3916 is soldered to
+every board, and an operator who wants it gone disables it **physically, with a
+knife**. NFC is a **future pass**. For this phase, **the payload and the keyboard
+are the primary data entries.**
+
+This corrects a false premise that had propagated into six sites across `cmd/emu`
+and `gui`, all of which asserted "phase-1 hardware has no reader". The reader
+exists and works. What phase 1 changes is **scope**, not hardware.
+
+Three consequences, and the first is the one that matters:
+
+1. **It STRENGTHENS the zero-NFC gate (F-174) rather than weakening it.** The
+   original justification was "there is no reader, so nothing can arrive that
+   way". The true justification is better: **a working reader is present, so a
+   walk CAN complete a gather by scanning and report success for the wrong
+   reason.** Asserting `shNFC.presented() === 0` is what makes payload-sourcing
+   provable at all. An assertion resting on absent hardware would have been
+   redundant; resting on present hardware it is load-bearing.
+2. **`FeatureNFC` stays the predicate for the gather's scan wording.** It is TRUE
+   of the hardware and is the honest question to ask about a machine. Scanning
+   remains AVAILABLE and simply stops being the headline: spec P0 item 6's
+   payload review is the primary surface. A platform that ever learns to report
+   a knife-disabled reader then gets the right wording for free.
+3. **Refusals must name the payload or the keyboard**, never "scan a card" — not
+   because scanning is impossible, but because it is not the route this phase
+   offers. A prompt pointing away from the only route the flow takes dead-ends
+   the operator just as effectively as an impossible one.
+
 ### 0.2 What may be RULED here, and what may not
 
 `§1a` ruled that mk1's random `chunk_set_id` was "a ruled property of the
