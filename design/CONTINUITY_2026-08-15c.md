@@ -108,7 +108,60 @@ declared opt-out; move all five sites together.
 `cargo install` yields a different binary, a different hash, a hard failure. It
 is filed as an S6-owned follow-up, not as the gate.
 
-## Stage status — SIX CLOSED, three to go
+## S4 IS CLOSED TOO — seven down, and S5 is BLOCKED on two prerequisites
+
+**S4 ✅ 0C/0I**, both Minors folded, merged and pushed; `origin/main` = `80d0c5d`.
+
+The review's strongest evidence was not a test: it took the **seven plate strings
+the emulator actually cut** and decoded them cold — the engraved mk1 holds exactly
+the key the engraved md1 puts at slot @0, does **not** hold @1's key, and the
+engraved ms1 seed derives @0's key at the shared origin. Nothing in the suite or
+the walk compared those artifacts to each other; that gap is closed by
+measurement.
+
+**S4's walk caught what its tests could not** → **F-185**. The gate's FAIL screen
+carried all four required elements *in its string* while the rendered first frame
+ended mid-word; `ErrorScreen` scrolls with no affordance, so the host route sat
+below an invisible fold. Every content assertion in the package checks the string
+**submitted**, not the pixels **drawn** — the F-179 seam by another route. S5
+inherits the class.
+
+**Both Minors folded** (`80d0c5d`): the mismatch refusal now leads with the cause
+its own negative control produces (picking the wrong card for the slot) — the old
+text sent the operator to rewrite a payload that was never wrong — and the
+post-gate dispatch ladder now has a regression guard pinning **order**, not just
+membership. The first fold attempt dropped `me sysw pack` and S4's own first-frame
+test caught it; the body is now **414 chars against the 422 it replaced**, so the
+fold margin improved.
+
+## S5's TWO PREREQUISITES — do not brief an implementer before these are ruled
+
+S5's gate is the strongest in the plan: Trace B completes with a correct
+descriptor by test **and** emulator walk, and the §4.5 byte comparison extends to
+**every mk1 and EVERY ms1, byte for byte, against the current primary**.
+
+1. **No `ExpectKind` exists for what S5 engraves (F-a).** `oracle/expect.go`
+   defines exactly one — `KindCosignerCards` → `mk1`. `DeriveExpected` refuses
+   any other kind *by design*, and `cmd/gaterecord` refuses to mint a record it
+   did not derive. S5 engraves **md1 policy chunks + mk1 + ms1** from a build, so
+   **no S5 gate record can be minted today**.
+   `TestCommittedFingerprintsAreRealAndDistinct` is a second blocker on the same
+   seam — it will hard-fail the first md1-chunk record.
+2. **The `ms` oracle pin lags the primary (F-177), and 2026-08-15 widened it.**
+   `oracle/pins.json` pins `ms` at **0.15.0** (`ddfa497`); `ms-cli-v0.16.0` was
+   released the same day. The gate says *"the **current** primary"*. **A stale pin
+   passes SILENTLY** — resolution checks only the installed binary's SHA-256, and
+   nothing asks whether the primary moved.
+
+**The question that matters, and why this was not just briefed out:** with the pin
+as it stands, would S5's byte-identity gate passing actually mean the engraved
+artifacts match what today's primary produces? If not, the strongest gate in the
+plan would be green about the wrong thing — this session's whole failure class,
+arriving at the last stage that could still hide it.
+
+S5 also inherits **F-185** (it owns the engrave tail's screens).
+
+## Stage status — SEVEN CLOSED, two to go
 
 S0 ✅ · **S0b ✅** (2C/2I → fold → 0C/1I → fold `43a07fe`) · S1 ✅ · **S2 ✅**
 (its byte-identity gate is now genuinely CI-enforced — that was C-3) ·
