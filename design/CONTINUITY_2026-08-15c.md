@@ -108,11 +108,34 @@ declared opt-out; move all five sites together.
 `cargo install` yields a different binary, a different hash, a hard failure. It
 is filed as an S6-owned follow-up, not as the gate.
 
-## Stage status
+## Stage status — SIX CLOSED, three to go
 
-S0 ✅ · **S0b ❌ 2C/2I + 2 controller Criticals — fold in flight** · S1 ✅ ·
-**S2 GREEN — gate verified LOCALLY; CI-enforced execution pending the S0b fold
-(C-3)** · **S3 in flight, may not close** · **S3b** ruled in (F-179) · S4 S5 S6.
+S0 ✅ · **S0b ✅** (2C/2I → fold → 0C/1I → fold `43a07fe`) · S1 ✅ · **S2 ✅**
+(its byte-identity gate is now genuinely CI-enforced — that was C-3) ·
+**S3 ✅** · **S3b ✅** · **S4 · S5 · S6 — not started.**
+
+`main` is at `6922b43`. S3 and S3b closed 2026-08-15 after a rebase onto the
+folded `main` and a **re-executed** gate — not a re-reasoned one:
+
+- suite exit 0, 51 ok / 0 FAIL; `grep -rn TYPED-ONLY gui/` → **0**; the glyph
+  guard scans **1790** production literals, **0 undrawable**.
+- the `sh(wsh)` walk re-driven: `ok true`, 9/9 needles, `presented 0`, 9 plates,
+  `unattributed 0`, restore doc reading `P2SH-P2WSH 2-of-3 multisig (sorted)`.
+- **the rebuild is proven, not asserted**: `emu.wasm` deleted and rebuilt,
+  9,809,117 bytes vs 9,809,168 pre-rebase. That delta is the positive evidence
+  the binary under test is the new one — the check that catches the stale-cache
+  false pass. Served on a fresh port.
+- the negative control still discriminates: `templateRow: 0` throws before
+  engraving, with a different stub (`06215ac0` vs `cd5ae625`).
+
+**Carry this forward:** the nine engrave digests are **byte-identical** to the
+pre-rebase run — same values, same order, same stub. So the S0b fold moved
+nothing on the toolpath the build path produces, measured as output rather than
+inferred from a diff. It is a same-inputs comparison, **not** the byte-identity
+oracle check against the primary toolchain, which is still its own gate.
+
+**An operator still cannot build a wallet policy on the device.** S5 is where the
+wallet gets engraved; S4–S5 are the remaining substance and S6 is hardware.
 
 **S2 does not reopen and gets no new review round.** Its green was real *where it
 was measured*; what was false is that the property is *enforced*. The fold's
