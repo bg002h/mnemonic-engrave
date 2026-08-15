@@ -192,13 +192,21 @@ gate includes the §4.5 emulator walk.
 
 **A walk's expected artifact census MUST derive from the recorded input
 tuple, never from what the walk produced.** And where a stage's walk produces
-**no** artifact — S1 and S3 end at a screen, not an engrave — the census is
-inert, so those walks assert on `shScreen()` text at a named screen instead. A
+**no** artifact — S1 ends at a screen, not an engrave — the census is
+inert, so that walk asserts on `shScreen()` text at a named screen instead. A
 gate whose only check cannot fire is not a gate; say which check each stage's
 walk actually runs. "Every mk1 and every ms1
 matched" is vacuously true of a walk that fell over after plate one. The
 script computes how many md1 chunks, mk1s and ms1s the inputs REQUIRE and
 fails when fewer arrive — a partial walk may never satisfy a total gate.
+
+**S3 was in that exemption until 2026-08-14 and it did not belong there.**
+Measured: `bundleEngrave(ctx, th, cardsOut)` is `gui/multisig_build.go:168` and
+`multisigRestoreDocFlow(ctx, th, tpl, keys)` is `gui/multisig_build.go:191` — the
+restore doc S3's gate reads comes **after** the engrave, so any walk that
+satisfies S3 has cut plates. Exempting it let S3 engrave the wrong artifacts and
+pass on a screen string, which is the exact defect this rule exists to prevent.
+S3 therefore owns F-170 alongside F-172. S1 alone is artifact-free.
 
 Tests are tier 1 (§4.6) unless named
 otherwise — synthetic time via `testing/synctest`, no real sleeps.

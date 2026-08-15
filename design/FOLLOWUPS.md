@@ -5670,10 +5670,24 @@ title is `layoutTitle(…, "Engrave Bundle")` at `gui/bundle_flow.go:155` — in
 the *shared* gatherer, so it reads "Engrave Bundle" even from Build policy. The
 only program identification in the whole script is the carousel match at entry.
 
-**S1 owns the scaffolding** because it is the first stage that needs it: a walk
-against Build policy, and a **flow-identifying needle that exists in one flow
-only**. After S2 fixes D-4 the gather title becomes that discriminator; before
-then it is a decoy.
+A **flow-identifying needle that exists in one flow only** is therefore
+mandatory. **Three exist today** — corrected after review (I-4), because the
+original text here said one arrives only after S2 fixes D-4, which argued for
+deferring the scaffolding past S2. Each is a single production site
+(`git grep -F … -- 'gui/*.go' | grep -v _test`):
+
+    gui/multisig_build.go:300   Lead: "Choose policy type"
+    gui/multisig_build.go:376   Lead: "How many keys (n)?"
+    gui/multisig_build.go:394   Lead: "Which slot is your key?"
+
+plus `gui/multisig.go:44` `Lead: "Supply or build a policy?"`, unique to
+`engraveMultisigFlow`. **Decoy, named so nobody reaches for it:** `Title:
+"Engrave wallet policy"` / `Lead: "Which md1?"` is two sites —
+`gui/multisig_build.go:121` and `gui/singlesig.go:94`.
+
+Owning phase is **S0b if that stage is created** (see
+`design/agent-reports/s1-walk-gate-judgement-review.md`), otherwise S1 as the
+first stage that needs it. Pairs with **F-174** — zero `shNFC.present`.
 
 ### F-170 — the walk asserts a plate COUNT where the plan requires a census derived from the input tuple (owning phase: **`SPEC_multisig_build_repair.md` S1**, gating) `#seedhammer`
 
@@ -5697,6 +5711,13 @@ Each stage's plate count differs — Trace A on the build path cuts md1 chunks
 plus the self mk1 plus (in full mode) an ms1, not six mk1 chunks; Trace B is 6–9
 plates (`:757`). So the derivation is not a nicety, it is the only way a
 per-stage walk can have a count at all.
+
+**S3 owns this too, added after review (I-2).** The plan's preamble exempted S1
+*and S3* from the derived census on the premise that both "end at a screen, not
+an engrave". Measured: `bundleEngrave` is `gui/multisig_build.go:168` and the
+restore doc S3's gate reads is `gui/multisig_build.go:191` — **after** it. Any
+walk satisfying S3 has cut plates, so S3 could have engraved wrong artifacts and
+passed on a screen string. Preamble corrected; S1 alone is artifact-free.
 
 ### F-171 — nothing invokes the pinned `md`/`mk`/`ms`, so S2's and S5's byte-comparison gates are unimplemented (owning phase: **`SPEC_multisig_build_repair.md` S2**, gating) `#seedhammer`
 
@@ -5732,3 +5753,70 @@ picked the template-only form at `:120-142`.**
 So the gate is satisfiable only if that stage's walk picks **"Full policy md1"**,
 and nothing says so. A walk down the other branch reaches the end with the gate's
 subject never drawn, which reads exactly like "the screen did not say it".
+
+### F-173 — CRITICAL, needs an operator ruling: Trace A cannot complete on the payload S0 delivered, once S1's unconditional payload feed lands (owning phase: **`SPEC_multisig_build_repair.md` — RULING BEFORE S1/S0b IS SCHEDULED**) `#seedhammer`
+
+Filed 2026-08-14 from `design/agent-reports/s1-walk-gate-judgement-review.md`
+(C-1), independently re-measured by the controller before filing. **Independent
+of the walk-gate findings (F-168–F-172) and survives every option proposed for
+them** — it is unsatisfiable with or without a walk.
+
+Measured, not inferred:
+
+- The delivered cosigner payload holds **nine `ClassMDMK` records forming FOUR
+  cards** — A@0, A@1, B@0, C@0 (`cmd/buildpayloadcards/main.go:53-58`; the
+  record count is `TestSyswCardsPayloadCoversEveryStagesWalk`'s own log line).
+- S1's implementation note is to replace the single `syswOffer` seeding with
+  **every** `ClassMDMK` record fed through `bundleGatherFlow`'s `offer()`, and
+  the gather has no per-card decline — only `dropPending` for an incomplete
+  chunk set (`gui/bundle_flow.go:127`), never removal of an added card.
+- `gui/multisig_build.go:61` calls `buildCosignerCards(cards, p.N-1)`, whose last
+  check is `if len(out) != want` at `gui/multisig_build.go:268`, and the flow
+  then shows *"Gather exactly %d cosigner key cards (and no md1)."*
+- `multisigNChoices()` is `{"2","3","4","5"}` with `multisigNFor(idx) = idx+2`
+  (`gui/multisig_build.go:310`), so `want = n-1` ranges over **1..4**.
+
+So four cards arrive into `want` open slots and the build **refuses for every n
+except 5**. Consequences:
+
+- **S2's gate is unsatisfiable.** "Trace A completes end to end: engrave" cannot
+  happen at n=3 on this payload.
+- **S1's gate has a third outcome nobody assigned.** Its disjunction is "either
+  the flow completes an engrave, or D-1 reproduces and is captured as a failing
+  test"; the walk instead ends on a legitimate **over-supply refusal**, which
+  S1's own test 6 (`TestBuildRefusesMoreCardsThanOpenSlots`) makes the specified
+  behaviour.
+- The only n this payload admits under an unconditional feed is **5**, which is
+  neither Trace A (2-of-3) nor Trace B (3-of-4).
+
+**Why S0's gate did not catch it.** `TestSyswCardsPayloadCoversEveryStagesWalk`
+asserts the payload carries *at least* the cards each stage needs — it has a
+`len(mdmk) < 8` floor and no ceiling. "Enough cards" and "a usable number of
+cards" are different properties, and only the first was ever gated.
+
+**The ruling, and it is the operator's.** Either:
+
+**(a) the payload feed becomes per-card accept/skip** — S1 scope, one screen,
+restores every n and keeps §2's Trace A as written; or
+**(b) the walks run n=5** and §2's Trace A shape is restated to match.
+
+(a) looks right and is not mine to take. Silence buys a walk that cannot pass
+and a second discovery round at S2.
+
+### F-174 — a stage-gate build walk must assert ZERO `shNFC.present` calls (owning phase: **`SPEC_multisig_build_repair.md` S0b/S1**, gating) `#seedhammer`
+
+Filed 2026-08-14 from the same review (I-1). The recon's own remedy table
+prescribed `shSysw` **+ `shNFC.present`** for the build-flow gather — the harness
+substitution that makes S1's gate pass without S1's feature.
+
+S1 delivers *"the payload supplies the whole cosigner set"* and its test 3 says
+**zero scans**. A build walk that completes its gather by presenting chunks over
+the emulated reader is green whether or not `takeAll` exists, and phase-1
+hardware has no reader at all, so the affordance is the harness's alone.
+
+**Fix:** count `shNFC.present` calls in the harness, assert zero for any
+stage-gate build run, and make that assertion one of the seen-to-fail mutations.
+An NFC-fed build run is a driver smoke test and must be labelled as one — and it
+is separately the cheapest route anyone has to **reproducing D-1**, which S2's
+test 1 requires to fail on unfixed code and which `SPEC §2.2:95` still records as
+NOT YET REPRODUCED.

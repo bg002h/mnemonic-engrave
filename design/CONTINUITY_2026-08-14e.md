@@ -6,10 +6,30 @@ S1–S6 walk-gate audit is written, folded and pushed. Read this one.
 
 ## Where to start
 
-**The audit changed what S1 is.** Before opening S1, decide the one thing below;
-everything else in this file is state.
+**One ruling is BLOCKED ON THE OPERATOR and everything else waits on it.**
 
-### The decision
+### F-173 — the ruling to make first
+
+The review found a Critical that is independent of every walk finding and
+survives all three options below: **Trace A cannot complete on the payload S0
+delivered.** The payload holds nine `ClassMDMK` records forming **four** cards;
+S1's unconditional feed puts all four into `buildCosignerCards(cards, p.N-1)`,
+whose last check is `if len(out) != want` (`gui/multisig_build.go:268`); and
+`n` ranges over 2..5, so `want` ranges over 1..4. **The build refuses for every
+n except 5**, and n=5 is neither trace. S2's "Trace A completes end to end" is
+unsatisfiable with or without a walk.
+
+Two ways out, and it is the operator's call:
+
+- **(a) per-card accept/skip on the payload feed** — S1 scope, one screen,
+  restores every n, keeps §2's Trace A as written. This looks right.
+- **(b) run the walks at n=5** and restate §2's Trace A shape.
+
+S0's gate missed it because `TestSyswCardsPayloadCoversEveryStagesWalk` has a
+`len(mdmk) < 8` floor and **no ceiling** — it gates "enough cards", never "a
+usable number of cards".
+
+### The decision that follows it
 
 Five stage gates say *"by test and by emulator walk"*, and
 `design/RECON_S1_S6_walk_gates.md` measured that the only walk that exists
@@ -26,22 +46,40 @@ discover in S1's third round:
 2. **A pre-S1 stage S0b** that owns the scaffolding for all five, since S1–S5
    share it and the concurrency ceiling is already 1.
 3. **Weaken the clause** to "by test", and say plainly that the walk is a smoke
-   check rather than a gate. Cheapest and the most honest of the cheap options —
-   but it gives up the thing §4.5 exists for.
+   check rather than a gate.
 
-**Recommend 2.** F-169/F-170/F-171 are one piece of work, they are shared by
-five stages that cannot run in parallel anyway, and splitting them across stages
-means the byte comparison arrives at S2 having never been exercised at S1.
+### REVIEWED, and the answer moved
 
-### The other open question
+An independent opus review ran on 2026-08-14 —
+`design/agent-reports/s1-walk-gate-judgement-review.md`, persisted at `b8c8cb5`,
+folded at the commit after. Every measurable claim in it was re-measured by the
+controller before folding.
 
-`design/RECON_S1_S6_walk_gates.md` has **not had an independent review**. Its
-facts are machine-checked — every `file:line` in it resolves and prints, and the
-one claim that could not be printed (the payload's single `ClassMnemonic` record
-is byte-equal to master A) was run. What has not been reviewed is the
-**judgement**: whether C1 really is fatal to the five gates or whether some
-stage's gate survives on its test half alone. That is an opus-tier design
-question on risk-set work, and it gates a plan rewrite.
+**C1 CONFIRMED for all five.** S3 is the only partial (its `grep` half needs no
+walk). **Option 3 is off the table and was never the plan's to take:** SPEC
+§4.5 is REQUIRED, quotes the operator verbatim — *"The emulator must be used to
+walk journeys…"* — and states *"A green unit suite is explicitly NOT
+sufficient"*, with R-4 (`SPEC:746`) restating it. Weakening it is an operator
+decision.
+
+**Recommendation is still 2, and its reason of record has CHANGED.** The
+rationale written here first — "splitting them across stages means the byte
+comparison arrives at S2 having never been exercised at S1" — is wrong: S1's
+walk produces no artifact, so the comparison cannot be exercised at S1 under any
+option. The real reason is stronger. **F-170 and F-171 have exactly one target
+that exists today with known-correct expected outputs: S0's committed record**
+(`oracle/gaterecords/S0-trace-a.record.json`, six mk1 plates reproducible from
+`go run ./cmd/buildpayloadcards`). Build the census derivation and the oracle
+comparison there and mutate an expected string until it goes red. Do it at S2
+instead and the harness's first execution is also its first verdict — the
+never-run gate this cycle has now been burned by twice.
+
+**S0b's scope is narrower than "the scaffolding for all five".** Three shared
+mechanisms, each exercised against the S0 record: the build-flow driver + needle
+(F-169, F-174), the census derivation replacing `plates = 6` (F-170), and the
+oracle comparison (F-171) — plus its own three-way seen-to-fail proof. **Not**
+the five per-stage walk scripts: the build flow's tail cannot be walked before
+the code that makes it walkable exists.
 
 ## State
 
@@ -122,10 +160,15 @@ Full report: `design/RECON_S1_S6_walk_gates.md`. Follow-ups F-168–F-172.
 
 ## Open follow-ups
 
+- **F-173** → **RULING FIRST**, before S0b or S1 is scheduled. See above.
 - **F-168** → S0 (folded; the "one walk per page load" half is a standing note).
-- **F-169, F-170** → S1, **gating**. The walk scaffolding and the derived census.
-- **F-171** → S2, **gating**. The oracle-invoking comparison harness.
+- **F-169, F-170** → S0b if created, else S1, **gating**. The driver + needle and
+  the derived census. F-170 now also owned by **S3** — the preamble exempted it
+  on a false premise, and S3 engraves before its restore doc.
+- **F-171** → S0b if created, else S2, **gating**. The oracle-invoking harness.
 - **F-172** → S3. Pick "Full policy md1" or the gate reads nothing.
+- **F-174** → S0b/S1, **gating**. Zero `shNFC.present` in a stage-gate build
+  walk, or the gate passes without S1's feature.
 - **F-166** → its own cycle. The fork's md decoder refuses a pathless origin.
 - **F-167** → CLOSED, folded into D5's text at `1d728e8`.
 - F-158 premise STALE; F-160 census gap. Neither blocks.

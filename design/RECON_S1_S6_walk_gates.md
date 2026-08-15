@@ -64,8 +64,19 @@ That function is `gui/multisig_build.go:39-193`. Per
 S1–S5 edit it**; it is the reason the concurrency ceiling is 1.
 
 **So S1, S2, S3, S4 and S5 each close on "by emulator walk", and the only walk
-that exists cannot execute one line any of them changes.** Not "asserts too
+that exists cannot execute the flow any of their gates name.** Not "asserts too
 little" — does not reach.
+
+**That sentence read "cannot execute one line any of them changes" until the
+review (I-3), and the absolute was false.** S2 edits
+`layoutTitle(ctx, dims.X, th.Text, "Engrave Bundle")` at `gui/bundle_flow.go:155`
+— **inside the shared gatherer**, which the existing bundle walk does render and
+wait on. That is S2's riskiest edit by the plan's own account: one shared file,
+five call sites, four flows that have nothing to do with multisig build. So the
+existing walk is **the only automated coverage D-4's blast radius has**, and
+writing it off would have discarded it. The conclusion is unchanged — each
+gate's *subject* is unreachable — but the S0 walk is now a regression check for
+S2 rather than nothing.
 
 ## C2 — S0's own evidence line calls this walk Trace A, and it is not Trace A
 
@@ -144,8 +155,22 @@ Consequence, and it is the trap: a stage walk written by editing the `goTo`
 target of this script would produce *identical* assertions and no needle would
 notice it was in the wrong program. The only program identification in the whole
 script is the carousel match at entry. **Every per-stage walk must assert a
-screen that exists in one flow only** — and after S2 fixes D-4, the gather title
-becomes that discriminator rather than a decoy.
+screen that exists in one flow only.**
+
+**Three such needles exist TODAY — corrected after review (I-4).** This section
+said the gather title becomes the discriminator only after S2 fixes D-4, which
+would have been an argument for deferring the scaffolding past S2. Measured with
+`git grep -F … -- 'gui/*.go' | grep -v _test`, each a single production site:
+
+    gui/multisig_build.go:300   Lead: "Choose policy type"
+    gui/multisig_build.go:376   Lead: "How many keys (n)?"
+    gui/multisig_build.go:394   Lead: "Which slot is your key?"
+
+plus `gui/multisig.go:44` `Lead: "Supply or build a policy?"`, unique to
+`engraveMultisigFlow`. **And a decoy this report missed:** `Title: "Engrave
+wallet policy"` / `Lead: "Which md1?"` is **two** sites —
+`gui/multisig_build.go:121` and `gui/singlesig.go:94` — so a stage author
+reaching for the obvious form screen reaches for a shared one.
 
 ## I2 — S3's restore-doc gate is readable, but only on one of two branches
 
@@ -199,7 +224,7 @@ The harness shapes are sufficient. A real Trace A walk needs, in order:
 | --- | --- |
 | template picker (`multisigTemplatePick`) | `shTap` on a ChoiceScreen |
 | n / k / self-slot / fp (`multisig_build.go` `buildParamPickFlow`) | four ChoiceScreens |
-| "First card from where?" + gather | `shSysw` + `shNFC.present`, as today |
+| "First card from where?" + gather | `shSysw` — and **zero `shNFC.present`**, see below |
 | **seed entry** | **`FROM PAYLOAD` is choice 0** — see below |
 | passphrase, review, form, EXPERIMENTAL, mode | ChoiceScreens |
 | engrave | the existing cut loop |
@@ -215,6 +240,17 @@ does. So the walk takes one confirm, not twelve words through a keyboard.
 Reading that comment instead of the call it guards would have costed a
 seed-typing harness nobody needs. It is the third time this cycle a doc comment
 described a retired mechanism.
+
+**The gather row said "`shSysw` + `shNFC.present`, as today" until the review
+caught it (I-1), and that was a harness substitution that would have made S1's
+gate pass without S1's feature.** S1 delivers *"the payload supplies the whole
+cosigner set"*, and its own test 3 says **zero scans**. A build walk that
+completes its gather by presenting chunks over the emulated reader is green
+whether or not `takeAll` exists — and phase-1 hardware has no reader at all, so
+the affordance exists only in the harness. **A stage-gate build walk must assert
+`shNFC.present` was called ZERO times**, with that assertion itself one of the
+seen-to-fail mutations. An NFC-fed build run is a driver smoke test and must be
+labelled as one.
 
 ---
 
