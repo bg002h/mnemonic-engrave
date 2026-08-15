@@ -933,7 +933,7 @@ an implementer had to re-derive the set from prose. Measured, not inferred:
 | `gui/bundle_flow.go` | D-4's title is `layoutTitle(..., "Engrave Bundle")` at `:155`, **inside the shared gatherer** |
 | `gui/multisig.go` `gui/multisig_build.go` `gui/multisig_verify.go` `gui/singlesig_verify.go` | the four external callers of `bundleGatherFlow` |
 | `gui/multisig_build.go` | ~~the D-1 fix,~~ the interim foreign-origin refusal and the §4.1 duplicate-key check (permanent, see test 4), in `assembleBuildPolicy`. There is no emulator D-1 to fix (F-178); D-1's remaining home is S6's hardware gate |
-| `gui/multisig_build_test.go` `gui/multisig_build_flow_test.go` `gui/template_engrave_test.go` | callers of `assembleBuildPolicy`; two assertions at `multisig_build_flow_test.go:239,249` **wait on the literal `"Engrave Bundle"`** and break the moment D-4 lands |
+| `gui/multisig_build_test.go` `gui/multisig_build_flow_test.go` `gui/template_engrave_test.go` | callers of `assembleBuildPolicy`. ~~two assertions at `multisig_build_flow_test.go:239,249` **wait on the literal `"Engrave Bundle"`** and break the moment D-4 lands~~ — **CORRECTED 2026-08-15, measured after S2 shipped D-4:** those lines were rewritten by S1 and now read `"me sysw pack"` and a modal dismiss. The file's ONE `"Engrave Bundle"` assertion is at `:29`, on the **Supply** path, where the title is correct and stays. D-4 broke nothing here. A decayed citation in the row that exists to save an implementer from re-deriving the file set. |
 | `gui/raster_test.go` | test 5's raster floor needs `runUITouchRaster` / `countInk` / `assertFrameHasBody` |
 | `cmd/emu/walk_trace_a.js` | this stage's walk gate, as for every stage |
 

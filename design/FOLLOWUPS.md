@@ -6165,16 +6165,32 @@ What was wrong was reading it as evidence that the flow was healthy.
 
 ---
 
-### F-179 — an em-dash BLANKS ITS WHOLE LINE, and ~30 operator-facing strings carry one (owning phase: **`SPEC_multisig_build_repair.md` S3** — "the code is right and the text lies") `#seedhammer`
+### F-179 — an em-dash BLANKS THE WHOLE BODY, and every content assertion in `gui` is blind to it (owning phase: **`SPEC_multisig_build_repair.md` S3** — "the code is right and the text lies"; 6 of the sites FIXED at S2) `#seedhammer`
 
 Found 2026-08-15 by S2's whole-walk raster floor, on its first run, on the one
 screen that is the operator's last chance to stop.
 
 **F-78 recorded that `·` is "a zero-pixel glyph" in `poppins.Regular16`. That
 understates it, and the understatement is what let this survive.** A glyph the
-face lacks does not merely fail to draw itself: the LINE containing it draws
-nothing at all. Measured through `showError` with the repo's own
-`runUITouchRaster`:
+face lacks does not merely fail to draw itself.
+
+**CORRECTED 2026-08-15 by the S2 execution review, and the correction is the
+point of this entry.** This item first said the glyph blanks *its line*. It
+blanks **the entire body of the frame**. The reviewer measured five bodies of
+different lengths through `showError` and every one of them rastered at
+**exactly 2652 px — the title-only value** — regardless of how much text
+followed. One glyph anywhere in a body and the operator sees a title and nothing
+else.
+
+**And the second correction is worse than the first: `uiContains` still returns
+TRUE on the blank frame.** The text ops are submitted; only the drawing fails.
+So **every content-based assertion in the `gui` package is blind to this class**
+— including S2's own D-4 guard, which asserted the gather's new title on a frame
+whose body was gone. Ink is the only instrument that sees it. Any fix for the
+remaining sites must be checked by raster or by a source/glyph lookup, never by
+asserting the text is present.
+
+Measured through `showError` with the repo's own `runUITouchRaster`:
 
     "Dropped an incomplete card - scan all its chunks to include it."   ink 7419
     "Dropped an incomplete card — scan all its chunks to include it."   ink 2652
@@ -6189,6 +6205,15 @@ On the Build path the EXPERIMENTAL warning measured **4973 ink pixels against a
 5482 px title-only frame** — i.e. below blank. Removing the em-dash took it to
 **18563**. S2 fixed that one and the review screen's fp line, because both are on
 its own walk.
+
+**FIXED AT S2 (6 sites), because they are on the flow S2 edited:** the
+EXPERIMENTAL warning body and the Policy Review's fingerprint line
+(`gui/multisig_build.go`), and all four gather strings in `gui/bundle_flow.go` —
+the two "Done" refusals plus the three `feedback()` messages, which the review's
+list did not include and which are drawn into the GATHER's own body, so one of
+them blanks the card tally rather than a modal. The pending-card refusal is now
+driven from Build and rastered
+(`TestGatherPendingRefusalIsReadableFromBuild`): **2652 -> 9855 px**.
 
 **The rest are not fixed.** Enumerated by a script over `gui/*.go` non-test
 string literals with whole-line comments excluded, re-run 2026-08-15 AFTER S2's
@@ -6220,6 +6245,14 @@ needs a GUARD. The cheap one is a test over `gui/*.go` production string literal
 refusing any rune the body and title faces lack, which is a lookup, not a raster.
 Scope it to the faces actually used (`poppins.Regular16`, `poppins.Bold25`).
 
+S2 built the shape of it for one file — `stringLiterals` +
+`TestGatherScreenTextCarriesNoBlankingGlyph` in
+`gui/bundle_gather_refusal_test.go`, with its own scanner-can-see mutation proof.
+It scans LITERALS rather than raw source, because the first version fired on a
+COMMENT containing an em-dash, which is not a defect and would have taught the
+next author to delete the guard instead of the glyph. Widening it to the whole
+package is S3's job and is mostly a matter of choosing which functions draw.
+
 ---
 
 ### F-180 — the Go cosigner-card roster is in a DIFFERENT order from the emulator payload (owning phase: **`SPEC_multisig_build_repair.md` S4**) `#seedhammer`
@@ -6249,7 +6282,36 @@ either align them or to state, in both files, that they deliberately differ.
 
 ---
 
-### F-181 — the typed-seed EMULATOR leg is not delivered: `shTap` cannot find a keyboard key (owning phase: **`SPEC_multisig_build_repair.md` S4** — which needs the same driver) `#seedhammer`
+### F-181 — ~~the typed-seed EMULATOR leg is not delivered: `shTap` cannot find a keyboard key~~ **WITHDRAWN 2026-08-15: the leg needed no keyboard, and S2's gate is now driven** (owning phase: **none for the gate; a keyboard driver remains OPTIONAL for S4**) `#seedhammer`
+
+**WITHDRAWN, the way F-176 was, and for the same reason: the premise was false.**
+
+This entry said S2's emulator gate was blocked on driving the on-device
+keyboard. It was not blocked on anything. **The emulator payload has always
+carried a `ClassMnemonic`** (master A, `cmd/emu/sysw_cards_payload.go`), so the
+self seed arrives FROM THE PAYLOAD with confirm-taps only — and the plan's own
+wording said so all along: *"default taps + **payload seed**"*. The keyboard was
+never on the path this gate needed.
+
+The mistake was not the measurement; the measurements below are real and still
+useful. The mistake was **treating "the route I picked is hard" as "the gate is
+blocked"**, and then writing the gate off in the same breath. The entry's worst
+sentence was the justification, not the deferral: *"S2's own gate is satisfied by
+the Go walk plus the payload-leg emulator walk that RAN green"* — the payload-leg
+walk stopped at `waitFor("Input Seed")` by design and had never reached an
+engrave. A closed gate was reported from a walk that could not have closed it.
+
+**Both arms are now driven, tap-only, and recorded** (S2 fold, 2026-08-15):
+
+    refusal arm  picks=[use,use],   seedFrom=payload -> "Duplicate key",
+                 naming slot @0 (your key, from your seed) and slot @1 (payload card 1)
+    clean arm    picks=[skip,skip], seedFrom=payload -> 9 plates, unattributed 0,
+                 census 1 ms1 + 2 mk1 + 6 md1, policy stub 06215ac0, presented 0
+
+**What remains, and it is now genuinely optional.** A `typeWord` over `shTap`
+would let a walk drive the KEYBOARD, which no walk does. That is worth having for
+S4's per-slot multi-seed entry, but it gates nothing today. The measurements that
+make it non-trivial stand:
 
 S2 delivered `TestBuildWalkTypedSeed` as a Go test and a `typeWords` driver over
 the event router, both run. The **emulator** half — a `typeWord` over `shTap`, as
@@ -6277,9 +6339,12 @@ key's rect, which the walk then taps) keeps `walk_js.go`'s rule intact: it
 computes a coordinate a finger could have found by looking, and bypasses no
 screen, no validation and no flow.
 
-Not built at S2 because it is a walk-API change and S2's own gate is satisfied by
-the Go walk plus the payload-leg emulator walk that RAN green. S4 needs per-slot
-multi-seed entry driven in the emulator and should build it there.
+~~Not built at S2 because it is a walk-API change and S2's own gate is satisfied
+by the Go walk plus the payload-leg emulator walk that RAN green.~~ **That
+sentence was the defect** — see the withdrawal at the top. Not built at S2
+because it gates nothing; S4 may build it if per-slot multi-seed entry wants
+driving in the emulator, and the Go-side `typeWords` driver
+(`gui/multisig_build_walk_test.go`) already covers the same ground in tests.
 
 ---
 
