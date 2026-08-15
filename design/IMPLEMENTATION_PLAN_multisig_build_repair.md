@@ -669,7 +669,7 @@ not eight: D6 added two and D5's last clause added one.
 | 7 | the singlesig shapes match BIP-84 and BIP-86 | `address/bip_vectors_test.go:576` | ✅ |
 | 8 | every vendored BIP source matches its recorded SHA-256 | `address/bip_vectors_test.go:63` | ✅ |
 | 9 | the oracle harness refuses vendored fork testdata | `oracle/oracle_test.go:118` — `TestOracleHarnessRefusesVendoredTestdata` | ✅ |
-| 10 | the oracle harness pins by source commit, not `--version` | `oracle/oracle_test.go:70` `TestOracleHarnessPinsBySourceCommit`; the real pins resolve the installed binaries at `oracle/oracle_test.go:283` (tier 2) | ✅ |
+| 10 | the oracle harness pins by source commit, not `--version` | `oracle/oracle_test.go:70` `TestOracleHarnessPinsBySourceCommit`; the real pins resolve the installed binaries in `oracle.TestRealPinsResolveTheInstalledOracles` (tier 2, `oracle/live_test.go`) | ✅ |
 | 11 | a gate record exists, cannot be emitted without a green walk, and its ABSENCE is a failure | `oracle/record_test.go:359` `TestS0GateHasARecord`; `oracle/record_test.go:386` `TestEveryGateRecordOnDiskVerifies`; anchored by `cmd/emu/gaterecord_anchor_test.go:31` | ✅ |
 
 **Property 11 has EXECUTED and has been SEEN TO FAIL**, which is the discipline
@@ -1264,6 +1264,16 @@ files were declared as being changed by the widest stage in the plan. Measured:
 | `gui/multisig_verify.go` | `multisigVerifyFlow(ctx, th, derived bundle.Bundle, full)` at `:49` takes one bundle; several held slots produce several |
 | `gui/multisig_build_test.go` `gui/template_engrave_test.go` | `buildPolicyParams` literals carrying `SelfSlot:` |
 | `cmd/emu/walk_trace_a.js` | this stage's walk gate |
+| `oracle/expect.go` | **F-a**: S5 is the first stage that must mint a record for a BUILT policy, so it owns the new `ExpectKind` — `built-policy-full` / `built-policy-watch`, plus the `md encode` and `ms encode` derivation steps and the multi-kind answer `ArtifactKindsFor` reserved for "a kind that engraves several artifact kinds" |
+| `oracle/expect_test.go` | the same F-a work: `CheckArtifactShape` / `CheckFingerprintScope` scope the kind-consistency and fingerprint rules per kind (S0b fold re-review M-3), since an md1 chunk has no fingerprint and a one-master build has one |
+| `oracle/live_test.go` `scripts/oracle-live.sh` | the new kind's live cross-check, and `TestPinsAreCurrentWithTheirPrimaries` (pin-drift detection, `oraclelive` tier) |
+| `oracle/pins.json` `oracle/gaterecords/S0-trace-a.{record,expect}.json` | **F-177**: the `ms` pin bump to `ms-cli-v0.16.0` and the one-commit S0 re-anchor, taken first so nothing S5 mints is staled by it |
+
+**These oracle rows are S5.0**, the stage's first work block: it lands and closes
+green in `oracle/**` **before any engrave-tail device code is written**, because
+the instrument must exist and be seen to fail before the thing it judges exists,
+and an instrument authored afterwards invites fitting the instrument to the
+output. Ruling: `design/agent-reports/s5-prerequisites-ruling-2026-08-15.md`.
 
 **Correction to this stage's own text.** It says the engrave-order change means
 "no other flow's call site changes". That is true of the *signature* and false
