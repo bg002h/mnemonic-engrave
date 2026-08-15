@@ -857,28 +857,71 @@ record machinery simply could not express it.
 
 **Tests first**
 
-1. The D-1 reproduction from S1, promoted to a regression test. It **MUST fail
-   on the unfixed code** — demonstrated, not assumed. If S1 found no D-1 on the
-   payload path, this stage records that as its result and names the source or
-   shape that was not exercised, rather than closing silently.
+1. **D-1 did not reproduce on the payload path (F-178), and its screens may
+   not be pinned: the session that proved "no dead end" was assembling the
+   duplicate policy (its Policy Review stub `4c3c96f1` is byte-reproducible
+   from self=masterA + cards A@0,A@1 at n=3,k=2,@0,fp-omit — machine-checked
+   2026-08-15).** What replaces the promotion:
+   (a) the completed-engrave gate below IS the regression guard for "the flow
+   continues past the gather" — Trace A's walk selects the labelled Trace A
+   cosigners by tapping SKIP on payload cards 1 and 2, letting the
+   remaining-equals-needed short-circuit take B@0 and C@0;
+   (b) `TestBuildWalkTypedSeed` — the typed-seed source (F-178 item 4, the
+   §0.1b-primary entry no walk has driven): the same walk with the self seed
+   entered on the keyboard, via a `typeWord` driver over `shTap` that S4's
+   multi-seed entry will reuse. If a dead end appears, capture it as the
+   failing test; if not, extend F-178's record;
+   (c) D-1 itself moves to S6: field-observed on hardware, unfalsifiable in
+   the emulator. S6 reproduces it or records its non-reproduction on the
+   machine. S2 may not close D-1. (F-178's owning-phase entry updates
+   accordingly.)
 2. `TestBuildGatherIsNotTitledEngraveBundle` — D-4.
 3. `TestBuildRefusesForeignOriginCardBeforeS5` — spec M-E: until S5,
    `cosignerFromCard` still discards origins, so a card whose declared origin
    differs from the shared origin must not be silently stamped
    `m/48'/0'/0'/2'`. The spec permits refuse OR warn; **this plan picks REFUSE**,
    so the test's name matches its body and the assertion has one arm.
-4. **`TestS2RefusesDuplicateKeysBeforeS4`** — the duplicate-key window. **No
-   duplicate check exists anywhere in the code today**, and §4.1's final-slot-set
-   check does not land until S4 — so from S2, which makes engraves complete,
-   until S4 the flow would silently engrave a policy containing the same key
-   twice. That is the quorum degradation §4.1 exists to refuse:
-   `sortedmulti(2,K,K,X)` is spendable by K alone. The interim check is a byte
-   comparison over the assembled slots and depends on nothing S4 introduces, so
-   it costs S2 almost nothing and closes a window that would otherwise ship.
-5. **A raster assertion on whatever D-1 turns out to be.** If the defect is a
-   screen whose body does not draw, a text assertion cannot see it — F-151.
-   Calibrate the floor against the real defect, measured both ways; F-151's
-   first guess of 2000 px passed the defect it was written for.
+4. **`TestS2RefusesDuplicateKeysBeforeS4` — and this is §4.1's PERMANENT
+   final-slot-set check landed early, not an interim one.** The check lives
+   in `assembleBuildPolicy` (the SOLE md1 producer — every present and
+   future route passes through it), after the `all` slice is complete and
+   before `md.EncodeMultisig`: refuse iff any two final slots carry an
+   identical 65-byte chain code ‖ pubkey, via a sentinel error naming both
+   slots. The flow maps the slots to provenance it already holds
+   (`p.SelfSlot`, `buildCosignerOrigins`) and shows a named modal:
+   *"Duplicate key — Slot @A (your key, from your seed) and slot @B (payload
+   card N) hold the SAME key. A policy that repeats a key can be spent by
+   fewer different keys than its k-of-n says. Nothing was engraved. Build
+   again and choose different cards, or use a different seed; if the payload
+   has no other cards, rewrite it on the host with `me sysw pack`."*
+   NOT at card selection (the self key does not exist until step 4, and a
+   second copy of the count/identity decision is how `n-1` grew back last
+   time); NOT at review (a duplicate never reaches review). S4 does not
+   replace this check — it feeds it more sources.
+   **Comparison basis is ruled:** cc‖pk equality fires on the delivered
+   collision (self at `multisigSharedOrigin()` == card A@0, byte-equal,
+   machine-checked) and passes Trace B (A@0 vs A@1 differ on both
+   components). Master fingerprint would refuse the legitimate multi-account
+   wallet; base58 xpub compares metadata the encoder drops.
+   **Sequencing, RULED:** this test and its check are S2's FIRST landing —
+   before any S2 work that completes an engrave — and no hardware engrave of
+   the Build path happens until it is in. F-178 proved the window is live
+   NOW (the flow reaches the engrave screens), so the plan's "from S2, which
+   makes engraves complete, until S4" understated it; the S1 closure stands,
+   the sequencing is the price.
+   **The delivered payload does not change.** masterA's mnemonic + A@0 must
+   coexist for S4's honest-`both` fixture, A@0+A@1 are Trace B's
+   multi-account shape, and the digest is pinned three ways (blob pin, walk
+   `CARDS_DIGEST`, S0's gate record). The collision it creates is the
+   refusal's standing walk fixture: S2's walk drives BOTH arms — default
+   taps + payload seed → the Duplicate key screen; SKIP, SKIP → B@0+C@0 →
+   completed engrave.
+5. **A raster floor over the whole Trace A walk** — every screen from the
+   template picker to the engrave-style picker draws a body. Calibrated both
+   ways against a measurable pair: each real screen's ink vs a title-only
+   frame (F-151's shape — title draws, body does not — is what a field
+   "blank screen after configuration" looks like). This is the standing
+   D-1-class guard; it does not wait for a reproduction to exist.
 
 **Files this stage touches.** Added 2026-08-14 by the plan-wide file-touch
 audit (`design/agent-reports/plan-wide-file-touch-matrix.md`). **This stage
@@ -889,7 +932,7 @@ an implementer had to re-derive the set from prose. Measured, not inferred:
 | --- | --- |
 | `gui/bundle_flow.go` | D-4's title is `layoutTitle(..., "Engrave Bundle")` at `:155`, **inside the shared gatherer** |
 | `gui/multisig.go` `gui/multisig_build.go` `gui/multisig_verify.go` `gui/singlesig_verify.go` | the four external callers of `bundleGatherFlow` |
-| `gui/multisig_build.go` | the D-1 fix, the interim foreign-origin refusal, the interim duplicate-key check, in `assembleBuildPolicy` |
+| `gui/multisig_build.go` | ~~the D-1 fix,~~ the interim foreign-origin refusal and the §4.1 duplicate-key check (permanent, see test 4), in `assembleBuildPolicy`. There is no emulator D-1 to fix (F-178); D-1's remaining home is S6's hardware gate |
 | `gui/multisig_build_test.go` `gui/multisig_build_flow_test.go` `gui/template_engrave_test.go` | callers of `assembleBuildPolicy`; two assertions at `multisig_build_flow_test.go:239,249` **wait on the literal `"Engrave Bundle"`** and break the moment D-4 lands |
 | `gui/raster_test.go` | test 5's raster floor needs `runUITouchRaster` / `countInk` / `assertFrameHasBody` |
 | `cmd/emu/walk_trace_a.js` | this stage's walk gate, as for every stage |
