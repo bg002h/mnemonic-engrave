@@ -6162,3 +6162,138 @@ Build path until it is in.
 
 The record of non-reproduction below stands, and is still what SPEC P1 required.
 What was wrong was reading it as evidence that the flow was healthy.
+
+---
+
+### F-179 — an em-dash BLANKS ITS WHOLE LINE, and ~30 operator-facing strings carry one (owning phase: **`SPEC_multisig_build_repair.md` S3** — "the code is right and the text lies") `#seedhammer`
+
+Found 2026-08-15 by S2's whole-walk raster floor, on its first run, on the one
+screen that is the operator's last chance to stop.
+
+**F-78 recorded that `·` is "a zero-pixel glyph" in `poppins.Regular16`. That
+understates it, and the understatement is what let this survive.** A glyph the
+face lacks does not merely fail to draw itself: the LINE containing it draws
+nothing at all. Measured through `showError` with the repo's own
+`runUITouchRaster`:
+
+    "Dropped an incomplete card - scan all its chunks to include it."   ink 7419
+    "Dropped an incomplete card — scan all its chunks to include it."   ink 2652
+
+2652 is the **exact** figure `gui/raster_test.go` records for F-151's
+shipped-blank body ("the body that shipped blank drew 2652 px, the fixed one
+6688"). So F-151's defect and this one are the same defect, and the raster floor
+that was written to catch F-151 has been catching this class all along without
+anyone naming the cause.
+
+On the Build path the EXPERIMENTAL warning measured **4973 ink pixels against a
+5482 px title-only frame** — i.e. below blank. Removing the em-dash took it to
+**18563**. S2 fixed that one and the review screen's fp line, because both are on
+its own walk.
+
+**The rest are not fixed.** Enumerated by a script over `gui/*.go` non-test
+string literals with whole-line comments excluded, re-run 2026-08-15 AFTER S2's
+two fixes — **31 sites**, of which 4 (`bundle_flow.go:383`,
+`codex32_polish.go:185,289`, `slip39_polish.go:237`) are trailing `// F-78:`
+comments quoting the glyph deliberately, leaving **27 live strings**:
+
+    gui/bip85.go:228
+    gui/bundle_flow.go:62,65,67,184,200,202,430,438
+    gui/codex32_polish.go:28
+    gui/derive_xpub.go:254,487
+    gui/gui.go:1020
+    gui/md1_gather.go:105,155,168
+    gui/md1_inspect.go:60,65
+    gui/mk1_inspect.go:202
+    gui/seedxor_polish.go:85
+    gui/sysw_load.go:128,274,275,279,280
+    gui/sysw_source.go:114
+    gui/verify_address.go:95
+
+Re-derive rather than trust this list; line numbers decay every merge.
+
+Several are refusals — `sysw_load.go`'s "A SECRET is stored unencrypted in
+flash", `sysw_source.go`'s "NO integrity check at all" — where a blank body is
+the worst possible outcome.
+
+**What to build, not just what to fix.** A per-string fix is a fix; the class
+needs a GUARD. The cheap one is a test over `gui/*.go` production string literals
+refusing any rune the body and title faces lack, which is a lookup, not a raster.
+Scope it to the faces actually used (`poppins.Regular16`, `poppins.Bold25`).
+
+---
+
+### F-180 — the Go cosigner-card roster is in a DIFFERENT order from the emulator payload (owning phase: **`SPEC_multisig_build_repair.md` S4**) `#seedhammer`
+
+Found 2026-08-15 while writing S2's typed-seed walk, by running it:
+
+    gui/multisig_build_payload_testdata_test.go  cosignerCardRoster
+        A@0, B@0, C@0, A@1, B@1
+    cmd/buildpayloadcards/main.go                wanted
+        A@0, A@1, B@0, C@0
+
+Both are deliberate and neither is wrong, but they are not the same payload, so
+**a tap sequence measured against one is wrong against the other.** S2's Go walk
+taps SKIP, USE, USE to reach Trace A's B@0 + C@0; the emulator walk taps SKIP,
+SKIP for the same result. The plan and the fable ruling both describe the
+emulator order as though the unit fixtures shared it.
+
+The first draft of `TestBuildWalkTypedSeed` tapped SKIP, SKIP and selected A@1 —
+caught immediately by S2's own foreign-origin refusal, which is the system
+working, but a test asserting only "the flow completed" would have passed on the
+wrong cosigner set.
+
+**Do not reorder the roster casually**: S1's tests take `cosignerCardRecords(t,
+n)` PREFIXES and assert which card fills which slot, so the order is load-bearing
+in both directions. S4 owns the slot-assignment model and is the right place to
+either align them or to state, in both files, that they deliberately differ.
+
+---
+
+### F-181 — the typed-seed EMULATOR leg is not delivered: `shTap` cannot find a keyboard key (owning phase: **`SPEC_multisig_build_repair.md` S4** — which needs the same driver) `#seedhammer`
+
+S2 delivered `TestBuildWalkTypedSeed` as a Go test and a `typeWords` driver over
+the event router, both run. The **emulator** half — a `typeWord` over `shTap`, as
+the plan's test 1(b) describes — was attempted 2026-08-15, driven live in the
+browser, and STOPPED rather than shipped unrun.
+
+**Why, measured rather than assumed.** The BIP-39 keyboard's key rectangles are
+computed at layout time from font metrics (`NewKeyboard`: `ctx.Styles.keyboard.
+Measure(MaxInt, "W")` plus per-row centring), so no coordinate formula exists in
+the walk's own terms. Probing empirically in the live emulator did not converge:
+
+  * `shTap(80, 180)` typed `Q`; `shTap(300, 200)` typed `U`  — same row, and the
+    hit regions do not fall on the grid a naive `rowY`-style formula predicts;
+  * **the valid-key mask makes blind probing self-defeating.** After `Q` only
+    `U` is enabled, so a sweep reads "nothing happened" for every other key and
+    learns nothing about where they are;
+  * a sweep looking for backspace instead COMPLETED word 1 and advanced the flow
+    to word 2, because an auto-completing fragment needs no confirm.
+
+**What would make it cheap, and it is not a shortcut into the GUI.** `op.Drawer`
+already resolves an input's screen rectangle — `tapNavSlot` in `gui/raster_test.go`
+uses exactly that to tap a nav slot by button rather than by coordinate. Exposing
+the same resolution to the walk (e.g. `shKeyRect(rune)` returning the CURRENT
+key's rect, which the walk then taps) keeps `walk_js.go`'s rule intact: it
+computes a coordinate a finger could have found by looking, and bypasses no
+screen, no validation and no flow.
+
+Not built at S2 because it is a walk-API change and S2's own gate is satisfied by
+the Go walk plus the payload-leg emulator walk that RAN green. S4 needs per-slot
+multi-seed entry driven in the emulator and should build it there.
+
+---
+
+### F-182 — the end-of-bundle ms1 reminder is titled "Engrave Bundle" on the Build path (owning phase: **`SPEC_multisig_build_repair.md` S5** — with the engrave tail) `#seedhammer`
+
+D-4-adjacent, found 2026-08-15 while fixing D-4 and deliberately left out of it.
+
+S2 made `bundleGatherFlow`'s title the caller's, which fixes the gather for all
+five callers. `bundleEngrave` still hard-codes one:
+
+    gui/bundle_flow.go:396   showError(ctx, th, "Engrave Bundle", bundleMs1ReminderText())
+
+That modal is shown at the end of a Build-policy engrave too — measured: S2's
+walk cuts 9 plates and reaches it. It is a DIFFERENT screen from D-4's (which
+names the gather specifically), and `bundleEngrave` is shared by T5, single-sig
+and the supplied-md1 path as well, so the same parameter-not-rename judgement
+applies and is worth doing once, in the stage that owns the engrave tail.
