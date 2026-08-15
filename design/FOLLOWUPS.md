@@ -5689,6 +5689,32 @@ Owning phase is **S0b if that stage is created** (see
 `design/agent-reports/s1-walk-gate-judgement-review.md`), otherwise S1 as the
 first stage that needs it. Pairs with **F-174** — zero `shNFC.present`.
 
+
+**✅ RESOLVED 2026-08-14 (S0b, fork `8345b0e`).** `cmd/emu/walk_build_policy.js`
+reaches the Build-policy cosigner gather via `Engrave Multisig`, and
+`cmd/emu/needle_test.go` machine-checks that the needles it anchors on have
+exactly ONE production site each — the counts in this entry are now a gate, not
+a comment, and the two decoys are pinned at 2 and 3 so a drift toward uniqueness
+is a deliberate promotion rather than an accident.
+
+**The ambiguity was worse than this entry claimed, and it was measured rather
+than argued.** Both flows were driven in the emulator and the gather screen is
+CHARACTER FOR CHARACTER identical:
+
+    via Build policy    EngraveBundlemd1descriptors:0mk1keys:0Scanacard,orDone.
+    via Engrave Bundle  EngraveBundlemd1descriptors:0mk1keys:0Scanacard,orDone.
+
+So the title reads "Engrave Bundle" while the operator is inside Build policy,
+and a driver checking "did I reach a card gather" passes in the WRONG flow.
+Driving the sibling program produced `needlesSeen: []`, the positive proof that
+the needle discriminates.
+
+**Mutation-proved:** a second real `ChoiceScreen{Lead: "Choose policy type"}`
+added to `gui/singlesig.go` — the mutant COMPILES (`go build` exit 0, so not a
+build-failure false proof) — turned the gate red naming both sites; green on
+restore. Minor citation drift folded: `"Which md1?"` is now
+`gui/multisig_build.go:122` and `gui/singlesig.go:95`.
+
 ### F-170 — the walk asserts a plate COUNT where the plan requires a census derived from the input tuple (owning phase: **`SPEC_multisig_build_repair.md` S1**, gating) `#seedhammer`
 
 Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md` (C3, I3).
@@ -5719,6 +5745,26 @@ restore doc S3's gate reads is `gui/multisig_build.go:191` — **after** it. Any
 walk satisfying S3 has cut plates, so S3 could have engraved wrong artifacts and
 passed on a screen string. Preamble corrected; S1 alone is artifact-free.
 
+
+**✅ RESOLVED 2026-08-14 (S0b, fork `c94c135`).** `oracle.DeriveExpected` computes
+the artifact set from the recorded input tuple by invoking the primary
+toolchain, and `oracle.CompareCensus` compares it to the census byte for byte
+and IN ORDER. `plates = 6` is gone: six now falls out of three seeds × two
+chunks, computed by `mk`. Exercised against S0's committed record —
+*"derived 6 artifact(s) from the recorded inputs; all matched the engraved
+census"*.
+
+**Seen to go red**, all four: a ONE-CHARACTER flip in plate 2 (the refusal names
+the plate and prints both strings in full); a census one plate short; reordered
+plates; and `CompareCensus(nil, nil)`, which FAILS rather than passing
+vacuously — as does an unknown expectation kind, so a typo cannot derive an
+empty set that then "matches".
+
+**Bonus the derivation forced:** the recorded ORIGIN is now checked rather than
+merely recorded. The deriver computes the path its own template implies and
+refuses on disagreement, so a record whose origins drifted from its key material
+cannot pass.
+
 ### F-171 — nothing invokes the pinned `md`/`mk`/`ms`, so S2's and S5's byte-comparison gates are unimplemented (owning phase: **`SPEC_multisig_build_repair.md` S2**, gating) `#seedhammer`
 
 Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md` (C4).
@@ -5739,6 +5785,35 @@ is not there.
 Note `oracle.CheckDataSource` refuses any `testdata` path by design, so the two
 `gui` tests reading `md/testdata/vectors` (`bundle_testdata_test.go:43`,
 `md1_gather_test.go:30`) are fixtures and cannot stand in for this.
+
+
+**✅ RESOLVED 2026-08-14 (S0b, fork `c94c135`).** `oracle/expect.go` invokes the
+pinned binaries; `TestS0CensusMatchesTheDerivedExpectation` is the gate. The
+chain is entirely primary-toolchain — `ms derive` for seed → fingerprint +
+account xpub, `mk encode` for xpub → mk1 chunks — so nothing re-implements a
+derivation.
+
+**It could not be closed as filed, and the blocker was in the PRIMARY.**
+`mk encode` drew `chunk_set_id` from the OS CSPRNG per call, so three runs on
+identical inputs emitted three different cards and byte-identity against chunked
+mk1 was permanently unsatisfiable. Per the Rust-primary rule that was fixed
+upstream first, as a conformance fix rather than a wire-format change —
+mnemonic-key `a38a908` (mk-codec 0.5.0), since SPEC §2.5 already required
+encoders to "reuse the same value for all subsequent re-encodings of the same
+card" and a stateless encoder cannot do that from entropy.
+
+**A second gap, and a real product defect rather than gate scaffolding.**
+`ms derive --template` offered single-sig templates only and took no literal
+path, so seed → MULTISIG account xpub had no oracle at all: the one tool that
+turns a seed into an account xpub could not serve the format the constellation
+exists to back up. Closed upstream as ms-cli 0.15.0 (`ddfa497`) with BIP-48
+`bip48-p2wsh` / `bip48-p2sh-p2wsh`, so an operator names their SCRIPT TYPE
+instead of knowing that native segwit multisig lives at `m/48'/0'/0'/2'`.
+
+Both oracles re-pinned (`04f2716`, `c94c135`). The old `ms` pin was additionally
+found to be an inaccurate attestation — it named commit `bf77f89` with version
+`ms 0.14.0`, but that commit's source declares `0.14.1`, so the binary was never
+built from the commit it named.
 
 ### F-172 — S3's restore-doc gate has nothing to read on the template branch (owning phase: **`SPEC_multisig_build_repair.md` S3**) `#seedhammer`
 
@@ -5846,3 +5921,47 @@ An NFC-fed build run is a driver smoke test and must be labelled as one — and 
 is separately the cheapest route anyone has to **reproducing D-1**, which S2's
 test 1 requires to fail on unfixed code and which `SPEC §2.2:95` still records as
 NOT YET REPRODUCED.
+
+
+**✅ RESOLVED 2026-08-14 (S0b, fork `8345b0e`).** `nfcSource.presented()` counts
+records across the reader for the session and is exposed as
+`window.shNFC.presented()`; `walk_build_policy.js` asserts ZERO at entry and
+again at the gather.
+
+**No reset is exposed, deliberately** — a counter a driver can zero just before
+asserting is a gate that always passes.
+
+**Mutation-proved live:** control green at 0; presenting one record throws; and
+`shNFC.clear()` does NOT launder it back to green, which is the assertion's
+whole integrity. Also unit-covered in `cmd/emu/nfc_presented_test.go`.
+
+
+### F-175 — an artifact-free stage cannot produce a gate record at all (owning phase: **`SPEC_multisig_build_repair.md` S1**, gating) `#seedhammer`
+
+Filed 2026-08-14 from S0b, and **measured rather than reasoned about**:
+
+    $ go run ./cmd/gaterecord -stage S0b -walk <a walk with an empty census> …
+    gaterecord: oracle: the walk did not finish green, so it cannot anchor a
+    gate record: the census is empty, so nothing was engraved to anchor to
+
+`ParseWalk` refuses an empty census (`oracle/record.go`), by design — a record
+with nothing in it is bound to nothing. But the plan's own §3 preamble says
+**S1 "ends at a screen, not an engrave"**, and S0b's driver engraves nothing
+either. So the stage whose gate is a SCREEN assertion has no way to emit the
+artifact the S0 D5 machinery makes mandatory.
+
+Not a defect in S0b: S0b's mechanisms are exercised against S0's record, which
+is what its gate asks for, and its own evidence is committed as tests. It is S1
+that first has to answer this.
+
+**Options, not yet chosen:** (a) a record variant that anchors a screen
+assertion instead of a census — needs a schema bump and a clear rule for what
+makes such a walk "green"; (b) leave artifact-free stages recordless and say so
+explicitly in the plan, accepting that their evidence is the committed test plus
+the walk script; (c) give S1's walk an engrave tail so it produces artifacts,
+which changes what S1 is. **(b) is the cheapest and (a) the most honest**; the
+one thing that must not happen is a stage quietly passing with neither a record
+nor a named substitute.
+
+Cross-ref: `TestS0GateHasARecord` demands a record for **S0 only**, so nothing
+is red today — which is exactly why this would go unnoticed until S1's gate.
