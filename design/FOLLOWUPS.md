@@ -6192,7 +6192,42 @@ What was wrong was reading it as evidence that the flow was healthy.
 
 ---
 
-### F-179 — an em-dash BLANKS THE WHOLE BODY, and every content assertion in `gui` is blind to it (owning phase: **`SPEC_multisig_build_repair.md` S3b** — re-owned 2026-08-15, was S3; "the code is right and the text lies"; 6 of the sites FIXED at S2) `#seedhammer`
+### F-179 — ~~an em-dash BLANKS THE WHOLE BODY~~ **RESOLVED 2026-08-15 by S3b — and it blanks a SIBLING LINE, which is worse** (owning phase: **`SPEC_multisig_build_repair.md` S3b** — re-owned 2026-08-15, was S3) `#seedhammer`
+
+> **RESOLVED by S3b (`0290459` the 27 fixes, `db6486c` the guard). The mechanism
+> was worse than every description of it, including this entry's.**
+>
+> **An undrawable rune does not blank its own sentence — it blanks a CLEAN
+> SIBLING LINE.** Measured on the Payload Warnings body, which holds two F1
+> lines: the pure-ASCII `"A SECRET is stored unencrypted in flash."` and a
+> separate em-dash sentence.
+>
+>     clean line only     7442 px
+>     broken line only    5004 px
+>     BOTH together       5004 px   <- identical to broken-only
+>
+> The clean line contributed **zero ink**. A correct, ASCII-only, funds-critical
+> warning was invisible because a *different* line in the same body carried a
+> rune the face lacks. So the blast radius was never limited to the strings that
+> contained the bad rune — which is why per-string review could never have found
+> it and only ink could. Fixed: 11014 px for that body, 10870 for the NFC
+> no-integrity refusal.
+>
+> **What landed.** 27 sites fixed (U+2014 ×21, U+2026 ×4, U+2713 ×1, U+2192 ×1);
+> `⌫ U+232B` correctly **exempted, not "fixed"**, since it is a keyboard sentinel
+> blitted as an image. The guard is a **face-coverage lookup via `go/parser`**,
+> not a blocklist: it reports `scanned 1790 production string literal(s) across
+> gui/*.go; 0 undrawable rune site(s)`, names file/line/code-point on failure,
+> and structurally cannot see comments because they are not in the AST. S2's
+> 7-rune `blankingGlyphs` blocklist was **deleted as subsumed** — a list of runes
+> that already bit you cannot catch the next one, which is F-163's construct.
+> The sentinel exemption is **proven, not asserted**: a test requires the source
+> to compare the rune as a char literal *and* reference the image asset, both
+> read from the AST, plus a raster check — and a rubber-stamped exemption was
+> mutation-proven to fail.
+>
+> **F-183 fixed here too** (below): the shared floor is now derived from a
+> measured blank rather than a constant.
 
 > **ADDENDUM 2026-08-15 — the site list below is stale in BOTH directions, and
 > the class is wider than "em-dash". Read this before working the entry.**
@@ -6464,7 +6499,20 @@ names the gather specifically), and `bundleEngrave` is shared by T5, single-sig
 and the supplied-md1 path as well, so the same parameter-not-rename judgement
 applies and is worth doing once, in the stage that owns the engrave tail.
 
-### F-183 — `assertFrameHasBody`'s floor is calibrated for ONE screen shape but named and worded as general (owning phase: **`SPEC_multisig_build_repair.md` S3b** — with the F-179 raster class) `#seedhammer`
+### F-183 — ~~`assertFrameHasBody`'s floor is calibrated for ONE screen shape but named and worded as general~~ **FIXED 2026-08-15 by S3b (`db6486c`)** (owning phase: **`SPEC_multisig_build_repair.md` S3b** — with the F-179 raster class) `#seedhammer`
+
+> **FIXED in the stage that owned it, the same day it was filed.** `const floor =
+> 4000` is now `titleOnlyInk(t) + margin`, where `titleOnlyInk` **searches 1..3
+> nav buttons and returns the worst** — so the floor is derived from a measured
+> blank instead of a constant calibrated on one screen. The sibling constant
+> `buildWalkRasterFloor` is pinned the same way rather than converted, and is now
+> bracketed on both sides:
+>
+>     worst blank 5482 px  <  floor 6000 px  <  thinnest real screen 6566 px
+>
+> That bracket is the property the old constant lacked: 4000 sat *below* the 5482
+> px blank of any three-nav screen, so it would have passed a completely blank
+> body — the exact defect it existed to catch.
 
 Found 2026-08-15 by S3, which hit it, declined the helper, and rolled its own
 floor rather than lowering the bar to fit.
