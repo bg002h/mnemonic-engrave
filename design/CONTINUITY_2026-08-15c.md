@@ -115,8 +115,30 @@ own escape hatch. **The constraint binds agents, not the human.**
   copy-paste of `test (rust + go)` is wrong in both — is what unblocks that.
   Required contexts, verified: `mnemonic-key` → `build (stable on
   ubuntu-latest)`; `mnemonic-secret` → `test (ubuntu-latest)`, `clippy`,
-  `test (ms-codec)`, `clippy (ms-codec)`. `mnemonic-secret` also push-filters by
-  `paths:`, which interacts with staging and needs looking at.
+  `test (ms-codec)`, `clippy (ms-codec)`.
+
+**DONE 2026-08-15** — `mnemonic-key` `8dc5dcb`, `mnemonic-secret` `d476b77`.
+Both now build `ci/**`; both `CLAUDE.md`s document the sequence with **their own**
+context names. `mnemonic-secret` also **dropped its push-side `paths:` filter**,
+because with it a docs-only staged SHA would never build and never earn its four
+contexts — the same wedge that workflow's own PR trigger already documents and
+avoids. Its old rationale ("covered by admin bypass") stays true for the operator
+and is false for automation, which is exactly the asymmetry above.
+
+**Safety audit run before pushing — no publish path is reachable from `ci/**`.**
+Every other workflow in both repos was checked: `musl-binaries.yml` (`mk-cli-v*`)
+and `man-release.yml` (`ms-cli-v*`) are **tag-gated**, as is `release-on-tag`
+inside `mnemonic-key`'s `ci.yml`; `vendor-freshness.yml` is `[main, master]` +
+paths in both. So a `ci/**` push cannot sign, release or publish anything.
+
+**One accepted side effect, recorded so it is not rediscovered as a bug.**
+`fuzz-smoke.yml` in **both** repos triggers on push with **no branch filter** —
+only `paths:`. So a `ci/**` staging push whose commit touches `fuzz/**` or
+`crates/*-codec/src/**` now runs fuzz-smoke **twice**, once on the staging ref and
+once on the final branch. Harmless (it is a smoke test, not a required context,
+and duplicate fuzz coverage is not a hazard), and it does not apply to
+docs/CI-only commits like these two. Fix if it ever becomes noisy by adding a
+branch filter that excludes `ci/**`.
 
 ## Traps this session paid for
 
