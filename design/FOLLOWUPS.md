@@ -5553,3 +5553,40 @@ So no code change could satisfy or violate D4. Split in the plan into:
 Pattern worth naming across F-163/164/165: all three were gates whose subject
 had drifted out from under them, and none was found by reading the plan — each
 took running the check. A gate that has never executed is a hypothesis.
+
+### F-166 — the fork's md decoder cannot read a PATHLESS origin; the Rust primary can (owning phase: **`SPEC_multisig_build_repair.md` post-S0 / its own cycle**) `#seedhammer` `#mnemonic`
+
+Filed 2026-08-14, found by S0 D8's coverage catch-up — and *only* by it. The
+re-pin's provenance half was green; this surfaced the moment the primary's new
+vectors were actually exercised.
+
+`md/testdata/vectors/sh_wpkh` fails in this fork:
+
+    decodePayloadValidated("md1yqpqqxpsq258xsks3kh0ye")
+      -> md: missing explicit origin        (md/md.go:893)
+
+Its descriptor declares a pathless shared origin —
+`"path_decl":{"tag":"Shared","data":"m"}` — i.e. depth-0 `m`. The Rust primary
+gained exactly this in the release D8 re-pins to: `5a0a4f41`, *"release:
+md-codec 0.42.0 + md-cli 0.13.0 — **pathless**/dead-card partial-decode"*.
+
+**Rust-primary status: CONVERGENCE, not a lead.** The primary is already
+correct and ships the vector; the Go port is behind. Per the standing rule that
+makes this exempt from "land it in Rust first" — but the rule's second half
+still binds, and it was checked: this is not a Go-only porting slip masking a
+Rust defect, because the Rust side is the thing that *has* the feature.
+
+Scope: teaching the Go decoder pathless origins is a feature with its own
+tests, not a re-pin, so it was deliberately NOT patched inside D8. The vector
+data is vendored and `md/testdata_test.go` names it in a comment, so the gap
+reproduces in one line — add `"sh_wpkh"` to `singleStringVectorNames` and run
+`go test ./md/`.
+
+Not urgent for this plan: no stage of the multisig-build-repair cycle engraves
+a pathless descriptor. It matters for anyone feeding the device an md1 produced
+by a current primary.
+
+**Method note worth keeping.** This is the second time today that vendoring a
+published/primary corpus and *running* it found something no amount of reading
+would. The first was BIP-141 publishing no vectors at all. Coverage catch-ups
+are not bookkeeping.
