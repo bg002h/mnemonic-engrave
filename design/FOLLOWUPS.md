@@ -7088,3 +7088,65 @@ and wrote "check that FIRST … because 'somebody assumed' is what made C-3 surv
 a whole stage." It then survived a *second* stage on a third path for the same
 reason. **An unverified claim in a follow-up is a defect with a countdown, not a
 note** — the answer cost one grep.
+
+---
+
+### F-199 — `verifyRefused` dead-ends on a CORRECTABLE readback (owning phase: **`SPEC_multisig_build_repair.md` S6**) `#seedhammer`
+
+Found 2026-08-16 by the B1..B5 fold while implementing B3, and deliberately
+**not folded**: it is outside B1..B5, and folding an unreviewed control-flow
+change into a fold is exactly what produces the text nobody has read.
+
+`gui/multisig_verify.go:698-702` shows *"Read back one wallet-policy md1 AND the
+operator key card(s) (mk1)."* — a screen that names precisely what the operator
+should do — and returns `verifyRefused`, a verdict neither engrave caller
+re-offers on. So the next screen is the restore document, headed *"If any of them
+is missing, this backup is incomplete."* It is round-1 **B3's class at a third
+site B3 did not name**, and it is reachable *before any seed is typed*: present
+the mk1s and forget the md1, or bring one plate short.
+
+**It needs a decision, not a reflex.** B3's fix scoped a `correctable` local to
+the seed-entry and ms1-entry breaks. The same local would cover this site, but
+`verifyRefused` **also carries two programmer-error refusals** (an empty
+`expectedSlots`, a missing engraved md1) which must NOT loop — so the fix is
+**per-site, not per-verdict**. Widening the verdict is the obvious move and the
+wrong one.
+
+**Provenance, verified by the controller rather than assumed — this is why it
+files rather than gates.** The dead-ending message is **pre-existing in `main`**
+(`gui/multisig_verify.go:82` there, from `b2c3231`, H1). `verifyRefused` itself
+is **new in this cycle's own fold** (`9f93362`). Before S5 *nothing* retried, on
+any path — so S5 did not regress this. It built a retry mechanism and did not
+extend it to this site, which is an **incomplete new feature, not a regression**.
+That is the same test F-191 was measured against ("pre-existing in kind and
+unchanged by the S5 seam, so it did not gate the fold").
+
+### F-200 — `engraveOnePlate`'s frame budget is harness-dependent, and the failure looks like a broken flow (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer` `#test-infra`
+
+`gui/multisig_build_walk_test.go:443` gives one plate 4096 frames. **Measured on
+the same plate**: the engraver closed at frame **881** under `runUITouchRaster`
+and at frame **10585** under plain `runUI`, because virtual time in the synctest
+bubble advances per idle point rather than per frame. `s5EngraveOnePlate`
+(`gui/multisig_supply_passphrase_test.go:110`) carries 32768 for the same reason
+and says nothing about it.
+
+**The cost is misattribution, which is what makes it worth a number.** A future
+test pairing `runUI` with `engraveOnePlate` fails with *"the engrave never closed
+the engraver, so no plate was cut"* while the engrave is running perfectly — it
+cost an hour inside this fold. Either make the budget a function of the harness,
+or have the helper state its precondition. Recorded meanwhile at
+`s5EngraveEveryPlate` in `gui/multisig_engrave_tail_walk_test.go`.
+
+### F-201 — `multisigVerifyRetryLeadFor(res)` now covers three distinct verdict shapes with one sentence (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer`
+
+Upgraded from round 1's Minor 4 by the B1..B5 fold. The retry lead *"Not every
+plate is verified. Try again?"* was filed for narrating a FAILED verify as an
+incomplete one. B3 adds a third shape: a first-seed refusal with **zero** legs.
+
+The lead stays literally TRUE in all three — zero verified plates is "not every
+plate" — so this is not a defect, which is why it is Minor. But one sentence now
+covers *"some plates checked"*, *"a comparison disagreed"* and *"the seed you
+typed fills no slot"*, and those want different next actions from the operator.
+`TestBothEngraveFlowsDriveTheRetryLoop` already drives the offer through a seam
+that can return any verdict, **so a verdict-specific lead is now assertable at
+flow level** — the mechanism to fix this properly landed with B4.
