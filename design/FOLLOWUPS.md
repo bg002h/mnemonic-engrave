@@ -6886,6 +6886,7 @@ and can say so; distinguishing "no slot matches with this passphrase" from
 "no slot matches at all" costs one re-derivation with the empty passphrase.
 
 Pre-existing in kind (the pre-S5 verify had the same shape through
+`findUserSlot`) and unchanged by the S5 seam, so it did not gate the fold.
 
 **Landed 2026-08-16 by the controller** on the implementer's behalf: an agent
 confined to a worktree cannot write this file, so a filed defect would otherwise
