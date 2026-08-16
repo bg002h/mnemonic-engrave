@@ -707,7 +707,7 @@ written to fix the previous Critical. The requirement never needed a lattice:
 
     // ...inside the existing offer loop, per attempt, changing no control flow:
     res := <verify>
-    if res == verifyFailed {
+    if res == verifyMismatch {   // NOT verifyFailed -- see 4.7d
         sawDisagreement = true       // STICKY. A later attempt cannot un-see it.
     }
     switch {
@@ -737,6 +737,50 @@ written to fix the previous Critical. The requirement never needed a lattice:
   sittings, and prints `VERIFIED`. This closes R2 C-2 by correcting the
   requirement rather than by widening an exception.
 
+#### 4.7d A WARNING MUST BE EARNED — `verifyFailed` MEANS TWO DIFFERENT THINGS (R4 C-1)
+
+**Keying the condemning line on `verifyFailed` stamps an unclearable "Do NOT rely
+on this backup" onto a document describing PERFECTLY GOOD STEEL.** Measured, only
+**two of five** `verifyFailed` sites are a comparison against this run's plates:
+
+| site | what it is | a comparison? |
+| --- | --- | --- |
+| `gui/multisig_verify.go:719` | `!slices.Equal(readbackMd1, engravedMd1)` — the plates belong to a **different wallet** | no |
+| `gui/multisig_verify.go:724` | the readback would not decode | no |
+| `gui/multisig_verify.go:897` | the **re-typed seed** would not derive — a typo at verify time | no |
+| `gui/multisig_verify.go:963` | `verifyMultisigLegsPartial` mismatch | **yes** |
+| `gui/multisig_verify.go:984` | `verifyMultisigLegs` mismatch | **yes** |
+
+Two of the three non-comparisons are ordinary operator mistakes *at verify time*
+with nothing wrong with the backup at all. **The codebase already states this
+lesson** at `gui/multisig_verify.go:42-48`: *"A generic 'Verify Failed' sends them
+to re-cut plates that are perfectly good."* The plan re-committed at the
+**document** level the error the code warns about at the **screen** level — and
+the document is the durable artifact, so it is worse there.
+
+**The fix puts the distinction in the TYPE, where a future call site cannot
+re-conflate it.** A new verdict `verifyMismatch` is returned at `:963` and `:984`
+only; `:719`, `:724` and `:897` keep `verifyFailed`. `sawDisagreement` is set on
+`verifyMismatch` alone. Non-comparison failures therefore print
+`DID NOT COMPLETE` — *"Confirm they restore before relying on this backup"* —
+which is true, actionable, and does not condemn.
+
+**Control flow is UNCHANGED, and that is load-bearing.** All five sites loop
+today, so both retry-loop conditions become
+
+    if res != verifyIncomplete && res != verifyFailed && res != verifyMismatch { break }
+
+at `gui/multisig.go:337` and `gui/multisig_build.go:453`, which preserves current
+looping exactly. **Whether a foreign-policy plate SHOULD loop** — the code's own
+comment says re-presenting those plates can never satisfy the run — is a real
+question and is **deliberately out of scope**: it is F-199's family, and changing
+retry behaviour here would be an unreviewed control-flow change riding a
+document fix. Named so a reviewer does not read it as missed.
+
+**Single-sig is unaffected**: `singleSigVerifyFlow` has no comparison split of
+this kind and no retry loop. The mapping produced at build-order step 1 must
+state which of its eleven exits, if any, are genuine comparisons.
+
 #### THE TWO PROPERTIES THIS MUST SATISFY — testable, unlike the old "invariant"
 
 The R2 fold asserted an "incentive invariant" phrased as a ranking claim, and R3
@@ -748,9 +792,21 @@ is `verifyComplete` prints `VERIFIED` or `VERIFIED on a repeat check`, never
 `DID NOT COMPLETE` and never `DISAGREED`. This is what makes running the verify
 never worse than skipping it.
 
-**P2 — a disagreement is never lost.** Any sequence containing a `verifyFailed`
-prints either `DISAGREED`, or the repeat-check line if a later attempt passed
-cleanly. It never prints bare `VERIFIED` and never `DID NOT COMPLETE`.
+**P2 — a disagreement is never lost.** Any sequence containing a
+`verifyMismatch` prints either `DISAGREED`, or the repeat-check line if a later
+attempt passed cleanly. It never prints bare `VERIFIED` and never
+`DID NOT COMPLETE`.
+
+**P3 — A WARNING MUST BE EARNED.** No sequence prints `DISAGREED` unless a
+comparison actually **ran and disagreed** (§4.7d). A structural refusal, an
+undecodable readback, or a mistyped seed at verify time must never condemn the
+plates.
+
+**P3 exists because P1 and P2 both constrain the SAME direction.** Both guard
+against *under*-warning; nothing guarded against *over*-condemning, and the
+asymmetry was invisible for four rounds precisely because having two properties
+read as rigour. A cycle whose subject is a device that lies by omission produced
+a design that lies by accusation.
 
 #### ENUMERATED — every sequence, and what it prints
 
@@ -764,11 +820,13 @@ argument.
 | `incomplete` then stop | false | incomplete | `DID NOT COMPLETE` |
 | `refused` / `abandoned` | false | that | `DID NOT COMPLETE` |
 | `incomplete` → `complete` | false | complete | `VERIFIED` |
-| `failed` then stop | **true** | failed | `DISAGREED` |
-| `failed` → `abandoned` | **true** | abandoned | `DISAGREED` |
-| `failed` → `incomplete` | **true** | incomplete | `DISAGREED` |
-| `failed` → `complete` | **true** | complete | `VERIFIED on a repeat check` |
-| `incomplete` → `failed` → `complete` | **true** | complete | `VERIFIED on a repeat check` |
+| `mismatch` then stop | **true** | mismatch | `DISAGREED` |
+| `mismatch` → `abandoned` | **true** | abandoned | `DISAGREED` |
+| `mismatch` → `incomplete` | **true** | incomplete | `DISAGREED` |
+| `mismatch` → `complete` | **true** | complete | `VERIFIED on a repeat check` |
+| `incomplete` → `mismatch` → `complete` | **true** | complete | `VERIFIED on a repeat check` |
+| **`failed`** (foreign plates / undecodable / seed typo) then stop | false | failed | **`DID NOT COMPLETE`** — never condemns (§4.7d) |
+| **`failed`** → `complete` | false | complete | **`VERIFIED`** — nothing was ever disagreed with |
 
 The retry space is unbounded, but the switch depends only on `sawDisagreement`
 and the final `res`, so these ten rows are the complete image of it — an honest
@@ -784,7 +842,7 @@ as an addition rather than as something already blessed.
 | clean pass after an earlier disagreement | `Plates VERIFIED on a repeat check, after an earlier read-back DISAGREED. Confirm they restore before relying on this backup.` |
 | skipped / never offered | `Plates NOT VERIFIED. Confirm they restore before relying on this backup.` |
 | incomplete / refused / abandoned, none worse | `Plate verification DID NOT COMPLETE. Confirm they restore before relying on this backup.` |
-| a comparison disagreed and was never cleared | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup. Re-verify or re-engrave.` |
+| a comparison disagreed and was never cleared | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup: engrave a fresh set and check it before use.` |
 
 **"matched", not "matched the seed" (R1 I-3).** The singular contradicted §4.4's
 own *"YOUR seeds"* on a multi-master build, in the same document. Dropping the
@@ -908,8 +966,21 @@ This section governs only sets that were fully **cut**.
 ## 4.8 BUILD ORDER — what to do first, and what can land on its own
 
 The comprehension review found the plan gave none, and that its single ordering
-sentence was wrong. Nine steps. **Each of 1–8 leaves the tree green**, so the
-work is landable in pieces rather than all-or-nothing.
+sentence was wrong. Nine steps.
+
+**NOT every step leaves the tree green, and an earlier draft claimed it did
+(R4 I-2).** Steps **1–4** and **8–9** each leave it green and are independently
+landable. **Steps 5, 6 and 7 land TOGETHER, as one commit.** Two reasons, and the
+second is the serious one:
+
+- Step 5 alone leaves the suite **red** — step 6 exists to repair the three walks
+  step 5 breaks, and step 6's own cell already said "must accompany step 5",
+  contradicting the header above it.
+- **Steps 5+6 without 7 are green AND landable AND are exactly C-1's harm**: a
+  restore document carrying a full inventory and completeness claim, with no
+  verification status line on it. A state the suite would call healthy is the
+  precise defect this cycle exists to close, so the build order must make it
+  unreachable rather than merely undesirable.
 
 | # | step | why here |
 | --- | --- | --- |
@@ -1005,6 +1076,7 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T7c** | **the capacity WIRING**, per path: drive each of the three flows to its restore document and assert the seed-handling subject clause matches that path's capacity (build → `Every seed`; supply and single-sig → `The seed you entered`) | swap either call site's capacity argument — a mutation no compiler and no current test detects |
 | **T13a** | **P1 — a clean pass always prints a pass line.** Table-driven over §4.7a's ten rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
 | **T13b** | **P2 — a disagreement is never lost.** Every sequence containing `verifyFailed` prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
+| **T15** | **P3 — a warning is EARNED.** Each of the three non-comparison `verifyFailed` sites (`:719` foreign plates, `:724` undecodable, `:897` seed typo) yields `DID NOT COMPLETE`, **never** `DISAGREED` | set `sawDisagreement` on `verifyFailed` instead of `verifyMismatch` — precisely what rounds 1–4 of this plan specified |
 | **T14** | the zero value of `verifyStatus` renders `NOT VERIFIED` | reorder the constants so `statusVerified` is 0 — the mutation that makes a forgotten assignment vouch |
 
 **T10, T12, T13a and T13b CANNOT RUN ON THE SINGLE-SIG PATH, and §5 put every
