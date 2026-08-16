@@ -6891,3 +6891,65 @@ Pre-existing in kind (the pre-S5 verify had the same shape through
 **Landed 2026-08-16 by the controller** on the implementer's behalf: an agent
 confined to a worktree cannot write this file, so a filed defect would otherwise
 survive only inside a report.
+
+---
+
+### F-192 — the F-185 drawn-frame check gates only the screens S5.C touched; every other long modal is still unmeasured (owning phase: **`SPEC_multisig_build_repair.md` S6**) `#seedhammer`
+
+Filed 2026-08-16 by the S5.C implementer, landed by the controller.
+
+The class check F-185 asked for now exists and is **a one-line call**, which is
+the point — the cost of gating a screen is now trivial. What has not happened is
+the sweep. Only this block's screens are measured; every other long modal in the
+firmware carries the same unmeasured exposure F-185 recorded.
+
+**Do not re-derive the mechanism when picking this up.** It is not a character
+budget: capacity depends on how words WRAP (588 normalised chars of short-word
+filler fit, while F-185's real refusal was cut at ~500), so the check compares
+the drawn frame to the source string and binary-searches the cut point. It
+carries the margin F-185 says its own per-screen fix lacked.
+
+### F-193 — the same key is spelled two ways on two device screens (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer`
+
+Filed 2026-08-16 by the S5.C implementer, landed by the controller.
+
+The review screen shows the operator's **real** base58 xpub (`xpub6DkFA…`); the
+restore doc's descriptor shows the **parent-fingerprint-zero reconstruction** of
+the same key (`xpub6DXuQ…`), because md1 carries no parent fingerprint.
+Pre-existing, shared with the supply path (`expandedToDescriptor`,
+`gui/md1_expand.go`), and harmless for import.
+
+**It is filed rather than fixed because the measurement changed a design
+decision and should not be quietly re-litigated.** S5.C originally intended to
+display the reconstructed form on the review screen; that would have asked the
+operator to perform a comparison **they cannot perform** — one of this stage's
+four normative prose constraints. The review now maps slots via the assembled
+md1's bytes but *displays the operator's own strings*. Reconciling the two
+renderings is a real improvement; reverting the review to the md1 form is not.
+
+### F-194 — the pre-engrave review's first page cannot show a key while the §0.1 clause-3 header holds page one (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer`
+
+Filed 2026-08-16 by the S5.C implementer, landed by the controller.
+
+Measured, not predicted: page 1 ends at `"@0, no fingerprint:"` — the first key
+falls on page 2. §0.1 clause 3 requires the assumption to be announced **on the
+confirmation surface itself**, so the header must hold page one, and that is a
+genuine cost paid deliberately rather than a bug.
+
+A page-break-aware pager — one that keeps a slot's label and its key chunks
+together — would fix it properly. It touches `confirmReviewScreen`, which is
+**shared code**, so it wants its own scope rather than a drive-by edit.
+
+### F-195 — a watch-only set never states outright that it contains no seed (owning phase: **`SPEC_multisig_build_repair.md` S6**) `#seedhammer`
+
+Filed 2026-08-16 by the S5.C implementer, landed by the controller.
+
+S5.C made the passphrase lines mode-safe and the inventory lists what was cut,
+but **no line says plainly that a watch-only set holds no seed**. It is the same
+family as the plan's "the backup must say what is NOT in it" requirement, which
+that block implemented for the passphrase and deliberately did not scope-creep
+to the seed.
+
+The asymmetry matters years later: an operator holding a watch-only set and a
+"Full" set side by side has the mode label to tell them apart, and a mode label
+is exactly the kind of thing that gets copied onto the wrong tin.
