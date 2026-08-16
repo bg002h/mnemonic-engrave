@@ -292,7 +292,24 @@ answer the request did not specify.
    as an assumption that was *wrong*, not one that held: it is the §1.3 landmine
    class committed by the plan that named the class — one clause of a shared
    string audited, the clause beside it not.
-7. **The presence-arm sentence names the inventory label `ms1 secret share` as a
+7. **THIS PLAN DEPARTS FROM `SPEC_seedhammer_T6a_singlesig_flagship.md`, AND
+   THAT SPEC MOVES** (R2 spec-coverage). That spec governs the single-sig restore
+   document and describes it **exhaustively** — `:36`, *"restore doc (R0-M2):
+   display-only + optional NFC; master fp + the concrete descriptor + first
+   receive/change address … greps clean of any xprv/private material"*. Four
+   fields, and §1.1 measured the shipped code as still matching it exactly.
+   §4.2, §4.4 and §4.7 add a plate inventory, a seed statement and a
+   verification status line. **The first two drafts of this plan cited that spec
+   zero times** while carrying a section built to declare exactly this kind of
+   thing.
+   Not Critical: nothing in T6a forbids additional non-secret content, so no
+   normative MUST is broken, and the "greps clean of private material" constraint
+   is **preserved** — every added line is public (a plate census, a passphrase
+   fact, a verify outcome). What breaks is the spec's *exhaustiveness*. So the
+   spec is updated in this cycle, in its own commit, separate from the plan and
+   from the code — a spec left describing the old artifact is the trap this
+   project has been caught by before.
+8. **The presence-arm sentence names the inventory label `ms1 secret share` as a
    PREFIX, not an exact string.** Measured: single-sig labels the card exactly
    `"ms1 secret share"` (`gui/singlesig_engrave.go:25`), multisig numbers it via
    `numberedLabel("ms1 secret share", i, n)` (`gui/multisig_engrave.go:37`) →
@@ -313,14 +330,23 @@ engrave-and-restore (plan §3, S6 items 1, 2 and 4). Filing this would park a
 known funds hole on exactly the territory the next phase enters — and under this
 project's own rule an item scheduled to a phase is not deferrable past it.
 
-**Why it is affordable — now measured, not estimated.** `multisigVerifyResult`
-already exists with **five** constants (`verifyComplete`, `verifyIncomplete`,
-`verifyFailed`, `verifyRefused`, `verifyAbandoned` —
-`gui/multisig_verify.go:88-100`; the first fold said "four" and was wrong), which
-is a superset of what the status line distinguishes. And
-`multisigRestoreDocFlow` **already takes `extra []string`**, so **neither
-multisig call site changes signature** — only what it builds for that argument.
-The retry loop's control flow does not change and no new verdict is introduced.
+**What it costs — corrected twice, so here it is measured rather than argued.**
+`multisigVerifyResult` has **five** constants (`gui/multisig_verify.go:88-100`;
+round 0 said "four" and was wrong — as does the type's own doc comment, §4.7b).
+
+**It is NOT a superset of what the status line needs** (R2 I-1): it has no value
+for *skipped* or *never offered*, which is the commonest outcome of all, since
+the operator may simply press Skip. §4.7c therefore defines a separate
+`verifyStatus` whose zero value is the safe one.
+
+**And `multisigRestoreDocFlow` DOES change signature** (R2 C-1). Round 1 claimed
+it did not, reasoning that `extra []string` already existed. The document needs
+**two** insertion points — status first, inventory last — and one trailing
+parameter cannot express that. Both multisig call sites change.
+
+What genuinely does **not** change: the retry loop's control flow, and the set of
+verdicts. The engrave, derive and encode paths are untouched, and no plate
+content moves.
 
 **One place multisig differs, and §4.7 is scoped around it:** the BUILD path
 skips the restore document entirely for a template engrave
@@ -416,13 +442,21 @@ So the ruling is assembled from two selectors:
 
     // seed is NOT on the plates (watch-only, any path):
     base + ". Do not leave a mid-build machine unattended: it is still holding " +
-           "the words you typed. Power the device off when you are done."
+           "seed material. Power the device off when you are done."
 
-**"the words you typed", not "your seed" (R1 Minor).** The watch-only arm is
-reached on the multi-seed BUILD path too, where a singular possessive is a
-singular/plural wobble against the plural subject clause four words earlier. The
-object-free phrasing is true whether the device holds one seed or three, so the
-sentence does not need a third selector.
+**"seed material" — and the two rejected drafts are recorded, because each was
+wrong in an instructive way.** The shipped singular *"your seed"* is a
+singular/plural wobble on the multi-seed BUILD path. The R1 fold replaced it with
+*"the words you typed"*, which fixed the wobble and **introduced a falsehood**
+(R2 I-5): `seedEntryFlow` is the *source picker*, not a keyboard — the flow's own
+security spine says so at `gui/singlesig.go:20-23`, and §3.3.2 admits a
+payload-borne `ClassMnemonic` on purpose. On a payload-sourced run **nothing was
+typed**. "seed material" is number-neutral and provenance-neutral, so it is true
+on every path and every source.
+
+Worth naming as a pattern rather than a one-off: a **wording** fix for a
+**wording** defect introduced a **factual** one, on a document read years later.
+Any replacement string is new text and inherits the full truth obligation.
 
 **Byte-identity check, and what deliberately churns.** `seedCapacityMany` +
 seed-on-plates reassembles the shipped string **byte for byte**, so the multisig
@@ -620,24 +654,56 @@ prints *"DID NOT COMPLETE"* over plates the device has already said do not match
 The remedy would have re-opened its own Critical, on the two paths §3.2 had just
 pulled into scope.
 
-**So severity is sticky, and it ranks:**
+**So the rule is: keep the WORST outcome seen, and let a clean pass supersede
+it — saying so when it does.** Stated as an algorithm rather than as prose,
+because the R1 fold reasoned about this in prose and got it wrong twice:
 
-    disagreed  >  did-not-complete  >  not-verified  >  verified-on-retry  >  verified
+    worst := statusNotVerified          // the zero value; see §4.7c
+    on each verify attempt:
+        worst = max(worst, severity(verdict))
+    if the FINAL attempt was a clean pass:
+        status = verifiedFirstTry   if worst is no worse than complete
+               = verifiedOnRetry    otherwise
+    else:
+        status = line(worst)
 
-The flow keeps the **most severe** outcome observed across the whole offer loop.
-A disagreement is evidence, and a later abandon cannot un-see it.
+severity, most severe first: `disagreed` > `did-not-complete` > `not-verified`
+> `verified`.
 
-**One exception, and it is the incentive rule from the C-1 decision.** A
-disagreement followed by a **clean pass on a repeat check** does not print the
-bare `DISAGREED` warning — it gets its own line. Printing the warning anyway
-would make re-verifying pointless, which is the same trap that ruled out gating
-the document: *never make running the check the way to lose something.* Printing
-a bare `VERIFIED` instead would hide a real anomaly from the stranger reading the
-page. So it is said, and said as an upgrade.
+**R1's version was wrong in BOTH directions, and each was reachable.** It said
+"hold the last verdict", which loses a `DISAGREED` to a later abandon (R1 C-1);
+then its exception covered only `failed → complete`, so `incomplete → VERIFY
+AGAIN → complete` — **the exact sequence `multisigVerifyIncompleteText` instructs
+the operator to perform** — printed `DID NOT COMPLETE` over a clean pass (R2
+C-2). That inverts the incentive a third time: verifying successfully would print
+a *worse* line than skipping.
 
-**This fifth state is a controller decision derived from the persisted C-1
-principles, not a new operator ruling** — flagged here so the next reviewer reads
-it as an addition rather than as something already blessed.
+#### ENUMERATED, NOT ARGUED — every sequence, and what it prints
+
+The state space is small enough to write down, so it is written down. `S` = skip
+/ never offered.
+
+| sequence | worst seen | final | prints |
+| --- | --- | --- | --- |
+| `S` | not-verified | — | `NOT VERIFIED` |
+| `complete` | verified | pass | `VERIFIED` |
+| `incomplete` then stop | did-not-complete | — | `DID NOT COMPLETE` |
+| `refused` / `abandoned` | did-not-complete | — | `DID NOT COMPLETE` |
+| `failed` then stop | disagreed | — | `DISAGREED` |
+| `failed` → `abandoned` | disagreed | — | `DISAGREED` *(R1 C-1's case)* |
+| `failed` → `incomplete` | disagreed | — | `DISAGREED` |
+| `incomplete` → `complete` | did-not-complete | pass | `VERIFIED on a repeat check` *(R2 C-2's case)* |
+| `failed` → `complete` | disagreed | pass | `VERIFIED on a repeat check` |
+| `incomplete` → `failed` → `complete` | disagreed | pass | `VERIFIED on a repeat check` |
+
+**The incentive invariant this must satisfy, and which R1 violated twice:**
+*running the verify can never produce a worse line than skipping it.* Every row
+above is at least as good as `NOT VERIFIED` whenever a pass was achieved, and no
+row lets a successful check print a non-pass line.
+
+**The repeat-check state is a controller decision derived from the persisted C-1
+principles, not a new operator ruling** — flagged so the next reviewer reads it
+as an addition rather than as something already blessed.
 
 | outcome | line (verbatim, ASCII only) |
 | --- | --- |
@@ -657,36 +723,89 @@ The first fold described two different seams for the same line. There is one:
 
     func buildVerifyStatusLines(v verifyStatus) []string   // exactly one line
 
-and it is **PREPENDED** to the lines already passed through the existing
-`extra []string` parameter:
+**IT MUST LAND AT SLICE INDEX 0, AND `extra` CANNOT PUT IT THERE (R2 C-1).**
 
-    extra := append(buildVerifyStatusLines(status),
-                    buildPlateInventoryLines(cards, facts, capacity)...)
+The R1 fold said "prepend it into `extra`". That does not work, and the plan had
+already written down why without noticing: re-read from source rather than
+recalled,
 
-**Prepended, not appended (R1 I-2).** `restoreDocScreen` is a pager whose Done
-key is live on page 1. Appended, the status line lands behind a 330-character
-seed-handling paragraph, on a page the operator need never turn — a warning
-nobody reads is not a warning. The in-tree precedent prepends for exactly this
-reason: `gui/multisig.go:271` puts its slot-collapse notice *ahead* of the
-census.
+    gui/multisig_restore.go:106   restoreDocScreen(ctx, th, append(lines, extra...))
 
-**This means NO signature change on the multisig side at all.**
-`multisigRestoreDocFlow` already takes `extra []string`
-(`gui/multisig_restore.go:100`), so both multisig call sites change only in what
-they build for that argument. It also strengthens §3.2's affordability claim from
-an estimate to a measurement.
+`extra` is appended **after** `lines`, so prepending *within* `extra` moves the
+status line from the end of the document to the middle of it. A reviewer
+measured the real shape by running the shipped supply walk: the document is
+**five pages**, and `extra` begins mid-**page 4**.
 
-**Single-sig** gets a verdict type mirroring `multisigVerifyResult`'s shape, and
-`engraveSingleSigFlow` threads the worst-seen outcome into the same `extra`
-parameter §4.2 adds.
+And `restoreDocScreen` (`gui/singlesig_restore.go:148-160`) opens at `start := 0`
+and draws `lines[start]` first, with `doneBtn` live on that same frame. So
+**"page 1" means slice index 0** — nothing weaker qualifies.
 
-**Both false comments are corrected, and there are TWO of them (R1-A).** The
-first fold cited one site, off by one line, using the *other* file's wording:
+So the status line is passed **separately** and placed first:
+
+    func multisigRestoreDocFlow(ctx *Context, th *Colors, tpl md.Template,
+        keys []md.ExpandedKey, status []string, extra []string) {
+        ...
+        restoreDocScreen(ctx, th, append(append(status, lines...), extra...))
+    }
+
+**This CORRECTS a claim the R1 fold made in §3.2.** That fold asserted "no
+signature change on the multisig side at all", reasoning that `extra` already
+existed. Wrong — the document needs **two** insertion points, front and back:
+the status line leads, the wallet facts follow, the inventory trails. One
+trailing parameter cannot express that, so `multisigRestoreDocFlow` **does**
+change signature, at both call sites. §3.2 is corrected to match.
+
+**Single-sig** gets its own status type (§4.7c) and threads the worst-seen
+outcome into the same new leading parameter §4.2 adds to `restoreDocFlow`.
+
+#### 4.7c THE STATUS TYPE, AND WHY ITS ZERO VALUE IS "NOT VERIFIED" (R2 I-1, I-2)
+
+The R1 fold used the identifier `verifyStatus` without ever defining it, and
+claimed `multisigVerifyResult` was "a superset of what the status line
+distinguishes". **It is not a superset:** it has no value for *skipped* or *never
+offered*, which is the single most common outcome — the operator picks "Skip".
+
+So the status is its own small type, distinct from the verdict:
+
+    type verifyStatus int
+
+    const (
+        // THE ZERO VALUE IS THE SAFE ONE, DELIBERATELY. A path that forgets to
+        // set a status prints "NOT VERIFIED" -- conservative and true-ish -- and
+        // can never print a vouch. Mirroring multisigVerifyResult's shape would
+        // have made verifyComplete = iota = 0, so the SAME omission would print
+        // "Plates VERIFIED" over plates nothing ever checked. That is the whole
+        // Critical, reachable by forgetting one assignment.
+        statusNotVerified verifyStatus = iota
+        statusDidNotComplete
+        statusDisagreed
+        statusVerifiedOnRetry
+        statusVerified
+    )
+
+**Single-sig's mapping must be written, not left to the implementer (R2 I-2).**
+`singleSigVerifyFlow` (`gui/singlesig_verify.go:65`) has eleven exit points and
+today returns nothing. Each one maps to exactly one status, and the plan owes
+that table rather than a resemblance to a type on another path — "mirrors
+`multisigVerifyResult`'s shape" is not a specification when the two types do not
+have the same members. The implementer produces the mapping as the **first**
+step of §4.7, and it is reviewed before the rest of the section is built.
+
+**There are THREE false-comment sites, not two (R2 I-4).** Two consecutive folds
+undercounted this same defect — round 0 said one (and cited the wrong file),
+round 1 said two. Pasted from the source, not from a report:
 
 | site | what it says now | why it is false |
 | --- | --- | --- |
 | `gui/multisig_build.go:439` | `Only verifyComplete falls through to the restore document.` | a CONTINUE after a failure falls through too |
 | `gui/multisig.go:321-322` | `Only verifyComplete falls through; a refusal or an abandon does not loop` | same, differently worded |
+| `gui/multisig_verify.go:78-79` | `FOUR OUTCOMES, NOT A BOOL` … `Only verifyComplete may fall through to the restore document.` | **doubly wrong**: the type has FIVE constants, and the fall-through claim is the same falsehood on the type's own doc comment |
+
+The third is the worst of them, because it sits on the **type definition** — the
+first thing anyone reads when they go looking for what the verdicts mean. It is
+also the one both previous folds missed while explicitly hunting for this exact
+defect, which is why this table is pasted from `sed` output rather than
+transcribed.
 
 Neither may survive a cycle that fixes the behaviour they misdescribe. **The
 citation gate resolved the wrong line happily and was right to** — it states
@@ -717,10 +836,20 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T6** | the single-sig run reaches `Plates To Cut` before the engrave picker | remove the census call |
 | **T7** | `seedCapacityOne` yields `The seed you entered` and not `Every seed`; `seedCapacityMany` yields `Every seed`; **and every new operator string is ASCII-clean** (the glyph set at `gui/multisig_build_prose_test.go:395`) | swap the capacity arms; insert an em dash |
 | **T8** | `gui/bundle_flow.go` no longer claims `both engraving callers` (source assertion, mirroring the `readGuiFile` pattern at `gui/multisig_build_prose_test.go:402`) | restore the old comment |
-| **T9** | each of the five §4.7a outcomes renders **its own** line, and every rendered document carries **exactly one** status line — asserted over `buildVerifyStatusLines` directly | return the same string for two outcomes; return an empty slice |
-| **T10** | **the stickiness.** A run whose verify DISAGREED and was then abandoned prints the `DISAGREED` warning, **not** `DID NOT COMPLETE` | implement it as last-wins — which is precisely what the first fold specified |
-| **T11** | the status line is the **first** line of the document, ahead of the plate inventory | append instead of prepend |
-| **T12** | a clean pass after an earlier disagreement prints the repeat-check line — **not** the bare `VERIFIED`, and **not** the bare `DISAGREED` | collapse the fifth state into either neighbour |
+| **T9** | each of the five §4.7c statuses renders **its own** line, and every rendered document carries **exactly one** — over `buildVerifyStatusLines` | return the same string for two statuses; return an empty slice |
+| **T10** | **the stickiness.** `failed` → `abandoned` prints `DISAGREED`, **not** `DID NOT COMPLETE` | implement as last-wins — precisely what the round-0 fold specified |
+| **T11** | the status line is at **slice index 0** of what `restoreDocScreen` receives — asserted **through a production flow**, not on a helper | pass it via the trailing `extra` parameter, as the round-1 fold specified |
+| **T12** | `incomplete` → `complete` prints the repeat-check line, **not** `DID NOT COMPLETE` and **not** bare `VERIFIED` | cover only `failed → complete` — precisely what the round-1 fold specified |
+| **T13** | **the incentive invariant.** Over every row of §4.7a's table, no sequence containing a clean pass prints a line worse than `NOT VERIFIED` | any ranking regression; this is the property, where T10/T12 are instances |
+| **T14** | the zero value of `verifyStatus` renders `NOT VERIFIED` | reorder the constants so `statusVerified` is 0 — the mutation that makes a forgotten assignment vouch |
+
+**T9–T14 must pin a PRODUCTION CALL SITE, not just the pure functions (R2 I-3).**
+Round 1's C-2 was that the Critical had no test; round 1 answered it with tests
+that would all still pass if the status line were wired into two of the three
+document flows and forgotten on the third. At least T11 and one of T10/T12 drive
+a real flow to a real restore document — the same standard §5.1's T5 is held to,
+and for the same reason: *a call-site assertion alone is what let the multisig
+instance ship.*
 
 **T5 is the one that carries the class.** F-197's own follow-up says it: *"A
 call-site assertion alone is not enough — that is exactly what let the multisig
