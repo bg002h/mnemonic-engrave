@@ -584,6 +584,31 @@ abort warning and the restore document can never disagree.
 Passphrase facts stay out of these lines entirely; that is the passphrase lines'
 job, immediately after.
 
+**THE ADVERSARY SIDE, STATED — because arguing only one side is the gap** (R5
+disclosure, Minor). This statement is a genuinely NEW disclosure: today's
+single-sig document says nothing about mode, so a reader holding the **document
+but not the plates** learns a definite yes/no on whether a seed-bearing plate
+physically exists for this wallet. That is help to a thief deciding whether the
+steel is worth hunting for.
+
+**The trade-off still favours saying it, for three measured reasons:**
+
+1. The same document already carries the **descriptor and both first addresses**,
+   which identify the wallet and its balance to anyone who reads them. That is a
+   far stronger incentive to go hunting than the one bit added here.
+2. **The identical fact already exists** on the abort-warning screen
+   (`gui/bundle_flow.go:555`, *"No plate in this set carries a seed."*). This
+   moves it from a transient screen to the durable artifact, which is the entire
+   point of F-195 — it does not invent the disclosure.
+3. The reader this document exists for — a stranger, years later, holding a pile
+   of steel and asking *is this everything?* — cannot act without it, and
+   silence is the state in which recoverable backups get abandoned.
+
+Recorded here rather than left implicit, because §4.7's incentive argument states
+both sides and this one did not. Under the operator's directive to declare
+assumptions loudly, a one-sided argument in the same document is the
+inconsistency.
+
 **Placement inside `buildPlateInventoryLines`**, so the document reads
 what-it-is → what-it-is-not → how-to-handle-it:
 
