@@ -858,6 +858,20 @@ So the status is its own small type, distinct from the verdict:
         statusVerified
     )
 
+**THE ZERO VALUE PROTECTS THE VARIABLE, NOT THE DOCUMENT (R3 I).** `verifyStatus`
+failing safe means a forgotten *assignment* prints `NOT VERIFIED`. It does
+nothing about a forgotten *call*: the seam is `[]string`, so a flow that never
+calls `buildVerifyStatusLines`, or passes `nil`, renders a document with **no
+status line at all** — silence, which §4.7 opens by declaring must never be
+mistakable for a pass. The type-level argument and the document-level guarantee
+are different claims, and the first fold conflated them.
+
+So the document-level guarantee is carried by a test, not by a type: **T9's
+"exactly one status line" must be asserted on the RENDERED DOCUMENT of each of
+the three production flows**, not only on the helper's return value. That is the
+only formulation that catches a flow wired to pass `nil` — which is precisely
+what `gui/multisig_nested_name_test.go:230` does today.
+
 **Single-sig's mapping must be written, not left to the implementer (R2 I-2).**
 `singleSigVerifyFlow` (`gui/singlesig_verify.go:65`) has eleven exit points and
 today returns nothing. Each one maps to exactly one status, and the plan owes
@@ -914,6 +928,38 @@ reviewed before step 2 begins, and it is the one place this plan deliberately
 delegates a decision — so it does not get made silently inside an
 implementation.
 
+### 4.9 The spec update — what it says, and how it is checked (R3 I-8)
+
+§3.1.7 declares this plan departs from `SPEC_seedhammer_T6a_singlesig_flagship.md`
+and that the spec moves. **It named no content and no check**, which is the same
+"filed rather than smuggled in" shape F-196 was written about: a promise that
+resolves to nothing.
+
+**What changes.** That spec's line 36 currently describes the restore document
+exhaustively:
+
+> `restore doc (R0-M2): display-only + optional NFC; master fp + the concrete descriptor + first receive/change address ... greps clean of any xprv/private material`
+
+It gains the three additions this cycle makes, and keeps the constraint that
+still binds:
+
+1. a **verification status line**, always exactly one, first on the page (§4.7);
+2. a **plate inventory** — count, per-card census, completeness sentence (§4.2);
+3. a **seed statement** and a **passphrase statement** (§4.4, §4.3);
+4. **unchanged and still normative:** display-only, no secret material. Every
+   added line is public — a plate count, a passphrase fact, a verify outcome —
+   so `greps clean of any xprv/private material` holds and is **not** weakened.
+
+**How it is checked.** The spec is prose, so the check is a grep pair rather than
+a test, run as step 9's gate:
+
+    grep -c "verification status" design/SPEC_seedhammer_T6a_singlesig_flagship.md   # expect >= 1
+    grep -c "xprv"                design/SPEC_seedhammer_T6a_singlesig_flagship.md   # expect unchanged
+
+**And it lands in its OWN commit** (§4.8 step 9), separate from plan and code, so
+a future reader can see what the spec said before this cycle and what it says
+after, without the behaviour change mixed in.
+
 ## 5. Test plan
 
 **Every test below must be shown to FAIL against ITS OWN MUTATION** — the one
@@ -960,6 +1006,17 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T13a** | **P1 — a clean pass always prints a pass line.** Table-driven over §4.7a's ten rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
 | **T13b** | **P2 — a disagreement is never lost.** Every sequence containing `verifyFailed` prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
 | **T14** | the zero value of `verifyStatus` renders `NOT VERIFIED` | reorder the constants so `statusVerified` is 0 — the mutation that makes a forgotten assignment vouch |
+
+**T10, T12, T13a and T13b CANNOT RUN ON THE SINGLE-SIG PATH, and §5 put every
+test there (R3 I-3).** Single-sig has **no retry loop** — its verify is a one-shot
+`if sel == 0 { ... }` — so `failed → abandoned` and `incomplete → complete` are
+unreachable by construction. Those four rows must be driven on a **multisig**
+flow, which is the only place a second attempt exists. Written as-is against
+`engraveSingleSigFlow` they would pass vacuously, never reaching the sequence
+they name — the exact vacuity §5.2 warns about for T5, one section later.
+
+Consequence for §4.8's build order: step 7 is where these land, and it needs a
+multisig walk, not the single-sig harness §1.7 lists as prior art.
 
 **T9–T14 must pin a PRODUCTION CALL SITE, not just the pure functions (R2 I-3).**
 Round 1's C-2 was that the Critical had no test; round 1 answered it with tests
