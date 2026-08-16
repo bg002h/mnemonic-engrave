@@ -349,7 +349,19 @@ the operator may simply press Skip. §4.7c therefore defines a separate
 **And `multisigRestoreDocFlow` DOES change signature** (R2 C-1). Round 1 claimed
 it did not, reasoning that `extra []string` already existed. The document needs
 **two** insertion points — status first, inventory last — and one trailing
-parameter cannot express that. Both multisig call sites change.
+parameter cannot express that.
+
+**THREE call sites change, not two (R3 I-5 / comprehension I-5).** Measured:
+
+    grep -rn "multisigRestoreDocFlow(" --include="*.go" gui/ | grep -v "^.*func "
+    gui/multisig_build.go:478
+    gui/multisig.go:361
+    gui/multisig_nested_name_test.go:230      <- passes nil, renders a REAL document
+
+The third is a test, and it is the kind that matters: it drives a real restore
+document, so it does not merely need re-compiling — it needs a status argument
+that is *correct for what it drives*, and it is a place the new line can be
+asserted for free.
 
 What genuinely does **not** change: the retry loop's control flow, and the set of
 verdicts. The engrave, derive and encode paths are untouched, and no plate
@@ -393,7 +405,7 @@ matching the shape §4.7b specifies for `multisigRestoreDocFlow`:
 and the one call site (`gui/singlesig.go:136`) supplies both:
 
     restoreDocFlow(ctx, th, xpub, masterFP, parentFP, script, path,
-        buildVerifyStatusLines(worstStatus),
+        buildVerifyStatusLines(status),
         buildPlateInventoryLines(cards, oneSeedPassphraseFact(passphrase != ""), seedCapacityOne))
 
 `cards` is already in scope from `:126`. Blast radius is one production call site
@@ -677,53 +689,91 @@ prints *"DID NOT COMPLETE"* over plates the device has already said do not match
 The remedy would have re-opened its own Critical, on the two paths §3.2 had just
 pulled into scope.
 
-**So the rule is: keep the WORST outcome seen, and let a clean pass supersede
-it — saying so when it does.** Stated as an algorithm rather than as prose,
-because the R1 fold reasoned about this in prose and got it wrong twice:
+**THE RULE IS TWO STICKY FACTS, NOT A SEVERITY LATTICE.**
 
-    worst := statusNotVerified          // the zero value; see §4.7c
-    on each verify attempt:
-        worst = max(worst, severity(verdict))
-    if the FINAL attempt was a clean pass:
-        status = verifiedFirstTry   if worst is no worse than complete
-               = verifiedOnRetry    otherwise
-    else:
-        status = line(worst)
+The R1 and R2 folds built a ranked ordering, an accumulator seeded at a zero
+value, a `max` over it, and a "was the final attempt clean" check. Two
+independent reviewers, on two different lenses, then found the same root defect:
+`not-verified` had to rank ABOVE `verified` for the table to hold, and had to be
+the accumulator's seed for the zero value to be safe. **One variable cannot be
+both**, and no reading of the algorithm reproduced its own table.
 
-severity, most severe first: `disagreed` > `did-not-complete` > `not-verified`
-> `verified`.
+That structure is deleted rather than patched. It was the fifth fold in a row to
+carry a defect, and the last two rounds each found a Critical in the algorithm
+written to fix the previous Critical. The requirement never needed a lattice:
 
-**R1's version was wrong in BOTH directions, and each was reachable.** It said
-"hold the last verdict", which loses a `DISAGREED` to a later abandon (R1 C-1);
-then its exception covered only `failed → complete`, so `incomplete → VERIFY
-AGAIN → complete` — **the exact sequence `multisigVerifyIncompleteText` instructs
-the operator to perform** — printed `DID NOT COMPLETE` over a clean pass (R2
-C-2). That inverts the incentive a third time: verifying successfully would print
-a *worse* line than skipping.
+    status := statusNotVerified      // zero value. No attempt has run.
+    sawDisagreement := false         // zero value. Nothing has disagreed.
 
-#### ENUMERATED, NOT ARGUED — every sequence, and what it prints
+    // ...inside the existing offer loop, per attempt, changing no control flow:
+    res := <verify>
+    if res == verifyFailed {
+        sawDisagreement = true       // STICKY. A later attempt cannot un-see it.
+    }
+    switch {
+    case res == verifyComplete && sawDisagreement: status = statusVerifiedOnRetry
+    case res == verifyComplete:                    status = statusVerified
+    case sawDisagreement:                          status = statusDisagreed
+    default:                                       status = statusDidNotComplete
+    }
 
-The state space is small enough to write down, so it is written down. `S` = skip
-/ never offered.
+**Why this is correct where the lattice was not:**
 
-| sequence | worst seen | final | prints |
+- **No ordering exists to get wrong.** There is no `severity()`, no `max`, no
+  seed. R3 C-1 is structurally impossible here.
+- **Zero attempts needs no special case.** `status` is assigned *only inside the
+  loop body*, so Skip leaves the zero value, which is `statusNotVerified`. R3
+  C-2 — where hoisting `res` outside the loop makes its zero value
+  `verifyComplete` and Skip prints VERIFIED — cannot arise, because **no verdict
+  variable is hoisted at all.** Both sticky facts are of types whose zero values
+  are the safe ones.
+- **`sawDisagreement` is the only sticky thing, and it is sticky in the only
+  direction that matters.** A disagreement is evidence; a later abandon cannot
+  erase it. That was R1 C-1's entire content, kept.
+- **An incomplete first attempt is NOT an anomaly**, and the earlier design
+  wrongly treated it as one. The repeat-check line exists to record that a
+  *disagreement* happened and was later cleared — that is the anomaly a stranger
+  needs to know about. `incomplete → complete` is simply a verify finished in two
+  sittings, and prints `VERIFIED`. This closes R2 C-2 by correcting the
+  requirement rather than by widening an exception.
+
+#### THE TWO PROPERTIES THIS MUST SATISFY — testable, unlike the old "invariant"
+
+The R2 fold asserted an "incentive invariant" phrased as a ranking claim, and R3
+showed it false on its own ordering. Ranking is not the property anyone cares
+about. These two are, and each is directly assertable:
+
+**P1 — a clean pass always prints a pass line.** Any sequence whose final attempt
+is `verifyComplete` prints `VERIFIED` or `VERIFIED on a repeat check`, never
+`DID NOT COMPLETE` and never `DISAGREED`. This is what makes running the verify
+never worse than skipping it.
+
+**P2 — a disagreement is never lost.** Any sequence containing a `verifyFailed`
+prints either `DISAGREED`, or the repeat-check line if a later attempt passed
+cleanly. It never prints bare `VERIFIED` and never `DID NOT COMPLETE`.
+
+#### ENUMERATED — every sequence, and what it prints
+
+`S` = skip / never offered. Derived by executing the switch above, not by
+argument.
+
+| sequence | sawDisagreement | final res | prints |
 | --- | --- | --- | --- |
-| `S` | not-verified | — | `NOT VERIFIED` |
-| `complete` | verified | pass | `VERIFIED` |
-| `incomplete` then stop | did-not-complete | — | `DID NOT COMPLETE` |
-| `refused` / `abandoned` | did-not-complete | — | `DID NOT COMPLETE` |
-| `failed` then stop | disagreed | — | `DISAGREED` |
-| `failed` → `abandoned` | disagreed | — | `DISAGREED` *(R1 C-1's case)* |
-| `failed` → `incomplete` | disagreed | — | `DISAGREED` |
-| `incomplete` → `complete` | did-not-complete | pass | `VERIFIED on a repeat check` *(R2 C-2's case)* |
-| `failed` → `complete` | disagreed | pass | `VERIFIED on a repeat check` |
-| `incomplete` → `failed` → `complete` | disagreed | pass | `VERIFIED on a repeat check` |
+| `S` | false | *(none)* | `NOT VERIFIED` |
+| `complete` | false | complete | `VERIFIED` |
+| `incomplete` then stop | false | incomplete | `DID NOT COMPLETE` |
+| `refused` / `abandoned` | false | that | `DID NOT COMPLETE` |
+| `incomplete` → `complete` | false | complete | `VERIFIED` |
+| `failed` then stop | **true** | failed | `DISAGREED` |
+| `failed` → `abandoned` | **true** | abandoned | `DISAGREED` |
+| `failed` → `incomplete` | **true** | incomplete | `DISAGREED` |
+| `failed` → `complete` | **true** | complete | `VERIFIED on a repeat check` |
+| `incomplete` → `failed` → `complete` | **true** | complete | `VERIFIED on a repeat check` |
 
-**The incentive invariant this must satisfy, and which R1 violated twice:**
-*running the verify can never produce a worse line than skipping it.* Every row
-above is at least as good as `NOT VERIFIED` whenever a pass was achieved, and no
-row lets a successful check print a non-pass line.
-
+The retry space is unbounded, but the switch depends only on `sawDisagreement`
+and the final `res`, so these ten rows are the complete image of it — an honest
+statement of coverage, where the previous table's "every sequence" header
+overclaimed.
 **The repeat-check state is a controller decision derived from the persisted C-1
 principles, not a new operator ruling** — flagged so the next reviewer reads it
 as an addition rather than as something already blessed.
@@ -776,10 +826,12 @@ signature change on the multisig side at all", reasoning that `extra` already
 existed. Wrong — the document needs **two** insertion points, front and back:
 the status line leads, the wallet facts follow, the inventory trails. One
 trailing parameter cannot express that, so `multisigRestoreDocFlow` **does**
-change signature, at both call sites. §3.2 is corrected to match.
+change signature, at all THREE call sites (§4.7b). §3.2 is corrected to match.
 
-**Single-sig** gets its own status type (§4.7c) and threads the worst-seen
-outcome into the same new leading parameter §4.2 adds to `restoreDocFlow`.
+**Single-sig** gets the same `verifyStatus` (§4.7c) and threads it into the
+leading parameter §4.2 adds to `restoreDocFlow`. It has **no retry loop**, so its
+two sticky facts collapse to a single assignment at each of the eleven exits —
+which is why §4.7c requires that mapping be written and reviewed *first*.
 
 #### 4.7c THE STATUS TYPE, AND WHY ITS ZERO VALUE IS "NOT VERIFIED" (R2 I-1, I-2)
 
@@ -839,6 +891,29 @@ That is the gate's declared blind spot doing its job by being declared.
 no verify offer and no document, because the set on the bench is incomplete.
 This section governs only sets that were fully **cut**.
 
+## 4.8 BUILD ORDER — what to do first, and what can land on its own
+
+The comprehension review found the plan gave none, and that its single ordering
+sentence was wrong. Nine steps. **Each of 1–8 leaves the tree green**, so the
+work is landable in pieces rather than all-or-nothing.
+
+| # | step | why here |
+| --- | --- | --- |
+| 1 | **Write the single-sig exit → `verifyStatus` mapping** (§4.7c) and get it reviewed | eleven exits, and every later step depends on it. Nothing else starts until it is agreed. |
+| 2 | `verifyStatus` + `buildVerifyStatusLines` + T9, T13a, T13b, T14 | pure functions, no callers yet, fully unit-testable |
+| 3 | `seedCapacity` + the two-axis ruling + `buildSeedInventoryLines` (§4.3, §4.4), updating the six existing call sites | shared census; still no flow changes |
+| 4 | `restoreDocFlow` and `multisigRestoreDocFlow` gain `status` + `extra` (§4.2, §4.7b), **all three call sites** | signature change; the tree must stay green across it |
+| 5 | Wire single-sig: label (§4.1), inventory, census (§4.6), abort gate (§4.5) | the F-198/F-195/F-197/F-202 body of work |
+| 6 | Update the three walks that the census screen stops (§5.1b) | must accompany step 5, not follow it |
+| 7 | Wire the verify status into all three flows, plus T10–T12 | needs 2, 4 and 5 in place |
+| 8 | Correct the three false comments (§4.7b) + T8 | independent; deliberately last so it cannot mask a behavioural regression |
+| 9 | Update `SPEC_seedhammer_T6a_singlesig_flagship.md` (§3.1.7), **in its own commit** | the spec follows the behaviour, and is not mixed with it |
+
+**Step 1 is a gate, not a task.** It produces a table of eleven rows, it is
+reviewed before step 2 begins, and it is the one place this plan deliberately
+delegates a decision — so it does not get made silently inside an
+implementation.
+
 ## 5. Test plan
 
 **Every test below must be shown to FAIL against the unfixed tree.** A green
@@ -863,7 +938,8 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T10** | **the stickiness.** `failed` → `abandoned` prints `DISAGREED`, **not** `DID NOT COMPLETE` | implement as last-wins — precisely what the round-0 fold specified |
 | **T11** | the status line is at **slice index 0** of what `restoreDocScreen` receives — asserted **through a production flow**, not on a helper | pass it via the trailing `extra` parameter, as the round-1 fold specified |
 | **T12** | `incomplete` → `complete` prints the repeat-check line, **not** `DID NOT COMPLETE` and **not** bare `VERIFIED` | cover only `failed → complete` — precisely what the round-1 fold specified |
-| **T13** | **the incentive invariant.** Over every row of §4.7a's table, no sequence containing a clean pass prints a line worse than `NOT VERIFIED` | any ranking regression; this is the property, where T10/T12 are instances |
+| **T13a** | **P1 — a clean pass always prints a pass line.** Table-driven over §4.7a's ten rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
+| **T13b** | **P2 — a disagreement is never lost.** Every sequence containing `verifyFailed` prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
 | **T14** | the zero value of `verifyStatus` renders `NOT VERIFIED` | reorder the constants so `statusVerified` is 0 — the mutation that makes a forgotten assignment vouch |
 
 **T9–T14 must pin a PRODUCTION CALL SITE, not just the pure functions (R2 I-3).**
