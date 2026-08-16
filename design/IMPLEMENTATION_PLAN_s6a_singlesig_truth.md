@@ -762,7 +762,50 @@ written to fix the previous Critical. The requirement never needed a lattice:
   sittings, and prints `VERIFIED`. This closes R2 C-2 by correcting the
   requirement rather than by widening an exception.
 
-#### 4.7d A WARNING MUST BE EARNED — `verifyFailed` MEANS TWO DIFFERENT THINGS (R4 C-1)
+#### 4.7d SIX STATUSES, ONE PER KNOWLEDGE STATE (R4 C-1, R5 C-1, R5 I-1)
+
+**The classifier's DOMAIN was wrong, not its shape.** Keep classify-then-map and
+the sticky-facts switch; classify **what the device knows**, not what the world
+is. This is evidence reporting, not diagnosis — and the sting is that **the
+screens already speak this frame and only the document lacked it**
+(`gui/multisig_verify.go:42-48`, `:717-724`). The codebase had the idea; two
+folds of this plan failed to adopt it.
+
+**Six statuses, and the number is DERIVED — one per distinguishable knowledge
+state.** If the device gains or loses a way of knowing, the set moves with it.
+
+| # | status | what the device actually knows |
+| --- | --- | --- |
+| 1 | `VERIFIED` | a comparison over plate-derived bytes completed for every plate and every leg matched |
+| 2 | `VERIFIED on a repeat check` | as (1), after an earlier **true** disagreement — one a clean pass does not retro-explain |
+| 3 | `NOT VERIFIED` | no attempt ran; the device observed nothing |
+| 4 | `DID NOT COMPLETE` | an attempt ran and ended with **no adverse observation about the plates** — seed typo, refusal, abandon, incomplete. It knows only that it does not know |
+| 5 | `DISAGREED` | a comparison of plate-derived bytes against this run's intent ran and diverged, **with no ambiguity of provenance**. The only status that may condemn |
+| 6 | **`PLATES UNACCOUNTED FOR`** *(new)* | an **adverse but ambiguous** observation: W holds both an operator-procedure world and a bad-plate world |
+
+**Status 6 is where the entire Critical-generating residue lands** —
+`errVerifyLegHasNoPlate`, the foreign-or-garbled md1 at `:719`, the garbled mk1
+skipped at claiming, and the hand-typed ms1 divergence (R5 I-1). *That every
+defect of rounds 4 and 5 falls into the one status that did not exist is the
+strongest evidence this is the right set.*
+
+Its line states **both readings and both actions**, exactly as the `:963` screen
+already does:
+
+> `Some plates could not be checked against this run. Either a plate was not presented, or it is not one this run cut. Present every plate this run engraved and check again; if this repeats, re-cut the set.`
+
+**Mechanically:** one more sticky fact — `sawDisagreement` and `sawUnaccounted`,
+with explicit switch-arm order, `DISAGREED` outranking `UNACCOUNTED`. Same shape
+as before; **not** a resurrected severity lattice, because both are booleans over
+observations rather than a ranking over verdicts.
+
+**The repeat-check wording is settled by P4 too.** After a **full** clean pass
+every plate this run cut was presented and matched, so an earlier *pairing*
+failure is retro-explained as procedural — W collapses to "plates fine" — and
+plain `VERIFIED` is earned. An earlier **true** disagreement is not
+retro-explained by a later pass and keeps its note.
+
+##### The old §4.7d, kept because its measurement still holds — `verifyFailed` MEANS TWO DIFFERENT THINGS
 
 **Keying the condemning line on `verifyFailed` stamps an unclearable "Do NOT rely
 on this backup" onto a document describing PERFECTLY GOOD STEEL.** Measured, only
@@ -783,10 +826,13 @@ to re-cut plates that are perfectly good."* The plan re-committed at the
 **document** level the error the code warns about at the **screen** level — and
 the document is the durable artifact, so it is worse there.
 
-**The fix puts the distinction in the TYPE, where a future call site cannot
-re-conflate it.** A new verdict `verifyMismatch` is returned at `:963` and `:984`
-only; `:719`, `:724` and `:897` keep `verifyFailed`. `sawDisagreement` is set on
-`verifyMismatch` alone. Non-comparison failures therefore print
+**SUPERSEDED AS A FIX, RETAINED AS A MEASUREMENT.** The R4 fold responded by
+adding a verdict `verifyMismatch` at `:963`/`:984` only. R5 showed the **site is
+not uniform either** — `errVerifyLegHasNoPlate` (`gui/multisig_verify.go:394`)
+returns from inside those very sites **before any comparison runs**. So the split
+is now made **per return path, per error, and per comparand provenance** (P4),
+and lands in the six statuses above. The five-site table below remains true and
+remains useful; it is simply not fine-grained enough to be the classifier. Non-comparison failures therefore print
 `DID NOT COMPLETE` — *"Confirm they restore before relying on this backup"* —
 which is true, actionable, and does not condemn.
 
@@ -817,21 +863,47 @@ is `verifyComplete` prints `VERIFIED` or `VERIFIED on a repeat check`, never
 `DID NOT COMPLETE` and never `DISAGREED`. This is what makes running the verify
 never worse than skipping it.
 
-**P2 — a disagreement is never lost.** Any sequence containing a
-`verifyMismatch` prints either `DISAGREED`, or the repeat-check line if a later
-attempt passed cleanly. It never prints bare `VERIFIED` and never
-`DID NOT COMPLETE`.
+**P2 — an ADVERSE OBSERVATION is never lost.** (Was "a disagreement is never
+lost"; repaired, because "disagreement" is a world-fact and the device holds
+observations.) Any sequence containing an adverse observation prints a line that
+carries it — `DISAGREED`, `PLATES UNACCOUNTED FOR`, or the repeat-check line —
+never bare `VERIFIED` and never `DID NOT COMPLETE`.
 
-**P3 — A WARNING MUST BE EARNED.** No sequence prints `DISAGREED` unless a
-comparison actually **ran and disagreed** (§4.7d). A structural refusal, an
-undecodable readback, or a mistyped seed at verify time must never condemn the
-plates.
+**P4 — A LINE MAY NEVER OUTRUN THE EVIDENCE.** For every reachable outcome —
+enumerated **per return path, per error, and per comparand provenance**, never
+per verdict and never per site — let **W** be the set of world-states consistent
+with everything the device observed on the way there. Every factual claim and
+every instruction in the printed line must be true in **every** member of W. If W
+contains worlds demanding different operator actions, the line must **state the
+ambiguity and cover both actions**; it may not pick one world and assert it.
 
-**P3 exists because P1 and P2 both constrain the SAME direction.** Both guard
-against *under*-warning; nothing guarded against *over*-condemning, and the
-asymmetry was invisible for four rounds precisely because having two properties
-read as rigour. A cycle whose subject is a device that lies by omission produced
-a design that lies by accusation.
+**P4 replaces P3, which it subsumes** (P3 is P4 restricted to the `DISAGREED`
+line), and it is why the previous two Criticals kept regenerating one level down.
+
+**THE DIAGNOSIS, and it is the reason this round changed the frame rather than
+the classifier.** P1, P2 and P3 all had **world-fact** antecedents — *"a
+comparison disagreed"*. The device does not have world-facts. It has
+**observations**, some of which are consistent with several worlds. A world-fact
+can only ever be implemented through a **proxy**, and any proxy can conflate
+worlds — so the defect regenerates forever: round 4 moved the proxy from the
+verdict to the site, round 5 found the site's own error set was not uniform
+either. **P4 is stated over the evidence, so there is no next level to move to.**
+
+**P4 catches all three prior findings mechanically rather than case by case** —
+which is the test of a property worth having. R4's C-1: at verdict granularity, W
+for `verifyFailed` contains seed-typo worlds, so *"a read-back check DISAGREED
+with these plates"* is false in a member of W. R5's C-1: at the
+`errVerifyLegHasNoPlate` path, W contains the forgot-a-plate world — same
+failure. R5's I-1, unprompted: a hand-typed ms1 divergence has a W containing
+*"one-character transcription typo, plates perfect"*.
+
+**THE ENFORCEMENT IS AN ARTIFACT, NOT A HABIT.** The review deliverable is a
+table keyed by **observation**, each row naming its W and its line, and
+
+> **a row with |W| > 1 may not carry a line that asserts a single member of W.**
+
+That check cannot be dodged by moving down a level, because its unit is the
+world-set rather than any proxy for it.
 
 #### ENUMERATED — every sequence, and what it prints
 
@@ -1099,9 +1171,10 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T11** | the status line is at **slice index 0** of what `restoreDocScreen` receives — asserted **through a production flow**, not on a helper | pass it via the trailing `extra` parameter, as the round-1 fold specified |
 | **T12** | `incomplete` → `complete` prints **bare `VERIFIED`** (nothing ever disagreed), and `mismatch` → `complete` prints the **repeat-check** line. Neither prints `DID NOT COMPLETE` | cover only `failed → complete` — precisely what the round-1 fold specified |
 | **T7c** | **the capacity WIRING**, per path: drive each of the three flows to its restore document and assert the seed-handling subject clause matches that path's capacity (build → `Every seed`; supply and single-sig → `The seed you entered`) | swap either call site's capacity argument — a mutation no compiler and no current test detects |
-| **T13a** | **P1 — a clean pass always prints a pass line.** Table-driven over §4.7a's twelve rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
-| **T13b** | **P2 — a disagreement is never lost.** Every sequence containing `verifyMismatch` prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
-| **T15** | **P3 — a warning is EARNED.** Each of the three non-comparison `verifyFailed` sites (`:719` foreign plates, `:724` undecodable, `:897` seed typo) yields `DID NOT COMPLETE`, **never** `DISAGREED` | set `sawDisagreement` on `verifyFailed` instead of `verifyMismatch` — precisely what rounds 1–4 of this plan specified |
+| **T13a** | **P1 — a clean pass always prints a pass line.** Assert the **whole line, byte-exact**, against the six-line table in §4.7d — **never `strings.Contains`**. Table-driven over §4.7a's twelve rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
+| **T13b** | **P2 — an ADVERSE OBSERVATION is never lost.** Every sequence containing one prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
+| **T15** | **P4 — the line does not outrun the evidence.** The §4.7d **observation table** is the test fixture: one row per return path / error / comparand provenance, each naming its world-set W and its line. Assert (a) every row's line is true in every member of its W, and (b) **no row with `|W| > 1` carries a line asserting a single member** | give `errVerifyLegHasNoPlate` the `DISAGREED` line — precisely what the R4 fold specified, and R5's Critical |
+| **T15b** | `errVerifyLegHasNoPlate`, the `:719` foreign-or-garbled md1, and a hand-typed ms1 divergence each yield `PLATES UNACCOUNTED FOR` — **never** `DISAGREED` and **never** `DID NOT COMPLETE` | route any of them to either neighbour; the first is R5's C-1, the second its I-1 |
 | **T14** | the zero value of `verifyStatus` renders `NOT VERIFIED` | reorder the constants so `statusVerified` is 0 — the mutation that makes a forgotten assignment vouch |
 
 **T10, T12, T13a and T13b CANNOT RUN ON THE SINGLE-SIG PATH, and §5 put every
@@ -1114,6 +1187,35 @@ they name — the exact vacuity §5.2 warns about for T5, one section later.
 
 Consequence for §4.8's build order: step 7 is where these land, and it needs a
 multisig walk, not the single-sig harness §1.7 lists as prior art.
+
+**NO SUBSTRING ASSERTIONS ON STATUS LINES — they do not bite (R5 I-3).**
+Measured over the six lines:
+
+    Plates VERIFIED: ...                 contains "VERIFIED"
+    Plates VERIFIED on a repeat check... contains "VERIFIED" AND "DISAGREED"
+    Plates NOT VERIFIED. ...             contains "VERIFIED"   <-- the trap
+    WARNING: ... DISAGREED ...           contains "DISAGREED"
+
+**Three of six contain `VERIFIED` and two contain `DISAGREED`**, so a
+`Contains("VERIFIED")` assertion passes on the *not-verified* line and T13a's own
+named mutation survives it. Every status assertion compares the **entire string**
+against the §4.7d table, which also makes a reworded line a deliberate test
+update rather than a silent pass.
+
+**THREE shipped tests pin the retry-loop condition, and §5.1 named none (R5
+I-2).** The `verifyMismatch` split changes that condition, so all three must be
+updated **in the same commit** or the atomic 5+6+7 landing is red:
+
+| test | what it pins |
+| --- | --- |
+| `gui/multisig_verify_report_test.go:166` | the flow returns `verifyFailed` so the caller can re-offer |
+| `gui/multisig_verify_report_test.go:759` | same, second site |
+| `gui/multisig_verify_report_test.go:1093` | the loop condition's **source text**, `res != verifyIncomplete && res != verifyFailed` |
+
+The third is the dangerous one: it is a **source assertion**, so it fails the
+moment the condition gains `&& res != verifyMismatch`, and the obvious repair —
+relaxing the string — is exactly the weakening §5.1 forbids. It must be updated
+to the new condition verbatim, not loosened.
 
 **T9–T14 must pin a PRODUCTION CALL SITE, not just the pure functions (R2 I-3).**
 Round 1's C-2 was that the Critical had no test; round 1 answered it with tests
