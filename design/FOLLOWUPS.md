@@ -7150,3 +7150,42 @@ typed fills no slot"*, and those want different next actions from the operator.
 `TestBothEngraveFlowsDriveTheRetryLoop` already drives the offer through a seam
 that can return any verdict, **so a verdict-specific lead is now assertable at
 flow level** — the mechanism to fix this properly landed with B4.
+
+### F-202 — the SINGLE-SIG engrave shows no pre-engrave plate census (owning phase: **S6a — `IMPLEMENTATION_PLAN_s6a_singlesig_truth.md`, in scope, not deferred**) `#seedhammer`
+
+Found 2026-08-16 by the controller during the S6a recon, and **not previously
+filed by anyone**. It is recorded here for the record and is being fixed inside
+S6a — it entered that plan *before* its R0 gate, so it is reviewed rather than
+folded in around the gate.
+
+Measured: `buildPlateCensusLines` is called at exactly two sites, both multisig —
+
+    grep -rn "buildPlateCensusLines" --include="*.go" gui/ | grep -v _test
+    # gui/multisig_build.go:394 and gui/multisig.go:271 only.
+
+So the single-sig operator commits to a 2- or 3-plate cut — minutes of
+irreversible machine time per plate — with no count on any screen. Both multisig
+paths show one, behind `confirmReviewScreen`, where Back is still free.
+
+It is the same family as F-198/F-195 (**the flow is silent about the set**), one
+step earlier: those are silences on the document read years later, this one is a
+silence at the machine. S4 built the census for exactly this and wired it to two
+of the three engraving paths.
+
+Rated **Minor** and not Important because nothing is lost: an operator who runs
+out of blanks has cut real plates but the encoders are deterministic, so a re-run
+mints byte-identical plates (`TestReRunMintsByteIdenticalPlates`). The cost is
+wasted blanks and wasted hours, not funds.
+
+### F-203 — the two multisig paths give the plate census two different titles (owning phase: **none — cross-cutting Nit, batches to the end**) `#seedhammer`
+
+Found 2026-08-16 alongside F-202. The same census screen is titled **"Plate
+Count"** on the BUILD path (`gui/multisig_build.go:394`) and **"Plates To Cut"**
+on the SUPPLY path (`gui/multisig.go:279`).
+
+Neither is wrong and no funds ride on it. S6a adds a third instance and picks
+`"Plates To Cut"` for single-sig — matching the other front-door path rather than
+the one behind the EXPERIMENTAL warning — so the split becomes 2:1 rather than
+1:1. Deliberately **not** unified inside S6a: renaming a screen title on a path
+S6a otherwise does not touch is scope creep into a reviewed diff, and the whole
+value of the census work is that it went through the gate.
