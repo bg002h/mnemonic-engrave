@@ -66,7 +66,15 @@ for path in sys.argv[1:]:
         if s.startswith("> ") and not s.startswith("> **"):
             cands.append(s[2:])
         # Backticked spans long enough to be a sentence rather than an identifier.
-        cands += re.findall(r"`([^`]{40,})`", s)
+        #
+        # EXTRACT ALL SPANS FIRST, THEN FILTER BY LENGTH. Putting the {40,} inside
+        # the regex looks equivalent and is not: the scanner SKIPS short spans
+        # instead of consuming them, so a later backtick pairs with an earlier
+        # unconsumed one and the "span" captured is the PROSE GAP between two
+        # separate code spans. On a markdown table row that reliably reports an em
+        # dash in ordinary text as an undrawable device string -- which is exactly
+        # how this bug was found, by the gate misfiring on a requirements doc.
+        cands += [m for m in re.findall(r"`([^`]+)`", s) if len(m) >= 40]
         for c in cands:
             scanned += 1
             hits = sorted({ch for ch in c if ch in BANNED})
