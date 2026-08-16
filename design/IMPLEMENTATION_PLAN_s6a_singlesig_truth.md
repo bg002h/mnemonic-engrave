@@ -729,11 +729,17 @@ written to fix the previous Critical. The requirement never needed a lattice:
 
     status := statusNotVerified      // zero value. No attempt has run.
     sawDisagreement := false         // zero value. Nothing has disagreed.
+    sawUnaccounted  := false         // zero value. Nothing was left unchecked.
 
-    // ...inside the existing offer loop, per attempt, changing no control flow:
-    res := <verify>
-    if res == verifyMismatch {   // NOT verifyFailed -- see 4.7d
+    // ...inside the existing offer loop, per attempt, changing no control flow.
+    // The observation is classified per RETURN PATH / ERROR / PROVENANCE (P4),
+    // never per verdict and never per site -- see the 4.7e observation table.
+    res, obs := <verify>             // obs is the classified observation
+    switch obs {
+    case obsDisagreed:               // a plate-derived comparison diverged
         sawDisagreement = true       // STICKY. A later attempt cannot un-see it.
+    case obsUnaccounted:             // adverse but AMBIGUOUS -- |W| > 1
+        sawUnaccounted = true        // STICKY, and outranked by obsDisagreed.
     }
     switch {
     case res == verifyComplete && sawDisagreement: status = statusVerifiedOnRetry
@@ -767,8 +773,13 @@ written to fix the previous Critical. The requirement never needed a lattice:
 **The classifier's DOMAIN was wrong, not its shape.** Keep classify-then-map and
 the sticky-facts switch; classify **what the device knows**, not what the world
 is. This is evidence reporting, not diagnosis — and the sting is that **the
-screens already speak this frame and only the document lacked it**
-(`gui/multisig_verify.go:42-48`, `:717-724`). The codebase had the idea; two
+screens already speak this frame and only the document lacked it** —
+`gui/multisig_verify.go:427-429`, verbatim: *"Either that plate was not
+presented, or it is not the one this run cut."* (An earlier draft of this
+sentence cited `:42-48`, which is **confident single-world diagnosis** — *"what
+actually happened is that the steel in their hands belongs to a different
+wallet"* — the opposite of ambiguity framing. The claim was right and the
+citation was wrong.) The codebase had the idea; two
 folds of this plan failed to adopt it.
 
 **Six statuses, and the number is DERIVED — one per distinguishable knowledge
@@ -852,7 +863,7 @@ document fix. Named so a reviewer does not read it as missed.
 this kind and no retry loop. The mapping produced at build-order step 1 must
 state which of its eleven exits, if any, are genuine comparisons.
 
-#### THE TWO PROPERTIES THIS MUST SATISFY — testable, unlike the old "invariant"
+#### THE THREE PROPERTIES THIS MUST SATISFY — testable, unlike the old "invariant"
 
 The R2 fold asserted an "incentive invariant" phrased as a ranking claim, and R3
 showed it false on its own ordering. Ranking is not the property anyone cares
@@ -933,13 +944,92 @@ overclaimed.
 principles, not a new operator ruling** — flagged so the next reviewer reads it
 as an addition rather than as something already blessed.
 
-| outcome | line (verbatim, ASCII only) |
-| --- | --- |
-| clean pass, first try | `Plates VERIFIED: each plate was read back and matched.` |
-| clean pass after an earlier disagreement | `Plates VERIFIED on a repeat check, after an earlier read-back DISAGREED. Confirm they restore before relying on this backup.` |
-| skipped / never offered | `Plates NOT VERIFIED. Confirm they restore before relying on this backup.` |
-| incomplete / refused / abandoned, none worse | `Plate verification DID NOT COMPLETE. Confirm they restore before relying on this backup.` |
-| a comparison disagreed and was never cleared | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup: engrave a fresh set and check it before use.` |
+| # | status | line (verbatim, ASCII only) |
+| --- | --- | --- |
+| 1 | `statusVerified` | `Plates VERIFIED: each plate was read back and matched.` |
+| 2 | `statusVerifiedOnRetry` | `Plates VERIFIED on a repeat check. An earlier read-back disagreed; a later check read every plate and matched.` |
+| 3 | `statusNotVerified` | `No check was run on these plates. Confirm they restore before relying on this backup.` |
+| 4 | `statusDidNotComplete` | `Plate verification DID NOT COMPLETE. Confirm they restore before relying on this backup.` |
+| 5 | `statusUnaccounted` | `Some plates could not be checked against this run. Either a plate was not presented, or it is not one this run cut. Present every plate this run engraved and check again; if this repeats, re-cut the set.` |
+| 6 | `statusDisagreed` | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup: engrave a fresh set and check it before use.` |
+
+**Six rows, matching §4.7c's six constants and §4.7d's six knowledge states.** An
+earlier draft carried five here while the prose above already argued for six —
+the frame had been changed in prose only, and the artifacts a reader would build
+from still described the old design.
+
+**I-2 and I-3, from the reader lens, are folded into the table above.**
+`Plates NOT VERIFIED` and `Plates VERIFIED` differed by **one leading word** at
+the highest-stakes position on the page — the very ambiguity §5 forbids in the
+*test suite* (three of six lines contain `VERIFIED`), shipped to a human reader
+who has no compiler. Status 3 now leads with `No check was run`, sharing no token
+with the pass lines. And status 2, the one PASS that mentions a disagreement, no
+longer closes with the same hedge as the two UNKNOWN statuses; it now states the
+resolution instead of hedging it.
+
+#### 4.7f THE STATUS MUST SCOPE THE PAGE BENEATH IT (R6 reader I-1)
+
+**The status line leads the document, and nothing below it was conditioned on
+it.** Under `DISAGREED` or `PLATES UNACCOUNTED FOR`, the inventory, seed,
+passphrase and seed-handling text was **byte-identical to the healthy case** —
+including a line reading *"make sure whoever needs **this backup** can also get
+the passphrase"*, reusing the exact phrase the status line had just said not to
+rely on.
+
+**That is this cycle's own defect one level up.** A page that warns in its first
+line and then describes a healthy backup for the rest of its length is a document
+vouching against the device's own evidence — F-198's shape at document scale
+rather than sentence scale.
+
+**The fix is one conditional line, not a rewrite of every downstream string.**
+When the status is adverse — `statusDisagreed` or `statusUnaccounted` — a
+**scoping line** renders immediately after it:
+
+> `Everything below describes what this run INTENDED to engrave. Until the check above is resolved, do not assume the plates match it.`
+
+**Why a scope line rather than conditional rewording throughout.** Rewording the
+inventory, seed and passphrase blocks per status multiplies six statuses across
+every downstream line, and each variant is a new string nobody has read — the
+combinatorial version of the defect this cycle keeps producing. One line that
+**re-frames** the rest is true under every status, needs no per-block variants,
+and cannot drift out of agreement with them.
+
+**It is P4-clean:** it asserts only that the text below states *intent*, which is
+true in every world consistent with any observation, and it prescribes no action
+that could be wrong.
+
+#### 4.7e THE OBSERVATION TABLE — P4's enforcement artifact
+
+**P4 is enforced by this table, and T15 tests it.** One row per **return path /
+error / comparand provenance** — never per verdict, never per site, because both
+of those proxies have already failed. `W` is the set of world-states consistent
+with what the device observed.
+
+| observation | where | W — worlds consistent with it | \|W\| | status |
+| --- | --- | --- | --- | --- |
+| no attempt ran | operator pressed Skip | *(nothing observed)* | — | `statusNotVerified` |
+| every leg matched its plate | `:984` success | the steel encodes this run's intent | 1 | `statusVerified` |
+| a plate-derived comparison diverged | `verifyMultisigLegs` mismatch | this plate is not what this run cut | 1 | `statusDisagreed` |
+| **no plate carries a leg's key** | `errVerifyLegHasNoPlate`, `gui/multisig_verify.go:394` | **(a)** a plate was not presented; **(b)** it is not one this run cut | **2** | `statusUnaccounted` |
+| **readback md1 ≠ engraved md1** | `:719` | **(a)** foreign wallet's plates; **(b)** this run's md1, garbled in the read | **2** | `statusUnaccounted` |
+| **readback will not decode** | `:724` | **(a)** a miscut plate; **(b)** an NFC read error | **2** | `statusUnaccounted` |
+| **hand-typed ms1 diverges** | ms1 comparand is **operator-typed**, not plate-derived | **(a)** the plate is wrong; **(b)** a transcription typo | **2** | `statusUnaccounted` |
+| re-typed seed will not derive | `:897` | the operator mistyped the seed; nothing observed about the plates | 1 | `statusDidNotComplete` |
+| operator abandoned / refused | loop exit | nothing observed about the plates | 1 | `statusDidNotComplete` |
+
+**The rule this table exists to enforce, and it is mechanical:**
+
+> **A row with `|W| > 1` may not carry a line that asserts a single member of W.**
+
+Every `|W| = 2` row above lands in `statusUnaccounted`, whose line states **both**
+readings and **both** actions. That is why the sixth status is not a nicety: it is
+the only line that can be true of a two-world observation.
+
+**Provenance is a first-class column, not a detail.** The ms1 row is
+`|W| = 2` *solely* because its comparand was typed by a human rather than read
+from a plate. Two identical-looking comparison failures classify differently on
+provenance alone — which is exactly what "per comparand provenance" in P4 means,
+and what a per-site or per-verdict split can never express.
 
 **"matched", not "matched the seed" (R1 I-3).** The singular contradicted §4.4's
 own *"YOUR seeds"* on a multi-master build, in the same document. Dropping the
@@ -1008,6 +1098,7 @@ So the status is its own small type, distinct from the verdict:
         // Critical, reachable by forgetting one assignment.
         statusNotVerified verifyStatus = iota
         statusDidNotComplete
+        statusUnaccounted        // adverse but ambiguous -- 4.7d status 6
         statusDisagreed
         statusVerifiedOnRetry
         statusVerified
@@ -1166,7 +1257,7 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T6** | the single-sig run reaches `Plates To Cut` before the engrave picker | remove the census call |
 | **T7** | `seedCapacityOne` yields `The seed you entered` and not `Every seed`; `seedCapacityMany` yields `Every seed`; **and every new operator string is ASCII-clean** (the glyph set at `gui/multisig_build_prose_test.go:395`) | swap the capacity arms; insert an em dash |
 | **T8** | `gui/bundle_flow.go` no longer claims `both engraving callers` (source assertion, mirroring the `readGuiFile` pattern at `gui/multisig_build_prose_test.go:402`) | restore the old comment |
-| **T9** | each of the five §4.7c statuses renders **its own** line, and every rendered document carries **exactly one** — over `buildVerifyStatusLines` | return the same string for two statuses; return an empty slice |
+| **T9** | each of the **six** §4.7c statuses renders **its own** line, and every rendered document carries **exactly one** — over `buildVerifyStatusLines` | return the same string for two statuses; return an empty slice |
 | **T10** | **the stickiness.** `mismatch` → `abandoned` prints `DISAGREED`, **not** `DID NOT COMPLETE` | implement as last-wins — precisely what the round-0 fold specified |
 | **T11** | the status line is at **slice index 0** of what `restoreDocScreen` receives — asserted **through a production flow**, not on a helper | pass it via the trailing `extra` parameter, as the round-1 fold specified |
 | **T12** | `incomplete` → `complete` prints **bare `VERIFIED`** (nothing ever disagreed), and `mismatch` → `complete` prints the **repeat-check** line. Neither prints `DID NOT COMPLETE` | cover only `failed → complete` — precisely what the round-1 fold specified |
@@ -1174,6 +1265,7 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T13a** | **P1 — a clean pass always prints a pass line.** Assert the **whole line, byte-exact**, against the six-line table in §4.7d — **never `strings.Contains`**. Table-driven over §4.7a's twelve rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
 | **T13b** | **P2 — an ADVERSE OBSERVATION is never lost.** Every sequence containing one prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
 | **T15** | **P4 — the line does not outrun the evidence.** The §4.7d **observation table** is the test fixture: one row per return path / error / comparand provenance, each naming its world-set W and its line. Assert (a) every row's line is true in every member of its W, and (b) **no row with `|W| > 1` carries a line asserting a single member** | give `errVerifyLegHasNoPlate` the `DISAGREED` line — precisely what the R4 fold specified, and R5's Critical |
+| **T16** | under `statusDisagreed` and `statusUnaccounted`, the scoping line (§4.7f) renders immediately after the status line; under the four non-adverse statuses it does **not** render | drop the condition and render it always, or never — the first cries wolf on a clean backup, the second is R6's I-1 |
 | **T15b** | `errVerifyLegHasNoPlate`, the `:719` foreign-or-garbled md1, and a hand-typed ms1 divergence each yield `PLATES UNACCOUNTED FOR` — **never** `DISAGREED` and **never** `DID NOT COMPLETE` | route any of them to either neighbour; the first is R5's C-1, the second its I-1 |
 | **T14** | the zero value of `verifyStatus` renders `NOT VERIFIED` | reorder the constants so `statusVerified` is 0 — the mutation that makes a forgotten assignment vouch |
 
@@ -1191,14 +1283,18 @@ multisig walk, not the single-sig harness §1.7 lists as prior art.
 **NO SUBSTRING ASSERTIONS ON STATUS LINES — they do not bite (R5 I-3).**
 Measured over the six lines:
 
-    Plates VERIFIED: ...                 contains "VERIFIED"
-    Plates VERIFIED on a repeat check... contains "VERIFIED" AND "DISAGREED"
-    Plates NOT VERIFIED. ...             contains "VERIFIED"   <-- the trap
-    WARNING: ... DISAGREED ...           contains "DISAGREED"
+    Plates VERIFIED: ...                  contains "VERIFIED"
+    Plates VERIFIED on a repeat check...  contains "VERIFIED"
+    No check was run on these plates. ... contains NEITHER   (was the trap)
+    WARNING: ... DISAGREED ...            contains "DISAGREED"
 
-**Three of six contain `VERIFIED` and two contain `DISAGREED`**, so a
-`Contains("VERIFIED")` assertion passes on the *not-verified* line and T13a's own
-named mutation survives it. Every status assertion compares the **entire string**
+**Recounted after the §4.7d rewording: two of six contain `VERIFIED`, one
+contains `DISAGREED`.** The original trap — `Plates NOT VERIFIED` matching
+`Contains("VERIFIED")`, which let T13a's own named mutation pass — is **gone**,
+because the reader lens forced status 3 to stop sharing a token with the pass
+lines (§4.7d, R6 I-2). The rule survives its own fix: even at two of six, a
+substring assertion cannot distinguish status 1 from status 2, so assertions
+still compare whole strings. Every status assertion compares the **entire string**
 against the §4.7d table, which also makes a reworded line a deliberate test
 update rather than a silent pass.
 
