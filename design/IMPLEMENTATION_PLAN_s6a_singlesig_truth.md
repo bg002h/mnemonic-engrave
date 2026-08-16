@@ -226,6 +226,7 @@ Decided by the operator stand-in; full reasoning in
 | id | severity | what |
 | --- | --- | --- |
 | **F-198** | **Critical** | the single-sig passphrase label, and a restore document that has no inventory at all |
+| **C-1** | **Critical (new, R0)** | a restore document that vouches for plates the device has just said are wrong — **on all three paths** (§4.7) |
 | F-197 | Important | the single-sig engrave does not stop on an aborted set — plus the false claim in `bundle_flow.go` that says it does |
 | F-195 | Important | no document states outright that a watch-only set contains no seed |
 | **F-202** | Minor (new) | single-sig shows no pre-engrave plate census |
@@ -279,11 +280,18 @@ answer the request did not specify.
    (`gui/multisig.go:279`). The build path says "Plate Count"
    (`gui/multisig_build.go:394`) — a pre-existing inconsistency this plan does not
    fix; filed as **F-203**, ownerless Nit.
-6. **Watch-only single-sig does hold a seed in device memory during the build.**
-   The stand-in flagged this as an untested premise; it is now measured, not
-   assumed: `gui/singlesig.go:41` obtains the mnemonic and `:90` derives from it
-   **unconditionally** — `full` affects only which cards are built at `:126`. So
-   the seed-handling ruling is true in both modes.
+6. **Watch-only single-sig does hold a seed in device memory during the build —
+   but that settles only HALF of the seed-handling sentence.** The measurement is
+   sound: `gui/singlesig.go:41` obtains the mnemonic and `:90` derives from it
+   **unconditionally**, so the *device-memory* clause is true in both modes.
+   **The first draft then wrote the assumption as though it covered the whole
+   sentence, and it does not** (R0 I-2). The same string ends "the plates are the
+   secret", which is **false on every watch-only run of every path**, and §4.4
+   would have placed a new line saying the opposite four lines above it. §4.3 now
+   conditions that clause on `bundleSetCarriesASecret(cards)` instead. Recorded
+   as an assumption that was *wrong*, not one that held: it is the §1.3 landmine
+   class committed by the plan that named the class — one clause of a shared
+   string audited, the clause beside it not.
 7. **The presence-arm sentence names the inventory label `ms1 secret share` as a
    PREFIX, not an exact string.** Measured: single-sig labels the card exactly
    `"ms1 secret share"` (`gui/singlesig_engrave.go:25`), multisig numbers it via
@@ -291,6 +299,30 @@ answer the request did not specify.
    `"ms1 secret share 1 of 2"`. The wording "the plate marked 'ms1 secret share'"
    is true of both. A future relabel must propagate into these lines; that
    coupling is deliberate and greppable.
+### 3.2 THE R0 ROUND GREW THIS CYCLE — declared, not absorbed quietly
+
+The first draft was a single-sig cycle. **C-1 pulls both multisig paths in**, and
+that is a scope increase the operator should see rather than find in a diff.
+
+**Why it could not be filed.** The same fall-through exists on the multisig
+supply and build paths: the retry loop breaks on `!ok || sel != 0`, so an
+operator who reads a FAILED verify and presses CONTINUE reaches
+`multisigRestoreDocFlow` anyway. The next phase is a **hardware flash where an
+operator cuts real backups**, and the hardware gate itself requires a multisig
+engrave-and-restore (plan §3, S6 items 1, 2 and 4). Filing this would park a
+known funds hole on exactly the territory the next phase enters — and under this
+project's own rule an item scheduled to a phase is not deferrable past it.
+
+**Why it is affordable.** `multisigVerifyResult` already exists with the four
+outcomes the status line needs. The change is to hold the last verdict outside
+the retry loop and pass it to the document. **The retry loop's control flow does
+not change**, no new verdict is introduced, and the same four status strings
+serve all three paths.
+
+**The fallback, stated in advance so it is a decision and not a surprise:** if
+the multisig side turns out to need structural change, it becomes a **named gate
+on the hardware flash** — never a batched follow-up.
+
 
 ---
 
@@ -343,12 +375,54 @@ intent rather than as an opaque boolean:
         seedCapacityMany
     )
 
-`buildPlateInventoryLines(cards, seeds, capacity)` selects the arm:
+**THE RULING HAS TWO INDEPENDENT AXES, NOT ONE (R0 I-2).** The first draft keyed
+the whole sentence on capacity and audited only the clause it had come to fix.
+The sentence contains a second conditional claim:
 
-- `seedCapacityMany` → **byte-identical to today's string.**
-- `seedCapacityOne` → the same sentence with the clause corrected:
+> Do not leave a mid-build machine unattended: **the plates are the secret.**
 
-> Seed handling: this build does not time out. The seed you entered -- this build holds exactly one -- stays in device memory until the build ends, and on a full build the words are also on the plates as they are cut. Do not leave a mid-build machine unattended: the plates are the secret. Power the device off when you are done.
+That is **false on every watch-only run**, on all three paths — and under §4.4 it
+would sit four lines below a new sentence asserting *"no plate in this set holds
+it"*. The document would contradict itself about the one thing it exists to
+settle. §3.1.6 measured that the device holds a seed in memory in watch-only mode
+and wrote the assumption as though it covered the *plates* half too. It does not.
+
+So the ruling is assembled from two selectors:
+
+| axis | source | what it selects |
+| --- | --- | --- |
+| **path capacity** | the `seedCapacity` argument | "The seed you entered -- this build holds exactly one --" vs "Every seed you entered -- this build can hold several --" |
+| **seed on the plates** | `bundleSetCarriesASecret(cards)` — a fact of THIS run | whether the "words are also on the plates" / "the plates are the secret" clauses appear at all |
+
+    base := "Seed handling: this build does not time out. " + subject +
+            " stays in device memory until the build ends"
+
+    subject = "The seed you entered -- this build holds exactly one --"    // seedCapacityOne
+            = "Every seed you entered -- this build can hold several --"   // seedCapacityMany
+
+    // seed IS on the plates:
+    base + ", and on a full build the words are also on the plates as they are cut. " +
+           "Do not leave a mid-build machine unattended: the plates are the secret. " +
+           "Power the device off when you are done."
+
+    // seed is NOT on the plates (watch-only, any path):
+    base + ". Do not leave a mid-build machine unattended: it is holding your seed. " +
+           "Power the device off when you are done."
+
+**Byte-identity check, and what deliberately churns.** `seedCapacityMany` +
+seed-on-plates reassembles the shipped string **byte for byte**, so the multisig
+BUILD path's full-mode document is unchanged. Two documents *do* change, both
+because they are wrong today:
+
+- **multisig SUPPLY, any mode** → the one-seed subject (§3.1.1).
+- **any path, WATCH-ONLY** → loses the "plates are the secret" pair, which is
+  false there.
+
+**"on a full build" is kept verbatim inside the seed-bearing arm** even though
+that arm now fires only on seed-bearing builds, making the qualifier vestigial.
+It is retained because removing it would re-word an S5-reviewed sentence for no
+gain in truth, and byte-identity with reviewed text is worth more than tidiness.
+Flagged here so a reviewer does not read it as an oversight.
 
 **Call sites (all 8, measured):** production `gui/multisig_build.go:479` →
 `seedCapacityMany`; `gui/multisig.go:362` → `seedCapacityOne` (see §3.1.1);
@@ -366,31 +440,65 @@ weakening it to accommodate the new signature is a Critical.
 
 ### 4.4 F-195 — the seed statement, both arms
 
-New function beside the passphrase one, same file:
+New function beside the passphrase one, same file. **It takes no `seedCapacity`
+(R0 I-1):**
 
-    func buildSeedInventoryLines(cards []bundleCard, capacity seedCapacity) []string
+    func buildSeedInventoryLines(cards []bundleCard) []string
 
-Presence is detected with the **existing** `bundleSetCarriesASecret(cards)`
-(`gui/bundle_flow.go:482`) rather than a second `any(kind == cardMS1)` walk — one
-definition of "this set holds a seed", so the abort warning and the restore
-document can never disagree.
+**WHY NOT CAPACITY — the two sentences answer two different questions.** The
+first draft keyed this on the same `seedCapacity` as §4.3, and that is wrong.
+Capacity is a property of the **path** (how many seeds the device can hold), and
+§3.1.2's argument for it holds only for the seed-handling ruling. The seed
+statement is a claim about **what is on the plates in front of the reader** — a
+fact of the *run*. Keying it on capacity makes the ordinary one-slot multisig
+build (the common case: the operator holds one key in a 2-of-3) print
+*"this set CONTAINS seeds … Each plate marked 'ms1 secret share'"* over **one**
+plate — which `numberedLabel` leaves **unnumbered** at n=1
+(`gui/multisig_engrave.go:37`, whose own comment says a one-leg build "reads
+exactly as it always did"). A reader counting one plate against a document
+saying *each* concludes a plate is missing from a complete set, and stops. That
+is the self-vouching defect run backwards, and this document's own prose
+(`gui/multisig_build_census.go:110-114`) names giving-up-on-a-recoverable-backup
+as the failure mode it exists to prevent.
 
-**Absence arm** (watch-only, all paths):
+So the discriminant is the **ms1 card count in `cards`**, counted here. Absence
+still uses the existing `bundleSetCarriesASecret(cards)`
+(`gui/bundle_flow.go:482`) — one definition of "this set holds a seed", so the
+abort warning and the restore document can never disagree.
 
-> Seed: this set contains NO seed. It is watch-only: these plates can rebuild the wallet's addresses but can never spend. If funds must be recovered, the seed must come from somewhere else -- no plate in this set holds it.
+**Absence arm** (no ms1 card — watch-only, any path):
 
-**Presence arm, `seedCapacityOne`:**
+> Seed: this set contains NO seed. It is watch-only: it records the wallet, but it can never spend. If funds must be recovered, the seed words must come from somewhere else -- no plate in this set holds them.
 
-> Seed: this set CONTAINS the seed. The plate marked 'ms1 secret share' in the inventory above is the seed backup -- treat that plate as the secret itself.
+**Presence arm, exactly one ms1 plate:**
 
-**Presence arm, `seedCapacityMany`:**
+> Seed: this set contains YOUR seed, on the plate marked 'ms1 secret share'. Treat that plate as the secret itself.
 
-> Seed: this set CONTAINS seeds. Each plate marked 'ms1 secret share' in the inventory above is a seed backup -- treat each one as the secret itself.
+**Presence arm, several ms1 plates:**
 
-Deliberately **not** claimed on the presence arm: that the seed plates *alone*
-suffice to spend (true on single-sig, false on a k-of-n multisig set), and
-anything about a passphrase (that is the passphrase lines' job, immediately
-after).
+> Seed: this set contains YOUR seeds, on the plates marked 'ms1 secret share'. Treat each of those plates as the secret itself.
+
+**Three things this wording does on purpose:**
+
+1. **"YOUR seed", not "THE seed" (R0 I-3).** The definite article, sitting
+   directly under *"If any of them is missing, this backup is incomplete"*,
+   answers the reader's one question — *is this everything?* — with **yes**. On a
+   2-of-3 that answer is false and costs the recovery. `"your seed"` is true in
+   all six modes and is already the codebase's own word for this fact
+   (`oneSeedPassphraseFact`, `gui/multisig_build_census.go:198`, which feeds
+   *"Needs a passphrase: your seed"*).
+2. **No sufficiency claim in either direction.** It does not say the seed plates
+   alone can spend (false on k-of-n), and it does not say they cannot (false on
+   single-sig). It states presence and consequence, and stops. How many keys must
+   sign is the descriptor's job, on the same page.
+3. **No address claim (R0 M-1).** The earlier draft said the plates "can rebuild
+   the wallet's addresses". On a supplied policy that `expandedToDescriptor`
+   cannot render, the same document already says *"Addresses unavailable for this
+   policy shape."* (`gui/multisig_restore.go:26-31`) — a visible contradiction on
+   the page. "It records the wallet" is true in both cases.
+
+Passphrase facts stay out of these lines entirely; that is the passphrase lines'
+job, immediately after.
 
 **Placement inside `buildPlateInventoryLines`**, so the document reads
 what-it-is → what-it-is-not → how-to-handle-it:
@@ -435,6 +543,72 @@ Back here aborts before anything is cut, which is the last moment that is free.
 
 ---
 
+### 4.7 C-1 — the restore document must say whether the plates were verified
+
+**This is the R0 round's Critical, and the first draft made it worse rather than
+introducing it.** Decision recorded verbatim in
+`design/agent-reports/s6a-c1-verify-tail-decision.md`.
+
+**The defect.** `singleSigVerifyFlow` (`gui/singlesig_verify.go:65`) returns
+**nothing**. Its caller offers it in a one-shot `if sel == 0 { ... }`
+(`gui/singlesig.go:130-133`) and then runs `restoreDocFlow` **unconditionally**
+on the next line. Skipped, passed, or failed — same next screen. §4.2 is exactly
+what turns that document from *silent* into *vouching*, so without this section
+the plan ships a device that says **"The read-back bundle does NOT match the
+seed"** and then prints a document headed *"This backup is 3 plates … If any of
+them is missing, this backup is incomplete."*
+
+**"Mirror multisig" is not available, because multisig has the same hole.** It
+does own a 5-value `multisigVerifyResult`, and it re-offers on
+incomplete-or-failed — but the loop breaks on `!ok || sel != 0`, so an operator
+who reads a FAILED verify and presses **CONTINUE** falls straight through to
+`multisigRestoreDocFlow`. The comment at `gui/multisig.go:323` asserting *"Only
+verifyComplete falls through to the restore document"* is **false in its own
+file** (R0 M-6).
+
+**The remedy is honesty, not silence — and the incentive argument is what
+decides it.** Any gate keyed on a FAILED verify makes the honest path strictly
+worse than the lazy one: the operator who wants the document — the only screen
+carrying the descriptor, the master fingerprint and the first addresses — learns
+to **skip the verify in order to keep it**. Never make running the check the way
+to lose something. A hard gate is worse still: it deletes an existing capability
+for the common skip case, which is rule 1 of the operator directive.
+
+Two supporting facts, both measured rather than assumed:
+
+- **A FAILED verify is evidence, not proof.** The comparison seed is re-typed by
+  hand and the plates are read over NFC, so a typo or a bad read yields FAILED on
+  good steel.
+- **The document's wallet facts are SEED-derived, not plate-derived.**
+  `gui/singlesig.go:90` derives `xpub`/`masterFP`/`parentFP` from the typed
+  mnemonic and `:136` hands exactly those to the document. They stay true even
+  when the steel is wrong, so destroying the page along with the vouch would
+  throw away the part that could still rescue the restore.
+
+**The design.** The restore document **always renders**, and always carries
+**exactly one** verification status line. A document with none is a defect, not
+a default — silence must never be mistakable for a pass.
+
+| state | line (verbatim, ASCII only) |
+| --- | --- |
+| clean pass | `Plates VERIFIED: each plate was read back and matched the seed.` |
+| skipped / never offered | `Plates NOT VERIFIED. Confirm they restore before relying on this backup.` |
+| incomplete / refused / abandoned | `Plate verification DID NOT COMPLETE. Confirm they restore before relying on this backup.` |
+| a comparison disagreed | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup. Re-verify or re-engrave.` |
+
+**Single-sig** gets a result type mirroring `multisigVerifyResult`'s shape, and
+`engraveSingleSigFlow` threads the outcome (or "skipped") into the inventory.
+
+**Multisig is IN SCOPE for this cycle** — see §3.2. Its verdict type already
+exists, so the change is to hold the last verdict outside the retry loop and
+pass it to `multisigRestoreDocFlow`; **the retry loop's control flow does not
+change.** `gui/multisig.go:323`'s false comment is corrected in the same edit —
+it must not survive a cycle that fixes the behaviour it misdescribes.
+
+**F-197 is untouched by this.** An *aborted engrave* still ends the program with
+no verify offer and no document, because the set on the bench is incomplete.
+This section governs only sets that were fully **cut**.
+
 ## 5. Test plan
 
 **Every test below must be shown to FAIL against the unfixed tree.** A green
@@ -461,9 +635,82 @@ call-site assertion alone is not enough — that is exactly what let the multisi
 instance ship."* T5 must drive the real screens end to end, not assert on the
 source.
 
-**Existing tests that must be updated, not weakened:** the six
-`buildPlateInventoryLines` call sites in §4.3. Any assertion deleted rather than
-re-parameterised is a blocking finding.
+### 5.1 EXISTING TESTS THAT MUST BE UPDATED, NOT WEAKENED
+
+Both R0 reviewers found this list incomplete, from different lenses. It is now
+two lists.
+
+**(a) The six `buildPlateInventoryLines` call sites** in §4.3 — all gain a
+capacity argument, all `seedCapacityMany`.
+
+**(b) THREE END-TO-END WALKS THAT §4.6's CENSUS SCREEN STOPS DEAD.** The first
+draft named none of them, and one of them is in a file the plan did not mention
+at all:
+
+| walk | file:line | where it breaks |
+| --- | --- | --- |
+| `TestEngraveSingleSigFlowFull` | `gui/singlesig_flow_test.go:51` | `:82` `click(Button3)` → `:83` `pumpUntil("Card 1 of 3", 64)` |
+| `TestEngraveSingleSigFlowWatchOnly` | `gui/singlesig_flow_test.go:91` | `:121` `click(Button3)` → `:122` `pumpUntil("Card 1 of 2", 64)` |
+| `TestEngraveSingleSigFlowTemplate` | `gui/template_engrave_test.go:79` | `:128` `click(Button3)` → `:129` `pumpUntil("Card 1 of 3", 64)` |
+
+`pumpUntil` (`gui/slip39_polish_test.go:353`) **only pumps frames — it never
+presses**, and `confirmReviewScreen` (`gui/multisig_build.go:1729`) loops
+`for !ctx.Done` until Button1/Button3/Center. So each walk parks on the census
+for its whole frame budget and hits its `t.Fatalf`.
+
+**The required repair is one extra press**, mirroring the in-tree positive
+control at `gui/multisig_verify_report_test.go:1009-1013`:
+
+    pumpUntil(frame, "Plates To Cut", N)
+    click(&ctx.Router, Button3)
+    // then the existing pumpUntil("Card 1 of N")
+
+**AND THE `Card 1 of 3` / `Card 1 of 2` DISTINCTION IS NOT WEAKENABLE.** It is
+the **only executing assertion in the tree** that full mode puts the ms1 seed
+plate on steel and watch-only does not. Relaxing either needle to `"Card 1 of"`,
+or deleting the assertion to get green, retires that proof — and would do so in
+good faith, since the first draft's not-weakened rule reached only list (a).
+Doing so is a **blocking finding**, not a style note.
+
+**Bounded, so this list is not itself incomplete:** exactly **four** tests drive
+`engraveSingleSigFlow` (`grep -rn "engraveSingleSigFlow" --include="*_test.go" gui/`).
+The fourth, `TestEngraveSingleSigFlowSeedScrubbed`
+(`gui/singlesig_flow_test.go:141`), aborts at the wallet-type picker and never
+reaches the engrave, so three is the count. `gui/singlesig_program_test.go` walks
+the start-screen carousel and never enters the flow — **not** affected.
+
+### 5.2 Per-test refinements the R0 round added
+
+Recorded so the implementer does not rediscover them:
+
+- **T2 has two unstated costs.** (a) `restoreDocScreen` is a **pager** and §4.2
+  appends `extra` *after* the descriptor chunks and both addresses, so the
+  inventory lands on the last page(s) — a single-frame assertion misses it. Use
+  `s5PageForNeedle` (`gui/multisig_build_s5_flow_test.go:119`). (b) The restore
+  doc sits past `bundleEngrave`, so the walk must cut **every** plate: that needs
+  `p.engraver = newEngraver()`, `p.display = sh2DisplaySize`, and a per-plate
+  driver (`s5EngraveOnePlate`, `gui/multisig_supply_passphrase_test.go:110`),
+  none of which the current single-sig walks set up. Both omissions fail loudly;
+  neither can produce a false green.
+- **T3 must say which half it drives.** The stated mutation exercises the label
+  only. Assert the document half directly on `buildPassphraseInventoryLines`, as
+  the prior art does (`gui/multisig_supply_passphrase_test.go:305-323`).
+- **T4 at unit level proves nothing about the single-sig document** — that seam
+  is carried by T2 alone. Fine as designed; stated so it is a choice, not an
+  oversight.
+- **T5 must now press through the census** (§5.1b). Also: `"This backup is"` is
+  absent from the single-sig document until §4.2 lands, so the pair that actually
+  bites the stated mutation is `"Verify the engraved plates?"` and
+  `"Descriptor:"`. T5 needs **no** engraver — the shipped walks already reach
+  `"Card 1 of 3"` on a plain `newPlatform()`.
+- **T7's absence arm is covered by nothing else.** Three existing tests already
+  run the ASCII guard over ms1-**bearing** inventories; the seedless fixture is
+  T7's alone and must be built on purpose.
+- **T8 needs a POSITIVE half.** As written it is a bare negative that a wholesale
+  deletion — or a differently-false replacement — satisfies. Its own cited prior
+  art pairs `!Contains` with a positive `Contains`
+  (`gui/multisig_build_prose_test.go:402-411`) for exactly this reason. T8 must
+  also assert the corrected comment **names all three tail-carrying callers**.
 
 ---
 
@@ -507,6 +754,23 @@ against the fork's working tree and prints the actual line, so a reviewer reads
 verified anchors rather than re-deriving them:
 
     ./scripts/plan-cite-check.sh design/IMPLEMENTATION_PLAN_s6a_singlesig_truth.md
+    # R0 fold: citations resolved: 76 / 76 ; dangling: 0   (exit 0)
+
+### 6.2 The glyph gate — every operator string this plan writes must DRAW
+
+`scripts/plan-glyph-check.sh` scans this plan's operator-facing strings for the
+glyphs the device's body face does not carry (`— – · ' ' " " …`). A string
+containing one does **not draw** on the machine, on screens whose entire job is
+to say what the backup does and does not contain.
+
+    ./scripts/plan-glyph-check.sh design/IMPLEMENTATION_PLAN_s6a_singlesig_truth.md
+    # R0 fold: operator strings scanned: 41 ; undrawable: 0   (exit 0)
+
+**It earned itself on the first fold.** It caught a string this plan had copied
+verbatim out of the R0 report, where the reviewer had joined `showNotice`'s two
+ASCII arguments with an em dash — so the plan carried a misquote of shipped code.
+Both gates are proven with **positive controls** (a bad citation and a bad glyph
+each produce exit 1), because a gate that has never failed is a hypothesis.
 
 **What it does NOT cover, stated so the gate does not hide its blind spot:**
 
@@ -565,3 +829,35 @@ Stated because a gate that hides its blind spot is worse than none.
    warning and the restore document go wrong together. That is the intended
    trade — one definition, one place to fix — but it is a single point of
    failure and is named here rather than discovered later.
+6. **`restoreDocFlow`'s two error returns drop the ENTIRE inventory after a
+   fully cut set** (R0 M-2). `gui/singlesig_restore.go:122` and `:127` `showError`
+   and `return` *before* `restoreDocScreen`, and §4.2 rides the inventory in as
+   `extra`, appended only on the success path. So on either error the operator
+   gets no plate count, no seed statement and — the half F-198 is Critical for —
+   **no passphrase statement**, after every plate is already on steel.
+   Reachability is low (all four `md.ScriptKind` values map, and the xpub is
+   device-derived) and `multisigRestoreDocFlow:103` has the identical shape
+   today, which is why this plan names it rather than fixing it. **If the
+   implementer can hoist the inventory ahead of the descriptor build cheaply,
+   they should; if it needs restructuring, it is filed, not folded.**
+7. **The template-only single-sig branch is in none of §4's edits** (R0 M-3).
+   Two consequences, neither funds-losing: `singleSigEngraveCards` hard-codes
+   `summary: "wallet policy descriptor"` (`gui/singlesig_engrave.go:41`), so
+   §4.2's inventory will call a **keyless template plate** the wallet policy; and
+   single-sig prints a restore document built from the live `xpub` for a template
+   engrave, where the build path skips the document entirely
+   (`gui/multisig_build.go:464`). The mk1 is in the set either way and
+   `templateWarningLines` already states the recovery dependency. Named because
+   §3's item inventory did not mention the template branch at all.
+8. **The verify-OK notice stays as-is on a passphrase run** (R0 M-4).
+   `gui/singlesig_verify.go:148` is
+   `showNotice(ctx, th, "Verify OK", "The engraved bundle matches the seed.")` —
+   **two** strings, both pure ASCII. (The R0 report rendered them as one string
+   joined by an em dash, and the first fold copied that verbatim before the
+   glyph gate caught it. Quoted from the source here. It is the
+   never-describe-code-from-an-earlier-report rule, committed against a report
+   that was otherwise right.)
+   True and incomplete, on the most vouching sentence in the flow. It is left
+   alone because §4.1's truthful label precedes it and §4.2's truthful document
+   now follows it, so the operator is bracketed by corrections — but §0 rule 2
+   says *every* screen, and this one is not yet compliant.
