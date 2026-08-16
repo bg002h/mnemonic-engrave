@@ -6733,3 +6733,48 @@ new md tag implies a rebuild and re-record, and an S0 re-anchor exactly like the
 `ms` bump just performed.
 
 **Defect 2 is worth fixing regardless of the answer to defect 1.**
+
+### F-187 — md's template origin syntax is undocumented for end users, and the only feedback for getting it wrong was an `internal:` error (owning phase: **none — cross-repo docs, batches to a manual cycle**) `#cross-repo` `#docs`
+
+Filed 2026-08-15 out of F-186, which was itself a wrong conclusion caused by the
+gap this entry describes.
+
+**What is missing.** `md` templates carry a key's origin **after** the
+placeholder — `@0/48'/0'/0'/2'/<0;1>/*` — and per-key origins may differ, which
+is how a **Divergent** path declaration is expressed. Nothing user-facing says
+so. `md encode --help` describes `--path` as *"Override the inferred origin path
+with a single shared path (flattens Divergent mode to Shared)"*, which mentions
+Divergent mode without ever showing how to write one, and the `[TEMPLATE]` help
+line gives only `wsh(multi(2,@0/<0;1>/*,@1/<0;1>/*))` — an origin-free example.
+
+**Why it cost something.** A reader who knows Bitcoin descriptors reaches for the
+descriptor form, `[fingerprint/48'/0'/0'/2']@0/…`, because that is what every
+other tool in the ecosystem accepts. It is not md's template syntax. The feedback
+was `template parse error: internal: synthetic key [73c5da0a not found in key
+map` — which reads as a tool bug, not a rejected input. That produced a wrong
+conclusion (that md could not encode divergent origins at all), an
+almost-landed change to a funds-relevant encoder that would have **silently
+dropped** the origins, and a design consult. The error message half is fixed in
+`descriptor-mnemonic` `11b01a9e`; **the documentation half is this entry.**
+
+**What to write, and where.** The end-user manual for the m-format star lives in
+the sibling `bg002h/mnemonic-toolkit` repo at `docs/manual/`, and `md-cli` has
+its own reference surface (`--help`, man pages). Both want:
+
+1. **The template origin form, with a worked divergent example** — two accounts
+   of one master is the motivating shape and the one a shared `--path` cannot
+   express:
+   `wsh(sortedmulti(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*))`
+2. **An explicit "this is NOT descriptor syntax" note.** The bracketed
+   `[fp/path]KEY` form is the thing readers will try first; say plainly that md
+   templates put the origin after `@i`, and that md models the fingerprint
+   separately (`--fingerprint @i=HEX`) rather than inside a bracket.
+3. **Shared vs Divergent as a user-visible concept** — when `--path` applies,
+   what it flattens, and that uniform inline origins and `--path` produce
+   identical bytes.
+
+**No owning phase.** This does not gate the multisig-build-repair plan; S5 is
+unblocked and derives the correct form directly. It batches to whenever the
+manual is next worked. Companion entries belong in `mnemonic-toolkit` (the
+manual) and `descriptor-mnemonic` (`--help`/man) when this is picked up, per the
+cross-repo notification convention.
