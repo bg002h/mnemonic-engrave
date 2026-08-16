@@ -916,11 +916,29 @@ implementation.
 
 ## 5. Test plan
 
-**Every test below must be shown to FAIL against the unfixed tree.** A green
-suite proves nothing on its own: 9 of round 0's 17 blocking findings in S5 were
-reproduced by mutating the tree and watching a green suite stay green. The
-implementer reports, per test, the mutation applied and the failure message
-observed — **and proves the mutated line RAN**, not merely that the edit landed.
+**Every test below must be shown to FAIL against ITS OWN MUTATION** — the one
+named in its row — **not against the pre-cycle tree.** A green suite proves
+nothing on its own: 9 of round 0's 17 blocking findings in S5 were reproduced by
+mutating the tree and watching a green suite stay green. The implementer reports,
+per test, the mutation applied and the failure message observed — **and proves
+the mutated line RAN**, not merely that the edit landed.
+
+**The earlier wording said "FAIL against the unfixed tree", and that was wrong
+for eight of these rows** (R3 comprehension I-6). Two distinct reasons, and the
+distinction matters because the sloppy version is unsatisfiable rather than
+merely loose:
+
+- **T3 is a NON-VACUITY test and PASSES on the unfixed tree by design.** It
+  asserts a bare run does *not* say "NOT passphrase" — which is exactly what
+  today's code does. Demanding it fail pre-cycle would demand it be wrong.
+- **A test of a function that does not exist yet does not "fail"; it does not
+  COMPILE.** T9, T13a, T13b and T14 target `buildVerifyStatusLines` and
+  `verifyStatus`, which this cycle introduces. "Red" from a missing symbol proves
+  nothing about the assertion.
+
+So the standard is per-row and adversarial: **revert or mutate the specific
+behaviour the row names, on an otherwise-complete tree, and watch that row go
+red.** That is what actually demonstrates the assertion bites.
 
 New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 
@@ -938,6 +956,7 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T10** | **the stickiness.** `failed` → `abandoned` prints `DISAGREED`, **not** `DID NOT COMPLETE` | implement as last-wins — precisely what the round-0 fold specified |
 | **T11** | the status line is at **slice index 0** of what `restoreDocScreen` receives — asserted **through a production flow**, not on a helper | pass it via the trailing `extra` parameter, as the round-1 fold specified |
 | **T12** | `incomplete` → `complete` prints the repeat-check line, **not** `DID NOT COMPLETE` and **not** bare `VERIFIED` | cover only `failed → complete` — precisely what the round-1 fold specified |
+| **T7c** | **the capacity WIRING**, per path: drive each of the three flows to its restore document and assert the seed-handling subject clause matches that path's capacity (build → `Every seed`; supply and single-sig → `The seed you entered`) | swap either call site's capacity argument — a mutation no compiler and no current test detects |
 | **T13a** | **P1 — a clean pass always prints a pass line.** Table-driven over §4.7a's ten rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
 | **T13b** | **P2 — a disagreement is never lost.** Every sequence containing `verifyFailed` prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
 | **T14** | the zero value of `verifyStatus` renders `NOT VERIFIED` | reorder the constants so `statusVerified` is 0 — the mutation that makes a forgotten assignment vouch |
@@ -1153,10 +1172,20 @@ Stated because a gate that hides its blind spot is worse than none.
    passing vacuously by never reaching the abort at all — which is why T5 must
    assert it *saw* `Bundle Incomplete` before asserting what came after, exactly
    as `TestSupplyAbortIsTheLastScreenOfTheProgram` does.
-4. **The capacity parameter is a new way to be wrong.** Eight call sites now
-   carry an argument that no compiler can check for *correctness* — only for
-   presence. §4.3's existing-test guard catches the build path; the supply path
-   and single-sig are covered only by T7 and by review.
+4. **The capacity parameter is a new way to be wrong, and T7 does NOT cover the
+   wiring** (R3 comprehension I-7 — an earlier draft of this very item claimed it
+   did, which made the blind spot worse than silence). Nine call sites carry an
+   argument no compiler can check for *correctness*, only for presence. T7
+   asserts `buildPlateInventoryLines` produces the right text **when handed a
+   given capacity** — it says nothing about whether any *call site* hands it the
+   right one.
+   The build path is covered by accident, because
+   `TestSeedResidencyRulingDescribesTheMultiSeedReality` asserts `"Every seed"`
+   and fails loudly if wired to the one-seed arm. **The supply path and single-sig
+   have no such guard**, and the supply path is precisely where §3.1.1 says the
+   capacity changes S5-reviewed output. So **T7c is required**: drive each of the
+   three flows to its restore document and assert the ruling's subject clause
+   matches that path's capacity. Without it, a mis-wired capacity is invisible.
 5. **`bundleSetCarriesASecret` is reused as the seed-presence detector.** If a
    future card kind carries seed material without being `cardMS1`, both the abort
    warning and the restore document go wrong together. That is the intended
