@@ -6867,7 +6867,7 @@ be reconciled on UX grounds alone.
 This is the same class as **F-184** (a needle's uniqueness proof counts
 comments as production sites): the counter measures source text where the claim
 is about screens.
-### F-191 — a passphrase divergence between engrave and verify is reported as "That seed is not a cosigner" (owning phase: **`SPEC_multisig_build_repair.md` S5.D** — with the screens/prose block) `#seedhammer`
+### F-191 — ~~a passphrase divergence between engrave and verify is reported as "That seed is not a cosigner"~~ **FIXED 2026-08-16 at the site filed, in `023505c`. THE CLASS IS NOT CLOSED — see the note at the end.** (owning phase: **`SPEC_multisig_build_repair.md` S5.D** — with the screens/prose block) `#seedhammer`
 
 Filed 2026-08-16 by the S5 policy-identity fold implementer, which could not
 write this file from its worktree. Found by the fable seam review (M1).
@@ -6891,6 +6891,26 @@ Pre-existing in kind (the pre-S5 verify had the same shape through
 **Landed 2026-08-16 by the controller** on the implementer's behalf: an agent
 confined to a worktree cannot write this file, so a filed defect would otherwise
 survive only inside a report.
+
+**FIXED 2026-08-16 in `023505c`** (S5, "the screens an operator reads before
+putting a seed on steel"), verified by the controller before the whole-diff gate:
+`multisigVerifySeedIsInnocent` (`gui/multisig_verify.go:74`) re-derives with the
+EMPTY passphrase only when one was actually typed — a passphrase never offered is
+not re-derived, because that is the derivation which just failed and re-running it
+would route a genuinely foreign seed to the reassuring arm. It feeds a three-state
+`multisigVerifyNoSlotBody(passphraseTyped, innocent)`: proved innocent, passphrase
+typed but still nothing, and no passphrase typed. Two tests pin it, and the second
+defeats a `return true` predicate explicitly.
+
+**BUT THE CLASS RECURRED AT A NEW SITE, and this is the part worth carrying
+forward.** The whole-diff gate's **I-14** found the same reasoning error one arm
+over: the verify's "that seed is a cosigner, but none of its slots were engraved in
+this run / that seed's slots have already been checked" arms assert a *foreign
+seed* where a same-seed passphrase divergence is equally likely. Fixing F-191 where
+it was filed did not fix the flow's habit of naming the frightening cause when it
+cannot tell which cause it is. **A follow-up closed at its filed site is not a class
+closed** — grep for the mechanism, not for the ticket. I-14 is burned down with the
+gate's fold, not here.
 
 ---
 
@@ -6953,3 +6973,44 @@ to the seed.
 The asymmetry matters years later: an operator holding a watch-only set and a
 "Full" set side by side has the mode label to tell them apart, and a mode label
 is exactly the kind of thing that gets copied onto the wrong tin.
+
+---
+
+### F-196 — a MIXED held set is not expressible through the screens (owning phase: **the spec — it is a model change, and earns its own R0**) `#seedhammer`
+
+Filed 2026-08-16 by the S5 picker/verify implementer, **landed by the controller
+2026-08-16 out of the whole-diff gate's I-10**, which is the only reason this
+entry exists: the implementer drafted it in
+`design/agent-reports/s5-picker-and-verify-implementation.md` §4 and could not
+write this file from its worktree, and — unlike its sibling F-191 from the same
+round — nobody landed it. Meanwhile `gui/multisig_build_slots.go:510-518` told
+every future reader the gap had been "filed rather than smuggled in".
+
+**It had not been.** A grep over this file for `SelfFromCard`,
+`buildSelfSourceFlow`, `per-slot`, `mixed build`, `not expressible` and
+`genuinely mixed` returned zero hits until this entry landed. That is the defect
+worth remembering, more than the picker limit itself: **a claim of the form
+"filed rather than smuggled in" is exactly the class of assertion a reviewer
+inherits as a given.** It must be a grep, not a promise — so the comment now
+cites this ID, and the ID resolves.
+
+The limitation, in the implementer's own words:
+
+> The derived-vs-`both` question is asked once and applied to every held slot
+> (`gui/multisig_build_slots.go:494`). An operator holding `@0` on a card and
+> `@1` from a seed alone cannot say so; both wrong answers are loud (gate
+> refusal, or a derived slot announced on the "Key sources" review) but neither
+> is what they meant. Expressing it means `buildPolicyParams.SelfFromCard`
+> becoming a per-slot set, which touches `buildSlotSources`,
+> `buildCosignerOrigins`, `buildSlotProvenance` and the pre-gather supply
+> arithmetic.
+
+**Not a funds-loss path**, which is why the gate rated it Important and not
+Critical: every reachable branch either refuses loudly or falls back to an
+all-derived configuration. The limit is in the PICKER, not the model —
+`slotSource` is already per-slot and `assembleBuildPolicy` already reads the
+mixture off the held-key set, so the later change is additive rather than a
+rework. It contradicts SPEC §4.3's per-slot language
+(`design/SPEC_multisig_build_repair.md:383`, "Every slot @0..@{n-1} carries
+exactly one source, **chosen by the operator**"), which is why the owning phase
+is the spec and not a stage.
