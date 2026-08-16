@@ -6636,7 +6636,43 @@ screens land, and because S5 already owns the "every comparison the device asks
 for must be one the operator can perform" constraint, of which this is the
 rendering half.
 
-### F-186 — `md encode` cannot encode a DIVERGENT-origin multisig template, and fails with an INTERNAL error rather than refusing (owning phase: **`SPEC_multisig_build_repair.md` S5** — ruling in flight; may escalate to the `descriptor-mnemonic` primary) `#seedhammer` `#cross-repo`
+### F-186 — ~~`md encode` cannot encode a DIVERGENT-origin multisig template~~ **HALF WITHDRAWN 2026-08-15: md CAN. The surviving half — an `internal:` error on wrong syntax — is FIXED in the primary.** (owning phase: **`SPEC_multisig_build_repair.md` S5**) `#seedhammer` `#cross-repo`
+
+> **CORRECTION 2026-08-15, and the correction matters more than the entry.**
+>
+> **md encodes divergent origins today, and always could.** The claim below that
+> it cannot was MINE and was wrong: I fed md **descriptor** syntax
+> (`[fingerprint/path]@0/…`) where **template** syntax was required
+> (`@0/48'/0'/0'/2'/<0;1>/*`). `lex_placeholders` has captured the inline
+> origin all along, and `make_path_decl` emits `PathDeclPaths::Divergent`
+> whenever the per-placeholder origins differ. Measured with the correct form:
+>
+>     path_decl: {"data": ["m/48'/0'/0'/2'", "m/48'/0'/1'/2'"],
+>                 "tag": "Divergent"}
+>
+> **S5 is NOT blocked.** Its md1 *does* require divergent origins, so S5's oracle
+> derivation must build the template in the inline per-`@N` form rather than the
+> shared `--path` form S5.0 shipped — and **uniform inline origins are
+> byte-identical to `--path`**, so no committed record or golden is staled.
+>
+> **What survived is defect 2, and it is FIXED** in the primary
+> (`descriptor-mnemonic` `11b01a9e`): the wrong syntax produced
+> `internal: synthetic key [73c5da0a not found in key map`, which reads as a tool
+> bug rather than a rejected input — and is exactly how I reached the wrong
+> conclusion. It now refuses at lex time, naming the correct syntax.
+>
+> **The trap recorded for whoever touches that encoder next:** the obvious fix —
+> teaching `lookup_key` to strip the bracket — makes md encode with the origins
+> **silently dropped** (`path_decl` empty, verified). That trades a loud
+> wrong-syntax error for a quiet wrong-policy on an encoder that describes where
+> money lives. A **round-trip** assertion catches it; an encode-succeeds
+> assertion passes.
+>
+> **The generalisable lesson:** a confusing error message is not cosmetic. This
+> one cost a wrong conclusion about a primary tool's capabilities, an
+> almost-landed change that would have introduced a funds-relevant silent
+> failure, and a fable consult. `internal:` in user-facing output should mean
+> "the tool broke", never "your input was wrong".
 
 Found 2026-08-15 while building S5.0's built-policy `ExpectKind`, independently
 by that stage's implementer and by the controller reproducing it.
