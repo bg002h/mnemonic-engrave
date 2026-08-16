@@ -7189,3 +7189,43 @@ the one behind the EXPERIMENTAL warning — so the split becomes 2:1 rather than
 1:1. Deliberately **not** unified inside S6a: renaming a screen title on a path
 S6a otherwise does not touch is scope creep into a reviewed diff, and the whole
 value of the census work is that it went through the gate.
+
+### F-204 — a FAILED single-sig verify sends the operator to doubt the PLATES, where the multisig sibling says suspect the passphrase first (owning phase: **S6b — with F-199, before the hardware flash**) `#seedhammer`
+
+Filed 2026-08-16 by the S6a R0 adversarial review (M-5), FILE-not-fix.
+
+`gui/singlesig_verify.go:145` tells a failed verify to "Check the engraved
+plates". The multisig sibling explicitly rules the other way --
+`multisigVerifyNoSlotBody` (`gui/multisig_verify.go:151-165`): *"Check the
+passphrase before you doubt the plates"*.
+
+The asymmetry costs steel. The verify requires the seed RE-TYPED (SPEC 7.4, so
+the engrave source is never compared against itself) and one wrong character
+derives an entirely different wallet, so a mistyped passphrase at verify is a
+common cause of a FAILED comparison on **correct** plates. The screen then sends
+the operator to destroy them.
+
+Not folded into S6a: S6a's C-1 work makes the *document* honest about the verify
+outcome, which is a different surface from the on-screen remedial instruction,
+and F-191 already established that the "a keystroke must not be reported as a
+wrong wallet" family is its own line of work. It rides with F-199 in S6b because
+both are single-screen verify-flow copy decisions on the same tail.
+
+### F-205 — `backupWalletFlow` and `deriveXpubFlow` engrave passphrase-bound artifacts and say nothing about the missing factor (owning phase: **none yet — needs a scoping decision; NOT gating the hardware flash**) `#seedhammer`
+
+Filed 2026-08-16 by the S6a R0 adversarial review (N-1), FILE-not-fix.
+
+`backupWalletFlow` (`gui/gui.go:2419-2432`) lets the operator engrave a
+**passphrase-derived master fingerprint** onto a seed plate that carries only the
+words. `deriveXpubFlow` (`gui/derive_xpub.go:344-354`) mints a passphrase-bound
+mk1 with the same silence.
+
+This is the **F-198 class without the vouching half**: a required spending factor
+is absent from the engraved artifact and unmentioned, but neither flow produces a
+restore document, so nothing asserts the result is complete. That is why it is
+not C-1's class and does not gate S6.
+
+It is filed rather than scoped because the remedy is not obviously the same one:
+these flows engrave single artifacts rather than sets, so `buildFullModeLabel`
+and the plate inventory have no natural home in them, and deciding what they
+should say is a design question rather than a wiring change.
