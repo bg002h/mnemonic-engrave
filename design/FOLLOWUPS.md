@@ -6867,3 +6867,26 @@ be reconciled on UX grounds alone.
 This is the same class as **F-184** (a needle's uniqueness proof counts
 comments as production sites): the counter measures source text where the claim
 is about screens.
+### F-191 — a passphrase divergence between engrave and verify is reported as "That seed is not a cosigner" (owning phase: **`SPEC_multisig_build_repair.md` S5.D** — with the screens/prose block) `#seedhammer`
+
+Filed 2026-08-16 by the S5 policy-identity fold implementer, which could not
+write this file from its worktree. Found by the fable seam review (M1).
+
+`gui/multisig_verify.go:479-481`. The engrave accepts a payload-borne
+passphrase (`syswPassphraseFlow`, `gui/multisig.go:147`); the verify requires
+it re-typed (`passphraseFlow`, deliberate per §7.4). A CORRECT seed with a
+forgotten or mistyped passphrase makes `allUserSlots` return empty, so the
+flow names the SEED and never mentions the passphrase — on plates that are
+perfectly good.
+
+**It is a false RED that teaches the operator the wrong lesson.** "My seed
+isn't in my wallet" is the most alarming sentence this device can say, and
+here it is caused by a keystroke. The device knows a passphrase was offered
+and can say so; distinguishing "no slot matches with this passphrase" from
+"no slot matches at all" costs one re-derivation with the empty passphrase.
+
+Pre-existing in kind (the pre-S5 verify had the same shape through
+
+**Landed 2026-08-16 by the controller** on the implementer's behalf: an agent
+confined to a worktree cannot write this file, so a filed defect would otherwise
+survive only inside a report.
