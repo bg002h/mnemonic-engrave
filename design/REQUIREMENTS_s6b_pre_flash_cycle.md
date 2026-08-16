@@ -1,17 +1,44 @@
-# S6c — REQUIREMENTS CAPTURE: the passphrase gets a plate, and the plates say so
+# S6b — REQUIREMENTS CAPTURE: the single pre-flash cycle (compressed)
 
 **Status:** requirements capture only. **Not a spec, not a plan, not gated.** No
 code may be written against this. Its job is to make the operator's directives
 outlive the conversation they were given in, and to record what has already been
 measured so a later spec does not re-derive it.
 
-**Owning phase:** S6c — its own cycle, with its own spec and R0, scheduled
-**before the hardware flash**, so S6 validates the new plate layout on real steel
-in the same flash cycle. Sequencing, not deferral.
+**Owning phase: S6b — the SINGLE pre-flash cycle.** Operator directive
+2026-08-16: **"compress"**. There were three software cycles queued between here
+and the hardware flash; there are now two.
 
-**Why not folded into S6a:** S6a closes F-198's Critical with text and control
-flow only. Everything here changes what the machine physically cuts, which is
-exactly what a hardware gate exists to validate.
+| was | now |
+| --- | --- |
+| S6a — single-sig truth (mid-review, round 3) | **unchanged — closes as-is** |
+| S6b — F-199 + F-204 (verify tail) | **merged** |
+| S6c — passphrase plate + plate marking | **merged** |
+| → flash | → flash |
+
+**S6a is deliberately NOT compressed into, and that is the whole reason the rest
+can be.** It is at review round 3 with a funds Critical folded four times;
+adding scope now would restart its gate and is the surest way for it never to
+close. It ships the F-198 Critical on its own.
+
+**Everything else becomes one cycle: one spec, one R0, one implementer, one
+whole-diff review.** The merged scope is F-199, F-204 and R1–R7 below.
+
+**Why merging these is sound rather than merely faster.** They are one surface.
+F-199 and F-204 are both verify-tail copy/control decisions, and S6a has already
+restructured that tail — so the code is open. The plate work is the only part
+that changes engraved output, and it *wants* the hardware flash immediately
+after, which is exactly where it now sits.
+
+**What merging costs, stated plainly:** F-199's own follow-up says it "needs a
+decision, not a reflex", so this cycle **opens with a decision pass** before any
+code — the same shape that produced the C-1 verify-tail ruling. A cycle that
+begins by answering its open question is compressed; one that begins by coding
+around it is just rushed.
+
+**Why not compressed into the flash itself:** the plate marking changes what the
+machine cuts, so it must be GREEN before the flash rather than validated by it.
+The flash then proves it on real steel in one pass.
 
 ---
 
@@ -107,10 +134,23 @@ and **also silently drops any rune the face cannot decode**.
     18  COMB FP: FC60 C6DF       fits EXACTLY AT THE CAP
     27  EXPECTED COMB FP: FC60 C6DF   band only
 
-**The operator's own phrasing, "PASSPHRASE REQUIRED", is 19 characters** and
-would engrave as `PASSPHRASE REQUIRE`, permanently, with no error. Two of the
-fingerprint forms sit *exactly* on the cap, which is a fragile place to live: one
-character added by a later edit truncates onto steel.
+**"PASSPHRASE REQUIRED" is 19 characters** and would engrave as
+`PASSPHRASE REQUIRE`, permanently, with no error.
+
+### DECIDED — the title text is `PASSWORD REQUIRED`
+
+Operator directive 2026-08-16, after being shown the measurement. **17
+characters, fits with 1 to spare**, and it is not a coinage invented for the
+plate: the device **already says "BIP-39 Password" to the operator** at
+`gui/gui.go:1997` and `gui/passphrase_flow.go:645`. The steel therefore matches
+the screen the operator already knows, which is worth more on an artifact read
+years later than internal consistency with the word the *source code* uses.
+
+**The budget still needs a TEST, not a correct string.** `PASSWORD REQUIRED` has
+one character of headroom and both fingerprint forms sit *exactly* on the cap.
+Every one of them is a single edit away from silent truncation onto steel, and
+`TitleString` reports nothing when it truncates. The gate is an assertion on the
+budget — for every title this cycle introduces, not just today's wording.
 
 **So the length budget is a first-class gate in S6c, not a wording detail** — a
 test must assert the budget, not merely the current string.
