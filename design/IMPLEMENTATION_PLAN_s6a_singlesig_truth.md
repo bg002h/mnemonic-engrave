@@ -339,7 +339,7 @@ project's own rule an item scheduled to a phase is not deferrable past it.
 
 **What it costs — corrected twice, so here it is measured rather than argued.**
 `multisigVerifyResult` has **five** constants (`gui/multisig_verify.go:88-100`;
-round 0 said "four" and was wrong — as does the type's own doc comment, §4.7b).
+round 0 said "four" and was wrong — as does the type's own doc comment, §4.7c).
 
 **It is NOT a superset of what the status line needs** (R2 I-1): it has no value
 for *skipped* or *never offered*, which is the commonest outcome of all, since
@@ -674,7 +674,7 @@ one** verification status line, and that line is **the first thing on the page**
 A rendered document with no status line is a defect, not a default — silence must
 never be mistakable for a pass.
 
-#### 4.7a THE STATUS IS THE WORST OUTCOME SEEN, NOT THE LAST ONE (R1 C-1)
+#### 4.7a TWO STICKY FACTS AND A SWITCH (R1 C-1, R2 C-2, R3 C-1/C-2)
 
 **The first fold said "hold the last verdict outside the retry loop", and that
 reintroduces the exact harm C-1 exists to close.** `verifyFailed` is one of the
@@ -914,13 +914,13 @@ work is landable in pieces rather than all-or-nothing.
 | # | step | why here |
 | --- | --- | --- |
 | 1 | **Write the single-sig exit → `verifyStatus` mapping** (§4.7c) and get it reviewed | eleven exits, and every later step depends on it. Nothing else starts until it is agreed. |
-| 2 | `verifyStatus` + `buildVerifyStatusLines` + T9, T13a, T13b, T14 | pure functions, no callers yet, fully unit-testable |
+| 2 | `verifyStatus` + `buildVerifyStatusLines` + **T14 only** | pure function, no callers yet. **T9, T13a and T13b do NOT land here** — §5.2 requires them on a rendered document and on a multisig walk, so they move to step 7 |
 | 3 | `seedCapacity` + the two-axis ruling + `buildSeedInventoryLines` (§4.3, §4.4), updating the six existing call sites | shared census; still no flow changes |
 | 4 | `restoreDocFlow` and `multisigRestoreDocFlow` gain `status` + `extra` (§4.2, §4.7b), **all three call sites** | signature change; the tree must stay green across it |
 | 5 | Wire single-sig: label (§4.1), inventory, census (§4.6), abort gate (§4.5) | the F-198/F-195/F-197/F-202 body of work |
 | 6 | Update the three walks that the census screen stops (§5.1b) | must accompany step 5, not follow it |
-| 7 | Wire the verify status into all three flows, plus T10–T12 | needs 2, 4 and 5 in place |
-| 8 | Correct the three false comments (§4.7b) + T8 | independent; deliberately last so it cannot mask a behavioural regression |
+| 7 | Wire the verify status into all three flows, plus T9, T10, T11, T12, T13a, T13b | needs 2, 4 and 5 in place. **T9/T13a/T13b need a rendered document and a multisig retry loop**, neither of which exists at step 2 |
+| 8 | Correct the three false comments (§4.7c) + T8 | independent; deliberately last so it cannot mask a behavioural regression |
 | 9 | Update `SPEC_seedhammer_T6a_singlesig_flagship.md` (§3.1.7), **in its own commit** | the spec follows the behaviour, and is not mixed with it |
 
 **Step 1 is a gate, not a task.** It produces a table of eleven rows, it is
