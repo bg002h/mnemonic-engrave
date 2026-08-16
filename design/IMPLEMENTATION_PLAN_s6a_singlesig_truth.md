@@ -829,7 +829,7 @@ argument.
 | **`failed`** → `complete` | false | complete | **`VERIFIED`** — nothing was ever disagreed with |
 
 The retry space is unbounded, but the switch depends only on `sawDisagreement`
-and the final `res`, so these ten rows are the complete image of it — an honest
+and the final `res`, so these twelve rows are the complete image of it — an honest
 statement of coverage, where the previous table's "every sequence" header
 overclaimed.
 **The repeat-check state is a controller decision derived from the persisted C-1
@@ -1070,12 +1070,12 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T7** | `seedCapacityOne` yields `The seed you entered` and not `Every seed`; `seedCapacityMany` yields `Every seed`; **and every new operator string is ASCII-clean** (the glyph set at `gui/multisig_build_prose_test.go:395`) | swap the capacity arms; insert an em dash |
 | **T8** | `gui/bundle_flow.go` no longer claims `both engraving callers` (source assertion, mirroring the `readGuiFile` pattern at `gui/multisig_build_prose_test.go:402`) | restore the old comment |
 | **T9** | each of the five §4.7c statuses renders **its own** line, and every rendered document carries **exactly one** — over `buildVerifyStatusLines` | return the same string for two statuses; return an empty slice |
-| **T10** | **the stickiness.** `failed` → `abandoned` prints `DISAGREED`, **not** `DID NOT COMPLETE` | implement as last-wins — precisely what the round-0 fold specified |
+| **T10** | **the stickiness.** `mismatch` → `abandoned` prints `DISAGREED`, **not** `DID NOT COMPLETE` | implement as last-wins — precisely what the round-0 fold specified |
 | **T11** | the status line is at **slice index 0** of what `restoreDocScreen` receives — asserted **through a production flow**, not on a helper | pass it via the trailing `extra` parameter, as the round-1 fold specified |
-| **T12** | `incomplete` → `complete` prints the repeat-check line, **not** `DID NOT COMPLETE` and **not** bare `VERIFIED` | cover only `failed → complete` — precisely what the round-1 fold specified |
+| **T12** | `incomplete` → `complete` prints **bare `VERIFIED`** (nothing ever disagreed), and `mismatch` → `complete` prints the **repeat-check** line. Neither prints `DID NOT COMPLETE` | cover only `failed → complete` — precisely what the round-1 fold specified |
 | **T7c** | **the capacity WIRING**, per path: drive each of the three flows to its restore document and assert the seed-handling subject clause matches that path's capacity (build → `Every seed`; supply and single-sig → `The seed you entered`) | swap either call site's capacity argument — a mutation no compiler and no current test detects |
-| **T13a** | **P1 — a clean pass always prints a pass line.** Table-driven over §4.7a's ten rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
-| **T13b** | **P2 — a disagreement is never lost.** Every sequence containing `verifyFailed` prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
+| **T13a** | **P1 — a clean pass always prints a pass line.** Table-driven over §4.7a's twelve rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
+| **T13b** | **P2 — a disagreement is never lost.** Every sequence containing `verifyMismatch` prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
 | **T15** | **P3 — a warning is EARNED.** Each of the three non-comparison `verifyFailed` sites (`:719` foreign plates, `:724` undecodable, `:897` seed typo) yields `DID NOT COMPLETE`, **never** `DISAGREED` | set `sawDisagreement` on `verifyFailed` instead of `verifyMismatch` — precisely what rounds 1–4 of this plan specified |
 | **T14** | the zero value of `verifyStatus` renders `NOT VERIFIED` | reorder the constants so `statusVerified` is 0 — the mutation that makes a forgotten assignment vouch |
 
