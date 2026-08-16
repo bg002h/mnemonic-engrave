@@ -7014,3 +7014,77 @@ rework. It contradicts SPEC §4.3's per-slot language
 (`design/SPEC_multisig_build_repair.md:383`, "Every slot @0..@{n-1} carries
 exactly one source, **chosen by the operator**"), which is why the owning phase
 is the spec and not a stage.
+
+---
+
+### F-197 — the SINGLE-SIG engrave does not stop on an aborted set (owning phase: **`SPEC_multisig_build_repair.md` S6** — before the hardware cycle) `#seedhammer`
+
+Found 2026-08-16 by the S5 whole-diff fold while landing I-12, and **not folded**:
+`gui/singlesig.go` is outside the review's scope, and scope creep in a fold is how
+a review round gets spent on unreviewed text.
+
+`gui/singlesig.go:127` calls `bundleEngrave(ctx, th, "Engrave Single-Sig", cards)`
+and discards the result. It is **I-12's defect verbatim**, on the flow the review
+did not scope: an operator who aborts mid-set reads "Bundle Incomplete … This set
+is not a usable backup yet", is then offered "Verify the engraved plates?" over a
+set whose last card was never cut, and is finally shown `restoreDocFlow(...)` —
+the artifact that is read years later, alone, presented as the last word of a run
+the device just said produced no usable backup.
+
+The fix is now one line, because the machinery landed with I-12: `bundleEngrave`
+returns `bundleEngraveResult` as of commit `9f93362`, so this is
+
+    if bundleEngrave(ctx, th, "Engrave Single-Sig", cards) != bundleEngraveDone {
+        return
+    }
+
+**It needs the flow-level test that goes with it.** See
+`TestSupplyAbortIsTheLastScreenOfTheProgram` for the shape: drive to the first
+engrave picker, press Back, assert the program ENDS with neither the verify offer
+nor the restore document drawn afterwards. **A call-site assertion alone is not
+enough — that is exactly what let the multisig instance ship.**
+
+### F-198 — **CRITICAL** — the SINGLE-SIG flow takes a passphrase into derivation, labels the result "Full (seed + keys)", and its restore document cannot mention a passphrase (owning phase: **`SPEC_multisig_build_repair.md` S6** — MUST land before the hardware cycle) `#seedhammer`
+
+Named by the S5 whole-diff review as "adjacent, out of scope, file it" (C-3), and
+filed by the fold with the harm **explicitly unverified**. **The controller
+verified it 2026-08-16, and the answer is the bad one**, so this is not a label
+tidy-up — it is C-3's defect on a third path, and single-sig is the more travelled
+path of the two.
+
+Measured against `gui/singlesig.go` at `s5-multislot`:
+
+1. **The passphrase is a live derivation input.** `:64-72` takes one via
+   `syswPassphraseFlow`, and `:90` passes it to
+   `deriveSingleSigBundle(mnemonic, passphrase, …)`.
+2. **The mode label is hard-coded.** `:80` carries
+   `Choices: []string{"Full (seed + keys)", "Watch-only (keys)"}` — the raw
+   literal, not `buildFullModeLabel(passphrase != "")`.
+3. **The restore document cannot say it.** `:136` calls
+   `restoreDocFlow(ctx, th, xpub, masterFP, parentFP, script, path)` and
+   `gui/singlesig_restore.go:119` has **no passphrase parameter at all**; `grep -i
+   passphrase gui/singlesig_restore.go` returns nothing.
+
+So a "Full" single-sig engrave with a passphrase cuts ms1 — which encodes the
+**words only** — and hands the operator a document asserting the set is complete.
+The passphrase is a required spending factor and is on no plate and in no
+sentence. That is a permanently unspendable wallet discovered years later, which
+is the exact harm S5 built `buildFullModeLabel` and the passphrase inventory line
+to prevent.
+
+**PRE-EXISTING, not an S5 regression** — verified: the literal is already in `main`
+at `gui/singlesig.go:80`, introduced by `b100425` (T6a-2), and S5's only edit to
+that file added a title argument to `bundleEngrave`. It therefore does **not** gate
+the S5 merge. It **does** gate the hardware cycle: S6 flashes firmware an operator
+engraves real backups with, and this path is reachable from the front door.
+
+The fix mirrors commit `5f54737` (which wired the multisig SUPPLY path): use
+`buildFullModeLabel(passphrase != "")` at `:80`, and give `restoreDocFlow` the
+passphrase-bearing inventory line so the document states what it does not contain.
+
+**Why this one is worth remembering beyond the fix.** Both the review and the fold
+declined to assert the harm because neither had checked; the fold said so plainly
+and wrote "check that FIRST … because 'somebody assumed' is what made C-3 survive
+a whole stage." It then survived a *second* stage on a third path for the same
+reason. **An unverified claim in a follow-up is a defect with a countdown, not a
+note** — the answer cost one grep.
