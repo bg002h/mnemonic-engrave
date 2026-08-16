@@ -313,11 +313,20 @@ engrave-and-restore (plan §3, S6 items 1, 2 and 4). Filing this would park a
 known funds hole on exactly the territory the next phase enters — and under this
 project's own rule an item scheduled to a phase is not deferrable past it.
 
-**Why it is affordable.** `multisigVerifyResult` already exists with the four
-outcomes the status line needs. The change is to hold the last verdict outside
-the retry loop and pass it to the document. **The retry loop's control flow does
-not change**, no new verdict is introduced, and the same four status strings
-serve all three paths.
+**Why it is affordable — now measured, not estimated.** `multisigVerifyResult`
+already exists with **five** constants (`verifyComplete`, `verifyIncomplete`,
+`verifyFailed`, `verifyRefused`, `verifyAbandoned` —
+`gui/multisig_verify.go:88-100`; the first fold said "four" and was wrong), which
+is a superset of what the status line distinguishes. And
+`multisigRestoreDocFlow` **already takes `extra []string`**, so **neither
+multisig call site changes signature** — only what it builds for that argument.
+The retry loop's control flow does not change and no new verdict is introduced.
+
+**One place multisig differs, and §4.7 is scoped around it:** the BUILD path
+skips the restore document entirely for a template engrave
+(`gui/multisig_build.go:464`, `if !template`). So the claim is *"wherever a
+document renders, it carries a status line"* — **not** "a status line always
+renders". The first fold wrote the stronger claim and it is false there.
 
 **The fallback, stated in advance so it is a decision and not a surprise:** if
 the multisig side turns out to need structural change, it becomes a **named gate
@@ -406,8 +415,14 @@ So the ruling is assembled from two selectors:
            "Power the device off when you are done."
 
     // seed is NOT on the plates (watch-only, any path):
-    base + ". Do not leave a mid-build machine unattended: it is holding your seed. " +
-           "Power the device off when you are done."
+    base + ". Do not leave a mid-build machine unattended: it is still holding " +
+           "the words you typed. Power the device off when you are done."
+
+**"the words you typed", not "your seed" (R1 Minor).** The watch-only arm is
+reached on the multi-seed BUILD path too, where a singular possessive is a
+singular/plural wobble against the plural subject clause four words earlier. The
+object-free phrasing is true whether the device holds one seed or three, so the
+sentence does not need a third selector.
 
 **Byte-identity check, and what deliberately churns.** `seedCapacityMany` +
 seed-on-plates reassembles the shipped string **byte for byte**, so the multisig
@@ -585,25 +600,98 @@ Two supporting facts, both measured rather than assumed:
   when the steel is wrong, so destroying the page along with the vouch would
   throw away the part that could still rescue the restore.
 
-**The design.** The restore document **always renders**, and always carries
-**exactly one** verification status line. A document with none is a defect, not
-a default — silence must never be mistakable for a pass.
+**The design.** Wherever a restore document renders at all, it carries **exactly
+one** verification status line, and that line is **the first thing on the page**.
+A rendered document with no status line is a defect, not a default — silence must
+never be mistakable for a pass.
 
-| state | line (verbatim, ASCII only) |
+#### 4.7a THE STATUS IS THE WORST OUTCOME SEEN, NOT THE LAST ONE (R1 C-1)
+
+**The first fold said "hold the last verdict outside the retry loop", and that
+reintroduces the exact harm C-1 exists to close.** `verifyFailed` is one of the
+two verdicts that **keep the loop alive** — measured, `gui/multisig.go:337` and
+`gui/multisig_build.go:453` both read
+
+    if res != verifyIncomplete && res != verifyFailed { break }
+
+So: a comparison **DISAGREES**, the operator presses **VERIFY AGAIN**, then backs
+out at the gather. The last verdict is `verifyAbandoned`, and a last-wins document
+prints *"DID NOT COMPLETE"* over plates the device has already said do not match.
+The remedy would have re-opened its own Critical, on the two paths §3.2 had just
+pulled into scope.
+
+**So severity is sticky, and it ranks:**
+
+    disagreed  >  did-not-complete  >  not-verified  >  verified-on-retry  >  verified
+
+The flow keeps the **most severe** outcome observed across the whole offer loop.
+A disagreement is evidence, and a later abandon cannot un-see it.
+
+**One exception, and it is the incentive rule from the C-1 decision.** A
+disagreement followed by a **clean pass on a repeat check** does not print the
+bare `DISAGREED` warning — it gets its own line. Printing the warning anyway
+would make re-verifying pointless, which is the same trap that ruled out gating
+the document: *never make running the check the way to lose something.* Printing
+a bare `VERIFIED` instead would hide a real anomaly from the stranger reading the
+page. So it is said, and said as an upgrade.
+
+**This fifth state is a controller decision derived from the persisted C-1
+principles, not a new operator ruling** — flagged here so the next reviewer reads
+it as an addition rather than as something already blessed.
+
+| outcome | line (verbatim, ASCII only) |
 | --- | --- |
-| clean pass | `Plates VERIFIED: each plate was read back and matched the seed.` |
+| clean pass, first try | `Plates VERIFIED: each plate was read back and matched.` |
+| clean pass after an earlier disagreement | `Plates VERIFIED on a repeat check, after an earlier read-back DISAGREED. Confirm they restore before relying on this backup.` |
 | skipped / never offered | `Plates NOT VERIFIED. Confirm they restore before relying on this backup.` |
-| incomplete / refused / abandoned | `Plate verification DID NOT COMPLETE. Confirm they restore before relying on this backup.` |
-| a comparison disagreed | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup. Re-verify or re-engrave.` |
+| incomplete / refused / abandoned, none worse | `Plate verification DID NOT COMPLETE. Confirm they restore before relying on this backup.` |
+| a comparison disagreed and was never cleared | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup. Re-verify or re-engrave.` |
 
-**Single-sig** gets a result type mirroring `multisigVerifyResult`'s shape, and
-`engraveSingleSigFlow` threads the outcome (or "skipped") into the inventory.
+**"matched", not "matched the seed" (R1 I-3).** The singular contradicted §4.4's
+own *"YOUR seeds"* on a multi-master build, in the same document. Dropping the
+object makes the line true in every mode and costs nothing.
 
-**Multisig is IN SCOPE for this cycle** — see §3.2. Its verdict type already
-exists, so the change is to hold the last verdict outside the retry loop and
-pass it to `multisigRestoreDocFlow`; **the retry loop's control flow does not
-change.** `gui/multisig.go:323`'s false comment is corrected in the same edit —
-it must not survive a cycle that fixes the behaviour it misdescribes.
+#### 4.7b ONE SEAM, AND IT IS THE ONE THAT ALREADY EXISTS (R1 I-1, I-2)
+
+The first fold described two different seams for the same line. There is one:
+
+    func buildVerifyStatusLines(v verifyStatus) []string   // exactly one line
+
+and it is **PREPENDED** to the lines already passed through the existing
+`extra []string` parameter:
+
+    extra := append(buildVerifyStatusLines(status),
+                    buildPlateInventoryLines(cards, facts, capacity)...)
+
+**Prepended, not appended (R1 I-2).** `restoreDocScreen` is a pager whose Done
+key is live on page 1. Appended, the status line lands behind a 330-character
+seed-handling paragraph, on a page the operator need never turn — a warning
+nobody reads is not a warning. The in-tree precedent prepends for exactly this
+reason: `gui/multisig.go:271` puts its slot-collapse notice *ahead* of the
+census.
+
+**This means NO signature change on the multisig side at all.**
+`multisigRestoreDocFlow` already takes `extra []string`
+(`gui/multisig_restore.go:100`), so both multisig call sites change only in what
+they build for that argument. It also strengthens §3.2's affordability claim from
+an estimate to a measurement.
+
+**Single-sig** gets a verdict type mirroring `multisigVerifyResult`'s shape, and
+`engraveSingleSigFlow` threads the worst-seen outcome into the same `extra`
+parameter §4.2 adds.
+
+**Both false comments are corrected, and there are TWO of them (R1-A).** The
+first fold cited one site, off by one line, using the *other* file's wording:
+
+| site | what it says now | why it is false |
+| --- | --- | --- |
+| `gui/multisig_build.go:439` | `Only verifyComplete falls through to the restore document.` | a CONTINUE after a failure falls through too |
+| `gui/multisig.go:321-322` | `Only verifyComplete falls through; a refusal or an abandon does not loop` | same, differently worded |
+
+Neither may survive a cycle that fixes the behaviour they misdescribe. **The
+citation gate resolved the wrong line happily and was right to** — it states
+plainly that it proves a line *exists*, never that the interpretation is right.
+That is the gate's declared blind spot doing its job by being declared.
 
 **F-197 is untouched by this.** An *aborted engrave* still ends the program with
 no verify offer and no document, because the set on the bench is incomplete.
@@ -629,11 +717,28 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T6** | the single-sig run reaches `Plates To Cut` before the engrave picker | remove the census call |
 | **T7** | `seedCapacityOne` yields `The seed you entered` and not `Every seed`; `seedCapacityMany` yields `Every seed`; **and every new operator string is ASCII-clean** (the glyph set at `gui/multisig_build_prose_test.go:395`) | swap the capacity arms; insert an em dash |
 | **T8** | `gui/bundle_flow.go` no longer claims `both engraving callers` (source assertion, mirroring the `readGuiFile` pattern at `gui/multisig_build_prose_test.go:402`) | restore the old comment |
+| **T9** | each of the five §4.7a outcomes renders **its own** line, and every rendered document carries **exactly one** status line — asserted over `buildVerifyStatusLines` directly | return the same string for two outcomes; return an empty slice |
+| **T10** | **the stickiness.** A run whose verify DISAGREED and was then abandoned prints the `DISAGREED` warning, **not** `DID NOT COMPLETE` | implement it as last-wins — which is precisely what the first fold specified |
+| **T11** | the status line is the **first** line of the document, ahead of the plate inventory | append instead of prepend |
+| **T12** | a clean pass after an earlier disagreement prints the repeat-check line — **not** the bare `VERIFIED`, and **not** the bare `DISAGREED` | collapse the fifth state into either neighbour |
 
 **T5 is the one that carries the class.** F-197's own follow-up says it: *"A
 call-site assertion alone is not enough — that is exactly what let the multisig
 instance ship."* T5 must drive the real screens end to end, not assert on the
 source.
+
+**T9–T12 exist because the R1 round found the cycle's Critical had NO TEST.**
+The first fold rewrote this section twice — adding §5.1 and §5.2, refining T2
+through T8 — and added not one row for §4.7. The remedy for the Critical was the
+only item in the plan with nothing that could fail if it regressed, while F-202,
+a Minor, had a row.
+
+**T10 is the sharpest test in this plan, and it is a regression test against the
+plan itself.** Its mutation is not hypothetical: *implement the status as
+last-wins* is **exactly what the first fold specified**, in writing, and it
+silently downgrades a `DISAGREED` to `DID NOT COMPLETE` on the two paths that
+same fold had just pulled into scope. If T10 does not fail against that
+implementation, it is not testing anything.
 
 ### 5.1 EXISTING TESTS THAT MUST BE UPDATED, NOT WEAKENED
 
