@@ -880,7 +880,39 @@ observations.) Any sequence containing an adverse observation prints a line that
 carries it — `DISAGREED`, `PLATES UNACCOUNTED FOR`, or the repeat-check line —
 never bare `VERIFIED` and never `DID NOT COMPLETE`.
 
-**P4 — A LINE MAY NEVER OUTRUN THE EVIDENCE.** For every reachable outcome —
+**P5 — THE LINE IS CONSTRUCTED FROM RECORDED EVIDENCE, AND ENUMERATION FAILURES
+MAY ONLY WEAKEN IT.** This is the *enforceable* property; **P4 below is now a
+THEOREM of it**, not a separate obligation.
+
+- **(a) Positive claims are GENERATED.** Every printed claim that a check
+  occurred is generated from a **recorded observation** of that check, carrying
+  that observation's provenance. A claim with no generating observation **cannot
+  be rendered**. *(This makes "each plate was read back" unwritable: nothing
+  records reading the ms1, because nothing reads it.)*
+- **(b) CLASSIFICATION AT THE POINT OF KNOWLEDGE.** Every distinction the status
+  map draws is made **at the code site where its distinguishing facts are values
+  in scope**, and recorded there — never reconstructed downstream from a verdict,
+  an error value, or an error string.
+- **(c) MONOTONE UNDER OMISSION.** An unrecognized observation maps to the line
+  making the **fewest claims**, and **a test asserts that default arm is
+  unreachable** from every known return path. Incompleteness may only ever
+  **weaken** the printed line, never strengthen it.
+
+**WHY THE TABLE ALONE COULD NOT DISCHARGE P4.** It needed three conjuncts at
+once — complete enumeration, a correct W per row, and code able to make every
+distinction the rows demand — and R7 falsified **each independently**. Worse,
+**it failed OPEN**: unrowed paths inherited `DID NOT COMPLETE`, and the
+unexamined success row inherited full-strength `VERIFIED`. A safety mechanism
+whose failure mode is *confident output* is worse than none, because it is
+trusted. P5(c) inverts that: the failure mode is now silence about what was not
+checked.
+
+P5 splits P4's completeness into **the part a tool enforces** (row coverage via a
+committed return-site sweep; classifier exhaustiveness via the tested default
+arm) and **the part a human still judges** (W per row) — whose failure direction
+is now safe.
+
+**P4 (now a theorem) — A LINE MAY NEVER OUTRUN THE EVIDENCE.** For every reachable outcome —
 enumerated **per return path, per error, and per comparand provenance**, never
 per verdict and never per site — let **W** be the set of world-states consistent
 with everything the device observed on the way there. Every factual claim and
@@ -946,12 +978,13 @@ as an addition rather than as something already blessed.
 
 | # | status | line (verbatim, ASCII only) |
 | --- | --- | --- |
-| 1 | `statusVerified` | `Plates VERIFIED: each plate was read back and matched.` |
-| 2 | `statusVerifiedOnRetry` | `Plates VERIFIED on a repeat check. An earlier read-back disagreed; a later check read every plate and matched.` |
-| 3 | `statusNotVerified` | `No check was run on these plates. Confirm they restore before relying on this backup.` |
-| 4 | `statusDidNotComplete` | `Plate verification DID NOT COMPLETE. Confirm they restore before relying on this backup.` |
-| 5 | `statusUnaccounted` | `Some plates could not be checked against this run. Either a plate was not presented, or it is not one this run cut. Present every plate this run engraved and check again; if this repeats, re-cut the set.` |
-| 6 | `statusDisagreed` | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup: engrave a fresh set and check it before use.` |
+| 1 | `statusUnclassified` **(reserved)** | `The device observed something it could not classify. Treat these plates as unchecked and confirm they restore before relying on this backup.` |
+| 2 | `statusVerified` | `Key and descriptor plates VERIFIED: read back and matched. The ms1 you typed matched this seed -- no ms1 plate was read.` |
+| 3 | `statusVerifiedOnRetry` | `Key and descriptor plates VERIFIED on a repeat check. An earlier read-back disagreed; a later one matched. No ms1 plate was read.` |
+| 4 | `statusNotVerified` | `No check was run on these plates. Confirm they restore before relying on this backup.` |
+| 5 | `statusDidNotComplete` | `Plate verification DID NOT COMPLETE. Confirm they restore before relying on this backup.` |
+| 6 | `statusUnaccounted` | `Some plates could not be checked against this run. Either a plate was not presented, or it is not one this run cut. Present every plate this run engraved and check again; if this repeats, re-cut the set.` |
+| 7 | `statusDisagreed` | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup: engrave a fresh set and check it before use.` |
 
 **Six rows, matching §4.7c's six constants and §4.7d's six knowledge states.** An
 earlier draft carried five here while the prose above already argued for six —
@@ -1017,13 +1050,67 @@ with what the device observed.
 | re-typed seed will not derive | `:897` | the operator mistyped the seed; nothing observed about the plates | 1 | `statusDidNotComplete` |
 | operator abandoned / refused | loop exit | nothing observed about the plates | 1 | `statusDidNotComplete` |
 
-**The rule this table exists to enforce, and it is mechanical:**
+**THIS TABLE IS A REVIEW PROJECTION, NOT THE ENFORCEMENT MECHANISM (R7 / P5).**
+It was demoted after R7 found three Criticals inside it: a wrong `|W|` on the
+success row, two reachable paths with **no row at all**, and a distinction the
+code cannot make. Enforcement is P5; this table is how a human reads what P5
+produced, and its coverage is checked by a **committed return-site sweep script**
+rather than by care.
+
+**MISSING ROWS ADDED (R7 C-2), and the method failure behind them named.** The
+plan performed an exhaustive per-return-site analysis for `verifyFailed` — five
+sites — **because a reviewer named that verdict**, and never repeated it for any
+other. `verifyIncomplete` has **three non-uniform return sites**, unexamined:
+
+| observation | where | W | \|W\| | status |
+| --- | --- | --- | --- | --- |
+| readback filter drops cards | `gui/multisig_verify.go:701`; single-sig `:116` | (a) not presented; (b) unreadable plate | **2** | `statusUnaccounted` |
+| plate count ≠ engraved count | `gui/multisig_verify.go:738` | (a) a plate withheld; (b) a plate this run cut is unreadable | **2** | `statusUnaccounted` |
+| partial verify, all compared matched | `gui/multisig_verify.go:979` | nothing adverse observed about the plates | 1 | `statusDidNotComplete` |
+
+**"incomplete" is removed from §4.7d's row-4 enumeration**, which had
+affirmatively swept the first two in — so they printed `DID NOT COMPLETE` with no
+scope line, violating P2.
+
+**THE REMAINING SEVEN SITES — enumerated BY THE SCRIPT, not from memory.**
+`./scripts/verify-returnsite-sweep.sh` reported **7 of 15 verdict return sites
+unrowed** the moment it was written — *immediately after this table had been
+"fixed" in response to R7*. Three review rounds found some of them; a command
+found all of them in one second. That is the method failure measured, and it is
+why P5(c) matters more than any row below: **being wrong about one of these must
+be safe, because being complete about them is not achievable by care.**
+
+| site | verdict | W | \|W\| | status |
+| --- | --- | --- | --- | --- |
+| `gui/multisig_verify.go:670` | `verifyRefused` | no expected slots — a programmer-error refusal; nothing observed about plates | 1 | `statusDidNotComplete` |
+| `gui/multisig_verify.go:680` | `verifyRefused` | no engraved md1 to compare against; nothing observed about plates | 1 | `statusDidNotComplete` |
+| `gui/multisig_verify.go:696` | `verifyAbandoned` | the operator declined to present plates at all | 1 | `statusDidNotComplete` |
+| `gui/multisig_verify.go:794` | `verifyRefused` | `verifyFreshSlots` failed — a structural refusal before any readback | 1 | `statusDidNotComplete` |
+| `gui/multisig_verify.go:938` | `verifyIncomplete` | zero legs, correctable — the seed filled no slot this run engraved | 1 | `statusDidNotComplete` |
+| `gui/multisig_verify.go:940` | `verifyAbandoned` | zero legs, not correctable | 1 | `statusDidNotComplete` |
+| `gui/multisig_verify.go:987` | `verifyComplete` | **the success path** — every leg matched a read-back plate; **no ms1 plate was read** | **2** | `statusVerified`, whose line is SCOPED (§4.7d) |
+
+**`:987` is the one that matters.** It is the success site, it was unrowed, and
+its `|W| = 2` is exactly R7's C-1: the device knows the key and descriptor plates
+matched and knows **nothing** about the ms1 plate, because nothing reads it. The
+scoped line is what makes that row P5(a)-clean.
+
+**The rule the projection is read against:**
 
 > **A row with `|W| > 1` may not carry a line that asserts a single member of W.**
 
 Every `|W| = 2` row above lands in `statusUnaccounted`, whose line states **both**
 readings and **both** actions. That is why the sixth status is not a nicety: it is
 the only line that can be true of a two-world observation.
+
+**C-3 — THE CODE CANNOT SEPARATE ROWS 3 AND 7 AS SPECIFIED, AND P5(b) IS WHY
+THAT IS NOW A DESIGN INSTRUCTION RATHER THAN A CONTRADICTION.** `bundle.Verify`
+returns only **untyped errors**, so a plate-derived comparison failure and a
+hand-typed ms1 divergence are indistinguishable *downstream*. Collapsing them
+either way reproduces R5's I-1 or loses a real `DISAGREED`. **So the distinction
+is not reconstructed downstream — it is recorded at the comparator, where mk1-vs-ms1
+provenance is a value in scope.** That is P5(b), and it is a change to *where*
+the classification happens, not to what the table says.
 
 **Provenance is a first-class column, not a detail.** The ms1 row is
 `|W| = 2` *solely* because its comparand was typed by a human rather than read
@@ -1265,6 +1352,9 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T13a** | **P1 — a clean pass always prints a pass line.** Assert the **whole line, byte-exact**, against the six-line table in §4.7d — **never `strings.Contains`**. Table-driven over §4.7a's twelve rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
 | **T13b** | **P2 — an ADVERSE OBSERVATION is never lost.** Every sequence containing one prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
 | **T15** | **P4 — the line does not outrun the evidence.** The §4.7d **observation table** is the test fixture: one row per return path / error / comparand provenance, each naming its world-set W and its line. Assert (a) every row's line is true in every member of its W, and (b) **no row with `|W| > 1` carries a line asserting a single member** | give `errVerifyLegHasNoPlate` the `DISAGREED` line — precisely what the R4 fold specified, and R5's Critical |
+| **T17** | **P5(c) — the default arm is UNREACHABLE.** No known return path reaches `statusUnclassified`; the reserved line renders for no reachable observation | add a return path and omit its classification — the test flags it the day it is written, which is exactly what `:701` and `:738` needed |
+| **T18** | **P5(a) — no pass line claims a check that was not recorded.** The `statusVerified` lines name the key and descriptor plates only, and state that no ms1 plate was read | restore "each plate was read back and matched" — R7's C-1, false on every full run |
+| **T19** | **P5(b) — provenance is recorded at the comparator**, not reconstructed downstream: a hand-typed ms1 divergence and a plate-derived mismatch reach the status map already distinguished | classify from `bundle.Verify`'s untyped error downstream — impossible by construction, which is the point |
 | **T16** | under `statusDisagreed` and `statusUnaccounted`, the scoping line (§4.7f) renders immediately after the status line; under the four non-adverse statuses it does **not** render | drop the condition and render it always, or never — the first cries wolf on a clean backup, the second is R6's I-1 |
 | **T15b** | `errVerifyLegHasNoPlate`, the `:719` foreign-or-garbled md1, and a hand-typed ms1 divergence each yield `PLATES UNACCOUNTED FOR` — **never** `DISAGREED` and **never** `DID NOT COMPLETE` | route any of them to either neighbour; the first is R5's C-1, the second its I-1 |
 | **T14** | the zero value of `verifyStatus` renders `NOT VERIFIED` | reorder the constants so `statusVerified` is 0 — the mutation that makes a forgotten assignment vouch |
