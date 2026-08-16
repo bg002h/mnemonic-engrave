@@ -6825,3 +6825,45 @@ cut instead of apologising for what is dropped. **State the plate count before
 the tail** — the plan's S4 prose constraint, and it binds harder here than
 anywhere, because this is the change that makes the count differ from what the
 operator saw last time.
+
+---
+
+### F-189 — `multisigEngraveCards` and `findUserSlot`'s `reused` return have no production callers left (owning phase: **`SPEC_multisig_build_repair.md` S5** — with the block that retired them) `#seedhammer`
+
+Filed 2026-08-16 by the F-188 implementer, which could not write this file from
+its worktree.
+
+Both were the single-leg world's API. `multisigEngraveCardsMulti` replaced the
+first when the build tail went multi-slot (S5.B); `allUserSlots` replaced the
+second when the supply tail did the same (F-188). Measured: neither has a
+non-test caller.
+
+**Why this is not merely tidiness.** A retired API left in place is an
+invitation to reintroduce the rule it encoded — exactly what happened with
+`errVerifyLegHasNoPlate`, where a *review* proposed relaxing a rule the deleted
+symmetry made look optional. The same argument retired
+`extractSuppliedMd1AndMk1` rather than leaving it as a trap. Delete them, or
+state in each why it is kept.
+
+### F-190 — `cmd/emu/needle_test.go`'s uniqueness counter reads SHARED-HELPER strings as if they were per-flow (owning phase: **`SPEC_multisig_build_repair.md` S5.D** — with the walk block) `#seedhammer`
+
+Filed 2026-08-16, widened by F-188 and found by it.
+
+A walk needle must identify ONE flow. The counter proves a string appears at one
+production site, but a string emitted by a **shared helper** appears once in
+source and on **every caller's screen** — so the count says "unique" while the
+needle is anything but. F-188 hit this directly: reusing the build path's
+`"Plate Count"` census title on the supply path made the build walk's anchor
+two-site, and the implementer had to differ the title (`"Plates To Cut"`) purely
+to keep the walk honest.
+
+**That is the tail wagging the dog** — a test's needle mechanism chose an
+operator-facing string. The body the operator reads is identical in both flows,
+which is correct; only the title differs, and only because of this counter. S5.D
+owns the walks, so it owns fixing the counter to attribute shared-helper strings
+to their CALL SITES rather than their definition — after which the titles should
+be reconciled on UX grounds alone.
+
+This is the same class as **F-184** (a needle's uniqueness proof counts
+comments as production sites): the counter measures source text where the claim
+is about screens.
