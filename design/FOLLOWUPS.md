@@ -6778,3 +6778,50 @@ unblocked and derives the correct form directly. It batches to whenever the
 manual is next worked. Companion entries belong in `mnemonic-toolkit` (the
 manual) and `descriptor-mnemonic` (`--help`/man) when this is picked up, per the
 cross-repo notification convention.
+
+---
+
+### F-188 — RULED 2026-08-15 (operator: "Build this"): the supply path engraves ONE plate where the seed fills SEVERAL slots, so the engrave rule and the verify rule disagree at the source (owning phase: **`SPEC_multisig_build_repair.md` S5**) `#seedhammer`
+
+Filed and immediately ruled IN by the operator, having been raised as a
+follow-up by the fable design review persisted at `5fc08c4`.
+
+**The disagreement, measured.** `allUserSlots` (`gui/multisig_match.go`) derives
+the operator's seed **at each policy slot's own `OriginPath`**, so it returns
+every slot ONE SEED accounts for — at different origins, carrying **different
+keys**. The supply path (`gui/multisig.go:141-149`) then engraves a plate for
+the **first** match only and announces:
+
+    This key is reused at slots @0 and @1; engraving the first (@0).
+
+**That sentence is false**, and the falsity is the tell: the keys at @0 and @1
+are not the same key. It is one seed filling two slots at two origins. The
+message describes a shape the code does not produce.
+
+**Why it had to be ruled rather than just fixed.** It changes what goes on
+**steel** in a flow this plan does not own — the operator may now cut more
+plates than the same inputs produced yesterday — so it is a normative output
+change, not a refactor. The **Rust-primary rule does not bind**: this is
+fork-native GUI/UX with no Rust counterpart (exempt clause b).
+
+**What it buys.** The verify's rule is a plate per matched slot; the engrave's
+is one plate per matched seed. Making the engrave agree removes the mismatch at
+its source rather than teaching the checker to tolerate it — and a checker
+taught to tolerate a disagreement is how a false GREEN gets in. Two attempts to
+absorb it on the verify side were rejected: dropping the leg→plate rule makes a
+LOST plate pass, and deduping legs by identical mk1 is inert for the real shape.
+
+**It does NOT make the slot-set fix (F-8 / the `expectedSlots` work) redundant,
+and reading it that way would reopen the false RED on the build path.** There,
+`allUserSlots` can still exceed the operator's declared `SelfSlots`: a payload
+cosigner card carrying a DIFFERENT key derived from the same seed at another
+origin is not a duplicate — `duplicateSlotPair` refuses only IDENTICAL keys —
+and is admitted. The two changes are complementary.
+
+**Constraints on the build.** Reuse `multisigEngraveCardsMulti` (already built
+in S5.B); do not invent a second emitter. One ms1 per distinct seed, and the
+supply path has exactly one seed. Rewrite the message to announce what WILL be
+cut instead of apologising for what is dropped. **State the plate count before
+the tail** — the plan's S4 prose constraint, and it binds harder here than
+anywhere, because this is the change that makes the count differ from what the
+operator saw last time.
