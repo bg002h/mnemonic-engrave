@@ -37,6 +37,31 @@ agent persists its own report — the controller is never the only copy.
 **Step 3. Do not re-litigate** the decisions in `design/agent-reports/`:
 C-1's remedy, ONE PIECE (F-198 is not separable), and the cycle scope.
 
+**Step 4. THE ESCALATION RULE** (agreed with the operator 2026-08-16, after five
+consecutive RED rounds): **if a round returns a Critical, dispatch a FABLE
+BLIND-SPOT PASS before folding it.** One question only —
+
+> *Here is the design and the properties it claims. What failure mode do they
+> collectively fail to constrain?*
+
+Then **fold its answer yourself**; do not have fable author the fold.
+
+**Why this shape, and not "fable writes the fold".** The operator proposed the
+latter; this is the agreed refinement. A fold is mostly mechanical — apply
+decisions to markdown, propagate, gate — and paying fable rates to edit prose is
+the same category error this repo already names, *a reviewer being paid
+design-review rates to act as a compiler*.
+
+**What actually failed was judgement, once, and it is nameable.** Through R3 every
+fold defect was a *verification* failure (a loop condition never traced, a slice
+composition never read), which is why an earlier proposal to delegate the fold
+was declined — a fresh author inherits that failure mode unchanged. **R4's C-1
+was different.** The plan asserted two properties, P1 and P2, and both constrained
+*under*-warning; nothing constrained *over*-condemning, so the design would have
+stamped "Do NOT rely on this backup" on perfectly good steel. No amount of
+checking finds that. Someone has to ask what direction the properties are blind
+to — and a reviewer asked it, not the author. P3 exists only because of that.
+
 ---
 
 ## THE ONE THING TO KNOW
