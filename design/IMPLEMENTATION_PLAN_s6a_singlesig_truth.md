@@ -179,8 +179,15 @@ matching `seedPassphraseFact.Uses`
     grep -rn "restoreDocFlow(" --include="*.go" gui/
     # the definition at gui/singlesig_restore.go:119, and gui/singlesig.go:136. Nothing else.
 
-`multisigRestoreDocFlow` (`gui/multisig_restore.go:100`) is the shape to mirror:
-it takes `extra []string` and ends `restoreDocScreen(ctx, th, append(lines, extra...))`.
+`multisigRestoreDocFlow` (`gui/multisig_restore.go:100`) takes `extra []string`
+and ends `restoreDocScreen(ctx, th, append(lines, extra...))`.
+
+**That is the CURRENT shape, and it is explicitly NOT the shape to mirror** — an
+earlier draft of this line said it was. §4.7b measures that a trailing parameter
+cannot reach slice index 0, which is what "page 1" means on this pager, so
+**both** functions gain a leading `status []string` as well (§4.2, §4.7b). This
+sentence is kept as a *measured fact about today's code* and is flagged so no
+reader takes it as the target design.
 
 ### 1.9 No test pins the literal single-sig label
 
@@ -373,22 +380,38 @@ already in scope at that point (`:64-74` precedes `:77`). This mirrors
 
 ### 4.2 F-198b — the restore document gets an inventory
 
-`restoreDocFlow` (`gui/singlesig_restore.go:119`) gains a trailing
-`extra []string`, mirroring `multisigRestoreDocFlow` (`gui/multisig_restore.go:100`):
+`restoreDocFlow` (`gui/singlesig_restore.go:119`) gains **two** parameters — a
+**leading** `status []string` and a **trailing** `extra []string` — exactly
+matching the shape §4.7b specifies for `multisigRestoreDocFlow`:
 
     func restoreDocFlow(ctx *Context, th *Colors, xpub string, masterFP, parentFP uint32,
-        script md.ScriptKind, path bip32.Path, extra []string) {
+        script md.ScriptKind, path bip32.Path, status []string, extra []string) {
         ...
-        restoreDocScreen(ctx, th, append(lines, extra...))
+        restoreDocScreen(ctx, th, append(append(status, lines...), extra...))
     }
 
-and the one call site (`gui/singlesig.go:136`) supplies it:
+and the one call site (`gui/singlesig.go:136`) supplies both:
 
     restoreDocFlow(ctx, th, xpub, masterFP, parentFP, script, path,
+        buildVerifyStatusLines(worstStatus),
         buildPlateInventoryLines(cards, oneSeedPassphraseFact(passphrase != ""), seedCapacityOne))
 
 `cards` is already in scope from `:126`. Blast radius is one production call site
 and zero test call sites (§1.8).
+
+**WHY TWO PARAMETERS AND NOT ONE, on this path too.** The first three drafts of
+this section specified only the trailing `extra`, and the R2 fold corrected that
+for multisig **and left this section behind** — while §4.7b went on to reference
+"the leading parameter §4.2 adds", which §4.2 did not add. So the plan asserted a
+design it did not contain, on the *more travelled* of the two paths.
+
+That is R2 C-1's own defect class, reintroduced **by omission**, in the fold that
+closed it: `append(lines, extra...)` cannot place anything at slice index 0, and
+index 0 is what §4.7b measured "page 1" to mean. **Folds fail by incomplete
+propagation — the facts get corrected and the duplicates are left standing** —
+and reading the diff does not find it, because the defect is in the text the diff
+did *not* touch. It was caught by a cheap pre-review pass grepping for the stale
+shape, which is precisely the job that pass exists to do.
 
 ### 4.3 The capacity-keyed seed-handling ruling
 
