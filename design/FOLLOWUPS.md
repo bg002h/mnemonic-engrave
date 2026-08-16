@@ -6635,3 +6635,65 @@ each time somebody notices. Scoped to S5 because that is where the engrave tail'
 screens land, and because S5 already owns the "every comparison the device asks
 for must be one the operator can perform" constraint, of which this is the
 rendering half.
+
+### F-186 — `md encode` cannot encode a DIVERGENT-origin multisig template, and fails with an INTERNAL error rather than refusing (owning phase: **`SPEC_multisig_build_repair.md` S5** — ruling in flight; may escalate to the `descriptor-mnemonic` primary) `#seedhammer` `#cross-repo`
+
+Found 2026-08-15 while building S5.0's built-policy `ExpectKind`, independently
+by that stage's implementer and by the controller reproducing it.
+
+**Measured, with real BIP-48 keys** derived via `ms derive --template
+bip48-p2wsh` from BIP-39's `abandon…about` vector (fingerprint `73c5da0a`), and
+run against the pinned oracle `~/.cargo/bin/md`, version `md 0.13.0`:
+
+    # DIVERGENT: two accounts of one master, bracketed per-key origins
+    md encode "wsh(sortedmulti(2,[73c5da0a/48h/0h/0h/2h]@0/<0;1>/*,\
+                                 [73c5da0a/48h/0h/1h/2h]@1/<0;1>/*))" \
+      --key @0=<A@0 xpub> --key @1=<A@1 xpub> --network mainnet --group-size 0
+    TRUE_EXIT=1
+    md: template parse error: internal: synthetic key [73c5da0a not found in
+        key map (rendered: [73c5da0a/48'/0'/0'/2']xpub6DXuQW1FgeHbfmex…)
+
+    # SHARED via --path: reaches the CODEC, i.e. a real encode
+    md encode "wsh(sortedmulti(2,@0/<0;1>/*,@1/<0;1>/*))" --key … \
+      --path "m/48'/0'/0'/2'" --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a
+    TRUE_EXIT=1
+    md: codec error: payload is 246 data symbols; … (use --force-chunked)
+
+So the shared path works and only the divergent one breaks.
+
+**Two distinct defects, and the second is the worse one.**
+
+1. **No working invocation for divergent origins.** `md encode --help`
+   documents `--path` as *"Override the inferred origin path with a single
+   shared path (**flattens Divergent mode to Shared**)"* — md plainly has a
+   notion of Divergent mode, yet no invocation found encodes one.
+2. **It fails INTERNALLY, not cleanly.** The message says `internal:`, and md
+   **rendered the descriptor correctly** before failing to find `[73c5da0a` in
+   its own key map — the parser appears to split on `/` and take the bracket
+   prefix as a key name. An unsupported input should produce a clean refusal
+   naming what is unsupported. A funds-relevant encoder that fails confusingly
+   is a defect in its own right, independent of whether the feature is wanted.
+
+**Why it may block S5.** S5 is *"multi-slot self, divergent origins, and the
+engrave tail"*, and the payload inventory describes Trace B as **A@0 and A@1
+(one master, two accounts) plus B@0 and C@0 — multi-slot, divergent origins,
+multi-master**. S5's gate mints a record whose census includes the engraved md1.
+If that md1 is divergent-origin, **the mint refuses and S5 cannot close.**
+
+**Why it may NOT block S5, which is why this is a question and not yet a
+Critical.** "Divergent origins" may describe the **cosigner cards'** own origins
+— each mk1 carries its own — while the assembled **policy** md1 still uses one
+shared origin. Evidence for that reading: S4 derives the self key *"at the
+LOCKED shared origin (self-origin == policy-origin by construction)"*; S2
+shipped an interim foreign-origin refusal; and §0.1a defers template-aware
+defaults to S5. If the device emits a shared-origin md1, md's limitation never
+bites.
+
+**If it does block**, the fix is **Rust-primary first**: the md primary is
+`descriptor-mnemonic` (pin `5a0a4f41`, which is also its HEAD and the
+`md-cli-v0.13.0` tag), it lands there with test vectors, and only then does the
+oracle pin move — noting the pin binds a maintainer-built binary's SHA-256, so a
+new md tag implies a rebuild and re-record, and an S0 re-anchor exactly like the
+`ms` bump just performed.
+
+**Defect 2 is worth fixing regardless of the answer to defect 1.**
