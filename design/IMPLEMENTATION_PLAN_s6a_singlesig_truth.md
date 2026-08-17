@@ -1094,11 +1094,11 @@ second is the serious one:
 | 1 | **Write BOTH step-1 artifacts and get them reviewed together:** (a) the single-sig eleven-exit → `verifyRecord` mapping, and (b) **the `suppliedCosigners` expression** — policy keys not covered by a verified leg, from `keys`/`covered` at `gui/multisig_verify.go:987`, with single-sig writing 0 | eleven exits plus one formula, and every later step depends on both. Nothing else starts until they are agreed. **(b) was asserted in prose and scheduled nowhere — R14 I-2.** |
 | 2 | `verifyRecord` + `passRecord` + `buildVerifyStatusLine` + **T21, T22, T26** | pure functions over a record, no callers yet. **T20 does NOT land here either** (R12 I-2): its *exactly-one-line-on-all-three-rendered-documents* half needs call sites that do not exist until step 7, and §5 says pure-function assertions do not satisfy it. T23, T24, T25 likewise need a rendered document and a multisig retry |
 | 3 | `seedCapacity` + the two-axis ruling + `buildSeedInventoryLines` (§4.3, §4.4), updating **all EIGHT existing call sites** — 2 production (`gui/multisig_build.go:479`, `gui/multisig.go:362`) and 6 in tests (`gui/multisig_build_prose_test.go:369,424,425`, `gui/multisig_build_perseed_passphrase_test.go:134,246,304`) | shared census; still no flow changes. **The NINTH site (`gui/singlesig.go:136`) is NOT here** — it hands the inventory to `restoreDocFlow`, which cannot accept one until step 4's signature change, and step 5 owns single-sig inventory wiring. **An earlier draft said "six" here while §4.3 said eight (measured); updating six leaves two test sites at the old arity, which is a compile error, not a soft failure** |
-| 4 | `restoreDocFlow` and `multisigRestoreDocFlow` gain `status` + `extra` (§4.2, §4.7b), **all three call sites** | signature change; the tree must stay green across it |
+| 4 | `restoreDocFlow` and `multisigRestoreDocFlow` gain `status` + `extra` (§4.2, §4.7b), **all FOUR call sites — 3 production + 1 test** | signature change; the tree must stay green across it. Measured: `restoreDocFlow` → `gui/singlesig.go:136`; `multisigRestoreDocFlow` → `gui/multisig.go:361`, `gui/multisig_build.go:478`, and **`gui/multisig_nested_name_test.go:230`, which passes `nil` today and must be updated, not left** (§5.1 already named it; this cell said "three" and would have left it at the old arity — a compile error) |
 | 5 | Wire single-sig: label (§4.1), inventory, census (§4.6), abort gate (§4.5) | the F-198/F-195/F-197/F-202 body of work |
 | 6 | Update the three walks that the census screen stops (§5.1b), **plus T7c** | must accompany step 5, not follow it. **T7c belongs here** (R12 I-2): it drives each of the three flows to its restore document and asserts the seed-handling clause matches that path's capacity — §8.4 calls it required and no earlier draft scheduled it to any step |
 | 7 | Wire the verify status into all three flows, plus **T11, T20, T23, T24, T25, T27** — and update **all TWELVE call sites plus the stub** (§5.1) in this same commit — four source assertions to the new call **verbatim**, eight direct `multisigVerifyFlow(...)` sites and the stub closure to the new arity | needs 2, 4 and 5 in place. **T20 lands here, not at step 2**, because its assertion is on the *rendered document* of all three flows. An earlier draft justified this step with T9/T13a/T13b, tests that **exist nowhere in this plan** |
-| 8 | Correct the three false comments (§4.7c) + T8 | independent; deliberately last so it cannot mask a behavioural regression |
+| 8 | Correct the three false comments **enumerated in §4.8b below** + T8 | independent; deliberately last so it cannot mask a behavioural regression |
 | 9 | Update `SPEC_seedhammer_T6a_singlesig_flagship.md` (§3.1.7), **in its own commit** | the spec follows the behaviour, and is not mixed with it |
 
 **Step 1 is a gate, not a task.** It produces **two** artifacts — a table of
@@ -1151,6 +1151,26 @@ message at `gui/singlesig_verify.go:89` is byte-identical to the multisig one at
 `gui/multisig_verify.go:896` — is its twin, same message string, same cause. **Any single-sig exit
 that observed nothing about the plates — a refusal, an abort, a re-derivation
 that never got as far as reading one — is benign and writes neither boolean.**
+
+### 4.8b THE THREE FALSE COMMENTS — enumerated, because step 8 never listed them
+
+**Step 8 said "correct the three false comments (§4.7c)" and §4.7c is *THE FOUR
+LINES*, which enumerates no comments.** Nothing anywhere in this plan listed
+them, so step 8 was an instruction with no object: an implementer reaching it had
+a count, a wrong cross-reference, and nothing to act on. Each one below was
+**read out of the source and checked**, not carried over from an earlier draft.
+
+| # | comment | why it is false |
+| --- | --- | --- |
+| 1 | `gui/bundle_flow.go:535` — *"both engraving callers now gate it on this function's own caller returning `bundleEngraveDone`"* | **THREE** callers carry a tail (§1.5), and only two gate. The claim was false when written — `gui/singlesig.go:127` already existed, ungated, with a tail. The corrected comment must name all three (T8, §5.1) |
+| 2 | `gui/multisig_verify.go:78` — *"FOUR OUTCOMES, NOT A BOOL"* | the type has **FIVE** constants (`gui/multisig_verify.go:88-100`): `verifyComplete`, `verifyIncomplete`, `verifyFailed`, `verifyRefused`, `verifyAbandoned`. **The comment's own body then names all five**, so it contradicts its own headline — and round 0 repeated the "four" from it (§3.1) |
+| 3 | `gui/bundle_flow.go:125-126` — *`bundleGatherFlow` returns `(nil,false)` on "Back / **an empty bundle**"* | there is **no empty-bundle return**. The only `(nil,false)` sites are `:177` (Back) and `:241` (`ctx.Done`); the empty-bundle arm shows a screen and **loops**. Found while classifying exits for step 1, where taking the comment at face value would have changed a row's argument |
+
+**Comment 3 was found by an implementer reading the code, not by any of the
+seventeen review rounds** — and it is the reason this section exists rather than
+a corrected count. **Step 8 must re-sweep rather than trust this list of three**:
+the plan asserted "three" before anything enumerated them, so the number was
+never evidence, and the third entry here is one nobody had written down.
 
 ### 4.9 The spec update — what it says, and how it is checked (R3 I-8)
 
