@@ -268,6 +268,64 @@ because verify would then compare the engrave source against itself. R-C
 preloads an *engrave* input, not a verification input, so §7.4 does not bind —
 but the spec must say so explicitly, because the shapes rhyme.
 
+### R-D — the governing principle, and it decides two of R-C's three questions
+
+Operator, 2026-08-17, answering R-C question 2:
+
+> "all things said must be true"
+
+**This is a general rule, not a footer fix**, and it is recorded at this level
+because it settles cases nobody has enumerated yet. Applied to R-C:
+
+**R-C.3 — the acceptance screen RUNS.** Operator: *"yes."*
+`syswSourceAccept` (`gui/sysw_source.go:113`) is shown when the preloaded
+passphrase enters the program.
+
+**R-C.1 — therefore a NEW `syswSource` value is required.** Not a free choice:
+it is forced by R-D plus R-C.3. `syswSourceName` (`gui/sysw_source.go:9`)
+resolves `srcTyped` through its `default:` arm to **`"the keyboard"`**, and
+`syswSourceAccept` prints `"Source: " + syswSourceName(src)`
+(`gui/sysw_source.go:127`). A preloaded passphrase did **not** come from the
+keyboard, so reusing `srcTyped` makes the screen state a falsehood — exactly
+what R-D forbids.
+
+Two mechanical consequences the spec must carry:
+
+- **The `default:` arm is a trap of the F-198 class.** A new enum value added
+  without an explicit `case` in `syswSourceName` falls through to
+  **`"the keyboard"`** — a missed edit becomes a *printed falsehood*, with no
+  compile error and no test failure. The new case and the new value must land
+  together, and a test must pin the rendered string, not the enum.
+- **The source line appears automatically, which is the desired behaviour.**
+  `syswFlags` (`gui/sysw_admit.go`) raises `flagSource` on `src != srcTyped`,
+  so any non-typed provenance is announced. Typing is the unremarkable
+  baseline; a carried-over passphrase is not, and now says so.
+
+**R-C.2 — `passphraseFooter` must become conditional.** The fixed string
+`"FINGERPRINTS TYPED, NOT VERIFIED"` (`backup/passphrase.go:156`) asserts a
+provenance that did not occur on the preloaded path, where the device **derived**
+those fingerprints itself. Under R-D that is not tolerable merely because it
+under-claims.
+
+**Measured, so the spec does not have to re-derive it:**
+
+```
+32  FINGERPRINTS TYPED, NOT VERIFIED     <- the existing string
+35  FINGERPRINTS DERIVED BY THIS DEVICE
+31  FINGERPRINTS DERIVED, NOT TYPED
+22  DERIVED BY THIS DEVICE
+```
+
+**The budget is NOT known to be 32.** §2.3 records only that this mechanism has
+no 18-char cap and that *this* footer happens to be 32 characters — that is the
+string's length, not a measured limit. **The real limit must be measured before
+a replacement is chosen**, and it belongs in the same spike as §3 Q2.
+
+This also resolves the asymmetry §2.5 flagged: the passphrase plate's footer was
+correct *because the operator typed the fingerprints there*. On the preloaded
+path the device derived them, which puts that plate in the same category as
+`mk1`/`md1` — plates that may legitimately vouch for their own fingerprints.
+
 ### Still open after this pass
 
 - **§3 Q1, Q2, Q3, Q6** — unchanged, and Q2 is a measurement, not a decision.
