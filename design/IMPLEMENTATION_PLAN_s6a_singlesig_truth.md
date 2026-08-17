@@ -1079,7 +1079,7 @@ criteria passes anything:**
 
 | artifact | accepted when |
 | --- | --- |
-| (a) the eleven-exit mapping | every one of `singleSigVerifyFlow`'s exits appears exactly once — **including the fall-through at `gui/singlesig_verify.go:149`, which is the only success exit and is not a `return`** (§4.7b-seam); **each row names which of `verifyRecord`'s two booleans that exit writes — `fullPassRecorded` (via `passRecord`, which carries the mode) and/or the sticky `adverseRecorded` — and NO row names a `verifyStatus` value**, because the status is derived once, downstream, by §4.7a's switch; **no exit writes a pass record on a path the device did not observe passing** (G2); the row count equals the exit count measured in the code, not quoted from here |
+| (a) the eleven-exit mapping | every one of `singleSigVerifyFlow`'s exits appears exactly once — **including the fall-through at `gui/singlesig_verify.go:149`, which is the only success exit and is not a `return`** (§4.7b-seam); **each row names which of `verifyRecord`'s two booleans that exit writes — `fullPassRecorded` (via `passRecord`, which carries the mode), the sticky `adverseRecorded`, or NEITHER, which is the right answer for a benign exit and lands it in the zero cell — and NO row names a `verifyStatus` value**, because the status is derived once, downstream, by §4.7a's switch; **each row carries §4.7b's one bit, adverse or benign, and an exit that observed nothing about the plates is benign** (R16 I-1); **no exit writes a pass record on a path the device did not observe passing** (G2); the row count equals the exit count measured in the code, not quoted from here |
 | (b) the `suppliedCosigners` expression | it is computable from names in scope at `gui/multisig_verify.go:987`; it is 0 on every single-sig path; it counts policy keys **not** covered by a verified leg, so it can never under-report what went unchecked (G2's direction of failure) |
 
 **Why (a) forbids naming a `verifyStatus` value, which is subtle enough that an
@@ -1090,17 +1090,34 @@ pass line must not lose (§4.7c). `verifyStatus` cannot carry `full` (T22) or
 historical defect this four-state design exists to make structurally impossible,
 so the mapping is a table of **record writes**, never of statuses.
 
-**A consequence worth checking the mapping against:** from *inside* the eleven
-exits, only **two** of the four states are reachable on single-sig —
-`statusVerified` (the fall-through) and `statusCheckDidNotPass` (the ten adverse
-returns). `statusVerifiedOnRetry` needs a prior adverse write *and* a later pass
-in one call, and single-sig has **no retry loop** (§5.2 — `gui/singlesig.go:131`
-is a one-shot `if sel, ok := verifyChoice.Choose(ctx, th); ok && sel == 0`, with
-no re-offer, so the flow runs at most once per engrave); `statusNotFullyChecked`
-is the zero cell, which is
-what *never calling the flow* leaves behind, not something an exit writes. **A
-proposed mapping that reaches either of those two from within the eleven exits
-is wrong**, and that is a check the reviewer can apply mechanically.
+**A consequence worth checking the mapping against.** Exactly **one** of the four
+states is unreachable from inside the eleven exits: **`statusVerifiedOnRetry`**,
+which needs a prior adverse write *and* a later pass within one call, and
+single-sig has **no retry loop** — `gui/singlesig.go:131` is a one-shot
+`if sel, ok := verifyChoice.Choose(ctx, th); ok && sel == 0` with no re-offer, so
+the flow runs at most once per engrave (§5.2). **A proposed mapping that reaches
+`statusVerifiedOnRetry` from within the eleven exits is wrong**, and that is
+checkable without judgement.
+
+**The other three are all reachable, including the zero cell — and an earlier
+draft of this paragraph got that wrong (R16 I-1), in the direction that matters.**
+It called all ten returns "adverse", which would have sent every non-success exit
+to `statusCheckDidNotPass`, whose line reads *"A verification check ran and did
+not pass"* (§4.7c). **On a benign exit that is a false statement and a G2
+violation** — it claims a check the device never performed. The zero cell is
+therefore *not* only what never calling the flow leaves behind: a benign exit
+reaches `statusNotFullyChecked` **from inside** the flow, by writing neither
+boolean, which is precisely how a prohibition fails safe (§0.1).
+
+**So splitting the ten returns into adverse and benign IS the step-1 work** — it
+is the one bit per site that §4.7b calls "the only classification left", and this
+table cannot pre-judge it. §4.7b's methodology governs, and it already carries a
+worked precedent that **binds** one single-sig row: `gui/multisig_verify.go:897`
+(*"re-typed seed will not derive"*) is classified **benign — nothing observed
+about the plates**, and `gui/singlesig_verify.go:89` is the byte-identical
+single-sig twin of it, same message string, same cause. **Any single-sig exit
+that observed nothing about the plates — a refusal, an abort, a re-derivation
+that never got as far as reading one — is benign and writes neither boolean.**
 
 ### 4.9 The spec update — what it says, and how it is checked (R3 I-8)
 
