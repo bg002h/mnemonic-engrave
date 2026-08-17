@@ -1197,7 +1197,7 @@ a count, a wrong cross-reference, and nothing to act on. Each one below was
 
 | # | comment | why it is false |
 | --- | --- | --- |
-| 1 | `gui/bundle_flow.go:535` — *"both engraving callers now gate it on this function's own caller returning `bundleEngraveDone`"* | **THREE** callers carry a tail (§1.5), and only two gate. The claim was false when written — `gui/singlesig.go:127` already existed, ungated, with a tail. The corrected comment must name all three (T8, §5.1) |
+| 1 | `gui/bundle_flow.go:535` — *"both engraving callers now gate it on this function's own caller returning `bundleEngraveDone`"* | **THREE** callers carry a tail (§1.5). Against `main` only two gate — the claim was false when written, since `gui/singlesig.go:127` already existed, ungated, with a tail. **BUT STEP 5 ADDS THE THIRD GATE, so by the time step 8 runs, all three gate.** The corrected comment must name all three *and* say they all gate (T8, §5.1) |
 | 2 | `gui/multisig_verify.go:78` — *"FOUR OUTCOMES, NOT A BOOL"* | the type has **FIVE** constants (`gui/multisig_verify.go:88-100`): `verifyComplete`, `verifyIncomplete`, `verifyFailed`, `verifyRefused`, `verifyAbandoned`. **The comment's own body then names all five**, so it contradicts its own headline — and round 0 repeated the "four" from it (§3.1) |
 | 3 | `gui/bundle_flow.go:125-126` — *`bundleGatherFlow` returns `(nil,false)` on "Back / **an empty bundle**"* | there is **no empty-bundle return**. The only `(nil,false)` sites are `:177` (Back) and `:241` (`ctx.Done`); the empty-bundle arm shows a screen and **loops**. Found while classifying exits for step 1, where taking the comment at face value would have changed a row's argument |
 
@@ -1206,6 +1206,22 @@ seventeen review rounds** — and it is the reason this section exists rather th
 a corrected count. **Step 8 must re-sweep rather than trust this list of three**:
 the plan asserted "three" before anything enumerated them, so the number was
 never evidence, and the third entry here is one nobody had written down.
+
+**THE RE-SWEEP FOUND THREE MORE, AND THIS TABLE ITSELF WENT STALE — both
+recorded because they are the same lesson twice.** Step 8's sweep confirmed
+`gui/multisig_build.go:873` ("three walk drivers", now **four**),
+`gui/bundle_flow.go:367` and the `gui/multisig.go:34` / `gui/singlesig.go:25`
+pair (all citing declarations at lines they have since moved from), and correctly
+**rejected** `gui/multisig_restore.go:44`, which *quotes* a superseded spec line
+and corrects the reader in the next sentence — editing it would misquote the spec.
+
+*"Three walk drivers"* was **true when written on 2026-08-15** and false on
+**2026-08-16**, when `walk_trace_b` landed. **A comment rotted in one day.** And
+row 1 above, written to fix an unenumerated instruction, described **pre-step-5**
+state while being scheduled to run **after** step 5 — transcribing it literally
+would have shipped a fresh false comment inside the fix for three old ones. **An
+enumeration is a measurement with a timestamp, not a fact**; re-measure at the
+step that consumes it.
 
 ### 4.9 The spec update — what it says, and how it is checked (R3 I-8)
 
