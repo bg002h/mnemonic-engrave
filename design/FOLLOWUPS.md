@@ -7229,3 +7229,36 @@ It is filed rather than scoped because the remedy is not obviously the same one:
 these flows engrave single artifacts rather than sets, so `buildFullModeLabel`
 and the plate inventory have no natural home in them, and deciding what they
 should say is a design question rather than a wiring change.
+
+### F-206 — the pass line's ms1 clause stays singular on a multi-seed multisig verify (owning phase: **S6b, with F-199's verify-screen copy pass**) `#seedhammer`
+
+Filed 2026-08-17 by the S6a whole-diff adversarial review (M-1), FILE-not-fix.
+
+§4.7c's clause **B** is the fixed string `The ms1 secret you typed matched this
+seed.` On a **full multisig** verify where the operator typed **two** ms1 secrets
+for two seeds, the document still says *"the ms1 secret"* and *"this seed"*,
+singular. The device's own already-reviewed screen gets this right — it says
+*"the ms1 you typed for each seed"*.
+
+**It UNDER-claims, so it is G2-safe and does not gate**: the line names fewer
+comparisons than actually ran, and omission weakening a claim is the direction
+this design is built to fail in. It is a legibility defect, not a truth defect.
+
+Owned by S6b because that cycle already opens the verify-flow copy on the same
+tail (F-199), and because the fix is a plural rule over `passRecord.legs` /
+seed count rather than a new recorded fact — **no new field, so it does not
+reopen NG1.**
+
+### F-207 — `singleSigReadbackCards` silently drops a card of an unexpected kind (owning phase: **none yet — pre-existing, NOT gating the hardware flash**) `#seedhammer`
+
+Filed 2026-08-17 by the S6a whole-diff adversarial review (N-1), FILE-not-fix.
+
+The readback accounting recognises the card kinds it expects and **silently
+ignores any third kind** rather than refusing or counting it.
+
+**Pre-existing, and it produces no false claim**: an unrecognised card cannot
+satisfy an expected slot, so the accounting that follows either falls short and
+takes an adverse exit or is unaffected. Nothing on the document asserts anything
+about it. Filed so the behaviour is written down rather than rediscovered — the
+question worth answering later is whether a card the device cannot classify
+should be an adverse observation rather than a non-event.
