@@ -1,0 +1,158 @@
+# S6b — Q2 spike results (executable, run 2026-08-17)
+
+**This is the gate §3 Q2 asked for and no document had ever run.** Everything
+below is a measurement produced by running code, not a reading of it. The spike
+itself is throwaway and is **not merged** — it lived in worktree
+`wt-s6b-spike` on branch `s6b-q2-spike`, off fork `main` = `b1479a1`.
+
+Toolchain: **go1.26.3** from the nix store. Tests scoped with `-run`; stdout and
+stderr captured to separate files, **stderr empty on every run**.
+
+> **Correction to the standing runbook.** `CONTINUITY_2026-08-17.md` and this
+> repo's notes say to use `export PATH="/nix/var/nix/profiles/default/bin:$PATH"`.
+> **That profile contains no `go`** — it holds only the `nix*` tools. The
+> toolchain is at `/nix/store/33fw5m31lfcnk4ff2f0df7j2bxnh8lgk-go-1.26.3/bin`,
+> and CI uses `actions/setup-go@v6` with `go-version: '1.26'` — the fork's
+> workflow file `.github/workflows/test.yml`, lines 10-12, **hand-verified**
+> because `plan-cite-check.sh` strips the leading dot and reports the path as
+> `github/workflows/test.yml … (no such file under any root)`. That is a parser
+> limitation, not a bad citation; expect `dangling: 1` on this file. The old
+> PATH line produces `command not found: go`, which the runbook itself warns
+> "proves nothing".
+
+---
+
+## 1. The documented variant thresholds REPRODUCE — but their unit is unstated
+
+`backup/backup.go:397-403` claims: *"TEXT+QR fails first (works through 268
+chars, fails at 269), then QR-ONLY (641, fails at 642), and TEXT-ONLY fails LAST
+(645, fails at 646)."*
+
+Measured by growing `"md1" + strings.Repeat("q", n-3)` through `validateMdmk`
+and recording each change in the offered label set:
+
+| variant | comment | measured, TOTAL string | measured, FILLER only |
+| --- | --- | --- | --- |
+| TEXT + QR | 268 / fails 269 | 271 / fails 272 | **268** ✓ |
+| QR ONLY | 641 / fails 642 | 644 / fails 645 | **641** ✓ |
+| TEXT ONLY | 645 / fails 646 | 648 / fails 649 | **645** ✓ |
+
+**Every figure is exactly +3 — the `"md1"` prefix.** The documented numbers are
+**correct**, and count the filler rather than the whole string. The comment does
+not say which, and the difference is large enough to be read as drift. **A
+future edit should state the unit**; this spike nearly reported a regression
+that does not exist.
+
+---
+
+## 2. Q2's headline: a title/footer band FITS, with large margin
+
+Measured by reserving *N* blank text rows at the top of `EngraveText` (a proxy
+for R-F's optional band: what a band costs the body is the vertical space it
+occupies) and re-measuring the TEXT+QR limit.
+
+| title rows reserved | TEXT+QR holds | slack over the longest real string (111) |
+| --- | --- | --- |
+| 0 (today) | 271 | +160 |
+| **1 (title)** | **262** | **+151** |
+| **2 (title + footer)** | **240** | **+129** |
+| 3 | 230 | +119 |
+| 4 | 228 | +117 |
+
+**A one-row title costs 9 characters of body budget. Title + footer costs 31.**
+
+Against real strings, measured in-repo:
+
+| string | length |
+| --- | --- |
+| single-sig `md1` (gui tests) | 67 |
+| `mk1` key card (gui tests) | 74 |
+| chunked `md1` (s2 golden) | 80 |
+| longest `md1`/`mk1` literal found anywhere in-repo | 111 |
+
+**Answer to Q2: YES, comfortably.** Even title + footer leaves 240 characters
+against a longest-observed 111 — better than 2× margin.
+
+**Stated limit of this measurement:** 111 is the longest string *found in the
+repository*, not a proven upper bound on `md1`/`mk1`. The bound that makes this
+robust is **chunking** — the s2 golden's multisig cards are 80 characters each
+because a long policy is split across cards — but the spike did **not** measure
+the maximum chunk payload. **A spec relying on this should measure that bound.**
+
+---
+
+## 3. Q3's proposal is WRONG about the passphrase plate: both bands are FULL
+
+This spike was written to check Q2 and found a defect in the **Q3** proposal,
+which claimed the wallet-policy id needed only *"one optional field and one
+conditional line"*. Structurally true; **there is nowhere to put the line.**
+
+Measured `passphraseLayoutFor` occupancy:
+
+| case | topLines | bottomLines |
+| --- | --- | --- |
+| no metadata | 0 | 0 |
+| both fingerprints | 2 | 1 |
+| **worst case: both fps + a spaced passphrase** | **2** | **2** |
+
+Worst-case contents:
+
+```
+top[0]     "SEED FP: 73c5 da0a"
+top[1]     "EXPECTED COMB FP: fc60 c6df"
+bottom[0]  "\x1f = SPACE"
+bottom[1]  "FINGERPRINTS TYPED, NOT VERIFIED"
+```
+
+And the band geometry, measured (`smallEm = 19200` device units = 3 mm;
+`bottomY = 480000` = 75 mm; band must stop at `plateSize - outerMargin` = 82 mm
+= 524800; the metal ends at 85 mm = 544000):
+
+| bottom lines | ends at | past the BAND | past the PLATE |
+| --- | --- | --- | --- |
+| 2 | 518400 | no | no |
+| **3** | 537600 | **YES** | no |
+| 4 | 556800 | yes | yes |
+
+**So the code comment at `backup/passphrase.go:171-174` is correct — at most two
+lines per band — and a third line does not error, does not clip: it silently
+cuts into the 3 mm outer margin**, the plate-edge/screw-hole zone. `band`
+(`backup/passphrase.go:228-235`) has no refusal of any kind.
+
+### What this forces the spec to decide
+
+There is **no free band line in the worst case**, so R6's policy id cannot
+simply be added. The options, none chosen here:
+
+1. **Render it only when a slot is free**, never displacing a safety line.
+   Omission under-claims, which is the direction **R-D** tolerates — but the id
+   is then absent exactly when the plate is busiest.
+2. **Displace `passphraseLegend`** (`"\x1f = SPACE"`). Rejected on its face: it
+   is needed precisely when the passphrase contains spaces, and it is more
+   safety-critical than an identifier.
+3. **Merge the two fingerprint lines** to free a top slot.
+4. **Shrink `smallEm` for band lines**, buying a third line within 7 mm.
+5. **Do not put the policy id on this plate at all.**
+
+**Note the interaction with R-C:** the preloaded path already requires a
+*different* footer string (`"FINGERPRINTS TYPED, NOT VERIFIED"` is false when
+the device derived them). Whatever replaces it competes for the same
+`bottomLines` budget measured above.
+
+---
+
+## 4. What the spike did NOT measure
+
+Named so the gate's blind spot is visible, per project practice:
+
+- **The maximum `md1`/`mk1` chunk payload** — §2's robustness argument rests on
+  it (see §2's stated limit above).
+- **Whether the band's own TEXT fits its width.** This measured vertical
+  occupancy only. A title's *horizontal* fit against `MaxTitleLen = 18` and the
+  screw-hole inset is a separate measurement, and §2.4 establishes nothing in
+  the render layer bounds it.
+- **Any rendered output.** No goldens were produced or compared, so R-G's
+  "unmarked path stays byte-identical" claim is **still unverified** — it
+  becomes checkable only once R-F's real (non-proxy) band exists.
+- **The F-208 arrow layout**, which R-F/R-G do not touch and which must still be
+  settled before F-192's sweep sets its budgets.
