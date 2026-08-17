@@ -6,61 +6,64 @@ Supersedes `CONTINUITY_2026-08-16b.md`. Read this one.
 
 ## ▶ START HERE — the first thing to do in a fresh session
 
-**Step 1. Read the R4 adversarial verdict**, which decides everything else:
+**Step 1. Read the goals**, which govern what counts as a defect:
 
-    head -20 design/agent-reports/s6a-r4-adversarial.md
+    sed -n '/## 0.1 WHAT THIS CYCLE/,/## 1. MEASURED FACTS/p' design/IMPLEMENTATION_PLAN_s6a_singlesig_truth.md
 
-That file is the last review of the S6a plan. It exists because every dispatched
-agent persists its own report — the controller is never the only copy.
+**G1** never misdescribe what was engraved. **G2** never vouch for plates the
+device has evidence against. **NG1 — reporting the verification's epistemic
+status — is an explicit NON-GOAL**: nobody asked for it, and every Critical of
+this cycle came from it. A finding that would expand it is **out of scope by
+default**, even when correct.
 
-**Step 2, branch on its verdict:**
+**Step 2. Read the newest review verdict:**
 
-- **GREEN (0 Critical / 0 Important) → the R0 loop is CLOSED. Start implementing.**
-  Do **not** run another review round for reassurance; a clean re-review closes
-  the loop. Go to §4.8's nine-step build order in
-  `design/IMPLEMENTATION_PLAN_s6a_singlesig_truth.md`.
+    ls -t design/agent-reports/s6a-r*.md | head -3
+    head -20 "$(ls -t design/agent-reports/s6a-r*.md | head -1)"
+
+**Step 3, branch on it:**
+
+- **GREEN (0C/0I) → the R0 loop is CLOSED. Start implementing.** Do **not** run
+  another round for reassurance. Go to §4.8's nine-step build order.
   **Step 1 of that order is a GATE, not a task:** produce the single-sig
-  11-exit → `verifyStatus` mapping and have it reviewed *before* any other code.
-  Work in `/scratch/code/shibboleth/wt-s6a` (branch `s6a-singlesig-truth`, empty,
-  already created). One implementer, TDD.
+  11-exit → `verifyRecord` mapping and have it reviewed *before* any other code.
+  Work in `/scratch/code/shibboleth/wt-s6a` (branch `s6a-singlesig-truth`,
+  empty, already created). One implementer, TDD.
 
-- **RED → fold it, and fold it the way that has been working:**
-  1. Commit the report verbatim in its **own** commit first.
-  2. **Fold from the file, never from memory** — re-read/re-run every mechanism
-     claim. This is where five of six folds went wrong.
-  3. **Grep the superseded phrasing** afterwards; reading the diff cannot find
-     what was left behind. Check headings, not just bodies.
-  4. Run `./scripts/plan-cite-check.sh` and `./scripts/plan-glyph-check.sh`.
-  5. Dispatch the **cheap sonnet claim-verification pass** before any expensive
-     adversarial round. It has paid for itself every time.
+- **RED → fold it, in this order, which is what has been working:**
+  1. Commit the report **verbatim, in its own commit**, first.
+  2. **Fold from the file, never from memory.** Re-read/re-run every mechanism
+     claim. This is where most fold defects came from.
+  3. **Run all five gates** (below), then `plan-fold-sweep.sh --terms` naming
+     every phrase this fold superseded. **Check headings, not just bodies.**
+  4. Dispatch the **cheap sonnet claim-verification pass** before any expensive
+     round. It has found something every single time.
+  5. **If the round returned a Critical, or an Important the reviewer labelled
+     JUDGEMENT → dispatch a FABLE BLIND-SPOT PASS before folding** (see Step 4).
 
-**Step 3. Do not re-litigate** the decisions in `design/agent-reports/`:
-C-1's remedy, ONE PIECE (F-198 is not separable), and the cycle scope.
-
-**Step 4. THE ESCALATION RULE** (agreed with the operator 2026-08-16, after five
-consecutive RED rounds): **if a round returns a Critical, dispatch a FABLE
-BLIND-SPOT PASS before folding it.** One question only —
+**Step 4. THE ESCALATION RULE** (agreed 2026-08-16). On a Critical, or a
+JUDGEMENT-labelled Important, ask fable ONE question before folding:
 
 > *Here is the design and the properties it claims. What failure mode do they
 > collectively fail to constrain?*
 
-Then **fold its answer yourself**; do not have fable author the fold.
+Then **fold its answer yourself** — fable's value is judgement, not
+transcription. Reviewers now label each finding MECHANICAL or JUDGEMENT so the
+trigger does not depend on the controller's own classification.
 
-**Why this shape, and not "fable writes the fold".** The operator proposed the
-latter; this is the agreed refinement. A fold is mostly mechanical — apply
-decisions to markdown, propagate, gate — and paying fable rates to edit prose is
-the same category error this repo already names, *a reviewer being paid
-design-review rates to act as a compiler*.
+**Step 5. THE FIVE GATES.** Run all five on any plan edit:
 
-**What actually failed was judgement, once, and it is nameable.** Through R3 every
-fold defect was a *verification* failure (a loop condition never traced, a slice
-composition never read), which is why an earlier proposal to delegate the fold
-was declined — a fresh author inherits that failure mode unchanged. **R4's C-1
-was different.** The plan asserted two properties, P1 and P2, and both constrained
-*under*-warning; nothing constrained *over*-condemning, so the design would have
-stamped "Do NOT rely on this backup" on perfectly good steel. No amount of
-checking finds that. Someone has to ask what direction the properties are blind
-to — and a reviewer asked it, not the author. P3 exists only because of that.
+    ./scripts/verify-returnsite-sweep.sh <plan>   # every verdict return site is rowed
+    ./scripts/plan-cite-check.sh        <plan>    # every path:line resolves
+    ./scripts/plan-glyph-check.sh       <plan>    # strings the display font can draw
+    ./scripts/plan-table-check.sh       <plan>    # no table row lost a cell
+    ./scripts/plan-fold-sweep.sh <plan> --terms '<superseded phrase>' ...
+
+Each prints what it does **not** cover. **Never cache their numbers in prose** —
+that rotted twice; the commit message carries each fold's measured output.
+
+**Step 6. Do not re-litigate** the decisions in `design/agent-reports/`: the
+goals (§0.1), C-1's remedy, ONE PIECE, the four-state set, and cycle scope.
 
 ---
 
