@@ -1,7 +1,14 @@
 # S6b — proposal for §3 Q1, Q3, Q6
 
-**Status:** a proposal awaiting operator approval. Not a spec, not gated, not
-implementable. Every code fact below is read from fork `main` =
+**Status: APPROVED by the operator, 2026-08-17** — *"I accept your
+recommendations"* — for **Q1** and **Q6**; **Q3** was settled separately against
+the primary Rust implementation (see the SETTLED block below). Recorded as
+rulings **R-F** and **R-G** in `REQUIREMENTS_s6b_pre_flash_cycle.md` §2bis,
+which is the authority the spec reads.
+
+Still not a spec, not gated, not implementable — an approved proposal is input
+to a spec, and the R0 gate is untouched. Every code fact below is read from fork
+`main` =
 `b1479a1b38f6b045d27443764c858906e4e6e122` and cited; the groundwork is
 `design/agent-reports/s6b-plate-mechanism-facts.md`, persisted verbatim in
 `3922fcf` before this document was written.

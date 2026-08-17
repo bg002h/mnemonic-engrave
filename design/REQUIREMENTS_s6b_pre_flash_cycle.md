@@ -418,13 +418,75 @@ and must state the predicate it chose. Two consequences:
 **Restoring the mask is filed with the honest-geometry work, after F-192 closes
 — not in S6b.**
 
-### Still open after this pass
+### R-F — Q1: optional `Title`/`Footer` on `backup.Text`
 
-- **§3 Q1, Q6** — proposed in `design/PROPOSAL_s6b_q1_q3_q6.md`, awaiting
-  approval.
-- **§3 Q2** — a measurement, not a decision. Still the gating spike.
-- **§3 Q3** — the "key-id" question is out for research against the primary
-  Rust `mk` implementation (`mnemonic-key/crates/mk-codec`).
+Operator, 2026-08-17: *"I accept your recommendations."* Full argument and
+citations in `design/PROPOSAL_s6b_q1_q3_q6.md`.
+
+`mk1`/`md1` keep their current mechanism (`backup.Text`), which gains
+**optional** `Title`/`Footer` rendered through the layout helpers it **already
+shares** with the free-text plate (`textLayout`, `qrPlaceAt`, `WrapText`, all in
+`backup/wrap.go`). Rejected: the passphrase band (a private closure with no
+wrap, no QR-narrowing, no screw-hole clamp — and these plates carry a QR), and
+migrating to `Fitted` (one row per string vs wrapped paragraphs).
+
+**OPTIONAL IS NORMATIVE, not an implementation detail.** Empty title → no row →
+no vertical budget consumed → **byte-identical to today**. This is the mechanism
+by which R-A and R-B are honoured without teaching `validateMdmk` about flows:
+the **caller** conditions the marking by supplying a string or not.
+
+**Required gate (from the proposal, adopted with it):** a test pinning **which
+engraving variants are offered** for a representative `md1` and `mk1`, with the
+title empty and with it set. TEXT+QR is the tightest variant — fits to 268
+characters, fails at 269 — so a band could silently change the offered set,
+which is what `backup/backup.go:386-392` warns about in its own words.
+
+### R-G — Q6: no golden churn is the ASSERTION, not the review burden
+
+Operator, same ruling.
+
+1. Because R-F's fields are optional, the unmarked path **must** stay
+   byte-identical. So if `backup/testdata/text-{0,1,2}-shards-1.bin` move, that
+   is a **finding — a defect in the optionality** — not a golden to refresh.
+2. **Marked states get NEW golden files.** The frozen sixteen keep meaning what
+   they meant.
+3. `backup/testdata/passphrase-*.bin` (4) **will** legitimately move if Q3's
+   policy-id line lands. Re-record them **in the same commit as the change that
+   moved them**, which is the contract `sizeproof-{front,back}.bin` already
+   documents.
+4. **Never run a bare `go test ./... -update`** — it rewrites the frozen
+   sixteen. Scope every regeneration with `-run`.
+
+---
+
+## THE DECISION PASS IS CLOSED
+
+Every question §3 posed is answered, except the one that was never a decision.
+
+| §3 question | outcome |
+| --- | --- |
+| Q1 — which plate-text mechanism | **R-F** — optional `Title`/`Footer` on `backup.Text` |
+| Q2 — does a title/footer FIT? | **not a decision — the gating SPIKE, still owed** |
+| Q3 — which identifier is the "key-id" | **settled** — the master fingerprint; `mk1` defines no key-id concept |
+| Q4 — watch-only sets | **R-A** — not marked |
+| Q5 — multisig paths | **R-B** — moved to `key & password custody refinement` |
+| Q6 — the goldens | **R-G** — no churn is the assertion |
+
+Rulings not arising from §3: **R-C** (passphrase program preloaded), **R-D**
+(*"all things said must be true"*), **R-E** (`fadeClip` stays stubbed).
+
+**What S6b owes before a spec may close, in order:**
+
+1. **The Q2 spike** — an executable measurement, not prose. It must answer:
+   does a title/footer fit alongside text+QR on an `md1`/`mk1` plate at current
+   sizes; what is the TEXT+QR threshold **with** a band present (today: 268/269
+   without); what is the passphrase band's real footer budget (§2.4's 32 is a
+   string length, not a measured limit); and does the band's third line problem
+   (§2.5 / Q3) force `bottomLines`.
+2. **The F-208 arrow layout** — before F-192's sweep sets its budgets, or every
+   screen gets measured twice.
+
+**The plan may not close while either has never been run.**
 
 ---
 
