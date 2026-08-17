@@ -903,7 +903,7 @@ A distinction earns a line **iff both prongs hold**:
 | --- | --- | --- | --- |
 | pass vs not-pass | success return, `full` in scope | rely-with-scope vs do not | **kept** |
 | adverse vs benign | all gui-local (§4.7b) | "confirm before relying" vs "do not rely until a check passes" | **kept** |
-| VERIFIED vs on-repeat | same two bits | action identical — **kept because it is FREE**, being a cell of the same 2x2, not because a property demands it |
+| VERIFIED vs on-repeat | same two bits | action identical | **kept because it is FREE** — a cell of the same 2x2, not because a property demands it |
 | DISAGREED vs UNACCOUNTED | **fails** — interior to `bundle.Verify` | — | **dropped** |
 | skip vs incomplete | — | **fails** — same action | **dropped** |
 
@@ -1000,7 +1000,7 @@ second is the serious one:
 | 4 | `restoreDocFlow` and `multisigRestoreDocFlow` gain `status` + `extra` (§4.2, §4.7b), **all three call sites** | signature change; the tree must stay green across it |
 | 5 | Wire single-sig: label (§4.1), inventory, census (§4.6), abort gate (§4.5) | the F-198/F-195/F-197/F-202 body of work |
 | 6 | Update the three walks that the census screen stops (§5.1b) | must accompany step 5, not follow it |
-| 7 | Wire the verify status into all three flows, plus T9, T10, T11, T12, T13a, T13b | needs 2, 4 and 5 in place. **T9/T13a/T13b need a rendered document and a multisig retry loop**, neither of which exists at step 2 |
+| 7 | Wire the verify status into all three flows, plus T11, T23, T24, T25 | needs 2, 4 and 5 in place. **T9/T13a/T13b need a rendered document and a multisig retry loop**, neither of which exists at step 2 |
 | 8 | Correct the three false comments (§4.7c) + T8 | independent; deliberately last so it cannot mask a behavioural regression |
 | 9 | Update `SPEC_seedhammer_T6a_singlesig_flagship.md` (§3.1.7), **in its own commit** | the spec follows the behaviour, and is not mixed with it |
 
@@ -1110,7 +1110,7 @@ Measured over the six lines:
 
 **Recounted after the §4.7d rewording: two of six contain `VERIFIED`, one
 contains `DISAGREED`.** The original trap — `Plates NOT VERIFIED` matching
-`Contains("VERIFIED")`, which let T13a's own named mutation pass — is **gone**,
+`Contains("VERIFIED")`, which let a status test's own named mutation pass — is **gone**,
 because the reader lens forced status 3 to stop sharing a token with the pass
 lines (§4.7d, R6 I-2). The rule survives its own fix: even at two of six, a
 substring assertion cannot distinguish status 1 from status 2, so assertions
@@ -1144,17 +1144,17 @@ call-site assertion alone is not enough — that is exactly what let the multisi
 instance ship."* T5 must drive the real screens end to end, not assert on the
 source.
 
-**T9–T12 exist because the R1 round found the cycle's Critical had NO TEST.**
+**T20–T26 exist because the R1 round found the cycle's Critical had NO TEST.**
 The first fold rewrote this section twice — adding §5.1 and §5.2, refining T2
 through T8 — and added not one row for §4.7. The remedy for the Critical was the
 only item in the plan with nothing that could fail if it regressed, while F-202,
 a Minor, had a row.
 
-**T10 is the sharpest test in this plan, and it is a regression test against the
+**T23 is the sharpest test in this plan, and it is a regression test against the
 plan itself.** Its mutation is not hypothetical: *implement the status as
 last-wins* is **exactly what the first fold specified**, in writing, and it
 silently downgrades a `DISAGREED` to `DID NOT COMPLETE` on the two paths that
-same fold had just pulled into scope. If T10 does not fail against that
+same fold had just pulled into scope. If T23 does not fail against that
 implementation, it is not testing anything.
 
 ### 5.1 EXISTING TESTS THAT MUST BE UPDATED, NOT WEAKENED
@@ -1276,7 +1276,9 @@ against the fork's working tree and prints the actual line, so a reviewer reads
 verified anchors rather than re-deriving them:
 
     ./scripts/plan-cite-check.sh design/IMPLEMENTATION_PLAN_s6a_singlesig_truth.md
-    # R0 fold: citations resolved: 76 / 76 ; dangling: 0   (exit 0)
+    # DO NOT CACHE THE NUMBER HERE. An earlier draft did, and it rotted twice
+    # (76/76 while the live count was 96/96). Run the command; the commit message
+    # of each fold carries that fold's measured output.
 
 ### 6.2 The glyph gate — every operator string this plan writes must DRAW
 
@@ -1286,7 +1288,7 @@ containing one does **not draw** on the machine, on screens whose entire job is
 to say what the backup does and does not contain.
 
     ./scripts/plan-glyph-check.sh design/IMPLEMENTATION_PLAN_s6a_singlesig_truth.md
-    # R0 fold: operator strings scanned: 41 ; undrawable: 0   (exit 0)
+    # DO NOT CACHE THE NUMBER HERE -- same reason (41 while live was 56).
 
 **It earned itself on the first fold.** It caught a string this plan had copied
 verbatim out of the R0 report, where the reviewer had joined `showNotice`'s two
