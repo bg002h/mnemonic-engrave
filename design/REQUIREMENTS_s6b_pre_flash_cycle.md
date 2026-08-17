@@ -553,6 +553,40 @@ re-litigated:
    currently draws (`fadeClip` clips nothing), so without a background they can
    land on top of a glyph.
 
+### R-J — the device preloads the FINGERPRINTS too, not just the passphrase
+
+Operator, 2026-08-17, on R0 round 1's C1: **yes**.
+
+**What C1 exposed.** R-C preloads the passphrase **bytes only**; both
+fingerprints are still typed (`gui/passphrase_flow.go:665-678`, and the code
+says so at `:628-629`). R-J closes that: the device supplies the fingerprints it
+already computed, `ppStepSeedFP`/`ppStepCombinedFP` are skipped on the preloaded
+path, and §2.3's footer may then truthfully read **`DERIVED, NOT TYPED`**.
+
+This is more faithful to R-C's own purpose — *do not make the operator re-type
+what the device already holds* — and the plate gets **stronger** fingerprints as
+a side effect: derived beats typed-and-unchecked.
+
+### R-J's two measured costs, stated because they are not free
+
+**1. It costs one extra ~31 s KDF.** The engrave path derives **once**, with the
+passphrase, at `gui/singlesig.go:107`. That yields `masterFP` — the **combined**
+fingerprint — for free. The **bare-seed** fingerprint is a second derivation with
+an empty passphrase, and a seed derivation on this device is a **~31 second
+KDF** (`gui/gui.go:825`, `gui/gui.go:1653`, `gui/unlock_platelist.go:175`).
+
+**2. It must happen AT `gui/singlesig.go:107`, not later — this is the binding
+constraint.** That line's own comment reads *"The mnemonic is consumed for the
+LAST time here."* Deriving the seed fingerprint afterwards would require keeping
+the mnemonic alive past its scrub point, **weakening a security property to buy
+a plate legend**. That trade is refused.
+
+**NORMATIVE:** both derivations happen back-to-back at `gui/singlesig.go:107`,
+while the mnemonic is legitimately alive; the scrub point does not move.
+
+The ~31 s lands during engrave setup — not on a failure screen, and small
+against a plate that takes roughly twenty minutes to cut.
+
 ---
 
 ## THE DECISION PASS IS CLOSED

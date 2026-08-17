@@ -258,10 +258,39 @@ preloaded path, where the device **derived** the fingerprints.
 
 **NORMATIVE:**
 
+**Superseded by R-J, 2026-08-17 — the operator ruled that the device preloads
+the fingerprints too**, so the derivation claim becomes true rather than being
+avoided:
+
 ```
-preloaded    "POLICY <8 hex, grouped>  FPS TYPED"   27 chars -> fits (42 budget)
-standalone   "FINGERPRINTS TYPED, NOT VERIFIED"     32 chars -> unchanged
+preloaded    "POLICY <8 hex, grouped>  DERIVED, NOT TYPED"  36 chars -> fits (42 budget)
+standalone   "FINGERPRINTS TYPED, NOT VERIFIED"             32 chars -> unchanged
 ```
+
+**This footer is true ONLY IF §2.3d ships with it.** If the fingerprint entry
+steps remain on the preloaded path for any reason, this string reverts to
+`"POLICY <8 hex, grouped>  FPS TYPED"` (27 chars). **The two must land in the
+same change** — a footer claiming derivation while `fingerprintEntryFlow` still
+runs is C1 all over again, and GATE 2.3b exists to catch exactly that.
+
+### 2.3d NORMATIVE — where the two derivations happen (R-J)
+
+Both fingerprints are derived **back-to-back at `gui/singlesig.go:107`**, and
+`ppStepSeedFP`/`ppStepCombinedFP` are skipped on the preloaded path.
+
+- `masterFP` — the **combined** fingerprint — already comes out of that call,
+  free.
+- The **bare-seed** fingerprint is a second `deriveSingleSigBundle` with an
+  **empty passphrase**, costing a **~31 s KDF** (`gui/gui.go:825`,
+  `gui/gui.go:1653`, `gui/unlock_platelist.go:175`).
+
+**It may not be deferred.** `gui/singlesig.go:106` states *"The mnemonic is
+consumed for the LAST time here."* Deriving later would extend the mnemonic's
+lifetime past its scrub point — **weakening a security property to buy a plate
+legend**, which is refused.
+
+**GATE 2.3d:** assert the mnemonic's scrub point has **not moved**, and that the
+preloaded path presents **no** fingerprint-entry step.
 
 The preloaded footer states the policy binding **and** the fingerprints'
 true provenance. 27 characters leaves 15 of headroom; the denser
