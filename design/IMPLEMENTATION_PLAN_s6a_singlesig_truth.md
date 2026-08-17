@@ -1079,8 +1079,28 @@ criteria passes anything:**
 
 | artifact | accepted when |
 | --- | --- |
-| (a) the eleven-exit mapping | every one of `singleSigVerifyFlow`'s exits appears exactly once — **including the fall-through at `gui/singlesig_verify.go:149`, which is the only success exit and is not a `return`** (§4.7b-seam); each maps to one of the four `verifyStatus` values; **no exit maps to a pass state on a path the device did not observe passing** (G2); the row count equals the exit count measured in the code, not quoted from here |
+| (a) the eleven-exit mapping | every one of `singleSigVerifyFlow`'s exits appears exactly once — **including the fall-through at `gui/singlesig_verify.go:149`, which is the only success exit and is not a `return`** (§4.7b-seam); **each row names which of `verifyRecord`'s two booleans that exit writes — `fullPassRecorded` (via `passRecord`, which carries the mode) and/or the sticky `adverseRecorded` — and NO row names a `verifyStatus` value**, because the status is derived once, downstream, by §4.7a's switch; **no exit writes a pass record on a path the device did not observe passing** (G2); the row count equals the exit count measured in the code, not quoted from here |
 | (b) the `suppliedCosigners` expression | it is computable from names in scope at `gui/multisig_verify.go:987`; it is 0 on every single-sig path; it counts policy keys **not** covered by a verified leg, so it can never under-report what went unchecked (G2's direction of failure) |
+
+**Why (a) forbids naming a `verifyStatus` value, which is subtle enough that an
+earlier draft of this very table got it wrong (R15 I-1).** An exit that assigns
+a status directly *has already lost the mode* — and the mode is exactly what the
+pass line must not lose (§4.7c). `verifyStatus` cannot carry `full` (T22) or
+`suppliedCosigners` (T27); only `passRecord` can. That collapse is R9's C-1, the
+historical defect this four-state design exists to make structurally impossible,
+so the mapping is a table of **record writes**, never of statuses.
+
+**A consequence worth checking the mapping against:** from *inside* the eleven
+exits, only **two** of the four states are reachable on single-sig —
+`statusVerified` (the fall-through) and `statusCheckDidNotPass` (the ten adverse
+returns). `statusVerifiedOnRetry` needs a prior adverse write *and* a later pass
+in one call, and single-sig has **no retry loop** (§5.2 — `gui/singlesig.go:131`
+is a one-shot `if sel, ok := verifyChoice.Choose(ctx, th); ok && sel == 0`, with
+no re-offer, so the flow runs at most once per engrave); `statusNotFullyChecked`
+is the zero cell, which is
+what *never calling the flow* leaves behind, not something an exit writes. **A
+proposed mapping that reaches either of those two from within the eleven exits
+is wrong**, and that is a check the reviewer can apply mechanically.
 
 ### 4.9 The spec update — what it says, and how it is checked (R3 I-8)
 
@@ -1158,7 +1178,7 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T23** | **stickiness.** adverse, then no full pass → `statusCheckDidNotPass`, never `statusNotFullyChecked` | make `adverseRecorded` non-sticky |
 | **T24** | **P2 on the retry path.** adverse, then a full pass → `statusVerifiedOnRetry`, never bare `statusVerified` | drop the `&& adverseRecorded` arm — a two-state collapse, which R9's I-1 proved loses the ms1 class |
 | **T25** | **no verdict is read.** The status derivation references neither `res` nor any `verify*` constant — only the two recorded booleans | key a pass arm on `res == verifyComplete`, which is R9's C-3 and the proxy two rounds proved unsound |
-| **T27** | **the PATH axis (R12 C-1, R13 C-1).** A single-sig full pass line **omits** `Other cosigners' keys are taken as supplied`; a multisig full pass line **includes** it. Assert on the rendered line of both flows | leave `suppliedCosigners` unwritten — its zero value makes the clause vanish everywhere, which is R13's Critical, and no other test notices |
+| **T27** | **the PATH axis (R12 C-1, R13 C-1).** A single-sig full pass line **omits** `Other cosigners' keys are taken as supplied`; a multisig full pass line **includes** it. Assert on the rendered line of both flows. **NON-VACUITY (R15): the multisig half needs a fixture where at least one policy key is NOT covered by a verified leg, so `suppliedCosigners > 0`. The self-multisig "operator holds every slot" fixture yields `open == 0` (`gui/multisig_build.go:96`) and therefore `suppliedCosigners == 0`, on which T27 passes while asserting nothing.** Name the fixture, or build one, at step 7 — a T27 that never observes the clause PRESENT cannot catch the regression it exists for | leave `suppliedCosigners` unwritten — its zero value makes the clause vanish everywhere, which is R13's Critical, and no other test notices |
 | **T26** | **P6 — every positive claim is named per mode.** For each clause of each pass line, in each mode, a recorded observation is named; a clause with none is deleted | add an unbacked clause to a pass line |
 | **T11** | the status line is at **slice index 0** of what `restoreDocScreen` receives, and the §4.7f scope line renders **only** under `statusCheckDidNotPass` — asserted **through a production flow**, not on a helper | pass it via the trailing `extra` parameter, as the round-1 fold specified |
 | **T7c** | **the capacity WIRING**, per path: drive each of the three flows to its restore document and assert the seed-handling subject clause matches that path's capacity (build → `Every seed`; supply and single-sig → `The seed you entered`) | swap either call site's capacity argument — a mutation no compiler and no current test detects |
