@@ -1114,8 +1114,9 @@ is the one bit per site that §4.7b calls "the only classification left", and th
 table cannot pre-judge it. §4.7b's methodology governs, and it already carries a
 worked precedent that **binds** one single-sig row: `gui/multisig_verify.go:897`
 (*"re-typed seed will not derive"*) is classified **benign — nothing observed
-about the plates**, and `gui/singlesig_verify.go:89` is the byte-identical
-single-sig twin of it, same message string, same cause. **Any single-sig exit
+about the plates**, and single-sig's exit at `gui/singlesig_verify.go:90` — whose
+message at `gui/singlesig_verify.go:89` is byte-identical to the multisig one at
+`gui/multisig_verify.go:896` — is its twin, same message string, same cause. **Any single-sig exit
 that observed nothing about the plates — a refusal, an abort, a re-derivation
 that never got as far as reading one — is benign and writes neither boolean.**
 
