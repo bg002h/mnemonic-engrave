@@ -141,16 +141,49 @@ the device derived them). Whatever replaces it competes for the same
 
 ---
 
+## 3b. The band's HORIZONTAL budget — 42 characters (measured after the fact)
+
+§4 below originally listed the band's horizontal fit as **not measured**. Three
+of the five options for the policy id turned out to depend on it, so it was
+measured rather than reasoned about.
+
+`band` centres each line at `(plateX-w)/2` with **no refusal**, so a line wider
+than the plate simply runs off both edges. Measured against
+`engrave.String(constant.Font, smallEm, s).Measure()`:
+
+- plate width = **544000** device units
+- the band face is **fixed-width at 12800 units per character**, confirmed by
+  `W`, `X`, `0` and space all fitting **42** and failing at 43
+- **so a band line holds 42 characters**
+
+| line | chars | units | fits |
+| --- | --- | --- | --- |
+| `SEED FP: 73C5 DA0A` | 18 | 230400 | yes |
+| `EXPECTED COMB FP: FC60 C6DF` | 27 | 345600 | yes |
+| `FINGERPRINTS TYPED, NOT VERIFIED` | 32 | 409600 | yes |
+| `FINGERPRINTS DERIVED, NOT TYPED` | 31 | 396800 | yes |
+| `SEED 73C5 DA0A  COMB FC60 C6DF` | 30 | 384000 | yes |
+| `POLICY 1A2B 3C4D` | 16 | 204800 | yes |
+| **`POLICY 1A2B 3C4D  DERIVED, NOT TYPED`** | **36** | 460800 | **yes** |
+| `SEED 73C5 DA0A  COMB FC60 C6DF  POLICY 1A2B 3C4D` | 48 | 614400 | **NO** |
+
+**This is the number §2.3 lacked.** That section records only that this
+mechanism has *"no 18-char cap"* — true, and not a budget. The budget is 42
+horizontally and 2 lines vertically, per band.
+
+---
+
 ## 4. What the spike did NOT measure
 
 Named so the gate's blind spot is visible, per project practice:
 
 - **The maximum `md1`/`mk1` chunk payload** — §2's robustness argument rests on
   it (see §2's stated limit above).
-- **Whether the band's own TEXT fits its width.** This measured vertical
-  occupancy only. A title's *horizontal* fit against `MaxTitleLen = 18` and the
-  screw-hole inset is a separate measurement, and §2.4 establishes nothing in
-  the render layer bounds it.
+- ~~Whether the band's own TEXT fits its width~~ — **measured, see §3b: 42
+  characters.** What remains unmeasured here is the *title* band's horizontal
+  fit on an `md1`/`mk1` plate (mechanism 4, R-F), which is a different face and
+  a different inset from the passphrase plate's band, and where §2.4 establishes
+  that **nothing in the render layer bounds it**.
 - **Any rendered output.** No goldens were produced or compared, so R-G's
   "unmarked path stays byte-identical" claim is **still unverified** — it
   becomes checkable only once R-F's real (non-proxy) band exists.

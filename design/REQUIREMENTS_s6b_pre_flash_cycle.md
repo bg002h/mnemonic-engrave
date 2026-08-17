@@ -457,6 +457,48 @@ Operator, same ruling.
 4. **Never run a bare `go test ./... -update`** — it rewrites the frozen
    sixteen. Scope every regeneration with `-run`.
 
+### R-H — the wallet-policy id rides IN the footer line, preloaded path only
+
+Operator, 2026-08-17, choosing from the options the Q2 spike forced open. Full
+measurements: `design/SPIKE_s6b_q2_results.md`.
+
+**Why a ruling was needed at all:** the Q3 proposal assumed a band line was
+available for the policy id. Execution showed there is none — the worst case
+(both fingerprints + a passphrase containing a space) already fills **2 top and
+2 bottom** lines, and a third line does not error or clip, it **silently cuts
+into the 3 mm outer margin**.
+
+**The ruling:**
+
+```
+preloaded path   "POLICY 1A2B 3C4D  DERIVED, NOT TYPED"    36 chars  -> fits (42 budget)
+standalone path  "FINGERPRINTS TYPED, NOT VERIFIED"        32 chars  -> unchanged
+```
+
+**It consumes no new line.** The worst case stays 2+2, both bands stay legal,
+nothing is displaced, and no font size changes. It is free because **R-C already
+requires a new footer string on that path** — the existing one is false once the
+device has derived the fingerprints — so the line is being rewritten anyway.
+
+The split is structural rather than chosen: the standalone path has **no
+descriptor**, hence no policy id to render, so its footer is untouched.
+
+**REQUIRED ASSERTION, not a comment.** `"FINGERPRINTS TYPED, NOT VERIFIED"`
+(32) plus a policy id would be **50 characters against a 42-character band** —
+over budget and, per §3b, rendered off both plate edges **with no refusal**.
+This design is safe only because the typed footer and the policy id **never
+co-occur**. That must be a test, because nothing in `band` enforces it.
+
+**Options rejected, with the reason, so they are not revisited from scratch:**
+
+| option | verdict |
+| --- | --- |
+| render only when a slot is free | rejected — present unpredictably, keyed to whether the passphrase has a space |
+| displace the `␟ = SPACE` legend | **rejected outright** — that legend prevents a mistyped passphrase and a wrong wallet; it outranks an identifier |
+| merge the two fingerprint lines (`SEED 73C5 DA0A  COMB FC60 C6DF`, 30 chars, fits) | viable and held in reserve — but costs the word **EXPECTED**, which marks a check target rather than a fact |
+| shrink the band font to fit three lines | rejected — 2.33 mm on steel read years later, against the project's own minimum-feature rule, and it churns every band |
+| omit the policy id entirely | rejected — but note R6's **key-id** half is already satisfied: the `mk` research confirmed the master fingerprint *is* the key identifier, and it is already on the plate |
+
 ---
 
 ## THE DECISION PASS IS CLOSED
