@@ -32,6 +32,15 @@
 #   * It only sees `return verify*` in the files it scans. A verdict produced by
 #     assignment, or in a file not listed, is invisible.
 #   * It cannot see paths that reach the document WITHOUT a verdict.
+#   * IT COVERS MULTISIG ONLY, TODAY, AND ITS CLEAN RESULT SAYS SO ONLY HERE.
+#     singleSigVerifyFlow's ELEVEN exits are structurally invisible to it: that
+#     function is still `void` and returns no verdict, so `return verify*` matches
+#     nothing in gui/singlesig_verify.go. A clean 15/0 therefore covers HALF the
+#     surface this plan changes. Once single-sig gains a verdict type (build-order
+#     step 1), those exits become visible and the count must jump -- if it does
+#     not, this script has stopped seeing them and is lying by omission.
+#     A gate that reports clean while seeing half its surface is the exact failure
+#     this cycle has already named twice.
 #   * A site can be listed in the plan for an unrelated reason and still count as
 #     covered here. Mention is a weak signal; it is simply a much better one than
 #     nothing, which is what preceded it.
@@ -73,6 +82,10 @@ done
 
 echo
 echo "─── verdict return sites: $total ; unrowed in the plan: $missing"
+if ! grep -qE 'return[[:space:]]+verify[A-Z]' "$FORK/gui/singlesig_verify.go" 2>/dev/null; then
+  echo "─── SCOPE WARNING: single-sig contributed ZERO sites. singleSigVerifyFlow"
+  echo "─── is still void, so this run covers MULTISIG ONLY -- half the surface."
+fi
 echo "─── NOT covered: whether each row's WORLD-SET is right (a human judgement,"
 echo "─── and R7 found a wrong one on a site that WAS cited); verdicts produced by"
 echo "─── assignment; files not scanned; and paths reaching the document with no"

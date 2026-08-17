@@ -745,7 +745,9 @@ written to fix the previous Critical. The requirement never needed a lattice:
     case res == verifyComplete && sawDisagreement: status = statusVerifiedOnRetry
     case res == verifyComplete:                    status = statusVerified
     case sawDisagreement:                          status = statusDisagreed
-    default:                                       status = statusDidNotComplete
+    case sawUnaccounted:                           status = statusUnaccounted
+    case obs == obsBenign:                         status = statusDidNotComplete
+    default:                                       status = statusUnclassified  // P5(c)
     }
 
 **Why this is correct where the lattice was not:**
@@ -986,7 +988,7 @@ as an addition rather than as something already blessed.
 | 6 | `statusUnaccounted` | `Some plates could not be checked against this run. Either a plate was not presented, or it is not one this run cut. Present every plate this run engraved and check again; if this repeats, re-cut the set.` |
 | 7 | `statusDisagreed` | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup: engrave a fresh set and check it before use.` |
 
-**Six rows, matching §4.7c's six constants and §4.7d's six knowledge states.** An
+**Seven rows: six reachable statuses plus the reserved `statusUnclassified` (§4.7c).** An
 earlier draft carried five here while the prose above already argued for six —
 the frame had been changed in prose only, and the artifacts a reader would build
 from still described the old design.
@@ -1031,9 +1033,9 @@ and cannot drift out of agreement with them.
 true in every world consistent with any observation, and it prescribes no action
 that could be wrong.
 
-#### 4.7e THE OBSERVATION TABLE — P4's enforcement artifact
+#### 4.7e THE OBSERVATION TABLE — a REVIEW PROJECTION, not the enforcement mechanism
 
-**P4 is enforced by this table, and T15 tests it.** One row per **return path /
+**Enforcement is P5; this table is how a human READS what P5 produced, and T15 tests it against that.** One row per **return path /
 error / comparand provenance** — never per verdict, never per site, because both
 of those proxies have already failed. `W` is the set of world-states consistent
 with what the device observed.
@@ -1041,7 +1043,7 @@ with what the device observed.
 | observation | where | W — worlds consistent with it | \|W\| | status |
 | --- | --- | --- | --- | --- |
 | no attempt ran | operator pressed Skip | *(nothing observed)* | — | `statusNotVerified` |
-| every leg matched its plate | `:984` success | the steel encodes this run's intent | 1 | `statusVerified` |
+| every leg matched its plate | `gui/multisig_verify.go:987` — the success return (`:984` is `verifyFailed`, and an earlier draft miscited it here) | key and descriptor plates match; **nothing was observed about the ms1 plate** | **2** | `statusVerified`, SCOPED |
 | a plate-derived comparison diverged | `verifyMultisigLegs` mismatch | this plate is not what this run cut | 1 | `statusDisagreed` |
 | **no plate carries a leg's key** | `errVerifyLegHasNoPlate`, `gui/multisig_verify.go:394` | **(a)** a plate was not presented; **(b)** it is not one this run cut | **2** | `statusUnaccounted` |
 | **readback md1 ≠ engraved md1** | `:719` | **(a)** foreign wallet's plates; **(b)** this run's md1, garbled in the read | **2** | `statusUnaccounted` |
@@ -1101,7 +1103,13 @@ scoped line is what makes that row P5(a)-clean.
 
 Every `|W| = 2` row above lands in `statusUnaccounted`, whose line states **both**
 readings and **both** actions. That is why the sixth status is not a nicety: it is
-the only line that can be true of a two-world observation.
+a line that can be true of a two-world observation.
+
+**Not the ONLY one, and an earlier draft claimed it was** (R7 M-5). The `:987`
+success row ten lines above is `|W| = 2` and takes `statusVerified` with a
+**scoped** line. Ambiguity is one way to be true in every world; **scope is the
+other, and the stronger one when the device knows WHICH thing it did not look
+at.** `statusUnaccounted` is for the case where it does not know.
 
 **C-3 — THE CODE CANNOT SEPARATE ROWS 3 AND 7 AS SPECIFIED, AND P5(b) IS WHY
 THAT IS NOW A DESIGN INSTRUCTION RATHER THAN A CONTRADICTION.** `bundle.Verify`
@@ -1183,13 +1191,23 @@ So the status is its own small type, distinct from the verdict:
         // have made verifyComplete = iota = 0, so the SAME omission would print
         // "Plates VERIFIED" over plates nothing ever checked. That is the whole
         // Critical, reachable by forgetting one assignment.
-        statusNotVerified verifyStatus = iota
+        statusNotVerified verifyStatus = iota   // zero value; no attempt ran
+        // RESERVED, P5(c). An observation the mapping does not recognise takes
+        // the fewest-claims line. T17 asserts NO reachable path produces it --
+        // it is scaffolding whose emptiness is continuously tested, not a
+        // seventh knowledge state.
+        statusUnclassified
         statusDidNotComplete
-        statusUnaccounted        // adverse but ambiguous -- 4.7d status 6
+        statusUnaccounted        // adverse but AMBIGUOUS -- 4.7d status 6
         statusDisagreed
         statusVerifiedOnRetry
         statusVerified
     )
+
+**`statusNotVerified` stays the ZERO VALUE, not `statusUnclassified`.** A
+forgotten assignment should say *no check ran* — which is what actually happened
+— rather than *something unclassifiable was observed*, which asserts an
+observation that never occurred. Both are safe; only one is true.
 
 **THE ZERO VALUE PROTECTS THE VARIABLE, NOT THE DOCUMENT (R3 I).** `verifyStatus`
 failing safe means a forgotten *assignment* prints `NOT VERIFIED`. It does
