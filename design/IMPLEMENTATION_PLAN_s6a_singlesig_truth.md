@@ -260,8 +260,31 @@ matching `seedPassphraseFact.Uses`
 `restoreDocFlow` has **exactly one** production call site
 (`gui/singlesig.go:136`) and **zero** test call sites:
 
-    grep -rn "restoreDocFlow(" --include="*.go" gui/
-    # the definition at gui/singlesig_restore.go:119, and gui/singlesig.go:136. Nothing else.
+    grep -rni "restoreDocFlow(" --include="*.go" gui/
+    # -i IS LOAD-BEARING. See the warning below before using this command.
+
+**WARNING — THE CASE-SENSITIVE FORM OF THIS GREP FINDS ONE SITE IN FOUR, AND AN
+EARLIER DRAFT OF THIS SECTION PUBLISHED IT (step 4).** `multisigRestoreDocFlow` contains
+a **capital R**, so `restoreDocFlow(` is *not* a substring of it and the search
+silently drops every multisig call site:
+
+    $ grep -rn  'restoreDocFlow(' --include='*.go' . | grep -vc 'func '   # 2
+    $ grep -rni 'restoreDocFlow(' --include='*.go' . | grep -vic 'func '  # 6
+
+The sentence *"Nothing else."* was **true of `restoreDocFlow` alone and read as
+true of the whole seam.** A step re-running the case-sensitive form gets a clean,
+confident, wrong answer — the failure mode where an empty result is mistaken for
+absence rather than for an instrument that cannot see. **Search
+`RestoreDocFlow(` (capital R, matching both) or pass `-i`.**
+
+**The class was swept, and it is isolated to this pair.** Every other grep quoted
+in this plan was re-run at step 4 — `buildPlateInventoryLines`,
+`buildFullModeLabel`, `buildPlateCensusLines`, `bundleEngrave(ctx`,
+`singleSigVerifyFlow`, `multisigRestoreDocFlow` — and none has a
+differently-cased sibling that hides call sites. (`bundleEngrave(ctx` returns one
+more than the bare name only because the pattern also matches its own `func`
+line.) Only `restoreDocFlow` has a wrapper whose name embeds it with a different
+capital, so **only this one was ever blind**.
 
 `multisigRestoreDocFlow` (`gui/multisig_restore.go:100`) takes `extra []string`
 and ends `restoreDocScreen(ctx, th, append(lines, extra...))`.
