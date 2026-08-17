@@ -276,6 +276,28 @@ empty in the next, and `grep -n "x" $EMPTY` hangs reading stdin.
 
 ## PUSHING
 
+**FREEZE `master` WHILE A STAGING PUSH IS IN FLIGHT. THE RITUAL ASSUMES THE TIP
+DOES NOT MOVE.** Learned the hard way 2026-08-16: a push agent staged a SHA and
+waited for CI; the controller committed twice during the CI-watch window; the
+final `git push origin master` therefore pushed a tip **two commits past** the
+gated SHA. GitHub's `strict:false` accepted it against the older gated ancestor
+and printed
+
+    remote: Bypassed rule violations for refs/heads/master:
+    remote: - Required status check "test (rust + go)" is expected.
+
+Nothing was lost — but two commits reached `origin/master` with **zero CI
+signal**, which is the exact failure the ritual exists to prevent. The push agent
+did everything right and reported the bypass rather than claiming success; the
+defect was the controller committing underneath it.
+
+**So: no commits to `master` between `git push origin master:refs/heads/ci/staging`
+and the final `git push origin master`.** If work arrives during that window,
+hold it — or re-stage the new tip afterwards and verify it, which is the
+remediation used here.
+
+
+
     git push origin master:refs/heads/ci/staging
     gh run watch <id> --repo bg002h/mnemonic-engrave
     git push origin master          # no bypass message = SATISFIED

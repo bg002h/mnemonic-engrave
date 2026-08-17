@@ -41,6 +41,15 @@ This file is auto-loaded by Claude Code when starting a session in this reposito
   git push origin --delete ci/staging
   ```
 
+  **FREEZE `master` FOR THE WHOLE WINDOW — the ritual assumes the tip does not
+  move.** 2026-08-16: a push agent staged a SHA, and the controller committed
+  twice while CI ran, so the final push carried a tip two commits past the gated
+  one. `strict: false` accepted it against the older gated ancestor and printed
+  "Bypassed rule violations"; two commits reached `origin/master` with zero CI
+  signal. The agent correctly refused to call that success. **No commits to
+  `master` between the staging push and the final push** — hold the work, or
+  re-stage the new tip afterwards and verify it.
+
   `.github/workflows/release.yml` builds `ci/**` for this reason and explains it
   at the trigger. `assemble + sign + release` is gated on `refs/tags/v*`, so a
   `ci/**` push cannot sign or publish — verified: it reported `skipped`. A push
