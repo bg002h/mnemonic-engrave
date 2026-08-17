@@ -69,6 +69,28 @@ lines; do not treat a green gate as a proof.**
 Each prints what it does **not** cover. **Never cache their numbers in prose** —
 that rotted twice; the commit message carries each fold's measured output.
 
+**Step 5b. WHAT THE OUTGOING CONTROLLER IS UNSURE OF** — put these in the next
+review brief. They are doubts about the R14 fold specifically, and they are
+written down because they would otherwise die with the context that held them:
+
+1. **Is build-order step 1 specified well enough to be REVIEWABLE?** It now
+   carries two artifacts — the single-sig eleven-exit → `verifyRecord` mapping,
+   and the `suppliedCosigners` expression. The plan says both are "reviewed
+   before step 2" but does not say *what a reviewer checks them against*. A gate
+   whose acceptance criteria are unstated is a gate that will pass anything.
+2. **Does single-sig actually have somewhere to write `suppliedCosigners = 0`?**
+   R14 said its one true success exit "can trivially write 0" — but
+   `singleSigVerifyFlow` is `void` today and gains the out-parameter only at step
+   1. Confirm the write site exists *after* step 1, not just in principle.
+3. **Are there `singleSigVerifyFlow(` call sites that gain a parameter too?**
+   Two rounds running, the call-site list was incomplete: R13 found eight beyond
+   the four named, R14 confirmed those twelve. Nobody has grepped the *single-sig*
+   side with the same rigour.
+4. **T27 asserts on "the rendered line of both flows" — can it?** The multisig
+   half needs a full walk to a rendered document. §5.1 says pure-function
+   assertions do not satisfy that standard. Verify T27 is schedulable where it
+   now sits (step 7) and not merely asserted there.
+
 **Step 6. Do not re-litigate** the decisions in `design/agent-reports/`: the
 goals (§0.1), C-1's remedy, ONE PIECE, the four-state set, and cycle scope.
 
