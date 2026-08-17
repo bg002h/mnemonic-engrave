@@ -592,9 +592,10 @@ It is retained because removing it would re-word an S5-reviewed sentence for no
 gain in truth, and byte-identity with reviewed text is worth more than tidiness.
 Flagged here so a reviewer does not read it as an oversight.
 
-**Call sites (all 8, measured):** production `gui/multisig_build.go:479` →
-`seedCapacityMany`; `gui/multisig.go:362` → `seedCapacityOne` (see §3.1.1);
-`gui/singlesig.go:136` (new) → `seedCapacityOne`. Tests:
+**Call sites (all 8 existing, measured):** production `gui/multisig_build.go:479` →
+`seedCapacityMany`; `gui/multisig.go:362` → `seedCapacityOne` (see §3.1.1).
+A ninth, `gui/singlesig.go:136` → `seedCapacityOne`, is **new and lands at step 5,
+not step 3** — it cannot compile before step 4 widens `restoreDocFlow`. Tests:
 `gui/multisig_build_prose_test.go:369,424,425` and
 `gui/multisig_build_perseed_passphrase_test.go:134,246,304` → all
 `seedCapacityMany` (they are build-path tests).
@@ -1092,7 +1093,7 @@ second is the serious one:
 | --- | --- | --- |
 | 1 | **Write BOTH step-1 artifacts and get them reviewed together:** (a) the single-sig eleven-exit → `verifyRecord` mapping, and (b) **the `suppliedCosigners` expression** — policy keys not covered by a verified leg, from `keys`/`covered` at `gui/multisig_verify.go:987`, with single-sig writing 0 | eleven exits plus one formula, and every later step depends on both. Nothing else starts until they are agreed. **(b) was asserted in prose and scheduled nowhere — R14 I-2.** |
 | 2 | `verifyRecord` + `passRecord` + `buildVerifyStatusLine` + **T21, T22, T26** | pure functions over a record, no callers yet. **T20 does NOT land here either** (R12 I-2): its *exactly-one-line-on-all-three-rendered-documents* half needs call sites that do not exist until step 7, and §5 says pure-function assertions do not satisfy it. T23, T24, T25 likewise need a rendered document and a multisig retry |
-| 3 | `seedCapacity` + the two-axis ruling + `buildSeedInventoryLines` (§4.3, §4.4), updating **all EIGHT existing call sites** — 2 production (`gui/multisig_build.go:479`, `gui/multisig.go:362`) and 6 in tests (`gui/multisig_build_prose_test.go:369,424,425`, `gui/multisig_build_perseed_passphrase_test.go:134,246,304`) — plus the **new ninth** at `gui/singlesig.go:136` | shared census; still no flow changes. **An earlier draft said "six" here while §4.3 said eight (measured); updating six leaves two test sites at the old arity, which is a compile error, not a soft failure** |
+| 3 | `seedCapacity` + the two-axis ruling + `buildSeedInventoryLines` (§4.3, §4.4), updating **all EIGHT existing call sites** — 2 production (`gui/multisig_build.go:479`, `gui/multisig.go:362`) and 6 in tests (`gui/multisig_build_prose_test.go:369,424,425`, `gui/multisig_build_perseed_passphrase_test.go:134,246,304`) | shared census; still no flow changes. **The NINTH site (`gui/singlesig.go:136`) is NOT here** — it hands the inventory to `restoreDocFlow`, which cannot accept one until step 4's signature change, and step 5 owns single-sig inventory wiring. **An earlier draft said "six" here while §4.3 said eight (measured); updating six leaves two test sites at the old arity, which is a compile error, not a soft failure** |
 | 4 | `restoreDocFlow` and `multisigRestoreDocFlow` gain `status` + `extra` (§4.2, §4.7b), **all three call sites** | signature change; the tree must stay green across it |
 | 5 | Wire single-sig: label (§4.1), inventory, census (§4.6), abort gate (§4.5) | the F-198/F-195/F-197/F-202 body of work |
 | 6 | Update the three walks that the census screen stops (§5.1b), **plus T7c** | must accompany step 5, not follow it. **T7c belongs here** (R12 I-2): it drives each of the three flows to its restore document and asserts the seed-handling clause matches that path's capacity — §8.4 calls it required and no earlier draft scheduled it to any step |
@@ -1209,7 +1210,10 @@ So the standard is per-row and adversarial: **revert or mutate the specific
 behaviour the row names, on an otherwise-complete tree, and watch that row go
 red.** That is what actually demonstrates the assertion bites.
 
-New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
+`gui/singlesig_truth_test.go` holds these tests. Prior art to mirror is in §1.7.
+**It is created by step 2** (T21/T22/T26), so every later step **appends** to it —
+it is a "new file" only for whichever step reaches it first, and that is no
+longer any step after 2.
 
 | id | asserts | mutation that must break it |
 | --- | --- | --- |
@@ -1336,10 +1340,17 @@ Both R0 reviewers found this list incomplete, from different lenses. It is now
 two lists.
 
 **(a) The EIGHT existing `buildPlateInventoryLines` call sites** enumerated in
-§4.3 — all gain a capacity argument. Six take `seedCapacityMany` (the build-path
-tests and `gui/multisig_build.go:479`); `gui/multisig.go:362` takes
-`seedCapacityOne` per §3.1.1; and a **ninth, new** call site appears at
-`gui/singlesig.go:136` with `seedCapacityOne`.
+§4.3 — all gain a capacity argument. Seven take `seedCapacityMany` (the six
+build-path tests and `gui/multisig_build.go:479`); `gui/multisig.go:362` takes
+`seedCapacityOne` per §3.1.1.
+
+A **ninth, new** call site appears at `gui/singlesig.go:136` with
+`seedCapacityOne` — **at step 5, NOT step 3.** That line hands the inventory to
+`restoreDocFlow`, which does not accept one until **step 4** gives it `status`
+and `extra` (§4.2), and **step 5** separately owns *"wire single-sig: inventory"*.
+**A ninth call site at step 3 does not compile.** Three sections of this plan
+scheduled that one edit to three different steps; step 3's copy was added while
+fixing the count below and was wrong the moment it was written.
 
 **This list said "six" for three rounds while §4.3 said "all 8, measured".** Both
 could not be right, and the short one was in the two places an implementer
