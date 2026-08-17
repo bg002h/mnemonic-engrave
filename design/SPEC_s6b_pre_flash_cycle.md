@@ -60,7 +60,46 @@ renders **no** title or footer row (`backup/backup.go:33-41`, `:350-446`).
 | slot | content | when |
 | --- | --- | --- |
 | **Title** | `PASSWORD REQUIRED` (17 chars) | iff the set was derived **with** a BIP-39 passphrase |
-| **Footer** | the fingerprint(s) the plates actually encode | iff the set contains a seed (R-A) |
+| **Footer** | `COMB FP: <8 hex, grouped>` (18 chars) | iff the set contains a seed (R-A) |
+
+### 1.2a MEASURED — the title/footer budget on a `Text` plate is 25 characters
+
+This was §7's outstanding gate. **Run 2026-08-17**, not inferred:
+
+- a title/footer must sit inside `[innerMargin, plateSize - innerMargin]` =
+  `[64000, 480000]` = **416000 device units** (the bound
+  `TestTitleCapFitsAtEveryRung` uses);
+- `plateFontSizeUR`, what every `md1`/`mk1` `Text` caller constructs, is
+  **3.8 mm** — *not* the free-text ladder's tight 6.0 mm rung;
+- at 3.8 mm, **25 characters** fit the span.
+
+| candidate | chars | units | fits |
+| --- | --- | --- | --- |
+| `PASSWORD REQUIRED` | 17 | 275621 | **yes** (66% of span) |
+| `SEED FP: 73C5 DA0A` | 18 | 291834 | yes |
+| `COMB FP: FC60 C6DF` | 18 | 291834 | yes |
+| `SEED 73C5 DA0A  COMB FC60 C6DF` | 30 | 486390 | **NO** |
+| `EXPECTED COMB FP: FC60 C6DF` | 27 | — | **NO** (> 25 chars) |
+
+**Consequence for R4, and it narrows the directive.** R4 asks for *"Seed FP and
+combined FP … in title or footer"*. **Both do not fit.** The title is taken by
+`PASSWORD REQUIRED`, one footer row holds **one** 18-character fingerprint, and
+the merged 30-character form — which *does* fit the passphrase band's 42-char
+budget — **overruns a `Text` title/footer**.
+
+**NORMATIVE: the footer carries the COMBINED fingerprint.** That is the one the
+plates actually encode (§1.2), so it is the value a words-only restore will
+**fail to reproduce** — which is the entire diagnostic R4 exists to enable. The
+seed fingerprint remains available on the passphrase plate
+(`backup/passphrase.go:176-180`), where the band budget accommodates both.
+
+**Method caveat, stated so a reviewer can retest it properly.** This measured
+**raw string width against the inset span**. `TestTitleCapFitsAtEveryRung`
+instead drives the real layout (`layAt`, `lay.holeChars * lay.charWidth`), and
+the two do not agree at the 6.0 mm rung — raw width admits only 16 characters
+there where the shipped cap is 18. The discrepancy does not touch the 3.8 mm
+result used here, and the numbers above carry ≥ 7 characters of headroom, but
+**the implementation's gate must be the layout-based form, not this one.**
 
 `PASSWORD REQUIRED` is the operator's decided wording (§2.4): 17 characters, and
 it matches the words the device already shows on screen (`gui/gui.go:1997`,
@@ -362,11 +401,19 @@ nothing is actually hidden is a **finding**, not a rounding error.
 | 5.1 | the arrow predicate agrees with actual visibility |
 | — | **`me` CLI untouched**; `mk1`/`md1`/`ms1` byte-identical (§0) |
 
-**Measurement still owed before this spec may close:** the **`Text` title/footer
-horizontal budget** on an `md1`/`mk1` plate. `SPIKE §3b` measured **42 chars**
-for the *passphrase band* — a different face and inset. §2.4 establishes that
-**nothing in the render layer bounds a title**, so an over-long device-generated
-title is neither rejected nor truncated: it is engraved, into a screw-hole band.
+**~~Measurement still owed~~ — RUN 2026-08-17, see §1.2a.** The `Text`
+title/footer budget is **25 characters** at `plateFontSizeUR` = 3.8 mm. Every
+string this cycle puts there fits with ≥ 7 characters of headroom, and the
+merged two-fingerprint form was **eliminated by measurement** rather than by
+review.
+
+**GATE 1.2a is still owed at implementation, and it is not this measurement.**
+§2.4 establishes that **nothing in the render layer bounds a title**, so an
+over-long device-generated title is neither rejected nor truncated — it is
+engraved, into a screw-hole band. The gate is therefore an assertion **on the
+budget**, in the layout-based form `TestTitleCapFitsAtEveryRung` uses, **for
+every title and footer this cycle introduces** — not on today's strings, which
+would pass while the next edit walks off the plate.
 
 **Golden policy (R-G):** marked states get **new** golden files; the frozen
 sixteen keep meaning what they meant; `backup/testdata/passphrase-*.bin` (4)
@@ -377,8 +424,12 @@ will legitimately move under §2.3 and are re-recorded **in the same commit**;
 
 ## 7. WHAT THIS SPEC DOES NOT SETTLE
 
-- The `Text` title/footer horizontal budget (above) — **a gate that has never
-  been run, so this spec may not close on it**.
-- Whether `PASSWORD REQUIRED` and the footer fingerprints **fit horizontally**
-  once that budget is known.
+- ~~The `Text` title/footer horizontal budget~~ — **measured, §1.2a: 25 chars.**
+- ~~Whether `PASSWORD REQUIRED` and the footer fingerprint fit~~ — **measured,
+  they do**; and the merged two-fingerprint form was eliminated because it does
+  not.
 - The exact wording of §3.2's no-passphrase arm and §2.4b's label.
+- **The raw-width vs layout-based discrepancy at the 6.0 mm rung** (§1.2a's
+  method caveat). It does not affect this cycle's 3.8 mm plates, and it is
+  **not** newly introduced here — but a reviewer should know the two methods
+  disagree before relying on either.
