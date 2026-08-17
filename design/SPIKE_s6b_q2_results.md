@@ -173,19 +173,60 @@ horizontally and 2 lines vertically, per band.
 
 ---
 
+## 3c. The `Text` title/footer budget — 25 characters
+
+Measured 2026-08-17, after §3b, for the `md1`/`mk1` plates R-F marks. **This is
+the provenance of the 25-character figure the spec uses**; it is recorded here
+rather than in the spec because measurements belong with the spike that ran them.
+
+- A title/footer must sit inside `[innerMargin, plateSize - innerMargin]` =
+  `[64000, 480000]` = **416000 device units** — the bound
+  `TestTitleCapFitsAtEveryRung` uses.
+- `plateFontSizeUR`, what every `md1`/`mk1` `Text` caller constructs, is
+  **3.8 mm** — *not* the free-text ladder's tight 6.0 mm rung.
+- At 3.8 mm, **25 characters** fit the span.
+
+| candidate | chars | units | fits |
+| --- | --- | --- | --- |
+| `PASSWORD REQUIRED` | 17 | 275621 | **yes** (66% of span) |
+| `SEED FP: 73C5 DA0A` | 18 | 291834 | yes |
+| `COMB FP: FC60 C6DF` | 18 | 291834 | yes |
+| `SEED 73C5 DA0A  COMB FC60 C6DF` | 30 | 486390 | **NO** |
+| `EXPECTED COMB FP: FC60 C6DF` | 27 | — | **NO** (> 25) |
+
+**METHOD CAVEAT — retest properly before relying on it for a gate.** This
+measured **raw string width against the inset span**.
+`TestTitleCapFitsAtEveryRung` instead drives the real layout (`layAt`,
+`lay.holeChars * lay.charWidth`), and **the two do not agree at the 6.0 mm
+rung** — raw width admits only 16 characters where the shipped cap is 18.
+
+The disagreement **errs in the safe direction**: raw width *under*-reports, so
+25 at 3.8 mm is conservative rather than optimistic. It does not touch the
+3.8 mm result, and every string above carries ≥ 7 characters of headroom. **But
+the implementation's gate must be the layout-based form, not this one.**
+
+---
+
 ## 4. What the spike did NOT measure
 
 Named so the gate's blind spot is visible, per project practice:
 
-- **The maximum `md1`/`mk1` chunk payload** — §2's robustness argument rests on
-  it (see §2's stated limit above).
-- ~~Whether the band's own TEXT fits its width~~ — **measured, see §3b: 42
-  characters.** What remains unmeasured here is the *title* band's horizontal
-  fit on an `md1`/`mk1` plate (mechanism 4, R-F), which is a different face and
-  a different inset from the passphrase plate's band, and where §2.4 establishes
-  that **nothing in the render layer bounds it**.
+- ~~The maximum `md1`/`mk1` chunk payload~~ — **CLOSED. It is a hard,
+  code-enforced constant**, found by R0 round 1: `ValidMD` rejects a data part
+  over `mdRegularMaxLen = 93` → **md1 ≤ 96 characters**; `ValidMK` admits only
+  `[14,93]` and `[96,108]` → **mk1 ≤ 111 characters**
+  (`codex32/mdmk.go:49,54-57,137-143,152-160`).
+
+  So §2's *"longest in-repo 111"* is in fact the **absolute maximum**, and the
+  240-character title+footer budget carries better than 2× margin against a
+  **proven** bound rather than an observed one. §2's robustness caveat is
+  retired.
+- ~~Whether the band's own TEXT fits its width~~ — **measured, §3b: 42
+  characters.**
+- ~~The title band's horizontal fit on an `md1`/`mk1` plate~~ — **measured,
+  §3c: 25 characters**, with the method caveat stated there.
 - **Any rendered output.** No goldens were produced or compared, so R-G's
   "unmarked path stays byte-identical" claim is **still unverified** — it
   becomes checkable only once R-F's real (non-proxy) band exists.
-- **The F-208 arrow layout**, which R-F/R-G do not touch and which must still be
-  settled before F-192's sweep sets its budgets.
+- **The F-208 arrow layout** — settled since, by R-I, which chose a layout
+  costing no body width and thereby decoupled F-192's sweep from it.

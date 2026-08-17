@@ -99,7 +99,7 @@ that does not match what the plates encode, so a wrong-wallet restore
 self-diagnoses instead of failing silently.
 
 **The budget is 25 characters** at `plateFontSizeUR` = 3.8 mm, inset span
-416000 units (`SPIKE_s6b_q2_results.md` §1.2a). Every string above fits with ≥ 7
+416000 units (`SPIKE_s6b_q2_results.md` §3c). Every string above fits with ≥ 7
 to spare. The merged two-fingerprint form (30) does **not** fit and is not used.
 
 **Marking applies to `cardMK1` and `cardMD1` plates only. A `cardMS1` plate is
@@ -477,6 +477,20 @@ later asserts the device engraves no passphrase.
 passphrase plate** — not on the flow, since the multisig build path reaches the
 same function. When one was cut, the document says so and says where it is.
 
+**CUT, not OFFERED — and the mechanism does not exist yet.** The operator can
+decline the offer, or abort mid-engrave, and in both cases the shipped sentence
+stays true and must not change. But `engravePassphraseFlowFrom`
+(`gui/passphrase_flow.go:617`) and `engravePassphraseFlow` (`:605`) **return
+nothing**, so today the caller cannot tell a completed plate from a declined
+offer.
+
+**The passphrase flow returns a result, following the idiom already beside it**:
+`bundleEngrave` returns `bundleEngraveResult` with `bundleEngraveDone` meaning
+*"every plate in the plan was engraved"* (`gui/bundle_flow.go:404,443,455-456`).
+§6's condition reads that result. Conditioning on the offer having been *shown*
+would put the claim on runs that cut nothing — a falsehood in the opposite
+direction, which R-D forbids equally.
+
 ### 6.1 The passphrase plate is NOT a member of the backup set
 
 `buildPlateInventoryLines` (`gui/multisig_build_census.go:59-73`) prints
@@ -523,6 +537,7 @@ the separation instruction, and `len(plan)` is unchanged.
 | 5.1b | R-E's `maxScroll` divergence probe — **failures expected, files findings, does not gate** |
 | 5.3 | one pixel-level assertion: an arrow's chip does not overlap the top/bottom drawn text rows |
 | 6 | the restore document does not claim the device engraves no passphrase on a run that cut a passphrase plate |
+| 6a | the condition is **cut**, not **offered** — a declined offer and an aborted engrave both leave the shipped sentence unchanged |
 | 6.1 | the passphrase plate is not inside `len(plan)` and not under *"If any of them is missing"* |
 | — | **`me` CLI untouched**; `mk1`/`md1`/`ms1` byte-identical (§0) |
 
