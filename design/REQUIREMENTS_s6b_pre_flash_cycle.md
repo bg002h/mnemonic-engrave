@@ -499,6 +499,60 @@ co-occur**. That must be a test, because nothing in `band` enforces it.
 | shrink the band font to fit three lines | rejected — 2.33 mm on steel read years later, against the project's own minimum-feature rule, and it churns every band |
 | omit the policy id entirely | rejected — but note R6's **key-id** half is already satisfied: the `mk` research confirmed the master fingerprint *is* the key identifier, and it is already on the plate |
 
+### R-I — the scroll arrows FLOAT over the body's edges
+
+Operator, 2026-08-17, choosing from four measured layouts.
+
+**Measured geometry this rests on:** panel 480×320; `leadingSize = 44`;
+`NavBtnPrimary` 53×53 at right-gutter slots **y = 44 / 133 / 223**, x = 427–480;
+body clip (6,44)–(423,314), i.e. **417 wide**; and `assets.ArrowDown` /
+`assets.ArrowUp` are **15×9** — icons, not buttons.
+
+**The ruling:** draw the arrows at the **top-centre and bottom-centre of the
+body**, over the 16 px fade zone, each with a background chip for legibility and
+an **enlarged invisible touch target**. Not in the nav gutter, not in a new
+column.
+
+### Why this one, and it is a scheduling result more than an aesthetic one
+
+**Body width is unchanged — 417 before, 417 after.** Wrap is what decides a
+modal's capacity, and body width is what decides wrap. So:
+
+> **R-I DECOUPLES F-192 FROM F-208.** The sequencing constraint recorded earlier
+> in both follow-ups — *"the arrow layout must be decided before F-192's sweep
+> sets its budgets, or every screen gets measured twice"* — **no longer binds.**
+> The sweep and the arrows can proceed independently, and F-192's fit
+> measurements stay valid whenever the arrows land.
+
+The rejected options each failed on something measured, recorded so they are not
+re-litigated:
+
+| option | why not |
+| --- | --- |
+| free nav slots | `ErrorScreen` has **two** free slots (top, middle), `ConfirmWarningScreen` only **one** (middle) — the arrows cannot occupy the same position on both, and one screen cannot host both arrows |
+| dedicated scroll gutter | costs ~25 px of 417 (~6%), re-opening the wrap calculation and making F-192 **strictly dependent** on it |
+| single Down arrow | fits both screens, but leaves no way back up except wrap-around — surprising on a screen whose purpose is to stop a funds-losing mistake |
+
+### Implementation constraints the spec must carry
+
+1. **It must NOT go through `layoutNavigation`.** That function computes
+   `idx := int(clk.Button - Button1)` and indexes a `[3]int`; `Up` and `Down`
+   sort **before** `Button1` in the enum, so they index **negative**. This binds
+   every layout option, not just this one.
+2. **A larger hit area than the drawn icon is idiomatic here.** The nav button
+   already separates the two — `op.Input(buf, t).Clip(...)` establishes the
+   touch region independently of the mask that is drawn. A 15×9 icon needs a
+   finger-sized target behind it.
+3. **Scrolling itself is free.** A `Clickable` bound to `Up`/`Down` gets pointer
+   routing (`gui/widget.go:70`) and press-and-hold auto-repeat
+   (`gui/widget.go:48`) with no new machinery.
+4. **The visibility predicate is R-E's problem, not this ruling's.** Arrows
+   render **iff** content is actually below the fold — which, while `fadeClip`
+   stays stubbed, is *not* `maxScroll > 0`. See R-E.
+5. **The chip is not optional.** The arrows sit over the region where body text
+   currently draws (`fadeClip` clips nothing), so without a background they can
+   land on top of a glyph.
+
 ---
 
 ## THE DECISION PASS IS CLOSED

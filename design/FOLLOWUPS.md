@@ -7004,12 +7004,20 @@ residue a fit gate cannot reach — bodies interpolating a descriptor, a policy,
 plate count, an operator-chosen label, whose runtime expansion is not fixed at
 authoring time.
 
-**SEQUENCING CONSTRAINT, and it binds this entry's schedule.** F-208's arrow
-layout must be **decided before this sweep sets its budgets**. `Warning.Layout`
-reserves a right-hand nav gutter (`gui/gui.go:402`) and an up/down pair needs a
-home; any change to body width re-opens the wrap calculation, and wrap is what
-decides capacity (see the mechanism note above). **Sweeping first and placing the
-arrows second means measuring every screen twice.**
+**~~SEQUENCING CONSTRAINT~~ — DISSOLVED by operator ruling R-I, 2026-08-17.**
+This entry previously recorded that F-208's arrow layout had to be *decided
+before this sweep sets its budgets*, because any change to body width re-opens
+the wrap calculation and wrap is what decides capacity.
+
+**R-I chose a layout that costs no body width** — the arrows float over the
+body's top and bottom edges rather than taking a column, so the body clip stays
+**417 px wide, unchanged**. The dependency is therefore gone: **this sweep and
+F-208 can proceed independently**, and the fit measurements taken here stay
+valid whenever the arrows land.
+
+The original constraint is kept above rather than deleted, because it was true
+of three of the four layouts considered and would bind again if R-I were
+revisited.
 
 So the S6b remedy is **the fit-gate sweep as filed**: guarantee every long modal
 fits, so nothing is ever below the fold and no affordance is needed. The
@@ -7471,15 +7479,34 @@ kind of stale safety argument this project has been bitten by before.
 nothing is actually hidden is a **finding**, not a rounding error. That test is
 the cheapest guard on the divergence R-E deliberately leaves in place.
 
-### Open question the spec must answer
+### ~~Open question~~ — ANSWERED by operator ruling R-I, 2026-08-17
 
-**Where do the arrows go?** `Warning.Layout` already reserves a right-hand gutter
-for nav buttons (`btnOff := assets.NavBtnPrimary.Bounds().Dx() + btnMargin`,
-`gui/gui.go:402`), and `Button1`/`Button2`/`Button3` occupy the nav positions.
-An up/down pair needs a home that steals neither a nav hit area nor body width —
-and body width feeds the wrap calculation, so moving it re-opens every fit
-measurement F-192 just made. **Decide the layout before the sweep sets the
-budgets, or the sweep gets done twice.**
+**The arrows float over the body's top and bottom edges**, centred, over the
+16 px fade zone — each with a background chip and an enlarged invisible touch
+target. Not in the nav gutter, not in a new column. Full argument and the four
+measured alternatives: `REQUIREMENTS_s6b_pre_flash_cycle.md` §2bis R-I.
+
+Measured geometry it rests on: panel 480×320; nav slots 53×53 at **y = 44 / 133
+/ 223**, x = 427–480; body clip (6,44)–(423,314) = **417 wide**;
+`assets.ArrowDown`/`ArrowUp` are **15×9**.
+
+**Why not the nav gutter:** `ErrorScreen` leaves **two** slots free (top,
+middle) but `ConfirmWarningScreen` only **one** (middle) — so the arrows could
+not sit in the same place on both, and one screen could not host both.
+
+**And it dissolves the F-192 coupling:** floating costs no body width, so
+F-192's sweep no longer waits on this and its fit measurements stay valid.
+
+**Three implementation constraints, carried into the spec:**
+
+1. **Not through `layoutNavigation`.** It computes
+   `idx := int(clk.Button - Button1)` into a `[3]int`, and `Up`/`Down` sort
+   *before* `Button1`, so they index **negative**. This binds any layout.
+2. **Hit area ≠ drawn icon.** The nav button already separates them —
+   `op.Input(buf, t).Clip(...)` sets the touch region independently of the mask
+   drawn — so a 15×9 icon can carry a finger-sized target.
+3. **The chip is not optional.** The arrows sit where body text currently draws
+   (`fadeClip` clips nothing), so without a background they can land on a glyph.
 
 **It also rescues work orphaned inside a CLOSED entry.** F-95's *"What is still
 owed, and the order matters"* paragraph is the origin of most of the above, and
