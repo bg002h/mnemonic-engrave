@@ -6995,7 +6995,7 @@ A page-break-aware pager — one that keeps a slot's label and its key chunks
 together — would fix it properly. It touches `confirmReviewScreen`, which is
 **shared code**, so it wants its own scope rather than a drive-by edit.
 
-### F-195 — a watch-only set never states outright that it contains no seed (owning phase: **`SPEC_multisig_build_repair.md` S6**) `#seedhammer`
+### F-195 — **CLOSED 2026-08-17** (S6a: the census page states it outright — `gui/multisig_build_census.go:208`, "Seed: this set contains NO seed. It is watch-only") — a watch-only set never states outright that it contains no seed (owning phase: **`SPEC_multisig_build_repair.md` S6**) `#seedhammer`
 
 Filed 2026-08-16 by the S5.C implementer, landed by the controller.
 
@@ -7052,7 +7052,7 @@ is the spec and not a stage.
 
 ---
 
-### F-197 — the SINGLE-SIG engrave does not stop on an aborted set (owning phase: **`SPEC_multisig_build_repair.md` S6** — before the hardware cycle) `#seedhammer`
+### F-197 — **CLOSED 2026-08-17** (S6a: the abort ends the program — `gui/singlesig.go:177` returns on any non-`bundleEngraveDone`, so nothing below vouches for a set that was not fully cut) — the SINGLE-SIG engrave does not stop on an aborted set (owning phase: **`SPEC_multisig_build_repair.md` S6** — before the hardware cycle) `#seedhammer`
 
 Found 2026-08-16 by the S5 whole-diff fold while landing I-12, and **not folded**:
 `gui/singlesig.go` is outside the review's scope, and scope creep in a fold is how
@@ -7079,7 +7079,7 @@ engrave picker, press Back, assert the program ENDS with neither the verify offe
 nor the restore document drawn afterwards. **A call-site assertion alone is not
 enough — that is exactly what let the multisig instance ship.**
 
-### F-198 — **CRITICAL** — the SINGLE-SIG flow takes a passphrase into derivation, labels the result "Full (seed + keys)", and its restore document cannot mention a passphrase (owning phase: **`SPEC_multisig_build_repair.md` S6** — MUST land before the hardware cycle) `#seedhammer`
+### F-198 — **CLOSED 2026-08-17** (S6a, the cycle built for it: the label now reads `Full (seed + keys, NOT passphrase)` at `gui/multisig_build_census.go:387`, and the restore document always renders with a plate inventory, a seed statement and a passphrase statement) — **CRITICAL** — the SINGLE-SIG flow takes a passphrase into derivation, labels the result "Full (seed + keys)", and its restore document cannot mention a passphrase (owning phase: **`SPEC_multisig_build_repair.md` S6** — MUST land before the hardware cycle) `#seedhammer`
 
 Named by the S5 whole-diff review as "adjacent, out of scope, file it" (C-3), and
 filed by the fold with the harm **explicitly unverified**. **The controller
@@ -7126,7 +7126,7 @@ note** — the answer cost one grep.
 
 ---
 
-### F-199 — `verifyRefused` dead-ends on a CORRECTABLE readback (owning phase: **`SPEC_multisig_build_repair.md` S6**) `#seedhammer`
+### F-199 — `verifyRefused` dead-ends on a CORRECTABLE readback (owning phase: **S6b** — corrected 2026-08-17 from the bare string `S6`, which S6a has passed; the S6b assignment was asserted only in F-204's body and the continuity doc, never in this heading) `#seedhammer`
 
 Found 2026-08-16 by the B1..B5 fold while implementing B3, and deliberately
 **not folded**: it is outside B1..B5, and folding an unreviewed control-flow
@@ -7186,7 +7186,7 @@ typed fills no slot"*, and those want different next actions from the operator.
 that can return any verdict, **so a verdict-specific lead is now assertable at
 flow level** — the mechanism to fix this properly landed with B4.
 
-### F-202 — the SINGLE-SIG engrave shows no pre-engrave plate census (owning phase: **S6a — `IMPLEMENTATION_PLAN_s6a_singlesig_truth.md`, in scope, not deferred**) `#seedhammer`
+### F-202 — **CLOSED 2026-08-17** (S6a: `gui/singlesig.go:163` gates the engrave behind `confirmReviewScreen(…, "Plates To Cut", buildPlateCensusLines(cards))`) — the SINGLE-SIG engrave shows no pre-engrave plate census (owning phase: **S6a — `IMPLEMENTATION_PLAN_s6a_singlesig_truth.md`, in scope, not deferred**) `#seedhammer`
 
 Found 2026-08-16 by the controller during the S6a recon, and **not previously
 filed by anyone**. It is recorded here for the record and is being fixed inside
