@@ -98,10 +98,20 @@ cell actually **prints** (§4.7c, `statusCheckDidNotPass`, verbatim):
 
 That line **asserts that a check ran**. So:
 
-> **ADVERSE iff the device ran a comparison or an accounting over what it read
-> back off the plates, AND that check produced a negative result.**
+> **ADVERSE iff the device READ, compared, or accounted for what came back off
+> the plates, AND that step produced a negative result.**
 > **BENIGN otherwise** — including every path where the device withdrew,
 > refused, or never obtained a comparable object at all.
+
+**The three verbs are deliberate, and an earlier draft of this rule had only two
+(gate review N-1).** "Comparison or accounting" is *narrower* than the printed
+line it is derived from, which says **"read, compared or accounted for"** — and
+the missing verb is load-bearing: `gui/multisig_verify.go:724` is a **decode**
+failure of a plate that was read, classified **adverse** by §4.7b. A two-verb
+rule would have argued it benign and contradicted the table it claims to
+reproduce. No single-sig verdict below changes under either wording — single-sig
+has no decode-failure exit of that shape — but the rule is the reusable
+instrument here, so it matches its source exactly.
 
 This is §4.7b's criterion restated so a site can be decided by inspection, and it
 is what makes the classification fail safe: if no check ran, saying "a check ran
@@ -389,6 +399,17 @@ seed plate — the operator would faithfully type a valid `md` string and land o
    past the keyboard and exits at `:125` (benign) instead. The residual bad-plate
    world requires a *whole wrong payload* engraved with its own valid checksum,
    which is a bug in the engrave path, not a mis-cut plate.
+
+   **This argument omitted `inputCodex32Flow`'s error-correction arm (gate review
+   N-2), and completing it makes the benign verdict stronger, not weaker.**
+   `gui/gui.go:1042-1049` offers `codex32.Correct(frag)` on an invalid-but-in-window
+   fragment, accepting a fix within 4 changes and re-validating. So a mis-engraved
+   character is not always a dead end at the keyboard. But a *corrected* string is
+   by construction a valid codex32 string, so it returns `(obj, true)` and flows
+   **past** `:130`/`:138` to the comparison at `:146` — which is classified
+   **adverse**, correctly. The correction arm therefore routes garbled-plate
+   worlds to the site that *does* assert a check ran, and leaves `:130`/`:138`
+   holding only the paths where nothing was ever compared.
 3. **§4.7b's multisig treatment matches.** `multisigVerifyMS1Entry`
    (`gui/multisig_verify.go:1004-1022`) shows the byte-identical two screens and
    returns `rejected=true`; the caller `break`s (`:887`), which lands on `:938`
@@ -411,6 +432,16 @@ loose description of the path and a reviewer reading that phrase literally may
 stumble.
 
 ### U4 — NOT a classification: can a **multisig** run record `suppliedCosigners == 0`?
+
+**ANSWERED, AND NO DECISION IS OWED BEFORE STEP 2 (gate review N-3).** The
+observation below is correct, but the plan already ruled on this exact case and
+this section did not cite it: **T27's row in §5 carries a NON-VACUITY clause**
+naming the self-multisig fixture, `open == 0` at `gui/multisig_build.go:96`, and
+the resulting `suppliedCosigners == 0` — and it requires a fixture with an
+uncovered key to be named or built at step 7, precisely so T27 cannot pass while
+asserting nothing. That was filed as R15's Part-3 caveat and folded at `4c40973`;
+this section reached the same fact independently from the other end. **Nothing
+breaks, and going further would be NG1.** The original analysis follows.
 
 Yes, I believe so, and the reviewer should decide whether that matters before
 step 2. If a build holds device-side seeds for *every* policy slot
