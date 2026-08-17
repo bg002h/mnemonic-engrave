@@ -6914,7 +6914,7 @@ gate's fold, not here.
 
 ---
 
-### F-192 — the F-185 drawn-frame check gates only the screens S5.C touched; every other long modal is still unmeasured (owning phase: **`SPEC_multisig_build_repair.md` S6**) `#seedhammer`
+### F-192 — the F-185 drawn-frame check gates only the screens S5.C touched; every other long modal is still unmeasured (owning phase: **S6b — operator ruling 2026-08-17, sweep before the hardware flash**) `#seedhammer`
 
 Filed 2026-08-16 by the S5.C implementer, landed by the controller.
 
@@ -6928,6 +6928,41 @@ budget: capacity depends on how words WRAP (588 normalised chars of short-word
 filler fit, while F-185's real refusal was cut at ~500), so the check compares
 the drawn frame to the source string and binary-searches the cut point. It
 carries the margin F-185 says its own per-screen fix lacked.
+
+**OWNING PHASE FIXED, AND THE REMEDY RULED ON — operator, 2026-08-17.** The
+owning phase was the bare string `S6`, which S6a has now passed; by the burndown
+rule that made this overdue rather than deferred. It is **S6b's**, to be swept
+before the hardware flash.
+
+The operator's opening instinct was an affordance:
+
+> "I think we need the down arrow available on screen everywhere there is a need
+> to scroll down"
+
+**It was ruled out on a measured hardware constraint, and the measurement is the
+part worth keeping.** `cmd/controller/platform_sh2.go` emits `gui.PointerEvent`
+**exclusively** (its only two event constructions, both inside `processTouch`)
+and carries **zero** references to directional buttons. `Warning.Layout`'s scroll
+handler reads `ButtonFilter(Up)` / `ButtonFilter(Down)`, so **it is dead code on
+the real machine** — the body is unscrollable on an SH2. A down arrow would name
+an action the device cannot perform, on the screens that exist to stop an
+operator losing funds. **An affordance for an impossible action is worse than no
+affordance.**
+
+So the S6b remedy is **the fit-gate sweep as filed**: guarantee every long modal
+fits, so nothing is ever below the fold and no affordance is needed. The
+affordance itself — touch scrolling, and only then the arrow — is filed
+separately as **F-208**, owned **post-flash**.
+
+**Two facts that make the sweep more urgent than "unmeasured exposure" sounds.**
+`fadeClip` (`gui/gui.go:763`) is a **no-op stub** — `return o.Offset(image.Pt(0,
+0))`, with the real mask commented out at `gui/gui.go:764`, immediately above
+that return — so there is today no fade *and* no
+clip: an overrun is a hard cut with no gradient hint, which is how F-185's frame
+ended mid-word. And per F-95's closed entry, **restoring that mask before the fit
+is closed would make things worse**, silently enforcing an overflow the stub
+currently hides. The sweep is therefore a prerequisite for ever fixing the
+renderer, not merely a hardening pass.
 
 ### F-193 — the same key is spelled two ways on two device screens (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer`
 
@@ -7262,3 +7297,50 @@ takes an adverse exit or is unaffected. Nothing on the document asserts anything
 about it. Filed so the behaviour is written down rather than rediscovered — the
 question worth answering later is whether a card the device cannot classify
 should be an adverse observation rather than a non-event.
+
+### F-208 — a long modal has NO affordance saying more text exists, and the SH2 cannot scroll to it anyway (owning phase: **post-flash** — operator ruling 2026-08-17, deliberately NOT in S6b) `#seedhammer`
+
+Filed 2026-08-17 on an operator directive:
+
+> "I think we need the down arrow available on screen everywhere there is a need
+> to scroll down"
+
+**The intent is right and the mechanism does not exist yet.** Three measured
+facts, in the order that matters:
+
+1. **The art is already compiled in and used nowhere.**
+   `gui/assets/arrow-down.alpha.png` ships as `assets.ArrowDown`
+   (`gui/assets/embed.go:13`) and has **zero** usages outside its own
+   declaration. So do `arrow-up`, `arrow-left`, `arrow-right`.
+2. **The machine has no scroll input.** `cmd/controller/platform_sh2.go` emits
+   `gui.PointerEvent` exclusively and references no directional button.
+   `Warning.Layout` (`gui/gui.go:380`) scrolls only on
+   `ButtonFilter(Up)`/`ButtonFilter(Down)` — dead code on real hardware.
+3. **So the arrow cannot come first.** Drawing it before scrolling exists
+   promises the operator an action the device cannot perform, on warning screens
+   whose whole purpose is to stop a funds-losing mistake.
+
+**Ordering is the whole content of this follow-up.** Touch scrolling first, then
+the arrow, and neither before the F-192 fit sweep has closed — because
+`fadeClip` (`gui/gui.go:763`) is a no-op stub, and restoring the real clip mask
+while any body still overflows would *silently* delete the sentence telling the
+operator to stop (F-95's closed entry measures exactly that: `maxScroll = 19 > 0`
+on §10.2.3's warning, the 19-px window holding *"the encrypted part has been
+REMOVED. Do not continue."*).
+
+**There is a precedent to copy, named in F-95:** bind `Warning`'s scroll to
+`Clickable`s with `op.Input` hit areas, *"the same fix the StartScreen pager
+took"*. So this is not novel input work.
+
+**Why it is post-flash rather than S6b** (operator ruling, after being shown
+fact 2): it is new input handling on the safety screens, it churns plate/screen
+goldens, and it would land immediately before an irreversible hardware step. S6b
+instead removes the *need* for the affordance by guaranteeing every modal fits
+(**F-192**). This entry keeps the affordance from being lost once that guarantee
+makes it invisible.
+
+**It also rescues work orphaned inside a CLOSED entry.** F-95's *"What is still
+owed, and the order matters"* paragraph is the origin of most of the above, and
+F-95's heading reads **CLOSED 2026-08-11** — so by this file's own convention
+(status lives in the heading) no sweep of open items would ever have surfaced it.
+F-208 is now the open handle for it.
