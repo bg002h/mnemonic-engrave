@@ -41,6 +41,70 @@ the result.
 
 ---
 
+## 0.1 WHAT THIS CYCLE IS TRYING TO ACHIEVE — and what it is not
+
+**Written at round 9, after the operator asked "maybe the goal of the design is
+simply wrong — what are we trying to achieve?" The absence of this section is how
+a third, unstated goal crept in and produced every Critical of the cycle.**
+
+### The two goals
+
+**G1 — THE DEVICE NEVER MISDESCRIBES WHAT IT ENGRAVED.**
+The mode label names what is and is not on the plates; the document states how
+many plates the set is and what it contains; a required spending factor that is
+on no plate is named out loud; and an aborted set produces no document at all.
+*This is F-198, verified by bytes. Its fix has produced **zero Criticals in nine
+rounds**.*
+
+**G2 — THE DEVICE NEVER VOUCHES FOR PLATES IT HAS EVIDENCE AGAINST, AND NEVER
+CLAIMS A CHECK IT DID NOT PERFORM.**
+The document asserts a verification only when one cleanly happened; otherwise it
+says so conservatively. Omission must **weaken** a claim, never strengthen it.
+*This is C-1, added by review in round 0.*
+
+### The non-goal that cost this cycle nine rounds
+
+**NG1 — REPORTING THE EPISTEMIC STATUS OF THE VERIFICATION.**
+Six knowledge states, per-observation world-sets, a monotonicity property, an
+enforcement artifact, a coverage script. **Nobody ever stated this goal.** It was
+inferred while fixing G2, and **every Critical since round 0 came from it.**
+
+**The structural reason it was unaffordable, and it generalises:**
+
+> **G2 is a PROHIBITION. NG1 is an OBLIGATION.**
+
+*"Never claim more than you know"* is satisfiable with one conservative default
+and requires **no enumeration** — if you do not know, you say less. *"Always say
+exactly what you know"* requires a **complete and correct partition of everything
+the device can observe.** That is what P4 needed and could not get, and what
+P5(b) needed and could not get. **Two properties failed for one reason:
+obligations over incomplete knowledge are not dischargeable.**
+
+A prohibition fails safe by construction. An obligation fails open — which is
+exactly what the observation table did.
+
+**NG2 — DISTINGUISHING FAILURE MODES ON THE DOCUMENT.** Diagnosis has a reader:
+the operator standing at the machine, at verify time. The fork's screens already
+do it well, and have already fixed bugs this plan then re-committed **four
+times**. The document's reader is a stranger, years later, who cannot act on a
+taxonomy.
+
+### The test any line must pass to belong on the document
+
+> Does a stranger holding a pile of steel need it to answer **"is this
+> everything?"** or **"can I trust it?"**
+
+If neither, it belongs on a screen or nowhere.
+
+### The lens that was never run
+
+Nine rounds applied adversarial, executability, test-falsifiability,
+fold-vs-findings, spec-coverage, comprehension, disclosure, reader-comprehension
+and two blind-spot passes. **Every one asks whether the design is CORRECT. None
+asked whether it should EXIST.** That lens is this section.
+
+---
+
 ## 1. MEASURED FACTS — what a reviewer need not re-derive
 
 Everything in this section was read out of the fork at `main` = `b8a23bf` by the
@@ -652,609 +716,172 @@ Back here aborts before anything is cut, which is the last moment that is free.
 
 ---
 
-### 4.7 C-1 — the restore document must say whether the plates were verified
+### 4.7 G2 — the document must not vouch for plates it has evidence against
 
-**This is the R0 round's Critical, and the first draft made it worse rather than
-introducing it.** Decision recorded verbatim in
-`design/agent-reports/s6a-c1-verify-tail-decision.md`.
+**REWRITTEN AT ROUND 9, AFTER NINE RED ROUNDS. §0.1 explains why.** The previous
+apparatus — six knowledge states plus a reserved seventh, per-observation
+world-sets, a lattice-free switch over a classified observation, an enforcement
+artifact and a coverage script — was chasing **NG1**, an unstated goal. Every
+Critical of this cycle came from it. What follows serves **G2 only**, and G2 is a
+prohibition, which is why it is discharged by construction rather than by
+enumeration.
 
-**The defect.** `singleSigVerifyFlow` (`gui/singlesig_verify.go:65`) returns
-**nothing**. Its caller offers it in a one-shot `if sel == 0 { ... }`
-(`gui/singlesig.go:130-133`) and then runs `restoreDocFlow` **unconditionally**
-on the next line. Skipped, passed, or failed — same next screen. §4.2 is exactly
-what turns that document from *silent* into *vouching*, so without this section
-the plan ships a device that says **"The read-back bundle does NOT match the
-seed"** and then prints a document headed *"This backup is 3 plates … If any of
-them is missing, this backup is incomplete."*
+#### 4.7a FOUR STATES — the 2×2 of TWO RECORDED BOOLEANS
 
-**"Mirror multisig" is not available, because multisig has the same hole.** It
-does own a 5-value `multisigVerifyResult`, and it re-offers on
-incomplete-or-failed — but the loop breaks on `!ok || sel != 0`, so an operator
-who reads a FAILED verify and presses **CONTINUE** falls straight through to
-`multisigRestoreDocFlow`. The comment at `gui/multisig.go:323` asserting *"Only
-verifyComplete falls through to the restore document"* is **false in its own
-file** (R0 M-6).
+No lattice. No ordering. No observation enum. No reserved status. No
+world-set table to keep complete.
 
-**The remedy is honesty, not silence — and the incentive argument is what
-decides it.** Any gate keyed on a FAILED verify makes the honest path strictly
-worse than the lazy one: the operator who wants the document — the only screen
-carrying the descriptor, the master fingerprint and the first addresses — learns
-to **skip the verify in order to keep it**. Never make running the check the way
-to lose something. A hard gate is worse still: it deletes an existing capability
-for the common skip case, which is rule 1 of the operator directive.
+    // Both are RECORDED at return sites this plan owns, never inferred from a
+    // verdict. A verdict is the proxy two rounds proved unsound; it is not read
+    // here at all.
+    fullPassRecorded := false   // written AT THE SUCCESS RETURN, with `full` in
+                                // scope, recording WHICH comparisons ran and
+                                // matched in this mode.
+    adverseRecorded  := false   // STICKY. Written at any return site whose world
+                                // -set contains a bad-plate world.
 
-Two supporting facts, both measured rather than assumed:
-
-- **A FAILED verify is evidence, not proof.** The comparison seed is re-typed by
-  hand and the plates are read over NFC, so a typo or a bad read yields FAILED on
-  good steel.
-- **The document's wallet facts are SEED-derived, not plate-derived.**
-  `gui/singlesig.go:90` derives `xpub`/`masterFP`/`parentFP` from the typed
-  mnemonic and `:136` hands exactly those to the document. They stay true even
-  when the steel is wrong, so destroying the page along with the vouch would
-  throw away the part that could still rescue the restore.
-
-**The design.** Wherever a restore document renders at all, it carries **exactly
-one** verification status line, and that line is **the first thing on the page**.
-A rendered document with no status line is a defect, not a default — silence must
-never be mistakable for a pass.
-
-#### 4.7a TWO STICKY FACTS AND A SWITCH (R1 C-1, R2 C-2, R3 C-1/C-2)
-
-**The first fold said "hold the last verdict outside the retry loop", and that
-reintroduces the exact harm C-1 exists to close.** `verifyFailed` is one of the
-two verdicts that **keep the loop alive** — measured, `gui/multisig.go:337` and
-`gui/multisig_build.go:453` both read
-
-    if res != verifyIncomplete && res != verifyFailed { break }
-
-So: a comparison **DISAGREES**, the operator presses **VERIFY AGAIN**, then backs
-out at the gather. The last verdict is `verifyAbandoned`, and a last-wins document
-prints *"DID NOT COMPLETE"* over plates the device has already said do not match.
-The remedy would have re-opened its own Critical, on the two paths §3.2 had just
-pulled into scope.
-
-**THE RULE IS TWO STICKY FACTS, NOT A SEVERITY LATTICE.**
-
-The R1 and R2 folds built a ranked ordering, an accumulator seeded at a zero
-value, a `max` over it, and a "was the final attempt clean" check. Two
-independent reviewers, on two different lenses, then found the same root defect:
-`not-verified` had to rank ABOVE `verified` for the table to hold, and had to be
-the accumulator's seed for the zero value to be safe. **One variable cannot be
-both**, and no reading of the algorithm reproduced its own table.
-
-That structure is deleted rather than patched. It was the fifth fold in a row to
-carry a defect, and the last two rounds each found a Critical in the algorithm
-written to fix the previous Critical. The requirement never needed a lattice:
-
-    status := statusNotVerified      // zero value. No attempt has run.
-    sawDisagreement := false         // zero value. Nothing has disagreed.
-    sawUnaccounted  := false         // zero value. Nothing was left unchecked.
-
-    // ...inside the existing offer loop, per attempt, changing no control flow.
-    // The observation is classified per RETURN PATH / ERROR / PROVENANCE (P4),
-    // never per verdict and never per site -- see the 4.7e observation table.
-    res, obs := <verify>             // obs is the classified observation
-    switch obs {
-    case obsDisagreed:               // a plate-derived comparison diverged
-        sawDisagreement = true       // STICKY. A later attempt cannot un-see it.
-    case obsUnaccounted:             // adverse but AMBIGUOUS -- |W| > 1
-        sawUnaccounted = true        // STICKY, and outranked by obsDisagreed.
-    }
+    // ...and the document line is the cell, not a search:
     switch {
-    case res == verifyComplete && sawDisagreement: status = statusVerifiedOnRetry
-    case res == verifyComplete:                    status = statusVerified
-    case sawDisagreement:                          status = statusDisagreed
-    case sawUnaccounted:                           status = statusUnaccounted
-    case obs == obsBenign:                         status = statusDidNotComplete
-    default:                                       status = statusUnclassified  // P5(c)
+    case fullPassRecorded && adverseRecorded: status = statusVerifiedOnRetry
+    case fullPassRecorded:                    status = statusVerified
+    case adverseRecorded:                     status = statusCheckDidNotPass
+    default:                                  status = statusNotFullyChecked
     }
 
-**Why this is correct where the lattice was not:**
-
-- **No ordering exists to get wrong.** There is no `severity()`, no `max`, no
-  seed. R3 C-1 is structurally impossible here.
-- **Zero attempts needs no special case.** `status` is assigned *only inside the
-  loop body*, so Skip leaves the zero value, which is `statusNotVerified`. R3
-  C-2 — where hoisting `res` outside the loop makes its zero value
-  `verifyComplete` and Skip prints VERIFIED — cannot arise, because **no verdict
-  variable is hoisted at all.** Both sticky facts are of types whose zero values
-  are the safe ones.
-- **`sawDisagreement` is the only sticky thing, and it is sticky in the only
-  direction that matters.** A disagreement is evidence; a later abandon cannot
-  erase it. That was R1 C-1's entire content, kept.
-- **An incomplete first attempt is NOT an anomaly**, and the earlier design
-  wrongly treated it as one. The repeat-check line exists to record that a
-  *disagreement* happened and was later cleared — that is the anomaly a stranger
-  needs to know about. `incomplete → complete` is simply a verify finished in two
-  sittings, and prints `VERIFIED`. This closes R2 C-2 by correcting the
-  requirement rather than by widening an exception.
-
-#### 4.7d SIX STATUSES, ONE PER KNOWLEDGE STATE (R4 C-1, R5 C-1, R5 I-1)
-
-**The classifier's DOMAIN was wrong, not its shape.** Keep classify-then-map and
-the sticky-facts switch; classify **what the device knows**, not what the world
-is. This is evidence reporting, not diagnosis — and the sting is that **the
-screens already speak this frame and only the document lacked it** —
-`gui/multisig_verify.go:427-429`, verbatim: *"Either that plate was not
-presented, or it is not the one this run cut."* (An earlier draft of this
-sentence cited `:42-48`, which is **confident single-world diagnosis** — *"what
-actually happened is that the steel in their hands belongs to a different
-wallet"* — the opposite of ambiguity framing. The claim was right and the
-citation was wrong.) The codebase had the idea; two
-folds of this plan failed to adopt it.
-
-**Six statuses, and the number is DERIVED — one per distinguishable knowledge
-state.** If the device gains or loses a way of knowing, the set moves with it.
-
-| # | status | what the device actually knows |
-| --- | --- | --- |
-| 1 | `VERIFIED` | a comparison over plate-derived bytes completed for every plate and every leg matched |
-| 2 | `VERIFIED on a repeat check` | as (1), after an earlier **true** disagreement — one a clean pass does not retro-explain |
-| 3 | `NOT VERIFIED` | no attempt ran; the device observed nothing |
-| 4 | `DID NOT COMPLETE` | an attempt ran and ended with **no adverse observation about the plates** — seed typo, refusal, abandon, incomplete. It knows only that it does not know |
-| 5 | `DISAGREED` | a comparison of plate-derived bytes against this run's intent ran and diverged, **with no ambiguity of provenance**. The only status that may condemn |
-| 6 | **`PLATES UNACCOUNTED FOR`** *(new)* | an **adverse but ambiguous** observation: W holds both an operator-procedure world and a bad-plate world |
-
-**Status 6 is where the entire Critical-generating residue lands** —
-`errVerifyLegHasNoPlate`, the foreign-or-garbled md1 at `:719`, the garbled mk1
-skipped at claiming, and the hand-typed ms1 divergence (R5 I-1). *That every
-defect of rounds 4 and 5 falls into the one status that did not exist is the
-strongest evidence this is the right set.*
-
-Its line states **both readings and both actions**, exactly as the `:963` screen
-already does:
-
-> `Some plates could not be checked against this run. Either a plate was not presented, or it is not one this run cut. Present every plate this run engraved and check again; if this repeats, re-cut the set.`
-
-**Mechanically:** one more sticky fact — `sawDisagreement` and `sawUnaccounted`,
-with explicit switch-arm order, `DISAGREED` outranking `UNACCOUNTED`. Same shape
-as before; **not** a resurrected severity lattice, because both are booleans over
-observations rather than a ranking over verdicts.
-
-**The repeat-check wording is settled by P4 too.** After a **full** clean pass
-every plate this run cut was presented and matched, so an earlier *pairing*
-failure is retro-explained as procedural — W collapses to "plates fine" — and
-plain `VERIFIED` is earned. An earlier **true** disagreement is not
-retro-explained by a later pass and keeps its note.
-
-##### The old §4.7d, kept because its measurement still holds — `verifyFailed` MEANS TWO DIFFERENT THINGS
-
-**Keying the condemning line on `verifyFailed` stamps an unclearable "Do NOT rely
-on this backup" onto a document describing PERFECTLY GOOD STEEL.** Measured, only
-**two of five** `verifyFailed` sites are a comparison against this run's plates:
-
-| site | what it is | a comparison? |
-| --- | --- | --- |
-| `gui/multisig_verify.go:719` | `!slices.Equal(readbackMd1, engravedMd1)` — the plates belong to a **different wallet** | no |
-| `gui/multisig_verify.go:724` | the readback would not decode | no |
-| `gui/multisig_verify.go:897` | the **re-typed seed** would not derive — a typo at verify time | no |
-| `gui/multisig_verify.go:963` | `verifyMultisigLegsPartial` mismatch | **yes** |
-| `gui/multisig_verify.go:984` | `verifyMultisigLegs` mismatch | **yes** |
-
-Two of the three non-comparisons are ordinary operator mistakes *at verify time*
-with nothing wrong with the backup at all. **The codebase already states this
-lesson** at `gui/multisig_verify.go:42-48`: *"A generic 'Verify Failed' sends them
-to re-cut plates that are perfectly good."* The plan re-committed at the
-**document** level the error the code warns about at the **screen** level — and
-the document is the durable artifact, so it is worse there.
-
-**SUPERSEDED AS A FIX, RETAINED AS A MEASUREMENT.** The R4 fold responded by
-adding a verdict `verifyMismatch` at `:963`/`:984` only. R5 showed the **site is
-not uniform either** — `errVerifyLegHasNoPlate` (`gui/multisig_verify.go:394`)
-returns from inside those very sites **before any comparison runs**. So the split
-is now made **per return path, per error, and per comparand provenance** (P4),
-and lands in the six statuses above. The five-site table below remains true and
-remains useful; it is simply not fine-grained enough to be the classifier. Non-comparison failures therefore print
-`DID NOT COMPLETE` — *"Confirm they restore before relying on this backup"* —
-which is true, actionable, and does not condemn.
-
-**Control flow is UNCHANGED, and that is load-bearing.** All five sites loop
-today, so both retry-loop conditions become
-
-    if res != verifyIncomplete && res != verifyFailed && res != verifyMismatch { break }
-
-at `gui/multisig.go:337` and `gui/multisig_build.go:453`, which preserves current
-looping exactly. **Whether a foreign-policy plate SHOULD loop** — the code's own
-comment says re-presenting those plates can never satisfy the run — is a real
-question and is **deliberately out of scope**: it is F-199's family, and changing
-retry behaviour here would be an unreviewed control-flow change riding a
-document fix. Named so a reviewer does not read it as missed.
-
-**Single-sig is unaffected**: `singleSigVerifyFlow` has no comparison split of
-this kind and no retry loop. The mapping produced at build-order step 1 must
-state which of its eleven exits, if any, are genuine comparisons.
-
-#### THE THREE PROPERTIES THIS MUST SATISFY — testable, unlike the old "invariant"
-
-The R2 fold asserted an "incentive invariant" phrased as a ranking claim, and R3
-showed it false on its own ordering. Ranking is not the property anyone cares
-about. These two are, and each is directly assertable:
-
-**P1 — a clean pass always prints a pass line.** Any sequence whose final attempt
-is `verifyComplete` prints `VERIFIED` or `VERIFIED on a repeat check`, never
-`DID NOT COMPLETE` and never `DISAGREED`. This is what makes running the verify
-never worse than skipping it.
-
-**P2 — an ADVERSE OBSERVATION is never lost.** (Was "a disagreement is never
-lost"; repaired, because "disagreement" is a world-fact and the device holds
-observations.) Any sequence containing an adverse observation prints a line that
-carries it — `DISAGREED`, `PLATES UNACCOUNTED FOR`, or the repeat-check line —
-never bare `VERIFIED` and never `DID NOT COMPLETE`.
-
-**P5 — THE LINE IS CONSTRUCTED FROM RECORDED EVIDENCE, AND ENUMERATION FAILURES
-MAY ONLY WEAKEN IT.** This is the *enforceable* property; **P4 below is now a
-THEOREM of it**, not a separate obligation.
-
-- **(a) Positive claims are GENERATED.** Every printed claim that a check
-  occurred is generated from a **recorded observation** of that check, carrying
-  that observation's provenance. A claim with no generating observation **cannot
-  be rendered**. *(This makes "each plate was read back" unwritable: nothing
-  records reading the ms1, because nothing reads it.)*
-- **(b) CLASSIFICATION AT THE POINT OF KNOWLEDGE.** Every distinction the status
-  map draws is made **at the code site where its distinguishing facts are values
-  in scope**, and recorded there — never reconstructed downstream from a verdict,
-  an error value, or an error string.
-- **(c) MONOTONE UNDER OMISSION.** An unrecognized observation maps to the line
-  making the **fewest claims**, and **a test asserts that default arm is
-  unreachable** from every known return path. Incompleteness may only ever
-  **weaken** the printed line, never strengthen it.
-
-**WHY THE TABLE ALONE COULD NOT DISCHARGE P4.** It needed three conjuncts at
-once — complete enumeration, a correct W per row, and code able to make every
-distinction the rows demand — and R7 falsified **each independently**. Worse,
-**it failed OPEN**: unrowed paths inherited `DID NOT COMPLETE`, and the
-unexamined success row inherited full-strength `VERIFIED`. A safety mechanism
-whose failure mode is *confident output* is worse than none, because it is
-trusted. P5(c) inverts that: the failure mode is now silence about what was not
-checked.
-
-P5 splits P4's completeness into **the part a tool enforces** (row coverage via a
-committed return-site sweep; classifier exhaustiveness via the tested default
-arm) and **the part a human still judges** (W per row) — whose failure direction
-is now safe.
-
-**P4 (now a theorem) — A LINE MAY NEVER OUTRUN THE EVIDENCE.** For every reachable outcome —
-enumerated **per return path, per error, and per comparand provenance**, never
-per verdict and never per site — let **W** be the set of world-states consistent
-with everything the device observed on the way there. Every factual claim and
-every instruction in the printed line must be true in **every** member of W. If W
-contains worlds demanding different operator actions, the line must **state the
-ambiguity and cover both actions**; it may not pick one world and assert it.
-
-**P4 replaces P3, which it subsumes** (P3 is P4 restricted to the `DISAGREED`
-line), and it is why the previous two Criticals kept regenerating one level down.
-
-**THE DIAGNOSIS, and it is the reason this round changed the frame rather than
-the classifier.** P1, P2 and P3 all had **world-fact** antecedents — *"a
-comparison disagreed"*. The device does not have world-facts. It has
-**observations**, some of which are consistent with several worlds. A world-fact
-can only ever be implemented through a **proxy**, and any proxy can conflate
-worlds — so the defect regenerates forever: round 4 moved the proxy from the
-verdict to the site, round 5 found the site's own error set was not uniform
-either. **P4 is stated over the evidence, so there is no next level to move to.**
-
-**P4 catches all three prior findings mechanically rather than case by case** —
-which is the test of a property worth having. R4's C-1: at verdict granularity, W
-for `verifyFailed` contains seed-typo worlds, so *"a read-back check DISAGREED
-with these plates"* is false in a member of W. R5's C-1: at the
-`errVerifyLegHasNoPlate` path, W contains the forgot-a-plate world — same
-failure. R5's I-1, unprompted: a hand-typed ms1 divergence has a W containing
-*"one-character transcription typo, plates perfect"*.
-
-**THE ENFORCEMENT IS AN ARTIFACT, NOT A HABIT.** The review deliverable is a
-table keyed by **observation**, each row naming its W and its line, and
-
-> **a row with |W| > 1 may not carry a line that asserts a single member of W.**
-
-That check cannot be dodged by moving down a level, because its unit is the
-world-set rather than any proxy for it.
-
-#### ENUMERATED — every sequence, and what it prints
-
-`S` = skip / never offered. Derived by executing the switch above, not by
-argument.
-
-| sequence | sawDisagreement | final res | prints |
-| --- | --- | --- | --- |
-| `S` | false | *(none)* | `NOT VERIFIED` |
-| `complete` | false | complete | `VERIFIED` |
-| `incomplete` then stop | false | incomplete | `DID NOT COMPLETE` |
-| `refused` / `abandoned` | false | that | `DID NOT COMPLETE` |
-| `incomplete` → `complete` | false | complete | `VERIFIED` |
-| `mismatch` then stop | **true** | mismatch | `DISAGREED` |
-| `mismatch` → `abandoned` | **true** | abandoned | `DISAGREED` |
-| `mismatch` → `incomplete` | **true** | incomplete | `DISAGREED` |
-| `mismatch` → `complete` | **true** | complete | `VERIFIED on a repeat check` |
-| `incomplete` → `mismatch` → `complete` | **true** | complete | `VERIFIED on a repeat check` |
-| **`failed`** (foreign plates / undecodable / seed typo) then stop | false | failed | **`DID NOT COMPLETE`** — never condemns (§4.7d) |
-| **`failed`** → `complete` | false | complete | **`VERIFIED`** — nothing was ever disagreed with |
-
-The retry space is unbounded, but the switch depends only on `sawDisagreement`
-and the final `res`, so these twelve rows are the complete image of it — an honest
-statement of coverage, where the previous table's "every sequence" header
-overclaimed.
-**The repeat-check state is a controller decision derived from the persisted C-1
-principles, not a new operator ruling** — flagged so the next reviewer reads it
-as an addition rather than as something already blessed.
-
-| # | status | line (verbatim, ASCII only) |
-| --- | --- | --- |
-| 1 | `statusUnclassified` **(reserved)** | `The device observed something it could not classify. Treat these plates as unchecked and confirm they restore before relying on this backup.` |
-| 2 | `statusVerified` | `Key and descriptor plates VERIFIED: read back and matched. The ms1 you typed matched this seed -- no ms1 plate was read.` |
-| 3 | `statusVerifiedOnRetry` | `Key and descriptor plates VERIFIED on a repeat check. An earlier read-back disagreed; a later one matched. No ms1 plate was read.` |
-| 4 | `statusNotVerified` | `No check was run on these plates. Confirm they restore before relying on this backup.` |
-| 5 | `statusDidNotComplete` | `Plate verification DID NOT COMPLETE. Confirm they restore before relying on this backup.` |
-| 6 | `statusUnaccounted` | `Some plates could not be checked against this run. Either a plate was not presented, or it is not one this run cut. Present every plate this run engraved and check again; if this repeats, re-cut the set.` |
-| 7 | `statusDisagreed` | `WARNING: a read-back check DISAGREED with these plates. Do NOT rely on this backup: engrave a fresh set and check it before use.` |
-
-**Seven rows: six reachable statuses plus the reserved `statusUnclassified` (§4.7c).** An
-earlier draft carried five here while the prose above already argued for six —
-the frame had been changed in prose only, and the artifacts a reader would build
-from still described the old design.
-
-**I-2 and I-3, from the reader lens, are folded into the table above.**
-`Plates NOT VERIFIED` and `Plates VERIFIED` differed by **one leading word** at
-the highest-stakes position on the page — the very ambiguity §5 forbids in the
-*test suite* (three of six lines contain `VERIFIED`), shipped to a human reader
-who has no compiler. Status 3 now leads with `No check was run`, sharing no token
-with the pass lines. And status 2, the one PASS that mentions a disagreement, no
-longer closes with the same hedge as the two UNKNOWN statuses; it now states the
-resolution instead of hedging it.
-
-#### 4.7f THE STATUS MUST SCOPE THE PAGE BENEATH IT (R6 reader I-1)
-
-**The status line leads the document, and nothing below it was conditioned on
-it.** Under `DISAGREED` or `PLATES UNACCOUNTED FOR`, the inventory, seed,
-passphrase and seed-handling text was **byte-identical to the healthy case** —
-including a line reading *"make sure whoever needs **this backup** can also get
-the passphrase"*, reusing the exact phrase the status line had just said not to
-rely on.
-
-**That is this cycle's own defect one level up.** A page that warns in its first
-line and then describes a healthy backup for the rest of its length is a document
-vouching against the device's own evidence — F-198's shape at document scale
-rather than sentence scale.
-
-**The fix is one conditional line, not a rewrite of every downstream string.**
-When the status is adverse — `statusDisagreed` or `statusUnaccounted` — a
-**scoping line** renders immediately after it:
-
-> `Everything below describes what this run INTENDED to engrave. Until the check above is resolved, do not assume the plates match it.`
-
-**Why a scope line rather than conditional rewording throughout.** Rewording the
-inventory, seed and passphrase blocks per status multiplies six statuses across
-every downstream line, and each variant is a new string nobody has read — the
-combinatorial version of the defect this cycle keeps producing. One line that
-**re-frames** the rest is true under every status, needs no per-block variants,
-and cannot drift out of agreement with them.
-
-**It is P4-clean:** it asserts only that the text below states *intent*, which is
-true in every world consistent with any observation, and it prescribes no action
-that could be wrong.
-
-#### 4.7e THE OBSERVATION TABLE — a REVIEW PROJECTION, not the enforcement mechanism
-
-**Enforcement is P5; this table is how a human READS what P5 produced, and T15 tests it against that.** One row per **return path /
-error / comparand provenance** — never per verdict, never per site, because both
-of those proxies have already failed. `W` is the set of world-states consistent
-with what the device observed.
-
-| observation | where | W — worlds consistent with it | \|W\| | status |
-| --- | --- | --- | --- | --- |
-| no attempt ran | operator pressed Skip | *(nothing observed)* | — | `statusNotVerified` |
-| every leg matched its plate | `gui/multisig_verify.go:987` — the success return (`:984` is `verifyFailed`, and an earlier draft miscited it here) | key and descriptor plates match; **nothing was observed about the ms1 plate** | **2** | `statusVerified`, SCOPED |
-| a plate-derived comparison diverged | `verifyMultisigLegs` mismatch | this plate is not what this run cut | 1 | `statusDisagreed` |
-| **no plate carries a leg's key** | `errVerifyLegHasNoPlate`, `gui/multisig_verify.go:394` | **(a)** a plate was not presented; **(b)** it is not one this run cut | **2** | `statusUnaccounted` |
-| **readback md1 ≠ engraved md1** | `:719` | **(a)** foreign wallet's plates; **(b)** this run's md1, garbled in the read | **2** | `statusUnaccounted` |
-| **readback will not decode** | `:724` | **(a)** a miscut plate; **(b)** an NFC read error | **2** | `statusUnaccounted` |
-| **hand-typed ms1 diverges** | ms1 comparand is **operator-typed**, not plate-derived | **(a)** the plate is wrong; **(b)** a transcription typo | **2** | `statusUnaccounted` |
-| re-typed seed will not derive | `:897` | the operator mistyped the seed; nothing observed about the plates | 1 | `statusDidNotComplete` |
-| operator abandoned / refused | loop exit | nothing observed about the plates | 1 | `statusDidNotComplete` |
-
-**THIS TABLE IS A REVIEW PROJECTION, NOT THE ENFORCEMENT MECHANISM (R7 / P5).**
-It was demoted after R7 found three Criticals inside it: a wrong `|W|` on the
-success row, two reachable paths with **no row at all**, and a distinction the
-code cannot make. Enforcement is P5; this table is how a human reads what P5
-produced, and its coverage is checked by a **committed return-site sweep script**
-rather than by care.
-
-**MISSING ROWS ADDED (R7 C-2), and the method failure behind them named.** The
-plan performed an exhaustive per-return-site analysis for `verifyFailed` — five
-sites — **because a reviewer named that verdict**, and never repeated it for any
-other. `verifyIncomplete` has **three non-uniform return sites**, unexamined:
-
-| observation | where | W | \|W\| | status |
-| --- | --- | --- | --- | --- |
-| readback filter drops cards | `gui/multisig_verify.go:701`; single-sig `:116` | (a) not presented; (b) unreadable plate | **2** | `statusUnaccounted` |
-| plate count ≠ engraved count | `gui/multisig_verify.go:738` | (a) a plate withheld; (b) a plate this run cut is unreadable | **2** | `statusUnaccounted` |
-| partial verify, all compared matched | `gui/multisig_verify.go:979` | nothing adverse observed about the plates | 1 | `statusDidNotComplete` |
-
-**"incomplete" is removed from §4.7d's row-4 enumeration**, which had
-affirmatively swept the first two in — so they printed `DID NOT COMPLETE` with no
-scope line, violating P2.
-
-**THE REMAINING SEVEN SITES — enumerated BY THE SCRIPT, not from memory.**
-`./scripts/verify-returnsite-sweep.sh` reported **7 of 15 verdict return sites
-unrowed** the moment it was written — *immediately after this table had been
-"fixed" in response to R7*. Three review rounds found some of them; a command
-found all of them in one second. That is the method failure measured, and it is
-why P5(c) matters more than any row below: **being wrong about one of these must
-be safe, because being complete about them is not achievable by care.**
-
-| site | verdict | W | \|W\| | status |
-| --- | --- | --- | --- | --- |
-| `gui/multisig_verify.go:670` | `verifyRefused` | no expected slots — a programmer-error refusal; nothing observed about plates | 1 | `statusDidNotComplete` |
-| `gui/multisig_verify.go:680` | `verifyRefused` | no engraved md1 to compare against; nothing observed about plates | 1 | `statusDidNotComplete` |
-| `gui/multisig_verify.go:696` | `verifyAbandoned` | the operator declined to present plates at all | 1 | `statusDidNotComplete` |
-| `gui/multisig_verify.go:794` | `verifyRefused` | `verifyFreshSlots` failed — a structural refusal before any readback | 1 | `statusDidNotComplete` |
-| `gui/multisig_verify.go:938` | `verifyIncomplete` | zero legs, correctable — the seed filled no slot this run engraved | 1 | `statusDidNotComplete` |
-| `gui/multisig_verify.go:940` | `verifyAbandoned` | zero legs, not correctable | 1 | `statusDidNotComplete` |
-| `gui/multisig_verify.go:987` | `verifyComplete` | **the success path** — every leg matched a read-back plate; **no ms1 plate was read** | **2** | `statusVerified`, whose line is SCOPED (§4.7d) |
-
-**`:987` is the one that matters.** It is the success site, it was unrowed, and
-its `|W| = 2` is exactly R7's C-1: the device knows the key and descriptor plates
-matched and knows **nothing** about the ms1 plate, because nothing reads it. The
-scoped line is what makes that row P5(a)-clean.
-
-**The rule the projection is read against:**
-
-> **A row with `|W| > 1` may not carry a line that asserts a single member of W.**
-
-Every `|W| = 2` row above lands in `statusUnaccounted`, whose line states **both**
-readings and **both** actions. That is why the sixth status is not a nicety: it is
-a line that can be true of a two-world observation.
-
-**Not the ONLY one, and an earlier draft claimed it was** (R7 M-5). The `:987`
-success row ten lines above is `|W| = 2` and takes `statusVerified` with a
-**scoped** line. Ambiguity is one way to be true in every world; **scope is the
-other, and the stronger one when the device knows WHICH thing it did not look
-at.** `statusUnaccounted` is for the case where it does not know.
-
-**C-3 — THE CODE CANNOT SEPARATE ROWS 3 AND 7 AS SPECIFIED, AND P5(b) IS WHY
-THAT IS NOW A DESIGN INSTRUCTION RATHER THAN A CONTRADICTION.** `bundle.Verify`
-returns only **untyped errors**, so a plate-derived comparison failure and a
-hand-typed ms1 divergence are indistinguishable *downstream*. Collapsing them
-either way reproduces R5's I-1 or loses a real `DISAGREED`. **So the distinction
-is not reconstructed downstream — it is recorded at the comparator, where mk1-vs-ms1
-provenance is a value in scope.** That is P5(b), and it is a change to *where*
-the classification happens, not to what the table says.
-
-**Provenance is a first-class column, not a detail.** The ms1 row is
-`|W| = 2` *solely* because its comparand was typed by a human rather than read
-from a plate. Two identical-looking comparison failures classify differently on
-provenance alone — which is exactly what "per comparand provenance" in P4 means,
-and what a per-site or per-verdict split can never express.
-
-**"matched", not "matched the seed" (R1 I-3).** The singular contradicted §4.4's
-own *"YOUR seeds"* on a multi-master build, in the same document. Dropping the
-object makes the line true in every mode and costs nothing.
-
-#### 4.7b ONE SEAM, AND IT IS THE ONE THAT ALREADY EXISTS (R1 I-1, I-2)
-
-The first fold described two different seams for the same line. There is one:
-
-    func buildVerifyStatusLines(v verifyStatus) []string   // exactly one line
-
-**IT MUST LAND AT SLICE INDEX 0, AND `extra` CANNOT PUT IT THERE (R2 C-1).**
-
-The R1 fold said "prepend it into `extra`". That does not work, and the plan had
-already written down why without noticing: re-read from source rather than
-recalled,
-
-    gui/multisig_restore.go:106   restoreDocScreen(ctx, th, append(lines, extra...))
-
-`extra` is appended **after** `lines`, so prepending *within* `extra` moves the
-status line from the end of the document to the middle of it. A reviewer
-measured the real shape by running the shipped supply walk: the document is
-**five pages**, and `extra` begins mid-**page 4**.
-
-And `restoreDocScreen` (`gui/singlesig_restore.go:148-160`) opens at `start := 0`
-and draws `lines[start]` first, with `doneBtn` live on that same frame. So
-**"page 1" means slice index 0** — nothing weaker qualifies.
-
-So the status line is passed **separately** and placed first:
-
-    func multisigRestoreDocFlow(ctx *Context, th *Colors, tpl md.Template,
-        keys []md.ExpandedKey, status []string, extra []string) {
-        ...
-        restoreDocScreen(ctx, th, append(append(status, lines...), extra...))
-    }
-
-**This CORRECTS a claim the R1 fold made in §3.2.** That fold asserted "no
-signature change on the multisig side at all", reasoning that `extra` already
-existed. Wrong — the document needs **two** insertion points, front and back:
-the status line leads, the wallet facts follow, the inventory trails. One
-trailing parameter cannot express that, so `multisigRestoreDocFlow` **does**
-change signature, at all THREE call sites (§4.7b). §3.2 is corrected to match.
-
-**Single-sig** gets the same `verifyStatus` (§4.7c) and threads it into the
-leading parameter §4.2 adds to `restoreDocFlow`. It has **no retry loop**, so its
-two sticky facts collapse to a single assignment at each of the eleven exits —
-which is why §4.7c requires that mapping be written and reviewed *first*.
-
-#### 4.7c THE STATUS TYPE, AND WHY ITS ZERO VALUE IS "NOT VERIFIED" (R2 I-1, I-2)
-
-The R1 fold used the identifier `verifyStatus` without ever defining it, and
-claimed `multisigVerifyResult` was "a superset of what the status line
-distinguishes". **It is not a superset:** it has no value for *skipped* or *never
-offered*, which is the single most common outcome — the operator picks "Skip".
-
-So the status is its own small type, distinct from the verdict:
+**The `default` is the ZERO CELL and it is where everything unclassified lands** —
+skip, incomplete, a benign refusal, an abort, a path nobody enumerated, a path
+added next year. **Monotonicity is now structural rather than promised:** a fact
+not recorded cannot set a bit, and an unset bit can only move the cell *toward*
+`statusNotFullyChecked`. There is no arm that an omission can strengthen, which
+is precisely what the previous design got backwards.
+
+#### 4.7b WHICH SITES ARE ADVERSE — the whole classification
+
+The only classification left is one bit per return site, and R9 already verified
+it row by row:
+
+| adverse (world-set contains a bad-plate world) | benign (nothing observed about the plates) |
+| --- | --- |
+| `gui/multisig_verify.go:719` foreign-or-garbled md1 | `gui/multisig_verify.go:897` re-typed seed will not derive |
+| `gui/multisig_verify.go:724` readback will not decode | `gui/multisig_verify.go:938` zero legs, correctable |
+| `gui/multisig_verify.go:394` `errVerifyLegHasNoPlate` | `gui/multisig_verify.go:940`, `gui/multisig_verify.go:696` abandons |
+| `gui/multisig_verify.go:738` plate count ≠ engraved count | `gui/multisig_verify.go:670`, `gui/multisig_verify.go:680`, `gui/multisig_verify.go:794` structural refusals |
+| **any `bundle.Verify` error** | *(loop exits, skip)* |
+| `gui/multisig_verify.go:701` readback filter drops cards | `gui/multisig_verify.go:979` partial verify, everything compared matched |
+| `gui/multisig_verify.go:963` `verifyMultisigLegsPartial` mismatch | |
+| `gui/multisig_verify.go:984` `verifyMultisigLegs` mismatch | |
+
+**`gui/multisig_verify.go:987` is neither** — it is the **success return**, and it
+is where `fullPassRecorded` is written **with `full` in scope**. It sets no
+adverse bit; it records *what was compared and matched in this mode*. That single
+site is the whole of P5(a) and the whole of R9's C-1 fix: the pass line is
+generated from what this record contains, so on watch-only it cannot claim an ms1
+comparison the record does not hold.
+
+**All fifteen `return verify*` sites are now classified**, and
+`./scripts/verify-returnsite-sweep.sh` is what proves it rather than care —
+though note its declared scope warning: single-sig contributes zero sites until
+`singleSigVerifyFlow` gains a verdict at build-order step 1, so this covers
+multisig only.
+
+**`bundle.Verify` NEEDS NO CHANGE, and this is what kills P5(b)'s unenforceable
+instance genuinely rather than hiding it.** All eleven of its errors classify
+**identically** — adverse — at the gui call site. The ms1-versus-plate provenance
+distinction that lived only inside it, and that P5(b) could not reach, turns out
+to be a distinction **nothing consumes**. There is no sub-classification within
+adverse.
+
+#### 4.7c THE FOUR LINES
 
     type verifyStatus int
-
     const (
-        // THE ZERO VALUE IS THE SAFE ONE, DELIBERATELY. A path that forgets to
-        // set a status prints "NOT VERIFIED" -- conservative and true-ish -- and
-        // can never print a vouch. Mirroring multisigVerifyResult's shape would
-        // have made verifyComplete = iota = 0, so the SAME omission would print
-        // "Plates VERIFIED" over plates nothing ever checked. That is the whole
-        // Critical, reachable by forgetting one assignment.
-        statusNotVerified verifyStatus = iota   // zero value; no attempt ran
-        // RESERVED, P5(c). An observation the mapping does not recognise takes
-        // the fewest-claims line. T17 asserts NO reachable path produces it --
-        // it is scaffolding whose emptiness is continuously tested, not a
-        // seventh knowledge state.
-        statusUnclassified
-        statusDidNotComplete
-        statusUnaccounted        // adverse but AMBIGUOUS -- 4.7d status 6
-        statusDisagreed
+        statusNotFullyChecked verifyStatus = iota  // THE ZERO VALUE. Safe, and true.
+        statusCheckDidNotPass
         statusVerifiedOnRetry
         statusVerified
     )
 
-**`statusNotVerified` stays the ZERO VALUE, not `statusUnclassified`.** A
-forgotten assignment should say *no check ran* — which is what actually happened
-— rather than *something unclassifiable was observed*, which asserts an
-observation that never occurred. Both are safe; only one is true.
-
-**THE ZERO VALUE PROTECTS THE VARIABLE, NOT THE DOCUMENT (R3 I).** `verifyStatus`
-failing safe means a forgotten *assignment* prints `NOT VERIFIED`. It does
-nothing about a forgotten *call*: the seam is `[]string`, so a flow that never
-calls `buildVerifyStatusLines`, or passes `nil`, renders a document with **no
-status line at all** — silence, which §4.7 opens by declaring must never be
-mistakable for a pass. The type-level argument and the document-level guarantee
-are different claims, and the first fold conflated them.
-
-So the document-level guarantee is carried by a test, not by a type: **T9's
-"exactly one status line" must be asserted on the RENDERED DOCUMENT of each of
-the three production flows**, not only on the helper's return value. That is the
-only formulation that catches a flow wired to pass `nil` — which is precisely
-what `gui/multisig_nested_name_test.go:230` does today.
-
-**Single-sig's mapping must be written, not left to the implementer (R2 I-2).**
-`singleSigVerifyFlow` (`gui/singlesig_verify.go:65`) has eleven exit points and
-today returns nothing. Each one maps to exactly one status, and the plan owes
-that table rather than a resemblance to a type on another path — "mirrors
-`multisigVerifyResult`'s shape" is not a specification when the two types do not
-have the same members. The implementer produces the mapping as the **first**
-step of §4.7, and it is reviewed before the rest of the section is built.
-
-**There are THREE false-comment sites, not two (R2 I-4).** Two consecutive folds
-undercounted this same defect — round 0 said one (and cited the wrong file),
-round 1 said two. Pasted from the source, not from a report:
-
-| site | what it says now | why it is false |
+| cell | status | line (verbatim, ASCII only) |
 | --- | --- | --- |
-| `gui/multisig_build.go:439` | `Only verifyComplete falls through to the restore document.` | a CONTINUE after a failure falls through too |
-| `gui/multisig.go:321-322` | `Only verifyComplete falls through; a refusal or an abandon does not loop` | same, differently worded |
-| `gui/multisig_verify.go:78-79` | `FOUR OUTCOMES, NOT A BOOL` … `Only verifyComplete may fall through to the restore document.` | **doubly wrong**: the type has FIVE constants, and the fall-through claim is the same falsehood on the type's own doc comment |
+| pass, no adverse | `statusVerified` | *generated from the pass record* — names exactly the comparisons this mode ran, and states what was not read |
+| pass, adverse | `statusVerifiedOnRetry` | the generated pass line, plus `An earlier check did not pass; a later full check passed.` |
+| no pass, adverse | `statusCheckDidNotPass` | `A verification check ran and did not pass: a comparison did not match, or a plate could not be read or accounted for. Do NOT rely on this backup until a full check passes. Check again with every plate this run engraved; if this repeats, engrave a fresh set.` |
+| no pass, no adverse | `statusNotFullyChecked` | `These plates were not fully checked. Confirm they restore this wallet (master fingerprint below) before relying on this backup.` |
 
-The third is the worst of them, because it sits on the **type definition** — the
-first thing anyone reads when they go looking for what the verdicts mean. It is
-also the one both previous folds missed while explicitly hunting for this exact
-defect, which is why this table is pasted from `sed` output rather than
-transcribed.
+**THE PASS LINE IS GENERATED, NOT A LITERAL — this is what closes R9's C-1.**
+`buildVerifyStatusLines` takes the **pass record**, which carries the mode. On a
+full run it names the key and descriptor plates AND the typed-ms1 comparison; on
+watch-only it names only what watch-only actually compares, and **the ms1 clause
+is absent because the record does not contain it.** A mode-blind literal is what
+claimed "the ms1 you typed matched this seed" on a run where no ms1 is typed —
+the bug `multisigVerifyOKMessage` had already found and fixed, in all four of its
+arms, before this plan re-committed it.
 
-Neither may survive a cycle that fixes the behaviour they misdescribe. **The
-citation gate resolved the wrong line happily and was right to** — it states
-plainly that it proves a line *exists*, never that the interpretation is right.
-That is the gate's declared blind spot doing its job by being declared.
+#### 4.7d THE MEMBERSHIP TEST — why four and not two, six, or seven
 
-**F-197 is untouched by this.** An *aborted engrave* still ends the program with
-no verify offer and no document, because the set on the bench is incomplete.
-This section governs only sets that were fully **cut**.
+A distinction earns a line **iff both prongs hold**:
+
+1. **ENFORCEABILITY** — its generating facts are values in scope at return sites
+   **in code this plan owns**. The boundary lies *on* the return-site partition,
+   never through a callee's interior.
+2. **CONSUMPTION** — across the boundary the stranger's required action differs,
+   **or** a settled property forbids the merge.
+
+| distinction | prong 1 | prong 2 | verdict |
+| --- | --- | --- | --- |
+| pass vs not-pass | success return, `full` in scope | rely-with-scope vs do not | **kept** |
+| adverse vs benign | all gui-local (§4.7b) | "confirm before relying" vs "do not rely until a check passes" | **kept** |
+| VERIFIED vs on-repeat | same two bits | action identical — but **P2 forbids the merge** | **kept, and free** |
+| DISAGREED vs UNACCOUNTED | **fails** — interior to `bundle.Verify` | — | **dropped** |
+| skip vs incomplete | — | **fails** — same action | **dropped** |
+
+**Two states would have been wrong**, and this is the part the controller's own
+hypothesis got wrong: on **adverse → clean retry**, a sticky adverse bit violates
+P1 and kills the re-verify incentive, while a non-sticky one violates P2 on the
+ms1 class, which R9's I-1 proved is not retro-explainable. Neither arm of a
+two-state collapse is available. Four is the smallest set that is both
+enforceable and sufficient.
+
+#### 4.7e WHAT THIS DELIBERATELY GIVES UP
+
+**`DISAGREED`'s condemnation.** The old design could say *a read-back check
+DISAGREED with these plates*. The new one says only *a check ran and did not
+pass*. That is a real loss of specificity **and it was a promise, not a
+capability** — the device could not reliably earn the stronger claim, which is
+what three consecutive Criticals were about. §0.1's test applies: a stranger can
+only rely, confirm, or re-cut, and both lines route to the same action.
+
+#### 4.7f THE STATUS MUST SCOPE THE PAGE BENEATH IT (R6 reader I-1)
+
+Under `statusCheckDidNotPass`, a **scoping line** renders immediately after the
+status line, because nothing below it is conditioned on it:
+
+> `Everything below describes what this run INTENDED to engrave. Until the check above is resolved, do not assume the plates match it.`
+
+**Not under `statusNotFullyChecked`**, whose own line already tells the reader to
+confirm before relying — R7 ruled that widening it to the modal Skip path cries
+wolf on a backup that is probably fine.
+
+#### 4.7g P6 — THE PASS PATH IS AUDITED LIKE THE FAILURE PATHS
+
+R9's root diagnosis was that **the pass path was never held to the discipline the
+failure paths were**: five verdict sites audited for one failure verdict, three
+for another, and the success return got one row, added last, carrying the only
+unscoped positive claim in the plan.
+
+> **P6 — every positive line is audited BY CLAIM, PER MODE.** For each claim a
+> pass line makes, in each mode the flow supports, the reviewer names **which
+> recorded observation says so**. A claim with no naming observation is deleted.
+> Guards are **entitlement, never inference** -- a mode guard says *this record
+> entitles this clause*, it never infers a fact from a verdict. And enumerations
+> are **outcome-blind**: every list of return sites includes the success return,
+> or it is not a list of return sites.
+
+**P5 survives in reduced form** — (a) claims generated from records, and (c)
+monotone under omission, both now structural rather than promised. **P5(b) is
+retired**: §4.7b shows the distinction it was written to enforce is one nothing
+consumes.
+
 
 ## 4.8 BUILD ORDER — what to do first, and what can land on its own
 
@@ -1362,25 +989,20 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T6** | the single-sig run reaches `Plates To Cut` before the engrave picker | remove the census call |
 | **T7** | `seedCapacityOne` yields `The seed you entered` and not `Every seed`; `seedCapacityMany` yields `Every seed`; **and every new operator string is ASCII-clean** (the glyph set at `gui/multisig_build_prose_test.go:395`) | swap the capacity arms; insert an em dash |
 | **T8** | `gui/bundle_flow.go` no longer claims `both engraving callers` (source assertion, mirroring the `readGuiFile` pattern at `gui/multisig_build_prose_test.go:402`) | restore the old comment |
-| **T9** | each of the **six** §4.7c statuses renders **its own** line, and every rendered document carries **exactly one** — over `buildVerifyStatusLines` | return the same string for two statuses; return an empty slice |
-| **T10** | **the stickiness.** `mismatch` → `abandoned` prints `DISAGREED`, **not** `DID NOT COMPLETE` | implement as last-wins — precisely what the round-0 fold specified |
-| **T11** | the status line is at **slice index 0** of what `restoreDocScreen` receives — asserted **through a production flow**, not on a helper | pass it via the trailing `extra` parameter, as the round-1 fold specified |
-| **T12** | `incomplete` → `complete` prints **bare `VERIFIED`** (nothing ever disagreed), and `mismatch` → `complete` prints the **repeat-check** line. Neither prints `DID NOT COMPLETE` | cover only `failed → complete` — precisely what the round-1 fold specified |
+| **T20** | **the 2x2.** Each of the four §4.7c cells renders **its own** line, byte-exact; every rendered document carries **exactly one** | return the same string for two cells; return an empty slice |
+| **T21** | **the ZERO CELL is the default.** An observation matching no recorded bit yields `statusNotFullyChecked` — including a return path added with no classification at all | make any other status the `default:` arm. This is monotonicity, and it must be structural rather than promised |
+| **T22** | **the pass line is GENERATED PER MODE (R9 C-1).** On watch-only the ms1 clause is **absent**, because the pass record does not contain it; on full it is present | use a mode-blind literal — the exact bug `multisigVerifyOKMessage` had already found and fixed in all four arms |
+| **T23** | **stickiness.** adverse, then no full pass → `statusCheckDidNotPass`, never `statusNotFullyChecked` | make `adverseRecorded` non-sticky |
+| **T24** | **P2 on the retry path.** adverse, then a full pass → `statusVerifiedOnRetry`, never bare `statusVerified` | drop the `&& adverseRecorded` arm — a two-state collapse, which R9's I-1 proved loses the ms1 class |
+| **T25** | **no verdict is read.** The status derivation references neither `res` nor any `verify*` constant — only the two recorded booleans | key a pass arm on `res == verifyComplete`, which is R9's C-3 and the proxy two rounds proved unsound |
+| **T26** | **P6 — every positive claim is named per mode.** For each clause of each pass line, in each mode, a recorded observation is named; a clause with none is deleted | add an unbacked clause to a pass line |
+| **T11** | the status line is at **slice index 0** of what `restoreDocScreen` receives, and the §4.7f scope line renders **only** under `statusCheckDidNotPass` — asserted **through a production flow**, not on a helper | pass it via the trailing `extra` parameter, as the round-1 fold specified |
 | **T7c** | **the capacity WIRING**, per path: drive each of the three flows to its restore document and assert the seed-handling subject clause matches that path's capacity (build → `Every seed`; supply and single-sig → `The seed you entered`) | swap either call site's capacity argument — a mutation no compiler and no current test detects |
-| **T13a** | **P1 — a clean pass always prints a pass line.** Assert the **whole line, byte-exact**, against the six-line table in §4.7d — **never `strings.Contains`**. Table-driven over §4.7a's twelve rows: every sequence whose final `res` is `verifyComplete` prints `VERIFIED` or the repeat-check line | make `sawDisagreement` non-sticky, or reorder the switch arms so a disagreement outranks the final pass |
-| **T13b** | **P2 — an ADVERSE OBSERVATION is never lost.** Every sequence containing one prints `DISAGREED` or the repeat-check line, never bare `VERIFIED`, never `DID NOT COMPLETE` | drop the `sawDisagreement` assignment — R1 C-1's defect exactly |
-| **T15** | **P4 — the line does not outrun the evidence.** The §4.7d **observation table** is the test fixture: one row per return path / error / comparand provenance, each naming its world-set W and its line. Assert (a) every row's line is true in every member of its W, and (b) **no row with `|W| > 1` carries a line asserting a single member** | give `errVerifyLegHasNoPlate` the `DISAGREED` line — precisely what the R4 fold specified, and R5's Critical |
-| **T17** | **P5(c) — the default arm is UNREACHABLE.** No known return path reaches `statusUnclassified`; the reserved line renders for no reachable observation | add a return path and omit its classification — the test flags it the day it is written, which is exactly what `:701` and `:738` needed |
-| **T18** | **P5(a) — no pass line claims a check that was not recorded.** The `statusVerified` lines name the key and descriptor plates only, and state that no ms1 plate was read | restore "each plate was read back and matched" — R7's C-1, false on every full run |
-| **T19** | **P5(b) — provenance is recorded at the comparator**, not reconstructed downstream: a hand-typed ms1 divergence and a plate-derived mismatch reach the status map already distinguished | classify from `bundle.Verify`'s untyped error downstream — impossible by construction, which is the point |
-| **T16** | under `statusDisagreed` and `statusUnaccounted`, the scoping line (§4.7f) renders immediately after the status line; under the four non-adverse statuses it does **not** render | drop the condition and render it always, or never — the first cries wolf on a clean backup, the second is R6's I-1 |
-| **T15b** | `errVerifyLegHasNoPlate`, the `:719` foreign-or-garbled md1, and a hand-typed ms1 divergence each yield `PLATES UNACCOUNTED FOR` — **never** `DISAGREED` and **never** `DID NOT COMPLETE` | route any of them to either neighbour; the first is R5's C-1, the second its I-1 |
-| **T14** | the zero value of `verifyStatus` renders `NOT VERIFIED` | reorder the constants so `statusVerified` is 0 — the mutation that makes a forgotten assignment vouch |
 
-**T10, T12, T13a and T13b CANNOT RUN ON THE SINGLE-SIG PATH, and §5 put every
-test there (R3 I-3).** Single-sig has **no retry loop** — its verify is a one-shot
+**T23 AND T24 CANNOT RUN ON THE SINGLE-SIG PATH, and §5 put every test there
+(R3 I-3).** Single-sig has **no retry loop** — its verify is a one-shot
 `if sel == 0 { ... }` — so `failed → abandoned` and `incomplete → complete` are
-unreachable by construction. Those four rows must be driven on a **multisig**
+unreachable by construction. Those rows must be driven on a **multisig**
 flow, which is the only place a second attempt exists. Written as-is against
 `engraveSingleSigFlow` they would pass vacuously, never reaching the sequence
 they name — the exact vacuity §5.2 warns about for T5, one section later.
