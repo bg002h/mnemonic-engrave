@@ -10,7 +10,7 @@ re-open them; it turns them into normative behaviour and gates.
 | --- | --- |
 | `REQUIREMENTS_s6b_pre_flash_cycle.md` §1 | the four operator directives (R1–R7) |
 | `REQUIREMENTS_s6b_pre_flash_cycle.md` §2 | measured facts (§2.3/§2.4 **corrected** 2026-08-17) |
-| `REQUIREMENTS_s6b_pre_flash_cycle.md` §2bis | rulings **R-A … R-I** |
+| `REQUIREMENTS_s6b_pre_flash_cycle.md` §2bis | rulings **R-A … R-M** |
 | `PROPOSAL_s6b_q1_q3_q6.md` | Q1/Q3/Q6, approved |
 | `SPIKE_s6b_q2_results.md` | the executable measurements |
 
@@ -84,6 +84,26 @@ specific wallet on an artifact whose whole design posture
 (`gui/singlesig_engrave.go:17-19`) is that it never leaves owner-held steel.
 
 Add `cardMS1`-is-unmarked to GATE 1.3's assertion list.
+
+**MECHANISM — because C3's fold made this impossible as first written.** *(R0
+round 2, N2.)* C3 moved the marking to `bundleEngrave`, whose loop iterates
+**`bundlePlate`** — and `bundlePlate` (`gui/bundle_flow.go:346-353`) carries
+`cardIdx`, `cardTotal`, `plateIdx`, `plateTotal`, `str`, `label` and **no
+`kind`**. So a single-sig full-mode call had no way to except the ms1 plate from
+a title/footer passed uniformly to every plate in the call, and I3's original
+reachable case survived the fold that was supposed to close it.
+
+**The fix is one field.** `bundlePlatePlan` (`gui/bundle_flow.go:358-373`)
+already iterates the `bundleCard` — which **does** carry `kind`
+(`gui/bundle.go:33-38`, values `cardMK1`/`cardMD1`/`cardMS1`) — so:
+
+1. `bundlePlate` gains `kind bundleCardKind`, populated `kind: c.kind` in
+   `bundlePlatePlan`;
+2. `bundleEngrave` applies the title/footer only when
+   `p.kind != cardMS1`.
+
+No new abstraction, no data path invented: the fact is already in the struct one
+level up and is simply not copied through.
 
 ### 1.2a MEASURED — the title/footer budget on a `Text` plate is 25 characters
 
@@ -284,14 +304,25 @@ Both fingerprints are derived **back-to-back at `gui/singlesig.go:107`**, and
   **empty passphrase**, costing a **~31 s KDF** (`gui/gui.go:825`,
   `gui/gui.go:1653`, `gui/unlock_platelist.go:175`).
 
-> **REVISED by R-K, 2026-08-17.** This section previously required both
-> derivations at `:107` and **refused to defer**, on the ground that extending
-> the mnemonic's lifetime past `gui/singlesig.go:106`'s scrub point would weaken
-> a security property. **That refusal was never the operator's policy.** R-K
-> states the threat model: the device is offline, cannot write to flash, and is
-> disposable; **sealed payload is the security program, and the remaining
-> programs favour convenience over security.** Single-sig engrave is not the
-> sealed-payload program.
+> **CORRECTED TWICE. Read this before trusting anything about the scrub point.**
+>
+> **First revision (R-K):** this section originally required both derivations at
+> `:107` and refused to defer, calling it *"weakening a security property to buy
+> a plate legend"*. R-K established that was never the operator's policy —
+> sealed payload is the security program, the rest favour convenience.
+>
+> **Second correction (R0 round 2, N1) — and it shows the first was answering a
+> question that did not exist.** The premise was **false**. `gui/singlesig.go:106`
+> says the mnemonic is *"consumed for the LAST time here"* — that is about
+> **consumption, not scrubbing.** The actual scrub is a **`defer` at
+> `gui/singlesig.go:50`**, and the file's own header states it at `:31`:
+> *"returns (defer), after its last derivation consumer."*
+>
+> **So the mnemonic is alive until the function returns.** A later derivation
+> sees a live mnemonic and moves no scrub point. **R-K was not needed for R-J at
+> all** — the controller invoked a threat-model ruling to lift a constraint that
+> did not exist. R-K stands on its own as the recorded threat model; its
+> *application here* rested on a misread comment.
 
 **NORMATIVE (revised): derive the bare-seed fingerprint LAZILY** — only when the
 operator elects to engrave a passphrase plate. The ~31 s KDF is then paid by the
@@ -306,6 +337,35 @@ engraved.
 
 **R-K does not relax R-D.** Convenience-over-security is a ruling about
 *secret-lifetime hardening*. Every truthfulness gate in §6 stands unchanged.
+
+### 2.3e NORMATIVE — WHERE the offer goes (R0 round 2, N1)
+
+**R2's *"offer to engrave the passphrase"* had no call site anywhere in this
+spec, and none exists in the code** — `gui/singlesig.go` contains **zero**
+references to a passphrase-plate offer. That is C3's defect recurring in
+new text: a specified output owning no mechanism.
+
+**The offer is inserted in `singleSigEngraveFlow`, between the verify offer
+(`gui/singlesig.go:188-192`) and `restoreDocFlow` (`:221-223`).**
+
+Everything it needs is in scope there, verified:
+
+| needs | available |
+| --- | --- |
+| `passphrase` | yes — `:97`, and read at `:223` |
+| `masterFP` (the combined fingerprint) | yes — `:107` |
+| a live mnemonic for the lazy bare-seed derivation | yes — the scrub is a `defer` at `:50`, firing at **return** |
+
+**Why between those two, not elsewhere.** After the verify, so the operator is
+offered a passphrase plate only once the set it belongs to is known good.
+Before the restore document, because the document's inventory already takes
+`oneSeedPassphraseFact(passphrase != "")` (`:223`) — **so if a passphrase plate
+is cut, the inventory must be able to say so.**
+
+**GATE 2.3e:** the offer appears **only** when `passphrase != ""`, and the
+restore document's plate inventory reflects whether a passphrase plate was
+actually engraved. *(An inventory that omits a plate the run cut is the F-198
+class: paperwork disagreeing with the steel.)*
 
 The preloaded footer states the policy binding **and** the fingerprints'
 true provenance. 27 characters leaves 15 of headroom; the denser
@@ -653,7 +713,7 @@ is how a false-PASS gate is born.)*
 
 ## 6. GATES, COLLECTED
 
-Revised by R0 round 1. Changes marked **▲**.
+Revised by R0 round 1 (**▲**) and round 2 (**▲▲**).
 
 | # | gate |
 | --- | --- |
@@ -665,11 +725,14 @@ Revised by R0 round 1. Changes marked **▲**.
 | 2.3 | the typed footer and a policy id never co-occur |
 | **2.3b** ▲ | the footer does not claim derivation while `fingerprintEntryFlow` is on the path |
 | **2.3c** ▲ | the policy id **renders** — it is gated on a non-empty fingerprint, so it can vanish silently |
+| **2.3d** ▲▲ | the preloaded path presents **no** fingerprint-entry step, and the ~31 s derivation does not run when no passphrase plate is engraved |
+| **2.3e** ▲▲ | the offer appears only when `passphrase != ""`, and the restore doc's inventory reflects whether a passphrase plate was engraved |
 | **2.4a** ▲ | the three `mk.Card` sites set `Fingerprint` *(replaces the withdrawn unreachable-case gate)* |
 | **2.4b** ▲ | the engraved policy id **equals the `policy_id_stub` the mk1 this run cut carries**, on **both** forms — a value equality, not a label check |
 | 2.5 | the passphrase QR contains the passphrase and nothing else |
 | **3.1** ▲ | `:717`/`:727` behavioural non-loop; **`:854` by source assertion** — it is unreachable in-process, and the gate says which arm is which |
 | 3.2 | both F-204 arms — passphrase entered and not |
+| **3.2a** ▲▲ | R-M's multisig body passes §4's class check, and asserts no claim that a passphrase is required |
 | 3.3 | the ms1 clause at 1/1, **1 seed / 2 legs**, and 2/2 |
 | 4 | the sweep states its own coverage |
 | **5.1** ▲ | the **new** predicate agrees with actual visibility — **must be green** |
