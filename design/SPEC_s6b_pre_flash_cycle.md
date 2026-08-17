@@ -462,6 +462,39 @@ so:
 **GATE 3.2:** both arms tested. A single-arm test would ship a false lead to
 every operator who used no passphrase.
 
+### 3.2a NORMATIVE — the MULTISIG `provedInnocent` arm (R-M)
+
+**Added to scope by operator directive R-M.** `multisigVerifyNoSlotBody`'s
+`provedInnocent` arm (`gui/multisig_verify.go:157-170`) currently ends *"Your
+plates are fine. Try again and skip the passphrase."* The operator struck the
+skip advice and ruled that **the operator must be told this is not a
+passphrase-protected wallet**.
+
+**Replacement body, adopted:**
+
+```
+These plates match this seed with NO passphrase. This is not a
+passphrase-protected wallet. If you meant to use one, these plates are not that
+wallet: try the password again. If you continue without a passphrase, these
+plates are complete as they are.
+```
+
+**Why the obvious alternative is FORBIDDEN.** *"A passphrase will be necessary
+to use the key"* is **false** on this arm: `provedInnocent` fires precisely
+because the plates match the seed with **no** passphrase, so no passphrase is
+needed to use that key. Under **R-D** it may not be said.
+
+**Pre-gated, so the reviewer's budget goes elsewhere:** **251 characters**,
+every rune drawable in `constant.Font`, and **no em dash** — the last is a hard
+constraint, not a preference (`gui/multisig_build.go:735-739`: an em dash in a
+modal body meant *"the BODY DID NOT DRAW AT ALL"*).
+
+**GATE 3.2a:** this body passes §4's class check like any other long modal, and
+a test asserts the string contains no claim that a passphrase is required.
+
+**Scope note:** copy only — no control flow, no marking — so it does **not**
+cross R-B.
+
 **A THIRD ARM IS AVAILABLE, and the choice is recorded rather than inherited.**
 *(R0 round 1, M4.)* The multisig sibling has **three** arms
 (`gui/multisig_verify.go:157-170`), and the one this spec drops is the

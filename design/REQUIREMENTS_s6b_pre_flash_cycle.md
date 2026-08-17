@@ -639,6 +639,66 @@ The combined fingerprint stays free — it falls out of the existing derivation 
 Operator, 2026-08-17: *"check passphrase is great advice."* §3.2's F-204 fix
 stands, including its conditional second arm for the no-passphrase case.
 
+### R-M — the multisig `provedInnocent` arm must say it is NOT a passphrase-protected wallet
+
+Operator, 2026-08-17, in two parts. First:
+
+> "For multisig: the advice is good except the advice to skip. Tell them to try
+> the password again. If skip, warn passphrase will be necessary to use the key."
+
+Then, resolving the ambiguity the controller put back:
+
+> "Oh, the user should be told that this is not a passphrase protected wallet."
+
+**The second statement governs, and it resolves toward truth.** The controller
+had flagged that *"warn passphrase will be necessary to use the key"* would be
+**false** on this arm: `provedInnocent` fires precisely when the plates match
+the seed with **no** passphrase, so no passphrase is needed to use that key. The
+operator's clarification replaces a warning that would have been untrue with the
+fact that actually resolves the operator's confusion.
+
+**What the arm must convey:**
+
+1. **The plates are fine** — true; they match a real derivation.
+2. **This is NOT a passphrase-protected wallet** — the fact the operator needs,
+   and the one that explains why their passphrase did not match.
+3. **NOT "skip the passphrase"** — the advice the operator struck. It reads as a
+   procedural workaround and buries the finding.
+4. **NOT "a passphrase will be necessary"** — false on this arm.
+
+### ADOPTED WORDING — operator, 2026-08-17: *"b wording you suggested is great"*
+
+```
+These plates match this seed with NO passphrase. This is not a
+passphrase-protected wallet. If you meant to use one, these plates are not that
+wallet: try the password again. If you continue without a passphrase, these
+plates are complete as they are.
+```
+
+It carries all four requirements above: the plates are sound (*"complete as they
+are"*), it states outright that this is **not** a passphrase-protected wallet,
+it keeps the operator's *"try the password again"*, and it neither says "skip"
+nor claims a passphrase will be needed.
+
+**MEASURED, before it reaches a reviewer:**
+
+- **251 characters** — comfortably inside the class check's real range (F-185's
+  actual refusal was cut at ~500).
+- **Every rune drawable** in `constant.Font`, checked directly.
+- **NO EM DASH.** The controller's first draft of this sentence used one. That
+  is disqualifying, not stylistic: `gui/multisig_build.go:735-739` records that
+  an em dash in a modal body once meant *"the BODY DID NOT DRAW AT ALL"* —
+  4973 ink pixels against a 5482 px title-only frame, on the screen that is the
+  operator's last chance to stop. The colon replaces it.
+
+**This ADDS SCOPE to S6b.** `multisigVerifyNoSlotBody`
+(`gui/multisig_verify.go:157`) is shipped multisig verify copy and was not in
+§0's list. It is admitted because it sits on the same verify tail F-199 and
+F-206 already open, and because it is a **truth** fix under R-D. It is copy
+only — no control flow, no marking — so it does **not** cross R-B.
+
+**It is a long-modal body, so F-192's fit gate applies to it** (§4).
+
 ---
 
 ## THE DECISION PASS IS CLOSED
