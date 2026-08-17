@@ -51,13 +51,20 @@ Then **fold its answer yourself** — fable's value is judgement, not
 transcription. Reviewers now label each finding MECHANICAL or JUDGEMENT so the
 trigger does not depend on the controller's own classification.
 
-**Step 5. THE FIVE GATES.** Run all five on any plan edit:
+**Step 5. THE SIX GATES.** Run all six on any plan edit:
 
     ./scripts/verify-returnsite-sweep.sh <plan>   # every verdict return site is rowed
     ./scripts/plan-cite-check.sh        <plan>    # every path:line resolves
     ./scripts/plan-glyph-check.sh       <plan>    # strings the display font can draw
     ./scripts/plan-table-check.sh       <plan>    # no table row lost a cell
+    ./scripts/plan-wiring-check.sh      <plan>    # nothing declared and left unwired
     ./scripts/plan-fold-sweep.sh <plan> --terms '<superseded phrase>' ...
+
+**Every one prints what it does NOT cover, and two have DEMONSTRATED blind
+spots** — `verify-returnsite-sweep` sees multisig only until single-sig gains a
+verdict, and `plan-wiring-check` still passes a name mentioned in two sections
+that never reached the section the document calls its authority. **Read those
+lines; do not treat a green gate as a proof.**
 
 Each prints what it does **not** cover. **Never cache their numbers in prose** —
 that rotted twice; the commit message carries each fold's measured output.
@@ -124,7 +131,9 @@ prints even after the device says the plates do NOT match), **F-197**, **F-195**
 | R9 | adversarial | RED **5C** 4I |
 | R10 | **goal conformance** | RED 1C 1I + 3 filed |
 | R11-pre | cheap verify | DIRTY 6 stale, 1 structural |
-| R12 | closing adversarial | *see `ls -t design/agent-reports/s6a-r*.md`* |
+| R12 | closing adversarial | RED 1C 2I — **and §4.1–§4.6, G1's actual fix, audited fresh: CLEAN** |
+| R13 | sonnet verify + attack | RED **1C** 1I — a field declared and never wired |
+| R14 | sonnet verify + attack | RED 0C 3I — all propagation into authoritative tables |
 
 Every report is in `design/agent-reports/s6a-*`, each persisted **verbatim in its
 own commit BEFORE** the fold responding to it, so `git diff <report>..<fold>`
@@ -160,6 +169,21 @@ means something.
    goal-conformance were each first-time questions, and each found what
    re-running the others could not. **Stop when out of QUESTIONS, not when a
    round comes back clean.**
+
+## WHAT THE LAST FOUR ROUNDS MEAN
+
+**Since the four-state rewrite, no round has found a defect in the DESIGN** —
+every finding has been transcription: a field declared and not wired, a call-site
+list too short, a test scheduled to a step that cannot run it, a table the fold
+never reached. R12 additionally audited **§4.1–§4.6 — G1's actual fix — fresh,
+and found it CLEAN**, including driving the real document to prove a
+~310-character line renders complete on its own page.
+
+**So the remaining risk is the controller's accuracy, not the design's
+soundness.** That is why the cheap sonnet tier keeps paying and why the six gates
+exist. Two of them were written *because* a reviewer found a class the others
+could not see, and one of those has a demonstrated false negative that
+strengthening did **not** close — recorded in its header rather than papered over.
 
 ## THE DESIGN, IN ONE PARAGRAPH
 
