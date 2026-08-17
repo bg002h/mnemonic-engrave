@@ -111,9 +111,15 @@ be re-confirmed by the spec, since it is what keeps S6c a fork-native cycle.
 This is the spec's first design call, and it must precede any wording, because
 the length budget differs per mechanism.
 
+> **The "length rule" column of row 1 was CORRECTED 2026-08-17** — see §2.4. It
+> read *"`MaxTitleLen = 18`, SILENT truncation via `TitleString`"*, and
+> `TitleString` has no production callers; title and footer are engraved
+> **verbatim**, with the 18 cap enforced only as a **UI-layer hard reject** on
+> keyboard-entered text.
+
 | mechanism | carries | length rule | used by |
 | --- | --- | --- | --- |
-| `Fitted.Title` / `.Footer` (`backup/fit.go:117-121`) | title at plate row 0, footer at the last row, at the screw-hole rows | **`MaxTitleLen = 18`, SILENT truncation** via `TitleString` (`backup/backup.go:98`) | free-text plate, preview |
+| `Fitted.Title` / `.Footer` (`backup/fit.go:117-121`) | title at plate row 0, footer at the last row, at the screw-hole rows | **`MaxTitleLen = 18`, engraved VERBATIM.** Cap enforced only at the UI (`gui/freetext_flow.go:1174`, hard reject) on **keyboard-entered** text; the `backup` layer bounds nothing | free-text plate, preview |
 | `Seed.Title` / `SeedString.Title` (`backup/backup.go:17,27`) | a title | rendered `strings.ToUpper` at `:223`, `:311` | codex32 / seed-share plates |
 | the passphrase plate's own `topLines` / `bottomLines` banding | arbitrary bands | **no 18-char cap** — its footer is 32 chars | `backup/passphrase.go` |
 | `Text.Paragraphs` | paragraphs only — **no title, no footer** | n/a | **`mk1` and `md1`**, via `validateMdmk` (`gui/gui.go`) |
@@ -122,10 +128,52 @@ the length budget differs per mechanism.
 therefore require either giving `Text` a title/footer band or routing those
 plates through a mechanism that has one. That choice is S6c's first gate.
 
-### 2.4 The 18-character cap is a real trap, and truncation is silent
+### 2.4 The 18-character cap is real — but truncation is NOT how it bites
 
-`TitleString` (`backup/backup.go:98-110`) stops at exactly `MaxTitleLen = 18`
-and **also silently drops any rune the face cannot decode**.
+> **CORRECTED 2026-08-17** by `design/agent-reports/s6b-plate-mechanism-facts.md`,
+> re-verified by the controller. **The original text of this section was wrong,
+> and it was wrong in the direction that matters** — it described a hazard that
+> cannot occur and missed the one that can. It is corrected in place; the
+> superseded claims are named below so a reader who saw them can recognise them.
+>
+> **WRONG: "truncation is silent, via `TitleString`."** `TitleString` has **zero
+> production callers anywhere in the repository** — 13 hits, every one a
+> definition, a doc comment, or a test. The code says so outright:
+> `backup/freetext.go:14` — *"f.Title and f.Footer are engraved VERBATIM —
+> never through TitleString"*. Titles are **never truncated**, anywhere.
+>
+> **WRONG: `COMB FP: FC60 C6DF` (18, "fits EXACTLY AT THE CAP").** That string
+> does not exist in the source. The emitted line is `"EXPECTED COMB FP: "` +
+> grouped fingerprint = **27 characters** (`backup/passphrase.go:180`), and it
+> sits in the passphrase plate's band, which has no cap at all.
+>
+> **RIGHT, and it is a different hazard.** The 18 limit is enforced in exactly
+> one place — the **UI input layer**, as a **hard reject** that names the limit
+> and the overrun (`gui/freetext_flow.go:1174`). That check guards
+> **keyboard-entered free text only**. Nothing in the `backup` package bounds
+> `Fitted.Title`/`Fitted.Footer` at all: `fitBlocksAt`, `FitSized` and
+> `EngraveFitted` never compare a title's length to anything, so an over-long
+> title reaching the render layer is **neither rejected nor truncated — it is
+> engraved**, and its ink can run into a screw-hole band.
+>
+> **So for a DEVICE-GENERATED title — which is exactly what R3 and R4 are —
+> there is no check at any layer.** The one existing precedent proves the point:
+> `gui/slip39_polish.go:492` builds a title with `fmt.Sprintf` and justifies its
+> length in a **comment** — `// max "32767 #16/16" = 12 <= MaxTitleLen 18` — a
+> human-verified bound, not a checked one.
+>
+> **§2.4's conclusion therefore SURVIVES for a better reason:** the gate must be
+> **a test asserting the budget**, because nothing else in the system will. What
+> changes is the failure mode it protects against — not a silently shortened
+> string, but ink in a screw hole.
+
+Why 18 is the number: row 0 and the last row are **screw-hole rows**, and the
+cap is what keeps their ink clear of the holes — *"measured at every rung by
+TestTitleCapFitsAtEveryRung"* (`backup/freetext.go:14-19`).
+
+**The superseded description of `TitleString` follows, for reference only. It is
+dead code as far as production is concerned.** It stops at exactly
+`MaxTitleLen = 18` and **also silently drops any rune the face cannot decode**.
 
     19  PASSPHRASE REQUIRED   -> TRUNCATES to 'PASSPHRASE REQUIRE'
     17  PASSPHRASE NEEDED        fits
