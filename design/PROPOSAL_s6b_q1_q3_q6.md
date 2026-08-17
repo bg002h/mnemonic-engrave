@@ -143,8 +143,76 @@ budget and off the plate with no refusal. `topLines` already holds up to two
 needs either `bottomLines`, or a decision about which line it displaces —
 **this is a real constraint, and it needs the Q2 spike to settle.**
 
-**Open for the operator:** does "key-id" mean the master fingerprint? If it
-means something else, this table is wrong and Q3 reopens.
+### SETTLED 2026-08-17 against the PRIMARY Rust implementation
+
+Operator: *"Key-Id: send an agent to look at mk repo code."* Done —
+`mnemonic-key` at `8dc5dcbf31947762a354d165ca2350ddbb15ba28` (clean), crate
+`mk-codec`, the provenance pin the Go port records. Report:
+`design/agent-reports/s6b-mk-key-identifier-facts.md`, persisted in `6d0de2d`.
+
+**`mk1` defines no "key id" / "kid" concept at all** — not in `crates/mk-codec`,
+not in `design/SPEC_mk_v0_1.md`, not in the BIP draft. Zero hits. The Go port
+agrees; no Rust-vs-Go disagreement. **The proposal above is confirmed:** the
+only per-key identifier an `mk1` carries is the master fingerprint
+(`origin_fingerprint`), so that is what "key-id" can mean.
+
+### One phrase in the research needed correcting, and it matters for funds
+
+The report's summary says `origin_fingerprint` is *"the BIP-32 master/seed
+fingerprint, **not a passphrase-combined value**"*. **That is right about the
+field's definition and wrong about its value**, and taking it literally would
+put the wrong fingerprint on steel.
+
+The Rust doc comment (`mnemonic-key/crates/mk-codec/src/key_card.rs:36-37`)
+reads:
+
+> *"Master-key fingerprint identifying the seed from which `xpub` was derived.
+> Verbatim from BIP 380 origin notation `[fp/...]`."*
+
+Under BIP-39, **a passphrase changes the master key**, so the master fingerprint
+of a passphrase-derived wallet *is* what this device calls `CombinedFP`. Two
+independent confirmations:
+
+- `deriveAccountXpub(m bip39.Mnemonic, passphrase string, …) (xpub string, masterFP uint32, err error)`
+  (`gui/derive.go:19`) — `masterFP` comes out of a derivation that **takes the
+  passphrase**.
+- §2.1's own measurement: bare seed → `73c5da0a`, same seed + passphrase →
+  `fc60c6df`, and both `mk1` and `md1` differ between them.
+
+**So: `origin_fingerprint` = `CombinedFP` when a passphrase was used, `SeedFP`
+when not.** That is precisely why both sit on the passphrase plate, and it is
+the mechanism §2.1 says R4 exploits — restoring the words alone yields a
+fingerprint that does **not** match what the key and descriptor plates encode,
+which is what makes a wrong-wallet restore self-diagnosing instead of silent.
+
+### Two constraints the research surfaced, for the spec
+
+1. **`origin_fingerprint` is OPTIONAL.** It is `Option<Fingerprint>`, omitted
+   when bytecode-header bit 2 is unset — *"the privacy-preserving mode"*
+   (`mnemonic-key/crates/mk-codec/src/key_card.rs:15-18` and `:38-39`). **An
+   `mk1` may carry no fingerprint at all**, in which case a plate asserting a
+   key-id has nothing on the card to bind to. The spec must say what the marking
+   does in that case; under **R-D** it may not assert a binding that does not
+   exist.
+2. **The policy stub is FORM-AWARE, so "wallet policy id" is not one thing.**
+   Per `mnemonic-key/crates/mk-codec/src/key_card.rs:25-32`, each stub is the
+   top 4 bytes of *either* the **`WalletPolicyId`** (keyed wallet-policy `md1`)
+   *or* the key-stable **`WalletDescriptorTemplateId`** (keyless template
+   `md1`). A label reading "wallet policy id" would be false on the template
+   form. The spec must either choose a label true of both, or distinguish them.
+
+> **GATE BLIND SPOT — read this before trusting the citation gate on this
+> document.** `./scripts/plan-cite-check.sh` resolves paths under this repo and
+> the `seedhammer` fork only. It does **not** reach `mnemonic-key`, and it
+> reports an unreachable path as `DANGLING  … (no such file under any root)` —
+> **indistinguishable from a wrong citation.** The **three**
+> `mnemonic-key/crates/mk-codec/src/key_card.rs` citations above (`:15-18`,
+> `:25-32`, `:36-37`, plus the `:38-39` range named inline) were therefore
+> **verified by hand** against `8dc5dcbf31947762a354d165ca2350ddbb15ba28`, and
+> every range was corrected by one line in the process — the first draft's
+> ranges were all off by one. A green gate on this file does not cover them,
+> and the gate's own output for them is `dangling: 3`, which is **expected
+> here and must not be "fixed"** by deleting the citations.
 
 ---
 

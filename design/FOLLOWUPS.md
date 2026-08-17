@@ -7441,12 +7441,35 @@ measured exactly this divergence: `maxScroll = 19 > 0`, i.e. the widget believed
 a line was hidden, **while nothing was actually cut off**. Wiring an arrow to
 that predicate today would show it on a screen with nothing below the fold.
 
-**So the order is forced, not chosen:**
+**REVISED by operator ruling R-E, 2026-08-17 — the clip mask is NOT restored in
+S6b.** The original three-step order below assumed it would be. It is kept
+because the *dependency* it records is still true; what changed is that step 2
+now happens **after** this cycle, which forces a compromise into step 3.
 
-1. **F-192's fit sweep** — the authored copy fits.
-2. **Make the geometry honest** — restore the real clip mask, which is safe only
-   once (1) holds, per F-95's ordering hazard.
-3. **Then the conditional arrow** — `maxScroll > 0` now means what it says.
+1. **F-192's fit sweep** — the authored copy fits. **In S6b.**
+2. ~~**Make the geometry honest** — restore the real clip mask~~ — **DEFERRED
+   past S6b (R-E).** Restoring it would start enforcing a clip nothing enforces
+   today, silently deleting text that currently draws.
+3. **The conditional arrow — in S6b, but it CANNOT use `maxScroll > 0`.**
+
+**Why step 3 is harder than it looks now.** With the mask stubbed,
+`maxScroll = bodysz.Y - (bodyClip.Dy() - 2*scrollFadeDist)` (`gui/gui.go:409`)
+reserves 32 px of fade margin that is never drawn as fade, and the body is not
+clipped to `bodyClip` at all (F-95 measured it drawing to y=317 against
+`bodyClip.Max.Y = 314`, in a 320-px panel). **So content can satisfy
+`maxScroll > 0` while being entirely visible**, and an arrow keyed to it would
+appear with nothing below the fold — a false statement by the UI, in the
+opposite direction, which R-D forbids just as firmly.
+
+**So the predicate must be defined against what is ACTUALLY VISIBLE (the panel),
+not against `bodyClip`, for as long as the mask stays stubbed** — and it is
+therefore **coupled to R-E**: whatever S6b writes must be revisited when the
+mask is restored. Say so in a comment that names R-E, or it becomes exactly the
+kind of stale safety argument this project has been bitten by before.
+
+**S6b owes a test that the two agree:** `maxScroll > 0` on a screen where
+nothing is actually hidden is a **finding**, not a rounding error. That test is
+the cheapest guard on the divergence R-E deliberately leaves in place.
 
 ### Open question the spec must answer
 

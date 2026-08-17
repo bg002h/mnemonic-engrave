@@ -374,11 +374,57 @@ correct *because the operator typed the fingerprints there*. On the preloaded
 path the device derived them, which puts that plate in the same category as
 `mk1`/`md1` — plates that may legitimately vouch for their own fingerprints.
 
+### R-E — `fadeClip`'s clip mask is NOT restored in S6b
+
+Operator, 2026-08-17, accepting the controller's recommendation.
+
+**What stays broken on purpose.** `fadeClip` (`gui/gui.go:763`) remains the
+no-op stub `return o.Offset(image.Pt(0, 0))`, with the real alpha mask
+(`gui/gui.go:768-777`) left commented out.
+
+**Why.** Restoring it would *start* enforcing a clip that nothing enforces
+today, silently deleting text that currently draws — F-95 measured that exact
+case, a 19-pixel window holding *"the encrypted part has been REMOVED. Do not
+continue."* Doing that to safety screens immediately before an irreversible
+flash trades a latent problem for a live one, and it buys nothing the arrows do
+not buy better: an arrow is a clearer cue than a gradient.
+
+### THE CONSEQUENCE R-E FORCES ON F-208, stated because it complicates the same recommendation
+
+**With the mask stubbed, `maxScroll > 0` is NOT a sound visibility predicate,
+so the arrow cannot simply be wired to it.**
+
+`maxScroll = bodysz.Y - (bodyClip.Dy() - 2*scrollFadeDist)` (`gui/gui.go:409`)
+reserves **32 px** of fade margin that is not being rendered as fade, and the
+body is not clipped to `bodyClip` at all — F-95 measured it drawing to y=317
+against `bodyClip.Max.Y = 314`, inside a 320-px panel. So content can satisfy
+`maxScroll > 0` while being **entirely visible**, and an arrow keyed to it would
+appear with nothing below the fold. Under **R-D** that is a false statement by
+the UI, in the other direction.
+
+**So the spec must define the arrow's predicate against what is ACTUALLY
+VISIBLE** — the panel, not `bodyClip` — for as long as the mask stays stubbed,
+and must state the predicate it chose. Two consequences:
+
+1. The predicate is **coupled to R-E** and changes when the mask is restored.
+   Whatever S6b writes must be revisited by the honest-geometry work, and should
+   say so in a comment naming R-E, or it becomes a stale safety argument of the
+   kind this project has been bitten by.
+2. **S6b owes a test that the two agree**: if `maxScroll > 0` on a screen where
+   nothing is actually hidden, that is a **finding**, not a rounding error. This
+   is the cheapest possible guard on the divergence R-E chooses to leave in
+   place.
+
+**Restoring the mask is filed with the honest-geometry work, after F-192 closes
+— not in S6b.**
+
 ### Still open after this pass
 
-- **§3 Q1, Q2, Q3, Q6** — unchanged, and Q2 is a measurement, not a decision.
-- **Whether to restore `fadeClip`'s real clip mask in S6b** (see F-192/F-208).
-  Put to the operator, not yet ruled.
+- **§3 Q1, Q6** — proposed in `design/PROPOSAL_s6b_q1_q3_q6.md`, awaiting
+  approval.
+- **§3 Q2** — a measurement, not a decision. Still the gating spike.
+- **§3 Q3** — the "key-id" question is out for research against the primary
+  Rust `mk` implementation (`mnemonic-key/crates/mk-codec`).
 
 ---
 
