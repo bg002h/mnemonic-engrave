@@ -962,7 +962,7 @@ tests cannot drive a record at all.
 | pass, no adverse | `statusVerified` | *generated from the pass record* — clauses **A**, then **B** or **B2**, then **C** if it applies, in that order; names exactly the comparisons this mode ran and states what was not read |
 | pass, adverse | `statusVerifiedOnRetry` | the same generated pass line, plus clause **D** |
 | no pass, adverse | `statusCheckDidNotPass` | `A verification check ran and did not pass: a comparison did not match, or a plate could not be read or accounted for. Do NOT rely on this backup until a full check passes. Check again with every plate this run engraved; if this repeats, engrave a fresh set.` |
-| no pass, no adverse | `statusNotFullyChecked` | `These plates were not fully checked. Confirm they restore this wallet (master fingerprint below) before relying on this backup.` |
+| no pass, no adverse | `statusNotFullyChecked` | `These plates were not fully checked. Confirm they restore this wallet before relying on this backup.` |
 
 **THE GENERATED PASS LINE, CLAUSE BY CLAUSE.** Emitted in this order, joined by a
 single space; every one is ASCII and draws in the body face:
@@ -974,6 +974,19 @@ single space; every one is ASCII and draws in the body face:
 | **B2** | `No secret seed share was read back or compared.` | iff **not** `rec.pass.full` — the watch-only counterpart, stating what was *not* read |
 | **C** | `Other cosigners' keys are taken as supplied.` | iff `rec.pass.suppliedCosigners > 0` |
 | **D** | `An earlier check did not pass; a later full check passed.` | iff the status is `statusVerifiedOnRetry` |
+
+**THE ZERO-CELL LINE NAMES NO ARTIFACT ON THE PAGE, and an earlier draft did.**
+It said *"(master fingerprint below)"* — true of the single-sig document
+(`gui/singlesig_restore.go:107` prints `Master fp: %08x`) and **false of both
+multisig documents**, which carry a policy, a descriptor and addresses and no
+fingerprint. §4.7c wrote that sentence while reasoning about single-sig; **step 4
+then placed the one constant on all three flows, and that is where it stopped
+being true.** On the modal Skip path of two of three flows, the only actionable
+instruction on the page pointed at something absent — found by the whole-diff
+review (I-1), because **no test could: every assertion about that line checks the
+line, and the defect was in the relationship between the line and the rest of the
+page.** The invariant, now enforced by the constant's own comment: **any artifact
+this line names must exist on ALL THREE documents.**
 
 **§4.7c IS THE SOLE AUTHORITY FOR WHAT THE BUILDER PRINTS, and it must therefore
 carry every clause.** An earlier fold added the cosigner clause to a separate
