@@ -1,10 +1,68 @@
-# Continuity — 2026-08-16c: S6a is at its R0 gate. NO CODE EXISTS YET, and that is correct.
+# Continuity — 2026-08-16c: S6a's R0 gate is **CLOSED — GREEN at R17**. Implementation may begin.
 
 Supersedes `CONTINUITY_2026-08-16b.md`. Read this one.
 
 ---
 
-## ▶ START HERE — the first thing to do in a fresh session
+## ▶▶ THE GATE IS CLOSED — READ THIS BEFORE THE START-HERE BELOW
+
+**R17 returned GREEN, 0 Critical / 0 Important** (`design/agent-reports/s6a-r17-closing-fold-verify.md`).
+**The R0 loop is CLOSED. Do NOT run another review round for reassurance** — that
+is the explicit rule, and seventeen rounds is where it applies hardest.
+
+**What rounds 15–17 were, and what they say about where the risk now is:**
+
+| round | lens | result |
+| --- | --- | --- |
+| R15 | sonnet verify + attack | RED 0C/1I — in the *controller's own* fold |
+| R16 | sonnet fold verify | RED 0C/1I — in the *controller's own* added paragraph |
+| R17 | sonnet closing fold verify | **GREEN 0C/0I** + 1 Nit, fixed at `b324023` |
+
+**Both R15 and R16 findings were in text the controller wrote on its own
+initiative, not in anything a reviewer asked for.** No round has found a *design*
+defect since the four-state rewrite. R16's was a real **G2** violation — the
+controller had called all ten non-success single-sig returns "adverse", which
+would have printed *"A verification check ran and did not pass"* after a benign
+exit that never read a plate. §4.7b classifies the byte-identical multisig site
+**benign**; that precedent now binds single-sig in the plan.
+
+**So: the plan is not the fragile artifact. Edits to it are.** Anything written
+during implementation re-earns the gate the same way.
+
+### ▶ NEXT ACTION: implement
+
+Worktree `/scratch/code/shibboleth/wt-s6a`, branch `s6a-singlesig-truth` (empty,
+ready). **ONE implementer subagent, TDD, UC OFF** — executing a GREEN plan is
+transcription, and parallel attempts produce reconciliation work, not coverage.
+Follow §4.8's nine-step build order.
+
+**STEP 1 IS A GATE, NOT A TASK.** It produces **two** artifacts, reviewed
+*together* before step 2 and before any other code:
+
+1. the single-sig **eleven-exit → `verifyRecord` mapping** — 11 exits = 10
+   `return`s (lines 69, 78, 90, 98, 112, 117, 125, 130, 138, 146) **plus the
+   implicit fall-through at `gui/singlesig_verify.go:149`, which is the ONLY
+   success exit and is not a `return`**. An implementer told "write the record at
+   each return site" writes ten adverse records and never writes the pass record.
+2. the **`suppliedCosigners` expression**.
+
+**§4.8 now states what a reviewer checks each against** — it did not, and a gate
+with unstated acceptance criteria passes anything. Each mapping row names which
+of `verifyRecord`'s two booleans the exit writes (or **NEITHER**, the right
+answer for a benign exit), carries §4.7b's adverse/benign bit, and names **no**
+`verifyStatus` value: the status is derived once, downstream, by §4.7a's switch.
+
+**Measured, so do not re-derive:** single-sig has exactly **one** call site
+(`gui/singlesig.go:132`) — no stub, no `singleSigVerifyFn` indirection, no test
+callers — unlike multisig's twelve-plus-stub. `statusVerifiedOnRetry` is the one
+state unreachable from inside the eleven exits (no retry loop;
+`gui/singlesig.go:131` is a one-shot `if`).
+
+Then: whole-diff adversarial execution review → merge → push.
+
+---
+
+## ▶ START HERE — for a fresh session while the loop was still OPEN (historical)
 
 **Step 1. Read the goals**, which govern what counts as a defect:
 
@@ -76,9 +134,24 @@ lines; do not treat a green gate as a proof.**
 Each prints what it does **not** cover. **Never cache their numbers in prose** —
 that rotted twice; the commit message carries each fold's measured output.
 
-**Step 5b. WHAT THE OUTGOING CONTROLLER IS UNSURE OF** — put these in the next
-review brief. They are doubts about the R14 fold specifically, and they are
-written down because they would otherwise die with the context that held them:
+**Step 5b. WHAT THE OUTGOING CONTROLLER WAS UNSURE OF — ALL FOUR ARE NOW
+RESOLVED.** Kept because the resolutions are load-bearing, not because they are
+still open:
+
+1. **RESOLVED — fixed.** §4.8 now states acceptance criteria for both step-1
+   artifacts (commit `4f40f1f`, corrected by R15/R16 at `4c40973`/`6a2198f`).
+2. **RESOLVED — measured, and it was a trap.** The write site exists, but the
+   only success exit is the **fall-through** at `gui/singlesig_verify.go:149`,
+   not a `return`. Now stated in the plan.
+3. **RESOLVED — measured.** Single-sig has exactly **one** call site
+   (`gui/singlesig.go:132`), no stub, no indirection, no test callers.
+4. **RESOLVED — R15 Part 3.** T27 is genuinely schedulable at step 7, and step 7
+   is its **only** valid slot. R15 also filed T27's non-vacuity risk, folded at
+   `4c40973`: the self-multisig fixture yields `open == 0`
+   (`gui/multisig_build.go:96`) hence `suppliedCosigners == 0`, on which T27
+   passes while asserting nothing. Name or build the fixture at step 7.
+
+The original wording of the four doubts follows, for the record:
 
 1. **Is build-order step 1 specified well enough to be REVIEWABLE?** It now
    carries two artifacts — the single-sig eleven-exit → `verifyRecord` mapping,
@@ -163,6 +236,9 @@ prints even after the device says the plates do NOT match), **F-197**, **F-195**
 | R12 | closing adversarial | RED 1C 2I — **and §4.1–§4.6, G1's actual fix, audited fresh: CLEAN** |
 | R13 | sonnet verify + attack | RED **1C** 1I — a field declared and never wired |
 | R14 | sonnet verify + attack | RED 0C 3I — all propagation into authoritative tables |
+| R15 | sonnet verify + attack | RED 0C 1I — **in the controller's own fold** |
+| R16 | sonnet fold verify | RED 0C 1I — **in the controller's own paragraph; a real G2 violation** |
+| R17 | sonnet closing fold verify | **GREEN 0C 0I** — the R0 loop CLOSES |
 
 Every report is in `design/agent-reports/s6a-*`, each persisted **verbatim in its
 own commit BEFORE** the fold responding to it, so `git diff <report>..<fold>`
@@ -240,11 +316,20 @@ pinning it — untouched.
 
 ## WHAT IS NEXT
 
-1. **R4 verdict.** Clean → the loop CLOSES (do not re-loop for reassurance).
-2. **Implement**, in `wt-s6a`, one implementer, TDD, following §4.8's **nine-step
-   build order**. Step 1 is a gate, not a task: the single-sig 11-exit → status
-   mapping, reviewed before any other code.
-3. Whole-diff adversarial review → merge → push.
+1. ~~R0 review loop.~~ **DONE — GREEN at R17.** Do not re-loop for reassurance.
+2. **Implement**, in `wt-s6a`, one implementer, TDD, **UC OFF**, following §4.8's
+   **nine-step build order**. Step 1 is a gate, not a task: **both** step-1
+   artifacts — the single-sig 11-exit → `verifyRecord` mapping (**including the
+   fall-through at `gui/singlesig_verify.go:149`**) and the `suppliedCosigners`
+   expression — reviewed together, against §4.8's stated acceptance criteria,
+   before any other code.
+3. Whole-diff adversarial execution review → merge → push.
+
+**Reviewer tiering, as of 2026-08-16: sonnet for mechanical/fold verification,
+opus for design-level adversarial AND for the final pre-irreversible review.
+`fable` is no longer a reviewer tier at any stage** (user directive; the old
+carve-out reserving it for the pre-flash gate is closed — see `CLAUDE.md` and the
+escalation rule in step 4 above).
 
 Then **S6b**, the single compressed pre-flash cycle (operator directive
 "compress", 3 cycles → 2): F-199, F-204, and the passphrase plate — see
