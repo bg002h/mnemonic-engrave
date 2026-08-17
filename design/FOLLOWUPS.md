@@ -6939,15 +6939,37 @@ The operator's opening instinct was an affordance:
 > "I think we need the down arrow available on screen everywhere there is a need
 > to scroll down"
 
-**It was ruled out on a measured hardware constraint, and the measurement is the
-part worth keeping.** `cmd/controller/platform_sh2.go` emits `gui.PointerEvent`
-**exclusively** (its only two event constructions, both inside `processTouch`)
-and carries **zero** references to directional buttons. `Warning.Layout`'s scroll
-handler reads `ButtonFilter(Up)` / `ButtonFilter(Down)`, so **it is dead code on
-the real machine** — the body is unscrollable on an SH2. A down arrow would name
-an action the device cannot perform, on the screens that exist to stop an
-operator losing funds. **An affordance for an impossible action is worse than no
-affordance.**
+**CORRECTED 2026-08-17, same day, before any work started.** The first version of
+this entry claimed the SH2 *cannot* scroll and that an arrow would promise an
+impossible action. **That was wrong, and the error was mine (the controller's),
+not the operator's.** What is true is narrower and the distinction is the whole
+point:
+
+- `cmd/controller/platform_sh2.go` emits `gui.PointerEvent` **exclusively** (its
+  only two event constructions, both inside `processTouch`) and carries **zero**
+  references to directional buttons. There are no *physical* arrow keys.
+- **But directional input is synthesised from touch.** `Clickable.Next`
+  (`gui/widget.go:48`) routes `ctx.Router.Next(ButtonFilter(c.Button),
+  ButtonFilter(c.AltButton), PointerFilter(c))` at `gui/widget.go:70`, and
+  carries press-and-hold auto-repeat written specifically for
+  `case Up, Down, Right, Left`. So a `Clickable` bound to a direction **is**
+  reachable by touch.
+- **It already ships.** The StartScreen pager is `prevBtn := &Clickable{Button:
+  Left}` / `nextBtn := &Clickable{Button: Right}` (`gui/gui.go:1931-1932`), with
+  the code stating it binds arrows this way to keep the button path working
+  "while making them touchable".
+
+**So the real defect is that `Warning.Layout` never wired itself up.** It reads
+bare `w.inp.Next(ctx, ButtonFilter(Up), ButtonFilter(Down))` — filters with **no
+`Clickable` and no drawn hit area** — so nothing can deliver those events on an
+SH2. The handler is dead *as written*, not dead *in principle*.
+
+**Why the ruling below still stands anyway.** Fit-first is right on its own
+merits: a modal that fits needs no affordance, the sweep is the prerequisite for
+ever restoring `fadeClip` (see below), and it does not add input handling to
+safety screens immediately before an irreversible flash. But it is a
+**sequencing** call, not a capability limit — and F-208 is correspondingly
+cheaper than first written.
 
 So the S6b remedy is **the fit-gate sweep as filed**: guarantee every long modal
 fits, so nothing is ever below the fold and no affordance is needed. The
@@ -7298,7 +7320,7 @@ about it. Filed so the behaviour is written down rather than rediscovered — th
 question worth answering later is whether a card the device cannot classify
 should be an adverse observation rather than a non-event.
 
-### F-208 — a long modal has NO affordance saying more text exists, and the SH2 cannot scroll to it anyway (owning phase: **post-flash** — operator ruling 2026-08-17, deliberately NOT in S6b) `#seedhammer`
+### F-208 — a long modal has NO affordance saying more text exists, and `Warning` never wired its scroll to anything touchable (owning phase: **post-flash** — operator ruling 2026-08-17, deliberately NOT in S6b) `#seedhammer`
 
 Filed 2026-08-17 on an operator directive:
 
@@ -7312,13 +7334,27 @@ facts, in the order that matters:
    `gui/assets/arrow-down.alpha.png` ships as `assets.ArrowDown`
    (`gui/assets/embed.go:13`) and has **zero** usages outside its own
    declaration. So do `arrow-up`, `arrow-left`, `arrow-right`.
-2. **The machine has no scroll input.** `cmd/controller/platform_sh2.go` emits
-   `gui.PointerEvent` exclusively and references no directional button.
-   `Warning.Layout` (`gui/gui.go:380`) scrolls only on
-   `ButtonFilter(Up)`/`ButtonFilter(Down)` — dead code on real hardware.
-3. **So the arrow cannot come first.** Drawing it before scrolling exists
-   promises the operator an action the device cannot perform, on warning screens
-   whose whole purpose is to stop a funds-losing mistake.
+2. **The machine has no PHYSICAL directional buttons, but it can still scroll.**
+   `cmd/controller/platform_sh2.go` emits `gui.PointerEvent` exclusively and
+   references no directional button — yet `Clickable.Next` (`gui/widget.go:48`)
+   routes `PointerFilter(c)` alongside its button filters (`gui/widget.go:70`)
+   and carries press-and-hold auto-repeat for `case Up, Down, Right, Left`.
+   Directional input is **synthesised from touch by a drawn hit area**.
+3. **The precedent already ships.** The StartScreen pager is
+   `&Clickable{Button: Left}` / `&Clickable{Button: Right}`
+   (`gui/gui.go:1931-1932`), touch-driven today.
+4. **So the actual gap is wiring, not capability.** `Warning.Layout`
+   (`gui/gui.go:380`) reads bare `ButtonFilter(Up)`/`ButtonFilter(Down)` with no
+   `Clickable` and no drawn target, so nothing can deliver those events. The
+   work is: give `Warning` two `Clickable`s bound to `Up`/`Down`, draw them with
+   the `ArrowDown` asset, and the existing repeat logic supplies held-scroll.
+   **No gesture handling is required.**
+
+**A correction is recorded here deliberately.** This entry first claimed the SH2
+*could not* scroll and that an arrow would promise an impossible action. That was
+a controller error, corrected the same day before any work began, and it is left
+visible rather than quietly rewritten because it changed the framing the operator
+ruled against — the ruling was re-offered on the corrected facts.
 
 **Ordering is the whole content of this follow-up.** Touch scrolling first, then
 the arrow, and neither before the F-192 fit sweep has closed — because
