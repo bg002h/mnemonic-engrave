@@ -587,6 +587,58 @@ while the mnemonic is legitimately alive; the scrub point does not move.
 The ~31 s lands during engrave setup — not on a failure screen, and small
 against a plate that takes roughly twenty minutes to cut.
 
+### R-K — THE THREAT MODEL, stated. Sealed payload is the security program; the rest favour convenience
+
+Operator, 2026-08-17, verbatim, answering the spec's refusal to extend the
+mnemonic's lifetime:
+
+> "yes, please weaken the security properties. The device is offline, can't
+> write to flash, and the computerized portion is even somewhat
+> disposable…sealed payload is our security program, the remaining programs are
+> to favor convenience over security."
+
+**This is far larger than S6b and is recorded at this level deliberately.** It
+is the threat model the whole device has been reasoned about without ever being
+written down, and its absence is why the spec reached for a refusal
+(*"weakening a security property to buy a plate legend"*) that was never the
+operator's policy.
+
+**What it authorises.** In the **non-sealed-payload** programs, secret-lifetime
+hardening is **not** a blocking concern, and convenience wins where the two
+trade off. The premises are stated so they can be re-checked rather than
+assumed: the device is **offline**, it **cannot write to flash**, and the
+computerised portion is **disposable**.
+
+**What it does NOT authorise, and the boundary is the whole point.** The
+**sealed-payload** program remains the security program. Its properties are
+**not** relaxed by this ruling. A change that touches sealed-payload secret
+handling is out of scope for R-K and needs its own decision.
+
+**Nor does it relax R-D.** Convenience over security is a ruling about
+*secret-lifetime hardening*. It says nothing about truthfulness: *"all things
+said must be true"* is unaffected, and a plate or screen may still not claim
+what did not happen.
+
+### R-K's consequence for R-J — the constraint is lifted, and a better design opens
+
+R-J's *"must happen at `gui/singlesig.go:107`"* rested on the scrub point being
+inviolable. **Under R-K it is not.** So the seed-fingerprint derivation may be
+**deferred**, and should be:
+
+**Derive the bare-seed fingerprint LAZILY — only if the operator chooses to
+engrave a passphrase plate.** The ~31 s KDF is then paid only by runs that
+actually want it, instead of by every single-sig engrave. That is strictly
+better for the operator, and it is only available because R-K lifted the
+constraint.
+
+The combined fingerprint stays free — it falls out of the existing derivation at
+`:107` regardless.
+
+### R-L — the single-sig failed-verify copy is approved as specified
+
+Operator, 2026-08-17: *"check passphrase is great advice."* §3.2's F-204 fix
+stands, including its conditional second arm for the no-passphrase case.
+
 ---
 
 ## THE DECISION PASS IS CLOSED

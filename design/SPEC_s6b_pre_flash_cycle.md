@@ -284,13 +284,28 @@ Both fingerprints are derived **back-to-back at `gui/singlesig.go:107`**, and
   **empty passphrase**, costing a **~31 s KDF** (`gui/gui.go:825`,
   `gui/gui.go:1653`, `gui/unlock_platelist.go:175`).
 
-**It may not be deferred.** `gui/singlesig.go:106` states *"The mnemonic is
-consumed for the LAST time here."* Deriving later would extend the mnemonic's
-lifetime past its scrub point — **weakening a security property to buy a plate
-legend**, which is refused.
+> **REVISED by R-K, 2026-08-17.** This section previously required both
+> derivations at `:107` and **refused to defer**, on the ground that extending
+> the mnemonic's lifetime past `gui/singlesig.go:106`'s scrub point would weaken
+> a security property. **That refusal was never the operator's policy.** R-K
+> states the threat model: the device is offline, cannot write to flash, and is
+> disposable; **sealed payload is the security program, and the remaining
+> programs favour convenience over security.** Single-sig engrave is not the
+> sealed-payload program.
 
-**GATE 2.3d:** assert the mnemonic's scrub point has **not moved**, and that the
-preloaded path presents **no** fingerprint-entry step.
+**NORMATIVE (revised): derive the bare-seed fingerprint LAZILY** — only when the
+operator elects to engrave a passphrase plate. The ~31 s KDF is then paid by the
+runs that want it, rather than by every single-sig engrave.
+
+The **combined** fingerprint stays free either way: it falls out of the existing
+derivation at `:107`.
+
+**GATE 2.3d (revised):** the preloaded path presents **no** fingerprint-entry
+step, and the ~31 s derivation does **not** run when no passphrase plate is
+engraved.
+
+**R-K does not relax R-D.** Convenience-over-security is a ruling about
+*secret-lifetime hardening*. Every truthfulness gate in §6 stands unchanged.
 
 The preloaded footer states the policy binding **and** the fingerprints'
 true provenance. 27 characters leaves 15 of headroom; the denser
