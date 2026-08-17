@@ -39,17 +39,24 @@ default**, even when correct.
   4. Dispatch the **cheap sonnet claim-verification pass** before any expensive
      round. It has found something every single time.
   5. **If the round returned a Critical, or an Important the reviewer labelled
-     JUDGEMENT → dispatch a FABLE BLIND-SPOT PASS before folding** (see Step 4).
+     JUDGEMENT → dispatch an OPUS BLIND-SPOT PASS before folding** (see Step 4).
 
 **Step 4. THE ESCALATION RULE** (agreed 2026-08-16). On a Critical, or a
-JUDGEMENT-labelled Important, ask fable ONE question before folding:
+JUDGEMENT-labelled Important, ask **opus** ONE question before folding:
 
 > *Here is the design and the properties it claims. What failure mode do they
 > collectively fail to constrain?*
 
-Then **fold its answer yourself** — fable's value is judgement, not
-transcription. Reviewers now label each finding MECHANICAL or JUDGEMENT so the
+Then **fold its answer yourself** — the escalation buys judgement, not
+transcription. Reviewers label each finding MECHANICAL or JUDGEMENT so the
 trigger does not depend on the controller's own classification.
+
+**The escalation target is OPUS, not fable** (user directive, 2026-08-16: *"we
+will not use fable for final review"*, *"we will use sonnet for the next review
+of mechanical fold"*). This closed the last carve-out that reserved fable for a
+single pre-irreversible gate. **Opus is now the top of the ladder — including
+for the final review before the hardware flash.** Sonnet keeps the mechanical
+and fold-verification rounds, which is where this cycle's findings actually live.
 
 **Step 5. THE SIX GATES.** Run all six on any plan edit:
 
