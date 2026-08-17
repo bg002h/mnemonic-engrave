@@ -857,6 +857,33 @@ a return type: **that is what makes build-order step 1 possible at all**, since
 P5(a) requires the record be written where the facts are in scope, and single-sig
 has eleven such sites.
 
+**MEASURED, because "eleven exits" hid a trap that would have cost the one exit
+that matters.** Counted in the code, not quoted from an earlier draft:
+
+    $ awk 'NR>=65 && NR<=149 && /return/{print NR}' gui/singlesig_verify.go
+    69 78 90 98 112 117 125 130 138 146          # ten explicit returns
+    149: }                                        # the ELEVENTH exit
+
+**Ten of the eleven are `return` statements; the eleventh — the only success
+exit — is the implicit fall-through at `gui/singlesig_verify.go:149`, reached
+after the verify-OK notice at `:148`.** An implementer told to "write the record
+at each return site" writes ten adverse records and **never writes the pass
+record at all**, leaving `fullPassRecorded` false on a clean single-sig verify:
+the document would say *not fully checked* on a run that fully checked. The
+write for the success case goes **before the closing brace**, and step 1's
+mapping table must carry the fall-through as a row like any other.
+
+**Single-sig's arity change has exactly ONE call site — not multisig's twelve.**
+Measured, since the call-site list was short twice running on the multisig side:
+
+    $ grep -rn 'singleSigVerifyFlow(' --include='*.go' .
+    gui/singlesig_verify.go:65     func singleSigVerifyFlow(...)   # the declaration
+    gui/singlesig.go:132           singleSigVerifyFlow(ctx, th, full, template)
+
+No stub, no `singleSigVerifyFn` indirection, no test call sites — so unlike
+`multisigVerifyFlow` (§5.1), step 1's signature change touches one caller and no
+source assertions.
+
 **`suppliedCosigners` MUST BE WRITTEN, READ AND TESTED — declaring it is not
 wiring it (R13 C-1).** The previous fold added the field and did nothing else
 with it: it appeared three times in this document, all inside its own
@@ -1042,10 +1069,18 @@ second is the serious one:
 | 8 | Correct the three false comments (§4.7c) + T8 | independent; deliberately last so it cannot mask a behavioural regression |
 | 9 | Update `SPEC_seedhammer_T6a_singlesig_flagship.md` (§3.1.7), **in its own commit** | the spec follows the behaviour, and is not mixed with it |
 
-**Step 1 is a gate, not a task.** It produces a table of eleven rows, it is
-reviewed before step 2 begins, and it is the one place this plan deliberately
-delegates a decision — so it does not get made silently inside an
-implementation.
+**Step 1 is a gate, not a task.** It produces **two** artifacts — a table of
+eleven rows *and* the `suppliedCosigners` expression — **both** reviewed before
+step 2 begins, and it is the one place this plan deliberately delegates a
+decision, so it does not get made silently inside an implementation.
+
+**What the reviewer of step 1 checks, since a gate with unstated acceptance
+criteria passes anything:**
+
+| artifact | accepted when |
+| --- | --- |
+| (a) the eleven-exit mapping | every one of `singleSigVerifyFlow`'s exits appears exactly once — **including the fall-through at `gui/singlesig_verify.go:149`, which is the only success exit and is not a `return`** (§4.7b-seam); each maps to one of the four `verifyStatus` values; **no exit maps to a pass state on a path the device did not observe passing** (G2); the row count equals the exit count measured in the code, not quoted from here |
+| (b) the `suppliedCosigners` expression | it is computable from names in scope at `gui/multisig_verify.go:987`; it is 0 on every single-sig path; it counts policy keys **not** covered by a verified leg, so it can never under-report what went unchecked (G2's direction of failure) |
 
 ### 4.9 The spec update — what it says, and how it is checked (R3 I-8)
 
