@@ -345,7 +345,7 @@ spec, and none exists in the code** — `gui/singlesig.go` contains **zero**
 references to a passphrase-plate offer. That is C3's defect recurring in
 new text: a specified output owning no mechanism.
 
-**The offer is inserted in `singleSigEngraveFlow`, between the verify offer
+**The offer is inserted in `engraveSingleSigFlow`, between the verify offer
 (`gui/singlesig.go:188-192`) and `restoreDocFlow` (`:221-223`).**
 
 Everything it needs is in scope there, verified:
