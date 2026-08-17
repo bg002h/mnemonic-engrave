@@ -96,6 +96,26 @@ taxonomy.
 
 If neither, it belongs on a screen or nowhere.
 
+### THE GUARD THAT KEEPS NG1 OUT — a non-goal only holds if it is enforced
+
+**NG1 did not arrive by decision. It arrived by review**, one reasonable-sounding
+increment at a time, and every increment was individually defensible. Reviewers
+propose precision; that is their job. So a stated non-goal is worthless without a
+rule for what to do when the next finding proposes crossing it:
+
+> **A finding that would expand what the document reports about the device's
+> epistemic state is OUT OF SCOPE BY DEFAULT.** It is recorded and filed. Acting
+> on it requires re-opening §0.1 and changing the goals **explicitly**, with the
+> operator, before any design work -- never inside a fold.
+
+**This applies to findings that are CORRECT.** NG1's increments were all correct;
+that is exactly why they were folded. Correctness is not the test — *goal
+membership* is. A reviewer who shows the document could say something truer about
+what the device knows has demonstrated something true and out of scope.
+
+**Symmetrically, a finding against G1 or G2 gates as normal.** The non-goal
+narrows what counts as a defect; it does not lower the bar on what remains.
+
 ### The lens that was never run
 
 Nine rounds applied adversarial, executability, test-falsifiability,
@@ -791,6 +811,33 @@ distinction that lived only inside it, and that P5(b) could not reach, turns out
 to be a distinction **nothing consumes**. There is no sub-classification within
 adverse.
 
+#### 4.7b-seam HOW THE TWO BITS REACH THE DOCUMENT (R9 I-3 — this was unowned)
+
+Both booleans are written **inside** the verify flow and read **after** it, so
+something must carry them across. **The verdict return is NOT that thing** — it
+is a verdict, and §4.7a reads no verdict.
+
+    type verifyRecord struct {
+        fullPass bool   // written AT the success return, with `full` in scope,
+                        // carrying WHICH comparisons ran and matched in this mode
+        adverse  bool   // sticky; written at any adverse site per 4.7b
+    }
+
+    // The flow gains ONE out-parameter and keeps its verdict return unchanged:
+    func multisigVerifyFlow(..., rec *verifyRecord) multisigVerifyResult
+
+**Why an out-parameter rather than a wider return.** Changing the verdict's type
+or arity breaks the three shipped tests above, including a source assertion —
+for no benefit, since the callers do not need a richer verdict. An out-parameter
+adds a seam without disturbing one. The same shape applies to
+`singleSigVerifyFlow`, which is `void` today and gains the parameter rather than
+a return type: **that is what makes build-order step 1 possible at all**, since
+P5(a) requires the record be written where the facts are in scope, and single-sig
+has eleven such sites.
+
+**The test seam `multisigVerifyFn` gains the parameter too**, or the flow-level
+tests cannot drive a record at all.
+
 #### 4.7c THE FOUR LINES
 
     type verifyStatus int
@@ -1028,20 +1075,13 @@ still compare whole strings. Every status assertion compares the **entire string
 against the §4.7d table, which also makes a reworded line a deliberate test
 update rather than a silent pass.
 
-**THREE shipped tests pin the retry-loop condition, and §5.1 named none (R5
-I-2).** The `verifyMismatch` split changes that condition, so all three must be
-updated **in the same commit** or the atomic 5+6+7 landing is red:
-
-| test | what it pins |
-| --- | --- |
-| `gui/multisig_verify_report_test.go:166` | the flow returns `verifyFailed` so the caller can re-offer |
-| `gui/multisig_verify_report_test.go:759` | same, second site |
-| `gui/multisig_verify_report_test.go:1093` | the loop condition's **source text**, `res != verifyIncomplete && res != verifyFailed` |
-
-The third is the dangerous one: it is a **source assertion**, so it fails the
-moment the condition gains `&& res != verifyMismatch`, and the obvious repair —
-relaxing the string — is exactly the weakening §5.1 forbids. It must be updated
-to the new condition verbatim, not loosened.
+**THE RETRY-LOOP CONDITION IS NOT CHANGED, AND THE THREE SHIPPED TESTS THAT PIN
+IT NEED NO UPDATE.** An earlier design added `&& res != verifyMismatch` to the
+condition, which broke `gui/multisig_verify_report_test.go:166`, `:759` and —
+worst — `:1093`, a **source assertion** on the condition's own text. The
+four-state design (§4.7) reads **no verdict at all**, so the condition stays
+byte-identical and all three tests keep passing untouched. This is a real
+simplification the four-state rewrite bought and the fold nearly missed.
 
 **T9–T14 must pin a PRODUCTION CALL SITE, not just the pure functions (R2 I-3).**
 Round 1's C-2 was that the Critical had no test; round 1 answered it with tests
