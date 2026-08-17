@@ -825,6 +825,20 @@ is a verdict, and §4.7a reads no verdict.
     type passRecord struct {
         full bool   // the MODE, captured AT the success return where it is in scope
         legs int    // how many key plates were compared -- gui/multisig_verify.go:986
+        // THE PATH AXIS (R12 C-1). Without it, single-sig Full and one-slot
+        // multisig Full both record {true, 1} -- and their truthful lines
+        // DIFFER: every multisig notice ends "Other cosigners' keys are taken as
+        // supplied" (gui/multisig_verify.go:32, :1053, :1059, :1062) and
+        // single-sig's deliberately does not, a split
+        // TestMultisigVerifyNoticeIsHonest (gui/multisig_verify_test.go:171)
+        // pins. Including the clause misdescribes a single-sig wallet (G1);
+        // omitting it is an unscoped claim on the multisig document (G2).
+        //
+        // A COUNT, NOT A FLOW ENUM, because P5(a) wants a RECORDED FACT rather
+        // than an identifier the line builder must interpret: the clause renders
+        // iff suppliedCosigners > 0, and single-sig records 0 because it has
+        // none. Nothing infers the path; the path is what was counted.
+        suppliedCosigners int
     }
     type verifyRecord struct {
         pass    *passRecord  // nil until the success return writes it
@@ -995,12 +1009,12 @@ second is the serious one:
 | # | step | why here |
 | --- | --- | --- |
 | 1 | **Write the single-sig exit → `verifyStatus` mapping** (§4.7c) and get it reviewed | eleven exits, and every later step depends on it. Nothing else starts until it is agreed. |
-| 2 | `verifyRecord` + `passRecord` + `buildVerifyStatusLine` + **T20, T21, T22, T26** | pure functions over a record, no callers yet. **T23, T24 and T25 do NOT land here** — they need a rendered document and a multisig retry, so they move to step 7 |
+| 2 | `verifyRecord` + `passRecord` + `buildVerifyStatusLine` + **T21, T22, T26** | pure functions over a record, no callers yet. **T20 does NOT land here either** (R12 I-2): its *exactly-one-line-on-all-three-rendered-documents* half needs call sites that do not exist until step 7, and §5 says pure-function assertions do not satisfy it. T23, T24, T25 likewise need a rendered document and a multisig retry |
 | 3 | `seedCapacity` + the two-axis ruling + `buildSeedInventoryLines` (§4.3, §4.4), updating the six existing call sites | shared census; still no flow changes |
 | 4 | `restoreDocFlow` and `multisigRestoreDocFlow` gain `status` + `extra` (§4.2, §4.7b), **all three call sites** | signature change; the tree must stay green across it |
 | 5 | Wire single-sig: label (§4.1), inventory, census (§4.6), abort gate (§4.5) | the F-198/F-195/F-197/F-202 body of work |
-| 6 | Update the three walks that the census screen stops (§5.1b) | must accompany step 5, not follow it |
-| 7 | Wire the verify status into all three flows, plus T11, T23, T24, T25 | needs 2, 4 and 5 in place. **T9/T13a/T13b need a rendered document and a multisig retry loop**, neither of which exists at step 2 |
+| 6 | Update the three walks that the census screen stops (§5.1b), **plus T7c** | must accompany step 5, not follow it. **T7c belongs here** (R12 I-2): it drives each of the three flows to its restore document and asserts the seed-handling clause matches that path's capacity — §8.4 calls it required and no earlier draft scheduled it to any step |
+| 7 | Wire the verify status into all three flows, plus **T11, T20, T23, T24, T25** — and update the **four source assertions** pinning the `multisigVerifyFn` call (§5.1) in this same commit | needs 2, 4 and 5 in place. **T20 lands here, not at step 2**, because its assertion is on the *rendered document* of all three flows. An earlier draft justified this step with T9/T13a/T13b, tests that **exist nowhere in this plan** |
 | 8 | Correct the three false comments (§4.7c) + T8 | independent; deliberately last so it cannot mask a behavioural regression |
 | 9 | Update `SPEC_seedhammer_T6a_singlesig_flagship.md` (§3.1.7), **in its own commit** | the spec follows the behaviour, and is not mixed with it |
 
@@ -1123,8 +1137,24 @@ IT NEED NO UPDATE.** An earlier design added `&& res != verifyMismatch` to the
 condition, which broke `gui/multisig_verify_report_test.go:166`, `:759` and —
 worst — `:1093`, a **source assertion** on the condition's own text. The
 four-state design (§4.7) reads **no verdict at all**, so the condition stays
-byte-identical and all three tests keep passing untouched. This is a real
-simplification the four-state rewrite bought and the fold nearly missed.
+byte-identical.
+
+**BUT "the tests keep passing untouched" WAS TRUE OF THE CONDITION AND FALSE OF
+THE CALL (R12 I-1).** Four source assertions pin the *call site* —
+`multisigVerifyFn(ctx, th, full, engravedSlots, <x>Md1)` — **including the
+closing paren**, so step 7's `&rec` argument breaks every one:
+
+| test | pins |
+| --- | --- |
+| `gui/multisig_verify_report_test.go:1079` | the supply-path call, verbatim |
+| `gui/multisig_verify_report_test.go:1081` | the build-path call, verbatim |
+| `gui/multisig_verify_flow_test.go:373` | the build-path call, verbatim |
+| `gui/multisig_verify_flow_test.go:394` | the supply-path call, verbatim |
+
+**All four must be updated in step 7's commit, to the new call verbatim — not
+loosened**, plus the `multisigVerifyFn` stub assignment those tests set. Relaxing
+any of them to a substring is the weakening §5.1 forbids. The retry-loop
+*condition* tests (`:166`, `:759`, `:1093`) genuinely are untouched.
 
 **EVERY ONE OF THE THREE PRODUCTION DOCUMENT FLOWS IS PINNED — not "at least
 two" (R10 I-1).** Round 1's C-2 was that the Critical had no test; the answer
