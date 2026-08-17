@@ -32,15 +32,32 @@
 #   * It only sees `return verify*` in the files it scans. A verdict produced by
 #     assignment, or in a file not listed, is invisible.
 #   * It cannot see paths that reach the document WITHOUT a verdict.
-#   * IT COVERS MULTISIG ONLY, TODAY, AND ITS CLEAN RESULT SAYS SO ONLY HERE.
-#     singleSigVerifyFlow's ELEVEN exits are structurally invisible to it: that
-#     function is still `void` and returns no verdict, so `return verify*` matches
-#     nothing in gui/singlesig_verify.go. A clean 15/0 therefore covers HALF the
-#     surface this plan changes. Once single-sig gains a verdict type (build-order
-#     step 1), those exits become visible and the count must jump -- if it does
-#     not, this script has stopped seeing them and is lying by omission.
+#   * IT COVERS MULTISIG ONLY -- PERMANENTLY, NOT "TODAY". singleSigVerifyFlow's
+#     ELEVEN exits are structurally invisible to it, and always will be. A clean
+#     15/0 therefore covers HALF the surface this plan changes.
+#
+#     AN EARLIER VERSION OF THIS NOTE SET A TRIPWIRE THAT CAN NEVER FIRE, and it
+#     is corrected here rather than quietly deleted. It said: "Once single-sig
+#     gains a verdict type (build-order step 1), those exits become visible and
+#     the count must jump -- if it does not, this script has stopped seeing them
+#     and is lying by omission." Single-sig never gains a verdict type. Section
+#     4.7b-seam gives it an OUT-PARAMETER instead, precisely so the verdict return
+#     and the three shipped tests pinning it stay untouched. Measured after step 7:
+#
+#         func singleSigVerifyFlow(ctx *Context, th *Colors, full, template bool,
+#                                  rec *verifyRecord)          # still void
+#         grep -c 'return verify' gui/singlesig_verify.go  ->  0
+#
+#     So the count does NOT jump, that is CORRECT, and a future reader acting on
+#     the old note would have gone hunting for a bug in this script that does not
+#     exist. The blind spot is permanent and needs a DIFFERENT instrument: one
+#     that checks which of verifyRecord's booleans each exit WRITES, not what it
+#     returns. Step 1's mapping table (design/S6A_STEP1_EXIT_MAPPING.md) is that
+#     artifact, and it was reviewed by hand because no script covers it.
+#
 #     A gate that reports clean while seeing half its surface is the exact failure
-#     this cycle has already named twice.
+#     this cycle has already named twice -- and a gate whose own scope note has
+#     gone stale is the third variant of it.
 #   * A site can be listed in the plan for an unrelated reason and still count as
 #     covered here. Mention is a weak signal; it is simply a much better one than
 #     nothing, which is what preceded it.
@@ -83,8 +100,12 @@ done
 echo
 echo "─── verdict return sites: $total ; unrowed in the plan: $missing"
 if ! grep -qE 'return[[:space:]]+verify[A-Z]' "$FORK/gui/singlesig_verify.go" 2>/dev/null; then
-  echo "─── SCOPE WARNING: single-sig contributed ZERO sites. singleSigVerifyFlow"
-  echo "─── is still void, so this run covers MULTISIG ONLY -- half the surface."
+  echo "─── SCOPE WARNING: single-sig contributed ZERO sites, and this is PERMANENT."
+  echo "─── singleSigVerifyFlow takes an OUT-PARAMETER and returns no verdict, so it"
+  echo "─── is invisible to a return-site sweep BY DESIGN (4.7b-seam) -- this count"
+  echo "─── will never rise. This run covers MULTISIG ONLY: half the surface."
+  echo "─── Single-sig's eleven exits are covered by S6A_STEP1_EXIT_MAPPING.md,"
+  echo "─── which was reviewed by hand because no script checks record WRITES."
 fi
 echo "─── NOT covered: whether each row's WORLD-SET is right (a human judgement,"
 echo "─── and R7 found a wrong one on a site that WAS cited); verdicts produced by"
