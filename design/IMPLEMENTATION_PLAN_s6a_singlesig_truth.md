@@ -935,21 +935,52 @@ tests cannot drive a record at all.
 
 | cell | status | line (verbatim, ASCII only) |
 | --- | --- | --- |
-| pass, no adverse | `statusVerified` | *generated from the pass record* — names exactly the comparisons this mode ran, states what was not read, **and appends `Other cosigners' keys are taken as supplied.` iff `rec.pass.suppliedCosigners > 0`** |
-| pass, adverse | `statusVerifiedOnRetry` | the generated pass line **including the cosigner clause on the same condition**, plus `An earlier check did not pass; a later full check passed.` |
+| pass, no adverse | `statusVerified` | *generated from the pass record* — clauses **A**, then **B** or **B2**, then **C** if it applies, in that order; names exactly the comparisons this mode ran and states what was not read |
+| pass, adverse | `statusVerifiedOnRetry` | the same generated pass line, plus clause **D** |
 | no pass, adverse | `statusCheckDidNotPass` | `A verification check ran and did not pass: a comparison did not match, or a plate could not be read or accounted for. Do NOT rely on this backup until a full check passes. Check again with every plate this run engraved; if this repeats, engrave a fresh set.` |
 | no pass, no adverse | `statusNotFullyChecked` | `These plates were not fully checked. Confirm they restore this wallet (master fingerprint below) before relying on this backup.` |
+
+**THE GENERATED PASS LINE, CLAUSE BY CLAUSE.** Emitted in this order, joined by a
+single space; every one is ASCII and draws in the body face:
+
+| # | clause | condition |
+| --- | --- | --- |
+| **A** | `<N> key plate was read back and matched what this run engraved.` — `plate`/`plates` and `was`/`were` both agree with `N`, so it never reads *"1 key plates"* | always; `N` is `rec.pass.legs` |
+| **B** | `The ms1 secret you typed matched this seed.` | iff `rec.pass.full` |
+| **B2** | `No secret seed share was read back or compared.` | iff **not** `rec.pass.full` — the watch-only counterpart, stating what was *not* read |
+| **C** | `Other cosigners' keys are taken as supplied.` | iff `rec.pass.suppliedCosigners > 0` |
+| **D** | `An earlier check did not pass; a later full check passed.` | iff the status is `statusVerifiedOnRetry` |
 
 **§4.7c IS THE SOLE AUTHORITY FOR WHAT THE BUILDER PRINTS, and it must therefore
 carry every clause.** An earlier fold added the cosigner clause to a separate
 obligation table and left this one unchanged (R14 I-3) — so the document's own
 stated authority did not know about it. Any future clause lands **here first**.
 
+**The clause table above was added after step 2, because §4.7c did not in fact
+carry the text it claims sole authority over.** It specified a *generation rule*
+and named only clauses C and D verbatim, so A, B and B2 — over half the printed
+characters of a pass line — were **authored during implementation rather than
+transcribed from here**. Seventeen review rounds did not see it; **one attempt to
+implement against it did, immediately.** A plan is a hypothesis until something
+executes it, and this is the second time this cycle that trying a thing beat
+reading it (the first was a walk gate that could never have run).
+
 **THE PASS LINE IS GENERATED, NOT A LITERAL — this is what closes R9's C-1.**
 `buildVerifyStatusLine` takes the **record**, whose `pass` field carries the mode. On a
-full run it names the key and descriptor plates AND the typed-ms1 comparison; on
+full run it names the key plates AND the typed-ms1 comparison; on
 watch-only it names only what watch-only actually compares, and **the ms1 clause
-is absent because the record does not contain it.** A mode-blind literal is what
+is absent because the record does not contain it.**
+
+**THERE IS DELIBERATELY NO DESCRIPTOR-PLATE CLAUSE, and an earlier draft of this
+paragraph promised one.** The read-back md1 *is* compared — but `passRecord`
+carries no field recording that, and **P6 deletes a clause no observation names.**
+Adding the field was considered and rejected on §0.1's rule: omitting the mention
+neither misdescribes what was engraved (G1) nor claims a check that did not run
+(G2), so the omission is *safe under both goals*, while adding it would expand
+what the document reports about the device's own activity — **out of scope by
+default, even though the comparison is real.** Naming the promise here and
+killing it is the point: it is exactly the increment that, taken one reasonable
+step at a time, became NG1. A mode-blind literal is what
 claimed "the ms1 you typed matched this seed" on a run where no ms1 is typed —
 the bug `multisigVerifyOKMessage` had already found and fixed, in all four of its
 arms, before this plan re-committed it.
