@@ -358,6 +358,23 @@ exited 0 — *a 0-scanned pass is not a clean pass*. Check such docs directly.
     nix develop --command go test ./... -count=1        # baseline: EXIT=0, stderr empty
     nix develop --command ./cmd/emu/build.sh            # go test does NOT build the emulator
 
+**SCOPE WITH `-run` WHILE ITERATING — the full suite is a PHASE GATE, not a
+per-edit check** (user directive 2026-08-16, "run them quickly as per our defined
+method"). Measured here, wall clock:
+
+| invocation | wall |
+| --- | --- |
+| `go test ./gui/ -run 'Name1\|Name2' -count=1` | **6 s** |
+| `go test ./gui/ -count=1` | **282 s** |
+| `go test ./... -count=1` | **249 s** (warm cache) |
+
+**Narrowing `./...` to `./gui/` buys NOTHING** — `gui` *is* essentially the whole
+suite cost (281 s of its 282 s is test time, not build). **The `-run` filter is
+the entire lever, worth ~47x.** About 6 s of any scoped run is `nix develop`
+startup, so batch alternations into one invocation rather than running them
+singly. Run the full suite once per phase gate, with **stdout and stderr in
+separate files**.
+
 Bare `go` is not on PATH — "command not found" proves nothing. `go vet` needs a
 **COLD** `GOCACHE`; **exit 1 with 40 test-only findings IS the clean baseline**.
 Separate stderr from stdout: nix prints `Git tree is dirty` on stderr and a
