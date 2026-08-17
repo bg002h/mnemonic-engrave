@@ -383,7 +383,35 @@ hence the plate, hence the goldens, in a way a speed change does not.
 
 `B2a-i` · `B2a-ii` · `B2b` · `B2c` · **`post-merge polish and hardening`** ·
 `before the release tag` · `the fable whole-diff review of ALL of Phase 2` ·
-`post-release feature`
+`post-release feature` · **`key & password custody refinement`**
+
+**`key & password custody refinement`** was created by operator ruling
+2026-08-17, in the operator's own framing:
+
+> "let's make further refinement of verifying user has keys and passwords for
+> any or all keys a separate polish phase"
+
+**What it holds:** the general problem of confirming the operator actually
+possesses every key and every password a set depends on — as opposed to S6b's
+narrower job, which is stopping a *single-sig* artifact from vouching for a
+wallet it cannot restore.
+
+- **F-205** — `backupWalletFlow` and `deriveXpubFlow` engrave passphrase-bound
+  artifacts and say nothing about the missing factor (moved here 2026-08-17 from
+  "none yet — needs a scoping decision")
+- **the multisig marking** — §3 Q5 of `REQUIREMENTS_s6b_pre_flash_cycle.md`.
+  Same defect as the single-sig marking, more plates, and it multiplies across
+  cosigners, which is what makes it a phase rather than a follow-on.
+
+**It does NOT gate the hardware flash.** S6b closes the single-sig path; this
+phase generalises it afterwards.
+
+**Consequence for S6b's design, recorded here because it is easy to violate
+accidentally:** `validateMdmk` is a four-call-site chokepoint and one of those
+callers is `gui/derive_xpub.go:494` — **F-205's own flow**. So marking placed
+unconditionally inside `validateMdmk` would close part of F-205 as a side
+effect, crossing this phase boundary without anyone deciding to. The marking
+must therefore be **conditioned**, not merely located.
 
 **`post-merge polish and hardening`** was created by operator ruling 2026-08-10
 to hold work that binds but does not gate the merge. It now holds two groups:
@@ -7280,7 +7308,7 @@ and F-191 already established that the "a keystroke must not be reported as a
 wrong wallet" family is its own line of work. It rides with F-199 in S6b because
 both are single-screen verify-flow copy decisions on the same tail.
 
-### F-205 — `backupWalletFlow` and `deriveXpubFlow` engrave passphrase-bound artifacts and say nothing about the missing factor (owning phase: **none yet — needs a scoping decision; NOT gating the hardware flash**) `#seedhammer`
+### F-205 — `backupWalletFlow` and `deriveXpubFlow` engrave passphrase-bound artifacts and say nothing about the missing factor (owning phase: **`key & password custody refinement`** — operator ruling 2026-08-17; NOT gating the hardware flash) `#seedhammer`
 
 Filed 2026-08-16 by the S6a R0 adversarial review (N-1), FILE-not-fix.
 

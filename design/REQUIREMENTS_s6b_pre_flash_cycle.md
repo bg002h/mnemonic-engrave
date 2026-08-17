@@ -193,6 +193,89 @@ which of the two is the "key-id" the operator means.
 
 ---
 
+## 2bis. OPERATOR RULINGS — 2026-08-17, verbatim
+
+Given in the decision pass, after §3's questions were put. Recorded word for word;
+a paraphrase of a decision is a decision lost.
+
+### R-A — watch-only sets are NOT marked (answers §3 Q4)
+
+> "no"
+
+**So the marking predicate is "the set contains a seed."** That is a clean,
+testable condition rather than a per-flow list.
+
+**Stated consequence, so it is chosen rather than discovered:** a watch-only set
+that *was* passphrase-derived carries no passphrase mark. That is tolerable
+because a watch-only set **already disclaims the thing that would make the
+omission dangerous** — F-195 shipped `"Seed: this set contains NO seed. It is
+watch-only"` (`gui/multisig_build_census.go:208`), so the set never claims to
+restore a wallet in the first place. F-198's defect was an artifact *vouching*
+for restorability it did not have; a watch-only set makes no such claim.
+
+### R-B — the multisig marking moves to a new phase (answers §3 Q5)
+
+> "let's make further refinement of verifying user has keys and passwords for
+> any or all keys a separate polish phase"
+
+Phase created: **`key & password custody refinement`** (see `FOLLOWUPS.md`,
+"Phases used in this file"). It takes §3 Q5 **and F-205**. It does **not** gate
+the hardware flash.
+
+**S6b's marking is therefore SINGLE-SIG ONLY**, and that constrains a design
+call §3 Q1 does not mention: `validateMdmk` has four call sites, one of which is
+`gui/derive_xpub.go:494` — F-205's flow, now owned by the new phase. Marking
+placed unconditionally at that chokepoint would cross the phase boundary by
+accident. **The marking must be conditioned, not merely located.**
+
+### R-C — R2 is the existing passphrase program, preloaded
+
+> "passphrase program gets run with passphrase preloaded"
+
+So R2 is **not** a new offer flow. The device runs the existing dedicated
+passphrase-plate program with the passphrase already in hand, rather than asking
+the operator to re-type it. This is a reuse ruling, and the machinery is already
+shaped for it: `engravePassphraseFlowFrom(ctx, th, body []byte, src syswSource)`
+(`gui/passphrase_flow.go:617`) already takes a body **and a provenance**.
+
+**Why re-typing is not the safer option here, stated because the instinct says
+otherwise:** the preloaded passphrase is the one the device *actually derived
+with*, so the plate records the passphrase belonging to the wallet that was
+engraved. If the operator mistyped at entry, they derived a different wallet —
+and the plate correctly records the passphrase for *that* wallet. Re-typing
+would introduce a second chance to disagree, not a check.
+
+**Three questions R-C opens, which the spec must answer:**
+
+1. **Which `syswSource`?** The enum is `srcTyped` / `srcNFC` / `srcPayload`
+   (`gui/sysw_admit.go:55-58`). None means "carried from this session's own
+   derivation". Reuse `srcTyped`, or add a value?
+2. **Does `passphraseFooter` still tell the truth?** It is the fixed string
+   `"FINGERPRINTS TYPED, NOT VERIFIED"` (`backup/passphrase.go:156`). In the
+   preloaded case the device **derived** those fingerprints itself, so the
+   footer asserts a provenance that did not happen. §2.5 already flags this
+   asymmetry in the opposite direction. It under-claims rather than
+   over-claims — the F-206 direction, so likely not gating — but it is an
+   affirmative false statement about provenance, not a mere omission.
+3. **Does the acceptance screen run?** `syswSourceAccept`
+   (`gui/sysw_source.go:113`) is the screen shown when a record *enters* a flow,
+   and it names the source. Preloading enters a record without the operator
+   presenting it.
+
+**§7.4 adjacency, to be stated and dismissed in the spec rather than left
+hanging:** §7.4 forbids the session cache answering a *verification* prompt,
+because verify would then compare the engrave source against itself. R-C
+preloads an *engrave* input, not a verification input, so §7.4 does not bind —
+but the spec must say so explicitly, because the shapes rhyme.
+
+### Still open after this pass
+
+- **§3 Q1, Q2, Q3, Q6** — unchanged, and Q2 is a measurement, not a decision.
+- **Whether to restore `fadeClip`'s real clip mask in S6b** (see F-192/F-208).
+  Put to the operator, not yet ruled.
+
+---
+
 ## 3. OPEN QUESTIONS FOR THE SPEC — not answered here
 
 1. **Which plate-text mechanism** do `mk1`/`md1` move to (§2.3)? Everything else
