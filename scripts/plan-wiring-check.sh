@@ -27,9 +27,22 @@
 #
 # ─── WHAT THIS DOES NOT COVER ────────────────────────────────────────────────
 #   * It proves a name is MENTIONED elsewhere, never that it is correctly wired.
-#     `suppliedCosigners` needed THREE things — written, read, and tested — and a
-#     single mention anywhere would satisfy this script. Mention is a weak signal;
-#     it is simply much better than zero, which is what preceded it.
+#     THIS WEAKNESS WAS DEMONSTRATED, not merely admitted: it passed
+#     `suppliedCosigners` as "wired" on three mentions that were ONE CONTIGUOUS
+#     PARAGRAPH, none of which touched the section the document names as the sole
+#     authority for what gets printed. It now requires mentions in at least TWO
+#     DISTINCT SECTIONS, which catches the confined-to-one-paragraph shape.
+#
+#     BUT THAT DOES *NOT* CLOSE THE DEMONSTRATED CASE, and saying so is the point:
+#     the state the reviewer flagged had three mentions across TWO sections, so it
+#     still passes. Closing it properly would mean asserting a name appears in the
+#     section the document names as its authority -- which is plan-specific
+#     knowledge this script does not have. So: this gate narrows the gap and does
+#     not close it. A name it calls "wired" may still be unwired in the way that
+#     matters, and only a reader checking WRITTEN *and* READ *and* TESTED can say.
+#   * It parses struct and const blocks only, so it is structurally blind to
+#     build-order tables and test-plan prose -- two of the three findings in the
+#     round that exposed it lived exactly there.
 #   * It only sees `type X struct { ... }` and `const ( ... )` blocks written in
 #     the plan's indented-code style. A field described only in prose is invisible.
 #   * It cannot tell a deliberately-reserved name (scaffolding whose emptiness is
@@ -80,14 +93,28 @@ for path in sys.argv[1:]:
             continue
         i += 1
 
+    # Section index: which heading each line falls under, so "mentioned twice in
+    # one paragraph" cannot pass as propagated.
+    sect, cur = [], "(preamble)"
+    for l in lines:
+        if l.startswith("#"):
+            cur = l.strip()
+        sect.append(cur)
+
     for name, lo, hi in decls:
         checked += 1
-        outside = sum(1 for n, l in enumerate(lines) if not (lo <= n < hi) and name in l)
-        if outside == 0:
+        hits = [n for n, l in enumerate(lines) if not (lo <= n < hi) and name in l]
+        sections = {sect[n] for n in hits}
+        if not hits:
             bad += 1
             print(f"DECLARED, NEVER USED   {name!r}   (declared around line {lo+1})")
+        elif len(sections) < 2:
+            bad += 1
+            only = next(iter(sections))
+            print(f"ONE SECTION ONLY       {name!r}   {len(hits)} mention(s), all under "
+                  f"{only[:56]!r} -- not propagated")
         else:
-            print(f"wired  {name:<24} {outside} mention(s) outside its declaration")
+            print(f"wired  {name:<24} {len(hits)} mention(s) across {len(sections)} sections")
 
 print()
 print(f"─── declared names checked: {checked} ; never used elsewhere: {bad}")

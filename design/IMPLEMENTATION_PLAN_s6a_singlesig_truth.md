@@ -908,10 +908,15 @@ tests cannot drive a record at all.
 
 | cell | status | line (verbatim, ASCII only) |
 | --- | --- | --- |
-| pass, no adverse | `statusVerified` | *generated from the pass record* — names exactly the comparisons this mode ran, and states what was not read |
-| pass, adverse | `statusVerifiedOnRetry` | the generated pass line, plus `An earlier check did not pass; a later full check passed.` |
+| pass, no adverse | `statusVerified` | *generated from the pass record* — names exactly the comparisons this mode ran, states what was not read, **and appends `Other cosigners' keys are taken as supplied.` iff `rec.pass.suppliedCosigners > 0`** |
+| pass, adverse | `statusVerifiedOnRetry` | the generated pass line **including the cosigner clause on the same condition**, plus `An earlier check did not pass; a later full check passed.` |
 | no pass, adverse | `statusCheckDidNotPass` | `A verification check ran and did not pass: a comparison did not match, or a plate could not be read or accounted for. Do NOT rely on this backup until a full check passes. Check again with every plate this run engraved; if this repeats, engrave a fresh set.` |
 | no pass, no adverse | `statusNotFullyChecked` | `These plates were not fully checked. Confirm they restore this wallet (master fingerprint below) before relying on this backup.` |
+
+**§4.7c IS THE SOLE AUTHORITY FOR WHAT THE BUILDER PRINTS, and it must therefore
+carry every clause.** An earlier fold added the cosigner clause to a separate
+obligation table and left this one unchanged (R14 I-3) — so the document's own
+stated authority did not know about it. Any future clause lands **here first**.
 
 **THE PASS LINE IS GENERATED, NOT A LITERAL — this is what closes R9's C-1.**
 `buildVerifyStatusLine` takes the **record**, whose `pass` field carries the mode. On a
@@ -1027,13 +1032,13 @@ second is the serious one:
 
 | # | step | why here |
 | --- | --- | --- |
-| 1 | **Write the single-sig exit → `verifyStatus` mapping** (§4.7c) and get it reviewed | eleven exits, and every later step depends on it. Nothing else starts until it is agreed. |
+| 1 | **Write BOTH step-1 artifacts and get them reviewed together:** (a) the single-sig eleven-exit → `verifyRecord` mapping, and (b) **the `suppliedCosigners` expression** — policy keys not covered by a verified leg, from `keys`/`covered` at `gui/multisig_verify.go:987`, with single-sig writing 0 | eleven exits plus one formula, and every later step depends on both. Nothing else starts until they are agreed. **(b) was asserted in prose and scheduled nowhere — R14 I-2.** |
 | 2 | `verifyRecord` + `passRecord` + `buildVerifyStatusLine` + **T21, T22, T26** | pure functions over a record, no callers yet. **T20 does NOT land here either** (R12 I-2): its *exactly-one-line-on-all-three-rendered-documents* half needs call sites that do not exist until step 7, and §5 says pure-function assertions do not satisfy it. T23, T24, T25 likewise need a rendered document and a multisig retry |
 | 3 | `seedCapacity` + the two-axis ruling + `buildSeedInventoryLines` (§4.3, §4.4), updating the six existing call sites | shared census; still no flow changes |
 | 4 | `restoreDocFlow` and `multisigRestoreDocFlow` gain `status` + `extra` (§4.2, §4.7b), **all three call sites** | signature change; the tree must stay green across it |
 | 5 | Wire single-sig: label (§4.1), inventory, census (§4.6), abort gate (§4.5) | the F-198/F-195/F-197/F-202 body of work |
 | 6 | Update the three walks that the census screen stops (§5.1b), **plus T7c** | must accompany step 5, not follow it. **T7c belongs here** (R12 I-2): it drives each of the three flows to its restore document and asserts the seed-handling clause matches that path's capacity — §8.4 calls it required and no earlier draft scheduled it to any step |
-| 7 | Wire the verify status into all three flows, plus **T11, T20, T23, T24, T25** — and update the **four source assertions** pinning the `multisigVerifyFn` call (§5.1) in this same commit | needs 2, 4 and 5 in place. **T20 lands here, not at step 2**, because its assertion is on the *rendered document* of all three flows. An earlier draft justified this step with T9/T13a/T13b, tests that **exist nowhere in this plan** |
+| 7 | Wire the verify status into all three flows, plus **T11, T20, T23, T24, T25, T27** — and update **all TWELVE call sites plus the stub** (§5.1) in this same commit — four source assertions to the new call **verbatim**, eight direct `multisigVerifyFlow(...)` sites and the stub closure to the new arity | needs 2, 4 and 5 in place. **T20 lands here, not at step 2**, because its assertion is on the *rendered document* of all three flows. An earlier draft justified this step with T9/T13a/T13b, tests that **exist nowhere in this plan** |
 | 8 | Correct the three false comments (§4.7c) + T8 | independent; deliberately last so it cannot mask a behavioural regression |
 | 9 | Update `SPEC_seedhammer_T6a_singlesig_flagship.md` (§3.1.7), **in its own commit** | the spec follows the behaviour, and is not mixed with it |
 
