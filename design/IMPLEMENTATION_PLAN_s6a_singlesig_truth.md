@@ -1054,6 +1054,18 @@ status line, because nothing below it is conditioned on it:
 confirm before relying — R7 ruled that widening it to the modal Skip path cries
 wolf on a backup that is probably fine.
 
+**§4.7f SPECIFIES THE LINE AND OWNS NO MECHANISM FOR IT — a real gap, found by
+step 7 and flagged rather than folded silently.** §4.2 fixes the doc-flow
+signature, §4.7c's builder returns **exactly one** line, and **nothing in this
+plan says who builds the second one.** Step 7 had to decide, and chose to derive
+it **inside both document flows** from the status string (identity against a
+package constant), so that no signature changed and it **cannot be forgotten on
+the third flow** — which is precisely the failure mode §5.1 was written about
+(*"wired into two of three flows and forgotten on the third"*). The alternative,
+an explicit parameter, is reversible across two functions and four call sites.
+**This is an implementation decision standing in for a specification, so it is
+named here for the whole-diff review rather than left in a commit message.**
+
 #### 4.7f-props WHAT BECAME OF P1, P2 AND P5 — they are THEOREMS now, not obligations
 
 **R10 found five property citations with zero surviving definitions** (P1, P2,
