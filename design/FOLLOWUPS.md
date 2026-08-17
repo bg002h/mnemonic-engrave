@@ -6964,12 +6964,24 @@ bare `w.inp.Next(ctx, ButtonFilter(Up), ButtonFilter(Down))` — filters with **
 `Clickable` and no drawn hit area** — so nothing can deliver those events on an
 SH2. The handler is dead *as written*, not dead *in principle*.
 
-**Why the ruling below still stands anyway.** Fit-first is right on its own
-merits: a modal that fits needs no affordance, the sweep is the prerequisite for
-ever restoring `fadeClip` (see below), and it does not add input handling to
-safety screens immediately before an irreversible flash. But it is a
+**Why fit-first still leads.** A modal that fits needs no affordance, and the
+sweep is the prerequisite for ever restoring `fadeClip` (see below). But it is a
 **sequencing** call, not a capability limit — and F-208 is correspondingly
 cheaper than first written.
+
+**F-208 IS ALSO IN S6b** (operator directive, restated on the corrected facts:
+*"We need arrows on screen for scrolling when necessary"*). The two are
+complements: this entry guarantees the **authored** copy fits; F-208 covers the
+residue a fit gate cannot reach — bodies interpolating a descriptor, a policy, a
+plate count, an operator-chosen label, whose runtime expansion is not fixed at
+authoring time.
+
+**SEQUENCING CONSTRAINT, and it binds this entry's schedule.** F-208's arrow
+layout must be **decided before this sweep sets its budgets**. `Warning.Layout`
+reserves a right-hand nav gutter (`gui/gui.go:402`) and an up/down pair needs a
+home; any change to body width re-opens the wrap calculation, and wrap is what
+decides capacity (see the mechanism note above). **Sweeping first and placing the
+arrows second means measuring every screen twice.**
 
 So the S6b remedy is **the fit-gate sweep as filed**: guarantee every long modal
 fits, so nothing is ever below the fold and no affordance is needed. The
@@ -7320,7 +7332,7 @@ about it. Filed so the behaviour is written down rather than rediscovered — th
 question worth answering later is whether a card the device cannot classify
 should be an adverse observation rather than a non-event.
 
-### F-208 — a long modal has NO affordance saying more text exists, and `Warning` never wired its scroll to anything touchable (owning phase: **post-flash** — operator ruling 2026-08-17, deliberately NOT in S6b) `#seedhammer`
+### F-208 — a long modal has NO affordance saying more text exists, and `Warning` never wired its scroll to anything touchable (owning phase: **S6b** — operator directive 2026-08-17, REAFFIRMED on corrected facts) `#seedhammer`
 
 Filed 2026-08-17 on an operator directive:
 
@@ -7368,12 +7380,55 @@ REMOVED. Do not continue."*).
 `Clickable`s with `op.Input` hit areas, *"the same fix the StartScreen pager
 took"*. So this is not novel input work.
 
-**Why it is post-flash rather than S6b** (operator ruling, after being shown
-fact 2): it is new input handling on the safety screens, it churns plate/screen
-goldens, and it would land immediately before an irreversible hardware step. S6b
-instead removes the *need* for the affordance by guaranteeing every modal fits
-(**F-192**). This entry keeps the affordance from being lost once that guarantee
-makes it invisible.
+**MOVED TO S6b — operator directive 2026-08-17, second statement, on corrected
+facts:**
+
+> "We need arrows on screen for scrolling when necessary"
+
+The first ruling parked this post-flash, but it was made against the controller's
+**wrong** claim that the device could not scroll at all. Re-offered on the
+corrected facts, the operator restated the requirement. **It is in scope for
+S6b.** Both prior statements are kept above so the record shows the requirement
+survived the correction rather than being introduced by it.
+
+**F-192 and F-208 are complements, not alternatives — and the word "necessary"
+is what joins them.** F-192 guarantees the *authored* copy fits, so on those
+screens no arrow should ever appear. F-208 covers the residue F-192 cannot
+reach: bodies whose length is **not fully controllable at authoring time** —
+anything interpolating a descriptor, a policy, a plate count, an operator-chosen
+label. A fit gate proves a string fits; it cannot prove every runtime expansion
+of it does.
+
+### What "when necessary" requires, and the trap in it
+
+The arrow must render **iff** content extends past the fold — an always-on arrow
+on a screen with nothing below it is the same class of lie in the other
+direction. The predicate is `maxScroll > 0`.
+
+**That predicate is currently UNRELIABLE, and this is the gating design
+problem.** `Warning.Layout` derives `maxScroll = bodysz.Y - (bodyClip.Dy() -
+2*scrollFadeDist)` (`gui/gui.go:409`) — but because `fadeClip` is a no-op stub
+(`gui/gui.go:763`), the body renders past `bodyClip.Max.Y` regardless. F-95
+measured exactly this divergence: `maxScroll = 19 > 0`, i.e. the widget believed
+a line was hidden, **while nothing was actually cut off**. Wiring an arrow to
+that predicate today would show it on a screen with nothing below the fold.
+
+**So the order is forced, not chosen:**
+
+1. **F-192's fit sweep** — the authored copy fits.
+2. **Make the geometry honest** — restore the real clip mask, which is safe only
+   once (1) holds, per F-95's ordering hazard.
+3. **Then the conditional arrow** — `maxScroll > 0` now means what it says.
+
+### Open question the spec must answer
+
+**Where do the arrows go?** `Warning.Layout` already reserves a right-hand gutter
+for nav buttons (`btnOff := assets.NavBtnPrimary.Bounds().Dx() + btnMargin`,
+`gui/gui.go:402`), and `Button1`/`Button2`/`Button3` occupy the nav positions.
+An up/down pair needs a home that steals neither a nav hit area nor body width —
+and body width feeds the wrap calculation, so moving it re-opens every fit
+measurement F-192 just made. **Decide the layout before the sweep sets the
+budgets, or the sweep gets done twice.**
 
 **It also rescues work orphaned inside a CLOSED entry.** F-95's *"What is still
 owed, and the order matters"* paragraph is the origin of most of the above, and
