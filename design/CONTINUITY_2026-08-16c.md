@@ -109,44 +109,69 @@ Scope: **F-198** (Critical), **C-1** (Critical, found in review — the document
 prints even after the device says the plates do NOT match), **F-197**, **F-195**,
 **F-202**. Plus both multisig paths, which share C-1.
 
-## WHERE IT STANDS — seven lenses, every one found something
+## WHERE IT STANDS — TWELVE ROUNDS, and what each lens was for
 
 | round | lens | result |
 | --- | --- | --- |
 | R0-A / R0-B | adversarial funds / executability | RED — 1C 4I · 0C 1I |
 | R1-A / R1-B | fold-vs-findings / adversarial on fold | RED — 0C 1I · **2C** 3I |
 | R2-A / R2-B | adversarial on fold / spec coverage | RED — **2C** 5I · 0C 1I |
-| R3-pre | cheap claim verification | DIRTY — 1 false claim |
-| R3-A / R3-B | adversarial on fold / comprehension | RED — **2C** 5I · 0C 8I |
-| R4-pre | cheap claim verification | DIRTY — 0 false, 4 stale |
-| R4 | adversarial on the simplified design | **IN FLIGHT** |
+| R3-pre · R3-A / R3-B | cheap verify / adversarial / comprehension | DIRTY · RED **2C** 5I · 0C 8I |
+| R4-pre · R4 | cheap verify / adversarial | DIRTY · RED **1C** 2I |
+| R5-pre · R5 · R5-B | cheap verify / adversarial / **disclosure** | DIRTY · RED **1C** 4I · **GREEN** |
+| R6-pre · R6-B | cheap verify / **reader comprehension** | DIRTY · RED 0C 3I |
+| R7 · R8-pre | adversarial / cheap verify | RED **3C** 3I · DIRTY 3 structural |
+| R9 | adversarial | RED **5C** 4I |
+| R10 | **goal conformance** | RED 1C 1I + 3 filed |
+| R11-pre | cheap verify | DIRTY 6 stale, 1 structural |
+| R12 | closing adversarial | *see `ls -t design/agent-reports/s6a-r*.md`* |
 
-All R0–R4-pre findings are folded. Reports are in `design/agent-reports/s6a-*`
-(13 files), each persisted **verbatim in its own commit before** the fold
-responding to it.
+Every report is in `design/agent-reports/s6a-*`, each persisted **verbatim in its
+own commit BEFORE** the fold responding to it, so `git diff <report>..<fold>`
+means something.
 
-## THE FIVE THINGS THIS CYCLE PAID FOR
+## THE SIX THINGS THIS CYCLE PAID FOR
 
-1. **The folds were the weak artifact, not the plan.** Six folds carried defects;
-   the last two rounds each found a Critical *inside the algorithm written to fix
-   the previous Critical*. Every one was a failure to CHECK something checkable —
-   never a failure of judgement.
-2. **So the fix was HOW, not WHO.** The operator asked whether an agent should
-   author the fold. No: fold from the file never from memory; enumerate rather
-   than argue; and add a **cheap sonnet claim-verification pass before the
-   expensive adversarial round**. That pass caught a Critical-class defect on its
-   first run for a fraction of an opus round, and 4 more on its second.
-3. **Delete, don't patch, when a structure keeps generating defects.** §4.7's
-   severity lattice had an unfixable collision — the zero value had to be *safe*
-   while the accumulator seed had to be the *minimum*, and one variable cannot be
-   both. Replaced by two sticky facts and a switch. Both Criticals became
-   structurally impossible rather than fixed.
-4. **Closure is LENS-closure.** Three of the seven lenses were first-time
-   questions (spec coverage, comprehension, claim verification) and each found
-   what re-running the others could not. Stop when out of QUESTIONS.
-5. **A blind-spot section that overstates its coverage is worse than silence.**
-   §8.4 claimed a test covered the capacity wiring; it covered the text only.
-   That is precisely what a reviewer budgets away from.
+1. **THE GOAL WAS WRONG, and nine rounds could not see it.** Three goals ran
+   under one name: G1 (never misdescribe what was engraved — the real defect,
+   **zero Criticals in eleven rounds**), G2 (never vouch against your own
+   evidence), and **NG1 — report the verification's epistemic status — which
+   NOBODY ASKED FOR and which produced EVERY Critical of the cycle.** The
+   operator found it by asking "maybe the goal is simply wrong?"
+2. **The structural reason NG1 was unaffordable, and it generalises: G2 is a
+   PROHIBITION, NG1 an OBLIGATION.** "Never claim more than you know" needs one
+   conservative default and no enumeration. "Always say exactly what you know"
+   needs a complete correct partition of everything observable — which two
+   successive properties (P4, then P5(b)) failed to deliver. **A prohibition
+   fails safe; an obligation fails OPEN.**
+3. **A non-goal only holds if it is ENFORCED against future findings.** NG1
+   arrived by review, one *correct* increment at a time. §0.1's guard: a finding
+   expanding epistemic reporting is out of scope by default, **even when
+   correct** — correctness is not the test, goal membership is.
+4. **The folds were the weak artifact, not the plan.** Thirteen carried defects,
+   overwhelmingly incomplete propagation — the fact corrected where the reviewer
+   pointed and left standing three sections away. **Reading the diff cannot find
+   this**; only a whole-file sweep can.
+5. **Delete, don't patch, when a structure keeps generating defects.** The
+   severity lattice, then the six-state knowledge partition, both deleted rather
+   than repaired. The replacement — a 2×2 of two recorded booleans — makes the
+   old Criticals *structurally impossible* rather than fixed.
+6. **Closure is LENS-closure.** Disclosure, reader-comprehension and
+   goal-conformance were each first-time questions, and each found what
+   re-running the others could not. **Stop when out of QUESTIONS, not when a
+   round comes back clean.**
+
+## THE DESIGN, IN ONE PARAGRAPH
+
+The restore document always renders and carries **exactly one status line**,
+chosen from **four states** — the 2×2 of two *recorded* booleans:
+`fullPassRecorded` (written at the success return, carrying the mode via
+`passRecord{full, legs}`) and a sticky `adverseRecorded`. The `default:` arm is
+the zero cell, so **monotonicity is structural**: an unrecorded fact cannot set a
+bit, and an unset bit only moves toward "not fully checked". One seam,
+`buildVerifyStatusLine(rec verifyRecord) string`, with a `verifyRecord`
+out-parameter that leaves the verdict return — and the three shipped tests
+pinning it — untouched.
 
 ## DECISIONS ON DISK — do not re-litigate
 
