@@ -269,7 +269,7 @@ and ends `restoreDocScreen(ctx, th, append(lines, extra...))`.
 **That is the CURRENT shape, and it is explicitly NOT the shape to mirror** — an
 earlier draft of this line said it was. §4.7b measures that a trailing parameter
 cannot reach slice index 0, which is what "page 1" means on this pager, so
-**both** functions gain a leading `status []string` as well (§4.2, §4.7b). This
+**both** functions gain a leading `status string` as well (§4.2, §4.7b). This
 sentence is kept as a *measured fact about today's code* and is flagged so no
 reader takes it as the target design.
 
@@ -477,19 +477,19 @@ already in scope at that point (`:64-74` precedes `:77`). This mirrors
 ### 4.2 F-198b — the restore document gets an inventory
 
 `restoreDocFlow` (`gui/singlesig_restore.go:119`) gains **two** parameters — a
-**leading** `status []string` and a **trailing** `extra []string` — exactly
+**leading** `status string` and a **trailing** `extra []string` — exactly
 matching the shape §4.7b specifies for `multisigRestoreDocFlow`:
 
     func restoreDocFlow(ctx *Context, th *Colors, xpub string, masterFP, parentFP uint32,
-        script md.ScriptKind, path bip32.Path, status []string, extra []string) {
+        script md.ScriptKind, path bip32.Path, status string, extra []string) {
         ...
-        restoreDocScreen(ctx, th, append(append(status, lines...), extra...))
+        restoreDocScreen(ctx, th, append(append([]string{status}, lines...), extra...))
     }
 
 and the one call site (`gui/singlesig.go:136`) supplies both:
 
     restoreDocFlow(ctx, th, xpub, masterFP, parentFP, script, path,
-        buildVerifyStatusLines(status),
+        buildVerifyStatusLine(rec),
         buildPlateInventoryLines(cards, oneSeedPassphraseFact(passphrase != ""), seedCapacityOne))
 
 `cards` is already in scope from `:126`. Blast radius is one production call site
@@ -817,10 +817,18 @@ Both booleans are written **inside** the verify flow and read **after** it, so
 something must carry them across. **The verdict return is NOT that thing** — it
 is a verdict, and §4.7a reads no verdict.
 
+    // A BOOL CANNOT CARRY A MODE. An earlier draft declared `fullPass bool` while
+    // describing it as carrying "WHICH comparisons ran and matched in this mode"
+    // -- one bit, asked to hold two facts. That is how R9's C-1 (a mode-blind
+    // pass line claiming an ms1 comparison on watch-only) came back inside the
+    // section written to close it.
+    type passRecord struct {
+        full bool   // the MODE, captured AT the success return where it is in scope
+        legs int    // how many key plates were compared -- gui/multisig_verify.go:986
+    }
     type verifyRecord struct {
-        fullPass bool   // written AT the success return, with `full` in scope,
-                        // carrying WHICH comparisons ran and matched in this mode
-        adverse  bool   // sticky; written at any adverse site per 4.7b
+        pass    *passRecord  // nil until the success return writes it
+        adverse bool         // sticky; written at any adverse site per 4.7b
     }
 
     // The flow gains ONE out-parameter and keeps its verdict return unchanged:
@@ -834,6 +842,23 @@ adds a seam without disturbing one. The same shape applies to
 a return type: **that is what makes build-order step 1 possible at all**, since
 P5(a) requires the record be written where the facts are in scope, and single-sig
 has eleven such sites.
+
+**ONE BUILDER, ONE INPUT, AND IT IS THE RECORD.** Three statements disagreed
+about what the line builder (then plural, `buildVerifyStatusLines`) takes — §4.2 passed the four-valued status
+enum, §4.7c said the record, and two of the three were code, both discarding the
+mode. The signature is:
+
+    func buildVerifyStatusLine(rec verifyRecord) string   // exactly one line
+
+**It takes the RECORD and derives the cell itself.** Nothing upstream computes a
+status and hands it over, because a status enum has already lost the mode, and
+the mode is exactly what the pass line must not lose. §4.2's call site passes
+`rec`, not `status`.
+
+**It returns a STRING, not a `[]string` (R10 I-1).** A slice's zero value is the
+empty slice, which renders as **silence** — and silence is what §4.7 opens by
+declaring must never be mistakable for a pass. A string cannot be absent; T20
+asserts it is never empty.
 
 **The test seam `multisigVerifyFn` gains the parameter too**, or the flow-level
 tests cannot drive a record at all.
@@ -856,7 +881,7 @@ tests cannot drive a record at all.
 | no pass, no adverse | `statusNotFullyChecked` | `These plates were not fully checked. Confirm they restore this wallet (master fingerprint below) before relying on this backup.` |
 
 **THE PASS LINE IS GENERATED, NOT A LITERAL — this is what closes R9's C-1.**
-`buildVerifyStatusLines` takes the **pass record**, which carries the mode. On a
+`buildVerifyStatusLine` takes the **record**, whose `pass` field carries the mode. On a
 full run it names the key and descriptor plates AND the typed-ms1 comparison; on
 watch-only it names only what watch-only actually compares, and **the ms1 clause
 is absent because the record does not contain it.** A mode-blind literal is what
@@ -878,7 +903,7 @@ A distinction earns a line **iff both prongs hold**:
 | --- | --- | --- | --- |
 | pass vs not-pass | success return, `full` in scope | rely-with-scope vs do not | **kept** |
 | adverse vs benign | all gui-local (§4.7b) | "confirm before relying" vs "do not rely until a check passes" | **kept** |
-| VERIFIED vs on-repeat | same two bits | action identical — but **P2 forbids the merge** | **kept, and free** |
+| VERIFIED vs on-repeat | same two bits | action identical — **kept because it is FREE**, being a cell of the same 2x2, not because a property demands it |
 | DISAGREED vs UNACCOUNTED | **fails** — interior to `bundle.Verify` | — | **dropped** |
 | skip vs incomplete | — | **fails** — same action | **dropped** |
 
@@ -908,6 +933,24 @@ status line, because nothing below it is conditioned on it:
 **Not under `statusNotFullyChecked`**, whose own line already tells the reader to
 confirm before relying — R7 ruled that widening it to the modal Skip path cries
 wolf on a backup that is probably fine.
+
+#### 4.7f-props WHAT BECAME OF P1, P2 AND P5 — they are THEOREMS now, not obligations
+
+**R10 found five property citations with zero surviving definitions** (P1, P2,
+P5a, P5b, P5c). That is NG1 residue: the properties were the apparatus NG1
+needed, and deleting NG1 left their names behind. Rather than re-define them,
+record what the 2x2 makes of each:
+
+| was | status now |
+| --- | --- |
+| **P1** — a clean pass always prints a pass line | **a theorem.** `fullPassRecorded` is written only at the success return, and both cells containing it are pass lines. There is no arm where it prints otherwise. |
+| **P2** — an adverse observation is never lost | **a theorem.** `adverseRecorded` is sticky and is read by two of the four cells. Nothing can clear it. |
+| **P5(a)** — claims generated from records | **retained as the design**, and now enforced by a type: the pass line is built from `passRecord`, which carries the mode, so a claim with no record is not constructible. |
+| **P5(b)** — classification at the point of knowledge | **retired.** §4.7b shows the distinction it enforced is one nothing consumes. |
+| **P5(c)** — monotone under omission | **a theorem.** The `default:` arm is the zero cell; an unrecorded fact cannot set a bit, and an unset bit can only move toward `statusNotFullyChecked`. |
+
+**Only P5(a) and P6 remain as obligations**, and both are about the pass line —
+which is precisely where R9 found the plan had never looked.
 
 #### 4.7g P6 — THE PASS PATH IS AUDITED LIKE THE FAILURE PATHS
 
@@ -952,7 +995,7 @@ second is the serious one:
 | # | step | why here |
 | --- | --- | --- |
 | 1 | **Write the single-sig exit → `verifyStatus` mapping** (§4.7c) and get it reviewed | eleven exits, and every later step depends on it. Nothing else starts until it is agreed. |
-| 2 | `verifyStatus` + `buildVerifyStatusLines` + **T14 only** | pure function, no callers yet. **T9, T13a and T13b do NOT land here** — §5.2 requires them on a rendered document and on a multisig walk, so they move to step 7 |
+| 2 | `verifyRecord` + `passRecord` + `buildVerifyStatusLine` + **T20, T21, T22, T26** | pure functions over a record, no callers yet. **T23, T24 and T25 do NOT land here** — they need a rendered document and a multisig retry, so they move to step 7 |
 | 3 | `seedCapacity` + the two-axis ruling + `buildSeedInventoryLines` (§4.3, §4.4), updating the six existing call sites | shared census; still no flow changes |
 | 4 | `restoreDocFlow` and `multisigRestoreDocFlow` gain `status` + `extra` (§4.2, §4.7b), **all three call sites** | signature change; the tree must stay green across it |
 | 5 | Wire single-sig: label (§4.1), inventory, census (§4.6), abort gate (§4.5) | the F-198/F-195/F-197/F-202 body of work |
@@ -1016,8 +1059,8 @@ merely loose:
   asserts a bare run does *not* say "NOT passphrase" — which is exactly what
   today's code does. Demanding it fail pre-cycle would demand it be wrong.
 - **A test of a function that does not exist yet does not "fail"; it does not
-  COMPILE.** T9, T13a, T13b and T14 target `buildVerifyStatusLines` and
-  `verifyStatus`, which this cycle introduces. "Red" from a missing symbol proves
+  COMPILE.** T20, T21, T22 and T26 target `buildVerifyStatusLine`, `verifyRecord`
+  and `verifyStatus`, which this cycle introduces. "Red" from a missing symbol proves
   nothing about the assertion.
 
 So the standard is per-row and adversarial: **revert or mutate the specific
@@ -1083,13 +1126,18 @@ four-state design (§4.7) reads **no verdict at all**, so the condition stays
 byte-identical and all three tests keep passing untouched. This is a real
 simplification the four-state rewrite bought and the fold nearly missed.
 
-**T9–T14 must pin a PRODUCTION CALL SITE, not just the pure functions (R2 I-3).**
-Round 1's C-2 was that the Critical had no test; round 1 answered it with tests
-that would all still pass if the status line were wired into two of the three
-document flows and forgotten on the third. At least T11 and one of T10/T12 drive
-a real flow to a real restore document — the same standard §5.1's T5 is held to,
-and for the same reason: *a call-site assertion alone is what let the multisig
-instance ship.*
+**EVERY ONE OF THE THREE PRODUCTION DOCUMENT FLOWS IS PINNED — not "at least
+two" (R10 I-1).** Round 1's C-2 was that the Critical had no test; the answer
+named the "wired into two of three flows and forgotten on the third" hazard
+**and then prescribed it**, requiring only "T11 and one of" the others. That is
+the defect written into its own remedy.
+
+So: **T20 asserts a status line on the rendered document of all three flows** —
+single-sig (`gui/singlesig.go:136`), multisig build (`gui/multisig_build.go:478`)
+and multisig supply (`gui/multisig.go:361`) — and a fourth call site exists in a
+test that passes `nil` today (`gui/multisig_nested_name_test.go:230`), which must
+be updated rather than left. Pure-function assertions do not satisfy this: *a
+call-site assertion alone is what let the multisig instance ship.*
 
 **T5 is the one that carries the class.** F-197's own follow-up says it: *"A
 call-site assertion alone is not enough — that is exactly what let the multisig
