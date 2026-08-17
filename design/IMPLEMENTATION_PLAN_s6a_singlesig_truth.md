@@ -857,6 +857,25 @@ a return type: **that is what makes build-order step 1 possible at all**, since
 P5(a) requires the record be written where the facts are in scope, and single-sig
 has eleven such sites.
 
+**`suppliedCosigners` MUST BE WRITTEN, READ AND TESTED — declaring it is not
+wiring it (R13 C-1).** The previous fold added the field and did nothing else
+with it: it appeared three times in this document, all inside its own
+declaration. As specified it would hold Go's zero value on every run, the
+cosigner clause would render nowhere, and R12's Critical would survive inside its
+own fix. **This is the second time this cycle a value was declared and left
+unwired** — `sawUnaccounted` was the first — so all three obligations are stated
+explicitly:
+
+| obligation | where |
+| --- | --- |
+| **WRITTEN** | at the success return (`gui/multisig_verify.go:987`), where the policy keys and the verified legs are both in scope. The value is **the number of policy keys NOT covered by a verified leg** — the keys this run took as supplied rather than checked. Single-sig writes **0** because it has no policy cosigners. |
+| **READ** | in `buildVerifyStatusLine`'s pass arm: the clause `Other cosigners' keys are taken as supplied.` renders **iff `rec.pass.suppliedCosigners > 0`**, and is otherwise absent. Nothing else reads it. |
+| **TESTED** | **T27** below — the path axis, distinct from T22's mode axis. |
+
+**The exact expression is the implementer's step-1 output, not a guess here** —
+it is the same class of work as the eleven-exit mapping, and it is reviewed
+before step 2 for the same reason.
+
 **ONE BUILDER, ONE INPUT, AND IT IS THE RECORD.** Three statements disagreed
 about what the line builder (then plural, `buildVerifyStatusLines`) takes — §4.2 passed the four-valued status
 enum, §4.7c said the record, and two of the three were code, both discarding the
@@ -1099,6 +1118,7 @@ New file: `gui/singlesig_truth_test.go`. Prior art to mirror is in §1.7.
 | **T23** | **stickiness.** adverse, then no full pass → `statusCheckDidNotPass`, never `statusNotFullyChecked` | make `adverseRecorded` non-sticky |
 | **T24** | **P2 on the retry path.** adverse, then a full pass → `statusVerifiedOnRetry`, never bare `statusVerified` | drop the `&& adverseRecorded` arm — a two-state collapse, which R9's I-1 proved loses the ms1 class |
 | **T25** | **no verdict is read.** The status derivation references neither `res` nor any `verify*` constant — only the two recorded booleans | key a pass arm on `res == verifyComplete`, which is R9's C-3 and the proxy two rounds proved unsound |
+| **T27** | **the PATH axis (R12 C-1, R13 C-1).** A single-sig full pass line **omits** `Other cosigners' keys are taken as supplied`; a multisig full pass line **includes** it. Assert on the rendered line of both flows | leave `suppliedCosigners` unwritten — its zero value makes the clause vanish everywhere, which is R13's Critical, and no other test notices |
 | **T26** | **P6 — every positive claim is named per mode.** For each clause of each pass line, in each mode, a recorded observation is named; a clause with none is deleted | add an unbacked clause to a pass line |
 | **T11** | the status line is at **slice index 0** of what `restoreDocScreen` receives, and the §4.7f scope line renders **only** under `statusCheckDidNotPass` — asserted **through a production flow**, not on a helper | pass it via the trailing `extra` parameter, as the round-1 fold specified |
 | **T7c** | **the capacity WIRING**, per path: drive each of the three flows to its restore document and assert the seed-handling subject clause matches that path's capacity (build → `Every seed`; supply and single-sig → `The seed you entered`) | swap either call site's capacity argument — a mutation no compiler and no current test detects |
@@ -1151,8 +1171,22 @@ closing paren**, so step 7's `&rec` argument breaks every one:
 | `gui/multisig_verify_flow_test.go:373` | the build-path call, verbatim |
 | `gui/multisig_verify_flow_test.go:394` | the supply-path call, verbatim |
 
-**All four must be updated in step 7's commit, to the new call verbatim — not
-loosened**, plus the `multisigVerifyFn` stub assignment those tests set. Relaxing
+**And the four needles were only the SEAM-VAR SUBSET (R13 I-1).** Step 7's
+`&rec` also changes **eight direct `multisigVerifyFlow(...)` call sites** in
+tests, which no source assertion protects and which the plan had not named:
+
+    gui/multisig_supply_multislot_test.go:271
+    gui/multisig_verify_flow_test.go:118, :224, :250
+    gui/multisig_verify_report_test.go:38, :348, :576
+    gui/multisig_verify_policy_test.go:177
+
+plus the stub assignment at `gui/multisig_engrave_tail_walk_test.go:105`, whose
+closure signature must gain the parameter or it will not satisfy
+`multisigVerifyFn`.
+
+**All twelve sites and the stub are updated in step 7's single commit** — the
+four source assertions to the new call **verbatim, never loosened to a
+substring**, and the eight call sites plus the stub to the new arity. Relaxing
 any of them to a substring is the weakening §5.1 forbids. The retry-loop
 *condition* tests (`:166`, `:759`, `:1093`) genuinely are untouched.
 
