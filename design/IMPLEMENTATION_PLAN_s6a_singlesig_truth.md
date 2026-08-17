@@ -1092,7 +1092,7 @@ second is the serious one:
 | --- | --- | --- |
 | 1 | **Write BOTH step-1 artifacts and get them reviewed together:** (a) the single-sig eleven-exit → `verifyRecord` mapping, and (b) **the `suppliedCosigners` expression** — policy keys not covered by a verified leg, from `keys`/`covered` at `gui/multisig_verify.go:987`, with single-sig writing 0 | eleven exits plus one formula, and every later step depends on both. Nothing else starts until they are agreed. **(b) was asserted in prose and scheduled nowhere — R14 I-2.** |
 | 2 | `verifyRecord` + `passRecord` + `buildVerifyStatusLine` + **T21, T22, T26** | pure functions over a record, no callers yet. **T20 does NOT land here either** (R12 I-2): its *exactly-one-line-on-all-three-rendered-documents* half needs call sites that do not exist until step 7, and §5 says pure-function assertions do not satisfy it. T23, T24, T25 likewise need a rendered document and a multisig retry |
-| 3 | `seedCapacity` + the two-axis ruling + `buildSeedInventoryLines` (§4.3, §4.4), updating the six existing call sites | shared census; still no flow changes |
+| 3 | `seedCapacity` + the two-axis ruling + `buildSeedInventoryLines` (§4.3, §4.4), updating **all EIGHT existing call sites** — 2 production (`gui/multisig_build.go:479`, `gui/multisig.go:362`) and 6 in tests (`gui/multisig_build_prose_test.go:369,424,425`, `gui/multisig_build_perseed_passphrase_test.go:134,246,304`) — plus the **new ninth** at `gui/singlesig.go:136` | shared census; still no flow changes. **An earlier draft said "six" here while §4.3 said eight (measured); updating six leaves two test sites at the old arity, which is a compile error, not a soft failure** |
 | 4 | `restoreDocFlow` and `multisigRestoreDocFlow` gain `status` + `extra` (§4.2, §4.7b), **all three call sites** | signature change; the tree must stay green across it |
 | 5 | Wire single-sig: label (§4.1), inventory, census (§4.6), abort gate (§4.5) | the F-198/F-195/F-197/F-202 body of work |
 | 6 | Update the three walks that the census screen stops (§5.1b), **plus T7c** | must accompany step 5, not follow it. **T7c belongs here** (R12 I-2): it drives each of the three flows to its restore document and asserts the seed-handling clause matches that path's capacity — §8.4 calls it required and no earlier draft scheduled it to any step |
@@ -1335,8 +1335,22 @@ implementation, it is not testing anything.
 Both R0 reviewers found this list incomplete, from different lenses. It is now
 two lists.
 
-**(a) The six `buildPlateInventoryLines` call sites** in §4.3 — all gain a
-capacity argument, all `seedCapacityMany`.
+**(a) The EIGHT existing `buildPlateInventoryLines` call sites** enumerated in
+§4.3 — all gain a capacity argument. Six take `seedCapacityMany` (the build-path
+tests and `gui/multisig_build.go:479`); `gui/multisig.go:362` takes
+`seedCapacityOne` per §3.1.1; and a **ninth, new** call site appears at
+`gui/singlesig.go:136` with `seedCapacityOne`.
+
+**This list said "six" for three rounds while §4.3 said "all 8, measured".** Both
+could not be right, and the short one was in the two places an implementer
+actually follows — here and §4.8's build order. Re-measured at step 3:
+
+    $ grep -rn 'buildPlateInventoryLines(' --include='*.go' . | grep -vc 'func buildPlateInventoryLines'
+    8
+
+Leaving two test call sites at the old arity is a **package-wide compile error**,
+which is the same harm R14's I-1 found in step 7's assertion count — **the third
+count in this plan to be corrected in one section and left stale in another.**
 
 **(b) THREE END-TO-END WALKS THAT §4.6's CENSUS SCREEN STOPS DEAD.** The first
 draft named none of them, and one of them is in a file the plan did not mention
