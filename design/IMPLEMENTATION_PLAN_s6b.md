@@ -72,8 +72,12 @@ Six phases. The order is forced by three dependencies and one convenience.
 2. **P3 before P4** — §6 conditions on *"this run cut a passphrase plate"*, and
    the flow returning that result is P3's work (`engravePassphraseFlowFrom`
    returns nothing today).
-3. **P1 before P6** — R-M's replacement body is a long modal and must be in the
-   tree before the sweep that gates long modals.
+3. **P6 last** — the sweep must run over every modal this cycle added or
+   changed, R-M's replacement body among them. *(This is a property of P6 being
+   last, not a constraint distinguishing P1's position: P1 could sit anywhere
+   before P6 and the requirement would still hold. Stated this way so the plan
+   does not claim more forcing than it has — only dependencies 1 and 2 actually
+   pin a phase's place.)*
 
 **P5 is order-free.** R-I chose a layout costing no body width precisely so the
 arrows and the fit sweep stopped blocking each other; nothing here re-couples
@@ -132,7 +136,12 @@ otherwise cross.
   are **elided from the sequence**, because the Back transition is `step -= 2`.
   Must not use `md.WalletPolicyIDStub` (the keyed branch) — the form-aware
   function, computed from the **post-`templateizeBundle`** `b.MD1`. Must not key
-  the footer on policy-id presence; it reads a recorded provenance.
+  the footer on policy-id presence; it reads a recorded provenance. **Must not
+  carry the preloaded values on a package-level variable or a field on
+  `Context`** (spec §2.1.3) — either would make a secret-adjacent value outlive
+  one flow. They are **parameters**. *(P2 carries the same prohibition against
+  shared state for a different reason — there it would cross R-B; here it is
+  secret lifetime. Both are stated because the cheap shortcut is identical.)*
 - **P4** — must not condition on the offer being *shown*; the condition is
   **cut**. Must not add the passphrase plate to `bundlePlatePlan`'s count.
 - **P5** — must not change body width from 417, and must not route `Up`/`Down`
