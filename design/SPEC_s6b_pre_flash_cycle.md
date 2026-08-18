@@ -528,7 +528,7 @@ the separation instruction, and `len(plan)` is unchanged.
 | 2.4c | the stub is computed from the **post-`templateizeBundle`** `b.MD1` |
 | 2.5 | the passphrase QR contains the passphrase and nothing else |
 | 2.6 | the offer appears only when `passphrase != ""`; the ~31 s derivation does **not** run when no passphrase plate is engraved |
-| 3.1 | `:717`/`:727` behavioural non-loop; **`:854` by source assertion** — unreachable in-process, and the gate says which arm is which |
+| 3.1 | **all three non-correctable arms by SOURCE assertion**, and the gate says which arm is which. `:717`/`:727` were specified as behavioural and are **not**, deliberately: whether a verdict re-offers is decided *only* by the callers' loop condition `res != verifyIncomplete && res != verifyFailed` — identical at `gui/multisig.go:346` and `gui/multisig_build.go:461`, with no retry construct at either refusal site. That is a **source fact**, so the assertion covers **both** callers uniformly where a walk samples one path, and costs ~119 s less against a `gui` package already at ~400 s of Go's 600 s ceiling. The test names what a source assertion cannot see |
 | 3.2 | both F-204 arms — passphrase entered and not |
 | 3.2a | R-M's body passes §4's class check, and asserts no claim that a passphrase is required |
 | 3.3 | the ms1 clause at 1 seed/1 leg, **1 seed/2 legs**, and 2 seeds/2 legs. **`passRecord` cannot distinguish the last two** (`{full, legs, suppliedCosigners}`), so this is a **flow-level** assertion driving verify with two seeds — as a unit test it silently degrades to two cases and stops exercising the middle one, which is the case that kills the filed remedy |
