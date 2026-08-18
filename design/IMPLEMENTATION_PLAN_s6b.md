@@ -66,9 +66,39 @@ measured and stated, keeps a timeout meaning *"something hung"* instead of
 guards, so its ~500 s runs on a single core while 23 sit idle.
 
 **Shard the gate across parallel `-run` invocations** — each shard is its own
-process with its own timeout budget and its own binary. This is the cheap win:
-no code change, no new abstraction, and it removes the ceiling cliff as a side
-effect rather than only postponing it.
+process with its own timeout budget and its own binary. No code change, and it
+removes the ceiling cliff as a side effect rather than postponing it.
+
+**Committed as `scripts/gui-shard-test.sh`, and MEASURED:**
+
+```
+814 top-level tests   partition verified exhaustive: 814 == 814
+6 shards, all ok, stderr empty      WALL: 106s   (longest shard 105.5s)
+```
+
+**versus ~497 s at P4 — a 4.2× reduction**, with no shard within a factor of ten
+of its timeout.
+
+**Use it for P6's gate and for the whole-diff review:**
+
+```
+./scripts/gui-shard-test.sh ./gui/ 6 20m
+```
+
+**Its safety property is why it is a script and not a shell one-liner.** The
+obvious way to shard is a hand-written "everything else" regex, which **silently
+drops every test added afterwards** — and a shard set that skips tests still
+reports `ok`. This project's own rule is that a skipped gate is the default
+failure mode. So the script enumerates from `go test -list`, partitions
+programmatically, and **asserts the union equals the full set before running
+anything**, refusing to start if one test would be missed. It also refuses to
+report success on zero tests enumerated, and fails if any shard's stderr is
+non-empty rather than only on exit status.
+
+It prints what it does **not** cover: subtests are not partitioned, one package
+only, and it cannot detect tests coupled through side effects — though sharding
+*exposes* such coupling as a failure rather than hiding it. **If a shard fails
+where a full run passes, suspect coupling before suspecting the shard.**
 
 **Do NOT add `t.Parallel()` to `gui` as a speed fix.** The package carries global
 state (`Context`, `Platform`, the emulator harness), and cross-test interference
