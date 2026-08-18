@@ -39,8 +39,24 @@ set -uo pipefail
 
 # Roots to resolve a citation against, in order. A `gui/...` path lives in the
 # fork; a `crates/...` path lives here.
+#
+# THE FORK ROOT IS OVERRIDABLE, AND IT HAS TO BE. The default is the fork's
+# checked-out `main`, so a doc citing UNMERGED branch work is resolved against a
+# tree that does not contain it -- and this script only checks that a line is
+# IN RANGE, never what is on it. So it prints `ok` for a citation pointing at an
+# unrelated line, which is the worst possible output: a gate that reports
+# success for the case it cannot see.
+#
+# Measured 2026-08-18, folding the falsified-elsewhere sweep: `gui/singlesig.go
+# :217` (`for {` on branch s6b-pre-flash) resolved against fork main to a
+# comment line from a different function, and was reported `ok`.
+#
+#   CITE_FORK_ROOT=/scratch/code/shibboleth/wt-s6b ./scripts/plan-cite-check.sh doc.md
+#
+# Set it to the worktree under review whenever the doc cites work that has not
+# landed on `main` yet.
 ROOTS=(
-  "/scratch/code/shibboleth/seedhammer"
+  "${CITE_FORK_ROOT:-/scratch/code/shibboleth/seedhammer}"
   "/scratch/code/shibboleth/mnemonic-engrave"
 )
 
@@ -121,6 +137,11 @@ bad=$(grep -c '^BAD$' "$TALLY" || true)
 
 echo
 echo "─── citations resolved: $((total - bad)) / $total ; dangling: $bad"
-echo "─── NOT covered: interpretation, absence-claims, code-block compilation."
+echo "─── resolved against fork root: ${ROOTS[0]}"
+echo "─── NOT covered: interpretation, absence-claims, code-block compilation,"
+echo "───              and WHAT IS ON THE LINE -- only that the line exists. A"
+echo "───              citation to unmerged work resolves against whatever is at"
+echo "───              that line in the root above; set CITE_FORK_ROOT to the"
+echo "───              worktree under review, or this prints ok for a wrong line."
 
 [ "$bad" -eq 0 ]
