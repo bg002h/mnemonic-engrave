@@ -7513,3 +7513,47 @@ owed, and the order matters"* paragraph is the origin of most of the above, and
 F-95's heading reads **CLOSED 2026-08-11** — so by this file's own convention
 (status lives in the heading) no sweep of open items would ever have surfaced it.
 F-208 is now the open handle for it.
+
+### F-209 — **CLOSED 2026-08-18, same day, inline** (S6b: `gui/s6b_modal_fit_sweep_test.go` gains the third arm — 177 raw chars, 146 drawn, headroom 418 — in fork commit `e3ac212`; the staleness it exposed swept in `1cec141`) — F3's new failure-copy arm is missing from the modal-fit sweep its two siblings are in (owning phase: **S6b — filed and closed within it**) `#seedhammer`
+
+Found by the P9 fold verification (`design/agent-reports/s6b-p9-fold-verification.md`,
+Minor N1), the sonnet pass over the failure-states fold. P9's F3 fix turned
+`singleSigVerifyFlow`'s failure-copy `switch` from two arms into three; the fit
+sweep's own stated gating rule covers the new arm and both siblings were already
+in the table, so this was an omission, not a judgement. **Not a live defect** —
+the verification proved the arm draws in full with 418 characters of headroom
+before reporting it.
+
+**Closed inline rather than deferred**, because its owning phase was closing that
+hour and the fix is one table entry. Verified byte-identical to the production
+call site programmatically (177 == 177) rather than by eye, and mutation-tested
+RED before GREEN.
+
+**What it actually bought was the defect underneath it.** Forcing the new entry
+RED printed the class check's own failure message, which said the lost text is
+unreachable *"because this modal's scroller is bound to buttons the SH2 does not
+have."* **P5 had falsified that earlier in the same diff** — `Warning` now draws
+touchable scroll arrows, and `ErrorScreen` embeds `Warning` by value
+(`gui/gui.go:317`), so every `showError` modal inherited them. Six sites across
+five files still asserted the old world, including a live `t.Errorf` in
+`gui/unlock_flow_test.go` stating outright *"Warning has no touch scroll"*.
+
+Swept in fork commit `1cec141`, classified per site rather than string-replaced:
+three were **falsified** (they describe the `Warning` modal, which now scrolls),
+four were **imprecise** (they describe screens that are not `Warning` — `ftProofBody`,
+`ppConfirmBody`, `ppPassProofBody` each build their own body ops — so the
+conclusion always held and only the reason was wrong; restated on the stronger
+true ground that those screens have no scroller at all). **Every gate was kept**,
+on the weaker but sufficient footing that a funds-critical warning must be on the
+first frame, not one tap below the fold. Reachable-by-scrolling is not the same
+as read.
+
+New test `TestErrorScreenModalCarriesTheScrollArrows` (`gui/scroll_arrows_test.go`)
+backs the corrected messages: P5's own `TestGate51ArrowActuallyScrolls` drives
+`Warning` directly, and nothing drove the `ErrorScreen` production actually shows.
+Mutation-tested two ways after passing first try in 0.00s.
+
+**The lesson is the lens, not the finding.** Neither fable pass looked for *text
+this diff made false elsewhere* — both read what the diff wrote, and the falsified
+prose sat in files the diff never opened. A scoped sweep for that class was
+dispatched on discovery; see `design/agent-reports/s6b-falsified-elsewhere.md`.
