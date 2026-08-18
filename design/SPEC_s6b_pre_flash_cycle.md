@@ -259,6 +259,34 @@ third line does not error or clip: it silently cuts into the 3 mm outer margin.
 minimal truthful string that fits, chosen in implementation and flagged for
 confirmation — see §8.
 
+### 2.3a The CONFIRM SCREEN says the same thing, and must change with it
+
+**Added during P3.** The plate footer is not the only place this claim appears.
+`ppConfirmWarning` (`gui/passphrase_flow.go`) — the last checkpoint before a
+permanent plate — reads:
+
+```
+"Fingerprints are typed, not verified. A wrong passphrase does not fail: it opens a DIFFERENT wallet."
+```
+
+On the preloaded path the device **derived** those fingerprints, so that first
+clause is false there — the identical R-D defect §2.3 fixes on the plate, one
+screen earlier.
+
+**NORMATIVE:** the preloaded path shows a counterpart whose first clause states
+derivation. **The second clause is preserved verbatim** — *"A wrong passphrase
+does not fail: it opens a DIFFERENT wallet"* is the funds-critical sentence and
+is true on both paths, so it must not be reworded while fixing the first.
+
+**GATE 2.3e:** the confirm screen's provenance clause agrees with the footer's on
+both paths. They are two renderings of one fact and must not be able to disagree.
+
+> **This is the second time in this cycle that a spec fixed one site of a
+> two-site claim.** The comprehension review caught the first — the restore
+> document's *"nothing this device engraves carries a passphrase"* (§6), which
+> S6b's own offer falsifies. **When a sentence is worth fixing, grep for it
+> before assuming it lives in one place.**
+
 **What selects between them is a recorded PROVENANCE, not the policy id.**
 `backup.Passphrase` gains a field stating whether the fingerprints were derived
 or typed, **independent** of whether a policy id is present. Keying the footer on
