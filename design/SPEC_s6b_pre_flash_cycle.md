@@ -505,14 +505,36 @@ A predicate of `bodysz.Y > bodyClip.Dy()` fires at 270 — short by
 `scrollFadeDist - boxMargin` = **10 px**, a **false negative** that hides content
 below the panel edge with no arrow. That is F-185's own harm.
 
-**NORMATIVE:**
+**NORMATIVE — one predicate PER DIRECTION, not one for both:**
 
 ```
-show arrows  iff  bodyClip.Min.Y + scrollFadeDist + bodysz.Y > dims.Y
+show UP    iff  w.scroll > 0
+show DOWN  iff  bodyClip.Min.Y + scrollFadeDist + bodysz.Y - w.scroll > dims.Y
 ```
 
-Against the **panel**, which is what R-E required. The implementation carries a
-comment naming R-E, because this changes when the mask is restored.
+Both against the **panel**, which is what R-E required, and both **scroll-aware**.
+The implementation carries a comment naming R-E, because the DOWN predicate
+changes when the mask is restored.
+
+**Why per-direction is normative and not a refinement.** A single shared
+predicate — which this section previously specified, and P5 implemented and then
+flagged — renders the **up arrow at the top of a modal, pointing at content that
+does not exist above it**, and the down arrow at the bottom likewise. Under
+**R-D** an arrow is a claim about where content is, so that is a false claim.
+
+It is also the exact failure that killed the original arrow proposal: **an
+affordance for something that is not there.** And it is worse in one specific
+way — tapping the up arrow at `scroll == 0` does nothing, because scroll clamps
+to 0. A control that visibly does nothing on a safety screen teaches the
+operator that the arrows do not work, which discredits the **down** arrow at the
+moment it matters.
+
+`w.scroll > 0` needs no geometry and cannot drift with the `fadeClip` stub.
+
+**GATE 5.1 (extended):** assert the up arrow is **absent at `scroll == 0`** and
+the down arrow **absent at full scroll**, on a body long enough that the other
+arrow is present. A test that only checks "arrows appear when content overflows"
+passes the defect.
 
 ---
 
