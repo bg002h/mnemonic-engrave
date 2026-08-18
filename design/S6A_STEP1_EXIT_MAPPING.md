@@ -206,6 +206,20 @@ around them (F3: no retry loop; the single call site is a one-shot `if`). So no
 control path writes `adverseRecorded` and then reaches `:149`.
 **`statusVerifiedOnRetry` is unreachable. PASS.**
 
+> **SUPERSEDED 2026-08-18 by S6b P9 — this PASS was true when written and is
+> false now.** S6b's failure-states review found that both adverse arms
+> dead-ended the operator, and the F2 fix replaced the one-shot `if` with a
+> `for` loop (`gui/singlesig.go:217`, fork commit `511f7f3`). The premise this
+> PASS rests on — "no loop around them" — is exactly what that fix removed, so
+> **`statusVerifiedOnRetry` is REACHABLE from single-sig today**, deliberately
+> and by design. It is reached and asserted by
+> `TestSingleSigVerifyRetryProducesAnHonestStatusVerifiedOnRetryLine`
+> (`gui/s6b_p9_failure_states_test.go`), which drives a real fail-then-pass
+> sequence and renders the line. The check itself was sound; only its input
+> changed. **Left standing rather than rewritten** — it is the record of what
+> S6a's gate actually verified, and editing it would make that record lie
+> about a different thing.
+
 The other three states are reachable, as §4.8 requires:
 
 | state | reached by |
@@ -369,6 +383,15 @@ on a backup that is probably fine"*) is a real cost.
    (`extractReadbackMd1AndMk1s` fails → `verifyRefused`), listed in §4.7b's
    **adverse** column as *"readback filter drops cards"*. Same position in the
    flow, same kind of check, same shape of failure.
+
+   > **STALE 2026-08-18 (Minor):** that site returns **`verifyIncomplete`**, not
+   > `verifyRefused`, since F-199 (S6b P1, fork commit `c95dd23`) — and it moved
+   > to `gui/multisig_verify.go:797`. The verdict change is the point of F-199:
+   > `verifyIncomplete` is what both multisig engrave callers re-offer on, where
+   > `verifyRefused` was terminal. **The conclusion this bullet supports is
+   > unaffected** — the twin is still adverse, still the same position in the
+   > flow — so only the quoted verdict and line number are wrong. Current
+   > behaviour is documented correctly in `SPEC_s6b_pre_flash_cycle.md` §3.1.
 4. **The world-set genuinely contains bad-plate worlds**: an md1 whose NFC data is
    damaged never completes a chunk set and never appears in `cards`; two mk1s means
    a plate from another run is in the pile.
@@ -548,6 +571,12 @@ a pass record. **PASS.**
 Two adverse rows (`:117`, `:146`), both `return` statements per F2, with no loop
 in the flow and a one-shot call site per F3. No path writes adverse then falls
 through to `:149`. **PASS.**
+
+> **SUPERSEDED 2026-08-18 by S6b P9**, same as the §4.8 consequence check above
+> and for the same reason: the "one-shot call site" clause is what S6b's F2 fix
+> removed. `statusVerifiedOnRetry` is reachable and tested today. The `awk`
+> count of 2 adverse rows still holds; it is the *no loop* half of the argument
+> that expired.
 
 **C6 — `suppliedCosigners`: names in scope, and the single write to `covered`.**
 

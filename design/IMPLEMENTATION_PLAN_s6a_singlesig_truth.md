@@ -970,7 +970,7 @@ single space; every one is ASCII and draws in the body face:
 | # | clause | condition |
 | --- | --- | --- |
 | **A** | `<N> key plate was read back and matched what this run engraved.` — `plate`/`plates` and `was`/`were` both agree with `N`, so it never reads *"1 key plates"* | always; `N` is `rec.pass.legs` |
-| **B** | `The ms1 secret you typed matched this seed.` | iff `rec.pass.full` |
+| **B** | `The ms1 secret you typed matched this seed.` — **STALE 2026-08-18: the production string is now `The ms1 you typed for each seed matched.`** (`verifyStatusMS1Clause`, `gui/verify_status.go:169`), changed by F-206 in S6b P1. The old wording stayed singular on a multi-seed multisig verify, which is what F-206 was filed for. | iff `rec.pass.full` |
 | **B2** | `No secret seed share was read back or compared.` | iff **not** `rec.pass.full` — the watch-only counterpart, stating what was *not* read |
 | **C** | `Other cosigners' keys are taken as supplied.` | iff `rec.pass.suppliedCosigners > 0` |
 | **D** | `An earlier check did not pass; a later full check passed.` | iff the status is `statusVerifiedOnRetry` |
@@ -989,7 +989,15 @@ page.** The invariant, now enforced by the constant's own comment: **any artifac
 this line names must exist on ALL THREE documents.**
 
 **§4.7c IS THE SOLE AUTHORITY FOR WHAT THE BUILDER PRINTS, and it must therefore
-carry every clause.** An earlier fold added the cosigner clause to a separate
+carry every clause.**
+
+> **QUALIFIED 2026-08-18.** "Sole authority" was true within S6a and is what kept
+> the clause table complete. It does **not** survive the phase: S6b changed
+> clause B's literal text (F-206) in the fork, a different repo from this
+> document, and nothing linked the two. Treat this table as authoritative for
+> **which clauses exist and when they fire**, and treat `gui/verify_status.go`
+> as authoritative for **their wording**. A doc in one repo cannot be the sole
+> authority for a string in another. An earlier fold added the cosigner clause to a separate
 obligation table and left this one unchanged (R14 I-3) — so the document's own
 stated authority did not know about it. Any future clause lands **here first**.
 
@@ -1179,6 +1187,14 @@ the flow runs at most once per engrave (§5.2). **A proposed mapping that reache
 `statusVerifiedOnRetry` from within the eleven exits is wrong**, and that is
 checkable without judgement.
 
+> **SUPERSEDED 2026-08-18 by S6b P9.** True for S6a; false now. S6b's
+> failure-states review found both adverse arms dead-ended the operator, and the
+> F2 fix replaced that one-shot `if` with a `for` loop — `gui/singlesig.go:217`
+> is now `for {`, and the flow dispatches through a `singleSigVerifyFn` seam so a
+> second attempt can be driven. **Single-sig HAS a retry loop**, so a mapping
+> that reaches `statusVerifiedOnRetry` is now correct rather than wrong. Proven
+> by `TestSingleSigVerifyRetryProducesAnHonestStatusVerifiedOnRetryLine`.
+
 **The other three are all reachable, including the zero cell — and an earlier
 draft of this paragraph got that wrong (R16 I-1), in the direction that matters.**
 It called all ten returns "adverse", which would have sent every non-success exit
@@ -1327,6 +1343,18 @@ unreachable by construction. Those rows must be driven on a **multisig**
 flow, which is the only place a second attempt exists. Written as-is against
 `engraveSingleSigFlow` they would pass vacuously, never reaching the sequence
 they name — the exact vacuity §5.2 warns about for T5, one section later.
+
+> **SUPERSEDED 2026-08-18 by S6b P9 — and this is the passage that would have
+> misled someone.** It is a test-PLACEMENT directive, not narration: it tells a
+> future implementer that retry-shaped single-sig coverage must go on multisig
+> instead. That instruction is now wrong. S6b's F2 fix gave single-sig its own
+> retry loop (`gui/singlesig.go:217`), and S6b's own new test
+> `TestSingleSigVerifyRetryProducesAnHonestStatusVerifiedOnRetryLine` drives a
+> real fail-then-pass sequence **on the single-sig path** — the exact thing this
+> paragraph says cannot be done there. **The vacuity warning still stands as a
+> method**: a retry test on single-sig must prove it actually reached the second
+> attempt, which is why that test asserts the rendered line rather than the
+> return value.
 
 Consequence for §4.8's build order: step 7 is where these land, and it needs a
 multisig walk, not the single-sig harness §1.7 lists as prior art.
