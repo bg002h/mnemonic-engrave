@@ -128,7 +128,42 @@ Six phases. The order is forced by three dependencies and one convenience.
 | **P3** | passphrase plate | §2 | needs the largest new mechanism (preloaded entry, new `syswSource`, provenance field, policy id) |
 | **P4** | restore document | §6 | **depends on P3** — its condition reads the result P3's flow starts returning |
 | **P5** | scroll arrows | §5 | independent; R-I's layout costs no body width, so it does not disturb P6 |
-| **P6** | modal fit sweep | §4 | **last, deliberately** — it must sweep every modal this cycle added or changed, including P1's R-M body |
+| **P6** | modal fit sweep, S6b's own modals | §4 | scheduled last so it covers every modal this cycle added or changed, including P1's R-M body |
+| **P7** | modal fit sweep, **the rest of the firmware** | §4 | **added 2026-08-18** — P6's scope was narrower than §4's, see below |
+
+### P7 exists because THIS PLAN SILENTLY NARROWED THE SPEC
+
+**Spec §4:** *"**Every** long modal body is gated by the F-185 class check. Only
+S5.C's screens are measured today."* — firmware-wide, matching **F-192**'s filed
+text: *"every other long modal in the firmware carries the same unmeasured
+exposure."*
+
+**This plan's P6 row said:** *"every modal **this cycle added or changed**."*
+
+That is a narrower requirement wearing the same name. P6 followed the plan,
+**noticed, and documented both readings instead of picking one** — which is the
+only reason it surfaced before S6b closed with F-192 marked done.
+
+**The plan review did not catch it.** That review was briefed to find
+requirements with **no owner**; it never asked whether a requirement had been
+**shrunk**. A narrowed requirement still has an owner, still has a gate, and
+still goes green — it is invisible to an ownership lens by construction.
+**Scope-narrowing is its own review question and is not covered by "is anything
+unowned".**
+
+### The scope was BOUNDED before P7 was dispatched, not after
+
+A `go/ast` scan over every `showError`/`showNotice` body argument in `gui`:
+
+| population | at risk |
+| --- | --- |
+| **92 literal bodies** | **no** — longest 152 chars against F-185's ~500-char cut |
+| **~36 composed bodies** (functions, `Sprintf`) | **yes — this is P7** |
+
+An earlier regex attempt at the same count returned noise (it swallowed comment
+blocks and reported an 8210-character "modal body"). It was discarded rather
+than reported. **A measurement that cannot distinguish a comment from a string
+literal cannot bound a sweep**, and the parser-based one can.
 
 **The three real dependencies:**
 
