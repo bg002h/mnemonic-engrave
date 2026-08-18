@@ -201,9 +201,19 @@ measured **raw string width against the inset span**.
 rung** — raw width admits only 16 characters where the shipped cap is 18.
 
 The disagreement **errs in the safe direction**: raw width *under*-reports, so
-25 at 3.8 mm is conservative rather than optimistic. It does not touch the
-3.8 mm result, and every string above carries ≥ 7 characters of headroom. **But
-the implementation's gate must be the layout-based form, not this one.**
+25 at 3.8 mm is conservative rather than optimistic. **But the implementation's
+gate must be the layout-based form, not this one.**
+
+> **CONFIRMED BY MEASUREMENT, P2, 2026-08-17.** The layout-based budget is
+> **28 characters**, not 25. This caveat predicted both the direction and the
+> fact of the gap, and the gate now asserts 28
+> (`backup/engravetext_test.go`).
+>
+> Worth recording because this caveat was **dropped in the spec's clean rewrite
+> and restored a commit later** on a fidelity finding. Had it stayed dropped, P2's
+> measurement would have read as a contradiction of a settled number instead of
+> a confirmation of a stated limit — and the cheapest response to an apparent
+> contradiction is to distrust the new measurement.
 
 ---
 

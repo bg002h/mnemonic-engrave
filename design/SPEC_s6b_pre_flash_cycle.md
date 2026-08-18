@@ -98,9 +98,15 @@ the whole mechanism R4 exploits:** restoring the words alone yields a fingerprin
 that does not match what the plates encode, so a wrong-wallet restore
 self-diagnoses instead of failing silently.
 
-**The budget is 25 characters** at `plateFontSizeUR` = 3.8 mm, inset span
-416000 units (`SPIKE_s6b_q2_results.md` §3c). Every string above fits with ≥ 7
-to spare. The merged two-fingerprint form (30) does **not** fit and is not used.
+**The budget is 28 characters**, measured layout-based during P2 at
+`plateFontSizeUR` = 3.8 mm. `SPIKE_s6b_q2_results.md` §3c reported **25** by raw
+string width — and **said so, and said raw width under-reports**. It does: the
+true bound is 28, so 25 was conservative rather than wrong, exactly as that
+caveat predicted.
+
+Every string above fits with ≥ 10 to spare. The merged two-fingerprint form (30)
+still does **not** fit and is not used. **The gate asserts the measured 28, not
+the estimate** — see `backup/engravetext_test.go`.
 
 **Marking applies to `cardMK1` and `cardMD1` plates only. A `cardMS1` plate is
 never marked.** In full mode the set includes an ms1 secret share —
@@ -139,9 +145,14 @@ computed there from `passphrase != ""` and `full`, both in scope (`:97`, `:103`,
 
 **Go has no default parameters** — this codebase says so at the function under
 discussion (`gui/bundle_flow.go:395-397`). So every other caller passes `""`,
-`""` explicitly. **Three tests assert the call text as a source string and must
-be updated in the same commit:** `gui/multisig_verify_report_test.go:940` and
-`:942`, and `gui/bundle_abort_prose_test.go:258`.
+`""` explicitly. **Two tests assert the call text as a source string and must be
+updated in the same commit:** `gui/multisig_verify_report_test.go:940` and
+`:942`.
+
+*(This section originally named a third, `gui/bundle_abort_prose_test.go:258`.
+P2 checked it empirically rather than editing it because a document said to, and
+found its substring-window check tolerates the new trailing arguments. Corrected
+here so the next reader does not "fix" a test that was never broken.)*
 
 **A variadic tail is prohibited**: it would leave order and arity unchecked on
 the value that decides whether a plate says `PASSWORD REQUIRED`. **Shared state
