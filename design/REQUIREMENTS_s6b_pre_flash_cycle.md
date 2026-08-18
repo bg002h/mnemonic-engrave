@@ -699,6 +699,45 @@ only — no control flow, no marking — so it does **not** cross R-B.
 
 **It is a long-modal body, so F-192's fit gate applies to it** (§4).
 
+### R-N — the preloaded footer is `POLICY <8 hex>  DERIVED`, and R-H's literal string is retired
+
+Operator, 2026-08-17, after being shown the measurement and a B-vs-C comparison:
+**"Go with option C."**
+
+**What R-H originally approved cannot be engraved.** `POLICY 1A2B 3C4D  DERIVED,
+NOT TYPED` is 36 characters / 460800 units against a **409600-unit (32-char)**
+cap — **8 mm over, into the screw-hole zone.** The cap is spec 4.3's *no metadata
+line may exceed 64 mm*, enforced by `backup`'s pre-existing
+`TestPassphraseBandBudget`. The operator re-approved the *wording* first, then
+chose the layout once the fit was measured.
+
+**The ruling: option C**, which P3 had already shipped — so this ruling required
+**no code change and no re-gate**.
+
+```
+preloaded    "POLICY <8 hex, grouped>  DERIVED"   25 chars, 7 spare
+standalone   "FINGERPRINTS TYPED, NOT VERIFIED"   32 chars, at the cap
+```
+
+**What C buys, and it is the reason it won.** It changes **one line**. The
+fingerprint lines keep their `FP:` and `EXPECTED` labels, so the plate has **one
+layout** rather than forking into a typed form and a preloaded form. Those
+fingerprint lines *are* R4's self-diagnosing mechanism — a reader compares them
+against their own wallet — and option B would have dropped both labels to free a
+band slot, paying legibility on the artifact to buy two words on a different
+line.
+
+**What C costs, accepted knowingly.** `DERIVED` alone is ambiguous about *what*
+was derived: the footer sits in the **bottom** band while the fingerprints it
+describes sit in the **top**, at the opposite edge of an 85 mm plate. Read in
+isolation it can parse as *the policy* was derived. The comprehension review
+raised this as **XN2** and it is **not** resolved by this ruling — it is
+accepted. A four-character `FPS` prefix would have removed it; the operator
+chose the smaller diff.
+
+**Recorded so it is a known trade rather than an oversight**, and so a future
+reader who notices the ambiguity finds it already considered.
+
 ---
 
 ## THE DECISION PASS IS CLOSED

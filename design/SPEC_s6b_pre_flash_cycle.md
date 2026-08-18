@@ -20,7 +20,7 @@ document** — a bare `§2.4` was previously ambiguous across three files.
 | --- | --- |
 | `REQUIREMENTS_s6b_pre_flash_cycle.md` §1 | operator directives R1–R7 |
 | `REQUIREMENTS_s6b_pre_flash_cycle.md` §2 | measured facts |
-| `REQUIREMENTS_s6b_pre_flash_cycle.md` §2bis | rulings **R-A … R-M** |
+| `REQUIREMENTS_s6b_pre_flash_cycle.md` §2bis | rulings **R-A … R-N** |
 | `PROPOSAL_s6b_q1_q3_q6.md` | Q1/Q3/Q6, approved |
 | `SPIKE_s6b_q2_results.md` | executable measurements |
 
@@ -255,9 +255,17 @@ The preloaded form consumes **no new band line** — the worst case (both
 fingerprints plus a spaced passphrase) already fills 2 top and 2 bottom, and a
 third line does not error or clip: it silently cuts into the 3 mm outer margin.
 
-**`DERIVED` is NOT operator-approved wording**, unlike R-M's arm. It is the
-minimal truthful string that fits, chosen in implementation and flagged for
-confirmation — see §8.
+**`DERIVED` IS operator-approved** — ruling **R-N**, 2026-08-17. R-H's original
+`DERIVED, NOT TYPED` measured **8 mm over the band cap**, so the operator was
+shown the measurement and chose this form over the alternative that would have
+carried the longer wording by merging the two fingerprint lines.
+
+**Known trade, accepted rather than overlooked:** `DERIVED` does not name its
+subject, and the fingerprints it describes sit in the *opposite* band. Read
+alone it can parse as *the policy* was derived (comprehension review **XN2**).
+R-N accepts this in exchange for changing one line instead of forking the plate
+into two layouts and dropping the `FP:` and `EXPECTED` labels that R4's
+self-diagnosing mechanism depends on.
 
 ### 2.3a The CONFIRM SCREEN says the same thing, and must change with it
 
@@ -630,13 +638,7 @@ a bare `go test ./... -update`** — it rewrites the frozen sixteen.
 ## 8. WHAT THIS SPEC DOES NOT SETTLE
 
 - The exact wording of §3.2's no-passphrase arm, and of §6's conditional clause.
-- **§2.3's preloaded footer, `POLICY <8 hex>  DERIVED`.** R-H's literal string
-  was measured 8 mm over the band cap during P3 and had to change; the
-  replacement is the **minimal truthful string that fits**, not an operator
-  ruling. `DERIVED` alone is a positive true claim on that path and the
-  acceptance screen states the source in the same words (§2.2) — but the
-  operator approved *"DERIVED, NOT TYPED"*, and this is not that. **Needs
-  confirmation.**
+
 - The label satisfying §2.4's both-forms requirement.
 - **§3.2's third arm** — the multisig sibling's *"Your plates are fine"* verdict,
   adapted to single-sig. Cheap here (the flow already re-derives from a re-typed
