@@ -217,6 +217,30 @@ visibility — is the one that must be green. Recording this here because a red
 result on a probe reads as "the gate failed, loosen it", and that is how a
 false-PASS gate is born.
 
+> **REVISED 2026-08-18 at the S6b merge, by operator ruling — the probe now
+> PINS the gap instead of failing on it.** The paragraph above is right about
+> the danger and wrong about the remedy, and the two halves came apart at the
+> merge: `.github/workflows/test.yml` in the fork runs `go test` on every push
+> and skips nothing (operator directive 2026-08-15), so a permanently failing
+> test **does** gate — it makes `main` red forever and hides the next real
+> failure inside an already-red run. "Does not gate" was never implemented.
+>
+> `TestGate51bMaxScrollAgreesWithVisibility` now asserts the divergence is
+> **exactly 22 values spanning `[239,260]`** — the measured gap. It is not
+> loosened; it is **strictly more sensitive**, and both directions were
+> mutation-proved before the merge:
+>
+> - predicates made to agree (fadeClip restored) → **FAILS**, naming that
+>   outcome and saying to delete the gate. The old shape went green and told
+>   nobody.
+> - geometry shifted by one → **FAILS** with `23 values spanning [238,260]`.
+>   The old shape could not tell 22 divergences from 200 — both were just red,
+>   which is the state it already sat in.
+>
+> The danger this section names is real and unchanged: **do not re-pin the
+> constants to whatever a red run prints.** The test says so itself. A moved
+> gap is either the deferred honest-geometry work landing, or a defect.
+
 ---
 
 ## 3. WHAT EACH PHASE MUST NOT DO

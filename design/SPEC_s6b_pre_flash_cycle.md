@@ -621,7 +621,7 @@ the separation instruction, and `len(plan)` is unchanged.
 | 3.3 | the ms1 clause at 1 seed/1 leg, **1 seed/2 legs**, and 2 seeds/2 legs. **`passRecord` cannot distinguish the last two** (`{full, legs, suppliedCosigners}`), so this is a **flow-level** assertion driving verify with two seeds — as a unit test it silently degrades to two cases and stops exercising the middle one, which is the case that kills the filed remedy |
 | 4 | the sweep states its own coverage |
 | 5.1 | the predicate agrees with actual visibility — **must be green** |
-| 5.1b | R-E's `maxScroll` divergence probe — **failures expected, files findings, does not gate** |
+| 5.1b | R-E's `maxScroll` divergence probe — **REVISED 2026-08-18 at the merge, by operator ruling: PINS the gap at exactly 22 values spanning `[239,260]` and passes.** Was "failures expected, files findings, does not gate" — but the fork's CI runs `go test` on every push and skips nothing, so a permanently red test gates everything and hides the next real failure. The pinned form is strictly more sensitive: it fails both when the gap vanishes (fadeClip restored — delete the gate) and when it drifts (a defect). Mutation-proved in both directions. See `IMPLEMENTATION_PLAN_s6b.md` §GATE 5.1b |
 | 5.3 | one pixel-level assertion: an arrow's chip does not overlap the top/bottom drawn text rows |
 | 6 | the restore document does not claim the device engraves no passphrase on a run that cut a passphrase plate |
 | 6a | the condition is **cut**, not **offered** — a declined offer and an aborted engrave both leave the shipped sentence unchanged |
