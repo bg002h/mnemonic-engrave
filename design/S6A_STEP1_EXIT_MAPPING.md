@@ -55,6 +55,22 @@ implicit fall-through at **149**, reached after the verify-OK notice at `:148`.
 
 **F3 — one call site, one-shot, no retry loop.**
 
+> **SUPERSEDED 2026-08-18 by S6b P9 — all three clauses.** The production call
+> site now loops (`gui/singlesig.go:217` is `for {`) and dispatches through a
+> test seam (`gui/singlesig.go:223`, `singleSigVerifyFn`, declared at
+> `gui/singlesig_verify.go:263`), so it is neither one-shot nor the only name
+> the flow is reached by. The signature in the grep transcript below is also
+> stale: it is now
+> `func singleSigVerifyFlow(ctx *Context, th *Colors, full, template, engravedWithPassphrase bool, rec *verifyRecord) bool`
+> (`gui/singlesig_verify.go:96`) — it takes a record and returns "can the
+> operator still act on this", which is what drives the retry.
+>
+> **This site was MISSED by the sweep that found the other four** and caught by
+> `scripts/fold-propagation-check.sh` on the phrasing `one-shot`. It is the
+> reason that script exists: the fold corrected the claim everywhere the
+> reviewer pointed and left the doc's own finding heading, three hundred lines
+> above, still asserting it.
+
     $ grep -rn 'singleSigVerifyFlow(' --include='*.go' .
     gui/singlesig_verify.go:65:func singleSigVerifyFlow(ctx *Context, th *Colors, full, template bool) {
     gui/singlesig.go:132:		singleSigVerifyFlow(ctx, th, full, template)
