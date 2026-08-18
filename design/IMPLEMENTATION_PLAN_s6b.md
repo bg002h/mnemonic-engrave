@@ -38,7 +38,42 @@ and the fix is never to delete assertions or raise the limit reflexively.
 
 **Scope with `-run` while iterating; run the full suite once per phase gate,
 with stdout and stderr captured to separate files.** Narrowing `./...` to
-`./gui/` buys nothing — `gui` is essentially the whole suite.
+`./gui/` buys nothing — `gui` is essentially the whole suite (**440.6 s of
+473.5 s at P3 — 93%**).
+
+### THE GATE MUST PASS `-timeout`, from P5 onward. Measured, not precautionary.
+
+| phase | `gui` wall |
+| --- | --- |
+| P3 | 440.6 s |
+| P4 | **496.8 s** (+56.2 s in one phase, **83% of the 600 s default**) |
+| P5 projected | ~553 s (92%) |
+| **P6 projected** | **~609 s — OVER** |
+
+**Every gate run from P5 on passes `-timeout 20m` explicitly.**
+
+**This is not the reflexive limit-raising the runbook forbids.** That warning is
+about raising a limit to turn a red run green, hiding a real failure. This is the
+opposite: the default is about to convert a **passing** suite into a fake failure.
+A package that dies at 600 s reports **every assertion passing** — S6a lost a
+whole cycle-step to exactly that. Raising it preemptively, with the growth
+measured and stated, keeps a timeout meaning *"something hung"* instead of
+*"the suite got longer"*.
+
+### Use the cores: 24 available, `gui` uses ONE
+
+`gui` has **zero** `t.Parallel()` call sites and **zero** `testing.Short()`
+guards, so its ~500 s runs on a single core while 23 sit idle.
+
+**Shard the gate across parallel `-run` invocations** — each shard is its own
+process with its own timeout budget and its own binary. This is the cheap win:
+no code change, no new abstraction, and it removes the ceiling cliff as a side
+effect rather than only postponing it.
+
+**Do NOT add `t.Parallel()` to `gui` as a speed fix.** The package carries global
+state (`Context`, `Platform`, the emulator harness), and cross-test interference
+produces flakes. A flake on a funds-critical gate is worse than a slow gate: it
+teaches people to re-run until green.
 
 **Toolchain:** go1.26.3 at
 `/nix/store/33fw5m31lfcnk4ff2f0df7j2bxnh8lgk-go-1.26.3/bin` (CI pins 1.26 via
