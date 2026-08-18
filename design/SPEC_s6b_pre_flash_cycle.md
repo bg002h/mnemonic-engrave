@@ -231,15 +231,33 @@ to **`"the keyboard"`**. A preloaded passphrase did not come from the keyboard.
 ### 2.3 The footer
 
 ```
-preloaded    "POLICY <8 hex, grouped>  DERIVED, NOT TYPED"   36 chars
-standalone   "FINGERPRINTS TYPED, NOT VERIFIED"              32 chars
+preloaded    "POLICY <8 hex, grouped>  DERIVED"    25 chars
+standalone   "FINGERPRINTS TYPED, NOT VERIFIED"    32 chars
 ```
 
-Band budget is **42 characters wide × 2 lines**
-(`SPIKE_s6b_q2_results.md` §3b). The preloaded form fits with 6 to spare and
-consumes **no new band line** — the worst case (both fingerprints plus a spaced
-passphrase) already fills 2 top and 2 bottom, and a third line does not error or
-clip: it silently cuts into the 3 mm outer margin.
+**Band budget is 32 characters × 2 lines**, from spec 4.3 — *no metadata line
+may exceed 64 mm* = 409600 device units — sized to clear the 10 mm corner
+screw-hole bands by 0.5 mm each side, and enforced by `backup`'s pre-existing
+`TestPassphraseBandBudget`.
+
+**Not 42.** `SPIKE_s6b_q2_results.md` §3b's 42 is where a line runs off the
+**plate edge** (544000 units), which is a looser and wrong bound for a metadata
+line. R-H's literal string `POLICY 1A2B 3C4D  DERIVED, NOT TYPED` measures 36
+chars / 460800 units — **8 mm over the cap, into the screw-hole zone** — and was
+corrected during P3 by dropping `, NOT TYPED`. `DERIVED` alone is already a
+positive true claim on this path, and the acceptance screen immediately before
+it states the source in those words (§2.2).
+
+**The standalone footer sits at exactly 409600 — the cap, with zero spare.** Any
+edit to it overruns.
+
+The preloaded form consumes **no new band line** — the worst case (both
+fingerprints plus a spaced passphrase) already fills 2 top and 2 bottom, and a
+third line does not error or clip: it silently cuts into the 3 mm outer margin.
+
+**`DERIVED` is NOT operator-approved wording**, unlike R-M's arm. It is the
+minimal truthful string that fits, chosen in implementation and flagged for
+confirmation — see §8.
 
 **What selects between them is a recorded PROVENANCE, not the policy id.**
 `backup.Passphrase` gains a field stating whether the fingerprints were derived
@@ -562,6 +580,13 @@ a bare `go test ./... -update`** — it rewrites the frozen sixteen.
 ## 8. WHAT THIS SPEC DOES NOT SETTLE
 
 - The exact wording of §3.2's no-passphrase arm, and of §6's conditional clause.
+- **§2.3's preloaded footer, `POLICY <8 hex>  DERIVED`.** R-H's literal string
+  was measured 8 mm over the band cap during P3 and had to change; the
+  replacement is the **minimal truthful string that fits**, not an operator
+  ruling. `DERIVED` alone is a positive true claim on that path and the
+  acceptance screen states the source in the same words (§2.2) — but the
+  operator approved *"DERIVED, NOT TYPED"*, and this is not that. **Needs
+  confirmation.**
 - The label satisfying §2.4's both-forms requirement.
 - **§3.2's third arm** — the multisig sibling's *"Your plates are fine"* verdict,
   adapted to single-sig. Cheap here (the flow already re-derives from a re-typed

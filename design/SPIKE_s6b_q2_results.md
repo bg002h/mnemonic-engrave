@@ -141,7 +141,31 @@ the device derived them). Whatever replaces it competes for the same
 
 ---
 
-## 3b. The band's HORIZONTAL budget — 42 characters (measured after the fact)
+## 3b. The band's horizontal budget — 42 characters, AND THAT IS THE WRONG BOUND
+
+> **CORRECTED BY P3 IMPLEMENTATION, 2026-08-17. Read this before using the 42.**
+>
+> **42 characters is where a band line runs off the 85 mm PLATE EDGE** (544000
+> device units). That is not the constraint a metadata line is subject to.
+>
+> The real cap is **spec 4.3: no metadata line may exceed 64 mm** = **409600
+> units** = **32 characters** at this face — a 2-D geometric limit sized to clear
+> the 10 mm corner screw-hole bands by 0.5 mm each side. `backup`'s own
+> pre-existing `TestPassphraseBandBudget` has enforced it all along.
+>
+> **The evidence was in the table below and went unread.** It records
+> `FINGERPRINTS TYPED, NOT VERIFIED` at **409600 units** — that figure *is* the
+> ceiling, exactly, with zero spare. The narrative called the budget 42 without
+> cross-checking its own row against the test that already existed.
+>
+> **What it cost:** R-H's literal footer `POLICY 1A2B 3C4D  DERIVED, NOT TYPED`
+> (36 chars, 460800 units) is **8 mm over the cap, into the screw-hole zone**,
+> and would have engraved there permanently. It passed five review lenses
+> because every one inherited "42" as settled rather than asking *42 of what*.
+>
+> **This is the second number in this cycle measured against the wrong bound** —
+> the first was the `Text` title budget (25 raw-width vs 28 layout-based, §3c).
+> Both were caught by implementation, not by review.
 
 §4 below originally listed the band's horizontal fit as **not measured**. Three
 of the five options for the policy id turned out to depend on it, so it was
