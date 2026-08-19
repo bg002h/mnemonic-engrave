@@ -245,6 +245,26 @@ matters before touching the machine.</p>
 </div>
 """)
 
+# Plate -> (key index, chunk, total) from the mapping the journey emitted.
+_CARD_INDEX = os.path.join(OUT, "card-index.txt")
+if not os.path.exists(_CARD_INDEX):
+    raise SystemExit(f"{_CARD_INDEX} missing — run transcript_pathological.sh first")
+_COUNTS = [(int(l.split()[0]), int(l.split()[1]))
+           for l in open(_CARD_INDEX).read().strip().split("\n") if l.strip()]
+_MD1_PLATES = 3
+
+
+def _plate_owner(n):
+    """Which key does plate n belong to, and which of its chunks is it?"""
+    idx = n - _MD1_PLATES - 1
+    for ki, cnt in _COUNTS:
+        if idx < cnt:
+            return ki, idx + 1, cnt
+        idx -= cnt
+    raise SystemExit(f"plate {n} is past the end of card-index.txt "
+                     f"({sum(c for _, c in _COUNTS)} card chunks recorded)")
+
+
 plates = sorted((f for f in os.listdir(os.path.join(OUT, "plates")) if f.endswith(".png")),
                 key=lambda s: int(re.search(r"(\d+)", s).group(1)))
 cells = []
@@ -253,9 +273,13 @@ for f in plates:
     if n <= 3:
         cap = f"plate {n} — md1 policy, chunk {n}/3"
     else:
-        ki, ch = (n - 4) // 2, (n - 4) % 2 + 1
+        # Was `(n-4)//2`, which assumed every key is exactly TWO chunks. Item 5
+        # moved the keys to four-level BIP-48 origins and most became THREE,
+        # so the arithmetic desynced and then raised IndexError. The journey
+        # now RECORDS the per-key chunk counts; read them rather than guess.
+        ki, ch, tot = _plate_owner(n)
         k = keys[ki]
-        cap = f"plate {n} — @{ki} [{k['fp']}/{k['path'][2:]}] chunk {ch}/2"
+        cap = f"plate {n} — @{ki} [{k['fp']}/{k['path'][2:]}] chunk {ch}/{tot}"
     cells.append(img(os.path.join(OUT, "plates", f), "plate", cap))
 
 P.append(f"""

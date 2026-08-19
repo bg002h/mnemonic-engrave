@@ -84,7 +84,7 @@ run "$MD" encode --group-size 0 "$T"
 
 echo "########## 3. so it is chunked -- WITH the origin the warning asked for"
 runcap "$W/out/pathological/md1.txt" '^md1' \
-  "$MD" encode --group-size 0 --force-chunked --path bip84 "$T"
+  "$MD" encode --group-size 0 --force-chunked --path bip48 "$T"
 
 # Now — and only now — the chunk set exists on disk for the steps below.
 MD1S=$(tr '\n' ' ' < "$W/out/pathological/md1.txt")
@@ -94,9 +94,14 @@ run "$MD" inspect $MD1S
 
 echo "########## 5. OBSTACLE 1 — mk cannot derive the stub from a CHUNKED md1"
 XPUB=$(grep '^xpub' "$W/inputs-pathological/keys/key-00.xpub")
+# Origin read from the key file rather than typed in, so it cannot drift from
+# the key it describes — it was hardcoded to key-00's old bip84 origin, which
+# item 5 has since moved to m/48'/0'/0'/2'.
+K0FP=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$W/inputs-pathological/keys/key-00.xpub" | head -1)
+K0PATH=$(sed -n 's/.*origin \[[0-9a-f]*\/\([^]]*\)\].*/\1/p' "$W/inputs-pathological/keys/key-00.xpub" | head -1)
 FIRST=$(head -1 "$W/out/pathological/md1.txt")
-run "$MK" encode --xpub "$XPUB" --origin-fingerprint 73c5da0a \
-  --origin-path "m/84'/0'/0'" --from-md1 "$FIRST" --group-size 0
+run "$MK" encode --xpub "$XPUB" --origin-fingerprint "$K0FP" \
+  --origin-path "m/$K0PATH" --from-md1 "$FIRST" --group-size 0
 
 echo "########## 6. the stub, derived by hand from the template id"
 echo "MEASURED, not cited: on a single-string wallet where --from-md1 DOES work,"
@@ -141,22 +146,48 @@ for f in "$W"/inputs-pathological/keys/key-*.xpub; do
     printf '%s\n' "$CARD" >&2
     exit 1
   fi
+  # Chunk count is NOT fixed at 2. Item 5 moved these keys to BIP-48's
+  # four-level origin `m/48'/0'/N'/2'`, and the longer path pushes most cards
+  # to THREE chunks (account 0 still fits in two). This guard caught that
+  # assumption the moment it became false, which is the whole point of it —
+  # so it now demands "at least one", not "exactly two".
   NL=$(printf '%s\n' "$CARD" | grep -c '^mk1')
-  if [ "$NL" -ne 2 ]; then
-    echo "FATAL: $f produced $NL mk1 line(s), expected 2" >&2
+  if [ "$NL" -lt 1 ]; then
+    echo "FATAL: $f produced no mk1 lines" >&2
     exit 1
   fi
   printf '%s\n' "$CARD" | grep '^mk1' >> "$W/out/pathological/mk-encode-raw.txt"
 done
 
 # Belt and braces: the engraved bundle must have exactly the expected shape.
+# Belt and braces: every key must have contributed at least one chunk. The
+# total is no longer 2*NKEYS (see above), so the invariant is "no key silently
+# missing" rather than an exact line count.
 NKEYS=$(ls "$W"/inputs-pathological/keys/key-*.xpub | wc -l)
-WANT=$(( NKEYS * 2 ))
 GOT=$(grep -c '^mk1' "$W/out/pathological/mk-encode-raw.txt")
-if [ "$GOT" -ne "$WANT" ]; then
-  echo "FATAL: expected $WANT mk1 lines for $NKEYS keys, got $GOT" >&2
+if [ "$GOT" -lt "$NKEYS" ]; then
+  echo "FATAL: $NKEYS keys produced only $GOT mk1 lines — a card is missing" >&2
   exit 1
 fi
+echo "note: $NKEYS key cards -> $GOT mk1 chunks (BIP-48 origins push most cards to 3)"
+
+# Emit the plate->key mapping the document needs, instead of leaving it to be
+# re-derived by arithmetic. The PDF builder used to compute `(n-4)//2`, which
+# silently assumed EVERY key was two chunks; item 5's four-level origins made
+# that false and it raised IndexError. A count that varies per key has to be
+# recorded by whatever produced it.
+: > "$W/out/pathological/card-index.txt"
+for f in "$W"/inputs-pathological/keys/key-*.xpub; do
+  ki=$(basename "$f" .xpub | sed 's/key-0*//'); [ -z "$ki" ] && ki=0
+  KX=$(grep '^xpub' "$f")
+  KFP=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$f" | head -1)
+  KPATH=$(sed -n 's/.*origin \[[0-9a-f]*\/\([^]]*\)\].*/\1/p' "$f" | head -1)
+  NC=$("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
+        --origin-path "m/$KPATH" --policy-id-stub "$STUB" --group-size 0 \
+        2>/dev/null | grep -c '^mk1')
+  printf '%s %s %s %s\n' "$ki" "$NC" "$KFP" "$KPATH" >> "$W/out/pathological/card-index.txt"
+done
+run cat "$W/out/pathological/card-index.txt"
 run wc -l "$W/out/pathological/mk-encode-raw.txt"
 run "$MK" decode $(sed -n '1,2p' "$W/out/pathological/mk-encode-raw.txt")
 
@@ -176,6 +207,33 @@ run "$ME" bundle --in "$W/out/pathological/backup-strings.txt" --preview "$W/out
 
 echo "########## 9. the ids, and which one mk actually uses for the stub"
 run bash -c "$MD inspect $MD1S 2>/dev/null | grep -E 'policy-id|template-id'"
+
+echo "########## 9b. THE ADDRESSES — the check this wallet could never do before"
+echo "Item 5: the eleven keys used to sit at BIP-84's three-level single-sig"
+echo "account path, while wsh(<miniscript>) is a MultiSig script context that"
+echo "requires a depth-FOUR xpub. md refused every one of them, so NO ADDRESS"
+echo "could be derived for this wallet by any tool -- which is why no journey"
+echo "ever showed one. Re-derived at m/48'/0'/N'/2', they compose."
+echo
+echo "This is the FUNCTIONAL half of a round trip: the structural half proves"
+echo "the bytes survived, and this proves they mean the wallet we intended."
+echo "Compare these against your coordinator before engraving anything."
+echo
+KEYARGS=()
+for f in "$W"/inputs-pathological/keys/key-*.xpub; do
+  ki=$(basename "$f" .xpub | sed 's/key-0*//'); [ -z "$ki" ] && ki=0
+  KEYARGS+=(--key "@$ki=$(grep '^xpub' "$f")")
+done
+# A full-policy md1 (keys embedded) is what carries the origin into the
+# derivation. The engraved artifact stays the KEYLESS template above; this is
+# the same wallet with its keys supplied, purely to check the addresses.
+FULL=$("$MD" encode --group-size 0 --force-chunked --path bip48 "${KEYARGS[@]}" "$T" 2>/dev/null | grep '^md1')
+if [ -z "$FULL" ]; then
+  echo "FATAL: could not build the keyed policy for address derivation" >&2
+  exit 1
+fi
+run "$MD" address $FULL --chain 0 --count 3
+run "$MD" address $FULL --chain 1 --count 3
 
 echo "########## 10. the seed, and the refusal that still holds"
 run cat "$W/inputs-pathological/seeds/master-A.seed"

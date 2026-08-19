@@ -30,28 +30,28 @@ md: codec error: payload is 182 data symbols; the codex32 regular code caps sing
 [exit 1]
 
 ########## 3. so it is chunked -- WITH the origin the warning asked for
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode --group-size 0 --force-chunked --path bip84 wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))))))
-chunk-set-id: 0x02038
-md1fqgpcpqpz3m6jzzqqvzv5e4kqq0gfqye4m2zdeeqfw4e8cwvqy08m65x4mvaevc3h25saqzxp5rc3jll8k8
-md1fqgpcpq03433dhkpfhxsg45vyyqfx2v6mwrda3qzv6a4pxuusyh2unu8xqz8naa2r2akwuh3njfahh5jk0d
-md1fqgpcpqje3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qlwnqys0chhage
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode --group-size 0 --force-chunked --path bip48 wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))))))
+chunk-set-id: 0x829c6
+md1fs2wxpqpzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsc92gdhnxq3mrt4
+md1fs2wxpqwxkx9k7c9xu6pzk3ssspyefntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkemjesdfjpw8z4kp2ay
+md1fs2wxpq3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qqh8tw3xyv8tr5s
 note: stdout is a keyless descriptor template (no keys)
 [exit 0]
 
 ########## 4. the chunk set decodes back to the same 11-key policy
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fqgpcpqpz3m6jzzqqvzv5e4kqq0gfqye4m2zdeeqfw4e8cwvqy08m65x4mvaevc3h25saqzxp5rc3jll8k8 md1fqgpcpq03433dhkpfhxsg45vyyqfx2v6mwrda3qzv6a4pxuusyh2unu8xqz8naa2r2akwuh3njfahh5jk0d md1fqgpcpqje3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qlwnqys0chhage
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fs2wxpqpzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsc92gdhnxq3mrt4 md1fs2wxpqwxkx9k7c9xu6pzk3ssspyefntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkemjesdfjpw8z4kp2ay md1fs2wxpq3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qqh8tw3xyv8tr5s
 template: wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))))))
 n: 11
 wallet-policy-mode: false
-md1-encoding-id: 02038dc4fbb636e437178a2798f63fb9
+md1-encoding-id: 829c6ddb2f65a7f47078dd60d5a57ce7
 wallet-descriptor-template-id: 5b48af35d4321a3ac18b43045e2523cc
-wallet-policy-id: d3dda0f3a9ef2eef1f1de404b8a352a5
-wallet-policy-id-fingerprint: 0xd3dda0f3
+wallet-policy-id: f89e23f13c697ae62ef10328d71d7e24
+wallet-policy-id-fingerprint: 0xf89e23f1
 note: stdout is a keyless descriptor template (no keys)
 [exit 0]
 
 ########## 5. OBSTACLE 1 — mk cannot derive the stub from a CHUNKED md1
-$ /scratch/code/shibboleth/mnemonic-key/target/release/mk encode --xpub xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V --origin-fingerprint 73c5da0a --origin-path m/84'/0'/0' --from-md1 md1fqgpcpqpz3m6jzzqqvzv5e4kqq0gfqye4m2zdeeqfw4e8cwvqy08m65x4mvaevc3h25saqzxp5rc3jll8k8 --group-size 0
+$ /scratch/code/shibboleth/mnemonic-key/target/release/mk encode --xpub xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --origin-fingerprint 73c5da0a --origin-path m/48'/0'/0'/2' --from-md1 md1fs2wxpqpzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsc92gdhnxq3mrt4 --group-size 0
 error: md1 input rejected: wire-format version mismatch: got 9, expected 4
 [exit 2]
 
@@ -63,19 +63,34 @@ mk embedded stub 726a6663 while that wallet's ids were
 though SPEC_mk_v0_1.md 3.3 names the WalletPolicyId. So mk follows the
 template-id, and the stub below is DERIVED from it rather than typed in.
 
-$ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fqgpcpqpz3m6jzzqqvzv5e4kqq0gfqye4m2zdeeqfw4e8cwvqy08m65x4mvaevc3h25saqzxp5rc3jll8k8 md1fqgpcpq03433dhkpfhxsg45vyyqfx2v6mwrda3qzv6a4pxuusyh2unu8xqz8naa2r2akwuh3njfahh5jk0d md1fqgpcpqje3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qlwnqys0chhage  2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p'
+$ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fs2wxpqpzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsc92gdhnxq3mrt4 md1fs2wxpqwxkx9k7c9xu6pzk3ssspyefntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkemjesdfjpw8z4kp2ay md1fs2wxpq3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qqh8tw3xyv8tr5s  2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p'
 5b48af35d4321a3ac18b43045e2523cc
 [exit 0]
 
 ########## 7. the eleven key cards — ALL of them, each with its own origin
-$ wc -l /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/mk-encode-raw.txt
-22 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/mk-encode-raw.txt
+note: 11 key cards -> 30 mk1 chunks (BIP-48 origins push most cards to 3)
+$ cat /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/card-index.txt
+0 2 73c5da0a 48'/0'/0'/2'
+1 3 73c5da0a 48'/0'/1'/2'
+2 3 73c5da0a 48'/0'/2'/2'
+3 3 73c5da0a 48'/0'/3'/2'
+4 2 b8688df1 48'/0'/0'/2'
+5 3 b8688df1 48'/0'/1'/2'
+6 3 b8688df1 48'/0'/2'/2'
+7 3 b8688df1 48'/0'/3'/2'
+8 2 28645006 48'/0'/0'/2'
+9 3 28645006 48'/0'/1'/2'
+10 3 28645006 48'/0'/2'/2'
 [exit 0]
 
-$ /scratch/code/shibboleth/mnemonic-key/target/release/mk decode mk1qp30napqqsq4kj90x4eutks2qvzg3vs70mejhk622ws2kgdemj2cd8zwj2skzx2wq0qw70l4q99vdyh5x0z8v4yslsp8qdfvejkukcmjmg0e mk1qp30napp0f30mtxzd65mvwcur9usdatwuqvq6z70r9nwrgk6xn6l8gy6nw970hj35r6l8namjhs4p
-xpub:                xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V
+$ wc -l /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/mk-encode-raw.txt
+30 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/mk-encode-raw.txt
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-key/target/release/mk decode mk1qpd8cwpqqsq4kj90x4eutks2q5zg3vs7rnefw94m5rru59s2su80aw2q4wgdpapgfl4pkhsdyytkwl5z8lphut2hvvpp5av5muuc0cmfrjw2 mk1qpd8cwpp806lhaeh6reknylagmwyjycf8044xtt9flsdlkvt6f6cthyl995lpm5zlrp6yv6kc36tw
+xpub:                xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf
 origin_fingerprint:  73c5da0a
-origin_path:         84'/0'/0'
+origin_path:         48'/0'/0'/2'
 policy_id_stubs:     5b48af35
 chunks:              2 (long)
 note: stdout is watch-only — public keys only, cannot spend
@@ -89,7 +104,7 @@ engraved file is now assembled from this run's own md1 chunks and key
 cards, so print and engrave cannot disagree.
 
 $ wc -l /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/backup-strings.txt
-25 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/backup-strings.txt
+33 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/backup-strings.txt
 [exit 0]
 
 ########## 8. me bundle: validates, and prints the plate checklist
@@ -119,41 +134,82 @@ me: rendered plate 22 → /scratch/code/shibboleth/mnemonic-engrave/design/journ
 me: rendered plate 23 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-23.png
 me: rendered plate 24 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-24.png
 me: rendered plate 25 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-25.png
+me: rendered plate 26 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-26.png
+me: rendered plate 27 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-27.png
+me: rendered plate 28 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-28.png
+me: rendered plate 29 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-29.png
+me: rendered plate 30 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-30.png
+me: rendered plate 31 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-31.png
+me: rendered plate 32 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-32.png
+me: rendered plate 33 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-33.png
 me: wrote manifest to /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/manifest.json
-me: backup needs 26 plates (25 public + ms1 on device):
-  plate 1/26  md1 policy  → push via NFC & engrave
-  plate 2/26  md1 policy  → push via NFC & engrave
-  plate 3/26  md1 policy  → push via NFC & engrave
-  plate 4/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 5/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 6/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 7/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 8/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 9/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 10/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 11/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 12/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 13/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 14/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 15/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 16/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 17/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 18/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 19/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 20/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 21/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 22/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 23/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 24/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 25/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 26/26  ms1 secret  → TYPE ON DEVICE (New > Input Seed > CODEX32); never via this tool
+me: backup needs 34 plates (33 public + ms1 on device):
+  plate 1/34  md1 policy  → push via NFC & engrave
+  plate 2/34  md1 policy  → push via NFC & engrave
+  plate 3/34  md1 policy  → push via NFC & engrave
+  plate 4/34  mk1 chunk 1/3  → push via NFC & engrave
+  plate 5/34  mk1 chunk 2/3  → push via NFC & engrave
+  plate 6/34  mk1 chunk 3/3  → push via NFC & engrave
+  plate 7/34  mk1 chunk 1/3  → push via NFC & engrave
+  plate 8/34  mk1 chunk 2/3  → push via NFC & engrave
+  plate 9/34  mk1 chunk 3/3  → push via NFC & engrave
+  plate 10/34  mk1 chunk 1/3  → push via NFC & engrave
+  plate 11/34  mk1 chunk 2/3  → push via NFC & engrave
+  plate 12/34  mk1 chunk 3/3  → push via NFC & engrave
+  plate 13/34  mk1 chunk 1/2  → push via NFC & engrave
+  plate 14/34  mk1 chunk 2/2  → push via NFC & engrave
+  plate 15/34  mk1 chunk 1/2  → push via NFC & engrave
+  plate 16/34  mk1 chunk 2/2  → push via NFC & engrave
+  plate 17/34  mk1 chunk 1/3  → push via NFC & engrave
+  plate 18/34  mk1 chunk 2/3  → push via NFC & engrave
+  plate 19/34  mk1 chunk 3/3  → push via NFC & engrave
+  plate 20/34  mk1 chunk 1/3  → push via NFC & engrave
+  plate 21/34  mk1 chunk 2/3  → push via NFC & engrave
+  plate 22/34  mk1 chunk 3/3  → push via NFC & engrave
+  plate 23/34  mk1 chunk 1/3  → push via NFC & engrave
+  plate 24/34  mk1 chunk 2/3  → push via NFC & engrave
+  plate 25/34  mk1 chunk 3/3  → push via NFC & engrave
+  plate 26/34  mk1 chunk 1/3  → push via NFC & engrave
+  plate 27/34  mk1 chunk 2/3  → push via NFC & engrave
+  plate 28/34  mk1 chunk 3/3  → push via NFC & engrave
+  plate 29/34  mk1 chunk 1/2  → push via NFC & engrave
+  plate 30/34  mk1 chunk 2/2  → push via NFC & engrave
+  plate 31/34  mk1 chunk 1/3  → push via NFC & engrave
+  plate 32/34  mk1 chunk 2/3  → push via NFC & engrave
+  plate 33/34  mk1 chunk 3/3  → push via NFC & engrave
+  plate 34/34  ms1 secret  → TYPE ON DEVICE (New > Input Seed > CODEX32); never via this tool
 [exit 0]
 
 ########## 9. the ids, and which one mk actually uses for the stub
-$ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fqgpcpqpz3m6jzzqqvzv5e4kqq0gfqye4m2zdeeqfw4e8cwvqy08m65x4mvaevc3h25saqzxp5rc3jll8k8 md1fqgpcpq03433dhkpfhxsg45vyyqfx2v6mwrda3qzv6a4pxuusyh2unu8xqz8naa2r2akwuh3njfahh5jk0d md1fqgpcpqje3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qlwnqys0chhage  2>/dev/null | grep -E 'policy-id|template-id'
+$ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fs2wxpqpzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsc92gdhnxq3mrt4 md1fs2wxpqwxkx9k7c9xu6pzk3ssspyefntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkemjesdfjpw8z4kp2ay md1fs2wxpq3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qqh8tw3xyv8tr5s  2>/dev/null | grep -E 'policy-id|template-id'
 wallet-descriptor-template-id: 5b48af35d4321a3ac18b43045e2523cc
-wallet-policy-id: d3dda0f3a9ef2eef1f1de404b8a352a5
-wallet-policy-id-fingerprint: 0xd3dda0f3
+wallet-policy-id: f89e23f13c697ae62ef10328d71d7e24
+wallet-policy-id-fingerprint: 0xf89e23f1
+[exit 0]
+
+########## 9b. THE ADDRESSES — the check this wallet could never do before
+Item 5: the eleven keys used to sit at BIP-84's three-level single-sig
+account path, while wsh(<miniscript>) is a MultiSig script context that
+requires a depth-FOUR xpub. md refused every one of them, so NO ADDRESS
+could be derived for this wallet by any tool -- which is why no journey
+ever showed one. Re-derived at m/48'/0'/N'/2', they compose.
+
+This is the FUNCTIONAL half of a round trip: the structural half proves
+the bytes survived, and this proves they mean the wallet we intended.
+Compare these against your coordinator before engraving anything.
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md address md1fatzr2spzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsr8ztkypux5za md1fatzr2s2rc6cckmmq5mngy26xzzqyn9xddhpk7cspxdw6snwwgzt4wf7rnqpre774p4wmxtyldgm8whvtd8 md1fatzr2s4evc3h25sapudvvtdas2de5z9drq3rg4jnxhqqqrll7xppvaxdwqqs8sngvq9zvd5z6s7pygwfk3 md1fatzr2su9k6zqhwsv0jskp2rsal4egz4ep5859p875x67p5s3wem7sgluxl3d2a3syx3m74wyswrxcvpc54 md1fatzr23zlhaeh6reknylagmwyjycf8044xtt9flsdlkvt6f6cthyl9yvevrz28llsnr4qy500rkxyfe6hw0 md1fatzr23tkxgeal5wa4wy86389z3gq870g9n6rjwuq7cmsyjgffgkpqmffa5k8pmzr2lxjzdetr8v52fs2cv md1fatzr23n04upy3z0n8ek4aj5kk9satjt7uv4am7jn7q2pvhex36qvgp5csmqq29aj78uss09z0mledqds8p md1fatzr23m7j8mxp87s87gwfzjsys8njyze0uj4852ajv5x7fyu88u23mx7vwv6azw8d59kw70a2lmlks0w95 md1fatzr2jx88nfhcc7nza0ynr9p5d3exan7jvup3kx8742q6d662qzwwx3qg6rmwy2r0upegmfdvte0lgjxay md1fatzr2jdkx6k89kfkaz2az67ajl8hyy967je7sks39z80kl7quz6axuvpffejsahhtp2x7gczf3clc26muz md1fatzr2j3w82jq5zap9302ynhp37ggd6z5u4emag0zr8gh9upnjugr26jfvunvs35jvgdjkvf8nxwprt58vw md1fatzr2jmwxeza6dduqqnvtpl3vsgcj7vs58sl2hmlrnysxhs57y20d0sn3047m4jnr9cz5e8jumuwpep9lg md1fatzr2n86g9y9evngtkrskaxskvp4qchq5qpv0pez9rarvlx32c8627y2x4unucwuan7ngdj6m8a4jm3a38 md1fatzr2ntm5awv08c2v0vktw5t6qu9g4xkmv2dywrwkudljyuk9dam643wu0vf30ddl5vwq28tgapq6km0dg md1fatzr2n3g59kdh7306na4nhq32cd5w9c2uzlhxryrtzdu2qf455xvp5uc0ktmeyw4h7cajy9dzdt2xm663g md1fatzr2nuqhu772hljrwlhzlncxfd22zx672chhdu5ajtemtchqtljnzwtnna6j74phutvjl0dhs8ws22759 md1fatzr25q9z7s576y0hwv6a92khwlwfmwulc9zrqupz2zll50ju3dcmghtxtfv0y025ltk2rlu3mjgf4q49y md1fatzr25fnqlk8ycusz0quhfev0a3hqdghjmksz3ry92d3gv4ejtmu9f0zxf3clxvtlnnvxgaz09mvs08va3 md1fatzr25hgcj5r8x9t5j54jfadzzykqz37sefnc0rhk5zchwu9cfljgk8tg3nlnyr6nv2e7vtf5ttahr4hn4 md1fatzr25efq2e50d8mg50ts8t8mquqwc90uynctuc4sv9py5lug68qthk65sax8thnpjetx05qdw2xnz9759 md1fatzr24xrn6wz3pd0pwa4xqjj8e7htel64394h6gme2g4flvkpvqrj3us7k4x9dcp2a2uz2f0tdhlnxyd7a md1fatzr24w75nz845y9up7y276lt29ywu3usza3aqrp2qarn88u9dtnzuy --chain 0 --count 3
+bc1qkuknuy6dsm0fq44cyyhzqy9wl3ex2n6ed39zxhx867l9wlh4yhlsejms64
+bc1q6k2emh2epd57p5qfwswnahtphjlzsuc5x92c7zphr2lnnckzrpzqjdaraf
+bc1q97cvjd2wj75hu62w4at6w4ay0mz3janslla3y3zrml4lglymm38qfh70pa
+note: stdout is watch-only — public keys only, cannot spend
+[exit 0]
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md address md1fatzr2spzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsr8ztkypux5za md1fatzr2s2rc6cckmmq5mngy26xzzqyn9xddhpk7cspxdw6snwwgzt4wf7rnqpre774p4wmxtyldgm8whvtd8 md1fatzr2s4evc3h25sapudvvtdas2de5z9drq3rg4jnxhqqqrll7xppvaxdwqqs8sngvq9zvd5z6s7pygwfk3 md1fatzr2su9k6zqhwsv0jskp2rsal4egz4ep5859p875x67p5s3wem7sgluxl3d2a3syx3m74wyswrxcvpc54 md1fatzr23zlhaeh6reknylagmwyjycf8044xtt9flsdlkvt6f6cthyl9yvevrz28llsnr4qy500rkxyfe6hw0 md1fatzr23tkxgeal5wa4wy86389z3gq870g9n6rjwuq7cmsyjgffgkpqmffa5k8pmzr2lxjzdetr8v52fs2cv md1fatzr23n04upy3z0n8ek4aj5kk9satjt7uv4am7jn7q2pvhex36qvgp5csmqq29aj78uss09z0mledqds8p md1fatzr23m7j8mxp87s87gwfzjsys8njyze0uj4852ajv5x7fyu88u23mx7vwv6azw8d59kw70a2lmlks0w95 md1fatzr2jx88nfhcc7nza0ynr9p5d3exan7jvup3kx8742q6d662qzwwx3qg6rmwy2r0upegmfdvte0lgjxay md1fatzr2jdkx6k89kfkaz2az67ajl8hyy967je7sks39z80kl7quz6axuvpffejsahhtp2x7gczf3clc26muz md1fatzr2j3w82jq5zap9302ynhp37ggd6z5u4emag0zr8gh9upnjugr26jfvunvs35jvgdjkvf8nxwprt58vw md1fatzr2jmwxeza6dduqqnvtpl3vsgcj7vs58sl2hmlrnysxhs57y20d0sn3047m4jnr9cz5e8jumuwpep9lg md1fatzr2n86g9y9evngtkrskaxskvp4qchq5qpv0pez9rarvlx32c8627y2x4unucwuan7ngdj6m8a4jm3a38 md1fatzr2ntm5awv08c2v0vktw5t6qu9g4xkmv2dywrwkudljyuk9dam643wu0vf30ddl5vwq28tgapq6km0dg md1fatzr2n3g59kdh7306na4nhq32cd5w9c2uzlhxryrtzdu2qf455xvp5uc0ktmeyw4h7cajy9dzdt2xm663g md1fatzr2nuqhu772hljrwlhzlncxfd22zx672chhdu5ajtemtchqtljnzwtnna6j74phutvjl0dhs8ws22759 md1fatzr25q9z7s576y0hwv6a92khwlwfmwulc9zrqupz2zll50ju3dcmghtxtfv0y025ltk2rlu3mjgf4q49y md1fatzr25fnqlk8ycusz0quhfev0a3hqdghjmksz3ry92d3gv4ejtmu9f0zxf3clxvtlnnvxgaz09mvs08va3 md1fatzr25hgcj5r8x9t5j54jfadzzykqz37sefnc0rhk5zchwu9cfljgk8tg3nlnyr6nv2e7vtf5ttahr4hn4 md1fatzr25efq2e50d8mg50ts8t8mquqwc90uynctuc4sv9py5lug68qthk65sax8thnpjetx05qdw2xnz9759 md1fatzr24xrn6wz3pd0pwa4xqjj8e7htel64394h6gme2g4flvkpvqrj3us7k4x9dcp2a2uz2f0tdhlnxyd7a md1fatzr24w75nz845y9up7y276lt29ywu3usza3aqrp2qarn88u9dtnzuy --chain 1 --count 3
+bc1qxtlrmq23lczrtx8l9x3nsfp3u5h7vt9zjmy94m6srl354ps9amus2q56lx
+bc1q6keuktp5nwv0mtr593gj8p4yvpvt5gl4hwhzyxzuyu66mtj7leaquyk8qt
+bc1qcyn83peqe3n6flckqwf3fvr2g0y2z8hplfxfm8nfecazxas4ux2sjjwuld
+note: stdout is watch-only — public keys only, cannot spend
 [exit 0]
 
 ########## 10. the seed, and the refusal that still holds
