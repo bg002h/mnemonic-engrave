@@ -27,8 +27,13 @@ Companion artifacts, all committed:
 workspace **781 passed / 0 failed**, clippy `-D warnings` clean, default
 (feature-off) build clean, `Cargo.lock` unchanged.
 
-Not yet reviewed by anyone but its author — an independent pass over the diff
-is still owed.
+**Reviewed and folded.** Opus exec review persisted at `e58f02f7`, fold at
+`e2288ddf`: **GREEN — 0 Critical, 0 Important, 5 Nits**, all five addressed.
+The reviewer rendered **all 23,714 proper binary taptree shapes (1–11 leaves)**
+against an independent oracle plus both BIP-341 depth-128 spines, byte-identical
+throughout, and measured non-regression: of 2,056 shapes, only **9 were
+parseable under the old path and the new renderer reproduces all 9 exactly**
+while repairing the other 2,047.
 
 <details><summary>original entry</summary>
 
@@ -92,23 +97,34 @@ a hypothesis.
 
 </details>
 
-### 3. ~~R1 — the `v:` wrapper-chain renderer bug~~ — **DONE 2026-08-18, review in flight**
+### 3. ~~R1 — the `v:` wrapper-chain renderer bug~~ — **DONE + REVIEWED + FOLDED 2026-08-18**
 
 **Shipped as `descriptor-mnemonic` `285b9fc9`.** `Tag::Verify` now joins the
 wrapper-chain dispatch and its standalone arm is removed, so `vj:` renders as
 `vj:` rather than the unparseable `v:j:`. Gates: **782 passed / 0 failed**,
 clippy clean, default build clean.
 
-**Mutation-verified, not assumed:** restoring the old standalone arm turns BOTH
-the new md-cli property test and the md-codec KAT red.
+**Review found an Important — against my test, not the fix.** The property
+test asserted `render == input` first, making its re-parse clause unreachable
+as a failure; my claim that it "closes the class whatever the shape" was false.
+Folded in `407cab4b`: the corpus is now **generated** (every chain of length
+1-3 over `c s a d j n v`, two bases, five type-position embeddings — 3990
+candidates, 93 accepted) and the property is a **fixpoint**, so the re-parse is
+genuinely load-bearing. Mutation-verified: restoring the old arm now fails with
+*"render emitted a template that does NOT re-parse"* — that clause firing, not
+the equality assert. Gates after fold: **784 passed / 0 failed**.
+
+The renderer itself came back clean: the reviewer diffed old-vs-new over **485
+encoder-accepted `v`-bearing shapes** — 439 changed, all 439 old outputs
+unparseable, and all 485 new renders re-encode to a **byte-identical md1 wire**
+(same-tree, not merely same-parses).
 
 Why it survived at *two* independent sites, both now closed: md-codec's frozen
 KAT had `snj:` as its only chain case (no `v`), and md-cli's fifteen
 hand-written round-trip tests all put `v:` directly on a `pk`, where the
-shorthand path renders it correctly by accident. The md-cli side now has a
-**table-driven property** instead of a sixteenth hand-written case, asserting
-`parse(t) → render == t` **and that the render re-parses** — the second clause
-closes the class for shapes nobody has thought of.
+shorthand path renders it correctly by accident — a corpus assembled
+shape-by-shape only ever covers the shapes somebody thought of, which is why
+the replacement generates its corpus instead of listing it.
 
 **Part 2 of the original item was NOT done, deliberately.** A *runtime* output
 contract inside md-codec — returning `Err` when the render doesn't re-parse —
@@ -311,7 +327,7 @@ entries carry `keys: &[]`.**
 different ways and both corruptions land on exactly the shapes the vectors are
 for.
 
-### 7. ~~F-210 — the journey generator~~ — **DONE 2026-08-18, review in flight**
+### 7. ~~F-210 — the journey generator~~ — **DONE + REVIEWED + FOLDED 2026-08-18** (I-1 spun out as item 9)
 
 **Shipped as `mnemonic-engrave` `b822e4a`.** Both journeys regenerate:
 
@@ -412,6 +428,40 @@ green check on a docs-only push proves only that untouched code still builds.
 ---
 
 </details>
+
+### 9. The engraved `backup-strings.txt` has NO producer — **NEW, Important, found by review 2026-08-18**
+
+Raised as **I-1** in `design/agent-reports/f210-journey-capture-exec-review.md`.
+It is F-210's own defect class, one layer up, and F-210's fix did not touch it.
+
+`inputs*/backup-strings.txt` is what `me bundle` **engraves**, and **nothing in
+the repo produces it**. It is now stale against `mk 0.13.0`, so the journey
+prints one card and engraves a different one for the same key:
+
+| journey | step 2 prints | step 4 engraves |
+| --- | --- | --- |
+| operator | `mk1qpj6vvpq…` | `mk1qpmn4upq…` |
+| pathological | `mk1qp30napq…` | `mk1qp0jgzpq…` |
+
+**Both decode to identical fields, so `me bundle` exits 0 and nothing
+complains.** Three generations of mk1 are now in play across inputs, committed
+transcripts, and today's output.
+
+**Not fixed unattended, deliberately.** Regenerating the fixture changes *what
+gets engraved* and moves committed artifacts — that is the operator's call, not
+a maintenance edit. Options: (a) generate `backup-strings.txt` from the journey
+itself, so the engraved cards are the ones just printed; (b) regenerate it once
+and pin it, accepting that it drifts again on the next `mk` release; (c) add a
+consistency check that fails when the two disagree, leaving the fixture alone.
+**(a) is the only one that removes the defect class rather than re-detecting
+it.**
+
+Same review also noted the committed **operator** transcript carries a second
+instance of the stale-file evidence (`mk encode` prints `mk1qpf7f8pq…`,
+`mk inspect` consumes `mk1qpmn4up…`) — my F-210 commit cited only the
+pathological one.
+
+---
 
 ## DECISIONS NEEDED — blocking, cheap to give
 
