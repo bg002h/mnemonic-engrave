@@ -41,7 +41,18 @@ runcap() {
   sout="$(mktemp)"; serr="$(mktemp)"
   "$@" >"$sout" 2>"$serr"; rc=$?
   cat "$sout"; cat "$serr"
-  grep -E "$keep" "$sout" > "$out" || true
+  # I-2 (exec review): a ZERO-MATCH capture used to be swallowed by `|| true`,
+  # leaving an empty file. Seven of eight consumers then fail loudly, but
+  # `transcript_pathological.sh`'s template-id step printed BLANK at [exit 0] --
+  # and that step is what justifies the hardcoded --policy-id-stub below it.
+  # An empty capture is a capture FAILURE, so say so and delete the file: a
+  # later read then dies with "no such file" instead of reading nothing.
+  if ! grep -E "$keep" "$sout" > "$out"; then
+    rm -f "$out"
+    printf 'runcap: CAPTURE FAILED -- no stdout line matched /%s/\n' "$keep"
+    printf 'runcap: %s not written; any later step reading it will fail loudly\n' "$out"
+    [ "$rc" -eq 0 ] && rc=1
+  fi
   rm -f "$sout" "$serr"
   echo "[exit $rc]"
   echo
