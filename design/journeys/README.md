@@ -113,12 +113,33 @@ the time they were built no address could be derived for this wallet.
 
 They were **not** rebuilt, deliberately: `shots/` has **zero tracked files**, so
 the screenshots these documents embed exist nowhere in the repo and a rebuild
-produces pages with missing-image placeholders. Regenerating them faithfully
+produces pages with missing-image placeholders — and **since 2026-08-19 such a
+build FAILS with exit 1** rather than reporting success (see "The builds refuse
+to lie" below). Regenerating them faithfully
 needs the emulator re-walked, which is separate work.
 
 Until then, **the HTML built by the commands below is the current document and
 the PDF is not.** This is exactly the decay the paragraph above warns about,
 recorded rather than left for a reader to discover.
+
+## The builds refuse to lie — 2026-08-19
+
+`build_pdf.py`, `build_pdf_pathological.py` and `build_pdf_payload.py` **exit 1
+when any referenced screenshot or plate is absent**, listing every one. They
+used to render a `missing:` placeholder and exit 0.
+
+The constellation recon measured what that cost: **both wallet journeys were
+building with 100 % of their screenshots missing — 19/19 and 13/13 — and both
+reported success.** A document that silently asserts less than it claims is the
+exact decay this README is otherwise about.
+
+Enforcement is the **default**. `--allow-missing` is an explicit opt-out for a
+deliberate draft; it still prints the full list, then exits 0. There is no flag
+or environment variable that switches the gate *on* — a gate something has to
+enable is a gate that is off whenever someone forgets it.
+
+So the commands below are honest now: if they exit 0, every image in the
+document is real.
 
 ## Reproducing
 

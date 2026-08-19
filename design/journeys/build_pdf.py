@@ -12,6 +12,47 @@ import html
 import json
 import os
 import re
+import sys
+
+# ── Missing-asset gate (P1, 2026-08-19) ────────────────────────────────────
+# `img()` renders a "missing:" placeholder when a screenshot is absent, and the
+# build used to carry on and exit 0. Measured by the constellation recon: BOTH
+# wallet journeys were building with 100 % of their referenced screenshots
+# missing and still reporting success -- a document that silently asserts less
+# than it claims, which is the failure the journeys README is itself about.
+#
+# A skipped step must FAIL, not pass. Enforcement is the DEFAULT and needs no
+# flag to switch on; `--allow-missing` is the explicit opt-OUT for a deliberate
+# draft build. Never the reverse -- a gate that an env var or flag has to ENABLE
+# is a gate that is off whenever someone forgets it.
+#
+# (Duplicated verbatim in the three build_pdf*.py scripts, which already carry
+# their own copies of img(). Keep them identical.)
+MISSING = []
+ALLOW_MISSING = "--allow-missing" in sys.argv
+
+
+def missing_gate(artifact):
+    """Exit non-zero if any referenced asset was absent. Call last."""
+    if not MISSING:
+        return
+    uniq = sorted(set(MISSING))
+    print(
+        f"\n{len(MISSING)} missing asset(s), {len(uniq)} distinct -- "
+        f"{artifact} is INCOMPLETE:",
+        file=sys.stderr,
+    )
+    for name in uniq:
+        print(f"  missing: {name}", file=sys.stderr)
+    if ALLOW_MISSING:
+        print("--allow-missing given: exiting 0 with an incomplete document.",
+              file=sys.stderr)
+        return
+    print("Refusing to report success. Capture the screenshots (see "
+          "README.md 'Reproducing'), or pass --allow-missing for a draft.",
+          file=sys.stderr)
+    sys.exit(1)
+
 
 W = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(W, "out")
@@ -25,6 +66,7 @@ def b64(path):
 
 def img(path, cls="", cap=None, crop=None):
     if not os.path.exists(path):
+        MISSING.append(os.path.basename(path))
         return f'<p class="missing">missing: {html.escape(os.path.basename(path))}</p>'
     src = path
     if crop:
@@ -452,3 +494,5 @@ path = os.path.join(OUT, "journey.html")
 with open(path, "w") as f:
     f.write(doc)
 print(f"wrote {path} ({len(doc)//1024} KB)")
+missing_gate(path)
+

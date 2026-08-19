@@ -29,3 +29,7 @@ mutants.out*/
 
 # Playwright MCP scratch (page snapshots, console logs) — never part of the repo.
 .playwright-mcp/
+
+# Python bytecode from the design/journeys build scripts.
+__pycache__/
+*.pyc
