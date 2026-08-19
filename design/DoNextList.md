@@ -601,9 +601,10 @@ Nothing in this section blocks any longer. Rulings are recorded at their home
 documents; this is the index, not the text.
 
 1. **Round-trip definition, 4 open items** — **RULED**, verbatim in
-   `DRAFT_round_trip_journey_definition.md` §8. Decoder reads the **rendered
-   preview**, not the toolpath (with a binding mitigation: the decoder must not
-   import the render path, or the check is a tautology); a **fixed test seed** is
+   `DRAFT_round_trip_journey_definition.md` §8. Decoder reads the **toolpath** —
+   the machine's movements (ruled preview, then REVERSED the same day to
+   toolpath, and set **LOW PRIORITY**; see §8.1 there. Independence from the
+   writer remains a separate, still-binding axis); a **fixed test seed** is
    sufficient; the audit **inventories what exists** for now, with the
    should-exist catalogue explicitly deferred rather than rejected; passphrase /
    network / account are **variations on a few common recipes**.

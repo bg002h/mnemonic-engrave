@@ -42,7 +42,7 @@ one tier must never be read as coverage at a higher one.
 | **T1 codec** | in-process encode → decode | the codec is faithful | anything about tools, screens or media |
 | **T2 tool** | CLI → files → CLI, separate processes, real exit codes | **the tools compose** | anything about the device |
 | **T3 operator** | the emulator walks the real device flow, real screens, real input transport | **a user can do the thing** | the physical media |
-| **T4-sim** | simulated engraving under an **advanced clock**, plate rasterized from the **rendered preview** (§8 ruling; was toolpath), **read back by a decoder** | the engraving is **legible**, not merely emitted | real material behaviour — burrs, glare, oxidation, tool deflection |
+| **T4-sim** | simulated engraving under an **advanced clock**, plate rasterized from the **toolpath**, **read back by a decoder** | the engraving is **legible**, not merely emitted | real material behaviour — burrs, glare, oxidation, tool deflection |
 | **T4-metal** | real engraving, photograph of real steel, same decoder | the physical loop | nothing — but ~21 min/plate and consumes material |
 
 T1 is CI-cheap and should be exhaustive. T2 is where this project's defects
@@ -72,17 +72,17 @@ If the decoder reads *the preview image the renderer drew*, sharing the glyph
 code with the writer, the loop proves only that a function agrees with itself —
 the same defect that let a frozen snapshot bless the `v:` renderer bug. So:
 
-- ~~read from the **toolpath the machine would actually cut**, rasterized
-  independently — not from the preview the GUI drew;~~ **SUPERSEDED by the §8
-  ruling 2026-08-19: the decoder reads the rendered preview.** This bullet is
-  struck rather than deleted because it states the cost the ruling accepts, and
-  the next bullet is what now carries the guarantee alone.
+- read from the **toolpath the machine would actually cut**, rasterized
+  independently — not from the preview the GUI drew. **(Briefly reversed and
+  then restored on 2026-08-19; see §8.1. This bullet stands.)**
 - do **not** share glyph-rendering code between writer and decoder. A decoder
   that inherits the writer's idea of a glyph cannot discover that the glyph is
-  ambiguous. **This bullet is now load-bearing, not advisory:** with the
-  toolpath requirement gone, an importing decoder makes the loop prove only that
-  a function agrees with itself. §8 restates it as binding — the decoder MUST
-  NOT import the render path, and reads the emitted image as opaque geometry;
+  ambiguous. **This is a SEPARATE axis from the bullet above** — the recon found
+  a working precedent for it (`seedhammer/backup/qrdecode_test.go`'s `decodeQR`
+  walks the QR module grid per spec and never calls the writer's encoder), and
+  that decoder reads a *rendered* grid. So independence is achievable on either
+  side; the toolpath requirement buys the *additional* guarantee that what was
+  checked is what the machine will actually cut;
 - an **advanced clock** is a legitimate substitution (it only compresses time),
   but every *other* substitution the harness makes must be named in the
   journey's non-coverage statement.
@@ -170,17 +170,30 @@ a run nobody has repeated.
 Recorded verbatim from the operator's ruling, because the audit fanout was
 explicitly gated on these: unruled, eight agents measure eight different things.
 
-**1. The decoder reads the RENDERED PREVIEW ("picture"), not the toolpath.**
-Operator's call, against the draft's recommendation, which is noted here rather
-than re-argued. The cost is real and must be designed around: a preview decoder
-shares code with the preview *writer*, so a bug in the writer produces a
-matching bug in the reader and the round trip passes anyway — the photocopier
-compared against its own copy. **Mitigation, binding on whoever builds it: the
-decoder MUST NOT import the render path.** It reads the emitted SVG/PNG as
-opaque pixels or geometry. That recovers most of the independence for a
-fraction of the toolpath decoder's cost, and it is the difference between this
-being a check and being a tautology. A toolpath decoder stays available later
-as the stronger form.
+**1. The decoder reads the TOOLPATH — the machine's movements. LOW PRIORITY.**
+*Superseded once and restored the same day: the first ruling said rendered
+preview; the operator reversed it — "it makes more sense to do it the other way,
+to read the movements" — and set it low priority. Recorded as a reversal rather
+than silently rewritten, because §3 and §3.1 were edited twice on its account
+and a future reader deserves to see why.*
+
+This restores §3.1's original design constraint in full, and the recon supplies
+a precedent for the harder half of it: `seedhammer/backup/qrdecode_test.go`'s
+`decodeQR` is a real independent decoder — it walks the QR module grid per spec,
+never calls the writer's encoder, and fails loudly on the version range it
+cannot handle rather than passing quietly. It is the only refutation of §3.1's
+"engraving is write-only across the entire current test surface", and it is
+scoped to the passphrase plate.
+
+Note the two requirements are **orthogonal axes**, which the reversal makes
+worth stating: *independence* (do not import the writer) and *substrate*
+(toolpath vs rendered preview). `decodeQR` achieves independence while reading a
+rendered grid. The toolpath ruling buys the additional guarantee that what was
+verified is what the machine will actually cut — not what the GUI drew.
+
+**Priority: LOW.** Consistent with the standing §3.1 deprioritisation. T4-sim
+stays *defined but not staffed*; journeys record T4 coverage as
+**absent-by-decision**, and no near-term work blocks on it.
 
 **2. Generative journeys may start from a FIXED TEST SEED.** Entropy is not
 required. A journey whose inputs change per run cannot serve as a regression
