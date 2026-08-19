@@ -58,7 +58,11 @@ runcap() {
   echo
 }
 
-mkdir -p "$W/out"
+# The two journeys used to share $W/out, so running one CLOBBERED the other's
+# engraved bundle, key cards, manifest and plates — and a PDF built afterwards
+# would then read the wrong journey's artifacts. Same stale-artifact class as
+# F-210, one directory up. Each journey owns its own subtree now.
+mkdir -p "$W/out/pathological/pathological"
 
 T=$(cat "$W/inputs-pathological/wallet-policy.txt")
 # NOTE: MD1S is deliberately NOT set here. It used to be, reading out/md1.txt
@@ -79,18 +83,18 @@ echo "########## 2. it does not fit one string"
 run "$MD" encode --group-size 0 "$T"
 
 echo "########## 3. so it is chunked -- WITH the origin the warning asked for"
-runcap "$W/out/md1.txt" '^md1' \
+runcap "$W/out/pathological/md1.txt" '^md1' \
   "$MD" encode --group-size 0 --force-chunked --path bip84 "$T"
 
 # Now — and only now — the chunk set exists on disk for the steps below.
-MD1S=$(tr '\n' ' ' < "$W/out/md1.txt")
+MD1S=$(tr '\n' ' ' < "$W/out/pathological/md1.txt")
 
 echo "########## 4. the chunk set decodes back to the same 11-key policy"
 run "$MD" inspect $MD1S
 
 echo "########## 5. OBSTACLE 1 — mk cannot derive the stub from a CHUNKED md1"
 XPUB=$(grep '^xpub' "$W/inputs-pathological/keys/key-00.xpub")
-FIRST=$(head -1 "$W/out/md1.txt")
+FIRST=$(head -1 "$W/out/pathological/md1.txt")
 run "$MK" encode --xpub "$XPUB" --origin-fingerprint 73c5da0a \
   --origin-path "m/84'/0'/0'" --from-md1 "$FIRST" --group-size 0
 
@@ -100,19 +104,52 @@ echo "mk embedded stub 726a6663 while that wallet's ids were"
 echo "  wallet-descriptor-template-id: 726a666305756435...  <-- the stub matches THIS"
 echo "  wallet-policy-id:              f05e8a1c282f7740...  <-- and NOT this,"
 echo "though SPEC_mk_v0_1.md 3.3 names the WalletPolicyId. So mk follows the"
-echo "template-id; this wallet's is 5b48af35d4321a3a..., giving stub 5b48af35."
+echo "template-id, and the stub below is DERIVED from it rather than typed in."
 echo
 run bash -c "$MD inspect $MD1S 2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p'"
 
-echo "########## 7. the eleven key cards"
-runcap "$W/out/mk-encode-raw.txt" '^mk1' \
-  "$MK" encode --xpub "$XPUB" --origin-fingerprint 73c5da0a \
-  --origin-path "m/84'/0'/0'" --policy-id-stub 5b48af35 --group-size 0
-run "$MK" decode $(sed -n '1,2p' "$W/out/mk-encode-raw.txt")
+# The stub used to be the literal 5b48af35, hardcoded two lines below with
+# nothing checking it still matched. It is now derived from the same command
+# the step above prints, so the narrative and the cards cannot drift apart.
+# (Verified equal to the old hardcode at the time of the change.)
+STUB=$("$MD" inspect $MD1S 2>/dev/null \
+        | sed -n 's/^wallet-descriptor-template-id: //p' | cut -c1-8)
+if [ -z "$STUB" ]; then
+  echo "FATAL: could not derive the policy-id stub from the template id" >&2
+  exit 1
+fi
+
+echo "########## 7. the eleven key cards — ALL of them, each with its own origin"
+# Was: one card for key-00 only, under a heading that said eleven.
+: > "$W/out/pathological/mk-encode-raw.txt"
+for f in "$W"/inputs-pathological/keys/key-*.xpub; do
+  KX=$(grep '^xpub' "$f")
+  KFP=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$f" | head -1)
+  KPATH=$(sed -n 's/.*origin \[[0-9a-f]*\/\([^]]*\)\].*/\1/p' "$f" | head -1)
+  if [ -z "$KX" ] || [ -z "$KFP" ] || [ -z "$KPATH" ]; then
+    echo "FATAL: $f is missing an xpub or an origin header" >&2
+    exit 1
+  fi
+  "$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
+    --origin-path "m/$KPATH" --policy-id-stub "$STUB" --group-size 0 \
+    2>/dev/null | grep '^mk1' >> "$W/out/pathological/mk-encode-raw.txt"
+done
+run wc -l "$W/out/pathological/mk-encode-raw.txt"
+run "$MK" decode $(sed -n '1,2p' "$W/out/pathological/mk-encode-raw.txt")
+
+echo "########## 7b. the bundle this journey ENGRAVES is BUILT here, not shipped"
+echo "F-210/I-1: inputs-pathological/backup-strings.txt used to be a tracked"
+echo "fixture that nothing produced. It drifted against mk, so the journey"
+echo "printed one card and engraved a different one for the same key. The"
+echo "engraved file is now assembled from this run's own md1 chunks and key"
+echo "cards, so print and engrave cannot disagree."
+echo
+cat "$W/out/pathological/md1.txt" "$W/out/pathological/mk-encode-raw.txt" > "$W/out/pathological/backup-strings.txt"
+run wc -l "$W/out/pathological/backup-strings.txt"
 
 echo "########## 8. me bundle: validates, and prints the plate checklist"
-rm -rf "$W/out/plates" && mkdir -p "$W/out/plates"
-run "$ME" bundle --in "$W/inputs-pathological/backup-strings.txt" --preview "$W/out/plates" --png --manifest "$W/out/manifest.json"
+rm -rf "$W/out/pathological/plates" && mkdir -p "$W/out/pathological/plates"
+run "$ME" bundle --in "$W/out/pathological/backup-strings.txt" --preview "$W/out/pathological/plates" --png --manifest "$W/out/pathological/manifest.json"
 
 echo "########## 9. the ids, and which one mk actually uses for the stub"
 run bash -c "$MD inspect $MD1S 2>/dev/null | grep -E 'policy-id|template-id'"

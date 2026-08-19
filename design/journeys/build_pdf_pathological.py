@@ -10,7 +10,7 @@ than edited out -- three of them are the most useful thing here.
 import base64, html, json, os, re, sys
 
 W = os.path.dirname(os.path.abspath(__file__))
-OUT, SHOTS = os.path.join(W, "out"), os.path.join(W, "shots")
+OUT, SHOTS = os.path.join(W, "out", "pathological"), os.path.join(W, "shots")
 
 
 def b64(p):
@@ -48,7 +48,10 @@ def filebox(path, label=None, limit=None):
                 f'{html.escape(label or os.path.relpath(path, W))}</div>{code(f.read(), limit)}</div>')
 
 
-transcript = open(os.path.join(OUT, "transcript.txt")).read()
+# F-210 class: was out/transcript.txt — an intermediate nothing writes, AND
+# the OPERATOR journey's filename, so this document was being built from the
+# wrong journey's transcript. Reads its own tracked artifact now.
+transcript = open(os.path.join(W, "transcript_pathological.txt")).read()
 S, cur, buf = {}, None, []
 for line in transcript.split("\n"):
     m = re.match(r"^########## (.*)$", line)
@@ -356,6 +359,10 @@ device framebuffer exactly. Plate overlays are the page's own SVG, rendered with
 
 doc = ("<!doctype html><meta charset=utf-8><title>SeedHammer II — the pathological wallet</title>"
        f"<style>{CSS}</style>" + "".join(P))
-p = os.path.join(OUT, "journey.html")
+# Was "journey.html" — the SAME filename build_pdf.py writes, so whichever
+# builder ran last silently clobbered the other's output and only one of the
+# two journeys could exist at a time. Named per journey now, matching
+# build_pdf_payload.py's journey_payload.html convention.
+p = os.path.join(OUT, "journey_pathological.html")
 open(p, "w").write(doc)
 print(f"wrote {p} ({len(doc)//1024} KB)")

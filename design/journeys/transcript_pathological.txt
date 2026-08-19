@@ -4,23 +4,23 @@ md 0.13.0
 [exit 0]
 
 $ /scratch/code/shibboleth/mnemonic-key/target/release/mk --version
-mk 0.12.1
+mk 0.13.0
 [exit 0]
 
 $ /scratch/code/shibboleth/mnemonic-secret/target/release/ms --version
-ms 0.14.1
+ms 0.16.0
 [exit 0]
 
 $ /scratch/code/shibboleth/mnemonic-engrave/target/release/me --version
-me 0.5.1
+me 0.6.0
 [exit 0]
 
 $ /scratch/code/shibboleth/mnemonic-engrave/target/release/me-preview --version
-me-preview 0.5.1
+me-preview 0.6.0
 [exit 0]
 
 ########## 1. the policy — 11 keys, four timelock kinds, a hashlock
-$ cat /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/inputs/wallet-policy.txt
+$ cat /scratch/code/shibboleth/mnemonic-engrave/design/journeys/inputs-pathological/wallet-policy.txt
 wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))))))
 [exit 0]
 
@@ -61,20 +61,18 @@ mk embedded stub 726a6663 while that wallet's ids were
   wallet-descriptor-template-id: 726a666305756435...  <-- the stub matches THIS
   wallet-policy-id:              f05e8a1c282f7740...  <-- and NOT this,
 though SPEC_mk_v0_1.md 3.3 names the WalletPolicyId. So mk follows the
-template-id; this wallet's is 5b48af35d4321a3a..., giving stub 5b48af35.
+template-id, and the stub below is DERIVED from it rather than typed in.
 
 $ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fqgpcpqpz3m6jzzqqvzv5e4kqq0gfqye4m2zdeeqfw4e8cwvqy08m65x4mvaevc3h25saqzxp5rc3jll8k8 md1fqgpcpq03433dhkpfhxsg45vyyqfx2v6mwrda3qzv6a4pxuusyh2unu8xqz8naa2r2akwuh3njfahh5jk0d md1fqgpcpqje3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qlwnqys0chhage  2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p'
 5b48af35d4321a3ac18b43045e2523cc
 [exit 0]
 
-########## 7. the eleven key cards
-$ /scratch/code/shibboleth/mnemonic-key/target/release/mk encode --xpub xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V --origin-fingerprint 73c5da0a --origin-path m/84'/0'/0' --policy-id-stub 5b48af35 --group-size 0
-mk1qpdw8zpqqsq4kj90x4eutks2qvzg3vs70mejhk622ws2kgdemj2cd8zwj2skzx2wq0qw70l4q99vdyh5x0z8v4yslsp8qs8lv4625hfhk862
-mk1qpdw8zpp0f30mtxzd65mvwcur9usdatwuqvq6z70r9nwrgk6xn6l8gy6nw970hj3pzwy4nwdnyztx
-note: stdout is watch-only — public keys only, cannot spend
+########## 7. the eleven key cards — ALL of them, each with its own origin
+$ wc -l /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/mk-encode-raw.txt
+22 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/mk-encode-raw.txt
 [exit 0]
 
-$ /scratch/code/shibboleth/mnemonic-key/target/release/mk decode mk1qpghz4pqqsq4kj90x4eutks2qvzg3vs70mejhk622ws2kgdemj2cd8zwj2skzx2wq0qw70l4q99vdyh5x0z8v4yslsp8qfdcga408tcwtxhq mk1qpghz4pp0f30mtxzd65mvwcur9usdatwuqvq6z70r9nwrgk6xn6l8gy6nw970hj3pdkafng87nwvt
+$ /scratch/code/shibboleth/mnemonic-key/target/release/mk decode mk1qp30napqqsq4kj90x4eutks2qvzg3vs70mejhk622ws2kgdemj2cd8zwj2skzx2wq0qw70l4q99vdyh5x0z8v4yslsp8qdfvejkukcmjmg0e mk1qp30napp0f30mtxzd65mvwcur9usdatwuqvq6z70r9nwrgk6xn6l8gy6nw970hj35r6l8namjhs4p
 xpub:                xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V
 origin_fingerprint:  73c5da0a
 origin_path:         84'/0'/0'
@@ -83,34 +81,45 @@ chunks:              2 (long)
 note: stdout is watch-only — public keys only, cannot spend
 [exit 0]
 
+########## 7b. the bundle this journey ENGRAVES is BUILT here, not shipped
+F-210/I-1: inputs-pathological/backup-strings.txt used to be a tracked
+fixture that nothing produced. It drifted against mk, so the journey
+printed one card and engraved a different one for the same key. The
+engraved file is now assembled from this run's own md1 chunks and key
+cards, so print and engrave cannot disagree.
+
+$ wc -l /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/backup-strings.txt
+25 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/backup-strings.txt
+[exit 0]
+
 ########## 8. me bundle: validates, and prints the plate checklist
-$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me bundle --in /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/inputs/backup-strings.txt --preview /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates --png --manifest /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/manifest.json
-me: rendered plate 1 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-1.png
-me: rendered plate 2 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-2.png
-me: rendered plate 3 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-3.png
-me: rendered plate 4 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-4.png
-me: rendered plate 5 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-5.png
-me: rendered plate 6 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-6.png
-me: rendered plate 7 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-7.png
-me: rendered plate 8 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-8.png
-me: rendered plate 9 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-9.png
-me: rendered plate 10 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-10.png
-me: rendered plate 11 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-11.png
-me: rendered plate 12 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-12.png
-me: rendered plate 13 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-13.png
-me: rendered plate 14 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-14.png
-me: rendered plate 15 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-15.png
-me: rendered plate 16 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-16.png
-me: rendered plate 17 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-17.png
-me: rendered plate 18 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-18.png
-me: rendered plate 19 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-19.png
-me: rendered plate 20 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-20.png
-me: rendered plate 21 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-21.png
-me: rendered plate 22 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-22.png
-me: rendered plate 23 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-23.png
-me: rendered plate 24 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-24.png
-me: rendered plate 25 → /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/plates/plate-25.png
-me: wrote manifest to /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/out/manifest.json
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me bundle --in /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/backup-strings.txt --preview /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates --png --manifest /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/manifest.json
+me: rendered plate 1 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-1.png
+me: rendered plate 2 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-2.png
+me: rendered plate 3 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-3.png
+me: rendered plate 4 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-4.png
+me: rendered plate 5 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-5.png
+me: rendered plate 6 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-6.png
+me: rendered plate 7 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-7.png
+me: rendered plate 8 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-8.png
+me: rendered plate 9 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-9.png
+me: rendered plate 10 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-10.png
+me: rendered plate 11 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-11.png
+me: rendered plate 12 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-12.png
+me: rendered plate 13 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-13.png
+me: rendered plate 14 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-14.png
+me: rendered plate 15 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-15.png
+me: rendered plate 16 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-16.png
+me: rendered plate 17 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-17.png
+me: rendered plate 18 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-18.png
+me: rendered plate 19 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-19.png
+me: rendered plate 20 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-20.png
+me: rendered plate 21 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-21.png
+me: rendered plate 22 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-22.png
+me: rendered plate 23 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-23.png
+me: rendered plate 24 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-24.png
+me: rendered plate 25 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-25.png
+me: wrote manifest to /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/manifest.json
 me: backup needs 26 plates (25 public + ms1 on device):
   plate 1/26  md1 policy  → push via NFC & engrave
   plate 2/26  md1 policy  → push via NFC & engrave
@@ -148,7 +157,7 @@ wallet-policy-id-fingerprint: 0xd3dda0f3
 [exit 0]
 
 ########## 10. the seed, and the refusal that still holds
-$ cat /tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/22fd28a4-d68a-47d6-82b1-8a8570fb5417/scratchpad/journey2/inputs/seeds/master-A.seed
+$ cat /scratch/code/shibboleth/mnemonic-engrave/design/journeys/inputs-pathological/seeds/master-A.seed
 abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
 [exit 0]
 

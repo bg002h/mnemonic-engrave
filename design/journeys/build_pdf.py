@@ -59,7 +59,11 @@ def filebox(path, label=None, limit=None):
 
 
 # ---------------------------------------------------------------- transcript --
-with open(os.path.join(OUT, "transcript.txt")) as f:
+# F-210 class, third instance: this used to read out/transcript.txt, an
+# intermediate NO committed script writes — it existed only because an earlier
+# session had left it there by manual redirect. The tracked artifact is the
+# transcript at the journeys root, so read that.
+with open(os.path.join(W, "transcript.txt")) as f:
     transcript = f.read()
 
 sections = {}
@@ -75,7 +79,31 @@ for line in transcript.split("\n"):
 if cur:
     sections[cur] = "\n".join(buf).strip("\n")
 
-keys = json.load(open(os.path.join(W, "keys.json")))
+# F-210 class: keys.json was NEVER COMMITTED, so this script could not run at
+# all — the same defect the pathological builder already worked around. Nothing
+# here needs a vanished artifact: the fingerprints are in the committed key
+# files' header comments, and the mk1 chunk pairs come from the bundle THIS RUN
+# built (out/backup-strings.txt), so the captions are traceable to the journey
+# rather than to a file somebody once had.
+def _keys_from_run():
+    d = os.path.join(W, "inputs", "keys")
+    bundle = os.path.join(OUT, "backup-strings.txt")
+    if not os.path.exists(bundle):
+        raise SystemExit(f"{bundle} missing — run transcript.sh first; it builds the bundle")
+    mk1 = [l for l in open(bundle).read().split("\n") if l.startswith("mk1")]
+    out = []
+    for i, f in enumerate(sorted(os.listdir(d))):
+        m = re.search(r"\[([0-9a-f]{8})/([^\]]+)\]", open(os.path.join(d, f)).read())
+        if not m:
+            raise SystemExit(f"{f}: no [fingerprint/path] header -- cannot caption its plates")
+        pair = mk1[i * 2:i * 2 + 2]
+        if len(pair) != 2:
+            raise SystemExit(f"{f}: expected 2 mk1 chunks at offset {i*2}, got {len(pair)}")
+        out.append({"index": i, "fingerprint": m.group(1), "mk1_raw": pair})
+    return out
+
+
+keys = _keys_from_run()
 
 # The plate checklist, lifted from the bundle run.
 checklist = ""

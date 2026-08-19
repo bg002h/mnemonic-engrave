@@ -81,10 +81,34 @@ echo "########## 2. one cosigner key, from file"
 run cat "$W/inputs/keys/cosigner-00.xpub"
 XPUB=$(grep '^xpub' "$W/inputs/keys/cosigner-00.xpub")
 MD1=$(grep '^md1' "$W/out/md-encode-raw.txt")
-runcap "$W/out/mk-encode-raw.txt" '^mk1' \
-  "$MK" encode --xpub "$XPUB" --origin-fingerprint ae6647ee \
-  --origin-path "m/48'/0'/0'/2'" --from-md1 "$MD1" --group-size 0
+
+# ALL twelve cosigner cards, each with its own origin read from its own key
+# file — was: cosigner-00 only. The stub comes from --from-md1, so it is
+# derived from the policy above rather than typed in.
+: > "$W/out/mk-encode-raw.txt"
+for f in "$W"/inputs/keys/cosigner-*.xpub; do
+  KX=$(grep '^xpub' "$f")
+  KFP=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$f" | head -1)
+  KPATH=$(sed -n 's/.*origin \[[0-9a-f]*\/\([^]]*\)\].*/\1/p' "$f" | head -1)
+  if [ -z "$KX" ] || [ -z "$KFP" ] || [ -z "$KPATH" ]; then
+    echo "FATAL: $f is missing an xpub or an origin header" >&2
+    exit 1
+  fi
+  "$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
+    --origin-path "m/$KPATH" --from-md1 "$MD1" --group-size 0 \
+    2>/dev/null | grep '^mk1' >> "$W/out/mk-encode-raw.txt"
+done
+run wc -l "$W/out/mk-encode-raw.txt"
 run "$MK" inspect $(sed -n '1,2p' "$W/out/mk-encode-raw.txt")
+
+echo "########## 2b. the bundle this journey ENGRAVES is BUILT here, not shipped"
+echo "F-210/I-1: inputs/backup-strings.txt used to be a tracked fixture that"
+echo "nothing produced. It drifted against mk, so the journey printed one card"
+echo "and engraved a different one for the same key. The engraved file is now"
+echo "assembled from this run's own md1 and key cards."
+echo
+cat "$W/out/md-encode-raw.txt" "$W/out/mk-encode-raw.txt" > "$W/out/backup-strings.txt"
+run wc -l "$W/out/backup-strings.txt"
 
 echo "########## 3. one seed, from file (SECRET)"
 run cat "$W/inputs/seeds/cosigner-00.seed"
@@ -92,10 +116,10 @@ runcap "$W/out/ms-encode.txt" '^ms1' \
   "$MS" encode --phrase "$(cat "$W/inputs/seeds/cosigner-00.seed")"
 
 echo "########## 4. the bundle: validate + plate manifest + checklist"
-run head -3 "$W/inputs/backup-strings.txt"
-run wc -l "$W/inputs/backup-strings.txt"
+run head -3 "$W/out/backup-strings.txt"
+run wc -l "$W/out/backup-strings.txt"
 rm -rf "$W/out/plates" && mkdir -p "$W/out/plates"   # --preview requires a clean dir
-run "$ME" bundle --in "$W/inputs/backup-strings.txt" \
+run "$ME" bundle --in "$W/out/backup-strings.txt" \
   --preview "$W/out/plates" --png --manifest "$W/out/manifest.json"
 
 echo "########## 5. NDEF for the descriptor card"
