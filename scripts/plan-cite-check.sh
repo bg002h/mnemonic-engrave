@@ -64,14 +64,37 @@ set -uo pipefail
 #
 # Order matters only for the advisory line printed at the end (ROOTS[0] is
 # named there as "the fork root"); resolution tries every entry.
+# THIS REPO is located from git, not hardcoded, so the script works from any
+# checkout path. The sibling constellation repos are still absolute, and that
+# is a real limitation — see the CI note below.
+SELF_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo /scratch/code/shibboleth/mnemonic-engrave)"
+
 ROOTS=(
   "${CITE_FORK_ROOT:-/scratch/code/shibboleth/seedhammer}"
-  "/scratch/code/shibboleth/mnemonic-engrave"
+  "$SELF_ROOT"
   "/scratch/code/shibboleth/descriptor-mnemonic"
   "/scratch/code/shibboleth/mnemonic-toolkit"
   "/scratch/code/shibboleth/mnemonic-key"
   "/scratch/code/shibboleth/mnemonic-secret"
 )
+
+# ─── WHY THIS GATE IS NOT IN CI, measured 2026-08-18 ──────────────────────────
+#
+# It cannot be, as written. CI checks out THIS repo plus the `seedhammer`
+# submodule at `third_party/seedhammer`. It has no
+# `/scratch/code/shibboleth/...` at all, so every sibling root above is absent
+# and the script would report 100% DANGLING regardless of citation quality —
+# a gate that is always red teaches people to ignore it just as surely as one
+# that is always green.
+#
+# Making it CI-able needs a decision, not a patch: either check the sibling
+# repos out in the workflow (slow, and pins their versions), or accept that
+# cross-repo citations are developer-machine-only and gate just the in-repo
+# ones. Separately, the corpus is not currently clean — a 12-doc sample of the
+# 201 top-level design docs found 13 dangling citations across 7 of them — so
+# any CI adoption must be scoped to CHANGED docs, which is green by
+# construction and matches the "a fold is authorship and re-earns the gate"
+# rule anyway.
 
 if [ "$#" -eq 0 ]; then
   echo "usage: $0 <doc.md> [doc.md ...]" >&2

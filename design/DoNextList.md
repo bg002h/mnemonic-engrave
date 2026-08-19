@@ -357,7 +357,51 @@ this generator inherits the same defect**, so fix it before writing one.
 
 </details>
 
-### 8. Wire the doc gates into CI — **XS**
+### 8. Wire the doc gates into CI — **BLOCKED, and it is not XS. Investigated 2026-08-18; nothing wired.**
+
+**Stopped rather than forced, per the standing "never skip jobs — if making
+them run turns CI red, stop and report" rule.** Two independent blockers, the
+first structural:
+
+1. **`plan-cite-check.sh` cannot run in CI as written.** It resolves citations
+   against **absolute paths to sibling checkouts on a developer machine**. CI
+   checks out this repo (into `$GITHUB_WORKSPACE`) plus the `seedhammer`
+   submodule at `third_party/seedhammer` — so `/scratch/code/shibboleth/…`
+   does not exist, `descriptor-mnemonic` / `mnemonic-toolkit` / `mnemonic-key`
+   / `mnemonic-secret` are not checked out at all, and the gate would report
+   **100% DANGLING regardless of citation quality**. A gate that is always red
+   trains people to ignore it exactly as fast as one that is always green.
+2. **The corpus is not clean.** 201 top-level design docs and 633 agent
+   reports; a 12-doc sample found **13 dangling citations across 7 of the 12**.
+   So even a working gate would be red on day one.
+
+**What a real adoption would need**, and it is a decision rather than a patch:
+either check the sibling repos out in the workflow (slow, and pins their
+versions), or accept that cross-repo citations are developer-machine-only and
+gate just the in-repo ones. Then scope it to **CHANGED docs only** — green by
+construction, and it matches the project's own "a fold is authorship and
+re-earns the gate" rule better than a whole-corpus sweep would.
+
+**Done in the meantime** (commit `d0005da` and its follow-up): the gate itself
+was repaired and is now genuinely useful locally — multi-repo roots,
+ambiguity reported instead of silently guessing the wrong repo's file,
+repo-qualified citations understood, and this repo's root located via `git`
+rather than hardcoded. It then caught real defects in **this session's own
+docs**, which is the strongest argument for eventually gating it:
+
+| doc | before | after |
+| --- | --- | --- |
+| `DoNextList.md` | 0 / 8 | **12 / 12** |
+| `DRAFT_round_trip_journey_definition.md` | 0 / 1 | **1 / 1** |
+| `Preliminary-Brainstorm-Arbitrary-Tr-Wsh…md` | 7 / 18 | **23 / 23** |
+| `pathological-matched-pair-roundtrip.md` | 6 / 7 | **7 / 7** |
+| `wallet-policy-pin-regime-differential.md` | 2 / 7 | **10 / 10** |
+
+Most of the gap was bare filenames — `render.rs` or `tag.rs` with a line number and no repo —
+which are ambiguous in a constellation. One was a genuine error — a citation to
+a citation to line 30 of `mnemonic-toolkit/Cargo.toml`, a file with 29 lines.
+
+<details><summary>original entry</summary>
 
 `scripts/plan-build-gate.sh` and `scripts/plan-cite-check.sh` exist and are
 documented as gates, but **nothing in CI invokes them**. CI runs
@@ -366,6 +410,8 @@ docs-shaped. So design docs currently have **no automated gate at all**, and the
 green check on a docs-only push proves only that untouched code still builds.
 
 ---
+
+</details>
 
 ## DECISIONS NEEDED — blocking, cheap to give
 
