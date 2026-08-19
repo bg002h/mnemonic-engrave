@@ -1,29 +1,33 @@
 #!/usr/bin/env bash
 # push-master.sh — the ci/staging ritual as ONE command, with tiny output.
 #
-# WHY THIS EXISTS. Branch protection requires the `test (rust + go)` context,
-# and a status check binds to a COMMIT SHA, not a branch. A commit pushed
-# straight to master therefore carries no check when the rule is evaluated,
-# reports "expected", and is BYPASSED. `strict: false` is what makes it
-# fixable: GitHub asks only whether the commit carries a passing context, so
-# the SHA has to earn one first — hence the staging branch.
+# WHY THIS EXISTS. Branch protection requires status contexts, and a status
+# check binds to a COMMIT SHA, not a branch. A commit pushed straight to the
+# default branch therefore carries no check when the rule is evaluated, reports
+# "expected", and is BYPASSED. `strict: false` is what makes it fixable:
+# GitHub asks only whether the commit carries a passing context, so the SHA has
+# to earn one first — hence the staging branch.
 #
 # This was previously run by dispatching a subagent, which cost ~45k tokens to
 # execute four commands. A script costs one Bash call and prints one line.
 #
-# It also enforces the FREEZE that the ritual assumes: master must not move
+# It also enforces the FREEZE the ritual assumes: the branch must not move
 # between the staging push and the final push. A prior incident staged one SHA,
 # had two more commits land while CI ran, and pushed a tip two commits past the
 # gated one — `strict: false` accepted it against the older gated ancestor and
-# printed "Bypassed rule violations". Two commits reached origin/master with
-# zero CI signal.
+# printed "Bypassed rule violations". Two commits reached the remote with zero
+# CI signal.
+#
+# REPO-AGNOSTIC. Repo, branch and the REQUIRED CONTEXTS are all discovered from
+# the remote and the protection API, so this works from any constellation repo
+# that builds `ci/**` — `mnemonic-engrave` and `descriptor-mnemonic` both do,
+# and both document the ritual in their own workflow. Nothing here is
+# hardcoded to one of them.
 #
 # Usage:  ./scripts/push-master.sh            # run the ritual
 #         ./scripts/push-master.sh --verbose  # show CI progress too
 set -uo pipefail
 
-REPO="bg002h/mnemonic-engrave"
-CTX="test (rust + go)"
 STAGE="ci/staging"
 VERBOSE=0
 [ "${1:-}" = "--verbose" ] && VERBOSE=1
@@ -34,17 +38,41 @@ cleanup() { git push origin --delete "$STAGE" >/dev/null 2>&1 || true; }
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
+# --- discover repo + branch ----------------------------------------------
+ORIGIN="$(git remote get-url origin 2>/dev/null)" || die "no origin remote"
+REPO="$(printf '%s' "$ORIGIN" | sed -E 's#\.git$##; s#^.*[:/]([^/]+/[^/]+)$#\1#')"
+case "$REPO" in
+  */*) : ;;
+  *)   die "could not derive owner/repo from $ORIGIN (got '$REPO')" ;;
+esac
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
 # --- preconditions --------------------------------------------------------
 [ -z "$(git status --porcelain)" ] || die "working tree is dirty; commit or stash first"
-[ "$(git rev-parse --abbrev-ref HEAD)" = "master" ] || die "not on master"
 
 SHA="$(git rev-parse HEAD)"                      # full 40-char; gh needs it
-N="$(git rev-list --count origin/master..HEAD 2>/dev/null || echo '?')"
+N="$(git rev-list --count "origin/$BRANCH..HEAD" 2>/dev/null || echo '?')"
 [ "$N" = "0" ] && { say "nothing to push"; exit 0; }
-say "staging $SHA ($N commit(s))"
 
-# --- stage: let the SHA earn its context ----------------------------------
-git push -f origin "master:refs/heads/$STAGE" >/dev/null 2>&1 \
+# --- which contexts does protection actually require? ---------------------
+# Asked, not assumed: the two repos require different ones.
+mapfile -t CONTEXTS < <(gh api "repos/$REPO/branches/$BRANCH/protection" \
+  --jq '.required_status_checks.contexts[]?' 2>/dev/null)
+# gh prints a JSON error BODY on 404 and still exits 0 here, so "non-empty" is
+# not the same as "these are contexts" — an earlier version of this script
+# happily staged a push with `{"message":"Not Found"...}` as its context list.
+[ "${#CONTEXTS[@]}" -gt 0 ] \
+  || die "could not read required contexts for $REPO@$BRANCH (gh returns empty silently — check auth/repo)"
+for c in "${CONTEXTS[@]}"; do
+  case "$c" in
+    '{'*|'['*|'') die "protection API did not return contexts for $REPO@$BRANCH; got: $c" ;;
+  esac
+done
+
+say "staging $SHA ($N commit(s)) → $REPO@$BRANCH; requires: ${CONTEXTS[*]}"
+
+# --- stage: let the SHA earn its contexts ---------------------------------
+git push -f origin "$BRANCH:refs/heads/$STAGE" >/dev/null 2>&1 \
   || die "could not push $STAGE"
 
 # --- find the run for THIS sha (gh returns empty silently; retry) ---------
@@ -63,22 +91,30 @@ else
   gh run watch "$RUNID" --repo "$REPO" >/dev/null 2>&1 || true
 fi
 
-# --- judge PER-JOB, never the run-level status ----------------------------
-CONC="$(gh run view "$RUNID" --repo "$REPO" --json jobs \
-        --jq ".jobs[] | select(.name == \"$CTX\") | .conclusion" 2>/dev/null)"
-[ -n "$CONC" ] || die "job '$CTX' not found in run $RUNID (empty != absent — check manually)"
-[ "$CONC" = "success" ] || die "'$CTX' concluded '$CONC' — see https://github.com/$REPO/actions/runs/$RUNID"
+# --- judge EVERY required context, PER JOB, never the run-level status ----
+# A repo may require several contexts and they may live in different runs, so
+# each is resolved across all runs for this SHA rather than assumed present.
+for ctx in "${CONTEXTS[@]}"; do
+  conc=""
+  for rid in $(gh run list --repo "$REPO" --commit "$SHA" --json databaseId --jq '.[].databaseId' 2>/dev/null); do
+    c="$(gh run view "$rid" --repo "$REPO" --json jobs \
+          --jq ".jobs[] | select(.name == \"$ctx\") | .conclusion" 2>/dev/null)"
+    [ -n "$c" ] && { conc="$c"; break; }
+  done
+  [ -n "$conc" ] || die "required context '$ctx' not found in any run for $SHA (empty != absent — check manually)"
+  [ "$conc" = "success" ] || die "'$ctx' concluded '$conc' — see https://github.com/$REPO/actions/runs/$RUNID"
+done
 
 # --- FREEZE check: the tip must not have moved ----------------------------
 NOW="$(git rev-parse HEAD)"
-[ "$NOW" = "$SHA" ] || die "master moved during CI ($SHA -> $NOW); re-run to stage the new tip"
+[ "$NOW" = "$SHA" ] || die "$BRANCH moved during CI ($SHA -> $NOW); re-run to stage the new tip"
 
 # --- push for real; a bypass line is a FAILURE, not a success -------------
-OUT="$(git push origin master 2>&1)"
+OUT="$(git push origin "$BRANCH" 2>&1)"
 if printf '%s' "$OUT" | grep -qi 'bypass'; then
   printf '%s\n' "$OUT" >&2
-  die "push printed a bypass line — the staged context did not apply"
+  die "push printed a bypass line — the staged contexts did not apply"
 fi
 
 cleanup
-say "PUSHED $N commit(s) — $CTX: success — run $RUNID — no bypass"
+say "PUSHED $N commit(s) to $REPO@$BRANCH — ${#CONTEXTS[@]} context(s) success — run $RUNID — no bypass"
