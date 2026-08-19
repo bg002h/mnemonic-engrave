@@ -6,6 +6,90 @@ wallets."*
 
 ---
 
+## PRIORITY 1 — `md encode --from-policy --context tap` is broken for ordinary taproot wallets
+
+**Found while answering "is there a right way to nest?", not while looking for
+it. This is a shipped command failing on unremarkable input, and it outranks
+everything else in this report.**
+
+### The failure
+
+```
+$ md encode --from-policy 'thresh(1,pk(@0),pk(@1),pk(@2),pk(@3),pk(@4))' --context tap
+md: template parse error: miniscript parse failed: taptree branch must have 2 children, but found 1
+```
+
+**A plain 1-of-5 taproot wallet cannot be compiled by our CLI.** So cannot the
+pathological wallet's own policy. Measured across six policies:
+
+| policy | result | taptree built |
+| --- | --- | --- |
+| `or(pk(@0),pk(@1))` | OK | `tr(@0,pk(@1))` |
+| `thresh(1,pk(@0),pk(@1),pk(@2))` | OK | `tr(@0,{pk(@1),pk(@2)})` |
+| `or(4@pk(@0),1@or(pk(@1),pk(@2)))` | OK | `tr(@0,{pk(@1),pk(@2)})` |
+| `or(1@or(pk(@0),pk(@1)),1@or(pk(@2),pk(@3)))` | OK | `tr(@0,{pk(@1),{pk(@2),pk(@3)}})` |
+| `or(pk(@0),or(pk(@1),or(pk(@2),pk(@3))))` | **FAIL** | — |
+| `thresh(1,pk(@0),…,pk(@4))` (1-of-5) | **FAIL** | — |
+
+### Root cause, with file:line
+
+`crates/md-cli/src/compile.rs:95-100` round-trips the compiled descriptor
+**through a string**:
+
+```rust
+    .compile_tr(unspendable)
+// Descriptor::to_string() includes a trailing #<8-char-checksum>
+let rendered = desc.to_string();
+```
+
+That `to_string()` is rust-miniscript's pre-#953 `Display`
+(`vendor/miniscript/src/descriptor/tr/taptree.rs:92-113`), which tracks only the
+depth *change between adjacent leaves*. Reading the algorithm gives the exact
+condition, sharper than the "depth ≥ 2" proxy in use:
+
+> **It is correct exactly when the leaf-depth sequence never decreases** — i.e.
+> only for right-spine "caterpillar" trees. Traced: `[1,2,2] → {A,{B,C}}` ✓;
+> `[2,2,2,2] → {{A,B,C,D}}` ✗; `[2,2,1] → {{A,B,C}}` ✗.
+
+Every OK row above is a caterpillar; every FAIL is not. The bug is
+**topology-dependent, not depth-dependent**.
+
+### Why it was not caught before
+
+Two reasons worth recording. The **template** route
+(`md encode '<template>'`) never touches `Display` — it parses the string md was
+handed — which is why the `tr` sibling in §2 encodes fine while the equivalent
+policy does not. And `--from-policy` requires the non-default `cli-compiler`
+feature, so a default build cannot reach the defect at all.
+
+### Mitigating, and not mitigating
+
+**It fails loudly** — a parse error, not silent corruption — because md re-parses
+what it rendered. Any consumer that took `Descriptor::to_string()` *without*
+re-parsing would get a malformed descriptor with no error at all. That is the
+argument for treating this as urgent rather than cosmetic.
+
+### Fix directions — not chosen here
+
+1. **Stop round-tripping through a string.** Convert the `compile_tr`
+   `Descriptor` into md's own AST directly, so `Display` is never invoked. This
+   needs a `Descriptor → md AST` converter; only the *forward* direction
+   (`to_miniscript.rs`) is known to exist, so the reverse may be new work.
+   **Fixes it with no dependency change**, and would also remove the last
+   production caller of the broken renderer.
+2. **Advance the miniscript pin past #953.** But see
+   `wallet-policy-pin-regime-differential.md`: `md-cli` does not currently
+   compile against `ff4732e` — two PR #915 API breaks — so this is not the cheap
+   option it looks like.
+3. **Refuse early with a good message.** Detect a non-caterpillar tree before
+   rendering and say so, instead of surfacing miniscript's parse error. Strictly
+   worse than (1) but far better than today.
+
+**(1) is the recommendation.** It is the only option that neither waits on an
+upstream release nor accepts the failure.
+
+---
+
 ## 1. Correction first — the pathological wallet is `wsh`, not `tr`
 
 It was described in conversation as a "deeply nested tr" wallet. Measured
@@ -44,13 +128,35 @@ D = and_v(v:older(4255898),    multi_a(1,@8,@9,@10))
 Installed as `design/journeys/inputs-pathological/wallet-policy-tr.txt`
 (502 bytes) with its keyless md1 at `backup-strings-tr.txt` (3 chunks).
 
-**Note the topology choice, because it is load-bearing.** Right-skewed
-`{A,{B,{C,D}}}` mirrors `or_i(A,or_i(B,or_i(C,D)))` exactly. Recon established
-that a **balanced depth-2** 4-leaf tree is what triggers the unreleased-#953
-`Display` bug, while a right-skewed chain does **not** — the bug is
-topology-dependent, not depth-dependent. So this faithful sibling *avoids* the
-known defect, and a balanced variant would be a second, deliberately
-defect-seeking fixture. Both are worth having; only the faithful one exists.
+**Note the topology choice, because it is load-bearing — and it is also the
+economically correct one, which is a coincidence worth not relying on.**
+
+Right-skewed `{A,{B,{C,D}}}` mirrors `or_i(A,or_i(B,or_i(C,D)))` exactly. It is
+also a caterpillar, so it is immune to the #953 `Display` defect described in
+PRIORITY 1 — but *that is an implementation accident, not a design reason*, and
+the two must not be conflated.
+
+**The design reason is cost.** Taptree topology is semantically free — any tree
+over the same leaf set authorizes the same spends — but a BIP-341 control block
+is `33 + 32×depth` bytes, so depth is charged in witness bytes per leaf. The
+*right* tree is therefore the Huffman tree weighted by spend probability, which
+is exactly what policy-language weights (`9@`, `1@`) and `compile_tr` are for.
+
+| | A | B | C | D |
+| --- | --- | --- | --- | --- |
+| right-skewed `{A,{B,{C,D}}}` | 65 B | 97 B | 129 B | 129 B |
+| balanced `{{A,B},{C,D}}` | 97 B | 97 B | 97 B | 97 B |
+
+Right-skewed wins iff **P(A) > P(C) + P(D)**. Here A is the tier-1 normal path
+while C and D sit behind `older(65535)` and `older(4255898)` — deep recovery — so
+right-skewed is right on cost too. The `wsh` form already encodes the same
+ordering, since `or_i` selector bytes likewise make earlier branches cheaper, so
+both script types agree. **Balanced would be the correct choice for a wallet
+whose branches are equally likely**, and such a wallet cannot currently be
+compiled via `--from-policy --context tap` at all.
+
+A balanced variant remains worth building as a deliberately defect-seeking
+fixture. It does not exist yet.
 
 ## 3. Round-trip results
 
@@ -141,6 +247,19 @@ are not mutually exclusive and the choice is the user's.**
 
 - Whether md's depth-4 rule for multisig contexts is correct per BIP-388/BIP-48,
   or over-strict. Not researched — it is an external-protocol question and this
-  run only observed the behaviour.
-- Whether the balanced depth-2 `tr` variant round-trips (not built).
+  run only observed the behaviour. **Confirmed by reading
+  `crates/md-cli/src/parse/path.rs:29-31`:** `bip84 => m/84'/0'/0'` (depth 3),
+  `bip86 => m/86'/0'/0'` (depth 3), `bip48 => m/48'/0'/0'/2'` (depth 4,
+  hardened). So the fixture's keys are single-sig account keys and the depth-4
+  demand is the BIP-48 multisig convention — but whether md is *right* to
+  enforce it is still unresearched.
+- Whether the balanced depth-2 `tr` variant round-trips (not built). Per
+  PRIORITY 1 it cannot be produced via `--from-policy`; the template route
+  should still reach it.
+- Whether a `Descriptor → md AST` converter exists or must be written — the
+  crux of PRIORITY 1 fix option (1). Only the forward direction was located.
 - Anything about the Go/device side. This run is `md` only, tier T2 at most.
+- The caterpillar characterization is **derived by reading the vendored
+  formatter and is consistent with six CLI observations**; it has not been
+  pinned by a direct per-topology unit test. That test is cheap and worth
+  writing before the rule is relied on.
