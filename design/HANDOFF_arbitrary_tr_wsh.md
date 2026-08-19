@@ -203,6 +203,29 @@ Not answers — the things that need ruling before a spec can be written.
 
 ---
 
+## HOW TO SEE THE THING RUNNING
+
+**The emulator is the firmware GUI compiled to wasm** — the same `gui` package,
+a real 480x320 framebuffer. It is how complex-policy screens get exercised
+without cutting steel.
+
+```sh
+sh /scratch/code/shibboleth/seedhammer/cmd/emu/build.sh     # -> emu.wasm
+cd /scratch/code/shibboleth/seedhammer/cmd/emu
+python3 -m http.server 8777 --bind 127.0.0.1                # open index.html
+```
+
+Rebuild before trusting it: the checked-in `emu.wasm` is a build artifact and
+was four days stale when this was written (it predated the whole S6b cycle).
+`build.sh` also refreshes `wasm_exec.js`, which MUST come from the same Go that
+compiled the wasm — a mismatched pair fails at load with an opaque error.
+
+**Do not trust the journey PDFs as a statement about today's build** — see F-210
+above. The emulator itself is fine; the documents around it cannot currently be
+regenerated.
+
+---
+
 ## STATE AT HANDOFF (nothing open, nothing in flight)
 
 | repo | branch | head |
