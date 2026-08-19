@@ -1,4 +1,4 @@
-# Continuity — 2026-08-18: **S6b IS SHIPPED.** Next is the hardware flash.
+# Continuity — 2026-08-18: **S6b IS SHIPPED AND FLASHED.** It boots as `bg5bfc118`.
 
 Supersedes `CONTINUITY_2026-08-17.md`. Read this one.
 
