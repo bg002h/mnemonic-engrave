@@ -1,264 +1,266 @@
 # PLAN — helping the operator know which key is which
 
-**Draft 2026-08-19. Not gated, not reviewed.** Written in response to: *"there
-is no way to know what seed phrase / private key material goes with which
-index."*
+**Rewritten 2026-08-19 (v2).** v1 was found **not executable**: 12 forced
+decisions, 2 Critical, 4 Important
+(`design/agent-reports/plan-key-index-legibility-architect-r0.md`), after an
+earlier critique (`design/agent-reports/plan-key-index-legibility-critique.md`).
+v1 is preserved in git at `2d9fe3e`.
 
-Scope: three changes (1, 2, 3 below). Each says what is already true, what
-would change, where, how big, and what it does **not** solve.
+**Every claim below was produced by running a command, not by reading help
+text.** That was v1's failure mode and it cost two review rounds: v1 chose a
+flag from its doc string that is refused in 84 ms, and "corrected" a true
+finding into a false one from a help sentence.
 
----
-
-## 0. The situation, measured
-
-**An `mk1` card does not carry its template index.** Decoded fields are
-`policy_id_stubs`, `origin_fingerprint` (**`Option`**), `origin_path`, `xpub`
-(`mnemonic-key/crates/mk-codec/src/key_card.rs:34-57`). A card says *"I belong
-to wallet `5b48af35`"*, never *"I am `@3`"*.
-
-**The assignment is recoverable — but ONLY against a target.** This section
-originally claimed recovery from "template + all N cards", and that was wrong;
-corrected after review.
-
-`crates/mnemonic-toolkit/src/permutation_search.rs` searches the slot
-bijections and returns `Unique` / `None` / `Ambiguous`, wired into
-`cmd/restore.rs` and `cmd/verify_bundle.rs`. Its contract is strong:
-
-> **No silent wrong assembly.** A `Unique` outcome is returned ONLY after the
-> engine has proven there is no SECOND match.
-
-But `restore` needs something to search *against*. Measured from
-`mnemonic restore --help`:
-
-| input | status |
-| --- | --- |
-| `--md1` (the template) | the multisig-mode entry point |
-| `--cosigner @N=` cards | EXACT by default; over-supply needs `--search-cosigner-subset` |
-| `--expect-wallet-id <prefix>` | a target; longer prefix needed as the space grows |
-| **`--search-address <addr>`** | a target, and **"recommended … collision-free"** |
-| `--from <seed>` | **"REQUIRED for single-sig restore; OPTIONAL in multisig mode"** |
-
-So: **a seed is NOT required** in multisig mode (an earlier critique said it
-was), but **a target IS**. The operator must have kept either a wallet-id
-prefix or — far more plausibly — **a known receive address**. Item 5 has just
-made the pathological journey print addresses for the first time, so that
-target now exists for this wallet.
-
-**Sorted vs unsorted is NOT symmetric — corrected after review.** The original
-text here said `sortedmulti` makes the index "irrelevant" and `Ambiguous`
-"harmless". Both wrong, per the SORTED carve-out at
-`crates/mnemonic-toolkit/src/cmd/restore.rs:1944-1954`:
-
-- **address**-search on a sorted shape *would* return `Ambiguous` (all `n!`
-  placements give the same scriptPubKey), so the engine collapses `n! → 1` by
-  restricting to the identity placement. Handled, not ambiguous.
-- **id**-search is **not** collapsed: `compute_wallet_policy_id` never sorts,
-  so *"the recorded id pins a SPECIFIC order the search must still resolve.
-  Verified: sortedmulti AB-id ≠ BA-id."*
-
-In one line: a sorted wallet's **addresses** are order-independent; its
-**wallet id is not**. The index still matters for identity.
-
-The pathological wallet uses unsorted `multi`, where each permutation is a
-different script — the recoverable case.
-
-**The concrete gap** is at the moment of engraving. The checklist an operator
-follows says:
-
-```
-plate 20/34  mk1 chunk 1/3  → push via NFC & engrave
-plate 21/34  mk1 chunk 2/3  → push via NFC & engrave
-```
-
-It never says *whose* key. And `me bundle` emits plates in `chunk_set_id`
-order, not key order, so the operator cannot infer it from position either.
+Originating question: *"there is no way to know what seed phrase / private key
+material goes with which index."*
 
 ---
 
-## 1. Name the card in the engrave checklist — **S, do first**
+## 0. Measured facts
+
+**A card does not carry its index.** `KeyCard` is `policy_id_stubs`,
+`origin_fingerprint` (**`Option`**), `origin_path`, `xpub`
+(`mnemonic-key/crates/mk-codec/src/key_card.rs:34-57`).
+
+**Recovery works, and is fast.** Own seed plus the other ten cards in
+deliberately scrambled order:
+
+```
+$ mnemonic restore --md1 ×3 --from phrase=<master-A> --account 0 \
+    --cosigner ×28 --expect-wallet-id ced2270948ecb5af
+searching 39916800 candidate assignment(s) (est. ≤ 189.6048s)…
+✓ wallet-id (completed): ced2270948ecb5af0779249ac7181f4a
+  your seed completes cosigner slot @0
+  first recv: bc1qkuknuy6dsm0fq44cyyhzqy9wl3ex2n6ed39zxhx867l9wlh4yhlsejms64
+elapsed=16s
+```
+
+**16 seconds** for the whole `11!` space, correct slot, and an address matching
+what the journey prints.
+
+**A seed IS required.** v1 claimed otherwise from the `--from` help text
+(*"OPTIONAL in multisig mode"*). For a **keyless template** it is required
+(`mnemonic-toolkit/crates/mnemonic-toolkit/src/cmd/restore.rs:1396`). The real
+model is **own seed + the other N−1 cards + a recorded target**, not "template
++ all N cards".
+
+**`--search-address` is REFUSED at n=11**, measured in 84 ms:
+
+```
+error: estimated exhaustive search time 890788.897152s exceeds the 3600s
+ceiling; re-run with --accept-search-time ≥890788.897152s to acknowledge
+```
+
+v1 rebuilt its demonstration around `--search-address` on the strength of its
+"recommended … collision-free" doc string. `--expect-wallet-id` is the flag
+that works. The `--accept-search-time` hatch exists; at ~10 days it is not a
+recovery path.
+
+**`me-cli` has `serde` + `serde_json` and NO `bitcoin` dependency**
+(`crates/me-cli/Cargo.toml:22-27`).
+
+**`manifest.json` has four consumers, one a test** —
+`design/journeys/transcript.sh`, `design/journeys/transcript_pathological.sh`,
+`design/journeys/build_pdf_pathological.py`, `crates/me-cli/tests/cli.rs`. It
+is a de facto contract; v1's "not a normative change" waved at that.
+
+---
+
+## 1. THE RECOVERY TARGET — the blocking problem, which v1 missed entirely
+
+### The defect
+
+`--expect-wallet-id` needs `ced2270948ecb5af…`. **No command in this repo
+prints that value.** Measured — one wallet, four ids:
+
+| id | value | printed by |
+| --- | --- | --- |
+| `WalletDescriptorTemplateId` | `5b48af35d4321a3ac18b43045e2523cc` | `md inspect`; journey prints it |
+| `WalletPolicyId`, **keyless** template | `f89e23f13c697ae62ef10328d71d7e24` | `md inspect`; journey prints it |
+| `WalletPolicyId`, **keyed** policy | `232214e4d60c0fa83a6715ba2f7e8ec7` | `md inspect` on a keyed encode |
+| **what `restore` matches** | **`ced2270948ecb5af0779249ac7181f4a`** | **nothing** |
+
+An operator who records the id their own tooling prints, and reaches for it at
+recovery, is refused. Supplying `232214e4…` was executed and rejected.
+
+### Root cause — a known finding nobody had connected to this
+
+`restore` re-serialises the completed descriptor's xpubs with BIP-32 metadata
+**zeroed**. Measured, same key:
+
+```
+committed xpub  depth=4  parent_fp=1cf29716  child=80000002
+restored xpub   depth=0  parent_fp=00000000  child=00000000
+```
+
+Different serialisation → different descriptor string → different
+`WalletPolicyId`. This is **F-130**, already in
+`design/journeys/README.md:63`: *"Keys byte-identical, addresses unaffected —
+but restored xpubs lose depth/parent/child, so the descriptor string and its
+checksum differ."* Addresses are unaffected — the `first recv` above matches.
+Only the **id** moves.
+
+### The change
+
+**Emit the recovery target at BACKUP time.** An operator cannot be asked to
+obtain it by performing the recovery they are preparing for.
+
+Two candidate homes. **This plan deliberately does not choose — see §7.1.**
+
+- **(a) `md inspect --restored-form`** — prints the restored-serialisation id
+  beside the existing two. Smallest surface; keeps identity in the tool that
+  owns it.
+- **(b) `me bundle` checklist header** — "record this to recover: `ced22709…`".
+  Where the operator is already writing things down, but `me` would have to
+  compute an id it currently has no reason to know.
+
+**Acceptance (either home):** a command in this repo prints
+`ced2270948ecb5af0779249ac7181f4a` for the pathological wallet, and the journey
+prints it under a label saying what it is for.
+
+### What this does NOT solve
+
+An operator who recorded **no** target. That case needs `--search-address`,
+refused at this scale — so for an 11-key wallet **there is currently no
+no-target recovery path**. State it in the docs rather than let it be
+discovered.
+
+---
+
+## 2. Name the card in the engrave checklist
 
 ### What is already true
 
-`me bundle` **already decodes every mk1 set** —
-`crates/me-cli/src/bundle.rs:279`, `mk_codec::decode(&refs)` — purely to prove
-set integrity, and then **discards the `KeyCard`**, keeping only `total` and an
-integrity flag. The identifying data is computed today and thrown away.
+`me bundle` decodes every mk1 set at `crates/me-cli/src/bundle.rs:279` and
+**discards the `KeyCard`**, keeping only `total` and an integrity flag. The
+identifying data is computed today and thrown away.
 
-### The change
+The checklist at `crates/me-cli/src/manifest.rs:82-108` renders `mk1 chunk 1/3`
+with no key identity, and plates are emitted in `chunk_set_id` order, so
+position carries no information either.
 
-Keep the decoded card. Thread its `origin_fingerprint` and `origin_path` into
-`PlateEntry`, and use them in the label built at
-`crates/me-cli/src/manifest.rs:82-108`:
+### The change, with the representation DECIDED
+
+Store **`String`**, converted at the decode site — not the `bitcoin` types.
+
+This is the decision v1 left open and the architect flagged as blocking.
+Rationale: `me-cli` has **no `bitcoin` dependency**, and adding one to name a
+field type is disproportionate for display text. `serde` is already present, so
+serialisation is not the constraint; the type-naming is.
+
+Rendering, specified so two implementers cannot differ:
 
 ```
-  plate 20/34  mk1 [73c5da0a/48'/0'/1'/2'] chunk 1/3  → push via NFC & engrave
+fingerprint present:  mk1 [73c5da0a/48'/0'/1'/2'] chunk 1/3
+fingerprint absent:   mk1 [path 48'/0'/1'/2', no fingerprint] chunk 1/3
 ```
 
-No new dependency (`mk-codec` is already a dep, `crates/me-cli/Cargo.toml:23`), no wire
-change, no normative change — this is display text derived from data already in
-hand.
+- Hardened markers rendered `'`, matching `mk decode`'s existing output, not `h`.
+- New `PlateEntry` fields are `Option<String>` with
+  `#[serde(skip_serializing_if = "Option::is_none")]`, so plates with no card
+  gain no keys and existing manifest consumers are unaffected.
 
-### What it does NOT solve, and this is the important part
+### It CANNOT print `@N`, and must not imply one
 
-**`me` cannot print `@N`.** It sees *cards*, and for a **keyless template** the
-md1 carries no keys, so there is no key order to match a card against. It can
-only state what the card says about itself: its origin.
+`me` sees cards; a keyless template carries no key order to match against.
+This survived both review rounds. The label states the card's **origin**, never
+a slot number. The index comes from §1+§3, or §4's convention.
 
-That is still the operator's practical question answered — *"which of my eleven
-cards is this plate?"* — but it is **not** the same as knowing the template
-index. The index comes from `restore`'s permutation search (§3), or from the
-convention in §2.
+### Edge cases, each with a defined behaviour
 
-An honest label must therefore avoid implying an index. Print the origin, not a
-slot number.
-
-### Edge cases that must be handled, not assumed
-
-- **`origin_fingerprint` is `Option`.** Privacy-preserving cards
-  (`mk encode --privacy-preserving`) may omit it. The label must degrade to
-  something truthful (e.g. `mk1 [path only: 48'/0'/1'/2'] chunk 1/3`) rather
-  than printing a placeholder that looks like a fingerprint.
-- **Two cards can share an origin.** Nothing forbids two keyholders deriving at
-  the same path from different seeds — different fingerprints then disambiguate,
-  but if fingerprints are omitted *and* paths collide, the label is ambiguous.
-  It should say so rather than silently repeat itself.
-- **`ms1` plates** have no card at all; leave their label alone.
+| case | behaviour |
+| --- | --- |
+| `origin_fingerprint` is `None` | second form above; never fabricate a fingerprint |
+| two cards share fingerprint+path | render identically, **plus `set <chunk_set_id>`** so they stay distinguishable |
+| `ms1` plate | unchanged — it has no card |
+| multiple `policy_id_stubs` | irrelevant here; ignore |
 
 ### Acceptance
 
-- Checklist for the pathological journey names an origin on all 30 card plates.
-- A privacy-preserving card renders without a fabricated fingerprint.
-- Existing `manifest.rs` tests (`:228` asserts `"mk1 chunk 1/2"`) updated
-  deliberately, not incidentally — that string is the current contract.
+- All 30 card plates in the pathological checklist name an origin.
+- `crates/me-cli/tests/cli.rs` and the `crates/me-cli/src/manifest.rs:228` assertion
+  (`"mk1 chunk 1/2"`) updated **deliberately** — that string is today's
+  contract and the diff must show it changing on purpose.
+- The no-fingerprint form is pinned by a test using a
+  `--privacy-preserving` card.
 
 ---
 
-## 2. Let the origin path carry the index, by convention — **XS docs, S lint**
-
-### The idea
-
-Every card already carries `origin_path`, and `mk decode` already prints it. If
-keyholders agree at generation time that **account index = template index**,
-then the index is *already on every card* with no format change.
-
-This is strictly stronger than "order the keys lexicographically", because the
-reader does not have to sort N xpubs by eye — the answer is printed on the card
-in front of them.
-
-### What would change
-
-Documentation, primarily: a stated convention in the journeys README and
-wherever wallet creation is described.
-
-**The `me bundle` lint is WITHDRAWN.** A review pointed out it cannot be
-written as stated and contradicts §4. `me` sees cards, not the template's key
-order (the same limitation §1 documents), so it cannot know whether a card's
-account index equals its template index — it has no template index to compare
-against. And §4 rejects an mk1 index field precisely because a card should not
-be coupled to a position in one wallet; a lint asserting exactly that coupling
-is the same mistake in advisory clothing. The convention stays a **documented
-practice for wallet creation**, enforced by the people in the room, not by a
-tool that cannot see what it would check.
-
-### What it does NOT solve
-
-- **It is advisory only.** Nothing enforces it, and a wallet assembled from
-  pre-existing keys at fixed paths cannot adopt it retroactively.
-- **The current fixture does not follow it.** The pathological keys restart
-  accounts per master. Measured 2026-08-19 from the key files themselves:
-  `@0-@3` are master A accounts `0'-3'`, and **`@4` is master B account `0'`**
-  (`[b8688df1/48'/0'/0'/2']`) — a review asserted `3'` here and is wrong.
-  Adopting the convention would mean re-deriving those keys a *second* time,
-  moving every wallet id again. **Not obviously worth it**; a decision, not a
-  step.
-- It only helps when keyholders coordinate at creation — exactly the case the
-  operator already identified as their responsibility.
-
----
-
-## 3. Surface the permutation search — **S**
-
-### The problem
-
-The search exists, has a strong funds-safety contract, and **nothing tells the
-user it exists.** An operator holding a shuffled pile of cards and a template
-would reasonably conclude the wallet is lost. That is a documentation failure
-with a recovery-shaped consequence.
+## 3. Surface and demonstrate recovery
 
 ### The change
 
-1. A section in `design/journeys/README.md` stating plainly: given the
-   template, all N cards **in any order**, and **a target the operator kept**
-   (a known receive address, or a recorded wallet-id prefix), `restore`
-   recovers the assignment — and `Unique` means proven-unique, not
-   first-match. **The target is not optional**; say so, because a reader who
-   assumes template+cards suffices will discover otherwise at recovery time.
-2. **Demonstrate it in the pathological journey, using `--search-address`.**
-   Item 5 made this journey print real addresses for the first time, so the
-   demonstration now has a natural target: take one printed receive address,
-   shuffle the card order, and recover. `--search-address` is documented as
-   *"recommended over `--expect-wallet-id` (full-scriptPubKey match —
-   collision-free)"*.
-3. State the `n ≤ 34` ceiling, the cost curve, and the **adaptive time-cap** —
-   the engine has a refusal ceiling, so a large search can decline rather than
-   run forever. Nobody should meet that at recovery time.
+1. **`design/journeys/README.md`**: state the model as measured — **own seed +
+   the other N−1 cards + a recorded target id** — that `Unique` is
+   proven-unique rather than first-match, that a target is **required**, and
+   that `--search-address` is refused at this scale.
+2. **Demonstrate it in the pathological journey** via `--expect-wallet-id`,
+   cards deliberately shuffled. Measured **16 s**, exit 0 — affordable in a
+   journey that must complete every run.
+3. State the `n ≤ 34` ceiling, the 3600 s cap, and `--accept-search-time`.
 
-### Unmeasured, and it gates step 2
+### Dependency
 
-**Nobody has run an 11-key search on this shape.** `11! = 39,916,800`. Before
-this demonstration goes into a journey that must complete on every run, the
-wall-clock must be measured against the engine's time-cap — if it refuses or
-takes minutes, the demonstration belongs in documentation with a recorded
-figure, not in the journey. **Measure first, then decide where it lives.**
-
-### What it does NOT solve
-
-- It does not help someone who has **lost a card**; the search needs all N.
-- `Ambiguous` is a real outcome for `sortedmulti` policies and the docs must
-  say it is *harmless there* — otherwise it reads as a failure.
+**Step 2 cannot ship before §1**, or the journey must hardcode an id nothing
+produces — the exact no-producer defect this session has fixed four times.
 
 ### Acceptance
 
-- The pathological journey demonstrates recovery from shuffled input, with its
-  real exit code — **conditional on the timing measurement above**.
-- README states the ceiling, the time-cap, and what each of the three outcomes
-  means.
-
-**On acceptance being runnable at all:** a review raised that both §1 and §3
-route acceptance through the pathological journey, which F-210 said could not
-regenerate. **Verified 2026-08-19 and no longer true** — the capture plumbing
-was fixed earlier, and a fresh run is byte-identical to the committed
-transcript (3 designed refusals, 6 addresses). What remains un-regenerable is
-the **PDF**, because `design/journeys/shots/` has zero tracked files. Neither
-§1's nor §3's acceptance depends on the PDF, so both are runnable.
+- The journey performs a shuffled recovery and prints its real exit code.
+- The target id it uses is one an **earlier step printed**, not a literal.
 
 ---
 
-## 4. Deliberately NOT proposed — an index field in `mk1`
+## 4. The account-index convention — documentation only
 
-It would be a **normative wire change** (Rust-primary, needs vectors), and it
-couples a card to a position in *one* wallet when the same key may sit at
-different indices in different wallets. §2 gets the same benefit without that
-coupling.
+Every card carries `origin_path` and `mk decode` prints it. If keyholders agree
+at generation that **account index = template index**, the index is on every
+card with no format change.
+
+**Deliverable, location, acceptance — the three things v1 lacked:**
+
+- **Deliverable:** one section in `design/journeys/README.md`, *"Choosing key
+  paths so the cards identify themselves"*.
+- **Acceptance:** that section exists and states all three limits below.
+
+**Limits, all three required:**
+
+1. Advisory only; pre-existing keys cannot adopt it retroactively.
+2. **The current fixture does not follow it.** Measured: `@0-@3` are master A
+   accounts `0'-3'`, but `@4` is master B account `0'`
+   (`[b8688df1/48'/0'/0'/2']`). Adopting it means re-deriving those keys again
+   and moving every id — **a decision, not a step**.
+3. It helps only where keyholders coordinate at creation.
+
+**No lint.** `me` cannot see the template's key order, so it cannot check the
+convention, and a lint asserting card↔position coupling contradicts §5.
 
 ---
 
-## 5. Order, and why
+## 5. Deliberately NOT proposed — an index field in `mk1`
 
-1 first: it is nearly free, needs no coordination, and fixes the moment where a
-mistake is expensive (cutting the wrong plate). 3 next: pure documentation plus
-a demonstration, and it is what turns "user responsibility" into "the tool does
-it". 2 last, and only the documentation half — the fixture question it raises is
-a separate decision.
+A normative wire change, and it couples a card to a position in *one* wallet
+when the same key may sit at different indices elsewhere. §4 gets the benefit
+without the coupling.
 
-## 6. Open questions for review
+---
 
-- Is printing an origin without an index **more** confusing than printing
-  nothing, for an operator who expects `@N`?
-- Should the §1 label appear on the **engraved plate itself**, not just the
-  checklist? That is plate furniture, not wire format — but it consumes area on
-  a physical plate and may collide with the font's minimum-feature rules.
-- Does `me bundle` have the md1 available at the point the checklist is built?
-  If a **keyed** full-policy md1 is present, `@N` *is* derivable and the label
-  could be exact — but the pathological journey engraves a keyless template, so
-  the common case stays origin-only. **Unverified.**
+## 6. Order
+
+**§1 → §2 → §3 → §4.** §1 leads: §3 is unbuildable without it, and it is the
+only item addressing a case where an operator loses access. §2 is independent
+and may run in parallel. §4 is documentation, last.
+
+---
+
+## 7. Open — escalated, not assumed
+
+1. **§1's home: (a) `md inspect --restored-form`, or (b) `me bundle` header?**
+   The one decision this plan deliberately leaves open.
+2. **Should `restore` instead accept the keyed-policy id and normalise
+   internally?** That would make F-130 invisible to operators rather than
+   documented at them, and might be a better fix than §1 entirely.
+   **Unresearched.**
+3. Should §2's label also appear on the **engraved plate**, not only the
+   checklist? Plate furniture, not wire format — but it consumes plate area and
+   interacts with the font's minimum-feature rules. **Unmeasured.**
