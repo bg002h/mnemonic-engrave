@@ -18,7 +18,19 @@ Companion artifacts, all committed:
 
 ## DO NEXT — ordered
 
-### 1. Fix `md encode --from-policy --context tap` — **S, do this first**
+### 1. ~~Fix `md encode --from-policy --context tap`~~ — **DONE 2026-08-18**
+
+**Shipped as `descriptor-mnemonic` `cf139508`.** `render_tr_template` in
+`md-cli` now renders taptrees with #953's corrected algorithm instead of
+`Descriptor::to_string()`. All six policies below compile and re-parse; the
+1-of-5 now yields `tr(@4,{{pk(@3),pk(@2)},{pk(@1),pk(@0)}})`. Gates: full
+workspace **781 passed / 0 failed**, clippy `-D warnings` clean, default
+(feature-off) build clean, `Cargo.lock` unchanged.
+
+Not yet reviewed by anyone but its author — an independent pass over the diff
+is still owed.
+
+<details><summary>original entry</summary>
 
 A **shipped command fails on ordinary input**: a plain 1-of-5 taproot wallet
 cannot be compiled. Root cause `crates/md-cli/src/compile.rs:95-100`, which
@@ -50,7 +62,23 @@ or(pk(@0),or(pk(@1),or(pk(@2),pk(@3))))        FAIL
 thresh(1,pk(@0),pk(@1),pk(@2),pk(@3),pk(@4))   FAIL
 ```
 
-### 2. Pin the caterpillar rule with a direct test — **XS, do with item 1**
+</details>
+
+### 2. ~~Pin the caterpillar rule with a direct test~~ — **DONE 2026-08-18**
+
+Same commit. Two tests: `render_tr_template_pins_every_topology_class` asserts
+exact strings for all four leaf-depth classes (single leaf `[0]`, flat pair
+`[1,1]`, **decreasing** `[2,2,1]`, **balanced** `[2,2,2,2]`), and
+`upstream_display_is_still_broken_delete_local_renderer_when_this_fails` pins
+the gap's exact shape — **when that test fails it is good news**, meaning the
+pin moved past #953 and the local renderer can be deleted.
+
+The exact-string form earned its keep immediately: it caught that the compiler
+promotes a *different* key to the internal position and orders leaves
+differently than encode→decode output suggests. My predicted strings were
+wrong; the structure was right.
+
+<details><summary>original entry</summary>
 
 > The pre-#953 formatter is correct **exactly when the leaf-depth sequence never
 > decreases**. Traced: `[1,2,2] → {A,{B,C}}` ✓, `[2,2,2,2] → {{A,B,C,D}}` ✗,
@@ -62,7 +90,9 @@ twice over: for item 1's fix, and as the justification for the device's
 depth-≥2 EXPERIMENTAL gate. A per-topology unit test is cheap. Do not let it stay
 a hypothesis.
 
-### 3. R1 — the `v:` wrapper-chain renderer bug — **S, ships standalone**
+</details>
+
+### 3. R1 — the `v:` wrapper-chain renderer bug — **S, ships standalone — NOW THE TOP ITEM**
 
 `render.rs:150-163` gives `Tag::Verify` its own arm instead of joining
 `render_wrapper_chain` (`render.rs:358`, dispatch at `:217` covers only
@@ -95,9 +125,37 @@ Verified: **BIP-48 defines only `1'` and `2'`** — no taproot, no miniscript.
 `48'/…/3'` for taproot multisig is a de facto convention, still unratified.
 `m/84'/0'/0'/2'` is **wrong** — under BIP-84 level 4 *is* the change field.
 
-Suggested: `wsh(<miniscript>) → m/48'/0'/0'/2'`, `tr(<taptree>) → m/48'/0'/0'/3'`.
-Counter-argument to weigh: overloading BIP-48 invites *false recognition* by
-wallets that assume plain multisig; a distinct path fails honestly instead.
+**Candidate A (interop-leaning):** `wsh(<miniscript>) → m/48'/0'/0'/2'`,
+`tr(<taptree>) → m/48'/0'/0'/3'`. Reuses the meaning BIP-48 already assigns to
+level 4 (script type), and matches what md assigns to `wsh(multi|sortedmulti)`.
+Risk: overloading BIP-48 invites **false recognition** — a wallet seeing
+`48'/…/2'` assumes plain multisig and may confidently show wrong information.
+
+**Candidate B (unambiguity-leaning, user proposal 2026-08-18):**
+`m/27'/0'/0'/2'/8'` — a play on `bg002h`, the operator's bitcointalk handle.
+
+*In its favour, and it is a real argument not a joke:* purpose `27'` is
+unregistered, so **no wallet will falsely recognise it**. That is precisely the
+"fails honestly" side of the tradeoff above, chosen deliberately rather than
+inherited. Recovery of any miniscript wallet requires the descriptor regardless,
+so a self-describing path buys less than it appears to.
+
+*Three things to settle before adopting it:*
+
+1. **It is depth 5**, deeper than any standard. md's script-context checks
+   currently expect depth 3 or 4 and *reject* a mismatch — that is the same
+   rejection blocking item 5. So candidate B needs md to accept depth 5, which is
+   the same normative change as item 5 option 2. **These two items should be
+   decided together.**
+2. **One path for both `tr` and `wsh` means key reuse across two wallets.** The
+   same seed would produce the same pubkeys in a wsh wallet and a tr wallet;
+   different scripts give different addresses, but spending from both links them
+   on-chain. Standards avoid this by varying the script-type level. Suggest
+   varying one level per script type — e.g. `m/27'/0'/0'/2'/8'` for `wsh` and
+   `m/27'/0'/0'/3'/8'` for `tr` — keeping the mnemonic intact while keeping the
+   key sets disjoint.
+3. **`27'` has not been checked for collisions** with any other project's
+   unregistered use. Low stakes, but unchecked.
 
 **This is normative** — the origin feeds the wire TLV and therefore both wallet
 ids, so changing it later moves every id. Rust-primary, needs vectors.
