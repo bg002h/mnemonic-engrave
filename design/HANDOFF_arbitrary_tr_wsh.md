@@ -172,6 +172,12 @@ sweep had missed.
 
 Not answers — the things that need ruling before a spec can be written.
 
+0. **The pathological journey does not currently regenerate — F-210.** It is the
+   only journey exercising timelocks and a hashlock, i.e. exactly this cycle's
+   shapes, and F-210 is assigned to THIS cycle to fix before leaning on it.
+   Measured 2026-08-18: 9 non-zero exits on a fresh run vs 1 in the committed
+   transcript, six intermediates read that nothing writes, and `mk`/`ms`/`me`
+   all moved under it.
 1. **Which gap is this cycle?** Display-only, address-derivation-only, or both?
    They are separable and Gap 2 is the one that touches funds.
 2. **Summary tier or full render?** The follow-ups deliberately order summary

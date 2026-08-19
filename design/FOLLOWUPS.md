@@ -7557,3 +7557,62 @@ Mutation-tested two ways after passing first try in 0.00s.
 this diff made false elsewhere* — both read what the diff wrote, and the falsified
 prose sat in files the diff never opened. A scoped sweep for that class was
 dispatched on discovery; see `design/agent-reports/s6b-falsified-elsewhere.md`.
+
+### F-210 — the operator journeys cannot be regenerated: all three transcripts read intermediates nothing writes, and the tool versions have moved under them (owning phase: **the arbitrary-`tr()`/`wsh()` cycle — before it leans on the pathological journey**) `#seedhammer` `#test-infra`
+
+Found 2026-08-18 by running `design/journeys/transcript.sh` on the operator
+(5-of-12 `wsh(multi(…))`) journey, at the operator's request, to check whether it
+still reproduced before the next cycle relied on it. It does not.
+
+**Measured, not inferred:**
+
+| | committed `transcript.txt` | fresh run |
+| --- | --- | --- |
+| non-zero exits | **1** | **9** |
+| `mk` | 0.12.1 | **0.13.0** |
+| `ms` | 0.14.1 | **0.16.0** |
+| `me` | 0.5.1 | **0.6.0** |
+
+**Defect 1 — the scripts consume files they never produce.** Six intermediates
+are read across the three transcripts and **none exists on disk**:
+`md-encode-raw.txt`, `mk-encode-raw.txt`, `ms-encode.txt`, `md1.txt`,
+`manifest.json`, `sysw-public.bin`. Read-vs-write counts per script:
+`transcript.sh` 9/2, `transcript_pathological.sh` 5/1, `transcript_payload.sh`
+1/0. So `grep '^md1' out/md-encode-raw.txt` fails, every downstream command
+receives an empty argument, and the run cascades:
+
+```
+md: codec error: codex32 decode error: string does not start with HRP md1
+[exit 1]
+```
+
+`out/` is untracked, so nothing carried those files across sessions.
+
+**Defect 2 — the committed transcript was made somewhere that no longer
+exists.** Line 23 of `transcript.txt` reads:
+
+```
+$ cat /tmp/claude-1000/…/22fd28a4-…/scratchpad/journey/inputs/wallet-policy.txt
+```
+
+a scratchpad path from a dead session. The script now uses `$W/inputs`, so the
+artifact of record was produced by a script that no longer exists in this form.
+
+**Why it matters more than a stale doc.** `README.md` opens *"Nothing in these
+documents is illustrative"* — every CLI block real stdout, every screenshot the
+emulator's own framebuffer. That was true when written and the PDFs still assert
+it, while the generator behind them cannot produce them. **A reproduction path
+nobody re-runs rots while its artifact keeps vouching for it.** The PDFs and two
+of three `transcript*.txt` are tracked; `out/` is not — so the vouching half is
+in git and the proving half never was.
+
+**Owning phase assigned deliberately.** This does not gate the hardware flash and
+did not gate S6b. It DOES gate the arbitrary-`tr()`/`wsh()` cycle, because the
+pathological journey — 11 keys, all four timelock kinds, a sha256 hashlock — is
+the only journey exercising exactly the complex shapes that cycle is about. Fix
+it before relying on it, not after.
+
+**Two repairs, and the choice is a scoping decision, not a detail:** either make
+each script produce its own intermediates (self-contained, slower, regenerates
+anywhere) or commit the intermediates as fixtures (fast, but re-creates the same
+decay one version bump later). The version drift above argues for the first.
