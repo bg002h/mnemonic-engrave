@@ -1,15 +1,17 @@
 # PLAN — helping the operator know which key is which
 
-**Rewritten 2026-08-19 (v2).** v1 was found **not executable**: 12 forced
-decisions, 2 Critical, 4 Important
-(`design/agent-reports/plan-key-index-legibility-architect-r0.md`), after an
-earlier critique (`design/agent-reports/plan-key-index-legibility-critique.md`).
-v1 is preserved in git at `2d9fe3e`.
+**v3, 2026-08-19.** v1 (`2d9fe3e`) and v2 (`53b2e82`) were both found not
+executable. **v2's headline section was false at its root and is deleted.**
 
-**Every claim below was produced by running a command, not by reading help
-text.** That was v1's failure mode and it cost two review rounds: v1 chose a
-flag from its doc string that is refused in 84 ms, and "corrected" a true
-finding into a false one from a help sentence.
+Reviews: `plan-key-index-legibility-critique.md`, `…-architect-r0.md`,
+`…-critique-v2.md`, `…-architect-r0-v2.md` in `design/agent-reports/`.
+
+**What went wrong twice, stated so it does not happen a third time.** v1 chose a
+flag from its doc string that is refused in 84 ms. v2 asserted "no command
+prints the recovery target" without checking `verify-bundle` — which prints it
+in **4 ms** — and diagnosed a root cause from a correlation without testing it.
+**Every claim below is pasted command output.** §8 is a ledger of every prior
+finding, so none can be silently dropped again.
 
 Originating question: *"there is no way to know what seed phrase / private key
 material goes with which index."*
@@ -18,249 +20,302 @@ material goes with which index."*
 
 ## 0. Measured facts
 
-**A card does not carry its index.** `KeyCard` is `policy_id_stubs`,
+**A card carries no index.** `KeyCard` = `policy_id_stubs`,
 `origin_fingerprint` (**`Option`**), `origin_path`, `xpub`
 (`mnemonic-key/crates/mk-codec/src/key_card.rs:34-57`).
 
-**Recovery works, and is fast.** Own seed plus the other ten cards in
-deliberately scrambled order:
+**The recovery target IS already printed, at backup time, in 4 ms:**
 
 ```
-$ mnemonic restore --md1 ×3 --from phrase=<master-A> --account 0 \
-    --cosigner ×28 --expect-wallet-id ced2270948ecb5af
-searching 39916800 candidate assignment(s) (est. ≤ 189.6048s)…
-✓ wallet-id (completed): ced2270948ecb5af0779249ac7181f4a
-  your seed completes cosigner slot @0
-  first recv: bc1qkuknuy6dsm0fq44cyyhzqy9wl3ex2n6ed39zxhx867l9wlh4yhlsejms64
-elapsed=16s
+$ mnemonic verify-bundle --network mainnet --from phrase=- \
+    --md1 ×3 --cosigner @N=… ×28 --mk1 ×2
+✓ wallet_completed: completed WalletPolicyId ced2270948ecb5af0779249ac7181f4a;
+  first receive bc1qkuknuy6dsm0fq44cyyhzqy9wl3ex2n6ed39zxhx867l9wlh4yhlsejms64
+warning: explicit --cosigner @N= mode builds the wallet from the ASSERTED
+  key→slot assignment WITHOUT verifying it against a recorded id/address.
+  A wrong assignment produces a wrong wallet silently. Record + check
+  --expect-wallet-id or a receive address.
 ```
 
-**16 seconds** for the whole `11!` space, correct slot, and an address matching
-what the journey prints.
+The tool already tells the operator to record it. **Nothing in the journey runs
+this, and no document mentions it.** That — not a missing capability — is the
+whole gap.
 
-**A seed IS required.** v1 claimed otherwise from the `--from` help text
-(*"OPTIONAL in multisig mode"*). For a **keyless template** it is required
-(`mnemonic-toolkit/crates/mnemonic-toolkit/src/cmd/restore.rs:1396`). The real
-model is **own seed + the other N−1 cards + a recorded target**, not "template
-+ all N cards".
+**Recovery from shuffled cards works.** Own seed + the other ten cards
+scrambled, `--expect-wallet-id`: 39,916,800 candidates, **exit 0 in 16 s**,
+correct slot, address matching the journey's.
 
-**`--search-address` is REFUSED at n=11**, measured in 84 ms:
+**A seed IS required** for a keyless template
+(`mnemonic-toolkit/crates/mnemonic-toolkit/src/cmd/restore.rs:1396`). Model:
+**own seed + the other N−1 cards + a recorded target**.
+
+**`--search-address` is REFUSED at n=11** in 84 ms — *"estimated exhaustive
+search time 890788.897152s exceeds the 3600s ceiling"*.
+
+**The `--expect-wallet-id` floor is 8 bytes / 16 hex.** Measured:
 
 ```
-error: estimated exhaustive search time 890788.897152s exceeds the 3600s
-ceiling; re-run with --accept-search-time ≥890788.897152s to acknowledge
+ced22709          ( 8 hex) → error: multisig-template-floor mismatch
+ced2270948ecb5af  (16 hex) → wallet-id (completed)
 ```
 
-v1 rebuilt its demonstration around `--search-address` on the strength of its
-"recommended … collision-free" doc string. `--expect-wallet-id` is the flag
-that works. The `--accept-search-time` hatch exists; at ~10 days it is not a
-recovery path.
+**Two independent causes make the completed id differ from a keyed `md encode`
+id** — and neither is BIP-32 metadata. The id preimage stores xpubs as
+65-byte `[chain_code‖pubkey]`, so depth/parent/child are **never hashed**.
+v2 blamed F-130 from a `depth=4` vs `depth=0` observation without testing it.
+The real causes: **`--path bip48` origin-flattening**, and **omitted
+fingerprints** (`--privacy-preserving` renders
+`origin_fingerprint: (omitted, privacy-preserving mode)` and moves the target
+to `d09840c3…` with identical addresses).
 
-**`me-cli` has `serde` + `serde_json` and NO `bitcoin` dependency**
+**`me-cli` has `serde` + `serde_json`, no `bitcoin`**
 (`crates/me-cli/Cargo.toml:22-27`).
 
-**`manifest.json` has four consumers, one a test** —
-`design/journeys/transcript.sh`, `design/journeys/transcript_pathological.sh`,
-`design/journeys/build_pdf_pathological.py`, `crates/me-cli/tests/cli.rs`. It
-is a de facto contract; v1's "not a normative change" waved at that.
+**The checklist string appears in BOTH committed transcripts** — measured
+`grep -c 'mk1 chunk'`: `design/journeys/transcript.txt` **24**,
+`design/journeys/transcript_pathological.txt` **31**.
+
+**The manifest golden is byte-pinned by two full-JSON-equality assertions** —
+`crates/me-cli/tests/cli.rs:308` and `:745`, both `assert_eq!(v, expected)`
+against `crates/me-cli/tests/vectors/bundle-md1-mk1.json`. Any new field on a
+card-bearing plate breaks both; `skip_serializing_if` does not help, because the
+golden's mk1 plates **have** cards.
 
 ---
 
-## 1. THE RECOVERY TARGET — the blocking problem, which v1 missed entirely
+## 1. Make the operator record the recovery target — **S**
 
-### The defect
-
-`--expect-wallet-id` needs `ced2270948ecb5af…`. **No command in this repo
-prints that value.** Measured — one wallet, four ids:
-
-| id | value | printed by |
-| --- | --- | --- |
-| `WalletDescriptorTemplateId` | `5b48af35d4321a3ac18b43045e2523cc` | `md inspect`; journey prints it |
-| `WalletPolicyId`, **keyless** template | `f89e23f13c697ae62ef10328d71d7e24` | `md inspect`; journey prints it |
-| `WalletPolicyId`, **keyed** policy | `232214e4d60c0fa83a6715ba2f7e8ec7` | `md inspect` on a keyed encode |
-| **what `restore` matches** | **`ced2270948ecb5af0779249ac7181f4a`** | **nothing** |
-
-An operator who records the id their own tooling prints, and reaches for it at
-recovery, is refused. Supplying `232214e4…` was executed and rejected.
-
-### Root cause — a known finding nobody had connected to this
-
-`restore` re-serialises the completed descriptor's xpubs with BIP-32 metadata
-**zeroed**. Measured, same key:
-
-```
-committed xpub  depth=4  parent_fp=1cf29716  child=80000002
-restored xpub   depth=0  parent_fp=00000000  child=00000000
-```
-
-Different serialisation → different descriptor string → different
-`WalletPolicyId`. This is **F-130**, already in
-`design/journeys/README.md:63`: *"Keys byte-identical, addresses unaffected —
-but restored xpubs lose depth/parent/child, so the descriptor string and its
-checksum differ."* Addresses are unaffected — the `first recv` above matches.
-Only the **id** moves.
+v2 proposed building an emitter and escalated which tool should own it. Both
+candidates were impossible and the capability already existed. **Deleted.**
+What remains is small.
 
 ### The change
 
-**Emit the recovery target at BACKUP time.** An operator cannot be asked to
-obtain it by performing the recovery they are preparing for.
+1. **Journey step.** After `me bundle`, the pathological journey runs
+   `verify-bundle` in explicit `--cosigner @N=` form and prints the completed
+   `WalletPolicyId` and the tool's own warning verbatim.
+2. **README.** `design/journeys/README.md` gains a section stating: this id is
+   what `--expect-wallet-id` needs at recovery; **record at least 16 hex**;
+   it is **not** the id `md inspect` prints for the template or for a keyed
+   encode — those are different values for the same wallet, for the two
+   reasons in §0.
 
-Two candidate homes. **This plan deliberately does not choose — see §7.1.**
+### Acceptance
 
-- **(a) `md inspect --restored-form`** — prints the restored-serialisation id
-  beside the existing two. Smallest surface; keeps identity in the tool that
-  owns it.
-- **(b) `me bundle` checklist header** — "record this to recover: `ced22709…`".
-  Where the operator is already writing things down, but `me` would have to
-  compute an id it currently has no reason to know.
+- The pathological journey prints `ced2270948ecb5af0779249ac7181f4a` and the
+  warning, from a step in the committed script.
+- §3's demonstration consumes **that printed value**, not a literal.
+- The README states the 16-hex floor and names the three other ids as *not*
+  the target.
 
-**Acceptance (either home):** a command in this repo prints
-`ced2270948ecb5af0779249ac7181f4a` for the pathological wallet, and the journey
-prints it under a label saying what it is for.
+### Not solved
 
-### What this does NOT solve
-
-An operator who recorded **no** target. That case needs `--search-address`,
-refused at this scale — so for an 11-key wallet **there is currently no
-no-target recovery path**. State it in the docs rather than let it be
-discovered.
+An operator who recorded **no** target. `--search-address` is refused at n=11,
+so for an 11-key wallet there is **no no-target recovery path**. Say so.
 
 ---
 
-## 2. Name the card in the engrave checklist
+## 2. Name the card in the engrave checklist — **S**
 
 ### What is already true
 
 `me bundle` decodes every mk1 set at `crates/me-cli/src/bundle.rs:279` and
-**discards the `KeyCard`**, keeping only `total` and an integrity flag. The
-identifying data is computed today and thrown away.
+**discards the `KeyCard`**. The checklist at
+`crates/me-cli/src/manifest.rs:82-108` renders `mk1 chunk 1/3` with no identity,
+and plates are emitted in `chunk_set_id` order, so position tells the operator
+nothing.
 
-The checklist at `crates/me-cli/src/manifest.rs:82-108` renders `mk1 chunk 1/3`
-with no key identity, and plates are emitted in `chunk_set_id` order, so
-position carries no information either.
+### Decided: representation
 
-### The change, with the representation DECIDED
+Store **`String`**, converted at the decode site. `me-cli` has no `bitcoin`
+dependency and adding one to name a field type is disproportionate for display
+text; `serde` is already present, so the constraint is type-naming, not
+serialisation.
 
-Store **`String`**, converted at the decode site — not the `bitcoin` types.
-
-This is the decision v1 left open and the architect flagged as blocking.
-Rationale: `me-cli` has **no `bitcoin` dependency**, and adding one to name a
-field type is disproportionate for display text. `serde` is already present, so
-serialisation is not the constraint; the type-naming is.
-
-Rendering, specified so two implementers cannot differ:
+### Decided: exact rendering
 
 ```
 fingerprint present:  mk1 [73c5da0a/48'/0'/1'/2'] chunk 1/3
 fingerprint absent:   mk1 [path 48'/0'/1'/2', no fingerprint] chunk 1/3
+empty path:           mk1 [73c5da0a, no path] chunk 1/3
+both absent:          mk1 [unidentified] chunk 1/3
+collision:            …] chunk 1/3 set 0xe03a5
 ```
 
-- Hardened markers rendered `'`, matching `mk decode`'s existing output, not `h`.
-- New `PlateEntry` fields are `Option<String>` with
-  `#[serde(skip_serializing_if = "Option::is_none")]`, so plates with no card
-  gain no keys and existing manifest consumers are unaffected.
+Hardened markers `'`, matching `mk decode`. The `set <chunk_set_id>` suffix is
+appended **only** to plates whose `(fingerprint, path)` pair is not unique
+within the bundle, placed **after** the chunk counter.
 
-### It CANNOT print `@N`, and must not imply one
+### Decided: JSON
 
-`me` sees cards; a keyless template carries no key order to match against.
-This survived both review rounds. The label states the card's **origin**, never
-a slot number. The index comes from §1+§3, or §4's convention.
+New `PlateEntry` fields **`card_fingerprint`** and **`card_path`**, both
+`Option<String>`, `#[serde(skip_serializing_if = "Option::is_none")]`.
 
-### Edge cases, each with a defined behaviour
+**The golden and the spec BOTH change.** `crates/me-cli/tests/vectors/bundle-md1-mk1.json`
+gains those keys on its mk1 plates, and `SPEC_me_bundle_phaseA.md` §6 gains
+the two field definitions. Both assertions at `crates/me-cli/tests/cli.rs:308`
+and `:745` must be regenerated deliberately, and the diff must show it.
 
-| case | behaviour |
-| --- | --- |
-| `origin_fingerprint` is `None` | second form above; never fabricate a fingerprint |
-| two cards share fingerprint+path | render identically, **plus `set <chunk_set_id>`** so they stay distinguishable |
-| `ms1` plate | unchanged — it has no card |
-| multiple `policy_id_stubs` | irrelevant here; ignore |
+### Decided: release mechanics
+
+`me-cli` version bump + `crates/me-cli/CHANGELOG.md` entry, per the lockstep
+convention in `SPEC_me_bundle_phaseA.md` §11. This changes user-visible output.
+
+### It CANNOT print `@N`
+
+`me` sees cards; a keyless template carries no key order. Survived three
+rounds. The label states the card's **origin**, never a slot number.
 
 ### Acceptance
 
 - All 30 card plates in the pathological checklist name an origin.
-- `crates/me-cli/tests/cli.rs` and the `crates/me-cli/src/manifest.rs:228` assertion
-  (`"mk1 chunk 1/2"`) updated **deliberately** — that string is today's
-  contract and the diff must show it changing on purpose.
-- The no-fingerprint form is pinned by a test using a
-  `--privacy-preserving` card.
+- **Both** committed transcripts regenerate — `transcript.txt` (24 lines) and
+  `transcript_pathological.txt` (31).
+- The `crates/me-cli/src/manifest.rs:228` assertion becomes
+  `assert!(c.contains("mk1 [aabbccdd/48'/0'/0'/2'] chunk 1/2"))`.
+- A test pins the no-fingerprint form using a `--privacy-preserving` card, and
+  a test pins the collision form using two cards sharing `(fingerprint, path)`.
+- Golden regenerated; SPEC §6 updated; CHANGELOG entry present.
 
 ---
 
-## 3. Surface and demonstrate recovery
+## 3. Demonstrate recovery in the journey — **S**
 
 ### The change
 
-1. **`design/journeys/README.md`**: state the model as measured — **own seed +
-   the other N−1 cards + a recorded target id** — that `Unique` is
-   proven-unique rather than first-match, that a target is **required**, and
-   that `--search-address` is refused at this scale.
-2. **Demonstrate it in the pathological journey** via `--expect-wallet-id`,
-   cards deliberately shuffled. Measured **16 s**, exit 0 — affordable in a
-   journey that must complete every run.
-3. State the `n ≤ 34` ceiling, the 3600 s cap, and `--accept-search-time`.
+1. **README**: the model (own seed + N−1 cards + recorded target), that
+   `Unique` is proven-unique not first-match, that a target is **required**,
+   that `--search-address` is refused at this scale, the `n ≤ 34` ceiling, the
+   3600 s cap, `--accept-search-time`, and the **16-hex** floor.
+2. **Journey step**: shuffled-card recovery via `--expect-wallet-id`, consuming
+   the id §1 printed.
+
+### The estimate varies — this gates the step
+
+Measured across identical runs the gating **estimate** swung **189.6 s →
+1284.9 s** against the 3600 s ceiling. A slower machine can therefore be
+refused, turning a document build red for a reason unrelated to the document.
+
+**Decision: pass `--accept-search-time 4000` in the journey step**, so the
+gate is the *actual* work (≈16 s), not a variable estimate. The journey states
+why the flag is present.
+
+### Shuffle CARDS, not CHUNKS
+
+A card's chunks must stay contiguous and in order; a chunk-level shuffle exits
+1 (measured). The step shuffles the order of the ten cards and keeps each
+card's chunks together.
+
+### Exit codes, named
+
+`0` working shape · `1` ceiling refusal · `2` missing seed / pool size ·
+`4` NO MATCH.
 
 ### Dependency
 
-**Step 2 cannot ship before §1**, or the journey must hardcode an id nothing
-produces — the exact no-producer defect this session has fixed four times.
+§3 consumes §1's printed id, so **§1 lands first**.
 
 ### Acceptance
 
-- The journey performs a shuffled recovery and prints its real exit code.
-- The target id it uses is one an **earlier step printed**, not a literal.
+- The journey performs a shuffled-card recovery, exit `0`, using the id an
+  earlier step printed.
+- The README states all seven facts listed in step 1.
 
 ---
 
 ## 4. The account-index convention — documentation only
 
-Every card carries `origin_path` and `mk decode` prints it. If keyholders agree
-at generation that **account index = template index**, the index is on every
-card with no format change.
+- **Deliverable:** one section in `design/journeys/README.md`, headed
+  *"Choosing key paths so the cards identify themselves"*.
+- **The convention sentence:** *"Derive cosigner `@N` at account index `N` of
+  its master, so that a card's printed `origin_path` states its own template
+  slot."*
+- **Which index (D11):** the index **in the encoded template**, after
+  `md-codec`'s `canonicalize_placeholder_indices` renumbers placeholders to
+  BIP-388 first-occurrence order. **Measured: for this wallet the source and
+  canonical orders coincide** (`@0…@10` already appear in first-occurrence
+  order), so the distinction is invisible here — which is exactly why it must
+  be written down rather than inferred from the fixture.
+- **Acceptance:** that section exists and states the convention sentence, the
+  canonicalisation answer, and all three limits below.
 
-**Deliverable, location, acceptance — the three things v1 lacked:**
+**Limits:**
 
-- **Deliverable:** one section in `design/journeys/README.md`, *"Choosing key
-  paths so the cards identify themselves"*.
-- **Acceptance:** that section exists and states all three limits below.
+1. Advisory; pre-existing keys cannot adopt it retroactively.
+2. **The fixture does not follow it** — `@0-@3` are master A accounts `0'-3'`,
+   `@4` is master B account `0'` (`[b8688df1/48'/0'/0'/2']`). Adopting it means
+   re-deriving those keys again and moving every id: **a decision, not a step.**
+3. Helps only where keyholders coordinate at creation.
 
-**Limits, all three required:**
-
-1. Advisory only; pre-existing keys cannot adopt it retroactively.
-2. **The current fixture does not follow it.** Measured: `@0-@3` are master A
-   accounts `0'-3'`, but `@4` is master B account `0'`
-   (`[b8688df1/48'/0'/0'/2']`). Adopting it means re-deriving those keys again
-   and moving every id — **a decision, not a step**.
-3. It helps only where keyholders coordinate at creation.
-
-**No lint.** `me` cannot see the template's key order, so it cannot check the
-convention, and a lint asserting card↔position coupling contradicts §5.
+**No lint** — `me` cannot see the template's key order, and a lint asserting
+card↔position coupling contradicts §5.
 
 ---
 
 ## 5. Deliberately NOT proposed — an index field in `mk1`
 
-A normative wire change, and it couples a card to a position in *one* wallet
-when the same key may sit at different indices elsewhere. §4 gets the benefit
-without the coupling.
+A normative wire change that couples a card to a position in *one* wallet when
+the same key may sit at different indices elsewhere. §4 gets the benefit
+without the coupling. **Acknowledged tension:** §4's convention encodes the
+same information in the path — the difference is that a path is the operator's
+choice at creation and carries no protocol promise, whereas a wire field would.
 
 ---
 
 ## 6. Order
 
-**§1 → §2 → §3 → §4.** §1 leads: §3 is unbuildable without it, and it is the
-only item addressing a case where an operator loses access. §2 is independent
-and may run in parallel. §4 is documentation, last.
+**§1 → §2 → §3 → §4.** §1 first (§3 consumes its output). §2 is independent.
+§1 and §3 each rewrite the pathological transcript, so regenerate once after
+both rather than twice.
 
 ---
 
-## 7. Open — escalated, not assumed
+## 7. Open — one item
 
-1. **§1's home: (a) `md inspect --restored-form`, or (b) `me bundle` header?**
-   The one decision this plan deliberately leaves open.
-2. **Should `restore` instead accept the keyed-policy id and normalise
-   internally?** That would make F-130 invisible to operators rather than
-   documented at them, and might be a better fix than §1 entirely.
-   **Unresearched.**
-3. Should §2's label also appear on the **engraved plate**, not only the
-   checklist? Plate furniture, not wire format — but it consumes plate area and
-   interacts with the font's minimum-feature rules. **Unmeasured.**
+**Should the §2 label also appear on the engraved plate**, not only the
+checklist? Plate furniture, not wire format — but it consumes plate area and
+interacts with the font's minimum-feature rules. **Unmeasured**, and outside
+this plan.
+
+---
+
+## 8. Ledger — every prior finding, resolved or explicitly rejected
+
+| finding | disposition |
+| --- | --- |
+| D1 type | §2: `String`, with rationale |
+| D2 manifest fields | §2: yes — `card_fingerprint`, `card_path`; golden + SPEC change |
+| D3 `None` fallback | §2: exact string given |
+| D4 empty path | §2: exact string given |
+| D5 collision | §2: `set <chunk_set_id>` suffix, placement specified |
+| D6 multi-wallet / multi-stub | §2: irrelevant to this label; ignored deliberately |
+| D7 restore invocation | §3 + §0 transcript give the full command |
+| D8 which target | §3: `--expect-wallet-id` (address form refused) |
+| D9 which number decides | §3: moot — `--accept-search-time` removes the estimate gate |
+| D10 doc location | §4: named file and heading |
+| D11 canonicalisation | §4: encoded-template index; measured identity here |
+| D12 release mechanics | §2: version bump + CHANGELOG |
+| F1 seed required | §0 |
+| F2 `--search-address` refused | §0 |
+| F3 wrong target id | §1 rewritten around `verify-bundle` |
+| F4 dependency conditional | §2: `String` makes it unconditional |
+| F5 manifest contract | §2: golden + SPEC named |
+| F6 `@N` reason over-broad | §2: claim narrowed to "keyless template, no key order" |
+| F7 fixture correction correct | §4 limit 2 |
+| F8 recoverable-shape claim correct | §0 |
+| MA-1 collision untested | §2 acceptance: a test |
+| MA-2 "deliberately" not a criterion | §2 acceptance: exact assertion text |
+| MA-3 golden/schema undecided | §2: both change |
+| MA-4 other journey | §2 acceptance: both transcripts |
+| MA-5 §4 no deliverable | §4: deliverable + sentence + acceptance |
+| MA-6 which exit code | §3: all four named |
+| MA-7 prefix floor | §1 + §3: 16 hex |
+| H1 §3 prerequisite | §3: dependency on §1 |
+| H2 two transcripts | §2 acceptance |
+| H3 double regeneration | §6: regenerate once after §1 and §3 |
+| H4 §2 decision not orderable | resolved — the decision is made in §2 |
+| v2-C1 `verify-bundle` prints it | §1 rewritten |
+| v2-C2 root cause disproven | §0: origin-flattening + omitted fingerprints |
+| v2-I2 estimate variance | §3: `--accept-search-time` |
+| v2-I4 empty-path card | §2 rendering table |
+| PDF already captions `@N` | noted: the *document* shows it; the *checklist* the operator engraves from does not — §2 targets the latter |
