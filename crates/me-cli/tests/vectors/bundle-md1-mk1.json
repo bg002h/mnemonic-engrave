@@ -26,6 +26,8 @@
       "string": "mk1qpzg69pqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3kx98j76m4mjlwphf",
       "chunk_set_id": "0x12345",
       "chunk_index": 0,
+      "card_fingerprint": "aabbccdd",
+      "card_path": "48'/0'/0'/2'",
       "integrity": "set-verified"
     },
     {
@@ -35,6 +37,8 @@
       "string": "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x",
       "chunk_set_id": "0x12345",
       "chunk_index": 1,
+      "card_fingerprint": "aabbccdd",
+      "card_path": "48'/0'/0'/2'",
       "integrity": "set-verified"
     },
     {

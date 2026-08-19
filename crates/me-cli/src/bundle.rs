@@ -241,6 +241,8 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
             chunk_set_id: None,
             chunk_index: None,
             integrity: Integrity::BchOnly,
+            card_fingerprint: None,
+            card_path: None,
             preview: None,
         });
     }
@@ -267,6 +269,8 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
                 chunk_set_id: Some(fmt_chunk_set_id(id)),
                 chunk_index: Some(*idx),
                 integrity: Integrity::SetVerified,
+                card_fingerprint: None,
+                card_path: None,
                 preview: None,
             });
         }
@@ -276,8 +280,29 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     for (id, mut chunks) in mk1_groups {
         chunks.sort_by_key(|(i, _)| *i);
         let refs: Vec<&str> = chunks.iter().map(|(_, s)| s.as_str()).collect();
-        mk_codec::decode(&refs)
+        // The decoded card used to be DISCARDED here — decoded purely to prove
+        // set integrity, then dropped. Its origin is what lets the engrave
+        // checklist say WHOSE key a plate carries, which an operator cutting 34
+        // plates otherwise cannot tell: `me bundle` emits plates in
+        // chunk_set_id order, so position carries no information either.
+        let card = mk_codec::decode(&refs)
             .map_err(|e| BundleError::SetIncompleteMk(fmt_chunk_set_id(id), e))?;
+
+        // Rendered to `String` right here, deliberately: `me-cli` has no
+        // `bitcoin` dependency and needs none, because these values are only
+        // ever displayed and `.to_string()` requires no type name.
+        let card_fingerprint = card.origin_fingerprint.map(|f| f.to_string());
+        let card_path = {
+            let p = card.origin_path.to_string();
+            // A card MAY carry an empty origin path; render that as absent
+            // rather than as an empty bracket.
+            if p.is_empty() {
+                None
+            } else {
+                Some(p)
+            }
+        };
+
         let total = chunks.len() as u8;
         sets.push(SetEntry {
             kind: Kind::Mk1,
@@ -294,6 +319,8 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
                 chunk_set_id: Some(fmt_chunk_set_id(id)),
                 chunk_index: Some(*idx),
                 integrity: Integrity::SetVerified,
+                card_fingerprint: card_fingerprint.clone(),
+                card_path: card_path.clone(),
                 preview: None,
             });
         }
@@ -308,6 +335,8 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         chunk_set_id: None,
         chunk_index: None,
         integrity: Integrity::Na,
+        card_fingerprint: None,
+        card_path: None,
         preview: None,
     });
 

@@ -309,6 +309,84 @@ fn bundle_manifest_golden() {
 }
 
 // ---------------------------------------------------------------------------
+// Checklist card identity (PLAN_key_index_legibility §2).
+//
+// An operator cutting 34 plates cannot otherwise tell whose key is on the one
+// in front of them. The two forms below are the ones that are NOT the happy
+// path, so they are the ones a regression would silently take away.
+//
+// All four cards here carry the same policy stub as MD1_VALID (generated with
+// `mk encode --from-md1 md1yqpqqxqq8xtwhw4xwn4qh`), which is what lets them
+// join that md1 in one bundle.
+// ---------------------------------------------------------------------------
+
+/// A `--privacy-preserving` card has NO master fingerprint by design. The label
+/// must say so and name the path instead — never fabricate a fingerprint, and
+/// never fall back to the anonymous `[unidentified]` form when a path is known.
+#[test]
+fn checklist_names_privacy_preserving_card_by_path() {
+    const P1: &str = "mk1qprx4gpqqqq52a6af5zsfz9jrcw099ckhwsv0jskp2rsal4egz4ep5859p875x67p5s3wem7sgluxl3d2a3syx3m7halwmgkz8syklk577aq";
+    const P2: &str = "mk1qprx4gppxlg0x6vnl4rdcjgnpya7k5edv487ph7e30f8tpwunu53n25fsq7a95v5u6dycrf";
+
+    let assert = Command::cargo_bin("me")
+        .unwrap()
+        .arg("bundle")
+        .write_stdin(format!("{MD1_VALID}\n{P1}\n{P2}\n"))
+        .assert()
+        .success();
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+
+    assert!(
+        stderr.contains("mk1 [path 48'/0'/0'/2', no fingerprint] chunk 1/2"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("mk1 [path 48'/0'/0'/2', no fingerprint] chunk 2/2"),
+        "{stderr}"
+    );
+    // One card cannot be ambiguous with itself: its two chunks trivially share
+    // an origin, and suffixing them would be the per-plate scan this test also
+    // exists to rule out.
+    assert!(!stderr.contains(" set 0x"), "{stderr}");
+}
+
+/// Two DIFFERENT cards sharing `(fingerprint, path)` render an identical
+/// bracket, so the chunk-set id is appended to keep them apart. Without it,
+/// plates 2..5 below would read as four chunks of one 2-chunk card.
+#[test]
+fn checklist_disambiguates_two_cards_sharing_an_origin() {
+    const A1: &str = "mk1qp7vlepqqsq52a6afk4thnxaq5zg3vs7rnefw94m5rru59s2su80aw2q4wgdpapgfl4pkhsdyytkwl5z8lphut2hvvpp5kk2m8f6m4kvfc0p";
+    const A2: &str =
+        "mk1qp7vlepp806lhaeh6reknylagmwyjycf8044xtt9flsdlkvt6f6cthyl98enl9mes92usqz2hd8vy";
+    const B1: &str = "mk1qp9kskpqqsq52a6afk4thnxaq5zg3vs78m0n74uevrz28llsnr4qya3jx00arhdt3p75feg52qpln6pv7sunhq8kxupyjh78u6atxdq73a9d";
+    const B2: &str =
+        "mk1qp9kskppp99zcyrd98kjcu8vgdtu6gt04upy3z0n8ek4aj5kk9satjt7uvk6zejjdmyuez3cwd3jk";
+
+    let assert = Command::cargo_bin("me")
+        .unwrap()
+        .arg("bundle")
+        .write_stdin(format!("{MD1_VALID}\n{A1}\n{A2}\n{B1}\n{B2}\n"))
+        .assert()
+        .success();
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+
+    for line in [
+        "mk1 [aabbccdd/48'/0'/0'/2'] chunk 1/2 set 0x2da16",
+        "mk1 [aabbccdd/48'/0'/0'/2'] chunk 2/2 set 0x2da16",
+        "mk1 [aabbccdd/48'/0'/0'/2'] chunk 1/2 set 0xf33f9",
+        "mk1 [aabbccdd/48'/0'/0'/2'] chunk 2/2 set 0xf33f9",
+    ] {
+        assert!(stderr.contains(line), "missing {line:?} in:\n{stderr}");
+    }
+    // The suffix is the ONLY thing distinguishing the two cards, so an
+    // unsuffixed line means the collision scan failed to fire.
+    assert!(
+        !stderr.contains("chunk 1/2  \u{2192}"),
+        "an unsuffixed chunk line survived:\n{stderr}"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Task 9: `me bundle --preview <DIR>` wiring (hermetic — fake `me-preview`).
 //
 // These tests stand up a tiny shell-script `me-preview` in a temp dir and point

@@ -71,8 +71,8 @@ Each is surfaced verbatim alongside the human framing "set `<chunk_set_id>` is i
   ],
   "plates": [
     { "plate": 1, "of": 4, "kind": "md1",       "string": "md1…", "chunk_set_id": "0x1a2b3", "chunk_index": 0, "integrity": "set-verified" },
-    { "plate": 2, "of": 4, "kind": "mk1-chunk", "string": "mk1…", "chunk_set_id": "0x4c5d6", "chunk_index": 0, "integrity": "set-verified" },
-    { "plate": 3, "of": 4, "kind": "mk1-chunk", "string": "mk1…", "chunk_set_id": "0x4c5d6", "chunk_index": 1, "integrity": "set-verified" },
+    { "plate": 2, "of": 4, "kind": "mk1-chunk", "string": "mk1…", "chunk_set_id": "0x4c5d6", "chunk_index": 0, "integrity": "set-verified", "card_fingerprint": "aabbccdd", "card_path": "48'/0'/0'/2'" },
+    { "plate": 3, "of": 4, "kind": "mk1-chunk", "string": "mk1…", "chunk_set_id": "0x4c5d6", "chunk_index": 1, "integrity": "set-verified", "card_fingerprint": "aabbccdd", "card_path": "48'/0'/0'/2'" },
     { "plate": 4, "of": 4, "kind": "ms1",                                                                       "integrity": "n/a" }
   ]
 }
@@ -81,17 +81,49 @@ Each is surfaced verbatim alongside the human framing "set `<chunk_set_id>` is i
 - **Plate ordering:** md1 policy plate(s) (chunk_index order) → each mk1 set's chunks (chunk_index order) → a single trailing **`ms1` reminder** plate (no `string`; the tool never knows it). `wallet_plates` counts the public plates + the ms1 reminder.
 - **`sets[]`** lists **only multi-string chunked sets** (chunked md1 and mk1) — each `set-verified`. An **unchunked single md1** is NOT a chunk set: it appears **only in `plates[]`** with `integrity: "bch-only"` and **no `chunk_set_id`/`chunk_index`**, and is **omitted from `sets[]`** (resolves m-2). The example's md1 set is a *chunked-of-1* (`total: 1`, hence it has a `chunk_set_id` and is `set-verified`). `sets[]` models ≥1 independent sets (e.g. one chunked md1 + two mk1 key cards → three entries), confirmed sound in design R1 (multi-set Q5). `string` is omitted for the `ms1` plate; `chunk_set_id`/`chunk_index` omitted for unchunked md1 and ms1.
 - **`version`** is the crate version at build time (`env!("CARGO_PKG_VERSION")`) — the `"0.2.0"` literal above is illustrative, NOT hardcoded. The §10 manifest golden test (#12) must therefore either pin/normalize the `version` field or assert on a version-independent projection, so a routine version bump does not break the golden.
+- **`card_fingerprint` / `card_path`** identify the mk1 **card** a chunk plate belongs to, carried straight from the decoded `KeyCard`'s origin. Present on `mk1-chunk` plates only — **both are omitted** on `md1` and `ms1` plates, and `card_fingerprint` is omitted for a **`--privacy-preserving`** card, which has none by design. They are *reporting* fields: nothing in the pipeline consumes them, and they do not participate in set integrity. Rendered as lowercase hex and an apostrophe-hardened path (matching `mk decode`), with no leading `m/`.
 - Hex `chunk_set_id` rendered `0x%05x` (20-bit). The schema is forward-compatible for a Phase-B consumer (it selects which plate to preview via `plates[]`).
 
 ## 7. Guided workflow checklist (stderr)
-One line per public plate plus the ms1 reminder, e.g.:
+One line per public plate plus the ms1 reminder. This is the **real** stderr of
+the §10 golden vector, not an illustration:
 ```
 me: backup needs 4 plates (3 public + ms1 on device):
-  plate 1/4  md1 policy        → push via NFC & engrave
-  plate 2/4  mk1 chunk 1/2     → push via NFC & engrave
-  plate 3/4  mk1 chunk 2/2     → push via NFC & engrave
-  plate 4/4  ms1 secret        → TYPE ON DEVICE (New > Input Seed > CODEX32); never via this tool
+  plate 1/4  md1 policy  → push via NFC & engrave
+  plate 2/4  mk1 [aabbccdd/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 3/4  mk1 [aabbccdd/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 4/4  ms1 secret  → TYPE ON DEVICE (New > Input Seed > CODEX32); never via this tool
 ```
+
+**Naming the card is normative.** An operator cutting a 34-plate bundle cannot
+otherwise tell whose key is on the plate in front of them: the plates are
+emitted in `chunk_set_id` order, which is neither the order the cards were
+supplied in nor the order of the template's `@N` indices. The bracket takes
+exactly one of four forms, by what the card actually carries:
+
+| card has | rendered |
+| --- | --- |
+| fingerprint + path | `[aabbccdd/48'/0'/0'/2']` |
+| path only (`--privacy-preserving`) | `[path 48'/0'/0'/2', no fingerprint]` |
+| fingerprint only | `[aabbccdd, no path]` |
+| neither | `[unidentified]` |
+
+A missing fingerprint is **never** fabricated or back-filled — omitting it is
+the point of `--privacy-preserving`.
+
+**Collision suffix.** When two *different* cards share one `(fingerprint, path)`
+— routine among privacy-preserving cosigners, who commonly all sit at the same
+path — their brackets are identical, and the four plates of two 2-chunk cards
+would read as one card. Such plates take a trailing ` set 0x…` with the card's
+`chunk_set_id`:
+```
+  plate 2/6  mk1 [aabbccdd/48'/0'/0'/2'] chunk 1/2 set 0x2da16  → push via NFC & engrave
+  plate 4/6  mk1 [aabbccdd/48'/0'/0'/2'] chunk 1/2 set 0xf33f9  → push via NFC & engrave
+```
+The scan that decides this is **per card, keyed on `chunk_set_id` — never per
+plate.** Every chunk of one card trivially shares that card's origin, so a
+per-plate scan would mark all 34 pathological plates ambiguous and suffix every
+one of them, hiding the real case the suffix exists to flag.
 
 ## 8. Edge cases (resolves m-4)
 - Empty input → exit 2. All lines `ms1` → exit 3 at the first `ms1` line. Exact-duplicate chunk (same `chunk_index` twice in a set) → codec dup-detection → exit 4. Incomplete set (missing chunk) → exit 4. Corrupted (BCH-correctable or failing) string → exit 4 at step 3. Mixed md1 + mk1 with any incomplete set → exit 4 (no manifest). A lone unchunked md1 with no mk1 → valid 1-public-plate manifest (+ ms1 reminder). mk1 chunks only, no md1 → valid manifest (+ ms1 reminder).

@@ -12,11 +12,11 @@ ms 0.16.0
 [exit 0]
 
 $ /scratch/code/shibboleth/mnemonic-engrave/target/release/me --version
-me 0.6.0
+me 0.7.0
 [exit 0]
 
 $ /scratch/code/shibboleth/mnemonic-engrave/target/release/me-preview --version
-me-preview 0.6.0
+me-preview 0.7.0
 [exit 0]
 
 ########## 1. the wallet policy, from file
@@ -136,30 +136,30 @@ me: rendered plate 25 → /scratch/code/shibboleth/mnemonic-engrave/design/journ
 me: wrote manifest to /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/manifest.json
 me: backup needs 26 plates (25 public + ms1 on device):
   plate 1/26  md1 policy  → push via NFC & engrave
-  plate 2/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 3/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 4/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 5/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 6/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 7/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 8/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 9/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 10/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 11/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 12/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 13/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 14/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 15/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 16/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 17/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 18/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 19/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 20/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 21/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 22/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 23/26  mk1 chunk 2/2  → push via NFC & engrave
-  plate 24/26  mk1 chunk 1/2  → push via NFC & engrave
-  plate 25/26  mk1 chunk 2/2  → push via NFC & engrave
+  plate 2/26  mk1 [ee9b5972/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 3/26  mk1 [ee9b5972/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 4/26  mk1 [c1826fbb/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 5/26  mk1 [c1826fbb/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 6/26  mk1 [7ab0a774/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 7/26  mk1 [7ab0a774/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 8/26  mk1 [ae6647ee/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 9/26  mk1 [ae6647ee/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 10/26  mk1 [dd7d1881/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 11/26  mk1 [dd7d1881/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 12/26  mk1 [ff4bdd8b/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 13/26  mk1 [ff4bdd8b/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 14/26  mk1 [ecbd6d3c/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 15/26  mk1 [ecbd6d3c/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 16/26  mk1 [bf3e6e44/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 17/26  mk1 [bf3e6e44/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 18/26  mk1 [68c883f9/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 19/26  mk1 [68c883f9/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 20/26  mk1 [5a3ae6a9/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 21/26  mk1 [5a3ae6a9/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 22/26  mk1 [7aa32b8d/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 23/26  mk1 [7aa32b8d/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 24/26  mk1 [b180e226/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 25/26  mk1 [b180e226/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
   plate 26/26  ms1 secret  → TYPE ON DEVICE (New > Input Seed > CODEX32); never via this tool
 [exit 0]
 

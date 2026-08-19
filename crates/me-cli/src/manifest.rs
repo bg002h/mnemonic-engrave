@@ -49,6 +49,19 @@ pub struct PlateEntry {
     pub chunk_set_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chunk_index: Option<u8>,
+    /// Origin fingerprint of the mk1 card this plate belongs to, lowercase hex.
+    ///
+    /// `None` for non-card plates, and for privacy-preserving cards, which omit
+    /// the fingerprint by design (`mk encode --privacy-preserving`). Stored as
+    /// `String` rather than the `bitcoin` type deliberately: `me-cli` has no
+    /// `bitcoin` dependency, and it needs none — the value is only ever
+    /// rendered, and `.to_string()` needs no type name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub card_fingerprint: Option<String>,
+    /// Origin derivation path of the mk1 card this plate belongs to, hardened
+    /// components rendered with `'` to match `mk decode`'s output.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub card_path: Option<String>,
     pub integrity: Integrity,
     /// Path to the rendered preview image (Phase B), set by `me bundle --preview`.
     /// `None` (the default / Phase A) omits the field entirely.
@@ -79,6 +92,28 @@ impl Manifest {
             self.wallet_plates,
             self.wallet_plates.saturating_sub(1)
         );
+        // Which origins are shared by MORE THAN ONE CARD.
+        //
+        // Scanned per CARD (by chunk-set id), never per PLATE: every chunk of a
+        // single card trivially carries that card's origin, so a per-plate scan
+        // would call all 30 pathological plates a collision and suffix every one
+        // of them — noise that hides the real case it exists to flag.
+        let mut origin_sets: std::collections::HashMap<
+            (Option<&str>, Option<&str>),
+            std::collections::HashSet<&str>,
+        > = std::collections::HashMap::new();
+        for p in &self.plates {
+            if !matches!(p.kind, PlateKind::Mk1Chunk) {
+                continue;
+            }
+            if let Some(sid) = p.chunk_set_id.as_deref() {
+                origin_sets
+                    .entry((p.card_fingerprint.as_deref(), p.card_path.as_deref()))
+                    .or_default()
+                    .insert(sid);
+            }
+        }
+
         for p in &self.plates {
             let label = match p.kind {
                 PlateKind::Md1 => "md1 policy".to_string(),
@@ -91,7 +126,30 @@ impl Manifest {
                         .map(|s| s.total)
                         .unwrap_or(0);
                     let idx = p.chunk_index.map(|i| i + 1).unwrap_or(0);
-                    format!("mk1 chunk {idx}/{total}")
+
+                    // Name the card. An operator cutting 34 plates could not
+                    // otherwise tell whose key is on the one in front of them.
+                    let ident = match (p.card_fingerprint.as_deref(), p.card_path.as_deref()) {
+                        (Some(f), Some(path)) => format!("[{f}/{path}]"),
+                        // Privacy-preserving cards omit the fingerprint by
+                        // design. Never fabricate one.
+                        (None, Some(path)) => format!("[path {path}, no fingerprint]"),
+                        (Some(f), None) => format!("[{f}, no path]"),
+                        (None, None) => "[unidentified]".to_string(),
+                    };
+
+                    // Two DIFFERENT cards sharing an origin would otherwise
+                    // render identically; the set id keeps them apart.
+                    let ambiguous = origin_sets
+                        .get(&(p.card_fingerprint.as_deref(), p.card_path.as_deref()))
+                        .is_some_and(|ids| ids.len() > 1);
+                    let suffix = if ambiguous {
+                        format!(" set {}", p.chunk_set_id.as_deref().unwrap_or("?"))
+                    } else {
+                        String::new()
+                    };
+
+                    format!("mk1 {ident} chunk {idx}/{total}{suffix}")
                 }
                 PlateKind::Ms1 => "ms1 secret".to_string(),
             };
@@ -124,6 +182,8 @@ mod tests {
             chunk_set_id: None,
             chunk_index: None,
             integrity: Integrity::BchOnly,
+            card_fingerprint: None,
+            card_path: None,
             preview: None,
         };
         let j = serde_json::to_value(&p).unwrap();
@@ -146,6 +206,8 @@ mod tests {
             chunk_set_id: None,
             chunk_index: None,
             integrity: Integrity::BchOnly,
+            card_fingerprint: None,
+            card_path: None,
             preview: Some("out/plate-1.svg".into()),
         };
         let j = serde_json::to_value(&with).unwrap();
@@ -198,6 +260,8 @@ mod tests {
                     chunk_set_id: Some("0x12345".into()),
                     chunk_index: Some(0),
                     integrity: Integrity::SetVerified,
+                    card_fingerprint: Some("aabbccdd".into()),
+                    card_path: Some("48'/0'/0'/2'".into()),
                     preview: None,
                 },
                 PlateEntry {
@@ -208,6 +272,8 @@ mod tests {
                     chunk_set_id: Some("0x12345".into()),
                     chunk_index: Some(1),
                     integrity: Integrity::SetVerified,
+                    card_fingerprint: Some("aabbccdd".into()),
+                    card_path: Some("48'/0'/0'/2'".into()),
                     preview: None,
                 },
                 PlateEntry {
@@ -218,6 +284,8 @@ mod tests {
                     chunk_set_id: None,
                     chunk_index: None,
                     integrity: Integrity::Na,
+                    card_fingerprint: None,
+                    card_path: None,
                     preview: None,
                 },
             ],
@@ -225,7 +293,7 @@ mod tests {
         let c = m.checklist();
         assert!(c.contains("3 plates"), "{c}");
         assert!(c.contains("plate 1/3"), "{c}");
-        assert!(c.contains("mk1 chunk 1/2"), "{c}");
+        assert!(c.contains("mk1 [aabbccdd/48'/0'/0'/2'] chunk 1/2"), "{c}");
         assert!(c.contains("plate 3/3"), "{c}");
         assert!(c.contains("TYPE ON DEVICE"), "{c}");
         assert!(c.contains("CODEX32"), "{c}");
