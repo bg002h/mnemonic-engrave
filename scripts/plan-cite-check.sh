@@ -55,9 +55,22 @@ set -uo pipefail
 #
 # Set it to the worktree under review whenever the doc cites work that has not
 # landed on `main` yet.
+# The constellation is MULTI-REPO and the design docs cite across it freely.
+# Until 2026-08-18 this list held only the fork and this repo, so every citation
+# into descriptor-mnemonic or mnemonic-toolkit came back DANGLING — measured:
+# 0 of 8 resolved for design/DoNextList.md, none of which was actually a wrong
+# citation. A gate that reports a false DANGLING is worse than no gate, because
+# it trains the reader to ignore its output.
+#
+# Order matters only for the advisory line printed at the end (ROOTS[0] is
+# named there as "the fork root"); resolution tries every entry.
 ROOTS=(
   "${CITE_FORK_ROOT:-/scratch/code/shibboleth/seedhammer}"
   "/scratch/code/shibboleth/mnemonic-engrave"
+  "/scratch/code/shibboleth/descriptor-mnemonic"
+  "/scratch/code/shibboleth/mnemonic-toolkit"
+  "/scratch/code/shibboleth/mnemonic-key"
+  "/scratch/code/shibboleth/mnemonic-secret"
 )
 
 if [ "$#" -eq 0 ]; then
@@ -89,14 +102,48 @@ for doc in "$@"; do
         nums="${cite#*:}"
         path="${path#./}"
 
-        # Locate the file under the first root that has it.
+        # Locate the file. AMBIGUITY IS AN ERROR, NOT A TIE-BREAK.
+        #
+        # This used to `break` on the first root that had the path, which in a
+        # multi-repo constellation silently resolves a bare `Cargo.toml:29`
+        # against whichever repo happens to be listed first — measured on
+        # 2026-08-18: it reported `Cargo.toml:29 (file has 6 lines)` for a
+        # citation meant for mnemonic-toolkit's 6-line-plus workspace manifest.
+        # A gate that resolves a citation to the WRONG repo's file and prints
+        # `ok` is worse than no gate at all, because the reader then trusts it.
+        # REPO-QUALIFIED FORM: `descriptor-mnemonic/crates/…/x.rs:12`.
+        #
+        # This is how an author disambiguates a path that genuinely exists in
+        # several repos — `Cargo.toml`, `vendor/miniscript/…`, `README.md`.
+        # If the first segment matches a root's basename, that root is the ONLY
+        # one tried, and the rest of the citation is taken as relative to it.
         file=""
+        hits=0
+        prefix="${path%%/*}"
         for root in "${ROOTS[@]}"; do
-          if [ -f "$root/$path" ]; then
-            file="$root/$path"
+          if [ "$(basename "$root")" = "$prefix" ] && [ -f "$root/${path#*/}" ]; then
+            file="$root/${path#*/}"
+            hits=1
             break
           fi
         done
+
+        if [ -z "$file" ]; then
+          for root in "${ROOTS[@]}"; do
+            if [ -f "$root/$path" ]; then
+              hits=$((hits + 1))
+              [ -z "$file" ] && file="$root/$path"
+            fi
+          done
+        fi
+        if [ "$hits" -gt 1 ]; then
+          printf 'AMBIGUOUS %-52s (exists under %d roots — qualify the path)\n' \
+            "$cite" "$hits"
+          echo "TOTAL" >>"$TALLY"
+          echo "BAD"   >>"$TALLY"
+          echo "AMB"   >>"$TALLY"
+          continue
+        fi
 
         if [ -z "$file" ]; then
           printf 'DANGLING  %-52s  (no such file under any root)\n' "$cite"
@@ -133,10 +180,11 @@ done
 # what a broken query looks like — here the gate caught it on itself.)
 total=$(grep -c '^TOTAL$' "$TALLY" || true)
 bad=$(grep -c '^BAD$' "$TALLY" || true)
-: "${total:=0}" "${bad:=0}"
+amb=$(grep -c '^AMB$' "$TALLY" || true)
+: "${total:=0}" "${bad:=0}" "${amb:=0}"
 
 echo
-echo "─── citations resolved: $((total - bad)) / $total ; dangling: $bad"
+echo "─── citations resolved: $((total - bad)) / $total ; dangling: $((bad - amb)) ; ambiguous: $amb"
 echo "─── resolved against fork root: ${ROOTS[0]}"
 echo "─── NOT covered: interpretation, absence-claims, code-block compilation,"
 echo "───              and WHAT IS ON THE LINE -- only that the line exists. A"

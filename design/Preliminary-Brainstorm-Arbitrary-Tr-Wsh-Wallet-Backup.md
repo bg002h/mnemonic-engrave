@@ -56,7 +56,7 @@ error and stop?"*, and it is the most durable thing here:
 > verified it can parse back.**
 
 Rationale. `descriptor_to_template` returns `Result`, but `RenderError`
-(`render.rs:35-39`) has exactly one variant, `MalformedTree`, describing a
+(`crates/md-codec/src/render.rs:35-39`) has exactly one variant, `MalformedTree`, describing a
 malformed **input** tree. The function cannot say *"I produced a string that
 isn't valid miniscript"* — and its only test, `render_template_snapshot.rs`,
 contains zero `from_str`, so it never re-parses. A snapshot test blesses whatever
@@ -94,13 +94,13 @@ so arbitrary shapes already derive. **Every gap is device-side.**
 
 ### 4.2 Rust is not ready to port against — the ordered blockers
 
-- **R1 — the `v:` wrapper-chain break.** `render.rs:150-163` gives `Tag::Verify`
-  its own arm instead of joining `render_wrapper_chain` (`render.rs:358`, whose
+- **R1 — the `v:` wrapper-chain break.** `crates/md-codec/src/render.rs:150-163` gives `Tag::Verify`
+  its own arm instead of joining `render_wrapper_chain` (`crates/md-codec/src/render.rs:358`, whose
   dispatch at `:217` covers only `Check | Swap | Alt | DupIf | NonZero |
   ZeroNotEqual`). So `vj:` emits as `v:j:` — **a string rust-miniscript's own
   parser rejects**. The 14-entry frozen KAT misses it because its only chain case
   is `snj:`. Emitted by **two shipped binaries**: `md` and the toolkit both call
-  `md_codec::descriptor_to_template` (`inspect.rs:325`, `:458`).
+  `md_codec::descriptor_to_template` (`crates/mnemonic-toolkit/src/cmd/inspect.rs:325`, `:458`).
 - **R2 — `l:`/`u:` normalization.** Rust renders `or_i(0,X)`/`or_i(X,0)`;
   rust-miniscript's canonical Display renders `l:X`/`u:X`. Both re-parse, so it
   is a divergence in *the text the operator compares against their coordinator*,
@@ -109,14 +109,14 @@ so arbitrary shapes already derive. **Every gap is device-side.**
   per vector: template string, per-`@N` xpubs + fingerprints, canonical
   descriptor string, scriptPubKey hex, `addresses[chain][0..N]`, both wallet ids,
   `Md1EncodingId`, md1 chunks. **13 of 15 `test_vectors::MANIFEST` entries carry
-  `keys: &[]`** (`test_vectors.rs:68-117`). Without this the Go side has nothing
+  `keys: &[]`** (`crates/md-codec/src/test_vectors.rs:68-117`). Without this the Go side has nothing
   to conform to.
 - **R4 — `--path` on `md address` and `md verify`.** Both lack it; `md encode`
   has it. Consequence: exactly the non-canonical shapes this feature is about are
   unreachable via `--template`. **R4 is a prerequisite of R3**, not a sibling.
-- **R5 — close or fence `sortedmulti_a`.** A first-class wire tag (`tag.rs:109`)
+- **R5 — close or fence `sortedmulti_a`.** A first-class wire tag (`crates/md-codec/src/tag.rs:109`)
   that renders but **cannot be encoded by the CLI and cannot be derived**
-  (`to_miniscript.rs:581-586`). Rust can render one and cannot price one.
+  (`crates/md-codec/src/to_miniscript.rs:581-586`). Rust can render one and cannot price one.
 
 **The trap R3 must avoid, and it belongs in the spec as a named constraint:** the
 exporter must **not** call `Descriptor::to_string()`. Both available
@@ -164,7 +164,7 @@ excluded by the shipped `#10b D2` subset. **A new journey is needed regardless.*
 
 Fix it first anyway, for a different reason: the root cause is **capture
 plumbing** (four intermediates have never had a writer in any committed version;
-`transcript_pathological.sh:18` reads `out/md1.txt` sixteen lines before the only
+`design/journeys/transcript_pathological.sh:18` reads `out/md1.txt` sixteen lines before the only
 command that could produce it), plus a stale `me-preview` 0.5.1 against `me`
 0.6.0. A new journey built on that same generator inherits the same defect.
 ~20–30 line refactor.
@@ -180,7 +180,7 @@ command that could produce it), plus a stale `me-preview` 0.5.1 against `me`
   through 13.1.0**, verified by `git merge-base --is-ancestor` against all three
   tags, and the bug was reproduced live. The gate's premise has been
   independently re-confirmed, not weakened. It is about **off-device
-  recoverability**, not the wire codec — `SPEC_seedhammer_template_engrave.md:36`
+  recoverability**, not the wire codec — `design/SPEC_seedhammer_template_engrave.md:36`
   says so explicitly.
 - **Advancing the miniscript pin is not free.** `mnemonic-toolkit/Cargo.toml:20-22`
   records a spike finding the bump to `ff4732e` "build-clean + regression-free" —
@@ -200,7 +200,7 @@ command that could produce it), plus a stale `me-preview` 0.5.1 against `me`
    read was to **defer** and leave the gate untouched — the one part of the
    user's ask consciously left unshipped.
 3. **Does the device ever show a *concrete* descriptor?** `render.rs` renders
-   **templates only** (`@{idx}`, `render.rs:552`); concrete-key rendering does
+   **templates only** (`@{idx}`, `crates/md-codec/src/render.rs:552`); concrete-key rendering does
    not exist in md-codec at all. Three xpubs at 111 chars each will not fit the
    panel, so the device likely shows template + per-slot fingerprints — but
    nobody has ruled, and off-device recovery *does* need a concrete descriptor.

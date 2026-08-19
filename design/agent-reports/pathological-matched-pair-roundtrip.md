@@ -43,7 +43,7 @@ let rendered = desc.to_string();
 ```
 
 That `to_string()` is rust-miniscript's pre-#953 `Display`
-(`vendor/miniscript/src/descriptor/tr/taptree.rs:92-113`), which tracks only the
+(`descriptor-mnemonic/vendor/miniscript/src/descriptor/tr/taptree.rs:92-113`), which tracks only the
 depth *change between adjacent leaves*. Reading the algorithm gives the exact
 condition, sharper than the "depth ≥ 2" proxy in use:
 
@@ -161,7 +161,7 @@ fixture. It does not exist yet.
 ## 3. Round-trip results
 
 Method: `md encode --group-size 0 --force-chunked --path bip84 <T>` (mirroring
-`transcript_pathological.sh:34`), then `md decode <chunks>`, then `md address`.
+`design/journeys/transcript_pathological.sh:34`), then `md decode <chunks>`, then `md address`.
 
 | | wsh | tr |
 | --- | --- | --- |

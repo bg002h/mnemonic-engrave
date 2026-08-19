@@ -11,9 +11,9 @@ revisions**, depending on which binary you build:
 | binary | source repo | rust-miniscript |
 | --- | --- | --- |
 | `md` | `descriptor-mnemonic` | registry **13.0.0** — no `[patch.crates-io]` |
-| `mnemonic` | `mnemonic-toolkit` | git **`95fdd1c5`**, mid-master (`Cargo.toml:29-30`) |
+| `mnemonic` | `mnemonic-toolkit` | git **`95fdd1c5`**, mid-master (`mnemonic-toolkit/Cargo.toml:28-29`) |
 
-Address derivation is *delegated* to rust-miniscript (`derive.rs:1-10`), so a
+Address derivation is *delegated* to rust-miniscript (`crates/md-codec/src/derive.rs:1-10`), so a
 behavioural difference between the revisions would land on funds-relevant
 output — two constellation binaries answering differently for the same wallet.
 Nobody had run the check.
@@ -49,7 +49,7 @@ Identical across all three, including the ~29 s `bitcoind_differential` suite.
 no *covered* behaviour diverges. It does not prove addresses are identical for
 shapes the corpus does not reach — and the corpus is weakest exactly where the
 risk is highest: **13 of 15 `test_vectors::MANIFEST` entries carry
-`keys: &[]`** (`test_vectors.rs:68-117`), so most vectors derive no address at
+`keys: &[]`** (`crates/md-codec/src/test_vectors.rs:68-117`), so most vectors derive no address at
 all. Keyed derivation across revisions is therefore barely exercised.
 
 So this is a **weak green**. It becomes a strong one only after R3 puts keys

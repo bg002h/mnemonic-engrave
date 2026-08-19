@@ -120,11 +120,11 @@ validator that does not exist. **Recorded rather than silently skipped.**
 
 <details><summary>original entry</summary>
 
-`render.rs:150-163` gives `Tag::Verify` its own arm instead of joining
-`render_wrapper_chain` (`render.rs:358`, dispatch at `:217` covers only
+`crates/md-codec/src/render.rs:150-163` gives `Tag::Verify` its own arm instead of joining
+`render_wrapper_chain` (`crates/md-codec/src/render.rs:358`, dispatch at `:217` covers only
 `c/s/a/d/j/n`), so `vj:` emits as `v:j:` — **a string rust-miniscript's own
 parser rejects**. Emitted by **two shipped binaries** (`md`, and the toolkit via
-`inspect.rs:325`/`:458`).
+`crates/mnemonic-toolkit/src/cmd/inspect.rs:325`/`:458`).
 
 Three parts, and the third closes the class:
 
@@ -145,7 +145,7 @@ self-check behind the existing `derive` feature.
 ### 4. Decide the default derivation path for arbitrary miniscript — **RULED; implementation still gated**
 
 md has **no** canonical origin for these shapes and says so at encode time
-("no canonical default derivation path"). `canonical_origin.rs:13-76` covers
+("no canonical default derivation path"). `crates/md-codec/src/canonical_origin.rs:13-76` covers
 `pkh→44'`, `wpkh→84'`, `tr` key-path-only→`86'`, `wsh(multi|sortedmulti)→48'/0'/0'/2'`,
 `sh(wsh(…))→48'/0'/0'/1'`.
 
@@ -348,7 +348,7 @@ canonical is a separate call.
 <details><summary>original entry</summary>
 
 Four intermediates have never had a writer in any committed version;
-`transcript_pathological.sh:18` reads `out/md1.txt` sixteen lines before the only
+`design/journeys/transcript_pathological.sh:18` reads `out/md1.txt` sixteen lines before the only
 command that could produce it. Plus a stale `me-preview` 0.5.1 against `me`
 0.6.0.
 

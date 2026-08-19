@@ -119,7 +119,7 @@ Each of these has cost this project a cycle.
 
 - **It must be re-runnable by one command.** *A journey that cannot be re-run is
   not a journey, it is a transcript.* F-210: four intermediates have never had a
-  writer in any committed version, and `transcript_pathological.sh:18` reads
+  writer in any committed version, and `design/journeys/transcript_pathological.sh:18` reads
   `out/md1.txt` sixteen lines before the only command that could produce it. The
   artifact kept vouching for a path that had rotted.
 - **It must not read an intermediate that nothing in the journey writes.** Same
