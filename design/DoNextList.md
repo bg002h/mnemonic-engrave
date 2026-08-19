@@ -294,7 +294,24 @@ vanity.
 **This is normative** — the origin feeds the wire TLV and therefore both wallet
 ids, so changing it later moves every id. Rust-primary, needs vectors.
 
-### 5. Make the pathological pair actually round-trip — **decision, then S/M**
+### 5. ~~Make the pathological pair actually round-trip~~ — **RULED option 1 + DONE 2026-08-18**
+
+> Operator ruled **option 1** ("so definitely option A"). Executed: the eleven
+> xpubs were regenerated at BIP-48 depth 4 from the same committed seeds by
+> `design/journeys/derive-pathological-keys.sh` (which also gave the key files a
+> producer for the first time). **Addresses derive for this wallet for the first
+> time**, cross-checked against an independent Python BIP-32 implementation and
+> Bitcoin Core v25 `deriveaddresses`. The master fingerprints are unchanged —
+> only the account path moved.
+>
+> **One question survives and was NOT answered, only sidestepped: is `md` right
+> to demand depth 4?** Option 1 conformed to the check rather than testing it.
+> That is an external-protocol question, so it must be settled against
+> **authoritative source text** (BIP-48/BIP-388), never against our own docs or
+> a plausible consensus. Routed to the recon.
+
+The original decision text follows, kept because it records why option 1 won.
+
 
 Both halves pass structurally; **both fail functionally** because the fixture's
 11 xpubs are bip84 **depth 3** and a multisig script context demands depth 4. So
@@ -578,23 +595,31 @@ pathological one.
 
 ---
 
-## DECISIONS NEEDED — blocking, cheap to give
+## DECISIONS — ALL RULED 2026-08-19
 
-1. **Round-trip definition, 3 open items** (`DRAFT_round_trip_journey_definition.md` §8):
-   does the audit inventory journeys that *exist* or enumerate those that
-   *should* exist and mark each present/absent (the latter finds holes, since a
-   per-repo sweep is blind to gaps *between* repos); may a generative journey
-   start from a fixed test seed; are passphrase/network/account dimensions or
-   separate journeys.
-2. **Constellation audit fanout** — ~7–8 read-only inventory agents by repo, then
-   synthesis by path single-author. **Not consented yet**, and should not start
-   before #1 is ruled or the agents measure eight different things.
-3. **Derivation path** (item 4) and **fixture keys** (item 5).
-4. **R2** (`l:`/`u:` normalization) and **R5** (`sortedmulti_a` — a wire tag that
-   renders but can neither be encoded by the CLI nor derived): rule inside the
-   next cycle, or file out?
+Nothing in this section blocks any longer. Rulings are recorded at their home
+documents; this is the index, not the text.
 
----
+1. **Round-trip definition, 4 open items** — **RULED**, verbatim in
+   `DRAFT_round_trip_journey_definition.md` §8. Decoder reads the **rendered
+   preview**, not the toolpath (with a binding mitigation: the decoder must not
+   import the render path, or the check is a tautology); a **fixed test seed** is
+   sufficient; the audit **inventories what exists** for now, with the
+   should-exist catalogue explicitly deferred rather than rejected; passphrase /
+   network / account are **variations on a few common recipes**.
+2. **Constellation audit fanout** — **CONSENTED**, framed as *recon that presents
+   recommendations, not actions*. Inherits all four rulings above.
+3. **Derivation path** (item 4) — ruled earlier, implementation still R0-gated.
+   **Fixture keys** (item 5) — ruled option A and **executed**; see the item.
+4. **R2** (`l:`/`u:` normalization) and **R5** (`sortedmulti_a`) — **FILED OUT.**
+   Not scheduled into the next cycle.
+
+Two further rulings landed the same day, both in
+`PLAN_key_index_legibility.md`: the account-index convention is **adopted** (§4),
+and the card label **should reach the engraved plate** (§7) — carrying a
+**(wallet id, slot) pair**, not a bare index, which reopens §5's rejection of a
+slot field on scoping grounds the operator supplied. That is normative wire
+work: Rust first, with test vectors, behind an R0 gate.
 
 ## BLOCKED / KNOWN-BAD — do not re-derive
 

@@ -136,9 +136,9 @@ so for an 11-key wallet there is **no no-target recovery path**. Say so.
 
 ### What is already true
 
-`me bundle` decodes every mk1 set at `crates/me-cli/src/bundle.rs:279` and
+`me bundle` decodes every mk1 set at `crates/me-cli/src/bundle.rs:288` and
 **discards the `KeyCard`**. The checklist at
-`crates/me-cli/src/manifest.rs:82-108` renders `mk1 chunk 1/3` with no identity,
+`crates/me-cli/src/manifest.rs:89-168` renders `mk1 chunk 1/3` with no identity,
 and plates are emitted in `chunk_set_id` order, so position tells the operator
 nothing.
 
@@ -188,7 +188,7 @@ rounds. The label states the card's **origin**, never a slot number.
 - All 30 card plates in the pathological checklist name an origin.
 - **Both** committed transcripts regenerate — `transcript.txt` (24 lines) and
   `transcript_pathological.txt` (31).
-- The `crates/me-cli/src/manifest.rs:228` assertion becomes
+- The `crates/me-cli/src/manifest.rs:296` assertion becomes
   `assert!(c.contains("mk1 [aabbccdd/48'/0'/0'/2'] chunk 1/2"))`.
 - A test pins the no-fingerprint form using a `--privacy-preserving` card, and
   a test pins the collision form using two cards sharing `(fingerprint, path)`.
@@ -242,6 +242,14 @@ card's chunks together.
 
 ## 4. The account-index convention — documentation only
 
+> **RULED 2026-08-19: adopt — "yes, if possible."** The convention is approved,
+> so §4 proceeds as written (documentation now). Limit 2 stands unchanged and is
+> the part that still needs a separate call: the fixture does **not** follow the
+> convention, and §2's shipped labels made that visible for the first time —
+> `@0`, `@4` and `@8` all print account `0'` of their own master. Bringing the
+> fixture into line means re-deriving the eleven keys a **second** time and
+> moving every id, which is why it is a decision and not a step.
+
 - **Deliverable:** one section in `design/journeys/README.md`, headed
   *"Choosing key paths so the cards identify themselves"*.
 - **The convention sentence:** *"Derive cosigner `@N` at account index `N` of
@@ -271,6 +279,26 @@ card↔position coupling contradicts §5.
 
 ## 5. Deliberately NOT proposed — an index field in `mk1`
 
+> **REOPENED 2026-08-19 — the operator supplied the missing scope.** This
+> section rejected a slot field because *"the same key may sit at different
+> indices elsewhere."* The ruling answers that objection head-on: *"which @index
+> a key uses will depend upon which wallet policy descriptor/template, and hence
+> recording both walletid and slot would make sense."* A bare slot is
+> ambiguous; a **(wallet id, slot) pair is not** — it names the slot *in a named
+> wallet*, which is exactly the coupling §5 objected to lacking.
+>
+> This lands on ground `mk1` already occupies: a `KeyCard` carries
+> `policy_id_stubs: Vec<[u8; 4]>` (`mnemonic-key/crates/mk-codec/src/key_card.rs:34`),
+> so a card **already** binds itself to a set of wallet policies. The proposal
+> becomes "attach a slot to each stub the card already carries", not "invent a
+> wallet reference".
+>
+> **Not a step — a cycle.** This is normative wire behaviour, so it is risk-set
+> work: it lands in **Rust first with test vectors** per the Rust-primary rule,
+> behind an R0 gate, and only then ports to the fork's Go. Nothing here is
+> implemented by this plan; §5's rejection is recorded as *superseded*, not
+> silently deleted.
+
 A normative wire change that couples a card to a position in *one* wallet when
 the same key may sit at different indices elsewhere. §4 gets the benefit
 without the coupling. **Acknowledged tension:** §4's convention encodes the
@@ -288,6 +316,16 @@ both rather than twice.
 ---
 
 ## 7. Open — one item
+
+> **RULED 2026-08-19: pursue — "yes, if possible."** The label should reach the
+> engraved plate, not only the paper checklist. Still unmeasured, and the two
+> constraints named below are unchanged: it consumes plate area and interacts
+> with the font's minimum-feature rules (a single-feature glyph loses identity
+> to one scratch). Per the ruling above, what goes on the plate is the
+> **(wallet id, slot) pair**, not a bare index — a slot alone is meaningless on
+> a plate that may outlive the operator's memory of which wallet it served.
+> Sequence: measure the area cost first, then design; do not engrave a plate to
+> find out.
 
 **Should the §2 label also appear on the engraved plate**, not only the
 checklist? Plate furniture, not wire format — but it consumes plate area and

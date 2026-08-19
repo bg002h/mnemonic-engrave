@@ -159,20 +159,44 @@ particular: a path with no functional assertion, a path spanning repos with no
 single command, and a path whose "expected" values were transcribed by hand from
 a run nobody has repeated.
 
-## 8. Open — for the user to rule before dispatch
+## 8. RULED 2026-08-19 — all four settled, audit unblocked
 
-1. ~~Is T4 in scope for the audit at all?~~ **RULED 2026-08-18: yes — performed
-   via the simulator under an advanced clock (T4-sim), with a
-   simulator-adjacent decoder built to read a simulated engraving of a string
-   or QR code.** See §3.1. Remaining sub-question: does the decoder read the
-   **toolpath** (independent, recommended) or the rendered preview (shares code
-   with the writer, and proves much less)?
-2. **Does a generative journey have to start at entropy**, or is starting from a
-   fixed test seed enough? (Fixed seeds are reproducible; real entropy is what
-   operators actually use.)
-3. **Is the audit's job to inventory journeys that exist, or to enumerate the
-   journeys that *should* exist and mark each present/absent?** The second is
-   more work per agent and is the one that finds holes — a per-repo sweep is
-   structurally blind to gaps *between* repos, which is where round trips break.
-4. **Passphrase, network and account-index variation** — dimensions of a journey,
-   or separate journeys?
+Recorded verbatim from the operator's ruling, because the audit fanout was
+explicitly gated on these: unruled, eight agents measure eight different things.
+
+**1. The decoder reads the RENDERED PREVIEW ("picture"), not the toolpath.**
+Operator's call, against the draft's recommendation, which is noted here rather
+than re-argued. The cost is real and must be designed around: a preview decoder
+shares code with the preview *writer*, so a bug in the writer produces a
+matching bug in the reader and the round trip passes anyway — the photocopier
+compared against its own copy. **Mitigation, binding on whoever builds it: the
+decoder MUST NOT import the render path.** It reads the emitted SVG/PNG as
+opaque pixels or geometry. That recovers most of the independence for a
+fraction of the toolpath decoder's cost, and it is the difference between this
+being a check and being a tautology. A toolpath decoder stays available later
+as the stronger form.
+
+**2. Generative journeys may start from a FIXED TEST SEED.** Entropy is not
+required. A journey whose inputs change per run cannot serve as a regression
+test, and every seed already in the corpus is public by construction.
+
+**3. The audit inventories the journeys that EXIST — for now.** The
+enumerate-what-should-exist catalogue is explicitly deferred, not rejected:
+*"have for now but we will add more later."* So the audit's output must be
+shaped to accept that later pass — an inventory that records what each journey
+covers, not merely that it exists, is what makes the catalogue a diff rather
+than a rewrite. **The known blind spot stands and must be stated in the audit's
+own conclusions:** a per-repo sweep cannot see gaps *between* repos, which is
+where round trips break.
+
+**4. Passphrase, network and account-index are VARIATIONS on a few common
+recipes** — not separate journeys, and not a single recipe with every axis
+bolted on. A small set of base journeys, each varying along the axes that
+matter to it.
+
+---
+
+## 9. Consented 2026-08-19 — recon dispatched
+
+The read-only constellation recon is **approved**, with output framed as
+**recommendations, not actions**. It inherits all four rulings above.
