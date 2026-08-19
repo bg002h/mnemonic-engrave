@@ -50,6 +50,36 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 # --- preconditions --------------------------------------------------------
 [ -z "$(git status --porcelain)" ] || die "working tree is dirty; commit or stash first"
 
+# --- CITATION GATE on changed docs ---------------------------------------
+# Decided 2026-08-18 (design/agent-reports/decision-item8-item9.md, item 8).
+#
+# The gate lives HERE rather than in CI for a semantic reason, not a cost one:
+# CI would resolve citations against sibling repos' ORIGIN HEAD, while authors
+# write docs against their LOCAL sibling state — often in the same session as
+# unpushed sibling work. Push-ordering races would then turn the gate red on
+# CORRECT docs, and a gate that reds on correct work trains the reader to
+# ignore it exactly as fast as one that is always green. The local roots are,
+# by construction, the state the doc was written against.
+#
+# Scope is CHANGED DOCS ONLY — "a fold is authorship and re-earns the gate".
+# The 201 + 633 doc corpus is not cleaned in a campaign; it converges one doc
+# at a time as docs are touched.
+#
+# `design/agent-reports/` is excluded PERMANENTLY. Reports are persisted
+# verbatim and never edited afterwards, so a red gate on a report would demand
+# a forbidden edit — a dangling citation inside a report is information about
+# the review, not a defect to fix.
+if [ -x scripts/plan-cite-check.sh ]; then
+  DOCS="$(git diff --name-only --diff-filter=d "origin/$BRANCH..HEAD" -- \
+            'design/*.md' 'design/**/*.md' ':(exclude)design/agent-reports/**' 2>/dev/null)"
+  if [ -n "$DOCS" ]; then
+    say "citation gate: $(printf '%s\n' "$DOCS" | wc -l | tr -d ' ') changed doc(s) (agent-reports excluded)"
+    # shellcheck disable=SC2086
+    ./scripts/plan-cite-check.sh $DOCS >&2 \
+      || die "citation gate failed on changed docs — fix the citations or qualify the paths"
+  fi
+fi
+
 SHA="$(git rev-parse HEAD)"                      # full 40-char; gh needs it
 N="$(git rev-list --count "origin/$BRANCH..HEAD" 2>/dev/null || echo '?')"
 [ "$N" = "0" ] && { say "nothing to push"; exit 0; }

@@ -373,7 +373,42 @@ this generator inherits the same defect**, so fix it before writing one.
 
 </details>
 
-### 8. Wire the doc gates into CI — **BLOCKED, and it is not XS. Investigated 2026-08-18; nothing wired.**
+### 8. Doc gates — **DECIDED 2026-08-18, and the citation gate is now WIRED (not to CI).**
+
+**Call (operator stand-in, `design/agent-reports/decision-item8-item9.md`):**
+`plan-cite-check.sh` runs from **`scripts/push-master.sh`** as a blocking,
+**changed-docs-only** step. CI is the wrong home. `plan-build-gate.sh` stays a
+fold-time local tool.
+
+**Why not CI — a semantic objection, not a cost one, and it corrects my
+earlier reasoning.** I declined the "check the siblings out in CI" option on
+speed. The real problem is that CI would resolve citations against sibling
+**origin HEAD**, while authors write docs against **local** sibling state,
+often in the same session as unpushed sibling work. Push-ordering races would
+then red the gate on *correct* docs — and by this repo's own measured words, a
+gate that reds on correct work trains the reader to ignore it exactly as fast
+as one that is always green. The local roots are, by construction, the state
+the doc was written against. (All five siblings are public, so the cheap-clone
+version was available and was declined on merit.)
+
+**Two rulings I would not have reached:**
+- **`design/agent-reports/` is excluded permanently**, and the exclusion is
+  named in the gate's output. Reports are persisted verbatim and never edited,
+  so a red gate on a report would demand a *forbidden edit*. A dangling
+  citation inside a report is information about the review, not a defect.
+- **`plan-build-gate.sh` stays out** because it is not generic — it is
+  hardcoded to one plan's files (`src/seal/*.rs`, `tests/seal_cli.rs`), and
+  the standing rule is that each repeatedly-folded plan commits its *own*
+  extractor. Revisit trigger: a fold ever reaching `master` uncompiled.
+
+**Traded away:** whole-corpus verification (the 201 + 633 corpus converges one
+doc at a time as docs are touched, not in a campaign), and coverage for pushes
+made outside the ritual — mitigated because a direct push already prints a
+bypass line, which this project treats as a failure.
+
+**Status: wired.** Its first execution is the push that introduces it.
+
+<details><summary>the investigation that led here</summary>
 
 **Stopped rather than forced, per the standing "never skip jobs — if making
 them run turns CI red, stop and report" rule.** Two independent blockers, the
@@ -429,7 +464,45 @@ green check on a docs-only push proves only that untouched code still builds.
 
 </details>
 
-### 9. The engraved `backup-strings.txt` has NO producer — **NEW, Important, found by review 2026-08-18**
+</details>
+
+### 9. The engraved `backup-strings.txt` has NO producer — **DECIDED 2026-08-18: option (a). Not yet implemented.**
+
+**Call (operator stand-in):** both journeys **generate** `out/backup-strings.txt`
+from their own inputs and encodes, `me bundle` engraves *that*, the tracked
+`inputs*/backup-strings.txt` fixtures are **deleted**, and transcripts + PDFs are
+re-recorded — landing **before** the round-trip audit dispatches.
+
+**Why (a) and not the safer-looking options.** (b) regenerate-and-pin is the
+current state with a newer timestamp. (c) a consistency check is **red today**,
+so it forces a regeneration anyway *and* still leaves a file nothing produces —
+and its one virtue, catching print/engrave divergence, is delivered
+**structurally** by (a): same run, same tool, same inputs, so divergence becomes
+impossible rather than merely detected. It is also exactly what
+`DRAFT_round_trip_journey_definition.md` §5 already codifies — this file is an
+intermediate wearing an input's clothes; the journeys' true origins are the
+seeds, xpubs and policy.
+
+**What answers the caution about touching engraving fixtures:** *nothing
+key-material changes.* The new strings are re-encodings of the same xpubs,
+field-identical under `mk decode`, so any steel already cut from the old fixture
+stays valid and decodable. The superseded generations stay in git history and
+should be named in the commit message.
+
+**Feasibility checked, not assumed.** Operator fixture is 1 md1 + 12×2 mk1 = 25
+lines and every cosigner xpub carries its origin in a header comment. The
+**pathological key files carry no origin headers** — that is the one named prep
+step, with values extractable mechanically via `mk decode` of the current
+fixture.
+
+**Still risk-set** (it changes what gets engraved): one implementer, one
+independent execution review over the diff — the F-210 pattern.
+
+**Why I have not done it while you slept:** it deletes tracked fixtures and
+re-records PDFs, which is a large diff whose correctness is not checkable at a
+glance. Decided and ready; yours to start.
+
+<details><summary>the finding</summary>
 
 Raised as **I-1** in `design/agent-reports/f210-journey-capture-exec-review.md`.
 It is F-210's own defect class, one layer up, and F-210's fix did not touch it.
@@ -460,6 +533,8 @@ Same review also noted the committed **operator** transcript carries a second
 instance of the stale-file evidence (`mk encode` prints `mk1qpf7f8pq…`,
 `mk inspect` consumes `mk1qpmn4up…`) — my F-210 commit cited only the
 pathological one.
+
+</details>
 
 ---
 
