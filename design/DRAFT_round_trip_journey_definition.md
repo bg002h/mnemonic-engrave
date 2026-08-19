@@ -42,7 +42,7 @@ one tier must never be read as coverage at a higher one.
 | **T1 codec** | in-process encode → decode | the codec is faithful | anything about tools, screens or media |
 | **T2 tool** | CLI → files → CLI, separate processes, real exit codes | **the tools compose** | anything about the device |
 | **T3 operator** | the emulator walks the real device flow, real screens, real input transport | **a user can do the thing** | the physical media |
-| **T4-sim** | simulated engraving under an **advanced clock**, plate rasterized from the toolpath, **read back by a decoder** | the engraving is **legible**, not merely emitted | real material behaviour — burrs, glare, oxidation, tool deflection |
+| **T4-sim** | simulated engraving under an **advanced clock**, plate rasterized from the **rendered preview** (§8 ruling; was toolpath), **read back by a decoder** | the engraving is **legible**, not merely emitted | real material behaviour — burrs, glare, oxidation, tool deflection |
 | **T4-metal** | real engraving, photograph of real steel, same decoder | the physical loop | nothing — but ~21 min/plate and consumes material |
 
 T1 is CI-cheap and should be exhaustive. T2 is where this project's defects
@@ -72,11 +72,17 @@ If the decoder reads *the preview image the renderer drew*, sharing the glyph
 code with the writer, the loop proves only that a function agrees with itself —
 the same defect that let a frozen snapshot bless the `v:` renderer bug. So:
 
-- read from the **toolpath the machine would actually cut**, rasterized
-  independently — not from the preview the GUI drew;
+- ~~read from the **toolpath the machine would actually cut**, rasterized
+  independently — not from the preview the GUI drew;~~ **SUPERSEDED by the §8
+  ruling 2026-08-19: the decoder reads the rendered preview.** This bullet is
+  struck rather than deleted because it states the cost the ruling accepts, and
+  the next bullet is what now carries the guarantee alone.
 - do **not** share glyph-rendering code between writer and decoder. A decoder
   that inherits the writer's idea of a glyph cannot discover that the glyph is
-  ambiguous;
+  ambiguous. **This bullet is now load-bearing, not advisory:** with the
+  toolpath requirement gone, an importing decoder makes the loop prove only that
+  a function agrees with itself. §8 restates it as binding — the decoder MUST
+  NOT import the render path, and reads the emitted image as opaque geometry;
 - an **advanced clock** is a legitimate substitution (it only compresses time),
   but every *other* substitution the harness makes must be named in the
   journey's non-coverage statement.
