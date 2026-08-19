@@ -153,11 +153,25 @@ vanity.
 
 *Three things to settle before adopting it:*
 
-1. **It is depth 5**, deeper than any standard. md's script-context checks
-   currently expect depth 3 or 4 and *reject* a mismatch — that is the same
-   rejection blocking item 5. So candidate B needs md to accept depth 5, which is
-   the same normative change as item 5 option 2. **These two items should be
-   decided together.**
+1. ~~It is depth 5~~ — **RESOLVED 2026-08-18 by going to depth 4:
+   `m/270'/0'/2'/8'`**, which still reads `bg002h` (`270`→"bg0", then `0`,`2`,
+   `8`→"h").
+
+   Measured at `crates/md-cli/src/parse/keys.rs:67-77`: the check reads the
+   **xpub's own serialized depth byte** and requires an **exact** match —
+   `SingleSig => 3`, `MultiSig => 4`, compared with `!=`, not `>=`. So the
+   original depth-5 form could never have bound keys, and depth 4 satisfies
+   `MultiSig` directly. Path *values* are not inspected, so `270'` is
+   unremarkable to it.
+
+   **No normative md change is needed**, and this item is now **independent of
+   item 5** (an earlier note said they had to be decided together — that is
+   superseded).
+
+   Residual, for whoever writes the spec: depth follows the **shape**, not the
+   script type. `tr()` with script leaves classifies as `MultiSig` (depth 4),
+   but key-path-only `tr(@0)` classifies as `SingleSig` (depth 3). Do not write
+   "always depth 4".
 2. **One path for both `tr` and `wsh` means key reuse across two wallets** —
    and this is in direct tension with the recognisability goal. The same seed
    yields the same pubkeys in both; different scripts give different addresses,
@@ -165,17 +179,24 @@ vanity.
    the operator's because it trades a real privacy property against the
    mnemonic:
 
-   | option | paths | mnemonic | keys |
-   | --- | --- | --- | --- |
-   | vary script level | `…/2'/8'` wsh, `…/3'/8'` tr | `bg002h` / `bg003h` | disjoint |
-   | **vary account level** | `m/27'/0'/0'/2'/8'` wsh, `m/27'/0'/1'/2'/8'` tr | `bg002h` / `bg012h` | disjoint |
-   | accept reuse | same path for both | `bg002h` exactly, once | **shared** |
+   At depth 4 the slots are `purpose / coin / account / X`, and because purpose
+   `270'` is **ours**, `X` means whatever we declare. Three layouts:
 
-   **Varying the account level is the best of the three**: level 3 is what
-   account indices are *for*, it keeps both the `27'`-`2'`-`8'` skeleton and the
-   reading intact, and only the digit that is *supposed* to vary changes. Only
-   the third option preserves `bg002h` exactly — at the cost of linking the two
-   wallets whenever both are spent from.
+   | layout | `0'` | `2'` | `8'` | separation via |
+   | --- | --- | --- | --- | --- |
+   | (a) BIP-48-shaped | coin | account | **script_type** | `8'` varies — breaks the trailing `h` |
+   | (b) script before account | coin | **script_type** | account | `2'` varies |
+   | **(c) script NOT in the path** | coin | **account** | fixed marker | the account digit: `bg002h` → `bg003h` |
+
+   **(c) is the one consistent with the entry's own argument.** If the path is
+   meant to say *this means nothing; you need the descriptor*, then encoding
+   script type in it is a half-claim — and the descriptor already states the
+   script type unambiguously. So `8'` is a fixed tail marker, **not** a script
+   level, and key separation comes from the account digit.
+
+   Accepting reuse (one path for both) is still available and preserves
+   `bg002h` exactly once — at the cost of linking the two wallets on-chain
+   whenever both are spent from.
 3. **`27'` has not been checked for collisions** with any other project's
    unregistered use. Low stakes, but unchecked.
 
