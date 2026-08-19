@@ -209,5 +209,7 @@ S6b is shipped and closed; see `CONTINUITY_2026-08-18.md`. Worktree `wt-s6b` is
 merged and safe to remove. One trailing push-record commit is local and
 unpushed, which is the normal tail.
 
-**The hardware flash has NOT been done yet** — it was deferred to "later today"
-and is independent of this feature.
+**The hardware flash is DONE** (2026-08-18): `seedhammerii-v0.0.0-bg5bfc118.
+signed.uf2`, sha256 `7fe6700b…7281258`, boots on machine power with
+`bg5bfc118` on the version line. So the SH2 in front of you is running the S6b
+tree, and any on-device check of this feature starts from that image.

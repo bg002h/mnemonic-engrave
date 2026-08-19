@@ -15,8 +15,13 @@ do not re-run its gates, do not re-litigate its decisions.
 | `bg002h/mnemonic-engrave` | `master` | `723a78fccad666e725b386ba009a77ef6c6c6ae3` + the trailing push record | pushed via `ci/staging`, check **SATISFIED** |
 | worktree `wt-s6b` | `s6b-pre-flash` | merged | **safe to remove** |
 
-**Next: the hardware flash.** That is an operator-driven, irreversible step on
-the real SeedHammer II. Use `~/bin/sh/sh2-flash` — never `picotool` by hand; the
+**The hardware flash is DONE, same day.** `seedhammerii-v0.0.0-bg5bfc118.signed.uf2`
+(sha256 `7fe6700b…7281258`) was built from fork `main` `5bfc118`, signed against
+the burned OTP key, flashed with `picotool load --verify`, and **boots on machine
+power with `bg5bfc118` on the version line** — so the bootrom accepted the
+signature and the device is running this tree. What that does NOT yet prove is
+that S6b's flows BEHAVE correctly on hardware; that is operator verification,
+not a boot. Use `~/bin/sh/sh2-flash` — never `picotool` by hand; the
 build output is unsigned and a laptop port cannot boot the machine. The boot key
 has been burned since 2026-08-03 (slot 1, permanent; slot 0 recovery path
 intact).
