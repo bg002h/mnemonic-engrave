@@ -179,26 +179,42 @@ vanity.
    the operator's because it trades a real privacy property against the
    mnemonic:
 
-   At depth 4 the slots are `purpose / coin / account / X`, and because purpose
-   `270'` is **ours**, `X` means whatever we declare. Three layouts:
+   ~~open~~ — **RULED 2026-08-18 by the operator.** Level 4 **is** the script
+   type, and the constellation defines its values:
 
-   | layout | `0'` | `2'` | `8'` | separation via |
-   | --- | --- | --- | --- | --- |
-   | (a) BIP-48-shaped | coin | account | **script_type** | `8'` varies — breaks the trailing `h` |
-   | (b) script before account | coin | **script_type** | account | `2'` varies |
-   | **(c) script NOT in the path** | coin | **account** | fixed marker | the account digit: `bg002h` → `bg003h` |
+   | wallet | path | reads as |
+   | --- | --- | --- |
+   | **`tr`** keys | `m/270'/0'/2'/8'` | `bg002h` |
+   | **`wsh`** keys | `m/270'/0'/2'/9'` | `bg002i` |
 
-   **(c) is the one consistent with the entry's own argument.** If the path is
-   meant to say *this means nothing; you need the descriptor*, then encoding
-   script type in it is a half-claim — and the descriptor already states the
-   script type unambiguously. So `8'` is a fixed tail marker, **not** a script
-   level, and key separation comes from the account digit.
+   `m / 270' / coin' / account' / script'` — purpose `270'`, then coin, then
+   account, then script type where **`8'` = tr** and **`9'` = wsh**.
 
-   Accepting reuse (one path for both) is still available and preserves
-   `bg002h` exactly once — at the cost of linking the two wallets on-chain
-   whenever both are spent from.
-3. **`27'` has not been checked for collisions** with any other project's
-   unregistered use. Low stakes, but unchecked.
+   This picks the BIP-48-shaped layout over "script type not in the path", and
+   the reason is sound: putting the script type *in* the path means an operator
+   reading it on the SH2 can tell `tr` from `wsh` **at a glance**, which serves
+   the same recognisability goal as the mnemonic itself. Key sets are disjoint
+   by construction, so the key-reuse concern is closed.
+
+   Note the mnemonic attaches to the **tr** variant; `wsh` reads one character
+   off. That is a consequence of encoding the script type, not a defect.
+3. ~~`27'` unchecked for collisions~~ — **CHECKED 2026-08-18 for `270'`: no
+   collision.**
+
+   `bitcoin/bips` `README.mediawiki` has **no BIP 270** — the index jumps from
+   199 to 300, so the entire 260–280 range is unassigned (highest assigned:
+   451). SLIP reservations are 10001–19999, which does not touch 270. The
+   `BIP-270` that surfaces in search results lives in the **moneybutton/bips**
+   fork (BSV "Simplified Payment Protocol"), a different ecosystem, and it
+   **defines no derivation paths** — so no key-space overlap exists even if one
+   counts it.
+
+   Two residual risks, both stated rather than dismissed:
+   - BIP-43's convention is *purpose N ↔ BIP N*, so `270'` is nominally
+     claimable by a future BIP-270. Low: 260–280 has stayed empty while
+     assignment ran past 450.
+   - A real collision would need another wallet to use purpose `270'` **and**
+     the same coin/account/script levels **and** the same seed. Effectively nil.
 
 **This is normative** — the origin feeds the wire TLV and therefore both wallet
 ids, so changing it later moves every id. Rust-primary, needs vectors.
