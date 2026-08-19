@@ -50,7 +50,14 @@ actually live. T3 is what proves a feature is reachable rather than merely
 built. **T4-sim is in scope and should run routinely** (user ruling
 2026-08-18); T4-metal stays rare and deliberate.
 
-### 3.1 T4 needs a reader that does not exist yet
+### 3.1 T4 needs a reader that does not exist yet — DEPRIORITIZED near-term
+
+**User ruling 2026-08-18: the engraving decoder is LOW PRIORITY for the near
+term.** So T4-sim is *defined* but not *staffed*: journeys record T4 coverage as
+**absent-by-decision**, not as an oversight, and no near-term work is blocked on
+it. The rest of this subsection is the design constraint for when it is picked
+up — written now because the reasoning is cheap to record and expensive to
+reconstruct.
 
 **Engraving is write-only across the entire current test surface.** Nothing
 anywhere decodes a plate back into a string. So T4's structural assertion has
