@@ -14,8 +14,45 @@ export PATH="$C/mnemonic-engrave/target/release:$PATH"
 
 run() { echo "\$ $*"; "$@" 2>&1; echo "[exit $?]"; echo; }
 
+# runcap <outfile> <keep-regex> <cmd...>
+#
+# Runs <cmd...> like run() does for transcript purposes, and ALSO writes the
+# lines of its STDOUT matching <keep-regex> to <outfile>.
+#
+# F-210: this is the mechanism these scripts never had. `run()` echoes a
+# command's output into the transcript and then throws it away, so several
+# intermediates were READ by later steps that nothing ever WROTE — the journey
+# only ever "worked" because some earlier, uncommitted process had left those
+# files lying in out/.
+#
+# The regex is a required argument rather than an optional one because the
+# consumers slurp WHOLE files: `md encode` prints `chunk-set-id: 0x…` on stdout
+# alongside the md1 lines, and feeding that to `md inspect` fails. Capturing
+# raw stdout would have replaced "file missing" with "file subtly wrong", which
+# is worse.
+#
+# Note on ordering: run() interleaves via `2>&1`; runcap prints all stdout then
+# all stderr. For every command captured here stderr is a trailing note, so the
+# transcript text is unchanged in practice.
+runcap() {
+  local out="$1" keep="$2"; shift 2
+  echo "\$ $*"
+  local sout serr rc
+  sout="$(mktemp)"; serr="$(mktemp)"
+  "$@" >"$sout" 2>"$serr"; rc=$?
+  cat "$sout"; cat "$serr"
+  grep -E "$keep" "$sout" > "$out" || true
+  rm -f "$sout" "$serr"
+  echo "[exit $rc]"
+  echo
+}
+
+mkdir -p "$W/out"
+
 T=$(cat "$W/inputs-pathological/wallet-policy.txt")
-MD1S=$(tr '\n' ' ' < "$W/out/md1.txt")
+# NOTE: MD1S is deliberately NOT set here. It used to be, reading out/md1.txt
+# at this line — sixteen lines BEFORE step 3, the only command that could
+# produce it. It is assigned immediately after step 3 instead.
 
 echo "########## versions"
 run "$MD" --version
@@ -31,7 +68,11 @@ echo "########## 2. it does not fit one string"
 run "$MD" encode --group-size 0 "$T"
 
 echo "########## 3. so it is chunked -- WITH the origin the warning asked for"
-run "$MD" encode --group-size 0 --force-chunked --path bip84 "$T"
+runcap "$W/out/md1.txt" '^md1' \
+  "$MD" encode --group-size 0 --force-chunked --path bip84 "$T"
+
+# Now — and only now — the chunk set exists on disk for the steps below.
+MD1S=$(tr '\n' ' ' < "$W/out/md1.txt")
 
 echo "########## 4. the chunk set decodes back to the same 11-key policy"
 run "$MD" inspect $MD1S
@@ -53,7 +94,8 @@ echo
 run bash -c "$MD inspect $MD1S 2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p'"
 
 echo "########## 7. the eleven key cards"
-run "$MK" encode --xpub "$XPUB" --origin-fingerprint 73c5da0a \
+runcap "$W/out/mk-encode-raw.txt" '^mk1' \
+  "$MK" encode --xpub "$XPUB" --origin-fingerprint 73c5da0a \
   --origin-path "m/84'/0'/0'" --policy-id-stub 5b48af35 --group-size 0
 run "$MK" decode $(sed -n '1,2p' "$W/out/mk-encode-raw.txt")
 
