@@ -92,7 +92,33 @@ a hypothesis.
 
 </details>
 
-### 3. R1 — the `v:` wrapper-chain renderer bug — **S, ships standalone — NOW THE TOP ITEM**
+### 3. ~~R1 — the `v:` wrapper-chain renderer bug~~ — **DONE 2026-08-18, review in flight**
+
+**Shipped as `descriptor-mnemonic` `285b9fc9`.** `Tag::Verify` now joins the
+wrapper-chain dispatch and its standalone arm is removed, so `vj:` renders as
+`vj:` rather than the unparseable `v:j:`. Gates: **782 passed / 0 failed**,
+clippy clean, default build clean.
+
+**Mutation-verified, not assumed:** restoring the old standalone arm turns BOTH
+the new md-cli property test and the md-codec KAT red.
+
+Why it survived at *two* independent sites, both now closed: md-codec's frozen
+KAT had `snj:` as its only chain case (no `v`), and md-cli's fifteen
+hand-written round-trip tests all put `v:` directly on a `pk`, where the
+shorthand path renders it correctly by accident. The md-cli side now has a
+**table-driven property** instead of a sixteenth hand-written case, asserting
+`parse(t) → render == t` **and that the render re-parses** — the second clause
+closes the class for shapes nobody has thought of.
+
+**Part 2 of the original item was NOT done, deliberately.** A *runtime* output
+contract inside md-codec — returning `Err` when the render doesn't re-parse —
+cannot live there as things stand: the renderer emits `@N` **placeholder**
+templates, which are not miniscript-parseable at all without md-cli's
+`substitute_synthetic`. The property therefore lives at the md-cli layer, where
+parsing is possible. Doing it inside md-codec needs a placeholder-aware
+validator that does not exist. **Recorded rather than silently skipped.**
+
+<details><summary>original entry</summary>
 
 `render.rs:150-163` gives `Tag::Verify` its own arm instead of joining
 `render_wrapper_chain` (`render.rs:358`, dispatch at `:217` covers only
@@ -114,7 +140,9 @@ Three parts, and the third closes the class:
 Put the re-parse property at test time (free, no dependency); gate any runtime
 self-check behind the existing `derive` feature.
 
-### 4. Decide the default derivation path for arbitrary miniscript — **decision, then S**
+</details>
+
+### 4. Decide the default derivation path for arbitrary miniscript — **RULED; implementation still gated**
 
 md has **no** canonical origin for these shapes and says so at encode time
 ("no canonical default derivation path"). `canonical_origin.rs:13-76` covers
@@ -283,7 +311,41 @@ entries carry `keys: &[]`.**
 different ways and both corruptions land on exactly the shapes the vectors are
 for.
 
-### 7. F-210 — the journey generator — **S, ~20–30 lines**
+### 7. ~~F-210 — the journey generator~~ — **DONE 2026-08-18, review in flight**
+
+**Shipped as `mnemonic-engrave` `b822e4a`.** Both journeys regenerate:
+
+| | non-zero exits, fresh run | committed |
+| --- | --- | --- |
+| pathological | **3** | 3 |
+| operator | **1** | 1 |
+
+All six intermediates now land, including `manifest.json` (11 KB, 25 plates) and
+`sysw-public.bin`, which were only ever blocked by the cascade from the
+unwritten files. The three pathological refusals are the **designed** ones and
+reproduce exactly — including OBSTACLE 1, `mk`'s wire-format version mismatch
+on a chunked md1.
+
+Mechanism: a `runcap <outfile> <keep-regex> <cmd…>` helper. The regex is a
+**required** argument because `md encode` prints `chunk-set-id: 0x…` on stdout
+beside the md1 lines, and `MD1S` slurps the whole file — capturing raw stdout
+would have swapped "file missing" for "file subtly wrong". Also: the `MD1S`
+read moved from sixteen lines *before* its producer to just after it, and the
+stale `me-preview` 0.5.1 sidecar was rebuilt to 0.6.0 the way CI does it.
+
+**Evidence the artifact carried its own defect**, worth keeping: in the
+committed pathological transcript, step 7's `mk encode` prints `mk1qpdw8zpq…`
+while the `mk decode` on the very next line consumes `mk1qpghz4pq…` — a
+different string, from a stale file. They now agree.
+
+**Left undone deliberately:** the committed `.txt` transcripts were NOT
+re-recorded. The remaining diff is tool versions, absolute paths (the committed
+run came from a scratchpad, not the repo), and the mk1 strings themselves, which
+changed between mk 0.12.1 and 0.13.0 — a real behavioural drift, and exactly
+what a regenerable journey exists to surface. Deciding which artifact is
+canonical is a separate call.
+
+<details><summary>original entry</summary>
 
 Four intermediates have never had a writer in any committed version;
 `transcript_pathological.sh:18` reads `out/md1.txt` sixteen lines before the only
@@ -292,6 +354,8 @@ command that could produce it. Plus a stale `me-preview` 0.5.1 against `me`
 
 Not on the critical path for the parked feature — but **a new journey built on
 this generator inherits the same defect**, so fix it before writing one.
+
+</details>
 
 ### 8. Wire the doc gates into CI — **XS**
 
