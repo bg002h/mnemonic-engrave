@@ -16,22 +16,51 @@ would change, where, how big, and what it does **not** solve.
 (`mnemonic-key/crates/mk-codec/src/key_card.rs:34-57`). A card says *"I belong
 to wallet `5b48af35`"*, never *"I am `@3`"*.
 
-**But the assignment is already recoverable, not guessed.**
-`mnemonic-toolkit/src/permutation_search.rs` searches all `n!` slot bijections
-against the wallet id and returns `Unique` / `None` / `Ambiguous`, wired into
-`cmd/restore.rs` and `cmd/verify_bundle.rs`. Its stated contract:
+**The assignment is recoverable — but ONLY against a target.** This section
+originally claimed recovery from "template + all N cards", and that was wrong;
+corrected after review.
+
+`crates/mnemonic-toolkit/src/permutation_search.rs` searches the slot
+bijections and returns `Unique` / `None` / `Ambiguous`, wired into
+`cmd/restore.rs` and `cmd/verify_bundle.rs`. Its contract is strong:
 
 > **No silent wrong assembly.** A `Unique` outcome is returned ONLY after the
 > engine has proven there is no SECOND match.
 
-Ceiling `n ≤ 34` (`n!` overflows `u128` above). 11 keys = 39,916,800
-permutations; 12 = 479,001,600.
+But `restore` needs something to search *against*. Measured from
+`mnemonic restore --help`:
 
-**Both policy families are safe, for opposite reasons.** Unsorted `multi()`
-makes each permutation a *different* script, so exactly one matches and the
-search returns `Unique`. `sortedmulti()` makes every permutation the *same*
-script, so the index is irrelevant and `Ambiguous` is harmless. The pathological
-wallet uses unsorted `multi`.
+| input | status |
+| --- | --- |
+| `--md1` (the template) | the multisig-mode entry point |
+| `--cosigner @N=` cards | EXACT by default; over-supply needs `--search-cosigner-subset` |
+| `--expect-wallet-id <prefix>` | a target; longer prefix needed as the space grows |
+| **`--search-address <addr>`** | a target, and **"recommended … collision-free"** |
+| `--from <seed>` | **"REQUIRED for single-sig restore; OPTIONAL in multisig mode"** |
+
+So: **a seed is NOT required** in multisig mode (an earlier critique said it
+was), but **a target IS**. The operator must have kept either a wallet-id
+prefix or — far more plausibly — **a known receive address**. Item 5 has just
+made the pathological journey print addresses for the first time, so that
+target now exists for this wallet.
+
+**Sorted vs unsorted is NOT symmetric — corrected after review.** The original
+text here said `sortedmulti` makes the index "irrelevant" and `Ambiguous`
+"harmless". Both wrong, per the SORTED carve-out at
+`crates/mnemonic-toolkit/src/cmd/restore.rs:1944-1954`:
+
+- **address**-search on a sorted shape *would* return `Ambiguous` (all `n!`
+  placements give the same scriptPubKey), so the engine collapses `n! → 1` by
+  restricting to the identity placement. Handled, not ambiguous.
+- **id**-search is **not** collapsed: `compute_wallet_policy_id` never sorts,
+  so *"the recorded id pins a SPECIFIC order the search must still resolve.
+  Verified: sortedmulti AB-id ≠ BA-id."*
+
+In one line: a sorted wallet's **addresses** are order-independent; its
+**wallet id is not**. The index still matters for identity.
+
+The pathological wallet uses unsorted `multi`, where each permutation is a
+different script — the recoverable case.
 
 **The concrete gap** is at the moment of engraving. The checklist an operator
 follows says:
@@ -119,19 +148,29 @@ in front of them.
 ### What would change
 
 Documentation, primarily: a stated convention in the journeys README and
-wherever wallet creation is described. Optionally a **lint** in `me bundle`
-that notes when a bundle's cards do *not* follow it, as an advisory rather than
-a refusal.
+wherever wallet creation is described.
+
+**The `me bundle` lint is WITHDRAWN.** A review pointed out it cannot be
+written as stated and contradicts §4. `me` sees cards, not the template's key
+order (the same limitation §1 documents), so it cannot know whether a card's
+account index equals its template index — it has no template index to compare
+against. And §4 rejects an mk1 index field precisely because a card should not
+be coupled to a position in one wallet; a lint asserting exactly that coupling
+is the same mistake in advisory clothing. The convention stays a **documented
+practice for wallet creation**, enforced by the people in the room, not by a
+tool that cannot see what it would check.
 
 ### What it does NOT solve
 
 - **It is advisory only.** Nothing enforces it, and a wallet assembled from
   pre-existing keys at fixed paths cannot adopt it retroactively.
 - **The current fixture does not follow it.** The pathological keys restart
-  accounts per master (`@0-@3` = master A accounts 0-3, but `@4` = master B
-  account 0). Adopting the convention here would mean re-deriving those keys a
-  *second* time — which, per §2 of the item-5 review, changes every wallet id
-  again. **Not obviously worth it**; flagged as a decision, not a step.
+  accounts per master. Measured 2026-08-19 from the key files themselves:
+  `@0-@3` are master A accounts `0'-3'`, and **`@4` is master B account `0'`**
+  (`[b8688df1/48'/0'/0'/2']`) — a review asserted `3'` here and is wrong.
+  Adopting the convention would mean re-deriving those keys a *second* time,
+  moving every wallet id again. **Not obviously worth it**; a decision, not a
+  step.
 - It only helps when keyholders coordinate at creation — exactly the case the
   operator already identified as their responsibility.
 
@@ -148,16 +187,29 @@ with a recovery-shaped consequence.
 
 ### The change
 
-1. A section in `design/journeys/README.md` stating plainly: given the template
-   and all N cards **in any order**, `restore` recovers the assignment, and
-   `Unique` means proven-unique rather than first-match.
-2. **Demonstrate it in the pathological journey.** Add a step that shuffles the
-   card order and recovers the wallet, printing the outcome. This is the
-   strongest form: the claim becomes a thing the transcript *does*, not a thing
-   the README *says* — and per this project's own rule, a gate that has never
-   run is a hypothesis.
-3. State the `n ≤ 34` ceiling and the cost curve, so nobody discovers it at
-   recovery time.
+1. A section in `design/journeys/README.md` stating plainly: given the
+   template, all N cards **in any order**, and **a target the operator kept**
+   (a known receive address, or a recorded wallet-id prefix), `restore`
+   recovers the assignment — and `Unique` means proven-unique, not
+   first-match. **The target is not optional**; say so, because a reader who
+   assumes template+cards suffices will discover otherwise at recovery time.
+2. **Demonstrate it in the pathological journey, using `--search-address`.**
+   Item 5 made this journey print real addresses for the first time, so the
+   demonstration now has a natural target: take one printed receive address,
+   shuffle the card order, and recover. `--search-address` is documented as
+   *"recommended over `--expect-wallet-id` (full-scriptPubKey match —
+   collision-free)"*.
+3. State the `n ≤ 34` ceiling, the cost curve, and the **adaptive time-cap** —
+   the engine has a refusal ceiling, so a large search can decline rather than
+   run forever. Nobody should meet that at recovery time.
+
+### Unmeasured, and it gates step 2
+
+**Nobody has run an 11-key search on this shape.** `11! = 39,916,800`. Before
+this demonstration goes into a journey that must complete on every run, the
+wall-clock must be measured against the engine's time-cap — if it refuses or
+takes minutes, the demonstration belongs in documentation with a recorded
+figure, not in the journey. **Measure first, then decide where it lives.**
 
 ### What it does NOT solve
 
@@ -168,8 +220,17 @@ with a recovery-shaped consequence.
 ### Acceptance
 
 - The pathological journey demonstrates recovery from shuffled input, with its
-  real exit code.
-- README states the ceiling and what each of the three outcomes means.
+  real exit code — **conditional on the timing measurement above**.
+- README states the ceiling, the time-cap, and what each of the three outcomes
+  means.
+
+**On acceptance being runnable at all:** a review raised that both §1 and §3
+route acceptance through the pathological journey, which F-210 said could not
+regenerate. **Verified 2026-08-19 and no longer true** — the capture plumbing
+was fixed earlier, and a fresh run is byte-identical to the committed
+transcript (3 designed refusals, 6 addresses). What remains un-regenerable is
+the **PDF**, because `design/journeys/shots/` has zero tracked files. Neither
+§1's nor §3's acceptance depends on the PDF, so both are runnable.
 
 ---
 
