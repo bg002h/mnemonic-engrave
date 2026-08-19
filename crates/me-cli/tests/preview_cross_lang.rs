@@ -35,7 +35,9 @@ fn go_available() -> bool {
 /// HARD FAILURE (the real-sidecar round-trip must not silently no-op, F3) rather
 /// than a skip. Locally-unset behavior is unchanged (skip note + pass).
 fn go_required() -> bool {
-    std::env::var("ME_REQUIRE_GO").map(|v| v == "1").unwrap_or(false)
+    std::env::var("ME_REQUIRE_GO")
+        .map(|v| v == "1")
+        .unwrap_or(false)
 }
 
 /// A unique scratch directory under the system temp dir.

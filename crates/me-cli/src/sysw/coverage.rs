@@ -62,7 +62,10 @@ pub const COVERAGE: &[(u32, Where)] = &[
     (10, Where::Device),       // compared once per payload
     (11, Where::Unit("fills_the_whole_region")),
     (12, Where::Unit("each_fill_is_what_it_says")),
-    (13, Where::Dropped("operator ruling 2026-08-12: the reminder is dropped")),
+    (
+        13,
+        Where::Dropped("operator ruling 2026-08-12: the reminder is dropped"),
+    ),
     // `[mdmk-decode]` (§12.6). Re-pointed 2026-08-12, off S-I: that vector
     // records only that a BCH-valid md1 packs, and asserted nothing about
     // confirmation, so the placement was a claim rather than coverage. S-J

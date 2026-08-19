@@ -1,5 +1,5 @@
-use mnemonic_engrave::ndef::encode_text_tlv;
 use mnemonic_engrave::convert;
+use mnemonic_engrave::ndef::encode_text_tlv;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -7,7 +7,9 @@ use std::process::{Command, Stdio};
 /// HARD FAILURE (the differential oracle must not silently no-op, F3) rather than
 /// a skip. Locally-unset behavior is unchanged (skip note + pass).
 fn go_required() -> bool {
-    std::env::var("ME_REQUIRE_GO").map(|v| v == "1").unwrap_or(false)
+    std::env::var("ME_REQUIRE_GO")
+        .map(|v| v == "1")
+        .unwrap_or(false)
 }
 
 /// Decode `ndef` through SeedHammer's OWN Go `nfc/ndef` reader

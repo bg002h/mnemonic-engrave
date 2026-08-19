@@ -404,7 +404,10 @@ mod tests {
 
     #[test]
     fn the_complete_set_is_confirmed() {
-        assert_eq!(mdmk_unconfirmed(&recs(&[MD1_A, MD1_B, MD1_C])), Vec::<usize>::new());
+        assert_eq!(
+            mdmk_unconfirmed(&recs(&[MD1_A, MD1_B, MD1_C])),
+            Vec::<usize>::new()
+        );
     }
 
     /// **Group by `(hrp, chunk_set_id)`, never by HRP alone.** Grouping by HRP
@@ -479,7 +482,10 @@ mod tests {
 
     #[test]
     fn mk1_sets_are_walked_the_same_way() {
-        assert_eq!(mdmk_unconfirmed(&recs(&[MK1_A, MK1_B])), Vec::<usize>::new());
+        assert_eq!(
+            mdmk_unconfirmed(&recs(&[MK1_A, MK1_B])),
+            Vec::<usize>::new()
+        );
         assert_eq!(mdmk_unconfirmed(&recs(&[MK1_A])), vec![0]);
         assert_eq!(mdmk_unconfirmed(&recs(&[MK1_LONE])), vec![0]);
         assert_eq!(

@@ -252,9 +252,7 @@ fn split(records: Vec<String>) -> Result<(Payload, Vec<u8>, wire::Header), SyswE
     let mut payload = Payload::default();
     for (i, r) in records.into_iter().enumerate() {
         match classify(&r) {
-            record::Class::Unknown => {
-                return Err(SyswError::Unclassifiable(i, unknown_reason(&r)))
-            }
+            record::Class::Unknown => return Err(SyswError::Unclassifiable(i, unknown_reason(&r))),
             c if c.is_secret() => payload.secret.push(Zeroizing::new(r)),
             _ => payload.public.push(r),
         }
@@ -503,7 +501,10 @@ mod tests {
             v.resize(n, 0xFF);
             v
         };
-        assert!(bound(pad_to(wire::REGION_LEN)).is_ok(), "exactly REGION_LEN fits");
+        assert!(
+            bound(pad_to(wire::REGION_LEN)).is_ok(),
+            "exactly REGION_LEN fits"
+        );
         assert_eq!(
             bound(pad_to(wire::REGION_LEN + 1)).unwrap_err(),
             SyswError::TooLarge(wire::REGION_LEN + 1)
@@ -521,7 +522,9 @@ mod tests {
                 "sealed pack accepted out-of-range iterations {iters}"
             );
         }
-        let huge: Vec<String> = (0..30).map(|_| format!("text:{}", "61".repeat(400))).collect();
+        let huge: Vec<String> = (0..30)
+            .map(|_| format!("text:{}", "61".repeat(400)))
+            .collect();
         assert!(
             pack(huge, None, wire::MIN_ITERATIONS).is_err(),
             "pack accepted a section its own parser rejects"

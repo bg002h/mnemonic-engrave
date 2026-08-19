@@ -260,7 +260,10 @@ fn ms1_refusal_table() {
     ];
     for (label, input) in &positions {
         let (code, stderr) = run(&["bundle"], input);
-        assert_eq!(code, 3, "bundle ms1 {label}: expected exit 3; stderr={stderr}");
+        assert_eq!(
+            code, 3,
+            "bundle ms1 {label}: expected exit 3; stderr={stderr}"
+        );
         assert!(stderr.contains("CODEX32"), "bundle ms1 {label}: {stderr}");
         assert!(
             !stderr.contains(BODY),
@@ -886,7 +889,11 @@ mod perms {
             .assert()
             .success();
         let mode = fs::metadata(&out).unwrap().permissions().mode();
-        assert_eq!(mode & 0o077, 0, "NDEF --out must be owner-only, got {mode:o}");
+        assert_eq!(
+            mode & 0o077,
+            0,
+            "NDEF --out must be owner-only, got {mode:o}"
+        );
         fs::remove_dir_all(&dir).ok();
     }
 

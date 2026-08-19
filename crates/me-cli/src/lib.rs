@@ -134,7 +134,10 @@ mod tests {
         // '-' sits at byte offset 8 in "md1yqpqq-…" (md1yqpqq == 8 ASCII bytes).
         let msg = format!("{}", convert("md1yqpqq-xqq8xtwhw4xwn4qh").unwrap_err());
         assert!(msg.contains("'-'"), "should name the offending char: {msg}");
-        assert!(msg.contains("byte 8"), "should name the byte position: {msg}");
+        assert!(
+            msg.contains("byte 8"),
+            "should name the byte position: {msg}"
+        );
     }
 
     #[test]

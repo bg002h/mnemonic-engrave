@@ -296,7 +296,9 @@ fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
     // tampering. §6.4 requires that a bundle the device will reject never leave
     // the host, so this belongs on this side.
     if let Some(pos) = non_canonical_separator(s) {
-        return Err(SealError::Record(record::RecordError::NonCanonicalSpace(pos)));
+        return Err(SealError::Record(record::RecordError::NonCanonicalSpace(
+            pos,
+        )));
     }
     if passphrase::is_valid(s) {
         return Ok(());
@@ -312,7 +314,10 @@ fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
 /// would report an uppercase mnemonic under a spacing error, losing the guard
 /// above's position and its message.
 fn non_canonical_separator(s: &str) -> Option<usize> {
-    if let Some((i, _)) = s.char_indices().find(|(_, c)| c.is_whitespace() && *c != ' ') {
+    if let Some((i, _)) = s
+        .char_indices()
+        .find(|(_, c)| c.is_whitespace() && *c != ' ')
+    {
         return Some(i);
     }
     if s.starts_with(' ') {
@@ -364,8 +369,14 @@ mod tests {
             );
         }
         // Leading and trailing space survive `split_whitespace` too.
-        assert!(record_or_mnemonic(&format!(" {MNEMONIC}")).is_err(), "leading space");
-        assert!(record_or_mnemonic(&format!("{MNEMONIC} ")).is_err(), "trailing space");
+        assert!(
+            record_or_mnemonic(&format!(" {MNEMONIC}")).is_err(),
+            "leading space"
+        );
+        assert!(
+            record_or_mnemonic(&format!("{MNEMONIC} ")).is_err(),
+            "trailing space"
+        );
     }
 
     /// The secret records must not be freed in the clear.

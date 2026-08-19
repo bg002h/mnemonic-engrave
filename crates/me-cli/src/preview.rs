@@ -37,7 +37,10 @@ impl std::fmt::Display for PreviewError {
                 write!(f, "me-preview render failed (exit {c}): {}", stderr.trim())
             }
             PreviewError::EmptyOutput { path, reason } => {
-                write!(f, "me-preview produced no usable render at {path}: {reason}")
+                write!(
+                    f,
+                    "me-preview produced no usable render at {path}: {reason}"
+                )
             }
             PreviewError::VersionParse(s) => {
                 write!(f, "cannot parse me-preview --version output: {s:?}")

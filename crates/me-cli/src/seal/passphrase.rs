@@ -56,7 +56,11 @@ pub fn normalise(s: &str) -> Zeroizing<String> {
             out.push(c);
         }
     }
-    debug_assert_eq!(out.len(), n, "normalise: pre-count disagreed with the build");
+    debug_assert_eq!(
+        out.len(),
+        n,
+        "normalise: pre-count disagreed with the build"
+    );
     out
 }
 
@@ -116,8 +120,8 @@ mod tests {
         for input in [
             "abandon abandon about",
             "  ABANDON\tabandon\u{00a0}about  ",
-            "İ İ",           // lowercasing lengthens this one
-            "ÄÖÜ  ßß\tàé",   // multi-byte, mixed case, runs
+            "İ İ",         // lowercasing lengthens this one
+            "ÄÖÜ  ßß\tàé", // multi-byte, mixed case, runs
         ] {
             let out = normalise(input);
             assert_eq!(

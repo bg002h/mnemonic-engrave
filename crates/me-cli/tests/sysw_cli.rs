@@ -255,14 +255,7 @@ fn region_and_container_have_the_same_digest_and_identity() {
 #[test]
 fn region_works_for_a_sealed_payload_too() {
     let out = me()
-        .args([
-            "sysw",
-            "pack",
-            "--region",
-            "--passphrase-words",
-            "12",
-            SEED,
-        ])
+        .args(["sysw", "pack", "--region", "--passphrase-words", "12", SEED])
         .assert()
         .success();
     assert_eq!(out.get_output().stdout.len(), 65_536);
@@ -315,7 +308,9 @@ fn pack_accepts_the_iteration_bounds_themselves() {
 fn pack_refuses_a_section_too_long_for_its_own_parser() {
     let dir = tempfile::tempdir().unwrap();
     let f = dir.path().join("big.txt");
-    let recs: Vec<String> = (0..30).map(|_| format!("text:{}", "61".repeat(400))).collect();
+    let recs: Vec<String> = (0..30)
+        .map(|_| format!("text:{}", "61".repeat(400)))
+        .collect();
     std::fs::write(&f, recs.join("\n")).unwrap();
     me().args(["sysw", "pack", "--no-passphrase", "--in"])
         .arg(&f)
@@ -450,7 +445,12 @@ fn an_empty_passphrase_is_refused_because_the_device_could_never_open_it() {
 #[test]
 fn pack_refuses_a_passphrase_the_device_could_not_type() {
     use mnemonic_engrave::sysw;
-    for p in ["hunter2", "correct horse battery staple", "abandon 1", "abandon abou"] {
+    for p in [
+        "hunter2",
+        "correct horse battery staple",
+        "abandon 1",
+        "abandon abou",
+    ] {
         match sysw::pack(vec![TEXT.into()], Some(p), 100_000) {
             Err(sysw::SyswError::NotEnterableOnDevice(_)) => {}
             other => panic!("{p:?} should be refused as un-typeable, got {other:?}"),
@@ -504,7 +504,9 @@ fn pack_warns_once_per_unconfirmed_record_and_still_succeeds() {
         .success();
     let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
     assert!(
-        err.contains("record 0, as given (records count from 0): an md1/mk1 this tool could not decode"),
+        err.contains(
+            "record 0, as given (records count from 0): an md1/mk1 this tool could not decode"
+        ),
         "the warning must name the record by the index the operator gave it, AND say \
              that is the basis — `me sysw show` numbers the public section instead, and \
              on a sealed payload the two diverge: {err}"
@@ -531,8 +533,14 @@ fn the_warning_names_the_record_the_operator_passed() {
         .assert()
         .success();
     let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
-    assert!(err.contains("record 1, as given (records count from 0): an md1/mk1"), "{err}");
-    assert!(!err.contains("record 0, as given (records count from 0): an md1/mk1"), "{err}");
+    assert!(
+        err.contains("record 1, as given (records count from 0): an md1/mk1"),
+        "{err}"
+    );
+    assert!(
+        !err.contains("record 0, as given (records count from 0): an md1/mk1"),
+        "{err}"
+    );
 }
 
 /// The other direction, which is what makes the test above able to fail: a
@@ -556,8 +564,7 @@ fn a_complete_card_set_draws_no_warning() {
 fn show_states_confirmed_or_unconfirmed_beside_each_mdmk_record() {
     let dir = tempfile::tempdir().unwrap();
     let f = dir.path().join("p.bin");
-    me()
-        .args(["sysw", "pack", "--no-passphrase", MD1, MD1_B, MD1_C, TEXT])
+    me().args(["sysw", "pack", "--no-passphrase", MD1, MD1_B, MD1_C, TEXT])
         .arg("--out")
         .arg(&f)
         .assert()
@@ -577,8 +584,7 @@ fn show_states_confirmed_or_unconfirmed_beside_each_mdmk_record() {
 
     // And the same command over a lone chunk says the opposite.
     let g = dir.path().join("q.bin");
-    me()
-        .args(["sysw", "pack", "--no-passphrase", TEXT, MD1, "--out"])
+    me().args(["sysw", "pack", "--no-passphrase", TEXT, MD1, "--out"])
         .arg(&g)
         .assert()
         .success();
