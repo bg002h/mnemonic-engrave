@@ -117,6 +117,23 @@ so for an 11-key wallet there is **no no-target recovery path**. Say so.
 
 ## 2. Name the card in the engrave checklist — **S**
 
+> **IMPLEMENTED 2026-08-19** — `a6f7829` (feature), `1ac6fee` (the sidecar build
+> script the version bump made necessary). All five acceptance bullets below are
+> machine-checked: 30/30 pathological card plates name an origin, both
+> transcripts regenerated at exit 0, the assertion and both new tests are in
+> place, golden +4 lines, SPEC §6/§7 and CHANGELOG updated.
+>
+> **The open collision-scope question is DECIDED: per CARD, keyed on
+> `chunk_set_id` — never per plate.** Every chunk of one card trivially shares
+> that card's origin, so a per-plate scan would mark all 34 pathological plates
+> ambiguous and suffix every one — noise hiding the single real case the suffix
+> exists to flag. Pinned by mutation test: flipping the scan to per-plate fails
+> `checklist_names_privacy_preserving_card_by_path`.
+>
+> Measured on the real journeys: **11 distinct brackets for 11 cards, 12 for 12
+> cosigners, zero collision suffixes in either** — so the suffix path is
+> exercised only by its dedicated test, not by the journeys.
+
 ### What is already true
 
 `me bundle` decodes every mk1 set at `crates/me-cli/src/bundle.rs:279` and
