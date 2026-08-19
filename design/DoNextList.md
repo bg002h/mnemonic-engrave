@@ -179,16 +179,46 @@ vanity.
    the operator's because it trades a real privacy property against the
    mnemonic:
 
-   ~~open~~ — **RULED 2026-08-18 by the operator.** Level 4 **is** the script
-   type, and the constellation defines its values:
+   ~~open~~ — **RULED 2026-08-18 by the operator, revised same day.** Level 4
+   **is** the script type, and the constellation defines its values:
 
-   | wallet | path | reads as |
-   | --- | --- | --- |
-   | **`tr`** keys | `m/270'/0'/2'/8'` | `bg002h` |
-   | **`wsh`** keys | `m/270'/0'/2'/9'` | `bg002i` |
+   | wallet | path |
+   | --- | --- |
+   | **`tr`** keys | `m/270028'/0'/0'/0'` |
+   | **`wsh`** keys | `m/270028'/0'/0'/1'` |
 
-   `m / 270' / coin' / account' / script'` — purpose `270'`, then coin, then
-   account, then script type where **`8'` = tr** and **`9'` = wsh**.
+   `m / 270028' / coin' / account' / script'` — purpose `270028'`, then coin,
+   then account, then script type where **`0'` = tr** and **`1'` = wsh**.
+
+   **Why the six-digit purpose replaced `270'`.** Two reasons, and the second is
+   the load-bearing one:
+
+   1. `270028` carries the whole handle in a **single component** (`27`→bg,
+      `00`, `2`, `8`→h = `bg002h`), which frees levels 2–4 to *mean* something
+      instead of spelling something. The script level is now pure semantics.
+   2. **It makes collision structurally impossible rather than merely
+      unlikely.** BIP-43's convention is *purpose N ↔ BIP N*, so `270'` was
+      always nominally claimable by a future BIP-270 (see item 3 below). A
+      six-digit purpose sits outside any plausible BIP number permanently.
+
+   It also deliberately does **not** reuse BIP-48's `1'`/`2'` script values, so
+   nothing can mistake the layout for BIP-48.
+
+   **Hard ceiling, measured — md1 is stricter than BIP-32.** A path component
+   must fit md1's varint single-extension range:
+
+   ```
+   m/2147483647'/0'/0'/0'   md: codec error: varint value 2147483647
+                                 exceeds single-extension range (max 2^29 - 1)
+   ```
+
+   BIP-32 allows hardened indices to 2^31−1; **md1 caps them at 2^29−1 =
+   536,870,911**. `270028` is comfortably inside. Any future "make it uglier"
+   proposal must stay under ~537 million.
+
+   **Depth check:** `m/270028'/0'/0'` alone is **depth 3**, which would classify
+   as `SingleSig`. The fourth (script) level is what makes it depth 4 and
+   therefore valid for arbitrary-miniscript shapes.
 
    This picks the BIP-48-shaped layout over "script type not in the path", and
    the reason is sound: putting the script type *in* the path means an operator
@@ -196,8 +226,9 @@ vanity.
    the same recognisability goal as the mnemonic itself. Key sets are disjoint
    by construction, so the key-reuse concern is closed.
 
-   Note the mnemonic attaches to the **tr** variant; `wsh` reads one character
-   off. That is a consequence of encoding the script type, not a defect.
+   With the purpose field carrying the mnemonic, both wallets now read
+   identically up to the script level — so the earlier wrinkle (the mnemonic
+   attaching only to the `tr` variant) is gone.
 3. ~~`27'` unchecked for collisions~~ — **CHECKED 2026-08-18 for `270'`: no
    collision.**
 
