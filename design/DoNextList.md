@@ -466,7 +466,47 @@ green check on a docs-only push proves only that untouched code still builds.
 
 </details>
 
-### 9. The engraved `backup-strings.txt` has NO producer — **DECIDED 2026-08-18: option (a). Not yet implemented.**
+### 9. ~~The engraved `backup-strings.txt` has NO producer~~ — **DONE + REVIEWED + FOLDED 2026-08-18**
+
+**Shipped**: `c6c6943` (fix) → `54e0d2b` (review) → `9992762` (fold). Both
+journeys now assemble `out/backup-strings.txt` from their own md1 chunks and
+freshly-encoded key cards and engrave *that*; the tracked fixtures are deleted.
+
+**Key material independently confirmed unchanged** — the funds-sensitive half.
+The reviewer decoded all **23 cards** (12 operator + 11 pathological) old-vs-new:
+field-identical on xpub / fingerprint / path / stub, **0 differences**, and both
+md1 sets byte-identical. Steel cut from the old fixtures stays valid.
+
+**Review found 3 Importants, all mine, all folded:**
+- **I-2, the serious one:** neither encode loop checked that `mk encode`
+  *succeeded*, so a one-character typo in a key header silently dropped that
+  cosigner from the **engraved** bundle at exit 0 — demonstrated as 23 plates
+  instead of 25, with 10 of 20 pathological captions then naming the **wrong
+  master**. I had replaced a *stale* bundle with a silently *short* one. Now
+  guarded three ways (exit status, 2-lines-per-card, total count before
+  engraving) and mutation-verified.
+- **I-1:** a heading rename left the PDF builder on the old name, blanking a
+  block as an empty `<pre>` — silent, because `S.get` returns its default. Fixed
+  the name *and* the class: all ten lookups now raise and list the available
+  headings.
+- **I-3:** the builder mixed a committed transcript with a live bundle. Now
+  guarded — and the guard caught **my own wrong assumption first**: I required
+  every bundle card to appear in the transcript, but the transcript only quotes
+  the first. The invariant runs the other way.
+
+**Four more no-producer instances fixed along the way:** both PDF builders read
+an `out/transcript.txt` nothing writes (and the *pathological* builder read the
+**operator's** transcript); `build_pdf.py` required a never-committed
+`keys.json`; both builders wrote the same `out/journey.html` and clobbered each
+other; the two journeys shared `out/` and destroyed each other's artifacts.
+
+**Still not regenerable, and the PDFs are deliberately untouched:**
+`design/journeys/shots/` has **zero tracked files** — the screenshots these
+documents embed exist nowhere, so a rebuild yields HTML with missing-image
+placeholders. The **data** layer is fixed; the **screenshot** layer needs the
+emulator re-walked. That is the remaining sense in which F-210 holds.
+
+<details><summary>the original finding</summary>
 
 **Call (operator stand-in):** both journeys **generate** `out/backup-strings.txt`
 from their own inputs and encodes, `me bundle` engraves *that*, the tracked
