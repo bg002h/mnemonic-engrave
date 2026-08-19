@@ -42,11 +42,45 @@ one tier must never be read as coverage at a higher one.
 | **T1 codec** | in-process encode → decode | the codec is faithful | anything about tools, screens or media |
 | **T2 tool** | CLI → files → CLI, separate processes, real exit codes | **the tools compose** | anything about the device |
 | **T3 operator** | the emulator walks the real device flow, real screens, real input transport | **a user can do the thing** | the physical media |
-| **T4 metal** | real engraving, real NFC scan, real hardware | the physical loop | nothing — but costs ~21 min/plate and consumes material |
+| **T4-sim** | simulated engraving under an **advanced clock**, plate rasterized from the toolpath, **read back by a decoder** | the engraving is **legible**, not merely emitted | real material behaviour — burrs, glare, oxidation, tool deflection |
+| **T4-metal** | real engraving, photograph of real steel, same decoder | the physical loop | nothing — but ~21 min/plate and consumes material |
 
 T1 is CI-cheap and should be exhaustive. T2 is where this project's defects
 actually live. T3 is what proves a feature is reachable rather than merely
-built. **T4 is rare and deliberate, never routine.**
+built. **T4-sim is in scope and should run routinely** (user ruling
+2026-08-18); T4-metal stays rare and deliberate.
+
+### 3.1 T4 needs a reader that does not exist yet
+
+**Engraving is write-only across the entire current test surface.** Nothing
+anywhere decodes a plate back into a string. So T4's structural assertion has
+never been provable even in principle: the constellation can write to metal, and
+nothing has ever confirmed the metal is *readable*. A **plate decoder** —
+engraved text and SeedQR — is therefore not a convenience for T4, it is what
+makes T4 a round trip rather than a one-way trip. Expect the audit to find it
+absent, and treat "absent" as the finding rather than a gap to paper over.
+
+**The trap it must avoid, and it is this document's §5 rule applied to pixels.**
+If the decoder reads *the preview image the renderer drew*, sharing the glyph
+code with the writer, the loop proves only that a function agrees with itself —
+the same defect that let a frozen snapshot bless the `v:` renderer bug. So:
+
+- read from the **toolpath the machine would actually cut**, rasterized
+  independently — not from the preview the GUI drew;
+- do **not** share glyph-rendering code between writer and decoder. A decoder
+  that inherits the writer's idea of a glyph cannot discover that the glyph is
+  ambiguous;
+- an **advanced clock** is a legitimate substitution (it only compresses time),
+  but every *other* substitution the harness makes must be named in the
+  journey's non-coverage statement.
+
+**The payoff is larger than round-tripping.** A decoder makes legibility
+*measurable*: degrade the raster — a scratch across a stroke, a burr, partial
+occlusion, the axis play once misdiagnosed as four different software bugs — and
+find the threshold at which decoding fails. That converts the engraving-font
+rules (2-stroke-width minimum feature; single-feature glyphs losing identity to
+one scratch) from asserted principles into measured margins, on a project whose
+entire value proposition is that the metal is still readable in twenty years.
 
 ## 4. The terminal assertion — two equalities, different layers
 
@@ -120,7 +154,12 @@ a run nobody has repeated.
 
 ## 8. Open — for the user to rule before dispatch
 
-1. **Is T4 in scope for the audit at all**, or recorded as "never attempted"?
+1. ~~Is T4 in scope for the audit at all?~~ **RULED 2026-08-18: yes — performed
+   via the simulator under an advanced clock (T4-sim), with a
+   simulator-adjacent decoder built to read a simulated engraving of a string
+   or QR code.** See §3.1. Remaining sub-question: does the decoder read the
+   **toolpath** (independent, recommended) or the rendered preview (shares code
+   with the writer, and proves much less)?
 2. **Does a generative journey have to start at entropy**, or is starting from a
    fixed test seed enough? (Fixed seeds are reproducible; real entropy is what
    operators actually use.)
