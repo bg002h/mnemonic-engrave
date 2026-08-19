@@ -104,6 +104,22 @@ uncommitted artifact. The lesson is the one the documents themselves are about:
 **a claim that nothing here is illustrative decays into a promise the moment the
 regeneration path stops being exercised.**
 
+## ⚠ The shipped PDFs are STALE — 2026-08-19
+
+**The two `.pdf` files in this directory predate DoNextList item 5 and no longer
+describe the wallet the scripts now produce.** They embed the **retired
+depth-3 xpubs** (`m/84'/0'/N'`) and contain **no addresses at all**, because at
+the time they were built no address could be derived for this wallet.
+
+They were **not** rebuilt, deliberately: `shots/` has **zero tracked files**, so
+the screenshots these documents embed exist nowhere in the repo and a rebuild
+produces pages with missing-image placeholders. Regenerating them faithfully
+needs the emulator re-walked, which is separate work.
+
+Until then, **the HTML built by the commands below is the current document and
+the PDF is not.** This is exactly the decay the paragraph above warns about,
+recorded rather than left for a reader to discover.
+
 ## Reproducing
 
 ```sh

@@ -132,7 +132,7 @@ mixes every timelock kind Bitcoin has:</p>
 descriptor commits to <code>H = sha256(sha256(word))</code>, shared by tiers 1
 and 2. Reusing a <em>hash</em> across tiers is fine — it is not a key. The 11
 keys come from three masters at divergent account indices
-(<code>84'/0'/0..3'</code>), so no key is reused.</p>
+(<code>48'/0'/0..3'/2'</code>), so no key is reused.</p>
 
 <div class="note"><b>This is the case that actually forces chunking.</b>
 The 12-key <code>multi(5,…)</code> policy tried first encodes to 13 bytes and one
@@ -178,9 +178,9 @@ VERIFY-ME) and <code>me bundle</code> rejects the set outright. Supplying the
 origin the warning asks for is what makes the rest of the chain work.</p>
 {code(sect('3. so it is chunked -- WITH the origin the warning asked for'), 14)}
 <div class="note"><b>What <code>--path</code> does and does not say.</b>
-It records ONE shared origin — <code>bip84</code> and <code>m/84'/0'/0'</code>
+It records ONE shared origin — <code>bip48</code> and <code>m/48'/0'/0'/2'</code>
 produce a byte-identical chunk set here. These eleven keys actually sit at four
-account indices (<code>84'/0'/0..3'</code>) across three masters, and each mk1
+account indices (<code>48'/0'/0..3'/2'</code>) across three masters, and each mk1
 card carries its own true <code>origin_path</code>. So the md1's shared value is
 a default the key cards override; a restore that trusted the descriptor card
 alone would derive the wrong keys for @3–@10. Worth pinning with a restore test
@@ -241,28 +241,64 @@ matters before touching the machine.</p>
 
 <div class="page">
 <h2>Host step 6 — the seed, and the refusal that still holds</h2>
+<h2 style="margin-top:14px">The addresses — the check this wallet could never do</h2>
+<p>Until the eleven keys were re-derived at BIP-48's four-level origin, <code>md</code>
+refused every one of them (<code>expected depth 4 for this script context, got 3</code>)
+and <b>no address could be derived for this wallet by any tool</b>. That is why no
+earlier version of this document showed one. These are the structural half's
+counterpart: proof the bytes mean the wallet that was intended.</p>
+{code(sect('9b. THE ADDRESSES — the check this wallet could never do before'))}
+
 {code(sect('10. the seed, and the refusal that still holds'), 26)}
 </div>
 """)
 
-# Plate -> (key index, chunk, total) from the mapping the journey emitted.
+# Caption each plate from WHAT IS ON IT, via two records neither of which
+# this file guesses at:
+#   out/pathological/manifest.json   — written by `me bundle`: plate -> string
+#   out/pathological/card-index.txt  — written by the journey: string -> key
+#
+# The previous attempt walked per-key chunk COUNTS in key order. `me bundle`
+# emits plates in chunk_set_id order, so every card caption named the wrong
+# key — silently. Keying on the plate's own string removes the ordering
+# assumption instead of trying to reproduce it.
+_MANIFEST = os.path.join(OUT, "manifest.json")
 _CARD_INDEX = os.path.join(OUT, "card-index.txt")
-if not os.path.exists(_CARD_INDEX):
-    raise SystemExit(f"{_CARD_INDEX} missing — run transcript_pathological.sh first")
-_COUNTS = [(int(l.split()[0]), int(l.split()[1]))
-           for l in open(_CARD_INDEX).read().strip().split("\n") if l.strip()]
-_MD1_PLATES = 3
+for _p in (_MANIFEST, _CARD_INDEX):
+    if not os.path.exists(_p):
+        raise SystemExit(f"{_p} missing — run transcript_pathological.sh first")
+
+_MAN = json.load(open(_MANIFEST))["plates"]
+_PLATE_KINDS = {int(e["plate"]): e["kind"] for e in _MAN}
+_PLATE_STRING = {int(e["plate"]): e["string"] for e in _MAN if "string" in e}
+_CARD_OWNER = {}
+for _l in open(_CARD_INDEX).read().strip().split("\n"):
+    if not _l.strip():
+        continue
+    _card, _ki, _nth, _tot, _fp, _path = _l.split()
+    _CARD_OWNER[_card] = (int(_ki), int(_nth), int(_tot), _fp, _path)
 
 
-def _plate_owner(n):
-    """Which key does plate n belong to, and which of its chunks is it?"""
-    idx = n - _MD1_PLATES - 1
-    for ki, cnt in _COUNTS:
-        if idx < cnt:
-            return ki, idx + 1, cnt
-        idx -= cnt
-    raise SystemExit(f"plate {n} is past the end of card-index.txt "
-                     f"({sum(c for _, c in _COUNTS)} card chunks recorded)")
+def _caption(n):
+    """Caption plate n from its own content, or fail loudly."""
+    if n not in _PLATE_KINDS:
+        raise SystemExit(f"manifest has no plate {n}")
+    st = _PLATE_STRING.get(n)
+    if st is None:
+        # The ms1 seed plate carries no string in the manifest (kind "ms1",
+        # integrity "n/a") — it is the operator's own seed card, not something
+        # `me bundle` encoded. Caption it as what it is rather than crashing.
+        return f"plate {n} — {_PLATE_KINDS[n]} (seed card — not machine-encoded)"
+    if st.startswith("md1"):
+        md1s = sorted(p for p, v in _PLATE_STRING.items() if v.startswith("md1"))
+        return f"plate {n} — md1 policy, chunk {md1s.index(n) + 1}/{len(md1s)}"
+    owner = _CARD_OWNER.get(st)
+    if owner is None:
+        raise SystemExit(
+            f"plate {n} carries an mk1 string that card-index.txt does not "
+            f"know — the bundle and the index are from different runs")
+    ki, nth, tot, fp, path = owner
+    return f"plate {n} — @{ki} [{fp}/{path}] chunk {nth}/{tot}"
 
 
 plates = sorted((f for f in os.listdir(os.path.join(OUT, "plates")) if f.endswith(".png")),
@@ -270,16 +306,7 @@ plates = sorted((f for f in os.listdir(os.path.join(OUT, "plates")) if f.endswit
 cells = []
 for f in plates:
     n = int(re.search(r"(\d+)", f).group(1))
-    if n <= 3:
-        cap = f"plate {n} — md1 policy, chunk {n}/3"
-    else:
-        # Was `(n-4)//2`, which assumed every key is exactly TWO chunks. Item 5
-        # moved the keys to four-level BIP-48 origins and most became THREE,
-        # so the arithmetic desynced and then raised IndexError. The journey
-        # now RECORDS the per-key chunk counts; read them rather than guess.
-        ki, ch, tot = _plate_owner(n)
-        k = keys[ki]
-        cap = f"plate {n} — @{ki} [{k['fp']}/{k['path'][2:]}] chunk {ch}/{tot}"
+    cap = _caption(n)
     cells.append(img(os.path.join(OUT, "plates", f), "plate", cap))
 
 P.append(f"""

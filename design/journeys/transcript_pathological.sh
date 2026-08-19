@@ -171,23 +171,33 @@ if [ "$GOT" -lt "$NKEYS" ]; then
 fi
 echo "note: $NKEYS key cards -> $GOT mk1 chunks (BIP-48 origins push most cards to 3)"
 
-# Emit the plate->key mapping the document needs, instead of leaving it to be
-# re-derived by arithmetic. The PDF builder used to compute `(n-4)//2`, which
-# silently assumed EVERY key was two chunks; item 5's four-level origins made
-# that false and it raised IndexError. A count that varies per key has to be
-# recorded by whatever produced it.
+# Record which KEY produced each mk1 STRING, so the document can caption a
+# plate from the plate's own content.
+#
+# The first attempt recorded per-key chunk COUNTS and let the builder walk them
+# in key order. That was wrong and worse than the bug it replaced: `me bundle`
+# emits plates in chunk_set_id order, not key order, so all 30 card captions
+# named the wrong key — a silent wrong answer where there had been a loud
+# IndexError. Keying on the string removes the ordering assumption entirely.
 : > "$W/out/pathological/card-index.txt"
 for f in "$W"/inputs-pathological/keys/key-*.xpub; do
   ki=$(basename "$f" .xpub | sed 's/key-0*//'); [ -z "$ki" ] && ki=0
   KX=$(grep '^xpub' "$f")
   KFP=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$f" | head -1)
   KPATH=$(sed -n 's/.*origin \[[0-9a-f]*\/\([^]]*\)\].*/\1/p' "$f" | head -1)
-  NC=$("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
+  nth=0
+  tot=$("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
         --origin-path "m/$KPATH" --policy-id-stub "$STUB" --group-size 0 \
         2>/dev/null | grep -c '^mk1')
-  printf '%s %s %s %s\n' "$ki" "$NC" "$KFP" "$KPATH" >> "$W/out/pathological/card-index.txt"
+  while read -r card; do
+    nth=$((nth + 1))
+    printf '%s %s %s %s %s %s\n' "$card" "$ki" "$nth" "$tot" "$KFP" "$KPATH" \
+      >> "$W/out/pathological/card-index.txt"
+  done < <("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
+             --origin-path "m/$KPATH" --policy-id-stub "$STUB" --group-size 0 \
+             2>/dev/null | grep '^mk1')
 done
-run cat "$W/out/pathological/card-index.txt"
+run wc -l "$W/out/pathological/card-index.txt"
 run wc -l "$W/out/pathological/mk-encode-raw.txt"
 run "$MK" decode $(sed -n '1,2p' "$W/out/pathological/mk-encode-raw.txt")
 
