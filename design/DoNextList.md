@@ -132,13 +132,24 @@ Risk: overloading BIP-48 invites **false recognition** — a wallet seeing
 `48'/…/2'` assumes plain multisig and may confidently show wrong information.
 
 **Candidate B (unambiguity-leaning, user proposal 2026-08-18):**
-`m/27'/0'/0'/2'/8'` — a play on `bg002h`, the operator's bitcointalk handle.
+`m/27'/0'/0'/2'/8'` — reads as `bg002h`, the operator's bitcointalk handle.
 
-*In its favour, and it is a real argument not a joke:* purpose `27'` is
-unregistered, so **no wallet will falsely recognise it**. That is precisely the
-"fails honestly" side of the tradeoff above, chosen deliberately rather than
-inherited. Recovery of any miniscript wallet requires the descriptor regardless,
-so a self-describing path buys less than it appears to.
+**Its two stated purposes, in the operator's words: to underscore the arbitrary
+nature of the path, and to be recognisable to the operator.** Both are real
+design arguments and neither is decoration.
+
+*On arbitrariness.* For arbitrary miniscript **there is no standard path**. So
+`48'/0'/0'/2'` actively *implies* a standard exists and that the wallet is plain
+multisig — it is a claim, and a false one. A visibly arbitrary path signals the
+truth: *this path means nothing on its own; you need the descriptor.* Purpose
+`27'` is unregistered, so no wallet can falsely recognise it either. This is the
+"fails honestly" property extended from machines to humans.
+
+*On recognisability.* The SH2 **displays origin paths**. An operator who can
+recognise their own path at a glance has a cheap personal checksum against a
+swapped, corrupted or substituted card — on a device whose entire purpose is
+letting a human verify things by eye. That is an operational property, not
+vanity.
 
 *Three things to settle before adopting it:*
 
@@ -147,13 +158,24 @@ so a self-describing path buys less than it appears to.
    rejection blocking item 5. So candidate B needs md to accept depth 5, which is
    the same normative change as item 5 option 2. **These two items should be
    decided together.**
-2. **One path for both `tr` and `wsh` means key reuse across two wallets.** The
-   same seed would produce the same pubkeys in a wsh wallet and a tr wallet;
-   different scripts give different addresses, but spending from both links them
-   on-chain. Standards avoid this by varying the script-type level. Suggest
-   varying one level per script type — e.g. `m/27'/0'/0'/2'/8'` for `wsh` and
-   `m/27'/0'/0'/3'/8'` for `tr` — keeping the mnemonic intact while keeping the
-   key sets disjoint.
+2. **One path for both `tr` and `wsh` means key reuse across two wallets** —
+   and this is in direct tension with the recognisability goal. The same seed
+   yields the same pubkeys in both; different scripts give different addresses,
+   but spending from both links them on-chain. Three ways out, and the choice is
+   the operator's because it trades a real privacy property against the
+   mnemonic:
+
+   | option | paths | mnemonic | keys |
+   | --- | --- | --- | --- |
+   | vary script level | `…/2'/8'` wsh, `…/3'/8'` tr | `bg002h` / `bg003h` | disjoint |
+   | **vary account level** | `m/27'/0'/0'/2'/8'` wsh, `m/27'/0'/1'/2'/8'` tr | `bg002h` / `bg012h` | disjoint |
+   | accept reuse | same path for both | `bg002h` exactly, once | **shared** |
+
+   **Varying the account level is the best of the three**: level 3 is what
+   account indices are *for*, it keeps both the `27'`-`2'`-`8'` skeleton and the
+   reading intact, and only the digit that is *supposed* to vary changes. Only
+   the third option preserves `bg002h` exactly — at the cost of linking the two
+   wallets whenever both are spent from.
 3. **`27'` has not been checked for collisions** with any other project's
    unregistered use. Low stakes, but unchecked.
 
