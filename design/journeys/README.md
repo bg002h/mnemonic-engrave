@@ -107,9 +107,12 @@ regeneration path stops being exercised.**
 ## Reproducing
 
 ```sh
-mkdir -p out shots
-bash transcript_pathological.sh > out/transcript.txt 2>&1
-python3 build_pdf_pathological.py          # writes out/journey.html
+mkdir -p shots
+bash transcript_pathological.sh > transcript_pathological.txt 2>&1
+python3 build_pdf_pathological.py   # writes out/pathological/journey_pathological.html
+
+bash transcript.sh > transcript.txt 2>&1
+python3 build_pdf.py                # writes out/journey.html
 ```
 
 **`build_pdf.py` and `build_pdf_pathological.py` write HTML, not PDF.** The

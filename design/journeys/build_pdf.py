@@ -100,6 +100,29 @@ def _keys_from_run():
         if len(pair) != 2:
             raise SystemExit(f"{f}: expected 2 mk1 chunks at offset {i*2}, got {len(pair)}")
         out.append({"index": i, "fingerprint": m.group(1), "mk1_raw": pair})
+
+    # I-3: this document mixes a COMMITTED transcript with a LIVE bundle. If
+    # out/ is from a different run than transcript.txt, the page renders one
+    # card string in its transcript blocks and a different one in its tables —
+    # for the SAME key — and nothing complains. Refuse that rather than publish
+    # it: every card in the bundle must appear in the transcript being quoted.
+    # Direction matters: the transcript only QUOTES the first card (it runs
+    # `mk inspect` on one pair), so requiring every bundle card to appear in it
+    # is wrong — that was this guard's first, over-strict form, and it fired on
+    # a perfectly consistent pair of artifacts. The real invariant is the other
+    # way round: every mk1 string the transcript SHOWS must be one the bundle
+    # actually contains. A transcript from an older run quotes strings that are
+    # not in today's bundle, and that is exactly the mixed document I-3 found.
+    tr = open(os.path.join(W, "transcript.txt")).read()
+    in_bundle = {c for k in out for c in k["mk1_raw"]}
+    quoted = set(re.findall(r"\bmk1[0-9a-z]+", tr))
+    orphan = sorted(q for q in quoted if q not in in_bundle)
+    if orphan:
+        raise SystemExit(
+            "transcript.txt quotes mk1 strings that are NOT in "
+            "out/backup-strings.txt — the two are from different runs.\n"
+            f"  first orphan: {orphan[0]}\n"
+            "  Re-run transcript.sh, refresh transcript.txt, then rebuild.")
     return out
 
 
@@ -413,7 +436,7 @@ re-run.</div>
 
 <h2 style="margin-top:16px">Reproducing this document</h2>
 {code('''cd <this directory>
-bash transcript.sh > out/transcript.txt 2>&1     # every CLI block
+bash transcript.sh > transcript.txt 2>&1         # every CLI block
 python3 build_pdf.py                              # this PDF
 
 # the cosigner set (run inside the seedhammer flake)

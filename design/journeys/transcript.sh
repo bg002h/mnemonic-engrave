@@ -94,10 +94,31 @@ for f in "$W"/inputs/keys/cosigner-*.xpub; do
     echo "FATAL: $f is missing an xpub or an origin header" >&2
     exit 1
   fi
-  "$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
-    --origin-path "m/$KPATH" --from-md1 "$MD1" --group-size 0 \
-    2>/dev/null | grep '^mk1' >> "$W/out/mk-encode-raw.txt"
+  # I-2: the encode's exit status USED TO BE DISCARDED by the pipe, so a typo
+  # in a key header silently dropped that cosigner's card from the ENGRAVED
+  # bundle at exit 0. A short bundle is a worse failure than the stale one
+  # this change set out to remove.
+  if ! CARD=$("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
+        --origin-path "m/$KPATH" --from-md1 "$MD1" --group-size 0 2>&1); then
+    echo "FATAL: mk encode failed for $f:" >&2
+    printf '%s\n' "$CARD" >&2
+    exit 1
+  fi
+  NL=$(printf '%s\n' "$CARD" | grep -c '^mk1')
+  if [ "$NL" -ne 2 ]; then
+    echo "FATAL: $f produced $NL mk1 line(s), expected 2" >&2
+    exit 1
+  fi
+  printf '%s\n' "$CARD" | grep '^mk1' >> "$W/out/mk-encode-raw.txt"
 done
+
+NKEYS=$(ls "$W"/inputs/keys/cosigner-*.xpub | wc -l)
+WANT=$(( NKEYS * 2 ))
+GOT=$(grep -c '^mk1' "$W/out/mk-encode-raw.txt")
+if [ "$GOT" -ne "$WANT" ]; then
+  echo "FATAL: expected $WANT mk1 lines for $NKEYS keys, got $GOT" >&2
+  exit 1
+fi
 run wc -l "$W/out/mk-encode-raw.txt"
 run "$MK" inspect $(sed -n '1,2p' "$W/out/mk-encode-raw.txt")
 

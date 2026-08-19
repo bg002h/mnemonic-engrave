@@ -64,6 +64,25 @@ for line in transcript.split("\n"):
 if cur:
     S[cur] = "\n".join(buf).strip("\n")
 
+
+def sect(name):
+    """Fetch a transcript section, LOUDLY.
+
+    I-1: every lookup here used to be `S.get(name, '')`, so renaming a
+    `##########` heading in the transcript script rendered that block as an
+    empty <pre> and the document still built. A rename broke a consumer nobody
+    grepped for, and the only symptom was a blank box in a 700 KB page. Missing
+    sections are now a hard failure that names the heading and lists what the
+    transcript actually contains.
+    """
+    if name not in S:
+        raise SystemExit(
+            f"transcript has no section {name!r}\n"
+            f"  (a heading was renamed in transcript_pathological.sh?)\n"
+            "  available: " + "\n             ".join(sorted(S)))
+    return S[name]
+
+
 # Was json.load(open("keys.json")) -- a file that was never committed, so this
 # script could not run at all. The two fields it uses (fingerprint and origin
 # path) are already in the committed key files' header comments, which makes the
@@ -123,7 +142,7 @@ two 32-byte hash literals and four timelock arguments, and comes to
 policy in this work that genuinely needs a chunk set.</div>
 
 <h2>Toolchain</h2>
-{code(S.get('versions',''))}
+{code(sect('versions'))}
 </div>
 """)
 
@@ -148,8 +167,8 @@ P.append(f"""
 P.append(f"""
 <div class="page">
 <h2>Host step 1 — it does not fit one string</h2>
-{code(S.get('1. the policy — 11 keys, four timelock kinds, a hashlock',''), 8)}
-{code(S.get('2. it does not fit one string',''), 8)}
+{code(sect('1. the policy — 11 keys, four timelock kinds, a hashlock'), 8)}
+{code(sect('2. it does not fit one string'), 8)}
 
 <h2 style="margin-top:14px">Host step 2 — so it is chunked, with an explicit origin</h2>
 <p>Encoded without <code>--path</code>, this policy's card carries no origin and
@@ -157,7 +176,7 @@ P.append(f"""
 default derivation path, so <code>md decode</code> only PARTIAL-decodes (exit 4,
 VERIFY-ME) and <code>me bundle</code> rejects the set outright. Supplying the
 origin the warning asks for is what makes the rest of the chain work.</p>
-{code(S.get('3. so it is chunked -- WITH the origin the warning asked for',''), 14)}
+{code(sect('3. so it is chunked -- WITH the origin the warning asked for'), 14)}
 <div class="note"><b>What <code>--path</code> does and does not say.</b>
 It records ONE shared origin — <code>bip84</code> and <code>m/84'/0'/0'</code>
 produce a byte-identical chunk set here. These eleven keys actually sit at four
@@ -170,7 +189,7 @@ before this shape is recommended to anyone.</div>
 <h2 style="margin-top:14px">Host step 3 — the chunk set decodes back</h2>
 <p>Three cards, reassembled, give the same 11-key policy back — the round trip
 that makes the backup worth engraving.</p>
-{code(S.get('4. the chunk set decodes back to the same 11-key policy',''), 16)}
+{code(sect('4. the chunk set decodes back to the same 11-key policy'), 16)}
 </div>
 
 <div class="page">
@@ -178,7 +197,7 @@ that makes the backup worth engraving.</p>
 <p>Every mk1 key card must carry a 4-byte policy-id stub; <code>mk encode</code>
 refuses without one. The only automatic way to get it is
 <code>--from-md1</code>, and that path rejects a chunk:</p>
-{code(S.get('5. OBSTACLE 1 — mk cannot derive the stub from a CHUNKED md1',''), 10)}
+{code(sect('5. OBSTACLE 1 — mk cannot derive the stub from a CHUNKED md1'), 10)}
 <p><code>mk</code> vendors <code>md-codec 0.34.0</code>; the primary crate is at
 <code>0.42.0</code>. The "version 9" it will not parse is the chunked wire form.</p>
 
@@ -197,14 +216,14 @@ policy_id_stubs (what mk embedded):  726a6663''')}
 Most likely a rename across versions — <code>mk</code> vendors md-codec 0.34.0
 and the primary is 0.42.0, which now exposes both — but as it stands the spec
 sentence and the binary disagree about which identity a key card indexes.</p>
-{code(S.get('9. the ids, and which one mk actually uses for the stub',''), 10)}
+{code(sect('9. the ids, and which one mk actually uses for the stub'), 10)}
 <p>Following the binary rather than the sentence, this wallet's stub is
 <b><code>5b48af35</code></b>, supplied with <code>--policy-id-stub</code>.</p>
 </div>
 
 <div class="page">
 <h2>Host step 4 — the eleven key cards</h2>
-{code(S.get('7. the eleven key cards',''), 30)}
+{code(sect('7. the eleven key cards — ALL of them, each with its own origin'), 30)}
 <p>Each key splits into <b>2 chunks</b>, so the eleven cards are 22 strings.
 Note the decode: the card carries the origin fingerprint and path, so the
 origins the descriptor card lacks are present in the bundle.</p>
@@ -215,14 +234,14 @@ origins the descriptor card lacks are present in the bundle.</p>
 <p>Every set verifies, the manifest emits, and the operator gets the number that
 matters before touching the machine.</p>
 {code(re.sub(r'^me: rendered plate (?!1 ).*\n', '',
-             S.get('8. me bundle: validates, and prints the plate checklist',''),
+             sect('8. me bundle: validates, and prints the plate checklist'),
              flags=re.M).replace(
       'me: rendered plate 1', 'me: rendered plate 1 … (2–25 elided) …'), 40)}
 </div>
 
 <div class="page">
 <h2>Host step 6 — the seed, and the refusal that still holds</h2>
-{code(S.get('10. the seed, and the refusal that still holds',''), 26)}
+{code(sect('10. the seed, and the refusal that still holds'), 26)}
 </div>
 """)
 
@@ -348,8 +367,8 @@ about at encode time. The plates and checklist here come from
 
 <h2 style="margin-top:16px">Reproducing this document</h2>
 {code('''cd <this directory>
-bash transcript.sh > out/transcript.txt 2>&1   # every CLI block, refusals included
-python3 build_pdf.py                            # this PDF''')}
+bash transcript_pathological.sh > transcript_pathological.txt 2>&1   # every CLI block, refusals included
+python3 build_pdf_pathological.py                                     # this document''')}
 <div class="foot">Emulator frames were captured by POSTing
 <code>canvas.toDataURL()</code> to a local receiver, so each screenshot is the
 device framebuffer exactly. Plate overlays are the page's own SVG, rendered with

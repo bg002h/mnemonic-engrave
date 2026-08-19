@@ -62,7 +62,7 @@ runcap() {
 # engraved bundle, key cards, manifest and plates — and a PDF built afterwards
 # would then read the wrong journey's artifacts. Same stale-artifact class as
 # F-210, one directory up. Each journey owns its own subtree now.
-mkdir -p "$W/out/pathological/pathological"
+mkdir -p "$W/out/pathological"
 
 T=$(cat "$W/inputs-pathological/wallet-policy.txt")
 # NOTE: MD1S is deliberately NOT set here. It used to be, reading out/md1.txt
@@ -130,10 +130,33 @@ for f in "$W"/inputs-pathological/keys/key-*.xpub; do
     echo "FATAL: $f is missing an xpub or an origin header" >&2
     exit 1
   fi
-  "$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
-    --origin-path "m/$KPATH" --policy-id-stub "$STUB" --group-size 0 \
-    2>/dev/null | grep '^mk1' >> "$W/out/pathological/mk-encode-raw.txt"
+  # I-2: the encode's exit status USED TO BE DISCARDED by the pipe, so a typo
+  # in a key header silently dropped that cosigner's card from the ENGRAVED
+  # bundle at exit 0 — 23 plates instead of 25, and every later plate caption
+  # naming the wrong master because caption index and card index desynced.
+  # A short bundle is a worse failure than the stale one this commit removed.
+  if ! CARD=$("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
+        --origin-path "m/$KPATH" --policy-id-stub "$STUB" --group-size 0 2>&1); then
+    echo "FATAL: mk encode failed for $f:" >&2
+    printf '%s\n' "$CARD" >&2
+    exit 1
+  fi
+  NL=$(printf '%s\n' "$CARD" | grep -c '^mk1')
+  if [ "$NL" -ne 2 ]; then
+    echo "FATAL: $f produced $NL mk1 line(s), expected 2" >&2
+    exit 1
+  fi
+  printf '%s\n' "$CARD" | grep '^mk1' >> "$W/out/pathological/mk-encode-raw.txt"
 done
+
+# Belt and braces: the engraved bundle must have exactly the expected shape.
+NKEYS=$(ls "$W"/inputs-pathological/keys/key-*.xpub | wc -l)
+WANT=$(( NKEYS * 2 ))
+GOT=$(grep -c '^mk1' "$W/out/pathological/mk-encode-raw.txt")
+if [ "$GOT" -ne "$WANT" ]; then
+  echo "FATAL: expected $WANT mk1 lines for $NKEYS keys, got $GOT" >&2
+  exit 1
+fi
 run wc -l "$W/out/pathological/mk-encode-raw.txt"
 run "$MK" decode $(sed -n '1,2p' "$W/out/pathological/mk-encode-raw.txt")
 
