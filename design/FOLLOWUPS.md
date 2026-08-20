@@ -7658,9 +7658,38 @@ committed ones.
    regenerates **end to end today** (transcript + 0 missing shots + PDF written,
    exit 0). It is the worked example the other two should follow.
 
-So the repair is now: commit a capture driver in `cmd/emu/` that POSTs to the
-documented shot server, and give the two builders the print step the payload one
-already has. The plate captions must come FROM the capture — `#plate-caption`
+**DONE 2026-08-20 for the PATHOLOGICAL journey — the one this entry gates the
+`tr()`/`wsh()` cycle on.** It regenerates end to end from committed inputs:
+
+```sh
+bash transcript_pathological.sh > transcript_pathological.txt 2>&1
+python3 capture_pathological.py     # rebuilds emu.wasm, drives it, writes shots/
+python3 build_pdf_pathological.py   # writes the PDF
+```
+
+`cmd/emu/shots_pathological.js` (seedhammer `f763067`) is the capture driver that
+never existed, and `capture_pathological.py` runs it. Rebuilt output: 15 pages, 4
+plate captions, and `pdftotext | grep -ci missing` = 0.
+
+Three defects the capture found on the way, each of which had REPORTED SUCCESS —
+worth recording because they are the shape of this whole follow-up:
+
+- the seed picker has **five** rows, not two, so a computed row typed the seed
+  into `Input m*1 string` three screens away;
+- the plate `viewBox` is in **device units** (544000²), and using it as a canvas
+  size makes `toDataURL` return `"data:,"` — which the shot server writes as a
+  **zero-byte PNG with a 200 OK**, four times, with the driver reporting `ok`;
+- sampling by wall clock made `b6-plate` and `b8-plate` **byte-identical**, which
+  would have put one picture in the document twice under two captions. Sampling
+  is on `shToolpath.summary().steps` now, with a >2% drift check against the
+  measured plan.
+
+And the captions are captured data rather than prose — they had **already
+drifted**: the sample labelled "three words down" shows all twelve words cut.
+
+**STILL OPEN: the operator journey.** No capture driver (19 shots), and
+`build_pdf.py` still stops at HTML — the remaining half of F-156. The pathological
+one is the worked example to copy. The plate captions must come FROM the capture — `#plate-caption`
 already emits `head X,Ymm`, which is exactly what the PDF currently hardcodes as
 prose beside the image.
 
