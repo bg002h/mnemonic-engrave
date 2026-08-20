@@ -7708,6 +7708,55 @@ from the same clean state, so the two captures do not tread on each other. The p
 already emits `head X,Ymm`, which is exactly what the PDF currently hardcodes as
 prose beside the image.
 
+### F-212 — Go and Rust compute DIFFERENT `WalletPolicyId` when the origin is elided (owning phase: **the tr/wsh cycle, Stage 3 at the latest — it gates any device-side identity claim**) `#seedhammer` `#security` `#codec`
+
+**Found 2026-08-20 by the R3 keyed conformance vectors, on their first run.** This
+is precisely the class those vectors were built to find, and no keyless corpus
+could have found it: the divergence is in how KEYS enter a hash.
+
+**Measured on ONE wallet encoded two ways** — same template, same xpub, same
+fingerprint:
+
+| origin | Rust | Go |
+| --- | --- | --- |
+| explicit `84'/0'/0'` | `c79039c5…` | `c79039c5…` — **agree** |
+| **elided** | `c79039c5…` | `260f334a…` — **DIVERGE** |
+
+Rust's policy id is **stable across origin-elision**; Go's is not. Reproduced on
+four of six keyed vectors — every one whose origin is elided — while both
+explicit-origin vectors (`keyed_tr_with_leaf`, `keyed_tr_depth2`) agree exactly.
+
+**Both sides call their behaviour deliberate, and they contradict each other.**
+
+- Rust `crates/md-codec/src/identity.rs`: canonical-fills an empty origin before
+  hashing so the id "honors its documented *stable across origin-elision*
+  invariant" (comment L14).
+- Go `md/walletpolicyid.go:138-145`: resolves the origin "**AS-IS — NO
+  canonicalOrigin fallback (the deliberate divergence from the display accessor,
+  R0-I2)**", and calls an elided shared path "a legitimate empty origin".
+
+Under the **Rust-primary rule** Rust is normative, so the port is the side that
+must converge — but R0-I2 chose this deliberately, so the ruling is not mine to
+make silently. It is also not obviously free: `WalletPolicyId` binds mk1 cards to
+a wallet, so changing it on-device changes what previously engraved cards verify
+against.
+
+**Why it matters beyond conformance.** The device computes this id to bind key
+cards. An elided-origin keyed card gets one id on the device and a different one
+from the toolkit, so a cross-tool verify would report a mismatch on a wallet that
+is actually correct — or, read the other way, agreement would stop meaning what
+it appears to mean.
+
+**Pinned, not skipped.** `md/conformance_keyed_test.go` asserts the gap's exact
+shape: an elided-origin vector must still diverge and an explicit-origin one must
+still agree, so the test fires when either changes — **including when the
+divergence is fixed**, which is when the arm should be deleted.
+
+**Open question for the ruling:** does the fork converge on Rust's canonical-fill
+(and what happens to cards engraved under the current behaviour), or does Rust's
+invariant get revisited? Whoever answers should read R0-I2 first — it is the
+argument on the other side.
+
 ### F-211 — `bip39.RandomWord()` is an exported CSPRNG-backed word generator compiled into the firmware, on a device that is not supposed to generate seeds (owning phase: **next `#seedhammer` cycle**) `#seedhammer` `#security`
 
 **Surfaced 2026-08-19** by an operator-directed audit of every RNG call site
