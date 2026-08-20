@@ -7616,3 +7616,70 @@ it before relying on it, not after.
 each script produce its own intermediates (self-contained, slower, regenerates
 anywhere) or commit the intermediates as fixtures (fast, but re-creates the same
 decay one version bump later). The version drift above argues for the first.
+
+### F-211 — `bip39.RandomWord()` is an exported CSPRNG-backed word generator compiled into the firmware, on a device that is not supposed to generate seeds (owning phase: **next `#seedhammer` cycle**) `#seedhammer` `#security`
+
+**Surfaced 2026-08-19** by an operator-directed audit of every RNG call site
+across the constellation. Operator statement: *"sh2 seed generation is not
+supposed to exist."*
+
+**PROVENANCE — ANSWERED: we did not add it. It is original SeedHammer firmware.**
+
+- `bip39/bip39.go:371 func RandomWord() Word` reads `crypto/rand` and returns a
+  random BIP-39 word.
+- Introduced upstream in `3398580`, **2023-03-22**, author `seedhammer` — about
+  two years before this fork existed. Still present upstream today at
+  `upstream/main:bip39/bip39.go:266`, byte-identical in behaviour.
+- The only fork commit touching it is upstream's own `74b8d00` (2024-01-01,
+  "bip39: store words more efficiently"), inherited via merge.
+
+**So the fork neither introduced nor wired up seed generation.** That is the
+question asked, and the answer is clean.
+
+**WHAT IS ACTUALLY OPEN — the capability is compiled in but unreachable.**
+
+Measured: **no production code calls it, in the fork OR upstream.** Every
+reference is a test —
+
+```
+bip39/bip39_test.go:98      mnemonic[j] = RandomWord()
+engrave/engrave_test.go:34  mnemonic[i] = bip39.RandomWord()
+```
+
+— both generating random mnemonics as test material. `git grep` for
+non-`_test.go` callers returns nothing in either tree.
+
+So it is **dead code in a production package**: an exported, CSPRNG-backed
+generator sitting in the `bip39` package's public API, on a device whose design
+intent forbids the feature. `bip39` is linked into the firmware (`gui/derive.go`,
+`gui/multisig_derive.go`, `gui/ms1_decode.go` all import it), so the symbol is in
+the build graph even though nothing reaches it.
+
+**Why file it rather than shrug.** The risk is not that it runs — nothing calls
+it. The risks are that (a) it is *exported*, so wiring it up is one line and
+reviews as ordinary API use rather than as adding seed generation; and (b) a
+device that must not generate seeds is stronger if it *cannot*, not merely if it
+*does not*.
+
+**OPEN QUESTION, not yet measured:** does the symbol survive TinyGo's
+dead-code elimination into the shipped firmware binary? If DCE drops it the
+concern is API-surface only; if it does not, the device ships an unused CSPRNG
+path. **Check before choosing a remedy** — this is exactly the "verify the
+mechanism, don't argue about it" rule.
+
+**Remedy options, cheapest first:**
+1. Move `RandomWord` into a `_test.go` file (or an internal test-only package).
+   It is only ever test material, so this is a relocation, not a removal, and
+   `_test.go` is never compiled into the firmware.
+2. Gate it `//go:build !tinygo`, which keeps host tests working and provably
+   removes it from device builds.
+3. Leave it and document the deliberate choice — the weakest option, and only
+   defensible if DCE is shown to drop it.
+
+Option 1 or 2 also makes the guarantee **testable**: a build-tag or symbol check
+can assert the device binary contains no seed-generation path, turning an
+intention into a gate.
+
+**Upstream-facing:** if this is fixed, it is a candidate small PR to
+`seedhammer/seedhammer` — the same dead export exists there, and the fix is
+strictly an improvement for a device with the same design intent.
