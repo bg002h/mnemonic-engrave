@@ -66,8 +66,51 @@ work, not composition.
 | singlesig | `gui/singlesig.go` | **DONE** |
 | bip85 | `bip85DeriveFlow` (`gui/bip85.go`) | **DONE** |
 | engrave bundle | `gui/bundle_flow.go` | **DONE** |
-| multisig build | `buildMultisigPolicyFlow` (`gui/multisig_build.go`) | **PARTIAL** — seed loop done, prefix deferred (below) |
-| multisig verify | `multisigVerifyFlow` (`gui/multisig_verify.go`) | **NOT STARTED** — deliberately last, see below |
+| multisig build | `buildMultisigPolicyFlow` (`gui/multisig_build.go`) | **DONE** — seed loop + prefix |
+| multisig verify | `multisigVerifyFlow` (`gui/multisig_verify.go`) | **DONE** |
+
+**All five are converted.** Sealed Payload stays excluded per the directive.
+
+## A resume costs nothing — but only since `wordEntryOpts.resuming`
+
+The first four conversions shipped with a defect none of their tests caught,
+because every one of them asserted *control flow* — where Back lands — and none
+asserted *cost*.
+
+Measured: `inputWordsFlow` commits a word, then skips already-filled slots and
+confirms on running off the end (`gui/gui.go:1069-1077`). So an operator
+returning to a complete 12-word entry could only leave it **forwards** by
+retyping word 1. Eleven words survived the Back and one did not.
+
+`wordEntryOpts.resuming` draws the `done` affordance while every slot is filled,
+so the count is zero. It does not weaken the rule that `done` cannot appear
+where a length is already known: here the length is known **and satisfied**, and
+a partial resume still never draws it.
+
+**The general lesson: assert the cost, not just the destination.** "Back returns
+to step N" is satisfied by a step N that has forgotten everything.
+
+## Two defects that only tests could find
+
+1. **A shadowed variable in the verify step machine.** `fresh, ferr :=
+   verifyFreshSlots(...)` inside a step shadowed the leg's `fresh` — legal,
+   because `ferr` is new — so the derive loop ran over a nil slice and appended
+   no legs. A clean build, and a verify that silently proves nothing. Caught by
+   `TestMS1ClauseIsCountFreeAcrossSeedAndLegCounts`.
+2. **A test that could not see an undrawn button.** The first version of the
+   affordance test used `click()`, which dispatches by *button*, so it reached a
+   handler whose `Clickable` was never drawn — the exact historical defect
+   `gui.go` carries a paragraph about, where `done` was accepted in code and
+   unreachable on the machine. Tapping a *position* through the drawer catches
+   both halves.
+
+## Still open — the review and picker Backs
+
+Inside the build's gather step, the Backs in `buildPayloadReviewFlow` and
+`buildCosignerPickFlow` still return. Their predecessor is the gather, and
+re-entering `bundleGatherFlow` without resume would discard cards already
+collected — on reader-equipped hardware, scanned ones. Wiring
+`bundleGatherFlowResume` through is a separate change with its own test.
 
 ## What the multisig-build conversion established (2026-08-19)
 
@@ -90,18 +133,15 @@ seed entry"* — and even once updated it did **not** cover the truncation,
 because a test that backs out and leaves never re-enters. Mutation-testing is
 what exposed that; the covering tests are unit tests over the extracted helper.
 
-### The prefix Backs are deferred, and why
+### The prefix Backs, once deferred, are done
 
-The two Backs earlier in `buildMultisigPolicyFlow` (`buildSelfSourceFlow`, the
-cosigner gather) still leave the program. They sit inside conditionals over
-state derived from `p`, so stepping back means retrying the **whole prefix** —
-and `chosen`, `cosigners` and `origins` are declared inside that prefix and
-consumed after it. Wrapping it in a retry loop re-scopes all three.
-
-Attempted once, failed to build with exactly that (`undefined: chosen`,
-`cosigners`, `origins`), and **reverted rather than half-landed**. The seam this
-needs is a hoist of those three declarations above the loop — a separate,
-test-first change, not a tail-end edit.
+They were reverted rather than half-landed on the first attempt: `chosen`,
+`cosigners` and `origins` looked like they needed hoisting. They did not — they
+were **already** hoisted into a `var` block, and the failed wrap had simply
+started *above* it. The real seam was an entry point that resumes the parameter
+pickers (`buildParamPickFlowFrom`), since `buildParamPickFlow` was already a step
+machine internally. Reverting cost one attempt; landing it half-built would have
+cost more.
 
 ## EXCLUDED — Sealed Payload (a carousel program)
 
