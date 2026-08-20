@@ -74,15 +74,46 @@ to the string itself is what makes that check mean something.)
 Upstream has just made it exactly that: a leaf. Two options, and they differ on
 the wire:
 
-- **(a) hold the rule.** The walker rejects `sortedmulti` anywhere but as the
-  sole child of `wsh`/`sh`. Wire format unchanged; the md1 corpus stays valid.
-- **(b) relax it.** `sortedmulti` becomes a general leaf. This is an
-  **admission change** — new shapes become encodable — so it is Rust-primary,
-  needs vectors, and needs an R0 gate of its own.
+**RULED: HOLD (a).** Not a preference — the standards settle it. Opus recon
+persisted at `design/agent-reports/sortedmulti-leaf-bip-recon.md`; every claim
+below was re-measured independently before this fold.
 
-**Recommendation: (a).** Nothing in D7 asks for new shapes; it asks for the
-depth-≥2 taproot gate to lift. Widening admission in the same stage would make
-one gate answer two questions.
+| source | verbatim |
+| --- | --- |
+| BIP-388 l.138 | `sortedmulti(k,KEY_1,KEY_2,...,KEY_n)` **(inside `sh` or `wsh` only)** |
+| BIP-383 l.37 | "`multi()` and `sortedmulti()` expressions can be used as a top level expression, or inside of either a `sh()` or `wsh()` descriptor." |
+| BIP-379 (Miniscript) | **zero** occurrences of `sortedmulti` — it is not a Miniscript fragment at all |
+| BIP-386 l.118 | lists `multi_a()`/`sortedmulti_a()` as expressions **of BIP-387**, a sibling category to the Miniscript fragments |
+
+BIP-388 is the decisive one, because md1 templates are BIP-388-shaped: it says
+*only*, in parentheses, in the normative list.
+
+**PR #915 is evidence AGAINST nesting, not for it.** It is self-described as an
+internal cleanup rather than a conformance fix, and its own body notes that
+`sortedmulti` "cannot be decoded into from Script" — which is exactly the
+property that disqualifies it as a Miniscript fragment. At `ff4732e` upstream
+dispatches `"sortedmulti"` through its generic recursive expression parser with
+no depth guard, so **rust-miniscript is now more permissive than the standard**.
+That is the trap this stage must not follow.
+
+**Our codec already implements the rule, and already implements the asymmetry**
+(`crates/md-codec/src/to_miniscript.rs:575-586`): `Tag::SortedMulti` refuses with
+"must be the sole child of wsh/sh", while `Tag::SortedMultiA` refuses with "must
+be a tap-leaf root child" — which is correct, because `sortedmulti_a` legitimately
+appears at arbitrary *taptree* depth under `tr()`, as a **sibling** of miniscript
+expressions rather than nested inside one. So Stage 0 changes no admission rule.
+
+**But one REASON goes stale at the new pin, and it must be updated in the same
+commit.** The `SortedMultiA` message ends "rust-miniscript v13 has no
+`Terminal::SortedMultiA` fragment" — true today, **false at `ff4732e`**. Left
+alone it tells a future reader the restriction is an implementation limitation,
+inviting them to "fix" it by relaxing a rule the BIPs impose. The restriction is
+normative; the message must say so.
+
+**Consequence for R5, correcting an earlier guess in this plan:** `sortedmulti_a`
+does **not** close for free when the pin moves. Its unencodability is a standards
+boundary, not an upstream gap, so R5 is a documentation-and-fencing task rather
+than a feature that arrives with `ff4732e`.
 
 **Then, and only then, the depth gate — and the evidence already exists and has
 been RUN (2026-08-20).**
@@ -120,8 +151,8 @@ or state in writing why not.
 
 **Exit:** `md-cli` builds and its suite is green on `ff4732e`; the toolkit is on
 the same rev; the depth gate is lifted with a re-run reproduction as evidence;
-R5 (`sortedmulti_a`) is re-checked, since it may close as a side effect of
-sortedmulti becoming a Terminal.
+R5 (`sortedmulti_a`) is fenced and documented rather than closed — see the
+ruling above.
 
 ---
 
