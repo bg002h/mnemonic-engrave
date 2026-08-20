@@ -7708,7 +7708,7 @@ from the same clean state, so the two captures do not tread on each other. The p
 already emits `head X,Ymm`, which is exactly what the PDF currently hardcodes as
 prose beside the image.
 
-### F-212 — Go and Rust compute DIFFERENT `WalletPolicyId` when the origin is elided (owning phase: **the tr/wsh cycle, Stage 3 at the latest — it gates any device-side identity claim**) `#seedhammer` `#security` `#codec`
+### F-212 — ~~Go and Rust compute DIFFERENT `WalletPolicyId` when the origin is elided~~ **CLOSED 2026-08-20** `#seedhammer` `#security` `#codec`
 
 **Found 2026-08-20 by the R3 keyed conformance vectors, on their first run.** This
 is precisely the class those vectors were built to find, and no keyless corpus
@@ -7752,10 +7752,27 @@ shape: an elided-origin vector must still diverge and an explicit-origin one mus
 still agree, so the test fires when either changes — **including when the
 divergence is fixed**, which is when the arm should be deleted.
 
-**Open question for the ruling:** does the fork converge on Rust's canonical-fill
-(and what happens to cards engraved under the current behaviour), or does Rust's
-invariant get revisited? Whoever answers should read R0-I2 first — it is the
-argument on the other side.
+**CLOSED 2026-08-20 — the fork converged** (`seedhammer` `90f4624`).
+
+**Operator ruling:** *"We can ignore cards already engraved. They don't exist. We
+can establish seeds and derive / replace keys for any journey if we desire."* That
+removes the only real cost of changing an on-device identity, so the Rust-primary
+rule decides it outright.
+
+**And R0-I2 turned out not to be the argument on the other side.** R0-I2 is a
+different ruling — it says `OriginPath` is a `bip32.Path` with in-band hardening
+and drops an `OriginHardened []bool` field. The ruling that governs this fallback
+is **R0-I1**, and it *requires* it: *"canonicalOrigin(d.tree) when both are
+empty"*. So the divergence was justified by a mis-citation, not by a competing
+position. Checked before overriding it.
+
+`resolveOriginRaw` has exactly one caller, so the change touches the policy id
+alone; the key-stable template id already agreed and is untouched.
+
+**The part worth remembering:** nothing in the fork's own suite caught or depended
+on the old value — 887/887 gui and 50 packages pass either way. The divergence was
+invisible to every test the fork had, and the cross-language vectors saw it on
+their first run. That is the argument for keyed conformance vectors in one line.
 
 ### F-211 — `bip39.RandomWord()` is an exported CSPRNG-backed word generator compiled into the firmware, on a device that is not supposed to generate seeds (owning phase: **next `#seedhammer` cycle**) `#seedhammer` `#security`
 
