@@ -7687,9 +7687,24 @@ worth recording because they are the shape of this whole follow-up:
 And the captions are captured data rather than prose — they had **already
 drifted**: the sample labelled "three words down" shows all twelve words cut.
 
-**STILL OPEN: the operator journey.** No capture driver (19 shots), and
-`build_pdf.py` still stops at HTML — the remaining half of F-156. The pathological
-one is the worked example to copy. The plate captions must come FROM the capture — `#plate-caption`
+**CLOSED 2026-08-20 — all three journeys regenerate end to end.** The operator
+journey got `cmd/emu/shots_operator.js` (19 shots) and `capture_operator.py`, and
+`build_pdf.py` now prints its own PDF, which closes the other half of F-156 too.
+
+Its capture had one finding the pathological one did not: **the emulator must be
+slowed while it cuts.** `steps` only advances when the engraver yields, and at
+the default walk pace this short text plate yields so rarely that four samples
+landed at 51/61/91/100% — the start of the cut was unobservable at any threshold.
+`shPace(128)` yields often enough for 12/35/71/100%, and changes when control
+returns rather than what is cut.
+
+Two more claims turned out false and are now rendered from the walk: the carousel
+has **ten** programs, not the eight the document counted and named, and the font
+caption had `font/sh` and `font/constant` the wrong way round.
+
+Verified from a wiped `shots/`: transcript diff 0, 19/19 shots, 14 pages,
+`pdftotext | grep -ci missing` = 0 — and the pathological journey still rebuilds
+from the same clean state, so the two captures do not tread on each other. The plate captions must come FROM the capture — `#plate-caption`
 already emits `head X,Ymm`, which is exactly what the PDF currently hardcodes as
 prose beside the image.
 
