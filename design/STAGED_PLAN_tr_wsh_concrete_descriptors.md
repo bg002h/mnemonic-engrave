@@ -219,7 +219,32 @@ runner that fails when the two implementations disagree.
 
 ---
 
-## Stage 2 — device-side display/expand
+## Stage 2 — device-side display/expand — **DONE 2026-08-20** (`seedhammer` `eceed57`)
+
+The cheap tier landed: `md.PolicyShapeChunks` walks the decoded tree and the
+consent screen renders spend-path structure instead of "Cannot fully display
+on-device."
+
+    Key-path: A KEY CAN SPEND ALONE
+    Spend paths: 3 (tree depth 2)
+      1: 1 key(s), custom
+      2: 1 key(s), custom
+      3: 2-of-3 +timelock
+
+**C3's objection is answered structurally, not argued away.** It refused a
+summary because summarizing one leaf hides the key-path and the other leaves —
+so `PolicyShape.Complete` is a field: the walk understands every node and
+describes every spend path, or the screen shows the old wording and nothing from
+the summary. Three refusals to invent are pinned by tests: the key-path line is
+never omitted, `K/N` are set only for a genuine threshold over keys (an
+`and_v(v:pk,older)` branch reads "1 key(s), custom", never "1-of-1"), and an
+unknown tag sets `Complete=false`.
+
+**Still open, and now the whole of the remaining display work:** the full text
+renderer (`seedhammer-broad-miniscript-renderer`). The summary earns the device
+the right to say *something* about a complex policy; it does not render one.
+
+### Original stage text
 
 `classifyPolicy` (`seedhammer/md/md.go:1266`) returns `PolicyComplex` for
 anything outside an enumerated shape list, so a complex policy degrades to the
