@@ -94,8 +94,12 @@ Inner ChoiceScreen on the existing programs (no new `program` → no `gui/gui.go
 ### S5 — Taproot depth gate (DD6)
 - **depth-1 tr template:** normal path (subject to S1–S4).
 - **depth-≥2 tr template:** a SECOND, louder gate. **Wire-level encode/bind is CONFIRMED (O1 resolved — no taptree-depth refusal; `encodePayload` shape-general; tree serialization byte-faithful).** Engrave it behind:
+> **THE RECOVERY BLOCKER IS FIXED — 2026-08-19. This warning's stated reason no
+> longer holds; the wording below is retained only until the operator rules on
+> the replacement text (see "What changed" beneath it).**
+
 ```
- ⚠⚠  EXPERIMENTAL — taproot depth-≥2 template
+ ⚠⚠  EXPERIMENTAL — taproot depth-≥2 template          ← SUPERSEDED, see below
  ─────────────────────────────────────────────
  The SHIPPED toolkit CANNOT reconstruct this
  taptree (rust-miniscript taptree-display bug,
@@ -104,6 +108,65 @@ Inner ChoiceScreen on the existing programs (no new `program` → no `gui/gui.go
  DO NOT use for real funds until that ships.
  [Back]                 [I accept the risk → Engrave]
 ```
+
+**What changed, and how it was established.**
+
+The blocker was real and correctly described: `miniscript::Descriptor`'s
+`Display` FLATTENS a non-caterpillar taptree, so md emitted a descriptor string
+Bitcoin Core rejects outright. Reproduced by adding a depth-2 shape to the
+bitcoind differential corpus, which failed on its first run:
+
+```
+tr(KEY/0/*,{{pk(A/0/*),pk(B/0/*),pk(C/0/*)}})
+error code: -5 — tr(): expected '}' after script expression
+```
+
+One inner brace holding three leaves; the correct form is `{{A,B},C}`. It had
+survived because **the corpus's sixteen shapes were all depth ≤ 1** — no nested
+taptree had ever been checked against Core.
+
+**md no longer waits for the release.** `md-codec`'s `to_miniscript::render_descriptor`
+ports PR #953's algorithm (`descriptor-mnemonic` `db8d0949`), as
+`md-cli`'s `render_tr_template` already did for templates. Verified against a
+live offline `-chain=main` node:
+
+```
+bitcoind differential PASS: 17 shapes × 2 chains × 5 indices = 170 address
+checks (+ checksum round-trip per shape×chain), all byte-identical vs
+/Satoshi:25.0.0/
+```
+
+Mutation-tested both ways, and a bitcoind-free regression test
+(`nested_taptree_renders_with_nesting_intact`) now runs on every push, carrying
+a tripwire for the day upstream's `Display` finally agrees.
+
+**PR #953 is still in no release**, and that no longer matters: verified with
+`git merge-base --is-ancestor` that `ff4732e` is not an ancestor of
+`miniscript-13.1.0` — 13.1.0 (2026-06-09) is *newer* than the merge (2026-05-24)
+because it was cut from a maintenance line. Waiting for it was never a plan with
+a date.
+
+**What was NEVER wrong: the addresses.** Derivation does not go through
+`Display`, so md always computed correct addresses and then handed out a
+descriptor string no other wallet could parse. This is why "md derives an
+address for it" was never sufficient evidence that recovery works, and why this
+advisory should not have been lifted before the differential covered the shape.
+
+**Unaffected by this fix, and still true:**
+- **The device is not implicated.** The fork never re-encodes a multisig
+  descriptor — it carries the strings verbatim (`gui/multisig_derive.go:20`,
+  I-2) — so the Go port has no equivalent of the `Display` bug and needs no
+  convergence change.
+- **Recovery now requires an `md` carrying `render_descriptor`.** An operator
+  holding an older build still cannot reconstruct a depth-≥2 taptree, so the
+  replacement text should state a minimum version rather than dropping the
+  caveat entirely.
+- The `tr(sortedmulti_a)` / `sortedmulti`-in-combinator refusals below are a
+  SEPARATE cause (md-codec lacks `sortedmulti_a`) and are untouched.
+
+**OPERATOR DECISION OUTSTANDING:** whether "DO NOT use for real funds" comes out
+now, or waits on something further. The engineering blocker is gone and measured;
+the risk appetite is not an engineering question.
 - **REFUSED with a clear message:** `tr(sortedmulti_a)`, `sortedmulti`-in-combinator (md-codec/crates.io rust-miniscript lacks `sortedmulti_a`); hardened use-site (at derive/address, `HardenedPublicDerivation`).
 
 ### S6 — Recovery-time estimate (the `seedhammer-template-engrave-key-search-time-estimate` FOLLOWUP, folded in)
