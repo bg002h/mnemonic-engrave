@@ -35,6 +35,8 @@ These are rulings, not proposals. Carry them forward.
 | D3 | **Accept either input shape.** A full-policy md1 (carries xpubs) derives addresses immediately; a keyless template md1 shows its summary and **gates addresses on gathering N `mk1` key cards**. Skipping the gather proceeds to consent **without** address proof. |
 | D4 | **Engraving a keyless template is a valid goal**, and a template has its own unique id. |
 | D5 | **A new 10th navigable program, "Wallet Policy"** — not a rename of Multisig, not an in-place extension. |
+| D7 | **Lift the miniscript pin and do the `md-cli` port it needs** (ruled 2026-08-20). Advance to `ff4732e` (PR #953), fix the two PR #915 breaks in `md-cli`, then lift the depth-≥2 EXPERIMENTAL gate. This reverses the controller's tentative "defer" in §6 Q2 — it was the one part of the original ask consciously left unshipped, and it is now in scope. |
+| D8 | **The device WILL emit concrete descriptors** (ruled 2026-08-20, answering §6 Q3 — which had no answer before). Two surfaces, both eventual, neither in this cycle: **engraved**, and **on the electronic display as a series of QR codes**. And it must carry **named wallet-backup formats — Nunchuk, Sparrow, BSMS (BIP-129)** — every one of which contains a **concrete** descriptor, not a template. |
 | D6 | **Show receive AND change, fewer of each** (≈0..2 per chain) rather than five receive-only. Change is where a policy mismatch silently loses funds, so proving both chains derive beats proving one chain five times. |
 
 ### Consequence of D2 + D4 that must reach the screen
@@ -46,6 +48,30 @@ name which id it is showing** or an operator comparing against a coordinator get
 a false mismatch. Confirmed by recon with a worked example: the template id is
 identical across keyless/keyed/re-keyed (`b02b4403…`) while the policy id differs
 in all three.
+
+### What D8 changes, and why it is not deferrable forever
+
+`render.rs` renders **templates only** (`@{idx}`); **concrete-key rendering does
+not exist in md-codec at all**. D8 says the device must eventually produce
+concrete descriptor text — engraved, on screen as a QR series, and inside
+Nunchuk / Sparrow / BSMS exports.
+
+Three consequences to carry into the phase plan, none of them costed yet:
+
+1. **A concrete renderer is a new normative surface**, not a display tweak. The
+   §3 invariant binds it hardest: a concrete descriptor that cannot be parsed
+   back is a backup that restores nothing, and unlike a template it names real
+   keys, so a wrong one is a wrong wallet rather than a wrong shape.
+2. **QR series is a transport, and transports have framing.** A multi-part QR
+   scheme (BBQr, UR, or plain indexed chunks) is a wire decision with its own
+   round-trip contract — a partially-scanned series must be detectably partial.
+3. **The three named formats are not one feature.** BSMS is BIP-129 with its own
+   normative text; Nunchuk and Sparrow are vendor formats. Each needs its own
+   conformance vectors, and the Rust-primary rule applies to all three.
+
+This does not enter the current cycle. It is written here because a ruling that
+lives only in a chat message is lost when the session ends, and this one decides
+what the renderer is eventually FOR.
 
 ## 3. The invariant this brainstorm produced
 
