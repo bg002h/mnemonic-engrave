@@ -163,16 +163,25 @@ It rebuilds `emu.wasm` first on purpose — a capture against a stale binary
 documents the stale binary — and exits non-zero unless all 13 shots arrive
 with content, so a partial capture cannot pass for a whole one.
 
-The operator journey still stops at HTML:
+The operator journey rebuilds the same way:
 
 ```sh
 bash transcript.sh > transcript.txt 2>&1
-python3 build_pdf.py                # writes out/journey.html; 19 shots still missing
+python3 capture_operator.py         # 19 shots, via cmd/emu/shots_operator.js
+python3 build_pdf.py                # writes the PDF
 ```
 
-**`build_pdf.py` writes HTML, not PDF**, and has no capture driver yet — the
-remaining half of F-156. `build_pdf_payload.py` and `build_pdf_pathological.py`
-both print their own:
+Its capture takes about 40 s and **slows the emulator while it cuts**
+(`shPace(128)`). At the default walk pace this plate yields so rarely that four
+progress samples all landed past 54 % of the cut — bunched at the end, with the
+start never seen. A lower pace yields more often and changes nothing about what
+is cut; the step total is identical, which is what the driver asserts.
+
+`capture_operator.py --measure` cuts the plate and reports its step total
+without capturing anything. That is where the driver's `PLAN_STEPS` comes from,
+and how to renew it if the toolpath changes.
+
+All three builders now print their own PDF:
 
 ```sh
 mkdir -p out shots

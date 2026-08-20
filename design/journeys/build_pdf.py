@@ -12,6 +12,8 @@ import html
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 
 # ── Missing-asset gate (P1, 2026-08-19) ────────────────────────────────────
@@ -57,6 +59,47 @@ def missing_gate(artifact):
 W = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(W, "out")
 SHOTS = os.path.join(W, "shots")
+
+# CAPTURED DATA, NOT PROSE (F-210). capture_operator.py writes both files; the
+# captions are what the plate overlay itself rendered at each sample, and the
+# carousel list is what the walk actually stepped through.
+CAPTIONS, CAROUSEL = {}, {}
+_cap = os.path.join(SHOTS, "captions-operator.json")
+if os.path.exists(_cap):
+    for _c in json.load(open(_cap)):
+        CAPTIONS[_c["name"]] = _c
+_car = os.path.join(SHOTS, "carousel-operator.json")
+if os.path.exists(_car):
+    CAROUSEL = json.load(open(_car))
+
+
+def plate_caption(name):
+    """The caption for one plate shot, or a refusal to invent one."""
+    c = CAPTIONS.get(name)
+    if not c:
+        MISSING.append(name + " (caption)")
+        return "no caption captured for this plate"
+    m = re.search(r"head\s*([\d.]+),\s*([\d.]+)mm", c["caption"])
+    head = f"head {m.group(1)}, {m.group(2)} mm" if m else c["caption"]
+    pct = c.get("percent", "?")
+    if pct == 100:
+        return f"complete — {head}"
+    return f"{head} — {pct}% of the cut"
+
+
+def carousel_entries():
+    """The program names the walk read off the carousel, spaced for prose."""
+    got = CAROUSEL.get("entries") or []
+    if not got:
+        MISSING.append("carousel-operator.json")
+        return [], "the carousel was not captured"
+    # The walk squashes whitespace out of the screen text, so put the spaces
+    # back before each capital that follows a letter OR A DIGIT: "BackupWallet"
+    # -> "Backup Wallet", and "BIP-39Password" -> "BIP-39 Password", which the
+    # letter-only rule left joined. A hyphen is not a word break here, so
+    # "Engrave Single-Sig" survives intact.
+    pretty = [re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", g) for g in got]
+    return pretty, " · ".join(pretty)
 
 
 def b64(path):
@@ -396,23 +439,22 @@ parts.append(f"""
 <p>The emulator runs the real firmware GUI compiled to wasm, driven only through
 the touch input the machine itself has.</p>
 <div class="grid3">
-{shot('j00-boot.png','Boot: the program carousel, 8 entries')}
+{shot('j00-boot.png',f'Boot: the program carousel, {len(carousel_entries()[0])} entries')}
 {shot('menu-4.png','Engrave Bundle — takes md1 + mk1 cards')}
 {shot('j06-bundle-enter.png','The gatherer, waiting for cards')}
 {shot('j01-backup-enter.png','Backup Wallet: seed source first')}
 {shot('j02-sel-mstring.png','M*1 STRING selected')}
 {shot('j03-mstring-prompt.png','bech32 keyboard — I, O and B are absent')}
 </div>
-<div class="note"><b>The eight programs, read off the carousel:</b>
-Backup Wallet · BIP-39 Password · Engrave Text · Account Xpub · Engrave Bundle ·
-Engrave Single-Sig · Engrave Multisig · BIP-85 Child Seed.</div>
+<div class="note"><b>The {len(carousel_entries()[0])} programs, read off the carousel:</b>
+{carousel_entries()[1]}.</div>
 </div>
 
 <div class="page">
 <h2>On the machine — composing a plate</h2>
 <div class="grid3">
 {shot('k01-engrave-text-enter.png','QR: the warning is that a photo of the plate is a copy of the text')}
-{shot('k04-font.png','Font: font/sh, or the face every seed and descriptor plate uses')}
+{shot('k04-font.png','Font: font/sh is this program’s own; font/constant is the face every seed and descriptor plate uses')}
 {shot('k06-size.png','Size: auto-fit takes the largest that holds')}
 {shot('k08-typed.png','Text entry masks by default')}
 {shot('k09-revealed.png','“show” reveals it')}
@@ -434,10 +476,10 @@ layout in grey</b>, from the same <code>PlanEngraving</code> call the firmware
 makes. What the driver has actually stepped is filled in <b>black</b>, decoded
 from the real step stream — not from the plan. The red circle is the head.</p>
 <div class="grid2">
-{img(os.path.join(SHOTS,'p0-plate.png'),'plate','head 45.5, 7.4 mm — mid-title; the whole layout is already drawn in grey', 0.30)}
-{img(os.path.join(SHOTS,'p2-plate.png'),'plate','head 14.5, 10.1 mm — “sh” cut, the rest still grey', 0.30)}
-{img(os.path.join(SHOTS,'p5-plate.png'),'plate','head 74.4, 24.1 mm — into the QR', 0.30)}
-{img(os.path.join(SHOTS,'p11-plate.png'),'plate','complete — head parked at 0.0, 0.0', 0.30)}
+{img(os.path.join(SHOTS,'p0-plate.png'),'plate',plate_caption('p0-plate.png'), 0.30)}
+{img(os.path.join(SHOTS,'p2-plate.png'),'plate',plate_caption('p2-plate.png'), 0.30)}
+{img(os.path.join(SHOTS,'p5-plate.png'),'plate',plate_caption('p5-plate.png'), 0.30)}
+{img(os.path.join(SHOTS,'p11-plate.png'),'plate',plate_caption('p11-plate.png'), 0.30)}
 </div>
 <div class="note"><b>Why the last frame reads 0.0, 0.0.</b>
 The job ends by homing, so plan and progress stay in one coordinate space. Before
@@ -494,5 +536,27 @@ path = os.path.join(OUT, "journey.html")
 with open(path, "w") as f:
     f.write(doc)
 print(f"wrote {path} ({len(doc)//1024} KB)")
+
+# GATED BEFORE THE PRINT. The PDF path is the committed deliverable, so printing
+# first and checking second overwrites a good document with an incomplete
+# rebuild and only then reports failure.
 missing_gate(path)
+
+# THE PDF STEP (the rest of F-156). This builder stopped at HTML and the
+# published PDF came from a manual headless-Chrome pass that lived nowhere in
+# the repo. Same three lines build_pdf_payload.py has always had.
+PDF = os.path.join(W, "SeedHammer-II-operator-journey.pdf")
+chrome = os.environ.get("CHROME") or shutil.which("chromium") or shutil.which("google-chrome")
+if not chrome:
+    guess = os.path.expanduser("~/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome")
+    chrome = guess if os.path.exists(guess) else None
+if not chrome:
+    print("no chrome/chromium found; set $CHROME to one. HTML is written.", file=sys.stderr)
+    sys.exit(1)
+subprocess.run(
+    [chrome, "--headless", "--disable-gpu", "--no-sandbox",
+     "--no-pdf-header-footer", f"--print-to-pdf={PDF}", "file://" + path],
+    check=True, capture_output=True,
+)
+print(f"wrote {PDF} ({os.path.getsize(PDF)//1024} KB)")
 
