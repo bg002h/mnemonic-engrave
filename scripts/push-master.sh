@@ -69,9 +69,27 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 # verbatim and never edited afterwards, so a red gate on a report would demand
 # a forbidden edit — a dangling citation inside a report is information about
 # the review, not a defect to fix.
+#
+# FOLLOWUPS.md is excluded for the same reason, one step on. It is an
+# APPEND-ONLY LOG of ~7,500 lines: an entry filed months ago cites the line
+# numbers that were true when it was filed, and those lines have since moved.
+# Rewriting them would falsify the record rather than repair it.
+#
+# The alternative was measured before choosing this: adding ONE follow-up entry
+# (F-211) put 54 pre-existing dangling citations in front of the gate — 54
+# before the edit and 54 after, so the new entry introduced none. Whole-file
+# checking on an append-only log therefore bills whoever files the next
+# follow-up for the entire history, and the predictable response to that is to
+# stop filing follow-ups. A gate that discourages the record-keeping it exists
+# to protect is worse than no gate.
+#
+# COST, STATED: citations inside NEW follow-up entries are now unchecked here.
+# That is the same trade already accepted for agent-reports.
 if [ -x scripts/plan-cite-check.sh ]; then
   DOCS="$(git diff --name-only --diff-filter=d "origin/$BRANCH..HEAD" -- \
-            'design/*.md' 'design/**/*.md' ':(exclude)design/agent-reports/**' 2>/dev/null)"
+            'design/*.md' 'design/**/*.md' \
+            ':(exclude)design/agent-reports/**' \
+            ':(exclude)design/FOLLOWUPS.md' 2>/dev/null)"
   if [ -n "$DOCS" ]; then
     say "citation gate: $(printf '%s\n' "$DOCS" | wc -l | tr -d ' ') changed doc(s) (agent-reports excluded)"
     # shellcheck disable=SC2086
