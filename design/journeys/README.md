@@ -143,19 +143,36 @@ document is real.
 
 ## Reproducing
 
-```sh
-mkdir -p shots
-bash transcript_pathological.sh > transcript_pathological.txt 2>&1
-python3 build_pdf_pathological.py   # writes out/pathological/journey_pathological.html
+The pathological journey regenerates END TO END — transcript, screenshots and
+PDF — with three commands:
 
-bash transcript.sh > transcript.txt 2>&1
-python3 build_pdf.py                # writes out/journey.html
+```sh
+bash transcript_pathological.sh > transcript_pathological.txt 2>&1
+python3 capture_pathological.py     # rebuilds emu.wasm, drives it, writes shots/
+python3 build_pdf_pathological.py   # writes the PDF
 ```
 
-**`build_pdf.py` and `build_pdf_pathological.py` write HTML, not PDF.** The
-published PDFs were produced by a manual headless-Chrome print that lives
-nowhere in this repo; that gap is half of F-156 and is why the command above
-does not end at a `.pdf`. `build_pdf_payload.py` does the print itself:
+`capture_pathological.py` is what F-210 was missing. This README described
+`shot_server.py` as the receiver the emulator posts frames to, and **nothing
+posted them**: the capture was console code in a session that no longer exists,
+so the PDFs were committed while the process behind their screenshots was not.
+The driver is now `cmd/emu/shots_pathological.js` in the `seedhammer` fork,
+beside the walk drivers, and the runner above drives it in a real browser.
+
+It rebuilds `emu.wasm` first on purpose — a capture against a stale binary
+documents the stale binary — and exits non-zero unless all 13 shots arrive
+with content, so a partial capture cannot pass for a whole one.
+
+The operator journey still stops at HTML:
+
+```sh
+bash transcript.sh > transcript.txt 2>&1
+python3 build_pdf.py                # writes out/journey.html; 19 shots still missing
+```
+
+**`build_pdf.py` writes HTML, not PDF**, and has no capture driver yet — the
+remaining half of F-156. `build_pdf_payload.py` and `build_pdf_pathological.py`
+both print their own:
 
 ```sh
 mkdir -p out shots

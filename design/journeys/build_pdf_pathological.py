@@ -7,7 +7,7 @@ is a real render. The refusals are reported with their actual exit codes rather
 than edited out -- three of them are the most useful thing here.
 """
 
-import base64, html, json, os, re, sys
+import base64, html, json, os, re, shutil, subprocess, sys
 
 # ── Missing-asset gate (P1, 2026-08-19) ────────────────────────────────────
 # `img()` renders a "missing:" placeholder when a screenshot is absent, and the
@@ -51,6 +51,36 @@ def missing_gate(artifact):
 
 W = os.path.dirname(os.path.abspath(__file__))
 OUT, SHOTS = os.path.join(W, "out", "pathological"), os.path.join(W, "shots")
+
+# THE PLATE CAPTIONS ARE CAPTURED DATA, NOT PROSE (F-210).
+#
+# They used to be typed beside the images -- "head 23.2, 20.6 mm - into word 1".
+# A typed caption can drift from the picture it labels while both still look
+# fine, and this one HAD: re-capturing showed all twelve words already cut at
+# the sample the text called "three words down". capture_pathological.py writes
+# what the overlay itself rendered at each sample, so the numbers under a plate
+# are that plate's own.
+CAPTIONS = {}
+_capfile = os.path.join(SHOTS, "captions-pathological.json")
+if os.path.exists(_capfile):
+    import json as _json
+    for _c in _json.load(open(_capfile)):
+        CAPTIONS[_c["name"]] = _c
+
+def plate_caption(name):
+    """The caption for one plate shot, or a refusal to invent one.
+
+    The overlay renders "plate N - plan in grey, cut in black ... head X,Ymm".
+    Only the head reading and the cut progress belong under the image; the rest
+    is said once in the prose above it.
+    """
+    c = CAPTIONS.get(name)
+    if not c:
+        MISSING.append(name + " (caption)")
+        return "no caption captured for this plate"
+    m = re.search(r"head\s*([\d.]+),\s*([\d.]+)mm", c["caption"])
+    head = f"head {m.group(1)}, {m.group(2)} mm" if m else c["caption"]
+    return f"{head} — {c.get('percent', '?')}% of the cut ({c.get('steps', '?')} steps)"
 
 
 def b64(p):
@@ -400,10 +430,10 @@ the driver has actually stepped is filled in <b>black</b>, decoded from the real
 step stream. The red circle is the head. The title is the master fingerprint
 <code>73C5DA0A</code> — the same one the descriptor's origins name.</p>
 <div class="grid2">
-{img(os.path.join(SHOTS,'b0-plate.png'),'plate','head 35.7, 13.0 mm — mid-fingerprint, all 12 words still pending', 0.82)}
-{img(os.path.join(SHOTS,'b3-plate.png'),'plate','head 23.2, 20.6 mm — into word 1', 0.82)}
-{img(os.path.join(SHOTS,'b6-plate.png'),'plate','head 35.9, 28.2 mm — three words down', 0.82)}
-{img(os.path.join(SHOTS,'b8-plate.png'),'plate','head 36.9, 33.4 mm — four of twelve', 0.82)}
+{img(os.path.join(SHOTS,'b0-plate.png'),'plate',plate_caption('b0-plate.png'), 0.82)}
+{img(os.path.join(SHOTS,'b3-plate.png'),'plate',plate_caption('b3-plate.png'), 0.82)}
+{img(os.path.join(SHOTS,'b6-plate.png'),'plate',plate_caption('b6-plate.png'), 0.82)}
+{img(os.path.join(SHOTS,'b8-plate.png'),'plate',plate_caption('b8-plate.png'), 0.82)}
 </div>
 </div>
 """)
@@ -460,11 +490,16 @@ about at encode time. The plates and checklist here come from
 <h2 style="margin-top:16px">Reproducing this document</h2>
 {code('''cd <this directory>
 bash transcript_pathological.sh > transcript_pathological.txt 2>&1   # every CLI block, refusals included
-python3 build_pdf_pathological.py                                     # this document''')}
+python3 capture_pathological.py                                       # the 13 screenshots, from the emulator
+python3 build_pdf_pathological.py                                     # this document, as a PDF''')}
 <div class="foot">Emulator frames were captured by POSTing
 <code>canvas.toDataURL()</code> to a local receiver, so each screenshot is the
-device framebuffer exactly. Plate overlays are the page's own SVG, rendered with
-<code>rsvg-convert</code>.</div>
+device framebuffer exactly. Plate overlays are the page's own SVG, rasterised in
+the browser that drew them. Both are produced by
+<code>capture_pathological.py</code>, which drives
+<code>cmd/emu/shots_pathological.js</code> — the capture used to be console code
+in a session that no longer exists, which is why this document could not be
+rebuilt (F-210).</div>
 </div>
 """)
 
@@ -477,5 +512,32 @@ doc = ("<!doctype html><meta charset=utf-8><title>SeedHammer II — the patholog
 p = os.path.join(OUT, "journey_pathological.html")
 open(p, "w").write(doc)
 print(f"wrote {p} ({len(doc)//1024} KB)")
+
+# GATED BEFORE THE PRINT, NOT AFTER. The PDF path is the committed deliverable,
+# so printing first and checking second OVERWRITES the good document with an
+# incomplete rebuild and only then reports failure -- which is how the first run
+# of this step replaced the published PDF with one whose plate captions said
+# "no caption captured for this plate". The gate exits non-zero, so reaching the
+# print at all means the HTML referenced every asset it names.
 missing_gate(p)
+
+# THE PDF STEP (half of F-156). This builder used to stop at HTML, and the
+# published PDF came from a manual headless-Chrome pass that lived nowhere in
+# the repo -- so the deliverable was committed and the command that made it was
+# not. Copied from build_pdf_payload.py, which already did it right.
+PDF = os.path.join(W, "SeedHammer-II-pathological-wallet-journey.pdf")
+chrome = os.environ.get("CHROME") or shutil.which("chromium") or shutil.which("google-chrome")
+if not chrome:
+    guess = os.path.expanduser("~/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome")
+    chrome = guess if os.path.exists(guess) else None
+if not chrome:
+    print("no chrome/chromium found; set $CHROME to one. HTML is written.", file=sys.stderr)
+    sys.exit(1)
+subprocess.run(
+    [chrome, "--headless", "--disable-gpu", "--no-sandbox",
+     "--no-pdf-header-footer", f"--print-to-pdf={PDF}", "file://" + p],
+    check=True, capture_output=True,
+)
+print(f"wrote {PDF} ({os.path.getsize(PDF)//1024} KB)")
+missing_gate(PDF)
 
