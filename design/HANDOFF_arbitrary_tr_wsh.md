@@ -12,7 +12,14 @@ was measured against the working tree on the date above.
 can't do miniscript, let's add it" — **is wrong**, and the first hour of a cold
 session will be wasted proving it if this paragraph is skipped.
 
-`md/md.go` implements the **full miniscript tag set**, 37 tags:
+`md/md.go` implements the **full miniscript tag set**, **36** tags:
+
+> **The 37 this document used to say was wrong, and the way it was wrong is the
+> point.** It came from a name-grep that swept up a local variable — `tagRaw, err
+> := r.read(5)` at `md/md.go:563` — which is not a tag at all. Counting the
+> const-block declarations instead gives 36. A grep for a naming convention is a
+> hand-count wearing a tool's clothes.
+
 
 ```
 tagAfter tagAlt tagAndB tagAndOr tagAndV tagCheck tagDupIf tagFalse tagHash160

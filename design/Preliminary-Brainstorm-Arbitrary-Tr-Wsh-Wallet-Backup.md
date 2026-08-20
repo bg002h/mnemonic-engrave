@@ -94,7 +94,12 @@ so arbitrary shapes already derive. **Every gap is device-side.**
 
 ### 4.2 Rust is not ready to port against — the ordered blockers
 
-- **R1 — the `v:` wrapper-chain break.** `crates/md-codec/src/render.rs:150-163` gives `Tag::Verify`
+- **R1 — FIXED 2026-08-19, after this brainstorm was written**
+  (`descriptor-mnemonic` `285b9fc9`, "render `v:` as part of the wrapper chain,
+  not its own arm", with `407cab4b` closing the property test's claimed class).
+  `Tag::Verify` now joins the wrapper-chain arm. **Re-measure before planning
+  around any blocker below** — this one went stale within a day. Original
+  finding, kept for the record: **the `v:` wrapper-chain break.** `crates/md-codec/src/render.rs:150-163` gives `Tag::Verify`
   its own arm instead of joining `render_wrapper_chain` (`crates/md-codec/src/render.rs:358`, whose
   dispatch at `:217` covers only `Check | Swap | Alt | DupIf | NonZero |
   ZeroNotEqual`). So `vj:` emits as `v:j:` — **a string rust-miniscript's own
@@ -108,11 +113,18 @@ so arbitrary shapes already derive. **Every gap is device-side.**
 - **R3 — machine-readable conformance-vector export. The real blocker.** Needed
   per vector: template string, per-`@N` xpubs + fingerprints, canonical
   descriptor string, scriptPubKey hex, `addresses[chain][0..N]`, both wallet ids,
-  `Md1EncodingId`, md1 chunks. **13 of 15 `test_vectors::MANIFEST` entries carry
-  `keys: &[]`** (`crates/md-codec/src/test_vectors.rs:68-117`). Without this the Go side has nothing
+  `Md1EncodingId`, md1 chunks. **EVERY `test_vectors::MANIFEST` entry carries `keys:
+  &[]`** — re-measured 2026-08-20 as **15 of 15**, not the 13 of 15 first
+  recorded (`crates/md-codec/src/test_vectors.rs`). Without this the Go side has nothing
   to conform to.
-- **R4 — `--path` on `md address` and `md verify`.** Both lack it; `md encode`
-  has it. Consequence: exactly the non-canonical shapes this feature is about are
+- **R4 — DONE 2026-08-20** (`descriptor-mnemonic` `a785c3b5`). `--path` exists
+  on `md address` and `md verify` now, through one shared
+  `parse::path::apply_path_override` that `encode` also calls. Verified by
+  round-trip: the same template and path encoded to md1 and derived through the
+  PHRASE path give byte-identical addresses to the `--template` path. The
+  refusal survives — no `--path` on a shape that needs one is still an error.
+  Original finding: **`--path` on `md address` and `md verify`.** Both lacked
+  it; `md encode` had it. Consequence: exactly the non-canonical shapes this feature is about are
   unreachable via `--template`. **R4 is a prerequisite of R3**, not a sibling.
 - **R5 — close or fence `sortedmulti_a`.** A first-class wire tag (`crates/md-codec/src/tag.rs:109`)
   that renders but **cannot be encoded by the CLI and cannot be derived**
