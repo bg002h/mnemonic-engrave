@@ -7617,6 +7617,53 @@ each script produce its own intermediates (self-contained, slower, regenerates
 anywhere) or commit the intermediates as fixtures (fast, but re-creates the same
 decay one version bump later). The version drift above argues for the first.
 
+**STATUS 2026-08-20 — the transcripts are FIXED; the gap is now screenshots and
+a missing print step.** Re-measured by running everything, against freshly built
+binaries (`md` 0.13.0, `mk` 0.13.0, `ms` 0.16.0, `me` 0.7.0 — all four rebuilt
+first, so this measures the tree and not a stale binary):
+
+| script | non-zero exits, fresh vs committed | diff vs committed transcript |
+| --- | --- | --- |
+| `transcript.sh` | **1 vs 1** | **0 lines — byte-identical** |
+| `transcript_pathological.sh` | **3 vs 3** | **0 lines — byte-identical** |
+| `transcript_payload.sh` | 2 (both deliberate refusals) | no committed transcript |
+
+The remaining non-zero exits are the refusals each journey exists to show — a
+`pass:` record whose body is not hex, `sysw show` on a wiped region, and the
+three the pathological header names. Defect 1 was repaired by `runcap()` (the
+capture mechanism these scripts never had); Defect 2 is gone with it — no
+`claude-1000`/scratchpad path survives in either tracked transcript.
+
+`derive-pathological-keys.sh`, recorded elsewhere as orphaned, also RUNS: it
+rewrote all 11 `inputs-pathological/keys/*.xpub` **byte-identically** to the
+committed ones.
+
+**What is actually left, and it is not the transcripts:**
+
+1. **Screenshots.** `shots/` is gitignored on purpose (size), so the proving
+   half was never in git — the structural point above, still true. Missing
+   today: **13** for the pathological journey (7 `a*` seed-entry screens, 6
+   `b*` engraving screens and plate overlays) and **19** for the operator
+   journey. Both builders REFUSE rather than emit a draft, which is the right
+   behaviour and is why neither produced a stale PDF.
+2. **No committed capture path.** `README.md` documents `shot_server.py` as the
+   receiver the emulator POSTs frames to — but **nothing in `cmd/emu/` posts
+   them.** The capture was ad-hoc console code in a session that no longer
+   exists. That is the same rot as Defect 1, one layer out: the driver was never
+   committed, so it decayed to nothing.
+3. **The print step (half of F-156).** `build_pdf.py` and
+   `build_pdf_pathological.py` write HTML and stop; the published PDFs came from
+   a manual headless-Chrome print that lives nowhere in this repo.
+   `build_pdf_payload.py` DOES print its own PDF — and that journey consequently
+   regenerates **end to end today** (transcript + 0 missing shots + PDF written,
+   exit 0). It is the worked example the other two should follow.
+
+So the repair is now: commit a capture driver in `cmd/emu/` that POSTs to the
+documented shot server, and give the two builders the print step the payload one
+already has. The plate captions must come FROM the capture — `#plate-caption`
+already emits `head X,Ymm`, which is exactly what the PDF currently hardcodes as
+prose beside the image.
+
 ### F-211 — `bip39.RandomWord()` is an exported CSPRNG-backed word generator compiled into the firmware, on a device that is not supposed to generate seeds (owning phase: **next `#seedhammer` cycle**) `#seedhammer` `#security`
 
 **Surfaced 2026-08-19** by an operator-directed audit of every RNG call site
