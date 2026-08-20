@@ -129,6 +129,14 @@ schemes. Normative: **Rust first, with vectors, R0-gated.**
 
 ## Recommendations, in priority order
 
+> **P1 STATUS 2026-08-19 — all six items closed.** `42481f0` (PDF builds),
+> `b9fbc87` seedhammer (payload sink), `8349324` mnemonic-secret (parity_smoke),
+> `d48a2f22` mnemonic-toolkit (bitcoind wiring), `e105a14` mnemonic-gui
+> (tutorial `#[ignore]`), and item 6 recorded in
+> `design/RECORD_walk_drivers_executed.md` — **all three unexecuted drivers were
+> run; the seed↔key negative control refuses correctly.** Separately `81b8555`
+> cleared a pre-existing red in `mnemonic-gui` (two cross-repo schema drifts).
+
 **P1 — Stop the green lies.** A false PASS is worse than no test, and there are
 now four of them plus a void-writing engraver. Make each skip **fail**; never let
 an env var be what enables enforcement. Give `testEngraver` a payload sink so a
