@@ -28,7 +28,48 @@ is device-side or vector-side.**
 
 ---
 
-## Stage 0 — lift the miniscript pin, port `md-cli` (ruling D7)
+## Stage 0 — lift the miniscript pin, port `md-cli` (ruling D7) — **DONE 2026-08-20**
+
+| repo | commit | gate |
+| --- | --- | --- |
+| `descriptor-mnemonic` | `5b4d20ad` | 758/758 nextest, fmt + clippy clean |
+| `mnemonic-toolkit` | `5f88071c` | 3893/3893, all 3 required contexts green |
+| `seedhammer` (fork) | `2b84de4` | 887/887 gui + every other package, wasm vet |
+
+What landed beyond the port itself, none of it foreseen when the stage was
+written:
+
+- **`render_descriptor` is deleted** and `d.to_string()` is correct again. The
+  previous cycle's tripwire decided it: it passes at `13.0.0` and FIRES at
+  `ff4732e`. It was **inverted, not deleted** — it now asserts upstream still
+  nests correctly, because addresses do not go through `Display`, so a
+  regression would produce right addresses and an unparseable descriptor
+  silently, exactly as before.
+- **The property tests reach nested taptrees for the first time.**
+  `t_tr_tree`'s depth-2 arm was capped *because* of the Display bug, so the
+  shapes this whole feature is about were excluded from every property run.
+  Restored, unbalanced on purpose, and `typed_generator_reaches_depth2_taptrees`
+  proves it fires — 29 in 400 samples — because a restored arm that never fires
+  looks exactly like a restored one.
+- **Two more depth gates came down with it:** the toolkit's
+  `ensure_taptree_depth_le_one` (now `ensure_taptree_wellformed`, keeping only
+  its malformed-tree branch), and its two refusal cells flipped to
+  reconstruction.
+- **The device's warning was false and is rewritten.** It claimed the shipped
+  toolkit cannot reconstruct the taptree and that recovery awaited an unreleased
+  rust-miniscript. The caveat is now a MINIMUM VERSION (`md 0.13+ / toolkit
+  0.97+`), and its test asserts the superseded phrases are *absent*.
+- **An EXPERIMENTAL docs appendix retired.** CI caught it: the examples golden
+  pinned two errors that are now successes, and regenerating alone would have
+  shipped a document whose prose contradicted the output printed beneath it.
+- **`at_derivation_index` deprecation handled with both branches** in
+  `derive.rs` — `derive_at_index` for wildcards, `into_definite` otherwise —
+  rather than assuming md1 can never mint a wildcard-free descriptor.
+
+**R5 did not close for free**, as the fold predicted: `sortedmulti_a`'s
+unencodability is a standards boundary, not an upstream gap.
+
+### Original stage text (kept — the measurements are still the evidence)
 
 **Measured today, by patching the pin to `ff4732e` and building.** Exactly two
 errors, both in **one file**:
