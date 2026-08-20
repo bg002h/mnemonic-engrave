@@ -92,3 +92,35 @@ through an unlock is not the same act as stepping backwards through data entry.
 engraved, Back cannot un-engrave them. Proposal: Back is disabled or relabelled
 after a step with physical effect, rather than stepping into a state the machine
 cannot actually return to. That is a UX ruling, not an engineering one.
+
+## Implementation note — verify is the WRONG place to start (2026-08-19)
+
+Attempted `multisigVerifyFlow` first, since its ms1 Back is the observed defect,
+and backed out. Recorded so the next attempt does not rediscover it.
+
+The leg loop (`for len(legs) < len(expectedSlots)`) is seed → passphrase →
+derive → ms1. Making Back at ms1 return to the passphrase needs an inner loop
+around those three, and that inner loop **silently retargets three existing bare
+`break`s** that today mean "stop verifying":
+
+| site | meaning today |
+| --- | --- |
+| the derive switch's `correctable = true; break` | seed is not in the policy — stop |
+| the ms1 `correctable = correctable \|\| rejected; break` | stop, correctable only if REJECTED |
+| `if len(legs) >= len(expectedSlots) { break }` | coverage complete — stop |
+
+All three must become `break legLoop`, and `passphrase`/`slots`/`fresh` must be
+hoisted out of the new loop because the leg-append below consumes them. That is
+a real refactor of the most carefully-reasoned control flow in the file — whose
+own comments already document **three** prior defects from exactly this class,
+including "a `break` in a Go switch breaks the SWITCH, not the loop".
+
+**So: do the simple programs first and land the pattern, then return here with
+the acceptance tests written FIRST.** `bip85DeriveFlow` is the smallest and is
+the right reference implementation.
+
+Also worth knowing before touching it: this flow's Back semantics are
+DELIBERATE, not accidental. It reads *"a Back at the ms1 entry ... is them
+declining to type one"* and *"ONLY A REJECTION IS CORRECTABLE (B3), AND A BACK
+IS NOT."* The directive overrides that reasoning, but the conversion should say
+so explicitly rather than appear to have missed it.
