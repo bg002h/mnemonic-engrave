@@ -61,13 +61,47 @@ work, not composition.
 
 ## Scope — the carousel programs to convert
 
-| program | entry |
-| --- | --- |
-| multisig build | `buildMultisigPolicyFlow` (`gui/multisig_build.go`) |
-| multisig verify | `multisigVerifyFlow` (`gui/multisig_verify.go`) |
-| singlesig | `gui/singlesig.go` |
-| bip85 | `bip85DeriveFlow` (`gui/bip85.go`) |
-| engrave bundle | `gui/bundle_flow.go` |
+| program | entry | status |
+| --- | --- | --- |
+| singlesig | `gui/singlesig.go` | **DONE** |
+| bip85 | `bip85DeriveFlow` (`gui/bip85.go`) | **DONE** |
+| engrave bundle | `gui/bundle_flow.go` | **DONE** |
+| multisig build | `buildMultisigPolicyFlow` (`gui/multisig_build.go`) | **PARTIAL** — seed loop done, prefix deferred (below) |
+| multisig verify | `multisigVerifyFlow` (`gui/multisig_verify.go`) | **NOT STARTED** — deliberately last, see below |
+
+## What the multisig-build conversion established (2026-08-19)
+
+The per-slot seed loop converted cleanly (`gatherSlotSeeds`, seedhammer
+`4c7f170`) and turned out to carry a **funds-relevant** invariant that the
+UI-level test could not reach: the ids are **positional**, since
+`buildSlotSources` reads `seedIDs[hi]` indexed by `SelfSlots`. So a step back
+must **truncate**. Left to grow, the re-entered seed shifts to the next slot —
+slot 0 keeps the seed the operator just *replaced*, slot 1 inherits the
+replacement, and both get engraved with a key the operator never chose for
+them. A wrong key in a multisig backup, not a UX defect.
+
+That is the general lesson for the two flows left: **in this codebase Back is
+not only a UX affordance, it re-indexes arrays that later bind keys to slots.**
+Convert the loop and the binding together, or not at all.
+
+The existing walk test (`TestBuildHoldingEverySlotReachesTheSeed`) asserted the
+*old* contract verbatim — *"the flow did not return after Back at the second
+seed entry"* — and even once updated it did **not** cover the truncation,
+because a test that backs out and leaves never re-enters. Mutation-testing is
+what exposed that; the covering tests are unit tests over the extracted helper.
+
+### The prefix Backs are deferred, and why
+
+The two Backs earlier in `buildMultisigPolicyFlow` (`buildSelfSourceFlow`, the
+cosigner gather) still leave the program. They sit inside conditionals over
+state derived from `p`, so stepping back means retrying the **whole prefix** —
+and `chosen`, `cosigners` and `origins` are declared inside that prefix and
+consumed after it. Wrapping it in a retry loop re-scopes all three.
+
+Attempted once, failed to build with exactly that (`undefined: chosen`,
+`cosigners`, `origins`), and **reverted rather than half-landed**. The seam this
+needs is a hoist of those three declarations above the loop — a separate,
+test-first change, not a tail-end edit.
 
 ## EXCLUDED — Sealed Payload (a carousel program)
 
