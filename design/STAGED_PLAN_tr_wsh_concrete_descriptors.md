@@ -84,8 +84,30 @@ the wire:
 depth-≥2 taproot gate to lift. Widening admission in the same stage would make
 one gate answer two questions.
 
-**Then, and only then, the depth gate.** Lifting it is a *separate* commit with
-its own evidence: `design/SPEC_seedhammer_template_engrave.md:36` says the gate is about
+**Then, and only then, the depth gate — and the evidence already exists and has
+been RUN (2026-08-20).**
+
+The previous cycle left a self-disarming tripwire inside
+`crates/md-codec/tests/address_derivation.rs` (the `assert_ne!` closing
+`nested_taptree_renders_with_nesting_intact`, not a separate test as the comment
+above `render_descriptor` implies). It asserts upstream's `Display` still
+DISAGREES with our corrected renderer. Measured both ways:
+
+| pin | tripwire | meaning |
+| --- | --- | --- |
+| crates.io `13.0.0` (today) | **passes** | upstream still mangles the tree; `render_descriptor` is load-bearing |
+| git `ff4732e` (spiked) | **fires** | *"upstream Display now agrees ... #953 has landed in the pinned release; delete render_descriptor and use to_string()"* |
+
+(The assertion's own wording uses an em dash, which `plan-glyph-check.sh` cannot
+draw; it is quoted here in italics rather than a code span so the check is not
+answering a question about device copy with a line of Rust.)
+
+So the depth-≥2 gate's premise is now falsified BY MEASUREMENT rather than by
+argument, and `render_descriptor` can be deleted in favour of `to_string()` in
+the same stage. Note the md-codec crate must be tested alone (`-p md-codec`)
+while `md-cli` is still broken by the port.
+
+The original reasoning, unchanged: `design/SPEC_seedhammer_template_engrave.md:36` says the gate is about
 **off-device recoverability**, so lifting it requires showing depth-≥2 taptrees
 now round-trip through a *released-or-pinned* renderer — which is precisely what
 #953 changes. Re-run the reproduction that re-confirmed the gate on 2026-08-18
