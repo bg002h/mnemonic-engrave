@@ -8260,3 +8260,51 @@ are not marked so:
 Two more are correctly labelled partial and stay open on purpose: **F-145**
 (PARTIALLY DONE, "still uncovered, now blocked on F-146") and **F-151**
 (`(1) DONE; (2)+(3) polish / v0.0.1`).
+
+---
+
+### F-219 — a card's per-key origins survive ENCODING but no read-back surface shows them, and the decoded text re-encodes to a DIFFERENT card (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
+
+Found building the taproot pathological journey, whose round-trip gate this
+breaks.
+
+**Measured, minimal case:**
+
+```
+source   wsh(sortedmulti(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*))
+decoded  wsh(sortedmulti(2,@0/<0;1>/*,@1/<0;1>/*))            <- origins gone
+```
+
+| check | result |
+| --- | --- |
+| `md verify --template <SOURCE>` | **OK** — the origins ARE in the card |
+| `md verify --template <DECODED>` | **MISMATCH**: expected 54-bit payload, got 115-bit |
+| re-encode the decoded text | **different cards** |
+| `md inspect` | shows template, `n`, and three ids — **no origin anywhere** |
+
+So the card faithfully carries 11 per-key derivation paths (`verify` proves it),
+and **neither `decode` nor `inspect` will tell an operator what they are.**
+
+**Why this matters for a backup.** The origin is what a signer uses to find its
+key. An operator restoring from an engraved plate decodes it, gets a template
+that looks complete, and has lost the one field that says where the keys live —
+with no error, because the template is well-formed. Re-encoding what they read
+back produces a *different card*, so a "did I transcribe this right?" check fails
+for a plate that is perfectly correct.
+
+**It is the mirror of F-217**, and the pair is the whole story: F-217 was origins
+declared *wrongly* and refused; this is origins carried *correctly* and never
+shown.
+
+**Consequence for the journey**, and the reason it surfaced: the plan's E1 asserts
+`md decode` of the chunk set is byte-identical to the committed policy. That
+cannot hold while decode is lossy. **`md verify` is the right instrument** — it
+exists precisely to check that backup strings re-encode to a given template, it
+returns exit 0/1, and it compares payloads rather than rendered text. The journey
+uses it.
+
+Two separable pieces:
+1. **Show the origins on read-back.** `md inspect` at minimum; `md decode`
+   arguably should render them inline, since that form re-encodes correctly.
+2. **Then the decode → re-encode fixpoint becomes assertable**, and is worth a
+   test: today it silently is not one.
