@@ -8217,9 +8217,14 @@ otherwise confuse everyone:
 chunk-assemble → `mk.Decode` → seat → the address Rust derived. That path is
 where this kind of feature usually fails with every component green.
 
-**Remaining:** refusal journeys in the emulator (A4), and pinning the
-same-key-two-slots shape end to end (A6). The unit-level coverage exists; what is
-missing is an operator walking into each refusal.
+**A6 done** (`seedhammer` unit tests): one card fills TWO slots when the policy
+seats one master at two multipath branches — a genuine two-key script that
+F-218's `(xpub, use-site)` check exists to let through, and the shape a naive
+"one card, one slot" rule would break. Pinned by mutation.
+
+**Remaining: A4 — refusal journeys in the emulator.** Every refusal has unit
+coverage and its own sentence; what is missing is an operator walking into each
+one on the device. That is journey work, not code.
 
 ---
 
