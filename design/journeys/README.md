@@ -16,10 +16,39 @@ emulator draws from the driver's step stream.
 | `SeedHammer-II-pathological-wallet-journey.pdf` | the constellation's **pathological example** — 11 keys, all four Bitcoin timelock kinds, a sha256 hashlock | typed on the device, **no NFC** |
 | `SeedHammer-II-operator-journey.pdf` | a 5-of-12 `wsh(multi(…))` | NFC attempted; see below |
 | `SeedHammer-II-load-payload-journey.pdf` | not a wallet — the **systemwide payload**: pack it, write it to `0x10D00000`, compare the digest across the air gap, use it, unload it, wipe it | host CLI + emulator |
+| `SeedHammer-II-wallet-policy-journey.pdf` | a wallet **someone else built** — a depth-2 taproot script tree, gathered over NFC and PROVED before engraving | host CLI + emulator, 8 md1 chunks over NFC |
 
 Each has a matching `transcript*.sh` (regenerates every CLI block),
 `build_pdf*.py` (regenerates the PDF from the artifacts) and `inputs*/` (the
 files the operator supplies).
+
+### The Wallet Policy journey CHECKS itself (2026-08-20)
+
+The other three documents record what happened; this one records an
+**agreement**, and the capture refuses to finish without it.
+
+`capture_walletpolicy.py` reads the host's wallet id and addresses out of
+`out/walletpolicy.*` and hands them to `cmd/emu/shots_walletpolicy.js`, which
+throws if the emulator's consent screen does not contain them. So the document
+cannot show a device agreeing with a host unless it did — two implementations,
+in two languages, from the same four xpubs.
+
+**The negative control was run**: corrupting one character of one expected
+address fails the capture with *"the device's proof does not match the host's"*.
+A comparison that has never been made to fail is not evidence.
+
+Three things this run measured that no reading would have:
+
+- **The tally counts CARDS, not chunks.** A card's intermediate chunks draw
+  nothing, so a walk that waits for the count to move per chunk hangs forever on
+  chunk 1 of 8. A dropped chunk is still caught — the set never completes.
+- **NFC records carry no spaces.** `md encode` prints codex32 in five-character
+  groups for a human reading a plate; presenting that verbatim fails with
+  *"character '1' not in codex32 alphabet"*, which reads like a corrupt card
+  rather than a formatting mismatch.
+- **The fingerprints are part of the wallet identity.** Same template, same four
+  xpubs, same origin, without `--fingerprint`: a 7-chunk set with a *different*
+  `wallet-policy-id`. The template id is unchanged, being key-stable.
 
 ### Which wallet is "pathological"
 

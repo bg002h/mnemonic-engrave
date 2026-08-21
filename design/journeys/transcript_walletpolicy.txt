@@ -1,0 +1,68 @@
+=== 0. What arrived from the other operator ===
+
+$ cat /scratch/code/shibboleth/mnemonic-engrave/design/journeys/inputs-walletpolicy/policy.template
+tr(@0/<0;1>/*,{{pk(@1/<0;1>/*),pk(@2/<0;1>/*)},pk(@3/<0;1>/*)})
+[exit 0]
+
+Four cosigner xpubs, at the shared origin 48'/0'/0'/2':
+$ head -c 40 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/inputs-walletpolicy/key0.xpub
+xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCH[exit 0]
+
+
+=== 1. The card set ===
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode tr(@0/<0;1>/*,{{pk(@1/<0;1>/*),pk(@2/<0;1>/*)},pk(@3/<0;1>/*)}) --key @0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --key @1=xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk --key @2=xpub6EGx8sPr9FxPPE1rbZazhqWwpMXA3Hf5DYKtZbL7c4BSddzmQktp96UaTvecEkoCZysuaj79GMCFZYT1KKk7Ph2M3Kf5g8B82KZ8TZ9SKQR --key @3=xpub6E6Z3Ss5TXJYNJp4U1q3NZ3pCn82i7KXQAKUtNnzLJ3cCdchQeSdFvXemizaHUF7wNwRQAB8mPdoZhGHLiv49cWPtCnoJY3Az3E8JKxH9Mq --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=73c5da0a --fingerprint @3=73c5da0a --path 48'/0'/0'/2' --force-chunked
+chunk-set-id: 0x66289
+md1fv c5frs pq6tv yyy4q qxq3z 3ff9g 4sc3q w0za5 zju79 mg9fe utks2 mnchd q59jp g9m5q n4qcn nhfk9 w2m
+md1fv c5frs w8egt q4pcw l6u5p 2us6r 6zsnl 2rd0q 6gghv algy0 7r0ck 4wccz rgalt 7lhxu wg56z xata4 9zn
+md1fv c5frs ks7d5 e8l2x m3y3x zfmad fj6e2 0ur0a nz7jw kzae8 efvev rz28l lsnr4 qya3s 9ww3k 2y9vw nrm
+md1fv c5frs uv7l6 8w6hz ragnj 3g5qr l85ze ape8w q0vdc zfyy5 5tqsd 5576t rsa3p 40nfq ms7yz kg0zk 0rc
+md1fv c5fr3 zma0q fygnu e7d40 v4943 v82uj lhr4a m7jn7 q2pvh ex36q vgp5c smqq2 9aj7y ay0mm lu38h 9z6
+md1fv c5fr3 0eppl franq nlgrl y8y3f gzgre ezpvh 7f2n6 9wex2 r0yjw rn79g an0x8 xdw3y smyq0 53dml n56
+md1fv c5fr3 k8d59 k03eu 6d7x7 nza0y nr9p5 d3exa n7jvu p3kx8 742q6 d662q zwwx3 qg6rc at2hq j4a5w 88g
+md1fv c5fr3 7ug5x lcrjj mrdtr jmymw 39w3d 0we0n mjzza 0fvlg tggj3 rhm0l qwpdw nwxqs y7gzl yl246 u0c
+note: stdout is watch-only — public keys only, cannot spend
+[exit 0]
+
+The operator carries 8 md1 chunks.
+
+=== 2. What the device must prove to ===
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fv c5frs pq6tv yyy4q qxq3z 3ff9g 4sc3q w0za5 zju79 mg9fe utks2 mnchd q59jp g9m5q n4qcn nhfk9 w2m md1fv c5frs w8egt q4pcw l6u5p 2us6r 6zsnl 2rd0q 6gghv algy0 7r0ck 4wccz rgalt 7lhxu wg56z xata4 9zn md1fv c5frs ks7d5 e8l2x m3y3x zfmad fj6e2 0ur0a nz7jw kzae8 efvev rz28l lsnr4 qya3s 9ww3k 2y9vw nrm md1fv c5frs uv7l6 8w6hz ragnj 3g5qr l85ze ape8w q0vdc zfyy5 5tqsd 5576t rsa3p 40nfq ms7yz kg0zk 0rc md1fv c5fr3 zma0q fygnu e7d40 v4943 v82uj lhr4a m7jn7 q2pvh ex36q vgp5c smqq2 9aj7y ay0mm lu38h 9z6 md1fv c5fr3 0eppl franq nlgrl y8y3f gzgre ezpvh 7f2n6 9wex2 r0yjw rn79g an0x8 xdw3y smyq0 53dml n56 md1fv c5fr3 k8d59 k03eu 6d7x7 nza0y nr9p5 d3exa n7jvu p3kx8 742q6 d662q zwwx3 qg6rc at2hq j4a5w 88g md1fv c5fr3 7ug5x lcrjj mrdtr jmymw 39w3d 0we0n mjzza 0fvlg tggj3 rhm0l qwpdw nwxqs y7gzl yl246 u0c
+template: tr(@0/<0;1>/*,{{pk(@1/<0;1>/*),pk(@2/<0;1>/*)},pk(@3/<0;1>/*)})
+n: 4
+wallet-policy-mode: true
+md1-encoding-id: 6628958a94056d42e86c415960a51acc
+wallet-descriptor-template-id: 6f58bdf70d6f7d2fa82e8604bdb89317
+wallet-policy-id: ade5967c4b3629f43e714498f426582e
+wallet-policy-id-fingerprint: 0xade5967c
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md address --template tr(@0/<0;1>/*,{{pk(@1/<0;1>/*),pk(@2/<0;1>/*)},pk(@3/<0;1>/*)}) --key @0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --key @1=xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk --key @2=xpub6EGx8sPr9FxPPE1rbZazhqWwpMXA3Hf5DYKtZbL7c4BSddzmQktp96UaTvecEkoCZysuaj79GMCFZYT1KKk7Ph2M3Kf5g8B82KZ8TZ9SKQR --key @3=xpub6E6Z3Ss5TXJYNJp4U1q3NZ3pCn82i7KXQAKUtNnzLJ3cCdchQeSdFvXemizaHUF7wNwRQAB8mPdoZhGHLiv49cWPtCnoJY3Az3E8JKxH9Mq --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=73c5da0a --fingerprint @3=73c5da0a --path 48'/0'/0'/2' --count 2
+bc1p2cycz66cyzltrvy5xd6v6g0jz3m5f9tjtz0aqkx9a5xet23su5rsa4mewu
+bc1pa4sqhg0qw69zhqyaw3wv75ke49rwdf9cdc4taah3z5p58lp3zc8se4amnr
+note: stdout is watch-only — public keys only, cannot spend
+[exit 0]
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md address --template tr(@0/<0;1>/*,{{pk(@1/<0;1>/*),pk(@2/<0;1>/*)},pk(@3/<0;1>/*)}) --key @0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --key @1=xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk --key @2=xpub6EGx8sPr9FxPPE1rbZazhqWwpMXA3Hf5DYKtZbL7c4BSddzmQktp96UaTvecEkoCZysuaj79GMCFZYT1KKk7Ph2M3Kf5g8B82KZ8TZ9SKQR --key @3=xpub6E6Z3Ss5TXJYNJp4U1q3NZ3pCn82i7KXQAKUtNnzLJ3cCdchQeSdFvXemizaHUF7wNwRQAB8mPdoZhGHLiv49cWPtCnoJY3Az3E8JKxH9Mq --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=73c5da0a --fingerprint @3=73c5da0a --path 48'/0'/0'/2' --change --count 2
+bc1pq67e92udm4tldq48jjdaravtekrw6k7u9apf6alhq2sfe8m9t6hsseycm5
+bc1pf0lcpa0n7whukgcapvl022964qyu40h4cq7uc06puphjl28ntf3q9uck2h
+note: stdout is watch-only — public keys only, cannot spend
+[exit 0]
+
+=== 3. Read the card set back, as the device will ===
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md decode md1fv c5frs pq6tv yyy4q qxq3z 3ff9g 4sc3q w0za5 zju79 mg9fe utks2 mnchd q59jp g9m5q n4qcn nhfk9 w2m md1fv c5frs w8egt q4pcw l6u5p 2us6r 6zsnl 2rd0q 6gghv algy0 7r0ck 4wccz rgalt 7lhxu wg56z xata4 9zn md1fv c5frs ks7d5 e8l2x m3y3x zfmad fj6e2 0ur0a nz7jw kzae8 efvev rz28l lsnr4 qya3s 9ww3k 2y9vw nrm md1fv c5frs uv7l6 8w6hz ragnj 3g5qr l85ze ape8w q0vdc zfyy5 5tqsd 5576t rsa3p 40nfq ms7yz kg0zk 0rc md1fv c5fr3 zma0q fygnu e7d40 v4943 v82uj lhr4a m7jn7 q2pvh ex36q vgp5c smqq2 9aj7y ay0mm lu38h 9z6 md1fv c5fr3 0eppl franq nlgrl y8y3f gzgre ezpvh 7f2n6 9wex2 r0yjw rn79g an0x8 xdw3y smyq0 53dml n56 md1fv c5fr3 k8d59 k03eu 6d7x7 nza0y nr9p5 d3exa n7jvu p3kx8 742q6 d662q zwwx3 qg6rc at2hq j4a5w 88g md1fv c5fr3 7ug5x lcrjj mrdtr jmymw 39w3d 0we0n mjzza 0fvlg tggj3 rhm0l qwpdw nwxqs y7gzl yl246 u0c
+tr(@0/<0;1>/*,{{pk(@1/<0;1>/*),pk(@2/<0;1>/*)},pk(@3/<0;1>/*)})
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+=== Artifacts for the device half ===
+$ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.md1.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.id.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.receive.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.change.txt
+-rw-r--r-- 1 bcg bcg 126 Aug 20 20:41 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.change.txt
+-rw-r--r-- 1 bcg bcg 115 Aug 20 20:41 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.id.txt
+-rw-r--r-- 1 bcg bcg 800 Aug 20 20:41 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.md1.txt
+-rw-r--r-- 1 bcg bcg 126 Aug 20 20:41 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.receive.txt
+[exit 0]
+
