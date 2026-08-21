@@ -91,6 +91,18 @@ n: 11
 wallet-policy-mode: false
 md1-encoding-id: 3d89678ac64eef08b84652f4fcaf59ea
 wallet-descriptor-template-id: 44ad26a19b53048b6ff8957359a30c31
+origins:
+  @0: m/48'/0'/0'/2'
+  @1: m/48'/0'/1'/2'
+  @2: m/48'/0'/2'/2'
+  @3: m/48'/0'/3'/2'
+  @4: m/48'/0'/0'/2'
+  @5: m/48'/0'/1'/2'
+  @6: m/48'/0'/2'/2'
+  @7: m/48'/0'/3'/2'
+  @8: m/48'/0'/0'/2'
+  @9: m/48'/0'/1'/2'
+  @10: m/48'/0'/2'/2'
 wallet-policy-id: e5a97a4e1d45d28a19a21861da70c57e
 wallet-policy-id-fingerprint: 0xe5a97a4e
 note: stdout is a keyless descriptor template (no keys)
@@ -102,6 +114,18 @@ n: 11
 wallet-policy-mode: true
 md1-encoding-id: 234018d64279d0e6b7dd1cbff1f35ade
 wallet-descriptor-template-id: 44ad26a19b53048b6ff8957359a30c31
+origins:
+  @0: [73c5da0a/48'/0'/0'/2']
+  @1: [73c5da0a/48'/0'/1'/2']
+  @2: [73c5da0a/48'/0'/2'/2']
+  @3: [73c5da0a/48'/0'/3'/2']
+  @4: [b8688df1/48'/0'/0'/2']
+  @5: [b8688df1/48'/0'/1'/2']
+  @6: [b8688df1/48'/0'/2'/2']
+  @7: [b8688df1/48'/0'/3'/2']
+  @8: [28645006/48'/0'/0'/2']
+  @9: [28645006/48'/0'/1'/2']
+  @10: [28645006/48'/0'/2'/2']
 wallet-policy-id: 590f3abcaad2aca5a3f526917f5bb57a
 wallet-policy-id-fingerprint: 0x590f3abc
 note: stdout is a keyless descriptor template (no keys)
@@ -117,6 +141,18 @@ n: 11
 wallet-policy-mode: true
 md1-encoding-id: 234018d64279d0e6b7dd1cbff1f35ade
 wallet-descriptor-template-id: 44ad26a19b53048b6ff8957359a30c31
+origins:
+  @0: [73c5da0a/48'/0'/0'/2']
+  @1: [73c5da0a/48'/0'/1'/2']
+  @2: [73c5da0a/48'/0'/2'/2']
+  @3: [73c5da0a/48'/0'/3'/2']
+  @4: [b8688df1/48'/0'/0'/2']
+  @5: [b8688df1/48'/0'/1'/2']
+  @6: [b8688df1/48'/0'/2'/2']
+  @7: [b8688df1/48'/0'/3'/2']
+  @8: [28645006/48'/0'/0'/2']
+  @9: [28645006/48'/0'/1'/2']
+  @10: [28645006/48'/0'/2'/2']
 wallet-policy-id: 590f3abcaad2aca5a3f526917f5bb57a
 wallet-policy-id-fingerprint: 0x590f3abc
 note: stdout is a keyless descriptor template (no keys)
@@ -138,14 +174,15 @@ note: stdout is watch-only — public keys only, cannot spend
 
 === Artifacts ===
 $ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological
-total 20
-drwxr-xr-x 1 bcg bcg  130 Aug 20 23:22 .
-drwxr-xr-x 1 bcg bcg  696 Aug 20 23:22 ..
--rw-r--r-- 1 bcg bcg 2087 Aug 20 23:22 md1-keyed.txt
--rw-r--r-- 1 bcg bcg  356 Aug 20 23:22 md1-template.txt
--rw-r--r-- 1 bcg bcg  126 Aug 20 23:22 tr.change.txt
--rw-r--r-- 1 bcg bcg   51 Aug 20 23:22 tr.id.txt
--rw-r--r-- 1 bcg bcg  126 Aug 20 23:22 tr.receive.txt
+total 240
+drwxr-xr-x 1 bcg bcg    186 Aug 20 23:25 .
+drwxr-xr-x 1 bcg bcg    696 Aug 20 23:22 ..
+-rw-r--r-- 1 bcg bcg   2087 Aug 20 23:44 md1-keyed.txt
+-rw-r--r-- 1 bcg bcg    356 Aug 20 23:44 md1-template.txt
+-rw-r--r-- 1 bcg bcg    126 Aug 20 23:44 tr.change.txt
+-rw-r--r-- 1 bcg bcg     51 Aug 20 23:44 tr.id.txt
+-rw-r--r-- 1 bcg bcg 224447 Aug 20 23:25 tr-pathological-journey.html
+-rw-r--r-- 1 bcg bcg    126 Aug 20 23:44 tr.receive.txt
 [exit 0]
 
 All gates green.

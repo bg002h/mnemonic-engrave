@@ -34,6 +34,11 @@ n: 4
 wallet-policy-mode: true
 md1-encoding-id: b5f80796d9a3bbbc716ce5ffd7acc5a7
 wallet-descriptor-template-id: 6f58bdf70d6f7d2fa82e8604bdb89317
+origins:
+  @0: [73c5da0a/48'/0'/0'/2']
+  @1: [73c5da0a/48'/0'/1'/2']
+  @2: [73c5da0a/48'/0'/2'/2']
+  @3: [73c5da0a/48'/0'/3'/2']
 wallet-policy-id: 4e67c6fd8220c32e51c9ad9947e24141
 wallet-policy-id-fingerprint: 0x4e67c6fd
 note: stdout is a keyless descriptor template (no keys)
@@ -60,9 +65,9 @@ note: stdout is a keyless descriptor template (no keys)
 
 === Artifacts for the device half ===
 $ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.md1.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.id.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.receive.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.change.txt
--rw-r--r-- 1 bcg bcg 126 Aug 20 22:12 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.change.txt
--rw-r--r-- 1 bcg bcg 115 Aug 20 22:12 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.id.txt
--rw-r--r-- 1 bcg bcg 826 Aug 20 22:12 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.md1.txt
--rw-r--r-- 1 bcg bcg 126 Aug 20 22:12 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.receive.txt
+-rw-r--r-- 1 bcg bcg 126 Aug 20 23:44 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.change.txt
+-rw-r--r-- 1 bcg bcg 115 Aug 20 23:44 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.id.txt
+-rw-r--r-- 1 bcg bcg 826 Aug 20 23:44 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.md1.txt
+-rw-r--r-- 1 bcg bcg 126 Aug 20 23:44 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.receive.txt
 [exit 0]
 

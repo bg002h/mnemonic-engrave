@@ -8323,7 +8323,16 @@ returns exit 0/1, and it compares payloads rather than rendered text. The journe
 uses it.
 
 Two separable pieces:
-1. **Show the origins on read-back.** `md inspect` at minimum; `md decode`
-   arguably should render them inline, since that form re-encodes correctly.
-2. **Then the decode → re-encode fixpoint becomes assertable**, and is worth a
-   test: today it silently is not one.
+1. ~~**Show the origins on read-back.**~~ **DONE 2026-08-21**
+   (`descriptor-mnemonic` `5ca5ceec`) — `md inspect`'s text output now prints
+   them per `@N`, in descriptor spelling when a fingerprint is present and as a
+   bare path when it is not. Gated on **agreement with `--json`** rather than on
+   the presence of a string, so the two surfaces cannot drift apart again, with
+   `md verify` as arbiter that the reported origins are the ones the card
+   re-encodes to (and a negative control, since a `verify` that accepts anything
+   would make that worthless).
+2. **STILL OPEN: `md decode`'s output is lossy and not a fixpoint.** It renders
+   the origins away, so re-encoding what it prints yields a different card. That
+   is the half that bites an operator reaching for the command named for the
+   job. Once decode round-trips, the fixpoint becomes assertable — today it
+   silently is not one.
