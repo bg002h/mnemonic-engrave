@@ -482,7 +482,64 @@ the multisig cycle six rounds.
 
 ---
 
-## Stages 6+ — concrete descriptors (ruling D8)
+## Stage 5 — a new journey — **DONE 2026-08-20** (`mnemonic-engrave` `4d45a82`)
+
+`SeedHammer-II-wallet-policy-journey.pdf`, and it is **executed**, not specified:
+8 md1 chunks over emulated NFC into the Wallet Policy program, and the consent
+screen's wallet id and four addresses compared against host-derived Rust output.
+The capture **refuses to finish** on a mismatch, and the negative control was run
+(corrupt one character of one address → *"the device's proof does not match the
+host's"*).
+
+Three things it measured that no reading would have: the gather tally counts
+**cards, not chunks** (a per-chunk wait hangs forever on chunk 1 of 8); NFC
+records carry **no spaces** (codex32's five-character grouping is for a human
+reading a plate); and the **fingerprints are part of the wallet identity**.
+
+It also found **F-154** on the framebuffer — the tenth program's carousel dot
+drawn over the version text, exactly as F-154 predicted in August — and, through
+a reader's two questions about it, **F-217**.
+
+---
+
+## Stage 6 — concrete descriptors (ruling D8)
+
+**F-217 PREEMPTED THIS STAGE**, per the operator-proxy ruling in
+`design/agent-reports/RULING_f217_vs_stage6_ordering.md`, and is now **closed**:
+the corpus every remaining sub-stage would author vectors against was 9-of-9
+contradictory, and 6c's whole purpose is to export descriptors verbatim into
+files real coordinators import.
+
+| sub-stage | state |
+| --- | --- |
+| **6a** concrete renderer | **DONE** (`descriptor-mnemonic` `c907240e`) — and the plan's premise was stale, see below |
+| **6b** QR-series transport | **contract + ruling OPEN** — needs an operator decision on wire shape and on what may cross a display channel. Its round-trip vectors were gated on F-217(3), which is now done |
+| **6c** named formats (BSMS / Nunchuk / Sparrow) | **UNBLOCKED, not started** — three features, each needing conformance vectors |
+| **6d** engraving a concrete descriptor | **DEFERRED out of this cycle** by the ruling: unmeasured sizing plus an irreversible medium while content rules were still moving |
+
+### 6a — the premise was stale, and measuring it first shrank the stage
+
+This section said *"`render.rs` renders **templates only** (`@{idx}`) —
+concrete-key rendering does not exist in md-codec at all"*, and ordered 6a around
+writing a renderer. **It existed.** `md_codec::to_miniscript` has built concrete
+descriptors all along — it is what every derived address goes through and what
+the conformance corpus stores per chain — and both
+`to_miniscript_descriptor` and `to_miniscript_descriptor_multipath` were already
+public. What was missing was a **surface**: no caller but the maintainer vector
+exporter.
+
+So 6a is a command, not a renderer. `md descriptor` emits the concrete string
+with real xpubs, key origins and its BIP-380 checksum; multipath (`<0;1>`) by
+default because that is the form a coordinator wants; gated against the corpus —
+every keyed vector, every chain, byte-identical.
+
+Same lesson as [[departure-sections-need-a-run-check]], and the second instance
+in this stage: the other was my own claim that the CLI could not express per-key
+origins (F-217), which was equally wrong and equally one command away.
+
+---
+
+## Stages 6+ — original text (superseded above)
 
 **Not in the current cycle**, and deliberately last: every stage above is a
 prerequisite. Recorded now because D8 decides what the renderer is eventually
