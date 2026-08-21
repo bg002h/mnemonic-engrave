@@ -7774,7 +7774,7 @@ on the old value — 887/887 gui and 50 packages pass either way. The divergence
 invisible to every test the fork had, and the cross-language vectors saw it on
 their first run. That is the argument for keyed conformance vectors in one line.
 
-### F-213 — `md encode` mints a card carrying a key for a placeholder the template never uses, and the device REFUSES it (owning phase: **the tr/wsh cycle, Stage 3**) `#codec` `#funds-safety`
+### F-213 — ~~`md encode` mints a card carrying a key for a placeholder the template never uses~~ **CLOSED 2026-08-20** `#codec` `#funds-safety`
 
 **Found 2026-08-20** while adding a `wsh(or_b(...))` conformance vector: the
 vector was accidentally given three keys for a two-key template, Rust encoded it
@@ -7813,9 +7813,25 @@ Note this is a NARROWING of admission, not a widening, and the operator has
 ruled that no engraved cards exist to protect — so the usual compatibility
 objection does not apply.
 
-**Not fixed yet**, and the conformance vector was corrected to two keys rather
-than being left as an exercise of the disagreement: a vector's job is to pin
-agreed behaviour, not to encode an open dispute.
+**CLOSED 2026-08-20** (`descriptor-mnemonic` `bf028ad0`). `md encode` refuses at
+encode time, naming both the stray slot and the ones that exist:
+
+```
+md: --key @2 does not appear in this template (it uses @0, @1); a key bound to
+no placeholder cannot be encoded, and a card carrying one is rejected on decode
+```
+
+**Fail-closed rather than dropped**, because a key bound to no placeholder is
+meaningless rather than partial: an operator who typed `@2` meant something, and
+guessing which slot is not the tool's job. **The check is the placeholder SET,
+not a count** — `wsh(or_b(pk(@0),s:pk(@3)))` uses two placeholders that are not
+`@0`/`@1`, so counting would accept two keys while binding one to nothing.
+Fingerprints get the same treatment. 766/766 pass, so nothing relied on the old
+laxity.
+
+The conformance vector was corrected to two keys rather than left as an exercise
+of the disagreement: a vector's job is to pin agreed behaviour, not to encode an
+open dispute.
 
 ### F-211 — `bip39.RandomWord()` is an exported CSPRNG-backed word generator compiled into the firmware, on a device that is not supposed to generate seeds (owning phase: **next `#seedhammer` cycle**) `#seedhammer` `#security`
 
