@@ -7931,7 +7931,7 @@ strictly an improvement for a device with the same design intent.
 
 ---
 
-### F-214 — a card this constellation can ENGRAVE has addresses the DEVICE cannot derive: tap leaves outside `pk`/`multi_a`/`sortedmulti_a` (owning phase: **the tr/wsh cycle, Stage 6**) `#seedhammer` `#funds-safety`
+### F-214 — ~~a card this constellation can ENGRAVE has addresses the DEVICE cannot derive~~ **CLOSED 2026-08-21** `#seedhammer` `#funds-safety`
 
 `md encode` accepts `tr(@0/<0;1>/*,and_v(v:pk(@1/<0;1>/*),older(144)))` and
 `md address` derives its addresses. The device cannot: `md.TapLeavesChunks`
@@ -7959,6 +7959,33 @@ derivation, a conformance vector **that discriminates** (see `keyed_tr_multi_a`
 — the corpus had no order-sensitive tap leaf at all until 2026-08-20), and a
 mutation pass. It is not a one-liner, and it is not urgent while the refusal
 holds.
+
+**CLOSED 2026-08-21** (`seedhammer` `e2f1ec3`, vector `descriptor-mnemonic`
+`276df02a`). The device EMITS tap leaves now instead of describing them.
+
+**The fix was to delete the vocabulary, not extend it.** A tap leaf is ordinary
+miniscript and the segwit-v0 emitter already walked it; only two things differ,
+and both now live in one `emitEnv.tap` flag — x-only 32-byte keys, and BIP-342's
+CHECKSIGADD in place of the disabled `OP_CHECKMULTISIG`. `multi` is now refused
+under taproot and `multi_a` outside it, rather than either being translated.
+
+**The pathological wallet derives, and matches Rust on every address.** It is
+vendored as `keyed_tr_pathological`: depth-3 tree, two hashlocks, both timelock
+flavours, `multi_a` at 3/2/2/1, NUMS internal key, eleven distinct accounts.
+
+**One defect found in the wiring, worth carrying forward.** The GUI first read
+the internal-key facts from `TapLeavesChunks` while tolerating its error — but
+that error path returns `0, false, nil, err` *before* reading them. Every shape
+the describer could not name silently got `isNUMS=false` and index 0, derived
+the internal key from `@0`, and produced a **well-formed wrong address**. Caught
+only against Rust, and the pattern named it: `multi_a` alone matched, all three
+`and_v(v:…, multi_a(…))` shapes did not — exactly the ones the describer could
+not name. **Never consume values from a call that returned an error.**
+
+**Still refused, and now the pinned gap:** `pkh()` in a tap leaf. The primary
+derives it; emitting it needs a hash160 of the derived key, which would pull
+RIPEMD-160 into a codec that does no key work at all. `gap_tr_leaf_pkh` carries
+Rust's addresses so a future fix has ground truth.
 
 ### It blocks the constellation's own flagship wallet (measured 2026-08-20)
 
