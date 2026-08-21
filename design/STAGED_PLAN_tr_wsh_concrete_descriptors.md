@@ -269,7 +269,21 @@ seconds before someone commits steel, is strictly worse than an honest refusal.
 **RULED 2026-08-20 (operator, on a fable recommendation): R5 is the FIRST work
 item of this stage, and R2 defers to S6.**
 
-**R5 — `sortedmulti_a` derive.** The CLI currently ADMITS a card it cannot
+**R5 — DONE 2026-08-20** (`descriptor-mnemonic` `75032c2f`, `seedhammer`
+`b79e2c9`). `sortedmulti_a` at a taproot leaf now derives; nested inside a
+fragment it still refuses, by the standard. The conversion went into
+`tree_to_taptree`'s leaf path exactly as ruled, leaving the generic converter's
+nested refusal byte-for-byte.
+
+Proven semantically rather than by "it returned an address": `sortedmulti_a` is
+order-INVARIANT and `multi_a` is not, and the sorted address equals `multi_a`
+with the keys already in sorted order — which pins *which* order the sort
+produces and rules out a reverse or a no-op. One known-bad self-test cell flipped
+to a conversion; its `wsh` sibling still refuses, which is what proves admission
+did not widen into segwit v0. A keyed conformance vector carries the shape to Go,
+where both wallet ids agreed with no port change.
+
+**Original framing:** the CLI ADMITTED a card it could not
 verify: `md encode` produces a valid `tr(@0,sortedmulti_a(...))` card (that half
 started working when PR #915 was ported in S0), while `md address` refuses it.
 The project's proof model is "derived addresses + wallet id", so an engraved card
