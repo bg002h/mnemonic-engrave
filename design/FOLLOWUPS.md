@@ -8148,9 +8148,37 @@ That is not an objection to the ruling; it is the admissibility boundary the
 implementation must state on screen, because "all your key cards were refused"
 with no explanation is the worst possible version of a correct refusal.
 
-Remaining acceptance conditions from the ruling: order-invariance, a Rust
-cross-check, **a mutation check proving that cross-check can fail**, refusal
-journeys, no-partial-derivation, and pinning the same-key-two-slots shape.
+### The CORE landed 2026-08-21 (`seedhammer` `2f3d140`)
+
+`seatKeyCards` implements the ruling: stub membership, then declaration match,
+with typed refusals for every undecidable state. **A1, A2, A3 and A5 are met** —
+order-invariance, the seated template derives the vector's Rust-computed
+address, a mutation (seat every card at slot 0) proves that cross-check can
+fail, and a refusal returns nothing to derive from.
+
+**Four things measured that would otherwise have shipped as bugs:**
+
+1. **The two sides spell paths differently.** `bip32.Path.String()` renders
+   `m/48h/0h/0h/2h`; `mk.Card.Path` carries `m/48'/0'/0'/2'`. A string compare
+   matches **nothing**, and the symptom is every card refused — which reads as a
+   corrupt card rather than a formatting mismatch. Compared structurally now.
+2. **`StripToTemplate` drops FINGERPRINTS along with the keys**, deliberately: a
+   fingerprint identifies a master, which is what a template-only engrave omits.
+   So a **stripped** template whose slots share an origin cannot be seated at
+   all, and is correctly refused. Only a template encoded with `--fingerprint`
+   and no `--key` can seat that shape. **This is the admissibility boundary the
+   screen must state.**
+3. **`sortedmulti` hides a misseating** — it sorts before building the script, so
+   slot assignment does not move the address. A swap test on a sortedmulti
+   fixture passed while proving nothing. Any cross-check of seating must use an
+   order-sensitive policy.
+4. **One card may fill several slots**, and the same card scanned twice is not a
+   contest — refusing a re-scan would be a false alarm on an ordinary mistake.
+
+**Still to do:** wire it into the gather, the refusal screens (each of the four
+typed errors needs its own sentence, especially boundary 2), and the remaining
+acceptance conditions — refusal journeys and pinning the same-key-two-slots
+shape end to end.
 
 ---
 
