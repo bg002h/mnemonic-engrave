@@ -392,6 +392,43 @@ The consent screen **must name which wallet id it shows** (D2 + D4): the templat
 id is key-stable and the policy id is not, so an operator comparing against a
 coordinator gets a false mismatch otherwise.
 
+### Progress — the WIRING landed 2026-08-20 (`seedhammer` `d028d44`)
+
+**What the stage actually needed first, and it was not the program.** Stage 3's
+two capabilities existed only as package APIs. Every complex policy still reached
+`gatheredDescriptorFlow`'s `expandUnsupported` branch and read *"Complex policy —
+display only"* — a sentence that had become false for exactly the shapes an
+operator most needs to check.
+
+That is closed. `gui/policy_address.go` routes a decoded md1 to the taproot or
+wsh deriver, `gatheredDescriptorFlow` asks before it asserts, and the addresses
+sit on Button2 where `DescriptorScreen.Confirm` already puts them for simple
+shapes. The screen is the same one — `descriptorAddressFlow`'s body became
+`addressListFlow`, parameterised by its address source — so the
+measure-and-advance paging rule exists once, and so does the use-site translation
+(`expandedKeysToBip380`, shared with the flat route).
+
+The consent requirement above is **met**: the screen labels the id it shows
+("Policy id: …"), because an unlabelled 32-hex string is ambiguous between the
+key-stable template id and the key-dependent policy id.
+
+**Gated from the device's side**, not the library's: all 13 keyed conformance
+vectors reach an address (4 flat, 9 complex), every index of every chain equal to
+Rust byte for byte, and the operator test taps the button *through the drawer*
+and reads the address off the rendered screen.
+
+Two fixture gaps that mutation found, both fixed rather than noted:
+
+| survivor | why nothing caught it | fix |
+| --- | --- | --- |
+| reverse a tap leaf's key indices | the corpus's only multi-key leaf was `sortedmulti_a`, which **sorts** — written order was unobservable in every input the suite owned | `keyed_tr_multi_a`, added Rust-first (`descriptor-mnemonic` `97d39e4b`) |
+| delete the derive probe | every vector derives | `gap_tr_leaf_and_v` — a timelocked tap leaf Rust derives and this port refuses (F-214), pinned by shape |
+
+**Still open in this stage:** the navigable **Wallet Policy program** itself (D5)
+— a front door with its own admission classes, rather than the NFC-inspect
+surface the wiring reached. Nothing above depends on it; it changes how an
+operator *arrives*, not what they can see once there.
+
 ---
 
 ## Stage 5 — a new journey, actually executed

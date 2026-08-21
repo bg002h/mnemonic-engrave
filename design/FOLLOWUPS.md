@@ -7899,3 +7899,34 @@ intention into a gate.
 **Upstream-facing:** if this is fixed, it is a candidate small PR to
 `seedhammer/seedhammer` — the same dead export exists there, and the fix is
 strictly an improvement for a device with the same design intent.
+
+---
+
+### F-214 — a card this constellation can ENGRAVE has addresses the DEVICE cannot derive: tap leaves outside `pk`/`multi_a`/`sortedmulti_a` (owning phase: **the tr/wsh cycle, Stage 6**) `#seedhammer` `#funds-safety`
+
+`md encode` accepts `tr(@0/<0;1>/*,and_v(v:pk(@1/<0;1>/*),older(144)))` and
+`md address` derives its addresses. The device cannot: `md.TapLeavesChunks`
+describes `pk`, `multi_a` and `sortedmulti_a` leaves only, so anything else
+returns `ErrTapLeafUnsupported` and the operator gets "Complex policy — display
+only".
+
+**Not a defect in what shipped.** The refusal is correct — an approximated tap
+leaf is a valid-looking address for a script nobody can spend from, which is
+strictly worse than showing nothing. The gap is that the constellation's own
+tools disagree about a card it happily produces: the host can verify the backup
+and the machine that engraved it cannot.
+
+Vendored as `md/testdata/vectors/gap_tr_leaf_and_v.*` in the fork, with Rust's
+addresses alongside as ground truth, and **pinned by shape**: the test asserts
+*this must refuse*, so it fails with "THE GAP IS CLOSED" the moment the emitter
+grows — rather than going quiet and letting a capability arrive unnoticed.
+
+The same shape covers `wsh` fragments outside the emitted set. The wsh emitter
+is much further along (`or_b`/`or_c`/`or_d`/`and_b`/`thresh` and the wrappers all
+landed in `6585115`), so the tap-leaf side is the narrower and more urgent half.
+
+Sized honestly: each new leaf kind needs a Script builder, a use-site-correct
+derivation, a conformance vector **that discriminates** (see `keyed_tr_multi_a`
+— the corpus had no order-sensitive tap leaf at all until 2026-08-20), and a
+mutation pass. It is not a one-liner, and it is not urgent while the refusal
+holds.
