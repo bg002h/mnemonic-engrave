@@ -8027,7 +8027,7 @@ the device can say nothing about where it pays.
 
 ---
 
-### F-215 — the template-engrave shape guard refuses two shapes that have both moved out from under it (owning phase: **the tr/wsh cycle, Stage 6**) `#seedhammer` `#codec`
+### F-215 — ~~the template-engrave shape guard refuses two shapes that have both moved out from under it~~ **CLOSED 2026-08-21** `#seedhammer` `#codec`
 
 `md.templateEngraveShapeGuard` refuses `tr(sortedmulti_a)` and `sortedmulti`
 nested under a combinator, on the stated grounds that the shipped off-device
@@ -8058,6 +8058,35 @@ enumerates its shapes, and enumerated safety arguments go stale silently. Grep
 for the mechanism, not the claim.
 
 ---
+
+**CLOSED 2026-08-21** (`seedhammer` `008b1a3`). `tr(sortedmulti_a)` is admitted;
+`sortedmulti` under a combinator stays refused.
+
+**Re-measured on the current binaries before a line changed** — an enumerated
+safety argument goes stale silently, and this one had:
+
+```
+md encode  tr(@0,sortedmulti_a(2,@0,@1))  -> 1 chunk
+md decode  -> exit 0, the template verbatim
+md verify  -> re-encodes to its own template
+md address -> bc1p588jmtx4ptv76t9sclt6gt33eyydvsrea4njyayerqj2frw5m5aq5gzycw
+```
+
+Fully recoverable, which is the only thing the guard ever asked.
+
+**Convergence, not leading.** The primary admits the shape at encode, decode,
+verify and address, and has no `template_admissible` refusing it either —
+despite the guard's own comment citing one. The fork was the only thing saying
+no.
+
+**The other arm stays**, and is now doubly defensive: our own encoder rejects
+`sortedmulti` under a combinator by BIP-383/388, so that arm guards against a
+card from some other producer. A guard narrowed to nothing is a guard deleted,
+which the measurement does not support.
+
+The pre-existing table test asserted the OLD behaviour; its row moved from
+`refused` to `admitted` **with the reason recorded** rather than being deleted,
+and three new tests pin the boundary directly.
 
 ### F-216 — a keyless template gathered *with* its mk1 key cards still shows no addresses (owning phase: **the tr/wsh cycle, Stage 5**) `#seedhammer`
 
