@@ -201,13 +201,16 @@ was rewritten:**
 | | addresses | retired `84'/0'/N'` | `48'/0'/N'/2'` |
 | --- | --- | --- | --- |
 | pathological (wsh) | **6** | 0 | 83 |
-| operator (5-of-12) | 0 | 0 | 39 |
+| operator (5-of-12) | **6** (added 2026-08-21) | 0 | 39 |
 
 The pathological document rebuilds and now carries its addresses — the wallet
 became derivable when the depth-4 re-derivation landed, and F-210 fixed the
-regeneration path. The operator journey still shows none, which is correct
-rather than stale: **it has no address step in its transcript at all**, and
-adding one is ordinary work rather than a repair.
+regeneration path. The operator journey **now shows six** — the address step was added
+2026-08-21, and adding it found **F-220**: that journey's engraved card declares
+`m` for all twelve slots, so its addresses had to be derived from the cosigner
+key *files* rather than recovered from the card. `wsh(...)` is a canonical
+wrapper, so nothing ever demanded an origin. The document shows the
+`origins: m` block beside its addresses and says so.
 
 `shots/` is still gitignored by design, so a rebuild needs a local capture
 first — `python3 capture_pathological.py`. That is a precondition, not a
