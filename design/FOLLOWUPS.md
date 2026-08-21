@@ -8180,7 +8180,7 @@ exist.
 
 ---
 
-### F-218 — `md encode` accepts the SAME xpub in every slot; the device refuses duplicates only when IT built the policy (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
+### F-218 — ~~`md encode` accepts the SAME xpub in every slot~~ **MOSTLY CLOSED 2026-08-21** `#codec` `#funds-safety`
 
 From the same question. `md encode` on a 4-key template with one xpub repeated
 four times emits a card without complaint — a policy that reads as 4-of-4 and is
@@ -8216,6 +8216,30 @@ default), that screen renders every slot `(no fp)`, so **a wallet one master can
 spend alone looks exactly like a wallet three masters share**. Its own comment
 states the scope limit outright: *"mints passes here; not every md1 the device
 engraves."*
+
+**MOSTLY CLOSED 2026-08-21** (`descriptor-mnemonic` `38cc2fb5`, `seedhammer`
+`9a7a3b9`). `md encode` refuses, and the Wallet Policy program refuses a supplied
+card, both before anything is minted or consented to.
+
+**The check is `(xpub, use_site_path)`, and the second half is what makes it
+correct rather than merely strict.** The fork's existing `duplicateSlotPair`
+compares chain-code‖pubkey alone, reasoning that "identical xpubs derive
+identical child keys at every address index" — true only when the use-sites
+match. Measured: `<0;1>` and `<2;3>` over one key give
+`bc1qsa6qqvk…` and `bc1ql5j095g…`, two different wallets. The build flow builds a
+uniform use-site so its check is correct there and is untouched; supplied
+policies carry arbitrary use-sites, which is exactly where the imprecision would
+start refusing legitimate wallets.
+
+**It caught two more fixtures on its first run** — `h13_hardened_multipath_reject`
+and `m5_multipath_not_last_reject` both bound `@0` and `@1` to one tpub, in tests
+about something else entirely. That is the third fixture set this cycle's checks
+have corrected.
+
+**STILL OPEN:** **Engrave Bundle** and **Engrave Multisig's supply path** also
+take an already-built card and still do not run this check. They are older shared
+flows, and editing them is a separate and riskier change than adding a check to a
+program written this cycle.
 
 **Scope, so this is not confused with F-217:** the check refuses only
 **IDENTICAL** keys. The same seed at a *different* origin is not a duplicate and
