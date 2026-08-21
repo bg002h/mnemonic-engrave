@@ -8868,3 +8868,44 @@ test: `--keys` is excluded from the schema, which describes the form the GUI
 RENDERS (one card), and the emitted schema was verified BYTE-IDENTICAL against
 a build of the previous tree.
 
+### F-224 — residual Minors/Nits from the six-lens review of the F-127/F-128/F-223 cycle (owning phase: **v0.0.1 polish**) `#mnemonic`
+
+Filed 2026-08-21, closing the review round.
+
+**All 3 Criticals and all 8 Importants are folded** (`mnemonic-key` 47d7f97 +
+this repo e3da435). What remains is **16 Minor / 8 Nit**, none gating.
+
+**They are NOT transcribed here on purpose.** The six reports are committed
+verbatim in `design/agent-reports/R1..R6` and are the record; copying 24 items
+into this file is exactly the transcription step that has introduced misquotes
+in this repo before. Read them with `git show 89470c9`.
+
+Triage, by report:
+
+- **R1** (6 Min / 2 Nit) — mostly ergonomics on the new batch path: a batch
+  encode error names no record; `--from-md1` refuses comma-grouped md1 that
+  `mk`'s own display format produces; `verify --from-md1` is order-sensitive;
+  batch JSON entries carry no `schema_version`. The "crossed record is
+  accepted" Minor is **partly addressed** — the over-claiming doc comment it
+  cited is corrected, and cards now report their origin in `--json`, which is
+  what detects a crossed record.
+- **R2** (6 Min / 2 Nit) — input-handling edges that all REFUSE correctly but
+  with poor messages (a trailing `#`, a Windows CRLF file, duplicate
+  `--from-md1`, SLIP-0132 handling), plus stub-order being argument-order
+  dependent.
+- **R3** (3 Min / 3 Nit) — journey-script hygiene. Two are now moot: the awk
+  paragraph-mode parse and its escape-sequence trap are gone with the rewrite
+  to `build_card_index.py`.
+- **R6** (1 Min / 1 Nit) — a stale unmarked Q-2 answer in the 2026-04-29
+  closure-design doc, and a phantom `SPEC §3.5.4` doc-cite in `verify.rs`
+  (a fifth instance of the "phantom §3.5.x cite" class the 2026-06-10 audit
+  fixed four of).
+
+**One Important was CLOSED BY DESIGN rather than by refusal** and is recorded
+here so the reasoning is not relitigated: R2 flagged that a `--keys` batch can
+mint N cards for N+1 cosigners. Refusing an incomplete set would break the
+ordinary workflow — a cosigner cards their own key without the others' xpubs in
+hand — so `mk encode` now emits a **note** naming how many cosigners are not
+carded, and still exits 0. Membership itself IS enforced, so every card in such
+a batch is a genuine member; only the count is short.
+
