@@ -8655,8 +8655,13 @@ wins the race* — and F-133 already established the timers fire in the wrong or
 relative to strength.
 
 Not a code defect and not funds at risk (published test seeds). It is a
-**teaching** defect in the example itself, and it belongs in both journey
-documents in one table.
+**teaching** defect in the example itself.
+
+**ADDRESSED 2026-08-21** (`8fe29c6`) — the wsh journey now carries a
+"What this backup will NOT do" section stating it plainly: *"in master terms
+this is a 1-of-3 vault with delays, not an 11-key multisig"*, with the per-tier
+breakdown. Still to do: the same section in the tr document, which states F-132
+and F-133 but not this.
 
 Adjacent: F-131 (the checklist's false recovery rule), F-132 (the preimage is
 absent from the backup), F-133 (the tiers are inverted). This is the fourth
