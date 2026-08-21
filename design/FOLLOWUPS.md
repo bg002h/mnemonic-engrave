@@ -604,7 +604,7 @@ worked. Then consider whether `Next` should scan the queue rather than only its
 head, and whether filter registration should be explicit rather than a side effect
 of consumption; either removes the whole class rather than this instance.
 
-### F-59 — WITHDRAWN 2026-08-06: the artefact was Y-axis play, not cusps
+### F-59 — ~~the artefact was Y-axis play, not cusps~~ **CLOSED 2026-08-21** (withdrawn — the artefact was Y-axis play, not cusps)
 
 **The cause was a loose screw in the Y axis**, found and fixed by the operator;
 both forward and reversed tildes now cut perfectly. Nothing in this entry's
@@ -989,7 +989,7 @@ away believing a test covers it.
   this Nit was closed by `mixed_payload_prints_the_sealed_hash_not_the_unsealed_one`,
   which pins the whole banner line.
 
-### F-72 — md-codec 0.40 → 0.42 rode into the Task 1 commit (owning phase: none — historical note, do NOT rewrite)
+### F-72 — ~~md-codec 0.40 → 0.42 rode into the Task 1 commit~~ **CLOSED 2026-08-21** (historical note, not a task)
 
 The review established that **every** md-codec API `seal` uses already exists in
 0.40 (`reassemble`, `decode_md1_string`, `ChunkHeader` + `chunk_set_id` +
@@ -2172,6 +2172,21 @@ assume the two accept sets agree.
 set, widen `me` to BIP-93's ranges, or document the divergence as intended.
 Requires the Rust-primary rule if either codec's admission moves.
 
+#### Addendum, 2026-08-10 — the ledger UNDERSTATES it, with a measured table
+
+*Filed as a second `F-120` heading; folded here 2026-08-21 so the number is not used twice. A follow-up number is cited in commits and reports, so reusing one makes those citations ambiguous forever.*
+
+It is not a boundary case at 90. The device admits **27** codex32 lengths in
+48–90; `me` admits **10**; **22 diverge**. The reverse set is **empty**, so
+unlike C1 this cannot produce an unopenable backup — every `ms1` that `me`
+emits, the device accepts.
+
+The entry's `[50,56,62,69,75] ∪ [51,58,64,70,77]` is misleading: those are two
+**disjoint tag families** (`entr` v0.1 vs `mnem` v0.2), and an `entr`-tagged
+77-character string is refused while a `mnem`-tagged one at the same length is
+admitted. Also, the "widen `me`" option is not actionable from this repo — the
+narrowing lives in `ms-codec`.
+
 ### F-121 — CLOSED 2026-08-11 (journeys/simulator: the emulator now homes, because the plate overlay cannot register without it) — the emulator does not HOME, so a resumed cut renders differently there than on the machine (owning phase: **post-merge polish and hardening**)
 
 Filed 2026-08-11, out of the F-114 closure.
@@ -2581,7 +2596,7 @@ What remains open:
 Both remaining halves are seed-derived geometry, and neither is covered by the
 design that files them.
 
-### F-111 — `knotBuf` unzeroed wherever a plate is built and no cut happens — SUBSUMED by the F-108 design (owning phase: **B2b**)
+### F-111 — ~~`knotBuf` unzeroed wherever a plate is built and no cut happens — SUBSUMED by the F-108 design~~ **CLOSED 2026-08-21** (subsumed by the F-108 design)
 
 **CLOSED 2026-08-10 — SUBSUMED by F-108's design and implemented with it.** `planEngraving` zeroes the caller's knot buffer on every exit path, which covers the plate-built-but-never-cut route this entry was filed for.
 
@@ -2734,6 +2749,33 @@ that survives is *named*, not guessed. Note the three traps that test found the
 hard way: `runtime.KeepAlive` the holder or the collector reclaims it and the
 test passes vacuously; two `GC()` calls plus a timeout, not one; and choose the
 canary so it actually enters the structure under test.
+
+#### Addendum, 2026-08-11 — DOWNGRADE recommended, and the security question is answered
+
+*Filed as a second `F-109` heading; folded here 2026-08-21 so the number is not used twice. A follow-up number is cited in commits and reports, so reusing one makes those citations ambiguous forever.*
+
+The residue was measured for the first time. **No secret was found in any of
+it**, against controls proving the search detects a secret when present: each
+canary scored at its own live instant and **zero at every post-wipe dump**,
+including the `[]bip39.Word` passphrase buffer the harness still referenced.
+
+23,024 B is now named and benign — a write-only display mask (12,480 B), the
+§10.2.4 warning frame's arg/ref buffers (9,472 B, decoded: compile-time
+constant text and package-level singletons over `//go:embed` flash, **zero**
+references to any session object), and the drawer's stacks (1,040 B). A further
+~13.5 K was never residue: `heapLine()` rides `StartScreen.Version`, built
+*before* the first frame, so the baseline and the later readings were not
+comparable. **~12 K across ~74 small objects remains unnamed.**
+
+**Caveat that keeps this open rather than closed:** measured on host Go 1.26.3,
+not the device's TinyGo build, whose `-gc precise` scans stacks conservatively
+and can retain what host Go frees. That can add bytes; it cannot un-zero a
+cleared buffer.
+
+**Suggested:** downgrade to Minor, fix the probe placement rather than the
+memory, and file the genuinely open question this surfaced — whether TinyGo's
+non-releasing `sync.Pool` retains a `fmt`-formatted copy of seed material on the
+**cut** path. That is F-88 territory, not F-109's.
 
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
@@ -3107,7 +3149,7 @@ construction. Found by the B2a plan's R0 round 0 (M5); round 1 (I1) then found
 that the guard must sit on the **click handler**, not the nav layout, because
 `Filter.matches` gates a button event on identity with no bounds check.
 
-### F-83 — the plate cannot be wiped until the engrave finishes — ACCEPTED LIMITATION, not a follow-up (operator, 2026-08-08)
+### F-83 — ~~the plate cannot be wiped until the engrave finishes — ACCEPTED LIMITATION, not a follow-up (operator, 2026-08-08)~~ **CLOSED 2026-08-21** (accepted limitation — operator ruling, not a follow-up)
 
 `validateMdmk`, `backup.SeedString`, `engraveSeed` and `toPlate` copy a record
 into Go strings and into `Plate.Spline`, none of which can be zeroed.
@@ -3174,7 +3216,7 @@ was believed at the time is not.
 
 ## Resolved
 
-### F-81 — WITHDRAWN 2026-08-08 before it was ever open
+### F-81 — ~~WITHDRAWN 2026-08-08 before it was ever open~~ **CLOSED 2026-08-21** (withdrawn before it was ever open)
 
 Filed by the B2a plan's first draft: "a FAILED secret plate stays resident while
 its retry prompt is up." It described a residency window created by wiping the
@@ -3627,44 +3669,6 @@ was done about it; per-entry edits are noted against their F-numbers.
   `Zeroizing` wrappers around the same words. FIXED (`24dff51`).
 - **Spec citations now name symbols where lines keep decaying.** `idleTimeout`
   had moved 2801 → 2879 → 2932 → 2955.
-
-### F-109 — DOWNGRADE recommended, and the security question is answered
-
-The residue was measured for the first time. **No secret was found in any of
-it**, against controls proving the search detects a secret when present: each
-canary scored at its own live instant and **zero at every post-wipe dump**,
-including the `[]bip39.Word` passphrase buffer the harness still referenced.
-
-23,024 B is now named and benign — a write-only display mask (12,480 B), the
-§10.2.4 warning frame's arg/ref buffers (9,472 B, decoded: compile-time
-constant text and package-level singletons over `//go:embed` flash, **zero**
-references to any session object), and the drawer's stacks (1,040 B). A further
-~13.5 K was never residue: `heapLine()` rides `StartScreen.Version`, built
-*before* the first frame, so the baseline and the later readings were not
-comparable. **~12 K across ~74 small objects remains unnamed.**
-
-**Caveat that keeps this open rather than closed:** measured on host Go 1.26.3,
-not the device's TinyGo build, whose `-gc precise` scans stacks conservatively
-and can retain what host Go frees. That can add bytes; it cannot un-zero a
-cleared buffer.
-
-**Suggested:** downgrade to Minor, fix the probe placement rather than the
-memory, and file the genuinely open question this surfaced — whether TinyGo's
-non-releasing `sync.Pool` retains a `fmt`-formatted copy of seed material on the
-**cut** path. That is F-88 territory, not F-109's.
-
-### F-120 — the ledger UNDERSTATES it, with a measured table
-
-It is not a boundary case at 90. The device admits **27** codex32 lengths in
-48–90; `me` admits **10**; **22 diverge**. The reverse set is **empty**, so
-unlike C1 this cannot produce an unopenable backup — every `ms1` that `me`
-emits, the device accepts.
-
-The entry's `[50,56,62,69,75] ∪ [51,58,64,70,77]` is misleading: those are two
-**disjoint tag families** (`entr` v0.1 vs `mnem` v0.2), and an `entr`-tagged
-77-character string is refused while a `mnem`-tagged one at the same length is
-admitted. Also, the "widen `me`" option is not actionable from this repo — the
-narrowing lives in `ms-codec`.
 
 ### Still open from this round, not yet folded
 
@@ -4331,7 +4335,7 @@ chunk count) always bite first? (2) if it exists, the guard belongs on the
 ENCODER, since that is the side that can still say no while the plate is blank.
 A decoder-only bound protects the reader and abandons the writer.
 
-### F-138 — WITHDRAWN: the Go port does NOT enforce a `Renderable` bound Rust lacks `#mnemonic`
+### F-138 — ~~the Go port does NOT enforce a `Renderable` bound Rust lacks `#mnemonic`~~ **CLOSED 2026-08-21** (withdrawn — the claim was wrong) `#mnemonic`
 
 **WITHDRAWN 2026-08-11.** The pre-flash conformance review refuted it by
 measurement: zero hits for `Renderable` in Go `sysw/` and in every Rust crate.
@@ -4652,7 +4656,7 @@ Still uncovered, and now blocked on F-146 rather than on fixtures: malformed and
 truncated regions producing no session, unsealed-with-digest in both operator
 directions, and sealed with the right and wrong passphrase.
 
-### F-146 — MISFILED, withdrawn 2026-08-12 (see the nested entry) — gui flow outcomes cannot be asserted: `runUITouch` gives the test goroutine no synchronised view (owning phase: **systemwide payloads**) `#mnemonic`
+### F-146 — ~~MISFILED, withdrawn 2026-08-12 (see the nested entry) — gui flow outcomes cannot be asserted: `runUITouch` gives the test goroutine no synchronised view`#mnemonic`~~ **CLOSED 2026-08-21** (misfiled and withdrawn) `#mnemonic`
 
 Filed 2026-08-12 from writing F-145's tests, and it is why three of them are
 missing rather than merely unwritten.
@@ -5362,7 +5366,7 @@ is the thing that would keep this boundary honest.
 
 ---
 
-### F-161 — WITHDRAWN, the claim was wrong: the GUI *does* redraw during a cut, and the refresh degrades with `shPace` (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic` `#seedhammer`
+### F-161 — ~~the GUI *does* redraw during a cut, and the refresh degrades with `shPace``#mnemonic` `#seedhammer`~~ **CLOSED 2026-08-21** (withdrawn — the claim was wrong) `#mnemonic` `#seedhammer`
 
 Filed 2026-08-14 and **corrected the same day.** The original entry claimed the
 GUI stops redrawing during a cut and that *"nothing in the engrave path calls
@@ -5431,7 +5435,7 @@ loop is fed by the same `WakeupAt` that measurably works here.
 
 ---
 
-### F-162 — FIXED 2026-08-14 (`88c028e`): `mk1Gatherer.collected()` returned chunks in RANDOM order (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic` `#seedhammer`
+### F-162 — ~~`mk1Gatherer.collected()` returned chunks in RANDOM order`#mnemonic` `#seedhammer`~~ **CLOSED 2026-08-21** (fixed `88c028e`) `#mnemonic` `#seedhammer`
 
 **Closed.** The index walk now mirrors `md1Gatherer`, with the doc comment and
 the regression tests md1 got at `3a23dbb`. All four assumptions below were
@@ -5528,7 +5532,7 @@ same pass, since it feeds `mk1DisplayFlow` too.
 
 ---
 
-### F-163 — FIXED 2026-08-14 (`2b7fc96`): S3's gate is a whole-tree `grep` and S0 already broke it (owning phase: **`SPEC_multisig_build_repair.md` P2/S3**) `#seedhammer`
+### F-163 — ~~S3's gate is a whole-tree `grep` and S0 already broke it`#seedhammer`~~ **CLOSED 2026-08-21** (fixed `2b7fc96`) `#seedhammer`
 
 Filed 2026-08-14 by the parallel-implementation review
 (`design/agent-reports/parallel-implementation-feasibility.md`), controller-verified.
@@ -5554,7 +5558,7 @@ that repeats the defect one stage later.
 Not urgent: S3 has not opened. It is filed rather than fixed because the plan
 text is the thing that needs editing, and the plan is a gated artifact.
 
-### F-164 — FIXED 2026-08-14 (`2b7fc96`): S0's gate names eight tests; three of them exist under different names, two do not exist (owning phase: **`SPEC_multisig_build_repair.md` S0**) `#seedhammer`
+### F-164 — ~~S0's gate names eight tests; three of them exist under different names, two do not exist`#seedhammer`~~ **CLOSED 2026-08-21** (fixed `2b7fc96`) `#seedhammer`
 
 Filed 2026-08-14, found by checking S0's gate against the tree rather than
 against the plan's own prose. Sibling of [F-163]: a gate written in terms that
@@ -8219,3 +8223,40 @@ is admitted deliberately (`gui/multisig.go:306`). And F-217's origin-contradicti
 check explicitly **exempts** the same key at one origin, so the two refusals stay
 distinct — one origin bound to two different keys is impossible; one key in two
 slots is merely unsafe.
+
+---
+
+## Ledger reconciliation, 2026-08-21
+
+The mechanical pass from `design/agent-reports/BURNDOWN_followups_2026-08-20.md`
+§2, run in full. **126 → 109 open**, and the count moved without a line of code
+changing, which was the point: about a sixth of the "debt" was bookkeeping.
+
+- **Closed 11** whose own titles already said withdrawn / fixed / subsumed /
+  misfiled, plus the two record-only entries (F-72's historical note, F-83's
+  accepted limitation). Each heading now says WHY it closed, not merely that it
+  did.
+- **Repaired both duplicate numbers.** F-109 and F-120 were each used for two
+  entries; the second of each was an addendum on the same subject and is now
+  nested under its original as `#### Addendum`. Numbers are never reused — they
+  are cited in commits and reports, and a reused one makes those citations
+  ambiguous forever.
+- **Verified the two "B2b — CRITICAL, gates the phase" entries first**, before
+  anything else acted on the plan. All three of that family (F-106, F-107,
+  F-108) were fixed on 2026-08-10 with commits recorded in their bodies —
+  F-106 confirmed on hardware at `v0.0.0-g747cf48`. Only the headings never said
+  so. **Zero still-open Criticals.**
+
+**Three entries were deliberately NOT closed**, because closing them needs a
+judgement the mechanical pass is not allowed to make. They read as resolved and
+are not marked so:
+
+| | why it was left |
+| --- | --- |
+| **F-129** | titled ANSWERED; whether the answer *resolves* it or merely records it is unclear |
+| **F-173** | titled RULED; the ruling constrains later work that may still be open |
+| **F-188** | titled RULED (operator: "Build this") — a ruling to DO something, so the work may remain |
+
+Two more are correctly labelled partial and stay open on purpose: **F-145**
+(PARTIALLY DONE, "still uncovered, now blocked on F-146") and **F-151**
+(`(1) DONE; (2)+(3) polish / v0.0.1`).
