@@ -513,9 +513,39 @@ files real coordinators import.
 | sub-stage | state |
 | --- | --- |
 | **6a** concrete renderer | **DONE** (`descriptor-mnemonic` `c907240e`) — and the plan's premise was stale, see below |
-| **6b** QR-series transport | **contract + ruling OPEN** — needs an operator decision on wire shape and on what may cross a display channel. Its round-trip vectors were gated on F-217(3), which is now done |
-| **6c** named formats (BSMS / Nunchuk / Sparrow) | **UNBLOCKED, not started** — three features, each needing conformance vectors |
+| **6b** QR-series transport | **DEFERRED, may be SKIPPED ENTIRELY** — operator ruling 2026-08-20 |
+| **6c** named formats (BSMS / Nunchuk / Sparrow) | **DEFERRED on-device** with 6b — no delivery channel exists. A HOST-side exporter survives and is unblocked |
 | **6d** engraving a concrete descriptor | **DEFERRED out of this cycle** by the ruling: unmeasured sizing plus an irreversible medium while content rules were still moving |
+
+### 6b — DEFERRED, possibly skipped (operator ruling 2026-08-20)
+
+Ruled without a wire-shape decision being needed, because the decision was
+whether to have the channel at all.
+
+**The consequence is larger than one sub-stage, and it is measured.** The GUI's
+platform interface exposes exactly **one output**: `Engraver`. `NFCReader` and
+`PayloadReader` are both read-**only** — the low-level `nfc/type5` has a
+`Transceiver.Write`, but the GUI is never handed it. And no device screen renders
+a concrete descriptor at all; `md1Summary` shows a structural summary (type,
+k-of-n, per-key fingerprint/path/use-site), never descriptor text.
+
+So with 6b deferred and **6d (engraving a concrete descriptor) already deferred**,
+a concrete descriptor has **no route off this device**: not over NFC, not by QR,
+not engraved, and not even by eye. 6a's `md descriptor` is a **host** command; it
+did not give the device a surface.
+
+**Therefore 6c is deferred with it, on the device.** Shipping BSMS / Nunchuk /
+Sparrow exporters the machine cannot deliver is [[can-a-user-do-the-thing]]
+exactly: every component green and the join missing. Those formats exist to
+produce a file a coordinator imports.
+
+**What survives, and is worth doing on its own schedule:** the same three formats
+**host-side**, off the md1 cards, via the CLI. That needs no device channel, is
+unblocked today, and is where an operator can actually use the output — they have
+the cards, and they have a computer. Recorded as the live remainder of D8 rather
+than as part of Stage 6.
+
+---
 
 ### 6a — the premise was stale, and measuring it first shrank the stage
 
