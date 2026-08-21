@@ -8018,43 +8018,73 @@ is tested.
 
 ---
 
-### F-217 — per-key (Divergent) origins are unreachable from `md encode`, so a multi-account policy declares a WRONG origin for every key but one (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
+### F-217 — a card can declare ONE key origin for SEVERAL DIFFERENT keys, which is impossible; 9 of 9 multi-key conformance vectors do (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
 
-Found by a reader's question about the Wallet Policy journey: why do all four
-cosigners share one master fingerprint?
+Found by a reader's two questions about the Wallet Policy journey — first why all
+four cosigners share a master fingerprint, then the sharper one: **how can one
+seed and one path yield two different keys?**
 
-**Measured.** The four keys are accounts 0..3 of BIP-39's published test mnemonic
-— four *distinct* xpubs, one master, fingerprint `73c5da0a`:
+They cannot. BIP-32 is deterministic: a `(master fingerprint, derivation path)`
+pair identifies exactly **one** xpub. A descriptor that repeats one origin across
+different keys is not merely mislabelled, it is **self-contradictory**, and
+saying so needs no seed, no network and no derivation — it is a pure function of
+the card.
+
+**The journey's card, rendered:**
 
 ```
-48'/0'/0'/2'  xpub6DkFAXWQ2dHxq2vatrt9…   (@0)
-48'/0'/1'/2'  xpub6DzhyrnFFYQ1HimDiM38…   (@1)
-48'/0'/2'/2'  xpub6EGx8sPr9FxPPE1rbZaz…   (@2)
-48'/0'/3'/2'  xpub6E6Z3Ss5TXJYNJp4U1q3…   (@3)
+[73c5da0a/48'/0'/0'/2']  xpub661MyMwAqRbcGQnC…LzpvZG2s
+[73c5da0a/48'/0'/0'/2']  xpub661MyMwAqRbcG516…HaHy6tFz
+[73c5da0a/48'/0'/0'/2']  xpub661MyMwAqRbcGS5Q…Nm3cGkqg
+[73c5da0a/48'/0'/0'/2']  xpub661MyMwAqRbcGeL2…Z7JECRrT
 ```
 
-So it is **not key reuse** — but the card the journey builds passes
-`--path "48'/0'/0'/2'"`, and `--path` *flattens Divergent mode to Shared*. The
-card therefore declares **all four keys at account 0's origin**, which is false
-for three of them.
+distinct origins: **1**; distinct xpubs: **4**.
 
-**Why it is not caught, and why it still matters.** Addresses are unaffected: they
-come from the xpubs the card carries, not from the declared origin — which is
-exactly why the journey's device-vs-host comparison passed. The origin is what a
-*signer* uses to find its key, so a restorer following it would look at
-`48'/0'/0'/2'` for `@1` and find the wrong key. Silent, and only at signing time.
+**And it is not one card.** Scanning every vendored keyed vector's rendered
+descriptor for an origin bound to more than one xpub:
 
-**The CLI cannot express the correct thing.** `md encode` has one origin flag and
-it is shared-only; `--key` rejects an inline origin
-(`--key "@0=[73c5da0a/48'/0'/0'/2']xpub…"` → *"base58check decode: decode"*). The
-codec supports `OriginPathOverrides` — the Divergent mode this needs — and nothing
-on the CLI reaches it. For a `tr()` template, whose wrapper has no canonical
-default, the only two options are **no origin** (partial decode, `md` warns) or
-**one shared origin that is wrong for most keys**.
+| | |
+| --- | --- |
+| multi-key vectors that are **contradictory** | **9** |
+| multi-key vectors that are **consistent** | **0** |
 
-Fix is a per-key origin surface, Rust-first, with a vector that has genuinely
-divergent origins. Until then, the conformance corpus's own `path` field carries
-the same flattening, so this is not a journey-only defect.
+`keyed_tr_depth2`, `…_rightspine`, `keyed_tr_multi_a`, `keyed_tr_sortedmulti_a`,
+`keyed_tr_with_leaf`, `keyed_wsh_or_b`, `keyed_wsh_or_d_degrading`,
+`keyed_wsh_thresh`, `keyed_wsh_timelock_hashlock`. **The corpus that gates the Go
+port against Rust pins an impossible wallet shape**, in every entry where the
+question can even be asked.
+
+**Cause.** The keys are genuinely distinct — accounts 0..3 of BIP-39's test seed,
+which live at `48'/0'/N'/2'` — but `md encode --path` **flattens Divergent mode
+to Shared**, overwriting all four with account 0's path. The CLI cannot express
+the truth: `--key` rejects an inline origin
+(`--key "@0=[73c5da0a/48'/0'/0'/2']xpub…"` → *"base58check decode: decode"*), and
+`--path` is shared-only, while the codec's per-key `OriginPathOverrides` sits
+unreachable behind both. For a `tr()` template, whose wrapper has no canonical
+default, the only choices are **no origin** (partial decode) or **one shared
+origin that is false for most keys**.
+
+**Why nothing caught it.** Addresses come from the xpubs the card carries, not
+from the declared origin — so every address check, including the journey's
+device-vs-host comparison and the whole cross-language corpus, passes either way.
+The origin is what a *signer* uses to find its key, so the failure surfaces at
+signing time and nowhere earlier. This is the [[cross-language-vectors-see-what-no-repo-test-can]]
+shape one level up: both languages agree, and both are wrong together.
+
+**Three separable pieces of work:**
+1. **Refuse it, Rust-first.** Same `(fingerprint, path)` bound to two different
+   xpubs is a contradiction a validator can prove. `md encode` should refuse;
+   `md inspect` should report it; the device should refuse such a card on the
+   supplied-policy paths.
+2. **A per-key origin surface**, so the correct card is expressible at all.
+3. **Regenerate the corpus** with genuinely divergent origins once (2) exists —
+   and add a gate asserting no vector declares one origin for two keys, so this
+   cannot come back.
+
+Ordered that way deliberately: the refusal is what stops new bad cards, and it is
+worth having before the corpus is rewritten, because the rewrite is what proves
+the refusal works.
 
 ---
 
