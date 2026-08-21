@@ -142,19 +142,25 @@ four-cosigner wallet would defeat the point. It is here because it is the
 conformance corpus's wallet, and the corpus is what makes the comparison on the
 last page checkable against something other than one run of one script.</p>
 
-<p class="note"><strong>The declared origin is wrong for three of the four
-(F-217).</strong> The transcript passes <code>--path 48'/0'/0'/2'</code>, and
-<code>--path</code> flattens Divergent mode to Shared — so the card says all four
-keys live at account 0, when they live at accounts 0, 1, 2 and 3. Addresses are
-unaffected: they come from the xpubs the card carries, which is exactly why the
-device-vs-host comparison still passes. A <em>signer</em> following the declared
-origin would look in the wrong place. <code>md encode</code> has no way to say
-otherwise — <code>--key</code> rejects an inline origin and <code>--path</code> is
-shared-only, while the codec's per-key <code>OriginPathOverrides</code> sits
-unreachable behind them.</p>
+<p class="note"><strong>The first version of this journey declared the wrong
+origin for three of the four keys (F-217)</strong>, and the fix is worth reading
+before the pages that follow. It passed <code>--path 48'/0'/0'/2'</code>, which
+<em>flattens</em> per-key origins to one shared path — so the card said all four
+keys live at account 0, when they live at accounts 0, 1, 2 and 3. Under BIP-32 a
+<code>(fingerprint, path)</code> pair names exactly <em>one</em> key, so that
+card described a wallet that cannot exist.</p>
 
-<p>Kept rather than papered over. A journey is a record of a run, and this run's
-card is a real card with a real defect in it.</p>
+<p><strong>Nothing could have caught it downstream, and the re-run proves it:</strong>
+the four addresses below are byte-identical to the ones the broken card
+produced. Addresses derive from the xpubs a card <em>carries</em>, never from the
+origin it <em>declares</em>, so the device-vs-host comparison on the last page
+passed just as happily against the impossible card. Only a signer, asked to find
+its key, would ever have noticed.</p>
+
+<p>The origins now live in the template — <code>@0/48'/0'/0'/2'/&lt;0;1&gt;/*</code>
+— which is where md has always taken per-key origins, and <code>md encode</code>
+refuses the flattened form outright. Nine of nine multi-key conformance vectors
+carried the same defect; all were regenerated.</p>
 </section>
 """)
 

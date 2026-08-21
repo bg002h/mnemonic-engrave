@@ -8018,7 +8018,7 @@ is tested.
 
 ---
 
-### F-217 — a card can declare ONE key origin for SEVERAL DIFFERENT keys, which is impossible; 9 of 9 multi-key conformance vectors do (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
+### F-217 — ~~a card can declare ONE key origin for SEVERAL DIFFERENT keys~~ **CLOSED 2026-08-20** `#codec` `#funds-safety`
 
 Found by a reader's two questions about the Wallet Policy journey — first why all
 four cosigners share a master fingerprint, then the sharper one: **how can one
@@ -8085,6 +8085,33 @@ shape one level up: both languages agree, and both are wrong together.
 Ordered that way deliberately: the refusal is what stops new bad cards, and it is
 worth having before the corpus is rewritten, because the rewrite is what proves
 the refusal works.
+
+---
+
+**CLOSED 2026-08-20.** All three pieces, in the order fable ruled
+(`design/agent-reports/RULING_f217_vs_stage6_ordering.md`):
+
+| piece | where | outcome |
+| --- | --- | --- |
+| (1) refuse it | `descriptor-mnemonic` `fe4b1ec9`, `seedhammer` `ca3e7d9` | `validate_origin_key_consistency`, on the ENCODE path in both languages |
+| (2) per-key origin surface | — | **already existed**; see the correction above |
+| (3) regenerate + gate | `fe4b1ec9`, `seedhammer` `0e180f6` | 9 contradictory → **0**; 11 consistent; a corpus gate reads what is committed |
+
+**Refused on encode, not decode**, so new impossible cards stop while
+already-written ones stay readable — a card that cannot be read is a backup that
+cannot be restored.
+
+**It caught a second one on its first Go run**: the fork's own
+`TestAssembleBuildPolicy_IncludeFpDiffers` synthesized the SAME fingerprint for
+two DIFFERENT foreign keys at one shared origin. Nothing that test asserts
+needed them to match.
+
+**And the journey it was found in was itself carrying the defect.** Repointed at
+per-key origins, re-run, re-captured: the wallet id changed to `4e67c6fd…`
+(matching the regenerated corpus) and **all four addresses are byte-identical to
+what the impossible card produced**. That is the finding, demonstrated: the
+device-vs-host comparison passed just as happily against a wallet that cannot
+exist.
 
 ---
 

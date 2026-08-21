@@ -31,44 +31,16 @@ here because it is the conformance corpus's wallet, and that corpus is what make
 the journey's device-vs-host comparison checkable against something other than
 one run of one script.
 
-**And the declared origin is wrong for three of the four (F-217).** The transcript
-passes `--path "48'/0'/0'/2'"`, and `--path` flattens Divergent mode to Shared, so
-the card says all four live at account 0. Addresses are unaffected — they come
-from the xpubs the card carries, which is why the comparison passes — but a
-*signer* following the declared origin would look in the wrong place. `md encode`
-has no way to say otherwise: `--key` rejects an inline origin and `--path` is
-shared-only, while the codec's `OriginPathOverrides` sits unreachable behind them.
+**The declared origin USED to be wrong for three of the four (F-217), and is
+fixed.** The transcript passed `--path "48'/0'/0'/2'"`, which flattens per-key
+origins to Shared, so the card claimed all four keys live at account 0. A
+`(fingerprint, path)` pair names exactly one key under BIP-32, so that card
+described a wallet that cannot exist — and `md encode` now refuses it.
 
-Both are recorded rather than papered over. A journey is a record of a run, and
-this run's card is a real card with a real defect in it.
+The origins live in the template instead (`@0/48'/0'/0'/2'/<0;1>/*`), which is
+where md has always taken them. **The addresses did not change**, which is the
+whole lesson: they come from the xpubs the card carries, so the journey's
+device-vs-host comparison passed identically against the impossible card.
 
-They are the same keys as `seedhammer`'s `keyed_tr_depth2` conformance vector,
-on purpose: that vector already pins this policy's addresses against the primary
-Rust implementation, so the journey's "the device agrees with the host" claim is
-checked against a corpus rather than against one run of one script.
-
-## Why this wallet
-
-Three properties, each load-bearing for what this journey is meant to exercise:
-
-- **A depth-2 taproot script tree.** The Merkle root depends on the tree's
-  SHAPE, so this is a policy no flat `bip380.Descriptor` can express — it can
-  only reach an address through the complex route Stage 3 added.
-- **Seven md1 chunks.** A keyless template of the same policy is one string; the
-  keys are what force a chunk set, so the gather is a real multi-card gather
-  rather than a single tap.
-- **Four distinct cosigners.** A one-key policy would let a wrong key-to-slot
-  mapping still produce the right address.
-
-## The fingerprints are not optional
-
-Measured while building this journey: encoding the same template with the same
-four xpubs and the same origin, but WITHOUT `--fingerprint`, yields a 7-chunk
-card set whose `wallet-policy-id` is `0b3b95a4…` — against `ade5967c…` for the
-8-chunk set that carries them. The template id is identical either way
-(`6f58bdf7…`), because it is key-stable.
-
-So the fingerprints are part of the wallet's IDENTITY, not decoration, and an
-operator who omits them gets a card that proves to a different id than their
-coordinator shows. This journey supplies them, and the id it checks against is
-the conformance corpus's.
+The single-seed property above is recorded rather than papered over — it is the
+conformance corpus's wallet, and a journey is a record of a run.

@@ -41,6 +41,7 @@ runcap() {
 }
 
 TEMPLATE="$(cat "$IN/policy.template")"
+# Retained for the prose below; NOT passed to any command any more.
 PATHARG="$(cat "$IN/origin.path")"
 K0="$(cat "$IN/key0.xpub")"; K1="$(cat "$IN/key1.xpub")"
 K2="$(cat "$IN/key2.xpub")"; K3="$(cat "$IN/key3.xpub")"
@@ -52,13 +53,22 @@ FP="$(cat "$IN/master.fingerprint")"
 # invisible in a transcript where each command spells its own arguments.
 KEYS=(--key "@0=$K0" --key "@1=$K1" --key "@2=$K2" --key "@3=$K3"
       --fingerprint "@0=$FP" --fingerprint "@1=$FP"
-      --fingerprint "@2=$FP" --fingerprint "@3=$FP"
-      --path "$PATHARG")
+      --fingerprint "@2=$FP" --fingerprint "@3=$FP")
+
+# NO --path, AND THAT IS THE WHOLE POINT (F-217). The first version of this
+# journey passed --path "48'/0'/0'/2'", which FLATTENS per-key origins to one
+# shared path -- so the card declared all four keys at account 0 when they live
+# at accounts 0..3. A (fingerprint, path) pair names exactly one key under
+# BIP-32, so that card described a wallet that cannot exist, and `md encode`
+# now refuses it outright.
+#
+# The origins belong in the TEMPLATE (`@0/48'/0'/0'/2'/<0;1>/*`), which is
+# where md has always taken per-key origins -- see policy.template.
 
 echo "=== 0. What arrived from the other operator ==="
 echo
 run cat "$IN/policy.template"
-echo "Four cosigner xpubs, at the shared origin $PATHARG:"
+echo "Four cosigner xpubs, at accounts 0..3 under $PATHARG's prefix:"
 run head -c 40 "$IN/key0.xpub"
 echo
 
