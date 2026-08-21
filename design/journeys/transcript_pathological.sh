@@ -43,8 +43,10 @@ runcap() {
   cat "$sout"; cat "$serr"
   # I-2 (exec review): a ZERO-MATCH capture used to be swallowed by `|| true`,
   # leaving an empty file. Seven of eight consumers then fail loudly, but
-  # `transcript_pathological.sh`'s template-id step printed BLANK at [exit 0] --
-  # and that step is what justifies the hardcoded --policy-id-stub below it.
+  # `transcript_pathological.sh`'s template-id step printed BLANK at [exit 0].
+  # That step no longer feeds a hardcoded --policy-id-stub (F-127 let the cards
+  # derive their own binding), but it still CROSS-CHECKS the stub mk chose, and
+  # a blank capture would silently retire the check rather than fail it.
   # An empty capture is a capture FAILURE, so say so and delete the file: a
   # later read then dies with "no such file" instead of reading nothing.
   if ! grep -E "$keep" "$sout" > "$out"; then
@@ -97,37 +99,73 @@ MD1S=$(tr '\n' ' ' < "$W/out/pathological/md1.txt")
 echo "########## 4. the chunk set decodes back to the same 11-key policy"
 run "$MD" inspect $MD1S
 
-echo "########## 5. OBSTACLE 1 — mk cannot derive the stub from a CHUNKED md1"
+echo "########## 5. mk derives the stub from the CHUNKED md1 itself"
+# This section used to be headed "OBSTACLE 1 -- mk cannot derive the stub from
+# a CHUNKED md1", and everything below it existed to work around that: the
+# stub was pulled out of `md inspect` by hand and passed as --policy-id-stub to
+# all eleven encodes.
+#
+# F-127 closed the obstacle, and it was two defects, not one. mk vendored
+# md-codec 0.34.0, which predates the v9 chunk wire series and refused every
+# chunk with "wire-format version mismatch: got 9, expected 4"; and mk decoded
+# each --from-md1 value INDEPENDENTLY, so even on a current codec a four-chunk
+# card was four incomplete sets. Both are fixed: values are now grouped by the
+# 20-bit chunk-set id in their wire header, and each GROUP yields one stub.
+#
+# Worth stating because it sets the scale of what was hidden: a keyed wallet
+# policy is 246 data symbols and the codex32 regular code caps a single md1
+# string at 80, so EVERY keyed card in the constellation is chunked. The
+# capability was not degraded for large wallets -- it was absent for all of
+# them, and only ever worked on templates small enough to fit one string.
 XPUB=$(grep '^xpub' "$W/inputs-pathological/keys/key-00.xpub")
 # Origin read from the key file rather than typed in, so it cannot drift from
-# the key it describes — it was hardcoded to key-00's old bip84 origin, which
-# item 5 has since moved to m/48'/0'/0'/2'.
+# the key it describes.
 K0FP=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$W/inputs-pathological/keys/key-00.xpub" | head -1)
 K0PATH=$(sed -n 's/.*origin \[[0-9a-f]*\/\([^]]*\)\].*/\1/p' "$W/inputs-pathological/keys/key-00.xpub" | head -1)
-FIRST=$(head -1 "$W/out/pathological/md1.txt")
+mapfile -t MD1_CHUNKS < <(grep '^md1' "$W/out/pathological/md1.txt")
+if [ "${#MD1_CHUNKS[@]}" -lt 2 ]; then
+  echo "FATAL: expected a CHUNKED md1; got ${#MD1_CHUNKS[@]} chunk(s)" >&2
+  exit 1
+fi
+FROM_MD1=(); for c in "${MD1_CHUNKS[@]}"; do FROM_MD1+=(--from-md1 "$c"); done
 run "$MK" encode --xpub "$XPUB" --origin-fingerprint "$K0FP" \
-  --origin-path "m/$K0PATH" --from-md1 "$FIRST" --group-size 0
+  --origin-path "m/$K0PATH" "${FROM_MD1[@]}" --group-size 0
 
-echo "########## 6. the stub, derived by hand from the template id"
-echo "MEASURED, not cited: on a single-string wallet where --from-md1 DOES work,"
-echo "mk embedded stub 726a6663 while that wallet's ids were"
-echo "  wallet-descriptor-template-id: 726a666305756435...  <-- the stub matches THIS"
-echo "  wallet-policy-id:              f05e8a1c282f7740...  <-- and NOT this,"
-echo "though SPEC_mk_v0_1.md 3.3 names the WalletPolicyId. So mk follows the"
-echo "template-id, and the stub below is DERIVED from it rather than typed in."
-echo
-run bash -c "$MD inspect $MD1S 2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p'"
+echo "########## 6. the stub mk chose, cross-checked against the template id"
+# The hand-derivation that used to live here is now a CHECK rather than a
+# workaround, and it is worth keeping in that form: it is the only thing in
+# this journey that would notice if mk's form-aware dispatch silently switched
+# to the WalletPolicyId. This card is a keyless template
+# (`wallet-policy-mode: false`), so the stub must be the top 4 bytes of the
+# key-stable WalletDescriptorTemplateId, NOT the key-dependent WalletPolicyId.
+run bash -c "$MD inspect $MD1S 2>/dev/null | grep -E 'wallet-policy-mode|template-id|wallet-policy-id:'"
 
-# The stub used to be the literal 5b48af35, hardcoded two lines below with
-# nothing checking it still matched. It is now derived from the same command
-# the step above prints, so the narrative and the cards cannot drift apart.
-# (Verified equal to the old hardcode at the time of the change.)
 STUB=$("$MD" inspect $MD1S 2>/dev/null \
         | sed -n 's/^wallet-descriptor-template-id: //p' | cut -c1-8)
 if [ -z "$STUB" ]; then
   echo "FATAL: could not derive the policy-id stub from the template id" >&2
   exit 1
 fi
+POLICY_STUB=$("$MD" inspect $MD1S 2>/dev/null \
+        | sed -n 's/^wallet-policy-id: //p' | cut -c1-8)
+# Read the stub back OUT of the card mk just built, rather than trusting that
+# it used the one we expect. `mk decode` is a different code path from the
+# derivation under test.
+MK_STUB=$("$MK" encode --xpub "$XPUB" --origin-fingerprint "$K0FP" \
+        --origin-path "m/$K0PATH" "${FROM_MD1[@]}" --group-size 0 2>/dev/null \
+        | grep '^mk1' | tr '\n' ' ' \
+        | xargs "$MK" decode 2>/dev/null \
+        | sed -n 's/^policy_id_stubs: *//p' | head -1)
+if [ "$MK_STUB" != "$STUB" ]; then
+  echo "FATAL: mk embedded stub '$MK_STUB' but the template id says '$STUB'" >&2
+  exit 1
+fi
+if [ -n "$POLICY_STUB" ] && [ "$MK_STUB" = "$POLICY_STUB" ]; then
+  echo "FATAL: mk used the WalletPolicyId stub for a KEYLESS template" >&2
+  exit 1
+fi
+echo "mk --from-md1 embedded $MK_STUB == template-id prefix $STUB (and != policy-id $POLICY_STUB)"
+echo
 
 echo "########## 7. the eleven key cards — ALL of them, each with its own origin"
 # Was: one card for key-00 only, under a heading that said eleven.
@@ -145,8 +183,11 @@ for f in "$W"/inputs-pathological/keys/key-*.xpub; do
   # bundle at exit 0 — 23 plates instead of 25, and every later plate caption
   # naming the wrong master because caption index and card index desynced.
   # A short bundle is a worse failure than the stale one this commit removed.
+  # --from-md1 rather than --policy-id-stub: each card now derives its own
+  # binding from the wallet card itself, so no hand-copied hex sits between
+  # the policy and the eleven cards that claim membership in it.
   if ! CARD=$("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
-        --origin-path "m/$KPATH" --policy-id-stub "$STUB" --group-size 0 2>&1); then
+        --origin-path "m/$KPATH" "${FROM_MD1[@]}" --group-size 0 2>&1); then
     echo "FATAL: mk encode failed for $f:" >&2
     printf '%s\n' "$CARD" >&2
     exit 1
@@ -192,14 +233,14 @@ for f in "$W"/inputs-pathological/keys/key-*.xpub; do
   KPATH=$(sed -n 's/.*origin \[[0-9a-f]*\/\([^]]*\)\].*/\1/p' "$f" | head -1)
   nth=0
   tot=$("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
-        --origin-path "m/$KPATH" --policy-id-stub "$STUB" --group-size 0 \
+        --origin-path "m/$KPATH" "${FROM_MD1[@]}" --group-size 0 \
         2>/dev/null | grep -c '^mk1')
   while read -r card; do
     nth=$((nth + 1))
     printf '%s %s %s %s %s %s\n' "$card" "$ki" "$nth" "$tot" "$KFP" "$KPATH" \
       >> "$W/out/pathological/card-index.txt"
   done < <("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
-             --origin-path "m/$KPATH" --policy-id-stub "$STUB" --group-size 0 \
+             --origin-path "m/$KPATH" "${FROM_MD1[@]}" --group-size 0 \
              2>/dev/null | grep '^mk1')
 done
 run wc -l "$W/out/pathological/card-index.txt"
