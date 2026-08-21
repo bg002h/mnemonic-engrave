@@ -8627,3 +8627,37 @@ Candidate fix: extend the contradiction check to keyless templates using
 **declared origins alone** — if a template's slots all share one origin while its
 `n` exceeds the number of keys one master could plausibly seat there, that is at
 minimum a warning. The precise rule needs a ruling; the measurement does not.
+
+---
+
+### F-222 — the pathological example vault is single-master in THREE of its four tiers, and neither journey says so (owning phase: **the tr/wsh cycle, Stage 6**) `#mnemonic` `#docs`
+
+Found by the comprehension lens, then re-measured and found to be worse than
+reported. The lens said master C alone drains the vault after ~365 days; the
+slot-to-master mapping says **three of the four tiers need only one master**:
+
+| tier | lock | threshold | slots | masters |
+| --- | --- | --- | --- | --- |
+| 1 | `after(1000000)` — a block HEIGHT, passed in 2016 | 3-of-3 | @0 @1 @2 | **A alone** (+ the sha256 preimage) |
+| 2 | `after(1893456000)` | 2-of-3 | @3 @4 @5 | A and B |
+| 3 | `older(65535)` ≈ 455 d | 2-of-2 | @6 @7 | **B alone** |
+| 4 | `older(4255898)` ≈ 365 d | 1-of-3 | @8 @9 @10 | **C alone** |
+
+So the wallet reads as an eleven-key, three-party vault and behaves as *any one
+of three parties, on a timer* — A immediately if they hold the preimage, C after
+a year, B after fifteen months. Tier 2 is the only one that needs two parties,
+and it is the one furthest out.
+
+**This changes what the example teaches.** It is presented as the constellation's
+showcase of a degrading multi-tier vault; a reader takes the tier structure as a
+model. The tiers do not degrade in strength, they degrade in *which single party
+wins the race* — and F-133 already established the timers fire in the wrong order
+relative to strength.
+
+Not a code defect and not funds at risk (published test seeds). It is a
+**teaching** defect in the example itself, and it belongs in both journey
+documents in one table.
+
+Adjacent: F-131 (the checklist's false recovery rule), F-132 (the preimage is
+absent from the backup), F-133 (the tiers are inverted). This is the fourth
+member of that family and the one that most changes how the wallet reads.
