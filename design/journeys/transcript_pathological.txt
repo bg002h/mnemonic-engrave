@@ -21,49 +21,50 @@ me-preview 0.7.0
 
 ########## 1. the policy — 11 keys, four timelock kinds, a hashlock
 $ cat /scratch/code/shibboleth/mnemonic-engrave/design/journeys/inputs-pathological/wallet-policy.txt
-wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))))))
+wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/48'/0'/3'/2'/<0;1>/*,@4/48'/0'/0'/2'/<0;1>/*,@5/48'/0'/1'/2'/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/48'/0'/2'/2'/<0;1>/*,@7/48'/0'/3'/2'/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/48'/0'/0'/2'/<0;1>/*,@9/48'/0'/1'/2'/<0;1>/*,@10/48'/0'/2'/2'/<0;1>/*))))))
 [exit 0]
 
 ########## 2. it does not fit one string
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode --group-size 0 wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))))))
-md: codec error: payload is 182 data symbols; the codex32 regular code caps single strings at 80 (use chunked encoding / --force-chunked)
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode --group-size 0 wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/48'/0'/3'/2'/<0;1>/*,@4/48'/0'/0'/2'/<0;1>/*,@5/48'/0'/1'/2'/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/48'/0'/2'/2'/<0;1>/*,@7/48'/0'/3'/2'/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/48'/0'/0'/2'/<0;1>/*,@9/48'/0'/1'/2'/<0;1>/*,@10/48'/0'/2'/2'/<0;1>/*))))))
+md: codec error: payload is 255 data symbols; the codex32 regular code caps single strings at 80 (use chunked encoding / --force-chunked)
 [exit 1]
 
 ########## 3. so it is chunked -- WITH the origin the warning asked for
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode --group-size 0 --force-chunked --path bip48 wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))))))
-chunk-set-id: 0x829c6
-md1fs2wxpqpzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsc92gdhnxq3mrt4
-md1fs2wxpqwxkx9k7c9xu6pzk3ssspyefntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkemjesdfjpw8z4kp2ay
-md1fs2wxpq3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qqh8tw3xyv8tr5s
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode --group-size 0 --force-chunked wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/48'/0'/3'/2'/<0;1>/*,@4/48'/0'/0'/2'/<0;1>/*,@5/48'/0'/1'/2'/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/48'/0'/2'/2'/<0;1>/*,@7/48'/0'/3'/2'/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/48'/0'/0'/2'/<0;1>/*,@9/48'/0'/1'/2'/<0;1>/*,@10/48'/0'/2'/2'/<0;1>/*))))))
+chunk-set-id: 0x66602
+md1fveszps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsetu0pjm8rjqtq
+md1fveszpsgs3ef9kzz2j5qqcyefntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3rw4fq6srum75s6g2w3
+md1fveszps36rc6cckmmq5mngy26xzzqyn9xddhpk7cspxdw6snwwgzt4wf7rnqpre774p4wm8gup7frjyxuc3nx
+md1fveszps7txyd64y8g0rtrzm0vznwdq3tgcyg69v5e4cqqqlll3sgt8fntsqypuy6rqpgngl2nznpqsv3g40
 note: stdout is a keyless descriptor template (no keys)
 [exit 0]
 
 ########## 4. the chunk set decodes back to the same 11-key policy
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fs2wxpqpzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsc92gdhnxq3mrt4 md1fs2wxpqwxkx9k7c9xu6pzk3ssspyefntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkemjesdfjpw8z4kp2ay md1fs2wxpq3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qqh8tw3xyv8tr5s
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fveszps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsetu0pjm8rjqtq md1fveszpsgs3ef9kzz2j5qqcyefntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3rw4fq6srum75s6g2w3 md1fveszps36rc6cckmmq5mngy26xzzqyn9xddhpk7cspxdw6snwwgzt4wf7rnqpre774p4wm8gup7frjyxuc3nx md1fveszps7txyd64y8g0rtrzm0vznwdq3tgcyg69v5e4cqqqlll3sgt8fntsqypuy6rqpgngl2nznpqsv3g40
 template: wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))))))
 n: 11
 wallet-policy-mode: false
-md1-encoding-id: 829c6ddb2f65a7f47078dd60d5a57ce7
+md1-encoding-id: 66602aeaec43032e254a352c66cf3655
 wallet-descriptor-template-id: 5b48af35d4321a3ac18b43045e2523cc
 origins:
   @0: m/48'/0'/0'/2'
-  @1: m/48'/0'/0'/2'
-  @2: m/48'/0'/0'/2'
-  @3: m/48'/0'/0'/2'
+  @1: m/48'/0'/1'/2'
+  @2: m/48'/0'/2'/2'
+  @3: m/48'/0'/3'/2'
   @4: m/48'/0'/0'/2'
-  @5: m/48'/0'/0'/2'
-  @6: m/48'/0'/0'/2'
-  @7: m/48'/0'/0'/2'
+  @5: m/48'/0'/1'/2'
+  @6: m/48'/0'/2'/2'
+  @7: m/48'/0'/3'/2'
   @8: m/48'/0'/0'/2'
-  @9: m/48'/0'/0'/2'
-  @10: m/48'/0'/0'/2'
-wallet-policy-id: f89e23f13c697ae62ef10328d71d7e24
-wallet-policy-id-fingerprint: 0xf89e23f1
+  @9: m/48'/0'/1'/2'
+  @10: m/48'/0'/2'/2'
+wallet-policy-id: bd6ba7e6bd7a86038b3963f977e727a6
+wallet-policy-id-fingerprint: 0xbd6ba7e6
 note: stdout is a keyless descriptor template (no keys)
 [exit 0]
 
 ########## 5. OBSTACLE 1 — mk cannot derive the stub from a CHUNKED md1
-$ /scratch/code/shibboleth/mnemonic-key/target/release/mk encode --xpub xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --origin-fingerprint 73c5da0a --origin-path m/48'/0'/0'/2' --from-md1 md1fs2wxpqpzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsc92gdhnxq3mrt4 --group-size 0
+$ /scratch/code/shibboleth/mnemonic-key/target/release/mk encode --xpub xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --origin-fingerprint 73c5da0a --origin-path m/48'/0'/0'/2' --from-md1 md1fveszps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsetu0pjm8rjqtq --group-size 0
 error: md1 input rejected: wire-format version mismatch: got 9, expected 4
 [exit 2]
 
@@ -75,7 +76,7 @@ mk embedded stub 726a6663 while that wallet's ids were
 though SPEC_mk_v0_1.md 3.3 names the WalletPolicyId. So mk follows the
 template-id, and the stub below is DERIVED from it rather than typed in.
 
-$ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fs2wxpqpzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsc92gdhnxq3mrt4 md1fs2wxpqwxkx9k7c9xu6pzk3ssspyefntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkemjesdfjpw8z4kp2ay md1fs2wxpq3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qqh8tw3xyv8tr5s  2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p'
+$ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fveszps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsetu0pjm8rjqtq md1fveszpsgs3ef9kzz2j5qqcyefntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3rw4fq6srum75s6g2w3 md1fveszps36rc6cckmmq5mngy26xzzqyn9xddhpk7cspxdw6snwwgzt4wf7rnqpre774p4wm8gup7frjyxuc3nx md1fveszps7txyd64y8g0rtrzm0vznwdq3tgcyg69v5e4cqqqlll3sgt8fntsqypuy6rqpgngl2nznpqsv3g40  2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p'
 5b48af35d4321a3ac18b43045e2523cc
 [exit 0]
 
@@ -106,7 +107,7 @@ engraved file is now assembled from this run's own md1 chunks and key
 cards, so print and engrave cannot disagree.
 
 $ wc -l /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/backup-strings.txt
-33 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/backup-strings.txt
+34 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/backup-strings.txt
 [exit 0]
 
 ########## 8. me bundle: validates, and prints the plate checklist
@@ -144,49 +145,51 @@ me: rendered plate 30 → /scratch/code/shibboleth/mnemonic-engrave/design/journ
 me: rendered plate 31 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-31.png
 me: rendered plate 32 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-32.png
 me: rendered plate 33 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-33.png
+me: rendered plate 34 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/plates/plate-34.png
 me: wrote manifest to /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/manifest.json
-me: backup needs 34 plates (33 public + ms1 on device):
-  plate 1/34  md1 policy  → push via NFC & engrave
-  plate 2/34  md1 policy  → push via NFC & engrave
-  plate 3/34  md1 policy  → push via NFC & engrave
-  plate 4/34  mk1 [b8688df1/48'/0'/1'/2'] chunk 1/3  → push via NFC & engrave
-  plate 5/34  mk1 [b8688df1/48'/0'/1'/2'] chunk 2/3  → push via NFC & engrave
-  plate 6/34  mk1 [b8688df1/48'/0'/1'/2'] chunk 3/3  → push via NFC & engrave
-  plate 7/34  mk1 [73c5da0a/48'/0'/3'/2'] chunk 1/3  → push via NFC & engrave
-  plate 8/34  mk1 [73c5da0a/48'/0'/3'/2'] chunk 2/3  → push via NFC & engrave
-  plate 9/34  mk1 [73c5da0a/48'/0'/3'/2'] chunk 3/3  → push via NFC & engrave
-  plate 10/34  mk1 [73c5da0a/48'/0'/2'/2'] chunk 1/3  → push via NFC & engrave
-  plate 11/34  mk1 [73c5da0a/48'/0'/2'/2'] chunk 2/3  → push via NFC & engrave
-  plate 12/34  mk1 [73c5da0a/48'/0'/2'/2'] chunk 3/3  → push via NFC & engrave
-  plate 13/34  mk1 [73c5da0a/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
-  plate 14/34  mk1 [73c5da0a/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
-  plate 15/34  mk1 [28645006/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
-  plate 16/34  mk1 [28645006/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
-  plate 17/34  mk1 [28645006/48'/0'/2'/2'] chunk 1/3  → push via NFC & engrave
-  plate 18/34  mk1 [28645006/48'/0'/2'/2'] chunk 2/3  → push via NFC & engrave
-  plate 19/34  mk1 [28645006/48'/0'/2'/2'] chunk 3/3  → push via NFC & engrave
-  plate 20/34  mk1 [73c5da0a/48'/0'/1'/2'] chunk 1/3  → push via NFC & engrave
-  plate 21/34  mk1 [73c5da0a/48'/0'/1'/2'] chunk 2/3  → push via NFC & engrave
-  plate 22/34  mk1 [73c5da0a/48'/0'/1'/2'] chunk 3/3  → push via NFC & engrave
-  plate 23/34  mk1 [b8688df1/48'/0'/2'/2'] chunk 1/3  → push via NFC & engrave
-  plate 24/34  mk1 [b8688df1/48'/0'/2'/2'] chunk 2/3  → push via NFC & engrave
-  plate 25/34  mk1 [b8688df1/48'/0'/2'/2'] chunk 3/3  → push via NFC & engrave
-  plate 26/34  mk1 [b8688df1/48'/0'/3'/2'] chunk 1/3  → push via NFC & engrave
-  plate 27/34  mk1 [b8688df1/48'/0'/3'/2'] chunk 2/3  → push via NFC & engrave
-  plate 28/34  mk1 [b8688df1/48'/0'/3'/2'] chunk 3/3  → push via NFC & engrave
-  plate 29/34  mk1 [b8688df1/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
-  plate 30/34  mk1 [b8688df1/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
-  plate 31/34  mk1 [28645006/48'/0'/1'/2'] chunk 1/3  → push via NFC & engrave
-  plate 32/34  mk1 [28645006/48'/0'/1'/2'] chunk 2/3  → push via NFC & engrave
-  plate 33/34  mk1 [28645006/48'/0'/1'/2'] chunk 3/3  → push via NFC & engrave
-  plate 34/34  ms1 secret  → TYPE ON DEVICE (New > Input Seed > CODEX32); never via this tool
+me: backup needs 35 plates (34 public + ms1 on device):
+  plate 1/35  md1 policy  → push via NFC & engrave
+  plate 2/35  md1 policy  → push via NFC & engrave
+  plate 3/35  md1 policy  → push via NFC & engrave
+  plate 4/35  md1 policy  → push via NFC & engrave
+  plate 5/35  mk1 [b8688df1/48'/0'/1'/2'] chunk 1/3  → push via NFC & engrave
+  plate 6/35  mk1 [b8688df1/48'/0'/1'/2'] chunk 2/3  → push via NFC & engrave
+  plate 7/35  mk1 [b8688df1/48'/0'/1'/2'] chunk 3/3  → push via NFC & engrave
+  plate 8/35  mk1 [73c5da0a/48'/0'/3'/2'] chunk 1/3  → push via NFC & engrave
+  plate 9/35  mk1 [73c5da0a/48'/0'/3'/2'] chunk 2/3  → push via NFC & engrave
+  plate 10/35  mk1 [73c5da0a/48'/0'/3'/2'] chunk 3/3  → push via NFC & engrave
+  plate 11/35  mk1 [73c5da0a/48'/0'/2'/2'] chunk 1/3  → push via NFC & engrave
+  plate 12/35  mk1 [73c5da0a/48'/0'/2'/2'] chunk 2/3  → push via NFC & engrave
+  plate 13/35  mk1 [73c5da0a/48'/0'/2'/2'] chunk 3/3  → push via NFC & engrave
+  plate 14/35  mk1 [73c5da0a/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 15/35  mk1 [73c5da0a/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 16/35  mk1 [28645006/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 17/35  mk1 [28645006/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 18/35  mk1 [28645006/48'/0'/2'/2'] chunk 1/3  → push via NFC & engrave
+  plate 19/35  mk1 [28645006/48'/0'/2'/2'] chunk 2/3  → push via NFC & engrave
+  plate 20/35  mk1 [28645006/48'/0'/2'/2'] chunk 3/3  → push via NFC & engrave
+  plate 21/35  mk1 [73c5da0a/48'/0'/1'/2'] chunk 1/3  → push via NFC & engrave
+  plate 22/35  mk1 [73c5da0a/48'/0'/1'/2'] chunk 2/3  → push via NFC & engrave
+  plate 23/35  mk1 [73c5da0a/48'/0'/1'/2'] chunk 3/3  → push via NFC & engrave
+  plate 24/35  mk1 [b8688df1/48'/0'/2'/2'] chunk 1/3  → push via NFC & engrave
+  plate 25/35  mk1 [b8688df1/48'/0'/2'/2'] chunk 2/3  → push via NFC & engrave
+  plate 26/35  mk1 [b8688df1/48'/0'/2'/2'] chunk 3/3  → push via NFC & engrave
+  plate 27/35  mk1 [b8688df1/48'/0'/3'/2'] chunk 1/3  → push via NFC & engrave
+  plate 28/35  mk1 [b8688df1/48'/0'/3'/2'] chunk 2/3  → push via NFC & engrave
+  plate 29/35  mk1 [b8688df1/48'/0'/3'/2'] chunk 3/3  → push via NFC & engrave
+  plate 30/35  mk1 [b8688df1/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 31/35  mk1 [b8688df1/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 32/35  mk1 [28645006/48'/0'/1'/2'] chunk 1/3  → push via NFC & engrave
+  plate 33/35  mk1 [28645006/48'/0'/1'/2'] chunk 2/3  → push via NFC & engrave
+  plate 34/35  mk1 [28645006/48'/0'/1'/2'] chunk 3/3  → push via NFC & engrave
+  plate 35/35  ms1 secret  → TYPE ON DEVICE (New > Input Seed > CODEX32); never via this tool
 [exit 0]
 
 ########## 9. the ids, and which one mk actually uses for the stub
-$ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fs2wxpqpzjtvyyy4qqxpx2v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42gwsc92gdhnxq3mrt4 md1fs2wxpqwxkx9k7c9xu6pzk3ssspyefntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkemjesdfjpw8z4kp2ay md1fs2wxpq3rw4fp6rc6cckmmq5mngy26xpzx3t9xdwqqq8lluvzze6v6uqpq0pxscq2y6qqh8tw3xyv8tr5s  2>/dev/null | grep -E 'policy-id|template-id'
+$ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fveszps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsetu0pjm8rjqtq md1fveszpsgs3ef9kzz2j5qqcyefntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3rw4fq6srum75s6g2w3 md1fveszps36rc6cckmmq5mngy26xzzqyn9xddhpk7cspxdw6snwwgzt4wf7rnqpre774p4wm8gup7frjyxuc3nx md1fveszps7txyd64y8g0rtrzm0vznwdq3tgcyg69v5e4cqqqlll3sgt8fntsqypuy6rqpgngl2nznpqsv3g40  2>/dev/null | grep -E 'policy-id|template-id'
 wallet-descriptor-template-id: 5b48af35d4321a3ac18b43045e2523cc
-wallet-policy-id: f89e23f13c697ae62ef10328d71d7e24
-wallet-policy-id-fingerprint: 0xf89e23f1
+wallet-policy-id: bd6ba7e6bd7a86038b3963f977e727a6
+wallet-policy-id-fingerprint: 0xbd6ba7e6
 [exit 0]
 
 ########## 9b. THE ADDRESSES — the check this wallet could never do before
@@ -233,8 +236,8 @@ me: refusing to emit ms1 over NFC: ms1 is secret seed entropy and must never be 
 
 ########## 9c. THE RESTORE TEST — what a card-only restore actually recovers
 $ python3 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/restore_test_pathological.py
-A restore that trusts the DESCRIPTOR CARD alone derives account 0 from every master.
 
+A) THE OLD CARD — one shared origin, so every master is read at account 0:
   @0  master 73c5da0a  at 48'/0'/0'/2'     RECOVERED
   @1  master 73c5da0a  at 48'/0'/1'/2'     WRONG KEY
   @2  master 73c5da0a  at 48'/0'/2'/2'     WRONG KEY
@@ -246,12 +249,26 @@ A restore that trusts the DESCRIPTOR CARD alone derives account 0 from every mas
   @8  master 28645006  at 48'/0'/0'/2'     RECOVERED
   @9  master 28645006  at 48'/0'/1'/2'     WRONG KEY
   @10 master 28645006  at 48'/0'/2'/2'     WRONG KEY
+  -> 3 of 11 recovered; wrong: [1, 2, 3, 5, 6, 7, 9, 10]
 
-  8 of 11 slots recover the WRONG key: [1, 2, 3, 5, 6, 7, 9, 10]
-  3 recover correctly: [0, 4, 8]
+B) THE CARD ENGRAVED NOW — each slot states its own origin:
+  @0  master 73c5da0a  at 48'/0'/0'/2'     RECOVERED
+  @1  master 73c5da0a  at 48'/0'/1'/2'     RECOVERED
+  @2  master 73c5da0a  at 48'/0'/2'/2'     RECOVERED
+  @3  master 73c5da0a  at 48'/0'/3'/2'     RECOVERED
+  @4  master b8688df1  at 48'/0'/0'/2'     RECOVERED
+  @5  master b8688df1  at 48'/0'/1'/2'     RECOVERED
+  @6  master b8688df1  at 48'/0'/2'/2'     RECOVERED
+  @7  master b8688df1  at 48'/0'/3'/2'     RECOVERED
+  @8  master 28645006  at 48'/0'/0'/2'     RECOVERED
+  @9  master 28645006  at 48'/0'/1'/2'     RECOVERED
+  @10 master 28645006  at 48'/0'/2'/2'     RECOVERED
+  -> 11 of 11 recovered; wrong: NONE
 
-  Every tier of this vault needs keys this restore cannot produce.
+  old card:  3 of 11 keys recoverable
+  new card:  11 of 11 keys recoverable
+  The difference is one extra chunk, and an identical template-id.
 
-  Matches what the journey documents. Gate green.
+  Both match what the journey documents. Gate green.
 [exit 0]
 

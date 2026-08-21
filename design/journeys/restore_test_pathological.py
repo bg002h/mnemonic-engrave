@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """THE RESTORE TEST — what a card-only restore of this wallet actually recovers.
 
+Measures BOTH cards: the flattened one this journey used to engrave, and the
+inline-origin one it engraves now. The difference between them is the finding,
+so showing only the fixed card would delete the reason it was fixed.
+
 The pathological journey called its `md decode` step "the round trip that makes
 the backup worth engraving". It is not. That step proves the BYTES survive the
 card format — a transcription check. **A restore test asks a different question:
@@ -28,13 +32,21 @@ W = os.path.dirname(os.path.abspath(__file__))
 MS = "/scratch/code/shibboleth/mnemonic-secret/target/release/ms"
 IN = os.path.join(W, "inputs-pathological")
 
-# What the engraved card declares for EVERY slot. `--path bip48` and
-# `m/48'/0'/0'/2'` produce a byte-identical chunk set, so this is account 0.
-DECLARED_ACCOUNT = 0
+# TWO CARDS ARE MEASURED, because the difference between them is the finding.
+#
+#   FLATTENED — what this journey used to engrave: `--path bip48` recorded one
+#   shared origin for every slot, so a restorer derives account 0 from each
+#   master. Kept as the counterfactual; it is why the card changed.
+#
+#   INLINE — what it engraves now: each slot states its own origin in the
+#   template. One extra chunk, identical template-id, same mk1 stubs.
+FLATTENED_ACCOUNT = 0
 
-# The claim under test, from the journey document itself. Kept here as data so a
-# disagreement is a failing gate rather than a sentence nobody re-read.
-DOCUMENTED_WRONG = [1, 2, 3, 5, 6, 7, 9, 10]
+# The claims under test, held as DATA so a disagreement is a failing gate rather
+# than a sentence nobody re-read. The flattened figure is the one that caught the
+# document's original "@3-@10" being wrong in both directions.
+FLATTENED_WRONG = [1, 2, 3, 5, 6, 7, 9, 10]
+INLINE_WRONG: list[int] = []
 
 
 def derive(phrase, account):
@@ -71,33 +83,44 @@ def main():
         ))
     slots.sort()
 
-    print(f"A restore that trusts the DESCRIPTOR CARD alone derives account "
-          f"{DECLARED_ACCOUNT} from every master.\n")
-    wrong = []
-    for idx, fp, real_path, real_xpub in slots:
-        if fp not in seeds:
-            sys.exit(f"@{idx}: no seed for master {fp}")
-        _, got = derive(seeds[fp][1], DECLARED_ACCOUNT)
-        ok = got == real_xpub
-        if not ok:
-            wrong.append(idx)
-        print(f"  @{idx:<2} master {fp}  at {real_path:<16} "
-              f"{'RECOVERED' if ok else 'WRONG KEY'}")
+    def measure(label, account_of):
+        print(f"\n{label}")
+        wrong = []
+        for idx, fp, real_path, real_xpub in slots:
+            if fp not in seeds:
+                sys.exit(f"@{idx}: no seed for master {fp}")
+            _, got = derive(seeds[fp][1], account_of(real_path))
+            ok = got == real_xpub
+            if not ok:
+                wrong.append(idx)
+            print(f"  @{idx:<2} master {fp}  at {real_path:<16} "
+                  f"{'RECOVERED' if ok else 'WRONG KEY'}")
+        good = [i for i, *_ in slots if i not in wrong]
+        print(f"  -> {len(good)} of {len(slots)} recovered; wrong: {wrong or 'NONE'}")
+        return wrong
 
-    print(f"\n  {len(wrong)} of {len(slots)} slots recover the WRONG key: {wrong}")
-    print(f"  {len(slots) - len(wrong)} recover correctly: "
-          f"{[i for i, *_ in slots if i not in wrong]}")
+    flat = measure(
+        f"A) THE OLD CARD — one shared origin, so every master is read at "
+        f"account {FLATTENED_ACCOUNT}:",
+        lambda _p: FLATTENED_ACCOUNT)
+    inline = measure(
+        "B) THE CARD ENGRAVED NOW — each slot states its own origin:",
+        lambda p: int(re.search(r"48'/0'/(\d+)'/2'", p).group(1)))
 
-    # A k-of-n reading, because "8 of 11 wrong" understates it for a policy whose
-    # smallest tier needs 3 signatures.
-    print("\n  Every tier of this vault needs keys this restore cannot produce.")
+    print(f"\n  old card:  {len(slots) - len(flat)} of {len(slots)} keys recoverable")
+    print(f"  new card:  {len(slots) - len(inline)} of {len(slots)} keys recoverable")
+    print("  The difference is one extra chunk, and an identical template-id.")
 
-    if wrong != DOCUMENTED_WRONG:
-        print(f"\nMISMATCH: the document says {DOCUMENTED_WRONG}, the measurement "
-              f"says {wrong}.\nOne of them is wrong; fix whichever it is.",
-              file=sys.stderr)
+    bad = False
+    for name, got, want in (("flattened", flat, FLATTENED_WRONG),
+                            ("inline", inline, INLINE_WRONG)):
+        if got != want:
+            print(f"\nMISMATCH ({name}): documented {want}, measured {got}.\n"
+                  f"One of them is wrong; fix whichever it is.", file=sys.stderr)
+            bad = True
+    if bad:
         return 1
-    print("\n  Matches what the journey documents. Gate green.")
+    print("\n  Both match what the journey documents. Gate green.")
     return 0
 
 

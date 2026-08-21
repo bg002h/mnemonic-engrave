@@ -83,8 +83,13 @@ echo "########## 2. it does not fit one string"
 run "$MD" encode --group-size 0 "$T"
 
 echo "########## 3. so it is chunked -- WITH the origin the warning asked for"
+# NO --path. The policy now states each slot's TRUE origin inline, and --path
+# would flatten all eleven onto one shared value -- which is what this journey
+# used to engrave, and what its own restore test measured as recovering 3 of 11
+# keys. Costs one extra chunk (4 vs 3) and changes nothing else: the template-id
+# is identical, so the mk1 key plates' stubs still bind.
 runcap "$W/out/pathological/md1.txt" '^md1' \
-  "$MD" encode --group-size 0 --force-chunked --path bip48 "$T"
+  "$MD" encode --group-size 0 --force-chunked "$T"
 
 # Now — and only now — the chunk set exists on disk for the steps below.
 MD1S=$(tr '\n' ' ' < "$W/out/pathological/md1.txt")

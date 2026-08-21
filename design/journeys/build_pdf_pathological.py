@@ -171,6 +171,32 @@ def _keys_from_inputs():
 
 keys = _keys_from_inputs()
 # design/journey/ has never existed; the sibling builder is in THIS directory.
+# PLATE COUNTS ARE COUNTED, NEVER TYPED.
+#
+# This document asserted 22 mk1 strings, 25 public plates and 28 total. Measured
+# against the artifacts the transcript beside it had just written: 30, 34 and 35.
+# The "each key splits into 2 chunks" premise was the error -- some keys need
+# three -- and nothing recomputed it when the wallet changed. Now nothing can.
+def _count_lines(path, prefix):
+    try:
+        with open(path) as f:
+            return sum(1 for l in f if l.startswith(prefix))
+    except OSError:
+        return 0
+
+
+MK1_CHUNKS = _count_lines(os.path.join(OUT, "backup-strings.txt"), "mk1")
+MD1_CHUNKS = _count_lines(os.path.join(OUT, "backup-strings.txt"), "md1")
+PUBLIC_STRINGS = _count_lines(os.path.join(OUT, "backup-strings.txt"), "")
+try:
+    with open(os.path.join(OUT, "manifest.json")) as _f:
+        _m = json.load(_f)
+    TOTAL_PLATES = len(_m if isinstance(_m, list) else _m.get("plates", _m.get("entries", [])))
+except Exception:
+    TOTAL_PLATES = 0
+if not (MK1_CHUNKS and MD1_CHUNKS and PUBLIC_STRINGS and TOTAL_PLATES):
+    sys.exit("plate counts could not be measured; run transcript_pathological.sh first")
+
 CSS = open(os.path.join(W, "build_pdf.py")).read()
 CSS = CSS.split('CSS = """')[1].split('"""')[0]
 
@@ -306,7 +332,8 @@ sentence and the binary disagree about which identity a key card indexes.</p>
 <div class="page">
 <h2>Host step 4 — the eleven key cards</h2>
 {code(sect('7. the eleven key cards — ALL of them, each with its own origin'), 30)}
-<p>Each key splits into <b>2 chunks</b>, so the eleven cards are 22 strings.
+<p>Each key splits into 2 or 3 chunks — {MK1_CHUNKS} strings for eleven cards,
+counted from the transcript's own output rather than assumed.
 Note the decode: the card carries the origin fingerprint and path, so the
 origins the descriptor card lacks are present in the bundle.</p>
 </div>
@@ -330,6 +357,33 @@ and <b>no address could be derived for this wallet by any tool</b>. That is why 
 earlier version of this document showed one. These are the structural half's
 counterpart: proof the bytes mean the wallet that was intended.</p>
 {code(sect('9b. THE ADDRESSES — the check this wallet could never do before'))}
+
+<h2 style="margin-top:14px">What this backup will NOT do</h2>
+<div class="note">
+<p><b>Tiers 1–2 cannot be spent from these plates alone.</b> Both need the
+32-byte preimage of the <code>sha256</code> hashlock — the "secret word". <b>No
+plate carries it.</b> Record it separately, with the vault, or those two tiers
+are decoration.</p>
+
+<p><b>The tiers do not open in the order they read.</b> Tier 4 (1-of-3) matures
+at ~365 days and tier 3 (2-of-2) at ~455 — the <i>weakest</i> key-set unlocks
+~90 days <i>first</i>. And each <code>older()</code> clock runs per-coin from
+that coin's confirmation, not from the day you engraved.</p>
+
+<p><b>In master terms this is a 1-of-3 vault with delays, not an 11-key
+multisig.</b> Three of its four tiers are satisfiable by a single master:</p>
+<ul>
+<li><b>A</b> alone — tier 1 (3-of-3 over @0–@2, all master A), unlocked since
+block 1,000,000 in 2016 — but only with the secret word;</li>
+<li><b>C</b> alone — tier 4 (1-of-3 over @8–@10), after ~365 days, <i>no</i>
+word needed;</li>
+<li><b>B</b> alone — tier 3 (2-of-2 over @6–@7), after ~455 days.</li>
+</ul>
+<p>Only tier 2 needs two masters, and it is the furthest out. So this vault
+<i>survives losing any two</i> seed plates — and <i>falls to the theft of any
+one</i>, given time. That is a deliberate trade if you chose it and a nasty
+surprise if you did not.</p>
+</div>
 
 <h2 style="margin-top:14px">The restore test — what a card-only restore recovers</h2>
 <p>The decode step is a transcription check. <b>This is the restore test</b>: it
@@ -405,16 +459,16 @@ for f in plates:
 
 P.append(f"""
 <div class="page">
-<h2>The 25 public plates</h2>
-<p>Three descriptor chunks, then eleven key cards at two chunks each.</p>
+<h2>The {PUBLIC_STRINGS} public plates</h2>
+<p>{MD1_CHUNKS} descriptor chunks, then eleven key cards at two or three chunks each.</p>
 <div class="grid3">{''.join(cells[:12])}</div>
 </div>
 <div class="page">
-<h2>The 25 public plates, continued</h2>
+<h2>The {PUBLIC_STRINGS} public plates, continued</h2>
 <div class="grid3">{''.join(cells[12:])}</div>
 <div class="note"><b>Plus three seed plates that are not here.</b>
 Each master is engraved from words typed on the machine. No host tool will
-render, transmit or preview them — so the real total is <b>28 plates</b>.</div>
+render, transmit or preview them — so the real total is <b>{TOTAL_PLATES} plates</b>.</div>
 </div>
 """)
 

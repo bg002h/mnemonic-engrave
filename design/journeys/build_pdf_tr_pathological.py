@@ -151,8 +151,16 @@ declares. That is F-217's lesson, and this gate is the answer to it.</p>
 <h2>2 · The engraved artifact</h2>
 <p>The keyless template set — {len(tmpl_cards)} chunks. No <code>--path</code>:
 the origins ride in the template, and <code>--path</code> would flatten eleven
-distinct origins onto one, which over eleven different keys is a card
-<code>md encode</code> now refuses outright.</p>
+distinct origins onto one.</p>
+<p class="note"><b>And nothing would stop it.</b> An earlier draft of this page
+said <code>md encode</code> "refuses outright". Measured: it refuses the
+<em>keyed</em> form, where it can see one fingerprint bound to several different
+keys — but on this <em>keyless</em> template <code>--path</code> exits <b>0</b>
+and produces a perfectly good card with eleven wrong origins. The check needs a
+fingerprint <em>and</em> an xpub per slot, and a keyless template carries
+neither (F-221). <b>The card that gets engraved is the form the guard cannot
+see</b>, so leaving <code>--path</code> off here is a choice this journey makes,
+not one the tool enforces.</p>
 {code(section(tx, "3. The engraved artifact"), 14)}
 </section>
 """)
@@ -255,9 +263,12 @@ unlocks ~90 days <em>first</em> (F-133).</li>
 equality above is the honest proxy.</li>
 <li><strong>No ms1 secret leg.</strong> Taproot-independent, and already shown
 in the earlier journeys.</li>
-<li><strong>The origins are not visible on read-back</strong> (F-219) — the card
-carries them, and neither <code>decode</code> nor <code>inspect</code> will show
-them to an operator.</li>
+<li><strong>Decode's output still does not round-trip</strong> (F-219). The
+card carries its origins and both <code>md inspect</code> and <code>md
+decode</code> now report them — an earlier draft of this line said neither did,
+which its own section 4 already disproved. What remains is that
+<code>decode</code>'s <em>stdout</em> renders them away, so re-encoding what it
+prints yields a different card.</li>
 </ul>
 </section>
 """)

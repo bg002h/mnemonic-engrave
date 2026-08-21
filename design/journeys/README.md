@@ -69,6 +69,30 @@ It also has **its own `out/tr-pathological/` subtree**, because the two wallet
 journeys previously shared `out/` and either could overwrite the other's
 intermediates — after which the second "passes" against the first's artifacts.
 
+### Which shape to use for a degrading vault (2026-08-21)
+
+Four lens reviews compared the two forms of this wallet
+(`design/agent-reports/REVIEW_pathological_lens*.md`). The recommendation is
+**`tr(NUMS,{…})`**, and the reasoning is worth keeping because most of the
+apparent gap turned out not to be real.
+
+**Backup parity is now exact.** The wsh card used to restore 3 of 11 keys and the
+tr card 11 of 11 — but that was a `--path` accident, not a property of either
+wrapper. With per-key origins written into the template, the wsh card carries all
+eleven true origins, costs **one extra chunk**, and keeps an **identical
+template-id** so the existing key plates still bind. Measured, then engraved: this
+journey now does exactly that.
+
+**The remaining margin is intrinsic and on-chain.** A `wsh` spend from any tier
+publishes the whole remaining weakening schedule; `tr` reveals only the leaf that
+was exercised. Deep-tier witnesses are roughly half the weight.
+
+**What would flip it:** if heirs must restore with generic third-party tools and
+no constellation binary, `wsh` with inline origins is the conservative pick —
+support for taproot script-path descriptors is thinner in the wild.
+
+---
+
 ### The seating walk (2026-08-21) — not a document, a gate
 
 `capture_seating.py` drives D3's first half on the device: a **keyless
