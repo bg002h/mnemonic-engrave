@@ -1787,7 +1787,7 @@ F-106** as well as Task 9.5's own check — see the bench card in
 `design/DESIGN_f106_idle_timer_never_starts.md`. If that warning does **not**
 appear, it is an F-105 defect in its own right and not merely F-106 spilling over.
 
-### F-106 — §10.2.4's window runs 2x (6:00, not 3:00): a LATE ARM EDGE lands on the deadline (owning phase: **B2b — CRITICAL, gates the phase**)
+### F-106 — ~~§10.2.4's window runs 2x (6:00, not 3:00): a LATE ARM EDGE lands on the deadline~~ **CLOSED 2026-08-10** (heading corrected 2026-08-20)
 
 **FIX WRITTEN AND R0-FOLDED 2026-08-10.** Design:
 `design/DESIGN_f106_late_arm_edge.md`. Implementation: worktree
@@ -1974,7 +1974,7 @@ search either way.
 
 </details>
 
-### F-107 — the RENDERED seed is scrubbed ONLY on the wipe path; a normal exit leaves the twelve words in `ctx.B` (owning phase: **B2b — CRITICAL**)
+### F-107 — ~~the RENDERED seed is scrubbed ONLY on the wipe path; a normal exit leaves the twelve words in `ctx.B`~~ **CLOSED 2026-08-10** (heading corrected 2026-08-20)
 
 **CLOSED 2026-08-10** — implemented on `b2b-residency` (`ctx.B.Scrub()` in both unlock brackets, pinned by `gui/unlock_session_scrub_test.go` and `gui/residency_wiring_test.go`), GREEN through three R0 rounds and a whole-diff review, and confirmed on hardware by reading 4c (abort→resume inside the secret session).
 
@@ -2040,7 +2040,7 @@ hold. Cross-ref R0 round 0's M4 on `frameOp.op.src`/`inputOp.tag` — also an
 enumerated argument rather than a structural one, and also about a copy `Scrub`
 cannot reach. Two findings in one day where residency rested on enumeration.
 
-### F-108 — `plate.Spline` is never zeroed AFTER the cut: F-83 buys the mid-cut window and nothing ends it (owning phase: **B2b — CRITICAL**)
+### F-108 — ~~`plate.Spline` is never zeroed AFTER the cut: F-83 buys the mid-cut window and nothing ends it~~ **CLOSED 2026-08-10** (heading corrected 2026-08-20)
 
 **CLOSED 2026-08-10** — the zeroing landed on `b2b-residency` (`planEngraving`'s defer, the `SafePointer.Resume` trim, `splineResumer.Knot`'s `defer clear(c)`, `ClearHistory`, `releaseResumeState`), 11 mutation rows, toolpath byte-identical across 5 plates, and hardware readings 4a/4b/4c showed a resumed cut tracking its interrupted letter exactly.
 
