@@ -3950,7 +3950,7 @@ the emulator happened to expose first.
 consumes exactly one tag, so a 25-card bundle cannot be delivered over the
 emulator's NFC source as it stands.
 
-### F-127 — `mk encode --from-md1` cannot read a CHUNKED md1 (owning phase: **operator journeys**) `#mnemonic`
+### F-127 — ~~`mk encode --from-md1` cannot read a CHUNKED md1~~ **CLOSED 2026-08-21** `#mnemonic`
 
 Filed 2026-08-11 building the pathological-wallet journey
 (`design/journeys/SeedHammer-II-pathological-wallet-journey.pdf`).
@@ -4008,7 +4008,91 @@ That is exactly the manual step `--from-md1` exists to remove, and getting it
 wrong produces a card that is refused at membership with no indication that the
 stub was the problem.
 
+#### RESOLVED 2026-08-21 — `mnemonic-key` 6ac5f99 + 85cf6c7 (this repo)
+
+Two defects, stacked, and the second was invisible until the first was fixed.
+
+1. The vendored md-codec was 0.34.0, five wire versions behind, so every chunk
+   was refused with `wire-format version mismatch: got 9, expected 4`. Bumped
+   to 0.42.0.
+2. With that fixed the error CHANGED rather than cleared, to `chunk set
+   incomplete: got 1 chunks, expected 4` -- because `mk` decoded each
+   `--from-md1` value INDEPENDENTLY. A four-chunk card was four incomplete
+   sets. Values are now grouped by the 20-bit chunk-set id in their wire
+   header, and each GROUP yields one stub.
+
+**The entry understated the blast radius, and the correction is the useful
+part.** It read "any policy over the single-string cap", framed as a large-
+wallet problem. Measured: a keyed wallet policy is **246 data symbols** against
+a single-string cap of **80**, so EVERY keyed wallet-policy card the
+constellation can produce is chunked. `--from-md1` was not degraded for big
+wallets; it was **absent for all of them**, and only ever worked on keyless
+templates small enough to fit one string. The severity downgrade to Minor was
+made on the belief that the stub "remains derivable" by hand -- true, but it
+was the *only* route for every keyed card, not a fallback.
+
+**Why it hid for so long.** The one test covering keyed wallet policies used a
+hand-minted **138-symbol single md1 string** -- a card no encoder emits and no
+engraver could cut, since it exceeds the 93-symbol regular-code cap. The test
+was standing in for a card that cannot exist. 0.42.0 enforces the cap, refused
+the fixture, and that is how both defects surfaced together. Replaced with two
+REAL chunk sets minted by `md encode --force-chunked`.
+
+`--from-md1` still means one card per POLICY: grouping keys on the set id, not
+on adjacency or on the whole argument list, so a key card belonging to two
+wallets still gets two stubs in first-appearance order.
+
+**Equivalence measured, not assumed.** Ran `transcript_pathological.sh` before
+and after and diffed the outputs: the 30 mk1 strings across 11 cards, and
+`card-index.txt`, are BYTE-IDENTICAL. Switching the binding route changed no
+engraved plate. The journey's section 5, headed "OBSTACLE 1", is now a
+demonstration that it works, and its hand-derivation survives as a CROSS-CHECK
+(85cf6c7) -- the only thing in that journey that would notice mk silently
+switching identities.
+
+**A second defect the bump exposed, in CI rather than code.** The repo commits
+a `vendor/` tree that the `--offline --locked` release build resolves against.
+Bumping `Cargo.lock` to 0.42.0 left `vendor/md-codec` at 0.34.0, so a release
+build would have silently reintroduced this exact bug. `ci/repro/vendor-
+freshness.sh` REDed on it locally, which is precisely the PR-time failure it
+was ported in to catch. Re-vendored and compiled through the vendored tree.
+
+**Not the whole labour win it was billed as.** The working estimate was that
+this collapses ~33 hand-built commands to ~3. Measured, it does not: `mk
+encode --xpub` takes ONE key, so an 11-cosigner wallet is 11 invocations
+before and after. What the fix removes is the hand-copied hex between a policy
+and the cards claiming membership in it, plus the `md inspect` step that
+produced it -- and it makes keyed cards possible at all. Reaching ~3 commands
+needs a batch input mode (`--xpub` repeatable, or a key file), which is a
+separate feature; see F-223.
+
 ### F-128 — the stub's spec sentence and `mk`'s behaviour name different identities (owning phase: **operator journeys**) `#mnemonic`
+#### The stale-pin hypothesis is REFUTED, 2026-08-21
+
+This entry speculated the divergence might be a consequence of md-codec drift
+"after 0.34.0 — which would make this F-127's twin rather than an independent
+bug". F-127 is now fixed, md-codec went 0.34.0 -> 0.42.0, and **the behaviour
+did not change**: `mk` still stamps a keyless template with the
+`WalletDescriptorTemplateId` prefix. Measured on the pathological card, whose
+`wallet-policy-mode` is `false`:
+
+```
+wallet-descriptor-template-id: 5b48af35d4321a3ac18b43045e2523cc
+wallet-policy-id:              bd6ba7e6bd7a86038b3963f977e727a6
+policy_id_stubs (mk decode):   5b48af35     <- the TEMPLATE id
+```
+
+So this is NOT F-127's twin and not drift. The dispatch is deliberate and
+form-aware -- `derive_stub_from_md1_card` picks the WalletPolicyId for a keyed
+policy and the WalletDescriptorTemplateId for a keyless template, citing audit
+I1 (2026-06-10) and toolkit #28 -- and the tests now pin BOTH arms with
+cross-language goldens. What is stale is the **spec sentence**, which names
+`WalletPolicyId` unconditionally and describes only one of the two arms.
+
+That relocates the fix: `SPEC_mk_v0_1.md` 3.3 needs the form-aware rule
+written down, and no code change is warranted. Still open on those terms.
+
+
 
 Filed 2026-08-11, same run as F-127.
 
@@ -8665,3 +8749,37 @@ missing preimage and F-133's inverted timers.
 Adjacent: F-131 (the checklist's false recovery rule), F-132 (the preimage is
 absent from the backup), F-133 (the tiers are inverted). This is the fourth
 member of that family and the one that most changes how the wallet reads.
+### F-223 — `mk encode` takes one key per invocation, so an N-cosigner backup is N commands (owning phase: **operator journeys**) `#mnemonic`
+
+Filed 2026-08-21, closing F-127.
+
+F-127 was expected to collapse the pathological wallet's key-card build from
+~33 hand-built commands to ~3. It does not, and the measurement is worth
+keeping so the estimate is not repeated: `mk encode --xpub <XPUB>` accepts
+**one** xpub, so eleven cosigners are eleven invocations both before and after
+the fix. What F-127 removed is the hand-copied stub hex and the `md inspect`
+step that produced it -- real, but a constant, not a factor of N.
+
+The remaining labour is genuinely per-key and genuinely mechanical: for each
+cosigner, read an xpub, read its origin fingerprint and path, and invoke
+`mk encode` with the same `--from-md1` chunk set every time. Every operator
+journey scripts this as a shell loop, which is the tell that the tool is
+missing the mode.
+
+Two candidate shapes, unruled:
+
+- make `--xpub` / `--origin-fingerprint` / `--origin-path` repeatable and
+  positionally correlated (fragile -- three parallel lists that can desync,
+  and a desync mints a card that names the wrong master);
+- accept a key FILE, one `[fingerprint/path]xpub` descriptor-style record per
+  line, which is the form the journey's `inputs-pathological/keys/*.xpub`
+  files already carry and which cannot desync.
+
+The second is the better shape for the same reason `card-index.txt` keys on
+the mk1 string rather than on key order (see the note in
+`transcript_pathological.sh` section 7b): an ordering assumption between two
+lists is exactly what produced 30 wrongly-captioned plates once already.
+
+**Not blocking anything.** The loop works and is committed. This is
+ergonomics, and it is the ergonomics an operator meets first.
+
