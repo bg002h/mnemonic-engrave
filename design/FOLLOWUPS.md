@@ -8110,6 +8110,48 @@ showing none. It needs a decision and vectors, not a guess.
 Until then the screen is honest about which case it is in, and that distinction
 is tested.
 
+### RULED 2026-08-21, and A0 measured
+
+`design/agent-reports/RULING_f216_slot_mapping.md`: **build it.** A gathered mk1
+card is seated by **declaration match** — its origin, and its fingerprint when
+the template declares one, equal the slot's — under **mandatory
+`policy_id_stub` membership**. Gather order and operator assignment are both
+rejected as inputs. The argument is that this is not a heuristic: given three
+invariants the device already enforces (stub = membership in *this* policy; one
+origin binds one key; slot origins pairwise distinct since F-217), the
+assignment is either fully determined or the gather is refused — there is no
+state in which the device guesses and shows the guess as proof.
+
+**A0 — its one precondition — is SATISFIED.** The stub is computable at gather
+time from the keyless md1 alone:
+
+```
+FormAwareStubChunks(keyless_tr_with_leaf) = c8fe87cd
+```
+
+**And measuring it surfaced the consequence that will bite the implementation.**
+`FormAwareStub` is form-aware by design: it returns the **template** id for a
+keyless card and the **policy** id for a keyed one. The same wallet therefore has
+two different stubs —
+
+```
+keyless template stub : c8fe87cd
+keyed   policy   stub : b6713001
+```
+
+— so **an mk1 card minted for the FULL policy will not match a keyless
+template's stub**, and every card would be refused at membership. Only cards
+re-stubbed on the template id (what `templateizeBundle` / `reStubMk1` already do
+when the device builds a template bundle) can pass layer 1.
+
+That is not an objection to the ruling; it is the admissibility boundary the
+implementation must state on screen, because "all your key cards were refused"
+with no explanation is the worst possible version of a correct refusal.
+
+Remaining acceptance conditions from the ruling: order-invariance, a Rust
+cross-check, **a mutation check proving that cross-check can fail**, refusal
+journeys, no-partial-derivation, and pinning the same-key-two-slots shape.
+
 ---
 
 ### F-217 — ~~a card can declare ONE key origin for SEVERAL DIFFERENT keys~~ **CLOSED 2026-08-20** `#codec` `#funds-safety`
