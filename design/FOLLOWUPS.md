@@ -8384,8 +8384,26 @@ Two separable pieces:
    `md verify` as arbiter that the reported origins are the ones the card
    re-encodes to (and a negative control, since a `verify` that accepts anything
    would make that worthless).
-2. **STILL OPEN: `md decode`'s output is lossy and not a fixpoint.** It renders
-   the origins away, so re-encoding what it prints yields a different card. That
-   is the half that bites an operator reaching for the command named for the
-   job. Once decode round-trips, the fixpoint becomes assertable — today it
-   silently is not one.
+2. **PARTLY DONE 2026-08-21** (`descriptor-mnemonic` `4fe5c2db`) — `md decode`
+   now NOTES the origins on **stderr**:
+
+   ```
+   note: key origins carried by this card (not shown in the template):
+     @0: [73c5da0a/48'/0'/0'/2']
+     @1: [73c5da0a/48'/0'/1'/2']
+   ```
+
+   stderr and not stdout, and that constraint chose the design: stdout is the
+   template and is piped into `verify`, `encode` and diffs — the pathological
+   journey's own round-trip gate does exactly that. A test asserts stdout is
+   still one line and still a template. Another asserts the note **agrees with
+   `md inspect`**, since two surfaces disagreeing about one card is the defect
+   itself.
+
+   **STILL OPEN, and it is the structural half:** decode's *stdout* does not
+   round-trip. The rendered template omits the origins, so re-encoding what it
+   prints yields a different card. Fixing that means threading the resolved
+   origins through the whole normative renderer and rewriting every vector's
+   `.template` — a design change with corpus-wide blast radius, and it should be
+   scoped as one rather than bolted on. Once it lands, the decode → re-encode
+   fixpoint becomes assertable; today it silently is not one.

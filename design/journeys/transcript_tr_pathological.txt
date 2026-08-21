@@ -177,12 +177,12 @@ $ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathol
 total 240
 drwxr-xr-x 1 bcg bcg    186 Aug 20 23:25 .
 drwxr-xr-x 1 bcg bcg    696 Aug 20 23:22 ..
--rw-r--r-- 1 bcg bcg   2087 Aug 20 23:44 md1-keyed.txt
--rw-r--r-- 1 bcg bcg    356 Aug 20 23:44 md1-template.txt
--rw-r--r-- 1 bcg bcg    126 Aug 20 23:44 tr.change.txt
--rw-r--r-- 1 bcg bcg     51 Aug 20 23:44 tr.id.txt
--rw-r--r-- 1 bcg bcg 224447 Aug 20 23:25 tr-pathological-journey.html
--rw-r--r-- 1 bcg bcg    126 Aug 20 23:44 tr.receive.txt
+-rw-r--r-- 1 bcg bcg   2087 Aug 21 00:21 md1-keyed.txt
+-rw-r--r-- 1 bcg bcg    356 Aug 21 00:21 md1-template.txt
+-rw-r--r-- 1 bcg bcg    126 Aug 21 00:21 tr.change.txt
+-rw-r--r-- 1 bcg bcg     51 Aug 21 00:21 tr.id.txt
+-rw-r--r-- 1 bcg bcg 224489 Aug 20 23:44 tr-pathological-journey.html
+-rw-r--r-- 1 bcg bcg    126 Aug 21 00:21 tr.receive.txt
 [exit 0]
 
 All gates green.

@@ -60,14 +60,19 @@ note: stdout is watch-only — public keys only, cannot spend
 
 $ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md decode md1fk huqrs 9q6tv yyy5j mpprj jtvyy 49ykc gfw2s qrqg3 g55j5 2cvgs 883w6 pfw0z a5z5u 796ay rwvv2 k4yg7 s md1fk huqrs dq4h8 3w6pg tyzst hgx8e gtq4p cwl6u 5p2us 6r6zs nl2rd 0q6gg hvalg y07r0 ck54c n4ywn jh6nr r md1fk huqrs 4mrqg drha0 m7uma pumfj 075dh zfzvy nh66n 94j5l cxlmx 9ayav 9mj0j jejcx y5wfr p8fs7 5nns9 s md1fk huqrs lluyc agp8v v3nml gam2u g04zw 29zsq 0u7st 858ya cpa3h qfysj j3vzp kjnmf vwzwt hg79w xw0kr k md1fk huqr3 xcs6h e5skl tczfz ylx0n dtm9f dvtp6 hyhac a0wl5 5lszs t97f5 wsrzq dxyxc qzsdm 9rkue zcref 9 md1fk huqr3 daj78 ussl5 37esf l5plj rjg55 pypuu 3qktl y4faz hvn9p hjf8p elz5w ehnrn xhgr7 3vdxs n7uez n md1fk huqr3 jw8d5 9k03e u6d7x 7nza0 ynr9p 5d3ex an7jv up3kx 8742q 6d662 qzwwx 3qg6r mwyjl jawmu h6d4a c md1fk huqr3 egdls 899kx 6k89k fkaz2 az67a jl8hy y967j e7sks 39z80 kl7qu z6axu vpqkr sg24z gatsl n
 tr(@0/<0;1>/*,{{pk(@1/<0;1>/*),pk(@2/<0;1>/*)},pk(@3/<0;1>/*)})
+note: key origins carried by this card (not shown in the template):
+  @0: [73c5da0a/48'/0'/0'/2']
+  @1: [73c5da0a/48'/0'/1'/2']
+  @2: [73c5da0a/48'/0'/2'/2']
+  @3: [73c5da0a/48'/0'/3'/2']
 note: stdout is a keyless descriptor template (no keys)
 [exit 0]
 
 === Artifacts for the device half ===
 $ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.md1.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.id.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.receive.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.change.txt
--rw-r--r-- 1 bcg bcg 126 Aug 20 23:44 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.change.txt
--rw-r--r-- 1 bcg bcg 115 Aug 20 23:44 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.id.txt
--rw-r--r-- 1 bcg bcg 826 Aug 20 23:44 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.md1.txt
--rw-r--r-- 1 bcg bcg 126 Aug 20 23:44 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.receive.txt
+-rw-r--r-- 1 bcg bcg 126 Aug 21 00:21 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.change.txt
+-rw-r--r-- 1 bcg bcg 115 Aug 21 00:21 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.id.txt
+-rw-r--r-- 1 bcg bcg 826 Aug 21 00:21 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.md1.txt
+-rw-r--r-- 1 bcg bcg 126 Aug 21 00:21 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/walletpolicy.receive.txt
 [exit 0]
 
