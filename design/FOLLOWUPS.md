@@ -8015,3 +8015,67 @@ showing none. It needs a decision and vectors, not a guess.
 
 Until then the screen is honest about which case it is in, and that distinction
 is tested.
+
+---
+
+### F-217 — per-key (Divergent) origins are unreachable from `md encode`, so a multi-account policy declares a WRONG origin for every key but one (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
+
+Found by a reader's question about the Wallet Policy journey: why do all four
+cosigners share one master fingerprint?
+
+**Measured.** The four keys are accounts 0..3 of BIP-39's published test mnemonic
+— four *distinct* xpubs, one master, fingerprint `73c5da0a`:
+
+```
+48'/0'/0'/2'  xpub6DkFAXWQ2dHxq2vatrt9…   (@0)
+48'/0'/1'/2'  xpub6DzhyrnFFYQ1HimDiM38…   (@1)
+48'/0'/2'/2'  xpub6EGx8sPr9FxPPE1rbZaz…   (@2)
+48'/0'/3'/2'  xpub6E6Z3Ss5TXJYNJp4U1q3…   (@3)
+```
+
+So it is **not key reuse** — but the card the journey builds passes
+`--path "48'/0'/0'/2'"`, and `--path` *flattens Divergent mode to Shared*. The
+card therefore declares **all four keys at account 0's origin**, which is false
+for three of them.
+
+**Why it is not caught, and why it still matters.** Addresses are unaffected: they
+come from the xpubs the card carries, not from the declared origin — which is
+exactly why the journey's device-vs-host comparison passed. The origin is what a
+*signer* uses to find its key, so a restorer following it would look at
+`48'/0'/0'/2'` for `@1` and find the wrong key. Silent, and only at signing time.
+
+**The CLI cannot express the correct thing.** `md encode` has one origin flag and
+it is shared-only; `--key` rejects an inline origin
+(`--key "@0=[73c5da0a/48'/0'/0'/2']xpub…"` → *"base58check decode: decode"*). The
+codec supports `OriginPathOverrides` — the Divergent mode this needs — and nothing
+on the CLI reaches it. For a `tr()` template, whose wrapper has no canonical
+default, the only two options are **no origin** (partial decode, `md` warns) or
+**one shared origin that is wrong for most keys**.
+
+Fix is a per-key origin surface, Rust-first, with a vector that has genuinely
+divergent origins. Until then, the conformance corpus's own `path` field carries
+the same flattening, so this is not a journey-only defect.
+
+---
+
+### F-218 — `md encode` accepts the SAME xpub in every slot; the device refuses duplicates only when IT built the policy (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
+
+From the same question. `md encode` on a 4-key template with one xpub repeated
+four times emits a card without complaint — a policy that reads as 4-of-4 and is
+spendable by one key.
+
+The fork **does** refuse this, with a named, well-written refusal naming the
+slots (`gui/multisig_build.go:364`, `errBuildDuplicateKey`) — but that check sits
+in `buildMultisigPolicyFlow`, the path where **the device assembles the policy
+from cosigner cards**. A policy that arrives already built — Engrave Bundle, and
+the new **Wallet Policy** program — never reaches it.
+
+So the check exists and guards the one path where the operator could not have
+made the mistake off-device, and is absent on the two paths where a host tool
+just did. Same asymmetry class as F-213, in the other direction.
+
+Two halves, and they are separable:
+- **Rust-primary:** `md encode` should refuse (or at minimum loudly warn about)
+  a duplicated key across slots, with a vector.
+- **Device:** the supplied-policy paths should run the same check the build path
+  does. `errBuildDuplicateKey`'s message is already the right one.
