@@ -8136,3 +8136,25 @@ Two halves, and they are separable:
   a duplicated key across slots, with a vector.
 - **Device:** the supplied-policy paths should run the same check the build path
   does. `errBuildDuplicateKey`'s message is already the right one.
+
+### Re-measured 2026-08-20, on the question "do we reject repeated keys as unsafe?"
+
+| surface | refuses a repeated key? |
+| --- | --- |
+| `md encode` (host) | **No.** Emits the card. No error, and **nothing on stderr** either |
+| device, **build** path (`buildMultisigPolicyFlow`) | **Yes** — `duplicateSlotPair` → `errBuildDuplicateKey`, naming both slots |
+| device, **supplied-policy** paths (Engrave Bundle, Engrave Multisig's supply, **Wallet Policy**) | **No** |
+
+The build-path check is well-placed and well-argued — it runs *before*
+`buildReviewFlow` precisely because, with fingerprint-presence `Omit` (the
+default), that screen renders every slot `(no fp)`, so **a wallet one master can
+spend alone looks exactly like a wallet three masters share**. Its own comment
+states the scope limit outright: *"mints passes here; not every md1 the device
+engraves."*
+
+**Scope, so this is not confused with F-217:** the check refuses only
+**IDENTICAL** keys. The same seed at a *different* origin is not a duplicate and
+is admitted deliberately (`gui/multisig.go:306`). And F-217's origin-contradiction
+check explicitly **exempts** the same key at one origin, so the two refusals stay
+distinct — one origin bound to two different keys is impossible; one key in two
+slots is merely unsafe.
