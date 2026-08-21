@@ -5085,7 +5085,7 @@ question stated: number the records from 1, or report the line they came from?
 
 ---
 
-### F-154 — the tenth program's carousel dot is drawn underneath the firmware version line (owning phase: **polish / v0.0.1**) `#mnemonic`
+### F-154 — ~~the tenth program's carousel dot is drawn underneath the firmware version line~~ **CLOSED 2026-08-20** `#mnemonic`
 
 Filed 2026-08-12, same run. **Measured on the framebuffer, not eyeballed** —
 scanning row y=297 of `shots/p09-load-payload-program.png` for near-white runs:
@@ -5112,6 +5112,35 @@ the dot pitch, or drop the dots past N. Owning phase **polish / v0.0.1** per the
 test-infra/cosmetics rule — this is UI polish found during functionality work.
 
 ---
+
+**CLOSED 2026-08-20** (`seedhammer` `1cf9dfc`). **The prediction above came
+true on schedule**: Stage 4's Wallet Policy program was the tenth, and the
+Wallet Policy journey's capture caught it on the emulator's own framebuffer —
+two dots drawn *around* "Fi" and "rm", enclosing the letters, with dot ink
+running to x=327 against a label starting at x=306.
+
+**The spacing was never the problem; the centring was.** The label is anchored
+to the right edge and the pager was centred on the FULL width, so at 480px the
+pager could be at most ~132px — and ten 13px dots do not fit that even edge to
+edge. The pager is now centred in the room it actually has: the label is
+measured first and its width sets the region. Re-running the capture moved the
+dots to x=59..241.
+
+**The gate took two tries, and both failures are the interesting part.**
+
+- *The difference method is invalid here.* Render with and without the version
+  string, diff the columns — obvious, and broken by this very fix, because the
+  pager's position now depends on the label's width. It reported a 195-column
+  "collision" on a screen with none.
+- *It was aimed at the wrong label.* `uiFlow`'s parameter is named `version`, so
+  the test passed `"emu"`: 24px wide, left edge x=452, and a comfortable pass.
+  But `run_flow.go:231` calls it with `versionText` — `"Firmware: <v>\nHardware:
+  <hw>"` — a two-line label ~171px wide starting at x=305. Against the real
+  string the gate fails on the old centring at x=301, agreeing with the
+  framebuffer to a pixel.
+
+Also worth carrying: `go test` served a **cached pass** for the first mutation
+run, so a mutant looked caught without having run. `-count=1` on every mutation.
 
 ### F-155 — the home screen cannot tell you whether a payload is loaded (owning phase: **systemwide payloads — spec question first**) `#mnemonic`
 
