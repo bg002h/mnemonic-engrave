@@ -7930,3 +7930,59 @@ derivation, a conformance vector **that discriminates** (see `keyed_tr_multi_a`
 — the corpus had no order-sensitive tap leaf at all until 2026-08-20), and a
 mutation pass. It is not a one-liner, and it is not urgent while the refusal
 holds.
+
+---
+
+### F-215 — the template-engrave shape guard refuses two shapes that have both moved out from under it (owning phase: **the tr/wsh cycle, Stage 6**) `#seedhammer` `#codec`
+
+`md.templateEngraveShapeGuard` refuses `tr(sortedmulti_a)` and `sortedmulti`
+nested under a combinator, on the stated grounds that the shipped off-device
+toolkit cannot reconstruct them — *"they would be silently engraved as an
+UNRECOVERABLE backup"*. Both halves were true when written. Neither is now, and
+the guard's own comment still says the fork does not port rust-miniscript, which
+S0's pin lift changed.
+
+Measured, not inferred:
+
+| shape | guard's premise | today |
+| --- | --- | --- |
+| `tr(sortedmulti_a)` | unrecoverable | **round-trips**: `md decode` returns the template verbatim, exit 0 |
+| `sortedmulti` in a combinator | unrecoverable | **unencodable**: `md encode` refuses it by BIP-383/388, so it cannot reach a card at all |
+
+So the guard now blocks exactly one thing: a legitimate `tr(sortedmulti_a)`
+template engrave, which D4 explicitly wants to allow.
+
+**Conservative, not dangerous** — it refuses something safe rather than admitting
+something unsafe, which is why this is a follow-up and not a defect. The new
+Wallet Policy program calls the guard *deliberately* despite knowing it is stale:
+a new program quietly admitting more than the shipped path is the worse of the
+two errors, and loosening an admission rule is risk-set work that should be
+applied to **both** paths in one cycle with vectors.
+
+This is [[comments-outlive-their-conditions]] with a worked example: the guard
+enumerates its shapes, and enumerated safety arguments go stale silently. Grep
+for the mechanism, not the claim.
+
+---
+
+### F-216 — a keyless template gathered *with* its mk1 key cards still shows no addresses (owning phase: **the tr/wsh cycle, Stage 5**) `#seedhammer`
+
+Plan D3 has two halves. The Wallet Policy program ships the second — *"skipping
+the gather proceeds to consent without address proof"* — and not the first:
+*"a keyless template md1 … gates addresses on gathering N mk1 key cards."*
+
+The gap is visible rather than hidden: `walletPolicyMd1` **accepts** mk1 cards in
+the set (they are legitimate cargo — `bundleEngrave` cuts every card), so an
+operator can gather a template plus its key plates and still be told *"Keyless
+template - no addresses"* with the keys sitting in the same bundle.
+
+**Not implemented as a mechanical extension, on purpose.** Combining them needs a
+rule for mapping each mk1 to an `@N` slot, and that rule is not obvious: a
+template carries no xpubs, so the mapping has to come from fingerprint + origin
+path, from gather order, or from the policy-id stub — and they disagree when a
+template elides fingerprints or seats one key at several slots. **A wrong slot
+mapping derives a wrong address and presents it as proof**, which is worse than
+showing none. It needs a decision and vectors, not a guess.
+
+Until then the screen is honest about which case it is in, and that distinction
+is tested.
