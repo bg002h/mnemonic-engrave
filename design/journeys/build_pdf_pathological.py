@@ -253,13 +253,24 @@ It records ONE shared origin — <code>bip48</code> and <code>m/48'/0'/0'/2'</co
 produce a byte-identical chunk set here. These eleven keys actually sit at four
 account indices (<code>48'/0'/0..3'/2'</code>) across three masters, and each mk1
 card carries its own true <code>origin_path</code>. So the md1's shared value is
-a default the key cards override; a restore that trusted the descriptor card
-alone would derive the wrong keys for @3–@10. Worth pinning with a restore test
-before this shape is recommended to anyone.</div>
+a default the key cards override, and a restore that trusted the descriptor card
+alone would derive the wrong key for most slots.</div>
+
+<div class="note"><b>That is now pinned, and the pin corrected the claim.</b>
+This paragraph used to say the wrong keys were <b>@3–@10</b> and that the case
+was "worth pinning with a restore test". It has been pinned —
+<code>restore_test_pathological.py</code>, run below — and the measured answer
+is <b>@1, @2, @3, @5, @6, @7, @9, @10</b>: eight of eleven, and the range was
+wrong in <i>both</i> directions. It included @4 and @8, which recover fine, and
+omitted @1 and @2, which do not. Only <b>@0, @4 and @8</b> — one per master,
+each the account-0 key — come back.</div>
 
 <h2 style="margin-top:14px">Host step 3 — the chunk set decodes back</h2>
-<p>Three cards, reassembled, give the same 11-key policy back — the round trip
-that makes the backup worth engraving.</p>
+<p>Three cards, reassembled, give the same 11-key policy back. <b>That is a
+transcription check, not a restore test</b> — it proves the bytes survive the
+card format and says nothing about whether the origins they carry are the ones
+the keys actually live at. The restore test is the next page, and this wallet
+fails it.</p>
 {code(sect('4. the chunk set decodes back to the same 11-key policy'), 16)}
 </div>
 
@@ -319,6 +330,18 @@ and <b>no address could be derived for this wallet by any tool</b>. That is why 
 earlier version of this document showed one. These are the structural half's
 counterpart: proof the bytes mean the wallet that was intended.</p>
 {code(sect('9b. THE ADDRESSES — the check this wallet could never do before'))}
+
+<h2 style="margin-top:14px">The restore test — what a card-only restore recovers</h2>
+<p>The decode step is a transcription check. <b>This is the restore test</b>: it
+derives, from each master seed, the key the <i>descriptor card's own declared
+origin</i> would lead a restorer to, and compares it against the key that slot
+actually holds.</p>
+{code(sect('9c. THE RESTORE TEST — what a card-only restore actually recovers'), 26)}
+<div class="note"><b>Three of eleven.</b> Only <code>@0</code>, <code>@4</code>
+and <code>@8</code> — one account-0 key per master — come back. Every tier of
+this vault needs signatures this restore cannot produce, so the descriptor card
+alone is not a backup of this wallet: the mk1 key cards carry the origins that
+make it one, and they are not optional.</div>
 
 {code(sect('10. the seed, and the refusal that still holds'), 26)}
 </div>
@@ -466,9 +489,11 @@ Without it the descriptor card carries no origin, <code>md decode</code>
 PARTIAL-decodes (exit 4) and <code>me bundle</code> refuses the set. With it,
 everything validates — but it records a single shared origin while these eleven
 keys sit at four account indices. The true paths survive on the mk1 cards; the
-descriptor card alone would restore @3–@10 wrongly. This is the one finding here
-that is a <em>design</em> question rather than a defect: a restore test should
-pin which source wins.</div>
+descriptor card alone restores only <b>3 of 11</b> slots correctly — @0, @4 and
+@8, one account-0 key per master. Measured by the restore test above, which also
+corrected this sentence's earlier claim of "@3–@10". Which source wins is a
+<em>design</em> question rather than a defect, and it is now pinned rather than
+argued.</div>
 
 <div class="note"><b>4. <code>md encode</code> has no per-key origin flag.</b>
 <code>--key</code> takes a bare xpub and rejects an origin-annotated one

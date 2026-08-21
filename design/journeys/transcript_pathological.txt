@@ -231,3 +231,27 @@ $ /scratch/code/shibboleth/mnemonic-engrave/target/release/me --in /dev/fd/63 --
 me: refusing to emit ms1 over NFC: ms1 is secret seed entropy and must never be transmitted by radio (RF eavesdropping risk). Enter it by hand on the device: New > Input Seed > CODEX32.
 [exit 3]
 
+########## 9c. THE RESTORE TEST — what a card-only restore actually recovers
+$ python3 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/restore_test_pathological.py
+A restore that trusts the DESCRIPTOR CARD alone derives account 0 from every master.
+
+  @0  master 73c5da0a  at 48'/0'/0'/2'     RECOVERED
+  @1  master 73c5da0a  at 48'/0'/1'/2'     WRONG KEY
+  @2  master 73c5da0a  at 48'/0'/2'/2'     WRONG KEY
+  @3  master 73c5da0a  at 48'/0'/3'/2'     WRONG KEY
+  @4  master b8688df1  at 48'/0'/0'/2'     RECOVERED
+  @5  master b8688df1  at 48'/0'/1'/2'     WRONG KEY
+  @6  master b8688df1  at 48'/0'/2'/2'     WRONG KEY
+  @7  master b8688df1  at 48'/0'/3'/2'     WRONG KEY
+  @8  master 28645006  at 48'/0'/0'/2'     RECOVERED
+  @9  master 28645006  at 48'/0'/1'/2'     WRONG KEY
+  @10 master 28645006  at 48'/0'/2'/2'     WRONG KEY
+
+  8 of 11 slots recover the WRONG key: [1, 2, 3, 5, 6, 7, 9, 10]
+  3 recover correctly: [0, 4, 8]
+
+  Every tier of this vault needs keys this restore cannot produce.
+
+  Matches what the journey documents. Gate green.
+[exit 0]
+

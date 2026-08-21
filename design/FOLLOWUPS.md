@@ -8587,3 +8587,43 @@ Two candidate fixes, and the choice is a ruling:
 Recorded in the operator journey itself rather than only here — that document now
 shows the `origins: m` block beside its addresses and says plainly that the
 twelve paths came from the key files, not from the card.
+
+---
+
+### F-221 — F-217's contradiction check cannot see a KEYLESS template, which is where the pathological journey's card hides one (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
+
+Found by a reader asking *"what is a round trip if not a restore test?"* about the
+pathological journey's decode step.
+
+F-217 refuses a card that binds one `(fingerprint, path)` to two different keys.
+The check needs **both** a fingerprint and an xpub per slot — a keyless template
+carries neither, so it passes silently. And a keyless template is exactly what
+gets engraved on the descriptor plate.
+
+**Measured on that journey's own card.** `md encode --path "48'/0'/0'/2'"` over a
+policy whose eleven keys sit at four account indices across three masters. The
+card declares one shared origin; the restore test
+(`design/journeys/restore_test_pathological.py`) derives what a card-trusting
+restorer would get:
+
+| | |
+| --- | --- |
+| slots recovered correctly | **3** — @0, @4, @8, one account-0 key per master |
+| slots recovering the WRONG key | **8** — @1, @2, @3, @5, @6, @7, @9, @10 |
+
+Every tier of that vault needs signatures this restore cannot produce.
+
+**The keyed form of the same wallet WOULD be refused** — that is the asymmetry.
+Add the xpubs and fingerprints and F-217 fires; leave them off and the identical
+mistake engraves cleanly. The check is on the form that is not engraved.
+
+**Related but distinct from F-220.** F-220 is a canonical wrapper never demanding
+an origin, so the card records `m`. This is a card that records an origin which
+is *wrong for most of its slots*. Both end the same way — a restorer cannot find
+the keys — and neither is visible to any address check, because addresses come
+from the xpubs a card carries rather than the origins it declares.
+
+Candidate fix: extend the contradiction check to keyless templates using
+**declared origins alone** — if a template's slots all share one origin while its
+`n` exceeds the number of keys one master could plausibly seat there, that is at
+minimum a warning. The precise rule needs a ruling; the measurement does not.

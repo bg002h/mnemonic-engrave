@@ -250,3 +250,15 @@ run cat "$W/inputs-pathological/seeds/master-A.seed"
 run "$MS" encode --phrase "$(cat "$W/inputs-pathological/seeds/master-A.seed")"
 MS1=$("$MS" encode --phrase "$(cat "$W/inputs-pathological/seeds/master-A.seed")" --no-engraving-card 2>/dev/null | tr -d ' ')
 run "$ME" --in <(printf '%s\n' "$MS1") --hex
+
+echo "########## 9c. THE RESTORE TEST — what a card-only restore actually recovers"
+# Step 3 above proves the BYTES survive. This asks the different question: if
+# someone holds these plates and their seeds, do they get the wallet back?
+#
+# They do not. `--path` recorded ONE shared origin while the eleven keys sit at
+# four account indices across three masters, so a restorer trusting the
+# descriptor card derives account 0 from each master and recovers three of
+# eleven. The script exits non-zero if the measured damage stops matching what
+# the document claims -- which is how the document's original "@3-@10" was
+# caught being wrong in both directions.
+run python3 "$W/restore_test_pathological.py"
