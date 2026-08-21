@@ -8222,9 +8222,25 @@ seats one master at two multipath branches — a genuine two-key script that
 F-218's `(xpub, use-site)` check exists to let through, and the shape a naive
 "one card, one slot" rule would break. Pinned by mutation.
 
-**Remaining: A4 — refusal journeys in the emulator.** Every refusal has unit
-coverage and its own sentence; what is missing is an operator walking into each
-one on the device. That is journey work, not code.
+**A4 DONE 2026-08-21** (`seedhammer` `a3f89c6`) — `capture_seating.py`, both
+arms, on the emulator:
+
+- **happy:** a keyless template + 2 key cards presented in **reverse order** →
+  all four host-derived addresses, with absence assertions rejecting "no
+  addresses" / "Keyless template" / "can't derive", because those are exactly
+  what the pre-F-216 device showed and what a regression looks like;
+- **refusal** (`--prove-refusal`): a card stubbed on the **policy** id instead of
+  the template id → the device refuses **in words**, naming the stub difference,
+  and shows **no address**. Both are asserted.
+
+**The refusal card had to be MINTED, not corrupted** — mk1 is BCH-checksummed,
+so a mangled card is dropped at the scanner and never reaches seating at all
+(measured: the key-card tally stayed at 0). The realistic failure is a card made
+for the full-policy form of the same wallet.
+
+**F-216 is functionally complete**: A0–A6 all met. What remains is optional
+polish — the other two refusal arms (no-slot, contested) have unit coverage and
+their own sentences but no emulator walk.
 
 ---
 

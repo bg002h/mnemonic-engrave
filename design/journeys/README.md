@@ -69,6 +69,30 @@ It also has **its own `out/tr-pathological/` subtree**, because the two wallet
 journeys previously shared `out/` and either could overwrite the other's
 intermediates — after which the second "passes" against the first's artifacts.
 
+### The seating walk (2026-08-21) — not a document, a gate
+
+`capture_seating.py` drives D3's first half on the device: a **keyless
+template** gathered with its **mk1 key cards**, seated by declared origin, and
+the addresses read off the consent screen. It produces no PDF — it is a gate,
+run like a test:
+
+```sh
+python3 make_seating_fixture.py     # mints the template, the key cards and the truth
+python3 capture_seating.py          # the happy arm
+python3 capture_seating.py --prove-refusal   # the refusal arm
+```
+
+**The cards are presented in reverse order on purpose.** Seating is by
+declaration, never by gather order, and a fixture in slot order would not notice
+if that stopped being true.
+
+**The refusal card is minted, not corrupted**, and that is a measured finding:
+mk1 carries a BCH checksum, so a mangled card is dropped at the *scanner* and
+never reaches seating (the gather tally stayed at 0 key cards). The case an
+operator actually hits is a card made for the **full-policy** form of the same
+wallet — its stub is the policy id, while a template expects the template id.
+The arm asserts the device says so **in words** and shows **no address**.
+
 Three things this run measured that no reading would have:
 
 - **The tally counts CARDS, not chunks.** A card's intermediate chunks draw
