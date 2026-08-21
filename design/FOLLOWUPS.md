@@ -4066,7 +4066,28 @@ produced it -- and it makes keyed cards possible at all. Reaching ~3 commands
 needs a batch input mode (`--xpub` repeatable, or a key file), which is a
 separate feature; see F-223.
 
-### F-128 — the stub's spec sentence and `mk`'s behaviour name different identities (owning phase: **operator journeys**) `#mnemonic`
+### F-128 — ~~the stub's spec sentence and `mk`'s behaviour name different identities~~ **CLOSED 2026-08-21** `#mnemonic`
+#### RESOLVED 2026-08-21 — `mnemonic-key` (SPEC 3.3 + 5)
+
+Fixed in the TEXT, since the refutation below establishes the code is right.
+3.3 now carries the form-aware dispatch as a normative table, with the
+measurement that shows why an unconditional WalletPolicyId is wrong: the same
+wallet in both forms shares a key-stable template-id (`a235ee75`) but has
+DIFFERENT policy-ids (`38bd7cec` keyed, `16ba6a79` keyless), so a keyless
+template hashes to a value binding nothing about its cosigners.
+
+5 (Linkage to MD) was the load-bearing half and is the reason to keep reading
+past 3.3. Its recovery flow said to compute the WalletPolicyId unconditionally,
+so a tool built to the letter of this spec would reject EVERY card minted from
+a template and present it as "none of my cards belong to this wallet". Fixed,
+with that failure mode named inline.
+
+The funds-relevant consequence is now stated rather than implied: **one wallet
+has two stubs**, and membership compares them verbatim. Pinned by a new test,
+`one_wallet_two_forms_two_stubs`, which asserts AGAINST `16ba6a79` so a
+regression to the old wording is caught by value; mutating the dispatch to
+unconditional kills 3 tests.
+
 #### The stale-pin hypothesis is REFUTED, 2026-08-21
 
 This entry speculated the divergence might be a consequence of md-codec drift
@@ -8749,7 +8770,7 @@ missing preimage and F-133's inverted timers.
 Adjacent: F-131 (the checklist's false recovery rule), F-132 (the preimage is
 absent from the backup), F-133 (the tiers are inverted). This is the fourth
 member of that family and the one that most changes how the wallet reads.
-### F-223 — `mk encode` takes one key per invocation, so an N-cosigner backup is N commands (owning phase: **operator journeys**) `#mnemonic`
+### F-223 — ~~`mk encode` takes one key per invocation~~ **CLOSED 2026-08-21** `#mnemonic`
 
 Filed 2026-08-21, closing F-127.
 
@@ -8782,4 +8803,51 @@ lists is exactly what produced 30 wrongly-captioned plates once already.
 
 **Not blocking anything.** The loop works and is committed. This is
 ergonomics, and it is the ergonomics an operator meets first.
+
+#### RESOLVED 2026-08-21 — `mnemonic-key` (`--keys`) + this repo `01697a1`
+
+`mk encode --keys <FILE>` mints one card per record. Records are BIP-380 origin
+notation, one per line (`[fingerprint/path]xpub`), `-` reads stdin, blank lines
+and `#` comments ignored. The key-file shape recommended in this entry was the
+one built, for the reason given: parallel repeatable flags can desync, and a
+desync mints a card naming the wrong master.
+
+**The number in this entry was wrong, and the correction is worth keeping.** It
+recorded that F-127's "~33 commands to ~3" estimate "does not survive
+measurement", on the grounds that eleven cosigners are eleven invocations
+either way. That was true of the *cards* and missed the larger half: the
+card-index step called `mk encode` TWICE PER KEY -- once to count chunks, once
+to read strings -- so the transcript's runtime total was 11 + 22 = **33**. The
+original estimate was right; the second measurement counted only section 7. The
+transcript now runs `mk encode` **twice**.
+
+So this closes better than either estimate: **33 -> 2**, with both artifacts
+byte-identical to the loop they replace.
+
+**The part that matters more than the count.** The old card-index loop
+RE-DERIVED the cards it was indexing, so nothing guaranteed the strings it
+captioned were the strings engraved. Both now come from one batch output.
+
+**Equivalence is the pinned property, not the convenience.** `--keys` is an
+input multiplexer; if it ever mints a different card than the loop it replaces
+it is wrong however convenient it is. `batch_matches_per_key_loop` asserts
+byte-identity against N single-key invocations, and both routes share one mint
+path so they cannot drift.
+
+**Deliberate refusals** (each tested): `--keys` is mutually exclusive with
+`--xpub`, `--origin-path`, `--origin-fingerprint`, `--chunk-set-id` and
+`--privacy-preserving`. A record carries its own origin, so a global one would
+override it or be ignored. Privacy-preserving cards are minted one at a time on
+purpose -- a record always declares a fingerprint, and dropping it silently is
+how a card gets engraved wrong. An empty key file is refused rather than
+minting nothing at exit 0.
+
+**Cross-repo catch worth remembering.** Making `--xpub` optional flipped
+`mk gui-schema` to `required: false`, caught by an existing test. `mnemonic-gui`
+keeps a HAND-WRITTEN mirror (`src/schema/mk.rs`) with `required: true` and there
+is no automated gate between the repos, so the flip would have desynced them
+silently. Resolved by holding the GUI contract fixed rather than editing the
+test: `--keys` is excluded from the schema, which describes the form the GUI
+RENDERS (one card), and the emitted schema was verified BYTE-IDENTICAL against
+a build of the previous tree.
 
