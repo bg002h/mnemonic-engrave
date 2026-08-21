@@ -375,7 +375,7 @@ where a policy mismatch silently loses funds.
 
 ---
 
-## Stage 4 — the Wallet Policy program (D5)
+## Stage 4 — the Wallet Policy program (D5) — **DONE 2026-08-20**
 
 A new navigable program, not a rename of Multisig and not an in-place extension.
 Most transport already exists: `bundleGatherFlow`
@@ -424,10 +424,48 @@ Two fixture gaps that mutation found, both fixed rather than noted:
 | reverse a tap leaf's key indices | the corpus's only multi-key leaf was `sortedmulti_a`, which **sorts** — written order was unobservable in every input the suite owned | `keyed_tr_multi_a`, added Rust-first (`descriptor-mnemonic` `97d39e4b`) |
 | delete the derive probe | every vector derives | `gap_tr_leaf_and_v` — a timelocked tap leaf Rust derives and this port refuses (F-214), pinned by shape |
 
-**Still open in this stage:** the navigable **Wallet Policy program** itself (D5)
-— a front door with its own admission classes, rather than the NFC-inspect
-surface the wiring reached. Nothing above depends on it; it changes how an
-operator *arrives*, not what they can see once there.
+### The program landed 2026-08-20 (`seedhammer` `09c5f14`) — **STAGE 4 CLOSES**
+
+The 10th navigable program, inserted mid-enum beside the other engrave programs
+so `bip85Derive` stays the bound `lastNav()` returns.
+
+**It is its own program because neither existing one answers D2.** Engrave Bundle
+can already gather and engrave a supplied md1 — its review reads "N cards
+verified", which says the chunks reassembled and nothing about *which wallet*.
+Engrave Multisig proves more but demands a seed and cuts cosigner plates: its
+question is "am I in this policy", not "is this the right policy".
+
+Transport is reused verbatim (`bundleGatherFlowResume`, `bundleEngrave`), so a
+card enters through the same `offer()`, deduplication and validation. What is new
+is the consent surface between them:
+
+- **addresses are LINES on the consent screen**, not a side trip — D2 says the
+  derivation belongs *on* the consent path, so an operator who taps straight
+  through still passes them. Receive **and** change, two each (D6).
+- **the id is named by the CODEC**, not by the caller: `md.FormAwareIdChunks`
+  returns the id authoritative for the card's form *and* which kind it is, so the
+  wrong label is unwritable. Same `isWalletPolicy` discriminant as the existing
+  `FormAwareStub`, so a card's stub and its displayed id cannot disagree.
+- **the absence of addresses is always stated**, and the two reasons are
+  distinguishable — keyless-on-purpose (D4) vs. F-214's capability gap. An empty
+  block reads as "this screen has no addresses", which is the observation that
+  should stop an operator.
+- **no seed class.** `progWalletPolicy` admits `ClassDescriptor` + `ClassMDMK`
+  only, enforced in the admission table rather than by the flow not asking.
+
+The 11 lockstep failures the enum comment predicts all fired and were updated
+rather than loosened; `cmd/emu`'s decoy-needle pin went 2 → 3.
+
+**Two mutation survivors, both in the TESTS:** the per-chain address count looped
+on `addrProofPerChain` itself, so halving it moved both sides together (now a
+literal, with the constant pinned once as a claim); and selecting the program
+needs the physical Button3, because the carousel's right-arrow `Clip` covers the
+whole right edge and a nav-slot hit test there resolves to the arrow.
+
+**Carried out of the stage, both filed rather than absorbed:** F-216 (D3's
+mk1-gated addresses for a keyless template — the slot-mapping rule is a decision,
+and a wrong mapping shows a wrong address as *proof*) and F-215 (the
+template-engrave shape guard is stale in both halves).
 
 ---
 
