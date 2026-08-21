@@ -206,10 +206,10 @@ run head -2 "$KEYFILE"
 # bundle is a worse failure than the stale one that commit removed. With
 # --keys the whole run fails on a bad record, naming its line number, so a
 # partial bundle is no longer reachable at all.
-CARDS_OUT="$W/out/pathological/mk-encode-stdout.txt"
+CARDS_OUT="$W/out/pathological/mk-encode.json"
 CARDS_ERR=$(mktemp)
-echo "\$ $MK encode --keys $KEYFILE ${#FROM_MD1[@]} --from-md1 args --group-size 0"
-if ! "$MK" encode --keys "$KEYFILE" "${FROM_MD1[@]}" --group-size 0 \
+echo "\$ $MK encode --keys $KEYFILE ${#FROM_MD1[@]} --from-md1 args --json"
+if ! "$MK" encode --keys "$KEYFILE" "${FROM_MD1[@]}" --json \
       > "$CARDS_OUT" 2> "$CARDS_ERR"; then
   echo "FATAL: mk encode --keys failed:" >&2
   cat "$CARDS_ERR" >&2
@@ -219,10 +219,18 @@ fi
 cat "$CARDS_ERR"; rm -f "$CARDS_ERR"
 echo "[exit 0]"
 echo
-# stdout ONLY, so the blank line BETWEEN cards still delimits them. The
-# watch-only advisory goes to stderr; folding it in with 2>&1 would land a
-# non-mk1 line inside a card block and merge two cards into one.
-grep '^mk1' "$CARDS_OUT" > "$W/out/pathological/mk-encode-raw.txt"
+# --json rather than the blank-line-separated text form. Each card object now
+# NAMES its origin (`origin_fingerprint`, `origin_path`), which is what lets the
+# index below check attribution instead of assuming it. The text form carries no
+# identity, so position was the only available join.
+python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+with open(sys.argv[2], "w") as f:
+    for c in d["cards"]:
+        for s in c["mk1_strings"]:
+            f.write(s + "\n")
+' "$CARDS_OUT" "$W/out/pathological/mk-encode-raw.txt" || exit 1
 
 # Belt and braces: the engraved bundle must have exactly the expected shape.
 # Belt and braces: every key must have contributed at least one chunk. The
@@ -247,33 +255,22 @@ echo "note: $NKEYS key cards -> $GOT mk1 chunks (BIP-48 origins push most cards 
 : > "$W/out/pathological/card-index.txt"
 # Derived from the SINGLE batch output above rather than from 22 more `mk
 # encode` calls (two per key: one for the chunk total, one for the strings).
-# That loop is what made this transcript run mk encode 33 times; it now runs
-# it twice, and neither extra call can disagree with the cards actually
-# engraved because there are no extra calls.
 #
-# `--keys` emits cards in FILE order separated by a blank line, and keys-meta
-# was written in that same order, so block N belongs to meta line N. awk's
-# paragraph mode (RS="") splits on the blank lines.
-awk -v RS= -v meta="$KEYMETA" -v out="$W/out/pathological/card-index.txt" '
-# RS="" governs getline-from-file too, so the meta file arrives as ONE
-# paragraph rather than 11 lines. Split it on newlines explicitly; reading it
-# line-wise here would silently give n=1 and mis-attribute every plate.
-BEGIN {
-  n = 0
-  while ((getline l < meta) > 0) {
-    c = split(l, T, "\n")
-    for (i = 1; i <= c; i++) if (T[i] != "") m[n++] = T[i]
-  }
-}
-{
-  if (NR > n) { print "FATAL: more card blocks than key records" > "/dev/stderr"; exit 1 }
-  split(m[NR-1], M, " ")
-  tot = split($0, L, "\n")
-  for (j = 1; j <= tot; j++)
-    printf "%s %s %s %s %s %s\n", L[j], M[1], j, tot, M[2], M[3] >> out
-}
-END { if (NR != n) { print "FATAL: " NR " card blocks for " n " key records" > "/dev/stderr"; exit 1 } }
-' "$CARDS_OUT" || exit 1
+# The join is now CHECKED, not assumed. The previous version paired card block N
+# with key record N and guarded it with a COUNT — which is permutation-blind: an
+# adversarial review swapped two records and got a self-consistent 30-line index
+# at exit 0 with five silently wrong plate captions, because `tot` is recomputed
+# per block so a permutation self-heals into a plausible-but-false chunk number.
+# The PDF guard did not fire either; it only raises on ABSENT strings.
+#
+# Now each card names its own origin, so every row asserts that the card really
+# was minted for the key it is captioned with. A permutation fails loudly.
+run "$W/build_card_index.py" "$CARDS_OUT" "$KEYMETA" \
+  "$W/out/pathological/card-index.txt"
+if [ ! -s "$W/out/pathological/card-index.txt" ]; then
+  echo "FATAL: card-index.txt was not written" >&2
+  exit 1
+fi
 
 run wc -l "$W/out/pathological/card-index.txt"
 run wc -l "$W/out/pathological/mk-encode-raw.txt"

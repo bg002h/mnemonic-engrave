@@ -8817,12 +8817,29 @@ recorded that F-127's "~33 commands to ~3" estimate "does not survive
 measurement", on the grounds that eleven cosigners are eleven invocations
 either way. That was true of the *cards* and missed the larger half: the
 card-index step called `mk encode` TWICE PER KEY -- once to count chunks, once
-to read strings -- so the transcript's runtime total was 11 + 22 = **33**. The
-original estimate was right; the second measurement counted only section 7. The
-transcript now runs `mk encode` **twice**.
+to read strings. The original estimate was right in shape; the second
+measurement counted only section 7.
 
-So this closes better than either estimate: **33 -> 2**, with both artifacts
-byte-identical to the loop they replace.
+**Both of this entry's numbers were still wrong, and the third measurement is
+the one to trust.** Counted with an instrumented `mk` shim that logs every
+actual process invocation, rather than by grepping the transcript LOG for
+`mk encode` -- the log only shows ECHOED commands, and the `$(...)` captures are
+silent, which is what produced both earlier errors:
+
+| tree | `mk encode` invocations |
+| --- | --- |
+| `6e6753c` (before this cycle) | **34** |
+| `85cf6c7` (parent of the commit that claimed "33") | **35** |
+| current | **3** |
+
+"33" omitted section 5's demonstration call; "2" omitted the section 6 stub
+read-back added in the same commit. Two independent reviewers (R3, R4) caught
+this and reported 34 and 35 respectively -- both correct, against different
+baselines. **So: 34 -> 3 across the cycle**, with every artifact byte-identical
+to the loop it replaces.
+
+The lesson is the same one three times: measuring a PROXY (a log, a static
+grep) instead of the thing. Count invocations by instrumenting the binary.
 
 **The part that matters more than the count.** The old card-index loop
 RE-DERIVED the cards it was indexing, so nothing guaranteed the strings it
