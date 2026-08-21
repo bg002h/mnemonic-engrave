@@ -1,0 +1,151 @@
+=== 0. Versions ===
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md --version
+md 0.13.0
+[exit 0]
+
+=== 1. The wallet ===
+
+$ cat /scratch/code/shibboleth/mnemonic-engrave/design/journeys/inputs-pathological/wallet-policy-tr.txt
+tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(3,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))),{and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(2,@3/48'/0'/3'/2'/<0;1>/*,@4/48'/0'/0'/2'/<0;1>/*,@5/48'/0'/1'/2'/<0;1>/*))),{and_v(v:older(65535),multi_a(2,@6/48'/0'/2'/2'/<0;1>/*,@7/48'/0'/3'/2'/<0;1>/*)),and_v(v:older(4255898),multi_a(1,@8/48'/0'/0'/2'/<0;1>/*,@9/48'/0'/1'/2'/<0;1>/*,@10/48'/0'/2'/2'/<0;1>/*))}}})
+[exit 0]
+
+=== 2. Every slot's origin matches its key file (G1) ===
+
+  @0  48'/0'/0'/2' ok
+  @1  48'/0'/1'/2' ok
+  @2  48'/0'/2'/2' ok
+  @3  48'/0'/3'/2' ok
+  @4  48'/0'/0'/2' ok
+  @5  48'/0'/1'/2' ok
+  @6  48'/0'/2'/2' ok
+  @7  48'/0'/3'/2' ok
+  @8  48'/0'/0'/2' ok
+  @9  48'/0'/1'/2' ok
+  @10 48'/0'/2'/2' ok
+
+0 slot(s) disagree with their key file
+
+=== 3. The engraved artifact: the KEYLESS TEMPLATE card set ===
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(3,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))),{and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(2,@3/48'/0'/3'/2'/<0;1>/*,@4/48'/0'/0'/2'/<0;1>/*,@5/48'/0'/1'/2'/<0;1>/*))),{and_v(v:older(65535),multi_a(2,@6/48'/0'/2'/2'/<0;1>/*,@7/48'/0'/3'/2'/<0;1>/*)),and_v(v:older(4255898),multi_a(1,@8/48'/0'/0'/2'/<0;1>/*,@9/48'/0'/1'/2'/<0;1>/*,@10/48'/0'/2'/2'/<0;1>/*))}}}) --group-size 0 --force-chunked
+chunk-set-id: 0x3d896
+md1f8kykps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsturhn8pf8jq0c
+md1f8kykpsgs3ef9kzz2j5qqcr32v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42glxskfar6x4423
+md1f8kykpssws7xkx9k7c9xu6pzkjqsspy9fntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkec5muezu6y3f47m
+md1f8kykpsmje3rw4fp6rc6cckmmq5mngy26gpzx3g4xdwqqq8lluszze6v6uqpq0px3qq2y6qqmxcdqfn702jwt
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+The engraved set is 4 md1 chunk(s).
+
+=== 4. E1: the cards re-encode to the policy they came from ===
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md verify --template tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(3,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))),{and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(2,@3/48'/0'/3'/2'/<0;1>/*,@4/48'/0'/0'/2'/<0;1>/*,@5/48'/0'/1'/2'/<0;1>/*))),{and_v(v:older(65535),multi_a(2,@6/48'/0'/2'/2'/<0;1>/*,@7/48'/0'/3'/2'/<0;1>/*)),and_v(v:older(4255898),multi_a(1,@8/48'/0'/0'/2'/<0;1>/*,@9/48'/0'/1'/2'/<0;1>/*,@10/48'/0'/2'/2'/<0;1>/*))}}}) md1f8kykps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsturhn8pf8jq0c md1f8kykpsgs3ef9kzz2j5qqcr32v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42glxskfar6x4423 md1f8kykpssws7xkx9k7c9xu6pzkjqsspy9fntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkec5muezu6y3f47m md1f8kykpsmje3rw4fp6rc6cckmmq5mngy26gpzx3g4xdwqqq8lluszze6v6uqpq0px3qq2y6qqmxcdqfn702jwt
+OK
+[exit 0]
+
+=== 5. G3: the committed input file is what this script produces ===
+
+$ diff /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/md1-template.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/inputs-pathological/backup-strings-tr.txt
+[exit 0]
+
+=== 6. The device's card set: the KEYED full policy ===
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(3,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))),{and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(2,@3/48'/0'/3'/2'/<0;1>/*,@4/48'/0'/0'/2'/<0;1>/*,@5/48'/0'/1'/2'/<0;1>/*))),{and_v(v:older(65535),multi_a(2,@6/48'/0'/2'/2'/<0;1>/*,@7/48'/0'/3'/2'/<0;1>/*)),and_v(v:older(4255898),multi_a(1,@8/48'/0'/0'/2'/<0;1>/*,@9/48'/0'/1'/2'/<0;1>/*,@10/48'/0'/2'/2'/<0;1>/*))}}}) --key @0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --fingerprint @0=73c5da0a --key @1=xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk --fingerprint @1=73c5da0a --key @2=xpub6EGx8sPr9FxPPE1rbZazhqWwpMXA3Hf5DYKtZbL7c4BSddzmQktp96UaTvecEkoCZysuaj79GMCFZYT1KKk7Ph2M3Kf5g8B82KZ8TZ9SKQR --fingerprint @2=73c5da0a --key @3=xpub6E6Z3Ss5TXJYNJp4U1q3NZ3pCn82i7KXQAKUtNnzLJ3cCdchQeSdFvXemizaHUF7wNwRQAB8mPdoZhGHLiv49cWPtCnoJY3Az3E8JKxH9Mq --fingerprint @3=73c5da0a --key @4=xpub6FQya7zGhR92kacYsNnjreouvnHJMpXYsUXnW6NJJAJRCKsa26TzDy4LdnGhEurr3d6y1J8PJ7EEMKQp74XTqYvmGJNogYXSKDszYHtF8mX --fingerprint @4=b8688df1 --key @5=xpub6EAMBJLn1jiquajTsNRkZXU1oKnA4WJMNvcz4FRR4QmFKdfHxJVvfRLoysWfcc16AMTR4CoMD8UNjvs9JtbsLeuLwpTczgq8zuuERnp8YZF --fingerprint @5=b8688df1 --key @6=xpub6EGceQV5wHrRemjYkJykRWQefTvsNTw1Lr7JUpQTgaaWz2P6Cg75o3LktGoyMPshKbCqrgy2RXxAmkqBXkbyqPe52CnwA1LUnyBkNUuMhRt --fingerprint @6=b8688df1 --key @7=xpub6ELyn7moeEZ9hJ1HmSm6G5hAfgcCeTa71X9PzYJ39tHNUj93e9MaKb2tjAFrMFb94NMeTG7MW8dwxuhhnPhn5swY6r5dxZH6cyiuPd25AQ5 --fingerprint @7=b8688df1 --key @8=xpub6DnEBNkSJKBYQmsbhS1sP9cNdtU5c9PLFGCjTJmxicxc13WB8zNNGQazabQpyFAGW5bV9tMko4uBxDxjUKL6dSAcx1tEbgEHtgSqyRsekh6 --fingerprint @8=28645006 --key @9=xpub6F6gx8ZP9R3R3eYsU2PeS5EPJ4jN7Wbt9uwyHNXLoaJxQjNT92FGAfCNDjUDRhCHwzjfgDuqAZ7Gk9SugPRMa6A8PnzLVvnyEKBW9jHRGRp --fingerprint @9=28645006 --key @10=xpub6Dh4twkBRkzxDSau8FdhVY16jARGnPtfdRUk6LbePrGUGok6xE8SvGtaygCMLV7beB55YtzkR9dJoic9zYbYy3C7EKc2FGLkKoPT4mQUjPg --fingerprint @10=28645006 --group-size 0 --force-chunked
+chunk-set-id: 0x23401
+md1fydqpts9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2g9dxek2y7nujt5
+md1fydqptsdkzz89ykcgf22sqrqw9fntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3zptvqjvcnjxwzs
+md1fydqpts464y8g0rtrzm0vznwdq3tfqggqjz5e4kuxmmzqye4m2zdeeqfw4e8cwvqy08m65gwj7tsrdu4lxh
+md1fydqptsc6hdnh9nzxa2jr583433dhkpfhxsg45szydz32v6uqqq0lleqy9n5e4cqzq7zdz2p56enkuv0wmd
+md1fydqpt3qqz3xsvuvqu79mg9pw0za5z3883w6pgmnchdq5jux3r03twrg3hckhp5gmutms62adsg9szjhkkm
+md1fydqpt3g3hcc9pj9qp5jsezsq63gv3gqv9k6zqhwsv0jskp2rsal4egz4ep5859p875x67k9jqdtfexpz6x
+md1fydqpt3sxjz9m806prlsm794tkxqs6806lhaeh6reknylagmwyjycf8044xtt9flsdlkv2cdfwmwvyvtshs
+md1fydqpt3lf8tpwunu53n9svfgll7zvw5qnkxgeal5wa4wy86389z3gq870g9n6rjwuq7cms9xujhgpxdl943
+md1fydqptjqjfp99zcyrd98kjcu8vgdtu6gt04upy3z0n8ek4aj5kk9satjt7uv4am7jn7q2q8zxlcml2eczwj
+md1fydqptjdjly68gp3qxnzrvqpghktcljzr7j8mxp87s87gwfzjsys8njyze0uj4852ajv5x9h80ejfs5f0ev
+md1fydqptjneynsul328vme3ent5fcakske788nfhcc7nza0ynr9p5d3exan7jvup3kx8742qsqc0mpk87fkuj
+md1fydqptjmfhtfgqfec6yprg0dc3gdls899kx6k89kfkaz2az67ajl8hyy967je7sks39z8we5emvhw6cqrza
+md1fydqptnxmlcrstt5m3s998x2rk7av9gmew82jq5zap9302ynhp37ggd6z5u4emag0zr8gkdy3qw763syq0m
+md1fydqptnvhsxwt3qdt2f9njdjzxjf3pk2mwxeza6dduqqnvtpl3vsgcj7vs58sl2hmlrnys76x2a7hhfx8n5
+md1fydqptns67znc3fa47zw97hmwk2vvhq2h6g9y9evngtkrskaxskvp4qchq5qpv0pez9razznwk32ujcyjk5
+md1fydqptnanu69tqlftc3g6hj0npmnk06drm5awv08c2v0vktw5t6qu9g4xkmv2dywrwkud7euvmc9egs7fl5
+md1fydqpt5xgnjc4hh02k9m3a3x9a4h733cpg59kdh7306na4nhq32cd5w9c2uzlhxryrtzduftjem8mym63un
+md1fydqpt5fgpxkjsesxnnp7e00y36klmrkvqhu772hljrwlhzlncxfd22zx672chhdu5ajtcmtv0vz8hye793
+md1fydqpt5hd0zup072vfeww0h2t65xl3djg9z7s576y0hwv6a92khwlwfmwulc9zrqupz2z7sktxueuey8thn
+md1fydqpt5l737tj9hrdzaved93u3a2nawefnqlk8ycusz0quhfev0a3hqdghjmksz3ry92dsr5uuvw3jqhu9r
+md1fydqpt49pjhxf00s49ugex8rue307wdslgcj5r8x9t5j54jfadzzykqz37sefnc0rhk5zckt9spyhvvhr3h
+md1fydqpt42amshp87fzcadzx07vs02d3t8efq2e50d8mg50ts8t8mquqwc90uynctuc4sv9q4ytx0xzzyq4ck
+md1fydqpt45jnl3rgupw7m2jr5caw7vxt9v7rn6wz3pd0pwa4xqjj8e7htel64394h6gme2g5uavyj00qjctyx
+md1fydqpt4a8ajc9sqw28jr665c4hq9t4tsw75nz845y9up7y276lt29ywu3usza3aqrp2qqj37hvham46nhy
+note: stdout is watch-only — public keys only, cannot spend
+[exit 0]
+
+The device gathers 24 md1 chunk(s).
+
+=== 7. THE BIND: both card sets are the same wallet ===
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1f8kykps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsturhn8pf8jq0c md1f8kykpsgs3ef9kzz2j5qqcr32v6mqq85yszv6a4pxuusyh2unu8xqz8naa2r2akwukvgm42glxskfar6x4423 md1f8kykpssws7xkx9k7c9xu6pzkjqsspy9fntdcdhkyqfntk5ymnjqjatj0sucqg70h4gdtkec5muezu6y3f47m md1f8kykpsmje3rw4fp6rc6cckmmq5mngy26gpzx3g4xdwqqq8lluszze6v6uqpq0px3qq2y6qqmxcdqfn702jwt
+template: tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),{and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),{and_v(v:older(65535),multi_a(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi_a(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))}}})
+n: 11
+wallet-policy-mode: false
+md1-encoding-id: 3d89678ac64eef08b84652f4fcaf59ea
+wallet-descriptor-template-id: 44ad26a19b53048b6ff8957359a30c31
+wallet-policy-id: e5a97a4e1d45d28a19a21861da70c57e
+wallet-policy-id-fingerprint: 0xe5a97a4e
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fydqpts9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2g9dxek2y7nujt5 md1fydqptsdkzz89ykcgf22sqrqw9fntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3zptvqjvcnjxwzs md1fydqpts464y8g0rtrzm0vznwdq3tfqggqjz5e4kuxmmzqye4m2zdeeqfw4e8cwvqy08m65gwj7tsrdu4lxh md1fydqptsc6hdnh9nzxa2jr583433dhkpfhxsg45szydz32v6uqqq0lleqy9n5e4cqzq7zdz2p56enkuv0wmd md1fydqpt3qqz3xsvuvqu79mg9pw0za5z3883w6pgmnchdq5jux3r03twrg3hckhp5gmutms62adsg9szjhkkm md1fydqpt3g3hcc9pj9qp5jsezsq63gv3gqv9k6zqhwsv0jskp2rsal4egz4ep5859p875x67k9jqdtfexpz6x md1fydqpt3sxjz9m806prlsm794tkxqs6806lhaeh6reknylagmwyjycf8044xtt9flsdlkv2cdfwmwvyvtshs md1fydqpt3lf8tpwunu53n9svfgll7zvw5qnkxgeal5wa4wy86389z3gq870g9n6rjwuq7cms9xujhgpxdl943 md1fydqptjqjfp99zcyrd98kjcu8vgdtu6gt04upy3z0n8ek4aj5kk9satjt7uv4am7jn7q2q8zxlcml2eczwj md1fydqptjdjly68gp3qxnzrvqpghktcljzr7j8mxp87s87gwfzjsys8njyze0uj4852ajv5x9h80ejfs5f0ev md1fydqptjneynsul328vme3ent5fcakske788nfhcc7nza0ynr9p5d3exan7jvup3kx8742qsqc0mpk87fkuj md1fydqptjmfhtfgqfec6yprg0dc3gdls899kx6k89kfkaz2az67ajl8hyy967je7sks39z8we5emvhw6cqrza md1fydqptnxmlcrstt5m3s998x2rk7av9gmew82jq5zap9302ynhp37ggd6z5u4emag0zr8gkdy3qw763syq0m md1fydqptnvhsxwt3qdt2f9njdjzxjf3pk2mwxeza6dduqqnvtpl3vsgcj7vs58sl2hmlrnys76x2a7hhfx8n5 md1fydqptns67znc3fa47zw97hmwk2vvhq2h6g9y9evngtkrskaxskvp4qchq5qpv0pez9razznwk32ujcyjk5 md1fydqptnanu69tqlftc3g6hj0npmnk06drm5awv08c2v0vktw5t6qu9g4xkmv2dywrwkud7euvmc9egs7fl5 md1fydqpt5xgnjc4hh02k9m3a3x9a4h733cpg59kdh7306na4nhq32cd5w9c2uzlhxryrtzduftjem8mym63un md1fydqpt5fgpxkjsesxnnp7e00y36klmrkvqhu772hljrwlhzlncxfd22zx672chhdu5ajtcmtv0vz8hye793 md1fydqpt5hd0zup072vfeww0h2t65xl3djg9z7s576y0hwv6a92khwlwfmwulc9zrqupz2z7sktxueuey8thn md1fydqpt5l737tj9hrdzaved93u3a2nawefnqlk8ycusz0quhfev0a3hqdghjmksz3ry92dsr5uuvw3jqhu9r md1fydqpt49pjhxf00s49ugex8rue307wdslgcj5r8x9t5j54jfadzzykqz37sefnc0rhk5zckt9spyhvvhr3h md1fydqpt42amshp87fzcadzx07vs02d3t8efq2e50d8mg50ts8t8mquqwc90uynctuc4sv9q4ytx0xzzyq4ck md1fydqpt45jnl3rgupw7m2jr5caw7vxt9v7rn6wz3pd0pwa4xqjj8e7htel64394h6gme2g5uavyj00qjctyx md1fydqpt4a8ajc9sqw28jr665c4hq9t4tsw75nz845y9up7y276lt29ywu3usza3aqrp2qqj37hvham46nhy
+template: tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),{and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),{and_v(v:older(65535),multi_a(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi_a(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))}}})
+n: 11
+wallet-policy-mode: true
+md1-encoding-id: 234018d64279d0e6b7dd1cbff1f35ade
+wallet-descriptor-template-id: 44ad26a19b53048b6ff8957359a30c31
+wallet-policy-id: 590f3abcaad2aca5a3f526917f5bb57a
+wallet-policy-id-fingerprint: 0x590f3abc
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+keyless template-id: 44ad26a19b53048b6ff8957359a30c31
+keyed   template-id: 44ad26a19b53048b6ff8957359a30c31
+SAME WALLET.
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fydqpts9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2g9dxek2y7nujt5 md1fydqptsdkzz89ykcgf22sqrqw9fntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3zptvqjvcnjxwzs md1fydqpts464y8g0rtrzm0vznwdq3tfqggqjz5e4kuxmmzqye4m2zdeeqfw4e8cwvqy08m65gwj7tsrdu4lxh md1fydqptsc6hdnh9nzxa2jr583433dhkpfhxsg45szydz32v6uqqq0lleqy9n5e4cqzq7zdz2p56enkuv0wmd md1fydqpt3qqz3xsvuvqu79mg9pw0za5z3883w6pgmnchdq5jux3r03twrg3hckhp5gmutms62adsg9szjhkkm md1fydqpt3g3hcc9pj9qp5jsezsq63gv3gqv9k6zqhwsv0jskp2rsal4egz4ep5859p875x67k9jqdtfexpz6x md1fydqpt3sxjz9m806prlsm794tkxqs6806lhaeh6reknylagmwyjycf8044xtt9flsdlkv2cdfwmwvyvtshs md1fydqpt3lf8tpwunu53n9svfgll7zvw5qnkxgeal5wa4wy86389z3gq870g9n6rjwuq7cms9xujhgpxdl943 md1fydqptjqjfp99zcyrd98kjcu8vgdtu6gt04upy3z0n8ek4aj5kk9satjt7uv4am7jn7q2q8zxlcml2eczwj md1fydqptjdjly68gp3qxnzrvqpghktcljzr7j8mxp87s87gwfzjsys8njyze0uj4852ajv5x9h80ejfs5f0ev md1fydqptjneynsul328vme3ent5fcakske788nfhcc7nza0ynr9p5d3exan7jvup3kx8742qsqc0mpk87fkuj md1fydqptjmfhtfgqfec6yprg0dc3gdls899kx6k89kfkaz2az67ajl8hyy967je7sks39z8we5emvhw6cqrza md1fydqptnxmlcrstt5m3s998x2rk7av9gmew82jq5zap9302ynhp37ggd6z5u4emag0zr8gkdy3qw763syq0m md1fydqptnvhsxwt3qdt2f9njdjzxjf3pk2mwxeza6dduqqnvtpl3vsgcj7vs58sl2hmlrnys76x2a7hhfx8n5 md1fydqptns67znc3fa47zw97hmwk2vvhq2h6g9y9evngtkrskaxskvp4qchq5qpv0pez9razznwk32ujcyjk5 md1fydqptnanu69tqlftc3g6hj0npmnk06drm5awv08c2v0vktw5t6qu9g4xkmv2dywrwkud7euvmc9egs7fl5 md1fydqpt5xgnjc4hh02k9m3a3x9a4h733cpg59kdh7306na4nhq32cd5w9c2uzlhxryrtzduftjem8mym63un md1fydqpt5fgpxkjsesxnnp7e00y36klmrkvqhu772hljrwlhzlncxfd22zx672chhdu5ajtcmtv0vz8hye793 md1fydqpt5hd0zup072vfeww0h2t65xl3djg9z7s576y0hwv6a92khwlwfmwulc9zrqupz2z7sktxueuey8thn md1fydqpt5l737tj9hrdzaved93u3a2nawefnqlk8ycusz0quhfev0a3hqdghjmksz3ry92dsr5uuvw3jqhu9r md1fydqpt49pjhxf00s49ugex8rue307wdslgcj5r8x9t5j54jfadzzykqz37sefnc0rhk5zckt9spyhvvhr3h md1fydqpt42amshp87fzcadzx07vs02d3t8efq2e50d8mg50ts8t8mquqwc90uynctuc4sv9q4ytx0xzzyq4ck md1fydqpt45jnl3rgupw7m2jr5caw7vxt9v7rn6wz3pd0pwa4xqjj8e7htel64394h6gme2g5uavyj00qjctyx md1fydqpt4a8ajc9sqw28jr665c4hq9t4tsw75nz845y9up7y276lt29ywu3usza3aqrp2qqj37hvham46nhy
+template: tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(3,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))),{and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi_a(2,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*))),{and_v(v:older(65535),multi_a(2,@6/<0;1>/*,@7/<0;1>/*)),and_v(v:older(4255898),multi_a(1,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*))}}})
+n: 11
+wallet-policy-mode: true
+md1-encoding-id: 234018d64279d0e6b7dd1cbff1f35ade
+wallet-descriptor-template-id: 44ad26a19b53048b6ff8957359a30c31
+wallet-policy-id: 590f3abcaad2aca5a3f526917f5bb57a
+wallet-policy-id-fingerprint: 0x590f3abc
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+=== 8. What the device must prove to ===
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md address md1fydqpts9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2g9dxek2y7nujt5 md1fydqptsdkzz89ykcgf22sqrqw9fntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3zptvqjvcnjxwzs md1fydqpts464y8g0rtrzm0vznwdq3tfqggqjz5e4kuxmmzqye4m2zdeeqfw4e8cwvqy08m65gwj7tsrdu4lxh md1fydqptsc6hdnh9nzxa2jr583433dhkpfhxsg45szydz32v6uqqq0lleqy9n5e4cqzq7zdz2p56enkuv0wmd md1fydqpt3qqz3xsvuvqu79mg9pw0za5z3883w6pgmnchdq5jux3r03twrg3hckhp5gmutms62adsg9szjhkkm md1fydqpt3g3hcc9pj9qp5jsezsq63gv3gqv9k6zqhwsv0jskp2rsal4egz4ep5859p875x67k9jqdtfexpz6x md1fydqpt3sxjz9m806prlsm794tkxqs6806lhaeh6reknylagmwyjycf8044xtt9flsdlkv2cdfwmwvyvtshs md1fydqpt3lf8tpwunu53n9svfgll7zvw5qnkxgeal5wa4wy86389z3gq870g9n6rjwuq7cms9xujhgpxdl943 md1fydqptjqjfp99zcyrd98kjcu8vgdtu6gt04upy3z0n8ek4aj5kk9satjt7uv4am7jn7q2q8zxlcml2eczwj md1fydqptjdjly68gp3qxnzrvqpghktcljzr7j8mxp87s87gwfzjsys8njyze0uj4852ajv5x9h80ejfs5f0ev md1fydqptjneynsul328vme3ent5fcakske788nfhcc7nza0ynr9p5d3exan7jvup3kx8742qsqc0mpk87fkuj md1fydqptjmfhtfgqfec6yprg0dc3gdls899kx6k89kfkaz2az67ajl8hyy967je7sks39z8we5emvhw6cqrza md1fydqptnxmlcrstt5m3s998x2rk7av9gmew82jq5zap9302ynhp37ggd6z5u4emag0zr8gkdy3qw763syq0m md1fydqptnvhsxwt3qdt2f9njdjzxjf3pk2mwxeza6dduqqnvtpl3vsgcj7vs58sl2hmlrnys76x2a7hhfx8n5 md1fydqptns67znc3fa47zw97hmwk2vvhq2h6g9y9evngtkrskaxskvp4qchq5qpv0pez9razznwk32ujcyjk5 md1fydqptnanu69tqlftc3g6hj0npmnk06drm5awv08c2v0vktw5t6qu9g4xkmv2dywrwkud7euvmc9egs7fl5 md1fydqpt5xgnjc4hh02k9m3a3x9a4h733cpg59kdh7306na4nhq32cd5w9c2uzlhxryrtzduftjem8mym63un md1fydqpt5fgpxkjsesxnnp7e00y36klmrkvqhu772hljrwlhzlncxfd22zx672chhdu5ajtcmtv0vz8hye793 md1fydqpt5hd0zup072vfeww0h2t65xl3djg9z7s576y0hwv6a92khwlwfmwulc9zrqupz2z7sktxueuey8thn md1fydqpt5l737tj9hrdzaved93u3a2nawefnqlk8ycusz0quhfev0a3hqdghjmksz3ry92dsr5uuvw3jqhu9r md1fydqpt49pjhxf00s49ugex8rue307wdslgcj5r8x9t5j54jfadzzykqz37sefnc0rhk5zckt9spyhvvhr3h md1fydqpt42amshp87fzcadzx07vs02d3t8efq2e50d8mg50ts8t8mquqwc90uynctuc4sv9q4ytx0xzzyq4ck md1fydqpt45jnl3rgupw7m2jr5caw7vxt9v7rn6wz3pd0pwa4xqjj8e7htel64394h6gme2g5uavyj00qjctyx md1fydqpt4a8ajc9sqw28jr665c4hq9t4tsw75nz845y9up7y276lt29ywu3usza3aqrp2qqj37hvham46nhy --chain 0 --count 2
+bc1pgavpejq7pkax6zdtuay9ejenangza2t3l6gfka79h94p23xcexssak7pzr
+bc1p3wy7tcypvkm49wtyeq2yw4t0266vxdnqlkny5nsgzguc0fcvdl3s5hkkp5
+note: stdout is watch-only — public keys only, cannot spend
+[exit 0]
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md address md1fydqpts9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2g9dxek2y7nujt5 md1fydqptsdkzz89ykcgf22sqrqw9fntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3zptvqjvcnjxwzs md1fydqpts464y8g0rtrzm0vznwdq3tfqggqjz5e4kuxmmzqye4m2zdeeqfw4e8cwvqy08m65gwj7tsrdu4lxh md1fydqptsc6hdnh9nzxa2jr583433dhkpfhxsg45szydz32v6uqqq0lleqy9n5e4cqzq7zdz2p56enkuv0wmd md1fydqpt3qqz3xsvuvqu79mg9pw0za5z3883w6pgmnchdq5jux3r03twrg3hckhp5gmutms62adsg9szjhkkm md1fydqpt3g3hcc9pj9qp5jsezsq63gv3gqv9k6zqhwsv0jskp2rsal4egz4ep5859p875x67k9jqdtfexpz6x md1fydqpt3sxjz9m806prlsm794tkxqs6806lhaeh6reknylagmwyjycf8044xtt9flsdlkv2cdfwmwvyvtshs md1fydqpt3lf8tpwunu53n9svfgll7zvw5qnkxgeal5wa4wy86389z3gq870g9n6rjwuq7cms9xujhgpxdl943 md1fydqptjqjfp99zcyrd98kjcu8vgdtu6gt04upy3z0n8ek4aj5kk9satjt7uv4am7jn7q2q8zxlcml2eczwj md1fydqptjdjly68gp3qxnzrvqpghktcljzr7j8mxp87s87gwfzjsys8njyze0uj4852ajv5x9h80ejfs5f0ev md1fydqptjneynsul328vme3ent5fcakske788nfhcc7nza0ynr9p5d3exan7jvup3kx8742qsqc0mpk87fkuj md1fydqptjmfhtfgqfec6yprg0dc3gdls899kx6k89kfkaz2az67ajl8hyy967je7sks39z8we5emvhw6cqrza md1fydqptnxmlcrstt5m3s998x2rk7av9gmew82jq5zap9302ynhp37ggd6z5u4emag0zr8gkdy3qw763syq0m md1fydqptnvhsxwt3qdt2f9njdjzxjf3pk2mwxeza6dduqqnvtpl3vsgcj7vs58sl2hmlrnys76x2a7hhfx8n5 md1fydqptns67znc3fa47zw97hmwk2vvhq2h6g9y9evngtkrskaxskvp4qchq5qpv0pez9razznwk32ujcyjk5 md1fydqptnanu69tqlftc3g6hj0npmnk06drm5awv08c2v0vktw5t6qu9g4xkmv2dywrwkud7euvmc9egs7fl5 md1fydqpt5xgnjc4hh02k9m3a3x9a4h733cpg59kdh7306na4nhq32cd5w9c2uzlhxryrtzduftjem8mym63un md1fydqpt5fgpxkjsesxnnp7e00y36klmrkvqhu772hljrwlhzlncxfd22zx672chhdu5ajtcmtv0vz8hye793 md1fydqpt5hd0zup072vfeww0h2t65xl3djg9z7s576y0hwv6a92khwlwfmwulc9zrqupz2z7sktxueuey8thn md1fydqpt5l737tj9hrdzaved93u3a2nawefnqlk8ycusz0quhfev0a3hqdghjmksz3ry92dsr5uuvw3jqhu9r md1fydqpt49pjhxf00s49ugex8rue307wdslgcj5r8x9t5j54jfadzzykqz37sefnc0rhk5zckt9spyhvvhr3h md1fydqpt42amshp87fzcadzx07vs02d3t8efq2e50d8mg50ts8t8mquqwc90uynctuc4sv9q4ytx0xzzyq4ck md1fydqpt45jnl3rgupw7m2jr5caw7vxt9v7rn6wz3pd0pwa4xqjj8e7htel64394h6gme2g5uavyj00qjctyx md1fydqpt4a8ajc9sqw28jr665c4hq9t4tsw75nz845y9up7y276lt29ywu3usza3aqrp2qqj37hvham46nhy --chain 1 --count 2
+bc1pnjrzcky5qqlhyz4rvhq5r96ca77wyccnfls0p5l7k8ae7402vjhshf3zya
+bc1p7yrpv9q6j58vwh5yrnnj8ky6dnykn7z2lak4j0ckt52j84j8fxzs4h6khc
+note: stdout is watch-only — public keys only, cannot spend
+[exit 0]
+
+=== Artifacts ===
+$ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological
+total 20
+drwxr-xr-x 1 bcg bcg  130 Aug 20 23:22 .
+drwxr-xr-x 1 bcg bcg  696 Aug 20 23:22 ..
+-rw-r--r-- 1 bcg bcg 2087 Aug 20 23:22 md1-keyed.txt
+-rw-r--r-- 1 bcg bcg  356 Aug 20 23:22 md1-template.txt
+-rw-r--r-- 1 bcg bcg  126 Aug 20 23:22 tr.change.txt
+-rw-r--r-- 1 bcg bcg   51 Aug 20 23:22 tr.id.txt
+-rw-r--r-- 1 bcg bcg  126 Aug 20 23:22 tr.receive.txt
+[exit 0]
+
+All gates green.

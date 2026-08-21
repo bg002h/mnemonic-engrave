@@ -17,6 +17,7 @@ emulator draws from the driver's step stream.
 | `SeedHammer-II-operator-journey.pdf` | a 5-of-12 `wsh(multi(…))` | NFC attempted; see below |
 | `SeedHammer-II-load-payload-journey.pdf` | not a wallet — the **systemwide payload**: pack it, write it to `0x10D00000`, compare the digest across the air gap, use it, unload it, wipe it | host CLI + emulator |
 | `SeedHammer-II-wallet-policy-journey.pdf` | a wallet **someone else built** — a depth-2 taproot script tree, gathered over NFC and PROVED before engraving | host CLI + emulator, 8 md1 chunks over NFC |
+| `SeedHammer-II-tr-pathological-journey.pdf` | the **taproot pathological wallet** — the four-tier degrading vault as a depth-3 taproot tree, 11 cosigners across 3 masters | host CLI + emulator, 24 md1 chunks over NFC |
 
 Each has a matching `transcript*.sh` (regenerates every CLI block),
 `build_pdf*.py` (regenerates the PDF from the artifacts) and `inputs*/` (the
@@ -36,6 +37,37 @@ in two languages, from the same four xpubs.
 **The negative control was run**: corrupting one character of one expected
 address fails the capture with *"the device's proof does not match the host's"*.
 A comparison that has never been made to fail is not evidence.
+
+### The taproot pathological journey (2026-08-21)
+
+The same machinery on the hardest wallet the constellation describes, and the
+two documents are worth reading in that order — the wallet-policy one
+establishes the method, this one is what the method was for.
+
+**It could not have been written a day earlier.** Every leaf of this policy is
+`and_v(v:…)` wrapping a timelock or hashlock, and the device's tap-leaf reader
+named only `pk`/`multi_a`/`sortedmulti_a` — it returned *zero* leaves and the
+consent screen read "Complex policy — display only" while the host derived the
+same addresses fine. F-214.
+
+Three things this one does that its predecessor did not:
+
+- **The negative control is a COMMAND.**
+  `python3 capture_tr_pathological.py --prove-it-can-fail` corrupts one
+  character of one expected address and exits 0 only if the walk caught it. The
+  sibling's was run once by hand and remembered.
+- **Absence assertions.** The walk rejects "display only" / "no addresses" /
+  "can't derive" outright, so the device cannot pass by refusing politely —
+  which is precisely what a F-214 regression would look like.
+- **`md verify`, not a `md decode` diff, for the round trip.** Decode renders
+  per-key origins *away*, so the decoded text is well-formed, missing the field
+  a signer needs, and re-encodes to a *different card* (F-219). An equality
+  built on it would either fail on a correct plate or be weakened until it
+  passed.
+
+It also has **its own `out/tr-pathological/` subtree**, because the two wallet
+journeys previously shared `out/` and either could overwrite the other's
+intermediates — after which the second "passes" against the first's artifacts.
 
 Three things this run measured that no reading would have:
 
