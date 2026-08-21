@@ -8630,7 +8630,7 @@ minimum a warning. The precise rule needs a ruling; the measurement does not.
 
 ---
 
-### F-222 — the pathological example vault is single-master in THREE of its four tiers, and neither journey says so (owning phase: **the tr/wsh cycle, Stage 6**) `#mnemonic` `#docs`
+### F-222 — ~~the example vault is single-master in THREE of its four tiers and neither journey says so~~ **CLOSED 2026-08-21** `#mnemonic` `#docs`
 
 Found by the comprehension lens, then re-measured and found to be worse than
 reported. The lens said master C alone drains the vault after ~365 days; the
@@ -8657,11 +8657,10 @@ relative to strength.
 Not a code defect and not funds at risk (published test seeds). It is a
 **teaching** defect in the example itself.
 
-**ADDRESSED 2026-08-21** (`8fe29c6`) — the wsh journey now carries a
-"What this backup will NOT do" section stating it plainly: *"in master terms
-this is a 1-of-3 vault with delays, not an 11-key multisig"*, with the per-tier
-breakdown. Still to do: the same section in the tr document, which states F-132
-and F-133 but not this.
+**CLOSED 2026-08-21** — BOTH journeys now carry a "What this backup will NOT
+do" section stating it plainly: *"in master terms this is a 1-of-3 vault with
+delays, not an 11-key multisig"*, with the per-tier breakdown, alongside F-132's
+missing preimage and F-133's inverted timers.
 
 Adjacent: F-131 (the checklist's false recovery rule), F-132 (the preimage is
 absent from the backup), F-133 (the tiers are inverted). This is the fourth

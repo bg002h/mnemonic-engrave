@@ -251,6 +251,24 @@ python3 capture_tr_pathological.py                    # rebuilds emu.wasm, drive
 python3 capture_tr_pathological.py --prove-it-can-fail # the negative control
 python3 build_pdf_tr_pathological.py                  # this document</pre>
 
+<h2>What this backup will NOT do</h2>
+<div class="note">
+<p><b>Tiers 1–2 cannot be spent from these plates alone.</b> Both need the
+32-byte preimage of the <code>sha256</code> hashlock. <b>No plate carries
+it</b> — record it separately, with the vault, or those tiers are
+decoration.</p>
+<p><b>The tiers do not open in the order they read.</b> Tier 4 (1-of-3) matures
+at ~365 days, tier 3 (2-of-2) at ~455 — the weakest key-set unlocks ~90 days
+first. Each <code>older()</code> clock runs per-coin from that coin's
+confirmation, not from the day you engraved.</p>
+<p><b>In master terms this is a 1-of-3 vault with delays, not an 11-key
+multisig.</b> Three of the four tiers need only one master: <b>A</b> alone for
+tier 1 (unlocked since 2016, but only with the secret word), <b>C</b> alone for
+tier 4 after ~365 days with no word, and <b>B</b> alone for tier 3 after ~455.
+Only tier 2 needs two, and it is the furthest out. The vault survives losing
+any two seed plates and falls to the theft of any one, given time.</p>
+</div>
+
 <h2>What this journey does NOT show</h2>
 <ul>
 <li><strong>No spend, and for tiers 1–2 no spend is possible from this backup
