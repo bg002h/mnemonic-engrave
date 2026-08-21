@@ -7774,6 +7774,49 @@ on the old value — 887/887 gui and 50 packages pass either way. The divergence
 invisible to every test the fork had, and the cross-language vectors saw it on
 their first run. That is the argument for keyed conformance vectors in one line.
 
+### F-213 — `md encode` mints a card carrying a key for a placeholder the template never uses, and the device REFUSES it (owning phase: **the tr/wsh cycle, Stage 3**) `#codec` `#funds-safety`
+
+**Found 2026-08-20** while adding a `wsh(or_b(...))` conformance vector: the
+vector was accidentally given three keys for a two-key template, Rust encoded it
+happily, and the Go port refused to read the result.
+
+**Reproduced at the CLI, both directions:**
+
+```sh
+# @2 is not referenced by this template. Rust encodes it anyway:
+md encode 'wsh(or_b(pk(@0/<0;1>/*),s:pk(@1/<0;1>/*)))' \
+    --key @0=<xpub> --key @1=<xpub> --key @2=<xpub> --path "48'/0'/0'/2'" --force-chunked
+# -> a valid-looking 4-chunk card
+
+# the fork, reading that card:
+md: override order violation
+```
+
+The card carries `n = 2` while its Pubkeys TLV holds three entries (`@0`, `@1`,
+`@2`). The Go re-encode path walks the TLV against `n` and refuses; Rust never
+checks that the supplied key indices are in range for the template.
+
+**Why it matters beyond tidiness.** The operator-visible failure is
+**engrave-then-discover**: the host tool accepts the command, prints a card, and
+the card is unreadable by the device that is supposed to restore it. Nothing
+between those two moments says anything is wrong, and the moment in between is
+where steel gets cut. A stray `--key` is an easy typo — `@2` for `@1` on a
+two-key policy — and it produces a *plausible* card rather than an error.
+
+**Which side is wrong: Rust.** A key for a placeholder the template does not
+reference is not meaningful data — there is nothing for it to bind to — so
+minting it is the defect, and the port's refusal is correct. Under the
+Rust-primary rule the fix lands in `md-cli` / `md-codec` first, with a vector:
+reject `--key @N` where `N >= n` at encode time.
+
+Note this is a NARROWING of admission, not a widening, and the operator has
+ruled that no engraved cards exist to protect — so the usual compatibility
+objection does not apply.
+
+**Not fixed yet**, and the conformance vector was corrected to two keys rather
+than being left as an exercise of the disagreement: a vector's job is to pin
+agreed behaviour, not to encode an open dispute.
+
 ### F-211 — `bip39.RandomWord()` is an exported CSPRNG-backed word generator compiled into the firmware, on a device that is not supposed to generate seeds (owning phase: **next `#seedhammer` cycle**) `#seedhammer` `#security`
 
 **Surfaced 2026-08-19** by an operator-directed audit of every RNG call site
