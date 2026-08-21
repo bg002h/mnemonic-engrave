@@ -8263,7 +8263,7 @@ Two more are correctly labelled partial and stay open on purpose: **F-145**
 
 ---
 
-### F-219 — a card's per-key origins survive ENCODING but no read-back surface shows them, and the decoded text re-encodes to a DIFFERENT card (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
+### F-219 — a card's per-key origins are shown by `inspect --json` but by no TEXT surface, and the decoded text re-encodes to a DIFFERENT card (owning phase: **the tr/wsh cycle, Stage 6**) `#codec`
 
 Found building the taproot pathological journey, whose round-trip gate this
 breaks.
@@ -8282,15 +8282,34 @@ decoded  wsh(sortedmulti(2,@0/<0;1>/*,@1/<0;1>/*))            <- origins gone
 | re-encode the decoded text | **different cards** |
 | `md inspect` | shows template, `n`, and three ids — **no origin anywhere** |
 
-So the card faithfully carries 11 per-key derivation paths (`verify` proves it),
-and **neither `decode` nor `inspect` will tell an operator what they are.**
+**CORRECTED 2026-08-21, before any fix was built — the original claim was too
+strong.** `md inspect --json` **does** show them:
 
-**Why this matters for a backup.** The origin is what a signer uses to find its
-key. An operator restoring from an engraved plate decodes it, gets a template
-that looks complete, and has lost the one field that says where the keys live —
-with no error, because the template is well-formed. Re-encoding what they read
-back produces a *different card*, so a "did I transcribe this right?" check fails
-for a plate that is perfectly correct.
+```json
+"path_decl": {"tag": "Divergent", "data": ["m/48'/0'/0'/2'", "m/48'/0'/1'/2'"]}
+```
+
+So the origins are recoverable from a card, and the honest finding is narrower
+and still worth fixing:
+
+1. **`md inspect`'s TEXT output omits what its own `--json` carries.** Text is
+   what an operator reads off a terminal; the two surfaces disagree about what
+   the card contains.
+2. **`md decode`'s output is lossy and not a fixpoint.** It renders the origins
+   away, and re-encoding what it prints yields a *different card* — so a "did I
+   transcribe this right?" check fails for a plate that is perfectly correct.
+
+**This is the THIRD time in this cycle I asserted a capability was absent after
+checking one surface** (the others: "concrete rendering does not exist in
+md-codec", and "the CLI cannot express per-key origins"). All three were one
+command from being disproved, and all three made the work look bigger than it
+was. See [[departure-sections-need-a-run-check]].
+
+**Why it still matters.** The origin is what a signer uses to find its key. An
+operator restoring from an engraved plate reaches for `md decode` — the command
+named for the job — gets a template that looks complete, and has silently lost
+the field that says where the keys live. `--json` on a different subcommand is
+not where they will look.
 
 **It is the mirror of F-217**, and the pair is the whole story: F-217 was origins
 declared *wrongly* and refused; this is origins carried *correctly* and never
