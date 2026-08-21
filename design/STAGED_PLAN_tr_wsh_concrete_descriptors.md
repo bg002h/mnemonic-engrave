@@ -266,6 +266,45 @@ seconds before someone commits steel, is strictly worse than an honest refusal.
 
 ## Stage 3 — device-side address derivation
 
+**RULED 2026-08-20 (operator, on a fable recommendation): R5 is the FIRST work
+item of this stage, and R2 defers to S6.**
+
+**R5 — `sortedmulti_a` derive.** The CLI currently ADMITS a card it cannot
+verify: `md encode` produces a valid `tr(@0,sortedmulti_a(...))` card (that half
+started working when PR #915 was ported in S0), while `md address` refuses it.
+The project's proof model is "derived addresses + wallet id", so an engraved card
+whose address cannot be derived is a backup nobody can verify with our own tools.
+It leads this stage because **S3 IS address derivation ported from Rust** — if
+Rust still refuses, S3 either ships the hole onto the device or lets the Go port
+lead, and both break Rust-primary.
+
+Taken *inside* S3 rather than before it, deliberately: it is risk-set normative
+work whose vectors and review gate make it a mini-cycle rather than a quick fix,
+so it should carry the stage's gate rather than a bolted-on one.
+
+**Where the fix goes, corrected.** NOT the `Tag::SortedMultiA` arm in the generic
+node→Terminal converter — that arm's *nested* refusal is a standards rule
+(BIP-386/387 put `sortedmulti_a` in BIP-387's category, a sibling of the
+Miniscript fragments) and must stay byte-for-byte. The legal position is the
+tap-leaf root ONLY, so the conversion belongs in `tree_to_taptree`'s leaf path,
+before it delegates. Upstream now has `Terminal::SortedMultiA` (PR #910, in the
+pinned rev), which is what makes this writable at all.
+
+**R2 — `l:`/`u:` normalization → S6, with an acceptance shape.** It has no
+operator-visible surface today: the device shows a structural summary, not
+descriptor text, and concrete text comes from rust-miniscript's `Display` — the
+same renderer Sparrow and Nunchuk sit on — so the coordinator comparison already
+matches byte-for-byte where it counts. The only cross-form exposure is our
+template render (long `or_i(0,X)`) vs concrete text (`l:X`), and nothing puts
+those in one view until S6 exists. **Acceptance:** S6's vectors assert
+byte-equality between our emitted concrete descriptors and coordinator output; if
+the template/concrete pair turns out to be visible together, normalize the
+template renderer then — Rust first, vectors, then the Go port. Not dropped:
+"two renderings of one policy read as a mismatch to exactly the careful operator"
+is a real honesty concern, it simply has no consumer yet.
+
+### Original stage text
+
 `seedhammer/address/address.go:97,130` derives `SortedMulti` and `Singlesig`
 only; everything else is a typed `errUnsupported`. Until this grows, **no
 receive/change address can be shown for a complex shape** — which is what D2 made
