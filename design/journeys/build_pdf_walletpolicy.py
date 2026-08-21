@@ -131,6 +131,30 @@ a wrong key-to-slot mapping cannot accidentally produce the right address.</p>
 <p class="note"><strong>The keys are BIP-39's published test mnemonic</strong>
 ("abandon … about") at <code>48'/0'/N'/2'</code>. Never put funds behind
 them.</p>
+
+<h2>What this wallet is, and is not</h2>
+
+<p>All four cosigners carry master fingerprint <code>73c5da0a</code>, because they
+are <strong>accounts 0..3 of one seed</strong>. That is <em>not</em> key reuse —
+four distinct xpubs, and the device's duplicate-key refusal has nothing to fire
+on — but it is a <strong>single-seed</strong> policy, which for a real
+four-cosigner wallet would defeat the point. It is here because it is the
+conformance corpus's wallet, and the corpus is what makes the comparison on the
+last page checkable against something other than one run of one script.</p>
+
+<p class="note"><strong>The declared origin is wrong for three of the four
+(F-217).</strong> The transcript passes <code>--path 48'/0'/0'/2'</code>, and
+<code>--path</code> flattens Divergent mode to Shared — so the card says all four
+keys live at account 0, when they live at accounts 0, 1, 2 and 3. Addresses are
+unaffected: they come from the xpubs the card carries, which is exactly why the
+device-vs-host comparison still passes. A <em>signer</em> following the declared
+origin would look in the wrong place. <code>md encode</code> has no way to say
+otherwise — <code>--key</code> rejects an inline origin and <code>--path</code> is
+shared-only, while the codec's per-key <code>OriginPathOverrides</code> sits
+unreachable behind them.</p>
+
+<p>Kept rather than papered over. A journey is a record of a run, and this run's
+card is a real card with a real defect in it.</p>
 </section>
 """)
 
