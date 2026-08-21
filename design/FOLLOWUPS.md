@@ -8195,10 +8195,31 @@ fail, and a refusal returns nothing to derive from.
 4. **One card may fill several slots**, and the same card scanned twice is not a
    contest — refusing a re-scan would be a false alarm on an ordinary mistake.
 
-**Still to do:** wire it into the gather, the refusal screens (each of the four
-typed errors needs its own sentence, especially boundary 2), and the remaining
-acceptance conditions — refusal journeys and pinning the same-key-two-slots
-shape end to end.
+### WIRED 2026-08-21 (`seedhammer` `a18d19e`, `4d2fc2f`) — D3's first half ships
+
+A keyless template gathered **with** its mk1 key cards now shows addresses on the
+consent screen, and D3's second half survives: skipping the gather still reaches
+consent without address proof, pinned by its own test.
+
+**Seating only when the template is keyless, all-or-nothing.** A full-policy card
+already carries its keys and seating over the top would let a stray card silently
+replace a declared one; a partially-keyed card is a shape this device already
+refuses to derive from, and filling its gaps would produce a wallet half engraved
+and half scanned.
+
+**One sentence per refusal**, and the first carries the finding that would
+otherwise confuse everyone:
+
+> "A key card doesn't belong to this policy. Note that key cards made for the
+> full-policy card carry a different stub than a template-only card expects."
+
+**Proved from real mk1 STRINGS**, not hand-built `Card` structs — scan →
+chunk-assemble → `mk.Decode` → seat → the address Rust derived. That path is
+where this kind of feature usually fails with every component green.
+
+**Remaining:** refusal journeys in the emulator (A4), and pinning the
+same-key-two-slots shape end to end (A6). The unit-level coverage exists; what is
+missing is an operator walking into each refusal.
 
 ---
 
