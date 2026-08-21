@@ -8539,3 +8539,51 @@ Two separable pieces:
    `.template` — a design change with corpus-wide blast radius, and it should be
    scoped as one rather than bolted on. Once it lands, the decode → re-encode
    fixpoint becomes assertable; today it silently is not one.
+
+---
+
+### F-220 — a CANONICAL wrapper never demands an origin, so a keyless template can be engraved declaring `m` for every slot (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
+
+Found adding the address step to the operator journey (5-of-12 `wsh(multi(...))`).
+
+`md inspect` on that journey's engraved card:
+
+```
+origins:
+  @0: m
+  @1: m
+  …
+  @11: m
+```
+
+**Twelve cosigners, and the card says nothing about where any of their keys
+live.** The origin is the field a signer uses to FIND its key, so a restorer
+holding only these plates has twelve xpub slots and no way to derive a single
+one of them.
+
+**Why nothing objected.** `wsh(...)` is a *canonical* wrapper, so it has a
+default derivation path and `md encode` never demands `--path` — that warning
+fires only for non-canonical wrappers like `tr()` (F-129). A keyless template
+records no origin of its own. So the card is well-formed, decodes cleanly,
+re-encodes byte-identically, and is missing the one field that makes it
+restorable.
+
+**The contrast that makes it sharp:** the *taproot* pathological journey carries
+all eleven origins, because `tr()` forced the issue and the origins went into the
+template. The `wsh` journeys do not, because nothing forced it. **Whether a
+backup records where its keys live currently depends on which script type the
+wallet happens to use.**
+
+Adjacent to F-219 but distinct: F-219 is origins *carried and not shown*; this is
+origins *never captured at all*.
+
+Two candidate fixes, and the choice is a ruling:
+1. **Warn (or refuse) on a keyless multi-key template with empty origins** at
+   encode. Cheap, and it puts the decision where the operator still has options.
+2. **Emit the canonical default explicitly** rather than leaving it empty, so the
+   card states the path it is relying on. Changes existing card bytes, so it
+   needs the same corpus care F-217 did.
+
+Recorded in the operator journey itself rather than only here — that document now
+shows the `origins: m` block beside its addresses and says plainly that the
+twelve paths came from the key files, not from the card.

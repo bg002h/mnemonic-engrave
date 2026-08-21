@@ -154,3 +154,51 @@ echo "########## 6. a systemwide payload carrying the public cards"
 run "$ME" sysw pack --no-passphrase "$MD1" --out "$W/out/sysw-public.bin"
 run "$ME" sysw show "$W/out/sysw-public.bin"
 run "$ME" sysw wipe --fill zeros --out /dev/null
+
+echo "########## 7. the addresses — and where their origins had to come from"
+# THE FUNCTIONAL HALF of a round trip. Everything above proves the bytes
+# survive; this proves they mean the wallet we intended. Compare these against
+# your coordinator before engraving anything.
+#
+# THE ORIGINS ARE NOT ON THE CARD, and that is the thing to notice here.
+# `md inspect` on the engraved template reports `m` for all twelve slots: this
+# policy's `wsh(...)` wrapper is CANONICAL, so md never demanded an explicit
+# origin and none was given, and a keyless template records none of its own.
+# So the twelve derivation paths below are read from the cosigner key FILES,
+# not recovered from the card — a restorer holding only the plate would have
+# twelve xpub slots and no idea where any of the keys live.
+#
+# They also have to be spelled with apostrophes. The key files write
+# `[ae6647ee/48h/0h/0h/2h]`, and md's template parser rejects the `h` form here
+# with "derivation steps after the multipath group are not representable".
+#
+# NOT `--path`: that flattens twelve DISTINCT origins onto one shared path,
+# which over twelve different keys is the impossible card F-217 refuses.
+KEYED_TEMPLATE=$(python3 - "$W" <<'PY'
+import glob, re, sys
+W = sys.argv[1]
+tmpl = open(f"{W}/inputs/wallet-policy.txt").read().strip()
+origin = {}
+for f in sorted(glob.glob(f"{W}/inputs/keys/cosigner-*.xpub")):
+    txt = open(f).read()
+    m = re.search(r"\[[0-9a-f]{8}/([^\]]+)\]", txt)
+    i = int(re.search(r"cosigner-(\d+)", f).group(1))
+    origin[i] = m.group(1).replace("h", "'")
+print(re.sub(r"@(\d+)/<0;1>/\*",
+             lambda k: "@%s/%s/<0;1>/*" % (k.group(1), origin[int(k.group(1))]),
+             tmpl), end="")
+PY
+)
+ADDR_ARGS=()
+for f in "$W"/inputs/keys/cosigner-*.xpub; do
+  i=$(basename "$f" | sed -E 's/cosigner-0*([0-9]+)\.xpub/\1/')
+  fp=$(grep -oE '\[[0-9a-f]{8}/' "$f" | head -1 | tr -d '[/')
+  xp=$(grep -E '^xpub' "$f" | head -1)
+  ADDR_ARGS+=(--key "@$i=$xp" --fingerprint "@$i=$fp")
+done
+run "$MD" address --template "$KEYED_TEMPLATE" "${ADDR_ARGS[@]}" --chain 0 --count 3
+run "$MD" address --template "$KEYED_TEMPLATE" "${ADDR_ARGS[@]}" --chain 1 --count 3
+
+echo "########## 7b. what the ENGRAVED card says about those origins"
+# Run so the gap above is a shown result rather than a claim in a comment.
+run "$MD" inspect "$MD1"

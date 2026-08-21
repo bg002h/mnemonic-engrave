@@ -394,6 +394,25 @@ Feeding the same seed's ms1 string to the NFC converter does not produce a tag:<
 <code>0x10D00000</code>. The digest is what the operator compares on screen.</p>
 {code(sections.get('6. a systemwide payload carrying the public cards',''))}
 </div>
+
+<div class="page">
+<h2>Host step 6 — the addresses, and where their origins came from</h2>
+<p>Everything above proves the bytes survive the card format. This is the other
+half: that they mean the wallet we intended. <b>Compare these against your
+coordinator before engraving anything.</b></p>
+{code(sections.get('7. the addresses — and where their origins had to come from',''))}
+
+<p class="note"><b>The origins are not on the card.</b> This policy's
+<code>wsh(...)</code> wrapper is <em>canonical</em>, so <code>md</code> never
+demanded an explicit origin and none was given — and a keyless template records
+none of its own. <code>md inspect</code> on the engraved card reports
+<code>m</code> for all twelve slots, which is what the block below shows. So the
+twelve derivation paths used above were read from the cosigner key
+<em>files</em>, not recovered from the card: <b>an operator holding only these
+plates would have twelve xpub slots and no idea where any of the keys
+live.</b></p>
+{code(sections.get('7b. what the ENGRAVED card says about those origins',''), 24)}
+</div>
 """)
 
 # --------------------------------------------------------------- the plates --
