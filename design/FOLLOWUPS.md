@@ -7960,6 +7960,40 @@ derivation, a conformance vector **that discriminates** (see `keyed_tr_multi_a`
 mutation pass. It is not a one-liner, and it is not urgent while the refusal
 holds.
 
+### It blocks the constellation's own flagship wallet (measured 2026-08-20)
+
+Asked whether the taproot pathological wallet round-trips, and the answer sharpens
+this entry considerably. `design/journeys/inputs-pathological/wallet-policy-tr.txt`
+is the taproot form of the four-tier degrading vault:
+
+```
+tr(NUMS,{and_v(v:after(1000000),and_v(v:sha256(a84d…),multi_a(3,@0,@1,@2))),
+        {and_v(v:after(1893456000),and_v(v:sha256(a84d…),multi_a(2,@3,@4,@5))),
+        {and_v(v:older(65535),multi_a(2,@6,@7)),
+         and_v(v:older(4255898),multi_a(1,@8,@9,@10))}}})
+```
+
+| | |
+| --- | --- |
+| host round-trip | **works** — the 3 committed chunks decode back to the policy exactly, exit 0 |
+| device address derivation | **refused** — `TapLeavesChunks` → `ErrTapLeafUnsupported`, 0 leaves |
+
+Every one of its four leaves is `and_v(v:…)` wrapping a timelock or hashlock, so
+**not one** is in the described set (`pk` / `multi_a` / `sortedmulti_a`). This is
+not an invented edge case: it is the wallet this repo calls *the* pathological
+example, the one the whole 182-symbol chunking story is about, and in taproot form
+the device can say nothing about where it pays.
+
+**Two adjacent facts found on the way:**
+- Re-encoding it today does **not** reproduce the committed cards — it needs
+  `--path`, and without one `md decode` exits **4** (partial decode, origin
+  unspecified) rather than failing loudly.
+- `backup-strings-tr.txt` and `wallet-policy-tr.txt` have **zero consumers** — no
+  transcript writes them, no builder reads them. Confirmed by an earlier agent
+  report with a positive control (4 hits for `backup-strings`, 0 for
+  `backup-strings-tr`). They are inputs to a journey that was never written, the
+  same class as F-156 / F-210.
+
 ---
 
 ### F-215 — the template-engrave shape guard refuses two shapes that have both moved out from under it (owning phase: **the tr/wsh cycle, Stage 6**) `#seedhammer` `#codec`
