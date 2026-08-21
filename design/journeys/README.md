@@ -189,23 +189,36 @@ uncommitted artifact. The lesson is the one the documents themselves are about:
 **a claim that nothing here is illustrative decays into a promise the moment the
 regeneration path stops being exercised.**
 
-## ⚠ The shipped PDFs are STALE — 2026-08-19
+## ~~⚠ The shipped PDFs are STALE~~ — RESOLVED 2026-08-21
 
-**The two `.pdf` files in this directory predate DoNextList item 5 and no longer
-describe the wallet the scripts now produce.** They embed the **retired
-depth-3 xpubs** (`m/84'/0'/N'`) and contain **no addresses at all**, because at
-the time they were built no address could be derived for this wallet.
+The warning that stood here said the two wallet PDFs *"embed the retired depth-3
+xpubs (`m/84'/0'/N'`) and contain no addresses at all"*, and that a rebuild would
+fail because `shots/` has no tracked files.
 
-They were **not** rebuilt, deliberately: `shots/` has **zero tracked files**, so
-the screenshots these documents embed exist nowhere in the repo and a rebuild
-produces pages with missing-image placeholders — and **since 2026-08-19 such a
-build FAILS with exit 1** rather than reporting success (see "The builds refuse
-to lie" below). Regenerating them faithfully
-needs the emulator re-walked, which is separate work.
+**Both claims are now false, and were re-measured with `pdftotext` before this
+was rewritten:**
 
-Until then, **the HTML built by the commands below is the current document and
-the PDF is not.** This is exactly the decay the paragraph above warns about,
-recorded rather than left for a reader to discover.
+| | addresses | retired `84'/0'/N'` | `48'/0'/N'/2'` |
+| --- | --- | --- | --- |
+| pathological (wsh) | **6** | 0 | 83 |
+| operator (5-of-12) | 0 | 0 | 39 |
+
+The pathological document rebuilds and now carries its addresses — the wallet
+became derivable when the depth-4 re-derivation landed, and F-210 fixed the
+regeneration path. The operator journey still shows none, which is correct
+rather than stale: **it has no address step in its transcript at all**, and
+adding one is ordinary work rather than a repair.
+
+`shots/` is still gitignored by design, so a rebuild needs a local capture
+first — `python3 capture_pathological.py`. That is a precondition, not a
+breakage, and the builder fails loudly (exit 1, published PDF untouched) if the
+shots are absent.
+
+**The measurement trap, recorded because it nearly landed in this file:** a
+first pass at counting addresses decompressed the PDF's streams and searched
+them as latin-1, and reported **0** for a document that has six. PDF text is
+font-subset encoded; a naive stream scan is not a text extractor. Use
+`pdftotext`. See [[empty-output-is-not-absence]].
 
 ## The builds refuse to lie — 2026-08-19
 
