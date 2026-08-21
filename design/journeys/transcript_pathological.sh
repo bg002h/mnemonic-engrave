@@ -167,9 +167,21 @@ fi
 echo "mk --from-md1 embedded $MK_STUB == template-id prefix $STUB (and != policy-id $POLICY_STUB)"
 echo
 
-echo "########## 7. the eleven key cards — ALL of them, each with its own origin"
-# Was: one card for key-00 only, under a heading that said eleven.
-: > "$W/out/pathological/mk-encode-raw.txt"
+echo "########## 7. the eleven key cards — ALL of them, in ONE command"
+# Was: one `mk encode` per cosigner in a shell loop, because `mk encode --xpub`
+# took a single key. F-223 moved the loop inside the tool -- `mk encode --keys`
+# mints one card per record -- so eleven invocations became one. The output is
+# byte-identical to the loop it replaces; that equivalence is pinned by
+# `batch_matches_per_key_loop` in mnemonic-key, not asserted here.
+#
+# The key file is BIP-380 origin notation, one record per line. It is BUILT
+# from the same key-*.xpub files the loop read, so nothing new is trusted --
+# and a record carries its fingerprint, path and key together, which is the
+# property that makes the desync the old loop could suffer impossible.
+KEYFILE="$W/out/pathological/keys.txt"
+KEYMETA="$W/out/pathological/keys-meta.txt"
+: > "$KEYFILE"
+: > "$KEYMETA"
 for f in "$W"/inputs-pathological/keys/key-*.xpub; do
   KX=$(grep '^xpub' "$f")
   KFP=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$f" | head -1)
@@ -178,32 +190,39 @@ for f in "$W"/inputs-pathological/keys/key-*.xpub; do
     echo "FATAL: $f is missing an xpub or an origin header" >&2
     exit 1
   fi
-  # I-2: the encode's exit status USED TO BE DISCARDED by the pipe, so a typo
-  # in a key header silently dropped that cosigner's card from the ENGRAVED
-  # bundle at exit 0 — 23 plates instead of 25, and every later plate caption
-  # naming the wrong master because caption index and card index desynced.
-  # A short bundle is a worse failure than the stale one this commit removed.
-  # --from-md1 rather than --policy-id-stub: each card now derives its own
-  # binding from the wallet card itself, so no hand-copied hex sits between
-  # the policy and the eleven cards that claim membership in it.
-  if ! CARD=$("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
-        --origin-path "m/$KPATH" "${FROM_MD1[@]}" --group-size 0 2>&1); then
-    echo "FATAL: mk encode failed for $f:" >&2
-    printf '%s\n' "$CARD" >&2
-    exit 1
-  fi
-  # Chunk count is NOT fixed at 2. Item 5 moved these keys to BIP-48's
-  # four-level origin `m/48'/0'/N'/2'`, and the longer path pushes most cards
-  # to THREE chunks (account 0 still fits in two). This guard caught that
-  # assumption the moment it became false, which is the whole point of it —
-  # so it now demands "at least one", not "exactly two".
-  NL=$(printf '%s\n' "$CARD" | grep -c '^mk1')
-  if [ "$NL" -lt 1 ]; then
-    echo "FATAL: $f produced no mk1 lines" >&2
-    exit 1
-  fi
-  printf '%s\n' "$CARD" | grep '^mk1' >> "$W/out/pathological/mk-encode-raw.txt"
+  printf '[%s/%s]%s\n' "$KFP" "$KPATH" "$KX" >> "$KEYFILE"
+  # Parallel metadata, SAME ORDER, for the card index below: the key's own
+  # number plus the origin it declares. Written here rather than re-derived
+  # later so the two files cannot disagree about what record N is.
+  ki=$(basename "$f" .xpub | sed 's/key-0*//'); [ -z "$ki" ] && ki=0
+  printf '%s %s %s\n' "$ki" "$KFP" "$KPATH" >> "$KEYMETA"
 done
+run head -2 "$KEYFILE"
+
+# I-2: the encode's exit status USED TO BE DISCARDED by the pipe, so a typo in
+# a key header silently dropped that cosigner's card from the ENGRAVED bundle
+# at exit 0 -- 23 plates instead of 25, and every later plate caption naming
+# the wrong master because caption index and card index desynced. A short
+# bundle is a worse failure than the stale one that commit removed. With
+# --keys the whole run fails on a bad record, naming its line number, so a
+# partial bundle is no longer reachable at all.
+CARDS_OUT="$W/out/pathological/mk-encode-stdout.txt"
+CARDS_ERR=$(mktemp)
+echo "\$ $MK encode --keys $KEYFILE ${#FROM_MD1[@]} --from-md1 args --group-size 0"
+if ! "$MK" encode --keys "$KEYFILE" "${FROM_MD1[@]}" --group-size 0 \
+      > "$CARDS_OUT" 2> "$CARDS_ERR"; then
+  echo "FATAL: mk encode --keys failed:" >&2
+  cat "$CARDS_ERR" >&2
+  rm -f "$CARDS_ERR"
+  exit 1
+fi
+cat "$CARDS_ERR"; rm -f "$CARDS_ERR"
+echo "[exit 0]"
+echo
+# stdout ONLY, so the blank line BETWEEN cards still delimits them. The
+# watch-only advisory goes to stderr; folding it in with 2>&1 would land a
+# non-mk1 line inside a card block and merge two cards into one.
+grep '^mk1' "$CARDS_OUT" > "$W/out/pathological/mk-encode-raw.txt"
 
 # Belt and braces: the engraved bundle must have exactly the expected shape.
 # Belt and braces: every key must have contributed at least one chunk. The
@@ -226,23 +245,36 @@ echo "note: $NKEYS key cards -> $GOT mk1 chunks (BIP-48 origins push most cards 
 # named the wrong key — a silent wrong answer where there had been a loud
 # IndexError. Keying on the string removes the ordering assumption entirely.
 : > "$W/out/pathological/card-index.txt"
-for f in "$W"/inputs-pathological/keys/key-*.xpub; do
-  ki=$(basename "$f" .xpub | sed 's/key-0*//'); [ -z "$ki" ] && ki=0
-  KX=$(grep '^xpub' "$f")
-  KFP=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$f" | head -1)
-  KPATH=$(sed -n 's/.*origin \[[0-9a-f]*\/\([^]]*\)\].*/\1/p' "$f" | head -1)
-  nth=0
-  tot=$("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
-        --origin-path "m/$KPATH" "${FROM_MD1[@]}" --group-size 0 \
-        2>/dev/null | grep -c '^mk1')
-  while read -r card; do
-    nth=$((nth + 1))
-    printf '%s %s %s %s %s %s\n' "$card" "$ki" "$nth" "$tot" "$KFP" "$KPATH" \
-      >> "$W/out/pathological/card-index.txt"
-  done < <("$MK" encode --xpub "$KX" --origin-fingerprint "$KFP" \
-             --origin-path "m/$KPATH" "${FROM_MD1[@]}" --group-size 0 \
-             2>/dev/null | grep '^mk1')
-done
+# Derived from the SINGLE batch output above rather than from 22 more `mk
+# encode` calls (two per key: one for the chunk total, one for the strings).
+# That loop is what made this transcript run mk encode 33 times; it now runs
+# it twice, and neither extra call can disagree with the cards actually
+# engraved because there are no extra calls.
+#
+# `--keys` emits cards in FILE order separated by a blank line, and keys-meta
+# was written in that same order, so block N belongs to meta line N. awk's
+# paragraph mode (RS="") splits on the blank lines.
+awk -v RS= -v meta="$KEYMETA" -v out="$W/out/pathological/card-index.txt" '
+# RS="" governs getline-from-file too, so the meta file arrives as ONE
+# paragraph rather than 11 lines. Split it on newlines explicitly; reading it
+# line-wise here would silently give n=1 and mis-attribute every plate.
+BEGIN {
+  n = 0
+  while ((getline l < meta) > 0) {
+    c = split(l, T, "\n")
+    for (i = 1; i <= c; i++) if (T[i] != "") m[n++] = T[i]
+  }
+}
+{
+  if (NR > n) { print "FATAL: more card blocks than key records" > "/dev/stderr"; exit 1 }
+  split(m[NR-1], M, " ")
+  tot = split($0, L, "\n")
+  for (j = 1; j <= tot; j++)
+    printf "%s %s %s %s %s %s\n", L[j], M[1], j, tot, M[2], M[3] >> out
+}
+END { if (NR != n) { print "FATAL: " NR " card blocks for " n " key records" > "/dev/stderr"; exit 1 } }
+' "$CARDS_OUT" || exit 1
+
 run wc -l "$W/out/pathological/card-index.txt"
 run wc -l "$W/out/pathological/mk-encode-raw.txt"
 run "$MK" decode $(sed -n '1,2p' "$W/out/pathological/mk-encode-raw.txt")
