@@ -3988,6 +3988,26 @@ What stays true, and is the part worth fixing, is that the tool gives the
 operator a hard parse error and no hint that `--policy-id-stub` plus
 `md inspect` is the way through.
 
+#### Re-measured 2026-08-21 — it is worse than "cannot read a CHUNKED md1"
+
+`mk encode --from-md1` now cannot read **any** current md1, chunked or not:
+
+```
+error: md1 input rejected: wire-format version mismatch: got 9, expected 4
+```
+
+The vendored md-codec has fallen five wire versions behind. The consequence is
+concrete and it bit while building F-216's tests: **the one command that derives
+a key card's `policy_id_stub` from the card it belongs to cannot be used with any
+card this constellation produces today.** Every mk1 must be minted with an
+explicit `--policy-id-stub`, which means computing the stub by hand — from
+`md inspect`'s `wallet-descriptor-template-id`, first 4 bytes, for a keyless
+template.
+
+That is exactly the manual step `--from-md1` exists to remove, and getting it
+wrong produces a card that is refused at membership with no indication that the
+stub was the problem.
+
 ### F-128 — the stub's spec sentence and `mk`'s behaviour name different identities (owning phase: **operator journeys**) `#mnemonic`
 
 Filed 2026-08-11, same run as F-127.
