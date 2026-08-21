@@ -317,6 +317,43 @@ template renderer then — Rust first, vectors, then the Go port. Not dropped:
 "two renderings of one policy read as a mismatch to exactly the careful operator"
 is a real honesty concern, it simply has no consumer yet.
 
+### Progress — two capabilities landed 2026-08-20
+
+| what | commits | cross-checked vs Rust |
+| --- | --- | --- |
+| **taproot script-path addresses** | `338e8c8` | 24 addresses (tr-with-leaf, sortedmulti_a, both depth-2 chiralities) |
+| **segwit-v0 witness scripts** (`wsh` miniscript) | `40318b8` | 18 addresses across 3 vectors |
+
+The `wsh` fragment set is the pathological journey's OWN wallet — `or_i`,
+`and_v`, `v:`, `after`, `older`, `sha256`, `multi` — so the target is a real
+policy this repo already engraves rather than an invented one.
+
+**Layering settled, and it is not what the stage text predicted.** The stage
+assumed the emitter must live inside `md` and that this makes it "a normative
+codec change". Emission does live in `md` (it owns the AST), but it does **no key
+derivation** — the caller passes derived keys, because the use-site path belongs
+to the address layer and applying it twice, or not at all, is a wrong address.
+`address` still does not import `md`.
+
+**Mutation testing drove three fixture fixes**, each a case where a test passed
+that should not have:
+
+- *ignore leaf depth* passed, because the only depth-2 vector was left-heavy —
+  fixed by adding a right-spine mirror (`b8663056`);
+- *emit `n` before `k`* passed, because both multis were `k == n` — fixed by
+  making them 2-of-3 and 1-of-2 (`e30224ef`);
+- *drop `sortedmulti`'s BIP-67 sort* passed, because the gate ran one vector —
+  fixed by running every vendored `keyed_wsh_*`.
+
+Also worth carrying forward: two mutation runs reported "not caught" when the
+mutant had simply **failed to compile**. A build failure prints no FAIL lines, so
+a mutation harness must verify the mutant built before believing a zero.
+
+**Still unsupported, and refused rather than approximated:** tap leaves and `wsh`
+fragments outside the emitted set (`thresh`, `and_b`, `or_b`/`or_c`/`or_d`, the
+`s:`/`a:`/`d:`/`n:`/`j:` wrappers), which return `ErrTapLeafUnsupported` /
+`ErrScriptUnsupported`.
+
 ### Original stage text
 
 `seedhammer/address/address.go:97,130` derives `SortedMulti` and `Singlesig`
