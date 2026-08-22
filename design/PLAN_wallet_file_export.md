@@ -1,8 +1,9 @@
 # PLAN — wallet-file export for the reasonably complex wallet
 
-**Status:** all five planning reports landed and folded. R0 round 1 on Phase 1
-came back **1C / 4I / 2M / 1N — RED**; this document is the fold. Phase 2 is
-DELETED. **No code until a re-review returns 0C/0I.**
+**Status:** all five planning reports landed and folded. R0 on Phase 1 has run
+twice — round 1 **1C/4I/2M/1N**, round 2 **0C/4I/1M/2N**. Both RED; this
+document is the fold of both. Phase 2 is DELETED. **No code until a review
+returns 0C/0I.**
 
 **Operator ask (2026-08-22):** output Nunchuk, Sparrow and Bitcoin Core
 **watch-only and hot** wallets via the m* utilities, and the same on SeedHammer
@@ -221,8 +222,8 @@ incidental safety becomes deliberate.**
 ## 3. Phases
 
 Each phase ends with a fable review before the next begins, per the operator's
-instruction. Phase 1 may start now; Phases 2-4 are blocked on the pending
-reports being folded.
+instruction. **No phase may start: the Phase 1 gate is RED** (round 1 1C/4I,
+round 2 0C/4I).
 
 ### Phase 1 — G1, `--allow` parity on `export-wallet`
 
@@ -310,6 +311,81 @@ different binary and a single-axis flag; importing its name would import
 semantics that do not match a five-valued rule set. The cross-constellation
 inconsistency is real and is **md's to reconcile**, not a gate item here.
 
+#### Round 2 fold — the breaking change I introduced and did not state
+
+**R0 round 2: 0C / 4I / 1M / 2N.** (`R0_export_phase1_round2.md`)
+
+**F-1 — Phase 1 IS A BREAKING CHANGE, and round 1 told me so in the sentence I
+dropped.** Round 1's option (a) carried a rider verbatim: *"then the wsh keyless
+form starts requiring the flag too (a behavior change to state loudly,
+Rust-first per Open Q4)."* I adopted the option and lost the rider. Stated now,
+plainly:
+
+> **`export-wallet --descriptor <wsh> --format bitcoin-core` exits 0 today and
+> will REFUSE without `--allow sigless-branch` once Phase 1 lands.** §1's table
+> describes **pre-Phase-1** behaviour. This is a behaviour change to a surface
+> shipped since v0.97.0 and it needs a release note, not a footnote.
+
+**The enforced rule set, which round 1 left singular and I left unscoped.**
+`rust-miniscript` runs **no** sane rule on Wsh/Sh/Bare at `from_str`, so
+"uniform policy" was itself an unstated fork. Taking it now:
+
+- **(b) `sigless-branch` only, enforced uniformly.** Chosen.
+- Not (a) all five, which would be true `build-descriptor` parity but would
+  start refusing every currently-exportable wsh/sh descriptor that is
+  malleable, repeats a key, mixes timelocks or exceeds resource limits. Four
+  new refusals nobody asked for on a shipped tool, each deserving its own
+  evidence and its own decision.
+
+The five-value vocabulary is still **shared** (I2/N1). On this surface the other
+four are simply never enforced, so requesting one always produces the existing
+*"requested but did not fire"* note — no new concept, and the plan says so
+explicitly rather than leaving a flag that silently does nothing.
+
+**Open Q4 is now in scope, not adjacent to it.** Uniform policy *is* touching
+the tr/wsh sanity asymmetry Q4 flags as potentially normative, so Q4's
+obligation binds: **Rust-first with vectors pinning the new refusals.** I
+deleted the Rust-primary bullet from Phase 1 in the round-1 diff; it is restored
+and strengthened.
+
+**F-2 — the plan must make the two decisions, not the implementer's PR.**
+Round 1 said the plan decides where relaxation lives; my fold deferred it to a
+PR and dropped the sole-gate caveat. Decided: **a single admission gate at
+intake.** Every downstream re-parse then becomes a lenient parse of an
+already-admitted string. The implementer still enumerates the sites file+function
+(that is discovery, not a decision), and the
+**sole-gate / `--template` invariant is an acceptance bullet**: the intake gate
+must be the only admission point, and `--template` inputs must not route around
+it.
+
+**F-3 — my acceptance contradicted my own ruling.** I ruled the never-silent
+contract extends to every enforced wrapper, then wrote acceptance pinning
+fired-detection to **tr leaves only**. Corrected: **fired-detection per enforced
+wrapper — per-leaf for tr, top-level for wsh/sh.** `to_ext_params` joins the
+pieces moving to the shared home, and the module is named:
+`descriptor_builder::allow` (beside `gate.rs`, which already owns `AllowSet`).
+
+**F-4 — I presented two added tests as closing I4 while deleting the baselines.**
+Restored to acceptance, per wrapper and with the format named: flagless refusal
+on **tr and wsh**; export-with-flag; the fired warning; the requested-not-fired
+note. And the sub-part I skipped is ruled: **`--allow` on
+`--template` / `--slot` / `--from-import-json` produces the did-not-fire note**
+rather than refusing — those paths do not reach the descriptor gate, so there is
+nothing to waive and a refusal would be a lie about why.
+
+**F-5 — "Phase 1 may start now" survived the RED gate it sat beside.** Removed.
+
+**N-2 — the import criterion needs a harness.** C1's acceptance ("an import, not
+an emit") binds later phases; naming how: a regtest `bitcoin-cli
+importdescriptors` against a pinned Core version, asserting per-entry `success`.
+Available on this box and already used to produce the round-1 evidence.
+
+**N-3 — the no-trace rationale contradicted my own I4 text.** M1 said "emitters
+are passthrough by design", which is not true of the transforming emitters I4
+names (`bip388`). Narrowed: **no trace in the artifact** stands as the ruling,
+but on the ground that a trace would be format-specific and silently dropped by
+most targets — not on a passthrough claim that is false for some of them.
+
 #### The constraint that survives all of this
 
 **No help text, doc, commit message or release note may say `--allow` "enables
@@ -320,12 +396,26 @@ merits — and on those alone.
 
 #### Acceptance
 
-- Every strict parse site on the `--descriptor` path enumerated and listed.
-- The uniform-policy vs quirk-passthrough ruling implemented as uniform policy,
-  with the wsh hole closed rather than pinned.
-- Per-rule over-admission tests; keyless-leaf vector through `bip388`.
-- tr-leaf fired-detection implemented and tested (new code, not reuse).
-- Export-specific warning wording.
+- Every strict parse site on the `--descriptor` path enumerated file+function
+  and listed in the PR.
+- **A single admission gate at intake**, and an assertion that it is the ONLY
+  admission point — `--template` inputs must not route around it.
+- Uniform enforcement of **`sigless-branch` only**; the wsh hole closed rather
+  than pinned; the other four rules explicitly not enforced on this surface.
+- **Baseline tests, per wrapper, format named:** flagless refusal on tr AND wsh;
+  export-with-flag; the fired warning; the requested-not-fired note.
+- Per-rule over-admission tests — requesting one rule admits no other.
+- Keyless-leaf vector through the transforming emitters (`bip388`).
+- **Fired-detection per enforced wrapper** — per-leaf for tr, top-level for
+  wsh/sh — implemented and tested. New code, not reuse.
+- Vocabulary, printer and `to_ext_params` moved to `descriptor_builder::allow`
+  **before** the second caller is wired.
+- Export-specific warning wording (not build's "don't author this").
+- **Rust-first vectors pinning the new refusals**, per Open Q4 — this phase
+  touches the asymmetry Q4 flags as potentially normative.
+- **A release-note line for the behaviour change.**
+- `--allow` on `--template`/`--slot`/`--from-import-json` emits the did-not-fire
+  note.
 - Re-review to 0C/0I before any of it merges.
 
 ### Phase 2 — **DELETED**
