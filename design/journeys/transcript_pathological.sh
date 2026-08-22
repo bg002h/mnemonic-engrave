@@ -101,8 +101,39 @@ echo "########## 3. so it is chunked -- WITH the origin the warning asked for"
 # used to engrave, and what its own restore test measured as recovering 3 of 11
 # keys. Costs one extra chunk (4 vs 3) and changes nothing else: the template-id
 # is identical, so the mk1 key plates' stubs still bind.
+# F-227: DECLARE THE FINGERPRINTS IN THE KEYLESS TEMPLATE.
+#
+# Without them this engraved set cannot be RESTORED, only verified. The
+# template names its slots by origin, and eleven slots share only four
+# distinct origins -- so a gathered mk1 card matches several slots at once, and
+# a device that will not guess must refuse the whole set
+# (errSeatSlotContested, gui/key_card_seating.go). `md encode` warns about this
+# now; before F-227 nothing did, which is how it survived a journey with a
+# restore test.
+#
+# All eleven (fingerprint, path) pairs ARE unique across the three masters, so
+# declaring the fingerprints closes it outright. Same shape as the origin fix
+# above and the same price: about one extra chunk, and the template-id does not
+# move, so every address, wallet id and mk1 stub below is unchanged.
+#
+# Slot assignment comes from each key file's own @N marker -- the same source
+# the keyed card's arguments use, rather than a second hand-maintained list.
+FPARGS=()
+for f in "$W"/inputs-pathological/keys/key-*.xpub; do
+  slot=$(grep -oE '@[0-9]+' "$f" | head -1 | tr -d '@')
+  fp=$(grep -oE '\[[0-9a-f]{8}/' "$f" | head -1 | tr -d '[/')
+  [ -n "$slot" ] && [ -n "$fp" ] || { echo "FATAL: no @N or fingerprint in $f" >&2; exit 1; }
+  FPARGS+=(--fingerprint "@$slot=$fp")
+done
+# TWO array elements per key -- the flag and its value -- so eleven keys is 22.
+# Asserted because a silently short list would engrave a template that is still
+# unseatable while looking fixed, which is the exact failure mode F-227 is about.
+if [ ${#FPARGS[@]} -ne 22 ]; then
+  echo "FATAL: expected 11 fingerprints (22 argv elements), built ${#FPARGS[@]}" >&2; exit 1
+fi
+
 runcap "$W/out/pathological/md1.txt" '^md1' \
-  "$MD" encode --group-size 0 --force-chunked "$T"
+  "$MD" encode --group-size 0 --force-chunked "${FPARGS[@]}" "$T"
 
 # Now — and only now — the chunk set exists on disk for the steps below.
 MD1S=$(tr '\n' ' ' < "$W/out/pathological/md1.txt")

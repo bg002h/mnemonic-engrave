@@ -101,8 +101,39 @@ echo
 # No --path: the origins ride in the template. --path would FLATTEN eleven
 # distinct origins onto one shared path, which over eleven different keys is the
 # impossible card F-217 refuses.
+# F-227: DECLARE THE FINGERPRINTS IN THE KEYLESS TEMPLATE.
+#
+# Without them this engraved set cannot be RESTORED, only verified. The
+# template names its slots by origin, and eleven slots share only four
+# distinct origins -- so a gathered mk1 card matches several slots at once, and
+# a device that will not guess must refuse the whole set
+# (errSeatSlotContested, gui/key_card_seating.go). `md encode` warns about this
+# now; before F-227 nothing did, which is how it survived a journey with a
+# restore test.
+#
+# All eleven (fingerprint, path) pairs ARE unique across the three masters, so
+# declaring the fingerprints closes it outright. Same shape as the origin fix
+# above and the same price: about one extra chunk, and the template-id does not
+# move, so every address, wallet id and mk1 stub below is unchanged.
+#
+# Slot assignment comes from each key file's own @N marker -- the same source
+# the keyed card's arguments use, rather than a second hand-maintained list.
+FPARGS=()
+for f in "$IN"/keys/key-*.xpub; do
+  slot=$(grep -oE '@[0-9]+' "$f" | head -1 | tr -d '@')
+  fp=$(grep -oE '\[[0-9a-f]{8}/' "$f" | head -1 | tr -d '[/')
+  [ -n "$slot" ] && [ -n "$fp" ] || { echo "FATAL: no @N or fingerprint in $f" >&2; exit 1; }
+  FPARGS+=(--fingerprint "@$slot=$fp")
+done
+# TWO array elements per key -- the flag and its value -- so eleven keys is 22.
+# Asserted because a silently short list would engrave a template that is still
+# unseatable while looking fixed, which is the exact failure mode F-227 is about.
+if [ ${#FPARGS[@]} -ne 22 ]; then
+  echo "FATAL: expected 11 fingerprints (22 argv elements), built ${#FPARGS[@]}" >&2; exit 1
+fi
+
 runcap "$OUT/md1-template.txt" '^md1' \
-  "$MD" encode "$POLICY" --group-size 0 --force-chunked
+  "$MD" encode "$POLICY" "${FPARGS[@]}" --group-size 0 --force-chunked
 
 echo "The engraved set is $(wc -l < "$OUT/md1-template.txt") md1 chunk(s)."
 echo
@@ -110,8 +141,14 @@ echo
 echo "=== 4. E1: the cards re-encode to the policy they came from ==="
 echo
 mapfile -t TMPL < "$OUT/md1-template.txt"
-run "$MD" verify --template "$POLICY" "${TMPL[@]}"
-if ! "$MD" verify --template "$POLICY" "${TMPL[@]}" >/dev/null 2>&1; then
+# The fingerprints go to VERIFY too. Verify re-encodes the template from the
+# arguments and compares payloads, so omitting them here compares a
+# fingerprinted card against an unfingerprinted expectation and fails -- which
+# is what happened the first time this ran. Same rule as `--experimental`:
+# verify must be given whatever encode was given, or a card authored with a
+# flag becomes unverifiable, which is worse than not authoring it.
+run "$MD" verify --template "$POLICY" "${FPARGS[@]}" "${TMPL[@]}"
+if ! "$MD" verify --template "$POLICY" "${FPARGS[@]}" "${TMPL[@]}" >/dev/null 2>&1; then
   fatal "E1: the keyless card set does not re-encode to its own policy"
 fi
 
