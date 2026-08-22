@@ -9345,3 +9345,64 @@ passed — is the one option that should not survive.**
 **Owning phase:** any phase that claims a user can author this wallet. The
 journey currently does not claim it, because it prints a hand-written policy
 without saying it was hand-written; the transcript's new §1b now says so.
+
+### F-229 — decide whether tier 4 gets a key `#wallet-design` `#interop` `#LOW`
+
+**Priority: LOW.** Operator-filed 2026-08-22. **Ruled once already** — keep it
+keyless (`design/agent-reports/RULING_export_deadlock.md`, delegated to a
+stand-in). This entry exists so the decision is re-openable with its evidence
+attached, not because it is pending.
+
+**The trade, measured:**
+
+| | keyless (today) | keyed tier 4 |
+| --- | --- | --- |
+| passphrase-only escape hatch | **yes** — the tier's whole point | gone: becomes "phrase AND key @6" |
+| third-party descriptor import | **impossible**, every app, non-waivable in Core | Core v29+ accepts the wsh form |
+| addresses | current | **all change** — funds migration |
+| watch in Core | via `addr()` list (Phase 1b, works) | via descriptor |
+
+Isolated on real Core binaries: `tier 4 as-is` refuses, `tier 4 with a key`
+accepts, and nothing else about the wallet bites.
+
+**Re-open only if** interop with third-party software becomes worth more than a
+key-free recovery path. The stand-in's reasoning for keeping it: the keyless
+tier looks deliberate, and interop was plausibly an accepted cost.
+
+**Not to be actioned by an agent.** Changing a funds-bearing vault's spending
+conditions is the operator's signature.
+
+### F-230 — hot-wallet export: NOT NOW, with a two-part trigger `#export` `#secrets` `#LOW`
+
+**Priority: LOW.** Operator-filed 2026-08-22. Ruled NOT NOW; **"never" was
+explicitly rejected**, so this is deferred rather than closed.
+
+`mnemonic export-wallet` is watch-only by definition (`validate_watch_only`
+rejects phrase/entropy/xprv/wif at slot resolution). Hot export exists nowhere in
+the constellation.
+
+**Why not now, in ascending order of weight:**
+
+1. It writes spendable key material to disk — the worst class of thing to get
+   wrong — and arrived as one clause of a long request.
+2. It is new attack surface, not parity: nothing like it exists today.
+3. **Decisive: it has no consumer for this wallet.** Core refuses the descriptor
+   for watching *and* for signing alike — the keyless-tier rule is checked
+   before signing ability matters — so an `export-signer` artifact would import
+   into nothing. Building it now yields the most dangerous file in the plan with
+   zero function.
+
+**Trigger — BOTH required:**
+
+1. A named wallet whose descriptor-with-keys is **measured to import**
+   (per-entry `success: true` on a pinned target version — an **import** test,
+   not an emit test; this is C1's lesson and the founding error of the whole
+   export cycle was accepting emission as evidence of import).
+2. A renewed operator ask naming that wallet and the hot-load purpose.
+
+**Contract, if built** — already ruled sound, only its trigger withheld: a
+distinct `mnemonic export-signer` subcommand; **account-level xprvs, never
+master** (master xprvs with hardened paths trip a Core duplicate-key false
+positive, root-caused to `PubkeyProvider::operator<`, reproduced on v29 and
+v31.1); `--output` required; `0600` + `create_new`; always-on advisory; no
+interactive confirm. R0 still applies.
