@@ -574,6 +574,51 @@ merits — and on those alone.
 Nunchuk needs no emitter; `descriptor` and `bsms` already emit its two import
 shapes. What remains is one regression test pinning that, folded into Phase 3.
 
+### Phase 1b — the `addr()`-list export, the ONE route that actually works
+
+Ruled in `RULING_export_deadlock.md` and specified here so it is implementable
+rather than described. **Additive** — a new `--format` value, no admission
+change, nothing existing behaves differently — so it is outside the risk set and
+needs no R0 gate of its own. It does need this Acceptance.
+
+**Why it matters:** every descriptor-level route into all three wallet apps is
+closed by the non-waivable sigless rule. An `addr()` list is the entire
+reachable surface for Core. You can **watch** this wallet; you cannot
+**describe** it to Core.
+
+**Measured, and it changes the build order:**
+
+| | |
+| --- | --- |
+| wsh concrete descriptor parses in the toolkit today | **exit 0** — `addr()` for wsh needs NO Phase 1 |
+| tr concrete descriptor | **exit 2** — `addr()` for tr is BLOCKED on Phase 1's leniency |
+| descriptor→address derivation in the export path | **does not exist** — `nostr.rs` and `permutation_search.rs` have unrelated address code; `restore.rs:2445` goes the other way (address→scriptPubKey) |
+
+That third row is the real work. This is not "add an enum variant".
+
+#### Acceptance
+
+- **`--format bitcoin-core-addresses`**, emitting N non-ranged
+  `addr(<address>)#<checksum>` entries as an `importdescriptors` array.
+- **Address derivation added to the export path**, deriving from the canonical
+  multipath descriptor — receive and change both, since a change-blind watch
+  wallet silently under-reports the balance.
+- **`--count` (default stated, not implied)**, and the emitted artifact
+  **states its own address count and the no-derivation caveat in-band** — a
+  consumer who loads it must be able to see from the file alone that it is a
+  fixed list which will not extend past the exported gap.
+- **wsh works without Phase 1; tr is gated on it** and says so when refused,
+  rather than failing with Phase 1's generic sanity message.
+- **Checksums Core agrees with** — the constellation already computes these;
+  assert against `getdescriptorinfo` rather than trusting the computation.
+- **An IMPORT test, not an emit test**, per C1: regtest `importdescriptors`
+  against a pinned Core, asserting per-entry `success: true`. This format exists
+  precisely because the descriptor route fails at import, so emit-only
+  acceptance would repeat the mistake C1 caught.
+- **The addresses must equal the journey's**, cross-checked against
+  `design/journeys/out/rcw/wsh/{receive,change}.txt` — which the device and the
+  BSMS canary already agree with. Four implementations, one address list.
+
 ### Phase 3 — Sparrow refusal pinned as deliberate
 
 One test asserting `--format sparrow --descriptor` refuses, whose comment
