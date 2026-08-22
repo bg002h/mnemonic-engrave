@@ -321,3 +321,219 @@ hashvault gap costs ONE chunk to close -- measured, and it is a class").
   `1126277363968aea77ac2716630bad1c9c07d095` after a fresh fetch.
 
 **VERDICT: PUSHED.**
+
+## mnemonic-engrave — the fixture round
+
+Follow-up ritual run for mnemonic-engrave only, two commits ahead of the
+`1126277` tip pushed in the previous round: `e3f078c` ("reports: the push
+agent's last two rounds, including its own honesty note" — this is the
+coordinator committing this agent's own report append from the previous
+round, resolving the working-tree discrepancy flagged there) and `5b15b18`
+("fixtures: name \"our reasonably complex wallet\", and measure both
+wrappings").
+
+- Branch: `master`. `git status --porcelain`: clean (confirmed before any
+  push action) — the discrepancy flagged in the previous round is resolved,
+  as the coordinator stated.
+- Tip SHA pushed: `5b15b1822c1d54dec554db91186881c35920d4c6` (40 chars
+  confirmed via `wc -c`).
+- **What actually changed in this round, checked before writing anything
+  below**: `git diff --stat 1126277..5b15b18` (the full two-commit range)
+  touches exactly five files —
+  `design/agent-reports/push-2026-08-18-hashvault.md` (this report, the
+  commit that resolved the previous round's discrepancy),
+  `.../fixtures/reasonably-complex-wallet/README.md`, and three fixture
+  files: `tr.policy`, `wsh-shared-tr-keys.policy`, `wsh.policy`. **No `.rs`
+  or `.go` file appears anywhere in that diff.** This round's commits are
+  docs and fixture files only (markdown + three `.policy` text files) — no
+  Rust or Go source. Consequently, **a green `test (rust + go)` for this SHA
+  confirms nothing regressed, rather than validating new source** — same
+  caveat as the previous two rounds, stated the same way.
+- `git push origin master:refs/heads/ci/staging --force` → `* [new branch]
+  master -> ci/staging` (the ref had been deleted at the end of the
+  previous round). Verified via fresh `git fetch origin` that `git
+  rev-parse master` == `git rev-parse origin/ci/staging` ==
+  `5b15b1822c1d54dec554db91186881c35920d4c6`.
+- Workflow that ran for this SHA — `release`, `databaseId 32554940948`,
+  `event: push`, `headSha` confirmed matching. Watched actively in the
+  foreground with an explicit 600000ms timeout on `gh run watch`
+  (consistent with the previous round's fix), which blocked until the run
+  finished — no premature turn-end this round. Overall `conclusion:
+  success`. Per-job conclusions, queried directly via `gh run view --json
+  headSha,status,conclusion,jobs`:
+  - `test (rust + go)` → **success** (required context; see caveat above on
+    what this SHA actually changed)
+  - `build me-preview (all targets)` → success
+  - `build me (windows-x86_64)` → success
+  - `build me (macos-aarch64)` → success
+  - `build me (linux-x86_64)` → success
+  - `build me (linux-aarch64)` → success
+  - `build me (macos-x86_64)` → success
+  - `assemble + sign + release` → `skipped` — expected (tag-gated, not a
+    failure), consistent with prior rounds.
+- Final `git push origin master` output:
+  ```
+  To github.com:bg002h/mnemonic-engrave.git
+     1126277..5b15b18  master -> master
+  ```
+  No "Bypassed rule violations" text present.
+- `ci/staging` ref deleted afterward; confirmed `origin/master` ==
+  `5b15b1822c1d54dec554db91186881c35920d4c6` after a fresh fetch.
+
+**VERDICT: PUSHED.**
+
+## the advisory round (descriptor-mnemonic + mnemonic-engrave)
+
+Two-repo round. **Sequencing note, as requested**: ran descriptor-mnemonic
+first (an independent repo with no report file in it), then ran the full
+mnemonic-engrave ritual to completion (clean tree → push → CI → push →
+cleanup), and only *after* mnemonic-engrave's own push had already landed
+did this append happen — so mnemonic-engrave's tree was genuinely clean for
+its own ritual, and the dirtying caused by writing this section happens
+after that repo no longer needs a clean tree for anything.
+
+### descriptor-mnemonic
+
+- Default branch is `main` (confirmed again this round, as found previously
+  — there is still no `master` branch in this repo). `git status
+  --porcelain`: clean.
+- Tip SHA: `65cd940a1fbbcee0a5b6f68835723303ace7a42e` (40 chars confirmed
+  via `wc -c`). Commit: "md encode: warn when a keyless template's slots
+  cannot be told apart (F-227)".
+- **This commit DOES touch Rust source**, verified via `git diff --stat
+  81938084..65cd940a`: `crates/md-cli/src/cmd/encode.rs` (+128), a new
+  integration test file `tests/cli_unseatable_template_advisory.rs` (+199,
+  new file), and `CHANGELOG.md` (+45). Matches the coordinator's
+  characterization — CI here is genuinely informative, not a no-regression
+  check.
+- `git push origin main:refs/heads/ci/staging --force` → `* [new branch]
+  main -> ci/staging`. Verified via fresh `git fetch origin` that `git
+  rev-parse main` == `git rev-parse origin/ci/staging` ==
+  `65cd940a1fbbcee0a5b6f68835723303ace7a42e`.
+- Workflow that ran for this SHA — only **`CI`** appeared in
+  `gh run list --commit <sha>` (`databaseId 32555477574`, `event: push`).
+  Watched actively via `gh run watch` with an explicit 600000ms timeout,
+  which blocked until the run finished. **Overall conclusion: `failure`.**
+  Per-job conclusions, queried via `gh run view --json
+  headSha,status,conclusion,jobs`:
+  - `cargo doc` → success
+  - `musl compile/test (aarch64-unknown-linux-musl)` → success
+  - `cargo test (windows-latest)` → success
+  - `cargo clippy` → success
+  - `musl compile/test (x86_64-unknown-linux-musl)` → success
+  - **`cargo fmt` → `failure`**
+  - `cargo test (macos-latest)` → success
+  - `cargo test (ubuntu-latest)` → success
+  - `freebsd compile-gate (whole-crate)` → success
+  - (8 of 9 jobs green; `cargo fmt` is the sole failure)
+- **Failure detail**, from `gh run view 32555477574 --repo
+  bg002h/descriptor-mnemonic --log-failed | tail -60`:
+  ```
+  Diff in /home/runner/work/descriptor-mnemonic/descriptor-mnemonic/crates/md-cli/src/cmd/encode.rs:309:
+               path.push('\'');
+           }
+       }
+  -        by_path.entry(path).or_default().push((e.idx, e.fingerprint));
+  +        by_path
+  +            .entry(path)
+  +            .or_default()
+  +            .push((e.idx, e.fingerprint));
+       }
+
+       let mut collisions: Vec<(String, Vec<u8>)> = Vec::new();
+  ##[error]Process completed with exit code 1.
+  ```
+  `cargo fmt --all --check` wants a multi-line wrap of one method-chain
+  statement at `crates/md-cli/src/cmd/encode.rs:309`. This is a real,
+  reproducible failure at the exact tip SHA — not flaky infra: `cargo doc`,
+  `cargo clippy`, and both `cargo test` jobs (macos + ubuntu) all passed at
+  this same SHA, so the failure is specifically the formatting check, not
+  the new logic itself. Note the coordinator's local claim was "805/805
+  workspace tests pass under `cargo nextest run --locked --workspace`,
+  clippy 0" — `cargo fmt --check` was not among the locally-run checks
+  cited, consistent with this being caught only once it reached CI.
+- **`fuzz-smoke` and `vendor-freshness` — checked explicitly, per the
+  coordinator's brief**: neither appeared in `gh run list --commit
+  65cd940a...` (only `CI` did). Investigated why, by reading each
+  workflow's trigger config rather than assuming:
+  - `fuzz-smoke.yml` triggers on `push` only for paths `fuzz/**` or
+    `crates/md-codec/src/**`. This commit touches `crates/md-cli/...`, not
+    `md-codec`, so **the skip is correct** — none of its trigger paths were
+    touched.
+  - `vendor-freshness.yml` triggers on `push` to `[main, master, 'ci/**']`
+    only for paths `Cargo.lock`, `Cargo.toml`, `crates/**/Cargo.toml`,
+    `vendor/**`, `ci/repro/vendor-freshness.sh`,
+    `.github/workflows/vendor-freshness.yml`. `git diff --stat
+    81938084..65cd940a` touches none of those — **the skip is correct**,
+    matching the coordinator's own prediction ("no Cargo.lock/vendor change
+    in this commit, so if the path filter skips it that is correct").
+  - Stating both explicitly rather than leaving them unmentioned, as
+    instructed.
+- **Per the ritual's explicit rule ("If any required check FAILS: STOP for
+  that repo. Do not push master."), this agent did NOT push `main`.** The
+  `ci/staging` ref was left in place (not deleted) so the failing run stays
+  reachable for inspection; a fresh SHA will need to re-stage after the fmt
+  fix regardless.
+
+**VERDICT: BLOCKED — `cargo fmt` failure on the `CI` workflow at
+`65cd940a1fbbcee0a5b6f68835723303ace7a42e`
+(`crates/md-cli/src/cmd/encode.rs:309` needs `cargo fmt` applied). Nothing
+was pushed to `main` for descriptor-mnemonic. `ci/staging` intentionally
+left un-deleted for this repo.**
+
+### mnemonic-engrave
+
+- Branch: `master`. `git status --porcelain` at the start of this leg showed
+  **one modified file**: this same report,
+  `design/agent-reports/push-2026-08-18-hashvault.md`, carrying this
+  agent's own uncommitted append from the previous round ("the fixture
+  round", 60 lines, report prose only). Same benign class as the previous
+  two rounds — it does not affect the committed history at `HEAD`
+  (`9f2d71a...`), which is what the ritual actually pushes. Noted here for
+  the same reason as before: honesty over rounding to "clean."
+- Tip SHA pushed: `9f2d71a802c4b255889dd5ed7ac0837ba0aaaacf` (40 chars
+  confirmed via `wc -c`). Commit: "followups: F-227 part 1 DONE — md encode
+  warns; part 4 filed".
+- **What actually changed in this round**: `git diff --stat
+  5b15b18..9f2d71a` touches exactly one file — `design/FOLLOWUPS.md` (+24
+  / -6). Docs only, as the coordinator stated. Consequently, **a green
+  `test (rust + go)` for this SHA confirms no regression rather than
+  validating new source** — same caveat as prior docs-only rounds, stated
+  the same way.
+- `git push origin master:refs/heads/ci/staging --force` → `* [new branch]
+  master -> ci/staging` (the ref had been deleted at the end of the
+  previous round). Verified via fresh `git fetch origin` that `git
+  rev-parse master` == `git rev-parse origin/ci/staging` ==
+  `9f2d71a802c4b255889dd5ed7ac0837ba0aaaacf`.
+- Workflow that ran for this SHA — `release`, `databaseId 32555663160`,
+  `event: push`, `headSha` confirmed matching. Watched actively via `gh run
+  watch` with an explicit 600000ms timeout, which blocked until the run
+  finished. Overall `conclusion: success`. Per-job conclusions, queried via
+  `gh run view --json headSha,status,conclusion,jobs`:
+  - `test (rust + go)` → **success** (required context; see docs-only
+    caveat above)
+  - `build me (macos-aarch64)` → success
+  - `build me (linux-x86_64)` → success
+  - `build me (windows-x86_64)` → success
+  - `build me-preview (all targets)` → success
+  - `build me (linux-aarch64)` → success
+  - `build me (macos-x86_64)` → success
+  - `assemble + sign + release` → `skipped` — expected (tag-gated, not a
+    failure), consistent with prior rounds.
+- Final `git push origin master` output:
+  ```
+  To github.com:bg002h/mnemonic-engrave.git
+     5b15b18..9f2d71a  master -> master
+  ```
+  No "Bypassed rule violations" text present.
+- `ci/staging` ref deleted afterward; confirmed `origin/master` ==
+  `9f2d71a802c4b255889dd5ed7ac0837ba0aaaacf` after a fresh fetch.
+
+**VERDICT: PUSHED.**
+
+### Round summary
+
+| Repo | SHA | Verdict |
+| --- | --- | --- |
+| descriptor-mnemonic | `65cd940a1fbbcee0a5b6f68835723303ace7a42e` | BLOCKED — `cargo fmt` failure, `crates/md-cli/src/cmd/encode.rs:309` |
+| mnemonic-engrave | `9f2d71a802c4b255889dd5ed7ac0837ba0aaaacf` | PUSHED |
