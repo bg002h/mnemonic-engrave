@@ -9220,14 +9220,32 @@ only when the walk fails — so the refusal assertion is not vacuous.
 
 #### STILL OPEN
 
-1. **`md encode` says nothing.** It will happily emit a keyless template whose
-   origins collide with no fingerprints, and the operator learns it is
-   unseatable only on attempting a restore — after engraving. It has every
-   input needed to warn at authoring time. This is the systemic fix; the
-   journeys are just where it surfaced. **Rust-primary: land the check in
-   `descriptor-mnemonic` with vectors, then port.**
+1. ~~**`md encode` says nothing.**~~ **DONE 2026-08-21** — `descriptor-mnemonic`
+   `65cd940a`. `md encode` now warns, naming the colliding slots, their path and
+   the remedy. Warn-only (a bare template is legal; an operator may record slot
+   order out of band), stderr, exit 0, `--json` branch too.
+
+   The subtlety, recorded because the first implementation got it wrong:
+   **ambiguity is not equality of declarations.** Slots collide iff one card can
+   match both — same path, and *not* both declaring a distinct fingerprint — so
+   an undeclared slot is ambiguous with every slot at its path, and declaring
+   fingerprints on only *some* of a group does not help. Grouping by
+   `(fingerprint, path)` reports nothing; the test written for that case is what
+   caught it. 4 mutations, all killed. 805/805, clippy 0.
+
+   No Go port due: CLI authoring UX, not normative codec behaviour, and the
+   device does not author templates from a policy string. **But the device's own
+   multisig BUILD path (`gui/multisig_build_*`) authors a policy and was not
+   checked** — it has the cosigner xpubs so it probably declares fingerprints,
+   but "probably" is not measured. Open, below.
 2. **Both pathological journeys carry the same latent gap** (11 slots, 4
    distinct origins, no fingerprints) and neither says so. Their device walks
    use the KEYED card, so nothing has ever exercised their seating path.
 3. **No plates-to-restore walk anywhere.** Arm 3 restores from the files that
    produced the cards, not from anything read back off metal.
+4. **The device's multisig build path is unchecked for this.**
+   `gui/multisig_build_*` authors a policy on-device and engraves it. It holds
+   the cosigner xpubs, so it very likely declares fingerprints and is fine —
+   but that is a guess, and the whole point of this follow-up is that an
+   unseatable template looks correct until someone tries to restore it. Measure
+   it the way the host side was measured: author one, inspect the slots.
