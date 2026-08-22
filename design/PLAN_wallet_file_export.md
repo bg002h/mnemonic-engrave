@@ -1,8 +1,8 @@
 # PLAN — wallet-file export for the reasonably complex wallet
 
 **Status:** all five planning reports landed and folded. R0 on Phase 1 has run
-twice — round 1 **1C/4I/2M/1N**, round 2 **0C/4I/1M/2N**. Both RED; this
-document is the fold of both. Phase 2 is DELETED. **No code until a review
+twice — round 1 **1C/4I/2M/1N**, round 2 **0C/4I/1M/2N**, round 3 **0C/2I/1M/0N**.
+All RED; this document is the fold of all three. Phase 2 is DELETED. **No code until a review
 returns 0C/0I.**
 
 **Operator ask (2026-08-22):** output Nunchuk, Sparrow and Bitcoin Core
@@ -222,8 +222,8 @@ incidental safety becomes deliberate.**
 ## 3. Phases
 
 Each phase ends with a fable review before the next begins, per the operator's
-instruction. **No phase may start: the Phase 1 gate is RED** (round 1 1C/4I,
-round 2 0C/4I).
+instruction. **No phase may start: the Phase 1 gate is RED** (rounds 1-3:
+1C/4I, 0C/4I, 0C/2I).
 
 ### Phase 1 — G1, `--allow` parity on `export-wallet`
 
@@ -386,6 +386,56 @@ names (`bip388`). Narrowed: **no trace in the artifact** stands as the ruling,
 but on the ground that a trace would be format-specific and silently dropped by
 most targets — not on a passthrough claim that is false for some of them.
 
+#### Round 3 fold — two rulings that did not compose
+
+**R0 round 3: 0C / 2I / 1M / 0N.** (`R0_export_phase1_round3.md`) Both
+Importants are NEW and both are mine: I answered F-2 and F-4 independently and
+never checked that the two answers describe the same surface.
+
+**R3-1 — I decided two incompatible gate topologies.** F-2's answer says the
+intake gate is the **ONLY** admission point; F-4's says
+`--template`/`--slot`/`--from-import-json` **do not reach** the descriptor gate.
+Against a surface with **three** descriptor intakes those cannot both hold, and
+under one reading a sigless wsh envelope **exits 0 via `--from-import-json` with
+no flag** — which would falsify "the wsh hole closed rather than pinned" in the
+same document that claims it.
+
+*Ruling — topology (B), the one consistent with this plan's own acceptance:*
+**the admission gate runs on the canonical descriptor where all three arms
+converge, before `EmitInputs`, honouring the `AllowSet` uniformly.**
+
+That makes F-4's answer a **prediction** rather than a rule, and splits it:
+
+- `--template` / `--slot` — a builder-produced descriptor cannot carry a sigless
+  branch, so those paths only ever emit the note. True, and now stated as a
+  consequence rather than an exemption.
+- **`--from-import-json` — CORRECTED.** An envelope descriptor **can** be
+  sigless. It is gated and waivable **exactly like `--descriptor`**. My round-2
+  text put it in the exempt list; that was wrong and is the hole R3-1 found.
+
+**R3-2 — the note I reused asserts a check that never ran.** `(b)` enforces
+`sigless-branch` only, and I pinned the *existing* did-not-fire note — which
+literally prints *"(the policy passes that rule without it)"*. For the four
+rules that never run under (b), that sentence is **false**: the descriptor was
+not checked, so nothing "passes". My own (b) ruling made the reused note lie.
+
+*Ruling:* (b) stands and note-not-refusal stands. **The "passes that rule"
+parenthetical may only ever be printed by a rule that actually ran.** Two
+export-side wordings, hung on the existing export-wording acceptance bullet:
+
+- **unenforced rule** — *"note: `--allow <rule>` has no effect on
+  `export-wallet` — only `sigless-branch` is enforced here; the descriptor was
+  NOT checked against `<rule>`"*
+- **ungated path** — *"note: `--allow` does not apply to this path — no
+  descriptor admission gate runs on `--template`/`--slot`"*
+
+Two distinct reasons no longer collide on one sentence, and (b) becomes as
+honest in the tool as it now is in the plan.
+
+**R3-3 (Minor) — "format named" named no format.** The baseline tests use
+**`--format bitcoin-core`**: it is the default, and it is the format with
+measured evidence on both sides of the air gap.
+
 #### The constraint that survives all of this
 
 **No help text, doc, commit message or release note may say `--allow` "enables
@@ -398,12 +448,15 @@ merits — and on those alone.
 
 - Every strict parse site on the `--descriptor` path enumerated file+function
   and listed in the PR.
-- **A single admission gate at intake**, and an assertion that it is the ONLY
-  admission point — `--template` inputs must not route around it.
+- **A single admission gate on the canonical descriptor, where all three
+  intakes converge (before `EmitInputs`)** — topology (B) — with an assertion
+  that it is the ONLY admission point and that no arm routes around it.
 - Uniform enforcement of **`sigless-branch` only**; the wsh hole closed rather
   than pinned; the other four rules explicitly not enforced on this surface.
-- **Baseline tests, per wrapper, format named:** flagless refusal on tr AND wsh;
-  export-with-flag; the fired warning; the requested-not-fired note.
+- **Baseline tests, per wrapper, `--format bitcoin-core`:** flagless refusal on
+  tr AND wsh; export-with-flag; the fired warning; the requested-not-fired note.
+- **`--from-import-json` gated like `--descriptor`** — a sigless envelope
+  refuses without the flag and exports with it. This is the hole round 3 found.
 - Per-rule over-admission tests — requesting one rule admits no other.
 - Keyless-leaf vector through the transforming emitters (`bip388`).
 - **Fired-detection per enforced wrapper** — per-leaf for tr, top-level for
@@ -414,8 +467,10 @@ merits — and on those alone.
 - **Rust-first vectors pinning the new refusals**, per Open Q4 — this phase
   touches the asymmetry Q4 flags as potentially normative.
 - **A release-note line for the behaviour change.**
-- `--allow` on `--template`/`--slot`/`--from-import-json` emits the did-not-fire
-  note.
+- `--allow` on `--template`/`--slot` emits the ungated-path note (NOT
+  `--from-import-json`, which is gated — see above).
+- **The "passes that rule" parenthetical is never printed by a rule that did
+  not run**, asserted per unenforced rule.
 - Re-review to 0C/0I before any of it merges.
 
 ### Phase 2 — **DELETED**
