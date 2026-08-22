@@ -1017,3 +1017,65 @@ violation reported there.
 **VERDICT: PUSHED (and the previous round's gap fully closed — both
 `8319ddb` and `4657f88` are now ancestors of a SHA that this ritual staged,
 watched CI for, and pushed cleanly).**
+
+## the R0-rounds round
+
+Ritual run for mnemonic-engrave only, six commits ahead of the `949b7aa`
+tip pushed in the previous round: `cc5b2ed`, `bd6e316`, `6087a35`,
+`a0a935f`, `09b1035`, `3aa6f33` — three R0 review rounds on export Phase 1
+and their three folds into `design/PLAN_wallet_file_export.md`.
+
+- Branch: `master`. `git status --porcelain`: clean, as the coordinator
+  stated they verified **before** promising the freeze this time
+  (confirmed independently before any push action here too).
+- Tip SHA pushed: `3aa6f339573c8f0439dcef9ac4c7ebcc1513adb6` (40 chars
+  confirmed via `wc -c`).
+- **What actually changed in this round, checked before writing anything
+  below**: `git diff --stat 949b7aa..3aa6f33` touches exactly 5 files —
+  `design/PLAN_wallet_file_export.md` (the plan document, folded three
+  times across this commit range), `design/agent-reports/
+  R0_export_phase1.md`, `R0_export_phase1_round2.md`,
+  `R0_export_phase1_round3.md` (the three R0 review reports), and
+  `design/agent-reports/push-2026-08-18-hashvault.md` (this report, the
+  previous round's append). **No `.rs` or `.go` file appears anywhere in
+  that diff.** Matches the coordinator's description exactly: three agent
+  reports and three folds of one plan document, all markdown, no Rust or
+  Go. Consequently, **a green `test (rust + go)` for this SHA confirms no
+  regression rather than validating new source** — same caveat as every
+  docs-only round this session, stated the same way.
+- `git push origin master:refs/heads/ci/staging --force` → `* [new branch]
+  master -> ci/staging` (the ref had been deleted at the end of the
+  previous round). Verified via fresh `git fetch origin` that `git
+  rev-parse master` == `git rev-parse origin/ci/staging` ==
+  `3aa6f339573c8f0439dcef9ac4c7ebcc1513adb6`.
+- Workflow that ran for this SHA — `release`, `databaseId 32570530821`,
+  `event: push`, `headSha` confirmed matching. Watched actively via `gh run
+  watch` with an explicit 600000ms timeout, which blocked until the run
+  finished. Overall `conclusion: success`. Per-job conclusions, queried via
+  `gh run view --json headSha,status,conclusion,jobs`:
+  - `test (rust + go)` → success
+  - `build me-preview (all targets)` → success
+  - `build me (linux-aarch64)` → success
+  - `build me (macos-x86_64)` → success
+  - `build me (linux-x86_64)` → success
+  - `build me (macos-aarch64)` → success
+  - `build me (windows-x86_64)` → success
+  - `assemble + sign + release` → `skipped` — expected (tag-gated).
+  8 of 8 jobs green.
+- **Extra caution applied again, given the two previous rounds' history**:
+  immediately before the final push, re-verified `git rev-parse master`
+  still equalled the exact staged/CI-tested SHA
+  (`3aa6f339573c8f0439dcef9ac4c7ebcc1513adb6` — confirmed match), fetched
+  fresh, confirmed `origin/master` (still at `949b7aa`) was an ancestor of
+  local `master`, guaranteeing a clean fast-forward. No tip movement
+  observed during this round's CI wait.
+- Final `git push origin master` output:
+  ```
+  To github.com:bg002h/mnemonic-engrave.git
+     949b7aa..3aa6f33  master -> master
+  ```
+  No "Bypassed rule violations" text present.
+- `ci/staging` ref deleted afterward; confirmed `origin/master` ==
+  `3aa6f339573c8f0439dcef9ac4c7ebcc1513adb6` after a fresh fetch.
+
+**VERDICT: PUSHED.**
