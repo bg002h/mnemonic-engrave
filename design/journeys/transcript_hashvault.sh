@@ -243,6 +243,42 @@ for f in "$OUT"/descriptor-plates/descriptor-part-*.txt; do
   echo
 done
 
+echo "=== 15. THE GAP: the engraved set does not say which seed is which slot ==="
+echo
+# Every key sits at the SAME path from a DIFFERENT seed, so the keyless
+# template's six origins are identical and it carries no fingerprints. The
+# engraved backup is the template plus the mk1 cards -- and the mk1 cards all
+# bind to the same template with the same stub and the same origin too.
+#
+# Slot order is load-bearing: multi_a commits to key ORDER, so a different
+# assignment is a different script, a different leaf, and a different address.
+echo "The keyless template's origins, as engraved:"
+"$MD" inspect "${TMPL[@]}" 2>/dev/null | sed -n '/^origins:/,/^wallet-policy-id/p' | head -8
+echo
+echo "The keyed card's origins, which DO name a master:"
+"$MD" inspect "${KEYED[@]}" 2>/dev/null | sed -n '/^origins:/,/^wallet-policy-id/p' | head -8
+echo
+echo "What a wrong assignment costs, measured:"
+addr_for() {
+  local A=() i=0 idx f fp xp cards
+  for idx in "$@"; do
+    f="$IN/keys/key-$idx.xpub"
+    fp=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$f" | head -1)
+    xp=$(grep '^xpub' "$f")
+    A+=(--key "@$i=$xp" --fingerprint "@$i=$fp"); i=$((i+1))
+  done
+  cards=$("$MD" encode "$POLICY" "${A[@]}" --group-size 0 --experimental 2>/dev/null | grep '^md1')
+  [ -n "$cards" ] || { echo "ENCODE-FAILED"; return; }
+  "$MD" address $cards --chain 0 --count 1 2>/dev/null | grep '^bc1' | head -1
+}
+echo "  canonical  @0..@5 = key-0..key-5 : $(addr_for 0 1 2 3 4 5)"
+echo "  swap @0/@1 (tier 1 3-of-3)       : $(addr_for 1 0 2 3 4 5)"
+echo "  swap @3/@4 (tier 2 2-of-2)       : $(addr_for 0 1 2 4 3 5)"
+echo
+echo "Three different wallets from one set of six keys. 6! = 720 assignments,"
+echo "and the engraved template distinguishes none of them."
+echo
+
 echo "=== Artifacts ==="
 run ls -la "$OUT"
 

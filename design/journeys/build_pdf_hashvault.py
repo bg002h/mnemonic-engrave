@@ -36,7 +36,7 @@ def missing_gate(artifact):
     sys.exit(1)
 
 
-def code(text, limit=None, must_show=None):
+def code(text, limit=None, must_show=None, must_show_all=None):
     """Render a transcript block, optionally clipped.
 
     `must_show` names a string the block exists to display — its punchline. A
@@ -48,6 +48,20 @@ def code(text, limit=None, must_show=None):
     goes stale the next time the transcript grows.
     """
     lines = text.rstrip("\n").split("\n")
+    if must_show_all is not None:
+        # A section that ENUMERATES things must show all of them. The reader
+        # counts what is on the page: a wallet described as six seeds that
+        # displays four reads as a document contradicting itself, and the
+        # first build of this page did exactly that (4 of 6 seeds, 3 of 6 key
+        # files) because the clip was a constant chosen before the section
+        # existed. The count comes from the transcript, so it cannot go stale.
+        hits = [i + 1 for i, l in enumerate(lines) if l.startswith(must_show_all)]
+        if limit and hits and hits[-1] > limit:
+            shown = sum(1 for h in hits if h <= limit)
+            raise SystemExit(
+                f"clip of {limit} lines shows only {shown} of {len(hits)} "
+                f"{must_show_all!r} blocks (the last is on line {hits[-1]}). "
+                f"Raise the limit past {hits[-1]}, or drop it.")
     if must_show is not None:
         at = next((i + 1 for i, l in enumerate(lines) if must_show in l), None)
         if at is None:
@@ -149,7 +163,7 @@ no key-path spend and every spend reveals which tier was used.</div>
 <p>One seed per key, so every key has its own master fingerprint. That is the
 difference from this constellation's other multi-key journey, where three
 masters supplied eleven keys across four accounts.</p>
-{code(section(tx, "1. The source material"), 14)}
+{code(section(tx, "1. The source material"), None, must_show_all="$ cat")}
 
 <h2>Derived at the constellation's own path</h2>
 <p><code>m/270028'/coin'/account'/script'</code> — purpose <code>270028'</code>
@@ -161,7 +175,7 @@ it.</b> <code>ms derive</code> offered only the BIP templates and
 <code>mk derive --path</code> is relative-and-unhardened-only, so nothing in the
 constellation could derive at its own path. <code>ms derive --template
 bg002h-tr</code> is what closed that.</div>
-{code(section(tx, "2. The keys"), 26)}
+{code(section(tx, "2. The keys"), None, must_show_all="$ cat")}
 </section>
 
 <section class="page">
@@ -175,7 +189,7 @@ human passphrases.</p>
 newline.</b> <code>printf %s</code>, never <code>echo</code>. A stray
 <code>\\n</code> changes the hash, and the tier it belongs to is then locked
 forever — with a plate beside it that looks correct.</div>
-{code(section(tx, "3. The three passphrases"), 20)}
+{code(section(tx, "3. The three passphrases"), None, must_show_all="$ cat")}
 </section>
 
 <section class="page">
@@ -289,16 +303,57 @@ preview at all.</p>
 </section>
 
 <section class="page">
+<h1>The gap: the engraved set does not name the slots</h1>
+
+<p>Every key sits at the <b>same path</b> from a <b>different seed</b>. So the
+keyless template's six origins are identical, and it carries no fingerprints —
+while the keyed card does. The engraved backup is the template plus the six mk1
+cards, and those bind to the same template with the same stub at the same
+origin, so they add no signal either.</p>
+
+<p>Slot order is load-bearing. <code>multi_a</code> commits to key <em>order</em>,
+so a different assignment is a different script, a different taptree leaf, and a
+different address:</p>
+{code(section(tx, "15. THE GAP"), None, must_show="720 assignments")}
+
+<div class="warn"><b>Three different wallets from one set of six keys, and the
+engraved template distinguishes none of them.</b> A restorer holding these
+plates and all six seeds has 720 candidate assignments and no way to choose.
+This is not a tooling defect — it is a property of the wallet's shape, and it is
+the thing this journey exists to have found before anything was cut.</div>
+
+<h2>The three ways out</h2>
+<ul>
+<li><b>Give each key its own account index</b> —
+<code>m/270028'/0'/N'/0'</code>. The origins then differ, and the existing
+seating rule (match on declared origin) assigns slots with no extra data. This
+is how the pathological wallet avoids the problem, and it changes no policy
+semantics.</li>
+<li><b>Engrave the KEYED card</b> instead of the template. It carries a
+fingerprint per slot, so the assignment is on the plate — at the cost of 15
+chunks rather than 4, and of putting the cosigner xpubs on metal.</li>
+<li><b>Record the assignment out of band</b> — the weakest option, because it is
+the one thing here that is not engraved and not checkable.</li>
+</ul>
+
+<div class="note">This is the same class as F-216 (mapping an mk1 to an
+<code>@N</code> slot) in its hardest form: there, seating could match on a
+declared origin, because the origins differed. Here they do not.</div>
+</section>
+
+<section class="page">
 <h1>What this journey does NOT show</h1>
 
 <ul>
 <li><b>No device walk.</b> Every command here is host-side. The cards have not
 been carried to a SeedHammer II, and no screen in this document is a
 framebuffer. The sibling taproot journey does that; this one does not yet.</li>
-<li><b>No restore test.</b> The wallet has not been rebuilt from the plates and
-the seeds and checked to spend to the same addresses. For a wallet whose tier 4
-is keyless, a restore test would also have to prove the passphrase alone
-reproduces the tier — which is exactly the property that makes it dangerous.</li>
+<li><b>No restore test — and as engraved, one cannot pass.</b> A restore rebuilds
+the wallet from the plates and the seeds and requires the same addresses. That
+is impossible here until the slot-assignment gap on the previous page is closed:
+the plates admit 720 assignments and only one is the wallet. Writing the test
+before fixing that would produce a test that fails for the right reason and
+teaches nothing new — the measurement on the previous page already says it.</li>
 <li><b>No hardware.</b> Nothing has been cut. The plate counts and the QR
 capacity are computed from the device's own constants, not measured on
 metal.</li>
