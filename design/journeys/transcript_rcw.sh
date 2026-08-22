@@ -61,12 +61,12 @@ echo
 cat <<'TXT'
 The starting representation of "our reasonably complex wallet" is a BIP-388
 WALLET POLICY TEMPLATE: a miniscript expression in which every key is a
-PLACEHOLDER -- @0 through @5 -- followed by that slot's derivation path and a
+PLACEHOLDER -- @0 through @6 -- followed by that slot's derivation path and a
 <0;1> multipath suffix for the receive/change chains.
 
 It is NOT a descriptor, NOT an address, and NOT a set of keys. It is the SHAPE
 of the wallet with key-shaped holes in it, and everything below is produced
-from it plus the six seeds. That distinction is the whole reason a keyless
+from it plus the seven seeds. That distinction is the whole reason a keyless
 template can be engraved separately from the keys that fill it.
 
 The four tiers, in the order the policy states them:
@@ -74,10 +74,24 @@ The four tiers, in the order the policy states them:
   tier 1   @0 and @1 and @2 and sha256(H1)          -- at any time
   tier 2   @3 and @4 and sha256(H2)                 -- after older(32768), relative
   tier 3   @5 alone                                 -- after height 1173520, absolute
-  tier 4   sha256(H3) alone                         -- after height 1383520, absolute
+  tier 4   @6 and sha256(H3)                        -- after height 1383520, absolute
 
-Tier 4 has NO KEY. Whoever learns H3's preimage can spend it alone once that
-height passes, which is why every encode below carries --experimental and why
+Tier 4 WAS keyless until 2026-08-22, when the operator ruled that out: "keyless
+path is not reasonable." It now needs @6's signature as well as H3's preimage.
+Two things followed. Stock rust-miniscript had REFUSED the keyless tr form
+outright ("All spend paths must require a signature") while ACCEPTING the
+keyless wsh form, so the two wrappings disagreed about their own validity
+(F-233); both are accepted now, and no encode below needs --experimental.
+
+Every H below is sha256(sha256(passphrase)), not sha256(passphrase). Miniscript
+emits OP_SIZE <32> OP_EQUALVERIFY, so the witness preimage must be EXACTLY 32
+bytes; the passphrases are 34-40, so committing to their digest directly left
+three of the four tiers unspendable by anyone. The preimage is the 32-byte inner
+digest, in preimages/preimage-N.hex.
+
+What the old text said about bearer risk, kept because it is still the reason
+the preimages are handled the way they are: whoever learns a preimage can
+height passes, which is why every encode below carries and why
 the preimages are as sensitive as the seeds.
 
 Two wrappings, which are DIFFERENT WALLETS with different addresses:
@@ -115,30 +129,41 @@ state every other unverified claim in this repo was in before it turned out to
 be wrong.
 
 check_tiers.py closes that: it parses the real policy and asserts each tier,
-per wrapper, including that EXACTLY ONE tier is keyless.
+per wrapper, including that NO tier is keyless (the assertion is inverted
+from what it was before 2026-08-22, and now guards against regression).
 TXT
 echo
 for w in tr wsh; do
   run python3 "$W/check_tiers.py" "$IN/policy-$w.txt" "$w"
-  if ! python3 "$W/check_tiers.py" "$IN/policy-$w.txt" "$w" >/dev/null 2>&1; then
-    fatal "$w: the tier table does not match the policy it describes"
-  fi
+  python3 "$W/check_tiers.py" "$IN/policy-$w.txt" "$w" >/dev/null 2>&1 || \
+    fatal "$w: the tier table does not match the policy it describes (exit $?)"
 done
 
-echo "AND THE GATE CAN FAIL. Give tier 4 a key -- the one change that would make"
-echo "this wallet importable, and would silently make the table above false:"
+echo "AND THE GATE CAN FAIL. The control is INVERTED from what it was before"
+echo "2026-08-22: tier 4 used to be keyless and the control added a key. The"
+echo "operator ruled keyless out, so the gate now requires a signature on every"
+echo "tier and the control REMOVES @6 -- the regression that would matter."
 echo
-sed "s#and_v(v:after(1383520),sha256(#and_v(v:after(1383520),and_v(v:pk(@5/270028'/0'/8'/0'/<0;1>/*),sha256(#" \
-  "$IN/policy-tr.txt" > "$OUT/policy-tr-KEYED-TIER4.txt"
-run python3 "$W/check_tiers.py" "$OUT/policy-tr-KEYED-TIER4.txt" tr
-if python3 "$W/check_tiers.py" "$OUT/policy-tr-KEYED-TIER4.txt" tr >/dev/null 2>&1; then
-  fatal "the tier gate ACCEPTED a policy whose tier 4 has a key -- it proves nothing"
-fi
+python3 - "$IN/policy-tr.txt" "$OUT/policy-tr-DEKEYED-TIER4.txt" <<'MUT' || fatal "the control mutation did not apply -- it is testing nothing"
+import re, sys
+src = open(sys.argv[1]).read().strip()
+mut, n = re.subn(r"and_v\(v:after\(1383520\),and_v\(v:sha256\(([0-9a-f]{64})\),pk\(@6/[^)]*\)\)\)",
+                 r"and_v(v:after(1383520),sha256(\1))", src)
+sys.exit(f"mutation applied {n} times, expected exactly 1") if n != 1 else None
+open(sys.argv[2], "w").write(mut + "\n")
+MUT
+run python3 "$W/check_tiers.py" "$OUT/policy-tr-DEKEYED-TIER4.txt" tr --preimages "$IN/preimages"
+# EXIT 1 SPECIFICALLY, not merely non-zero. Exit 2 means the gate could not be
+# evaluated -- a missing preimages/ next to the scratch copy used to produce
+# exactly that, and the control reported success while proving nothing.
+python3 "$W/check_tiers.py" "$OUT/policy-tr-DEKEYED-TIER4.txt" tr --preimages "$IN/preimages" >/dev/null 2>&1
+rc=$?
+[ "$rc" -eq 1 ] || fatal "control: want exit 1 (gate caught the de-keyed tier 4), got $rc$([ "$rc" -eq 2 ] && echo ' = COULD NOT EVALUATE, so this control proves nothing')"
 echo
 
-echo "=== 2. Six seeds, one per key ==="
+echo "=== 2. Seven seeds, one per key ==="
 echo
-for i in 0 1 2 3 4 5; do
+for i in 0 1 2 3 4 5 6; do
   printf 'key-%d: %s\n' "$i" "$(cat "$IN/seeds/key-$i.seed")"
 done
 echo
@@ -150,13 +175,13 @@ echo
 # The master fingerprint is a property of the SEED, not of any derivation path,
 # so it is the same in both wrappings. Asserted rather than asserted-in-prose.
 echo "  key   fingerprint"
-for i in 0 1 2 3 4 5; do
+for i in 0 1 2 3 4 5 6; do
   printf '  @%d    %s\n' "$i" "$(cat "$IN/seeds/key-$i.fingerprint")"
 done
 echo
 NFP=$(cat "$IN"/seeds/key-*.fingerprint | sort -u | wc -l)
 echo "$NFP distinct fingerprints across 6 seeds."
-[ "$NFP" -eq 6 ] || fatal "expected 6 distinct seed fingerprints, got $NFP"
+[ "$NFP" -eq 7 ] || fatal "expected 7 distinct seed fingerprints, got $NFP"
 echo
 
 echo "=== 4. The keys, at the bg002h path ==="
@@ -165,7 +190,7 @@ cat <<'TXT'
 bg002h is m/270028'/coin'/account'/script', with the level-4 script value ruled
 0' = tr and 1' = wsh. The operator selected ACCOUNT 8 for the tr form and
 ACCOUNT 9 for the wsh form, so the two wallets hold disjoint keys derived from
-the same six masters.
+the same seven masters.
 TXT
 echo
 for w in tr wsh; do
@@ -182,7 +207,7 @@ for w in tr wsh; do
 
   # Per-slot key and fingerprint arguments, read from the key files themselves.
   KEYARGS=(); FPARGS=(); KEYFILE="$O/keys.txt"; : > "$KEYFILE"
-  for i in 0 1 2 3 4 5; do
+  for i in 0 1 2 3 4 5 6; do
     f="$IN/keys-$w/key-$i.xpub"
     fp=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$f" | head -1)
     pa=$(sed -n 's/.*origin \[[0-9a-f]*\/\([^]]*\)\].*/\1/p' "$f" | head -1)
@@ -198,17 +223,17 @@ for w in tr wsh; do
 
   echo "=== 5$w. The md1 KEYLESS template ==="
   echo
-  echo "Fingerprints are declared (F-227): all six slots share one origin path,"
+  echo "Fingerprints are declared (F-227): all seven slots share one origin path,"
   echo "so without them a gathered key card matches every slot and seating must"
   echo "refuse the whole set."
   echo
   runcap "$O/md1-template.txt" '^md1' \
-    "$MD" encode "$P" --group-size 0 --experimental "${FPARGS[@]}"
+    "$MD" encode "$P" --group-size 0 "${FPARGS[@]}"
   mapfile -t TMPL < "$O/md1-template.txt"
   echo "The keyless template is ${#TMPL[@]} md1 chunk(s)."
   echo
-  run "$MD" verify --template "$P" "${FPARGS[@]}" "${TMPL[@]}" --experimental
-  if ! "$MD" verify --template "$P" "${FPARGS[@]}" "${TMPL[@]}" --experimental >/dev/null 2>&1; then
+  run "$MD" verify --template "$P" "${FPARGS[@]}" "${TMPL[@]}"
+  if ! "$MD" verify --template "$P" "${FPARGS[@]}" "${TMPL[@]}" >/dev/null 2>&1; then
     fatal "$w: the keyless card set does not re-encode to its own policy"
   fi
   run "$MD" inspect "${TMPL[@]}"
@@ -216,7 +241,7 @@ for w in tr wsh; do
   echo "=== 6$w. The md1 KEYED concrete wallet descriptor ==="
   echo
   runcap "$O/md1-keyed.txt" '^md1' \
-    "$MD" encode "$P" "${KEYARGS[@]}" "${FPARGS[@]}" --group-size 0 --experimental
+    "$MD" encode "$P" "${KEYARGS[@]}" "${FPARGS[@]}" --group-size 0
   mapfile -t KEYED < "$O/md1-keyed.txt"
   echo "The keyed card set is ${#KEYED[@]} md1 chunk(s)."
   echo
@@ -414,7 +439,7 @@ cat <<'TXT'
 THE TAPROOT FORM EMITS NOTHING, and every format fails at the SAME place --
 "All spend paths must require a signature", before format selection is even
 reached. That is rust-miniscript's sanity_check() refusing tier 4, which needs
-no key. `md encode` has --experimental for exactly this; export-wallet has no
+no key. `md encode` has for exactly this; export-wallet has no
 equivalent (filed as G1 in design/PLAN_wallet_file_export.md).
 
 AND IT WOULD NOT HELP THE OPERATOR IF IT DID. Measured against a real Bitcoin

@@ -65,7 +65,7 @@ def code(text, limit=None, must_show=None, must_show_all=None, tail=None):
 
     `must_show` refuses a clip that hides a named punchline. `must_show_all`
     refuses a clip that hides ANY member of an enumerated set — the guard that
-    caught this document's sibling showing four of six seeds, because the clip
+    caught this document's sibling showing four of seven seeds, because the clip
     limit was a constant chosen before the section grew.
 
     `tail` keeps the LAST n lines as well as the first `limit`. Some sections
@@ -183,7 +183,7 @@ P.append(f"""
 <section class="page title">
 <h1>SeedHammer II — the reasonably complex wallet</h1>
 <p class="sub">A four-tier degrading vault, taken end to end in <b>both</b> its
-wrappings: taproot and wsh. Six seeds in; two engraved backups out; the device
+wrappings: taproot and wsh. Seven seeds in; two engraved backups out; the device
 agreeing with the host on every address, by two different routes.</p>
 
 <div class="note">Every command in this document ran, and its real stdout,
@@ -193,7 +193,7 @@ emulator rendered while an assertion held. Regenerate with
 <code>python3 build_pdf_rcw.py</code>; the builder refuses a transcript produced
 by a different version of its generator.</div>
 
-<div class="warn"><b>Test material.</b> The six seeds come from entropy
+<div class="warn"><b>Test material.</b> The seven seeds come from entropy
 0x000…001 through 0x000…006 and the three passphrases are printed in the
 generator. Never put funds behind any of it.</div>
 </section>
@@ -257,8 +257,8 @@ four tiers, including the other two hashlock digests and both deadlines.</div>
 </section>
 
 <section class="page">
-<h1>Six seeds, six fingerprints</h1>
-{code(section(tx, "2. Six seeds"), 9, must_show_all="key-")}
+<h1>Seven seeds, seven fingerprints</h1>
+{code(section(tx, "2. Seven seeds"), 9, must_show_all="key-")}
 {code(section(tx, "3. The seed fingerprint"), 10, must_show="distinct fingerprints")}
 
 <div class="note">The master fingerprint is a property of the <b>seed</b>, not
@@ -333,7 +333,7 @@ that matters:</p>
 <ul>
 <li><b>keyed</b> — the 15-chunk card alone. It carries its own keys, so nothing
 is seated. Proves the device can derive this wallet at all.</li>
-<li><b>seating</b> — the 5-chunk keyless template plus its six mk1 cards, which
+<li><b>seating</b> — the keyless template plus its seven mk1 cards, which
 is <em>what actually gets engraved</em>. Proves the device can join them.</li>
 </ul>
 
@@ -353,7 +353,7 @@ addresses.</p>
 addresses.</p>
 
 <div class="warn"><b>That equality is the whole point.</b> One wallet reached
-two ways — from a card that carries its keys, and from a template plus six
+two ways — from a card that carries its keys, and from a template plus seven
 separate key cards — across the air gap, through two implementations in two
 languages. Either route alone would only prove the device is self-consistent.</div>
 </section>
@@ -462,7 +462,7 @@ describe it.</div>
 
 <p>The BSMS record's fourth line is BIP-129's canary — the wallet's first
 address, computed by the <em>emitter</em>. Set against <code>md</code>'s own
-derivation, and against what SeedHammer II showed after seating six key cards
+derivation, and against what SeedHammer II showed after seating seven key cards
 onto the keyless template over NFC:</p>
 
 {code(section(tx, "15. Three implementations"), None, must_show="ALL THREE AGREE")}

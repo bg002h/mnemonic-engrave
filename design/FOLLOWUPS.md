@@ -9487,12 +9487,62 @@ them, so it cannot drift from the generator, and its keyless assertion is
 zero. Mutation-checked both ways — stripping `pk(@6/…)` back out makes it fail
 with exit 1 on both the tier-4 predicate and the keyless count.
 
-**Still stale, and NOT touched:** `transcript_rcw.txt` (which quotes the old
-template-id at lines 196, 234, 235, 287 and an old address at 537),
-`capture_rcw.py`, `build_pdf_rcw.py`, and any committed backup strings. These are
-**records of a run that happened**, so the fix is to re-run the journey against
-the new wallet and let it rewrite them — not to hand-edit the numbers, which
-would produce a transcript nobody ever executed.
+**REPAIRED 2026-08-22, after running it.** `transcript_rcw.sh` was executed and
+went red on five gates. Four were real and are fixed; the scripts are updated,
+not their recorded output:
+
+- three key loops iterated `0 1 2 3 4 5`, so `@6` was never supplied and
+  `md address` returned nothing — *"expected 5 receive addresses, got 0"*;
+- the seed-fingerprint gate demanded exactly 6;
+- six `--experimental` flags, no longer needed now that every tier requires a
+  signature;
+- prose: "six seeds", "six masters", "@0 through @5", "Tier 4 has NO KEY",
+  "EXACTLY ONE tier is keyless".
+
+`build_pdf_rcw.py` had the same counts **and one that would have failed
+silently**: `section(tx, "2. Six seeds")` is a live lookup keyed on the
+transcript's heading, so once the transcript printed "Seven seeds" the PDF would
+have dropped that whole section without erroring.
+
+**THE NEGATIVE CONTROL HAD GONE VACUOUS — the worst of the five.** It mutated
+tier 4 to ADD a key and required the gate to reject it. Post-ruling the gate
+*wants* a key there, and the `sed` no longer matched anything, so it fed the gate
+a byte-identical copy. That copy sat in a scratch directory with no sibling
+`preimages/`, so the gate exited non-zero for a MISSING FILE, and the control
+read that as success. It would have gone on printing *"AND THE GATE CAN FAIL"*
+forever while proving nothing.
+
+Fixed in three places, because one was not enough:
+
+1. `check_tiers.py` now separates **exit 1 (the policy is wrong)** from **exit 2
+   (could not evaluate)**, and takes `--preimages DIR` so a policy outside
+   `inputs-rcw/` can still be checked. A gate whose failure modes are
+   indistinguishable by exit code cannot be used by a control.
+2. The control's mutation is **inverted** — it now REMOVES `@6`, the regression
+   that would actually matter — and aborts if the mutation does not apply
+   exactly once, so a future no-op cannot pass silently again.
+3. The control demands **exit 1 specifically**, and its failure message names the
+   exit-2 case explicitly.
+
+Verified: real policy 0, copy without preimages 2, copy with `--preimages` 0,
+unreadable policy 2, de-keyed policy 1.
+
+**WHAT REMAINS — one gate, and it needs hardware, not editing.** With
+`ME_PREVIEW_BIN` set, the transcript now has exactly one FATAL:
+
+    the BSMS canary, md and the device do not agree on the first address
+
+    BSMS canary (mnemonic-toolkit) : bc1qmm0vfnpxpsst2jv973tenr9e4hrfaxcjv3ck0fcgyf2ps24vcw6szr5a29
+    md address  (descriptor-mnemonic) : bc1qmm0vfnpxpsst2jv973tenr9e4hrfaxcjv3ck0fcgyf2ps24vcw6szr5a29
+    SeedHammer II (captured walk)     : bc1qr6h5gahcaqa8a35p3ts0d2w6qvhmsn7dhunu5xd9kyculcgz3dwqf266zj
+
+The two host implementations **agree with each other** on the new wallet — that
+cross-language check still passes. The device value is read from a captured JSON
+of a walk against the OLD wallet, so it cannot match and no code change will make
+it. **Re-run `capture_rcw.py --wrapper wsh --route seating`** against the
+emulator, then rebuild the PDF. `transcript_rcw.txt` (old template-id at lines
+196/234/235/287, old address at 537) is rewritten by that run — it is a record of
+something that happened, so it is regenerated, never hand-edited.
 
 **Do NOT hand-edit `capture_hashvault.py`.** Its `TEMPLATE_ID` constant is
 `68a1a888…`, which is still correct: the hashvault wallet was not changed, and it
