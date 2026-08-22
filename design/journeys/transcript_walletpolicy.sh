@@ -74,8 +74,10 @@ echo
 
 echo "=== 1. The card set ==="
 echo
-# --force-chunked, because md encode does NOT auto-chunk: it fails and tells you
-# to retry with the flag (F-136). --path, because a tr() wrapper has no
+# --force-chunked is now REDUNDANT here: F-136 is fixed and `md encode` chunks
+# automatically on overflow (descriptor-mnemonic 9af0975). Kept because the
+# output is byte-identical either way and this transcript is a recorded walk --
+# removing it would change the printed command without changing a single card. --path, because a tr() wrapper has no
 # canonical default origin and without one the card only PARTIAL-decodes.
 runcap "$OUT/walletpolicy.md1.txt" '^md1' \
   "$MD" encode "$TEMPLATE" "${KEYS[@]}" --force-chunked

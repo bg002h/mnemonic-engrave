@@ -433,9 +433,11 @@ follow-up with the measurement behind it.</p>
     <td>Keys are byte-identical and addresses unaffected, but restored xpubs lose
     depth/parent/child, so the descriptor string and its checksum differ.</td></tr>
 <tr><td>F-136</td><td><code>md encode</code> auto-chunks</td>
-    <td>It does not; it fails and tells you to retry with
-    <code>--force-chunked</code>. Two places say otherwise, including the flag's
-    own help.</td></tr>
+    <td>It did not when this walk was recorded &mdash; it failed and told you to
+    retry with <code>--force-chunked</code>, while two places (including the
+    flag's own help) said otherwise. <b>Fixed 2026-08-21</b>: the encoder caught
+    up to its documentation and now chunks on overflow. Output is byte-identical
+    either way, so the cards in this document are unchanged.</td></tr>
 <tr><td>F-127<br>F-128</td><td>the key-card stub comes from the md1</td>
     <td><code>--from-md1</code> cannot read a chunked md1 at all
     (<code>version 9, expected 4</code>), and the stub <code>mk</code> embeds is

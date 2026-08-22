@@ -4425,7 +4425,7 @@ The real costs of this shape are downstream of Bitcoin entirely: F-127, F-130,
 F-131, F-132, F-134, and `md address` refusing the keys on depth. Depth itself is
 two orders of magnitude from anything that bites.
 
-### F-136 — `md encode` does not auto-chunk, though two places say it does (owning phase: **operator journeys**) `#mnemonic`
+### F-136 — ~~`md encode` does not auto-chunk, though two places say it does~~ **CLOSED 2026-08-21** `#mnemonic`
 
 Filed 2026-08-11 from the codec lens; **confirmed first-hand** — this is the
 error that stopped the journey build before the review raised it:
@@ -4443,6 +4443,45 @@ today" on the mk side), and the codec docs describe dispatch as automatic. Eithe
 auto-chunk on overflow or stop describing it as automatic; today the first
 encounter with a large policy is a hard error that reads like the policy is
 unsupported.
+
+#### RESOLVED 2026-08-21 — `descriptor-mnemonic` `9af0975`
+
+`md encode` now chunks automatically when the payload exceeds the codex32
+regular code's 80-data-symbol cap. **Neither help string needed editing** — the
+code caught up to them. That is the shape of this fix: the documentation was
+right about the intent and the encoder was the thing that disagreed.
+
+**The scale, re-measured:** this entry recorded 182 data symbols; a plain 2-of-2
+measures **246** against a cap of 80. Combined with what F-127 established —
+that *every* keyed wallet-policy card is chunked — this was not a large-wallet
+corner but the default path for any card carrying keys.
+
+**No wire change.** Auto-chunked output is byte-identical to what
+`--force-chunked` produced, pinned by a test. What changed is which inputs are
+accepted. `--force-chunked` keeps its documented meaning (chunk even a short
+policy), the fallback matches only `PayloadTooLongForSingleString` so unrelated
+failures still propagate, and md-codec's fail-closed guarantee is untouched —
+`wrap_payload` still refuses to emit an over-length single string.
+
+**One pre-existing test changed, and the distinction is the point.**
+`md_encode_default_rejects_oversize` asserted the ERROR, which was the
+mechanism. Cycle-4 H6's actual property is *never emit an un-decodable single
+string*. Restated to assert that: an over-cap policy emits a chunk SET, every
+chunk fits the regular-code envelope, and the set decodes back — which holds
+across this change and still catches a regression that emitted one long string.
+
+**Rust-primary check:** the Go port never had this. `md/encode_singlesig.go`
+and `encode_multisig.go` route through `split` unconditionally, with no
+single-string-or-error mode. Second time in this cycle the strictly-downstream
+port was already correct where the primary was not (the first was the mk1
+encoder path cap, R2/C2).
+
+**Falsified by this fix, and corrected in the same pass:**
+`transcript_walletpolicy.sh`'s comment explaining why the flag is passed, and
+`build_pdf_payload.py`'s findings-table row. Both said auto-chunking does not
+happen. The journeys keep passing `--force-chunked` — it is now redundant, but
+the output is byte-identical and these are recorded walks, so removing it would
+change a printed command without changing a card.
 
 ### F-137 — the md encoder has no depth guard but the decoder does, so an unrestorable card is expressible (owning phase: **operator journeys**) `#mnemonic`
 
@@ -8953,4 +8992,71 @@ ordinary workflow — a cosigner cards their own key without the others' xpubs i
 hand — so `mk encode` now emits a **note** naming how many cosigners are not
 carded, and still exits 0. Membership itself IS enforced, so every card in such
 a batch is a genuine member; only the count is short.
+
+### F-225 — **HIGH PRIORITY FEATURE**: one chunk per plate wastes ~60% of every plate, and nothing decided it (owning phase: **engraving throughput**) `#mnemonic` `#hardware`
+
+Filed 2026-08-21 from an operator question — "if we chunk at 80 for the
+mnemonic, does that force us to engrave each chunk separately, or can multiple
+chunks be on one plate?" — which nothing in this repo answers.
+
+**Measured today on the pathological wallet.** `me bundle` emits exactly one
+plate per string: 34 public strings → 34 plates (+ 1 `ms1` secret plate, listed
+and deliberately never rendered). Against `PLATE_TEXT_BUDGET = 300`
+(`crates/me-cli/src/lib.rs:48`, "SeedHammer's 85×85mm text layout wraps ~35
+chars/line over ~20 usable lines"):
+
+| chunks | length | share of one plate |
+| --- | --- | --- |
+| 19 | 111 chars | 37% |
+| 3 | 88 | 29% |
+| 1 | 86 | 29% |
+| 3 | 80 | 27% |
+| 8 | 29 | 10% |
+
+The longest chunk uses **37%** of a plate; the two longest together are 74% and
+would fit. So the wallet engraves **34 plates to carry content that fits on
+roughly 13**. At the measured ~21 minutes per plate that is about **12 hours
+versus 4½** — the single largest throughput lever in the engraving path.
+
+**Two limits are being conflated, and that is the root of it.** The 80-symbol
+cap is a CODE constraint: the codex32 regular code is BCH(93, 80, 8) and cannot
+protect a longer string. The 300-char budget is a PHYSICAL constraint: how much
+text fits on an 85×85mm plate. Nothing requires them to line up, and they do
+not — which is exactly where the slack is.
+
+**No decision record exists.** Grepped `design/` for a ruling on plates-per-
+chunk and found none; the one-per-plate shape appears to be inherited from the
+single-string era rather than chosen. That is the first thing to establish.
+
+**The real counter-argument, which must be answered rather than assumed away.**
+Each plate is independently damageable, and a chunk set is ALL-OR-NOTHING —
+`reassemble` refuses an incomplete set, so losing one plate loses the whole
+descriptor either way. That cuts both directions and needs measuring, not
+arguing:
+  - AGAINST packing: two chunks on one corroded plate lose two chunks, so
+    per-plate redundancy schemes (engrave a spare) get more expensive.
+  - FOR packing: fewer plates is less metal, less time, less handling, and
+    fewer opportunities for a mis-ordered or mislaid plate — and the
+    all-or-nothing property means the set already has no partial-loss
+    tolerance to protect.
+
+**Open questions, in the order they should be settled:**
+1. What is the plate's REAL capacity? The 300 is self-described as conservative
+   and says "with a QR present, far less" — does the bundle render a QR, and
+   what is the measured character ceiling with and without one?
+2. Does the SeedHammer II firmware accept a multi-string plate at all, or does
+   its plate model assume one payload? (`ErrTooLarge` is the current backstop.)
+3. Is there a legibility floor — does packing shrink the glyphs, and does that
+   collide with the 2-stroke-width minimum-feature rule already established for
+   engraving fonts?
+4. Chunk-set integrity: should chunks of ONE set be allowed to share a plate,
+   or only chunks of DIFFERENT sets, so a lost plate never takes two chunks of
+   the same descriptor?
+
+**Not a codec change.** Nothing here touches md1/mk1 or the 80-symbol cap; it is
+purely how `me bundle` lays strings onto plates. That keeps the blast radius
+small and makes it independently gateable.
+
+Related: F-136 (auto-chunking, closed 2026-08-21) is the *encoder* half of the
+same operator confusion; this is the *engraving* half and the expensive one.
 
