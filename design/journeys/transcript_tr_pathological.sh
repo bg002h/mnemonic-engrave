@@ -19,6 +19,9 @@ set -u
 W="$(cd "$(dirname "$0")" && pwd)"
 C=/scratch/code/shibboleth
 MD=$C/descriptor-mnemonic/target/release/md
+MK=$C/mnemonic-key/target/release/mk
+ME=$C/mnemonic-engrave/target/release/me
+MS=$C/mnemonic-secret/target/release/ms
 IN="$W/inputs-pathological"
 # ITS OWN OUTPUT SUBTREE. The two wallet journeys previously shared out/, so one
 # could overwrite the other's intermediates and the second would "pass" against
@@ -160,6 +163,103 @@ echo
 # carry, not what was typed to make them.
 runcap "$OUT/tr.receive.txt" '^bc1' "$MD" address "${KEYED[@]/#/}" --chain 0 --count 2
 runcap "$OUT/tr.change.txt"  '^bc1' "$MD" address "${KEYED[@]}" --chain 1 --count 2
+
+echo "=== 9. The eleven key cards ==="
+echo
+# Until now this journey engraved a DESCRIPTOR and nothing else. A descriptor
+# card alone is not a backup: it names eleven @N slots and carries no way for a
+# cosigner to prove which slot is theirs. The mk1 key cards are that half.
+#
+# They bind to the KEYLESS TEMPLATE card, not the keyed one. The stub is
+# form-aware (SPEC_mk_v0_1.md 3.3), so a card minted against the keyed policy
+# carries a DIFFERENT stub and is refused against the template -- one wallet,
+# two stubs. The template is what gets engraved here, so the template is what
+# the cards must bind to.
+KEYFILE="$OUT/keys.txt"
+KEYMETA="$OUT/keys-meta.txt"
+: > "$KEYFILE"; : > "$KEYMETA"
+for f in "$IN"/keys/key-*.xpub; do
+  KX=$(grep '^xpub' "$f")
+  KFP=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$f" | head -1)
+  KPATH=$(sed -n 's/.*origin \[[0-9a-f]*\/\([^]]*\)\].*/\1/p' "$f" | head -1)
+  if [ -z "$KX" ] || [ -z "$KFP" ] || [ -z "$KPATH" ]; then
+    fatal "$f is missing an xpub or an origin header"; continue
+  fi
+  printf '[%s/%s]%s\n' "$KFP" "$KPATH" "$KX" >> "$KEYFILE"
+  ki=$(basename "$f" .xpub | sed 's/key-0*//'); [ -z "$ki" ] && ki=0
+  printf '%s %s %s\n' "$ki" "$KFP" "$KPATH" >> "$KEYMETA"
+done
+run head -2 "$KEYFILE"
+
+# ONE invocation for all eleven, and each card derives its own binding from the
+# template card rather than from a hand-copied stub.
+FROM_MD1=(); for c in "${TMPL[@]}"; do FROM_MD1+=(--from-md1 "$c"); done
+CARDS_JSON="$OUT/mk-encode.json"
+if ! "$MK" encode --keys "$KEYFILE" "${FROM_MD1[@]}" --json > "$CARDS_JSON" 2>"$OUT/mk.err"; then
+  cat "$OUT/mk.err"; fatal "mk encode --keys failed for the taproot template"
+fi
+cat "$OUT/mk.err"; rm -f "$OUT/mk.err"
+run "$W/mk_cards_from_json.py" "$CARDS_JSON" "$OUT/mk-encode-raw.txt" \
+  || fatal "could not read the batch JSON"
+
+# The stub every card carries must be the TEMPLATE id, not the policy id.
+TID=$("$MD" inspect "${TMPL[@]}" 2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p' | cut -c1-8)
+PID=$("$MD" inspect "${TMPL[@]}" 2>/dev/null | sed -n 's/^wallet-policy-id: //p' | cut -c1-8)
+# Exactly the FIRST card's chunks -- `head -3` spanned two cards, and an
+# incomplete chunk set decodes to nothing, which read as an empty stub rather
+# than as the mistake it was.
+N0=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["cards"][0]["chunk_count"])' "$CARDS_JSON")
+STUB=$("$MK" decode $(head -n "$N0" "$OUT/mk-encode-raw.txt" | tr '\n' ' ') 2>/dev/null | sed -n 's/^policy_id_stubs: *//p' | head -1)
+echo "template-id prefix: $TID   policy-id prefix: $PID   stub mk embedded: $STUB"
+if [ "$STUB" != "$TID" ]; then
+  fatal "the key cards bind to $STUB, not the template id $TID"
+elif [ "$STUB" = "$PID" ]; then
+  fatal "the key cards bind to the POLICY id -- wrong form for a keyless card"
+else
+  echo "The cards bind to the keyless template. Same wallet, correct form."
+fi
+echo
+
+echo "=== 10. me bundle: the plate checklist ==="
+echo
+# What actually gets cut. The descriptor chunks and every key card in one set,
+# so the plate count is the real one rather than the descriptor's alone.
+cat "$OUT/md1-template.txt" "$OUT/mk-encode-raw.txt" > "$OUT/backup-strings.txt"
+echo "The engraved set: $(grep -c '^md1' "$OUT/backup-strings.txt") md1 + $(grep -c '^mk1' "$OUT/backup-strings.txt") mk1 = $(grep -c . "$OUT/backup-strings.txt") strings."
+rm -rf "$OUT/plates" && mkdir -p "$OUT/plates"
+run "$ME" bundle --in "$OUT/backup-strings.txt" --preview "$OUT/plates" --png --manifest "$OUT/manifest.json"
+if [ ! -s "$OUT/manifest.json" ]; then
+  fatal "me bundle produced no manifest"
+fi
+echo
+
+echo "=== 11. The seed, and the refusal that still holds ==="
+echo
+# The one plate that is NOT public. `me` refuses an ms1 outright -- it will not
+# render, preview or transmit a secret -- so the seed plate is listed in the
+# manifest and never rendered. That refusal is the reason the bundle above can
+# be previewed at all.
+run cat "$IN/seeds/master-A.seed"
+run "$MS" encode --phrase "$(cat "$IN/seeds/master-A.seed")"
+MS1=$("$MS" encode --phrase "$(cat "$IN/seeds/master-A.seed")" --no-engraving-card 2>/dev/null | tr -d ' ')
+run "$ME" --in <(printf '%s\n' "$MS1") --hex
+echo
+
+echo "=== 12. THE RESTORE TEST: the plates plus the seeds give the wallet back ==="
+echo
+# Section 4 proves the card RE-ENCODES to its own policy -- a transcription
+# check on the bytes. This asks the different question: hold these plates and
+# the three seeds, and do you get the wallet back?
+#
+# Taproot makes that question harder than it is for wsh. A tr() address commits
+# to the TAPTREE SHAPE as well as the keys, so a restore can recover all eleven
+# keys, rebuild the tree wrongly, and produce a wallet that looks right and is
+# not. The test therefore ends on ADDRESSES, not on keys.
+run "$W/restore_test_tr_pathological.py"
+if ! "$W/restore_test_tr_pathological.py" >/dev/null 2>&1; then
+  fatal "a card-only-plus-seeds restore does NOT reproduce this wallet"
+fi
+echo
 
 echo "=== Artifacts ==="
 run ls -la "$OUT"

@@ -1,4 +1,4 @@
-# transcript-generator-sha256: 6996f34afb1f9e7ab4ef00dc92532551d07d35d227e7b7a61153c177c9c254e8
+# transcript-generator-sha256: e6679b9cfb8ab18103b8e084e42f727f1514bdfc462d67f39a02ff6fe387ffc4
 === 0. Versions ===
 
 $ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md --version
@@ -173,17 +173,165 @@ bc1p7yrpv9q6j58vwh5yrnnj8ky6dnykn7z2lak4j0ckt52j84j8fxzs4h6khc
 note: stdout is watch-only — public keys only, cannot spend
 [exit 0]
 
+=== 9. The eleven key cards ===
+
+$ head -2 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/keys.txt
+[73c5da0a/48'/0'/0'/2']xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf
+[73c5da0a/48'/0'/1'/2']xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk
+[exit 0]
+
+note: stdout is watch-only — public keys only, cannot spend
+$ /scratch/code/shibboleth/mnemonic-engrave/design/journeys/mk_cards_from_json.py /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/mk-encode.json /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/mk-encode-raw.txt
+11 key cards -> 30 mk1 chunks
+[exit 0]
+
+template-id prefix: 44ad26a1   policy-id prefix: e5a97a4e   stub mk embedded: 44ad26a1
+The cards bind to the keyless template. Same wallet, correct form.
+
+=== 10. me bundle: the plate checklist ===
+
+The engraved set: 4 md1 + 30 mk1 = 34 strings.
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me bundle --in /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/backup-strings.txt --preview /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates --png --manifest /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/manifest.json
+me: rendered plate 1 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-1.png
+me: rendered plate 2 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-2.png
+me: rendered plate 3 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-3.png
+me: rendered plate 4 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-4.png
+me: rendered plate 5 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-5.png
+me: rendered plate 6 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-6.png
+me: rendered plate 7 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-7.png
+me: rendered plate 8 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-8.png
+me: rendered plate 9 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-9.png
+me: rendered plate 10 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-10.png
+me: rendered plate 11 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-11.png
+me: rendered plate 12 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-12.png
+me: rendered plate 13 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-13.png
+me: rendered plate 14 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-14.png
+me: rendered plate 15 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-15.png
+me: rendered plate 16 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-16.png
+me: rendered plate 17 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-17.png
+me: rendered plate 18 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-18.png
+me: rendered plate 19 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-19.png
+me: rendered plate 20 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-20.png
+me: rendered plate 21 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-21.png
+me: rendered plate 22 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-22.png
+me: rendered plate 23 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-23.png
+me: rendered plate 24 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-24.png
+me: rendered plate 25 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-25.png
+me: rendered plate 26 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-26.png
+me: rendered plate 27 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-27.png
+me: rendered plate 28 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-28.png
+me: rendered plate 29 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-29.png
+me: rendered plate 30 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-30.png
+me: rendered plate 31 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-31.png
+me: rendered plate 32 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-32.png
+me: rendered plate 33 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-33.png
+me: rendered plate 34 → /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/plates/plate-34.png
+me: wrote manifest to /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological/manifest.json
+me: backup needs 35 plates (34 public + ms1 on device):
+  plate 1/35  md1 policy  → push via NFC & engrave
+  plate 2/35  md1 policy  → push via NFC & engrave
+  plate 3/35  md1 policy  → push via NFC & engrave
+  plate 4/35  md1 policy  → push via NFC & engrave
+  plate 5/35  mk1 [73c5da0a/48'/0'/1'/2'] chunk 1/3  → push via NFC & engrave
+  plate 6/35  mk1 [73c5da0a/48'/0'/1'/2'] chunk 2/3  → push via NFC & engrave
+  plate 7/35  mk1 [73c5da0a/48'/0'/1'/2'] chunk 3/3  → push via NFC & engrave
+  plate 8/35  mk1 [b8688df1/48'/0'/3'/2'] chunk 1/3  → push via NFC & engrave
+  plate 9/35  mk1 [b8688df1/48'/0'/3'/2'] chunk 2/3  → push via NFC & engrave
+  plate 10/35  mk1 [b8688df1/48'/0'/3'/2'] chunk 3/3  → push via NFC & engrave
+  plate 11/35  mk1 [b8688df1/48'/0'/1'/2'] chunk 1/3  → push via NFC & engrave
+  plate 12/35  mk1 [b8688df1/48'/0'/1'/2'] chunk 2/3  → push via NFC & engrave
+  plate 13/35  mk1 [b8688df1/48'/0'/1'/2'] chunk 3/3  → push via NFC & engrave
+  plate 14/35  mk1 [b8688df1/48'/0'/2'/2'] chunk 1/3  → push via NFC & engrave
+  plate 15/35  mk1 [b8688df1/48'/0'/2'/2'] chunk 2/3  → push via NFC & engrave
+  plate 16/35  mk1 [b8688df1/48'/0'/2'/2'] chunk 3/3  → push via NFC & engrave
+  plate 17/35  mk1 [28645006/48'/0'/2'/2'] chunk 1/3  → push via NFC & engrave
+  plate 18/35  mk1 [28645006/48'/0'/2'/2'] chunk 2/3  → push via NFC & engrave
+  plate 19/35  mk1 [28645006/48'/0'/2'/2'] chunk 3/3  → push via NFC & engrave
+  plate 20/35  mk1 [28645006/48'/0'/1'/2'] chunk 1/3  → push via NFC & engrave
+  plate 21/35  mk1 [28645006/48'/0'/1'/2'] chunk 2/3  → push via NFC & engrave
+  plate 22/35  mk1 [28645006/48'/0'/1'/2'] chunk 3/3  → push via NFC & engrave
+  plate 23/35  mk1 [28645006/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 24/35  mk1 [28645006/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 25/35  mk1 [73c5da0a/48'/0'/2'/2'] chunk 1/3  → push via NFC & engrave
+  plate 26/35  mk1 [73c5da0a/48'/0'/2'/2'] chunk 2/3  → push via NFC & engrave
+  plate 27/35  mk1 [73c5da0a/48'/0'/2'/2'] chunk 3/3  → push via NFC & engrave
+  plate 28/35  mk1 [b8688df1/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 29/35  mk1 [b8688df1/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 30/35  mk1 [73c5da0a/48'/0'/0'/2'] chunk 1/2  → push via NFC & engrave
+  plate 31/35  mk1 [73c5da0a/48'/0'/0'/2'] chunk 2/2  → push via NFC & engrave
+  plate 32/35  mk1 [73c5da0a/48'/0'/3'/2'] chunk 1/3  → push via NFC & engrave
+  plate 33/35  mk1 [73c5da0a/48'/0'/3'/2'] chunk 2/3  → push via NFC & engrave
+  plate 34/35  mk1 [73c5da0a/48'/0'/3'/2'] chunk 3/3  → push via NFC & engrave
+  plate 35/35  ms1 secret  → TYPE ON DEVICE (New > Input Seed > CODEX32); never via this tool
+[exit 0]
+
+
+=== 11. The seed, and the refusal that still holds ===
+
+$ cat /scratch/code/shibboleth/mnemonic-engrave/design/journeys/inputs-pathological/seeds/master-A.seed
+abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-secret/target/release/ms encode --phrase abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
+ms10e ntrsq qqqqq qqqqq qqqqq qqqqq qqqqq qqcj9 sxraq 34v7f
+word count: 12
+language: english (BIP-39 checksum valid)
+passphrase: not stored in ms1 (record separately if used)
+warning: stdout carries private key material (can spend) — redirect or encrypt (e.g. '> file.txt' or '| age -e ...')
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-engrave/target/release/me --in /dev/fd/63 --hex
+me: refusing to emit ms1 over NFC: ms1 is secret seed entropy and must never be transmitted by radio (RF eavesdropping risk). Enter it by hand on the device: New > Input Seed > CODEX32.
+[exit 3]
+
+
+=== 12. THE RESTORE TEST: the plates plus the seeds give the wallet back ===
+
+$ /scratch/code/shibboleth/mnemonic-engrave/design/journeys/restore_test_tr_pathological.py
+Restoring 11 slots from the engraved template + the seeds:
+  @0  73c5da0a at m/48'/0'/0'/2'   -> xpub6DkFAXWQ2dHxq2vatrt9…
+  @1  73c5da0a at m/48'/0'/1'/2'   -> xpub6DzhyrnFFYQ1HimDiM38…
+  @2  73c5da0a at m/48'/0'/2'/2'   -> xpub6EGx8sPr9FxPPE1rbZaz…
+  @3  73c5da0a at m/48'/0'/3'/2'   -> xpub6E6Z3Ss5TXJYNJp4U1q3…
+  @4  b8688df1 at m/48'/0'/0'/2'   -> xpub6FQya7zGhR92kacYsNnj…
+  @5  b8688df1 at m/48'/0'/1'/2'   -> xpub6EAMBJLn1jiquajTsNRk…
+  @6  b8688df1 at m/48'/0'/2'/2'   -> xpub6EGceQV5wHrRemjYkJyk…
+  @7  b8688df1 at m/48'/0'/3'/2'   -> xpub6ELyn7moeEZ9hJ1HmSm6…
+  @8  28645006 at m/48'/0'/0'/2'   -> xpub6DnEBNkSJKBYQmsbhS1s…
+  @9  28645006 at m/48'/0'/1'/2'   -> xpub6F6gx8ZP9R3R3eYsU2Pe…
+  @10 28645006 at m/48'/0'/2'/2'   -> xpub6Dh4twkBRkzxDSau8Fdh…
+
+  receive addresses
+    MATCH      bc1pgavpejq7pkax6zdtuay9ejenangza2t3l6gfka79h94p23xcexssak7pzr
+    MATCH      bc1p3wy7tcypvkm49wtyeq2yw4t0266vxdnqlkny5nsgzguc0fcvdl3s5hkkp5
+
+  change addresses
+    MATCH      bc1pnjrzcky5qqlhyz4rvhq5r96ca77wyccnfls0p5l7k8ae7402vjhshf3zya
+    MATCH      bc1p7yrpv9q6j58vwh5yrnnj8ky6dnykn7z2lak4j0ckt52j84j8fxzs4h6khc
+
+RESTORED: 11 of 11 slots, and the rebuilt wallet spends to the SAME
+addresses as the engraved card — so the taptree shape survived too.
+[exit 0]
+
+
 === Artifacts ===
 $ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological
-total 244
-drwxr-xr-x 1 bcg bcg    186 Aug 20 23:25 .
+total 292
+drwxr-xr-x 1 bcg bcg    364 Aug 21 19:41 .
 drwxr-xr-x 1 bcg bcg    710 Aug 21 12:34 ..
--rw-r--r-- 1 bcg bcg   2087 Aug 21 19:01 md1-keyed.txt
--rw-r--r-- 1 bcg bcg    356 Aug 21 19:01 md1-template.txt
--rw-r--r-- 1 bcg bcg    126 Aug 21 19:01 tr.change.txt
--rw-r--r-- 1 bcg bcg     51 Aug 21 19:01 tr.id.txt
--rw-r--r-- 1 bcg bcg 226316 Aug 21 17:34 tr-pathological-journey.html
--rw-r--r-- 1 bcg bcg    126 Aug 21 19:01 tr.receive.txt
+-rw-r--r-- 1 bcg bcg   2967 Aug 21 19:41 backup-strings.txt
+-rw-r--r-- 1 bcg bcg    265 Aug 21 19:41 keys-meta.txt
+-rw-r--r-- 1 bcg bcg   1485 Aug 21 19:41 keys.txt
+-rw------- 1 bcg bcg  17060 Aug 21 19:41 manifest.json
+-rw-r--r-- 1 bcg bcg   2087 Aug 21 19:41 md1-keyed.txt
+-rw-r--r-- 1 bcg bcg    356 Aug 21 19:41 md1-template.txt
+-rw-r--r-- 1 bcg bcg   4005 Aug 21 19:41 mk-encode.json
+-rw-r--r-- 1 bcg bcg   2611 Aug 21 19:41 mk-encode-raw.txt
+drwxr-xr-x 1 bcg bcg    798 Aug 21 19:41 plates
+-rw-r--r-- 1 bcg bcg    126 Aug 21 19:41 tr.change.txt
+-rw-r--r-- 1 bcg bcg     51 Aug 21 19:41 tr.id.txt
+-rw-r--r-- 1 bcg bcg 235335 Aug 21 19:41 tr-pathological-journey.html
+-rw-r--r-- 1 bcg bcg    126 Aug 21 19:41 tr.receive.txt
 [exit 0]
 
 All gates green.

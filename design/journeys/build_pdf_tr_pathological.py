@@ -244,6 +244,62 @@ for a four-key wallet would stop before reaching the half that matters.</p>
 matched = result.get("matched", {})
 P.append(f"""
 <section class="page">
+<h1>The key cards — the half a descriptor cannot supply</h1>
+
+<p>Everything up to here engraved a <em>descriptor</em>. A descriptor card is
+not a backup on its own: it names eleven <code>@N</code> slots and gives a
+cosigner no way to prove which slot is theirs. The mk1 key cards are that other
+half.</p>
+
+<p>They bind to the <b>keyless template</b> card, not the keyed one. The stub is
+form-aware, so a card minted against the keyed policy carries a different stub
+and is refused against the template — <b>one wallet, two stubs</b>. The template
+is what gets engraved here, so the template is what the cards bind to, and the
+journey fails if they do not:</p>
+{code(section(tx, "9. The eleven key cards"), 22)}
+
+<h2>The plate checklist</h2>
+<p>What actually gets cut — the descriptor chunks and every key card in one
+set, so the plate count is the real one rather than the descriptor's alone:</p>
+{code(section(tx, "10. me bundle"), 20)}
+
+<h2>The seed, and the refusal that holds</h2>
+<p>The one plate that is not public. <code>me</code> refuses an <code>ms1</code>
+outright — it will not render, preview or transmit a secret — so the seed plate
+is counted in the manifest and never drawn. That refusal is what makes the rest
+of the bundle safe to preview at all:</p>
+{code(section(tx, "11. The seed"), 14)}
+</section>
+
+<section class="page">
+<h1>The restore test — and why taproot needs its own</h1>
+
+<p>Section 4 proved the cards <em>re-encode</em> to their own policy. That is a
+transcription check on the bytes. This asks the question a backup actually has
+to answer: <b>hold these plates and the three seeds, and do you get the wallet
+back?</b></p>
+
+<p>Taproot makes that harder than it is for <code>wsh</code>. A
+<code>tr()</code> address commits to the <b>taptree shape</b> as well as to the
+keys, so a restore can recover all eleven keys, rebuild the tree wrongly, and
+produce a wallet that looks correct and is not. The test therefore ends on
+<b>addresses</b>, not on keys — get the shape wrong and they differ even when
+every key is right.</p>
+
+<p>It restores only from what a holder of the plates has: each slot's origin is
+read <em>from the card</em>, the key is derived from its seed at that origin,
+the template is re-annotated with the card's own origins, and the addresses come
+from the result:</p>
+{code(section(tx, "12. THE RESTORE TEST"), 30)}
+
+<div class="note"><b>Verified to be capable of failing.</b> Swapping two slots'
+recovered keys — the same key set, a different assignment, so the same tree
+shape over different leaves — makes the rebuilt wallet spend to entirely
+different addresses and the test fails loudly. A restore test that cannot fail
+proves nothing, and this one was checked rather than assumed.</div>
+</section>
+
+<section class="page">
 <h2>8 · What this run established</h2>
 
 <p>The capture is a <strong>comparison</strong>. It is handed the host's id and
