@@ -1,0 +1,13 @@
+[package]
+name = "mt-size-probe"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+miniscript = { version = "13.1.0", features = ["base64"] }
+bitcoin = { version = "0.32.101", features = ["base64"] }
+bip39 = "2"
+qrcode = { version = "0.14", default-features = false }
+
+[profile.dev]
+opt-level = 2

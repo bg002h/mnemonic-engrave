@@ -1,0 +1,43 @@
+PLATE 85 x 85 mm, outerMargin 3 mm/side => 79 mm usable
+stroke 0.3 mm = the smallest feature that can be engraved => module floor
+
+=== 1. WHAT BINDS: the QR standard, or the plate? ===
+  plate can hold           263 modules across at 1 stroke/module
+  largest QR that exists   177 modules (version 40)
+  v40 at 1 stroke/module   53.1 mm square
+  => the QR STANDARD binds; linear headroom 49%
+  a v40 still fits at      0.427 mm/module (1.42 strokes), quiet zone included
+
+=== 2. ONE v40 SYMBOL — raw transaction bytes, no codex32 ===
+  v40 L ~7%    2953 B
+  v40 M ~15%   2331 B
+  v40 Q ~25%   1663 B
+  v40 H ~30%   1273 B
+
+=== 3. TILING: many symbols per plate (quiet zone included) ===
+  module mm  best ver  footprint      grid      L total      H total
+  0.30            v26     38.7mm       2x2       5468 B       2372 B
+  0.45            v37     77.9mm       1x1       2563 B       1093 B
+  0.60            v26     77.4mm       1x1       1367 B        593 B
+  0.90            v15     76.5mm       1x1        520 B        220 B
+
+  NOTE: tiling beyond 16 symbols exceeds QR Structured Append's limit and would
+  need a scheme of mt's own. Counts above are unconstrained.
+
+=== 4. HOW BIG A TRANSACTION FITS — one plate, raw bytes ===
+  0.30 mm/module -> single v40: L  2953 B   H  1273 B
+  0.60 mm/module -> single v26: L  1367 B   H   593 B
+  0.90 mm/module -> single v15: L   520 B   H   220 B
+
+=== 5. INPUTS PER PLATE, raw signed transaction, no codex32 ===
+  (1-input size and marginal cost per input measured by envelope.rs)
+  budgets: one v40 = 2953 B (L) / 1273 B (H);  2x2 v26 = 5468 B (L) / 2372 B (H)
+
+  wallet / spend path             v40 L      v40 H      2x2 L      2x2 H
+  RCW tr key-path                    27         11         50         21
+  RCW tr tier4                        8          3         15          6
+  RCW tr tier1                        6          2         11          4
+  RCW wsh tier1                       4          1          7          3
+  pathological wsh tier1              3          1          6          2
+  3-of-5 wsh                          6          2         12          5
+  2-of-3 wsh                          9          4         18          7

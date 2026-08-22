@@ -1,0 +1,24 @@
+gate v40-L: numeric 7089/7089 OK | alnum 4296/4296 OK | byte 2953/2953 OK
+gate v40-H: numeric 3057/3057 OK | alnum 1852/1852 OK | byte 1273/1273 OK
+
+=== ONE v40 SYMBOL, ECC L ~7% ===
+  raw capacity by mode: numeric 7089 ch | alphanumeric 4296 ch | byte 2953 ch
+  representation             SOURCE B    vs binary     chars   note
+  raw binary                   2953 B         100%      2953   1 octet per byte
+  base45 (RFC 9285)            2864 B          97%      4296   designed FOR qr alphanumeric
+  base32 / bech32 UPPER        2685 B          91%      4296   codex32 uppercased; 5 data bits per 5.5-bit char
+  base64                       2214 B          75%      2952   mixed case -> byte mode, no alnum discount
+  base58                       2162 B          73%      2953   mixed case -> byte mode
+  hex UPPER                    2148 B          73%      4296   2 chars/byte but alnum-discounted
+  decimal digits               2943 B         100%      7087   densest MODE, worst expansion
+
+=== ONE v40 SYMBOL, ECC H ~30% ===
+  raw capacity by mode: numeric 3057 ch | alphanumeric 1852 ch | byte 1273 ch
+  representation             SOURCE B    vs binary     chars   note
+  raw binary                   1273 B         100%      1273   1 octet per byte
+  base45 (RFC 9285)            1234 B          97%      1851   designed FOR qr alphanumeric
+  base32 / bech32 UPPER        1157 B          91%      1852   codex32 uppercased; 5 data bits per 5.5-bit char
+  base64                        954 B          75%      1272   mixed case -> byte mode, no alnum discount
+  base58                        932 B          73%      1273   mixed case -> byte mode
+  hex UPPER                     926 B          73%      1852   2 chars/byte but alnum-discounted
+  decimal digits               1269 B         100%      3056   densest MODE, worst expansion

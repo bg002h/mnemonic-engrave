@@ -1,0 +1,35 @@
+== 1. do the fixture's preimages satisfy its hashlocks? ==
+   tier 1: phrase 40 B -> preimage 32 B: true | literal in policy: true
+   tier 2: phrase 38 B -> preimage 32 B: true | literal in policy: true
+   tier 3: phrase 34 B -> preimage 32 B: true | literal in policy: true
+   tr leaf depth 1 (143 B script): OP_SIZE OP_PUSHBYTES_1 20 OP_EQUALVERIFY OP_SHA256 OP_PUSHBYTES_32 ...
+   tr leaf depth 2 (115 B script): OP_PUSHBYTES_3 008000 OP_CSV OP_VERIFY OP_SIZE OP_PUSHBYTES_1 ...
+   tr leaf depth 3 ( 40 B script): OP_PUSHBYTES_3 10e811 OP_CLTV OP_VERIFY OP_PUSHBYTES_32 865f104d6dea9a456714afde13a2b45414d5328791ac4f129d6aca33b378df5c ...
+   tr leaf depth 3 ( 79 B script): OP_PUSHBYTES_3 601c15 OP_CLTV OP_VERIFY OP_SIZE OP_PUSHBYTES_1 ...
+
+== 2. does stock rust-miniscript 13.1 accept the STORED RCW (tier 4 keyed)? ==
+   tr   ACCEPTED
+   wsh  ACCEPTED
+
+== 3. sizing, STORED fixture: tier 4 = after AND hashlock AND signature, 7 keys ==
+tr   1in/1out tier1 3of3+hash      | bare  151B( 4ch,fits) | full-unsigned  1813B( 40ch,fits) | SIGNED TX   535B( 12ch,fits) vsize 205   wit[64, 64, 64, 32, 143, 65]
+wsh  1in/1out tier1 3of3+hash      | bare  151B( 4ch,fits) | full-unsigned  1061B( 24ch,fits) | SIGNED TX   742B( 17ch,fits) vsize 256   wit[0, 71, 71, 71, 32, 1, 390]
+tr   1in/2out tier1 3of3+hash      | bare  195B( 5ch,fits) | full-unsigned  2998B( 67ch,OVER) | SIGNED TX   578B( 13ch,fits) vsize 248   wit[64, 64, 64, 32, 143, 65]
+wsh  1in/2out tier1 3of3+hash      | bare  195B( 5ch,fits) | full-unsigned  1948B( 43ch,fits) | SIGNED TX   785B( 18ch,fits) vsize 299   wit[0, 71, 71, 71, 32, 1, 390]
+tr   5in/2out tier1 3of3+hash      | bare  549B(13ch,fits) | full-unsigned 10000B(221ch,OVER) | SIGNED TX  2498B( 56ch,fits) vsize 851   wit[64, 64, 64, 32, 143, 65]
+wsh  5in/2out tier1 3of3+hash      | bare  549B(13ch,fits) | full-unsigned  5942B(131ch,OVER) | SIGNED TX  3538B( 78ch,OVER) vsize 1111  wit[0, 71, 71, 72, 32, 1, 390]
+
+tr   1in/1out tier3 pk+after       | bare  151B( 4ch,fits) | full-unsigned  1746B( 39ch,fits) | SIGNED TX   333B(  8ch,fits) vsize 154   wit[64, 40, 129]
+wsh  1in/1out tier3 pk+after       | bare  151B( 4ch,fits) | full-unsigned   994B( 22ch,fits) | SIGNED TX   566B( 13ch,fits) vsize 212   wit[71, 1, 0, 0, 390]
+tr   1in/2out tier3 pk+after       | bare  195B( 5ch,fits) | full-unsigned  2931B( 65ch,OVER) | SIGNED TX   376B(  9ch,fits) vsize 197   wit[64, 40, 129]
+wsh  1in/2out tier3 pk+after       | bare  195B( 5ch,fits) | full-unsigned  1881B( 42ch,fits) | SIGNED TX   610B( 14ch,fits) vsize 256   wit[72, 1, 0, 0, 390]
+tr   5in/2out tier3 pk+after       | bare  549B(13ch,fits) | full-unsigned  9665B(214ch,OVER) | SIGNED TX  1488B( 33ch,fits) vsize 598   wit[64, 40, 129]
+wsh  5in/2out tier3 pk+after       | bare  549B(13ch,fits) | full-unsigned  5607B(124ch,OVER) | SIGNED TX  2657B( 59ch,fits) vsize 890   wit[72, 1, 0, 0, 390]
+
+tr   1in/1out tier4 keyed          | bare  151B( 4ch,fits) | full-unsigned  1813B( 40ch,fits) | SIGNED TX   405B(  9ch,fits) vsize 172   wit[64, 32, 79, 129]
+wsh  1in/1out tier4 keyed          | bare  151B( 4ch,fits) | full-unsigned  1061B( 24ch,fits) | SIGNED TX   599B( 14ch,fits) vsize 221   wit[72, 32, 0, 0, 0, 390]
+tr   1in/2out tier4 keyed          | bare  195B( 5ch,fits) | full-unsigned  2998B( 67ch,OVER) | SIGNED TX   448B( 10ch,fits) vsize 215   wit[64, 32, 79, 129]
+wsh  1in/2out tier4 keyed          | bare  195B( 5ch,fits) | full-unsigned  1948B( 43ch,fits) | SIGNED TX   642B( 15ch,fits) vsize 264   wit[72, 32, 0, 0, 0, 390]
+tr   5in/2out tier4 keyed          | bare  549B(13ch,fits) | full-unsigned 10000B(221ch,OVER) | SIGNED TX  1848B( 41ch,fits) vsize 688   wit[64, 32, 79, 129]
+wsh  5in/2out tier4 keyed          | bare  549B(13ch,fits) | full-unsigned  5942B(131ch,OVER) | SIGNED TX  2815B( 63ch,fits) vsize 930   wit[72, 32, 0, 0, 0, 390]
+

@@ -1,0 +1,21 @@
+single-sig wpkh        1in/1out | bare  139B( 4ch) | full-unsigned   199B(  5ch,fits) | SIGNED TX   204B(  5ch,fits) vsize 122
+single-sig tr (keypath) 1in/1out | bare  151B( 4ch) | full-unsigned   246B(  6ch,fits) | SIGNED TX   162B(  4ch,fits) vsize 111
+2-of-3 wsh             1in/1out | bare  151B( 4ch) | full-unsigned   451B( 10ch,fits) | SIGNED TX   349B(  8ch,fits) vsize 158
+2-of-3 tr (1 leaf)     1in/1out | bare  151B( 4ch) | full-unsigned   690B( 16ch,fits) | SIGNED TX   367B(  9ch,fits) vsize 163
+3-of-5 wsh             1in/1out | bare  151B( 4ch) | full-unsigned   647B( 15ch,fits) | SIGNED TX   489B( 11ch,fits) vsize 193
+3-of-5 tr (1 leaf)     1in/1out | bare  151B( 4ch) | full-unsigned   950B( 21ch,fits) | SIGNED TX   501B( 12ch,fits) vsize 196
+
+single-sig wpkh        1in/2out | bare  171B( 4ch) | full-unsigned   291B(  7ch,fits) | SIGNED TX   235B(  6ch,fits) vsize 153
+single-sig tr (keypath) 1in/2out | bare  195B( 5ch) | full-unsigned   385B(  9ch,fits) | SIGNED TX   205B(  5ch,fits) vsize 154
+2-of-3 wsh             1in/2out | bare  195B( 5ch) | full-unsigned   795B( 18ch,fits) | SIGNED TX   392B(  9ch,fits) vsize 201
+2-of-3 tr (1 leaf)     1in/2out | bare  195B( 5ch) | full-unsigned  1207B( 27ch,fits) | SIGNED TX   410B( 10ch,fits) vsize 206
+3-of-5 wsh             1in/2out | bare  195B( 5ch) | full-unsigned  1187B( 27ch,fits) | SIGNED TX   533B( 12ch,fits) vsize 236
+3-of-5 tr (1 leaf)     1in/2out | bare  195B( 5ch) | full-unsigned  1727B( 39ch,fits) | SIGNED TX   544B( 12ch,fits) vsize 239
+
+single-sig wpkh        5in/2out | bare  477B(11ch) | full-unsigned   837B( 19ch,fits) | SIGNED TX   828B( 19ch,fits) vsize 424
+single-sig tr (keypath) 5in/2out | bare  549B(13ch) | full-unsigned  1119B( 25ch,fits) | SIGNED TX   633B( 14ch,fits) vsize 384
+2-of-3 wsh             5in/2out | bare  549B(13ch) | full-unsigned  2349B( 52ch,fits) | SIGNED TX  1570B( 35ch,fits) vsize 619
+2-of-3 tr (1 leaf)     5in/2out | bare  549B(13ch) | full-unsigned  3717B( 82ch,OVER) | SIGNED TX  1658B( 37ch,fits) vsize 641
+3-of-5 wsh             5in/2out | bare  549B(13ch) | full-unsigned  3525B( 78ch,OVER) | SIGNED TX  2270B( 51ch,fits) vsize 794
+3-of-5 tr (1 leaf)     5in/2out | bare  549B(13ch) | full-unsigned  5277B(117ch,OVER) | SIGNED TX  2328B( 52ch,fits) vsize 808
+

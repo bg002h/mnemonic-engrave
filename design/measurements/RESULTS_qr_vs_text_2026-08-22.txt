@@ -1,0 +1,36 @@
+ONE PLATE: 85 x 85 mm, 4 mm margin per side => 77 mm usable
+stroke 0.3 mm
+
+--- AS ENGRAVED TEXT (codex32) ---
+  md today (balanced, 85 ch)    85 ch/string,  38 B/string | 3 string(s)/plate at the 300-char budget =>  114 B/plate  (today: 1 string/plate =>  38 B/plate)
+  regular code, filled          96 ch/string,  45 B/string | 3 string(s)/plate at the 300-char budget =>  135 B/plate  (today: 1 string/plate =>  45 B/plate)
+  LONG code, filled            127 ch/string,  65 B/string | 2 string(s)/plate at the 300-char budget =>  130 B/plate  (today: 1 string/plate =>  65 B/plate)
+
+--- AS AN ENGRAVED QR ---
+  scale / ECC       mod mm max mods   QR version  BYTE mode     ALNUM mode
+  scale 3 L  ~7%       0.90       85  v17 (85mod)      644 B         895 ch
+  scale 3 M ~15%       0.90       85  v17 (85mod)      504 B         701 ch
+  scale 3 Q ~25%       0.90       85  v17 (85mod)      364 B         508 ch
+  scale 3 H ~30%       0.90       85  v17 (85mod)      280 B         391 ch
+  scale 2 L  ~7%       0.60      128 v27 (125mod)     1465 B        1992 ch
+  scale 2 M ~15%       0.60      128 v27 (125mod)     1125 B        1531 ch
+  scale 2 Q ~25%       0.60      128 v27 (125mod)      805 B        1096 ch
+  scale 2 H ~30%       0.60      128 v27 (125mod)      625 B         852 ch
+  scale 1 L  ~7%       0.30      256 v40 (177mod)     2953 B        4014 ch
+  scale 1 M ~15%       0.30      256 v40 (177mod)     2331 B        3170 ch
+  scale 1 Q ~25%       0.30      256 v40 (177mod)     1663 B        2262 ch
+  scale 1 H ~30%       0.30      256 v40 (177mod)     1273 B        1733 ch
+
+  (the fork engraves at scale 3, ECC M — backup.go:108 and :77)
+  gate: v40-L byte capacity measured 2953, published 2953 -> MATCH
+  gate: v40-M byte capacity measured 2331, published 2331 -> MATCH
+  gate: v40-Q byte capacity measured 1663, published 1663 -> MATCH
+  gate: v40-H byte capacity measured 1273, published 1273 -> MATCH
+
+--- PLATES NEEDED FOR A REAL SIGNED TRANSACTION (1-input sweep) ---
+  wallet / path                     tx    QR plates @s3 ECC M     codex32 plates today
+  RCW tr KEY-PATH                162 B                   1                      5
+  RCW tr tier4                   405 B                   1                     11
+  RCW tr tier1                   535 B                   2                     14
+  RCW wsh tier1                  742 B                   2                     20
+  pathological wsh tier1         852 B                   2                     23
