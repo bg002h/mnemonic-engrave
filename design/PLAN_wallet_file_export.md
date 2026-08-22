@@ -1,8 +1,8 @@
 # PLAN — wallet-file export for the reasonably complex wallet
 
-**Status:** all five planning reports landed and folded (2026-08-22). Phase 2
-is DELETED and Phase 1's justification has changed — see §1a. Awaiting the R0
-review of Phase 1 before any code.
+**Status:** all five planning reports landed and folded. R0 round 1 on Phase 1
+came back **1C / 4I / 2M / 1N — RED**; this document is the fold. Phase 2 is
+DELETED. **No code until a re-review returns 0C/0I.**
 
 **Operator ask (2026-08-22):** output Nunchuk, Sparrow and Bitcoin Core
 **watch-only and hot** wallets via the m* utilities, and the same on SeedHammer
@@ -33,7 +33,7 @@ Against this wallet's own concrete descriptors
 
 | what | result | exit |
 | --- | --- | --- |
-| `export-wallet --descriptor <wsh> --format bitcoin-core` | **works** — 2694 bytes of `importdescriptors` JSON, valid checksum | 0 |
+| `export-wallet --descriptor <wsh> --format bitcoin-core` | **emits, and Core then REFUSES it at import** — 2694 bytes of shape-perfect JSON with a valid checksum that `importdescriptors` rejects per-entry (R0/C1) | 0 |
 | `export-wallet --descriptor <tr> --format bitcoin-core` | **refused** — *"All spend paths must require a signature"* | 2 |
 | `export-wallet --descriptor <wsh> --format sparrow` | **refused** — *"requires --template; descriptor passthrough is not supported"* | 1 |
 | `--format nunchuk` | **does not exist** (11 formats, no nunchuk) | — |
@@ -226,23 +226,107 @@ reports being folded.
 
 ### Phase 1 — G1, `--allow` parity on `export-wallet`
 
-**This changes ADMISSION**, which is risk-set work (project CLAUDE.md item (c)),
-so it takes the R0 gate: this plan reviewed to 0C/0I before code.
+**R0 round 1: 1C / 4I / 2M / 1N — gate RED. This section is the fold.**
+(`design/agent-reports/R0_export_phase1.md`)
 
-- Add `--allow <RULE>` to `export-wallet`, repeatable, reusing `CliAllow` and
-  `allow_set()` from `cmd/build_descriptor.rs` rather than a parallel enum.
-- Route the `--descriptor` parse at `export_wallet.rs:524` through the relaxed
-  path when any allowance is requested, mirroring what `md encode
-  --experimental` does with `ExtParams`.
-- **The warning is not optional.** `build-descriptor` already has the
-  never-silent surface (`emit_allow_notes`): an unmissable stderr warning for
-  every allowed rule that actually FIRED, plus a note for each requested
-  allowance that did not. Reuse it; do not reimplement a quieter one.
-- Tests: tr form exports with `--allow sigless-branch` and refuses without it;
-  the warning appears; a rule requested but not fired says so; the wsh form is
-  unaffected with no flag.
-- **Rust-primary:** `mnemonic-toolkit` is Rust and upstream of the Go port. No
-  Go change is due unless the fork gains an export surface, which it has not.
+**This changes ADMISSION**, risk-set item (c), so it takes the R0 gate: 0C/0I
+before code.
+
+#### What the review changed
+
+**C1 — the purpose sentence was falsified by measurement.** §1's table says
+wsh → bitcoin-core *"works"*. That is **export-side only**. Measured on a live
+Core v25: `importdescriptors` returns per-entry `success: false`,
+*"is not sane: witnesses without signature exist"*, on the toolkit's **own**
+exported JSON. So for `bitcoin-core`, `--allow` converts an export-time refusal
+into an **import-time** refusal — and no Phase-1 test as listed would ever
+notice, because every test stopped at emission.
+
+*Fold:* §1's row is re-worded to **"emits; Core refuses at import"**, and Phase 1
+gains an explicit non-goal — see the constraint below. The acceptance criterion
+for anything claiming Core compatibility is an **import**, not an emit.
+
+**I3 — "relaxing the sanity rule" is partly fiction on this surface.** On
+`build-descriptor` the rule is a genuine surface invariant checked on every
+artifact. On `export-wallet` it is a **tr-only upstream parser quirk** that the
+surface never enforced for other wrappers. Worse: the test I listed
+(*"the wsh form is unaffected with no flag"*) would have **pinned that silent
+wsh hole as correct**.
+
+*Fold:* Phase 1 must first **rule** whether `--allow` here means *uniform
+policy* (enforce on every wrapper, then waive) or *quirk passthrough* (waive
+only where the parser happens to object). These are different products. The plan
+picks **uniform policy**, because a flag whose reach depends on an upstream
+parser's shape is not a flag anyone can reason about — and that decision makes
+the wsh hole a **defect to close**, not a behaviour to pin.
+
+**I1 — one parse site named, at least three exist.** `export_wallet.rs:524` is
+not the only strict parse on the target path.
+
+*Fold:* the implementer **enumerates every strict parse site on the
+`--descriptor` path first and lists them in the PR**, then states where the
+relaxation lives (one chokepoint vs per-site). Divergence here is the single
+largest "two implementers build different things" risk the review found.
+
+**I2 — `emit_allow_notes` cannot be reused as written.** The enum and printer
+are reusable and drift-tested (`CliAllow::kind()` ↔ `DiagnosticKind`). The
+**fired-detection** behind it is Segwitv0/wsh-typed and **cannot run on tr
+leaves** — exactly the shape Phase 1 unlocks.
+
+*Fold:* the plan no longer says "reuse `emit_allow_notes`". It says: reuse the
+**vocabulary and the printer**; the **fired-detection for tr leaves is new
+code** and is Phase 1's real work. N1 applies — both pieces are currently
+private to `cmd/build_descriptor.rs` and need a shared home.
+
+**I4 — the missing test is the one that guards over-admission.** My list tested
+that the flag *permits*; none tested that it permits **only what was asked**. A
+granularity lapse admitting rules the user never waived is invisible to every
+test I named.
+
+*Fold:* added — (a) requesting one rule must not admit any other, asserted
+per-rule; (b) a keyless-leaf vector through the **transforming** emitters
+(`bip388`), which are reached post-relaxation and had no such vector.
+
+**M1 — does the override leave a trace in the artifact?** Undecided in round 1.
+*Fold:* **no trace in the artifact.** The emitters are passthrough by design and
+a comment field would be format-specific and silently dropped by most targets.
+The trace lives in stderr and in the operator's records. Stated so it is a
+decision, not an omission.
+
+**M2 — the warning speaks the wrong act.** Build's wording is *"don't author
+this"*; export needs *"understand what watching this means"*.
+*Fold:* export gets its own wording. Same vocabulary, different sentence.
+
+**N1 — "reuse" needs a home.** `CliAllow`, `allow_set()` and
+`emit_allow_notes` are all private to `cmd/build_descriptor.rs`.
+*Fold:* Phase 1 lifts the **vocabulary and printer** into a shared module before
+wiring the second caller — not after, because "make it pub" applied twice is how
+two commands end up with two rule vocabularies that drift. The new tr-leaf
+fired-detection (I2) lands beside them.
+
+**Naming — settled, no finding.** `--allow` is right: same binary as
+`build-descriptor`, same five-value vocabulary. `md encode --experimental` is a
+different binary and a single-axis flag; importing its name would import
+semantics that do not match a five-valued rule set. The cross-constellation
+inconsistency is real and is **md's to reconcile**, not a gate item here.
+
+#### The constraint that survives all of this
+
+**No help text, doc, commit message or release note may say `--allow` "enables
+export to Core / Nunchuk / Sparrow".** It enables **emission**. Measured: Core
+refuses the result at import on every version through v31.1, and the rule is
+non-waivable there. Phase 1 is worth doing on parity, inspection and archival
+merits — and on those alone.
+
+#### Acceptance
+
+- Every strict parse site on the `--descriptor` path enumerated and listed.
+- The uniform-policy vs quirk-passthrough ruling implemented as uniform policy,
+  with the wsh hole closed rather than pinned.
+- Per-rule over-admission tests; keyless-leaf vector through `bip388`.
+- tr-leaf fired-detection implemented and tested (new code, not reuse).
+- Export-specific warning wording.
+- Re-review to 0C/0I before any of it merges.
 
 ### Phase 2 — **DELETED**
 
