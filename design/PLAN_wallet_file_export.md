@@ -2,7 +2,8 @@
 
 **Status:** all five planning reports landed and folded. R0 on Phase 1 has run
 twice — round 1 **1C/4I/2M/1N**, round 2 **0C/4I/1M/2N**, round 3 **0C/2I/1M/0N**,
-round 4 **0C/2I/1M/0N**. All RED; this document is the fold of all four. Phase 2 is DELETED. **No code until a review
+round 4 **0C/2I/1M/0N**, round 5 **0C/0I/2M/2N — GREEN**. The loop is
+CLOSED; this document is the fold of all five, Minors and Nits included. Phase 2 is DELETED. **No code until a review
 returns 0C/0I.**
 
 **Operator ask (2026-08-22):** output Nunchuk, Sparrow and Bitcoin Core
@@ -222,8 +223,9 @@ incidental safety becomes deliberate.**
 ## 3. Phases
 
 Each phase ends with a fable review before the next begins, per the operator's
-instruction. **No phase may start: the Phase 1 gate is RED** (rounds 1-4:
-1C/4I, 0C/4I, 0C/2I, 0C/2I).
+instruction. **The Phase 1 gate is GREEN** after five rounds
+(1C/4I, 0C/4I, 0C/2I, 0C/2I, 0C/0I). Phase 1 may be implemented against the
+Acceptance list below.
 
 ### Phase 1 — G1, `--allow` parity on `export-wallet`
 
@@ -426,8 +428,9 @@ export-side wordings, hung on the existing export-wording acceptance bullet:
 - **unenforced rule** — *"note: `--allow <rule>` has no effect on
   `export-wallet` — only `sigless-branch` is enforced here; the descriptor was
   NOT checked against `<rule>`"*
-- **ungated path** — *"note: `--allow` does not apply to this path — no
-  descriptor admission gate runs on `--template`/`--slot`"*
+- ~~**ungated path**~~ — **DELETED in round 4.** Under topology (B) no arm is
+  ungated, so this wording has no referent. Struck here at its definition site
+  so nobody re-adopts it from this section.
 
 Two distinct reasons no longer collide on one sentence, and (b) becomes as
 honest in the tool as it now is in the plan.
@@ -488,7 +491,7 @@ flag. Scoped to **wsh**.
 Rounds 3 and 4 both found note-wording defects, and both were *composition*
 failures: a cell that was false, or a cell with no referent. Prose hid them
 because prose has no cells. Every reachable combination, enumerated — **six
-cells, and the arm dimension is deliberately degenerate**:
+cells; the arm dimension is degenerate in row 2 and near-degenerate in row 1**:
 
 | | `--descriptor` | `--from-import-json` | `--template` / `--slot` |
 | --- | --- | --- | --- |
@@ -497,9 +500,13 @@ cells, and the arm dimension is deliberately degenerate**:
 
 Reading the grid:
 
-- **The columns are identical by construction.** That is the point of topology
-  (B) and the check on it: if any future edit makes a column differ, the uniform
-  gate has been broken somewhere.
+- **Row 2's columns are identical by construction** — that is the uniform
+  gate's observable signature, and if a future edit makes one differ, (B) has
+  been broken somewhere. **Row 1's are NOT**, and deliberately so: the
+  `--template`/`--slot` cell carries only the did-not-fire note because the rule
+  runs there and *cannot* fire. Same gate, different reachable outcomes. (Caught
+  in round 5 — the earlier wording claimed all columns matched and was falsified
+  by the grid printed one line above it.)
 - **The `--template`/`--slot` cell is a consequence, not an exemption.** A
   builder-produced descriptor cannot carry a sigless branch, so the rule runs
   and does not fire. Same note as everywhere else, reached by a different route.
@@ -535,8 +542,10 @@ merits — and on those alone.
   tr AND wsh; export-with-flag; the fired warning; the requested-not-fired note.
 - **`--from-import-json` gated like `--descriptor`** — a sigless **wsh**
   envelope refuses without the flag and exports with it. This is the hole round 3
-  found. (Scoped to wsh: tr refuses regardless of the flag, so a tr bullet would
-  be unsatisfiable.)
+  found. (Scoped to wsh: **taproot envelopes remain categorically refused by
+  the v0.28.7 `Fix-α` gate regardless of `--allow`**, so a tr bullet would be
+  unsatisfiable. The mechanism is named so nobody "fixes" a red tr test by
+  relaxing `Fix-α`, which nobody has ruled on.)
 - Per-rule over-admission tests — requesting one rule admits no other.
 - Keyless-leaf vector through the transforming emitters (`bip388`).
 - **Fired-detection per enforced wrapper** — per-leaf for tr, top-level for
@@ -546,7 +555,9 @@ merits — and on those alone.
 - Export-specific warning wording (not build's "don't author this").
 - **Rust-first vectors pinning the new refusals**, per Open Q4 — this phase
   touches the asymmetry Q4 flags as potentially normative.
-- **A release-note line for the behaviour change.**
+- **Release-note lines for BOTH behaviour changes** — the flagless wsh refusal
+  *and* the `:524` intake becoming lenient. Two operator-visible changes, not
+  one; round 5 caught the singular.
 - **Every cell of the note matrix asserted** (2 rule-classes x 3 arms = 6), and
   a test that the three columns are identical for row 2 — the uniform gate's
   observable signature.
