@@ -9285,3 +9285,63 @@ only when the walk fails — so the refusal assertion is not vacuous.
    but that is a guess, and the whole point of this follow-up is that an
    unseatable template looks correct until someone tries to restore it. Measure
    it the way the host side was measured: author one, inspect the slots.
+
+### F-228 — you cannot get from the English spec to the policy with the shipped tools `#md` `#usability` `#experimental`
+
+Filed 2026-08-22. The operator asked the obvious question a journey exists to
+provoke: *how does a user go from the four-tier English description to
+`policy-tr.txt`?* Measured answer: **they cannot.** I hand-wrote that string in
+the hashlock-vault cycle, and everything since is copy plus `sed` — which is why
+the question had no good answer.
+
+`md encode --from-policy <EXPR> --context tap|segwitv0` is exactly the intended
+route. Two things stop it.
+
+#### G1 — `--from-policy` is not in the default build
+
+```
+$ md encode --from-policy "…" --context tap
+md: --from-policy requires the cli-compiler feature
+```
+
+`crates/md-cli/Cargo.toml:25` — `cli-compiler = ["miniscript/compiler"]`, not in
+`default`. A user following this journey hits a wall and has to rebuild with
+`--features cli-compiler`.
+
+**Decision needed, not just a fix:** enable it by default (cost: miniscript's
+compiler feature in every build — larger binary, longer compile), or ship it as
+a documented opt-in with the journey saying so. Either is defensible; silence is
+not.
+
+#### G2 — `--experimental` does not reach the compiler, so this wallet cannot be compiled at all
+
+With the feature built, isolated on real invocations:
+
+| policy | result |
+| --- | --- |
+| `or(pk(@0),and(older(144),pk(@1)))` | **compiles** — positive control |
+| last branch WITH a key | **compiles** (`chunk-set-id 0x888c8`) |
+| last branch KEYLESS, **plus `--experimental`** | **refuses** — *"compile: Top Level script is not safe on some spendpath"* |
+
+`--experimental` relaxes the **parse** path (`sanity_check`'s `requires_sig` via
+`ExtParams::top_unsafe`). The **compiler** applies its own safety rule and
+nothing waives it. So the whole `English → Policy → template` route is closed
+for any wallet with a keyless spend path — which is this wallet's defining
+feature.
+
+**Consequence:** the documented authoring workflow works for wallets that do not
+need `--experimental`, and silently stops working exactly where the flag was
+invented to help. A user is left hand-writing miniscript, which is what the
+compiler exists to prevent.
+
+**Rust-primary**, `descriptor-mnemonic`. Options, unruled: extend
+`--experimental` to the compiler path (`compile_tr`/`compile` with relaxed
+`ExtParams`, if the fork's compiler supports it); or refuse with a message that
+names the limitation instead of a generic compile error; or document the route
+as unavailable for keyless policies and say what to do instead. **The current
+behaviour — a generic error that does not mention the flag the user already
+passed — is the one option that should not survive.**
+
+**Owning phase:** any phase that claims a user can author this wallet. The
+journey currently does not claim it, because it prints a hand-written policy
+without saying it was hand-written; the transcript's new §1b now says so.
