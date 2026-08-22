@@ -483,6 +483,32 @@ this is machine-caught — but it should not have to be discovered.
 sigless-envelope bullet is unsatisfiable for tr, which refuses regardless of the
 flag. Scoped to **wsh**.
 
+#### The note matrix, as a grid rather than prose
+
+Rounds 3 and 4 both found note-wording defects, and both were *composition*
+failures: a cell that was false, or a cell with no referent. Prose hid them
+because prose has no cells. Every reachable combination, enumerated — **six
+cells, and the arm dimension is deliberately degenerate**:
+
+| | `--descriptor` | `--from-import-json` | `--template` / `--slot` |
+| --- | --- | --- | --- |
+| `--allow sigless-branch` | fired warning, **or** did-not-fire note | fired warning, **or** did-not-fire note | did-not-fire note |
+| `--allow <other four>` | unenforced-rule note | unenforced-rule note | unenforced-rule note |
+
+Reading the grid:
+
+- **The columns are identical by construction.** That is the point of topology
+  (B) and the check on it: if any future edit makes a column differ, the uniform
+  gate has been broken somewhere.
+- **The `--template`/`--slot` cell is a consequence, not an exemption.** A
+  builder-produced descriptor cannot carry a sigless branch, so the rule runs
+  and does not fire. Same note as everywhere else, reached by a different route.
+- **No cell prints "the policy passes that rule without it" for a rule that did
+  not run.** Row 2's rules never run on this surface, so row 2 gets its own
+  wording. This is the R3-2 ruling, now visible as a row rather than buried.
+- **There is no ungated-path cell**, because under (B) there is no ungated path.
+  R4-1 deleted it.
+
 #### The constraint that survives all of this
 
 **No help text, doc, commit message or release note may say `--allow` "enables
@@ -521,6 +547,9 @@ merits — and on those alone.
 - **Rust-first vectors pinning the new refusals**, per Open Q4 — this phase
   touches the asymmetry Q4 flags as potentially normative.
 - **A release-note line for the behaviour change.**
+- **Every cell of the note matrix asserted** (2 rule-classes x 3 arms = 6), and
+  a test that the three columns are identical for row 2 — the uniform gate's
+  observable signature.
 - `--allow sigless-branch` on `--template`/`--slot` emits the **did-not-fire
   note** — a consequence of the uniform gate, asserted as such; `--allow <other>`
   emits the unenforced-rule note. Same wordings as `--descriptor`, **because no
