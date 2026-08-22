@@ -7,9 +7,16 @@
 # inputs come from fixed, obviously-test entropy and this script is the only
 # thing that writes them.
 #
-# EVERYTHING HERE IS TEST MATERIAL. Six seeds from entropy 0x000…001 through
-# 0x000…006; three preimages are printable strings in this file. Never put funds
-# behind any of it.
+# EVERYTHING HERE IS TEST MATERIAL. Seven seeds from entropy 0x000…001 through
+# 0x000…007; three passphrases are printable strings in this file. Never put
+# funds behind any of it.
+#
+# TIER 4 IS KEYED (operator ruling 2026-08-22: "keyless path is not reasonable").
+# It was `after(1383520) AND sha256(C)` with no key, which made that tier bearer
+# access to anyone holding the preimage — and made stock rust-miniscript refuse
+# the tr form outright ("All spend paths must require a signature"), the same
+# NeedsSignature() check that closes Bitcoin Core and Nunchuk. Tier 4 is now
+# `after(1383520) AND sha256(C) AND pk(@6)`, so @6 is the seventh seed below.
 #
 # TWO KEY SETS FROM THE SAME SIX SEEDS. The operator ruled (2026-08-22) that the
 # tr form derives at ACCOUNT 8 and the wsh form at ACCOUNT 9:
@@ -33,6 +40,9 @@ IN="$W/inputs-rcw"
 
 mkdir -p "$IN/seeds" "$IN/keys-tr" "$IN/keys-wsh" "$IN/preimages"
 
+FIXCHK="$W/../fixtures/reasonably-complex-wallet"
+[ -f "$FIXCHK/tr.policy" ] || { echo "FATAL: no fixture policy at $FIXCHK" >&2; exit 1; }
+
 # The six keys and the tier each one serves.
 ROLE=(
   "tier 1 — 3-of-3 with hash A, spendable at any time"
@@ -41,6 +51,7 @@ ROLE=(
   "tier 2 — 2-of-2 with hash B, after older(32768) relative"
   "tier 2 — 2-of-2 with hash B, after older(32768) relative"
   "tier 3 — sole key, after(1173520) absolute"
+  "tier 4 — sole key, after(1383520) absolute + hash C"
 )
 
 # wrapper -> (ms template, account). Kept as parallel arrays rather than an
@@ -50,7 +61,7 @@ TMPL=(bg002h-tr bg002h-wsh)
 ACCT=(8 9)
 
 echo "== seeds =="
-for i in 0 1 2 3 4 5; do
+for i in 0 1 2 3 4 5 6; do
   ent=$(printf '%063d%x' 0 $((i + 1)))
   phrase=$("$MS" decode "$("$MS" encode --hex "$ent" --no-engraving-card 2>/dev/null | tr -d ' ')" 2>/dev/null \
              | sed -n 's/^phrase: //p')
@@ -68,7 +79,7 @@ echo "== keys =="
 for w in 0 1; do
   wrap=${WRAP[$w]}
   echo "  -- $wrap: ${TMPL[$w]}, account ${ACCT[$w]}"
-  for i in 0 1 2 3 4 5; do
+  for i in 0 1 2 3 4 5 6; do
     phrase=$(cat "$IN/seeds/key-$i.seed")
     out=$("$MS" derive --phrase - --template "${TMPL[$w]}" --account "${ACCT[$w]}" <<<"$phrase" 2>/dev/null)
     fp=$(printf '%s\n' "$out" | sed -n 's/^master_fingerprint: *//p')
@@ -101,13 +112,23 @@ done
 
 echo
 echo "== preimages =="
-# Human passphrases. The POLICY commits to sha256 of the UTF-8 bytes with NO
-# trailing newline -- `printf %s`, never `echo` -- because a stray \n changes
-# the hash and silently locks that tier forever.
+# Human passphrases, hashed TWICE. This is not decoration -- it is what makes
+# the hashlock tiers spendable at all.
 #
-# These are the SAME three the hashlock-vault journey uses, deliberately: the
-# reasonably-complex wallet's policy carries those exact digests as literals, so
-# any other preimage would produce a different wallet.
+# Miniscript's sha256(H) fragment compiles to
+#   OP_SIZE <32> OP_EQUALVERIFY OP_SHA256 <H> OP_EQUAL
+# so the WITNESS PREIMAGE MUST BE EXACTLY 32 BYTES. That is in the script, so it
+# is consensus-enforced, not a library rule. These passphrases are 34-40 bytes,
+# so committing to sha256(phrase) directly -- as this file did until
+# 2026-08-22 -- produced three tiers that could never be spent by anyone.
+#
+# The fix keeps the passphrase human and the preimage 32 bytes:
+#   witness preimage = sha256(phrase)          <- 32 bytes, the .hex file
+#   policy literal   = sha256(sha256(phrase))  <- what the descriptor commits to
+# A recoverer remembers the phrase and hashes it once to get the preimage.
+#
+# The phrase bytes carry NO trailing newline -- `printf %s`, never `echo` --
+# because a stray \n changes both digests and silently locks that tier forever.
 PRE=(
   "correct horse battery staple vault alpha"
   "seven bridges over a quiet river bravo"
@@ -115,8 +136,21 @@ PRE=(
 )
 for i in 0 1 2; do
   printf '%s' "${PRE[$i]}" > "$IN/preimages/preimage-$i.txt"
-  h=$(printf '%s' "${PRE[$i]}" | sha256sum | cut -d' ' -f1)
-  printf '  preimage-%d sha256 %s\n' "$i" "$h"
+  inner=$(printf '%s' "${PRE[$i]}" | sha256sum | cut -d' ' -f1)
+  outer=$(printf '%s' "$inner" | xxd -r -p | sha256sum | cut -d' ' -f1)
+
+  # The preimage that goes in the witness, as raw hex. Assert 32 bytes: if this
+  # ever stops holding, the tier is unspendable and the run must stop.
+  [ ${#inner} -eq 64 ] || { echo "FATAL: preimage-$i is ${#inner} hex chars, not 64 (32 bytes)" >&2; exit 1; }
+  printf '%s' "$inner" > "$IN/preimages/preimage-$i.hex"
+
+  # And the literal must actually be the one the fixture policy commits to.
+  grep -q "sha256($outer)" "$FIXCHK/tr.policy" || {
+    echo "FATAL: preimage-$i double-hash $outer is not a literal in tr.policy" >&2
+    echo "       the passphrase and the policy have drifted apart." >&2; exit 1; }
+
+  printf '  preimage-%d  phrase %d B -> preimage %s -> literal %s\n' \
+         "$i" "${#PRE[$i]}" "${inner:0:16}..." "${outer:0:16}..."
 done
 
 echo
@@ -137,16 +171,16 @@ sed "s#270028'/0'/1'/1'#270028'/0'/9'/1'#g; s#270028'/0'/0'/1'#270028'/0'/9'/1'#
 for w in tr wsh; do
   want=$([ "$w" = tr ] && echo "270028'/0'/8'/0'" || echo "270028'/0'/9'/1'")
   n=$(grep -o "$want" "$IN/policy-$w.txt" | wc -l)
-  [ "$n" -eq 6 ] || {
-    echo "FATAL: policy-$w.txt has $n occurrences of $want, expected 6" >&2
+  [ "$n" -eq 7 ] || {
+    echo "FATAL: policy-$w.txt has $n occurrences of $want, expected 7" >&2
     echo "       the path substitution did not take -- check the fixture's paths." >&2
     exit 1; }
   # And NO stale account-0 path may survive.
   if grep -qE "270028'/0'/0'/" "$IN/policy-$w.txt"; then
     echo "FATAL: policy-$w.txt still contains an account-0 path" >&2; exit 1
   fi
-  printf '  policy-%s.txt  %d chars, 6 slots at %s\n' "$w" "$(wc -c < "$IN/policy-$w.txt")" "$want"
+  printf '  policy-%s.txt  %d chars, %d slots at %s\n' "$w" "$(wc -c < "$IN/policy-$w.txt")" "$n" "$want"
 done
 
 echo
-echo "Wrote $IN — 6 seeds, 6 fingerprints, 12 xpubs (6 tr + 6 wsh), 3 preimages, 2 policies."
+echo "Wrote $IN — 7 seeds, 7 fingerprints, 14 xpubs (7 tr + 7 wsh), 3 preimages, 2 policies."

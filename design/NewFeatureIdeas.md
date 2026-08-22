@@ -1,5 +1,14 @@
 # New feature ideas — filed 2026-08-22, to brainstorm after a context clear
 
+> **SUPERSEDED IN PART, 2026-08-22.** The operator ruled *"keyless path is not
+> reasonable"* and **tier 4 of the RCW is now keyed** —
+> `after(1383520) AND sha256(H3) AND pk(@6)`, a seventh seed. The fixture,
+> `derive-rcw-keys.sh` and the journey inputs are updated. So idea 1's premise
+> ("the RCW's tier 4 has no key") is **closed by decision, not by this feature**,
+> and F-229 is resolved: tier 4 got a key. Idea 1's KDF question survives as
+> *how* `@6` should be derived; idea 2 is unaffected. Two numbers below are now
+> stale and are marked inline.
+
 Two features, both arising from the reasonably-complex-wallet cycle. **Neither is
 specced or ruled.** This file exists so the reasoning survives a clear; the
 brainstorm has not happened yet.
@@ -10,8 +19,8 @@ brainstorm has not happened yet.
 
 ### Why
 
-The RCW's tier 4 has **no key**, and that one fact closes every third-party
-route: Bitcoin Core (no version through v31.1), Nunchuk (same vendored
+The RCW's tier 4 **had no key** (keyed 2026-08-22 — see the banner), and that one
+fact closed every third-party route: Bitcoin Core (no version through v31.1), Nunchuk (same vendored
 `NeedsSignature()` check), Sparrow (no miniscript engine at all). Measured, not
 argued — see `PLAN_wallet_file_export.md` §1a.
 
@@ -46,8 +55,21 @@ recovery. That asymmetry is the whole mechanism.
   none is secret; all exist **before `@6` does**, so there is no circularity.
 
   **Verified 2026-08-22:** the `wallet-descriptor-template-id` is **key-stable
-  and path-stable** — `68a1a888…` for the tr form whether keyless, keyed, at
+  and path-stable** — the same value for the tr form whether keyless, keyed, at
   account 0 or account 8. That is what makes it usable as a salt input.
+
+  **Stale value, corrected.** This paragraph originally cited `68a1a888…`, the
+  template-id of the *keyless, single-hash* four-tier shape. Two rulings on
+  2026-08-22 moved it — keying tier 4 (which adds a placeholder) and
+  double-hashing the passphrases (which changes three literals). Both are
+  **shape** changes, so the id moves. Current values, measured with `md 0.13.0`:
+
+      tr   a00772edbdbb41fb4acb450672c5e5cb
+      wsh  6c635eac0f5a772d80c2eb7a43872bc8
+
+  Key-stability means the id does not move when `@N` is *bound to an xpub*. It
+  does move when you add an `@N`, or change what the policy commits to. Anything
+  citing a template-id should say which shape it measured.
 
 - **Zero extra forgetting risk**, which is the argument that settles it: if you
   hold no plate and no wallet file, you have no policy, no other keys, and no
@@ -170,6 +192,10 @@ the other two.
 - **F-228** — the English→policy route is closed for keyless wallets:
   `--from-policy` is not in the default build, and `--experimental` does not
   reach the compiler
-- **F-229** — whether tier 4 gets a key (LOW; ruled keep-keyless, re-openable —
-  **this cycle is re-opening it**)
+- **F-229** — whether tier 4 gets a key — **RESOLVED 2026-08-22: it does.**
+  Operator ruling, *"keyless path is not reasonable."* Side effect worth
+  recording: stock `rust-miniscript` refused the keyless **tr** form outright
+  (*"All spend paths must require a signature"*) while accepting the keyless
+  **wsh** form, because `Descriptor::from_str` only sanity-checks `Tr`. Both
+  forms are accepted now, and `md encode` no longer needs `--experimental`.
 - **F-230** — hot export NOT NOW, with a two-part trigger

@@ -1,24 +1,35 @@
 # "Our reasonably complex wallet" — the named fixture
 
-> ## ⚠ TIER 4 OF THIS FIXTURE IS BEARER ACCESS TO ANYONE WHO READS THIS REPO
+> ## The hashlocks are DOUBLE-hashed, and that is load-bearing
 >
-> The policies below commit to three **fixed `sha256` literals**, and all three
-> preimages are **committed in plaintext** at
-> `../../journeys/inputs-rcw/preimages/`. Verified: each file's digest is the
-> exact literal in `tr.policy` and `wsh.policy`.
+> Miniscript's `sha256(H)` fragment compiles to
+> `OP_SIZE <32> OP_EQUALVERIFY OP_SHA256 <H> OP_EQUAL` — read off the **compiled
+> leaf script**, not inferred: `OP_SIZE OP_PUSHBYTES_1 20 OP_EQUALVERIFY
+> OP_SHA256 …`, where `0x20` is 32. **The witness preimage must be exactly 32
+> bytes**, and that is in the script, so it is consensus-enforced.
 >
-> Tier 4 needs **no key** — `sha256(H3)` alone after block **1383520**. So
-> anyone who can read this repository can spend tier 4 of any wallet using these
-> policies, once that height passes.
+> The three passphrases are 40, 38 and 34 bytes. So the wallet commits to the
+> passphrase hashed **twice**:
 >
-> **That is correct and intended for a fixture.** It is a hazard because a
-> fixture is the thing people copy. If you build a real wallet from this shape:
-> **generate your own preimages, never reuse these**, and treat the preimages as
-> exactly as sensitive as the seeds — because for tier 4 they *are* the seed.
+>     witness preimage = sha256(phrase)          -- 32 bytes, in preimage-N.hex
+>     policy literal   = sha256(sha256(phrase))  -- what the descriptor commits to
 >
-> Engraving one of these three passphrases on a plate that ever holds funds
-> publishes that money to everyone reading this file.
+> A recoverer remembers the phrase and hashes it **once** to get the preimage.
+>
+> **This is a fix, applied 2026-08-22.** Until then the policies committed to
+> `sha256(phrase)` directly, so tiers 1, 2 and 4 could never satisfy `OP_SIZE`
+> and were unspendable by anyone — three of four tiers, silently. Verified both
+> ways: the probe at `design/measurements/` now finalizes a real transaction on
+> every tier using these exact preimage files, and asserts each
+> `preimage-N.hex` really is `sha256(preimage-N.txt)`.
 
+> ## ⚠ THE PREIMAGES ARE STILL PUBLIC — DO NOT REUSE THEM
+>
+> All three preimages are committed in plaintext in this repository. Every tier
+> now also requires a signature (see below), so the wallet is **no longer bearer
+> access** — but a fixture is the thing people copy. If you build a real wallet
+> from this shape: **generate your own preimages, never reuse these**, and treat
+> them as exactly as sensitive as the seeds.
 
 Named by the operator 2026-08-21. This is the standing reference wallet for
 arbitrary-miniscript work across the constellation: complex enough to exercise
@@ -31,27 +42,49 @@ A four-tier degrading vault:
 | 1 | `@0` **and** `@1` **and** `@2` **and** `sha256(H1)` — at any time |
 | 2 | `@3` **and** `@4` **and** `sha256(H2)` — after 32768 blocks (relative) |
 | 3 | `@5` alone — after absolute height 1173520 |
-| 4 | `sha256(H3)` alone — after absolute height 1383520 |
+| 4 | `@6` **and** `sha256(H3)` — after absolute height 1383520 |
+
+…where each `H` is `sha256(sha256(passphrase))`, per the banner above.
 
 What it exercises, in one wallet: two `sha256` hashlocks, **both** timelock
-flavours (`older` relative, `after` absolute), thresholds at 3/2/1, a spend path
-with **no key at all** (tier 4), and six cosigners at one shared path.
+flavours (`older` relative, `after` absolute), thresholds at 3/2/1/1, and seven
+cosigners at one shared path.
+
+## Tier 4 is keyed, and that is a change (2026-08-22)
+
+Tier 4 was `after(1383520) AND sha256(H3)` with **no key at all**. The operator
+ruled it out: *"keyless path is not reasonable."* It is now
+`after(1383520) AND sha256(H3) AND pk(@6)`, which added a seventh seed.
+
+Two things follow, both measured:
+
+1. **Stock `rust-miniscript` now accepts both forms.** Before the change, the
+   `tr` form was refused outright — *"All spend paths must require a
+   signature"*, from `Miniscript::sanity_check()`'s `requires_sig` test. That is
+   the same `NeedsSignature()` check that closes Bitcoin Core and Nunchuk. The
+   `wsh` form was accepted even when keyless, because `Descriptor::from_str`
+   only runs `sanity_check` for `Tr` (there is a `FIXME` in
+   `miniscript-13.1.0/src/descriptor/mod.rs:1053` calling this preserved 12.x
+   behaviour) — so the two forms disagreed about their own validity.
+2. **`--experimental` is no longer required.** The previous version of this file
+   said both forms need it. They do not: `md encode` succeeds on all three
+   policies with no such flag. Verified by running it.
 
 ## Two wrappings, and wsh is NOT a wrapper swap
 
 `tr.policy` and `wsh.policy` express the same four tiers. **They are different
 wallets** — different scripts, different ids, different addresses, and different
-keys. Measured, not typed:
+keys. Measured with `md 0.13.0`, not typed:
 
 | | tr | wsh |
 | --- | --- | --- |
-| policy chars | 575 | 519 |
+| policy chars | 616 | 560 |
 | keyless md1 chunks | 4 | 4 |
 | keyless + `--fingerprint` | 5 | 5 |
-| keyed md1 chunks | 15 | 15 |
-| template-id | `68a1a888385797337ce5debc90fcfb1e` | `daee67be4eacf85e8b832ae64fc06566` |
-| policy-id | `a0b128ceaef3155a40af6f8e88765ecb` | `9c74e0d2e96dd80c605b5fea19d551a9` |
-| first receive | `bc1puvyd9zxz6uvz0y0ehq7r5qz6h30txl4mgr8fxl3dqjp6xzpsy0qsgpgyny` | `bc1qyd7k9t5y0pxsg558y7mypgekdf0y25awnkw9tlvtec59c4wu5eeqsagcgq` |
+| keyed md1 chunks | 16 | 16 |
+| template-id | `a00772edbdbb41fb4acb450672c5e5cb` | `6c635eac0f5a772d80c2eb7a43872bc8` |
+| policy-id | `fa568be08b48847595bf536db6a1f74d` | `f095e31101e2c77139d77c98c5d6d9f6` |
+| first receive | `bc1p8rrz3ts8u4dm2fu7ax3hlwywy3esads3dz2ykrwrwvcjrcqz5q3s6n0vcl` | `bc1qvm27h3dgyr0zr3htd0y8pqer7kvzzyeg60zn674dlxvvausg5vjqa0hjzp` |
 | `md verify` keyless | OK (exit 0) | OK (exit 0) |
 
 **Three changes are required, none cosmetic:**
@@ -65,29 +98,30 @@ keys. Measured, not typed:
 3. **The keys change, because the path's script type changes.** bg002h is
    `m/270028'/coin'/account'/script'` with **`0'` = tr and `1'` = wsh**
    (`ms-cli/src/cmd/derive.rs:149`). So the wsh form derives at
-   `m/270028'/0'/0'/1'` from the *same six seeds* — same masters, same
+   `m/270028'/0'/0'/1'` from the *same seven seeds* — same masters, same
    fingerprints, different account xpubs. `ms derive --template bg002h-wsh`.
 
 **`wsh-shared-tr-keys.policy`** is the variant that reuses the tr keys at
 `…/0'`. It is kept because it is the obvious thing to write and it *works* —
-`md verify` passes — so it needs to be here with a reason not to use it: it
-reuses one key across two script contexts, which is what the level-4 script
-field exists to prevent. Its policy-id is `b422a03491f457d36840e5b974a08855`.
-Note the **template-id is the same either way** (`daee67be…`) — that id is
-key-stable by design, so it will not distinguish these two.
+`md verify` passes at exit 0 — so it needs to be here with a reason not to use
+it: it reuses one key across two script contexts, which is what the level-4
+script field exists to prevent. Its policy-id is
+`e5546bae3aaf2f88dda91f362b4b7a8d` and its first receive is
+`bc1qyx7xwkk47aqdmvwqtxyf6acl489llsl5pdxlspx9f3y7cau59yjqca0eg8`. Note the
+**template-id is the same either way** (`6c635eac…`) — that id is key-stable by
+design, so it will not distinguish these two.
 
 That second point has a consequence worth stating: in `tr` a spend reveals only
 the leaf used, while in `wsh` **every spend reveals all four tiers**, including
 the other two hashlocks' digests and both deadlines.
 
-## Both need `--experimental`
+### Which form is "bigger" depends on what you are storing
 
-Tier 4 needs no key, so `rust-miniscript`'s `sanity_check()` refuses both forms
-by default — `requires_sig` is a safety policy, not a language rule. `md encode
---experimental` relaxes **only** that rule; malleability, resource limits,
-repeated keys and timelock mixing are still enforced, and it warns on every use.
-The warning is the important part here: **whoever learns H3's preimage can spend
-tier 4 alone, so if that preimage is engraved, the plate is bearer access.**
+Measured on the pathological sibling (`design/measurements/`), and the inversion
+holds here too: the `tr` **PSBT** is larger than the `wsh` one, because it
+carries the whole taptree as metadata; the `tr` **signed transaction** is
+smaller, because a spend reveals one leaf and a control block instead of the
+entire `or_i` script.
 
 ## The tr form has no key-path spend
 
@@ -100,19 +134,56 @@ stronger claim should diff it against the BIP directly.
 
 ## Keys, and the seating trap
 
-Six keys, one seed each, all at `m/270028'/0'/0'/0'` — the bg002h path
-(`m/270028'/coin'/account'/script'`, `0'` = tr). Seeds and xpubs live in
-`../../journeys/inputs-hashvault/`.
+Seven keys, one seed each (entropy `0x…01` through `0x…07`), all at one shared
+path — `m/270028'/0'/0'/0'` for tr, `…/1'` for wsh.
 
-**All six share one origin, so a keyless template that declares no fingerprints
-is unseatable** — every card matches every slot and the device refuses
-(`errSeatSlotContested`). Pass one `--fingerprint @i=HEX` per slot; it costs one
-extra chunk and changes nothing else. See **F-227**, and
+**All seven share one origin, so a keyless template that declares no
+fingerprints is unseatable** — every card matches every slot and the device
+refuses (`errSeatSlotContested`). Pass one `--fingerprint @i=HEX` per slot; it
+costs one extra chunk and changes nothing else. See **F-227**, and
 `SeedHammer-II-hashlock-vault-journey.pdf` for the three-arm device proof.
+
+Seeds live in `../../journeys/inputs-rcw/seeds/`. The journey's committed xpubs
+are at **accounts 8 (tr) and 9 (wsh)** — see `derive-rcw-keys.sh`, which is the
+only thing that writes them. The **account-0** xpubs this file's table uses are
+derivable from the same seeds with `ms derive --account 0`; keys `@0`–`@5` are
+byte-identical to `../../journeys/inputs-hashvault/keys/`, and `@6` is new:
+
+| | fingerprint | account-0 xpub |
+| --- | --- | --- |
+| `@6` tr | `26bd1e33` | `xpub6FFLRoki7AXPyHrBCHVkdrukPsmaKPCLuG78mAfw5He6XMQa6DFX818PF5op3psGenAyUdL6V6RxbAv8Kj5fJaPM68uJvzPCk6df5YW3VY7` |
+| `@6` wsh | `26bd1e33` | `xpub6FFLRoki7AXPzGPhhsdcQuGpVURQD6oZEEH5CN8k1s7WbQywoANgXzksvXxKUb82sMEdBTr4Nm7TFLyegt18W3VFJVXhF2SGTdPZ7BweUhA` |
+
+## Divergence from the hashlock-vault journey — NOT yet reconciled
+
+The `tr` form used to be byte-identical to
+`../../journeys/inputs-hashvault/wallet-policy-hashvault.txt`. **It no longer
+is.** That journey's wallet still has the keyless tier 4 and only six keys, so
+its transcript, PDF and committed artifacts describe a different wallet from
+this fixture. Reconciling it is a separate piece of work: either key its tier 4
+too and re-run the journey, or state plainly that the hashlock-vault journey
+pins the historical keyless shape on purpose.
 
 ## Provenance
 
-Every number above was produced by running `md`, not copied from a doc. The tr
-form is the hashlock-vault journey's wallet
-(`design/journeys/inputs-hashvault/wallet-policy-hashvault.txt`, byte-identical);
-the wsh form was derived here and both `md verify` round-trip clean at exit 0.
+Every number above was produced by running `md 0.13.0` and `ms`, not copied from
+a doc. The chunk counts come from `md encode --force-chunked --json`; the ids
+from `md inspect`; the addresses from `md address --template … --key …`; the
+verify results from `md verify`, whose exit status is quoted. The policies
+themselves are the input to `../../journeys/derive-rcw-keys.sh`, which
+substitutes the account path and asserts it found **seven** slots before writing.
+
+## Changes of 2026-08-22, in one place
+
+Two operator rulings landed together, and between them they moved every id and
+address in this file:
+
+1. **Tier 4 is keyed** — *"keyless path is not reasonable."* Added `@6`, a
+   seventh seed.
+2. **The hashlocks are double-hashed** — the preimage fix in the banner, which
+   made tiers 1, 2 and 4 spendable for the first time.
+
+Both are in `../../journeys/derive-rcw-keys.sh`, which asserts seven slots and
+refuses to write a preimage that is not 32 bytes or whose double-hash is not a
+literal in `tr.policy`. Still open: reconciling the hashlock-vault journey,
+above.
