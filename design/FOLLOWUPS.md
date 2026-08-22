@@ -9127,11 +9127,29 @@ script's two-block source-replacement config cannot redirect a `git+` source,
 and it **fails closed on purpose** — the guard is correct and is telling the
 truth.
 
-**Why it is quiet.** The workflow is path-filtered to `Cargo.lock`, `vendor/**`
-and the script itself, and nothing has touched those since the pin, so it has
-not run. `gh run list --branch main` shows no vendor-freshness runs at all. That
-is the shape this constellation has been bitten by before: a gate that cannot
-pass AND does not fire looks exactly like a gate that passes.
+**Why it is quiet.** ~~The workflow is path-filtered ... so it has not run.
+`gh run list --branch main` shows no vendor-freshness runs at all.~~
+
+**THAT WAS WRONG, and the correction changes what this entry is about.**
+Queried properly with `gh run list --workflow vendor-freshness.yml`, the gate
+**did** run — on the pin commit itself:
+
+```
+2026-08-22  fc7548ce  success     <- the fix
+2026-08-20  5b4d20ad  failure     <- the pin; it fired and reported
+2026-07-11  5a0a4f41  success
+```
+
+It fired, it failed, and the failure **sat unacted-on for two days**. The
+original claim came from `gh run list --branch main --limit 6`, which truncates
+across ALL workflows — the vendor run was older than those six, and absence
+from a truncated list was read as never-having-run. Fifth wrong claim of this
+cycle, same root cause every time: measuring a rendering instead of querying
+the thing. The right query names the workflow.
+
+So the lesson is NOT "a gate that cannot fire is invisible". It is worse and
+more ordinary: **a red gate nobody is watching costs exactly as much as one
+that cannot run.** The signal existed, was correct, and was ignored.
 
 **Not currently blocking.** It is not one of `main`'s required contexts
 (`cargo test (ubuntu-latest)`, `cargo clippy`), so nothing is bypassed today.
