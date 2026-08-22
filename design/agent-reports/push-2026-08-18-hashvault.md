@@ -608,3 +608,76 @@ round (the coordinator was working in it directly), and this report was
 written to `/tmp/claude-1000/push-advisory-retry.md` instead of the in-repo
 `design/agent-reports/push-2026-08-18-hashvault.md`, for the coordinator to
 commit into the repo themselves.
+
+## the journey-fix round
+
+Ritual run for mnemonic-engrave only, four commits ahead of the `9f2d71a`
+tip pushed in the previous round: `93e2f6d` ("journeys: both pathological
+wallets engraved an unseatable backup — fixed"), `f4d8756` ("reports: the
+advisory round, including the gate I skipped"), `2d1abba` ("followups:
+F-227 item 2 DONE — and it was not latent"), `75434a3` ("reports: the
+descriptor-mnemonic retry — 9 of 9 with fmt green").
+
+**Sequencing note, as invited by the brief**: ran the full ritual first
+(push → CI → push to master → cleanup) and wrote this append *after* it
+completed, not before. Reasoning: this agent only pushes, never commits —
+the ritual's `git push origin master` step ships whatever is already
+*committed* at the tip SHA, not the working tree, so writing this section
+before vs. after the push makes no difference to what actually ships in
+this round's push either way. Writing it after keeps the tree clean
+throughout the ritual steps themselves (avoiding the now-familiar "same
+report file shows modified" note from prior rounds), and matches the
+established pattern where the coordinator commits this agent's report
+append in a following commit (as with `e3f078c` and `75434a3` already
+in this file's own history).
+
+- Branch: `master`. `git status --porcelain`: clean, as the coordinator
+  said (confirmed before any push action).
+- Tip SHA pushed: `75434a3ec58e49753269fcc42ae93b1c1d9b92b2` (40 chars
+  confirmed via `wc -c`).
+- **What actually changed in this round, checked before writing anything
+  below**: `git diff --stat 9f2d71a..75434a3` touches exactly nine files —
+  `design/FOLLOWUPS.md`, `design/agent-reports/push-2026-08-18-hashvault.md`
+  (this report, folded in by the coordinator across `f4d8756`/`75434a3`),
+  two PDFs (`SeedHammer-II-pathological-wallet-journey.pdf`,
+  `SeedHammer-II-tr-pathological-journey.pdf`, both binary), one tracked
+  input file (`inputs-pathological/backup-strings-tr.txt`), and two pairs of
+  journey shell-script + regenerated transcript
+  (`transcript_pathological.sh`/`.txt`,
+  `transcript_tr_pathological.sh`/`.txt`). **No `.rs` or `.go` file appears
+  anywhere in that diff.** Matches the coordinator's description exactly:
+  two journey shell scripts, two regenerated transcripts, one tracked input
+  file, two PDFs, `FOLLOWUPS.md`, and the report — no Rust or Go source.
+  Consequently, **a green `test (rust + go)` for this SHA confirms no
+  regression rather than validating new source** — same caveat as prior
+  docs/journey-only rounds, stated the same way.
+- `git push origin master:refs/heads/ci/staging --force` → `* [new branch]
+  master -> ci/staging` (the ref had been deleted at the end of the
+  previous round). Verified via fresh `git fetch origin` that `git
+  rev-parse master` == `git rev-parse origin/ci/staging` ==
+  `75434a3ec58e49753269fcc42ae93b1c1d9b92b2`.
+- Workflow that ran for this SHA — `release`, `databaseId 32556164931`,
+  `event: push`, `headSha` confirmed matching. Watched actively via `gh run
+  watch` with an explicit 600000ms timeout, which blocked until the run
+  finished. Overall `conclusion: success`. Per-job conclusions, queried via
+  `gh run view --json headSha,status,conclusion,jobs`:
+  - `test (rust + go)` → **success** (required context; see caveat above on
+    what this SHA actually changed)
+  - `build me (linux-x86_64)` → success
+  - `build me (linux-aarch64)` → success
+  - `build me-preview (all targets)` → success
+  - `build me (macos-aarch64)` → success
+  - `build me (macos-x86_64)` → success
+  - `build me (windows-x86_64)` → success
+  - `assemble + sign + release` → `skipped` — expected (tag-gated, not a
+    failure), consistent with every prior round.
+- Final `git push origin master` output:
+  ```
+  To github.com:bg002h/mnemonic-engrave.git
+     9f2d71a..75434a3  master -> master
+  ```
+  No "Bypassed rule violations" text present.
+- `ci/staging` ref deleted afterward; confirmed `origin/master` ==
+  `75434a3ec58e49753269fcc42ae93b1c1d9b92b2` after a fresh fetch.
+
+**VERDICT: PUSHED.**
