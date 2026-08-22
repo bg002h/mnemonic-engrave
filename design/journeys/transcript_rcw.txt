@@ -1,4 +1,4 @@
-# transcript-generator-sha256: 4de2b4c237861e340298ad7bc8655122bebae76502d9ee4cfa623120d2819ac9
+# transcript-generator-sha256: 419de8b65cc6241f3bb625415b68f45ba20db9c147eee3625fb6d5ac609137b4
 
 === 0. Versions ===
 
@@ -527,7 +527,7 @@ me: wrote 4096 bytes to /scratch/code/shibboleth/mnemonic-engrave/design/journey
 
 passphrase — write this down and store it APART from the machine:
 
-    exhibit gallery crisp illegal inspire jewel winner ethics pluck blast mask vivid
+    tent liberty sphere speak armor express clay torch crater early valid true
 
 load:  picotool load --verify /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/rcw/tr/sealed.uf2   (machine in BOOTSEL)
 wipe:  picotool erase -r 0x10E00000 0x10E10000
@@ -542,7 +542,7 @@ me: wrote 4096 bytes to /scratch/code/shibboleth/mnemonic-engrave/design/journey
 
 passphrase — write this down and store it APART from the machine:
 
-    hour speak abandon curtain round grass achieve latin result urban quick half
+    six noise medal quantum state citizen sound canyon monitor regular tank speed
 
 load:  picotool load --verify /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/rcw/wsh/sealed.uf2   (machine in BOOTSEL)
 wipe:  picotool erase -r 0x10E00000 0x10E10000
@@ -551,15 +551,65 @@ runcap: CAPTURE FAILED -- no stdout line matched /./
 
    sealed UF2: 4096 bytes
 
+=== 14. Wallet files: what this wallet can and cannot export ===
+
+`mnemonic export-wallet` (mnemonic-toolkit, shipped since v0.97.0) emits 11
+formats. Run against BOTH concrete descriptors, every format, nothing hidden:
+
+  wrap  format         result       detail
+  tr    descriptor     refused(2)  error: export-wallet --descriptor: All spend paths must re
+  tr    bsms           refused(2)  error: export-wallet --descriptor: All spend paths must re
+  tr    bip388         refused(2)  error: export-wallet --descriptor: All spend paths must re
+  tr    bitcoin-core   refused(2)  error: export-wallet --descriptor: All spend paths must re
+  tr    sparrow        refused(2)  error: export-wallet --descriptor: All spend paths must re
+  tr    electrum       refused(2)  error: export-wallet --descriptor: All spend paths must re
+  tr    specter        refused(2)  error: export-wallet --descriptor: All spend paths must re
+  tr    jade           refused(2)  error: export-wallet --descriptor: All spend paths must re
+  tr    coldcard       refused(2)  error: export-wallet --descriptor: All spend paths must re
+  wsh   descriptor     EMITTED      1243 bytes
+  wsh   bsms           EMITTED      1325 bytes
+  wsh   bip388         EMITTED      1350 bytes
+  wsh   bitcoin-core   EMITTED      2694 bytes
+  wsh   sparrow        refused(1)  error: --format sparrow requires --template; descriptor pa
+  wsh   electrum       refused(2)  error: --format electrum cannot faithfully export an UNSOR
+  wsh   specter        refused(2)  Re-invoke with all missing fields supplied.
+  wsh   jade           refused(2)  error: --format jade cannot faithfully export an UNSORTED 
+  wsh   coldcard       refused(2)  error: --format coldcard cannot faithfully export an UNSOR
+
+4 of 18 (wrapper x format) combinations emitted a file.
+
+THE TAPROOT FORM EMITS NOTHING, and every format fails at the SAME place --
+"All spend paths must require a signature", before format selection is even
+reached. That is rust-miniscript's sanity_check() refusing tier 4, which needs
+no key. `md encode` has --experimental for exactly this; export-wallet has no
+equivalent (filed as G1 in design/PLAN_wallet_file_export.md).
+
+AND IT WOULD NOT HELP THE OPERATOR IF IT DID. Measured against a real Bitcoin
+Core 25 node: Core refuses the keyless tier 4 too, and accepts the identical
+script once tier 4 has a key. Nunchuk refuses through the same check
+(libnunchuk's IsSane/NeedsSignature). Sparrow refuses for a different reason --
+it has no miniscript engine at all. Relaxing OUR gate would emit a file no
+target will import.
+
+=== 15. Three implementations, one address ===
+
+  BSMS canary (mnemonic-toolkit emitter) : bc1qr6h5gahcaqa8a35p3ts0d2w6qvhmsn7dhunu5xd9kyculcgz3dwqf266zj
+  md address  (descriptor-mnemonic)      : bc1qr6h5gahcaqa8a35p3ts0d2w6qvhmsn7dhunu5xd9kyculcgz3dwqf266zj
+  SeedHammer II (Go, over NFC, seated)   : bc1qr6h5gahcaqa8a35p3ts0d2w6qvhmsn7dhunu5xd9kyculcgz3dwqf266zj
+
+ALL THREE AGREE — three implementations, two languages, one air gap.
+
 === Artifacts ===
 $ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/rcw
-total 8
-drwxr-xr-x 1 bcg bcg   70 Aug 22 03:39 .
-drwxr-xr-x 1 bcg bcg  734 Aug 22 03:32 ..
--rw-r--r-- 1 bcg bcg 3887 Aug 22 03:39 payload.bin
--rw-r--r-- 1 bcg bcg 3836 Aug 22 03:39 payload-strings.txt
-drwxr-xr-x 1 bcg bcg  300 Aug 22 03:39 tr
-drwxr-xr-x 1 bcg bcg  300 Aug 22 03:39 wsh
+total 104
+drwxr-xr-x 1 bcg bcg   116 Aug 22 03:58 .
+drwxr-xr-x 1 bcg bcg   734 Aug 22 03:32 ..
+drwxr-xr-x 1 bcg bcg   160 Aug 22 03:58 exports
+-rw-r--r-- 1 bcg bcg  3887 Aug 22 03:58 payload.bin
+-rw-r--r-- 1 bcg bcg  3836 Aug 22 03:58 payload-strings.txt
+-rw-r--r-- 1 bcg bcg 97155 Aug 22 03:42 rcw-journey.html
+drwxr-xr-x 1 bcg bcg   300 Aug 22 03:58 tr
+drwxr-xr-x 1 bcg bcg   300 Aug 22 03:58 wsh
 [exit 0]
 
 All gates green.

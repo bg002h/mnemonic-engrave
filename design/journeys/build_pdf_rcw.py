@@ -372,6 +372,68 @@ gets rewritten — rather than quietly becoming false.</div>
 </section>
 
 <section class="page">
+<h1>Wallet files: what this wallet can and cannot export</h1>
+{code(section(tx, "14. Wallet files"), 26, must_show="combinations emitted")}
+
+<div class="warn"><b>The taproot form emits nothing at all</b>, and every format
+fails at the same place — before format selection is even reached. That is
+<code>rust-miniscript</code>'s <code>sanity_check()</code> refusing tier 4,
+which needs no key.</div>
+</section>
+
+<section class="page">
+<h1>Why no wallet app will take it — one reason, three apps</h1>
+
+<p>Measured, not assumed. Against a real Bitcoin Core node, isolating one
+feature at a time:</p>
+
+<table>
+<tr><th>probe</th><th>Core</th></tr>
+<tr><td><code>wsh(and_v(v:sha256(H1),pk(K)))</code> — hashlock AND a key</td><td>accepts</td></tr>
+<tr><td><code>wsh(and_v(v:sha256(H1),multi(3,…)))</code> — our tier 1</td><td>accepts</td></tr>
+<tr><td><code>wsh(and_v(v:after(…),sha256(H3)))</code> — <b>tier 4 as-is</b></td><td><b>refuses</b></td></tr>
+<tr><td>the same, <b>with a key added to tier 4</b></td><td><b>accepts</b></td></tr>
+<tr><td><code>wsh(or_i(keyed, KEYLESS))</code></td><td><b>refuses</b></td></tr>
+<tr><td><code>wsh(or_i(keyed, keyed))</code></td><td>accepts</td></tr>
+</table>
+
+<p><b>Not the hashlocks. Not the mixed timelock flavours. Not
+<code>multi_a</code>, <code>or_i</code>, or the NUMS key.</b> The single sigless
+spend path, and nothing else.</p>
+
+<p>All three named apps refuse for that reason. Nunchuk reaches it through
+libnunchuk's <code>IsSane()</code>/<code>NeedsSignature()</code> — the same
+vendored Core checker. Sparrow refuses by a different mechanism: it has no
+miniscript engine at all.</p>
+
+<div class="warn"><b>In Core the rule is non-waivable.</b> No version through
+v31.1 loads this wallet, either wrapper, watch or hot. Relaxing our own gate
+would produce a file no target accepts.</div>
+
+<div class="note">Version floors, pinned on six real binaries: <code>wsh</code>
+miniscript watch v24 / sign v25, <code>tr</code> miniscript v26, and multipath
+<code>&lt;0;1&gt;</code> only v29+ — absent even from v28, and undocumented in
+the release notes that introduced it. The one Core-loadable watch artifact for
+this wallet is an <code>addr()</code> list: you can watch it, you cannot
+describe it.</div>
+</section>
+
+<section class="page">
+<h1>Three implementations, one address</h1>
+
+<p>The BSMS record's fourth line is BIP-129's canary — the wallet's first
+address, computed by the <em>emitter</em>. Set against <code>md</code>'s own
+derivation, and against what SeedHammer II showed after seating six key cards
+onto the keyless template over NFC:</p>
+
+{code(section(tx, "15. Three implementations"), None, must_show="ALL THREE AGREE")}
+
+<div class="warn">Three implementations, two languages, one air gap, and a
+BIP-129 record produced by a fourth code path — all naming the same address.
+The transcript fails if they ever stop.</div>
+</section>
+
+<section class="page">
 <h1>What this journey does NOT show</h1>
 
 <ul>
@@ -380,11 +442,14 @@ firmware compiled to wasm, driven over the same NFC entry point, but not a
 machine with a screen and a hammer.</li>
 <li><b>Nothing was engraved.</b> The plates are rendered previews. No steel was
 cut, and the payloads were built but not flashed to a device.</li>
-<li><b>No wallet-file export.</b> Nunchuk, Sparrow and Bitcoin Core outputs are
-a separate piece of work; at the time of writing no export surface exists
-anywhere in the constellation. The Sparrow answer is already known to be
-<b>no</b>, and worse than no — see
-<code>design/agent-reports/PLAN_export_sparrow.md</code>.</li>
+<li><b>No wallet app actually loaded these files.</b> The four wsh artifacts
+were emitted and their BSMS canary cross-checked, but no Nunchuk, Sparrow or
+Core instance was driven to import one — and per the reports, none of them
+would. The Core refusals were measured directly; the Nunchuk and Sparrow
+verdicts rest on source reading plus Core execution, not on a live import.</li>
+<li><b>No hot wallet.</b> Every artifact here is watch-only. Hot export exists
+nowhere in the constellation and is deliberately gated on an explicit
+go-ahead — it writes spendable key material to disk.</li>
 <li><b>No spend.</b> Every address here is derived, none is funded, and no tier
 has been exercised against a real chain. The timelocks in particular are
 arithmetic in this document and consensus rules everywhere else.</li>

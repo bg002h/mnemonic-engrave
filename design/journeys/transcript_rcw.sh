@@ -318,6 +318,73 @@ for w in tr wsh; do
   echo
 done
 
+echo "=== 14. Wallet files: what this wallet can and cannot export ==="
+echo
+cat <<'TXT'
+`mnemonic export-wallet` (mnemonic-toolkit, shipped since v0.97.0) emits 11
+formats. Run against BOTH concrete descriptors, every format, nothing hidden:
+TXT
+echo
+TK=/scratch/code/shibboleth/mnemonic-toolkit/target/debug/mnemonic
+EXP="$OUT/exports"; rm -rf "$EXP"; mkdir -p "$EXP"
+printf '  %-5s %-14s %-12s %s\n' wrap format result detail
+NEMIT=0
+for w in tr wsh; do
+  D=$(cat "$OUT/$w/descriptor.txt")
+  for f in descriptor bsms bip388 bitcoin-core sparrow electrum specter jade coldcard; do
+    if "$TK" export-wallet --descriptor "$D" --format "$f" > "$EXP/rcw-$w.$f.txt" 2>"$EXP/e"; then
+      printf '  %-5s %-14s %-12s %s bytes\n' "$w" "$f" EMITTED "$(wc -c < "$EXP/rcw-$w.$f.txt")"
+      NEMIT=$((NEMIT+1))
+    else
+      rc=$?; rm -f "$EXP/rcw-$w.$f.txt"
+      printf '  %-5s %-14s refused(%d)  %s\n' "$w" "$f" "$rc" "$(tail -1 "$EXP/e" | cut -c1-58)"
+    fi
+  done
+done
+rm -f "$EXP/e"
+echo
+echo "$NEMIT of 18 (wrapper x format) combinations emitted a file."
+echo
+cat <<'TXT'
+THE TAPROOT FORM EMITS NOTHING, and every format fails at the SAME place --
+"All spend paths must require a signature", before format selection is even
+reached. That is rust-miniscript's sanity_check() refusing tier 4, which needs
+no key. `md encode` has --experimental for exactly this; export-wallet has no
+equivalent (filed as G1 in design/PLAN_wallet_file_export.md).
+
+AND IT WOULD NOT HELP THE OPERATOR IF IT DID. Measured against a real Bitcoin
+Core 25 node: Core refuses the keyless tier 4 too, and accepts the identical
+script once tier 4 has a key. Nunchuk refuses through the same check
+(libnunchuk's IsSane/NeedsSignature). Sparrow refuses for a different reason --
+it has no miniscript engine at all. Relaxing OUR gate would emit a file no
+target will import.
+TXT
+echo
+
+echo "=== 15. Three implementations, one address ==="
+echo
+# The BSMS record's 4th line is BIP-129's canary: the wallet's first address, as
+# computed by the EMITTER. Compare it against md's own derivation and against
+# what SeedHammer II showed when it seated six key cards onto the template.
+BSMS_ADDR=$(sed -n '4p' "$EXP/rcw-wsh.bsms.txt" 2>/dev/null)
+HOST_ADDR=$(head -1 "$OUT/wsh/receive.txt")
+DEV_JSON="$W/shots/rcw-wsh-seating-result.json"
+if [ -f "$DEV_JSON" ]; then
+  DEV_ADDR=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['matched']['addresses'][0])" "$DEV_JSON")
+else
+  DEV_ADDR="(no device walk captured — run capture_rcw.py --wrapper wsh --route seating)"
+fi
+echo "  BSMS canary (mnemonic-toolkit emitter) : $BSMS_ADDR"
+echo "  md address  (descriptor-mnemonic)      : $HOST_ADDR"
+echo "  SeedHammer II (Go, over NFC, seated)   : $DEV_ADDR"
+echo
+if [ -n "$BSMS_ADDR" ] && [ "$BSMS_ADDR" = "$HOST_ADDR" ] && [ "$HOST_ADDR" = "$DEV_ADDR" ]; then
+  echo "ALL THREE AGREE — three implementations, two languages, one air gap."
+else
+  fatal "the BSMS canary, md and the device do not agree on the first address"
+fi
+echo
+
 echo "=== Artifacts ==="
 run ls -la "$OUT"
 
