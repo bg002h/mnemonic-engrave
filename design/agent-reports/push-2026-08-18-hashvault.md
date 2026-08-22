@@ -192,3 +192,132 @@ ritual for mnemonic-secret only.
   `7c12f669b096468f2ff71cc1403186ffa3f37151` after a fresh fetch.
 
 **VERDICT: PUSHED.**
+
+## mnemonic-engrave — device walk round
+
+Follow-up ritual run for mnemonic-engrave only, two commits ahead of the
+`93a7629` tip pushed in the first round of this file: `5778038` ("reports:
+the three-repo push record, and one repo that had to wait") and `5d90e35`
+("journeys: the hashvault device walk -- the device refuses to guess the
+slots").
+
+- Branch: `master`. `git status --porcelain`: clean (confirmed before any
+  push action).
+- Tip SHA pushed: `5d90e35a71568f5fa1ab46ef8e6bd8f6c211d5d5` (40 chars
+  confirmed via `wc -c`).
+- **What actually changed in this round, checked before writing anything
+  below**: `git diff --stat 93a7629..5d90e35` touches exactly five files —
+  `design/agent-reports/push-2026-08-18-hashvault.md` (this report, from the
+  prior round), `.../SeedHammer-II-hashlock-vault-journey.pdf` (binary),
+  `design/journeys/build_pdf_hashvault.py`, `design/journeys/
+  capture_hashvault.py`, `design/journeys/capture_seating.py`. **No `.rs` or
+  `.go` file appears anywhere in that diff.** This round's commits are
+  documentation and journey-driver changes only (Python + a PDF) — no Rust
+  or Go source touched. Consequently, **a green `test (rust + go)` for this
+  SHA is expected to be unchanged in substance from the previous round's
+  green result, not fresh evidence of anything new** — it confirms the build
+  still works after a doc/tooling-only change, not that new code was
+  validated. Recording it below because the ritual requires checking it
+  per-SHA regardless, not because it says anything new.
+- `git push origin master:refs/heads/ci/staging --force` → `* [new branch]
+  master -> ci/staging` (the ref had been deleted at the end of the previous
+  round). Verified via fresh `git fetch origin` that `git rev-parse master`
+  == `git rev-parse origin/ci/staging` ==
+  `5d90e35a71568f5fa1ab46ef8e6bd8f6c211d5d5`.
+- Workflow that ran for this SHA — `release`, `databaseId 32554140488`,
+  `event: push`, `headSha` confirmed matching. Initially watched via a
+  backgrounded `gh run watch`; per the coordinator's correction that no
+  background notification would reach this turn, re-ran `gh run watch
+  32554140488 --repo bg002h/mnemonic-engrave` in the foreground, which
+  reported the run had already completed with `success`. Overall
+  `conclusion: success`. Per-job conclusions, queried directly via `gh run
+  view --json headSha,status,conclusion,jobs` (not eyeballed from a run
+  list):
+  - `test (rust + go)` → **success** (required context; see caveat above on
+    what this SHA actually changed)
+  - `build me-preview (all targets)` → success
+  - `build me (linux-aarch64)` → success
+  - `build me (macos-x86_64)` → success
+  - `build me (linux-x86_64)` → success
+  - `build me (macos-aarch64)` → success
+  - `build me (windows-x86_64)` → success
+  - `assemble + sign + release` → `skipped` — expected (tag-gated, not a
+    failure), matching the coordinator's brief and consistent with the same
+    job's behavior in the first round of this file.
+- Final `git push origin master` output:
+  ```
+  To github.com:bg002h/mnemonic-engrave.git
+     93a7629..5d90e35  master -> master
+  ```
+  No "Bypassed rule violations" text present.
+- `ci/staging` ref deleted afterward; confirmed `origin/master` ==
+  `5d90e35a71568f5fa1ab46ef8e6bd8f6c211d5d5` after a fresh fetch.
+
+**VERDICT: PUSHED.**
+
+## mnemonic-engrave — the fix round
+
+Follow-up ritual run for mnemonic-engrave only, one commit ahead of the
+`5d90e35` tip pushed in the previous round: `1126277` ("journeys: the
+hashvault gap costs ONE chunk to close -- measured, and it is a class").
+
+- Branch: `master`. `git status --porcelain` at the start of this round
+  showed **one modified file**: `design/agent-reports/push-2026-08-18-
+  hashvault.md` — this report itself, carrying this agent's own uncommitted
+  append from the previous round ("## mnemonic-engrave — device walk
+  round", 62 lines, all report prose, no other tracked file touched). This
+  is not the same class of dirty-tree condition that stopped the
+  mnemonic-secret round: it is this agent's own in-progress report, it does
+  not affect the committed history at `HEAD` (`1126277...`), and the ritual
+  pushes that committed history, not working-tree state. Noting it here
+  rather than silently calling the tree "clean," since the coordinator's
+  brief asserted it was clean and the literal `git status --porcelain`
+  output was not empty.
+- Tip SHA pushed: `1126277363968aea77ac2716630bad1c9c07d095` (40 chars
+  confirmed via `wc -c`).
+- **What actually changed in this round, checked before writing anything
+  below**: `git diff --stat 5d90e35..1126277` touches exactly six files —
+  `design/FOLLOWUPS.md`, `.../SeedHammer-II-hashlock-vault-journey.pdf`
+  (binary), `design/journeys/build_pdf_hashvault.py`,
+  `design/journeys/capture_hashvault.py`,
+  `design/journeys/transcript_hashvault.sh`,
+  `design/journeys/transcript_hashvault.txt`. **No `.rs` or `.go` file
+  appears anywhere in that diff.** This commit touches only journey
+  scripts, a transcript, a PDF, and `FOLLOWUPS.md` — no Rust or Go source.
+  Consequently, **a green `test (rust + go)` for this SHA confirms nothing
+  regressed, rather than validating new source** — same caveat as the
+  previous round, stated the same way.
+- `git push origin master:refs/heads/ci/staging --force` → `* [new branch]
+  master -> ci/staging` (the ref had been deleted at the end of the
+  previous round). Verified via fresh `git fetch origin` that `git
+  rev-parse master` == `git rev-parse origin/ci/staging` ==
+  `1126277363968aea77ac2716630bad1c9c07d095`.
+- Workflow that ran for this SHA — `release`, `databaseId 32554545344`,
+  `event: push`, `headSha` confirmed matching. Waited **actively** this
+  round: the first `gh run watch` invocation exceeded the tool's 120s
+  default timeout and was auto-moved to background; re-issued the same
+  command in the foreground with an explicit 600000ms timeout, which
+  blocked until the run finished (per the coordinator's correction after
+  the previous round ended a turn mid-CI-wait). Overall `conclusion:
+  success`. Per-job conclusions, queried directly via `gh run view --json
+  headSha,status,conclusion,jobs`:
+  - `test (rust + go)` → **success** (required context; see caveat above on
+    what this SHA actually changed)
+  - `build me-preview (all targets)` → success
+  - `build me (windows-x86_64)` → success
+  - `build me (linux-aarch64)` → success
+  - `build me (macos-x86_64)` → success
+  - `build me (linux-x86_64)` → success
+  - `build me (macos-aarch64)` → success
+  - `assemble + sign + release` → `skipped` — expected (tag-gated, not a
+    failure), consistent with prior rounds.
+- Final `git push origin master` output:
+  ```
+  To github.com:bg002h/mnemonic-engrave.git
+     5d90e35..1126277  master -> master
+  ```
+  No "Bypassed rule violations" text present.
+- `ci/staging` ref deleted afterward; confirmed `origin/master` ==
+  `1126277363968aea77ac2716630bad1c9c07d095` after a fresh fetch.
+
+**VERDICT: PUSHED.**
