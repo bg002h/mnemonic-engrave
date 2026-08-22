@@ -8893,8 +8893,12 @@ message polish left open.**
   policies in a different `--from-md1` order returned exit 4. Filed Minor;
   in effect Important, because a verification tool that calls a good card bad
   invites re-engraving a good plate. Now a multiset compare.
-- The phantom `SPEC §3.5.4` cite was **one of eight** (§3.5.2, .3, .4, .5,
-  .6 ×2, .7 ×2, and §1.1). §3.5 is "Origin path encoding" and has no
+- The phantom `SPEC §3.5.4` cite was **one of nine** (§3.5.2, .3, .4, .5,
+  .6 ×2, .7 ×2, and §1.1 — `error.rs:3` carried two on one line). Written as
+  "eight" on first filing while the enumeration beside it listed nine;
+  machine-counted and corrected 2026-08-21. Fourth wrong count in this cycle,
+  and the third produced while correcting the second — every one of them from
+  counting a rendering instead of the thing. §3.5 is "Origin path encoding" and has no
   subsections at all. A 2026-06-10 audit had already found four of this class
   and repointed them, leaving these — so fixing only the one a reviewer noticed
   would have repeated that exactly. `tests/spec_cites_resolve.rs` now makes the
