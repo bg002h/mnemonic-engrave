@@ -9060,9 +9060,57 @@ small and makes it independently gateable.
 Related: F-136 (auto-chunking, closed 2026-08-21) is the *encoder* half of the
 same operator confusion; this is the *engraving* half and the expensive one.
 
-### F-226 — `descriptor-mnemonic`'s vendor-freshness gate cannot pass, and is path-filtered so it never says so (owning phase: **CI hygiene**) `#mnemonic` `#ci`
+### F-226 — ~~`descriptor-mnemonic`'s vendor-freshness gate cannot pass, and is path-filtered so it never says so~~ **CLOSED 2026-08-21** `#mnemonic` `#ci`
 
 Filed 2026-08-21, found incidentally while gating the F-136 fix.
+
+#### RESOLVED 2026-08-21 — `descriptor-mnemonic` `d22aedd` (gate) + the re-vendor that followed
+
+**It was masking a live defect, which is the part that matters.** Making the
+gate runnable turned it red immediately: `cargo vendor` was last run 2026-06-24
+(`e8474f48`), miniscript was pinned to the git fork 2026-08-20 (`5b4d20ad`),
+and it was never re-run — so the committed tree held the **crates.io**
+miniscript 13.0.0 while `Cargo.lock` demanded the fork. Proven rather than
+inferred:
+
+```
+vendor/miniscript/.cargo-checksum.json   "package": "867b1f11e0545ad5…"
+    -> a crates.io sha; a git-vendored crate has "package": null
+git log -1 -- vendor/miniscript          e8474f48  (2026-06-24)
+git log -1 -- Cargo.lock                 5b4d20ad  (2026-08-20)   ANCESTOR check: vendor predates the pin
+diff vendor/miniscript/src/lib.rs <fork checkout>/src/lib.rs  -> DIFFERS
+```
+
+So the `--offline --locked` reproducible build — the entire reason a vendor
+tree is committed — would have resolved the WRONG miniscript. That is the
+toolkit v0.74.0 release-CI failure class, live here since 2026-08-20 and
+invisible because the gate could not run.
+
+**The fix, in two commits.** The script moved to the three-block source config
+its own error message prescribed (crates-io + the miniscript git fork +
+vendored-sources), with the rev derived from `Cargo.lock` so it auto-tracks the
+pin and fails closed on an empty match. Then `cargo vendor vendor/`, whose
+churn is confined to one crate.
+
+**The original guard was kept, generalized.** The three-block form covers
+exactly one fork, so a SECOND git dependency would still be unredirected — the
+same false GREEN one dep further along. Any git source not matching the
+configured rev now trips a loud error naming it. Both arms verified: an
+injected `git+https://example.com/fake` fails closed and prints the source;
+removing it returns green with `Cargo.lock` byte-exact.
+
+**Verified past what the gate checks.** The gate resolves metadata only; a
+release build was additionally compiled through the vendored tree under the
+reproducible build's own flags and reported `Compiling miniscript v13.0.0
+(https://github.com/rust-bitcoin/rust-miniscript?rev=ff4732e…)` — the fork's
+rev, from `vendor/`, offline. That is the claim the gate exists to make.
+
+**Two lessons, both already in the constellation's notes and both re-earned
+here:** a gate that cannot pass and does not fire is indistinguishable from one
+that passes; and the cheapest way to find out what a silent gate was hiding is
+to make it run.
+
+
 
 `ci/repro/vendor-freshness.sh` in `descriptor-mnemonic` fails immediately:
 
