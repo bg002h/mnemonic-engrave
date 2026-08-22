@@ -576,9 +576,49 @@ one of them alone would have been ambiguous.</div>
 </section>
 
 <section class="page">
+<h1>And the plates themselves cannot restore it</h1>
+
+<p>Everything up to here starts from the strings in <code>out/</code> — the
+generator's own output. An operator starts from a stack of plates. So the last
+step goes the other way: <code>restore_from_plates.py</code> decodes the QR out
+of each rendered plate image using <code>zbarimg</code> — an <b>independent</b>
+decoder, not the library that drew them — and rebuilds the wallet from what came
+off the images and nothing else.</p>
+
+{code(section(tx, "17. RESTORE FROM THE PLATES"), 30, must_show="NOT SEATABLE")}
+
+<div class="warn"><b>The template-id off the plates is RIGHT.</b> The QR, the
+rendering, the codec and the chunking are all fine — 22 of 23 images decoded
+byte-exact. What the plates cannot do is say which key is which, and the
+seatability check is what catches it.</div>
+
+<p>That is the finding stated one final way, and the most concrete one: not
+"this template is ambiguous" as a property of a data structure, but <em>these
+twenty-two pieces of metal do not add up to this wallet</em>.</p>
+
+<h2>The gate here is inverted, deliberately</h2>
+
+<p>This journey's plates carry the <b>bare</b> template on purpose — they are
+the set the gap pages are about. So the transcript requires the restore to
+<b>fail</b>, and goes red if these plates ever restore cleanly. If someone
+later fixes them without rewriting the narrative, that gate fires and says so.
+The sibling pathological journeys run the same driver expecting exit 0, with
+both of its controls.</p>
+
+<div class="note">The 23rd plate is an <code>ms1</code> entry with no rendered
+image, so it was not checked. Reported rather than skipped: a plate this driver
+did not look at is the difference between a partial result and a false clean
+one.</div>
+</section>
+
+<section class="page">
 <h1>What this journey does NOT show</h1>
 
 <ul>
+<li><b>Still not metal.</b> The plate restore above reads a rendered PNG. The
+path from that PNG to scratched steel to a phone camera — legibility, depth,
+glare, engraving artefacts — is not exercised anywhere in this document. What is
+proved is the software chain end to end.</li>
 <li><b>No REAL hardware.</b> The device walk is the emulator — the same Go
 firmware compiled to wasm, driven over the same NFC entry point, but not a
 machine with a screen and a hammer. Everything upstream of the display stack is

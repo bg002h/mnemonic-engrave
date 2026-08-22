@@ -298,6 +298,34 @@ if ! "$W/restore_test_tr_pathological.py" >/dev/null 2>&1; then
 fi
 echo
 
+echo "=== 12. RESTORE FROM THE PLATES ==="
+echo
+echo "Everything above starts from the strings in out/. An operator starts from"
+echo "a stack of plates. restore_from_plates.py goes the other way: it decodes"
+echo "the QR out of each rendered plate image with zbarimg -- an independent"
+echo "decoder, not the library that drew them -- and rebuilds the wallet from"
+echo "what came off the images and nothing else. Two layers: the QR matches the"
+echo "manifest string byte-for-byte, and the rebuilt template-id matches what"
+echo "this run derived by a separate route."
+echo
+run python3 "$W/restore_from_plates.py" tr-pathological
+if ! python3 "$W/restore_from_plates.py" tr-pathological >/dev/null 2>&1; then
+  fatal "the engraved plates do not rebuild this wallet"
+fi
+echo "AND THE GATE CAN FAIL. A match check nobody has broken is not evidence."
+echo "Two controls, exercising DIFFERENT layers -- the first is refused by the"
+echo "codex32 checksum at decode, the second is perfectly valid and simply the"
+echo "wrong wallet, which is the only one that reaches the id comparison:"
+echo
+run python3 "$W/restore_from_plates.py" tr-pathological --prove-it-can-fail
+run python3 "$W/restore_from_plates.py" tr-pathological --prove-layer2-can-fail hashvault
+for ctl in --prove-it-can-fail "--prove-layer2-can-fail hashvault"; do
+  if ! python3 "$W/restore_from_plates.py" tr-pathological $ctl >/dev/null 2>&1; then
+    fatal "control '$ctl' did not catch a wallet it should have rejected"
+  fi
+done
+echo
+
 echo "=== Artifacts ==="
 run ls -la "$OUT"
 

@@ -379,3 +379,35 @@ echo "########## 9c. THE RESTORE TEST — what a card-only restore actually reco
 # the document claims -- which is how the document's original "@3-@10" was
 # caught being wrong in both directions.
 run python3 "$W/restore_test_pathological.py"
+
+echo "########## 10. RESTORE FROM THE PLATES"
+# Everything above starts from the strings in out/. An operator starts from a
+# stack of plates. restore_from_plates.py goes the other way: it decodes the QR
+# out of each rendered plate image with zbarimg -- an INDEPENDENT decoder, not
+# the library that drew them -- and rebuilds the wallet from what came off the
+# images and nothing else.
+#
+# Two layers, and only the second is worth much: the QR matching the manifest
+# string is `me bundle` agreeing with itself, while the rebuilt template-id
+# matching what this run derived by a separate route is the layer that says the
+# plate carries the wallet.
+run python3 "$W/restore_from_plates.py" pathological
+if ! python3 "$W/restore_from_plates.py" pathological >/dev/null 2>&1; then
+  echo "FATAL: the engraved plates do not rebuild this wallet" >&2
+  exit 1
+fi
+
+# AND THE GATE CAN FAIL. A match check nobody has broken is not evidence. Two
+# controls exercising DIFFERENT layers: the first flips one character and is
+# refused by the codex32 checksum at DECODE -- so on its own it tests the
+# checksum, not the comparison. The second substitutes another journey's
+# perfectly VALID template, which is the only one that reaches the id check.
+run python3 "$W/restore_from_plates.py" pathological --prove-it-can-fail
+run python3 "$W/restore_from_plates.py" pathological --prove-layer2-can-fail hashvault
+for ctl in --prove-it-can-fail "--prove-layer2-can-fail hashvault"; do
+  # shellcheck disable=SC2086
+  if ! python3 "$W/restore_from_plates.py" pathological $ctl >/dev/null 2>&1; then
+    echo "FATAL: control '$ctl' did not catch a wallet it should have rejected" >&2
+    exit 1
+  fi
+done

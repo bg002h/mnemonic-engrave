@@ -1,4 +1,4 @@
-# transcript-generator-sha256: c17edd9453fc8991a91dd8401f44726a1d796dfa8af19a830d31df74061cfd40
+# transcript-generator-sha256: ba1ed6339efbf76da788c516b859f1a2a98c26ca3ef3dabdea96b7d7cecfe753
 ########## versions
 $ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md --version
 md 0.13.0
@@ -294,5 +294,62 @@ B) THE CARD ENGRAVED NOW — each slot states its own origin:
   The difference is one extra chunk, and an identical template-id.
 
   Both match what the journey documents. Gate green.
+[exit 0]
+
+########## 10. RESTORE FROM THE PLATES
+$ python3 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/restore_from_plates.py pathological
+pathological: 37 plates in the manifest
+
+Layer 1 — the QR on each plate decodes to the string the manifest names:
+  36 of 37 plates decoded byte-exact via zbarimg
+  1 plate(s) carry NO rendered image and were NOT checked:
+    plate 37 (ms1)
+
+Rebuilding from the plate-borne strings alone: 6 md1 chunk(s), 30 mk1 string(s)
+
+Layer 2 — the rebuilt wallet, against what the journey derived separately:
+  template-id off the PLATES : 5b48af35d4321a3ac18b43045e2523cc
+  template-id from the run   : 5b48af35d4321a3ac18b43045e2523cc
+
+  slots 11, distinct declarations 11, with a fingerprint 11
+  the plate-borne template is SEATABLE
+
+RESTORED FROM THE PLATES. 36 images in, the same wallet out.
+Caveat: 1 plate(s) had no rendered image and were not part of this.
+Not metal: this proves the software chain, not that steel is legible.
+[exit 0]
+
+$ python3 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/restore_from_plates.py pathological --prove-it-can-fail
+pathological: 37 plates in the manifest
+
+Layer 1 — the QR on each plate decodes to the string the manifest names:
+  36 of 37 plates decoded byte-exact via zbarimg
+  1 plate(s) carry NO rendered image and were NOT checked:
+    plate 37 (ms1)
+
+NEGATIVE CONTROL: flipped one character of plate-borne chunk 1
+
+Rebuilding from the plate-borne strings alone: 6 md1 chunk(s), 30 mk1 string(s)
+
+NEGATIVE CONTROL PASSED: the corrupted chunk was refused at decode.
+[exit 0]
+
+$ python3 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/restore_from_plates.py pathological --prove-layer2-can-fail hashvault
+pathological: 37 plates in the manifest
+
+Layer 1 — the QR on each plate decodes to the string the manifest names:
+  36 of 37 plates decoded byte-exact via zbarimg
+  1 plate(s) carry NO rendered image and were NOT checked:
+    plate 37 (ms1)
+
+LAYER-2 CONTROL: replaced the plate-borne template with hashvault's (4 chunks). Every string is VALID; the wallet is wrong.
+
+Rebuilding from the plate-borne strings alone: 4 md1 chunk(s), 30 mk1 string(s)
+
+Layer 2 — the rebuilt wallet, against what the journey derived separately:
+  template-id off the PLATES : 68a1a888385797337ce5debc90fcfb1e
+  template-id from the run   : 5b48af35d4321a3ac18b43045e2523cc
+
+NEGATIVE CONTROL PASSED: the rebuild produced a different wallet and the LAYER-2 comparison caught it.
 [exit 0]
 

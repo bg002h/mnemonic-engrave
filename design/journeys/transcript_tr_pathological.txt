@@ -1,4 +1,4 @@
-# transcript-generator-sha256: 1a98eb99c63945fd257ad11807f0417db0bca937a257c845961f2da93b711ed9
+# transcript-generator-sha256: 918f1059087717575f73bfdf8af335f751c7f7563c22ae66e02e74858a01277a
 === 0. Versions ===
 
 $ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md --version
@@ -320,24 +320,96 @@ addresses as the engraved card — so the taptree shape survived too.
 [exit 0]
 
 
+=== 12. RESTORE FROM THE PLATES ===
+
+Everything above starts from the strings in out/. An operator starts from
+a stack of plates. restore_from_plates.py goes the other way: it decodes
+the QR out of each rendered plate image with zbarimg -- an independent
+decoder, not the library that drew them -- and rebuilds the wallet from
+what came off the images and nothing else. Two layers: the QR matches the
+manifest string byte-for-byte, and the rebuilt template-id matches what
+this run derived by a separate route.
+
+$ python3 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/restore_from_plates.py tr-pathological
+tr-pathological: 37 plates in the manifest
+
+Layer 1 — the QR on each plate decodes to the string the manifest names:
+  36 of 37 plates decoded byte-exact via zbarimg
+  1 plate(s) carry NO rendered image and were NOT checked:
+    plate 37 (ms1)
+
+Rebuilding from the plate-borne strings alone: 6 md1 chunk(s), 30 mk1 string(s)
+
+Layer 2 — the rebuilt wallet, against what the journey derived separately:
+  template-id off the PLATES : 44ad26a19b53048b6ff8957359a30c31
+  template-id from the run   : 44ad26a19b53048b6ff8957359a30c31
+
+  slots 11, distinct declarations 11, with a fingerprint 11
+  the plate-borne template is SEATABLE
+
+RESTORED FROM THE PLATES. 36 images in, the same wallet out.
+Caveat: 1 plate(s) had no rendered image and were not part of this.
+Not metal: this proves the software chain, not that steel is legible.
+[exit 0]
+
+AND THE GATE CAN FAIL. A match check nobody has broken is not evidence.
+Two controls, exercising DIFFERENT layers -- the first is refused by the
+codex32 checksum at decode, the second is perfectly valid and simply the
+wrong wallet, which is the only one that reaches the id comparison:
+
+$ python3 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/restore_from_plates.py tr-pathological --prove-it-can-fail
+tr-pathological: 37 plates in the manifest
+
+Layer 1 — the QR on each plate decodes to the string the manifest names:
+  36 of 37 plates decoded byte-exact via zbarimg
+  1 plate(s) carry NO rendered image and were NOT checked:
+    plate 37 (ms1)
+
+NEGATIVE CONTROL: flipped one character of plate-borne chunk 1
+
+Rebuilding from the plate-borne strings alone: 6 md1 chunk(s), 30 mk1 string(s)
+
+NEGATIVE CONTROL PASSED: the corrupted chunk was refused at decode.
+[exit 0]
+
+$ python3 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/restore_from_plates.py tr-pathological --prove-layer2-can-fail hashvault
+tr-pathological: 37 plates in the manifest
+
+Layer 1 — the QR on each plate decodes to the string the manifest names:
+  36 of 37 plates decoded byte-exact via zbarimg
+  1 plate(s) carry NO rendered image and were NOT checked:
+    plate 37 (ms1)
+
+LAYER-2 CONTROL: replaced the plate-borne template with hashvault's (4 chunks). Every string is VALID; the wallet is wrong.
+
+Rebuilding from the plate-borne strings alone: 4 md1 chunk(s), 30 mk1 string(s)
+
+Layer 2 — the rebuilt wallet, against what the journey derived separately:
+  template-id off the PLATES : 68a1a888385797337ce5debc90fcfb1e
+  template-id from the run   : 44ad26a19b53048b6ff8957359a30c31
+
+NEGATIVE CONTROL PASSED: the rebuild produced a different wallet and the LAYER-2 comparison caught it.
+[exit 0]
+
+
 === Artifacts ===
 $ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological
 total 292
-drwxr-xr-x 1 bcg bcg    364 Aug 21 23:03 .
+drwxr-xr-x 1 bcg bcg    364 Aug 21 23:24 .
 drwxr-xr-x 1 bcg bcg    728 Aug 21 21:06 ..
--rw-r--r-- 1 bcg bcg   3095 Aug 21 23:03 backup-strings.txt
--rw-r--r-- 1 bcg bcg    265 Aug 21 23:03 keys-meta.txt
--rw-r--r-- 1 bcg bcg   1485 Aug 21 23:03 keys.txt
--rw------- 1 bcg bcg  17782 Aug 21 23:04 manifest.json
--rw-r--r-- 1 bcg bcg   2087 Aug 21 23:03 md1-keyed.txt
--rw-r--r-- 1 bcg bcg    484 Aug 21 23:03 md1-template.txt
--rw-r--r-- 1 bcg bcg   4005 Aug 21 23:03 mk-encode.json
--rw-r--r-- 1 bcg bcg   2611 Aug 21 23:03 mk-encode-raw.txt
-drwxr-xr-x 1 bcg bcg    846 Aug 21 23:04 plates
--rw-r--r-- 1 bcg bcg    126 Aug 21 23:03 tr.change.txt
--rw-r--r-- 1 bcg bcg     51 Aug 21 23:03 tr.id.txt
--rw-r--r-- 1 bcg bcg 235335 Aug 21 19:41 tr-pathological-journey.html
--rw-r--r-- 1 bcg bcg    126 Aug 21 23:03 tr.receive.txt
+-rw-r--r-- 1 bcg bcg   3095 Aug 21 23:24 backup-strings.txt
+-rw-r--r-- 1 bcg bcg    265 Aug 21 23:24 keys-meta.txt
+-rw-r--r-- 1 bcg bcg   1485 Aug 21 23:24 keys.txt
+-rw------- 1 bcg bcg  17782 Aug 21 23:24 manifest.json
+-rw-r--r-- 1 bcg bcg   2087 Aug 21 23:24 md1-keyed.txt
+-rw-r--r-- 1 bcg bcg    484 Aug 21 23:24 md1-template.txt
+-rw-r--r-- 1 bcg bcg   4005 Aug 21 23:24 mk-encode.json
+-rw-r--r-- 1 bcg bcg   2611 Aug 21 23:24 mk-encode-raw.txt
+drwxr-xr-x 1 bcg bcg    846 Aug 21 23:24 plates
+-rw-r--r-- 1 bcg bcg    126 Aug 21 23:24 tr.change.txt
+-rw-r--r-- 1 bcg bcg     51 Aug 21 23:24 tr.id.txt
+-rw-r--r-- 1 bcg bcg 236392 Aug 21 23:05 tr-pathological-journey.html
+-rw-r--r-- 1 bcg bcg    126 Aug 21 23:24 tr.receive.txt
 [exit 0]
 
 All gates green.

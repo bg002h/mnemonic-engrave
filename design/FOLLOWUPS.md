@@ -9250,8 +9250,35 @@ only when the walk fails — so the refusal assertion is not vacuous.
    The check that it actually worked is that `md encode`'s new advisory is now
    **silent** on both, rather than that the plates got bigger. Their seating
    path still has no device walk; that is what item 3 would cover.
-3. **No plates-to-restore walk anywhere.** Arm 3 restores from the files that
-   produced the cards, not from anything read back off metal.
+3. ~~**No plates-to-restore walk anywhere.**~~ **PARTLY DONE 2026-08-21** —
+   `restore_from_plates.py`, wired into all three journeys as a gate. It decodes
+   the QR out of every rendered plate image with `zbarimg` — an **independent**
+   decoder, not the library that drew them — and rebuilds the wallet from the
+   decoded strings alone.
+
+   Two layers, and the first is nearly worthless on its own: QR-matches-manifest
+   is `me bundle` agreeing with itself. The load-bearing one is the rebuilt
+   `wallet-descriptor-template-id` matching what the run derived by a separate
+   route, plus a seatability check on the plate-borne slots.
+
+   Results: both pathological journeys restore clean (36 of 37 images, 11/11
+   distinct declarations, SEATABLE). **The hashvault plates do NOT** — 22 of 23
+   decode byte-exact and the template-id is right, but 6 slots share 1
+   declaration, so the driver exits 1. That journey's gate is therefore
+   *inverted*: it requires the failure, and goes red if those plates ever
+   restore cleanly without the narrative being rewritten.
+
+   Two controls, exercising different layers, because the obvious one does not
+   test what it looks like it tests: `--prove-it-can-fail` flips a character and
+   is refused by the **codex32 checksum at decode**, never reaching the
+   comparison; `--prove-layer2-can-fail <journey>` substitutes another wallet's
+   perfectly valid template, which is the only control that exercises the id
+   check.
+
+   **STILL OPEN, and it is the harder half: this is not metal.** The path from a
+   rendered PNG to scratched steel to a phone camera — legibility, depth, glare,
+   engraving artefacts — is exercised nowhere. What is now closed is the
+   software chain end to end.
 4. **The device's multisig build path is unchecked for this.**
    `gui/multisig_build_*` authors a policy on-device and engraves it. It holds
    the cosigner xpubs, so it very likely declares fingerprints and is fine —

@@ -316,6 +316,29 @@ echo "seats all six cards on this template and derives the wallet's addresses,"
 echo "where --seating on the bare template is refused. Same cards, same policy."
 echo
 
+echo "=== 17. RESTORE FROM THE PLATES -- and why THIS one cannot ==="
+echo
+echo "Everything above starts from the strings in out/. An operator starts from"
+echo "a stack of plates. restore_from_plates.py goes the other way: it decodes"
+echo "the QR out of each rendered plate image with zbarimg -- an independent"
+echo "decoder, not the library that drew them -- and rebuilds the wallet from"
+echo "what came off the images and nothing else."
+echo
+echo "This journey's plates carry the BARE template, deliberately: they are the"
+echo "set section 15 is about. So the restore is expected to FAIL, and the gate"
+echo "below is inverted -- it goes red if these plates ever restore cleanly,"
+echo "because that would mean the finding this journey documents has silently"
+echo "stopped being true and the narrative around it is now wrong."
+echo
+run python3 "$W/restore_from_plates.py" hashvault
+if python3 "$W/restore_from_plates.py" hashvault >/dev/null 2>&1; then
+  fatal "the hashvault plates now restore cleanly -- section 15's finding is stale, rewrite it"
+fi
+echo "Expected failure, and it is the seatability check that catches it: the"
+echo "template-id off the plates is RIGHT, so the QR, the rendering and the"
+echo "codec are all fine. What the plates cannot do is say which key is which."
+echo
+
 echo "=== Artifacts ==="
 run ls -la "$OUT"
 
