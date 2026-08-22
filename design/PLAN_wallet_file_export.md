@@ -1,8 +1,8 @@
 # PLAN — wallet-file export for the reasonably complex wallet
 
 **Status:** all five planning reports landed and folded. R0 on Phase 1 has run
-twice — round 1 **1C/4I/2M/1N**, round 2 **0C/4I/1M/2N**, round 3 **0C/2I/1M/0N**.
-All RED; this document is the fold of all three. Phase 2 is DELETED. **No code until a review
+twice — round 1 **1C/4I/2M/1N**, round 2 **0C/4I/1M/2N**, round 3 **0C/2I/1M/0N**,
+round 4 **0C/2I/1M/0N**. All RED; this document is the fold of all four. Phase 2 is DELETED. **No code until a review
 returns 0C/0I.**
 
 **Operator ask (2026-08-22):** output Nunchuk, Sparrow and Bitcoin Core
@@ -222,8 +222,8 @@ incidental safety becomes deliberate.**
 ## 3. Phases
 
 Each phase ends with a fable review before the next begins, per the operator's
-instruction. **No phase may start: the Phase 1 gate is RED** (rounds 1-3:
-1C/4I, 0C/4I, 0C/2I).
+instruction. **No phase may start: the Phase 1 gate is RED** (rounds 1-4:
+1C/4I, 0C/4I, 0C/2I, 0C/2I).
 
 ### Phase 1 — G1, `--allow` parity on `export-wallet`
 
@@ -436,6 +436,53 @@ honest in the tool as it now is in the plan.
 **`--format bitcoin-core`**: it is the default, and it is the format with
 measured evidence on both sides of the air gap.
 
+#### Round 4 fold — the composition lens, run on my own rulings
+
+**R0 round 4: 0C / 2I / 1M / 0N.** (`R0_export_phase1_round4.md`) I asked round
+4 to check the rulings **pairwise** rather than in isolation, because that is
+what round 3 caught. It found two more, both mine, both from the same habit.
+
+**R4-1 — my two note wordings do not compose with my own topology ruling.**
+Under topology (B) the gate is uniform, so **there is no ungated path** — and my
+new *"no descriptor admission gate runs on `--template`/`--slot`"* note is
+therefore **false under the very ruling I wrote it beside**.
+
+*Fix: delete a wording, not add one.* The note matrix loses its arm dimension
+entirely:
+
+- `--allow sigless-branch`, **any arm** → the fired warning, or the did-not-fire
+  note. True everywhere *as a consequence of the uniform gate*, including
+  `--template`/`--slot`.
+- `--allow <other>`, **any arm** → the unenforced-rule wording. Already
+  arm-independent and already true everywhere.
+
+**R4-2 — "where all three arms converge, before `EmitInputs`" is not one
+place.** The arms build `EmitInputs` at **two** sites in **two** functions, and
+the shared pre-`EmitInputs` boundary I gestured at also serves **`restore`'s**
+two production constructors. Machine-run at toolkit tip `5f88071c`:
+`restore --md1 --format bitcoin-core` on this wallet's sigless wsh **emits
+flagless at exit 0 today**, 2694 bytes. So my one phrase admits two compliant
+placements that are *observably different products*, one of which silently
+breaks a shipped, waiver-less surface I never intended to touch.
+
+*Ruling, stated as a mechanism against real code rather than a locus:*
+
+> **One gate helper, invoked at `export-wallet`'s two `EmitInputs` construction
+> sites (`run` and `run_from_import_json`), on each arm's canonical descriptor,
+> honouring the `AllowSet`.** Other `EmitInputs` builders —
+> `cmd/restore.rs:2496` and `:2801` — are **explicitly out of scope. Phase 1
+> makes no behaviour change to `restore`.** If that door should be ruled on, it
+> is its own decision with its own release note.
+
+And the consequence my topology implied but never stated: **the `--descriptor`
+intake parse at `:524` becomes LENIENT**, so a tr form can reach the gate at
+all. An implementer who leaves it strict fails the export-with-flag baseline, so
+this is machine-caught — but it should not have to be discovered.
+
+**R4-3 (Minor) — an acceptance bullet that cannot be satisfied.** The
+sigless-envelope bullet is unsatisfiable for tr, which refuses regardless of the
+flag. Scoped to **wsh**.
+
 #### The constraint that survives all of this
 
 **No help text, doc, commit message or release note may say `--allow` "enables
@@ -446,17 +493,24 @@ merits — and on those alone.
 
 #### Acceptance
 
-- Every strict parse site on the `--descriptor` path enumerated file+function
-  and listed in the PR.
-- **A single admission gate on the canonical descriptor, where all three
-  intakes converge (before `EmitInputs`)** — topology (B) — with an assertion
-  that it is the ONLY admission point and that no arm routes around it.
+- Every strict parse site on **all three arms** enumerated file+function and
+  listed in the PR, **annotated with which arm each serves** — that annotation
+  is what makes "ONLY admission point" assertable rather than asserted.
+- **One gate helper at `export-wallet`'s two `EmitInputs` construction sites**
+  (`run`, `run_from_import_json`), on each arm's canonical descriptor, honouring
+  the `AllowSet`; asserted to be the ONLY admission point with no arm routing
+  around it. **`cmd/restore.rs:2496`/`:2801` are out of scope — no behaviour
+  change to `restore`.**
+- **The `--descriptor` intake parse at `:524` becomes lenient**, so a tr form
+  reaches the gate at all.
 - Uniform enforcement of **`sigless-branch` only**; the wsh hole closed rather
   than pinned; the other four rules explicitly not enforced on this surface.
 - **Baseline tests, per wrapper, `--format bitcoin-core`:** flagless refusal on
   tr AND wsh; export-with-flag; the fired warning; the requested-not-fired note.
-- **`--from-import-json` gated like `--descriptor`** — a sigless envelope
-  refuses without the flag and exports with it. This is the hole round 3 found.
+- **`--from-import-json` gated like `--descriptor`** — a sigless **wsh**
+  envelope refuses without the flag and exports with it. This is the hole round 3
+  found. (Scoped to wsh: tr refuses regardless of the flag, so a tr bullet would
+  be unsatisfiable.)
 - Per-rule over-admission tests — requesting one rule admits no other.
 - Keyless-leaf vector through the transforming emitters (`bip388`).
 - **Fired-detection per enforced wrapper** — per-leaf for tr, top-level for
@@ -467,8 +521,10 @@ merits — and on those alone.
 - **Rust-first vectors pinning the new refusals**, per Open Q4 — this phase
   touches the asymmetry Q4 flags as potentially normative.
 - **A release-note line for the behaviour change.**
-- `--allow` on `--template`/`--slot` emits the ungated-path note (NOT
-  `--from-import-json`, which is gated — see above).
+- `--allow sigless-branch` on `--template`/`--slot` emits the **did-not-fire
+  note** — a consequence of the uniform gate, asserted as such; `--allow <other>`
+  emits the unenforced-rule note. Same wordings as `--descriptor`, **because no
+  arm is ungated**.
 - **The "passes that rule" parenthetical is never printed by a rule that did
   not run**, asserted per unenforced rule.
 - Re-review to 0C/0I before any of it merges.
