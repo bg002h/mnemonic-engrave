@@ -1,3 +1,5 @@
+# transcript-generator-sha256: 4de2b4c237861e340298ad7bc8655122bebae76502d9ee4cfa623120d2819ac9
+
 === 0. Versions ===
 
 $ /scratch/code/shibboleth/mnemonic-secret/target/release/ms --version
@@ -525,7 +527,7 @@ me: wrote 4096 bytes to /scratch/code/shibboleth/mnemonic-engrave/design/journey
 
 passphrase — write this down and store it APART from the machine:
 
-    cabbage earn slender witness element give convince cave behave device boring beef
+    exhibit gallery crisp illegal inspire jewel winner ethics pluck blast mask vivid
 
 load:  picotool load --verify /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/rcw/tr/sealed.uf2   (machine in BOOTSEL)
 wipe:  picotool erase -r 0x10E00000 0x10E10000
@@ -540,7 +542,7 @@ me: wrote 4096 bytes to /scratch/code/shibboleth/mnemonic-engrave/design/journey
 
 passphrase — write this down and store it APART from the machine:
 
-    sphere gloom treat mobile hour island frost include furnace fold park draft
+    hour speak abandon curtain round grass achieve latin result urban quick half
 
 load:  picotool load --verify /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/rcw/wsh/sealed.uf2   (machine in BOOTSEL)
 wipe:  picotool erase -r 0x10E00000 0x10E10000
@@ -552,12 +554,12 @@ runcap: CAPTURE FAILED -- no stdout line matched /./
 === Artifacts ===
 $ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/rcw
 total 8
-drwxr-xr-x 1 bcg bcg   70 Aug 22 03:34 .
+drwxr-xr-x 1 bcg bcg   70 Aug 22 03:39 .
 drwxr-xr-x 1 bcg bcg  734 Aug 22 03:32 ..
--rw-r--r-- 1 bcg bcg 3887 Aug 22 03:34 payload.bin
--rw-r--r-- 1 bcg bcg 3836 Aug 22 03:34 payload-strings.txt
-drwxr-xr-x 1 bcg bcg  300 Aug 22 03:34 tr
-drwxr-xr-x 1 bcg bcg  300 Aug 22 03:34 wsh
+-rw-r--r-- 1 bcg bcg 3887 Aug 22 03:39 payload.bin
+-rw-r--r-- 1 bcg bcg 3836 Aug 22 03:39 payload-strings.txt
+drwxr-xr-x 1 bcg bcg  300 Aug 22 03:39 tr
+drwxr-xr-x 1 bcg bcg  300 Aug 22 03:39 wsh
 [exit 0]
 
 All gates green.

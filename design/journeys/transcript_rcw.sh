@@ -43,6 +43,12 @@ done
 [ -d "$IN" ] || { echo "FATAL: no $IN -- run ./derive-rcw-keys.sh first" >&2; exit 1; }
 mkdir -p "$OUT"
 
+# THE STALENESS STAMP. A transcript is a snapshot; this records WHICH generator
+# produced it, so the PDF builder can refuse a snapshot from a different version
+# of this script rather than rendering stale output that still parses.
+echo "# transcript-generator-sha256: $(sha256sum "$0" | cut -d" " -f1)"
+echo
+
 echo "=== 0. Versions ==="
 echo
 run "$MS" --version
