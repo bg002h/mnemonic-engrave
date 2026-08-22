@@ -681,3 +681,67 @@ in this file's own history).
   `75434a3ec58e49753269fcc42ae93b1c1d9b92b2` after a fresh fetch.
 
 **VERDICT: PUSHED.**
+
+## the plate-restore round
+
+Ritual run for mnemonic-engrave only, one commit ahead of the `6cea0dd` tip
+pushed in the previous round: `f8ffd52` ("journeys: restore from the PLATE
+IMAGES — the rendering step was unverified").
+
+**Sequencing note, same choice as last round**: ran the full ritual first
+(push → CI → push to master → cleanup), wrote this append after. This
+agent never commits, so `git push origin master` ships whatever is already
+committed at the tip SHA regardless of when the report file is edited; this
+append rides the next commit, same as the previous round's did.
+
+- Branch: `master`. `git status --porcelain`: clean, as stated (confirmed
+  before any push action).
+- Tip SHA pushed: `f8ffd525d150bc5b48022d60237a9644aa4783f6` (40 chars
+  confirmed via `wc -c`).
+- **What actually changed in this round, checked before writing anything
+  below**: `git diff --stat 6cea0dd..f8ffd52` touches exactly twelve files
+  — `design/FOLLOWUPS.md`; three PDFs
+  (`SeedHammer-II-hashlock-vault-journey.pdf`,
+  `SeedHammer-II-pathological-wallet-journey.pdf`,
+  `SeedHammer-II-tr-pathological-journey.pdf`, all binary);
+  `design/journeys/build_pdf_hashvault.py` (modified, the PDF builder);
+  `design/journeys/restore_from_plates.py` (new file, +236, the new Python
+  driver); and three shell-script/transcript pairs
+  (`transcript_hashvault.sh`/`.txt`, `transcript_pathological.sh`/`.txt`,
+  `transcript_tr_pathological.sh`/`.txt`). **No `.rs` or `.go` file appears
+  anywhere in that diff.** Matches the coordinator's description exactly: a
+  new Python driver, three journey shell scripts + their regenerated
+  transcripts, one PDF builder, three PDFs, `FOLLOWUPS.md`. Consequently,
+  **a green `test (rust + go)` for this SHA confirms no regression rather
+  than validating new source** — same caveat as every journey/docs-only
+  round this session, stated the same way.
+- `git push origin master:refs/heads/ci/staging --force` → `* [new branch]
+  master -> ci/staging` (the ref had been deleted at the end of the
+  previous round). Verified via fresh `git fetch origin` that `git
+  rev-parse master` == `git rev-parse origin/ci/staging` ==
+  `f8ffd525d150bc5b48022d60237a9644aa4783f6`.
+- Workflow that ran for this SHA — `release`, `databaseId 32556967311`,
+  `event: push`, `headSha` confirmed matching. Watched actively via `gh run
+  watch` with an explicit 600000ms timeout, which blocked until the run
+  finished. Overall `conclusion: success`. Per-job conclusions, queried via
+  `gh run view --json headSha,status,conclusion,jobs`:
+  - `test (rust + go)` → **success** (required context; see caveat above on
+    what this SHA actually changed)
+  - `build me (linux-aarch64)` → success
+  - `build me (windows-x86_64)` → success
+  - `build me (linux-x86_64)` → success
+  - `build me (macos-aarch64)` → success
+  - `build me-preview (all targets)` → success
+  - `build me (macos-x86_64)` → success
+  - `assemble + sign + release` → `skipped` — expected (tag-gated, not a
+    failure), consistent with every prior round.
+- Final `git push origin master` output:
+  ```
+  To github.com:bg002h/mnemonic-engrave.git
+     6cea0dd..f8ffd52  master -> master
+  ```
+  No "Bypassed rule violations" text present.
+- `ci/staging` ref deleted afterward; confirmed `origin/master` ==
+  `f8ffd525d150bc5b48022d60237a9644aa4783f6` after a fresh fetch.
+
+**VERDICT: PUSHED.**
