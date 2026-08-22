@@ -8868,7 +8868,7 @@ test: `--keys` is excluded from the schema, which describes the form the GUI
 RENDERS (one card), and the emitted schema was verified BYTE-IDENTICAL against
 a build of the previous tree.
 
-### F-224 — residual Minors/Nits from the six-lens review of the F-127/F-128/F-223 cycle (owning phase: **v0.0.1 polish**) `#mnemonic`
+### F-224 — residual Minors/Nits from the six-lens review — ~~24~~ **PARTIALLY BURNED DOWN 2026-08-21** `#mnemonic`
 
 Filed 2026-08-21, closing the review round.
 
@@ -8879,6 +8879,47 @@ this repo e3da435). What remains is **16 Minor / 8 Nit**, none gating.
 verbatim in `design/agent-reports/R1..R6` and are the record; copying 24 items
 into this file is exactly the transcription step that has introduced misquotes
 in this repo before. Read them with `git show 89470c9`.
+
+#### The valuable third is DONE (`mnemonic-key` 9b30566)
+
+Triaged by asking what each item actually costs an operator, rather than
+burning down by count. **8 done, ~5 already moot, ~4 declined, the rest are
+message polish left open.**
+
+**Two were worth more than their filed severity:**
+
+- `mk verify --from-md1` reported a **CORRECT card as FAILING** — the stub
+  comparison was order-sensitive, so the same card checked against the same
+  policies in a different `--from-md1` order returned exit 4. Filed Minor;
+  in effect Important, because a verification tool that calls a good card bad
+  invites re-engraving a good plate. Now a multiset compare.
+- The phantom `SPEC §3.5.4` cite was **one of eight** (§3.5.2, .3, .4, .5,
+  .6 ×2, .7 ×2, and §1.1). §3.5 is "Origin path encoding" and has no
+  subsections at all. A 2026-06-10 audit had already found four of this class
+  and repointed them, leaving these — so fixing only the one a reviewer noticed
+  would have repeated that exactly. `tests/spec_cites_resolve.rs` now makes the
+  check a command instead of a discipline.
+
+Also done: a batch mint failure names the record; the origin fingerprint is
+checked at depth 0/1 where the xpub proves it; BOM and CR-only key files are
+handled or refused by name (CR-only was a SILENT SHORT BUNDLE); `--from-md1`
+accepts display-grouped md1; the SLIP-0132 note no longer names `--xpub`.
+
+**Declined, with reasons**, so they are not relitigated: stub order being
+argument order is real but changing it is a behaviour change to a documented
+property — better documented than "fixed"; batch `--json` entries omitting
+`schema_version` is consistent with the envelope-level house style, not a
+contradiction; duplicate-policy form-dependence and the unanchored
+`sed 's/key-0*//'` are theoretical against the fixtures in play.
+
+**Moot**: all three R3 awk findings, its double-FATAL guard, and the wrong
+invocation counts died with the rewrite to `build_card_index.py`.
+
+**Still open**: the message-quality residue — a wrong bound in the `>255 stubs`
+error, a `u8`-truncated depth in `XpubOriginPathMismatch`, a trailing-slash
+origin that is refused for the right outcome by the wrong check, and the
+non-JSON `--keys` output carrying no per-card identity (the JSON form now
+does, which is what the journey consumes).
 
 Triage, by report:
 
