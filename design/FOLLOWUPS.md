@@ -9060,7 +9060,9 @@ small and makes it independently gateable.
 Related: F-136 (auto-chunking, closed 2026-08-21) is the *encoder* half of the
 same operator confusion; this is the *engraving* half and the expensive one.
 
-### F-226 — ~~`descriptor-mnemonic`'s vendor-freshness gate cannot pass, and is path-filtered so it never says so~~ **CLOSED 2026-08-21** `#mnemonic` `#ci`
+### F-226 — ~~`descriptor-mnemonic`'s vendor-freshness gate cannot pass~~ **CLOSED 2026-08-21** `#mnemonic` `#ci`
+
+> **Title corrected.** It originally ended "…and is path-filtered so it never says so". The gate DID say so — it ran on the pin commit and failed, and the failure was ignored for two days. See the correction in the body.
 
 Filed 2026-08-21, found incidentally while gating the F-136 fix.
 
