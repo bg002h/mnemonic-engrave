@@ -3,8 +3,17 @@
 **Status:** all five planning reports landed and folded. R0 on Phase 1 has run
 twice — round 1 **1C/4I/2M/1N**, round 2 **0C/4I/1M/2N**, round 3 **0C/2I/1M/0N**,
 round 4 **0C/2I/1M/0N**, round 5 **0C/0I/2M/2N — GREEN**. The loop is
-CLOSED; this document is the fold of all five, Minors and Nits included. Phase 2 is DELETED. **No code until a review
-returns 0C/0I.**
+CLOSED; this document is the fold of all five, Minors and Nits included.
+
+**Phase 1 is BUILT, REVIEWED and MERGED** (2026-08-22, `mnemonic-toolkit`
+`0c672a4c`, `05ac190b`, `8a564a08`). Whole-diff review R1 returned 0C/1I/2M; the
+Important was an untested `sh(ms)` branch that a mutation proved a green 3928-test
+suite would not have caught, folded with tests that kill that mutation. Final
+state: fmt clean, clippy 0, **3930/3930**, and `restore` byte-identical
+(`sha256 c121fb6c…`) before, after, and after the fold.
+
+**Phase state:** 1 DONE · 1b SPECIFIED, not built · 2 DELETED · 3 not built ·
+4 ruled NOT NOW with a trigger · 5 separate cycle.
 
 **Operator ask (2026-08-22):** output Nunchuk, Sparrow and Bitcoin Core
 **watch-only and hot** wallets via the m* utilities, and the same on SeedHammer
