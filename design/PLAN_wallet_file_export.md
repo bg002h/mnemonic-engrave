@@ -53,8 +53,9 @@ mapping to `ExtParams::top_unsafe`, and `build-descriptor` exposes all five
 rules as `--allow <RULE>` including `sigless-branch`. `md encode` solves the
 same problem with `--experimental`.
 
-So G1 is *parity*, not invention: the smallest change that unblocks the wallet
-the operator actually asked about.
+So G1 is *parity*, not invention. **But see §1a: it does not unblock import
+into any of the three targets** — they enforce the same rule. It unblocks our
+own emission, which is worth having and is not the same thing.
 
 > I initially recorded `sigless-branch` as "deliberately excluded" from
 > `--allow`. That was false and came from my own `grep -A6` truncating a
@@ -88,6 +89,79 @@ emulator already implements `READ_BINARY` and transmits over RF, serving a
 hardcoded 2-byte `emptyFile` with 8 KB advertised capacity
 (`nfc/type4/type4.go:103-106, 241-242`). An NFC share is ~200-400 LOC with no
 new dependency, ranked above a paged-display QR route.
+
+---
+
+## 1a. THE FINDING THAT REFRAMES ALL OF THIS
+
+**Every one of the three named wallet apps refuses this wallet, and all three
+refuse it for the same reason: tier 4 has no key.**
+
+Not miniscript complexity. Not the hashlocks. Not the mixed timelock flavours.
+Not `multi_a`, not `or_i`, not the NUMS internal key. The single sigless spend
+path.
+
+Measured directly against **Bitcoin Core 25.0** (`getdescriptorinfo`, a running
+node, positive controls first):
+
+| probe | result |
+| --- | --- |
+| `wsh(and_v(v:sha256(H1),pk(K)))` — hashlock AND a key | **accepts** |
+| `wsh(and_v(v:sha256(H1),multi(3,…)))` — our tier 1 | **accepts** |
+| `wsh(and_v(v:after(1383520),sha256(H3)))` — tier 4 as-is | **refuses** |
+| `wsh(and_v(v:after(…),and_v(v:sha256(H3),pk(K))))` — tier 4 **with a key** | **accepts** |
+| `wsh(or_i(keyed, KEYLESS))` | **refuses** |
+| `wsh(or_i(keyed, keyed))` | **accepts** |
+
+This independently reproduces the minimal pair in `PLAN_export_nunchuk.md`,
+which found the same thing through libnunchuk's `IsSane()`/`NeedsSignature()`.
+Sparrow's refusal has a different mechanism (no miniscript engine at all) but
+the same practical effect.
+
+**Consequence for this plan: G1 does not achieve the operator's goal.** Adding
+`--allow` to `export-wallet` lets US emit a file. It does not make any target
+import it, because the targets run the same rule we would be relaxing. G1 is
+still worth doing — parity, and it unblocks `--format descriptor`/`bsms` output
+for inspection — but it must not be described as "enables export to Core".
+
+**The change that WOULD achieve the goal is a wallet-design change: give tier 4
+a key.** That is the operator's call, not mine, and it is a different wallet.
+
+### 1b. Taproot has a SECOND, independent blocker
+
+The tr form refuses **even with tier 4 keyed**. Isolated on the same node:
+
+| tapleaf contents | Core 25 |
+| --- | --- |
+| `pk(K)` | accepts |
+| `multi_a(3,…)` | accepts |
+| `and_v(v:pk(K),older(144))` — any miniscript | **refuses** |
+| `and_v(v:sha256(H),pk(K))` | **refuses** |
+
+**Core 25 supports miniscript in `wsh()` but not in tapleaves** — a leaf may
+hold `pk` or `multi_a` and nothing else. So the tr form is unreachable for Core
+25 regardless of what we do to tier 4.
+
+Whether a later Core lifts that is exactly what the pending
+`PLAN_export_bitcoin_core.md` is measuring, on a six-version matrix (25, 26, 27,
+28, 29, 31) of real nodes. **My numbers above are ONE version and should be
+treated as superseded by that report where the two overlap.**
+
+### 1c. How nearly I got this wrong
+
+Worth recording, because the method matters more than the result:
+
+- My first run tested a **mainnet** descriptor against a **regtest** node. Core
+  said `"is not valid"` for every key and I was one step from reporting "Core
+  rejects our export". The tell was that my **control also failed** — a
+  known-good xpub straight from `ms derive` was rejected identically. A control
+  that fails with the subject means the harness is broken, not the subject.
+- Before that I read `[exit 0]` on a refusal because I took `$?` through a
+  `head` pipe (real codes: 0/2/1), and recorded `sigless-branch` as "excluded
+  from `--allow`" because `grep -A6` truncated a five-item list at four.
+
+Three wrong readings in one afternoon, all from a filter between me and the
+output. See `negatives-inherit-the-search-scope`.
 
 ---
 
