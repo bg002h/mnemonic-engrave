@@ -1,3 +1,4 @@
+# transcript-generator-sha256: ea2856a9f1bd3988780a4022b17b43e788b45838064a063f3e1a2b3893ef5971
 ########## versions
 $ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md --version
 md 0.13.0
@@ -26,8 +27,13 @@ wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b
 
 ########## 2. it does not fit one string
 $ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode --group-size 0 wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/48'/0'/3'/2'/<0;1>/*,@4/48'/0'/0'/2'/<0;1>/*,@5/48'/0'/1'/2'/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/48'/0'/2'/2'/<0;1>/*,@7/48'/0'/3'/2'/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/48'/0'/0'/2'/<0;1>/*,@9/48'/0'/1'/2'/<0;1>/*,@10/48'/0'/2'/2'/<0;1>/*))))))
-md: codec error: payload is 255 data symbols; the codex32 regular code caps single strings at 80 (use chunked encoding / --force-chunked)
-[exit 1]
+chunk-set-id: 0x66602
+md1fveszps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsetu0pjm8rjqtq
+md1fveszpsgs3ef9kzz2j5qqcyefntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3rw4fq6srum75s6g2w3
+md1fveszps36rc6cckmmq5mngy26xzzqyn9xddhpk7cspxdw6snwwgzt4wf7rnqpre774p4wm8gup7frjyxuc3nx
+md1fveszps7txyd64y8g0rtrzm0vznwdq3tgcyg69v5e4cqqqlll3sgt8fntsqypuy6rqpgngl2nznpqsv3g40
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
 
 ########## 3. so it is chunked -- WITH the origin the warning asked for
 $ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode --group-size 0 --force-chunked wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(3,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))),or_i(and_v(v:after(1893456000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@3/48'/0'/3'/2'/<0;1>/*,@4/48'/0'/0'/2'/<0;1>/*,@5/48'/0'/1'/2'/<0;1>/*))),or_i(and_v(v:older(65535),multi(2,@6/48'/0'/2'/2'/<0;1>/*,@7/48'/0'/3'/2'/<0;1>/*)),and_v(v:older(4255898),multi(1,@8/48'/0'/0'/2'/<0;1>/*,@9/48'/0'/1'/2'/<0;1>/*,@10/48'/0'/2'/2'/<0;1>/*))))))
@@ -63,25 +69,37 @@ wallet-policy-id-fingerprint: 0xbd6ba7e6
 note: stdout is a keyless descriptor template (no keys)
 [exit 0]
 
-########## 5. OBSTACLE 1 — mk cannot derive the stub from a CHUNKED md1
-$ /scratch/code/shibboleth/mnemonic-key/target/release/mk encode --xpub xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --origin-fingerprint 73c5da0a --origin-path m/48'/0'/0'/2' --from-md1 md1fveszps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsetu0pjm8rjqtq --group-size 0
-error: md1 input rejected: wire-format version mismatch: got 9, expected 4
-[exit 2]
-
-########## 6. the stub, derived by hand from the template id
-MEASURED, not cited: on a single-string wallet where --from-md1 DOES work,
-mk embedded stub 726a6663 while that wallet's ids were
-  wallet-descriptor-template-id: 726a666305756435...  <-- the stub matches THIS
-  wallet-policy-id:              f05e8a1c282f7740...  <-- and NOT this,
-though SPEC_mk_v0_1.md 3.3 names the WalletPolicyId. So mk follows the
-template-id, and the stub below is DERIVED from it rather than typed in.
-
-$ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fveszps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsetu0pjm8rjqtq md1fveszpsgs3ef9kzz2j5qqcyefntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3rw4fq6srum75s6g2w3 md1fveszps36rc6cckmmq5mngy26xzzqyn9xddhpk7cspxdw6snwwgzt4wf7rnqpre774p4wm8gup7frjyxuc3nx md1fveszps7txyd64y8g0rtrzm0vznwdq3tgcyg69v5e4cqqqlll3sgt8fntsqypuy6rqpgngl2nznpqsv3g40  2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p'
-5b48af35d4321a3ac18b43045e2523cc
+########## 5. mk derives the stub from the CHUNKED md1 itself
+$ /scratch/code/shibboleth/mnemonic-key/target/release/mk encode --xpub xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --origin-fingerprint 73c5da0a --origin-path m/48'/0'/0'/2' --from-md1 md1fveszps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsetu0pjm8rjqtq --from-md1 md1fveszpsgs3ef9kzz2j5qqcyefntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3rw4fq6srum75s6g2w3 --from-md1 md1fveszps36rc6cckmmq5mngy26xzzqyn9xddhpk7cspxdw6snwwgzt4wf7rnqpre774p4wm8gup7frjyxuc3nx --from-md1 md1fveszps7txyd64y8g0rtrzm0vznwdq3tgcyg69v5e4cqqqlll3sgt8fntsqypuy6rqpgngl2nznpqsv3g40 --group-size 0
+mk1qpd8cwpqqsq4kj90x4eutks2q5zg3vs7rnefw94m5rru59s2su80aw2q4wgdpapgfl4pkhsdyytkwl5z8lphut2hvvpp5av5muuc0cmfrjw2
+mk1qpd8cwpp806lhaeh6reknylagmwyjycf8044xtt9flsdlkvt6f6cthyl995lpm5zlrp6yv6kc36tw
+note: stdout is watch-only — public keys only, cannot spend
 [exit 0]
 
-########## 7. the eleven key cards — ALL of them, each with its own origin
+########## 6. the stub mk chose, cross-checked against the template id
+$ bash -c /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fveszps9zjtvyyy5jmpprjjtvyy49ykcgfw2fdsssjjtvyyw2fdssj55jmpp9ef9kzzz2fdsetu0pjm8rjqtq md1fveszpsgs3ef9kzz2j5qqcyefntvqq7sjqfntk5ymnjqjatj0sucqg70h4gdtkemje3rw4fq6srum75s6g2w3 md1fveszps36rc6cckmmq5mngy26xzzqyn9xddhpk7cspxdw6snwwgzt4wf7rnqpre774p4wm8gup7frjyxuc3nx md1fveszps7txyd64y8g0rtrzm0vznwdq3tgcyg69v5e4cqqqlll3sgt8fntsqypuy6rqpgngl2nznpqsv3g40  2>/dev/null | grep -E 'wallet-policy-mode|template-id|wallet-policy-id:'
+wallet-policy-mode: false
+wallet-descriptor-template-id: 5b48af35d4321a3ac18b43045e2523cc
+wallet-policy-id: bd6ba7e6bd7a86038b3963f977e727a6
+[exit 0]
+
+mk --from-md1 embedded 5b48af35 == template-id prefix 5b48af35 (and != policy-id bd6ba7e6)
+
+########## 7. the eleven key cards — ALL of them, in ONE command
+$ head -2 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/keys.txt
+[73c5da0a/48'/0'/0'/2']xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf
+[73c5da0a/48'/0'/1'/2']xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk
+[exit 0]
+
+$ /scratch/code/shibboleth/mnemonic-key/target/release/mk encode --keys /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/keys.txt 8 --from-md1 args --json
+note: stdout is watch-only — public keys only, cannot spend
+[exit 0]
+
 note: 11 key cards -> 30 mk1 chunks (BIP-48 origins push most cards to 3)
+$ /scratch/code/shibboleth/mnemonic-engrave/design/journeys/build_card_index.py /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/mk-encode.json /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/keys-meta.txt /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/card-index.txt
+card-index: 30 rows, 11 cards, origins verified
+[exit 0]
+
 $ wc -l /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/card-index.txt
 30 /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/pathological/card-index.txt
 [exit 0]

@@ -7,7 +7,7 @@ is a real render. The refusals are reported with their actual exit codes rather
 than edited out -- three of them are the most useful thing here.
 """
 
-import base64, html, json, os, re, shutil, subprocess, sys
+import base64, hashlib, html, json, os, re, shutil, subprocess, sys
 
 # ── Missing-asset gate (P1, 2026-08-19) ────────────────────────────────────
 # `img()` renders a "missing:" placeholder when a screenshot is absent, and the
@@ -123,6 +123,28 @@ def filebox(path, label=None, limit=None):
 # the OPERATOR journey's filename, so this document was being built from the
 # wrong journey's transcript. Reads its own tracked artifact now.
 transcript = open(os.path.join(W, "transcript_pathological.txt")).read()
+
+# Refuse a snapshot that does not match the script that produced it.
+#
+# `sect()` already fails loudly on a RENAMED heading, but a snapshot can go
+# stale without any rename -- the F-127 fold corrected an obstacle in
+# transcript_pathological.sh and the document kept publishing the old
+# failure, because the .txt was never re-captured and every lookup still
+# resolved. Comparing the generator's stamped hash closes that gap.
+_gen = os.path.join(W, "transcript_pathological.sh")
+_want = hashlib.sha256(open(_gen, "rb").read()).hexdigest()
+_m = re.search(r"^# transcript-generator-sha256: ([0-9a-f]{64})$", transcript, re.M)
+if not _m:
+    raise SystemExit(
+        "transcript_pathological.txt carries no generator stamp.\n"
+        "  Regenerate it:  bash transcript_pathological.sh > transcript_pathological.txt")
+if _m.group(1) != _want:
+    raise SystemExit(
+        "transcript_pathological.txt is STALE -- it was produced by a different\n"
+        "  version of transcript_pathological.sh.\n"
+        f"    snapshot generator sha256: {_m.group(1)}\n"
+        f"    current  generator sha256: {_want}\n"
+        "  Regenerate it:  bash transcript_pathological.sh > transcript_pathological.txt")
 S, cur, buf = {}, None, []
 for line in transcript.split("\n"):
     m = re.match(r"^########## (.*)$", line)
@@ -301,29 +323,44 @@ fails it.</p>
 </div>
 
 <div class="page">
-<h2>Obstacle 1 — <code>mk</code> cannot derive the policy stub from a chunked md1</h2>
-<p>Every mk1 key card must carry a 4-byte policy-id stub; <code>mk encode</code>
-refuses without one. The only automatic way to get it is
-<code>--from-md1</code>, and that path rejects a chunk:</p>
-{code(sect('5. OBSTACLE 1 — mk cannot derive the stub from a CHUNKED md1'), 10)}
-<p><code>mk</code> vendors <code>md-codec 0.34.0</code>; the primary crate is at
-<code>0.42.0</code>. The "version 9" it will not parse is the chunked wire form.</p>
+<h2>Host step 4 — the key cards bind themselves to the policy</h2>
+<p>Every mk1 key card carries a 4-byte policy-id stub; <code>mk encode</code>
+refuses without one. The stub is derived straight from the wallet card with
+<code>--from-md1</code>, so no hand-copied hex sits between the policy and the
+eleven cards that claim membership in it:</p>
+{code(sect('5. mk derives the stub from the CHUNKED md1 itself'), 12)}
 
-<h3>Working around it — and a spec/implementation divergence found on the way</h3>
-<p>The stub is a property of the <em>descriptor</em>, not of the md1 string, so
-it is well defined for a chunked policy; <code>md inspect</code> prints the
-identities. But which one? <code>SPEC_mk_v0_1.md</code> §3.3 is explicit —
-"the top 4 bytes of the MD-encoded policy's <b>WalletPolicyId</b>" — and today's
-<code>md</code> prints a field by exactly that name. <b>That is not the one
-<code>mk</code> uses.</b> Measured on a single-string wallet where
-<code>--from-md1</code> does work:</p>
-{code('''wallet-descriptor-template-id: 726a666305756435b7c52c5b3fc69c41
-wallet-policy-id:              f05e8a1c282f7740bbfd902a759b5577
-policy_id_stubs (what mk embedded):  726a6663''')}
-<p>The stub tracks the <b>template-id</b>, not the <code>wallet-policy-id</code>.
-Most likely a rename across versions — <code>mk</code> vendors md-codec 0.34.0
-and the primary is 0.42.0, which now exposes both — but as it stands the spec
-sentence and the binary disagree about which identity a key card indexes.</p>
+<p><b>This did not work when this journey was first walked.</b> <code>mk</code>
+vendored <code>md-codec 0.34.0</code> against a primary at <code>0.42.0</code>,
+and every chunk was refused with
+<code>wire-format version mismatch: got 9, expected 4</code> — so the stub had
+to be computed by hand and passed as <code>--policy-id-stub</code>. Fixed
+2026-08-21 (F-127), and it was two defects stacked: the stale pin, and then
+<code>mk</code> decoding each <code>--from-md1</code> value independently, so a
+four-chunk card was four incomplete sets. Values are now grouped by the 20-bit
+chunk-set id in their wire header.</p>
+
+<h3>The stub, cross-checked against the identity it should be</h3>
+<p>The workaround became a check. This card is a keyless template, so the stub
+must be the top 4 bytes of the key-stable <b>WalletDescriptorTemplateId</b> —
+not the key-dependent WalletPolicyId. The journey now reads the stub back out
+of the card <code>mk</code> just built and fails the build if it disagrees:</p>
+{code(sect('6. the stub mk chose, cross-checked against the template id'), 12)}
+
+<h3>Which identity a key card indexes — settled</h3>
+<p>Walking this journey turned up a spec/implementation disagreement.
+<code>SPEC_mk_v0_1.md</code> §3.3 said the stub is "the top 4 bytes of the
+MD-encoded policy's <b>WalletPolicyId</b>", and that is not the one
+<code>mk</code> uses — it uses the <b>template-id</b> for a keyless card. The
+document originally guessed this was "most likely a rename across versions".
+<b>That guess was wrong.</b> The md-codec pin moved 0.34.0 → 0.42.0 and the
+behaviour did not change, so the dispatch is deliberate and form-aware:
+WalletPolicyId for a keyed policy, WalletDescriptorTemplateId for a keyless
+template. The SPEC was the stale half and was corrected 2026-08-21 (F-128),
+along with its §5 recovery flow — which, followed literally, would have made a
+recovery tool reject every card minted from a template.</p>
+<p>The consequence is worth carrying: <b>one wallet has two stubs</b>, one per
+form, and membership compares them verbatim.</p>
 {code(sect('9. the ids, and which one mk actually uses for the stub'), 10)}
 <p>Following the binary rather than the sentence, this wallet's stub is
 <b><code>5b48af35</code></b>, supplied with <code>--policy-id-stub</code>.</p>
@@ -331,7 +368,7 @@ sentence and the binary disagree about which identity a key card indexes.</p>
 
 <div class="page">
 <h2>Host step 4 — the eleven key cards</h2>
-{code(sect('7. the eleven key cards — ALL of them, each with its own origin'), 30)}
+{code(sect('7. the eleven key cards — ALL of them, in ONE command'), 30)}
 <p>Each key splits into 2 or 3 chunks — {MK1_CHUNKS} strings for eleven cards,
 counted from the transcript's own output rather than assumed.
 Note the decode: the card carries the origin fingerprint and path, so the
@@ -519,24 +556,49 @@ P.append(f"""
 <div class="page">
 <h2>What this run turned up</h2>
 
-<div class="warn"><b>1. <code>mk encode --from-md1</code> cannot read a chunked md1.</b>
-<code>wire-format version mismatch: got 9, expected 4</code>, exit 2 — and a stub
-is mandatory, so for any policy large enough to need chunking the documented
-route to a key card does not work. <code>mk</code> vendors
-<code>md-codec 0.34.0</code> against the primary's <code>0.42.0</code>; version 9
-is the chunked wire form its copy predates. The provenance pin is what should
-have caught this. Workaround: read the identity out of <code>md inspect</code>
-and pass <code>--policy-id-stub</code> by hand — which nothing tells an operator
-to do, and which requires knowing the next finding.</div>
+<div class="note"><b>1. <code>mk encode --from-md1</code> could not read a
+chunked md1. FIXED 2026-08-21 (F-127).</b>
+Every chunk was refused with
+<code>wire-format version mismatch: got 9, expected 4</code>, exit 2 — and a
+stub is mandatory, so for any policy large enough to need chunking the
+documented route to a key card did not work. This document's original
+workaround was to read the identity out of <code>md inspect</code> and pass
+<code>--policy-id-stub</code> by hand.
+<br><br>
+It was <b>two</b> defects stacked, the second invisible until the first was
+fixed. <code>mk</code> vendored <code>md-codec 0.34.0</code> against a primary
+at <code>0.42.0</code> — version 9 is the chunked wire form its copy predated.
+Once bumped, the error only <em>changed</em>, to
+<code>chunk set incomplete: got 1 chunks, expected 4</code>, because each
+<code>--from-md1</code> value was decoded independently: a four-chunk card was
+four incomplete sets. Values are now grouped by the 20-bit chunk-set id in
+their wire header.
+<br><br>
+Scale, measured afterwards: a keyed wallet policy is 246 data symbols against a
+single-string cap of 80, so <b>every</b> keyed card in the constellation is
+chunked. Not a large-wallet corner — the feature was absent for all of them and
+only ever worked on templates short enough to fit one string.</div>
 
-<div class="warn"><b>2. The spec and the binary disagree about which identity the
-stub indexes.</b> <code>SPEC_mk_v0_1.md</code> §3.3 says the stub is the top 4
-bytes of the <b>WalletPolicyId</b>, and <code>md</code> prints a field of exactly
-that name. Measured, <code>mk</code> embeds the top 4 bytes of the
+<div class="note"><b>2. The spec and the binary disagreed about which identity
+the stub indexes. FIXED 2026-08-21 (F-128) — in the SPEC, not the code.</b>
+<code>SPEC_mk_v0_1.md</code> §3.3 said the stub is the top 4 bytes of the
+<b>WalletPolicyId</b>, and <code>md</code> prints a field of exactly that name.
+Measured, <code>mk</code> embeds the top 4 bytes of the
 <b>wallet-descriptor-template-id</b> instead — <code>726a6663</code> where the
-<code>wallet-policy-id</code> began <code>f05e8a1c</code>. Probably a rename that
-landed in md-codec after 0.34.0, but the sentence and the code now name different
-things, and a stub is the index a recovering operator uses to tell wallets apart.</div>
+<code>wallet-policy-id</code> began <code>f05e8a1c</code>.
+<br><br>
+This document originally guessed that was "probably a rename that landed in
+md-codec after 0.34.0". <b>The guess was wrong.</b> The pin moved 0.34.0 →
+0.42.0 and the behaviour did not change, establishing the dispatch as
+deliberate and form-aware: WalletPolicyId for a keyed policy,
+WalletDescriptorTemplateId for a keyless template. The SPEC was the stale half.
+Its §5 recovery flow mattered more than §3.3 — followed literally it would have
+made a recovery tool reject <em>every</em> card minted from a template, and
+present it as "none of my cards belong to this wallet".
+<br><br>
+The consequence the spec now states: <b>one wallet has two stubs</b>, one per
+form, and membership compares them verbatim.</div>
+
 
 <div class="note"><b>3. <code>--path</code> is required here, and it flattens.</b>
 Without it the descriptor card carries no origin, <code>md decode</code>

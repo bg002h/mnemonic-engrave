@@ -71,6 +71,17 @@ T=$(cat "$W/inputs-pathological/wallet-policy.txt")
 # at this line — sixteen lines BEFORE step 3, the only command that could
 # produce it. It is assigned immediately after step 3 instead.
 
+# PROVENANCE. The PDF builder reads a COMMITTED SNAPSHOT of this script's
+# output, not a live run -- so a change here that is never re-captured leaves
+# the document asserting things the toolchain no longer does. That happened:
+# the F-127 fix renamed a section and corrected an obstacle, the snapshot was
+# not regenerated, and the PDF kept publishing the old failure as current.
+#
+# Stamping the generator's own hash lets the builder refuse a stale snapshot
+# instead of rendering it (F-226-adjacent; the same "a gate nobody can see"
+# shape). Regenerate with:  bash <this script> > <the .txt>
+echo "# transcript-generator-sha256: $(sha256sum "$0" | cut -d" " -f1)"
+
 echo "########## versions"
 run "$MD" --version
 run "$MK" --version

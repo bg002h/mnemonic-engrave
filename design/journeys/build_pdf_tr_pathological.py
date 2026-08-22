@@ -11,7 +11,7 @@ addresses and throws if the screen disagrees. So the pages below cannot show a
 device agreeing with a host unless it did.
 """
 
-import base64, html, json, os, shutil, subprocess, sys
+import base64, hashlib, html, json, os, re, shutil, subprocess, sys
 
 W = os.path.dirname(os.path.abspath(__file__))
 SHOTS = os.path.join(W, "shots")
@@ -95,6 +95,25 @@ def section(transcript, header):
 CSS = open(os.path.join(W, "build_pdf.py")).read().split('CSS = """')[1].split('"""')[0]
 
 tx = readfile(os.path.join(W, "transcript_tr_pathological.txt")).split("\n")
+
+# Refuse a snapshot produced by a different version of the generator.
+# `section()` catches a renamed header; this catches everything else that can
+# go stale while every header still resolves (see the wsh journey's F-127
+# regression, which shipped a fixed obstacle as a live one).
+_gen = os.path.join(W, "transcript_tr_pathological.sh")
+_want = hashlib.sha256(open(_gen, "rb").read()).hexdigest()
+_m = re.search(r"^# transcript-generator-sha256: ([0-9a-f]{64})$", "\n".join(tx), re.M)
+if not _m:
+    raise SystemExit(
+        "transcript_tr_pathological.txt carries no generator stamp.\n"
+        "  Regenerate:  bash transcript_tr_pathological.sh > transcript_tr_pathological.txt")
+if _m.group(1) != _want:
+    raise SystemExit(
+        "transcript_tr_pathological.txt is STALE -- produced by a different\n"
+        "  version of transcript_tr_pathological.sh.\n"
+        f"    snapshot: {_m.group(1)}\n"
+        f"    current : {_want}\n"
+        "  Regenerate:  bash transcript_tr_pathological.sh > transcript_tr_pathological.txt")
 result_path = os.path.join(SHOTS, "tr-pathological-result.json")
 result = json.load(open(result_path)) if os.path.exists(result_path) else MISSING.append(
     "tr-pathological-result.json") or {}

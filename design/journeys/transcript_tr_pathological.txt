@@ -1,3 +1,4 @@
+# transcript-generator-sha256: 6996f34afb1f9e7ab4ef00dc92532551d07d35d227e7b7a61153c177c9c254e8
 === 0. Versions ===
 
 $ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md --version
@@ -174,15 +175,15 @@ note: stdout is watch-only — public keys only, cannot spend
 
 === Artifacts ===
 $ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/tr-pathological
-total 240
+total 244
 drwxr-xr-x 1 bcg bcg    186 Aug 20 23:25 .
-drwxr-xr-x 1 bcg bcg    696 Aug 20 23:22 ..
--rw-r--r-- 1 bcg bcg   2087 Aug 21 00:21 md1-keyed.txt
--rw-r--r-- 1 bcg bcg    356 Aug 21 00:21 md1-template.txt
--rw-r--r-- 1 bcg bcg    126 Aug 21 00:21 tr.change.txt
--rw-r--r-- 1 bcg bcg     51 Aug 21 00:21 tr.id.txt
--rw-r--r-- 1 bcg bcg 224489 Aug 20 23:44 tr-pathological-journey.html
--rw-r--r-- 1 bcg bcg    126 Aug 21 00:21 tr.receive.txt
+drwxr-xr-x 1 bcg bcg    710 Aug 21 12:34 ..
+-rw-r--r-- 1 bcg bcg   2087 Aug 21 19:01 md1-keyed.txt
+-rw-r--r-- 1 bcg bcg    356 Aug 21 19:01 md1-template.txt
+-rw-r--r-- 1 bcg bcg    126 Aug 21 19:01 tr.change.txt
+-rw-r--r-- 1 bcg bcg     51 Aug 21 19:01 tr.id.txt
+-rw-r--r-- 1 bcg bcg 226316 Aug 21 17:34 tr-pathological-journey.html
+-rw-r--r-- 1 bcg bcg    126 Aug 21 19:01 tr.receive.txt
 [exit 0]
 
 All gates green.

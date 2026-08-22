@@ -49,6 +49,15 @@ runcap() {
 
 POLICY="$(cat "$IN/wallet-policy-tr.txt")"
 
+# PROVENANCE. The PDF builder reads a COMMITTED SNAPSHOT of this script's
+# output, not a live run. `section()` already fails on a RENAMED header, but a
+# snapshot can go stale with every header still matching -- which is exactly
+# what happened to the wsh journey: the F-127 fix corrected an obstacle, the
+# .txt was never re-captured, and the document kept publishing the old failure
+# as current. Stamping this script's hash lets the builder refuse a stale
+# snapshot. Regenerate with:  bash <this script> > <the .txt>
+echo "# transcript-generator-sha256: $(sha256sum "$0" | cut -d" " -f1)"
+
 echo "=== 0. Versions ==="
 echo
 run "$MD" --version
