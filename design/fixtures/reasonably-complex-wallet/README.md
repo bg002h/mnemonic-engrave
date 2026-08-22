@@ -1,5 +1,25 @@
 # "Our reasonably complex wallet" — the named fixture
 
+> ## ⚠ TIER 4 OF THIS FIXTURE IS BEARER ACCESS TO ANYONE WHO READS THIS REPO
+>
+> The policies below commit to three **fixed `sha256` literals**, and all three
+> preimages are **committed in plaintext** at
+> `../../journeys/inputs-rcw/preimages/`. Verified: each file's digest is the
+> exact literal in `tr.policy` and `wsh.policy`.
+>
+> Tier 4 needs **no key** — `sha256(H3)` alone after block **1383520**. So
+> anyone who can read this repository can spend tier 4 of any wallet using these
+> policies, once that height passes.
+>
+> **That is correct and intended for a fixture.** It is a hazard because a
+> fixture is the thing people copy. If you build a real wallet from this shape:
+> **generate your own preimages, never reuse these**, and treat the preimages as
+> exactly as sensitive as the seeds — because for tier 4 they *are* the seed.
+>
+> Engraving one of these three passphrases on a plate that ever holds funds
+> publishes that money to everyone reading this file.
+
+
 Named by the operator 2026-08-21. This is the standing reference wallet for
 arbitrary-miniscript work across the constellation: complex enough to exercise
 the things that actually break, small enough to read.
