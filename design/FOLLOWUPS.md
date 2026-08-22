@@ -9238,9 +9238,18 @@ only when the walk fails — so the refusal assertion is not vacuous.
    multisig BUILD path (`gui/multisig_build_*`) authors a policy and was not
    checked** — it has the cosigner xpubs so it probably declares fingerprints,
    but "probably" is not measured. Open, below.
-2. **Both pathological journeys carry the same latent gap** (11 slots, 4
-   distinct origins, no fingerprints) and neither says so. Their device walks
-   use the KEYED card, so nothing has ever exercised their seating path.
+2. ~~**Both pathological journeys carry the same latent gap.**~~ **DONE
+   2026-08-21** — `93e2f6d`. Not latent, as it turned out: their engraved set is
+   the keyless template plus 30 mk1 cards, so both were shipping a backup that
+   could not be restored. Declaring the fingerprints fixed both outright (all 11
+   `(fingerprint, path)` pairs are unique), 11 slots going from 4 distinct
+   declarations to 11. Cost two chunks each, 4 → 6; template-id unchanged, so
+   every address, wallet id and mk1 stub is the same and the tr device walk —
+   which gathers the KEYED card — is untouched.
+
+   The check that it actually worked is that `md encode`'s new advisory is now
+   **silent** on both, rather than that the plates got bigger. Their seating
+   path still has no device walk; that is what item 3 would cover.
 3. **No plates-to-restore walk anywhere.** Arm 3 restores from the files that
    produced the cards, not from anything read back off metal.
 4. **The device's multisig build path is unchecked for this.**
