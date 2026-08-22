@@ -1,0 +1,345 @@
+#!/usr/bin/env python3
+"""Assembles the HASHLOCK VAULT journey.
+
+Same rule as the four sibling builders: every CLI block below is
+transcript_hashvault.sh's real stdout+stderr with its actual exit code, and
+every input file is shown as the transcript `cat`-ed it. Nothing here is a value
+somebody typed into a document.
+
+This journey has no device walk yet, so it carries no screenshots — and the
+missing-asset gate is kept anyway, so adding one later cannot silently ship
+half-captured.
+"""
+
+import hashlib, html, os, re, shutil, subprocess, sys
+
+W = os.path.dirname(os.path.abspath(__file__))
+OUT = os.path.join(W, "out", "hashvault")
+IN = os.path.join(W, "inputs-hashvault")
+
+MISSING = []
+ALLOW_MISSING = "--allow-missing" in sys.argv
+
+
+def missing_gate(artifact):
+    if not MISSING:
+        return
+    uniq = sorted(set(MISSING))
+    print(f"\n{len(MISSING)} missing asset(s), {len(uniq)} distinct -- "
+          f"{artifact} is INCOMPLETE:", file=sys.stderr)
+    for name in uniq:
+        print(f"  missing: {name}", file=sys.stderr)
+    if ALLOW_MISSING:
+        print("--allow-missing given: exiting 0 with an incomplete document.", file=sys.stderr)
+        return
+    print("Refusing to report success.", file=sys.stderr)
+    sys.exit(1)
+
+
+def code(text, limit=None, must_show=None):
+    """Render a transcript block, optionally clipped.
+
+    `must_show` names a string the block exists to display — its punchline. A
+    clip that cuts the punchline off leaves a page that shows the command and
+    hides the result, which reads as evidence while proving nothing. Two
+    sections did exactly that on the first build: the "SAME WALLET" bind proof
+    sat at line 27 behind a 16-line clip, and the plate count at line 27 behind
+    a 20-line clip. Refusing is better than a bigger number, because the number
+    goes stale the next time the transcript grows.
+    """
+    lines = text.rstrip("\n").split("\n")
+    if must_show is not None:
+        at = next((i + 1 for i, l in enumerate(lines) if must_show in l), None)
+        if at is None:
+            raise SystemExit(
+                f"transcript block does not contain its punchline {must_show!r} — "
+                "did the transcript change?")
+        if limit and at > limit:
+            raise SystemExit(
+                f"clip of {limit} lines would hide the punchline {must_show!r} "
+                f"(it is on line {at}). Raise the limit past {at}.")
+    clip = limit and len(lines) > limit
+    if clip:
+        lines = lines[:limit]
+    body = html.escape("\n".join(lines))
+    if clip:
+        body += "\n<span class='clip'>… clipped; full text in transcript_hashvault.txt</span>"
+    return f"<pre>{body}</pre>"
+
+
+def readfile(p):
+    if not os.path.exists(p):
+        MISSING.append(os.path.basename(p))
+        return ""
+    with open(p) as f:
+        return f.read()
+
+
+def section(transcript, header):
+    marks = [i for i, l in enumerate(transcript) if l.startswith("=== ")]
+    for n, i in enumerate(marks):
+        if header in transcript[i]:
+            end = marks[n + 1] if n + 1 < len(marks) else len(transcript)
+            return "\n".join(transcript[i + 1:end]).strip("\n")
+    MISSING.append(f"transcript section {header!r}")
+    return ""
+
+
+CSS = open(os.path.join(W, "build_pdf.py")).read().split('CSS = """')[1].split('"""')[0]
+
+tx = readfile(os.path.join(W, "transcript_hashvault.txt")).split("\n")
+
+# Refuse a snapshot produced by a different version of the generator. `section()`
+# catches a renamed header; this catches everything else that goes stale while
+# every header still resolves.
+_gen = os.path.join(W, "transcript_hashvault.sh")
+_want = hashlib.sha256(open(_gen, "rb").read()).hexdigest()
+_m = re.search(r"^# transcript-generator-sha256: ([0-9a-f]{64})$", "\n".join(tx), re.M)
+if not _m:
+    raise SystemExit("transcript_hashvault.txt carries no generator stamp.\n"
+                     "  Regenerate:  bash transcript_hashvault.sh > transcript_hashvault.txt")
+if _m.group(1) != _want:
+    raise SystemExit("transcript_hashvault.txt is STALE -- produced by a different\n"
+                     "  version of transcript_hashvault.sh.\n"
+                     f"    snapshot: {_m.group(1)}\n    current : {_want}\n"
+                     "  Regenerate:  bash transcript_hashvault.sh > transcript_hashvault.txt")
+
+policy = readfile(os.path.join(IN, "wallet-policy-hashvault.txt")).strip()
+desc = readfile(os.path.join(OUT, "descriptor.txt")).strip()
+recv = readfile(os.path.join(OUT, "receive.txt")).split()
+chg = readfile(os.path.join(OUT, "change.txt")).split()
+md1 = [l for l in readfile(os.path.join(OUT, "md1-template.txt")).split("\n") if l.strip()]
+mk1 = [l for l in readfile(os.path.join(OUT, "mk-encode-raw.txt")).split("\n") if l.strip()]
+
+P = []
+
+P.append(f"""
+<section class="page">
+<h1>SeedHammer II — the hashlock vault</h1>
+<p class="sub">Six seeds, three engraved passphrases, four degrading tiers, one taproot tree.</p>
+
+<p>A wallet that hands control on in stages. Three keys and a passphrase can
+spend today; two other keys and a second passphrase can spend after a relative
+delay; a sixth key alone can spend after an absolute height; and after a longer
+height <b>a passphrase alone</b> can spend — no key at all.</p>
+
+<pre>{html.escape(policy)}</pre>
+
+<table>
+<tr><th>tier</th><th>who can spend</th><th>when</th></tr>
+<tr><td>1</td><td>3-of-3 (@0,@1,@2) + passphrase A</td><td>any time</td></tr>
+<tr><td>2</td><td>2-of-2 (@3,@4) + passphrase B</td><td><code>older(32768)</code> — relative, ~7.6 months after funding</td></tr>
+<tr><td>3</td><td>@5 alone</td><td><code>after(1173520)</code> — 963,520 + 210,000</td></tr>
+<tr><td>4</td><td><b>passphrase C alone</b></td><td><code>after(1383520)</code> — 963,520 + 420,000</td></tr>
+</table>
+
+<div class="warn"><b>Test material only — never put funds behind these keys.</b>
+The six seeds come from entropy <code>0x0…01</code> through <code>0x0…06</code>
+and the three passphrases are printable strings in
+<code>derive-hashvault-keys.sh</code>. Everything here is regenerable by design;
+that is the point, and it is also why it is worthless.</div>
+
+<div class="note"><b>The internal key is the BIP-341 NUMS point</b>, so there is
+no key-path spend and every spend reveals which tier was used.</div>
+</section>
+
+<section class="page">
+<h1>The source material</h1>
+
+<p>One seed per key, so every key has its own master fingerprint. That is the
+difference from this constellation's other multi-key journey, where three
+masters supplied eleven keys across four accounts.</p>
+{code(section(tx, "1. The source material"), 14)}
+
+<h2>Derived at the constellation's own path</h2>
+<p><code>m/270028'/coin'/account'/script'</code> — purpose <code>270028'</code>
+reads <code>bg002h</code> in a single component, and level 4 is the script type
+with <code>0'</code> = tr. Ruled 2026-08-18.</p>
+
+<div class="note"><b>The ruling had no implementation until this journey needed
+it.</b> <code>ms derive</code> offered only the BIP templates and
+<code>mk derive --path</code> is relative-and-unhardened-only, so nothing in the
+constellation could derive at its own path. <code>ms derive --template
+bg002h-tr</code> is what closed that.</div>
+{code(section(tx, "2. The keys"), 26)}
+</section>
+
+<section class="page">
+<h1>The passphrases, and what the policy commits to</h1>
+
+<p>These are engraved as TEXT + QR plates rather than as <code>ms1</code>:
+<code>ms encode</code> takes a BIP-39 mnemonic or hex entropy, and these are
+human passphrases.</p>
+
+<div class="warn"><b>The hash is over the UTF-8 bytes with NO trailing
+newline.</b> <code>printf %s</code>, never <code>echo</code>. A stray
+<code>\\n</code> changes the hash, and the tier it belongs to is then locked
+forever — with a plate beside it that looks correct.</div>
+{code(section(tx, "3. The three passphrases"), 20)}
+</section>
+
+<section class="page">
+<h1>Tier 4 has no key, and the default parser refuses it</h1>
+
+<p>rust-miniscript answers <code>All spend paths must require a signature</code>.
+That is a <b>safety policy, not a language rule</b>:
+<code>and_v(v:after(N),sha256(H))</code> is well-formed miniscript that compiles
+to valid script. <code>sanity_check()</code> applies five rules and
+<code>requires_sig()</code> is the first; the library documents them as
+guarantees rather than validity — "results cannot be relied upon" — and ships
+<code>ExtParams</code> precisely so individual rules can be relaxed.</p>
+{code(section(tx, "5. Tier 4 has no key"), 24)}
+
+<div class="warn"><b><code>--experimental</code> relaxes ONLY that rule.</b>
+Malleability, resource limits, repeated keys and timelock mixing are still
+enforced per leaf — those admit scripts that are <em>unspendable</em> rather
+than merely unguaranteed, which is a worse class of mistake. And it warns on
+every use, because the card carries no record that a flag authored it.</div>
+
+<div class="warn"><b>What tier 4 means in practice.</b> After block 1,383,520,
+whoever holds passphrase C can spend this wallet alone. That passphrase is
+engraved on a plate. <b>The plate is bearer access.</b> That is the design, not
+an oversight — but it is the reason this wallet's plates are not all equal, and
+the reason the passphrase plates want a different hiding place from the key
+plates.</div>
+</section>
+
+<section class="page">
+<h1>The cards</h1>
+
+<h2>The keyless template — what gets engraved</h2>
+{code(section(tx, "6. The cards re-encode"), 12, must_show="[exit 0]")}
+
+<h2>What the cards carry</h2>
+{code(section(tx, "7. What the cards carry"), 26)}
+
+<h2>The keyed set, and the bind</h2>
+<p>Two card sets, one wallet. The <b>template id</b> is key-stable, so it is the
+same across the keyless and keyed forms — which is exactly what makes it the
+right thing to compare.</p>
+{code(section(tx, "8. The KEYED card set"), 30, must_show="SAME WALLET")}
+</section>
+
+<section class="page">
+<h1>Addresses, derived from the card</h1>
+
+<p>From the cards, not from the policy string — this proves what the cards
+carry, not what was typed to make them. A taproot address commits to the
+<b>taptree shape</b> as well as the keys, so a wrong tree gives wrong addresses
+even when every key is right.</p>
+{code(section(tx, "9. Addresses"), 14, must_show="bc1p")}
+
+<table>
+<tr><th>chain</th><th>index</th><th>address</th></tr>
+<tr><td>receive</td><td>0</td><td><code>{html.escape(recv[0]) if recv else '—'}</code></td></tr>
+<tr><td>receive</td><td>1</td><td><code>{html.escape(recv[1]) if len(recv) > 1 else '—'}</code></td></tr>
+<tr><td>change</td><td>0</td><td><code>{html.escape(chg[0]) if chg else '—'}</code></td></tr>
+<tr><td>change</td><td>1</td><td><code>{html.escape(chg[1]) if len(chg) > 1 else '—'}</code></td></tr>
+</table>
+</section>
+
+<section class="page">
+<h1>The concrete descriptor</h1>
+
+<p>The whole wallet in one string: every key, every hash, every timelock. This
+is what a coordinator wants pasted in.</p>
+{code(section(tx, "10. The CONCRETE descriptor"), 10, must_show="descriptor is")}
+<pre>{html.escape(desc[:900])}{'…' if len(desc) > 900 else ''}</pre>
+</section>
+
+<section class="page">
+<h1>The six key cards</h1>
+
+<p>An <code>mk1</code> card binds a cosigner's key to the wallet. They bind to
+the <b>keyless template</b>, not the keyed set: the stub is form-aware, so a
+card minted against the keyed policy carries a different stub and is refused
+against the template. <b>One wallet, two stubs.</b></p>
+{code(section(tx, "11. The six mk1 key cards"), 22, must_show="stub mk embedded")}
+</section>
+
+<section class="page">
+<h1>What goes on which plate</h1>
+
+<p>The device caps a QR at <code>dim 37</code> — QR v5, about 106 bytes at
+ECC-L (<code>engrave/engrave.go:420</code>). Measured against that cap, the three
+kinds of content land in three different places:</p>
+{code(section(tx, "14. What goes on which plate"), 40, must_show="rejoin check")}
+
+<div class="note"><b>The mk1 cards lose their QR to five characters</b> — 111
+against a 106-byte cap. Nothing is lost by it; an mk1 is BCH-protected either
+way. It is the difference between scanning a plate and typing one.</div>
+
+<div class="warn"><b>The descriptor plates carry NO checksum.</b> An md1 chunk
+has a BCH checksum and a shared chunk-set-id, so a mis-transcribed character is
+detected and a mixed-up set is refused. These five plates are raw text split at
+a byte offset: one wrong character yields a descriptor that is still
+syntactically plausible and describes a <em>different wallet</em>. They are a
+convenience for a coordinator. <b>The md1 card set is the backup.</b></div>
+</section>
+
+<section class="page">
+<h1>The bundle, and the secrets</h1>
+{code(section(tx, "12. me bundle"), 30, must_show="backup needs")}
+
+<h2>The secrets</h2>
+<p><code>me</code> refuses an <code>ms1</code> outright — it will not render,
+preview or transmit a secret, which is what makes the rest of the bundle safe to
+preview at all.</p>
+{code(section(tx, "13. The secrets"), 16)}
+</section>
+
+<section class="page">
+<h1>What this journey does NOT show</h1>
+
+<ul>
+<li><b>No device walk.</b> Every command here is host-side. The cards have not
+been carried to a SeedHammer II, and no screen in this document is a
+framebuffer. The sibling taproot journey does that; this one does not yet.</li>
+<li><b>No restore test.</b> The wallet has not been rebuilt from the plates and
+the seeds and checked to spend to the same addresses. For a wallet whose tier 4
+is keyless, a restore test would also have to prove the passphrase alone
+reproduces the tier — which is exactly the property that makes it dangerous.</li>
+<li><b>No hardware.</b> Nothing has been cut. The plate counts and the QR
+capacity are computed from the device's own constants, not measured on
+metal.</li>
+<li><b>The descriptor plates are unchecked text.</b> Stated again because it is
+the one place this backup is weaker than the constellation's usual guarantees.</li>
+</ul>
+
+<h2>Reproducing this document</h2>
+<pre>bash derive-hashvault-keys.sh
+bash transcript_hashvault.sh &gt; transcript_hashvault.txt
+python3 build_pdf_hashvault.py</pre>
+<p>The builder refuses a transcript snapshot that does not match the script that
+produced it, so this document cannot quietly describe a toolchain that has moved
+on underneath it.</p>
+</section>
+""")
+
+html_doc = f"<!doctype html><meta charset=utf-8><title>SeedHammer II — the hashlock vault</title><style>{CSS}</style>{''.join(P)}"
+out_html = os.path.join(OUT, "hashvault-journey.html")
+os.makedirs(OUT, exist_ok=True)
+with open(out_html, "w") as f:
+    f.write(html_doc)
+print(f"wrote {out_html} ({len(html_doc)//1024} KB)")
+
+# THE GATE BEFORE THE PRINT. A sibling builder once printed its PDF BEFORE
+# running this, so the first bad run overwrote the published deliverable with an
+# incomplete one. Gate first, print second.
+missing_gate(out_html)
+
+PDF = os.path.join(W, "SeedHammer-II-hashlock-vault-journey.pdf")
+chrome = os.environ.get("CHROME") or shutil.which("chromium") or shutil.which("google-chrome")
+if not chrome:
+    guess = os.path.expanduser("~/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome")
+    chrome = guess if os.path.exists(guess) else None
+if not chrome:
+    print("no chrome/chromium found; set $CHROME to one. HTML is written.", file=sys.stderr)
+    sys.exit(1)
+subprocess.run(
+    [chrome, "--headless", "--disable-gpu", "--no-sandbox",
+     "--no-pdf-header-footer", f"--print-to-pdf={PDF}", "file://" + out_html],
+    check=True, capture_output=True,
+)
+print(f"wrote {PDF} ({os.path.getsize(PDF)//1024} KB)")
+missing_gate(PDF)
