@@ -12,8 +12,25 @@ suite would not have caught, folded with tests that kill that mutation. Final
 state: fmt clean, clippy 0, **3930/3930**, and `restore` byte-identical
 (`sha256 c121fb6c…`) before, after, and after the fold.
 
-**Phase state:** 1 DONE · 1b SPECIFIED, not built · 2 DELETED · 3 not built ·
+**Phase 1b is BUILT, VERIFIED and MERGED** (`mnemonic-toolkit` `e95e80a8`).
+`--format bitcoin-core-addresses` emits checksummed `addr()` entries — receive
+AND change — that import into real Core (gate green against v27.0 and v31.1,
+with a negative control proving the same wallet's *descriptor* route still
+returns `success: false`). Its addresses equal the journey's exactly, making it
+the fourth independent implementation to agree with SeedHammer II, `md address`
+and the BIP-129 BSMS canary. `--count` defaults to 20 (BIP-44 gap limit); the
+fixed-list caveat rides in-band on Core's `label`.
+
+**Phase state:** 1 DONE · **1b DONE** · 2 DELETED · 3 not built ·
 4 ruled NOT NOW with a trigger · 5 separate cycle.
+
+**Open defect this cycle exposed (not in any phase):** only `examples.yml` and
+`rust.yml` carry `'ci/**'`; **seven workflows are `[main, master]`-only**, so the
+staging ritual structurally cannot gate them — including `vendor-freshness.yml`,
+the exact workflow F-226 was about, fixed in `descriptor-mnemonic` and
+`mnemonic-secret` and never here. That gap is how Phase 1 reached `master` with
+`docs/manual`'s lint red (MD012); 1b fixed the lint and `manual` is `success`
+again, but the hole remains.
 
 **Operator ask (2026-08-22):** output Nunchuk, Sparrow and Bitcoin Core
 **watch-only and hot** wallets via the m* utilities, and the same on SeedHammer
