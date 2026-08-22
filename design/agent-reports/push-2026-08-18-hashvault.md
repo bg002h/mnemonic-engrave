@@ -945,3 +945,75 @@ ritual**, which is the entire point of the gate.
 (`6d1dd24696f8563a5618d266f54cdaa609309f41`) this ritual actually staged
 and watched CI for. `ci/staging` intentionally left un-deleted, pointing at
 the gated SHA, for inspection.**
+
+## the re-gate round
+
+Re-gate of everything on `master`, including the two commits that slipped
+past CI in the previous round (`8319ddb`, `4657f88`) due to the freeze
+violation reported there.
+
+- Branch: `master`. `git status --porcelain`: clean (confirmed before any
+  push action).
+- Tip SHA: `949b7aadbcac296610a30d12ce1d98e2cc25a862` (40 chars confirmed
+  via `wc -c`). Two commits ahead of the previously-bypassed `4657f88`:
+  `b328ead` ("journeys: the export matrix, and three implementations naming
+  one address") and `949b7aa` ("reports: a freeze violation I caused, and
+  the export deadlock ruling" — this is the coordinator's own commit
+  persisting the previous round's failure report and their acknowledgment
+  of it).
+- **What this gate now covers that the previous one didn't**: `git diff
+  --stat 6d1dd24..949b7aa` (everything since the last SHA that was actually
+  staged and CI-verified before the freeze violation) touches 8 files —
+  `design/PLAN_wallet_file_export.md`,
+  `design/agent-reports/PLAN_export_bitcoin_core.md`,
+  `design/agent-reports/RULING_export_deadlock.md`,
+  `design/agent-reports/push-2026-08-18-hashvault.md` (this report), one
+  PDF, and the RCW journey builder/transcript files. **No `.rs` or `.go`
+  file anywhere in that range.** Confirmed via `git merge-base
+  --is-ancestor` that both previously-slipped commits (`8319ddb...`,
+  `4657f88...`) are now ancestors of this gate's tip — they are no longer
+  unverified, they are simply part of the history CI just ran green
+  against.
+- `git push origin master:refs/heads/ci/staging --force` →
+  `6d1dd24..949b7aa  master -> ci/staging` — this intentionally overwrote
+  the `ci/staging` ref that had been deliberately left pointing at
+  `6d1dd24` since the previous round, now that the gap it recorded is
+  captured in both the report and in `949b7aa` itself. Verified via fresh
+  `git fetch origin` that `git rev-parse master` == `git rev-parse
+  origin/ci/staging` == `949b7aadbcac296610a30d12ce1d98e2cc25a862`.
+- Workflow that ran for this SHA — `release`, `databaseId 32569263475`,
+  `event: push`, `headSha` confirmed matching. Watched actively via `gh run
+  watch` with an explicit 600000ms timeout, which blocked until the run
+  finished. Overall `conclusion: success`. Per-job conclusions, queried via
+  `gh run view --json headSha,status,conclusion,jobs`:
+  - `test (rust + go)` → success
+  - `build me (linux-aarch64)` → success
+  - `build me (linux-x86_64)` → success
+  - `build me (windows-x86_64)` → success
+  - `build me-preview (all targets)` → success
+  - `build me (macos-x86_64)` → success
+  - `build me (macos-aarch64)` → success
+  - `assemble + sign + release` → `skipped` — expected (tag-gated).
+  8 of 8 jobs green.
+- **Extra caution applied this round, given the previous failure**:
+  immediately before the final push, re-verified `git rev-parse master`
+  still equalled the exact SHA that was staged and CI-tested
+  (`949b7aadbcac296610a30d12ce1d98e2cc25a862` — confirmed match), then
+  fetched and confirmed `origin/master` (still at the previously-bypassed
+  `4657f88`) was an ancestor of local `master`, guaranteeing the push could
+  only be a clean fast-forward. It was: no commits landed on `master`
+  during this round's CI wait.
+- Final `git push origin master` output:
+  ```
+  To github.com:bg002h/mnemonic-engrave.git
+     4657f88..949b7aa  master -> master
+  ```
+  No "Bypassed rule violations" text present. This is a genuine
+  fast-forward push carrying a verified-green SHA, unlike the previous
+  round's bypassed push.
+- `ci/staging` ref deleted afterward; confirmed `origin/master` ==
+  `949b7aadbcac296610a30d12ce1d98e2cc25a862` after a fresh fetch.
+
+**VERDICT: PUSHED (and the previous round's gap fully closed — both
+`8319ddb` and `4657f88` are now ancestors of a SHA that this ritual staged,
+watched CI for, and pushed cleanly).**
