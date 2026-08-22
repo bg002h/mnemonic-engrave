@@ -1,4 +1,4 @@
-# transcript-generator-sha256: dfe65c4f9c6259fb1cbff74392ef86e84769b12fe2cc4c8d45b75849126349b5
+# transcript-generator-sha256: a94fcf9b5684485ec9ff316dc2e5d5b2ec1548b7231835db0b88bd599fc40b80
 
 === 0. Versions ===
 
@@ -383,24 +383,61 @@ What a wrong assignment costs, measured:
 Three different wallets from one set of six keys. 6! = 720 assignments,
 and the engraved template distinguishes none of them.
 
+=== 16. THE FIX: one more chunk, and the template names its slots ===
+
+The gap is not that the paths collide -- it is that the template carries
+NOTHING ELSE to tell the slots apart. `md encode` takes a repeatable
+--fingerprint, and the six masters have six distinct fingerprints, so the
+template can declare them without touching a path, a key or the policy.
+
+$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{and_v(v:sha256(ede0b28a805feca09a77c48f82babc1249c79aa840de94fa4a85bf55a453c813),multi_a(3,@0/270028'/0'/0'/0'/<0;1>/*,@1/270028'/0'/0'/0'/<0;1>/*,@2/270028'/0'/0'/0'/<0;1>/*)),{and_v(v:older(32768),and_v(v:sha256(9ce09a8df1d1f8bc8892441a9eb30d0a18bc7db81bb0fb3f54c6d9064e7b76ad),multi_a(2,@3/270028'/0'/0'/0'/<0;1>/*,@4/270028'/0'/0'/0'/<0;1>/*))),{and_v(v:after(1173520),pk(@5/270028'/0'/0'/0'/<0;1>/*)),and_v(v:after(1383520),sha256(4743d7c47df21d29e3ed3dfec5d0c0a884ccc2708637dddf771c36d214056954))}}}) --group-size 0 --experimental --fingerprint @0=39ec1b6e --fingerprint @1=d02bcedf --fingerprint @2=5fd78eb3 --fingerprint @3=92c4c8b2 --fingerprint @4=086c047e --fingerprint @5=cef8224c
+chunk-set-id: 0x00d82
+md1fqrvzzqpp2040veppppqqxqu2nxh0duzeg4qzlajsf5a7y37pt40qjf8re42zqx6mqa80ahfvpj
+md1fqrvzzqt0ff7j2skl4tfzneqfjqss9p2v6uqqqgqqzv6annsf4r0368utezyjgc2rty2pdjletd
+md1fqrvzzqjp484np59p30rahqdmp7el2nrdjpjw0dm26gppwp2v6mqqg7syp25e5q7yl59skuwn57
+md1fqrvzzq7cqz5wxqagapa03ra7gwjncld8hlvt5xq4zzvesnsscmamhmhrsmdyyrk6djz5tls2wy
+md1fqrvzzpyq454grrfqw0vrdhr5ptem05h7h36ehykyezegzrvq3ltnhcyfxq5yrmdta2t8avv
+warning: --experimental relaxed the signature rule. This descriptor has at least one spend path that needs NO key, so whoever learns its preimage can spend it alone. If that preimage is engraved, THE PLATE IS BEARER ACCESS. Malleability, resource limits, repeated keys and timelock mixing were still checked.
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+Chunks: 4 without fingerprints, 5 with. The whole cost is 1.
+
+It is the SAME WALLET -- the template id is key-stable and does not move:
+  bare        68a1a888385797337ce5debc90fcfb1e
+  fingerprint 68a1a888385797337ce5debc90fcfb1e
+
+And the slots are now distinguishable:
+  @0: [39ec1b6e/270028'/0'/0'/0']
+  @1: [d02bcedf/270028'/0'/0'/0']
+  @2: [5fd78eb3/270028'/0'/0'/0']
+  @3: [92c4c8b2/270028'/0'/0'/0']
+  @4: [086c047e/270028'/0'/0'/0']
+  @5: [cef8224c/270028'/0'/0'/0']
+
+The device half proves the consequence -- capture_hashvault.py --fingerprinted
+seats all six cards on this template and derives the wallet's addresses,
+where --seating on the bare template is refused. Same cards, same policy.
+
 === Artifacts ===
 $ ls -la /scratch/code/shibboleth/mnemonic-engrave/design/journeys/out/hashvault
-total 92
-drwxr-xr-x 1 bcg bcg   358 Aug 21 22:02 .
-drwxr-xr-x 1 bcg bcg   728 Aug 21 21:06 ..
--rw-r--r-- 1 bcg bcg  1848 Aug 21 22:02 backup-strings.txt
--rw-r--r-- 1 bcg bcg   126 Aug 21 22:02 change.txt
-drwxr-xr-x 1 bcg bcg   260 Aug 21 21:17 descriptor-plates
--rw-r--r-- 1 bcg bcg  1299 Aug 21 22:02 descriptor.txt
--rw-r--r-- 1 bcg bcg 42323 Aug 21 21:35 hashvault-journey.html
--rw-r--r-- 1 bcg bcg   834 Aug 21 22:02 keys.txt
--rw------- 1 bcg bcg 10774 Aug 21 22:02 manifest.json
--rw-r--r-- 1 bcg bcg  1278 Aug 21 22:02 md1-keyed.txt
--rw-r--r-- 1 bcg bcg   324 Aug 21 22:02 md1-template.txt
--rw-r--r-- 1 bcg bcg  2332 Aug 21 22:02 mk-encode.json
--rw-r--r-- 1 bcg bcg  1524 Aug 21 22:02 mk-encode-raw.txt
-drwxr-xr-x 1 bcg bcg   510 Aug 21 22:02 plates
--rw-r--r-- 1 bcg bcg   126 Aug 21 22:02 receive.txt
+total 200
+drwxr-xr-x 1 bcg bcg    396 Aug 21 22:27 .
+drwxr-xr-x 1 bcg bcg    728 Aug 21 21:06 ..
+-rw-r--r-- 1 bcg bcg   1848 Aug 21 22:26 backup-strings.txt
+-rw-r--r-- 1 bcg bcg    126 Aug 21 22:26 change.txt
+drwxr-xr-x 1 bcg bcg    260 Aug 21 21:17 descriptor-plates
+-rw-r--r-- 1 bcg bcg   1299 Aug 21 22:26 descriptor.txt
+-rw-r--r-- 1 bcg bcg 151271 Aug 21 22:19 hashvault-journey.html
+-rw-r--r-- 1 bcg bcg    834 Aug 21 22:26 keys.txt
+-rw------- 1 bcg bcg  10774 Aug 21 22:27 manifest.json
+-rw-r--r-- 1 bcg bcg   1278 Aug 21 22:26 md1-keyed.txt
+-rw-r--r-- 1 bcg bcg    392 Aug 21 22:27 md1-template-fp.txt
+-rw-r--r-- 1 bcg bcg    324 Aug 21 22:26 md1-template.txt
+-rw-r--r-- 1 bcg bcg   2332 Aug 21 22:26 mk-encode.json
+-rw-r--r-- 1 bcg bcg   1524 Aug 21 22:26 mk-encode-raw.txt
+drwxr-xr-x 1 bcg bcg    510 Aug 21 22:27 plates
+-rw-r--r-- 1 bcg bcg    126 Aug 21 22:26 receive.txt
 [exit 0]
 
 All gates green.

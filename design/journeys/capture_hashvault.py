@@ -168,6 +168,9 @@ async def drive(port, shot_port, md1, key_cards, policy_id, addresses, refusal, 
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--fingerprinted", action="store_true",
+                    help="THE FIX: the template re-encoded with --fingerprint per slot, "
+                         "expecting the six cards to seat and derive")
     ap.add_argument("--keyed", action="store_true",
                     help="the control arm: the 15-chunk keyed card alone, expecting addresses")
     ap.add_argument("--port", type=int, default=8799)
@@ -185,7 +188,19 @@ def main():
 
     template, keyed, key_cards, addresses, shared_path = read_artifacts()
 
-    if a.prove_it_can_fail:
+    if a.fingerprinted:
+        p = os.path.join(OUT, "md1-template-fp.txt")
+        if not os.path.exists(p):
+            sys.exit(f"missing {p} -- encode the template with one --fingerprint per slot first.")
+        md1 = [l.strip() for l in open(p) if l.strip()]
+        cards, refusal, policy_id, prefix = key_cards, None, None, "f"
+        print(f"FINGERPRINTED ARM: {len(md1)} template chunks + {len(cards)} mk1 cards.")
+        print("  Same wallet, same paths -- the template now DECLARES a fingerprint per")
+        print("  slot, so seating layer 2 can tell the six cards apart. Expecting the")
+        print("  same addresses the keyed card produced.")
+        for x in addresses:
+            print(f"    {x}")
+    elif a.prove_it_can_fail:
         md1, cards, refusal, policy_id, prefix = keyed, [], REFUSAL_NEEDLE, None, "n"
         print("NEGATIVE CONTROL: feeding the KEYED card while demanding the seating refusal.")
         print(f"  {len(md1)} chunks, no key cards, so {REFUSAL_NEEDLE!r} must NOT appear.")
@@ -248,18 +263,27 @@ def main():
         return not os.path.exists(p) or os.path.getsize(p) < 512
 
     want = list(res.get("shots", []))
-    if not a.keyed:
+    if not a.keyed and not a.fingerprinted:
         want = SEATING_EXPECTED + [n for n in want if n not in SEATING_EXPECTED]
     missing = [n for n in want if bad(n)]
     if missing:
         sys.exit(f"capture INCOMPLETE -- missing or empty: {missing}")
 
-    tag = "hashvault-keyed" if a.keyed else "hashvault-seating"
+    tag = ("hashvault-fingerprinted" if a.fingerprinted
+           else "hashvault-keyed" if a.keyed else "hashvault-seating")
     with open(os.path.join(SHOTS, f"{tag}-result.json"), "w") as f:
         json.dump(res, f, indent=2)
 
     print(f"\ncaptured {len(want)} shots into {SHOTS}")
-    if a.keyed:
+    if a.fingerprinted:
+        print(f"template chunks: {res['chunksPresented']}, "
+              f"key cards seated: {res.get('keyCardsGathered', 0)}")
+        print("SEATED, and MATCHED against the host:")
+        for x in res["matched"]["addresses"]:
+            print(f"  address    {x}")
+        print("\nOne extra chunk -- 5 instead of 4 -- and the engraved set determines")
+        print("the wallet. Same template id, same paths, same policy.")
+    elif a.keyed:
         print(f"chunks presented: {res['chunksPresented']}, "
               f"consent pages read: {len(res['consentPages'])}")
         print("MATCHED against the host:")

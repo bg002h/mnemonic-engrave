@@ -9170,3 +9170,64 @@ Related: this is the same class as the mk-side catch earlier in this cycle,
 where `vendor/` had silently fallen out of sync with `Cargo.lock` and only a
 PR-time gate caught it. There the gate worked; here the gate cannot run.
 
+### F-227 — a keyless template with colliding origins and no fingerprints cannot be seated `#journeys` `#funds` `#md` `#firmware`
+
+Filed 2026-08-21, found by building the hashlock-vault journey — not by review.
+**Owning phase:** the hashvault journey part is DONE; the `md encode` warning
+and the two pathological journeys are open.
+
+**The class.** A keyless md1 template names its slots by origin. `seatKeyCards`
+(`gui/key_card_seating.go`) matches a card to a slot on that origin, checking
+the fingerprint **only when the template declares one**, and refuses every
+undecidable state. So when two slots share a derivation path and the template
+declares no fingerprints, the card set is **unseatable** — the engraved backup
+does not determine the wallet.
+
+This is not exotic. `48'/0'/0'/2'` is *the* standard multisig account path;
+every cosigner using it is the normal case. Measured across the journeys'
+own artifacts:
+
+| journey | slots | distinct origins | fingerprints |
+|---|---|---|---|
+| hashlock vault (bare) | 6 | 1 | 0 |
+| tr-pathological | 11 | 4 | 0 |
+| pathological | 11 | 4 | 0 |
+
+**Why it matters.** `multi_a` commits to key order, so a wrong assignment is a
+different wallet, not a cosmetic difference. Measured on the hashvault: three
+assignments, three different addresses; 6! = 720 available.
+
+#### RESOLVED for the hashvault journey — `md encode --fingerprint`, one extra chunk
+
+`--fingerprint @i=HEX` is repeatable and was simply never passed. The six
+masters already have distinct fingerprints. Declaring them moves no path,
+reveals no key, leaves the policy character-identical, and the transcript gates
+on `wallet-descriptor-template-id` being unchanged (`68a1a888…` both ways).
+Cost: **4 chunks → 5**.
+
+Proved on the device, three arms (`capture_hashvault.py`), not argued:
+
+- `--keyed` — the 15-chunk keyed card derives; rules out the vault's shape
+  (4 tiers, 2 hashlocks, both timelock flavours, `multi_a`, NUMS) as the cause.
+- default — bare template + 6 cards: **refused**, `errSeatSlotContested`,
+  *"Two different key cards claim the same slot, and this template can't tell
+  them apart. It declares no fingerprints."*, no address shown.
+- `--fingerprinted` — the SAME six cards on the 5-chunk template: **seated**,
+  and derived all four host addresses.
+
+`--prove-it-can-fail` demands the refusal from a card that derives, and exits 0
+only when the walk fails — so the refusal assertion is not vacuous.
+
+#### STILL OPEN
+
+1. **`md encode` says nothing.** It will happily emit a keyless template whose
+   origins collide with no fingerprints, and the operator learns it is
+   unseatable only on attempting a restore — after engraving. It has every
+   input needed to warn at authoring time. This is the systemic fix; the
+   journeys are just where it surfaced. **Rust-primary: land the check in
+   `descriptor-mnemonic` with vectors, then port.**
+2. **Both pathological journeys carry the same latent gap** (11 slots, 4
+   distinct origins, no fingerprints) and neither says so. Their device walks
+   use the KEYED card, so nothing has ever exercised their seating path.
+3. **No plates-to-restore walk anywhere.** Arm 3 restores from the files that
+   produced the cards, not from anything read back off metal.

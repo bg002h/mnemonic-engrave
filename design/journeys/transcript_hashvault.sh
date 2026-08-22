@@ -279,6 +279,43 @@ echo "Three different wallets from one set of six keys. 6! = 720 assignments,"
 echo "and the engraved template distinguishes none of them."
 echo
 
+echo "=== 16. THE FIX: one more chunk, and the template names its slots ==="
+echo
+echo "The gap is not that the paths collide -- it is that the template carries"
+echo "NOTHING ELSE to tell the slots apart. \`md encode\` takes a repeatable"
+echo "--fingerprint, and the six masters have six distinct fingerprints, so the"
+echo "template can declare them without touching a path, a key or the policy."
+echo
+FPARGS=()
+for i in 0 1 2 3 4 5; do
+  FPARGS+=(--fingerprint "@$i=$(sed -n 's/.*origin \[\([0-9a-f]*\)\/.*/\1/p' "$IN/keys/key-$i.xpub" | head -1)")
+done
+runcap "$OUT/md1-template-fp.txt" '^md1' \
+  "$MD" encode "$POLICY" --group-size 0 --experimental "${FPARGS[@]}"
+
+FPN=$(grep -c '^md1' "$OUT/md1-template-fp.txt")
+BAREN=$(grep -c '^md1' "$OUT/md1-template.txt")
+echo "Chunks: $BAREN without fingerprints, $FPN with. The whole cost is $((FPN - BAREN))."
+echo
+
+echo "It is the SAME WALLET -- the template id is key-stable and does not move:"
+TID_BARE=$("$MD" inspect $(grep '^md1' "$OUT/md1-template.txt" | tr '\n' ' ') 2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p')
+TID_FP=$("$MD" inspect $(grep '^md1' "$OUT/md1-template-fp.txt" | tr '\n' ' ') 2>/dev/null | sed -n 's/^wallet-descriptor-template-id: //p')
+if [ -z "$TID_BARE" ] || [ "$TID_BARE" != "$TID_FP" ]; then
+  fatal "adding fingerprints changed the wallet: '$TID_BARE' vs '$TID_FP'"
+fi
+echo "  bare        $TID_BARE"
+echo "  fingerprint $TID_FP"
+echo
+
+echo "And the slots are now distinguishable:"
+"$MD" inspect $(grep '^md1' "$OUT/md1-template-fp.txt" | tr '\n' ' ') 2>/dev/null | grep -E '^\s+@[0-9]+'
+echo
+echo "The device half proves the consequence -- capture_hashvault.py --fingerprinted"
+echo "seats all six cards on this template and derives the wallet's addresses,"
+echo "where --seating on the bare template is refused. Same cards, same policy."
+echo
+
 echo "=== Artifacts ==="
 run ls -la "$OUT"
 

@@ -205,6 +205,21 @@ sw_gather = img("h03-gather-full.png",
 sw_refusal = img("h05-refusal.png",
                  cap="Arm 2: the refusal. No address anywhere on the screen.")
 
+FW = walk_result("hashvault-fingerprinted-result.json",
+                 need=["chunksPresented", "keyCardsGathered", "matched"])
+fw_chunks = FW.get("chunksPresented", "?")
+fw_cards = FW.get("keyCardsGathered", "?")
+_fw_rows = "".join(f"<tr><td><code>{html.escape(a)}</code></td></tr>"
+                   for a in FW.get("matched", {}).get("addresses", []))
+fw_table = ("<table><tr><th>derived on the device, matching the host</th></tr>"
+            f"{_fw_rows}</table>")
+fw_gather = img("f03-gather-full.png",
+                cap=f"Arm 3: the {fw_chunks}-chunk fingerprinted template and the same "
+                    f"{fw_cards} mk1 cards. No refusal this time.")
+fw_consent = img("f04-consent-p1.png",
+                 cap="Arm 3: the addresses, seated from the key cards rather than read "
+                     "off a keyed card.")
+
 NEG_CONTROL = """$ python3 capture_hashvault.py --prove-it-can-fail --no-build
 NEGATIVE CONTROL: feeding the KEYED card while demanding the seating refusal.
   15 chunks, no key cards, so 'declares no fingerprints' must NOT appear.
@@ -411,23 +426,32 @@ plates and all six seeds has 720 candidate assignments and no way to choose.
 This is not a tooling defect — it is a property of the wallet's shape, and it is
 the thing this journey exists to have found before anything was cut.</div>
 
-<h2>The three ways out</h2>
+<h2>The ways out, and the one that costs almost nothing</h2>
 <ul>
+<li><b>Declare the fingerprints in the template</b> —
+<code>md encode --fingerprint @0=… --fingerprint @1=…</code>, which is
+repeatable and was simply not passed. The six masters already have six distinct
+fingerprints. No path moves, no key is revealed, the policy is untouched, and
+the template id does not change. <b>This is the fix, and the next two pages
+measure it.</b></li>
 <li><b>Give each key its own account index</b> —
-<code>m/270028'/0'/N'/0'</code>. The origins then differ, and the existing
-seating rule (match on declared origin) assigns slots with no extra data. This
-is how the pathological wallet avoids the problem, and it changes no policy
-semantics.</li>
-<li><b>Engrave the KEYED card</b> instead of the template. It carries a
-fingerprint per slot, so the assignment is on the plate — at the cost of 15
-chunks rather than 4, and of putting the cosigner xpubs on metal.</li>
-<li><b>Record the assignment out of band</b> — the weakest option, because it is
-the one thing here that is not engraved and not checkable.</li>
+<code>m/270028'/0'/N'/0'</code>, so the origins themselves differ. Works, but it
+changes every address and every derivation, which is a large price for
+something a declaration solves.</li>
+<li><b>Engrave the KEYED card</b> instead of the template — a fingerprint per
+slot, at the cost of 15 chunks rather than 4 and of putting the cosigner xpubs
+on metal.</li>
+<li><b>Record the assignment out of band</b> — the weakest, because it is then
+the one part of the backup that is neither engraved nor checkable.</li>
 </ul>
 
-<div class="note">This is the same class as F-216 (mapping an mk1 to an
-<code>@N</code> slot) in its hardest form: there, seating could match on a
-declared origin, because the origins differed. Here they do not.</div>
+<div class="note">This is F-216 (mapping an mk1 to an <code>@N</code> slot) in
+its hardest form: there, seating matched on a declared origin because the
+origins differed. <b>And the sibling taproot journey is not safe from it either
+— checked, not assumed.</b> Its keyless template reads <code>@0</code>,
+<code>@4</code> and <code>@8</code> as the same <code>m/48'/0'/0'/2'</code>, one
+per master, with no fingerprints. The collision here is six-way and obvious;
+there it is three-way and hides inside a wallet that looks fine. Filed.</div>
 </section>
 
 <section class="page">
@@ -501,6 +525,57 @@ it, and the device was already right.</div>
 </section>
 
 <section class="page">
+<h1>The fix costs one chunk</h1>
+
+<p><code>md encode</code> takes a repeatable <code>--fingerprint</code>. The
+template was encoded without it, so it declared bare paths. The six masters
+already have six distinct fingerprints — they are printed on the key cards —
+and declaring them is the whole repair:</p>
+{code(section(tx, "16. THE FIX"), 26, must_show="The whole cost is 1")}
+
+<p>Four chunks became five. The paths did not move, no key is revealed, the
+policy is character-for-character the same, and the transcript gates on the
+wallet-descriptor-template-id being unchanged — <code>68a1a888…</code> before
+and after — so this is demonstrably the same wallet and not a new one that
+happens to work.</p>
+
+<div class="note">Worth being precise about what was wrong: not the paths.
+Sharing <code>m/270028'/0'/0'/0'</code> across six masters is legitimate and
+common — it is the standard shape for multisig, where every cosigner uses the
+same account path. What was wrong is that the template carried <b>nothing else
+to tell the slots apart</b>, and it had a field for exactly that.</div>
+</section>
+
+<section class="page">
+<h1>Arm 3 — the same six cards, and now the device seats them</h1>
+
+<p>Nothing about the cards changed. The only difference from arm 2 is which
+template they are presented against.</p>
+
+<div class="shotrow">
+{fw_gather}
+{fw_consent}
+</div>
+
+{fw_table}
+
+<p>The same four addresses the keyed card produced in arm 1, and the same four
+the host derived in Rust — but reached the way a restorer would actually reach
+them: from a keyless template and one card per key, with the device doing the
+join.</p>
+
+<div class="warn"><b>That is the round trip.</b> Six seeds went in; a template
+and six key cards came out; the device rebuilt the wallet from those and agreed
+with the host on every address. Arm 2 remains the more valuable half of the
+journey — it is the version that would have been engraved.</div>
+
+<div class="note">Three arms, three different things proved, and the order
+matters: arm 1 rules out the wallet's shape as an explanation, arm 2 shows the
+engraved set failing, arm 3 shows the repair working on the identical cards. Any
+one of them alone would have been ambiguous.</div>
+</section>
+
+<section class="page">
 <h1>What this journey does NOT show</h1>
 
 <ul>
@@ -512,12 +587,11 @@ the shipping code; the display stack itself is not exercised.</li>
 It refuses, so no other order was tried — and by the argument on the gap page,
 no order would have helped, because the refusal is about the cards being
 <em>indistinguishable</em>, not about their sequence.</li>
-<li><b>No restore test — and as engraved, one cannot pass.</b> A restore rebuilds
-the wallet from the plates and the seeds and requires the same addresses. That
-is impossible here until the slot-assignment gap on the previous page is closed:
-the plates admit 720 assignments and only one is the wallet. Writing the test
-before fixing that would produce a test that fails for the right reason and
-teaches nothing new — the measurement on the previous page already says it.</li>
+<li><b>No host-side restore test</b>, though the device now performs the
+restoring half: arm 3 rebuilds the wallet on a SeedHammer II from the
+fingerprinted template plus the six key cards and derives the right addresses.
+What is missing is the same walk done from the <em>engraved plates</em> — read
+back off metal rather than replayed from the files that produced them.</li>
 <li><b>No hardware.</b> Nothing has been cut. The plate counts and the QR
 capacity are computed from the device's own constants, not measured on
 metal.</li>
