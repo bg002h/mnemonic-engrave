@@ -1,9 +1,8 @@
 # PLAN — wallet-file export for the reasonably complex wallet
 
-**Status:** DRAFT. Two of five planning reports still outstanding
-(`PLAN_export_nunchuk.md`, `PLAN_export_bitcoin_core.md`); their sections below
-are marked **PENDING** and this plan may not be implemented past Phase 1 until
-they land and are folded.
+**Status:** all five planning reports landed and folded (2026-08-22). Phase 2
+is DELETED and Phase 1's justification has changed — see §1a. Awaiting the R0
+review of Phase 1 before any code.
 
 **Operator ask (2026-08-22):** output Nunchuk, Sparrow and Bitcoin Core
 **watch-only and hot** wallets via the m* utilities, and the same on SeedHammer
@@ -62,11 +61,19 @@ own emission, which is worth having and is not the same thing.
 > five-item list. It is exposed. Same class of error as reading an exit code
 > through a pipe, which I also did in this cycle.
 
-### G2 — no Nunchuk format — **PENDING** `PLAN_export_nunchuk.md`
+### G2 — ~~no Nunchuk format~~ **CLOSED: do not add one**
 
-Open question the report must settle: whether Nunchuk is reachable through the
-**already-implemented `bsms` emitter** rather than a new format. If it is, G2
-collapses to documentation.
+`PLAN_export_nunchuk.md` settles it. `--format descriptor` and `--format bsms`
+already emit exactly Nunchuk's two import shapes, verified by execution
+including a byte-exact 4-line BSMS record. **No `nunchuk` emitter should be
+built.**
+
+Nunchuk still refuses this wallet — same keyless tier 4, via libnunchuk's
+`IsSane()`/`NeedsSignature()` — plus a second tr-specific blocker: it cannot
+represent a fixed raw NUMS internal key and re-renders a per-index unspendable
+xpub, changing every address.
+
+**Phase 2 is deleted.** The gap was in the wallet, not the constellation.
 
 ### G3 — no hot-wallet export anywhere
 
@@ -142,10 +149,37 @@ The tr form refuses **even with tier 4 keyed**. Isolated on the same node:
 hold `pk` or `multi_a` and nothing else. So the tr form is unreachable for Core
 25 regardless of what we do to tier 4.
 
-Whether a later Core lifts that is exactly what the pending
-`PLAN_export_bitcoin_core.md` is measuring, on a six-version matrix (25, 26, 27,
-28, 29, 31) of real nodes. **My numbers above are ONE version and should be
-treated as superseded by that report where the two overlap.**
+**SUPERSEDED — and my claim was version-local.** `PLAN_export_bitcoin_core.md`
+landed with a six-binary matrix (v25, 26, 27, 28, 29, 31.1) and pins the actual
+floors:
+
+| capability | first Core version |
+| --- | --- |
+| `wsh` miniscript, watch | v24 |
+| `wsh` miniscript, sign | v25 |
+| **`tr` miniscript** | **v26** |
+| **multipath `<0;1>`** | **v29+** — absent even from v28; PR #22838, milestone 29.0, undocumented in its release notes |
+
+So my "Core cannot do tapleaf miniscript" was true of **v25 only** and would not
+have held at v26. One version is not a floor.
+
+### 1d. It does not matter, and that is the real answer
+
+**No Core version through v31.1 can load this wallet** — either wrapper, watch
+or hot. The keyless tier 4 trips *"witnesses without signature exist"*, and in
+Core that rule is **non-waivable**. Unlike our side, there is no flag.
+
+The one thing that DOES work: an **`addr()`-list export**, verified. You can
+watch this wallet in Core; you cannot describe it to Core.
+
+Two traps worth carrying forward, both verified:
+
+- `getdescriptorinfo` **silently collapses multipath**, so round-tripping a
+  `<0;1>` descriptor through it loses the change descriptor — still true on
+  v31.1. Anyone "normalising" that way loses half the wallet with no error.
+- A hot export must use **account-level xprvs**; master xprvs with hardened
+  paths trip a Core duplicate-key false positive (`PubkeyProvider::operator<`,
+  reproduced on v29 and v31.1).
 
 ### 1c. How nearly I got this wrong
 
@@ -210,9 +244,10 @@ so it takes the R0 gate: this plan reviewed to 0C/0I before code.
 - **Rust-primary:** `mnemonic-toolkit` is Rust and upstream of the Go port. No
   Go change is due unless the fork gains an export surface, which it has not.
 
-### Phase 2 — G2, Nunchuk — **BLOCKED** on `PLAN_export_nunchuk.md`
+### Phase 2 — **DELETED**
 
-If the answer is "use `bsms`", this phase is a test plus documentation.
+Nunchuk needs no emitter; `descriptor` and `bsms` already emit its two import
+shapes. What remains is one regression test pinning that, folded into Phase 3.
 
 ### Phase 3 — Sparrow refusal pinned as deliberate
 
