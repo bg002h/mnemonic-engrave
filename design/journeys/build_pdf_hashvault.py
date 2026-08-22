@@ -6,16 +6,19 @@ transcript_hashvault.sh's real stdout+stderr with its actual exit code, and
 every input file is shown as the transcript `cat`-ed it. Nothing here is a value
 somebody typed into a document.
 
-This journey has no device walk yet, so it carries no screenshots — and the
-missing-asset gate is kept anyway, so adding one later cannot silently ship
-half-captured.
+The device half is capture_hashvault.py, which drives the SAME card set into
+the emulator over NFC in two arms -- a keyed control that must DERIVE, and the
+engraved template+mk1 set that must be REFUSED. Both are assertions, so a
+screenshot below is a comparison that held, not a photo. The missing-asset gate
+means a half-captured walk cannot ship as a complete document.
 """
 
-import hashlib, html, os, re, shutil, subprocess, sys
+import base64, hashlib, html, json, os, re, shutil, subprocess, sys
 
 W = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(W, "out", "hashvault")
 IN = os.path.join(W, "inputs-hashvault")
+SHOTS = os.path.join(W, "shots")
 
 MISSING = []
 ALLOW_MISSING = "--allow-missing" in sys.argv
@@ -34,6 +37,46 @@ def missing_gate(artifact):
         return
     print("Refusing to report success.", file=sys.stderr)
     sys.exit(1)
+
+
+def b64(p):
+    with open(p, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+
+def img(name, cls="shot", cap=None):
+    """Embed a captured frame, or record it missing.
+
+    SIZE, NOT EXISTENCE: a canvas that failed to rasterise is written as a
+    zero-byte PNG with a 200 OK, so a document could otherwise embed nothing
+    and still pass its own gate.
+    """
+    path = os.path.join(SHOTS, name)
+    if not os.path.exists(path) or os.path.getsize(path) < 512:
+        MISSING.append(name)
+        return f'<p class="missing">missing: {html.escape(name)}</p>'
+    tag = f'<img class="{cls}" src="data:image/png;base64,{b64(path)}">'
+    return f"<figure>{tag}<figcaption>{cap}</figcaption></figure>" if cap else tag
+
+
+def walk_result(name, *, need):
+    """Read a walk's result JSON and REQUIRE the fields the prose asserts.
+
+    The prose below states what the device did. If the walk did not actually
+    run, or ran and returned something else, the document must not still say
+    it -- that is the mislabelled-evidence failure, and it is the whole reason
+    these numbers are read from the run rather than typed.
+    """
+    path = os.path.join(SHOTS, name)
+    if not os.path.exists(path):
+        MISSING.append(name)
+        return {}
+    with open(path) as f:
+        d = json.load(f)
+    for k in need:
+        if k not in d:
+            MISSING.append(f"{name}:{k}")
+    return d
 
 
 def code(text, limit=None, must_show=None, must_show_all=None):
@@ -100,6 +143,11 @@ def section(transcript, header):
 
 
 CSS = open(os.path.join(W, "build_pdf.py")).read().split('CSS = """')[1].split('"""')[0]
+CSS += """
+.shot { width: 100%; image-rendering: pixelated; border: 1px solid var(--dim); }
+.shotrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; }
+.shotrow3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 8px 0; }
+"""
 
 tx = readfile(os.path.join(W, "transcript_hashvault.txt")).split("\n")
 
@@ -124,6 +172,47 @@ recv = readfile(os.path.join(OUT, "receive.txt")).split()
 chg = readfile(os.path.join(OUT, "change.txt")).split()
 md1 = [l for l in readfile(os.path.join(OUT, "md1-template.txt")).split("\n") if l.strip()]
 mk1 = [l for l in readfile(os.path.join(OUT, "mk-encode-raw.txt")).split("\n") if l.strip()]
+
+# ── The device walk's numbers, read from the walks' own result JSON ───────────
+#
+# TYPED numbers are how a document ends up describing a run that never happened.
+# walk_result() records a MISSING asset if a walk has not been run or did not
+# return the field the prose leans on, so the gate refuses the document rather
+# than shipping a confident sentence about nothing.
+KW = walk_result("hashvault-keyed-result.json",
+                 need=["chunksPresented", "matched", "consentPages"])
+SW = walk_result("hashvault-seating-result.json",
+                 need=["chunksPresented", "keyCardsGathered", "refused"])
+
+kw_chunks = KW.get("chunksPresented", "?")
+sw_chunks = SW.get("chunksPresented", "?")
+sw_cards = SW.get("keyCardsGathered", "?")
+
+_kw_matched = KW.get("matched", {})
+_kw_rows = "".join(
+    f"<tr><td><code>{html.escape(a)}</code></td></tr>" for a in _kw_matched.get("addresses", []))
+kw_table = (
+    "<table><tr><th>matched on the device AND on the host</th></tr>"
+    f"<tr><td>wallet id <code>{html.escape(str(_kw_matched.get('walletPolicyId', '?')))}</code></td></tr>"
+    f"{_kw_rows}</table>")
+
+kw_consent0 = img("k04-consent-p0.png", cap="Arm 1: the consent screen, page 1 of "
+                  f"{len(KW.get('consentPages', []))} — the keyed card's Policy-ID.")
+kw_consent1 = img("k04-consent-p1.png", cap="Arm 1, page 2 — the derived addresses.")
+sw_gather = img("h03-gather-full.png",
+                cap=f"Arm 2: {sw_chunks} template chunks assembled, {sw_cards} mk1 key cards "
+                    "gathered. Nothing has been refused yet.")
+sw_refusal = img("h05-refusal.png",
+                 cap="Arm 2: the refusal. No address anywhere on the screen.")
+
+NEG_CONTROL = """$ python3 capture_hashvault.py --prove-it-can-fail --no-build
+NEGATIVE CONTROL: feeding the KEYED card while demanding the seating refusal.
+  15 chunks, no key cards, so 'declares no fingerprints' must NOT appear.
+
+NEGATIVE CONTROL PASSED: the walk refused to report a refusal that never happened.
+$ echo $?
+0"""
+neg_control = code(NEG_CONTROL, must_show="NEGATIVE CONTROL PASSED")
 
 P = []
 
@@ -342,12 +431,87 @@ declared origin, because the origins differed. Here they do not.</div>
 </section>
 
 <section class="page">
+<h1>The device walk — two arms, and the second one is the point</h1>
+
+<p>Everything so far is host-side. This is the same card set carried into the
+SeedHammer II emulator over NFC by <code>capture_hashvault.py</code>, which
+reuses the seating walk's driver. Both arms <b>assert</b>: the screenshots below
+are comparisons that held, not photographs of whatever happened.</p>
+
+<h2>Arm 1 — the control: the keyed card, {kw_chunks} chunks, no seating</h2>
+
+<p>Before the interesting arm can mean anything, the device has to be able to
+handle this wallet at all. Four tiers, two <code>sha256</code> hashlocks, both
+timelock flavours, <code>multi_a</code> at 3/2/1 and a NUMS internal key — a
+device that simply choked on that shape would <em>also</em> produce a refusal in
+arm 2, for an entirely different reason.</p>
+
+<div class="shotrow">
+{kw_consent0}
+{kw_consent1}
+</div>
+
+<p>It derives. Read off the screen and compared against the host, which computed
+them in Rust from the same six xpubs:</p>
+{kw_table}
+
+<div class="note">Two implementations, two languages, one air gap, same
+answers. That is what makes arm 2's refusal attributable to the seating and
+nothing else.</div>
+</section>
+
+<section class="page">
+<h1>Arm 2 — the engraved set, and the device declines to guess</h1>
+
+<p>Now the plates as they would actually be cut: the {sw_chunks}-chunk keyless
+template and all {sw_cards} mk1 key cards. The device gathers every one of them
+— the tally on the left confirms it — and then refuses.</p>
+
+<div class="shotrow">
+{sw_gather}
+{sw_refusal}
+</div>
+
+<p>The sentence is <code>gui/wallet_policy.go</code>'s, and it names the cause
+rather than merely reporting failure:</p>
+
+<div class="warn">“Two different key cards claim the same slot, and this
+template can't tell them apart. It declares no fingerprints.”</div>
+
+<p>That is <code>errSeatSlotContested</code>. All six cards match all six slots
+on origin, the template declares no fingerprint to break the tie, and
+<code>seatKeyCards</code> treats every undecidable state as a refusal — because
+a misassignment does not fail loudly, it derives a <em>different wallet's</em>
+address and shows it to the operator as proof. <b>No address appears on this
+screen, and the walk asserts that too.</b></p>
+
+<h2>The refusal check is not vacuous</h2>
+
+<p>An assertion that a string <em>appears</em> passes for a walk that quietly
+stopped driving the device. So <code>--prove-it-can-fail</code> feeds the keyed
+card — which derives, per arm 1 — while still demanding the refusal, and the run
+counts as passing only if the walk <em>fails</em>:</p>
+{neg_control}
+
+<div class="note">The firmware anticipated this exact case before this wallet
+existed: the comment above that refusal reads “It happens when the template
+declares no fingerprints and two slots share a derivation path — a stripped
+template cannot tell them apart.” This journey is the first wallet to walk into
+it, and the device was already right.</div>
+</section>
+
+<section class="page">
 <h1>What this journey does NOT show</h1>
 
 <ul>
-<li><b>No device walk.</b> Every command here is host-side. The cards have not
-been carried to a SeedHammer II, and no screen in this document is a
-framebuffer. The sibling taproot journey does that; this one does not yet.</li>
+<li><b>No REAL hardware.</b> The device walk is the emulator — the same Go
+firmware compiled to wasm, driven over the same NFC entry point, but not a
+machine with a screen and a hammer. Everything upstream of the display stack is
+the shipping code; the display stack itself is not exercised.</li>
+<li><b>Only one seating attempt.</b> Arm 2 presents the six cards in one order.
+It refuses, so no other order was tried — and by the argument on the gap page,
+no order would have helped, because the refusal is about the cards being
+<em>indistinguishable</em>, not about their sequence.</li>
 <li><b>No restore test — and as engraved, one cannot pass.</b> A restore rebuilds
 the wallet from the plates and the seeds and requires the same addresses. That
 is impossible here until the slot-assignment gap on the previous page is closed:

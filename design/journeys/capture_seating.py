@@ -84,15 +84,18 @@ async def drive(port, shot_port, md1, key_cards, policy_id, addresses, refusal=N
         await page.wait_for_timeout(2500)
         try:
             res = await page.evaluate(
-                """async ({shotURL, md1, keyCards, expect, expectRefusal}) => {
+                """async ({shotURL, md1, keyCards, expect, expectRefusal, prefix}) => {
                      const m = await import("./shots_seating.js");
-                     return await m.run({ shotURL, md1, keyCards, expect, expectRefusal });
+                     return await m.run({ shotURL, md1, keyCards, expect, expectRefusal, prefix });
                    }""",
                 {"shotURL": f"http://127.0.0.1:{shot_port}/",
                  "md1": md1,
                  "keyCards": key_cards,
                  "expect": {"walletPolicyId": policy_id, "addresses": addresses},
-                 "expectRefusal": refusal},
+                 "expectRefusal": refusal,
+                 # Explicit, though "s" is the default: shots/ is shared by every
+                 # journey and the prefix is the only thing keeping them apart.
+                 "prefix": "s"},
             )
         except Exception as e:
             print("DRIVER FAILED:", e, file=sys.stderr)
