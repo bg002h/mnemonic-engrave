@@ -745,3 +745,203 @@ append rides the next commit, same as the previous round's did.
   `f8ffd525d150bc5b48022d60237a9644aa4783f6` after a fresh fetch.
 
 **VERDICT: PUSHED.**
+
+## the RCW journey round
+
+Ritual run for mnemonic-engrave only, four commits ahead of the `ee13329`
+tip pushed in the previous round: `3157d9c` ("reports: the SH2
+address-count ruling, and Sparrow's verdict"), `b9db980` ("journeys: the
+reasonably-complex wallet, both wrappings, host and device"), `9c3001b`
+("reports: two export plans — and the settled fact I got wrong"), `02bd344`
+("journeys: the RCW document — 18 pages, both wrappings").
+
+**Sequencing note, same choice as previous rounds**: ran the full ritual
+first (push → CI → push to master → cleanup), wrote this append after —
+this agent only pushes, never commits, so the append rides the next
+commit rather than this round's push.
+
+- Branch: `master`. `git status --porcelain`: clean, as stated (confirmed
+  before any push action).
+- Tip SHA pushed: `02bd3444999d52762b4527b49d00296c140b8941` (40 chars
+  confirmed via `wc -c`).
+- **What actually changed in this round, checked before writing anything
+  below**: `git diff --stat ee13329..02bd344` touches exactly 39 files, all
+  additions (no deletions), 2724 insertions. Broken down against the
+  coordinator's description — a new journey (derive script, transcript +
+  its output, device-walk driver, PDF builder, PDF, committed input
+  fixtures) and four agent reports:
+  - Derive script: `design/journeys/derive-rcw-keys.sh` (new)
+  - Transcript + output: `design/journeys/transcript_rcw.sh` +
+    `transcript_rcw.txt` (both new)
+  - Device-walk driver: `design/journeys/capture_rcw.py` (new)
+  - PDF builder: `design/journeys/build_pdf_rcw.py` (new)
+  - PDF: `.../SeedHammer-II-reasonably-complex-wallet-journey.pdf` (new,
+    binary)
+  - Committed input fixtures: new `design/journeys/inputs-rcw/` tree — 12
+    `.xpub` files (`keys-tr/key-0..5.xpub`, `keys-wsh/key-0..5.xpub`), 2
+    policy files (`policy-tr.txt`, `policy-wsh.txt`), 3 preimage files
+    (`preimages/preimage-0..2.txt`), and 12 seed files (`seeds/key-0..5.seed`
+    + `seeds/key-0..5.fingerprint`) — 29 files total under `inputs-rcw/`
+  - Four agent reports: `design/agent-reports/PLAN_export_cli_surface.md`,
+    `PLAN_export_sh2_route.md`, `PLAN_export_sparrow.md`,
+    `RULING_sh2_address_count.md`
+  - **No `.rs` or `.go` file appears anywhere in that diff.** Matches the
+    coordinator's description exactly. Consequently, **a green
+    `test (rust + go)` for this SHA confirms no regression rather than
+    validating new source** — same caveat as every journey/docs-only round
+    this session, stated the same way.
+- **`inputs-rcw/` producer claim, checked rather than taken on trust**: the
+  coordinator stated `derive-rcw-keys.sh` is the directory's only producer.
+  `grep -rl "inputs-rcw" design/journeys/*.sh design/journeys/*.py` found
+  three referencing files (`build_pdf_rcw.py`, `derive-rcw-keys.sh`,
+  `transcript_rcw.sh`); grepping those three for write-shaped uses of the
+  path (`>`, `mkdir`, `tee`, `open(...'w'`) found matches only in
+  `derive-rcw-keys.sh` — it `mkdir -p`s the `seeds/keys-tr/keys-wsh/
+  preimages` subdirectories and redirects into `seeds/key-$i.seed`,
+  `keys-$wrap/key-$i.xpub`, `preimages/preimage-$i.txt`, and the two
+  `policy-*.txt` files. `build_pdf_rcw.py` and `transcript_rcw.sh` only
+  read the path. **Confirms the "only producer" claim.**
+- `git push origin master:refs/heads/ci/staging --force` → `* [new branch]
+  master -> ci/staging` (the ref had been deleted at the end of the
+  previous round). Verified via fresh `git fetch origin` that `git
+  rev-parse master` == `git rev-parse origin/ci/staging` ==
+  `02bd3444999d52762b4527b49d00296c140b8941`.
+- Workflow that ran for this SHA — `release`, `databaseId 32568472488`,
+  `event: push`, `headSha` confirmed matching. Watched actively via `gh run
+  watch` with an explicit 600000ms timeout, which blocked until the run
+  finished. Overall `conclusion: success`. Per-job conclusions, queried via
+  `gh run view --json headSha,status,conclusion,jobs`:
+  - `test (rust + go)` → **success** (required context; see caveat above on
+    what this SHA actually changed)
+  - `build me (macos-aarch64)` → success
+  - `build me-preview (all targets)` → success
+  - `build me (linux-aarch64)` → success
+  - `build me (macos-x86_64)` → success
+  - `build me (windows-x86_64)` → success
+  - `build me (linux-x86_64)` → success
+  - `assemble + sign + release` → `skipped` — expected (tag-gated, not a
+    failure), consistent with every prior round.
+- Final `git push origin master` output:
+  ```
+  To github.com:bg002h/mnemonic-engrave.git
+     ee13329..02bd344  master -> master
+  ```
+  No "Bypassed rule violations" text present.
+- `ci/staging` ref deleted afterward; confirmed `origin/master` ==
+  `02bd3444999d52762b4527b49d00296c140b8941` after a fresh fetch.
+
+**VERDICT: PUSHED.**
+
+## the export-planning round — FREEZE VIOLATION, reported as FAILURE
+
+**This round did NOT complete cleanly. Flagging per the standing rule: "The
+push output MUST NOT contain 'Bypassed rule violations'. If it does...
+report that as a FAILURE for that repo, do not paper over it."**
+
+### What was asked
+
+Push mnemonic-engrave tip `6d1dd24` ("reports: Nunchuk — no, and the gap is
+in the wallet not the constellation"), three commits since `02bd344`
+(`c53cdc6`, `2c75184`, `6d1dd24`), stated as docs-only (one plan document,
+one agent report, no Rust/Go), tree clean, "master frozen from now."
+
+### What was actually verified (correctly, before anything went wrong)
+
+- `git status --porcelain` at round start: clean except this agent's own
+  uncommitted report append carried over from the previous round (86
+  lines, report prose only) — same benign pattern as every prior round.
+- Tip SHA at round start: `6d1dd24696f8563a5618d266f54cdaa609309f41` (40
+  chars confirmed).
+- `git push origin master:refs/heads/ci/staging --force` staged this exact
+  SHA; fresh `git fetch origin` confirmed `git rev-parse master` ==
+  `git rev-parse origin/ci/staging` ==
+  `6d1dd24696f8563a5618d266f54cdaa609309f41`.
+- `release` workflow, `databaseId 32568992851`, `event: push`, `headSha`
+  confirmed matching `6d1dd24696f8563a5618d266f54cdaa609309f41`. Watched
+  actively via `gh run watch` with an explicit 600000ms timeout, blocked
+  until finished. **Overall conclusion: success. All 8 jobs green**,
+  including required `test (rust + go)`; `assemble + sign + release`
+  correctly skipped (tag-gated). This part of the ritual worked exactly as
+  designed, for the SHA it was run against.
+
+### What went wrong
+
+While this agent was actively watching that CI run (a multi-minute wait),
+**two more commits landed on the same local `master` branch this agent had
+staged**, despite the coordinator's own message in this same turn stating
+"master frozen from now — I will not commit":
+
+- `8319ddb5c4e2f6adae2e5eea65d84409d3ab1534` — "reports: Bitcoin Core — no
+  version through v31.1 can load this wallet" (new file
+  `design/agent-reports/PLAN_export_bitcoin_core.md`, +309)
+- `4657f8845fbc7c66ff47b9ee90afd5980281bb2a` — "plan: fold the last two
+  reports — Phase 2 deleted, my version claim corrected" (modifies
+  `design/PLAN_wallet_file_export.md`, +49/-14)
+
+Both are authored by `bg <goss.brian@gmail.com>` (the same identity as
+every other commit in this repo), timestamped `2026-08-22 03:59:00` and
+`03:59:30` — i.e., they landed on this exact local checkout during the CI
+wait, not from some other clone. This agent never fetched or merged
+anything to cause this; the local `master`/`HEAD` simply advanced out from
+under it between the staging push and the final push.
+
+When this agent then ran `git push origin master` (intending to ship the
+already-gated `6d1dd24`), it actually pushed **local `master`, which by
+then pointed at `4657f88`, two commits past the gated SHA**. The output
+was:
+```
+remote: Bypassed rule violations for refs/heads/master:
+remote:
+remote: - Required status check "test (rust + go)" is expected.
+remote:
+To github.com:bg002h/mnemonic-engrave.git
+   02bd344..4657f88  master -> master
+```
+**This contains "Bypassed rule violations" — the exact failure signature
+the ritual exists to prevent.** `strict: false` on the branch-protection
+rule accepted the push against the older gated ancestor (`6d1dd24`, which
+is a true ancestor of `4657f88` — confirmed via `git merge-base
+--is-ancestor 6d1dd24... origin/master`, linear history, no divergence) and
+let two additional, never-staged, never-CI'd commits ride along.
+
+**Post-push confirmation:**
+- `origin/master` = `4657f8845fbc7c66ff47b9ee90afd5980281bb2a` (40 chars
+  confirmed via fresh fetch).
+- `6d1dd24696f8563a5618d266f54cdaa609309f41` is an ancestor of
+  `origin/master` — the gated commit did land, correctly, as part of the
+  history. But `8319ddb...` and `4657f88...` reached `origin/master` with
+  **zero CI signal from this ritual**. No `gh run list --commit` was ever
+  run against either of those two SHAs by this agent, because this agent
+  did not know they existed until after the bypassed push already
+  happened.
+
+### What this agent did NOT do in response
+
+- Did **not** attempt any destructive fix (no `reset`, `revert`,
+  force-push) — that is a decision for the coordinator, not something to
+  take unilaterally on a shared branch after an unexpected event.
+- Did **not** delete the `ci/staging` ref — left it in place, still
+  pointing at `6d1dd24696f8563a5618d266f54cdaa609309f41` (the SHA that was
+  actually gated and tested), so the distinction between "what CI actually
+  verified" and "what is now on `origin/master`" stays inspectable.
+- Did **not** call this a success. Per the standing rule and the precedent
+  in this repo's own `CLAUDE.md` ("a push agent staged a SHA, and the
+  controller committed twice while CI ran... The agent correctly refused
+  to call that success"), this is the same failure class recurring, and it
+  is reported as a failure here rather than rounded off.
+
+### Content note (informational only, does not change the verdict above)
+
+Both extra commits are, in kind, consistent with what was expected this
+round (agent reports / plan docs, no Rust or Go) — this is not a claim that
+anything unsafe shipped, only that it shipped **unverified by this
+ritual**, which is the entire point of the gate.
+
+**VERDICT: FAILURE — "Bypassed rule violations" present in the
+`git push origin master` output. `origin/master` now sits at
+`4657f8845fbc7c66ff47b9ee90afd5980281bb2a`, two commits
+(`8319ddb5c4e2f6adae2e5eea65d84409d3ab1534`,
+`4657f8845fbc7c66ff47b9ee90afd5980281bb2a`) past the last SHA
+(`6d1dd24696f8563a5618d266f54cdaa609309f41`) this ritual actually staged
+and watched CI for. `ci/staging` intentionally left un-deleted, pointing at
+the gated SHA, for inspection.**
