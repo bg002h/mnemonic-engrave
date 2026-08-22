@@ -9060,3 +9060,45 @@ small and makes it independently gateable.
 Related: F-136 (auto-chunking, closed 2026-08-21) is the *encoder* half of the
 same operator confusion; this is the *engraving* half and the expensive one.
 
+### F-226 — `descriptor-mnemonic`'s vendor-freshness gate cannot pass, and is path-filtered so it never says so (owning phase: **CI hygiene**) `#mnemonic` `#ci`
+
+Filed 2026-08-21, found incidentally while gating the F-136 fix.
+
+`ci/repro/vendor-freshness.sh` in `descriptor-mnemonic` fails immediately:
+
+```
+::error::vendor-freshness: Cargo.lock now has a git source — the codec
+two-block config can't redirect it. Add a per-source git-fork [source] stanza
+(see the toolkit ci/repro/vendor-freshness.sh three-block form).
+```
+
+**Pre-existing, and proven so** — the same script fails identically on `HEAD~1`,
+and my commit's `Cargo.lock` diff is empty. The cause is the miniscript git pin
+landed by the tr/wsh cycle (`5b4d20ad`, "pin miniscript at ff4732e"). The
+script's two-block source-replacement config cannot redirect a `git+` source,
+and it **fails closed on purpose** — the guard is correct and is telling the
+truth.
+
+**Why it is quiet.** The workflow is path-filtered to `Cargo.lock`, `vendor/**`
+and the script itself, and nothing has touched those since the pin, so it has
+not run. `gh run list --branch main` shows no vendor-freshness runs at all. That
+is the shape this constellation has been bitten by before: a gate that cannot
+pass AND does not fire looks exactly like a gate that passes.
+
+**Not currently blocking.** It is not one of `main`'s required contexts
+(`cargo test (ubuntu-latest)`, `cargo clippy`), so nothing is bypassed today.
+But the next change to `Cargo.lock` or `vendor/` turns it red for a reason
+unrelated to that change — and the *release* build it stands in for is the
+`--offline --locked` reproducible one, which is exactly the path a git pin
+breaks.
+
+**Fix:** port the toolkit's THREE-block form (crates-io + vendored-sources +
+a per-source git-fork stanza with the miniscript rev), which the script's own
+error message already prescribes. `mnemonic-key`'s copy is the two-block CODEC
+form and is correct there — that crate is fork-free — so this is not a
+copy-paste sync, it is the fork-carrying variant.
+
+Related: this is the same class as the mk-side catch earlier in this cycle,
+where `vendor/` had silently fallen out of sync with `Cargo.lock` and only a
+PR-time gate caught it. There the gate worked; here the gate cannot run.
+
