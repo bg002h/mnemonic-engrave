@@ -537,3 +537,74 @@ left un-deleted for this repo.**
 | --- | --- | --- |
 | descriptor-mnemonic | `65cd940a1fbbcee0a5b6f68835723303ace7a42e` | BLOCKED — `cargo fmt` failure, `crates/md-cli/src/cmd/encode.rs:309` |
 | mnemonic-engrave | `9f2d71a802c4b255889dd5ed7ac0837ba0aaaacf` | PUSHED |
+
+# descriptor-mnemonic — advisory-round retry (fmt fix)
+
+Re-run of the `ci/staging` push ritual for **descriptor-mnemonic only**,
+after the previous round's `cargo fmt` failure at `65cd940a` was fixed by
+`beb2fb2a` ("fmt: rustfmt the advisory's map insert -- I never ran the
+formatter").
+
+- Default branch: `main` (confirmed again — no `master` branch in this
+  repo). `git status --porcelain`: clean.
+- Tip SHA: `beb2fb2af8dbd189482ecfea07e5c31fbda134cc` (40 chars confirmed
+  via `wc -c`).
+- **Diff from the previously-blocked tip**: `git diff --stat
+  65cd940a..beb2fb2a` touches exactly one file —
+  `crates/md-cli/src/cmd/encode.rs` (+4/-1). Whitespace-only reformat of the
+  single statement flagged by `cargo fmt --all --check` last round (the
+  `.entry(path).or_default().push(...)` chain at line 309), matching the
+  coordinator's description ("whitespace only, one statement").
+- `git push origin main:refs/heads/ci/staging --force` →
+  `65cd940a..beb2fb2a  main -> ci/staging` (this overwrote the stale
+  `ci/staging` ref intentionally left in place from the previous, blocked
+  round). Verified via fresh `git fetch origin` that `git rev-parse main`
+  == `git rev-parse origin/ci/staging` ==
+  `beb2fb2af8dbd189482ecfea07e5c31fbda134cc`.
+- Workflow that ran for this SHA — `CI`, `databaseId 32555900406`, `event:
+  push`, `headSha` confirmed matching. Watched actively via `gh run watch`
+  with an explicit 600000ms timeout, which blocked until the run finished.
+  Overall `conclusion: success`. Per-job conclusions, queried via `gh run
+  view --json headSha,status,conclusion,jobs` (all 9 jobs green, including
+  the one that failed last round):
+  - `cargo fmt` → **success** (this is the job that failed at `65cd940a`;
+    now green)
+  - `cargo clippy` → success
+  - `cargo doc` → success
+  - `cargo test (windows-latest)` → success
+  - `cargo test (macos-latest)` → success
+  - `cargo test (ubuntu-latest)` → success
+  - `musl compile/test (x86_64-unknown-linux-musl)` → success
+  - `musl compile/test (aarch64-unknown-linux-musl)` → success
+  - `freebsd compile-gate (whole-crate)` → success
+  - 9 of 9 jobs green (previous round was 8/9, `cargo fmt` the sole
+    failure — now resolved).
+- **`fuzz-smoke` and `vendor-freshness` — reconfirmed, not just assumed**:
+  `gh run list --commit beb2fb2af8dbd189482ecfea07e5c31fbda134cc` returned
+  only `CI`; neither of the other two workflows triggered. Checked why
+  directly rather than relying on the previous round's reasoning alone:
+  `git diff --stat 65cd940a..beb2fb2a` touches only
+  `crates/md-cli/src/cmd/encode.rs`, which still does not match
+  `fuzz-smoke.yml`'s trigger paths (`fuzz/**`, `crates/md-codec/src/**`) or
+  `vendor-freshness.yml`'s trigger paths (`Cargo.lock`, `Cargo.toml`,
+  `crates/**/Cargo.toml`, `vendor/**`, `ci/repro/vendor-freshness.sh`,
+  `.github/workflows/vendor-freshness.yml`). **Both skips remain correct**
+  for this fix commit, same as the underlying advisory commit.
+- Final `git push origin main` output:
+  ```
+  To github.com:bg002h/descriptor-mnemonic.git
+     81938084..beb2fb2a  main -> main
+  ```
+  No "Bypassed rule violations" text present.
+- `ci/staging` ref deleted afterward; confirmed `origin/main` ==
+  `beb2fb2af8dbd189482ecfea07e5c31fbda134cc` after a fresh fetch.
+
+**VERDICT: PUSHED.**
+
+## Note on scope this round
+
+Per the coordinator's instruction, mnemonic-engrave was **not** touched this
+round (the coordinator was working in it directly), and this report was
+written to `/tmp/claude-1000/push-advisory-retry.md` instead of the in-repo
+`design/agent-reports/push-2026-08-18-hashvault.md`, for the coordinator to
+commit into the repo themselves.
