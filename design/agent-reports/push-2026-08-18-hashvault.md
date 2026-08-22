@@ -1079,3 +1079,65 @@ and their three folds into `design/PLAN_wallet_file_export.md`.
   `3aa6f339573c8f0439dcef9ac4c7ebcc1513adb6` after a fresh fetch.
 
 **VERDICT: PUSHED.**
+
+## the loop-closed round
+
+Ritual run for mnemonic-engrave only, six commits ahead of the `3aa6f33`
+tip pushed in the previous round: `6d7d17e`, `7dbc00f`, `c2e56a1`,
+`2d7bc0f`, `f969592`, `f01d75e` — R0 rounds 4 and 5 on export Phase 1, and
+their folds. The R0 loop closed GREEN at round 5 (1C/4I → 0C/4I → 0C/2I →
+0C/2I → 0C/0I); this is the last of the planning commits for this cycle,
+nothing implemented yet.
+
+- Branch: `master`. `git status --porcelain`: clean, as the coordinator
+  stated they verified before writing the round's message (confirmed
+  independently before any push action here too).
+- Tip SHA pushed: `f01d75e928148b36a1ded1ebe720c7261d7074d2` (40 chars
+  confirmed via `wc -c`).
+- **What actually changed in this round, checked before writing anything
+  below**: `git diff --stat 3aa6f33..f01d75e` touches exactly 4 files —
+  `design/PLAN_wallet_file_export.md` (the plan document, folded three
+  times across this range), `design/agent-reports/
+  R0_export_phase1_round4.md`, `R0_export_phase1_round5.md` (the two R0
+  reports), and `design/agent-reports/push-2026-08-18-hashvault.md` (this
+  report, the previous round's append). **No `.rs` or `.go` file appears
+  anywhere in that diff.** Matches the coordinator's description exactly:
+  two R0 reports, three folds of one plan document, one push report, all
+  markdown, no Rust or Go. Consequently, **a green `test (rust + go)` for
+  this SHA confirms no regression rather than validating new source** —
+  same caveat as every docs-only round this session, stated the same way.
+- `git push origin master:refs/heads/ci/staging --force` → `* [new branch]
+  master -> ci/staging` (the ref had been deleted at the end of the
+  previous round). Verified via fresh `git fetch origin` that `git
+  rev-parse master` == `git rev-parse origin/ci/staging` ==
+  `f01d75e928148b36a1ded1ebe720c7261d7074d2`.
+- Workflow that ran for this SHA — `release`, `databaseId 32571851355`,
+  `event: push`, `headSha` confirmed matching. Watched actively via `gh run
+  watch` with an explicit 600000ms timeout, which blocked until the run
+  finished. Overall `conclusion: success`. Per-job conclusions, queried via
+  `gh run view --json headSha,status,conclusion,jobs`:
+  - `test (rust + go)` → success
+  - `build me-preview (all targets)` → success
+  - `build me (macos-x86_64)` → success
+  - `build me (windows-x86_64)` → success
+  - `build me (linux-aarch64)` → success
+  - `build me (linux-x86_64)` → success
+  - `build me (macos-aarch64)` → success
+  - `assemble + sign + release` → `skipped` — expected (tag-gated).
+  8 of 8 jobs green.
+- **Extra caution applied again**: immediately before the final push,
+  re-verified `git rev-parse master` still equalled the exact
+  staged/CI-tested SHA (`f01d75e928148b36a1ded1ebe720c7261d7074d2` —
+  confirmed match), fetched fresh, confirmed `origin/master` (still at
+  `3aa6f33`) was an ancestor of local `master`, guaranteeing a clean
+  fast-forward. No tip movement observed during this round's CI wait.
+- Final `git push origin master` output:
+  ```
+  To github.com:bg002h/mnemonic-engrave.git
+     3aa6f33..f01d75e  master -> master
+  ```
+  No "Bypassed rule violations" text present.
+- `ci/staging` ref deleted afterward; confirmed `origin/master` ==
+  `f01d75e928148b36a1ded1ebe720c7261d7074d2` after a fresh fetch.
+
+**VERDICT: PUSHED.**
