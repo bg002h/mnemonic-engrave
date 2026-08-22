@@ -9346,12 +9346,23 @@ passed — is the one option that should not survive.**
 journey currently does not claim it, because it prints a hand-written policy
 without saying it was hand-written; the transcript's new §1b now says so.
 
-### F-229 — decide whether tier 4 gets a key `#wallet-design` `#interop` `#LOW`
+### F-229 — ~~decide whether tier 4 gets a key~~ **RESOLVED 2026-08-22: IT GETS ONE** `#wallet-design` `#interop`
 
-**Priority: LOW.** Operator-filed 2026-08-22. **Ruled once already** — keep it
-keyless (`design/agent-reports/RULING_export_deadlock.md`, delegated to a
-stand-in). This entry exists so the decision is re-openable with its evidence
-attached, not because it is pending.
+**Operator ruling: *"keyless path is not reasonable."*** Tier 4 of the RCW is now
+`after(1383520) AND sha256(H3) AND pk(@6)` — a seventh seed. Applied to all three
+fixture policies, to `design/journeys/derive-rcw-keys.sh` (the generator, not the
+artifacts), and to the regenerated `inputs-rcw/`. The earlier keep-keyless ruling
+(`design/agent-reports/RULING_export_deadlock.md`, delegated to a stand-in) is
+**superseded**.
+
+**One thing the trade table below did not know**, found while applying this:
+stock `rust-miniscript 13.1` refused the keyless **tr** form outright — *"All
+spend paths must require a signature"* — while **accepting** the keyless **wsh**
+form, because `Descriptor::from_str` only sanity-checks `Tr`. The two wrappings
+of one wallet disagreed about their own validity, and only one said so. Both are
+accepted now, and `md encode` no longer needs `--experimental`. See F-233.
+
+The original entry follows, kept because its measured trade is the reasoning.
 
 **The trade, measured:**
 
@@ -9406,3 +9417,252 @@ master** (master xprvs with hardened paths trip a Core duplicate-key false
 positive, root-caused to `PubkeyProvider::operator<`, reproduced on v29 and
 v31.1); `--output` required; `0600` + `create_new`; always-on advisory; no
 interactive confirm. R0 still applies.
+
+### F-231 — the OTHER two fixtures still carry the defects the RCW just fixed (owning phase: **journeys**) `#journeys` `#funds-safety` `#wallet-design`
+
+**Filed 2026-08-22**, while applying the two RCW rulings (F-229 and the
+double-hash fix). Those rulings were scoped to the reasonably-complex wallet on
+purpose. Two sibling fixtures were left alone, and each still has one or both of
+the problems:
+
+| fixture | keyless tier? | hashlock satisfiable? |
+| --- | --- | --- |
+| `fixtures/reasonably-complex-wallet` | **no** — fixed | **yes** — fixed |
+| `journeys/inputs-hashvault` | **yes**, tier 4 | **no** — single-hashed |
+| `journeys/inputs-pathological` | no (all tiers keyed) | **no** — no preimage committed at all |
+
+**The hashlock problem, stated once.** Miniscript's `sha256(H)` compiles to
+`OP_SIZE <32> OP_EQUALVERIFY OP_SHA256 <H> OP_EQUAL` — read off the compiled leaf
+script, `OP_SIZE OP_PUSHBYTES_1 20 …`, where `0x20` is 32. **The witness preimage
+must be exactly 32 bytes**, consensus-enforced. The hashvault fixture commits to
+`sha256(phrase)` where the phrases are 34–40 bytes, so those tiers cannot be
+spent by anyone. The pathological fixture commits to `sha256(a84dce40…)` with no
+preimage in the repo at all, so its hashlock tiers are unspendable *and*
+unreproducible.
+
+**The RCW's fix, for reuse:** commit to `sha256(sha256(phrase))` and use the
+32-byte inner digest as the witness preimage. The passphrase stays human; the
+recoverer hashes it once. `derive-rcw-keys.sh` writes both `preimage-N.txt` (the
+phrase) and `preimage-N.hex` (the preimage) and refuses to emit a preimage that
+is not 32 bytes or whose double-hash is not a literal in `tr.policy`.
+
+**The decision is per-fixture and is NOT obviously "converge".** A case exists
+for leaving hashvault exactly as it is: it is the *historical* keyless shape, its
+journey PDF and transcript are evidence of a real device run against it, and
+something should still pin the shape that F-229 ruled against — otherwise no test
+covers the case the ruling exists to prevent. If that is the call, say so in the
+fixture's README so the next reader does not "fix" it.
+
+**Not to be actioned by an agent** for the same reason F-229 was not: changing a
+vault's spending conditions is the operator's signature. Filing the options only.
+
+### F-232 — the RCW journey artifacts describe a wallet that no longer exists (owning phase: **journeys**) `#journeys` `#docs`
+
+**Filed 2026-08-22.** The two RCW rulings changed the wallet's identity —
+seven keys instead of six, three new hash literals — so every id and address
+moved:
+
+| | before | after |
+| --- | --- | --- |
+| policy chars (tr / wsh) | 575 / 519 | 616 / 560 |
+| tr template-id | `68a1a888385797337ce5debc90fcfb1e` | `a00772edbdbb41fb4acb450672c5e5cb` |
+| wsh template-id | `daee67be4eacf85e8b832ae64fc06566` | `6c635eac0f5a772d80c2eb7a43872bc8` |
+| tr policy-id | `a0b128ceaef3155a40af6f8e88765ecb` | `fa568be08b48847595bf536db6a1f74d` |
+| wsh policy-id | `9c74e0d2e96dd80c605b5fea19d551a9` | `f095e31101e2c77139d77c98c5d6d9f6` |
+| keyed md1 chunks | 15 | 16 |
+| keyless md1 chunks | 4 | 4 (unchanged) |
+
+Before-column values are `git show HEAD:design/fixtures/reasonably-complex-wallet/README.md`;
+after-column values are `md 0.13.0` run against the updated policies.
+
+**Already updated** (so this item is only about what remains):
+`fixtures/reasonably-complex-wallet/*.policy` and its `README.md`,
+`derive-rcw-keys.sh`, `inputs-rcw/`, `check_tiers.py`, `NewFeatureIdeas.md`.
+
+**`check_tiers.py` earned its keep here.** It is the gate on the prose tier table
+and it went red the moment the policy changed — four correct failures, exit 1.
+It now derives the three literals from the preimage files instead of hard-coding
+them, so it cannot drift from the generator, and its keyless assertion is
+**inverted**: it used to require exactly one keyless branch, and now requires
+zero. Mutation-checked both ways — stripping `pk(@6/…)` back out makes it fail
+with exit 1 on both the tier-4 predicate and the keyless count.
+
+**Still stale, and NOT touched:** `transcript_rcw.txt` (which quotes the old
+template-id at lines 196, 234, 235, 287 and an old address at 537),
+`capture_rcw.py`, `build_pdf_rcw.py`, and any committed backup strings. These are
+**records of a run that happened**, so the fix is to re-run the journey against
+the new wallet and let it rewrite them — not to hand-edit the numbers, which
+would produce a transcript nobody ever executed.
+
+**Do NOT hand-edit `capture_hashvault.py`.** Its `TEMPLATE_ID` constant is
+`68a1a888…`, which is still correct: the hashvault wallet was not changed, and it
+still hashes to that value. Verified, not assumed.
+
+### F-233 — `rust-miniscript` sanity-checks `Tr` only, so one wallet's two wrappings disagree about their own validity (owning phase: **the tr/wsh cycle**) `#codec` `#funds-safety` `#upstream`
+
+**Filed 2026-08-22**, found while keying the RCW's tier 4.
+
+`Descriptor::from_str` runs `sanity_check()` **only** for the `Tr` variant —
+`miniscript-13.1.0/src/descriptor/mod.rs:1052-1057`, guarded by
+`if let Descriptor::Tr(ref inner) = ret`, with an upstream `FIXME` calling it
+*"preserve weird/broken behavior from 12.x"*
+([rust-miniscript#734](https://github.com/rust-bitcoin/rust-miniscript/issues/734)).
+
+**The observable consequence**, measured on the RCW before the fix: the keyless
+`tr` form was **REFUSED** — *"All spend paths must require a signature"* — while
+the byte-equivalent keyless `wsh` form was **ACCEPTED**. Same four tiers, same
+keylessness, opposite verdicts, no warning on the accepting path.
+
+**Why this matters beyond one fixture.** `requires_sig` is the same check that
+closes Bitcoin Core and Nunchuk (`NeedsSignature()`), so it is a genuine interop
+predictor — but only the `tr` path reports it. A `wsh` policy that will be
+refused by every third-party wallet sails through the constellation's own
+tooling. Anything in `md`/`mnemonic` that treats "parsed OK" as "this will
+import" inherits the asymmetry.
+
+**Worth checking, not yet checked:** whether `md encode --experimental`'s
+relaxation is likewise `tr`-only in effect, and whether the Go port
+(`Rust-primary rule`) reproduces the asymmetry or diverges from it — a divergence
+here would be a cross-language behaviour difference of exactly the class F-212
+was.
+
+### F-234 — every QR carries the STANDARD form, never a codex32 string: a constellation-independent recovery path (owning phase: **the mt cycle**) `#mt` `#qr` `#recovery` `#firmware` `#md`
+
+**Operator directive, 2026-08-22:** *"convert all QR codes to remove all
+codex32-style encoding … this way we have a constellation independent
+information recovery format."*
+
+**The principle.** A plate should carry two representations with two different
+audiences and two different failure modes:
+
+| | engraved TEXT | engraved QR |
+| --- | --- | --- |
+| format | codex32 (`md1`/`mk1`/`ms1`) | **the standard form only** — raw tx bytes, BIP-380 descriptor, BIP-39 words |
+| audience | a human with eyes and a keyboard | anyone with a camera and standard Bitcoin tooling |
+| error correction | BCH — fixes **transcription** slips | Reed-Solomon — fixes **physical damage** |
+| needs constellation knowledge? | **yes** | **no** |
+| survives a dead decoder? | yes | no |
+| survives a scratched plate? | degrades gracefully | cliff — kill the finder patterns and nothing decodes |
+
+Putting a codex32 string inside a QR pays for error correction **twice** — BCH
+inside Reed-Solomon — on data a machine was going to read anyway, and it still
+leaves the recoverer needing to know what `md1` means. **That second reason is
+the load-bearing one.** The QR's whole value is being the escape hatch for
+someone who has the plate and none of our tools; a codex32 payload throws that
+away for nothing.
+
+The *density* cost is real but small — **9%**, not the ~60% the 8/5 expansion
+suggests, because uppercased bech32 lands in QR's alphanumeric mode. Measured
+below in "Density by representation"; do not argue this follow-up on capacity
+grounds.
+
+**Current state — verified, and better than feared.** The fork's existing QRs
+are already standards-based; nothing needs undoing there:
+
+- seed QR: `qr.Encode(strings.ToUpper(plate.Seed), qr.M)` — BIP-39 words
+  (`third_party/seedhammer/backup/backup.go:76-77`).
+- descriptor QR: `qr.Encode(desc.EncodeCompact(), qr.L)` — a BIP-380 descriptor
+  (`gui/gui.go:401`).
+- three plate modes already exist — `TEXT + QR`, `TEXT ONLY`, `QR ONLY`
+  (`gui/gui.go:411-423`), so the dual-representation layout is precedent.
+- `me bundle` emits **no QR at all**: constellation plates are text-only today.
+
+So the work is (a) write the principle down so it is not eroded, (b) extend it
+to `me bundle`'s plates and to `mt`, and (c) **never** let an `md1`/`mk1`/`ms1`
+string become QR content.
+
+**What it buys, measured** (`design/measurements/RESULTS_qr_physical_max_2026-08-22.txt`).
+The plate is not the limit — at the 0.3 mm stroke floor it could hold 263
+modules across, while the largest QR that exists is v40 at 177 modules (53.1 mm
+of a 79 mm square, **49% linear headroom**):
+
+| one plate, raw bytes | L (~7%) | H (~30%) |
+| --- | --- | --- |
+| one v40 @ 0.3 mm | 2,953 B | 1,273 B |
+| 2x2 v26 @ 0.3 mm (Structured Append, 4 symbols) | **5,468 B** | **2,372 B** |
+| one v26 @ 0.6 mm (2 strokes, conservative) | 1,367 B | 593 B |
+
+Against **38 bytes** on a codex32 text plate today. Even at the *strongest*
+error correction a single plate carries a whole signed transaction: 2-11 inputs
+for the RCW depending on spend path, 21 for key-path.
+
+**Prerequisite that gates the small-module numbers — NOT yet run.** 0.3 mm is one
+stroke wide. It is the theoretical floor, and whether a camera reads 0.3 mm
+engraved modules off brushed steel is a **hardware** question, not a
+calculation. The font work established a two-stroke minimum for *glyph*
+legibility; a QR module is a solid square, so the constraint genuinely differs —
+but it has to be tried. Cut a test plate with QR blocks at 0.3 / 0.45 / 0.6 /
+0.9 mm modules and scan them. Until that exists, **design against the 0.6 mm
+column**. Cheap: the single-character test-plate technique cuts in ~2 s rather
+than ~21 min.
+
+**Open questions.**
+
+1. **Raw bytes, base45, or uppercased text inside the QR?** Measured below —
+   the density spread is smaller than assumed, and **base45 is the candidate to
+   beat**. See "Density by representation".
+2. **Raw bytes or UR?** The fork vendors `bc/ur`. UR is self-describing and
+   multi-part, which is worth something for recovery, at a size cost — and it is
+   arguably a *third* format to know, which cuts against the whole point.
+3. **What states the QR's content type**, so a recoverer knows whether they are
+   holding a transaction, a descriptor or a seed? A plate legend is the obvious
+   answer and costs text budget.
+4. **Does `QR ONLY` become dangerous under this rule?** A QR-only plate has no
+   hand-transcribable fallback at all — exactly the property the constellation
+   exists to provide. Likely: QR ONLY stays available but is never the default,
+   and the guide says why.
+5. Reed-Solomon's percentages are **per RS block**, not per symbol, so a single
+   deep scratch can exceed one block's budget while total damage looks fine.
+   Tiling helps — four independent symbols fail independently, and Structured
+   Append reports *which* one is unreadable.
+
+#### Density by representation — and a correction to this entry's own argument
+
+Measured 2026-08-22, `design/measurements/RESULTS_qr_modes_2026-08-22.txt`.
+Source bytes of a signed transaction that fit **one v40 symbol**:
+
+| representation | ECC L | ECC H | vs binary | why |
+| --- | --- | --- | --- | --- |
+| **raw binary** | 2,953 B | 1,273 B | **100%** | 1 octet per byte |
+| base45 (RFC 9285) | 2,864 B | 1,234 B | **97%** | 3 alphanumeric chars per 2 bytes; built for QR |
+| **base32 / bech32 UPPERCASED** | 2,685 B | 1,157 B | **91%** | 5 data bits in a 5.5-bit char |
+| base64 | 2,214 B | 954 B | 75% | mixed case -> byte mode |
+| base58 | 2,162 B | 932 B | 73% | mixed case -> byte mode |
+| hex uppercase | 2,148 B | 926 B | 73% | 2 chars/byte, only partly offset |
+| decimal digits | 2,943 B | 1,269 B | 100% | densest mode, worst expansion — they cancel |
+
+QR's alphanumeric mode is **UPPERCASE ONLY** (0-9 A-Z space `$%*+-./:`), at 5.5
+bits/char against byte mode's 8. That single fact drives the whole table.
+
+**This corrects the size argument made above.** Codex32 uppercased lands in
+alphanumeric mode and costs only **9%** against raw binary — not the ~60% its
+8/5 expansion suggests, because the alphanumeric discount very nearly cancels
+the expansion. bech32 is case-insensitive and the fork already uppercases before
+engraving (`strings.ToUpper(plate.Seed)`, `backup/backup.go:76`). So **the case
+for raw bytes in the QR rests on CONSTELLATION-INDEPENDENCE, not on density.**
+The directive stands; one of its stated reasons was overstated and should not be
+repeated as a capacity claim.
+
+Note also that **base58 is the worst practical choice** at 73% — it needs
+lowercase, so it drops to byte mode and pays 8 bits for 5.86 bits of data. It is
+the instinctive Bitcoin encoding and it is the wrong one here.
+
+**Why base45 may beat raw binary in the field.** Raw binary is the most
+efficient and the least robust: many QR scanners assume UTF-8 and mangle octets
+>= 0x80, and this encoder emitted an **ECI header** for high bytes — costing
+~0.5% and, more tellingly, marking binary payloads as a special case in real
+toolchains. That is exactly why UR uses an alphanumeric-safe encoding. base45
+gives essentially binary's density (97%) with none of the charset hazard, and it
+is an RFC rather than a constellation invention, so it does not reintroduce the
+problem this follow-up exists to remove. **Recommend measuring both against a
+real scanner on a real engraved plate**, together with the 0.3/0.45/0.6/0.9 mm
+module test above — same test plate, same cycle.
+
+**Measurement caution, recorded because it bit three times.** The encoder does
+optimal MODE SEGMENTATION and will silently re-encode parts of a payload in a
+denser mode. An all-`0x41` payload measured *alphanumeric* capacity while
+claiming byte; a high-byte payload paid an ECI header; a digits-and-letters
+payload split into numeric and alphanumeric segments and read 6.6% low. Every
+one produced a plausible-looking number. Only asserting measured v40 capacity
+against the published limits (numeric 7089 / alnum 4296 / byte 2953 at L) caught
+them. **Any future QR sizing work must carry that gate.**
