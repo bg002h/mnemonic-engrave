@@ -204,6 +204,45 @@ generator. Never put funds behind any of it.</div>
 </section>
 
 <section class="page">
+<h1>Where the policy came from — and why the table above is now gated</h1>
+
+<p>The four-tier table on the previous page reads like the <em>source</em> of
+this wallet. It is not. The arrow runs the other way, and the provenance is
+short enough to print in full:</p>
+
+{code(section(tx, "1b. WHERE THE POLICY CAME FROM"), 30, must_show="derive-rcw-keys.sh")}
+
+<div class="note">The operator's English spec was turned into a policy string
+<b>by hand, once</b>, in the hashlock-vault cycle. Everything since is a
+byte-for-byte copy plus one <code>sed</code> path substitution. The prose table
+is a <b>description written afterwards</b> — and until this run, nothing tied
+the two together. It was accurate because it had been checked once by hand,
+which is precisely the state every claim in this repo occupied right before it
+turned out to be wrong.</div>
+
+<h2>The gate, and proof it can fail</h2>
+
+<p><code>check_tiers.py</code> parses the real policy string and asserts each
+tier against it, per wrapper — including that <b>exactly one</b> tier is
+keyless, so neither losing that property nor gaining a second keyless branch
+passes quietly.</p>
+
+{code(section(tx, "1b. WHERE THE POLICY CAME FROM").split("AND THE GATE CAN FAIL")[-1], 26, must_show="FAIL[tr]")}
+
+<div class="warn">The negative control gives tier 4 a key — the single change
+that would make this wallet importable by third-party software, and that would
+silently falsify the table. The gate catches it on two independent grounds:
+tier 4's own claim, and the exactly-one-keyless count.</div>
+
+<div class="note">Written after the first version of this checker reported a
+false FAIL on tier 2. Tier 2 is a <em>nested</em> <code>and_v</code> —
+<code>older</code> wrapping <code>sha256</code> and <code>multi_a</code> — and a
+single-level regex grabs the inner group, so the branch looks like it has lost
+its timelock. Structure needs bracket balancing, not patterns. The fix is in the
+function's own doc comment so the next person does not repeat it.</div>
+</section>
+
+<section class="page">
 <h1>The two policies</h1>
 <p>Same four tiers, two wrappings, and they are <b>different wallets</b>. The
 wsh form is not the tr form with a different prefix: <code>multi_a</code>

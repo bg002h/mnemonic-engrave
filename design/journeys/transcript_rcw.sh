@@ -93,6 +93,49 @@ echo
 run cat "$IN/policy-tr.txt"
 run cat "$IN/policy-wsh.txt"
 
+echo "=== 1b. WHERE THE POLICY CAME FROM, and gating the tier table ==="
+echo
+cat <<'TXT'
+The four-tier table above reads like the source of this wallet. It is not. The
+arrow runs the other way, and the provenance is short enough to print:
+TXT
+echo
+E=/scratch/code/shibboleth/mnemonic-engrave
+run git -C "$E" log --oneline --diff-filter=A -- design/journeys/inputs-hashvault/wallet-policy-hashvault.txt
+run git -C "$E" log --oneline --diff-filter=A -- design/fixtures/reasonably-complex-wallet/tr.policy
+echo "And this journey's copy is that fixture with one path substitution:"
+run grep -n "policy-tr.txt" "$W/derive-rcw-keys.sh"
+echo
+cat <<'TXT'
+So: the operator's English spec was turned into a policy string BY HAND, once,
+in the hashlock-vault cycle. Everything since is copy plus `sed`. The prose
+table is a DESCRIPTION written afterwards, and until now nothing tied the two
+together — it was accurate because it was checked once by hand, which is the
+state every other unverified claim in this repo was in before it turned out to
+be wrong.
+
+check_tiers.py closes that: it parses the real policy and asserts each tier,
+per wrapper, including that EXACTLY ONE tier is keyless.
+TXT
+echo
+for w in tr wsh; do
+  run python3 "$W/check_tiers.py" "$IN/policy-$w.txt" "$w"
+  if ! python3 "$W/check_tiers.py" "$IN/policy-$w.txt" "$w" >/dev/null 2>&1; then
+    fatal "$w: the tier table does not match the policy it describes"
+  fi
+done
+
+echo "AND THE GATE CAN FAIL. Give tier 4 a key -- the one change that would make"
+echo "this wallet importable, and would silently make the table above false:"
+echo
+sed "s#and_v(v:after(1383520),sha256(#and_v(v:after(1383520),and_v(v:pk(@5/270028'/0'/8'/0'/<0;1>/*),sha256(#" \
+  "$IN/policy-tr.txt" > "$OUT/policy-tr-KEYED-TIER4.txt"
+run python3 "$W/check_tiers.py" "$OUT/policy-tr-KEYED-TIER4.txt" tr
+if python3 "$W/check_tiers.py" "$OUT/policy-tr-KEYED-TIER4.txt" tr >/dev/null 2>&1; then
+  fatal "the tier gate ACCEPTED a policy whose tier 4 has a key -- it proves nothing"
+fi
+echo
+
 echo "=== 2. Six seeds, one per key ==="
 echo
 for i in 0 1 2 3 4 5; do
@@ -232,7 +275,23 @@ for w in tr wsh; do
   echo "The engraved set: $(grep -c '^md1' "$O/backup-strings.txt") md1 + $(grep -c '^mk1' "$O/backup-strings.txt") mk1 = $(grep -c . "$O/backup-strings.txt") public strings."
   echo
   rm -rf "$O/plates" && mkdir -p "$O/plates"
+  mkdir -p "$O/plates"
   run "$ME" bundle --in "$O/backup-strings.txt" --preview "$O/plates" --png --manifest "$O/manifest.json"
+
+  # THE PREVIEW MUST NOT SILENTLY SKIP. `me bundle --preview` degrades
+  # gracefully when the me-preview sidecar is absent -- it prints "preview
+  # skipped (install me-preview)", still emits the manifest, and STILL EXITS 0.
+  # That is right for the tool and wrong for a journey: this run produced a
+  # complete-looking plate checklist with ZERO rendered plates and nothing said
+  # so. The sidecar is discovered only ALONGSIDE the `me` binary, so a debug
+  # build finds nothing while a release build works.
+  NPLATE=$(ls "$O/plates" 2>/dev/null | wc -l)
+  NPUB=$(grep -c . "$O/backup-strings.txt")
+  echo "Rendered $NPLATE plate image(s) for $NPUB public string(s)."
+  if [ "$NPLATE" -ne "$NPUB" ]; then
+    fatal "$w: rendered $NPLATE plates for $NPUB strings -- the me-preview sidecar must sit beside \$ME (or set ME_PREVIEW_BIN)"
+  fi
+  echo
 done
 
 echo "############################################################"
@@ -332,7 +391,13 @@ NEMIT=0
 for w in tr wsh; do
   D=$(cat "$OUT/$w/descriptor.txt")
   for f in descriptor bsms bip388 bitcoin-core sparrow electrum specter jade coldcard; do
-    if "$TK" export-wallet --descriptor "$D" --format "$f" > "$EXP/rcw-$w.$f.txt" 2>"$EXP/e"; then
+    # --allow sigless-branch IS NOW REQUIRED, and this journey is the first
+    # consumer to need it. Phase 1 (mnemonic-toolkit 05ac190b) made the sigless
+    # admission gate uniform across wrappers, so the wsh form -- which exported
+    # flagless at exit 0 before -- now refuses without the flag. That is the
+    # documented migration, and this line is what it looks like in practice.
+    if "$TK" export-wallet --descriptor "$D" --format "$f" --allow sigless-branch \
+         > "$EXP/rcw-$w.$f.txt" 2>"$EXP/e"; then
       printf '  %-5s %-14s %-12s %s bytes\n' "$w" "$f" EMITTED "$(wc -c < "$EXP/rcw-$w.$f.txt")"
       NEMIT=$((NEMIT+1))
     else
