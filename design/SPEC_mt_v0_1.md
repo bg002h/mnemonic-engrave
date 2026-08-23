@@ -96,6 +96,32 @@ warnings on stderr.
 > operator may engrave beside their strings. `mt` does not control the layout
 > and does not withhold the words.
 >
+> **`stdout` IS THE STRINGS AND NOTHING ELSE — operator ruling 2026-08-23, and
+> it is a hard interface boundary, not a formatting preference.** The output of
+> `mt encode` exists to be **piped**: into a file, into `mt qr` when that cycle
+> lands, into whatever the operator's engraving path is. The moment a legend
+> line, a banner, a count or a blank separator shares that stream, every
+> downstream consumer has to parse `mt`'s prose out of its own input — and the
+> first one that forgets engraves a warning label as if it were a chunk.
+> **Suggested legend text is `stderr`, unconditionally**, alongside the
+> warnings, for exactly the reason §3b already gives: stdout carries the
+> artifact, stderr carries everything a human must see.
+>
+> **And the honest consequence, which this spec must design around rather than
+> hope away: the realistic plate has NO legend on it.** The operator ruling is
+> blunt — the legend is *"a warning message that a user would be encouraged to
+> engrave but probably won't."* Every line of it is optional, hand-cut, and paid
+> for in the operator's own labour, at the end of a job whose real product is
+> already finished.
+>
+> So **`mt` may not treat any legend field as present**, and no journey in this
+> spec may be walked from a plate that has one. The recovery path that has to
+> work is the bare one: **`mt1` strings, nothing else, into `mt inspect`** —
+> which is precisely why §10.20 has `inspect` consult a node and reconstruct
+> what the legend would have said (§10.21 closes on the single field inspection
+> *cannot* reconstruct). A legend, where an operator does cut one, is a
+> **convenience that shortens a recovery** — never a component one depends on.
+>
 > **It is NOT §5's five fields, and an earlier version of this section said it
 > was — U-5.** §5's set was designed for a `mt qr` plate, where every symbol
 > sits beside one legend. Hand-engraved strings split the text in two:
@@ -1047,8 +1073,8 @@ The 0.30 mm results are recorded for when the plate exists.
 
 Everything constellation-specific lives here, in engraved text, never in the QR.
 
-**The legend carries only what a human needs BEFORE the QR is decoded.** Five
-fields, **145 characters**, 6 lines — measured,
+**The legend carries only what a human needs BEFORE the QR is decoded.** Six
+fields, **164 characters**, 7 lines — measured,
 `RESULTS_legend_budget_2026-08-22.txt`:
 
 | field | chars | why |
@@ -1076,8 +1102,38 @@ fields, **145 characters**, 6 lines — measured,
 | `LOCKED TO BLOCK <n> ~<SEASON> <year>` / `LOCKED UNTIL <t>` | 35 | the single most actionable fact. Reads **`NO TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
 | `TO <wallet id, fp or label>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when blank.** A free-text label is allowed **only behind an explicit flag**, since nothing can check it against the transaction |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
+| `FORMAT: mt1 codex32` | 19 | **names the encoding, so a stranger can start.** Operator ruling 2026-08-23, closing §10.21 — see the note below for why this field is not the least important of the six but arguably the most |
 
-Plus, **not part of the 145-character budget above**, one `n/m` label engraved
+> **`FORMAT: mt1 codex32` — the only field a recoverer cannot do without, and
+> the only one naming a standard rather than this project.** Operator ruling
+> 2026-08-23, closing §10.21.
+>
+> Every other field on this plate is a **convenience**: `mt inspect` can
+> reconstruct the destination, the amount, the locktime and the bearer warning
+> from the string itself, and with a node reachable it can say more than the
+> legend ever could (§10.20). **What no amount of inspection recovers is which
+> program to run.** `MT1QZRF8X…` in a search engine returns nothing, and a
+> recoverer who cannot name the format cannot reach any of the other fields.
+>
+> **`codex32` is why this wording and not a URL.** The operator raised a GitHub
+> URL, which is a reasonable instinct and the wrong durability: a domain or an
+> org name must **outlive the plate**, twenty years is longer than most of them
+> last, and a lapsed name someone else buys back is *worse* than no line at all
+> — it points a recoverer holding a bearer instrument at a stranger. `codex32`
+> is **BIP-93**, published and archived independently of this project, so the
+> tag stays findable through a channel that does not depend on this repository
+> existing. `mt1` alone does not have that property; `codex32` does. A repo URL
+> may accompany it as *additional* suggested text (§0a) — it is a convenience
+> layered on a durable tag, never the tag itself.
+>
+> Cost: **+19 characters, 145 → 164, and 6 → 7 lines** — the one field that
+> moves the line count. Free for `mt encode`, where the legend is `stderr` text
+> and `mt` owns no layout; **not** free for the deferred `mt qr` cycle, where
+> `legend.rs`'s own table shows a 7-line legend still fits one plate at v13 but
+> forces a second plate at v18 and above. That is a §0a-deferred cost, recorded
+> here so the QR cycle inherits it priced rather than as a surprise.
+
+Plus, **not part of the 164-character budget above**, one `n/m` label engraved
 beside **each QR symbol**, naming the `mt1` chunk it carries (§10.8's ruling). A
 plate may hold several symbols, so `PLATE n OF m` alone cannot tell a recoverer
 which *part* is missing. These labels are per-symbol and their area is not yet
@@ -1779,9 +1835,18 @@ exactly as permanent, as a machine-engraved one.
      **consensus-targeted**, so it depends on nothing external, whereas a
      currency figure depends on everything.
 
-   Measured cost: the legend goes from **130 to 136 characters** and stays at
-   **6 lines** (`RESULTS_legend_budget_2026-08-22.txt`), so §4's reservation and
-   plate table are unaffected.
+   Measured cost **of this field alone: +6 characters**, and it did not move
+   the line count when it landed (130 → 136, 6 lines), so §4's reservation and
+   plate table were unaffected by it.
+
+   > **That 136 is this field's own delta, not the legend's size.** Two later
+   > rulings moved the total — `BROADCAST` (§5, +4) and `FORMAT: mt1 codex32`
+   > (§10.21, +19, and *that* one crossed to 7 lines). The live figure is **164
+   > characters, 7 lines**, and it is emitted by `legend.rs` rather than carried
+   > in prose, because this sentence is exactly how the earlier stale number
+   > survived: a per-field delta reads like a total, and nobody re-ran the
+   > probe. Read the current size from
+   > `RESULTS_legend_budget_2026-08-22.txt`, never from a delta.
 
    - **A lock that has already passed is reported the same way**, because the
      two numbers say so: `LOCKED TO BLOCK 900000, current height 963663` is a
@@ -2622,13 +2687,36 @@ signed PSBT.
     confirm. Worth a sentence somewhere a recoverer will read.
 
 
-21. **Nothing on the plate names the format.** A recoverer in 2040 holds QR
-    symbols or a codex32 string, a five-field legend, and no indication of which
-    tool reads them. The `mt1…` prefix identifies the string form to someone who
-    already knows the constellation; `mt qr`'s symbols carry nothing at all.
-    Weigh a short format tag against §5's budget — which is 136 characters of a
-    300-character allowance, so the room exists (§10.14's regeneration should
-    price it).
+21. ~~Nothing on the plate names the format.~~ **CLOSED**, operator ruling
+    2026-08-23: the suggested legend gains a sixth field, **`FORMAT: mt1
+    codex32`**, specified in §5 with its reasoning.
+
+    **The question was found by walking Journey B, not by reviewing §5.** A
+    recoverer in 2040 holds a string and no indication of which tool reads it;
+    `MT1QZRF8X…` in a search engine returns nothing. Every *other* legend field
+    is reconstructible by `mt inspect` from the string alone (§10.20) — **which
+    program to run is the one thing inspection cannot tell you**, so the field
+    that looked like the least important of the six is the only one whose
+    absence ends the journey.
+
+    **A repo URL was considered and rejected as the tag.** It fails on
+    durability: a domain must outlive the plate, and a lapsed one someone else
+    buys points a bearer-instrument holder at a stranger. `codex32` is BIP-93 —
+    published and archived independently of this project — so the tag survives
+    the project. A URL may ride along as extra suggested text; it may not *be*
+    the identifier.
+
+    **The `136 characters` cited in the original entry was already stale**, and
+    regenerating the probe to price this field is what exposed it: §5's minimal
+    legend measured 141, then 145 after the `BROADCAST` fix, and **164** with
+    this field. The stale figure had survived because nothing re-ran
+    `legend.rs`; the number is now emitted by the probe rather than carried in
+    prose (§10.14).
+
+    **Residual, inherited by the deferred `mt qr` cycle (§0a):** the sixth field
+    takes the legend from 6 lines to **7**, which `legend.rs` shows still fits
+    one plate at v13 but forces a second at v18 and above. Free for `mt encode`,
+    where the legend is `stderr` text and `mt` owns no layout.
 
 
 22. ~~`mt1`'s NUMS domain string is undecided.~~ **CLOSED**, operator ruling

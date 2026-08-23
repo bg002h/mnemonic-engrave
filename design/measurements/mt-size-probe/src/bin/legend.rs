@@ -25,7 +25,7 @@ fn legend(n_inputs: usize) -> Vec<(&'static str, String)> {
     let addr = "bc1p8rrz3ts8u4dm2fu7ax3hlwywy3esads3dz2ykrwrwvcjrcqz5q3s6n0vcl";
     let blockhash = "0000000000000000000021c5fe68b74cfc766960ea8ed93b2bcda93cf7845fa8";
     let mut v = vec![
-        ("bearer warning", "BEARER - ANYONE HOLDING THIS PLATE CAN SPEND IT".into()),
+        ("bearer warning", "BEARER - ANYONE HOLDING THIS CAN BROADCAST IT".into()),
         ("source wallet",  "FROM WALLET fa568be0".into()),
         ("txid",           format!("TXID {txid}")),
         ("destination",    format!("TO {addr}  0.00399 BTC")),
@@ -52,6 +52,7 @@ fn minimal_legend() -> Vec<(&'static str, String)> {
         ("locktime",       "LOCKED TO BLOCK 1383520 ~FALL 2034".into()),
         ("destination",    "TO bc1p8rrz...s6n0vcl  0.00399 BTC".into()),
         ("symbol index",   "PLATE 1 OF 1".into()),
+        ("format tag",     "FORMAT: mt1 codex32".into()),
     ]
 }
 
