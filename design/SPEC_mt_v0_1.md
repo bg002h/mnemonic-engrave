@@ -198,12 +198,20 @@ overturned an earlier assumption and are marked.
    functions and are out of scope (§9). **This overrules the previous draft's
    produce/present/engrave triple**, which split on *stage of the transaction*;
    these two split on *how the steel is cut*.
-1b. **`mt encode` exists so that short transactions can be HAND engraved, with
-   fault tolerance.** Operator ruling 2026-08-23: *"For some shorter
-   transactions, users will want codex32 style fault tolerant hand engraving."*
-   Without it, the only route onto steel is a machine — which makes `mt`
-   unusable for anyone without a SeedHammer, and gives up the human-readable,
-   error-correcting property the rest of the constellation is built on.
+1d. **`mt encode` exists so a transaction can be HAND engraved, with fault
+   tolerance.** Operator ruling 2026-08-23: *"For some shorter transactions,
+   users will want codex32 style fault tolerant hand engraving."* It gives `mt`
+   the human-readable, error-correcting property the rest of the constellation
+   is built on, and makes it usable by someone with no SeedHammer.
+
+   > **The original wording said "without it, the only route onto steel is a
+   > machine" — and §0a inverted that.** With `mt qr` deferred, `mt encode` is
+   > not the alternative to the machine, it is **the only route at all**, and
+   > everything up to the 4,096-chunk ceiling goes through it. The ruling's word
+   > *"shorter"* described a verb that had a sibling; it now describes the whole
+   > tool. Nothing about the format changes — but nobody should read this item
+   > as scoping `mt encode` to small transactions, because §8.7b's ceiling is the
+   > only bound and it sits above Bitcoin's own relay limit.
 2. **Its own repository**, `mnemonic-transaction`, with **`mt-cli` and
    `mt-codec`** — matching the constellation's pattern exactly, and not a
    subcommand of `me`. Every normative format has this shape: `descriptor-mnemonic`
@@ -1497,6 +1505,21 @@ exactly as permanent, as a machine-engraved one.
    plate count**, which `mt` compares against §4's search result; there is no
    fixed number, because §4's answer depends on module size, ECC and tiling.
 
+7b. **Over the 4,096-chunk ceiling** → refuse, naming the chunk count and the
+   ceiling. Both verbs share it, since both use `mt1`'s header (§3).
+
+   > **This refusal is deliberately unreachable for anything broadcastable.**
+   4,096 chunks is 163,840 bytes, and Bitcoin's own standardness limit is
+   ~100,000 vbytes — so a transaction large enough to trip this **could not be
+   relayed even if `mt` engraved it** (§3). It exists for completeness, not as a
+   working constraint. For scale: the largest artifact measured in §3b is
+   **89 chunks, 2.2% of the ceiling.**
+   >
+   > **An earlier version of this refusal said "over the 64-chunk container"**
+   > and cited that same 89-chunk artifact as a wallet that *"hit this"*. Both
+   > were wrong: 64 was `md-codec`'s 6-bit field, never `mt1`'s (§3's
+   > correction), and at 4,096 the artifact is nowhere near the limit. It also
+   > pointed at `mt qr` *"which has no such limit"* — both verbs share it.
 7c. **Over the `sysw` section ceiling (`mt qr`)** → refuse. **Deferred with the
    verb (§0a); no v0.1 behaviour depends on it.** `MAX_SECTION_LEN =
    8191` (`crates/me-cli/src/sysw/wire.rs:42`), inherited from EPD. **This is a
@@ -1529,9 +1552,6 @@ exactly as permanent, as a machine-engraved one.
    > commit that discovered the ceiling: a 40% margin invites "no need to model
    > this", while 15% is close enough that §4's search and this refusal must be
    > reconciled rather than left independent (§10.14's regeneration).
-7b. **Over the 64-chunk container (`mt encode`)** → refuse, naming the chunk
-   count and the ceiling, and pointing at `mt qr`, which has no such limit. Real
-   wallets hit this: RCW `wsh` tier 1 at 5 inputs needs **89** chunks (§3b).
 8. **Module size is the operator's choice, defaulting to 0.60 mm** — not a
    refusal. Ruling 2026-08-23 (§10.1): `mt` offers every size it can engrave and
    suggests 0.60 mm (two engraved strokes). Sizes below that are **optically

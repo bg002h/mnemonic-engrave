@@ -14,7 +14,9 @@
 #   1. `## N.` and `### Na.` headings are sequential and unique.
 #   2. Numbered items inside each section run 1..N with no gaps or repeats
 #      (suffixed items like `2b.` are allowed and checked for ordering).
-#   3. Every `§N` and `§N.M` cross-reference resolves to something that exists.
+#   3. Suffixed items (`2b.`, `7c.`) are unique and alphabetically ordered after
+#      their base — a duplicate or an out-of-order suffix reads perfectly well.
+#   4. Every `§N` and `§N.M` cross-reference resolves to something that exists.
 #   4. GFM table rows match their header's column count — an overflow cell is
 #      silently DROPPED when rendered, so the text exists and shows nowhere.
 #   5. Superseded terms (design/SUPERSEDED_TERMS.txt) appear only inside a
@@ -93,6 +95,24 @@ for (start, head), end in zip(heads, bounds[1:]):
     for base, suf, ln, l in order:
         if suf and base not in bases:
             err(f"line {ln}: item {base}{suf}. has no base item {base}.")
+    # SUFFIXED items must be unique and in alphabetical order after their base.
+    # The gate passed a spec carrying TWO `1b.` items and a `7c.` printed before
+    # `7b.` — it checked that base numbers ran 1..N and that a suffixed item had
+    # a base, but never that the suffixes themselves were unique or ordered.
+    by_base = {}
+    for base, suf, ln, l in order:
+        if suf:
+            by_base.setdefault(base, []).append((suf, ln))
+    for base, sufs in by_base.items():
+        seen_suf = {}
+        for suf, ln in sufs:
+            if suf in seen_suf:
+                err(f"line {ln}: DUPLICATE item {base}{suf}. (also line {seen_suf[suf]})")
+            seen_suf[suf] = ln
+        letters = [suf for suf, _ in sufs]
+        if letters != sorted(letters):
+            err(f"§ item {base}: suffixes out of order — {' '.join(letters)}")
+
     # duplicate item text
     txt = {}
     for base, suf, ln, l in order:
