@@ -21,7 +21,7 @@ different ways:
 
 | verb | form | engraved how | payload | size limit |
 | --- | --- | --- | --- | --- |
-| **`mt qr`** | QR symbols + legend, as a **SH2 payload** | **machine** (SeedHammer II) | `mt1` chunks, **base45** (§3) | the plate budget |
+| **`mt qr`** | QR symbols + legend, as a **SH2 payload** | **machine** (SeedHammer II) | `mt1` chunks, **bech32 uppercase** (§3) | the plate budget |
 | **`mt string`** | `mt1` chunked codex32, **on stdout** | **by hand** | raw signed transaction (§3b) | **64 chunks** |
 
 `mt qr` decides how many symbols that takes, at what error-correction level,
@@ -76,7 +76,7 @@ overturned an earlier assumption and are marked.
 3. **The QR carries the standard form, never a codex32 string** (F-234).
 4. **UR is dropped entirely. Both verbs share the `mt1` chunk header and NOTHING
    ELSE** — each medium carries the error correction native to it (§3a). The QR
-   payload is **base45**.
+   payload is **bech32 uppercase**, the constellation's own alphabet.
    **This overrules the previous draft's `ur:psbt`, which itself overruled
    `ur:bytes`** — three positions in one cycle, and §3 records why each fell.
    The payload remains a fully finalized PSBT. See §3.
@@ -177,37 +177,56 @@ only once.**
 header and reassembly take a transaction-shaped payload cleanly was already
 open; it is now load-bearing for everything `mt` emits.
 
-**What a symbol carries: `mt1` chunks, base45-encoded.** Operator ruling
-2026-08-23. Three candidates were measured
-(`RESULTS_ecc_selection_2026-08-22.txt`, `qr_payload_forms`), all carrying the
-same chunk header:
+**What a symbol carries: `mt1` chunks, bech32 UPPERCASE.** Measured
+(`RESULTS_ecc_selection_2026-08-22.txt`, `qr_payload_forms`), all four
+candidates carrying the same chunk header:
 
-| form | efficiency | worst plate cost |
-| --- | --- | --- |
-| codex32 string inside the QR | **63–65%** | **+2 plates** (`wsh` tier 1, 5-in: 5 → 7) |
-| bytes + **base45** | **85.5–86%** | — **chosen** |
-| bytes, raw binary | 88.4–88.8% | — |
+| form | efficiency | worst plate cost | usable in a `sysw` record? |
+| --- | --- | --- | --- |
+| codex32 string inside the QR | 63–65% | +2 plates | yes |
+| bytes + base45 | 85.5–86% | — | **NO** |
+| **bytes + bech32 UPPERCASE** | **80.3–80.7%** | **+1 plate** on one artifact | **yes — chosen** |
+| bytes, raw binary | 88.4–88.8% | — | no |
 
-**Why not base45's 3%-denser rival.** Binary is marginally smaller and produces
-**identical plate counts in 4 of the 5 measured artifacts**, so the choice was
-never about size. base45 (RFC 9285) wins on two other grounds: it is pure QR
-alphanumeric text, so no scanner is asked to accept arbitrary bytes — a real
-failure mode at the application layer even though QR byte mode is standard — and
-it carries **intrinsic error detection**, because 45³ = 91,125 exceeds the 65,536
-values two bytes can hold, so roughly **28% of corrupted 3-character groups are
-detectably invalid**. Raw binary has none: every byte sequence is legal.
-
-> **Why the codex32 string does NOT go in the QR, measured rather than argued.**
-> Operator question: *"are you suggesting we first codex32 style encode the
-> transaction and then qr encode that? Does that massively increase the plate
-> count?"* It does. At **63–65%** it is **worse than UR's ~73%**, which §3 had
-> already dropped for waste, and it costs one extra plate on two artifacts and
-> **two** on `wsh` tier 1 at five inputs.
+> **base45 was chosen on 2026-08-23 and is REVERSED here, because it cannot
+> reach the machine.** R2 lens 3 found the collision. **base45's alphabet
+> contains SPACE** (index 36, RFC 9285), and EPD §6.4 — the `sysw` record rule —
+> is normative and emphatic:
 >
-> It pays twice: a 65-bit BCH checksum per 40-byte chunk, and then bech32's five
-> data bits per 5.5 character-bits through alphanumeric mode. That is far below
-> the 91% a *bare* bech32 payload measures, because at 40 payload bytes per chunk
-> the header, checksum and HRP are a large fraction of every chunk.
+> > *"Every record MUST be the canonical, unbroken string — **no interior
+> > spaces, no hyphens, no grouping of any kind**."*
+>
+> **The reason is about engraving, not parsing**, and it is why the rule does not
+> bend: records engrave **verbatim**, so *"a record carrying separator characters
+> the BCH checksum never covered turns a scratch on the operator's only copy into
+> silently-absorbed damage rather than a detected error."* A character outside
+> the checksum's coverage is a hole in the guarantee, cut into the only copy.
+>
+> **This is the third format to collide with EPD §6.4, and the precedent is
+> settled.**
+> `FreeText` and `Passphrase` hit it too, and *"the exemption is refused —
+> relaxing EPD §6.4 for two classes would weaken the rule for all of them."* They
+> were hex-encoded instead, at 2×. Hex-escaping base45 would land at **48.5%**,
+> worse than raw binary and worse than the UR this cycle dropped for waste.
+
+**Why bech32 uppercase satisfies all three constraints at once**, which is why it
+is the constellation's alphabet rather than a stylistic choice:
+
+| constraint | bech32 uppercase |
+| --- | --- |
+| **EPD §6.4** — no interior spaces; every character inside the checksum | ✓ 32-character alphabet, no space |
+| **EPD §6.6** — records hashed in canonical **lowercase** | ✓ case-insensitive by design; uppercase→lowercase is **lossless**, verified 1:1 |
+| **QR alphanumeric** — for 11-bits-per-2-characters packing | ✓ when uppercased |
+
+base45 satisfies only the third; hex satisfies the first two at twice the cost.
+`md1`, `mk1` and codex32 already store lowercase and uppercase for QR, so
+`mt qr` and `mt string` now share one alphabet.
+
+> **Correction to a figure I quoted while recommending this.** The 91% measured
+> for bech32 in `RESULTS_qr_modes_2026-08-22.txt` is for a **bare** payload. With
+> `mt1` chunk headers added before encoding, the measured figure is **80.4%** —
+> the overhead compounds. The plate consequence is one extra plate on RCW `wsh`
+> tier 1 at five inputs (5 → 6) and no change on the other four artifacts.
 
 ## 3a. The medium-appropriate ECC principle
 
@@ -456,18 +475,18 @@ The 0.30 mm results are recorded for when the plate exists.
 Everything constellation-specific lives here, in engraved text, never in the QR.
 
 **The legend carries only what a human needs BEFORE the QR is decoded.** Five
-fields, **130 characters**, 6 lines — measured,
+fields, **136 characters**, 6 lines — measured,
 `RESULTS_legend_budget_2026-08-22.txt`:
 
 | field | chars | why |
 | --- | --- | --- |
 | `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
 | `FROM WALLET <8 hex>` | 20 | wallet id or seed fingerprint. The transaction does **not** say what it spends *from* (§6). **Optional — loudly warned when absent** (§10.4) |
-| `LOCKED TO BLOCK <n>` / `LOCKED UNTIL <t>` | 23 | the single most actionable fact. Reads **`NO BLOCK TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
+| `LOCKED TO BLOCK <n> ~<year>` / `LOCKED UNTIL <t>` | 29 | the single most actionable fact. Reads **`NO BLOCK TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
 | `TO <wallet id, fp or label>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when blank.** A free-text label is allowed **only behind an explicit flag**, since nothing can check it against the transaction |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
-Plus, **not part of the 130-character budget above**, one `n/m` label engraved
+Plus, **not part of the 136-character budget above**, one `n/m` label engraved
 beside **each QR symbol**, naming the `mt1` chunk it carries (§10.8's ruling). A
 plate may hold several symbols, so `PLATE n OF m` alone cannot tell a recoverer
 which *part* is missing. These labels are per-symbol and their area is not yet
@@ -880,9 +899,9 @@ exactly as permanent, as a machine-engraved one.
    whereas *"spendable"* is a claim about a transaction's fate that depends on
    scripts, fees and unspent inputs — none of which `mt` evaluates.
 
-   - **Legend:** `LOCKED TO BLOCK <n>` for a height, **`LOCKED UNTIL <time>`**
-     for a timestamp, or `NO TIMELOCK`. **A timestamp is never presented as a
-     height.**
+   - **Legend:** `LOCKED TO BLOCK <n> ~<year>` for a height,
+     **`LOCKED UNTIL <time>`** for a timestamp, or `NO TIMELOCK`. **A timestamp
+     is never presented as a height.**
    - **Compare like with like:** a height against the chain height, a timestamp
      against the chain's **median-time-past** — which §6a's node already
      reports, and which is the monotonic, consensus-enforced figure rather than
@@ -890,6 +909,44 @@ exactly as permanent, as a machine-engraved one.
    - **Height or MTP comes from `bitcoind` when reachable**, and is reported as
      unknown otherwise. This is the whole of `mt`'s use of the chain here — it never
      hands the transaction to the node for validation.
+   **A height means nothing to a human; `mt` estimates the date.** Operator
+   ruling 2026-08-23: *"estimate unlock date for time locked transactions
+   assuming 10 minute block times. Will need to embed a timestamp in binary for
+   reference."*
+
+       estimated unlock  =  reference_time + (target_height − reference_height) × 600 s
+
+   **`mt`'s binary embeds a reference `(height, unix_time)` pair at build time**,
+   so the estimate works **with no node at all** — which is the case that needed
+   it, since a height is exactly as meaningless offline as online. When a node
+   *is* reachable, `mt` uses the live height instead and the estimate is better.
+
+   Worked from the pair in this spec's measurements — height 963,663 at
+   2026-08-23 — a lock at block 1,383,520 is 419,857 blocks out, ≈ 2,916 days,
+   ≈ **2034**.
+
+   **Stated to the year, deliberately.** Three separate reasons, and they all
+   point the same way:
+
+   - **Ten minutes is a target, not a rate.** Difficulty retargeting holds the
+     average near it over the long run, but the realised interval drifts with
+     hashrate between adjustments. Month or day precision would claim accuracy
+     the method does not have.
+   - **The reference pair ages.** A binary built in 2026 and run in 2031 carries
+     a five-year-old anchor, and the error grows with that gap. `mt` prints the
+     reference pair alongside the estimate so the operator can see how fresh it
+     is, and prefers a live node when one is there.
+   - **It is engraved, and engraved numbers are forever.** The legend carries
+     `~<year>` with the tilde, because a projection presented as a fact is the
+     mistake §9 refuses for fiat figures. The difference that makes a year
+     acceptable where a dollar amount is not: block rate is
+     **consensus-targeted**, so it depends on nothing external, whereas a
+     currency figure depends on everything.
+
+   Measured cost: the legend goes from **130 to 136 characters** and stays at
+   **6 lines** (`RESULTS_legend_budget_2026-08-22.txt`), so §4's reservation and
+   plate table are unaffected.
+
    - **A lock that has already passed is reported the same way**, because the
      two numbers say so: `LOCKED TO BLOCK 900000, current height 963663` is a
      plate that is live now, and the operator can read that without `mt`

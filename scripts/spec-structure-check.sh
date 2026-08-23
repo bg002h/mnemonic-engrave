@@ -99,7 +99,12 @@ for (start, head), end in zip(heads, bounds[1:]):
 # ---- 3. cross-references resolve -------------------------------------------
 body = '\n'.join(lines)
 sect_ids = set(seen.keys())
-for ref in sorted(set(re.findall(r'§(\d+[a-z]?)(?:\.(\d+))?', body))):
+# QUALIFIED references belong to ANOTHER document and are not ours to resolve.
+# `EPD §6.4`, `BIP §2`, `BCR §3` name a foreign spec's section; only a bare `§N`
+# refers to this one. Without this the gate reports EPD §6.4 as "section 6 has
+# no item 4" — a FALSE FAIL, and the second one this script produced.
+FOREIGN = r'(?<!EPD )(?<!BIP )(?<!RFC )(?<!BCR )(?<!EPD§)(?<!BIP§)'
+for ref in sorted(set(re.findall(FOREIGN + r'§(\d+[a-z]?)(?:\.(\d+))?', body))):
     sec, item = ref
     if sec not in sect_ids:
         err(f"cross-reference §{sec} -> no such section")

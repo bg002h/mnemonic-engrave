@@ -267,9 +267,17 @@ fn qr_payload_forms(raw: usize) -> Vec<(&'static str, usize, f64)> {
     let b45_chars = bin_bytes.div_ceil(2) * 3;
     let b45_bytes = (b45_chars.div_ceil(2) * 11).div_ceil(8);
 
+    // (4) bech32 UPPERCASE: 5 data bits per character, alnum-packed at 11 bits
+    //     per 2 chars. No SPACE in its charset, so unlike base45 it satisfies
+    //     EPD 6.4's canonical-record rule, and lowercasing is lossless so it
+    //     survives EPD 6.6's lowercase hashing.
+    let b32_chars = (bin_bytes * 8).div_ceil(5);
+    let b32_bytes = (b32_chars.div_ceil(2) * 11).div_ceil(8);
+
     vec![
         ("codex32 string", alnum_bytes, raw as f64 / alnum_bytes as f64),
         ("bytes + base45", b45_bytes,   raw as f64 / b45_bytes as f64),
+        ("bytes + bech32U", b32_bytes,  raw as f64 / b32_bytes as f64),
         ("bytes, binary",  bin_bytes,   raw as f64 / bin_bytes as f64),
     ]
 }

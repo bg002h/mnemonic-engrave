@@ -29,7 +29,7 @@ fn legend(n_inputs: usize) -> Vec<(&'static str, String)> {
         ("source wallet",  "FROM WALLET fa568be0".into()),
         ("txid",           format!("TXID {txid}")),
         ("destination",    format!("TO {addr}  0.00399 BTC")),
-        ("locktime",       "LOCKED TO BLOCK 1383520".into()),
+        ("locktime",       "LOCKED TO BLOCK 1383520 ~2034".into()),
         ("fee",            "FEE 12 SAT/VB SET 2026-08-22".into()),
         ("mtp bound",      "INPUTS EXISTED NOT BEFORE 2026-08-22T23:22Z".into()),
         ("symbol index",   "PLATE 1 OF 1".into()),
@@ -49,7 +49,7 @@ fn minimal_legend() -> Vec<(&'static str, String)> {
     vec![
         ("bearer warning", "BEARER - ANYONE HOLDING THIS CAN SPEND IT".into()),
         ("source wallet",  "FROM WALLET fa568be0".into()),
-        ("locktime",       "LOCKED TO BLOCK 1383520".into()),
+        ("locktime",       "LOCKED TO BLOCK 1383520 ~2034".into()),
         ("destination",    "TO bc1p8rrz...s6n0vcl  0.00399 BTC".into()),
         ("symbol index",   "PLATE 1 OF 1".into()),
     ]
