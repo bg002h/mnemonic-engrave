@@ -122,6 +122,7 @@ under *Known capture artifacts* below.
 | `qrmax.rs` | `RESULTS_qr_physical_max_2026-08-22.txt` | physical module limits |
 | `qrplate.rs` | `RESULTS_qr_vs_text_2026-08-22.txt` | QR vs engraved text |
 | `psbtqr.rs` | `RESULTS_psbt_qr_multisig_2026-08-22.txt` | PSBT-over-QR |
+| `psbtfinal.rs` | `RESULTS_psbt_envelope_2026-08-23.txt` | **R0 T-3**, the compliant-envelope cost |
 
 ### Why this section is longer than "run three binaries"
 
@@ -181,3 +182,47 @@ count (100,000 sat per input, 1,000 sat fee) so no case trips `SendingTooMuch`.
   P2WSH destination shifts the non-witness size by a few bytes.
 - No fee-rate realism: amounts are synthetic and chosen only to keep the
   transaction valid.
+
+
+## `psbtfinal.rs` — added 2026-08-23, for R0 finding T-3
+
+The R0 round-0 gate established that §3's `ur:bytes` envelope is forbidden for
+production by BCR-2020-005 itself, and that the BCR-2020-006 registry has **no**
+type for a raw signed transaction — `psbt` is the only transaction-shaped entry
+in all 58 rows. The compliant payload is therefore a **fully finalized PSBT**,
+which extracts to the identical raw signed transaction. This probe measures what
+that wrapper costs, on the same fixture and the same forced spending paths as
+`rcw.rs`.
+
+Three forms are measured, and **each is asserted to extract to a byte-identical
+transaction** rather than assumed to:
+
+| form | what it is | extracts via the standard API? |
+| --- | --- | --- |
+| `full` | what BIP-174's finalizer leaves, untouched | yes |
+| `MIN` | UTXO records kept, **output maps cleared** | **yes** |
+| `lean` | UTXO records also stripped | **NO** |
+
+**The `lean` row is a correction to this probe's first version, which assumed
+stripping the UTXO records was free.** `rust-bitcoin`'s `extract_tx()` runs a
+fee check, which needs each input's value, so a UTXO-stripped PSBT fails with
+`MissingInputValue`. The bytes are all present and
+`extract_tx_unchecked_fee_rate()` returns the right transaction — but the safe
+API a recoverer would reach for refuses it, which is exactly the wrong property
+for an artifact meant to be read by whatever tooling exists in 2040. The
+assertion caught this; the first run panicked rather than reporting a cheap
+number that would not have survived contact with a real extractor.
+
+**MIN is the form to specify.** Clearing the *output* maps is what matters: the
+change output's descriptor metadata (derivations, taproot leaf scripts) is what
+an updater wrote for a signer, BIP-174's finalizer strips only *input* fields, and
+no extractor or broadcaster reads it. On 2-output artifacts it is the entire
+blowup — `tr` tier 1 1in/2out is **+1202 B** as finalized and **+61 B** with the
+output maps cleared.
+
+Measured overhead of MIN over raw: **+58 to +61 bytes at one input**, **+261 to
++271 bytes at five** (~54 B/input), i.e. 7.7%–17.5%.
+
+`select.rs` gained a matching section that runs the same search on both sizes, so
+the cost is expressed in **plates** rather than bytes. That section is purely
+additive — the original rows are byte-identical, verified by diff.

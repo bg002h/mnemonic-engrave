@@ -194,5 +194,27 @@ fn main() {
             ("RCW tr tier1, 5in", 2455),
             ("9-of-11 tr PSBT, 2in/2out", 4962),
         ] { row(l, n, min_mm, &caps); }
+
+        // ---- R0 T-3: what the COMPLIANT envelope costs, in PLATES ----------
+        // BCR-2020-005 forbids `ur:bytes` outside testing and the BCR-2020-006
+        // registry has no raw-transaction type, so the compliant payload is a
+        // fully finalized PSBT (extract -> the same raw signed transaction).
+        // Sizes measured by psbtfinal.rs, MIN form: UTXO records kept so the
+        // standard extract_tx() fee check passes, output maps cleared because
+        // no extractor or broadcaster reads them. Pairs are (raw, psbt-min) for
+        // the SAME artifact, so the two rows differ only by the wrapper.
+        println!("\n  --- same artifacts as a finalized PSBT (compliant envelope) ---");
+        for (l, raw, psbt) in [
+            ("RCW tr tier3, 1in/1out", 333usize, 391usize),
+            ("RCW tr tier4, 1in/1out", 405, 465),
+            ("RCW tr tier1, 1in/1out", 535, 595),
+            ("RCW wsh tier3, 1in/1out", 566, 626),
+            ("RCW wsh tier1, 1in/1out", 742, 802),
+            ("RCW tr tier1, 5in/2out", 2498, 2769),
+            ("RCW wsh tier1, 5in/2out", 3538, 3809),
+        ] {
+            row(&format!("{l} [raw]"), raw, min_mm, &caps);
+            row(&format!("{l} [PSBT]"), psbt, min_mm, &caps);
+        }
     }
 }

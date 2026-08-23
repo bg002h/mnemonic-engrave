@@ -1,0 +1,35 @@
+== 1. do the fixture's preimages satisfy its hashlocks? ==
+   tier 1: phrase 40 B -> preimage 32 B: true | literal in policy: true
+   tier 2: phrase 38 B -> preimage 32 B: true | literal in policy: true
+   tier 3: phrase 34 B -> preimage 32 B: true | literal in policy: true
+   tr leaf depth 1 (143 B script): OP_SIZE OP_PUSHBYTES_1 20 OP_EQUALVERIFY OP_SHA256 OP_PUSHBYTES_32 ...
+   tr leaf depth 2 (115 B script): OP_PUSHBYTES_3 008000 OP_CSV OP_VERIFY OP_SIZE OP_PUSHBYTES_1 ...
+   tr leaf depth 3 ( 40 B script): OP_PUSHBYTES_3 10e811 OP_CLTV OP_VERIFY OP_PUSHBYTES_32 865f104d6dea9a456714afde13a2b45414d5328791ac4f129d6aca33b378df5c ...
+   tr leaf depth 3 ( 79 B script): OP_PUSHBYTES_3 601c15 OP_CLTV OP_VERIFY OP_SIZE OP_PUSHBYTES_1 ...
+
+== 2. does stock rust-miniscript 13.1 accept the STORED RCW (tier 4 keyed)? ==
+   tr   ACCEPTED
+   wsh  ACCEPTED
+
+== 3. sizing, STORED fixture: tier 4 = after AND hashlock AND signature, 7 keys ==
+tr   1in/1out tier1 3of3+hash      | RAW   535B | full   595B(+  60) ex:y | MIN   595B(+ 60, 11.2%) ex:y | lean   549B(+  14) ex:n | all extract==raw
+wsh  1in/1out tier1 3of3+hash      | RAW   742B | full   802B(+  60) ex:y | MIN   802B(+ 60,  8.1%) ex:y | lean   756B(+  14) ex:n | all extract==raw
+tr   1in/2out tier1 3of3+hash      | RAW   578B | full  1780B(+1202) ex:y | MIN   639B(+ 61, 10.6%) ex:y | lean  1734B(+1156) ex:n | all extract==raw
+wsh  1in/2out tier1 3of3+hash      | RAW   785B | full  1689B(+ 904) ex:y | MIN   846B(+ 61,  7.8%) ex:y | lean  1643B(+ 858) ex:n | all extract==raw
+tr   5in/2out tier1 3of3+hash      | RAW  2498B | full  3910B(+1412) ex:y | MIN  2769B(+271, 10.8%) ex:y | lean  3680B(+1182) ex:n | all extract==raw
+wsh  5in/2out tier1 3of3+hash      | RAW  3538B | full  4652B(+1114) ex:y | MIN  3809B(+271,  7.7%) ex:y | lean  4422B(+ 884) ex:n | all extract==raw
+
+tr   1in/1out tier3 pk+after       | RAW   333B | full   391B(+  58) ex:y | MIN   391B(+ 58, 17.4%) ex:y | lean   345B(+  12) ex:n | all extract==raw
+wsh  1in/1out tier3 pk+after       | RAW   566B | full   626B(+  60) ex:y | MIN   626B(+ 60, 10.6%) ex:y | lean   580B(+  14) ex:n | all extract==raw
+tr   1in/2out tier3 pk+after       | RAW   376B | full  1576B(+1200) ex:y | MIN   435B(+ 59, 15.7%) ex:y | lean  1530B(+1154) ex:n | all extract==raw
+wsh  1in/2out tier3 pk+after       | RAW   610B | full  1514B(+ 904) ex:y | MIN   671B(+ 61, 10.0%) ex:y | lean  1468B(+ 858) ex:n | all extract==raw
+tr   5in/2out tier3 pk+after       | RAW  1488B | full  2890B(+1402) ex:y | MIN  1749B(+261, 17.5%) ex:y | lean  2660B(+1172) ex:n | all extract==raw
+wsh  5in/2out tier3 pk+after       | RAW  2657B | full  3771B(+1114) ex:y | MIN  2928B(+271, 10.2%) ex:y | lean  3541B(+ 884) ex:n | all extract==raw
+
+tr   1in/1out tier4 keyed          | RAW   405B | full   465B(+  60) ex:y | MIN   465B(+ 60, 14.8%) ex:y | lean   419B(+  14) ex:n | all extract==raw
+wsh  1in/1out tier4 keyed          | RAW   599B | full   659B(+  60) ex:y | MIN   659B(+ 60, 10.0%) ex:y | lean   613B(+  14) ex:n | all extract==raw
+tr   1in/2out tier4 keyed          | RAW   448B | full  1650B(+1202) ex:y | MIN   509B(+ 61, 13.6%) ex:y | lean  1604B(+1156) ex:n | all extract==raw
+wsh  1in/2out tier4 keyed          | RAW   642B | full  1546B(+ 904) ex:y | MIN   703B(+ 61,  9.5%) ex:y | lean  1500B(+ 858) ex:n | all extract==raw
+tr   5in/2out tier4 keyed          | RAW  1848B | full  3260B(+1412) ex:y | MIN  2119B(+271, 14.7%) ex:y | lean  3030B(+1182) ex:n | all extract==raw
+wsh  5in/2out tier4 keyed          | RAW  2815B | full  3929B(+1114) ex:y | MIN  3086B(+271,  9.6%) ex:y | lean  3699B(+ 884) ex:n | all extract==raw
+
