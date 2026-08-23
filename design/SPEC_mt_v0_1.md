@@ -650,7 +650,7 @@ mitigation, the row says so instead of inventing one.
 | **Bearer** — holder can broadcast (`mt string`) | **accepted risk, not mitigated on the plate.** `mt` emits a string, not an engraving, so it has no mechanism to put a warning on hand-cut steel (§3b). It warns once on `stderr` at encode time, to the person encoding — who is not the person holding the plate later. The timelock bound still applies |
 | **Pinned destination** — a 2040 recoverer pays a 2026 address whose keys may be lost | **cannot be fixed; partly disclosed.** §5's `TO` line names the destination **wallet** (id or fingerprint), which does not degrade with output count as the old truncated-address form did — but it is **optional**, and says nothing when the destination is not a known wallet (§10.4). `mt` displays every output in full at encode time; the plate carries a summary |
 | **Indistinguishable from a watch-only plate** — an `mt1` plate sits in the same drawer as `md1` and `mk1` plates, in the same script, differing in **one HRP character**, and is the only one of the three that is spendable by whoever picks it up | for `mt qr` the `BEARER` legend line carries the difference. For `mt string` there is **no mitigation** — see the bearer row above and §3b. R0 round 1 (R-13) |
-| **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed by `mt`, and is NOT on the plate.** `mt` warns below 10 sat/vB (§8.2b) and names two things a future holder can try, guaranteeing neither: **CPFP** — spending one of this transaction's outputs with a high-fee child, which needs no key from the original signer, unlike **RBF**, which requires signing a replacement and is therefore useless to a plate holder — and **out-of-band submission** straight to a miner, which bypasses relay policy and is the escape hatch when a fee is too low for the parent to reach a mempool at all | Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving. A holder in 2040 recovers the fee by decoding **only for `mt qr`**, whose PSBT payload carries the input amounts; an `mt string` plate carries a raw transaction, from which the fee is **not** recoverable without the prevouts |
+| **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed by `mt`, and is NOT on the plate.** `mt` warns below 10 sat/vB (§8.2b) and names two things a future holder can try, guaranteeing neither: **CPFP** — spending one of this transaction's outputs with a high-fee child, which needs no key from the original signer, unlike **RBF**, which requires signing a replacement and is therefore useless to a plate holder — and **out-of-band submission** straight to a miner, which bypasses relay policy and is the escape hatch when a fee is too low for the parent to reach a mempool at all. **Neither is recoverable from an `mt string` plate's own contents**, since a raw transaction carries no input amounts (§6) |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
 | **Non-`ALL` sighash** — an input signed with `SIGHASH_NONE` or `SIGHASH_SINGLE` leaves outputs unbound, so a plate-holder can redirect the funds and the `TO` line becomes a lie | refused at encode time, §8.6 — **structurally**, since §8.2's removal left no script engine |
 | **Wrong input value** — a legacy input whose claimed value is wrong yields a valid transaction, and **the fee absorbs the entire difference** | **not detectable by `mt`.** §8.2's removal means no signature is verified, and a legacy sighash never committed to the amount anyway. Mitigated only by §8.2c's `stderr` warning, which states the arithmetic `(real input value) − (output total)` since the output total is the one term `mt` knows for certain. **Nothing reaches the steel for `mt qr`** — §5's legend is full (§8.2c). An `mt string` operator controls their own plate and may add a reminder; `mt qr`'s operator cannot |
@@ -1018,6 +1018,24 @@ exactly as permanent, as a machine-engraved one.
       > and witness alike**, applying (a) and (b) to whichever carries the
       > satisfaction.
       >
+      > **The structural recognizer is AMBIGUOUS, and the fixture in this repo
+      > proves it — R2 lens 2.** A Schnorr signature carrying an explicit sighash
+      > byte is **65 bytes**; a BIP-341 control block is `33 + 32m`, so at
+      > `m = 1` it is also **65 bytes**. They are indistinguishable by length.
+      > The RCW's own taproot witness measures
+      > `[64, 64, 64, 32, 143, 65]` (`RESULTS_rcw_2026-08-22.txt`) — three
+      > signatures, a preimage, a 143-byte leaf script, and that trailing **65 is
+      > a control block**, not a signature.
+      >
+      > So (b)'s *"every input must carry at least one signature"* is
+      > **grindable**: a keyless leaf spent at depth 1 yields
+      > `[preimage, script, control-block(65)]`, and a length-based recognizer
+      > counts the control block as the signature it is looking for. `mt` must
+      > therefore recognise a taproot script-path witness **by shape** — last
+      > element is the control block, second-last the leaf script — and count
+      > signatures only among the remaining elements. **This is still a
+      > heuristic and the spec does not claim otherwise.**
+      >
       > **Limited by §8.2's removal.** Without a script engine `mt` inspects the
       > spending structure **structurally** — it can tell that a stack element is
       > *shaped* like a signature (a 64-byte Schnorr element, or a DER-encoded
@@ -1043,7 +1061,17 @@ exactly as permanent, as a machine-engraved one.
    > inputs are segwit inputs, and every input type is accepted.
 
 7. **Over the plate budget (`mt qr`)** → refuse, naming the exact plate count
-   and what would fit.
+   and what would fit. **"Plate budget" means the operator's stated maximum
+   plate count**, which `mt` compares against §4's search result; there is no
+   fixed number, because §4's answer depends on module size, ECC and tiling.
+
+7c. **Over the `sysw` section ceiling (`mt qr`)** → refuse. `MAX_SECTION_LEN =
+   8191` bytes (`crates/me-cli/src/sysw/wire.rs:42`), inherited from EPD.
+   **This is a hard transport limit that §4's search knows nothing about**, and
+   §4's largest measured artifact — RCW `wsh` tier 1 at five inputs, 4,719 B
+   once chunked and bech32-encoded — sits inside it with roughly 40% headroom.
+   A larger wallet or more inputs would exceed it while §4 still reported a
+   satisfiable plate count. R2 lens 3 found this; nothing had cited the ceiling.
 7b. **Over the 64-chunk container (`mt string`)** → refuse, naming the chunk
    count and the ceiling, and pointing at `mt qr`, which has no such limit. Real
    wallets hit this: RCW `wsh` tier 1 at 5 inputs needs **89** chunks (§3b).
@@ -1055,6 +1083,24 @@ exactly as permanent, as a machine-engraved one.
    day, not a property of the size (§10.1).
 9. **Secrets** → refuse, as `me` already does for `ms1`.
 
+> **What §8 does NOT check, enumerated because §8.2's removal made the list
+> longer and nothing else states it — R2 lens 2.** These are **commitment
+> checks**: one hash each, no script engine needed, and `mt` performs none of
+> them.
+>
+> | unchecked | what it would catch |
+> | --- | --- |
+> | **script-hash** — does the revealed `witnessScript` hash to the `scriptPubKey`? | a witness script that is not the one being spent |
+> | **taproot tweak** — does the internal key + merkle root tweak to the output key? | a control block that does not belong to this output |
+> | **k-of-n sufficiency** — are there enough signatures for the policy? | an under-signed multisig that will never validate |
+>
+> Each is cheap and none is script *evaluation* in the sense §8.4's scope ruling
+> excludes — they are hashes over data already in the PSBT. They are listed here
+> rather than implemented because adding refusals is the operator's call, and
+> because §8.2's removal was itself a ruling that `mt` does not verify
+> validity. **The consequence stands either way: a transaction can fail every
+> one of these and still be engraved.**
+
 Every refusal names the number that caused it. A refusal that says only "too
 large" costs the operator a round trip.
 
@@ -1065,6 +1111,13 @@ removed by operator ruling 2026-08-23 (§0). Coin selection, fee estimation,
 change handling and input selection go with them: they are wallet decisions with
 their own failure modes, they are better tested in wallet software before
 anything is engraved, and folding them in would make `mt` a wallet.
+
+**A DECODER IS OUT OF SCOPE FOR v0.1, and the consequence deserves stating
+plainly:** a plate cut by `mt` v0.1 **cannot be read back by `mt` v0.1.** The
+reader arrives with §10.2's static-scan verb in the next subversion. R2 lens 3
+raised it, and it compounds with something the legend does not carry — **no
+field names the format, the tool, or the encoding** — so a recoverer holding a
+plate has nothing on it telling them what software to look for (§10.21).
 
 Also out: signing; broadcasting; RBF or CPFP; watching the chain to detect
 invalidation after engraving; any machine-readable provenance (ruled: legend
@@ -1334,7 +1387,26 @@ signed PSBT.
 
     **(b) Its own HRP**, `mt1`, currently hardcoded at four sites in `md-codec`.
 
-    **(c) A content id — RULED: the transaction id.** `derive_chunk_set_id`
+    **(c) A content id — the transaction id, and R2 lens 2 found the ruling
+    AMBIGUOUS.** A PSBT holds **two** transactions that could be called "the"
+    transaction: its `unsigned_tx`, and the one `extract_tx()` produces. **For
+    every legacy and `sh(wsh(…))` input their txids DIFFER**, because a legacy
+    `scriptSig` is part of the txid preimage while a witness is not. Two
+    implementers picking differently would produce plates neither could
+    reassemble from the other.
+
+    **Resolved: the id derives from the EXTRACTED transaction's txid** — the
+    thing actually engraved, actually broadcast, and actually re-derivable by a
+    recoverer who has decoded the plate and holds nothing else. `unsigned_tx` is
+    a PSBT-internal artifact a recoverer never sees.
+
+    **The top 20 bits of the txid in its standard display form** — the
+    big-endian hex a user reads. Stated to that precision because *"which 20
+    bits, from which end"* is exactly where two implementers diverge silently,
+    and the internal byte order is the reverse of the displayed one.
+
+    Reassembly re-derives the id from the transaction it decoded and compares.
+    `derive_chunk_set_id`
     hashes a *descriptor*, and reassembly re-derives it from the decoded object
     as what the source calls *"the content-id oracle; funds-load-bearing
     invariant."* `mt1`'s analogue is the **txid**: already a canonical hash of
@@ -1452,6 +1524,15 @@ signed PSBT.
     version confirms first, the confirmed txid will not match the plate's** —
     the plate is not wrong, it is superseded, and the original can no longer
     confirm. Worth a sentence somewhere a recoverer will read.
+
+
+21. **Nothing on the plate names the format.** A recoverer in 2040 holds QR
+    symbols or a codex32 string, a five-field legend, and no indication of which
+    tool reads them. The `mt1` HRP identifies the string form to someone who
+    already knows the constellation; `mt qr`'s symbols carry nothing at all.
+    Weigh a short format tag against §5's budget — which is 136 characters of a
+    300-character allowance, so the room exists (§10.14's regeneration should
+    price it).
 
 ## 11. Provenance of the numbers
 

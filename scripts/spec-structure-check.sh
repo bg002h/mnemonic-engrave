@@ -15,7 +15,9 @@
 #   2. Numbered items inside each section run 1..N with no gaps or repeats
 #      (suffixed items like `2b.` are allowed and checked for ordering).
 #   3. Every `§N` and `§N.M` cross-reference resolves to something that exists.
-#   4. No duplicated heading text, and no heading glued to other text.
+#   4. GFM table rows match their header's column count — an overflow cell is
+#      silently DROPPED when rendered, so the text exists and shows nowhere.
+#   5. No duplicated heading text, and no heading glued to other text.
 #   5. Superseded terms (passed via SUPERSEDED, newline-separated) do not appear
 #      outside a correction/retraction block.
 #
@@ -115,6 +117,25 @@ for ref in sorted(set(re.findall(FOREIGN + r'§(\d+[a-z]?)(?:\.(\d+))?', body)))
         seg = lines[ln:nxt-1]
         if not any(re.match(rf'^{item}[a-z]?\. ', l) for l in seg):
             err(f"cross-reference §{sec}.{item} -> section {sec} has no item {item}")
+
+# ---- 3b. GFM table rows must match their header's column count -------------
+# A row with MORE cells than the header silently DROPS the overflow when
+# rendered — the text is in the file, invisible on the page. Found for real:
+# §7's "Pinned fee" row carried a third cell orphaned by an earlier rewrite, so
+# the statement that an `mt string` plate's fee is unrecoverable existed in the
+# source and rendered nowhere. A row with FEWER cells renders blank columns.
+ncol = 0
+for ln, l in enumerate(lines, 1):
+    if l.startswith('|'):
+        cells = l.strip().strip('|').split('|')
+        if set(l.strip().strip('|').replace('|', '').strip()) <= set('-: '):
+            ncol = len(cells)
+            continue
+        if ncol and len(cells) != ncol:
+            err(f"line {ln}: table row has {len(cells)} cells, header has {ncol} "
+                f"(GFM drops the overflow): {l[:50]!r}")
+    else:
+        ncol = 0
 
 # ---- 4. duplicated heading text --------------------------------------------
 htext = {}
