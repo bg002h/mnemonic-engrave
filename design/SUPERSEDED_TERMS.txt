@@ -1,0 +1,27 @@
+# Terms that must NOT appear as LIVE text in SPEC_mt_v0_1.md.
+#
+# Each line is a phrase that a fold superseded. The gate matches with
+# WHITESPACE NORMALISED, so a phrase wrapping across a markdown line break is
+# still caught — a line-based grep is blind to those, which is how four
+# incomplete sweeps in one cycle each reported success.
+#
+# A hit is allowed only inside a correction/retraction context: a blockquote
+# line, or a line carrying retraction vocabulary. That is what lets the spec
+# keep its history without keeping its mistakes.
+#
+# Add a line here whenever a fold supersedes a term. Blank lines and #-comments
+# are ignored.
+
+ur:psbt
+ur:bytes
+--timelocked
+--immediate
+IMMEDIATELY SPENDABLE
+SPENDABLE AFTER BLOCK
+libbitcoinconsensus
+base45
+130-character budget
+engraved out-of-band reminder
+three verbs
+must not select a module
+78 chunks

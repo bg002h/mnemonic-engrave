@@ -184,7 +184,7 @@ candidates carrying the same chunk header:
 | form | efficiency | worst plate cost | usable in a `sysw` record? |
 | --- | --- | --- | --- |
 | codex32 string inside the QR | 63–65% | +2 plates | yes |
-| bytes + base45 | 85.5–86% | — | **NO** |
+| bytes + base45 — *rejected, see below* | 85.5–86% | — | **NO** |
 | **bytes + bech32 UPPERCASE** | **80.3–80.7%** | **+1 plate** on one artifact | **yes — chosen** |
 | bytes, raw binary | 88.4–88.8% | — | no |
 
@@ -218,7 +218,8 @@ is the constellation's alphabet rather than a stylistic choice:
 | **EPD §6.6** — records hashed in canonical **lowercase** | ✓ case-insensitive by design; uppercase→lowercase is **lossless**, verified 1:1 |
 | **QR alphanumeric** — for 11-bits-per-2-characters packing | ✓ when uppercased |
 
-base45 satisfies only the third; hex satisfies the first two at twice the cost.
+The rejected base45 satisfies only the third; hex satisfies the first two at
+twice the cost.
 `md1`, `mk1` and codex32 already store lowercase and uppercase for QR, so
 `mt qr` and `mt string` now share one alphabet.
 
@@ -259,7 +260,7 @@ So the split is clean, in the operator's own words: **QR is for machine
 engraving, codex32 is for hand engraving.**
 
     mt string:  chunk header + payload -> BCH + codex32 -> engraved characters
-    mt qr:      chunk header + payload -> base45 -> QR (Reed-Solomon) -> modules
+    mt qr:      chunk header + payload -> bech32U -> QR (Reed-Solomon) -> modules
                 ^ identical header, medium-appropriate correction
 
 ## 3b. The string form: `mt1`, for hand engraving
@@ -1173,13 +1174,17 @@ signed PSBT.
    before anyone engraves a multi-symbol artifact.
 
 3. ~~Is UR worth its expansion? What goes in the QR?~~ **CLOSED.** UR is
-   dropped (§3), and the QR payload is **`mt1` chunks, base45-encoded** —
-   operator ruling 2026-08-23. Codex32-in-QR was measured and rejected at 63–65%
-   efficiency, worse than the UR it would replace and up to two extra plates
-   (§3). base45 was chosen over 3%-denser raw binary for scanner compatibility
-   and its ~28% intrinsic detection of corrupted triples. **§10.1's test plate
-   should still confirm scanners read base45 off engraved steel** — the choice is
-   made, the optical validation is not.
+   dropped (§3), and the QR payload is **`mt1` chunks, bech32 UPPERCASE** —
+   operator rulings 2026-08-23. Codex32-in-QR was measured and rejected at
+   63–65% efficiency, worse than the UR it would replace and up to two extra
+   plates. **base45 was chosen first and then REVERSED**: its alphabet contains
+   SPACE, which EPD §6.4 forbids in a `sysw` record, so it could never have
+   reached the machine (§3). bech32 uppercase is the only candidate satisfying
+   EPD §6.4, EPD §6.6 and QR-alphanumeric packing together.
+
+   **§10.1's test plate should still confirm scanners read bech32-uppercase QR
+   symbols off engraved steel** — the encoding is decided, the optical
+   validation is not.
 
 4. ~~The legend's FROM and TO fields.~~ **CLOSED**, operator rulings
    2026-08-23: *"we use walletid or seed fp for the from: field and to: field.
@@ -1245,7 +1250,8 @@ signed PSBT.
    header.** `ChunkHeader` carries `count` and `index` — n-of-m — plus a 20-bit
    `chunk_set_id` so pieces of different transactions cannot be combined
    (`crates/md-codec/src/chunk.rs`). For `mt string` that header sits inside the
-   BCH-protected chunk; for `mt qr` it rides in the base45 payload. **One
+   BCH-protected chunk; for `mt qr` it rides in the bech32-uppercase payload.
+   **One
    mechanism, both media.**
 
    > **This item was answered TWICE, and the first answer is gone.** It
@@ -1476,8 +1482,10 @@ signed PSBT.
     responsibility to know their inputs for such edge cases."* See §8.6. The
     original refusal's premise was false (`non_witness_utxo` binds a legacy
     amount by txid), and `sh(wsh(…))` is no longer unclassified since every
-    input type is accepted. The residual risk is handled by §8.2c's engraved
-    out-of-band reminder and recorded in §7.
+    input type is accepted. The residual risk is handled by §8.2c's `stderr`
+    warning — which states the fee arithmetic — and by §8.2d, which binds any
+    input carrying `non_witness_utxo` by txid. **Nothing reaches an `mt qr`
+    plate**: §5's legend is full (§8.2c). Recorded in §7.
 
 17. **The firmware cannot yet engrave what §4 selects — and will be taught.**
     Operator ruling 2026-08-23: *"we will later teach SH2 how to handle

@@ -17,7 +17,10 @@
 #   3. Every `§N` and `§N.M` cross-reference resolves to something that exists.
 #   4. GFM table rows match their header's column count — an overflow cell is
 #      silently DROPPED when rendered, so the text exists and shows nowhere.
-#   5. No duplicated heading text, and no heading glued to other text.
+#   5. Superseded terms (design/SUPERSEDED_TERMS.txt) appear only inside a
+#      correction context — matched with WHITESPACE NORMALISED so a phrase
+#      wrapping across a line break cannot hide from the check.
+#   6. No duplicated heading text, and no heading glued to other text.
 #   5. Superseded terms (passed via SUPERSEDED, newline-separated) do not appear
 #      outside a correction/retraction block.
 #
@@ -136,6 +139,55 @@ for ln, l in enumerate(lines, 1):
                 f"(GFM drops the overflow): {l[:50]!r}")
     else:
         ncol = 0
+
+# ---- 3c. superseded terms must not appear as LIVE text ----------------------
+# WHITESPACE-NORMALISED, because the spec is hard-wrapped at ~78 columns and a
+# superseded phrase that straddles a line break is INVISIBLE to a line-based
+# grep. Four incomplete sweeps in one cycle each reported success for exactly
+# that reason. A hit is allowed only inside a blockquote or on a line carrying
+# retraction vocabulary — the spec keeps its history, not its mistakes.
+import os
+terms_path = os.path.join(os.path.dirname(doc), 'SUPERSEDED_TERMS.txt')
+if os.path.exists(terms_path):
+    terms = [t.strip() for t in open(terms_path)
+             if t.strip() and not t.strip().startswith('#')]
+    RETRACT = re.compile(r'CORRECTION|RETRACTION|previous draft|earlier draft|'
+                         r'earlier version|removed|overrule|are gone|no longer|'
+                         r'moot|~~|superseded|was wrong|REVERSED|reversal|'
+                         r'used to|had claimed|first version|no longer|rejected', re.I)
+    # normalise the whole document, keeping a map back to line numbers
+    norm_lines = []
+    for k, l in enumerate(lines):
+        norm_lines.append((k + 1, l, re.sub(r'\s+', ' ', l).strip()))
+    joined = ' '.join(n for _, _, n in norm_lines)
+    for t in terms:
+        tn = re.sub(r'\s+', ' ', t).strip()
+        if tn not in joined:
+            continue
+        # report EVERY live occurrence, not just the first: an earlier version
+        # of this check broke after one hit per term and would have reported a
+        # clean sweep with later instances still live.
+        seen_at = set()
+        for idx, (ln, raw, _) in enumerate(norm_lines):
+            if any(abs(idx - p) < 3 for p in seen_at):
+                continue
+            window = ' '.join(n for _, _, n in norm_lines[idx:idx + 3])
+            if tn not in window:
+                continue
+            # NARROW window and TIGHT vocabulary, both deliberately. An earlier
+            # version used +/-8 lines and words like "regenerated" and
+            # "candidate" — common enough in ordinary prose that an injected
+            # live `base45` at the end of the file landed inside "correction
+            # context" and the POSITIVE CONTROL DID NOT FIRE. A gate loosened
+            # until it stops failing is a gate that cannot fail. If a legitimate
+            # mention trips this, fix the SENTENCE to say it is historical —
+            # which a human reader needs anyway — rather than widening the
+            # exemption.
+            ctx = ' '.join(r for _, r, _ in norm_lines[max(0, idx - 2):idx + 3])
+            quoted = raw.lstrip().startswith('>') or RETRACT.search(ctx)
+            if not quoted:
+                err(f"line {ln}: SUPERSEDED term {t!r} appears as LIVE text")
+                seen_at.add(idx)
 
 # ---- 4. duplicated heading text --------------------------------------------
 htext = {}
