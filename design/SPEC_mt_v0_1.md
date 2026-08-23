@@ -115,7 +115,7 @@ what Sparrow, Keystone, Passport and Specter already read.
 `seqLen` parts costs least and tolerates no loss: one unreadable plate and the
 transaction is gone. Each part beyond `seqLen` is a genuine fountain part,
 buying tolerance of one more lost symbol at one more symbol's cost — which, at
-§4's sizes, is frequently one more plate. **Undecided; see §10.7.**
+§4's sizes, is frequently one more plate. **Undecided; see §10.6.**
 
 **Its cost, measured.** Bytewords minimal is exactly 2 characters per byte plus
 an 8-character CRC32 (`bc/bytewords/bytewords.go:17-31`, read from source).
@@ -509,13 +509,13 @@ folding them in would make `mt` a wallet.
    and the ECC-maximising QR left a 4 mm strip — zero text lines — so §4 and §5
    were mutually unsatisfiable. The legend is now 5 fields / 136 chars / 6 lines,
    and §4's objective reserves that space.
-7. **How much fountain redundancy should `mt` emit?** Parts beyond `seqLen` are
+6. **How much fountain redundancy should `mt` emit?** Parts beyond `seqLen` are
    real fountain parts, each tolerating one more lost symbol at the cost of one
    more symbol — often one more plate (§3). Zero redundancy means a single
    unreadable plate destroys the transaction, and surviving decades in a drawer
    is the entire point of the artifact. **The most consequential undecided
    question in this spec**, trading directly against §4's plate counts.
-8. **Would back-side engraving recover the 25.5 mm?** It would restore the ECC
+7. **Would back-side engraving recover the 25.5 mm?** It would restore the ECC
    levels and halve the plate counts the legend now costs. But there is **no
    back-side path in the fork**: `backup.go:161` is named `frontSideSeed`, which
    implies one, yet there is a single `Engraving` per plate and nothing that
