@@ -1081,29 +1081,68 @@ signed PSBT.
     trading it for ~340 bytes of ceiling is the wrong trade. The 2,560 B ceiling
     stands, and §8.7b refuses past it.
 
-13. **`mt1` needs its own encoding and its own NUMS constant.** Operator
-    ruling 2026-08-23: *"we might need a new encoding… and a new nums thingy."*
-    Confirmed by R0 round 1 (S-2), which read `md-codec` directly: the header
-    *layout*, ordering, gap-detection and missing-chunk checks are genuinely
-    payload-agnostic and take a transaction cleanly — but three things do not
-    transfer:
+13. **`mt1`'s own encoding, NUMS constant and content id — RULED, ready to
+    build.** Operator rulings 2026-08-23.
 
-    - **`MD_REGULAR_CONST` is hardcoded** into checksum create and verify
-      (`crates/md-codec/src/bch.rs`), and the constellation's convention is a
-      per-format NUMS constant plus its own HRP. **`mt1` has neither specified.**
-      Two formats sharing a constant means a chunk of one can verify as a chunk
-      of the other.
-    - **The HRP is hardcoded at four sites.**
-    - **`derive_chunk_set_id` hashes a descriptor**, and reassembly re-derives
-      it from the decoded object as what the source calls *"the content-id
-      oracle; funds-load-bearing invariant"*. `mt1` has no analogue, so it would
-      inherit a 20-bit set id **without the check that makes it safe**.
+    R0 round 1 (S-2) read `md-codec` directly: the header *layout* (37 bits),
+    chunk ordering, gap detection and missing-chunk checks are payload-agnostic
+    and take a transaction cleanly. Three things do not transfer, and all three
+    are now decided:
 
-    So this is design work, not a compatibility check: a `mt1` domain string, a
-    NUMS constant, and a content-id derivation over a transaction. **The
-    Rust-primary rule binds** — it lands in the Rust codec with test vectors
-    first. **Blocks implementation of `mt string`, and now of `mt qr` too**,
-    since §3 made the chunk header the fragmentation for both verbs.
+    **(a) Its own NUMS constant.** `MD_REGULAR_CONST` is hardcoded into checksum
+    create and verify (`crates/md-codec/src/bch.rs`). Every constellation format
+    gets its own; without a distinct one **an `mt1` chunk would verify as a valid
+    `md1` chunk**, which for a bearer plate sitting in a drawer beside `md1`
+    plates is a real hazard, not a theoretical one.
+
+    **(b) Its own HRP**, `mt1`, currently hardcoded at four sites in `md-codec`.
+
+    **(c) A content id — RULED: the transaction id.** `derive_chunk_set_id`
+    hashes a *descriptor*, and reassembly re-derives it from the decoded object
+    as what the source calls *"the content-id oracle; funds-load-bearing
+    invariant."* `mt1`'s analogue is the **txid**: already a canonical hash of
+    exactly this content, already present, already what a recoverer would use to
+    name the transaction. **Reassembly re-derives it from the decoded
+    transaction and compares**, giving `mt1` the same invariant `md1` has.
+
+    **Width stays at 20 bits.** Operator: *"1 in a million is more than unique
+    enough. User only needs to distinguish between at most a few dozen engraved
+    transactions… 1 in 1000 only saves 2 characters from 1 in 1000000, so 20
+    bits is probably not too burdensome."* The arithmetic holds — 20 bits is 4
+    codex32 symbols against 10 bits' 2, so narrowing saves 2 characters **per
+    chunk** (~24 on a 12-chunk transaction). Worth adding: **the re-derivation in
+    (c) is what makes the width non-critical.** A collision cannot yield a wrong
+    transaction, because reassembly re-derives the id from what it decoded and a
+    mismatch is caught. The 20 bits buy human discrimination and early detection,
+    not integrity.
+
+    > **WHERE THIS LANDS — and an earlier statement of mine was wrong.** I said
+    > this "lands in `descriptor-mnemonic`". It does not. The constellation's
+    > precedent is **forking, not sharing**: `md-codec`'s own BCH decoder says
+    > *"Forked from `mk-codec` v0.3.1… The algorithm is constant-agnostic — the
+    > caller XORs the polymod residue against the per-HRP target constant"*, and
+    > `md-codec` has **no dependency on `mk-codec`**. So `mt1` forks the same
+    > machinery into **`mt-codec`, in the new `mnemonic-transaction` repo**, with
+    > its own constants. **`descriptor-mnemonic` is untouched.**
+    >
+    > A future `mc-codex32` shared crate is planned to retire these forks; its
+    > stated trigger is *"both formats v1.0 with cross-validated conformance
+    > vectors"*, so `mt1` should be built to be absorbed by it later, not to
+    > block on it now.
+
+    **What Rust-primary means for this format**, since it binds later rather
+    than now: `mt-codec` in Rust is the primary and only implementation today.
+    When SH2 learns to read `mt1` — §10.2's static-scan reader and §10.17's
+    firmware work — the **Go decoder is written as a PORT**, bound to the Rust
+    conformance vectors, and may never lead. If the two ever disagree, Rust is
+    right by definition and Go is the bug. That is not theoretical in this
+    constellation: Go and Rust once computed **different `WalletPolicyId`s**
+    while 887 fork tests passed either way, and only cross-language vectors
+    caught it.
+
+    **No longer blocking as a design question** — it is now scoped
+    implementation work with every decision made. It still blocks *code* for
+    both verbs, since both fragment with this header.
 
 14. **§5's legend budget rests on a doc comment, not on the fork's font
     metrics. DEFERRED** by operator ruling 2026-08-23. `legend.rs` hardcodes
