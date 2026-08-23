@@ -107,7 +107,8 @@ is for — is everything between them:
 - what is engraved **beside** the symbols, so the plate is self-describing;
 - what `mt` refuses to engrave at all.
 
-...and, for `mt string`, **the string format itself**: an `mt1` HRP, the chunk
+...and, for `mt string`, **the string format itself**: the `mt` HRP (rendering as `mt1…`,
+where `1` is bech32's separator — §10.13b), the chunk
 header, and the BCH checksum that makes hand engraving fault-tolerant (§3b).
 
 > **CORRECTION — the previous draft said the opposite, and it is worth saying
@@ -1887,7 +1888,7 @@ signed PSBT.
 
 21. **Nothing on the plate names the format.** A recoverer in 2040 holds QR
     symbols or a codex32 string, a five-field legend, and no indication of which
-    tool reads them. The `mt1` HRP identifies the string form to someone who
+    tool reads them. The `mt1…` prefix identifies the string form to someone who
     already knows the constellation; `mt qr`'s symbols carry nothing at all.
     Weigh a short format tag against §5's budget — which is 136 characters of a
     300-character allowance, so the room exists (§10.14's regeneration should
