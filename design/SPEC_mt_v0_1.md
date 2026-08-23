@@ -166,6 +166,7 @@ Everything constellation-specific lives here, in engraved text, never in the QR.
 | **txid** | the transaction's own identity; lets a recoverer confirm the QR decoded to the right thing without trusting the QR |
 | destination address(es) and amounts | already in the transaction; shown so a human need not decode it |
 | **input outpoints** (`txid:vout`) | the only actionable mitigation for silent invalidation (§7) |
+| block hash + height per input, when known | lets a future recoverer verify inclusion with one node command (§6c) |
 | locktime, in height or time | says when the plate becomes live |
 | fee rate **and the date it was chosen** | makes staleness visible |
 | symbol index / total, if more than one plate | so a missing plate is obvious |
@@ -230,13 +231,70 @@ distinction PSBT draws between `non_witness_utxo` (the whole previous
 transaction) and `witness_utxo` (a bare amount and scriptPubKey), and it is why
 wallets hardened toward the former after the segwit fee-lying attack.
 
-So there are three tiers, and `mt` must treat them as different:
+So there are four tiers, and `mt` must treat them as different:
 
 | source | amount trustworthy? | unspent? | verdict |
 | --- | --- | --- | --- |
-| **`bitcoind` / equivalent UTXO source** | yes, authoritative | **yes** | **preferred** |
-| **full previous transactions** (`non_witness_utxo`) | **yes — bound by txid** | unknown | **accepted**, with the caveat stated on screen and in the legend |
-| bare asserted amount (`witness_utxo` alone, operator-typed) | **no — self-certified** | unknown | **refused** by default; `--i-certify-amounts` overrides and the legend records that it was used |
+| **`bitcoind` reachable** | yes, authoritative | **yes** | **preferred — fetched automatically, §6b** |
+| full previous transaction **+ `gettxoutproof`** | **yes — txid, anchored to proof-of-work** | unknown | **accepted**, strongest offline tier |
+| full previous transaction alone (`non_witness_utxo`) | **yes — bound by txid** | unknown | **accepted**, caveat stated on screen and in the legend |
+| bare asserted amount (`witness_utxo` alone, operator-typed) | **no — self-certified** | unknown | **refused** by default; `--i-certify-amounts` overrides and the legend records it |
+
+### 6b. When `bitcoind` is reachable, fetch the prevouts — do not ask
+
+**Operator ruling 2026-08-22.** If a node is available, `mt` resolves every input
+itself and the operator is asked for nothing.
+
+The call is **`gettxout <txid> <vout> false`**, verified against a live Core
+v25.0.0 node while writing this. It is the right RPC for three reasons:
+
+- it returns `value` and `scriptPubKey` together — everything an amount needs;
+- **it answers unspentness in the same call**, because it queries the UTXO set
+  rather than the chain. A spent or nonexistent output returns `null`, which is
+  a clean, unambiguous refusal;
+- it needs **no `-txindex`**, unlike `getrawtransaction`.
+
+`include_mempool` is passed **false** deliberately. The default is `true`, and
+mempool state is the wrong basis for an artifact meant to sit in a drawer for
+years — an input that is unspent only until someone else's transaction confirms
+is not a foundation for a backup.
+
+A `null` from `gettxout` is a **hard refusal**: the input is already spent or
+never existed, and no flag overrides it. `mt` records which tier supplied each
+amount, so the provenance of the numbers is auditable after the fact.
+
+### 6c. Proving an input existed, without a node
+
+*"Is there a way we can prove a transaction is in a block with a costly
+header?"* — operator, 2026-08-22. Yes: a Merkle inclusion proof, which is what
+`gettxoutproof` emits and `verifytxoutproof` checks. Demonstrated end to end
+against the live node: a transaction in a 4,886-transaction block produced a
+**538-byte** proof — an 80-byte block header, the transaction count, and a
+13-hash Merkle branch — and verification independently recovered the txid.
+
+The security argument is the operator's: forging the header requires redoing its
+proof-of-work.
+
+**What it establishes, and what it does not.** Three limits, all load-bearing:
+
+1. **It proves inclusion, never unspentness.** A perfectly valid proof can
+   describe an output spent years ago. This is the same gap as §7's silent
+   invalidation, and it is disclosed the same way — the outpoints go on the
+   plate.
+2. **A lone header proves little.** Eighty bytes of header can be produced
+   cheaply *in isolation*; the work only means something once the header is
+   known to sit on the real chain with cumulative work behind it.
+   `verifytxoutproof` gets that for free by checking against a node's own chain.
+   **Offline, `mt` has no such anchor**, so the proof is only as strong as the
+   verifier's chain context — which is precisely what the offline case lacks.
+3. Therefore the proof is most useful **deferred**. `mt` stores the block hash
+   and height and puts them in the legend, so a future recoverer — who will
+   almost certainly have a node, since they are about to broadcast — verifies in
+   one command. Verification moves to the moment when chain context exists.
+
+**The 538 bytes never reach the steel.** The proof is an *input* to `mt`, not an
+output: only the block hash and height go in the legend. Plate counts in §4 are
+unaffected.
 
 The middle tier matters because it keeps `mt` usable offline, which is the
 constellation's whole posture. What it cannot tell you is whether the outpoint
@@ -275,6 +333,8 @@ All are machine-checkable before a single plate is cut.
 3a. **Input amounts asserted without proof** → refuse unless
    `--i-certify-amounts` is given (§6a). Self-certified amounts are verified
    against themselves.
+3b. **`gettxout` returns `null` for any input** → refuse, **no override**. The
+   output is spent or never existed, and a node said so authoritatively (§6b).
 4. **Broadcastable today** → refuse **by default**. The use case is dormant
    recovery at a future height; a transaction that can be broadcast now should
    be broadcast, not engraved. `--allow-immediate` overrides, and the legend
