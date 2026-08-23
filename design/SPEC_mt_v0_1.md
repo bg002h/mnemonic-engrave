@@ -1628,7 +1628,20 @@ signed PSBT.
     and take a transaction cleanly. Three things do not transfer, and all three
     are now decided:
 
-    **(a) Its own NUMS constant.** `MD_REGULAR_CONST` is hardcoded into checksum
+    **(a) Its own NUMS constant — RULED, operator 2026-08-23:**
+
+        domain string    : "shibbolethnumstransaction"
+        MT_REGULAR_CONST = 0x1a2fc877f9528d7c1
+
+    the **top 65 bits of `SHA-256("shibbolethnumstransaction")`**, following the
+    constellation's rule exactly — `md1` uses `"shibbolethnums"`, `mk1` uses
+    `"shibbolethnumskey"`, each appending its distinguishing noun spelled out.
+    **Recomputed independently before folding**: SHA-256 is
+    `d17e43bfca946be09034ac97e7950cdd50d3b5a3e3cf4bad5cb65516897978f6`, the top
+    65 bits are `0x1a2fc877f9528d7c1`, the value occupies exactly 65 bits, and it
+    differs from both constants already in use.
+
+    `MD_REGULAR_CONST` is hardcoded into checksum
     create and verify (`crates/md-codec/src/bch.rs`). Every constellation format
     gets its own; without a distinct one **an `mt1` chunk would verify as a valid
     `md1` chunk**, which for a bearer plate sitting in a drawer beside `md1`
@@ -1817,28 +1830,17 @@ signed PSBT.
     price it).
 
 
-22. **`mt1`'s NUMS domain string is UNDECIDED, and it is the last thing blocking
-    the codec.** §10.13 rules that `mt1` needs its own constant but omits the one
-    input an implementer cannot infer. The derivation rule is public and
-    verified: `MD_REGULAR_CONST = 0x0815c07747a3392e7` is the **top 65 bits of
-    `SHA-256("shibbolethnums")`**, and `mk1` uses `"shibbolethnumskey"` — I
-    recomputed both and they match. **The rule is derivable; the domain string is
-    an arbitrary chosen name.**
+22. ~~`mt1`'s NUMS domain string is undecided.~~ **CLOSED**, operator ruling
+    2026-08-23: the domain string is **`"shibbolethnumstransaction"`**, giving
+    **`MT_REGULAR_CONST = 0x1a2fc877f9528d7c1`**. Stated with its derivation in
+    §10.13(a), and recomputed there before it became normative.
 
-    Only two are in use, so `mt1` needs a third. Following `mk1`'s pattern of
-    appending its distinguishing noun spelled out:
-
-    | domain string | top-65-bit constant | |
-    | --- | --- | --- |
-    | `shibbolethnums` | `0x0815c07747a3392e7` | md1, in use |
-    | `shibbolethnumskey` | `0x1062435f91072fa5c` | mk1, in use |
-    | **`shibbolethnumstransaction`** | **`0x1a2fc877f9528d7c1`** | **candidate** |
-    | `shibbolethnumstx` | `0x01a77d120c35339b2` | candidate, abbreviated |
-
-    **The fork mechanic makes the worst guess the most tempting**: an implementer
-    copying `md-codec` and changing the HRP would leave `MD_REGULAR_CONST` alone,
-    producing exactly the `md1`/`mt1` chunk collision §10.13 exists to prevent —
-    a chunk of one verifying as a chunk of the other. **Operator decision.**
+    The *rule* was always derivable — `MD_REGULAR_CONST` is verifiably the top
+    65 bits of `SHA-256("shibbolethnums")` — but the **domain string is an
+    arbitrary chosen name** no implementer could have inferred. That mattered
+    because the fork mechanic makes the worst guess the most tempting: copy
+    `md-codec`, change the HRP, leave the constant, and `mt1` chunks verify as
+    `md1` chunks. **§10.13 now has no undecided input left.**
 
 ## 11. Provenance of the numbers
 
