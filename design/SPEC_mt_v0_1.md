@@ -625,7 +625,7 @@ mitigation, the row says so instead of inventing one.
 | **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **partly recoverable via CPFP, and NOT on the plate.** A holder who controls one of the transaction's outputs can spend it with a high-fee child and have the pair scored together — this needs no keys from the original signer, which is what makes it the *only* fee-bump available to a plate holder. **RBF is not**: replacing a transaction means signing a new one, and the plate holder has a signed transaction, not keys. Caveat: CPFP has historically required the parent to reach the mempool at all, so a fee below minimum relay may be unrescuable (§10.19). Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving. A holder in 2040 recovers the fee by decoding **only for `mt qr`**, whose PSBT payload carries the input amounts; an `mt string` plate carries a raw transaction, from which the fee is **not** recoverable without the prevouts |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
 | **Non-`ALL` sighash** — an input signed with `SIGHASH_NONE` or `SIGHASH_SINGLE` leaves outputs unbound, so a plate-holder can redirect the funds and the `TO` line becomes a lie | refused at encode time, §8.6 — **structurally**, since §8.2's removal left no script engine |
-| **Wrong input value** — a legacy input whose claimed value is wrong yields a valid transaction with a catastrophic fee | **not detectable by `mt`.** §8.2's removal means no signature is verified, and a legacy sighash never committed to the amount anyway. Mitigated only by §8.2c's engraved out-of-band reminder |
+| **Wrong input value** — a legacy input whose claimed value is wrong yields a valid transaction, and **the fee absorbs the entire difference** | **not detectable by `mt`.** §8.2's removal means no signature is verified, and a legacy sighash never committed to the amount anyway. Mitigated only by §8.2c's warning — which states the arithmetic, `(real input value) − (output total)`, since the output total is the one term `mt` knows for certain — plus the engraved out-of-band reminder |
 | **Well-formed but INVALID** — a transaction with a bad signature engraves cleanly and fails at broadcast, years later | **accepted, not mitigated.** Operator ruling 2026-08-23 removed script verification from v0.1 (§8.2). §8.1 sees a witness, §8.2b sees balanced values, §8.6 sees correct sighash flags — none of them verifies the signature. `mt` may add this someday |
 
 > The last two rows are the honest state of this design. R0 lens 2 found that the
@@ -695,32 +695,47 @@ exactly as permanent, as a machine-engraved one.
    > `SendingTooMuch` and `AbsurdFeeRate`. §8 adopted the first and ignored the
    > other two while citing the same API as its standard of care.
 
-2c. **Input values missing → require them, and warn about what cannot be
-   checked.** Operator ruling 2026-08-23: *"Only require user to supply utxo
-   values if not part of the psbt… But do instruct user on stderr to engrave a
-   reminder to double check utxo input out of band."*
+2c. **Input values: require them when the PSBT lacks them, and WARN whenever a
+   legacy input is present.** Operator rulings 2026-08-23: *"Only require user to
+   supply utxo values if not part of the psbt"*, and *"Just warn users legacy
+   input exists and they will pay a fee equivalent to what is really present at
+   the input minus sum of outputs. Explain that this could be very large if they
+   are wrong about what the value of the input is."*
 
    A finalized PSBT in the MIN form normally carries every input's UTXO record
    (§3), so `mt` computes the fee itself and asks for nothing. Where a record is
-   **absent**, `mt` requires the operator to supply that input's value — or the
-   total across all inputs — because §8.2b cannot check the value balance
-   without it.
+   absent, `mt` requires the operator to supply that input's value — or the total
+   across all inputs — since §8.2b cannot check the value balance without it.
 
-   **`mt` then tells the operator, on `stderr`, to engrave a reminder to verify
-   the input values out of band.** That instruction is not ceremony, and §7
-   records why:
+   **The legacy warning fires whenever any input is legacy**, whether the value
+   came from the PSBT or from the operator, because `mt` verifies neither. It
+   states the mechanism rather than a caution:
 
-   > **A wrong input value is the one funds-loss path §8 cannot close, and
-   > §8.2's removal widened it.** The value is not in the transaction — it lives
-   > in the already-confirmed previous output — so **no miner can alter it and
-   > no attacker can inflate the fee that way.** The hazard is entirely that the
-   > *claimed* value is wrong. If an input is really 10 BTC, the claim says 1,
-   > and the outputs total 0.99, the intended fee of 0.01 is really **9.01 BTC**
-   > — and the transaction is perfectly valid.
-   >
-   > Whether that is caught depends on the input type, and this is exactly what
-   > BIP-143 was written for (*"eliminates the possibility to lie to offline
-   > signing devices about the fee of a transaction"*):
+       WARNING: input 0 is a legacy (pre-SegWit) input.
+
+       The fee you will pay is:   (what is REALLY at that input) - 0.99000000 BTC
+       You have told mt it holds:  1.00000000 BTC
+       So mt shows a fee of:       0.01000000 BTC
+
+       mt CANNOT VERIFY THAT VALUE. A legacy signature does not commit to the
+       input's amount, so a wrong value still produces a perfectly valid
+       transaction -- and the fee absorbs the entire difference. If that input
+       actually holds 10 BTC, this transaction pays 9.01 BTC in fees and a
+       miner will simply take it.
+
+       Verify the input value out of band, and engrave a reminder to re-check
+       it before broadcasting.
+
+   **The output total is the anchor and `mt` knows it with certainty** — it is in
+   the transaction. Everything uncertain sits on the other side of the
+   subtraction, which is what makes the warning stateable as arithmetic rather
+   than as advice.
+
+   > **Why this is the residual hazard §8 cannot close.** The value is not in the
+   > transaction; it lives in the already-confirmed previous output. **No miner
+   > can alter it and no attacker can inflate the fee that way** — a miner would
+   > have to rewrite a block. The entire risk is that the claimed value is wrong,
+   > and whether anything catches that depends on the input type:
    >
    > | input | sighash commits to the amount? | a wrong value produces |
    > | --- | --- | --- |
@@ -728,9 +743,11 @@ exactly as permanent, as a machine-engraved one.
    > | Taproot (BIP-341) | **yes** | an invalid signature — caught |
    > | **legacy** | **no** | **a valid signature and a catastrophic fee** |
    >
-   > With §8.2 removed `mt` verifies no signatures at all, so for a legacy input
-   > the operator's number is checked against **nothing**. The engraved reminder
-   > is the mitigation, and it is load-bearing rather than belt-and-braces.
+   > This is exactly what BIP-143 was written for: *"eliminates the possibility
+   > to lie to offline signing devices about the fee of a transaction."* And
+   > §8.2's removal widened it — `mt` verifies no signatures at all now, so for a
+   > legacy input the claimed value is checked against **nothing**. The warning
+   > and the engraved reminder are the whole mitigation.
 
 3. **An unsigned or unfinalized transaction offered for engraving** → refuse. It
    cannot be broadcast, so it is not a backup.
