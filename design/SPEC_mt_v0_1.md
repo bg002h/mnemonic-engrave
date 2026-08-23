@@ -1006,12 +1006,28 @@ exactly as permanent, as a machine-engraved one.
    deliberately by a maintainer the way a checkpoint is, and never a property of
    a build environment.
 
+   **The v0.1 constant, taken from a live node on 2026-08-23** — operator ruling
+   *"use now on today and current blockheight for fallback"*:
+
+       MT_REF_HEIGHT = 963_759
+       MT_REF_TIME   = 1_787_507_701   // 2026-08-23T17:55:01Z
+
+   `MT_REF_TIME` is the tip's **median-time-past**, not its header `nTime`. MTP
+   is monotonic and consensus-enforced, while a header stamp is only loosely
+   constrained — it may run up to two hours fast and need not exceed its
+   parent's. Anchoring a decades-long projection to the loose figure would bake
+   that slack in permanently. (The tip's own `nTime` at capture was
+   `1787509876`, 36 minutes ahead of its MTP — the gap is small here and is not
+   bounded in general.)
+
+   Provenance, so a maintainer refreshing it knows what to capture: block
+   963,759, `00000000000000000000b7060d74b6540e3b2accc9cb50f2a0d428b55911a455`.
+
    So a build needs no node, and a run needs no node; a run *with* one simply
    does better.
 
-   Worked from the pair in this spec's measurements — height 963,663 at
-   2026-08-23 — a lock at block 1,383,520 is 419,857 blocks out, ≈ 2,916 days,
-   ≈ **2034**.
+   Worked from the v0.1 constant below — height 963,759 at 2026-08-23 — a lock
+   at block 1,383,520 is 419,761 blocks out, ≈ 2,915 days, ≈ **2034**.
 
    **Stated to the year, deliberately.** Three separate reasons, and they all
    point the same way:
