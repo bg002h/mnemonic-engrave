@@ -356,25 +356,46 @@ overturned an earlier assumption and are marked.
                  wrong. BCH repairs substitutions; an omission shifts every
                  symbol after it and cannot be corrected. Re-read the plate.
 
-   **Confusable characters are autocorrected FIRST, and the order is the
-   point.** bech32's data charset excludes `1`, `b`, `i` and `o` *precisely*
+   **AUTOCORRECT NEVER TOUCHES A STRING THAT ALREADY PARSES.** It is a
+   **repair attempted on failure**, not a preprocessing pass. The order is:
+
+       1. strip whitespace, normalise case
+       2. check the length (90 characters)
+       3. TRY THE STRING AS WRITTEN — if it parses and the checksum holds, STOP
+       4. only then attempt correction, positionally (below)
+       5. re-check, and report the verdict either way
+
+   **Step 3 is not an optimisation, it is a safety rule**: the corrections run in
+   **opposite directions** depending on position, so a naive character map
+   applied to a *correct* string would rewrite `mt1…` as `mtl…`, destroy the
+   separator, and turn a perfectly good transcription into one that cannot parse
+   at all. **A repair pass that can damage valid input is worse than no repair
+   pass.**
+
+   **Correction is POSITIONAL, because `mt1` has a fixed HRP.** The separator is
+   at index 2, always; data begins at index 3:
+
+   | position | character | correct to | why |
+   | --- | --- | --- | --- |
+   | 0–1 | must be `mt` | — | the HRP |
+   | **2** | `l`, `I`, `i` | **`1`** | this is the **separator**, and `1` is the only legal character here |
+   | **3+** | `1`, `i` | **`l`** | `1` is *never* data — it is the separator |
+   | 3+ | `o` | `0` | excluded from the charset |
+   | 3+ | `b` | `6` | excluded |
+
+   **`1` at index 2 is correct and must never be altered. `1` after index 2 is
+   always an error.** Same glyph, opposite verdicts, decided only by where it
+   sits — which is exactly why a positionless map is unsafe.
+
+   **Why correcting before decoding costs nothing.** bech32's data charset excludes `1`, `b`, `i` and `o` *precisely*
    because they are confusable, so a typed excluded character is not a wrong
    symbol — **it is not a symbol at all**, and BCH never sees it. Repairing it
    before decoding therefore **costs nothing from the `t = 4` budget**, which
    stays available for genuine substitution errors:
 
-   | typed | meant | why |
-   | --- | --- | --- |
-   | `o` | `0` | excluded from the charset |
-   | `b` | `6` | excluded |
-   | `i` | `l` | excluded |
-   | `1` **in the data** | `l` | `1` is the separator, never data |
-   | `l`/`I` **in the prefix** | `1` | the separator, which every user types |
-
-   That last row matters most: the prefix is `mt1`, so **every string a person
-   types contains the single most confusable glyph in the set**, and `mtl…` or
-   `mtI…` does not merely fail its checksum — it has no separator and will not
-   parse at all.
+   The prefix case matters most: **every string a person types contains the
+   single most confusable glyph in the set**, and `mtl…` or `mtI…` does not
+   merely fail its checksum — it has no separator and will not parse at all.
 
    **Autocorrect announces itself, localises, and states its verdict.**
    Operator ruling: never silently. A silent fix means the operator never learns
