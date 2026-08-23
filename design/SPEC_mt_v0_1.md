@@ -21,8 +21,8 @@ different ways:
 
 | verb | form | engraved how | payload | size limit |
 | --- | --- | --- | --- | --- |
-| **`mt qr`** | QR symbols + legend, as a **SH2 payload** | **machine** (SeedHammer II) | `mt1` chunks, **bech32 uppercase** (§3) | the plate budget |
-| **`mt string`** | `mt1` chunked codex32, **on stdout** | **by hand** | raw signed transaction (§3b) | **64 chunks** |
+| **`mt string`** | `mt1` chunked codex32, **on stdout** | **by hand**, or by any tool the operator chooses | raw signed transaction (§3b) | **64 chunks** |
+| ~~`mt qr`~~ | ~~QR symbols + legend~~ | **DEFERRED out of v0.1 — §0a** | | |
 
 `mt qr` decides how many symbols that takes, at what error-correction level,
 across how many plates, and what is engraved beside them. `mt string` emits a
@@ -52,12 +52,55 @@ receiver* of transactions built elsewhere. Everything it can still get wrong is
 a failure to inspect what it was handed, so §8 — the refusals — carries the
 entire safety argument. It gets stricter in this fold, not looser.
 
+## 0a. `mt qr` is DEFERRED out of v0.1
+
+**Operator ruling 2026-08-23.** v0.1 has **one verb**: `mt string`. QR
+conversion is deferred to its own cycle.
+
+**The reason is that QR is a CROSS-FORMAT concern, not an `mt` one.** `md1` and
+`mk1` will want the same conversion, and building it inside `mt` first would
+mean either duplicating it for them or refactoring it out later. Where it
+belongs — a shared crate, the toolkit, or `me` — is a design question that
+deserves its own cycle rather than being settled as a side effect of shipping a
+transaction format. The same instinct made `me` the constellation's single
+`sysw` writer (§10.9).
+
+**What it costs, measured: one artifact of seven.** `mt string`'s 64-chunk
+ceiling covers every single-input spend of even the most complex wallet
+measured, and one of the two five-input cases (§3b). The wallet that loses its
+path is RCW `wsh` tier 1 at five inputs, at 89 chunks — which had no comfortable
+path anyway.
+
+**What it removes from v0.1**, all of it QR-only: §4's entire configuration
+search, §5's plate legend, the `sysw` transaction `Class`, the record framing,
+§8.7c's transport ceiling, and §10.17's firmware work. Four of the open
+questions in §10 go with them. **Those sections are retained in this document
+rather than deleted**, because the measurements behind them are real and the
+next cycle starts from them — but nothing in them binds v0.1.
+
+**What remains is small enough to state in a sentence:** read a finalized PSBT,
+validate it per §8, and emit an `mt1` chunked codex32 string on stdout, with
+warnings on stderr.
+
+> **A consequence worth naming: a v0.1 plate carries the string and nothing
+> else.** §5's legend is `mt qr`'s, and `mt string`'s layout is the operator's
+> by ruling (§3b) — so no `BEARER` line, no `FROM`/`TO`, no locktime line
+> reaches the steel unless the operator puts it there.
+>
+> **`mt string` therefore PRINTS the suggested legend text on `stderr`** — the
+> same five fields §5 specifies — as text the operator may engrave beside the
+> string. `mt` does not control the layout and does not withhold the words.
+
 ## 1. The operator's decisions, recorded
 
 Each of these is a ruling, with the reasoning that produced it. Several
 overturned an earlier assumption and are marked.
 
-1. **Two verbs, both engraving: `qr` and `string`.** Signed, finalized
+1. **One verb in v0.1: `mt string`.** `mt qr` is deferred to its own cycle
+   (§0a) because QR conversion is a cross-format concern `md1` and `mk1` share.
+   The two-verb design below is retained as the eventual shape.
+1a. ~~Two verbs, both engraving: `qr` and `string`.~~ **The eventual shape,
+   deferred.** Signed, finalized
    transactions only. Transaction construction and PSBT presentation are wallet
    functions and are out of scope (§9). **This overrules the previous draft's
    produce/present/engrave triple**, which split on *stage of the transaction*;
@@ -68,8 +111,16 @@ overturned an earlier assumption and are marked.
    Without it, the only route onto steel is a machine — which makes `mt`
    unusable for anyone without a SeedHammer, and gives up the human-readable,
    error-correcting property the rest of the constellation is built on.
-2. **Its own repository**, `mnemonic-transaction`, with `mt-codec` and an `mt`
-   CLI — not a subcommand of `me`. **This overrules the recommendation in
+2. **Its own repository**, `mnemonic-transaction`, with **`mt-cli` and
+   `mt-codec`** — matching the constellation's pattern exactly, and not a
+   subcommand of `me`. Every normative format has this shape: `descriptor-mnemonic`
+   is `md-cli` + `md-codec` for `md1`, `mnemonic-key` is `mk-cli` + `mk-codec`
+   for `mk1`, `mnemonic-secret` is `ms-cli` + `ms-codec` for `ms1`. **`mt-cli`
+   builds the `mt` binary**, as `md-cli` builds `md`. (An earlier draft said
+   "`mt-codec` and an `mt` CLI", which named the binary where the siblings name
+   the crate — a rename that is cheap now and annoying after a release.)
+   `me` is the one repo with no codec, because it defines no format; that is
+   precisely why `mt1` cannot live there. **This overrules the recommendation in
    §Section 1 of the brainstorm**, which argued `mt` had no wire format left to
    define and belonged next to `me bundle`. See §2 for what the codec does in
    fact specify; the objection was answered rather than ignored.
@@ -478,7 +529,7 @@ no such mechanism because it emits no engraving. §7 records it as an accepted
 risk, not as a mitigation.
 
 
-## 4. Choosing the configuration — `mt qr` only
+## 4. Choosing the configuration — `mt qr` only, DEFERRED (§0a)
 
 **This section governs `mt qr` and nothing else.** `mt string`'s layout is
 undecided and is §10.10.
@@ -571,7 +622,13 @@ The 0.30 mm results are recorded for when the plate exists.
 > and the old prose. **No superseded-term sweep could have caught it** — every
 > word in the sentence was still current, and only the modal verb changed.
 
-## 5. The plate legend
+## 5. The plate legend — `mt qr` only, DEFERRED (§0a)
+
+> **Retained for the deferred QR cycle, and for one live purpose:** §0a rules
+> that `mt string` **prints these five fields on `stderr`** as suggested text
+> the operator may engrave beside their string. The measurements and the field
+> choices below are what that suggestion is made of.
+
 
 Everything constellation-specific lives here, in engraved text, never in the QR.
 
@@ -1300,11 +1357,12 @@ exactly as permanent, as a machine-engraved one.
    > inputs are segwit inputs, and every input type is accepted.
 
 7. **Over the plate budget (`mt qr`)** → refuse, naming the exact plate count
-   and what would fit. **"Plate budget" means the operator's stated maximum
+   and what would fit. **Deferred with the verb (§0a).** **"Plate budget" means the operator's stated maximum
    plate count**, which `mt` compares against §4's search result; there is no
    fixed number, because §4's answer depends on module size, ECC and tiling.
 
-7c. **Over the `sysw` section ceiling (`mt qr`)** → refuse. `MAX_SECTION_LEN =
+7c. **Over the `sysw` section ceiling (`mt qr`)** → refuse. **Deferred with the
+   verb (§0a); no v0.1 behaviour depends on it.** `MAX_SECTION_LEN =
    8191` (`crates/me-cli/src/sysw/wire.rs:42`), inherited from EPD. **This is a
    hard transport limit §4's search knows nothing about**, so a transaction can
    pass every plate-count check and still be unsendable.
@@ -1374,6 +1432,10 @@ removed by operator ruling 2026-08-23 (§0). Coin selection, fee estimation,
 change handling and input selection go with them: they are wallet decisions with
 their own failure modes, they are better tested in wallet software before
 anything is engraved, and folding them in would make `mt` a wallet.
+
+**`mt qr` IS OUT OF SCOPE FOR v0.1** — deferred to a cross-format QR cycle
+(§0a), taking §4, §5, the `sysw` transaction `Class`, the record framing and
+§10.17's firmware work with it.
 
 **A DECODER IS OUT OF SCOPE FOR v0.1, and the consequence deserves stating
 plainly:** a plate cut by `mt` v0.1 **cannot be read back by `mt` v0.1.** The
