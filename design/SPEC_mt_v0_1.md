@@ -439,8 +439,17 @@ up a plate — and the smallest artifact still gets meaningful ECC free.
 **Module size.** 0.30 mm is one engraved stroke: the theoretical floor and
 **optically unvalidated**. Whether a camera reads 0.30 mm modules off brushed
 steel is a hardware question, gated on the test plate in F-234. **Until that
-plate exists, `mt` must not select a module below 0.60 mm** (two strokes). The
-0.30 mm results are recorded for when it does.
+plate exists, 0.60 mm (two strokes) is what `mt` SUGGESTS** — not a floor it
+enforces. **Operator ruling 2026-08-23 (§10.1, §8.8): the operator picks from
+every size `mt` can engrave, with 0.60 mm suggested.** `mt` says at the point of
+choice that finer modules are optically unvalidated; it does not refuse them.
+The 0.30 mm results are recorded for when the plate exists.
+
+> **This paragraph stated a hard floor until 2026-08-23 and was missed when the
+> ruling landed.** R2 lens 1 (F-3) found it: commit `fc4179c` rewrote the rule in
+> §8 item 8 and §10.1 and never touched §4, so the spec carried both the new rule
+> and the old prose. **No superseded-term sweep could have caught it** — every
+> word in the sentence was still current, and only the modal verb changed.
 
 ## 5. The plate legend
 
@@ -458,8 +467,8 @@ fields, **130 characters**, 6 lines — measured,
 | `TO <wallet id, fp or label>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when blank.** A free-text label is allowed **only behind an explicit flag**, since nothing can check it against the transaction |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
-Plus, **not part of the 136-character budget above**, one `n/m` label engraved
-beside **each QR symbol**, naming the UR part it carries (§10.8's ruling). A
+Plus, **not part of the 130-character budget above**, one `n/m` label engraved
+beside **each QR symbol**, naming the `mt1` chunk it carries (§10.8's ruling). A
 plate may hold several symbols, so `PLATE n OF m` alone cannot tell a recoverer
 which *part* is missing. These labels are per-symbol and their area is not yet
 reserved in §4 — see §10.8 and §10.14.
@@ -765,8 +774,37 @@ exactly as permanent, as a machine-engraved one.
    > This is exactly what BIP-143 was written for: *"eliminates the possibility
    > to lie to offline signing devices about the fee of a transaction."* And
    > §8.2's removal widened it — `mt` verifies no signatures at all now, so for a
-   > legacy input the claimed value is checked against **nothing**. The warning
-   > and the engraved reminder are the whole mitigation.
+   > legacy input the claimed value is checked against **nothing by signature**.
+   > **§8.2d closes part of this**: where the input carries `non_witness_utxo`,
+   > `mt` binds the value by txid, which is a hash comparison rather than script
+   > evaluation. The residue this warning exists for is an input whose value
+   > arrives with **no** `non_witness_utxo` — supplied by the operator under this
+   > refusal — where the warning and the engraved reminder are the whole
+   > mitigation.
+
+2d. **`non_witness_utxo` present but not matching the input's txid** → refuse.
+   Where a PSBT input carries `non_witness_utxo` — the **whole previous
+   transaction**, which BIP-174 requires for legacy inputs — `mt` hashes it and
+   requires the result to equal that input's `previous_output.txid`, then reads
+   the value from `output[vout]`. A mismatch is a refusal naming both txids.
+
+   **This is a hash comparison, not script evaluation**, so it sits inside the
+   2026-08-23 scope ruling (§8.4): `mt` never executes a script, never asks a
+   node, and learns nothing about the wallet's policy. Forging a passing value
+   would need a txid collision.
+
+   > **Added by R2 lens 1 (F-1), which found the spec asserting this binding
+   > without anyone performing it.** §8.6 accepts legacy inputs on the grounds
+   > that `non_witness_utxo` *"binds the amount"* — true of the mechanism, and
+   > false of `mt` until this refusal existed. An acceptance resting on an
+   > unperformed check is the same defect as the original legacy refusal, whose
+   > premise was also wrong.
+   >
+   > **This materially narrows §8.2c's hazard.** A legacy input carrying
+   > `non_witness_utxo` now has its value bound by proof-of-work-anchored
+   > history rather than by the operator's word. What remains unbound — and what
+   > §8.2c's warning still exists for — is an input whose value arrives with
+   > **no** `non_witness_utxo` at all, or by operator assertion under §8.2c.
 
 3. **An unsigned or unfinalized transaction offered for engraving** → refuse. It
    cannot be broadcast, so it is not a backup.
@@ -890,7 +928,10 @@ exactly as permanent, as a machine-engraved one.
    > does not commit to it. The first clause is true; the conclusion does not
    > follow, since BIP-174 requires `non_witness_utxo` for a legacy input —
    > the **whole previous transaction** — so hashing it and matching the txid
-   > binds the amount without any help from the sighash.
+   > binds the amount without any help from the sighash. **§8.2d makes `mt`
+   > actually perform that check**; without it, this justification would assert a
+   > binding nobody computes, which is the same defect as the premise it
+   > replaced.
    >
    > `sh(wsh(…))` is therefore no longer an unclassified case: wrapped-segwit
    > inputs are segwit inputs, and every input type is accepted.
