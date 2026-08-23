@@ -21,7 +21,7 @@ different ways:
 
 | verb | form | engraved how | payload | size limit |
 | --- | --- | --- | --- | --- |
-| **`mt encode`** | `mt1` chunked codex32, **on stdout** | **by hand**, or by any tool the operator chooses | raw signed transaction (§3b) | **64 chunks** |
+| **`mt encode`** | `mt1` chunked codex32, **on stdout** | **by hand**, or by any tool the operator chooses | raw signed transaction (§3b) | **4,096 chunks / 164 KB** |
 | ~~`mt qr`~~ | ~~QR symbols + legend~~ | **DEFERRED out of v0.1 — §0a** | | |
 
 `mt qr` decides how many symbols that takes, at what error-correction level,
@@ -65,11 +65,16 @@ deserves its own cycle rather than being settled as a side effect of shipping a
 transaction format. The same instinct made `me` the constellation's single
 `sysw` writer (§10.9).
 
-**What it costs, measured: one artifact of seven.** `mt encode`'s 64-chunk
-ceiling covers every single-input spend of even the most complex wallet
-measured, and one of the two five-input cases (§3b). The wallet that loses its
-path is RCW `wsh` tier 1 at five inputs, at 89 chunks — which had no comfortable
-path anyway.
+**What it costs: NO artifact loses its path.** `mt1`'s ceiling is **4,096
+chunks / 163,840 bytes** (§3), above Bitcoin's own ~100 KB standardness limit —
+so every transaction that will relay can be encoded, including RCW `wsh` tier 1
+at five inputs (89 chunks, **2.2%** of the ceiling).
+
+> **An earlier version of this section said the cut "costs one artifact of
+> seven", naming that same 89-chunk wallet as losing its path.** That rested on
+> a 64-chunk ceiling `mt1` never had — `md-codec`'s 6-bit `count` field, which
+> §3 corrected to 12 bits. The scope cut costs **machine engraving**, not
+> transaction sizes.
 
 **What it removes from v0.1**, all of it QR-only: §4's entire configuration
 search, §5's plate legend, the `sysw` transaction `Class`, the record framing,
@@ -130,6 +135,32 @@ overturned an earlier assumption and are marked.
    It checks: every string parses, every BCH checksum holds, the set is complete
    (`count` chunks, indices `0..count-1`, no duplicates), every chunk carries the
    same `chunk_set_id`, and the reassembled transaction re-derives that id.
+
+   **`verify` REPORTS ITS MARGIN, not just its verdict.** Usability journey
+   walk, U-2 — the one Critical it found, and five correctness rounds had missed
+   it because nothing in the spec was *wrong*; a step was simply silent.
+
+   BCH corrects up to **`t = 4` symbol errors per chunk** (§3a). A plate miscut
+   in four places therefore **passes `verify` as OK** — while sitting **one
+   scratch from unrecoverable**, with §1.8's zero redundancy behind it and no
+   second copy unless the operator made one. A verdict that hides how much of
+   its budget it just spent is telling the operator the opposite of what they
+   need.
+
+       mt verify: OK — 14 chunks, set 0x0e17e, transaction re-derives.
+
+         CORRECTION APPLIED. 3 chunks needed repair:
+           chunk  2   1 of 4 symbols
+           chunk  7   4 of 4 symbols   <-- NO MARGIN LEFT
+           chunk 11   2 of 4 symbols
+
+         Chunk 7 is at its correction limit. One more damaged symbol in
+         that string and this transaction is unrecoverable. Re-cut it.
+
+   **`verify` still returns OK** — the transaction *is* recoverable today, and
+   inventing a refusal would overrule the operator on their own plate. What
+   changes is that the margin is **stated**, so re-cutting one string is a
+   decision they can make rather than one they never knew was available.
 
    **It never asks a node.** A predicate whose answer changes between runs is not
    a predicate, and keeping `verify` offline means it runs on an air-gapped
@@ -330,9 +361,11 @@ specify, test, teach a recoverer, and get wrong only once.**
 > (`crates/md-codec/src/chunk.rs`), and `write()` refuses any `count` outside
 > `1..=64` with `ChunkCountOutOfRange`. **Six bits caps a set at 64 chunks** —
 > while §3b's own table measures the largest `mt qr` artifact at **96**, and
-> §3b and §8.7b both state that the 64-chunk ceiling is what distinguishes
-> `mt encode` from `mt qr`. The ruled encoding could not be written by the ruled
-> header.
+> §3b and §8.7b both **stated at the time** that the 64-chunk ceiling was what
+> distinguished `mt encode` from `mt qr`. The ruled encoding could not be
+> written by the ruled header. (Both of those sentences are gone: the ceiling is
+> now 4,096 for **both** verbs, and what distinguishes them is what a chunk
+> *costs*, not how many are permitted.)
 >
 > **`mt1` therefore uses 12 bits each for `count` and `index`** — a **49-bit**
 > header admitting **4,096 chunks = 163,840 bytes**, `mt1`'s ceiling for **both**
@@ -609,9 +642,15 @@ characters and the deferred QR verb would warn in plates and minutes.
 > §4's *"never leave redundancy unbought"* requires: a padded chunk spends plate
 > area on nothing.
 >
-> The old model claimed 2,904 B where the real ceiling is **2,560 B**, leaving a
-> **344-byte band** in which a transaction the table called "fits" would in fact
-> return `ChunkCountExceedsMax`. That band *was* §8.7b's refusal boundary.
+> **The error was per-chunk, and it is easiest to see there.** The old model
+> put **45.4 payload bytes** in a chunk where the chunker puts **40** — about
+> 13% too many — so every chunk count derived from it was that much too low.
+> At the time the chunk count was capped at 64, so the mistake also showed up as
+> a **2,904 B versus 2,560 B** total ceiling, and a transaction inside that
+> 344-byte band would have been called "fits" and then returned
+> `ChunkCountExceedsMax`. Those two totals are themselves now historical — the
+> cap is 4,096 chunks (§3) — but the per-chunk figure is the durable part and it
+> is what §3b's table rests on.
 >
 > The defect was **one shared helper replicated across seven probe binaries**,
 > so every chunk count in every results file was wrong the same way — a corpus
@@ -640,8 +679,9 @@ it are all the user's decisions. This spec does not constrain any of them, and
 An earlier version of this section derived a chars-per-plate table from the
 fork's font ladder and drew plate counts from it. **That was out of scope and is
 deleted.** What survives from it is the one part that *is* a property of the
-codec rather than of anyone's steel: the **64-chunk ceiling** above, which binds
-regardless of how the string is engraved, and which §8.7b refuses against.
+codec rather than of anyone's steel: the **4,096-chunk ceiling** above, which
+binds regardless of how the string is engraved, and which §8.7b refuses
+against.
 
 > **The distinction that decides what belongs here:** what `mt` *emits* is this
 > spec's concern; what a user does with steel is not. `mt qr` is the exception
@@ -1184,6 +1224,88 @@ exactly as permanent, as a machine-engraved one.
    > history rather than by the operator's word. What remains unbound — and what
    > §8.2c's warning still exists for — is an input whose value arrives with
    > **no** `non_witness_utxo` at all, or by operator assertion under §8.2c.
+
+2e. **A raw signed transaction instead of a PSBT** → **accept, and warn
+   loudly.** Operator ruling 2026-08-23: *"we can't refuse raw hex signed tx. We
+   have to warn loudly if they paste it and state what we can't verify."*
+
+   **Refusing was the wrong response to someone holding the exact bytes that get
+   engraved**, and it was never a special case: a raw transaction is simply the
+   **no-UTXO-records** input §8.2c already covers. What degrades is narrow, and
+   a node closes most of it:
+
+   | check | PSBT | raw, no node | raw, **node** |
+   | --- | --- | --- | --- |
+   | §8.1 finalized | ✓ | ✓ | ✓ |
+   | §8.6 satisfaction binds outputs | ✓ | ✓ | ✓ |
+   | §8.2b value balance | ✓ | **✗** | **✓ via `gettxout`** |
+   | the fee | ✓ | **unknown** | **✓** |
+
+       WARNING: this is a raw signed transaction, not a PSBT.
+
+         A raw transaction carries its inputs' OUTPOINTS but not their
+         VALUES, so mt cannot compute the fee from it alone.
+
+         [no node]   The fee is UNKNOWN. mt cannot tell you whether it is
+                     0.0001 BTC or 9 BTC. Supply input values, or a node.
+         [with node] mt fetched each input's value from the chain:
+                     fee 0.00012 BTC, 3.2 sat/vB.
+
+   **`mt` never refuses the bytes — it refuses to pretend it checked something
+   it did not.** This supersedes the earlier PSBT-only input ruling.
+
+2f. **A PSBT or transaction passed as a COMMAND-LINE ARGUMENT** → **refuse**,
+   and tell the operator how to clean up. Operator ruling 2026-08-23.
+
+   **A finalized transaction is a BEARER artifact** — anyone holding it can
+   broadcast it, exactly like the plate it becomes. As an argument it lands in
+   the shell's history file in plaintext and in `ps` output for every user on
+   the machine. `mt` reads from a **file or stdin** only.
+
+       mt encode: refusing a transaction passed as a command-line argument.
+
+         It is now in your shell history and was visible in `ps` while this
+         ran. A finalized transaction is BEARER: anyone who reads it can
+         spend it.
+
+         Remove it:  history -d 512 && fc -W        # zsh
+         Then re-run: mt encode < tx.psbt
+
+   The purge command is **specific to the operator's shell**, detected from
+   `$SHELL`. Two limits stated rather than papered over: it cannot know who
+   read the history before now, and it cannot reach backups.
+
+   > **The siblings' precedent does not transfer, and the reason is the whole
+   > point.** `md verify <STRINGS>...` and `mk verify [MK1_STRINGS]...` do take
+   > their material as positional arguments — but `md1`/`mk1` strings are
+   > **watch-only public material**, where a leak costs privacy. A finalized
+   > transaction is bearer, where it costs the money. Same shape, different
+   > hazard class.
+
+2g. **The source file is readable by anyone but its owner** → **warn loudly.**
+   Operator ruling 2026-08-23. `mt` checks `mode & 0o077 == 0` — no group bits,
+   no other bits — accepting `600`, `400`, `700` and warning on `644`, `640`,
+   `604`.
+
+       WARNING: /home/bcg/tx.psbt is mode 0644 — readable by every user
+                on this machine.
+
+         A finalized transaction is BEARER. Anyone who can read this file
+         can broadcast it. It is exactly as dangerous as the plate you are
+         about to cut.
+
+         chmod 600 /home/bcg/tx.psbt
+
+   **It works in more cases than "a named file", which was worth checking.**
+   Verified by experiment: with `mt encode < tx.psbt` an `fstat` on fd 0 still
+   returns the underlying file's mode, so the redirect form is checkable too.
+   Piped input (`cat … | mt`) gives a FIFO and typed input gives no file — in
+   both `mt` says the permissions are **unknown** rather than silently skipping
+   the check.
+
+   Two honest limits: it says nothing about who read the file **before** now,
+   and nothing about backups or directories it has passed through. It is the
+   check that is available, not a guarantee.
 
 3. **An unsigned or unfinalized transaction offered for engraving** → refuse. It
    cannot be broadcast, so it is not a backup.
@@ -1829,7 +1951,7 @@ signed PSBT.
     | | |
     | --- | --- |
     | verbs | **`encode`**, `decode`, `verify`, `inspect` — matching `md` and `mk` |
-    | **input** | **a finalized PSBT, and nothing else** — from a file or stdin, equivalently |
+    | **input** | a finalized PSBT (preferred) **or a raw signed transaction** (§8.2e) — from a **file or stdin**, never a command-line argument (§8.2f) |
     | `mt qr` output | a **SH2 payload** (`sysw`) carrying the QR — machine engraving |
     | `mt encode` output | the **codex32 string on stdout** — hand engraving |
     | stderr | every warning and refusal a human must see (§3b) |
@@ -1922,6 +2044,34 @@ signed PSBT.
     but they will at least build the same tool. Given different tables they build
     different tools.
 
+    **A TTY on stdin gets a welcome line, not silence.** Operator ruling
+    2026-08-23. `mt encode` with nothing piped in **blocks waiting on stdin**,
+    and to anyone who does not know the paste-then-Ctrl-D idiom that is
+    indistinguishable from a hang: no output, no prompt, no cursor movement. The
+    natural response is Ctrl-C and the conclusion that the tool is broken.
+
+        mt encode: reading a transaction from stdin.
+                   Paste it and press Ctrl-D, or Ctrl-C to abort.
+
+    **The test is one line** — stdin is a TTY rather than a pipe — and it is the
+    same check that tells `mt` a paste is coming rather than a redirect. The
+    failure it prevents is not a wrong result but **a new user concluding the
+    tool does not work and leaving**, which no other check catches.
+
+    It is also the one place `mt` would otherwise stop doing what it does
+    everywhere else: §8.2c states the fee arithmetic, §8.4 states two facts,
+    §6a enumerates the skipped checks. **A tool that silently waits is the
+    exception.**
+
+    **Unrecognised input is NAMED, not merely rejected.** `me` already has a
+    `classify` module and `md`/`mk` classify their input too, so this is the
+    constellation's habit rather than a new idea. A txid is 64 hex characters
+    and recognisable as such:
+
+        mt encode: that is a transaction ID (a 64-character hash), not a
+                   transaction. mt needs the transaction itself — a txid
+                   identifies one, it does not contain one.
+
     **Still unspecified:** the flag spellings themselves, exit codes, and the
     format of the refusal messages §8 promises will *"name the number that
     caused it"*.
@@ -1929,8 +2079,8 @@ signed PSBT.
 11. ~~How many codex32 characters fit a hand-engraved plate?~~ **CLOSED — OUT
     OF SCOPE**, operator ruling 2026-08-23: *"As many as a user wants. It is not
     our concern."* `mt encode` emits a string; what a user does with steel is
-    theirs. See §3b. The 64-chunk ceiling is unaffected — that is a property of
-    the codec, not of anyone's plate.
+    theirs. See §3b. The **4,096-chunk** ceiling is unaffected — that is a
+    property of the codec, not of anyone's plate.
 
 12. ~~Should `mt1` FILL its chunks rather than balance them?~~ **CLOSED — NO.
     Filling would reduce error recoverability, which is the one thing this
@@ -1956,8 +2106,8 @@ signed PSBT.
     Both effects push the same way. **Balancing is not a limitation of `md`'s
     chunker — it is error-correction budget bought with plate area**, and for a
     hand-engraved artifact whose entire purpose is surviving a miscut character,
-    trading it for ~340 bytes of ceiling is the wrong trade. The 2,560 B ceiling
-    stands, and §8.7b refuses past it.
+    trading it for ~340 bytes per chunk of capacity is the wrong trade. The
+    **163,840 B** ceiling stands, and §8.7b refuses past it.
 
 13. **`mt1`'s own encoding, NUMS constant and content id — RULED, ready to
     build.** Operator rulings 2026-08-23.
@@ -2228,7 +2378,7 @@ grew between them:
 
 §3b's chunk counts come from `RESULTS_envelope_2026-08-22.txt` and
 `RESULTS_rcw_2026-08-22.txt`, which measure the **raw signed transaction**
-against the 64-chunk container.
+against a 40-byte chunk. `mt1`'s ceiling is 4,096 of them (§3).
 
 > **They remain a LOWER BOUND, but not for the reason an earlier draft gave.**
 > That draft called them "a floor, for the balancing reason stated in §3b" —
