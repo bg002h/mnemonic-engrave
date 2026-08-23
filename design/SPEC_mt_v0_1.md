@@ -248,12 +248,60 @@ overturned an earlier assumption and are marked.
        mt verify: OK — 14 chunks, set 0x0e17e, transaction re-derives.
 
          CORRECTION APPLIED. 3 chunks needed repair:
-           chunk  2   1 of 4 symbols
-           chunk  7   4 of 4 symbols   <-- NO MARGIN LEFT
-           chunk 11   2 of 4 symbols
+           chunk  2   1 of 4 symbols   pos 61
+           chunk  7   4 of 4 symbols   pos 12, 34, 35, 78   <-- NO MARGIN LEFT
+           chunk 11   2 of 4 symbols   pos 9, 52
+
+         chunk 7, with the corrections marked:
+           MT1QZRF8XK2V[q>p]HQ9WRDG5S8XE7M2[v>d][8>g]4KP3NAYU6TC...
+                                                   ...5J2W[l>1]E7RQ
+             pos 12   read q   corrected to p
+             pos 34   read v   corrected to d
+             pos 35   read 8   corrected to g
+             pos 78   read l   corrected to 1
 
          Chunk 7 is at its correction limit. One more damaged symbol in
          that string and this transaction is unrecoverable. Re-cut it.
+
+   **`verify` LOCALISES every correction, and stops there.** Operator ruling
+   2026-08-23, from walking Journey C: *"verify highlights the location of the
+   errors and it is on the user to not be an idiot and check typing and
+   engraving."*
+
+   **The ambiguity `verify` does not resolve, and does not try to.** The
+   operator types 1,228 characters back from steel, so a corrected symbol has
+   two possible authors — **the engraving is wrong, or the typing is wrong** —
+   and BCH cannot tell them apart. A wrong symbol is a wrong symbol regardless
+   of which hand made it. The two call for opposite responses: a miscut chunk 7
+   is one scratch from unrecoverable and must be re-cut, while four fat-fingered
+   keystrokes mean **the plate is perfect** and re-cutting it wastes an hour on
+   steel that was already right.
+
+   > **Localisation is what makes this the operator's job rather than an
+   > unanswerable question.** `pos 34 read v corrected to d` is a claim they can
+   > settle in seconds against the plate itself: **if position 34 on the steel
+   > reads `d`, they mistyped; if it reads `v`, they miscut.** One glance at one
+   > character, and the ambiguity is gone. That is why the report prints what
+   > each symbol **was** alongside what it was corrected **to** — the
+   > before-value is the entire diagnostic, and a report giving only counts and
+   > positions would leave the operator with nothing to compare.
+   >
+   > So `mt` supplies the fact and declines the inference. It cannot see the
+   > steel; the operator is holding it.
+
+   **Two mechanisms were considered at this step and BOTH are refused**,
+   recorded so a later reader knows they were weighed rather than missed:
+
+   | rejected | why |
+   | --- | --- |
+   | **a "type it twice and compare" flag** | two transcriptions agreeing is real evidence, but it doubles the most tedious step in the whole journey to answer a question one glance at the plate answers. `mt` would be buying with the operator's hour what localisation gives away |
+   | **diffing against `encode`'s original output** | it would localise perfectly — and it requires keeping the strings **in a file**, which is a bearer instrument (§7) that §8's `0600` refusal already treats as hazardous. **The reason to engrave is that the file goes away.** A verify path that depends on retaining it inverts the point of the artifact |
+
+   > **Neither refusal costs the operator anything they cannot get another way**,
+   > which is the test §0a's journey rule sets: a divergence earns a change only
+   > when the wrong outcome is worse than telling the user nothing. Here the
+   > operator is told a great deal — every position, every before-value — and
+   > what remains is a comparison only they can perform.
 
    **`verify` still returns OK** — the transaction *is* recoverable today, and
    inventing a refusal would overrule the operator on their own plate. What
