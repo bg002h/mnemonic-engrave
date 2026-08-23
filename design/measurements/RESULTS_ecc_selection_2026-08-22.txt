@@ -1,0 +1,30 @@
+
+=== CONSERVATIVE — 0.60 mm modules (2 strokes), optically plausible ===
+  rule: fewest plates first, then the STRONGEST ECC that still fits that plate count
+
+  single-sig tr, 1in sweep     162 B | RAW  1 pl, 1 qr, v13 ECC H @0.60mm          | UR  1 pl, 1 qr, v16 ECC H @0.60mm
+  RCW tr key-path, 1in         162 B | RAW  1 pl, 1 qr, v13 ECC H @0.60mm          | UR  1 pl, 1 qr, v16 ECC H @0.60mm
+  RCW tr tier4, 1in            405 B | RAW  1 pl, 1 qr, v22 ECC H @0.60mm          | UR  1 pl, 1 qr, v26 ECC H @0.60mm
+  3-of-5 wsh signed, 1in       488 B | RAW  1 pl, 1 qr, v24 ECC H @0.60mm          | UR  1 pl, 1 qr, v25 ECC Q @0.60mm
+  3-of-5 tr signed, 1in        501 B | RAW  1 pl, 1 qr, v24 ECC H @0.60mm          | UR  1 pl, 1 qr, v25 ECC Q @0.60mm
+  RCW tr tier1, 1in            535 B | RAW  1 pl, 1 qr, v25 ECC H @0.60mm          | UR  1 pl, 1 qr, v26 ECC Q @0.60mm
+  RCW wsh tier1, 1in           742 B | RAW  1 pl, 1 qr, v26 ECC Q @0.60mm          | UR  1 pl, 1 qr, v26 ECC M @0.60mm
+  9-of-11 tr signed, 1in      1097 B | RAW  1 pl, 1 qr, v24 ECC L @0.60mm          | UR  2 pl, 2 qr, v22 ECC M @0.60mm
+  9-of-11 wsh signed, 1in     1130 B | RAW  1 pl, 1 qr, v24 ECC L @0.60mm          | UR  2 pl, 2 qr, v23 ECC M @0.60mm
+  RCW tr tier1, 5in           2455 B | RAW  2 pl, 2 qr, v25 ECC L @0.60mm          | UR  3 pl, 3 qr, v24 ECC L @0.60mm
+  9-of-11 tr PSBT, 2in/2out   4962 B | RAW  4 pl, 4 qr, v25 ECC L @0.60mm          | UR  5 pl, 5 qr, v26 ECC L @0.60mm
+
+=== AGGRESSIVE — 0.30 mm allowed (1 stroke, UNVALIDATED, F-234) ===
+  rule: fewest plates first, then the STRONGEST ECC that still fits that plate count
+
+  single-sig tr, 1in sweep     162 B | RAW  1 pl, 1 qr, v13 ECC H @0.30mm (9 up)   | UR  1 pl, 1 qr, v16 ECC H @0.30mm (4 up)
+  RCW tr key-path, 1in         162 B | RAW  1 pl, 1 qr, v13 ECC H @0.30mm (9 up)   | UR  1 pl, 1 qr, v16 ECC H @0.30mm (4 up)
+  RCW tr tier4, 1in            405 B | RAW  1 pl, 1 qr, v22 ECC H @0.30mm (4 up)   | UR  1 pl, 1 qr, v26 ECC H @0.30mm (4 up)
+  3-of-5 wsh signed, 1in       488 B | RAW  1 pl, 1 qr, v24 ECC H @0.30mm (4 up)   | UR  1 pl, 1 qr, v29 ECC H @0.30mm
+  3-of-5 tr signed, 1in        501 B | RAW  1 pl, 1 qr, v24 ECC H @0.30mm (4 up)   | UR  1 pl, 1 qr, v30 ECC H @0.30mm
+  RCW tr tier1, 1in            535 B | RAW  1 pl, 1 qr, v25 ECC H @0.30mm (4 up)   | UR  1 pl, 1 qr, v31 ECC H @0.30mm
+  RCW wsh tier1, 1in           742 B | RAW  1 pl, 1 qr, v30 ECC H @0.30mm          | UR  1 pl, 1 qr, v36 ECC H @0.30mm
+  9-of-11 tr signed, 1in      1097 B | RAW  1 pl, 1 qr, v38 ECC H @0.30mm          | UR  1 pl, 3 qr, v24 ECC H @0.30mm (4 up)
+  9-of-11 wsh signed, 1in     1130 B | RAW  1 pl, 1 qr, v38 ECC H @0.30mm          | UR  1 pl, 3 qr, v25 ECC H @0.30mm (4 up)
+  RCW tr tier1, 5in           2455 B | RAW  1 pl, 4 qr, v24 ECC Q @0.30mm (4 up)   | UR  1 pl, 4 qr, v23 ECC M @0.30mm (4 up)
+  9-of-11 tr PSBT, 2in/2out   4962 B | RAW  1 pl, 4 qr, v25 ECC L @0.30mm (4 up)   | UR  2 pl, 7 qr, v25 ECC M @0.30mm (4 up)
