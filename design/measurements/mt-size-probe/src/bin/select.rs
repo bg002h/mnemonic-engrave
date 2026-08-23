@@ -39,6 +39,29 @@ fn cap(v: u8, ec: EcLevel, alnum: bool) -> usize {
     lo
 }
 fn modules(v: u8) -> usize { 4 * v as usize + 17 }
+
+fn cbor_uint(v: u64) -> usize {
+    match v { 0..=23 => 1, 24..=255 => 2, 256..=65535 => 3, 65536..=4294967295 => 5, _ => 9 }
+}
+
+/// Characters ONE multi-part UR fragment occupies, uppercased. Structure read
+/// from the fork: a 5-element CBOR array (fountain.go:73-80) of SeqNum, SeqLen,
+/// MessageLen, Checksum, Data, deterministically encoded, then bytewords
+/// (2 ch/byte + 8-char CRC32) behind `ur:<type>/<n>-<m>/` (ur.go:117-123).
+/// A single-part UR skips the fountain wrapper entirely (ur.go:118).
+fn ur_chars_per_fragment(msg: usize, seq_len: usize) -> usize {
+    if seq_len == 1 { return 3 + 5 + 1 + msg * 2 + 8 }   // "ur:bytes/" + bytewords
+    let n = msg.div_ceil(seq_len);
+    let cbor = 1 + cbor_uint(seq_len as u64) + cbor_uint(seq_len as u64)
+             + cbor_uint(msg as u64) + 5 + cbor_uint(n as u64) + n;
+    cbor * 2 + 8 + 3 + 5 + 1 + seq_len.to_string().len() * 2 + 2
+}
+
+/// Smallest fragment count whose parts each fit `cap` characters. None if even
+/// a very fine split cannot fit — the symbol is simply too small.
+fn ur_fragments(msg: usize, cap: usize) -> Option<usize> {
+    (1..=512usize).find(|&sl| ur_chars_per_fragment(msg, sl) <= cap)
+}
 fn ec_rank(e: EcLevel) -> u8 { match e { EcLevel::L => 0, EcLevel::M => 1, EcLevel::Q => 2, EcLevel::H => 3 } }
 fn ec_name(e: EcLevel) -> &'static str { match e { EcLevel::L => "L", EcLevel::M => "M", EcLevel::Q => "Q", EcLevel::H => "H" } }
 
@@ -100,13 +123,47 @@ fn best(units: usize, alnum: bool, min_module_mm: f64, caps: &Caps) -> Option<Pi
     best
 }
 
+/// UR selection: a fragment must fit a WHOLE symbol, so symbol count comes from
+/// splitting, not from dividing a flat character total.
+fn best_ur(msg: usize, min_module_mm: f64, caps: &Caps) -> Option<Pick> {
+    let mut best: Option<Pick> = None;
+    for &mm in MODULES_MM.iter().filter(|m| **m >= min_module_mm - 1e-9) {
+        for v in 1..=40u8 {
+            let fp = (modules(v) + 2 * QUIET) as f64 * mm;
+            let h_first = USABLE_MM - LEGEND_LINES_FIRST * LINE_PITCH_MM;
+            let h_rest = USABLE_MM - LEGEND_LINES_REST * LINE_PITCH_MM;
+            let across = (USABLE_MM / fp).floor() as usize;
+            let rows_first = (h_first / fp).floor() as usize;
+            let rows_rest = (h_rest / fp).floor() as usize;
+            if across == 0 || rows_rest == 0 { continue }
+            let first_cap = across * rows_first;
+            let per_plate = across * rows_rest;
+            for ec in [EcLevel::L, EcLevel::M, EcLevel::Q, EcLevel::H] {
+                let c = caps.alnum[v as usize][ec_rank(ec) as usize];
+                if c == 0 { continue }
+                let Some(symbols) = ur_fragments(msg, c) else { continue };
+                let plates = if symbols <= first_cap { 1 }
+                             else if first_cap == 0 { 1 + symbols.div_ceil(per_plate) }
+                             else { 1 + (symbols - first_cap).div_ceil(per_plate) };
+                let better = match &best {
+                    None => true,
+                    Some(b) => (plates, std::cmp::Reverse(ec_rank(ec)), symbols)
+                             < (b.plates, std::cmp::Reverse(ec_rank(b.ec)), b.symbols),
+                };
+                if better { best = Some(Pick { plates, symbols, ec, ver: v, module_mm: mm, per_plate }); }
+            }
+        }
+    }
+    best
+}
+
 fn row(label: &str, raw: usize, min_mm: f64, caps: &Caps) {
     // UR: bytewords minimal is exactly 2 chars/byte + an 8-char CRC32
     // (bc/bytewords/bytewords.go:17-31), and uppercased `ur:bytes/N-M/...` is
     // fully QR-alphanumeric (`:` and `/` are both in the alnum set).
-    let ur_chars = raw * 2 + 8 + 16; // + room for the ur:bytes/N-M/ prefix
+
     let a = best(raw, false, min_mm, caps);
-    let b = best(ur_chars, true, min_mm, caps);
+    let b = best_ur(raw, min_mm, caps);
     let f = |p: &Option<Pick>| match p {
         Some(p) => format!("{} pl, {} qr, v{} ECC {} @{:.2}mm{}",
                            p.plates, p.symbols, p.ver, ec_name(p.ec), p.module_mm,

@@ -96,12 +96,26 @@ remove — a recoverer would need `mt`-aware software, and the QR's entire purpo
 is to be the escape hatch for someone who has none of our tools.
 
 **Why UR is positively good here, not merely available.** It is already vendored
-and device-tested in the fork (`bc/ur`, `bc/bytewords`, `bc/fountain`), it is
-what Sparrow, Keystone, Passport and Specter already read, and `ur.Split` is
-**fountain-coded** — the transaction recovers from any sufficient subset of
-fragments rather than requiring every one. On steel that directly answers the
-per-block Reed-Solomon concern recorded in F-234: losing one symbol to a deep
-scratch becomes survivable instead of fatal.
+and device-tested in the fork (`bc/ur`, `bc/bytewords`, `bc/fountain`), and it is
+what Sparrow, Keystone, Passport and Specter already read.
+
+> **CORRECTION.** An earlier draft claimed UR "recovers from any sufficient
+> subset of fragments rather than requiring every one", and used that to answer
+> F-234's per-block Reed-Solomon worry. **That is false as stated.**
+> `fountain.go:242` returns a *singleton* for every `seqNum <= seqLen`:
+>
+>     if seqNum <= uint32(seqLen) { return []int{int(seqNum - 1)} }
+>
+> so parts 1..seqLen each carry one pure fragment and **all of them are
+> required**. Only `seqNum > seqLen` produces XOR-mixed fountain parts.
+> `Decoder::Progress()` estimating `seqLen * 1.75` describes *random* reception,
+> not the deterministic set an engraver emits.
+
+**Redundancy is therefore a choice with a price, not a property.** Emitting
+`seqLen` parts costs least and tolerates no loss: one unreadable plate and the
+transaction is gone. Each part beyond `seqLen` is a genuine fountain part,
+buying tolerance of one more lost symbol at one more symbol's cost — which, at
+§4's sizes, is frequently one more plate. **Undecided; see §10.7.**
 
 **Its cost, measured.** Bytewords minimal is exactly 2 characters per byte plus
 an 8-character CRC32 (`bc/bytewords/bytewords.go:17-31`, read from source).
@@ -110,10 +124,28 @@ the alphanumeric set — so it costs **11 bits per payload byte against raw
 binary's 8**, a 37.5% expansion. Under the §4 rule that costs an ECC level on
 mid-size artifacts and a whole plate on 9-of-11.
 
-> **NOT YET MEASURED.** The per-fragment CBOR header that UR adds (seqNum,
-> seqLen, message length, checksum) is not in the 2-chars-per-byte figure. Every
-> plate count in this spec is therefore a **floor** for the UR path. Measure
-> before any of these numbers reach an implementation plan.
+**Per-fragment overhead, now measured** (`RESULTS_ur_overhead_2026-08-22.txt`).
+A multi-part fragment is a 5-element CBOR array (`cbor:",toarray"`,
+`fountain.go:73-80`) of SeqNum, SeqLen, MessageLen, Checksum and Data,
+deterministically encoded, then bytewords-encoded and prefixed. Read from the
+fork's source, not the BCR paper:
+
+| component | cost |
+| --- | --- |
+| CBOR array head + 4 scalars | **12–14 bytes**, by message size |
+| Data payload | `ceil(messageLen / seqLen)`, identical in every part |
+| bytewords | 2 chars per byte, **+ 8 chars** of CRC32 |
+| `ur:bytes/<n>-<m>/` prefix | ~13 characters |
+
+So each fragment costs about **49 characters** of overhead beyond its share of
+the payload. A **single-part** UR skips the fountain wrapper entirely
+(`ur.go:118`) and pays only the prefix and CRC.
+
+§4's selection now models this exactly — it finds the smallest `seqLen` whose
+fragments each fit a whole symbol, instead of dividing a flat character total.
+The old flat approximation was close in aggregate, the CBOR head being small
+against the payload, but it could not express the real constraint: **a fragment
+must fit one symbol.**
 
 ## 4. Choosing the configuration
 
@@ -149,11 +181,11 @@ Measured at the conservative 0.60 mm module, **with the legend reserved**
 | --- | --- | --- |
 | RCW `tr` key-path, 1-in | 1 plate, v13, **ECC H** | 1 plate, v16, **ECC H** |
 | RCW `tr` tier 4, 1-in | 1 plate, v15, ECC M | 1 plate, v16, ECC L |
-| 3-of-5 signed, 1-in | 1 plate, v15, ECC L | **2 plates**, 6 qr, ECC Q |
-| RCW `tr` tier 1, 1-in | 1 plate, v16, ECC L | **2 plates**, 6 qr, ECC Q |
-| RCW `wsh` tier 1, 1-in | **2 plates**, 6 qr, ECC Q | **2 plates**, 6 qr, ECC M |
-| 9-of-11 signed, 1-in | **2 plates**, v24, ECC L | **3 plates**, v22, ECC M |
-| RCW `tr` tier 1, 5-in | **4 plates**, v23, ECC M | 4 plates, v24, ECC L |
+| 3-of-5 signed, 1-in | 1 plate, v15, ECC L | **2 plates**, v21, ECC M |
+| RCW `tr` tier 1, 1-in | 1 plate, v16, ECC L | **2 plates**, v22, ECC M |
+| RCW `wsh` tier 1, 1-in | **2 plates**, 6 qr, ECC Q | **2 plates**, 1 qr, ECC L |
+| 9-of-11 signed, 1-in | **2 plates**, v24, ECC L | **3 plates**, 2 qr, ECC M |
+| RCW `tr` tier 1, 5-in | **4 plates**, v23, ECC M | 4 plates, 3 qr, ECC L |
 
 **What the legend costs, stated plainly**, because the difference is large and a
 reader who saw the earlier draft should see it: reserving 25.5 mm drops small
@@ -461,8 +493,8 @@ folding them in would make `mt` a wallet.
 
 ## 10. Open questions
 
-1. **UR fragment overhead is unmeasured** (§3). This gates every plate count on
-   the UR path.
+1. ~~UR fragment overhead is unmeasured.~~ **MEASURED**, §3: 12–14 bytes of CBOR
+   and ~49 characters per fragment; §4's selection now models it exactly.
 2. **The F-234 optical test plate has not been cut.** It gates §4's module
    floor, and should test 0.30/0.45/0.60/0.90 mm modules *and* raw-vs-base45-vs-
    UR payloads in one cycle.
@@ -477,7 +509,13 @@ folding them in would make `mt` a wallet.
    and the ECC-maximising QR left a 4 mm strip — zero text lines — so §4 and §5
    were mutually unsatisfiable. The legend is now 5 fields / 136 chars / 6 lines,
    and §4's objective reserves that space.
-6. **Would back-side engraving recover the 25.5 mm?** It would restore the ECC
+7. **How much fountain redundancy should `mt` emit?** Parts beyond `seqLen` are
+   real fountain parts, each tolerating one more lost symbol at the cost of one
+   more symbol — often one more plate (§3). Zero redundancy means a single
+   unreadable plate destroys the transaction, and surviving decades in a drawer
+   is the entire point of the artifact. **The most consequential undecided
+   question in this spec**, trading directly against §4's plate counts.
+8. **Would back-side engraving recover the 25.5 mm?** It would restore the ECC
    levels and halve the plate counts the legend now costs. But there is **no
    back-side path in the fork**: `backup.go:161` is named `frontSideSeed`, which
    implies one, yet there is a single `Engraving` per plate and nothing that

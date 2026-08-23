@@ -1,0 +1,34 @@
+=== PER-FRAGMENT OVERHEAD (ur:bytes), exact ===
+  msg bytes    seqLen payload/pt  CBOR bytes   overhead   chars/part
+  162        1 (none)       162           -    0 (raw)          341
+  162               2        81          93         12          207
+  162               4        41          53         12          127
+  535        1 (none)       535           -    0 (raw)         1087
+  535               2       268         282         14          585
+  535               4       134         147         13          315
+  1097       1 (none)      1097           -    0 (raw)         2211
+  1097              2       549         563         14         1147
+  1097              4       275         289         14          599
+  2455       1 (none)      2455           -    0 (raw)         4927
+  2455              2      1228        1242         14         2505
+  2455              4       614         628         14         1277
+
+=== THE REDUNDANCY QUESTION ===
+  fountain.go:242 — parts 1..seqLen are SINGLETONS (one pure fragment each).
+  Only seqNum > seqLen produces mixed parts. So emitting exactly seqLen
+  parts gives ZERO redundancy: lose one and the message is unrecoverable.
+  Decoder::Progress() estimates seqLen * 1.75 parts for RANDOM reception.
+
+  policy                            parts     survives   cost vs bare
+  exactly seqLen (singletons)    seqLen+0      no loss              -
+  seqLen + 1                     seqLen+1   any 1 lost     +1 symbols
+  seqLen + 2                     seqLen+2   any 2 lost     +2 symbols
+
+=== PLATES, legend reserved, 0.60mm, ECC H, with and without redundancy ===
+  artifact                  bytes     seqLen plates(bare) plates(+1 redun)
+  RCW tr key-path             162          1            1              2
+  RCW tr tier1 1in            535          4            4              5
+  9-of-11 signed 1in         1097          7            7              8
+  RCW tr tier1 5in           2455         16           16             17
+
+  (v16 ECC H holds 365 alnum chars beside the legend at 0.60mm)
