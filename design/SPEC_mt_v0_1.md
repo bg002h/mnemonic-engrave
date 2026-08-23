@@ -21,7 +21,7 @@ different ways:
 
 | verb | form | engraved how | payload | size limit |
 | --- | --- | --- | --- | --- |
-| **`mt qr`** | QR symbols + legend | **machine** (SeedHammer II) | `ur:psbt` (§3) | the plate budget |
+| **`mt qr`** | QR symbols + legend | **machine** (SeedHammer II) | finalized PSBT in `mt1` chunks (§3) | the plate budget |
 | **`mt string`** | `mt1` chunked codex32 | **by hand**, or machine | raw signed transaction (§3b) | **64 chunks** |
 
 `mt qr` decides how many symbols that takes, at what error-correction level,
@@ -74,9 +74,10 @@ overturned an earlier assumption and are marked.
    define and belonged next to `me bundle`. See §2 for what the codec does in
    fact specify; the objection was answered rather than ignored.
 3. **The QR carries the standard form, never a codex32 string** (F-234).
-4. **The envelope is `ur:psbt`, carrying a fully finalized PSBT.** **This
-   overrules the previous draft's `ur:bytes`**, which R0 found is forbidden for
-   production use by BCR-2020-005 itself. See §3.
+4. **UR is dropped entirely. Both verbs fragment with the `mt1` chunk header.**
+   **This overrules the previous draft's `ur:psbt`, which itself overruled
+   `ur:bytes`** — three positions in one cycle, and §3 records why each fell.
+   The payload remains a fully finalized PSBT. See §3.
 5. **Reed-Solomon density is the highest that still minimises plate count.**
 6. **Provenance rides in the engraved legend, not in the wire format.**
 7. **The operator chooses between a timelocked and an immediately-spendable
@@ -118,27 +119,75 @@ header, and the BCH checksum that makes hand engraving fault-tolerant (§3b).
 > normative string encoding, which is precisely what earns a codec crate of its
 > own in this constellation.
 
-## 3. The envelope: `ur:psbt`
+## 3. The envelope: none — `mt1` chunks, both verbs
 
-Fragmentation uses **UR (Uniform Resources, BCR-2020-005)**, type **`psbt`**.
-The payload is a **fully finalized PSBT**, from which any standard tool extracts
-the identical raw signed transaction.
+There is **no UR**, and no third-party envelope of any kind. Both verbs
+fragment with the **`mt1` chunk header** (§3b), and `mt qr` puts the resulting
+chunks into QR symbols directly.
 
-> **CORRECTION — the previous draft specified `ur:bytes`, and that was wrong.**
-> R0 lens 3 read BCR-2020-005 directly. Its "Types" section states:
+> **CORRECTION, and this is the third envelope position in one cycle. All three
+> are recorded because the reasoning matters more than the answer.**
 >
-> > The `bytes` type exists only for testing and validation of UR
-> > implementations and **MUST NOT** be used for any other purpose.
+> 1. **`ur:bytes`** — the original draft. R0 round 0 killed it: BCR-2020-005
+>    states the `bytes` type *"exists only for testing and validation of UR
+>    implementations and MUST NOT be used for any other purpose."*
+> 2. **`ur:psbt`** — the compliant replacement, on the operator's *"don't go
+>    off-label"* ruling. Correct as far as it went: the BCR-2020-006 registry has
+>    58 rows and `psbt` is its only transaction-shaped type, so this was the one
+>    conformant way to carry a transaction under UR.
+> 3. **No UR at all** — operator ruling 2026-08-23: *"I don't think UR wrapper
+>    complexity is worth it."*
 >
-> RFC-2119 keywords are declared normative in that same document. I then
-> enumerated the companion registry BCR-2020-006 — **58 rows** — and the
-> complete Bitcoin set is `seed`, `hdkey`, `keypath`, `coin-info`, `eckey`,
-> `address`, `output-descriptor`, `sskr`, `psbt` and `account-descriptor`.
-> **There is no registered UR type for a raw signed transaction.** `psbt` is the
-> only transaction-shaped entry, and it requires a valid BIP-174 PSBT.
+> **What made (3) available was §10.2**, ruled the same day. UR's real defence
+> was never conformance — it was that UR is the only fragmentation the Bitcoin
+> ecosystem implements, so a recoverer could reassemble engraved symbols with
+> off-the-shelf wallet software. Once `mt` ships its own static-scan reader, the
+> ecosystem reassembles nothing and that defence is void.
 >
-> So the compliant envelope and "raw signed transaction support" are the same
-> artifact, reached through `psbt`.
+> **What it costs, measured** (`RESULTS_ecc_selection_2026-08-22.txt`, at
+> 0.60 mm, same finalized-PSBT artifacts): dropping UR **saves a whole plate on
+> 3 of 7 artifacts** — `tr` tier 4 goes 2 plates to 1, `tr` tier 1 at 5 inputs
+> goes 5 to 4, `wsh` tier 1 at 5 inputs goes 6 to 5 — **and buys one to two ECC
+> levels on the other 4.** Under §1.8, which spends slack on damage tolerance,
+> UR was spending the exact currency the artifact needs.
+>
+> **The efficiency numbers, which decide this on their own**
+> (`RESULTS_qr_modes_2026-08-22.txt`, gated against published v40 limits):
+> raw binary 100%, **base45 97%**, bech32 uppercase 91%, base64 75%, and **UR
+> bytewords ~73%** — the same density as plain uppercase hex. UR was paying a
+> 27% tax for a wrapper whose benefit §10.2 removed.
+
+**Fragmentation: the `mt1` chunk header, for both verbs.** Operator ruling
+2026-08-23. `md-codec`'s `ChunkHeader` carries `version`, a 20-bit
+`chunk_set_id`, `count` and `index` — n-of-m **plus a set identifier**, so
+symbols from two different transactions cannot be combined. That is strictly
+stronger than UR, which has a payload checksum but no set identity, and it means
+**one fragmentation scheme to specify, test, teach a recoverer, and get wrong
+only once.**
+
+    mt string:  mt1 chunk -> BCH + codex32 text -> engraved as characters
+    mt qr:      mt1 chunk -> bytes              -> engraved as a QR symbol
+                ^ identical header both ways
+
+**Consequence: §10.13 now gates both verbs, not one.** Whether `md-codec`'s
+header and reassembly take a transaction-shaped payload cleanly was already
+open; it is now load-bearing for everything `mt` emits.
+
+**What a single symbol carries is UNDECIDED, and is pinned by experiment.** The
+choice is raw binary (QR byte mode, 8 bits per byte, zero expansion) against
+base45 (RFC 9285, alphanumeric mode, 97% of binary). Three percent apart, so the
+deciding factor is not size:
+
+- **Binary is fine at the QR layer** — byte mode is base ISO/IEC 18004, not an
+  extension. The risk is the *application* layer: generic scanners commonly try
+  to interpret content as text and mangle or reject arbitrary bytes.
+- **base45 is pure alphanumeric text**, so it sidesteps that entirely, at 3%.
+
+**Which of the two an off-the-shelf wallet will actually read from a static
+engraved symbol is UNVERIFIED and this spec does not assert it.** §10.1's test
+plate is already scoped to compare raw against base45 against UR payloads; that
+experiment decides it. Until then `mt` must not claim ecosystem readability for
+either form.
 
 **"Fully finalized" is exactly what `mt` already requires.** A PSBT holds a
 transaction at any stage. Signatures accumulate as loose items in a scratch area
@@ -207,21 +256,6 @@ it is the entire cost: `tr` tier 1, 1-in/2-out is **+1202 B** as finalized and
 transaction: **+58 to +61 bytes at one input, +261 to +271 at five** (~54 B per
 input).
 
-**Why UR at all, now that redundancy is zero.** Decision 8 removed the fountain,
-so every emitted part is a pure singleton — which is what
-`bc/fountain/fountain.go:242` already returns for `seqNum <= seqLen`. What UR
-still buys is a **type tag** and **fragmentation**, and for multi-symbol
-artifacts there is no alternative that satisfies F-234: QR's own Structured
-Append is unavailable in practice (the `qrcode` Rust crate knows it only as a
-mode indicator with no encoder; the fork has none; wallets do not read it), and
-an `mt`-specific envelope would reintroduce exactly the dependency F-234 exists
-to remove. UR is the only fragmentation the Bitcoin ecosystem implements.
-
-It is also cheap to adopt: the fork's encoder takes the type as a parameter and
-its one live use is `ur:crypto-output` (`bc/ur/ur.go:111`) — an on-label,
-*registered* type, so `ur:bytes` was the anomaly rather than the precedent. The
-`psbt` type is a plain CBOR byte string, so wrapping costs 2–5 bytes.
-
 **Redundancy is zero — ruling, operator, 2026-08-23.** Emitting exactly `seqLen`
 parts costs least and tolerates no lost symbol. That is deliberate: **`mt`
 protects against damage to a plate, which is what error correction does, and not
@@ -235,30 +269,14 @@ free to engrave copies. Two consequences follow and are load-bearing:
   and corrosion on a symbol, which is the failure this artifact is being
   hardened against.
 
-**Its cost, measured.** Bytewords minimal is exactly 2 characters per byte plus
-an 8-character CRC32 (`bc/bytewords/bytewords.go:17-31`, read from source).
-Uppercased, `ur:psbt/N-M/…` is fully QR-alphanumeric — `:` and `/` are both in
-the alphanumeric set — so it costs **11 bits per payload byte against raw
-binary's 8**, a 37.5% expansion.
+**Its cost.** The chunk header is 37 bits per symbol
+(`md-codec/src/chunk.rs`), against UR's ~49 characters of prefix, CRC and CBOR
+per fragment. §3b measures the chunk arithmetic; §4's plate table is computed on
+the payload sizes that follow from it.
 
-**Per-fragment overhead, measured** (`RESULTS_ur_overhead_2026-08-22.txt`). A
-multi-part fragment is a 5-element CBOR array (`cbor:",toarray"`,
-`bc/fountain/fountain.go:74-80`) of SeqNum, SeqLen, MessageLen, Checksum and
-Data, deterministically encoded, then bytewords-encoded and prefixed. Read from
-the fork's source, not the BCR paper:
-
-| component | cost |
-| --- | --- |
-| CBOR array head + 4 scalars | **12–14 bytes**, by message size |
-| Data payload | `ceil(messageLen / seqLen)`, identical in every part |
-| bytewords | 2 chars per byte, **+ 8 chars** of CRC32 |
-| `ur:psbt/<n>-<m>/` prefix | ~12 characters |
-
-So each fragment costs about **49 characters** of overhead beyond its share of
-the payload. A **single-part** UR skips the fountain wrapper entirely
-(`bc/ur/ur.go:118`) and pays only the prefix and CRC — and therefore carries
-**no MessageLen and no Checksum**, which §10.3 records as a trap for the
-recoverer's tooling.
+> §10.8's per-symbol `n/m` label is now doubly grounded: the chunk header
+> carries `count` and `index` machine-readably, and the engraved label states
+> the same pair for a human who has not decoded anything.
 
 ## 3b. The string form: `mt1`, for hand engraving
 
@@ -277,7 +295,7 @@ discovering years later that the plate is scrap.
 **The payload is the raw signed transaction, NOT the PSBT — deliberately, and
 for a different reason than §3.** F-234 binds the *QR*, because the QR is the
 escape hatch for a recoverer holding no `mt`-aware software; it must therefore
-carry a form the wider ecosystem reads, which is `ur:psbt`. An `mt1` string is
+carry a form the wider ecosystem might read. An `mt1` string is
 the opposite case: **nothing but `mt`-aware software will ever parse it**, so
 F-234's argument does not apply and size is what matters. Dropping the PSBT
 wrapper saves the **+58 to +61 bytes per input** measured in §3 — which at 5 bits
@@ -419,29 +437,34 @@ trade a plate for redundancy; never leave redundancy unbought.
 > the order total, and make it break toward legibility, which is the direction
 > the artifact's purpose demands.
 
-**Measured, at the conservative 0.60 mm module, with the legend reserved, for
-the actual `ur:psbt` payload** (`RESULTS_ecc_selection_2026-08-22.txt`):
+**Measured, at the conservative 0.60 mm module, with the legend reserved**
+(`RESULTS_ecc_selection_2026-08-22.txt`, the **RAW** column — the payload is now
+PSBT bytes, not bytewords):
 
 | artifact | PSBT bytes | plates, symbols, version, ECC |
 | --- | --- | --- |
-| RCW `tr` tier 3, 1-in/1-out | 391 | **1 plate**, 1 qr, v16, ECC L |
-| RCW `tr` tier 4, 1-in/1-out | 465 | **2 plates**, 1 qr, v24, ECC Q |
-| RCW `tr` tier 1, 1-in/1-out | 595 | **2 plates**, 1 qr, v23, ECC M |
-| RCW `wsh` tier 3, 1-in/1-out | 626 | **2 plates**, 1 qr, v24, ECC M |
-| RCW `wsh` tier 1, 1-in/1-out | 802 | **2 plates**, 1 qr, v24, ECC L |
-| RCW `tr` tier 1, 5-in/2-out | 2769 | **5 plates**, 4 qr, v22, ECC L |
-| RCW `wsh` tier 1, 5-in/2-out | 3809 | **6 plates**, 5 qr, v23, ECC L |
+| RCW `tr` tier 3, 1-in/1-out | 391 | **1 plate**, 1 qr, v15, ECC M |
+| RCW `tr` tier 4, 1-in/1-out | 465 | **1 plate**, 1 qr, v15, ECC L |
+| RCW `tr` tier 1, 1-in/1-out | 595 | **2 plates**, 1 qr, v23, ECC Q |
+| RCW `wsh` tier 3, 1-in/1-out | 626 | **2 plates**, 1 qr, v24, ECC Q |
+| RCW `wsh` tier 1, 1-in/1-out | 802 | **2 plates**, 1 qr, v23, ECC M |
+| RCW `tr` tier 1, 5-in/2-out | 2769 | **4 plates**, 3 qr, v21, ECC L |
+| RCW `wsh` tier 1, 5-in/2-out | 3809 | **5 plates**, 4 qr, v22, ECC L |
 
-> **This table replaces the previous draft's, which described the wrong
-> payload.** That one was computed for raw transactions under `ur:bytes`. These
-> are the finalized-PSBT sizes under `ur:psbt`, which is what will actually be
-> engraved. The envelope change costs **one extra plate on three of seven
-> artifacts and one ECC level on the other four** — the price of compliance,
-> stated rather than buried.
+> **This table has now been regenerated twice and is STILL provisional.** The
+> first version described raw transactions under `ur:bytes`; the second,
+> finalized PSBTs under `ur:psbt`; this one, finalized PSBTs with UR dropped
+> (§3). Compare the second against this one for what UR cost: a plate on three
+> of seven artifacts, one to two ECC levels on the rest.
 >
-> Ordinary-wallet comparisons (single-sig, 3-of-5, 9-of-11) are **not** in this
-> table because their finalized-PSBT sizes have not been measured; only their
-> raw-transaction sizes have. Filed as a follow-up rather than estimated.
+> **Three inputs are still unmodelled here**, all of them additive, so treat
+> every row as a lower bound: the **37-bit `mt1` chunk header per symbol**
+> (§3), §10.8's **per-symbol `n/m` labels**, and §10.14's **font-metric
+> correction** to the legend reservation. §10.14 already requires the
+> regeneration; this note names all three inputs it must take.
+>
+> Ordinary-wallet comparisons (single-sig, 3-of-5, 9-of-11) are **not** here
+> because their finalized-PSBT sizes have not been measured.
 
 **What the legend costs, stated plainly**: reserving 25.5 mm drops small
 artifacts by two or three ECC levels and doubles the plate count on the larger
@@ -465,9 +488,9 @@ fields, 136 characters, 6 lines — measured,
 | field | chars | why |
 | --- | --- | --- |
 | `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
-| `FROM WALLET <8 hex>` | 20 | the 4-byte policy-id stub. The transaction does **not** say what it spends *from* (§6) |
+| `FROM WALLET <8 hex>` | 20 | wallet id or seed fingerprint. The transaction does **not** say what it spends *from* (§6). **Optional — loudly warned when absent** (§10.4) |
 | `SPENDABLE AFTER BLOCK <n>` | 29 | the single most actionable fact: whether this plate is live yet. Reads `IMMEDIATELY SPENDABLE` when the operator chose that (§8.4) |
-| `TO <truncated addr>  <amount>` | 34 | so a human sees where the money goes without a scanner. **One output only, and truncated** — see the limit below |
+| `TO <wallet id or fp>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when absent** |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
 Plus, **not part of the 136-character budget above**, one `n/m` label engraved
@@ -501,14 +524,17 @@ reserved in §4 — see §10.8 and §10.14.
 > independent derivation from the source formulas, which is two agreeing
 > derivations and not a run.
 
-> **What the `TO` line does NOT do, stated because §7 leaned on it.** It shows
-> **one** output, **truncated**. A transaction with change has two or more
-> outputs, so the line is silent about the rest, and a truncated address cannot
-> be checked against the decoded transaction by eye. It is an orientation aid —
-> *"this is roughly the plate I meant"* — not a disclosure of where the money
-> goes. Widening it is not available: §5's whole budget is 136 characters and
-> §4's plate table is built on the 6-line reservation. `mt` prints every output
-> in full at encode time instead. R0 round 1 (R-14).
+> **What the `TO` line does NOT do.** It was `TO <truncated addr>` until
+> 2026-08-23, showing **one** output and truncated — so a transaction with
+> change named one destination, silently omitted the rest, and offered an
+> address that could not be checked by eye. R0 round 1 (R-14) filed that as a
+> Critical against §7's pinned-destination mitigation. The operator's ruling
+> replaces it with a **wallet identity**, which names the counterparty instead
+> of one of its scripts and does not degrade with output count.
+>
+> It is still not a full disclosure: it is one line, it is optional, and it says
+> nothing when the destination is not a known wallet (§10.4). `mt` prints every
+> output in full at encode time; the plate carries the summary.
 
 ### What was dropped, and why
 
@@ -624,7 +650,7 @@ mitigation, the row says so instead of inventing one.
 | --- | --- |
 | **Bearer** — holder can broadcast (`mt qr`) | a timelock bounds it in *time*, not in space, and only when §8.4's `nSequence` condition holds; the `BEARER` line is the first line of a legend `mt` controls |
 | **Bearer** — holder can broadcast (`mt string`) | **accepted risk, not mitigated on the plate.** `mt` emits a string, not an engraving, so it has no mechanism to put a warning on hand-cut steel (§3b). It warns once on `stderr` at encode time, to the person encoding — who is not the person holding the plate later. The timelock bound still applies |
-| **Pinned destination** — a 2040 recoverer pays a 2026 address whose keys may be lost | **cannot be fixed, and the legend only partly discloses it.** §5's `TO` line is a **single, truncated** address plus one amount. Any transaction with change has two or more outputs, so the line names *one* of them and silently omits the rest; truncation also means the shown address is not verifiable against the decoded transaction by eye. `mt` displays every output in full at encode time — the plate does not |
+| **Pinned destination** — a 2040 recoverer pays a 2026 address whose keys may be lost | **cannot be fixed; partly disclosed.** §5's `TO` line names the destination **wallet** (id or fingerprint), which does not degrade with output count as the old truncated-address form did — but it is **optional**, and says nothing when the destination is not a known wallet (§10.4). `mt` displays every output in full at encode time; the plate carries a summary |
 | **Indistinguishable from a watch-only plate** — an `mt1` plate sits in the same drawer as `md1` and `mk1` plates, in the same script, differing in **one HRP character**, and is the only one of the three that is spendable by whoever picks it up | for `mt qr` the `BEARER` legend line carries the difference. For `mt string` there is **no mitigation** — see the bearer row above and §3b. R0 round 1 (R-13) |
 | **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed, and is NOT on the plate.** Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving. A holder in 2040 recovers the fee by decoding **only for `mt qr`**, whose PSBT payload carries the input amounts; an `mt string` plate carries a raw transaction, from which the fee is **not** recoverable without the prevouts |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
@@ -850,28 +876,61 @@ signed PSBT.
    multi-plate transactions recoverable at all, and it should be specified
    before anyone engraves a multi-symbol artifact.
 
-3. **Is UR worth its 37.5% expansion for SINGLE-symbol artifacts?** There it
-   buys only a type tag, and a PSBT is already self-identifying by its `psbt\xff`
-   magic. Measured cost of that tag: one extra plate on RCW `tr` tier 4. Item 1's
-   plate is already scoped to compare raw against UR payloads.
-4. **Where does `FROM WALLET <8 hex>` come from?** It is a mandatory legend
-   field sized into §4's reservation, and nothing specifies what supplies the
-   md1 card, nor what the legend does when it is absent. Related: should `mt`
-   verify the transaction against the source wallet when both are supplied?
-   §5 forbids branching on the stub at decode time, so such a check can only
-   warn — which makes it deferrable, but the *input* question is not.
-5. **Should `mt` require the node to be out of IBD before trusting `gettxout`?**
-   §8.5's refusal cannot currently distinguish "spent" from "this node does not
-   know yet", and routing a tired operator around a false refusal is its own
-   hazard.
+3. ~~Is UR worth its 37.5% expansion?~~ **CLOSED — UR IS DROPPED ENTIRELY**,
+   operator ruling 2026-08-23: *"I don't think UR wrapper complexity is worth
+   it."* See §3. What remains open is narrower and is folded into §10.1's test
+   plate: **raw binary (QR byte mode, 100%) versus base45 (RFC 9285,
+   alphanumeric, 97%)** for the symbol payload. Three percent apart, so the
+   decider is not size but whether a scanner mangles arbitrary bytes.
+
+4. **The legend's FROM and TO fields — RULED, with one thing still open.**
+   Operator ruling 2026-08-23: *"we use walletid or seed fp for the from: field
+   and to: field. Optional but loudly warn if either not supplied."*
+
+   So both fields are **wallet identities**, not addresses:
+
+   - **FROM** — the source wallet's id, or the seed fingerprint. This is what
+     §6 says a transaction cannot tell you on its own.
+   - **TO** — likewise, when the destination is a known wallet. **This is a
+     better answer to R0 round 1's R-14 than the field it replaces**: §5's old
+     `TO <truncated addr>` showed *one* output, truncated, so a transaction with
+     change named one destination and silently omitted the rest, and the shown
+     address could not be checked by eye. A wallet identity names the
+     counterparty rather than one of its scripts.
+   - **Both optional, both loudly warned when absent** — on `stderr`, per §3b's
+     stream convention. A plate with no FROM is legal and is worse, and the
+     operator hears about it before cutting.
+
+   **Still open: `mt` cannot derive either field from the transaction**, so both
+   arrive as operator input, and nothing yet specifies that input — an md1 card?
+   an mk1 card? a bare fingerprint on the command line? That is part of §10.10's
+   unspecified CLI surface, and §5's stub derivation (`derive_stub_from_md1_card`)
+   presumes a card that nothing supplies. **Also unresolved: what the TO field
+   says when the destination is NOT a known wallet**, which is the ordinary case
+   for paying a third party.
+
+   Unchanged: the stub is a hint, never an authority — nothing branches on it,
+   and if it disagrees with the transaction, the transaction wins (§5).
+
+5. ~~Should `mt` require the node to be out of IBD before trusting
+   `gettxout`?~~ **CLOSED — OUT OF SCOPE**, operator ruling 2026-08-23. `mt`
+   asks the node it is given and reports what it is told; vouching for the
+   node's sync state is not `mt`'s job. §8.5's refusal stands as written, and
+   §6a already records that a `null` cannot distinguish "spent" from "this node
+   does not know yet".
+
 6. ~~How much fountain redundancy?~~ **CLOSED**, operator ruling 2026-08-23:
    zero. `mt` protects against plate damage (ECC), not plate loss (duplicate
    plates, the operator's choice). See §3.
-7. **Would back-side engraving recover the 25.5 mm?** It would restore ECC levels
-   and reduce plate counts. But there is **no back-side path in the fork**:
-   `backup/backup.go:247` defines `frontSideSeed`, called once at
-   `backup/backup.go:134`, and there is a single `Engraving` per plate with
-   nothing that engraves a reverse. Firmware work, not a free option.
+7. **Back-side engraving — CLOSED for v0.1**, operator ruling 2026-08-23:
+   *"yes, but probably better left to user to manage physically."* It would
+   recover the 25.5 mm the legend costs and reduce plate counts, but there is no
+   back-side path in the fork (`backup/backup.go:247` defines `frontSideSeed`,
+   called once at `:134`, with a single `Engraving` per plate), so it is
+   firmware work. An operator who wants both sides used can flip the plate and
+   run a second job — a physical workflow rather than a `mt` feature. §4's plate
+   counts therefore stand as one-sided.
+
 8. ~~How does a recoverer learn the fountain parameters?~~ **ANSWERED, and the
    operator has ruled on what follows from it.**
 
@@ -973,37 +1032,75 @@ signed PSBT.
     theirs. See §3b. The 64-chunk ceiling is unaffected — that is a property of
     the codec, not of anyone's plate.
 
-12. **Should `mt1` FILL its chunks rather than balance them?** `md-codec` sizes
-    every chunk by a flat 320-bit budget (`md-codec/src/chunk.rs:224,253-254`) = 40 payload
-    bytes, giving the 2,560 B ceiling in §3b. codex32 long form could carry 363
-    payload bits per chunk if filled, which would raise the ceiling to ~2,904 B
-    — enough to matter, though **not** enough to bring RCW `wsh` tier 1 at 5
-    inputs (89 chunks) under it. Filling diverges from the chunker every other
-    constellation format uses, and **the Rust-primary rule means any such change
-    lands in the Rust codec first, with test vectors.** R0 round 1 (S-1) also
-    reports that a byte-granular filling chunker reusing the same reassembler
-    tops out at 2,880 B rather than 2,904 — unverified by me, and worth
-    resolving before this is decided.
-13. **Does `mt1` reuse the `md1` chunk header verbatim, or need its own?** §3b
-    assumes the existing string layer takes a new payload type cleanly. That is
-    an assumption about `md-codec`'s header (37 header bits, chunk-set id,
-    ordering) and has not been checked against a transaction-shaped payload.
+12. ~~Should `mt1` FILL its chunks rather than balance them?~~ **CLOSED — NO.
+    Filling would reduce error recoverability, which is the one thing this
+    format exists for.** Operator question 2026-08-23: *"does increased packing
+    reduce error recoverability?"* Answered from source, and the answer is yes,
+    by two independent mechanisms:
+
+    **BCH correction is PER CHUNK, and it is `t = 4`.** `decode_regular_errors`
+    returns `None` for any pattern above *"t = 4 errors"*, against a 13-symbol
+    checksum (`REGULAR_CHECKSUM_SYMBOLS`) over a codeword of at most 93 symbols
+    (`md-codec/src/bch_decode.rs`). Each chunk therefore carries its **own
+    independent 4-error budget**.
+
+    1. **Fewer chunks means less total correction.** For a fixed payload,
+       filling packs the same bytes into ~12% fewer chunks — and the budget
+       scales with chunk *count*. A 535 B transaction balanced at 40 B/chunk is
+       14 chunks = **56 correctable symbol errors**; filled at ~45 B/chunk it is
+       12 chunks = **48**. Same data, 8 fewer errors survivable.
+    2. **Each chunk is longer under the same `t`.** Filling raises the symbols
+       at risk per chunk while the per-chunk budget stays at 4, so the
+       probability that any single chunk exceeds its budget rises.
+
+    Both effects push the same way. **Balancing is not a limitation of `md`'s
+    chunker — it is error-correction budget bought with plate area**, and for a
+    hand-engraved artifact whose entire purpose is surviving a miscut character,
+    trading it for ~340 bytes of ceiling is the wrong trade. The 2,560 B ceiling
+    stands, and §8.7b refuses past it.
+
+13. **`mt1` needs its own encoding and its own NUMS constant.** Operator
+    ruling 2026-08-23: *"we might need a new encoding… and a new nums thingy."*
+    Confirmed by R0 round 1 (S-2), which read `md-codec` directly: the header
+    *layout*, ordering, gap-detection and missing-chunk checks are genuinely
+    payload-agnostic and take a transaction cleanly — but three things do not
+    transfer:
+
+    - **`MD_REGULAR_CONST` is hardcoded** into checksum create and verify
+      (`md-codec/src/bch.rs`), and the constellation's convention is a
+      per-format NUMS constant plus its own HRP. **`mt1` has neither specified.**
+      Two formats sharing a constant means a chunk of one can verify as a chunk
+      of the other.
+    - **The HRP is hardcoded at four sites.**
+    - **`derive_chunk_set_id` hashes a descriptor**, and reassembly re-derives
+      it from the decoded object as what the source calls *"the content-id
+      oracle; funds-load-bearing invariant"*. `mt1` has no analogue, so it would
+      inherit a 20-bit set id **without the check that makes it safe**.
+
+    So this is design work, not a compatibility check: a `mt1` domain string, a
+    NUMS constant, and a content-id derivation over a transaction. **The
+    Rust-primary rule binds** — it lands in the Rust codec with test vectors
+    first. **Blocks implementation of `mt string`, and now of `mt qr` too**,
+    since §3 made the chunk header the fragmentation for both verbs.
+
 14. **§5's legend budget rests on a doc comment, not on the fork's font
-    metrics.** `legend.rs` hardcodes `CHARS_PER_LINE = 35.0` /
-    `LINES_FULL_PLATE = 20.0` "per `crates/me-cli/src/lib.rs:46`"; the fork's real ladder has six
-    rungs and those two values are the 3.8 mm one. §4's 4.25 mm pitch is `85/20`
-    — full plate height, where §4 uses 79 mm everywhere else — and is not a rung
-    of `FontSizes`. Small in magnitude, but §4's plate table and §5's 6-line
-    reservation both stand on it. **Re-derive both from `CharsPerLine` /
-    `LinesPerPlate` and regenerate §4's table if they move.**
+    metrics. DEFERRED** by operator ruling 2026-08-23. `legend.rs` hardcodes
+    `CHARS_PER_LINE = 35.0` / `LINES_FULL_PLATE = 20.0` per a doc comment at
+    `crates/me-cli/src/lib.rs:46`; the fork's real ladder has six rungs and
+    those are the 3.8 mm one. §4's 4.25 mm pitch is `85/20` — full plate height,
+    where §4 uses 79 mm elsewhere — and is not a rung of `FontSizes`. Magnitude
+    is under a millimetre. **Deferred, not closed:** §4's table must be
+    regenerated before implementation anyway, for the three unmodelled inputs
+    named there, and this correction rides along with that regeneration.
 
+15. ~~§8.4 sets no minimum timelock horizon, and cannot tell a timelock from
+    RBF signalling.~~ **CLOSED — OUT OF SCOPE**, operator ruling 2026-08-23:
+    *"not our concern. User handles this by their own wallet, or we later create
+    our own wallet utilities."* Consistent with §0: `mt` does not build
+    transactions, so how long a timelock ought to be is a wallet decision. `mt`
+    still verifies that the timelock it was handed is **enforced** (§8.4) — it
+    simply does not judge whether the horizon is wise.
 
-15. **§8.4 sets no minimum timelock horizon, and cannot tell a timelock from
-    RBF signalling.** A locktime one block out satisfies `--timelocked`; and the
-    `nSequence != 0xFFFFFFFF` condition is met by ordinary RBF signalling
-    (`0xFFFFFFFD`), so it proves the locktime is *enforced*, not that a timelock
-    was intended. Should `mt` require a minimum horizon, and should it say
-    anything when the only non-final sequence looks like RBF?
 16. **Should `mt` refuse legacy (non-segwit) inputs at all?** The previous
     draft's rule did, on a false premise (§8.6's correction: `non_witness_utxo`
     binds a legacy amount by txid). With the premise gone the refusal needs a
