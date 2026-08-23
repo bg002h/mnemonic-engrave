@@ -92,9 +92,39 @@ warnings on stderr.
 > by ruling (§3b) — so no `BEARER` line, no `FROM`/`TO`, no locktime line
 > reaches the steel unless the operator puts it there.
 >
-> **`mt encode` therefore PRINTS the suggested legend text on `stderr`** — the
-> same five fields §5 specifies — as text the operator may engrave beside the
-> string. `mt` does not control the layout and does not withhold the words.
+> **`mt encode` therefore PRINTS suggested legend text on `stderr`**, which the
+> operator may engrave beside their strings. `mt` does not control the layout
+> and does not withhold the words.
+>
+> **It is NOT §5's five fields, and an earlier version of this section said it
+> was — U-5.** §5's set was designed for a `mt qr` plate, where every symbol
+> sits beside one legend. Hand-engraved strings split the text in two:
+>
+> | printed | text |
+> | --- | --- |
+> | **once** | `BEARER…`, `FROM`, `TO`, `LOCKED TO BLOCK n ~SEASON year` |
+> | **per string** | `n/m` — string `n` of `m`, which `mt` knows exactly |
+>
+> **`PLATE n OF m` is dropped, because `mt` cannot compute `m`.** §3b rules that
+> how many plates you use is the operator's decision, so the denominator would
+> be invented — and **`PLATE 1 OF 1` cut onto each of five plates is a false
+> completeness claim on permanent steel**, read by someone who then stops
+> looking for the other four.
+>
+> **`STRING n OF m` is strictly better anyway**, not merely computable: it names
+> which *data unit* is missing rather than which plate, and it survives any
+> layout — three strings per plate, one per plate, all of them on one.
+>
+> **Set membership needs no legend field at all.** The header packs its
+> invariant fields first — `version(4) + chunked(1) + chunk_set_id(20) +
+> count(12)` — so bits 0–36 are identical across a set, and at 5 bits per symbol
+> **the first 7 characters after `mt1` are the same on every string in it**.
+> Verified on real `md1` output, where four chunks of one wallet all read
+> `md1fveszps…`. A recoverer groups plates **by eye, without decoding**, so
+> `mt encode` prints the shared prefix once and tells them the rule:
+>
+>     All 14 strings begin `mt1qzrf8x`. Strings sharing that prefix belong
+>     to this transaction; strings that do not, do not.
 
 ## 1. The operator's decisions, recorded
 
@@ -176,7 +206,45 @@ overturned an earlier assumption and are marked.
 
    **`inspect` reports what is IN the artifact**: chunk count and indices, the
    set id, and the decoded transaction's own facts — outputs, fee, locktime,
-   per-input value provenance.
+   per-input value provenance, and **plate liveness** (below).
+
+   **`inspect` consults the local node automatically when one is reachable.**
+   Operator ruling 2026-08-23, matching §6a's *"the operator is asked for
+   nothing"*. This is what lets `inspect` produce its full report **from an
+   `mt1` string alone** — the decoded transaction carries its inputs' outpoints
+   but not their values, so without a node the fee and provenance rows are
+   simply unavailable. With one, `gettxout` supplies both.
+
+   > That repairs §1's claim rather than weakening it: *"the operator and the
+   > 2040 recoverer see the same output"* holds whenever the recoverer has a
+   > node, and when they do not, `inspect` **names the rows it could not
+   > produce** exactly as §6a enumerates its skipped checks. Third use of the
+   > same pattern — the node rescues a raw-transaction payload (§8.2e), the node
+   > answers unspentness (§8.5), the node completes this report.
+
+   **PLATE LIVENESS is its own row, and it has FOUR states, not two.** Operator
+   ruling 2026-08-23: *"a transaction may be invalid because its input has been
+   spent, which is different than its input hasn't been broadcast yet."* Those
+   are opposite situations for a recoverer and `gettxout` alone conflates them —
+   it returns a bare `null` for both.
+
+   | state | how `mt` knows | what the recoverer does |
+   | --- | --- | --- |
+   | **LIVE** | `gettxout` returns a value | broadcast it |
+   | **DEAD** | `null`, **and** `getrawtransaction` finds the parent | the input was spent by someone else. **The plate is scrap** |
+   | **PENDING** | `null`, **and** the parent is not found | the parent transaction was never confirmed. **The plate may still become live** — find out what happened to the parent |
+   | **UNKNOWN** | `null`, and no `-txindex` | `mt` cannot distinguish DEAD from PENDING and says so |
+
+   **The parent lookup needs `-txindex`**, which most nodes do not run:
+   `getrawtransaction` *"only returns a transaction if it is in the mempool. If
+   `-txindex` is enabled"* it resolves any confirmed transaction. So `mt` uses
+   the index when it is there and **reports UNKNOWN rather than guessing** when
+   it is not — never printing DEAD on evidence that cannot distinguish it from
+   PENDING.
+
+   > **Telling a recoverer their plate is scrap when it is merely early is the
+   > worst error available here**, because it is the one that gets a live plate
+   > thrown away.
 
    **`inspect` OWNS the report; `encode` CALLS it.** Operator ruling
    2026-08-23. `encode` does not compose its own version of §10.10's report — it
