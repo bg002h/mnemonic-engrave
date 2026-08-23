@@ -463,7 +463,7 @@ fields, **130 characters**, 6 lines — measured,
 | --- | --- | --- |
 | `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
 | `FROM WALLET <8 hex>` | 20 | wallet id or seed fingerprint. The transaction does **not** say what it spends *from* (§6). **Optional — loudly warned when absent** (§10.4) |
-| `LOCKED TO BLOCK <n>` | 23 | the single most actionable fact. Reads **`NO BLOCK TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
+| `LOCKED TO BLOCK <n>` / `LOCKED UNTIL <t>` | 23 | the single most actionable fact. Reads **`NO BLOCK TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
 | `TO <wallet id, fp or label>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when blank.** A free-text label is allowed **only behind an explicit flag**, since nothing can check it against the transaction |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
@@ -634,7 +634,7 @@ mitigation, the row says so instead of inventing one.
 | **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed by `mt`, and is NOT on the plate.** `mt` warns below 10 sat/vB (§8.2b) and names two things a future holder can try, guaranteeing neither: **CPFP** — spending one of this transaction's outputs with a high-fee child, which needs no key from the original signer, unlike **RBF**, which requires signing a replacement and is therefore useless to a plate holder — and **out-of-band submission** straight to a miner, which bypasses relay policy and is the escape hatch when a fee is too low for the parent to reach a mempool at all | Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving. A holder in 2040 recovers the fee by decoding **only for `mt qr`**, whose PSBT payload carries the input amounts; an `mt string` plate carries a raw transaction, from which the fee is **not** recoverable without the prevouts |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
 | **Non-`ALL` sighash** — an input signed with `SIGHASH_NONE` or `SIGHASH_SINGLE` leaves outputs unbound, so a plate-holder can redirect the funds and the `TO` line becomes a lie | refused at encode time, §8.6 — **structurally**, since §8.2's removal left no script engine |
-| **Wrong input value** — a legacy input whose claimed value is wrong yields a valid transaction, and **the fee absorbs the entire difference** | **not detectable by `mt`.** §8.2's removal means no signature is verified, and a legacy sighash never committed to the amount anyway. Mitigated only by §8.2c's warning — which states the arithmetic, `(real input value) − (output total)`, since the output total is the one term `mt` knows for certain — plus the engraved out-of-band reminder |
+| **Wrong input value** — a legacy input whose claimed value is wrong yields a valid transaction, and **the fee absorbs the entire difference** | **not detectable by `mt`.** §8.2's removal means no signature is verified, and a legacy sighash never committed to the amount anyway. Mitigated only by §8.2c's `stderr` warning, which states the arithmetic `(real input value) − (output total)` since the output total is the one term `mt` knows for certain. **Nothing reaches the steel for `mt qr`** — §5's legend is full (§8.2c). An `mt string` operator controls their own plate and may add a reminder; `mt qr`'s operator cannot |
 | **Well-formed but INVALID** — a transaction with a bad signature engraves cleanly and fails at broadcast, years later | **accepted, not mitigated.** Operator ruling 2026-08-23 removed script verification from v0.1 (§8.2). §8.1 sees a witness, §8.2b sees balanced values, §8.6 sees correct sighash flags — none of them verifies the signature. `mt` may add this someday |
 
 > The last two rows are the honest state of this design. R0 lens 2 found that the
@@ -745,14 +745,25 @@ exactly as permanent, as a machine-engraved one.
        You have told mt it holds:  1.00000000 BTC
        So mt shows a fee of:       0.01000000 BTC
 
-       mt CANNOT VERIFY THAT VALUE. A legacy signature does not commit to the
-       input's amount, so a wrong value still produces a perfectly valid
-       transaction -- and the fee absorbs the entire difference. If that input
-       actually holds 10 BTC, this transaction pays 9.01 BTC in fees and a
-       miner will simply take it.
+       NOTHING HAS VERIFIED THAT VALUE. This input carries no
+       non_witness_utxo, so mt could not bind it by txid (see 8.2d), and a
+       legacy signature does not commit to the amount either. A wrong value
+       still produces a perfectly valid transaction -- and the fee absorbs the
+       entire difference. If that input actually holds 10 BTC, this transaction
+       pays 9.01 BTC in fees and a miner will simply take it.
 
-       Verify the input value out of band, and engrave a reminder to re-check
-       it before broadcasting.
+       Verify the input value out of band before you cut this plate.
+
+   > **`mt` CANNOT put that reminder on a `mt qr` plate, and an earlier draft
+   > said it could — R2 lens 2 (S-3), the third recurrence of this class in this
+   > artifact.** §7 named *"the engraved out-of-band reminder"* as the
+   > mitigation, and §5's legend has **no such field**: it is five fields over
+   > six lines, sized into §4's reservation, with no room for a sixth. So the
+   > instruction only lands where the operator controls the plate — **`mt
+   > string`**, whose layout is theirs by ruling (§3b). For **`mt qr`** the
+   > legend is `mt`-controlled and full, so the warning reaches the operator on
+   > `stderr` **before** they cut and nothing reaches the steel. §7 records that
+   > asymmetry rather than claiming a mitigation `mt qr` does not have.
 
    **The output total is the anchor and `mt` knows it with certainty** — it is in
    the transaction. Everything uncertain sits on the other side of the
@@ -827,18 +838,38 @@ exactly as permanent, as a machine-engraved one.
    | `nSequence`, per input | transaction field | **yes** |
    | current block height | `bitcoind` if reachable, else absent | yes when present |
 
-   **The rule:**
+   **`nLockTime` IS NOT ALWAYS A BLOCK HEIGHT, and an earlier version of this
+   section assumed it was.** Verified against source:
+   `LOCK_TIME_THRESHOLD: u32 = 500_000_000`. Below that value `nLockTime` is a
+   **block height**; at or above it, a **Unix timestamp**. `mt` branches on the
+   threshold before it compares anything or engraves anything.
 
-**`mt` states the two facts and stops.** Operator ruling 2026-08-23:
+   > **Two failures came from the missing branch — R2 lens 2 (S-4).**
+   >
+   > 1. **A permanent falsehood on steel.** A transaction with
+   >    `nLockTime = 1800000000` would have engraved `LOCKED TO BLOCK
+   >    1800000000` — a block number some thirty thousand years out, for a plate
+   >    that actually unlocks in 2027. A holder could reasonably read that as
+   >    "never" and discard it.
+   > 2. **False reassurance, which this section had CLAIMED to close.**
+   >    Comparing a *timestamp* against a *height* makes every timestamp look
+   >    enormously distant, so `mt` would stay silent about a plate whose
+   >    time-lock has **already passed** and which is spendable today. §8.4
+   >    asserted that the `nSequence` rule closed false reassurance; this was a
+   >    second road to it, needing no script read.
+
+   **`mt` states the two facts and stops.** Operator ruling 2026-08-23:
    *"'may be immediately spendable' is accurate but incomplete. Just say whether
    the transaction is locked to block x and current height is y."*
 
-   So the `stderr` report is a statement of what was read, not a verdict:
+   So the `stderr` report is a statement of what was read, not a verdict — with
+   the units named, never mixed:
 
-       LOCKED TO BLOCK 1383520   current height 963663
-       NO BLOCK TIMELOCK         current height 963663
+       LOCKED TO BLOCK 1383520          current height 963663
+       LOCKED UNTIL 2027-03-14T00:00Z   current MTP 2026-08-23T03:00Z
+       NO TIMELOCK                      current height 963663
        nLockTime 900000 present but NOT ENFORCED (all inputs final)
-       LOCKED TO BLOCK 900000    current height unknown (no node)
+       LOCKED TO BLOCK 900000           current height unknown (no node)
 
    **Why facts beat a verdict here.** *"May be immediately spendable"* is true of
    almost any transaction and tells the operator nothing they can act on — it
@@ -849,9 +880,15 @@ exactly as permanent, as a machine-engraved one.
    whereas *"spendable"* is a claim about a transaction's fate that depends on
    scripts, fees and unspent inputs — none of which `mt` evaluates.
 
-   - **Legend:** `LOCKED TO BLOCK <n>`, or `NO BLOCK TIMELOCK`.
-   - **Height comes from `bitcoind` when reachable**, and is reported as unknown
-     otherwise. This is the whole of `mt`'s use of the chain here — it never
+   - **Legend:** `LOCKED TO BLOCK <n>` for a height, **`LOCKED UNTIL <time>`**
+     for a timestamp, or `NO TIMELOCK`. **A timestamp is never presented as a
+     height.**
+   - **Compare like with like:** a height against the chain height, a timestamp
+     against the chain's **median-time-past** — which §6a's node already
+     reports, and which is the monotonic, consensus-enforced figure rather than
+     the loosely-constrained header stamp.
+   - **Height or MTP comes from `bitcoind` when reachable**, and is reported as
+     unknown otherwise. This is the whole of `mt`'s use of the chain here — it never
      hands the transaction to the node for validation.
    - **A lock that has already passed is reported the same way**, because the
      two numbers say so: `LOCKED TO BLOCK 900000, current height 963663` is a
@@ -912,8 +949,20 @@ exactly as permanent, as a machine-engraved one.
       So the rule is over the **satisfaction**, not the signature: every input
       must carry at least one signature, and every signature must be (a)-clean.
 
+      > **BOTH SPENDING STRUCTURES, not just the witness — R2 lens 2 (S-1).**
+      > An earlier version of this refusal named only the **witness**, written
+      > when legacy inputs were refused. §10.16 now **accepts** them, and a
+      > legacy input's signature lives in the **`scriptSig`**, which that
+      > wording never examined — while §8.1 admits such an input by disjunction
+      > (*"a non-empty `scriptSig` **or** a non-empty witness"*). So a
+      > `SIGHASH_NONE` **legacy** input would have passed every refusal here
+      > with its outputs unbound, making §7's *"refused at encode time"* false
+      > and the plate redirectable by any holder. `mt` inspects **`scriptSig`
+      > and witness alike**, applying (a) and (b) to whichever carries the
+      > satisfaction.
+      >
       > **Limited by §8.2's removal.** Without a script engine `mt` inspects the
-      > witness **structurally** — it can tell that a stack element is
+      > spending structure **structurally** — it can tell that a stack element is
       > *shaped* like a signature (a 64-byte Schnorr element, or a DER-encoded
       > ECDSA one with a trailing sighash byte), but not that the script it
       > satisfies actually **requires** one. A crafted witness carrying a
@@ -940,7 +989,7 @@ exactly as permanent, as a machine-engraved one.
    and what would fit.
 7b. **Over the 64-chunk container (`mt string`)** → refuse, naming the chunk
    count and the ceiling, and pointing at `mt qr`, which has no such limit. Real
-   wallets hit this: RCW `wsh` tier 1 at 5 inputs needs 78 chunks (§3b).
+   wallets hit this: RCW `wsh` tier 1 at 5 inputs needs **89** chunks (§3b).
 8. **Module size is the operator's choice, defaulting to 0.60 mm** — not a
    refusal. Ruling 2026-08-23 (§10.1): `mt` offers every size it can engrave and
    suggests 0.60 mm (two engraved strokes). Sizes below that are **optically
