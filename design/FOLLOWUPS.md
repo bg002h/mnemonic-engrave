@@ -9717,6 +9717,48 @@ problem this follow-up exists to remove. **Recommend measuring both against a
 real scanner on a real engraved plate**, together with the 0.3/0.45/0.6/0.9 mm
 module test above — same test plate, same cycle.
 
+#### What codex32 wrapping actually costs — whole plates, and a hard wall
+
+The 9% figure above is per CHARACTER and understates the practical cost, because
+a payload has to fit a whole number of discrete symbols. Measured on real
+multisig PSBTs, 1-in/1-out, into v26 ECC L QRs
+(`RESULTS_psbt_qr_multisig_2026-08-22.txt`):
+
+| wallet | PSBT | codex32 chars | codex32 chunks | raw -> QRs | codex32 -> QRs |
+| --- | --- | --- | --- | --- | --- |
+| 3-of-5 `wsh` | 647 B | 1,440 | 15 | **1** | 1 |
+| 3-of-5 `tr` | 950 B | 2,016 | 21 | **1** | **2** |
+| 9-of-11 `wsh` | 1,237 B | 2,688 | 28 | **1** | **2** |
+| 9-of-11 `tr` | 1,732 B | 3,744 | 39 | 2 | 2 |
+
+**Wrapping doubles the QR count in half these cases**, and one QR is one plate.
+A 9% density loss becomes a 100% plate loss at the threshold.
+
+**And codex32 hits a wall the raw form does not.** The chunk counts are also the
+engraved-TEXT cost, at one plate per string today: 15-39 plates, 5-14 hours, for
+artifacts that fit on ONE plate as a raw QR. Worse, 9-of-11 `tr` is already 39
+chunks at 1-in/1-out; add a change output (3,293 B) and it needs **73 chunks —
+over the codex32 wire format's 64-chunk hard cap**, so it is unencodable at any
+plate count. The raw QR takes 3 symbols on one plate.
+
+#### Signed transactions are the smaller artifact, and the gap is wrapper-shaped
+
+Same wallets, 1-in/1-out sweep:
+
+| wallet | unsigned PSBT | signed tx | signed as % of PSBT |
+| --- | --- | --- | --- |
+| 3-of-5 `wsh` | 647 B | 488 B | 75% |
+| 3-of-5 `tr` | 950 B | 501 B | **53%** |
+| 9-of-11 `wsh` | 1,237 B | 1,130 B | 91% |
+| 9-of-11 `tr` | 1,732 B | 1,097 B | **63%** |
+
+Taproot is the EXPENSIVE wrapper for a PSBT and the CHEAP one for a spend: the
+PSBT carries `tap_key_origins` and leaf data for every key, while the spend
+reveals one leaf. `wsh` is the reverse. So "which wrapper is bigger" has no
+answer independent of which artifact is being stored — worth stating in the spec,
+since `mt`'s scope is signed transactions only and the intuition from PSBT work
+points the wrong way.
+
 **Measurement caution, recorded because it bit three times.** The encoder does
 optimal MODE SEGMENTATION and will silently re-encode parts of a payload in a
 denser mode. An all-`0x41` payload measured *alphanumeric* capacity while
