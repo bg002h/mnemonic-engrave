@@ -102,7 +102,7 @@ what Sparrow, Keystone, Passport and Specter already read.
 > **CORRECTION.** An earlier draft claimed UR "recovers from any sufficient
 > subset of fragments rather than requiring every one", and used that to answer
 > F-234's per-block Reed-Solomon worry. **That is false as stated.**
-> `fountain.go:242` returns a *singleton* for every `seqNum <= seqLen`:
+> `bc/fountain/fountain.go:242` returns a *singleton* for every `seqNum <= seqLen`:
 >
 >     if seqNum <= uint32(seqLen) { return []int{int(seqNum - 1)} }
 >
@@ -126,7 +126,7 @@ mid-size artifacts and a whole plate on 9-of-11.
 
 **Per-fragment overhead, now measured** (`RESULTS_ur_overhead_2026-08-22.txt`).
 A multi-part fragment is a 5-element CBOR array (`cbor:",toarray"`,
-`fountain.go:73-80`) of SeqNum, SeqLen, MessageLen, Checksum and Data,
+`bc/fountain/fountain.go:74-80`) of SeqNum, SeqLen, MessageLen, Checksum and Data,
 deterministically encoded, then bytewords-encoded and prefixed. Read from the
 fork's source, not the BCR paper:
 
@@ -139,7 +139,7 @@ fork's source, not the BCR paper:
 
 So each fragment costs about **49 characters** of overhead beyond its share of
 the payload. A **single-part** UR skips the fountain wrapper entirely
-(`ur.go:118`) and pays only the prefix and CRC.
+(`bc/ur/ur.go:118`) and pays only the prefix and CRC.
 
 §4's selection now models this exactly — it finds the smallest `seqLen` whose
 fragments each fit a whole symbol, instead of dividing a flat character total.
@@ -222,7 +222,7 @@ fields, 136 characters, 6 lines — measured, `RESULTS_legend_budget_2026-08-22.
 
 The first draft listed ten fields and measured **474 characters at one input**,
 growing 148 per input to 1,066 at five — against a 300-character budget
-(`me-cli/src/lib.rs:48`). It could never have fitted.
+(`crates/me-cli/src/lib.rs:48`). It could never have fitted.
 
 Four fields were cut on one principle: **everything derivable from the decoded
 transaction is duplication.** The txid, the input outpoints and the full
@@ -247,10 +247,13 @@ recoverer without one cannot use them.
 **The stub is a hint, never an authority.** It is the top 4 bytes of a canonical
 md1 identity, form-aware — WalletPolicyId for a keyed wallet, the key-stable
 WalletDescriptorTemplateId for a keyless template — reusing `mk1`'s existing
-derivation (`POLICY_ID_STUB_BYTES = 4`, `mk-codec/src/key_card.rs:24-32`,
-`derive_stub_from_md1`), so one convention spans the constellation. If the
-legend says wallet X and the transaction spends wallet Y's UTXOs, **the
-transaction wins.** The stub exists to help a human find the right plates, not
+derivation — all three citations below are in the **`mnemonic-key` repo**, not
+this one, so `plan-cite-check.sh` cannot resolve them and they were checked by
+hand: `POLICY_ID_STUB_BYTES = 4` at `mk-codec/src/consts.rs:60`, the form-aware
+rule documented at `mk-codec/src/key_card.rs:25-33`, and the derivation
+`derive_stub_from_md1_card` at `mk-cli/src/cmd/mod.rs:126`. So one convention
+spans the constellation. If the legend says wallet X and the transaction spends
+wallet Y's UTXOs, **the transaction wins.** The stub exists to help a human find the right plates, not
 to validate anything, and nothing may branch on it.
 
 ## 6. Why provenance is asymmetric
@@ -517,7 +520,8 @@ folding them in would make `mt` a wallet.
    question in this spec**, trading directly against §4's plate counts.
 7. **Would back-side engraving recover the 25.5 mm?** It would restore the ECC
    levels and halve the plate counts the legend now costs. But there is **no
-   back-side path in the fork**: `backup.go:161` is named `frontSideSeed`, which
+   back-side path in the fork**: `backup/backup.go:247` defines `frontSideSeed`, called once at
+   `backup/backup.go:134`, which
    implies one, yet there is a single `Engraving` per plate and nothing that
    engraves a reverse. This is firmware work, not a free option — but it is the
    single highest-value change to these numbers, so cost it before accepting the
