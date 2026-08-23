@@ -159,12 +159,28 @@ follow the pubkey order in the script. For the RCW the finalizer must also
 decide **which of four tiers** is being satisfied, which is why `rcw.rs`
 withholds keys per scenario and why `finalize_mut` can fail outright.
 
-> **A hazard this envelope CREATES, recorded because the compliance fix is what
-> introduced it.** A raw transaction cannot represent an unsigned one: if it
-> serializes with witnesses, it is finished, and the format makes the mistake
-> impossible. A PSBT can represent all three states above. So "is it finalized?"
-> moves from a property physics enforced to a check `mt` must perform and must
-> never skip. §8.1 is that check, and it is why §8.1 is stated first.
+> **RETRACTION — an earlier version of this box was wrong, and it was
+> load-bearing.** It claimed: *"A raw transaction cannot represent an unsigned
+> one: if it serializes with witnesses, it is finished, and the format makes the
+> mistake impossible."* **False.** An unsigned transaction has empty
+> `scriptSig`s and no witness marker, which is a perfectly legal serialization.
+> Verified against a live node: `createrawtransaction` returns
+> `0200000001…0000000000fdffffff01a086…` — a complete transaction, empty
+> `scriptSig`, no witness, with a valid txid.
+>
+> So the finalization hazard was **never** created by the PSBT envelope; it
+> exists for both payloads and always did. That matters twice over. First, the
+> retracted claim was used to justify writing §8.1 and §8.2 in **PSBT
+> vocabulary** — `PSBT_IN_FINAL_SCRIPTWITNESS` and UTXO records — which left
+> **`mt string`, whose payload is a raw transaction, with no expressed
+> finalization check at all**. Second, it is the reason §8.1 was described as
+> "merely illegal" rather than "impossible": the correct statement is that it
+> was always merely illegal.
+>
+> `mt` must check finalization on **both** payloads, by their own vocabulary:
+> for a PSBT, every input carries `PSBT_IN_FINAL_SCRIPTSIG` or
+> `PSBT_IN_FINAL_SCRIPTWITNESS`; for a raw transaction, every input carries a
+> non-empty `scriptSig` **or** a non-empty witness. §8.1 states both.
 
 **What the payload is, exactly — the MIN form.** Measured in
 `RESULTS_psbt_envelope_2026-08-23.txt`, three forms of a finalized PSBT, each
@@ -451,7 +467,7 @@ fields, 136 characters, 6 lines — measured,
 | `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
 | `FROM WALLET <8 hex>` | 20 | the 4-byte policy-id stub. The transaction does **not** say what it spends *from* (§6) |
 | `SPENDABLE AFTER BLOCK <n>` | 29 | the single most actionable fact: whether this plate is live yet. Reads `IMMEDIATELY SPENDABLE` when the operator chose that (§8.4) |
-| `TO <truncated addr>  <amount>` | 34 | so a human sees where the money goes without a scanner |
+| `TO <truncated addr>  <amount>` | 34 | so a human sees where the money goes without a scanner. **One output only, and truncated** — see the limit below |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
 > **This budget rests on a DOC COMMENT, not on the fork's font metrics, and the
@@ -478,6 +494,15 @@ fields, 136 characters, 6 lines — measured,
 > so the six rungs above are the fork's committed pins cross-checked against an
 > independent derivation from the source formulas, which is two agreeing
 > derivations and not a run.
+
+> **What the `TO` line does NOT do, stated because §7 leaned on it.** It shows
+> **one** output, **truncated**. A transaction with change has two or more
+> outputs, so the line is silent about the rest, and a truncated address cannot
+> be checked against the decoded transaction by eye. It is an orientation aid —
+> *"this is roughly the plate I meant"* — not a disclosure of where the money
+> goes. Widening it is not available: §5's whole budget is 136 characters and
+> §4's plate table is built on the 6-line reservation. `mt` prints every output
+> in full at encode time instead. R0 round 1 (R-14).
 
 ### What was dropped, and why
 
@@ -593,7 +618,8 @@ mitigation, the row says so instead of inventing one.
 | --- | --- |
 | **Bearer** — holder can broadcast (`mt qr`) | a timelock bounds it in *time*, not in space, and only when §8.4's `nSequence` condition holds; the `BEARER` line is the first line of a legend `mt` controls |
 | **Bearer** — holder can broadcast (`mt string`) | **accepted risk, not mitigated on the plate.** `mt` emits a string, not an engraving, so it has no mechanism to put a warning on hand-cut steel (§3b). It warns once on `stderr` at encode time, to the person encoding — who is not the person holding the plate later. The timelock bound still applies |
-| **Pinned destination** — a 2040 recoverer pays a 2026 address whose keys may be lost | **cannot be fixed**; the `TO` line names the destination so the operator sees what they commit to before cutting |
+| **Pinned destination** — a 2040 recoverer pays a 2026 address whose keys may be lost | **cannot be fixed, and the legend only partly discloses it.** §5's `TO` line is a **single, truncated** address plus one amount. Any transaction with change has two or more outputs, so the line names *one* of them and silently omits the rest; truncation also means the shown address is not verifiable against the decoded transaction by eye. `mt` displays every output in full at encode time — the plate does not |
+| **Indistinguishable from a watch-only plate** — an `mt1` plate sits in the same drawer as `md1` and `mk1` plates, in the same script, differing in **one HRP character**, and is the only one of the three that is spendable by whoever picks it up | for `mt qr` the `BEARER` legend line carries the difference. For `mt string` there is **no mitigation** — see the bearer row above and §3b. R0 round 1 (R-13) |
 | **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed, and is NOT on the plate.** Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving. A holder in 2040 recovers the fee by decoding **only for `mt qr`**, whose PSBT payload carries the input amounts; an `mt string` plate carries a raw transaction, from which the fee is **not** recoverable without the prevouts |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
 | **Non-`ALL` sighash** — an input signed with `SIGHASH_NONE` or `SIGHASH_SINGLE` leaves outputs unbound, so a plate-holder can redirect the funds and the `TO` line becomes a lie | refused at encode time, §8.6 |
@@ -611,12 +637,13 @@ machine-checkable before a single plate is cut. **Every refusal below binds BOTH
 verbs** unless it names one — a hand-engraved plate is exactly as bearer, and
 exactly as permanent, as a machine-engraved one.
 
-1. **Not fully finalized** → refuse. Every input must carry a populated
-   `PSBT_IN_FINAL_SCRIPTSIG` or `PSBT_IN_FINAL_SCRIPTWITNESS`. A PSBT can
-   represent partially-signed and fully-signed-but-unfinalized states (§3), and
-   neither is broadcastable. **The raw-transaction format made this impossible;
-   the PSBT envelope makes it merely illegal, so this check is mandatory and may
-   not be skipped or overridden.**
+1. **Not fully finalized** → refuse, **on both payloads, by their own
+   vocabulary.** For a PSBT: every input carries a populated
+   `PSBT_IN_FINAL_SCRIPTSIG` or `PSBT_IN_FINAL_SCRIPTWITNESS`. For a raw
+   transaction: every input carries a non-empty `scriptSig` **or** a non-empty
+   witness. Neither format makes an unfinalized transaction unrepresentable —
+   §3's retraction — so this check is mandatory on both verbs and may not be
+   skipped or overridden.
 2. **Script-invalid** → refuse. Real libbitcoinconsensus verification: `bitcoin`
    0.32.101 ships the `bitcoinconsensus` feature and `consensus/validation.rs`
    (verified against the crates.io source). The finalized PSBT carries each
@@ -627,6 +654,27 @@ exactly as permanent, as a machine-engraved one.
    refusal is evaluable only while `mt` still holds the PSBT it was handed at
    encode time — never from the engraved artifact alone. A PSBT whose UTXO records are missing
    is refused under (1)'s sibling rule: `mt` requires the MIN form of §3.
+2b. **Value-blind acceptance** → refuse. **§8.2 does not cover this and the
+   previous draft had no check at all.** `verify_transaction` is a per-input
+   *script* loop — read from `bitcoin-0.32.101/src/consensus/validation.rs:82-107`,
+   it iterates `tx.input` calling `verify_script_with_flags` and returns — so it
+   never compares input value against output value. Outputs exceeding inputs,
+   duplicate inputs and an empty `vin` all pass every other refusal here.
+   `mt` must therefore check, at minimum:
+
+   - **inputs ≥ outputs** (`SendingTooMuch`);
+   - **fee within a sane band** — `rust-bitcoin`'s own ceiling is
+     `DEFAULT_MAX_FEE_RATE = 25,000 sat/vB` (`psbt/mod.rs:136`, raised as
+     `AbsurdFeeRate` at `:198-215`), and a fee at the *other* extreme is a plate
+     that will never relay;
+   - **no duplicate outpoints**, and **`vin` non-empty**.
+
+   > **The spec convicts itself here.** §3 rejected the `lean` PSBT form on the
+   > grounds that *"the safe API a recoverer reaches for refuses it"*. That API
+   > is `extract_tx()`, and it refuses on **three** counts — `MissingInputValue`,
+   > `SendingTooMuch` and `AbsurdFeeRate`. §8 adopted the first and ignored the
+   > other two while citing the same API as its standard of care.
+
 3. **An unsigned or unfinalized transaction offered for engraving** → refuse. It
    cannot be broadcast, so it is not a backup.
 4. **Locktime: the operator chooses, and the second choice warns loudly.**
@@ -643,23 +691,82 @@ exactly as permanent, as a machine-engraved one.
    **Verifying "actually timelocked" requires reading `nSequence`, and the
    previous draft never mentioned it.** `nLockTime` is enforced only when at
    least one input has `nSequence != 0xFFFFFFFF`. A transaction with all inputs
-   final ignores its locktime entirely — so a plate could have satisfied the old
-   "required future locktime" rule on paper and been spendable the moment it was
-   cut. Under `--timelocked`, `mt` refuses unless **both** hold: `nLockTime` is
-   in the future, **and** at least one input is non-final. The warning under
-   `--immediate` says *might* be spendable, not *is*, because relay also depends
-   on fee and on the inputs still being unspent.
+   final ignores its locktime entirely — so a plate could have satisfied the
+   original "required future locktime" rule on paper and been spendable the
+   moment it was cut.
+
+   **There are TWO kinds of timelock and an earlier version of this rule saw
+   only one.** R0 round 1 (R-3):
+
+   - **Absolute** (`nLockTime` + `OP_CLTV`): the transaction is invalid before a
+     stated height or time.
+   - **Relative** (BIP-68 `nSequence` + `OP_CSV`): the transaction is invalid
+     until N blocks or N units of time have elapsed **since its input
+     confirmed**. Two of the RCW's taproot leaves are `OP_CLTV`; **one is
+     `OP_CSV`** with `008000` = 32,768 blocks, read from the probe's own leaf
+     dump in `RESULTS_rcw_2026-08-22.txt`.
+
+   A genuinely CSV-locked spend has **`nLockTime = 0`**. An absolute-only rule
+   therefore refuses it as "not timelocked" and routes the operator to
+   `--immediate`, which engraves `IMMEDIATELY SPENDABLE` on a plate that cannot
+   be mined for roughly seven months. The mixed case is worse: it *passes* and
+   the legend prints a height at which the transaction still fails
+   `non-BIP68-final`.
+
+   **So `--timelocked` accepts if EITHER lock is present and unmet**, and
+   refuses only when neither is. And because a relative lock is measured from
+   the input's confirmation, `mt` **cannot compute the unlock height without
+   knowing when each input confirmed**. Where a relative lock is present and
+   `mt` cannot resolve that — no node (§6a), no supplied confirmation data — it
+   **refuses rather than engraving a legend it cannot substantiate.** A
+   `SPENDABLE AFTER BLOCK <n>` that is wrong is worse than no plate.
+
+   Two limits, stated rather than assumed. §8.4 sets **no minimum horizon**: a
+   locktime one block in the future satisfies it, which is a timelock in name
+   only. And the `nSequence != 0xFFFFFFFF` condition is satisfied by ordinary
+   **RBF signalling** (`0xFFFFFFFD`), so it proves the locktime is *enforced*,
+   not that anyone intended a timelock. Both are §10.15.
+
+   The warning under `--immediate` says *might* be spendable, not *is*, because
+   relay also depends on fee and on the inputs still being unspent.
 5. **`gettxout` returns `null` for any input** → refuse, when a node is
    reachable. The output is spent or never existed. See §6a's limitation and
    §10.5 for the IBD case.
-6. **Any input not signed with `SIGHASH_ALL` (or taproot's `SIGHASH_DEFAULT`)**
-   → refuse. R0 lens 2's finding. A `SIGHASH_NONE` input leaves the outputs
-   unbound, so a holder — or anyone who photographs the plate — can redirect the
-   funds while the signature stays valid, and the legend's `TO` line becomes
-   false. `SIGHASH_SINGLE` and `SIGHASH_ANYONECANPAY` are refused on the same
-   grounds. **Additionally, any legacy (non-segwit) input is refused**, because
-   nothing in a legacy sighash commits to the input amount, so the PSBT's UTXO
-   record for it is unverifiable (§6).
+6. **Any input whose satisfaction does not bind the outputs** → refuse. Two
+   cases, and the previous draft caught only the first:
+
+   a. **A signature with a non-`ALL` sighash.** A `SIGHASH_NONE` input leaves
+      the outputs unbound, so a holder — or anyone who photographs the plate —
+      can redirect the funds while the signature stays valid, and the legend's
+      `TO` line becomes false. `SIGHASH_SINGLE` and `SIGHASH_ANYONECANPAY` are
+      refused on the same grounds. Accepted: `SIGHASH_ALL`, and taproot's
+      `SIGHASH_DEFAULT`.
+
+   b. **NO signature at all.** R0 round 1 (R-4). The previous rule was written
+      over *signatures* and silently assumed every input has one. **A miniscript
+      satisfaction need not.** This project's own RCW fixture is the proof: its
+      tier 4 was `after(N) AND sha256(H)` — a timelock and a hash preimage, no
+      key — until commit `d1889e4` added one, and stock rust-miniscript accepted
+      the `wsh` form throughout. An input satisfied by preimage alone commits to
+      **nothing**: any holder can rewrite every output and re-satisfy it. That
+      is strictly worse than the `SIGHASH_NONE` case (a), which at least binds
+      the inputs.
+
+      So the rule is over the **satisfaction**, not the signature: every input
+      must carry at least one signature, and every signature must be (a)-clean.
+
+   > **CORRECTION — the previous draft also refused all legacy (non-segwit)
+   > inputs, and its stated reason was false.** It claimed *"nothing in a legacy
+   > sighash commits to the input amount, so the PSBT's UTXO record for it is
+   > unverifiable."* The first clause is true and the conclusion does not
+   > follow: a legacy input's amount is verified through `non_witness_utxo`,
+   > which carries the **whole previous transaction**, so hashing it and
+   > matching the txid binds the amount without any help from the sighash. That
+   > is exactly the `non_witness_utxo`-versus-`witness_utxo` distinction.
+   >
+   > Whether to refuse legacy inputs anyway is now an **open decision, §10.16**,
+   > not a settled rule with a broken justification. Note also that `sh(wsh(…))`
+   > is unclassified by the current wording.
 7. **Over the plate budget (`mt qr`)** → refuse, naming the exact plate count
    and what would fit.
 7b. **Over the 64-chunk container (`mt string`)** → refuse, naming the chunk
@@ -688,7 +795,6 @@ amounts offline for *construction*, and the amounts now arrive bound inside a
 signed PSBT.
 
 ## 10. Open questions
-
 1. **The F-234 optical test plate has not been cut.** It gates §4's module
    floor, and should test 0.30/0.45/0.60/0.90 mm modules *and*
    raw-vs-base45-vs-UR payloads in one cycle. It should now **also** answer
@@ -778,7 +884,18 @@ signed PSBT.
     reservation both stand on it. **Re-derive both from `CharsPerLine` /
     `LinesPerPlate` and regenerate §4's table if they move.**
 
-## 11. Provenance of the numbers
+
+15. **§8.4 sets no minimum timelock horizon, and cannot tell a timelock from
+    RBF signalling.** A locktime one block out satisfies `--timelocked`; and the
+    `nSequence != 0xFFFFFFFF` condition is met by ordinary RBF signalling
+    (`0xFFFFFFFD`), so it proves the locktime is *enforced*, not that a timelock
+    was intended. Should `mt` require a minimum horizon, and should it say
+    anything when the only non-final sequence looks like RBF?
+16. **Should `mt` refuse legacy (non-segwit) inputs at all?** The previous
+    draft's rule did, on a false premise (§8.6's correction: `non_witness_utxo`
+    binds a legacy amount by txid). With the premise gone the refusal needs a
+    reason or should be dropped. Related: `sh(wsh(…))` is unclassified by §8.6's
+    wording.## 11. Provenance of the numbers
 
 Everything measured is in `design/measurements/`, with the probe sources and a
 reproduce path that is a command rather than a memory. Transaction sizes come
