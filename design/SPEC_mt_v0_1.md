@@ -778,7 +778,12 @@ exactly as permanent, as a machine-engraved one.
 7b. **Over the 64-chunk container (`mt string`)** → refuse, naming the chunk
    count and the ceiling, and pointing at `mt qr`, which has no such limit. Real
    wallets hit this: RCW `wsh` tier 1 at 5 inputs needs 78 chunks (§3b).
-8. **Module below 0.60 mm** → refuse until the F-234 optical test plate exists.
+8. **Module size is the operator's choice, defaulting to 0.60 mm** — not a
+   refusal. Ruling 2026-08-23 (§10.1): `mt` offers every size it can engrave and
+   suggests 0.60 mm (two engraved strokes). Sizes below that are **optically
+   unvalidated**, and `mt` says so at the point of choice rather than refusing.
+   A scan that succeeds today is evidence about one plate on one machine on one
+   day, not a property of the size (§10.1).
 9. **Secrets** → refuse, as `me` already does for `ms1`.
 
 Every refusal names the number that caused it. A refusal that says only "too
@@ -801,19 +806,50 @@ amounts offline for *construction*, and the amounts now arrive bound inside a
 signed PSBT.
 
 ## 10. Open questions
-1. **The F-234 optical test plate has not been cut.** It gates §4's module
-   floor, and should test 0.30/0.45/0.60/0.90 mm modules *and*
-   raw-vs-base45-vs-UR payloads in one cycle. It should now **also** answer
-   items 2 and 3 below — one plate cycle, three answers.
-2. **Will a wallet reassemble multi-part `ur:psbt` from STATIC symbols?** Every
-   wallet that reads multi-part UR does so from an *animated* QR on a screen.
-   `mt` engraves static symbols on separate plates, scanned minutes apart. R0
-   lens 3 found a concrete report of a static multi-part `ur:bytes` QR failing
-   to scan into Sparrow at all. **This is the single most load-bearing unverified
-   assumption in the spec**: if it does not hold, no envelope satisfies F-234 for
-   multi-plate transactions, and the recoverability premise holds only for
-   single-symbol artifacts. Test before relying on it; §3 does not currently
-   claim ecosystem readability for the multi-plate case.
+
+1. **The F-234 optical test plate has not been cut — and the module size is now
+   the USER's choice.** **Operator ruling 2026-08-23: "User picks from all
+   available options, suggesting 0.6."**
+
+   So §8.8's hard refusal below 0.60 mm becomes a **default and a
+   recommendation**, not a floor: `mt` offers every module size it can engrave,
+   suggests 0.60 mm, and the operator decides. The test plate still wants
+   cutting — it is how anyone learns what 0.30 mm actually does on steel — but it
+   no longer gates the tool.
+
+   > **The operator's second point, which generalises past this question:**
+   > *"just because one size engraves and scans today doesn't guarantee in the
+   > future the engraving will scan due to maintenance issues."*
+   >
+   > A successful scan is evidence about **one plate, one machine, one day** —
+   > not a property of the module size. Machine wear, stylus condition, plate
+   > stock and lighting all drift, and the artifact must survive decades of that
+   > drift. This is why a test plate can **license** a size and can never
+   > **certify** it, and it is an independent argument for spending slack on ECC
+   > rather than on smaller modules: error correction is the only margin that
+   > keeps paying after the machine has changed.
+
+2. ~~Will a wallet reassemble multi-part UR from STATIC symbols?~~ **OUT OF
+   SCOPE, operator ruling 2026-08-23: "We will add another verb in the next
+   subversion to accept static scan data."**
+
+   `mt` will ship its own reader rather than depend on third-party wallets
+   stitching engraved symbols together. That retires the spec's most
+   load-bearing unverified assumption by removing the dependency instead of
+   testing it.
+
+   **It also removes the main argument for UR**, and §10.3 turns on this. UR was
+   defended as the only fragmentation the Bitcoin ecosystem implements; if `mt`
+   supplies the reader, the ecosystem is not reassembling anything and that
+   defence is void for every multi-symbol artifact.
+
+   **What it costs, stated plainly:** F-234's promise — that a recoverer with
+   none of our tools can still read the plate — now holds only for artifacts
+   that fit **one** symbol. Multi-symbol recovery requires `mt`'s reader. The
+   next subversion's verb is therefore not a convenience; it is what keeps
+   multi-plate transactions recoverable at all, and it should be specified
+   before anyone engraves a multi-symbol artifact.
+
 3. **Is UR worth its 37.5% expansion for SINGLE-symbol artifacts?** There it
    buys only a type tag, and a PSBT is already self-identifying by its `psbt\xff`
    magic. Measured cost of that tag: one extra plate on RCW `tr` tier 4. Item 1's
@@ -885,21 +921,52 @@ signed PSBT.
 
    Also unchanged: `Progress()` is a `x1.75` UI heuristic that can reach 1.0
    while `Result()` is still nil, so **nothing may gate on `Progress()`**.
-9. **How does the engraving reach the machine, and can the machine engrave what
-   §4 selects?** R0 lens 4 and lens 1 both found this and it is the largest
-   remaining gap: the spec stops at "choose a configuration" and never says how
-   an engraving is produced or conveyed. The fork's only arbitrary-payload QR
-   path is fixed at `freeTextQRScale = 2` (`backup/fit.go:19`) with a
-   compile-time ECC level and one code per plate, and `sysw/record.go` has no
-   transaction class. §4 may be selecting from a space the machine cannot reach.
-   **This blocks implementation and must close before code.**
-10. **There is no CLI surface.** Two verbs (`mt qr`, `mt string`), two flags
-    (`--timelocked` / `--immediate`) and one stream convention are now fixed —
+9. ~~How does the engraving reach the machine?~~ **ANSWERED, operator ruling
+   2026-08-23: "send via payload unencrypted. We have a format for transferring
+   data to SH2 via USB."**
+
+   That format is **`sysw`**, the system-wide payload already used for every
+   other constellation artifact. It is Rust-primary in this repo
+   (`crates/me-cli/src/sysw/`) and ported to the fork (`sysw/record.go`). A
+   payload carries a **`Class`**, and the existing set is `Mnemonic`,
+   `Codex32Secret`, `Passphrase`, `FreeText`, `Descriptor`, `MdMk`, `Address`,
+   `Unknown` (`crates/me-cli/src/sysw/record.rs:31-40`).
+
+   **There is no transaction class**, which is what R0 lens 4 found. Adding one
+   is the work, and **the Rust-primary rule binds**: the new class lands in
+   `me-cli`'s Rust `sysw` first, with test vectors, and only then ports to the
+   fork's Go.
+
+   **Unencrypted, by ruling.** Note `me` has an encrypted-payload path and this
+   deliberately does not use it. The reasoning is consistent with §7: the plate
+   the payload produces is **bearer** and sits in a drawer, so the wire is not
+   where this artifact's secrecy lives. What the ruling does accept is that
+   anyone with access to the USB link sees the transaction before it is cut.
+
+   **Still open underneath this ruling, and it still blocks:** §4 selects an ECC
+   level, a module size and a multi-symbol tiling, and the fork's only
+   arbitrary-payload QR path is fixed at `freeTextQRScale = 2`
+   (`backup/fit.go:19`) with a compile-time ECC level and one code per plate.
+   A `sysw` class says how the bytes *arrive*; it does not make the firmware able
+   to engrave what §4 chose. **That gap is now §10.17.**
+
+10. **The CLI surface, partly ruled.** **Operator ruling 2026-08-23: input via
+    stdin AND file.** So `mt` reads its transaction from a named path or from
+    standard input, and the two are equivalent.
+
+    Fixed so far: two verbs (`mt qr`, `mt string`), two flags (`--timelocked` /
+    `--immediate`), input from stdin or a file, and the stream convention —
     **stdout carries the artifact, stderr carries everything the human must
-    see** (§3b) — but nothing specifies the input convention (file? stdin? PSBT or raw hex or both?), the output
-    convention, or the exit codes — and §8 promises *"every refusal names the
-    number that caused it"*, which is an output contract with no format.
-    **Blocks implementation.**
+    see** (§3b).
+
+    Still unspecified: **which input formats are accepted** (a binary PSBT? a
+    base64 PSBT? raw transaction hex? all three, sniffed?) — this matters more
+    than it looks, because §8.1's finalization check and §8.2's script check are
+    written in *PSBT* vocabulary and a raw transaction supports neither fully
+    (§3's retraction); the output convention; and the exit codes, where §8
+    promises *"every refusal names the number that caused it"* — an output
+    contract with no format. **Still blocks implementation.**
+
 11. ~~How many codex32 characters fit a hand-engraved plate?~~ **CLOSED — OUT
     OF SCOPE**, operator ruling 2026-08-23: *"As many as a user wants. It is not
     our concern."* `mt string` emits a string; what a user does with steel is
@@ -941,7 +1008,13 @@ signed PSBT.
     draft's rule did, on a false premise (§8.6's correction: `non_witness_utxo`
     binds a legacy amount by txid). With the premise gone the refusal needs a
     reason or should be dropped. Related: `sh(wsh(…))` is unclassified by §8.6's
-    wording.## 11. Provenance of the numbers
+    wording.
+17. **Can the firmware engrave what §4 selects?** Split out of §10.9, which the
+    `sysw` ruling answered only halfway. The fork's arbitrary-payload QR path is
+    `freeTextQRScale = 2` (`backup/fit.go:19`) with a compile-time ECC level and
+    one code per plate; §4 chooses module size, ECC level and a multi-symbol
+    tiling. Either the firmware grows to accept those, or §4's search space
+    shrinks to what the machine can do. **Blocks implementation.**## 11. Provenance of the numbers
 
 Everything measured is in `design/measurements/`, with the probe sources and a
 reproduce path that is a command rather than a memory. Transaction sizes come
