@@ -1085,9 +1085,9 @@ against.
 > And that's it."*
 
 `mt encode` prints a warning at encode time that the artifact is **bearer** —
-anyone holding the resulting plate can spend it — and takes no further interest
-in the steel. It does not require a legend, does not reserve space for one, and
-cannot verify that any warning reached the plate.
+anyone holding the resulting plate can broadcast it — and takes no further
+interest in the steel. It does not require a legend, does not reserve space for
+one, and cannot verify that any warning reached the plate.
 
 **On `stderr` specifically, and this is load-bearing rather than incidental.**
 The `mt1` string goes to **stdout**, so the ordinary invocation pipes it to a
@@ -1799,7 +1799,7 @@ exactly as permanent, as a machine-engraved one.
 
          It is now in your shell history and was visible in `ps` while this
          ran. A finalized transaction is BEARER: anyone who reads it can
-         spend it.
+         broadcast it.
 
          Remove it:  history -d 512 && fc -W        # zsh
          Then re-run: mt encode < tx.psbt
