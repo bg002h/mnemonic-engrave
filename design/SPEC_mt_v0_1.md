@@ -109,18 +109,41 @@ overturned an earlier assumption and are marked.
    as a contrast with `mt qr`; with the QR verb deferred (§0a) the contrast is
    gone, and `encode` is what a user who already drives `md` will reach for.
 
-   **`decode` is not optional, and §9 previously implied it was.** §9 records
-   that v0.1 ships no decoder — *"a plate cut by `mt` v0.1 cannot be read back by
-   `mt` v0.1"* — which was stated when the reader was tied to the deferred
-   static-scan verb. A `decode` that reassembles `mt1` chunks back into a
-   transaction needs no scanner and no camera: it takes strings a human typed or
-   pasted. **It is the verb that makes the format falsifiable**, and `md`/`mk`
-   both have it.
+   **`decode` is not optional, and §9 said the opposite until 2026-08-23.** §9
+   claimed v0.1 shipped no decoder, which was written when "reading a plate"
+   meant the deferred static-scan verb. §9 now carries the retraction and the
+   distinction that resolves it: **optical reading stays deferred; reassembling
+   `mt1` strings does not**, because it needs no scanner and no camera. See
+   decision 1a above.
 
    **`verify` and `inspect` follow the siblings**: `verify` checks a string set
    without producing output, `inspect` reports what a set contains — chunk count,
    set id, and for `mt` the transaction's own facts (§10.10's report rows are
    already specified and are exactly what `inspect` should print).
+
+1a. **`mt decode` reads `mt` output, and ships in v0.1.** Operator ruling
+   2026-08-23: *"we need a decode to read mt output."* It takes `mt1` strings —
+   from a file, from stdin, typed or pasted, in any order — and reassembles the
+   transaction.
+
+   **What it must do, and each of these is a property the format already
+   provides rather than new machinery:**
+
+   | step | what makes it possible |
+   | --- | --- |
+   | accept chunks in any order | `index` in every header (§10.13 a2) |
+   | know when the set is complete | `count` in every header |
+   | reject chunks from a different transaction | the 20-bit `chunk_set_id` |
+   | correct a miscut character | BCH, `t = 4` per chunk (§3a) |
+   | **prove the result is the right transaction** | re-derive the content id from the decoded transaction and compare (§10.13 c) |
+
+   That last row is the one that matters. It is the *"funds-load-bearing
+   invariant"* `md-codec`'s own source names, and it is what turns `decode` from
+   a convenience into the check that the engraving round-trips at all.
+
+   **`decode` is also how `encode` gets tested.** A format whose encoder has no
+   decoder can only be verified against itself; with both, every artifact in §3b
+   becomes a round-trip vector.
 
 1b. **One ENGRAVING form in v0.1.** `mt qr` is deferred to its own cycle
    (§0a) because QR conversion is a cross-format concern `md1` and `mk1` share. `mt qr` is deferred to its own cycle
@@ -1483,12 +1506,29 @@ anything is engraved, and folding them in would make `mt` a wallet.
 (§0a), taking §4, §5, the `sysw` transaction `Class`, the record framing and
 §10.17's firmware work with it.
 
-**A DECODER IS OUT OF SCOPE FOR v0.1, and the consequence deserves stating
-plainly:** a plate cut by `mt` v0.1 **cannot be read back by `mt` v0.1.** The
-reader arrives with §10.2's static-scan verb in the next subversion. R2 lens 3
-raised it, and it compounds with something the legend does not carry — **no
-field names the format, the tool, or the encoding** — so a recoverer holding a
-plate has nothing on it telling them what software to look for (§10.21).
+> **CORRECTION — an earlier version of this section said "a decoder is out of
+> scope for v0.1" and that a plate cut by `mt` v0.1 could not be read back by
+> `mt` v0.1. Operator ruling 2026-08-23 reverses it: `mt decode` ships in
+> v0.1.**
+>
+> The claim was written when "reading a plate" meant §10.2's **static-scan**
+> verb — a camera pointed at engraved QR symbols. Two things make that framing
+> wrong now. `mt qr` is deferred (§0a), so v0.1 engraves **characters**, not
+> symbols; and reassembling `mt1` chunks into a transaction **needs no scanner
+> and no camera at all** — it takes strings a human typed or pasted. The
+> obstacle I described was never in the way of the thing that matters.
+>
+> **A format whose own tool cannot read its own output is not falsifiable**, and
+> both siblings have a decoder — `md decode`, `mk decode`. `mt` shipping without
+> one would have been the anomaly.
+
+**What IS still out of scope: reading a plate OPTICALLY.** §10.2's static-scan
+verb — camera, symbol detection, reassembly from images — is deferred with
+`mt qr` (§0a), because there are no engraved symbols in v0.1 to scan. That
+leaves one real gap, §10.21: **no legend field names the format, the tool, or
+the encoding**, so a recoverer holding steel has nothing on it telling them what
+software to look for. `mt1…` identifies the string to someone who already knows
+the constellation; it says nothing to someone who does not.
 
 Also out: signing; broadcasting; RBF or CPFP; watching the chain to detect
 invalidation after engraving; any machine-readable provenance (ruled: legend
