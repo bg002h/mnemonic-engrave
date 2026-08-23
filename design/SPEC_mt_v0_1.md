@@ -162,12 +162,33 @@ chunks into QR symbols directly.
 > 27% tax for a wrapper whose benefit §10.2 removed.
 
 **Fragmentation: the `mt1` chunk header, for both verbs.** Operator ruling
-2026-08-23. `md-codec`'s `ChunkHeader` carries `version`, a 20-bit
-`chunk_set_id`, `count` and `index` — n-of-m **plus a set identifier**, so
-symbols from two different transactions cannot be combined. That is strictly
-stronger than UR, which has a payload checksum but no set identity, and it means
-**one fragmentation scheme to specify, test, teach a recoverer, and get wrong
-only once.**
+2026-08-23. It carries `version`, a 20-bit `chunk_set_id`, `count` and `index` —
+n-of-m **plus a set identifier**, so symbols from two different transactions
+cannot be combined. That is strictly stronger than UR, which has a payload
+checksum but no set identity, and it means **one fragmentation scheme to
+specify, test, teach a recoverer, and get wrong only once.**
+
+> **`mt1` WIDENS `count` and `index`, and an earlier version of this section said
+> the header was shared "verbatim" with `md-codec`. That was unbuildable.**
+> R3 lens 3 found it. `md-codec`'s header packs
+> `version(4) + chunked(1) + chunk_set_id(20) + count−1(6) + index(6) = 37 bits`
+> (`crates/md-codec/src/chunk.rs`), and `write()` refuses any `count` outside
+> `1..=64` with `ChunkCountOutOfRange`. **Six bits caps a set at 64 chunks** —
+> while §3b's own table measures the largest `mt qr` artifact at **96**, and
+> §3b and §8.7b both state that the 64-chunk ceiling is what distinguishes
+> `mt string` from `mt qr`. The ruled encoding could not be written by the ruled
+> header.
+>
+> **`mt1` therefore uses 8 bits each for `count` and `index`** — a 41-bit header
+> admitting 256 chunks. That is consistent with §10.13, which already forks the
+> codec with its own NUMS constant and HRP rather than reusing `md-codec`'s; the
+> fork extends to the field widths. Cost is **4 bits per chunk**: 48 bytes on the
+> 96-chunk artifact, which changes no plate count.
+>
+> **What is shared is `mt1`'s header, identically across both verbs** — not
+> `md-codec`'s. `mt string` keeps the **64-chunk limit** because that is a
+> property of the codex32 container it is engraved into (§3b), not of the
+> header.
 
     mt string:  mt1 chunk -> BCH + codex32 text -> engraved as characters
     mt qr:      mt1 chunk -> bytes              -> engraved as a QR symbol
@@ -216,6 +237,7 @@ is the constellation's alphabet rather than a stylistic choice:
 | --- | --- |
 | **EPD §6.4** — no interior spaces; every character inside the checksum | ✓ 32-character alphabet, no space |
 | **EPD §6.6** — records hashed in canonical **lowercase** | ✓ case-insensitive by design; uppercase→lowercase is **lossless**, verified 1:1 |
+| **which case is STORED** — the record and the QR are different artifacts | the `sysw` record stores **lowercase**, and `mt` uppercases only when encoding the QR symbol. Storing uppercase would make EPD §6.6 hash a form differing from the stored bytes, leaving "canonical" ambiguous |
 | **QR alphanumeric** — for 11-bits-per-2-characters packing | ✓ when uppercased |
 
 The rejected base45 satisfies only the third; hex satisfies the first two at
@@ -622,6 +644,16 @@ v25.0.0 node. It is the right RPC for three reasons:
   rather than the chain. A spent or nonexistent output returns `null`;
 - it needs **no `-txindex`**, unlike `getrawtransaction`.
 
+**Use the value it returns, not merely its null-ness.** `gettxout` returns
+`value` and `scriptPubKey` — which is this section's stated reason for choosing
+it over `getrawtransaction` — and an earlier draft acted only on whether the
+result was `null`. R3's information lens (I-2) caught that: since §8.2's
+removal, **the chain's own answer is the only value check `mt` has for a segwit
+input**, and it was being thrown away. `mt` compares the fetched `value` against
+the PSBT's UTXO record for that input and **refuses on mismatch**, naming both
+numbers. This is a comparison of two integers, not script evaluation, so it sits
+inside §8.4's scope ruling.
+
 `include_mempool` is passed **false** deliberately. The default is `true`, and
 mempool state is the wrong basis for an artifact meant to sit in a drawer for
 years.
@@ -755,8 +787,17 @@ exactly as permanent, as a machine-engraved one.
    absent, `mt` requires the operator to supply that input's value — or the total
    across all inputs — since §8.2b cannot check the value balance without it.
 
-   **The legacy warning fires whenever any input is legacy**, whether the value
-   came from the PSBT or from the operator, because `mt` verifies neither. It
+   **The legacy warning fires only when the value is UNBOUND** — not on every
+   legacy input. R3's information lens found the earlier rule actively harmful:
+   it fired *"whenever any input is legacy"* while its body asserted `mt` could
+   not bind the value by txid, **which §8.2d now does**. In the common case —
+   a legacy input carrying `non_witness_utxo`, which BIP-174 requires — that
+   printed a false, capitalised, eleven-line block, **training the operator to
+   ignore the rare case where it is true.** A warning that cries wolf on the
+   normal path has negative value.
+
+   So it fires when, and only when, the value is bound by nothing: no
+   `non_witness_utxo` (§8.2d), no chain fetch (§6a). It
    states the mechanism rather than a caution:
 
        WARNING: input 0 is a legacy (pre-SegWit) input.
@@ -1067,12 +1108,22 @@ exactly as permanent, as a machine-engraved one.
    fixed number, because §4's answer depends on module size, ECC and tiling.
 
 7c. **Over the `sysw` section ceiling (`mt qr`)** → refuse. `MAX_SECTION_LEN =
-   8191` bytes (`crates/me-cli/src/sysw/wire.rs:42`), inherited from EPD.
-   **This is a hard transport limit that §4's search knows nothing about**, and
-   §4's largest measured artifact — RCW `wsh` tier 1 at five inputs, 4,719 B
-   once chunked and bech32-encoded — sits inside it with roughly 40% headroom.
-   A larger wallet or more inputs would exceed it while §4 still reported a
-   satisfiable plate count. R2 lens 3 found this; nothing had cited the ceiling.
+   8191` (`crates/me-cli/src/sysw/wire.rs:42`), inherited from EPD. **This is a
+   hard transport limit §4's search knows nothing about**, so a transaction can
+   pass every plate-count check and still be unsendable.
+
+   Recomputed: §4's largest measured artifact — RCW `wsh` tier 1 at five inputs,
+   3,809 B of PSBT — becomes 96 chunks, 34,656 bits, **6,932 bech32 characters**.
+   Against 8,191 that is **15.4% headroom**, and the largest PSBT that fits is
+   roughly **4,537 B**.
+
+   > **An earlier version of this refusal said "roughly 40% headroom", and that
+   > was wrong by a units error — R3 lens 3.** It compared the artifact's
+   > **QR-capacity bytes** against a cap that counts **record text characters**.
+   > The mistake is instructive because it flattered the design in the same
+   > commit that discovered the ceiling: a 40% margin invites "no need to model
+   > this", while 15% is close enough that §4's search and this refusal must be
+   > reconciled rather than left independent (§10.14's regeneration).
 7b. **Over the 64-chunk container (`mt string`)** → refuse, naming the chunk
    count and the ceiling, and pointing at `mt qr`, which has no such limit. Real
    wallets hit this: RCW `wsh` tier 1 at 5 inputs needs **89** chunks (§3b).
@@ -1340,6 +1391,28 @@ signed PSBT.
     lost: a PSBT is what wallet software emits at the point this workflow
     starts, which is exactly the *"test it in your wallet first"* flow §0 is
     built around.
+
+    **The SUCCESS-PATH REPORT — `mt` was specified silent when nothing is
+    wrong.** R3's information lens (I-1) found that stdout carries the artifact
+    and stderr carries warnings and refusals, so the fee, the plate count, the
+    configuration and **the outputs themselves had no channel at all** — while
+    §5 and §7 both justify `TO` being an optional one-line summary on the
+    grounds that *"`mt` prints every output in full at encode time."* Nothing
+    defined that printing.
+
+    **It goes to `stderr`, with the warnings**, because stdout is the artifact
+    and writing a report there would corrupt `mt string`'s output. Before any
+    plate is cut, `mt` reports:
+
+    | | |
+    | --- | --- |
+    | **every output** | address in full, amount, and which are change if a wallet was supplied |
+    | **the fee** | absolute and as sat/vB — the number §8.2b's warning thresholds refer to, printed whether or not a warning fires |
+    | **the locktime** | §8.4's two facts |
+    | **the plate count** | and, since a plate is ~21 minutes (F-225), the **engraving time** |
+    | **the configuration** | module size, QR version, ECC level, symbol count — §4's answer |
+    | **the headroom** | chunks against 64 (`mt string`) or characters against 8,191 (`mt qr`), so a near-ceiling artifact is visible before it is cut |
+    | **the value provenance** | per input: chain-fetched (§6a), txid-bound (§8.2d), or operator-asserted (§8.2c) |
 
     **Still unspecified:** exit codes, and the format of the refusal messages
     §8 promises will *"name the number that caused it"*.
