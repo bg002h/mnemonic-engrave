@@ -167,6 +167,7 @@ Everything constellation-specific lives here, in engraved text, never in the QR.
 | destination address(es) and amounts | already in the transaction; shown so a human need not decode it |
 | **input outpoints** (`txid:vout`) | the only actionable mitigation for silent invalidation (§7) |
 | block hash + height per input, when known | lets a future recoverer verify inclusion with one node command (§6c) |
+| `input existed not before <MTP>` | a date bound a human can act on; median-time-past, not the header's own stamp (§6d) |
 | locktime, in height or time | says when the plate becomes live |
 | fee rate **and the date it was chosen** | makes staleness visible |
 | symbol index / total, if more than one plate | so a missing plate is obvious |
@@ -295,6 +296,64 @@ proof-of-work.
 **The 538 bytes never reach the steel.** The proof is an *input* to `mt`, not an
 output: only the block hash and height go in the legend. Plate counts in §4 are
 unaffected.
+
+### 6d. Telling the operator what the header cost, and when it was made
+
+*"There is a cost to producing each header. Can we convey to the user how costly
+the header was to create?"* and *"And the timestamp of the block?"* — operator,
+2026-08-22. Both come out of the same 80 bytes, and they answer different
+questions: **how expensive** this evidence was to forge, and **how old** it is.
+
+**Work, from `nBits`.** The header's compact target expands to
+`target = mantissa x 2^(8 x (exponent - 3))`, and the expected number of hashes
+is `2^256 / (target + 1)`. Self-contained: no price feed, no network statistics,
+nothing that decays. Computed on the block proved in §6c:
+
+| | |
+| --- | --- |
+| `nBits` | `17023cc1` |
+| difficulty | 125,807,076,547,198 |
+| **expected hashes for this ONE header** | **5.403 x 10^23** |
+| chainwork at that height | 9.952 x 10^28 cumulative hashes |
+
+**Date, from `nTime` — with a caveat that must not be dropped.** The header says
+`2026-08-23T00:56:49Z`, but a block's `nTime` is only loosely constrained: it
+must exceed the median timestamp of the previous 11 blocks, and must not exceed
+network-adjusted time by more than two hours. It is therefore **not monotonic** —
+a block's stamp can precede its parent's — and can run up to ~2 h fast.
+
+**The median-time-past is the honest figure**, being monotonic and
+consensus-enforced. For this block it is `2026-08-22T23:22:33Z`, **94 minutes
+behind** the header's own stamp. So the legend states a bound, *"input existed
+not before <MTP>"*, never an exact time.
+
+> Both timestamp rules are consensus behaviour quoted from general knowledge, not
+> read out of Bitcoin Core here. **Confirm them against the source before
+> implementation.**
+
+**How to convey it.** `5.403 x 10^23` is unreadable. Three framings, in
+descending order of durability:
+
+1. **Network-time equivalent** — *"about 10 minutes of the entire Bitcoin
+   network at the difficulty of the day"*. Self-contained, since that is what
+   difficulty retargeting means, and immediately intuitive.
+2. **Expected hashes** — exact and permanent, but meaningless to most readers.
+   Show it as the precise backing for (1), not as the headline.
+3. **Economic** — the block's own revenue, which the node reports: subsidy
+   3.1250 BTC + fees 0.0110 BTC = **3.1360 BTC**. Under competition, miner
+   revenue approximates the cost of production. **Quote BTC, never fiat**: a
+   dollar figure engraved in 2026 is misinformation by 2040.
+
+**Rejected: the energy framing.** *"Roughly $X of electricity"* needs a J/TH
+figure and an electricity price, both of which go stale and neither of which is
+in the header. It is the most intuitive framing and the least durable, so it may
+appear on screen but must never be engraved.
+
+**Where each belongs.** The cost figures are a **decision aid at encode time**,
+shown on screen so the operator knows how good the evidence is before committing
+to steel. The plate carries only the durable anchor — block height, block hash,
+and the MTP bound — because a future recoverer with a node recomputes every one
+of these numbers from the hash alone.
 
 The middle tier matters because it keeps `mt` usable offline, which is the
 constellation's whole posture. What it cannot tell you is whether the outpoint
