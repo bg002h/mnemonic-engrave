@@ -341,7 +341,7 @@ overturned an earlier assumption and are marked.
    ownership rule above exists to prevent: a single owner in the code means
    nothing while the specification of what it owns is scattered.
 
-       mt1 SET   e6f7a2c    14 strings, 1..14 all present
+       mt1 SET   0x0e17e    14 strings, 1..14 all present
        TX        9a3f21c0d4e5b6a7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f
        OUT       1 output
                    bc1p8rrz...s6n0vcl        0.05000000 BTC
@@ -374,7 +374,7 @@ overturned an earlier assumption and are marked.
       versus what is confirmed, and an offline report is fully populated in the
       first column and empty in the second.
    3. **`encode` appends, never edits.** Its two extra rows —
-      `CUT   14 strings, 1,246 characters` — go **below** `STATUS`, so the
+      `CUT   14 strings, 1,228 characters` — go **below** `STATUS`, so the
       operator's view is the recoverer's view plus a suffix. Anything `encode`
       needs to *change* about a row is a defect in the row, fixable in one place.
 
