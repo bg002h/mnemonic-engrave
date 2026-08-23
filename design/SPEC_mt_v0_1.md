@@ -166,6 +166,48 @@ overturned an earlier assumption and are marked.
    (`count` chunks, indices `0..count-1`, no duplicates), every chunk carries the
    same `chunk_set_id`, and the reassembled transaction re-derives that id.
 
+   **What the correction DOES and DOES NOT cover — printed ALWAYS, before
+   cutting.** Operator ruling 2026-08-23. Nothing in `mt`'s output contradicts
+   the impression that "error correction" has the operator covered, and §1.8's
+   zero-redundancy ruling lives only in the spec:
+
+   | damage | BCH? | what catches it |
+   | --- | --- | --- |
+   | up to **4 wrong characters** per string | **corrects it** | — |
+   | a **missing** or **extra** character | no — every later symbol shifts | the **length check** (decision 1e in §1) |
+   | a **missing string** | no | `count`, and `n/m` beside each string |
+   | a **lost plate** | no | **nothing. The transaction is gone** |
+
+       Before you cut: mt corrects up to 4 wrong CHARACTERS per string.
+
+         It cannot repair a MISSING or EXTRA character — those shift every
+         symbol after them. Count each string: strings 1-13 are 89
+         characters, string 14 is 71.
+
+         It cannot repair a missing STRING or a lost PLATE. There is no
+         redundancy: all 14 strings are required. To survive losing a
+         plate, cut a second copy — mt will not do it for you.
+
+   **Counting is the operator's own check on the damage BCH cannot touch**, and
+   it is the failure a careful person actually has when hand-cutting over a
+   thousand characters: losing their place, skipping a glyph, doubling one. That
+   damage does not present as "four errors I can fix" — it presents as total
+   garbage — yet it is trivially detectable by counting.
+
+   **`verify` must be run against the STEEL, and `mt` says so.** After `encode`
+   succeeds the operator holds two copies of the same strings: the ones on
+   stdout and the ones they cut. **Verifying the file proves nothing about the
+   plate** — it re-checks the tool's own output, which was correct by
+   construction. The whole point of BCH is to catch what the *hand* got wrong.
+
+       Now engrave these strings.
+
+       When you are done, verify the ENGRAVING, not this output:
+         mt verify < typed-from-plates.txt
+
+       Type them back from the steel. Verifying the file you just created
+       tests nothing that can fail.
+
    **`verify` REPORTS ITS MARGIN, not just its verdict.** Usability journey
    walk, U-2 — the one Critical it found, and five correctness rounds had missed
    it because nothing in the spec was *wrong*; a step was simply silent.
@@ -349,10 +391,32 @@ overturned an earlier assumption and are marked.
    keep their place. Whatever grouping the operator chose, `mt decode` and
    `mt verify` strip whitespace before doing anything else.
 
-   **A full string is exactly 90 characters**, and that is checked *before*
-   decoding, because it catches the one damage class BCH cannot:
+   **Every string in a set has a KNOWN length, checked before decoding**, because
+   it catches the one damage class BCH cannot.
 
-       string 7: 89 characters (expected 90) — a character is MISSING, not
+   > **There is no universal constant, and an earlier version of this section
+   > said "exactly 90 characters".** Wrong for most transactions. `md-codec`
+   > balances — `bytes_per_chunk = ceil(len / count)` — which is usually **less**
+   > than the 40-byte ceiling the chunk *count* derives from:
+   >
+   > | tx bytes | chunks | bytes/chunk | full string | last string |
+   > | --- | --- | --- | --- | --- |
+   > | 162 | 5 | 33 | **79** | 74 |
+   > | 405 | 11 | 37 | **85** | 82 |
+   > | 535 | 14 | 39 | **89** | 71 |
+   > | 742 | 19 | 40 | **90** | 61 |
+   > | 560 | 14 | 40 | **90** | **90** |
+   > | 2,498 | 63 | 40 | **90** | 55 |
+   >
+   > 90 occurs only when the arithmetic lands on a 40-byte chunk. **This is the
+   > third time in this document a LIMIT has been read as a RULE** — after
+   > "363 bits per chunk" and "a flat 40 payload bytes per chunk" (§3b).
+
+   **`mt` computes both lengths and states them.** Every string but the last is
+   one length; the last is the remainder, equal to the others only when the
+   payload divides evenly.
+
+       string 7: 88 characters (expected 89) — a character is MISSING, not
                  wrong. BCH repairs substitutions; an omission shifts every
                  symbol after it and cannot be corrected. Re-read the plate.
 
@@ -360,7 +424,7 @@ overturned an earlier assumption and are marked.
    **repair attempted on failure**, not a preprocessing pass. The order is:
 
        1. strip whitespace, normalise case
-       2. check the length (90 characters)
+       2. check the length against this set's computed value
        3. TRY THE STRING AS WRITTEN — if it parses and the checksum holds, STOP
        4. only then attempt correction, positionally (below)
        5. re-check, and report the verdict either way
