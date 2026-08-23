@@ -116,10 +116,53 @@ overturned an earlier assumption and are marked.
    `mt1` strings does not**, because it needs no scanner and no camera. See
    decision 1a above.
 
-   **`verify` and `inspect` follow the siblings**: `verify` checks a string set
-   without producing output, `inspect` reports what a set contains — chunk count,
-   set id, and for `mt` the transaction's own facts (§10.10's report rows are
-   already specified and are exactly what `inspect` should print).
+   **`verify` and `inspect` follow the siblings, whose division is consistent
+   across all three.** Read from their own help text:
+
+   | | `verify` | `inspect` |
+   | --- | --- | --- |
+   | `md` | *"Verify backup strings re-encode to a given template"* — `--template` **required** | *"Decode + pretty-print everything the codec sees"* |
+   | `mk` | *"BCH check + **optional** content match"* | *"structural commentary in addition to decode"* |
+   | `ms` | *"is valid (and **optionally** round-trips against a phrase)"* | *"structural fields and decoder verdict"* |
+
+   **`mt verify` is STRUCTURAL ONLY.** Operator ruling 2026-08-23, and it is
+   what the siblings already do — **none of the three touches external state.**
+   It checks: every string parses, every BCH checksum holds, the set is complete
+   (`count` chunks, indices `0..count-1`, no duplicates), every chunk carries the
+   same `chunk_set_id`, and the reassembled transaction re-derives that id.
+
+   **It never asks a node.** A predicate whose answer changes between runs is not
+   a predicate, and keeping `verify` offline means it runs on an air-gapped
+   machine — which is this constellation's posture. Chain questions live in
+   `inspect` (§6a), where they are reported as observations rather than folded
+   into a verdict.
+
+   **Optionally, `--transaction <psbt|hex>`** — the sibling round-trip. `mt`'s
+   form is unusually strong: because the content id **is** the txid (§10.13 c),
+   comparing a supplied transaction against the set's id is a cryptographic
+   round-trip rather than a structural comparison. `md verify` can only re-encode
+   and diff; `mt verify` can prove identity.
+
+   **`inspect` reports what is IN the artifact**: chunk count and indices, the
+   set id, and the decoded transaction's own facts — outputs, fee, locktime,
+   per-input value provenance.
+
+   **`inspect` OWNS the report; `encode` CALLS it.** Operator ruling
+   2026-08-23. `encode` does not compose its own version of §10.10's report — it
+   invokes `inspect` on what it just produced and appends the rows only it can
+   know: character count, chunk count, and headroom against the ceiling.
+   `md inspect` cannot say how many plates an `md1` string takes either; that is
+   not the codec's business.
+
+   > **The point of the ownership rule is that the two CANNOT DRIFT.** If
+   > `encode` composed its own report, the operator's pre-engraving view and the
+   > recoverer's post-hoc view would be two implementations of the same thing,
+   > free to disagree — and this artifact has already produced that defect twice
+   > (§7's mitigations naming legend fields §5 had deleted; §11 asserting a chunk
+   > rule §3b had retracted). With `inspect` as the single owner, **the operator
+   > and the 2040 recoverer are looking at the same output**, and `inspect` is
+   > independently testable in a way an inline report inside `encode` would not
+   > be.
 
 1a. **`mt decode` reads `mt` output, and ships in v0.1.** Operator ruling
    2026-08-23: *"we need a decode to read mt output."* It takes `mt1` strings —
@@ -1792,8 +1835,13 @@ signed PSBT.
     starts, which is exactly the *"test it in your wallet first"* flow §0 is
     built around.
 
-    **The SUCCESS-PATH REPORT — `mt` was specified silent when nothing is
-    wrong.** R3's information lens (I-1) found that stdout carries the artifact
+    **The SUCCESS-PATH REPORT is `inspect`'s, and `encode` calls it** (§1's
+    verb rulings). What follows is the report's content; the ownership rule is
+    that `encode` invokes `inspect` rather than composing a second copy, so the
+    operator's pre-engraving view and a recoverer's later `mt inspect` cannot
+    disagree.
+
+    **`mt` was specified silent when nothing is wrong.** R3's information lens (I-1) found that stdout carries the artifact
     and stderr carries warnings and refusals, so the fee, the plate count, the
     configuration and **the outputs themselves had no channel at all** — while
     §5 and §7 both justify `TO` being an optional one-line summary on the
