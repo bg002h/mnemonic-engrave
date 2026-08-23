@@ -1335,6 +1335,37 @@ what it could not check:
 >     Everything above this line was read from the plate itself and is
 >     what the transaction SAYS. None of it is confirmed.
 >
+>     TO RESOLVE ALL FOUR AT ONCE, either:
+>       - run mt inspect again with a bitcoind reachable, or
+>       - look this txid up in any block explorer:
+>           9a3f21c0d4e5b6a7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f
+>
+> **The resolution line is a ruling, and it exists because the honest report
+> creates the deadlock it resolves.** Operator ruling 2026-08-23 — *"warn to
+> make bitcoind available or check txid in blockexplorer"* — closing the last
+> divergence of Journey B.
+>
+> With no node, **every actionable field reads `UNKNOWN`**, which is correct and
+> leaves the recoverer no basis to act *or* to discard. The plate goes back in
+> the drawer, and the tool's most likely offline outcome is **paralysis** —
+> arrived at through nothing but accurate reporting. Four `UNKNOWN`s tell them
+> nothing they can do, which is the exact condition under which a line of
+> guidance beats silence.
+>
+> **`mt` can print the txid because it just reconstructed the transaction**, so
+> this costs no new capability: the txid is the double-SHA-256 of the very bytes
+> `decode` emits, computable with no node and no network. That makes the second
+> option genuinely offline-friendly — the recoverer needs *someone's* internet,
+> not their own node, and a block explorer answers all four questions from that
+> one string.
+>
+> **Naming both options matters more than either.** A recoverer told only to
+> *"run a node"* in 2040 faces a multi-hundred-gigabyte sync before they can
+> read their own plate; one told only to *"use an explorer"* is being pushed to
+> hand a third party a bearer instrument's txid. The two have opposite
+> trade-offs — effort versus privacy — and which one is acceptable is the
+> recoverer's call, not this spec's.
+>
 > **The last two lines are the load-bearing ones**, and they are the difference
 > between the two warnings. An offline `inspect` still reports a destination, an
 > amount and a locktime, all of them read correctly — and a reader who has just
