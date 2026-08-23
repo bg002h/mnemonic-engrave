@@ -195,6 +195,25 @@ fn main() {
             ("9-of-11 tr PSBT, 2in/2out", 4962),
         ] { row(l, n, min_mm, &caps); }
 
+        if (min_mm - 0.60).abs() < 1e-9 {
+            println!("\n  --- WHAT GOES IN THE QR: three candidate payloads ---");
+            for (label, raw) in [("RCW tr tier4 1in", 465usize),
+                                 ("RCW tr tier1 1in", 595),
+                                 ("RCW wsh tier1 1in", 802),
+                                 ("RCW tr tier1 5in", 2769),
+                                 ("RCW wsh tier1 5in", 3809)] {
+                println!("  {label}  (PSBT {raw} B, {} chunks)", raw.div_ceil(40));
+                for (form, qr_bytes, eff) in qr_payload_forms(raw) {
+                    let p = best(qr_bytes, false, min_mm, &caps);
+                    match p {
+                        Some(k) => println!("      {form:<16} {qr_bytes:>5} B in QR  eff {:>5.1}%  -> {} pl, {} qr, v{} ECC {:?}",
+                                            eff*100.0, k.plates, k.symbols, k.ver, k.ec),
+                        None => println!("      {form:<16} {qr_bytes:>5} B in QR  eff {:>5.1}%  -> DOES NOT FIT", eff*100.0),
+                    }
+                }
+            }
+        }
+
         // ---- R0 T-3: what the COMPLIANT envelope costs, in PLATES ----------
         // BCR-2020-005 forbids `ur:bytes` outside testing and the BCR-2020-006
         // registry has no raw-transaction type, so the compliant payload is a
@@ -217,4 +236,40 @@ fn main() {
             row(&format!("{l} [PSBT]"), psbt, min_mm, &caps);
         }
     }
+}
+
+// ─── What actually goes INTO the QR? (operator question, 2026-08-23) ─────────
+//
+// Three candidate payloads for `mt qr`, measured against each other. The
+// question is whether carrying the codex32 STRING into the QR -- which would
+// give one artifact definition for both verbs, and BCH t=4 on top of QR's
+// Reed-Solomon -- costs an acceptable number of plates.
+//
+// Per mt1 chunk, from md-codec's real geometry:
+//   header      37 bits   (version, chunk_set_id, count, index)
+//   payload    320 bits   (SINGLE_STRING_PAYLOAD_BIT_LIMIT = 64*5, = 40 bytes)
+//   checksum    13 symbols = 65 bits  (REGULAR_CHECKSUM_SYMBOLS)
+//   hrp+sep     "mt1" + "1" = 4 chars
+fn qr_payload_forms(raw: usize) -> Vec<(&'static str, usize, f64)> {
+    let chunks = raw.div_ceil(40);
+
+    // (1) codex32 STRING in QR alphanumeric mode.
+    let data_syms = (37 + 320usize).div_ceil(5);        // 72 symbols
+    let chars_per_chunk = data_syms + 13 + 4;           // + checksum + hrp/sep
+    let total_chars = chunks * chars_per_chunk;
+    // alnum packs 2 chars per 11 bits
+    let alnum_bytes = (total_chars.div_ceil(2) * 11).div_ceil(8);
+
+    // (2) header+payload as BYTES, no BCH. 37 bits rounds to 5 bytes/chunk.
+    let bin_bytes = raw + chunks * 5;
+
+    // (3) same as (2) but base45'd: 2 bytes -> 3 chars, alnum.
+    let b45_chars = bin_bytes.div_ceil(2) * 3;
+    let b45_bytes = (b45_chars.div_ceil(2) * 11).div_ceil(8);
+
+    vec![
+        ("codex32 string", alnum_bytes, raw as f64 / alnum_bytes as f64),
+        ("bytes + base45", b45_bytes,   raw as f64 / b45_bytes as f64),
+        ("bytes, binary",  bin_bytes,   raw as f64 / bin_bytes as f64),
+    ]
 }

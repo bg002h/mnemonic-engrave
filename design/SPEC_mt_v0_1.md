@@ -21,7 +21,7 @@ different ways:
 
 | verb | form | engraved how | payload | size limit |
 | --- | --- | --- | --- | --- |
-| **`mt qr`** | QR symbols + legend | **machine** (SeedHammer II) | finalized PSBT in `mt1` chunks (§3) | the plate budget |
+| **`mt qr`** | QR symbols + legend | **machine** (SeedHammer II) | `mt1` chunks, **base45** (§3) | the plate budget |
 | **`mt string`** | `mt1` chunked codex32 | **by hand**, or machine | raw signed transaction (§3b) | **64 chunks** |
 
 `mt qr` decides how many symbols that takes, at what error-correction level,
@@ -74,7 +74,9 @@ overturned an earlier assumption and are marked.
    define and belonged next to `me bundle`. See §2 for what the codec does in
    fact specify; the objection was answered rather than ignored.
 3. **The QR carries the standard form, never a codex32 string** (F-234).
-4. **UR is dropped entirely. Both verbs fragment with the `mt1` chunk header.**
+4. **UR is dropped entirely. Both verbs share the `mt1` chunk header and NOTHING
+   ELSE** — each medium carries the error correction native to it (§3a). The QR
+   payload is **base45**.
    **This overrules the previous draft's `ur:psbt`, which itself overruled
    `ur:bytes`** — three positions in one cycle, and §3 records why each fell.
    The payload remains a fully finalized PSBT. See §3.
@@ -173,110 +175,71 @@ only once.**
 header and reassembly take a transaction-shaped payload cleanly was already
 open; it is now load-bearing for everything `mt` emits.
 
-**What a single symbol carries is UNDECIDED, and is pinned by experiment.** The
-choice is raw binary (QR byte mode, 8 bits per byte, zero expansion) against
-base45 (RFC 9285, alphanumeric mode, 97% of binary). Three percent apart, so the
-deciding factor is not size:
+**What a symbol carries: `mt1` chunks, base45-encoded.** Operator ruling
+2026-08-23. Three candidates were measured
+(`RESULTS_ecc_selection_2026-08-22.txt`, `qr_payload_forms`), all carrying the
+same chunk header:
 
-- **Binary is fine at the QR layer** — byte mode is base ISO/IEC 18004, not an
-  extension. The risk is the *application* layer: generic scanners commonly try
-  to interpret content as text and mangle or reject arbitrary bytes.
-- **base45 is pure alphanumeric text**, so it sidesteps that entirely, at 3%.
-
-**Which of the two an off-the-shelf wallet will actually read from a static
-engraved symbol is UNVERIFIED and this spec does not assert it.** §10.1's test
-plate is already scoped to compare raw against base45 against UR payloads; that
-experiment decides it. Until then `mt` must not claim ecosystem readability for
-either form.
-
-**"Fully finalized" is exactly what `mt` already requires.** A PSBT holds a
-transaction at any stage. Signatures accumulate as loose items in a scratch area
-(`PSBT_IN_PARTIAL_SIG`); a *finalizer* then assembles them into the real witness
-stack (`PSBT_IN_FINAL_SCRIPTWITNESS` / `PSBT_IN_FINAL_SCRIPTSIG`), which is the
-only form the network understands. Three states matter:
-
-| state | signatures live in | broadcastable? | `mt` engraves it? |
-| --- | --- | --- | --- |
-| partially signed | scratch, some inputs missing | no | **refused** |
-| fully signed, not finalized | scratch, all inputs present | **no** | **refused** |
-| **finalized** | assembled witness stack | **yes** | **yes** |
-
-The middle state is not bureaucracy: assembling the witness stack requires
-understanding the *script*. A P2WSH multisig witness must open with an empty
-element — the `OP_CHECKMULTISIG` off-by-one workaround — and the signatures must
-follow the pubkey order in the script. For the RCW the finalizer must also
-decide **which of four tiers** is being satisfied, which is why `rcw.rs`
-withholds keys per scenario and why `finalize_mut` can fail outright.
-
-> **RETRACTION — an earlier version of this box was wrong, and it was
-> load-bearing.** It claimed: *"A raw transaction cannot represent an unsigned
-> one: if it serializes with witnesses, it is finished, and the format makes the
-> mistake impossible."* **False.** An unsigned transaction has empty
-> `scriptSig`s and no witness marker, which is a perfectly legal serialization.
-> Verified against a live node: `createrawtransaction` returns
-> `0200000001…0000000000fdffffff01a086…` — a complete transaction, empty
-> `scriptSig`, no witness, with a valid txid.
->
-> So the finalization hazard was **never** created by the PSBT envelope; it
-> exists for both payloads and always did. That matters twice over. First, the
-> retracted claim was used to justify writing §8.1 and §8.2 in **PSBT
-> vocabulary** — `PSBT_IN_FINAL_SCRIPTWITNESS` and UTXO records — which left
-> **`mt string`, whose payload is a raw transaction, with no expressed
-> finalization check at all**. Second, it is the reason §8.1 was described as
-> "merely illegal" rather than "impossible": the correct statement is that it
-> was always merely illegal.
->
-> `mt` must check finalization on **both** payloads, by their own vocabulary:
-> for a PSBT, every input carries `PSBT_IN_FINAL_SCRIPTSIG` or
-> `PSBT_IN_FINAL_SCRIPTWITNESS`; for a raw transaction, every input carries a
-> non-empty `scriptSig` **or** a non-empty witness. §8.1 states both.
-
-**What the payload is, exactly — the MIN form.** Measured in
-`RESULTS_psbt_envelope_2026-08-23.txt`, three forms of a finalized PSBT, each
-**asserted** to extract to a byte-identical transaction rather than assumed to:
-
-| form | what it is | standard `extract_tx()` works? |
+| form | efficiency | worst plate cost |
 | --- | --- | --- |
-| full | what BIP-174's finalizer leaves, untouched | yes |
-| **MIN** | UTXO records kept, **output maps cleared** | **yes — this is the payload** |
-| lean | UTXO records also stripped | **no** |
+| codex32 string inside the QR | **63–65%** | **+2 plates** (`wsh` tier 1, 5-in: 5 → 7) |
+| bytes + **base45** | **85.5–86%** | — **chosen** |
+| bytes, raw binary | 88.4–88.8% | — |
 
-The `lean` row is a measured negative that corrects an assumption of mine:
-`rust-bitcoin`'s `extract_tx()` runs a fee check needing each input's value, so
-a UTXO-stripped PSBT fails with `MissingInputValue`. The bytes are all present
-and `extract_tx_unchecked_fee_rate()` returns the right transaction, but the
-*safe* API a recoverer reaches for refuses it — the wrong property for a plate
-read in 2040.
+**Why not base45's 3%-denser rival.** Binary is marginally smaller and produces
+**identical plate counts in 4 of the 5 measured artifacts**, so the choice was
+never about size. base45 (RFC 9285) wins on two other grounds: it is pure QR
+alphanumeric text, so no scanner is asked to accept arbitrary bytes — a real
+failure mode at the application layer even though QR byte mode is standard — and
+it carries **intrinsic error detection**, because 45³ = 91,125 exceeds the 65,536
+values two bytes can hold, so roughly **28% of corrupted 3-character groups are
+detectably invalid**. Raw binary has none: every byte sequence is legal.
 
-**Clearing the output maps is what matters.** The change output's descriptor
-metadata is what an updater wrote for a signer; BIP-174's finalizer strips only
-*input* fields, so it rides along unless told otherwise. On two-output artifacts
-it is the entire cost: `tr` tier 1, 1-in/2-out is **+1202 B** as finalized and
-**+61 B** with the output maps cleared. Measured overhead of MIN over the raw
-transaction: **+58 to +61 bytes at one input, +261 to +271 at five** (~54 B per
-input).
+> **Why the codex32 string does NOT go in the QR, measured rather than argued.**
+> Operator question: *"are you suggesting we first codex32 style encode the
+> transaction and then qr encode that? Does that massively increase the plate
+> count?"* It does. At **63–65%** it is **worse than UR's ~73%**, which §3 had
+> already dropped for waste, and it costs one extra plate on two artifacts and
+> **two** on `wsh` tier 1 at five inputs.
+>
+> It pays twice: a 65-bit BCH checksum per 40-byte chunk, and then bech32's five
+> data bits per 5.5 character-bits through alphanumeric mode. That is far below
+> the 91% a *bare* bech32 payload measures, because at 40 payload bytes per chunk
+> the header, checksum and HRP are a large fraction of every chunk.
 
-**Redundancy is zero — ruling, operator, 2026-08-23.** Emitting exactly `seqLen`
-parts costs least and tolerates no lost symbol. That is deliberate: **`mt`
-protects against damage to a plate, which is what error correction does, and not
-against a missing plate, which is what a duplicate plate does.** The operator is
-free to engrave copies. Two consequences follow and are load-bearing:
+## 3a. The medium-appropriate ECC principle
 
-- `PLATE n OF m` stays honest, because all `m` really are required. Any
-  redundancy above zero would have made it misleading — a holder would need `k`
-  of `m` and the plate would not say so.
-- §4 is right to spend leftover capacity on ECC. ECC addresses marks, scratches
-  and corrosion on a symbol, which is the failure this artifact is being
-  hardened against.
+**Each medium carries exactly one error-correction layer: the one native to it.**
+This is the rule that rejected codex32-in-QR, and it generalises.
 
-**Its cost.** The chunk header is 37 bits per symbol
-(`crates/md-codec/src/chunk.rs`), against UR's ~49 characters of prefix, CRC and CBOR
-per fragment. §3b measures the chunk arithmetic; §4's plate table is computed on
-the payload sizes that follow from it.
+1. **One layer per medium**, chosen to match **how that medium physically
+   fails**:
 
-> §10.8's per-symbol `n/m` label is now doubly grounded: the chunk header
-> carries `count` and `index` machine-readably, and the engraved label states
-> the same pair for a human who has not decoded anything.
+   | medium | fails as | native correction |
+   | --- | --- | --- |
+   | hand-engraved string | **per character** — a miscut stroke, a wrong glyph, one scratched letter | **BCH** over 5-bit symbols, `t = 4` per chunk |
+   | machine-engraved QR | **per region** — a scratch across modules, corrosion, a dent | **Reed-Solomon** + QR codeword interleaving, which spreads a local blot across many RS blocks |
+
+2. **Never stack them, because a redundant layer is paid for in the same
+   currency as the native one: plate area.** §4's objective spends every leftover
+   byte on ECC, so carrying BCH inside a QR does not add protection *on top of*
+   Reed-Solomon — it buys BCH parity **with area that would otherwise have bought
+   RS parity**, at a worse rate. Measured above: 64% against 88.8%, up to two
+   extra plates, and a lower ECC level everywhere else. **Stacking made the
+   artifact strictly less damage-tolerant**, which is the opposite of what a
+   second checksum intuitively promises.
+
+3. **What legitimately crosses both media is FRAMING, not correction.** The
+   chunk header — version, `chunk_set_id`, `count`, `index` — is about identity
+   and assembly, so it is shared verbatim. Damage is medium-specific; identity is
+   not.
+
+So the split is clean, in the operator's own words: **QR is for machine
+engraving, codex32 is for hand engraving.**
+
+    mt string:  chunk header + payload -> BCH + codex32 -> engraved characters
+    mt qr:      chunk header + payload -> base45 -> QR (Reed-Solomon) -> modules
+                ^ identical header, medium-appropriate correction
 
 ## 3b. The string form: `mt1`, for hand engraving
 
@@ -876,12 +839,14 @@ signed PSBT.
    multi-plate transactions recoverable at all, and it should be specified
    before anyone engraves a multi-symbol artifact.
 
-3. ~~Is UR worth its 37.5% expansion?~~ **CLOSED — UR IS DROPPED ENTIRELY**,
-   operator ruling 2026-08-23: *"I don't think UR wrapper complexity is worth
-   it."* See §3. What remains open is narrower and is folded into §10.1's test
-   plate: **raw binary (QR byte mode, 100%) versus base45 (RFC 9285,
-   alphanumeric, 97%)** for the symbol payload. Three percent apart, so the
-   decider is not size but whether a scanner mangles arbitrary bytes.
+3. ~~Is UR worth its expansion? What goes in the QR?~~ **CLOSED.** UR is
+   dropped (§3), and the QR payload is **`mt1` chunks, base45-encoded** —
+   operator ruling 2026-08-23. Codex32-in-QR was measured and rejected at 63–65%
+   efficiency, worse than the UR it would replace and up to two extra plates
+   (§3). base45 was chosen over 3%-denser raw binary for scanner compatibility
+   and its ~28% intrinsic detection of corrupted triples. **§10.1's test plate
+   should still confirm scanners read base45 off engraved steel** — the choice is
+   made, the optical validation is not.
 
 4. **The legend's FROM and TO fields — RULED, with one thing still open.**
    Operator ruling 2026-08-23: *"we use walletid or seed fp for the from: field

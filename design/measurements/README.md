@@ -239,3 +239,33 @@ Measured overhead of MIN over raw: **+58 to +61 bytes at one input**, **+261 to
 `select.rs` gained a matching section that runs the same search on both sizes, so
 the cost is expressed in **plates** rather than bytes. That section is purely
 additive — the original rows are byte-identical, verified by diff.
+
+
+## What goes in the QR — measured 2026-08-23
+
+`select.rs` gained a `qr_payload_forms` comparison answering the operator's
+question: *"are you suggesting we first codex32 style encode the transaction and
+then qr encode that? Does that massively increase the plate count?"*
+
+Yes, it does, and the option was rejected on these numbers. Three candidate
+payloads for `mt qr`, all carrying the same `mt1` chunk header:
+
+| form | efficiency | worst plate cost |
+| --- | --- | --- |
+| codex32 string in QR | **63–65%** | +2 plates (`wsh` tier 1, 5-in: 5 → 7) |
+| bytes + base45 | 85.5–86% | — |
+| bytes, binary | 88.4–88.8% | — |
+
+Codex32-in-QR is **worse than UR's ~73%**, which this cycle had already dropped
+for being wasteful. It pays twice: a 65-bit BCH checksum per 40-byte chunk, then
+bech32's 5-data-bits-per-5.5-character-bits packing through QR alphanumeric mode.
+
+The chunk overhead is why efficiency lands near 64% rather than the 91% a bare
+bech32 payload measures in `RESULTS_qr_modes_2026-08-22.txt` — at 40 payload
+bytes per chunk, the header, checksum and HRP are a large fraction of each chunk.
+
+**base45 and binary sit ~3% apart and produce identical plate counts in 4 of 5
+cases**, so the choice between them was never a size question. The operator chose
+**base45** (§3): it is pure alphanumeric text, so no scanner has to accept
+arbitrary bytes, and ~28% of corrupted 3-character groups are detectably invalid
+because 45³ = 91,125 exceeds the 65,536 values two bytes can hold.
