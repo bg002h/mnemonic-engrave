@@ -21,8 +21,8 @@ different ways:
 
 | verb | form | engraved how | payload | size limit |
 | --- | --- | --- | --- | --- |
-| **`mt qr`** | QR symbols + legend | **machine** (SeedHammer II) | `mt1` chunks, **base45** (§3) | the plate budget |
-| **`mt string`** | `mt1` chunked codex32 | **by hand**, or machine | raw signed transaction (§3b) | **64 chunks** |
+| **`mt qr`** | QR symbols + legend, as a **SH2 payload** | **machine** (SeedHammer II) | `mt1` chunks, **base45** (§3) | the plate budget |
+| **`mt string`** | `mt1` chunked codex32, **on stdout** | **by hand** | raw signed transaction (§3b) | **64 chunks** |
 
 `mt qr` decides how many symbols that takes, at what error-correction level,
 across how many plates, and what is engraved beside them. `mt string` emits a
@@ -82,10 +82,12 @@ overturned an earlier assumption and are marked.
    The payload remains a fully finalized PSBT. See §3.
 5. **Reed-Solomon density is the highest that still minimises plate count.**
 6. **Provenance rides in the engraved legend, not in the wire format.**
-7. **The operator chooses between a timelocked and an immediately-spendable
-   transaction**, with a loud warning on the second. **This replaces the
-   previous draft's "future locktime required by default"**, which R0 found was
-   unenforceable as written. See §8.
+7. **`mt` does not offer a locktime CHOICE. It reads the transaction and warns
+   if the plate would be immediately spendable.** Operator ruling 2026-08-23:
+   *"Timelocking happens by user at their wallet software. We do not create
+   transactions. We merely read transaction and warn if immediate."* **This
+   overrules the previous draft's `--timelocked` / `--immediate` flags**, which
+   made `mt` a party to a decision it does not own. See §8.4.
 8. **Redundancy is zero. `mt` protects against damage to a plate, not against a
    missing plate.** The operator is free to engrave duplicate copies. **This
    closes §10.6, the previous draft's largest open question.** See §3.
@@ -452,7 +454,7 @@ fields, 136 characters, 6 lines — measured,
 | --- | --- | --- |
 | `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
 | `FROM WALLET <8 hex>` | 20 | wallet id or seed fingerprint. The transaction does **not** say what it spends *from* (§6). **Optional — loudly warned when absent** (§10.4) |
-| `SPENDABLE AFTER BLOCK <n>` | 29 | the single most actionable fact: whether this plate is live yet. Reads `IMMEDIATELY SPENDABLE` when the operator chose that (§8.4) |
+| `SPENDABLE AFTER BLOCK <n>` | 29 | the single most actionable fact: whether this plate is live yet. Reads `IMMEDIATELY SPENDABLE` when the transaction **is** — derived, never chosen (§8.4) |
 | `TO <wallet id or fp>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when absent** |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
@@ -672,58 +674,46 @@ exactly as permanent, as a machine-engraved one.
 
 3. **An unsigned or unfinalized transaction offered for engraving** → refuse. It
    cannot be broadcast, so it is not a backup.
-4. **Locktime: the operator chooses, and the second choice warns loudly.**
-   **Ruling, operator, 2026-08-23**, replacing the previous draft's "refuse
-   anything broadcastable today":
+4. **Immediately spendable → WARN, never refuse, and never on a flag.**
+   Operator ruling 2026-08-23. Timelocking is a wallet decision made before `mt`
+   is invoked; `mt` reads what it was handed and tells the truth about it.
 
-   - `--timelocked` (default): `mt` verifies the transaction is **actually**
-     timelocked, and the legend reads `SPENDABLE AFTER BLOCK <n>`.
-   - `--immediate`: the operator accepts an immediately-spendable plate. The
-     legend reads `IMMEDIATELY SPENDABLE`, and `mt` prints a prominent warning
-     that a transaction without an enforced timelock **may be broadcast by
-     anyone who holds or photographs the plate, from the moment it is cut.**
+   - If the transaction is **effectively timelocked**, the legend reads
+     `SPENDABLE AFTER BLOCK <n>` and no warning is printed.
+   - If it is **immediately spendable**, the legend reads `IMMEDIATELY
+     SPENDABLE` and `mt` prints a prominent `stderr` warning: this plate **may be
+     broadcast by anyone who holds or photographs it, from the moment it is
+     cut.**
 
-   **Verifying "actually timelocked" requires reading `nSequence`, and the
-   previous draft never mentioned it.** `nLockTime` is enforced only when at
-   least one input has `nSequence != 0xFFFFFFFF`. A transaction with all inputs
-   final ignores its locktime entirely — so a plate could have satisfied the
-   original "required future locktime" rule on paper and been spendable the
-   moment it was cut.
+   Both outcomes are **derived from the transaction**, not selected by the
+   operator. The previous draft's `--timelocked` / `--immediate` flags are gone:
+   a flag would have let the operator assert something `mt` can determine, and
+   `--timelocked` refusing a transaction was `mt` overruling a wallet decision
+   that is not its own.
 
-   **There are TWO kinds of timelock and an earlier version of this rule saw
-   only one.** R0 round 1 (R-3):
+   **Determining "effectively timelocked" is still real work, and the previous
+   draft got it wrong twice.** The warning is only worth printing if it is
+   accurate, so both mechanisms must be read:
 
-   - **Absolute** (`nLockTime` + `OP_CLTV`): the transaction is invalid before a
-     stated height or time.
-   - **Relative** (BIP-68 `nSequence` + `OP_CSV`): the transaction is invalid
-     until N blocks or N units of time have elapsed **since its input
-     confirmed**. Two of the RCW's taproot leaves are `OP_CLTV`; **one is
-     `OP_CSV`** with `008000` = 32,768 blocks, read from the probe's own leaf
-     dump in `RESULTS_rcw_2026-08-22.txt`.
+   - **`nLockTime` is enforced only when at least one input has
+     `nSequence != 0xFFFFFFFF`.** A transaction with every input final ignores
+     its locktime entirely — so a future `nLockTime` alone does **not** mean
+     timelocked. `nSequence` appeared nowhere in the 534-line draft that first
+     specified this rule.
+   - **Relative timelocks exist and look like nothing.** A BIP-68 `OP_CSV` spend
+     has **`nLockTime = 0`**, so an absolute-only test calls it immediately
+     spendable and warns when it should not. One of the RCW's taproot leaves is
+     `OP_CSV` with `008000` = 32,768 blocks — roughly seven months — read from
+     the probe's leaf dump in `RESULTS_rcw_2026-08-22.txt`.
 
-   A genuinely CSV-locked spend has **`nLockTime = 0`**. An absolute-only rule
-   therefore refuses it as "not timelocked" and routes the operator to
-   `--immediate`, which engraves `IMMEDIATELY SPENDABLE` on a plate that cannot
-   be mined for roughly seven months. The mixed case is worse: it *passes* and
-   the legend prints a height at which the transaction still fails
-   `non-BIP68-final`.
+   So: **timelocked if EITHER lock is present and unmet**; immediately spendable
+   only when neither is. Where a relative lock is present and `mt` cannot resolve
+   the input's confirmation height — no node (§6a), no supplied data — it
+   **cannot compute the unlock height**, so it must say so rather than engrave a
+   `SPENDABLE AFTER BLOCK` it cannot substantiate.
 
-   **So `--timelocked` accepts if EITHER lock is present and unmet**, and
-   refuses only when neither is. And because a relative lock is measured from
-   the input's confirmation, `mt` **cannot compute the unlock height without
-   knowing when each input confirmed**. Where a relative lock is present and
-   `mt` cannot resolve that — no node (§6a), no supplied confirmation data — it
-   **refuses rather than engraving a legend it cannot substantiate.** A
-   `SPENDABLE AFTER BLOCK <n>` that is wrong is worse than no plate.
-
-   Two limits, stated rather than assumed. §8.4 sets **no minimum horizon**: a
-   locktime one block in the future satisfies it, which is a timelock in name
-   only. And the `nSequence != 0xFFFFFFFF` condition is satisfied by ordinary
-   **RBF signalling** (`0xFFFFFFFD`), so it proves the locktime is *enforced*,
-   not that anyone intended a timelock. Both are §10.15.
-
-   The warning under `--immediate` says *might* be spendable, not *is*, because
-   relay also depends on fee and on the inputs still being unspent.
+   The warning says the plate *may* be broadcast, not *will* be: relay also
+   depends on fee and on the inputs still being unspent.
 5. **`gettxout` returns `null` for any input** → refuse, when a node is
    reachable. The output is spent or never existed. See §6a's limitation and
    §10.5 for the IBD case.
@@ -974,22 +964,30 @@ signed PSBT.
    A `sysw` class says how the bytes *arrive*; it does not make the firmware able
    to engrave what §4 chose. **That gap is now §10.17.**
 
-10. **The CLI surface, partly ruled.** **Operator ruling 2026-08-23: input via
-    stdin AND file.** So `mt` reads its transaction from a named path or from
-    standard input, and the two are equivalent.
+10. **The CLI surface — output settled, input formats still open.** Operator
+    rulings 2026-08-23.
 
-    Fixed so far: two verbs (`mt qr`, `mt string`), two flags (`--timelocked` /
-    `--immediate`), input from stdin or a file, and the stream convention —
-    **stdout carries the artifact, stderr carries everything the human must
-    see** (§3b).
+    **Settled:**
 
-    Still unspecified: **which input formats are accepted** (a binary PSBT? a
-    base64 PSBT? raw transaction hex? all three, sniffed?) — this matters more
-    than it looks, because §8.1's finalization check and §8.2's script check are
-    written in *PSBT* vocabulary and a raw transaction supports neither fully
-    (§3's retraction); the output convention; and the exit codes, where §8
-    promises *"every refusal names the number that caused it"* — an output
-    contract with no format. **Still blocks implementation.**
+    | | |
+    | --- | --- |
+    | verbs | `mt qr`, `mt string` |
+    | input | a file **or** stdin, equivalently |
+    | `mt qr` output | a **SH2 payload** (`sysw`) carrying the QR — machine engraving |
+    | `mt string` output | the **codex32 string on stdout** — hand engraving |
+    | stderr | every warning and refusal a human must see (§3b) |
+    | flags | **none for locktime.** `--timelocked` / `--immediate` are removed (§8.4) |
+
+    So the two verbs differ in destination as well as medium: one addresses the
+    machine, the other addresses a person holding a stylus.
+
+    **Still open, and it is a safety question rather than a convenience one:
+    which INPUT formats are accepted** — a binary PSBT, a base64 PSBT, raw
+    transaction hex, or several sniffed apart? §8.1's finalization check and
+    §8.2's script check are written in PSBT vocabulary, and a raw transaction
+    supports neither fully (§3's retraction), so accepting raw hex silently
+    weakens two refusals. Also unspecified: exit codes, and the format of the
+    refusal messages §8 promises will *"name the number that caused it"*.
 
 11. ~~How many codex32 characters fit a hand-engraved plate?~~ **CLOSED — OUT
     OF SCOPE**, operator ruling 2026-08-23: *"As many as a user wants. It is not
@@ -1067,6 +1065,26 @@ signed PSBT.
     simply does not judge whether the horizon is wise.
 
 16. **Should `mt` refuse legacy (non-segwit) inputs at all?** The previous
+    draft's rule did, on a false premise (§8.6's correction: `non_witness_utxo`
+    binds a legacy amount by txid). With the premise gone the refusal needs a
+    reason or should be dropped. Related: `sh(wsh(…))` is unclassified by §8.6's
+    wording.
+17. **The firmware cannot yet engrave what §4 selects — and will be taught.**
+    Operator ruling 2026-08-23: *"we will later teach SH2 how to handle
+    transactions."* So this is scheduled firmware work rather than an unresolved
+    design question, and §4 keeps its full search space.
+
+    What stands today: the fork's only arbitrary-payload QR path is
+    `freeTextQRScale = 2` (`backup/fit.go:19`) with a compile-time ECC level and
+    one code per plate, and `sysw`'s `Class` enum has no transaction member
+    (`crates/me-cli/src/sysw/record.rs:31-40`). **Until that work lands, `mt qr`
+    can produce a payload that no shipped firmware will engrave.** That is a
+    real limitation on the verb, not on the spec, and it should be stated
+    wherever `mt qr` is documented as usable. **The Rust-primary rule binds the
+    new `Class`:** it lands in `me-cli`'s Rust `sysw` with test vectors first,
+    then ports to the fork's Go.
+
+16. **Should `mt` refuse legacy (non-segwit) inputs at all?**16. **Should `mt` refuse legacy (non-segwit) inputs at all?** The previous
     draft's rule did, on a false premise (§8.6's correction: `non_witness_utxo`
     binds a legacy amount by txid). With the premise gone the refusal needs a
     reason or should be dropped. Related: `sh(wsh(…))` is unclassified by §8.6's
