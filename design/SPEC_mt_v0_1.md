@@ -454,7 +454,7 @@ fields, 136 characters, 6 lines — measured,
 | --- | --- | --- |
 | `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
 | `FROM WALLET <8 hex>` | 20 | wallet id or seed fingerprint. The transaction does **not** say what it spends *from* (§6). **Optional — loudly warned when absent** (§10.4) |
-| `SPENDABLE AFTER BLOCK <n>` | 29 | the single most actionable fact: whether this plate is live yet. Reads `IMMEDIATELY SPENDABLE` when the transaction **is** — derived, never chosen (§8.4) |
+| `SPENDABLE AFTER BLOCK <n>` | 29 | the single most actionable fact: whether this plate is live yet. Reads **`NO BLOCK TIMELOCK`** when the transaction carries no enforced `nLockTime` — an **observation about fields `mt` read**, never a claim about spendability, because `mt` does not evaluate scripts (§8.4) |
 | `TO <wallet id or fp>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when absent** |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
@@ -651,6 +651,27 @@ exactly as permanent, as a machine-engraved one.
    refusal is evaluable only while `mt` still holds the PSBT it was handed at
    encode time — never from the engraved artifact alone. A PSBT whose UTXO records are missing
    is refused under (1)'s sibling rule: `mt` requires the MIN form of §3.
+
+   > **Is this inside the 2026-08-23 scope line? Flagged, not assumed — §10.18.**
+   > The ruling excludes *"handing the transaction to `bitcoind` to check
+   > validity"* and *"reading scripts to evaluate for timelocks in the sending
+   > wallet's descriptor."* This refusal is arguably neither, and the difference
+   > is **execution versus interpretation**:
+   >
+   > - **What §8.2 does:** runs the consensus engine over a complete transaction
+   >   and its prevouts, **in process**, and reads one bit back. It never parses
+   >   the script, never learns the wallet's policy, and never asks a node.
+   > - **What the ruling excludes:** *interpreting* a script to extract
+   >   semantics — "there is an `OP_CSV` here for 32,768 blocks" — which requires
+   >   understanding the sending wallet's descriptor.
+   >
+   > `mt` executing a script it does not understand is closer to a checksum than
+   > to reading a wallet's policy. But it IS script evaluation, and it is the
+   > operator's call whether that belongs in a tool that *"merely reads
+   > transactions"*. **If it goes, §8 loses its only check that the transaction
+   > would actually validate** — leaving §8.1 (are the inputs finalized?) and
+   > §8.2b (does the value balance?) as structural checks that cannot catch a
+   > bad signature.
 2b. **Value-blind acceptance** → refuse. **§8.2 does not cover this and the
    previous draft had no check at all.** `verify_transaction` is a per-input
    *script* loop — read from `consensus/validation.rs` in the `bitcoin` 0.32.101 crate (lines 82-107 of the registry source),
@@ -674,46 +695,65 @@ exactly as permanent, as a machine-engraved one.
 
 3. **An unsigned or unfinalized transaction offered for engraving** → refuse. It
    cannot be broadcast, so it is not a backup.
-4. **Immediately spendable → WARN, never refuse, and never on a flag.**
-   Operator ruling 2026-08-23. Timelocking is a wallet decision made before `mt`
-   is invoked; `mt` reads what it was handed and tells the truth about it.
+4. **Read the locktime FIELDS, compare against the chain if a node is there,
+   and warn. Never refuse, never on a flag, and never by reading scripts.**
+   Operator rulings 2026-08-23: *"Timelocking happens by user at their wallet
+   software… We merely read transaction and warn if immediate"*, and — the scope
+   line that decides how this is implemented — *"we can know with certainty if a
+   transaction is locked to a specific block. And we can ask `bitcoind`, if
+   available, what the current block is. But we are not in the business of
+   handing the transaction to `bitcoind` to check validity or reading scripts to
+   evaluate for timelocks in the sending wallet's descriptor."*
 
-   - If the transaction is **effectively timelocked**, the legend reads
-     `SPENDABLE AFTER BLOCK <n>` and no warning is printed.
-   - If it is **immediately spendable**, the legend reads `IMMEDIATELY
-     SPENDABLE` and `mt` prints a prominent `stderr` warning: this plate **may be
-     broadcast by anyone who holds or photographs it, from the moment it is
-     cut.**
+   **So `mt` reads two FIELDS and asks one question.** Fields are certain;
+   scripts are somebody else's job.
 
-   Both outcomes are **derived from the transaction**, not selected by the
-   operator. The previous draft's `--timelocked` / `--immediate` flags are gone:
-   a flag would have let the operator assert something `mt` can determine, and
-   `--timelocked` refusing a transaction was `mt` overruling a wallet decision
-   that is not its own.
+   | input | source | certain? |
+   | --- | --- | --- |
+   | `nLockTime` | transaction field | **yes** |
+   | `nSequence`, per input | transaction field | **yes** |
+   | current block height | `bitcoind` if reachable, else absent | yes when present |
 
-   **Determining "effectively timelocked" is still real work, and the previous
-   draft got it wrong twice.** The warning is only worth printing if it is
-   accurate, so both mechanisms must be read:
+   **The rule:**
 
-   - **`nLockTime` is enforced only when at least one input has
-     `nSequence != 0xFFFFFFFF`.** A transaction with every input final ignores
-     its locktime entirely — so a future `nLockTime` alone does **not** mean
-     timelocked. `nSequence` appeared nowhere in the 534-line draft that first
-     specified this rule.
-   - **Relative timelocks exist and look like nothing.** A BIP-68 `OP_CSV` spend
-     has **`nLockTime = 0`**, so an absolute-only test calls it immediately
-     spendable and warns when it should not. One of the RCW's taproot leaves is
-     `OP_CSV` with `008000` = 32,768 blocks — roughly seven months — read from
-     the probe's leaf dump in `RESULTS_rcw_2026-08-22.txt`.
+   - **`nLockTime` in the future AND at least one input non-final** → the
+     locktime is enforced. Legend: `SPENDABLE AFTER BLOCK <n>`. No warning.
+   - **Otherwise** → legend records what was observed, and `mt` prints a
+     prominent `stderr` warning that the plate **may be broadcast by anyone who
+     holds or photographs it, from the moment it is cut.**
+   - **If a node is reachable and `nLockTime` has ALREADY PASSED**, the plate is
+     spendable now despite carrying a locktime. `mt` warns. This is what the
+     height query is for, and it is the whole of `mt`'s use of the chain here —
+     it never hands the transaction to the node for validation.
 
-   So: **timelocked if EITHER lock is present and unmet**; immediately spendable
-   only when neither is. Where a relative lock is present and `mt` cannot resolve
-   the input's confirmation height — no node (§6a), no supplied data — it
-   **cannot compute the unlock height**, so it must say so rather than engrave a
-   `SPENDABLE AFTER BLOCK` it cannot substantiate.
+   **`nSequence` is not optional, and omitting it causes the dangerous error.**
+   `nLockTime` is enforced only when at least one input has
+   `nSequence != 0xFFFFFFFF`. A transaction with every input final ignores its
+   locktime — so reading `nLockTime` alone would engrave `SPENDABLE AFTER BLOCK
+   900000` on a plate anyone can broadcast today. That is **false reassurance on
+   steel**, the worst failure available here, and it is a field read rather than
+   a script read, so it stays in scope. `nSequence` appeared nowhere in the
+   534-line draft that first specified this rule.
 
-   The warning says the plate *may* be broadcast, not *will* be: relay also
-   depends on fee and on the inputs still being unspent.
+   > **What `mt` therefore CANNOT see, disclosed rather than glossed.** A BIP-68
+   > **relative** timelock lives in the witness script as `OP_CSV`, and a
+   > relative-locked spend has **`nLockTime = 0`**. Reading it means evaluating
+   > the sending wallet's script, which is out of scope by ruling. One of the
+   > RCW's own taproot leaves is exactly this — `OP_CSV` with `008000` = 32,768
+   > blocks, roughly seven months (`RESULTS_rcw_2026-08-22.txt`).
+   >
+   > **`mt` will therefore OVER-WARN on such transactions**, which is the safe
+   > direction: it says a plate might be spendable when it is not, and the
+   > operator — who chose the wallet — can disregard it. The unsafe direction,
+   > false reassurance, is closed by the `nSequence` rule above.
+   >
+   > **This is why the legend states an OBSERVATION, not a conclusion.** An
+   > earlier draft engraved `IMMEDIATELY SPENDABLE`, which is a positive claim
+   > about spendability that `mt` can no longer substantiate — engrave it on a
+   > `OP_CSV`-locked transaction and the steel permanently asserts something
+   > false. A `stderr` warning is disposable; a legend line is forever. The
+   > legend now reads **`NO BLOCK TIMELOCK`**: precisely true about the fields
+   > `mt` read, and silent about scripts it did not.
 5. **`gettxout` returns `null` for any input** → refuse, when a node is
    reachable. The output is spent or never existed. See §6a's limitation and
    §10.5 for the IBD case.
@@ -1069,6 +1109,13 @@ signed PSBT.
     binds a legacy amount by txid). With the premise gone the refusal needs a
     reason or should be dropped. Related: `sh(wsh(…))` is unclassified by §8.6's
     wording.
+18. **Does §8.2's consensus-engine check survive the scope line?** Split out of
+    §8.2, where the distinction is set out in full. Short version: running
+    libbitcoinconsensus over a finished transaction is *execution* — a
+    black-box yes/no, in process, no node, no descriptor — whereas the ruling
+    excludes *interpreting* scripts for timelock semantics. Operator's call.
+    **If it goes, §8 has no check that the transaction would validate at all.**
+
 17. **The firmware cannot yet engrave what §4 selects — and will be taught.**
     Operator ruling 2026-08-23: *"we will later teach SH2 how to handle
     transactions."* So this is scheduled firmware work rather than an unresolved
