@@ -563,6 +563,11 @@ silent about both the input amounts and the source scripts. It still does not na
 hence the stub living in text, because it is the one constellation-specific fact
 on the plate and F-234 forbids that inside the QR.
 
+> **`mt`'s INPUT is always a finalized PSBT (§10.10), even for `mt string`,
+> whose engraved payload is the extracted raw transaction.** Input format and
+> payload format are separate decisions; requiring a PSBT is what keeps §8.2 and
+> §8.2b runnable at all.
+>
 > **Do not lean on the PSBT's input amounts as trusted without a rule.** For
 > segwit inputs they are committed to by the signature (BIP-341 `sha_amounts`,
 > BIP-143), so they are cryptographically bound. **For legacy inputs nothing
@@ -1023,30 +1028,39 @@ signed PSBT.
    A `sysw` class says how the bytes *arrive*; it does not make the firmware able
    to engrave what §4 chose. **That gap is now §10.17.**
 
-10. **The CLI surface — output settled, input formats still open.** Operator
-    rulings 2026-08-23.
-
-    **Settled:**
+10. **The CLI surface — RULED.** Operator rulings 2026-08-23.
 
     | | |
     | --- | --- |
     | verbs | `mt qr`, `mt string` |
-    | input | a file **or** stdin, equivalently |
+    | **input** | **a finalized PSBT, and nothing else** — from a file or stdin, equivalently |
     | `mt qr` output | a **SH2 payload** (`sysw`) carrying the QR — machine engraving |
     | `mt string` output | the **codex32 string on stdout** — hand engraving |
     | stderr | every warning and refusal a human must see (§3b) |
-    | flags | **none for locktime.** `--timelocked` / `--immediate` are removed (§8.4) |
+    | flags | **none for locktime** (§8.4) |
 
-    So the two verbs differ in destination as well as medium: one addresses the
-    machine, the other addresses a person holding a stylus.
+    **Why PSBT-only, when `mt string`'s PAYLOAD is a raw transaction.** Input
+    format and payload format are independent, and conflating them would have
+    cost two refusals. §8 is written in PSBT vocabulary and degrades unevenly
+    without one:
 
-    **Still open, and it is a safety question rather than a convenience one:
-    which INPUT formats are accepted** — a binary PSBT, a base64 PSBT, raw
-    transaction hex, or several sniffed apart? §8.1's finalization check and
-    §8.2's script check are written in PSBT vocabulary, and a raw transaction
-    supports neither fully (§3's retraction), so accepting raw hex silently
-    weakens two refusals. Also unspecified: exit codes, and the format of the
-    refusal messages §8 promises will *"name the number that caused it"*.
+    | refusal | finalized PSBT | raw signed transaction |
+    | --- | --- | --- |
+    | §8.1 finalized? | reads `PSBT_IN_FINAL_*` | reads scriptSig/witness — **works** |
+    | §8.2 script-valid? | UTXO records ride along | **cannot run** — no prevouts |
+    | §8.2b value balance? | UTXO records give input values | **cannot run** — no input amounts |
+    | §8.6 satisfaction binds outputs? | parses the witness | parses the witness — **works** |
+
+    So accepting raw hex would **silently disable two refusals**, including the
+    only check that inputs ≥ outputs, while the artifact looked identical. `mt`
+    therefore requires a PSBT, runs the full refusal set against it, and then —
+    for `mt string` — extracts the raw transaction as the payload. Nothing is
+    lost: a PSBT is what wallet software emits at the point this workflow
+    starts, which is exactly the *"test it in your wallet first"* flow §0 is
+    built around.
+
+    **Still unspecified:** exit codes, and the format of the refusal messages
+    §8 promises will *"name the number that caused it"*.
 
 11. ~~How many codex32 characters fit a hand-engraved plate?~~ **CLOSED — OUT
     OF SCOPE**, operator ruling 2026-08-23: *"As many as a user wants. It is not
