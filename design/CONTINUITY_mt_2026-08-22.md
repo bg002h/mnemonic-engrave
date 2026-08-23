@@ -1,5 +1,20 @@
 # CONTINUITY — the `mt` cycle, 2026-08-22
 
+> **SUPERSEDED 2026-08-23.** This is the resume note written *before* the R0
+> review ran. Everything below describes the pre-review state and several of its
+> conclusions have since been overturned — UR was adopted and then **dropped
+> entirely**, transaction construction was **removed from scope**, and the
+> "three open questions" listed here are all now closed or reframed. Read
+> `design/SPEC_mt_v0_1.md` §10 for the live list; keep this only as the record
+> of where the cycle stood before review.
+>
+> Two citations in it were also wrong and are corrected in place. A bare
+> `backup.go` at line 161 does **not** name `frontSideSeed` — line 161 is inside
+> `EngraveSeedString`, and the real definition is `backup/backup.go:247`. A bare
+> `fountain.go` at 242 was right about the code but needed its `bc/` prefix to
+> resolve. The claim about "16/16 citations" below did not hold: the gate found
+> 6 of 12 dangling.
+
 Written before a context clear. Everything below is committed; `origin/master` is
 at `ba8fa57` (one later commit, the second push report, may still be local).
 
@@ -35,14 +50,15 @@ funds, addresses, a new normative format.
 ## The three open questions, in the order they matter
 
 1. **§10.6 — how much fountain redundancy?** THE BIG ONE. Currently zero: UR
-   parts `1..seqLen` are pure singletons (`fountain.go:242`), so **one
-   unreadable plate destroys the transaction**. An artifact whose purpose is
+   parts `1..seqLen` are pure singletons (`bc/fountain/fountain.go:242`), so
+   **one unreadable plate destroys the transaction**. An artifact whose purpose is
    surviving decades in a drawer cannot obviously ship that way, and buying
    tolerance costs one symbol — often one plate — per part.
 2. **§10.7 — back-side engraving.** Would recover the 25.5 mm the legend costs,
    restore two to three ECC levels, and halve several plate counts. But there is
-   **no back-side path in the fork**: `backup.go:161` is named `frontSideSeed`
-   and there is a single `Engraving` per plate. Firmware work; cost it before
+   **no back-side path in the fork**: `backup/backup.go:247` defines
+   `frontSideSeed`, called once at `backup/backup.go:134`, and there is a single
+   `Engraving` per plate. Firmware work; cost it before
    accepting the doubled plate counts.
 3. **F-234's optical test plate** — gates the 0.30 mm module. Matters more than
    it looks: finer modules are what buy the legend's space back without new
