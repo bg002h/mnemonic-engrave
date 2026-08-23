@@ -823,7 +823,7 @@ exactly as permanent, as a machine-engraved one.
    **`nSequence` is not optional, and omitting it causes the dangerous error.**
    `nLockTime` is enforced only when at least one input has
    `nSequence != 0xFFFFFFFF`. A transaction with every input final ignores its
-   locktime — so reading `nLockTime` alone would engrave `SPENDABLE AFTER BLOCK
+   locktime — so reading `nLockTime` alone would engrave `LOCKED TO BLOCK
    900000` on a plate anyone can broadcast today. That is **false reassurance on
    steel**, the worst failure available here, and it is a field read rather than
    a script read, so it stays in scope. `nSequence` appeared nowhere in the
@@ -1035,55 +1035,46 @@ signed PSBT.
    run a second job — a physical workflow rather than a `mt` feature. §4's plate
    counts therefore stand as one-sided.
 
-8. ~~How does a recoverer learn the fountain parameters?~~ **ANSWERED, and the
-   operator has ruled on what follows from it.**
+8. ~~How does a recoverer learn the fragment parameters?~~ **ANSWERED, and the
+   operator has ruled on what follows.**
 
    > **Ruling, operator, 2026-08-23: "each piece should say something like
    > n of m."**
 
-   Machine-readably this already holds at both layers, verified from source:
+   **Machine-readably this holds for both verbs, because §3 made them share one
+   header.** `ChunkHeader` carries `count` and `index` — n-of-m — plus a 20-bit
+   `chunk_set_id` so pieces of different transactions cannot be combined
+   (`crates/md-codec/src/chunk.rs`). For `mt string` that header sits inside the
+   BCH-protected chunk; for `mt qr` it rides in the base45 payload. **One
+   mechanism, both media.**
 
-   - **`mt string`** — `ChunkHeader` carries `count` and `index`
-     (`crates/md-codec/src/chunk.rs`), inside the BCH-protected header, plus a 20-bit
-     `chunk_set_id` shared across a set so pieces of different transactions
-     cannot be combined. This is the model; nothing to add.
-   - **`mt qr`** — every multi-part UR carries `SeqLen`, `MessageLen` and
-     `Checksum` in its CBOR (`bc/fountain/fountain.go:74-87`), and the string
-     itself reads `ur:psbt/<n>-<m>/…` (`bc/ur/ur.go:122`).
+   > **This item was answered TWICE, and the first answer is gone.** It
+   > originally analysed UR's fountain encoding — `SeqLen`/`MessageLen`/
+   > `Checksum` in CBOR, the `ur:psbt/<n>-<m>/` prefix, and three traps in the
+   > vendored decoder (the prefix is parsed then discarded; a single-part UR
+   > carries no length or checksum at all; `Progress()` is a `x1.75` heuristic
+   > that reaches 1.0 while `Result()` is still nil). **All of that is moot: §3
+   > dropped UR entirely.** The traps are recorded here only so a future reader
+   > who finds UR attractive again knows what the vendored implementation does.
 
-   **Three traps, all load-bearing for the ruling:**
+   **The gap the ruling closes, which survives the envelope change unaltered:**
+   `PLATE n OF m` is **not** `part n of m`. Under a multi-symbol tiling, plate 2
+   of 3 may carry parts 5–8 of 11, and §5's legend offers only the plate label.
+   A recoverer who scans out of sequence, or misses one symbol *on* a plate,
+   cannot tell which part is absent.
 
-   1. **The visible `<n>-<m>` prefix is NOT authoritative.** `bc/ur/ur.go:179`
-      parses it with `Sscanf` into locals `seq` and `n` — and then never uses
-      them, calling `d.fountain.Add(enc)` and letting the CBOR decide. The
-      prefix a human reads and the field a decoder obeys are different data. They
-      agree when `mt` writes both, but nothing enforces that.
-   2. **A single-part UR says nothing at all.** `bc/ur/ur.go:118`: at
-      `seqLen == 1` the encoder emits `ur:psbt/<data>` with **no `n-m` prefix**
-      and skips the fountain wrapper entirely, so there is no SeqLen, no
-      MessageLen and no Checksum. A lone symbol cannot state that it is
-      complete.
-   3. **`PLATE n OF m` is not `part n of m`, and §5 offers only the former.**
-      Under a multi-symbol tiling, plate 2 of 3 may carry parts 5–8 of 11.
-      Nothing in the spec maps symbols to plates or fixes their order, so a
-      recoverer who scans out of sequence, or misses one symbol *on* a plate,
-      cannot tell which part is absent. This is the gap the ruling closes.
+   **Normative:** every engraved symbol carries its own human-readable `n/m`
+   beside it, for the chunk it holds — independent of, and in addition to, the
+   plate's `PLATE n OF m`. A recoverer must be able to inventory what they hold
+   and name what is missing **without decoding anything**. A lone symbol reads
+   `1/1`, which is the only way it can state that it is whole.
 
-   **Normative, from the ruling:** every engraved symbol carries its own
-   human-readable `n/m` beside it, in engraved text, for the UR part it holds —
-   independent of, and in addition to, the plate's `PLATE n OF m`. A recoverer
-   must be able to inventory what they hold and name what is missing **without
-   decoding anything**. For the single-part case that label reads `1/1`, which is
-   the only way a lone symbol can say it is whole.
+   **Unpriced.** These labels consume plate area §4's table does not reserve,
+   exactly as the legend did before it was measured — see §10.14, which already
+   requires that regeneration. The cost is small per label (3–5 characters) but
+   it is per **symbol**, not per plate, and the worst artifact here carries 5.
+   **Measure before §4's numbers are treated as final.**
 
-   **Unpriced.** These labels consume plate area that §4's table does not
-   reserve, exactly as the legend did before it was measured — see §10.14, which
-   already requires that table's regeneration. Cost per label is small (3–5
-   characters) but it is per *symbol*, not per plate, and the worst artifact here
-   carries 5 symbols. **Measure before §4's numbers are treated as final.**
-
-   Also unchanged: `Progress()` is a `x1.75` UI heuristic that can reach 1.0
-   while `Result()` is still nil, so **nothing may gate on `Progress()`**.
 9. ~~How does the engraving reach the machine?~~ **ANSWERED, operator ruling
    2026-08-23: "send via payload unencrypted. We have a format for transferring
    data to SH2 via USB."**
@@ -1360,6 +1351,7 @@ The BCH corrector's existence was read from `crates/md-codec/src/bch_decode.rs` 
 `plan-cite-check.sh` has no root for it and those two were checked by hand.
 
 > The previous draft's §11 claimed *"everything measured is in
-> `design/measurements/`"* while the §6c/§6d block figures had no results file
+> `design/measurements/`"* while the block figures in the old sections 6c and 6d
+> — the Merkle-proof and header-cost material — had no results file
 > behind them. Those sections are now out of scope (§9), so the claim is true
 > again by subtraction rather than by generating the missing evidence.
