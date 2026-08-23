@@ -195,7 +195,8 @@ overturned an earlier assumption and are marked.
    > independently testable in a way an inline report inside `encode` would not
    > be.
 
-1a. **`mt decode` reads `mt` output, and ships in v0.1.** Operator ruling
+1a. **`mt decode` reads `mt` output and emits BROADCASTABLE HEX, and ships in
+   v0.1.** Operator ruling
    2026-08-23: *"we need a decode to read mt output."* It takes `mt1` strings —
    from a file, from stdin, typed or pasted, in any order — and reassembles the
    transaction.
@@ -214,6 +215,26 @@ overturned an earlier assumption and are marked.
    That last row is the one that matters. It is the *"funds-load-bearing
    invariant"* `md-codec`'s own source names, and it is what turns `decode` from
    a convenience into the check that the engraving round-trips at all.
+
+   **Its output is raw transaction HEX on stdout — not a PSBT, not JSON, not a
+   pretty-print.** Operator ruling 2026-08-23, settled by checking what the
+   ecosystem's broadcast paths accept:
+
+   | endpoint | accepts |
+   | --- | --- |
+   | `bitcoin-cli sendrawtransaction` | *"The **hex string** of the raw transaction"* |
+   | Esplora `POST /tx` | *"The transaction should be provided as **hex** in the request body"* |
+   | Esplora `POST /txs/package` | a JSON array of **hex** strings |
+
+   **Hex is the only format that reaches all of them without conversion**, and
+   the recoverer's last step is always a broadcast. So `decode` hands them
+   exactly what the next command wants:
+
+       mt decode < plates.txt | xargs bitcoin-cli sendrawtransaction
+
+   This closes the pipe `mt` sits in the middle of: **hex or PSBT in
+   (§8.2e), `mt1` strings onto steel, hex back out.** Everything human goes to
+   stderr at both ends, so the pipe stays clean.
 
    **`decode` is also how `encode` gets tested.** A format whose encoder has no
    decoder can only be verified against itself; with both, every artifact in §3b
@@ -1225,8 +1246,33 @@ exactly as permanent, as a machine-engraved one.
    > §8.2c's warning still exists for — is an input whose value arrives with
    > **no** `non_witness_utxo` at all, or by operator assertion under §8.2c.
 
-2e. **A raw signed transaction instead of a PSBT** → **accept, and warn
-   loudly.** Operator ruling 2026-08-23: *"we can't refuse raw hex signed tx. We
+2e. **Which serialisations `mt` accepts, and why all three.** Operator ruling
+   2026-08-23, settled by checking what the tools actually hand a user:
+
+   | form | recognised by | where a user gets it |
+   | --- | --- | --- |
+   | **binary PSBT** | the `psbt\xff` magic | a `.psbt` file from a wallet |
+   | **base64 PSBT** | the `cHNidP8` prefix | what wallets export and display |
+   | **raw transaction hex** | bare hex, no magic | **Bitcoin Core's default output** — see below |
+
+   Each is distinguishable by inspection, so `mt` sniffs rather than asking.
+
+   > **Core's canonical workflow ENDS in hex, which is why refusing it was
+   > untenable.** `finalizepsbt` takes `extract` (boolean, **default `true`**):
+   > *"If true and the transaction is complete, extract and return the complete
+   > transaction in normal network serialization instead of the PSBT."* So the
+   > moment a PSBT is finalized — the exact state `mt` requires — **Core stops
+   > returning a PSBT and returns hex.** A user must pass `extract=false`
+   > explicitly to keep the PSBT form.
+   >
+   > The earlier PSBT-only ruling would therefore have refused **the default
+   > output of the reference implementation**, for the one transaction state
+   > this tool exists to consume. That is a stronger reason than "refusing the
+   > engraved bytes is unhelpful", and it is why §8.2e accepts hex rather than
+   > tolerating it.
+
+   **A raw signed transaction is ACCEPTED, with a loud warning.** Operator
+   ruling 2026-08-23: *"we can't refuse raw hex signed tx. We
    have to warn loudly if they paste it and state what we can't verify."*
 
    **Refusing was the wrong response to someone holding the exact bytes that get
@@ -2071,6 +2117,9 @@ signed PSBT.
         mt encode: that is a transaction ID (a 64-character hash), not a
                    transaction. mt needs the transaction itself — a txid
                    identifies one, it does not contain one.
+
+    **Input and output serialisations are now settled** — three accepted input
+    forms (§8.2e) and raw hex out of `decode` (decision 1a in §1).
 
     **Still unspecified:** the flag spellings themselves, exit codes, and the
     format of the refusal messages §8 promises will *"name the number that
