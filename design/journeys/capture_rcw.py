@@ -39,11 +39,20 @@ OUT = os.path.join(W, "out", "rcw")
 PREFIX = {("tr", "keyed"): "tk", ("tr", "seating"): "ts",
           ("wsh", "keyed"): "wk", ("wsh", "seating"): "ws"}
 
-# The device shows addrProofPerChain = 2 per chain (gui/wallet_policy.go:184,
-# plan D6). The host derived FIVE per chain. Asserting on more than the screen
-# can hold would fail for the wrong reason, so the comparison uses the first two
-# of each chain — and the journey says plainly that the device proves a SAMPLE
-# of what the host proves.
+# TWO PER CHAIN IS SUFFICIENT — operator ruling 2026-08-22: "Two addresses is
+# fine, we don't need 5." This is settled; do not re-open it as a coverage gap.
+#
+# The device shows addrProofPerChain = 2 (gui/wallet_policy.go:184, plan D6),
+# pinned by a test (gui/wallet_policy_test.go:33, "want 2 (plan D6)"), and the
+# firmware states the reason at the constant: a chain mismatch silently loses
+# funds, so proving BOTH CHAINS derive beats proving one chain five times. A
+# backdoored screen defeats five addresses exactly as easily as two; the extra
+# three buy reading fatigue on a consent surface and no extra evidence.
+#
+# The host still derives five, deliberately: the device proves a SAMPLE and the
+# host proves the RANGE. The comparison asserts the device's four values are
+# byte-equal to host indices 0-1 per chain, rather than quietly comparing fewer
+# and calling it agreement.
 DEVICE_PER_CHAIN = 2
 
 

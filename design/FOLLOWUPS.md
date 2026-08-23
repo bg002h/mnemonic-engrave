@@ -9537,7 +9537,16 @@ unreadable policy 2, de-keyed policy 1.
     SeedHammer II (captured walk)     : bc1qr6h5gahcaqa8a35p3ts0d2w6qvhmsn7dhunu5xd9kyculcgz3dwqf266zj
 
 The two host implementations **agree with each other** on the new wallet — that
-cross-language check still passes. The device value is read from a captured JSON
+cross-language check still passes.
+
+**Settled while investigating, so the re-run does not re-open it:** the device
+proves **two addresses per chain**, and that is enough. Operator ruling
+2026-08-22, *"Two addresses is fine, we don't need 5."* It agrees with the
+firmware, which pins `addrProofPerChain = 2` with a test
+(`gui/wallet_policy_test.go:33`) and argues at the constant that a chain
+mismatch silently loses funds, so proving both chains beats proving one chain
+five times. The host keeps deriving five: the device proves a sample, the host
+proves the range. Recorded at `DEVICE_PER_CHAIN` in `capture_rcw.py`. The device value is read from a captured JSON
 of a walk against the OLD wallet, so it cannot match and no code change will make
 it. **Re-run `capture_rcw.py --wrapper wsh --route seating`** against the
 emulator, then rebuild the PDF. `transcript_rcw.txt` (old template-id at lines
