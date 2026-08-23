@@ -270,7 +270,7 @@ free to engrave copies. Two consequences follow and are load-bearing:
   hardened against.
 
 **Its cost.** The chunk header is 37 bits per symbol
-(`md-codec/src/chunk.rs`), against UR's ~49 characters of prefix, CRC and CBOR
+(`crates/md-codec/src/chunk.rs`), against UR's ~49 characters of prefix, CRC and CBOR
 per fragment. §3b measures the chunk arithmetic; §4's plate table is computed on
 the payload sizes that follow from it.
 
@@ -287,8 +287,8 @@ form: human-readable, hand-engravable, and — the point — **fault tolerant**.
 **The machinery exists and is proven; `mt1` is a new payload in it, not a new
 codec.** `md-codec` ships a syndrome-based BCH *corrector*, not merely a
 detector: `decode_with_correction` and `CorrectionDetail` in
-`md-codec/src/lib.rs:48`, Berlekamp–Massey over `GF(1024)` in
-`md-codec/src/bch_decode.rs`, on the `BCH(93,80,8)` regular-code variant of
+`crates/md-codec/src/lib.rs:48`, Berlekamp–Massey over `GF(1024)` in
+`crates/md-codec/src/bch_decode.rs`, on the `BCH(93,80,8)` regular-code variant of
 BIP-93. A hand engraver who cuts a character wrong gets it corrected rather than
 discovering years later that the plate is scrap.
 
@@ -326,8 +326,8 @@ span: `mt string` for short transactions, `mt qr` for anything.
 > x 5 bits − 37 header bits, i.e. what a chunk *could* carry if the chunker
 > **filled** to long-form capacity. **It does not.** `md-codec` sizes chunks by
 > `SINGLE_STRING_PAYLOAD_BIT_LIMIT = 64 * 5 = 320` bits
-> (`md-codec/src/chunk.rs:224`), applied over `payload_bytes.len() * 8`
-> (`md-codec/src/chunk.rs:253-254`) — a flat **40 bytes per chunk**.
+> (`crates/md-codec/src/chunk.rs:224`), applied over `payload_bytes.len() * 8`
+> (`crates/md-codec/src/chunk.rs:253-254`) — a flat **40 bytes per chunk**.
 >
 > The old model claimed 2,904 B where the real ceiling is **2,560 B**, leaving a
 > **344-byte band** in which a transaction the table called "fits" would in fact
@@ -567,9 +567,9 @@ md1 identity, form-aware — WalletPolicyId for a keyed wallet, the key-stable
 WalletDescriptorTemplateId for a keyless template — reusing `mk1`'s existing
 derivation — all three citations below are in the **`mnemonic-key` repo**, not
 this one, so `plan-cite-check.sh` cannot resolve them and they were checked by
-hand: `POLICY_ID_STUB_BYTES = 4` at `mk-codec/src/consts.rs:60`, the form-aware
-rule documented at `mk-codec/src/key_card.rs:25-33`, and the derivation
-`derive_stub_from_md1_card` at `mk-cli/src/cmd/mod.rs:126`. So one convention
+hand: `POLICY_ID_STUB_BYTES = 4` at `crates/mk-codec/src/consts.rs:60`, the form-aware
+rule documented at `crates/mk-codec/src/key_card.rs:25-33`, and the derivation
+`derive_stub_from_md1_card` at `crates/mk-cli/src/cmd/mod.rs:126`. So one convention
 spans the constellation. If the legend says wallet X and the transaction spends
 wallet Y's UTXOs, **the transaction wins.** The stub exists to help a human find
 the right plates, not to validate anything, and nothing may branch on it.
@@ -688,7 +688,7 @@ exactly as permanent, as a machine-engraved one.
    is refused under (1)'s sibling rule: `mt` requires the MIN form of §3.
 2b. **Value-blind acceptance** → refuse. **§8.2 does not cover this and the
    previous draft had no check at all.** `verify_transaction` is a per-input
-   *script* loop — read from `bitcoin-0.32.101/src/consensus/validation.rs:82-107`,
+   *script* loop — read from `consensus/validation.rs` in the `bitcoin` 0.32.101 crate (lines 82-107 of the registry source),
    it iterates `tx.input` calling `verify_script_with_flags` and returns — so it
    never compares input value against output value. Outputs exceeding inputs,
    duplicate inputs and an empty `vin` all pass every other refusal here.
@@ -696,8 +696,8 @@ exactly as permanent, as a machine-engraved one.
 
    - **inputs ≥ outputs** (`SendingTooMuch`);
    - **fee within a sane band** — `rust-bitcoin`'s own ceiling is
-     `DEFAULT_MAX_FEE_RATE = 25,000 sat/vB` (`psbt/mod.rs:136`, raised as
-     `AbsurdFeeRate` at `:198-215`), and a fee at the *other* extreme is a plate
+     `DEFAULT_MAX_FEE_RATE = 25,000 sat/vB` (`DEFAULT_MAX_FEE_RATE` in the crate's `psbt` module, raised as
+     `AbsurdFeeRate` in the same file), and a fee at the *other* extreme is a plate
      that will never relay;
    - **no duplicate outpoints**, and **`vin` non-empty**.
 
@@ -940,7 +940,7 @@ signed PSBT.
    Machine-readably this already holds at both layers, verified from source:
 
    - **`mt string`** — `ChunkHeader` carries `count` and `index`
-     (`md-codec/src/chunk.rs`), inside the BCH-protected header, plus a 20-bit
+     (`crates/md-codec/src/chunk.rs`), inside the BCH-protected header, plus a 20-bit
      `chunk_set_id` shared across a set so pieces of different transactions
      cannot be combined. This is the model; nothing to add.
    - **`mt qr`** — every multi-part UR carries `SeqLen`, `MessageLen` and
@@ -1041,7 +1041,7 @@ signed PSBT.
     **BCH correction is PER CHUNK, and it is `t = 4`.** `decode_regular_errors`
     returns `None` for any pattern above *"t = 4 errors"*, against a 13-symbol
     checksum (`REGULAR_CHECKSUM_SYMBOLS`) over a codeword of at most 93 symbols
-    (`md-codec/src/bch_decode.rs`). Each chunk therefore carries its **own
+    (`crates/md-codec/src/bch_decode.rs`). Each chunk therefore carries its **own
     independent 4-error budget**.
 
     1. **Fewer chunks means less total correction.** For a fixed payload,
@@ -1067,7 +1067,7 @@ signed PSBT.
     transfer:
 
     - **`MD_REGULAR_CONST` is hardcoded** into checksum create and verify
-      (`md-codec/src/bch.rs`), and the constellation's convention is a
+      (`crates/md-codec/src/bch.rs`), and the constellation's convention is a
       per-format NUMS constant plus its own HRP. **`mt1` has neither specified.**
       Two formats sharing a constant means a chunk of one can verify as a chunk
       of the other.
@@ -1140,7 +1140,7 @@ against the 64-chunk container.
 > That draft called them "a floor, for the balancing reason stated in §3b" —
 > i.e. because `md`'s chunker balances rather than fills. **That reason is now
 > void**: §3b's correction established that chunk sizing is a flat 40 payload
-> bytes (`md-codec/src/chunk.rs:224,253-254`), so the count is *exact* for a
+> bytes (`crates/md-codec/src/chunk.rs:224,253-254`), so the count is *exact* for a
 > given payload size.
 >
 > They are a lower bound because of what is fed in. `md-codec` chunks the output
@@ -1151,8 +1151,8 @@ against the 64-chunk container.
 > is precisely open question §10.13, and it must close before these counts are
 > treated as final.
 
-The BCH corrector's existence was read from `md-codec/src/bch_decode.rs` and
-`md-codec/src/lib.rs:48` in the `descriptor-mnemonic` repo — a sibling, so
+The BCH corrector's existence was read from `crates/md-codec/src/bch_decode.rs` and
+`crates/md-codec/src/lib.rs:48` in the `descriptor-mnemonic` repo — a sibling, so
 `plan-cite-check.sh` has no root for it and those two were checked by hand.
 
 > The previous draft's §11 claimed *"everything measured is in

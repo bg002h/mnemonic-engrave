@@ -21,7 +21,7 @@ wallets?* Three subjects, three result files:
   figure was the *theoretical* filled capacity: 64 chunks x (80 data symbols −
   37 header bits) = 363 payload bits each. The real chunker does not fill. It
   sizes by `SINGLE_STRING_PAYLOAD_BIT_LIMIT = 64 * 5 = 320` bits
-  (`md-codec/src/chunk.rs:224`, applied at `:253-254`) — a flat **40 payload
+  (`crates/md-codec/src/chunk.rs:224`, applied at `:253-254`) — a flat **40 payload
   bytes per chunk**, so 64 chunks is **2,560 B**.
 
   That error lived in ONE helper, `(n * 8).div_ceil(363)`, copied into **seven**
