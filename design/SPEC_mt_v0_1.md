@@ -622,9 +622,10 @@ mitigation, the row says so instead of inventing one.
 | **Bearer** — holder can broadcast (`mt string`) | **accepted risk, not mitigated on the plate.** `mt` emits a string, not an engraving, so it has no mechanism to put a warning on hand-cut steel (§3b). It warns once on `stderr` at encode time, to the person encoding — who is not the person holding the plate later. The timelock bound still applies |
 | **Pinned destination** — a 2040 recoverer pays a 2026 address whose keys may be lost | **cannot be fixed; partly disclosed.** §5's `TO` line names the destination **wallet** (id or fingerprint), which does not degrade with output count as the old truncated-address form did — but it is **optional**, and says nothing when the destination is not a known wallet (§10.4). `mt` displays every output in full at encode time; the plate carries a summary |
 | **Indistinguishable from a watch-only plate** — an `mt1` plate sits in the same drawer as `md1` and `mk1` plates, in the same script, differing in **one HRP character**, and is the only one of the three that is spendable by whoever picks it up | for `mt qr` the `BEARER` legend line carries the difference. For `mt string` there is **no mitigation** — see the bearer row above and §3b. R0 round 1 (R-13) |
-| **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed, and is NOT on the plate.** Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving. A holder in 2040 recovers the fee by decoding **only for `mt qr`**, whose PSBT payload carries the input amounts; an `mt string` plate carries a raw transaction, from which the fee is **not** recoverable without the prevouts |
+| **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **partly recoverable via CPFP, and NOT on the plate.** A holder who controls one of the transaction's outputs can spend it with a high-fee child and have the pair scored together — this needs no keys from the original signer, which is what makes it the *only* fee-bump available to a plate holder. **RBF is not**: replacing a transaction means signing a new one, and the plate holder has a signed transaction, not keys. Caveat: CPFP has historically required the parent to reach the mempool at all, so a fee below minimum relay may be unrescuable (§10.19). Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving. A holder in 2040 recovers the fee by decoding **only for `mt qr`**, whose PSBT payload carries the input amounts; an `mt string` plate carries a raw transaction, from which the fee is **not** recoverable without the prevouts |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
 | **Non-`ALL` sighash** — an input signed with `SIGHASH_NONE` or `SIGHASH_SINGLE` leaves outputs unbound, so a plate-holder can redirect the funds and the `TO` line becomes a lie | refused at encode time, §8.6 — **structurally**, since §8.2's removal left no script engine |
+| **Wrong input value** — a legacy input whose claimed value is wrong yields a valid transaction with a catastrophic fee | **not detectable by `mt`.** §8.2's removal means no signature is verified, and a legacy sighash never committed to the amount anyway. Mitigated only by §8.2c's engraved out-of-band reminder |
 | **Well-formed but INVALID** — a transaction with a bad signature engraves cleanly and fails at broadcast, years later | **accepted, not mitigated.** Operator ruling 2026-08-23 removed script verification from v0.1 (§8.2). §8.1 sees a witness, §8.2b sees balanced values, §8.6 sees correct sighash flags — none of them verifies the signature. `mt` may add this someday |
 
 > The last two rows are the honest state of this design. R0 lens 2 found that the
@@ -693,6 +694,43 @@ exactly as permanent, as a machine-engraved one.
    > is `extract_tx()`, and it refuses on **three** counts — `MissingInputValue`,
    > `SendingTooMuch` and `AbsurdFeeRate`. §8 adopted the first and ignored the
    > other two while citing the same API as its standard of care.
+
+2c. **Input values missing → require them, and warn about what cannot be
+   checked.** Operator ruling 2026-08-23: *"Only require user to supply utxo
+   values if not part of the psbt… But do instruct user on stderr to engrave a
+   reminder to double check utxo input out of band."*
+
+   A finalized PSBT in the MIN form normally carries every input's UTXO record
+   (§3), so `mt` computes the fee itself and asks for nothing. Where a record is
+   **absent**, `mt` requires the operator to supply that input's value — or the
+   total across all inputs — because §8.2b cannot check the value balance
+   without it.
+
+   **`mt` then tells the operator, on `stderr`, to engrave a reminder to verify
+   the input values out of band.** That instruction is not ceremony, and §7
+   records why:
+
+   > **A wrong input value is the one funds-loss path §8 cannot close, and
+   > §8.2's removal widened it.** The value is not in the transaction — it lives
+   > in the already-confirmed previous output — so **no miner can alter it and
+   > no attacker can inflate the fee that way.** The hazard is entirely that the
+   > *claimed* value is wrong. If an input is really 10 BTC, the claim says 1,
+   > and the outputs total 0.99, the intended fee of 0.01 is really **9.01 BTC**
+   > — and the transaction is perfectly valid.
+   >
+   > Whether that is caught depends on the input type, and this is exactly what
+   > BIP-143 was written for (*"eliminates the possibility to lie to offline
+   > signing devices about the fee of a transaction"*):
+   >
+   > | input | sighash commits to the amount? | a wrong value produces |
+   > | --- | --- | --- |
+   > | SegWit v0 (BIP-143) | **yes** | an invalid signature — caught by anyone who verifies |
+   > | Taproot (BIP-341) | **yes** | an invalid signature — caught |
+   > | **legacy** | **no** | **a valid signature and a catastrophic fee** |
+   >
+   > With §8.2 removed `mt` verifies no signatures at all, so for a legacy input
+   > the operator's number is checked against **nothing**. The engraved reminder
+   > is the mitigation, and it is load-bearing rather than belt-and-braces.
 
 3. **An unsigned or unfinalized transaction offered for engraving** → refuse. It
    cannot be broadcast, so it is not a backup.
@@ -809,18 +847,18 @@ exactly as permanent, as a machine-engraved one.
       > is a structural heuristic, not a proof, and the spec should not claim
       > more than that.
 
-   > **CORRECTION — the previous draft also refused all legacy (non-segwit)
-   > inputs, and its stated reason was false.** It claimed *"nothing in a legacy
-   > sighash commits to the input amount, so the PSBT's UTXO record for it is
-   > unverifiable."* The first clause is true and the conclusion does not
-   > follow: a legacy input's amount is verified through `non_witness_utxo`,
-   > which carries the **whole previous transaction**, so hashing it and
-   > matching the txid binds the amount without any help from the sighash. That
-   > is exactly the `non_witness_utxo`-versus-`witness_utxo` distinction.
+   > **Legacy inputs are ACCEPTED. Operator ruling 2026-08-23:** *"Do not
+   > exclude legacy inputs. It is user responsibility to know their inputs for
+   > such edge cases."* The previous draft refused them, and its stated reason
+   > was false: it claimed a legacy amount is unverifiable because the sighash
+   > does not commit to it. The first clause is true; the conclusion does not
+   > follow, since BIP-174 requires `non_witness_utxo` for a legacy input —
+   > the **whole previous transaction** — so hashing it and matching the txid
+   > binds the amount without any help from the sighash.
    >
-   > Whether to refuse legacy inputs anyway is now an **open decision, §10.16**,
-   > not a settled rule with a broken justification. Note also that `sh(wsh(…))`
-   > is unclassified by the current wording.
+   > `sh(wsh(…))` is therefore no longer an unclassified case: wrapped-segwit
+   > inputs are segwit inputs, and every input type is accepted.
+
 7. **Over the plate budget (`mt qr`)** → refuse, naming the exact plate count
    and what would fit.
 7b. **Over the 64-chunk container (`mt string`)** → refuse, naming the chunk
@@ -1181,11 +1219,14 @@ signed PSBT.
     still verifies that the timelock it was handed is **enforced** (§8.4) — it
     simply does not judge whether the horizon is wise.
 
-16. **Should `mt` refuse legacy (non-segwit) inputs at all?** The previous
-    draft's rule did, on a false premise (§8.6's correction: `non_witness_utxo`
-    binds a legacy amount by txid). With the premise gone the refusal needs a
-    reason or should be dropped. Related: `sh(wsh(…))` is unclassified by §8.6's
-    wording.
+16. ~~Should `mt` refuse legacy (non-segwit) inputs at all?~~ **CLOSED — NO**,
+    operator ruling 2026-08-23: *"Do not exclude legacy inputs. It is user
+    responsibility to know their inputs for such edge cases."* See §8.6. The
+    original refusal's premise was false (`non_witness_utxo` binds a legacy
+    amount by txid), and `sh(wsh(…))` is no longer unclassified since every
+    input type is accepted. The residual risk is handled by §8.2c's engraved
+    out-of-band reminder and recorded in §7.
+
 17. **The firmware cannot yet engrave what §4 selects — and will be taught.**
     Operator ruling 2026-08-23: *"we will later teach SH2 how to handle
     transactions."* So this is scheduled firmware work rather than an unresolved
@@ -1209,6 +1250,24 @@ signed PSBT.
     dependency, and §7 carries the accepted hazard: a transaction with a bad
     signature engraves cleanly and fails at broadcast. Reopen if it is ever
     added.
+
+
+19. **Does CPFP still require the parent to reach the mempool?** §7 now names
+    CPFP as the only fee-bump available to a plate holder, since it needs no
+    keys from the original signer. Historically a parent below minimum relay
+    fee was rejected outright and no child could rescue it; package relay in
+    recent Bitcoin Core versions changes this, and **the spec should not lean on
+    CPFP until current behaviour is verified against the real thing.** Cheap to
+    settle against the synced node.
+
+20. **Legacy inputs are txid-malleable, and the content id is the txid.** A
+    legacy `scriptSig` can be re-encoded by a third party in relay without
+    invalidating the signature, changing the txid — what SegWit fixed. The
+    engraved bytes still have exactly one txid and a recoverer re-derives it
+    deterministically, so §10.13's content id is sound. But **if a malleated
+    version confirms first, the confirmed txid will not match the plate's** —
+    the plate is not wrong, it is superseded, and the original can no longer
+    confirm. Worth a sentence somewhere a recoverer will read.
 
 ## 11. Provenance of the numbers
 
