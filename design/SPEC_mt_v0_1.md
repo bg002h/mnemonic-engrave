@@ -938,7 +938,8 @@ artifact, stderr carries everything the human must see.**
 **once**, by the person doing the encoding. The person holding the plate in 2040
 is a different person, and the plate itself says nothing. This is a deliberate
 asymmetry between the two verbs — `mt qr` engraves `BEARER - ANYONE HOLDING THIS
-CAN SPEND IT` as the first line of a legend `mt` controls, and `mt encode` has
+CAN BROADCAST IT` as the first line of a legend `mt` controls, and `mt encode`
+has
 no such mechanism because it emits no engraving. §7 records it as an accepted
 risk, not as a mitigation.
 
@@ -1047,18 +1048,36 @@ The 0.30 mm results are recorded for when the plate exists.
 Everything constellation-specific lives here, in engraved text, never in the QR.
 
 **The legend carries only what a human needs BEFORE the QR is decoded.** Five
-fields, **141 characters**, 6 lines — measured,
+fields, **145 characters**, 6 lines — measured,
 `RESULTS_legend_budget_2026-08-22.txt`:
 
 | field | chars | why |
 | --- | --- | --- |
-| `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
+| `BEARER - ANYONE HOLDING THIS CAN BROADCAST IT` | 45 | the plate is spendable; this is not a backup in the sense the other formats are |
+
+> **"BROADCAST", not "SPEND" — operator ruling 2026-08-23, and the old wording
+> contradicted a guarantee this spec makes.** §8.6 refuses any input whose
+> satisfaction does not bind the outputs, so a holder **cannot redirect the
+> money**: the destination is fixed by signatures they cannot alter. What they
+> can do is **cause the transaction to happen** — sending the funds where the
+> operator already chose, at a moment the operator did not.
+>
+> So `SPEND` was wrong in both directions. It **overstates** the holder's power,
+> implying theft that §8.6 exists to prevent; and it **misnames the real
+> hazard**, which is *timing* — a payment completed early, or after the operator
+> changed their mind, or after the destination wallet became unreachable. A
+> reader who takes "spend" literally builds the wrong model of what they are
+> holding.
+>
+> Cost: 41 → 45 characters, legend 141 → **145**, still **6 lines**
+> (`RESULTS_legend_budget_2026-08-22.txt`), so §4's reservation does not move.
+
 | `FROM WALLET <8 hex>` | 20 | wallet id or seed fingerprint. The transaction does **not** say what it spends *from* (§6). **Optional — loudly warned when absent** (§10.4) |
 | `LOCKED TO BLOCK <n> ~<SEASON> <year>` / `LOCKED UNTIL <t>` | 35 | the single most actionable fact. Reads **`NO TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
 | `TO <wallet id, fp or label>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when blank.** A free-text label is allowed **only behind an explicit flag**, since nothing can check it against the transaction |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
-Plus, **not part of the 141-character budget above**, one `n/m` label engraved
+Plus, **not part of the 145-character budget above**, one `n/m` label engraved
 beside **each QR symbol**, naming the `mt1` chunk it carries (§10.8's ruling). A
 plate may hold several symbols, so `PLATE n OF m` alone cannot tell a recoverer
 which *part* is missing. These labels are per-symbol and their area is not yet

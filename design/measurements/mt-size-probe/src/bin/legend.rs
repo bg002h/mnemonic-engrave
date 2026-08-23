@@ -47,7 +47,7 @@ fn legend(n_inputs: usize) -> Vec<(&'static str, String)> {
 /// anyway because you still have no transaction.
 fn minimal_legend() -> Vec<(&'static str, String)> {
     vec![
-        ("bearer warning", "BEARER - ANYONE HOLDING THIS CAN SPEND IT".into()),
+        ("bearer warning", "BEARER - ANYONE HOLDING THIS CAN BROADCAST IT".into()),
         ("source wallet",  "FROM WALLET fa568be0".into()),
         ("locktime",       "LOCKED TO BLOCK 1383520 ~FALL 2034".into()),
         ("destination",    "TO bc1p8rrz...s6n0vcl  0.00399 BTC".into()),
