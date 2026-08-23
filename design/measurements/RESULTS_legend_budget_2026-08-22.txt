@@ -1,0 +1,29 @@
+PLATE_TEXT_BUDGET = 300 chars (35 chars/line x 20 lines, TEXT-ONLY plate)
+
+  FULL legend, 1-input sweep: 10 fields,  474 ch, 18 lines -> OVER BUDGET
+  FULL legend, 2-input sweep: 12 fields,  622 ch, 23 lines -> OVER BUDGET
+  FULL legend, 5-input sweep: 18 fields, 1066 ch, 38 lines -> OVER BUDGET
+
+  MINIMAL legend (any input count): 5 fields, 136 ch, 6 lines -> fits budget
+     bearer warning    41 ch  BEARER - ANYONE HOLDING THIS CAN SPEND IT
+     source wallet     20 ch  FROM WALLET fa568be0
+     locktime          29 ch  SPENDABLE AFTER BLOCK 1383520
+     destination       34 ch  TO bc1p8rrz...s6n0vcl  0.00399 BTC
+     symbol index      12 ch  PLATE 1 OF 1
+
+=== ROOM BESIDE THE QR — the binding constraint ===
+  config @0.60mm                  QR mm    strip mm   lines   chars     FULL(1in)      MINIMAL
+  RCW tr key-path  v13 ECC H     46.2mm      32.8mm       7     245            NO         fits
+  RCW tr tier4     v22 ECC H     67.8mm      11.2mm       2      70            NO           NO
+  3-of-5 signed    v24 ECC H     72.6mm       6.4mm       1      35            NO           NO
+  RCW tr tier1     v25 ECC H     75.0mm       4.0mm       0       0            NO           NO
+  RCW wsh tier1    v26 ECC Q     77.4mm       1.6mm       0       0            NO           NO
+
+=== what ECC each config could afford if the legend needs 6 lines (25.5mm) ===
+  v13    46.2mm  + legend 25.5mm =  71.7mm  fits one plate
+  v18    58.2mm  + legend 25.5mm =  83.7mm  NEEDS A SECOND PLATE
+  v20    63.0mm  + legend 25.5mm =  88.5mm  NEEDS A SECOND PLATE
+  v22    67.8mm  + legend 25.5mm =  93.3mm  NEEDS A SECOND PLATE
+  v24    72.6mm  + legend 25.5mm =  98.1mm  NEEDS A SECOND PLATE
+  v25    75.0mm  + legend 25.5mm = 100.5mm  NEEDS A SECOND PLATE
+  v26    77.4mm  + legend 25.5mm = 102.9mm  NEEDS A SECOND PLATE

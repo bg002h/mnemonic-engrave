@@ -13,6 +13,13 @@ use qrcode::{EcLevel, QrCode, Version};
 
 const USABLE_MM: f64 = 79.0;
 const QUIET: usize = 4;
+/// The plate must hold the QR *and* its legend. Measured in legend.rs: the
+/// minimal legend is 5 fields / 136 chars / 6 lines, and the fork's own budget
+/// comment implies a 4.25 mm line pitch (85 mm / 20 lines). Plate 1 carries the
+/// full legend; later plates carry only "PLATE n OF m", one line.
+const LINE_PITCH_MM: f64 = 85.0 / 20.0;
+const LEGEND_LINES_FIRST: f64 = 6.0;
+const LEGEND_LINES_REST: f64 = 1.0;
 /// 0.30 mm = one engraved stroke, the theoretical floor and OPTICALLY
 /// UNVALIDATED (F-234). 0.60 mm = two strokes, the conservative floor.
 const MODULES_MM: [f64; 4] = [0.30, 0.45, 0.60, 0.90];
@@ -57,15 +64,28 @@ fn best(units: usize, alnum: bool, min_module_mm: f64, caps: &Caps) -> Option<Pi
     for &mm in MODULES_MM.iter().filter(|m| **m >= min_module_mm - 1e-9) {
         for v in 1..=40u8 {
             let fp = (modules(v) + 2 * QUIET) as f64 * mm;
-            let k = (USABLE_MM / fp).floor() as usize;
-            if k == 0 { continue }
-            let per_plate = k * k;
+            // Reserve legend height. Symbols tile the width freely, but the
+            // vertical budget is shared with the text.
+            let h_first = USABLE_MM - LEGEND_LINES_FIRST * LINE_PITCH_MM;
+            let h_rest  = USABLE_MM - LEGEND_LINES_REST  * LINE_PITCH_MM;
+            let across = (USABLE_MM / fp).floor() as usize;
+            let rows_first = (h_first / fp).floor() as usize;
+            let rows_rest  = (h_rest  / fp).floor() as usize;
+            if across == 0 || rows_rest == 0 { continue }
+            let first_cap = across * rows_first;   // may be 0: QR too tall to share with the legend
+            let per_plate = across * rows_rest;
             for ec in [EcLevel::L, EcLevel::M, EcLevel::Q, EcLevel::H] {
                 let c = if alnum { caps.alnum[v as usize][ec_rank(ec) as usize] }
                         else { caps.byte[v as usize][ec_rank(ec) as usize] };
                 if c == 0 { continue }
                 let symbols = units.div_ceil(c);
-                let plates = symbols.div_ceil(per_plate);
+                // plate 1 holds `first_cap`; the rest hold `per_plate` each
+                let plates = if symbols <= first_cap { 1 }
+                             else if first_cap == 0 {
+                                 // legend cannot share a plate with this symbol
+                                 // size: it needs a plate of its own
+                                 1 + symbols.div_ceil(per_plate)
+                             } else { 1 + (symbols - first_cap).div_ceil(per_plate) };
                 let better = match &best {
                     None => true,
                     // RULE: fewest plates wins; ties go to the strongest ECC;
@@ -101,7 +121,9 @@ fn main() {
     for (min_mm, title) in [(0.60_f64, "CONSERVATIVE — 0.60 mm modules (2 strokes), optically plausible"),
                             (0.30_f64, "AGGRESSIVE — 0.30 mm allowed (1 stroke, UNVALIDATED, F-234)")] {
         println!("\n=== {title} ===");
-        println!("  rule: fewest plates first, then the STRONGEST ECC that still fits that plate count\n");
+        println!("  rule: fewest plates first, then the STRONGEST ECC that still fits that plate count");
+        println!("  CORRECTED: the plate must hold the QR *and* the legend (6 lines = {:.1}mm on plate 1)\n",
+                 LEGEND_LINES_FIRST * LINE_PITCH_MM);
         for (l, n) in [
             ("single-sig tr, 1in sweep", 162usize),
             ("RCW tr key-path, 1in", 162),

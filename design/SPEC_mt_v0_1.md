@@ -126,28 +126,44 @@ error correction. Never trade a plate for redundancy; never leave redundancy
 unbought.
 
     search space:  module size x QR version (1..40) x ECC (L,M,Q,H) x k*k tiling
-    objective:     minimise plates
+    objective:     minimise plates      <- a plate must hold the QR AND its legend
                    then maximise ECC
                    then minimise symbol count
     plate:         85 x 85 mm, outerMargin 3 mm => 79 mm usable
     quiet zone:    4 modules per side, per symbol
+    legend:        6 lines reserved on plate 1 (25.5 mm at a 4.25 mm pitch),
+                   1 line on every later plate for "PLATE n OF m"
 
-The rule turns out to be nearly free. Measured, at the conservative 0.60 mm
-module (`RESULTS_ecc_selection_2026-08-22.txt`):
+> **This objective is a correction, and the first version of this spec had it
+> wrong.** §4 originally minimised plates for the QR alone while §5 specified a
+> legend beside it — and the two were **mutually unsatisfiable**. Measured: the
+> ECC-maximising symbol for RCW `tr` tier 1 is 75.0 mm of a 79 mm plate, leaving
+> a **4 mm strip: zero text lines**. RCW `wsh` tier 1 left 1.6 mm. Only the
+> smallest artifact left room for any legend at all. The table below is the
+> regenerated one; the optimistic original is gone.
+
+Measured at the conservative 0.60 mm module, **with the legend reserved**
+(`RESULTS_ecc_selection_2026-08-22.txt`):
 
 | artifact | raw bytes | UR |
 | --- | --- | --- |
 | RCW `tr` key-path, 1-in | 1 plate, v13, **ECC H** | 1 plate, v16, **ECC H** |
-| RCW `tr` tier 4, 1-in | 1 plate, v22, **ECC H** | 1 plate, v26, **ECC H** |
-| 3-of-5 signed, 1-in | 1 plate, v24, **ECC H** | 1 plate, v25, ECC Q |
-| RCW `tr` tier 1, 1-in | 1 plate, v25, **ECC H** | 1 plate, v26, ECC Q |
-| RCW `wsh` tier 1, 1-in | 1 plate, v26, ECC Q | 1 plate, v26, ECC M |
-| 9-of-11 signed, 1-in | 1 plate, v24, ECC L | **2 plates**, v22, ECC M |
+| RCW `tr` tier 4, 1-in | 1 plate, v15, ECC M | 1 plate, v16, ECC L |
+| 3-of-5 signed, 1-in | 1 plate, v15, ECC L | **2 plates**, 6 qr, ECC Q |
+| RCW `tr` tier 1, 1-in | 1 plate, v16, ECC L | **2 plates**, 6 qr, ECC Q |
+| RCW `wsh` tier 1, 1-in | **2 plates**, 6 qr, ECC Q | **2 plates**, 6 qr, ECC M |
+| 9-of-11 signed, 1-in | **2 plates**, v24, ECC L | **3 plates**, v22, ECC M |
+| RCW `tr` tier 1, 5-in | **4 plates**, v23, ECC M | 4 plates, v24, ECC L |
 
-A 162-byte key-path spend would fit at ECC L in a v13 with room to spare; the
-rule spends that room on H instead. Same plate, same 21 minutes, four times the
-damage tolerance. It also degrades in the right order — H → Q → M → L *before*
-it gives up a plate.
+**What the legend costs, stated plainly**, because the difference is large and a
+reader who saw the earlier draft should see it: reserving 25.5 mm drops small
+artifacts by **two or three ECC levels** (tier 4 H→M, 3-of-5 H→L, tier 1 H→L)
+and **doubles the plate count** on everything from RCW `wsh` tier 1 upward. The
+5-input case went from 2 plates to 4.
+
+The rule still degrades in the right order — H → Q → M → L before it gives up a
+plate — and the smallest artifact still gets ECC H free. But "nearly free", which
+the first draft claimed, was an artifact of ignoring the legend.
 
 **Module size.** 0.30 mm is one engraved stroke: the theoretical floor and
 **optically unvalidated**. Whether a camera reads 0.30 mm modules off brushed
@@ -159,18 +175,42 @@ plate exists, `mt` must not select a module below 0.60 mm** (two strokes). The
 
 Everything constellation-specific lives here, in engraved text, never in the QR.
 
-| field | why |
+**The legend carries only what a human needs BEFORE the QR is decoded.** Five
+fields, 136 characters, 6 lines — measured, `RESULTS_legend_budget_2026-08-22.txt`:
+
+| field | chars | why |
+| --- | --- | --- |
+| `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
+| `FROM WALLET <8 hex>` | 20 | the 4-byte policy-id stub. The transaction does **not** say what it spends *from* (§6) |
+| `SPENDABLE AFTER BLOCK <n>` | 29 | the single most actionable fact: whether this plate is live yet |
+| `TO <truncated addr>  <amount>` | 34 | so a human sees where the money goes without a scanner |
+| `PLATE n OF m` | 12 | a missing plate must be obvious |
+
+### What was dropped, and why
+
+The first draft listed ten fields and measured **474 characters at one input**,
+growing 148 per input to 1,066 at five — against a 300-character budget
+(`me-cli/src/lib.rs:48`). It could never have fitted.
+
+Four fields were cut on one principle: **everything derivable from the decoded
+transaction is duplication.** The txid, the input outpoints and the full
+destination address are all *in* the transaction. Engraving them buys nothing —
+and in the one case where it might seem to, an unreadable QR, the duplicate is
+useless anyway because you still have no transaction to broadcast.
+
+| dropped | recoverable how |
 | --- | --- |
-| `BEARER — anyone holding this plate can spend it` | the plate is spendable; this is not a backup in the sense the other formats are |
-| source wallet: **4-byte policy-id stub** | the transaction does not say what it spends *from* (§6) |
-| **txid** | the transaction's own identity; lets a recoverer confirm the QR decoded to the right thing without trusting the QR |
-| destination address(es) and amounts | already in the transaction; shown so a human need not decode it |
-| **input outpoints** (`txid:vout`) | the only actionable mitigation for silent invalidation (§7) |
-| block hash + height per input, when known | lets a future recoverer verify inclusion with one node command (§6c) |
-| `input existed not before <MTP>` | a date bound a human can act on; median-time-past, not the header's own stamp (§6d) |
-| locktime, in height or time | says when the plate becomes live |
-| fee rate **and the date it was chosen** | makes staleness visible |
-| symbol index / total, if more than one plate | so a missing plate is obvious |
+| txid | hash the decoded transaction |
+| input outpoints | they are the transaction's inputs |
+| block hash + height per input | from the outpoints, with any node (§6c) |
+| `input existed not before <MTP>` | from the block, with any node (§6d) |
+| fee rate and date | inputs − outputs, once prevouts are known |
+
+The block anchor and MTP bound are the sharpest loss, since §6c and §6d argued
+for deferring verification to a future recoverer holding a node. They survive as
+**`mt` output at encode time** — printed, and available in the manifest — just
+not on steel, because a recoverer with a node does not need them engraved and a
+recoverer without one cannot use them.
 
 **The stub is a hint, never an authority.** It is the top 4 bytes of a canonical
 md1 identity, form-aware — WalletPolicyId for a keyed wallet, the key-stable
@@ -432,10 +472,18 @@ folding them in would make `mt` a wallet.
 4. **Does `mt` verify the transaction against the source wallet** when both the
    md1 card and prevouts are supplied — i.e. can it prove the stub is honest at
    encode time, even though nothing may branch on it at decode time?
-5. **Plate legend text budget.** `PLATE_TEXT_BUDGET = 300` characters
-   (`me-cli/src/lib.rs:48`) and §5 lists nine fields, several of them long
-   (txid is 64 characters, each outpoint 66). This may not fit, and the legend
-   competes with the QR for plate area. **Measure before speccing the layout.**
+5. ~~Plate legend text budget.~~ **MEASURED AND FIXED**, see §4 and §5. Both
+   halves failed: the ten-field legend was 474 characters against a 300 budget,
+   and the ECC-maximising QR left a 4 mm strip — zero text lines — so §4 and §5
+   were mutually unsatisfiable. The legend is now 5 fields / 136 chars / 6 lines,
+   and §4's objective reserves that space.
+6. **Would back-side engraving recover the 25.5 mm?** It would restore the ECC
+   levels and halve the plate counts the legend now costs. But there is **no
+   back-side path in the fork**: `backup.go:161` is named `frontSideSeed`, which
+   implies one, yet there is a single `Engraving` per plate and nothing that
+   engraves a reverse. This is firmware work, not a free option — but it is the
+   single highest-value change to these numbers, so cost it before accepting the
+   doubled plate counts.
 
 ## 11. Provenance of the numbers
 
