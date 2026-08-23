@@ -447,14 +447,14 @@ plate exists, `mt` must not select a module below 0.60 mm** (two strokes). The
 Everything constellation-specific lives here, in engraved text, never in the QR.
 
 **The legend carries only what a human needs BEFORE the QR is decoded.** Five
-fields, 136 characters, 6 lines — measured,
+fields, **130 characters**, 6 lines — measured,
 `RESULTS_legend_budget_2026-08-22.txt`:
 
 | field | chars | why |
 | --- | --- | --- |
 | `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
 | `FROM WALLET <8 hex>` | 20 | wallet id or seed fingerprint. The transaction does **not** say what it spends *from* (§6). **Optional — loudly warned when absent** (§10.4) |
-| `SPENDABLE AFTER BLOCK <n>` | 29 | the single most actionable fact: whether this plate is live yet. Reads **`NO BLOCK TIMELOCK`** when the transaction carries no enforced `nLockTime` — an **observation about fields `mt` read**, never a claim about spendability, because `mt` does not evaluate scripts (§8.4) |
+| `LOCKED TO BLOCK <n>` | 23 | the single most actionable fact. Reads **`NO BLOCK TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
 | `TO <wallet id or fp>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when absent** |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
@@ -716,15 +716,34 @@ exactly as permanent, as a machine-engraved one.
 
    **The rule:**
 
-   - **`nLockTime` in the future AND at least one input non-final** → the
-     locktime is enforced. Legend: `SPENDABLE AFTER BLOCK <n>`. No warning.
-   - **Otherwise** → legend records what was observed, and `mt` prints a
-     prominent `stderr` warning that the plate **may be broadcast by anyone who
-     holds or photographs it, from the moment it is cut.**
-   - **If a node is reachable and `nLockTime` has ALREADY PASSED**, the plate is
-     spendable now despite carrying a locktime. `mt` warns. This is what the
-     height query is for, and it is the whole of `mt`'s use of the chain here —
-     it never hands the transaction to the node for validation.
+**`mt` states the two facts and stops.** Operator ruling 2026-08-23:
+   *"'may be immediately spendable' is accurate but incomplete. Just say whether
+   the transaction is locked to block x and current height is y."*
+
+   So the `stderr` report is a statement of what was read, not a verdict:
+
+       LOCKED TO BLOCK 1383520   current height 963663
+       NO BLOCK TIMELOCK         current height 963663
+       nLockTime 900000 present but NOT ENFORCED (all inputs final)
+       LOCKED TO BLOCK 900000    current height unknown (no node)
+
+   **Why facts beat a verdict here.** *"May be immediately spendable"* is true of
+   almost any transaction and tells the operator nothing they can act on — it
+   cannot distinguish a lock that has already passed from one that was never
+   enforced from one still years away, and all three want different responses.
+   Two numbers side by side let the operator see which case they are in. It also
+   keeps `mt` inside its own scope: a height comparison is arithmetic on fields,
+   whereas *"spendable"* is a claim about a transaction's fate that depends on
+   scripts, fees and unspent inputs — none of which `mt` evaluates.
+
+   - **Legend:** `LOCKED TO BLOCK <n>`, or `NO BLOCK TIMELOCK`.
+   - **Height comes from `bitcoind` when reachable**, and is reported as unknown
+     otherwise. This is the whole of `mt`'s use of the chain here — it never
+     hands the transaction to the node for validation.
+   - **A lock that has already passed is reported the same way**, because the
+     two numbers say so: `LOCKED TO BLOCK 900000, current height 963663` is a
+     plate that is live now, and the operator can read that without `mt`
+     concluding it for them.
 
    **`nSequence` is not optional, and omitting it causes the dangerous error.**
    `nLockTime` is enforced only when at least one input has
