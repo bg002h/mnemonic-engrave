@@ -1044,11 +1044,18 @@ exactly as permanent, as a machine-engraved one.
    boundary**, which can tip; the `~` marks the whole estimate as approximate and
    the height beside it is what settles any dispute.
 
-   > **Seasons are NORTHERN-HEMISPHERE names on a permanent artifact, and the
-   > spec should not pretend otherwise.** "Fall 2034" means opposite halves of
-   > the year in Sydney and Toronto. The height is unambiguous everywhere and is
-   > why it is mandatory. Whether to keep hemisphere-relative names, switch to
-   > month ranges (`~SEP 2034`), or use quarters (`~Q4 2034`) is **§10.23**.
+   **Seasons are NORTHERN-HEMISPHERE, by ruling.** Operator, 2026-08-23. So
+   `SPRING` / `SUMMER` / `FALL` / `WINTER` are the meteorological quarters of the
+   northern year — `~FALL 2034` means roughly September to November 2034 —
+   regardless of where the plate is read.
+
+   > **The residual, stated because a plate cannot be asked a question.** A
+   > reader in Sydney sees `~FALL 2034` and, reading it locally, is wrong by
+   > about six months. The harm is bounded and small for one reason: **the
+   > mandatory block height sits beside it and is unambiguous everywhere.** The
+   > height is the fact and the season is the courtesy, so a misread courtesy
+   > costs an orientation, not a recovery. That asymmetry is exactly why the
+   > height is mandatory and the estimate is not.
 
    - **Legend:** `LOCKED TO BLOCK <n> ~<SEASON> <year>` for a height,
      **`LOCKED UNTIL <time>`** for a timestamp, or **`NO TIMELOCK`** — that exact
@@ -1908,13 +1915,14 @@ signed PSBT.
     `md1` chunks. **§10.13 now has no undecided input left.**
 
 
-23. **Season names are hemisphere-relative on a permanent artifact.** §8.4's
-    legend reads `~FALL 2034`, which means opposite halves of the year in Sydney
-    and Toronto — on steel meant to be read anywhere, decades out, by someone who
-    cannot ask. The mandatory block height beside it is unambiguous, so nothing
-    is *lost*; the estimate is simply useless to half the world. Alternatives:
-    month ranges (`~SEP 2034`), quarters (`~Q4 2034`), or keeping the names and
-    accepting it. Costs nothing to change now and cannot be changed later.
+23. ~~Season names are hemisphere-relative on a permanent artifact.~~
+    **CLOSED**, operator ruling 2026-08-23: seasons are **northern-hemisphere**
+    and §8.4 says so. A southern reader misreads the estimate by about six
+    months; the harm is bounded because the **mandatory block height beside it
+    is unambiguous everywhere**, so a misread costs an orientation rather than a
+    recovery. Alternatives considered and not taken: month ranges (`~SEP 2034`)
+    or quarters (`~Q4 2034`), both hemisphere-neutral, both less legible to the
+    majority of readers.
 
 ## 11. Provenance of the numbers
 
