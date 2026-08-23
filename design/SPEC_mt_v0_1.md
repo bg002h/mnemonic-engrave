@@ -986,48 +986,58 @@ exactly as permanent, as a machine-engraved one.
 
        estimated unlock  =  reference_time + (target_height − reference_height) × 600 s
 
-   **The reference `(height, unix_time)` pair is a CONSTANT IN SOURCE, embedded
-   at compile time, used as a FALLBACK.** Operator ruling 2026-08-23: *"Embed
-   fallback timestamp blockheight in case bitcoind not available at compile
-   time."*
-
-   | when | what `mt` uses |
-   | --- | --- |
-   | a node is reachable at **run** time | the **live** height or MTP — always preferred, always fresher |
-   | no node at run time | the **embedded** pair, and `mt` prints it so the operator sees how old the anchor is |
-   | no node at **build** time | nothing changes — the pair is a checked-in constant, not something the build machine derives |
-
-   **It is a source constant rather than a build-machine value, and that is the
-   whole point of the ruling.** Deriving it from whatever node happened to be
-   reachable during the build would make the binary **non-reproducible** and, far
-   worse, make the engraved `~<year>` **depend on which machine built the tool** —
-   two builds, same transaction, different permanent number on steel. A
-   checked-in constant makes the estimate a property of the *release*, refreshed
-   deliberately by a maintainer the way a checkpoint is, and never a property of
-   a build environment.
-
-   **The v0.1 constant, taken from a live node on 2026-08-23** — operator ruling
-   *"use now on today and current blockheight for fallback"*:
+   **The estimate uses the embedded constant, and ONLY the embedded constant.**
+   Operator rulings 2026-08-23: *"Embed fallback timestamp blockheight in case
+   bitcoind not available at compile time"*, then — simplifying — *"Use embedded
+   timestamp above only ever. It's essentially constant and reasonably reliable
+   as an estimate."*
 
        MT_REF_HEIGHT = 963_759
        MT_REF_TIME   = 1_787_507_701   // 2026-08-23T17:55:01Z
 
+   **`mt` never consults a node for this.** An earlier draft branched — live
+   height when a node was reachable, the constant otherwise — and that was
+   removed as too complex. The simplification is worth more than the accuracy it
+   costs, for three reasons:
+
+   - **The answer is deterministic.** Two runs of `mt`, on any two machines,
+     with or without a node, produce the **same engraved year** for the same
+     transaction. Branching would have made a permanent number on steel depend
+     on the operator's network.
+   - **The accuracy difference is immaterial at this granularity.** The estimate
+     is stated to the **year** (below), and a reference pair drifting by even a
+     few months moves a projection years out by less than the rounding.
+   - **It removes a whole class of question** — what if the node disagrees, what
+     if it is syncing, what if it is on another chain — from a number that only
+     ever orients a human.
+
    `MT_REF_TIME` is the tip's **median-time-past**, not its header `nTime`. MTP
    is monotonic and consensus-enforced, while a header stamp is only loosely
    constrained — it may run up to two hours fast and need not exceed its
-   parent's. Anchoring a decades-long projection to the loose figure would bake
-   that slack in permanently. (The tip's own `nTime` at capture was
-   `1787509876`, 36 minutes ahead of its MTP — the gap is small here and is not
-   bounded in general.)
+   parent's. At capture the tip's `nTime` was `1787509876`, **36 minutes ahead**
+   of its MTP; small here, unbounded in general, and baking that slack into a
+   decades-long projection would be permanent.
 
-   Provenance, so a maintainer refreshing it knows what to capture: block
-   963,759, `00000000000000000000b7060d74b6540e3b2accc9cb50f2a0d428b55911a455`.
+   Provenance for whoever refreshes it: block 963,759,
+   `00000000000000000000b7060d74b6540e3b2accc9cb50f2a0d428b55911a455`.
 
-   So a build needs no node, and a run needs no node; a run *with* one simply
-   does better.
+   **A NEGATIVE subtraction means the lock is already behind us — warn.**
+   Operator ruling: *"If subtraction is negative, warn user transaction is not
+   time locked."* When `target_height < MT_REF_HEIGHT` there is no future date to
+   estimate, and `mt` says so rather than printing a past year:
 
-   Worked from the v0.1 constant below — height 963,759 at 2026-08-23 — a lock
-   at block 1,383,520 is 419,761 blocks out, ≈ 2,915 days, ≈ **2034**.
+       WARNING: nLockTime 900000 is BELOW this build's reference height 963759.
+                This transaction is not meaningfully time-locked -- its lock
+                height passed before mt was built. Treat it as spendable now.
+
+   The legend then reads `NO TIMELOCK` rather than a `~<year>` that would be
+   both meaningless and reassuring. Note this is a **separate** determination
+   from §8.4's `nSequence` rule: a locktime can be unenforced *and* in the past,
+   and either alone is enough to make the plate immediately spendable.
+
+   Reporting the **current height** alongside (§8.4's two facts) is unaffected —
+   that comes from the node when one is reachable and is a fact `mt` observed,
+   not an input to this estimate.
 
    **Stated to the year, deliberately.** Three separate reasons, and they all
    point the same way:
