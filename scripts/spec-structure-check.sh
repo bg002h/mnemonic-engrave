@@ -32,7 +32,9 @@
 #     contradict each other with perfect numbering.
 #   * Citations — that is scripts/plan-cite-check.sh.
 #   * Whether a cross-reference points at the RIGHT thing, only that the target
-#     exists.
+#     exists. MITIGATED, not closed: every target's first line is printed, so a
+#     wrong-but-existing citation (measured: four to §10.20 meaning §1.1) is a
+#     read away rather than a lookup away. Reading them is still a human's job.
 #
 # USAGE   ./scripts/spec-structure-check.sh design/SPEC_mt_v0_1.md
 # EXIT    0 clean, 1 structural defect found
@@ -137,6 +139,28 @@ sect_ids = set(seen.keys())
 # refers to this one. Without this the gate reports EPD §6.4 as "section 6 has
 # no item 4" — a FALSE FAIL, and the second one this script produced.
 FOREIGN = r'(?<!EPD )(?<!BIP )(?<!RFC )(?<!BCR )(?<!EPD§)(?<!BIP§)'
+
+# ---- WHAT IS AT THE TARGET, not merely that a target exists -----------------
+#
+# This check used to answer only "does §N.M exist", and said so at the top of
+# the file. That honesty did not stop it costing a defect: four citations to
+# `§10.20` for the `inspect`-consults-a-node design resolved CLEAN across three
+# commits, because §10.20 exists — it is "legacy inputs are txid-malleable".
+# The design lives at §1.1. A gate that is right about its own blind spot is
+# still green while the blind spot is being walked into.
+#
+# So the target's first line is now PRINTED for every distinct reference, which
+# is `plan-cite-check.sh`'s pattern: it does not make aboutness machine-checked
+# — nothing here can — but it turns it from a LOOKUP into a READ. An author who
+# writes §10.20 meaning §1.1 sees "legacy inputs are txid-malleable" in the gate
+# output next to their own citation, in the run they were going to do anyway.
+def _gist(line, n=68):
+    t = re.sub(r'^#{2,3} ', '', line).strip()
+    t = re.sub(r'^\d+[a-z]?\.\s*', '', t)
+    t = re.sub(r'[*`~_]', '', t)
+    return (t[:n] + '…') if len(t) > n else t
+
+targets = []
 for ref in sorted(set(re.findall(FOREIGN + r'§(\d+[a-z]?)(?:\.(\d+))?', body))):
     sec, item = ref
     if sec not in sect_ids:
@@ -146,8 +170,13 @@ for ref in sorted(set(re.findall(FOREIGN + r'§(\d+[a-z]?)(?:\.(\d+))?', body)))
         ln = seen[sec]
         nxt = min([v for v in seen.values() if v > ln] + [len(lines)+1])
         seg = lines[ln:nxt-1]
-        if not any(re.match(rf'^{item}[a-z]?\. ', l) for l in seg):
+        hit = [l for l in seg if re.match(rf'^{item}[a-z]?\. ', l)]
+        if not hit:
             err(f"cross-reference §{sec}.{item} -> section {sec} has no item {item}")
+        else:
+            targets.append((f"§{sec}.{item}", _gist(hit[0])))
+    else:
+        targets.append((f"§{sec}", _gist(lines[seen[sec]-1])))
 
 # ---- 3b. GFM table rows must match their header's column count -------------
 # A row with MORE cells than the header silently DROPS the overflow when
@@ -224,6 +253,14 @@ for ln, h in heads:
     if t and t in htext:
         err(f"line {ln}: heading TEXT duplicated (also line {htext[t]}): {t[:50]!r}")
     htext[t] = ln
+
+if targets:
+    print("  ── cross-reference targets (READ THESE: the gate proves they EXIST,")
+    print("     never that they say what the citing sentence claims) ──")
+    for ref, gist in sorted(set(targets), key=lambda r: [int(x) if x.isdigit() else x
+                                                         for x in re.findall(r'\d+|[a-z]+', r[0])]):
+        print(f"     {ref:<9} {gist}")
+    print()
 
 print(f"  sections: {len(heads)} ; cross-refs checked: {len(set(re.findall(r'§(\d+[a-z]?)(?:\.(\d+))?', body)))}")
 print("  STRUCTURE OK" if bad == 0 else f"  {bad} STRUCTURAL DEFECT(S)")
