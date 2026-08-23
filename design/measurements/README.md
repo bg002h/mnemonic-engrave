@@ -96,13 +96,78 @@ for in prose. The RCW probe additionally withholds specific keys per scenario
 
 ## Reproduce
 
+**Verified end to end on 2026-08-22, before the spec's R0 review**: every binary
+below was rebuilt from this committed tree and its output diffed against the
+committed results file. All twelve reproduce, and nine are **byte-identical**.
+The two exceptions are both capture artifacts, not measurement drift — recorded
+under *Known capture artifacts* below.
+
     cd design/measurements/mt-size-probe
-    cargo run -q --bin mt-size-probe
-    cargo run -q --bin signed
-    cargo run -q --bin rcw
+    for b in mt-size-probe signed rcw baselines envelope legend \
+             select urover qrmodes qrmax qrplate psbtqr; do
+        cargo run -q --bin $b
+    done
+
+| binary | results file | feeds |
+| --- | --- | --- |
+| `mt-size-probe` (`main.rs`) | `RESULTS_2026-08-22.txt` (Probe 1) | bound cross-check |
+| `signed.rs` | `RESULTS_2026-08-22.txt` (Probe 2) | pathological wallet sizes |
+| `rcw.rs` | `RESULTS_rcw_2026-08-22.txt` | RCW sizes, spec §4 |
+| `baselines.rs` | `RESULTS_baselines_2026-08-22.txt` | ordinary-wallet comparison |
+| `envelope.rs` | `RESULTS_envelope_2026-08-22.txt` | input ceilings |
+| `legend.rs` | `RESULTS_legend_budget_2026-08-22.txt` | **spec §5**, the 136-char legend |
+| `select.rs` | `RESULTS_ecc_selection_2026-08-22.txt` | **spec §4**, the plate/ECC table |
+| `urover.rs` | `RESULTS_ur_overhead_2026-08-22.txt` | **spec §3**, UR per-fragment cost |
+| `qrmodes.rs` | `RESULTS_qr_modes_2026-08-22.txt` | QR mode capacities |
+| `qrmax.rs` | `RESULTS_qr_physical_max_2026-08-22.txt` | physical module limits |
+| `qrplate.rs` | `RESULTS_qr_vs_text_2026-08-22.txt` | QR vs engraved text |
+| `psbtqr.rs` | `RESULTS_psbt_qr_multisig_2026-08-22.txt` | PSBT-over-QR |
+
+### Why this section is longer than "run three binaries"
+
+It used to list three of the twelve, and the first one it listed **did not run**.
+Two separate reasons, both of which made the documented path a dead letter:
+
+1. The crate is inside the repo but was in neither `workspace.members` nor
+   `workspace.exclude`, so `cargo build` here aborted with *"current package
+   believes it's in a workspace when it's not"*. It now carries its own empty
+   `[workspace]` table, the same pattern as `crates/me-cli/fuzz`.
+2. `main.rs` read `desc-tr.txt` / `desc-wsh.txt` as **cwd-relative** paths, and
+   those two files had never been committed — they existed only in an
+   out-of-repo scratch copy of this crate. They are now committed beside the
+   sources, and `main.rs` resolves them against `CARGO_MANIFEST_DIR` so the cwd
+   no longer matters.
+
+A generator nobody re-runs rots while its artifact keeps vouching for it. These
+results are cited as measured fact throughout `SPEC_mt_v0_1.md`, so the path that
+produces them has to be a command, not a memory.
+
+**`desc-tr.txt` and `desc-wsh.txt`** are the key-expanded form of
+`design/journeys/inputs-pathological/wallet-policy-tr.txt` and
+`wallet-policy.txt` — same wallet, placeholders resolved to the committed xpubs.
+They hold **public material only** (checked: zero `xprv`/`tprv` occurrences,
+against a positive control confirming `xpub` is present). They are committed
+rather than regenerated, which is a second copy of the same wallet and therefore
+a drift risk; nothing currently asserts the two agree.
+
+`Cargo.lock` is now committed too, so *"pinned to the same versions the repo
+already locks"* above is enforced rather than asserted.
 
 Paths to the fixture are absolute in `signed.rs`; it reads
 `/scratch/code/shibboleth/mnemonic-engrave/design/journeys/inputs-pathological/`.
+
+### Known capture artifacts
+
+Neither affects a measured number; both are noted so a future re-run is not
+misread as drift.
+
+- `RESULTS_2026-08-22.txt` is `main.rs` output followed by `signed.rs` output,
+  with the two `### Probe N —` headings and their blank lines added by hand at
+  capture time. Every measured line is byte-identical to a fresh run.
+- `RESULTS_psbt_qr_multisig_2026-08-22.txt` has eight lines of `cargo` build
+  warning (`constant STROKE_MM is never used`) captured at the top, because it
+  was taken with stderr merged into stdout. The measurement body below it is
+  byte-identical.
 
 ## Dimensions swept
 

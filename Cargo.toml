@@ -3,4 +3,4 @@ resolver = "2"
 members = ["crates/me-cli"]
 # The cargo-fuzz crate is its OWN workspace (see its empty `[workspace]` table); this
 # exclude is belt-and-suspenders so the root never pulls its nightly-only fuzz deps.
-exclude = ["crates/me-cli/fuzz"]
+exclude = ["crates/me-cli/fuzz", "design/measurements/mt-size-probe"]

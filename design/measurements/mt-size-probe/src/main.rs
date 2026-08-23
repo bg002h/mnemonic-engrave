@@ -114,7 +114,13 @@ fn main() {
         ("PATHOLOGICAL / tr  (taproot, 4 leaves, 11 keys)", "desc-tr.txt"),
         ("PATHOLOGICAL / wsh (or_i nest, 11 keys)", "desc-wsh.txt"),
     ] {
-        let s = std::fs::read_to_string(path).expect("read descriptor");
+        // Resolved against the crate root, not the cwd: the README tells you to
+        // run this from `mt-size-probe/`, but a relative path also breaks under
+        // `cargo run` from the repo root. These two files are the key-expanded
+        // form of design/journeys/inputs-pathological/wallet-policy{,-tr}.txt.
+        let full = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
+        let s = std::fs::read_to_string(&full)
+            .unwrap_or_else(|e| panic!("read descriptor {}: {e}", full.display()));
         probe(label, s.trim());
     }
 }

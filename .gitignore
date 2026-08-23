@@ -12,6 +12,12 @@ ndefroundtrip
 /crates/me-cli/fuzz/artifacts
 /crates/me-cli/fuzz/target
 
+# Same deal for the measurement probe: sources, its inputs and its Cargo.lock ARE
+# committed (README.md's Reproduce section depends on all three); the build dir
+# is not. The crate carries its own empty [workspace] table, so this target/ is
+# separate from the root one that /target already covers.
+/design/measurements/mt-size-probe/target
+
 # Working dir for scripts/pico2-bootkey-rehearsal.sh. Contains secp256k1 PRIVATE
 # KEYS (the boot-signing keys) and generated OTP json. NEVER commit this.
 rehearsal-work/
