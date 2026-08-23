@@ -5,7 +5,7 @@ verbatim in their own commits before this file was written:
 
 | lens | model | reported | commit |
 | --- | --- | --- | --- |
-| 1 — design / determinism | opus | *still running at time of writing* | — |
+| 1 — design / determinism | opus | 3C / 5I / 4M / 2N | `239020d` |
 | 2 — funds safety | opus | 6C / 10I / 5M / 1N | `52b91a3` |
 | 3 — external facts | sonnet | 1C / 1I / 1M / 0N | `d68d454` |
 | 4 — coverage | opus | 3C / 11I / 5M / 2N | `bc8b0c1` |
@@ -16,6 +16,10 @@ totals — it rests on the subset below, which I verified myself.
 ## Independently CONFIRMED (controller-verified, not taken on a reviewer's word)
 
 **T-1 (Critical) — §7's mitigation column is false for 2 of its 4 hazards.**
+*Independently confirmed by lens 1, which reached it from a different direction
+and counts it larger: ten claims across §6a, §6c, §6d and §7, not the four sites
+I found. Two lenses converging on one defect from different angles is the
+strongest signal in the round.*
 Verified against the artifact alone, no source needed. §7 promises *"legend
 carries the input outpoints so a holder can check they are still unspent"* and
 *"legend states rate and date so staleness is visible."* §5's legend has five
@@ -65,6 +69,34 @@ plate is cut.
 Also 0 occurrences of `SIGHASH_NONE` and `SIGHASH_SINGLE`; the spec inspects
 sighash *flags* nowhere, and its one sighash discussion (§6a) covers only
 `SIGHASH_ANYONECANPAY` in the amount-commitment argument.
+
+**T-6 (Critical) — §4's objective is not a total order, and its implicit
+tie-break is backwards.** Reported by lens 1 from re-running the search;
+confirmed by me from the source of §4's own reference implementation,
+`design/measurements/mt-size-probe/src/bin/select.rs`:
+
+- `MODULES_MM: [f64; 4] = [0.30, 0.45, 0.60, 0.90]` (line 25) — module size
+  **is** in the search space, iterated at lines 87 and 130.
+- the comparison key is `(plates, Reverse(ec_rank(ec)), symbols)` (lines
+  116-117, 150-151) — module size is **not in it**.
+- replacement is strict `<` against the incumbent, so on a tie the **first**
+  configuration encountered wins, and the module loop ascends.
+
+So a tie resolves silently to the **smallest** module — the least legible one,
+and once F-234 lifts the floor, the optically **unvalidated** 0.30 mm. For an
+artifact whose purpose is being scanned off brushed steel in 2040, the implicit
+tie-break runs opposite to the objective's own spirit.
+
+This falsifies §2's *"deterministically, so two encoders agree"* by
+construction: a second implementer who iterates modules descending produces
+different plates for the same transaction, while following §4 exactly. Lens 1
+counts 4 tied configurations for a 162 B spend at the 0.60 mm floor and 41 once
+the floor lifts; I have confirmed the **mechanism** rather than re-run those two
+counts.
+
+Note this compounds with T-2: `k*k` in the prose against a rectangular search in
+the code is the same class of defect — §4's prose and §4's reference
+implementation are two different specifications.
 
 ## Found by me, outside every lens
 
