@@ -372,6 +372,31 @@ overturned an earlier assumption and are marked.
    (§8.2e), `mt1` strings onto steel, hex back out.** Everything human goes to
    stderr at both ends, so the pipe stays clean.
 
+   **`decode` PRINTS THE INSPECTION SUMMARY ON `stderr`, and does not stay
+   silent.** Operator ruling 2026-08-23, from walking Journey B. The reasoning
+   is a divergence, not a preference: **`decode` is the verb a recoverer reaches
+   for first**, because it is the obvious one. `inspect` is the verb that was
+   *designed* for them, and they have no way to know that.
+
+   A silent `decode` therefore hands a stranger sixty kilobytes of hex — a
+   bearer instrument, in the single most broadcastable form that exists —
+   **before anything has told them what it does**. The next command they type is
+   plausibly `sendrawtransaction`, and the first thing they learn about the
+   destination, the amount and the locktime is whatever the chain does with it.
+
+   So `decode` emits **§10.20's `inspect` report on `stderr`** while the hex
+   goes to stdout. This costs the pipe nothing — `mt decode < plates.txt | xargs
+   bitcoin-cli sendrawtransaction` is byte-identical either way, because §0a's
+   boundary is what makes the summary free — and it means **no path through this
+   tool broadcasts a transaction the operator was never shown.** `--quiet`
+   suppresses it for scripted use; the default is loud.
+
+   > **`inspect` remains the verb, and `decode` remains a pipe fitting.** This
+   > is not a merge. `inspect` is the one that reports *without* handing over
+   > the weapon, and it is what §5's `FORMAT:` tag should point a recoverer
+   > toward (§10.21). `decode` merely stops being silent about what it just
+   > reconstructed.
+
    **`decode` is also how `encode` gets tested.** A format whose encoder has no
    decoder can only be verified against itself; with both, every artifact in §3b
    becomes a round-trip vector.
@@ -1285,6 +1310,42 @@ what it could not check:
 
     The transaction may already be unspendable. A plate is ~21 minutes.
     Consider re-running with a node before cutting.
+
+> **THAT WARNING IS ENCODE-SHAPED, AND THE RECOVERY PATH NEEDS ITS OWN.**
+> Operator ruling 2026-08-23 — *"warn about what cannot be confirmed"* — applied
+> to `mt inspect` and `mt decode`, where the advice above is useless: the plate
+> already exists, so *"before cutting"* names a decision made years ago, and
+> *"a plate is ~21 minutes"* prices something the reader is not buying.
+>
+> **The enumeration carries over unchanged; the consequence line does not.** The
+> recoverer's decision is not *cut or don't cut*, it is **broadcast or don't
+> broadcast** — irreversible in the other direction, and taken by someone who
+> may know nothing about this transaction beyond what `mt` just told them:
+>
+>     WARNING: no bitcoind reachable. mt read this transaction from the
+>     strings, but could confirm NOTHING about it against the chain:
+>
+>       - do these inputs still exist, or were they already spent?  UNKNOWN
+>       - was this transaction already broadcast?                   UNKNOWN
+>       - has the locktime passed?                                  UNKNOWN
+>         locked to block 1383520, current height unknown
+>       - what fee does it pay?                                     UNKNOWN
+>         (the fee needs input values, which are not in the tx)
+>
+>     Everything above this line was read from the plate itself and is
+>     what the transaction SAYS. None of it is confirmed.
+>
+> **The last two lines are the load-bearing ones**, and they are the difference
+> between the two warnings. An offline `inspect` still reports a destination, an
+> amount and a locktime, all of them read correctly — and a reader who has just
+> been shown a clean report is *more* likely to act on it, not less. **The
+> warning's job is to separate what was read from what was verified**, because
+> the report looks identical either way and nothing else on the screen marks the
+> difference.
+>
+> `UNKNOWN` is also already the right word: §6a's liveness table uses it for
+> exactly this — `mt` cannot distinguish DEAD from PENDING and says so, rather
+> than picking the reassuring one.
 
 **Enumerating the skipped checks is the point.** *"No node"* alone tells the
 operator nothing they can act on; a list of what is therefore unknown tells them
