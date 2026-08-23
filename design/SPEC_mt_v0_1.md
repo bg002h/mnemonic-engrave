@@ -986,10 +986,28 @@ exactly as permanent, as a machine-engraved one.
 
        estimated unlock  =  reference_time + (target_height − reference_height) × 600 s
 
-   **`mt`'s binary embeds a reference `(height, unix_time)` pair at build time**,
-   so the estimate works **with no node at all** — which is the case that needed
-   it, since a height is exactly as meaningless offline as online. When a node
-   *is* reachable, `mt` uses the live height instead and the estimate is better.
+   **The reference `(height, unix_time)` pair is a CONSTANT IN SOURCE, embedded
+   at compile time, used as a FALLBACK.** Operator ruling 2026-08-23: *"Embed
+   fallback timestamp blockheight in case bitcoind not available at compile
+   time."*
+
+   | when | what `mt` uses |
+   | --- | --- |
+   | a node is reachable at **run** time | the **live** height or MTP — always preferred, always fresher |
+   | no node at run time | the **embedded** pair, and `mt` prints it so the operator sees how old the anchor is |
+   | no node at **build** time | nothing changes — the pair is a checked-in constant, not something the build machine derives |
+
+   **It is a source constant rather than a build-machine value, and that is the
+   whole point of the ruling.** Deriving it from whatever node happened to be
+   reachable during the build would make the binary **non-reproducible** and, far
+   worse, make the engraved `~<year>` **depend on which machine built the tool** —
+   two builds, same transaction, different permanent number on steel. A
+   checked-in constant makes the estimate a property of the *release*, refreshed
+   deliberately by a maintainer the way a checkpoint is, and never a property of
+   a build environment.
+
+   So a build needs no node, and a run needs no node; a run *with* one simply
+   does better.
 
    Worked from the pair in this spec's measurements — height 963,663 at
    2026-08-23 — a lock at block 1,383,520 is 419,857 blocks out, ≈ 2,916 days,
