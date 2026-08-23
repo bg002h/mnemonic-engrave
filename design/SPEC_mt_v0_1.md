@@ -470,6 +470,12 @@ fields, 136 characters, 6 lines — measured,
 | `TO <truncated addr>  <amount>` | 34 | so a human sees where the money goes without a scanner. **One output only, and truncated** — see the limit below |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
+Plus, **not part of the 136-character budget above**, one `n/m` label engraved
+beside **each QR symbol**, naming the UR part it carries (§10.8's ruling). A
+plate may hold several symbols, so `PLATE n OF m` alone cannot tell a recoverer
+which *part* is missing. These labels are per-symbol and their area is not yet
+reserved in §4 — see §10.8 and §10.14.
+
 > **This budget rests on a DOC COMMENT, not on the fork's font metrics, and the
 > doubt is not resolved here.** `legend.rs` hardcodes `CHARS_PER_LINE = 35.0`
 > and `LINES_FULL_PLATE = 20.0` taken "per `crates/me-cli/src/lib.rs:46`" — and
@@ -830,15 +836,55 @@ signed PSBT.
    `backup/backup.go:247` defines `frontSideSeed`, called once at
    `backup/backup.go:134`, and there is a single `Engraving` per plate with
    nothing that engraves a reverse. Firmware work, not a free option.
-8. ~~How does a recoverer learn the fountain parameters?~~ **ANSWERED** from
-   source by R0 lens 4, and it is a gap rather than a question. Every multi-part
-   UR carries `SeqLen`, `MessageLen` and `Checksum` in its CBOR
-   (`bc/fountain/fountain.go:74-87`); `Result()` returns non-nil only at
-   `len(completed) == SeqLen`; and `Progress()` is a `x1.75` UI heuristic that
-   can reach 1.0 while `Result()` is still nil — so **nothing may gate on
-   `Progress()`**. Two further traps: the URI prefix is parsed then discarded,
-   and single-part URs skip the fountain wrapper entirely, carrying no
-   MessageLen and no Checksum.
+8. ~~How does a recoverer learn the fountain parameters?~~ **ANSWERED, and the
+   operator has ruled on what follows from it.**
+
+   > **Ruling, operator, 2026-08-23: "each piece should say something like
+   > n of m."**
+
+   Machine-readably this already holds at both layers, verified from source:
+
+   - **`mt string`** — `ChunkHeader` carries `count` and `index`
+     (`md-codec/src/chunk.rs`), inside the BCH-protected header, plus a 20-bit
+     `chunk_set_id` shared across a set so pieces of different transactions
+     cannot be combined. This is the model; nothing to add.
+   - **`mt qr`** — every multi-part UR carries `SeqLen`, `MessageLen` and
+     `Checksum` in its CBOR (`bc/fountain/fountain.go:74-87`), and the string
+     itself reads `ur:psbt/<n>-<m>/…` (`bc/ur/ur.go:122`).
+
+   **Three traps, all load-bearing for the ruling:**
+
+   1. **The visible `<n>-<m>` prefix is NOT authoritative.** `bc/ur/ur.go:179`
+      parses it with `Sscanf` into locals `seq` and `n` — and then never uses
+      them, calling `d.fountain.Add(enc)` and letting the CBOR decide. The
+      prefix a human reads and the field a decoder obeys are different data. They
+      agree when `mt` writes both, but nothing enforces that.
+   2. **A single-part UR says nothing at all.** `bc/ur/ur.go:118`: at
+      `seqLen == 1` the encoder emits `ur:psbt/<data>` with **no `n-m` prefix**
+      and skips the fountain wrapper entirely, so there is no SeqLen, no
+      MessageLen and no Checksum. A lone symbol cannot state that it is
+      complete.
+   3. **`PLATE n OF m` is not `part n of m`, and §5 offers only the former.**
+      Under a multi-symbol tiling, plate 2 of 3 may carry parts 5–8 of 11.
+      Nothing in the spec maps symbols to plates or fixes their order, so a
+      recoverer who scans out of sequence, or misses one symbol *on* a plate,
+      cannot tell which part is absent. This is the gap the ruling closes.
+
+   **Normative, from the ruling:** every engraved symbol carries its own
+   human-readable `n/m` beside it, in engraved text, for the UR part it holds —
+   independent of, and in addition to, the plate's `PLATE n OF m`. A recoverer
+   must be able to inventory what they hold and name what is missing **without
+   decoding anything**. For the single-part case that label reads `1/1`, which is
+   the only way a lone symbol can say it is whole.
+
+   **Unpriced.** These labels consume plate area that §4's table does not
+   reserve, exactly as the legend did before it was measured — see §10.14, which
+   already requires that table's regeneration. Cost per label is small (3–5
+   characters) but it is per *symbol*, not per plate, and the worst artifact here
+   carries 5 symbols. **Measure before §4's numbers are treated as final.**
+
+   Also unchanged: `Progress()` is a `x1.75` UI heuristic that can reach 1.0
+   while `Result()` is still nil, so **nothing may gate on `Progress()`**.
 9. **How does the engraving reach the machine, and can the machine engrave what
    §4 selects?** R0 lens 4 and lens 1 both found this and it is the largest
    remaining gap: the spec stops at "choose a configuration" and never says how
