@@ -311,6 +311,32 @@ engraving, codex32 is for hand engraving.**
     mt string:  chunk header + payload -> BCH + codex32 -> engraved characters
     mt qr:      chunk header + payload -> bech32U -> QR (Reed-Solomon) -> modules
                 ^ identical header, medium-appropriate correction
+                ^ and PER-CHUNK conversion in both (below)
+
+**The base32 conversion is PER CHUNK, never over the concatenated stream.**
+Operator ruling 2026-08-23. `mt string` has no choice here — codex32 is
+per-chunk by construction, each chunk becoming a complete string with its own
+HRP and checksum — so this rules the only verb where the question arises,
+`mt qr`, **to follow the convention `mt string` already has.**
+
+**Why, and it is not the size.** Measured on the 3,809 B artifact: per-chunk is
+**7,054 characters**, whole-stream **7,016** — a 0.5% saving for whole-stream.
+What per-chunk buys instead:
+
+- **One chunking rule across both verbs.** A recoverer's chunk 7 is byte-
+  identical in either medium before the medium-specific encoding, which is what
+  makes §3a's "identical header" claim true at the byte level rather than only
+  at the field level.
+- **Chunk independence, which is the point of chunking.** Whole-stream couples
+  every chunk's characters to every byte before it, so a damaged chunk shifts
+  its neighbours' alignment.
+
+> **The failure mode if two implementers split here is silent and
+> misdiagnosed** — R5 readiness computed it. The two strings **share no
+> character after position ~74**, yet the first chunk still parses with a valid
+> header. The corruption surfaces only at the content-id compare, which reports
+> *"this is a different transaction"* — pointing the recoverer at the wrong
+> plate rather than at the wrong software.
 
 ## 3b. The string form: `mt1`, for hand engraving
 
