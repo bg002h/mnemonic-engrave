@@ -21,11 +21,11 @@ different ways:
 
 | verb | form | engraved how | payload | size limit |
 | --- | --- | --- | --- | --- |
-| **`mt string`** | `mt1` chunked codex32, **on stdout** | **by hand**, or by any tool the operator chooses | raw signed transaction (§3b) | **64 chunks** |
+| **`mt encode`** | `mt1` chunked codex32, **on stdout** | **by hand**, or by any tool the operator chooses | raw signed transaction (§3b) | **64 chunks** |
 | ~~`mt qr`~~ | ~~QR symbols + legend~~ | **DEFERRED out of v0.1 — §0a** | | |
 
 `mt qr` decides how many symbols that takes, at what error-correction level,
-across how many plates, and what is engraved beside them. `mt string` emits a
+across how many plates, and what is engraved beside them. `mt encode` emits a
 character string with **BCH error correction**, so a hand engraver who cuts a
 character wrong can still recover the transaction.
 
@@ -54,7 +54,7 @@ entire safety argument. It gets stricter in this fold, not looser.
 
 ## 0a. `mt qr` is DEFERRED out of v0.1
 
-**Operator ruling 2026-08-23.** v0.1 has **one verb**: `mt string`. QR
+**Operator ruling 2026-08-23.** v0.1 has **one verb**: `mt encode`. QR
 conversion is deferred to its own cycle.
 
 **The reason is that QR is a CROSS-FORMAT concern, not an `mt` one.** `md1` and
@@ -65,7 +65,7 @@ deserves its own cycle rather than being settled as a side effect of shipping a
 transaction format. The same instinct made `me` the constellation's single
 `sysw` writer (§10.9).
 
-**What it costs, measured: one artifact of seven.** `mt string`'s 64-chunk
+**What it costs, measured: one artifact of seven.** `mt encode`'s 64-chunk
 ceiling covers every single-input spend of even the most complex wallet
 measured, and one of the two five-input cases (§3b). The wallet that loses its
 path is RCW `wsh` tier 1 at five inputs, at 89 chunks — which had no comfortable
@@ -83,11 +83,11 @@ validate it per §8, and emit an `mt1` chunked codex32 string on stdout, with
 warnings on stderr.
 
 > **A consequence worth naming: a v0.1 plate carries the string and nothing
-> else.** §5's legend is `mt qr`'s, and `mt string`'s layout is the operator's
+> else.** §5's legend is `mt qr`'s, and `mt encode`'s layout is the operator's
 > by ruling (§3b) — so no `BEARER` line, no `FROM`/`TO`, no locktime line
 > reaches the steel unless the operator puts it there.
 >
-> **`mt string` therefore PRINTS the suggested legend text on `stderr`** — the
+> **`mt encode` therefore PRINTS the suggested legend text on `stderr`** — the
 > same five fields §5 specifies — as text the operator may engrave beside the
 > string. `mt` does not control the layout and does not withhold the words.
 
@@ -96,16 +96,43 @@ warnings on stderr.
 Each of these is a ruling, with the reasoning that produced it. Several
 overturned an earlier assumption and are marked.
 
-1. **One verb in v0.1: `mt string`.** `mt qr` is deferred to its own cycle
+1. **`mt` is the constellation's fourth format tool, with the same verbs as the
+   others.** Operator ruling 2026-08-23: **`encode`**, plus **`decode`**,
+   **`verify`** and **`inspect`**. `md` and `mk` both carry exactly this set —
+   neither has a verb named `string`, and both call the emit path `encode`.
+
+       md encode  ->  descriptor      ->  md1 string(s)
+       mk encode  ->  key card        ->  mk1 string(s)
+       mt encode  ->  finalized PSBT  ->  mt1 string(s)
+
+   **This renames the previous draft's `mt string`.** That name only made sense
+   as a contrast with `mt qr`; with the QR verb deferred (§0a) the contrast is
+   gone, and `encode` is what a user who already drives `md` will reach for.
+
+   **`decode` is not optional, and §9 previously implied it was.** §9 records
+   that v0.1 ships no decoder — *"a plate cut by `mt` v0.1 cannot be read back by
+   `mt` v0.1"* — which was stated when the reader was tied to the deferred
+   static-scan verb. A `decode` that reassembles `mt1` chunks back into a
+   transaction needs no scanner and no camera: it takes strings a human typed or
+   pasted. **It is the verb that makes the format falsifiable**, and `md`/`mk`
+   both have it.
+
+   **`verify` and `inspect` follow the siblings**: `verify` checks a string set
+   without producing output, `inspect` reports what a set contains — chunk count,
+   set id, and for `mt` the transaction's own facts (§10.10's report rows are
+   already specified and are exactly what `inspect` should print).
+
+1b. **One ENGRAVING form in v0.1.** `mt qr` is deferred to its own cycle
+   (§0a) because QR conversion is a cross-format concern `md1` and `mk1` share. `mt qr` is deferred to its own cycle
    (§0a) because QR conversion is a cross-format concern `md1` and `mk1` share.
    The two-verb design below is retained as the eventual shape.
-1a. ~~Two verbs, both engraving: `qr` and `string`.~~ **The eventual shape,
-   deferred.** Signed, finalized
+1c. ~~Two engraving verbs, `qr` and `string`.~~ **Superseded**: the engraving
+   split is `encode` now and `qr` later (§0a); the verb set is `md`'s. Signed, finalized
    transactions only. Transaction construction and PSBT presentation are wallet
    functions and are out of scope (§9). **This overrules the previous draft's
    produce/present/engrave triple**, which split on *stage of the transaction*;
    these two split on *how the steel is cut*.
-1b. **`mt string` exists so that short transactions can be HAND engraved, with
+1b. **`mt encode` exists so that short transactions can be HAND engraved, with
    fault tolerance.** Operator ruling 2026-08-23: *"For some shorter
    transactions, users will want codex32 style fault tolerant hand engraving."*
    Without it, the only route onto steel is a machine — which makes `mt`
@@ -158,14 +185,14 @@ is for — is everything between them:
 - what is engraved **beside** the symbols, so the plate is self-describing;
 - what `mt` refuses to engrave at all.
 
-...and, for `mt string`, **the string format itself**: the `mt` HRP (rendering as `mt1…`,
+...and, for `mt encode`, **the string format itself**: the `mt` HRP (rendering as `mt1…`,
 where `1` is bech32's separator — §10.13b), the chunk
 header, and the BCH checksum that makes hand engraving fault-tolerant (§3b).
 
 > **CORRECTION — the previous draft said the opposite, and it is worth saying
 > why it was wrong.** It read: *"It is a plate format rather than a string
 > format, which is why it has no bech32 HRP and no BCH checksum."* Adding
-> `mt string` falsifies that sentence outright. `mt-codec` now defines a bech32
+> `mt encode` falsifies that sentence outright. `mt-codec` now defines a bech32
 > string format with an HRP and a BCH checksum, exactly like `md-codec` and
 > `mk-codec`.
 >
@@ -228,21 +255,37 @@ specify, test, teach a recoverer, and get wrong only once.**
 > `1..=64` with `ChunkCountOutOfRange`. **Six bits caps a set at 64 chunks** —
 > while §3b's own table measures the largest `mt qr` artifact at **96**, and
 > §3b and §8.7b both state that the 64-chunk ceiling is what distinguishes
-> `mt string` from `mt qr`. The ruled encoding could not be written by the ruled
+> `mt encode` from `mt qr`. The ruled encoding could not be written by the ruled
 > header.
 >
 > **`mt1` therefore uses 8 bits each for `count` and `index`** — a 41-bit header
-> admitting 256 chunks. That is consistent with §10.13, which already forks the
+> admitting **256 chunks = 10,240 bytes**, which is `mt1`'s real ceiling for
+> **both** verbs. That is consistent with §10.13, which already forks the
 > codec with its own NUMS constant and HRP rather than reusing `md-codec`'s; the
 > fork extends to the field widths. Cost is **4 bits per chunk**: 48 bytes on the
 > 96-chunk artifact, which changes no plate count.
 >
 > **What is shared is `mt1`'s header, identically across both verbs** — not
-> `md-codec`'s. `mt string` keeps the **64-chunk limit** because that is a
-> property of the codex32 container it is engraved into (§3b), not of the
-> header.
+> `md-codec`'s.
+>
+> **CORRECTION: an earlier version of this box said `mt encode` "keeps the
+> 64-chunk limit because that is a property of the codex32 container". That is
+> false, and it was mine.** codex32 limits a **single string** — 80 data symbols
+> plus 13 checksum, `BCH(93,80,8)` — and says **nothing** about how many strings
+> form a set. The 64 comes entirely from `md-codec` writing `count` into **6
+> bits**, which `mt1` no longer shares. **`mt1`'s ceiling is 256 chunks for both
+> verbs**, and every artifact measured in §3b fits it.
+>
+> **Why 64 was right for `md1` and wrong for `mt1`, measured.** Encoding this
+> repo's pathological wallet with the real `md` binary: the keyless template is
+> **4 chunks**, and the keyed form carrying all **11 xpubs is 23 chunks** — about
+> a third of 64. `md-codec`'s bound has ~3× headroom over the worst real
+> descriptor. The same wallet's five-input **spend** needs **89 chunks**, because
+> a transaction carries the witnesses, signatures and script paths a descriptor
+> only describes. `mt1` is a different format with different sizing, which is
+> why it has its own codec.
 
-    mt string:  mt1 chunk -> BCH + codex32 text -> engraved as characters
+    mt encode:  mt1 chunk -> BCH + codex32 text -> engraved as characters
     mt qr:      mt1 chunk -> bytes              -> engraved as a QR symbol
                 ^ identical header both ways
 
@@ -321,7 +364,7 @@ is the constellation's alphabet rather than a stylistic choice:
 The rejected base45 satisfies only the third; hex satisfies the first two at
 twice the cost.
 `md1`, `mk1` and codex32 already store lowercase and uppercase for QR, so
-`mt qr` and `mt string` now share one alphabet.
+`mt qr` and `mt encode` now share one alphabet.
 
 > **Correction to a figure I quoted while recommending this.** The 91% measured
 > for bech32 in `RESULTS_qr_modes_2026-08-22.txt` is for a **bare** payload. With
@@ -359,16 +402,16 @@ This is the rule that rejected codex32-in-QR, and it generalises.
 So the split is clean, in the operator's own words: **QR is for machine
 engraving, codex32 is for hand engraving.**
 
-    mt string:  chunk header + payload -> BCH + codex32 -> engraved characters
+    mt encode:  chunk header + payload -> BCH + codex32 -> engraved characters
     mt qr:      chunk header + payload -> bech32U -> QR (Reed-Solomon) -> modules
                 ^ identical header, medium-appropriate correction
                 ^ and PER-CHUNK conversion in both (below)
 
 **The base32 conversion is PER CHUNK, never over the concatenated stream.**
-Operator ruling 2026-08-23. `mt string` has no choice here — codex32 is
+Operator ruling 2026-08-23. `mt encode` has no choice here — codex32 is
 per-chunk by construction, each chunk becoming a complete string with its own
 HRP and checksum — so this rules the only verb where the question arises,
-`mt qr`, **to follow the convention `mt string` already has.**
+`mt qr`, **to follow the convention `mt encode` already has.**
 
 **Why, and it is not the size.** Measured on the 3,809 B artifact: per-chunk is
 **7,054 characters**, whole-stream **7,016** — a 0.5% saving for whole-stream.
@@ -391,7 +434,7 @@ What per-chunk buys instead:
 
 ## 3b. The string form: `mt1`, for hand engraving
 
-**`mt string` emits a chunked codex32 string with BCH error correction**, in the
+**`mt encode` emits a chunked codex32 string with BCH error correction**, in the
 same string layer `md1` and `mk1` already use. This is the constellation-native
 form: human-readable, hand-engravable, and — the point — **fault tolerant**.
 
@@ -414,8 +457,9 @@ per character is real engraving time by hand.
 
 ### What fits
 
-A chunk carries **40 payload bytes**, and the container holds **64 chunks**, so
-the hard ceiling is **2,560 B**. Measured
+A chunk carries **40 payload bytes** and `mt1`'s header admits **256 chunks**, so
+the ceiling is **10,240 B**. (An earlier draft said 64 chunks / 2,560 B,
+inheriting `md-codec`'s 6-bit `count` field that `mt1` does not use — see §3.) Measured
 (`RESULTS_envelope_2026-08-22.txt`, `RESULTS_rcw_2026-08-22.txt`):
 
 | artifact | raw bytes | chunks | fits? |
@@ -425,11 +469,13 @@ the hard ceiling is **2,560 B**. Measured
 | RCW `tr` tier 1, 1-in/1-out | 535 | **14** | yes |
 | RCW `wsh` tier 1, 1-in/1-out | 742 | **19** | yes |
 | RCW `tr` tier 1, 5-in/2-out | 2498 | **63** | yes, barely |
-| RCW `wsh` tier 1, 5-in/2-out | 3538 | **89** | **NO — refused** |
+| RCW `wsh` tier 1, 5-in/2-out | 3538 | **89** | yes — 35% of `mt1`'s 256 |
 
-**The 64-chunk ceiling is a hard limit `mt qr` does not have**, and one real
-wallet already exceeds it. That is the size asymmetry the two verbs exist to
-span: `mt string` for short transactions, `mt qr` for anything.
+**Both verbs share the 256-chunk ceiling**, because both use `mt1`'s header.
+What differs is what a chunk *costs*: one chunk is one hand-cut string of ~96
+characters, or about 1/24th of a machine-engraved QR symbol. **The same count is
+two orders of magnitude apart in human effort**, which is why §8.7b warns in
+characters and the deferred QR verb would warn in plates and minutes.
 
 > **CORRECTION — every number above was ~13% low until 2026-08-23, and so was
 > the ceiling.** R0 round 1 (S-1) found that the probe helper feeding all of
@@ -487,7 +533,7 @@ span: `mt string` for short transactions, `mt qr` for anything.
 > **Scope ruling, operator, 2026-08-23.** *"How many codex32 characters fit a
 > hand engraved plate? As many as a user wants. It is not our concern."*
 
-**`mt string` emits a string. That is the whole of its output.** Font size,
+**`mt encode` emits a string. That is the whole of its output.** Font size,
 characters per plate, how many plates, what order they are laid out in, whether
 the string is cut by hand or by machine, and whether anything is engraved beside
 it are all the user's decisions. This spec does not constrain any of them, and
@@ -503,12 +549,12 @@ regardless of how the string is engraved, and which §8.7b refuses against.
 > spec's concern; what a user does with steel is not. `mt qr` is the exception
 > only because it emits an engraving, so plate geometry is part of its output.
 
-### The one thing `mt string` does say about the plate
+### The one thing `mt encode` does say about the plate
 
 > **Ruling, operator, 2026-08-23:** *"Hand cut plates get a warning on stderr.
 > And that's it."*
 
-`mt string` prints a warning at encode time that the artifact is **bearer** —
+`mt encode` prints a warning at encode time that the artifact is **bearer** —
 anyone holding the resulting plate can spend it — and takes no further interest
 in the steel. It does not require a legend, does not reserve space for one, and
 cannot verify that any warning reached the plate.
@@ -524,14 +570,14 @@ artifact, stderr carries everything the human must see.**
 **once**, by the person doing the encoding. The person holding the plate in 2040
 is a different person, and the plate itself says nothing. This is a deliberate
 asymmetry between the two verbs — `mt qr` engraves `BEARER - ANYONE HOLDING THIS
-CAN SPEND IT` as the first line of a legend `mt` controls, and `mt string` has
+CAN SPEND IT` as the first line of a legend `mt` controls, and `mt encode` has
 no such mechanism because it emits no engraving. §7 records it as an accepted
 risk, not as a mitigation.
 
 
 ## 4. Choosing the configuration — `mt qr` only, DEFERRED (§0a)
 
-**This section governs `mt qr` and nothing else.** `mt string`'s layout is
+**This section governs `mt qr` and nothing else.** `mt encode`'s layout is
 undecided and is §10.10.
 
 > **Rule (operator, 2026-08-22): the Reed-Solomon density is the highest that
@@ -625,7 +671,7 @@ The 0.30 mm results are recorded for when the plate exists.
 ## 5. The plate legend — `mt qr` only, DEFERRED (§0a)
 
 > **Retained for the deferred QR cycle, and for one live purpose:** §0a rules
-> that `mt string` **prints these five fields on `stderr`** as suggested text
+> that `mt encode` **prints these five fields on `stderr`** as suggested text
 > the operator may engrave beside their string. The measurements and the field
 > choices below are what that suggestion is made of.
 
@@ -743,13 +789,13 @@ encoded.
 outpoints only; the source scriptPubKeys live in the *previous* transactions.
 Without them you cannot tell which wallet it spends. **`mt qr`'s** finalized
 PSBT closes part of this by carrying each input's UTXO record — value and
-scriptPubKey — so that payload does describe what it spends. **`mt string`'s
+scriptPubKey — so that payload does describe what it spends. **`mt encode`'s
 does not**: a raw transaction carries outpoints only, so a string plate is
 silent about both the input amounts and the source scripts. It still does not name the *wallet*, hence the stub, and
 hence the stub living in text, because it is the one constellation-specific fact
 on the plate and F-234 forbids that inside the QR.
 
-> **`mt`'s INPUT is always a finalized PSBT (§10.10), even for `mt string`,
+> **`mt`'s INPUT is always a finalized PSBT (§10.10), even for `mt encode`,
 > whose engraved payload is the extracted raw transaction.** Input format and
 > payload format are separate decisions; requiring a PSBT is what keeps §8.2 and
 > §8.2b runnable at all.
@@ -843,13 +889,13 @@ mitigation, the row says so instead of inventing one.
 | hazard | mitigation |
 | --- | --- |
 | **Bearer** — holder can broadcast (`mt qr`) | a timelock bounds it in *time*, not in space, and only when §8.4's `nSequence` condition holds; the `BEARER` line is the first line of a legend `mt` controls |
-| **Bearer** — holder can broadcast (`mt string`) | **accepted risk, not mitigated on the plate.** `mt` emits a string, not an engraving, so it has no mechanism to put a warning on hand-cut steel (§3b). It warns once on `stderr` at encode time, to the person encoding — who is not the person holding the plate later. The timelock bound still applies |
+| **Bearer** — holder can broadcast (`mt encode`) | **accepted risk, not mitigated on the plate.** `mt` emits a string, not an engraving, so it has no mechanism to put a warning on hand-cut steel (§3b). It warns once on `stderr` at encode time, to the person encoding — who is not the person holding the plate later. The timelock bound still applies |
 | **Pinned destination** — a 2040 recoverer pays a 2026 address whose keys may be lost | **cannot be fixed; partly disclosed.** §5's `TO` line names the destination **wallet** (id or fingerprint), which does not degrade with output count as the old truncated-address form did — but it is **optional**, and says nothing when the destination is not a known wallet (§10.4). `mt` displays every output in full at encode time; the plate carries a summary |
-| **Indistinguishable from a watch-only plate** — an `mt1` plate sits in the same drawer as `md1` and `mk1` plates, in the same script, differing in **one HRP character**, and is the only one of the three that is spendable by whoever picks it up | for `mt qr` the `BEARER` legend line carries the difference. For `mt string` there is **no mitigation** — see the bearer row above and §3b. R0 round 1 (R-13) |
-| **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed by `mt`, and is NOT on the plate.** `mt` warns below 10 sat/vB (§8.2b) and names two things a future holder can try, guaranteeing neither: **CPFP** — spending one of this transaction's outputs with a high-fee child, which needs no key from the original signer, unlike **RBF**, which requires signing a replacement and is therefore useless to a plate holder — and **out-of-band submission** straight to a miner, which bypasses relay policy and is the escape hatch when a fee is too low for the parent to reach a mempool at all. **Neither is recoverable from an `mt string` plate's own contents**, since a raw transaction carries no input amounts (§6) |
+| **Indistinguishable from a watch-only plate** — an `mt1` plate sits in the same drawer as `md1` and `mk1` plates, in the same script, differing in **one HRP character**, and is the only one of the three that is spendable by whoever picks it up | for `mt qr` the `BEARER` legend line carries the difference. For `mt encode` there is **no mitigation** — see the bearer row above and §3b. R0 round 1 (R-13) |
+| **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed by `mt`, and is NOT on the plate.** `mt` warns below 10 sat/vB (§8.2b) and names two things a future holder can try, guaranteeing neither: **CPFP** — spending one of this transaction's outputs with a high-fee child, which needs no key from the original signer, unlike **RBF**, which requires signing a replacement and is therefore useless to a plate holder — and **out-of-band submission** straight to a miner, which bypasses relay policy and is the escape hatch when a fee is too low for the parent to reach a mempool at all. **Neither is recoverable from an `mt encode` plate's own contents**, since a raw transaction carries no input amounts (§6) |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
 | **Non-`ALL` sighash** — an input signed with `SIGHASH_NONE` or `SIGHASH_SINGLE` leaves outputs unbound, so a plate-holder can redirect the funds and the `TO` line becomes a lie | refused at encode time, §8.6 — **structurally**, since §8.2's removal left no script engine |
-| **Wrong input value** — a legacy input whose claimed value is wrong yields a valid transaction, and **the fee absorbs the entire difference** | **not detectable by `mt`.** §8.2's removal means no signature is verified, and a legacy sighash never committed to the amount anyway. Mitigated only by §8.2c's `stderr` warning, which states the arithmetic `(real input value) − (output total)` since the output total is the one term `mt` knows for certain. **Nothing reaches the steel for `mt qr`** — §5's legend is full (§8.2c). An `mt string` operator controls their own plate and may add a reminder; `mt qr`'s operator cannot |
+| **Wrong input value** — a legacy input whose claimed value is wrong yields a valid transaction, and **the fee absorbs the entire difference** | **not detectable by `mt`.** §8.2's removal means no signature is verified, and a legacy sighash never committed to the amount anyway. Mitigated only by §8.2c's `stderr` warning, which states the arithmetic `(real input value) − (output total)` since the output total is the one term `mt` knows for certain. **Nothing reaches the steel for `mt qr`** — §5's legend is full (§8.2c). An `mt encode` operator controls their own plate and may add a reminder; `mt qr`'s operator cannot |
 | **Well-formed but INVALID** — a transaction with a bad signature engraves cleanly and fails at broadcast, years later | **accepted, not mitigated.** Operator ruling 2026-08-23 removed script verification from v0.1 (§8.2). §8.1 sees a witness, §8.2b sees balanced values, §8.6 sees correct sighash flags — none of them verifies the signature. `mt` may add this someday |
 
 > The last two rows are the honest state of this design. R0 lens 2 found that the
@@ -1393,7 +1439,7 @@ exactly as permanent, as a machine-engraved one.
    > commit that discovered the ceiling: a 40% margin invites "no need to model
    > this", while 15% is close enough that §4's search and this refusal must be
    > reconciled rather than left independent (§10.14's regeneration).
-7b. **Over the 64-chunk container (`mt string`)** → refuse, naming the chunk
+7b. **Over the 64-chunk container (`mt encode`)** → refuse, naming the chunk
    count and the ceiling, and pointing at `mt qr`, which has no such limit. Real
    wallets hit this: RCW `wsh` tier 1 at 5 inputs needs **89** chunks (§3b).
 8. **Module size is the operator's choice, defaulting to 0.60 mm** — not a
@@ -1574,7 +1620,7 @@ signed PSBT.
    header.** `mt1`'s header carries `count` and `index` — n-of-m — plus a 20-bit
    `chunk_set_id` so pieces of different transactions cannot be combined. **It is
    `mt1`'s own 41-bit header, not `md-codec`'s 37-bit one** (§3): the latter's
-   6-bit `count` caps a set at 64 chunks, which `mt qr` exceeds. For `mt string` that header sits inside the
+   6-bit `count` caps a set at 64 chunks, which `mt qr` exceeds. For `mt encode` that header sits inside the
    BCH-protected chunk; for `mt qr` it rides in the bech32-uppercase payload.
    **One
    mechanism, both media.**
@@ -1655,14 +1701,14 @@ signed PSBT.
 
     | | |
     | --- | --- |
-    | verbs | `mt qr`, `mt string` |
+    | verbs | **`encode`**, `decode`, `verify`, `inspect` — matching `md` and `mk` |
     | **input** | **a finalized PSBT, and nothing else** — from a file or stdin, equivalently |
     | `mt qr` output | a **SH2 payload** (`sysw`) carrying the QR — machine engraving |
-    | `mt string` output | the **codex32 string on stdout** — hand engraving |
+    | `mt encode` output | the **codex32 string on stdout** — hand engraving |
     | stderr | every warning and refusal a human must see (§3b) |
     | flags | **none for locktime** (§8.4) |
 
-    **Why PSBT-only, when `mt string`'s PAYLOAD is a raw transaction.** Input
+    **Why PSBT-only, when `mt encode`'s PAYLOAD is a raw transaction.** Input
     format and payload format are independent, and conflating them would have
     cost two refusals. §8 is written in PSBT vocabulary and degrades unevenly
     without one:
@@ -1677,7 +1723,7 @@ signed PSBT.
     So accepting raw hex would **silently disable two refusals**, including the
     only check that inputs ≥ outputs, while the artifact looked identical. `mt`
     therefore requires a PSBT, runs the full refusal set against it, and then —
-    for `mt string` — extracts the raw transaction as the payload. Nothing is
+    for `mt encode` — extracts the raw transaction as the payload. Nothing is
     lost: a PSBT is what wallet software emits at the point this workflow
     starts, which is exactly the *"test it in your wallet first"* flow §0 is
     built around.
@@ -1691,7 +1737,7 @@ signed PSBT.
     defined that printing.
 
     **It goes to `stderr`, with the warnings**, because stdout is the artifact
-    and writing a report there would corrupt `mt string`'s output. Before any
+    and writing a report there would corrupt `mt encode`'s output. Before any
     plate is cut, `mt` reports:
 
     | | |
@@ -1701,7 +1747,7 @@ signed PSBT.
     | **the locktime** | §8.4's two facts |
     | **the plate count** | and, since a plate is ~21 minutes (F-225), the **engraving time** |
     | **the configuration** | module size, QR version, ECC level, symbol count — §4's answer |
-    | **the headroom** | chunks against 64 (`mt string`) or characters against 8,191 (`mt qr`), so a near-ceiling artifact is visible before it is cut |
+    | **the headroom** | chunks against 64 (`mt encode`) or characters against 8,191 (`mt qr`), so a near-ceiling artifact is visible before it is cut |
     | **the value provenance** | per input: chain-fetched (§6a), txid-bound (§8.2d), or operator-asserted (§8.2c) |
 
     **THE SPEC NAMES ZERO FLAGS while requiring SEVEN operator inputs the PSBT
@@ -1735,7 +1781,7 @@ signed PSBT.
 
 11. ~~How many codex32 characters fit a hand-engraved plate?~~ **CLOSED — OUT
     OF SCOPE**, operator ruling 2026-08-23: *"As many as a user wants. It is not
-    our concern."* `mt string` emits a string; what a user does with steel is
+    our concern."* `mt encode` emits a string; what a user does with steel is
     theirs. See §3b. The 64-chunk ceiling is unaffected — that is a property of
     the codec, not of anyone's plate.
 
@@ -1838,7 +1884,7 @@ signed PSBT.
     the order above, matching `md-codec`'s `BitWriter`. The 41-bit header is
     followed immediately by the chunk payload with **no padding between them**;
     padding appears only once, at the end of a chunk, to reach the next 5-bit
-    symbol boundary (`mt string`) or byte boundary (`mt qr`).
+    symbol boundary (`mt encode`) or byte boundary (`mt qr`).
 
     **(c) A content id — the transaction id, and R2 lens 2 found the ruling
     AMBIGUOUS.** A PSBT holds **two** transactions that could be called "the"
