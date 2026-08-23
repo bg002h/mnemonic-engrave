@@ -273,7 +273,9 @@ specify, test, teach a recoverer, and get wrong only once.**
 > **`mt1` WIDENS `count` and `index`, and an earlier version of this section said
 > the header was shared "verbatim" with `md-codec`. That was unbuildable.**
 > R3 lens 3 found it. `md-codec`'s header packs
-> `version(4) + chunked(1) + chunk_set_id(20) + count−1(6) + index(6) = 37 bits`
+> `version(4) + chunked(1) + chunk_set_id(20) + count−1(6) + index(6) = 37 bits`,
+> against `mt1`'s
+> `version(4) + chunked(1) + chunk_set_id(20) + count−1(12) + index(12) = 49 bits`
 > (`crates/md-codec/src/chunk.rs`), and `write()` refuses any `count` outside
 > `1..=64` with `ChunkCountOutOfRange`. **Six bits caps a set at 64 chunks** —
 > while §3b's own table measures the largest `mt qr` artifact at **96**, and
@@ -281,9 +283,30 @@ specify, test, teach a recoverer, and get wrong only once.**
 > `mt encode` from `mt qr`. The ruled encoding could not be written by the ruled
 > header.
 >
-> **`mt1` therefore uses 8 bits each for `count` and `index`** — a 41-bit header
-> admitting **256 chunks = 10,240 bytes**, which is `mt1`'s real ceiling for
-> **both** verbs. That is consistent with §10.13, which already forks the
+> **`mt1` therefore uses 12 bits each for `count` and `index`** — a **49-bit**
+> header admitting **4,096 chunks = 163,840 bytes**, `mt1`'s ceiling for **both**
+> verbs.
+>
+> **Why 12, and the bound is Bitcoin's rather than ours.** Operator ruling
+> 2026-08-23. `MAX_STANDARD_TX_WEIGHT = 400,000` (verified in `bitcoin`
+> 0.32.101's `policy.rs`) is 100,000 vbytes, so **a transaction above ~100 KB
+> will not relay** and `mt` could never usefully engrave one. That is **2,500
+> chunks**; 4,096 covers it with 1.6x headroom. An 8-bit field gave 10 KB and
+> would have refused an ordinary 20-input multisig spend; 14 bits would give
+> 640 KB, six times what any node accepts, bought for nothing.
+>
+> **The cost is ONE CHARACTER per engraved string.** `md-codec` sizes chunks
+> against a 320-bit budget that sits *below* codex32's 400-bit capacity, so a
+> wider header does not change the chunk count — it consumes slack. Measured: a
+> chunk-string goes from **89 to 90 characters**, so a five-chunk transaction
+> goes from 445 to ~450. Both `41 + 320 = 361` and `49 + 320 = 369` fit the
+> 400-bit capacity.
+>
+> **Sizing this field for hand engraving would have been sizing the wrong
+> constraint.** Nobody hand-cuts 2,500 strings whatever the format permits —
+> *effort* limits that, not `count`. The header must serve the largest consumer,
+> which is the machine path (§0a), and it is the one field that cannot be
+> widened after v0.1 without breaking the wire format. That is consistent with §10.13, which already forks the
 > codec with its own NUMS constant and HRP rather than reusing `md-codec`'s; the
 > fork extends to the field widths. Cost is **4 bits per chunk**: 48 bytes on the
 > 96-chunk artifact, which changes no plate count.
@@ -296,8 +319,8 @@ specify, test, teach a recoverer, and get wrong only once.**
 > false, and it was mine.** codex32 limits a **single string** — 80 data symbols
 > plus 13 checksum, `BCH(93,80,8)` — and says **nothing** about how many strings
 > form a set. The 64 comes entirely from `md-codec` writing `count` into **6
-> bits**, which `mt1` no longer shares. **`mt1`'s ceiling is 256 chunks for both
-> verbs**, and every artifact measured in §3b fits it.
+> bits**, which `mt1` no longer shares. **`mt1`'s ceiling is 4,096 chunks for
+> both verbs**, and every artifact measured in §3b fits it many times over.
 >
 > **Why 64 was right for `md1` and wrong for `mt1`, measured.** Encoding this
 > repo's pathological wallet with the real `md` binary: the keyless template is
@@ -480,8 +503,9 @@ per character is real engraving time by hand.
 
 ### What fits
 
-A chunk carries **40 payload bytes** and `mt1`'s header admits **256 chunks**, so
-the ceiling is **10,240 B**. (An earlier draft said 64 chunks / 2,560 B,
+A chunk carries **40 payload bytes** and `mt1`'s header admits **4,096 chunks**,
+so the ceiling is **163,840 B** — above Bitcoin's own ~100 KB standardness limit,
+so `mt1` encodes any transaction that will relay (§3). (An earlier draft said 64 chunks / 2,560 B,
 inheriting `md-codec`'s 6-bit `count` field that `mt1` does not use — see §3.) Measured
 (`RESULTS_envelope_2026-08-22.txt`, `RESULTS_rcw_2026-08-22.txt`):
 
@@ -492,9 +516,9 @@ inheriting `md-codec`'s 6-bit `count` field that `mt1` does not use — see §3.
 | RCW `tr` tier 1, 1-in/1-out | 535 | **14** | yes |
 | RCW `wsh` tier 1, 1-in/1-out | 742 | **19** | yes |
 | RCW `tr` tier 1, 5-in/2-out | 2498 | **63** | yes, barely |
-| RCW `wsh` tier 1, 5-in/2-out | 3538 | **89** | yes — 35% of `mt1`'s 256 |
+| RCW `wsh` tier 1, 5-in/2-out | 3538 | **89** | yes — 2% of `mt1`'s 4,096 |
 
-**Both verbs share the 256-chunk ceiling**, because both use `mt1`'s header.
+**Both verbs share the 4,096-chunk ceiling**, because both use `mt1`'s header.
 What differs is what a chunk *costs*: one chunk is one hand-cut string of ~96
 characters, or about 1/24th of a machine-engraved QR symbol. **The same count is
 two orders of magnitude apart in human effort**, which is why §8.7b warns in
@@ -663,7 +687,7 @@ PSBT bytes, not bytewords):
 > of seven artifacts, one to two ECC levels on the rest.
 >
 > **Three inputs are still unmodelled here**, all of them additive, so treat
-> every row as a lower bound: the **41-bit `mt1` chunk header per symbol**
+> every row as a lower bound: the **49-bit `mt1` chunk header per symbol**
 > (§3), §10.8's **per-symbol `n/m` labels**, and §10.14's **font-metric
 > correction** to the legend reservation. §10.14 already requires the
 > regeneration; this note names all three inputs it must take.
@@ -1659,7 +1683,7 @@ signed PSBT.
    **Machine-readably this holds for both verbs, because §3 made them share one
    header.** `mt1`'s header carries `count` and `index` — n-of-m — plus a 20-bit
    `chunk_set_id` so pieces of different transactions cannot be combined. **It is
-   `mt1`'s own 41-bit header, not `md-codec`'s 37-bit one** (§3): the latter's
+   `mt1`'s own 49-bit header, not `md-codec`'s 37-bit one** (§3): the latter's
    6-bit `count` caps a set at 64 chunks, which `mt qr` exceeds. For `mt encode` that header sits inside the
    BCH-protected chunk; for `mt qr` it rides in the bech32-uppercase payload.
    **One
@@ -1897,18 +1921,18 @@ signed PSBT.
 
     **(a2) The header's exact layout, because R4 found five things an
     implementer would otherwise guess — and two of the guesses produce plates
-    another implementation cannot read.** `mt1`'s 41 bits are, in order:
+    another implementation cannot read.** `mt1`'s 49 bits are, in order:
 
     | field | bits | value |
     | --- | --- | --- |
     | `version` | 4 | **`0b0001`** — `mt1` wire v1. Not inherited from `md1`; a shared value would let one format's chunk verify as the other's under a colliding constant |
     | `chunked` | 1 | **`1`, always, and RETAINED** even though `mt1` is always chunked — see below |
     | `chunk_set_id` | 20 | top 20 bits of the extracted txid, display form (c) |
-    | `count` | 8 | **`count − 1`**, matching `md-codec`'s offset convention: a set of 1 stores `0`, a set of 256 stores `255` |
-    | `index` | 8 | **plain, zero-based**, `index < count` |
+    | `count` | **12** | **`count − 1`**, matching `md-codec`'s offset convention: a set of 1 stores `0`, a set of 4,096 stores `4095` |
+    | `index` | **12** | **plain, zero-based**, `index < count` |
 
-    **`count` stores `count − 1`.** §3's *"admitting 256 chunks"* and its
-    `count(8)` are consistent only under the offset, and `md-codec` already does
+    **`count` stores `count − 1`.** §3's *"admitting 4,096 chunks"* and its
+    `count(12)` are consistent only under the offset, and `md-codec` already does
     this (`chunk.rs`). An implementer choosing plain would produce plates whose
     every multi-chunk set is off by one — **unreadable by the other
     implementation, and sending a recoverer to hunt a plate that was never cut.**
@@ -1921,7 +1945,7 @@ signed PSBT.
     bit per chunk and keeps the layout identical to the format `mt1` forked from.
 
     **Bit order and padding.** Fields are written most-significant-bit first in
-    the order above, matching `md-codec`'s `BitWriter`. The 41-bit header is
+    the order above, matching `md-codec`'s `BitWriter`. The 49-bit header is
     followed immediately by the chunk payload with **no padding between them**;
     padding appears only once, at the end of a chunk, to reach the next 5-bit
     symbol boundary (`mt encode`) or byte boundary (`mt qr`).
