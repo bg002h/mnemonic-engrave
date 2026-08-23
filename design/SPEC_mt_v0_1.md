@@ -644,6 +644,34 @@ v25.0.0 node. It is the right RPC for three reasons:
   rather than the chain. A spent or nonexistent output returns `null`;
 - it needs **no `-txindex`**, unlike `getrawtransaction`.
 
+**NO NODE IS A WARNING, NOT A SILENCE.** Operator ruling 2026-08-23:
+*"bitcoind might not be available and we need a warning for that."* An earlier
+draft made every check in this section conditional on a node being reachable and
+said nothing when one was not — so the quietest possible run was also the
+least-verified one, and the operator could not tell the difference. `mt` names
+what it could not check:
+
+    WARNING: no bitcoind reachable. These checks did NOT run:
+
+      - are the inputs still unspent?        (§8.5)   UNKNOWN
+      - do the PSBT's input values match
+        the chain?                           (§6a)    UNKNOWN
+      - has the locktime already passed?     (§8.4)   UNKNOWN
+        locked to block 1383520, current height unknown
+
+    The transaction may already be unspendable. A plate is ~21 minutes.
+    Consider re-running with a node before cutting.
+
+**Enumerating the skipped checks is the point.** *"No node"* alone tells the
+operator nothing they can act on; a list of what is therefore unknown tells them
+exactly what they are trading for convenience, and the plate-time reminder tells
+them what it costs to be wrong. This is the same principle as §8.2c: state the
+mechanism, not the caution.
+
+**Not a refusal.** Offline operation is the constellation's posture (§0), and
+§8.5 refuses only on a node's *positive* answer that an output is spent — an
+absent node is an absent answer, not a bad one.
+
 **Use the value it returns, not merely its null-ness.** `gettxout` returns
 `value` and `scriptPubKey` — which is this section's stated reason for choosing
 it over `getrawtransaction` — and an earlier draft acted only on whether the
