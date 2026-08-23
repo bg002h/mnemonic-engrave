@@ -117,7 +117,7 @@ warnings on stderr.
 > So **`mt` may not treat any legend field as present**, and no journey in this
 > spec may be walked from a plate that has one. The recovery path that has to
 > work is the bare one: **`mt1` strings, nothing else, into `mt inspect`** —
-> which is precisely why §10.20 has `inspect` consult a node and reconstruct
+> which is precisely why §1.1 has `inspect` consult a node and reconstruct
 > what the legend would have said (§10.21 closes on the single field inspection
 > *cannot* reconstruct). A legend, where an operator does cut one, is a
 > **convenience that shortens a recovery** — never a component one depends on.
@@ -331,6 +331,59 @@ overturned an earlier assumption and are marked.
    > independently testable in a way an inline report inside `encode` would not
    > be.
 
+   #### The report, stated once — three callers, one layout
+
+   **This block is normative and it is the only place the layout appears.** It
+   is written out because the report had acquired **three callers** — a
+   pre-engraving operator, a recoverer with a node, a recoverer without — and
+   its rows had only ever been specified *obliquely*, a clause at a time, in
+   four different sections. That is the precondition for exactly the drift the
+   ownership rule above exists to prevent: a single owner in the code means
+   nothing while the specification of what it owns is scattered.
+
+       mt1 SET   e6f7a2c    14 strings, 1..14 all present
+       TX        9a3f21c0d4e5b6a7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f
+       OUT       1 output
+                   bc1p8rrz...s6n0vcl        0.05000000 BTC
+       FEE       0.00012000 BTC   (12 sat/vB over 1000 vB)
+       LOCKTIME  block 1383520, ~FALL 2034   current height 1402887 — PASSED
+       INPUTS    1 input
+                   9a3f21c0:0   0.05012000 BTC   from node       LIVE
+       STATUS    LIVE — every input is unspent
+
+   | row | present when | source |
+   | --- | --- | --- |
+   | `mt1 SET` | the caller had strings — `inspect`, `decode`, `verify` | the chunk headers (§10.13 a2) |
+   | `TX` | **always** | double-SHA-256 of the decoded bytes; needs no node and no network (§6a) |
+   | `OUT` | **always** | the transaction itself |
+   | `FEE` | a node is reachable, **or** the input was a PSBT carrying values | inputs minus outputs — and the transaction alone does not carry input values (§6a) |
+   | `LOCKTIME` | **always**; the `current height` clause needs a node | `nLockTime`, plus §8.4's threshold rule and the season projection |
+   | `INPUTS` | **always**; the value and provenance columns need a node | outpoints from the transaction, values from `gettxout` |
+   | `STATUS` | **always** — `UNKNOWN` with no node | the four-state liveness table above |
+
+   **Three rules govern every row, and they are what make the report honest:**
+
+   1. **A row is never omitted for being unanswerable — it reads `UNKNOWN`.**
+      Omission and ignorance look identical on a terminal, and the reader cannot
+      tell a row that was skipped from one that never existed. §6a's warning
+      then enumerates every `UNKNOWN` and names both ways to resolve them.
+   2. **Read and verified are visually distinct, always.** `TX`, `OUT` and
+      `LOCKTIME` come off the plate; `FEE`, the input values and `STATUS` come
+      off the chain. A report where those look alike is the failure §6a's
+      recovery warning exists to prevent — it is *"what the transaction SAYS"*
+      versus what is confirmed, and an offline report is fully populated in the
+      first column and empty in the second.
+   3. **`encode` appends, never edits.** Its two extra rows —
+      `CUT   14 strings, 1,246 characters` — go **below** `STATUS`, so the
+      operator's view is the recoverer's view plus a suffix. Anything `encode`
+      needs to *change* about a row is a defect in the row, fixable in one place.
+
+   > **Per caller, the only differences are the stream and the suffix**, which
+   > is the whole point of one owner: `inspect` prints it on **stdout** (it is
+   > the artifact); `decode` prints it on **stderr** beside the hex (§1.1a);
+   > `encode` prints it on **stderr** before the strings (§0a), with the `CUT`
+   > row appended. **No caller reorders, reformats, or drops a row.**
+
 1a. **`mt decode` reads `mt` output and emits BROADCASTABLE HEX, and ships in
    v0.1.** Operator ruling
    2026-08-23: *"we need a decode to read mt output."* It takes `mt1` strings —
@@ -384,7 +437,7 @@ overturned an earlier assumption and are marked.
    plausibly `sendrawtransaction`, and the first thing they learn about the
    destination, the amount and the locktime is whatever the chain does with it.
 
-   So `decode` emits **§10.20's `inspect` report on `stderr`** while the hex
+   So `decode` emits **§1.1's `inspect` report on `stderr`** while the hex
    goes to stdout. This costs the pipe nothing — `mt decode < plates.txt | xargs
    bitcoin-cli sendrawtransaction` is byte-identical either way, because §0a's
    boundary is what makes the summary free — and it means **no path through this
@@ -1136,7 +1189,7 @@ fields, **164 characters**, 7 lines — measured,
 > Every other field on this plate is a **convenience**: `mt inspect` can
 > reconstruct the destination, the amount, the locktime and the bearer warning
 > from the string itself, and with a node reachable it can say more than the
-> legend ever could (§10.20). **What no amount of inspection recovers is which
+> legend ever could (§1.1). **What no amount of inspection recovers is which
 > program to run.** `MT1QZRF8X…` in a search engine returns nothing, and a
 > recoverer who cannot name the format cannot reach any of the other fields.
 >
@@ -2786,7 +2839,7 @@ signed PSBT.
     **The question was found by walking Journey B, not by reviewing §5.** A
     recoverer in 2040 holds a string and no indication of which tool reads it;
     `MT1QZRF8X…` in a search engine returns nothing. Every *other* legend field
-    is reconstructible by `mt inspect` from the string alone (§10.20) — **which
+    is reconstructible by `mt inspect` from the string alone (§1.1) — **which
     program to run is the one thing inspection cannot tell you**, so the field
     that looked like the least important of the six is the only one whose
     absence ends the journey.
