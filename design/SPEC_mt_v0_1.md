@@ -150,7 +150,7 @@ overturned an earlier assumption and are marked.
    **`inspect` OWNS the report; `encode` CALLS it.** Operator ruling
    2026-08-23. `encode` does not compose its own version of §10.10's report — it
    invokes `inspect` on what it just produced and appends the rows only it can
-   know: character count, chunk count, and headroom against the ceiling.
+   know: **how many strings to cut, and how many characters in total.**
    `md inspect` cannot say how many plates an `md1` string takes either; that is
    not the codec's business.
 
@@ -1835,6 +1835,21 @@ signed PSBT.
     starts, which is exactly the *"test it in your wallet first"* flow §0 is
     built around.
 
+> **A row was removed here on 2026-08-23, and it had gone stale twice.** The
+> report carried *"the headroom — chunks against 64 (`mt encode`) or characters
+> against 8,191 (`mt qr`)"*. **Both ceilings it named are gone**: 64 was never
+> `mt1`'s (§3's correction — it was `md-codec`'s 6-bit field), and 8,191 is
+> `sysw`'s, deferred with `mt qr` (§0a). It survived both corrections because
+> each fixed a *ceiling* and neither re-read the row that cited it.
+>
+> **It would not have earned its place even with the right number.** Against
+> `mt1`'s real 4,096-chunk ceiling the worst measured artifact is **2.2%** and
+> the pathological wallet's descriptor is 0.6%, so the row would report ~98%
+> headroom every time — a figure that never varies and never informs. A ceiling
+> is worth reporting only where it binds, and this one binds at sizes nobody
+> hand-engraves. It returns for the QR cycle, where `sysw`'s 8,191 *does* bind
+> at realistic sizes.
+
     **The SUCCESS-PATH REPORT is `inspect`'s, and `encode` calls it** (§1's
     verb rulings). What follows is the report's content; the ownership rule is
     that `encode` invokes `inspect` rather than composing a second copy, so the
@@ -1859,7 +1874,7 @@ signed PSBT.
     | **the locktime** | §8.4's two facts |
     | **the plate count** | and, since a plate is ~21 minutes (F-225), the **engraving time** |
     | **the configuration** | module size, QR version, ECC level, symbol count — §4's answer |
-    | **the headroom** | chunks against 64 (`mt encode`) or characters against 8,191 (`mt qr`), so a near-ceiling artifact is visible before it is cut |
+    | **the engraving size** | how many strings to cut and **how many characters in total** — the unit the person doing the cutting actually experiences |
     | **the value provenance** | per input: chain-fetched (§6a), txid-bound (§8.2d), or operator-asserted (§8.2c) |
 
     **THE SPEC NAMES ZERO FLAGS while requiring SEVEN operator inputs the PSBT
