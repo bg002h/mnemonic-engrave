@@ -2131,6 +2131,7 @@ signed PSBT.
     | **the plate count** | and, since a plate is ~21 minutes (F-225), the **engraving time** |
     | **the configuration** | module size, QR version, ECC level, symbol count — §4's answer |
     | **the engraving size** | how many strings to cut and **how many characters in total** — the unit the person doing the cutting actually experiences |
+    | **the set prefix** | the **first 7 characters after `mt1`**, shared by every string in this set, with the rule stated — see below |
     | **the value provenance** | per input: chain-fetched (§6a), txid-bound (§8.2d), or operator-asserted (§8.2c) |
 
     **THE SPEC NAMES ZERO FLAGS while requiring SEVEN operator inputs the PSBT
@@ -2185,6 +2186,26 @@ signed PSBT.
         mt encode: that is a transaction ID (a 64-character hash), not a
                    transaction. mt needs the transaction itself — a txid
                    identifies one, it does not contain one.
+
+    **The SET PREFIX row, and why it is a row rather than a footnote.**
+    Operator ruling 2026-08-23. `mt1`'s header packs its invariant fields first
+    — `version(4) + chunked(1) + chunk_set_id(20) + count(12)` — so bits 0–36
+    are identical across every chunk of a set, and at 5 bits per symbol **the
+    first 7 characters after `mt1` are the same on all of them**. Only `index`
+    varies.
+
+    **Verified on real output rather than derived**: the four `md1` chunks of
+    this repo's pathological wallet all read `md1fveszps…`.
+
+        All 14 strings begin `mt1qzrf8x`. Strings sharing that prefix belong
+        to this transaction; strings that do not, do not.
+
+    **This is the only grouping rule a recoverer can apply without software.**
+    They may hold plates from two transactions, or one plate from a set whose
+    siblings are elsewhere, and the prefix separates them **by eye** — no
+    decoding, no checksum, no tool. It costs one line at encode time and hands
+    the 2040 reader a rule they would otherwise have to be told by someone who
+    is not there.
 
     **Input and output serialisations are now settled** — three accepted input
     forms (§8.2e) and raw hex out of `decode` (decision 1a in §1).
