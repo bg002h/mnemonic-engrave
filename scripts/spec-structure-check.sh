@@ -79,6 +79,14 @@ for a, b in zip(nums, nums[1:]):
 bounds = [ln for ln, _ in heads] + [len(lines)+1]
 for (start, head), end in zip(heads, bounds[1:]):
     body = lines[start:end-1]
+    # MALFORMED item labels: `1a0.` or `2e0.` look like items and are INVISIBLE
+    # to every check below, because the strict pattern allows one optional
+    # letter. I produced both, an hour apart, and the gate passed both times.
+    for k, l in enumerate(body):
+        if re.match(r'^\d+[a-z0-9]+\. ', l) and not re.match(r'^\d+[a-z]?\. ', l):
+            err(f"line {start+1+k}: MALFORMED item label {l.split('.')[0]!r} — "
+                f"a label must be digits plus at most one letter, or it is "
+                f"invisible to every numbering check")
     items = [(start+1+k, l) for k, l in enumerate(body) if re.match(r'^\d+[a-z]?\. ', l)]
     if not items:
         continue

@@ -332,6 +332,62 @@ overturned an earlier assumption and are marked.
    > tool. Nothing about the format changes — but nobody should read this item
    > as scoping `mt encode` to small transactions, because §8.7b's ceiling is the
    > only bound and it sits above Bitcoin's own relay limit.
+1e. **The human text surface: what `mt` suggests engraving, and what it accepts
+   back.** Operator rulings 2026-08-23. A string leaves `mt` as text and comes
+   back typed by a person, and both ends need rules.
+
+   **Engrave UPPERCASE; accept anything.** `mt` suggests uppercase because it is
+   more legible on steel — fewer ascenders and descenders, more distinct
+   letterforms under a scratch — and the fork's own keyboard path already emits
+   it. **Input is case-insensitive**, because bech32 treats all-upper and
+   all-lower as identical and normalising costs nothing. (Mixed case is invalid
+   *bech32*; `mt` normalises before that rule bites.)
+
+   **Spaces are stripped on input, and offered on output.** `mt encode` takes an
+   optional grouping — every N characters, space-separated — **for hand
+   engraving only**, since a person cutting 90 characters needs somewhere to
+   keep their place. Whatever grouping the operator chose, `mt decode` and
+   `mt verify` strip whitespace before doing anything else.
+
+   **A full string is exactly 90 characters**, and that is checked *before*
+   decoding, because it catches the one damage class BCH cannot:
+
+       string 7: 89 characters (expected 90) — a character is MISSING, not
+                 wrong. BCH repairs substitutions; an omission shifts every
+                 symbol after it and cannot be corrected. Re-read the plate.
+
+   **Confusable characters are autocorrected FIRST, and the order is the
+   point.** bech32's data charset excludes `1`, `b`, `i` and `o` *precisely*
+   because they are confusable, so a typed excluded character is not a wrong
+   symbol — **it is not a symbol at all**, and BCH never sees it. Repairing it
+   before decoding therefore **costs nothing from the `t = 4` budget**, which
+   stays available for genuine substitution errors:
+
+   | typed | meant | why |
+   | --- | --- | --- |
+   | `o` | `0` | excluded from the charset |
+   | `b` | `6` | excluded |
+   | `i` | `l` | excluded |
+   | `1` **in the data** | `l` | `1` is the separator, never data |
+   | `l`/`I` **in the prefix** | `1` | the separator, which every user types |
+
+   That last row matters most: the prefix is `mt1`, so **every string a person
+   types contains the single most confusable glyph in the set**, and `mtl…` or
+   `mtI…` does not merely fail its checksum — it has no separator and will not
+   parse at all.
+
+   **Autocorrect announces itself, localises, and states its verdict.**
+   Operator ruling: never silently. A silent fix means the operator never learns
+   which engraved glyph reads badly, and so never re-cuts it before the next
+   scratch lands there.
+
+       string 3: corrected `o` -> `0` at position 41. Checksum now valid.
+                 That character reads badly on your plate — consider re-cutting it.
+
+       string 9: corrected `b` -> `6` at position 12. Checksum STILL INVALID.
+                 mt1qzrf8xk2v...9d7b4...
+                            ^ here            <- could not resolve
+
 2. **Its own repository**, `mnemonic-transaction`, with **`mt-cli` and
    `mt-codec`** — matching the constellation's pattern exactly, and not a
    subcommand of `me`. Every normative format has this shape: `descriptor-mnemonic`
