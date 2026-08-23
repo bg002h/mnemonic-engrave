@@ -269,27 +269,48 @@ per character is real engraving time by hand.
 
 ### What fits
 
-Measured (`RESULTS_envelope_2026-08-22.txt`, `RESULTS_rcw_2026-08-22.txt`),
-against the **64-chunk** container:
+A chunk carries **40 payload bytes**, and the container holds **64 chunks**, so
+the hard ceiling is **2,560 B**. Measured
+(`RESULTS_envelope_2026-08-22.txt`, `RESULTS_rcw_2026-08-22.txt`):
 
 | artifact | raw bytes | chunks | fits? |
 | --- | --- | --- | --- |
-| RCW `tr` key-path, 1-in/1-out | 162 | **4** | yes |
-| RCW `tr` tier 4, 1-in/1-out | 405 | **9** | yes |
-| RCW `tr` tier 1, 1-in/1-out | 535 | **12** | yes |
-| RCW `wsh` tier 1, 1-in/1-out | 742 | **17** | yes |
-| RCW `tr` tier 1, 5-in/2-out | 2498 | **56** | yes, barely |
-| RCW `wsh` tier 1, 5-in/2-out | 3538 | **78** | **NO — refused** |
+| RCW `tr` key-path, 1-in/1-out | 162 | **5** | yes |
+| RCW `tr` tier 4, 1-in/1-out | 405 | **11** | yes |
+| RCW `tr` tier 1, 1-in/1-out | 535 | **14** | yes |
+| RCW `wsh` tier 1, 1-in/1-out | 742 | **19** | yes |
+| RCW `tr` tier 1, 5-in/2-out | 2498 | **63** | yes, barely |
+| RCW `wsh` tier 1, 5-in/2-out | 3538 | **89** | **NO — refused** |
 
 **The 64-chunk ceiling is a hard limit `mt qr` does not have**, and one real
 wallet already exceeds it. That is the size asymmetry the two verbs exist to
 span: `mt string` for short transactions, `mt qr` for anything.
 
-The theoretical ceiling is **2,904 B** (64 chunks x (80 data symbols − 37 header
-bits)). Treat the chunk counts above as a **floor**: `md`'s chunker balances
-rather than fills, so a real chunk measures ~85 characters where a filled one
-would be 96. **A new `mt1` codec could choose to fill**, which would raise the
-ceiling — undecided, §10.12.
+> **CORRECTION — every number above was ~13% low until 2026-08-23, and so was
+> the ceiling.** R0 round 1 (S-1) found that the probe helper feeding all of
+> them modelled a chunk as `(bytes*8).div_ceil(363)`. 363 = 80 codex32 symbols
+> x 5 bits − 37 header bits, i.e. what a chunk *could* carry if the chunker
+> **filled** to long-form capacity. **It does not.** `md-codec` sizes chunks by
+> `SINGLE_STRING_PAYLOAD_BIT_LIMIT = 64 * 5 = 320` bits
+> (`md-codec/src/chunk.rs:224`), applied over `payload_bytes.len() * 8`
+> (`md-codec/src/chunk.rs:253-254`) — a flat **40 bytes per chunk**.
+>
+> The old model claimed 2,904 B where the real ceiling is **2,560 B**, leaving a
+> **344-byte band** in which a transaction the table called "fits" would in fact
+> return `ChunkCountExceedsMax`. That band *was* §8.7b's refusal boundary.
+>
+> The defect was **one shared helper replicated across seven probe binaries**,
+> so every chunk count in every results file was wrong the same way — a corpus
+> can be uniformly wrong and still look perfectly self-consistent. It is now the
+> named constant `CHUNK_PAYLOAD_BITS = 320` carrying the citation and the
+> history, and **all thirteen binaries were rebuilt and re-run**. Capacity
+> conclusions moved: single-sig `tr` key-path from a 26-input ceiling to **23**,
+> RCW `wsh` tier 1 from 4 inputs to **3**.
+>
+> The measurements README *did* label the old counts "a floor", which was the
+> right hedge. §3b dropped the label and presented them as counts, and §8.7b
+> refused against them. **The caveat existed and was lost in transit.**
+> Whether `mt1` should instead FILL its chunks, raising the ceiling, is §10.12.
 
 ### Layout on steel is the user's, not `mt`'s
 
@@ -512,10 +533,11 @@ encoded.
 
 **"Comes from" is partly absent.** A signed transaction references inputs as
 outpoints only; the source scriptPubKeys live in the *previous* transactions.
-Without them you cannot tell which wallet it spends. The finalized PSBT closes
-part of this by carrying each input's UTXO record — value and scriptPubKey — so
-the engraved payload does describe what it spends, which the bare raw
-transaction did not. It still does not name the *wallet*, hence the stub, and
+Without them you cannot tell which wallet it spends. **`mt qr`'s** finalized
+PSBT closes part of this by carrying each input's UTXO record — value and
+scriptPubKey — so that payload does describe what it spends. **`mt string`'s
+does not**: a raw transaction carries outpoints only, so a string plate is
+silent about both the input amounts and the source scripts. It still does not name the *wallet*, hence the stub, and
 hence the stub living in text, because it is the one constellation-specific fact
 on the plate and F-234 forbids that inside the QR.
 
@@ -572,7 +594,7 @@ mitigation, the row says so instead of inventing one.
 | **Bearer** — holder can broadcast (`mt qr`) | a timelock bounds it in *time*, not in space, and only when §8.4's `nSequence` condition holds; the `BEARER` line is the first line of a legend `mt` controls |
 | **Bearer** — holder can broadcast (`mt string`) | **accepted risk, not mitigated on the plate.** `mt` emits a string, not an engraving, so it has no mechanism to put a warning on hand-cut steel (§3b). It warns once on `stderr` at encode time, to the person encoding — who is not the person holding the plate later. The timelock bound still applies |
 | **Pinned destination** — a 2040 recoverer pays a 2026 address whose keys may be lost | **cannot be fixed**; the `TO` line names the destination so the operator sees what they commit to before cutting |
-| **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed, and is NOT on the plate.** Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving; a holder in 2040 recovers them by decoding, since the PSBT carries the input amounts |
+| **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed, and is NOT on the plate.** Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving. A holder in 2040 recovers the fee by decoding **only for `mt qr`**, whose PSBT payload carries the input amounts; an `mt string` plate carries a raw transaction, from which the fee is **not** recoverable without the prevouts |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
 | **Non-`ALL` sighash** — an input signed with `SIGHASH_NONE` or `SIGHASH_SINGLE` leaves outputs unbound, so a plate-holder can redirect the funds and the `TO` line becomes a lie | refused at encode time, §8.6 |
 
@@ -600,7 +622,10 @@ exactly as permanent, as a machine-engraved one.
    (verified against the crates.io source). The finalized PSBT carries each
    input's UTXO record, so — unlike the previous draft, where this refusal was
    conditional on prevouts being supplied separately — **the data needed to run
-   it always arrives with the payload.** A PSBT whose UTXO records are missing
+   it always arrives with the payload **for `mt qr`**. For **`mt string`** it does
+   NOT: that payload is a raw transaction, which carries no UTXO records, so this
+   refusal is evaluable only while `mt` still holds the PSBT it was handed at
+   encode time — never from the engraved artifact alone. A PSBT whose UTXO records are missing
    is refused under (1)'s sibling rule: `mt` requires the MIN form of §3.
 3. **An unsigned or unfinalized transaction offered for engraving** → refuse. It
    cannot be broadcast, so it is not a backup.
@@ -729,6 +754,21 @@ signed PSBT.
     theirs. See §3b. The 64-chunk ceiling is unaffected — that is a property of
     the codec, not of anyone's plate.
 
+12. **Should `mt1` FILL its chunks rather than balance them?** `md-codec` sizes
+    every chunk by a flat 320-bit budget (`md-codec/src/chunk.rs:224,253-254`) = 40 payload
+    bytes, giving the 2,560 B ceiling in §3b. codex32 long form could carry 363
+    payload bits per chunk if filled, which would raise the ceiling to ~2,904 B
+    — enough to matter, though **not** enough to bring RCW `wsh` tier 1 at 5
+    inputs (89 chunks) under it. Filling diverges from the chunker every other
+    constellation format uses, and **the Rust-primary rule means any such change
+    lands in the Rust codec first, with test vectors.** R0 round 1 (S-1) also
+    reports that a byte-granular filling chunker reusing the same reassembler
+    tops out at 2,880 B rather than 2,904 — unverified by me, and worth
+    resolving before this is decided.
+13. **Does `mt1` reuse the `md1` chunk header verbatim, or need its own?** §3b
+    assumes the existing string layer takes a new payload type cleanly. That is
+    an assumption about `md-codec`'s header (37 header bits, chunk-set id,
+    ordering) and has not been checked against a transaction-shaped payload.
 14. **§5's legend budget rests on a doc comment, not on the fork's font
     metrics.** `legend.rs` hardcodes `CHARS_PER_LINE = 35.0` /
     `LINES_FULL_PLATE = 20.0` "per `crates/me-cli/src/lib.rs:46`"; the fork's real ladder has six
@@ -737,11 +777,6 @@ signed PSBT.
     of `FontSizes`. Small in magnitude, but §4's plate table and §5's 6-line
     reservation both stand on it. **Re-derive both from `CharsPerLine` /
     `LinesPerPlate` and regenerate §4's table if they move.**
-
-13. **Does `mt1` reuse the `md1` chunk header verbatim, or need its own?** §3b
-    assumes the existing string layer takes a new payload type cleanly. That is
-    an assumption about `md-codec`'s header (37 header bits, chunk-set id,
-    ordering) and has not been checked against a transaction-shaped payload.
 
 ## 11. Provenance of the numbers
 

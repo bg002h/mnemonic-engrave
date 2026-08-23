@@ -8,6 +8,22 @@ use miniscript::psbt::PsbtExt;
 use miniscript::{Descriptor, DescriptorPublicKey};
 use bitcoin::hashes::Hash as _;
 
+/// Bits of PAYLOAD each md1 chunk carries, read from the REAL chunker rather
+/// than derived from codex32's theoretical long-form capacity.
+///
+/// `md-codec` sizes chunks by `SINGLE_STRING_PAYLOAD_BIT_LIMIT = 64 * 5 = 320`
+/// (`md-codec/src/chunk.rs:224`), applied as
+/// `payload_bytes.len() * 8 / 320` rounded up (`chunk.rs:253-254`). That is a
+/// flat **40 payload bytes per chunk**, and the 64-chunk cap is therefore
+/// **2,560 B**, not the 2,904 B a filled-capacity model predicts.
+///
+/// THIS CONSTANT WAS 363 AND THAT WAS WRONG. 363 = 80 symbols x 5 bits - 37
+/// header bits, i.e. what a chunk COULD carry if the chunker filled to
+/// codex32's long-form maximum. It does not: it balances at a 320-bit budget.
+/// The old model ran ~13% light on every chunk count in every results file.
+const CHUNK_PAYLOAD_BITS: usize = 320;
+
+
 const N_IN: usize = 5;
 
 fn dummy_outpoint(i: u32) -> OutPoint {
@@ -99,7 +115,7 @@ fn probe(label: &str, desc_str: &str) {
     println!();
     let cap = 2904usize;
     for (what, n) in [("unsigned PSBT", full_len), ("signed tx", signed_total)] {
-        let chunks = (n * 8).div_ceil(363);
+        let chunks = (n * 8).div_ceil(CHUNK_PAYLOAD_BITS);
         println!(
             "  {what:<14} {n:>6} B -> {chunks:>4} codex32 chunks ({} chars){}",
             chunks * 97,

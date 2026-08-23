@@ -19,6 +19,22 @@ use miniscript::{Descriptor, DescriptorPublicKey};
 use qrcode::{EcLevel, QrCode, Version as QrVersion};
 use std::str::FromStr;
 
+/// Bits of PAYLOAD each md1 chunk carries, read from the REAL chunker rather
+/// than derived from codex32's theoretical long-form capacity.
+///
+/// `md-codec` sizes chunks by `SINGLE_STRING_PAYLOAD_BIT_LIMIT = 64 * 5 = 320`
+/// (`md-codec/src/chunk.rs:224`), applied as
+/// `payload_bytes.len() * 8 / 320` rounded up (`chunk.rs:253-254`). That is a
+/// flat **40 payload bytes per chunk**, and the 64-chunk cap is therefore
+/// **2,560 B**, not the 2,904 B a filled-capacity model predicts.
+///
+/// THIS CONSTANT WAS 363 AND THAT WAS WRONG. 363 = 80 symbols x 5 bits - 37
+/// header bits, i.e. what a chunk COULD carry if the chunker filled to
+/// codex32's long-form maximum. It does not: it balances at a 320-bit budget.
+/// The old model ran ~13% light on every chunk count in every results file.
+const CHUNK_PAYLOAD_BITS: usize = 320;
+
+
 const NUMS: &str = "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0";
 const USABLE_MM: f64 = 79.0;
 const STROKE_MM: f64 = 0.3;
@@ -67,11 +83,11 @@ fn cap_alnum(v: u8, ec: EcLevel) -> usize {
 }
 
 /// Characters a codex32 chunk-set costs for `n` payload bytes.
-/// Per chunk: 80 data symbols, of which a 37-bit header eats 7.4, leaving 363
+/// NOT 363. See CHUNK_PAYLOAD_BITS below: the real chunker sizes by 320
 /// payload bits; the engraved string is hrp(3) + 80 + 13 checksum = 96 chars.
 /// Capped at 64 chunks by the wire format.
 fn codex32_chars(n: usize) -> Option<usize> {
-    let chunks = (n * 8).div_ceil(363);
+    let chunks = (n * 8).div_ceil(CHUNK_PAYLOAD_BITS);
     if chunks > 64 { return None }
     Some(chunks * 96)
 }
@@ -224,7 +240,7 @@ fn main() {
             let raw_qr = b.div_ceil(cap(26, EcLevel::L));
             match codex32_chars(b) {
                 Some(ch) => println!("  {name:<12} {b:>6} B {ch:>10} {:>12} {raw_qr:>14} {:>14}",
-                                     (b * 8).div_ceil(363), ch.div_ceil(cap_alnum(26, EcLevel::L))),
+                                     (b * 8).div_ceil(CHUNK_PAYLOAD_BITS), ch.div_ceil(cap_alnum(26, EcLevel::L))),
                 None => println!("  {name:<12} {b:>6} B {:>10} {:>12} {raw_qr:>14} {:>14}",
                                  "-", "OVER 64", "-"),
             }

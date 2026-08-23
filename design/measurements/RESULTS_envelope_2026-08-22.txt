@@ -1,54 +1,54 @@
 SIGNED TRANSACTIONS ONLY — container = 64 chunks / 2904 B; one plate per string today (F-225), ~21 min/plate
 
-single-sig wpkh            sweep  1in  203B( 5ch) | +149B/in | MAX 19 in = 2882B = 64ch = 64 plates = 22.4 h   witness[71, 33]
-single-sig wpkh            2-out  1in  234B( 6ch) | +149B/in | MAX 19 in = 2904B = 64ch = 64 plates = 22.4 h
-single-sig tr keypath      sweep  1in  162B( 4ch) | +107B/in | MAX 26 in = 2837B = 63ch = 63 plates = 22.1 h   witness[64]
-single-sig tr keypath      2-out  1in  205B( 5ch) | +107B/in | MAX 26 in = 2880B = 64ch = 64 plates = 22.4 h
-2-of-3 wsh                 sweep  1in  349B( 8ch) | +293B/in | MAX  9 in = 2702B = 60ch = 60 plates = 21.0 h   witness[0, 71, 72, 105]
-2-of-3 wsh                 2-out  1in  393B( 9ch) | +295B/in | MAX  9 in = 2742B = 61ch = 61 plates = 21.4 h
-2-of-3 tr                  sweep  1in  367B( 9ch) | +312B/in | MAX  9 in = 2863B = 64ch = 64 plates = 22.4 h   witness[64, 64, 0, 104, 33]
-2-of-3 tr                  2-out  1in  410B(10ch) | +312B/in | MAX  8 in = 2594B = 58ch = 58 plates = 20.3 h
-3-of-5 wsh                 sweep  1in  491B(11ch) | +433B/in | MAX  6 in = 2661B = 59ch = 59 plates = 20.6 h   witness[0, 72, 72, 72, 173]
-3-of-5 wsh                 2-out  1in  533B(12ch) | +433B/in | MAX  6 in = 2703B = 60ch = 60 plates = 21.0 h
-3-of-5 tr                  sweep  1in  501B(12ch) | +446B/in | MAX  6 in = 2731B = 61ch = 61 plates = 21.4 h   witness[64, 64, 64, 0, 0, 172, 33]
-3-of-5 tr                  2-out  1in  544B(12ch) | +446B/in | MAX  6 in = 2774B = 62ch = 62 plates = 21.7 h
-RCW tr tier1 (worst)       sweep  1in  535B(12ch) | +480B/in | MAX  5 in = 2455B = 55ch = 55 plates = 19.2 h   witness[64, 64, 64, 32, 143, 65]
-RCW tr tier1 (worst)       2-out  1in  578B(13ch) | +480B/in | MAX  5 in = 2498B = 56ch = 56 plates = 19.6 h
-RCW tr tier4 (keyed)       sweep  1in  405B( 9ch) | +350B/in | MAX  8 in = 2855B = 63ch = 63 plates = 22.1 h   witness[64, 32, 79, 129]
-RCW tr tier4 (keyed)       2-out  1in  448B(10ch) | +350B/in | MAX  8 in = 2898B = 64ch = 64 plates = 22.4 h
-RCW wsh tier1 (worst)      sweep  1in  742B(17ch) | +691B/in | MAX  4 in = 2812B = 62ch = 62 plates = 21.7 h   witness[0, 71, 72, 70, 32, 1, 390]
-RCW wsh tier1 (worst)      2-out  1in  787B(18ch) | +688B/in | MAX  4 in = 2853B = 63ch = 63 plates = 22.1 h
-RCW wsh tier4 (keyed)      sweep  1in  598B(14ch) | +543B/in | MAX  5 in = 2772B = 62ch = 62 plates = 21.7 h   witness[71, 32, 0, 0, 0, 390]
-RCW wsh tier4 (keyed)      2-out  1in  641B(15ch) | +544B/in | MAX  5 in = 2813B = 62ch = 62 plates = 21.7 h
-pathological tr tier1      sweep  1in  541B(12ch) | +486B/in | MAX  5 in = 2485B = 55ch = 55 plates = 19.2 h   witness[64, 64, 64, 32, 149, 65]
-pathological tr tier1      2-out  1in  584B(13ch) | +486B/in | MAX  5 in = 2528B = 56ch = 56 plates = 19.6 h
-pathological wsh tier1     sweep  1in  852B(19ch) | +796B/in | MAX  3 in = 2443B = 54ch = 54 plates = 18.9 h   witness[0, 71, 72, 72, 32, 1, 498]
-pathological wsh tier1     2-out  1in  896B(20ch) | +795B/in | MAX  3 in = 2488B = 55ch = 55 plates = 19.2 h
-RCW tr KEY-PATH            sweep  1in  162B( 4ch) | +107B/in | MAX 26 in = 2837B = 63ch = 63 plates = 22.1 h   witness[64]
-RCW tr KEY-PATH            2-out  1in  205B( 5ch) | +107B/in | MAX 26 in = 2880B = 64ch = 64 plates = 22.4 h
-pathological tr KEY-PATH   sweep  1in  162B( 4ch) | +107B/in | MAX 26 in = 2837B = 63ch = 63 plates = 22.1 h   witness[64]
-pathological tr KEY-PATH   2-out  1in  205B( 5ch) | +107B/in | MAX 26 in = 2880B = 64ch = 64 plates = 22.4 h
+single-sig wpkh            sweep  1in  203B( 6ch) | +149B/in | MAX 16 in = 2430B = 61ch = 61 plates = 21.4 h   witness[71, 33]
+single-sig wpkh            2-out  1in  234B( 6ch) | +149B/in | MAX 16 in = 2458B = 62ch = 62 plates = 21.7 h
+single-sig tr keypath      sweep  1in  162B( 5ch) | +107B/in | MAX 23 in = 2516B = 63ch = 63 plates = 22.1 h   witness[64]
+single-sig tr keypath      2-out  1in  205B( 6ch) | +107B/in | MAX 23 in = 2559B = 64ch = 64 plates = 22.4 h
+2-of-3 wsh                 sweep  1in  349B( 9ch) | +293B/in | MAX  8 in = 2409B = 61ch = 61 plates = 21.4 h   witness[0, 71, 72, 105]
+2-of-3 wsh                 2-out  1in  393B(10ch) | +295B/in | MAX  8 in = 2452B = 62ch = 62 plates = 21.7 h
+2-of-3 tr                  sweep  1in  367B(10ch) | +312B/in | MAX  8 in = 2551B = 64ch = 64 plates = 22.4 h   witness[64, 64, 0, 104, 33]
+2-of-3 tr                  2-out  1in  410B(11ch) | +312B/in | MAX  7 in = 2282B = 58ch = 58 plates = 20.3 h
+3-of-5 wsh                 sweep  1in  491B(13ch) | +433B/in | MAX  5 in = 2228B = 56ch = 56 plates = 19.6 h   witness[0, 72, 72, 72, 173]
+3-of-5 wsh                 2-out  1in  533B(14ch) | +433B/in | MAX  5 in = 2270B = 57ch = 57 plates = 19.9 h
+3-of-5 tr                  sweep  1in  501B(13ch) | +446B/in | MAX  5 in = 2285B = 58ch = 58 plates = 20.3 h   witness[64, 64, 64, 0, 0, 172, 33]
+3-of-5 tr                  2-out  1in  544B(14ch) | +446B/in | MAX  5 in = 2328B = 59ch = 59 plates = 20.6 h
+RCW tr tier1 (worst)       sweep  1in  535B(14ch) | +480B/in | MAX  5 in = 2455B = 62ch = 62 plates = 21.7 h   witness[64, 64, 64, 32, 143, 65]
+RCW tr tier1 (worst)       2-out  1in  578B(15ch) | +480B/in | MAX  5 in = 2498B = 63ch = 63 plates = 22.1 h
+RCW tr tier4 (keyed)       sweep  1in  405B(11ch) | +350B/in | MAX  7 in = 2505B = 63ch = 63 plates = 22.1 h   witness[64, 32, 79, 129]
+RCW tr tier4 (keyed)       2-out  1in  448B(12ch) | +350B/in | MAX  7 in = 2548B = 64ch = 64 plates = 22.4 h
+RCW wsh tier1 (worst)      sweep  1in  742B(19ch) | +691B/in | MAX  3 in = 2117B = 53ch = 53 plates = 18.6 h   witness[0, 71, 72, 70, 32, 1, 390]
+RCW wsh tier1 (worst)      2-out  1in  787B(20ch) | +688B/in | MAX  3 in = 2162B = 55ch = 55 plates = 19.2 h
+RCW wsh tier4 (keyed)      sweep  1in  598B(15ch) | +543B/in | MAX  4 in = 2231B = 56ch = 56 plates = 19.6 h   witness[71, 32, 0, 0, 0, 390]
+RCW wsh tier4 (keyed)      2-out  1in  641B(17ch) | +544B/in | MAX  4 in = 2274B = 57ch = 57 plates = 19.9 h
+pathological tr tier1      sweep  1in  541B(14ch) | +486B/in | MAX  5 in = 2485B = 63ch = 63 plates = 22.1 h   witness[64, 64, 64, 32, 149, 65]
+pathological tr tier1      2-out  1in  584B(15ch) | +486B/in | MAX  5 in = 2528B = 64ch = 64 plates = 22.4 h
+pathological wsh tier1     sweep  1in  852B(22ch) | +796B/in | MAX  3 in = 2443B = 62ch = 62 plates = 21.7 h   witness[0, 71, 72, 72, 32, 1, 498]
+pathological wsh tier1     2-out  1in  896B(23ch) | +795B/in | MAX  3 in = 2488B = 63ch = 63 plates = 22.1 h
+RCW tr KEY-PATH            sweep  1in  162B( 5ch) | +107B/in | MAX 23 in = 2516B = 63ch = 63 plates = 22.1 h   witness[64]
+RCW tr KEY-PATH            2-out  1in  205B( 6ch) | +107B/in | MAX 23 in = 2559B = 64ch = 64 plates = 22.4 h
+pathological tr KEY-PATH   sweep  1in  162B( 5ch) | +107B/in | MAX 23 in = 2516B = 63ch = 63 plates = 22.1 h   witness[64]
+pathological tr KEY-PATH   2-out  1in  205B( 6ch) | +107B/in | MAX 23 in = 2559B = 64ch = 64 plates = 22.4 h
 
 
 PLATE COST OF A SWEEP (1 output) — one plate per string today, ~21 min/plate
 
 wallet / spend path                   1 input           2 inputs           5 inputs   max inputs
-single-sig wpkh                 203B 5pl 1.8h      352B 8pl 2.8h     798B 18pl 6.3h           19
-single-sig tr keypath           162B 4pl 1.4h      269B 6pl 2.1h     590B 14pl 4.9h           26
-2-of-3 wsh                      349B 8pl 2.8h     642B 15pl 5.2h   1527B 34pl 11.9h            9
-2-of-3 tr                       367B 9pl 3.1h     679B 15pl 5.2h   1615B 36pl 12.6h            9
-3-of-5 wsh                     491B 11pl 3.9h     924B 21pl 7.3h   2228B 50pl 17.5h            6
-3-of-5 tr                      501B 12pl 4.2h     947B 21pl 7.3h   2285B 51pl 17.9h            6
-RCW tr tier1 (worst)           535B 12pl 4.2h    1015B 23pl 8.1h   2455B 55pl 19.2h            5
-RCW tr tier4 (keyed)            405B 9pl 3.1h     755B 17pl 6.0h   1805B 40pl 14.0h            8
-RCW wsh tier1 (worst)          742B 17pl 6.0h   1433B 32pl 11.2h         3495B OVER            4
-RCW wsh tier4 (keyed)          598B 14pl 4.9h    1141B 26pl 9.1h   2772B 62pl 21.7h            5
-pathological tr tier1          541B 12pl 4.2h    1027B 23pl 8.1h   2485B 55pl 19.2h            5
-pathological wsh tier1         852B 19pl 6.7h   1648B 37pl 12.9h         4041B OVER            3
-RCW tr KEY-PATH                 162B 4pl 1.4h      269B 6pl 2.1h     590B 14pl 4.9h           26
-pathological tr KEY-PATH        162B 4pl 1.4h      269B 6pl 2.1h     590B 14pl 4.9h           26
+single-sig wpkh                 203B 6pl 2.1h      352B 9pl 3.1h     798B 20pl 7.0h           16
+single-sig tr keypath           162B 5pl 1.8h      269B 7pl 2.5h     590B 15pl 5.2h           23
+2-of-3 wsh                      349B 9pl 3.1h     642B 17pl 6.0h   1527B 39pl 13.7h            8
+2-of-3 tr                      367B 10pl 3.5h     679B 17pl 6.0h   1615B 41pl 14.3h            8
+3-of-5 wsh                     491B 13pl 4.5h     924B 24pl 8.4h   2228B 56pl 19.6h            5
+3-of-5 tr                      501B 13pl 4.5h     947B 24pl 8.4h   2285B 58pl 20.3h            5
+RCW tr tier1 (worst)           535B 14pl 4.9h    1015B 26pl 9.1h   2455B 62pl 21.7h            5
+RCW tr tier4 (keyed)           405B 11pl 3.9h     755B 19pl 6.7h   1805B 46pl 16.1h            7
+RCW wsh tier1 (worst)          742B 19pl 6.7h   1433B 36pl 12.6h         3495B OVER            3
+RCW wsh tier4 (keyed)          598B 15pl 5.2h   1141B 29pl 10.2h         2772B OVER            4
+pathological tr tier1          541B 14pl 4.9h    1027B 26pl 9.1h   2485B 63pl 22.1h            5
+pathological wsh tier1         852B 22pl 7.7h   1648B 42pl 14.7h         4041B OVER            3
+RCW tr KEY-PATH                 162B 5pl 1.8h      269B 7pl 2.5h     590B 15pl 5.2h           23
+pathological tr KEY-PATH        162B 5pl 1.8h      269B 7pl 2.5h     590B 15pl 5.2h           23
 
 BARE PSBT for comparison — skeleton only, descriptor metadata re-derived from md1.
 Depends on scriptPubKey length, NOT on the policy, so these two lines cover every wallet above.
-bare PSBT (wpkh, 22B spk)  1in  159B( 4ch) | + 76B/input | MAX  37 inputs = 2897B(64ch) | 38 inputs = 2973B( 66ch) OVER
-bare PSBT (tr/wsh, 34B spk) 1in  195B( 5ch) | + 88B/input | MAX  31 inputs = 2837B(63ch) | 32 inputs = 2925B( 65ch) OVER
+bare PSBT (wpkh, 22B spk)  1in  159B( 4ch) | + 76B/input | MAX  32 inputs = 2517B(63ch) | 33 inputs = 2593B( 65ch) OVER
+bare PSBT (tr/wsh, 34B spk) 1in  195B( 5ch) | + 88B/input | MAX  27 inputs = 2485B(63ch) | 28 inputs = 2573B( 65ch) OVER

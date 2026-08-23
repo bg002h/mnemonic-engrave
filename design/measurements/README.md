@@ -17,11 +17,24 @@ wallets?* Three subjects, three result files:
   ~21 min/plate make engraving time the binding constraint long before the codec
   ceiling is, and the **key-path** variants of both complex wallets.
 
-  **Caveat on the 2,904 B ceiling.** That is the *theoretical* chunked-codex32
-  capacity (64 chunks x (80 data symbols - 37 header bits)). `md`'s chunker does
-  not fill to 80 — it balances, so a real chunk measures **85 characters**, not
-  the 96 a filled one would. A new `mt1` codec could choose to fill; today's
-  encoder does not, so treat chunk counts here as a floor.
+  **CORRECTED 2026-08-23 — the ceiling is 2,560 B, not 2,904 B.** The old
+  figure was the *theoretical* filled capacity: 64 chunks x (80 data symbols −
+  37 header bits) = 363 payload bits each. The real chunker does not fill. It
+  sizes by `SINGLE_STRING_PAYLOAD_BIT_LIMIT = 64 * 5 = 320` bits
+  (`md-codec/src/chunk.rs:224`, applied at `:253-254`) — a flat **40 payload
+  bytes per chunk**, so 64 chunks is **2,560 B**.
+
+  That error lived in ONE helper, `(n * 8).div_ceil(363)`, copied into **seven**
+  probe binaries, so every chunk count in every results file was ~13% low and
+  perfectly self-consistent. It is now the named constant `CHUNK_PAYLOAD_BITS`
+  with the citation attached. All results files here were regenerated after the
+  fix. Capacity conclusions moved: single-sig `tr` key-path 26 inputs -> **23**,
+  RCW `wsh` tier 1 4 inputs -> **3**.
+
+  This file previously called the counts "a floor", which was the right hedge —
+  but `SPEC_mt_v0_1.md` dropped the hedge and refused against the numbers. Found
+  by R0 round 1, finding S-1.
+
 - `RESULTS_rcw_2026-08-22.txt` — the **reasonably complex wallet** (7 keys),
   swept over 1in/1out, 1in/2out and 5in/2out, on three spending tiers. It
   satisfies the fixture with the fixture's **own** preimages — no stand-ins —

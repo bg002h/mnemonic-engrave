@@ -9,8 +9,8 @@ PSBT, + change output metadata   : 12617 B   <-- UNSIGNED PSBT mt would produce
 max witness weight / input       : 447 WU
 signed tx, worst-case path       : ~2538 B  <-- SIGNED tx mt would encode
 
-  unsigned PSBT   12617 B ->  279 codex32 chunks (27063 chars)  EXCEEDS the 64-chunk ceiling
-  signed tx        2538 B ->   56 codex32 chunks (5432 chars)  FITS in 64 chunks
+  unsigned PSBT   12617 B ->  316 codex32 chunks (30652 chars)  EXCEEDS the 64-chunk ceiling
+  signed tx        2538 B ->   64 codex32 chunks (6208 chars)  FITS in 64 chunks
 
 =========== PATHOLOGICAL / wsh (or_i nest, 11 keys) ===========
 descriptor chars                 : 1892
@@ -21,31 +21,30 @@ PSBT, + change output metadata   : 7791 B   <-- UNSIGNED PSBT mt would produce
 max witness weight / input       : 756 WU
 signed tx, worst-case path       : ~4083 B  <-- SIGNED tx mt would encode
 
-  unsigned PSBT    7791 B ->  172 codex32 chunks (16684 chars)  EXCEEDS the 64-chunk ceiling
-  signed tx        4083 B ->   90 codex32 chunks (8730 chars)  EXCEEDS the 64-chunk ceiling
+  unsigned PSBT    7791 B ->  195 codex32 chunks (18915 chars)  EXCEEDS the 64-chunk ceiling
+  signed tx        4083 B ->  103 codex32 chunks (9991 chars)  EXCEEDS the 64-chunk ceiling
 
 
 ### Probe 2 — REAL signed transactions, swept over dimensions
 
-tr   1in/1out tier1 (3-of-3 + hash)    | bare   151B(  4ch,fits) | full-unsigned   2305B( 51ch,fits) | SIGNED TX   541B( 12ch,fits) vsize 206
-wsh  1in/1out tier1 (3-of-3 + hash)    | bare   151B(  4ch,fits) | full-unsigned   1425B( 32ch,fits) | SIGNED TX   852B( 19ch,fits) vsize 284
-tr   1in/2out tier1 (3-of-3 + hash)    | bare   195B(  5ch,fits) | full-unsigned   3982B( 88ch,OVER) | SIGNED TX   584B( 13ch,fits) vsize 249
-wsh  1in/2out tier1 (3-of-3 + hash)    | bare   195B(  5ch,fits) | full-unsigned   2676B( 59ch,fits) | SIGNED TX   893B( 20ch,fits) vsize 326
-tr   2in/2out tier1 (3-of-3 + hash)    | bare   283B(  7ch,fits) | full-unsigned   6224B(138ch,OVER) | SIGNED TX  1070B( 24ch,fits) vsize 401
-wsh  2in/2out tier1 (3-of-3 + hash)    | bare   283B(  7ch,fits) | full-unsigned   4038B( 89ch,OVER) | SIGNED TX  1692B( 38ch,fits) vsize 557
-tr   5in/2out tier1 (3-of-3 + hash)    | bare   549B( 13ch,fits) | full-unsigned  12952B(286ch,OVER) | SIGNED TX  2528B( 56ch,fits) vsize 858
-wsh  5in/2out tier1 (3-of-3 + hash)    | bare   549B( 13ch,fits) | full-unsigned   8126B(180ch,OVER) | SIGNED TX  4080B( 90ch,OVER) vsize 1246
-tr   10in/2out tier1 (3-of-3 + hash)    | bare   989B( 22ch,fits) | full-unsigned  24162B(533ch,OVER) | SIGNED TX  4958B(110ch,OVER) vsize 1619
-wsh  10in/2out tier1 (3-of-3 + hash)    | bare   989B( 22ch,fits) | full-unsigned  14936B(330ch,OVER) | SIGNED TX  8067B(178ch,OVER) vsize 2397
+tr   1in/1out tier1 (3-of-3 + hash)    | bare   151B(  4ch,fits) | full-unsigned   2305B( 58ch,fits) | SIGNED TX   541B( 14ch,fits) vsize 206
+wsh  1in/1out tier1 (3-of-3 + hash)    | bare   151B(  4ch,fits) | full-unsigned   1425B( 36ch,fits) | SIGNED TX   852B( 22ch,fits) vsize 284
+tr   1in/2out tier1 (3-of-3 + hash)    | bare   195B(  5ch,fits) | full-unsigned   3982B(100ch,OVER) | SIGNED TX   584B( 15ch,fits) vsize 249
+wsh  1in/2out tier1 (3-of-3 + hash)    | bare   195B(  5ch,fits) | full-unsigned   2676B( 67ch,OVER) | SIGNED TX   893B( 23ch,fits) vsize 326
+tr   2in/2out tier1 (3-of-3 + hash)    | bare   283B(  8ch,fits) | full-unsigned   6224B(156ch,OVER) | SIGNED TX  1070B( 27ch,fits) vsize 401
+wsh  2in/2out tier1 (3-of-3 + hash)    | bare   283B(  8ch,fits) | full-unsigned   4038B(101ch,OVER) | SIGNED TX  1692B( 43ch,fits) vsize 557
+tr   5in/2out tier1 (3-of-3 + hash)    | bare   549B( 14ch,fits) | full-unsigned  12952B(324ch,OVER) | SIGNED TX  2528B( 64ch,fits) vsize 858
+wsh  5in/2out tier1 (3-of-3 + hash)    | bare   549B( 14ch,fits) | full-unsigned   8126B(204ch,OVER) | SIGNED TX  4080B(102ch,OVER) vsize 1246
+tr   10in/2out tier1 (3-of-3 + hash)    | bare   989B( 25ch,fits) | full-unsigned  24162B(605ch,OVER) | SIGNED TX  4958B(124ch,OVER) vsize 1619
+wsh  10in/2out tier1 (3-of-3 + hash)    | bare   989B( 25ch,fits) | full-unsigned  14936B(374ch,OVER) | SIGNED TX  8067B(202ch,OVER) vsize 2397
 
-tr   1in/1out tier4 (1-of-3, cheapest) | bare   151B(  4ch,fits) | full-unsigned   2305B( 51ch,fits) | SIGNED TX   405B(  9ch,fits) vsize 172
-wsh  1in/1out tier4 (1-of-3, cheapest) | bare   151B(  4ch,fits) | full-unsigned   1425B( 32ch,fits) | SIGNED TX   674B( 15ch,fits) vsize 239
-tr   1in/2out tier4 (1-of-3, cheapest) | bare   195B(  5ch,fits) | full-unsigned   3982B( 88ch,OVER) | SIGNED TX   448B( 10ch,fits) vsize 215
-wsh  1in/2out tier4 (1-of-3, cheapest) | bare   195B(  5ch,fits) | full-unsigned   2676B( 59ch,fits) | SIGNED TX   718B( 16ch,fits) vsize 283
-tr   2in/2out tier4 (1-of-3, cheapest) | bare   283B(  7ch,fits) | full-unsigned   6224B(138ch,OVER) | SIGNED TX   798B( 18ch,fits) vsize 333
-wsh  2in/2out tier4 (1-of-3, cheapest) | bare   283B(  7ch,fits) | full-unsigned   4038B( 89ch,OVER) | SIGNED TX  1337B( 30ch,fits) vsize 468
-tr   5in/2out tier4 (1-of-3, cheapest) | bare   549B( 13ch,fits) | full-unsigned  12952B(286ch,OVER) | SIGNED TX  1848B( 41ch,fits) vsize 688
-wsh  5in/2out tier4 (1-of-3, cheapest) | bare   549B( 13ch,fits) | full-unsigned   8126B(180ch,OVER) | SIGNED TX  3196B( 71ch,OVER) vsize 1025
-tr   10in/2out tier4 (1-of-3, cheapest) | bare   989B( 22ch,fits) | full-unsigned  24162B(533ch,OVER) | SIGNED TX  3598B( 80ch,OVER) vsize 1279
-wsh  10in/2out tier4 (1-of-3, cheapest) | bare   989B( 22ch,fits) | full-unsigned  14936B(330ch,OVER) | SIGNED TX  6291B(139ch,OVER) vsize 1953
-
+tr   1in/1out tier4 (1-of-3, cheapest) | bare   151B(  4ch,fits) | full-unsigned   2305B( 58ch,fits) | SIGNED TX   405B( 11ch,fits) vsize 172
+wsh  1in/1out tier4 (1-of-3, cheapest) | bare   151B(  4ch,fits) | full-unsigned   1425B( 36ch,fits) | SIGNED TX   674B( 17ch,fits) vsize 239
+tr   1in/2out tier4 (1-of-3, cheapest) | bare   195B(  5ch,fits) | full-unsigned   3982B(100ch,OVER) | SIGNED TX   448B( 12ch,fits) vsize 215
+wsh  1in/2out tier4 (1-of-3, cheapest) | bare   195B(  5ch,fits) | full-unsigned   2676B( 67ch,OVER) | SIGNED TX   718B( 18ch,fits) vsize 283
+tr   2in/2out tier4 (1-of-3, cheapest) | bare   283B(  8ch,fits) | full-unsigned   6224B(156ch,OVER) | SIGNED TX   798B( 20ch,fits) vsize 333
+wsh  2in/2out tier4 (1-of-3, cheapest) | bare   283B(  8ch,fits) | full-unsigned   4038B(101ch,OVER) | SIGNED TX  1337B( 34ch,fits) vsize 468
+tr   5in/2out tier4 (1-of-3, cheapest) | bare   549B( 14ch,fits) | full-unsigned  12952B(324ch,OVER) | SIGNED TX  1848B( 47ch,fits) vsize 688
+wsh  5in/2out tier4 (1-of-3, cheapest) | bare   549B( 14ch,fits) | full-unsigned   8126B(204ch,OVER) | SIGNED TX  3196B( 80ch,OVER) vsize 1025
+tr   10in/2out tier4 (1-of-3, cheapest) | bare   989B( 25ch,fits) | full-unsigned  24162B(605ch,OVER) | SIGNED TX  3598B( 90ch,OVER) vsize 1279
+wsh  10in/2out tier4 (1-of-3, cheapest) | bare   989B( 25ch,fits) | full-unsigned  14936B(374ch,OVER) | SIGNED TX  6291B(158ch,OVER) vsize 1953
