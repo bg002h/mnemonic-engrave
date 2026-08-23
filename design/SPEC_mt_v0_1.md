@@ -455,7 +455,7 @@ fields, **130 characters**, 6 lines — measured,
 | `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
 | `FROM WALLET <8 hex>` | 20 | wallet id or seed fingerprint. The transaction does **not** say what it spends *from* (§6). **Optional — loudly warned when absent** (§10.4) |
 | `LOCKED TO BLOCK <n>` | 23 | the single most actionable fact. Reads **`NO BLOCK TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
-| `TO <wallet id or fp>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when absent** |
+| `TO <wallet id, fp or label>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when blank.** A free-text label is allowed **only behind an explicit flag**, since nothing can check it against the transaction |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
 Plus, **not part of the 136-character budget above**, one `n/m` label engraved
@@ -981,34 +981,40 @@ signed PSBT.
    should still confirm scanners read base45 off engraved steel** — the choice is
    made, the optical validation is not.
 
-4. **The legend's FROM and TO fields — RULED, with one thing still open.**
-   Operator ruling 2026-08-23: *"we use walletid or seed fp for the from: field
-   and to: field. Optional but loudly warn if either not supplied."*
+4. ~~The legend's FROM and TO fields.~~ **CLOSED**, operator rulings
+   2026-08-23: *"we use walletid or seed fp for the from: field and to: field.
+   Optional but loudly warn if either not supplied"*, and — for the third-party
+   case — *"warn if blank but allow, allow arbitrary text if user passes a
+   flag."*
 
-   So both fields are **wallet identities**, not addresses:
+   Both fields are **wallet identities**, not addresses: a wallet id or a seed
+   fingerprint. `FROM` is what §6 says a transaction cannot tell you on its own.
+   `TO` names the counterparty rather than one of its scripts, which is why it
+   replaced the truncated address R0 round 1 filed as a Critical (R-14) — a
+   truncated address showed one output of several and could not be checked by
+   eye.
 
-   - **FROM** — the source wallet's id, or the seed fingerprint. This is what
-     §6 says a transaction cannot tell you on its own.
-   - **TO** — likewise, when the destination is a known wallet. **This is a
-     better answer to R0 round 1's R-14 than the field it replaces**: §5's old
-     `TO <truncated addr>` showed *one* output, truncated, so a transaction with
-     change named one destination and silently omitted the rest, and the shown
-     address could not be checked by eye. A wallet identity names the
-     counterparty rather than one of its scripts.
-   - **Both optional, both loudly warned when absent** — on `stderr`, per §3b's
-     stream convention. A plate with no FROM is legal and is worse, and the
-     operator hears about it before cutting.
+   **Three states for `TO`, and paying a third party is the reason for the
+   third:**
 
-   **Still open: `mt` cannot derive either field from the transaction**, so both
-   arrive as operator input, and nothing yet specifies that input — an md1 card?
-   an mk1 card? a bare fingerprint on the command line? That is part of §10.10's
-   unspecified CLI surface, and §5's stub derivation (`derive_stub_from_md1_card`)
-   presumes a card that nothing supplies. **Also unresolved: what the TO field
-   says when the destination is NOT a known wallet**, which is the ordinary case
-   for paying a third party.
+   | state | behaviour |
+   | --- | --- |
+   | wallet id or fingerprint | engraved as given |
+   | **blank** | **allowed, loudly warned** on `stderr` — a plate with no destination named is legal and worse |
+   | **arbitrary text, behind a flag** | engraved as given, e.g. `TO ALICE` |
 
-   Unchanged: the stub is a hint, never an authority — nothing branches on it,
-   and if it disagrees with the transaction, the transaction wins (§5).
+   **The flag is the point, not a convenience.** A free-text label cannot be
+   derived from or checked against the transaction, so requiring an explicit flag
+   makes it an **act of assertion by the operator** rather than something that
+   quietly appears. It is the same posture as the stub: a human-orientation aid,
+   never an authority, and §5 already forbids branching on any of it. If the
+   label disagrees with the transaction, the transaction wins.
+
+   **Still to specify (§10.10's CLI work, not a design question):** the flag's
+   name, and what `mt` does with a label too long for the field — §5's budget
+   gives `TO` 34 characters including the amount, so a label has roughly 16.
+   Refusing with the limit named fits §8's rule that every refusal names its
+   number; silent truncation does not.
 
 5. ~~Should `mt` require the node to be out of IBD before trusting
    `gettxout`?~~ **CLOSED — OUT OF SCOPE**, operator ruling 2026-08-23. `mt`
