@@ -223,6 +223,32 @@ candidates carrying the same chunk header:
 > silently-absorbed damage rather than a detected error."* A character outside
 > the checksum's coverage is a hole in the guarantee, cut into the only copy.
 >
+> **EPD §6.4 HAS A SECOND CLAUSE — ALL-LOWERCASE — AND I DENIED IT IN THIS
+> SPEC.** R3 lens 3 reported that bech32 uppercase collides with it, citing
+> `design/SPEC_encrypted_payload_delivery.md:806-825` by exact line range. In
+> commit `52ad001` I **refuted that Critical**, writing that EPD §6.4 carries no
+> lowercase clause and that the rule belongs to EPD §6.6's hashing. **That was
+> wrong.** I checked `SPEC_systemwide_payloads.md` — a secondary document that
+> quotes EPD §6.4 *in part* — found no lowercase clause in the fragment, and
+> concluded the clause did not exist, without opening the file the reviewer had
+> named. The primary source says:
+>
+> > *"**All-lowercase.** … without this the same wallet has two spec-legal
+> > encodings — and therefore two different EPD §6.6 hashes. … **Pinned here at
+> > EPD §6.4, not inside EPD §6.6**, so the engraved artefact and the hash agree by
+> > construction."*
+>
+> It states the proposition I denied, in the terms I denied it, and its last
+> sentence pre-empts my exact reasoning. **A partial quote in a secondary
+> document is not the clause** — a negative inherits the scope of the search
+> that produced it, and mine searched the wrong file.
+>
+> **The design survives; the justification did not.** The same commit ruled that
+> the record stores lowercase and `mt` uppercases only for the QR, which
+> satisfies EPD §6.4 as actually written. So bech32 remains correct — but for a
+> reason the spec had stated falsely, and a reader would have learned that EPD §6.4
+> has no case rule.
+>
 > **This is the third format to collide with EPD §6.4, and the precedent is
 > settled.**
 > `FreeText` and `Passphrase` hit it too, and *"the exemption is refused —
@@ -236,8 +262,8 @@ is the constellation's alphabet rather than a stylistic choice:
 | constraint | bech32 uppercase |
 | --- | --- |
 | **EPD §6.4** — no interior spaces; every character inside the checksum | ✓ 32-character alphabet, no space |
-| **EPD §6.6** — records hashed in canonical **lowercase** | ✓ case-insensitive by design; uppercase→lowercase is **lossless**, verified 1:1 |
-| **which case is STORED** — the record and the QR are different artifacts | the `sysw` record stores **lowercase**, and `mt` uppercases only when encoding the QR symbol. Storing uppercase would make EPD §6.6 hash a form differing from the stored bytes, leaving "canonical" ambiguous |
+| **EPD §6.4 — ALL-LOWERCASE**, a second clause of the same rule | ✓ **only because the record stores lowercase.** bech32 is case-insensitive by design and uppercase→lowercase is lossless (verified 1:1), so the payload survives the constraint — but the *record* must be written lowercase, not merely be convertible |
+| **which case is STORED** — the record and the QR are different artifacts | the `sysw` record stores **lowercase**; `mt` uppercases **only** when encoding the QR symbol, where alphanumeric mode needs it. The uppercase form never reaches a record |
 | **QR alphanumeric** — for 11-bits-per-2-characters packing | ✓ when uppercased |
 
 The rejected base45 satisfies only the third; hex satisfies the first two at
@@ -334,7 +360,22 @@ span: `mt string` for short transactions, `mt qr` for anything.
 > **filled** to long-form capacity. **It does not.** `md-codec` sizes chunks by
 > `SINGLE_STRING_PAYLOAD_BIT_LIMIT = 64 * 5 = 320` bits
 > (`crates/md-codec/src/chunk.rs:224`), applied over `payload_bytes.len() * 8`
-> (`crates/md-codec/src/chunk.rs:253-254`) — a flat **40 bytes per chunk**.
+> (`crates/md-codec/src/chunk.rs:253-254`) — **40 bytes is the CEILING the chunk
+> count is derived from, not the size of each chunk.**
+>
+> **An earlier version of this box called it "a flat 40 bytes per chunk", and
+> that mis-describes the chunker — R4 lens 1.** `md-codec` computes
+> `chunks_needed` against the 320-bit ceiling and then **balances** the payload
+> across that many chunks (`crates/md-codec/src/chunk.rs:267`), so the last
+> chunk is not a short remainder and no chunk is padded to 40. The **chunk
+> counts in this spec are unaffected** — they derive from the ceiling, which is
+> what `chunks_needed` uses — but the **per-chunk sizes** differ on any payload
+> that is not a multiple of the chunk count. This is the same error class as the
+> 363-vs-320 correction above: a limit read as a rule.
+>
+> **`mt1` balances too**, which §10.12 already implies by forbidding fill, and which
+> §4's *"never leave redundancy unbought"* requires: a padded chunk spends plate
+> area on nothing.
 >
 > The old model claimed 2,904 B where the real ceiling is **2,560 B**, leaving a
 > **344-byte band** in which a transaction the table called "fits" would in fact
@@ -465,7 +506,7 @@ PSBT bytes, not bytewords):
 > of seven artifacts, one to two ECC levels on the rest.
 >
 > **Three inputs are still unmodelled here**, all of them additive, so treat
-> every row as a lower bound: the **37-bit `mt1` chunk header per symbol**
+> every row as a lower bound: the **41-bit `mt1` chunk header per symbol**
 > (§3), §10.8's **per-symbol `n/m` labels**, and §10.14's **font-metric
 > correction** to the legend reservation. §10.14 already requires the
 > regeneration; this note names all three inputs it must take.
@@ -1184,10 +1225,24 @@ exactly as permanent, as a machine-engraved one.
    hard transport limit §4's search knows nothing about**, so a transaction can
    pass every plate-count check and still be unsendable.
 
-   Recomputed: §4's largest measured artifact — RCW `wsh` tier 1 at five inputs,
-   3,809 B of PSBT — becomes 96 chunks, 34,656 bits, **6,932 bech32 characters**.
-   Against 8,191 that is **15.4% headroom**, and the largest PSBT that fits is
-   roughly **4,537 B**.
+   **This refusal cannot carry a NUMBER until the record framing is chosen, and
+   two earlier attempts to give it one were both wrong — R4 lens 2.** The
+   ceiling counts **record text**, so the largest admissible PSBT depends
+   entirely on how a chunk is framed into a record. Four candidate framings give
+   **four different ceilings — 3,671 / 4,094 / 4,476 / 4,525 B** — and none is
+   the 4,537 B computed here previously.
+   **The only EPD-conformant candidate refuses §4's own largest artifact by
+   322 B**, which would mean the biggest wallet this spec measures cannot reach
+   the machine at all.
+
+   > **Its two previous numbers, recorded because the pattern matters more than
+   > either.** First *"roughly 40% headroom"*, from comparing QR-capacity
+   > **bytes** against a cap counting **characters**. Then *"15.4%, ceiling
+   > ~4,537 B"*, arithmetically sound but computed against a record framing the
+   > spec had never chosen. Three numbers, three unstated assumptions. The fix is
+   > not to compute more carefully — it is that **§10.9's record framing is a
+   > prerequisite for this refusal**, and until it is settled the refusal is
+   > stated as a rule with its threshold named as pending.
 
    > **An earlier version of this refusal said "roughly 40% headroom", and that
    > was wrong by a units error — R3 lens 3.** It compared the artifact's
@@ -1370,9 +1425,10 @@ signed PSBT.
    > n of m."**
 
    **Machine-readably this holds for both verbs, because §3 made them share one
-   header.** `ChunkHeader` carries `count` and `index` — n-of-m — plus a 20-bit
-   `chunk_set_id` so pieces of different transactions cannot be combined
-   (`crates/md-codec/src/chunk.rs`). For `mt string` that header sits inside the
+   header.** `mt1`'s header carries `count` and `index` — n-of-m — plus a 20-bit
+   `chunk_set_id` so pieces of different transactions cannot be combined. **It is
+   `mt1`'s own 41-bit header, not `md-codec`'s 37-bit one** (§3): the latter's
+   6-bit `count` caps a set at 64 chunks, which `mt qr` exceeds. For `mt string` that header sits inside the
    BCH-protected chunk; for `mt qr` it rides in the bech32-uppercase payload.
    **One
    mechanism, both media.**
@@ -1416,9 +1472,25 @@ signed PSBT.
    `Unknown` (`crates/me-cli/src/sysw/record.rs:31-40`).
 
    **There is no transaction class**, which is what R0 lens 4 found. Adding one
-   is the work, and **the Rust-primary rule binds**: the new class lands in
-   `me-cli`'s Rust `sysw` first, with test vectors, and only then ports to the
-   fork's Go.
+   is **necessary and not sufficient**, and **the Rust-primary rule binds**: the
+   new class lands in `me-cli`'s Rust `sysw` first, with test vectors, and only
+   then ports to the fork's Go.
+
+   > **What "the work" actually is, and a correction to a claim I nearly
+   > folded.** R3 lens 3 reported that a new `Class` must pass four gates
+   > including `MaxRecords = 24` and `MaxRecordLen = 512`. **Those are `seal`
+   > gates, not `sysw` gates** — R4 lens 2 caught the mis-attribution, and it
+   > checks out: they are defined in `seal/wire.go`, while `sysw`'s own
+   > `splitRecords` is a bare LF split with a UTF-8 check and no caps. The wrong
+   > claim reached a persist commit and **never reached this spec**, which is
+   > what persisting a report verbatim *before* folding it is for.
+   >
+   > **The real prerequisite is the RECORD FRAMING**, which nothing has chosen:
+   > what a record's text actually contains, and how a multi-symbol artifact maps
+   > onto records. Four candidate framings were costed and they give four
+   > different transport ceilings (§8.7c), with the only EPD-conformant one
+   > refusing §4's largest artifact. **§8.7c cannot state a threshold until this
+   > is settled**, and no implementer can build `mt qr`'s output without it.
 
    **Unencrypted, by ruling.** Note `me` has an encrypted-payload path and this
    deliberately does not use it. The reasoning is consistent with §7: the plate
@@ -1486,8 +1558,34 @@ signed PSBT.
     | **the headroom** | chunks against 64 (`mt string`) or characters against 8,191 (`mt qr`), so a near-ceiling artifact is visible before it is cut |
     | **the value provenance** | per input: chain-fetched (§6a), txid-bound (§8.2d), or operator-asserted (§8.2c) |
 
-    **Still unspecified:** exit codes, and the format of the refusal messages
-    §8 promises will *"name the number that caused it"*.
+    **THE SPEC NAMES ZERO FLAGS while requiring SEVEN operator inputs the PSBT
+    cannot supply — R4 lens 2.** A `grep` for `--[a-z]` returns one hit, and it
+    is the *deleted* locktime pair inside a retraction. Most consequentially
+    **§8.7's plate budget has no input at all**, which makes that numbered
+    refusal unrunnable as written: a refusal whose threshold cannot be supplied
+    is not a refusal.
+
+    The inputs `mt` needs, and which section needs them:
+
+    | input | needed by | absent → |
+    | --- | --- | --- |
+    | the PSBT | everything | refuse |
+    | **plate budget** | §8.7 | **§8.7 cannot run** |
+    | `FROM` wallet id / fingerprint | §5 | warn, engrave blank |
+    | `TO` wallet id / fingerprint | §5 | warn, engrave blank |
+    | `TO` free-text label | §10.4 | **requires an explicit flag** by ruling |
+    | input values | §8.2c, when the PSBT lacks them | refuse |
+    | module size | §8.8 | default 0.60 mm |
+    | node location | §6a | the no-node warning |
+
+    **Naming them is a prerequisite for implementation, not a nicety**: two
+    implementers given this table will still choose different flag *spellings*,
+    but they will at least build the same tool. Given different tables they build
+    different tools.
+
+    **Still unspecified:** the flag spellings themselves, exit codes, and the
+    format of the refusal messages §8 promises will *"name the number that
+    caused it"*.
 
 11. ~~How many codex32 characters fit a hand-engraved plate?~~ **CLOSED — OUT
     OF SCOPE**, operator ruling 2026-08-23: *"As many as a user wants. It is not
@@ -1537,6 +1635,37 @@ signed PSBT.
     plates is a real hazard, not a theoretical one.
 
     **(b) Its own HRP**, `mt1`, currently hardcoded at four sites in `md-codec`.
+
+    **(a2) The header's exact layout, because R4 found five things an
+    implementer would otherwise guess — and two of the guesses produce plates
+    another implementation cannot read.** `mt1`'s 41 bits are, in order:
+
+    | field | bits | value |
+    | --- | --- | --- |
+    | `version` | 4 | **`0b0001`** — `mt1` wire v1. Not inherited from `md1`; a shared value would let one format's chunk verify as the other's under a colliding constant |
+    | `chunked` | 1 | **`1`, always, and RETAINED** even though `mt1` is always chunked — see below |
+    | `chunk_set_id` | 20 | top 20 bits of the extracted txid, display form (c) |
+    | `count` | 8 | **`count − 1`**, matching `md-codec`'s offset convention: a set of 1 stores `0`, a set of 256 stores `255` |
+    | `index` | 8 | **plain, zero-based**, `index < count` |
+
+    **`count` stores `count − 1`.** §3's *"admitting 256 chunks"* and its
+    `count(8)` are consistent only under the offset, and `md-codec` already does
+    this (`chunk.rs`). An implementer choosing plain would produce plates whose
+    every multi-chunk set is off by one — **unreadable by the other
+    implementation, and sending a recoverer to hunt a plate that was never cut.**
+
+    **The `chunked` bit is RETAINED, dead though it is.** `mt1` is always
+    chunked, so a thoughtful implementer would drop it and reach a byte-aligned
+    40 bits. That is precisely the danger: dropping it shifts every later field
+    by one bit, so the two implementations disagree **silently** and produce
+    nonsense rather than a clean refusal. Keeping a known-constant bit costs one
+    bit per chunk and keeps the layout identical to the format `mt1` forked from.
+
+    **Bit order and padding.** Fields are written most-significant-bit first in
+    the order above, matching `md-codec`'s `BitWriter`. The 41-bit header is
+    followed immediately by the chunk payload with **no padding between them**;
+    padding appears only once, at the end of a chunk, to reach the next 5-bit
+    symbol boundary (`mt string`) or byte boundary (`mt qr`).
 
     **(c) A content id — the transaction id, and R2 lens 2 found the ruling
     AMBIGUOUS.** A PSBT holds **two** transactions that could be called "the"
@@ -1686,6 +1815,30 @@ signed PSBT.
     Weigh a short format tag against §5's budget — which is 136 characters of a
     300-character allowance, so the room exists (§10.14's regeneration should
     price it).
+
+
+22. **`mt1`'s NUMS domain string is UNDECIDED, and it is the last thing blocking
+    the codec.** §10.13 rules that `mt1` needs its own constant but omits the one
+    input an implementer cannot infer. The derivation rule is public and
+    verified: `MD_REGULAR_CONST = 0x0815c07747a3392e7` is the **top 65 bits of
+    `SHA-256("shibbolethnums")`**, and `mk1` uses `"shibbolethnumskey"` — I
+    recomputed both and they match. **The rule is derivable; the domain string is
+    an arbitrary chosen name.**
+
+    Only two are in use, so `mt1` needs a third. Following `mk1`'s pattern of
+    appending its distinguishing noun spelled out:
+
+    | domain string | top-65-bit constant | |
+    | --- | --- | --- |
+    | `shibbolethnums` | `0x0815c07747a3392e7` | md1, in use |
+    | `shibbolethnumskey` | `0x1062435f91072fa5c` | mk1, in use |
+    | **`shibbolethnumstransaction`** | **`0x1a2fc877f9528d7c1`** | **candidate** |
+    | `shibbolethnumstx` | `0x01a77d120c35339b2` | candidate, abbreviated |
+
+    **The fork mechanic makes the worst guess the most tempting**: an implementer
+    copying `md-codec` and changing the HRP would leave `MD_REGULAR_CONST` alone,
+    producing exactly the `md1`/`mt1` chunk collision §10.13 exists to prevent —
+    a chunk of one verifying as a chunk of the other. **Operator decision.**
 
 ## 11. Provenance of the numbers
 
