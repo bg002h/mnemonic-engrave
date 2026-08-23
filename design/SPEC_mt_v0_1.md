@@ -312,6 +312,31 @@ regardless of how the string is engraved, and which §8.7b refuses against.
 > spec's concern; what a user does with steel is not. `mt qr` is the exception
 > only because it emits an engraving, so plate geometry is part of its output.
 
+### The one thing `mt string` does say about the plate
+
+> **Ruling, operator, 2026-08-23:** *"Hand cut plates get a warning on stderr.
+> And that's it."*
+
+`mt string` prints a warning at encode time that the artifact is **bearer** —
+anyone holding the resulting plate can spend it — and takes no further interest
+in the steel. It does not require a legend, does not reserve space for one, and
+cannot verify that any warning reached the plate.
+
+**On `stderr` specifically, and this is load-bearing rather than incidental.**
+The `mt1` string goes to **stdout**, so the ordinary invocation pipes it to a
+file or another tool. A warning on stdout would be captured by that redirection
+and silently swallowed; on stderr it reaches the operator's terminal either way.
+This is the first fixed point of §10.10's CLI contract: **stdout carries the
+artifact, stderr carries everything the human must see.**
+
+**The accepted risk, stated plainly rather than buried.** That warning is seen
+**once**, by the person doing the encoding. The person holding the plate in 2040
+is a different person, and the plate itself says nothing. This is a deliberate
+asymmetry between the two verbs — `mt qr` engraves `BEARER - ANYONE HOLDING THIS
+CAN SPEND IT` as the first line of a legend `mt` controls, and `mt string` has
+no such mechanism because it emits no engraving. §7 records it as an accepted
+risk, not as a mitigation.
+
 
 ## 4. Choosing the configuration — `mt qr` only
 
@@ -544,7 +569,8 @@ mitigation, the row says so instead of inventing one.
 
 | hazard | mitigation |
 | --- | --- |
-| **Bearer** — holder can broadcast | a timelock bounds it in *time*, not in space, and only when §8.4's `nSequence` condition holds; the `BEARER` line states it plainly, and it is the first line on the plate |
+| **Bearer** — holder can broadcast (`mt qr`) | a timelock bounds it in *time*, not in space, and only when §8.4's `nSequence` condition holds; the `BEARER` line is the first line of a legend `mt` controls |
+| **Bearer** — holder can broadcast (`mt string`) | **accepted risk, not mitigated on the plate.** `mt` emits a string, not an engraving, so it has no mechanism to put a warning on hand-cut steel (§3b). It warns once on `stderr` at encode time, to the person encoding — who is not the person holding the plate later. The timelock bound still applies |
 | **Pinned destination** — a 2040 recoverer pays a 2026 address whose keys may be lost | **cannot be fixed**; the `TO` line names the destination so the operator sees what they commit to before cutting |
 | **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed, and is NOT on the plate.** Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving; a holder in 2040 recovers them by decoding, since the PSBT carries the input amounts |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
@@ -690,9 +716,10 @@ signed PSBT.
    compile-time ECC level and one code per plate, and `sysw/record.go` has no
    transaction class. §4 may be selecting from a space the machine cannot reach.
    **This blocks implementation and must close before code.**
-10. **There is no CLI surface.** Two verbs (`mt qr`, `mt string`) and two flags
-    (`--timelocked` / `--immediate`) are now named, but nothing specifies the
-    input convention (file? stdin? PSBT or raw hex or both?), the output
+10. **There is no CLI surface.** Two verbs (`mt qr`, `mt string`), two flags
+    (`--timelocked` / `--immediate`) and one stream convention are now fixed —
+    **stdout carries the artifact, stderr carries everything the human must
+    see** (§3b) — but nothing specifies the input convention (file? stdin? PSBT or raw hex or both?), the output
     convention, or the exit codes — and §8 promises *"every refusal names the
     number that caused it"*, which is an output contract with no format.
     **Blocks implementation.**
