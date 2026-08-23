@@ -905,19 +905,39 @@ mode and ECC level, a gate that caught three wrong payload constructions before
 these numbers were trusted. Plate and module constants are read from the fork
 (`backup/backup.go:45,99-102`, `cmd/controller/platform_sh2.go:188`).
 
-All twelve probe binaries were rebuilt and re-run on 2026-08-22 before R0, and
-nine of eleven results files reproduced **byte-identically**; the two exceptions
-differ only by capture artifacts, documented in `design/measurements/README.md`.
-`psbtfinal.rs` and the PSBT section of `select.rs` were added 2026-08-23 for this
-fold.
+The probe crate has been re-run twice, and the counts differ because the crate
+grew between them:
+
+- **2026-08-22, before R0** — all **12** binaries then in the crate rebuilt and
+  re-run; **9 of 11** results files reproduced **byte-identically**, the two
+  exceptions differing only by capture artifacts documented in
+  `design/measurements/README.md`.
+- **2026-08-23, for the chunk-size correction** — `psbtfinal.rs` had since been
+  added, so all **13** binaries were rebuilt and re-run and all **12** results
+  files regenerated. This is the current state of every number in this spec.
 
 §3b's chunk counts come from `RESULTS_envelope_2026-08-22.txt` and
 `RESULTS_rcw_2026-08-22.txt`, which measure the **raw signed transaction**
-against the 64-chunk container. They are a floor, for the balancing reason
-stated in §3b. The BCH corrector's existence was read from
-`md-codec/src/bch_decode.rs` and `md-codec/src/lib.rs:48` in the
-`descriptor-mnemonic` repo — a sibling, so `plan-cite-check.sh` has no root for
-it and those two were checked by hand.
+against the 64-chunk container.
+
+> **They remain a LOWER BOUND, but not for the reason an earlier draft gave.**
+> That draft called them "a floor, for the balancing reason stated in §3b" —
+> i.e. because `md`'s chunker balances rather than fills. **That reason is now
+> void**: §3b's correction established that chunk sizing is a flat 40 payload
+> bytes (`md-codec/src/chunk.rs:224,253-254`), so the count is *exact* for a
+> given payload size.
+>
+> They are a lower bound because of what is fed in. `md-codec` chunks the output
+> of `encode_payload`, which is a **framed** payload — canonicalization plus TLV
+> sections — not raw bytes. The probe feeds the **raw transaction length**
+> straight in, modelling **zero framing overhead** for `mt1`. Whatever header
+> `mt1` ends up carrying adds to the payload and can therefore add chunks. That
+> is precisely open question §10.13, and it must close before these counts are
+> treated as final.
+
+The BCH corrector's existence was read from `md-codec/src/bch_decode.rs` and
+`md-codec/src/lib.rs:48` in the `descriptor-mnemonic` repo — a sibling, so
+`plan-cite-check.sh` has no root for it and those two were checked by hand.
 
 > The previous draft's §11 claimed *"everything measured is in
 > `design/measurements/`"* while the §6c/§6d block figures had no results file
