@@ -291,17 +291,69 @@ rather than fills, so a real chunk measures ~85 characters where a filled one
 would be 96. **A new `mt1` codec could choose to fill**, which would raise the
 ceiling — undecided, §10.12.
 
-### What is NOT yet decided, and must be before code
+### How many chunks fit a plate — resolved from the fork's real geometry
 
-**How many codex32 characters fit on a hand-engraved plate is unmeasured, and it
-is the number that decides whether this verb is practical.** The existing
-constellation convention is one string per plate (F-225, ~21 min machine), which
-would read the table above as "12 chunks = 12 plates". **That convention comes
-from machine engraving and should probably not bind a hand engraver**: a chunk
-is ~85 characters, so a 4-chunk transaction is ~340 characters, which is a large
-but plausible single-plate hand job. Until it is measured, this spec does not
-state a plate count for `mt string`, and §4's search does not cover it. See
-§10.11.
+The constellation convention is one string per plate (F-225), which would read
+the table above as *"12 chunks = 12 plates"*. **That convention comes from
+machine engraving and does not bind a hand engraver.** The fork's own text grid
+says so.
+
+`CharsPerLine` is `(plateSize − 2·outerMargin) / fixedCharWidth` and
+`LinesPerPlate` is `(plateSize − 2·outerMargin) / fontMM`
+(`backup/backup.go:87-97`), over the six-rung ladder `FontSizes`
+(`backup/backup.go:82`). That yields:
+
+| font | chars/line | lines/plate | **chars/plate** | **~85-char chunks/plate** |
+| --- | --- | --- | --- | --- |
+| 6.0 mm | 22 | 13 | 286 | **3** |
+| 5.0 mm | 26 | 15 | 390 | **4** |
+| 4.4 mm | 30 | 17 | 510 | **6** |
+| 3.8 mm | 34 | 20 | 680 | **8** |
+| 3.4 mm | 38 | 23 | 874 | **10** |
+| 3.0 mm | 44 | 26 | 1144 | **13** |
+
+So `mt string` plate counts, against `mt qr` for the same transaction:
+
+| artifact | chunks | plates @6.0 mm | plates @3.8 mm | `mt qr` plates |
+| --- | --- | --- | --- | --- |
+| RCW `tr` key-path, 1-in | 4 | 2 | **1** | 1 |
+| RCW `tr` tier 4, 1-in | 9 | 3 | **2** | 2 |
+| RCW `tr` tier 1, 1-in | 12 | 4 | **2** | 2 |
+| RCW `wsh` tier 1, 1-in | 17 | 6 | **3** | 2 |
+| RCW `tr` tier 1, 5-in | 56 | 19 | **7** | 5 |
+
+**This vindicates scoping the verb to short transactions and refutes the "4–6x
+worse" reading.** At a middling font a short transaction costs the same one or
+two plates as the QR form, while being human-readable and BCH-correctable. It
+degrades sharply with size — 19 plates at 5 inputs and the largest font — which
+is exactly why §8.7b refuses past the 64-chunk ceiling and points at `mt qr`.
+
+> **PROVENANCE, and its one weakness.** The six rungs above are pinned by the
+> fork's own `TestFontSizeLadder` (`backup/sizes_test.go:29-56`), whose comment
+> calls them *"the basis of every capacity number in the spec"*. **Go is not
+> installed on this machine, so that test was NOT executed here.** What I have
+> is two agreeing derivations: the fork's committed pins, and my own arithmetic
+> from the source formulas above, which reproduces all six rungs exactly. Two
+> agreeing derivations are not an execution. **Run `go test ./backup/ -run
+> TestFontSizeLadder` before this table is relied on** (§10.11).
+>
+> Two further limits: these are **unobstructed** lines — `CharsPerLine`'s own
+> comment notes that lines crossing a screw-hole band hold fewer, per the
+> `widthAt` predicate in `fit.go` — so every figure is an **upper bound**. And
+> whether a legend is engraved beside a hand-cut string, consuming some of this
+> budget, is undecided (§10.11).
+
+> **This also casts doubt on §5's legend budget, and the doubt is not resolved
+> here.** `legend.rs` takes `CHARS_PER_LINE = 35.0` and `LINES_FULL_PLATE = 20.0`
+> from a **doc comment** in `crates/me-cli/src/lib.rs`, not from the fork's font
+> metrics — and this project's own rule forbids describing code from its doc
+> comment. Those two numbers correspond to the **3.8 mm rung** (34 chars, 20
+> lines), one of six, treated as if universal. §4's 4.25 mm line pitch is
+> `85/20`, which uses the **full** plate height where §4 uses 79 mm everywhere
+> else, and 4.25 mm is not a rung of `FontSizes` at all. The nearest real rungs
+> put 6 lines at 26.4 mm (4.4 mm) or 22.8 mm (3.8 mm) against §4's 25.5 mm.
+> **The magnitude is small — under a millimetre — but §4's whole plate table
+> rests on it.** Filed as §10.14.
 
 ## 4. Choosing the configuration — `mt qr` only
 
@@ -661,21 +713,28 @@ signed PSBT.
     convention, or the exit codes — and §8 promises *"every refusal names the
     number that caused it"*, which is an output contract with no format.
     **Blocks implementation.**
-11. **How many codex32 characters fit on a hand-engraved plate?** UNMEASURED,
-    and it decides whether `mt string` is practical at all. The constellation's
-    one-string-per-plate convention (F-225) comes from *machine* engraving; a
-    chunk is ~85 characters, so a 4-chunk transaction is ~340 characters. If
-    several chunks fit one plate the string form is attractive for short
-    transactions; if not, it is 4–6x the plates of `mt qr` and its purpose
-    largely evaporates. **Measure before specifying a layout.** Related: is
-    there a legend on a hand-engraved plate, and does §5's 6-line reservation
-    apply?
+11. ~~How many codex32 characters fit a hand-engraved plate?~~ **ANSWERED in
+    §3b** from the fork's text grid: 286 characters at the largest font rung to
+    1144 at the smallest, i.e. 3 to 13 chunks per plate. Two residues remain:
+    **(a)** Go is not installed here, so the fork's `TestFontSizeLadder` was
+    never executed — run it before the table is relied on; **(b)** is a legend
+    engraved beside a hand-cut string, and does §5's 6-line reservation apply to
+    `mt string` at all? The plate counts in §3b assume it does not.
 12. **Should `mt1` FILL its chunks rather than balance them?** `md`'s chunker
     balances, so a real chunk is ~85 characters against a filled 96. Filling
     would raise the 64-chunk ceiling meaningfully — possibly enough to bring
     RCW `wsh` tier 1 at 5 inputs (78 chunks) under it. But it diverges from the
     chunker every other constellation format uses, and **the Rust-primary rule
     means any such change lands in the Rust codec first, with test vectors.**
+14. **§5's legend budget rests on a doc comment, not on the fork's font
+    metrics.** `legend.rs` hardcodes `CHARS_PER_LINE = 35.0` /
+    `LINES_FULL_PLATE = 20.0` "per `crates/me-cli/src/lib.rs:46`"; the fork's real ladder has six
+    rungs and those two values are the 3.8 mm one. §4's 4.25 mm pitch is `85/20`
+    — full plate height, where §4 uses 79 mm everywhere else — and is not a rung
+    of `FontSizes`. Small in magnitude, but §4's plate table and §5's 6-line
+    reservation both stand on it. **Re-derive both from `CharsPerLine` /
+    `LinesPerPlate` and regenerate §4's table if they move.**
+
 13. **Does `mt1` reuse the `md1` chunk header verbatim, or need its own?** §3b
     assumes the existing string layer takes a new payload type cleanly. That is
     an assumption about `md-codec`'s header (37 header bits, chunk-set id,
