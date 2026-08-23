@@ -660,9 +660,19 @@ overturned an earlier assumption and are marked.
 ## 2. What `mt-codec` actually specifies
 
 The payload is a Bitcoin transaction, specified by Bitcoin. The container is a
-QR, specified by ISO/IEC 18004. The envelope is UR, specified by Blockchain
-Commons. None of the three needs `mt`. What is unspecified — and what this codec
-is for — is everything between them:
+QR, specified by ISO/IEC 18004. **Neither needs `mt`.** What is unspecified —
+and what this codec is for — is everything between them:
+
+> **This sentence named a third specification, UR, until 2026-08-23, and §3
+> thirty lines below already said *"there is no UR, and no third-party envelope
+> of any kind."*** The two were in the document together, in direct
+> contradiction, and the drop was ruled a full cycle earlier. **The envelope
+> being `mt`'s own is not a footnote to this paragraph — it is half of the
+> paragraph's point**, since the fragmentation `mt-codec` specifies is now the
+> item that was previously delegated. Found by walking Journey C, not by any
+> gate: no superseded-term sweep catches it, because every word in the sentence
+> is still current vocabulary and `UR` appears legitimately eleven other times
+> in this document as history.
 
 - how one transaction maps onto **one or more** QR symbols, and onto plates;
 - how a recoverer reassembles them, and how they know a fragment is missing;
