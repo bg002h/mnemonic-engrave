@@ -1,13 +1,13 @@
 PLATE_TEXT_BUDGET = 300 chars (35 chars/line x 20 lines, TEXT-ONLY plate)
 
-  FULL legend, 1-input sweep: 10 fields,  474 ch, 18 lines -> OVER BUDGET
-  FULL legend, 2-input sweep: 12 fields,  622 ch, 23 lines -> OVER BUDGET
-  FULL legend, 5-input sweep: 18 fields, 1066 ch, 38 lines -> OVER BUDGET
+  FULL legend, 1-input sweep: 10 fields,  479 ch, 18 lines -> OVER BUDGET
+  FULL legend, 2-input sweep: 12 fields,  627 ch, 23 lines -> OVER BUDGET
+  FULL legend, 5-input sweep: 18 fields, 1071 ch, 38 lines -> OVER BUDGET
 
-  MINIMAL legend (any input count): 5 fields, 136 ch, 6 lines -> fits budget
+  MINIMAL legend (any input count): 5 fields, 141 ch, 6 lines -> fits budget
      bearer warning    41 ch  BEARER - ANYONE HOLDING THIS CAN SPEND IT
      source wallet     20 ch  FROM WALLET fa568be0
-     locktime          29 ch  LOCKED TO BLOCK 1383520 ~2034
+     locktime          34 ch  LOCKED TO BLOCK 1383520 ~FALL 2034
      destination       34 ch  TO bc1p8rrz...s6n0vcl  0.00399 BTC
      symbol index      12 ch  PLATE 1 OF 1
 

@@ -365,9 +365,19 @@ span: `mt string` for short transactions, `mt qr` for anything.
 >
 > **An earlier version of this box called it "a flat 40 bytes per chunk", and
 > that mis-describes the chunker — R4 lens 1.** `md-codec` computes
-> `chunks_needed` against the 320-bit ceiling and then **balances** the payload
-> across that many chunks (`crates/md-codec/src/chunk.rs:267`), so the last
-> chunk is not a short remainder and no chunk is padded to 40. The **chunk
+> `chunks_needed` against the 320-bit ceiling and then splits the payload
+> **`bytes_per_chunk = ceil(len / count)`**, each chunk taking that many bytes
+> and the **last taking whatever remains** (`crates/md-codec/src/chunk.rs:267-273`).
+> No chunk is padded to 40.
+>
+> **An intermediate version of this box said "the last chunk is not a short
+> remainder", and that describes a different split — R5 readiness.** Under
+> `ceil` the last chunk *is* the remainder and is normally shorter: a 535-byte
+> payload over 14 chunks gives `ceil(535/14) = 39` bytes each for the first
+> thirteen and **28** for the last. Two implementers, one following the sentence
+> and one following the code, produce different chunk boundaries and therefore
+> **plates neither can read**. Correcting the flat-40 error introduced this one
+> in the same paragraph. The **chunk
 > counts in this spec are unaffected** — they derive from the ceiling, which is
 > what `chunks_needed` uses — but the **per-chunk sizes** differ on any payload
 > that is not a multiple of the chunk count. This is the same error class as the
@@ -539,18 +549,18 @@ The 0.30 mm results are recorded for when the plate exists.
 Everything constellation-specific lives here, in engraved text, never in the QR.
 
 **The legend carries only what a human needs BEFORE the QR is decoded.** Five
-fields, **136 characters**, 6 lines — measured,
+fields, **141 characters**, 6 lines — measured,
 `RESULTS_legend_budget_2026-08-22.txt`:
 
 | field | chars | why |
 | --- | --- | --- |
 | `BEARER - ANYONE HOLDING THIS CAN SPEND IT` | 41 | the plate is spendable; this is not a backup in the sense the other formats are |
 | `FROM WALLET <8 hex>` | 20 | wallet id or seed fingerprint. The transaction does **not** say what it spends *from* (§6). **Optional — loudly warned when absent** (§10.4) |
-| `LOCKED TO BLOCK <n> ~<year>` / `LOCKED UNTIL <t>` | 29 | the single most actionable fact. Reads **`NO BLOCK TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
+| `LOCKED TO BLOCK <n> ~<SEASON> <year>` / `LOCKED UNTIL <t>` | 35 | the single most actionable fact. Reads **`NO TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
 | `TO <wallet id, fp or label>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when blank.** A free-text label is allowed **only behind an explicit flag**, since nothing can check it against the transaction |
 | `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
 
-Plus, **not part of the 136-character budget above**, one `n/m` label engraved
+Plus, **not part of the 141-character budget above**, one `n/m` label engraved
 beside **each QR symbol**, naming the `mt1` chunk it carries (§10.8's ruling). A
 plate may hold several symbols, so `PLATE n OF m` alone cannot tell a recoverer
 which *part* is missing. These labels are per-symbol and their area is not yet
@@ -1010,8 +1020,48 @@ exactly as permanent, as a machine-engraved one.
    whereas *"spendable"* is a claim about a transaction's fate that depends on
    scripts, fees and unspent inputs — none of which `mt` evaluates.
 
-   - **Legend:** `LOCKED TO BLOCK <n> ~<year>` for a height,
-     **`LOCKED UNTIL <time>`** for a timestamp, or `NO TIMELOCK`. **A timestamp
+   **The block height is MANDATORY, and the estimate names a SEASON.** Operator
+   ruling 2026-08-23: *"Estimate year and season (spring, summer, winter, fall)
+   and mandate output of blockheight at unlock time."* So the legend always
+   carries the raw unlock height — the one figure that is exact, consensus-
+   defined, and re-derivable forever — and the estimate rides beside it as an
+   orientation aid:
+
+       LOCKED TO BLOCK 1383520 ~FALL 2034
+
+   **The height is the fact; the season is the courtesy.** A height alone is
+   meaningless to a human (§8.4's original problem) and a season alone is
+   unverifiable, so the plate carries both and a reader can always fall back to
+   the number.
+
+   **Season precision is supported by the measured block rate, and this was
+   checked rather than assumed.** Over three windows ending at height 963,759 the
+   realised interval was **9.945 to 10.116 min/block** — within ±1.2% of the
+   10-minute target — which over the 419,761 blocks of the worked example is
+   **+16 to −34 days** of drift. A season is ~91 days, so the error sits inside
+   one comfortably. **The exception is a projection landing near a season
+   boundary**, which can tip; the `~` marks the whole estimate as approximate and
+   the height beside it is what settles any dispute.
+
+   > **Seasons are NORTHERN-HEMISPHERE names on a permanent artifact, and the
+   > spec should not pretend otherwise.** "Fall 2034" means opposite halves of
+   > the year in Sydney and Toronto. The height is unambiguous everywhere and is
+   > why it is mandatory. Whether to keep hemisphere-relative names, switch to
+   > month ranges (`~SEP 2034`), or use quarters (`~Q4 2034`) is **§10.23**.
+
+   - **Legend:** `LOCKED TO BLOCK <n> ~<SEASON> <year>` for a height,
+     **`LOCKED UNTIL <time>`** for a timestamp, or **`NO TIMELOCK`** — that exact
+     spelling, 11 characters, normative everywhere.
+
+     > **This string existed in TWO spellings across four sites — `NO TIMELOCK`
+     > and `NO BLOCK TIMELOCK`, 11 versus 17 characters — and §8.4 contradicted
+     > itself twice (R5 readiness).** It is **engraved permanently**, so drifting
+     > spelling is not a style question: two `mt` versions would cut different
+     > plates for the same transaction, and a recoverer matching against
+     > documentation would find neither. The 6-character difference also changes
+     > what fits the line.
+
+     **A timestamp
      is never presented as a height.**
    - **Compare like with like:** a height against the chain height, a timestamp
      against the chain's **median-time-past** — which §6a's node already
@@ -1133,7 +1183,7 @@ exactly as permanent, as a machine-engraved one.
    > about spendability that `mt` can no longer substantiate — engrave it on a
    > `OP_CSV`-locked transaction and the steel permanently asserts something
    > false. A `stderr` warning is disposable; a legend line is forever. The
-   > legend now reads **`NO BLOCK TIMELOCK`**: precisely true about the fields
+   > legend now reads **`NO TIMELOCK`**: precisely true about the fields
    > `mt` read, and silent about scripts it did not.
 5. **`gettxout` returns `null` for any input** → refuse, when a node is
    reachable. The output is spent or never existed. See §6a's limitation and
@@ -1647,7 +1697,21 @@ signed PSBT.
     `md1` chunk**, which for a bearer plate sitting in a drawer beside `md1`
     plates is a real hazard, not a theoretical one.
 
-    **(b) Its own HRP**, `mt1`, currently hardcoded at four sites in `md-codec`.
+    **(b) Its own HRP — the string is `"mt"`, NOT `"mt1"`.** The `1` in a
+    rendered `mt1…` string is bech32's **separator**, not part of the HRP.
+    `md-codec` makes this explicit: `const HRP: &str = "md"`
+    (`crates/md-codec/src/codex32.rs:15`) while its strings render as `md1…`,
+    and the checksum is computed over `hrp_expand("md")`
+    (`crates/md-codec/src/chunk.rs:565,615`).
+
+    > **R4 filed this as a MINOR and the R4 fold skipped it; R5 found it makes
+    > plates MUTUALLY UNVERIFIABLE.** An implementer reading "its own HRP, `mt1`"
+    > would compute `hrp_expand("mt1")`, producing a different polymod residue —
+    > so every plate written by one implementation fails the other's checksum,
+    > and fails it with a *"damaged beyond correction"* diagnostic that points
+    > the recoverer at their steel rather than at their software. **Triage by
+    > severity label is what let this through**: the finding was correct and its
+    > label was wrong, and I folded by label.
 
     **(a2) The header's exact layout, because R4 found five things an
     implementer would otherwise guess — and two of the guesses produce plates
@@ -1841,6 +1905,15 @@ signed PSBT.
     because the fork mechanic makes the worst guess the most tempting: copy
     `md-codec`, change the HRP, leave the constant, and `mt1` chunks verify as
     `md1` chunks. **§10.13 now has no undecided input left.**
+
+
+23. **Season names are hemisphere-relative on a permanent artifact.** §8.4's
+    legend reads `~FALL 2034`, which means opposite halves of the year in Sydney
+    and Toronto — on steel meant to be read anywhere, decades out, by someone who
+    cannot ask. The mandatory block height beside it is unambiguous, so nothing
+    is *lost*; the estimate is simply useless to half the world. Alternatives:
+    month ranges (`~SEP 2034`), quarters (`~Q4 2034`), or keeping the names and
+    accepting it. Costs nothing to change now and cannot be changed later.
 
 ## 11. Provenance of the numbers
 
