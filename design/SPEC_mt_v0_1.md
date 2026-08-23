@@ -624,7 +624,8 @@ mitigation, the row says so instead of inventing one.
 | **Indistinguishable from a watch-only plate** — an `mt1` plate sits in the same drawer as `md1` and `mk1` plates, in the same script, differing in **one HRP character**, and is the only one of the three that is spendable by whoever picks it up | for `mt qr` the `BEARER` legend line carries the difference. For `mt string` there is **no mitigation** — see the bearer row above and §3b. R0 round 1 (R-13) |
 | **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed, and is NOT on the plate.** Fee rate and date were cut from the legend (§5). `mt` displays both at encode time so the operator can judge staleness *before* engraving. A holder in 2040 recovers the fee by decoding **only for `mt qr`**, whose PSBT payload carries the input amounts; an `mt string` plate carries a raw transaction, from which the fee is **not** recoverable without the prevouts |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
-| **Non-`ALL` sighash** — an input signed with `SIGHASH_NONE` or `SIGHASH_SINGLE` leaves outputs unbound, so a plate-holder can redirect the funds and the `TO` line becomes a lie | refused at encode time, §8.6 |
+| **Non-`ALL` sighash** — an input signed with `SIGHASH_NONE` or `SIGHASH_SINGLE` leaves outputs unbound, so a plate-holder can redirect the funds and the `TO` line becomes a lie | refused at encode time, §8.6 — **structurally**, since §8.2's removal left no script engine |
+| **Well-formed but INVALID** — a transaction with a bad signature engraves cleanly and fails at broadcast, years later | **accepted, not mitigated.** Operator ruling 2026-08-23 removed script verification from v0.1 (§8.2). §8.1 sees a witness, §8.2b sees balanced values, §8.6 sees correct sighash flags — none of them verifies the signature. `mt` may add this someday |
 
 > The last two rows are the honest state of this design. R0 lens 2 found that the
 > previous draft claimed the plate carried outpoints when §5 had removed them,
@@ -646,39 +647,34 @@ exactly as permanent, as a machine-engraved one.
    witness. Neither format makes an unfinalized transaction unrepresentable —
    §3's retraction — so this check is mandatory on both verbs and may not be
    skipped or overridden.
-2. **Script-invalid** → refuse. Real libbitcoinconsensus verification: `bitcoin`
-   0.32.101 ships the `bitcoinconsensus` feature and `consensus/validation.rs`
-   (verified against the crates.io source). The finalized PSBT carries each
-   input's UTXO record, so — unlike the previous draft, where this refusal was
-   conditional on prevouts being supplied separately — **the data needed to run
-   it always arrives with the payload **for `mt qr`**. For **`mt string`** it does
-   NOT: that payload is a raw transaction, which carries no UTXO records, so this
-   refusal is evaluable only while `mt` still holds the PSBT it was handed at
-   encode time — never from the engraved artifact alone. A PSBT whose UTXO records are missing
-   is refused under (1)'s sibling rule: `mt` requires the MIN form of §3.
+2. **Script validity is NOT checked in v0.1.** **Operator ruling 2026-08-23:
+   *"We don't care if transaction is valid for initial version. We might never
+   care but we might add it someday."*** The previous draft ran real
+   libbitcoinconsensus verification here; that is removed, and with it `mt`'s
+   only dependency on a consensus engine.
 
-   > **Is this inside the 2026-08-23 scope line? Flagged, not assumed — §10.18.**
-   > The ruling excludes *"handing the transaction to `bitcoind` to check
-   > validity"* and *"reading scripts to evaluate for timelocks in the sending
-   > wallet's descriptor."* This refusal is arguably neither, and the difference
-   > is **execution versus interpretation**:
+   > **What this costs, stated plainly because nothing else in §8 covers it.**
+   > `mt` no longer detects a transaction that is **well-formed but invalid** —
+   > most importantly one carrying a **bad signature**. Such a transaction has a
+   > witness present (passes §8.1), balances (passes §8.2b), and carries correct
+   > sighash flags (passes §8.6). It engraves cleanly and **fails at broadcast**,
+   > which for this artifact means years later, in exactly the situation it was
+   > cut for. §7 records this as an accepted hazard.
    >
-   > - **What §8.2 does:** runs the consensus engine over a complete transaction
-   >   and its prevouts, **in process**, and reads one bit back. It never parses
-   >   the script, never learns the wallet's policy, and never asks a node.
-   > - **What the ruling excludes:** *interpreting* a script to extract
-   >   semantics — "there is an `OP_CSV` here for 32,768 blocks" — which requires
-   >   understanding the sending wallet's descriptor.
+   > **It also weakens §8.6.** That refusal reasons about whether an input's
+   > *satisfaction binds the outputs*, and without a script engine `mt` can only
+   > inspect the witness **structurally** — it can see that a stack element is
+   > shaped like a signature, not that the script requires one. See §8.6.
    >
-   > `mt` executing a script it does not understand is closer to a checksum than
-   > to reading a wallet's policy. But it IS script evaluation, and it is the
-   > operator's call whether that belongs in a tool that *"merely reads
-   > transactions"*. **If it goes, §8 loses its only check that the transaction
-   > would actually validate** — leaving §8.1 (are the inputs finalized?) and
-   > §8.2b (does the value balance?) as structural checks that cannot catch a
-   > bad signature.
-2b. **Value-blind acceptance** → refuse. **§8.2 does not cover this and the
-   previous draft had no check at all.** `verify_transaction` is a per-input
+   > The upside is real and is why the ruling is defensible: `mt` becomes a tool
+   > that parses a PSBT, checks structure and arithmetic, reads two locktime
+   > fields and asks a node two questions. That is a far smaller thing to get
+   > right than one embedding a consensus engine, and this artifact's other
+   > failure modes — the plate being bearer, the destination being stale, the
+   > inputs being spent — are ones validity checking never addressed anyway.
+
+2b. **Value-blind acceptance** → refuse. **Now one of the few checks `mt` runs,
+   since §8.2 is gone.** `verify_transaction` is a per-input
    *script* loop — read from `consensus/validation.rs` in the `bitcoin` 0.32.101 crate (lines 82-107 of the registry source),
    it iterates `tx.input` calling `verify_script_with_flags` and returns — so it
    never compares input value against output value. Outputs exceeding inputs,
@@ -803,6 +799,15 @@ exactly as permanent, as a machine-engraved one.
 
       So the rule is over the **satisfaction**, not the signature: every input
       must carry at least one signature, and every signature must be (a)-clean.
+
+      > **Limited by §8.2's removal.** Without a script engine `mt` inspects the
+      > witness **structurally** — it can tell that a stack element is
+      > *shaped* like a signature (a 64-byte Schnorr element, or a DER-encoded
+      > ECDSA one with a trailing sighash byte), but not that the script it
+      > satisfies actually **requires** one. A crafted witness carrying a
+      > signature-shaped element that the script never checks would pass. This
+      > is a structural heuristic, not a proof, and the spec should not claim
+      > more than that.
 
    > **CORRECTION — the previous draft also refused all legacy (non-segwit)
    > inputs, and its stated reason was false.** It claimed *"nothing in a legacy
@@ -1047,7 +1052,7 @@ signed PSBT.
     | refusal | finalized PSBT | raw signed transaction |
     | --- | --- | --- |
     | §8.1 finalized? | reads `PSBT_IN_FINAL_*` | reads scriptSig/witness — **works** |
-    | §8.2 script-valid? | UTXO records ride along | **cannot run** — no prevouts |
+    | ~~§8.2 script-valid?~~ | *removed from v0.1* | *removed from v0.1* |
     | §8.2b value balance? | UTXO records give input values | **cannot run** — no input amounts |
     | §8.6 satisfaction binds outputs? | parses the witness | parses the witness — **works** |
 
@@ -1181,13 +1186,6 @@ signed PSBT.
     binds a legacy amount by txid). With the premise gone the refusal needs a
     reason or should be dropped. Related: `sh(wsh(…))` is unclassified by §8.6's
     wording.
-18. **Does §8.2's consensus-engine check survive the scope line?** Split out of
-    §8.2, where the distinction is set out in full. Short version: running
-    libbitcoinconsensus over a finished transaction is *execution* — a
-    black-box yes/no, in process, no node, no descriptor — whereas the ruling
-    excludes *interpreting* scripts for timelock semantics. Operator's call.
-    **If it goes, §8 has no check that the transaction would validate at all.**
-
 17. **The firmware cannot yet engrave what §4 selects — and will be taught.**
     Operator ruling 2026-08-23: *"we will later teach SH2 how to handle
     transactions."* So this is scheduled firmware work rather than an unresolved
@@ -1203,17 +1201,16 @@ signed PSBT.
     new `Class`:** it lands in `me-cli`'s Rust `sysw` with test vectors first,
     then ports to the fork's Go.
 
-16. **Should `mt` refuse legacy (non-segwit) inputs at all?**16. **Should `mt` refuse legacy (non-segwit) inputs at all?** The previous
-    draft's rule did, on a false premise (§8.6's correction: `non_witness_utxo`
-    binds a legacy amount by txid). With the premise gone the refusal needs a
-    reason or should be dropped. Related: `sh(wsh(…))` is unclassified by §8.6's
-    wording.
-17. **Can the firmware engrave what §4 selects?** Split out of §10.9, which the
-    `sysw` ruling answered only halfway. The fork's arbitrary-payload QR path is
-    `freeTextQRScale = 2` (`backup/fit.go:19`) with a compile-time ECC level and
-    one code per plate; §4 chooses module size, ECC level and a multi-symbol
-    tiling. Either the firmware grows to accept those, or §4's search space
-    shrinks to what the machine can do. **Blocks implementation.**## 11. Provenance of the numbers
+
+18. ~~Does §8.2's consensus-engine check survive the scope line?~~ **CLOSED —
+    NO. Script validity is out of v0.1**, operator ruling 2026-08-23: *"We don't
+    care if transaction is valid for initial version. We might never care but we
+    might add it someday."* §8.2 is removed, `mt` drops its consensus-engine
+    dependency, and §7 carries the accepted hazard: a transaction with a bad
+    signature engraves cleanly and fails at broadcast. Reopen if it is ever
+    added.
+
+## 11. Provenance of the numbers
 
 Everything measured is in `design/measurements/`, with the probe sources and a
 reproduce path that is a command rather than a memory. Transaction sizes come
