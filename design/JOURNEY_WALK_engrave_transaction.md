@@ -474,8 +474,78 @@ read-back exists, so no future phase plans one.*
 
 **What the device must SAY, per the ruling** — and the `mt` Critical is the
 argument for saying it at all rather than dropping the operator back at the
-carousel with two pieces of steel and no statement. Open: the exact wording, and
-whether it names what to test WITH.
+carousel with two pieces of steel and no statement:
+
+```
+PLATE 1 OF 2 — CUT
+────────────────────────
+TEST IT NOW, before you
+leave the machine.
+
+Scan the QR. It must read
+back as the same transaction.
+────────────────────────
+This machine has no camera.
+It cannot check its own work.
+────────────────────────
+NEXT PLATE          DONE
+```
+
+The last block is the anti-overclaim discipline again: it tells the operator
+**why** the job is theirs, which is what makes them do it.
+
+**RULED (operator): the test is "scan, then `mt inspect`."** A host round trip,
+and that is the right cost — the plate is still in the machine, which is the
+cheapest possible moment to re-cut it.
+
+### O — NO `mt` VERB CAN READ A DEFAULT PLATE
+
+Measured, because the ruling depends on it:
+
+```
+$ mt inspect --help
+  --in <PATH>   Read the STRINGS from a file. Defaults to stdin
+```
+
+`mt inspect`, `mt verify` and `mt decode` **all take `mt1` strings**. The default
+plate, by the operator's own step-4 ruling and by F-234, carries **raw
+transaction bytes in a QR**.
+
+> **The tool that defines the format cannot read its own default artifact.**
+
+For **broadcasting** this is F-234 working exactly as designed — raw bytes go
+straight into `bitcoin-cli sendrawtransaction` and no constellation knowledge is
+needed. The gap is in **inspection**: the step just ruled mandatory has no input
+path today.
+
+**So the ruling requires `mt inspect` to gain a raw-transaction subject**, so one
+verb reads both representations: `mt1` strings from text plates, raw bytes from
+QR plates. This is new scope on `mt`, owned by Goal 1's P2.
+
+*Classification: **missing capability**, and it earns the change — a mandatory
+step with no tool behind it is the "affordance without a mechanism" shape, caught
+twice in one walk (see N).*
+
+*Minor, in passing: `--transaction <PATH>` is advertised in `mt inspect --help`
+while its own text says "**`verify` only**" — a flag offered by a verb that does
+not honour it.*
+
+### The encoding parameter is far more urgent than F-243 says
+
+F-243 filed the QR encoding as *"can a stranger read this plate in 15 years"*.
+The step-5 ruling makes it **"can the operator complete a mandatory step, today,
+every single time"**:
+
+- **raw octets** — a phone scanner hands back bytes >= `0x80` that most apps
+  render as mojibake or refuse. **The operator's test appears to fail on a good
+  plate.**
+- **base45 / bech32-uppercase** — pure alphanumeric, every scanner shows clean
+  text, but the operator cannot tell it is the RIGHT transaction without a tool
+  (which is why the ruling routes through `mt inspect`).
+
+**F-243's test plate is therefore a gate on whether the ruled workflow functions
+at all, not only on long-term recoverability.** Its priority should be read that
+way.
 
 ---
 
@@ -498,6 +568,7 @@ whether it names what to test WITH.
 | L | must every output be seen before ENGRAVE | **no** — total + skip, residual accepted | RULED |
 | M | the total must not read as a destination amount | refusal to overclaim | RULED |
 | N | **the device has no camera** — no on-device read-back, ever | hardware fact; spec must state it | RULED |
+| O | **no `mt` verb can read a default plate** — all three take `mt1` strings | missing capability, new P2 scope | RULED |
 
 **Step 4 onward: not yet walked.** The payload is loaded into the session; the
 operator has not yet reached the Engrave Transaction program itself.
