@@ -4,12 +4,11 @@ PLATE_TEXT_BUDGET = 300 chars (35 chars/line x 20 lines, TEXT-ONLY plate)
   FULL legend, 2-input sweep: 12 fields,  625 ch, 23 lines -> OVER BUDGET
   FULL legend, 5-input sweep: 18 fields, 1069 ch, 38 lines -> OVER BUDGET
 
-  MINIMAL legend (any input count): 6 fields, 164 ch, 7 lines -> fits budget
+  MINIMAL legend (any input count): 5 fields, 152 ch, 6 lines -> fits budget
      bearer warning    45 ch  BEARER - ANYONE HOLDING THIS CAN BROADCAST IT
      source wallet     20 ch  FROM WALLET fa568be0
      locktime          34 ch  LOCKED TO BLOCK 1383520 ~FALL 2034
      destination       34 ch  TO bc1p8rrz...s6n0vcl  0.00399 BTC
-     symbol index      12 ch  PLATE 1 OF 1
      format tag        19 ch  FORMAT: mt1 codex32
 
 === ROOM BESIDE THE QR — the binding constraint ===
@@ -20,11 +19,11 @@ PLATE_TEXT_BUDGET = 300 chars (35 chars/line x 20 lines, TEXT-ONLY plate)
   RCW tr tier1     v25 ECC H     75.0mm       4.0mm       0       0            NO           NO
   RCW wsh tier1    v26 ECC Q     77.4mm       1.6mm       0       0            NO           NO
 
-=== what ECC each config could afford if the legend needs 7 lines (29.8mm) ===
-  v13    46.2mm  + legend 29.8mm =  75.9mm  fits one plate
-  v18    58.2mm  + legend 29.8mm =  87.9mm  NEEDS A SECOND PLATE
-  v20    63.0mm  + legend 29.8mm =  92.8mm  NEEDS A SECOND PLATE
-  v22    67.8mm  + legend 29.8mm =  97.5mm  NEEDS A SECOND PLATE
-  v24    72.6mm  + legend 29.8mm = 102.3mm  NEEDS A SECOND PLATE
-  v25    75.0mm  + legend 29.8mm = 104.8mm  NEEDS A SECOND PLATE
-  v26    77.4mm  + legend 29.8mm = 107.1mm  NEEDS A SECOND PLATE
+=== what ECC each config could afford if the legend needs 6 lines (25.5mm) ===
+  v13    46.2mm  + legend 25.5mm =  71.7mm  fits one plate
+  v18    58.2mm  + legend 25.5mm =  83.7mm  NEEDS A SECOND PLATE
+  v20    63.0mm  + legend 25.5mm =  88.5mm  NEEDS A SECOND PLATE
+  v22    67.8mm  + legend 25.5mm =  93.3mm  NEEDS A SECOND PLATE
+  v24    72.6mm  + legend 25.5mm =  98.1mm  NEEDS A SECOND PLATE
+  v25    75.0mm  + legend 25.5mm = 100.5mm  NEEDS A SECOND PLATE
+  v26    77.4mm  + legend 25.5mm = 102.9mm  NEEDS A SECOND PLATE

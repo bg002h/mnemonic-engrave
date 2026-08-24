@@ -51,7 +51,9 @@ fn minimal_legend() -> Vec<(&'static str, String)> {
         ("source wallet",  "FROM WALLET fa568be0".into()),
         ("locktime",       "LOCKED TO BLOCK 1383520 ~FALL 2034".into()),
         ("destination",    "TO bc1p8rrz...s6n0vcl  0.00399 BTC".into()),
-        ("symbol index",   "PLATE 1 OF 1".into()),
+        // PLATE n OF m REMOVED 2026-08-23: mt does not know the string->plate
+        // mapping. How many strings go on a plate is the operator's decision
+        // (or mnemonic-engrave's), so any denominator mt printed would be invented.
         ("format tag",     "FORMAT: mt1 codex32".into()),
     ]
 }

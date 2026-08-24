@@ -1579,7 +1579,7 @@ risk, not as a mitigation.
 ## 5. The plate legend — LIVE for `mt encode`, sized for the deferred `mt qr`
 
 > **The heading said "`mt qr` only, DEFERRED" until 2026-08-23, and that was
-> wrong.** Six fields of this section are printed by `mt encode` in v0.1, so
+> wrong.** Five fields of this section are printed by `mt encode` in v0.1, so
 > labelling the whole thing deferred invited exactly the cut that the QR
 > extraction nearly made. What is deferred is the **plate-area** material — the
 > millimetre reservations, lines per plate, and the ECC-level tradeoff — which
@@ -1587,7 +1587,7 @@ risk, not as a mitigation.
 > field from its measurement helps nobody.
 >
 > **Retained for the deferred QR cycle, and for one live purpose:** §0a rules
-> that `mt encode` **prints these SIX fields on `stderr`** as suggested text
+> that `mt encode` **prints these FIVE fields on `stderr`** as suggested text
 > the operator may engrave beside their string. (Five until §10.21 added
 > `FORMAT: mt1 codex32` on 2026-08-23; this note said "five" for the rest of
 > that day — R6 fold-propagation I-4.) The measurements and the field
@@ -1596,8 +1596,8 @@ risk, not as a mitigation.
 
 Everything constellation-specific lives here, in engraved text, never in the QR.
 
-**The legend carries only what a human needs BEFORE the QR is decoded.** Six
-fields, **164 characters**, 7 lines — measured,
+**The legend carries only what a human needs BEFORE the QR is decoded.** Five
+fields, **152 characters**, 6 lines — measured,
 `RESULTS_legend_budget_2026-08-22.txt`:
 
 | field | chars | why |
@@ -1659,7 +1659,19 @@ fields, **164 characters**, 7 lines — measured,
 | `FROM WALLET <8 hex>` | 20 | wallet id or seed fingerprint. The transaction does **not** say what it spends *from* (§6). **Optional — loudly warned when absent** (§10.4) |
 | `LOCKED TO BLOCK <n> ~<SEASON> <year>` / `LOCKED UNTIL <t>` | 35 | the single most actionable fact. Reads **`NO TIMELOCK`** when there is no enforced `nLockTime`. **A statement about the transaction's fields, never about spendability** — `mt` does not evaluate scripts, so it reports the lock it read and lets the reader conclude (§8.4) |
 | `TO <wallet id, fp or label>  <amount>` | 34 | names the destination **wallet**, not one truncated address — operator ruling, §10.4. **Optional — loudly warned when blank.** A free-text label is allowed **only behind an explicit flag**, since nothing can check it against the transaction |
-| `PLATE n OF m` | 12 | a missing plate must be obvious, and all `m` are required (§3) |
+
+> **`PLATE n OF m` WAS A FIELD HERE AND IS DELETED — R8 coverage C-3.** §0a had
+> already dropped it (*"`mt` cannot compute `m`… `PLATE 1 OF 1` cut onto each of
+> five plates is a false completeness claim on permanent steel"*) and **this
+> table still listed it**, so the spec carried the field and its own deletion at
+> once. Operator ruling 2026-08-23 goes further and removes the *category*:
+> **`mt` does not know how strings map to plates at all** — all on one, one
+> each, or any split — and that is the operator's decision or
+> `mnemonic-engrave`'s, never `mt`'s.
+>
+> **The `n/m` printed per string stays**, and is a different claim: `mt` knows
+> exactly how many *strings* it emitted. It is the *plate* denominator that
+> would be invented.
 | `FORMAT: mt1 codex32` | 19 | **names the encoding, so a stranger can start.** Operator ruling 2026-08-23, closing §10.21 — see the note below for why this field is not the least important of the six but arguably the most |
 
 > **`FORMAT: mt1 codex32` — the only field a recoverer cannot do without, and
@@ -1684,18 +1696,19 @@ fields, **164 characters**, 7 lines — measured,
 > may accompany it as *additional* suggested text (§0a) — it is a convenience
 > layered on a durable tag, never the tag itself.
 >
-> Cost: **+19 characters, 145 → 164, and 6 → 7 lines** — the one field that
-> moves the line count. Free for `mt encode`, where the legend is `stderr` text
+> Cost: **+19 characters.** It briefly took the legend to 7 lines; deleting
+> `PLATE n OF m` on the same day took it back to **6**, so the net is 5 fields,
+> **152 characters, 6 lines** and §4's reservation never moved. Free for `mt encode`, where the legend is `stderr` text
 > and `mt` owns no layout; **not** free for the deferred `mt qr` cycle, where
 > `legend.rs`'s own table shows a 7-line legend still fits one plate at v13 but
 > forces a second plate at v18 and above. That is a §0a-deferred cost, recorded
 > here so the QR cycle inherits it priced rather than as a surprise.
 
-Plus, **not part of the 164-character budget above**, one `n/m` label engraved
-beside **each QR symbol**, naming the `mt1` chunk it carries (§10.8's ruling). A
-plate may hold several symbols, so `PLATE n OF m` alone cannot tell a recoverer
-which *part* is missing. These labels are per-symbol and their area is not yet
-reserved in §4 — see §10.8 and §10.14.
+Plus, **not part of the 152-character budget above**, one `n/m` label beside
+**each engraved unit** — a string for `mt encode`, a symbol for the deferred
+`mt qr` — naming the `mt1` chunk it carries (§10.8's ruling). **`n/m` is the
+only completeness claim `mt` can make**, because it counts what `mt` emitted;
+any denominator over *plates* would be invented (§0a).
 
 > **This budget rests on a DOC COMMENT, not on the fork's font metrics, and the
 > doubt is not resolved here.** `legend.rs` hardcodes `CHARS_PER_LINE = 35.0`
@@ -2134,7 +2147,7 @@ exactly as permanent, as a machine-engraved one.
    > **Two stale details were removed from this argument rather than updated —
    > R6 fold-propagation I-5.** It said *"five fields over six lines … with no
    > room for a sixth"*, which §10.21 falsified the same day by adding a sixth
-   > field (`FORMAT: mt1 codex32`, 164 characters over 7 lines); and it called
+   > field (`FORMAT: mt1 codex32`); and it called
    > the verb **`mt string`**, a name §1.1 renamed to `encode`. Neither carried
    > any weight — the point is that §5 has **no field for this reminder**, which
    > is true at five fields, at six, and at any count §4's deferred cycle
@@ -2558,8 +2571,9 @@ exactly as permanent, as a machine-engraved one.
 
    > **That 136 is this field's own delta, not the legend's size.** Two later
    > rulings moved the total — `BROADCAST` (§5, +4) and `FORMAT: mt1 codex32`
-   > (§10.21, +19, and *that* one crossed to 7 lines). The live figure is **164
-   > characters, 7 lines**, and it is emitted by `legend.rs` rather than carried
+   > (§10.21, +19, which briefly crossed to 7 lines) and `PLATE n OF m` (−12,
+   > deleted, which took it back). The live figure is **152 characters, 5
+   > fields, 6 lines**, and it is emitted by `legend.rs` rather than carried
    > in prose, because this sentence is exactly how the earlier stale number
    > survived: a per-field delta reads like a total, and nobody re-ran the
    > probe. Read the current size from
@@ -3456,17 +3470,22 @@ The BCH corrector's existence was read from `crates/md-codec/src/bch_decode.rs` 
    > dropped UR entirely.** The traps are recorded here only so a future reader
    > who finds UR attractive again knows what the vendored implementation does.
 
-   **The gap the ruling closes, which survives the envelope change unaltered:**
-   `PLATE n OF m` is **not** `part n of m`. Under a multi-symbol tiling, plate 2
-   of 3 may carry parts 5–8 of 11, and §5's legend offers only the plate label.
-   A recoverer who scans out of sequence, or misses one symbol *on* a plate,
-   cannot tell which part is absent.
+   **The gap the ruling closes, which survives both the envelope change and the
+   2026-08-23 removal of plate language:** a count of *carriers* is not a count
+   of *parts*. One engraved object may hold several chunks, so a label naming
+   the object cannot tell a recoverer which **part** is missing — and a
+   recoverer who reads out of sequence, or misses one chunk on a shared
+   carrier, cannot tell what is absent.
 
-   **Normative:** every engraved symbol carries its own human-readable `n/m`
-   beside it, for the chunk it holds — independent of, and in addition to, the
-   plate's `PLATE n OF m`. A recoverer must be able to inventory what they hold
-   and name what is missing **without decoding anything**. A lone symbol reads
-   `1/1`, which is the only way it can state that it is whole.
+   **Normative:** every engraved unit carries its own human-readable `n/m`
+   beside it, for the chunk it holds. A recoverer must be able to inventory what
+   they hold and name what is missing **without decoding anything**. A lone unit
+   reads `1/1`, which is the only way it can state that it is whole.
+
+   > **This is now the ONLY completeness label `mt` prints**, since the
+   > operator's ruling deleted `PLATE n OF m` and the plate category with it.
+   > `n/m` survives precisely because it counts chunks `mt` emitted rather than
+   > carriers it cannot see.
 
    **Unpriced.** These labels consume plate area §4's table does not reserve,
    exactly as the legend did before it was measured — see §10.14, which already
@@ -3575,8 +3594,8 @@ The BCH corrector's existence was read from `crates/md-codec/src/bch_decode.rs` 
 
     **The `136 characters` cited in the original entry was already stale**, and
     regenerating the probe to price this field is what exposed it: §5's minimal
-    legend measured 141, then 145 after the `BROADCAST` fix, and **164** with
-    this field. The stale figure had survived because nothing re-ran
+    legend measured 141, then 145 after the `BROADCAST` fix, 164 with this
+    field, and **152** once `PLATE n OF m` was deleted the same day. The stale figure had survived because nothing re-ran
     `legend.rs`; the number is now emitted by the probe rather than carried in
     prose (§10.14).
 
