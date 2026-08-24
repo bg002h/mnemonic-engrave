@@ -213,9 +213,36 @@ overturned an earlier assumption and are marked.
 
    | two chunks, same index | what is true | what `mt` does |
    | --- | --- | --- |
-   | **one passes BCH, one fails** | the re-cut case — the miscut copy is detectably bad | **use the good one, and say so.** No operator decision is needed; `mt` has proof |
+   | **one passes BCH, the rest fail** | the re-cut case — the miscut copies are detectably bad | **use the good one, and ANNOUNCE it** — printed as a finding, not a log line. See the note on what `mt` does and does not have proof of |
    | **both pass, bytes identical** | a deliberate duplicate copy, per §1.8 | **accept silently.** This is the spec's own advice being followed, and reporting it would make correct behaviour look like a problem |
-   | **both pass, bytes differ** | two valid chunks disagreeing — different transactions, or damage that landed inside the code word | **refuse loudly.** The only genuinely ambiguous case, and the only one where guessing could pick a wrong transaction |
+   | **two or more pass, bytes differ** | valid chunks disagreeing — different transactions, or damage that landed inside the code word | **refuse loudly.** The only genuinely ambiguous case, and the only one where guessing could pick a wrong transaction |
+
+   **THE RULE IS OVER `n` CANDIDATES, NOT TWO, AND MAJORITY VOTE IS FORBIDDEN.**
+   R6 adversarial I-7. Partition the candidates at an index by BCH-validity,
+   then the valid ones by exact bytes; **accept only if exactly one distinct
+   valid byte string remains**, and refuse otherwise.
+
+   > **Written for two, the table returned opposite verdicts on three.** Given
+   > `{genuine, forgeA, forgeA}` at one index, a pairwise reading finds
+   > `forgeA == forgeA` (row 2, accept silently) *and* `genuine ≠ forgeA` (row
+   > 3, refuse loudly). An implementer resolving that contradiction by majority
+   > vote **hands the decision to whoever can add the most strings** — and a
+   > drawer holding a re-cut plate and two predecessors reaches three
+   > candidates with nobody attacking anything.
+   >
+   > **Row 1 says `mt` has proof, and it does not.** It has proof that one
+   > *checksum* holds — not that the surviving chunk is the one that was
+   > engraved. **The genuine string fails BCH whenever the operator mistyped
+   > more than `t = 4` characters**, which is an ordinary event: it is the
+   > entire reason the margin report exists. So the discarded candidate may be
+   > the real one, and the old wording promised *"no operator decision is
+   > needed"* while making that decision silently.
+   >
+   > Hence **announce**. `mt` still picks the checksum-valid chunk — that is
+   > the right default and the operator's ruling — but it says which candidate
+   > it discarded and that a badly-mistyped genuine string looks exactly like
+   > this. Row 2 keeps *accept silently* because byte-identical copies are
+   > §1.8's own advice being followed, and there is nothing to decide.
 
    > **The third row is why this is a split rather than a relaxation.** Dropping
    > the duplicate rule outright would accept two disagreeing valid chunks and
@@ -437,9 +464,24 @@ overturned an earlier assumption and are marked.
 
    **Optionally, `--transaction <psbt|hex>`** — the sibling round-trip. `mt`'s
    form is unusually strong: because the content id **is** the txid (§10.13 c),
-   comparing a supplied transaction against the set's id is a cryptographic
-   round-trip rather than a structural comparison. `md verify` can only re-encode
-   and diff; `mt verify` can prove identity.
+   `mt` compares hashes rather than structures. `md verify` can only re-encode
+   and diff.
+
+   > **It compares the FULL 32-byte txid, not the 20-bit set id, and an earlier
+   > version of this paragraph implied otherwise while claiming to "prove
+   > identity" — R6 adversarial I-1.** Comparing against the set id is a
+   > **20-bit** check: 1 in 1,048,576 by accident, and **under a second to
+   > construct deliberately** — 2^20 double-SHA-256 operations. `mt verify`
+   > would then report that the plate holds a transaction it does not hold,
+   > using the words *"prove identity"*. Nothing forces the narrow compare:
+   > `mt` is holding the whole reassembled transaction, so the full txid is
+   > free.
+   >
+   > **A supplied PSBT is compared against its EXTRACTED transaction**, per
+   > §10.13(c) — the same resolution that section already made, for the same
+   > reason: a PSBT holds two transactions whose txids differ for every legacy
+   > and `sh(wsh(…))` input, so leaving the basis unstated lets `--transaction`
+   > report a **mismatch on the correct transaction**.
 
    **`inspect` reports what is IN the artifact**: chunk count and indices, the
    set id, and the decoded transaction's own facts — outputs, fee, locktime,
@@ -465,9 +507,29 @@ overturned an earlier assumption and are marked.
    are opposite situations for a recoverer and `gettxout` alone conflates them —
    it returns a bare `null` for both.
 
+   **BEFORE CLASSIFYING ANY INPUT, `mt` ASKS WHETHER THIS TRANSACTION ITSELF
+   ALREADY CONFIRMED** — `getrawtransaction <our txid> true`. If it did, the
+   status is **SPENT — ALREADY CONFIRMED**, naming the block, and no input is
+   classified at all.
+
+   > **Without that first question the table reports the SUCCESS case as the
+   > theft case — R6 adversarial I-8.** A plate broadcast in 2029 and confirmed
+   > has every input spent (by itself) and every parent confirmed, so
+   > `gettxout` returns `null` and `getrawtransaction` finds the parents: the
+   > DEAD row fires and prints *"the input was spent by someone else. The plate
+   > is scrap."* **Someone else did not take the money — the operator's own
+   > payment went through.** The recoverer is told a theft occurred, on the
+   > happiest path this artifact has.
+   >
+   > It is cheap because `mt` already holds the txid (§1.1's `TX` row), and it
+   > is checked **first** because every other row is a guess about *why* the
+   > inputs are gone. Knowing they were spent by *this* transaction answers
+   > that question exactly, and the remaining states only make sense once it
+   > has been ruled out.
+
    | state | how `mt` knows | what the recoverer does |
    | --- | --- | --- |
-   | **LIVE** | `gettxout` returns a value | broadcast it |
+   | **LIVE** | `gettxout` returns a value | the input is unspent **in the UTXO set**. A conflicting spend may already sit in a mempool this node did not consult — see below |
    | **DEAD** | `null`, **and** the parent is **CONFIRMED** (`getrawtransaction <parent> true` returns `confirmations ≥ 1`) | the input was spent by someone else. **The plate is scrap** |
    | **PENDING** | `null`, and the parent is **not found — or is found only in the mempool** | the parent has not confirmed. **The plate may still become live** — find out what happened to the parent |
    | **UNKNOWN** | `null`, and no `-txindex` | `mt` cannot distinguish DEAD from PENDING and says so |
@@ -479,6 +541,26 @@ overturned an earlier assumption and are marked.
    it is not — never printing DEAD on evidence that cannot distinguish it from
    PENDING.
 
+   > **LIVE MEANS "UNSPENT IN THE UTXO SET", NOT "UNSPENT" — R6 adversarial
+   > I-3.** `include_mempool` is `false` by ruling (§6a), so `gettxout` answers
+   > from the UTXO set only. If someone has already broadcast a conflicting
+   > spend that is sitting unconfirmed, `gettxout` still returns a value, LIVE
+   > fires, and the old action column said **"broadcast it"** — sending a
+   > recoverer into a race `mt` has told them they already won.
+   >
+   > **§6a knew the mechanism and the table did not inherit it:** *"a
+   > mempool-spent input reads as unspent, which is the opposite of the caution
+   > this section argues for."* That was recorded as an encode-time limitation,
+   > and the four-state table, added later, carried no trace of it — the same
+   > shape as the encode-shaped offline warning.
+   >
+   > **Qualified rather than re-queried**, on the operator's standing ruling
+   > that `mt` guarantees nothing and names what it could not check. Switching
+   > the liveness report to `include_mempool = true` was the alternative and is
+   > rejected here: it would give one RPC two behaviours depending on caller,
+   > and §8.5's refusal genuinely wants `false` for the drawer-years reason
+   > §6a gives.
+   >
    > **Telling a recoverer their plate is scrap when it is merely early is the
    > worst error available here**, because it is the one that gets a live plate
    > thrown away.
@@ -531,20 +613,42 @@ overturned an earlier assumption and are marked.
        OUT       1 output
                    bc1p8rrz...s6n0vcl        0.05000000 BTC
        FEE       0.00012000 BTC   (12 sat/vB over 1000 vB)
-       LOCKTIME  block 1383520, ~FALL 2034   current height 1402887 — PASSED
+       LOCKTIME  block 1383520, ~FALL 2034   current height 1402887
        INPUTS    1 input
                    9a3f21c0:0   0.05012000 BTC   from node       LIVE
-       STATUS    LIVE — every input is unspent
+       STATUS    LIVE — every input unspent in the UTXO set (mempool not
+                 consulted; a conflicting spend may already be in flight)
 
    | row | present when | source |
    | --- | --- | --- |
    | `mt1 SET` | the caller had strings — `inspect`, `decode`, `verify` | the chunk headers (§10.13 a2) |
    | `TX` | **always** | the **txid** — double-SHA-256 of the decoded transaction **with marker, flag and witnesses stripped**. Needs no node and no network. **Not** a hash of the engraved bytes; see the note below |
    | `OUT` | **always** | the transaction itself |
-   | `FEE` | a node is reachable, **or** the input was a PSBT carrying values | inputs minus outputs — and the transaction alone does not carry input values (§6a) |
-   | `LOCKTIME` | **always**; the `current height` clause needs a node | `nLockTime`, plus §8.4's threshold rule and the season projection |
+   | `FEE` | a node is reachable, **or** the input was a PSBT carrying values | inputs minus outputs — the transaction alone carries no input values (§6a). **Carries the WEAKEST provenance of any input, inline**: `(CLAIMED — no input value verified)` when any input's value is neither chain-fetched nor txid-bound |
+   | `LOCKTIME` | **always**; the `current height` clause needs a node | `nLockTime`, plus §8.4's threshold rule and the season projection. **Wording is §8.4's five normative spellings, by reference — this row may not invent a sixth** |
    | `INPUTS` | **always**; the value and provenance columns need a node | outpoints from the transaction, values from `gettxout` |
    | `STATUS` | **always** — `UNKNOWN` with no node | the four-state liveness table above |
+
+   > **THIS BLOCK PRINTED A VERDICT §8.4 FORBIDS — R6 adversarial I-4, and it
+   > is the same drift as I-8 in the opposite direction.** The `LOCKTIME` row
+   > ended `— PASSED`, which is not among §8.4's five permitted spellings, and
+   > §8.4 exists to establish that **`mt` cannot make a claim about
+   > spendability at all**: a BIP-68 relative timelock lives in `OP_CSV` inside
+   > the witness script, a relative-locked spend carries `nLockTime = 0`, and
+   > reading it means evaluating the sending wallet's script — out of scope by
+   > ruling.
+   >
+   > **This project's own RCW fixture has exactly such a leaf** (`OP_CSV`,
+   > 32,768 blocks, ~7 months). A transaction spending it with `nLockTime` at a
+   > height already reached would print `— PASSED` and `LIVE`, and be rejected
+   > as non-final for months. §8.4 calls that *"false reassurance … the worst
+   > failure available here"*, closed it in its own text — **and §1.1 reopened
+   > it by printing a verdict in an example.**
+   >
+   > `— PASSED` is deleted, and the row is bound to §8.4 by reference so the
+   > two cannot drift again. **A section that declares itself normative can
+   > overrule another section by accident**, which is an argument for binding
+   > by reference rather than restating.
 
    **Three rules govern every row, and they are what make the report honest:**
 
@@ -552,12 +656,30 @@ overturned an earlier assumption and are marked.
       Omission and ignorance look identical on a terminal, and the reader cannot
       tell a row that was skipped from one that never existed. §6a's warning
       then enumerates every `UNKNOWN` and names both ways to resolve them.
-   2. **Read and verified are visually distinct, always.** `TX`, `OUT` and
-      `LOCKTIME` come off the plate; `FEE`, the input values and `STATUS` come
-      off the chain. A report where those look alike is the failure §6a's
-      recovery warning exists to prevent — it is *"what the transaction SAYS"*
-      versus what is confirmed, and an offline report is fully populated in the
-      first column and empty in the second.
+   2. **Read and verified are visually distinct, and there are THREE classes,
+      not two.** `TX`, `OUT` and `LOCKTIME` come off the plate. `STATUS` and
+      chain-fetched values come off the chain. **Between them sits
+      operator-asserted or PSBT-claimed data, which nothing checked** — §10.10
+      already enumerates all three (*"chain-fetched (§6a), txid-bound (§8.2d),
+      or operator-asserted (§8.2c)"*) and this rule collapsed them to two.
+
+      > **The collapse put an unverified number in the verified column — R6
+      > adversarial I-5.** Air-gapped `mt encode`, the constellation's own
+      > posture: a PSBT carries `witness_utxo` for a segwit input claiming
+      > 1.0 BTC. No node, so §6a's comparison does not run. Not legacy, so
+      > §8.2d's txid binding does not apply. §8.2c's warning fires *"when, and
+      > only when, the value is bound by nothing"* — and the spec treats a
+      > segwit amount as bound **by the signature**. But **§8.2's removal means
+      > `mt` verifies no signature**, so that binding is asserted and never
+      > computed. This is precisely the defect §8.2d was created to close for
+      > legacy inputs, reappearing on the segwit side.
+      >
+      > The number the operator uses to decide whether to spend 21 minutes a
+      > plate was therefore printed as chain-verified with no warning anywhere.
+      > **Honest bound, stated rather than hidden:** a wrong `witness_utxo`
+      > also invalidates the signature, so the transaction cannot confirm —
+      > §7's accepted hazard. **The wrong number stands regardless**, and it is
+      > the number that drives the decision.
    3. **`encode` appends, never edits.** Its two extra rows go **below**
       `STATUS`, so the operator's view is the recoverer's view plus a suffix:
 
@@ -621,11 +743,39 @@ overturned an earlier assumption and are marked.
    the recoverer's last step is always a broadcast. So `decode` hands them
    exactly what the next command wants:
 
-       mt decode < plates.txt | xargs bitcoin-cli sendrawtransaction
+       mt decode < plates.txt > tx.hex \
+         && bitcoin-cli sendrawtransaction "$(cat tx.hex)"
 
    This closes the pipe `mt` sits in the middle of: **hex or PSBT in
    (§8.2e), `mt1` strings onto steel, hex back out.** Everything human goes to
    stderr at both ends, so the pipe stays clean.
+
+   **`decode` WRITES NOTHING TO STDOUT UNLESS EVERY CHECK IN THE TABLE ABOVE
+   PASSES, and exits non-zero otherwise.** Stated normatively because it was
+   not stated at all — R6 adversarial I-2.
+
+   > **The gap shipped a documented path that broadcasts a transaction failing
+   > `mt`'s own integrity check.** `decode`'s required steps end with *"prove
+   > the result is the right transaction"*, and nothing said what happens when
+   > that fails. An implementer could reasonably print the hex with a warning
+   > on stderr — consistent with §8.2e's *"`mt` never refuses the bytes"*. Then
+   > the spec's own flagship one-liner ran it through `xargs`, **which consumes
+   > stdout only and is blind to both stderr and the exit code**.
+   >
+   > That contradicted, in the same section, the justification given for
+   > `decode` printing its report at all: *"no path through this tool
+   > broadcasts a transaction the operator was never shown."* The tool shipped
+   > exactly such a path, in a copy-pasteable line.
+   >
+   > **So the one-liner changed too**, above: `> tx.hex && …` respects the exit
+   > code where `| xargs` cannot. **An example command is specification** —
+   > people run what is printed, and a pipeline that cannot observe failure
+   > teaches a habit no amount of normative prose undoes.
+   >
+   > **This does not conflict with §8.2e.** That ruling is about `mt` never
+   > refusing to *read* bytes on the way IN; this is about what `mt` vouches
+   > for on the way OUT. Reading anything and emitting only what verifies are
+   > the same posture, not opposite ones.
 
    **`decode` PRINTS THE INSPECTION SUMMARY ON `stderr`, and does not stay
    silent.** Operator ruling 2026-08-23, from walking Journey B. The reasoning
@@ -640,11 +790,12 @@ overturned an earlier assumption and are marked.
    destination, the amount and the locktime is whatever the chain does with it.
 
    So `decode` emits **§1.1's `inspect` report on `stderr`** while the hex
-   goes to stdout. This costs the pipe nothing — `mt decode < plates.txt | xargs
-   bitcoin-cli sendrawtransaction` is byte-identical either way, because §0a's
-   boundary is what makes the summary free — and it means **no path through this
-   tool broadcasts a transaction the operator was never shown.** `--quiet`
-   suppresses it for scripted use; the default is loud.
+   goes to stdout. This costs the pipe nothing — stdout is byte-identical either
+   way, because §0a's boundary is what makes the summary free — and combined
+   with §1.1a's rule that **stdout stays empty unless every check passes**, it
+   means no path through this tool broadcasts a transaction the operator was
+   never shown. `--quiet` suppresses the report for scripted use; the default is
+   loud, and `--quiet` does **not** relax the stdout rule.
 
    > **`inspect` remains the verb, and `decode` remains a pipe fitting.** This
    > is not a merge. `inspect` is the one that reports *without* handing over
@@ -1874,8 +2025,22 @@ exactly as permanent, as a machine-engraved one.
 
    A finalized PSBT in the MIN form normally carries every input's UTXO record
    (§3), so `mt` computes the fee itself and asks for nothing. Where a record is
-   absent, `mt` requires the operator to supply that input's value — or the total
-   across all inputs — since §8.2b cannot check the value balance without it.
+   absent, `mt` requires the operator to supply **that input's value, per input** —
+   since §8.2b cannot check the value balance without it.
+
+   > **The alternative "or the total across all inputs" was deleted — R6
+   > adversarial I-6 — because it is two rules wearing one sentence.** Two
+   > inputs: input 0 is txid-bound at 1.0 BTC (§8.2d), input 1 carries nothing,
+   > and the operator supplies *the total*, 2.0 BTC, against 1.99 BTC of
+   > outputs. Reading A — the supplied total **is** the input sum — gives a fee
+   > of 0.01 BTC. Reading B — it is **added** to the already-bound inputs —
+   > gives 1.01 BTC. **The same sentence states both**, one is wrong by an
+   > entire input, and which one an implementer picked decides whether §8.2b's
+   > `AbsurdFeeRate` and its `inputs ≥ outputs` refusal fire at all.
+   >
+   > Per-input is what every neighbouring rule already requires — §8.2b, §8.2d,
+   > §6a's per-input comparison, and the report's per-input `INPUTS` rows — so
+   > the alternative bought nothing and cost a wrong fee.
 
    **The legacy warning fires only when the value is UNBOUND** — not on every
    legacy input. R3's information lens found the earlier rule actively harmful:
