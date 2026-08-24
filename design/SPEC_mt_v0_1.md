@@ -2692,10 +2692,11 @@ exactly as permanent, as a machine-engraved one.
    > `sh(wsh(…))` is therefore no longer an unclassified case: wrapped-segwit
    > inputs are segwit inputs, and every input type is accepted.
 
-7. **Over the plate budget (`mt qr`)** → refuse, naming the exact plate count
-   and what would fit. **Deferred with the verb (§0a).** **"Plate budget" means the operator's stated maximum
-   plate count**, which `mt` compares against §4's search result; there is no
-   fixed number, because §4's answer depends on module size, ECC and tiling.
+7. **MOVED — see `design/SPEC_mt_qr_DEFERRED.md`.** The `mt qr` plate-budget
+   refusal. It cannot fire in v0.1 — the verb that would trip it is deferred (§0a)
+   — and it was moreover **unrunnable as written**: R6 found its threshold has no
+   input path, and a refusal whose threshold cannot be supplied is not a refusal.
+   The number is kept so §8.7b's base and every citation still resolve.
 
 7b. **Over the 4,096-chunk ceiling** → refuse, naming the chunk count and the
    ceiling. Both verbs share it, since both use `mt1`'s header (§3).
@@ -2712,38 +2713,11 @@ exactly as permanent, as a machine-engraved one.
    > were wrong: 64 was `md-codec`'s 6-bit field, never `mt1`'s (§3's
    > correction), and at 4,096 the artifact is nowhere near the limit. It also
    > pointed at `mt qr` *"which has no such limit"* — both verbs share it.
-7c. **Over the `sysw` section ceiling (`mt qr`)** → refuse. **Deferred with the
-   verb (§0a); no v0.1 behaviour depends on it.** `MAX_SECTION_LEN =
-   8191` (`crates/me-cli/src/sysw/wire.rs:42`), inherited from EPD. **This is a
-   hard transport limit §4's search knows nothing about**, so a transaction can
-   pass every plate-count check and still be unsendable.
+7c. **MOVED — see `design/SPEC_mt_qr_DEFERRED.md`.** The `sysw` section-ceiling
+   refusal (`MAX_SECTION_LEN = 8191`). Deferred with the verb (§0a); no v0.1
+   behaviour depends on it, and it still **cannot carry a number** until the
+   record framing is chosen — four candidate framings give four ceilings.
 
-   **This refusal cannot carry a NUMBER until the record framing is chosen, and
-   two earlier attempts to give it one were both wrong — R4 lens 2.** The
-   ceiling counts **record text**, so the largest admissible PSBT depends
-   entirely on how a chunk is framed into a record. Four candidate framings give
-   **four different ceilings — 3,671 / 4,094 / 4,476 / 4,525 B** — and none is
-   the 4,537 B computed here previously.
-   **The only EPD-conformant candidate refuses §4's own largest artifact by
-   322 B**, which would mean the biggest wallet this spec measures cannot reach
-   the machine at all.
-
-   > **Its two previous numbers, recorded because the pattern matters more than
-   > either.** First *"roughly 40% headroom"*, from comparing QR-capacity
-   > **bytes** against a cap counting **characters**. Then *"15.4%, ceiling
-   > ~4,537 B"*, arithmetically sound but computed against a record framing the
-   > spec had never chosen. Three numbers, three unstated assumptions. The fix is
-   > not to compute more carefully — it is that **§10.9's record framing is a
-   > prerequisite for this refusal**, and until it is settled the refusal is
-   > stated as a rule with its threshold named as pending.
-
-   > **An earlier version of this refusal said "roughly 40% headroom", and that
-   > was wrong by a units error — R3 lens 3.** It compared the artifact's
-   > **QR-capacity bytes** against a cap that counts **record text characters**.
-   > The mistake is instructive because it flattered the design in the same
-   > commit that discovered the ceiling: a 40% margin invites "no need to model
-   > this", while 15% is close enough that §4's search and this refusal must be
-   > reconciled rather than left independent (§10.14's regeneration).
 8. **Module size is the operator's choice, defaulting to 0.60 mm** — not a
    refusal. Ruling 2026-08-23 (§10.1): `mt` offers every size it can engrave and
    suggests 0.60 mm (two engraved strokes). Sizes below that are **optically
@@ -2864,9 +2838,15 @@ signed PSBT.
     | --- | --- |
     | verbs | **`encode`**, `decode`, `verify`, `inspect` — matching `md` and `mk` |
     | **input** | a finalized PSBT (preferred) **or a raw signed transaction** (§8.2e) — from a **file or stdin**, never a command-line argument (§8.2f) |
-    | `mt qr` output | a **SH2 payload** (`sysw`) carrying the QR — machine engraving |
-    | `mt encode` output | the **codex32 string on stdout** — hand engraving |
+    | `mt encode` output | the **codex32 string on stdout**, lowercase, ungrouped — hand engraving |
     | stderr | every warning and refusal a human must see (§3b) |
+
+    > **A `mt qr` output row sat in this table until 2026-08-23, and the table
+    > CONTRADICTED ITSELF:** the `verbs` row lists `encode`, `decode`, `verify`,
+    > `inspect` — `mt qr` is not among them — while the row below described what
+    > `mt qr` emits. **A CLI surface cannot describe the output of a verb it
+    > does not offer.** The row moved to `design/SPEC_mt_qr_DEFERRED.md` with
+    > the rest of the deferred material.
     | flags | **none for locktime** (§8.4) |
 
     **Why a PSBT is PREFERRED — not required. §8.2e superseded the PSBT-only

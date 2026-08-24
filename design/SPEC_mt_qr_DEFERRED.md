@@ -249,3 +249,68 @@ The 0.30 mm results are recorded for when the plate exists.
     new `Class`:** it lands in `me-cli`'s Rust `sysw` with test vectors first,
     then ports to the fork's Go.
 
+---
+
+## Refusals carried over from `SPEC_mt_v0_1.md` §8
+
+> **§8.7 and §8.7c are refusals only `mt qr` can trip.** They were numbered
+> entries in the live refusal list while the verb that would reach them does not
+> ship — and §8.7 was additionally **unrunnable as written**: R6 found its
+> threshold (the operator's stated maximum plate count) has no input path, and
+> a refusal whose threshold cannot be supplied is not a refusal.
+>
+> **§8.7b stayed in the parent.** The 4,096-chunk ceiling comes from `mt1`'s
+> own header, so **both verbs share it** — it is not QR material despite sitting
+> between these two.
+>
+> Numbers preserved: the parent keeps `7.` and `7c.` as pointers, which is also
+> what keeps `7b.` from becoming an orphan suffix with no base item.
+
+7. **Over the plate budget (`mt qr`)** → refuse, naming the exact plate count
+   and what would fit. **Deferred with the verb (§0a).** **"Plate budget" means the operator's stated maximum
+   plate count**, which `mt` compares against §4's search result; there is no
+   fixed number, because §4's answer depends on module size, ECC and tiling.
+
+7c. **Over the `sysw` section ceiling (`mt qr`)** → refuse. **Deferred with the
+   verb (§0a); no v0.1 behaviour depends on it.** `MAX_SECTION_LEN =
+   8191` (`crates/me-cli/src/sysw/wire.rs:42`), inherited from EPD. **This is a
+   hard transport limit §4's search knows nothing about**, so a transaction can
+   pass every plate-count check and still be unsendable.
+
+   **This refusal cannot carry a NUMBER until the record framing is chosen, and
+   two earlier attempts to give it one were both wrong — R4 lens 2.** The
+   ceiling counts **record text**, so the largest admissible PSBT depends
+   entirely on how a chunk is framed into a record. Four candidate framings give
+   **four different ceilings — 3,671 / 4,094 / 4,476 / 4,525 B** — and none is
+   the 4,537 B computed here previously.
+   **The only EPD-conformant candidate refuses §4's own largest artifact by
+   322 B**, which would mean the biggest wallet this spec measures cannot reach
+   the machine at all.
+
+   > **Its two previous numbers, recorded because the pattern matters more than
+   > either.** First *"roughly 40% headroom"*, from comparing QR-capacity
+   > **bytes** against a cap counting **characters**. Then *"15.4%, ceiling
+   > ~4,537 B"*, arithmetically sound but computed against a record framing the
+   > spec had never chosen. Three numbers, three unstated assumptions. The fix is
+   > not to compute more carefully — it is that **§10.9's record framing is a
+   > prerequisite for this refusal**, and until it is settled the refusal is
+   > stated as a rule with its threshold named as pending.
+
+   > **An earlier version of this refusal said "roughly 40% headroom", and that
+   > was wrong by a units error — R3 lens 3.** It compared the artifact's
+   > **QR-capacity bytes** against a cap that counts **record text characters**.
+   > The mistake is instructive because it flattered the design in the same
+   > commit that discovered the ceiling: a 40% margin invites "no need to model
+   > this", while 15% is close enough that §4's search and this refusal must be
+   > reconciled rather than left independent (§10.14's regeneration).
+
+---
+
+## The CLI-surface row, carried over from `SPEC_mt_v0_1.md` §10.10
+
+| `mt qr` output | a **SH2 payload** (`sysw`) carrying the QR — machine engraving |
+
+> Removed from the live CLI-surface table because that table's own `verbs` row
+> lists `encode`, `decode`, `verify`, `inspect` and **not** `qr` — so it was
+> describing the output of a verb it did not offer. It belongs with the verb.
+
