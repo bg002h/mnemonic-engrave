@@ -777,9 +777,37 @@ blobs, and §4.3's mandatory post-cut test — *scan the QR, then `mt inspect`* 
 would be handed a **truncated transaction on every plate but the last**, reporting
 failure on a correct plate.
 
-**Structured Append is QR's own standard for this.** Each symbol carries its
-index, the total count, and a parity byte over the whole message; standard
-decoders reassemble it themselves. So it keeps F-234's promise **intact for
+**Structured Append is QR's own standard for this.** Each symbol carries a
+20-bit header ahead of its data (ISO/IEC 18004):
+
+```
+0011        mode indicator, 4 bits   "this symbol is part of a set"
+index       4 bits    which symbol this is, 0-based
+count-1     4 bits    how many there are  -- and this 4-bit field is WHERE THE
+                      16-SYMBOL CAP COMES FROM (see the cap discussion below)
+parity      8 bits    XOR of every byte of the ORIGINAL undivided message
+```
+
+**THREE OPERATIONAL CONSEQUENCES, and the spec must state them because the
+operator acts on them:**
+
+1. **The order lives INSIDE each symbol, never on the plate.** Not the legend,
+   not the plate numbering, not the operator's memory. A symbol says "I am 3 of
+   6" in its own data.
+2. **SCAN ORDER IS IRRELEVANT.** A standard decoder collects symbols, sorts by
+   index and concatenates, so plate 4 may be scanned before plate 1. **§4.3's
+   per-job instruction must say so**, or an operator will assume a sequence they
+   must preserve — and will believe they have ruined the set when they scan out
+   of order.
+3. **The parity byte is identical across a set**, so a decoder detects a symbol
+   from a *different* transaction mixed in. That is the drawer-of-plates failure,
+   and it is caught by the format rather than by the operator.
+
+**SYMBOL INDEX IS NOT PLATE NUMBER.** With `4 up` tiling plate 1 carries symbols
+1–4, so `PLATE n OF m` (for humans, §4.5a) and the symbol index (for decoders)
+are different numbering over different things. **They must never be presented as
+the same number**, and §4.3a's per-plate instruction is a function of what is on
+*that plate*, not of the symbol index. So it keeps F-234's promise **intact for
 multi-symbol jobs** — a recoverer with an ordinary scanner still gets the
 transaction, with no constellation knowledge — which no bespoke header could do.
 
@@ -946,7 +974,10 @@ not of the job's symbol count:
   legible and complete, which is the operator's eyes
 
 **And the per-JOB instruction stays keyed to the job**: after the last plate,
-scan every symbol and run `mt inspect` once.
+scan every symbol and run `mt inspect` once. **It MUST say that order does not
+matter** (§4.2a) — Structured Append sorts by index, so an operator who scans out
+of sequence has done nothing wrong, and one who believes otherwise will re-cut a
+good set.
 
 **NORMATIVE, and this is what closes C1's walkthrough:**
 
