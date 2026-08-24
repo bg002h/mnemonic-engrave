@@ -129,7 +129,12 @@ gate that has never run is a hypothesis, not a gate.
 
 ### P0 — skeleton
 
-**Deliverable.** `mnemonic-transaction` exists with two crates, workspace lints
+**Deliverable.** The **spec and its pinned vector are copied into
+`mnemonic-transaction`** — `design/SPEC_mt_v0_1.md` and the vector file — because
+P5's exhaustiveness gate and P6's journeys read them and **no phase put them
+there** (R8 coverage I-12). They are copied with the commit SHA they came from
+recorded alongside, so drift against `mnemonic-engrave` is a `git diff` and not
+a guess. `mnemonic-transaction` exists with two crates, workspace lints
 matching the constellation, CI running `cargo nextest run --locked`, and
 `[profile.test] opt-level = 2` / `[profile.dev] opt-level = 2` (keeps
 `debug_assertions` — do **not** use `--release` to speed tests).
@@ -143,6 +148,12 @@ is not touched by this plan at all.
 **Gate.** `cargo build --locked`, `cargo clippy --all-targets -- -D warnings`,
 and `cargo fmt --check`. **`cargo nextest run` is deliberately NOT part of this
 gate.**
+
+> **From P1 onward the gate is the WHOLE validation surface, not one crate —
+> R8 gates I12.** `cargo nextest run --locked` unqualified, plus clippy and fmt,
+> across the workspace. A per-phase gate scoped with `-p mt-codec` reports green
+> while the CLI crate is broken, and this constellation's rule is that reviews
+> run against the whole surface rather than the slice a phase touched.
 
 > **Because it would fail — measured, not reasoned about.** Since nextest
 > 0.9.85 the default is `--no-tests=fail`, and on the installed **0.9.140** a
@@ -180,11 +191,22 @@ generalise-or-fork decision `mt` faces; `md` has only ever been first.
 Normative content, all from the spec — **this plan restates none of it as new
 decisions**:
 
-- header 49 bits: `version(4) + chunked(1) + chunk_set_id(20) + count−1(12) + index(12)` (§10.13 a2)
+- **HRP = `"mt"`, not `"mt1"`** — the `1` is bech32's separator (§10.13 b). Stated because it is one of the values §10.13(a2) flags as a guess-hazard, and it feeds `hrp_expand` on both the create and verify sides
+- header **55 bits = 11 symbols, every field a whole number of symbols** (§10.13 a2):
+  `version(5) + chunk_set_id(20) + count−1(15) + index(15)`.
+  **There is no `chunked` bit** — it was deleted as dead, and it is what used to break alignment
+- `version = 0b00001`; **`count` stores `count − 1`** (a set of 1 stores `0`), `index` is plain and zero-based
+- **no bit packer**: every field is a whole number of 5-bit symbols, so the header is built by pushing symbols
 - `MT_REGULAR_CONST = 0x1a2fc877f9528d7c1`, from `"shibbolethnumstransaction"` (§12.22)
 - `count = ceil(payload_len / 40)`; `bytes_per_chunk = ceil(payload_len / count)`; last chunk takes the remainder (§3b)
 - content id = **top 20 bits of the txid in display form** (§10.13 c)
 - BCH(93,80,8), `t = 4` per chunk (§3a)
+
+> **This block said "49 bits, `version(4) + chunked(1) + … count−1(12) +
+> index(12)`" until 2026-08-23** — the layout two wire-format rulings had
+> already replaced. The spec was updated and the plan was not, which is the
+> propagation failure this cycle keeps producing: **an implementer following the
+> plan would have built a header no conforming decoder could read.**
 
 **Tests first. The pinned vector is the phase's whole point; the rest are
 tripwires:**
@@ -203,8 +225,14 @@ tripwires:**
    assert it is not silently accepted. R8 gates C5: the round-trip gate uses
    *clean* vectors, so the residue is zero and **the correction path is never
    entered** — nothing else in this plan proves the format's whole purpose works.
-5. Chunking property test: for random payload lengths, `count`, `bytes_per_chunk`
-   and the reassembled payload round-trip, and no chunk exceeds 40 bytes.
+5. **Chunking property test that distinguishes BALANCED from FILLED** — R8
+   gates I2. For random payload lengths, assert **every chunk but the last is
+   exactly `ceil(len/count)` bytes** and the last is the remainder, not merely
+   that no chunk exceeds 40. A *filling* chunker also round-trips and also stays
+   under 40, so the previous test passed on the exact divergence §3b was written
+   to close: a filler and a balancer produce different chunk boundaries, and
+   §1.1e's mandatory length check then reads the other implementation's strings
+   as damaged steel.
 
 **Gate.** `cargo nextest run --locked -p mt-codec` green, **including the pinned
 vector and the within-budget correction test**.
@@ -223,10 +251,32 @@ matches the spec's pinned vector**.
 **Deliverable.** Input handling and string output.
 
 - the ordered sniffing procedure — binary PSBT before whitespace removal, then base64, then hex (§8.2e)
+- **an input path for every operator-supplied value §10.10 requires** — R8
+  coverage I-5. Per-input values (§8.2c), the `FROM`/`TO` identities, the
+  free-text `TO` label behind its own flag (§10.4), and the node location.
+  **A refusal whose threshold cannot be supplied is not a refusal**, and §10.10
+  lists five such inputs with no way to provide any of them. Flag *spellings*
+  remain open; the *paths* are P2's to build
 - normalisation to **lowercase**; stdout is lowercase, ungrouped (§1.1e, §10.10)
+- **1-based chunk numbers and 1-based positions in ALL human-facing output**,
+  with `position = codeword_index + 4` (§1.1) — R8 coverage I-11. Wire `index`
+  is 0-based and appears nowhere in output. This is the rule whose violation
+  sends an operator to re-cut the wrong string
+- **exit code 0 means every check passed**, non-zero otherwise (§10.10) — the
+  documented `decode` pipeline depends on it
 - optional grouping, opt-in, **stdout only**
 - **`--elide-prefix`** — first string full, rest carry `index + payload` only (§3b)
-- the `stderr` legend suggestion, six fields including `FORMAT: mt1 codex32` (§5)
+- the `stderr` legend suggestion — **five** fields including
+  `FORMAT: mt1 codex32` (§5). *(Six until `PLATE n OF m` was deleted on
+  2026-08-23; this line said six, another spec change the plan did not inherit.)*
+- **the three mandatory `stderr` blocks, which no phase owned — R8 coverage
+  I-3.** All three are ruled and all three are what the operator actually reads:
+  the **BEARER warning** carrying both halves (what `mt` checked, that it reads
+  witness *shape* rather than script, and that an exotic input can defeat it —
+  §5); the **"what correction does and does not cover"** block, printed
+  **always, before cutting** (§1.1e); and the **"verify the STEEL, not this
+  output"** instruction (§1.1), without which an operator verifies the file
+  `mt` just produced and tests nothing that can fail
 - the `CUT` and `PREFIX` rows appended to the report (§1.1)
 
 **Tests first.** One test per sniffing branch **including the failure branch**,
@@ -234,7 +284,25 @@ each asserting the *message* names what was seen; a test that a hex-encoded PSBT
 is refused with the message naming the real problem; a test that grouping never
 reaches a non-stdout consumer.
 
-**Gate.** `mt encode` on each P1 vector reproduces the vector's strings exactly.
+**Deliverable, and P5 and P6 both consume it: the FIXTURE CORPUS.** R8 coverage
+I-8 — no phase created it. `tests/fixtures/` holds the malformed and awkward
+inputs §8.2e's procedure and §8's refusals are tested against: a binary PSBT, a
+base64 PSBT, line-wrapped base64, CRLF and trailing-newline variants, uppercase
+hex, a `0x`-prefixed hex, a hex-encoded PSBT, a raw signed transaction, and one
+PSBT per refusal that must fire. Built here because P2 is the first phase that
+reads input at all.
+
+**Gate.** `mt encode` on each P1 vector reproduces the vector's strings exactly,
+**and every fixture is either accepted or refused with the ruled message**.
+
+> **P2's gate as first written would have started failing once P5 landed — R8
+> coverage I-13.** P1's vectors are transactions, and they carry **no input
+> values**; once §8.2c's warning and §8.2b's balance refusal exist, encoding a
+> bare vector emits warnings the gate did not expect, and a refusal-bearing
+> vector fails outright. The vectors therefore come in two kinds from P1
+> onward: **clean** ones that must encode silently, and **refusal fixtures**
+> that must be rejected by name. A gate that passes in one phase and breaks in a
+> later one is a gate nobody will trust by the time it matters.
 
 ### P3 — `decode` and `verify`
 
@@ -260,7 +328,22 @@ deliverable, no test and no gate is a verb nobody has agreed to build.
   reassembled transaction **re-derives that id**
 - it **reports its margin, not just its verdict** (§1.1) — per corrected chunk,
   the count against `t = 4`, the 1-based positions, and each symbol's
-  before-value, ordered so the nearest-to-limit chunk is visible
+  **before-value**, ordered so the nearest-to-limit chunk is visible
+
+  > **This was assigned to no phase — R8 coverage I-2 — and it is the Critical
+  > the journey walk found.** A plate miscut in four places passes `verify` as
+  > OK while sitting **one scratch from unrecoverable**, with zero redundancy
+  > behind it. A verdict that hides how much of its budget it just spent tells
+  > the operator the opposite of what they need. The **before-value** is the
+  > load-bearing part: `pos 29 read v corrected to d` is settled against the
+  > steel in seconds — if position 29 reads `d` they mistyped, if it reads `v`
+  > they miscut — and a report giving only counts and positions leaves them
+  > nothing to compare.
+
+- **the re-derivation FAILURE path** (§1.1): when every checksum holds and the
+  transaction still does not re-derive its id, report the ranked suspect list in
+  **descending correction order**, and state that the check identifies the
+  transaction rather than proving every byte
 - **`--transaction <psbt|hex>`** compares against the **full 32-byte txid** of the
   supplied transaction's *extracted* form (§1.1), never the 20-bit set id
 
@@ -305,9 +388,16 @@ chain queries.
 run air-gapped and deterministically. One fixture per liveness state, including
 the mempool-unconfirmed parent that must read PENDING and not DEAD.
 
-**Gate.** For one vector, the three callers' reports agree on **every row the
-§1.1 row-presence table says all three can produce**, and differ **only** where
-that table predicts — each difference asserted individually, not waved past.
+**Gate, run BOTH with node fixtures and offline.** For one vector, the three
+callers' reports agree on **every row the §1.1 row-presence table says all three
+can produce**, and differ **only** where that table predicts — each difference
+asserted individually, not waved past.
+
+> **Offline-only would pass vacuously — R8 gates I5.** With no node every
+> chain-derived row reads `UNKNOWN` for all three callers, so they agree
+> trivially and the gate proves nothing about the rows that matter. The
+> node-fixture run is where `FEE`, `STATUS` and the input provenance actually
+> differ, and therefore where the row table is actually tested.
 
 > **"Identically" was unsatisfiable, and §1.1's own table says why — R8
 > coverage C-4.** `FEE` is present *"when a node is reachable **or** the input
@@ -332,23 +422,70 @@ that table predicts — each difference asserted individually, not waved past.
 
 **Deliverable.** §8 in full, each refusal naming the number that caused it.
 
-**Tests first — one test per numbered refusal, and each must be shown to FAIL
-when the refusal is removed.** A refusal test that passes against code with the
-check deleted is testing nothing; this is the mutation discipline this
-constellation has already paid for twice.
+**Tests first — one test per refusal in `tests/refusals.toml`, and each must be
+shown to FAIL when the refusal is removed.**
+
+> **That discipline was prose with no executable form — R8 gates I6.** "Must be
+> shown to fail" is a thing a person does once and nobody re-runs. P5 commits
+> `scripts/mutate-refusals.sh`, which for each entry comments out the named
+> check, runs **only that refusal's test**, and asserts it goes **red** —
+> restoring the source afterwards. A refusal test that passes against code with
+> the check deleted is testing nothing, and this constellation has paid for that
+> lesson twice.
+>
+> **The script must fail loudly if a mutation does not apply.** A `sed` that
+> matches nothing leaves the code intact, the test passes, and the run reports
+> success — a *vacuous* control, which has already happened twice in this cycle
+> alone. Each mutation asserts it changed the file before the test runs.
 
 **Not implemented:** §8.7 and §8.7c — moved to the deferred QR spec, unreachable
 in v0.1.
 
-**Gate.** Every numbered refusal in §8 has a test, and a script asserts the
-**union is exhaustive** against the spec's numbering — so a refusal cannot be
-added to the spec and silently go untested.
+**Gate.** Every refusal on the **explicit list below** has a test, and a
+committed script asserts the union is exhaustive against that list — so a
+refusal cannot be added and silently go untested.
+
+> **The exhaustiveness gate had no well-defined input, which is three findings
+> with one cause — R8 coverage I-6, I-7 and gates I7.** "Every numbered refusal
+> in §8" is not a set a script can compute:
+>
+> - **§8's numbering contains non-refusals.** §8.2 (script validity) and §8.8
+>   are numbered items that are *not* v0.1 refusals; §8.7 and §8.7c are now
+>   pointers to deferred material. A script counting `^\d+[a-z]?\. ` in §8 would
+>   demand tests for four things that cannot fire.
+> - **A real refusal lives OUTSIDE §8's numbering.** §6a's value-mismatch
+>   refusal is normative and is not a numbered §8 item, so a §8-numbering script
+>   is **structurally unable to see it** — the one class an exhaustiveness gate
+>   exists to prevent.
+> - **The spec is in a different repository** (`mnemonic-engrave/design/`) from
+>   the crate under test (`mnemonic-transaction`), and no phase put it there —
+>   so the script had no file to read either. R8 coverage I-12.
+>
+> **The fix is a list, not a parser.** P5 commits
+> `tests/refusals.toml` in `mnemonic-transaction`, one entry per v0.1 refusal
+> with its spec §-reference and its test name, and the script asserts a
+> **bijection between that file and the tests that exist**. A parser over prose
+> in another repo is a gate that breaks on a heading edit; a checked-in list
+> breaks only when someone adds a refusal and forgets its entry, which is
+> exactly the failure to catch.
+>
+> **Adding a refusal to the spec therefore requires touching this file**, and
+> that is the point — the coupling is the mechanism, not an inconvenience.
 
 ### P6 — journeys
 
-**Deliverable.** The three walked journeys (§ the spec's own), as executable
-acceptance runs: the operator encoding a finalized PSBT, the 2040 recoverer with
-strings and nothing else, and the operator who miscuts and re-cuts.
+**Deliverable.** Three journeys as executable acceptance runs. **They are named
+here because they were named nowhere — R8 gates I13** ("§ the spec's own" was a
+placeholder, and no section enumerates them):
+
+| journey | the moment | what it asserts |
+| --- | --- | --- |
+| **A — encode** | operator pastes a finalized PSBT and cuts | the three mandatory `stderr` blocks appear, stdout is lowercase and ungrouped, the report matches §1.1 |
+| **B — recover** | 2040, `mt1` strings and **no legend**, no node | every row reads `UNKNOWN` rather than being omitted, the read-vs-verified split is visible, and the resolution line names **both** a node and a block explorer |
+| **C — miscut** | operator re-cuts one string, drawer holds both | duplicate resolution announces which candidate it discarded; the margin report gives positions **and before-values** |
+
+**Journey B runs with `--elide-prefix` output as well**, since that is the form a
+hand engraver most plausibly leaves behind.
 
 **Gate.** Each journey runs end to end as a script and asserts on **what the
 operator sees**, not only on exit codes.
@@ -405,10 +542,37 @@ implementation reads are three more places for the values to drift together.
    `md-codec` is not modified and there is no version bump, no publish decision
    and no upstream coordination. This question existed only because an earlier
    draft of this plan contradicted the `mk` precedent.
-2. **Where the four remaining spec open questions land.** §10 holds §10.10
-   (CLI surface — flag *spellings* only), §10.13, §10.14, §10.20. None blocks
-   P0–P2. **§10.10's spellings must close before P2 ships**, since P2 builds the
-   CLI.
-3. **Repo creation** — `mnemonic-transaction` does not exist yet. Creating a
+2. **§10.14 says its correction must land BEFORE implementation, and this plan
+   said it does not block P0–P2 — R8 gates I14.** Reconciled: §10.14 is the
+   legend budget resting on a doc comment rather than the fork's font metrics.
+   It binds **§5's plate-area material, which is deferred with `mt qr`**, and
+   `mt encode` reserves no area at all — so it does not block the live verbs.
+   **Stated rather than assumed**, because "does not block" was an assertion
+   with no reasoning attached.
+3. **Where the remaining spec open questions land.** §10 holds §10.10, §10.13,
+   §10.14 and §10.20.
+
+   > **This entry called §10.10 "flag *spellings* only" and that was false —
+   > R8 coverage I-10.** Two more things are open there, and one of them is a
+   > dependency of a later phase:
+   >
+   > - **the refusal-message format** — §8 promises every refusal will *"name
+   >   the number that caused it"*, and **P5 tests exactly that**. A test
+   >   asserting on a message format nobody has specified is a test written
+   >   against a guess.
+   > - **exit codes beyond 0** — `0 = every check passed` is now fixed
+   >   (§10.10 b), and the rest of the code space is not.
+   >
+   > **§10.13 is the header, NUMS constant and content id — the entire normative
+   > content of P1** (R8 gates I9). It is marked RULED rather than open, so
+   > nothing blocks; the entry is kept because a reader seeing "P1's content
+   > comes from an open question" deserves the resolution rather than the
+   > appearance of one.
+   >
+   > **Blocking order:** §10.10's spellings and refusal format must close
+   > **before P2 ships**; the refusal format again **before P5 writes a test
+   > against it**. Neither blocks P0 or P1.
+
+4. **Repo creation** — `mnemonic-transaction` does not exist yet. Creating a
    GitHub repo is an outward-facing action and needs the operator's go-ahead,
    including whether it starts private.
