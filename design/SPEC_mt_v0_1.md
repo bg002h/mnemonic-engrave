@@ -24,8 +24,10 @@ different ways:
 | **`mt encode`** | `mt1` chunked codex32, **on stdout** | **by hand**, or by any tool the operator chooses | raw signed transaction (§3b) | **4,096 chunks / 164 KB** |
 | ~~`mt qr`~~ | ~~QR symbols + legend~~ | **DEFERRED out of v0.1 — §0a** | | |
 
-`mt qr` decides how many symbols that takes, at what error-correction level,
-across how many plates, and what is engraved beside them. `mt encode` emits a
+`mt qr` decides how many symbols that takes and at what error-correction level.
+**Neither verb decides how the result is laid onto steel** — one string per
+plate, all of them on one, or any split, is the operator's choice or
+`mnemonic-engrave`'s (§0a). `mt encode` emits a
 character string with **BCH error correction**, so a hand engraver who cuts a
 character wrong can still recover the transaction.
 
@@ -618,8 +620,9 @@ overturned an earlier assumption and are marked.
    2026-08-23. `encode` does not compose its own version of §10.10's report — it
    invokes `inspect` on what it just produced and appends the rows only it can
    know: **how many strings to cut, and how many characters in total.**
-   `md inspect` cannot say how many plates an `md1` string takes either; that is
-   not the codec's business.
+   **It counts strings and characters, never plates** — `mt` cannot see how the
+   strings are laid onto steel, and `md inspect` cannot say how many plates an
+   `md1` string takes either. That is not a codec's business.
 
    > **The point of the ownership rule is that the two CANNOT DRIFT.** If
    > `encode` composed its own report, the operator's pre-engraving view and the
@@ -707,8 +710,9 @@ overturned an earlier assumption and are marked.
       > computed. This is precisely the defect §8.2d was created to close for
       > legacy inputs, reappearing on the segwit side.
       >
-      > The number the operator uses to decide whether to spend 21 minutes a
-      > plate was therefore printed as chain-verified with no warning anywhere.
+      > The number the operator uses to decide whether to cut the transaction
+      > at all was therefore printed as chain-verified with no warning
+      > anywhere.
       > **Honest bound, stated rather than hidden:** a wrong `witness_utxo`
       > also invalidates the signature, so the transaction cannot confirm —
       > §7's accepted hazard. **The wrong number stands regardless**, and it is
@@ -1700,9 +1704,12 @@ fields, **152 characters**, 6 lines — measured,
 > `PLATE n OF m` on the same day took it back to **6**, so the net is 5 fields,
 > **152 characters, 6 lines** and §4's reservation never moved. Free for `mt encode`, where the legend is `stderr` text
 > and `mt` owns no layout; **not** free for the deferred `mt qr` cycle, where
-> `legend.rs`'s own table shows a 7-line legend still fits one plate at v13 but
-> forces a second plate at v18 and above. That is a §0a-deferred cost, recorded
-> here so the QR cycle inherits it priced rather than as a surprise.
+> the legend briefly reached 7 lines, which `legend.rs` showed would have cost
+> the deferred QR cycle real area. **Deleting `PLATE n OF m` the same day took
+> it back to 6, so that cost never materialised** — the two edits were made
+> hours apart and neither knew about the other. Recorded because a future
+> reader will find the 7-line note in the history and should know it was
+> withdrawn, not carried.
 
 Plus, **not part of the 152-character budget above**, one `n/m` label beside
 **each engraved unit** — a string for `mt encode`, a symbol for the deferred
@@ -1829,7 +1836,7 @@ on the plate and F-234 forbids that inside the QR.
 
 This section used to source input *amounts* for transaction construction. `mt`
 no longer constructs, and the amounts now arrive inside the payload, so its job
-is narrower and sharper: **before you spend ~21 minutes a plate, is this
+is narrower and sharper: **before you spend an evening cutting steel, is this
 transaction still worth engraving?**
 
 The call is **`gettxout <txid> <vout> false`**, verified against a live Core
@@ -1856,8 +1863,9 @@ what it could not check:
       - has the locktime already passed?     (§8.4)   UNKNOWN
         locked to block 1383520, current height unknown
 
-    The transaction may already be unspendable. A plate is ~21 minutes.
-    Consider re-running with a node before cutting.
+    The transaction may already be unspendable, and cutting 1,228
+    characters by hand is not quick. Consider re-running with a node
+    before you start.
 
 > **THAT WARNING IS ENCODE-SHAPED, AND THE RECOVERY PATH NEEDS ITS OWN.**
 > Operator ruling 2026-08-23 — *"warn about what cannot be confirmed"* — applied
@@ -2915,7 +2923,7 @@ signed PSBT.
     disagree.
 
     **`mt` was specified silent when nothing is wrong.** R3's information lens (I-1) found that stdout carries the artifact
-    and stderr carries warnings and refusals, so the fee, the plate count, the
+    and stderr carries warnings and refusals, so the fee, the string count, the
     configuration and **the outputs themselves had no channel at all** — while
     §5 and §7 both justify `TO` being an optional one-line summary on the
     grounds that *"`mt` prints every output in full at encode time."* Nothing
@@ -2930,8 +2938,8 @@ signed PSBT.
     | **every output** | address in full, amount, and which are change if a wallet was supplied |
     | **the fee** | absolute and as sat/vB — the number §8.2b's warning thresholds refer to, printed whether or not a warning fires |
     | **the locktime** | §8.4's two facts |
-    | **the plate count** | and, since a plate is ~21 minutes (F-225), the **engraving time** |
-    | **the configuration** | module size, QR version, ECC level, symbol count — §4's answer |
+    | ~~the plate count~~ | **DELETED 2026-08-23** — `mt` cannot see how strings are laid onto steel, so it has no plate count and cannot price engraving time in plates |
+    | **the configuration** (`mt qr` only, deferred) | module size, QR version, ECC level, symbol count — §4's answer |
     | **the engraving size** | how many strings to cut and **how many characters in total** — the unit the person doing the cutting actually experiences |
     | **the set prefix** | the **first 7 characters after `mt1`**, shared by every string in this set, with the rule stated — see below |
     | **the value provenance** | per input: chain-fetched (§6a), txid-bound (§8.2d), or operator-asserted (§8.2c) |
@@ -3018,7 +3026,7 @@ signed PSBT.
         to this transaction; strings that do not, do not.
 
     **This is the only grouping rule a recoverer can apply without software.**
-    They may hold plates from two transactions, or one plate from a set whose
+    They may hold engravings from two transactions, or part of a set whose
     siblings are elsewhere, and the prefix separates them **by eye** — no
     decoding, no checksum, no tool. It costs one line at encode time and hands
     the 2040 reader a rule they would otherwise have to be told by someone who
