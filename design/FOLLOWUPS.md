@@ -9585,7 +9585,7 @@ relaxation is likewise `tr`-only in effect, and whether the Go port
 here would be a cross-language behaviour difference of exactly the class F-212
 was.
 
-### F-234 — every QR carries the STANDARD form, never a codex32 string: a constellation-independent recovery path (owning phase: **the mt cycle**) `#mt` `#qr` `#recovery` `#firmware` `#md`
+### F-234 — every QR carries the STANDARD form, never a codex32 string: a constellation-independent recovery path (owning phase: **Goal 1 — Engrave a Transaction**; RE-OWNED 2026-08-24, **OVERDUE** — its original owning phase was *the mt cycle*, which closed with this open because QR was deferred out of v0.1 entirely and nothing re-scoped it) `#mt` `#qr` `#recovery` `#firmware` `#md`
 
 **Operator directive, 2026-08-22:** *"convert all QR codes to remove all
 codex32-style encoding … this way we have a constellation independent
@@ -9615,20 +9615,46 @@ suggests, because uppercased bech32 lands in QR's alphanumeric mode. Measured
 below in "Density by representation"; do not argue this follow-up on capacity
 grounds.
 
-**Current state — verified, and better than feared.** The fork's existing QRs
-are already standards-based; nothing needs undoing there:
+**Current state — CORRECTED 2026-08-24 at the re-own.** The paragraph this
+replaces read *"verified, and better than feared … nothing needs undoing there"*.
+That conclusion was wrong, and its evidence had decayed. Re-measured against
+`bg002h/seedhammer` at `a91df84` by enumerating **every** non-test `qr.Encode`
+call site rather than by re-reading the three the original survey named:
 
-- seed QR: `qr.Encode(strings.ToUpper(plate.Seed), qr.M)` — BIP-39 words
-  (`third_party/seedhammer/backup/backup.go:76-77`).
-- descriptor QR: `qr.Encode(desc.EncodeCompact(), qr.L)` — a BIP-380 descriptor
-  (`gui/gui.go:401`).
+| site | QR content | verdict |
+| --- | --- | --- |
+| `backup/backup.go:160` | BIP-39 words (`seedQRLevel`) | standard |
+| `gui/gui.go:687` | `desc.EncodeNoChecksum()` — BIP-380 | standard |
+| `gui/gui.go:789` | `seedqr.QR(m)` — SeedQR | standard |
+| `backup/fit.go:154` | free text | n/a — no standard form exists |
+| `backup/passphrase.go:102` | the passphrase | n/a — no standard form exists |
+| `cmd/biptool/main.go:354` | host tool, not firmware | out of scope |
+| **`gui/gui.go:2514`** (`validateMdmk`) | **the `md1`/`mk1` codex32 string itself** | **VIOLATION** |
+
+**`validateMdmk` is the violation this entry existed to forbid, and the original
+survey missed it.** It is not a corner: four production call sites reach it —
+`gui/derive_xpub.go:575`, `gui/bundle_flow.go:459`, `gui/gui.go:2570`
+(`mdmkFlow`), `gui/unlock_platelist.go:222` — so every md1/mk1 plate cut with a
+QR today carries a payload no camera-and-standard-tooling recoverer can use.
+
+**Both citations the original survey did give have decayed**, which is why
+re-reading them would not have caught this: `backup/backup.go:76-77` is now
+`:160`, and `gui/gui.go:401` (`EncodeCompact()`) is now `gui/gui.go:687`
+(`EncodeNoChecksum()`). Both remain standards-based — the conclusion about
+*those two* held — but a survey that names three sites and concludes about all
+of them was never measuring what it claimed. **Enumerate the call sites; do not
+re-read the ones you already know about.**
+
 - three plate modes already exist — `TEXT + QR`, `TEXT ONLY`, `QR ONLY`
   (`gui/gui.go:411-423`), so the dual-representation layout is precedent.
 - `me bundle` emits **no QR at all**: constellation plates are text-only today.
 
 So the work is (a) write the principle down so it is not eroded, (b) extend it
-to `me bundle`'s plates and to `mt`, and (c) **never** let an `md1`/`mk1`/`ms1`
-string become QR content.
+to `me bundle`'s plates and to `mt`, (c) **never** let an `md1`/`mk1`/`ms1`
+string become QR content, and (d) **remediate `validateMdmk`'s four callers** —
+which is new scope this entry did not previously carry, and which needs its own
+ruling, because for an `md1`/`mk1` card the "standard form" is not obvious the
+way raw transaction bytes are.
 
 **What it buys, measured** (`design/measurements/RESULTS_qr_physical_max_2026-08-22.txt`).
 The plate is not the limit — at the 0.3 mm stroke floor it could hold 263
@@ -9724,22 +9750,50 @@ a payload has to fit a whole number of discrete symbols. Measured on real
 multisig PSBTs, 1-in/1-out, into v26 ECC L QRs
 (`RESULTS_psbt_qr_multisig_2026-08-22.txt`):
 
-| wallet | PSBT | codex32 chars | codex32 chunks | raw -> QRs | codex32 -> QRs |
+> **CORRECTED 2026-08-24 (at the F-234 re-own). EVERY CHUNK NUMBER BELOW WAS
+> WRONG, AND SO WAS THE CONCLUSION DRAWN FROM THEM.** Two independent defects,
+> both already fixed in `SPEC_mt_v0_1.md` on 2026-08-23 and neither propagated
+> here — the classic incomplete-propagation shape, where the facts are corrected
+> at the source and the duplicates are left standing.
+>
+> 1. **The counts were ~13% low.** They imply ~44.4 payload bytes per chunk. The
+>    normative rule is `count = ceil(payload_len / 40)` (`SPEC_mt_v0_1.md:1527`).
+>    The 44.4 comes from the probe helper `SPEC_mt_v0_1.md:1568` retracts, which
+>    modelled a chunk as `(bytes*8).div_ceil(363)` — 363 bits being what a chunk
+>    *could* carry if the chunker filled it rather than balancing.
+> 2. **There is no 64-chunk cap.** `SPEC_mt_v0_1.md:1548-1549`: 64 was
+>    `md-codec`'s 6-bit `count` field, **which `mt1` does not use**. `mt1` spends
+>    15 bits each on `count` and `index` (`:1291`), so the ceiling is **32,768
+>    chunks / 1,310,720 B** — above Bitcoin's own ~100 KB standardness limit.
+>
+> The `codex32 chars` and `codex32 -> QRs` columns came from the same broken
+> probe and are **NOT re-measured here** — recomputing them from a rule-of-thumb
+> would substitute arithmetic for a measurement, which is how the original error
+> got in. They are struck and left for the next QR sizing run, which must carry
+> the mode-segmentation gate anyway.
+
+| wallet | PSBT | codex32 chars | **codex32 chunks** | raw -> QRs | codex32 -> QRs |
 | --- | --- | --- | --- | --- | --- |
-| 3-of-5 `wsh` | 647 B | 1,440 | 15 | **1** | 1 |
-| 3-of-5 `tr` | 950 B | 2,016 | 21 | **1** | **2** |
-| 9-of-11 `wsh` | 1,237 B | 2,688 | 28 | **1** | **2** |
-| 9-of-11 `tr` | 1,732 B | 3,744 | 39 | 2 | 2 |
+| 3-of-5 `wsh` | 647 B | ~~1,440~~ unmeasured | ~~15~~ → **17** | **1** | ~~1~~ unmeasured |
+| 3-of-5 `tr` | 950 B | ~~2,016~~ unmeasured | ~~21~~ → **24** | **1** | ~~2~~ unmeasured |
+| 9-of-11 `wsh` | 1,237 B | ~~2,688~~ unmeasured | ~~28~~ → **31** | **1** | ~~2~~ unmeasured |
+| 9-of-11 `tr` | 1,732 B | ~~3,744~~ unmeasured | ~~39~~ → **44** | 2 | ~~2~~ unmeasured |
 
-**Wrapping doubles the QR count in half these cases**, and one QR is one plate.
-A 9% density loss becomes a 100% plate loss at the threshold.
+The chunk column is now exact rather than probed: it is `ceil(bytes / 40)`
+applied to the PSBT sizes in column 2, which is normative arithmetic from §3.
 
-**And codex32 hits a wall the raw form does not.** The chunk counts are also the
-engraved-TEXT cost, at one plate per string today: 15-39 plates, 5-14 hours, for
-artifacts that fit on ONE plate as a raw QR. Worse, 9-of-11 `tr` is already 39
-chunks at 1-in/1-out; add a change output (3,293 B) and it needs **73 chunks —
-over the codex32 wire format's 64-chunk hard cap**, so it is unencodable at any
-plate count. The raw QR takes 3 symbols on one plate.
+**codex32 is EXPENSIVE, not walled.** The chunk counts are also the engraved-TEXT
+cost, at one plate per string today: **17-44 plates, 6-15 hours**, for artifacts
+that fit on ONE plate as a raw QR. A 9-of-11 `tr` with a change output added
+(3,293 B) is **83 chunks — 0.25% of `mt1`'s ceiling, and ~83 plates.** The raw QR
+takes 3 symbols on one plate.
+
+> **The retracted sentence said that case was "unencodable at any plate count".**
+> It is encodable. The design answer changes from *impossible* to *expensive*,
+> and those call for different things: an impossibility earns a refusal, an
+> expense earns a stated plate count and the operator's decision. **Any design
+> that inherited "unencodable" from this entry is reasoning from a fact that was
+> retracted the day before it was read.**
 
 #### Signed transactions are the smaller artifact, and the gap is wrapper-shaped
 
@@ -9928,3 +9982,90 @@ is that moment: the cycle is closed and nothing later owns them.
 so. Reconciling *before* working is what the per-phase rule asks for, and it cost
 one `grep` here — against a list of six. On a longer list the same omission is
 how a closed item gets "fixed" twice, or how a real one hides behind a stale one.
+
+### F-241 — CLOSED 2026-08-24 — `SPEC_mt_v0_1.md` §3's retraction note stated the `count` width as **12 bits**, while §3 itself states **15** (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#MINOR`
+
+**Found 2026-08-24**, reading the spec against itself while correcting F-234's
+chunk arithmetic. `SPEC_mt_v0_1.md:86` reads:
+
+> That rested on a 64-chunk ceiling `mt1` never had — `md-codec`'s 6-bit `count`
+> field, which §3 corrected to **12 bits**.
+
+§3 says otherwise, twice, and the rest of the document agrees with §3:
+
+| site | says | implies a ceiling of |
+| --- | --- | --- |
+| `:86` (the retraction note) | `count` corrected to **12** bits | 4,096 chunks |
+| `:157` | `version(5) + chunk_set_id(20) + count(15)` | 32,768 |
+| `:1291` | "**`mt1` uses 15 bits each for `count` and `index`** — a **55-bit** header" | 32,768 |
+| `:33`, `:79`, `:1545` | ceiling is **32,768 chunks / 1,310,720 B** | 32,768 |
+
+So `:86` is the lone dissenter and **12 is the wrong number** — 2^15 = 32,768 is
+what four other sites state. Nothing derives from `:86`, which is why it is
+Minor rather than Important: it is a parenthetical inside a correction note.
+
+**Why it is worth filing anyway.** It is the fourth defect of the F-238/F-239/
+F-240 class — a *record* disagreeing with itself, found by reading rather than by
+running — and it sits **inside the very sentence that retracts a wrong ceiling**.
+A note whose job is to stop a stale number propagating, propagating a stale
+number, is the sharpest available argument for the standing rule that records are
+the weak half of any cycle.
+
+**Fix:** change `12` to `15` at `:86`. One character pair, no other site moves.
+
+**CLOSED same day, operator-confirmed** ("Header is 15 bit count/index"). `:86`
+now reads *"which §3 **widened to 15 bits**"* — `widened` rather than
+`corrected`, because `mt1` did not fix a defect in `md-codec`, it chose a wider
+field for a different job. Re-grepped afterwards: **no `12 bits` / `12-bit`
+claim remains anywhere in the spec.**
+
+The copy at `mnemonic-transaction/design/SPEC_mt_v0_1.md` is pinned in that
+repo's `PROVENANCE.md` at `aa232ca` and must be re-synced with the new SHA, or
+`check-provenance.sh` goes red. That gate is not in CI (it needs both repos), so
+it will not catch itself.
+
+### F-242 — `SPEC_mt_v0_1.md` calls a chunk "~96 characters"; a full chunk is **91** (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#sizing` `#MINOR`
+
+**Found 2026-08-24**, sizing the `sysw` transaction payload for Goal 1 and
+declining to hand-count what the shipped vectors could be measured for.
+
+`:1562` reads *"one chunk is one hand-cut string of ~96 characters"*, and `:3456`
+implies **88.7** for the 535 B / 14-chunk case (1,242 chars / 14). Two figures,
+neither matching. **Measured** on `mnemonic-transaction/design/vectors/mt1_v1_vectors.md`
+— 14 real `mt1` strings, whose chunk payload sizes the file states:
+
+| chunk payload | measured chars | count |
+| --- | --- | --- |
+| 32 B (the short final chunk of the `uneven` vector) | **79** | 1 |
+| 36 B | **85** | 7 |
+| 37 B | **87** | 6 |
+
+Those three points solve exactly, with no free parameters left over:
+
+    chars = ceil((payload_bytes * 8 + 55) / 5) + 16
+
+55 is the header (`version(5) + chunk_set_id(20) + count−1(15) + index(15)`,
+`:1291`); the +16 is `mt1` (3) plus a 13-symbol checksum. It reproduces 79, 85
+and 87 exactly. **A full 40-byte chunk is therefore 91 characters** — the vectors
+top out at 37 B so none directly exhibits it, which is why the formula is given
+rather than a fourth measured row.
+
+**Neither published figure is right.** 96 is **5.5% high**, 88.7 is 2.5% low.
+The `~96` is the one that matters, because `:1562`'s surrounding paragraph is
+what a sizing calculation reaches for — it is the sentence that converts a chunk
+count into an engraving cost.
+
+**What it moves.** Nothing already shipped: `mt` chunks by bytes, never by
+characters, so no code reads either number. It binds **future sizing work** —
+the QR configuration search (`SPEC_mt_qr_DEFERRED.md` §4), plate legend budgets,
+and any transport-capacity arithmetic. Goal 1's `sysw` payload ceiling for the
+chunks form is **~3,561 B**, not the ~3,377 B that `~96` gives.
+
+**Fix:** replace `~96` at `:1562` with the formula and the 91-character full-chunk
+figure, and reconcile `:3456`'s 1,242 (14 chunks of 39 B → 14 × 89 = 1,246).
+
+**Class.** Same as [F-241]: a *record* disagreeing with itself, found by reading
+rather than running, in a document that has passed thirteen review lenses. Both
+were found in one afternoon by checking numbers against the artifact instead of
+against the prose — which is the standing rule, and the reason it exists.
+
