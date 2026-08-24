@@ -631,10 +631,16 @@ and a menu entry promising something they are not.
 that apply to the payload. If no transaction is present in the payload then
 engrave transaction should not be an option."*
 
-### P — program applicability, and why the FIRST form of the ruling was expensive
+### P — the carousel is the WRONG PLACE for applicability. RULED, after two retractions.
 
-Measured before writing it down, because the enum carries a compile-time guard
-defending the opposite assumption:
+This finding went through three forms in one exchange, and the third is the
+right one. Recording all three, because the reasoning is the value.
+
+**Form 1 (operator):** *"If no transaction is present in the payload then engrave
+transaction should not be an option."* — i.e. hide it.
+
+**Measured, and expensive.** The carousel is a contiguous integer range with ONE
+conditional endpoint, and that endpoint is already spent on `unlockPayload`:
 
 ```go
 npages := int(lastNav) + 1        // layoutMainPager:2445
@@ -642,45 +648,62 @@ for i := range npages { ... }     // one dot per index, 0..lastNav
 if m.prog > m.lastNav() { ... }   // wrap is a BOUND, not a set
 ```
 
-**The carousel is a contiguous integer range with ONE conditional endpoint**, and
-that endpoint is already spent on `unlockPayload`. The enum comment shows the
-codebase analysed this exact case and deliberately avoided it:
+The enum comment shows the codebase analysed this exact case and avoided it:
 
 > *"inserted mid-enum, conditional visibility means the carousel must **SKIP an
 > interior index in both wrap directions**, and `layoutMainPager` fills dot
 > `int(page)`, which would then point at the wrong dot."*
 
-Hiding programs needs **holes in the middle** — a rewrite from `lastNav program`
-(a bound) to a visible-program **slice** (a set): wrap over the slice, dots =
-`len(slice)`, filled dot = index within the slice, and the guard
-`[qaProgram - unlockPayload]struct{}{}` stops meaning anything.
+So form 1 costs a bound-to-set rewrite and retires the compile-time guard — plus
+**carousel positions would shift with payload content**, on a device where a
+wrong selection costs ~21 minutes of steel.
 
-**A consequence surfaced that was not on the table when the ruling was made:**
-the carousel's length and positions would change with payload content. *Engrave
-Bundle* is 5 taps right today and 3 with a transaction-only payload. On a device
-where a wrong selection costs ~21 minutes of steel, muscle memory is worth
-something.
+**Form 2:** shown but dimmed. Cheaper, positions stable. **RETRACTED by the
+operator.**
 
-**REFINED RULING (operator): shown, UNSELECTABLE.**
+**Form 3 — RULED, and it dissolves the problem instead of solving it:**
 
-- all eleven programs always appear; **the range stays contiguous**
-- inapplicable ones render **dimmed** (`mulAlpha`, `gui.go:1157`, already exists)
-- selecting one **states why**
-- **no bound-to-set rewrite, no change to the compile-time guard**
+> *"All carousel items shown always because eventually user can use any program
+> to start nfc transfer. Maybe we need an 'on payload load' program than runs
+> when payload exists and has a menu that offers user only the applicable
+> operations like engrave transaction or wallet descriptor or key or seed."*
 
-This is strictly cheaper than the first form and keeps both properties the
-operator wanted: nothing inapplicable is silently offered as working, and nothing
-moves.
+**The operator supplied a constraint I did not have, and it invalidates the whole
+line of reasoning:** every program may eventually start an NFC transfer, so
+**payload-independence of the carousel is CORRECT, not a limitation.** I had been
+treating the contiguous range as an obstacle. It is the right shape.
 
-**The message must name the FIX, not just the problem** — finding I's discipline
-applied: *"this payload holds no transaction — load one with Load Payload."*
-Standing at the machine, "why not" is half of what an operator needs.
+**The two screens answer two different questions:**
 
-**SCOPE.** The ruling is general ("only offer programs that apply"), but
-applicability predicates for all eleven programs are a cross-cutting job well
-outside Goal 1. **Proposed split:** Goal 1 builds the *mechanism* (dimming, the
-reason screen, the predicate hook) plus the predicate for **Engrave Transaction**
-only; the other ten predicates become a follow-up that reuses it. Not ruled.
+| | question | content-dependent? |
+| --- | --- | --- |
+| **the carousel** | what can this MACHINE do? | **never.** All eleven, always |
+| **the payload menu** | what can THIS PAYLOAD do? | **by construction** |
+
+**Cost: near zero, and lower than both earlier forms.** Nothing in the carousel
+changes — `lastNav`, the compile-time guard, `layoutMainPager` and every wrap
+site are untouched. `syswPayloadMenu` (`gui/sysw_unload.go:34`) already exists
+and today offers only `LOAD AGAIN` / `UNLOAD`; it gains content-derived entries
+above them. And the classification is already computable — `sysw.Classify` returns
+`ClassMnemonic`, `ClassDescriptor`, `ClassMDMK`, `ClassPassphrase`, `ClassFreeText`,
+`ClassAddress`.
+
+**The original walk question dissolves too.** The operator asked what happens when
+you pick *Engrave Transaction* with a seed payload loaded. Under form 3 they are
+far less likely to be there at all: after loading, the device shows what the
+payload can do. The carousel entry remains reachable and must still refuse
+gracefully — but it stops being the primary path, so the refusal is a backstop
+rather than the design.
+
+**Message discipline still applies** (finding I): a refusal must name the FIX, not
+just the problem — *"this payload holds no transaction — load one with Load
+Payload."*
+
+**FOLLOW-THROUGH, not yet ruled.** The operator's phrase is *"an 'on payload
+load' program that RUNS WHEN PAYLOAD EXISTS"*. Today `syswLoadFlow` loads and
+returns to the carousel. The natural reading is that a successful load lands the
+operator **in the payload menu**, showing what this payload can do — which is
+what would have prevented the divergence this thread was built to explore.
 
 ---
 
@@ -704,7 +727,7 @@ only; the other ten predicates become a follow-up that reuses it. Not ruled.
 | M | the total must not read as a destination amount | refusal to overclaim | RULED |
 | N | **the device has no camera** — no on-device read-back, ever | hardware fact; spec must state it | RULED |
 | O | **no `mt` verb can read a default plate** — all three take `mt1` strings | missing capability, new P2 scope | RULED |
-| P | inapplicable programs offered as if they work | **shown but dimmed**, message names the fix | RULED |
+| P | applicability belongs in the PAYLOAD MENU, not the carousel — the carousel stays payload-independent | RULED (3rd form) |
 
 **Step 4 onward: not yet walked.** The payload is loaded into the session; the
 operator has not yet reached the Engrave Transaction program itself.
