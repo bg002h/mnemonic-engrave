@@ -355,16 +355,49 @@ overturned an earlier assumption and are marked.
    symbol errors are *corrected*; **more than four can land on a different valid
    code word**, and the decoder then "corrects" a chunk into something that
    checksums perfectly and is not what was engraved. Per-chunk verification
-   cannot see this. **The content id is the only thing that can** — which is
-   what makes it the funds-load-bearing invariant (§10.13 c) rather than a
-   belt-and-braces extra.
+   cannot see this.
+
+   > **THE CONTENT ID IDENTIFIES THE TRANSACTION. IT DOES NOT PROVE THE BYTES.**
+   > Operator ruling 2026-08-23, disposing of R6 adversarial C-2: *"we just want
+   > to id with content id not error correct. Codex32 handles errors."*
+   >
+   > **An earlier version of this very paragraph — written the same day —
+   > claimed the content id was "the only thing that can" catch miscorrection.
+   > That is false, and the spec already contained the sentence that falsifies
+   > it.** §10.13(c) notes that *"a legacy `scriptSig` is part of the txid
+   > preimage while a witness is not"*, uses that fact to settle a different
+   > question, and then calls the txid *"a canonical hash of exactly this
+   > content"* three sentences later. It is not: the txid is blind to the
+   > **entire witness region**, which is where the signatures live and which is
+   > the bulk of every artifact §3b measures. Damage there re-derives the
+   > expected id and passes — not improbably, but **always**.
+   >
+   > **The design is unchanged; the CLAIM is withdrawn.** The error layer is
+   > BCH, per chunk, `t = 4`, plus §1.1e's length check for the shifts BCH
+   > cannot see. The content id's job is to answer *"do these chunks belong to
+   > the transaction they claim to?"* — which the txid answers regardless of
+   > witness coverage, because a set id that matched a different transaction
+   > would need a 20-bit collision. **Calling it "the funds-load-bearing
+   > invariant" borrowed `md-codec`'s phrase for a check that does less here**,
+   > and `mt` should not claim a proof it does not perform (§0's posture, and
+   > the same principle as the offline report's read-versus-verified split).
+   >
+   > **What the operator is owed instead is the limit, stated plainly** — which
+   > is what the report below does.
 
        mt verify: FAILED — 14 chunks, set 0x0e17e, every checksum holds,
                   but the transaction does not re-derive its id.
 
-         At least one chunk was MIS-CORRECTED: it took more than 4 damaged
+         These chunks do not add up to the transaction they name. The
+         likeliest cause is MIS-CORRECTION: a chunk took more than 4 damaged
          symbols, and BCH repaired it into a valid string that is not what
          you engraved. A chunk cannot detect this about itself.
+
+         NOTE: this check identifies the transaction. It does NOT prove
+         every byte. Damage inside the witness data (the signatures --
+         most of the payload) does not change the txid, so mt can pass
+         this check on bytes that will not broadcast. Error correction is
+         BCH's job, per string, up to 4 characters.
 
          Most likely first — re-type these from the steel, in this order:
            chunk  7   4 of 4 symbols corrected   <-- most suspect
@@ -434,8 +467,8 @@ overturned an earlier assumption and are marked.
    | state | how `mt` knows | what the recoverer does |
    | --- | --- | --- |
    | **LIVE** | `gettxout` returns a value | broadcast it |
-   | **DEAD** | `null`, **and** `getrawtransaction` finds the parent | the input was spent by someone else. **The plate is scrap** |
-   | **PENDING** | `null`, **and** the parent is not found | the parent transaction was never confirmed. **The plate may still become live** — find out what happened to the parent |
+   | **DEAD** | `null`, **and** the parent is **CONFIRMED** (`getrawtransaction <parent> true` returns `confirmations ≥ 1`) | the input was spent by someone else. **The plate is scrap** |
+   | **PENDING** | `null`, and the parent is **not found — or is found only in the mempool** | the parent has not confirmed. **The plate may still become live** — find out what happened to the parent |
    | **UNKNOWN** | `null`, and no `-txindex` | `mt` cannot distinguish DEAD from PENDING and says so |
 
    **The parent lookup needs `-txindex`**, which most nodes do not run:
@@ -448,6 +481,22 @@ overturned an earlier assumption and are marked.
    > **Telling a recoverer their plate is scrap when it is merely early is the
    > worst error available here**, because it is the one that gets a live plate
    > thrown away.
+   >
+   > **AND THE RULE AS FIRST WRITTEN PRODUCED EXACTLY THAT — R6 adversarial
+   > C-3.** DEAD required only that `getrawtransaction` **find** the parent, and
+   > the spec quotes the falsifying sentence three lines below the table:
+   > `getrawtransaction` *"only returns a transaction if it is in the
+   > mempool"*. So for a parent sitting **unconfirmed in the mempool** — a CPFP
+   > chain, unconfirmed change, or simply a congested hour — `gettxout` returns
+   > `null` (`include_mempool` is `false` by ruling) **and** the parent is
+   > found. Verdict: DEAD, *"the plate is scrap"*. The truth is the PENDING
+   > row's own words: the plate is perfectly good and becomes spendable the
+   > moment the parent confirms.
+   >
+   > **The document contained its own refutation, in the same section, and named
+   > the resulting error the worst one available.** What it lacked was the word
+   > *confirmed*. `found` and `confirmed` are not the same predicate, and only
+   > one of them means someone else took the money.
 
    **`inspect` OWNS the report; `encode` CALLS it.** Operator ruling
    2026-08-23. `encode` does not compose its own version of §10.10's report — it
@@ -489,7 +538,7 @@ overturned an earlier assumption and are marked.
    | row | present when | source |
    | --- | --- | --- |
    | `mt1 SET` | the caller had strings — `inspect`, `decode`, `verify` | the chunk headers (§10.13 a2) |
-   | `TX` | **always** | double-SHA-256 of the decoded bytes; needs no node and no network (§6a) |
+   | `TX` | **always** | the **txid** — double-SHA-256 of the decoded transaction **with marker, flag and witnesses stripped**. Needs no node and no network. **Not** a hash of the engraved bytes; see the note below |
    | `OUT` | **always** | the transaction itself |
    | `FEE` | a node is reachable, **or** the input was a PSBT carrying values | inputs minus outputs — and the transaction alone does not carry input values (§6a) |
    | `LOCKTIME` | **always**; the `current height` clause needs a node | `nLockTime`, plus §8.4's threshold rule and the season projection |
@@ -1064,9 +1113,40 @@ F-234's argument does not apply and size is what matters. Dropping the PSBT
 wrapper saves the **+58 to +61 bytes per input** measured in §3 — which at 5 bits
 per character is real engraving time by hand.
 
+### The chunking rule — NORMATIVE, and stated here for `mt-codec` itself
+
+**R6's implementability lens filed this as a Critical and it was right: no line
+in this document said how `mt-codec` chooses `count`.** The rule existed only as
+prose *about `md-codec`*, inside a correction box that warns the reader against
+reading a limit as a rule — so the spec required the exact inference it told the
+reader not to make. Two implementers diverge on the spec's own arithmetic: one
+reads the 400-bit single-string capacity and sizes chunks at `(400 − 49)/8 = 43`
+bytes, and a 535-byte transaction becomes **13 chunks, not 14**. Every plate
+then fails the other implementation's §1.1e length check as damaged steel.
+
+Stated normatively, for `mt-codec`, in the only place it is stated:
+
+    PAYLOAD_BYTES_PER_CHUNK_CEILING = 40
+    count           = ceil(payload_len / 40)          # never 0; count >= 1
+    bytes_per_chunk = ceil(payload_len / count)       # BALANCED, not filled
+    chunk i         = payload[i*bytes_per_chunk ..]   # last takes the remainder
+
+**Two constants, two different jobs, and conflating them is the whole defect.**
+`40` is the **ceiling the count is derived from** — it never describes a chunk's
+size. `bytes_per_chunk` is what a chunk actually carries, it is `≤ 40`, and it is
+**equal across the set except for the last**. A 535-byte payload gives
+`count = 14` and `bytes_per_chunk = 39`, not thirteen 41-byte chunks and not
+fourteen chunks of 40/40/…/15.
+
+> **Why balanced rather than filled, restated so it is not re-derived:** this
+> matches `md-codec` (`crates/md-codec/src/chunk.rs:267-273`), and the
+> constellation's Rust-primary rule makes that binding — a sibling's normative
+> behaviour is not re-litigated in a downstream spec. §10.12 records the ruling.
+
 ### What fits
 
-A chunk carries **40 payload bytes** and `mt1`'s header admits **4,096 chunks**,
+A chunk carries **at most 40 payload bytes** and `mt1`'s header admits **4,096
+chunks**,
 so the ceiling is **163,840 B** — above Bitcoin's own ~100 KB standardness limit,
 so `mt1` encodes any transaction that will relay (§3). (An earlier draft said 64 chunks / 2,560 B,
 inheriting `md-codec`'s 6-bit `count` field that `mt1` does not use — see §3.) Measured
@@ -1304,12 +1384,47 @@ fields, **164 characters**, 7 lines — measured,
 | --- | --- | --- |
 | `BEARER - ANYONE HOLDING THIS CAN BROADCAST IT` | 45 | the plate is spendable; this is not a backup in the sense the other formats are |
 
-> **"BROADCAST", not "SPEND" — operator ruling 2026-08-23, and the old wording
-> contradicted a guarantee this spec makes.** §8.6 refuses any input whose
-> satisfaction does not bind the outputs, so a holder **cannot redirect the
-> money**: the destination is fixed by signatures they cannot alter. What they
-> can do is **cause the transaction to happen** — sending the funds where the
-> operator already chose, at a moment the operator did not.
+> **"BROADCAST", not "SPEND" — operator ruling 2026-08-23.** §8.6 refuses inputs
+> whose satisfaction does not bind the outputs, so in the ordinary case a holder
+> **cannot redirect the money**: the destination is fixed by signatures they
+> cannot alter. What they can do is **cause the transaction to happen** —
+> sending the funds where the operator already chose, at a moment the operator
+> did not.
+>
+> **`mt` GUARANTEES NOTHING HERE, AND AN EARLIER VERSION OF THIS NOTE SAID IT
+> DID — R6 adversarial C-4.** It asserted flatly that a holder *"cannot redirect
+> the money"*, and used that assertion to choose **text cut permanently into
+> steel**. The spec knows better two sections away: §8.6 recognises a signature
+> **by shape**, because §8.2's removal left no script engine, and it says so —
+> *"a crafted witness carrying a signature-shaped element that the script never
+> checks would pass. This is a structural heuristic, not a proof."*
+>
+> **A concrete input defeats it.** A taproot script-path leaf satisfied by a
+> 64-byte hash preimage — witness `[preimage(64), script, control_block(65)]` —
+> has its last two elements stripped as control block and leaf script, leaving a
+> 64-byte element that the shape rule counts as a Schnorr signature with
+> `SIGHASH_DEFAULT`. `mt` accepts. The satisfaction commits to **nothing**, and
+> any holder re-satisfies the same leaf with different outputs and keeps the
+> money. That is precisely what §8.6(b) was added to close, reached **through**
+> the recogniser rather than around it.
+>
+> **Operator ruling 2026-08-23, and it settles the class rather than the
+> instance:** *"we aren't guaranteeing anything. We are helping users understand
+> what they are doing. We may be incomplete and can warn users of that."* So
+> this spec claims no unqualified property about what a holder can do. `mt`
+> reports what it checked, names what it could not, and the wording stays
+> `BROADCAST` — which remains right for the ordinary case and, unlike `SPEND`,
+> does not invite a reader to imagine a power the design tries to withhold.
+>
+> **The warning `mt encode` prints therefore says both halves:**
+>
+>     BEARER: anyone holding this plate can broadcast this transaction.
+>
+>       mt checked that every input carries a signature committing to the
+>       outputs, so a holder should not be able to send the money anywhere
+>       else. That check reads WITNESS SHAPE, not script -- mt has no
+>       script engine (8.2). An exotic or hostile input CAN defeat it.
+>       Treat the plate as if a holder could take the funds.
 >
 > So `SPEND` was wrong in both directions. It **overstates** the holder's power,
 > implying theft that §8.6 exists to prevent; and it **misnames the real
@@ -1551,8 +1666,21 @@ what it could not check:
 > guidance beats silence.
 >
 > **`mt` can print the txid because it just reconstructed the transaction**, so
-> this costs no new capability: the txid is the double-SHA-256 of the very bytes
-> `decode` emits, computable with no node and no network. That makes the second
+> this costs no new capability: it is computable with no node and no network.
+>
+> **It is NOT the double-SHA-256 of the bytes `decode` emits, and an earlier
+> version of this sentence said it was — R6 adversarial C-1.** Those bytes are
+> the network serialization, so hashing them gives the **wtxid** (BIP-141). The
+> **txid** hashes the same transaction with marker, flag and witnesses
+> stripped. Every artifact §3b measures is `tr` or `wsh`, so **segwit is the
+> normal case here, not an edge** — for the smallest measured artifact the two
+> are hashes over 162 and 94 bytes, different preimages and different values.
+>
+> **The consequence was a wrong action, not a wrong number.** A recoverer
+> following the line below pastes a wtxid into a block explorer, gets nothing
+> back, and concludes the transaction was never broadcast — when it may have
+> confirmed years ago. Explorers index the txid. **This row exists to be looked
+> up, so it must be the value that can be.** That makes the second
 > option genuinely offline-friendly — the recoverer needs *someone's* internet,
 > not their own node, and a block explorer answers all four questions from that
 > one string.
@@ -2171,9 +2299,24 @@ exactly as permanent, as a machine-engraved one.
    > false. A `stderr` warning is disposable; a legend line is forever. The
    > legend now reads **`NO TIMELOCK`**: precisely true about the fields
    > `mt` read, and silent about scripts it did not.
-5. **`gettxout` returns `null` for any input** → refuse, when a node is
-   reachable. The output is spent or never existed. See §6a's limitation and
-   §10.5 for the IBD case.
+5. **`gettxout` returns `null` for any input, AND the parent is confirmed** →
+   refuse, when a node is reachable. The output was spent or never existed. See
+   §6a's limitation and §10.5 for the IBD case.
+
+   > **The `and the parent is confirmed` clause is not a refinement, it is the
+   > difference between a true and a false refusal message — R6 adversarial C-3,
+   > second site.** The earlier text refused on `null` alone and told the
+   > operator *"the output is spent or never existed."* For a parent sitting
+   > unconfirmed in the mempool that is **a false statement of fact inside a
+   > refusal**: the output exists and is unspent, and it enters the UTXO set the
+   > moment the parent confirms. `include_mempool` is `false` by ruling (§6a),
+   > so `null` is the *expected* answer for an unconfirmed parent, not a
+   > finding.
+   >
+   > **A mempool-only parent is a WARNING, not a refusal** — §6a's PENDING
+   > state, reported with the same words. Refusing it would block an operator
+   > from engraving a transaction whose parent is thirty seconds from
+   > confirming, and the refusal would explain itself with something untrue.
 6. **Any input whose satisfaction does not bind the outputs** → refuse. Two
    cases, and the previous draft caught only the first:
 
@@ -3058,10 +3201,25 @@ against a 40-byte chunk. `mt1`'s ceiling is 4,096 of them (§3).
 
 > **They remain a LOWER BOUND, but not for the reason an earlier draft gave.**
 > That draft called them "a floor, for the balancing reason stated in §3b" —
-> i.e. because `md`'s chunker balances rather than fills. **That reason is now
-> void**: §3b's correction established that chunk sizing is a flat 40 payload
-> bytes (`crates/md-codec/src/chunk.rs:224,253-254`), so the count is *exact* for a
-> given payload size.
+> i.e. because `md`'s chunker balances rather than fills.
+>
+> **THE REPLACEMENT REASON WAS ITSELF WRONG, AND IT INVERTED THE CITATION IT
+> LEANED ON — R6, two lenses independently.** This box went on to say *"§3b's
+> correction established that chunk sizing is a flat 40 payload bytes"*. §3b
+> establishes the **opposite**: it retracts "a flat 40 bytes per chunk" by name
+> as a mis-description of the chunker, and gives `bytes_per_chunk =
+> ceil(len / count)`. §11 was citing §3b as the authority for the very sentence
+> §3b exists to withdraw.
+>
+> **It is a Critical rather than a wording slip because the two rules produce
+> different chunk boundaries**, and §1.1e's pre-decode length check is mandatory:
+> an implementer who followed §11 would read an implementer who followed §3b's
+> plates as **damaged steel**, and vice versa. Both would be reporting a hand
+> error that never happened, on a set that is byte-perfect.
+>
+> The counts below remain a lower bound for the reason given next — what is fed
+> in — and **not** for any claim about chunk sizing. The normative rule is §3b's,
+> stated once under "The chunking rule".
 >
 > They are a lower bound because of what is fed in. `md-codec` chunks the output
 > of `encode_payload`, which is a **framed** payload — canonicalization plus TLV
