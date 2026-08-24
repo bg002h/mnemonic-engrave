@@ -60,38 +60,50 @@ a shared crate is most likely to be shaped around assumptions that later break.
 **This deletes a whole phase of upstream work.** No change to `md-codec`, no
 semver question, no publish decision, and the Go port is untouched.
 
-### How the copy-paste hazard is defended
+### How the constant is defended
 
-§12.22 names it: *"copy `md-codec`, change the HRP, leave the constant, and
-`mt1` chunks verify as `md1` chunks."* **Two tests, and they catch different
-failures — one is not a substitute for the other.**
+**Operator ruling 2026-08-23: cross-format verification is ABANDONED** —
+*"it's unlikely and not worth the effort"* — and the spec's own statement of the
+hazard was **false as worded**. §12.22 warned that a copied constant makes
+*"`mt1` chunks verify as `md1` chunks"*. It cannot: the HRP is mixed into the
+checksum on both sides, so differing HRPs separate the formats **by themselves**,
+whatever the constant is. The spec is corrected; the cross-format negative test
+this plan proposed is **deleted**, because it returned the same result whether or
+not a constant had been copied and therefore measured nothing.
 
-1. **A drift test, copying the sibling pattern verbatim.** Both siblings already
-   have one, and `md-codec`'s cites `mk`'s as its model:
-   `mk-codec`'s `consts::tests::nums_constants_reproduce_from_domain`, and
-   `md-codec`'s at `crates/md-codec/src/bch.rs:122`, asserting
-   *"MD_REGULAR_CONST drift from SHA-256(\"shibbolethnums\") top-65-bits"*.
+**The real hazard is intra-format, and worse for being silent.** A wrong
+constant — copied *or* mistyped — produces chunks that are **self-consistent and
+unreadable by every other implementation**, and it surfaces at *recovery*, where
+it is indistinguishable from steel damage: checksum failures on a physically
+perfect plate, years later, with no second copy of the transaction anywhere.
 
-   `mt`'s is the same shape: `SHA-256("shibbolethnumstransaction")`, top 65
-   bits, asserted equal to `MT_REGULAR_CONST`. **Independently recomputed before
-   this plan was written** — `0x1a2fc877f9528d7c1`, matching the spec; and the
-   rule reproduces `md`'s `0x0815c07747a3392e7` from `"shibbolethnums"`, so it
-   is the derivation that is confirmed and not one lucky value.
+**So the defence is one artifact and two cheap tripwires:**
 
-   **What it catches:** the constant and its domain string drifting apart.
-   **What it does NOT catch:** a constant copied wholesale from a sibling —
-   `MD_REGULAR_CONST` pasted into `mt-codec` with the domain string pasted too
-   would satisfy it.
+1. **A spec-authored, independently derived PINNED BYTE-EXACT VECTOR** — a real
+   signed segwit transaction to its exact `mt1` strings, plus a 13-symbol
+   checksum micro-vector, with the generator script committed. **It lands in the
+   spec before `mt-codec`'s first commit**, so the implementation is checked
+   against bytes it did not produce. This is the load-bearing item; everything
+   else is a tripwire.
 
-2. **A cross-format negative, which NEITHER sibling has.** An `mt1` chunk must
-   **fail** `md1` verification, and an `md1` chunk must fail `mt1` verification.
-   This is the §12.22 hazard stated as an executable test, and it is the only
-   one of the two that fails when a copied module keeps a copied constant.
+2. **The drift test**, copying the sibling pattern verbatim:
+   `SHA-256("shibbolethnumstransaction")` top 65 bits `== MT_REGULAR_CONST`.
+   Both siblings have one and `md-codec`'s cites `mk`'s as its model. Cheap,
+   and it catches the constant and its domain string drifting apart.
 
-> **Both, not either.** The drift test guards the constant against its own
-> definition; the cross-format negative guards `mt1` against the neighbouring
-> format. A fork defended by only the first is defended against the failure that
-> is easy to imagine and not against the one the spec actually warns about.
+3. **Four `assert_ne!` lines against BOTH siblings' constants and domain
+   strings — as HARDCODED LITERALS, never crate imports.** An import would let a
+   future refactor move both sides together, which is the one thing these lines
+   exist to prevent. Both siblings, not just `md`, because **the mistake that
+   actually gets made is against the crate you have open** — and this plan ports
+   from `mk`, whose constant and domain string would satisfy the drift test if
+   pasted as a pair.
+
+> **Why the vector and not more assertions.** Assertions restate values the
+> implementation already reads, so they can be satisfied by the implementation
+> agreeing with itself. A vector the implementation did not produce is the only
+> kind that can falsify it — the same reasoning that makes R8 C-5 a won't-fix
+> (§2a).
 
 ## 2. Phases
 
@@ -136,20 +148,31 @@ decisions**:
 - content id = **top 20 bits of the txid in display form** (§10.13 c)
 - BCH(93,80,8), `t = 4` per chunk (§3a)
 
-**Tests first, and two of them are the phase's whole point:**
+**Tests first. The pinned vector is the phase's whole point; the rest are
+tripwires:**
 
-1. **The drift test** (§1) — `SHA-256("shibbolethnumstransaction")` top 65 bits
-   equals `MT_REGULAR_CONST`. Same shape as both siblings'.
-2. **The cross-format negative** (§1) — an `mt1` chunk fails `md1` verification
-   and vice versa. **Neither sibling has this**, and it is the only one of the
-   two that catches a constant copied together with its domain string.
-3. Chunking property test: for random payload lengths, `count`, `bytes_per_chunk`
+1. **The pinned byte-exact vector** (§1) — asserted against **before** any other
+   test is written, because it is the only artifact here `mt-codec` did not
+   produce. Includes at least one **real signed segwit transaction**, so the
+   witness-bearing serialisation is exercised rather than a synthetic byte
+   string.
+2. **The drift test** (§1) — `SHA-256("shibbolethnumstransaction")` top 65 bits
+   equals `MT_REGULAR_CONST`.
+3. **Four `assert_ne!` lines** (§1) against both siblings' constants and domain
+   strings, **hardcoded, no imports**.
+4. **A correction test that CORRECTS** — mutate 1, 2, 3 and 4 symbols of a valid
+   chunk and assert each is repaired to the original bytes, then mutate 5 and
+   assert it is not silently accepted. R8 gates C5: the round-trip gate uses
+   *clean* vectors, so the residue is zero and **the correction path is never
+   entered** — nothing else in this plan proves the format's whole purpose works.
+5. Chunking property test: for random payload lengths, `count`, `bytes_per_chunk`
    and the reassembled payload round-trip, and no chunk exceeds 40 bytes.
 
-**Gate.** `cargo nextest run --locked -p mt-codec` green, **including the
-cross-format negative**.
+**Gate.** `cargo nextest run --locked -p mt-codec` green, **including the pinned
+vector and the within-budget correction test**.
 
-**Exit.** A transaction encodes to `mt1` strings and back, byte-exact.
+**Exit.** A transaction encodes to `mt1` strings and back, byte-exact, **and
+matches the spec's pinned vector**.
 
 > **Test vectors are produced here and are the artifact P2–P4 are checked
 > against.** Per the spec's own lesson that a corpus can be uniformly wrong,

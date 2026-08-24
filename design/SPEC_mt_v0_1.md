@@ -3621,9 +3621,31 @@ The BCH corrector's existence was read from `crates/md-codec/src/bch_decode.rs` 
     The *rule* was always derivable — `MD_REGULAR_CONST` is verifiably the top
     65 bits of `SHA-256("shibbolethnums")` — but the **domain string is an
     arbitrary chosen name** no implementer could have inferred. That mattered
-    because the fork mechanic makes the worst guess the most tempting: copy
-    `md-codec`, change the HRP, leave the constant, and `mt1` chunks verify as
-    `md1` chunks. **§10.13 now has no undecided input left.**
+    because the fork mechanic makes the worst guess the most tempting: copy a
+    sibling codec, change the HRP, and leave the constant.
+    **§10.13 now has no undecided input left.**
+
+    > **CORRECTION 2026-08-23 — this entry said the consequence was that "`mt1`
+    > chunks verify as `md1` chunks", and that is FALSE.** The HRP is mixed into
+    > the checksum on both sides — `bch_create_checksum_regular` computes
+    > `polymod_run(hrp_expand(hrp) ‖ data) ^ CONST`, and verification compares
+    > `polymod_run(hrp_expand(hrp) ‖ data_with_checksum)` against the constant —
+    > so **differing HRPs separate the formats by themselves**, whatever the
+    > constant is. Cross-format acceptance is unreachable while the HRPs differ.
+    >
+    > **The real consequence is intra-format and worse**, because it is silent:
+    > a wrong constant — copied *or* mistyped — produces chunks that are
+    > **self-consistent and unreadable by every other implementation**. And it
+    > surfaces at *recovery*, where it is indistinguishable from steel damage:
+    > the recoverer sees checksum failures on a plate that is physically
+    > perfect.
+    >
+    > **Operator ruling: cross-format verification is abandoned** — *"it's
+    > unlikely and not worth the effort"* — and the plan's cross-format negative
+    > test is deleted with it, since it returned the same result whether or not
+    > a constant had been copied and therefore measured nothing. What defends
+    > the constant instead is a **spec-authored pinned byte-exact vector**
+    > (§10.13 a) that the implementation cannot produce for itself.
 
 
 23. ~~Season names are hemisphere-relative on a permanent artifact.~~
