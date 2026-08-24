@@ -345,6 +345,56 @@ overturned an earlier assumption and are marked.
    changes is that the margin is **stated**, so re-cutting one string is a
    decision they can make rather than one they never knew was available.
 
+   **WHEN EVERY CHECKSUM HOLDS AND THE TRANSACTION STILL DOES NOT RE-DERIVE.**
+   Journey C, step 3. The spec required this check from the start and stated
+   what it proves — and **never said what happens when it fails**, which is the
+   silence class this method keeps finding: `verify`'s single most important
+   check had no specified failure output at all.
+
+   It is not a contradiction, it is BCH working as designed. `t = 4` means four
+   symbol errors are *corrected*; **more than four can land on a different valid
+   code word**, and the decoder then "corrects" a chunk into something that
+   checksums perfectly and is not what was engraved. Per-chunk verification
+   cannot see this. **The content id is the only thing that can** — which is
+   what makes it the funds-load-bearing invariant (§10.13 c) rather than a
+   belt-and-braces extra.
+
+       mt verify: FAILED — 14 chunks, set 0x0e17e, every checksum holds,
+                  but the transaction does not re-derive its id.
+
+         At least one chunk was MIS-CORRECTED: it took more than 4 damaged
+         symbols, and BCH repaired it into a valid string that is not what
+         you engraved. A chunk cannot detect this about itself.
+
+         Most likely first — re-type these from the steel, in this order:
+           chunk  7   4 of 4 symbols corrected   <-- most suspect
+           chunk 11   2 of 4
+           chunk  2   1 of 4
+         The other 11 chunks needed no correction and are almost certainly
+         right.
+
+   > **The margin report is already the suspect list, and that is the whole
+   > design here.** Miscorrection risk rises with the number of corrections
+   > applied: a chunk that needed none is almost certainly intact, and the one
+   > that spent its entire budget is the one most likely to have spent more than
+   > it had. So `verify` does not need a new mechanism to localise this failure
+   > — it needs to **print the counts it already computed, in descending
+   > order**, and say what they mean. An operator retyping three strings instead
+   > of fourteen is the difference between a five-minute fix and abandoning the
+   > plate.
+   >
+   > **Ordering is the entire value.** *"Something is wrong somewhere in 1,228
+   > characters"* is a report that leaves the operator with a pile of steel and
+   > nowhere to start; the same failure with a ranked suspect list is a
+   > half-hour of work. Neither costs `mt` anything it did not already know.
+   >
+   > **The rarer cause is named too, and not guessed at:** a chunk carried in
+   > from a *different* transaction whose 20-bit `chunk_set_id` collides (§3b)
+   > would also pass every per-chunk check. `mt` cannot distinguish the two
+   > causes and says so rather than asserting miscorrection — but the operator's
+   > action is identical, so the report leads with the likely cause and the
+   > remedy that covers both.
+
    **It never asks a node.** A predicate whose answer changes between runs is not
    a predicate, and keeping `verify` offline means it runs on an air-gapped
    machine — which is this constellation's posture. Chain questions live in
