@@ -3298,10 +3298,26 @@ signed PSBT.
     > machinery into **`mt-codec`, in the new `mnemonic-transaction` repo**, with
     > its own constants. **`descriptor-mnemonic` is untouched.**
     >
-    > A future `mc-codex32` shared crate is planned to retire these forks; its
-    > stated trigger is *"both formats v1.0 with cross-validated conformance
-    > vectors"*, so `mt1` should be built to be absorbed by it later, not to
-    > block on it now.
+    > **There is no future shared crate, and this box said there was — R8 gates
+    > I10.** It read: *"a future `mc-codex32` shared crate is planned to retire
+    > these forks… so `mt1` should be built to be absorbed by it later."* That
+    > plan was **RETIRED on 2026-05-03**, recorded in
+    > `mnemonic-key/design/FOLLOWUPS.md` as
+    > `mc-codex32-extraction-retired-2026-05-03`, and retired on a technical
+    > finding rather than a schedule:
+    >
+    > > *"md1 and mk1 use HRP-mixed BCH with per-format target residues that are
+    > > NOT upstreamable … There is no longer shared code worth extracting —
+    > > only a shared **pattern** … md1↔mk1 BCH plumbing stays forked
+    > > **indefinitely**."*
+    >
+    > **The correction changes what an implementer should do.** "Build it to be
+    > absorbed later" shapes a crate around a merge that will never come —
+    > generic seams, deferred naming, constants held at arm's length. The truth
+    > is that HRP-mixing and per-format residues make this code **unshareable in
+    > principle**: there is nothing to absorb, now or at v1.0. **`mt-codec` is
+    > the third instance of a pattern, not the third tenant of a future crate**,
+    > and should be written to be clear on its own terms.
 
     **What Rust-primary means for this format**, since it binds later rather
     than now: `mt-codec` in Rust is the primary and only implementation today.

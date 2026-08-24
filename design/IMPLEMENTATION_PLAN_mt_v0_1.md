@@ -50,12 +50,27 @@ the sibling rather than assumed:
 | depends on `md-codec`? | **no** — the name appears only in doc comments |
 | BCH primitives | its own, in `crates/mk-codec/src/string_layer/` (`bch.rs`, `bch_decode.rs`, `chunk.rs`, `header.rs`) |
 | its NUMS constant | its own, `MK_REGULAR_CONST` (`crates/mk-codec/src/consts.rs:18`) |
-| extraction into a shared crate | **deliberately deferred**, trigger recorded as *"both md-codec and mk-codec at v1.0"* (closure Q-9) |
+| extraction into a shared crate | **RETIRED, not deferred** — `mnemonic-key/design/FOLLOWUPS.md`, `mc-codex32-extraction-retired-2026-05-03` |
 
-So the established pattern is **fork per codec, carry your own constant, defer
-extraction until the formats have stopped moving.** `mt` is the third format to
-face this and has no reason to be the exception — a new codec is precisely when
-a shared crate is most likely to be shaped around assumptions that later break.
+So the established pattern is **fork per codec and carry your own constant** —
+and R8 corrected this plan's account of *why*, which is worth having right
+because the corrected reason is stronger.
+
+> **An earlier draft said extraction was "deliberately deferred until both crates
+> reach v1.0". It was RETIRED on 2026-05-03**, recorded in
+> `mnemonic-key/design/FOLLOWUPS.md` as `mc-codex32-extraction-retired-2026-05-03`,
+> on a technical finding rather than a scheduling one:
+>
+> > *"md1 and mk1 use HRP-mixed BCH with per-format target residues that are NOT
+> > upstreamable … There is no longer shared code worth extracting — only a
+> > shared **pattern** … md1↔mk1 BCH plumbing stays forked **indefinitely**."*
+>
+> **That is a better argument than the one it replaces.** "Wait until the
+> formats settle" implies the fork is temporary and invites building `mt` to be
+> absorbed later. **The real reason is that HRP-mixing and per-format residues
+> make the code unshareable in principle** — there is nothing to absorb, now or
+> at v1.0. `mt` is the third instance of a pattern, not the third tenant of a
+> future crate, and it should be built that way.
 
 **This deletes a whole phase of upstream work.** No change to `md-codec`, no
 semver question, no publish decision, and the Go port is untouched.
@@ -144,9 +159,18 @@ gate.**
 
 ### P1 — the `mt1` wire format
 
-**Deliverable.** `mt-codec`: `header.rs`, `chunk.rs`, `nums.rs`, `bch.rs`,
-`bch_decode.rs`, `error.rs` — the module set `mk-codec` carries in
-`crates/mk-codec/src/string_layer/`.
+**Deliverable.** `mt-codec`'s string layer, mirroring the module set `mk-codec`
+actually carries in `crates/mk-codec/src/string_layer/` — **`bch.rs`,
+`bch_decode.rs`, `chunk.rs`, `header.rs`, `mod.rs`, `pipeline.rs`** — plus
+`consts.rs` and `error.rs` at the crate root, where `mk` keeps them.
+
+> **The earlier list was `md-codec`'s, mis-attributed to `mk-codec` — R8
+> coverage I-1.** It named `nums.rs` and `error.rs` inside the string layer
+> (neither is there) and **omitted `pipeline.rs`, the module that joins the
+> pieces**. Listed here from `ls`, not from memory: describing a sibling's
+> layout from recollection is the same defect class as describing code from its
+> doc comment, and it is the second time in this plan that a claim about `mk`
+> was actually a claim about `md`.
 
 **Ported from `mk-codec`, which is the closest sibling** — not from `md-codec`,
 and not written from scratch. `mk` already solved chunk + header + BCH for a
@@ -199,7 +223,7 @@ matches the spec's pinned vector**.
 **Deliverable.** Input handling and string output.
 
 - the ordered sniffing procedure — binary PSBT before whitespace removal, then base64, then hex (§8.2e)
-- normalisation to **lowercase**; stdout is lowercase, ungrouped (§1.1e, §12.10)
+- normalisation to **lowercase**; stdout is lowercase, ungrouped (§1.1e, §10.10)
 - optional grouping, opt-in, **stdout only**
 - **`--elide-prefix`** — first string full, rest carry `index + payload` only (§3b)
 - the `stderr` legend suggestion, six fields including `FORMAT: mt1 codex32` (§5)
