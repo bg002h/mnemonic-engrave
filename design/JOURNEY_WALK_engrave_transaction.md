@@ -322,9 +322,20 @@ against what"* — against *what*, obtained *how*, is exactly the question the
 operator asked, and the device is silent on both.
 
 *Classification: **affordance + documentation**, and it earns the change — the
-wrong outcome is a payload whose passphrase the operator no longer holds. The
-device screen should name `me sysw show`, and `me sysw pack`'s digest line should
-say the number can be re-read without re-packing.*
+wrong outcome is a payload whose passphrase the operator no longer holds.*
+
+**RULED (operator) 2026-08-24:** *"Sh2 could put `me sysw show` under the digest
+to nudge user to execute the correct command on host."*
+
+So the device prints the command **beneath the digit groups**, on the screen that
+creates the need. This is better than documenting it, for the reason the walk
+found it in the first place: the operator is **standing at the machine**, and a
+manual they would have to go and open is exactly what they cannot reach. It also
+steers them off the re-pack path before they take it, rather than warning them
+afterwards.
+
+`me sysw pack`'s digest line should carry the same pointer, so the host says it
+too.
 
 ### J — the digest does not distinguish sealed from unsealed
 
@@ -334,6 +345,87 @@ the compared number cannot tell them which they hold. `me sysw show` prints
 `sealed:` and answers it.
 
 *Classification: **not our concern** — the affordance in I covers it.*
+
+---
+
+## Step 4 — the confirm screen (the unbuilt part)
+
+**Display is 240x240** (`gui/gui_test.go:383`). Drawn honestly, §3.3's confirm
+screen is **already at the limit for a 1-in/1-out transaction with no change** —
+and the moment there is change, which is the normal case, it does not fit.
+
+Operator, unprompted: **"I want to scroll to see all outputs or show the full
+txid so I can compare to host."**
+
+Both asks are right, and together they force a **two-screen split** that resolves
+the squeeze — because the screen was trying to do two different jobs at once:
+
+| screen | job | contents |
+| --- | --- | --- |
+| 1 | **where the money goes** | outputs (paged), amounts, network params, IN count, FEE, locktime |
+| 2 | **which transaction** | the **full 64-hex txid**, in 16 groups of 4 — the same shape as the identity digest, for the same reason. `ENGRAVE` lives here and nowhere else |
+
+### K — the txid must be shown for RECOGNITION and must never be claimed as proof
+
+`mt` reports the **txid** (`SPEC_mt_v0_1.md:680`), so both ends name the same
+number and the operator's comparison works. But the same line, and a correction
+`mt` already paid for, bind the device:
+
+> the txid is blind to the **entire witness region**, which is where the
+> signatures live and which is the bulk of every artifact. Damage there
+> re-derives the expected id and passes — **not improbably, but always**.
+
+`mt verify`'s own report says it in operator language: *"this check identifies
+the transaction. It does NOT prove every byte."*
+
+**The device must carry the same limit on the same screen.** A txid match means
+*which transaction*, never *the bytes are right*.
+
+**And byte integrity is already covered elsewhere, which is why this division is
+clean:** in transit the record set is protected by the identity digest the
+operator compared at load (unsealed) or by AEAD (sealed). The txid's job is
+operator recognition — *"yes, that is the one I built"*. Two checks, two jobs,
+neither claiming the other's.
+
+*Classification: **refusal to overclaim** — a wording constraint that is
+normative, not cosmetic. `mt` withdrew this exact claim after making it.*
+
+### L — must every output be seen before ENGRAVE? RULED: no.
+
+**RULED (operator) 2026-08-24: "Show a total, allow skip."** Page 1 shows the
+first output plus a total, and `ENGRAVE` is reachable immediately.
+
+**The argument for it, which is stronger than the one against:** a forced
+page-through that operators learn to tap past is **worse** than an honest
+summary, because it manufactures the appearance of review. Verification happens
+on the host with `mt inspect`; the device is a second look, not the primary
+check. Forcing a re-read of what was already checked is how tapping-through
+becomes a habit, and the habit then applies to the screen that mattered.
+
+**ACCEPTED RESIDUAL, stated plainly because it is real:** an operator can reach
+`ENGRAVE` having seen one destination address of N.
+
+### M — the TOTAL must not be spelled as "the amount you are sending"
+
+**This is a known defect class in this constellation, not a hypothetical.** One
+of the five near-miss failures of the `mt` cycle was exactly it:
+
+> print the plate legend -> **printed the sum of all outputs as the destination
+> amount**, for steel.
+
+**Change outputs are yours.** A total that reads as *"you are sending X"*
+overstates it whenever there is change — the normal case. So the summary line
+ruled in L must state what it is counting:
+
+- `N outputs, X.XXXXXXXX BTC total` -- a neutral sum, not a destination claim
+- and it MUST NOT be labelled `TO`, `SENDING`, or any word implying a recipient
+
+`TO` remains an **asserted** field (§3.3), taken from the operator's own
+`--to-label`, never derived from output values. The two must not be adjacent in a
+way that lets one read as the other's value.
+
+*Classification: **refusal to overclaim**, same class as K. Earns a change: the
+wrong outcome is an operator reading their own change back as money leaving.*
 
 ---
 
@@ -352,6 +444,9 @@ the compared number cannot tell them which they hold. `me sysw show` prints
 | H | region write destroys the standing payload | **design intent** — write the courier model down | RULED |
 | I | compare screen names no command; re-pack is the risky recovery | affordance + documentation | RULED |
 | J | digest does not distinguish sealed from unsealed | not our concern | CLOSED |
+| K | txid shown for recognition, never claimed as proof | refusal to overclaim | RULED |
+| L | must every output be seen before ENGRAVE | **no** — total + skip, residual accepted | RULED |
+| M | the total must not read as a destination amount | refusal to overclaim | RULED |
 
 **Step 4 onward: not yet walked.** The payload is loaded into the session; the
 operator has not yet reached the Engrave Transaction program itself.
