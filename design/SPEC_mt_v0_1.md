@@ -122,13 +122,14 @@ warnings on stderr.
 > *cannot* reconstruct). A legend, where an operator does cut one, is a
 > **convenience that shortens a recovery** — never a component one depends on.
 >
-> **It is NOT §5's five fields, and an earlier version of this section said it
-> was — U-5.** §5's set was designed for a `mt qr` plate, where every symbol
-> sits beside one legend. Hand-engraved strings split the text in two:
+> **It is NOT §5's field set applied verbatim, and an earlier version of this
+> section said it was — U-5.** §5's set was designed for a `mt qr` plate, where
+> every symbol sits beside one legend. Hand-engraved strings split the text in
+> two:
 >
 > | printed | text |
 > | --- | --- |
-> | **once** | `BEARER…`, `FROM`, `TO`, `LOCKED TO BLOCK n ~SEASON year` |
+> | **once** | `BEARER…`, `FROM`, `TO`, `LOCKED TO BLOCK n ~SEASON year`, `FORMAT: mt1 codex32` |
 > | **per string** | `n/m` — string `n` of `m`, which `mt` knows exactly |
 >
 > **`PLATE n OF m` is dropped, because `mt` cannot compute `m`.** §3b rules that
@@ -557,10 +558,27 @@ overturned an earlier assumption and are marked.
       recovery warning exists to prevent — it is *"what the transaction SAYS"*
       versus what is confirmed, and an offline report is fully populated in the
       first column and empty in the second.
-   3. **`encode` appends, never edits.** Its two extra rows —
-      `CUT   14 strings, 1,228 characters` — go **below** `STATUS`, so the
-      operator's view is the recoverer's view plus a suffix. Anything `encode`
-      needs to *change* about a row is a defect in the row, fixable in one place.
+   3. **`encode` appends, never edits.** Its two extra rows go **below**
+      `STATUS`, so the operator's view is the recoverer's view plus a suffix:
+
+          CUT       14 strings, 1,228 characters
+          PREFIX    all 14 strings begin mt1qzrf8x — plates sharing that
+                    prefix belong together
+
+      Anything `encode` needs to *change* about a row is a defect in the row,
+      fixable in one place.
+
+      > **The `PREFIX` row was missing here until R6 fold-propagation I-8, and
+      > the omission is worth more than the fix.** §0a and §10.10 both rule that
+      > `encode` prints the shared prefix, §10.10 makes it a ruled row with its
+      > own justification — and this block, which declares itself *"the only
+      > place the layout appears"* and ends *"no caller reorders, reformats, or
+      > drops a row"*, dropped it. It also said **"two extra rows"** while
+      > showing **one**, so its own sentence contradicted its own example.
+      >
+      > **The section whose entire purpose is that two views CANNOT DRIFT
+      > drifted from a third view within hours of being written.** Declaring a
+      > single source of truth does not create one; only the content does.
 
    > **Per caller, the only differences are the stream and the suffix**, which
    > is the whole point of one owner: `inspect` prints it on **stdout** (it is
@@ -784,7 +802,7 @@ overturned an earlier assumption and are marked.
 5. **Reed-Solomon density is the highest that still minimises plate count.**
 6. **Provenance rides in the engraved legend, not in the wire format.**
 7. **`mt` does not offer a locktime CHOICE. It reads the transaction and warns
-   if the plate would be immediately spendable.** Operator ruling 2026-08-23:
+   if the plate would be immediately broadcastable.** Operator ruling 2026-08-23:
    *"Timelocking happens by user at their wallet software. We do not create
    transactions. We merely read transaction and warn if immediate."* **This
    overrules the previous draft's `--timelocked` / `--immediate` flags**, which
@@ -1369,8 +1387,10 @@ The 0.30 mm results are recorded for when the plate exists.
 ## 5. The plate legend — `mt qr` only, DEFERRED (§0a)
 
 > **Retained for the deferred QR cycle, and for one live purpose:** §0a rules
-> that `mt encode` **prints these five fields on `stderr`** as suggested text
-> the operator may engrave beside their string. The measurements and the field
+> that `mt encode` **prints these SIX fields on `stderr`** as suggested text
+> the operator may engrave beside their string. (Five until §10.21 added
+> `FORMAT: mt1 codex32` on 2026-08-23; this note said "five" for the rest of
+> that day — R6 fold-propagation I-4.) The measurements and the field
 > choices below are what that suggestion is made of.
 
 
@@ -1382,7 +1402,7 @@ fields, **164 characters**, 7 lines — measured,
 
 | field | chars | why |
 | --- | --- | --- |
-| `BEARER - ANYONE HOLDING THIS CAN BROADCAST IT` | 45 | the plate is spendable; this is not a backup in the sense the other formats are |
+| `BEARER - ANYONE HOLDING THIS CAN BROADCAST IT` | 45 | the plate carries a transaction anyone holding it can broadcast; this is not a backup in the sense the other formats are |
 
 > **"BROADCAST", not "SPEND" — operator ruling 2026-08-23.** §8.6 refuses inputs
 > whose satisfaction does not bind the outputs, so in the ordinary case a holder
@@ -1740,7 +1760,7 @@ years.
 An `mt` plate is unlike every other plate in the constellation. `md1` and `mk1`
 are watch-only public material: losing one costs privacy, not money. `ms1` is a
 secret, and `me` refuses to push it over NFC at all. **An `mt` plate is
-spendable by whoever holds it.** In hazard terms it sits nearer `ms1` than
+broadcastable by whoever holds it.** In hazard terms it sits nearer `ms1` than
 `md1`, and the existing tooling's assumption that "public string" means "safe to
 engrave" does not hold here.
 
@@ -1752,7 +1772,7 @@ mitigation, the row says so instead of inventing one.
 | **Bearer** — holder can broadcast (`mt qr`) | a timelock bounds it in *time*, not in space, and only when §8.4's `nSequence` condition holds; the `BEARER` line is the first line of a legend `mt` controls |
 | **Bearer** — holder can broadcast (`mt encode`) | **accepted risk, not mitigated on the plate.** `mt` emits a string, not an engraving, so it has no mechanism to put a warning on hand-cut steel (§3b). It warns once on `stderr` at encode time, to the person encoding — who is not the person holding the plate later. The timelock bound still applies |
 | **Pinned destination** — a 2040 recoverer pays a 2026 address whose keys may be lost | **cannot be fixed; partly disclosed.** §5's `TO` line names the destination **wallet** (id or fingerprint), which does not degrade with output count as the old truncated-address form did — but it is **optional**, and says nothing when the destination is not a known wallet (§10.4). `mt` displays every output in full at encode time; the plate carries a summary |
-| **Indistinguishable from a watch-only plate** — an `mt1` plate sits in the same drawer as `md1` and `mk1` plates, in the same script, differing in **one HRP character**, and is the only one of the three that is spendable by whoever picks it up | for `mt qr` the `BEARER` legend line carries the difference. For `mt encode` there is **no mitigation** — see the bearer row above and §3b. R0 round 1 (R-13) |
+| **Indistinguishable from a watch-only plate** — an `mt1` plate sits in the same drawer as `md1` and `mk1` plates, in the same script, differing in **one HRP character**, and is the only one of the three that **moves money when whoever picks it up broadcasts it** | for `mt qr` the `BEARER` legend line carries the difference. For `mt encode` there is **no mitigation** — see the bearer row above and §3b. R0 round 1 (R-13) |
 | **Pinned fee** — a 2026 fee rate may be unbroadcastable in 2040 | **cannot be fixed by `mt`, and is NOT on the plate.** `mt` warns below 10 sat/vB (§8.2b) and names two things a future holder can try, guaranteeing neither: **CPFP** — spending one of this transaction's outputs with a high-fee child, which needs no key from the original signer, unlike **RBF**, which requires signing a replacement and is therefore useless to a plate holder — and **out-of-band submission** straight to a miner, which bypasses relay policy and is the escape hatch when a fee is too low for the parent to reach a mempool at all. **Neither is recoverable from an `mt encode` plate's own contents**, since a raw transaction carries no input amounts (§6) |
 | **Silent invalidation** — one ordinary spend of any input voids the plate, and nothing on it says so | **not mitigated on the plate.** The input outpoints were cut from the legend (§5), so a holder cannot check unspentness from the plate alone — they must decode the QR first. `mt` checks it at encode time (§6a, §8.5); after that the hazard is open and undisclosed on steel |
 | **Non-`ALL` sighash** — an input signed with `SIGHASH_NONE` or `SIGHASH_SINGLE` leaves outputs unbound, so a plate-holder can redirect the funds and the `TO` line becomes a lie | refused at encode time, §8.6 — **structurally**, since §8.2's removal left no script engine |
@@ -1888,13 +1908,22 @@ exactly as permanent, as a machine-engraved one.
    > **`mt` CANNOT put that reminder on a `mt qr` plate, and an earlier draft
    > said it could — R2 lens 2 (S-3), the third recurrence of this class in this
    > artifact.** §7 named *"the engraved out-of-band reminder"* as the
-   > mitigation, and §5's legend has **no such field**: it is five fields over
-   > six lines, sized into §4's reservation, with no room for a sixth. So the
-   > instruction only lands where the operator controls the plate — **`mt
-   > string`**, whose layout is theirs by ruling (§3b). For **`mt qr`** the
+   > mitigation, and §5's legend has **no such field**. So the instruction only
+   > lands where the operator controls the plate — **`mt encode`**, whose layout
+   > is theirs by ruling (§3b). For **`mt qr`** the
    > legend is `mt`-controlled and full, so the warning reaches the operator on
    > `stderr` **before** they cut and nothing reaches the steel. §7 records that
    > asymmetry rather than claiming a mitigation `mt qr` does not have.
+   >
+   > **Two stale details were removed from this argument rather than updated —
+   > R6 fold-propagation I-5.** It said *"five fields over six lines … with no
+   > room for a sixth"*, which §10.21 falsified the same day by adding a sixth
+   > field (`FORMAT: mt1 codex32`, 164 characters over 7 lines); and it called
+   > the verb **`mt string`**, a name §1.1 renamed to `encode`. Neither carried
+   > any weight — the point is that §5 has **no field for this reminder**, which
+   > is true at five fields, at six, and at any count §4's deferred cycle
+   > settles on. **An argument that names a number it does not need acquires a
+   > way to become false for free**, which is exactly what happened here.
 
    **The output total is the anchor and `mt` knows it with certainty** — it is in
    the transaction. Everything uncertain sits on the other side of the
@@ -2506,9 +2535,18 @@ anything is engraved, and folding them in would make `mt` a wallet.
 **What IS still out of scope: reading a plate OPTICALLY.** §10.2's static-scan
 verb — camera, symbol detection, reassembly from images — is deferred with
 `mt qr` (§0a), because there are no engraved symbols in v0.1 to scan. That
-leaves one real gap, §10.21: **no legend field names the format, the tool, or
-the encoding**, so a recoverer holding steel has nothing on it telling them what
-software to look for. `mt1…` identifies the string to someone who already knows
+leaves one real gap — and **§10.21 closed the version of it stated here, while
+the hazard survives on other grounds (R6 fold-propagation I-7).** §5 now
+suggests a `FORMAT: mt1 codex32` line, so the legend *has* a field naming the
+encoding. But §0a rules that **the realistic plate carries no legend at all** —
+every line of it is optional, hand-cut, and paid for in the operator's own
+labour — so a recoverer may still hold steel that names nothing.
+
+**The gap moved from "the spec has no such field" to "the operator probably did
+not cut it", which is not an argument for deleting this entry.** A suggestion
+`mt` prints and an operator skips leaves exactly the hazard the original
+sentence described; what changed is that `mt` has now done everything it can
+about it. `mt1…` identifies the string to someone who already knows
 the constellation; it says nothing to someone who does not.
 
 Also out: signing; broadcasting; RBF or CPFP; watching the chain to detect
@@ -2729,10 +2767,18 @@ signed PSBT.
     | stderr | every warning and refusal a human must see (§3b) |
     | flags | **none for locktime** (§8.4) |
 
-    **Why PSBT-only, when `mt encode`'s PAYLOAD is a raw transaction.** Input
-    format and payload format are independent, and conflating them would have
-    cost two refusals. §8 is written in PSBT vocabulary and degrades unevenly
-    without one:
+    **Why a PSBT is PREFERRED — not required. §8.2e superseded the PSBT-only
+    ruling and this heading still asserted it (R6, two lenses).** Raw signed
+    transaction hex **is accepted**, loudly warned, with `mt` stating what it
+    cannot verify: the operator ruling was *"we can't refuse raw hex signed tx.
+    We have to warn loudly if they paste it and state what we can't verify."*
+    Bitcoin Core's `finalizepsbt` defaults `extract=true` and returns hex, so a
+    PSBT-only rule would refuse **the default output of the standard tool**.
+
+    Input format and payload format remain independent, and the table below is
+    why a PSBT is worth preferring: §8 is written in PSBT vocabulary and
+    degrades unevenly without one. **Read it as the cost of pasting hex, not as
+    a refusal.**
 
     | refusal | finalized PSBT | raw signed transaction |
     | --- | --- | --- |
@@ -2792,9 +2838,19 @@ signed PSBT.
     | **the set prefix** | the **first 7 characters after `mt1`**, shared by every string in this set, with the rule stated — see below |
     | **the value provenance** | per input: chain-fetched (§6a), txid-bound (§8.2d), or operator-asserted (§8.2c) |
 
-    **THE SPEC NAMES ZERO FLAGS while requiring SEVEN operator inputs the PSBT
-    cannot supply — R4 lens 2.** A `grep` for `--[a-z]` returns one hit, and it
-    is the *deleted* locktime pair inside a retraction. Most consequentially
+    **THE SPEC NAMES TWO FLAGS while requiring SEVEN operator inputs the PSBT
+    cannot supply — R4 lens 2, corrected by R6.**
+
+    > **The original wording was "ZERO FLAGS", and it was falsified by a
+    > one-second `grep` the sentence itself prescribes.** `--transaction`
+    > (§1.1's `verify`) and `--quiet` (§1.1a's `decode`) were both added by
+    > rulings on 2026-08-23, *after* this claim was written. **An absence-claim
+    > is only as wide as the search that produced it**, and this one outlived
+    > its own search by a day — the standing lesson about negatives inheriting
+    > their scope, landing on a sentence that names the command to re-run.
+    >
+    > The finding it supports is **unchanged and still open**: two flags is not
+    > seven, so the gap is 5 rather than 7. Most consequentially
     **§8.7's plate budget has no input at all**, which makes that numbered
     refusal unrunnable as written: a refusal whose threshold cannot be supplied
     is not a refusal.
