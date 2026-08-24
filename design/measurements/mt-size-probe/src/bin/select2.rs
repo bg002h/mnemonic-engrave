@@ -177,10 +177,17 @@ fn best_ur(msg: usize, min_module_mm: f64, caps: &Caps) -> Option<Pick> {
                 let plates = if symbols <= first_cap { 1 }
                              else if first_cap == 0 { 1 + symbols.div_ceil(per_plate) }
                              else { 1 + (symbols - first_cap).div_ceil(per_plate) };
+                // R0 round 3, I4: best_ur was left on the RETIRED objective when
+                // best() was updated, so 18 rows read ECC L under a header
+                // promising a floor of M. Same constraints, same ordering.
+                if ec_rank(ec) < ec_rank(EcLevel::M) { continue }
+                if symbols > 16 { continue }
                 let better = match &best {
                     None => true,
-                    Some(b) => (plates, std::cmp::Reverse(ec_rank(ec)), symbols)
-                             < (b.plates, std::cmp::Reverse(ec_rank(b.ec)), b.symbols),
+                    Some(b) => (plates, symbols, std::cmp::Reverse(ec_rank(ec)),
+                                std::cmp::Reverse((mm * 100.0).round() as i64), v)
+                             < (b.plates, b.symbols, std::cmp::Reverse(ec_rank(b.ec)),
+                                std::cmp::Reverse((b.module_mm * 100.0).round() as i64), b.ver),
                 };
                 if better { best = Some(Pick { plates, symbols, ec, ver: v, module_mm: mm, per_plate }); }
             }
@@ -236,6 +243,13 @@ fn main() {
             ("PATH wsh t1, 2in/2out", 1692),
             ("PATH wsh t1, 5in/2out", 4080),
             ("PATH wsh t1, 10in/2out", 8067),
+            // R0 round 3, I1: where does the ECC-M floor + 16-symbol cap make a
+            // transaction UNENCODEABLE? 2.3 advertises the section cap as buying
+            // a 16,367 B transaction; if these come back "-", it cannot be cut.
+            ("CEILING probe", 14000),
+            ("CEILING last that fits", 14560),
+            ("CEILING first that does not", 14600),
+            ("CEILING what 2.3 advertises", 16367),
         ] { row(l, n, min_mm, &caps); }
 
         if (min_mm - 0.60).abs() < 1e-9 {
