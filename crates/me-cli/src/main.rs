@@ -31,6 +31,13 @@ struct Cli {
     /// into a phone NFC-writer app). Off by default.
     #[arg(long)]
     echo: bool,
+    /// Proceed even though stdout is a world-readable file (F-244).
+    ///
+    /// NDEF bytes embed md1/mk1 material, so on a multi-user host their at-rest
+    /// copies must not be world- or group-readable -- the same rule `--out`
+    /// already enforces by creating at 0600. Prefer `--out`.
+    #[arg(long)]
+    allow_world_readable: bool,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -183,6 +190,13 @@ enum SyswCmd {
         /// kept so existing invocations keep working.
         #[arg(long)]
         allow_weak: bool,
+        /// Proceed even though stdout is a world-readable file (F-244).
+        ///
+        /// `me` refuses by default: a container is BEARER, and `>` creates a
+        /// file at 0644 under the usual umask. Prefer `--out`, which `me`
+        /// creates owner-only.
+        #[arg(long)]
+        allow_world_readable: bool,
         /// PBKDF2 rounds.
         #[arg(long, default_value_t = 100_000)]
         iterations: u32,
@@ -328,13 +342,20 @@ fn run() -> i32 {
             return EXIT_USAGE;
         }
         eprintln!("me: wrote {} NDEF bytes to {}", bytes.len(), path.display());
-    } else if cli.hex {
-        let s: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
-        println!("{s}");
-    } else if cli.base64 {
-        println!("{}", base64_encode(&bytes));
-    } else if cli.stdout {
-        if std::io::stdout().write_all(&bytes).is_err() {
+    } else if cli.hex || cli.base64 || cli.stdout {
+        // F-244: all three stdout modes carry the SAME bytes; gating raw and not
+        // hex would teach the operator to reach for hex. `--out` was already
+        // owner-only via write_private -- these were the paths that were not.
+        if !cli.allow_world_readable && stdout_is_world_readable() {
+            refuse_world_readable_stdout();
+            return EXIT_USAGE;
+        }
+        if cli.hex {
+            let s: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+            println!("{s}");
+        } else if cli.base64 {
+            println!("{}", base64_encode(&bytes));
+        } else if std::io::stdout().write_all(&bytes).is_err() {
             return EXIT_USAGE;
         }
     } else {
@@ -758,7 +779,60 @@ fn write_private(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
         opts.mode(0o600);
     }
     let mut f = opts.open(path)?;
+    // F-244: `0o600` binds on CREATE, so an existing world-readable target kept
+    // its old mode -- measured true, and it is the case an operator re-running a
+    // command actually hits. Tightening the OPEN file (rather than the path)
+    // cannot be raced onto a different file between the two calls.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
     f.write_all(bytes)
+}
+
+/// Is this process's stdout a REGULAR FILE that others can read?
+///
+/// F-244. `me sysw pack ... > payload.bin` hands the container to a file `me`
+/// never names -- but a process can `fstat` its own stdout, so the mode is
+/// visible even when the path is not.
+///
+/// **Only `S_ISREG` counts.** A pipe (`me ... | picotool`) has no meaningful
+/// mode and a terminal persists nothing, so both must pass; firing on them would
+/// break every pipeline in the constellation. That is the near-miss this check
+/// is most likely to get wrong, and there are tests for both.
+#[cfg(unix)]
+fn stdout_is_world_readable() -> bool {
+    use std::mem::ManuallyDrop;
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::io::FromRawFd;
+    // ManuallyDrop: fd 1 belongs to the process, and dropping the File would
+    // CLOSE stdout out from under everything downstream.
+    let f = unsafe { ManuallyDrop::new(std::fs::File::from_raw_fd(1)) };
+    match f.metadata() {
+        Ok(md) => md.file_type().is_file() && md.permissions().mode() & 0o044 != 0,
+        // Unreadable stdout is not evidence of exposure; fail OPEN rather than
+        // refusing a write for a reason we cannot state.
+        Err(_) => false,
+    }
+}
+
+#[cfg(not(unix))]
+fn stdout_is_world_readable() -> bool {
+    false
+}
+
+/// The refusal F-244 asks for, with the override it names.
+fn refuse_world_readable_stdout() {
+    eprintln!(
+        "me: stdout is a world-readable file, and this payload is BEARER.\n\
+         \n\
+         Anyone who can read that file can use what is in it. Three ways on:\n\
+         \n\
+           --out <FILE>              me creates it owner-only (0600)\n\
+           umask 077                 then re-run, and the shell creates it 0600\n\
+           --allow-world-readable    proceed anyway"
+    );
 }
 
 /// Minimal standard base64 (no padding-free shortcuts); avoids a dep for one use.
@@ -800,6 +874,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             passphrase_ask,
             no_passphrase,
             allow_weak,
+            allow_world_readable,
             iterations,
             region,
         } => {
@@ -920,9 +995,9 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     blob.len(),
                     sysw::wire::REGION_ADDR
                 );
-                return emit(&img, out.as_ref());
+                return emit(&img, out.as_ref(), *allow_world_readable);
             }
-            emit(&blob, out.as_ref())
+            emit(&blob, out.as_ref(), *allow_world_readable)
         }
 
         SyswCmd::Wipe { out, fill } => {
@@ -941,7 +1016,18 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                      indistinguishable from one that was never written"
                 );
             }
-            emit(&sysw::overwrite::region_image(f), out.as_ref())
+            // NOT GATED, and deliberately. `emit` is shared, so F-244's guard
+            // reached `wipe` too -- and a wipe image is 65,536 bytes of
+            // random/zeros/ones with NOTHING in it. Its purpose is to DESTROY a
+            // payload, so it is the opposite of bearer: refusing it buys no
+            // safety and costs the operator a working command. Caught by asking
+            // what else the new guard would catch; there is a test.
+            const WIPE_IMAGE_CARRIES_NO_SECRET: bool = true;
+            emit(
+                &sysw::overwrite::region_image(f),
+                out.as_ref(),
+                WIPE_IMAGE_CARRIES_NO_SECRET,
+            )
         }
 
         SyswCmd::Show { file } => {
@@ -1128,10 +1214,19 @@ fn read_records(
     Ok(argv.to_vec())
 }
 
-fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>) -> i32 {
+fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>, allow_world_readable: bool) -> i32 {
     use std::io::Write;
+    // F-244: this used to be `std::fs::write`, which creates at 0o666 & ~umask
+    // -- so an UNSEALED container holding a BIP-39 mnemonic landed at 0644 while
+    // `write_private` sat in this same file, documented for exactly this threat,
+    // and used only for NDEF/manifest/uf2. The container was less protected than
+    // the artifact that merely depicts key material.
+    if out.is_none() && !allow_world_readable && stdout_is_world_readable() {
+        refuse_world_readable_stdout();
+        return EXIT_USAGE;
+    }
     let r = match out {
-        Some(p) => std::fs::write(p, bytes).map_err(|e| format!("{}: {e}", p.display())),
+        Some(p) => write_private(p, bytes).map_err(|e| format!("{}: {e}", p.display())),
         None => std::io::stdout()
             .write_all(bytes)
             .map_err(|e| format!("stdout: {e}")),
