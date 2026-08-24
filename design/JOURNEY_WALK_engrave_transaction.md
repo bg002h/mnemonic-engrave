@@ -766,6 +766,55 @@ the one the operator can match against `mt inspect` on the host.
 what an operator actually recognises. But it is **asserted** (§3.3) and must be
 rendered as such, never as the entry's identity.
 
+## Thread 2 — stopping mid-cut
+
+**What the operator has:** a plate 20 minutes into a 21-minute cut, and either a
+finger on BACK or a power drop.
+
+**The two plate forms fail differently, and only one fails safe in the artifact:**
+
+- **a partial QR** will not scan — Reed-Solomon fails and the finder patterns may
+  not even be cut. **Fails safe in the steel itself.**
+- **a partial text plate** carries chunks 1-15 of 22 and **every one has a valid
+  BCH checksum**. It looks like a real plate. It fails safe only because `mt`
+  requires chunks `1..count` to be present — **the safety lives in the host tool,
+  not in the artifact.** Worth stating, because an operator holding the steel has
+  no way to see the difference.
+
+### R — the legend is cut LAST, and an incomplete plate is discarded
+
+**RULED (operator) 2026-08-24: "Legend should come last. Incomplete plate is
+discarded."**
+
+**Why legend-last is more than an ordering choice.** The legend is the plate's
+**claim about itself**. Cut last, a plate only claims to be `PLATE 2 OF 3` once
+it actually is one; cut first, it is a claim the plate has not earned — a partial
+plate asserting completeness. This is the anti-overclaim discipline of K, M and Q
+applied to the **artifact** rather than to a screen.
+
+**The invariant it buys, and it is worth writing into the spec explicitly:**
+
+> **An unsigned plate is an unfinished plate.**
+
+Visible at a glance, in a drawer, with no tooling and no scanner — which matters
+precisely because the device has no camera (N) and the operator is the only
+inspector there is.
+
+**Why no RESUME, with a mechanism behind it rather than a preference.**
+Re-clamping cannot guarantee the plate returns to the same origin, and this
+machine has already produced a misregistration artefact traced to **Y-axis play
+from a loose screw** — found only after four software hypotheses had failed. A
+resumed cut would be offset against the first half, and the result would look
+like a finished plate. Discard is the sound rule, not merely the simple one.
+
+**The device must SAY it**, on the same principle as the step-5 ruling: it knows
+it stopped mid-cut, and the operator is holding twenty minutes of steel they will
+be tempted to keep. A plate with no legend is self-evidently unfinished, but only
+to someone who has been told the invariant.
+
+*Classification: **default (ordering) + instruction**. Earns the change: the
+wrong outcome is an anonymous half-plate entering a stack of good ones.*
+
 ---
 
 ## Running classification tally
@@ -790,6 +839,7 @@ rendered as such, never as the entry's identity.
 | O | **no `mt` verb can read a default plate** — all three take `mt1` strings | missing capability, new P2 scope | RULED |
 | P | applicability belongs in the PAYLOAD MENU, not the carousel — the carousel stays payload-independent | RULED (3rd form) |
 | Q | several transactions in one payload — picker keyed on **txid**; prefix distinguishes, never verifies | RULED |
+| R | stopping mid-cut — **legend last**, incomplete plate discarded, no resume | RULED |
 
 **Step 4 onward: not yet walked.** The payload is loaded into the session; the
 operator has not yet reached the Engrave Transaction program itself.
