@@ -198,6 +198,70 @@ silent is a worse defect than the one it replaces.
 
 ---
 
+## Step 2 — getting it to the device
+
+The operator asked: **"So the device was in bootsel and payload was flashed and
+sh2 is now off?"** — a question about machine STATE, and the uncertainty is the
+finding again.
+
+Ground truth: after `picotool load` the SH2 is **still in BOOTSEL** (no reboot
+without `-x` or `picotool reboot`), so it is not "off" — it is in the ROM
+bootloader running no firmware.
+
+The command is documented, `SPEC_systemwide_payloads.md:869`:
+
+```
+picotool load --verify -t bin -o 0x10D00000 payload.bin   # machine in BOOTSEL, laptop power
+```
+
+### G — the documented command's power note is right for the flash and silent about the step after it
+
+The fork carries upstream `713aee2`, *"reboot into USB drive mode if 20V/28V is
+not available… blocking the user from operating a machine that won't engrave"*.
+Verified an ancestor of the fork's `main`:
+
+```
+$ git merge-base --is-ancestor 713aee2 main  ->  YES
+```
+
+So **rebooting on laptop power brings the SH2 up in USB drive mode, not the
+GUI.** The operator never sees *"A systemwide payload is present. Load it?"*, and
+the honest conclusion they draw is **"the payload didn't take"** — so they
+re-flash a payload that was already written correctly.
+
+The real sequence needs a step no document states: flash on laptop power →
+**move to the machine's own 20V/28V supply** → then boot.
+
+*Classification: **documentation only**, and it earns the change — the wrong
+outcome is re-flashing a correct payload, and the operator has no way to tell
+that from a failed write.*
+
+### H — writing the region destroys the standing payload. RULED: that is intended.
+
+`me sysw pack --region` emits a full 65,536-byte image and
+`picotool load -o 0x10D00000` writes all of it, so a transaction payload
+**replaces the entire region** — including any seeds, descriptors or passphrase
+already there. No tool says so: not `me`, not `picotool`, not the device. There
+is no merge; the region holds exactly one container.
+
+**RULED (operator) 2026-08-24: "Overwriting is the desired default behavior."**
+
+This is a ruling against all three options offered (NFC-preferred, warn-and-keep,
+read-and-merge), and it is coherent once the model is stated:
+
+> **The systemwide region is a COURIER, not a vault.** It carries what the
+> operator is working on to the machine, one job at a time. It was never the
+> durable copy of anything, so replacing it loses nothing that was not already
+> backed up elsewhere.
+
+*Classification: **not a defect — design intent.*** One cheap residual remains,
+**documentation only**: the courier model should be **written down**, because
+nothing currently says it and an operator who has not been told will reasonably
+read a persistent flash region as storage. The failure that model prevents is not
+the overwrite — it is someone treating the region as a backup in the first place.
+
+---
+
 ## Running classification tally
 
 | # | finding | class | status |
@@ -209,6 +273,8 @@ silent is a worse defect than the one it replaces.
 | E | world-readable output | refusal + override, all of `me` and `mt` | RULED |
 | F-244 | container written 0644 with a cleartext mnemonic | **CRITICAL** | FILED |
 | F | seal-by-default wrong here | default by content | RULED |
+| G | power note silent about the step after the flash | documentation only | RULED |
+| H | region write destroys the standing payload | **design intent** — write the courier model down | RULED |
 
-**Step 2 onward: not yet walked.** The operator has a container and has not yet
-got it to the device.
+**Step 3 onward: not yet walked.** The payload is on the device; the operator has
+not yet booted it on machine power.
