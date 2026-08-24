@@ -9833,3 +9833,78 @@ into `mt`, which currently knows only its own — and the constellation's
 fork-per-codec ruling (2026-05-03) exists precisely to stop that coupling
 spreading. A one-line hint keyed on the literal prefixes `md1`/`mk1` would be
 enough and would not import anything; that is what to write if it is done.
+
+### F-238 — §5 and §8.4's worked example `~FALL 2034` disagrees with §8.4's own algorithm, which gives SUMMER (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#MINOR`
+
+**Found by implementing it, 2026-08-24.** §8.4 rules the projection exactly:
+
+    estimated unlock = MT_REF_TIME + (target_height − MT_REF_HEIGHT) × 600 s
+    MT_REF_HEIGHT = 963_759
+    MT_REF_TIME   = 1_787_507_701
+
+For the worked example, block **1,383,520**: 419,761 blocks × 600 s =
+251,856,600 s, so the projection is **2034-08-16T18:05Z**. §8.4 also rules the
+seasons as *northern-hemisphere meteorological quarters*, under which August is
+**SUMMER**. Both §5's legend table and §8.4's own example render it `~FALL 2034`.
+
+**The spec anticipated this exact case and it is why the finding is Minor.**
+§8.4: *"The exception is a projection landing near a season boundary, which can
+tip"*, against a measured drift of *"+16 to −34 days"* over this very span — and
+the projection lands **15 days** from the September boundary. So the `~` is doing
+precisely the work it was put there for.
+
+**What was done.** The algorithm is implemented as ruled and pinned by
+`locktime::tests::the_worked_example_projects_to_summer_not_the_spec_s_fall`,
+with the boundary table pinned separately in
+`the_season_boundaries_are_the_meteorological_quarters`. **The code follows the
+rule, not the example** — the reverse would have been the defect, since the
+example is one datum and the rule governs every plate.
+
+**What to change.** Either re-render the example as `~SUMMER 2034` in both
+sites, or pick a worked height that lands mid-season so the example stops being
+a boundary case. The second is better: an example that tips is an example that
+will disagree with some future reference pair too.
+
+### F-239 — §8.4 gives ONE state two normative spellings, and never says they are different surfaces (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#MINOR`
+
+**Found by the post-implementation spec-conformance review, 2026-08-24 (S-2).**
+For a transaction with a non-zero `nLockTime` and every input final:
+
+- §8.4's list of report spellings gives
+  `nLockTime 900000 present but NOT ENFORCED (all inputs final)`;
+- forty lines below, §8.4 rules *"`NO TIMELOCK` is reserved for a transaction
+  with `nLockTime = 0` **or with all inputs final**"*.
+
+One reading resolves it — the `NO TIMELOCK` sentence sits in the paragraph about
+the **engraved legend**, the `NOT ENFORCED` line in the list of **`stderr`
+report** spellings — **but that split is never stated**, and §1.1 binds the
+report's `LOCKTIME` row to *"§8.4's five normative spellings"* as a single set.
+
+**This is the same two-spellings-one-input class §8.4 itself calls a real
+defect** (R6 implementability I-8), landing on §8.4.
+
+**What was implemented**, on the resolving reading: `Lock::report_row` emits
+`nLockTime N present but NOT ENFORCED (all inputs final)` and `Lock::legend`
+emits `NO TIMELOCK`, with the split stated in the code. The legend is 11
+characters and cut into steel; the report is disposable and can afford the
+value.
+
+**What to change.** One sentence in §8.4 naming the two surfaces, so the next
+implementer does not have to derive it.
+
+### F-240 — §1.1's row-presence table names `verify` as a report caller; §1.1's own `verify` example does not (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#NIT`
+
+**Found by the post-implementation spec-conformance review, 2026-08-24 (S-1).**
+§1.1's table lists `mt1 SET` as a row `verify` produces, which reads as `verify`
+being a caller of the shared report. §1.1's own worked `verify` output is a
+single `OK` line plus the margin report — no report rows at all — and §1.1
+elsewhere describes `verify` as **structural only**, never consulting a node,
+which is exactly what makes it runnable air-gapped.
+
+**Implemented as the examples describe**: `verify` prints its OK line, the
+duplicate/unreadable notices and the margin report, and calls no node. `decode`
+and `inspect` are the report's two callers.
+
+Low stakes — nobody is misled in a way that costs anything — but it is a table
+and a worked example disagreeing inside one section, and the table is what an
+implementer reads first.
