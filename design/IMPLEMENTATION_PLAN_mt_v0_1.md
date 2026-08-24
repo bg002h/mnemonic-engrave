@@ -19,6 +19,58 @@
 
 ---
 
+## Status: EXECUTED — S0 through P6 shipped 2026-08-24
+
+**The code is in a different repository**, `bg002h/mnemonic-transaction`
+(PRIVATE), at `/scratch/code/shibboleth/mnemonic-transaction`. This plan and the
+spec stay here. CI green; v0.1 publishes nothing, tags nothing, releases nothing.
+
+| | |
+| --- | --- |
+| tests | **160**, plus three gates that run in CI |
+| refusal ledger | `crates/mt-cli/tests/refusals.toml` — **25 tests over 16 ruled refusals** |
+| mutation gate | `scripts/mutate-refusals.sh` — all 25 go **red** when their check is removed |
+| journeys | `scripts/journeys.sh` — A/B(×2)/C, asserting on what the operator SEES |
+
+**THE MANDATORY POST-IMPLEMENTATION REVIEW FOUND NINE CRITICALS IN CODE THAT WAS
+GREEN.** 160 tests, three gates and CI all passed before a single reviewer was
+dispatched. Reports persist verbatim in `mnemonic-transaction/design/agent-reports/`:
+
+| lens | verdict |
+| --- | --- |
+| `R-post-impl-adversarial-funds.md` | 2C / 8I / 4M — **NOT SAFE** |
+| `R-post-impl-spec-conformance.md` | 4C / 7I / 8M, **spec-first** |
+| `R-post-impl-false-pass.md` | 2C / 1I — what in the suite and gates cannot fail |
+| `R-post-impl-live-node.md` | 1C / 1I — found by RUNNING it against real `bitcoind` |
+
+**The four Criticals worth carrying forward as lessons**, because each is a class
+rather than an instance:
+
+- **`verify` asserted a check that did not exist.** §1.1's content-id
+  re-derivation had no code behind it, so `verify` printed *"transaction
+  re-derives"* on every run — and `decode` emitted the WRONG transaction's
+  broadcastable hex for a forged set. *A sentence in a spec is not a test.*
+- **§8.2f was bypassed by the invocation it exists to refuse.** `mt encode <hex>`
+  never reached the guard: clap rejects the positional first, and **clap's error
+  echoes the bearer transaction**. *A guard downstream of the parser has already
+  lost.*
+- **§8.4 was essentially unbuilt** — no `LOCK_TIME_THRESHOLD` branch, no
+  `nSequence` rule — so both failures §8.4 names in its own text were in the
+  shipped binary. *The spec-first lens is what found it; a code-first pass finds
+  only what the code chose to do.*
+- **`encode` told a CONFIRMED transaction it "can never be broadcast"** and
+  advised building a new one, which is advice to pay twice. `inspect` got it
+  right on the same node. *Found by running it against a real node — no stub
+  models the difference, because all three cases share `gettxout → null`.*
+
+**Three defects in THIS PLAN's own artifacts fell out of executing it**, filed as
+F-238, F-239 and F-240: §8.4's worked example disagrees with §8.4's algorithm,
+§8.4 gives one state two spellings without saying they are two surfaces, and
+§1.1's row table disagrees with §1.1's own `verify` example. **Implementation
+catches what review inherits as a given.**
+
+---
+
 ## 0. What is being built
 
 A new repository, `mnemonic-transaction`, with two crates matching the
