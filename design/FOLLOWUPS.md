@@ -9768,7 +9768,7 @@ one produced a plausible-looking number. Only asserting measured v40 capacity
 against the published limits (numeric 7089 / alnum 4296 / byte 2953 at L) caught
 them. **Any future QR sizing work must carry that gate.**
 
-### F-235 — `mt` renders every address with MAINNET parameters, so a testnet or regtest transaction shows an address that does not exist (owning phase: **post-v0.1 UX**) `#mt` `#report` `#LOW`
+### F-235 — CLOSED 2026-08-24 — `mt` rendered every address with MAINNET parameters, so a testnet or regtest transaction showed an address that does not exist (owning phase: **post-v0.1 UX**) `#mt` `#report` `#LOW`
 
 **Found by running P5's fixtures, 2026-08-24.** The `OUT` row of a regtest
 transaction reads
@@ -9797,7 +9797,7 @@ prefixes in the inputs — there are none, the inputs are outpoints.
 useful row for a recoverer deciding whether to broadcast; a hex `scriptPubKey`
 is not a substitute.
 
-### F-236 — `--input-value` takes BTC as an `f64`, and the parse is lossy by construction (owning phase: **post-v0.1 UX**) `#mt` `#funds-safety` `#LOW`
+### F-236 — CLOSED 2026-08-24, by the adversarial review rather than by this entry — `--input-value` took BTC as an `f64` (owning phase: **post-v0.1 UX**) `#mt` `#funds-safety` `#LOW`
 
 **Noticed while writing P5's tests, 2026-08-24.** `parse_input_values` does
 `btc.parse::<f64>()` then `(btc * 100_000_000.0).round()`. For every value a
@@ -9816,7 +9816,7 @@ split on `.`, require at most 8 fractional digits, reject anything else — whic
 also gives a better refusal for `0:1.234567891` (nine decimals) than silently
 rounding it. That refusal is the actual user-visible gain, not the arithmetic.
 
-### F-237 — `me`'s `md1`/`mk1` strings are accepted by `mt decode`'s reader before the codec rejects them, so the refusal names the wrong thing (owning phase: **post-v0.1 UX**) `#mt` `#refusals` `#NIT`
+### F-237 — CLOSED 2026-08-24 — `md1`/`mk1` strings reached `mt decode`'s codec and were reported as bad bech32 rather than as a sibling's material (owning phase: **post-v0.1 UX**) `#mt` `#refusals` `#NIT`
 
 **Noticed while implementing §8.9, 2026-08-24.** §8.9 refuses `ms1` *before*
 §8.2e's byte-naming, because that refusal prints the first eight bytes and for a
@@ -9834,7 +9834,7 @@ fork-per-codec ruling (2026-05-03) exists precisely to stop that coupling
 spreading. A one-line hint keyed on the literal prefixes `md1`/`mk1` would be
 enough and would not import anything; that is what to write if it is done.
 
-### F-238 — §5 and §8.4's worked example `~FALL 2034` disagrees with §8.4's own algorithm, which gives SUMMER (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#MINOR`
+### F-238 — CLOSED 2026-08-24 — §5 and §8.4's worked example `~FALL 2034` disagreed with §8.4's own algorithm, which gives SUMMER (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#MINOR`
 
 **Found by implementing it, 2026-08-24.** §8.4 rules the projection exactly:
 
@@ -9865,7 +9865,7 @@ sites, or pick a worked height that lands mid-season so the example stops being
 a boundary case. The second is better: an example that tips is an example that
 will disagree with some future reference pair too.
 
-### F-239 — §8.4 gives ONE state two normative spellings, and never says they are different surfaces (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#MINOR`
+### F-239 — CLOSED 2026-08-24 — §8.4 gave ONE state two normative spellings and never said they are different surfaces (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#MINOR`
 
 **Found by the post-implementation spec-conformance review, 2026-08-24 (S-2).**
 For a transaction with a non-zero `nLockTime` and every input final:
@@ -9892,7 +9892,7 @@ value.
 **What to change.** One sentence in §8.4 naming the two surfaces, so the next
 implementer does not have to derive it.
 
-### F-240 — §1.1's row-presence table names `verify` as a report caller; §1.1's own `verify` example does not (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#NIT`
+### F-240 — CLOSED 2026-08-24 — §1.1's row-presence table named `verify` as a report caller; §1.1's own `verify` example does not (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#NIT`
 
 **Found by the post-implementation spec-conformance review, 2026-08-24 (S-1).**
 §1.1's table lists `mt1 SET` as a row `verify` produces, which reads as `verify`
@@ -9908,3 +9908,23 @@ and `inspect` are the report's two callers.
 Low stakes — nobody is misled in a way that costs anything — but it is a table
 and a worked example disagreeing inside one section, and the table is what an
 implementer reads first.
+
+
+## Burndown — the `mt` cycle's six, closed 2026-08-24
+
+All six were owned by **post-v0.1 UX** or **the mt spec, next touch**, and this
+is that moment: the cycle is closed and nothing later owns them.
+
+| | closed by |
+| --- | --- |
+| **F-235** | `Node::chain()` reads `getblockchaininfo`. Addresses render for the operator's network, and **when no node is reachable the row SAYS `addresses shown as MAINNET — no node to ask`** rather than printing one silently. Read from the node, not asked of the operator — §6a's posture, and it adds no flag to set wrongly. |
+| **F-236** | Already fixed, by the adversarial review, hours before this burndown. `parse_btc` parses a decimal STRING into satoshis; the only `f64` left in the amount path is a comment describing what was removed. **The entry was stale when written down** — worth noting, because a follow-up list that is not reconciled reports work that is already done. |
+| **F-237** | `sibling_format` names `md1`/`mk1` by their literal prefix and points at the tool that reads them. **Keyed on three characters and nothing else**, so `mt` imports no knowledge of the siblings' codecs and the fork-per-codec ruling stands. It also asserts `mt` echoes none of the material back. |
+| **F-238** | The worked example now reads `~SUMMER 2034` in both sites, with a note recording that **the example was wrong and the rule was right** — the only ordering that could be corrected safely, since the rule governs every plate and the example is one datum. Pinned in code, with the season boundaries pinned separately. |
+| **F-239** | §8.4 now states the split it always relied on: the `stderr` REPORT says `nLockTime N present but NOT ENFORCED (all inputs final)`, the engraved LEGEND says `NO TIMELOCK`. Two surfaces, two spellings, one state — said out loud, in a table, where an implementer will hit it. |
+| **F-240** | The row-presence table no longer names `verify` as a report caller, with a note pointing at §1.1's own worked `verify` output — a single `OK` line — and at the structural-only ruling that makes `verify` runnable air-gapped. |
+
+**What the burndown itself found.** F-236 was already done and nobody had said
+so. Reconciling *before* working is what the per-phase rule asks for, and it cost
+one `grep` here — against a list of six. On a longer list the same omission is
+how a closed item gets "fixed" twice, or how a real one hides behind a stale one.
