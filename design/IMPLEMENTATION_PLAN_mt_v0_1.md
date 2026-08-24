@@ -242,6 +242,38 @@ operator sees**, not only on exit codes.
 
 ---
 
+## 2a. Rulings on review findings — what is NOT being done, and why
+
+**R8 C-5 — bespoke tests for a wrong HRP, a wrong `version`, or a plain
+`count`: WON'T FIX.** Operator ruling 2026-08-23.
+
+**The operator's reasoning, on the engraving side.** *"If a user can't get the
+first two chars correct for engraving, everything else we could possibly do to
+help will fail. An incorrect count or plate id doesn't necessarily preclude
+recovering funds if all cards are present — it just means ignoring the headers
+and finding the correct order, most if not all of which will be correctly
+recorded."*
+
+That holds, and one mechanism makes it hold harder than stated: **the header is
+inside the BCH-protected region**, so a miscut `index` is corrected exactly like
+a payload symbol, under the same `t = 4` budget. Past that budget a recoverer
+holding every string can disregard the headers entirely and search orderings,
+with the **content id validating the result** (§10.13 c). Header fields are a
+recovery *convenience*; the content id is what makes recovery decidable.
+
+**And the case the finding was actually aimed at — an IMPLEMENTER choosing
+`"mt1"` as the HRP, or plain `count` — is already covered**, which is what makes
+this a genuine won't-fix rather than an accepted risk. Each wrong choice
+produces **different bytes**, so the pinned byte-exact vector below fails on all
+three by construction. C-5 asked for three bespoke tests to catch what one
+vector catches for free, and three tests that restate the same values the
+implementation reads are three more places for the values to drift together.
+
+> **The general rule this is an instance of:** prefer **one artifact the
+> implementation did not produce** over N assertions the implementation could
+> satisfy by agreeing with itself. That is also why the vector is spec-authored
+> and lands first.
+
 ## 3. What this plan deliberately does not do
 
 - **No `mt qr`, no `sysw`, no QR anything.** Deferred (§0a).
