@@ -189,8 +189,45 @@ overturned an earlier assumption and are marked.
    **`mt verify` is STRUCTURAL ONLY.** Operator ruling 2026-08-23, and it is
    what the siblings already do — **none of the three touches external state.**
    It checks: every string parses, every BCH checksum holds, the set is complete
-   (`count` chunks, indices `0..count-1`, no duplicates), every chunk carries the
-   same `chunk_set_id`, and the reassembled transaction re-derives that id.
+   (`count` chunks, indices `0..count-1`), every chunk carries the same
+   `chunk_set_id`, and the reassembled transaction re-derives that id.
+
+   **TWO CHUNKS SHARING AN INDEX IS NOT AN ERROR, AND AN EARLIER DRAFT OF THIS
+   LINE MADE IT ONE.** It required *"no duplicates"* — which put this section in
+   direct contradiction with **§1.8**, whose entire answer to plate loss is
+   *"the operator is free to engrave duplicate copies."* **The one mitigation
+   the spec offers for its largest accepted risk was the one thing `verify`
+   rejected**, so an operator who followed §1.8 was rewarded with a set that
+   would not verify. Found by walking Journey C, 2026-08-23.
+
+   It bites hardest in the case that produces duplicates *without anyone
+   choosing to*: an operator re-cuts a miscut string, and the old plate is still
+   in the drawer. Now two chunks claim index 7, **they are not identical**, and
+   a recoverer who deletes "the extra one" has even odds of keeping the bad copy
+   and binning the good one.
+
+   **The mechanism to resolve this already exists and was going unused: every
+   chunk carries its own BCH checksum**, so each candidate is testable
+   independently of the others.
+
+   | two chunks, same index | what is true | what `mt` does |
+   | --- | --- | --- |
+   | **one passes BCH, one fails** | the re-cut case — the miscut copy is detectably bad | **use the good one, and say so.** No operator decision is needed; `mt` has proof |
+   | **both pass, bytes identical** | a deliberate duplicate copy, per §1.8 | **accept silently.** This is the spec's own advice being followed, and reporting it would make correct behaviour look like a problem |
+   | **both pass, bytes differ** | two valid chunks disagreeing — different transactions, or damage that landed inside the code word | **refuse loudly.** The only genuinely ambiguous case, and the only one where guessing could pick a wrong transaction |
+
+   > **The third row is why this is a split rather than a relaxation.** Dropping
+   > the duplicate rule outright would accept two disagreeing valid chunks and
+   > silently use whichever arrived first. That is the failure this whole
+   > document is organised against — a plausible answer where there should be a
+   > refusal — and it is rare enough to be invisible in testing and severe
+   > enough to matter.
+   >
+   > **Nothing here weakens the content-id check.** `verify` re-derives the id
+   > from the reassembled transaction either way (§10.13 c), so the surviving
+   > copy still has to produce the right transaction. Duplicate resolution
+   > chooses *which bytes to try*; it does not decide whether the result is
+   > correct.
 
    **What the correction DOES and DOES NOT cover — printed ALWAYS, before
    cutting.** Operator ruling 2026-08-23. Nothing in `mt`'s output contradicts
