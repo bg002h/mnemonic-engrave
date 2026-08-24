@@ -122,11 +122,25 @@ matching the constellation, CI running `cargo nextest run --locked`, and
 **No upstream change.** §1 settles this: `mt-codec` forks, so `descriptor-mnemonic`
 is not touched by this plan at all.
 
-**Tests first.** Nothing to test yet beyond the skeleton building.
+**Tests first.** Nothing to test yet — which is exactly why this phase does
+**not** run the test command.
 
-**Gate.** `cargo build` and an empty `cargo nextest run --locked` succeed.
+**Gate.** `cargo build --locked`, `cargo clippy --all-targets -- -D warnings`,
+and `cargo fmt --check`. **`cargo nextest run` is deliberately NOT part of this
+gate.**
 
-**Exit.** The repo exists and is green. No `mt1` behaviour yet.
+> **Because it would fail — measured, not reasoned about.** Since nextest
+> 0.9.85 the default is `--no-tests=fail`, and on the installed **0.9.140** a
+> workspace with no tests prints `error: no tests to run` and exits **4**. The
+> earlier version of this gate was *"`cargo build` and an empty
+> `cargo nextest run --locked` succeed"* — **a gate that could never pass**, in
+> a plan whose own text says a gate that has never executed is a hypothesis
+> rather than a gate. Both R8 lenses found it independently, and the fix is not
+> `--no-tests=pass`: **an empty test run is a vacuous gate either way**, so the
+> honest move is to gate on what P0 actually produces — a tree that builds and
+> lints clean — and let P1 be the first phase with tests to run.
+
+**Exit.** The repo exists, builds, and lints clean. No `mt1` behaviour yet.
 
 ### P1 — the `mt1` wire format
 
@@ -210,6 +224,22 @@ reaches a non-stdout consumer.
 - duplicate resolution over **`n`** candidates, post-correction bytes, majority vote forbidden (§1.1)
 - `decode` writes **nothing to stdout** unless every check passes, exits non-zero otherwise (§1.1a)
 
+**`mt verify` IS A DELIVERABLE OF THIS PHASE, and had none — R8 gates C4.** The
+plan named it in the verb list and in this heading and nowhere else: every bullet
+above is a `decode`-path item, and the gate tested `decode` only. A verb with no
+deliverable, no test and no gate is a verb nobody has agreed to build.
+
+- **`verify` is STRUCTURAL ONLY and NEVER asks a node** (§1.1) — it must run on
+  an air-gapped machine, so a node call here is a defect, not a feature
+- it checks: every string parses, every BCH checksum holds, the set is complete
+  (chunks 1..`count`), every chunk carries the same `chunk_set_id`, and the
+  reassembled transaction **re-derives that id**
+- it **reports its margin, not just its verdict** (§1.1) — per corrected chunk,
+  the count against `t = 4`, the 1-based positions, and each symbol's
+  before-value, ordered so the nearest-to-limit chunk is visible
+- **`--transaction <psbt|hex>`** compares against the **full 32-byte txid** of the
+  supplied transaction's *extracted* form (§1.1), never the 20-bit set id
+
 **Tests first.** A round-trip through `--elide-prefix` (encode elided → decode →
 byte-identical transaction), a **mixed** full/elided input test, and a test that
 **all-elided input is refused** with the message naming the 8 characters needed —
@@ -220,9 +250,22 @@ that the `mt1`→`mtl` autocorrect hazard does not fire on a valid string; a
 duplicate-resolution test with **three** candidates asserting refusal rather than
 a vote; a test asserting stdout is empty on failure.
 
-**Gate.** Every P1 vector round-trips through `decode`. **And a negative gate:**
-a deliberately corrupted vector must fail, with the failure naming the suspect
-chunks in descending correction order.
+**Gate, and it now covers both verbs.**
+
+1. Every P1 vector round-trips through `decode`.
+2. **`verify` returns OK on every P1 vector**, and on a vector with **one**
+   corrupted symbol returns OK **while reporting `1 of 4`** — the margin report
+   is the deliverable, so a `verify` that says OK without it fails this gate.
+3. **`verify --transaction` matches the right transaction and REJECTS a wrong
+   one whose txid shares the set's 20 bits.** Constructing that input is cheap —
+   2^20 double-SHA-256 operations — and it is the only test that distinguishes
+   the full-txid comparison from the 20-bit one.
+4. **Negative:** a vector corrupted beyond `t = 4` must fail, with the failure
+   naming the suspect chunks in descending correction order.
+
+> Gate 3 is the one that would have caught the defect R8 found in the spec: a
+> comparison against the set id reports a **match** for any transaction sharing
+> 20 bits, and says so in the words *"prove identity"*.
 
 ### P4 — `inspect`, the report, and the node
 
@@ -238,8 +281,24 @@ chain queries.
 run air-gapped and deterministically. One fixture per liveness state, including
 the mempool-unconfirmed parent that must read PENDING and not DEAD.
 
-**Gate.** The report renders identically from `encode`, `decode` and `inspect`
-for one vector, differing only in stream and the `CUT`/`PREFIX` suffix.
+**Gate.** For one vector, the three callers' reports agree on **every row the
+§1.1 row-presence table says all three can produce**, and differ **only** where
+that table predicts — each difference asserted individually, not waved past.
+
+> **"Identically" was unsatisfiable, and §1.1's own table says why — R8
+> coverage C-4.** `FEE` is present *"when a node is reachable **or** the input
+> was a PSBT carrying values"*: `encode` is handed a PSBT with UTXO records and
+> can compute it, while `inspect` is handed `mt1` strings and offline cannot.
+> The same table makes `mt1 SET` absent for `encode` (it has no strings to
+> report on yet) and present for the other two. **A gate demanding identity
+> would fail on conformant code**, which is the worst kind: it trains whoever
+> hits it to weaken the gate rather than fix the defect.
+>
+> **Asserting the differences is the stronger test anyway.** "Identical" checks
+> that three callers agree; this checks that they differ **exactly where the
+> specification says they must** — which is the property the single-owner rule
+> exists to protect, and it catches a caller that drops a row it *should* have
+> produced. Identity never would.
 
 > **A live-node smoke test is a separate, non-gating check.** A synced
 > `bitcoind` is available on this machine, and one manual run against it is
