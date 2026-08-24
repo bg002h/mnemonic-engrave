@@ -153,10 +153,47 @@ begin until the previous one is green. A phase's gate is written **in the phase
 that owns it** and must be executed at least once before that phase closes — a
 gate that has never run is a hypothesis, not a gate.
 
+### S0 — the pinned vector, authored HERE, before any phase runs
+
+**R10 Important 1: the load-bearing NUMS defence had no owning phase and does
+not exist.** P0 copied *"the spec and its pinned vector"* as though the vector
+were already a file; P1 asserted against it *"before any other test is
+written"*; **no phase created it**. P0 cannot copy what does not exist, and
+`mt-codec` cannot be checked against bytes nothing produced.
+
+**S0 runs in `mnemonic-engrave`, not `mnemonic-transaction`, and completes
+before `mt-codec`'s first commit** — that ordering is the whole point of the
+ruling it comes from (`design/agent-reports/R8-fable-ruling-nums-defence.md`).
+A vector the implementation produced cannot falsify the implementation.
+
+**Deliverable — `design/vectors/mt1_v1_vectors.md` plus its generator:**
+
+1. **One real signed segwit transaction**, so the witness-bearing serialisation
+   is exercised: 1 input P2WPKH, 1 output P2TR, `nLockTime` set to a past
+   height. Recorded as raw hex, with its txid and wtxid **both** stated so the
+   §1.1 `TX` row's distinction is pinned by the vector rather than by prose.
+2. **Its exact `mt1` strings**, in full form and in `--elide-prefix` form.
+3. **A 13-symbol checksum micro-vector** — HRP `"mt"`, a fixed 40-symbol data
+   part, the resulting BCH checksum — so a checksum bug is localisable without
+   decoding a whole transaction.
+4. **`scripts/gen-mt1-vectors.py`, committed**, deriving all of the above from
+   the transaction hex **independently of `mt-codec`** — bech32, the 55-bit
+   header layout and the BCH polymod implemented directly from §10.13(a2) and
+   BIP-93. Slower and dumber than the crate on purpose: an independent
+   derivation is the only kind that can disagree.
+
+**Gate.** The generator runs, its output matches the committed vector file
+byte-for-byte, and the header fields it emits satisfy the arithmetic of
+§10.13(a2): 55 bits, 11 symbols, invariant prefix exactly 8 symbols.
+
+**Exit.** The vector exists in this repo and is committed. P0 now has something
+to copy.
+
 ### P0 — skeleton
 
-**Deliverable.** The **spec and its pinned vector are copied into
-`mnemonic-transaction`** — `design/SPEC_mt_v0_1.md` and the vector file — because
+**Deliverable.** The **spec and the S0 vector are copied into
+`mnemonic-transaction`** — `design/SPEC_mt_v0_1.md` and
+`design/vectors/mt1_v1_vectors.md` — because
 P5's exhaustiveness gate and P6's journeys read them and **no phase put them
 there** (R8 coverage I-12). They are copied with the commit SHA they came from
 recorded alongside, so drift against `mnemonic-engrave` is a `git diff` and not
@@ -292,6 +329,12 @@ matches the spec's pinned vector**.
   documented `decode` pipeline depends on it
 - optional grouping, opt-in, **stdout only**
 - **`--elide-prefix`** — first string full, rest carry `index + payload` only (§3b)
+- **§10.20's recovery caveat**, carried by `inspect` and `decode`: a **legacy**
+  input is txid-malleable, so if a malleated version confirmed first the
+  confirmed txid will not match the plate's — **the plate is not wrong, it is
+  superseded**, and the original can no longer confirm. R10 Minor 1, and an
+  uncarried R8 finding before that: §10.20 says this belongs *"somewhere a
+  recoverer will read"*, and no phase had it
 - the `stderr` legend suggestion — **five** fields including
   `FORMAT: mt1 codex32` (§5). *(Six until `PLATE n OF m` was deleted on
   2026-08-23; this line said six, another spec change the plan did not inherit.)*
@@ -440,9 +483,14 @@ asserted individually, not waved past.
 > exists to protect, and it catches a caller that drops a row it *should* have
 > produced. Identity never would.
 
-> **A live-node smoke test is a separate, non-gating check.** A synced
-> `bitcoind` is available on this machine, and one manual run against it is
-> worth doing — but it must not gate CI, which has no node.
+> **A live-node smoke test is a separate, non-gating check, run ONCE at the end
+> of P4** — R10 Minor 2 gave it a moment, since "worth doing" with no scheduled
+> point is a thing nobody does. A synced `bitcoind` is available on this
+> machine; the run compares `inspect`'s liveness verdict for one confirmed and
+> one unconfirmed outpoint against the fixtures P4 was built on. **It must not
+> gate CI, which has no node** — a fixture that has drifted from the real RPC is
+> exactly what a fixture-only gate cannot see, and the point of running it once
+> is to find that.
 
 ### P5 — refusals
 
@@ -488,9 +536,23 @@ refusal cannot be added and silently go untested.
 >   so the script had no file to read either. R8 coverage I-12.
 >
 > **The fix is a list, not a parser.** P5 commits
-> `tests/refusals.toml` in `mnemonic-transaction`, one entry per v0.1 refusal
-> with its spec §-reference and its test name, and the script asserts a
-> **bijection between that file and the tests that exist**. A parser over prose
+> `tests/refusals.toml` in `mnemonic-transaction`, **three fields per entry**,
+> and the script asserts a **bijection between that file and the tests that
+> exist**:
+>
+>     [[refusal]]
+>     spec  = "§8.1"                      # where it is ruled
+>     test  = "refuses_unfinalized_psbt"  # the test that proves it fires
+>     check = "src/validate.rs::finalized_guard"   # the function to mutate
+>
+> **The third field exists because `mutate-refusals.sh` has to LOCATE the check
+> — R10 Important 3.** A two-field schema names the rule and the test and gives
+> the mutation script nothing to point at, so the implementer would invent the
+> locating mechanism: grep for a message string, match a test name to a
+> function, or edit by line number. All three break silently on a refactor, and
+> the last one mutates whatever has moved into that line. **`check` is a
+> `path::symbol` an implementer can resolve exactly**, and it is what makes the
+> mutation gate's own "assert the mutation applied" step checkable. A parser over prose
 > in another repo is a gate that breaks on a heading edit; a checked-in list
 > breaks only when someone adds a refusal and forgets its entry, which is
 > exactly the failure to catch.

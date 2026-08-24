@@ -3519,9 +3519,28 @@ The BCH corrector's existence was read from `crates/md-codec/src/bch_decode.rs` 
    never an authority, and §5 already forbids branching on any of it. If the
    label disagrees with the transaction, the transaction wins.
 
-   **Still to specify (§10.10's CLI work, not a design question):** the flag's
-   name, and what `mt` does with a label too long for the field — §5's budget
-   gives `TO` 34 characters including the amount, so a label has roughly 16.
+   **Length: UNBOUNDED for `mt encode`, and the question only arises for the
+   deferred verb.** Ruling 2026-08-23, prompted by R10 Important 2, which
+   correctly objected that *"what `mt` does with a label too long for the
+   field"* was filed as *"not a design question"* when refuse-versus-truncate is
+   exactly a design question.
+
+   > **It dissolves rather than needing an answer: `mt encode` HAS NO FIELD.**
+   > §0a rules its legend is **`stderr` suggestion text**, and §3b rules the
+   > layout is the operator's — so there is no width to exceed. `mt` prints what
+   > it was given and the operator decides what fits their steel.
+   >
+   > **`mt qr` is where a width exists** (§5's 34 characters including the
+   > amount, leaving a label roughly 16), and that verb is deferred — so the
+   > overflow rule is the QR cycle's to make, alongside the budget that creates
+   > the constraint.
+   >
+   > **Truncation is pre-refused for whenever that cycle runs.** A silently
+   > shortened label on permanent steel says something the operator did not
+   > write, which is the `PLATE 1 OF 1` failure in a different costume: a plate
+   > asserting something false, read by someone who cannot tell.
+
+   **Still to specify (§10.10's CLI work):** the flag's name.
    Refusing with the limit named fits §8's rule that every refusal names its
    number; silent truncation does not.
 
