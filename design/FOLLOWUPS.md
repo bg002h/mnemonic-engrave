@@ -10223,3 +10223,13 @@ consistent with it, and `mt`'s should probably become mode-aware in the same pas
 **Not Goal 1's scope, and it must not wait for Goal 1.** It is a defect in
 shipped code affecting seeds today, independent of transactions.
 
+**SCOPE RULED 2026-08-24 (operator): ALL of `me`, and `mt` too.** One rule across
+both tools and every write path — refuse a world-readable destination unless
+overridden; `--out` creates at 0600 **and** `fchmod`s an existing target.
+`mt`'s `redirected_output_warning` becomes mode-aware in the same pass: today it
+fires on *any* redirection, so it cries wolf on a 0600 file and warns no harder
+on a 0644 one. A constellation-wide rule is the kind an operator can remember;
+two tools treating one hazard differently teaches the wrong lesson from whichever
+they meet first. Note `emit` is a SHARED helper — fixing `sysw pack` alone would
+knowingly leave the same hole elsewhere in the same binary.
+
