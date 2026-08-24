@@ -262,6 +262,81 @@ the overwrite — it is someone treating the region as a backup in the first pla
 
 ---
 
+## Step 3 — the compare screen
+
+The device shows the identity digest and asks the operator to compare it
+(`gui/sysw_load.go:168`, *"Compare this against what"*). That number was printed
+by `me sysw pack` to **stderr, in a terminal, possibly an hour ago**.
+
+Operator, verbatim: **"I see that I was supposed to compare and I go back to pc
+and run the pack command again."**
+
+### A CORRECTION TO THIS WALK'S OWN METHOD, recorded because it nearly became a finding
+
+The first reproducibility test packed **the same record twice** and reported
+three identical digests as evidence the digest "does not discriminate". That was
+a **test artifact** — same input, same output, correct behaviour. Re-run with
+three different records it discriminates cleanly:
+
+| record | unsealed | sealed |
+| --- | --- | --- |
+| `text:6869` | `c679 6b68 …` | `c679 6b68 …` |
+| `text:776f726c64` | `dc3f 66f0 …` | `dc3f 66f0 …` |
+| `text:646966666572656e74` | `2c65 64b8 …` | `2c65 64b8 …` |
+
+*A control that varies nothing measures nothing.* The alarm was mine, not the
+tool's.
+
+**What the corrected measurement establishes**, and it is good news for the
+operator's move: the digest is over the RECORDS, so it is **reproducible**,
+**identical for sealed and unsealed**, and **independent of the passphrase**
+(two different generated passphrases, same digest). Re-running `pack` does give
+back the same number.
+
+### I — the operator reached for the risky recovery because the safe one is invisible
+
+**`me sysw show` exists** — *"Print what a container holds, and its digest"* —
+and is read-only:
+
+```
+$ me sysw show w.bin
+sealed:   false
+pub_len:  9
+ct_len:   0
+digest:   c679 6b68 b993 bc10 793a 3de2 8b3d 46e0    <- identical to pack's
+```
+
+The operator did not reach for it. They reached for **re-packing**, which works
+for the digest and carries a trap on the sealed path: **it prints a brand-new
+12-word passphrase every time.** That reads as *"this is a different container"*,
+so an operator can reasonably conclude they have just invalidated what is on the
+device. They have not — but if they act on that belief and **re-flash** the fresh
+container, the words they wrote down earlier are now **wrong**, and the payload on
+the device opens only with a passphrase they saw once and did not keep.
+
+Re-packing to recover the digest is safe **only if you do not re-flash**, and
+nothing says so at the moment an operator would do it.
+
+**The screen that creates the need never names the command.** *"Compare this
+against what"* — against *what*, obtained *how*, is exactly the question the
+operator asked, and the device is silent on both.
+
+*Classification: **affordance + documentation**, and it earns the change — the
+wrong outcome is a payload whose passphrase the operator no longer holds. The
+device screen should name `me sysw show`, and `me sysw pack`'s digest line should
+say the number can be re-read without re-packing.*
+
+### J — the digest does not distinguish sealed from unsealed
+
+Identical for both, by construction. With content-based sealing (finding F) the
+seal state now depends on payload content the operator may not be tracking, so
+the compared number cannot tell them which they hold. `me sysw show` prints
+`sealed:` and answers it.
+
+*Classification: **not our concern** — the affordance in I covers it.*
+
+---
+
 ## Running classification tally
 
 | # | finding | class | status |
@@ -275,6 +350,8 @@ the overwrite — it is someone treating the region as a backup in the first pla
 | F | seal-by-default wrong here | default by content | RULED |
 | G | power note silent about the step after the flash | documentation only | RULED |
 | H | region write destroys the standing payload | **design intent** — write the courier model down | RULED |
+| I | compare screen names no command; re-pack is the risky recovery | affordance + documentation | RULED |
+| J | digest does not distinguish sealed from unsealed | not our concern | CLOSED |
 
-**Step 3 onward: not yet walked.** The payload is on the device; the operator has
-not yet booted it on machine power.
+**Step 4 onward: not yet walked.** The payload is loaded into the session; the
+operator has not yet reached the Engrave Transaction program itself.
