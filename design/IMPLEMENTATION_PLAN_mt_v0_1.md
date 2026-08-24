@@ -254,6 +254,14 @@ byte-for-byte, and the header fields it emits satisfy the arithmetic of
 > is the difference that matters, since re-deriving from the implementation is
 > how a wrong vector would launder itself into looking correct.
 >
+> **So the pin records where the generator LIVES — R11 M7.** `P0` copies the
+> vectors but not `scripts/gen-mt1-vectors.py`, which stays in
+> `mnemonic-engrave`. Beside the SHA-256 pin, `mt-codec` records the
+> generator's **repo, path and commit SHA**, because a rule saying "regenerate
+> with S0's generator, not the crate" is unfollowable by someone who cannot
+> find it — and the person re-pinning years from now is exactly the person
+> without that context.
+>
 > *(Noted in passing: `mk`'s own doc comment names the constant
 > `VECTORS_V0_1_SHA256`; it is `V0_1_SHA256`. A grep for the documented name
 > finds only the comment, and I nearly filed the pin as missing.)*
@@ -270,7 +278,10 @@ P5's exhaustiveness gate and P6's journeys read them and **no phase put them
 there** (R8 coverage I-12). They are copied with the commit SHA they came from
 recorded alongside, so drift against `mnemonic-engrave` is a `git diff` and not
 a guess. `mnemonic-transaction` exists with two crates, workspace lints
-matching the constellation, CI running `cargo nextest run --locked`, and
+matching the constellation, **`license = "MIT OR Unlicense"` and
+`rust-version = "1.85"` with `rust-toolchain.toml` pinning `1.85.0`** (R11 M8 —
+the constellation standard, stated so it is certain rather than copied-and-
+probably-right), CI running `cargo nextest run --locked`, and
 `[profile.test] opt-level = 2` / `[profile.dev] opt-level = 2` (keeps
 `debug_assertions` — do **not** use `--release` to speed tests).
 
@@ -454,7 +465,14 @@ PSBT per refusal that must fire. Built here because P2 is the first phase that
 reads input at all.
 
 **Gate.** `mt encode` on each P1 vector reproduces the vector's strings exactly,
-**and every fixture is either accepted or refused with the ruled message**.
+and **every SNIFFING fixture is accepted or rejected as §8.2e's procedure says**.
+
+> **P2 asserts the sniffing fixtures only; P5 owns the refusal fixtures — R11
+> M1.** At P2 the refusals do not exist yet, so a gate asserting "accepted or
+> refused with the ruled message" over the whole corpus **passes because
+> everything is accepted** — a vacuous gate, and one that silently starts
+> failing when P5 lands. P5 already commits the bijection script; the refusal
+> assertions belong with it.
 
 **`--bitcoin-cli /nonexistent` IS THE OFFLINE MECHANISM**, and P2 asserts it
 produces §6a's no-node warning rather than a crash.
@@ -537,9 +555,15 @@ a vote; a test asserting stdout is empty on failure.
    corrupted symbol returns OK **while reporting `1 of 4`** — the margin report
    is the deliverable, so a `verify` that says OK without it fails this gate.
 3. **`verify --transaction` matches the right transaction and REJECTS a wrong
-   one whose txid shares the set's 20 bits.** Constructing that input is cheap —
-   2^20 double-SHA-256 operations — and it is the only test that distinguishes
-   the full-txid comparison from the 20-bit one.
+   one whose txid shares the set's 20 bits.** It is the only test that
+   distinguishes the full-txid comparison from the 20-bit one.
+
+   > **Ground out ONCE and PINNED as a fixture, not searched every run — R11
+   > M6.** The search is ~2^20 double-SHA-256 operations, sub-second, but a CI
+   > run that re-grinds it makes **a flaky search indistinguishable from a real
+   > failure** — and a test that sometimes cannot find its own input is worse
+   > than no test. S0 grinds it and records the colliding transaction beside the
+   > vector.
 4. **Negative:** a vector corrupted beyond `t = 4` must fail, with the failure
    naming the suspect chunks in descending correction order.
 
@@ -663,6 +687,32 @@ refusal cannot be added and silently go untested.
 >
 > **Adding a refusal to the spec therefore requires touching this file**, and
 > that is the point — the coupling is the mechanism, not an inconvenience.
+
+**THE LIST IS SEEDED HERE, not derived by the implementer — R11 M2.** An
+exhaustiveness gate whose input is the implementer's own reading of §8 checks
+only that they were self-consistent.
+
+| | |
+| --- | --- |
+| **REFUSE** (12) | §8.1, §8.2b, §8.2d, §8.2e step 4 (unrecognised input), §8.2f, §8.3, §8.5, §8.6(a), §8.6(b), §8.7b, §8.9, **and §6a's value-mismatch refusal** |
+| **WARN, not refuse** | §8.2c's legacy-unbound warning, §8.2g, §8.4 (*"never refuse"*) |
+| **EXCLUDED** | §8.2 (script validity — not a refusal), §8.7, §8.7c, §8.8 (all deferred with `mt qr`) |
+
+> **§6a's value-mismatch refusal is the one that matters most in this table.** It
+> is normative and sits **outside §8's numbering**, so it is exactly the entry a
+> §8-parsing script is structurally unable to see — the case the bijection gate
+> exists for. It is also why the gate reads a committed list rather than parsing
+> a section.
+
+**Each refusal fixture must be clean in all other respects** (R11 M4), so it
+trips exactly one refusal. Several would otherwise trip two — an oversized
+transaction is also value-blind — and a fixture tripping the wrong one still
+passes a naive test.
+
+**§8.7b's fixture is SYNTHESISED and GENERATED AT TEST TIME, not committed**
+(R11 M5): exceeding 32,768 chunks needs >1,310,720 payload bytes, so it is one
+signed input and many outputs, built in the test rather than a ~1.3 MB blob in
+git.
 
 ### P6 — journeys
 

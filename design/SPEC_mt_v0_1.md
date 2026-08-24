@@ -1733,7 +1733,7 @@ fields, **152 characters**, 6 lines — measured,
 > **The `n/m` printed per string stays**, and is a different claim: `mt` knows
 > exactly how many *strings* it emitted. It is the *plate* denominator that
 > would be invented.
-| `FORMAT: mt1 codex32` | 19 | **names the encoding, so a stranger can start.** Operator ruling 2026-08-23, closing §10.21 — see the note below for why this field is not the least important of the six but arguably the most |
+| `FORMAT: mt1 codex32` | 19 | **names the encoding, so a stranger can start.** Operator ruling 2026-08-23, closing §10.21 — see the note below for why this field is not the least important of the five but arguably the most |
 
 > **`FORMAT: mt1 codex32` — the only field a recoverer cannot do without, and
 > the only one naming a standard rather than this project.** Operator ruling
@@ -2192,8 +2192,18 @@ exactly as permanent, as a machine-engraved one.
 
    A finalized PSBT in the MIN form normally carries every input's UTXO record
    (§3), so `mt` computes the fee itself and asks for nothing. Where a record is
-   absent, `mt` requires the operator to supply **that input's value, per input** —
-   since §8.2b cannot check the value balance without it.
+   absent **from a PSBT**, `mt` requires the operator to supply **that input's
+   value, per input** — since §8.2b cannot check the value balance without it.
+
+   > **The two words "from a PSBT" remove a coin-flip that decides whether the
+   > pinned vector encodes or refuses — R11 M3.** Read without them, this clause
+   > *requires* a value for any input lacking a record, which contradicts
+   > §8.2e's *"`mt` never refuses the bytes"* and its `✗` for §8.2b on
+   > *raw, no node*. §10.10's table already scopes the refusal to *"when the
+   > **PSBT** lacks them"*; this makes §8.2c agree with it in its own body
+   > rather than only by cross-reference. **A raw transaction with no node is
+   > warned about (§8.2c's legacy path, §8.2e's loud warning), never refused
+   > for want of values.**
 
    > **The alternative "or the total across all inputs" was deleted — R6
    > adversarial I-6 — because it is two rules wearing one sentence.** Two
