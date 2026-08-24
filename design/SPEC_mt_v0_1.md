@@ -307,8 +307,8 @@ overturned an earlier assumption and are marked.
        Before you cut: mt corrects up to 4 wrong CHARACTERS per string.
 
          It cannot repair a MISSING or EXTRA character — those shift every
-         symbol after them. Count each string: strings 1-13 are 89
-         characters, string 14 is 71.
+         symbol after them. Count each string: strings 1-13 are 90
+         characters, string 14 is 72.
 
          It cannot repair a missing STRING or a lost PLATE. There is no
          redundancy: all 14 strings are required. To survive losing a
@@ -369,7 +369,7 @@ overturned an earlier assumption and are marked.
    engraving."*
 
    **The ambiguity `verify` does not resolve, and does not try to.** The
-   operator types 1,228 characters back from steel, so a corrected symbol has
+   operator types 1,242 characters back from steel, so a corrected symbol has
    two possible authors — **the engraving is wrong, or the typing is wrong** —
    and BCH cannot tell them apart. A wrong symbol is a wrong symbol regardless
    of which hand made it. The two call for opposite responses: a miscut chunk 7
@@ -479,7 +479,7 @@ overturned an earlier assumption and are marked.
    > of fourteen is the difference between a five-minute fix and abandoning the
    > plate.
    >
-   > **Ordering is the entire value.** *"Something is wrong somewhere in 1,228
+   > **Ordering is the entire value.** *"Something is wrong somewhere in 1,242
    > characters"* is a report that leaves the operator with a pile of steel and
    > nowhere to start; the same failure with a ranked suspect list is a
    > half-hour of work. Neither costs `mt` anything it did not already know.
@@ -720,7 +720,7 @@ overturned an earlier assumption and are marked.
    3. **`encode` appends, never edits.** Its two extra rows go **below**
       `STATUS`, so the operator's view is the recoverer's view plus a suffix:
 
-          CUT       14 strings, 1,228 characters
+          CUT       14 strings, 1,242 characters
           PREFIX    all 14 strings begin mt1qzrf8xk2 — strings sharing that
                     prefix belong together
 
@@ -945,7 +945,7 @@ overturned an earlier assumption and are marked.
 
    > **An earlier version said only "strip whitespace before doing anything
    > else", which is unbuildable — R6 implementability I-2.** Followed
-   > literally, fourteen 89-character strings become **one 1,228-character
+   > literally, fourteen 90-character strings become **one 1,242-character
    > blob** and the tool cannot parse its own output. The rule could not mean
    > what it said, and the spec never said what it did mean, so three readings
    > were all defensible: split on newlines then strip within (refuses the
@@ -955,7 +955,7 @@ overturned an earlier assumption and are marked.
    > assembly).
    >
    > **The recovery path is where this bites**, and a refusal there is answered
-   > by an operator retyping 1,228 characters off steel. The prefix-split
+   > by an operator retyping 1,242 characters off steel. The prefix-split
    > clause is what makes the pasted-blob case work rather than fail.
 
    **Every string in a set has a KNOWN length, checked before decoding**, because
@@ -968,14 +968,14 @@ overturned an earlier assumption and are marked.
    >
    > | tx bytes | chunks | bytes/chunk | full string | last string |
    > | --- | --- | --- | --- | --- |
-   > | 162 | 5 | 33 | **79** | 74 |
-   > | 405 | 11 | 37 | **85** | 82 |
-   > | 535 | 14 | 39 | **89** | 71 |
-   > | 742 | 19 | 40 | **90** | 61 |
-   > | 560 | 14 | 40 | **90** | **90** |
-   > | 2,498 | 63 | 40 | **90** | 55 |
+   > | 162 | 5 | 33 | **80** | 75 |
+   > | 405 | 11 | 37 | **87** | 83 |
+   > | 535 | 14 | 39 | **90** | 72 |
+   > | 742 | 19 | 40 | **91** | 63 |
+   > | 560 | 14 | 40 | **91** | **91** |
+   > | 2,498 | 63 | 40 | **91** | 56 |
    >
-   > 90 occurs only when the arithmetic lands on a 40-byte chunk. **This is the
+   > 91 occurs only when the arithmetic lands on a 40-byte chunk. **This is the
    > third time in this document a LIMIT has been read as a RULE** — after
    > "363 bits per chunk" and "a flat 40 payload bytes per chunk" (§3b).
 
@@ -1920,7 +1920,7 @@ what it could not check:
       - has the locktime already passed?     (§8.4)   UNKNOWN
         locked to block 1383520, current height unknown
 
-    The transaction may already be unspendable, and cutting 1,228
+    The transaction may already be unspendable, and cutting 1,242
     characters by hand is not quick. Consider re-running with a node
     before you start.
 
@@ -3039,8 +3039,10 @@ signed PSBT.
     | **the set prefix** | the **first 8 characters after `mt1`**, shared by every string in this set, with the rule stated — see below |
     | **the value provenance** | per input: chain-fetched (§6a), txid-bound (§8.2d), or operator-asserted (§8.2c) |
 
-    **THE SPEC NAMES THREE FLAGS while requiring SEVEN operator inputs the PSBT
-    cannot supply — R4 lens 2, corrected by R6, updated 2026-08-23.**
+    ~~**THE SPEC NAMES THREE FLAGS while requiring SEVEN operator inputs**~~
+    **CLOSED 2026-08-23 — twelve flags are ruled in the table above, and the
+    node location stopped being an input at all.** The finding and its history
+    are kept below because the *lesson* outlived the gap.
 
     > **The original wording was "ZERO FLAGS", and it was falsified by a
     > one-second `grep` the sentence itself prescribes.** `--transaction`
@@ -3221,11 +3223,14 @@ signed PSBT.
     > `--rpc`** — (b1) rules that `bitcoin-cli` already holds the node's
     > location.
 
-    **Still unspecified, and deliberately:** exit codes,
-    and the format of the refusal messages §8 promises will *"name the number
-    that caused it"*. Each input the table above requires needs some flag —
-    input values per input (§8.2c), `FROM`/`TO` identities, the free-text `TO`
-    label behind its own flag (§10.4), and the node location — and naming them
+    **Still unspecified, and deliberately: exit codes beyond 0.** `0 = every
+    check passed` is fixed in (b); the rest of the code space is implementation's.
+    **The refusal-message format is RULED** — §8's preamble, three parts, with a
+    machine-parseable verdict line. It was declared unspecified here while being
+    the one item P5's tests assert against (R11 I4). Each input the table above requires needs some flag —
+    input values per input (§8.2c), `FROM`/`TO` identities, and the free-text
+    `TO` label behind its own flag (§10.4). **The node location is NOT among
+    them** — (b1) deleted it, because `bitcoin-cli` already holds it. Naming them
     is a CLI-design task, not a codec one. **Exit codes are the exception that
     should not wait**: §1.1a's documented pipeline now depends on a non-zero
     exit, so `0 = every check passed` is fixed here and the rest of the code
@@ -3356,7 +3361,7 @@ signed PSBT.
     >
     > **The cost, measured against real artifacts:** +1 symbol per chunk versus
     > the 50-bit layout — 5 characters on the smallest measured transaction, 14
-    > on the 535-byte case, 63 on the 2,498-byte one. Against 1,228 characters
+    > on the 535-byte case, 63 on the 2,498-byte one. Against 1,242 characters
     > for that middle case, 14 is noise.
     >
     > **`count` and `index` are 15 bits, giving 32,768 chunks.** The width is set
@@ -3370,7 +3375,7 @@ signed PSBT.
     end of a chunk, to reach the next 5-bit symbol boundary (`mt encode`) or
     byte boundary (`mt qr`).
 
-    > **Since the header is exactly 10 symbols, the payload begins at symbol 10
+    > **Since the header is exactly 11 symbols, the payload begins at symbol 11
     > of the data part** — so a reader can locate it by counting characters,
     > with no bit arithmetic. This is the practical dividend of the alignment
     > ruling above, and it is why `mt1` does not need the padding-versus-

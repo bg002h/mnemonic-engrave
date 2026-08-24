@@ -1,8 +1,10 @@
 # IMPLEMENTATION PLAN — `mt` v0.1
 
-> **Status: DRAFT, pre-R0.** No code is written until an architect review closes
-> this at 0 Critical / 0 Important. Risk-set work: funds, addresses, a new
-> normative wire format.
+> **Status: GREEN — 0 Critical / 0 Important as of 2026-08-23**, closed by
+> `design/agent-reports/R11-pre-implementation-gate.md` after seven review
+> lenses. **Implementation may begin at S0.** Risk-set work: funds, addresses,
+> a new normative wire format — so the post-implementation adversarial review
+> over the whole diff is mandatory and non-deferrable.
 >
 > **Source of truth is `design/SPEC_mt_v0_1.md`**, GREEN at 0C/0I as of
 > 2026-08-23 after R6 (three lenses, 6C + 27I) and R7 (fold verification,
@@ -166,12 +168,53 @@ before `mt-codec`'s first commit** — that ordering is the whole point of the
 ruling it comes from (`design/agent-reports/R8-fable-ruling-nums-defence.md`).
 A vector the implementation produced cannot falsify the implementation.
 
-**Deliverable — `design/vectors/mt1_v1_vectors.md` plus its generator:**
+**Deliverable — the vectors in BOTH forms, from ONE generator, plus the
+generator:**
 
-1. **One real signed segwit transaction**, so the witness-bearing serialisation
-   is exercised: 1 input P2WPKH, 1 output P2TR, `nLockTime` set to a past
-   height. Recorded as raw hex, with its txid and wtxid **both** stated so the
-   §1.1 `TX` row's distinction is pinned by the vector rather than by prose.
+- **`design/vectors/mt1_v1_vectors.md`** — human-readable, for a reader
+- **`design/vectors/mt1_v1_vectors.json`** — machine-readable, **the file a Rust
+  test actually reads and the file the SHA-256 pin covers**
+
+> **`mk`'s pattern cannot be adopted "verbatim" over Markdown — R11 I1.** `mk`
+> pins `src/test_vectors/v0.1.json`, resolved from `CARGO_MANIFEST_DIR` and
+> consumed by `serde_json`. An implementer handed only a `.md` has three bad
+> options unattended: write a Markdown parser inside a test, hand-transcribe the
+> values into Rust constants — **which breaks the pin, since the hash would
+> cover a file the test does not read** — or invent a sidecar format mid-phase.
+> P0 copies the `.json` to `crates/mt-codec/src/test_vectors/mt1_v1.json`,
+> matching `mk`'s location shape, and P1 pins **that** file's hash.
+
+1. **One real signed segwit transaction, PRODUCED ON A LOCAL REGTEST NODE — not
+   lifted from mainnet.** R11 C3, and the provenance is the whole point:
+   `createwallet` → `generatetoaddress` → `walletcreatefundedpsbt` →
+   `walletprocesspsbt` → `finalizepsbt`, never broadcast.
+
+   > **A confirmed mainnet transaction makes P2's gate fail on this machine and
+   > pass in CI.** Every input of a confirmed transaction is spent, and its
+   > parents are confirmed — which is exactly §8.5's refusal condition and makes
+   > §6a report `SPENT — ALREADY CONFIRMED` before any input is classified. So
+   > `mt encode <vector>` **refuses where a node is reachable and succeeds where
+   > one is not.** P2's gate is *"reproduces the vector's strings exactly"*; it
+   > would have failed at 3am with the remedy being to redo S0.
+   >
+   > **A regtest outpoint is unknown to a mainnet node**, so `gettxout` returns
+   > null with the parent **not** confirmed → §8.5 does not fire and §6a reports
+   > `UNKNOWN`. That is the only provenance under which every later gate passes
+   > **both** online and offline.
+   >
+   > *(A mainnet candidate had already been selected — 162 bytes, past locktime,
+   > txid ≠ wtxid — before this gate caught the problem. Its virtue was being
+   > independently verifiable; its defect was being confirmed.)*
+
+   Recorded for that transaction: the **raw hex**, its **txid and wtxid both**
+   (so §1.1's `TX`-row distinction is pinned by bytes rather than prose), the
+   **finalized PSBT in base64**, and **each input's value and outpoint**.
+
+   > **All four forms, because different gates need different ones — R11 C3(b).**
+   > The PSBT is the clean-encode input, since its UTXO records satisfy §8.2c
+   > and §8.2b; the raw hex exercises §8.2e's loud-warning path; the recorded
+   > values back `--input-value` where a test wants the raw form to encode
+   > without a node.
 2. **Its exact `mt1` strings**, in full form and in `--elide-prefix` form.
 3. **A 13-symbol checksum micro-vector** — HRP `"mt"`, a fixed 40-symbol data
    part, the resulting BCH checksum — so a checksum bug is localisable without
@@ -353,10 +396,12 @@ matches the spec's pinned vector**.
   cookie handling, no `--rpc`
 - **an input path for every operator-supplied value §10.10 requires** — R8
   coverage I-5. Per-input values (§8.2c), the `FROM`/`TO` identities, the
-  free-text `TO` label behind its own flag (§10.4), and the node location.
-  **A refusal whose threshold cannot be supplied is not a refusal**, and §10.10
-  lists five such inputs with no way to provide any of them. Flag *spellings*
-  remain open; the *paths* are P2's to build
+  free-text `TO` label behind its own flag (§10.4). **Not the node location** —
+  `bitcoin-cli` holds it (§10.10 b1).
+  **A refusal whose threshold cannot be supplied is not a refusal.**
+  **Spellings are ruled above**; the input *paths* are P2's to build (R11 I5 —
+  this bullet said spellings were still open, three bullets below the list that
+  rules them)
 - normalisation to **lowercase**; stdout is lowercase, ungrouped (§1.1e, §10.10)
 - **1-based chunk numbers and 1-based positions in ALL human-facing output**,
   with `position = codeword_index + 4` (§1.1) — R8 coverage I-11. Wire `index`
@@ -375,6 +420,16 @@ matches the spec's pinned vector**.
 - the `stderr` legend suggestion — **five** fields including
   `FORMAT: mt1 codex32` (§5). *(Six until `PLATE n OF m` was deleted on
   2026-08-23; this line said six, another spec change the plan did not inherit.)*
+- **the TTY WELCOME LINE — R11 I6, and it is the item the operator's own
+  confusion produced.** `mt encode` with nothing piped in blocks on stdin with
+  no prompt, so a new user's first action looks like a hang. §10.10 names the
+  cost: *"a new user concluding the tool does not work and leaving, which no
+  other check catches."* Reported PARTIAL twice and closed by neither fold.
+  P2 prints the welcome line and a newline when stdin is a TTY
+- **§6a's no-node warning at ENCODE time** — the enumerated skipped checks, and
+  the encode-shaped consequence line (*"consider re-running with a node before
+  you start"*), distinct from the recovery-time wording §1.1a carries. R11 I6;
+  also PARTIAL twice
 - **the three mandatory `stderr` blocks, which no phase owned — R8 coverage
   I-3.** All three are ruled and all three are what the operator actually reads:
   the **BEARER warning** carrying both halves (what `mt` checked, that it reads
@@ -400,6 +455,18 @@ reads input at all.
 
 **Gate.** `mt encode` on each P1 vector reproduces the vector's strings exactly,
 **and every fixture is either accepted or refused with the ruled message**.
+
+**`--bitcoin-cli /nonexistent` IS THE OFFLINE MECHANISM**, and P2 asserts it
+produces §6a's no-node warning rather than a crash.
+
+> **Two later gates require an offline run and there was no way to force one —
+> R11 C3(c).** P4's gate must run *"BOTH with node fixtures and offline"* and
+> journey B is *"no node"*, yet none of the twelve flags is `--offline`. The only
+> lever is §10.10(b1)'s rule that a `--bitcoin-cli` path which is absent or not
+> found yields the no-node warning. Naming it here matters because the
+> alternative an implementer reaches for is **editing `PATH`**, which is
+> process-global and silently changes the behaviour of neighbouring tests in the
+> same run.
 
 > **P2's gate as first written would have started failing once P5 landed — R8
 > coverage I-13.** P1's vectors are transactions, and they carry **no input
@@ -703,6 +770,12 @@ implementation reads are three more places for the values to drift together.
    > assert against without matching prose. **No spec-side item now gates any
    > phase.**
 
-4. **Repo creation** — `mnemonic-transaction` does not exist yet. Creating a
-   GitHub repo is an outward-facing action and needs the operator's go-ahead,
-   including whether it starts private.
+4. ~~Repo creation~~ **CLOSED 2026-08-23** — `bg002h/mnemonic-transaction`
+   exists, is **EMPTY** and **PRIVATE**. P0 initialises and pushes to it.
+
+   > **v0.1 publishes nothing, tags nothing, releases nothing, and makes nothing
+   > public.** `mt-codec`, `mt-cli` and `mnemonic-transaction` are all free on
+   > crates.io (checked 2026-08-23) and stay unclaimed until the operator says
+   > otherwise. The repo staying private is deliberate: all five siblings are
+   > public, so it will likely be flipped at release — but private→public is one
+   > command and the safe direction, and public→private does not un-announce.
