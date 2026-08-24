@@ -797,20 +797,32 @@ fn write_private(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
 /// never names -- but a process can `fstat` its own stdout, so the mode is
 /// visible even when the path is not.
 ///
-/// **Only `S_ISREG` counts.** A pipe (`me ... | picotool`) has no meaningful
-/// mode and a terminal persists nothing, so both must pass; firing on them would
-/// break every pipeline in the constellation. That is the near-miss this check
-/// is most likely to get wrong, and there are tests for both.
+/// **KEYED ON MODE BITS, NOT ON `S_ISREG`** — R0 round 0, finding I3. The first
+/// version of this asked `is_file()`, and this comment claimed a FIFO "has no
+/// meaningful mode". **Measured false:** a NAMED fifo carries a mode (`mkfifo`
+/// gives 0666) and a third party reading it really does receive the bytes. Only
+/// the ANONYMOUS pipe behind `|` is 0600, which the mode test passes on its own.
+///
+/// **CHARACTER DEVICES ARE EXEMPT, and that exemption is load-bearing:**
+/// `/dev/null` is mode **0666**, so a mode-only check would refuse
+/// `me … > /dev/null` — one of the most ordinary things anyone does with a CLI.
+/// A terminal and `/dev/null` persist nothing, so neither can leak. There are
+/// tests for the FIFO, for `/dev/null`, and for the anonymous pipe.
 #[cfg(unix)]
 fn stdout_is_world_readable() -> bool {
     use std::mem::ManuallyDrop;
-    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::fs::{FileTypeExt, PermissionsExt};
     use std::os::unix::io::FromRawFd;
     // ManuallyDrop: fd 1 belongs to the process, and dropping the File would
     // CLOSE stdout out from under everything downstream.
     let f = unsafe { ManuallyDrop::new(std::fs::File::from_raw_fd(1)) };
     match f.metadata() {
-        Ok(md) => md.file_type().is_file() && md.permissions().mode() & 0o044 != 0,
+        Ok(md) => {
+            if md.file_type().is_char_device() {
+                return false;
+            }
+            md.permissions().mode() & 0o044 != 0
+        }
         // Unreadable stdout is not evidence of exposure; fail OPEN rather than
         // refusing a write for a reason we cannot state.
         Err(_) => false,

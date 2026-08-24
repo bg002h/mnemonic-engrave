@@ -310,3 +310,61 @@ fn converter_does_not_refuse_a_pipe() {
     );
     assert!(!res.stdout.is_empty(), "the NDEF bytes must reach the pipe");
 }
+
+// ---------------------------------------------------------------------------
+// R0 round 0, finding I3. The first fix keyed on `is_file()`, and the spec said
+// "a pipe/FIFO has no file mode" -- citing a measurement as proof. MEASURED
+// FALSE: a NAMED fifo carries a mode (0666 from mkfifo) and a third party
+// reading it really does receive the bytes. Only the ANONYMOUS pipe is 0600.
+// ---------------------------------------------------------------------------
+
+/// Open a FIFO `O_RDWR` — on Linux that does not block waiting for a reader,
+/// which opening write-only would.
+#[cfg(unix)]
+fn open_fifo_rdwr(p: &std::path::Path) -> fs::File {
+    fs::OpenOptions::new().read(true).write(true).open(p).unwrap()
+}
+
+#[test]
+fn refuses_a_world_readable_named_fifo() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("leak");
+    std::process::Command::new("mkfifo")
+        .arg(&p)
+        .status()
+        .unwrap();
+    fs::set_permissions(&p, fs::Permissions::from_mode(0o666)).unwrap();
+
+    let res = Command::new(me_bin())
+        .args(["sysw", "pack", "--no-passphrase", TEXT])
+        .stdout(Stdio::from(open_fifo_rdwr(&p)))
+        .stderr(Stdio::piped())
+        .output()
+        .unwrap();
+
+    assert!(
+        !res.status.success(),
+        "a 0666 named FIFO is readable by others and really leaks; it must be refused"
+    );
+}
+
+/// NEAR MISS, and the sharpest one yet: `/dev/null` is mode **0666**. A guard
+/// that looks only at permission bits refuses `me … > /dev/null`, which is one
+/// of the most ordinary things anyone does with a CLI. Character devices persist
+/// nothing, so they are exempt.
+#[test]
+fn does_not_refuse_dev_null() {
+    let f = fs::OpenOptions::new().write(true).open("/dev/null").unwrap();
+    let res = Command::new(me_bin())
+        .args(["sysw", "pack", "--no-passphrase", TEXT])
+        .stdout(Stdio::from(f))
+        .stderr(Stdio::piped())
+        .output()
+        .unwrap();
+
+    assert!(
+        res.status.success(),
+        "/dev/null is 0666 but persists nothing; stderr: {}",
+        String::from_utf8_lossy(&res.stderr)
+    );
+}
