@@ -936,10 +936,33 @@ overturned an earlier assumption and are marked.
    > failure is recoverable rather than terminal; **`mt` v0.1 does not implement
    > the search** and the refusal above says so plainly.
 
-   **What it costs and saves, measured.** Eliding saves `8 × (n − 1)` characters:
-   32 on a 5-string transaction, **104 on the 14-string case**, 496 on the
-   63-string one. Against §10.13(a2)'s +1 symbol per chunk, the 14-string case is
-   **90 characters cheaper than the 50-bit layout that could not elide at all**.
+   **What it costs and saves, measured — and the figure was WRONG until S0's
+   generator produced real strings.** Eliding drops **11 characters** per elided
+   string, not 8: the 8-symbol invariant prefix **and the `mt1` prefix**, since
+   an elided line carries index + payload only. So the saving is
+   `11 × (n − 1)`:
+
+   | artifact | strings | unelided | elided | saved |
+   | --- | --- | --- | --- | --- |
+   | 162 B | 5 | 395 | 351 | 44 |
+   | 405 B | 11 | 953 | 843 | 110 |
+   | 535 B | 14 | 1,242 | 1,099 | **143** |
+   | 742 B | 19 | 1,701 | 1,503 | 198 |
+   | 2,498 B | 63 | 5,698 | 5,016 | 682 |
+
+   Against §10.13(a2)'s +1 symbol per chunk, the 14-string case is **129
+   characters cheaper than the 49-bit layout that could not elide at all**.
+
+   > **This is the first defect found by IMPLEMENTATION rather than review, and
+   > it arrived from S0 — before `mt-codec` exists.** Eleven review rounds read
+   > `8 × (n − 1)` and none caught it, because the arithmetic is only wrong once
+   > you ask what an elided line *literally contains*. The generator's own
+   > output settles it: the `even` vector's strings go 522 → 467, a saving of
+   > **55 = 11 × 5**, and `uneven` goes 674 → 597, **77 = 11 × 7**.
+   >
+   > That is the whole argument for an independently-derived vector landing
+   > before the crate: a spec figure nobody could falsify by reading became
+   > falsifiable the moment something generated real strings.
 
    **Spaces are stripped on input, and offered on output.** `mt encode` takes an
    optional grouping — every N characters, space-separated — **for hand
