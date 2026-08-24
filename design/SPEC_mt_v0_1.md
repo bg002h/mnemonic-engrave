@@ -1175,7 +1175,7 @@ specify, test, teach a recoverer, and get wrong only once.**
 > R3 lens 3 found it. `md-codec`'s header packs
 > `version(4) + chunked(1) + chunk_set_id(20) + count−1(6) + index(6) = 37 bits`,
 > against `mt1`'s
-> `version(4) + chunked(1) + chunk_set_id(20) + count−1(12) + index(12) = 49 bits`
+> `version(5) + chunked(1) + chunk_set_id(20) + count−1(12) + index(12) = 50 bits`
 > (`crates/md-codec/src/chunk.rs`), and `write()` refuses any `count` outside
 > `1..=64` with `ChunkCountOutOfRange`. **Six bits caps a set at 64 chunks** —
 > while §3b's own table measures the largest `mt qr` artifact at **96**, and
@@ -1185,9 +1185,10 @@ specify, test, teach a recoverer, and get wrong only once.**
 > now 4,096 for **both** verbs, and what distinguishes them is what a chunk
 > *costs*, not how many are permitted.)
 >
-> **`mt1` therefore uses 12 bits each for `count` and `index`** — a **49-bit**
+> **`mt1` therefore uses 12 bits each for `count` and `index`** — a **50-bit**
 > header admitting **4,096 chunks = 163,840 bytes**, `mt1`'s ceiling for **both**
-> verbs.
+> verbs. (The header is 50 rather than 49 because `version` is 5 bits, which is
+> what makes it symbol-aligned — §10.13 a2.)
 >
 > **Why 12, and the bound is Bitcoin's rather than ours.** Operator ruling
 > 2026-08-23. `MAX_STANDARD_TX_WEIGHT = 400,000` (verified in `bitcoin`
@@ -2986,10 +2987,15 @@ signed PSBT.
 
     **The SET PREFIX row, and why it is a row rather than a footnote.**
     Operator ruling 2026-08-23. `mt1`'s header packs its invariant fields first
-    — `version(4) + chunked(1) + chunk_set_id(20) + count(12)` — so bits 0–36
+    — `version(5) + chunked(1) + chunk_set_id(20) + count(12)` — so bits 0–37
     are identical across every chunk of a set, and at 5 bits per symbol **the
     first 7 characters after `mt1` are the same on all of them**. Only `index`
     varies.
+
+    > **The 7 survived the header widening, and was recomputed rather than
+    > assumed.** 38 invariant bits still yield `38 // 5 = 7` whole invariant
+    > symbols, exactly as 37 did — the eighth symbol straddles the `index`
+    > boundary in both layouts. The operator-facing string is unchanged.
 
     **Verified on real output rather than derived**: the four `md1` chunks of
     this repo's pathological wallet all read `md1fveszps…`.
@@ -3087,15 +3093,62 @@ signed PSBT.
 
     **(a2) The header's exact layout, because R4 found five things an
     implementer would otherwise guess — and two of the guesses produce plates
-    another implementation cannot read.** `mt1`'s 49 bits are, in order:
+    another implementation cannot read.** `mt1`'s **50 bits — exactly 10 bech32
+    symbols** — are, in order:
 
     | field | bits | value |
     | --- | --- | --- |
-    | `version` | 4 | **`0b0001`** — `mt1` wire v1. Not inherited from `md1`; a shared value would let one format's chunk verify as the other's under a colliding constant |
+    | `version` | **5** | **`0b00001`** — `mt1` wire v1. Not inherited from `md1`; a shared value would let one format's chunk verify as the other's under a colliding constant. **Five bits, not four — see the alignment ruling below** |
     | `chunked` | 1 | **`1`, always, and RETAINED** even though `mt1` is always chunked — see below |
     | `chunk_set_id` | 20 | top 20 bits of the extracted txid, display form (c) |
     | `count` | **12** | **`count − 1`**, matching `md-codec`'s offset convention: a set of 1 stores `0`, a set of 4,096 stores `4095` |
     | `index` | **12** | **plain, zero-based**, `index < count` |
+
+    **THE HEADER IS SYMBOL-ALIGNED: 50 BITS = 10 BECH32 SYMBOLS EXACTLY.**
+    Operator ruling 2026-08-23, and it changed `version` from 4 bits to 5.
+
+    > **`md1` is NOT aligned — 37 bits — and nothing in `md` ever justified
+    > that.** Checked rather than assumed: every place the number appears it is
+    > stated as arithmetic and never as a decision (`SPEC_v0_30_wire_format.md`
+    > *"Total chunk header = 37 bits"*, `crates/md-codec/src/chunk.rs:6`
+    > *"Total = 4 + 1 + 20 + 6 + 6 = 37 bits"*). There is no rationale anywhere.
+    >
+    > **Its costs, by contrast, ARE documented — as things `md` wishes it could
+    > redo.** `md`'s own `design/FOLLOWUPS.md` item 10 records that the payload
+    > and chunk header bit positions do not line up and that *"a v2 design
+    > should put a single unambiguous discriminator bit at the same numeric
+    > position across both modes"*; a second entry notes the misalignment is
+    > absorbed by trailing-zero padding and that a length prefix *"would let
+    > decoders distinguish 'padding' from 'truncation' without the rollback
+    > ceremony."* **A documented cost, a recorded wish to undo it, and no
+    > recorded benefit.** `mt1` was about to inherit it purely by imitation.
+    >
+    > **The arithmetic, which makes the choice easy to check.** `version +
+    > chunked + chunk_set_id` was already 25 bits — a multiple of 5 — so
+    > alignment depends entirely on `count + index`, which must itself be a
+    > multiple of 5. Equal widths mean `2n ≡ 0 (mod 5)`, so `n` must be a
+    > multiple of **5**: 10 or 15, never 12 or 13.
+    >
+    > | option | total | symbols | |
+    > | --- | --- | --- | --- |
+    > | `4+1+20+12+12` (previous) | 49 | 9.8 | not aligned |
+    > | `4+1+20+13+13` | 51 | 10.2 | **still not aligned** — widening `count`/`index` by one does not fix it |
+    > | **`5+1+20+12+12`** | **50** | **10.0** | **RULED** |
+    > | `4+1+21+12+12` | 50 | 10.0 | aligned, but spends the bit on a `chunk_set_id` §10.13(c) already sized |
+    > | `4+1+20+15+15` | 55 | 11.0 | aligned, 32,768 chunks — two extra symbols for headroom nothing needs |
+    >
+    > **The bit goes to `version`.** It keeps `count` at 12 — the width §3
+    > justified as 1.6× headroom over the 2,500-chunk standardness ceiling — and
+    > spends the spare bit where it buys the most: **32 wire-format generations
+    > instead of 16**, in the one field that cannot be widened later without
+    > breaking every plate already cut.
+    >
+    > **What alignment buys.** The header ends exactly on a symbol boundary, so
+    > the payload starts at symbol 10 of the data part and a reader can locate
+    > any field by symbol index without a bitstream. It also removes the
+    > padding-versus-truncation ambiguity `md` had to absorb with a rollback
+    > contract — `mt1` pads once, at the end of a chunk, and never between
+    > header and payload.
 
     **`count` stores `count − 1`.** §3's *"admitting 4,096 chunks"* and its
     `count(12)` are consistent only under the offset, and `md-codec` already does
@@ -3111,10 +3164,16 @@ signed PSBT.
     bit per chunk and keeps the layout identical to the format `mt1` forked from.
 
     **Bit order and padding.** Fields are written most-significant-bit first in
-    the order above, matching `md-codec`'s `BitWriter`. The 49-bit header is
-    followed immediately by the chunk payload with **no padding between them**;
-    padding appears only once, at the end of a chunk, to reach the next 5-bit
-    symbol boundary (`mt encode`) or byte boundary (`mt qr`).
+    the order above. The **50-bit** header is followed immediately by the chunk
+    payload with **no padding between them**; padding appears only once, at the
+    end of a chunk, to reach the next 5-bit symbol boundary (`mt encode`) or
+    byte boundary (`mt qr`).
+
+    > **Since the header is exactly 10 symbols, the payload begins at symbol 10
+    > of the data part** — so a reader can locate it by counting characters,
+    > with no bit arithmetic. This is the practical dividend of the alignment
+    > ruling above, and it is why `mt1` does not need the padding-versus-
+    > truncation rollback contract `md1` carries.
 
     **(c) A content id — the transaction id, and R2 lens 2 found the ruling
     AMBIGUOUS.** A PSBT holds **two** transactions that could be called "the"
@@ -3382,7 +3441,7 @@ The BCH corrector's existence was read from `crates/md-codec/src/bch_decode.rs` 
    **Machine-readably this holds for both verbs, because §3 made them share one
    header.** `mt1`'s header carries `count` and `index` — n-of-m — plus a 20-bit
    `chunk_set_id` so pieces of different transactions cannot be combined. **It is
-   `mt1`'s own 49-bit header, not `md-codec`'s 37-bit one** (§3): the latter's
+   `mt1`'s own 50-bit header, not `md-codec`'s 37-bit one** (§3): the latter's
    6-bit `count` caps a set at 64 chunks, which `mt qr` exceeds. For `mt encode` that header sits inside the
    BCH-protected chunk; for `mt qr` it rides in the bech32-uppercase payload.
    **One

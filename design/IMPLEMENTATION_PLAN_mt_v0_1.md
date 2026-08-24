@@ -130,10 +130,10 @@ generalise-or-fork decision `mt` faces; `md` has only ever been first.
 Normative content, all from the spec — **this plan restates none of it as new
 decisions**:
 
-- header 49 bits: `version(4) + chunked(1) + chunk_set_id(20) + count−1(12) + index(12)` (§12.13 a2)
+- header 49 bits: `version(4) + chunked(1) + chunk_set_id(20) + count−1(12) + index(12)` (§10.13 a2)
 - `MT_REGULAR_CONST = 0x1a2fc877f9528d7c1`, from `"shibbolethnumstransaction"` (§12.22)
 - `count = ceil(payload_len / 40)`; `bytes_per_chunk = ceil(payload_len / count)`; last chunk takes the remainder (§3b)
-- content id = **top 20 bits of the txid in display form** (§12.13 c)
+- content id = **top 20 bits of the txid in display form** (§10.13 c)
 - BCH(93,80,8), `t = 4` per chunk (§3a)
 
 **Tests first, and two of them are the phase's whole point:**
