@@ -1,14 +1,26 @@
 # SPEC — Engrave a Transaction (SeedHammer II program)
 
-**Status:** DRAFT, pre-R0. Written 2026-08-24; **folded 2026-08-24 against the
-operator journey walk** (`JOURNEY_WALK_engrave_transaction.md`), which by ruling
-is this document's review. The walk produced **18 findings (A–R)** and one
-Critical in shipped code (F-244).
+**Status:** DRAFT. **R0 round 0 is FOLDED, NOT CLOSED.** The gate stays open
+until a re-review returns 0C/0I; **no code before that.**
 
-**The fold made this smaller.** Two rulings removed work the first draft
-described: chunks are engraved **verbatim**, so v1 needs no `mt1` decoder (§2.2);
-and applicability lives in a **payload menu**, so the carousel is untouched
-(§3.1). Scope shrank rather than grew.
+**Two reviews have run, and both are recorded:**
+
+| review | result | where |
+| --- | --- | --- |
+| the **operator journey walk** — this spec's review by ruling | 18 findings (A–R), all ruled | `JOURNEY_WALK_engrave_transaction.md` |
+| **R0 round 0**, adversarial, opus | **3 Critical / 8 Important / 4 Minor** | `agent-reports/R0-engrave-transaction-round0-adversarial.md`, persisted verbatim at `caa90cb` **before** any of it was folded |
+
+**The walk made this spec smaller; R0 made it truer.** The walk removed work —
+chunks engrave **verbatim**, so v1 needs no `mt1` decoder (§2.2). R0 removed
+*false claims*: three sentences this spec asserted were measurably wrong
+(*"nothing in the carousel changes"* — §3.1a; *"a pipe has no file mode"* —
+§2.5; *"the compare screen names no command"* — §3.2), and two more described
+reuse that does not exist (§2.2a, §4.4a).
+
+**Where a section carries a `####` sub-heading in SHOUTING CAPS, that is an R0
+finding folded in place.** They are left visible rather than smoothed away,
+because each one is a claim this document previously made and a future reader is
+entitled to know which sentences have already been wrong.
 
 **Goal 1 of the two set by the operator 2026-08-24** (`CONTINUITY_mt_2026-08-24.md`).
 
@@ -35,22 +47,33 @@ normative container change. R0 gate applies: **no code before 0C/0I.**
 
 ## 1. The pipeline, and who owns each stage
 
+**The two transports FORK EARLY and never rejoin** — §1.2. A container goes to
+flash; a bare record goes on a tag. They enter the device by different doors and
+arrive with different guarantees.
+
 ```
 tx.final.psbt ─▶ mt encode --record --raw|--chunks ─▶ tx: record
                         (mnemonic-transaction)            │
-                                                          ▼
-                                             me sysw pack  (stdin or --in)
-                                                (mnemonic-engrave)
-                                                          │
-                                        ┌─────────────────┴──────────────┐
-                                   --region                          NFC tag
-                                   picotool                              │
-                                   0x10D00000                            │
-                                        └─────────────────┬──────────────┘
-                                                          ▼
-                                        SeedHammer: load ─▶ payload menu
-                                                    ─▶ comprehend ─▶ confirm ─▶ cut
+                          ┌───────────────────────────────┴───────────┐
+                          ▼                                           ▼
+              me sysw pack (stdin or --in)                    write to an NFC tag
+                 (mnemonic-engrave)                                   │
+                          │  a CONTAINER                              │  a RECORD
+                          ▼                                           ▼
+              picotool --region 0x10D00000                     gui/scan.go
+                          │                                           │
+                          ▼                                           ▼
+              syswLoadFlow ─▶ digest compare ─▶              engraveObjectFlow
+              payload menu                                    (txScan case)
+                          └─────────────────┬─────────────────────────┘
+                                            ▼
+                          comprehend ─▶ confirm ─▶ cut   (§3.4–§3.7)
 ```
+
+**What the NFC path does NOT get:** the identity digest compare (§3.2) and the
+payload menu (§3.3). There is no header to hash and nothing is loaded into the
+session. Its provenance rests on `syswSourceAccept` naming the source, and
+nothing else.
 
 | owner | owns | gains |
 | --- | --- | --- |
@@ -66,7 +89,7 @@ container can disagree.
 **Rust-primary.** The container lands in `me` with vectors first and reaches the
 fork as a port.
 
-### 1.1 The join is stdin — the first draft was wrong about this
+### 1.1 The join is stdin — an earlier draft was wrong about this
 
 The first draft said the two tools *"compose over a pipe."* **They do not**:
 `me sysw pack` took `--in <FILE>` and argv only. Measured:
@@ -76,26 +99,45 @@ $ printf 'text:6869\n' | me sysw pack --no-passphrase
 me: no records: pass them on argv or with --in     (exit 2, stdout empty)
 ```
 
-**RULED: `me sysw pack` gains a stdin path**, so the natural command works:
-
-```
-mt encode --record --raw < tx.final.psbt | me sysw pack --region --out region.bin
-```
+**RULED: `me sysw pack` gains a stdin path**, so the natural command works.
 
 **Two invariants this pipeline depends on, and both MUST be stated and tested
-rather than inherited by luck** (finding D). `fish` reports a pipeline's status
-as the *last* command's, so an upstream failure is otherwise invisible
-(`false | true` → `status=0`, `pipestatus=1 0`):
+rather than inherited by luck.** `fish` reports a pipeline's status as the *last*
+command's, so an upstream failure is otherwise invisible (`false | true` →
+`status=0`, `pipestatus=1 0`):
 
 1. **`mt` contributes NOTHING to stdout on any failure path.** Measured today:
    `mt encode --in bad.hex` → exit 1, **stdout 0 bytes**.
 2. **`me sysw pack` refuses empty stdin** rather than packing an empty container.
-   Stdin must join the existing "no records" exit-2 path, not bypass it.
 
-Together these make a failed encode produce a non-zero pipeline status. Neither
-is currently asserted as a *pipeline* property.
+### 1.2 THE TWO TRANSPORTS DO NOT DELIVER THE SAME THING
 
----
+**R0 round 0, I4.** An earlier draft's diagram showed `picotool` and `NFC tag` as
+two routes for one container. **There is no NFC reader for a `sysw` container.**
+`sysw.Reader` has exactly two implementations — `FileReader` (host) and
+`XIPReader` (flash XIP, `sysw/read_tinygo.go`) — and NFC arrives through a
+different door entirely, `gui/scan.go`, which parses **records**, not containers.
+
+| | picotool → `0x10D00000` | NFC tag |
+| --- | --- | --- |
+| carries | a **container** | a **record** |
+| framed by | `MNEMSYSW` header, `pub_len`/`ct_len` | the `tx:` prefix alone |
+| identity digest to compare? | **yes** (§3.2) | **no — there is no header to hash** |
+| payload menu (§3.3)? | **yes** | **no — nothing is loaded into the session** |
+| sealing (§2.4)? | possible | **not applicable** |
+| enters via | `syswLoadFlow` | `engraveObjectFlow` (§3.3's `txScan` case) |
+
+**Consequences the spec must carry rather than gloss:**
+
+- **The NFC path has no digest compare**, so its provenance rests on
+  `syswSourceAccept` naming the source (F3) and nothing else.
+- **§2.3's "which transports its output fits" is nearly meaningless as written**
+  for a container, because a container has only one transport. What `me sysw
+  pack` should state is the **section-cap** fact; what `mt encode --record`
+  should state is whether its record fits an **NFC tag**, which is `gui/scan.go`'s
+  8 KB buffer and not `MaxSectionLen`.
+- **R6 as first drafted would have `me` print "fits NFC" for a container that can
+  never travel that way.**
 
 ## 2. The container
 
@@ -105,27 +147,51 @@ is currently asserted as a *pipeline* property.
 the legend fields `mt encode` already computes. One record, not siblings, so the
 legend stays bound to what it describes.
 
-`tx:` inherits the reserved-prefix rule (`sysw/record.go:41-51`,
-`gui/scan.go:56-80`): a body that is not lowercase hex is `ClassUnknown` and
-**refused before any sniffer sees it**, so it can never fall through to free text
-and become a plate.
-
 **No new secrecy class.** A transaction rides beside `ClassMDMK` and
 `ClassFreeText`.
 
-**A `tx:` record on argv is REFUSED** (finding B). `mt` refuses a transaction as
-an argument because *"an argument lands in shell history and in `ps` for every
-user on the machine, and this material is bearer."* `me sysw pack`'s help
-currently says only *"**prefer** `--in` for anything real"* — so the
-constellation would refuse the leak upstream and permit it downstream. **Prefer
-is not enough for a bearer instrument.**
+**A `tx:` record on argv is REFUSED.** `mt` refuses a transaction as an argument
+because *"an argument lands in shell history and in `ps` for every user on the
+machine, and this material is bearer."* `me sysw pack` currently says only
+*"**prefer** `--in` for anything real"*. **Prefer is not enough for a bearer
+instrument.**
+
+#### 2.1a A RESERVED PREFIX IS NOT A GUARD — it is a route to free text
+
+**R0 round 0, C3.** An earlier draft of this section said a `tx:` record *"can
+never fall through to free text and become a plate"*, citing `gui/scan.go:56-80`.
+**That is false, and the citation is what makes it false.** Read the block:
+
+```go
+} else if isSyswEncoded(buf) {
+    body, err := sysw.DecodeBody(string(buf))
+    if err != nil { return nil, errScanUnknownFormat }   // MALFORMED -> refused
+    if bytes.HasPrefix(buf, []byte(sysw.PassPrefix)) { return passScan(body), nil }
+    return freeTextScan(body), nil                       // <- EVERYTHING ELSE
+}
+```
+
+The hex check catches the **malformed** case only. A **well-formed** `tx:` record —
+valid lowercase hex, exactly what `mt encode --record` emits — reaches
+`gui/scan.go:79`'s default and becomes a `freeTextScan`, which
+`engraveObjectFlow` hands to `engraveTextFlowFrom`. **The transaction is engraved
+as free text**, bypassing every §3.4–§3.7 guarantee: no parse, no comprehension,
+no confirm screen, no txid, no plate-count warning.
+
+**NORMATIVE:** adding `tx:` to `isSyswEncoded` **without** adding a matching
+branch beside the `PassPrefix` one is the defect. The branch is the work; the
+prefix is not.
+
+> **The general rule, because this is the third time this shape has appeared
+> here.** `mt`'s §8.2f was bypassed by the invocation it refused, because the
+> arg parser ran first. A guard placed downstream of a dispatcher has already
+> lost. **For every refusal in §5, name what runs BEFORE it.**
 
 ### 2.2 Raw transaction XOR chunks — and chunks are engraved VERBATIM
 
 **RULED: the payload carries the raw transaction OR its `mt1` chunks, never
-both.** This supersedes the first draft's *"always decode and compare"* — with
-one form present there is nothing to compare, and a requirement its own
-architecture made unreachable is how a check that does not exist gets asserted.
+both.** This supersedes an earlier *"always decode and compare"* — with one form
+present there is nothing to compare.
 
 **RULED: no default.** `mt encode --record` refuses without `--raw` or
 `--chunks`, and **the refusal teaches**, because a bare blocking refusal is what
@@ -141,33 +207,64 @@ mt: --record needs a form. Say which:
              The device engraves them verbatim.
 ```
 
-**RULED, and this is what shrank v1:**
-
 | payload | the device does | it needs |
 | --- | --- | --- |
-| **raw** | parse → comprehend → confirm → **QR plates** | a transaction parser |
-| **chunks** | **engrave verbatim** → **text plates** | **nothing new** |
+| **raw** | parse -> comprehend -> confirm -> **QR plates** | a transaction parser |
+| **chunks** | **engrave verbatim** -> **text plates** | see §2.2a — **not "nothing"** |
 
-Chunks take the existing `mdmkText` / `validateMdmk` path already used for
-`md1`/`mk1` cards. **There is no `mt1` decoder in v1.**
+> **THIS IS A DELIBERATE EXCEPTION TO §3.4's "COMPREHEND, THEN CUT", STATED IN
+> THOSE WORDS SO A LATER READER DOES NOT "FIX" IT.** Comprehension did not
+> disappear; it **moved upstream**. `mt encode` built those chunks from a
+> transaction the operator inspected on the host.
 
-> **THIS IS A DELIBERATE EXCEPTION TO §3.3's "COMPREHEND, THEN CUT", AND IT IS
-> STATED HERE IN THOSE WORDS SO A LATER READER DOES NOT "FIX" IT.** Comprehension
-> did not disappear; it **moved upstream**. `mt encode` built those chunks from a
-> transaction the operator inspected on the host. The device adds nothing by
-> re-deriving it, and would need a decoder to try.
+**RULED (operator 2026-08-24): text+QR is NEVER offered for a transaction.** Each
+form produces exactly one kind of plate.
 
-**Chunks means text plates ONLY, never QR.** F-234 forbids an `mt1` string as QR
-content, and without a decoder the device cannot recover the bytes. Each form
-produces exactly one kind of plate.
+> **What that costs, named rather than left implicit.** F-234's own argument is
+> that a plate should carry **both** representations — codex32 text for a human
+> with a keyboard, standard-form QR for anyone with a camera, two audiences with
+> two failure modes. **The XOR ruling forecloses that for transactions**, because
+> the device holds only one form and has neither an encoder nor a decoder to
+> derive the other. The ruling stands and the cost is accepted; it is written
+> here so nobody rediscovers it as a defect.
 
-**ACCEPTED COST, stated plainly:** a chunks plate is cut with the device making
-**no claim whatever** about its content — no destination, no amount, no txid.
+#### 2.2a `validateMdmk` CANNOT be reused as-is — it QR-encodes the string
+
+**R0 round 0, C2.** An earlier draft routed chunks through `validateMdmk` and
+said the path needs **"nothing new"**. Read what it does
+(`gui/gui.go:2512-2530`):
+
+```go
+qrc, err := qr.Encode(s, qr.L)                                    // :2514 UNCONDITIONAL
+engravings := []textEngraving{
+    {"TEXT + QR", backup.Paragraph{Text: s, QR: qrc, ...}},       // :2524 and it is FIRST
+    {"TEXT ONLY", backup.Paragraph{Text: s}},
+    {"QR ONLY",   backup.Paragraph{QR: qrc, ...}},                // :2526
+}
+```
+
+`s` is the `mt1` string. So reuse produces **an `mt1` codex32 string inside a QR**
+— exactly what F-234 forbids and what §2.2 just ruled out — and offers it
+**first**, i.e. as the default variant.
+
+**NORMATIVE:** the chunks path engraves **TEXT ONLY**. It may not call
+`validateMdmk` unchanged, and the spec may not describe the chunks form as
+needing "nothing new". What it needs is small — a text-only plate builder — but
+it is not nothing.
+
+> **This is the same live violation §9 O5 records for `md1`/`mk1` cards, reached
+> by a different door.** O5 keeps the *existing* four callers out of Goal 1's
+> scope. It cannot also license a **new fifth caller**, which is what reuse
+> would create.
+
+**ACCEPTED COST:** a chunks plate is cut with the device making **no claim
+whatever** about its content — no destination, no amount, no txid.
 
 **PROPOSED, not ruled:** the device verifies **each chunk's own BCH checksum**
-before cutting. The fork already carries the engine (`codex32/gf32.go`,
-`gf1024.go`, `checksum.go`) and already exposes `ValidMD`/`ValidMK`. Far less
-than a decoder, and it catches garbage before ~21 minutes per plate of scrap.
+before cutting, so a corrupted payload does not become ~21 minutes per plate of
+scrap. **The cost is NOT zero (R0 M1):** `codex32.ValidMD`/`ValidMK` hard-code
+the `md`/`mk` HRPs and BCH targets, and `mt1` has its own — so this is a new
+`ValidMT` over the shared GF engine, not a call to an existing predicate.
 
 ### 2.3 The section cap rises to 32,734
 
@@ -235,35 +332,42 @@ content-dependent default that is silent is worse than the default it replaces.
 
 ### 2.5 Output files
 
-**RULED (scope: all of `me`, and `mt` too):**
+**RULED (scope: all of `me`, and `mt` too). IMPLEMENTED — F-244, closed.**
 
 ```
-stdout is a TTY          → nothing. Nothing persists.
-stdout is a pipe/FIFO    → nothing. No file mode exists.
-stdout is a regular file ┐
-or --out FILE            ┘→ mode grants group or other read?
-                              → REFUSE unless --allow-world-readable
+stdout is a CHARACTER DEVICE  → nothing. Nothing persists.
+stdout is anything else       ┐
+or --out FILE                 ┘→ mode grants group or other read?
+                                   → REFUSE unless --allow-world-readable
 
 --out additionally creates at 0600 AND fchmods an existing target to 0600
 ```
 
-Mechanically verified, not assumed: a process can `fstat(1)` its own redirected
-stdout and sees `S_ISREG` + mode 0644, and sees `S_ISFIFO` for a pipe — so the
-check fires exactly where the exposure is.
+**KEYED ON MODE BITS, NOT ON "is it a regular file" — R0 round 0, I3.** An
+earlier draft said *"stdout is a pipe/FIFO → nothing. **No file mode exists.**"*
+and cited a measurement as proof. **Measured false:**
 
-**The `fchmod` half is load-bearing.** `write_private`'s documented residual —
-*"0o600 binds on CREATE"* — was **measured true**: a pre-existing 0644 target
+| destination | mode | leaks? |
+| --- | --- | --- |
+| anonymous pipe (`\|`) | **0600** | no — the mode test passes it unaided |
+| **named FIFO** (`mkfifo`) | **0666** | **yes — verified: a third party reading it received the bytes** |
+| `/dev/null` | **0666** | no — character device, persists nothing |
+| regular file | umask-dependent | yes when group- or other-readable |
+
+So the exemption belongs to **character devices**, not to FIFOs — **and it is
+load-bearing in both directions**: `/dev/null` is 0666, so a mode-only check with
+no `S_ISCHR` exemption refuses `me … > /dev/null`.
+
+**The `fchmod` half is load-bearing too.** `write_private`'s documented residual
+— *"0o600 binds on CREATE"* — was **measured true**: a pre-existing 0644 target
 stays 0644. Creating carefully is not enough.
 
-`mt`'s existing `redirected_output_warning` becomes mode-aware in the same pass;
-today it fires on *any* redirection and never reads the mode, so it cries wolf on
-a 0600 file and warns no harder on a 0644 one.
-
----
+`mt`'s `redirected_output_warning` is **additive** to this, not replaced: it is
+about how long a file *lasts*, this is about who can *read* it.
 
 ## 3. The device
 
-### 3.1 The carousel does not change. Applicability lives in the payload menu.
+### 3.1 The carousel's SHAPE does not change. One enumeration must.
 
 **RULED: all carousel items are shown always**, because every program may
 eventually start an NFC transfer — so payload-independence of the carousel is
@@ -273,38 +377,77 @@ eventually start an NFC transfer — so payload-independence of the carousel is
 
 | | asks | content-dependent? |
 | --- | --- | --- |
-| the carousel | what can this **machine** do? | **never** |
+| the carousel | what can this **machine** do? | **no — every program, always** |
 | the payload menu | what can **this payload** do? | **by construction** |
 
-**Nothing in the carousel changes** — `lastNav`, the compile-time guard
-`[qaProgram - unlockPayload]struct{}{}`, `layoutMainPager` and every wrap site
-are untouched. Two earlier forms of this ruling (hide inapplicable entries; show
-them dimmed) were retracted; see finding P for why each was worse.
+> **M3, corrected.** An earlier draft wrote "**never**" content-dependent. The
+> carousel already is: `unlockPayload` is shown only when a Sealed Payload is
+> present (`StartScreen.lastNav()`). The accurate claim is narrower and still
+> sufficient — **this program adds no new conditionality**, and the existing one
+> is untouched.
 
-`engraveTransaction` is still **inserted mid-enum** before `loadPayload`, per the
-house rule for unconditional programs, and placed beside the other engrave
-programs.
+**The wrap and pager machinery is untouched** — `lastNav`, the compile-time guard
+`[qaProgram - unlockPayload]struct{}{}`, `layoutMainPager` and every wrap site.
+`engraveTransaction` is **inserted mid-enum** before `loadPayload`, per the house
+rule for unconditional programs.
 
-### 3.2 The compare screen names the command
+#### 3.1a `layoutMainPlates` PANICS on a program it does not enumerate
 
-Before the payload menu comes the load flow's authentication: the device displays
-the identity digest and asks the operator to compare it
-(`gui/sysw_load.go:168`). **That number was printed by `me sysw pack` to stderr,
-in a terminal, possibly an hour ago and possibly on a laptop now closed** — and
-the screen currently says *"Compare this against what"* without naming what, or
-how to get it.
+**R0 round 0, I2.** An earlier draft said "nothing in the carousel changes".
+**False.** `gui/gui.go:2429-2436`:
 
-**Measured during the walk:** the digest is over the RECORDS, so it is
-**reproducible**, **identical for sealed and unsealed**, and **independent of the
-passphrase**. Re-running `me sysw pack` does return the same number.
+```go
+func layoutMainPlates(buf *op.Buffer, page program) (op.Op, image.Point) {
+	switch page {
+	case backupWallet, engravePassphrase, engraveText, engraveXpub, engraveBundle,
+	     engraveSingleSig, engraveMultisig, walletPolicy, loadPayload, bip85Derive,
+	     unlockPayload:
+		...
+	}
+	panic("invalid page")
+}
+```
 
-**But re-packing is the risky recovery, and it is the one an operator reaches
-for.** On a sealed payload it prints a **brand-new 12-word passphrase every
-time**, which reads as *"this is a different container"*. An operator who acts on
-that belief and **re-flashes** ends up with a payload whose passphrase they saw
-once and did not keep.
+An explicit per-program list, **with no compile-time guard**. Adding
+`engraveTransaction` to the enum and not to this list means **the device panics
+the moment the operator pages onto the new entry** — not at build time, not in a
+test that never pages there, but in the operator's hands.
 
-**RULED: the device prints the command beneath the digit groups.**
+**NORMATIVE:** the enum and this case list are **lockstep sites**. The enum's own
+guard protects `unlockPayload`'s position and says nothing about this switch.
+
+### 3.2 The compare screen names the WRONG command today
+
+The load flow displays the identity digest and asks the operator to compare it.
+That number was printed by `me sysw pack` to **stderr, possibly an hour ago, on a
+laptop now closed**.
+
+**R0 round 0, I7 — an earlier draft said the screen "names no command". It does,
+and it names the risky one.** `gui/sysw_load.go:167-171`:
+
+```go
+lines := []string{
+    "Compare this against what",
+    "`me sysw pack` printed:",        // <- the RE-PACK path
+    "",
+    sysw.FormatHash(d),
+}
+```
+
+**Measured:** the digest is over the RECORDS, so it is reproducible, identical
+for sealed and unsealed, and independent of the passphrase. Re-running `pack`
+does return the same number — **but on a sealed payload it prints a brand-new
+12-word passphrase every time**, which reads as *"this is a different
+container"*. An operator who acts on that belief and **re-flashes** ends up with
+a payload whose passphrase they saw once and did not keep.
+
+**`me sysw show` already exists**, is **read-only**, and prints the same digest
+plus `sealed:`, `pub_len:`, `ct_len:`.
+
+**NORMATIVE, and it is a REPLACEMENT, not an addition.** The ruling was phrased
+*"put `me sysw show` beneath the digits"*, which — taken additively — leaves the
+sentence that sends the operator to re-pack sitting directly above it. **The
+`me sysw pack` line must go.**
 
 ```
 Compare this against
@@ -314,14 +457,7 @@ c679 6b68 b993 bc10
 793a 3de2 8b3d 46e0
 ```
 
-`me sysw show` already exists — *"Print what a container holds, and its digest"* —
-is **read-only**, and prints `sealed:`, `pub_len:`, `ct_len:` and the same digest.
-Putting it on this screen is better than documenting it, for the reason the walk
-found it: **the operator is standing at the machine**, and a manual they would
-have to go and open is exactly what they cannot reach. It also steers them off
-the re-pack path *before* they take it, rather than warning them afterwards.
-
-`me sysw pack`'s digest line carries the same pointer, so the host says it too.
+`me sysw pack`'s own digest line carries the same pointer, so the host says it too.
 
 ### 3.3 The payload menu
 
@@ -333,16 +469,29 @@ boot → "payload present, load it?" → LOAD → compare digest
      → BACK exits to the carousel
 ```
 
-`syswPayloadMenu` exists (`gui/sysw_unload.go:34`) and today offers only
-`LOAD AGAIN` / `UNLOAD`; it gains content-derived entries above them.
-`sysw.Classify` already computes what a payload holds.
+**R0 round 0, I1 — the cited mechanism is NOT a post-load hook.**
+`gui/sysw_unload.go:23` documents `syswPayloadMenu` as *"the `Load Payload`
+carousel entry"*, and it is reached only from `uiFlow`'s `case loadPayload`.
+**The boot path calls `syswLoadFlow` directly** (`gui/gui.go:2011`) and returns
+to the carousel. So `syswPayloadMenu` gaining content-derived entries produces
+the menu **only when the operator navigates to Load Payload** — never after the
+boot load, which is the moment the ruling names.
 
-**BACK is the exit and must be**, for the same reason `syswUnloadFlow`'s BACK is
-choice 0: the resting position is the one that costs nothing.
+**NORMATIVE:** two changes, not one. (a) `syswPayloadMenu` gains content-derived
+entries; (b) **the boot path must invoke it on a successful load**, which is a
+new call `uiFlow` does not make today.
 
-The carousel entry stays reachable and must still refuse gracefully — as a
-backstop, not the path — and **its refusal names the FIX, not just the problem**:
-*"this payload holds no transaction — load one with Load Payload."*
+> **Why this is filed as a defect and not a detail:** P4's gate ("the payload
+> menu exists and lists what the payload holds") is satisfiable by (a) alone,
+> while the ruled behaviour stays untrue. A gate that can pass while its own
+> sentence is false is the shape the closure rule exists to catch.
+
+`sysw.Classify` already computes what a payload holds. **BACK is the exit and
+must be**, for the same reason `syswUnloadFlow`'s BACK is choice 0.
+
+The carousel entry stays reachable as a **backstop** and must refuse gracefully,
+**naming the FIX**: *"this payload holds no transaction — load one with Load
+Payload."*
 
 ### 3.4 Comprehend, then cut — the raw form
 
@@ -405,17 +554,43 @@ AEAD (sealed). Two checks, two jobs, neither claiming the other's.
 
 The picker is keyed on the **txid** — the derived, collision-free identifier, and
 the one that matches `mt inspect` on the host. The `TO` label may ride as a
-second line but is **asserted** and can collide; three transactions could all read
-"cold storage".
+second line but is **asserted** and can collide.
 
 **The picker shows a PREFIX. The prefix DISTINGUISHES; it never VERIFIES.**
 `mt`'s own help names where truncation turns dangerous: a 20-bit set id is
-*"1 in 1,048,576 by accident, and under a second to construct deliberately."* The
-prefix separates transactions inside a payload the operator packed; the **full
-txid on screen 2** is what gets compared.
+*"1 in 1,048,576 by accident, and under a second to construct deliberately."*
+The **full txid on screen 2** is what gets compared.
 
 **Two identical txids in one payload is the same transaction packed twice** — a
 duplicate to refuse or collapse, never two picker entries.
+
+#### 3.6a THE DEVICE CANNOT DERIVE A TXID FOR A CHUNKS PAYLOAD
+
+**R0 round 0, I5.** A txid is `double-SHA256` over the deserialised transaction
+with witnesses stripped. For a **chunks** payload the device has **`mt1` strings
+and no decoder** (§2.2, ruled) — so it cannot reassemble the transaction and
+cannot compute the txid. **The picker's only key is unavailable in exactly the
+form that most needs it**, since a chunks job is 22–202 plates.
+
+Three transactions in chunk form therefore present as three identical rows, and
+**R10's duplicate rule is unevaluable** — the device cannot tell two entries
+apart well enough to know whether they are duplicates.
+
+**What IS available without a decoder**, and this is the constraint the fix must
+work inside:
+
+| candidate | available for chunks? | note |
+| --- | --- | --- |
+| txid | **no** — needs the transaction | |
+| `chunk_set_id` (20 bits, in every chunk header) | **yes** — read off the string | not a txid, and 20 bits is not a comparison key (`mt` says so) |
+| the legend fields | **yes** — carried in the record (§2.1) | **asserted**, and may collide |
+| record order in the payload | yes | positional, and says nothing |
+
+**OPEN — this spec does not resolve it.** Recorded as §9 O11 rather than guessed
+at, because every option trades against a ruling: deriving a txid needs the
+decoder §2.2 rules out; keying on `chunk_set_id` puts a 20-bit value in the role
+`mt` explicitly refuses it for; keying on the legend makes an **asserted** field
+the identity of an artifact.
 
 ### 3.7 What the device does not do
 
@@ -438,30 +613,71 @@ duplicate to refuse or collapse, never two picker entries.
 
 **Default: QR + legend** (raw payload). **Text plates** come only from a chunks
 payload. The device states plate count and cut time before the operator commits —
-~21 minutes per plate (F-225), and the forms are not close: the pathological
-10-in/2-out spend is **~9–11 QR plates** or **202 text plates**.
+~21 minutes per plate (F-225).
 
-### 4.2 What the QR carries
+**MULTI-SYMBOL IS THE COMMON CASE, NOT A CORNER.** At the ruled 0.60 mm module
+(§4.7) the largest QR that fits an 85 mm plate is **v26 — 1,367 B at ECC L**
+(`RESULTS_qr_physical_max_2026-08-22.txt`); a v40 would be 111 mm wide against
+79 mm usable. And the search **prefers** several small symbols over one large one
+when that buys ECC: the measured 742 B case resolves to **6 symbols on 2 plates**
+(`RESULTS_ecc_selection_2026-08-22.txt`). So multi-symbol begins **below every row
+in §2.3's table**.
+
+**Plates, symbols and tiling are three different counts** and the spec must not
+conflate them:
+
+- **symbol** = one QR code
+- **plate** = one piece of steel; several symbols may be tiled on one (`4 up`)
+- and a plate may hold **one** symbol yet still be the *second* plate, because
+  the legend reservation pushed it there (measured: 1,130 B is `2 pl, 1 qr`)
+
+### 4.2 What the QR carries, and how several of them reassemble
 
 **The raw transaction bytes** — F-234, not re-litigable.
 
-**The ENCODING of those bytes is a PARAMETER, resolved by the test plate**
-(F-243), not ruled here. The argument that previously settled this **does not
-bind**: base45 was rejected because its alphabet contains SPACE and EPD §6.4
-forbids interior whitespace *in a `sysw` record* — and in that architecture *"the
-record stores lowercase; `mt` uppercases only when encoding the QR symbol"*, so
-record and QR were **one string**. **Here they are decoupled**: the record carries
-hex, the QR is generated **on-device** from parsed bytes and never passes through
-a record.
+#### 4.2a Multi-symbol uses QR STRUCTURED APPEND
 
-**F-243 is more urgent than it was filed as.** It was filed as *"can a stranger
-read this in 15 years"*. §4.3's ruling makes it **"can the operator complete a
-mandatory step, today, every time"**:
+**R0 round 0, C1 — RULED (operator 2026-08-24).** An earlier draft said the QR
+carries *"the raw transaction bytes"*, singular and whole, and said **nothing**
+about what each symbol holds when there is more than one, or in what order they
+concatenate. A recoverer with nine plates from a drawer had nine anonymous byte
+blobs, and §4.3's mandatory post-cut test — *scan the QR, then `mt inspect`* —
+would be handed a **truncated transaction on every plate but the last**, reporting
+failure on a correct plate.
 
-- **raw octets** — phone scanners mangle bytes ≥ `0x80`. **A good plate appears
-  to fail.**
-- **base45 / bech32-uppercase** — every scanner shows clean text, but the
-  operator cannot tell it is the *right* transaction without a tool.
+**Structured Append is QR's own standard for this.** Each symbol carries its
+index, the total count, and a parity byte over the whole message; standard
+decoders reassemble it themselves. So it keeps F-234's promise **intact for
+multi-symbol jobs** — a recoverer with an ordinary scanner still gets the
+transaction, with no constellation knowledge — which no bespoke header could do.
+
+**The 16-symbol cap is not a constraint here:** at 1,367 B per full-area v26
+symbol that is ~21 KB, against Bitcoin's ~100 KB standardness limit and a
+pathological worst case of 8,067 B.
+
+**TWO GATES, and neither may be assumed:**
+
+1. **Our encoder must actually emit Structured Append.** Unverified. If it does
+   not, this ruling has no mechanism — the same class as C2 and I8.
+2. **Real scanners must reassemble it off engraved steel.** This is an S0
+   question and costs nothing extra: the test plate is already being cut.
+
+**§4.3's post-cut test is only meaningful once (1) and (2) hold.** Until then a
+multi-symbol job cannot be verified by the operator at all.
+
+#### 4.2b The byte ENCODING is still a parameter
+
+Resolved by the test plate (F-243), not here. The argument that previously
+settled it **does not bind**: base45 was rejected because its alphabet contains
+SPACE and EPD §6.4 forbids interior whitespace **in a `sysw` record** — and in
+that architecture the record's string **was** the QR's string. **Here they are
+decoupled:** the record carries hex; the QR is generated **on-device** from
+parsed bytes and never passes through a record.
+
+**F-243 is more urgent than it was filed as.** Filed as *"can a stranger read this
+in 15 years"*, §4.3's ruling makes it **"can the operator complete a mandatory
+step, today, every time"** — and raw octets make a **good** plate appear to fail,
+because phone scanners mangle bytes >= `0x80`.
 
 ### 4.3 After the cut, the device says to TEST THE PLATE
 
@@ -491,24 +707,48 @@ re-cut.
 **This requires new `mt` scope; see §6, finding O.** No `mt` verb can read a raw
 transaction today.
 
-### 4.4 The legend is cut LAST
+### 4.4 The legend is cut LAST — which is a CHANGE, not the status quo
 
 **RULED: legend last; an incomplete plate is discarded; there is no resume.**
 
 **The legend is the plate's claim about itself.** Cut last, a plate only claims to
-be `PLATE 2 OF 3` once it is one. Cut first, it is a claim the plate has not
-earned. This is §3.4's anti-overclaim discipline applied to the **artifact**.
+be `PLATE 2 OF 3` once it is one. This is §3.5's anti-overclaim discipline applied
+to the **artifact**.
 
 > **AN UNSIGNED PLATE IS AN UNFINISHED PLATE.**
 
-Visible at a glance, in a drawer, with no tooling — which matters precisely
-because the device has no camera and the operator is the only inspector.
+Visible at a glance, with no tooling — which matters precisely because the device
+has no camera (§3.7) and the operator is the only inspector.
 
-**No resume, for a mechanical reason and not a preference:** re-clamping cannot
-guarantee the plate returns to the same origin, and this machine has already
-produced a misregistration artefact traced to **Y-axis play from a loose screw**,
-found only after four software hypotheses failed. A resumed cut would be offset
-and would still look finished.
+#### 4.4a THE BUILDER EMITS THE LEGEND FIRST TODAY
+
+**R0 round 0, I8.** `Engraving` is `iter.Seq[Command]` (`engrave/engrave.go:55`)
+— an **ordered sequence executed in emission order** — and `EngraveText`
+(`backup/backup.go:363-396`) emits:
+
+```go
+offy := params.I(outerMargin)
+centerRow(plate.Title, offy)      // the legend row, FIRST
+if plate.Title != "" { offy += fontSize }
+...                                // the body, after
+```
+
+**So the invariant above is FALSE as shipped.** A plate abandoned at minute 20
+already carries `PLATE 1 OF 2` and **looks finished** — the exact failure §4.4
+exists to prevent, and an operator taught the rule would sort it into the good
+stack.
+
+**It is achievable**, unlike C2: plate *position* comes from the `y` offset, not
+from emission order, so legend-last is a **reordering of yields**, not a layout
+change. **NORMATIVE: P5 must reorder it, and P5's gate must assert the emission
+order** — not merely that a finished plate looks right, since a finished plate
+looks identical either way.
+
+**No resume, for a mechanical reason:** re-clamping cannot guarantee the plate
+returns to the same origin, and this machine has already produced a
+misregistration artefact traced to **Y-axis play from a loose screw**, found only
+after four software hypotheses failed. A resumed cut would be offset and would
+still look finished.
 
 **The device must SAY to discard it.** It knows it stopped mid-cut, and the
 operator is holding twenty minutes of steel they will be tempted to keep.
@@ -520,9 +760,9 @@ all hold and looks real — it fails safe only because `mt` requires chunks
 
 ### 4.5 The configuration search
 
-**The DEVICE runs it.** §4 of `SPEC_mt_qr_DEFERRED.md` was written for a host
-verb this design does not have; its objective is stated in **plates and minutes**,
-and only the device holds `EngraverParams`.
+**The DEVICE runs it.** §4 of `SPEC_mt_qr_DEFERRED.md` was written for a host verb
+this design does not have; its objective is stated in **plates and minutes**, and
+only the device holds `EngraverParams`.
 
 ```
 search space:  module size × QR version (1..40) × ECC (L,M,Q,H)
@@ -534,24 +774,69 @@ objective:     1. minimise plates    ← a plate holds the QR(s) AND the legend
                5. then minimise QR version
 plate:         85 × 85 mm, outer margin 3 mm ⇒ 79 mm usable
 quiet zone:    4 modules per side, per symbol
-legend:        6 lines reserved on plate 1 (25.5 mm at 4.25 mm pitch),
-               1 line on every later plate
 ```
 
-**Both R0 corrections MUST be carried, because they are easy to lose:** tiling is
-`across × rows`, **not** `k × k`; and the objective must be a **total order**
-breaking toward the **largest** module — the original omitted module size and used
-strict `<` against a loop ascending from 0.30 mm, so ties broke toward the
-**smallest, least legible** symbol. **41 configurations tie** once the floor lifts.
+**Both R0 corrections MUST be carried:** tiling is `across × rows`, **not**
+`k × k`; and the objective must be a **total order** breaking toward the
+**largest** module — the original omitted module size and used strict `<` against
+a loop ascending from 0.30 mm, so ties broke toward the **smallest, least
+legible** symbol.
 
-### 4.6 The plate table must be regenerated
+#### 4.5a The legend reservation is a FORMULA, and the fields are PACKED
+
+The reservation was a hard-coded **6 lines / 25.5 mm**, and because a QR is
+**square**, losing 25.5 mm of height loses 25.5 mm of width with it:
+
+```
+plate usable        79.0 × 79.0 mm = 6241 mm²
+with the legend     53.5 × 53.5 mm = 2862 mm²
+                    the legend costs 54% of plate 1's AREA
+at 0.60 mm          full plate = v26   with the legend = v16
+```
+
+**Six lines came from one field per line, with the 45-character BEARER line
+wrapping.** Packing them instead — measured at the **3.0 mm** face, `font/sh`,
+44 columns:
+
+| legend | lines | height | QR gets | version at 0.60 mm |
+| --- | --- | --- | --- | --- |
+| 6, one field per line (the old reservation) | 6 | 25.5 mm | 53.5 mm | **v16** |
+| **packed, all five fields** (153 chars) | **4** | **17.0 mm** | 62.0 mm | **v19** |
+| **packed, mandatory three** (99 chars) | **3** | **12.8 mm** | 66.2 mm | **v21** |
+| none | 0 | 0 | 79.0 mm | v26 |
+
+**NORMATIVE: the reservation is computed from the field set and the face, never
+hard-coded.** Two of the five fields (`FROM WALLET`, `TO`) are **optional**, so a
+fixed 6-line charge bills every plate 1 for rows that may not exist.
+
+**3.0 mm IS THE FLOOR, and it is already the hard case.**
+`gui/freetext_proof.go:24` calls it *"the smallest rung and the hardest legibility
+case"*. Smaller faces would help a great deal — the same packing at 1.5 mm gives
+**2 lines, 4.2 mm, v24**, i.e. the legend costing a single version step — **but
+no face below 3.0 mm has been tested.** That is an **S0** question, and it costs
+one extra line of text on a plate already being cut.
+
+**And `FORMAT: mt1 codex32` is WRONG on a QR plate.** §5 of `SPEC_mt_v0_1.md`
+calls that field *"arguably the most important"* because it is what lets a
+stranger start — and on a QR plate the content is raw transaction bytes by F-234,
+not a codex32 string. **The field must state what the QR actually carries.**
+
+### 4.6 The plate table must be regenerated — and it measures the wrong family
 
 It measures **PSBTs**; this design carries **signed transactions** (53–91% of PSBT
-size). It corrects for a **49-bit** header; the ruled header is **55 bits**
-(F-242). And `SPEC_mt_qr_DEFERRED.md` §10.14's **font-metric correction** is
-already owed. One job, three
-inputs. **Until then no plate count here is load-bearing** beyond §4.1's
-order-of-magnitude comparison.
+size). It corrects for a **49-bit** chunk header; the ruled header is **55 bits**
+(F-242). And `SPEC_mt_qr_DEFERRED.md` §10.14's **font-metric correction** is owed.
+
+**R0 round 0, M2 — a fourth input, and it is the largest.** The regeneration must
+also carry **§4.5a's packed-and-computed legend reservation**. The existing table
+was produced with the hard-coded 6-line / 25.5 mm charge, which costs **54% of
+plate 1's area**; packing alone moves 0.60 mm from **v16 to v19**. Every plate
+count in that table is therefore high by an amount larger than the other three
+corrections combined, and re-running it without this input would produce a second
+wrong table.
+
+**Until it is regenerated, no plate count in this spec is load-bearing** beyond
+§4.1's order-of-magnitude comparison.
 
 ### 4.7 Module size
 
@@ -564,79 +849,115 @@ against 0.60 mm until the test plate exists.**
 
 ## 5. Refusals
 
-Generated by the walk, not imagined. **Every refusal gets a test, and every
-refusal test must go RED when its check is removed** — `mt` has this machinery
-(`refusals.toml`, `check-refusal-coverage.sh`, `mutate-refusals.sh`, 30/30 red);
-the fork side needs its equivalent.
+Generated by the walk and the R0 round, not imagined. **Every refusal gets a
+test, and every refusal test must go RED when its check is removed** — `mt` has
+this machinery (`refusals.toml`, `check-refusal-coverage.sh`,
+`mutate-refusals.sh`); the fork side needs its equivalent.
 
-| # | refusal | why | §
+| # | refusal | why | § |
 | --- | --- | --- | --- |
-| R1 | a `tx:` record whose body is not lowercase hex | else it falls through to free text and becomes a plate | 2.1 |
+| R1 | a `tx:` record whose body is not lowercase hex | else it is claimed by a sniffer | 2.1 |
 | R2 | **a `tx:` record on argv** | argv is world-readable via `/proc` and lands in shell history; this material is bearer | 2.1 |
 | R3 | `mt encode --record` with neither `--raw` nor `--chunks` | no default, and the refusal teaches | 2.2 |
-| R4 | a payload carrying **both** raw and chunks | §2.2 is XOR; both means it was built by something that does not know this format | 2.2 |
-| R5 | a chunk set whose per-chunk BCH checksums do not hold *(proposed)* | catches garbage before ~21 min/plate of scrap, without a decoder | 2.2 |
-| R6 | a section exceeding `MaxSectionLen` — **naming the transport**, since NFC's bound is lower | 2.3 |
+| R4 | **see R4′ below — the first draft of this was wrong** | | 2.2 |
+| R5 | a chunk set whose per-chunk BCH checksums do not hold *(proposed)* | catches garbage before ~21 min/plate of scrap | 2.2a |
+| R6 | a section exceeding `MaxSectionLen`, stating the **section cap** — **not** "which transports it fits" (§1.2) | 2.3 |
 | R7 | **empty stdin** to `me sysw pack` | must join the existing exit-2 path, not bypass it | 1.1 |
 | R8 | a world-readable output destination, unless `--allow-world-readable` | 2.5 |
-| R9 | a transaction the parser rejects | 3.3 |
-| R10 | two identical txids in one payload | the same transaction packed twice — collapse or refuse, never two picker entries | 3.5 |
-| R11 | *Engrave Transaction* on a payload holding no transaction — **naming the fix** | backstop to §3.3 | 3.3 |
+| R9 | a transaction the parser rejects | 3.4 |
+| R10 | two identical txids in one payload | the same transaction packed twice — **unevaluable for chunks, see §3.6a** | 3.6 |
+| R11 | **see R11′ below** | | 3.3 |
+| **R12** | **a well-formed `tx:` record reaching `freeTextScan`** — i.e. `tx:` added to `isSyswEncoded` without its own branch | §2.1a; this is the C3 defect made into a test | 2.1a |
+| **R13** | **a multi-symbol QR job when Structured Append is unavailable** | §4.2a's two gates; without them the artifact is unrecoverable and §4.3's test cannot pass | 4.2a |
+
+### R4′ — refusing "both forms" was wrong
+
+**R0 round 0, I6.** The first draft refused *"a payload carrying **both** raw and
+chunks"*, reasoning that §2.2's XOR made both-present evidence of broken tooling.
+**§3.6 makes it legitimate:** a payload may hold **several transactions**, and
+nothing says they must share a form. A sensible operator packs a small transaction
+`--raw` (one QR plate) and a large one `--chunks`, and the payload then contains
+both — correctly.
+
+**NORMATIVE: the XOR is PER TRANSACTION, not per payload.** R4 refuses a **single
+`tx:` record** carrying both forms. A payload holding a raw record and a chunks
+record is well-formed.
+
+> **And the first draft's refusal text made it worse.** It blamed the operator's
+> tooling — *"built by something that does not know this format"* — for a payload
+> their own tooling built correctly. The natural recovery is to re-pack
+> everything as chunks, which moves every transaction onto the form where the
+> device **makes no claim about content at all** (§2.2). A refusal that pushes
+> the operator toward the blinder path is worse than none.
+
+### R11′ — the message is wrong in the case that will be most common
+
+**R0 round 0, M4.** The first draft's message was *"this payload holds no
+transaction — load one with Load Payload."* But the carousel entry is
+**unconditional** (§3.1), so the **most common** way to reach it is with **no
+payload loaded at all** — a fresh boot where the operator declined the offer, or
+a machine with no payload region. Telling that operator their payload "holds no
+transaction" names a payload that does not exist.
+
+**NORMATIVE: two distinct messages.**
+
+| state | message |
+| --- | --- |
+| no payload loaded | *"No payload is loaded. Load one with Load Payload."* |
+| a payload is loaded, with no transaction in it | *"This payload holds no transaction. It holds: <classes>."* |
+
+Both name the fix (finding I's discipline); only the second may speak about
+contents.
+
+### Where a refusal RUNS is part of the refusal
 
 **A guard downstream of the parser has already lost.** `mt`'s §8.2f was bypassed
 by the invocation it existed to refuse, because clap rejected the positional
-argument first — **and clap's error echoed the bearer transaction**. Every refusal
-above must be checked against *where in the pipeline it actually runs*.
+first — **and clap's error echoed the bearer transaction**. C3 is the same shape
+inside `gui/scan.go`. **For every refusal above, name what runs before it.**
 
-**And every guard must be tested against its NEAREST LEGITIMATE INPUT.** Five
-fixes in the `mt` cycle broke on the near miss. **Before committing any fold that
-adds or widens a guard: run the hostile input (must be caught) AND the nearest
-legitimate one (must pass), and keep both as tests.**
-
----
+**And every guard must be tested against its NEAREST LEGITIMATE INPUT.** Six
+instances in this cycle now, the most recent two found while fixing F-244:
+`me sysw wipe` (a fill image with nothing in it) and **`/dev/null` (mode 0666)**.
+**Before committing any fold that adds or widens a guard: run the hostile input
+(must be caught) AND the nearest legitimate one (must pass), and keep both.**
 
 ## 6. Sequencing
 
 | | where | what |
 | --- | --- | --- |
-| **S0** | this repo | **Cut the test plate.** QR blocks at 0.3 / 0.45 / 0.6 / 0.9 mm, plus one raw-octet and one base45 symbol, scanned off brushed steel **with an external scanner** (§3.7). ~2 s per cut. Resolves module size **and** the encoding parameter |
-| **P1** | `me` (Rust) | `ClassTransaction`, the framed record, stdin, content-based sealing, output-mode refusal, `MaxSectionLen` → 32,734 — **with vectors** |
-| **P2** | `mt` (Rust) | `mt encode --record --raw\|--chunks`; **`mt inspect` gains a raw-transaction subject** (finding O); mode-aware output refusal |
-| **P3** | fork (Go) | Port P1, provenance-pinned |
-| **P4** | fork | The payload menu (§3.3) and the program (§3.4–3.7) |
-| **P5** | fork | The plate: search, legend-last, test-the-plate, plate count (§4) |
+| **S0** | this repo | **Cut the test plate.** QR blocks at 0.3 / 0.45 / 0.6 / 0.9 mm; one raw-octet and one base45 symbol; **a Structured-Append pair**; and **one legend line at each candidate face below 3.0 mm**. Read with an **external scanner** (§3.7). ~2 s per cut. Resolves module size, the byte encoding, §4.2a gate 2, and §4.5a's face |
+| **P1** | `me` (Rust) | `ClassTransaction`, the framed record, stdin, content-based sealing, `MaxSectionLen` → 32,734 — **with vectors** |
+| **P2** | `mt` (Rust) | `mt encode --record --raw\|--chunks`; **`mt inspect` gains a raw-transaction subject**; the record must state whether it fits an **NFC tag** (§1.2), which is `gui/scan.go`'s 8 KB buffer, not `MaxSectionLen` |
+| **P3** | fork (Go) | Port P1, provenance-pinned. **Includes the `tx:` branch in `gui/scan.go` (§2.1a) — the prefix without the branch is the C3 defect** |
+| **P4** | fork | The payload menu (§3.3) **and the boot-path call that invokes it**; the program (§3.4–3.7); **`layoutMainPlates`' case list (§3.1a)** |
+| **P5** | fork | The plate: search, **the computed legend reservation (§4.5a)**, **the legend-emission REORDER (§4.4a)**, test-the-plate, plate count |
 | **P6** | both | Journeys and refusal coverage (§5) |
 
-**S0 first is the closure rule applied rather than quoted.** Two of this design's
-gates are hypotheses and one is two seconds of machine time.
+**S0 first is the closure rule applied rather than quoted.** Four of this
+design's gates are hypotheses and S0 is two seconds of machine time each.
 
-**Finding O is real new scope.** `mt inspect`, `mt verify` and `mt decode` all
-take `mt1` strings — so **no `mt` verb can read a default plate.** For
-*broadcasting* that is F-234 working as designed (raw bytes go straight into
-`bitcoin-cli`). The gap is **inspection**, and §4.3 makes it mandatory.
-
-**Not in this sequence: F-244.** Critical, pre-existing, affects seeds today, and
-must not wait.
-
----
+**Not in this sequence: F-244** — closed 2026-08-24, and it did not wait.
 
 ## 7. What must be true to close
 
 - **0C / 0I** under the R0 loop, over lenses enumerated up front. *Closure is
   lens-closure* — not "a round came back clean".
 - **The mode-segmentation gate is green.** Any QR sizing MUST assert measured v40
-  capacity against **numeric 7089 / alnum 4296 / byte 2953 at L**. An all-`0x41`
-  payload once measured *alphanumeric* capacity while claiming byte; a mixed one
-  read **6.6% low**. Every wrong number looked plausible; only this gate caught them.
+  capacity against **numeric 7089 / alnum 4296 / byte 2953 at L**.
 - **The test plate is cut and read** (S0).
-- **`check-provenance.sh` green** across both repos. **Not in CI** — it needs a
-  second repository — so it will not catch itself.
+- **§4.2a's TWO Structured-Append gates are both satisfied** — the encoder emits
+  it, and a real scanner reassembles it off engraved steel. **Until both hold,
+  a multi-symbol QR job may not be cut**, because it is unrecoverable and §4.3's
+  mandatory test cannot pass on any plate but the last.
+- **The legend reservation is COMPUTED, not hard-coded** (§4.5a), and the plate
+  table is regenerated with it as an input (§4.6).
+- **P5's gate asserts the legend's EMISSION ORDER** (§4.4a), not merely that a
+  finished plate looks right — a finished plate looks identical either way.
+- **`check-provenance.sh` green** across both repos. **Not in CI.**
 - **Refusal coverage is a bijection, and every refusal test goes red without its
   check** (§5).
-- **The plate table is regenerated** (§4.6).
 - **Both pipeline invariants are asserted as pipeline properties** (§1.1).
-
----
 
 ## 8. Ruled, and not to be re-litigated
 
@@ -668,6 +989,9 @@ must not wait.
 | The payload menu appears right after a successful load | walk P |
 | The picker is keyed on the txid; the prefix never verifies | walk Q |
 | Legend cut last; incomplete plates discarded; no resume | walk R |
+| **Text+QR is never offered for a transaction** | operator 2026-08-24 |
+| **Multi-symbol QR uses QR Structured Append** | operator 2026-08-24, R0 C1 |
+| **The legend is packed and its reservation computed; 3.0 mm is the tested floor** | operator 2026-08-24 |
 
 ---
 
@@ -681,7 +1005,10 @@ must not wait.
 | O4 | the network the address row renders under | F-235's unresolved half |
 | O5 | **`validateMdmk`'s four callers** engrave an `md1`/`mk1` codex32 string as QR content — a live F-234 violation | **NOT this spec.** For an `md1` card the "standard form" is not obvious the way transaction bytes are |
 | O6 | multi-symbol recovery without `mt`'s reader | `SPEC_mt_qr_DEFERRED.md:169` |
-| O7 | applicability predicates for the **other ten** programs (§3.2 builds the mechanism plus this one) | follow-up |
+| O7 | applicability predicates for the **other ten** programs | follow-up |
+| **O11** | **the picker's key for a CHUNKS payload** — the device cannot derive a txid without a decoder (§3.6a), and every alternative trades against a ruling | **unresolved; blocks a multi-transaction chunks payload** |
+| **O12** | does our QR encoder emit **Structured Append**? §4.2a gate 1 — unverified, and without it C1's ruling has no mechanism | S0 / P5 |
+| **O13** | a legend face **below 3.0 mm** — untested, and worth ~5 QR versions (§4.5a) | S0 |
 | O8 | **Journey B — recovery.** Someone finds the plate years later. Not yet walked | next walk |
 | O9 | the documented `picotool` line stops before the move to 20V/28V power, so a correct payload reads as a failed one | walk G, documentation |
 | O10 | the **courier model** is nowhere written down (§ walk H) | documentation |
