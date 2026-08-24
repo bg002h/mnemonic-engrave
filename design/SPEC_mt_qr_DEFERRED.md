@@ -314,3 +314,22 @@ The 0.30 mm results are recorded for when the plate exists.
 > lists `encode`, `decode`, `verify`, `inspect` and **not** `qr` — so it was
 > describing the output of a verb it did not offer. It belongs with the verb.
 
+---
+
+## Module size, carried over from `SPEC_mt_v0_1.md` §8 item 8
+
+> **Module size is the operator's choice, defaulting to 0.60 mm** — not a
+> refusal. Ruling 2026-08-23: `mt` offers every size it can engrave and suggests
+> 0.60 mm (two engraved strokes). Sizes below that are **optically
+> unvalidated**, and `mt` says so at the point of choice rather than refusing.
+> **A scan that succeeds today is evidence about one plate on one machine on one
+> day, not a property of the size.**
+
+Removed from the live refusal list because it is **engraving geometry only
+`mt qr` has** — `mt encode` emits characters and reserves no area at all — and
+it sat among live refusals, reading as v0.1 behaviour. The same shape as §8.7
+and §8.7c; the first sweep caught those and missed this one.
+
+The `§10.10` input-table row citing it (`module size | §8.8 | default 0.60 mm`)
+was deleted at the same time.
+

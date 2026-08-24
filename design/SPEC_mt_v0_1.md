@@ -1121,14 +1121,18 @@ overturned an earlier assumption and are marked.
    §Section 1 of the brainstorm**, which argued `mt` had no wire format left to
    define and belonged next to `me bundle`. See §2 for what the codec does in
    fact specify; the objection was answered rather than ignored.
-3. **The QR carries the standard form, never a codex32 string** (F-234).
+3. **The QR carries the standard form, never a codex32 string** (F-234) —
+   **`mt qr` only, deferred (§0a)**; recorded here because it is what §3a's
+   one-layer-per-medium principle rejected, and that principle is live.
 4. **UR is dropped entirely. Both verbs share the `mt1` chunk header and NOTHING
    ELSE** — each medium carries the error correction native to it (§3a). The QR
    payload is **bech32 uppercase**, the constellation's own alphabet.
    **This overrules the previous draft's `ur:psbt`, which itself overruled
    `ur:bytes`** — three positions in one cycle, and §3 records why each fell.
    The payload remains a fully finalized PSBT. See §3.
-5. **Reed-Solomon density is the highest that still minimises plate count.**
+5. **Reed-Solomon density is the highest that still minimises engraved area** —
+   **`mt qr` only, deferred (§0a)**. Stated in area rather than plates, because
+   `mt` cannot see how strings map to steel.
 6. **Provenance rides in the engraved legend, not in the wire format.**
 7. **`mt` does not offer a locktime CHOICE. It reads the transaction and warns
    if the plate would be immediately broadcastable.** Operator ruling 2026-08-23:
@@ -2794,12 +2798,12 @@ exactly as permanent, as a machine-engraved one.
    behaviour depends on it, and it still **cannot carry a number** until the
    record framing is chosen — four candidate framings give four ceilings.
 
-8. **Module size is the operator's choice, defaulting to 0.60 mm** — not a
-   refusal. Ruling 2026-08-23 (§10.1): `mt` offers every size it can engrave and
-   suggests 0.60 mm (two engraved strokes). Sizes below that are **optically
-   unvalidated**, and `mt` says so at the point of choice rather than refusing.
-   A scan that succeeds today is evidence about one plate on one machine on one
-   day, not a property of the size (§10.1).
+8. **MOVED — see `design/SPEC_mt_qr_DEFERRED.md`.** Module size and its 0.60 mm
+   default. **Engraving geometry only `mt qr` has** — `mt encode` emits
+   characters and reserves no area at all — and it sat in this list beside live
+   refusals, reading as v0.1 behaviour. Same shape as §8.7 and §8.7c, which the
+   first sweep caught and this one did not. The number is kept so §8.9 keeps its
+   place and citations resolve.
 9. **Secrets** → refuse, as `me` already does for `ms1`.
 
 > **What §8 does NOT check, enumerated because §8.2's removal made the list
@@ -3025,7 +3029,7 @@ signed PSBT.
     | `TO` wallet id / fingerprint | §5 | warn, engrave blank |
     | `TO` free-text label | §10.4 | **requires an explicit flag** by ruling |
     | input values | §8.2c, when the PSBT lacks them | refuse |
-    | module size | §8.8 | default 0.60 mm |
+    | ~~module size~~ | ~~§8.8~~ | **DELETED 2026-08-23** — `mt qr` only, deferred; `mt encode` has no geometry to configure |
     | node location | §6a | the no-node warning |
 
     **Naming them is a prerequisite for implementation, not a nicety**: two
