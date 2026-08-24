@@ -91,6 +91,37 @@ reservation is now a **formula**. Faces below 3.0 mm are untested —
 `gui/freetext_proof.go:24` calls 3.0 mm *"the smallest rung and the hardest
 legibility case"* — and are worth ~5 versions, so they go to S0.
 
+## THE LENS PLAN — enumerated up front, not discovered one round at a time
+
+*Closure is LENS-closure: a clean round means the question you asked has no more
+answers, not that the artifact is sound. The `mt` cycle closed GREEN under a
+correctness lens and the six rounds after found seven more Criticals — every one
+from a **first-time question**, none from looking harder. So the lenses are
+listed here BEFORE they are needed.*
+
+| # | lens | asks | status |
+| --- | --- | --- | --- |
+| 1 | **operator journey walk** | what would the operator actually do? | **DONE** — 18 findings (A–R) |
+| 2 | **adversarial correctness** (R0 r0, opus) | construct a failure the spec permits | **DONE** — 3C / 8I / 4M |
+| 3 | **fold-check** (R0 r1, sonnet) | did the fold fix it, or only claim to? | **DONE** — 3 PARTIAL + 1I/2M *the fold introduced* |
+| 4 | **fold-check + implementability** (R0 r2, opus) | could two implementers build different things — or nothing? | **RUNNING** |
+| 5 | **spec-coverage** | does every §8 ruling have a section, every section a phase, every refusal a §? | not run |
+| 6 | **failure-states** | for each thing that goes wrong, what does the operator SEE? | not run |
+| 7 | **comprehension** | can someone who was NOT here read this and build the right thing? | not run |
+| 8 | **Journey B — recovery** | someone finds the plate in fifteen years | not run |
+
+**Lens 8 is the one most likely to change the design**, because everything so far
+has been walked from the *engraving* end. F-234's whole promise lives at the
+recovery end, and the one time this session anybody glanced that way it produced
+finding O — *no `mt` verb can read a default plate*.
+
+**And a gate that has never executed is a hypothesis, not a gate.** Four of this
+spec's own gates are unrun: S0's test plate (module size, byte encoding,
+Structured-Append scanning, sub-3.0 mm legend face) and O12 (does our encoder
+even emit Structured Append). The `mt` cycle's worst defect was exactly this —
+an acceptance mechanism nobody had ever executed, invisible to thirteen readings
+and about an hour to find by trying it.
+
 ## Open, and who owns it
 
 | | owner |
