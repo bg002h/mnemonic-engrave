@@ -3024,13 +3024,13 @@ signed PSBT.
     | input | needed by | absent → |
     | --- | --- | --- |
     | the PSBT | everything | refuse |
-    | **plate budget** | §8.7 | **§8.7 cannot run** |
+    | ~~plate budget~~ | ~~§8.7~~ | **DELETED 2026-08-23** — §8.7 moved to the deferred QR spec; `mt` cannot see how strings map to steel |
     | `FROM` wallet id / fingerprint | §5 | warn, engrave blank |
     | `TO` wallet id / fingerprint | §5 | warn, engrave blank |
     | `TO` free-text label | §10.4 | **requires an explicit flag** by ruling |
     | input values | §8.2c, when the PSBT lacks them | refuse |
     | ~~module size~~ | ~~§8.8~~ | **DELETED 2026-08-23** — `mt qr` only, deferred; `mt encode` has no geometry to configure |
-    | node location | §6a | the no-node warning |
+    | ~~node location~~ | ~~§6a~~ | **NOT AN INPUT** — `mt` shells out to `bitcoin-cli -stdin`, which already holds it. See the ruling below |
 
     **Naming them is a prerequisite for implementation, not a nicety**: two
     implementers given this table will still choose different flag *spellings*,
@@ -3109,6 +3109,42 @@ signed PSBT.
        must strip them — including `mt qr` when that lands. Grouping is a
        hand-engraving courtesy, so it is **opt-in and never the default**.
 
+    b1. **`mt` REACHES A NODE BY SHELLING OUT TO `bitcoin-cli -stdin`, NOT BY
+       SPEAKING JSON-RPC.** Operator ruling 2026-08-23 — *"Don't you just do
+       bitcoin-cli command?"* — which replaces the proposed `--rpc <url>` flag.
+
+       > **It makes §6a's "the operator is asked for nothing" true by
+       > construction.** `bitcoin-cli` already holds the RPC URL, the cookie or
+       > credentials, the network, the datadir and the wallet selection, from
+       > `bitcoin.conf` and its own defaults. **`mt` works exactly when the
+       > operator's node works** — there is no second place to configure, and no
+       > way for `mt`'s idea of the node to drift from `bitcoin-cli`'s.
+       >
+       > A `--rpc <url>` flag would have re-asked for information the operator
+       > has already given their node once, and would have obliged `mt` to
+       > handle cookie files and RPC auth — a surface it has no other reason to
+       > have.
+       >
+       > **`-stdin` is not optional, and the reason is §8.2f.** Arguments go on
+       > **stdin, one per line**, never on the command line: a `bitcoin-cli
+       > gettxout <txid> 0 false` invocation puts the txid in `ps` for every
+       > user on the machine. That is the same leak §8.2f refuses for
+       > transactions — smaller, since a txid is not a bearer instrument, but
+       > free to avoid. `bitcoin-cli`'s own help calls `-stdin` *"recommended
+       > for sensitive information"*.
+       >
+       > **Verified against a live node before ruling**, not inferred:
+       >
+       >     printf 'getblockcount\n' | bitcoin-cli -stdin          -> 963808
+       >     printf 'gettxout\n<txid>\n0\nfalse\n' | bitcoin-cli -stdin  -> empty, exit 0
+       >
+       > The second is the shape §6a keys on: a spent or nonexistent output
+       > yields **empty output and exit 0**, which is the `null` this spec's
+       > liveness table reads.
+       >
+       > **The only flag is `--bitcoin-cli <path>`**, for a binary not on
+       > `PATH`. Absent and not found → §6a's no-node warning, unchanged.
+
     b2. **`--elide-prefix` (`mt encode`) emits the set's invariant 8 characters
        on the first string only** (§3b). It changes the **display** form, never
        the wire form: `decode` and `verify` restore the prefix before parsing,
@@ -3121,7 +3157,33 @@ signed PSBT.
        which is the opposite of what §0a's stderr split is for. It does **not**
        relax §1.1a's rule that stdout stays empty unless every check passes.
 
-    **Still unspecified, and deliberately:** the flag *spellings*, exit codes,
+    **THE FLAG SPELLINGS — RULED 2026-08-23.** Operator-approved; sibling
+    precedent taken verbatim wherever it exists, so an operator who knows `md`
+    does not learn a second dialect for the same concept.
+
+    | flag | takes | serves |
+    | --- | --- | --- |
+    | `--in <path>` | a path; **stdin** when absent | the PSBT or raw transaction (§8.2e). Never a command-line argument (§8.2f) |
+    | `--from <id>` | wallet id or fingerprint | §5's `FROM` field |
+    | `--to <id>` | wallet id or fingerprint | §5's `TO` field |
+    | `--to-label <text>` | free text | §10.4 — **a separate flag IS the ruling**: it makes the label an act of assertion rather than something that quietly appears |
+    | `--input-value <index>:<amount>` | **repeatable, per input** | §8.2c. Per-input because a single total has two readings that differ by a whole input — deleted as a defect earlier the same day |
+    | `--group-size <n>` | count | grouping for hand engraving (§1.1e). **`md`'s spelling, unchanged** |
+    | `--separator <s>` | string | grouping separator. **`md`'s spelling, unchanged** |
+    | `--elide-prefix` | — | §3b |
+    | `--quiet` | — | suppresses the inspection report only; never warnings or refusals |
+    | `--transaction <psbt\|hex>` | on `verify` | §1.1's full-txid comparison |
+    | `--json` | — | machine-readable report. `md` has it |
+    | `--bitcoin-cli <path>` | a path | only for a binary not on `PATH` — see (b1) |
+
+    > **Two spellings are deliberate departures, recorded so they are not read
+    > as oversights.** `md verify` calls the equivalent of `--transaction`
+    > `--template`; `mt`'s argument **is** a transaction rather than a template,
+    > so the name follows the thing rather than the sibling. And there is **no
+    > `--rpc`** — (b1) rules that `bitcoin-cli` already holds the node's
+    > location.
+
+    **Still unspecified, and deliberately:** exit codes,
     and the format of the refusal messages §8 promises will *"name the number
     that caused it"*. Each input the table above requires needs some flag —
     input values per input (§8.2c), `FROM`/`TO` identities, the free-text `TO`

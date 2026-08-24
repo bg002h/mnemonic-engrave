@@ -343,6 +343,14 @@ matches the spec's pinned vector**.
 **Deliverable.** Input handling and string output.
 
 - the ordered sniffing procedure — binary PSBT before whitespace removal, then base64, then hex (§8.2e)
+- **the twelve ruled flags of §10.10**, spellings included — `--in`, `--from`,
+  `--to`, `--to-label`, `--input-value <index>:<amount>` (repeatable),
+  `--group-size`, `--separator`, `--elide-prefix`, `--quiet`, `--transaction`,
+  `--json`, `--bitcoin-cli`
+- **node access by SHELLING OUT to `bitcoin-cli -stdin`**, arguments on stdin
+  and never on the command line (§10.10 b1) — a txid on the command line lands
+  in `ps`, the leak §8.2f refuses for transactions. No JSON-RPC client, no
+  cookie handling, no `--rpc`
 - **an input path for every operator-supplied value §10.10 requires** — R8
   coverage I-5. Per-input values (§8.2c), the `FROM`/`TO` identities, the
   free-text `TO` label behind its own flag (§10.4), and the node location.
@@ -686,9 +694,11 @@ implementation reads are three more places for the values to drift together.
    > comes from an open question" deserves the resolution rather than the
    > appearance of one.
    >
-   > **Blocking order:** §10.10's spellings and refusal format must close
-   > **before P2 ships**; the refusal format again **before P5 writes a test
-   > against it**. Neither blocks P0 or P1.
+   > **Blocking order:** ~~§10.10's spellings~~ **CLOSED 2026-08-23** — all
+   > twelve flags are ruled in §10.10, and `--rpc` was **deleted** in favour of
+   > shelling out to `bitcoin-cli -stdin`, which already holds the node's
+   > location. **The refusal-message format remains open and must close before
+   > P5 writes a test against it.** Neither blocks P0, S0 or P1.
 
 4. **Repo creation** — `mnemonic-transaction` does not exist yet. Creating a
    GitHub repo is an outward-facing action and needs the operator's go-ahead,
