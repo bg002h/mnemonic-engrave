@@ -21,7 +21,7 @@ different ways:
 
 | verb | form | engraved how | payload | size limit |
 | --- | --- | --- | --- | --- |
-| **`mt encode`** | `mt1` chunked codex32, **on stdout** | **by hand**, or by any tool the operator chooses | raw signed transaction (§3b) | **32,768 chunks / 164 KB** |
+| **`mt encode`** | `mt1` chunked codex32, **on stdout** | **by hand**, or by any tool the operator chooses | raw signed transaction (§3b) | **32,768 chunks / ~1,280 KB** |
 | ~~`mt qr`~~ | ~~QR symbols + legend~~ | **DEFERRED out of v0.1 — §0a** | | |
 
 `mt qr` decides how many symbols that takes and at what error-correction level.
@@ -1247,11 +1247,11 @@ specify, test, teach a recoverer, and get wrong only once.**
 > verbs. The widths are set by **per-field symbol alignment** (§10.13 a2), not by
 > a capacity target: 15 bits is 3 whole characters where 12 would straddle.
 >
-> **Why 12, and the bound is Bitcoin's rather than ours.** Operator ruling
+> **Why 15, and the bound is Bitcoin's rather than ours.** Operator ruling
 > 2026-08-23. `MAX_STANDARD_TX_WEIGHT = 400,000` (verified in `bitcoin`
 > 0.32.101's `policy.rs`) is 100,000 vbytes, so **a transaction above ~100 KB
 > will not relay** and `mt` could never usefully engrave one. That is **2,500
-> chunks**; 32,768 covers it with 1.6x headroom. An 8-bit field gave 10 KB and
+> chunks**; 32,768 covers it with **13.1x** headroom. An 8-bit field gave 10 KB and
 > would have refused an ordinary 20-input multisig spend; 14 bits would give
 > 640 KB, six times what any node accepts, bought for nothing.
 >
@@ -3152,11 +3152,32 @@ signed PSBT.
     65 bits are `0x1a2fc877f9528d7c1`, the value occupies exactly 65 bits, and it
     differs from both constants already in use.
 
-    `MD_REGULAR_CONST` is hardcoded into checksum
-    create and verify (`crates/md-codec/src/bch.rs`). Every constellation format
-    gets its own; without a distinct one **an `mt1` chunk would verify as a valid
-    `md1` chunk**, which for a bearer plate sitting in a drawer beside `md1`
-    plates is a real hazard, not a theoretical one.
+    `MD_REGULAR_CONST` is hardcoded into checksum create and verify
+    (`crates/md-codec/src/bch.rs`), so every constellation format needs its own.
+
+    > **THIS PARAGRAPH SAID A DISTINCT CONSTANT PREVENTS "an `mt1` chunk
+    > verifying as a valid `md1` chunk". IT DOES NOT, AND NOTHING NEEDS TO —
+    > R9 B-3.** The HRP is mixed into the polymod on both sides, so
+    > `hrp_expand("mt") ≠ hrp_expand("md")` separates the formats **by
+    > themselves**, whatever the constants are. Cross-format acceptance is
+    > unreachable while the HRPs differ, and cross-format verification is
+    > abandoned by operator ruling.
+    >
+    > **The correction was made in §12.22 and not here, and that is the defect
+    > worth recording.** §12.22 is the *historical appendix*; **this** is the
+    > normative "RULED, ready to build" section an implementer works from. So
+    > the retraction lived in the record of what was decided while the live text
+    > still asserted the falsehood — and the finding was marked closed, which
+    > made it invisible. **Fixing the wrong location is worse than not fixing
+    > it.**
+    >
+    > **The real reason `mt1` needs its own constant is intra-format.** A wrong
+    > constant — copied *or* mistyped — produces chunks that are
+    > **self-consistent and unreadable by every other implementation**, and it
+    > surfaces at *recovery*, indistinguishable from steel damage: checksum
+    > failures on a physically perfect plate, years later, with no second copy
+    > of the transaction anywhere. That is a real hazard, and it is not the one
+    > this paragraph used to name.
 
     **(b) Its own HRP — the string is `"mt"`, NOT `"mt1"`.** The `1` in a
     rendered `mt1…` string is bech32's **separator**, not part of the HRP.

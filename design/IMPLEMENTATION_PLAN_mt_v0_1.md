@@ -114,6 +114,32 @@ perfect plate, years later, with no second copy of the transaction anywhere.
    from `mk`, whose constant and domain string would satisfy the drift test if
    pasted as a pair.
 
+### Two obligations the fork creates, which this plan had not named
+
+R8 gates I11 — **NOT FIXED until now, and correctly reported as never
+attempted** rather than folded into something adjacent.
+
+1. **A PROVENANCE PIN.** Every ported package in this constellation records the
+   crate and version/SHA it tracks, updated on every sync, so drift is
+   auditable. `mt-codec`'s string layer is ported from `mk-codec`, so it carries
+   the same pin: the `mk-codec` version and commit the port was taken from, in
+   the module header. **Without it the port's ancestry is folklore** — a later
+   reader cannot tell which `mk` a given behaviour came from, or whether a `mk`
+   fix has been carried across.
+
+2. **A THREE-WAY DEFECT CHECK.** The standing rule is that a defect found in one
+   implementation triggers checking the others. With `mt` there are **three**
+   BCH implementations, not two — `md`, `mk`, `mt` — and the fork is now
+   **permanent** (extraction retired 2026-05-03), so this is not a temporary
+   burden that a future shared crate retires. Any BCH, chunking or header defect
+   found in one is checked against the other two, and the check is recorded even
+   when it finds nothing.
+
+> **These are the price of forking, and the fork is still right** — HRP-mixed
+> BCH with per-format residues is unshareable, so there is no version of this
+> where one implementation serves three formats. Naming the price is what makes
+> it payable; leaving it unnamed is how three copies quietly diverge.
+
 > **Why the vector and not more assertions.** Assertions restate values the
 > implementation already reads, so they can be satisfied by the implementation
 > agreeing with itself. A vector the implementation did not produce is the only
