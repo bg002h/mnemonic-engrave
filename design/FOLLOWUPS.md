@@ -10150,3 +10150,76 @@ an untested assertion into steel.
 the search that produced it; this one's scope was `design/measurements/`, and it
 found nothing because nothing is there.
 
+### F-244 — `me sysw pack` writes the container with `std::fs::write`, so an UNSEALED payload holding a BIP-39 mnemonic lands mode 0644 (owning phase: **immediate — pre-existing defect, not Goal 1**) `#me` `#sysw` `#funds-safety` `#CRITICAL`
+
+**Found 2026-08-24 by the Goal 1 journey walk**, at the step where the operator
+said *"I didn't realize `>` creates a world readable file"*. The walk was about
+transactions; it found a seed-exposure defect in shipped code.
+
+**Reproduced, three ways, all mode 644:**
+
+```
+$ me sysw pack --no-passphrase --out p1.bin "text:6869"     -> 644   (fresh --out)
+$ me sysw pack --no-passphrase --out p2.bin "text:6869"     -> 644   (pre-existing 0644)
+$ me sysw pack --no-passphrase "text:6869" > p3.bin         -> 644   (shell redirect)
+
+$ me sysw pack --no-passphrase --out s.bin "abandon ...x11... about"
+$ stat -c '%a' s.bin   -> 644
+$ strings s.bin        -> abandon abandon abandon ... about
+```
+
+The last one is the finding: **a BIP-39 mnemonic, cleartext, world-readable, no
+warning.** (Standard BIP-39 test vector; nothing real was written.)
+
+**Cause.** `SyswCmd::Pack` ends in `emit(&blob, out.as_ref())`
+(`crates/me-cli/src/main.rs:924`), and `emit` (`:1131-1136`) uses
+`std::fs::write`, which creates at `0o666 & ~umask` = 0644 under the default
+umask.
+
+**The fix already exists in the same file and is not called.**
+`write_private` (`:751-762`) creates at `0o600` and its doc comment states this
+exact threat model:
+
+> F10 (D5-2): NDEF and manifest artifacts embed/depict md1/mk1 material, so **on
+> a multi-user host their at-rest copies must not be world/group-readable**.
+
+It has three callers — `:326`, `:391`, `:515` — for NDEF, manifest and UF2.
+**None of them is the payload container.** So `me` protects the artifact that
+*depicts* key material and leaves unprotected the container that *contains* it,
+including `ClassMnemonic`, `ClassCodex32Secret` and `ClassPassphrase` records
+whenever `--no-passphrase` is used. `Class::IsSecret()` already names those three
+as secret; nothing consults it on the write path.
+
+**Why CRITICAL rather than Important.** The repo's severity rule counts "security
+/ an unmet guarantee". `me` states the guarantee in its own source, applies it to
+a lesser artifact, and misses the greater one. A sealed payload's ciphertext is
+protected by cryptography; an **unsealed** payload's records are protected by
+nothing but the file mode, and `--no-passphrase` is a supported, documented mode.
+
+**Two separate gaps, and fixing only the first leaves the one the operator hit.**
+
+1. **`--out`** — route it through `write_private`. Straightforward.
+2. **`> file` shell redirection** — `me` never sees that path, so no create-mode
+   can help. **Mechanically verified during the walk that a process CAN detect
+   this**: `os.fstat(1)` on a redirected stdout reports `S_ISREG` true and mode
+   0644, and reports `S_ISFIFO` for a pipe — so a check can fire exactly on a
+   world-readable regular file and leave `| picotool` and terminals alone.
+   Operator asked for **a refusal with a command-line override**; that is
+   implementable as specified.
+
+**`write_private`'s own documented residual is also real and now measured**:
+*"0o600 binds on CREATE. Overwriting a pre-existing world-readable file keeps its
+old mode."* Case 2 above confirms it. A fix that only calls `write_private` still
+leaves a pre-existing 0644 target at 0644 — so the write path must **also**
+`fchmod` or refuse, not merely create carefully. **This is the near-miss shape:
+the obvious fix closes the case the finding names and not the one beside it.**
+
+**Prior art to match, not to duplicate.** `mt` already warns on redirected stdout
+(`mt-cli/src/blocks.rs:268`, `redirected_output_warning`) — *"the strings just
+left this terminal — and they are BEARER"* — with `shred -u` advice. It fires on
+**any** redirection and does not consult the mode. Whatever `me` grows should be
+consistent with it, and `mt`'s should probably become mode-aware in the same pass.
+
+**Not Goal 1's scope, and it must not wait for Goal 1.** It is a defect in
+shipped code affecting seeds today, independent of transactions.
+
