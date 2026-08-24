@@ -5,7 +5,8 @@
 
 ## State in one line
 
-**Spec written, walked, folded, gated — no code. R0 round 0 dispatched.**
+**Spec written, walked, R0 round 0 folded — no code. Round 1 (fold-check) in
+flight. The gate is OPEN.**
 
 ## What exists now
 
@@ -13,7 +14,8 @@
 | --- | --- |
 | `design/SPEC_engrave_transaction.md` | the spec. ~710 lines, DRAFT, pre-R0 |
 | `design/JOURNEY_WALK_engrave_transaction.md` | the operator walk that reviewed it — **18 findings A–R**, every ruling and its reasoning |
-| `design/agent-reports/R0-engrave-transaction-round0-adversarial.md` | the R0 round-0 report, **if the dispatched agent finished** |
+| `design/agent-reports/R0-engrave-transaction-round0-adversarial.md` | round 0, verbatim: **3C / 8I / 4M**, persisted at `caa90cb` before anything was folded |
+| `design/agent-reports/R0-engrave-transaction-round1-foldcheck.md` | round 1's fold-check, **if the dispatched agent finished** |
 
 ## The design, compressed
 
@@ -59,12 +61,45 @@ growing it — unusual, and both came from the walk:
    from reading records against artifacts: F-241 (closed), F-242, F-243, F-244
    (closed).
 
+## What R0 round 0 cost and bought
+
+**Three sentences the spec ASSERTED were measurably false**, and none was
+reachable by re-reading:
+
+| the claim | the reality |
+| --- | --- |
+| "nothing in the carousel changes" | `layoutMainPlates` is a per-program switch ending in `panic("invalid page")`, no compile-time guard — **the device panics when the operator pages onto the new entry** |
+| "a pipe/FIFO has no file mode" | a named FIFO is **0666** and really leaks; the F-244 fix had shipped with the hole |
+| "the compare screen names no command" | it names **`me sysw pack`** — the risky re-pack path — so the fix is a REPLACEMENT, not the addition that was ruled |
+
+**And two described reuse that does not exist:** `validateMdmk` QR-encodes the
+`mt1` string it was meant to engrave as text (C2), and `EngraveText` emits the
+legend **first**, the opposite of §4.4 (I8 — found by the controller closing a
+gap round 0 flagged as unexamined).
+
+**C1 was the structural one.** Multi-symbol QR is the **common** case — at the
+ruled 0.60 mm the largest QR that fits is v26/1,367 B, and the search *prefers*
+6 small symbols at 742 B — and nothing said how symbols split or reassemble, so
+§4.3's mandatory post-cut test would report failure on a **correct** plate.
+**RULED: QR Structured Append**, which is self-ordering, so F-234's promise
+survives multi-symbol.
+
+**The legend was costing 54% of plate 1's AREA** — a QR is square, so 25.5 mm of
+height takes 25.5 mm of width with it (v26 → v16). Packing the five fields at the
+tested 3.0 mm face gives **v19**, or v21 without the two optional fields. The
+reservation is now a **formula**. Faces below 3.0 mm are untested —
+`gui/freetext_proof.go:24` calls 3.0 mm *"the smallest rung and the hardest
+legibility case"* — and are worth ~5 versions, so they go to S0.
+
 ## Open, and who owns it
 
 | | owner |
 | --- | --- |
 | **S0 — cut the test plate** (QR at 0.3/0.45/0.6/0.9 mm + a raw-octet and a base45 symbol, external scanner) | **the operator**. Resolves BOTH live hypotheses: QR encoding (F-243) and module size (F-234) |
-| **R0 to 0C/0I** | dispatched; fold, re-dispatch until green |
+| **R0 to 0C/0I** | round 0 folded (`48da287`); round 1 in flight. **Not green** |
+| **O11 — the picker's key for a chunks payload** | **deliberately unresolved.** The device cannot derive a txid without a decoder, and every alternative trades against a ruling |
+| **O12 — does our QR encoder emit Structured Append?** | unverified; without it C1's ruling has no mechanism |
+| **O13 — a legend face below 3.0 mm** | S0; worth ~5 QR versions |
 | **Journey B — recovery**, never walked | next walk |
 | per-chunk BCH checksum before cutting | proposed, not ruled (spec O3) |
 | `validateMdmk`'s four callers — a live F-234 violation | **not this spec** (O5) |
