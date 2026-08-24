@@ -37,20 +37,23 @@ nothing, tags nothing, releases nothing, makes nothing public.
 
 ## Resume with
 
-    Read design/CONTINUITY_mt_2026-08-23.md, design/SPEC_mt_v0_1.md and
-    design/IMPLEMENTATION_PLAN_mt_v0_1.md. R0 on the PLAN was dispatched
-    (two opus lenses, reports at design/agent-reports/R8-*.md) — fold
-    whatever came back, then take the three operator questions below.
+    Read design/CONTINUITY_mt_2026-08-23.md and
+    design/IMPLEMENTATION_PLAN_mt_v0_1.md. Check whether
+    design/agent-reports/R12-gate-rerun.md exists and what its verdict is.
+    If SAFE TO EXECUTE — begin at S0, using the prepared inputs in the
+    scratchpad's s0-READY.md. If NOT, or if it never returned — fold or
+    re-dispatch, and WRITE NO CODE until it closes.
 
 ## Where the cycle stands
 
-**SPEC — GREEN, 0C / 0I.** `design/SPEC_mt_v0_1.md`, 3,545 lines.
-**PLAN — DRAFT, pre-R0**, `design/IMPLEMENTATION_PLAN_mt_v0_1.md`. R0 in flight.
-**NO CODE MAY BE WRITTEN** until the plan closes 0C/0I. Risk-set work.
+**SPEC — GREEN, 0C / 0I.** `design/SPEC_mt_v0_1.md`.
+**PLAN — all findings folded across SEVEN lenses**; the only thing outstanding is
+R12's verdict (above). Risk-set work, so the post-implementation adversarial
+review over the whole diff is mandatory and non-deferrable.
 
-`origin/master` is at `9de904e` plus whatever landed after — the `ci/staging`
-ritual is a single command now, `./scripts/push-master.sh`, which enforces the
-freeze itself. Do not dispatch an agent for it.
+The `ci/staging` ritual is a single command, `./scripts/push-master.sh`, which
+enforces the freeze itself. **Do not dispatch an agent for it** — the script is
+one Bash call and costs ~45k fewer tokens than the agent it replaced.
 
 ## What the spec says, in one paragraph
 
@@ -62,20 +65,34 @@ lost plate cuts a second copy. Four verbs: `encode`, `decode`, `verify`,
 `mk1`; its material lives in `design/SPEC_mt_qr_DEFERRED.md` and nothing in v0.1
 reads it.
 
-## The three questions waiting on the operator
+## The operator questions — ALL THREE CLOSED 2026-08-23
 
-1. **Creating `mnemonic-transaction` on GitHub** — outward-facing, needs a
-   go-ahead, including whether it starts private.
-2. **§10.10's flag spellings** must close before P2 ships, since P2 builds the
-   CLI. The two *behavioural* flag questions are already ruled (grouping affects
-   stdout and the canonical artifact is ungrouped; `--quiet` suppresses the
-   inspection report only, never warnings or refusals).
-3. Whether anything else should leave the spec — one out-of-scope sweep has run.
+1. ~~Repo creation~~ — `bg002h/mnemonic-transaction` created, EMPTY, PRIVATE.
+   All five siblings are public, so it will likely be flipped at release;
+   private→public is one command and the safe direction.
+2. ~~§10.10's flag spellings~~ — **twelve flags ruled**, sibling spellings taken
+   verbatim where they exist (`--group-size`, `--separator`, `--json`, `--in`).
+   **`--rpc` was DELETED**: `mt` shells out to `bitcoin-cli -stdin`, which
+   already holds the node's location, so §6a's *"the operator is asked for
+   nothing"* holds by construction. `-stdin` is not optional — a txid on the
+   command line lands in `ps`, the leak §8.2f refuses for transactions.
+3. ~~Anything else leaving the spec~~ — **two** out-of-scope sweeps ran; the
+   second found a QR-only ruling (module size) sitting in the live refusal list,
+   the same shape as §8.7 and §8.7c.
+
+**The refusal-message format** was also ruled rather than left open, since it
+gates P5 and the operator was away: three parts, with a machine-parseable
+verdict line `<verb>: REFUSED — §<ref>, <reason with the number>`.
 
 ## What is already machine-verified — do NOT re-derive
 
 - `./scripts/spec-structure-check.sh` → STRUCTURE OK, 17 sections, 58 cross-refs.
-- `./scripts/plan-cite-check.sh` → spec 32/32, plan 5/5, 0 dangling.
+- `./scripts/plan-cite-check.sh` → 0 dangling on both documents.
+- **The header is 55 bits = 11 symbols**, per-field symbol-aligned, no `chunked`
+  bit; invariant prefix exactly 8 symbols; 32,768 chunks. **Every string-length
+  figure was recomputed** when it moved 49→55 (the 535-byte case: 90/72,
+  total 1,242) — the old table was stale and none of it had been recomputed
+  across three header rulings.
 - **The NUMS derivation, both constants:** `SHA-256("shibbolethnumstransaction")`
   top 65 bits = `0x1a2fc877f9528d7c1` (spec) and `SHA-256("shibbolethnums")` top
   65 bits = `0x0815c07747a3392e7` (`md-codec`). The *rule* is confirmed, not one
