@@ -1,5 +1,9 @@
 # CONTINUITY — the `mt` cycle, 2026-08-22
 
+> **SUPERSEDED — see `design/CONTINUITY_mt_2026-08-23.md`, which is the live
+> resume note. This one is kept only as the record of where the cycle stood
+> before review.**
+>
 > **SUPERSEDED 2026-08-23.** This is the resume note written *before* the R0
 > review ran. Everything below describes the pre-review state and several of its
 > conclusions have since been overturned — UR was adopted and then **dropped
