@@ -1,0 +1,95 @@
+Regenerated 2026-08-24 by src/bin/select2.rs -- the objective ruled that day.
+select.rs and RESULTS_ecc_selection_2026-08-22.txt are KEPT UNCHANGED, so the
+earlier measurement stays reproducible. This is a second measurement, not an edit.
+
+
+=== CONSERVATIVE — 0.60 mm modules (2 strokes), optically plausible ===
+  rule: fewest plates, then FEWEST SYMBOLS, then strongest ECC. Floor: ECC >= M. Cap: 16 symbols.
+  legend is PACKED and COMPUTED: 167 chars / 44 cols = 4 lines = 17.0mm on plate 1
+
+  single-sig tr, 1in sweep     162 B | RAW  1 pl, 1 qr, v13 ECC H @0.60mm          | UR  1 pl, 1 qr, v16 ECC H @0.60mm
+  RCW tr key-path, 1in         162 B | RAW  1 pl, 1 qr, v13 ECC H @0.60mm          | UR  1 pl, 1 qr, v16 ECC H @0.60mm
+  RCW tr tier4, 1in            405 B | RAW  1 pl, 1 qr, v19 ECC Q @0.60mm          | UR  1 pl, 1 qr, v19 ECC M @0.60mm
+  3-of-5 wsh signed, 1in       488 B | RAW  1 pl, 1 qr, v17 ECC M @0.60mm          | UR  1 pl, 1 qr, v18 ECC L @0.60mm
+  3-of-5 tr signed, 1in        501 B | RAW  1 pl, 1 qr, v17 ECC M @0.60mm          | UR  1 pl, 1 qr, v18 ECC L @0.60mm
+  RCW tr tier1, 1in            535 B | RAW  1 pl, 1 qr, v18 ECC M @0.60mm          | UR  1 pl, 1 qr, v19 ECC L @0.60mm
+  RCW wsh tier1, 1in           742 B | RAW  2 pl, 1 qr, v22 ECC M @0.60mm          | UR  2 pl, 2 qr, v18 ECC M @0.60mm
+  9-of-11 tr signed, 1in      1097 B | RAW  2 pl, 2 qr, v18 ECC M @0.60mm          | UR  2 pl, 2 qr, v19 ECC L @0.60mm
+  9-of-11 wsh signed, 1in     1130 B | RAW  2 pl, 2 qr, v19 ECC M @0.60mm          | UR  3 pl, 2 qr, v23 ECC M @0.60mm
+  RCW tr tier1, 5in           2455 B | RAW  4 pl, 3 qr, v23 ECC M @0.60mm          | UR  4 pl, 3 qr, v24 ECC L @0.60mm
+  9-of-11 tr PSBT, 2in/2out   4962 B | RAW  7 pl, 6 qr, v23 ECC M @0.60mm          | UR  7 pl, 6 qr, v24 ECC L @0.60mm
+
+  --- WHAT GOES IN THE QR: three candidate payloads ---
+  RCW tr tier4 1in  (PSBT 465 B, 12 chunks)
+      codex32 string     735 B in QR  eff  63.3%  -> 2 pl, 1 qr, v22 ECC M
+      bytes + base45     544 B in QR  eff  85.5%  -> 1 pl, 1 qr, v18 ECC M
+      bytes + bech32U    578 B in QR  eff  80.4%  -> 1 pl, 1 qr, v19 ECC M
+      bytes, binary      525 B in QR  eff  88.6%  -> 1 pl, 1 qr, v18 ECC M
+  RCW tr tier1 1in  (PSBT 595 B, 15 chunks)
+      codex32 string     919 B in QR  eff  64.7%  -> 2 pl, 2 qr, v17 ECC M
+      bytes + base45     692 B in QR  eff  86.0%  -> 2 pl, 1 qr, v21 ECC M
+      bytes + bech32U    737 B in QR  eff  80.7%  -> 2 pl, 1 qr, v22 ECC M
+      bytes, binary      670 B in QR  eff  88.8%  -> 2 pl, 1 qr, v21 ECC M
+  RCW wsh tier1 1in  (PSBT 802 B, 21 chunks)
+      codex32 string    1286 B in QR  eff  62.4%  -> 3 pl, 2 qr, v24 ECC Q
+      bytes + base45     937 B in QR  eff  85.6%  -> 2 pl, 2 qr, v17 ECC M
+      bytes + bech32U    999 B in QR  eff  80.3%  -> 2 pl, 2 qr, v17 ECC M
+      bytes, binary      907 B in QR  eff  88.4%  -> 2 pl, 1 qr, v24 ECC M
+  RCW tr tier1 5in  (PSBT 2769 B, 70 chunks)
+      codex32 string    4284 B in QR  eff  64.6%  -> 6 pl, 5 qr, v23 ECC M
+      bytes + base45    3218 B in QR  eff  86.0%  -> 5 pl, 4 qr, v23 ECC M
+      bytes + bech32U   3432 B in QR  eff  80.7%  -> 5 pl, 4 qr, v24 ECC M
+      bytes, binary     3119 B in QR  eff  88.8%  -> 5 pl, 4 qr, v23 ECC M
+  RCW wsh tier1 5in  (PSBT 3809 B, 96 chunks)
+      codex32 string    5874 B in QR  eff  64.8%  -> 8 pl, 7 qr, v23 ECC M
+      bytes + base45    4425 B in QR  eff  86.1%  -> 6 pl, 5 qr, v24 ECC M
+      bytes + bech32U   4719 B in QR  eff  80.7%  -> 7 pl, 6 qr, v23 ECC M
+      bytes, binary     4289 B in QR  eff  88.8%  -> 6 pl, 5 qr, v24 ECC M
+
+  --- same artifacts as a finalized PSBT (compliant envelope) ---
+  RCW tr tier3, 1in/1out [raw]   333 B | RAW  1 pl, 1 qr, v19 ECC H @0.60mm          | UR  1 pl, 1 qr, v17 ECC M @0.60mm
+  RCW tr tier3, 1in/1out [PSBT]   391 B | RAW  1 pl, 1 qr, v18 ECC Q @0.60mm          | UR  1 pl, 1 qr, v18 ECC M @0.60mm
+  RCW tr tier4, 1in/1out [raw]   405 B | RAW  1 pl, 1 qr, v19 ECC Q @0.60mm          | UR  1 pl, 1 qr, v19 ECC M @0.60mm
+  RCW tr tier4, 1in/1out [PSBT]   465 B | RAW  1 pl, 1 qr, v17 ECC M @0.60mm          | UR  1 pl, 1 qr, v18 ECC L @0.60mm
+  RCW tr tier1, 1in/1out [raw]   535 B | RAW  1 pl, 1 qr, v18 ECC M @0.60mm          | UR  1 pl, 1 qr, v19 ECC L @0.60mm
+  RCW tr tier1, 1in/1out [PSBT]   595 B | RAW  1 pl, 1 qr, v19 ECC M @0.60mm          | UR  2 pl, 1 qr, v23 ECC M @0.60mm
+  RCW wsh tier3, 1in/1out [raw]   566 B | RAW  1 pl, 1 qr, v19 ECC M @0.60mm          | UR  1 pl, 1 qr, v19 ECC L @0.60mm
+  RCW wsh tier3, 1in/1out [PSBT]   626 B | RAW  2 pl, 1 qr, v24 ECC Q @0.60mm          | UR  2 pl, 1 qr, v24 ECC M @0.60mm
+  RCW wsh tier1, 1in/1out [raw]   742 B | RAW  2 pl, 1 qr, v22 ECC M @0.60mm          | UR  2 pl, 2 qr, v18 ECC M @0.60mm
+  RCW wsh tier1, 1in/1out [PSBT]   802 B | RAW  2 pl, 1 qr, v23 ECC M @0.60mm          | UR  2 pl, 2 qr, v19 ECC M @0.60mm
+  RCW tr tier1, 5in/2out [raw]  2498 B | RAW  4 pl, 3 qr, v23 ECC M @0.60mm          | UR  5 pl, 4 qr, v24 ECC M @0.60mm
+  RCW tr tier1, 5in/2out [PSBT]  2769 B | RAW  5 pl, 4 qr, v21 ECC M @0.60mm          | UR  5 pl, 4 qr, v22 ECC L @0.60mm
+  RCW wsh tier1, 5in/2out [raw]  3538 B | RAW  5 pl, 4 qr, v24 ECC M @0.60mm          | UR  6 pl, 5 qr, v23 ECC L @0.60mm
+  RCW wsh tier1, 5in/2out [PSBT]  3809 B | RAW  6 pl, 5 qr, v22 ECC M @0.60mm          | UR  6 pl, 5 qr, v23 ECC L @0.60mm
+
+=== AGGRESSIVE — 0.30 mm allowed (1 stroke, UNVALIDATED, F-234) ===
+  rule: fewest plates, then FEWEST SYMBOLS, then strongest ECC. Floor: ECC >= M. Cap: 16 symbols.
+  legend is PACKED and COMPUTED: 167 chars / 44 cols = 4 lines = 17.0mm on plate 1
+
+  single-sig tr, 1in sweep     162 B | RAW  1 pl, 1 qr, v13 ECC H @0.60mm          | UR  1 pl, 1 qr, v16 ECC H @0.30mm (4 up)
+  RCW tr key-path, 1in         162 B | RAW  1 pl, 1 qr, v13 ECC H @0.60mm          | UR  1 pl, 1 qr, v16 ECC H @0.30mm (4 up)
+  RCW tr tier4, 1in            405 B | RAW  1 pl, 1 qr, v22 ECC H @0.45mm          | UR  1 pl, 1 qr, v26 ECC H @0.30mm (2 up)
+  3-of-5 wsh signed, 1in       488 B | RAW  1 pl, 1 qr, v24 ECC H @0.45mm          | UR  1 pl, 1 qr, v29 ECC H @0.30mm
+  3-of-5 tr signed, 1in        501 B | RAW  1 pl, 1 qr, v24 ECC H @0.45mm          | UR  1 pl, 1 qr, v30 ECC H @0.30mm
+  RCW tr tier1, 1in            535 B | RAW  1 pl, 1 qr, v25 ECC H @0.45mm          | UR  1 pl, 1 qr, v31 ECC H @0.30mm
+  RCW wsh tier1, 1in           742 B | RAW  1 pl, 1 qr, v30 ECC H @0.30mm          | UR  1 pl, 1 qr, v36 ECC H @0.30mm
+  9-of-11 tr signed, 1in      1097 B | RAW  1 pl, 1 qr, v38 ECC H @0.30mm          | UR  1 pl, 1 qr, v39 ECC Q @0.30mm
+  9-of-11 wsh signed, 1in     1130 B | RAW  1 pl, 1 qr, v38 ECC H @0.30mm          | UR  1 pl, 1 qr, v39 ECC Q @0.30mm
+  RCW tr tier1, 5in           2455 B | RAW  1 pl, 4 qr, v19 ECC M @0.30mm (4 up)   | UR  2 pl, 6 qr, v23 ECC Q @0.30mm (4 up)
+  9-of-11 tr PSBT, 2in/2out   4962 B | RAW  2 pl, 6 qr, v23 ECC M @0.30mm (4 up)   | UR  2 pl, 6 qr, v24 ECC L @0.30mm (4 up)
+
+  --- same artifacts as a finalized PSBT (compliant envelope) ---
+  RCW tr tier3, 1in/1out [raw]   333 B | RAW  1 pl, 1 qr, v19 ECC H @0.60mm          | UR  1 pl, 1 qr, v24 ECC H @0.30mm (4 up)
+  RCW tr tier3, 1in/1out [PSBT]   391 B | RAW  1 pl, 1 qr, v21 ECC H @0.45mm          | UR  1 pl, 1 qr, v26 ECC H @0.30mm (2 up)
+  RCW tr tier4, 1in/1out [raw]   405 B | RAW  1 pl, 1 qr, v22 ECC H @0.45mm          | UR  1 pl, 1 qr, v26 ECC H @0.30mm (2 up)
+  RCW tr tier4, 1in/1out [PSBT]   465 B | RAW  1 pl, 1 qr, v24 ECC H @0.45mm          | UR  1 pl, 1 qr, v28 ECC H @0.30mm
+  RCW tr tier1, 1in/1out [raw]   535 B | RAW  1 pl, 1 qr, v25 ECC H @0.45mm          | UR  1 pl, 1 qr, v31 ECC H @0.30mm
+  RCW tr tier1, 1in/1out [PSBT]   595 B | RAW  1 pl, 1 qr, v27 ECC H @0.45mm          | UR  1 pl, 1 qr, v32 ECC H @0.30mm
+  RCW wsh tier3, 1in/1out [raw]   566 B | RAW  1 pl, 1 qr, v26 ECC H @0.45mm          | UR  1 pl, 1 qr, v31 ECC H @0.30mm
+  RCW wsh tier3, 1in/1out [PSBT]   626 B | RAW  1 pl, 1 qr, v28 ECC H @0.45mm          | UR  1 pl, 1 qr, v33 ECC H @0.30mm
+  RCW wsh tier1, 1in/1out [raw]   742 B | RAW  1 pl, 1 qr, v30 ECC H @0.30mm          | UR  1 pl, 1 qr, v36 ECC H @0.30mm
+  RCW wsh tier1, 1in/1out [PSBT]   802 B | RAW  1 pl, 1 qr, v32 ECC H @0.30mm          | UR  1 pl, 1 qr, v38 ECC H @0.30mm
+  RCW tr tier1, 5in/2out [raw]  2498 B | RAW  1 pl, 12 qr, v10 ECC M @0.30mm (12 up) | UR  2 pl, 6 qr, v23 ECC Q @0.30mm (4 up)
+  RCW tr tier1, 5in/2out [PSBT]  2769 B | RAW  2 pl, 2 qr, v37 ECC Q @0.30mm          | UR  2 pl, 2 qr, v37 ECC M @0.30mm
+  RCW wsh tier1, 5in/2out [raw]  3538 B | RAW  2 pl, 2 qr, v35 ECC M @0.30mm          | UR  2 pl, 6 qr, v23 ECC M @0.30mm (4 up)
+  RCW wsh tier1, 5in/2out [PSBT]  3809 B | RAW  2 pl, 2 qr, v36 ECC M @0.30mm          | UR  2 pl, 6 qr, v24 ECC M @0.30mm (4 up)
