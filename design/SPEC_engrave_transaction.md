@@ -10,6 +10,7 @@ until a re-review returns 0C/0I; **no code before that.**
 | the **operator journey walk** — this spec's review by ruling | 18 findings (A–R), all ruled | `JOURNEY_WALK_engrave_transaction.md` |
 | **R0 round 0**, adversarial, opus | **3 Critical / 8 Important / 4 Minor** | `agent-reports/R0-engrave-transaction-round0-adversarial.md`, persisted verbatim at `caa90cb` **before** any of it was folded |
 | **R0 round 1**, fold-check, sonnet | **12 FIXED / 3 PARTIAL / 0 NOT FIXED**, plus **0C / 1I / 2M** the round-0 fold itself introduced | `agent-reports/R0-engrave-transaction-round1-foldcheck.md`, persisted at `321cba6` |
+| **R0 round 2**, fold-check + **implementability**, opus | **4 FIXED / 2 PARTIAL**, plus **0 Critical / 7 Important / 3 Minor** — the first round with **no Criticals** | `agent-reports/R0-engrave-transaction-round2-foldcheck-implementability.md`, persisted at `31dbdff` |
 
 **The walk made this spec smaller; R0 made it truer.** The walk removed work —
 chunks engrave **verbatim**, so v1 needs no `mt1` decoder (§2.2). R0 removed
@@ -18,12 +19,22 @@ chunks engrave **verbatim**, so v1 needs no `mt1` decoder (§2.2). R0 removed
 §2.5; *"the compare screen names no command"* — §3.2), and two more described
 reuse that does not exist (§2.2a, §4.4a).
 
-**Round 1's own lesson, and it is about auditing rather than code.** Round 0's I2
-named ONE program-keyed switch; the fold answering it enumerated that one site
-carefully and stopped. Round 1 grepped the **class** and found **three**, two of
-which fail *silently* — including the program's own front door. **Fixing the
-instance a finding names, and not the class, is how the second instance survives
-a round.** See §3.1a.
+**Round 2 changed what this spec KNOWS, not only what it says.** Its
+implementability lens **refuted** something the document had recorded as merely
+unverified: the vendored QR library has **no Structured Append**, so C1's ruling
+— the operator's own — had no mechanism (§4.2a). And it found the largest gap in
+the document: **`ClassTransaction`'s wire layout is defined nowhere** (§2.1b),
+while four other sections read it. Both are invisible to a reader who is not
+implementing, which is the entire argument for running that lens.
+
+**The recurring lesson, now three rounds deep, is about AUDITING rather than
+code.** Round 0's I2 named ONE program-keyed switch; the fold enumerated that one
+site carefully and stopped. Round 1 grepped the class and found **three**, two
+failing *silently*. Round 2 then found a **fourth** — because the grep meant to
+close the class searched for *"switches on `program`"*, and the fourth switches
+on a scanned object's **type**. **Fixing the instance a finding names, and not
+the class, is how the next instance survives another round.** §3.1a now states
+the *rule* rather than only the list.
 
 **Where a section carries a `####` sub-heading in SHOUTING CAPS, that is an R0
 finding folded in place.** They are left visible rather than smoothed away,
@@ -194,6 +205,31 @@ prefix is not.
 > here.** `mt`'s §8.2f was bypassed by the invocation it refused, because the
 > arg parser ran first. A guard placed downstream of a dispatcher has already
 > lost. **For every refusal in §5, name what runs BEFORE it.**
+
+#### 2.1b THE RECORD'S WIRE LAYOUT IS NOT DEFINED, AND FOUR THINGS DEPEND ON IT
+
+**R0 round 2, I5.** `ClassTransaction` is named three times in this document and
+**defined nowhere**; `TxPrefix` does not exist in the fork. Yet:
+
+| depends on the framing | why |
+| --- | --- |
+| **P1's "with vectors"** | you cannot write a test vector for a format you have not stated |
+| **R4′** (both forms in one record) | it must be able to *see* both forms to refuse them |
+| **R14** (several chunks-form transactions) | it must count transactions in a payload |
+| **§3.4's asserted column** | `TO` and the fee are read out of the record's legend fields |
+
+And **Rust (`me`) and Go (fork `sysw/`) must agree byte-for-byte** — the
+Rust-primary rule makes `me` normative, but "normative" means nothing until the
+layout is written down.
+
+**NORMATIVE: P1 defines it before anything reads it**, stating at minimum: how
+the raw form and the chunks form are distinguished, how the optional legend
+fields are delimited, and what an absent optional field looks like. **The body is
+lowercase hex** (the reserved-prefix rule); what the hex *decodes to* is missing.
+
+> **This is the largest single gap in the document**, and it is invisible to a
+> reader who is not implementing: every section that uses the record reads
+> naturally, because each assumes a framing somebody else defined.
 
 ### 2.2 Raw transaction XOR chunks — and chunks are engraved VERBATIM
 
@@ -422,6 +458,34 @@ page" gui/*.go`, non-test):
 `layoutMainPager` also takes a `program` but consumes it **numerically**
 (`int(lastNav)+1`), so it carries no case list and no lockstep obligation.
 
+**A FOURTH SITE, AND THE ENUMERATION ABOVE MISSED IT — R0 round 2, I4.**
+
+| site | line | if the new type is missing | fails |
+| --- | --- | --- | --- |
+| `engraveObjectFlow`'s **type** switch | `gui/gui.go:2487` | `default: return false` → **`scanUnknownFormat`** | **SILENTLY** |
+
+**Why it was missed, and this is the lesson.** The table above was built by
+grepping `switch .*prog` — *"switches keyed on a `program`"*. `engraveObjectFlow`
+switches on the **scanned object's TYPE**, so it is the same defect class through
+a different key, and the grep that was supposed to close the class had its
+boundary drawn too narrowly.
+
+**It is on the NFC path**, which §1.2 establishes is a *different door* from
+flash. So a `tx:` record arriving on a tag lands here — and §2.1a's ruled `tx:`
+branch in `gui/scan.go` is **necessary but not sufficient**: `scan.go` must
+produce a `txScan`, **and this switch must have a case for it**, or the record is
+recognised, decoded, and then silently discarded.
+
+> **THE CLASS, STATED ONCE, so a fifth instance does not need a fourth round:**
+> **every enumeration a new program or a new scanned type must be added to, whose
+> default is silent.** Not "switches on `program`". The three above plus this one
+> are the current membership; the *rule* is what a future reviewer should re-run,
+> not the list.
+
+**NORMATIVE: P4 owns the `txScan` case in `engraveObjectFlow`**, and it is named
+here rather than only in §1.2's table cell, because a mechanism mentioned only in
+a table is a mechanism nobody schedules.
+
 **The silent one is the worse one, and it is the program's front door.** The
 operator selects *Engrave Transaction*, the device says **"unknown format"**, and
 nothing crashed, nothing logged, and no test that never pages there would notice.
@@ -434,9 +498,20 @@ A panic at least announces itself.
 > Fixing the instance a finding names, and not the class, is how the second
 > instance survives a round.
 
-**NORMATIVE:** all three are lockstep sites. **None is protected by the enum's
-compile-time guard**, which asserts only `unlockPayload`'s position. P4 must
-touch `uiFlow` and `StartScreen.draw`; P5 must touch `layoutMainPlates`.
+**NORMATIVE: all four are lockstep sites, and P4 owns every one of them.**
+**None is protected by the enum's compile-time guard**, which asserts only
+`unlockPayload`'s position.
+
+> **R0 round 2, I3.** An earlier draft said *"P5 must touch `layoutMainPlates`"*
+> here while §6's P4 row already claimed it — a straight contradiction, and the
+> dangerous reading is the one in this section: taken that way, **P4 closes green
+> on a build that panics the moment the operator pages onto the new entry.**
+> Resolved in P4's favour: all four sites are what makes the program *reachable*,
+> which is P4's job. P5 is the plate.
+
+| site | owner |
+| --- | --- |
+| `uiFlow`'s dispatch, `StartScreen.draw`, `layoutMainPlates`, `engraveObjectFlow` | **P4** |
 
 ### 3.2 The compare screen names the WRONG command today
 
@@ -673,24 +748,58 @@ decoders reassemble it themselves. So it keeps F-234's promise **intact for
 multi-symbol jobs** — a recoverer with an ordinary scanner still gets the
 transaction, with no constellation knowledge — which no bespoke header could do.
 
-**The 16-symbol cap is not a constraint here**, and the bound that shows it is
-**this spec's own container cap, not Bitcoin's standardness limit.** Structured
-Append gives 16 × 1,367 B ≈ **21.9 KB** at a full-area v26. The largest
-transaction that can reach the device at all is **16,367 B** — §2.3's
-`MaxSectionLen`-derived raw-hex ceiling — and the pathological worst case
-measured is 8,067 B. So the transport runs out before the symbol count does.
+**THE 16-SYMBOL CAP CAN BIND, and two earlier drafts of this paragraph argued
+otherwise on two different wrong grounds.**
 
-> **R0 round 1, M.** An earlier draft argued this against *"Bitcoin's ~100 KB
-> standardness limit"*, which is **larger** than the 21.9 KB it was meant to
-> reassure about — an argument that refutes its own conclusion. The governing
-> bound was §2.3's, three sections away, and uncited.
+> **R0 round 1, M** — the first draft compared 21.9 KB against *"Bitcoin's
+> ~100 KB standardness limit"*, a bound **larger** than the thing it was meant to
+> reassure about. An argument that refutes its own conclusion.
+>
+> **R0 round 2, I2** — the second draft fixed the ceiling and kept the **divisor**
+> that made it wrong. `16 × 1,367 B` assumes every symbol is a **max-capacity
+> v26**. §4.5's ruled objective ranks **maximise ECC ABOVE minimise symbol
+> count**, so the search deliberately produces *many small* symbols: this spec's
+> own measured case is **742 B → 6 symbols**, about **124 B each — 11× smaller**
+> than the divisor assumed. And `RESULTS_qr_physical_max_2026-08-22.txt`, the
+> very file cited for 1,367 B, says *"tiling beyond 16 symbols exceeds QR
+> Structured Append's limit… Counts above are unconstrained."*
 
-**TWO GATES, and neither may be assumed:**
+**NORMATIVE: the search MUST treat 16 symbols as a hard bound**, discarding any
+configuration above it, exactly as it discards one that does not fit a plate. The
+cap is not a comfortable headroom argument; it is a constraint the objective can
+walk into while optimising for ECC.
 
-1. **Our encoder must actually emit Structured Append.** Unverified. If it does
-   not, this ruling has no mechanism — the same class as C2 and I8.
-2. **Real scanners must reassemble it off engraved steel.** This is an S0
-   question and costs nothing extra: the test plate is already being cut.
+**And the interaction is the point:** the objective *prefers* small symbols, so
+the cap binds **soonest on exactly the configurations the search likes best.**
+
+**GATE 1 IS NOT UNVERIFIED — IT IS REFUTED. R0 round 2, I1.**
+
+`github.com/seedhammer/kortschak-qr v0.3.2` **has no Structured Append.**
+Verified: zero occurrences of "structured" anywhere in the module, and
+`func Encode(text string, level Level) (*Code, error)` returns **one** `*Code`.
+`engrave.QR` takes one code; `backup.Paragraph` holds one.
+
+**So C1's ruling currently has no mechanism** — the third instance this session
+of a spec instructing something the code cannot do (C2, I8, and now this).
+
+**It is buildable.** The vendored library exposes a `coding` package, which is
+where a Structured Append header (mode 3: index, count, parity) would be written.
+That is real work, and **NORMATIVE: a phase must own it.** §6 assigns it to
+**P5**.
+
+**AND IT BREAKS §6's ORDER, which this spec must not paper over.** S0 runs
+**first** and is specified to cut *"a Structured-Append pair"* — an artifact
+nothing in the tree can currently produce. Three ways out, and this spec does
+**not** choose between them (see §9 O14):
+
+| | |
+| --- | --- |
+| build SA before S0 | S0 stops being "two seconds of machine time" and gains a code dependency |
+| S0 cuts hand-built SA symbols | needs a throwaway encoder, but keeps S0 first and cheap |
+| S0 drops the SA pair | then gate 2 moves to a later plate, and P5 closes without knowing scanners can read it |
+
+**GATE 2 stands as written:** real scanners must reassemble it off engraved
+steel. That remains an S0-class question whichever route is taken.
 
 **§4.3's post-cut test is only meaningful once (1) and (2) hold.** Until then a
 multi-symbol job cannot be verified by the operator at all.
@@ -756,6 +865,31 @@ plate 6.
 ────────────────────────
 NEXT PLATE
 ```
+
+#### 4.3a THE BRANCH IS ON SYMBOLS; THE INSTRUCTION IS PER PLATE
+
+**R0 round 2, I6.** The two screens above branch on *symbol* count and are shown
+*per plate*, and those are different axes. Three cases fall through, each with a
+measured witness in this document:
+
+| case | witness | what the screens above say | what is wrong |
+| --- | --- | --- | --- |
+| several symbols **on one plate** (tiling) | 742 B → **6 qr on 2 plates, `4 up`** | "scan this plate" | the operator scans **one** of four and moves on; three are unchecked |
+| **one** symbol across **two** plates | 1,130 B → **2 pl, 1 qr** (the legend pushed the QR to plate 2) | "scan this plate" | **plate 1 has no QR on it at all**, so the instruction is unfollowable |
+| a **chunks/text** job | any `--chunks` payload | neither screen applies | zero symbols, no branch — the operator is told nothing after cutting 22–202 plates, which is §4.3's own silent step |
+
+**NORMATIVE: the per-plate instruction is a function of what is ON THAT PLATE**,
+not of the job's symbol count:
+
+- **n symbols on this plate** → *"scan all n on this plate"*, and the count is
+  named so the operator knows when they are done
+- **no symbol on this plate** (legend-only) → say so, and say nothing about
+  scanning
+- **a text plate** → the check is not scanning at all; it is that the strings are
+  legible and complete, which is the operator's eyes
+
+**And the per-JOB instruction stays keyed to the job**: after the last plate,
+scan every symbol and run `mt inspect` once.
 
 **NORMATIVE, and this is what closes C1's walkthrough:**
 
@@ -870,9 +1004,31 @@ wrapping.** Packing them instead — measured at the **3.0 mm** face, `font/sh`,
 | **packed, mandatory three** (99 chars) | **3** | **12.8 mm** | 66.2 mm | **v21** |
 | none | 0 | 0 | 79.0 mm | v26 |
 
-**NORMATIVE: the reservation is computed from the field set and the face, never
-hard-coded.** Two of the five fields (`FROM WALLET`, `TO`) are **optional**, so a
-fixed 6-line charge bills every plate 1 for rows that may not exist.
+**A SIXTH FIELD IS MISSING FROM THIS LIST — R0 round 2, I7.** §4.4 makes
+`PLATE n OF m` **normative** — it carries the *"an unsigned plate is an unfinished
+plate"* invariant — and the table above omits it, so the computed reservation
+**under-charges every multi-plate job**, exactly the class that needs it.
+
+**And plate-1-only vs every-plate was never settled.** The original reservation
+said *"6 lines on plate 1, **1 line on every later plate** for `PLATE n OF m`"*,
+while §4.5's objective note says only that a plate holds "the QR(s) AND the
+legend".
+
+**NORMATIVE: the reservation is computed PER PLATE, from that plate's field set
+and the face — never hard-coded, and never computed once for the job.**
+
+| plate | fields |
+| --- | --- |
+| 1 | the five above **plus** `PLATE 1 OF m` |
+| 2..m | **`PLATE n OF m` only** |
+
+Two of plate 1's five fields (`FROM WALLET`, `TO`) are **optional**, so a fixed
+charge bills every job for rows that may not exist.
+
+> **The 4.25 mm pitch is stated nowhere in this document (R0 round 2, Minor)**,
+> and the table above pairs a 44-column face measurement with a reservation
+> derived from a different one. **P5 must state the pitch it uses and where it
+> comes from**, or "computed" is computed from a number nobody can find.
 
 **3.0 mm IS THE FLOOR, and it is already the hard case.**
 `gui/freetext_proof.go:24` calls it *"the smallest rung and the hardest legibility
@@ -934,7 +1090,7 @@ this machinery (`refusals.toml`, `check-refusal-coverage.sh`,
 | R11 | **see R11′ below** | | 3.3 |
 | **R12** | **a well-formed `tx:` record reaching `freeTextScan`** — i.e. `tx:` added to `isSyswEncoded` without its own branch | §2.1a; this is the C3 defect made into a test | 2.1a |
 | **R13** | **a multi-symbol QR job when Structured Append is unavailable** | §4.2a's two gates; without them the artifact is unrecoverable and §4.3's test cannot pass | 4.2a |
-| **R14** | **a payload holding MORE THAN ONE chunks-form transaction** | §3.6a: the device cannot derive a txid without a decoder, so the picker cannot distinguish them and R10's duplicate rule is unevaluable. **Until O11 resolves, refusing is the only honest option** — the alternative is an operator committing 22–202 plates to whichever row they guessed | 3.6a |
+| **R14** | **a payload holding MORE THAN ONE chunks-form transaction** | §3.6a: the device cannot derive a txid without a decoder, so the picker cannot distinguish them and R10's duplicate rule is unevaluable. **Until O11 resolves, refusing is the only honest option** — the alternative is an operator committing a whole job to whichever row they guessed | 3.6a |
 
 ### R4′ — refusing "both forms" was wrong
 
@@ -996,8 +1152,8 @@ instances in this cycle now, the most recent two found while fixing F-244:
 | **P1** | `me` (Rust) | `ClassTransaction`, the framed record, stdin, content-based sealing, `MaxSectionLen` → 32,734 — **with vectors** |
 | **P2** | `mt` (Rust) | `mt encode --record --raw\|--chunks`; **`mt inspect` gains a raw-transaction subject**; the record must state whether it fits an **NFC tag** (§1.2), which is `gui/scan.go`'s 8 KB buffer, not `MaxSectionLen` |
 | **P3** | fork (Go) | Port P1, provenance-pinned. **Includes the `tx:` branch in `gui/scan.go` (§2.1a) — the prefix without the branch is the C3 defect** |
-| **P4** | fork | The payload menu (§3.3) **and the boot-path call that invokes it**; the program (§3.4–3.7); **`layoutMainPlates`' case list (§3.1a)** |
-| **P5** | fork | The plate: search, **the computed legend reservation (§4.5a)**, **the legend-emission REORDER (§4.4a)**, test-the-plate, plate count |
+| **P4** | fork | The payload menu (§3.3) **and the boot-path call that invokes it**; the program (§3.4–3.7); **ALL FOUR lockstep sites (§3.1a)** — `uiFlow`, `StartScreen.draw`, `layoutMainPlates`, `engraveObjectFlow` |
+| **P5** | fork | The plate: search (**with the 16-symbol cap as a hard bound, §4.2a**), **QR STRUCTURED APPEND over the vendored `coding` package — it does not exist today (§4.2a, I1)**, **the computed legend reservation (§4.5a)**, **the legend-emission REORDER (§4.4a)**, test-the-plate, plate count |
 | **P6** | both | Journeys and refusal coverage (§5) |
 
 **S0 first is the closure rule applied rather than quoted.** Four of this
@@ -1080,8 +1236,9 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
 | O6 | multi-symbol recovery without `mt`'s reader | `SPEC_mt_qr_DEFERRED.md:169` |
 | O7 | applicability predicates for the **other ten** programs | follow-up |
 | **O11** | **the picker's key for a CHUNKS payload** — the device cannot derive a txid without a decoder (§3.6a), and every alternative trades against a ruling | **unresolved; blocks a multi-transaction chunks payload** |
-| **O12** | does our QR encoder emit **Structured Append**? §4.2a gate 1 — unverified, and without it C1's ruling has no mechanism | S0 / P5 |
+| ~~O12~~ | **ANSWERED, and the answer is NO** — `kortschak-qr v0.3.2` has no Structured Append (verified: zero occurrences; `Encode` returns one `*Code`). Buildable over its `coding` package; **P5 owns it**. See O14 for what that does to S0's order | **closed → P5 + O14** |
 | **O13** | a legend face **below 3.0 mm** — untested, and worth ~5 QR versions (§4.5a) | S0 |
+| **O14** | **S0 is specified to cut a Structured-Append pair, and nothing in the tree can produce one** (§4.2a, I1). Build SA before S0, hand-build throwaway symbols, or drop the pair from S0 — **unresolved** | operator |
 | O8 | **Journey B — recovery.** Someone finds the plate years later. Not yet walked | next walk |
 | O9 | the documented `picotool` line stops before the move to 20V/28V power, so a correct payload reads as a failed one | walk G, documentation |
 | O10 | the **courier model** is nowhere written down (§ walk H) | documentation |
