@@ -3,6 +3,38 @@
 > Supersedes `CONTINUITY_mt_2026-08-22.md`, which described the pre-R0 state and
 > is now wrong in most of its conclusions.
 
+## OVERNIGHT RUN — state as of the last checkpoint
+
+**The plan is GREEN (0C/0I) pending ONE re-gate that has not yet returned.**
+`R11-pre-implementation-gate.md` returned **NOT SAFE TO EXECUTE** (3C/6I/10m);
+all Criticals and Importants plus 9 Minors are folded (`946e376`, `bd7f191`).
+The re-run is `R12-gate-rerun.md`.
+
+**A dispatch of that re-run DIED on a 529 Overloaded** — a server error, not a
+result. Flagged rather than absorbed, per the rule that a failed Agent-API
+dispatch is never silently replaced by the controller's own review. It was
+re-dispatched fresh. **If R12 never returns, NO CODE IS WRITTEN** — the gate has
+not closed, and the plan's own status line says implementation may begin only
+after it does.
+
+**S0's inputs are prepared, verified, and NOT yet committed** (scratchpad
+`s0-READY.md`): two regtest transactions, never broadcast — 222 B (6×37, even)
+and 284 B (8 chunks, 32-byte last chunk, uneven). All checksums verify and
+vector 1 round-trips to its original bytes. The independent generator was
+validated against **40/40** of `mk-codec`'s committed vectors before use, and
+the HRP-separation claim was proven empirically (a genuine `mk1` string fails
+under `md`/`mt` HRPs against every constant).
+
+**Verified against the mainnet node, which is what R11 C3 turns on:** for a
+regtest outpoint, `gettxout` → empty (null) and `getrawtransaction` → error −5.
+So §8.5 does not fire, §6a reports UNKNOWN, and `mt encode` behaves the same
+with a node and without. A confirmed *mainnet* vector fails this — its inputs
+are spent and parents confirmed, which is exactly §8.5's refusal condition. That
+was the defect that would have failed P2's gate at 3am.
+
+**`bg002h/mnemonic-transaction` exists, EMPTY and PRIVATE.** v0.1 publishes
+nothing, tags nothing, releases nothing, makes nothing public.
+
 ## Resume with
 
     Read design/CONTINUITY_mt_2026-08-23.md, design/SPEC_mt_v0_1.md and
