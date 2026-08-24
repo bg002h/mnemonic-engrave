@@ -990,6 +990,40 @@ version, level and mask, and the vendored library takes all three explicitly:
 `coding.NewPlan(version Version, level Level, mask Mask)` — `coding/qr.go:484`.
 So *"module-for-module"* is a byte comparison, not a judgement call.
 
+**THE MASK IS PER SYMBOL — an earlier draft of this section said "pinned
+version/level/mask" as one triple for the sequence, and that is wrong.** Measured
+from the fixture: its two symbols are both `v5-M` and carry masks **3** and **2**.
+The encoder chooses the mask per symbol by penalty scoring, so **a gate pinning
+one mask for the whole set would fail a correct implementation.** P5's gate
+compares **per symbol**.
+
+#### 4.2d THE FIXTURE EXISTS — `scripts/gen-sa-fixture.py`
+
+**Written 2026-08-24**, ahead of S0, because its lead time was the risk: S0 is
+loud-window-constrained, and an unwritten generator would have spent that window
+answering three of four questions.
+
+Output is pinned in `design/measurements/SA_FIXTURE.txt`:
+
+| | |
+| --- | --- |
+| payload | **fixed, 129 bytes, and NOT a transaction** — a bearer artifact on a test plate is a hazard with no upside |
+| symbols | 2, both `v5-M`, masks **3** and **2** |
+| size | 37 × 37 modules ⇒ **27.0 mm each at 0.60 mm**; the pair is **54.0 mm of 79 mm usable**, so it shares a plate with S0's other blocks and costs no extra cut |
+| reproducible | **byte-for-byte across runs** — required of an oracle |
+
+**TWO THINGS IT SETTLED THAT THIS SPEC HAD ONLY QUOTED FROM THE STANDARD:**
+
+1. **The 16-symbol cap is executable.** `segno` refuses `symbol_count=17`:
+   *"The symbol count must be in range 1 .. 16."* §4.2a's hard bound now rests on
+   a run rather than on ISO/IEC 18004 quoted from memory.
+2. **The per-symbol mask**, above.
+
+**WHAT IT DOES NOT ESTABLISH, and the script prints this itself:** it is
+**encode-only**. `segno` does not decode, so nothing in it proves the symbols
+reassemble. **A green run of the generator is not a green gate** — §4.2c's
+physics question is answered by S0's scan, off steel, with a real scanner.
+
 **NORMATIVE:**
 
 - **S0 cuts the SA pair** from the independent generator, which is **committed**,
@@ -1460,7 +1494,7 @@ instances in this cycle now, the most recent two found while fixing F-244:
 
 | | where | what |
 | --- | --- | --- |
-| **S0** | this repo | **Cut the test plate.** QR blocks at 0.3 / 0.45 / 0.6 / 0.9 mm; one raw-octet and one base45 symbol; **a Structured-Append pair from `scripts/gen-sa-fixture.py` (§4.2c) — committed, because P5's gate needs it**; and **one legend line at each candidate face below 3.0 mm**. Read with an **external scanner** (§3.7). ~2 s per cut, no dependency on P5 |
+| **S0** | this repo | **Cut the test plate.** QR blocks at 0.3 / 0.45 / 0.6 / 0.9 mm; one raw-octet and one base45 symbol; **the Structured-Append pair from `scripts/gen-sa-fixture.py` (§4.2d) — WRITTEN AND COMMITTED; 54.0 mm of the plate, no extra cut**; and **one legend line at each candidate face below 3.0 mm**. Read with an **external scanner** (§3.7). ~2 s per cut, no dependency on P5 |
 | **P1** | `me` (Rust) | `ClassTransaction`, the framed record **including the mandatory 32-byte carried txid (§2.1b, §3.6b)**, stdin, content-based sealing, `MaxSectionLen` → 32,734 — **with vectors** |
 | **P2** | `mt` (Rust) | `mt encode --record --raw\|--chunks`; **`mt inspect` gains a raw-transaction subject**; the record must state whether it fits an **NFC tag** (§1.2), which is `gui/scan.go`'s 8 KB buffer, not `MaxSectionLen` |
 | **P3** | fork (Go) | Port P1, provenance-pinned. **Includes the `tx:` branch in `gui/scan.go` (§2.1a) — the prefix without the branch is the C3 defect** |
