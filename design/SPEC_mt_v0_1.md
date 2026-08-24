@@ -2843,101 +2843,15 @@ signed PSBT.
    to §10.3 from elsewhere in this document, and from commit messages, keep
    resolving.
 
-4. ~~The legend's FROM and TO fields.~~ **CLOSED**, operator rulings
-   2026-08-23: *"we use walletid or seed fp for the from: field and to: field.
-   Optional but loudly warn if either not supplied"*, and — for the third-party
-   case — *"warn if blank but allow, allow arbitrary text if user passes a
-   flag."*
+4. **SETTLED** — The legend's FROM and TO fields. Reasoning in §12.4.
 
-   Both fields are **wallet identities**, not addresses: a wallet id or a seed
-   fingerprint. `FROM` is what §6 says a transaction cannot tell you on its own.
-   `TO` names the counterparty rather than one of its scripts, which is why it
-   replaced the truncated address R0 round 1 filed as a Critical (R-14) — a
-   truncated address showed one output of several and could not be checked by
-   eye.
+5. **SETTLED** — Should mt require the node to be out of IBD before trusting. Reasoning in §12.5.
 
-   **Three states for `TO`, and paying a third party is the reason for the
-   third:**
+6. **SETTLED** — How much fountain redundancy. Reasoning in §12.6.
 
-   | state | behaviour |
-   | --- | --- |
-   | wallet id or fingerprint | engraved as given |
-   | **blank** | **allowed, loudly warned** on `stderr` — a plate with no destination named is legal and worse |
-   | **arbitrary text, behind a flag** | engraved as given, e.g. `TO ALICE` |
+7. **SETTLED** — Back-side engraving. Reasoning in §12.7.
 
-   **The flag is the point, not a convenience.** A free-text label cannot be
-   derived from or checked against the transaction, so requiring an explicit flag
-   makes it an **act of assertion by the operator** rather than something that
-   quietly appears. It is the same posture as the stub: a human-orientation aid,
-   never an authority, and §5 already forbids branching on any of it. If the
-   label disagrees with the transaction, the transaction wins.
-
-   **Still to specify (§10.10's CLI work, not a design question):** the flag's
-   name, and what `mt` does with a label too long for the field — §5's budget
-   gives `TO` 34 characters including the amount, so a label has roughly 16.
-   Refusing with the limit named fits §8's rule that every refusal names its
-   number; silent truncation does not.
-
-5. ~~Should `mt` require the node to be out of IBD before trusting
-   `gettxout`?~~ **CLOSED — OUT OF SCOPE**, operator ruling 2026-08-23. `mt`
-   asks the node it is given and reports what it is told; vouching for the
-   node's sync state is not `mt`'s job. §8.5's refusal stands as written, and
-   §6a already records that a `null` cannot distinguish "spent" from "this node
-   does not know yet".
-
-6. ~~How much fountain redundancy?~~ **CLOSED**, operator ruling 2026-08-23:
-   zero. `mt` protects against plate damage (ECC), not plate loss (duplicate
-   plates, the operator's choice). See §3.
-7. **Back-side engraving — CLOSED for v0.1**, operator ruling 2026-08-23:
-   *"yes, but probably better left to user to manage physically."* It would
-   recover the 25.5 mm the legend costs and reduce plate counts, but there is no
-   back-side path in the fork (`backup/backup.go:247` defines `frontSideSeed`,
-   called once at `:134`, with a single `Engraving` per plate), so it is
-   firmware work. An operator who wants both sides used can flip the plate and
-   run a second job — a physical workflow rather than a `mt` feature. §4's plate
-   counts therefore stand as one-sided.
-
-8. ~~How does a recoverer learn the fragment parameters?~~ **ANSWERED, and the
-   operator has ruled on what follows.**
-
-   > **Ruling, operator, 2026-08-23: "each piece should say something like
-   > n of m."**
-
-   **Machine-readably this holds for both verbs, because §3 made them share one
-   header.** `mt1`'s header carries `count` and `index` — n-of-m — plus a 20-bit
-   `chunk_set_id` so pieces of different transactions cannot be combined. **It is
-   `mt1`'s own 49-bit header, not `md-codec`'s 37-bit one** (§3): the latter's
-   6-bit `count` caps a set at 64 chunks, which `mt qr` exceeds. For `mt encode` that header sits inside the
-   BCH-protected chunk; for `mt qr` it rides in the bech32-uppercase payload.
-   **One
-   mechanism, both media.**
-
-   > **This item was answered TWICE, and the first answer is gone.** It
-   > originally analysed UR's fountain encoding — `SeqLen`/`MessageLen`/
-   > `Checksum` in CBOR, the `ur:psbt/<n>-<m>/` prefix, and three traps in the
-   > vendored decoder (the prefix is parsed then discarded; a single-part UR
-   > carries no length or checksum at all; `Progress()` is a `x1.75` heuristic
-   > that reaches 1.0 while `Result()` is still nil). **All of that is moot: §3
-   > dropped UR entirely.** The traps are recorded here only so a future reader
-   > who finds UR attractive again knows what the vendored implementation does.
-
-   **The gap the ruling closes, which survives the envelope change unaltered:**
-   `PLATE n OF m` is **not** `part n of m`. Under a multi-symbol tiling, plate 2
-   of 3 may carry parts 5–8 of 11, and §5's legend offers only the plate label.
-   A recoverer who scans out of sequence, or misses one symbol *on* a plate,
-   cannot tell which part is absent.
-
-   **Normative:** every engraved symbol carries its own human-readable `n/m`
-   beside it, for the chunk it holds — independent of, and in addition to, the
-   plate's `PLATE n OF m`. A recoverer must be able to inventory what they hold
-   and name what is missing **without decoding anything**. A lone symbol reads
-   `1/1`, which is the only way it can state that it is whole.
-
-   **Unpriced.** These labels consume plate area §4's table does not reserve,
-   exactly as the legend did before it was measured — see §10.14, which already
-   requires that regeneration. The cost is small per label (3–5 characters) but
-   it is per **symbol**, not per plate, and the worst artifact here carries 5.
-   **Measure before §4's numbers are treated as final.**
+8. **SETTLED** — How does a recoverer learn the fragment parameters. Reasoning in §12.8.
 
 9. **MOVED — see `design/SPEC_mt_qr_DEFERRED.md`.** How does the engraving reach the machine? ANSWERED, operator ruling. `mt qr`
    material, deferred with the verb (§0a). The number is kept so citations
@@ -3144,40 +3058,9 @@ signed PSBT.
     exit, so `0 = every check passed` is fixed here and the rest of the code
     space is left to implementation.
 
-11. ~~How many codex32 characters fit a hand-engraved plate?~~ **CLOSED — OUT
-    OF SCOPE**, operator ruling 2026-08-23: *"As many as a user wants. It is not
-    our concern."* `mt encode` emits a string; what a user does with steel is
-    theirs. See §3b. The **4,096-chunk** ceiling is unaffected — that is a
-    property of the codec, not of anyone's plate.
+11. **SETTLED** — How many codex32 characters fit a hand-engraved plate. Reasoning in §12.11.
 
-12. ~~Should `mt1` FILL its chunks rather than balance them?~~ **CLOSED — NO.
-    Filling would reduce error recoverability, which is the one thing this
-    format exists for.** Operator question 2026-08-23: *"does increased packing
-    reduce error recoverability?"* Answered from source, and the answer is yes,
-    by two independent mechanisms:
-
-    **BCH correction is PER CHUNK, and it is `t = 4`.** `decode_regular_errors`
-    returns `None` for any pattern above *"t = 4 errors"*, against a 13-symbol
-    checksum (`REGULAR_CHECKSUM_SYMBOLS`) over a codeword of at most 93 symbols
-    (`crates/md-codec/src/bch_decode.rs`). Each chunk therefore carries its **own
-    independent 4-error budget**.
-
-    1. **Fewer chunks means less total correction.** For a fixed payload,
-       filling packs the same bytes into ~12% fewer chunks — and the budget
-       scales with chunk *count*. A 535 B transaction **balanced** is 14 chunks
-       of 39 B (§3b's rule: `count = ceil(535/40) = 14`, then
-       `bytes_per_chunk = ceil(535/14) = 39`) = **56 correctable symbol
-       errors**; filled at ~45 B/chunk it is
-       12 chunks = **48**. Same data, 8 fewer errors survivable.
-    2. **Each chunk is longer under the same `t`.** Filling raises the symbols
-       at risk per chunk while the per-chunk budget stays at 4, so the
-       probability that any single chunk exceeds its budget rises.
-
-    Both effects push the same way. **Balancing is not a limitation of `md`'s
-    chunker — it is error-correction budget bought with plate area**, and for a
-    hand-engraved artifact whose entire purpose is surviving a miscut character,
-    trading it for ~340 bytes per chunk of capacity is the wrong trade. The
-    **163,840 B** ceiling stands, and §8.7b refuses past it.
+12. **SETTLED** — Should mt1 FILL its chunks rather than balance them. Reasoning in §12.12.
 
 13. **`mt1`'s own encoding, NUMS constant and content id — RULED, ready to
     build.** Operator rulings 2026-08-23.
@@ -3329,49 +3212,18 @@ signed PSBT.
     regenerated before implementation anyway, for the three unmodelled inputs
     named there, and this correction rides along with that regeneration.
 
-15. ~~§8.4 sets no minimum timelock horizon, and cannot tell a timelock from
-    RBF signalling.~~ **CLOSED — OUT OF SCOPE**, operator ruling 2026-08-23:
-    *"not our concern. User handles this by their own wallet, or we later create
-    our own wallet utilities."* Consistent with §0: `mt` does not build
-    transactions, so how long a timelock ought to be is a wallet decision. `mt`
-    still verifies that the timelock it was handed is **enforced** (§8.4) — it
-    simply does not judge whether the horizon is wise.
+15. **SETTLED** — §8.4 sets no minimum timelock horizon, and cannot tell a timelock from. Reasoning in §12.15.
 
-16. ~~Should `mt` refuse legacy (non-segwit) inputs at all?~~ **CLOSED — NO**,
-    operator ruling 2026-08-23: *"Do not exclude legacy inputs. It is user
-    responsibility to know their inputs for such edge cases."* See §8.6. The
-    original refusal's premise was false (`non_witness_utxo` binds a legacy
-    amount by txid), and `sh(wsh(…))` is no longer unclassified since every
-    input type is accepted. The residual risk is handled by §8.2c's `stderr`
-    warning — which states the fee arithmetic — and by §8.2d, which binds any
-    input carrying `non_witness_utxo` by txid. **Nothing reaches an `mt qr`
-    plate**: §5's legend is full (§8.2c). Recorded in §7.
+16. **SETTLED** — Should mt refuse legacy (non-segwit) inputs at all. Reasoning in §12.16.
 
 17. **MOVED — see `design/SPEC_mt_qr_DEFERRED.md`.** The firmware cannot yet engrave what §4 selects — and will be taught. `mt qr`
    material, deferred with the verb (§0a). The number is kept so citations
    to §10.17 from elsewhere in this document, and from commit messages, keep
    resolving.
 
-18. ~~Does §8.2's consensus-engine check survive the scope line?~~ **CLOSED —
-    NO. Script validity is out of v0.1**, operator ruling 2026-08-23: *"We don't
-    care if transaction is valid for initial version. We might never care but we
-    might add it someday."* §8.2 is removed, `mt` drops its consensus-engine
-    dependency, and §7 carries the accepted hazard: a transaction with a bad
-    signature engraves cleanly and fails at broadcast. Reopen if it is ever
-    added.
+18. **SETTLED** — Does §8.2's consensus-engine check survive the scope line. Reasoning in §12.18.
 
-
-19. ~~Does CPFP still require the parent to reach the mempool?~~ **CLOSED — the
-    spec no longer needs the answer.** Operator ruling 2026-08-23: *"We don't
-    care about rbf or cpfp… we can't control the future but cpfp is a well known
-    standard that will help user in future if they picked a bad fee."*
-
-    `mt` neither implements nor checks either mechanism. §8.2b's low-fee warning
-    **names** CPFP and out-of-band miner submission as things a future holder can
-    try, and guarantees neither — so the mempool question stops being
-    load-bearing. Out-of-band submission is itself the answer to the case that
-    prompted this: a fee too low for the parent to reach a mempool at all
-    bypasses relay policy by going straight to a miner.
+19. **SETTLED** — Does CPFP still require the parent to reach the mempool. Reasoning in §12.19.
 
 20. **Legacy inputs are txid-malleable, and the content id is the txid.** A
     legacy `scriptSig` can be re-encoded by a third party in relay without
@@ -3383,59 +3235,11 @@ signed PSBT.
     confirm. Worth a sentence somewhere a recoverer will read.
 
 
-21. ~~Nothing on the plate names the format.~~ **CLOSED**, operator ruling
-    2026-08-23: the suggested legend gains a sixth field, **`FORMAT: mt1
-    codex32`**, specified in §5 with its reasoning.
+21. **SETTLED** — Nothing on the plate names the format. Reasoning in §12.21.
 
-    **The question was found by walking Journey B, not by reviewing §5.** A
-    recoverer in 2040 holds a string and no indication of which tool reads it;
-    `MT1QZRF8X…` in a search engine returns nothing. Every *other* legend field
-    is reconstructible by `mt inspect` from the string alone (§1.1) — **which
-    program to run is the one thing inspection cannot tell you**, so the field
-    that looked like the least important of the six is the only one whose
-    absence ends the journey.
+22. **SETTLED** — mt1's NUMS domain string is undecided. Reasoning in §12.22.
 
-    **A repo URL was considered and rejected as the tag.** It fails on
-    durability: a domain must outlive the plate, and a lapsed one someone else
-    buys points a bearer-instrument holder at a stranger. `codex32` is BIP-93 —
-    published and archived independently of this project — so the tag survives
-    the project. A URL may ride along as extra suggested text; it may not *be*
-    the identifier.
-
-    **The `136 characters` cited in the original entry was already stale**, and
-    regenerating the probe to price this field is what exposed it: §5's minimal
-    legend measured 141, then 145 after the `BROADCAST` fix, and **164** with
-    this field. The stale figure had survived because nothing re-ran
-    `legend.rs`; the number is now emitted by the probe rather than carried in
-    prose (§10.14).
-
-    **Residual, inherited by the deferred `mt qr` cycle (§0a):** the sixth field
-    takes the legend from 6 lines to **7**, which `legend.rs` shows still fits
-    one plate at v13 but forces a second at v18 and above. Free for `mt encode`,
-    where the legend is `stderr` text and `mt` owns no layout.
-
-
-22. ~~`mt1`'s NUMS domain string is undecided.~~ **CLOSED**, operator ruling
-    2026-08-23: the domain string is **`"shibbolethnumstransaction"`**, giving
-    **`MT_REGULAR_CONST = 0x1a2fc877f9528d7c1`**. Stated with its derivation in
-    §10.13(a), and recomputed there before it became normative.
-
-    The *rule* was always derivable — `MD_REGULAR_CONST` is verifiably the top
-    65 bits of `SHA-256("shibbolethnums")` — but the **domain string is an
-    arbitrary chosen name** no implementer could have inferred. That mattered
-    because the fork mechanic makes the worst guess the most tempting: copy
-    `md-codec`, change the HRP, leave the constant, and `mt1` chunks verify as
-    `md1` chunks. **§10.13 now has no undecided input left.**
-
-
-23. ~~Season names are hemisphere-relative on a permanent artifact.~~
-    **CLOSED**, operator ruling 2026-08-23: seasons are **northern-hemisphere**
-    and §8.4 says so. A southern reader misreads the estimate by about six
-    months; the harm is bounded because the **mandatory block height beside it
-    is unambiguous everywhere**, so a misread costs an orientation rather than a
-    recovery. Alternatives considered and not taken: month ranges (`~SEP 2034`)
-    or quarters (`~Q4 2034`), both hemisphere-neutral, both less legible to the
-    majority of readers.
+23. **SETTLED** — Season names are hemisphere-relative on a permanent artifact. Reasoning in §12.23.
 
 ## 11. Provenance of the numbers
 
@@ -3501,3 +3305,267 @@ The BCH corrector's existence was read from `crates/md-codec/src/bch_decode.rs` 
 > — the Merkle-proof and header-cost material — had no results file
 > behind them. Those sections are now out of scope (§9), so the claim is true
 > again by subtraction rather than by generating the missing evidence.
+
+
+## 12. Appendix — the settled questions, with the reasoning that settled them
+
+<!-- numbering: preserved -->
+
+> **These are not open questions and stopped being so during the 2026-08-23
+> cycle.** They were carved out of §10 so that section holds only what is still
+> undecided — it had grown to 701 lines of which 301 were answers, which is the
+> opposite of what a reader consults it for.
+>
+> **This is a MOVE, not a rewrite.** The bodies below are byte-identical to what
+> §10 carried; nothing was re-authored in transit, so `git diff` on this commit
+> shows relocation and nothing else. That was the deciding argument for an
+> appendix over folding each entry back into the section it settled: folding
+> would have re-authored ~300 lines, and this cycle has just measured what that
+> costs — four of R6's six Criticals were defects in text written the same day.
+>
+> **The reasoning is the point, not the answers.** The three-position envelope
+> history, the NUMS derivation with its independent recomputation, the retracted
+> fountain-redundancy claim — these record WHY, which is the most-cited thing in
+> this document and the part a future reader cannot reconstruct. Deleting them
+> to shorten §10 would have destroyed exactly what was worth keeping.
+>
+> **Numbers are unchanged.** §12.N carries what §10.N carried, and §10.N now
+> points here, so every citation — in this document, in the carved QR file, and
+> in commit messages git will never update — still resolves.
+
+
+4. ~~The legend's FROM and TO fields.~~ **CLOSED**, operator rulings
+   2026-08-23: *"we use walletid or seed fp for the from: field and to: field.
+   Optional but loudly warn if either not supplied"*, and — for the third-party
+   case — *"warn if blank but allow, allow arbitrary text if user passes a
+   flag."*
+
+   Both fields are **wallet identities**, not addresses: a wallet id or a seed
+   fingerprint. `FROM` is what §6 says a transaction cannot tell you on its own.
+   `TO` names the counterparty rather than one of its scripts, which is why it
+   replaced the truncated address R0 round 1 filed as a Critical (R-14) — a
+   truncated address showed one output of several and could not be checked by
+   eye.
+
+   **Three states for `TO`, and paying a third party is the reason for the
+   third:**
+
+   | state | behaviour |
+   | --- | --- |
+   | wallet id or fingerprint | engraved as given |
+   | **blank** | **allowed, loudly warned** on `stderr` — a plate with no destination named is legal and worse |
+   | **arbitrary text, behind a flag** | engraved as given, e.g. `TO ALICE` |
+
+   **The flag is the point, not a convenience.** A free-text label cannot be
+   derived from or checked against the transaction, so requiring an explicit flag
+   makes it an **act of assertion by the operator** rather than something that
+   quietly appears. It is the same posture as the stub: a human-orientation aid,
+   never an authority, and §5 already forbids branching on any of it. If the
+   label disagrees with the transaction, the transaction wins.
+
+   **Still to specify (§10.10's CLI work, not a design question):** the flag's
+   name, and what `mt` does with a label too long for the field — §5's budget
+   gives `TO` 34 characters including the amount, so a label has roughly 16.
+   Refusing with the limit named fits §8's rule that every refusal names its
+   number; silent truncation does not.
+
+
+5. ~~Should `mt` require the node to be out of IBD before trusting
+   `gettxout`?~~ **CLOSED — OUT OF SCOPE**, operator ruling 2026-08-23. `mt`
+   asks the node it is given and reports what it is told; vouching for the
+   node's sync state is not `mt`'s job. §8.5's refusal stands as written, and
+   §6a already records that a `null` cannot distinguish "spent" from "this node
+   does not know yet".
+
+
+6. ~~How much fountain redundancy?~~ **CLOSED**, operator ruling 2026-08-23:
+   zero. `mt` protects against plate damage (ECC), not plate loss (duplicate
+   plates, the operator's choice). See §3.
+
+
+7. **Back-side engraving — CLOSED for v0.1**, operator ruling 2026-08-23:
+   *"yes, but probably better left to user to manage physically."* It would
+   recover the 25.5 mm the legend costs and reduce plate counts, but there is no
+   back-side path in the fork (`backup/backup.go:247` defines `frontSideSeed`,
+   called once at `:134`, with a single `Engraving` per plate), so it is
+   firmware work. An operator who wants both sides used can flip the plate and
+   run a second job — a physical workflow rather than a `mt` feature. §4's plate
+   counts therefore stand as one-sided.
+
+
+8. ~~How does a recoverer learn the fragment parameters?~~ **ANSWERED, and the
+   operator has ruled on what follows.**
+
+   > **Ruling, operator, 2026-08-23: "each piece should say something like
+   > n of m."**
+
+   **Machine-readably this holds for both verbs, because §3 made them share one
+   header.** `mt1`'s header carries `count` and `index` — n-of-m — plus a 20-bit
+   `chunk_set_id` so pieces of different transactions cannot be combined. **It is
+   `mt1`'s own 49-bit header, not `md-codec`'s 37-bit one** (§3): the latter's
+   6-bit `count` caps a set at 64 chunks, which `mt qr` exceeds. For `mt encode` that header sits inside the
+   BCH-protected chunk; for `mt qr` it rides in the bech32-uppercase payload.
+   **One
+   mechanism, both media.**
+
+   > **This item was answered TWICE, and the first answer is gone.** It
+   > originally analysed UR's fountain encoding — `SeqLen`/`MessageLen`/
+   > `Checksum` in CBOR, the `ur:psbt/<n>-<m>/` prefix, and three traps in the
+   > vendored decoder (the prefix is parsed then discarded; a single-part UR
+   > carries no length or checksum at all; `Progress()` is a `x1.75` heuristic
+   > that reaches 1.0 while `Result()` is still nil). **All of that is moot: §3
+   > dropped UR entirely.** The traps are recorded here only so a future reader
+   > who finds UR attractive again knows what the vendored implementation does.
+
+   **The gap the ruling closes, which survives the envelope change unaltered:**
+   `PLATE n OF m` is **not** `part n of m`. Under a multi-symbol tiling, plate 2
+   of 3 may carry parts 5–8 of 11, and §5's legend offers only the plate label.
+   A recoverer who scans out of sequence, or misses one symbol *on* a plate,
+   cannot tell which part is absent.
+
+   **Normative:** every engraved symbol carries its own human-readable `n/m`
+   beside it, for the chunk it holds — independent of, and in addition to, the
+   plate's `PLATE n OF m`. A recoverer must be able to inventory what they hold
+   and name what is missing **without decoding anything**. A lone symbol reads
+   `1/1`, which is the only way it can state that it is whole.
+
+   **Unpriced.** These labels consume plate area §4's table does not reserve,
+   exactly as the legend did before it was measured — see §10.14, which already
+   requires that regeneration. The cost is small per label (3–5 characters) but
+   it is per **symbol**, not per plate, and the worst artifact here carries 5.
+   **Measure before §4's numbers are treated as final.**
+
+
+11. ~~How many codex32 characters fit a hand-engraved plate?~~ **CLOSED — OUT
+    OF SCOPE**, operator ruling 2026-08-23: *"As many as a user wants. It is not
+    our concern."* `mt encode` emits a string; what a user does with steel is
+    theirs. See §3b. The **4,096-chunk** ceiling is unaffected — that is a
+    property of the codec, not of anyone's plate.
+
+
+12. ~~Should `mt1` FILL its chunks rather than balance them?~~ **CLOSED — NO.
+    Filling would reduce error recoverability, which is the one thing this
+    format exists for.** Operator question 2026-08-23: *"does increased packing
+    reduce error recoverability?"* Answered from source, and the answer is yes,
+    by two independent mechanisms:
+
+    **BCH correction is PER CHUNK, and it is `t = 4`.** `decode_regular_errors`
+    returns `None` for any pattern above *"t = 4 errors"*, against a 13-symbol
+    checksum (`REGULAR_CHECKSUM_SYMBOLS`) over a codeword of at most 93 symbols
+    (`crates/md-codec/src/bch_decode.rs`). Each chunk therefore carries its **own
+    independent 4-error budget**.
+
+    1. **Fewer chunks means less total correction.** For a fixed payload,
+       filling packs the same bytes into ~12% fewer chunks — and the budget
+       scales with chunk *count*. A 535 B transaction **balanced** is 14 chunks
+       of 39 B (§3b's rule: `count = ceil(535/40) = 14`, then
+       `bytes_per_chunk = ceil(535/14) = 39`) = **56 correctable symbol
+       errors**; filled at ~45 B/chunk it is
+       12 chunks = **48**. Same data, 8 fewer errors survivable.
+    2. **Each chunk is longer under the same `t`.** Filling raises the symbols
+       at risk per chunk while the per-chunk budget stays at 4, so the
+       probability that any single chunk exceeds its budget rises.
+
+    Both effects push the same way. **Balancing is not a limitation of `md`'s
+    chunker — it is error-correction budget bought with plate area**, and for a
+    hand-engraved artifact whose entire purpose is surviving a miscut character,
+    trading it for ~340 bytes per chunk of capacity is the wrong trade. The
+    **163,840 B** ceiling stands, and §8.7b refuses past it.
+
+
+15. ~~§8.4 sets no minimum timelock horizon, and cannot tell a timelock from
+    RBF signalling.~~ **CLOSED — OUT OF SCOPE**, operator ruling 2026-08-23:
+    *"not our concern. User handles this by their own wallet, or we later create
+    our own wallet utilities."* Consistent with §0: `mt` does not build
+    transactions, so how long a timelock ought to be is a wallet decision. `mt`
+    still verifies that the timelock it was handed is **enforced** (§8.4) — it
+    simply does not judge whether the horizon is wise.
+
+
+16. ~~Should `mt` refuse legacy (non-segwit) inputs at all?~~ **CLOSED — NO**,
+    operator ruling 2026-08-23: *"Do not exclude legacy inputs. It is user
+    responsibility to know their inputs for such edge cases."* See §8.6. The
+    original refusal's premise was false (`non_witness_utxo` binds a legacy
+    amount by txid), and `sh(wsh(…))` is no longer unclassified since every
+    input type is accepted. The residual risk is handled by §8.2c's `stderr`
+    warning — which states the fee arithmetic — and by §8.2d, which binds any
+    input carrying `non_witness_utxo` by txid. **Nothing reaches an `mt qr`
+    plate**: §5's legend is full (§8.2c). Recorded in §7.
+
+
+18. ~~Does §8.2's consensus-engine check survive the scope line?~~ **CLOSED —
+    NO. Script validity is out of v0.1**, operator ruling 2026-08-23: *"We don't
+    care if transaction is valid for initial version. We might never care but we
+    might add it someday."* §8.2 is removed, `mt` drops its consensus-engine
+    dependency, and §7 carries the accepted hazard: a transaction with a bad
+    signature engraves cleanly and fails at broadcast. Reopen if it is ever
+    added.
+
+
+19. ~~Does CPFP still require the parent to reach the mempool?~~ **CLOSED — the
+    spec no longer needs the answer.** Operator ruling 2026-08-23: *"We don't
+    care about rbf or cpfp… we can't control the future but cpfp is a well known
+    standard that will help user in future if they picked a bad fee."*
+
+    `mt` neither implements nor checks either mechanism. §8.2b's low-fee warning
+    **names** CPFP and out-of-band miner submission as things a future holder can
+    try, and guarantees neither — so the mempool question stops being
+    load-bearing. Out-of-band submission is itself the answer to the case that
+    prompted this: a fee too low for the parent to reach a mempool at all
+    bypasses relay policy by going straight to a miner.
+
+
+21. ~~Nothing on the plate names the format.~~ **CLOSED**, operator ruling
+    2026-08-23: the suggested legend gains a sixth field, **`FORMAT: mt1
+    codex32`**, specified in §5 with its reasoning.
+
+    **The question was found by walking Journey B, not by reviewing §5.** A
+    recoverer in 2040 holds a string and no indication of which tool reads it;
+    `MT1QZRF8X…` in a search engine returns nothing. Every *other* legend field
+    is reconstructible by `mt inspect` from the string alone (§1.1) — **which
+    program to run is the one thing inspection cannot tell you**, so the field
+    that looked like the least important of the six is the only one whose
+    absence ends the journey.
+
+    **A repo URL was considered and rejected as the tag.** It fails on
+    durability: a domain must outlive the plate, and a lapsed one someone else
+    buys points a bearer-instrument holder at a stranger. `codex32` is BIP-93 —
+    published and archived independently of this project — so the tag survives
+    the project. A URL may ride along as extra suggested text; it may not *be*
+    the identifier.
+
+    **The `136 characters` cited in the original entry was already stale**, and
+    regenerating the probe to price this field is what exposed it: §5's minimal
+    legend measured 141, then 145 after the `BROADCAST` fix, and **164** with
+    this field. The stale figure had survived because nothing re-ran
+    `legend.rs`; the number is now emitted by the probe rather than carried in
+    prose (§10.14).
+
+    **Residual, inherited by the deferred `mt qr` cycle (§0a):** the sixth field
+    takes the legend from 6 lines to **7**, which `legend.rs` shows still fits
+    one plate at v13 but forces a second at v18 and above. Free for `mt encode`,
+    where the legend is `stderr` text and `mt` owns no layout.
+
+
+22. ~~`mt1`'s NUMS domain string is undecided.~~ **CLOSED**, operator ruling
+    2026-08-23: the domain string is **`"shibbolethnumstransaction"`**, giving
+    **`MT_REGULAR_CONST = 0x1a2fc877f9528d7c1`**. Stated with its derivation in
+    §10.13(a), and recomputed there before it became normative.
+
+    The *rule* was always derivable — `MD_REGULAR_CONST` is verifiably the top
+    65 bits of `SHA-256("shibbolethnums")` — but the **domain string is an
+    arbitrary chosen name** no implementer could have inferred. That mattered
+    because the fork mechanic makes the worst guess the most tempting: copy
+    `md-codec`, change the HRP, leave the constant, and `mt1` chunks verify as
+    `md1` chunks. **§10.13 now has no undecided input left.**
+
+
+23. ~~Season names are hemisphere-relative on a permanent artifact.~~
+    **CLOSED**, operator ruling 2026-08-23: seasons are **northern-hemisphere**
+    and §8.4 says so. A southern reader misreads the estimate by about six
+    months; the harm is bounded because the **mandatory block height beside it
+    is unambiguous everywhere**, so a misread costs an orientation rather than a
+    recovery. Alternatives considered and not taken: month ranges (`~SEP 2034`)
+    or quarters (`~Q4 2034`), both hemisphere-neutral, both less legible to the
+    majority of readers.
+
