@@ -10069,3 +10069,84 @@ rather than running, in a document that has passed thirteen review lenses. Both
 were found in one afternoon by checking numbers against the artifact instead of
 against the prose — which is the standing rule, and the reason it exists.
 
+**CORROBORATED FROM THE SPEC'S OWN TEXT, and a third site found (2026-08-24,
+same day).** The 91 figure was not only derivable from the vectors — it is
+**already written in the document**. `SPEC_mt_v0_1.md:1308`:
+
+> chunk-string goes from **89 to 90 characters** at the 49-bit header this box
+> was written under; at the ruled 55-bit header a 40-byte chunk is **91** and the
+
+So the spec states **91** at `:1308` and **~96** at `:1562`, four hundred lines
+apart, and the derivation from the shipped vectors agrees with `:1308`. That
+settles it without needing a fourth measurement — and it downgrades the cause
+from "nobody measured" to **"it was measured, written down, and then contradicted
+elsewhere in the same file"**, which is the harder failure to catch and the one
+worth naming.
+
+**Third site, in a different document.** `SPEC_mt_qr_DEFERRED.md:98` lists, among
+three unmodelled additive inputs making its plate table a lower bound, *"the
+**49-bit** `mt1` chunk header per symbol"*. 49 is a superseded draft layout —
+`:1281` and `:1291` rule the header at **55 bits** (`version(5) +
+chunk_set_id(20) + count−1(15) + index(15)`), and `:1307` names 49 explicitly as
+"the header this box was written under". So the deferred QR spec's own
+lower-bound correction is computed against a header width that no longer exists,
+which makes that table **more provisional than it claims to be** — a document
+warning you its numbers are low, using a stale number to say by how much.
+
+**Fix, revised — three sites, not two:**
+1. `SPEC_mt_v0_1.md:1562` — replace `~96` with the formula and 91.
+2. `SPEC_mt_v0_1.md:3456` — reconcile 1,242 (14 chunks of 39 B → 14 × 89 = 1,246).
+3. `SPEC_mt_qr_DEFERRED.md:98` — 49-bit → 55-bit, and note the table must be
+   regenerated against it (§10.14 already requires a regeneration for the
+   font-metric correction; these are the same job).
+
+### F-243 — F-234's case against raw octets in the QR rests on an UNTESTED scanner claim, stated in the same register as its measurements (owning phase: **Goal 1 — Engrave a Transaction**) `#qr` `#mt` `#measurement` `#IMPORTANT`
+
+**Found 2026-08-24**, when the operator asked *"Raw octets doesn't work for some
+scanners?"* and the claim was checked instead of repeated.
+
+F-234 says, arguing base45 over raw binary:
+
+> Raw binary is the most efficient and the least robust: **many QR scanners
+> assume UTF-8 and mangle octets >= 0x80**, and this encoder emitted an **ECI
+> header** for high bytes — costing ~0.5% and, more tellingly, marking binary
+> payloads as a special case in real toolchains.
+
+**Two claims in one sentence, and only one of them is ours.**
+
+| claim | status |
+| --- | --- |
+| our encoder emits an ECI header for high bytes, ~0.5% | **MEASURED** — `design/measurements/mt-size-probe/src/bin/qrplate.rs:28-29` |
+| many scanners assume UTF-8 and mangle octets >= 0x80 | **NOT MEASURED.** `grep -ri "scanner\|utf-8\|utf8\|mangl" design/measurements/` returns no test, no result, no apparatus — only two prose asides, one of which is `README.md:269` restating the same assertion |
+
+**Zero scanner tests exist in this repository.** Not "inconclusive" — never run.
+
+**The phenomenon is real in general**, which is exactly why it survived: QR byte
+mode is nominally ISO-8859-1, many decoders guess UTF-8 and re-encode, and the
+Bitcoin ecosystem moves PSBTs as base64 or UR rather than raw octets. But
+*generally true* is not *measured here*, and the sentence's construction — a real
+measurement and an untested assertion joined by "and" — makes them read as one
+finding. It is the same shape as the retracted 64-chunk cap: a plausible fact,
+never checked, load-bearing for a design decision.
+
+**What it is load-bearing FOR.** It is the main argument against putting raw
+transaction bytes in the QR — and raw octets are the *only* candidate that
+delivers F-234's own stated promise, that a recoverer with a camera and standard
+Bitcoin tooling needs no constellation knowledge. So an untested claim is
+currently the reason F-234's headline goal is not being met.
+
+**It costs almost nothing to settle, on a plate we already owe.** F-234 already
+requires an optical test plate — QR blocks at 0.3 / 0.45 / 0.6 / 0.9 mm, scanned
+off brushed steel — and that gate **has never been run** either. Adding one
+raw-octet symbol and one base45 symbol to the same plate answers this with
+evidence. The single-character technique cuts test plates in ~2 s rather than
+~21 min.
+
+**Until then the QR encoding is a PARAMETER, not a ruling** — operator decision
+2026-08-24, so Goal 1's design does not stall on an unrun test and does not bake
+an untested assertion into steel.
+
+**Do not close this by re-reading the prose.** A negative inherits the scope of
+the search that produced it; this one's scope was `design/measurements/`, and it
+found nothing because nothing is there.
+
