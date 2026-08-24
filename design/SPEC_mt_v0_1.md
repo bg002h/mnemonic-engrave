@@ -347,15 +347,15 @@ overturned an earlier assumption and are marked.
 
          CORRECTION APPLIED. 3 chunks needed repair:
            chunk  2   1 of 4 symbols   pos 61
-           chunk  7   4 of 4 symbols   pos 13, 34, 35, 78   <-- NO MARGIN LEFT
+           chunk  7   4 of 4 symbols   pos 13, 29, 30, 78   <-- NO MARGIN LEFT
            chunk 11   2 of 4 symbols   pos 9, 52
 
          chunk 7, with the corrections marked:
            MT1QZRF8XK2V[q>p]HQ9WRDG5S8XE7M2[v>d][8>g]4KP3NAYU6TC...
                                                    ...5J2W[l>1]E7RQ
              pos 13   read q   corrected to p
-             pos 34   read v   corrected to d
-             pos 35   read 8   corrected to g
+             pos 29   read v   corrected to d
+             pos 30   read 8   corrected to g
              pos 78   read l   corrected to 1
 
          Chunk 7 is at its correction limit. One more damaged symbol in
@@ -376,8 +376,8 @@ overturned an earlier assumption and are marked.
    steel that was already right.
 
    > **Localisation is what makes this the operator's job rather than an
-   > unanswerable question.** `pos 34 read v corrected to d` is a claim they can
-   > settle in seconds against the plate itself: **if position 34 on the steel
+   > unanswerable question.** `pos 29 read v corrected to d` is a claim they can
+   > settle in seconds against the plate itself: **if position 29 on the steel
    > reads `d`, they mistyped; if it reads `v`, they miscut.** One glance at one
    > character, and the ambiguity is gone. That is why the report prints what
    > each symbol **was** alongside what it was corrected **to** — the
@@ -534,7 +534,7 @@ overturned an earlier assumption and are marked.
    > same pattern — the node rescues a raw-transaction payload (§8.2e), the node
    > answers unspentness (§8.5), the node completes this report.
 
-   **PLATE LIVENESS is its own row, and it has FOUR states, not two.** Operator
+   **PLATE LIVENESS is its own row, and it has FIVE states, not two.** Operator
    ruling 2026-08-23: *"a transaction may be invalid because its input has been
    spent, which is different than its input hasn't been broadcast yet."* Those
    are opposite situations for a recoverer and `gettxout` alone conflates them —
@@ -584,7 +584,7 @@ overturned an earlier assumption and are marked.
    > **§6a knew the mechanism and the table did not inherit it:** *"a
    > mempool-spent input reads as unspent, which is the opposite of the caution
    > this section argues for."* That was recorded as an encode-time limitation,
-   > and the four-state table, added later, carried no trace of it — the same
+   > and the liveness table, added later, carried no trace of it — the same
    > shape as the encode-shaped offline warning.
    >
    > **Qualified rather than re-queried**, on the operator's standing ruling
@@ -660,7 +660,7 @@ overturned an earlier assumption and are marked.
    | `FEE` | a node is reachable, **or** the input was a PSBT carrying values | inputs minus outputs — the transaction alone carries no input values (§6a). **Carries the WEAKEST provenance of any input, inline**: `(CLAIMED — no input value verified)` when any input's value is neither chain-fetched nor txid-bound |
    | `LOCKTIME` | **always**; the `current height` clause needs a node | `nLockTime`, plus §8.4's threshold rule and the season projection. **Wording is §8.4's five normative spellings, by reference — this row may not invent a sixth** |
    | `INPUTS` | **always**; the value and provenance columns need a node | outpoints from the transaction, values from `gettxout` |
-   | `STATUS` | **always** — `UNKNOWN` with no node | the four-state liveness table above |
+   | `STATUS` | **always** — `UNKNOWN` with no node | the liveness table above: `SPENT — ALREADY CONFIRMED` first, then LIVE / DEAD / PENDING / UNKNOWN |
 
    > **THIS BLOCK PRINTED A VERDICT §8.4 FORBIDS — R6 adversarial I-4, and it
    > is the same drift as I-8 in the opposite direction.** The `LOCKTIME` row
@@ -1000,7 +1000,7 @@ overturned an earlier assumption and are marked.
    > claimed to correct. Both are regenerated above from computed offsets.
    >
    > **It matters because §1.1's whole miscut-versus-mistyped design rests on
-   > this number being checkable against steel:** *"if position 34 on the steel
+   > this number being checkable against steel:** *"if position 29 on the steel
    > reads `d`, they mistyped; if it reads `v`, they miscut."* An off-by-one
    > sends the operator to a character matching neither value, where they learn
    > nothing — right after being told this single comparison settles it.
@@ -3126,7 +3126,7 @@ signed PSBT.
     | --- | --- | --- |
     | §8.1 finalized? | reads `PSBT_IN_FINAL_*` | reads scriptSig/witness — **works** |
     | ~~§8.2 script-valid?~~ | *removed from v0.1* | *removed from v0.1* |
-    | §8.2b value balance? | UTXO records give input values | **cannot run** — no input amounts |
+    | §8.2b value balance? | UTXO records give input values | **needs a node or operator-supplied values** — a raw transaction carries no input amounts, and §6a's `gettxout` supplies them when one is reachable (§8.2c otherwise) |
     | §8.6 satisfaction binds outputs? | parses the witness | parses the witness — **works** |
 
     So accepting raw hex would **silently disable two refusals**, including the
@@ -3318,8 +3318,10 @@ signed PSBT.
 
     1. **Fewer chunks means less total correction.** For a fixed payload,
        filling packs the same bytes into ~12% fewer chunks — and the budget
-       scales with chunk *count*. A 535 B transaction balanced at 40 B/chunk is
-       14 chunks = **56 correctable symbol errors**; filled at ~45 B/chunk it is
+       scales with chunk *count*. A 535 B transaction **balanced** is 14 chunks
+       of 39 B (§3b's rule: `count = ceil(535/40) = 14`, then
+       `bytes_per_chunk = ceil(535/14) = 39`) = **56 correctable symbol
+       errors**; filled at ~45 B/chunk it is
        12 chunks = **48**. Same data, 8 fewer errors survivable.
     2. **Each chunk is longer under the same `t`.** Filling raises the symbols
        at risk per chunk while the per-chunk budget stays at 4, so the
