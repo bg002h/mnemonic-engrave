@@ -9,6 +9,7 @@ until a re-review returns 0C/0I; **no code before that.**
 | --- | --- | --- |
 | the **operator journey walk** — this spec's review by ruling | 18 findings (A–R), all ruled | `JOURNEY_WALK_engrave_transaction.md` |
 | **R0 round 0**, adversarial, opus | **3 Critical / 8 Important / 4 Minor** | `agent-reports/R0-engrave-transaction-round0-adversarial.md`, persisted verbatim at `caa90cb` **before** any of it was folded |
+| **R0 round 1**, fold-check, sonnet | **12 FIXED / 3 PARTIAL / 0 NOT FIXED**, plus **0C / 1I / 2M** the round-0 fold itself introduced | `agent-reports/R0-engrave-transaction-round1-foldcheck.md`, persisted at `321cba6` |
 
 **The walk made this spec smaller; R0 made it truer.** The walk removed work —
 chunks engrave **verbatim**, so v1 needs no `mt1` decoder (§2.2). R0 removed
@@ -16,6 +17,13 @@ chunks engrave **verbatim**, so v1 needs no `mt1` decoder (§2.2). R0 removed
 (*"nothing in the carousel changes"* — §3.1a; *"a pipe has no file mode"* —
 §2.5; *"the compare screen names no command"* — §3.2), and two more described
 reuse that does not exist (§2.2a, §4.4a).
+
+**Round 1's own lesson, and it is about auditing rather than code.** Round 0's I2
+named ONE program-keyed switch; the fold answering it enumerated that one site
+carefully and stopped. Round 1 grepped the **class** and found **three**, two of
+which fail *silently* — including the program's own front door. **Fixing the
+instance a finding names, and not the class, is how the second instance survives
+a round.** See §3.1a.
 
 **Where a section carries a `####` sub-heading in SHOUTING CAPS, that is an R0
 finding folded in place.** They are left visible rather than smoothed away,
@@ -306,9 +314,15 @@ character formula reproduces the three shipped vector lengths (79 / 85 / 87 at
 **Four things the raise touches:**
 
 1. `boundBlob`'s comment names `8191` and goes stale on landing.
-2. **NFC stays at 8191** — `gui/scan.go`'s buffer bounds it — so a large
-   transaction is **picotool-only**, and `me sysw pack` MUST say which transports
-   its output fits.
+2. **NFC does not carry a container at all (§1.2)** — `sysw.Reader` is
+   `FileReader` (host) or `XIPReader` (flash), and NFC arrives through
+   `gui/scan.go` as a **record**. So the sentence an earlier draft had here —
+   *"`me sysw pack` MUST say which transports its output fits"* — is close to
+   meaningless: a container has exactly one transport. **What each tool must
+   state is different:** `me sysw pack` states the **section cap** it is bound
+   by; `mt encode --record` states whether its **record** fits an NFC tag, which
+   is `gui/scan.go`'s 8 KB buffer and **not** `MaxSectionLen`. (R0 round 1 caught
+   that the round-0 fold corrected §1.2 and left this sentence standing.)
 3. Rust-primary: `me`'s `sysw` first, with vectors.
 4. **`seal` is untouched**, keeps its own 8191, stays frozen.
 
@@ -391,30 +405,38 @@ eventually start an NFC transfer — so payload-independence of the carousel is
 `engraveTransaction` is **inserted mid-enum** before `loadPayload`, per the house
 rule for unconditional programs.
 
-#### 3.1a `layoutMainPlates` PANICS on a program it does not enumerate
+#### 3.1a THREE program-keyed sites are LOCKSTEP, and two of them fail SILENTLY
 
-**R0 round 0, I2.** An earlier draft said "nothing in the carousel changes".
-**False.** `gui/gui.go:2429-2436`:
+**R0 round 0 (I2) found one. R0 round 1 found that this section named the wrong
+one.** An earlier draft said "nothing in the carousel changes" — false — and the
+fold answering it cited `layoutMainPlates` alone, which is the site that fails
+**loudly**. Enumerated exhaustively (`grep "switch act.prog|switch m.prog|switch
+page" gui/*.go`, non-test):
 
-```go
-func layoutMainPlates(buf *op.Buffer, page program) (op.Op, image.Point) {
-	switch page {
-	case backupWallet, engravePassphrase, engraveText, engraveXpub, engraveBundle,
-	     engraveSingleSig, engraveMultisig, walletPolicy, loadPayload, bip85Derive,
-	     unlockPayload:
-		...
-	}
-	panic("invalid page")
-}
-```
+| site | line | if `engraveTransaction` is missing | fails |
+| --- | --- | --- | --- |
+| `uiFlow`'s program dispatch | `gui/gui.go:2029` | `obj` stays `nil` → `engraveObjectFlow`'s `default: return false` → **`scanUnknownFormat` forever** | **SILENTLY** |
+| `StartScreen.draw`'s title | `gui/gui.go:2186` | **blank title** on the carousel page | **SILENTLY** |
+| `layoutMainPlates` | `gui/gui.go:2430` | `panic("invalid page")` | loudly |
 
-An explicit per-program list, **with no compile-time guard**. Adding
-`engraveTransaction` to the enum and not to this list means **the device panics
-the moment the operator pages onto the new entry** — not at build time, not in a
-test that never pages there, but in the operator's hands.
+`layoutMainPager` also takes a `program` but consumes it **numerically**
+(`int(lastNav)+1`), so it carries no case list and no lockstep obligation.
 
-**NORMATIVE:** the enum and this case list are **lockstep sites**. The enum's own
-guard protects `unlockPayload`'s position and says nothing about this switch.
+**The silent one is the worse one, and it is the program's front door.** The
+operator selects *Engrave Transaction*, the device says **"unknown format"**, and
+nothing crashed, nothing logged, and no test that never pages there would notice.
+A panic at least announces itself.
+
+> **The lesson is about the AUDIT, not the code.** The fold that answered I2
+> enumerated one site carefully and concluded. **The defect class was "program
+> enumerations that must move in lockstep", and the fix was to grep for the
+> class** — which is what round 1 did, and what produced the two rows above.
+> Fixing the instance a finding names, and not the class, is how the second
+> instance survives a round.
+
+**NORMATIVE:** all three are lockstep sites. **None is protected by the enum's
+compile-time guard**, which asserts only `unlockPayload`'s position. P4 must
+touch `uiFlow` and `StartScreen.draw`; P5 must touch `layoutMainPlates`.
 
 ### 3.2 The compare screen names the WRONG command today
 
@@ -651,9 +673,17 @@ decoders reassemble it themselves. So it keeps F-234's promise **intact for
 multi-symbol jobs** — a recoverer with an ordinary scanner still gets the
 transaction, with no constellation knowledge — which no bespoke header could do.
 
-**The 16-symbol cap is not a constraint here:** at 1,367 B per full-area v26
-symbol that is ~21 KB, against Bitcoin's ~100 KB standardness limit and a
-pathological worst case of 8,067 B.
+**The 16-symbol cap is not a constraint here**, and the bound that shows it is
+**this spec's own container cap, not Bitcoin's standardness limit.** Structured
+Append gives 16 × 1,367 B ≈ **21.9 KB** at a full-area v26. The largest
+transaction that can reach the device at all is **16,367 B** — §2.3's
+`MaxSectionLen`-derived raw-hex ceiling — and the pathological worst case
+measured is 8,067 B. So the transport runs out before the symbol count does.
+
+> **R0 round 1, M.** An earlier draft argued this against *"Bitcoin's ~100 KB
+> standardness limit"*, which is **larger** than the 21.9 KB it was meant to
+> reassure about — an argument that refutes its own conclusion. The governing
+> bound was §2.3's, three sections away, and uncited.
 
 **TWO GATES, and neither may be assumed:**
 
@@ -679,12 +709,22 @@ in 15 years"*, §4.3's ruling makes it **"can the operator complete a mandatory
 step, today, every time"** — and raw octets make a **good** plate appear to fail,
 because phone scanners mangle bytes >= `0x80`.
 
-### 4.3 After the cut, the device says to TEST THE PLATE
+### 4.3 After the cut, the device says to TEST — and WHAT it says depends on the symbol count
 
-The `mt` cycle's Critical was exactly this shape — **a silent step**. So:
+The `mt` cycle's Critical was exactly this shape — **a silent step**. So the
+device speaks. But **the sentence it speaks is not the same on a one-symbol job
+and a nine-symbol one**, and an earlier draft had only the first.
+
+**R0 round 1, C1 PARTIAL.** Round 0's C1 was answered in §4.2a by ruling
+Structured Append — and this screen's text was left untouched. So C1's exact
+walkthrough still ran: the operator scans plate 1 of 2, gets **a fragment**, runs
+`mt inspect`, and is told the transaction is bad. **A correct plate reporting
+failure**, which is the outcome C1 was filed about.
+
+**SINGLE-SYMBOL JOB — the test is per plate:**
 
 ```
-PLATE 1 OF 2 — CUT
+PLATE 1 OF 1 — CUT
 ────────────────────────
 TEST IT NOW, before you
 leave the machine.
@@ -696,16 +736,41 @@ on what you get.
 This machine has no camera.
 It cannot check its own work.
 ────────────────────────
-NEXT PLATE          DONE
+DONE
 ```
 
-The last block tells the operator **why** the job is theirs, which is what makes
-them do it. **RULED: the test is "scan, then `mt inspect`."** A host round trip,
-and the right cost — the plate is still in the machine, the cheapest moment to
-re-cut.
+**MULTI-SYMBOL JOB — the test is per JOB, and the device must say so:**
 
-**This requires new `mt` scope; see §6, finding O.** No `mt` verb can read a raw
-transaction today.
+```
+PLATE 2 OF 6 — CUT
+────────────────────────
+Scan this plate now to
+check it READS.
+
+Do NOT run mt inspect yet:
+this is 1 of 6 symbols and
+they only decode together.
+────────────────────────
+Test the whole set after
+plate 6.
+────────────────────────
+NEXT PLATE
+```
+
+**NORMATIVE, and this is what closes C1's walkthrough:**
+
+- **Per plate**, the operator checks only that the symbol **scans** — geometry,
+  module size, contrast, the things engraving can get wrong. That is checkable on
+  one plate and is the failure mode a cut introduces.
+- **Per job**, after the last plate, the operator scans **all** symbols and runs
+  `mt inspect` once on the reassembled result.
+- **The device MUST NOT ask for `mt inspect` on a partial set.** Doing so reports
+  failure on correct work and teaches the operator to stop testing — the exact
+  silent-step outcome §4.3 exists to prevent, arrived at from the other side.
+
+**This requires new `mt` scope; see §6.** No `mt` verb can read a raw transaction
+today, and reassembling a Structured Append set is the reader §4.2a's gate 2
+depends on.
 
 ### 4.4 The legend is cut LAST — which is a CHANGE, not the status quo
 
@@ -869,6 +934,7 @@ this machinery (`refusals.toml`, `check-refusal-coverage.sh`,
 | R11 | **see R11′ below** | | 3.3 |
 | **R12** | **a well-formed `tx:` record reaching `freeTextScan`** — i.e. `tx:` added to `isSyswEncoded` without its own branch | §2.1a; this is the C3 defect made into a test | 2.1a |
 | **R13** | **a multi-symbol QR job when Structured Append is unavailable** | §4.2a's two gates; without them the artifact is unrecoverable and §4.3's test cannot pass | 4.2a |
+| **R14** | **a payload holding MORE THAN ONE chunks-form transaction** | §3.6a: the device cannot derive a txid without a decoder, so the picker cannot distinguish them and R10's duplicate rule is unevaluable. **Until O11 resolves, refusing is the only honest option** — the alternative is an operator committing 22–202 plates to whichever row they guessed | 3.6a |
 
 ### R4′ — refusing "both forms" was wrong
 
@@ -957,6 +1023,13 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
 - **`check-provenance.sh` green** across both repos. **Not in CI.**
 - **Refusal coverage is a bijection, and every refusal test goes red without its
   check** (§5).
+- **O11 is resolved, OR R14 refuses a multi-transaction chunks payload.**
+  **R0 round 1, I5 PARTIAL:** opening O11 honestly was not enough on its own —
+  nothing stopped such a payload reaching the ambiguous picker. One of the two
+  must hold before P4 closes.
+- **All THREE program-keyed lockstep sites carry the new program** (§3.1a), and
+  the two that fail **silently** are asserted by test — a panic announces itself,
+  `scanUnknownFormat` does not.
 - **Both pipeline invariants are asserted as pipeline properties** (§1.1).
 
 ## 8. Ruled, and not to be re-litigated
