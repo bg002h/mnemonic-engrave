@@ -307,8 +307,15 @@ it is not nothing.
 > scope. It cannot also license a **new fifth caller**, which is what reuse
 > would create.
 
-**ACCEPTED COST:** a chunks plate is cut with the device making **no claim
-whatever** about its content — no destination, no amount, no txid.
+**ACCEPTED COST:** a chunks plate is cut with the device making **no DERIVED
+claim** about its content — no destination, no amount.
+
+> **R0 round 3, I5.** This previously read *"no claim whatever … no txid"*, which
+> §3.6b then contradicted by having the record **carry** one. The accurate
+> statement is narrower: the device derives nothing, and **repeats one asserted
+> value** — the carried txid, rendered in §3.4's *asserted* voice beside `TO` and
+> the fee. §3.4's table lists `txid` under **derived**, which is true of the
+> **raw** form only; it must say so.
 
 **PROPOSED, not ruled:** the device verifies **each chunk's own BCH checksum**
 before cutting, so a corrupted payload does not become ~21 minutes per plate of
@@ -609,6 +616,12 @@ organising rule:
 | **Derived** | the bytes; the device stands behind it | txid, input count, each output's address and amount, locktime, `nSequence` |
 | **Asserted** | the payload's legend fields; the operator's words | the `TO` label, the fee |
 
+> **THIS TABLE IS THE RAW FORM ONLY (R0 round 3, I5).** For a **chunks** payload
+> the device has no decoder, so it derives **nothing** — and the **txid moves to
+> the ASSERTED row**, carried by the record (§3.6b). A screen that renders a
+> carried txid in the derived voice would have the device vouching for a value it
+> cannot compute.
+
 Forced, not stylistic: **fee is not in a signed transaction** (it needs input
 values), and F-235 established `TO` comes from `--to-label`.
 
@@ -664,8 +677,12 @@ second line but is **asserted** and can collide.
 *"1 in 1,048,576 by accident, and under a second to construct deliberately."*
 The **full txid on screen 2** is what gets compared.
 
-**Two identical txids in one payload is the same transaction packed twice** — a
-duplicate to refuse or collapse, never two picker entries.
+**Two identical txids in one payload: REFUSE, do not collapse (R0 round 3, I7).**
+An earlier draft said *"refuse or collapse"*, which was written when the txid was
+**derived**. It is now **asserted** for a chunks payload, and R15 validates it
+only *within* a single record — so two records may carry the same txid and hold
+**different** transactions. Collapsing on an asserted key would silently discard
+one of two distinct artifacts. Refusing states the problem and loses nothing.
 
 #### 3.6a THE DEVICE CANNOT DERIVE A TXID FOR A CHUNKS PAYLOAD
 
@@ -706,7 +723,13 @@ two identically would have the device vouching for a value it cannot check.
 `mt1` chunk header's `chunk_set_id` **is the top 20 bits of the txid** —
 `SPEC_mt_v0_1.md:943`: *"the set id **is** the top 20 bits of the reassembled
 transaction's txid (§10.13 c), so a wrong guess cannot survive reassembly."* The
-device reads that field off **every chunk** with no decoder at all.
+device reads that field off **every chunk without reassembling anything** —
+**but "without a decoder" is not "for free" (R0 round 3, I8).** Extracting a
+20-bit `chunk_set_id` from an `mt1` bech32 string is **new device code**: bech32
+character decoding plus a 55-bit header read. It is far less than a decoder — no
+BCH, no reassembly, no transaction parse — and §2.2a already measured the
+neighbouring case as *"a new `ValidMT`, not a call to an existing predicate."*
+**NORMATIVE: P4 owns it, and it is not zero.**
 
 **NORMATIVE — R15: 20 bits REFUTES; it never CONFIRMS.**
 
@@ -761,8 +784,37 @@ ECC by splitting:
 | pathological 10-in/2-out, 8,067 B | **10** | 9 |
 
 Against **202 text plates** for that last case, the two forms are not close.
-**The 16-symbol cap does not bind anywhere in this range** — the worst case uses
-nine.
+
+#### 4.1a THERE IS AN ENCODEABLE CEILING, AND IT IS BELOW THE CONTAINER'S
+
+**R0 round 3, I1.** The ECC-M floor (§4.5b) and the 16-symbol cap (§4.2a) combine
+into a hard wall. Measured
+(`RESULTS_ecc_selection_2026-08-24.txt`, rows labelled `CEILING`):
+
+| transaction | @ 0.60 mm (ruled) | @ 0.30 mm |
+| --- | --- | --- |
+| 14,560 B | 17 pl, **16 qr**, v24 ECC M — the last that fits | 5 pl, 16 qr |
+| 14,600 B | **no configuration exists** | 7 pl, 7 qr, v38 ECC M |
+| **16,367 B** — what §2.3 advertises | **no configuration exists** | 8 pl, 8 qr, v38 ECC M |
+
+**16 symbols × v24 at ECC M = 14,560 B**, and that is the wall at the ruled
+module size.
+
+**§2.3 QUOTES A CONTAINER NUMBER AS THOUGH IT WERE AN ENGRAVING NUMBER.** It sells
+the section-cap raise as buying *"a 16,367-byte raw transaction"* — true of what
+the container will carry, false of what the plate can cut. Between **14,561 and
+16,367 bytes** the payload loads, the device comprehends it, and the search
+returns nothing.
+
+**THE WALL BELONGS TO THE MODULE, NOT THE DESIGN.** At 0.30 mm the same 16,367 B
+is 8 plates at ECC M. So this is one more thing **S0 decides** — and if 0.30 mm
+validates, the wall moves out of the container's range entirely.
+
+**NORMATIVE — R16: the device refuses a transaction for which the search returns
+no configuration**, naming the module size, the byte count, and the ceiling **at
+that module size**. An empty result set was previously uncovered by any refusal
+in §5; a device that comprehends a transaction and then silently cannot proceed
+is the silent-step failure §4.3 exists to prevent, arrived at from a third side.
 
 **Plates, symbols and tiling are three different counts** and the spec must not
 conflate them:
@@ -841,11 +893,17 @@ configuration above it, exactly as it discards one that does not fit a plate. Th
 cap is not a comfortable headroom argument; it is a constraint the objective can
 walk into while optimising for ECC.
 
-**But the objective does NOT simply prefer many small symbols, and an earlier
-version of this paragraph said it did.** Criterion 3 is *minimise symbol count*,
-so among configurations tied on plates and ECC the search breaks toward **fewer**
-symbols. **More symbols are chosen only when they BUY something** — a higher ECC
-level, or a lower plate count. Measured at 0.60 mm
+**The objective does not prefer many small symbols, and two earlier drafts of
+this paragraph got it wrong in opposite directions.** **Criterion 2 is *minimise
+symbol count*, ranked ABOVE ECC** (§4.5) — so the search takes fewer symbols
+whenever it can, and more only when the extra buys a **lower plate count**.
+
+> **R0 round 3, I2.** The immediately preceding draft said *"criterion 3 is
+> minimise symbol count … among configurations tied on plates and ECC"*. That
+> described the **retired** objective, and it was written one commit before the
+> reorder landed — so the correction to one wrong claim was itself falsified by
+> the next commit. **Under the ruled objective, ECC never outranks symbols, so
+> there is no "tied on plates and ECC" state to break.** Measured at 0.60 mm
 (`RESULTS_ecc_selection_2026-08-22.txt`):
 
 **MEASURED under the ruled objective** (`RESULTS_ecc_selection_2026-08-24.txt`,
@@ -1016,11 +1074,22 @@ NEXT PLATE
 *per plate*, and those are different axes. Three cases fall through, each with a
 measured witness in this document:
 
-| case | witness | what the screens above say | what is wrong |
+| case | witness (2026-08-24 measurement) | what the screens above say | what is wrong |
 | --- | --- | --- | --- |
-| several symbols **on one plate** (tiling) | 742 B → **6 qr on 2 plates, `4 up`** | "scan this plate" | the operator scans **one** of four and moves on; three are unchecked |
-| **one** symbol across **two** plates | 1,130 B → **2 pl, 1 qr** (the legend pushed the QR to plate 2) | "scan this plate" | **plate 1 has no QR on it at all**, so the instruction is unfollowable |
-| a **chunks/text** job | any `--chunks` payload | neither screen applies | zero symbols, no branch — the operator is told nothing after cutting 22–202 plates, which is §4.3's own silent step |
+| several symbols **on one plate** (tiling) | **0.30 mm only**: 8,067 B → `3 pl, 9 qr, 4 up`. **At the ruled 0.60 mm there is NO tiling row at all** | "scan this plate" | the operator scans **one** of four and moves on; three are unchecked |
+| **one** symbol across **two** plates | **852 B → 2 pl, 1 qr** (the legend pushed the QR off plate 1) | "scan this plate" | **plate 1 has no QR on it at all**, so the instruction is unfollowable |
+| a **chunks/text** job | any `--chunks` payload | neither screen applies | zero symbols, no branch — the operator is told nothing after cutting a whole job, which is §4.3's own silent step |
+
+> **R0 round 3, I3 — both of this table's original witnesses were RETRACTED by
+> the objective change and neither was updated.** It cited 742 B → 6 qr `4 up`
+> (now **1 qr**) and 1,130 B → 2 pl 1 qr (now **2 qr**). §4.1's copy of the same
+> fact *was* corrected in that diff; this one was not — the same fact living in
+> two places, fixed in one.
+>
+> **And the tiling case now has NO witness at the ruled module size.** Tiling
+> appears only at 0.30 mm. That does not make the case unreal — it makes it
+> **conditional on S0**, and the instruction must still be right if 0.30 mm
+> validates.
 
 **NORMATIVE: the per-plate instruction is a function of what is ON THAT PLATE**,
 not of the job's symbol count:
@@ -1327,11 +1396,12 @@ this machinery (`refusals.toml`, `check-refusal-coverage.sh`,
 | R7 | **empty stdin** to `me sysw pack` | must join the existing exit-2 path, not bypass it | 1.1 |
 | R8 | a world-readable output destination, unless `--allow-world-readable` | 2.5 |
 | R9 | a transaction the parser rejects | 3.4 |
-| R10 | two identical txids in one payload | the same transaction packed twice — **unevaluable for chunks, see §3.6a** | 3.6 |
+| R10 | two identical txids in one payload | the same transaction packed twice. **Refuse — do NOT collapse.** For a chunks payload the txid is **asserted** (§3.6b), and R15 checks it only *within* one record, so two records can carry the same txid honestly-looking and differ in content. Collapsing on an asserted key silently discards one of two distinct artifacts | 3.6b |
 | R11 | **see R11′ below** | | 3.3 |
 | **R12** | **a well-formed `tx:` record reaching `freeTextScan`** — i.e. `tx:` added to `isSyswEncoded` without its own branch | §2.1a; this is the C3 defect made into a test | 2.1a |
 | **R13** | **a multi-symbol QR job when Structured Append is unavailable** | §4.2a's two gates; without them the artifact is unrecoverable and §4.3's test cannot pass | 4.2a |
 | ~~R14~~ | **RETIRED.** It refused a payload holding several chunks-form transactions, as the honest stopgap while the picker had no key. §3.6b gives it one | — |
+| **R16** | **a transaction the search cannot configure at all** — at 0.60 mm that is anything above **14,560 B** (§4.1a). Names the module size, the byte count and the ceiling at that module | 4.1a |
 | **R15** | **a chunks record whose carried txid's top 20 bits match no chunk's `chunk_set_id`** | §3.6b: the set id **is** those bits, so a mismatch proves the record is internally inconsistent. It **refutes only** — a match proves nothing | 3.6b |
 
 ### R4′ — refusing "both forms" was wrong
@@ -1391,10 +1461,10 @@ instances in this cycle now, the most recent two found while fixing F-244:
 | | where | what |
 | --- | --- | --- |
 | **S0** | this repo | **Cut the test plate.** QR blocks at 0.3 / 0.45 / 0.6 / 0.9 mm; one raw-octet and one base45 symbol; **a Structured-Append pair from `scripts/gen-sa-fixture.py` (§4.2c) — committed, because P5's gate needs it**; and **one legend line at each candidate face below 3.0 mm**. Read with an **external scanner** (§3.7). ~2 s per cut, no dependency on P5 |
-| **P1** | `me` (Rust) | `ClassTransaction`, the framed record, stdin, content-based sealing, `MaxSectionLen` → 32,734 — **with vectors** |
+| **P1** | `me` (Rust) | `ClassTransaction`, the framed record **including the mandatory 32-byte carried txid (§2.1b, §3.6b)**, stdin, content-based sealing, `MaxSectionLen` → 32,734 — **with vectors** |
 | **P2** | `mt` (Rust) | `mt encode --record --raw\|--chunks`; **`mt inspect` gains a raw-transaction subject**; the record must state whether it fits an **NFC tag** (§1.2), which is `gui/scan.go`'s 8 KB buffer, not `MaxSectionLen` |
 | **P3** | fork (Go) | Port P1, provenance-pinned. **Includes the `tx:` branch in `gui/scan.go` (§2.1a) — the prefix without the branch is the C3 defect** |
-| **P4** | fork | The payload menu (§3.3) **and the boot-path call that invokes it**; the program (§3.4–3.7); **ALL FOUR lockstep sites (§3.1a)** — `uiFlow`, `StartScreen.draw`, `layoutMainPlates`, `engraveObjectFlow` |
+| **P4** | fork | The payload menu (§3.3) **and the boot-path call that invokes it**; the program (§3.4–3.7); **ALL FOUR lockstep sites (§3.1a)** — `uiFlow`, `StartScreen.draw`, `layoutMainPlates`, `engraveObjectFlow`; **R15's carried-txid cross-check and the asserted-voice rendering (§3.6b)**; **R16's empty-configuration refusal (§4.1a)** |
 | **P5** | fork | The plate: search (**with the 16-symbol cap as a hard bound, §4.2a**), **QR STRUCTURED APPEND over the vendored `coding` package — it does not exist today (§4.2a, I1)**, **the computed legend reservation (§4.5a)**, **the legend-emission REORDER (§4.4a)**, test-the-plate, plate count |
 | **P6** | both | Journeys and refusal coverage (§5) |
 
