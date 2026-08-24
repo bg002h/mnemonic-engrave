@@ -719,6 +719,53 @@ a payload present. `BACK` is the exit and must be, for the same reason
 `syswUnloadFlow`'s BACK is choice 0: the resting position is the one that costs
 nothing.
 
+## Thread 3, case 2 — the payload holds several transactions
+
+Under P's design the payload menu reports *"this payload holds: 3 transactions"*,
+so **Engrave Transaction needs a picker**. Four candidates were offered for what
+distinguishes entries, and the tension is findings K and M again — **the derived
+fields are unique but unreadable, and the readable fields are asserted and may
+collide**:
+
+| candidate | unique? | readable? |
+| --- | --- | --- |
+| txid | **yes, derived** | no |
+| `TO` label | no — asserted, three could all read "cold storage" | yes |
+| amount | no — two can share one | yes |
+| position ("1 of 3") | yes | honest and useless |
+
+### Q — the picker is keyed on the TXID, and the prefix distinguishes without verifying
+
+**RULED (operator) 2026-08-24: txid.**
+
+Consistent with K: the txid is the derived, collision-free identifier, and it is
+the one the operator can match against `mt inspect` on the host.
+
+**Two constraints follow, both from discipline this cycle already paid for.**
+
+1. **The picker shows a PREFIX; only the confirm screen shows the full txid.**
+   Three 64-hex txids do not fit 240x240. But `mt`'s own help already names where
+   truncation turns dangerous:
+
+   > *"Comparing against the 20-bit set id would report a match for any
+   > transaction sharing those bits — 1 in 1,048,576 by accident, and **under a
+   > second to construct deliberately**."*
+
+   So **the prefix distinguishes, it never verifies.** It separates transactions
+   inside a payload the operator packed themselves; the full txid on screen 2 is
+   what gets compared. **The spec must say this in those words**, or a later
+   reader treats the picker as the check — the same overclaim K and M exist to
+   prevent, in a third place.
+
+2. **Two identical txids in one payload is the same transaction packed twice** —
+   a duplicate to refuse or collapse, not a picker entry to disambiguate. A
+   picker that renders it twice invites the operator to believe there are two
+   artifacts.
+
+**The `TO` label is not discarded** — it may ride as a second line, since it is
+what an operator actually recognises. But it is **asserted** (§3.3) and must be
+rendered as such, never as the entry's identity.
+
 ---
 
 ## Running classification tally
@@ -742,6 +789,7 @@ nothing.
 | N | **the device has no camera** — no on-device read-back, ever | hardware fact; spec must state it | RULED |
 | O | **no `mt` verb can read a default plate** — all three take `mt1` strings | missing capability, new P2 scope | RULED |
 | P | applicability belongs in the PAYLOAD MENU, not the carousel — the carousel stays payload-independent | RULED (3rd form) |
+| Q | several transactions in one payload — picker keyed on **txid**; prefix distinguishes, never verifies | RULED |
 
 **Step 4 onward: not yet walked.** The payload is loaded into the session; the
 operator has not yet reached the Engrave Transaction program itself.
