@@ -2072,6 +2072,44 @@ machine-checkable before a single plate is cut. **Every refusal below binds BOTH
 verbs** unless it names one — a hand-engraved plate is exactly as bearer, and
 exactly as permanent, as a machine-engraved one.
 
+**THE REFUSAL MESSAGE FORMAT — RULED 2026-08-23**, closing the last open item in
+§10.10. Every refusal `mt` prints has three parts, in this order, on `stderr`:
+
+    mt encode: REFUSED — §8.2b, fee rate 31,250 sat/vB exceeds 25,000.
+
+      Inputs total 0.50000000 BTC and outputs total 0.00400000 BTC, so this
+      transaction pays 0.49600000 BTC in fees over 1,588 vB. mt refuses
+      above 25,000 sat/vB because a fee that large is almost always a
+      mistake in the input values, not an intention.
+
+      Supply the input values with --input-value <index>:<amount>, or
+      re-run with a node reachable so mt can fetch them.
+
+- **The verdict line** — `<verb>: REFUSED — §<ref>, <reason with the number
+  that caused it>`. **One line, and it always names both the section and the
+  value.** §8 promises each refusal *"names the number that caused it"*; this is
+  where that promise is kept, and it is what P5's tests assert against.
+- **The mechanism** — what was read, what the rule is, and **why the rule
+  exists**. Stating the mechanism rather than the caution is §8.2c's posture
+  applied everywhere: an operator who understands *why* can tell a real problem
+  from a mis-supplied value.
+- **What to do**, when there is something — the flag to supply, the command to
+  re-run. **Omitted entirely when there is nothing**, rather than padded with
+  advice that does not apply.
+
+> **Two properties make this testable rather than decorative.** The verdict line
+> is **machine-parseable** — a stable prefix, a `§`-reference, and a number — so
+> a P5 test asserts on the reference and the value without matching prose that
+> will be reworded. And the parts are **ordered by what a reader needs first**:
+> the verdict answers *what happened*, and everything below it is optional
+> reading for someone who wants to know why.
+>
+> **`REFUSED` is reserved for refusals.** A warning is not a refusal, and §8's
+> warnings use `WARNING:` with no `§`-reference in the first line — a reader
+> scanning `stderr` must be able to tell, at a glance, which output stopped the
+> run. That distinction is load-bearing: `mt` warns far more often than it
+> refuses, and a format that blurs the two teaches operators to skim both.
+
 1. **Not fully finalized** → refuse, **on both payloads, by their own
    vocabulary.** For a PSBT: every input carries a populated
    `PSBT_IN_FINAL_SCRIPTSIG` or `PSBT_IN_FINAL_SCRIPTWITNESS`. For a raw

@@ -697,8 +697,11 @@ implementation reads are three more places for the values to drift together.
    > **Blocking order:** ~~§10.10's spellings~~ **CLOSED 2026-08-23** — all
    > twelve flags are ruled in §10.10, and `--rpc` was **deleted** in favour of
    > shelling out to `bitcoin-cli -stdin`, which already holds the node's
-   > location. **The refusal-message format remains open and must close before
-   > P5 writes a test against it.** Neither blocks P0, S0 or P1.
+   > location. ~~The refusal-message format~~ **CLOSED 2026-08-23** — §8's
+   > preamble rules the three-part format, with a machine-parseable verdict line
+   > (`<verb>: REFUSED — §<ref>, <reason with the number>`) that P5's tests
+   > assert against without matching prose. **No spec-side item now gates any
+   > phase.**
 
 4. **Repo creation** — `mnemonic-transaction` does not exist yet. Creating a
    GitHub repo is an outward-facing action and needs the operator's go-ahead,
