@@ -155,10 +155,50 @@ instance survives another round.** The spec now states the *rule* — *"every
 enumeration a new program or type must join, whose default is silent"* — instead
 of the list, because the list was wrong three times.
 
+## S0's SCHEDULE, AND THE PREREQUISITE IT DEPENDS ON
+
+**Operator, 2026-08-24: S0 is high priority but the machine is VERY LOUD and can
+only run at certain times of day. Anticipate cutting it in about a week.**
+
+**That un-blocks most of the plan rather than delaying it.** §6 reads "S0 first",
+but only **P5** actually depends on S0's answers:
+
+| phase | depends on S0? |
+| --- | --- |
+| P1 `me` — `ClassTransaction`, record framing, stdin, sealing, cap | **no** |
+| P2 `mt` — `--record`, `inspect` raw subject, the carried txid | **no** |
+| P3 fork — port P1, the `tx:` branch | **no** |
+| P4 fork — payload menu, the program, the four lockstep sites | **no** |
+| **P5** fork — the plate: module size, encoding, Structured Append | **YES** |
+
+So P1–P4 can proceed against the R0 gate on their own schedule; S0 gates P5 only.
+**§6 should be re-sequenced to say that** once round 3 is folded — it currently
+implies a hard serial order that the loudness constraint would otherwise turn
+into a week of idle time.
+
+### THE PREREQUISITE NOBODY OWNS, and it has lead time
+
+§4.2c says S0 cuts its Structured-Append pair from *"an independent committed
+generator, `scripts/gen-sa-fixture.py`, segno-based, validated off-screen before
+the cut"*.
+
+**That generator does not exist, and no phase owns writing it.**
+
+It must be written, `segno` installed, the symbols validated on screen, and the
+fixture committed **before the loud window opens** — otherwise the window gets
+spent answering three of the four questions it could have, and the
+Structured-Append physics gate slips another week. Its lead time is the reason
+this is recorded here rather than left to §6.
+
+**It is also the cross-implementation oracle** P5's gate reproduces
+module-for-module (§4.2c), so it is not throwaway scaffolding — it is a
+committed artifact with a second job later.
+
 ## Open, and who owns it
 
 | | owner |
 | --- | --- |
+| **gen-sa-fixture.py — does not exist, blocks S0's SA pair** | **unassigned.** Needs `segno`; must be committed and validated before the loud window |
 | **S0 — cut the test plate** (QR at 0.3/0.45/0.6/0.9 mm + a raw-octet and a base45 symbol, external scanner) | **the operator**. Resolves BOTH live hypotheses: QR encoding (F-243) and module size (F-234) |
 | **R0 to 0C/0I** | rounds 0–2 folded (`48da287`, `8290415`, `6d4d099`). **Not green** |
 | **O14 — S0 is specified to cut a Structured-Append pair that nothing can produce** | **the operator.** Build SA before S0, hand-build throwaway symbols, or drop the pair — each trades against something |
