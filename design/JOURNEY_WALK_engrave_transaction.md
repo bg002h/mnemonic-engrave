@@ -699,11 +699,25 @@ rather than the design.
 just the problem — *"this payload holds no transaction — load one with Load
 Payload."*
 
-**FOLLOW-THROUGH, not yet ruled.** The operator's phrase is *"an 'on payload
-load' program that RUNS WHEN PAYLOAD EXISTS"*. Today `syswLoadFlow` loads and
-returns to the carousel. The natural reading is that a successful load lands the
-operator **in the payload menu**, showing what this payload can do — which is
-what would have prevented the divergence this thread was built to explore.
+**FOLLOW-THROUGH — RULED (operator): the menu appears RIGHT AFTER A SUCCESSFUL
+LOAD.** Today `syswLoadFlow` loads and returns to the carousel. The flow becomes:
+
+```
+boot -> "payload present, load it?" -> LOAD -> compare digest
+     -> THE PAYLOAD MENU  ("this payload holds: a transaction, 2 seeds")
+     -> BACK exits to the carousel
+```
+
+This is the plain reading of *"a program that runs when payload exists"*, and it
+is what would have prevented the divergence this thread was built to explore: the
+operator never has to guess which program applies, because the device just told
+them. **The carousel entry stays** — reachable, and refusing gracefully — but it
+becomes the backstop rather than the path.
+
+**Accepted cost:** one screen between loading and normal use, on every boot with
+a payload present. `BACK` is the exit and must be, for the same reason
+`syswUnloadFlow`'s BACK is choice 0: the resting position is the one that costs
+nothing.
 
 ---
 
