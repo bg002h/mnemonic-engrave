@@ -622,6 +622,68 @@ decoder, and it catches garbage before the machine moves.
 
 ---
 
+## Thread 3 — entry divergence: the wrong payload, the right program
+
+**What the operator has:** a loaded session holding mnemonics and descriptors,
+and a menu entry promising something they are not.
+
+**RULED (operator) 2026-08-24:** *"Loading payload should only offer programs
+that apply to the payload. If no transaction is present in the payload then
+engrave transaction should not be an option."*
+
+### P — program applicability, and why the FIRST form of the ruling was expensive
+
+Measured before writing it down, because the enum carries a compile-time guard
+defending the opposite assumption:
+
+```go
+npages := int(lastNav) + 1        // layoutMainPager:2445
+for i := range npages { ... }     // one dot per index, 0..lastNav
+if m.prog > m.lastNav() { ... }   // wrap is a BOUND, not a set
+```
+
+**The carousel is a contiguous integer range with ONE conditional endpoint**, and
+that endpoint is already spent on `unlockPayload`. The enum comment shows the
+codebase analysed this exact case and deliberately avoided it:
+
+> *"inserted mid-enum, conditional visibility means the carousel must **SKIP an
+> interior index in both wrap directions**, and `layoutMainPager` fills dot
+> `int(page)`, which would then point at the wrong dot."*
+
+Hiding programs needs **holes in the middle** — a rewrite from `lastNav program`
+(a bound) to a visible-program **slice** (a set): wrap over the slice, dots =
+`len(slice)`, filled dot = index within the slice, and the guard
+`[qaProgram - unlockPayload]struct{}{}` stops meaning anything.
+
+**A consequence surfaced that was not on the table when the ruling was made:**
+the carousel's length and positions would change with payload content. *Engrave
+Bundle* is 5 taps right today and 3 with a transaction-only payload. On a device
+where a wrong selection costs ~21 minutes of steel, muscle memory is worth
+something.
+
+**REFINED RULING (operator): shown, UNSELECTABLE.**
+
+- all eleven programs always appear; **the range stays contiguous**
+- inapplicable ones render **dimmed** (`mulAlpha`, `gui.go:1157`, already exists)
+- selecting one **states why**
+- **no bound-to-set rewrite, no change to the compile-time guard**
+
+This is strictly cheaper than the first form and keeps both properties the
+operator wanted: nothing inapplicable is silently offered as working, and nothing
+moves.
+
+**The message must name the FIX, not just the problem** — finding I's discipline
+applied: *"this payload holds no transaction — load one with Load Payload."*
+Standing at the machine, "why not" is half of what an operator needs.
+
+**SCOPE.** The ruling is general ("only offer programs that apply"), but
+applicability predicates for all eleven programs are a cross-cutting job well
+outside Goal 1. **Proposed split:** Goal 1 builds the *mechanism* (dimming, the
+reason screen, the predicate hook) plus the predicate for **Engrave Transaction**
+only; the other ten predicates become a follow-up that reuses it. Not ruled.
+
+---
+
 ## Running classification tally
 
 | # | finding | class | status |
@@ -642,6 +704,7 @@ decoder, and it catches garbage before the machine moves.
 | M | the total must not read as a destination amount | refusal to overclaim | RULED |
 | N | **the device has no camera** — no on-device read-back, ever | hardware fact; spec must state it | RULED |
 | O | **no `mt` verb can read a default plate** — all three take `mt1` strings | missing capability, new P2 scope | RULED |
+| P | inapplicable programs offered as if they work | **shown but dimmed**, message names the fix | RULED |
 
 **Step 4 onward: not yet walked.** The payload is loaded into the session; the
 operator has not yet reached the Engrave Transaction program itself.
