@@ -187,10 +187,29 @@ overturned an earlier assumption and are marked.
    | `mk` | *"BCH check + **optional** content match"* | *"structural commentary in addition to decode"* |
    | `ms` | *"is valid (and **optionally** round-trips against a phrase)"* | *"structural fields and decoder verdict"* |
 
+   **ALL HUMAN-FACING OUTPUT NUMBERS CHUNKS FROM 1** — `chunk n` means wire
+   `index n−1`. The zero-based `index` is a wire field (§10.13 a2) and **appears
+   nowhere in output**.
+
+   > **The document was 0-based in its rules and 1-based in every report, and
+   > the correction report sat between them saying only "chunk 7" — R6
+   > implementability I-6.** Both readings were supported, and the consequence
+   > is not cosmetic: that report ends *"Chunk 7 is at its correction limit …
+   > **Re-cut it.**"* **An operator re-cutting the wrong string spends ~21
+   > minutes duplicating a good plate and leaves the one-scratch-from-
+   > unrecoverable string on the shelf.** The same ambiguity governs the FAILED
+   > report's ranked suspect list, whose entire value is telling the operator
+   > *which three of fourteen* to retype.
+   >
+   > One rule rather than two: **positions and chunk numbers are both 1-based
+   > in output**, wire fields are 0-based, and each conversion is stated as an
+   > equation where it is used.
+
    **`mt verify` is STRUCTURAL ONLY.** Operator ruling 2026-08-23, and it is
    what the siblings already do — **none of the three touches external state.**
    It checks: every string parses, every BCH checksum holds, the set is complete
-   (`count` chunks, indices `0..count-1`), every chunk carries the same
+   (**chunks 1 through `count` present**, i.e. wire indices `0..count-1`), every
+   chunk carries the same
    `chunk_set_id`, and the reassembled transaction re-derives that id.
 
    **TWO CHUNKS SHARING AN INDEX IS NOT AN ERROR, AND AN EARLIER DRAFT OF THIS
@@ -216,6 +235,20 @@ overturned an earlier assumption and are marked.
    | **one passes BCH, the rest fail** | the re-cut case — the miscut copies are detectably bad | **use the good one, and ANNOUNCE it** — printed as a finding, not a log line. See the note on what `mt` does and does not have proof of |
    | **both pass, bytes identical** | a deliberate duplicate copy, per §1.8 | **accept silently.** This is the spec's own advice being followed, and reporting it would make correct behaviour look like a problem |
    | **two or more pass, bytes differ** | valid chunks disagreeing — different transactions, or damage that landed inside the code word | **refuse loudly.** The only genuinely ambiguous case, and the only one where guessing could pick a wrong transaction |
+
+   **"BYTES" MEANS THE POST-CORRECTION PAYLOAD, NEVER THE AS-TYPED
+   CHARACTERS.** R6 implementability I-4. Two copies of one chunk that differ
+   only by an error BCH repaired are **the same chunk** — identical after
+   correction, different before — so comparing as-typed characters would send
+   the commonest real case (a re-cut plate plus a slightly mistyped
+   transcription) to the *refuse loudly* row.
+
+   > **It also decides which row fires for the case §1.8 tells operators to
+   > create.** An operator who cuts a spare copy, then types both back with one
+   > fat-fingered character in one of them, has two chunks whose characters
+   > differ and whose payloads are identical. Post-correction: accept silently,
+   > which is right — they engraved a duplicate on purpose and both are good.
+   > As-typed: refuse, on a set with nothing wrong with it.
 
    **THE RULE IS OVER `n` CANDIDATES, NOT TWO, AND MAJORITY VOTE IS FORBIDDEN.**
    R6 adversarial I-7. Partition the candidates at an index by BCH-validity,
@@ -314,13 +347,13 @@ overturned an earlier assumption and are marked.
 
          CORRECTION APPLIED. 3 chunks needed repair:
            chunk  2   1 of 4 symbols   pos 61
-           chunk  7   4 of 4 symbols   pos 12, 34, 35, 78   <-- NO MARGIN LEFT
+           chunk  7   4 of 4 symbols   pos 13, 34, 35, 78   <-- NO MARGIN LEFT
            chunk 11   2 of 4 symbols   pos 9, 52
 
          chunk 7, with the corrections marked:
            MT1QZRF8XK2V[q>p]HQ9WRDG5S8XE7M2[v>d][8>g]4KP3NAYU6TC...
                                                    ...5J2W[l>1]E7RQ
-             pos 12   read q   corrected to p
+             pos 13   read q   corrected to p
              pos 34   read v   corrected to d
              pos 35   read 8   corrected to g
              pos 78   read l   corrected to 1
@@ -845,8 +878,28 @@ overturned an earlier assumption and are marked.
    **Spaces are stripped on input, and offered on output.** `mt encode` takes an
    optional grouping — every N characters, space-separated — **for hand
    engraving only**, since a person cutting 90 characters needs somewhere to
-   keep their place. Whatever grouping the operator chose, `mt decode` and
-   `mt verify` strip whitespace before doing anything else.
+   keep their place.
+
+   **Whatever grouping the operator chose, `mt decode` and `mt verify` SPLIT
+   FIRST, then strip.** Input is split into candidate strings on **any run of
+   whitespace containing a newline**; spaces and tabs *within* a line are
+   grouping separators and are stripped. **A line containing more than one
+   `mt1`/`MT1` prefix is split at each prefix.**
+
+   > **An earlier version said only "strip whitespace before doing anything
+   > else", which is unbuildable — R6 implementability I-2.** Followed
+   > literally, fourteen 89-character strings become **one 1,228-character
+   > blob** and the tool cannot parse its own output. The rule could not mean
+   > what it said, and the spec never said what it did mean, so three readings
+   > were all defensible: split on newlines then strip within (refuses the
+   > single-line paste an operator gets by copying a terminal), scan for `mt1`
+   > and slice between (accepts it), or strip everything and re-split by
+   > counting characters (needs the length §1.1e cannot compute before
+   > assembly).
+   >
+   > **The recovery path is where this bites**, and a refusal there is answered
+   > by an operator retyping 1,228 characters off steel. The prefix-split
+   > clause is what makes the pasted-blob case work rather than fail.
 
    **Every string in a set has a KNOWN length, checked before decoding**, because
    it catches the one damage class BCH cannot.
@@ -873,6 +926,26 @@ overturned an earlier assumption and are marked.
    one length; the last is the remainder, equal to the others only when the
    payload divides evenly.
 
+   **AT DECODE TIME THE EXPECTED LENGTH COMES FROM THE STRINGS THEMSELVES —
+   the MODAL length across the set.** Every chunk with `index < count − 1`
+   carries the same payload length, so the most common string length in the set
+   *is* the expected one, and any string differing from it is the suspect. The
+   **final** chunk's expected length cannot be checked until the set is
+   complete, and is not checked before then.
+
+   > **Stated because the obvious derivation is CIRCULAR — R6 implementability
+   > I-3.** Per-chunk length follows from `bytes_per_chunk`, which follows from
+   > the total payload length, which is not known until every chunk is
+   > assembled — **which is the thing this check exists to gate.** For `encode`
+   > it is trivial (it holds the payload); for `decode` and `verify` it is not,
+   > and three implementers diverge: modal length, `count` × an assumed 40-byte
+   > chunk (landing in the flat-40 defect), or skipping the check when the set
+   > is incomplete — **which is precisely the case §1.1e was written for.**
+   >
+   > The message says *"a character is MISSING … Re-read the plate"*, which is
+   > **an accusation about the operator's steel**. A wrong expected value makes
+   > it a false one, and sends someone to re-read a plate that is correct.
+
        string 7: 88 characters (expected 89) — a character is MISSING, not
                  wrong. BCH repairs substitutions; an omission shifts every
                  symbol after it and cannot be corrected. Re-read the plate.
@@ -880,7 +953,7 @@ overturned an earlier assumption and are marked.
    **AUTOCORRECT NEVER TOUCHES A STRING THAT ALREADY PARSES.** It is a
    **repair attempted on failure**, not a preprocessing pass. The order is:
 
-       1. strip whitespace, normalise case
+       1. split (above), strip whitespace, **normalise to LOWERCASE**
        2. check the length against this set's computed value
        3. TRY THE STRING AS WRITTEN — if it parses and the checksum holds, STOP
        4. only then attempt correction, positionally (below)
@@ -893,8 +966,56 @@ overturned an earlier assumption and are marked.
    at all. **A repair pass that can damage valid input is worse than no repair
    pass.**
 
-   **Correction is POSITIONAL, because `mt1` has a fixed HRP.** The separator is
-   at index 2, always; data begins at index 3:
+   > **`mt encode` WRITES LOWERCASE, and the direction of "normalise case" was
+   > never stated — R6 implementability I-1.** Every case rule in this document
+   > governs a **deferred** artifact (the QR payload, the `sysw` record), and
+   > *"engrave UPPERCASE"* is advice to a human about steel, not a statement
+   > about the byte stream. §0a makes stdout normative and never said which
+   > case, while the document's own examples split both ways.
+   >
+   > It is not style: **stdout is declared the artifact** and gets piped, hashed
+   > and diffed, so two implementations emitting different bytes for the same
+   > transaction both look correct while nothing compares equal. §3's EPD §6.4
+   > argument also turns on lowercase being what is *stored*. Uppercase remains
+   > the engraving advice; the two are independent, and normalising is free.
+   >
+   > **The correction table below is read AFTER normalisation**, which the
+   > second half of the same gap made ambiguous: the table is written in mixed
+   > case, so an implementer who normalised to uppercase first had a table that
+   > matched nothing.
+
+   **POSITIONS IN OUTPUT ARE 1-BASED, COUNTED OVER THE WHITESPACE-STRIPPED
+   STRING INCLUDING THE HRP.** Position 1 is `m`, position 3 is the separator,
+   position 4 is the first data symbol. **A BCH codeword index `k` is position
+   `k + 4`.** Where the operator engraved with grouping, positions do **not**
+   count the spaces.
+
+   > **The document used two conventions and neither was stated — R6
+   > implementability I-5, measured by column rather than read.** One worked
+   > example put the corrected character at 0-based index 12 and called it
+   > `pos 12`; another put a caret under 0-based index 11 and called it
+   > `position 12`. Same document, same concept, opposite conventions — **and
+   > the second example was broken outright**, since index 11 of
+   > `mt1qzrf8xk2v` is `v` and index 12 is `.`, neither of them the `b` it
+   > claimed to correct. Both are regenerated above from computed offsets.
+   >
+   > **It matters because §1.1's whole miscut-versus-mistyped design rests on
+   > this number being checkable against steel:** *"if position 34 on the steel
+   > reads `d`, they mistyped; if it reads `v`, they miscut."* An off-by-one
+   > sends the operator to a character matching neither value, where they learn
+   > nothing — right after being told this single comparison settles it.
+   >
+   > **A third offset is invisible and worth naming:** BCH error positions come
+   > out of the decoder as indices into `data || checksum`
+   > (`crates/md-codec/src/bch_decode.rs:22`), so codeword index 0 is the first
+   > *data* symbol. An implementer wiring the corrector's output straight into
+   > the report is off by four **and will never notice, because the report is
+   > prose.** Hence the mapping is stated as an equation.
+
+   **Correction is POSITIONAL, because `mt1` has a fixed HRP.** In the index
+   language this section uses for string structure — 0-based — the separator is
+   at index 2, always, and data begins at index 3. **Add 1 for the positions
+   reports print:**
 
    | position | character | correct to | why |
    | --- | --- | --- | --- |
@@ -926,9 +1047,9 @@ overturned an earlier assumption and are marked.
        string 3: corrected `o` -> `0` at position 41. Checksum now valid.
                  That character reads badly on your plate — consider re-cutting it.
 
-       string 9: corrected `b` -> `6` at position 12. Checksum STILL INVALID.
-                 mt1qzrf8xk2v...9d7b4...
-                            ^ here            <- could not resolve
+       string 9: corrected `b` -> `6` at position 16. Checksum STILL INVALID.
+                 mt1qzrf8xk2v9d7b4...
+                                ^ here        <- could not resolve
 
 2. **Its own repository**, `mnemonic-transaction`, with **`mt-cli` and
    `mt-codec`** — matching the constellation's pattern exactly, and not a
@@ -1747,7 +1868,9 @@ silent about both the input amounts and the source scripts. It still does not na
 hence the stub living in text, because it is the one constellation-specific fact
 on the plate and F-234 forbids that inside the QR.
 
-> **`mt`'s INPUT is always a finalized PSBT (§10.10), even for `mt encode`,
+> **`mt` PREFERS a finalized PSBT and accepts a raw signed transaction with
+> §8.2e's loud warning — corrected, R6 implementability I-7. Even for
+> `mt encode`,
 > whose engraved payload is the extracted raw transaction.** Input format and
 > payload format are separate decisions; requiring a PSBT is what keeps §8.2 and
 > §8.2b runnable at all.
@@ -2151,7 +2274,41 @@ exactly as permanent, as a machine-engraved one.
    | **base64 PSBT** | the `cHNidP8` prefix | what wallets export and display |
    | **raw transaction hex** | bare hex, no magic | **Bitcoin Core's default output** — see below |
 
-   Each is distinguishable by inspection, so `mt` sniffs rather than asking.
+   **Sniffing is an ORDERED PROCEDURE, not a set of recognisers.** R6
+   implementability I-11: the table above is true of the three canonical forms
+   and silent about everything a user actually hands a tool. `mt` applies, in
+   order:
+
+       1. Read all input. Strip leading and trailing whitespace (including
+          CRLF). Do NOT strip interior whitespace yet.
+       2. Binary PSBT   -- first 5 bytes are 70 73 62 74 ff.
+       3. Otherwise, remove ALL interior whitespace, so line-wrapped exports
+          at 64 or 76 columns are handled; then:
+          a. base64 PSBT -- begins cHNidP8
+          b. raw hex     -- every remaining character is [0-9a-fA-F], case
+                            insensitive, an optional 0x prefix is stripped
+                            first, and the length is even
+       4. Nothing matches -> refuse, naming what was seen (first 8 bytes as
+          hex, and the detected length), never a bare "invalid input".
+
+   > **Each numbered step exists because a real user input falls through the
+   > previous one.** Line-wrapped base64 is what `openssl`-style exports and
+   > many wallets produce; a trailing newline is what every `.psbt` file and
+   > every terminal paste carries; uppercase hex and a `0x` prefix are both
+   > plausible and neither was mentioned. Under the old text, one implementer
+   > accepts a wrapped `.psbt` and another refuses it, **and the refusal is
+   > answered by a user who has done nothing wrong.**
+   >
+   > **Order matters at one place in particular:** binary is tested *before*
+   > whitespace removal, because `0x09`, `0x0a` and `0x20` are ordinary bytes
+   > inside a binary PSBT and stripping them corrupts it. Everything after
+   > step 2 is text.
+   >
+   > **Hex-encoded PSBT (`70736274ff…`) is the one genuinely ambiguous input**:
+   > it is valid hex *and* a PSBT. It matches step 3b, fails to parse as a
+   > transaction, and the refusal **must name the real problem** — *"this looks
+   > like a hex-encoded PSBT; decode it or pass the `.psbt` file"* — because
+   > "invalid transaction" sends the user to look at the wrong thing.
 
    > **Core's canonical workflow ENDS in hex, which is why refusing it was
    > untenable.** `finalizepsbt` takes `extract` (boolean, **default `true`**):
@@ -2420,10 +2577,30 @@ exactly as permanent, as a machine-engraved one.
                 This transaction is not meaningfully time-locked -- its lock
                 height passed before mt was built. Treat it as spendable now.
 
-   The legend then reads `NO TIMELOCK` rather than a `~<year>` that would be
-   both meaningless and reassuring. Note this is a **separate** determination
-   from §8.4's `nSequence` rule: a locktime can be unenforced *and* in the past,
-   and either alone is enough to make the plate immediately spendable.
+   **The legend keeps `LOCKED TO BLOCK <n>` and OMITS the `~<SEASON> <year>`
+   estimate.** `NO TIMELOCK` is reserved for a transaction with `nLockTime = 0`
+   or with all inputs final.
+
+   > **This section said `NO TIMELOCK`, and §8.4 forty lines away said `LOCKED
+   > TO BLOCK 900000, current height 963663` — for the same transaction — R6
+   > implementability I-8.** Two engraved spellings for one input, in one
+   > document, and **§8.4 had already established that class as a real defect**:
+   > *"two `mt` versions would cut different plates for the same transaction,
+   > and a recoverer matching against documentation would find neither."* The
+   > `NO TIMELOCK` spelling was pinned to fix exactly this, and this instance
+   > survived the fix.
+   >
+   > **§8.4's rule wins on the substance, not just on precedence.** `NO
+   > TIMELOCK` is a claim about the *fields*, and a transaction with an enforced
+   > past `nLockTime` **has one** — saying otherwise engraves something false on
+   > steel that outlives the claim. What is meaningless here is only the
+   > *estimate*, so only the estimate is dropped: the height is the fact and the
+   > year was always the courtesy (§10.23). The `stderr` warning above still
+   > fires in full.
+
+   Note this is a **separate** determination from §8.4's `nSequence` rule: a
+   locktime can be unenforced *and* in the past, and either alone is enough to
+   make the plate immediately broadcastable.
 
    Reporting the **current height** alongside (§8.4's two facts) is unaffected —
    that comes from the node when one is reachable and is a fact `mt` observed,
@@ -2954,7 +3131,8 @@ signed PSBT.
 
     So accepting raw hex would **silently disable two refusals**, including the
     only check that inputs ≥ outputs, while the artifact looked identical. `mt`
-    therefore requires a PSBT, runs the full refusal set against it, and then —
+    therefore *prefers* a PSBT (§8.2e supersedes the requirement), runs the full
+    refusal set against it, and then —
     for `mt encode` — extracts the raw transaction as the payload. Nothing is
     lost: a PSBT is what wallet software emits at the point this workflow
     starts, which is exactly the *"test it in your wallet first"* flow §0 is
@@ -3089,9 +3267,36 @@ signed PSBT.
     **Input and output serialisations are now settled** — three accepted input
     forms (§8.2e) and raw hex out of `decode` (decision 1a in §1).
 
-    **Still unspecified:** the flag spellings themselves, exit codes, and the
-    format of the refusal messages §8 promises will *"name the number that
-    caused it"*.
+    **THE TWO BEHAVIOURAL QUESTIONS ARE RULED HERE; ONLY SPELLINGS REMAIN
+    OPEN.** R6 implementability I-10 drew the distinction and it is the right
+    one: this section anticipated the objection with *"two implementers given
+    this table will still choose different flag spellings, but they will at
+    least build the same tool"* — **true of spellings, false of the two below,
+    which are behaviour.**
+
+    a. **Grouping affects `stdout`, and the CANONICAL artifact is the UNGROUPED
+       string.** `decode` and `verify` accept both (§1.1e splits then strips).
+       Without this, an operator who asked for grouping gets spaces inside the
+       stream §0a declares to be the artifact, and every downstream consumer
+       must strip them — including `mt qr` when that lands. Grouping is a
+       hand-engraving courtesy, so it is **opt-in and never the default**.
+
+    b. **`--quiet` suppresses the INSPECTION REPORT only. Warnings and refusals
+       are NEVER suppressed**, on any verb. It was defined only for `decode`,
+       and its scope was the open question: a `--quiet` that silenced §8's
+       warnings would let a script engrave a plate whose hazards nobody saw,
+       which is the opposite of what §0a's stderr split is for. It does **not**
+       relax §1.1a's rule that stdout stays empty unless every check passes.
+
+    **Still unspecified, and deliberately:** the flag *spellings*, exit codes,
+    and the format of the refusal messages §8 promises will *"name the number
+    that caused it"*. Each input the table above requires needs some flag —
+    input values per input (§8.2c), `FROM`/`TO` identities, the free-text `TO`
+    label behind its own flag (§10.4), and the node location — and naming them
+    is a CLI-design task, not a codec one. **Exit codes are the exception that
+    should not wait**: §1.1a's documented pipeline now depends on a non-zero
+    exit, so `0 = every check passed` is fixed here and the rest of the code
+    space is left to implementation.
 
 11. ~~How many codex32 characters fit a hand-engraved plate?~~ **CLOSED — OUT
     OF SCOPE**, operator ruling 2026-08-23: *"As many as a user wants. It is not
