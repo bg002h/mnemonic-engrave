@@ -832,8 +832,30 @@ configuration above it, exactly as it discards one that does not fit a plate. Th
 cap is not a comfortable headroom argument; it is a constraint the objective can
 walk into while optimising for ECC.
 
-**And the interaction is the point:** the objective *prefers* small symbols, so
-the cap binds **soonest on exactly the configurations the search likes best.**
+**But the objective does NOT simply prefer many small symbols, and an earlier
+version of this paragraph said it did.** Criterion 3 is *minimise symbol count*,
+so among configurations tied on plates and ECC the search breaks toward **fewer**
+symbols. **More symbols are chosen only when they BUY something** — a higher ECC
+level, or a lower plate count. Measured at 0.60 mm
+(`RESULTS_ecc_selection_2026-08-22.txt`):
+
+| transaction | result | why |
+| --- | --- | --- |
+| 162 B | **1 pl, 1 qr**, v13 **ECC H** | one symbol already reaches one plate *and* the top ECC level; sixteen tiny ones would tie on criteria 1–2 and lose on 3 |
+| 405 B | 1 pl, 1 qr, v15 ECC M | same shape |
+| 488–535 B | 1 pl, 1 qr, v15–16 ECC L | same shape |
+| **742 B** | **2 pl, 6 qr**, v9 **ECC Q**, `4 up` | here splitting *buys* ECC Q that one symbol could not reach in the plate budget |
+
+**So the cap binds where splitting BUYS something and the split runs long** — not
+on the smallest artifacts, where one symbol already wins. **NORMATIVE remains
+unchanged:** the search discards any configuration above 16 symbols. What changes
+is where an implementer should expect to *meet* it, and a test that reaches for a
+tiny transaction to trigger the cap will never fire.
+
+> **These measured rows are from the OLD hard-coded legend charge** (6 lines /
+> 25.5 mm) and are therefore **stale in the plate column** — §4.6 requires the
+> regeneration, with §4.5a's computed reservation as an input. The *shape* of the
+> argument above survives the regeneration; the specific plate counts do not.
 
 **GATE 1 IS NOT UNVERIFIED — IT IS REFUTED. R0 round 2, I1.**
 
