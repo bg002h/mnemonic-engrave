@@ -1236,11 +1236,13 @@ charge bills every job for rows that may not exist.
 > derived from a different one. **P5 must state the pitch it uses and where it
 > comes from**, or "computed" is computed from a number nobody can find.
 
-**3.0 mm IS THE FLOOR, and it is already the hard case.**
-`gui/freetext_proof.go:24` calls it *"the smallest rung and the hardest legibility
-case"*. Smaller faces would help a great deal — the same packing at 1.5 mm gives
-**2 lines, 4.2 mm, v24**, i.e. the legend costing a single version step — **but
-no face below 3.0 mm has been tested.** That is an **S0** question, and it costs
+**3.0 mm IS THE FLOOR, AND IT IS TESTED** — operator confirmation 2026-08-24.
+`gui/freetext_proof.go:24` calls it *"the smallest rung and the hardest
+legibility case"*, and the proof patterns are tuned to land there precisely
+because *"if a glyph reads at 3.0mm it reads at every rung."* Smaller faces would
+help a great deal — the same packing at 1.5 mm gives **2 lines, 4.2 mm, v24**,
+the legend costing a single version step — **but no face below 3.0 mm has been
+tested**, which makes it an opportunity rather than an exposure. That is an **S0** question, and it costs
 one extra line of text on a plate already being cut.
 
 **And `FORMAT: mt1 codex32` is WRONG on a QR plate.** §5 of `SPEC_mt_v0_1.md`
@@ -1272,14 +1274,28 @@ computed legend reservation** (167 chars / 44 columns = 4 lines = 17.0 mm).
   rather than an omission: the 44-column figure is `font/sh` at the 3.0 mm face,
   taken from `gui/freetext_flow.go:33`.
 
-**STILL OWED, and neither is a number this table can produce:**
+**THE 3.0 mm FACE IS NOT AN ASSUMPTION — it is tested.** Operator confirmation
+2026-08-24, and the fork's own proof machinery is built around it
+(`gui/freetext_proof.go:20-25`):
+
+> *"O1 asks a question a render cannot answer: are these glyphs legible cut into
+> steel? … Every pattern here is tuned to land at **3.0mm**, the smallest rung
+> and the hardest legibility case. **If a glyph reads at 3.0mm it reads at every
+> rung.**"*
+
+So the table's 3.0 mm column rests on a validated face, and **O13 is pure upside
+rather than risk**: a smaller face would shrink the reservation further, and if
+none validates, nothing here moves.
+
+**STILL OWED — one item, and it is not a number this table can produce:**
 
 1. **The legend's character count is an ESTIMATE** — 153 characters for the five
    §5 fields plus 14 for `PLATE n OF m`. The field *definitions* are normative
-   (`SPEC_mt_v0_1.md` §5); their rendered lengths at a given face are not, and a
-   different count moves the line count and therefore every plate-1 capacity.
-2. **The 3.0 mm face is assumed.** If S0 validates a smaller one (O13), the
-   reservation shrinks and the table moves again — favourably.
+   (`SPEC_mt_v0_1.md` §5); their **rendered lengths at a given face** are not.
+   A different count changes the line count and therefore every plate-1 capacity
+   in §4.2a. **`font/sh` is 44 columns at 3.0 mm and `font/constant` is 39**
+   (`gui/freetext_proof.go:33`), so the face choice alone moves it — and the
+   table assumes `font/sh`.
 
 **The plate counts in §4.2a are now measured rather than provisional** — subject
 to the two owed items above, both of which move the table in a stated direction.
@@ -1466,7 +1482,7 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
 | O7 | applicability predicates for the **other ten** programs | follow-up |
 | ~~O11~~ | **RESOLVED (§3.6b)** — the txid is **carried** by the record, shown in the **asserted** voice, and cross-checked against `chunk_set_id`, which **is** its top 20 bits. R15 refutes; it never confirms. R14 retired | closed → P1 + P4 |
 | ~~O12~~ | **ANSWERED, and the answer is NO** — `kortschak-qr v0.3.2` has no Structured Append (verified: zero occurrences; `Encode` returns one `*Code`). Buildable over its `coding` package; **P5 owns it**. See O14 for what that does to S0's order | **closed → P5 + O14** |
-| **O13** | a legend face **below 3.0 mm** — untested, and worth ~5 QR versions (§4.5a) | S0 |
+| **O13** | a legend face **below 3.0 mm** — worth ~5 QR versions (§4.5a). **Pure upside:** 3.0 mm is tested, so if nothing smaller validates, nothing moves | S0 |
 | ~~O14~~ | **RESOLVED (§4.2c)** — S0 cuts the pair from an independent committed generator, so the **physics** gate runs first and cheap; P5 reproduces that fixture **module-for-module**, so the **software** gate is a byte comparison against a cross-implementation oracle | closed → S0 + P5 |
 | O8 | **Journey B — recovery.** Someone finds the plate years later. Not yet walked | next walk |
 | O9 | the documented `picotool` line stops before the move to 20V/28V power, so a correct payload reads as a failed one | walk G, documentation |
