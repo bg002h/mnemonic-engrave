@@ -1,10 +1,19 @@
 # SPEC — `mt`, the mnemonic-transaction format (v0.1 draft)
 
-Status: **DRAFT, in R0.** Round 0 ran four independent lenses and did not close;
-this is the fold responding to it. No code may be written against this until a
-re-review closes it at 0 Critical / 0 Important. This is risk-set work by the
-project's own definition — it touches funds, addresses and a new normative
-format — so the gate is not optional.
+Status: **GREEN — 0 Critical / 0 Important, 2026-08-23.** Closed after R6 (three
+lenses: fold-propagation, implementability, adversarial — 6C/27I) and R7's fold
+verification, then held green through three live journey walks, two out-of-scope
+sweeps and the pre-implementation gates R11/R12. Risk-set work by the project's
+own definition — it touches funds, addresses and a new normative format — so the
+post-implementation adversarial review over the whole diff remains mandatory and
+non-deferrable.
+
+> **This line said "DRAFT, in R0 … no code may be written" until 2026-08-23 —
+> R12 B5.** It predated R6/R7 closing the spec and was outside every grep the
+> intervening gates ran. **Anyone opening the spec directly — which they must,
+> it is the source of truth — hit the same contradiction R12's C1 was about**:
+> a document telling its reader not to proceed, with nothing in it recording
+> that the condition had been met.
 
 Written 2026-08-22 from a brainstorm with the operator; folded 2026-08-23 after
 R0 round 0. Every number in it was measured; the probes and raw results are in
@@ -934,7 +943,7 @@ overturned an earlier assumption and are marked.
 
    **Spaces are stripped on input, and offered on output.** `mt encode` takes an
    optional grouping — every N characters, space-separated — **for hand
-   engraving only**, since a person cutting 90 characters needs somewhere to
+   engraving only**, since a person cutting ~90 characters needs somewhere to
    keep their place.
 
    **Whatever grouping the operator chose, `mt decode` and `mt verify` SPLIT
@@ -1003,7 +1012,7 @@ overturned an earlier assumption and are marked.
    > **an accusation about the operator's steel**. A wrong expected value makes
    > it a false one, and sends someone to re-read a plate that is correct.
 
-       string 7: 88 characters (expected 89) — a character is MISSING, not
+       string 7: 89 characters (expected 90) — a character is MISSING, not
                  wrong. BCH repairs substitutions; an omission shifts every
                  symbol after it and cannot be corrected. Re-read the plate.
 
@@ -1262,8 +1271,11 @@ specify, test, teach a recoverer, and get wrong only once.**
 > **The cost is ONE CHARACTER per engraved string.** `md-codec` sizes chunks
 > against a 320-bit budget that sits *below* codex32's 400-bit capacity, so a
 > wider header does not change the chunk count — it consumes slack. Measured: a
-> chunk-string goes from **89 to 90 characters**, so a five-chunk transaction
-> goes from 445 to ~450. Both `41 + 320 = 361` and `49 + 320 = 369` fit the
+> chunk-string goes from **89 to 90 characters** at the 49-bit header this box
+> was written under; at the ruled 55-bit header the same string is 90 and the
+> 162-byte five-chunk artifact totals **395** characters (four strings of 80
+> plus a last of 75 — §10.13 a2's table, recomputed). The *cost per widening* is what
+> this box measures, not the current length. Both `41 + 320 = 361` and `49 + 320 = 369` fit the
 > 400-bit capacity.
 >
 > **Sizing this field for hand engraving would have been sizing the wrong

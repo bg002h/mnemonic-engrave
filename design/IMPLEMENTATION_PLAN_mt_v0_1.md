@@ -1,8 +1,11 @@
 # IMPLEMENTATION PLAN — `mt` v0.1
 
-> **Status: GREEN — 0 Critical / 0 Important as of 2026-08-23**, closed by
-> `design/agent-reports/R11-pre-implementation-gate.md` after seven review
-> lenses. **Implementation may begin at S0.** Risk-set work: funds, addresses,
+> **Status: GREEN — 0 Critical as of 2026-08-23**, after eight review lenses.
+> The pre-implementation gate ran twice: `R11-pre-implementation-gate.md` found
+> the blockers (3C/6I/10m) and `R12-gate-rerun.md` verified the fold. **Cite the
+> verifying report, not the finding report** — an earlier version of this line
+> named R11 as having closed the gate, and R11's own recorded verdict is *"NOT
+> SAFE TO EXECUTE"* (R12 B2). **Implementation may begin at S0.** Risk-set work: funds, addresses,
 > a new normative wire format — so the post-implementation adversarial review
 > over the whole diff is mandatory and non-deferrable.
 >
@@ -189,6 +192,14 @@ generator:**
    `createwallet` → `generatetoaddress` → `walletcreatefundedpsbt` →
    `walletprocesspsbt` → `finalizepsbt`, never broadcast.
 
+   **Shape, restored after the regtest fold dropped it (R12 B4):** at least one
+   **segwit** input — so the witness-bearing serialisation is exercised and
+   `txid != wtxid` holds — and a **non-zero `nLockTime` set to a PAST height**,
+   which exercises §8.4's threshold rule and the lock-already-passed path rather
+   than the `nLockTime = 0` default. Core's regtest wallet defaults to native
+   segwit, so the first is satisfied without asking; the locktime is not, and
+   must be passed to `walletcreatefundedpsbt`.
+
    > **A confirmed mainnet transaction makes P2's gate fail on this machine and
    > pass in CI.** Every input of a confirmed transaction is spent, and its
    > parents are confirmed — which is exactly §8.5's refusal condition and makes
@@ -271,9 +282,15 @@ to copy.
 
 ### P0 — skeleton
 
-**Deliverable.** The **spec and the S0 vector are copied into
-`mnemonic-transaction`** — `design/SPEC_mt_v0_1.md` and
-`design/vectors/mt1_v1_vectors.md` — because
+**Deliverable.** Three files are copied into `mnemonic-transaction`:
+
+- `design/SPEC_mt_v0_1.md`
+- `design/vectors/mt1_v1_vectors.md` — the human-readable vectors
+- **`design/vectors/mt1_v1_vectors.json` → `crates/mt-codec/src/test_vectors/mt1_v1.json`**
+  — the machine-readable form, at `mk`'s location shape. **This is the exact file
+  P1's SHA-256 pin test reads**, so P1 fails on a missing file without it (R12 B1)
+
+They are copied because
 P5's exhaustiveness gate and P6's journeys read them and **no phase put them
 there** (R8 coverage I-12). They are copied with the commit SHA they came from
 recorded alongside, so drift against `mnemonic-engrave` is a `git diff` and not
