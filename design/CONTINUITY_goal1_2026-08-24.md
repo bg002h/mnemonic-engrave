@@ -5,8 +5,8 @@
 
 ## State in one line
 
-**Spec written, walked, R0 round 0 folded — no code. Round 1 (fold-check) in
-flight. The gate is OPEN.**
+**Spec written, walked, R0 rounds 0–2 folded — no code. The gate is OPEN, and
+two of the blockers are now the OPERATOR's, not a reviewer's: O11 and O14.**
 
 ## What exists now
 
@@ -104,7 +104,7 @@ listed here BEFORE they are needed.*
 | 1 | **operator journey walk** | what would the operator actually do? | **DONE** — 18 findings (A–R) |
 | 2 | **adversarial correctness** (R0 r0, opus) | construct a failure the spec permits | **DONE** — 3C / 8I / 4M |
 | 3 | **fold-check** (R0 r1, sonnet) | did the fold fix it, or only claim to? | **DONE** — 3 PARTIAL + 1I/2M *the fold introduced* |
-| 4 | **fold-check + implementability** (R0 r2, opus) | could two implementers build different things — or nothing? | **RUNNING** |
+| 4 | **fold-check + implementability** (R0 r2, opus) | could two implementers build different things — or nothing? | **DONE** — 2 PARTIAL + **0C / 7I / 3M**; first round with no Criticals |
 | 5 | **spec-coverage** | does every §8 ruling have a section, every section a phase, every refusal a §? | not run |
 | 6 | **failure-states** | for each thing that goes wrong, what does the operator SEE? | not run |
 | 7 | **comprehension** | can someone who was NOT here read this and build the right thing? | not run |
@@ -122,14 +122,49 @@ even emit Structured Append). The `mt` cycle's worst defect was exactly this —
 an acceptance mechanism nobody had ever executed, invisible to thirteen readings
 and about an hour to find by trying it.
 
+## The severity curve, and what it says about stopping
+
+| round | lens | result |
+| --- | --- | --- |
+| 0 | adversarial correctness | **3C** / 8I / 4M |
+| 1 | fold-check | 0C / **1I** / 2M — and the I was *introduced by the round-0 fold* |
+| 2 | fold-check + implementability | **0C** / 7I / 3M |
+
+**Criticals are gone; Importants are not.** But round 2's seven were mostly
+**propagation** (a ruling in one section contradicting a phase row in another)
+rather than **design** — which is the signal the "when review rounds stop paying"
+rule names: once only claims remain, audit them mechanically at fold time instead
+of buying another round.
+
+**Except round 2 also produced two findings no fold-check could have:** the QR
+library has no Structured Append, and `ClassTransaction`'s wire layout is
+defined nowhere. Both came from the **implementability** lens, not from checking
+the fold. That is the argument for spending rounds on **new questions** rather
+than on re-checking the last answer.
+
+## THE CLASS FAILURE, THREE ROUNDS RUNNING — the most reusable thing learned here
+
+| round | what was named | what was actually true |
+| --- | --- | --- |
+| 0 (I2) | "one program-keyed switch must change" | |
+| 1 | the fold cited **one** site and stopped | grepping the class found **three**, two failing *silently* |
+| 2 | the grep searched `switch .*prog` | a **fourth** switches on a scanned object's **type** — same class, different key |
+
+**Fixing the instance a finding names, and not the class, is how the next
+instance survives another round.** The spec now states the *rule* — *"every
+enumeration a new program or type must join, whose default is silent"* — instead
+of the list, because the list was wrong three times.
+
 ## Open, and who owns it
 
 | | owner |
 | --- | --- |
 | **S0 — cut the test plate** (QR at 0.3/0.45/0.6/0.9 mm + a raw-octet and a base45 symbol, external scanner) | **the operator**. Resolves BOTH live hypotheses: QR encoding (F-243) and module size (F-234) |
-| **R0 to 0C/0I** | round 0 folded (`48da287`); round 1 in flight. **Not green** |
+| **R0 to 0C/0I** | rounds 0–2 folded (`48da287`, `8290415`, `6d4d099`). **Not green** |
+| **O14 — S0 is specified to cut a Structured-Append pair that nothing can produce** | **the operator.** Build SA before S0, hand-build throwaway symbols, or drop the pair — each trades against something |
 | **O11 — the picker's key for a chunks payload** | **deliberately unresolved.** The device cannot derive a txid without a decoder, and every alternative trades against a ruling |
-| **O12 — does our QR encoder emit Structured Append?** | unverified; without it C1's ruling has no mechanism |
+| ~~O12~~ | **ANSWERED: NO.** `kortschak-qr v0.3.2` has no Structured Append — zero occurrences, `Encode` returns one `*Code`. Buildable over its `coding` package; **P5 owns it** |
+| **O15 — `ClassTransaction`'s wire layout is defined nowhere** | **P1**, and it is the largest gap in the spec: 3 mentions, 0 definitions, and four sections read it |
 | **O13 — a legend face below 3.0 mm** | S0; worth ~5 QR versions |
 | **Journey B — recovery**, never walked | next walk |
 | per-chunk BCH checksum before cutting | proposed, not ruled (spec O3) |
