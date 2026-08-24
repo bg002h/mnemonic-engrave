@@ -747,13 +747,22 @@ in one sitting works again.
 payload. The device states plate count and cut time before the operator commits —
 ~21 minutes per plate (F-225).
 
-**MULTI-SYMBOL IS THE COMMON CASE, NOT A CORNER.** At the ruled 0.60 mm module
-(§4.7) the largest QR that fits an 85 mm plate is **v26 — 1,367 B at ECC L**
-(`RESULTS_qr_physical_max_2026-08-22.txt`); a v40 would be 111 mm wide against
-79 mm usable. And the search **prefers** several small symbols over one large one
-when that buys ECC: the measured 742 B case resolves to **6 symbols on 2 plates**
-(`RESULTS_ecc_selection_2026-08-22.txt`). So multi-symbol begins **below every row
-in §2.3's table**.
+**MEASURED under the ruled objective** (`RESULTS_ecc_selection_2026-08-24.txt`),
+0.60 mm, raw transaction bytes. **Multi-symbol is NOT the common case** — an
+earlier draft said it was, on the strength of the *old* objective, which bought
+ECC by splitting:
+
+| signed transaction | plates | QR codes |
+| --- | --- | --- |
+| ≤ **624 B** — covers a 3-of-5 `wsh` (488 B) and `tr` (501 B) | **1** | **1** |
+| pathological 1-in/1-out, 852 B | 2 | 1 |
+| pathological 2-in/2-out, 1,692 B | 3 | 2 |
+| pathological 5-in/2-out, 4,080 B | 6 | 5 |
+| pathological 10-in/2-out, 8,067 B | **10** | 9 |
+
+Against **202 text plates** for that last case, the two forms are not close.
+**The 16-symbol cap does not bind anywhere in this range** — the worst case uses
+nine.
 
 **Plates, symbols and tiling are three different counts** and the spec must not
 conflate them:
@@ -761,7 +770,7 @@ conflate them:
 - **symbol** = one QR code
 - **plate** = one piece of steel; several symbols may be tiled on one (`4 up`)
 - and a plate may hold **one** symbol yet still be the *second* plate, because
-  the legend reservation pushed it there (measured: 1,130 B is `2 pl, 1 qr`)
+  the legend reservation pushed it there — measured: **852 B is `2 pl, 1 qr`**
 
 ### 4.2 What the QR carries, and how several of them reassemble
 
@@ -839,12 +848,15 @@ symbols. **More symbols are chosen only when they BUY something** — a higher E
 level, or a lower plate count. Measured at 0.60 mm
 (`RESULTS_ecc_selection_2026-08-22.txt`):
 
+**MEASURED under the ruled objective** (`RESULTS_ecc_selection_2026-08-24.txt`,
+`src/bin/select2.rs`), 0.60 mm, raw transaction bytes:
+
 | transaction | result | why |
 | --- | --- | --- |
-| 162 B | **1 pl, 1 qr**, v13 **ECC H** | one symbol already reaches one plate *and* the top ECC level; sixteen tiny ones would tie on criteria 1–2 and lose on 3 |
-| 405 B | 1 pl, 1 qr, v15 ECC M | same shape |
-| 488–535 B | 1 pl, 1 qr, v15–16 ECC L | same shape |
-| **742 B** | **2 pl, 6 qr**, v9 **ECC Q**, `4 up` | here splitting *buys* ECC Q that one symbol could not reach in the plate budget |
+| 162 B | **1 pl, 1 qr**, v13 **ECC H** | one symbol reaches one plate *and* the top ECC; more symbols would tie on plates and lose on symbol count |
+| 405 B | 1 pl, 1 qr, v19 **ECC Q** | leftover capacity spent upward (step 3) |
+| 488–595 B | 1 pl, 1 qr, v17–19 **ECC M** | at the floor; capacity is spent on reaching it |
+| **742 B** | **2 pl, 1 qr**, v22 ECC M | **one** symbol — see §4.5b for what this row used to be |
 
 **So the cap binds where splitting BUYS something and the split runs long** — not
 on the smallest artifacts, where one symbol already wins. **NORMATIVE remains
@@ -852,13 +864,35 @@ unchanged:** the search discards any configuration above 16 symbols. What change
 is where an implementer should expect to *meet* it, and a test that reaches for a
 tiny transaction to trigger the cap will never fire.
 
-> **These rows are stale in TWO ways at once, and are kept only for their
-> SHAPE.** They carry the old hard-coded legend charge (6 lines / 25.5 mm), *and*
-> they were produced under the **old objective** — ECC ranked above symbol count,
-> with no floor. Under §4.5b the 488–535 B rows' **ECC L is now inadmissible**,
-> and the 742 B row's six symbols would now lose to a configuration with fewer.
-> **The argument above survives — more symbols only when they buy something — but
-> not one number in the table does.** §4.6 requires the regeneration.
+**THE ONE-PLATE CEILING IS 624 BYTES** at 0.60 mm (`src/bin/plate1.rs`), and it
+is bounded by plate 1 being the only plate that carries the legend: the packed
+legend takes 4 lines = 17.0 mm, leaving **62.0 mm** of 79, which caps plate 1 at
+**v19**. A bare plate would take v26 — the legend costs seven versions here.
+
+| module | largest version on plate 1 | one-plate maximum |
+| --- | --- | --- |
+| 0.90 mm | v10 | 213 B |
+| **0.60 mm** (ruled) | **v19** | **624 B** |
+| 0.45 mm | v28 | 1,190 B |
+| 0.30 mm (unvalidated) | v40 | ~2,331 B as one symbol |
+
+**624 B covers the ordinary cases outright** — a 3-of-5 `wsh` spend is 488 B, a
+3-of-5 `tr` is 501 B. One plate, one QR, ECC M, ~21 minutes.
+
+> **WHAT S0's MODULE TEST IS WORTH, now that it is measured.** The same
+> pathological rows at **0.30 mm**, if it proves legible:
+>
+> | inputs/outputs | 0.60 mm (ruled) | 0.30 mm (unvalidated) |
+> | --- | --- | --- |
+> | 1-in/1-out, 852 B | 2 pl, 1 qr, ECC M | **1 pl**, 1 qr, **ECC H** |
+> | 2-in/2-out, 1,692 B | 3 pl, 2 qr, ECC M | **1 pl**, 1 qr, ECC M |
+> | 5-in/2-out, 4,080 B | 6 pl, 5 qr, ECC M | **2 pl**, 2 qr, ECC M |
+> | **10-in/2-out, 8,067 B** | **10 pl**, 9 qr | **3 pl**, 9 qr |
+>
+> The worst case goes **10 plates → 3** — about **2.5 hours** of machine time —
+> and the smallest goes from two plates at ECC M to **one plate at ECC H**: fewer
+> plates *and* stronger error correction together. **That is a far larger prize
+> than which encoding goes in the QR**, and S0 answers both on the same plate.
 
 **GATE 1 IS NOT UNVERIFIED — IT IS REFUTED. R0 round 2, I1.**
 
@@ -1114,6 +1148,18 @@ is gouged.
 **Minimising symbols is therefore a ROBUSTNESS decision, not an operator
 convenience.** That is why it outranks ECC.
 
+**MEASURED, and this row is the whole argument in one line**
+(`RESULTS_ecc_selection_2026-08-24.txt` against `..._2026-08-22.txt`):
+
+| RCW `wsh` tier 1, 742 B | plates | symbols | ECC |
+| --- | --- | --- | --- |
+| old objective (ECC ranked 2nd) | 2 | **6** | Q |
+| **ruled objective** (symbols 2nd) | 2 | **1** | M |
+
+**Six independent fatal points collapse to one, at the cost of one ECC level and
+no extra plate.** Given that losing any one of six symbols loses the whole
+transaction, that is the trade this ordering exists to make.
+
 **But ECC gets a FLOOR rather than losing, because it is the only thing that
 survives DISTRIBUTED damage** — the scuffs and handling a plate accumulates over
 years, as opposed to one catastrophic gouge. And F-234 records that
@@ -1202,30 +1248,41 @@ calls that field *"arguably the most important"* because it is what lets a
 stranger start — and on a QR plate the content is raw transaction bytes by F-234,
 not a codex32 string. **The field must state what the QR actually carries.**
 
-### 4.6 The plate table must be regenerated — and it measures the wrong family
+### 4.6 The plate table — REGENERATED 2026-08-24, and what is still owed
 
-It measures **PSBTs**; this design carries **signed transactions** (53–91% of PSBT
-size). It corrects for a **49-bit** chunk header; the ruled header is **55 bits**
-(F-242). And `SPEC_mt_qr_DEFERRED.md` §10.14's **font-metric correction** is owed.
+**DONE.** `RESULTS_ecc_selection_2026-08-24.txt`, produced by
+`src/bin/select2.rs`. The 2026-08-22 file and `select.rs` are **kept unchanged**,
+so the earlier measurement stays reproducible — a second measurement, not an edit
+of the first.
 
-**TWO MORE INPUTS, from the 2026-08-24 objective change (§4.5b):** the search now
-**minimises symbols above ECC** and carries a **hard ECC floor at M**. Every row
-in the existing table was produced under the opposite ranking with **no floor**,
-so its ECC column is not merely stale — several rows chose **ECC L**, which is
-now **inadmissible**. **Six inputs in total, and the table cannot be partially
-updated:** the packed legend *buys* capacity and the M floor *spends* it, so
-evaluating either alone gives a wrong answer.
+**What the regeneration now carries:** the ruled objective (symbols above ECC),
+the **ECC floor at M**, the **16-symbol cap**, the **module-size and version
+tie-breaks** (previously absent — ties fell to loop order), and the **packed,
+computed legend reservation** (167 chars / 44 columns = 4 lines = 17.0 mm).
 
-**R0 round 2, M2 — a fourth input, and it is the largest.** The regeneration must
-also carry **§4.5a's packed-and-computed legend reservation**. The existing table
-was produced with the hard-coded 6-line / 25.5 mm charge, which costs **54% of
-plate 1's area**; packing alone moves 0.60 mm from **v16 to v19**. Every plate
-count in that table is therefore high by an amount larger than the other three
-corrections combined, and re-running it without this input would produce a second
-wrong table.
+**Corrections to this section's own earlier text, from running it:**
 
-**Until it is regenerated, no plate count in this spec is load-bearing** beyond
-§4.1's order-of-magnitude comparison.
+- *"It measures **PSBTs**"* — **not accurate.** It measures both, labelled:
+  rows read `signed` or `PSBT`, and several pairs give the same artifact in both
+  forms so the wrapper cost is visible.
+- The **49-bit vs 55-bit chunk header** (F-242) is **moot for this table.** That
+  header rides in `mt1` chunks; under F-234 the QR carries **raw transaction
+  bytes**, so no chunk header is inside a QR at all.
+- `SPEC_mt_qr_DEFERRED.md` §10.14's **font-metric correction** is now an input
+  rather than an omission: the 44-column figure is `font/sh` at the 3.0 mm face,
+  taken from `gui/freetext_flow.go:33`.
+
+**STILL OWED, and neither is a number this table can produce:**
+
+1. **The legend's character count is an ESTIMATE** — 153 characters for the five
+   §5 fields plus 14 for `PLATE n OF m`. The field *definitions* are normative
+   (`SPEC_mt_v0_1.md` §5); their rendered lengths at a given face are not, and a
+   different count moves the line count and therefore every plate-1 capacity.
+2. **The 3.0 mm face is assumed.** If S0 validates a smaller one (O13), the
+   reservation shrinks and the table moves again — favourably.
+
+**The plate counts in §4.2a are now measured rather than provisional** — subject
+to the two owed items above, both of which move the table in a stated direction.
 
 ### 4.7 Module size
 
@@ -1343,8 +1400,8 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
   **module-for-module** with pinned version/level/mask **and** its own rendering
   decodes with the same scanners (software, machine-checked). **Until both hold,
   a multi-symbol QR job may not be cut.**
-- **The legend reservation is COMPUTED, not hard-coded** (§4.5a), and the plate
-  table is regenerated with it as an input (§4.6).
+- **The legend reservation is COMPUTED, not hard-coded** (§4.5a). *(The plate
+  table was regenerated with it as an input on 2026-08-24 — §4.6.)*
 - **P5's gate asserts the legend's EMISSION ORDER** (§4.4a), not merely that a
   finished plate looks right — a finished plate looks identical either way.
 - **`check-provenance.sh` green** across both repos. **Not in CI.**

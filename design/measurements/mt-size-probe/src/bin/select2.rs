@@ -227,6 +227,15 @@ fn main() {
             ("9-of-11 wsh signed, 1in", 1130),
             ("RCW tr tier1, 5in", 2455),
             ("9-of-11 tr PSBT, 2in/2out", 4962),
+            // THE PATHOLOGICAL WALLET (11 keys, 3 masters), wsh, tier 1 --
+            // the most expensive spend path the constellation describes, and
+            // absent from every earlier version of this table. Sizes from
+            // RESULTS_2026-08-22.txt, signed transactions.
+            ("PATH wsh t1, 1in/1out", 852),
+            ("PATH wsh t1, 1in/2out", 893),
+            ("PATH wsh t1, 2in/2out", 1692),
+            ("PATH wsh t1, 5in/2out", 4080),
+            ("PATH wsh t1, 10in/2out", 8067),
         ] { row(l, n, min_mm, &caps); }
 
         if (min_mm - 0.60).abs() < 1e-9 {
