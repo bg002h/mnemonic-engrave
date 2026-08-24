@@ -799,3 +799,61 @@ as a reserved prefix falls through `gui/scan.go:79` to a free-text plate).
   affordance-without-a-mechanism class as C2.
 - **The `mt` side of §6/P2** beyond confirming that `Inspect` exists and that
   `mt1` has its own HRP and BCH constants.
+
+---
+
+## [I8] CONTROLLER ADDENDUM — §4.4's "legend last" is the OPPOSITE of what the engrave builder does today, so its invariant is false as shipped
+
+**Severity:** Important
+**Found by:** the controller, closing a gap this report's own Verdict flagged as
+unexamined (*"§4.4's legend-last mechanism against the actual engrave plan
+builder … the same affordance-without-a-mechanism class as C2"*).
+
+**Where:** §4.4. Code: `backup/backup.go:363-396` (`EngraveText`),
+`engrave/engrave.go:55` (`type Engraving = iter.Seq[Command]`).
+
+**The failure, concretely:**
+
+`Engraving` is `iter.Seq[Command]` — an **ordered sequence** the machine executes
+in emission order. `EngraveText` emits:
+
+```go
+offy := params.I(outerMargin)
+centerRow(plate.Title, offy)      // <- the legend row, FIRST
+if plate.Title != "" { offy += fontSize }
+...                                // <- the body, after
+```
+
+So the legend is cut **first**, and §4.4 rules it must be cut **last**. Nothing in
+the spec records that this is a change; §4.4 reads as though it describes the
+system.
+
+Walk it with §4.4's own scenario. The operator stops a 21-minute cut at minute
+20. Under the shipped builder the plate already carries `PLATE 1 OF 2` — it is
+**anonymous no longer, and looks finished**. §4.4 asserts the opposite in bold:
+
+> **AN UNSIGNED PLATE IS AN UNFINISHED PLATE.**
+
+That invariant is **false as shipped**, and §4.4 leans on it precisely where it
+matters: *"Visible at a glance, in a drawer, with no tooling — which matters
+precisely because the device has no camera and the operator is the only
+inspector."* An operator taught that rule would sort a half-cut plate into the
+good stack.
+
+**Why the spec permits it:** §4.4 states the ruling and the invariant and never
+states the delta. §6's P5 line is *"The plate: search, legend-last,
+test-the-plate, plate count (§4)"* — "legend-last" appears as a deliverable, but
+nothing says the current builder emits title-first, so a P5 that renders a
+correct-looking plate can close green with the ordering untouched and the
+invariant quietly false.
+
+**Not the same as C2.** C2 is an affordance the reused code actively contradicts.
+This one **is achievable** — plate position comes from the `y` offset, not from
+emission order, so legend-last is a reordering of yields and not a layout change.
+The defect is that the spec asserts an invariant the code does not yet provide,
+and books no work to close the gap.
+
+**Confidence:** high. `EngraveText`'s ordering is quoted above; `Engraving`'s type
+is `iter.Seq[Command]`. What would settle the remaining question — whether any
+other plate builder already emits title last — was not checked; `EngraveFitted`
+and `EngraveSeedString` were not read.
