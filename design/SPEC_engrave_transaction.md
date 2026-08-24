@@ -852,10 +852,13 @@ unchanged:** the search discards any configuration above 16 symbols. What change
 is where an implementer should expect to *meet* it, and a test that reaches for a
 tiny transaction to trigger the cap will never fire.
 
-> **These measured rows are from the OLD hard-coded legend charge** (6 lines /
-> 25.5 mm) and are therefore **stale in the plate column** — §4.6 requires the
-> regeneration, with §4.5a's computed reservation as an input. The *shape* of the
-> argument above survives the regeneration; the specific plate counts do not.
+> **These rows are stale in TWO ways at once, and are kept only for their
+> SHAPE.** They carry the old hard-coded legend charge (6 lines / 25.5 mm), *and*
+> they were produced under the **old objective** — ECC ranked above symbol count,
+> with no floor. Under §4.5b the 488–535 B rows' **ECC L is now inadmissible**,
+> and the 742 B row's six symbols would now lose to a configuration with fewer.
+> **The argument above survives — more symbols only when they buy something — but
+> not one number in the table does.** §4.6 requires the regeneration.
 
 **GATE 1 IS NOT UNVERIFIED — IT IS REFUTED. R0 round 2, I1.**
 
@@ -1076,20 +1079,67 @@ only the device holds `EngraverParams`.
 ```
 search space:  module size × QR version (1..40) × ECC (L,M,Q,H)
                × rectangular tiling (across × rows)
-objective:     1. minimise plates    ← a plate holds the QR(s) AND the legend
-               2. maximise ECC
-               3. minimise symbol count
+
+CONSTRAINT:    ECC >= M          <- NEVER traded, at any plate or symbol count.
+                                    A configuration below it is DISCARDED, not
+                                    ranked. Same status as "must fit the plate".
+CONSTRAINT:    symbols <= 16     <- QR Structured Append's 4-bit count field
+
+objective:     1. minimise plates      <- a plate holds the QR(s) AND the legend
+               2. minimise SYMBOL COUNT
+               3. maximise ECC         <- spend whatever capacity is left over
                4. TIE-BREAK: maximise MODULE SIZE
                5. then minimise QR version
+
 plate:         85 × 85 mm, outer margin 3 mm ⇒ 79 mm usable
 quiet zone:    4 modules per side, per symbol
 ```
 
-**Both R0 corrections MUST be carried:** tiling is `across × rows`, **not**
-`k × k`; and the objective must be a **total order** breaking toward the
-**largest** module — the original omitted module size and used strict `<` against
-a loop ascending from 0.30 mm, so ties broke toward the **smallest, least
-legible** symbol.
+#### 4.5b WHY SYMBOLS RANK ABOVE ECC, AND WHY ECC GETS A FLOOR
+
+**Operator ruling 2026-08-24**, replacing an objective that ranked ECC second and
+symbol count third.
+
+**STRUCTURED APPEND HAS NO CROSS-SYMBOL REDUNDANCY.** The parity byte *detects* a
+symbol from a foreign set; it does not *reconstruct* a missing one. **Lose one
+symbol and the whole transaction is lost.** ECC protects **within** a symbol;
+nothing protects **across** symbols.
+
+So every additional symbol is an **independent fatal point**, and six symbols at
+ECC Q can be less survivable than one at ECC L — the six-symbol set dies if any
+one of six dies. F-234 already names the cliff this sits on: *"kill the finder
+patterns and nothing decodes."* No ECC level saves a symbol whose finder pattern
+is gouged.
+
+**Minimising symbols is therefore a ROBUSTNESS decision, not an operator
+convenience.** That is why it outranks ECC.
+
+**But ECC gets a FLOOR rather than losing, because it is the only thing that
+survives DISTRIBUTED damage** — the scuffs and handling a plate accumulates over
+years, as opposed to one catastrophic gouge. And F-234 records that
+Reed-Solomon's percentages are **per RS block**, not per symbol, so a single deep
+scratch can exhaust one block's budget while total damage looks mild.
+
+**The floor is a CONSTRAINT, not a ranking step, and the distinction is the whole
+point.** Ranked third, ECC gets traded away whenever dropping a level shaves a
+symbol. As a constraint it cannot be traded at all: **the search discards any
+configuration below ECC M**, exactly as it discards one that does not fit the
+plate. Step 3 then spends genuinely leftover capacity on going higher.
+
+> **AN INTERACTION THAT PARTLY CANCELS, and both halves must land in the same
+> regeneration (§4.6).** §4.5a's packed legend *buys* capacity on plate 1
+> (v16 → v19, or v21 without the optional fields). **The M floor spends it**: the
+> measured 488–535 B cases chose **ECC L**, which the floor now forbids, so they
+> must find that capacity elsewhere — a larger version, another symbol, or
+> another plate. Neither change can be evaluated without the other, and the old
+> table has neither.
+
+**Both R0 corrections still apply, unchanged by the reordering:** tiling is
+`across × rows`, **not** `k × k`; and the objective must be a **total order**
+breaking toward the **largest** module — the original omitted module size and
+used strict `<` against a loop ascending from 0.30 mm, so ties broke toward the
+**smallest, least legible** symbol. Reordering steps 2 and 3 changes *what* is
+compared, not *that* the comparison must be total.
 
 #### 4.5a The legend reservation is a FORMULA, and the fields are PACKED
 
@@ -1158,7 +1208,15 @@ It measures **PSBTs**; this design carries **signed transactions** (53–91% of 
 size). It corrects for a **49-bit** chunk header; the ruled header is **55 bits**
 (F-242). And `SPEC_mt_qr_DEFERRED.md` §10.14's **font-metric correction** is owed.
 
-**R0 round 0, M2 — a fourth input, and it is the largest.** The regeneration must
+**TWO MORE INPUTS, from the 2026-08-24 objective change (§4.5b):** the search now
+**minimises symbols above ECC** and carries a **hard ECC floor at M**. Every row
+in the existing table was produced under the opposite ranking with **no floor**,
+so its ECC column is not merely stale — several rows chose **ECC L**, which is
+now **inadmissible**. **Six inputs in total, and the table cannot be partially
+updated:** the packed legend *buys* capacity and the M floor *spends* it, so
+evaluating either alone gives a wrong answer.
+
+**R0 round 2, M2 — a fourth input, and it is the largest.** The regeneration must
 also carry **§4.5a's packed-and-computed legend reservation**. The existing table
 was produced with the hard-coded 6-line / 25.5 mm charge, which costs **54% of
 plate 1's area**; packing alone moves 0.60 mm from **v16 to v19**. Every plate
@@ -1334,6 +1392,7 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
 | **Text+QR is never offered for a transaction** | operator 2026-08-24 |
 | **Multi-symbol QR uses QR Structured Append** | operator 2026-08-24, R0 C1 |
 | **The legend is packed and its reservation computed; 3.0 mm is the tested floor** | operator 2026-08-24 |
+| **Symbol count outranks ECC; ECC gets a hard FLOOR at M** | operator 2026-08-24 |
 
 ---
 
