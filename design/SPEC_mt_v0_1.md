@@ -879,6 +879,59 @@ overturned an earlier assumption and are marked.
    all-lower as identical and normalising costs nothing. (Mixed case is invalid
    *bech32*; `mt` normalises before that rule bites.)
 
+   **`--elide-prefix` — emit the invariant 8 characters ONCE.** Operator ruling
+   2026-08-23: *"the hand engraving user might put many strings on one plate and
+   skip repeating the header after a while, keeping the payload characters for
+   each string vertically aligned to indicate a dropped header."*
+
+   Per-field alignment (§10.13 a2) makes this expressible: `version +
+   chunk_set_id + count` is **exactly 8 characters** and `index` is exactly 3, so
+   there is a clean boundary to cut at.
+
+       mt encode --elide-prefix
+
+       mt1qzrf8xk2 q9d7b4h2... <- string 1, FULL
+                   qp4m2e7k9... <- strings 2..n: index + payload only
+                   qzr8xk2vt...
+
+   **The FIRST string is always emitted in full and the rest are elided.** That
+   makes the output **self-describing**: `mt decode` and `mt verify` take the
+   prefix from string 1 and need no extra flag, so the round trip closes with
+   one option on one side.
+
+   **Detection is unambiguous and needs no flag on input:** a line beginning
+   `mt1` is a full string; anything else is elided and is prefixed with the set's
+   invariant 8 characters before anything else happens. Mixed input is therefore
+   legal — which matters, because an operator who elides *"after a while"* will
+   produce exactly that.
+
+   > **AN ELIDED STRING IS NOT A VALID `mt1` STRING, and this is the property
+   > that governs the whole feature.** The BCH checksum is computed over the
+   > **full** data including the invariant fields, so an elided line will not
+   > verify on its own. It is a **display form**, never a wire form: `mt`
+   > restores the prefix and only then parses, checksums or corrects. Nothing
+   > downstream of that restoration knows elision happened.
+   >
+   > **If every line is elided — refuse, and say what is missing.** Without one
+   > full string there is no prefix to restore, and guessing is not `mt`'s to
+   > do silently. The refusal names the shape of what is needed: the **8
+   > characters following `mt1` on any intact string of the same set**.
+   >
+   > **The prefix is not lost with the string that carried it.** `version` is a
+   > known constant and `count` is guessable from the number of strings held, so
+   > only `chunk_set_id` is genuinely unknown — **20 bits, 1,048,576
+   > candidates**, one BCH verification each. And the content id settles it
+   > independently: the set id **is** the top 20 bits of the reassembled
+   > transaction's txid (§10.13 c), so a wrong guess cannot survive reassembly.
+   > Recorded because an operator deciding whether to elide deserves to know the
+   > failure is recoverable rather than terminal; **`mt` v0.1 does not implement
+   > the search** and the refusal above says so plainly.
+
+   **What it costs and saves, measured.** Eliding saves `8 × (n − 1)` characters:
+   32 on a 5-string transaction, **104 on the 14-string case**, 496 on the
+   63-string one. Against §10.13(a2)'s +1 symbol per chunk, the 14-string case is
+   **90 characters cheaper than the 50-bit layout that could not elide at all**.
+
    **Spaces are stripped on input, and offered on output.** `mt encode` takes an
    optional grouping — every N characters, space-separated — **for hand
    engraving only**, since a person cutting 90 characters needs somewhere to
@@ -2944,8 +2997,8 @@ signed PSBT.
     | **the set prefix** | the **first 8 characters after `mt1`**, shared by every string in this set, with the rule stated — see below |
     | **the value provenance** | per input: chain-fetched (§6a), txid-bound (§8.2d), or operator-asserted (§8.2c) |
 
-    **THE SPEC NAMES TWO FLAGS while requiring SEVEN operator inputs the PSBT
-    cannot supply — R4 lens 2, corrected by R6.**
+    **THE SPEC NAMES THREE FLAGS while requiring SEVEN operator inputs the PSBT
+    cannot supply — R4 lens 2, corrected by R6, updated 2026-08-23.**
 
     > **The original wording was "ZERO FLAGS", and it was falsified by a
     > one-second `grep` the sentence itself prescribes.** `--transaction`
@@ -2955,8 +3008,9 @@ signed PSBT.
     > its own search by a day — the standing lesson about negatives inheriting
     > their scope, landing on a sentence that names the command to re-run.
     >
-    > The finding it supports is **unchanged and still open**: two flags is not
-    > seven, so the gap is 5 rather than 7. Most consequentially
+    > The finding it supports is **unchanged and still open**: three flags
+    > (`--transaction`, `--quiet`, `--elide-prefix`) is not seven, so the gap is
+    > 4 rather than 7. Most consequentially
     **§8.7's plate budget has no input at all**, which makes that numbered
     refusal unrunnable as written: a refusal whose threshold cannot be supplied
     is not a refusal.
@@ -3050,6 +3104,11 @@ signed PSBT.
        stream §0a declares to be the artifact, and every downstream consumer
        must strip them — including `mt qr` when that lands. Grouping is a
        hand-engraving courtesy, so it is **opt-in and never the default**.
+
+    b2. **`--elide-prefix` (`mt encode`) emits the set's invariant 8 characters
+       on the first string only** (§3b). It changes the **display** form, never
+       the wire form: `decode` and `verify` restore the prefix before parsing,
+       and accept full, elided and mixed input with no flag of their own.
 
     b. **`--quiet` suppresses the INSPECTION REPORT only. Warnings and refusals
        are NEVER suppressed**, on any verb. It was defined only for `decode`,

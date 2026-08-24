@@ -187,6 +187,7 @@ matches the spec's pinned vector**.
 - the ordered sniffing procedure — binary PSBT before whitespace removal, then base64, then hex (§8.2e)
 - normalisation to **lowercase**; stdout is lowercase, ungrouped (§1.1e, §12.10)
 - optional grouping, opt-in, **stdout only**
+- **`--elide-prefix`** — first string full, rest carry `index + payload` only (§3b)
 - the `stderr` legend suggestion, six fields including `FORMAT: mt1 codex32` (§5)
 - the `CUT` and `PREFIX` rows appended to the report (§1.1)
 
@@ -201,6 +202,7 @@ reaches a non-stdout consumer.
 
 **Deliverable.** The reading path, which is where the recovery journeys live.
 
+- **prefix restoration before anything else** — a line not beginning `mt1` is elided and is prefixed from the set's full string; full, elided and **mixed** input all accepted (§3b)
 - splitting **then** stripping (§1.1e) — including the single-line pasted blob
 - length check from the **modal** string length (§1.1e)
 - autocorrect: try-as-written first, positional, never touching a string that parses (§1.1e)
@@ -208,7 +210,12 @@ reaches a non-stdout consumer.
 - duplicate resolution over **`n`** candidates, post-correction bytes, majority vote forbidden (§1.1)
 - `decode` writes **nothing to stdout** unless every check passes, exits non-zero otherwise (§1.1a)
 
-**Tests first.** A test that a >4-error chunk is *not* silently accepted; a test
+**Tests first.** A round-trip through `--elide-prefix` (encode elided → decode →
+byte-identical transaction), a **mixed** full/elided input test, and a test that
+**all-elided input is refused** with the message naming the 8 characters needed —
+elision is a display form over a checksum that covers the full data, so a
+restoration bug shows up as a checksum failure and must not be mistaken for one.
+A test that a >4-error chunk is *not* silently accepted; a test
 that the `mt1`→`mtl` autocorrect hazard does not fire on a valid string; a
 duplicate-resolution test with **three** candidates asserting refusal rather than
 a vote; a test asserting stdout is empty on failure.
