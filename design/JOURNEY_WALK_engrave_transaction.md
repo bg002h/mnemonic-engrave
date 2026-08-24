@@ -549,13 +549,86 @@ way.
 
 ---
 
+## Finding C, resolved — the XOR form, and what it costs v1
+
+**RULED (operator) 2026-08-24: no default. `mt encode --record` refuses without
+`--raw` or `--chunks`.**
+
+The concern raised and overruled: a flag required on every invocation is the
+friction that gets aliased away, and the alias re-hides the choice — which is
+exactly how finding F happened. **Mitigation adopted: make the refusal TEACH.**
+A refusal that states what each choice costs is far less likely to be aliased
+away than one that merely blocks:
+
+```
+mt: --record needs a form. Say which:
+
+  --raw      the transaction's bytes. QR plates only.
+             The device needs no mt1 decoder.
+
+  --chunks   mt1 strings. Text plates.
+             The device engraves them verbatim.
+```
+
+It belongs on **`mt encode`**, not `me sysw pack`: `mt` owns the transaction and
+the chunking, and `me` treats the record body as opaque by design.
+
+### The scope consequence, and the operator's answer to it
+
+With no default an operator may pass `--chunks` on day one, so the device must
+handle it — which appeared to put the `mt1` decoder back on v1's critical path.
+
+**RULED (operator): "if chunks passed, chunks get engraved without inspection or
+confirmation. If raw passed, inspection offered on device."**
+
+This removes the decoder from v1 entirely, because **chunks are engraved verbatim
+as TEXT** — the existing `mdmkText` / `validateMdmk` path the device already uses
+for `md1`/`mk1` cards. The device never needs to understand them.
+
+| payload | device does | needs |
+| --- | --- | --- |
+| **raw** | parse -> comprehend -> confirm -> **QR plates** | tx parser only |
+| **chunks** | engrave verbatim -> **text plates** | nothing new |
+
+**Three things this pins:**
+
+1. **It is a deliberate EXCEPTION to the first ruling of the day**
+   ("comprehend, then cut"), and the spec must say so **in those words**.
+   Otherwise a future reader finds the inconsistency and "fixes" it. The
+   justification is that comprehension **moved upstream** — `mt encode` built
+   those chunks from a transaction the operator inspected on the host — not that
+   it was dropped.
+2. **Chunks means text plates ONLY, no QR.** F-234 forbids an `mt1` string as QR
+   content, and with no decoder the device cannot turn chunks back into bytes.
+   Each form therefore produces exactly one kind of plate, which is simpler than
+   the matrix the brainstorm assumed.
+3. **ACCEPTED COST, stated plainly:** a chunks plate is cut with the device
+   making **no claim whatever** about its content — no destination, no amount, no
+   txid. The operator's only verification is the one they did on the host.
+
+### PROPOSED refinement — per-chunk checksum, no decoder
+
+Without a decoder the device cannot distinguish a valid chunk set from garbage,
+so a corrupted payload becomes ~21 minutes per plate of scrap, and the plate
+looks right.
+
+**The fork already carries the codex32 BCH engine** (`codex32/gf32.go`,
+`gf1024.go`, `checksum.go`, `correct.go`) and already exposes validity predicates
+for the sibling formats (`codex32.ValidMD`, `ValidMK`). So the device can verify
+**each chunk's own BCH checksum** without reassembling anything — far less than a
+decoder, and it catches garbage before the machine moves.
+
+*Status: proposed, not ruled.*
+
+---
+
 ## Running classification tally
 
 | # | finding | class | status |
 | --- | --- | --- | --- |
 | A | pipeline does not compose | spec correction + new stdin path | RULED |
 | B | `tx:` record on argv | refusal | RULED |
-| C | XOR has no CLI surface | flag + default | **OPEN** |
+| C | XOR has no CLI surface | **no default — a teaching refusal**; chunks engrave verbatim, no decoder in v1 | RULED |
 | D | pipeline safety rests on unstated invariants | two spec requirements | RULED |
 | E | world-readable output | refusal + override, all of `me` and `mt` | RULED |
 | F-244 | container written 0644 with a cleartext mnemonic | **CRITICAL** | FILED |
