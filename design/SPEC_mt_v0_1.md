@@ -1272,7 +1272,7 @@ specify, test, teach a recoverer, and get wrong only once.**
 > against a 320-bit budget that sits *below* codex32's 400-bit capacity, so a
 > wider header does not change the chunk count — it consumes slack. Measured: a
 > chunk-string goes from **89 to 90 characters** at the 49-bit header this box
-> was written under; at the ruled 55-bit header the same string is 90 and the
+> was written under; at the ruled 55-bit header a 40-byte chunk is **91** and the
 > 162-byte five-chunk artifact totals **395** characters (four strings of 80
 > plus a last of 75 — §10.13 a2's table, recomputed). The *cost per widening* is what
 > this box measures, not the current length. Both `41 + 320 = 361` and `49 + 320 = 369` fit the
