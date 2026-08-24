@@ -105,10 +105,11 @@ listed here BEFORE they are needed.*
 | 2 | **adversarial correctness** (R0 r0, opus) | construct a failure the spec permits | **DONE** — 3C / 8I / 4M |
 | 3 | **fold-check** (R0 r1, sonnet) | did the fold fix it, or only claim to? | **DONE** — 3 PARTIAL + 1I/2M *the fold introduced* |
 | 4 | **fold-check + implementability** (R0 r2, opus) | could two implementers build different things — or nothing? | **DONE** — 2 PARTIAL + **0C / 7I / 3M**; first round with no Criticals |
-| 5 | **spec-coverage** | does every §8 ruling have a section, every section a phase, every refusal a §? | not run |
-| 6 | **failure-states** | for each thing that goes wrong, what does the operator SEE? | not run |
-| 7 | **comprehension** | can someone who was NOT here read this and build the right thing? | not run |
-| 8 | **Journey B — recovery** | someone finds the plate in fifteen years | not run |
+| 4b | **what did the diff FALSIFY** (R0 r3, opus) | what did these changes make untrue *elsewhere*? | **DONE** — **0C / 8I / 10M**, seven of eight pure propagation |
+| 5 | **spec-coverage** (R0 r4, sonnet) | ruled but unbuilt, or built but unruled? | **RUNNING** |
+| 6 | **failure-states** | for each thing that goes wrong, what does the operator SEE? | not run — **candidate for during implementation** |
+| 7 | **comprehension** | can someone who was NOT here read this and build the right thing? | not run — **candidate for during implementation** |
+| ~~8~~ | ~~Journey B — recovery~~ | ~~someone finds the plate in fifteen years~~ | **SKIPPED by operator ruling 2026-08-24** |
 
 **Lens 8 is the one most likely to change the design**, because everything so far
 has been walked from the *engraving* end. F-234's whole promise lives at the
@@ -194,11 +195,26 @@ this is recorded here rather than left to §6.
 module-for-module (§4.2c), so it is not throwaway scaffolding — it is a
 committed artifact with a second job later.
 
+## The severity curve after four rounds
+
+| round | lens | result |
+| --- | --- | --- |
+| 0 | adversarial correctness | **3C** / 8I / 4M |
+| 1 | fold-check | 0C / 1I / 2M — the I was *introduced by the round-0 fold* |
+| 2 | fold-check + implementability | 0C / 7I / 3M — two findings no fold-check could reach |
+| 3 | what did the diff falsify | 0C / 8I / 10M — **seven of eight pure propagation** |
+
+**Three rounds with zero Criticals, and the last one was almost entirely
+propagation.** That is the "rounds stop paying" signal: once only propagation
+remains, audit it **mechanically at fold time** rather than buying another round.
+Round 2 is the counter-example worth remembering — its two best findings came
+from a **new lens**, not from re-checking the previous answer.
+
 ## Open, and who owns it
 
 | | owner |
 | --- | --- |
-| **gen-sa-fixture.py — does not exist, blocks S0's SA pair** | **unassigned.** Needs `segno`; must be committed and validated before the loud window |
+| ~~gen-sa-fixture.py~~ | **WRITTEN 2026-08-24** (`4e45933`, folded at `5e7c491`). Two symbols, `v5-M`, masks **3 and 2**, 54.0 mm of 79 mm — shares a plate with S0's other blocks, no extra cut. It also proved the 16-symbol cap executably (segno refuses 17) and that **the mask is PER SYMBOL**, which §4.2c had wrong |
 | **S0 — cut the test plate** (QR at 0.3/0.45/0.6/0.9 mm + a raw-octet and a base45 symbol, external scanner) | **the operator**. Resolves BOTH live hypotheses: QR encoding (F-243) and module size (F-234) |
 | **R0 to 0C/0I** | rounds 0–2 folded (`48da287`, `8290415`, `6d4d099`). **Not green** |
 | **O14 — S0 is specified to cut a Structured-Append pair that nothing can produce** | **the operator.** Build SA before S0, hand-build throwaway symbols, or drop the pair — each trades against something |
