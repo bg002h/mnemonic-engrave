@@ -11,6 +11,7 @@ until a re-review returns 0C/0I; **no code before that.**
 | **R0 round 0**, adversarial, opus | **3 Critical / 8 Important / 4 Minor** | `agent-reports/R0-engrave-transaction-round0-adversarial.md`, persisted verbatim at `caa90cb` **before** any of it was folded |
 | **R0 round 1**, fold-check, sonnet | **12 FIXED / 3 PARTIAL / 0 NOT FIXED**, plus **0C / 1I / 2M** the round-0 fold itself introduced | `agent-reports/R0-engrave-transaction-round1-foldcheck.md`, persisted at `321cba6` |
 | **R0 round 2**, fold-check + **implementability**, opus | **4 FIXED / 2 PARTIAL**, plus **0 Critical / 7 Important / 3 Minor** — the first round with **no Criticals** | `agent-reports/R0-engrave-transaction-round2-foldcheck-implementability.md`, persisted at `31dbdff` |
+| **architect**, fable, operator-routed | decided **O11** and **O14**, the two the controller declined to guess | `agent-reports/ARCHITECT-o11-o14.md`, persisted at `eca34c1` |
 
 **The walk made this spec smaller; R0 made it truer.** The walk removed work —
 chunks engrave **verbatim**, so v1 needs no `mt1` decoder (§2.2). R0 removed
@@ -215,7 +216,7 @@ prefix is not.
 | --- | --- |
 | **P1's "with vectors"** | you cannot write a test vector for a format you have not stated |
 | **R4′** (both forms in one record) | it must be able to *see* both forms to refuse them |
-| **R14** (several chunks-form transactions) | it must count transactions in a payload |
+| **R15** (the carried-txid cross-check) | it reads the carried txid out of the record |
 | **§3.4's asserted column** | `TO` and the fee are read out of the record's legend fields |
 
 And **Rust (`me`) and Go (fork `sysw/`) must agree byte-for-byte** — the
@@ -224,7 +225,12 @@ layout is written down.
 
 **NORMATIVE: P1 defines it before anything reads it**, stating at minimum: how
 the raw form and the chunks form are distinguished, how the optional legend
-fields are delimited, and what an absent optional field looks like. **The body is
+fields are delimited, what an absent optional field looks like, and — **new,
+below** — the carried txid.
+
+**THE CHUNKS FORM CARRIES A MANDATORY 32-BYTE TXID, COMPUTED BY `mt`.**
+Architect decision on O11, taken **while this layout is still unfrozen**, which
+is the cheapest moment it will ever be available. See §3.6b. **The body is
 lowercase hex** (the reserved-prefix rule); what the hex *decodes to* is missing.
 
 > **This is the largest single gap in the document**, and it is invisible to a
@@ -683,11 +689,40 @@ work inside:
 | the legend fields | **yes** — carried in the record (§2.1) | **asserted**, and may collide |
 | record order in the payload | yes | positional, and says nothing |
 
-**OPEN — this spec does not resolve it.** Recorded as §9 O11 rather than guessed
-at, because every option trades against a ruling: deriving a txid needs the
-decoder §2.2 rules out; keying on `chunk_set_id` puts a 20-bit value in the role
-`mt` explicitly refuses it for; keying on the legend makes an **asserted** field
-the identity of an artifact.
+#### 3.6b RESOLVED — the txid is CARRIED, and 20 bits may only REFUTE it
+
+**O11, decided.** The device cannot *derive* a txid without a decoder, so it is
+**carried**: `mt` computes it on the host, where the transaction is in hand, and
+the chunks record carries it as a mandatory 32-byte field (§2.1b).
+
+**IT IS DISPLAYED AS CARRIED, NEVER AS DERIVED**, and the distinction is
+normative rather than cosmetic. For a **raw** payload the device computes the
+txid from bytes it holds and stands behind it (§3.4's *derived* column). For a
+**chunks** payload it is repeating a number `mt` told it — which belongs in
+§3.4's **asserted** column, beside `TO` and the fee. A screen that renders the
+two identically would have the device vouching for a value it cannot check.
+
+**BUT IT IS NOT UNCHECKED, and this is what makes the decision sound.** The
+`mt1` chunk header's `chunk_set_id` **is the top 20 bits of the txid** —
+`SPEC_mt_v0_1.md:943`: *"the set id **is** the top 20 bits of the reassembled
+transaction's txid (§10.13 c), so a wrong guess cannot survive reassembly."* The
+device reads that field off **every chunk** with no decoder at all.
+
+**NORMATIVE — R15: 20 bits REFUTES; it never CONFIRMS.**
+
+| observation | verdict |
+| --- | --- |
+| carried txid's top 20 bits ≠ some chunk's `chunk_set_id` | **REFUSE.** The record is internally inconsistent — a mis-assembled payload, and the device says so |
+| they match | **nothing is proven.** 1 in 1,048,576 by accident, *"under a second to construct deliberately"* (`mt`'s own help). It stays **asserted** |
+
+This is precisely the role `mt` refuses 20 bits for — *identification* — and
+precisely the role it is sound in: **falsification.** A check that can only fail
+honestly is worth having; one that claims to confirm is not.
+
+**R14 IS RETIRED.** It refused any payload holding more than one chunks-form
+transaction, which was the honest stopgap while the picker had no key. The picker
+now has one, so the refusal's reason is gone and backing up several transactions
+in one sitting works again.
 
 ### 3.7 What the device does not do
 
@@ -787,19 +822,41 @@ where a Structured Append header (mode 3: index, count, parity) would be written
 That is real work, and **NORMATIVE: a phase must own it.** §6 assigns it to
 **P5**.
 
-**AND IT BREAKS §6's ORDER, which this spec must not paper over.** S0 runs
-**first** and is specified to cut *"a Structured-Append pair"* — an artifact
-nothing in the tree can currently produce. Three ways out, and this spec does
-**not** choose between them (see §9 O14):
+#### 4.2c RESOLVED — S0 keeps the pair, and the fixture becomes the ORACLE
 
-| | |
-| --- | --- |
-| build SA before S0 | S0 stops being "two seconds of machine time" and gains a code dependency |
-| S0 cuts hand-built SA symbols | needs a throwaway encoder, but keeps S0 first and cheap |
-| S0 drops the SA pair | then gate 2 moves to a later plate, and P5 closes without knowing scanners can read it |
+**O14, decided.** S0 runs **first** and is specified to cut a Structured-Append
+pair — an artifact nothing in the tree can produce until P5. The resolution
+separates the two questions that were tangled together:
 
-**GATE 2 stands as written:** real scanners must reassemble it off engraved
-steel. That remains an S0-class question whichever route is taken.
+| question | when | how |
+| --- | --- | --- |
+| **can a scanner read SA off engraved steel?** — physics | **S0, first** | cut **hand-built, standard-conformant** symbols from an independent committed generator (`scripts/gen-sa-fixture.py`, `segno`-based), validated on screen before anything is cut |
+| **does OUR encoder emit it correctly?** — software | **P5** | its gate must reproduce the S0 fixture **module-for-module** |
+
+**The obvious objection is that the thing tested is not the thing shipped. The
+decision turns that into the point.** Because P5's gate must reproduce the S0
+fixture module-for-module, **the fixture is a cross-implementation oracle** — an
+independent encoder's output that ours must match exactly. That is strictly
+stronger than testing our encoder against itself, which is the shape a prior
+cycle's pinned corpus had when it was uniformly wrong.
+
+**It is achievable, not aspirational.** A QR symbol is deterministic given
+version, level and mask, and the vendored library takes all three explicitly:
+`coding.NewPlan(version Version, level Level, mask Mask)` — `coding/qr.go:484`.
+So *"module-for-module"* is a byte comparison, not a judgement call.
+
+**NORMATIVE:**
+
+- **S0 cuts the SA pair** from the independent generator, which is **committed**,
+  not run once and discarded — P5's gate needs it later.
+- **P5's gate has two halves:** reproduce the S0 fixture module-for-module with
+  pinned version/level/mask, **and** decode P5's own rendering with **the same
+  scanners used at S0**. Neither half alone is sufficient: the first proves our
+  encoder agrees with a standard implementation, the second proves the result
+  survives the machine.
+- **The physics gate therefore runs FIRST and cheaply; the software gate stays
+  machine-checked.** S0 keeps its character — two seconds of machine time — and
+  gains no code dependency on P5.
 
 **§4.3's post-cut test is only meaningful once (1) and (2) hold.** Until then a
 multi-symbol job cannot be verified by the operator at all.
@@ -1090,7 +1147,8 @@ this machinery (`refusals.toml`, `check-refusal-coverage.sh`,
 | R11 | **see R11′ below** | | 3.3 |
 | **R12** | **a well-formed `tx:` record reaching `freeTextScan`** — i.e. `tx:` added to `isSyswEncoded` without its own branch | §2.1a; this is the C3 defect made into a test | 2.1a |
 | **R13** | **a multi-symbol QR job when Structured Append is unavailable** | §4.2a's two gates; without them the artifact is unrecoverable and §4.3's test cannot pass | 4.2a |
-| **R14** | **a payload holding MORE THAN ONE chunks-form transaction** | §3.6a: the device cannot derive a txid without a decoder, so the picker cannot distinguish them and R10's duplicate rule is unevaluable. **Until O11 resolves, refusing is the only honest option** — the alternative is an operator committing a whole job to whichever row they guessed | 3.6a |
+| ~~R14~~ | **RETIRED.** It refused a payload holding several chunks-form transactions, as the honest stopgap while the picker had no key. §3.6b gives it one | — |
+| **R15** | **a chunks record whose carried txid's top 20 bits match no chunk's `chunk_set_id`** | §3.6b: the set id **is** those bits, so a mismatch proves the record is internally inconsistent. It **refutes only** — a match proves nothing | 3.6b |
 
 ### R4′ — refusing "both forms" was wrong
 
@@ -1148,7 +1206,7 @@ instances in this cycle now, the most recent two found while fixing F-244:
 
 | | where | what |
 | --- | --- | --- |
-| **S0** | this repo | **Cut the test plate.** QR blocks at 0.3 / 0.45 / 0.6 / 0.9 mm; one raw-octet and one base45 symbol; **a Structured-Append pair**; and **one legend line at each candidate face below 3.0 mm**. Read with an **external scanner** (§3.7). ~2 s per cut. Resolves module size, the byte encoding, §4.2a gate 2, and §4.5a's face |
+| **S0** | this repo | **Cut the test plate.** QR blocks at 0.3 / 0.45 / 0.6 / 0.9 mm; one raw-octet and one base45 symbol; **a Structured-Append pair from `scripts/gen-sa-fixture.py` (§4.2c) — committed, because P5's gate needs it**; and **one legend line at each candidate face below 3.0 mm**. Read with an **external scanner** (§3.7). ~2 s per cut, no dependency on P5 |
 | **P1** | `me` (Rust) | `ClassTransaction`, the framed record, stdin, content-based sealing, `MaxSectionLen` → 32,734 — **with vectors** |
 | **P2** | `mt` (Rust) | `mt encode --record --raw\|--chunks`; **`mt inspect` gains a raw-transaction subject**; the record must state whether it fits an **NFC tag** (§1.2), which is `gui/scan.go`'s 8 KB buffer, not `MaxSectionLen` |
 | **P3** | fork (Go) | Port P1, provenance-pinned. **Includes the `tx:` branch in `gui/scan.go` (§2.1a) — the prefix without the branch is the C3 defect** |
@@ -1168,10 +1226,12 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
 - **The mode-segmentation gate is green.** Any QR sizing MUST assert measured v40
   capacity against **numeric 7089 / alnum 4296 / byte 2953 at L**.
 - **The test plate is cut and read** (S0).
-- **§4.2a's TWO Structured-Append gates are both satisfied** — the encoder emits
-  it, and a real scanner reassembles it off engraved steel. **Until both hold,
-  a multi-symbol QR job may not be cut**, because it is unrecoverable and §4.3's
-  mandatory test cannot pass on any plate but the last.
+- **§4.2c's TWO Structured-Append gates are both satisfied**, and they are
+  separate: **(a)** a real scanner reassembles the S0 fixture off engraved steel
+  (physics, answered at S0), and **(b)** P5's encoder reproduces that fixture
+  **module-for-module** with pinned version/level/mask **and** its own rendering
+  decodes with the same scanners (software, machine-checked). **Until both hold,
+  a multi-symbol QR job may not be cut.**
 - **The legend reservation is COMPUTED, not hard-coded** (§4.5a), and the plate
   table is regenerated with it as an input (§4.6).
 - **P5's gate asserts the legend's EMISSION ORDER** (§4.4a), not merely that a
@@ -1179,10 +1239,10 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
 - **`check-provenance.sh` green** across both repos. **Not in CI.**
 - **Refusal coverage is a bijection, and every refusal test goes red without its
   check** (§5).
-- **O11 is resolved, OR R14 refuses a multi-transaction chunks payload.**
-  **R0 round 1, I5 PARTIAL:** opening O11 honestly was not enough on its own —
-  nothing stopped such a payload reaching the ambiguous picker. One of the two
-  must hold before P4 closes.
+- **The carried txid and R15 are implemented** (§3.6b), and **the chunks picker
+  renders the txid in the ASSERTED voice, not the derived one** (§3.4). O11 is
+  resolved; R14 is retired; a test must show a chunks-form txid is not presented
+  as though the device computed it.
 - **All THREE program-keyed lockstep sites carry the new program** (§3.1a), and
   the two that fail **silently** are asserted by test — a panic announces itself,
   `scanUnknownFormat` does not.
@@ -1235,10 +1295,10 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
 | O5 | **`validateMdmk`'s four callers** engrave an `md1`/`mk1` codex32 string as QR content — a live F-234 violation | **NOT this spec.** For an `md1` card the "standard form" is not obvious the way transaction bytes are |
 | O6 | multi-symbol recovery without `mt`'s reader | `SPEC_mt_qr_DEFERRED.md:169` |
 | O7 | applicability predicates for the **other ten** programs | follow-up |
-| **O11** | **the picker's key for a CHUNKS payload** — the device cannot derive a txid without a decoder (§3.6a), and every alternative trades against a ruling | **unresolved; blocks a multi-transaction chunks payload** |
+| ~~O11~~ | **RESOLVED (§3.6b)** — the txid is **carried** by the record, shown in the **asserted** voice, and cross-checked against `chunk_set_id`, which **is** its top 20 bits. R15 refutes; it never confirms. R14 retired | closed → P1 + P4 |
 | ~~O12~~ | **ANSWERED, and the answer is NO** — `kortschak-qr v0.3.2` has no Structured Append (verified: zero occurrences; `Encode` returns one `*Code`). Buildable over its `coding` package; **P5 owns it**. See O14 for what that does to S0's order | **closed → P5 + O14** |
 | **O13** | a legend face **below 3.0 mm** — untested, and worth ~5 QR versions (§4.5a) | S0 |
-| **O14** | **S0 is specified to cut a Structured-Append pair, and nothing in the tree can produce one** (§4.2a, I1). Build SA before S0, hand-build throwaway symbols, or drop the pair from S0 — **unresolved** | operator |
+| ~~O14~~ | **RESOLVED (§4.2c)** — S0 cuts the pair from an independent committed generator, so the **physics** gate runs first and cheap; P5 reproduces that fixture **module-for-module**, so the **software** gate is a byte comparison against a cross-implementation oracle | closed → S0 + P5 |
 | O8 | **Journey B — recovery.** Someone finds the plate years later. Not yet walked | next walk |
 | O9 | the documented `picotool` line stops before the move to 20V/28V power, so a correct payload reads as a failed one | walk G, documentation |
 | O10 | the **courier model** is nowhere written down (§ walk H) | documentation |
