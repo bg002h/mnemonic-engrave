@@ -18,7 +18,7 @@ still runs and still has to be checked per-job.
 
 ## State
 
-S0 and P0–P6 shipped. CI green. **198 tests**, and six gates:
+S0 and P0–P6 shipped. CI green. **203 tests**, and six gates:
 
 | gate | what it asserts | in CI? |
 | --- | --- | --- |
@@ -88,8 +88,18 @@ legitimate one (must pass), and keep both as tests.**
 - Three v0.1 residues: **F-235** (addresses render with mainnet parameters),
   **F-236** (`--input-value` `f64` — since fixed, entry stale), **F-237** (no
   hint for a sibling `md1`/`mk1` string).
-- A round-4 fold check was in flight at the time of writing; its report will be
-  `R-round4-fold-check.md`.
+**Nothing else is open.** Thirteen lenses ran; the last two rounds found no
+Criticals, and the final verification returned 0 NOT FIXED and 0 regressions.
+Its single PARTIAL — the elided half of the misread-separator case — is fixed
+and pinned with one case per mode.
+
+**The last defect is the one to learn from.** It survived TWO fixes, and neither
+was wrong: both addressed real defects and neither addressed the half that
+mattered. A guard measured a malformed line against `full_len`, derived from the
+other `mt1` candidates — and with `--elide-prefix` **exactly one line is full**,
+so when that line is the corrupted one the reference does not exist and no
+tolerance can help. *When a guard derives a yardstick from other data, ask in
+which modes that data exists.*
 
 ## Resume
 
