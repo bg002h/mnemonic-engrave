@@ -429,6 +429,56 @@ wrong outcome is an operator reading their own change back as money leaving.*
 
 ---
 
+## Step 5 — after the cut
+
+The `mt` cycle's Critical was found at exactly this shape: not a wrong thing in a
+section, but a **silent step**. `mt verify` never reported how much of its
+`t = 4` budget a plate had consumed, so a plate miscut four times passed as OK
+while one scratch from unrecoverable. Nothing was wrong; a step said nothing.
+
+**RULED (operator) 2026-08-24: "Device says to test the plate now."**
+
+### N — THE DEVICE HAS NO CAMERA. It can never read back its own QR.
+
+Checked before writing the ruling into the spec, because *"test the plate"* is an
+**affordance** and an affordance needs a mechanism.
+
+`driver/` holds `ap33772s` (USB-PD), `clrc663` and `st25r3916` (**NFC readers**),
+`ft6x36` (touch), `ili9488` (display), `tmc2209` (steppers), `mjolnir2` (the
+machine), plus `dma`, `pio`, `otp`. **No image sensor.** And `scanner.Scan` has
+exactly one feed — `gui/nfc_scan.go:62`, the NFC poller.
+
+The only `camera` strings in the tree are a vestigial `cameraTheme` **colour**
+theme (`gui/theme.go:62`), a comment at `gui/derive_xpub.go:197`, and the BIP-39
+word *camera* in three wordlists. (The comment is a small instance of a mechanism
+outliving its hardware; not worth its own entry, worth not being misled by.)
+
+**The operator's wording was already the implementable one — the device SAYS to
+test, it does not test.** Three consequences bind the spec:
+
+1. **The device can never verify its own QR output.** It writes a symbol it has
+   no way to read. Plate testing is necessarily the operator's, with an external
+   scanner.
+2. **It retroactively validates today's FIRST ruling.** "Comprehend + read back"
+   was offered and rejected in favour of "comprehend, then cut". Read-back was
+   never possible on this hardware — the rejected option was unbuildable, and
+   nobody knew that at the time.
+3. **It changes F-243's test plate.** The optical test uses an external scanner
+   by necessity, and its result can never be checked by the machine that cut it.
+   *"Which encoding survives engraving"* is permanently a host-side,
+   human-in-the-loop measurement.
+
+*Classification: **not a defect — a hardware fact that removes an option and
+constrains a ruling.** It earns a spec change: §4 must state that no on-device
+read-back exists, so no future phase plans one.*
+
+**What the device must SAY, per the ruling** — and the `mt` Critical is the
+argument for saying it at all rather than dropping the operator back at the
+carousel with two pieces of steel and no statement. Open: the exact wording, and
+whether it names what to test WITH.
+
+---
+
 ## Running classification tally
 
 | # | finding | class | status |
@@ -447,6 +497,7 @@ wrong outcome is an operator reading their own change back as money leaving.*
 | K | txid shown for recognition, never claimed as proof | refusal to overclaim | RULED |
 | L | must every output be seen before ENGRAVE | **no** — total + skip, residual accepted | RULED |
 | M | the total must not read as a destination amount | refusal to overclaim | RULED |
+| N | **the device has no camera** — no on-device read-back, ever | hardware fact; spec must state it | RULED |
 
 **Step 4 onward: not yet walked.** The payload is loaded into the session; the
 operator has not yet reached the Engrave Transaction program itself.
