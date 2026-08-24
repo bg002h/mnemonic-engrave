@@ -9767,3 +9767,69 @@ payload split into numeric and alphanumeric segments and read 6.6% low. Every
 one produced a plausible-looking number. Only asserting measured v40 capacity
 against the published limits (numeric 7089 / alnum 4296 / byte 2953 at L) caught
 them. **Any future QR sizing work must carry that gate.**
+
+### F-235 — `mt` renders every address with MAINNET parameters, so a testnet or regtest transaction shows an address that does not exist (owning phase: **post-v0.1 UX**) `#mt` `#report` `#LOW`
+
+**Found by running P5's fixtures, 2026-08-24.** The `OUT` row of a regtest
+transaction reads
+
+    OUT       1 output(s)
+                bc1q07h88fcj0j86excq5m9k97e26su7j5tdvldytq   7.99900000 BTC
+
+while the node calls that same output `bcrt1q07h88fcj0j86excq5m9k97e26su7j5tdys0686`.
+Same witness program, different HRP and therefore a different checksum — so the
+printed string is not an address on any network the transaction belongs to.
+
+**Why it is LOW and not Important.** A transaction's `scriptPubKey` carries no
+network, so `mt` genuinely cannot know; mainnet is the only defensible default
+for a mainnet tool, and the spec is silent. The row is `stderr`-only and
+disposable. Crucially **the legend's `TO` line does not come from here** — §5
+takes it from `--to` / `--to-label`, which are the operator's own assertion
+(§10.4), so nothing wrong reaches steel.
+
+**What would close it.** Either a `--network` flag defaulting to mainnet, or
+deriving the network from the node when one is reachable and saying `network
+UNKNOWN — shown as mainnet` when not. The second is better: it needs no new
+operator input, which is §6a's posture. **Not** silently guessing from address
+prefixes in the inputs — there are none, the inputs are outpoints.
+
+**Do not fix this by suppressing the address.** The address is the single most
+useful row for a recoverer deciding whether to broadcast; a hex `scriptPubKey`
+is not a substitute.
+
+### F-236 — `--input-value` takes BTC as an `f64`, and the parse is lossy by construction (owning phase: **post-v0.1 UX**) `#mt` `#funds-safety` `#LOW`
+
+**Noticed while writing P5's tests, 2026-08-24.** `parse_input_values` does
+`btc.parse::<f64>()` then `(btc * 100_000_000.0).round()`. For every value a
+person will actually type this is exact — `f64` has 53 bits of mantissa and
+21 M BTC is under 2^51 satoshis — so the rounding recovers the intended integer
+and no realistic input is wrong.
+
+**It is recorded anyway because the reasoning is load-bearing and invisible.**
+The safety rests on a bound nobody has written down next to the code, and the
+same expression in a context with larger numbers would be a defect. The
+constellation's own lesson applies: an enumerated safety argument that lives
+only in someone's head goes stale silently.
+
+**What would close it.** Parse the decimal STRING into satoshis directly —
+split on `.`, require at most 8 fractional digits, reject anything else — which
+also gives a better refusal for `0:1.234567891` (nine decimals) than silently
+rounding it. That refusal is the actual user-visible gain, not the arithmetic.
+
+### F-237 — `me`'s `md1`/`mk1` strings are accepted by `mt decode`'s reader before the codec rejects them, so the refusal names the wrong thing (owning phase: **post-v0.1 UX**) `#mt` `#refusals` `#NIT`
+
+**Noticed while implementing §8.9, 2026-08-24.** §8.9 refuses `ms1` *before*
+§8.2e's byte-naming, because that refusal prints the first eight bytes and for a
+secret those bytes are the secret. The sibling formats have no such hazard —
+`md1`/`mk1` are watch-only public material — so nothing was added for them.
+
+The consequence is only a message-quality one: hand `mt decode` a valid `md1`
+string and it reports a codec error about symbols and checksums rather than
+*"this is an `md1` descriptor string; you want `md`"*. The operator is holding
+the right material for the wrong tool and the tool does not say so.
+
+**Deliberately NOT done in v0.1.** It would put knowledge of the sibling HRPs
+into `mt`, which currently knows only its own — and the constellation's
+fork-per-codec ruling (2026-05-03) exists precisely to stop that coupling
+spreading. A one-line hint keyed on the literal prefixes `md1`/`mk1` would be
+enough and would not import anything; that is what to write if it is done.
