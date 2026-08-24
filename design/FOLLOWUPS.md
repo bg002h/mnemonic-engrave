@@ -10150,7 +10150,7 @@ an untested assertion into steel.
 the search that produced it; this one's scope was `design/measurements/`, and it
 found nothing because nothing is there.
 
-### F-244 — `me sysw pack` writes the container with `std::fs::write`, so an UNSEALED payload holding a BIP-39 mnemonic lands mode 0644 (owning phase: **immediate — pre-existing defect, not Goal 1**) `#me` `#sysw` `#funds-safety` `#CRITICAL`
+### F-244 — CLOSED 2026-08-24 — `me sysw pack` wrote the container with `std::fs::write`, so an UNSEALED payload holding a BIP-39 mnemonic landed mode 0644 (owning phase: **immediate — pre-existing defect, not Goal 1**) `#me` `#sysw` `#funds-safety` `#CRITICAL`
 
 **Found 2026-08-24 by the Goal 1 journey walk**, at the step where the operator
 said *"I didn't realize `>` creates a world readable file"*. The walk was about
@@ -10232,4 +10232,67 @@ on a 0644 one. A constellation-wide rule is the kind an operator can remember;
 two tools treating one hazard differently teaches the wrong lesson from whichever
 they meet first. Note `emit` is a SHARED helper — fixing `sysw pack` alone would
 knowingly leave the same hole elsewhere in the same binary.
+
+---
+
+**CLOSED 2026-08-24, both halves, TDD throughout.**
+
+| | commit |
+| --- | --- |
+| `me` — the Critical itself | `46f2fd4` |
+| `mt` spec §8.2h | `f152aac` (engrave) |
+| `mt` implementation | `542b391` (transaction) |
+| provenance re-sync | `a76c1a9` (transaction) |
+
+**`me`.** `emit`'s `--out` now routes through `write_private`, which additionally
+`fchmod`s an existing target — the documented residual *"0o600 binds on CREATE"*,
+which this entry **measured true**, so creating carefully was never enough. The
+stdout side `fstat`s fd 1 and refuses a world-readable **regular file**, with
+`--allow-world-readable`. The converter's `--stdout`/`--hex`/`--base64` are gated
+too: all three carry the same bytes, and gating raw but not hex teaches the
+operator to reach for hex.
+
+**`mt`.** §8.2h, the other half of §8.2g. `validate.rs::world_readable_stdout_guard`,
+called before a byte of stdout is written so a refusal leaves no artifact.
+**Additive** to `redirected_output_warning`, not a replacement: that one is about
+how long the file lasts, this one about who can read it.
+
+**TWO NEAR MISSES CAUGHT, one of them mine.**
+
+1. **`me sysw wipe`** — `emit` is a **shared** helper, so the new guard reached a
+   command whose output is 65,536 bytes of `random`/`zeros`/`ones` with nothing
+   in it, existing to **destroy** a payload. Refusing it buys no safety and costs
+   a working command. Caught by asking what else the guard would now catch, then
+   pinned with a test. **The fifth instance** of the pattern the `mt` cycle
+   recorded.
+2. **`mt encode` has no `--out`** — and the first draft of both the refusal and
+   §8.2h advised one. Verified against `mt encode --help`; its absence is
+   deliberate, since stdout **is** the strings by ruling (§3b). A refusal naming
+   a flag that does not exist is worse than one naming none: it sends the
+   operator to `--help` to look for it.
+
+**Near misses are half of each test suite, and they PASSED before the fix** —
+which is what makes them non-vacuous. They catch a guard that **over**-fires,
+which is this codebase's demonstrated failure mode. Pinned: a pipe (`S_ISFIFO`)
+in both tools, an owner-only `0600` redirect in both, a wipe image, and a piped
+converter run.
+
+**GATES, all green:**
+
+```
+me   cargo nextest run --locked           303 passed, 1 skipped
+me   cargo clippy --all-targets           clean
+mt   cargo nextest run --locked           210 passed, 0 skipped
+mt   cargo clippy --all-targets           clean
+mt   check-refusal-coverage.sh            31 refusal tests over 18 ruled refusals
+mt   mutate-refusals.sh                   all 31 go RED without their check,
+                                          INCLUDING §8.2h world_readable_stdout_guard
+mt   journeys.sh                          A, B (both forms), C pass
+mt   check-provenance.sh                  every copied file matches its source
+```
+
+`check-refusal-coverage.sh` **refused the new entry first**: §8.2h was not in its
+seeded set. That is the typo guard working, and the seeded set now records that
+this entry did not come from widening the gate — the refusal did not exist until
+the walk found it.
 
