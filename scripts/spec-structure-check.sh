@@ -98,8 +98,28 @@ for (start, head), end in zip(heads, bounds[1:]):
         base, suf = int(m.group(1)), m.group(2)
         order.append((base, suf, ln, l))
     bases = [b for b, s, _, _ in order if s == '']
+    # A section may DECLARE that it preserves numbering borrowed from elsewhere,
+    # by carrying `<!-- numbering: preserved -->` in its body. An appendix that
+    # holds §10's settled questions under their ORIGINAL numbers is the case
+    # this exists for: §12.4 must stay 4, because §10.4 points at it and because
+    # commit messages cite it and git will never update those.
+    #
+    # THE OPT-OUT IS DECLARED IN THE DOCUMENT, NOT HIDDEN IN THIS SCRIPT. A gate
+    # exception that lives only in the checker is invisible to the person
+    # reading the artifact, and the next author to see a gap in the numbering
+    # has no way to tell a deliberate one from the corruption this check exists
+    # to catch -- which it did catch, minutes before this was added, when a
+    # botched range-replace ate two items and a whole section.
+    #
+    # Still enforced under the opt-out: ASCENDING and UNIQUE. Preserved
+    # numbering may have gaps; it may not go backwards or repeat.
+    preserved = any('<!-- numbering: preserved -->' in l for l in body)
     exp = list(range(1, len(bases)+1))
-    if bases != exp:
+    if preserved:
+        if bases != sorted(set(bases)):
+            err(f"{head[:40]!r}: numbering declared preserved, but items are "
+                f"not strictly ascending: {bases}")
+    elif bases != exp:
         err(f"{head[:40]!r}: item numbering is {bases}, expected {exp}")
     # suffixed items must follow their base
     for base, suf, ln, l in order:
