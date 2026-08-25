@@ -246,6 +246,64 @@ double-SHA256" over a witness-carrying body is the **wtxid**, not the txid; and
 anti-smuggling claim v1 rested on was false — entropy round-trips as a valid
 `mt1` string with an attacker-chosen `set_id`.
 
+## RULING 2026-08-24 — THE CHUNKS FORM RIDES AS BARE RECORDS (md1/mk1's pattern)
+
+**Found while explaining the architect's new finding to the operator, and it is a
+real defect in the R0-GREEN spec.**
+
+**The problem.** An `mt1` chunk is a bech32 string — already printable ASCII. The
+reserved-prefix rule hex-encodes a record body, so **every character costs two**.
+The chunks form is text encoded as though it were binary, and the cost compounds
+with text's own ~2.3 chars/byte:
+
+```
+pathological 10-in/2-out, 8,067 B
+  RAW     -> record 16,223 chars   fits (16,511 spare)
+  CHUNKS  -> record 37,255 chars   OVER THE 32,734 CAP BY 4,521
+```
+
+**The same transaction fits comfortably as raw bytes and cannot enter the
+container at all as chunks.** And the hex is there only to smuggle the LF
+separators past EPD §6.4 — it carries the separators, not the data.
+
+**The fix, ruled: follow `md1`/`mk1`.** They already solved this — a chunked
+constellation format does **not** ride as one hex-encoded record. Each chunk is
+its **own bare record** (`gui/scan.go:92` returns `mdmkText(buf)`, no prefix, no
+hex), and the container's own LF separates them.
+
+```
+  metadata record  3 + 2x43       =     89
+  202 bare chunks                 = 18,583   (LF-separated by the container)
+  total                           = 18,673 chars   FITS, 14,061 spare
+```
+
+**§2.1's "one record, not siblings" ruling is reopened — and the binding gets
+STRONGER.** §2.1 worried a separate legend would be merely *adjacent*. But the
+metadata record carries the txid and **every chunk carries `chunk_set_id` = the
+top 20 bits of that same txid**, so the association is **derivable from content,
+not positional**. **R15 stops being a consistency check and becomes the binding
+mechanism.**
+
+**Safe because of a bech32 property**: the data charset
+`qpzry9x8gf2tvdw0s3jn54khce6mua7l` excludes `1`, `b`, `i`, `o` — so `1` appears
+only as the HRP separator and **`mt1` can only ever mark a chunk boundary**.
+
+### The change-list, so the fold is mechanical
+
+| where | change |
+| --- | --- |
+| spec §2.1 | the CHUNKS form is a metadata record **plus** bare chunk records; RAW stays one record |
+| spec §2.3 | the table's chunks column is recomputed against the new framing |
+| spec §3.6b | R15 is described as the **binding** mechanism, not only a cross-check |
+| spec §5 | R15's wording follows |
+| plan §1 | the `tx:` record's `form = 0x02` body becomes **empty**; the chunks live outside it |
+| plan §2.4 | wiring gains a **`ValidMT`** classify branch for bare `mt1` records — the "new `ValidMT`, not a call to an existing predicate" the spec's round 2 already identified (M1) |
+| plan §3 | V3, V18–V20 and the CHUNKS vectors re-cut against bare records |
+
+**Not applied yet, deliberately:** R0 round 2 is reading both documents. Moving a
+file under a reviewer is how a fold gets reviewed against text that no longer
+exists.
+
 ## Open, and who owns it
 
 | | owner |
