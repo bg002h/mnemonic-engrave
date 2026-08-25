@@ -167,14 +167,61 @@ different door entirely, `gui/scan.go`, which parses **records**, not containers
 
 ## 2. The container
 
-### 2.1 One framed record under `tx:`
+### 2.1 One framed record under `tx:` — and, for CHUNKS, its bare siblings
 
-`ClassTransaction` is one record carrying the transaction (or its chunks) **and**
-the legend fields `mt encode` already computes. One record, not siblings, so the
-legend stays bound to what it describes.
+`ClassTransaction` is one record carrying the transaction **and** the legend
+fields `mt encode` already computes.
+
+> **AMENDED 2026-08-24 — operator ruling. "One record, not siblings" held for
+> the RAW form and is WITHDRAWN for the chunks form.** The sentence used to read
+> *"one record carrying the transaction (or its chunks) … One record, not
+> siblings, so the legend stays bound to what it describes"*, and its concern was
+> **positional**: siblings drift apart, so keep them in one record. P1's framing
+> arithmetic then measured what that costs. An `mt1` chunk is bech32 — already
+> printable ASCII — and the reserved-prefix rule hex-encodes a record body, so
+> **every character costs two**. Compounded with the chunk text's own ~2.3
+> characters per byte, the worst measured pathological spend in §2.3's own table
+> **could not enter the container at all** in chunk form, while the *same
+> transaction* fitted as raw bytes with room to spare. The hex was carrying the
+> **separators**, not the data — its only job was to keep LF bytes out of a
+> record.
+>
+> **RULED: follow `md1`/`mk1`, which already solved this.** A chunked
+> constellation format does not ride as one hex-encoded record; each chunk is its
+> **own bare record**, no prefix and no hex, and the container's own LF separates
+> them. The fork already ships that route — `gui/scan.go:91-92`, `ValidMD ||
+> ValidMK` → `mdmkText(buf)`.
+
+**NORMATIVE, per form:**
+
+| form | what rides in the container |
+| --- | --- |
+| **raw** | **ONE `tx:` record** — the framing, the legend fields and the transaction's bytes |
+| **chunks** | **ONE `tx:` metadata record** — the framing, the legend fields, the carried txid and wtxid, and an **EMPTY body** — **PLUS one BARE `mt1` record per chunk** |
+
+**THE LEGEND STAYS BOUND, AND BY A STRONGER MECHANISM THAN POSITION.** The
+metadata record carries the txid; **every chunk carries `chunk_set_id`, which
+IS the top 20 bits of that same txid** (§3.6b). So the association between a
+legend and its chunks is derivable from what the records **say**, not from where
+they sit — which survives reordering, an interleaved second transaction, and a
+container that makes no ordering promise. **R15 is therefore the BINDING
+MECHANISM, not merely a cross-check**, and §3.6b and §5 are amended to say so.
+
+**Safe because of a bech32 property, verified rather than assumed:** the data
+charset `qpzry9x8gf2tvdw0s3jn54khce6mua7l` excludes `1`, `b`, `i` and `o`, so `1`
+occurs in an `mt1` string **only** as the HRP separator and the three characters
+`mt1` can only ever mark a chunk boundary.
+
+**What it costs, named rather than left implicit.** A bare `mt1` record is a
+record the container has never seen: `me`'s classifier refuses one today
+(measured — `crates/me-cli/src/classify.rs` matches `md`/`mk`/`ms` only), and so
+does `gui/scan.go`. **P1 and P3 each need the `ValidMT` branch §2.2a already
+described** — *"a new `ValidMT`, not a call to an existing predicate"* — and P1's
+plan carries a payload-level rule for set completeness and orphan chunks, because
+neither is decidable one record at a time.
 
 **No new secrecy class.** A transaction rides beside `ClassMDMK` and
-`ClassFreeText`.
+`ClassFreeText`. **Neither `ClassTransaction` nor the chunk class is secret.**
 
 **A `tx:` record on argv is REFUSED.** `mt` refuses a transaction as an argument
 because *"an argument lands in shell history and in `ps` for every user on the
@@ -352,13 +399,37 @@ fit the region. Today that is `52 + 8191 + 8191 + 16 = 16,450`, the figure
 pathological spend. Measured (`RESULTS_2026-08-22.txt`, pathological wallet,
 11 keys / 3 masters, `wsh`, tier 1 = 3-of-3 + hash, the most expensive path):
 
-| in/out | signed tx | as hex | chunks | bytes/chunk | as chars | fits 32,734? |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1/1 | 852 B | 1,704 | 22 | 39 | 2,001 | ✅ |
-| 1/2 | 893 B | 1,786 | 23 | 39 | 2,092 | ✅ |
-| 2/2 | 1,692 B | 3,384 | 43 | 40 | 3,955 | ✅ |
-| 5/2 | 4,080 B | 8,160 | 102 | 40 | 9,383 | ✅ (**raw-only at 8191, by 31 chars**) |
-| 10/2 | 8,067 B | 16,134 | 202 | 40 | 18,583 | ✅ |
+| in/out | signed tx | as hex | chunks | bytes/chunk | as chars | **chunks IN THE CONTAINER** | fits 32,734? |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1/1 | 852 B | 1,704 | 22 | 39 | 2,001 | **2,155** | ✅ |
+| 1/2 | 893 B | 1,786 | 23 | 39 | 2,092 | **2,246** | ✅ |
+| 2/2 | 1,692 B | 3,384 | 43 | 40 | 3,955 | **4,109** | ✅ |
+| 5/2 | 4,080 B | 8,160 | 102 | 40 | 9,383 | **9,537** | ✅ (**raw-only at 8191, by 31 chars**) |
+| 10/2 | 8,067 B | 16,134 | 202 | 40 | 18,583 | **18,737** | ✅ (**13,997 spare**) |
+
+> **AMENDED 2026-08-24 — the container column is NEW, and it exists because
+> §2.1's ruling changed what a chunks transaction costs.** The `as chars` column
+> is the chunk **text** alone. What the section actually holds is that text as
+> **bare records** (§2.1) **plus** the `tx:` metadata record **plus** one LF
+> between them: `153 + 1 + as_chars`, where 153 is `3 + 2×75` — the `tx:` prefix
+> and the hex of P1's 75-byte framing with no legend fields, and the legend
+> fields add to it. Every figure in the new column was computed, not
+> transcribed. **The ✅ column was and remains correct; it was under-counted, not
+> wrong.**
+>
+> **Under the framing this ruling REPLACED**, where the chunk text rode
+> hex-encoded inside one record, the 10/2 row cost `3 + 2×(43 + 18,583) =
+> 37,255` characters — **4,521 OVER the cap** — while its raw form fitted. That
+> measurement is what produced the ruling; it is recorded here so nobody
+> rediscovers the ✅ as a defect, and it is **not** a live ceiling.
+>
+> **STILL OWED BY P1, and deliberately NOT edited here:** the headline
+> *"a 16,367-byte raw transaction"* is wrong by the record framing (it is
+> **16,290 B of body**, minus the legend fields), and the 5/2 row's
+> *"raw-only at 8191, by 31 chars"* is false in both halves (the raw record is
+> **8,313 chars, 122 OVER 8191**, so at the old cap *neither* form fitted). Both
+> are P1's to land, with the rest of its framing corrections, and both are
+> recomputed in its §3.1.
 
 Computed, not estimated: `chunks = ceil(bytes/40)`,
 `bytes_per_chunk = ceil(bytes/chunks)` (**balanced, not filled**),
@@ -749,6 +820,35 @@ neighbouring case as *"a new `ValidMT`, not a call to an existing predicate."*
 This is precisely the role `mt` refuses 20 bits for — *identification* — and
 precisely the role it is sound in: **falsification.** A check that can only fail
 honestly is worth having; one that claims to confirm is not.
+
+> **AMENDED 2026-08-24 — R15 IS ALSO THE BINDING MECHANISM, and that is a second
+> role, not a widened first one.** §2.1's ruling makes the chunks **bare sibling
+> records** rather than a hex body inside the `tx:` record, so something has to
+> say which chunks belong to which transaction. That something is
+> `chunk_set_id`: the metadata record carries the txid, every chunk carries its
+> top 20 bits, and the association is **derivable from content rather than from
+> position**.
+>
+> **The two roles make two different claims, and only one of them is an
+> identification claim about the world:**
+>
+> | role | the claim | why it is sound |
+> | --- | --- | --- |
+> | **BINDING** (new) | *"within THIS payload, these chunks go with that `tx:` record"* | the payload is a **closed set the operator built**, not the world. **EPD §6.3 already does exactly this** — its grouping key is `(HRP, chunk_set_id)`, NORMATIVE, shipped, and it is the same 20 bits used the same way for `md1`/`mk1`. What makes it unambiguous is the new refusal below, not the width of the field |
+> | **REFUTATION** (unchanged) | *"this payload is internally inconsistent"* | a mismatch proves breakage; a match still proves **nothing** about whether those chunks reassemble to the transaction the txid names. Only a host that reassembles and hashes can settle that, and the device has no decoder (§3.6a) |
+>
+> **So `mt`'s objection is respected rather than overridden.** `mt` refuses 20
+> bits for *identification* — telling one transaction from another in the world —
+> and this uses them to partition a set the operator assembled, exactly as the
+> encrypted-payload container already does.
+>
+> **THE ONE THING THE BINDING ADDS IS A COLLISION, AND IT GETS A REFUSAL — R17
+> (§5).** Two chunks-form transactions in one payload whose txids share their top
+> 20 bits leave every chunk assignable to either, and no amount of care downstream
+> recovers it. **NORMATIVE: refuse the payload at pack time, naming both txids.**
+> This is strictly stronger than R10 for the chunks form — R10 refuses two
+> *identical* txids, R17 refuses two that merely *collide* — and it is cheap,
+> because the host holds every txid it is about to write.
 
 **R14 IS RETIRED.** It refused any payload holding more than one chunks-form
 transaction, which was the honest stopgap while the picker had no key. The picker
@@ -1438,13 +1538,14 @@ this machinery (`refusals.toml`, `check-refusal-coverage.sh`,
 | R7 | **empty stdin** to `me sysw pack` | must join the existing exit-2 path, not bypass it | 1.1 |
 | R8 | a world-readable output destination, unless `--allow-world-readable` | 2.5 |
 | R9 | a transaction the parser rejects | 3.4 |
-| R10 | two identical txids in one payload | the same transaction packed twice. **Refuse — do NOT collapse.** For a chunks payload the txid is **asserted** (§3.6b), and R15 checks it only *within* one record, so two records can carry the same txid honestly-looking and differ in content. Collapsing on an asserted key silently discards one of two distinct artifacts | 3.6b |
+| R10 | two identical txids in one payload | the same transaction packed twice. **Refuse — do NOT collapse.** For a chunks payload the txid is **asserted** (§3.6b), and R15 checks it only *within* one transaction's own record set — **amended 2026-08-24: "one record" became "one metadata record plus its bare chunk records" (§2.1); the scope of the check did not widen, only the shape of what it spans** — so two transactions can carry the same txid honestly-looking and differ in content. Collapsing on an asserted key silently discards one of two distinct artifacts. **R17 refuses the weaker 20-bit collision separately** | 3.6b |
 | R11 | **see R11′ below** | | 3.3 |
 | **R12** | **a well-formed `tx:` record reaching `freeTextScan`** — i.e. `tx:` added to `isSyswEncoded` without its own branch | §2.1a; this is the C3 defect made into a test | 2.1a |
 | **R13** | **a multi-symbol QR job when Structured Append is unavailable** | §4.2a's two gates; without them the artifact is unrecoverable and §4.3's test cannot pass | 4.2a |
 | ~~R14~~ | **RETIRED.** It refused a payload holding several chunks-form transactions, as the honest stopgap while the picker had no key. §3.6b gives it one | — |
 | **R16** | **a transaction the search cannot configure at all** — at 0.60 mm that is anything above **14,560 B** (§4.1a). Names the module size, the byte count and the ceiling at that module | 4.1a |
-| **R15** | **a chunks record whose carried txid's top 20 bits match no chunk's `chunk_set_id`** | §3.6b: the set id **is** those bits, so a mismatch proves the record is internally inconsistent. It **refutes only** — a match proves nothing | 3.6b |
+| **R15** | **a chunks record whose carried txid's top 20 bits match no chunk's `chunk_set_id`** — **and, since 2026-08-24, an ORPHAN `mt1` record whose `chunk_set_id` matches no `tx:` record, and an INCOMPLETE set (a missing or duplicated `index` against the header's `count`)** | §3.6b: the set id **is** those bits, so a mismatch proves the payload is internally inconsistent. **R15 is now the BINDING mechanism as well** (§2.1, §3.6b): the chunks ride as bare sibling records, so `chunk_set_id` is what says which chunks belong to which transaction. It still **refutes only** — a match proves nothing about the transaction the txid names | 3.6b |
+| **R17** | **two chunks-form transactions in one payload whose carried txids share their TOP 20 BITS** | **added 2026-08-24 with §2.1's ruling.** Once `chunk_set_id` is the binding, a collision leaves every chunk assignable to either transaction and nothing downstream recovers it. Strictly stronger than R10 for this form — R10 refuses two *identical* txids, R17 refuses two that merely collide. The host holds both txids when it packs, so it is cheap. **Names both txids in full** | 3.6b |
 
 ### R4′ — refusing "both forms" was wrong
 
@@ -1456,8 +1557,19 @@ nothing says they must share a form. A sensible operator packs a small transacti
 both — correctly.
 
 **NORMATIVE: the XOR is PER TRANSACTION, not per payload.** R4 refuses a **single
-`tx:` record** carrying both forms. A payload holding a raw record and a chunks
-record is well-formed.
+`tx:` record** carrying both forms. A payload holding a raw transaction and a
+chunks transaction is well-formed.
+
+> **AMENDED 2026-08-24 — what "a single `tx:` record carrying both forms" now
+> MEANS, since §2.1's ruling moved the chunks out of the record.** A `tx:` record
+> has one `form` byte, so the two forms can no longer both be *present* in one
+> record. What R4 refuses is the **residue**: a `form = 0x02` (chunks) record
+> that also carries a non-empty body, and its mirror, a `form = 0x01` (raw)
+> record declaring an empty one. **P1 makes that one comparison
+> (`body_len == 0` iff `form == 0x02`) rather than a reader's judgement**, which
+> is what turns R4′ from a description into a refusal. The rest of the ruling is
+> unchanged: a payload may hold several transactions and they need not share a
+> form.
 
 > **And the first draft's refusal text made it worse.** It blamed the operator's
 > tooling — *"built by something that does not know this format"* — for a payload
