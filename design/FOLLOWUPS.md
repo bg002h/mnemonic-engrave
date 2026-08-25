@@ -10439,3 +10439,67 @@ COMPLETE set that reassembles to bytes that are not a transaction, the §2.1 C3
 smuggling channel) also demotes to a flag under §5.3.2, or stays a refusal. The
 two cases are different: incomplete is *missing material*, non-decoding is
 *wrong material*. **P1 may not close while this is open.**
+
+---
+
+## RULING 2026-08-25b — `not_a_transaction` is a LOUD FLAG ON THE DEVICE with MANDATORY LEGEND SUBSTITUTION. Nothing refuses.
+
+**Operator ruling.** Asked whether `not_a_transaction` (a COMPLETE chunk set that
+reassembles to bytes that are not a transaction — the §2.1 C3 smuggling channel)
+stays a refusal or demotes to a flag like the incomplete case, the operator ruled:
+
+> *"Becomes a loud flag on sh2, mandates legend substitution: drop user desired
+> legend and replace with 'incomplete, re-encode payload' or something to that
+> effect but don't refuse engraving."*
+
+**So NOTHING in the chunk path refuses.** Incomplete sets and non-decoding sets
+both pack, both reach the device, and both engrave — with the operator's chosen
+legend **replaced** by a warning.
+
+**Why this is a better control than a refusal, and it is not a weakening.** A
+stderr line at pack time is gone in a week; `me sysw show` must be re-run to be
+seen. **An engraved legend is permanent and travels with the artifact** — and the
+device has NO CAMERA (`sh2-has-no-camera`), so it can never read a plate back to
+warn anyone later. Substituting the legend converts an ephemeral warning into a
+durable one, on the only surface that outlives the session. For a
+fifteen-year-recovery product that is the right place to put it.
+
+**THE DEVICE MUST COMPUTE THIS ITSELF — verified precedent, not inference.** The
+fork already does exactly this for the siblings, on-device:
+
+```
+seedhammer/sysw/confirm.go:81       _, err := md.Reassemble(set)
+seedhammer/seal/record.go:475       decodePublicSet enforces §6.3: every public
+                                    record belongs to a card set that decodes
+seedhammer/seal/record.go:231       public | md1/mk1 only, AND every card group
+                                    must reassemble and decode
+```
+
+**A host-set flag byte would be worthless for this**, and the reason is in EPD's
+own threat statement: the adversary is *"a defective or third-party sealer"*. A
+sealer that smuggles will also set the flag to "fine". The check is only worth
+anything where it cannot be forged, which is on the device.
+
+**THE COST, and it lands on P3, not P1.** The fork has **no `mt` package and no
+Bitcoin transaction deserialiser** (packages verified: `md`, `mk`, `codex32`,
+`bip32/39/85/380`, `slip39`, `seedxor`, `address`, `seal`, `sysw`, …). To flag
+`not_a_transaction` on-device, **P3 must port `mt` reassembly AND a transaction
+deserialiser to TinyGo.** Incomplete is far cheaper — the chunk header carries
+`count` and `index`, so only the header parser is needed.
+
+**TWO CONSEQUENCES THE OPERATOR SHOULD HAVE IN WRITING.**
+
+1. **The anti-smuggling gate stops being admission control and becomes LABELLING
+   control.** Under this ruling the smuggled bytes still reach metal — 32 bytes of
+   entropy engraved on a plate, under a legend that says the payload is bad. The
+   flash exposure EPD measured is unchanged either way (the payload is in flash
+   once loaded); the plate is *additional* exposure the refusal would have
+   prevented. The operator is warned and chooses. **This is a deliberate trade,
+   not an oversight** — recorded here so no future reviewer "fixes" it back.
+2. **Substitution is sometimes INSERTION.** The legend field is OPTIONAL. When a
+   payload carries no legend, the device must **add** one, which consumes plate
+   space that was not budgeted. P4 owns the layout consequence; P1 owes only that
+   the field's absence is representable and detectable, which it already is.
+
+**Un-overridable.** The substituted legend MUST NOT be dismissible back to the
+operator's own text — a warning the operator can turn off is not a control.
