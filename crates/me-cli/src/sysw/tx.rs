@@ -225,12 +225,12 @@ pub fn parse(bytes: &[u8]) -> Result<TxSummary, TxError> {
 
     let mut input_has_witness = vec![false; n_in];
     if segwit {
-        for i in 0..n_in {
+        for slot in input_has_witness.iter_mut() {
             let items = c.count()?;
             for _ in 0..items {
                 c.skip_bytes()?;
             }
-            input_has_witness[i] = items > 0;
+            *slot = items > 0;
         }
     }
     let locktime = c.take(4)?;

@@ -40,7 +40,22 @@ ms-codec = "0.7"
 # (mnemonic-transaction) and is unpublished; the layout is the constellation's
 # standard side-by-side checkout. A release build of `me` would need mt-codec
 # published or vendored -- recorded in IMPLEMENTATION_LOG_B.md.
-mt-codec = { path = "../../../mnemonic-transaction/crates/mt-codec" }
+# A GIT dependency pinned to a rev, not a path and not a publish.
+#
+# The path form does not resolve in CI: `mnemonic-transaction` is NOT a
+# submodule of this repo (`.gitmodules` carries only `third_party/seedhammer`),
+# so `../../../mnemonic-transaction` does not exist in a fresh checkout and
+# cargo fails before a single test runs.
+#
+# A git dep works TODAY because the repo is public, needs no deploy key, and --
+# the point -- keeps `cargo publish mt-codec` DEFERRED. Publishing is
+# irreversible; pinning a rev is not.
+#
+# Pinned to origin/main rather than the local HEAD, and that is checked rather
+# than assumed: `git diff origin/main..HEAD -- crates/mt-codec/` is EMPTY. The
+# six unpushed commits touch `mt-cli` and the spec only, and `me` depends on
+# `mt-codec`. So this needs no push -- an outward-facing act -- to build.
+mt-codec = { git = "https://github.com/bg002h/mnemonic-transaction", rev = "72b79b8762ec208b6143afade8c4b66a551bd29d" }
 rpassword = "7.5.4"
 
 [dev-dependencies]

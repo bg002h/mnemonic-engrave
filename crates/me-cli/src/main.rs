@@ -1231,8 +1231,13 @@ fn report_unconfirmed(records: &[String]) {
     for i in mnemonic_engrave::sysw::mt::mt_unconfirmed(records) {
         eprintln!(
             "me: record {i}, as given (records count from 0): an mt1 chunk whose set \
-             this tool could not confirm as one signed transaction; the device will \
-             treat it as a SECRET and refuse to engrave the set"
+             this tool could not confirm as one signed transaction.\n      \
+             It is PACKED and ENGRAVEABLE anyway (ruling 2026-08-25) -- every mt1 \
+             string is independently valid, so the strings you have are worth \
+             cutting and a missing one can be added later.\n      \
+             The device will REPLACE your plate legend with a re-encode warning, \
+             and QR plates will be unavailable: a set that does not reassemble has \
+             no transaction bytes to encode."
         );
     }
 }
@@ -1263,7 +1268,7 @@ fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header
             continue;
         }
         let state = if unconfirmed.contains(&i) {
-            "unconfirmed — the device will treat it as a SECRET"
+            "unconfirmed — engraveable, but the device REPLACES the legend"
         } else {
             "confirmed"
         };
@@ -1285,7 +1290,7 @@ fn print_mt_confirmation(records: &[String]) {
             continue;
         }
         let state = if unconfirmed.contains(&i) {
-            "unconfirmed — the device will treat it as a SECRET"
+            "unconfirmed — engraveable, but the device REPLACES the legend"
         } else {
             "confirmed"
         };
