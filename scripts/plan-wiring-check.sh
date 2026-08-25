@@ -94,9 +94,29 @@ if not live:
     sys.exit(2)
 
 # ---------- 2. the step table: which steps name which W and which V ----------
+# SCOPED to the TDD-order section. Reading numbered rows document-wide is a
+# FALSE-PASS path: any other numbered table (a bit-index table, a numbered list
+# of stale statements) contributes text, and a W or V named there would count as
+# "built by a step" when no step builds it. Measured 2026-08-25 -- three bit rows
+# and five stale-statement rows were being counted as steps.
 STEP = re.compile(r"^\|\s*\*{0,2}(\d+)\*{0,2}\s*\|(.*)$")
+tdd_start = tdd_end = None
+for i, l in enumerate(lines):
+    if re.match(r"^##+\s*4\.\s", l) and tdd_start is None:
+        tdd_start = i
+    elif tdd_start is not None and re.match(r"^##+\s*(4\.\d|5\.)", l):
+        tdd_end = i
+        break
+if tdd_start is None:
+    print("plan-wiring-check: no section 4 heading found -- refusing to report a pass", file=sys.stderr)
+    sys.exit(2)
+if tdd_end is None:
+    tdd_end = len(lines)
+
 steps = {}
 for i, l in enumerate(lines, 1):
+    if not (tdd_start < i <= tdd_end):
+        continue
     m = STEP.match(l)
     if m and not l.startswith("  |"):
         steps.setdefault(m.group(1), []).append((i, m.group(2)))
