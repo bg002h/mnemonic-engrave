@@ -10338,3 +10338,51 @@ difference — but check the device side first: `gui/scan.go` may already tolera
 or reject padded records differently, and a host that refuses what the device
 accepts is its own defect.
 
+
+---
+
+## F-246 — `me sysw pack` generates and PRINTS a passphrase before it validates the records, so an invalid input still emits secret material
+
+**Severity:** Minor. **Owning phase:** post-P1 UX (not P1 — P1 neither introduces
+this nor is scoped to fix it). **Found:** 2026-08-24, while verifying R0 round 4's
+C2 against the shipped binary.
+
+The C2 check packed six bare `mt1` records to confirm they are refused. They are —
+`exit 4`, *"record 0 (records count from 0) is not a form this container can
+place"*. But the refusal is not the first thing that happens:
+
+```
+$ me sysw pack --in <six bare mt1 records> --out /tmp/t.bin
+passphrase — write this down and store it APART from the machine:
+
+    parade accident toilet various cluster demand dress afraid around system crunch vapor
+
+strength: 12 words — at or above the threshold
+me: record 0 ... is not a form this container can place: ...
+exit 4
+```
+
+**A twelve-word passphrase is generated and written to stdout, and then the pack
+aborts having produced no container.** The passphrase is meant to be shown — that
+is not the defect. The defect is that it is shown for a run that produces
+**nothing**, so the operator is handed material to "write down and store apart"
+that protects no artifact, immediately above an error telling them the run failed.
+
+**Why it matters beyond tidiness.** The instruction is imperative and the operator
+is told to record it off-machine. An operator who follows it now holds a
+passphrase with no payload, and the natural next move — fix the record, re-run —
+generates a **different** one. The first is now a written-down secret that opens
+nothing, and the operator has no way to tell which of the two is live.
+
+**Why Minor, not Important.** Nothing is lost and nothing is exposed that the
+successful path would not also print; the run visibly fails at exit 4. The cost is
+operator confusion and a stray written secret, not a wrong result.
+
+**Related:** this is the shape of [`a guard downstream of the parser has lost`] —
+work performed and output emitted before the validation that would have made it
+unnecessary. Same class as clap echoing a bearer transaction before the refusal
+ran (spec §1.5's *what runs before it*).
+
+**What would close it.** Validate and classify every record **before** generating
+or printing any passphrase. Cheap: the classification pass already exists and
+already runs; it simply runs second.
