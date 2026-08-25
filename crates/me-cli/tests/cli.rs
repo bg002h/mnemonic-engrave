@@ -969,3 +969,127 @@ mod perms {
         fs::remove_dir_all(&dir).ok();
     }
 }
+
+/// GRAFT 2 — THE EXIT-CODE VOCABULARY IS ONE VOCABULARY.
+///
+/// `me` has three failure codes and they mean different things:
+///
+/// | code | meaning | the operator's next move |
+/// | --- | --- | --- |
+/// | 2 | **usage** — the invocation is wrong; nothing was read, nothing judged | fix the command line |
+/// | 3 | **policy refusal** — understood, admissible-looking, and refused on purpose | this tool will never do that |
+/// | 4 | **invalid** — the INPUT is not what it must be | fix the input |
+///
+/// The distinction is load-bearing for scripts: a `2` says try again, a `3`
+/// says stop, a `4` says the artifact is wrong. A subcommand that spells the
+/// same situation with a different digit makes all three unusable.
+///
+/// This is a TABLE rather than a set of scattered `.code()` calls precisely
+/// because the defect it exists to catch is a DISAGREEMENT between two
+/// subcommands, which no per-subcommand test can see.
+#[test]
+fn the_exit_code_vocabulary_is_one_vocabulary() {
+    // A transaction whose one input carries NEITHER scriptSig NOR witness --
+    // the stripped form of the pinned "even" vector, same txid as the honest
+    // one. Refused as inadmissible input, not as usage.
+    const STRIPPED: &str = "02000000017c8da925af70e49a12b0cea7b639df5037c87b7fa61f262b86ac32c47aa3ba1a0000000000fdffffff02404b4c0000000000160014c1de0dd435d1d4ad97ed1f51d63f91c800cc4eab3ea1b92901000000160014751097c299d6354fbb2c5a84512dd708f2902f5e60000000";
+    const SEED: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
+    let dir = tempfile::tempdir().unwrap();
+    let notacontainer = dir.path().join("nope.bin");
+    std::fs::write(&notacontainer, b"this is not a systemwide container at all").unwrap();
+    let uf2 = dir.path().join("o.uf2");
+
+    struct Case {
+        code: i32,
+        args: Vec<String>,
+        stdin: &'static str,
+        why: &'static str,
+    }
+    let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+    let cases = vec![
+        // ── 2, USAGE ────────────────────────────────────────────────────────
+        Case { code: 2, args: s(&["--stdout"]), stdin: "",
+               why: "no input at all" },
+        Case { code: 2, args: s(&[]), stdin: MD1_VALID,
+               why: "a valid string with no output mode chosen" },
+        Case { code: 2, args: s(&["sysw", "pack", "--no-passphrase"]), stdin: "",
+               why: "no records on argv and no --in" },
+        Case { code: 2, args: s(&["sysw", "wipe", "--fill", "sideways"]), stdin: "",
+               why: "a --fill value that does not exist" },
+        Case { code: 2, args: s(&["sysw", "show", "/nonexistent/payload.bin"]), stdin: "",
+               why: "a file that is not there" },
+        Case { code: 2, args: s(&["tx"]), stdin: "",
+               why: "`me tx` with nothing piped in" },
+        // THE ONE THAT DISAGREED. `me seal --iterations 5` exits 2 and
+        // `me sysw pack --iterations 5` exited 4, for the same typo on the
+        // same flag with the same range in the same message. Both are usage:
+        // no input has been read and nothing about the operator's DATA is
+        // wrong. Fixed on the sysw side, because `seal` is the shipped one.
+        Case { code: 2,
+               args: s(&["seal", "--iterations", "5", "--out"]),
+               stdin: "", why: "seal: --iterations below the floor" },
+        Case { code: 2,
+               args: s(&["sysw", "pack", "--iterations", "5", "--passphrase-words", "12", SEED]),
+               stdin: "", why: "sysw pack: --iterations below the floor" },
+        Case { code: 2,
+               args: s(&["sysw", "pack", "--iterations", "2000001", "--passphrase-words", "12", SEED]),
+               stdin: "", why: "sysw pack: --iterations above the ceiling" },
+        // ── 3, POLICY REFUSAL ───────────────────────────────────────────────
+        Case { code: 3, args: s(&["--stdout"]), stdin: MS1,
+               why: "an ms1 secret: understood, well-formed, and never engraved" },
+        // ── 4, INVALID INPUT ────────────────────────────────────────────────
+        Case { code: 4, args: s(&["--stdout"]), stdin: "md1notavalidstring",
+               why: "a string that does not decode" },
+        Case { code: 4, args: s(&["sysw", "show"]), stdin: "",
+               why: "a file that is not a container" },
+        Case { code: 4, args: s(&["sysw", "pack", "--no-passphrase", "not a record"]), stdin: "",
+               why: "a record this container cannot place" },
+        Case { code: 4, args: s(&["sysw", "pack", "--no-passphrase", &format!("tx:{STRIPPED}")]),
+               stdin: "", why: "a transaction with an unsigned input" },
+        Case { code: 4, args: s(&["tx"]), stdin: "abababab",
+               why: "`me tx` over bytes that are not a transaction" },
+    ];
+
+    for c in &cases {
+        let mut cmd = Command::cargo_bin("me").unwrap();
+        cmd.args(&c.args);
+        // The two cases needing a path argument get it here rather than in the
+        // table, so the temp dir does not have to outlive a &'static str.
+        if c.args.last().map(String::as_str) == Some("--out") {
+            cmd.arg(&uf2).arg("text:6869");
+        }
+        if c.args == ["sysw", "show"] {
+            cmd.arg(&notacontainer);
+        }
+        cmd.write_stdin(c.stdin);
+        let out = cmd.output().unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(c.code),
+            "`me {}` ({}) exited {:?}, want {}\nstderr: {}",
+            c.args.join(" "),
+            c.why,
+            out.status.code(),
+            c.code,
+            String::from_utf8_lossy(&out.stderr)
+        );
+        // A failure must not put anything on stdout: the pipeline downstream
+        // reads stdout, and a half-written artifact is worse than none.
+        assert!(
+            out.stdout.is_empty(),
+            "`me {}` wrote {} bytes to stdout while failing",
+            c.args.join(" "),
+            out.stdout.len()
+        );
+    }
+
+    // ...and all three codes are actually exercised, so the table cannot rot
+    // into a one-code test without anyone noticing.
+    for want in [2, 3, 4] {
+        assert!(
+            cases.iter().any(|c| c.code == want),
+            "the vocabulary test no longer covers exit {want}"
+        );
+    }
+}

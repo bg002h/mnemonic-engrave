@@ -247,6 +247,23 @@ enum SyswCmd {
     Show { file: std::path::PathBuf },
 }
 
+/// THE EXIT-CODE VOCABULARY. Three failure codes, three different things, and
+/// the distinction is what makes them usable from a script:
+///
+/// | code | meaning | the operator's next move |
+/// | --- | --- | --- |
+/// | 2 | **usage** — the invocation is wrong. Nothing was read and nothing about the DATA was judged | fix the command line |
+/// | 3 | **policy refusal** — understood, well-formed, and refused on purpose | this tool will never do that |
+/// | 4 | **invalid** — the INPUT is not what it must be | fix the input |
+///
+/// Every site returns one of these BY NAME. Bare integers are what let
+/// `me seal --iterations 5` exit 2 while `me sysw pack --iterations 5` exited
+/// 4, for the same typo on the same flag with the same range in the same
+/// sentence — invisible until the two were put in one table
+/// (`tests/cli.rs::the_exit_code_vocabulary_is_one_vocabulary`).
+///
+/// A flag value out of range is USAGE, not invalid: no input has been read at
+/// the point it is caught, so there is nothing yet for "invalid" to be about.
 const EXIT_OK: i32 = 0;
 const EXIT_USAGE: i32 = 2;
 const EXIT_REFUSED: i32 = 3;
@@ -320,6 +337,18 @@ fn run() -> i32 {
         }
     } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
         eprintln!("me: cannot read stdin: {e}");
+        return EXIT_USAGE;
+    }
+
+    // NOTHING PIPED IN IS A USAGE ERROR, not a decode failure. Before this,
+    // empty input reached `convert` and came back
+    // "not a bech32 string (no '1' separator / empty HRP)" at exit 4 --
+    // describing input the operator never gave as malformed, and disagreeing
+    // with `me tx`, which has always said "no ... given (pipe it in, or --in
+    // FILE)" at exit 2 for the same situation. A new user's first action is
+    // exactly this one.
+    if input.trim().is_empty() {
+        eprintln!("me: no input given (pipe an md1/mk1 string in, or --in FILE)");
         return EXIT_USAGE;
     }
 
@@ -982,7 +1011,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 Ok(r) => r,
                 Err(e) => {
                     eprintln!("me: {e}");
-                    return 2;
+                    return EXIT_USAGE;
                 }
             };
 
@@ -999,7 +1028,10 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     sysw::wire::MIN_ITERATIONS,
                     sysw::wire::MAX_ITERATIONS
                 );
-                return 4;
+                // USAGE, not invalid, and `me seal` has always said so
+                // (`SealError::Iterations(_) => EXIT_USAGE`). Nothing has been
+                // read yet; the operator mistyped a flag.
+                return EXIT_USAGE;
             }
 
             // Exactly one passphrase mode. clap enforces mutual exclusion; this
@@ -1013,7 +1045,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     Ok(p) => Some(p),
                     Err(e) => {
                         eprintln!("me: reading the passphrase: {e}");
-                        return 2;
+                        return EXIT_USAGE;
                     }
                 }
             } else {
@@ -1031,7 +1063,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     }
                     Err(e) => {
                         eprintln!("me: {e:?}");
-                        return 2;
+                        return EXIT_USAGE;
                     }
                 }
             };
@@ -1062,7 +1094,16 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     } else {
                         eprintln!("me: {}", sysw_error(&e));
                     }
-                    return 4;
+                    // The library's own out-of-range iteration check reports
+                    // the same operator mistake as the flag guard above, so it
+                    // gets the same code rather than the generic one.
+                    if matches!(
+                        e,
+                        sysw::SyswError::Wire(sysw::wire::WireError::Iterations(_))
+                    ) {
+                        return EXIT_USAGE;
+                    }
+                    return EXIT_INVALID;
                 }
             };
             // The digest is computed on the CONTAINER, before any padding. It
@@ -1079,7 +1120,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                         blob.len(),
                         sysw::wire::REGION_ADDR
                     );
-                    return 4;
+                    return EXIT_INVALID;
                 }
                 let mut img = Zeroizing::new(vec![0xFFu8; n]);
                 img[..blob.len()].copy_from_slice(&blob);
@@ -1101,7 +1142,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 "ones" => sysw::overwrite::Fill::Ones,
                 other => {
                     eprintln!("me: unknown --fill {other:?}; want random, zeros or ones");
-                    return 2;
+                    return EXIT_USAGE;
                 }
             };
             if f == sysw::overwrite::Fill::Ones {
@@ -1129,7 +1170,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 Ok(b) => b,
                 Err(e) => {
                     eprintln!("me: {}: {e}", file.display());
-                    return 2;
+                    return EXIT_USAGE;
                 }
             };
             let h = match sysw::wire::Header::parse(&blob) {
@@ -1139,7 +1180,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     // phrase teaches the operator to read a wrong file as
                     // tampering.
                     eprintln!("me: not a systemwide container: {e:?}");
-                    return 4;
+                    return EXIT_INVALID;
                 }
             };
             println!("sealed:   {}", h.sealed());
@@ -1158,7 +1199,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     blob.len(),
                     h.total_len()
                 );
-                return 4;
+                return EXIT_INVALID;
             }
             println!(
                 "identity: {}",
@@ -1166,7 +1207,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             );
             print_digest(&blob);
             print_mdmk_confirmation(&blob, &h);
-            0
+            EXIT_OK
         }
     }
 }
@@ -1392,10 +1433,12 @@ fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>, allow_world_readable: bo
             .map_err(|e| format!("stdout: {e}")),
     };
     match r {
-        Ok(()) => 0,
+        Ok(()) => EXIT_OK,
         Err(e) => {
+            // A write that failed is the environment, not the artifact: a
+            // read-only directory, a full disk, a closed pipe. USAGE.
             eprintln!("me: {e}");
-            2
+            EXIT_USAGE
         }
     }
 }
