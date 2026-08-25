@@ -160,6 +160,22 @@ format change.
 **Done when:** each graft lands with its test; the delivery ceiling row in the
 docs states the new number.
 
+**P1 LANDED 2026-08-25. THE DELIVERY CEILING, MEASURED** — every figure below
+was produced by running the shipped code, not derived on paper:
+
+| what | before | after | how it was measured |
+| --- | --- | --- | --- |
+| container section (`sysw::wire::MAX_SECTION_LEN`) | 8,191 B | **32,734 B** | `(65536 − 52 − 16) / 2`, const-asserted in Rust and Go; a 32,768 cap fails the BUILD in both |
+| one raw `tx:` record | 4,094 B of transaction | **16,365 B** | `tx:` + 2N hex ≤ 32,734 |
+| an `mt1` chunk set | 3,720 B (93 chunks) | **14,840 B (371 chunks)** | measured: 371 × 87-char records pack (`pub_len: 32647`), 372 exits 4 |
+| QR plates (device side) | — | **37,264 B** at ECC M | measured by `txqr`'s capgate: 2,329 B/symbol × 16 Structured Append symbols |
+
+So the **container binds at 32,734 bytes**, not the QR path, and the ~8 KB
+pathological spend is deliverable in either form — in chunk form it was
+deliverable in neither. Six grafts landed, none skipped; the two folded
+together (the `capgate` finding and `mt inspect`) are recorded in
+`IMPLEMENTATION_LOG_P1.md`.
+
 **P2 — Reconcile the shipped code against the R0-GREEN spec; retire the plan.**
 The spec is mostly framing-agnostic *(verified: one MTX1/wtxid hit in 1,775
 lines)*, so its walk-derived R-rules and refusal lists still bind. Walk it

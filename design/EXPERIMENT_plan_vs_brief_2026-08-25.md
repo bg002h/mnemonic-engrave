@@ -120,3 +120,9 @@ pressure to demonstrate.
 
 **Neither arm is shippable as-is.** A has no decode proof and four gates resting
 on unrun hardware; B has no wtxid, a ~3.5 KB delivery ceiling, and no UI walk.
+
+> *Record kept as written. Two of those three have since moved: **P1 (2026-08-25)
+> raised the ceiling to 32,734 bytes of section** — 16,365 B as one raw `tx:`
+> record, 14,840 B as an `mt1` chunk set, both measured — and the `wtxid` was
+> RETIRED rather than added, replaced by the signature predicate in §3 of
+> `FORWARD_PLAN_post_experiment.md`. The UI walk is still open, owned by P3.*
