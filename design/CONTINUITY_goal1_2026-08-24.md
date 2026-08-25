@@ -5,8 +5,9 @@
 
 ## State in one line
 
-**Spec written, walked, R0 rounds 0–2 folded — no code. The gate is OPEN, and
-two of the blockers are now the OPERATOR's, not a reviewer's: O11 and O14.**
+**Spec is R0 GREEN. P1's plan is in review (round 0 found 5C/13I; v2 rewritten).
+Still no code — the plan gates it.** `mnemonic-transaction` is now PUBLIC so
+`mt-codec` can be published and depended on.
 
 ## What exists now
 
@@ -209,6 +210,41 @@ propagation.** That is the "rounds stop paying" signal: once only propagation
 remains, audit it **mechanically at fold time** rather than buying another round.
 Round 2 is the counter-example worth remembering — its two best findings came
 from a **new lens**, not from re-checking the previous answer.
+
+## P1 — and the sharpest lesson of the cycle
+
+**The spec went GREEN, so I wrote P1's implementation plan. R0 returned 5
+Critical / 13 Important.** Three Criticals were in **one 32-byte field**.
+
+**The lesson is not "the plan had bugs". It is this:**
+
+> **v1's §1.1 named the txid byte order *"the most likely defect in this plan"* —
+> and then stated the LOSING answer as normative.**
+
+And the escape clause made it worse: it deferred to *"whatever `mt-codec` does"*,
+but `mt-codec` takes a display **string** and has no txid field, so **V4 — the
+vector designed to pin the dangerous thing — was pinned to the wrong axis and
+could not have caught it.**
+
+**The answer was in the function's NAME the whole time**:
+`content_id_from_txid_display` (`mt-codec/src/string_layer/pipeline.rs:17`), whose
+comment had already anticipated the exact trap — *"'which 20 bits, from which
+end' is exactly where two implementations diverge silently, so this takes the
+display string rather than raw bytes."*
+
+**Naming a risk is not managing it.** The moment a plan says "this is the most
+likely defect", that is the thing to go READ THE SOURCE for — not the thing to
+defer to a vector.
+
+**What it would have cost.** Shipped, R15 refuses every byte-perfect chunks
+record. Nothing surfaces until the Go port disagrees, or until a plate is cut.
+And `cargo publish` is irreversible — a wrong constant would have frozen.
+
+**Two further Criticals in the same field and its neighbours:** "raw
+double-SHA256" over a witness-carrying body is the **wtxid**, not the txid; and
+`mt_codec::decode` is a **BCH verifier** (`grep bitcoin:: → 0 hits`), so the
+anti-smuggling claim v1 rested on was false — entropy round-trips as a valid
+`mt1` string with an attacker-chosen `set_id`.
 
 ## Open, and who owns it
 
