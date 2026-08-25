@@ -328,26 +328,33 @@ field is the former's bytes, and the test compares
 `wtxid` alongside their `txid`, and a `txid_is_wtxid` boolean — read from the
 corpus for this fold, not inferred.
 
-### 1.2 Legend field tags
+### 1.2 The three legend slots
 
-| tag | field | value | `len` | refused when |
+| bit | slot | value | width | refused when |
 | --- | --- | --- | --- | --- |
-| `0x01` | `TO` label | UTF-8, operator's own words (spec §3.4, asserted) | `1..=64` | not valid UTF-8 (E14); `len = 0` (E6); `len > 64` (E15) |
-| `0x02` | fee | **u64 satoshis**, big-endian | **exactly 8** | `len != 8` (E16) |
-| `0x03` | `FROM` wallet | the master fingerprint | **exactly 4** | `len != 4` (E16) |
+| 0 | fee | **u64 satoshis**, big-endian | **exactly 8, structural** | *cannot be malformed* — the width is not encoded, so there is no length to disagree with |
+| 1 | `FROM` wallet | the master fingerprint | **exactly 4, structural** | *cannot be malformed* — same reason |
+| 2 | `TO` label | UTF-8, operator's own words (spec §3.4, asserted) | `u8` len, **`1..=64`** | not valid UTF-8 (**E14**); `len = 0` or `len > 64` (**E15**) |
+
+> **(SIMPLIFICATION 3.1) THIS TABLE WAS THE TLV TAG TABLE AND THE FOLD LEFT IT
+> STANDING.** Caught by `plan-wiring-check.sh`'s new rule 4b, not by reading: the
+> old rows cited **E6** and **E16** for `len = 0` and `len != 8`, and both rules
+> are struck. **Only the label can be malformed now**, because it is the one slot
+> that still carries a length byte; `fee` and `fingerprint` are fixed-width and
+> a wrong width is not expressible.
+>
+> **What round 0's I3 was about is now STRUCTURAL rather than ruled.** It said a
+> width in a tag table is *"a description of the encoder, not a refusal binding
+> the decoder"* — with `u16 len` on every TLV, `tag=0x02, len=2, value=0x03E8`
+> was expressible and four implementers answered differently (refuse; read 2
+> bytes BE as `1,000 sat`; left-pad; right-pad to
+> `281,474,976,710,656,000 sat`). **Under fixed slots that input cannot be
+> written**, so the disagreement has no encoding to arise from. The finding is
+> not folded away — it is designed away, which is why V17 and V17b are struck
+> rather than re-cut.
 
 **The fee is satoshis, not BTC, and not a float.** F-236 closed exactly this in
 `mt`. A wire format repeating it would be the same bug somewhere harder to change.
-
-**(I3, r1-I11) "exactly 8 bytes" IN A TAG TABLE IS NOT A REFUSAL.** Round 0's I3
-said this in those words — *"a description of the encoder, not a refusal binding
-the decoder"* — and v2 folded only its zero-length half. The layout gives every
-TLV its own `u16 len`, so `tag=0x02, len=2, value=0x03E8` is expressible and four
-implementers answer differently: refuse; read 2 bytes BE as `1,000 sat`; left-pad
-to 8 (`1,000 sat` by another route); right-pad (`281,474,976,710,656,000 sat`).
-**The fee is engraved in spec §3.4's asserted column.** So the widths above are a
-column of the table *and* **E16**, and the near-miss `len = 7` / `len = 9` is
-vectored (V17), not just `len = 0`.
 
 **(r1-I10) THE `TO` LABEL NEEDED A UTF-8 VERDICT AND A BOUND, AND RUST AND GO
 DISAGREE BY DEFAULT.** Feed both a TLV whose value is `74 6f ff 21`: Rust's
@@ -395,7 +402,7 @@ v1 stated a layout and no rules. A layout without rules is a family of formats.
 **Every one of the THIRTEEN LIVE rules gets a vector (§3) and a test that goes RED without its
 check — WITH TWO NAMED EXCEPTIONS, because a completeness claim that is false is
 worse than a narrower one that is true.** A rule with no negative test is a
-comment. **E1's negative is V16**, not V2 — **(r1-I1)** V2 is a *positive* vector
+comment. **(3.1) That whole distinction is gone with E1 and V16** — the slots sit in fixed structural order, so there is no order to violate and no negative to write. V2 remains a *positive* vector
 whose bytes are ascending by construction, so deleting the ordering check
 entirely left it green and the closure condition unsatisfiable for the one rule
 it was written for.
@@ -404,10 +411,10 @@ it was written for.
 
 | rule | why it has no RED test in Rust | who owns it |
 | --- | --- | --- |
-| **E7** — absence is omission, no empty encoding, no sentinel | it is an **encoder** rule. Its one checkable clause (*no empty encoding*) is E6, vectored by V12; *"no sentinel"* is semantic and no decoder check can reach it | nobody — it constrains what P1 EMITS, and V5 is its positive |
+| ~~**E7**~~ | ~~an encoder rule with no decoder check~~ | **STRUCK by SIMPLIFICATION 3.1** — it is no longer an exception because it is no longer a rule. Absence is a clear flag bit, which has exactly one spelling, so there is nothing left to constrain |
 | **E11** — RAW re-serialisation equality | **measured for this fold, not argued:** `bitcoin::consensus::deserialize` already refuses everything E11 could catch. A non-minimal `VarInt` input count is refused `non-minimal varint` on **both** the segwit and the legacy body, and a trailing byte is refused `parse failed: data not consumed entirely`. Delete E11's `==` in Rust and every vector stays green | **P3.** The Go port's decoder is hand-written and has no such guarantee; E11's RED test is a **Go** test against a decoder that accepts a non-minimal `VarInt` |
 
-**Neither exception is a licence.** E7 and E11 are the only two, they are named
+**The exception is not a licence.** **(3.1) E11 is now the ONLY one** — E7 was the other and it is struck outright, so the list got shorter by deletion rather than by discharge. It is named
 here and again in §6, and **any future rule that cannot be made to fail must join
 this table or be deleted.** v3's completeness claim over its sixteen rules was
 false for both of them and for E13's and E16's second halves (r2-I7), and it read
@@ -1185,11 +1192,11 @@ verified by reading the corpus's own `generator` field, which is that path.
 | # | vector | pins |
 | --- | --- | --- |
 | V1 | **RAW (segwit)**, no optional fields | the fixed layout; `n_fields = 0` |
-| V2 | **RAW (segwit)**, all three optional fields | E1's ascending tag order as an *instance*, `u16 BE` lengths, u64 fee. **Not E1's negative — that is V16 (r1-I1)** |
+| V2 | **RAW (segwit)**, all three slots present | **(3.1)** the flags byte with bits 0–2 set, the fixed slot ORDER as an *instance*, a `u8` label length and a u64 fee. **v10's cell pinned E1's ascending TAG order and `u16 BE` lengths; both are struck** |
 | V3 | **CHUNKS: a metadata record with `body_len = 0` PLUS its six BARE `mt1` records** | **(§1.4a)** `form = 0x02`; E18's empty body; E12's single `\n` between records and absent trailing LF; E13's lowercase ASCII; E20's complete set (`count = 6`, indices 0..5). **The whole payload is the vector**, not one record — that is what the ruling changed |
 | **V4a** | **RAW**, with txid AND wtxid written out | **§1.1's display order AND txid-not-wtxid, on the RAW path.** Segwit is required: for a legacy transaction txid == wtxid and the vector passes in both worlds |
 | **V4b** | **CHUNKS**, with txid AND wtxid AND `chunk_set_id` written out | the same facts on the chunks path, plus **R15's positive case — which is now the BINDING, not a cross-check** (§1.4a). **(r1-I7)** v2 had one V4 and never said which form it was |
-| V5 | absent optional field | absence is omission (E7) |
+| V5 | **all three flag bits clear** | absence is a CLEAR BIT with exactly one spelling (3.1). v10's cell said *"absence is omission (E7)"*, and E7 is struck |
 | ~~V6~~ | ~~unknown tag~~ | **DELETED by SIMPLIFICATION 3.1** — no tags exist, so an unknown one cannot be encoded (E8 struck) |
 | V7 | **RAW body at exactly `16,290 − F` bytes, `F` = the fields present; near-miss `16,291 − F` REFUSED** | the **record framing** ceiling under the 75-byte framing — see §3.1. **The only vector not built on the corpus transaction (r2-I3)**; its source is `scripts/gen-tx-record-vectors.py` |
 | V8 | RAW whose carried txid ≠ the body's | the §2.2 consistency refusal. **NORMATIVE (r6-I5), because it decides whether the vector can go RED — the third time this cycle a vector needed this clause (cf. V15, V27): perturb ONLY the carried txid and leave the wtxid HONEST.** Built the obvious way — copying a *different transaction's* identifiers, which is what a generator writing a "wrong metadata" case reaches for — **both** identifiers mismatch, **E17 refuses it unaided**, and deleting §2.2's txid comparison leaves V8 green |
@@ -1428,7 +1435,7 @@ is the defect rather than the gate.
 
 **Which step files which vector.** §4 **step 4** writes and commits
 `scripts/gen-tx-record-vectors.py` and files **V1–V6 and V8–V26** (27 plan ROWS — **and (r6-M5) MORE than 27 fixture ENTRIES**: a row naming a refusal and its near-miss is two, and V13 alone is three (`magic`, `version`, `form`). §6's near-miss bullet enumerates the pairs and is what the entry count must satisfy,
-counting V4a, V4b and V17b). **Step 9** files **V7** — **but (r7-I3) its `16,291 − F` NEAR-MISS goes to
+counting V4a and V4b; **V17b is struck by 3.1**). **Step 9** files **V7** — **but (r7-I3) its `16,291 − F` NEAR-MISS goes to
 `crates/me-cli/tests/sysw_cli.rs`, NOT the codec fixture.** That body passes every
 codec rule — `magic`, `version`, `form`, every TLV rule, E4's arithmetic balances,
 E5 matches, E11 and E17 hold — and is refused by the **section ceiling**, which is
@@ -1699,9 +1706,10 @@ plan closing.
   *legitimate* input as well as the hostile one — **(M3) v2 said "seven instances
   this cycle" against spec §5's six and named no seventh.** The count is dropped;
   the rule is not. P1's own near-miss pairs are named where they live: V22
-  (`len = 65` refused / `len = 64` passes), V17 (`len = 7` and `len = 9` refused /
-  `len = 8` passes), **V17b (`len = 3` and `len = 5` refused / `len = 4` passes,
-  r2-I7)**, **V18/V26 (a stripped body with the real wtxid refused / the SAME 113
+  (`len = 65` refused / `len = 64` passes) **and V12 (`len = 0` refused / `len = 1`
+  passes)** — the label is the only slot that still carries a length, so it is the
+  only near-miss pair left in the legend. **(3.1) V17 and V17b are struck**:
+  `fee` and `fingerprint` are fixed-width and a wrong width is inexpressible, **V18/V26 (a stripped body with the real wtxid refused / the SAME 113
   bytes with an honest wtxid passes — the sharpest pair here, and the one that
   makes §1.1a's accepted cost visible)**, V19 (a non-empty CHUNKS body refused /
   `body_len = 0` passes), V20 (uppercase refused / lowercase passes), **V23 (a
@@ -1764,7 +1772,7 @@ document, measured on this fold, so a future run has something to diff against:
 | --- | --- | --- | --- |
 | `./scripts/plan-cite-check.sh` | every `path:line` citation, resolved against the real tree | **91 of 108 resolve; the 17 dangling are exactly the 8 into the vendored `bitcoin` crate and the 9 into `mnemonic-transaction`** — see below. Any eighteenth is a defect. **(r3 AND r4 folds) This gate has now caught THREE bare-path citations in EACH of three successive folds — nine in total** — two `sysw/mod.rs` citations and one `main.rs` citation, written in the REPORT's shorthand (no `crates/me-cli/src/` prefix) and unresolvable as written. **They are not reproduced here with their line numbers, because doing so mints fresh dangling citations — measured, twice.** The r4 fold repeated the defect a third time in §3.3 and the gate caught it again in seconds. **No reading has ever caught this class; the gate has caught it every time.** The six hand-checks that fold ran did not include this gate. **That is the argument for the row, and it is why the citation TOTAL has climbed every round — **(r6-M2) the running figures are deliberately NOT restated here.** v7 wrote one total in this cell's headline and a different one in its narrative, and v8 fixed the headline and left the narrative; the PASS figure at the head of this cell is the only one, and it is re-measured every fold** | **interpretation** — it proves the line exists, never that this plan reads it right; and it cannot check absence claims |
 | `./scripts/plan-table-check.sh` | every table row against its header's cell count | **156 rows checked, 0 malformed, exit 0** | cell **content**; a right-width row with wrong values passes |
-| `./scripts/plan-wiring-check.sh` | **referential integrity of §2.4's sites and §3's vectors** — a retracted site still prescribed by a step or asserted in closure; a site with no row; a **live site no step builds**; a vector no step names | **exit 0.** **(r5) This gate exists because r4-C1 and r4-C2 shared NO TOKEN with the text they falsified, so `plan-fold-sweep.sh` structurally could not see either, and each cost a full review round.** Mutation-tested: run against **v6** it returns exit 1 naming *"W11/W12/W13 are LIVE wiring sites that NO step builds"* — r4-C1's core, in milliseconds; run against **v4** it correctly returns exit 0 | **whether a step builds the RIGHT thing, and whether the step ORDER is feasible** — r4-C2 and r5-C2 were both ordering defects and this gate would have caught NEITHER. It is the structural half; the sweep is the lexical half; ordering still belongs to a reviewer |
+| `./scripts/plan-wiring-check.sh` | **referential integrity of §2.4's sites, §1.3's rules and §3's vectors** — including **(new, 2026-08-25) rule 4b: a STRUCK rule or vector still referenced as LIVE** — a retracted site still prescribed by a step or asserted in closure; a site with no row; a **live site no step builds**; a vector no step names | **exit 1 with EXACTLY 8 rule-4b references, and they are the baseline**: four are this document explaining a strike (§1.2's note, §1.3's E8 quotation, §3's V16 note) and two are archaeology (r2-I7's and r4-I5's narratives). **A ninth is a real finding.** All other rules: clean. **Rule 4b caught 48 on its first run after SIMPLIFICATION 3.1 — including a field table still citing two deleted rules, V5's row citing a deleted rule, and §6's near-miss bullet pairing two deleted vectors — none of which any reading had caught.** **(r5) This gate exists because r4-C1 and r4-C2 shared NO TOKEN with the text they falsified, so `plan-fold-sweep.sh` structurally could not see either, and each cost a full review round.** Mutation-tested: run against **v6** it returns exit 1 naming *"W11/W12/W13 are LIVE wiring sites that NO step builds"* — r4-C1's core, in milliseconds; run against **v4** it correctly returns exit 0 | **whether a step builds the RIGHT thing, and whether the step ORDER is feasible** — r4-C2 and r5-C2 were both ordering defects and this gate would have caught NEITHER. It is the structural half; the sweep is the lexical half; ordering still belongs to a reviewer |
 | `./scripts/plan-fold-sweep.sh <doc> --terms <the forty-four below>` | **terms this fold removed that survive elsewhere** | **exactly 44 hits, one per term, ALL of them inside the block below — the self-reference. A forty-fifth hit anywhere else is a real finding.** **(r3 fold)** Its ten new terms were swept BEFORE they were written down and **nine were absent**; the tenth (the `five sites` entry) survives twice in prose and **both are HISTORICAL** — *"none of v3's five sites"*, *"three of v3's five sites"* — where a present-tense survivor would be a finding. **The terms live ONLY in the block: quoting them in this cell instead made all ten self-hit from a table, measured one edit ago** | it flags candidates, not defects; and terms nobody named |
 
 **`plan-glyph-check.sh` is NOT a close condition here either, and the reason is

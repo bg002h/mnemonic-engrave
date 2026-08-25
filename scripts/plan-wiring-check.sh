@@ -29,6 +29,7 @@
 #      RETRACTED -- i.e. every place still telling a reader to build it.
 #   3. Flags every reference to a W with no row at all.
 #   4. Flags every LIVE W that no step in the TDD-order table builds.
+#   4b. Flags a STRUCK rule or vector still referenced as LIVE somewhere else.
 #   5. Parses the vector table and flags any vector no step's test column names,
 #      and any vector named by more than one step.
 #
@@ -161,6 +162,40 @@ for w, defline in sorted(live.items(), key=lambda kv: int(kv[0][1:])):
     if w not in built_by:
         findings.append((f"{w} is a LIVE wiring site that NO step builds",
                          defline, "an implementer following section 4 never writes it"))
+
+# ---------- rule 4b: a STRUCK rule or vector still referenced as LIVE ----------
+# Added 2026-08-25. Striking a row in place leaves every OTHER mention of it
+# reading as live -- measured at 48 references after one simplification pass, of
+# which several were load-bearing (a field table citing a deleted rule, a
+# near-miss pair citing a deleted vector). A reviewer reporting these is a
+# reviewer paid design-review rates to act as a grep.
+STRIKE_LANG = re.compile(r"STRUCK|DELETED|struck|RETRACTED|retracted|SIMPLIFICATION|inexpressible|collapse", re.I)
+# A RANGE label ("E1-E20", "V1-V26") names a numbering span, not a claim that
+# every member is live. Flagging those buried the three real defects under 16
+# false ones on the first run. The span is stated once in the plan instead.
+RANGE = re.compile(r"[EV]\d+\s*[\u2013-]\s*[EV]\d+")
+
+def struck_names(prefix):
+    out = {}
+    for i, l in enumerate(lines, 1):
+        m = re.match(rf"^\|\s*~~\*{{0,2}}({prefix}\d+[a-z]?)\*{{0,2}}~~\s*\|", l)
+        if m:
+            out[m.group(1)] = i
+    return out
+
+for prefix, what in (("E", "rule"), ("V", "vector")):
+    dead = struck_names(prefix)
+    for nm, defline in sorted(dead.items(), key=lambda kv: int(re.sub(r"\D", "", kv[0]))):
+        for i, l in enumerate(lines, 1):
+            if i == defline or STRIKE_LANG.search(l):
+                continue
+            if l.lstrip().startswith("| ~~"):
+                continue
+            if RANGE.search(l):
+                continue
+            if re.search(rf"\b{nm}\b(?![a-z0-9])", l):
+                findings.append((f"{nm} is a STRUCK {what} (row at line {defline}) but line {i} "
+                                 f"references it as live", i, l.strip()[:110]))
 
 # ---------- rule 5: vectors named by exactly one step ----------
 VROW = re.compile(r"^\|\s*\*{0,2}(V\d+[a-z]?)\*{0,2}\s*\|")
