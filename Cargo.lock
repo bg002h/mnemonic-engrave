@@ -621,6 +621,7 @@ dependencies = [
 [[package]]
 name = "mt-codec"
 version = "0.1.0"
+source = "git+https://github.com/bg002h/mnemonic-transaction?rev=72b79b8762ec208b6143afade8c4b66a551bd29d#72b79b8762ec208b6143afade8c4b66a551bd29d"
 dependencies = [
  "bitcoin",
  "thiserror",
