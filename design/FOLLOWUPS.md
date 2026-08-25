@@ -10386,3 +10386,56 @@ ran (spec §1.5's *what runs before it*).
 **What would close it.** Validate and classify every record **before** generating
 or printing any passphrase. Cheap: the classification pass already exists and
 already runs; it simply runs second.
+
+---
+
+## RULING 2026-08-25 — an INCOMPLETE chunk set REPORTS LOUDLY and PACKS; and P1's refuse posture diverged from its own container spec
+
+**Operator ruling, taken 2026-08-25.** Asked whether an incomplete `mt1` chunk
+set should be REFUSED (the P1 plan's E20) or reported-and-packed (the
+`md1`/`mk1` sibling's posture), the operator ruled: **"Report loudly and pack."**
+
+**The question arose from an operator correction.** A fable simplification report
+justified P1's refuse posture on the grounds that *"a `tx:` payload is
+regenerable, an `md1` card may be the only copy"*. **The operator corrected this:
+a `tx:` payload is NOT necessarily regenerable.** The journey pipes
+`tx.final.psbt` — a FINALIZED transaction, embodying a completed signing
+ceremony. A multisig quorum collected across time and geography may take days to
+re-collect or be impossible if a cosigner is unavailable; the source PSBT may be
+gone; and **re-signing is not idempotent under this design** — a fresh nonce
+yields a different signature and therefore a different **wtxid**, which this plan
+carries (E17) and binds on (R15's top-20 of the txid). A regenerated payload is a
+different artifact by the design's own identifiers.
+
+**That correction is what makes report-and-pack right.** Every `mt1` chunk is
+independently valid, BCH-protected, and carries its own index and count, so a
+partial set is self-describing about what is missing: 201 engraved chunks plus
+the 202nd recovered later reassembles. That is exactly how `md1`/`mk1` multi-card
+backups already work. Refusing means the operator engraves NOTHING and may lose
+the ceremony.
+
+**AND THE PLAN WAS DIVERGING FROM ITS OWN CONTAINER'S SPEC, WHICH NOBODY NOTICED
+IN EIGHT ROUNDS.** `design/SPEC_systemwide_payloads.md:587` —
+
+> **5.3.2 The card-set DECODE check — now a FLAG, not a refusal (R0-I1; demoted
+> 2026-08-12, §13 D6)**
+
+EPD §6.3's per-card-set decode requirement *"reaches this container as a **flag
+input**, not as the refusal EPD gives it"*. So report-and-pack is not a
+divergence from the sibling at all — **it is what the container spec already
+requires, and P1's refuse posture was the divergence**, from the normative
+document it is building inside.
+
+**"Loudly" is normative and means more than the sibling does.** `mdmk_unconfirmed`
+reports quietly — it returns indices. P1's incomplete-set report MUST:
+- emit a **stderr warning at pack time** naming the set and **every** missing
+  index, not the first (r7-M1);
+- be visible in `me sysw show`, marked INCOMPLETE with the missing indices;
+- carry no format change — the chunks' own `count`/`index` let any reader
+  recompute it, so P4's device display can too.
+
+**Still OPEN and NOT ruled here:** whether `not_a_transaction` (W15/V28 — a
+COMPLETE set that reassembles to bytes that are not a transaction, the §2.1 C3
+smuggling channel) also demotes to a flag under §5.3.2, or stays a refusal. The
+two cases are different: incomplete is *missing material*, non-decoding is
+*wrong material*. **P1 may not close while this is open.**
