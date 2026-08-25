@@ -1,17 +1,21 @@
 # IMPLEMENTATION PLAN — P1: `me`'s transaction container
 
-**Status:** DRAFT v4, pre-R0. **Round 2 returned 2 Critical / 7 Important / 4
-Minor on v3**, and scored round 1's twenty-two at **20 FIXED / 2 PARTIAL / 0 NOT
-FIXED** — the best fold this cycle has had. This is the **FOLD of round 2**, and
-it carries an **operator ruling taken the same day** (§1.4a) that changes how the
-chunks form is framed. Not a rewrite.
+**Status:** DRAFT v6, pre-R0. **Round 3 returned 2 Critical / 7 Important / 3
+Minor on v4**, and scored round 2's twenty-two at **12 of 13 landed**. This is
+the **COMPLETE FOLD of round 3**: v5 (`c517286`) took only the two Criticals plus
+I2 and I7 — one structural defect, the error path — and deliberately deferred the
+counts, citations and vector construction so a design edit would not ship mixed
+with bookkeeping. **v6 is that deferred half**, and it also fixes **three defects
+v5 introduced**: bare-path citations transcribed from the report's shorthand,
+which `plan-cite-check.sh` caught and v5's six hand-checks did not run.
 
 **The reports are `design/agent-reports/R0-P1-plan-round0.md`** (5C/13I/5M on v1),
-**`R0-P1-plan-round1.md`** (3C/11I/8M on v2) **and `R0-P1-plan-round2.md`** (the
-live one), all persisted before any of this was written. Findings are marked
+**`R0-P1-plan-round1.md`** (3C/11I/8M on v2), **`R0-P1-plan-round2.md`**
+(2C/7I/4M on v3) **and `R0-P1-plan-round3.md`** (the live one, 2C/7I/3M on v4),
+all persisted before any of this was written. Findings are marked
 inline — round-0 markers as `(C1)`, `(I7)`; round-1 as `(r1-C2)`, `(r1-I9)`;
-round-2 as `(r2-C1)`, `(r2-I3)` — so a reader can trace each one to the report
-that raised it.
+round-2 as `(r2-C1)`, `(r2-I3)`; round-3 as `(r3-I1)`, `(r3-M2)` — so a reader
+can trace each one to the report that raised it.
 
 > **THE TWO THINGS THIS FOLD CHANGES STRUCTURALLY, stated once at the top
 > because everything below is downstream of them.**
@@ -340,7 +344,7 @@ v1 stated a layout and no rules. A layout without rules is a family of formats.
 | E9 | **A bad `magic`, an unknown `version`, or a `form` outside {0x01, 0x02} is REFUSED, each with its own message.** | **(I4)** v1 gave a verdict for unknown *tags* only |
 | E10 | **`n_fields` MUST equal the number of TLVs actually parsed.** | a disagreement is a malformed record, not a hint |
 | **E11** | **RAW: re-serialising the decoded transaction MUST reproduce the body BYTE FOR BYTE.** | **(r1-C2, CORRECTED r2-C1)** this is a **CANONICALITY** rule and nothing more — it rejects a non-canonical encoding of a transaction, and it **cannot** see a different, canonical transaction substituted. v3 claimed it enforced witness presence; **measured false**, see §1.1a. It is retained for the Go port, and §6 records that it has **no RED test in Rust** — `bitcoin`'s decoder already refuses both things it could catch |
-| **E12** | **CHUNKS: the chunk records are separated by the CONTAINER's own record separator — a single `\n` (0x0A), no trailing separator, no empty record.** | **(r1-C2, RE-HOMED §1.4a)** the chunks are no longer elements inside a body, so this is no longer a body rule: it is the container's, and `me` already has it — `payload.public.join("\n")` at `crates/me-cli/src/sysw/mod.rs:260`, asserted by `joins_with_lf_and_no_trailing_lf`. **The fact did not leave the plan; it moved to the layer that owns it**, and P1's job is to assert it holds for a `tx:` set rather than to re-implement it |
+| **E12** | **CHUNKS: the chunk records are separated by the CONTAINER's own record separator — a single `\n` (0x0A), no trailing separator, no empty record.** | **(r1-C2, RE-HOMED §1.4a)** the chunks are no longer elements inside a body, so this is no longer a body rule: it is the container's, and `me` already has it — `payload.public.join("\n")` at `crates/me-cli/src/sysw/mod.rs:260` — but **(r3-I1) the ASSERTION v4 cited is `seal`'s, not `sysw`'s.** `joins_with_lf_and_no_trailing_lf` lives at `crates/me-cli/src/seal/container.rs:85` and asserts on `seal`'s `encode_section`, the frozen container whose `MAX_RECORDS = 24` and `MAX_RECORD_LEN = 512` §3.1 insists are **not** `sysw`'s; `grep -rn 'joins_with_lf_and_no_trailing_lf' crates/` returns that **single** hit, and `sysw`'s four joins (`crates/me-cli/src/sysw/mod.rs:192`, `:260`, `:278`, `crates/me-cli/src/sysw/pubhash.rs:27`) are reached by it nowhere — change `:260`'s separator and it stays GREEN. **The fact did leave the plan, and it landed somewhere nothing asserts it.** So P1 OWES E12 a RED test in `sysw`: **§4 step 12**. This is §4.1's own shape — *"a test that only checks the raise would pass if someone edited the frozen container instead"* — applied to the rule one section earlier |
 | **E13** | **Every `mt1` chunk RECORD is lowercase ASCII with no leading or trailing whitespace and no interior whitespace or `-`.** | **(r1-C2, RE-SCOPED §1.4a)** `mt-codec`'s `to_symbols` does `s.trim().to_ascii_lowercase()` (`mnemonic-transaction/crates/mt-codec/src/string_layer/pipeline.rs:66`), so it **accepts** uppercase and padded strings — a different record, a different EPD §6.6 public-data hash, and `mt_codec::decode_chunk` still green. The tolerance is the decoder's; the record layer may not inherit it. `me` already refuses exactly this for md1/mk1 — `first_noncanonical` plus the uppercase scan at `crates/me-cli/src/seal/record.rs:118-128` — and `mt1` joins them. **BOTH halves are vectored (r2-I7)**: V20 the case, V23 the whitespace |
 | **E14** | **Tag `0x01`'s value MUST be valid UTF-8. Invalid is REFUSED.** | **(r1-I10)** Rust refuses by default and Go accepts by default — one implementation refuses what the other engraves |
 | **E15** | **Tag `0x01`'s value is `1..=64` bytes.** | **(r1-I10)** a `u16 len` otherwise admits a 65,535-byte label into a plate legend budgeted at 34 characters |
@@ -770,7 +774,7 @@ catch."*
 | W6 | `crates/me-cli/src/sysw/mod.rs:107-115` | `unknown_reason` iterates `[PASS_PREFIX, TEXT_PREFIX]` only, so today a `tx:` record with a bad body reports `Unrecognised` **without naming its prefix**. Add `TX_PREFIX` |
 | **W7** | `crates/me-cli/src/sysw/mod.rs:96-105` | **`UnknownReason` gains a rule-carrying variant** — `TxRule(&'static str)` — so a `tx:` failure can say *which* rule. **`&'static str` is what makes this legal:** the enum's doc comment at `crates/me-cli/src/sysw/mod.rs:89-95` rules that it *"Carries NO operator data, and that is load-bearing"*, because a `pass:` body is a passphrase. **Rule names are compile-time constants**, exactly like the prefixes already carried, so the invariant holds by construction rather than by care |
 | **W8** | `crates/me-cli/src/main.rs:1263-1280` | **`sysw_error` gains the `TxRule` arm** — *"record {i} (records count from 0) is a `tx:` record that fails rule {rule}"* — and E9's three rule names (`magic`, `version`, `form`) become its three distinct lines |
-| **W9** | `crates/me-cli/src/main.rs:1156-1181` | **`print_mdmk_confirmation` gains a `tx:` / `mt1` arm** (r2-I5). Today its second statement is `if classify(r) != Class::MdMk { continue; }`, so a `tx:` record produces **no line at all** and §6's *"`me sysw show` reads it back"* names a capability `show` does not have. It prints one line per `tx:` record (form and carried txid) and **one line per chunk SET, not per chunk** — 202 chunks must not become 202 lines |
+| **W9** | `crates/me-cli/src/main.rs:1156-1181` | **`print_mdmk_confirmation` gains a `tx:` / `mt1` arm** (r2-I5). Today its second statement is `if classify(r) != Class::MdMk { continue; }`, so a `tx:` record produces **no line at all** and §6's *"`me sysw show` reads it back"* names a capability `show` does not have. It prints one line per `tx:` record (**form, carried txid AND carried wtxid** — r3-I4) and **one line per chunk SET, not per chunk** — 202 chunks must not become 202 lines. **The wtxid is not decoration here:** §1.1a buys the field partly for *"a second value to compare against `mt inspect`"*, and V26 is the case that needs it — a stripped body whose txid EQUALS the honest record's, so an operator comparing the txid alone gets a **match** on a payload with its signatures removed. Print the value that separates them |
 | **W10** | `crates/me-cli/src/sysw/mod.rs:251-259` | **`split` gains a payload-level pass for E20** — set membership, completeness, orphans. `classify` sees one record at a time and **none of E20 is decidable from one record**; `split` is the only place the whole list is in hand. This is the site §1.4a's ruling creates |
 
 **W3 is the one that costs the operator if it is wrong.** `is_secret` is a
@@ -791,9 +795,14 @@ of it in the same function**. **The branch is the work; the prefix is not.**
 
 **§4's step 6 is these ten sites, and its test is END TO END** — `me sysw pack`
 on a real `tx:` record and its chunk set, read back with `me sysw show`, which
-**W9 is what makes possible**. V1–V27 are record-level vectors: they exercise the
-codec directly and stay green with `classify` untouched, so **no vector in §3 can
-substitute for that test.** §6 states the per-site assertion for each of the ten,
+**W9 is what makes possible**. **Most** of V1–V27 are record-level vectors: they
+exercise the codec directly and stay green with `classify` untouched, so **no
+vector in §3 can substitute for that test.** **(r3-M3) FIVE are not, and siting
+their tests at the codec would site them where their input never arrives:** V20
+(uppercase `mt1`), V23 (padded) and V24 (BCH-repaired) are **bare chunk records
+with no `tx:` framing**, refusable only by `classify`'s W5 branch; V25 and V27 are
+**whole payloads**, decidable only in `split` (W10). The conclusion stands — step 6
+is still irreplaceable — but it rests on the other twenty-two. §6 states the per-site assertion for each of the ten,
 because a `grep -c` cannot see a site and cannot assert an absence (r2-I4).
 
 ## 2.5 THE ERROR PATH — r2-C2 was named, not plumbed (r3-C1, r3-C2)
@@ -804,14 +813,14 @@ failure TRAVELS from where it is detected to where it is printed.** Round 3's tw
 Criticals are one defect: **there is no channel.** Measured, not read:
 
 ```rust
-// sysw/mod.rs:107-115 -- the SOLE producer on the production path
+// crates/me-cli/src/sysw/mod.rs:107-115 -- SOLE producer on the production path
 fn unknown_reason(record: &str) -> UnknownReason {      // <- only the STRING
     for prefix in [record::PASS_PREFIX, record::TEXT_PREFIX] {
         if record.starts_with(prefix) { return UnknownReason::NonHexBody(prefix); }
     }
     UnknownReason::Unrecognised
 }
-// sysw/mod.rs:255
+// crates/me-cli/src/sysw/mod.rs:255
 Class::Unknown => return Err(SyswError::Unclassifiable(i, unknown_reason(&r))),
 ```
 
@@ -838,7 +847,7 @@ edit:
 | --- | --- |
 | **W11** | a `TxRecordError` enum whose variants are the rules — one per E-number that can fail a **single record**. Produced by the parse, where the failure is known. |
 | **W12** | `SyswError` gains a **set-level** variant. It may not carry a bare `usize`: E20's failures are *"chunk 7 of set 0x2dcf2 is missing"* and *"record 12 is an orphan"*, and R17's is *"two sets share top-20 bits"* — none of which is one index. |
-| **W13** | the printer arm for both, at `sysw_error` **and its outer match** (`main.rs:1257-1300`), which round 3 found required by W10/R17 and named by no row. |
+| **W13** | the printer arm for both, at `sysw_error` **and its outer match** (`crates/me-cli/src/main.rs:1257-1300`), which round 3 found required by W10/R17 and named by no row. |
 
 **`unknown_reason` is NOT the place.** It is reached only after `classify` has
 already returned `Unknown`, by which point the reason is gone. **The parse must
@@ -943,9 +952,25 @@ verified by reading the corpus's own `generator` field, which is that path.
 > match — and §2.2's own ACCEPTED COST block already states that a well-formed
 > transaction is all this gate can ever require.
 >
-> **V7 is the only vector this exception covers.** Every other vector below —
-> including V18 and V26, which are the `even` vector's own bytes with the
-> witnesses cleared — is the corpus transaction.
+> **V7 and V27 are the only vectors this exception covers (r3-I3).** Every other
+> vector below — including V18 and V26, which are the `even` vector's own bytes
+> with the witnesses cleared — is the corpus transaction.
+>
+> **V27's exception is FORCED, and v4's scoping sentence made its vector
+> UNBUILDABLE.** V27 needs two records whose txids **share their top 20 bits
+> without being equal**, and that is two DIFFERENT transactions. The corpus holds
+> two and they do not collide: `even`'s `set_id` is **`0x2dcf2`** and `uneven`'s is
+> **`0x3b426`**, both read from `mt1_v1.json` while writing this fold, each equal to
+> the top 20 bits of its own display-order txid. Built the only way v4's rule
+> allowed — the same transaction twice — the two records carry **IDENTICAL** txids,
+> which is **R10**; the payload is refused with R17's comparison deleted, so **V27
+> would have had no RED test.** That is r2-M4's failure mode exactly.
+>
+> **So V27 GRINDS a second transaction** whose display-order txid begins `2dcf2` —
+> locktime is the free knob, and `mt`'s own help puts a 20-bit grind at *"under a
+> second"*. §4 step 9's generator produces it and writes it into the vector file
+> beside the corpus pair, so the collision is a **committed input**, not a
+> re-grind at test time.
 
 | # | vector | pins |
 | --- | --- | --- |
@@ -969,7 +994,7 @@ verified by reading the corpus's own `generator` field, which is that path.
 | **V17** | **`tag=0x02, len=2`; and the near-misses `len=7` and `len=9` refused, `len=8` passes** | **(I3, r1-I11)** E16's FEE half. E6 refuses only `len = 0`; `1..7` is the gap, and the fee is engraved |
 | **V17b** | **`tag=0x03, len=3` and `len=5` REFUSED; `len=4` passes** | **(r2-I7)** E16's FINGERPRINT half, which v3 never vectored at any width. Delete the `0x03 → 4` clause and every v3 vector stayed green — while a 3-byte value for the master fingerprint reached the plate's `FROM` line |
 | **V18** | **RAW body = the same transaction serialized WITHOUT witness (113 B), carried txid correct, carried wtxid the REAL transaction's** | **(r1-C2, RE-ASSIGNED r2-C1)** **E17, not E11.** This is the vector that separates the two conforming records: it deserialises, its txid matches, **and E11 passes on it** — measured, §1.1a. The wtxid is what refuses it, because the stripped body's wtxid equals its own txid |
-| **V19** | **`form = 0x02` with a NON-EMPTY body** (and its sibling: `form = 0x01` with `body_len = 0`) | **(§1.4a)** E18. v3's V19 was *"CHUNKS body with a trailing `\n`"*; the CHUNKS body is empty now, so that case moved to the container and is covered by `joins_with_lf_and_no_trailing_lf`. **The rule did not go away and neither did the vector** — it is re-cut against the framing that replaced it, and it is also spec §5's R4′ made checkable |
+| **V19** | **`form = 0x02` with a NON-EMPTY body** (and its sibling: `form = 0x01` with `body_len = 0`) | **(§1.4a)** E18. v3's V19 was *"CHUNKS body with a trailing `\n`"*; the CHUNKS body is empty now, so that case moved to the container and is covered by **§4 step 12's new `sysw` test** (r3-I1: the `joins_with_lf_and_no_trailing_lf` v4 named here is `seal`'s and does not reach `sysw`'s join). **The rule did not go away and neither did the vector** — it is re-cut against the framing that replaced it, and it is also spec §5's R4′ made checkable |
 | **V20** | **a bare `mt1` RECORD in UPPERCASE** | **(§1.4a)** E13's case half — `mt_codec::decode_chunk` lowercases before it verifies, so it accepts what the record layer must not |
 | **V21** | **`tag=0x01` whose value is `74 6f ff 21`** | **(r1-I10)** E14. Rust refuses by default, Go accepts by default |
 | **V22** | **`tag=0x01, len=65`; near-miss `len=64` must PASS** | E15, and the near-miss rule (§6) |
@@ -1018,8 +1043,8 @@ removed from the path; none was raised.
 
 **(M7) THE 16,290 FIGURE ASSUMES THE `tx:` RECORD IS ALONE IN THE SECTION.**
 Records are joined with `\n` and no trailing LF
-(`crates/me-cli/src/sysw/mod.rs:260`, asserted by
-`joins_with_lf_and_no_trailing_lf`), spec §3.6 contemplates several transactions
+(`crates/me-cli/src/sysw/mod.rs:260`, asserted by **§4 step 12**, not by
+`joins_with_lf_and_no_trailing_lf` — that one is `seal`'s, r3-I1), spec §3.6 contemplates several transactions
 in one payload, and a payload may also carry `md1`/`mk1` records. For `k` records
 the bound is `Σ(record chars) + (k − 1) ≤ 32,734`, so **V7 is explicitly the
 single-record vector** and the plan claims nothing about a full payload.
@@ -1095,7 +1120,7 @@ code, full suite green.
 | 1 | **`sysw::wire::MAX_SECTION_LEN` is 32,734** — and `seal::wire::MAX_SECTION_LEN` is **still 8191** | raise **only** `crates/me-cli/src/sysw/wire.rs:42` |
 | 2 | `me sysw pack` reads from **stdin**; **empty stdin refused at EXIT 2** (R7, spec §5); **a TTY with no `--in` and no argv refuses at EXIT 2 instead of blocking**; **`--in` still wins over argv, and stdin is read only when neither is given** (§4.2). **Both exit codes are asserted, not just non-zero** (r2-I2) | the stdin path |
 | 3 | **a payload with NO `Class::is_secret()` record packs UNSEALED; one with any packs SEALED** (spec §2.4, the base rule); an explicit passphrase-mode flag **wins**; **`--allow-weak` is not one** (§4.3); **stderr says which way and why, every time** | content-based sealing |
-| 4 | V1–V3 round-trip (**V3 is a whole PAYLOAD now** — a metadata record plus six bare chunks, §1.4a) | the layout codec — **and this is the step that adds BOTH manifest lines to `crates/me-cli/Cargo.toml`: `bitcoin = { version = "0.32", default-features = false, features = ["std"] }` (I5) and `mt-codec = "0.1.0"`, the pinned published version (r2-I6, §2.2)** |
+| 4 | V1–V3 round-trip (**V3 is a whole PAYLOAD now** — a metadata record plus six bare chunks, §1.4a) | the layout codec — **and this is the step that adds BOTH manifest lines to `crates/me-cli/Cargo.toml`: `bitcoin = { version = "0.32", default-features = false, features = ["std"] }` (I5) and **`mt-codec = "=0.1.0"`** — **the `=` is required (r3-M1): a bare `"0.1.0"` is `^0.1.0`, and a `0.1.1` publish could change `decode_chunk`'s tolerance under `me` with no manifest edit** — the pinned published version (r2-I6, §2.2)** |
 | 5 | **V4a, V4b, V18 and V26** | the two identifier fields: txid (display order, witness-stripped) **and wtxid** (display order, canonical serialization), on **both** forms. **V18/V26 belong here and not in step 8**, because they are the pair that proves the wtxid field does work the txid cannot (§1.1a) |
 | **6** | **`Class::Transaction` AND `Class::MtChunk` exist and `is_secret()` is FALSE for BOTH; `me sysw pack` on a real `tx:` record puts it in the PUBLIC section; a bare `mt1` chunk classifies instead of being refused; `me sysw show` reads BOTH back (one line per `tx:` record, ONE line per chunk SET); a `tx:` record with a bad body names its PREFIX, not `Unrecognised`; a `tx:` record with a bad MAGIC names the MAGIC RULE, not "not lowercase hex"** | **(r1-C3, r2-C2, r2-I5) the wiring — W1–W10 of §2.4.** End to end, because no record-level vector can see this. **The last clause is the r2-C2 test**: without W7/W8 it reports a false statement plus a corrupting instruction |
 | **7** | **a `tx:` record that fails DECODE aborts the whole pack: nothing on stdout, one stderr line naming the index and the rule, exit 4 — with four other valid records present** | **§2.3's refusal, at the layer and scope §1.5 rules.** The anti-smuggling gate, tested as a `me sysw pack` outcome rather than as a codec `Err` |
@@ -1103,6 +1128,7 @@ code, full suite green.
 | 9 | V7 at **16,290 − F**, and the near-miss `16,291 − F` REFUSED | the framing ceiling, single-record (§3.1) — **and this is the step that writes and commits `scripts/gen-tx-record-vectors.py`** (r2-I3), because V7 has no other input |
 | 10 | V8, **V15**, **V25** and **V27** | the identifier-consistency refusals on both forms, **and E20's set binding** (§1.4a) |
 | 11 | a `tx:` record on **argv** refused (R2) **at EXIT 3**, **and its text does not appear in stderr** | the argv guard — §1.5's *what runs before it*: clap must not echo the record. **Exit 3, not 4** (r2-I2): it is a policy refusal, the shape of `crates/me-cli/src/main.rs:509-515` |
+| **12** | **(r3-I1) E12's RED test, in `sysw`** — pack a CHUNKS `tx:` set, read the public section back as bytes, and assert it is the records joined by a single `0x0A` with **no trailing LF and no empty record**. It goes RED when `crates/me-cli/src/sysw/mod.rs:260`'s separator changes | E12, which until this step is a rule the plan states and nothing in `sysw` asserts. **Not** `seal`'s `joins_with_lf_and_no_trailing_lf`, which tests a different container |
 
 ### 4.1 (I11) STEP 1 SAYS WHICH CONSTANT, BECAUSE THERE ARE TWO
 
@@ -1132,7 +1158,7 @@ refuse with a message naming both real inputs.** And note **R7's test as written
 path, so it cannot catch this. The TTY case needs its own test.
 
 **(M6) AND STEP 2 MAKES A THIRD RECORD SOURCE, SO THE PRECEDENCE MUST BE RULED.**
-Today `--in` wins over argv silently and filters blank lines
+Today `--in` wins over argv silently and filters **empty** lines
 (`crates/me-cli/src/main.rs:1211-1227`). v1 and v2 both added stdin without saying
 what `me sysw pack rec1 --in f.txt < g.txt` does.
 
@@ -1140,8 +1166,10 @@ what `me sysw pack rec1 --in f.txt < g.txt` does.
 nor argv records are given — which is exactly the branch that returns
 `no records: pass them on argv or with --in` today
 (`crates/me-cli/src/main.rs:1223-1225`), so the new path *replaces a refusal*
-rather than pre-empting a working input. **Stdin filters blank lines exactly as
-`--in` does**, so a record's index is its position among the non-blank lines in
+rather than pre-empting a working input. **Stdin filters EMPTY lines exactly as
+`--in` does** — `read_records` (`crates/me-cli/src/main.rs:1217-1221`) tests
+`!l.is_empty()`, so **a line holding a single space SURVIVES as a record** (r3-M2),
+becomes no class, and lands in §1.5's refusal path via W11 — so a record's index is its position among the non-empty lines in
 both cases; anything else makes `me: record 3` mean two things.
 
 ### 4.3 (I9) (r1-I9) STEP 3: THE BASE RULE, THEN PRECEDENCE — AND `--allow-weak` IS NOT A MODE
@@ -1193,7 +1221,8 @@ version.** No path dependency, no git dependency, no ordering knot.
 **AND `me` DECLARES IT IN §4 STEP 4 (r2-I6).** v3 named the publish in three
 places and added the dependency in no step, so the first step that needed
 `mt-codec` was the step that did not have it. The manifest line is
-`mt-codec = "0.1.0"` and §2.2's second decision table owns it. **The publish
+**`mt-codec = "=0.1.0"`** — the exact-pin operator, not the caret a bare `"0.1.0"`
+would mean (r3-M1) — and §2.2's second decision table owns it. **The publish
 therefore happens BEFORE step 1 runs**, not between steps — this plan going GREEN
 is the gate, and step 4 is only where the manifest line is written.
 
@@ -1233,8 +1262,9 @@ plan closing.
   false PASS**, and the plan already names the shape twice (*"a close condition
   that could pass on the defect it exists to catch"*). `grep -c
   'Class::Transaction' crates/me-cli/src/sysw/` returns **per-file** counts over
-  nine files; W1–W3 all live in `record.rs` and W4–W6 all live in `mod.rs`, so it
-  sees **two files, not five sites** — and three of v3's five sites contain no
+  nine files; **(r3-I6) W1–W3 live in `record.rs`, W4–W7 and W10 live in `mod.rs`,
+  and W8–W9 live in `main.rs` — which that grep's path (`crates/me-cli/src/sysw/`)
+  cannot see at all**, so it sees **two files, not ten sites** — and three of v3's five sites contain no
   such token at all: W1 is a `const`, W6 is an error message, and **W3 requires
   the token to be ABSENT**, so a non-zero count there is the defect rather than
   the proof. **An absence is not assertable by any non-zero grep.** Each site
@@ -1250,7 +1280,7 @@ plan closing.
   | W6 | a `tx:` record with a non-hex body reports `NonHexBody("tx:")`, not `Unrecognised` |
   | W7 | `UnknownReason::TxRule("magic")` exists and is `Copy` — and carries no operator data |
   | W8 | a `tx:` record with magic `MTX2` produces a line naming the **magic** rule, and **the string "not lowercase hex" does NOT appear in it** |
-  | W9 | `me sysw show` on a packed `tx:` payload prints the carried txid, and on a 202-chunk payload prints **one** set line |
+  | W9 | `me sysw show` on a packed `tx:` payload prints the carried txid **and the carried wtxid** (r3-I4), and on a 202-chunk payload prints **one** set line. **V18 and V26 differ in exactly 32 output positions**, and that is the assertion |
   | W10 | V25's three negatives all refuse; V3's complete payload packs |
 - **(r2-I5) `me sysw show` CAN ACTUALLY DO THIS, BECAUSE W9 MAKES IT SO.** v3's
   read-back gate named a capability `show` does not have: `show`
@@ -1275,7 +1305,10 @@ plan closing.
 - **`mt-codec`'s dead `bitcoin` declaration is removed (M8), `cargo publish
   --dry-run` is clean, `mt-codec` is published**, and `me` depends on the
   **pinned published version**.
-- **Spec corrections this phase owns — THREE, not one (r1-I7), and all three are
+- **Spec corrections this phase owns — TWO still open (r3-I5). v4 said THREE and
+  correction 3 LANDED IN THE SAME FOLD**, in spec §2.3's new container column;
+  the spec's own amendment block already enumerates the remaining **two**, and v4's
+  plan-side list was never reconciled with it. All three are
   RE-DERIVED against the 75-byte framing and §1.4a's bare records.** All three are
   **spec §2.3's**, all three are recomputed in §3.1, and the *"opaque"* item v2
   listed is **struck: it has no referent** (r1-I8, §2):
@@ -1283,10 +1316,11 @@ plan closing.
   2. the 5/2 row's *"raw-only at 8191, by 31 chars"* → **struck**: the raw record
      is **8,313 chars, 122 OVER 8191**, so at the old cap *neither* form fitted.
      At 32,734 both do.
-  3. the 10/2 chunks row's *"18,583 … ✅"* → the ✅ is **correct**; the number is
-     the chunk text alone and the container cost is **18,737 chars (13,997
-     spare)**, which is the figure a reader needs. **The spec table gains a
-     container column.**
+  3. ~~the 10/2 chunks row~~ — **DONE, this fold's predecessor.** Verified in the
+     artifact rather than assumed: `design/SPEC_engrave_transaction.md` now carries
+     the container column and the 10/2 row reads **18,737** with **13,997 spare**.
+     Items 1 and 2 are what the phase still owes, and the spec's amendment block
+     names exactly those two.
 
   **These three MOVED between v3 and v4**, and that is itself the argument for
   computing them: correction 2's number changed and its verdict widened,
@@ -1295,8 +1329,8 @@ plan closing.
   the previous fold would now be wrong.
 - **The SPEC EDITS this fold already made are spec §2.1, spec §2.3, spec §3.6b
   and spec §5**, and
-  they are the ruling's, not these three corrections'. The three above are still
-  owed by the phase.
+  they are the ruling's — **and spec §2.3 carried correction 3 with them**, which is
+  why the list above is now two. **Items 1 and 2** are still owed by the phase.
 - **The near-miss rule**: every guard here is tested against its nearest
   *legitimate* input as well as the hostile one — **(M3) v2 said "seven instances
   this cycle" against spec §5's six and named no seventh.** The count is dropped;
@@ -1364,9 +1398,9 @@ document, measured on this fold, so a future run has something to diff against:
 
 | gate | what it reads here | PASS on this document | what it does NOT cover |
 | --- | --- | --- | --- |
-| `./scripts/plan-cite-check.sh` | every `path:line` citation, resolved against the real tree | **73 of 90 resolve; the 17 dangling are exactly the 8 into the vendored `bitcoin` crate and the 9 into `mnemonic-transaction`** — see below. Any eighteenth is a defect | **interpretation** — it proves the line exists, never that this plan reads it right; and it cannot check absence claims |
-| `./scripts/plan-table-check.sh` | every table row against its header's cell count | **120 rows checked, 0 malformed, exit 0** | cell **content**; a right-width row with wrong values passes |
-| `./scripts/plan-fold-sweep.sh <doc> --terms <the twelve below>` | **terms this fold removed that survive elsewhere** | **exactly 12 hits, one per term, ALL of them inside the list block below — the self-reference. A thirteenth hit anywhere else is a real finding** | it flags candidates, not defects; and terms nobody named |
+| `./scripts/plan-cite-check.sh` | every `path:line` citation, resolved against the real tree | **81 of 98 resolve; the 17 dangling are exactly the 8 into the vendored `bitcoin` crate and the 9 into `mnemonic-transaction`** — see below. Any eighteenth is a defect. **(r3 fold) This gate caught THREE defects in the fold that answered round 3's Criticals** — two `sysw/mod.rs` citations and one `main.rs` citation, written in the REPORT's shorthand (no `crates/me-cli/src/` prefix) and unresolvable as written. **They are not reproduced here with their line numbers, because doing so mints three fresh dangling citations — measured, one edit ago.** The six hand-checks that fold ran did not include this gate. **That is the argument for the row, and it is why the number moved from 90 to 98 rather than staying put** | **interpretation** — it proves the line exists, never that this plan reads it right; and it cannot check absence claims |
+| `./scripts/plan-table-check.sh` | every table row against its header's cell count | **133 rows checked, 0 malformed, exit 0** | cell **content**; a right-width row with wrong values passes |
+| `./scripts/plan-fold-sweep.sh <doc> --terms <the twenty-two below>` | **terms this fold removed that survive elsewhere** | **exactly 22 hits, one per term, ALL of them inside the block below — the self-reference. A twenty-third hit anywhere else is a real finding.** **(r3 fold)** Its ten new terms were swept BEFORE they were written down and **nine were absent**; the tenth (the `five sites` entry) survives twice in prose and **both are HISTORICAL** — *"none of v3's five sites"*, *"three of v3's five sites"* — where a present-tense survivor would be a finding. **The terms live ONLY in the block: quoting them in this cell instead made all ten self-hit from a table, measured one edit ago** | it flags candidates, not defects; and terms nobody named |
 
 **`plan-glyph-check.sh` is NOT a close condition here either, and the reason is
 not the same as the build gate's.** It runs and it reads this document — but it
@@ -1381,7 +1415,7 @@ that is red for non-defects trains a reader to ignore it just as surely as one
 that is green for everything.**
 
 **The `--terms` list is fixed, because the explicit mode is the one that works
-and the fold author is the only one who knows what was superseded.** These six,
+and the fold author is the only one who knows what was superseded.** These **twenty-two**,
 each of which this fold removed and each of which must survive **only** in this
 block:
 
@@ -1399,10 +1433,20 @@ block:
 'the serialized signed transaction'
                                the undecodable RAW body row     (r2-I1)
 'strings, LF-separated'        the superseded chunks body       (§1.4a)
+'THREE, not one'               spec corrections owed            (r3-I5)
+'These six'                    the terms list's own count       (r3-I6)
+'not five sites'               the ten-site wiring count        (r3-I6)
+'filters blank lines'          they are EMPTY, not blank        (r3-M2)
+'non-blank lines'              they are EMPTY, not blank        (r3-M2)
+'V7 is the only vector'        V27 needs the exception too      (r3-I3)
+'mt-codec = "0.1.0"'           a caret requirement, not a pin   (r3-M1)
+'asserted by `joins_with_lf'   that test is `seal`'s            (r3-I1)
+'all three are still'          correction 3 had already landed  (r3-I5)
+'FOUR `mnemonic-transaction`'  measured NINE                    (r3-I6)
 ```
 
-**The last six are v4's, and each one is a fact this fold RETRACTED.** A hit for
-any of the twelve **outside the block above** is a real finding — that is the
+**The last TEN are this fold's, and each one is a fact it RETRACTED** (the six
+before them are v4's). A hit for any of the twenty-two **outside the block above** is a real finding — that is the
 whole mechanism, and r1-C1 is why: a fact corrected in the prose and left
 standing in a table three sections away is invisible to a diff, because by
 construction it lives in the text the diff did not touch.
@@ -1518,8 +1562,8 @@ trailing byte is refused `parse failed: data not consumed entirely`.
 have enforced if it could read this document, applied by hand because it cannot.
 
 **Adding `/scratch/code/shibboleth/mnemonic-transaction` to that `ROOTS` list is
-the one-line change that would bring the FOUR `mnemonic-transaction` citations
-inside the gate**, leaving 4. The `bitcoin` four cannot be gated at all: they
+the one-line change that would bring the **NINE** `mnemonic-transaction` citations
+inside the gate**, leaving **eight**. The `bitcoin` **eight** cannot be gated at all: they
 point into a registry cache whose path carries a version hash, and a gate that
 resolved them would be asserting a *local build artifact*, not a source of truth.
 The change is named rather than made, because this plan does not edit tooling.
@@ -1537,6 +1581,7 @@ anti-smuggling gate the whole plan is built around:
 | **R7** — empty stdin | §4 step 2 | **2** | **no** |
 | **the TTY refusal** | §4.2, NORMATIVE | **2** | **no** |
 | **§2.3's decode-failure refusal** | §4 step 7 | **4** | **no** — and it is the reason EPD §6.3 exists |
+| **R17** — two chunk SETS sharing top-20 bits | §4 step 10, **V27** | **4** | **no** (r3-I3) — it has no E-number, so §6's E1–E20 sweep never reached it. This table is the mechanism that does |
 
 **NORMATIVE: all four get a test that goes RED when its check is removed**, the
 same standard as E1–E20, verified by deleting the check by hand and watching the
