@@ -85,6 +85,29 @@ while i < len(lines):
         blocks.setdefault(cur, []).append((prepend or code.lstrip().startswith("//!"), code))
     i += 1
 
+# EXTRACTING NOTHING IS A FAILURE, NOT A PASS.
+#
+# Added 2026-08-24 after this gate was cited as a close condition in
+# `IMPLEMENTATION_PLAN_P1_me_container.md` and RAN CLEAN ON IT -- exit 0,
+# "clippy clean", 77 tests -- having extracted ZERO blocks, because the anchor
+# filter below is hardcoded to `src/seal/*` and `tests/seal_cli.rs`. It then
+# built the UNMODIFIED crate and reported its success as the plan's.
+#
+# "I tested nothing" must never be indistinguishable from "I tested everything
+# and it passed". A gate that cannot see its input has to say so.
+if not blocks:
+    sys.stderr.write(
+        "\nplan-build-gate: EXTRACTED NOTHING from %s\n\n"
+        "  This gate only recognises anchors naming `src/seal/*.rs` or\n"
+        "  `tests/seal_cli.rs`. Nothing in this plan matched, so there is\n"
+        "  no code to build and NOTHING HERE WOULD HAVE BEEN CHECKED.\n\n"
+        "  Refusing rather than reporting a pass on an empty extraction.\n"
+        "  Either the plan carries no extractable Rust -- in which case do not\n"
+        "  cite this gate as one of its close conditions -- or the anchor\n"
+        "  filter needs widening to the files this plan actually creates.\n"
+        % plan)
+    sys.exit(3)
+
 # mod.rs's `pub mod X;` lines live in prose, not in fences — synthesise them
 # from whichever seal files were actually extracted.
 mods = sorted({os.path.basename(p)[:-3] for p in blocks
