@@ -1,15 +1,20 @@
 # IMPLEMENTATION PLAN — P1: `me`'s transaction container
 
-**Status:** DRAFT, pre-R0. Written 2026-08-24 after `SPEC_engrave_transaction.md`
-reached **R0 GREEN**. **No code until this plan is 0C/0I** — the risk-set rule
-gates plan-docs as well as specs, and P1's riskiest content is a **new normative
-wire format** that Go must later match byte-for-byte.
+**Status:** DRAFT v2, pre-R0. **Round 0 returned 5 Critical / 13 Important / 5
+Minor and this is the rewrite**, not a fold — three of the Criticals were in one
+32-byte field and the rest of §1–§3 rested on them.
 
-**Scope: §6's P1 row and nothing else.** `ClassTransaction`, the framed record
-including the mandatory carried txid, stdin, content-based sealing,
-`MaxSectionLen` → 32,734 — with vectors.
+**The round-0 report is `design/agent-reports/R0-P1-plan-round0.md`**, persisted
+before any of this was written.
 
----
+> **WHAT v1 GOT WRONG, kept at the top because it is the argument for gating
+> plans at all.** v1's §1.1 called the txid byte order *"the most likely defect
+> in this plan"* — and then **stated the losing answer as normative**, with an
+> escape clause deferring to a decision `mt-codec` does not make. So **V4, the
+> vector designed to pin the dangerous thing, was pinned to the wrong axis and
+> could not have caught it.** Had this been implemented straight from §6's scope
+> line, the disagreement would have surfaced when the Go port was written — or
+> when a plate was cut and R15 refused a correct record.
 
 ## 0. Why this plan exists at all
 
@@ -45,159 +50,272 @@ format with mixed endianness is a defect generator.
 record is framed; the magic says the *body* is this format. A hex-valid body of
 the wrong shape is caught at byte 0 instead of somewhere deeper.
 
-### 1.1 THE TXID'S BYTE ORDER IS THE MOST LIKELY DEFECT IN THIS PLAN
+### 1.1 THE TXID FIELD — display order, witness-stripped. TWO errors were here.
 
-Bitcoin displays a txid **reversed** from the internal `double-SHA256` output.
-Every implementation that has ever touched txids has had this bug.
+**NORMATIVE: the `txid` field is the transaction's txid in its STANDARD DISPLAY
+ORDER — the byte-reversed form a user reads — computed over the transaction with
+marker, flag and witnesses STRIPPED.**
 
-**NORMATIVE: the `txid` field is the raw `double-SHA256` result, INTERNAL byte
-order, unreversed.** Display reverses it; the wire does not.
+Two independent mistakes lived in this one field in v1, and each is separately
+sufficient to make two implementations disagree.
 
-**And it interacts with §3.6b.** That section rules `chunk_set_id` **is the top
-20 bits of the txid**. *Top 20 bits of which order?* The two answers differ
-completely, and picking wrong makes R15 refuse every honest record — or, worse,
-accept every dishonest one.
+**(C1) The order. v1 said INTERNAL; the constellation uses DISPLAY.** Verified in
+`mt-codec` itself — the answer is in the function's name:
 
-**This plan does not guess.** `mt-codec` already computes `chunk_set_id`, so the
-answer is whatever `mt-codec` does, and **a vector must pin it** (§3, V4). If
-`mt-codec`'s own choice turns out to be the display order, this field follows it
-— consistency with the sibling beats consistency with a convention.
+```rust
+// crates/mt-codec/src/string_layer/pipeline.rs:17-27
+/// Top 20 bits of a txid **in its display form** — the content id (§10.13 c).
+/// The display form is the byte-reversed one a user reads, and "which 20 bits,
+/// from which end" is exactly where two implementations diverge silently. So
+/// this takes the display string rather than raw bytes.
+pub fn content_id_from_txid_display(txid_hex: &str) -> Result<u32>
+```
+
+It is the sole producer of a `chunk_set_id` (`pipeline.rs:54`), and
+`SPEC_mt_v0_1.md:3546-3549` already ruled it. **`mt-codec`'s author anticipated
+this exact trap and took a display STRING to defeat it. v1 walked into it
+anyway** — and because `mt-codec` has no txid *field*, v1's "defer to `mt-codec`"
+escape clause pointed at nothing.
+
+**Shipped as written, R15 would have refused every byte-perfect chunks record.**
+
+**(C2) txid, not wtxid.** v1 said *"the raw `double-SHA256` result"* while §1.3
+says the RAW body carries the **witness**. Double-SHA256 over a witness-carrying
+serialization is the **wtxid**. `SPEC_mt_v0_1.md:680` is explicit: the txid is
+*"double-SHA-256 of the decoded transaction **with marker, flag and witnesses
+stripped** … **Not** a hash of the engraved bytes."*
+
+**V4 must use a SEGWIT transaction** (§3), because for a non-segwit transaction
+txid == wtxid and the vector would pass in both worlds.
 
 ### 1.2 Legend field tags
 
 | tag | field | value |
 | --- | --- | --- |
 | `0x01` | `TO` label | UTF-8, operator's own words (§3.4, asserted) |
-| `0x02` | fee | **u64 satoshis**, big-endian, 8 bytes |
-| `0x03` | `FROM` wallet | 4 bytes, the fingerprint |
+| `0x02` | fee | **u64 satoshis**, big-endian, exactly 8 bytes |
+| `0x03` | `FROM` wallet | exactly 4 bytes, the fingerprint |
 
-**An absent optional field is simply not present in the TLV list.** There is no
-"empty" encoding and no sentinel — §2.1b asked what absence looks like, and the
-answer is *nothing at all*, which cannot be confused with a present-but-blank
-value.
+**The fee is satoshis, not BTC, and not a float.** F-236 closed exactly this in
+`mt`. A wire format repeating it would be the same bug somewhere harder to change.
 
-**The fee is satoshis, not BTC, and not a float.** F-236 closed exactly this
-defect in `mt` (`--input-value` took BTC as an `f64`). A wire format repeating it
-would be the same bug in a place harder to change.
+### 1.3 ENCODING RULES — every one of these is a way two implementations diverge
 
-**Unknown tags are REFUSED, not skipped.** Skipping is how a format silently
-diverges between two implementations; refusing makes the Go port's disagreement
-visible on the first vector.
+v1 stated a layout and no rules. A layout without rules is a family of formats.
 
-### 1.3 The body
+| # | rule | why |
+| --- | --- | --- |
+| E1 | **TLVs appear in ASCENDING TAG ORDER.** | **(C4)** v1 left order undefined and V2 pinned an *instance*, not a rule — two conforming encoders emit different bytes for the same input |
+| E2 | **A tag appears AT MOST ONCE. A duplicate is REFUSED.** | **(I1)** undefined, a map-insert keeps the last and a `find` keeps the first — *different `TO` text on steel* |
+| E3 | **The record ends where the body ends. Trailing bytes are REFUSED.** | **(C5)** without it, 32 bytes appended after a genuine transaction pass every other check |
+| E4 | **`39 + Σ(3 + len) + 4 + body_len` MUST equal the decoded length exactly.** | makes E3 checkable rather than aspirational |
+| E5 | **`body_len` is validated against the remaining length BEFORE any allocation.** | **(I2)** an 89-character record otherwise declares 4 GiB; EPD §6.2 sets the precedent — bound before you trust |
+| E6 | **A zero-length TLV value is REFUSED.** | **(I3)** absence is *omission* (E7); a present-but-empty field is a second spelling of nothing |
+| E7 | **An absent optional field is OMITTED from the list.** There is no empty encoding and no sentinel. | §2.1b asked what absence looks like |
+| E8 | **An unknown tag is REFUSED, not skipped.** | skipping is how two implementations silently diverge |
+| E9 | **A bad `magic`, an unknown `version`, or a `form` outside {0x01, 0x02} is REFUSED, each with its own message.** | **(I4)** v1 gave a verdict for unknown *tags* only |
+| E10 | **`n_fields` MUST equal the number of TLVs actually parsed.** | a disagreement is a malformed record, not a hint |
 
-| form | body is |
+**Every one of E1–E10 gets a vector (§3) and a test that goes RED without its
+check.** A rule with no negative test is a comment.
+
+## 2. WHAT `me` MUST DECODE — and what decoding can and cannot prove
+
+§1 of the spec says *"the record body is **opaque** to `me`."* **False, and never
+true of `md1`/`mk1` either** — `me` calls `md_codec::reassemble` today.
+
+EPD §6.3: a public-section record *"MUST additionally **DECODE**."* The rationale
+is anti-smuggling: BCH is publicly computable, so arbitrary bytes wrap into
+something that *classifies* right, and a non-conforming sealer could put secret
+bytes in cleartext where `picotool save` reaches them with **no passphrase**.
+
+### 2.1 (C3) `mt_codec::decode` PROVES NOTHING ON ITS OWN
+
+v1 said the CHUNKS decode satisfies §6.3. **It does not.** Round 0 executed it:
+32 bytes of entropy → one valid `mt1` string → exact round-trip, with an
+attacker-chosen `set_id` so **R15 passes too**. Confirmed independently:
+
+```
+grep -rn "bitcoin::" crates/mt-codec/src/   ->  0 hits
+Cargo.toml                                  ->  bitcoin = "0.32"   (DECLARED, UNUSED)
+```
+
+`mt_codec::decode` is a **BCH verifier**. It proves a string is well-formed
+`mt1`; it says nothing about whether the bytes are a transaction. **So the
+smuggling channel v1 claimed to close was still wide open.**
+
+### 2.2 NORMATIVE — both forms end at the same proof
+
+| form | decode |
 | --- | --- |
-| `0x01` RAW | the serialized signed transaction, **with witness** |
-| `0x02` CHUNKS | the `mt1` strings, **LF-separated**, ASCII |
+| RAW | deserialise the body as a Bitcoin transaction |
+| CHUNKS | **reassemble via `mt-codec`, THEN deserialise the result** as a Bitcoin transaction |
 
-LF inside the body is safe: the body is inside the record's **hex**, so no LF
-reaches `sysw/open.go:74`'s record splitter.
+**and in both cases the transaction's txid (display order, witness-stripped, §1.1)
+MUST equal the carried `txid` field.**
 
----
+**Chaining the parse onto the reassembly is what closes C3**, and it costs
+nothing extra: `me` needs a transaction parser for the RAW form regardless, so
+the CHUNKS path reuses it. The two forms become **symmetric** — each ends at *the
+bytes are a real transaction, and it is the one the record claims*.
 
-## 2. WHAT `me` MUST DECODE, AND WHY §1's "OPAQUE" IS WRONG
+**(I5) `me` gains a `bitcoin` dependency.** It has none today — its deps are the
+three sibling codecs, clap, zeroize, serde, aes-gcm, pbkdf2, sha2, bip39, rand,
+rpassword. v1 required a transaction parse and never said where it comes from.
+`bitcoin` is a public crate; `mt-codec` already declares it.
 
-`SPEC_engrave_transaction.md` §1 says *"`me` owns the container. The record body
-is **opaque** to it."* **That is false, and it was never true of `md1`/`mk1`
-either.**
+### 2.3 (I8) A `tx:` record that fails DECODE is REFUSED, not warned
 
-EPD §6.3: *"A record in the PUBLIC section MUST NOT classify as `ms1` or as a
-BIP-39 mnemonic, and **MUST additionally DECODE**."* The rationale is
-anti-smuggling — BCH is publicly computable, so arbitrary bytes wrap into
-something that *classifies* correctly, and a non-conforming sealer could put
-secret bytes in cleartext where `picotool save` reaches them with **no
-passphrase**. `me` satisfies this today by calling `md_codec::reassemble` and
-`mk_codec::decode`.
+The two containers already differ and v1 said which applied to neither: `seal`
+**refuses** (`seal/mod.rs:171`), while `sysw` **warns and packs anyway**
+(`main.rs:1141` — *"then the container is built anyway"*).
 
-**`tx:<hex of a seed>` is exactly that smuggling channel.** So:
-
-**NORMATIVE: `me` DECODES a `tx:` record before admitting it to the public
-section.**
-
-| form | decode means |
-| --- | --- |
-| RAW | the body deserialises as a Bitcoin transaction, **and its txid equals the carried `txid` field** |
-| CHUNKS | the body's `mt1` strings reassemble as a chunk set via `mt-codec` |
-
-**The RAW check is stronger than §6.3 requires and costs nothing** — `me` holds
-both the bytes and the claim, so it can compare them. A mismatch means the record
-is internally inconsistent, which is R15's shape applied to the raw form.
-
-**§1's "opaque" sentence must be corrected as part of this phase.** The accurate
-statement: `me` does not interpret the record's *meaning*, but it does prove the
-record is what it claims.
-
----
+**NORMATIVE: `tx:` follows `seal`'s posture — refuse.** The `sysw` warn-and-pack
+posture is defensible for a record whose worst case is an unengraveable plate. It
+is not defensible for the one record class whose failure mode is **secret bytes
+riding in cleartext**, which is the whole reason §6.3 exists.
 
 ## 3. THE VECTORS
 
-Rust-primary means these vectors are what the Go port is judged against. They
-must therefore pin every choice a second implementer could make differently.
+Rust-primary means these are what the Go port is judged against. They must pin
+every choice a second implementer could make differently.
 
 | # | vector | pins |
 | --- | --- | --- |
-| V1 | RAW form, no optional fields | the fixed layout; `n_fields = 0` |
-| V2 | RAW form, all three optional fields | TLV order, `u16 BE` lengths, u64 fee |
-| V3 | CHUNKS form, multi-chunk body | LF separation, `form = 0x02` |
-| **V4** | **a transaction whose txid and `chunk_set_id` are both stated** | **§1.1's byte order, and §3.6b's top-20-bits claim, together** |
-| V5 | absent optional field | that absence is *omission*, not an empty TLV |
-| V6 | unknown tag | that it is REFUSED, not skipped |
-| V7 | body at `MaxSectionLen` boundary | the cap, exactly |
-| V8 | RAW whose carried txid ≠ the body's txid | the §2 consistency refusal |
+| V1 | RAW, no optional fields | the fixed layout; `n_fields = 0` |
+| V2 | RAW, all three optional fields | **E1's ascending tag order**, `u16 BE` lengths, u64 fee |
+| V3 | CHUNKS, multi-chunk body | LF separation, `form = 0x02` |
+| **V4** | **a SEGWIT transaction, with txid AND wtxid AND `chunk_set_id` all written out** | **§1.1's display order AND txid-not-wtxid, together.** Segwit is required: for a legacy transaction txid == wtxid and the vector passes in both worlds |
+| V5 | absent optional field | absence is omission (E7) |
+| V6 | unknown tag | REFUSED (E8) |
+| V7 | body at **16,322 B minus the fields present** | the **record framing** ceiling — see below |
+| V8 | RAW whose carried txid ≠ the body's | the §2.2 consistency refusal |
+| **V9** | **duplicate tag** | E2 |
+| **V10** | **trailing bytes after the body** | E3/E4 |
+| **V11** | **`body_len` larger than the bytes remaining** | E5, before allocation |
+| **V12** | **zero-length TLV value** | E6 |
+| **V13** | **bad magic / unknown version / `form = 0x03`** | E9, three distinct messages |
+| **V14** | **`n_fields` ≠ the TLVs present** | E10 |
+| **V15** | **R15 NEGATIVE: a chunks record whose carried txid's top 20 bits ≠ its chunks' `chunk_set_id`** | **(I13)** without it, deleting R15's comparison leaves every other vector green — and this vector alone would have caught C1 on the first run |
 
-**V4 is the one that matters.** It is the only vector that can catch a byte-order
-disagreement, and a byte-order disagreement is invisible to every other test —
-both implementations produce 32 plausible bytes.
+### 3.1 (I7) V7's number, and a THIRD ceiling nobody had
 
----
+v1 said *"body at `MaxSectionLen` boundary"*. **Unconstructible.** A record is
+`tx:` plus hex, so:
+
+```
+32,734 section chars − 3 for "tx:"  = 32,731 hex chars
+                                     = 16,365 bytes
+                       − 43 framing  = 16,322 bytes of body, minus the fields
+```
+
+**So there are THREE ceilings and the spec states only two:**
+
+| ceiling | value | where |
+| --- | --- | --- |
+| container section | 16,367 B | spec §2.3 **as written** |
+| **record framing** | **16,322 B** | **this plan — new** |
+| engraveable | 14,560 B | spec §4.1a, at 0.60 mm |
+
+**Spec §2.3's "a 16,367-byte raw transaction" is wrong by the framing.** Round 3
+already corrected it once for the engraving ceiling; this is a second correction
+in the same sentence, and P1 must land it.
+
+### 3.2 (I12) THE VECTORS MAY NOT BE PRODUCED BY THE CODE THEY JUDGE
+
+`mt-codec`'s own `lib.rs:9-14` rules against exactly that, and `mt`'s vectors are
+generated by `scripts/gen-mt1-vectors.py`, which **re-implements the format
+independently**. P1's vectors follow that precedent: **hand-constructed or
+independently generated, never dumped from the encoder under test.** A vector
+derived from the implementation cannot falsify it — that is how a wrong NUMS
+constant once launders itself into looking correct.
 
 ## 4. TDD ORDER
 
-Each step: failing test first, watch it fail **for the stated reason**, minimal
+Each step: failing test first, watched fail **for the stated reason**, minimal
 code, full suite green.
 
 | step | test first | then |
 | --- | --- | --- |
-| 1 | `MaxSectionLen` is 32,734 and `boundBlob`'s no-wrap argument still holds | raise the constant; **update the comment that names 8191** |
-| 2 | `me sysw pack` reads records from **stdin**; **empty stdin is refused** (R7) | the stdin path |
-| 3 | a payload with no `IsSecret()` record packs **unsealed**; one with any packs **sealed**; **stderr says which and why, every time** | content-based sealing (§2.4) |
-| 4 | V1–V3 round-trip | the layout encoder/decoder |
-| 5 | **V4** | whatever `mt-codec` says; pin it |
-| 6 | V5, V6, V8 | absence, unknown-tag refusal, txid consistency |
-| 7 | V7 | boundary |
-| 8 | a `tx:` record on **argv** is refused (R2) | the argv guard |
+| 1 | **`sysw::wire::MAX_SECTION_LEN` is 32,734** — and `seal::wire::MAX_SECTION_LEN` is **still 8191** | raise **only** `crates/me-cli/src/sysw/wire.rs:42` |
+| 2 | `me sysw pack` reads from **stdin**; **empty stdin refused** (R7); **a TTY with no `--in` and no argv refuses instead of blocking** | the stdin path |
+| 3 | explicit passphrase flags **win**; content decides **only** when none is given; **stderr says which way and why, every time** | content-based sealing |
+| 4 | V1–V3 round-trip | the layout codec |
+| 5 | **V4** | the txid field, display order, witness-stripped |
+| 6 | V5–V6, V9–V14 | every rule in E1–E10 |
+| 7 | V7 at **16,322 − F** | the framing ceiling |
+| 8 | V8 and **V15** | the txid-consistency refusals, both forms |
+| 9 | a `tx:` record on **argv** refused (R2) | the argv guard |
 
----
+### 4.1 (I11) STEP 1 SAYS WHICH CONSTANT, BECAUSE THERE ARE TWO
 
-## 5. THE ORDERING CONSTRAINT NOBODY CAN SKIP
+v1 said *"the constant"* and named `boundBlob` — which has **0 hits in this
+repo's Rust**; it is Go, and belongs to **P3**. Meanwhile **two** Rust constants
+carry this name:
 
-**`mt-codec` 0.1.0 must be published to crates.io before step 5 can build.**
-`mnemonic-transaction` went public 2026-08-24 for this reason; the crate is
-already structured and marked publishable, like its three siblings.
+```
+crates/me-cli/src/seal/wire.rs:21   MAX_SECTION_LEN: u32   = 8191   <- FROZEN. Do not touch.
+crates/me-cli/src/sysw/wire.rs:42   MAX_SECTION_LEN: usize = 8191   <- this one
+```
 
-**`cargo publish` is IRREVERSIBLE — a version can be yanked but never replaced.**
-So it happens **after** this plan is GREEN and after V4 has pinned the byte
-order, not before. Publishing a codec whose txid convention we have not yet
-verified would put a wrong constant in an immutable artifact.
+**Step 1's test asserts BOTH** — the new value on `sysw`, and that `seal` is
+unchanged. A test that only checks the raise would pass if someone edited the
+frozen container instead.
 
----
+### 4.2 (I10) STEP 2 MUST NOT TURN `me sysw pack` INTO A HANG
+
+Adding a stdin path makes a bare `me sysw pack` block on a TTY with no prompt —
+**a new user's first action looks like the tool has crashed.** The `mt` cycle
+found this exact defect (*"stdin doesn't mean from the command line?"*), and it
+was the operator's own confusion that surfaced it.
+
+**NORMATIVE: if stdin is a TTY and neither `--in` nor argv records are given,
+refuse with a message naming both real inputs.** And note **R7's test as written
+(`printf '' | me sysw pack`) passes in both worlds** — it never touches the TTY
+path, so it cannot catch this. The TTY case needs its own test.
+
+### 4.3 (I9) STEP 3 MUST RULE PRECEDENCE, BECAUSE FOUR FLAGS ALREADY EXIST
+
+`me sysw pack` already has `--passphrase-words`, `--passphrase-ask`,
+`--no-passphrase` and `--allow-weak`. v1 said "seal by content" and never said
+what happens when the operator also passes a flag — so step 3's test could not be
+written.
+
+**NORMATIVE:** an explicit flag **always wins**; content decides **only** in
+their absence; and **stderr states which rule applied and why, on every run**. A
+content-dependent default that is silent is worse than the default it replaced.
+
+## 5. `mt-codec` IS PUBLISHED FIRST — the v1 deadlock is dissolved
+
+**(I6) v1 deadlocked**: §5 said publish before step 5, §5 also said publish after
+V4 pinned the byte order, and §6 forbade a path dependency. All three cannot hold.
+
+**It dissolves because the premise was false.** v1 wanted to wait for V4 to
+resolve the byte order — but **`mt-codec` already implements it**, has done since
+before this plan existed, and §1.1 now quotes the source. **There is nothing left
+to learn before publishing.**
+
+So: **publish `mt-codec` 0.1.0 to crates.io, then depend on the pinned published
+version.** No path dependency, no git dependency, no ordering knot.
+
+**`cargo publish` remains irreversible** — a version can be yanked, never
+replaced — so it happens once **this plan is GREEN**, not before. The thing that
+made it risky was uncertainty about the byte order, and that uncertainty is gone.
 
 ## 6. WHAT MUST BE TRUE TO CLOSE P1
 
 - This plan is **0C/0I** and the build gate has run on it.
-- V1–V8 all pass, and **V4's byte order is stated in the vector file itself**, not
-  only in code.
+- **V1–V15 pass**, and **V4 writes out txid, wtxid and `chunk_set_id` explicitly**
+  in the vector file, not only in code.
+- **Every rule E1–E10 has a test that goes RED without its check.** A rule with no
+  negative test is a comment.
 - `cargo nextest run --locked` green; `cargo clippy --all-targets` clean.
-- **Every refusal added has a test that goes RED without its check** — the
-  `mutate-refusals.sh` discipline, applied to `me`'s new guards.
-- `mt-codec` published, and `me` depends on the **pinned published version**, not
-  a path or a git URL.
-- **§1's "opaque" sentence is corrected** in `SPEC_engrave_transaction.md`.
-- **The near-miss rule**: every guard added here is tested against its nearest
-  *legitimate* input as well as the hostile one. Six instances this cycle.
-
----
+- **The vectors were not produced by the code they judge** (§3.2).
+- `mt-codec` published; `me` depends on the **pinned published version**.
+- **Spec corrections this phase owns:** §1's "opaque" sentence, and §2.3's
+  "16,367-byte raw transaction" (§3.1's third ceiling).
+- **The near-miss rule**: every guard here is tested against its nearest
+  *legitimate* input as well as the hostile one. Seven instances this cycle.
 
 ## 7. OUT OF SCOPE
 
