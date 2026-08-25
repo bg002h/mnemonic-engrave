@@ -796,6 +796,95 @@ codec directly and stay green with `classify` untouched, so **no vector in §3 c
 substitute for that test.** §6 states the per-site assertion for each of the ten,
 because a `grep -c` cannot see a site and cannot assert an absence (r2-I4).
 
+## 2.5 THE ERROR PATH — r2-C2 was named, not plumbed (r3-C1, r3-C2)
+
+**Round 2 asked for the sixth wiring site. v4 answered with ten sites, and all
+ten resolve — but naming where the code changes is not the same as saying how a
+failure TRAVELS from where it is detected to where it is printed.** Round 3's two
+Criticals are one defect: **there is no channel.** Measured, not read:
+
+```rust
+// sysw/mod.rs:107-115 -- the SOLE producer on the production path
+fn unknown_reason(record: &str) -> UnknownReason {      // <- only the STRING
+    for prefix in [record::PASS_PREFIX, record::TEXT_PREFIX] {
+        if record.starts_with(prefix) { return UnknownReason::NonHexBody(prefix); }
+    }
+    UnknownReason::Unrecognised
+}
+// sysw/mod.rs:255
+Class::Unknown => return Err(SyswError::Unclassifiable(i, unknown_reason(&r))),
+```
+
+**Three mismatches between that channel and the rules E1–E20 need:**
+
+| the channel is | the new rules are | consequence |
+| --- | --- | --- |
+| **string-only** — `unknown_reason` never sees a parse result | **parse-result-shaped** — E9 must say *which* of magic/version/form failed | `UnknownReason::TxRule` **can never be produced** (r3-C1) |
+| **prefix-shaped** | E13/E19 apply to **bare `mt1`** records, which match no prefix | they reach `Unrecognised`, whose message is **false** for V20/V23/V24 (r3-C2) |
+| **per-record, carrying an index** — `Unclassifiable(usize, …)` | E20 and R17 are **set-level** | a *missing* chunk has **no index**; §1.5's "index and the rule" is unsatisfiable |
+
+**And W6's prescribed edit is actively wrong.** Adding `TX_PREFIX` to that loop
+makes an `MTX2` record with valid hex report *"its body is not lowercase hex …
+`xxd -p -c 256`"* — advice for a defect it does not have, and **RED against §6's
+own W8 assertion.**
+
+### 2.5a NORMATIVE — what P1 builds instead
+
+**A rule failure must carry the rule.** The parse returns its own error type; the
+container error carries it; the printer names it. Three additions, replacing W6's
+edit:
+
+| | |
+| --- | --- |
+| **W11** | a `TxRecordError` enum whose variants are the rules — one per E-number that can fail a **single record**. Produced by the parse, where the failure is known. |
+| **W12** | `SyswError` gains a **set-level** variant. It may not carry a bare `usize`: E20's failures are *"chunk 7 of set 0x2dcf2 is missing"* and *"record 12 is an orphan"*, and R17's is *"two sets share top-20 bits"* — none of which is one index. |
+| **W13** | the printer arm for both, at `sysw_error` **and its outer match** (`main.rs:1257-1300`), which round 3 found required by W10/R17 and named by no row. |
+
+**`unknown_reason` is NOT the place.** It is reached only after `classify` has
+already returned `Unknown`, by which point the reason is gone. **The parse must
+fail with its reason, not be re-interrogated afterwards** — that is the shape
+that produced r3-C1.
+
+**The near-miss, and it has a test:** a `tx:` record whose body genuinely is not
+lowercase hex must **still** report `NonHexBody`. W11 must not swallow the case
+the existing channel gets right.
+
+### 2.5b E13's PRECEDENT IS FALSE — measured, and the truth is worse (r3-I2)
+
+E13 (no padding / whitespace) cited `seal`'s `validate_record` as precedent.
+**Executed, and the citation does not hold:**
+
+```rust
+// crates/me-cli/src/seal/record.rs:118
+pub fn validate_record(s: &str) -> Result<RecordKind, RecordError> {
+    let s = s.trim();                                   // <- TRIMS FIRST
+    if let Some((pos, ch)) = first_noncanonical(s) {    // <- then checks
+```
+
+Padding never reaches the canonicality check. **And the container does not merely
+tolerate it — it preserves it.** Run against the shipped binary:
+
+```
+me sysw pack --no-passphrase "<md1 string> "     -> exit 0
+the packed record's last byte                    -> b' '   (the space, verbatim)
+```
+
+**So a record carrying trailing whitespace is packed into the public section with
+the whitespace intact** — which is the hazard EPD §6.4 states in its own words:
+records engrave **verbatim**, so a character outside the BCH checksum's coverage
+*"turns a scratch on the operator's only copy into silently-absorbed damage
+rather than a detected error."*
+
+**NORMATIVE for P1:** E13 stands on its own reasoning, **not** on a precedent
+that does not exist. The false citation is struck.
+
+**AND THIS IS A LIVE `me` DEFECT WIDER THAN P1**, on the `md1`/`mk1` path, which
+P1 neither introduces nor is scoped to fix. **Filed, not folded** — see
+`FOLLOWUPS.md` F-245. Naming it here so a reader does not mistake E13's
+correctness for the neighbouring path being safe.
+
+
+
 ## 3. THE VECTORS
 
 Rust-primary means these are what the Go port is judged against. They must pin
@@ -1464,6 +1553,29 @@ fork side needs its equivalent"*). So P1 owns the **per-refusal RED test**, done
 by hand; spec §6's **P6** row owns building this repo's equivalent of the
 **bijection sweep**. Naming P1 as the owner of the sweep would move a gate onto a
 phase that has no tool for it.
+
+## 6.3 SPEC STATEMENTS THIS RULING LEFT STALE — FIVE, not three (r3-I7)
+
+The v4 fold named three and was right that they were out of its scope. **Round 3
+found five, and one of the three was right for the wrong reason.** All verified
+at source:
+
+| # | where | why stale |
+| --- | --- | --- |
+| 1 | spec §3.6 | *"R15 validates it only within a single record"* — now one metadata record **plus** its bare chunks |
+| 2 | spec §6's **P1** row | describes the framed record without the **wtxid** or the chunk class |
+| 3 | spec §2.1b | **not** the wtxid omission the fold gave as the reason — its **R4′ dependency row is now outright false**, because the XOR is no longer expressible inside one record |
+| **4** | spec §6's **P3** row | says *"the `tx:` branch in `gui/scan.go`"* — **singular**. The ruling needs a **second** branch (`ValidMT`, bare `mt1`), which this plan's own §7 already assigns to P3 |
+| **5** | spec §1's ownership table | `me` owns *"`ClassTransaction`; a stdin path; content-based sealing"* — no chunk class, no wtxid |
+
+**P1 owns correcting all five**, and §6's closure list carries them. **Both misses
+are the same shape**: a row that describes P1/P3's work in a *sentence* rather
+than a *list*, so widening the work did not visibly widen the row.
+
+> **This is the sixth enumeration this cycle to be wrong on first count** — three
+> lockstep sites that were four, five wiring sites that were ten, ten that needed
+> thirteen, three stale statements that were five. **An enumeration in this
+> document is a hypothesis until something re-derives it.**
 
 ## 7. OUT OF SCOPE
 

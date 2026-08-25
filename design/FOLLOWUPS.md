@@ -10296,3 +10296,45 @@ seeded set. That is the typo guard working, and the seeded set now records that
 this entry did not come from widening the gate — the refusal did not exist until
 the walk found it.
 
+### F-245 — `me sysw pack` packs a record's trailing whitespace VERBATIM into the public section (owning phase: **post-P1, `md1`/`mk1` path**) `#me` `#sysw` `#IMPORTANT`
+
+**Found 2026-08-24** while machine-checking a claim in R0 round 3 of the P1 plan.
+The plan cited `seal`'s `validate_record` as precedent for refusing padding. The
+citation does not hold, and checking why turned up a live defect on a path P1
+does not touch.
+
+**`seal` trims before it checks** (`crates/me-cli/src/seal/record.rs:118`):
+
+```rust
+pub fn validate_record(s: &str) -> Result<RecordKind, RecordError> {
+    let s = s.trim();                                   // <- TRIMS FIRST
+    if let Some((pos, ch)) = first_noncanonical(s) {    // <- then checks
+```
+
+So padding never reaches the canonicality check. **And `sysw` does not merely
+tolerate it — it preserves it.** Executed against the shipped binary:
+
+```
+me sysw pack --no-passphrase "<md1 string> "     -> exit 0
+the packed record's last byte                    -> b' '
+```
+
+**The space rides into the public section intact**, and EPD §6.4 states the hazard
+in its own words: records engrave **verbatim**, so a character outside the BCH
+checksum's coverage *"turns a scratch on the operator's only copy into
+silently-absorbed damage rather than a detected error."*
+
+**Why Important rather than Critical.** It needs the operator to supply a padded
+record, and the most likely source — a copy-paste with a trailing space — is
+plausible but not automatic. Nothing is lost silently *today*; the damage is
+deferred to a scratch on a plate cut from the padded string.
+
+**Scope.** This is the **`md1`/`mk1`** path. P1's `tx:` records are refused for
+padding by its own E13, which stands on its own reasoning now that the false
+precedent is struck. **P1 neither introduces this nor is scoped to fix it.**
+
+**What would close it.** Refuse rather than trim, or trim and refuse the
+difference — but check the device side first: `gui/scan.go` may already tolerate
+or reject padded records differently, and a host that refuses what the device
+accepts is its own defect.
+
