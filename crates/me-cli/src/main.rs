@@ -1419,6 +1419,15 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      prefix is RESERVED for a raw signed transaction — produce the record \
                      with `me tx` rather than by hand"
                 ),
+                U::UnsignedInputs => format!(
+                    "record {i} (records count from 0) is a `tx:` record whose transaction \
+                     parses but has an input carrying NEITHER a scriptSig NOR a witness — \
+                     it is unsigned, or its signatures were stripped in transit.\n      \
+                     This is refused because the txid does NOT change when signatures are \
+                     removed: the record would show the txid you expect, and the plate cut \
+                     from it could never be broadcast.\n      \
+                     Re-export the FINALIZED transaction from your signer."
+                ),
                 U::Unrecognised => format!(
                     "record {i} (records count from 0) is not a form this container can \
                      place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not \

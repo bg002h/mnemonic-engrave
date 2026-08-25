@@ -40,6 +40,23 @@ pub struct TxSummary {
     pub inputs: usize,
     pub outputs: usize,
     pub segwit: bool,
+    /// **Every input carries a signature** — a non-empty scriptSig, or at least
+    /// one witness item. False means the transaction cannot be broadcast.
+    ///
+    /// This is the ONLY thing that separates a signature-stripped transaction
+    /// from the honest one it was made from: stripping the witness is precisely
+    /// the operation the txid is defined to ignore, so **both have the same
+    /// txid**, and no carried identifier can tell them apart.
+    ///
+    /// The design this replaces carried a second identifier (a `wtxid`) to
+    /// catch it, and could only catch the case where the carried wtxid was
+    /// *inconsistent* with the body — an encoder bug. A body whose txid and
+    /// wtxid were both recomputed from stripped bytes passed, and that document
+    /// called the gap unclosable *"because it IS an honest witness-free
+    /// transaction"*. **It is not.** An honest witness-free transaction is a
+    /// legacy transaction, and a signed one has non-empty scriptSigs. This
+    /// predicate catches both cases and carries no field at all.
+    pub every_input_signed: bool,
 }
 
 impl TxSummary {
@@ -149,14 +166,15 @@ impl<'a> Cursor<'a> {
         Ok(v as usize)
     }
 
-    /// A length-prefixed byte string (script, witness item), skipped.
-    fn skip_bytes(&mut self) -> Result<(), TxError> {
+    /// A length-prefixed byte string (script, witness item). **Returns it**,
+    /// because the signature predicate needs to know whether a scriptSig was
+    /// empty and `()` cannot say.
+    fn skip_bytes(&mut self) -> Result<&'a [u8], TxError> {
         let n = self.varint()?;
         if n > (self.buf.len() - self.pos) as u64 {
             return Err(TxError::LengthOverflow);
         }
-        self.take(n as usize)?;
-        Ok(())
+        self.take(n as usize)
     }
 }
 
@@ -186,9 +204,13 @@ pub fn parse(bytes: &[u8]) -> Result<TxSummary, TxError> {
     if n_in == 0 {
         return Err(TxError::NoInputs);
     }
+    // Per input, not per transaction: a mixed transaction keeps its legacy
+    // scriptSigs when the witnesses are stripped, so a whole-transaction test
+    // would pass while the segwit inputs were left unsigned.
+    let mut input_has_script_sig = Vec::with_capacity(n_in);
     for _ in 0..n_in {
         c.take(36)?; // outpoint: txid + vout
-        c.skip_bytes()?; // scriptSig
+        input_has_script_sig.push(!c.skip_bytes()?.is_empty()); // scriptSig
         c.take(4)?; // sequence
     }
     let n_out = c.count()?;
@@ -201,12 +223,14 @@ pub fn parse(bytes: &[u8]) -> Result<TxSummary, TxError> {
     }
     let core_end = c.pos;
 
+    let mut input_has_witness = vec![false; n_in];
     if segwit {
-        for _ in 0..n_in {
+        for i in 0..n_in {
             let items = c.count()?;
             for _ in 0..items {
                 c.skip_bytes()?;
             }
+            input_has_witness[i] = items > 0;
         }
     }
     let locktime = c.take(4)?;
@@ -230,6 +254,7 @@ pub fn parse(bytes: &[u8]) -> Result<TxSummary, TxError> {
         inputs: n_in,
         outputs: n_out,
         segwit,
+        every_input_signed: (0..n_in).all(|i| input_has_script_sig[i] || input_has_witness[i]),
     })
 }
 
@@ -241,6 +266,24 @@ pub(crate) mod tests {
     /// signed 1-in/2-out P2WPKH transaction, txid from the node that made it.
     /// 222 bytes.
     pub const EVEN_RAW_HEX: &str = "020000000001017c8da925af70e49a12b0cea7b639df5037c87b7fa61f262b86ac32c47aa3ba1a0000000000fdffffff02404b4c0000000000160014c1de0dd435d1d4ad97ed1f51d63f91c800cc4eab3ea1b92901000000160014751097c299d6354fbb2c5a84512dd708f2902f5e0247304402207debc7d89984c7717940b622504318d2c184966a618b32cf8b700d0f125b3ffa02206ef875f9c0b5931e0ea1cf0c109bdb8512835c8e51526f99b3419929a2ea7259012103718f5fd45b926226357e2b0400574b41a32d0bf0ae69a02eebea5fbc542ff52060000000";
+
+    /// The SAME transaction with every witness stripped: 113 bytes, and its
+    /// txid is **byte-identical** to the 222-byte original, because stripping
+    /// the witness is precisely the operation the txid is defined to ignore.
+    /// Built by parsing `EVEN_RAW_HEX` and re-emitting the legacy form.
+    ///
+    /// This is the artifact the whole signature check exists for: it parses,
+    /// it round-trips, its txid matches what an operator would compare against
+    /// `mt inspect` — and **not one input carries a signature**, so a plate cut
+    /// from it can never be broadcast.
+    pub const EVEN_STRIPPED_HEX: &str = "02000000017c8da925af70e49a12b0cea7b639df5037c87b7fa61f262b86ac32c47aa3ba1a0000000000fdffffff02404b4c0000000000160014c1de0dd435d1d4ad97ed1f51d63f91c800cc4eab3ea1b92901000000160014751097c299d6354fbb2c5a84512dd708f2902f5e60000000";
+
+    /// A MIXED transaction with its witnesses stripped: input 0 is legacy and
+    /// still carries its scriptSig, input 1 is a segwit input whose witness was
+    /// removed. **A whole-transaction test passes this** — some input is signed
+    /// — while input 1 is unspendable. Only the PER-INPUT predicate catches it,
+    /// and mutation testing is what proved the difference is real.
+    pub const MIXED_STRIPPED_HEX: &str = "020000000211111111111111111111111111111111111111111111111111111111111111110000000048473030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030ffffffff22222222222222222222222222222222222222222222222222222222222222220100000000ffffffff0150c3000000000000160014333333333333333333333333333333333333333300000000";
     pub const EVEN_TXID: &str = "2dcf2b973d52044b1e58c988a5a59d388073ff05598b0a1e93eeb04c72ebf630";
 
     pub fn unhex(s: &str) -> Vec<u8> {
@@ -340,5 +383,52 @@ pub(crate) mod tests {
         b.extend_from_slice(&[0xFE, 0xFF, 0xFF, 0xFF, 0xFF]); // scriptSig len u32::MAX
         b.extend_from_slice(&[0x00; 64]);
         assert_eq!(parse(&b), Err(TxError::LengthOverflow));
+    }
+}
+
+#[cfg(test)]
+mod signature_predicate_tests {
+    use super::tests::{unhex, EVEN_RAW_HEX, EVEN_STRIPPED_HEX, MIXED_STRIPPED_HEX};
+    use super::*;
+
+    /// RED FIRST. A witness-stripped transaction has the SAME txid as the
+    /// honest one, so no identifier — carried or computed — distinguishes them.
+    /// What distinguishes them is that no input carries a signature.
+    #[test]
+    fn a_signature_stripped_transaction_is_refused() {
+        let stripped = unhex(EVEN_STRIPPED_HEX);
+        let honest = unhex(EVEN_RAW_HEX);
+
+        // The premise, asserted rather than assumed: the txids are identical.
+        let s = parse(&stripped).expect("the stripped body still parses — that is the problem");
+        let h = parse(&honest).expect("the honest body parses");
+        assert_eq!(
+            s.txid_display, h.txid_display,
+            "premise broken: if the txids differed, the txid alone would catch this"
+        );
+
+        assert!(
+            !s.every_input_signed,
+            "the stripped body has no witness and empty scriptSigs — it is unsigned"
+        );
+        assert!(
+            h.every_input_signed,
+            "the honest body's single input carries a witness"
+        );
+    }
+
+    /// The predicate is PER INPUT, and this is the vector that proves it.
+    /// Mutation-tested: replacing the `all` with an `any` over the whole
+    /// transaction leaves `a_signature_stripped_transaction_is_refused` GREEN
+    /// and turns this one RED.
+    #[test]
+    fn one_signed_input_does_not_vouch_for_the_others() {
+        let t = parse(&unhex(MIXED_STRIPPED_HEX)).expect("a mixed stripped body parses");
+        assert_eq!(t.inputs, 2);
+        assert!(
+            !t.every_input_signed,
+            "input 1 has no scriptSig and no witness — input 0 being signed does not make the \
+             transaction spendable, and a whole-transaction test would call this signed"
+        );
     }
 }

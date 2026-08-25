@@ -106,6 +106,12 @@ pub enum UnknownReason {
     /// transaction. Carries the structural reason — which names no operator
     /// data, only a shape.
     NotATransaction(tx::TxError),
+    /// A `tx:` body that parses as a transaction but has an input carrying
+    /// NEITHER a scriptSig NOR a witness — it is unsigned, or its signatures
+    /// were stripped. **The txid is unchanged by stripping**, so this is the
+    /// only signal there is, and a plate cut from such a body can never be
+    /// broadcast.
+    UnsignedInputs,
     /// No reserved prefix, not a BIP-39 mnemonic, and not a constellation
     /// string. This is the case the descriptor/address gap belongs to.
     Unrecognised,
@@ -118,7 +124,9 @@ fn unknown_reason(record: &str) -> UnknownReason {
             Err(_) => UnknownReason::NonHexBody(record::TX_PREFIX),
             Ok(b) => match tx::parse(&b) {
                 Err(e) => UnknownReason::NotATransaction(e),
-                // classify refused it, so the parse cannot succeed here; keep
+                // It parsed, so the refusal was the signature predicate.
+                Ok(t) if !t.every_input_signed => UnknownReason::UnsignedInputs,
+                // classify refused it, so neither arm can be reached here; keep
                 // a total answer anyway rather than panic on a future skew.
                 Ok(_) => UnknownReason::Unrecognised,
             },
@@ -146,7 +154,15 @@ pub fn classify(record: &str) -> record::Class {
         // PARSE as a transaction, so the prefix cannot smuggle arbitrary
         // bytes into a non-secret class.
         return match record::decode_body(record) {
-            Ok(b) if tx::parse(&b).is_ok() => Class::Tx,
+            // A `tx:` record must parse AND carry a signature on every input.
+            // The signature check is not fastidiousness: a witness-stripped
+            // transaction has the SAME TXID as the honest one it came from, so
+            // it passes every identifier comparison an operator can make — and
+            // a plate cut from it can never be broadcast. See `tx::TxSummary`.
+            Ok(b) => match tx::parse(&b) {
+                Ok(t) if t.every_input_signed => Class::Tx,
+                _ => Class::Unknown,
+            },
             _ => Class::Unknown,
         };
     }
