@@ -1,7 +1,13 @@
 # SPEC — Engrave a Transaction (SeedHammer II program)
 
-**Status:** DRAFT. **R0 round 0 is FOLDED, NOT CLOSED.** The gate stays open
-until a re-review returns 0C/0I; **no code before that.**
+**Status: R0 GATE GREEN — operator ruling 2026-08-24. P1 is open.**
+
+Five lenses ran (the operator journey walk, then R0 rounds 0–4). **Four
+consecutive rounds returned zero Criticals**, and the closing round's findings
+were all *orphaned obligations* rather than defects — true sentences no phase
+owned, now assigned. Closure here is **lens-closure**: the questions asked have
+no more answers, and the two unrun lenses (failure-states, comprehension) ask
+things better answered against running code than against prose.
 
 **Two reviews have run, and both are recorded:**
 
