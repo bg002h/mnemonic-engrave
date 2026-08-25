@@ -3,6 +3,12 @@
 > Supersedes nothing. `CONTINUITY_mt_2026-08-24.md` set the two goals; this
 > records the first day of **Goal 1**. Goal 2 is untouched.
 
+> **SUPERSEDED FOR P1 AS OF 2026-08-25 — see
+> `design/CONTINUITY_goal1_P1_2026-08-25.md`.** The plan is at **v8** after
+> five rounds, not the round-0 state described below. **This file remains
+> authoritative for the SPEC cycle, the operator journey walk, the two
+> rulings and S0's schedule**, none of which changed.
+
 ## State in one line
 
 **Spec is R0 GREEN. P1's plan is in review (round 0 found 5C/13I; v2 rewritten).
