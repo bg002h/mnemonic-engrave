@@ -1,11 +1,19 @@
 # IMPLEMENTATION PLAN — P1: `me`'s transaction container
 
-**Status:** DRAFT v11, pre-R0. **Two OPERATOR RULINGS and three SIMPLIFICATION
-CUTS**, not a review fold — the first change this cycle driven by something other
-than a finding. **Nothing in the chunk path refuses any more** (RULING
-2026-08-25 a/b), and the legend fields stopped being TLVs (3.1), the per-record
-rule names stopped being a cross-language contract (3.2), and E20/W15 took the
-sibling's shape (3.3).
+**Status:** DRAFT v12, pre-R0. **Round 8 returned 8 Critical / 6 Important /
+6 Minor on v11 — the worst round of the cycle, and every Critical was in the
+fold, not the design.** v11 changed five independent things at once (two operator
+rulings, three simplification cuts) across a two-thousand-line document, and each
+was propagated into the sections its author was reading and not into the sections
+that depend on them. **Four of the eight — C1, C3, C5, C6 — are literally *folded
+into X, not into Y*.** C4 left a LIVE rule stating TLV's arithmetic, so as written
+it refused every legal record carrying a fee; C7 was a MUST invented in a layout
+comment with no rule, no vector and no test, written inside the blockquote that
+quotes the round-0 finding it reproduces.
+
+**All 8C, all 6I and all 6M are folded here, in five separately-gated batches.**
+**Lines 2121, measured now rather than carried forward (r8-M1).** The archaeology
+eviction is still outstanding and is the next operation.
 
 **Measured delta v10 → v11: rules 20 → 13, vectors 30 → 24, table rows 156 → 146
 — and LINES 2,007 → 2,068, which went the WRONG WAY.** Deleted rules and vectors
@@ -14,13 +22,13 @@ shrank. That is a deliberate choice for an artifact under active review and it i
 also, by this document's own §6.1 argument, more archaeology. **Evicting it is a
 separate operation and is not done here.**
 
-**The reports are `design/agent-reports/R0-P1-plan-round0.md`** (5C/13I/5M on v1),
-**`R0-P1-plan-round1.md`** (3C/11I/8M on v2), **`R0-P1-plan-round2.md`**
-(2C/7I/4M on v3) **and `R0-P1-plan-round3.md`** (the live one, 2C/7I/3M on v4),
-all persisted before any of this was written. Findings are marked
-inline — round-0 markers as `(C1)`, `(I7)`; round-1 as `(r1-C2)`, `(r1-I9)`;
-round-2 as `(r2-C1)`, `(r2-I3)`; round-3 as `(r3-I1)`, `(r3-M2)` — so a reader
-can trace each one to the report that raised it.
+**The reports are `design/agent-reports/R0-P1-plan-round0.md` … `round8.md`** —
+**NINE rounds, all persisted verbatim before their folds** (5C/13I/5M, 3C/11I/8M,
+2C/7I/4M, 2C/7I/3M, 2C/5I/1M, 2C/5I/5M, 2C/5I/7M, 2C/5I/5M, **8C/6I/6M**), plus
+`R0-P1-simplification-sibling-conformance.md`. **(r8-M6) v11's roster stopped at
+round 3 and called it *"the live one"*, so a reader trusting it missed five
+rounds of findings.** Findings are marked inline — `(C1)`, `(r5-I4)`, `(r8-C7)` —
+so each traces to the report that raised it.
 
 > **THE TWO THINGS THIS FOLD CHANGES STRUCTURALLY, stated once at the top
 > because everything below is downstream of them.**
@@ -364,7 +372,7 @@ that posture at `crates/me-cli/src/sysw/record.rs:93`
 accepted and the label reaches steel with a replacement character. Hence **E14**.
 
 **The 64-byte bound is a P1 DECISION, not a derivation, and is stated as one.**
-A `u16 len` makes a 65,535-byte label expressible, bounded only incidentally by
+**(r8-I6) The label's length is a `u8`**, so 255 bytes is expressible, bounded only incidentally by
 the section cap. 64 is chosen because the plate's `TO` line is budgeted at **34
 characters** (`design/SPEC_mt_v0_1.md:1767`, which covers the whole
 `TO <wallet id, fp or label>  <amount>` line), so 64 bytes is comfortably above
@@ -391,8 +399,8 @@ v1 stated a layout and no rules. A layout without rules is a family of formats.
 | **E11** | **RAW: re-serialising the decoded transaction MUST reproduce the body BYTE FOR BYTE.** | **(r1-C2, CORRECTED r2-C1)** this is a **CANONICALITY** rule and nothing more — it rejects a non-canonical encoding of a transaction, and it **cannot** see a different, canonical transaction substituted. v3 claimed it enforced witness presence; **measured false**, see §1.1a. It is retained for the Go port, and §6 records that it has **no RED test in Rust** — `bitcoin`'s decoder already refuses both things it could catch |
 | **E12** | **CHUNKS: the chunk records are separated by the CONTAINER's own record separator — a single `\n` (0x0A), no trailing separator, no empty record.** | **(r1-C2, RE-HOMED §1.4a)** the chunks are no longer elements inside a body, so this is no longer a body rule: it is the container's, and `me` already has it — `payload.public.join("\n")` at `crates/me-cli/src/sysw/mod.rs:260` — but **(r3-I1) the ASSERTION v4 cited is `seal`'s, not `sysw`'s.** `joins_with_lf_and_no_trailing_lf` lives at `crates/me-cli/src/seal/container.rs:85` and asserts on `seal`'s `encode_section`, the frozen container whose `MAX_RECORDS = 24` and `MAX_RECORD_LEN = 512` §3.1 insists are **not** `sysw`'s; `grep -rn 'joins_with_lf_and_no_trailing_lf' crates/` returns that **single** hit, and `sysw`'s four joins (`crates/me-cli/src/sysw/mod.rs:192`, `:260`, `:278`, `crates/me-cli/src/sysw/pubhash.rs:27`) are reached by it nowhere — change `:260`'s separator and it stays GREEN. **The fact did leave the plan, and it landed somewhere nothing asserts it.** So P1 OWES E12 a RED test in `sysw`: **§4 step 12**. This is §4.1's own shape — *"a test that only checks the raise would pass if someone edited the frozen container instead"* — applied to the rule one section earlier |
 | **E13** | **Every `mt1` chunk RECORD is lowercase ASCII with no leading or trailing whitespace and no interior whitespace or `-`.** | **(r1-C2, RE-SCOPED §1.4a)** `mt-codec`'s `to_symbols` does `s.trim().to_ascii_lowercase()` (`mnemonic-transaction/crates/mt-codec/src/string_layer/pipeline.rs:66`), so it **accepts** uppercase and padded strings — a different record, a different EPD §6.6 public-data hash, and `mt_codec::decode_chunk` still green. The tolerance is the decoder's; the record layer may not inherit it. `me` already refuses exactly this for md1/mk1 — `first_noncanonical` plus the uppercase scan at `crates/me-cli/src/seal/record.rs:118-128` — and `mt1` joins them. **BOTH halves are vectored (r2-I7)**: V20 the case, V23 the whitespace |
-| **E14** | **Tag `0x01`'s value MUST be valid UTF-8. Invalid is REFUSED.** | **(r1-I10)** Rust refuses by default and Go accepts by default — one implementation refuses what the other engraves |
-| **E15** | **Tag `0x01`'s value is `1..=64` bytes.** | **(r1-I10)** a `u16 len` otherwise admits a 65,535-byte label into a plate legend budgeted at 34 characters |
+| **E14** | **The LABEL slot's value (flags bit 2) MUST be valid UTF-8. Invalid is REFUSED.** | **(r1-I10; renamed r8-I6 — v11 still said *"Tag 0x01"*, and tag→bit is a PERMUTATION)** Rust refuses by default and Go accepts by default — one implementation engraves what the other rejects |
+| **E15** | **The LABEL slot's length byte is `1..=64`.** | **(r1-I10; corrected r8-I6)** the length is a **`u8`**, which otherwise admits a **255**-byte label into a plate legend budgeted at 34 characters. **v11's cell still said `u16 len` and 65,535 — the TLV ceiling, which no longer exists** |
 | ~~E16~~ | ~~A fixed-width tag MUST carry exactly its width: `0x02` → 8, `0x03` → 4. Any other `len` is REFUSED.~~ | **DELETED by SIMPLIFICATION 3.1 (2026-08-25)** — the widths are structural — `fee` is 8 bytes, `fingerprint` is 4, and neither is length-prefixed |
 | **E17** | **The decoded transaction's WTXID (display order, §1.1a) MUST equal the carried `wtxid` field — on BOTH forms.** | **(r2-C1)** this is the rule E11 was believed to be. **What fails it, measured (§1.1a):** V18, the witness-stripped body, whose computed wtxid equals its txid and so differs from the carried one in all 32 bytes. **What passes it:** V26, the same 113 bytes with the wtxid recomputed honestly — the near-miss, and the accepted cost §1.1a states |
 | **E18** | **`form = 0x02` (CHUNKS) MUST carry `body_len == 0` and an EMPTY body. A non-empty CHUNKS body is REFUSED, and so is `form = 0x01` with `body_len == 0`.** | **(§1.4a)** the chunks are sibling records now, so a CHUNKS record with a body is either v3's superseded framing or a record carrying **both** forms — which is exactly what **spec §5's R4′** refuses, made checkable in one comparison instead of left to a reader. Vectored by V19 |
@@ -460,7 +468,7 @@ untested).
 
 **RAW: WHAT SEPARATES A HONEST BODY FROM A STRIPPED ONE IS E17, NOT E11
 (r2-C1).** Walk a witness-STRIPPED body through every other check in this plan:
-`magic`, `version`, `form` pass; **every TLV rule passes**, because they
+`magic`, `version`, `form` pass; **every legend-slot rule passes**, because they
 constrain the fields and the lengths and not the body's shape; §2.2's
 *"deserialise the body as a Bitcoin transaction"* passes, because a witness-free
 serialisation **is** a valid transaction; §2.2's txid equality passes, **because
@@ -1205,7 +1213,7 @@ verified by reading the corpus's own `generator` field, which is that path.
 
 | # | vector | pins |
 | --- | --- | --- |
-| V1 | **RAW (segwit)**, no optional fields | the fixed layout; `n_fields = 0` |
+| V1 | **RAW (segwit)**, no optional slots | the fixed layout; **`flags = 0x00`** (r8-M3; v11 pinned `n_fields = 0`, a field that no longer exists — and V1 is the fixture's FIRST entry) |
 | V2 | **RAW (segwit)**, all three slots present | **(3.1)** the flags byte with bits 0–2 set, the fixed slot ORDER as an *instance*, a `u8` label length and a u64 fee. **v10's cell pinned E1's ascending TAG order and `u16 BE` lengths; both are struck** |
 | V3 | **CHUNKS: a metadata record with `body_len = 0` PLUS its six BARE `mt1` records** | **(§1.4a)** `form = 0x02`; E18's empty body; E12's single `\n` between records and absent trailing LF; E13's lowercase ASCII; E20's complete set (`count = 6`, indices 0..5). **The whole payload is the vector**, not one record — that is what the ruling changed |
 | **V4a** | **RAW**, with txid AND wtxid written out | **§1.1's display order AND txid-not-wtxid, on the RAW path.** Segwit is required: for a legacy transaction txid == wtxid and the vector passes in both worlds |
@@ -1227,8 +1235,8 @@ verified by reading the corpus's own `generator` field, which is that path.
 | **V18** | **RAW body = the same transaction serialized WITHOUT witness (113 B), carried txid correct, carried wtxid the REAL transaction's** | **(r1-C2, RE-ASSIGNED r2-C1)** **E17, not E11.** This is the vector that separates the two conforming records: it deserialises, its txid matches, **and E11 passes on it** — measured, §1.1a. The wtxid is what refuses it, because the stripped body's wtxid equals its own txid |
 | **V19** | **`form = 0x02` with a NON-EMPTY body** (and its sibling: `form = 0x01` with `body_len = 0`) | **(§1.4a)** E18. v3's V19 was *"CHUNKS body with a trailing `\n`"*; the CHUNKS body is empty now, so that case moved to the container and is covered by **§4 step 12's new `sysw` test** (r3-I1: the `joins_with_lf_and_no_trailing_lf` v4 named here is `seal`'s and does not reach `sysw`'s join). **The rule did not go away and neither did the vector** — it is re-cut against the framing that replaced it, and it is also spec §5's R4′ made checkable |
 | **V20** | **a bare `mt1` RECORD in UPPERCASE** | **(§1.4a)** E13's case half — `mt_codec::decode_chunk` lowercases before it verifies, so it accepts what the record layer must not |
-| **V21** | **`tag=0x01` whose value is `74 6f ff 21`** | **(r1-I10)** E14. Rust refuses by default, Go accepts by default |
-| **V22** | **`tag=0x01, len=65`; near-miss `len=64` must PASS** | E15, and the near-miss rule (§6) |
+| **V21** | **the LABEL slot (bit 2) carrying `74 6f ff 21`** — not valid UTF-8 | E14. **(r8-I6)** v11 said tag 0x01, and **tag→bit is a PERMUTATION**: label → bit **2**, fee → bit **0**, fingerprint → bit **1**. A reader mapping 0x01 to bit 1 lands on the **fingerprint**, a 4-byte structural slot for which "invalid UTF-8" is meaningless |
+| **V22** | **the LABEL slot with `len = 65`; near-miss `len = 64` PASSES** | E15. **(r8-I6)** v11 said tag 0x01 with len 65; see V21 on the permutation |
 | **V23** | **a bare `mt1` record with a TRAILING SPACE** (and one with a leading space) | **(r2-I7)** E13's WHITESPACE half, which v3 never vectored — delete it and every v3 vector stayed green, while `to_symbols`'s `s.trim()` swallowed the padding and `decode_chunk` returned Ok. A padded record is a different record and a different EPD §6.6 public-data hash |
 | **V24** | **a bare `mt1` record with ONE symbol corrupted — BCH-correctable, `corrected == 1`; near-miss: the pristine string passes** | **(§1.4a)** E19. `decode_chunk` REPAIRS it and reports success, so without E19 `me sysw pack` launders a damaged chunk into the payload. The near-miss pair is what shows E19 refuses damage and not `mt1` |
 | **V25** | **E20's three conditions on one payload: (a) an ORPHAN `mt1` record whose `chunk_set_id` matches no `tx:` record; (b) a set MISSING an index; (c) a set with an index TWICE** | **(RULING 2026-08-25) all three PACK at exit 0 and each emits its own `SetFinding` on stderr** — v10 required all three to REFUSE. The assertion is the **report**, not the refusal: every missing index named, not the first, and the orphan line names *add the `tx:` record*, which is the remedy r7-M1 found inverts if omitted |
@@ -1343,7 +1351,7 @@ independently generated, never dumped from the encoder under test.** A vector
 derived from the implementation cannot falsify it — that is how a wrong NUMS
 constant once launders itself into looking correct.
 
-### 3.3 (r4-I3, REWRITTEN r5-C1) WHERE THE TWENTY-NINE VECTORS PHYSICALLY LIVE
+### 3.3 (r4-I3, REWRITTEN r5-C1) WHERE THE TWENTY-FOUR VECTORS PHYSICALLY LIVE
 
 **v6 discussed the vectors as pins and never as a file.** Three sites said *"the
 vector file"* and none named it; §4 assigned the construction of V1–V6 and V8–V26
@@ -1455,7 +1463,7 @@ operator-facing report strings (§2.5a.2) and live nowhere near `expect`.**
 is the defect rather than the gate.
 
 **Which step files which vector.** §4 **step 4** writes and commits
-`scripts/gen-tx-record-vectors.py` and files **V1–V6 and V8–V26** (27 plan ROWS — **and (r6-M5) MORE than 27 fixture ENTRIES**: a row naming a refusal and its near-miss is two, and V13 alone is three (`magic`, `version`, `form`). §6's near-miss bullet enumerates the pairs and is what the entry count must satisfy,
+`scripts/gen-tx-record-vectors.py` and files **V1–V5, V8, V10–V13, V18–V24, V26** — the live RECORD-level rows, **19 plan ROWS (r8-I4; v11 said 27 and re-asserted five struck vectors inside a range)** — (**and (r6-M5) MORE than 19 fixture ENTRIES**: a row naming a refusal and its near-miss is two, and V13 alone is three (`magic`, `version`, `form`). §6's near-miss bullet enumerates the pairs and is what the entry count must satisfy,
 counting V4a and V4b; **V17b is struck by 3.1**). **Step 9** files **V7** — **but (r7-I3) its `16,291 − F` NEAR-MISS goes to
 `crates/me-cli/tests/sysw_cli.rs`, NOT the codec fixture.** That body passes every
 codec rule — `magic`, `version`, `form`, every TLV rule, E4's arithmetic balances,
@@ -1613,7 +1621,7 @@ plan closing.
 - This plan is **0C/0I** under the R0 loop, over lenses enumerated up front.
 - **The document gates below have RUN on this document** — §6.1, which is a
   different sentence from the one v2 had, and the difference is the point.
-- **V1–V27 pass**, and **V4a/V4b write out txid, wtxid and `chunk_set_id`
+- **all TWENTY-FOUR live vectors pass** (r8-M4; v11's *"V1–V27"* named six struck vectors and omitted V28, W15's only RED test), and **V4a/V4b write out txid, wtxid and `chunk_set_id`
   explicitly** in the vector file, not only in code.
 - **Every LIVE rule has a test that goes RED without its check.** The numbering still runs E1–E20 because numbers were not reused, but **SIMPLIFICATION 3.1 struck seven — E1, E2, E6, E7, E8, E10, E16 — leaving THIRTEEN**, and the exception list below is now shorter by two: **E7 was one of the two, and it is struck outright.** The remaining exception is E11 alone — **EXCEPT E7 and
   E11, which §1.3 names, explains and assigns.** Anything else without a RED test
@@ -1669,7 +1677,7 @@ plan closing.
   fold while leaving it standing.** *"Satisfied by construction, since §3's
   transaction comes from `gen-mt1-vectors.py`"* is **true no matter how the
   framing was built**: the corpus supplies the *transaction*, while magic,
-  version, form, both identifiers, `n_fields`, the TLVs and `body_len` come from
+  version, form, both identifiers, the flags byte, the present slots and `body_len` come from
   somewhere the bullet never names. It could not detect the defect it exists to
   detect. It also claimed V27, which §3's exception says needs a **second,
   ground** transaction no corpus supplies.
@@ -1794,7 +1802,7 @@ document, measured on this fold, so a future run has something to diff against:
 | `./scripts/plan-cite-check.sh` | every `path:line` citation, resolved against the real tree | **91 of 108 resolve; the 17 dangling are exactly the 8 into the vendored `bitcoin` crate and the 9 into `mnemonic-transaction`** — see below. Any eighteenth is a defect. **(r3 AND r4 folds) This gate has now caught THREE bare-path citations in EACH of three successive folds — nine in total** — two `sysw/mod.rs` citations and one `main.rs` citation, written in the REPORT's shorthand (no `crates/me-cli/src/` prefix) and unresolvable as written. **They are not reproduced here with their line numbers, because doing so mints fresh dangling citations — measured, twice.** The r4 fold repeated the defect a third time in §3.3 and the gate caught it again in seconds. **No reading has ever caught this class; the gate has caught it every time.** The six hand-checks that fold ran did not include this gate. **That is the argument for the row, and it is why the citation TOTAL has climbed every round — **(r6-M2) the running figures are deliberately NOT restated here.** v7 wrote one total in this cell's headline and a different one in its narrative, and v8 fixed the headline and left the narrative; the PASS figure at the head of this cell is the only one, and it is re-measured every fold** | **interpretation** — it proves the line exists, never that this plan reads it right; and it cannot check absence claims |
 | `./scripts/plan-table-check.sh` | every table row against its header's cell count | **156 rows checked, 0 malformed, exit 0** | cell **content**; a right-width row with wrong values passes |
 | `./scripts/plan-wiring-check.sh` | **referential integrity of §2.4's sites, §1.3's rules and §3's vectors** — including **(new, 2026-08-25) rule 4b: a STRUCK rule or vector still referenced as LIVE** — a retracted site still prescribed by a step or asserted in closure; a site with no row; a **live site no step builds**; a vector no step names | **exit 1 with EXACTLY 8 rule-4b references, and they are the baseline**: four are this document explaining a strike (§1.2's note, §1.3's E8 quotation, §3's V16 note) and two are archaeology (r2-I7's and r4-I5's narratives). **A ninth is a real finding.** All other rules: clean. **Rule 4b caught 48 on its first run after SIMPLIFICATION 3.1 — including a field table still citing two deleted rules, V5's row citing a deleted rule, and §6's near-miss bullet pairing two deleted vectors — none of which any reading had caught.** **(r5) This gate exists because r4-C1 and r4-C2 shared NO TOKEN with the text they falsified, so `plan-fold-sweep.sh` structurally could not see either, and each cost a full review round.** Mutation-tested: run against **v6** it returns exit 1 naming *"W11/W12/W13 are LIVE wiring sites that NO step builds"* — r4-C1's core, in milliseconds; run against **v4** it correctly returns exit 0 | **whether a step builds the RIGHT thing, and whether the step ORDER is feasible** — r4-C2 and r5-C2 were both ordering defects and this gate would have caught NEITHER. It is the structural half; the sweep is the lexical half; ordering still belongs to a reviewer |
-| `./scripts/plan-fold-sweep.sh <doc> --terms <the forty-four below>` | **terms this fold removed that survive elsewhere** | **exactly 44 hits, one per term, ALL of them inside the block below — the self-reference. A forty-fifth hit anywhere else is a real finding.** **(r3 fold)** Its ten new terms were swept BEFORE they were written down and **nine were absent**; the tenth (the `five sites` entry) survives twice in prose and **both are HISTORICAL** — *"none of v3's five sites"*, *"three of v3's five sites"* — where a present-tense survivor would be a finding. **The terms live ONLY in the block: quoting them in this cell instead made all ten self-hit from a table, measured one edit ago** | it flags candidates, not defects; and terms nobody named |
+| `./scripts/plan-fold-sweep.sh <doc> --terms <the forty-nine below>` | **terms this fold removed that survive elsewhere** | **exactly 49 hits, one per term, ALL of them inside the block below — the self-reference. A fiftieth hit anywhere else is a real finding.** **(r3 fold)** Its ten new terms were swept BEFORE they were written down and **nine were absent**; the tenth (the `five sites` entry) survives twice in prose and **both are HISTORICAL** — *"none of v3's five sites"*, *"three of v3's five sites"* — where a present-tense survivor would be a finding. **The terms live ONLY in the block: quoting them in this cell instead made all ten self-hit from a table, measured one edit ago** | it flags candidates, not defects; and terms nobody named |
 
 **`plan-glyph-check.sh` is NOT a close condition here either, and the reason is
 not the same as the build gate's.** It runs and it reads this document — but it
@@ -1809,7 +1817,7 @@ that is red for non-defects trains a reader to ignore it just as surely as one
 that is green for everything.**
 
 **The `--terms` list is fixed, because the explicit mode is the one that works
-and the fold author is the only one who knows what was superseded.** These **forty-four**,
+and the fold author is the only one who knows what was superseded.** These **forty-nine**,
 each of which this fold removed and each of which must survive **only** in this
 block:
 
@@ -1865,10 +1873,31 @@ block:
 "they are W12's variant and not"
                                W12 got no vocabulary            (r7-C2)
 'chunk_charset` | E13'         not TxRecordError's              (r7-C1)
+'Tag `0x01`'                   tag->bit is a PERMUTATION        (r8-I6)
+"follows `seal`'s posture — refuse"
+                               2.3 SPLITS record from set       (r8-C1)
+'TWENTY-SIX rule names'        per-record names went internal   (3.2)
+'V1–V27 pass'                  24 live vectors, and V28         (r8-M4)
+'the twenty-nine'              twenty-four                      (r8-M2)
 ```
 
-**The last FOUR are r7's, the five before them r6's, the eight before those r5's,
-the five before those r4's, the ten before those r3's**, each a fact its fold RETRACTED. A hit for any of the forty-four **outside the block above** is a real finding — that is the
+> **(r8-I5) v11 ADDED NOT ONE TERM while claiming *"each of which this fold
+> removed"*, so §6.1's close condition was satisfied trivially — the gate was
+> handed an empty question.** Round 8 ran it with ten terms v11 actually
+> superseded: **ten of ten were still standing**, and each one was C1–C5, I1 or
+> I4 of that report. **The gate works; nobody pointed it at the fold.**
+>
+> **Only FIVE of v11's terms are listed below, and the omission is deliberate.**
+> The other five — `Σ(3 + len)`, `set-level variant`, ``rule name on `refuse` ``,
+> `V25's three negatives all refuse`, `n_fields = 0` — are **quoted in this
+> document while explaining the fix that removed them**, so listing them would
+> fire the gate on the corrections. Same reason §6.3's tally DESCRIBES its stale
+> phrases instead of quoting them; **this is the sixth time in this cycle that
+> documenting a retraction re-created it.**
+
+**The last FIVE are r8's, the four before them r7's, the five before those r6's,
+the eight before those r5's, the five before those r4's, the ten before those
+r3's**, each a fact its fold RETRACTED. A hit for any of the forty-nine **outside the block above** is a real finding — that is the
 whole mechanism, and r1-C1 is why: a fact corrected in the prose and left
 standing in a table three sections away is invisible to a diff, because by
 construction it lives in the text the diff did not touch.
