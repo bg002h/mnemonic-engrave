@@ -1,15 +1,24 @@
 # IMPLEMENTATION PLAN — P1: `me`'s transaction container
 
-**Status:** DRAFT v12, pre-R0. **Round 8 returned 8 Critical / 6 Important /
-6 Minor on v11 — the worst round of the cycle, and every Critical was in the
-fold, not the design.** v11 changed five independent things at once (two operator
-rulings, three simplification cuts) across a two-thousand-line document, and each
-was propagated into the sections its author was reading and not into the sections
-that depend on them. **Four of the eight — C1, C3, C5, C6 — are literally *folded
-into X, not into Y*.** C4 left a LIVE rule stating TLV's arithmetic, so as written
-it refused every legal record carrying a fee; C7 was a MUST invented in a layout
-comment with no rule, no vector and no test, written inside the blockquote that
-quotes the round-0 finding it reproduces.
+**Status:** DRAFT v13, pre-R0. **Round 8's 8C / 6I / 6M are fully folded, and
+the ARCHAEOLOGY PASS has run** against round 8 Part B's reviewed list — not the
+author's judgment, because the same author had just produced eight Criticals by
+changing five things at once across two thousand lines.
+
+**Lines 2,121 → 2039, measured.** Evicted: the v1/v2 post-mortem blockquotes
+(37), §3.3's three-numbered refutation (34 → 9), §6.1's build-gate history
+(42 → 10), the W6 paragraph (4) and the hand-maintained report roster (7 → a
+glob that cannot go stale). **One live sentence was PROMOTED before its block was
+deleted** — *no rule is added here without a stated input that would fail it, and
+that input measured* — now §1.3's preamble.
+
+**NOT evicted, and both were named as traps:** the `--terms` block looks exactly
+like archaeology and is an **executable gate input** whose deletion would disarm
+the gate that caught ten of round 8's findings; and **E8's struck row is the only
+record anywhere of why TLV cannot come back.** **Part B's item 5 — collapsing
+twelve struck rows into one paragraph — is DEFERRED by its own terms** until one
+more round closes, so a reader mid-cycle can still find out what happened to a
+rule they remember.
 
 **All 8C, all 6I and all 6M are folded here, in five separately-gated batches.**
 **Lines 2121, measured now rather than carried forward (r8-M1).** The archaeology
@@ -22,13 +31,13 @@ shrank. That is a deliberate choice for an artifact under active review and it i
 also, by this document's own §6.1 argument, more archaeology. **Evicting it is a
 separate operation and is not done here.**
 
-**The reports are `design/agent-reports/R0-P1-plan-round0.md` … `round8.md`** —
-**NINE rounds, all persisted verbatim before their folds** (5C/13I/5M, 3C/11I/8M,
-2C/7I/4M, 2C/7I/3M, 2C/5I/1M, 2C/5I/5M, 2C/5I/7M, 2C/5I/5M, **8C/6I/6M**), plus
-`R0-P1-simplification-sibling-conformance.md`. **(r8-M6) v11's roster stopped at
-round 3 and called it *"the live one"*, so a reader trusting it missed five
-rounds of findings.** Findings are marked inline — `(C1)`, `(r5-I4)`, `(r8-C7)` —
-so each traces to the report that raised it.
+**Every round is persisted verbatim before its fold** —
+`ls design/agent-reports/R0-P1-plan-round*.md`, plus
+`R0-P1-simplification-sibling-conformance.md`. **Findings are marked inline** —
+`(C1)` is round 0, `(r5-I4)` round 5, `(r8-C7)` round 8 — so each traces to the
+report that raised it, and `git diff <persist>..<fold>` shows what changed in
+response to what. **(r8 Part B, evict-6: the hand-maintained roster is gone; it
+was stale at round 3 and the glob cannot be.)**
 
 > **THE TWO THINGS THIS FOLD CHANGES STRUCTURALLY, stated once at the top
 > because everything below is downstream of them.**
@@ -52,43 +61,6 @@ so each traces to the report that raised it.
 > `design/SPEC_encrypted_payload_delivery.md`. Anything cited as `SPEC_mt_v0_1.md`
 > carries its filename. v2 left `§2.3`, `§2.4` and `§6` meaning two different
 > documents in adjacent sentences.
-
-> **WHAT v1 GOT WRONG, kept at the top because it is the argument for gating
-> plans at all.** v1's §1.1 called the txid byte order *"the most likely defect
-> in this plan"* — and then **stated the losing answer as normative**, with an
-> escape clause deferring to a decision `mt-codec` does not make. So **V4, the
-> vector designed to pin the dangerous thing, was pinned to the wrong axis and
-> could not have caught it.** Had this been implemented straight from §6's scope
-> line (spec §6), the disagreement would have surfaced when the Go port was written — or
-> when a plate was cut and R15 refused a correct record.
-
-> **AND WHAT THE v2 REWRITE BROKE, kept beside it because all three of round 1's
-> Criticals came from the EDIT, not from the design.** v2 was a wholesale
-> rewrite, and a wholesale rewrite fails in three ways this document now has to
-> be read against — **and round 2 found a fourth, which is why item 4 is here:**
->
-> 1. **Partial propagation (r1-C1).** §1.1's prose was corrected to *display*
->    order and **§1's layout table was left saying `INTERNAL`** — and the table
->    is what an implementer transcribes. One fact, two places, one fix. §6 now
->    gates it with `plan-fold-sweep.sh --terms`.
-> 2. **Destructive restructuring (r1-C2).** Turning v1's body table into the
->    E1–E10 rules **deleted the only statement of what the body contains**, and
->    left §1.1 citing the deleted section. Restored as **§1.4**, and nothing in
->    this fold is deleted without the fact landing somewhere and every citation
->    being repointed.
-> 3. **Building a thing without wiring it in (r1-C3).** The plan specified a
->    record format completely and never once wrote `ClassTransaction`, so §6
->    could close green while `me sysw pack` returned `Unclassifiable` for every
->    `tx:` record. Wired in **§2.4**, with its own TDD step (§4, step 6) and its
->    own closure condition. **Round 2 found the same shape one layer in
->    (r2-C2):** the five wiring sites were correct and *insufficient*, because
->    none of them could carry WHICH rule a record broke. §2.4 now names **ten**.
-> 4. **A rule that does not enforce what it claims (r2-C1).** E11 was invented to
->    close r1-C2 and was *reasoned*, not executed. Round 2 executed it and it
->    returned `true` on the vector written to prove it fires. **NORMATIVE FOR
->    THIS DOCUMENT: no rule is added here without a stated input that would fail
->    it, and that input measured.** Every new rule below (E17–E20) carries its
->    measurement or names the command that produces it.
 
 ## 0. Why this plan exists at all
 
@@ -381,6 +353,14 @@ the operator wants a different number this is the field to change**, and nothing
 else moves with it.
 
 ### 1.3 ENCODING RULES — every one of these is a way two implementations diverge
+
+> **NORMATIVE FOR THIS DOCUMENT: no rule is added here without a stated input
+> that would fail it, and that input MEASURED.** Promoted here by the archaeology
+> pass from the v2 post-mortem it was buried in (r8 Part B, evict-1). It exists
+> because **E11 was invented to close r1-C2 and was *reasoned*, not executed** —
+> round 2 ran it and it returned `true` on the very vector written to prove it
+> fires. Every rule added since carries its measurement or names the command that
+> produces it.
 
 v1 stated a layout and no rules. A layout without rules is a family of formats.
 
@@ -939,11 +919,6 @@ Class::Unknown => return Err(SyswError::Unclassifiable(i, unknown_reason(&r))),
 | **prefix-shaped** | E13/E19 apply to **bare `mt1`** records, which match no prefix | they reach `Unrecognised`, whose message is **false** for V20/V23/V24 (r3-C2) |
 | **per-record, carrying an index** — `Unclassifiable(usize, …)` | E20 and R17 are **set-level** | a *missing* chunk has **no index**; §1.5's "index and the rule" is unsatisfiable |
 
-**And W6's prescribed edit is actively wrong.** Adding `TX_PREFIX` to that loop
-makes an `MTX2` record with valid hex report *"its body is not lowercase hex …
-`xxd -p -c 256`"* — advice for a defect it does not have, and **RED against §6's
-own W8 assertion.**
-
 ### 2.5a NORMATIVE — what P1 builds instead
 
 **A rule failure must carry the rule.** The parse returns its own error type; the
@@ -1357,39 +1332,15 @@ constant once launders itself into looking correct.
 vector file"* and none named it; §4 assigned the construction of V1–V6 and V8–V26
 to no step.
 
-> **v7 ANSWERED THIS WRONGLY AND THE ANSWER WOULD HAVE TURNED THE SUITE RED
-> (r5-C1).** It ruled that P1's vectors *"extend
-> `crates/me-cli/testdata/sysw_vectors.json`"*, citing two assertions round 4's
-> report had named — **without opening the file.** The plan's own standing rule is
-> *never describe code from its doc comment, its name, or an earlier agent's
-> report*, and that is the rule the fold broke. **A reviewer's prescribed remedy is
-> not authoritative; the defect is.** Three measured reasons the ruling was wrong,
-> each fatal alone:
->
-> 1. **That file is a GOLDEN OF THE CODE UNDER TEST — §3.2's exact negation.**
->    `the_implementation_still_matches_the_recorded_vectors`
->    (`crates/me-cli/src/sysw/vectors.rs:137`) is a plain `#[test]`, **not
->    `#[ignore]`**, and asserts `generate() == load()` on every run — where
->    `generate()` builds the fixture through `me`'s own encoder. Its contract is
->    *"these vectors are byte-for-byte what the code produces"*. An independently
->    generated vector differing by one byte turns the suite RED, and the only
->    documented remedy is the `regenerate` command §3.2 forbids. **Step 4 could not
->    end green, and nor could any step after it.**
-> 2. **The schema cannot express a refusal.** `Vector` is
->    `{name, note, records, passphrase, blob, pub_len, ct_len, sealed, digest,
->    identity, mdmk_unconfirmed}` — the *output of a successful pack* — and
->    `generate()` calls `pack_deterministic(...).expect("fixture inputs must
->    pack")`, which **panics** on anything that does not pack. **At least 20 of
->    P1's 29 vectors are records `me sysw pack` must REFUSE.**
-> 3. **The two assertions v7 named as the gate are vacuous for P1, and one BREAKS
->    if extended.** `every_required_vector_exists` iterates `required_vectors()` =
->    `COVERAGE`'s `Where::Vector` entries, i.e. the vectors a **spec §8.3** test
->    points at; 29 new vectors trigger nothing. And
->    `assert_every_named_test_is_placed` ends
->    `assert_eq!(COVERAGE.len() as u32, 23)` — so "extending `COVERAGE`", which
->    v7's own W14 row prescribed, **makes it FAIL**, because P1 adds no spec §8.3
->    tests. v7's §6 closure row *"both pass with P1's 29 vectors present"*
->    **passed with ZERO present.**
+> **NOT `crates/me-cli/testdata/sysw_vectors.json`, and the reason is one line:**
+> `the_implementation_still_matches_the_recorded_vectors`
+> (`crates/me-cli/src/sysw/vectors.rs:137`) is a plain `#[test]`, **not
+> `#[ignore]`**, asserting `generate() == load()` where `generate()` builds the
+> fixture through `me`'s own encoder — **a golden of the code under test, which
+> is §3.2's exact negation.** An independently generated vector differing by one
+> byte turns the suite RED, and its schema cannot express a refusal at all
+> (`Vector` is the output of a successful pack). **v7 ruled the other way and it
+> would have made step 4 unfinishable** (r5-C1).
 
 **NORMATIVE — P1's vectors get their OWN fixture:
 `crates/me-cli/testdata/tx_record_vectors.json`, loaded by a new
@@ -1750,49 +1701,17 @@ plan closing.
 
 ### 6.1 (r1-I6) THE GATES THAT ACTUALLY READ THIS DOCUMENT — and the one that does not
 
-**v2's first bullet was *"the build gate has run on it"*, and that is a
-STRUCTURAL FALSE PASS.** Round 1 executed it and got:
+**NORMATIVE — `plan-build-gate.sh` is NOT a close condition for P1, and the
+reason is structural, not historical.** The extractor accepts a ```rust block
+only when an anchor comment names a file it can assemble, and **this plan
+carries no such block** — its Rust appears as illustrative fragments inside
+prose. Run against it, the script now refuses rather than reporting a pass on
+an empty extraction (`c8f8557`, exit 3), which is the right behaviour and still
+not a gate on this document. **(r8 Part B, evict-4: the round-1 output, the
+already-closed false-PASS blockquote and the extractor walk-through are
+evicted — the fix is in the script and its own tests, not here.)**
 
-```
-$ ./scripts/plan-build-gate.sh design/IMPLEMENTATION_PLAN_P1_me_container.md
-test result: ok. 77 passed; 0 failed          <- ROUND 1's RUN. This output
-   PASS: the CLI tests compile                   NO LONGER REPRODUCES; see
-   clippy clean                                  the note below.
-EXIT=0
-```
-
-> **(r2-M3) THAT OUTPUT IS HISTORICAL, AND THE HOLE IT DEMONSTRATES IS ALREADY
-> CLOSED.** `c8f8557` — *"scripts: plan-build-gate must FAIL when it extracts
-> nothing (R0 P1 round 1, I6)"* — made the script refuse on an empty extraction.
-> **Re-run while writing this fold, the same command now prints *"Refusing rather
-> than reporting a pass on an empty extraction"* at `EXIT=3`.** The round-1 quote
-> is correctly attributed and the conclusion below is unaffected, but a reader
-> who ran the command to check this section's premise got a different answer than
-> the section showed. The structural false PASS is a FIXED defect; **the
-> remaining reason this gate does not apply to P1 is the anchor filter alone**,
-> which the NORMATIVE paragraph below states.
-
-**It extracted nothing.** The extractor accepts a ```rust block only when a
-preceding anchor names `src/seal/*.rs` or `tests/seal_cli.rs`
-(`scripts/plan-build-gate.sh:70-74`). This plan has neither anchor, and its only
-```rust block is a quoted signature from another crate. So the script copied the
-pristine crate, applied **zero** edits, and built, tested and linted **`me` as it
-already is** — green, for an artifact it never read a line of. Its honesty clause
-misfires the same way: the result block names *"src/main.rs and src/validate.rs
-arrive as fragments"*, which are the **encrypted-payload** plan's files.
-
-**NORMATIVE: `plan-build-gate.sh` is NOT a close condition for P1**, and this
-plan does not cite it. What would have to change for it to apply, stated
-precisely rather than left as "someday": the extractor's anchor test at
-`scripts/plan-build-gate.sh:70-74` would have to accept `src/sysw/*.rs` and
-`tests/sysw_cli.rs`, **and** this plan would have to carry assemblable whole-file
-```rust blocks under those anchors — which it deliberately does not, because P1's
-code is written test-first in §4, not transcribed from a plan. **Since `c8f8557`
-the script also refuses rather than reporting a pass**, so citing it here would
-now turn the gate red for a non-defect — which §6.1's own last paragraph rules
-against.
-
-**THREE gates DO read this document, and P1 runs all three** — before a
+THREE gates DO read this document, and P1 runs all three** — before a
 reviewer, and again before committing any fold, because **a fold is authorship
 and re-earns the gate**. Each row states what a PASS looks like on *this*
 document, measured on this fold, so a future run has something to diff against:
