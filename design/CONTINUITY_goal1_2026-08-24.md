@@ -304,6 +304,25 @@ only as the HRP separator and **`mt1` can only ever mark a chunk boundary**.
 file under a reviewer is how a fold gets reviewed against text that no longer
 exists.
 
+## A PROCESS LESSON THE OPERATOR HAD TO REPEAT — look at the siblings first
+
+**Twice in one day the operator had to redirect me to the precedent**: *"How are
+mk and md handled here?"*, then *"this question is answered already for md and
+mk, so what do they do?"*
+
+Both times I had produced **an option list with tradeoffs** instead of reading
+the sibling. Both times the answer was already in the tree — `me`'s `Cargo.toml`
+for the codec dependency, the uniform `X-cli`/`X-codec` split for publishing, and
+`gui/scan.go:92` for bare chunk records.
+
+**An option list built without the precedent is imagination formatted as
+analysis.** It reads as a survey of the space and is a survey of me, and it costs
+the operator a turn correcting the frame rather than making the decision.
+
+**Rule for this constellation: before generating options, ask what `md`, `mk`,
+`ms` and the fork already do.** If a precedent exists, the burden is on departing
+from it.
+
 ## Open, and who owns it
 
 | | owner |
