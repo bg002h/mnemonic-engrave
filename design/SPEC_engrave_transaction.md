@@ -297,10 +297,11 @@ engravings := []textEngraving{
 — exactly what F-234 forbids and what §2.2 just ruled out — and offers it
 **first**, i.e. as the default variant.
 
-**NORMATIVE:** the chunks path engraves **TEXT ONLY**. It may not call
-`validateMdmk` unchanged, and the spec may not describe the chunks form as
-needing "nothing new". What it needs is small — a text-only plate builder — but
-it is not nothing.
+**NORMATIVE: the chunks path engraves TEXT ONLY, and P5 owns building it.** It
+may not call `validateMdmk` unchanged, and the spec may not describe the chunks
+form as needing "nothing new". What it needs is small — a text-only plate builder
+— but it is not nothing, and **R0 round 4 found it named as a deliverable with no
+phase owning it.**
 
 > **This is the same live violation §9 O5 records for `md1`/`mk1` cards, reached
 > by a different door.** O5 keeps the *existing* four callers out of Goal 1's
@@ -554,10 +555,11 @@ a payload whose passphrase they saw once and did not keep.
 **`me sysw show` already exists**, is **read-only**, and prints the same digest
 plus `sealed:`, `pub_len:`, `ct_len:`.
 
-**NORMATIVE, and it is a REPLACEMENT, not an addition.** The ruling was phrased
-*"put `me sysw show` beneath the digits"*, which — taken additively — leaves the
-sentence that sends the operator to re-pack sitting directly above it. **The
-`me sysw pack` line must go.**
+**NORMATIVE, and it is a REPLACEMENT, not an addition. P4 owns it.** The ruling
+was phrased *"put `me sysw show` beneath the digits"*, which — taken additively —
+leaves the sentence that sends the operator to re-pack sitting directly above it.
+**The `me sysw pack` line must go.** (R0 round 4: this was NORMATIVE and appeared
+in no §6 phase row.)
 
 ```
 Compare this against
@@ -1511,8 +1513,33 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
 
 - **0C / 0I** under the R0 loop, over lenses enumerated up front. *Closure is
   lens-closure* — not "a round came back clean".
-- **The mode-segmentation gate is green.** Any QR sizing MUST assert measured v40
-  capacity against **numeric 7089 / alnum 4296 / byte 2953 at L**.
+- **The mode-segmentation gate is green** — `cargo run --bin capgate`, which
+  **exits non-zero on mismatch**.
+
+  > **WHAT IT IS, because R0 round 4 found this requirement stated in §7 and
+  > NOWHERE ELSE in the document.** A QR encoder performs optimal **mode
+  > segmentation** and will silently re-encode part of a payload in a denser
+  > mode. F-234 records three measurements it corrupted: an all-`0x41` payload
+  > measured *alphanumeric* capacity while claiming byte, a high-byte payload
+  > paid an ECI header, and a mixed payload read **6.6% low**. **Every one
+  > produced a plausible number.** The gate asserts a probe's measured v40
+  > capacity equals the published limits, per mode, per EC level — a capacity
+  > function that disagrees is measuring a different mode than it claims, and
+  > every figure derived from it is suspect.
+  >
+  > **It was implemented for the WRONG probe.** `qrmodes.rs:68-71` ran it and
+  > **printed OK without failing**; `select2.rs` — which produced the table
+  > §4.1/§4.2a cite — has its own `cap()` and never ran it at all. `capgate.rs`
+  > closes both gaps and covers all four EC levels rather than L and H:
+  >
+  > ```
+  > v40-L  alnum 4296/4296  byte 2953/2953      v40-M  alnum 3391/3391  byte 2331/2331
+  > v40-Q  alnum 2420/2420  byte 1663/1663      v40-H  alnum 1852/1852  byte 1273/1273
+  > ```
+  >
+  > **8/8 exact**, so the spec's table is sound — and that is now measured rather
+  > than assumed. **Owner: any phase that produces or changes a capacity number**,
+  > which today is the measurement probe and tomorrow is **P5**'s device search.
 - **The test plate is cut and read** (S0).
 - **§4.2c's TWO Structured-Append gates are both satisfied**, and they are
   separate: **(a)** a real scanner reassembles the S0 fixture off engraved steel
@@ -1531,10 +1558,26 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
   renders the txid in the ASSERTED voice, not the derived one** (§3.4). O11 is
   resolved; R14 is retired; a test must show a chunks-form txid is not presented
   as though the device computed it.
-- **All THREE program-keyed lockstep sites carry the new program** (§3.1a), and
-  the two that fail **silently** are asserted by test — a panic announces itself,
+- **All FOUR lockstep sites carry the new program or type** (§3.1a), and the
+  **three that fail silently** are asserted by test — a panic announces itself,
   `scanUnknownFormat` does not.
-- **Both pipeline invariants are asserted as pipeline properties** (§1.1).
+
+  > **R0 round 4.** This close condition read *"all THREE **program-keyed**
+  > lockstep sites"* — stale twice over. §3.1a and §6's P4 row both say **four**,
+  > and "program-keyed" is the narrow framing round 2 corrected: the fourth
+  > (`engraveObjectFlow`) is keyed on a scanned object's **type**. **As worded the
+  > gate was satisfiable while the document's own "silent front door" stayed
+  > unfixed** — a close condition that could pass on the defect it exists to
+  > catch.
+- **Both pipeline invariants are asserted as pipeline properties** (§1.1), and
+  **each has a phase**: `me sysw pack` refusing empty stdin is **P1** (R7);
+  **`mt` contributing nothing to stdout on any failure path is P2** — which R0
+  round 4 found had no owner at all, though §1.1 requires both.
+
+  > `mt`'s invariant is the one holding the pipeline safe: `fish` reports only
+  > the LAST command's status, so a failed encode is invisible unless `mt`'s
+  > stdout is empty and `me` therefore refuses. It is asserted today by accident
+  > of implementation, not by a test that names it.
 
 ## 8. Ruled, and not to be re-litigated
 
@@ -1588,7 +1631,7 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
 | ~~O12~~ | **ANSWERED, and the answer is NO** — `kortschak-qr v0.3.2` has no Structured Append (verified: zero occurrences; `Encode` returns one `*Code`). Buildable over its `coding` package; **P5 owns it**. See O14 for what that does to S0's order | **closed → P5 + O14** |
 | **O13** | a legend face **below 3.0 mm** — worth ~5 QR versions (§4.5a). **Pure upside:** 3.0 mm is tested, so if nothing smaller validates, nothing moves | S0 |
 | ~~O14~~ | **RESOLVED (§4.2c)** — S0 cuts the pair from an independent committed generator, so the **physics** gate runs first and cheap; P5 reproduces that fixture **module-for-module**, so the **software** gate is a byte comparison against a cross-implementation oracle | closed → S0 + P5 |
-| O8 | **Journey B — recovery.** Someone finds the plate years later. Not yet walked | next walk |
+| ~~O8~~ | ~~**Journey B — recovery**~~ — **SKIPPED, operator ruling 2026-08-24.** Kept rather than deleted, because it records what the skip ACCEPTS: every walk ran from the **engraving** end, F-234's promise lives at the **recovery** end, and the single glance that way produced finding O (*no `mt` verb can read a default plate*). The recovery path rests on review, not on a walk | **closed — a decision, not an omission** |
 | O9 | the documented `picotool` line stops before the move to 20V/28V power, so a correct payload reads as a failed one | walk G, documentation |
 | O10 | the **courier model** is nowhere written down (§ walk H) | documentation |
 
