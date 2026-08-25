@@ -173,7 +173,9 @@ enum SyswCmd {
     /// engraving path — produce it with `me tx`, which checks the bytes parse.
     ///
     /// mt1 strings (from `mt encode`) feed its transaction TEXT plates; pack
-    /// the COMPLETE set, or the device will refuse to engrave it.
+    /// the COMPLETE set of FULL strings — never `--elide-prefix` output, whose
+    /// shortened lines are not self-verifying and are refused here — or the
+    /// device will refuse to engrave it.
     ///
     /// To encode one: `printf '%s' 'correct horse battery staple' | xxd -p -c 256`
     ///
