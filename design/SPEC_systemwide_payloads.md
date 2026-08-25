@@ -569,8 +569,9 @@ The construction is otherwise EPD§6.6's, verbatim.
 Lowercase hex, not base64 or base32: it is case-insensitive by construction so
 lowercasing cannot destroy it, it contains no space, hyphen or LF, and it is the
 easiest form for a human to compare on a screen. The cost is 2×, against
-`MaxSectionLen` of 8191 — about 4 KB of text, far past what 24 engraved lines
-can hold, so the expansion binds nothing real.
+`MaxSectionLen` of 32,734 — about 16 KB of text, far past what 24 engraved lines
+can hold, so the expansion binds nothing real. (The cap was 8191 until the
+transaction-engraving cycle raised it; the 2× argument held at either value.)
 
 **Decoding is normative too:** a `ClassFreeText` record's body is hex-decoded
 back to UTF-8 before it reaches Engrave Text, and a `ClassPassphrase` body before

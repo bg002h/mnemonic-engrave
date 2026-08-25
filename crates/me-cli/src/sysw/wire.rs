@@ -37,9 +37,35 @@ pub const SALT_LEN: usize = 16;
 pub const IV_LEN: usize = 12;
 pub const TAG_LEN: usize = 16;
 
-/// EPD §6's cap, inherited unchanged: 8191 rather than 8192 because the
-/// device's scan buffer signals overflow when it is exactly FULL.
-pub const MAX_SECTION_LEN: usize = 8191;
+/// RAISED from 8191 to 32,734 — the ceiling on what one payload can deliver.
+///
+/// 8191 was the NFC SCAN BUFFER minus one (`gui/scan.go` allocates `8*1024` and
+/// signals overflow when the buffer is exactly FULL), and `sysw` inherited it
+/// unchanged. That capped the FLASH path at an eighth of its own region for a
+/// reason belonging to a transport it never uses: a `sysw` container reaches
+/// the device by `picotool` at `0x10D00000`, never on a tag. A RECORD on a tag
+/// is still bound by the scan buffer, and that is a different limit on a
+/// different thing. `seal`'s own `MAX_SECTION_LEN` stays 8191 and stays FROZEN,
+/// because EPD's container really is scanned.
+///
+/// The formula preserves the property 8191 had — and it is the property the
+/// readers' no-wrap reasoning rests on — that TWO maxed sections plus header
+/// plus tag still fit the region:
+///
+/// ```text
+/// (REGION_LEN - HEADER_LEN - TAG_LEN) / 2 = (65536 - 52 - 16) / 2 = 32734
+/// ```
+///
+/// A round 32,768 would break it by 34 bytes. That is why the cap is an ugly
+/// number, and both halves of the reason are const-asserted below.
+pub const MAX_SECTION_LEN: usize = (REGION_LEN - HEADER_LEN - TAG_LEN) / 2;
+
+/// The property the formula exists to preserve, asserted at COMPILE time: two
+/// maxed sections plus header plus tag still fit the region.
+const _: () = assert!(HEADER_LEN + 2 * MAX_SECTION_LEN + TAG_LEN <= REGION_LEN);
+/// ...and a round 32,768 would NOT — by 34 bytes. Asserted so nobody "tidies"
+/// the constant into a power of two later.
+const _: () = assert!(HEADER_LEN + 2 * 32_768 + TAG_LEN > REGION_LEN);
 pub const MIN_ITERATIONS: u32 = 100_000;
 pub const MAX_ITERATIONS: u32 = 2_000_000;
 
@@ -165,6 +191,25 @@ mod tests {
     fn magic_is_distinguishable_from_the_sealed_payload_container() {
         assert_eq!(MAGIC.len(), 8);
         assert_ne!(&MAGIC[..], b"MNEMBLOB");
+    }
+
+    /// GRAFT 1 — the section cap is RAISED HERE and FROZEN in `seal`.
+    ///
+    /// **BOTH constants are asserted**, because a test that only checked the
+    /// raise would pass if someone edited the FROZEN container's constant
+    /// instead: there are two `MAX_SECTION_LEN` in this crate and only one of
+    /// them moves.
+    #[test]
+    fn the_section_cap_is_raised_here_and_frozen_in_seal() {
+        assert_eq!(MAX_SECTION_LEN, 32_734, "sysw's cap, raised from 8191");
+        assert_eq!(
+            crate::seal::wire::MAX_SECTION_LEN,
+            8191,
+            "seal is FROZEN and may not move with it"
+        );
+        // The property the formula exists to preserve is a CONST assertion
+        // beside the constant itself, not a runtime one here: a check that
+        // fails the BUILD is strictly stronger than one that fails a test.
     }
 
     /// §4's clearance argument, as arithmetic rather than prose.

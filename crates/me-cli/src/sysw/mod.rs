@@ -570,7 +570,20 @@ mod tests {
                 "sealed pack accepted out-of-range iterations {iters}"
             );
         }
-        let huge: Vec<String> = (0..30)
+        // SIZED FROM THE CAP, never hard-coded. This used to build a literal
+        // 30 records, which was comfortably past 8191 and stopped testing
+        // anything the moment the cap was raised to 32,734: the section it
+        // produced became legal, and `pack` was right to accept it. A count
+        // derived from the constant cannot go quietly vacuous that way.
+        const REC_LEN: usize = "text:".len() + 800; // 400 hex pairs
+        let n = wire::MAX_SECTION_LEN / (REC_LEN + 1) + 2; // + the LF between records
+        let section_len = n * REC_LEN + (n - 1);
+        assert!(
+            section_len > wire::MAX_SECTION_LEN,
+            "the fixture must exceed the cap to test anything: {section_len} vs {}",
+            wire::MAX_SECTION_LEN
+        );
+        let huge: Vec<String> = (0..n)
             .map(|_| format!("text:{}", "61".repeat(400)))
             .collect();
         assert!(

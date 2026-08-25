@@ -304,19 +304,41 @@ fn pack_accepts_the_iteration_bounds_themselves() {
     }
 }
 
+/// The NEAREST HOSTILE INPUT to the raised cap: a section one record past it is
+/// still refused, on the write path, in the writer's words rather than the
+/// reader's.
+///
+/// THE COUNT IS DERIVED FROM THE CONSTANT. It was a literal 30 records, which
+/// was comfortably past 8191 and went silently vacuous the moment the cap was
+/// raised to 32,734 -- the section it built became legal and `pack` was right
+/// to accept it. That is the shape a raise is supposed to expose, and a
+/// hard-coded fixture hides it.
 #[test]
 fn pack_refuses_a_section_too_long_for_its_own_parser() {
+    use mnemonic_engrave::sysw::wire::MAX_SECTION_LEN;
     let dir = tempfile::tempdir().unwrap();
     let f = dir.path().join("big.txt");
-    let recs: Vec<String> = (0..30)
+    const REC_LEN: usize = "text:".len() + 800; // 400 hex pairs
+    let n = MAX_SECTION_LEN / (REC_LEN + 1) + 2; // + the LF between records
+    let section_len = n * REC_LEN + (n - 1);
+    assert!(
+        section_len > MAX_SECTION_LEN,
+        "the fixture must exceed the cap to test anything: {section_len} vs {MAX_SECTION_LEN}"
+    );
+    // ...and it must stay INSIDE the region, or `bound` refuses it for the
+    // other reason and this stops being a section-cap test at all.
+    assert!(52 + section_len < 65_536, "still a section refusal, not a region one");
+    let recs: Vec<String> = (0..n)
         .map(|_| format!("text:{}", "61".repeat(400)))
         .collect();
     std::fs::write(&f, recs.join("\n")).unwrap();
     me().args(["sysw", "pack", "--no-passphrase", "--in"])
         .arg(&f)
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("too long"));
+        .code(4)
+        .stderr(predicate::str::contains(format!(
+            "a section caps at {MAX_SECTION_LEN} bytes"
+        )));
 }
 
 /// The property behind both, stated once: anything `pack` writes, `show` reads.
@@ -732,4 +754,51 @@ fn show_names_a_tx_record() {
         .stdout(predicate::str::contains("raw signed transaction"))
         .stdout(predicate::str::contains(MT_EVEN_TXID))
         .stdout(predicate::str::contains("222 bytes"));
+}
+
+/// GRAFT 1 — THE DELIVERY CEILING, end to end.
+///
+/// The cap that governs how much one payload can carry is
+/// `sysw::wire::MAX_SECTION_LEN`, raised here from 8191 to 32,734. This is the
+/// case the raise exists for and the case that failed before it: a public
+/// section of ~20 KB packs, and `show` reads back exactly what went in.
+///
+/// `text:` records are used because the cap is a CONTAINER fact — it counts
+/// bytes of section, not transactions — and a `text:` record is the cheapest
+/// honest way to occupy them.
+#[test]
+fn a_payload_past_the_old_8191_cap_packs_and_reads_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let recs_path = dir.path().join("recs.txt");
+    let out = dir.path().join("p.bin");
+
+    // 20 records of 1,005 bytes each, joined by LF: 20*1005 + 19 = 20,119.
+    let one = format!("text:{}", "6162636465".repeat(100)); // 5 + 1000 = 1005
+    assert_eq!(one.len(), 1005);
+    let n = 20;
+    let section_len = n * one.len() + (n - 1);
+    assert_eq!(section_len, 20_119);
+    assert!(
+        section_len > 8191,
+        "the test is vacuous unless the section is past the OLD cap"
+    );
+    let body = std::iter::repeat_n(one.as_str(), n).collect::<Vec<_>>().join("\n");
+    std::fs::write(&recs_path, &body).unwrap();
+
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--in",
+        recs_path.to_str().unwrap(),
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .assert()
+    .success();
+
+    me().args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(format!("pub_len:  {section_len}")));
 }
