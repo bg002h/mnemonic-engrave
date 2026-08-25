@@ -124,6 +124,23 @@ enum Command {
         iterations: u32,
     },
 
+    /// Turn a raw signed transaction into a `tx:` record for `me sysw pack`.
+    ///
+    /// Input is the transaction as HEX — the form `mt decode` and every wallet
+    /// export produces — from a file or stdin, never argv (a transaction is a
+    /// BEARER instrument; argv lands in shell history and /proc). The bytes
+    /// must parse as one serialized transaction; the record is printed to
+    /// stdout and a summary (txid, size) to stderr.
+    ///
+    /// The record feeds the device's QR engraving path: the QR carries the RAW
+    /// transaction bytes, which any ordinary scanner turns back into
+    /// broadcastable hex — no constellation knowledge needed.
+    Tx {
+        /// Read the transaction hex from this file instead of stdin.
+        #[arg(long, value_name = "FILE")]
+        r#in: Option<PathBuf>,
+    },
+
     /// Re-derive the §6.6 public-data hash from your own cards.
     ///
     /// No passphrase, no seal operation, no original file — so the expected
@@ -145,12 +162,18 @@ enum Command {
 enum SyswCmd {
     /// Build a systemwide container.
     ///
-    /// A record is a BIP-39 mnemonic, an md1/mk1/ms1 string, or one of the two
-    /// prefixed forms — and those two carry their bodies as LOWERCASE HEX.
+    /// A record is a BIP-39 mnemonic, an md1/mk1/ms1/mt1 string, or one of the
+    /// prefixed forms — which carry their bodies as LOWERCASE HEX.
     ///
     /// `text:<hex of the UTF-8 bytes>` is free text.
     ///
     /// `pass:<hex of the UTF-8 bytes>` is a BIP-39 passphrase.
+    ///
+    /// `tx:<hex of the raw signed transaction>` feeds the device's QR
+    /// engraving path — produce it with `me tx`, which checks the bytes parse.
+    ///
+    /// mt1 strings (from `mt encode`) feed its transaction TEXT plates; pack
+    /// the COMPLETE set, or the device will refuse to engrave it.
     ///
     /// To encode one: `printf '%s' 'correct horse battery staple' | xxd -p -c 256`
     ///
@@ -246,6 +269,9 @@ fn run() -> i32 {
 
     if let Some(Command::Sysw { cmd }) = &cli.command {
         return run_sysw(cmd);
+    }
+    if let Some(Command::Tx { r#in }) = &cli.command {
+        return run_tx_cli(r#in.as_ref());
     }
     if let Some(Command::Seal {
         payload,
@@ -575,6 +601,60 @@ fn run_seal_cli(
         out.display()
     );
     eprintln!("wipe:  picotool erase -r 0x10E00000 0x10E10000");
+    EXIT_OK
+}
+
+/// `me tx` — hex in, canonical `tx:` record out.
+fn run_tx_cli(in_path: Option<&PathBuf>) -> i32 {
+    use mnemonic_engrave::sysw::{record, tx};
+    let mut input = String::new();
+    if let Some(path) = in_path {
+        match std::fs::read_to_string(path) {
+            Ok(s) => input = s,
+            Err(e) => {
+                eprintln!("me: cannot read {}: {e}", path.display());
+                return EXIT_USAGE;
+            }
+        }
+    } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
+        eprintln!("me: cannot read stdin: {e}");
+        return EXIT_USAGE;
+    }
+    let hexstr: String = input.split_whitespace().collect::<String>().to_lowercase();
+    if hexstr.is_empty() {
+        eprintln!("me: no transaction hex given (pipe it in, or --in FILE)");
+        return EXIT_USAGE;
+    }
+    // `% 2 != 0`, not `is_multiple_of` — unstable on the Rust CI builds with
+    // (the same trap sysw/wire.rs records).
+    #[allow(clippy::manual_is_multiple_of)]
+    let odd = hexstr.len() % 2 != 0;
+    if odd || !hexstr.bytes().all(|b| b.is_ascii_hexdigit()) {
+        eprintln!("me: input is not hex");
+        return EXIT_INVALID;
+    }
+    let bytes: Vec<u8> = (0..hexstr.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hexstr[i..i + 2], 16).unwrap())
+        .collect();
+    let summary = match tx::parse(&bytes) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("me: not one serialized Bitcoin transaction: {e}");
+            return EXIT_INVALID;
+        }
+    };
+    // stderr gets the human summary; stdout is the record, pipeable straight
+    // into `me sysw pack --in`.
+    eprintln!(
+        "txid: {}\nsize: {} bytes, {} input(s), {} output(s){}",
+        summary.txid_display,
+        summary.size,
+        summary.inputs,
+        summary.outputs,
+        if summary.segwit { ", segwit" } else { "" }
+    );
+    println!("{}", record::encode_tx(&bytes));
     EXIT_OK
 }
 
@@ -1144,6 +1224,15 @@ fn report_unconfirmed(records: &[String]) {
              could not decode; the device will treat it as a SECRET"
         );
     }
+    // `[mt-decode]` — the same rule for mt1 chunk sets: incomplete, or the
+    // bytes do not parse as a transaction whose txid matches the set id.
+    for i in mnemonic_engrave::sysw::mt::mt_unconfirmed(records) {
+        eprintln!(
+            "me: record {i}, as given (records count from 0): an mt1 chunk whose set \
+             this tool could not confirm as one signed transaction; the device will \
+             treat it as a SECRET and refuse to engrave the set"
+        );
+    }
 }
 
 /// `me sysw show`: the same rule, stated per record, so the operator can see
@@ -1177,6 +1266,44 @@ fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header
             "confirmed"
         };
         println!("public record {i}: md1/mk1 — {state}");
+    }
+    print_mt_confirmation(&records);
+}
+
+/// `[mt-decode]` in `show`: per mt1 record, whether its chunk set confirmed —
+/// and per confirmed SET, the transaction it carries, because the txid is what
+/// the operator can check against `mt encode`'s own report.
+fn print_mt_confirmation(records: &[String]) {
+    use mnemonic_engrave::sysw;
+    use std::collections::BTreeMap;
+    let unconfirmed = sysw::mt::mt_unconfirmed(records);
+    let mut sets: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
+    for (i, r) in records.iter().enumerate() {
+        if sysw::classify(r) != sysw::record::Class::Mt {
+            continue;
+        }
+        let state = if unconfirmed.contains(&i) {
+            "unconfirmed — the device will treat it as a SECRET"
+        } else {
+            "confirmed"
+        };
+        println!("public record {i}: mt1 chunk — {state}");
+        if let Some(h) = sysw::mt::header(r) {
+            sets.entry(h.chunk_set_id).or_default().push(i);
+        }
+    }
+    for idxs in sets.values() {
+        let set: Vec<String> = idxs.iter().map(|&i| records[i].clone()).collect();
+        if let Some((_, t)) = sysw::mt::decode_confirmed(&set) {
+            println!(
+                "  mt set: txid {} — {} bytes, {} input(s), {} output(s), {} string(s)",
+                t.txid_display,
+                t.size,
+                t.inputs,
+                t.outputs,
+                set.len()
+            );
+        }
     }
 }
 
@@ -1270,11 +1397,17 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      (§5.3.1). Encode the body first:\n      \
                      printf '%s' 'your text here' | xxd -p -c 256"
                 ),
+                U::NotATransaction(e) => format!(
+                    "record {i} (records count from 0) begins `tx:` and its body is hex, \
+                     but the bytes are not one serialized Bitcoin transaction ({e}). The \
+                     prefix is RESERVED for a raw signed transaction — produce the record \
+                     with `me tx` rather than by hand"
+                ),
                 U::Unrecognised => format!(
                     "record {i} (records count from 0) is not a form this container can \
-                     place: not a BIP-39 mnemonic, not an md1/mk1/ms1 string, and not a \
-                     `text:`/`pass:` record. Descriptors and addresses are not yet \
-                     classifiable here — see sysw::classify"
+                     place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not \
+                     a `text:`/`pass:`/`tx:` record. Descriptors and addresses are not \
+                     yet classifiable here — see sysw::classify"
                 ),
             }
         }

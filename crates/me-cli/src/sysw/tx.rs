@@ -1,0 +1,344 @@
+//! Minimal structural parser for a serialized Bitcoin transaction, and its
+//! txid.
+//!
+//! Exists for TWO consumers, both in this container's mt handling:
+//!
+//! 1. `[mt-decode]` confirmation (`sysw::mt`): an `mt1` chunk set reassembles
+//!    to bytes with **no semantic decoder of its own** — any complete set of
+//!    BCH-valid strings "decodes", which is exactly the entropy-smuggling
+//!    channel `[mdmk-decode]` closes for md/mk with their real decoders. The
+//!    semantic arbiter mt has is this: the bytes must parse as a transaction,
+//!    and the set's 20-bit `chunk_set_id` must equal the top 20 bits of the
+//!    parsed transaction's display txid (SPEC_mt_v0_1 §10.13 c). A wrapped
+//!    32-byte seed fails the parse; a forged transaction with a random header
+//!    fails the txid binding at 1 in 2^20.
+//!
+//! 2. The `tx:` record class (`sysw::record::TX_PREFIX`): a raw signed
+//!    transaction delivered for QR engraving. Classification requires the body
+//!    to parse, so a payload cannot smuggle arbitrary bytes under the prefix.
+//!
+//! This is a STRUCTURAL parser only. It checks the serialization shape —
+//! version, inputs, outputs, optional BIP-144 witness section, locktime,
+//! nothing trailing — and computes the txid over the witness-stripped form.
+//! It validates no script, checks no signature, and does not judge whether
+//! the transaction is signed; `mt` owns those refusals at encode time.
+//!
+//! The Go port is `seedhammer.com/mt`'s `ParseTx`; the two are bound by the
+//! vectors in `mt-codec/src/test_vectors/mt1_v1.json`, whose `raw_hex`/`txid`
+//! pairs were produced by a real node.
+
+use sha2::{Digest, Sha256};
+
+/// What a structural parse learns. Everything a review screen needs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TxSummary {
+    /// The txid in DISPLAY form: byte-reversed, lowercase hex — the form a
+    /// user reads and the form `chunk_set_id` binds to.
+    pub txid_display: String,
+    /// Serialized length, witness included.
+    pub size: usize,
+    pub inputs: usize,
+    pub outputs: usize,
+    pub segwit: bool,
+}
+
+impl TxSummary {
+    /// The top 20 bits of the display txid — the value an `mt1` chunk set's
+    /// `chunk_set_id` must carry. First five hex characters, read as a number,
+    /// exactly as `mt-codec`'s `content_id_from_txid_display` reads them.
+    pub fn chunk_set_id(&self) -> u32 {
+        u32::from_str_radix(&self.txid_display[..5], 16).expect("txid is lowercase hex")
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TxError {
+    /// Ran out of bytes mid-field.
+    Truncated,
+    /// Parsed cleanly but bytes remain — this is not one transaction.
+    TrailingBytes,
+    /// A compactSize encoded non-canonically. Bitcoin Core's `ReadCompactSize`
+    /// rejects these, so accepting one here would admit bytes no node would.
+    NonCanonicalVarInt,
+    /// Zero inputs. (A zero first varint is how the segwit marker is
+    /// recognised; a zero input count WITH a valid marker is still refused.)
+    NoInputs,
+    NoOutputs,
+    /// Marker byte 0x00 not followed by flag 0x01 (BIP-144).
+    BadSegwitFlag,
+    /// A declared length larger than the buffer could ever satisfy.
+    LengthOverflow,
+}
+
+impl std::fmt::Display for TxError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            TxError::Truncated => "transaction truncated",
+            TxError::TrailingBytes => "trailing bytes after the transaction",
+            TxError::NonCanonicalVarInt => "non-canonical compactSize",
+            TxError::NoInputs => "transaction has no inputs",
+            TxError::NoOutputs => "transaction has no outputs",
+            TxError::BadSegwitFlag => "segwit marker without the 0x01 flag",
+            TxError::LengthOverflow => "declared length exceeds the data",
+        };
+        f.write_str(s)
+    }
+}
+
+struct Cursor<'a> {
+    buf: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Cursor<'a> {
+    fn take(&mut self, n: usize) -> Result<&'a [u8], TxError> {
+        // Checked against the REMAINDER, not `pos + n`, so a huge declared
+        // length cannot wrap the addition.
+        if n > self.buf.len() - self.pos {
+            return Err(TxError::Truncated);
+        }
+        let s = &self.buf[self.pos..self.pos + n];
+        self.pos += n;
+        Ok(s)
+    }
+
+    fn u8(&mut self) -> Result<u8, TxError> {
+        Ok(self.take(1)?[0])
+    }
+
+    /// Bitcoin compactSize, canonical form required.
+    fn varint(&mut self) -> Result<u64, TxError> {
+        let first = self.u8()?;
+        let v = match first {
+            0..=0xFC => u64::from(first),
+            0xFD => {
+                let b = self.take(2)?;
+                let v = u64::from(u16::from_le_bytes([b[0], b[1]]));
+                if v < 0xFD {
+                    return Err(TxError::NonCanonicalVarInt);
+                }
+                v
+            }
+            0xFE => {
+                let b = self.take(4)?;
+                let v = u64::from(u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
+                if v <= u64::from(u16::MAX) {
+                    return Err(TxError::NonCanonicalVarInt);
+                }
+                v
+            }
+            0xFF => {
+                let b = self.take(8)?;
+                let v = u64::from_le_bytes(b.try_into().unwrap());
+                if v <= u64::from(u32::MAX) {
+                    return Err(TxError::NonCanonicalVarInt);
+                }
+                v
+            }
+        };
+        Ok(v)
+    }
+
+    /// A count that will drive a loop. Bounded by what the buffer could hold
+    /// at ≥1 byte per element, so a hostile count cannot spin the parser.
+    fn count(&mut self) -> Result<usize, TxError> {
+        let v = self.varint()?;
+        if v > (self.buf.len() - self.pos) as u64 {
+            return Err(TxError::LengthOverflow);
+        }
+        Ok(v as usize)
+    }
+
+    /// A length-prefixed byte string (script, witness item), skipped.
+    fn skip_bytes(&mut self) -> Result<(), TxError> {
+        let n = self.varint()?;
+        if n > (self.buf.len() - self.pos) as u64 {
+            return Err(TxError::LengthOverflow);
+        }
+        self.take(n as usize)?;
+        Ok(())
+    }
+}
+
+/// Parse one serialized transaction. The WHOLE buffer must be consumed.
+pub fn parse(bytes: &[u8]) -> Result<TxSummary, TxError> {
+    let mut c = Cursor { buf: bytes, pos: 0 };
+    let version = c.take(4)?;
+
+    // BIP-144: a 0x00 where the input count belongs is the witness marker —
+    // unambiguous because a real input count of zero is invalid either way.
+    let mark = c.pos;
+    let mut segwit = false;
+    if c.u8()? == 0x00 {
+        if c.u8()? != 0x01 {
+            return Err(TxError::BadSegwitFlag);
+        }
+        segwit = true;
+    } else {
+        c.pos = mark;
+    }
+
+    // The witness-stripped span: everything from the input count through the
+    // last output. Recorded rather than re-serialized, so the txid is computed
+    // over bytes that provably came from the wire.
+    let core_start = c.pos;
+    let n_in = c.count()?;
+    if n_in == 0 {
+        return Err(TxError::NoInputs);
+    }
+    for _ in 0..n_in {
+        c.take(36)?; // outpoint: txid + vout
+        c.skip_bytes()?; // scriptSig
+        c.take(4)?; // sequence
+    }
+    let n_out = c.count()?;
+    if n_out == 0 {
+        return Err(TxError::NoOutputs);
+    }
+    for _ in 0..n_out {
+        c.take(8)?; // value
+        c.skip_bytes()?; // scriptPubKey
+    }
+    let core_end = c.pos;
+
+    if segwit {
+        for _ in 0..n_in {
+            let items = c.count()?;
+            for _ in 0..items {
+                c.skip_bytes()?;
+            }
+        }
+    }
+    let locktime = c.take(4)?;
+    if c.pos != bytes.len() {
+        return Err(TxError::TrailingBytes);
+    }
+
+    // txid = SHA256d(version ‖ inputs ‖ outputs ‖ locktime) — the
+    // witness-STRIPPED serialization (BIP-141), displayed byte-reversed.
+    let mut h = Sha256::new();
+    h.update(version);
+    h.update(&bytes[core_start..core_end]);
+    h.update(locktime);
+    let d1 = h.finalize();
+    let d2 = Sha256::digest(d1);
+    let txid_display: String = d2.iter().rev().map(|b| format!("{b:02x}")).collect();
+
+    Ok(TxSummary {
+        txid_display,
+        size: bytes.len(),
+        inputs: n_in,
+        outputs: n_out,
+        segwit,
+    })
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    /// The "even" vector from `mt-codec/src/test_vectors/mt1_v1.json` — a REAL
+    /// signed 1-in/2-out P2WPKH transaction, txid from the node that made it.
+    /// 222 bytes.
+    pub const EVEN_RAW_HEX: &str = "020000000001017c8da925af70e49a12b0cea7b639df5037c87b7fa61f262b86ac32c47aa3ba1a0000000000fdffffff02404b4c0000000000160014c1de0dd435d1d4ad97ed1f51d63f91c800cc4eab3ea1b92901000000160014751097c299d6354fbb2c5a84512dd708f2902f5e0247304402207debc7d89984c7717940b622504318d2c184966a618b32cf8b700d0f125b3ffa02206ef875f9c0b5931e0ea1cf0c109bdb8512835c8e51526f99b3419929a2ea7259012103718f5fd45b926226357e2b0400574b41a32d0bf0ae69a02eebea5fbc542ff52060000000";
+    pub const EVEN_TXID: &str = "2dcf2b973d52044b1e58c988a5a59d388073ff05598b0a1e93eeb04c72ebf630";
+
+    pub fn unhex(s: &str) -> Vec<u8> {
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn parses_a_real_signed_segwit_tx_and_reproduces_its_txid() {
+        let b = unhex(EVEN_RAW_HEX);
+        let t = parse(&b).unwrap();
+        assert_eq!(t.txid_display, EVEN_TXID);
+        assert_eq!((t.size, t.inputs, t.outputs, t.segwit), (222, 1, 2, true));
+        assert_eq!(t.chunk_set_id(), 0x2dcf2);
+    }
+
+    /// A legacy (pre-segwit) shape: txid == sha256d(whole serialization).
+    /// Hand-built: 1 input with an empty scriptSig, 1 output, so it parses but
+    /// is unsigned — this parser deliberately does not care.
+    #[test]
+    fn parses_a_legacy_tx() {
+        let mut b = vec![0x01, 0x00, 0x00, 0x00]; // version
+        b.push(0x01); // one input
+        b.extend_from_slice(&[0xAA; 36]); // outpoint
+        b.push(0x00); // empty scriptSig
+        b.extend_from_slice(&[0xFF; 4]); // sequence
+        b.push(0x01); // one output
+        b.extend_from_slice(&[0x00; 8]); // value
+        b.extend_from_slice(&[0x02, 0x51, 0x51]); // 2-byte script
+        b.extend_from_slice(&[0x00; 4]); // locktime
+        let t = parse(&b).unwrap();
+        assert!(!t.segwit);
+        assert_eq!((t.inputs, t.outputs), (1, 1));
+        // Legacy: the stripped form IS the wire form.
+        let d = Sha256::digest(Sha256::digest(&b));
+        let want: String = d.iter().rev().map(|x| format!("{x:02x}")).collect();
+        assert_eq!(t.txid_display, want);
+    }
+
+    #[test]
+    fn refuses_the_shapes_a_smuggler_or_a_scratch_produces() {
+        let good = unhex(EVEN_RAW_HEX);
+        // 32 bytes of entropy — the §5.3.2 smuggling case, now aimed at mt.
+        assert!(parse(&[0xAB; 32]).is_err());
+        // Truncated at every prefix length: never a panic, never an accept.
+        for n in 0..good.len() {
+            assert!(parse(&good[..n]).is_err(), "prefix of {n} bytes accepted");
+        }
+        // One trailing byte.
+        let mut long = good.clone();
+        long.push(0x00);
+        assert_eq!(parse(&long), Err(TxError::TrailingBytes));
+        // Marker without flag.
+        let mut bad = good.clone();
+        bad[5] = 0x02;
+        assert_eq!(parse(&bad), Err(TxError::BadSegwitFlag));
+        assert!(parse(&[]).is_err());
+    }
+
+    #[test]
+    fn refuses_zero_inputs_and_zero_outputs() {
+        // version + 0x00 0x01 (segwit) + zero input count.
+        let b = [0u8, 0, 0, 0, 0x00, 0x01, 0x00];
+        assert_eq!(parse(&b), Err(TxError::NoInputs));
+        let mut b = vec![0x01, 0x00, 0x00, 0x00, 0x01];
+        b.extend_from_slice(&[0xAA; 36]);
+        b.push(0x00);
+        b.extend_from_slice(&[0xFF; 4]);
+        b.push(0x00); // zero outputs
+        b.extend_from_slice(&[0x00; 4]);
+        assert_eq!(parse(&b), Err(TxError::NoOutputs));
+    }
+
+    #[test]
+    fn refuses_non_canonical_varints() {
+        // Input count as 0xFD 0x01 0x00 — the value 1 in the 3-byte form.
+        let mut b = vec![0x01, 0x00, 0x00, 0x00, 0xFD, 0x01, 0x00];
+        b.extend_from_slice(&[0xAA; 36]);
+        b.push(0x00);
+        b.extend_from_slice(&[0xFF; 4]);
+        b.push(0x01);
+        b.extend_from_slice(&[0x00; 8]);
+        b.push(0x00);
+        b.extend_from_slice(&[0x00; 4]);
+        assert_eq!(parse(&b), Err(TxError::NonCanonicalVarInt));
+    }
+
+    /// A hostile count cannot make the parser loop past the buffer: a declared
+    /// script length of u32::MAX against a 300-byte buffer is LengthOverflow,
+    /// not 4 GiB of takes.
+    #[test]
+    fn a_huge_declared_length_fails_fast() {
+        let mut b = vec![0x01, 0x00, 0x00, 0x00, 0x01];
+        b.extend_from_slice(&[0xAA; 36]);
+        b.extend_from_slice(&[0xFE, 0xFF, 0xFF, 0xFF, 0xFF]); // scriptSig len u32::MAX
+        b.extend_from_slice(&[0x00; 64]);
+        assert_eq!(parse(&b), Err(TxError::LengthOverflow));
+    }
+}

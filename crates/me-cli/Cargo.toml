@@ -35,6 +35,12 @@ sha2 = "0.10"
 bip39 = { version = "2.2", features = ["zeroize"] }
 rand = "0.9"
 ms-codec = "0.7"
+# The mt1 wire format -- the PRIMARY for everything sysw::mt converges on.
+# A path dependency because mt-codec lives in a private sibling repo
+# (mnemonic-transaction) and is unpublished; the layout is the constellation's
+# standard side-by-side checkout. A release build of `me` would need mt-codec
+# published or vendored -- recorded in IMPLEMENTATION_LOG_B.md.
+mt-codec = { path = "../../../mnemonic-transaction/crates/mt-codec" }
 rpassword = "7.5.4"
 
 [dev-dependencies]

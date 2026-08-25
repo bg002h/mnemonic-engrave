@@ -10,6 +10,8 @@ pub enum Format {
     Mk,
     /// ms1 — secret entropy (refused; never over RF).
     Ms,
+    /// mt1 — one chunk of a signed Bitcoin transaction (public; bearer).
+    Mt,
 }
 
 /// Why a string could not be classified.
@@ -28,7 +30,7 @@ impl std::fmt::Display for ClassifyError {
                 write!(f, "not a bech32 string (no '1' separator / empty HRP)")
             }
             ClassifyError::UnknownHrp(h) => {
-                write!(f, "unrecognized HRP '{h}' (expected md, mk, or ms)")
+                write!(f, "unrecognized HRP '{h}' (expected md, mk, ms, or mt)")
             }
         }
     }
@@ -47,6 +49,7 @@ pub fn classify(s: &str) -> Result<Format, ClassifyError> {
         "md" => Ok(Format::Md),
         "mk" => Ok(Format::Mk),
         "ms" => Ok(Format::Ms),
+        "mt" => Ok(Format::Mt),
         other => Err(ClassifyError::UnknownHrp(other.to_owned())),
     }
 }

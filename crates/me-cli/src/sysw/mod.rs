@@ -12,10 +12,12 @@
 
 pub mod coverage;
 pub mod identity;
+pub mod mt;
 pub mod overwrite;
 pub mod passphrase;
 pub mod pubhash;
 pub mod record;
+pub mod tx;
 pub mod vectors;
 pub mod wire;
 
@@ -95,10 +97,15 @@ pub enum SyswError {
 /// is named, and that is a compile-time constant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnknownReason {
-    /// A reserved prefix (`text:` / `pass:`) whose body is not lowercase hex.
-    /// The prefixes are RESERVED, so this is refused rather than demoted to
-    /// free text — see [`record`]'s module docs for why the bodies are encoded.
+    /// A reserved prefix (`text:` / `pass:` / `tx:`) whose body is not
+    /// lowercase hex. The prefixes are RESERVED, so this is refused rather
+    /// than demoted to free text — see [`record`]'s module docs for why the
+    /// bodies are encoded.
     NonHexBody(&'static str),
+    /// A `tx:` body that IS hex but does not parse as one serialized Bitcoin
+    /// transaction. Carries the structural reason — which names no operator
+    /// data, only a shape.
+    NotATransaction(tx::TxError),
     /// No reserved prefix, not a BIP-39 mnemonic, and not a constellation
     /// string. This is the case the descriptor/address gap belongs to.
     Unrecognised,
@@ -106,6 +113,17 @@ pub enum UnknownReason {
 
 /// Which reason applies, decided where the record is still in hand.
 fn unknown_reason(record: &str) -> UnknownReason {
+    if record.starts_with(record::TX_PREFIX) {
+        return match record::decode_body(record) {
+            Err(_) => UnknownReason::NonHexBody(record::TX_PREFIX),
+            Ok(b) => match tx::parse(&b) {
+                Err(e) => UnknownReason::NotATransaction(e),
+                // classify refused it, so the parse cannot succeed here; keep
+                // a total answer anyway rather than panic on a future skew.
+                Ok(_) => UnknownReason::Unrecognised,
+            },
+        };
+    }
     for prefix in [record::PASS_PREFIX, record::TEXT_PREFIX] {
         if record.starts_with(prefix) {
             return UnknownReason::NonHexBody(prefix);
@@ -123,6 +141,15 @@ fn unknown_reason(record: &str) -> UnknownReason {
 /// the failure is a named error at creation rather than a mis-filed secret.
 pub fn classify(record: &str) -> record::Class {
     use record::Class;
+    if record.starts_with(record::TX_PREFIX) {
+        // Reserved, like text:/pass: -- and admission requires the body to
+        // PARSE as a transaction, so the prefix cannot smuggle arbitrary
+        // bytes into a non-secret class.
+        return match record::decode_body(record) {
+            Ok(b) if tx::parse(&b).is_ok() => Class::Tx,
+            _ => Class::Unknown,
+        };
+    }
     if record.starts_with(record::PASS_PREFIX) {
         return if record::decode_body(record).is_ok() {
             Class::Passphrase
@@ -139,6 +166,11 @@ pub fn classify(record: &str) -> record::Class {
     }
     if bip39::Mnemonic::parse_normalized(record).is_ok() {
         return Class::Mnemonic;
+    }
+    // Before validate_record: mt1's HRP is unknown to seal's validator, and
+    // the strict check is self-contained.
+    if mt::valid_mt(record) {
+        return Class::Mt;
     }
     match crate::seal::record::validate_record(record) {
         Ok(crate::seal::record::RecordKind::Ms) => Class::Codex32Secret,

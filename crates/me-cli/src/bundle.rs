@@ -15,6 +15,10 @@ pub enum BundleError {
     Empty,
     /// An `ms1` line was present — refused before any further processing.
     RefusedSecret,
+    /// An `mt1` line was present. A signed transaction is not part of a wallet
+    /// backup bundle; it travels via `me sysw pack` (and the device's Engrave
+    /// Transaction program), where its chunk set is decode-confirmed.
+    RefusedTransaction,
     /// A line could not be classified by HRP.
     Classify(String, ClassifyError),
     /// A line failed per-string pristine validation.
@@ -57,6 +61,11 @@ impl std::fmt::Display for BundleError {
             // Codec error text is metadata-only EXCEPT mk-codec's InvalidHrp
             // (carries an input substring), which ValidateError's own Display
             // redacts before it reaches here.
+            BundleError::RefusedTransaction => write!(
+                f,
+                "mt1 is a signed TRANSACTION, not part of a wallet backup bundle — pack it \
+                 with `me sysw pack` for the device's Engrave Transaction program"
+            ),
             BundleError::Classify(_, e) => write!(f, "cannot classify input: {e}"),
             BundleError::Validate(_, e) => write!(f, "invalid input string: {e}"),
             BundleError::Mk1SingleString(_) => {
@@ -102,6 +111,9 @@ pub fn parse_line(s: &str) -> Result<Parsed, BundleError> {
     let fmt = classify::classify(s).map_err(|e| BundleError::Classify(s.to_string(), e))?;
     if fmt == Format::Ms {
         return Err(BundleError::RefusedSecret);
+    }
+    if fmt == Format::Mt {
+        return Err(BundleError::RefusedTransaction);
     }
     // Per-string PRISTINE validation BEFORE any reassembly (reuses the converter).
     validate::validate(fmt, s).map_err(|e| BundleError::Validate(s.to_string(), e))?;
@@ -172,6 +184,7 @@ pub fn parse_line(s: &str) -> Result<Parsed, BundleError> {
                 Err(e) => Err(BundleError::Md1HeaderRead(s.to_string(), e)),
             }
         }
+        Format::Mt => unreachable!("mt1 is refused above"),
         Format::Ms => unreachable!("ms1 refused above"),
     }
 }

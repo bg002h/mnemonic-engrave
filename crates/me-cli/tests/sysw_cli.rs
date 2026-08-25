@@ -595,3 +595,123 @@ fn show_states_confirmed_or_unconfirmed_beside_each_mdmk_record() {
         "a lone chunk of a declared set must read unconfirmed:\n{out}"
     );
 }
+
+// ─── mt1 + tx: records (the transaction-engraving payload path) ──────────────
+
+/// The "even" vector from mt-codec's pinned corpus: a real signed 222-byte
+/// transaction, 6 chunks, chunk_set_id 0x2dcf2.
+const MT_EVEN: [&str; 6] = [
+    "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax",
+    "mt1p9h8jqq9qqphgdqqqqqqqq0mllllupyqj6vqqqqqqqqzcqpfsw7ph2rt5w54kt768636cls8zxg0najlzunp",
+    "mt1p9h8jqq9qqzj8yqpnzw4vl2rwffqyqqqqqkqq282yyhc2vavd20hvk94pz39hts3u5s9a0qd8pwskxfl7ju5",
+    "mt1p9h8jqq9qqrqfrnq3qzyp77h37cnxzvwutegzmzy5zrrrfvrpykdfsckvk03dcq6rcjtvlsfcglv7zx43yaz",
+    "mt1p9h8jqq9qqylgpzqmhcwhuupdvnrc82rncvzzdahpgjsdwgu52jd7vmxsve9x3w5ujeqyssuvddxvwqze4ve",
+    "mt1p9h8jqq9qq9qdcc7h75twfxyf340c4sgqzhfdq6xtgt7zhxngpwa049l0z59l6jqcqqqqqq5k5y2ye5nv8yf",
+];
+const MT_EVEN_RAW_HEX: &str = "020000000001017c8da925af70e49a12b0cea7b639df5037c87b7fa61f262b86ac32c47aa3ba1a0000000000fdffffff02404b4c0000000000160014c1de0dd435d1d4ad97ed1f51d63f91c800cc4eab3ea1b92901000000160014751097c299d6354fbb2c5a84512dd708f2902f5e0247304402207debc7d89984c7717940b622504318d2c184966a618b32cf8b700d0f125b3ffa02206ef875f9c0b5931e0ea1cf0c109bdb8512835c8e51526f99b3419929a2ea7259012103718f5fd45b926226357e2b0400574b41a32d0bf0ae69a02eebea5fbc542ff52060000000";
+const MT_EVEN_TXID: &str = "2dcf2b973d52044b1e58c988a5a59d388073ff05598b0a1e93eeb04c72ebf630";
+
+/// A complete mt set packs plaintext with NO unconfirmed warnings, and `show`
+/// names the transaction it carries.
+#[test]
+fn pack_accepts_a_complete_mt_set_and_show_confirms_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    let mut args = vec!["sysw", "pack", "--no-passphrase", "--out"];
+    args.push(out.to_str().unwrap());
+    args.extend(MT_EVEN);
+    let a = me().args(&args).assert().success();
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+    assert!(
+        !err.contains("could not confirm"),
+        "a complete set must not warn: {err}"
+    );
+
+    let show = me()
+        .args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&show.get_output().stdout).to_string();
+    assert_eq!(stdout.matches("mt1 chunk — confirmed").count(), 6, "{stdout}");
+    assert!(stdout.contains(MT_EVEN_TXID), "{stdout}");
+    assert!(stdout.contains("222 bytes"), "{stdout}");
+}
+
+/// One chunk alone packs — nothing refuses (§13 D6's demotion applies to mt as
+/// to mdmk) — but pack WARNS and show reports it unconfirmed.
+#[test]
+fn pack_warns_on_an_incomplete_mt_set() {
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase", MT_EVEN[0]])
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+    assert!(
+        err.contains("record 0") && err.contains("could not confirm"),
+        "{err}"
+    );
+}
+
+/// `me tx` builds the record, and the record round-trips through pack + show.
+#[test]
+fn me_tx_builds_a_record_that_packs() {
+    let a = me()
+        .arg("tx")
+        .write_stdin(MT_EVEN_RAW_HEX)
+        .assert()
+        .success();
+    let record = String::from_utf8_lossy(&a.get_output().stdout)
+        .trim()
+        .to_string();
+    assert_eq!(record, format!("tx:{MT_EVEN_RAW_HEX}"));
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+    assert!(err.contains(MT_EVEN_TXID), "summary must name the txid: {err}");
+
+    me()
+        .args(["sysw", "pack", "--no-passphrase", &record])
+        .assert()
+        .success();
+}
+
+/// The tx: prefix is RESERVED: hex that is not a transaction is refused with
+/// the structural reason, and non-hex with the hex reason.
+#[test]
+fn pack_refuses_a_tx_record_that_is_not_a_transaction() {
+    me()
+        .args(["sysw", "pack", "--no-passphrase", "tx:abab"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not one serialized Bitcoin transaction"));
+    me()
+        .args(["sysw", "pack", "--no-passphrase", "tx:zz"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not lowercase hex"));
+}
+
+/// `me tx` refuses bytes that do not parse, at exit 4, naming the shape.
+#[test]
+fn me_tx_refuses_non_transactions() {
+    me()
+        .arg("tx")
+        .write_stdin("abababab")
+        .assert()
+        .code(4)
+        .stderr(predicate::str::contains("not one serialized Bitcoin transaction"));
+    me().arg("tx").write_stdin("zz").assert().code(4);
+    me().arg("tx").write_stdin("").assert().code(2);
+}
+
+/// A flipped character in an mt1 string is REFUSED at pack (exact validity,
+/// never correction), with the record's index named.
+#[test]
+fn pack_refuses_a_damaged_mt1_string() {
+    let mut bad = MT_EVEN[0].to_string();
+    bad.pop();
+    bad.push(if MT_EVEN[0].ends_with('x') { 'y' } else { 'x' });
+    me()
+        .args(["sysw", "pack", "--no-passphrase", &bad])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("record 0"));
+}

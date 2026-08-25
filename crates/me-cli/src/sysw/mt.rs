@@ -1,0 +1,285 @@
+//! `mt1` records in the systemwide container — classification and the
+//! `[mt-decode]` confirmation walk.
+//!
+//! An `mt1` string carries a chunk of an **already-signed Bitcoin
+//! transaction** (SPEC_mt_v0_1). It is a BEARER instrument — anyone holding
+//! the complete set can broadcast — but it is NOT a secret class here: the
+//! whole purpose of packing one is to engrave it in cleartext on steel, so
+//! flash holds nothing the plate will not. What IS carried over from the
+//! md/mk handling is the smuggling concern, and mt's version is worse:
+//! reassembly alone confirms nothing, because any complete set of BCH-valid
+//! strings "decodes" — there is no semantic decoder the way `md::Reassemble`
+//! is one. So confirmation here is:
+//!
+//!   1. the set is COMPLETE and reassembles (`mt_codec::pipeline::decode`),
+//!   2. the bytes PARSE as a serialized Bitcoin transaction ([`super::tx`]),
+//!   3. the set's `chunk_set_id` equals the top 20 bits of the parsed
+//!      transaction's display txid — the binding §10.13(c) of the mt spec
+//!      builds into the format.
+//!
+//! A wrapped 32-byte seed fails (2); a forged transaction with an unrelated
+//! header fails (3) at 1 in 2^20. An unconfirmed record counts as SECRET for
+//! flag evaluation, exactly as `[mdmk-decode]` records do.
+//!
+//! **Strictness relative to `mt-codec`.** Classification uses a strict
+//! verifier: exact BCH validity (no error correction) and consistent case.
+//! `mt-codec`'s decoder corrects up to t = 4 and lowercases blindly — right
+//! for hand-typed recovery, wrong for admitting a payload someone else wrote:
+//! a record needing correction would be engraved verbatim, correcting steel
+//! into carrying the damage. The device's `codex32.ValidMT` is the same
+//! strictness; Rust is primary and the Go port converges on THIS module.
+
+use mt_codec::consts::{CHECKSUM_SYMBOLS, HEADER_SYMBOLS, HRP, REGULAR_CODE_SYMBOLS_MAX};
+use mt_codec::string_layer::bch::{bch_verify_regular, ALPHABET};
+use mt_codec::string_layer::ChunkHeader;
+
+use super::tx;
+
+/// The shortest data part a structurally meaningful mt1 string can have:
+/// the 11-symbol header plus the 13-symbol checksum.
+const MIN_DATA_SYMBOLS: usize = HEADER_SYMBOLS + CHECKSUM_SYMBOLS;
+
+/// Strict validity: is this record an `mt1` string the device would admit?
+///
+/// Trims (matching `seal::record::validate_record`'s asymmetry note — the
+/// classifier trims everywhere in this container), refuses mixed case,
+/// requires exact BCH validity and a parseable header.
+pub fn valid_mt(record: &str) -> bool {
+    data_symbols(record).is_some()
+}
+
+/// The parsed header of a strictly-valid mt1 record.
+pub fn header(record: &str) -> Option<ChunkHeader> {
+    let syms = data_symbols(record)?;
+    ChunkHeader::from_symbols(&syms).ok()
+}
+
+/// Data-part symbols of a strictly-valid mt1 string, checksum included.
+/// `None` for anything that is not one.
+fn data_symbols(record: &str) -> Option<Vec<u8>> {
+    let t = record.trim();
+    // Consistent case only, like the device's codex32 engine: a mixed-case
+    // string is refused rather than normalised, because a payload is not a
+    // keyboard.
+    if !(t == t.to_ascii_lowercase() || t == t.to_ascii_uppercase()) {
+        return None;
+    }
+    let lower = t.to_ascii_lowercase();
+    let rest = lower.strip_prefix(HRP)?.strip_prefix('1')?;
+    if rest.len() < MIN_DATA_SYMBOLS || rest.len() > REGULAR_CODE_SYMBOLS_MAX {
+        return None;
+    }
+    let mut syms = Vec::with_capacity(rest.len());
+    for c in rest.bytes() {
+        let v = ALPHABET.iter().position(|&a| a == c)?;
+        syms.push(v as u8);
+    }
+    if !bch_verify_regular(HRP, &syms) {
+        return None;
+    }
+    // The header must parse (known version, index < count) or the record is
+    // not a chunk of anything.
+    ChunkHeader::from_symbols(&syms).ok()?;
+    Some(syms)
+}
+
+/// Indices of [`super::record::Class::Mt`] records that are NOT
+/// decode-confirmed — the `[mt-decode]` walk. Mirrors
+/// [`super::record::mdmk_unconfirmed`]'s contract exactly:
+///
+/// - grouped by `chunk_set_id` (every mt1 is chunked; there is no
+///   non-chunked form and therefore no `uniq` arm),
+/// - indices are into the CALLER'S slice, whatever else it holds,
+/// - nothing is refused — the caller flags, per §13 D6's demotion.
+pub fn mt_unconfirmed(records: &[String]) -> Vec<usize> {
+    use std::collections::BTreeMap;
+
+    let mut groups: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
+    let mut out: Vec<usize> = Vec::new();
+
+    for (i, r) in records.iter().enumerate() {
+        if super::classify(r) != super::record::Class::Mt {
+            continue;
+        }
+        match header(r) {
+            Some(h) => groups.entry(h.chunk_set_id).or_default().push(i),
+            // Fail closed. Unreachable today — classify and header run the
+            // same strict parse — but kept so a future classifier loosening
+            // cannot silently confirm what it cannot read.
+            None => out.push(i),
+        }
+    }
+
+    for (csid, idxs) in groups {
+        let set: Vec<String> = idxs.iter().map(|&i| records[i].clone()).collect();
+        if !set_confirmed(csid, &set) {
+            out.extend(idxs);
+        }
+    }
+    out.sort_unstable();
+    out
+}
+
+/// The three-step confirmation. `csid` is the group key every member carries.
+fn set_confirmed(csid: u32, set: &[String]) -> bool {
+    let Ok(decoded) = mt_codec::pipeline::decode(set) else {
+        return false;
+    };
+    // Strictly-valid strings never need correction; a decode that used the
+    // correction budget means the walk was handed something classify did not
+    // admit. Refuse rather than trust it.
+    if decoded.chunks.iter().any(|c| c.corrected != 0) || !decoded.unreadable.is_empty() {
+        return false;
+    }
+    let Ok(summary) = tx::parse(&decoded.bytes) else {
+        return false;
+    };
+    summary.chunk_set_id() == csid
+}
+
+/// Decode a confirmed set to `(transaction bytes, summary)` — what the host's
+/// `show` prints and the device's review screen displays. `None` exactly when
+/// [`mt_unconfirmed`] would report the set.
+pub fn decode_confirmed(set: &[String]) -> Option<(Vec<u8>, tx::TxSummary)> {
+    let decoded = mt_codec::pipeline::decode(set).ok()?;
+    if decoded.chunks.iter().any(|c| c.corrected != 0) || !decoded.unreadable.is_empty() {
+        return None;
+    }
+    let summary = tx::parse(&decoded.bytes).ok()?;
+    if summary.chunk_set_id() != decoded.chunks.first()?.header.chunk_set_id {
+        return None;
+    }
+    Some((decoded.bytes, summary))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sysw::record::Class;
+
+    /// The "even" vector from mt-codec's pinned corpus
+    /// (`src/test_vectors/mt1_v1.json`): a real signed 222-byte transaction,
+    /// 6 chunks of 37 bytes, chunk_set_id 0x2dcf2. Strings VERBATIM from the
+    /// corpus, which `scripts/gen-mt1-vectors.py` produced independently of
+    /// mt-codec — so this fixture can falsify the encoder it is checked
+    /// against below.
+    const EVEN: [&str; 6] = [
+        "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax",
+        "mt1p9h8jqq9qqphgdqqqqqqqq0mllllupyqj6vqqqqqqqqzcqpfsw7ph2rt5w54kt768636cls8zxg0najlzunp",
+        "mt1p9h8jqq9qqzj8yqpnzw4vl2rwffqyqqqqqkqq282yyhc2vavd20hvk94pz39hts3u5s9a0qd8pwskxfl7ju5",
+        "mt1p9h8jqq9qqrqfrnq3qzyp77h37cnxzvwutegzmzy5zrrrfvrpykdfsckvk03dcq6rcjtvlsfcglv7zx43yaz",
+        "mt1p9h8jqq9qqylgpzqmhcwhuupdvnrc82rncvzzdahpgjsdwgu52jd7vmxsve9x3w5ujeqyssuvddxvwqze4ve",
+        "mt1p9h8jqq9qq9qdcc7h75twfxyf340c4sgqzhfdq6xtgt7zhxngpwa049l0z59l6jqcqqqqqq5k5y2ye5nv8yf",
+    ];
+
+    /// The pinned set, cross-checked against a fresh encode of the vector's
+    /// raw bytes so the two can never drift apart silently.
+    fn even_set() -> Vec<String> {
+        let bytes = crate::sysw::tx::tests::unhex(crate::sysw::tx::tests::EVEN_RAW_HEX);
+        let set = mt_codec::pipeline::encode(&bytes, crate::sysw::tx::tests::EVEN_TXID).unwrap();
+        assert_eq!(set, EVEN.map(String::from).to_vec(), "encoder diverges from the pinned vector");
+        set
+    }
+
+    #[test]
+    fn a_real_mt1_string_is_strictly_valid_and_classified() {
+        for s in &even_set() {
+            assert!(valid_mt(s), "{s}");
+            assert_eq!(crate::sysw::classify(s), Class::Mt);
+        }
+        // Uppercase consistently: valid. Mixed: refused.
+        let up = even_set()[0].to_ascii_uppercase();
+        assert!(valid_mt(&up));
+        let mut mixed = even_set()[0].clone();
+        mixed.replace_range(0..1, "M");
+        assert!(!valid_mt(&mixed), "mixed case must be refused");
+    }
+
+    #[test]
+    fn one_flipped_character_is_not_corrected_into_validity() {
+        let s = &even_set()[0];
+        let flipped = format!(
+            "{}{}",
+            &s[..s.len() - 1],
+            if s.ends_with('x') { 'y' } else { 'x' }
+        );
+        assert!(
+            !valid_mt(&flipped),
+            "classification must be exact BCH validity, never correction"
+        );
+        assert_eq!(crate::sysw::classify(&flipped), Class::Unknown);
+    }
+
+    #[test]
+    fn the_complete_set_is_confirmed_and_partial_sets_are_not() {
+        let set = even_set();
+        assert_eq!(mt_unconfirmed(&set), Vec::<usize>::new());
+        // Any one chunk missing: every remaining member is unconfirmed.
+        let partial: Vec<String> = set[..5].to_vec();
+        assert_eq!(mt_unconfirmed(&partial), vec![0, 1, 2, 3, 4]);
+        // A single chunk alone.
+        assert_eq!(mt_unconfirmed(&set[..1]), vec![0]);
+    }
+
+    #[test]
+    fn indices_are_into_the_callers_list_not_a_filtered_one() {
+        let set = even_set();
+        let mixed = vec![
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string(),
+            set[0].clone(),
+        ];
+        assert_eq!(mt_unconfirmed(&mixed), vec![1]);
+    }
+
+    /// The smuggling arm this module exists for: bytes that reassemble but do
+    /// not PARSE. Encode 32 bytes of entropy as a (BCH-valid, complete,
+    /// 1-chunk) mt1 set — reassembly succeeds, tx::parse refuses, unconfirmed.
+    #[test]
+    fn entropy_wrapped_as_a_complete_mt_set_is_unconfirmed() {
+        let set = mt_codec::pipeline::encode(&[0xAB; 32], "deadbeef00").unwrap();
+        assert_eq!(set.len(), 1, "32 bytes is one chunk");
+        assert_eq!(crate::sysw::classify(&set[0]), Class::Mt);
+        assert_eq!(mt_unconfirmed(&set), vec![0]);
+    }
+
+    /// The forgery arm: a REAL transaction encoded under the WRONG
+    /// chunk_set_id. Reassembles, parses — and fails the txid binding.
+    #[test]
+    fn a_real_tx_under_a_foreign_set_id_is_unconfirmed() {
+        let bytes = crate::sysw::tx::tests::unhex(crate::sysw::tx::tests::EVEN_RAW_HEX);
+        let forged = mt_codec::pipeline::encode(&bytes, "00000feed").unwrap();
+        assert_eq!(forged.len(), 6);
+        assert_eq!(mt_unconfirmed(&forged), vec![0, 1, 2, 3, 4, 5]);
+    }
+
+    /// Two sets in one payload are grouped apart by chunk_set_id: the complete
+    /// one confirms beside the lone stranger.
+    #[test]
+    fn grouping_is_by_chunk_set_id() {
+        let mut records = even_set();
+        let stranger = mt_codec::pipeline::encode(&[0x01; 80], "fffff00000").unwrap();
+        assert!(stranger.len() >= 2);
+        records.push(stranger[0].clone());
+        assert_eq!(mt_unconfirmed(&records), vec![6]);
+    }
+
+    #[test]
+    fn decode_confirmed_returns_the_bytes_and_the_summary() {
+        let set = even_set();
+        let (bytes, summary) = decode_confirmed(&set).unwrap();
+        assert_eq!(
+            bytes,
+            crate::sysw::tx::tests::unhex(crate::sysw::tx::tests::EVEN_RAW_HEX)
+        );
+        assert_eq!(summary.txid_display, crate::sysw::tx::tests::EVEN_TXID);
+        assert!(decode_confirmed(&set[..5]).is_none());
+    }
+
+    #[test]
+    fn mt_is_not_a_secret_class() {
+        // The plate is cleartext by design; flash holds nothing the steel will
+        // not. Bearer-ness is a MESSAGING posture (mt-cli's), not a secrecy
+        // class — but an UNCONFIRMED record still reads as secret via flags.
+        assert!(!Class::Mt.is_secret());
+    }
+}

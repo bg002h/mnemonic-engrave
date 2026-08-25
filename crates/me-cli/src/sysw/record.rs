@@ -26,6 +26,11 @@ use zeroize::Zeroizing;
 /// free text, which would let a malformed record become an engraved plate.
 pub const TEXT_PREFIX: &str = "text:";
 pub const PASS_PREFIX: &str = "pass:";
+/// A raw signed Bitcoin transaction, lowercase hex, for QR engraving. The body
+/// must both decode as hex AND parse as a serialized transaction
+/// ([`crate::sysw::tx`]) -- the prefix is reserved either way, so a body that
+/// fails either check is [`Class::Unknown`], never demoted to free text.
+pub const TX_PREFIX: &str = "tx:";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Class {
@@ -35,6 +40,16 @@ pub enum Class {
     FreeText,
     Descriptor,
     MdMk,
+    /// One chunk of an `mt1` signed-transaction set (SPEC_mt_v0_1). Not
+    /// secret: the record exists to be engraved in cleartext, so flash holds
+    /// nothing the steel will not. An UNCONFIRMED one still reads as secret
+    /// through `[mt-decode]` (`sysw::mt::mt_unconfirmed`), mirroring
+    /// `[mdmk-decode]`.
+    Mt,
+    /// A `tx:`-prefixed raw signed transaction, for QR plates. Same secrecy
+    /// reasoning as [`Class::Mt`]; classification already proved it parses,
+    /// so no confirmation walk exists for it.
+    Tx,
     Address,
     Unknown,
 }
@@ -83,8 +98,16 @@ pub fn decode_body(record: &str) -> Result<Zeroizing<Vec<u8>>, RecordError> {
     let body = record
         .strip_prefix(TEXT_PREFIX)
         .or_else(|| record.strip_prefix(PASS_PREFIX))
+        .or_else(|| record.strip_prefix(TX_PREFIX))
         .ok_or(RecordError::NotEncoded)?;
     unhex_lower(body).ok_or(RecordError::BadHex)
+}
+
+/// Encode a raw signed transaction as a canonical `tx:` record. The caller is
+/// expected to have parsed it first (`me tx` does); packing re-checks via
+/// `classify`.
+pub fn encode_tx(bytes: &[u8]) -> String {
+    format!("{TX_PREFIX}{}", hex_lower(bytes))
 }
 
 /// Decode to a `String`, for the consumers that need text rather than bytes.

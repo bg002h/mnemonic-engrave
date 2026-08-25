@@ -142,6 +142,11 @@ pub fn validate_record(s: &str) -> Result<RecordKind, RecordError> {
             }
             Ok(RecordKind::Mk)
         }
+        Format::Mt => Err(RecordError::Invalid(
+            "mt1 records belong to the systemwide container (`me sysw pack`), not the \
+             frozen sealed payload"
+                .into(),
+        )),
         Format::Ms => {
             // §10.2.1a, and it MUST run BEFORE `ms_codec::decode`. The crate's
             // own length gate fires first otherwise, and it reports

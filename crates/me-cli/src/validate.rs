@@ -10,6 +10,10 @@ pub enum ValidateError {
     Md(md_codec::Error),
     /// mk1 string failed `mk_codec` per-string checks.
     Mk(mk_codec::Error),
+    /// mt1 string failed the strict check (exact BCH validity, consistent
+    /// case, parseable header) -- `sysw::mt::valid_mt`. Correction is never
+    /// applied: the converter engraves/transmits verbatim.
+    Mt,
     /// mk1 string was not pristine — `decode_string` had to BCH-correct N
     /// symbol(s). We refuse non-pristine input rather than engrave a string
     /// that needed repair (the converter engraves the input verbatim).
@@ -37,6 +41,11 @@ impl std::fmt::Display for ValidateError {
                 write!(f, "invalid mk1 string: invalid or missing HRP")
             }
             ValidateError::Mk(e) => write!(f, "invalid mk1 string: {e}"),
+            ValidateError::Mt => write!(
+                f,
+                "invalid mt1 string: not exactly BCH-valid (no correction is applied -- the \
+                 string travels verbatim), or its header does not parse"
+            ),
             ValidateError::MkCorrected(n) => write!(
                 f,
                 "mk1 string is not pristine: it required {n} BCH correction(s) — fix the input \
@@ -96,6 +105,13 @@ pub fn validate(fmt: Format, s: &str) -> Result<(), ValidateError> {
                 return Err(ValidateError::MkCorrected(decoded.corrections_applied));
             }
             Ok(())
+        }
+        Format::Mt => {
+            if crate::sysw::mt::valid_mt(s) {
+                Ok(())
+            } else {
+                Err(ValidateError::Mt)
+            }
         }
         Format::Ms => unreachable!("ms1 is refused before validation"),
     }

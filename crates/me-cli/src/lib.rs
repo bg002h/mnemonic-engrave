@@ -1,5 +1,6 @@
-//! `mnemonic-engrave` (`me`) — converts public constellation strings (md1/mk1)
-//! into NFC NDEF payloads for SeedHammer II. Refuses the secret ms1.
+//! `mnemonic-engrave` (`me`) — converts public constellation strings
+//! (md1/mk1/mt1) into NFC NDEF payloads for SeedHammer II. Refuses the secret
+//! ms1.
 
 pub mod bundle;
 pub mod classify;
@@ -154,6 +155,24 @@ mod tests {
     fn converts_md1_to_ndef() {
         let bytes = convert(MD1_VALID).unwrap();
         assert_eq!(ndef::decode_text_tlv(&bytes).as_deref(), Some(MD1_VALID));
+    }
+
+    /// An mt1 string (from mt-codec's pinned "even" vector) converts to NDEF
+    /// for single-string NFC delivery, exactly as md1/mk1 do; a damaged one is
+    /// refused rather than corrected, because the converter transmits verbatim.
+    #[test]
+    fn converts_mt1_to_ndef_and_refuses_damage() {
+        const MT1: &str =
+            "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax";
+        let bytes = convert(MT1).unwrap();
+        assert_eq!(ndef::decode_text_tlv(&bytes).as_deref(), Some(MT1));
+        let mut bad = MT1.to_string();
+        bad.pop();
+        bad.push('y');
+        assert!(matches!(
+            convert(&bad),
+            Err(ConvertError::Validate(validate::ValidateError::Mt))
+        ));
     }
 
     #[test]
