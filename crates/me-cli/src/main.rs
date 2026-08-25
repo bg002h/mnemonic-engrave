@@ -1294,6 +1294,20 @@ fn print_mt_confirmation(records: &[String]) {
             sets.entry(h.chunk_set_id).or_default().push(i);
         }
     }
+    for (i, r) in records.iter().enumerate() {
+        if sysw::classify(r) != sysw::record::Class::Tx {
+            continue;
+        }
+        // Classification already proved the parse; re-derive for the report.
+        if let Ok(b) = sysw::record::decode_body(r) {
+            if let Ok(t) = sysw::tx::parse(&b) {
+                println!(
+                    "public record {i}: raw signed transaction — txid {}, {} bytes",
+                    t.txid_display, t.size
+                );
+            }
+        }
+    }
     for idxs in sets.values() {
         let set: Vec<String> = idxs.iter().map(|&i| records[i].clone()).collect();
         if let Some((_, t)) = sysw::mt::decode_confirmed(&set) {

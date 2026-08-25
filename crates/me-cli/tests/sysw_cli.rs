@@ -715,3 +715,21 @@ fn pack_refuses_a_damaged_mt1_string() {
         .failure()
         .stderr(predicate::str::contains("record 0"));
 }
+
+/// `show` names a tx: record as what it is, with its txid — the value the
+/// operator compares against `me tx`'s own report.
+#[test]
+fn show_names_a_tx_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    let rec = format!("tx:{MT_EVEN_RAW_HEX}");
+    me().args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap(), &rec])
+        .assert()
+        .success();
+    me().args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("raw signed transaction"))
+        .stdout(predicate::str::contains(MT_EVEN_TXID))
+        .stdout(predicate::str::contains("222 bytes"));
+}
