@@ -1,3 +1,29 @@
+> # SUPERSEDED — RETIRED 2026-08-25. DO NOT BUILD FROM THIS DOCUMENT.
+>
+> **The normative surface is now `design/ACCEPTANCE_engrave_transaction.md`**,
+> with `design/FORWARD_PLAN_post_experiment.md` for the phase sequence and
+> `design/SPEC_engrave_transaction.md` for the requirements themselves.
+>
+> This plan specifies the **`MTX1` record framing** — a 75-byte header carrying a
+> magic, a version, a form byte, a txid, a **`wtxid`** and a flags byte. **None of
+> it shipped.** The experiment (`design/EXPERIMENT_plan_vs_brief_2026-08-25.md`)
+> selected the brief-driven arm, which carries transactions as two record classes
+> inside the *existing* `sysw` container (`mt1` bare records, and `tx:<hex>`) with
+> no new framing at all. Measured against the shipped tree: `MTX1` occurs in
+> **0** source files in either repo, and `wtxid` — which this document names
+> **72** times — occurs in exactly one place, the doc comment in
+> `crates/me-cli/src/sysw/tx.rs` that explains why it was **retired rather than
+> implemented**. It is replaced by the per-input signature predicate ruled in
+> `FORWARD_PLAN_post_experiment.md` §3 and implemented as
+> `every_input_signed` (`crates/me-cli/src/sysw/tx.rs`), which catches strictly
+> more.
+>
+> It is **kept in git, unshrunk and unedited below this marker**, deliberately:
+> the ~600 lines an implementer would still find useful all describe `MTX1`, so
+> shrinking it would produce a shorter document that is still about a format that
+> does not exist. Its sixteen review reports stay in `design/agent-reports/`.
+> Read it as archaeology — never as instructions.
+
 # IMPLEMENTATION PLAN — P1: `me`'s transaction container
 
 **Status:** DRAFT v14, pre-R0. **Round 9 returned 4C / 7I / 8M on v13**, and its
