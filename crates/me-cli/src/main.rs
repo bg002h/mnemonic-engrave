@@ -1980,7 +1980,11 @@ fn read_records(
                 let example = if by_prefix || class.is_bearer() {
                     "    mt encode --qr --in tx.hex | me sysw pack --out p.bin"
                 } else {
-                    "    ms encode --in seed.txt | me sysw pack --out p.bin"
+                    // `ms encode --in` DOES NOT EXIST (exit 64) -- caught by the
+                    // R0 fold. `--phrase -` is ms's shipped stdin idiom and is
+                    // verified to pipe into pack. Advice for a flag that is not
+                    // there is worse than no advice.
+                    "    ms encode --phrase - < seed.txt | me sysw pack --out p.bin"
                 };
                 let (what, why) = if by_prefix || class == Class::Tx {
                     ("a `tx:` record", "A raw signed transaction is a BEARER instrument -- anyone who can read it can broadcast it")
