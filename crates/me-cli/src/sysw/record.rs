@@ -90,6 +90,21 @@ impl Class {
         matches!(self, Class::Mt | Class::Tx)
     }
 
+    /// What must never cross a public channel — `/proc/<pid>/cmdline`, `ps`, or
+    /// a shell history file that outlives the machine.
+    ///
+    /// **RULED 2026-08-26:** *"we want uniform behavior with secret bearing
+    /// between ms1 and passwords and mt1 to the extent we can."* Before that,
+    /// the argv gate refused a `tx:` record and an `mt1` string while accepting
+    /// a BIP-39 mnemonic, an `ms1` string and a `pass:` record at exit 0 in
+    /// silence — it refused a TRANSACTION and accepted a SEED PHRASE.
+    ///
+    /// Secret and bearer differ in kind — one is key material, the other an
+    /// already-signed instrument — but at a public channel they are the same
+    /// problem, so they get the same answer.
+    pub fn is_argv_forbidden(self) -> bool {
+        self.is_secret() || self.is_bearer()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

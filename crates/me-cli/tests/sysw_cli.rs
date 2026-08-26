@@ -103,7 +103,8 @@ fn show_prints_the_same_digest_pack_did() {
 /// non-zero exit here would be re-imposing the demoted rule.
 #[test]
 fn a_weak_passphrase_over_a_secret_warns_and_still_succeeds() {
-    me().args(["sysw", "pack", "--passphrase-words", "2", SEED])
+    me().args(["sysw", "pack", "--passphrase-words", "2"])
+        .write_stdin(SEED)
         .assert()
         .success()
         .stderr(predicate::str::contains("WARNING"))
@@ -127,7 +128,8 @@ fn omitting_every_passphrase_flag_generates_one() {
     // the one carrying secret material. A payload of public cards is now
     // deliberately cleartext, which
     // `a_payload_with_no_secret_record_is_not_sealed_by_default` pins.
-    me().args(["sysw", "pack", SEED])
+    me().args(["sysw", "pack"])
+        .write_stdin(SEED)
         .assert()
         .success()
         .stderr(predicate::str::contains("write this down"))
@@ -173,7 +175,8 @@ fn a_wrong_file_is_not_reported_as_tampering() {
 fn a_secrets_only_payload_reports_no_digest() {
     let dir = tempfile::tempdir().unwrap();
     let f = dir.path().join("s.bin");
-    me().args(["sysw", "pack", "--passphrase-words", "12", SEED, "--out"])
+    me().args(["sysw", "pack", "--passphrase-words", "12", "--out"])
+        .write_stdin(SEED)
         .arg(&f)
         .assert()
         .success();
@@ -261,7 +264,8 @@ fn region_and_container_have_the_same_digest_and_identity() {
 #[test]
 fn region_works_for_a_sealed_payload_too() {
     let out = me()
-        .args(["sysw", "pack", "--region", "--passphrase-words", "12", SEED])
+        .args(["sysw", "pack", "--region", "--passphrase-words", "12"])
+            .write_stdin(SEED)
         .assert()
         .success();
     assert_eq!(out.get_output().stdout.len(), 65_536);
@@ -285,6 +289,7 @@ fn pack_refuses_iterations_its_own_parser_would_reject() {
             n,
             "--passphrase-words",
             "12",
+            "--allow-argv-secret",
             SEED,
         ])
         .assert()
@@ -303,6 +308,7 @@ fn pack_accepts_the_iteration_bounds_themselves() {
             n,
             "--passphrase-words",
             "12",
+            "--allow-argv-secret",
             SEED,
         ])
         .assert()
@@ -354,8 +360,8 @@ fn everything_pack_emits_is_readable_by_show() {
     for (i, args) in [
         vec!["--no-passphrase", TEXT],
         vec!["--no-passphrase", MD1],
-        vec!["--passphrase-words", "12", SEED],
-        vec!["--iterations", "100000", "--passphrase-words", "2", SEED],
+        vec!["--passphrase-words", "12", "--allow-argv-secret", SEED],
+        vec!["--iterations", "100000", "--passphrase-words", "2", "--allow-argv-secret", SEED],
     ]
     .iter()
     .enumerate()
@@ -556,8 +562,13 @@ fn pack_warns_once_per_unconfirmed_record_and_still_succeeds() {
 /// md1/mk1 records — R1-I2. With a seed first, the same card is record 1.
 #[test]
 fn the_warning_names_the_record_the_operator_passed() {
+    // BOTH records through the SAME channel, in order. This test is about the
+    // INDEX the warning names -- record 1, not record 0 -- so splitting them
+    // across argv and stdin would silently reduce it to a one-record run
+    // (argv wins over stdin) and the assertion would be vacuous.
     let out = me()
-        .args(["sysw", "pack", "--no-passphrase", SEED, MD1])
+        .args(["sysw", "pack", "--no-passphrase"])
+        .write_stdin(format!("{SEED}\n{MD1}"))
         .assert()
         .success();
     let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
@@ -1307,7 +1318,8 @@ fn a_payload_with_no_secret_record_is_not_sealed_by_default() {
 fn a_payload_holding_secret_material_is_still_sealed_by_default() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.bin");
-    me().args(["sysw", "pack", "--out", out.to_str().unwrap(), SEED])
+    me().args(["sysw", "pack", "--out", out.to_str().unwrap()])
+        .write_stdin(SEED)
         .assert()
         .success()
         .stderr(predicate::str::contains("write this down"));
@@ -1327,9 +1339,9 @@ fn pack_states_which_way_sealing_went_and_why_every_time() {
     // flag-unsealed, flag-sealed.
     let cases: [(Vec<&str>, &str, &str); 5] = [
         (vec![MD1], "NOT SEALED", "no record"),
-        (vec![SEED], "SEALED", "secret material"),
-        (vec!["--no-passphrase", SEED], "NOT SEALED", "--no-passphrase"),
-        (vec!["--passphrase-words", "4", SEED], "SEALED", "--passphrase-words"),
+        (vec!["--allow-argv-secret", SEED], "SEALED", "secret material"),
+        (vec!["--no-passphrase", "--allow-argv-secret", SEED], "NOT SEALED", "--no-passphrase"),
+        (vec!["--passphrase-words", "4", "--allow-argv-secret", SEED], "SEALED", "--passphrase-words"),
         // The flag CANNOT seal a payload with nothing secret in it, and the
         // line must say so rather than claim a protection that does not exist.
         (vec!["--passphrase-words", "4", MD1], "NOT SEALED", "IGNORED"),
@@ -1371,7 +1383,7 @@ fn the_sealed_and_unsealed_lines_are_two_sentences() {
     let a = dir.path().join("a.bin");
     let b = dir.path().join("b.bin");
     let unsealed = grab(&["sysw", "pack", "--out", a.to_str().unwrap(), MD1]);
-    let sealed = grab(&["sysw", "pack", "--out", b.to_str().unwrap(), SEED]);
+    let sealed = grab(&["sysw", "pack", "--out", b.to_str().unwrap(), "--allow-argv-secret", SEED]);
     assert!(!unsealed.is_empty() && !sealed.is_empty(), "{unsealed:?} {sealed:?}");
     assert_ne!(unsealed, sealed);
     assert!(unsealed.contains("NOT SEALED"), "{unsealed}");
@@ -1411,10 +1423,10 @@ fn a_transaction_payload_packs_unsealed_with_no_flags() {
 fn what_pack_says_about_sealing_is_what_show_reads_back() {
     let cases: [Vec<&str>; 6] = [
         vec![MD1],
-        vec![SEED],
+        vec!["--allow-argv-secret", SEED],
         vec![TEXT, MD1],
-        vec!["--no-passphrase", SEED],
-        vec!["--passphrase-words", "4", SEED],
+        vec!["--no-passphrase", "--allow-argv-secret", SEED],
+        vec!["--passphrase-words", "4", "--allow-argv-secret", SEED],
         vec!["--passphrase-words", "4", MD1],
     ];
     for extra in cases {
@@ -1772,7 +1784,7 @@ fn an_admissible_record_still_gets_its_passphrase_ceremony() {
     let a = me()
         .args(["sysw", "pack", "--passphrase-words", "12", "--out"])
         .arg(&out)
-        .arg(SEED)
+        .write_stdin(SEED)
         .assert()
         .success();
     let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
@@ -1988,27 +2000,91 @@ fn argv_refuses_every_bearer_class() {
     }
 }
 
-/// **PINNED GAP, not an endorsement.** Secret-class records — a BIP-39 mnemonic,
-/// an `ms1` string, a `pass:` record — are still ACCEPTED on argv today, at exit
-/// 0, in silence. That is arguably worse than the bearer hole this commit
-/// closed: a seed phrase spends everything, forever.
+/// **RULED 2026-08-26 — secret and bearer classes behave THE SAME on argv.**
 ///
-/// It is not fixed here because refusing it is the same decision as the
-/// CLI-uniformity spec's D3 (refuse, with an override), it breaks 13 shipped
-/// invocations in this repo's own tests, and it is the operator's ruling to
-/// make. This test asserts the CURRENT shape so the change is deliberate: when
-/// the ruling lands, this test flips, and its failure is the reminder.
+/// Operator: *"we want uniform behavior with secret bearing between ms1 and
+/// passwords and mt1 to the extent we can."* Before this, `me sysw pack`
+/// refused a `tx:` record and an `mt1` string on argv while accepting, at exit
+/// 0 in silence, a BIP-39 mnemonic, an `ms1` string and a `pass:` record — so
+/// it refused a TRANSACTION and accepted a SEED PHRASE.
+///
+/// `--allow-argv-secret` is the escape hatch, and it is what makes the refusal
+/// fair on a single-user air-gapped box or an amnesic Tails session where the
+/// argv threat model does not bite. It is greppable in a script, so a reviewer
+/// can find it.
 #[test]
-fn argv_still_accepts_secret_classes_which_is_the_open_gap() {
+fn argv_refuses_every_secret_class_too() {
     let dir = tempfile::tempdir().unwrap();
-    let out = dir.path().join("seed.bin");
-    me().args(["sysw", "pack", "--no-passphrase", "--out"])
+    let passhex: String = "correct horse battery staple"
+        .bytes()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    for (what, rec) in [
+        ("a BIP-39 mnemonic", SEED.to_string()),
+        ("a pass: record", format!("pass:{passhex}")),
+    ] {
+        let out = dir.path().join("nope.bin");
+        let a = me()
+            .args(["sysw", "pack", "--no-passphrase", "--out"])
+            .arg(&out)
+            .arg(&rec)
+            .write_stdin("")
+            .assert()
+            .failure();
+        let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+        assert!(err.contains("ARGV"), "{what} must be refused: {err}");
+        assert!(!out.exists(), "{what}: nothing may be written");
+        assert!(
+            !err.contains(&rec[..rec.len().min(24)]),
+            "{what}: never echo the body: {err}"
+        );
+    }
+}
+
+/// **The override makes it a speed bump, not a wall** — the operator's balance
+/// between helpful and annoying. Air-gapped and amnesic machines are real.
+#[test]
+fn allow_argv_secret_proceeds() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("ok.bin");
+    me().args(["sysw", "pack", "--no-passphrase", "--allow-argv-secret", "--out"])
         .arg(&out)
         .arg(SEED)
         .write_stdin("")
         .assert()
         .success();
-    assert!(out.exists(), "today a seed phrase on argv still packs");
+    assert!(out.exists(), "the override must actually proceed");
+}
+
+/// **The refusal TEACHES the cleanup command, not just the need for one.**
+///
+/// Operator: telling someone to "remove the line from your shell history" says
+/// WHAT and not HOW. Two measured facts shape this:
+/// - zsh's `history -d` does NOT delete (on 5.9.2 `-d` is a timestamp display
+///   flag), so it must never be suggested;
+/// - the pattern must anchor on the COMMAND NAME, because grepping for the
+///   secret would type the secret into history a second time.
+#[test]
+fn the_argv_refusal_names_the_command_that_purges_history() {
+    let dir = tempfile::tempdir().unwrap();
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase", "--out"])
+        .arg(dir.path().join("n.bin"))
+        .arg(SEED)
+        .write_stdin("")
+        .assert()
+        .failure();
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+    assert!(err.contains("HISTFILE"), "name the history file: {err}");
+    assert!(err.contains("sed -i"), "give the actual command: {err}");
+    // NOT `!err.contains("history -d")` -- the message deliberately NAMES that
+    // command in order to warn against it, so the naive negative fails on the
+    // warning itself. The requirement is that it is never OFFERED, which is
+    // what the explicit disclaimer proves.
+    assert!(
+        err.contains("does NOT delete"),
+        "must actively warn that zsh's history -d does not delete: {err}"
+    );
 }
 
 /// THE CONTROL: watch-only public material stays usable on argv. `md verify

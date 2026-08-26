@@ -238,6 +238,18 @@ enum SyswCmd {
         /// creates owner-only.
         #[arg(long)]
         allow_world_readable: bool,
+        /// Proceed even though a record was passed on argv (ruling 2026-08-26).
+        ///
+        /// argv is public — `/proc`, `ps`, and a shell history file that
+        /// outlives the machine — so secret and bearer records are refused
+        /// there by default. **This exists because that threat model does not
+        /// bite everywhere**: a single-user air-gapped box, or an amnesic Tails
+        /// session, has no other observer and no persistence. The refusal is a
+        /// speed bump, not a wall.
+        ///
+        /// Greppable in a script on purpose, so a reviewer can find it.
+        #[arg(long)]
+        allow_argv_secret: bool,
         /// PBKDF2 rounds.
         #[arg(long, default_value_t = 100_000)]
         iterations: u32,
@@ -1101,6 +1113,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             allow_weak,
             allow_unsigned_inputs,
             allow_world_readable,
+            allow_argv_secret,
             iterations,
             region,
         } => {
@@ -1111,7 +1124,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 );
             }
 
-            let recs = match read_records(records, r#in.as_ref()) {
+            let recs = match read_records(records, r#in.as_ref(), *allow_argv_secret) {
                 Ok(r) => r,
                 Err((msg, code)) => {
                     eprintln!("me: {msg}");
@@ -1902,6 +1915,7 @@ fn no_records_guard(
 fn read_records(
     argv: &[String],
     in_path: Option<&std::path::PathBuf>,
+    allow_argv_secret: bool,
 ) -> Result<Vec<String>, (String, i32)> {
     if let Some(p) = in_path {
         let raw = std::fs::read_to_string(p)
@@ -1936,6 +1950,14 @@ fn read_records(
             // BEARER reason rather than three screens later for a formatting
             // one. `classify` would call that shape `Unknown`.
             let by_prefix = trimmed.starts_with(mnemonic_engrave::sysw::record::TX_PREFIX);
+            if allow_argv_secret {
+                // The operator has said where they are. A single-user
+                // air-gapped box or an amnesic Tails session has no other
+                // observer and no persistence, and refusing there is friction
+                // that teaches people to alias the flag on permanently -- the
+                // failure mode that retired R3.
+                continue;
+            }
 
             // P5 I-1 — AND THE CLASS CHECK, because the prefix covered ONE of
             // five. Measured 2026-08-26: this gate refused a `tx:` record and
@@ -1948,19 +1970,18 @@ fn read_records(
             // later is covered by `is_argv_forbidden` rather than by whoever
             // remembers to extend a match arm here.
             let class = mnemonic_engrave::sysw::classify(r);
-            // SCOPED TO BEARER, deliberately. `is_secret()` classes -- a BIP-39
-            // mnemonic, an `ms1` string, a `pass:` record -- are ALSO accepted
-            // on argv today at exit 0 in silence, which is arguably worse. That
-            // is a real defect and it is FILED, not fixed here: refusing it is
-            // the same decision as the CLI-uniformity spec's D3 (refuse with an
-            // override), it breaks 13 shipped invocations in this repo's own
-            // tests, and it is the operator's ruling to make. Widening this
-            // condition to `is_secret() || is_bearer()` is the whole change once
-            // that ruling exists.
-            if by_prefix || class.is_bearer() {
+            if by_prefix || class.is_argv_forbidden() {
                 // NAME THE CLASS, NEVER THE BODY. Printing it back would put the
                 // material in a SECOND public place -- the defect this refusal
                 // exists to name.
+                // The private-channel EXAMPLE must match the class. Showing
+                // `mt encode --qr | me sysw pack` to someone who pasted a seed
+                // phrase is advice for a different artifact entirely.
+                let example = if by_prefix || class.is_bearer() {
+                    "    mt encode --qr --in tx.hex | me sysw pack --out p.bin"
+                } else {
+                    "    ms encode --in seed.txt | me sysw pack --out p.bin"
+                };
                 let (what, why) = if by_prefix || class == Class::Tx {
                     ("a `tx:` record", "A raw signed transaction is a BEARER instrument -- anyone who can read it can broadcast it")
                 } else if class == Class::Mt {
@@ -1975,10 +1996,20 @@ fn read_records(
                          {why} -- and argv is public: /proc, `ps` and \
                          your shell history all keep a copy.\n      \
                          Use a private channel instead:\n      \
-                         \x20   mt encode --qr --in tx.hex | me sysw pack --out p.bin\n      \
-                         \x20   me sysw pack --in records.txt --out p.bin\n      \
-                         To purge what already leaked: remove the line from your \
-                         shell history, and `shred -u` any file you pasted it from."
+                         {example}\n      \
+                         \x20   me sysw pack --in records.txt --out p.bin\n\n      \
+                         TO PURGE WHAT ALREADY LEAKED -- match on the COMMAND, \
+                         never on the secret, or you type it into history a \
+                         second time:\n      \
+                         \x20   bash/zsh:  sed -i '/me sysw pack/d' \"$HISTFILE\"\n      \
+                         \x20   fish:      history delete --prefix 'me sysw pack'\n      \
+                         \x20   and `shred -u` any file you pasted it from.\n      \
+                         (On zsh, `history -d` does NOT delete -- -d prints \
+                         timestamps. It would report success and purge \
+                         nothing.)\n      \
+                         If argv is safe where you are -- a single-user \
+                         air-gapped box, an amnesic Tails session -- \
+                         --allow-argv-secret proceeds."
                     ),
                     // POLICY REFUSAL, not usage: the record is understood and
                     // well-formed, and this tool will never accept it here.

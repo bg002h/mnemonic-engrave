@@ -1030,10 +1030,10 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
                args: s(&["seal", "--iterations", "5", "--out"]),
                stdin: "".to_string(), why: "seal: --iterations below the floor" },
         Case { code: 2,
-               args: s(&["sysw", "pack", "--iterations", "5", "--passphrase-words", "12", SEED]),
+               args: s(&["sysw", "pack", "--allow-argv-secret", "--iterations", "5", "--passphrase-words", "12", SEED]),
                stdin: "".to_string(), why: "sysw pack: --iterations below the floor" },
         Case { code: 2,
-               args: s(&["sysw", "pack", "--iterations", "2000001", "--passphrase-words", "12", SEED]),
+               args: s(&["sysw", "pack", "--allow-argv-secret", "--iterations", "2000001", "--passphrase-words", "12", SEED]),
                stdin: "".to_string(), why: "sysw pack: --iterations above the ceiling" },
         // ── 3, POLICY REFUSAL ───────────────────────────────────────────────
         Case { code: 3, args: s(&["--stdout"]), stdin: MS1.to_string(),
