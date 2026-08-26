@@ -1111,47 +1111,6 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 );
             }
 
-            // F-246 — THE WRITE GATE RUNS BEFORE ANYTHING DESCRIBES A CONTAINER.
-            //
-            // `emit` checks this too, and that is where it used to be checked
-            // ONLY. By then `sealing:`, `strength:`, `digest:` and "re-print it
-            // with: me sysw show <the file you just wrote>" had all been
-            // printed -- for a run that then exited 2 leaving a 0-byte file.
-            // The digest is the value the operator verifies the PLATE against
-            // on the device, so recording it means carrying a checksum for a
-            // payload that does not exist, beneath a line that is false as it
-            // prints.
-            //
-            // This is the rule the passphrase ceremony already follows a few
-            // lines below -- "generating a passphrase, telling the operator to
-            // write it down, and THEN refusing the container teaches them that
-            // the note they just made is worthless". It simply had not been
-            // applied to the gate that aborts the WRITE.
-            //
-            // The condition is `emit`'s, character for character, so the two
-            // cannot disagree about when a write is refused. `emit` keeps its
-            // copy: it is reached by `wipe` and by the region path too, and a
-            // guard that exists only at one call site is one refactor from
-            // being bypassed.
-            {
-                use std::io::IsTerminal;
-                // The length is not known yet -- the container has not been
-                // built -- and it does not need to be: this refusal is about
-                // WHERE, and the byte count only sharpens a message the
-                // operator sees when they retry. `emit` reports the real
-                // length; here 0 stands for "not built, and never will be".
-                if let Some(code) = refuse_write_block(
-                    write_block(
-                        out.is_some(),
-                        *allow_world_readable,
-                        std::io::stdout().is_terminal(),
-                        stdout_world_readable_mode(),
-                    ),
-                    0,
-                ) {
-                    return code;
-                }
-            }
             let recs = match read_records(records, r#in.as_ref()) {
                 Ok(r) => r,
                 Err((msg, code)) => {
@@ -1187,6 +1146,55 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 return EXIT_INVALID;
             }
 
+            // F-246 — THE WRITE GATE RUNS BEFORE ANYTHING DESCRIBES A CONTAINER,
+            // AND AFTER EVERY REFUSAL ABOUT THE INPUT ITSELF.
+            //
+            // `emit` checks this too, and that is where it used to be checked
+            // ONLY. By then `sealing:`, `strength:`, `digest:` and "re-print it
+            // with: me sysw show <the file you just wrote>" had all been
+            // printed -- for a run that then exited 2 leaving a 0-byte file.
+            // The digest is the value the operator verifies the PLATE against
+            // on the device, so recording it means carrying a checksum for a
+            // payload that does not exist, beneath a line that is false as it
+            // prints.
+            //
+            // This is the rule the passphrase ceremony already follows a few
+            // lines below -- "generating a passphrase, telling the operator to
+            // write it down, and THEN refusing the container teaches them that
+            // the note they just made is worthless". It simply had not been
+            // applied to the gate that aborts the WRITE.
+            //
+            // The decision is `write_block`, shared with `emit`, so the two
+            // cannot disagree about when a write is refused. `emit` keeps its
+            // call: it is reached by `wipe` and by the region path too, and a
+            // guard that exists only at one call site is one refactor from
+            // being bypassed.
+            //
+            // POSITION IS LOAD-BEARING, and the first attempt got it wrong.
+            // Placed above `read_records`, it PRE-EMPTED R2 -- the refusal for
+            // a `tx:` record passed on ARGV, which is bearer material already
+            // in the shell's history and in `ps`. That refusal is both more
+            // urgent and more specific, and it exits 3 rather than 2. The
+            // regenerated journey caught the swap; no test did.
+            {
+                use std::io::IsTerminal;
+                // The length is not known yet -- the container has not been
+                // built -- and it does not need to be: this refusal is about
+                // WHERE, and the byte count only sharpens a message the
+                // operator sees when they retry. `emit` reports the real
+                // length; here 0 stands for "not built, and never will be".
+                if let Some(code) = refuse_write_block(
+                    write_block(
+                        out.is_some(),
+                        *allow_world_readable,
+                        std::io::stdout().is_terminal(),
+                        stdout_world_readable_mode(),
+                    ),
+                    0,
+                ) {
+                    return code;
+                }
+            }
             // G-P3.6 / SPEC §2.4 — SEALING IS DECIDED BY CONTENT.
             //
             // This used to be `let sealing = !*no_passphrase;`: seal unless

@@ -1911,3 +1911,37 @@ fn the_one_liner_admits_the_string_kinds_me_actually_accepts() {
     let top = String::from_utf8_lossy(&o.stdout).to_lowercase();
     assert!(top.contains("mt1"), "mt1 is accepted and must be named: {top}");
 }
+
+/// **A refusal about the INPUT outranks one about the destination.**
+///
+/// F-246 hoisted the write gate so nothing describes a container before it
+/// runs. The first attempt hoisted it above `read_records`, which pre-empted
+/// R2 — the refusal for a `tx:` record passed on ARGV, where the transaction is
+/// already in the shell's history and in `ps`. That is both more urgent and
+/// more specific than "your stdout is 0644", and it exits 3 rather than 2.
+///
+/// **The regenerated journey caught that swap; no test did.** This is the test.
+#[test]
+fn a_bearer_record_on_argv_outranks_the_write_gate() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let sink = dir.path().join("out.bin");
+    let handle = std::fs::File::create(&sink).unwrap();
+    std::fs::set_permissions(&sink, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+    // BOTH faults at once: a tx: record on argv AND a world-readable stdout.
+    let o = std::process::Command::new(assert_cmd::cargo::cargo_bin("me"))
+        .args(["sysw", "pack", "--no-passphrase", "tx:0100"])
+        .stdout(std::process::Stdio::from(handle))
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&o.stderr).to_string();
+
+    assert_eq!(o.status.code(), Some(3), "R2's code, not the write gate's: {err}");
+    assert!(err.contains("ARGV"), "R2 must be the refusal shown: {err}");
+    assert!(
+        !err.contains("its permissions grant read"),
+        "the destination complaint must not pre-empt the bearer one: {err}"
+    );
+}

@@ -132,11 +132,16 @@ WARNING: the record just left this terminal — and it is BEARER, exactly like t
   `rm` unlinks the name and leaves the bytes. And check it is not
   already in a backup, a sync folder, or your editor's undo history.
 
-mt encode: REFUSED — §8.2h, stdout is a file of mode 0644 — readable by other users on this machine.
+mt encode: REFUSED — §8.2h, stdout is a file of mode 0644 — its permissions grant read to group or others.
 
   This record IS the engraving, and a finalized transaction is BEARER:
   anyone who can read that file can broadcast it.
 
+  Only the file's OWN mode was checked. If a directory above it denies
+  search to others -- a 0700 home directory does -- nobody else can
+  open it today; the mode still becomes dangerous the moment the file
+  is moved, copied, or its parent relaxed (F-252).
+  
   mt has no --out: stdout IS the record, by design (§3b). So the
   remedies are the shell's:
   
@@ -320,10 +325,6 @@ me: no records on stdin: pass them on argv, with --in, or on stdin.
 
 ```console
 $ printf 'tx:%s\n' '<the 113-byte stripped transaction, elided>' | me sysw pack --no-passphrase --out /dev/null
-sealing:  NOT SEALED — no record in this payload is secret material, so there 
-      is nothing to encrypt. The container is cleartext: anyone holding the file 
-      can read it.
-strength: no passphrase — BELOW the threshold
 me: record 0 (records count from 0) is a `tx:` record whose transaction parses but whose input 0 carries NEITHER a scriptSig NOR a witness — it is unsigned, or its signatures were stripped in transit.
       This is refused because the txid does NOT change when signatures are removed: the record would show the txid you expect, and the plate cut from it could never be broadcast.
       Re-export the FINALIZED transaction from your signer.
