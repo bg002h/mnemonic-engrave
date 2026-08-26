@@ -227,6 +227,7 @@ argv.** §6d enumerates what does not.
 | D4 | **stdout is canonical (ungrouped); the grouped form moves to the stderr engraving card.** | flipping the default only; teaching `me sysw pack` to strip separators |
 | D5 | **One shared crate owns the IO + safety layer**, depended on by all five. | spec + conformance vectors with copied code; a pure-logic crate with per-repo flag wiring |
 | D6 | **`me sysw pack --expect <kinds>` closes C-1**, opt-in, keyed on kinds. | a record COUNT; a conjunction-shaped acceptance form; `pack` running the producers itself |
+| D7 | **This cycle makes the encoding tier UNIFORM and RELOCATES nothing** (§9a). Tier placement is its own cycle. | bundling relocation into this cycle, which would make symmetry wait on placement |
 
 **On D3's rejected third option, recorded so it is not revisited.** A declared
 machine posture — an environment variable or config file saying *"this box is
@@ -1076,6 +1077,59 @@ is how a real finding hides.
   reports **16 distinct sigils over 50 occurrences**, and each was read.
 
 ## 9. Out of scope, explicitly
+
+### 9a. D7 — THIS CYCLE MOVES NOTHING BETWEEN TIERS
+
+**RULED by the operator 2026-08-26, and it is the scope boundary the rest of
+this section hangs off:** *"We can finish our plan keeping only features that
+should remain where they are for our current plan."*
+
+**The constellation has three tiers**, in the operator's own words: `md`/`mk`/
+`ms`/`mt` do **m*1 string encoding**; `mnemonic-toolkit` does **fancy
+processing** (BIP-85, SLIP-39, Electrum crypto, seed XOR, address derivation);
+`mnemonic-engrave` does **payload prep and communication**. The goal is a
+"clean, organized, and relatively symmetric" constellation.
+
+**This cycle makes the encoding tier UNIFORM. It does not RELOCATE anything.**
+Every rule in §6 applies to a feature already living where it belongs:
+
+| in scope, because it is already in the right tier | why |
+| --- | --- |
+| `--in` / `--out` / `-` on all four encoders | reading material and writing the artifact IS the encoding job; the operator ruled these "very good for all m\*-cli" |
+| the argv refusal and its override | argv arrives at *that* process; `/proc/<pid>/cmdline` is the binary's own, and no other tool can refuse on its behalf |
+| the world-readable and terminal gates | they guard the binary's **own** stdout, which is the artifact it just produced |
+| grouping to the stderr card, whitespace-only separators | presentation of the string that binary encodes |
+| exit-code alignment | each tool's own vocabulary |
+| `me sysw pack --expect` | payload prep, in the payload tier |
+
+**DEFERRED to a tier-placement cycle, not resolved here:**
+
+- **Where the `tx:` record is constructed.** `mt encode --qr` emits a `me sysw`
+  record class — the encoding tier reaching into the payload tier. The operator
+  has ruled that QR belongs out of `m*-cli` **and** that PSBT handling stays in
+  `mt` (because a PSBT's end result is a string that gets engraved). Landing
+  both is a separate design question with its own blast radius, and it is being
+  ruled on separately.
+- Anything that follows from that placement, including whether §10's acceptance
+  pipeline keeps its current shape.
+
+**WHY THE DEFERRAL IS THE RIGHT SHAPE, AND NOT A DODGE.** Uniformity and
+relocation are independent: every §6 rule is true of `mt encode --qr` wherever
+that flag ends up living, because the rules are about channels, permissions and
+presentation rather than about which binary owns a record class. Bundling them
+would make a cycle whose value is symmetry wait on a cycle whose value is
+placement.
+
+**AND WHY THE REVERSAL HAPPENED, recorded so nobody moves it a third time.**
+The operator's own diagnosis: *"We had too narrow a view of the constellation
+when we started."* This spec was written believing the constellation was four
+CLIs plus `me`; it is six repos in three tiers, and `mnemonic-toolkit` — which
+already ships a canonical display-grouping layer and an argv-secret taxonomy —
+was not in view. The transaction verb has **already moved once this cycle**,
+from `me` to `mt`, for reasons that were locally correct. A spec that records
+only its current position invites the next move; this one records the reason.
+
+### 9b. Also out of scope
 
 - **QR-for-everything** (D2). `md`/`mk`/`ms` payloads engraved as plaintext QR
   needs new record classes, device rendering, plate layout and an S0 hardware
