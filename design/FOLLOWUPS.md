@@ -10420,125 +10420,6 @@ and digest all describe an artifact, so all three belong after the guard.
 three concrete ways on (`--out`, `umask 077`, `--allow-world-readable`). F-249
 records `mt` giving none. Whatever fixes F-249 should copy this message, not the
 other way round.
-
-
----
-
-## RULING 2026-08-25 — an INCOMPLETE chunk set REPORTS LOUDLY and PACKS; and P1's refuse posture diverged from its own container spec
-
-**Operator ruling, taken 2026-08-25.** Asked whether an incomplete `mt1` chunk
-set should be REFUSED (the P1 plan's E20) or reported-and-packed (the
-`md1`/`mk1` sibling's posture), the operator ruled: **"Report loudly and pack."**
-
-**The question arose from an operator correction.** A fable simplification report
-justified P1's refuse posture on the grounds that *"a `tx:` payload is
-regenerable, an `md1` card may be the only copy"*. **The operator corrected this:
-a `tx:` payload is NOT necessarily regenerable.** The journey pipes
-`tx.final.psbt` — a FINALIZED transaction, embodying a completed signing
-ceremony. A multisig quorum collected across time and geography may take days to
-re-collect or be impossible if a cosigner is unavailable; the source PSBT may be
-gone; and **re-signing is not idempotent under this design** — a fresh nonce
-yields a different signature and therefore a different **wtxid**, which this plan
-carries (E17) and binds on (R15's top-20 of the txid). A regenerated payload is a
-different artifact by the design's own identifiers.
-
-**That correction is what makes report-and-pack right.** Every `mt1` chunk is
-independently valid, BCH-protected, and carries its own index and count, so a
-partial set is self-describing about what is missing: 201 engraved chunks plus
-the 202nd recovered later reassembles. That is exactly how `md1`/`mk1` multi-card
-backups already work. Refusing means the operator engraves NOTHING and may lose
-the ceremony.
-
-**AND THE PLAN WAS DIVERGING FROM ITS OWN CONTAINER'S SPEC, WHICH NOBODY NOTICED
-IN EIGHT ROUNDS.** `design/SPEC_systemwide_payloads.md:587` —
-
-> **5.3.2 The card-set DECODE check — now a FLAG, not a refusal (R0-I1; demoted
-> 2026-08-12, §13 D6)**
-
-EPD §6.3's per-card-set decode requirement *"reaches this container as a **flag
-input**, not as the refusal EPD gives it"*. So report-and-pack is not a
-divergence from the sibling at all — **it is what the container spec already
-requires, and P1's refuse posture was the divergence**, from the normative
-document it is building inside.
-
-**"Loudly" is normative and means more than the sibling does.** `mdmk_unconfirmed`
-reports quietly — it returns indices. P1's incomplete-set report MUST:
-- emit a **stderr warning at pack time** naming the set and **every** missing
-  index, not the first (r7-M1);
-- be visible in `me sysw show`, marked INCOMPLETE with the missing indices;
-- carry no format change — the chunks' own `count`/`index` let any reader
-  recompute it, so P4's device display can too.
-
-**Still OPEN and NOT ruled here:** whether `not_a_transaction` (W15/V28 — a
-COMPLETE set that reassembles to bytes that are not a transaction, the §2.1 C3
-smuggling channel) also demotes to a flag under §5.3.2, or stays a refusal. The
-two cases are different: incomplete is *missing material*, non-decoding is
-*wrong material*. **P1 may not close while this is open.**
-
----
-
-## RULING 2026-08-25b — `not_a_transaction` is a LOUD FLAG ON THE DEVICE with MANDATORY LEGEND SUBSTITUTION. Nothing refuses.
-
-**Operator ruling.** Asked whether `not_a_transaction` (a COMPLETE chunk set that
-reassembles to bytes that are not a transaction — the §2.1 C3 smuggling channel)
-stays a refusal or demotes to a flag like the incomplete case, the operator ruled:
-
-> *"Becomes a loud flag on sh2, mandates legend substitution: drop user desired
-> legend and replace with 'incomplete, re-encode payload' or something to that
-> effect but don't refuse engraving."*
-
-**So NOTHING in the chunk path refuses.** Incomplete sets and non-decoding sets
-both pack, both reach the device, and both engrave — with the operator's chosen
-legend **replaced** by a warning.
-
-**Why this is a better control than a refusal, and it is not a weakening.** A
-stderr line at pack time is gone in a week; `me sysw show` must be re-run to be
-seen. **An engraved legend is permanent and travels with the artifact** — and the
-device has NO CAMERA (`sh2-has-no-camera`), so it can never read a plate back to
-warn anyone later. Substituting the legend converts an ephemeral warning into a
-durable one, on the only surface that outlives the session. For a
-fifteen-year-recovery product that is the right place to put it.
-
-**THE DEVICE MUST COMPUTE THIS ITSELF — verified precedent, not inference.** The
-fork already does exactly this for the siblings, on-device:
-
-```
-seedhammer/sysw/confirm.go:81       _, err := md.Reassemble(set)
-seedhammer/seal/record.go:475       decodePublicSet enforces §6.3: every public
-                                    record belongs to a card set that decodes
-seedhammer/seal/record.go:231       public | md1/mk1 only, AND every card group
-                                    must reassemble and decode
-```
-
-**A host-set flag byte would be worthless for this**, and the reason is in EPD's
-own threat statement: the adversary is *"a defective or third-party sealer"*. A
-sealer that smuggles will also set the flag to "fine". The check is only worth
-anything where it cannot be forged, which is on the device.
-
-**THE COST, and it lands on P3, not P1.** The fork has **no `mt` package and no
-Bitcoin transaction deserialiser** (packages verified: `md`, `mk`, `codex32`,
-`bip32/39/85/380`, `slip39`, `seedxor`, `address`, `seal`, `sysw`, …). To flag
-`not_a_transaction` on-device, **P3 must port `mt` reassembly AND a transaction
-deserialiser to TinyGo.** Incomplete is far cheaper — the chunk header carries
-`count` and `index`, so only the header parser is needed.
-
-**TWO CONSEQUENCES THE OPERATOR SHOULD HAVE IN WRITING.**
-
-1. **The anti-smuggling gate stops being admission control and becomes LABELLING
-   control.** Under this ruling the smuggled bytes still reach metal — 32 bytes of
-   entropy engraved on a plate, under a legend that says the payload is bad. The
-   flash exposure EPD measured is unchanged either way (the payload is in flash
-   once loaded); the plate is *additional* exposure the refusal would have
-   prevented. The operator is warned and chooses. **This is a deliberate trade,
-   not an oversight** — recorded here so no future reviewer "fixes" it back.
-2. **Substitution is sometimes INSERTION.** The legend field is OPTIONAL. When a
-   payload carries no legend, the device must **add** one, which consumes plate
-   space that was not budgeted. P4 owns the layout consequence; P1 owes only that
-   the field's absence is representable and detectable, which it already is.
-
-**Un-overridable.** The substituted legend MUST NOT be dismissible back to the
-operator's own text — a warning the operator can turn off is not a control.
-
 ---
 
 ### F-247 — `mt encode --qr` does not say whether the record fits an NFC TAG (owning phase: **P2, and it needs an operator ruling FIRST**) `#mt` `#nfc`
@@ -10892,4 +10773,232 @@ load-bearing sentence outside the form everyone types is.
 expected prefixes although `me` refuses `ms1`. Parsing it is what earns the real
 refusal — *"ms1 is secret seed entropy and must never be transmitted by radio"* —
 instead of a generic one. Verified by feeding an `ms1` string.
+---
+
+### F-252 — the world-readable refusal asserts reachability it never checked, and is FALSE under any 0700 ancestor (owning phase: **post-ship polish**) `#me` `#mt` `#ux`
+
+**Found in the side-by-side walk, 2026-08-25**, when the operator read the
+refusal that had just blocked their `me sysw pack` and asked plainly: *"Is it
+true that stdout is readable systemwide?"*
+
+**It is not, in the commonest case there is.** Both binaries say:
+
+> stdout is a world-readable file … **readable by other users on this machine**
+
+The guard behind it (`stdout_is_world_readable`, `me-cli/src/main.rs:871`) does
+`fstat(1)` and tests `mode & 0o044`. **It inspects the file's own mode and
+nothing else.** POSIX requires search (`x`) permission on *every* directory in a
+path, so a 0644 file beneath a 0700 directory cannot be opened by anyone else.
+Measured on this box:
+
+```
+file mode:                       0644
+first dir denying other-search:  /tmp/tmp.jM9DwOet55   (mktemp -d is 0700)
+actually reachable by others?    False        <- and yet: refused, exit 2
+```
+
+`$HOME` here is **0700**, so *every* file the operator creates under their home
+directory is in exactly this state. The refusal that stopped the walk described a
+file no other user could open.
+
+**A truthful check is implementable — mechanism verified, not assumed.**
+`readlink /proc/self/fd/1` resolves stdout to a real path, and walking its
+ancestors for `S_IXOTH` returns the right answer. Cost: it is Linux-only
+(`/proc`); macOS needs `fcntl(F_GETPATH)`. That is a real portability question
+and the reason this is filed rather than fixed in passing.
+
+**DO NOT DROP THE BLOCK.** A 0644 file is a latent hazard even while currently
+unreachable: move it to a 0755 directory (`/scratch` on this box), tar it, back
+it up, or `chmod` the parent, and it becomes readable with no further warning.
+For bearer material that defence is worth keeping, and this entry exists so a
+future reader does not "fix" the false sentence by deleting the guard.
+
+**What to change is the SENTENCE.** State what was measured — *"stdout is a file
+with mode 0644 (group/other-readable)"* — instead of asserting reachability the
+guard never established. Crying wolf in the majority case is precisely what
+trains an operator to reach for `--allow-world-readable` reflexively, which is
+the aliased-away failure mode the retired R3 rule was built around; see
+`SPEC_engrave_transaction.md` §2.2.
+
+**Both repos.** `mt`'s §8.2h refusal carries the same sentence, and per the
+Rust-primary rule the wording should move together. F-249 already records that
+`mt`'s version of this refusal offers no remedy while `me`'s offers three, so
+these two are one edit on `mt`'s side.
+
+
+
+---
+
+## RULING 2026-08-25 — an INCOMPLETE chunk set REPORTS LOUDLY and PACKS; and P1's refuse posture diverged from its own container spec
+
+**Operator ruling, taken 2026-08-25.** Asked whether an incomplete `mt1` chunk
+set should be REFUSED (the P1 plan's E20) or reported-and-packed (the
+`md1`/`mk1` sibling's posture), the operator ruled: **"Report loudly and pack."**
+
+**The question arose from an operator correction.** A fable simplification report
+justified P1's refuse posture on the grounds that *"a `tx:` payload is
+regenerable, an `md1` card may be the only copy"*. **The operator corrected this:
+a `tx:` payload is NOT necessarily regenerable.** The journey pipes
+`tx.final.psbt` — a FINALIZED transaction, embodying a completed signing
+ceremony. A multisig quorum collected across time and geography may take days to
+re-collect or be impossible if a cosigner is unavailable; the source PSBT may be
+gone; and **re-signing is not idempotent under this design** — a fresh nonce
+yields a different signature and therefore a different **wtxid**, which this plan
+carries (E17) and binds on (R15's top-20 of the txid). A regenerated payload is a
+different artifact by the design's own identifiers.
+
+**That correction is what makes report-and-pack right.** Every `mt1` chunk is
+independently valid, BCH-protected, and carries its own index and count, so a
+partial set is self-describing about what is missing: 201 engraved chunks plus
+the 202nd recovered later reassembles. That is exactly how `md1`/`mk1` multi-card
+backups already work. Refusing means the operator engraves NOTHING and may lose
+the ceremony.
+
+**AND THE PLAN WAS DIVERGING FROM ITS OWN CONTAINER'S SPEC, WHICH NOBODY NOTICED
+IN EIGHT ROUNDS.** `design/SPEC_systemwide_payloads.md:587` —
+
+> **5.3.2 The card-set DECODE check — now a FLAG, not a refusal (R0-I1; demoted
+> 2026-08-12, §13 D6)**
+
+EPD §6.3's per-card-set decode requirement *"reaches this container as a **flag
+input**, not as the refusal EPD gives it"*. So report-and-pack is not a
+divergence from the sibling at all — **it is what the container spec already
+requires, and P1's refuse posture was the divergence**, from the normative
+document it is building inside.
+
+**"Loudly" is normative and means more than the sibling does.** `mdmk_unconfirmed`
+reports quietly — it returns indices. P1's incomplete-set report MUST:
+- emit a **stderr warning at pack time** naming the set and **every** missing
+  index, not the first (r7-M1);
+- be visible in `me sysw show`, marked INCOMPLETE with the missing indices;
+- carry no format change — the chunks' own `count`/`index` let any reader
+  recompute it, so P4's device display can too.
+
+**Still OPEN and NOT ruled here:** whether `not_a_transaction` (W15/V28 — a
+COMPLETE set that reassembles to bytes that are not a transaction, the §2.1 C3
+smuggling channel) also demotes to a flag under §5.3.2, or stays a refusal. The
+two cases are different: incomplete is *missing material*, non-decoding is
+*wrong material*. **P1 may not close while this is open.**
+
+---
+
+## RULING 2026-08-25b — `not_a_transaction` is a LOUD FLAG ON THE DEVICE with MANDATORY LEGEND SUBSTITUTION. Nothing refuses.
+
+**Operator ruling.** Asked whether `not_a_transaction` (a COMPLETE chunk set that
+reassembles to bytes that are not a transaction — the §2.1 C3 smuggling channel)
+stays a refusal or demotes to a flag like the incomplete case, the operator ruled:
+
+> *"Becomes a loud flag on sh2, mandates legend substitution: drop user desired
+> legend and replace with 'incomplete, re-encode payload' or something to that
+> effect but don't refuse engraving."*
+
+**So NOTHING in the chunk path refuses.** Incomplete sets and non-decoding sets
+both pack, both reach the device, and both engrave — with the operator's chosen
+legend **replaced** by a warning.
+
+**Why this is a better control than a refusal, and it is not a weakening.** A
+stderr line at pack time is gone in a week; `me sysw show` must be re-run to be
+seen. **An engraved legend is permanent and travels with the artifact** — and the
+device has NO CAMERA (`sh2-has-no-camera`), so it can never read a plate back to
+warn anyone later. Substituting the legend converts an ephemeral warning into a
+durable one, on the only surface that outlives the session. For a
+fifteen-year-recovery product that is the right place to put it.
+
+**THE DEVICE MUST COMPUTE THIS ITSELF — verified precedent, not inference.** The
+fork already does exactly this for the siblings, on-device:
+
+```
+seedhammer/sysw/confirm.go:81       _, err := md.Reassemble(set)
+seedhammer/seal/record.go:475       decodePublicSet enforces §6.3: every public
+                                    record belongs to a card set that decodes
+seedhammer/seal/record.go:231       public | md1/mk1 only, AND every card group
+                                    must reassemble and decode
+```
+
+**A host-set flag byte would be worthless for this**, and the reason is in EPD's
+own threat statement: the adversary is *"a defective or third-party sealer"*. A
+sealer that smuggles will also set the flag to "fine". The check is only worth
+anything where it cannot be forged, which is on the device.
+
+**THE COST, and it lands on P3, not P1.** The fork has **no `mt` package and no
+Bitcoin transaction deserialiser** (packages verified: `md`, `mk`, `codex32`,
+`bip32/39/85/380`, `slip39`, `seedxor`, `address`, `seal`, `sysw`, …). To flag
+`not_a_transaction` on-device, **P3 must port `mt` reassembly AND a transaction
+deserialiser to TinyGo.** Incomplete is far cheaper — the chunk header carries
+`count` and `index`, so only the header parser is needed.
+
+**TWO CONSEQUENCES THE OPERATOR SHOULD HAVE IN WRITING.**
+
+1. **The anti-smuggling gate stops being admission control and becomes LABELLING
+   control.** Under this ruling the smuggled bytes still reach metal — 32 bytes of
+   entropy engraved on a plate, under a legend that says the payload is bad. The
+   flash exposure EPD measured is unchanged either way (the payload is in flash
+   once loaded); the plate is *additional* exposure the refusal would have
+   prevented. The operator is warned and chooses. **This is a deliberate trade,
+   not an oversight** — recorded here so no future reviewer "fixes" it back.
+2. **Substitution is sometimes INSERTION.** The legend field is OPTIONAL. When a
+   payload carries no legend, the device must **add** one, which consumes plate
+   space that was not budgeted. P4 owns the layout consequence; P1 owes only that
+   the field's absence is representable and detectable, which it already is.
+
+**Un-overridable.** The substituted legend MUST NOT be dismissible back to the
+operator's own text — a warning the operator can turn off is not a control.
+---
+
+### F-253 — a bare `me sysw pack` writes the BEARER container to the terminal at exit 0, under an exemption justified by a false claim (owning phase: **post-ship polish**) `#me` `#security` `#ux`
+
+**Found in the side-by-side walk, 2026-08-25**, immediately after F-252 and from
+the same question. The operator typed the plain command and pasted one `tx:`
+record — no redirect, no `--out`:
+
+```
+$ me sysw pack                      (paste, Ctrl-D)
+sealing:  NOT SEALED — ...
+digest:   7981 04fa 8223 f3fc 8839 6701 2f0b 5a8e
+          re-print it with: me sysw show <the file you just wrote>
+MNEMSYSW^A^@^@^@ ... 1,743 bytes of raw container ...
+exit 0
+```
+
+**Nothing failed, so nothing contradicts the false line.** F-246's second
+instance records *"the file you just wrote"* printing when a guard aborts the
+write; here it prints on a **successful** run that also wrote no file, so there
+is no error beneath it to give the game away.
+
+**THE EXEMPTION RESTS ON A FALSE PREMISE.** `stdout_is_world_readable`
+(`me-cli/src/main.rs:871`) returns `false` for any character device, and its own
+comment justifies that:
+
+> *"A terminal and `/dev/null` persist nothing, so neither can leak."*
+
+The `/dev/null` half is correct and the exemption is genuinely load-bearing for
+it — `/dev/null` is mode 0666, so a mode-only test would refuse
+`me … > /dev/null`, which the comment rightly calls one of the most ordinary
+things anyone does with a CLI. **The terminal half is false.** A terminal
+persists in scrollback, and terminal sessions are routinely logged — this very
+finding was captured through `script`. For BEARER material that is exposure, not
+absence of it.
+
+**ONE CAUSE, TWO OPPOSITE FAILURES.** With F-252, the guard is wrong in both
+directions because it inspects the file's own mode instead of where the bytes
+actually come to rest:
+
+| situation | reality | `me` does |
+| --- | --- | --- |
+| 0644 file under a 0700 ancestor | unreachable by others | **refuses**, exit 2 (F-252) |
+| a terminal | scrollback, session logs | **writes it**, exit 0 (this entry) |
+
+**What would close it.** Split the char-device exemption: keep `/dev/null` (and
+`/dev/zero`) exempt by device identity rather than by the whole class, and treat
+an actual TTY as a destination that must be opted into. `isatty(1)` already
+distinguishes them, and `me` calls it elsewhere — the stdin banner in F-251's
+measurement is TTY-gated, so the mechanism is present in this binary today.
+
+**Do not close it by refusing all char devices** — that is the `/dev/null` case
+the existing comment protects, and there are tests for it.
+
+**Check `mt` for the same shape.** Its §8.2h guard shares this design and the
+Rust-primary rule applies; `mt encode` writes text rather than a binary blob, so
+the terminal case is far less alarming there, but the exemption's reasoning is
+the same and the comment may carry the same sentence.
 
