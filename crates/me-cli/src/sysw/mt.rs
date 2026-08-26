@@ -211,49 +211,22 @@ pub fn mt_unconfirmed(records: &[String]) -> Vec<usize> {
     out
 }
 
-/// The three-step confirmation. `csid` is the group key every member carries.
-fn set_confirmed(csid: u32, set: &[String]) -> bool {
-    let Ok(decoded) = mt_codec::pipeline::decode(set) else {
-        return false;
-    };
-    // Strictly-valid strings never need correction; a decode that used the
-    // correction budget means the walk was handed something classify did not
-    // admit. Refuse rather than trust it.
-    if decoded.chunks.iter().any(|c| c.corrected != 0) || !decoded.unreadable.is_empty() {
-        return false;
-    }
-    let Ok(summary) = tx::parse(&decoded.bytes) else {
-        return false;
-    };
-    // (G-P3.1) EVERY INPUT MUST CARRY A SIGNATURE, and this class needs the
-    // check as much as `tx:` does -- more, because a chunk set is the path a
-    // transaction takes when it is too large for one record, i.e. the usual
-    // one. Stripping the witnesses does not change the txid, so the binding
-    // below passes on a stripped set exactly as it does on the honest one:
-    // every other check in this function is blind to it.
-    if !summary.every_input_signed {
-        return false;
-    }
-    summary.chunk_set_id() == csid
-}
-
 /// Decode a confirmed set to `(transaction bytes, summary)` — what the host's
-/// `show` prints and the device's review screen displays. `None` exactly when
-/// [`mt_unconfirmed`] would report the set.
+/// `show` prints and the device's review screen displays.
+///
+/// **`None` exactly when [`diagnose`] found a problem**, and that is
+/// structural rather than a promise: this function asks `diagnose` rather than
+/// re-running the checks. An earlier version ran its own copy of the walk
+/// beside `set_confirmed`'s, which is two implementations of one rule — the
+/// defect shape this module already carries a note about, and the one that put
+/// the signature predicate into one of them and not the other.
 pub fn decode_confirmed(set: &[String]) -> Option<(Vec<u8>, tx::TxSummary)> {
+    let csid = header(set.first()?)?.chunk_set_id;
+    if diagnose(csid, set).is_some() {
+        return None;
+    }
     let decoded = mt_codec::pipeline::decode(set).ok()?;
-    if decoded.chunks.iter().any(|c| c.corrected != 0) || !decoded.unreadable.is_empty() {
-        return None;
-    }
     let summary = tx::parse(&decoded.bytes).ok()?;
-    // (G-P3.1) Mirrors `set_confirmed`; the doc comment above promises these
-    // two agree exactly, and an unsigned set must not decode to a candidate.
-    if !summary.every_input_signed {
-        return None;
-    }
-    if summary.chunk_set_id() != decoded.chunks.first()?.header.chunk_set_id {
-        return None;
-    }
     Some((decoded.bytes, summary))
 }
 
@@ -458,10 +431,11 @@ mod tests {
         for set in corpora {
             let unconfirmed = mt_unconfirmed(&set);
             for (csid, idxs, problem) in set_problems(&set) {
+                let members: Vec<String> = idxs.iter().map(|&i| set[i].clone()).collect();
                 assert_eq!(
                     problem.is_none(),
-                    set_confirmed(csid, &idxs.iter().map(|&i| set[i].clone()).collect::<Vec<_>>()),
-                    "diagnosis and set_confirmed disagree about set {csid:05x}"
+                    decode_confirmed(&members).is_some(),
+                    "diagnosis and decode_confirmed disagree about set {csid:05x}"
                 );
                 // ...and mt_unconfirmed reports exactly the sets with problems.
                 for i in &idxs {
