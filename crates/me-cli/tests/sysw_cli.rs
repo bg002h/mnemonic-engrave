@@ -802,3 +802,118 @@ fn a_payload_past_the_old_8191_cap_packs_and_reads_back() {
         .success()
         .stdout(predicate::str::contains(format!("pub_len:  {section_len}")));
 }
+
+// ─── G-P3.4 — the ruled pipeline `mt encode | me sysw pack` ──────────────────
+
+/// SPEC §1.1 ruled that `me sysw pack` gains a stdin path, because the join
+/// between the two tools IS a pipe and the first draft was wrong to say they
+/// already composed over one. Measured before this gate:
+///
+/// ```text
+/// $ printf 'text:6869\n' | me sysw pack --no-passphrase
+/// me: no records: pass them on argv or with --in     (exit 2, stdout empty)
+/// ```
+#[test]
+fn pack_reads_records_from_stdin_when_neither_argv_nor_in_is_given() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .write_stdin(format!("{TEXT}\n{MD1}\n"))
+    .assert()
+    .success();
+    // Not merely "exit 0": both records must be IN the container.
+    me().args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("public record 1: md1/mk1"));
+}
+
+/// Blank lines are skipped on stdin exactly as they are with `--in`, so a
+/// record's index is its position among the NON-blank lines. `mt encode`
+/// separates nothing with blanks today, but a shell heredoc does.
+#[test]
+fn stdin_skips_blank_lines_like_in_does() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .write_stdin(format!("\n{TEXT}\n\n{MD1}\n\n"))
+    .assert()
+    .success();
+    me().args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("public record 1: md1/mk1"));
+}
+
+/// R7. EMPTY stdin joins the existing exit-2 path rather than packing an empty
+/// container — `fish` reports a pipeline's status as the LAST command's, so an
+/// upstream `mt encode` failure arrives here as nothing at all, and a container
+/// built from it would be a silent success.
+#[test]
+fn empty_stdin_is_the_exit_2_path_not_an_empty_container() {
+    me().args(["sysw", "pack", "--no-passphrase"])
+        .write_stdin("")
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("no records"));
+    // Whitespace-only is the same thing: `mt encode` writing a bare newline on
+    // a failure path must not become a container either.
+    me().args(["sysw", "pack", "--no-passphrase"])
+        .write_stdin("\n\n\n")
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("no records"));
+}
+
+/// The sentence §1.1 quoted must have changed: it named two channels and there
+/// are now three. A message that still says "argv or with --in" teaches the
+/// operator the pipeline does not exist.
+#[test]
+fn the_no_records_message_names_stdin() {
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase"])
+        .write_stdin("")
+        .assert()
+        .code(2);
+    let err = String::from_utf8_lossy(&out.get_output().stderr).to_string();
+    assert!(
+        err.contains("stdin"),
+        "the refusal must name stdin now that it is a channel: {err}"
+    );
+}
+
+/// argv still wins over stdin when both are present — otherwise every existing
+/// invocation that also happens to have something on stdin changes meaning.
+#[test]
+fn argv_records_win_over_stdin() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--out",
+        out.to_str().unwrap(),
+        TEXT,
+    ])
+    .write_stdin(format!("{MD1}\n"))
+    .assert()
+    .success();
+    me().args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success()
+        // The md1 arrived on stdin and must NOT be in the container.
+        .stdout(predicate::str::contains("md1/mk1").not());
+}

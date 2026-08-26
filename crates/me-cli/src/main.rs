@@ -186,7 +186,8 @@ enum SyswCmd {
     /// copy into silently-absorbed damage.
     Pack {
         /// Records, on argv. As with `seal`, argv is a PUBLIC channel — prefer
-        /// --in for anything real.
+        /// --in or stdin for anything real. A `tx:` record here is REFUSED
+        /// outright: a raw transaction is a BEARER instrument.
         ///
         /// `text:`/`pass:` bodies are lowercase hex — see the command help.
         records: Vec<String>,
@@ -194,6 +195,9 @@ enum SyswCmd {
         ///
         /// Blank lines are skipped, so a record's index is its position among
         /// the NON-blank lines, not its line number.
+        ///
+        /// With neither this nor argv records, the same newline-separated form
+        /// is read from STDIN — so `mt encode … | me sysw pack …` works.
         #[arg(long, value_name = "FILE")]
         r#in: Option<std::path::PathBuf>,
         /// Write the blob here instead of stdout.
@@ -1397,22 +1401,61 @@ fn report_strength(passphrase: Option<&str>, records: &[String]) {
     }
 }
 
+/// Split a newline-separated record stream. Blank lines are skipped, so a
+/// record's index is its position among the NON-blank lines and not its line
+/// number — the `--in` contract, applied to stdin too so the two channels
+/// cannot disagree about what record 3 is.
+fn split_record_stream(raw: &str) -> Vec<String> {
+    raw.lines()
+        .map(str::to_owned)
+        .filter(|l| !l.trim().is_empty())
+        .collect()
+}
+
+/// Where `me sysw pack` takes its records from, in precedence order:
+/// `--in`, then argv, then **stdin** (G-P3.4 / SPEC §1.1).
+///
+/// stdin is LAST rather than first so no existing invocation changes meaning,
+/// and it exists at all because the ruled pipeline is
+/// `mt encode … | me sysw pack …` — a join an early draft claimed already
+/// worked and which measurably did not.
 fn read_records(
     argv: &[String],
     in_path: Option<&std::path::PathBuf>,
 ) -> Result<Vec<String>, String> {
     if let Some(p) = in_path {
         let raw = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
-        return Ok(raw
-            .lines()
-            .map(str::to_owned)
-            .filter(|l| !l.is_empty())
-            .collect());
+        return Ok(split_record_stream(&raw));
     }
-    if argv.is_empty() {
-        return Err("no records: pass them on argv or with --in".into());
+    if !argv.is_empty() {
+        return Ok(argv.to_vec());
     }
-    Ok(argv.to_vec())
+    // A TTY here is the "looks like a hang" case: an operator who typed
+    // `me sysw pack` and pressed Enter with nothing piped in otherwise sees a
+    // blank line forever. Say what is being waited for, on stderr, before
+    // blocking. (`mt` was measured doing exactly this and reading as a hang.)
+    {
+        use std::io::IsTerminal;
+        if std::io::stdin().is_terminal() {
+            eprintln!(
+                "me: reading records from stdin, one per line — end with Ctrl-D. \
+                 (Or pass them with --in FILE, or on argv.)"
+            );
+        }
+    }
+    let mut raw = String::new();
+    std::io::stdin()
+        .read_to_string(&mut raw)
+        .map_err(|e| format!("stdin: {e}"))?;
+    let recs = split_record_stream(&raw);
+    if recs.is_empty() {
+        // R7. EMPTY stdin joins this exit-2 path rather than packing an empty
+        // container: `fish` reports a pipeline's status as the LAST command's,
+        // so `mt encode` failing upstream arrives here as nothing at all, and
+        // a container built from nothing would be a silent success.
+        return Err("no records: pass them on argv, with --in, or on stdin".into());
+    }
+    Ok(recs)
 }
 
 fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>, allow_world_readable: bool) -> i32 {

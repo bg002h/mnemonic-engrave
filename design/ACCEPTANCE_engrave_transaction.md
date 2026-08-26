@@ -115,7 +115,7 @@ Verdicts: **MET** · **MET-DIFF** (purpose satisfied another way, reason given) 
 | R4′ | MET-DIFF | there is no `form` byte and no combined record: the two forms are distinct record **classes** (`Class::Mt`, `Class::Tx`). "One record carrying both" is unrepresentable, so the comparison R4′ prescribes has nothing to compare |
 | R5 | MET | strict admission both sides (L3); **measured:** an elided `mt1` string is refused at exit 4 |
 | R6 | MET | `main.rs:1088-1093` names the 32,734-byte cap. *Minor:* "Split them across two payloads" is not actionable for one transaction |
-| R7 | NOT-MET (P3) | subsumed by the missing stdin path — see §8-10 below |
+| R7 | **MET (P3a)** | `read_records` (`main.rs:1400-1454`) reads stdin when neither argv nor `--in` is given, and EMPTY or whitespace-only stdin joins the same exit-2 path; `empty_stdin_is_the_exit_2_path_not_an_empty_container` |
 | R8 | MET | L13; `mt`'s half at `mnemonic-transaction@542b391` (§8.2h) |
 | R9 | MET | `pack_refuses_a_tx_record_that_is_not_a_transaction`, `me_tx_refuses_non_transactions` |
 | R10 | MET-DIFF | the txid is **derived**, never asserted, so R10's stated hazard (two records *asserting* one txid over different bytes) cannot arise from an assertion. Duplicate candidates merge on **bytes**, not on the txid (`gui/transaction.go:263-327`, `TestPayloadTransactionsConfirmsAndMerges`), so identical twins collapse safely and different ones stay two candidates. Residual: G-P3.10 |
@@ -169,7 +169,7 @@ Verdicts: **MET** · **MET-DIFF** (purpose satisfied another way, reason given) 
 | `MaxSectionLen` → 32,734; NFC keeps 8191 | MET | L9 |
 | the QR's byte encoding stays a parameter until the test plate | MET-DIFF | byte mode is now fixed and **proven decodable by an independent decoder**; the steel half is still S0's (G-P4.1) |
 | the journey walk is the review of this spec | MET | `design/JOURNEY_WALK_engrave_transaction.md` |
-| `me sysw pack` gains stdin | NOT-MET (P3) | **measured:** `printf '' \| me sysw pack --no-passphrase` → exit 2, *"no records: pass them on argv or with --in"* — the exact sentence §1.1 ruled must change |
+| `me sysw pack` gains stdin | **MET (P3a)** | G-P3.4. `pack_reads_records_from_stdin_when_neither_argv_nor_in_is_given`; the sentence now names three channels (`the_no_records_message_names_stdin`). A TTY stdin prints what it is waiting for rather than looking like a hang |
 | a `tx:` record on argv is refused | NOT-MET (P3) | R2 |
 | no `--record` default; the refusal teaches | MET-DIFF | R3 |
 | chunks engraved verbatim — **no `mt1` decoder in v1** | SUPERSEDED | ruling 2026-08-25b requires the device to compute the confirmation, so the decoder was ported. Chunks are still engraved verbatim |
@@ -280,7 +280,7 @@ host CLI and device screens both, because a journey starts at the host).
 | G-P3.1 | the signature predicate has **no Go counterpart** (`grep` for `every_input_signed` over the fork: 0 hits; `mt/mt.go:263` skips the scriptSig without inspecting it) | `mt.ParseTx` returns a per-input signedness flag; a `tx:` record or reassembled set with an unsigned input reaches the device flagged with the mandatory legend substitution; RED-tested with the 113-byte stripped vector |
 | G-P3.2 | the predicate does not guard the **`mt1` chunk class** on either side — `sysw::mt::set_confirmed` (`sysw/mt.rs:124-138`) checks parse + binding only. (`mt encode` refuses unsigned input at §8.3 — but that is a different tool, not this container's admission boundary) | `set_confirmed` and `mt.Decode` both consult the predicate, or the sheet records a ruling that they deliberately do not |
 | G-P3.3 | `--allow-unsigned-inputs` (`FORWARD_PLAN` §2.1) does not exist — **measured:** clap rejects it. Overdue from P0 | the flag exists, names the failing input indices, and has a test |
-| G-P3.4 | `me sysw pack` has **no stdin path**; the ruled pipeline `mt encode \| me sysw pack` cannot be typed | stdin is read when neither argv nor `--in` is given; **empty** stdin joins the exit-2 path (R7); both tested |
+| **G-P3.4 — CLOSED (P3a)** | `me sysw pack` has **no stdin path**; the ruled pipeline `mt encode \| me sysw pack` cannot be typed | **DONE.** `main.rs:split_record_stream`/`read_records`; precedence `--in` > argv > stdin. Five tests in `tests/sysw_cli.rs`: stdin is read, blank lines skipped as with `--in`, empty and whitespace-only stdin exit 2, the message names stdin, argv still wins. Mutation-tested: removing the empty guard reddens 2 |
 | G-P3.5 | a `tx:` record on **argv** is not refused (R2) | argv carrying a `tx:` record exits non-zero **before** the record is echoed anywhere |
 | G-P3.6 | sealing is **flag-decided**, not content-decided, and says nothing | `pack` seals iff some record is `Class::is_secret()`, and prints which way it went and why, every time |
 | G-P3.7 | the incomplete-set warning does not name **the set** or **every missing index** — ruling 2026-08-25 makes "loudly" normative | the stderr line names the `chunk_set_id` and every missing index against the header's `count`; `me sysw show` does the same |
