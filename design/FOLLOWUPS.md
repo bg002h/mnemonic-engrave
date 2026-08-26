@@ -11112,4 +11112,79 @@ the existing comment protects (mode 0666), and there are tests for it.
 Rust-primary rule applies; `mt encode` writes text rather than a binary blob, so
 the terminal case is far less alarming there, but the exemption's reasoning is
 the same and the comment may carry the same sentence.
+---
+
+## RULING 2026-08-26a (P5 I-2) — duplicate chunk indices: LAST WINS, and the device MUST SAY SO
+
+**Operator ruling, taken while folding the P5 whole-diff review:**
+
+> *"P5 I-2 last wins is fine but message to user that this is the rule is
+> required so they can try again in different order. Message should say
+> something like duplicate plate 13 of 20 found, last wins"*
+
+**What the finding was.** `orderByIndex` (`gui/transaction.go`) builds TEXT-plate
+content with `byIdx[h.ChunkIndex] = s`. When one `chunk_set_id` group holds two
+DIFFERENT strings for the same index, all but the last are silently dropped from
+the steel. `mt.Decode` correctly detects the ambiguity and the set is offered
+unconfirmed under a substituted legend — but the review screen shows the deduped
+count and nothing names what was dropped.
+
+**No low-odds event is required.** Sign the same PSBT twice: a fresh nonce gives
+different witness bytes but an **identical txid**, therefore an identical
+`chunk_set_id` by construction. Pack strings from both runs interleaved and the
+engraved last-wins mix can later decode and **CONFIRM** — the txid ignores
+witness bytes — while its spliced signature is invalid and the transaction can
+never be broadcast, under a permanent legend reading *"DOES NOT DECODE"*.
+
+**The ruling keeps the behaviour and adds the disclosure.** Last-wins stays. The
+device must name **which** plate duplicated and **out of how many**, so the
+operator can re-order the payload and re-run. The operator's own example of the
+shape: `duplicate plate 13 of 20 found, last wins`.
+
+**Distinguished from 2026-08-25c**, which retired the txid-keyed *merge* drop on
+"the odds are low" grounds. This site is not that: the collision is guaranteed
+rather than unlikely, the ambiguity is *detected* and then discarded, and silence
+here breaks the loudness ruling 2026-08-25b made normative.
+
+**Implementation constraints carried into the brief**, because getting them wrong
+is the whole failure mode: the number shown must be the **plate number the
+operator sees** (1-indexed if the surrounding UI is), the total must be the set's
+**declared** count from the header, **every** duplicated index must be named and
+not just the first, and **no string body may be rendered** — `mt1` strings are
+bearer.
+
+---
+
+## OPEN — awaiting an operator ruling: SECRET material on argv
+
+**Not a ruling. A question raised 2026-08-26 while folding P5 I-1, recorded so it
+is not lost.**
+
+P5 I-1 was that `me sysw pack` refused a `tx:` record on argv while accepting the
+same transaction as `mt1` strings. That is **fixed** (`90c1a04`): the gate is now
+keyed on `Class::is_bearer()`.
+
+**Fixing it surfaced a larger hole.** The first attempt refused
+`is_secret() || is_bearer()` and broke 15 tests, because `me sysw pack` accepts,
+**at exit 0 in silence, on argv**:
+
+| what | result |
+| --- | --- |
+| a raw BIP-39 mnemonic | 145-byte payload |
+| an `ms1` string (seed entropy) | 102-byte payload |
+| a `pass:` record | 113-byte payload |
+
+So `me` refuses a *transaction* on argv and accepts a *seed phrase* — the same
+inverted gradient `SPEC_constellation_cli_uniformity.md` §1 found in `ms`, inside
+`me` itself.
+
+**Not fixed unilaterally**, because it is the same decision as that spec's D3
+(refuse, with an override), it breaks 13 shipped invocations in this repo's own
+tests, and it is a ruling rather than a fold. The gap is **pinned** by
+`argv_still_accepts_secret_classes_which_is_the_open_gap`, which asserts the
+current unsafe shape so the change is deliberate: when the ruling lands, that
+test flips and its failure is the reminder. The one-line widening is named in a
+comment at the gate.
+
+**Answering D3 probably settles both.**
 
