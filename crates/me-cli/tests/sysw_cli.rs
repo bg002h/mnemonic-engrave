@@ -121,7 +121,13 @@ fn allow_weak_is_accepted_and_says_it_is_ignored() {
 /// The default is to GENERATE, not to leave a payload unprotected by omission.
 #[test]
 fn omitting_every_passphrase_flag_generates_one() {
-    me().args(["sysw", "pack", MD1])
+    // SEED, not MD1: since G-P3.6 the default is decided by CONTENT (§2.4),
+    // so the invocation this test is about -- "no flag, and a passphrase is
+    // generated rather than the payload left unprotected by omission" -- is
+    // the one carrying secret material. A payload of public cards is now
+    // deliberately cleartext, which
+    // `a_payload_with_no_secret_record_is_not_sealed_by_default` pins.
+    me().args(["sysw", "pack", SEED])
         .assert()
         .success()
         .stderr(predicate::str::contains("write this down"))
@@ -1205,4 +1211,177 @@ fn the_override_is_silent_when_nothing_needed_it() {
         !err.contains("--allow-unsigned-inputs"),
         "a fully-signed transaction must not trip the override warning: {err}"
     );
+}
+
+// ─── G-P3.6 — sealing is decided by CONTENT, and says so ─────────────────────
+
+/// SPEC §2.4. `me sysw pack` sealed by DEFAULT — right for a mnemonic, wrong
+/// for a transaction, and contrary to the operator's 2026-08-23 ruling *"send
+/// via payload unencrypted"*. Sealing a transaction payload costs a 12-word
+/// passphrase to store, those 12 words typed on the device's on-screen
+/// keyboard, ~31 s of on-device KDF, and a new way to lose the backup — all to
+/// protect a payload whose whole purpose is to become a steel plate anyone can
+/// read.
+#[test]
+fn a_payload_with_no_secret_record_is_not_sealed_by_default() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    let res = me()
+        .args(["sysw", "pack", "--out", out.to_str().unwrap(), MD1, TEXT])
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
+    assert!(
+        !err.contains("write this down"),
+        "no passphrase should have been generated: {err}"
+    );
+    me().args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("sealed:   false"))
+        .stdout(predicate::str::contains("ct_len:   0"));
+}
+
+/// The other half of the SAME rule, and the half that must not regress: a
+/// payload holding a BIP-39 mnemonic still seals with no flag at all.
+#[test]
+fn a_payload_holding_secret_material_is_still_sealed_by_default() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    me().args(["sysw", "pack", "--out", out.to_str().unwrap(), SEED])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("write this down"));
+    me().args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("sealed:   true"));
+}
+
+/// **"It MUST say which way it went, and why, on stderr, EVERY TIME."** A
+/// content-dependent default that is silent is worse than the default it
+/// replaces: the operator cannot tell a deliberate cleartext container from a
+/// flag they forgot.
+#[test]
+fn pack_states_which_way_sealing_went_and_why_every_time() {
+    // Four invocations, four sentences: content-unsealed, content-sealed,
+    // flag-unsealed, flag-sealed.
+    let cases: [(Vec<&str>, &str, &str); 5] = [
+        (vec![MD1], "NOT SEALED", "no record"),
+        (vec![SEED], "SEALED", "secret material"),
+        (vec!["--no-passphrase", SEED], "NOT SEALED", "--no-passphrase"),
+        (vec!["--passphrase-words", "4", SEED], "SEALED", "--passphrase-words"),
+        // The flag CANNOT seal a payload with nothing secret in it, and the
+        // line must say so rather than claim a protection that does not exist.
+        (vec!["--passphrase-words", "4", MD1], "NOT SEALED", "IGNORED"),
+    ];
+    for (extra, verdict, why) in cases {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("p.bin");
+        let mut args = vec!["sysw", "pack", "--out", out.to_str().unwrap()];
+        args.extend(extra.iter().copied());
+        let res = me().args(&args).assert().success();
+        let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
+        assert!(
+            err.contains(verdict),
+            "`me {}` never said {verdict}: {err}",
+            args.join(" ")
+        );
+        assert!(
+            err.contains(why),
+            "`me {}` said {verdict} without saying why ({why}): {err}",
+            args.join(" ")
+        );
+    }
+}
+
+/// The two verdicts are DISTINGUISHABLE, not one sentence with a word swapped
+/// — "NOT SEALED" contains "SEALED", so a naive contains() check passes on
+/// both and would let the two collapse without a test noticing.
+#[test]
+fn the_sealed_and_unsealed_lines_are_two_sentences() {
+    let grab = |args: &[&str]| -> String {
+        let res = me().args(args).write_stdin("").assert();
+        String::from_utf8_lossy(&res.get_output().stderr)
+            .lines()
+            .find(|l| l.contains("SEALED"))
+            .unwrap_or("")
+            .to_string()
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let a = dir.path().join("a.bin");
+    let b = dir.path().join("b.bin");
+    let unsealed = grab(&["sysw", "pack", "--out", a.to_str().unwrap(), MD1]);
+    let sealed = grab(&["sysw", "pack", "--out", b.to_str().unwrap(), SEED]);
+    assert!(!unsealed.is_empty() && !sealed.is_empty(), "{unsealed:?} {sealed:?}");
+    assert_ne!(unsealed, sealed);
+    assert!(unsealed.contains("NOT SEALED"), "{unsealed}");
+    assert!(!sealed.contains("NOT SEALED"), "{sealed}");
+}
+
+/// The ruled pipeline, whole: a transaction payload packs UNSEALED with no
+/// flags at all, which is the invocation §2.4 exists to make correct.
+#[test]
+fn a_transaction_payload_packs_unsealed_with_no_flags() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    me().args(["sysw", "pack", "--out", out.to_str().unwrap()])
+        .write_stdin(format!("tx:{MT_EVEN_RAW_HEX}\n"))
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("NOT SEALED"));
+    me().args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("sealed:   false"));
+}
+
+/// THE HONESTY INVARIANT, and it is the strongest form this can take: whatever
+/// `pack` says on stderr must be what `show` reads back out of the file. A
+/// message cannot lie if a second program has to agree with it.
+///
+/// This is the test that caught the defect G-P3.6 turned up.
+/// `me sysw pack --passphrase-words 4 <md1>` printed a passphrase, told the
+/// operator to store it APART FROM THE MACHINE -- and wrote a container with
+/// `sealed: false, ct_len: 0`. `pack` moves only SECRET records into the
+/// ciphertext, so with none there the plaintext was empty, `sealed()` is
+/// `ct_len > 0`, and the 16-byte AEAD tag landed past `total_len()` where
+/// nothing authenticates it. The passphrase protected nothing and opened
+/// nothing, and the operator was told to keep it forever.
+#[test]
+fn what_pack_says_about_sealing_is_what_show_reads_back() {
+    let cases: [Vec<&str>; 6] = [
+        vec![MD1],
+        vec![SEED],
+        vec![TEXT, MD1],
+        vec!["--no-passphrase", SEED],
+        vec!["--passphrase-words", "4", SEED],
+        vec!["--passphrase-words", "4", MD1],
+    ];
+    for extra in cases {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("p.bin");
+        let mut args = vec!["sysw", "pack", "--out", out.to_str().unwrap()];
+        args.extend(extra.iter().copied());
+        let res = me().args(&args).assert().success();
+        let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
+        let claimed_sealed = err.contains("sealing:  SEALED");
+        let shown = me().args(["sysw", "show", out.to_str().unwrap()]).assert().success();
+        let stdout = String::from_utf8_lossy(&shown.get_output().stdout).to_string();
+        let really_sealed = stdout.contains("sealed:   true");
+        assert_eq!(
+            claimed_sealed,
+            really_sealed,
+            "`me {}` claimed sealed={claimed_sealed} and the file says {really_sealed}\n\
+             stderr: {err}\nshow: {stdout}",
+            args.join(" ")
+        );
+        // AND: a passphrase is minted only when it opens something.
+        assert_eq!(
+            err.contains("write this down"),
+            really_sealed,
+            "`me {}` minted a passphrase for a container it does not open",
+            args.join(" ")
+        );
+    }
 }

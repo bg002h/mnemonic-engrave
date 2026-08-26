@@ -1045,10 +1045,24 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 report_unsigned_overrides(&recs);
             }
 
+            // G-P3.6 / SPEC §2.4 — SEALING IS DECIDED BY CONTENT.
+            //
+            // This used to be `let sealing = !*no_passphrase;`: seal unless
+            // told otherwise. Right for a mnemonic and wrong for a
+            // transaction, whose whole purpose is to become a steel plate
+            // anyone can read -- and sealing one costs the operator a 12-word
+            // passphrase to store, those 12 words typed on the device's
+            // on-screen keyboard, ~31 s of on-device KDF, and a new way to
+            // lose the backup, to protect nothing.
+            //
+            // The flags still WIN when given: they are the operator saying
+            // what they want, and the content default only decides when
+            // nobody has. What §2.4 forbids is deciding SILENTLY.
+            let sealing = decide_sealing(&recs, *no_passphrase, *passphrase_ask, *passphrase_words);
+
             // Before the passphrase ceremony, not after: generating a passphrase,
             // telling the operator to write it down, and THEN refusing the
             // container teaches them that the note they just made is worthless.
-            let sealing = !*no_passphrase;
             if sealing
                 && !(sysw::wire::MIN_ITERATIONS..=sysw::wire::MAX_ITERATIONS).contains(iterations)
             {
@@ -1068,7 +1082,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // is the "none given" case, and the DEFAULT is to generate rather
             // than to leave a payload unprotected by omission.
             let generated;
-            let passphrase: Option<String> = if *no_passphrase {
+            let passphrase: Option<String> = if !sealing {
                 None
             } else if *passphrase_ask {
                 match rpassword::prompt_password("passphrase: ") {
@@ -1463,6 +1477,109 @@ fn print_mt_confirmation(records: &[String]) {
                 set.len()
             );
         }
+    }
+}
+
+/// SPEC §2.4: **seal iff the payload holds a `Class::is_secret()` record.**
+///
+/// Content decides, and the flags choose only HOW — `--passphrase-ask` to
+/// supply one, `--passphrase-words N` for the generated length,
+/// `--no-passphrase` to keep secret material in the clear (§13 D6 permits it;
+/// F1 flags it at load).
+///
+/// **`--passphrase-ask`/`--passphrase-words` CANNOT seal a payload with
+/// nothing secret in it, and this function refuses to pretend otherwise.**
+/// Measured before this gate, and the defect predates it: `me sysw pack
+/// --passphrase-words 4 <md1>` generated a passphrase, told the operator to
+/// write it down and store it apart from the machine — and emitted
+/// `sealed: false, ct_len: 0`. `pack` moves only SECRET records into the
+/// ciphertext, so with none there the plaintext is empty, `sealed()` is
+/// `ct_len > 0`, and the container is cleartext with a 16-byte AEAD tag
+/// stranded past `total_len()`. The passphrase protected nothing and opened
+/// nothing. So the flag is reported IGNORED, loudly, and no passphrase is
+/// minted for an operator to keep forever.
+///
+/// **It says which way it went and why, on stderr, every time.** A
+/// content-dependent default that is silent is worse than the default it
+/// replaces: the operator cannot tell a deliberately-cleartext container from
+/// a flag they forgot to pass.
+///
+/// The class names are the CLASSES, never the records: naming a `pass:`
+/// record's body here would put a passphrase on stderr.
+fn decide_sealing(
+    records: &[String],
+    no_passphrase: bool,
+    passphrase_ask: bool,
+    passphrase_words: Option<usize>,
+) -> bool {
+    use mnemonic_engrave::sysw;
+    let secret: Vec<String> = records
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| sysw::classify(r).is_secret())
+        .map(|(i, r)| format!("record {i} ({})", class_name(sysw::classify(r))))
+        .collect();
+    let asked = if passphrase_ask {
+        Some("--passphrase-ask")
+    } else if passphrase_words.is_some() {
+        Some("--passphrase-words")
+    } else {
+        None
+    };
+    if secret.is_empty() {
+        // THE CASE §2.4 EXISTS FOR, and the only honest verdict: there is
+        // nothing this container would encrypt.
+        eprint!(
+            "sealing:  NOT SEALED — no record in this payload is secret material, so there \n      \
+             is nothing to encrypt. The container is cleartext: anyone holding the file \n      \
+             can read it."
+        );
+        match asked {
+            Some(flag) => eprintln!(
+                "\n      \
+                 {flag} is IGNORED here, deliberately. `pack` encrypts only secret-class \n      \
+                 records, so a passphrase would have opened nothing and protected nothing \n      \
+                 — and you would have had to keep it forever."
+            ),
+            None => eprintln!(),
+        }
+        return false;
+    }
+    if no_passphrase {
+        eprintln!(
+            "sealing:  NOT SEALED — you passed --no-passphrase, and this payload HOLDS \n      \
+             SECRET MATERIAL ({}). It will sit in flash in cleartext.",
+            secret.join(", ")
+        );
+        return false;
+    }
+    eprintln!(
+        "sealing:  SEALED — this payload holds secret material ({}), so it is encrypted \n      \
+         and opens only with the passphrase{}. Pass --no-passphrase to write it in \n      \
+         cleartext instead.",
+        secret.join(", "),
+        match asked {
+            Some(flag) => format!(" you chose with {flag}"),
+            None => " below".into(),
+        }
+    );
+    true
+}
+
+/// A record CLASS, for an operator. Names the class, never the record.
+fn class_name(c: mnemonic_engrave::sysw::record::Class) -> &'static str {
+    use mnemonic_engrave::sysw::record::Class as C;
+    match c {
+        C::Mnemonic => "BIP-39 mnemonic",
+        C::Codex32Secret => "codex32 secret",
+        C::Passphrase => "passphrase",
+        C::FreeText => "free text",
+        C::Descriptor => "descriptor",
+        C::MdMk => "md1/mk1 card",
+        C::Mt => "mt1 chunk",
+        C::Tx => "raw transaction",
+        C::Address => "address",
+        C::Unknown => "unrecognised record",
     }
 }
 
