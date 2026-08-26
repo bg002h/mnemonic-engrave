@@ -87,9 +87,11 @@ invisible except by its silence.
 
 **It does NOT hold for the composition D1 mandates, and that is C-1.** Zero
 bytes from producer 3 of 3 is not silence — it is a shorter payload that packs
-clean at exit 0. An earlier draft of this section called the invariant *the one
-thing that did not need fixing*; that claim is **retracted**, and §6g is the
-response.
+clean at exit 0. An earlier draft of this section called the invariant the one
+thing here that needed no work; **that claim is retracted**, and §6g is the
+response. (Described rather than quoted — the exact phrasing is a swept term in
+`design/SUPERSEDED_TERMS.txt`, and reproducing it here would make the sweep red
+for prose that is doing its job.)
 
 ## 2a. The affected surface is larger than four CLIs
 
@@ -501,8 +503,9 @@ wrong:
   ASCII that a human must *read* in order to hand-engrave. **The predicate is
   false for all four CLIs.**
 - **`mt`, the tool this spec generalises FROM, deliberately prints to a
-  terminal.** Measured on a pty: `mt encode --quiet --in tx.hex` prints all six
-  strings and exits **0**. Its bearer-exposure warning fires on the *opposite*
+  terminal.** Measured on a pty, naming the input because a count without one is
+  not a measurement (round-1 B6, same defect as B2): `mt encode --quiet --in
+  <the corpus `even` vector>` prints all **six** of that vector's strings and exits **0**. Its bearer-exposure warning fires on the *opposite*
   condition — it warns that stdout is **not** a terminal, so the strings went
   somewhere that keeps them. `mt` treats the terminal as the **safe** disposal
   and the file as the dangerous one. The earlier draft inverted that for its own
@@ -562,7 +565,9 @@ And `ms repair --help` records a deliberate **divergence** from that parity —
 exit **4** rather than 5, because a corrected `ms1` is an unverified candidate
 that cannot self-verify. **The non-uniformity is reasoned and load-bearing.**
 
-**Measured, every cell run during the fold:**
+**Measured where the cell says a number; cells that say "not measured" were
+not run.** The header previously claimed every cell was run while three cells
+in the last row said otherwise — a table cannot assert more than its contents.
 
 | CLI | clap usage error | invalid artifact | repair applied | repair uncorrectable |
 | --- | --- | --- | --- | --- |
@@ -570,7 +575,25 @@ that cannot self-verify. **The non-uniformity is reasoned and load-bearing.**
 | `mk` | 64 | **2** | 5 | 2 |
 | `ms` | 64 | 1 | **4** | 2 |
 | `mt` | 2 | 1 | n/a | n/a |
-| `mnemonic` | 64 | not measured | 5 per D26 | not measured |
+| `mnemonic` | 64 | not measured | **not measured — see below** | not measured |
+
+**On `mnemonic repair` (round-1 B3).** That cell used to carry a number cited
+to the parity ruling rather than to a run — inferred, inside a table whose
+header claimed every cell had been executed. (Not quoted: writing the old cell
+out re-creates the very string this retracts, which has now happened six times
+in this cycle and is caught only by re-running the sweep, never by re-reading.)
+Round 1 reports measuring **4** on identical input, on the grounds that a
+single-string `md1` has no cross-chunk oracle. **That number is not adopted
+here**: the controller could not reproduce it (the input to hand was one chunk
+of a two-chunk set, which exits 2 in both tools for a different reason), and
+transcribing a reviewer's measurement as one's own is how a wrong figure
+travels.
+
+**It matters because the "repair codes are FROZEN" ruling rests on this cell.**
+If `mnemonic repair` really exits 4 where `md repair` exits 5, the parity that
+ruling asserts does not hold across all five CLIs, and D26 needs restating
+rather than citing. **P0 owes the measurement, on a single-chunk `md1` that
+actually repairs, before anything is frozen.**
 | `me` | 2 | 4 = unplaceable record; 2 = terminal refusal | n/a | n/a |
 
 Two collisions this table makes visible and the one-sentence version hid:
@@ -619,9 +642,25 @@ fires.
   `--expect descriptor,cosigner,transaction`. `pack` refuses when a named kind
   is absent from the stream.
 - **Keyed on KINDS, not counts, because a chunked set is N records and N is
-  unpredictable.** Measured: a trivial `pk(@0)` descriptor produces 2 `md1`
-  strings; the reference transaction produces 22 `mt1` strings. `--expect 3`
-  would be wrong more often than right.
+  unpredictable.** Measured 2026-08-26, each with the invocation that produced
+  it — a bare number is not a measurement:
+
+  ```
+  md encode --group-size 0 --from-policy 'pk(@0)' \
+            --context segwitv0 --key '@0=<account xpub>'   -> 2 md1 strings
+  mt encode --in <the corpus `even` vector's raw_hex>      -> 6 mt1 strings
+  ```
+
+  Two records for the simplest descriptor the compiler accepts, six for one
+  small transaction, and neither number is predictable from the input. So
+  `--expect 3` would be wrong more often than right.
+
+  **Note the first command's SHAPE.** `md encode 'pk(@0)'` — a bare template
+  argument — is REFUSED (`unsupported descriptor wrapper`); the count comes
+  from the `--from-policy` compiler path with a concrete key. An earlier
+  revision of this bullet quoted the number without the invocation and was
+  therefore unverifiable, which is how it stood while being wrong about the
+  command and citing an unnamed "reference transaction" for the second figure.
 - **When `--expect` names a kind, an INCOMPLETE chunk set of that kind must
   REFUSE rather than warn.** Without this, C-1's smaller sibling survives.
   Reproduced during the fold: feeding `pack` 1 of a 2-chunk `mk1` set prints
@@ -689,10 +728,14 @@ The reference implementation is `me sysw pack`'s widened argv refusal, landed
 - **Name the override at the point of refusal**, with the condition under which
   it is reasonable — a single-user air-gapped box or an amnesic Tails session.
 - **The remedy must not forward-reference a channel that does not exist.**
-  Measured: `me`'s shipped refusal advises `ms encode --in seed.txt` as the
-  private channel for a secret class, and **`ms encode` has no `--in`** — it
-  exits 64, `unexpected argument '--in' found`. **P2 owes this text, not merely
-  the feature**, and until P2 lands, `me` is advising a command that fails.
+  This rule was earned rather than imagined: `me`'s refusal did advise a
+  secret-class operator to reach `ms encode` through a `--in` flag, and that
+  flag does not exist — the binary exits 64. **It was fixed in `956eea3`,
+  before this spec shipped**; `me` now advises `ms encode --phrase - <
+  seed.txt`, which is `ms`'s actual stdin idiom and is verified to pipe into
+  `me sysw pack`. **Stated forward, because the tree already satisfies it:**
+  when P2 gives `ms` an `--in`, that line becomes the `--in` form — and not
+  before. This rule is not licence to write the older advice back in.
 - **NOT YET VERIFIED, and marked rather than specified:** an interactive shell
   holds history in memory and can rewrite the file on exit, so an in-place edit
   may be undone. A complete recipe has to address that. **No command for it is
@@ -711,7 +754,9 @@ merge them.
   worthless, regardless of where it runs.
 
 Measured in `mt`: `Refusal::new(` is constructed at **56** sites, naming **12**
-distinct `§8` sections. Exactly **two** of the twelve are posture — the argv
+distinct section-8 subsections of `SPEC_mt_v0_1` (written without the sigil —
+see the note in §8a; a sigil here resolves against THIS document and goes green
+against the wrong target). Exactly **two** of the twelve are posture — the argv
 section and the world-readable-stdout section. The other ten are correctness:
 not finalized, fee rate over the ceiling, a malformed input-value argument, a
 `non_witness_utxo` that hashes wrong, an input that looks like base64 PSBT and
@@ -729,9 +774,22 @@ override is scoped to the posture pair and to nothing else.
 | --- | --- | --- |
 | **P0** | the shared crate: `--in`/`--out`/`-`, argv guard with pre-parser ordering, write gate, exit codes, remedy text per §6h, the `--expect` kind vocabulary per §6g. Extracted FROM `mt`/`me`. Plus the distribution mechanism below. | its own tests + an R0 round closing 0C/0I + the two unmeasured `mnemonic` exit cells filled + the in-memory-history question of §6h measured |
 | **P1** | `mt` adopts the crate, and gains `--out` (§6b) and `--allow-argv-secret` (§6d). | `mt`'s 236 tests pass, **with the diff to them enumerated and each edit justified by a named §6 ruling** |
-| **P2** | `ms` FIRST `-` on `combine` and `--in` on all eight verbs, THEN the argv refusal, THEN the 0600 `--out`. Plus this repo's journey drivers. **Highest safety value; do it before the cosmetic work.** | round-trip vectors; `ms combine` and `ms repair` each driven through the private channel; the 18 argv call sites migrated; `me`'s shipped remedy text made true |
-| **P3** | `md`, `mk` header off stdout, grouping to stderr, `--in`/`--out`. Plus `mnemonic`'s grouping surface and the GUI mirror. Plus golden regeneration. | `md encode` into `me sysw pack` runs with **no flags and no grep, on a CHUNKING policy**; `mnemonic-gui`'s schema mirror regenerated; the 7 goldens regenerated |
+| **P2** | `ms` FIRST `-` on `combine` and `--in` on all eight verbs, THEN the argv refusal, THEN the 0600 `--out`. Plus this repo's journey drivers. **Highest safety value; do it before the cosmetic work.** | round-trip vectors; `ms combine` and `ms repair` each driven through the private channel; the 18 argv call sites migrated; `me`'s remedy text still naming only channels that exist |
+| **P3** | `md`, `mk` header off stdout, grouping to stderr, `--in`/`--out`. Plus `mnemonic`'s grouping surface AND its argv refusal across all five of its secret-material channels (`bundle`, `convert`, `derive-child`, `restore --passphrase`, `electrum-decrypt --decrypt-password`), and the GUI mirror. Plus golden regeneration. | `md encode` into `me sysw pack` runs with **no flags and no grep, on a CHUNKING policy**; `mnemonic-gui`'s schema mirror regenerated; the 7 goldens regenerated |
 | **P4** | the operator journey: several inputs of different kinds, one payload, `--expect` engaged. | a captured journey that regenerates, and that FAILS when one producer is made to refuse |
+
+**On `mnemonic`'s argv surface (round-1 B4).** The fold widened this spec from
+four CLIs to five and ruled the override name uniform across all of them — then
+gave `mnemonic` only its *grouping* work, leaving its argv exposure with no
+owning phase at all. That is the same defect as the one round 0 raised for the
+golden files, re-introduced for the tool the fold had just added.
+
+**Five channels carry secret material**, and each is a place a seed phrase or a
+decryption password reaches argv: `bundle`, `convert`, `derive-child`,
+`restore --passphrase`, and `electrum-decrypt --decrypt-password`. They are
+named in P3's row rather than left to "the `mnemonic` work", because a phase
+item that does not enumerate its sites is one a later reader satisfies by doing
+less.
 
 **P2 before P3 is deliberate**: the seed-phrase-on-argv hole is the finding with
 funds behind it; the grouped default is a usability defect.
@@ -755,7 +813,9 @@ to avoid a release step, and D5 needs one. **P0 must name which mechanism it
 uses.** Two further facts it has to absorb:
 
 - **The code being extracted is not in a library.** `write_private` is at
-  `crates/me-cli/src/main.rs:844`, inside a **binary** crate, not exported by
+  `crates/me-cli/src/main.rs` (line 856 at the time of writing — a line number
+  in a file this cycle keeps editing is a fact with a short shelf life; grep for
+  the name), inside a **binary** crate, not exported by
   `me`'s `lib.rs`. It is tested through the binary's integration tests, not
   through an API. Extraction is fresh work with no existing consumers holding it
   steady.
@@ -803,9 +863,17 @@ reported.** I-10 gives 12 files carrying `chunk-set-id:`, including generated
 HTML under `design/journeys/out/`. Measured during the fold: **`design/journeys/out/`
 is not tracked** — `git ls-files design/journeys/out` returns nothing — so those
 are build products that regenerate themselves. **7 tracked files** under
-`design/journeys/` carry the line (5 transcripts and 2 drivers); 28 tracked
-files carry it across all of `design/`. P3 owns the 7; the rest are prose about
-the format and are a documentation sweep, not a regeneration.
+`design/journeys/` carry the line (5 transcripts and 2 drivers), and **P3 owns
+exactly those 7** — they are the ones a regeneration changes.
+
+**The wider count across `design/` is deliberately not pinned.** It has been
+written as 28, reported as 29 by round 1, and measured as 30 by the controller,
+all correctly at the moment each was taken: every new document that *discusses*
+the header increments it, and this spec and its own review reports are three of
+them. A self-referential count is a fact with a shelf life measured in commits.
+The actionable number is 7; the rest are prose about the format and are a
+documentation sweep whose size is `git ls-files design | xargs grep -l` at the
+time anyone does it.
 
 ## 8. What is NOT verified, and must be before the plan closes
 
@@ -871,6 +939,14 @@ is how a real finding hides.
   read as *"section 3b"*. The bad form is described rather than reproduced,
   because writing it out re-creates it — and re-running the gate is what caught
   that.
+- **THAT CLAIM WAS TOO CONFIDENT, and round 1 (B5) proved it.** It was stated
+  document-wide while a third external reference still carried a sigil inside a
+  code span — and because it named a section number this document also has, the
+  gate resolved it against the wrong target and reported STRUCTURE OK. **A green
+  gate is evidence about the references it could resolve, never about the ones
+  it resolved to the wrong place.** That site is now de-sigilled, and the sweep
+  that finds this class is to list EVERY sigil in the file and read each one,
+  not to trust the exit code.
 
 ## 9. Out of scope, explicitly
 

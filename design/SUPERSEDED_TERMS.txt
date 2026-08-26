@@ -25,3 +25,7 @@ engraved out-of-band reminder
 three verbs
 must not select a module
 78 chunks
+reference transaction produces 22
+ms encode --in seed.txt
+did not need fixing
+5 per D26
