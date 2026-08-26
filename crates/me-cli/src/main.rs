@@ -124,23 +124,6 @@ enum Command {
         iterations: u32,
     },
 
-    /// Turn a raw signed transaction into a `tx:` record for `me sysw pack`.
-    ///
-    /// Input is the transaction as HEX — the form `mt decode` and every wallet
-    /// export produces — from a file or stdin, never argv (a transaction is a
-    /// BEARER instrument; argv lands in shell history and /proc). The bytes
-    /// must parse as one serialized transaction; the record is printed to
-    /// stdout and a summary (txid, size) to stderr.
-    ///
-    /// The record feeds the device's QR engraving path: the QR carries the RAW
-    /// transaction bytes, which any ordinary scanner turns back into
-    /// broadcastable hex — no constellation knowledge needed.
-    Tx {
-        /// Read the transaction hex from this file instead of stdin.
-        #[arg(long, value_name = "FILE")]
-        r#in: Option<PathBuf>,
-    },
-
     /// Re-derive the §6.6 public-data hash from your own cards.
     ///
     /// No passphrase, no seal operation, no original file — so the expected
@@ -170,7 +153,9 @@ enum SyswCmd {
     /// `pass:<hex of the UTF-8 bytes>` is a BIP-39 passphrase.
     ///
     /// `tx:<hex of the raw signed transaction>` feeds the device's QR
-    /// engraving path — produce it with `me tx`, which checks the bytes parse.
+    /// engraving path — produce it with `mt encode --record --raw`, which
+    /// checks the bytes parse AND that every input carries a signature. `me`
+    /// consumes constellation strings; it manufactures none of them.
     ///
     /// mt1 strings (from `mt encode`) feed its transaction TEXT plates; pack
     /// the COMPLETE set of FULL strings — never `--elide-prefix` output, whose
@@ -307,9 +292,6 @@ fn run() -> i32 {
     if let Some(Command::Sysw { cmd }) = &cli.command {
         return run_sysw(cmd);
     }
-    if let Some(Command::Tx { r#in }) = &cli.command {
-        return run_tx_cli(r#in.as_ref());
-    }
     if let Some(Command::Seal {
         payload,
         plaintext,
@@ -362,9 +344,11 @@ fn run() -> i32 {
     // empty input reached `convert` and came back
     // "not a bech32 string (no '1' separator / empty HRP)" at exit 4 --
     // describing input the operator never gave as malformed, and disagreeing
-    // with `me tx`, which has always said "no ... given (pipe it in, or --in
-    // FILE)" at exit 2 for the same situation. A new user's first action is
-    // exactly this one.
+    // with `me sysw pack`, which has always said "no ... given (pipe it in, or
+    // --in FILE)" at exit 2 for the same situation. A new user's first action
+    // is exactly this one. (The verb it used to agree with was `me tx`, which
+    // has since moved to `mt encode --record --raw`; the agreement is with the
+    // remaining verbs, and it still has to hold.)
     if input.trim().is_empty() {
         eprintln!("me: no input given (pipe an md1/mk1 string in, or --in FILE)");
         return EXIT_USAGE;
@@ -650,60 +634,6 @@ fn run_seal_cli(
         out.display()
     );
     eprintln!("wipe:  picotool erase -r 0x10E00000 0x10E10000");
-    EXIT_OK
-}
-
-/// `me tx` — hex in, canonical `tx:` record out.
-fn run_tx_cli(in_path: Option<&PathBuf>) -> i32 {
-    use mnemonic_engrave::sysw::{record, tx};
-    let mut input = String::new();
-    if let Some(path) = in_path {
-        match std::fs::read_to_string(path) {
-            Ok(s) => input = s,
-            Err(e) => {
-                eprintln!("me: cannot read {}: {e}", path.display());
-                return EXIT_USAGE;
-            }
-        }
-    } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
-        eprintln!("me: cannot read stdin: {e}");
-        return EXIT_USAGE;
-    }
-    let hexstr: String = input.split_whitespace().collect::<String>().to_lowercase();
-    if hexstr.is_empty() {
-        eprintln!("me: no transaction hex given (pipe it in, or --in FILE)");
-        return EXIT_USAGE;
-    }
-    // `% 2 != 0`, not `is_multiple_of` — unstable on the Rust CI builds with
-    // (the same trap sysw/wire.rs records).
-    #[allow(clippy::manual_is_multiple_of)]
-    let odd = hexstr.len() % 2 != 0;
-    if odd || !hexstr.bytes().all(|b| b.is_ascii_hexdigit()) {
-        eprintln!("me: input is not hex");
-        return EXIT_INVALID;
-    }
-    let bytes: Vec<u8> = (0..hexstr.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&hexstr[i..i + 2], 16).unwrap())
-        .collect();
-    let summary = match tx::parse(&bytes) {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("me: not one serialized Bitcoin transaction: {e}");
-            return EXIT_INVALID;
-        }
-    };
-    // stderr gets the human summary; stdout is the record, pipeable straight
-    // into `me sysw pack --in`.
-    eprintln!(
-        "txid: {}\nsize: {} bytes, {} input(s), {} output(s){}",
-        summary.txid_display,
-        summary.size,
-        summary.inputs,
-        summary.outputs,
-        if summary.segwit { ", segwit" } else { "" }
-    );
-    println!("{}", record::encode_tx(&bytes));
     EXIT_OK
 }
 
@@ -1707,6 +1637,46 @@ fn split_record_stream(raw: &str) -> Vec<String> {
 ///
 /// stdin is LAST rather than first so no existing invocation changes meaning,
 /// and it exists at all because the ruled pipeline is
+/// R7, for EVERY channel that can arrive empty — **not just stdin**.
+///
+/// An empty input is refused rather than packed, because a container built
+/// from nothing is a SILENT SUCCESS: 52 bytes of header, exit 0, and a file
+/// the operator can flash. The device then offers nothing, which is the same
+/// shape as P3's F1 reached from the host side.
+///
+/// **It was implemented on stdin alone, and `--in` bypassed it.** R7's own
+/// reason is why that mattered: `fish` reports a pipeline's status as the LAST
+/// command's, so a failed upstream arrives as nothing at all — and a failed
+/// upstream also leaves a **0-byte file**. `mt encode --record --raw > rec.txt`
+/// fails exactly that way on an operator's first try, because §8.2h refuses a
+/// world-readable stdout and `>` creates 0644 under the usual umask. The
+/// stdin half exited 2 and the `--in` half exited 0 for the same situation.
+///
+/// The message NAMES THE FILE when there is one: "pass them with --in" is
+/// advice to do the thing they just did.
+fn no_records_guard(
+    recs: Vec<String>,
+    from: Option<&std::path::Path>,
+) -> Result<Vec<String>, (String, i32)> {
+    if !recs.is_empty() {
+        return Ok(recs);
+    }
+    let what = match from {
+        Some(p) => format!("no records in {}", p.display()),
+        None => "no records on stdin".to_string(),
+    };
+    Err((
+        format!(
+            "{what}: pass them on argv, with --in, or on stdin.\n      \
+             An EMPTY input is what a FAILED upstream command leaves behind -- \
+             `mt encode --record --raw > rec.txt` writes nothing when it refuses \
+             -- so it is refused here rather than packed into a container that \
+             holds nothing and still flashes."
+        ),
+        EXIT_USAGE,
+    ))
+}
+
 /// `mt encode … | me sysw pack …` — a join an early draft claimed already
 /// worked and which measurably did not.
 fn read_records(
@@ -1716,7 +1686,8 @@ fn read_records(
     if let Some(p) = in_path {
         let raw = std::fs::read_to_string(p)
             .map_err(|e| (format!("{}: {e}", p.display()), EXIT_USAGE))?;
-        return Ok(split_record_stream(&raw));
+        // R7, and it applies to THIS channel too -- see `no_records`.
+        return no_records_guard(split_record_stream(&raw), Some(p));
     }
     if !argv.is_empty() {
         // R2 / G-P3.5. THIS RUNS BEFORE ANYTHING ELSE `pack` DOES, and that is
@@ -1749,7 +1720,7 @@ fn read_records(
                          read it can broadcast it -- and argv is public: /proc, `ps` and \
                          your shell history all keep a copy.\n      \
                          Use a private channel instead:\n      \
-                         \x20   me tx --in tx.hex | me sysw pack --no-passphrase --out p.bin\n      \
+                         \x20   mt encode --record --raw --in tx.hex | me sysw pack --out p.bin\n      \
                          \x20   me sysw pack --in records.txt --out p.bin"
                     ),
                     // POLICY REFUSAL, not usage: the record is understood and
@@ -1777,18 +1748,8 @@ fn read_records(
     std::io::stdin()
         .read_to_string(&mut raw)
         .map_err(|e| (format!("stdin: {e}"), EXIT_USAGE))?;
-    let recs = split_record_stream(&raw);
-    if recs.is_empty() {
-        // R7. EMPTY stdin joins this exit-2 path rather than packing an empty
-        // container: `fish` reports a pipeline's status as the LAST command's,
-        // so `mt encode` failing upstream arrives here as nothing at all, and
-        // a container built from nothing would be a silent success.
-        return Err((
-            "no records: pass them on argv, with --in, or on stdin".into(),
-            EXIT_USAGE,
-        ));
-    }
-    Ok(recs)
+    // R7 for the stdin channel, through the same guard `--in` uses.
+    no_records_guard(split_record_stream(&raw), None)
 }
 
 fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>, allow_world_readable: bool) -> i32 {
@@ -1841,7 +1802,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                     "record {i} (records count from 0) begins `tx:` and its body is hex, \
                      but the bytes are not one serialized Bitcoin transaction ({e}). The \
                      prefix is RESERVED for a raw signed transaction — produce the record \
-                     with `me tx` rather than by hand"
+                     with `mt encode --record --raw` rather than by hand"
                 ),
                 U::UnsignedInputs(idx) => format!(
                     "record {i} (records count from 0) is a `tx:` record whose transaction \

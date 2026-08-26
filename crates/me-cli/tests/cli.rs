@@ -1021,8 +1021,6 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
                why: "a --fill value that does not exist" },
         Case { code: 2, args: s(&["sysw", "show", "/nonexistent/payload.bin"]), stdin: "".to_string(),
                why: "a file that is not there" },
-        Case { code: 2, args: s(&["tx"]), stdin: "".to_string(),
-               why: "`me tx` with nothing piped in" },
         // THE ONE THAT DISAGREED. `me seal --iterations 5` exits 2 and
         // `me sysw pack --iterations 5` exited 4, for the same typo on the
         // same flag with the same range in the same message. Both are usage:
@@ -1059,8 +1057,15 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
         // be reached through a private channel.
         Case { code: 4, args: s(&["sysw", "pack", "--no-passphrase"]),
                stdin: format!("tx:{STRIPPED}\n"), why: "a transaction with an unsigned input" },
-        Case { code: 4, args: s(&["tx"]), stdin: "abababab".to_string(),
-               why: "`me tx` over bytes that are not a transaction" },
+        // WAS `me tx` over bytes that are not a transaction, at exit 4. That
+        // verb moved to `mt encode --record --raw` with P3b -- `me` no longer
+        // manufactures any constellation string -- so the SITUATION is kept
+        // here on the verb that survives, because what this table checks is
+        // that every subcommand spells "the input is wrong" with the same
+        // digit, and dropping the row would shrink the comparison instead.
+        Case { code: 4, args: s(&["sysw", "pack", "--no-passphrase"]),
+               stdin: "tx:abababab\n".to_string(),
+               why: "a tx: record whose body is hex but not a transaction" },
     ];
 
     for c in &cases {

@@ -127,11 +127,11 @@ Verdicts: **MET** · **MET-DIFF** (purpose satisfied another way, reason given) 
 | --- | --- | --- |
 | R1 | MET | `sysw/mod.rs:152-167`; `an_uppercase_hex_body_is_still_a_non_hex_body` |
 | R2 | **MET (P3a)** | `read_records` refuses any argv record whose trimmed, case-folded form begins `tx:`, at **exit 3**, before the passphrase ceremony and before any output; `a_tx_record_on_argv_is_refused`, `the_argv_refusal_echoes_neither_the_transaction_nor_a_passphrase` |
-| R3 | MET-DIFF | `mt encode --record` was never built. The form is chosen by **which tool you run** — `mt encode` → `mt1` chunks → TEXT plates; `me tx` → `tx:` record → QR plates. There is no defaultable flag, so the refusal R3 exists to teach cannot arise |
+| R3 | **MET (P3b)** | `mt encode --record` is built. The form is a FLAG with no default: `record_form_guard` (`mt-cli/src/main.rs`) refuses `--record` with neither `--raw` nor `--chunks`, names both forms and says what each PRODUCES, and runs before the transaction is read. Registered in `mt`'s `refusals.toml` and proven non-vacuous by `scripts/mutate-refusals.sh`. Clap carries the other two halves structurally (`requires`/`conflicts_with`), so the guard is the remainder, not a re-check; `record_without_a_form_is_refused_and_the_refusal_teaches`. **The earlier verdict here was true of a world where `me tx` existed** |
 | R4′ | MET-DIFF | there is no `form` byte and no combined record: the two forms are distinct record **classes** (`Class::Mt`, `Class::Tx`). "One record carrying both" is unrepresentable, so the comparison R4′ prescribes has nothing to compare |
 | R5 | MET | strict admission both sides (L3); **measured:** an elided `mt1` string is refused at exit 4 |
 | R6 | MET | `main.rs:1088-1093` names the 32,734-byte cap. *Minor:* "Split them across two payloads" is not actionable for one transaction |
-| R7 | **MET (P3a)** | `read_records` (`main.rs:1400-1454`) reads stdin when neither argv nor `--in` is given, and EMPTY or whitespace-only stdin joins the same exit-2 path; `empty_stdin_is_the_exit_2_path_not_an_empty_container` |
+| R7 | **MET (P3a; WIDENED P3b)** | `read_records` reads stdin when neither argv nor `--in` is given, and EMPTY or whitespace-only input joins the same exit-2 path. **P3b found the guard was on stdin ALONE**: `--in` an empty file exited **0** and wrote a 52-byte container holding nothing. Both channels now go through one `no_records_guard`, which names the file when there is one; `empty_stdin_is_the_exit_2_path_not_an_empty_container`, `an_empty_in_file_is_the_exit_2_path_too`, `the_empty_in_refusal_names_the_file` |
 | R8 | MET | L13; `mt`'s half at `mnemonic-transaction@542b391` (§8.2h) |
 | R9 | MET | `pack_refuses_a_tx_record_that_is_not_a_transaction`, `me_tx_refuses_non_transactions` |
 | R10 | MET-DIFF | the txid is **derived**, never asserted, so R10's stated hazard (two records *asserting* one txid over different bytes) cannot arise from an assertion. Duplicate candidates merge on **bytes**, not on the txid (`gui/transaction.go:263-327`, `TestPayloadTransactionsConfirmsAndMerges`), so identical twins collapse safely and different ones stay two candidates. Residual: G-P3.10 |
@@ -180,14 +180,14 @@ Verdicts: **MET** · **MET-DIFF** (purpose satisfied another way, reason given) 
 | the device comprehends before it cuts | MET | `mt.Decode`/`ParseTx` before the review screen |
 | plate default is QR + legend; text optional | MET-DIFF | the operator **chooses**; a `tx:`-only candidate offers QR only, an unconfirmed set offers TEXT only. An explicit choice is not worse than a default |
 | payload carries raw XOR chunks | MET-DIFF | per transaction; both may coexist and merge |
-| `mt` emits the record, `me` packs | MET-DIFF | `mt encode` emits the `mt1` strings, which **are** the records; `me tx` emits the `tx:` record; `me` packs. `mt` was left untouched |
+| `mt` emits the record, `me` packs | **MET (P3b)** | `mt encode --record --raw` emits the `tx:` record and `--chunks` emits the bare `mt1` records; `me` packs both and manufactures neither. **`me tx` is deleted** — `me` had no other verb that produced a constellation string, and the one it had disagreed with the consumer one step downstream (G-P3.19) |
 | no new secrecy class | MET | L8 |
 | `MaxSectionLen` → 32,734; NFC keeps 8191 | MET | L9 |
 | the QR's byte encoding stays a parameter until the test plate | MET-DIFF | byte mode is now fixed and **proven decodable by an independent decoder**; the steel half is still S0's (G-P4.1) |
 | the journey walk is the review of this spec | MET | `design/JOURNEY_WALK_engrave_transaction.md` |
 | `me sysw pack` gains stdin | **MET (P3a)** | G-P3.4. `pack_reads_records_from_stdin_when_neither_argv_nor_in_is_given`; the sentence now names three channels (`the_no_records_message_names_stdin`). A TTY stdin prints what it is waiting for rather than looking like a hang |
 | a `tx:` record on argv is refused | **MET (P3a)** | R2 / G-P3.5 |
-| no `--record` default; the refusal teaches | MET-DIFF | R3 |
+| no `--record` default; the refusal teaches | **MET (P3b)** | R3 |
 | chunks engraved verbatim — **no `mt1` decoder in v1** | SUPERSEDED | ruling 2026-08-25b requires the device to compute the confirmation, so the decoder was ported. Chunks are still engraved verbatim |
 | world-readable output refused + override, `me` and `mt` | MET | L13 |
 | sealing decided by content | **MET (P3a)** | `decide_sealing` (`main.rs`): seals iff some record is `Class::is_secret()`, and prints which way and why on **every** invocation. G-P3.6 |
@@ -232,24 +232,36 @@ about never hand-counting is for. Output, pasted:
 
 ```
 section                   MET  DIFF  NOT  SUP  rows
-4.1 refusals               10     5    0    2    17
+4.1 refusals               11     4    0    2    17
 4.2 NORMATIVE              14     6    2    2    24
-4.3 rulings                18     7    4    1    30
+4.3 rulings                20     5    4    1    30
 4.4 close conditions        3     1    6    1    11
-spec items                 45    19   12    6    82
+spec items                 48    16   12    6    82
 
 gates listed in §6: 36  (unique 36)
-gates marked CLOSED: 17
-gates still open:    19 -> G-P3.10 G-P3.14 G-P3.19
+gates marked CLOSED: 18
+gates still open:    18 -> G-P3.10 G-P3.14
                           G-P4.1..G-P4.6  G-P5.1..G-P5.10
 ```
 
-**Every remaining §4 NOT-MET is owned by P4 or P5, or by one of the three P3
-gates held back for the operator's journey walk** (G-P3.10 the txid-collision
-picker, G-P3.14 the review screen's missing outputs/fee/network, G-P3.19 `me
-tx`'s exit 0 on an unsigned transaction). No NOT-MET is unowned.
+**Re-measured after P3b** (the `me tx` → `mt encode --record` graft), by the
+same script. Three verdicts moved and one gate closed: R3 and the two
+`--record` rows became **MET** because the flag now exists to have no default,
+and **G-P3.19 closed by construction**. Nothing was re-classified by reading.
 
-**P3a closed 17 gates** — G-P3.3…G-P3.9, G-P3.11…G-P3.13, G-P3.15…G-P3.18,
+> **A wording trap this recount walked into**, recorded because it costs a
+> whole round to find twice: the script matches `MET-DIFF` **anywhere in a
+> row**, so a row whose verdict is `MET` and whose *prose* says "the earlier
+> MET-DIFF was true of…" counts as DIFF. It printed 10/5 for §4.1 after R3 had
+> already been flipped. **The count is measured; the row is still prose, and
+> prose can lie to the measurement.**
+
+**Every remaining §4 NOT-MET is owned by P4 or P5, or by one of the two P3
+gates held back for the operator's journey walk** (G-P3.10 the txid-collision
+picker, G-P3.14 the review screen's missing outputs/fee/network). No NOT-MET is
+unowned. **G-P3.19 was the third and is closed** — P3b.
+
+**P3b closed G-P3.19.** **P3a closed 17 gates** — G-P3.3…G-P3.9, G-P3.11…G-P3.13, G-P3.15…G-P3.18,
 G-P3.20 — and verified G-P3.1/G-P3.2, **completing the half of G-P3.1 that was
 still open**. §7 records six defects none of the gates asked for.
 
@@ -258,7 +270,14 @@ regrouped — several spec lines say one thing, so e.g. G-P3.16 discharges three
 (§3.2's two NORMATIVE statements and the walk-I ruling) and G-P3.4 discharges
 two (R7 and the stdin ruling); G-P4.5 and G-P5.2 are extra gates on items already
 counted. The other **19** are defects the code walk found that no spec line
-states, and they are the 19 counted above.
+states.
+
+**That second number stopped equalling the open count at P3b**, and the
+sentence here used to lean on their agreeing. Through P3a the 19 walk-found
+gates *were* exactly the 19 still open; G-P3.19 was walk-found and is now
+closed, so it is **19 walk-found, 18 still open**, and the two are different
+sets from here on. Closing 17 §4-derived gates plus G-P3.19 is the 18 CLOSED
+above.
 
 ---
 
@@ -276,7 +295,7 @@ artifact that passes every check and is worthless — or dangerous — in steel.
 | 4 | independent decode proof for every QR class emitted | **MET in the suite** (ZXing, k∈{1,2,3,6}, reverse order). Off steel: G-P4.1 |
 | 5 | cross-language seam tests | **MET** — `sysw_mt_payload.bin`, packed by the Rust binary, read by Go |
 | 6 | txid truth at every surface | **PARTIAL** — full display-order txid on the review screen and the legend; the post-cut recompute path needs `mt inspect`'s raw subject (unmerged) and a phone scan (P4) |
-| 7 | bearer posture | **MET** — raw hex never on argv for `me tx`/`mt encode`; review screen states *"BEARER: anyone holding the plates can broadcast it."*; no echo before a refusal |
+| 7 | bearer posture | **MET** — raw hex never on argv for `mt encode` (§8.2f, before clap) and never accepted on argv by `me sysw pack` (R2, exit 3); review screen states *"BEARER: anyone holding the plates can broadcast it."*; no echo before a refusal |
 | 8 | rulings conformance | **MET** — L7; both legends substituted, un-overridably; nothing in the chunk path refuses |
 | 9 | never emit unvalidated geometry | **MET** — L11; 0.3 mm is never emitted |
 
@@ -330,7 +349,7 @@ host CLI and device screens both, because a journey starts at the host).
 | **G-P3.16 — CLOSED (P3a)** | the compare screen names `me sysw pack` (the re-pack path); `pack`'s digest line carries no pointer | **DONE.** The screen names `me sysw show <file>`; `pack` prints `re-print it with: me sysw show <path>` with the path filled in, and says *"the file you just wrote"* on stdout rather than inventing one. `the_named_command_prints_the_same_digest` RUNS the named command and compares — a pointer to a command that prints something else makes the operator read a mismatch as tampering |
 | **G-P3.17 — CLOSED (P3a)** | no post-cut instruction screen; the engraved instruction is job-level even on a plate with no QR on it | **DONE.** `transactionLegend` takes `plateHasQR`: the legend-only plate says where the symbols are, an inline one says scan these, a single-symbol plate does not mention order. `transactionPostCutFlow` runs once after the last plate, names ONE command per plate kind (`mt inspect` / `mt verify`+`mt decode`), and for an unconfirmed set says the set did not confirm rather than sending the operator to check a txid it never produced. **It was a modal and the modal TRUNCATED it** — `ErrorScreen` does not page, so *"this machine has no camera"* was unreachable with three assertions on its wording passing; it pages now and a test pages it. **Scoped, recorded:** TEXT plates gain no on-plate instruction — a line trades against the brief's own priority (fewest plates) and the `mt1` hrp is self-describing. **Depends on G-P5.7:** `mt inspect`'s raw subject is unmerged, so the named command is not yet on `main` |
 | **G-P3.18 — CLOSED (P3a)** | no cut-TIME estimate before commit, though the code claims the operator budgets by it | **DONE.** `transactionJobTime` sums `Plate.Duration` over `TicksPerSecond` — the same clock the live remaining-time readout uses, so two clocks cannot disagree in front of the operator — and says *"unknown"* at tps 0 rather than dividing by it on a confirm screen. The pinned vector reports *"about 30 min of cutting"* |
-| G-P3.19 | `me tx` emits a `tx:` record for an **unsigned** transaction at exit 0, and `pack` refuses the same bytes at exit 4 one step later | ruled in the journey walk: either `me tx` applies the predicate, or it warns and the sequencing is documented |
+| **G-P3.19 — CLOSED (P3b)** | `me tx` emits a `tx:` record for an **unsigned** transaction at exit 0, and `pack` refuses the same bytes at exit 4 one step later | **DONE — BY CONSTRUCTION, which is why neither prescribed remedy was taken.** The walk offered two: make `me tx` apply the predicate, or make it warn and document the sequencing. Both keep two implementations of one question. The verb moved to `mt` instead, where the transaction vocabulary already lives, and `mt encode --record --raw` inherits **§8.3** — an input with neither scriptSig nor witness on any input is refused, per input, **before a record exists**. There is no exit-0-then-exit-4 disagreement left to sequence, because the producer cannot emit what the consumer refuses. **Measured end to end:** the 113-byte witness-stripped form of the pinned `even` vector → `mt` REFUSED §8.3, 0 bytes on stdout → `me sysw pack` "no records", nothing written. `the_raw_form_inherits_the_signature_guard` (+ its honest control), `the_chunks_form_inherits_the_signature_guard_too` |
 | **G-P3.20 — CLOSED (P3a)** | **no end-to-end UI walk exists** for the transaction program (`runUITouch` is used in 39 other test files, not this one) | **DONE.** Five walks in `gui/transaction_walk_test.go` drive the real flow through real screens and finish the engrave through a real `EngraveScreen`: QR from a `tx:` record, TEXT from a confirmed set, the two legend-substitution paths, and the picker. Four **goldens** of the plates themselves (`tx-qr`, `tx-text`, `tx-unconfirmed`, `tx-unsigned-qr`) — mutation-proven to catch a lost warning at the artifact rather than at a string. **Journey:** `design/JOURNEY_engrave_transaction.md`, regenerated byte-identically by `scripts/gen-tx-journey.sh`; its device screens come from `TestCaptureTransactionJourney`, which is the walk instrumented, so document and test cannot drift. **Its one limit, stated in it:** the frames are the firmware's op tree, not the emulator's framebuffer — what the device SAYS, not how it LOOKS. That capture needs WASM + playwright and belongs with P4, beside a photograph of steel. **THREE DEFECTS THE WALK FOUND** are recorded in §7 |
 
 **P4 — S0, the hardware session.** *This gate cannot be simulated and the

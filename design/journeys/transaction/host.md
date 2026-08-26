@@ -7,32 +7,214 @@ $ head -c 96 'work/tx.hex'; echo '...'
 (exit 0)
 ```
 
-### Turn it into a record. argv is refused for this class, so it is a pipe
+### The obvious two-step form: write the record to a file first
 
 ```console
-$ me tx --in 'work/tx.hex' > 'work/rec.txt'; head -c 40 'work/rec.txt'; echo '...'
-tx:020000000001017c8da925af70e49a12b0cea...
-txid: 2dcf2b973d52044b1e58c988a5a59d388073ff05598b0a1e93eeb04c72ebf630
-size: 222 bytes, 1 input(s), 2 output(s), segwit
-(exit 0)
+$ mt encode --record --raw --bitcoin-cli /nonexistent/bitcoin-cli --in 'work/tx.hex' > 'work/rec.txt'
+WARNING: nLockTime 96 is BELOW this build's reference height 963759.
+
+  This transaction is not meaningfully time-locked -- its lock height
+  passed before mt was built. Treat it as spendable now.
+
+WARNING: no bitcoind reachable — mt could not check the chain before you cut.
+
+  These are the questions a node would have answered, and mt has NOT:
+  
+  - are these inputs still unspent, or did something else take them?
+  - what fee does this actually pay?
+  - how far away is the locktime, in real blocks?
+  
+  Engraving takes about 21 minutes per plate and is permanent. Running
+  mt again with a node reachable takes seconds and answers all three.
+  If the inputs turn out to be spent, the plate is scrap the moment it
+  leaves the machine.
+
+WARNING: this is a RAW TRANSACTION, not a PSBT.
+
+  A raw transaction carries its inputs' OUTPOINTS but not their
+  VALUES, so mt cannot compute the fee from it alone.
+  
+  THE FEE IS UNKNOWN. mt cannot tell you whether it is 0.0001 BTC or 9
+  BTC. Supply the values with --input-value <index>:<amount>, or
+  re-run with a node reachable so mt can fetch them. (§8.2e)
+
+WARNING: anyone holding this engraving can broadcast this transaction.
+
+  mt checked that every input carries a signature committing to the
+  outputs, so a holder should not be able to send the money anywhere
+  else. That check reads WITNESS SHAPE, not script — mt has no
+  script engine (§8.2). An exotic or hostile input CAN defeat it.
+  Treat the engraving as if a holder could take the funds.
+
+WARNING: when you are done, verify the ENGRAVING — not this output.
+
+  SCAN the cut symbol with an ordinary QR reader and run:
+  
+  mt inspect --in scanned.hex
+  
+  It must report the same txid as the report above. Inspecting the
+  file mt just produced tests nothing that can fail — and this
+  machine has no camera, so nothing but you will ever look at the
+  plate.
+
+TX        2dcf2b973d52044b1e58c988a5a59d388073ff05598b0a1e93eeb04c72ebf630
+OUT       2 output(s)   (addresses shown as MAINNET — no node to ask)
+            bc1qc80qm4p46822m9ldragav0u3eqqvcn4th8q3sl   0.05000000 BTC
+            bc1qw5gf0s5e6c65lwevt2z9ztwhprefqt67ng6mjz   49.94998590 BTC
+FEE       UNKNOWN   (needs input values, which the transaction
+          does not carry)
+LOCKTIME  LOCKED TO BLOCK 96          current height unknown (no node)
+INPUTS    1 input(s)
+            1abaa37ac432ac86…   UNKNOWN
+STATUS    UNKNOWN — no node reachable
+RECORD    one tx: record, 447 characters — for QR plates
+          the device chooses the plate layout; mt does not
+
+SUGGESTED LEGEND — cut this beside the symbol. mt cannot see your
+plate, so the layout is yours (§3b); these are the five facts a
+stranger needs BEFORE they can do anything with the steel.
+
+    BEARER - ANYONE HOLDING THIS CAN BROADCAST IT
+    FORMAT: raw transaction, QR — scan it, then broadcast
+    FROM WALLET ????????        <-- NOT SUPPLIED
+    TO ????????   <-- NOT SUPPLIED
+    LOCKED TO BLOCK 96
+
+  FROM WALLET and TO are NOT SUPPLIED. The transaction does not carry either
+  fact — it names outpoints and scripts, not wallets — so mt cannot
+  fill it in and will not guess. Supply --from / --to, or engrave the
+  line by hand. A plate that says neither leaves a recoverer holding
+  steel they cannot place.
+
+  NO AMOUNT on the TO line: this transaction has 2 outputs and mt
+  cannot tell which is the destination and which is CHANGE — that
+  needs the sending wallet's descriptor, which mt never sees. Write
+  the amount yourself if you want it on the plate; the report above
+  lists every output.
+
+WARNING: the record just left this terminal — and it is BEARER, exactly like the plate.
+
+  stdout is not a terminal, so the record went somewhere that keeps it
+  — a file, a pipe, or another program. Wherever that is, anyone who
+  reads it can broadcast this transaction: it is the engraving, in a
+  form that copies itself.
+  
+  If it landed in a FILE, destroy it once the plates are cut and
+  verified: `shred -u <file>` on Linux, `rm -P <file>` on macOS. Plain
+  `rm` unlinks the name and leaves the bytes. And check it is not
+  already in a backup, a sync folder, or your editor's undo history.
+
+mt encode: REFUSED — §8.2h, stdout is a file of mode 0644 — readable by other users on this machine.
+
+  This record IS the engraving, and a finalized transaction is BEARER:
+  anyone who can read that file can broadcast it.
+
+  mt has no --out: stdout IS the record, by design (§3b). So the
+  remedies are the shell's:
+  
+  umask 077 then re-run; the shell creates it 0600
+  chmod 600 <file> then re-run -- `>` truncates but keeps the mode
+  --allow-world-readable proceed anyway
+(exit 1)
 ```
 
-### The refusal that makes it a pipe
+### So it is a PIPE — mt owns transactions, me owns the container
 
 ```console
-$ me sysw pack --no-passphrase 'tx:<the 222-byte transaction, elided>'
-me: record 0, as given (records count from 0), is a `tx:` record on ARGV. Refused; nothing was read and nothing was written.
-      A raw signed transaction is a BEARER instrument -- anyone who can read it can broadcast it -- and argv is public: /proc, `ps` and your shell history all keep a copy.
-      Use a private channel instead:
-          me tx --in tx.hex | me sysw pack --no-passphrase --out p.bin
-          me sysw pack --in records.txt --out p.bin
-(exit 3)
-```
+$ mt encode --record --raw --bitcoin-cli /nonexistent/bitcoin-cli --in 'work/tx.hex' | me sysw pack --region --out 'work/region.bin'
+WARNING: nLockTime 96 is BELOW this build's reference height 963759.
 
-### Pack it. Nothing here is secret, so nothing is sealed
+  This transaction is not meaningfully time-locked -- its lock height
+  passed before mt was built. Treat it as spendable now.
 
-```console
-$ me sysw pack --region --out 'work/region.bin' --in 'work/rec.txt'
+WARNING: no bitcoind reachable — mt could not check the chain before you cut.
+
+  These are the questions a node would have answered, and mt has NOT:
+  
+  - are these inputs still unspent, or did something else take them?
+  - what fee does this actually pay?
+  - how far away is the locktime, in real blocks?
+  
+  Engraving takes about 21 minutes per plate and is permanent. Running
+  mt again with a node reachable takes seconds and answers all three.
+  If the inputs turn out to be spent, the plate is scrap the moment it
+  leaves the machine.
+
+WARNING: this is a RAW TRANSACTION, not a PSBT.
+
+  A raw transaction carries its inputs' OUTPOINTS but not their
+  VALUES, so mt cannot compute the fee from it alone.
+  
+  THE FEE IS UNKNOWN. mt cannot tell you whether it is 0.0001 BTC or 9
+  BTC. Supply the values with --input-value <index>:<amount>, or
+  re-run with a node reachable so mt can fetch them. (§8.2e)
+
+WARNING: anyone holding this engraving can broadcast this transaction.
+
+  mt checked that every input carries a signature committing to the
+  outputs, so a holder should not be able to send the money anywhere
+  else. That check reads WITNESS SHAPE, not script — mt has no
+  script engine (§8.2). An exotic or hostile input CAN defeat it.
+  Treat the engraving as if a holder could take the funds.
+
+WARNING: when you are done, verify the ENGRAVING — not this output.
+
+  SCAN the cut symbol with an ordinary QR reader and run:
+  
+  mt inspect --in scanned.hex
+  
+  It must report the same txid as the report above. Inspecting the
+  file mt just produced tests nothing that can fail — and this
+  machine has no camera, so nothing but you will ever look at the
+  plate.
+
+TX        2dcf2b973d52044b1e58c988a5a59d388073ff05598b0a1e93eeb04c72ebf630
+OUT       2 output(s)   (addresses shown as MAINNET — no node to ask)
+            bc1qc80qm4p46822m9ldragav0u3eqqvcn4th8q3sl   0.05000000 BTC
+            bc1qw5gf0s5e6c65lwevt2z9ztwhprefqt67ng6mjz   49.94998590 BTC
+FEE       UNKNOWN   (needs input values, which the transaction
+          does not carry)
+LOCKTIME  LOCKED TO BLOCK 96          current height unknown (no node)
+INPUTS    1 input(s)
+            1abaa37ac432ac86…   UNKNOWN
+STATUS    UNKNOWN — no node reachable
+RECORD    one tx: record, 447 characters — for QR plates
+          the device chooses the plate layout; mt does not
+
+SUGGESTED LEGEND — cut this beside the symbol. mt cannot see your
+plate, so the layout is yours (§3b); these are the five facts a
+stranger needs BEFORE they can do anything with the steel.
+
+    BEARER - ANYONE HOLDING THIS CAN BROADCAST IT
+    FORMAT: raw transaction, QR — scan it, then broadcast
+    FROM WALLET ????????        <-- NOT SUPPLIED
+    TO ????????   <-- NOT SUPPLIED
+    LOCKED TO BLOCK 96
+
+  FROM WALLET and TO are NOT SUPPLIED. The transaction does not carry either
+  fact — it names outpoints and scripts, not wallets — so mt cannot
+  fill it in and will not guess. Supply --from / --to, or engrave the
+  line by hand. A plate that says neither leaves a recoverer holding
+  steel they cannot place.
+
+  NO AMOUNT on the TO line: this transaction has 2 outputs and mt
+  cannot tell which is the destination and which is CHANGE — that
+  needs the sending wallet's descriptor, which mt never sees. Write
+  the amount yourself if you want it on the plate; the report above
+  lists every output.
+
+WARNING: the record just left this terminal — and it is BEARER, exactly like the plate.
+
+  stdout is not a terminal, so the record went somewhere that keeps it
+  — a file, a pipe, or another program. Wherever that is, anyone who
+  reads it can broadcast this transaction: it is the engraving, in a
+  form that copies itself.
+  
+  If it landed in a FILE, destroy it once the plates are cut and
+  verified: `shred -u <file>` on Linux, `rm -P <file>` on macOS. Plain
+  `rm` unlinks the name and leaves the bytes. And check it is not
+  already in a backup, a sync folder, or your editor's undo history.
+
 sealing:  NOT SEALED — no record in this payload is secret material, so there 
       is nothing to encrypt. The container is cleartext: anyone holding the file 
       can read it.
@@ -41,6 +223,18 @@ digest:   c282 6ca8 4f21 2887 02cc 70f0 91d7 5d34
           re-print it with: me sysw show work/region.bin
 me: region image — 499 bytes of container, padded with 0xFF to 65536; write it at 0x10D00000
 (exit 0)
+```
+
+### The refusal that keeps it off argv
+
+```console
+$ me sysw pack --no-passphrase 'tx:<the 222-byte transaction, elided>'
+me: record 0, as given (records count from 0), is a `tx:` record on ARGV. Refused; nothing was read and nothing was written.
+      A raw signed transaction is a BEARER instrument -- anyone who can read it can broadcast it -- and argv is public: /proc, `ps` and your shell history all keep a copy.
+      Use a private channel instead:
+          mt encode --record --raw --in tx.hex | me sysw pack --out p.bin
+          me sysw pack --in records.txt --out p.bin
+(exit 3)
 ```
 
 ### What is in it, and the digest to compare on the machine
@@ -78,10 +272,26 @@ digest:   c2af 6413 749c 2241 319b 95aa 0ee2 532e
 (exit 0)
 ```
 
-### An unsigned transaction is refused, and it names the input
+### An unsigned transaction never becomes a record — the PRODUCER refuses
 
 ```console
-$ printf 'tx:<the 113-byte stripped transaction, elided>\n' | me sysw pack --no-passphrase --out /dev/null
+$ mt encode --record --raw --bitcoin-cli /nonexistent/bitcoin-cli --in 'work/stripped.hex' | me sysw pack --no-passphrase --out 'work/never.bin'
+mt encode: REFUSED — §8.3, 1 of 1 inputs carry no signature (input 0)
+
+  Each of these inputs has an empty scriptSig AND an empty witness, so
+  nothing satisfies it. An unsigned transaction cannot be broadcast,
+  so engraving it produces a plate that is not a backup of anything.
+
+  Sign it first — `walletprocesspsbt`, then `finalizepsbt`.
+me: no records on stdin: pass them on argv, with --in, or on stdin.
+      An EMPTY input is what a FAILED upstream command leaves behind -- `mt encode --record --raw > rec.txt` writes nothing when it refuses -- so it is refused here rather than packed into a container that holds nothing and still flashes.
+(exit 2)
+```
+
+### …and the consumer still refuses it on its own, if one reaches it by hand
+
+```console
+$ printf 'tx:%s\n' '<the 113-byte stripped transaction, elided>' | me sysw pack --no-passphrase --out /dev/null
 sealing:  NOT SEALED — no record in this payload is secret material, so there 
       is nothing to encrypt. The container is cleartext: anyone holding the file 
       can read it.

@@ -10503,3 +10503,33 @@ deserialiser to TinyGo.** Incomplete is far cheaper — the chunk header carries
 
 **Un-overridable.** The substituted legend MUST NOT be dismissible back to the
 operator's own text — a warning the operator can turn off is not a control.
+
+---
+
+### F-246 — `mt encode --record` does not say whether the record fits an NFC TAG (owning phase: **P2, and it needs an operator ruling FIRST**) `#mt` `#nfc`
+
+**Filed 2026-08-25 during P3b, deliberately NOT implemented.**
+
+`SPEC_engrave_transaction.md` §2.3 item 2 (line 450) and the §6 P2 scope row both
+say the record must state whether it fits an **NFC tag** — `gui/scan.go`'s 8 KB
+scan buffer, **8191**, and explicitly **not** `MaxSectionLen` (32,734). The two
+caps belong to different transports: a `sysw` container has exactly one (picotool
+to `0x10D00000`), while a bare record on a tag is bounded by the scan buffer, so
+quoting the container's number on a record would promise a journey the artifact
+cannot take.
+
+**Why it is not built.** The operator has not ruled on it, and the graft's brief
+scoped it out in those words. The parallel arm (`exp/tx-plan-driven` `fc7072a`)
+did build it — a `RECORD    <n> characters — fits an NFC tag (8191 max…)` line on
+stderr, with a `TOO LARGE … deliver it by me sysw pack and picotool instead`
+branch — so there is a worked reference if the ruling goes that way. **Do not
+graft it without the ruling**: that arm's line was attached to its own `MTX1`
+framing, whose length is not this record's length.
+
+**What the ruling has to settle**, because it is not obvious which way it should
+go: `mt` has no `--out` (stdout *is* the artifact, §3b), so it cannot know the
+record's destination. A line that says "fits an NFC tag" on a record the operator
+is about to flash by picotool is noise on every run of the commoner journey.
+
+**Done when:** the operator rules, and either the line exists with a test
+asserting it names 8191 and never 32,734, or this item is closed as declined.

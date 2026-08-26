@@ -682,25 +682,23 @@ fn pack_warns_on_an_incomplete_mt_set() {
     assert!(err.contains("of 6"), "must name the declared count: {err}");
 }
 
-/// `me tx` builds the record, and the record round-trips through pack + show.
+/// THE RULED PIPELINE'S `me` HALF: the record `mt encode --record --raw`
+/// emits packs, on stdin, and reads back.
+///
+/// **The record is CONSTRUCTED here rather than produced.** The producer moved
+/// to `mt` with P3b, and this repo cannot invoke it, so what is pinned is the
+/// FORMAT: `tx:` + the transaction's canonical serialization in lowercase hex,
+/// nothing else. `mt`'s own
+/// `tests/tx_record.rs::the_raw_form_is_the_prefix_and_the_transaction_hex_and_nothing_else`
+/// asserts its stdout equals that same string over the same `even` vector, so
+/// the two repos pin one shape from opposite sides with no shared code between
+/// them. If either drifts, one of the two goes red.
+///
+/// argv is refused for this class (G-P3.5), so stdin is the whole join — and
+/// it is the invocation §1.1 said must work.
 #[test]
-fn me_tx_builds_a_record_that_packs() {
-    let a = me()
-        .arg("tx")
-        .write_stdin(MT_EVEN_RAW_HEX)
-        .assert()
-        .success();
-    let record = String::from_utf8_lossy(&a.get_output().stdout)
-        .trim()
-        .to_string();
-    assert_eq!(record, format!("tx:{MT_EVEN_RAW_HEX}"));
-    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
-    assert!(err.contains(MT_EVEN_TXID), "summary must name the txid: {err}");
-
-    // THE RULED PIPELINE, end to end: `me tx` writes the record on stdout and
-    // `me sysw pack` reads it on stdin. argv is refused for this class
-    // (G-P3.5), so this is the whole join -- and it is the invocation §1.1
-    // said must work.
+fn the_record_mt_emits_packs_on_stdin() {
+    let record = format!("tx:{MT_EVEN_RAW_HEX}");
     me()
         .args(["sysw", "pack", "--no-passphrase"])
         .write_stdin(format!("{record}\n"))
@@ -730,19 +728,6 @@ fn pack_refuses_a_tx_record_that_is_not_a_transaction() {
         .stderr(predicate::str::contains("not lowercase hex"));
 }
 
-/// `me tx` refuses bytes that do not parse, at exit 4, naming the shape.
-#[test]
-fn me_tx_refuses_non_transactions() {
-    me()
-        .arg("tx")
-        .write_stdin("abababab")
-        .assert()
-        .code(4)
-        .stderr(predicate::str::contains("not one serialized Bitcoin transaction"));
-    me().arg("tx").write_stdin("zz").assert().code(4);
-    me().arg("tx").write_stdin("").assert().code(2);
-}
-
 /// A flipped character in an mt1 string is REFUSED at pack (exact validity,
 /// never correction), with the record's index named.
 #[test]
@@ -758,7 +743,8 @@ fn pack_refuses_a_damaged_mt1_string() {
 }
 
 /// `show` names a tx: record as what it is, with its txid — the value the
-/// operator compares against `me tx`'s own report.
+/// operator compares against the report `mt encode` printed when it built the
+/// record.
 #[test]
 fn show_names_a_tx_record() {
     let dir = tempfile::tempdir().unwrap();
@@ -895,6 +881,71 @@ fn empty_stdin_is_the_exit_2_path_not_an_empty_container() {
         .assert()
         .code(2)
         .stderr(predicate::str::contains("no records"));
+}
+
+/// R7's OTHER CHANNEL, found by running the pipeline rather than by reading it.
+///
+/// R7 was implemented on stdin only, and `--in` returned whatever the file
+/// held — so an EMPTY file packed an empty container at **exit 0** and wrote
+/// 52 bytes of header holding nothing, while the byte-identical situation on
+/// stdin exited 2. R7's own stated reason applies verbatim here: a failed
+/// upstream leaves a 0-byte file, and `mt encode --record --raw > rec.txt`
+/// fails that way for a reason an operator meets on their first try — §8.2h
+/// refuses a world-readable stdout, and `>` under the usual umask creates 0644.
+///
+/// **The empty container is the worse outcome, which is what earns the
+/// refusal.** It flashes, it boots, and the device offers nothing — the same
+/// silent-nothing shape as P3's F1, reached from the host side instead.
+#[test]
+fn an_empty_in_file_is_the_exit_2_path_too() {
+    let dir = tempfile::tempdir().unwrap();
+    let empty = dir.path().join("rec.txt");
+    let out = dir.path().join("p.bin");
+    std::fs::write(&empty, "").unwrap();
+    me().args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
+        .args(["--in", empty.to_str().unwrap()])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("no records"));
+    assert!(
+        !out.exists(),
+        "a refusal must leave no artifact — an empty container that exists is          one an operator can flash"
+    );
+    // Whitespace-only, the same: `split_record_stream` drops blank lines, so a
+    // file of newlines is empty by the same definition stdin uses.
+    let blanks = dir.path().join("blanks.txt");
+    std::fs::write(&blanks, "\n\n\n").unwrap();
+    me().args(["sysw", "pack", "--no-passphrase"])
+        .args(["--in", blanks.to_str().unwrap()])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("no records"));
+    // THE CONTROL: the same channel with one real record still packs, so the
+    // guard is about emptiness and not about `--in`.
+    let good = dir.path().join("good.txt");
+    std::fs::write(&good, format!("{TEXT}\n")).unwrap();
+    me().args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
+        .args(["--in", good.to_str().unwrap()])
+        .assert()
+        .success();
+}
+
+/// The refusal NAMES THE FILE when the records came from `--in`. "no records:
+/// pass them on argv, with --in, or on stdin" is advice to do the thing the
+/// operator just did, and it is the message they meet when an upstream tool
+/// failed — so it has to say which file was empty.
+#[test]
+fn the_empty_in_refusal_names_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let empty = dir.path().join("rec.txt");
+    std::fs::write(&empty, "").unwrap();
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase"])
+        .args(["--in", empty.to_str().unwrap()])
+        .assert()
+        .code(2);
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+    assert!(err.contains("rec.txt"), "name the file that was empty: {err}");
 }
 
 /// The sentence §1.1 quoted must have changed: it named two channels and there

@@ -30,6 +30,14 @@ pub const PASS_PREFIX: &str = "pass:";
 /// must both decode as hex AND parse as a serialized transaction
 /// ([`crate::sysw::tx`]) -- the prefix is reserved either way, so a body that
 /// fails either check is [`Class::Unknown`], never demoted to free text.
+///
+/// **`me` READS this class and does not WRITE it.** `mt encode --record --raw`
+/// produces it, which is where the transaction vocabulary lives: `mt` refuses
+/// an input whose every satisfaction is empty (§8.3) before a record exists,
+/// so the producer cannot emit what [`classify`](crate::sysw::classify) would
+/// refuse. There is no `encode_tx` here for the same reason there is no
+/// mnemonic generator -- every other constellation string comes from its own
+/// tool too, and a second encoder is a second thing to drift.
 pub const TX_PREFIX: &str = "tx:";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,13 +109,6 @@ pub fn decode_body(record: &str) -> Result<Zeroizing<Vec<u8>>, RecordError> {
         .or_else(|| record.strip_prefix(TX_PREFIX))
         .ok_or(RecordError::NotEncoded)?;
     unhex_lower(body).ok_or(RecordError::BadHex)
-}
-
-/// Encode a raw signed transaction as a canonical `tx:` record. The caller is
-/// expected to have parsed it first (`me tx` does); packing re-checks via
-/// `classify`.
-pub fn encode_tx(bytes: &[u8]) -> String {
-    format!("{TX_PREFIX}{}", hex_lower(bytes))
 }
 
 /// Decode to a `String`, for the consumers that need text rather than bytes.
