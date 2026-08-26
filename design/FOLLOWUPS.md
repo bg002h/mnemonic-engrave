@@ -10988,14 +10988,59 @@ actually come to rest:
 | 0644 file under a 0700 ancestor | unreachable by others | **refuses**, exit 2 (F-252) |
 | a terminal | scrollback, session logs | **writes it**, exit 0 (this entry) |
 
-**What would close it.** Split the char-device exemption: keep `/dev/null` (and
-`/dev/zero`) exempt by device identity rather than by the whole class, and treat
-an actual TTY as a destination that must be opted into. `isatty(1)` already
-distinguishes them, and `me` calls it elsewhere — the stdin banner in F-251's
-measurement is TTY-gated, so the mechanism is present in this binary today.
+**WHAT WOULD CLOSE IT — the operator's proposal, 2026-08-25, and it has
+precedent in this binary.** Rather than dumping the blob or bare-refusing, print
+the command that writes it. **`me seal` already does this** (`run_seal_cli`,
+`me-cli/src/main.rs:633`):
+
+```
+load:  picotool load --verify <file>   (machine in BOOTSEL)
+wipe:  picotool erase -r 0x10E00000 0x10E10000
+```
+
+`me sysw pack` prints **zero** picotool hints — measured. So the fix is not a new
+invention, it is making `pack` do what its sibling verb already does, with `sysw`'s
+own region address (`0x10D00000`, `--region`) instead of `seal`'s `0x10E00000`.
+
+Mechanically: when stdout is a TTY and no `--out` was given, emit the `--out` +
+`picotool` sequence instead of the container. That closes the scrollback exposure
+**and** supplies the route, which is the through-line of F-246/248/249/250/251.
+`IsTerminal` is already used in this binary at `main.rs:1740` for the stdin
+banner, so the mechanism is present today.
+
+**PIPING STRAIGHT INTO `picotool` IS NOT THE ANSWER — SETTLED ON HARDWARE
+2026-08-25**, with the operator's SH2 in BOOTSEL (`2e8a:000f RP2350 Boot`).
+Tested with `picotool verify`, which is READ-ONLY on the device — `load` was
+never run, because it writes and the machine carries the burned OTP key.
+
+| stdout | `st_size` | picotool does |
+| --- | --- | --- |
+| regular file | 4096 | reads it, reports the flash mismatch |
+| `/dev/stdin` ← a file | 4096 | **identical** to naming the file |
+| `/dev/stdin` ← a pipe | **0** | *"No ranges to verify"* |
+
+**picotool sizes the file with `fstat`, and a pipe reports `st_size` 0.** So a
+pipe does not fail — it silently reads NOTHING. `picotool load -` is separately
+rejected at argument parsing ("unexpected option: -").
+
+**The danger is the silence.** `load` takes the same file-sizing path, so
+`me sysw pack | picotool load /dev/stdin` should write nothing and report
+success — a silent no-op on a FLASHING operation, leaving the operator believing
+their payload is on the device. NOT tested directly: `load` writes, and the test
+device is the operator's own machine. The `verify` result and the shared sizing
+path are the evidence.
+
+**Two controls were run, and the first one mattered.** With NO device attached,
+a nonexistent path and a real path return the same "No accessible RP-series
+devices" message — picotool checks for a device *before* opening the file, so
+the device gate absorbs the whole test. The hardware run is what made file-level
+errors observable at all ("Could not open '/nonexistent/nope.bin'").
+
+It is moot regardless: a `0x10D00000` write wants `--region`, which pads to
+`REGION_LEN` with `0xFF` and is file-shaped by design.
 
 **Do not close it by refusing all char devices** — that is the `/dev/null` case
-the existing comment protects, and there are tests for it.
+the existing comment protects (mode 0666), and there are tests for it.
 
 **Check `mt` for the same shape.** Its §8.2h guard shares this design and the
 Rust-primary rule applies; `mt encode` writes text rather than a binary blob, so
