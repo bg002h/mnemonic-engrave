@@ -264,7 +264,10 @@ artifact that passes every check and is worthless — or dangerous — in steel.
 - **An adversary holding the machine, or forging plates.** Physical custody is
   assumed, as everywhere in this product.
 - **Honest empty/empty inputs** (P2A anchor spends and similar exotica) —
-  false-positives of check 1. The override that names them is not built (G-P3.3).
+  false-positives of check 1. `--allow-unsigned-inputs` is the override, and it
+  names every failing input index at pack time and again in `me sysw show`
+  (G-P3.3, closed P3a). It is host-only by construction: there is no flag byte
+  in the wire format, so the DEVICE re-derives signedness for itself.
 - **Regenerability of the payload.** Ruled 2026-08-25: report loudly, pack.
 - **A second `tx:` record that is byte-different but shares a txid** (witness
   malleation). Both pass; the picker cannot tell them apart. G-P3.10.
@@ -280,7 +283,7 @@ host CLI and device screens both, because a journey starts at the host).
 | --- | --- | --- |
 | G-P3.1 | the signature predicate has **no Go counterpart** (`grep` for `every_input_signed` over the fork: 0 hits; `mt/mt.go:263` skips the scriptSig without inspecting it) | `mt.ParseTx` returns a per-input signedness flag; a `tx:` record or reassembled set with an unsigned input reaches the device flagged with the mandatory legend substitution; RED-tested with the 113-byte stripped vector |
 | G-P3.2 | the predicate does not guard the **`mt1` chunk class** on either side — `sysw::mt::set_confirmed` (`sysw/mt.rs:124-138`) checks parse + binding only. (`mt encode` refuses unsigned input at §8.3 — but that is a different tool, not this container's admission boundary) | `set_confirmed` and `mt.Decode` both consult the predicate, or the sheet records a ruling that they deliberately do not |
-| G-P3.3 | `--allow-unsigned-inputs` (`FORWARD_PLAN` §2.1) does not exist — **measured:** clap rejects it. Overdue from P0 | the flag exists, names the failing input indices, and has a test |
+| **G-P3.3 — CLOSED (P3a)** | `--allow-unsigned-inputs` (`FORWARD_PLAN` §2.1) does not exist — **measured:** clap rejects it. Overdue from P0 | **DONE.** `TxSummary::unsigned_inputs` carries the indices and `every_input_signed` is now *defined* from it, so the two cannot drift. `sysw::Admission` is the seam (`classify_with`/`pack_with`); the refusal, the override warning and `me sysw show` all name the failing inputs by number. **Scoped:** it loosens nothing else, is silent on a fully-signed transaction, and deliberately does NOT reach the `mt1` chunk class — nothing there refuses, and the device recomputes confirmation itself, so a host flag could only make the two disagree. Mutation-tested twice (per-input → whole-transaction reddens 4; flag ignored in `classify` reddens 3) |
 | **G-P3.4 — CLOSED (P3a)** | `me sysw pack` has **no stdin path**; the ruled pipeline `mt encode \| me sysw pack` cannot be typed | **DONE.** `main.rs:split_record_stream`/`read_records`; precedence `--in` > argv > stdin. Five tests in `tests/sysw_cli.rs`: stdin is read, blank lines skipped as with `--in`, empty and whitespace-only stdin exit 2, the message names stdin, argv still wins. Mutation-tested: removing the empty guard reddens 2 |
 | **G-P3.5 — CLOSED (P3a)** | a `tx:` record on **argv** is not refused (R2) | **DONE.** Exit 3 (policy refusal — the record is well-formed, the channel is not), raised in `read_records` before anything else `pack` does. Five tests: refused, located by argv index, echoes neither the body nor a generated passphrase, still packs from `--in` and stdin (byte-identical containers), and is scoped to the `tx:` class alone. The exit-code table gained a row. Mutation-tested: `if false &&` reddens 4 |
 | G-P3.6 | sealing is **flag-decided**, not content-decided, and says nothing | `pack` seals iff some record is `Class::is_secret()`, and prints which way it went and why, every time |

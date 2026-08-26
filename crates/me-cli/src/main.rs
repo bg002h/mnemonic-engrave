@@ -219,6 +219,20 @@ enum SyswCmd {
         /// kept so existing invocations keep working.
         #[arg(long)]
         allow_weak: bool,
+        /// Admit a `tx:` record with an input carrying NEITHER a scriptSig NOR
+        /// a witness (FORWARD_PLAN §2.1).
+        ///
+        /// The predicate this overrides has honest false positives -- a P2A
+        /// anchor-spend input carries neither and is perfectly valid -- so the
+        /// escape hatch exists rather than a check nobody can get past. Every
+        /// admitted record is named on stderr, with the failing input indices.
+        ///
+        /// It loosens NOTHING else: the body must still be lowercase hex and
+        /// must still parse as one serialized transaction. It also does not
+        /// reach the `mt1` chunk class, which never refuses and whose
+        /// confirmation the DEVICE recomputes for itself.
+        #[arg(long)]
+        allow_unsigned_inputs: bool,
         /// Proceed even though stdout is a world-readable file (F-244).
         ///
         /// `me` refuses by default: a container is BEARER, and `>` creates a
@@ -1001,6 +1015,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             passphrase_ask,
             no_passphrase,
             allow_weak,
+            allow_unsigned_inputs,
             allow_world_readable,
             iterations,
             region,
@@ -1018,6 +1033,17 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     return code;
                 }
             };
+
+            // G-P3.3. Stated BEFORE the passphrase ceremony for the same
+            // reason the ceremony itself is ordered that way: a warning the
+            // operator reads after writing a passphrase down is a warning
+            // about work already done.
+            let admission = mnemonic_engrave::sysw::Admission {
+                allow_unsigned_inputs: *allow_unsigned_inputs,
+            };
+            if *allow_unsigned_inputs {
+                report_unsigned_overrides(&recs);
+            }
 
             // Before the passphrase ceremony, not after: generating a passphrase,
             // telling the operator to write it down, and THEN refusing the
@@ -1082,7 +1108,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // legitimately produces.
             report_unconfirmed(&recs);
 
-            let blob = match sysw::pack(recs, passphrase.as_deref(), *iterations) {
+            let blob = match sysw::pack_with(recs, passphrase.as_deref(), *iterations, admission) {
                 Ok(b) => b,
                 Err(e) => {
                     // On the WRITE path "malformed container" is the wrong
@@ -1287,6 +1313,53 @@ fn report_unconfirmed(records: &[String]) {
     }
 }
 
+/// "input 1" / "inputs 1 and 3" / "inputs 0, 2 and 5" — the operator reads
+/// this, so it is prose rather than a Debug-formatted Vec.
+fn name_inputs(idx: &[usize]) -> String {
+    let n: Vec<String> = idx.iter().map(usize::to_string).collect();
+    match n.len() {
+        0 => "no input".into(),
+        1 => format!("input {}", n[0]),
+        _ => format!("inputs {} and {}", n[..n.len() - 1].join(", "), n[n.len() - 1]),
+    }
+}
+
+/// `--allow-unsigned-inputs` (G-P3.3): one loud line per record the override
+/// actually admitted, naming the failing inputs.
+///
+/// SILENT when nothing needed it. A flag that shouts on every payload trains
+/// the operator to ignore the one payload where it matters — and this one
+/// matters: the artifact it lets through has the txid of a transaction that
+/// can never be broadcast.
+fn report_unsigned_overrides(records: &[String]) {
+    use mnemonic_engrave::sysw;
+    for (i, r) in records.iter().enumerate() {
+        if !r.starts_with(sysw::record::TX_PREFIX) {
+            continue;
+        }
+        let Ok(body) = sysw::record::decode_body(r) else {
+            continue;
+        };
+        let Ok(t) = sysw::tx::parse(&body) else {
+            continue;
+        };
+        if t.every_input_signed {
+            continue;
+        }
+        eprintln!(
+            "me: WARNING — record {i}, as given (records count from 0): {} of this \n      \
+             transaction carr{} neither a scriptSig nor a witness. ADMITTED because you \n      \
+             passed --allow-unsigned-inputs.\n      \
+             txid {} — the SAME txid a fully signed version would have, because \n      \
+             stripping signatures is exactly what the txid ignores. If those inputs are \n      \
+             not honestly empty, the plate you are about to cut can never be broadcast.",
+            name_inputs(&t.unsigned_inputs),
+            if t.unsigned_inputs.len() == 1 { "ies" } else { "y" },
+            t.txid_display,
+        );
+    }
+}
+
 /// `me sysw show`: the same rule, stated per record, so the operator can see
 /// which cards the machine will treat as secrets before anything is flashed.
 ///
@@ -1345,17 +1418,37 @@ fn print_mt_confirmation(records: &[String]) {
         }
     }
     for (i, r) in records.iter().enumerate() {
-        if sysw::classify(r) != sysw::record::Class::Tx {
+        // Keyed on the PREFIX, not on `classify`. `classify` is strict, so a
+        // record admitted by `--allow-unsigned-inputs` reads back as
+        // `Class::Unknown` -- and `show` listing nothing at all for a record
+        // the container demonstrably holds is worse than either verdict.
+        // A reader may disagree with the writer; it may not go quiet.
+        if !r.starts_with(sysw::record::TX_PREFIX) {
             continue;
         }
-        // Classification already proved the parse; re-derive for the report.
-        if let Ok(b) = sysw::record::decode_body(r) {
-            if let Ok(t) = sysw::tx::parse(&b) {
-                println!(
-                    "public record {i}: raw signed transaction — txid {}, {} bytes",
-                    t.txid_display, t.size
-                );
-            }
+        let Ok(b) = sysw::record::decode_body(r) else {
+            println!("public record {i}: `tx:` record whose body is not lowercase hex");
+            continue;
+        };
+        let Ok(t) = sysw::tx::parse(&b) else {
+            println!("public record {i}: `tx:` record whose body is not a transaction");
+            continue;
+        };
+        if t.every_input_signed {
+            println!(
+                "public record {i}: raw signed transaction — txid {}, {} bytes",
+                t.txid_display, t.size
+            );
+        } else {
+            println!(
+                "public record {i}: raw transaction with UNSIGNED input(s) — txid {}, {} \
+                 bytes; {} carr{} neither a scriptSig nor a witness, so a plate cut from \
+                 this can never be broadcast. It was packed with --allow-unsigned-inputs.",
+                t.txid_display,
+                t.size,
+                name_inputs(&t.unsigned_inputs),
+                if t.unsigned_inputs.len() == 1 { "ies" } else { "y" },
+            );
         }
     }
     for idxs in sets.values() {
@@ -1553,14 +1646,17 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      prefix is RESERVED for a raw signed transaction — produce the record \
                      with `me tx` rather than by hand"
                 ),
-                U::UnsignedInputs => format!(
+                U::UnsignedInputs(idx) => format!(
                     "record {i} (records count from 0) is a `tx:` record whose transaction \
-                     parses but has an input carrying NEITHER a scriptSig NOR a witness — \
-                     it is unsigned, or its signatures were stripped in transit.\n      \
+                     parses but whose {} carries NEITHER a scriptSig NOR a witness — it is \
+                     unsigned, or its signatures were stripped in transit.\n      \
                      This is refused because the txid does NOT change when signatures are \
                      removed: the record would show the txid you expect, and the plate cut \
                      from it could never be broadcast.\n      \
-                     Re-export the FINALIZED transaction from your signer."
+                     Re-export the FINALIZED transaction from your signer.\n      \
+                     If those inputs are honestly empty (a P2A anchor spend and similar \
+                     exotica), pass --allow-unsigned-inputs.",
+                    name_inputs(idx)
                 ),
                 U::Unrecognised => format!(
                     "record {i} (records count from 0) is not a form this container can \

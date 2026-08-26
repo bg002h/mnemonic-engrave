@@ -57,6 +57,15 @@ pub struct TxSummary {
     /// legacy transaction, and a signed one has non-empty scriptSigs. This
     /// predicate catches both cases and carries no field at all.
     pub every_input_signed: bool,
+    /// The INDICES of the inputs that carry neither. Empty exactly when
+    /// [`TxSummary::every_input_signed`] is true.
+    ///
+    /// Carried rather than recomputed by the caller because a refusal that
+    /// says only *"an input is unsigned"* sends the operator back to a wallet
+    /// with nothing to look at, and because `--allow-unsigned-inputs` has to
+    /// name what it let through -- an override whose warning is as vague as
+    /// the refusal it replaces is a switch, not a decision.
+    pub unsigned_inputs: Vec<usize>,
 }
 
 impl TxSummary {
@@ -238,6 +247,13 @@ pub fn parse(bytes: &[u8]) -> Result<TxSummary, TxError> {
         return Err(TxError::TrailingBytes);
     }
 
+    // PER INPUT, and the list is the answer rather than a bool derived from a
+    // list: `unsigned_inputs` is what the messages print and `every_input_signed`
+    // is defined from it, so the two cannot drift.
+    let unsigned: Vec<usize> = (0..n_in)
+        .filter(|&i| !(input_has_script_sig[i] || input_has_witness[i]))
+        .collect();
+
     // txid = SHA256d(version ‖ inputs ‖ outputs ‖ locktime) — the
     // witness-STRIPPED serialization (BIP-141), displayed byte-reversed.
     let mut h = Sha256::new();
@@ -254,7 +270,8 @@ pub fn parse(bytes: &[u8]) -> Result<TxSummary, TxError> {
         inputs: n_in,
         outputs: n_out,
         segwit,
-        every_input_signed: (0..n_in).all(|i| input_has_script_sig[i] || input_has_witness[i]),
+        every_input_signed: unsigned.is_empty(),
+        unsigned_inputs: unsigned,
     })
 }
 
@@ -430,5 +447,23 @@ mod signature_predicate_tests {
             "input 1 has no scriptSig and no witness — input 0 being signed does not make the \
              transaction spendable, and a whole-transaction test would call this signed"
         );
+        // The INDICES, not just the verdict: this is what `--allow-unsigned-inputs`
+        // and the refusal both print, and naming input 0 would send the operator
+        // to the one input that is fine.
+        assert_eq!(t.unsigned_inputs, vec![1]);
+    }
+
+    /// `every_input_signed` is DEFINED from `unsigned_inputs`, and this asserts
+    /// the two agree on all three shapes rather than trusting the definition to
+    /// stay that way.
+    #[test]
+    fn the_verdict_and_the_index_list_are_one_answer() {
+        for hex in [EVEN_RAW_HEX, EVEN_STRIPPED_HEX, MIXED_STRIPPED_HEX] {
+            let t = parse(&unhex(hex)).unwrap();
+            assert_eq!(t.every_input_signed, t.unsigned_inputs.is_empty(), "{hex}");
+            assert!(t.unsigned_inputs.iter().all(|&i| i < t.inputs), "{hex}");
+        }
+        assert_eq!(parse(&unhex(EVEN_STRIPPED_HEX)).unwrap().unsigned_inputs, vec![0]);
+        assert!(parse(&unhex(EVEN_RAW_HEX)).unwrap().unsigned_inputs.is_empty());
     }
 }

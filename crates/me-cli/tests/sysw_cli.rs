@@ -1045,3 +1045,164 @@ fn the_argv_refusal_is_scoped_to_the_transaction_class() {
         .assert()
         .success();
 }
+
+// ─── G-P3.3 — `--allow-unsigned-inputs` (FORWARD_PLAN §2.1) ──────────────────
+
+/// `EVEN` with every witness stripped: 113 bytes, and its txid is byte-for-byte
+/// the honest transaction's, because stripping the witness is precisely the
+/// operation the txid is defined to ignore.
+const TX_STRIPPED: &str = "02000000017c8da925af70e49a12b0cea7b639df5037c87b7fa61f262b86ac32c47aa3ba1a0000000000fdffffff02404b4c0000000000160014c1de0dd435d1d4ad97ed1f51d63f91c800cc4eab3ea1b92901000000160014751097c299d6354fbb2c5a84512dd708f2902f5e60000000";
+
+/// TWO inputs: input 0 legacy and still carrying its scriptSig, input 1 a
+/// segwit input whose witness was removed. A whole-transaction predicate
+/// passes this; only the per-INPUT one names input 1.
+const TX_MIXED_STRIPPED: &str = "020000000211111111111111111111111111111111111111111111111111111111111111110000000048473030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030ffffffff22222222222222222222222222222222222222222222222222222222222222220100000000ffffffff0150c3000000000000160014333333333333333333333333333333333333333300000000";
+
+/// The refusal must NAME THE FAILING INPUTS, not just assert unsignedness.
+/// "an input is unsigned" sends the operator back to a wallet with nothing to
+/// look at; "input 1" is a place to look.
+#[test]
+fn the_unsigned_refusal_names_the_failing_input_indices() {
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase"])
+        .write_stdin(format!("tx:{TX_MIXED_STRIPPED}\n"))
+        .assert()
+        .code(4)
+        .get_output()
+        .clone();
+    let err = String::from_utf8_lossy(&out.stderr).to_string();
+    assert!(err.contains("input 1"), "must name the failing input: {err}");
+    assert!(
+        !err.contains("input 0"),
+        "input 0 IS signed and must not be named: {err}"
+    );
+    assert!(
+        err.contains("--allow-unsigned-inputs"),
+        "the refusal must name the override that exists for honest exotica: {err}"
+    );
+}
+
+/// THE OVERRIDE ITSELF. It exists because the predicate has honest
+/// false-positives — a P2A anchor-spend input carries neither scriptSig nor
+/// witness and is perfectly valid — and a check with no escape hatch becomes a
+/// reason to stop using the tool.
+#[test]
+fn allow_unsigned_inputs_admits_the_record_and_names_what_it_admitted() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    let res = me()
+        .args([
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--allow-unsigned-inputs",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .write_stdin(format!("tx:{TX_STRIPPED}\n"))
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
+    // Loud, and specific: which record, which inputs, and what it costs.
+    assert!(err.contains("record 0"), "{err}");
+    assert!(err.contains("input 0"), "must name the input it let through: {err}");
+    assert!(
+        err.contains("--allow-unsigned-inputs"),
+        "the warning must name the flag that caused it: {err}"
+    );
+    assert!(
+        err.to_lowercase().contains("broadcast"),
+        "the warning must say what the operator loses: {err}"
+    );
+    // AND THE RECORD IS REALLY IN THERE. `show` is a READER and reads
+    // strictly, so it must not describe this one as a signed transaction --
+    // but it must not be SILENT about it either. A container whose `show`
+    // omits a record it holds is the worst of both.
+    me().args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("UNSIGNED"))
+        .stdout(predicate::str::contains("input 0"))
+        .stdout(predicate::str::contains(MT_EVEN_TXID));
+}
+
+/// `show` reports an unsigned `tx:` record it finds in a container, whoever
+/// wrote it. The strict reader classifies it `Unknown`, so before this it
+/// listed nothing at all: the operator saw a 229-byte public section and no
+/// account of what was in it.
+#[test]
+fn show_names_an_unsigned_tx_record_rather_than_omitting_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--allow-unsigned-inputs",
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .write_stdin(format!("tx:{TX_MIXED_STRIPPED}\n"))
+    .assert()
+    .success();
+    let res = me().args(["sysw", "show", out.to_str().unwrap()]).assert().success();
+    let stdout = String::from_utf8_lossy(&res.get_output().stdout).to_string();
+    assert!(stdout.contains("public record 0"), "{stdout}");
+    assert!(stdout.contains("input 1"), "must name the failing input: {stdout}");
+    assert!(
+        !stdout.contains("input 0"),
+        "input 0 is signed and must not be named: {stdout}"
+    );
+    assert!(
+        stdout.to_lowercase().contains("broadcast"),
+        "must say what it costs: {stdout}"
+    );
+}
+
+/// The override is SCOPED to the signature predicate. Everything else the
+/// `tx:` prefix requires still refuses with it set — otherwise the flag would
+/// be a general "admit anything" switch, which is not what it was ruled to be.
+#[test]
+fn allow_unsigned_inputs_loosens_nothing_else() {
+    for (body, want) in [
+        ("tx:abab", "not one serialized Bitcoin transaction"),
+        ("tx:zz", "not lowercase hex"),
+    ] {
+        me().args(["sysw", "pack", "--no-passphrase", "--allow-unsigned-inputs"])
+            .write_stdin(format!("{body}\n"))
+            .assert()
+            .code(4)
+            .stderr(predicate::str::contains(want));
+    }
+}
+
+/// It names ONLY the unsigned inputs of a mixed transaction — the mutation
+/// that turns the per-input predicate into a whole-transaction one leaves the
+/// single-input vector green and reddens this.
+#[test]
+fn the_override_reports_exactly_the_unsigned_inputs_of_a_mixed_transaction() {
+    let res = me()
+        .args(["sysw", "pack", "--no-passphrase", "--allow-unsigned-inputs"])
+        .write_stdin(format!("tx:{TX_MIXED_STRIPPED}\n"))
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
+    assert!(err.contains("input 1"), "{err}");
+    assert!(!err.contains("input 0"), "input 0 is signed: {err}");
+}
+
+/// A SIGNED transaction produces no warning at all with the flag set. A flag
+/// that shouts on every payload trains the operator to ignore it.
+#[test]
+fn the_override_is_silent_when_nothing_needed_it() {
+    let res = me()
+        .args(["sysw", "pack", "--no-passphrase", "--allow-unsigned-inputs"])
+        .write_stdin(format!("tx:{MT_EVEN_RAW_HEX}\n"))
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
+    assert!(
+        !err.contains("--allow-unsigned-inputs"),
+        "a fully-signed transaction must not trip the override warning: {err}"
+    );
+}

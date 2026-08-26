@@ -95,7 +95,7 @@ pub enum SyswError {
 /// passphrase. An error message is the last place it may appear — stderr is
 /// logged, scrolled back and pasted into bug reports. Only the reserved prefix
 /// is named, and that is a compile-time constant.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnknownReason {
     /// A reserved prefix (`text:` / `pass:` / `tx:`) whose body is not
     /// lowercase hex. The prefixes are RESERVED, so this is refused rather
@@ -111,7 +111,12 @@ pub enum UnknownReason {
     /// were stripped. **The txid is unchanged by stripping**, so this is the
     /// only signal there is, and a plate cut from such a body can never be
     /// broadcast.
-    UnsignedInputs,
+    ///
+    /// Carries the failing INPUT indices. They name no operator data — an
+    /// input's position in a serialization the operator already holds — and a
+    /// refusal that says only "an input is unsigned" gives them nothing to
+    /// look at. [`Admission::allow_unsigned_inputs`] overrides this one arm.
+    UnsignedInputs(Vec<usize>),
     /// No reserved prefix, not a BIP-39 mnemonic, and not a constellation
     /// string. This is the case the descriptor/address gap belongs to.
     Unrecognised,
@@ -125,7 +130,9 @@ fn unknown_reason(record: &str) -> UnknownReason {
             Ok(b) => match tx::parse(&b) {
                 Err(e) => UnknownReason::NotATransaction(e),
                 // It parsed, so the refusal was the signature predicate.
-                Ok(t) if !t.every_input_signed => UnknownReason::UnsignedInputs,
+                Ok(t) if !t.every_input_signed => {
+                    UnknownReason::UnsignedInputs(t.unsigned_inputs)
+                }
                 // classify refused it, so neither arm can be reached here; keep
                 // a total answer anyway rather than panic on a future skew.
                 Ok(_) => UnknownReason::Unrecognised,
@@ -140,6 +147,27 @@ fn unknown_reason(record: &str) -> UnknownReason {
     UnknownReason::Unrecognised
 }
 
+/// What the packer will admit that strict classification would not.
+///
+/// **One arm, deliberately.** `--allow-unsigned-inputs` (`FORWARD_PLAN` §2.1)
+/// exists because the signature predicate has honest false positives — a P2A
+/// anchor-spend input carries neither a scriptSig nor a witness and is
+/// perfectly valid — and a check with no escape hatch becomes a reason to stop
+/// using the tool. It is NOT a general "admit anything" switch: every other
+/// requirement the `tx:` prefix carries still refuses.
+///
+/// **It deliberately does not reach the `mt1` chunk class.** Nothing in the
+/// chunk path refuses (ruling 2026-08-25b), so there is no refusal to
+/// override; and the DEVICE recomputes confirmation itself, so a host flag
+/// that made an unsigned set report "confirmed" would only make the two
+/// disagree. `sysw::mt::set_confirmed` therefore ignores this type.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Admission {
+    /// Admit a `tx:` record whose transaction parses but has at least one
+    /// input carrying neither a scriptSig nor a witness.
+    pub allow_unsigned_inputs: bool,
+}
+
 /// Which section a record belongs in.
 ///
 /// **Descriptor and Address are deliberately absent**, and this is a known
@@ -148,6 +176,12 @@ fn unknown_reason(record: &str) -> UnknownReason {
 /// crate. An unclassifiable record is REFUSED at pack time with its index, so
 /// the failure is a named error at creation rather than a mis-filed secret.
 pub fn classify(record: &str) -> record::Class {
+    classify_with(record, Admission::default())
+}
+
+/// [`classify`] under a stated [`Admission`]. The strict default is what every
+/// reader uses; only `me sysw pack` with an explicit flag passes anything else.
+pub fn classify_with(record: &str, adm: Admission) -> record::Class {
     use record::Class;
     if record.starts_with(record::TX_PREFIX) {
         // Reserved, like text:/pass: -- and admission requires the body to
@@ -160,7 +194,7 @@ pub fn classify(record: &str) -> record::Class {
             // it passes every identifier comparison an operator can make — and
             // a plate cut from it can never be broadcast. See `tx::TxSummary`.
             Ok(b) => match tx::parse(&b) {
-                Ok(t) if t.every_input_signed => Class::Tx,
+                Ok(t) if t.every_input_signed || adm.allow_unsigned_inputs => Class::Tx,
                 _ => Class::Unknown,
             },
             _ => Class::Unknown,
@@ -207,11 +241,21 @@ pub fn pack(
     passphrase: Option<&str>,
     iterations: u32,
 ) -> Result<Vec<u8>, SyswError> {
+    pack_with(records, passphrase, iterations, Admission::default())
+}
+
+/// [`pack`] under a stated [`Admission`] — the `--allow-unsigned-inputs` seam.
+pub fn pack_with(
+    records: Vec<String>,
+    passphrase: Option<&str>,
+    iterations: u32,
+    adm: Admission,
+) -> Result<Vec<u8>, SyswError> {
     let mut salt = [0u8; wire::SALT_LEN];
     let mut iv = [0u8; wire::IV_LEN];
     rand::RngCore::fill_bytes(&mut rand::rng(), &mut salt);
     rand::RngCore::fill_bytes(&mut rand::rng(), &mut iv);
-    pack_deterministic(records, passphrase, iterations, salt, iv)
+    pack_deterministic_with(records, passphrase, iterations, salt, iv, adm)
 }
 
 /// [`pack`] with the randomness supplied, so a fixture can be a fixture.
@@ -229,7 +273,20 @@ pub fn pack_deterministic(
     salt: [u8; wire::SALT_LEN],
     iv: [u8; wire::IV_LEN],
 ) -> Result<Vec<u8>, SyswError> {
-    let (mut payload, mut pub_bytes, mut header) = split(records)?;
+    pack_deterministic_with(records, passphrase, iterations, salt, iv, Admission::default())
+}
+
+/// [`pack_deterministic`] under a stated [`Admission`]. **Still the only
+/// implementation** — the doc comment above is about this function.
+pub fn pack_deterministic_with(
+    records: Vec<String>,
+    passphrase: Option<&str>,
+    iterations: u32,
+    salt: [u8; wire::SALT_LEN],
+    iv: [u8; wire::IV_LEN],
+    adm: Admission,
+) -> Result<Vec<u8>, SyswError> {
+    let (mut payload, mut pub_bytes, mut header) = split(records, adm)?;
 
     // UNSEALED carries secret classes in the cleartext section — decision 6
     // permits it and F1 flags it at load. Only the sealed path encrypts them.
@@ -296,10 +353,13 @@ pub fn pack_deterministic(
     seal_with(payload, pub_bytes, header, pass, iterations, salt, iv)
 }
 
-fn split(records: Vec<String>) -> Result<(Payload, Vec<u8>, wire::Header), SyswError> {
+fn split(
+    records: Vec<String>,
+    adm: Admission,
+) -> Result<(Payload, Vec<u8>, wire::Header), SyswError> {
     let mut payload = Payload::default();
     for (i, r) in records.into_iter().enumerate() {
-        match classify(&r) {
+        match classify_with(&r, adm) {
             record::Class::Unknown => return Err(SyswError::Unclassifiable(i, unknown_reason(&r))),
             c if c.is_secret() => payload.secret.push(Zeroizing::new(r)),
             _ => payload.public.push(r),
