@@ -10506,7 +10506,7 @@ operator's own text — a warning the operator can turn off is not a control.
 
 ---
 
-### F-246 — `mt encode --record` does not say whether the record fits an NFC TAG (owning phase: **P2, and it needs an operator ruling FIRST**) `#mt` `#nfc`
+### F-247 — `mt encode --record` does not say whether the record fits an NFC TAG (owning phase: **P2, and it needs an operator ruling FIRST**) `#mt` `#nfc`
 
 **Filed 2026-08-25 during P3b, deliberately NOT implemented.**
 
@@ -10533,3 +10533,167 @@ is about to flash by picotool is noise on every run of the commoner journey.
 
 **Done when:** the operator rules, and either the line exists with a test
 asserting it names 8191 and never 32,734, or this item is closed as declined.
+
+---
+
+## RULING 2026-08-25c (G-P3.10) — two transactions sharing a txid: ENGRAVE BOTH
+
+**Operator ruling, taken during the journey walk 2026-08-25:**
+
+> *"If two transactions in a payload have same txid, we can just engrave both
+> without much concern. The odds are low and we can't be responsible for every
+> edge case."*
+
+**Consistent with the standard** — reasonable effort funds safety, not
+perfection. A deliberate 20-bit collision costs under a second to construct, but
+a full 256-bit txid collision does not, and the operator is not the threat model.
+
+**BUT THE CODE DOES NOT DO THIS, AND IS WORSE THAN THE RULING ASSUMES.**
+`gui/transaction.go:449`:
+
+```go
+if c.confirmed && c.tx.TxidDisplay == tx.TxidDisplay {
+    continue next   // merged: the set candidate already carries the bytes
+}
+```
+
+A `tx:` record whose txid matches an existing chunk-set candidate is **skipped
+entirely** — not merged, not flagged, **dropped**. So today two transactions
+sharing a txid yield **one** engraveable candidate and the operator is never told
+the other existed. That is silent data loss, which is a different and worse thing
+than the duplicate-row confusion G-P3.10 was filed about.
+
+**The merge itself is legitimate and must stay:** the SAME transaction delivered
+both as `mt1` chunks and as a `tx:` record should appear once.
+
+**WHAT CHANGES: NOTHING. The operator was told the code DROPS rather than
+duplicates, and ruled again: leave it that way.**
+
+So the behaviour is: two transactions sharing a full 256-bit txid yield **one**
+engraveable candidate, the second is discarded, and nothing says so. My earlier
+proposal to key the merge on the bytes instead is **retracted** — it was raised,
+heard, and declined.
+
+**The cost, recorded once so it is on file and not relitigated:** this is silent,
+not loud. Every other lossy condition in this design reports (an incomplete set,
+an orphan, a set that will not decode). This one does not. The operator's
+judgement is that a full-txid collision is rare enough, and not the tool's
+responsibility, that a silent drop is an acceptable trade at the
+reasonable-effort bar. **A future reviewer finding this should read this
+paragraph and move on, not re-open it.**
+
+**G-P3.10's premise is retired.** It asked about two identical picker rows. The
+rows were never the problem.
+
+---
+
+---
+
+## RULING 2026-08-25d — S0 (P4) is DEFERRED UNTIL AFTER SHIP, and its purpose changes
+
+**Operator ruling:**
+
+> *"P4 will be deferred until after ship. The results are essentially already
+> known from work outside the repo, but it's still worth doing as probing higher
+> density / smaller features isn't well explored."*
+
+**This inverts `FORWARD_PLAN` §4**, which read *"S0 gates the release and nothing
+earlier."* It no longer gates it. **P5 may ship with P4 outstanding.**
+
+**AND IT CHANGES WHAT S0 IS FOR.** The acceptance sheet frames G-P4.1–G-P4.6 as
+*confirmatory* — "no engraved QR has ever been scanned", "the physics gate has
+never run". That framing is true **of this repository** and false of the
+operator's knowledge: the results are already known from work outside it. So S0's
+remaining value is **exploratory** — probing higher density and smaller features,
+which is genuinely unexplored — not proving the design works.
+
+**WHAT SHIPS UNPROVEN-IN-REPO, stated plainly so nobody has to reconstruct it.**
+Six gates rest on S0, and after this ruling the release carries all six as
+out-of-repo evidence rather than committed artifacts:
+
+| gate | what ships without in-repo proof |
+| --- | --- |
+| G-P4.1 | no engraved QR has been scanned **in this repo's record** |
+| G-P4.2 | the Structured-Append physics gate — the `SA_FIXTURE` pair cut and reassembled off steel |
+| G-P4.3 | the legend reservation stays hard-coded; no face below 3.0 mm tested here |
+| G-P4.4 | 0.3 mm optically unvalidated (and correctly never emitted) |
+| G-P4.5 | the byte encoding is proven only against a software decoder (ZXing) |
+| G-P4.6 | the post-cut verify path unwalked |
+
+**This is a legitimate call at the stated standard** — *reasonable effort funds
+safety, not perfection* — because the evidence exists, it simply is not in these
+files. **The risk is not that the design is unproven; it is that the REPOSITORY
+cannot show its work**, which matters to a future maintainer rather than to a
+present operator.
+
+**What P5's whole-diff review must therefore be told:** these six are deferred by
+ruling, not overlooked, and are **not** grounds for a blocking finding.
+
+**When S0 does run, its first plate is already chosen** (P3a): the reference
+transaction defaults to **ECC H at 0.6 mm** — the smaller face, never read off
+steel. If that fails to scan, the QR objective's module-size tie-break is wrong.
+
+---
+
+---
+
+## CLOSED 2026-08-25 — G-P3.14 and the NFC-fit line, both by operator ruling
+
+**G-P3.14 — the device review screen shows the txid and nothing else** (no
+outputs, amounts, fee, locktime, network). **DISMISSED.** Operator: *"I don't
+care."*
+
+Recorded once so it is not re-opened: the txid **commits to every output and
+amount**, the wallet displayed those before signing, and fixing this is a
+**parser** change on both sides of the language boundary plus on-device address
+encoding — not a screen change. The operator's identity check is the txid
+comparison, which §4.3 already builds. **Not a gap; a decision.**
+
+**Spec line 450 — `mt encode --record` stating whether its record fits an NFC
+tag.** **NOT BUILT, and it was already settled.** Operator: *"we long ago decided
+nfc comes later."*
+
+**And the spec says so itself, at line 142:** *"There is no NFC reader for a
+`sysw` container."* NFC arrives by a different path than the flash-XIP route
+(`XIPReader`, `sysw/read_tinygo.go`), and §1's table splits the two. So line 450
+describes a fit-check for a delivery route this container has no reader for.
+
+**This one is on me:** I raised it twice as an open scope question. It was
+answered in the document I had already read, eight lines from a passage I quoted
+in a different context. *Look for the existing decision before asking for a new
+one.*
+
+---
+
+---
+
+## CONTEXT 2026-08-25 — no real funds have ever passed through this software
+
+**Operator, stated during the pre-ship walk planning:**
+
+> *"Nobody but me uses the software and it's never been used for real funds at
+> all yet (across the entire repo)."*
+
+**Recorded because it relocates the risk, and every funds-safety argument in
+these documents reads differently once you know it.**
+
+**What it makes CHEAPER.** Shipping. There are no users to break, no deployed
+versions to stay compatible with, and no funds currently depending on any
+guarantee here. A tag is a checkpoint, not a commitment. The `ci/staging` ritual
+and the whole-diff review are worth doing for the codebase's sake, not because
+something is at stake in the release itself.
+
+**What it makes MORE serious, and this is the real gate.** **The first
+real-funds engraving will be the first time any of this touches something that
+matters.** Every guarantee in the acceptance sheet — the signature predicate, the
+txid binding, the anti-smuggling decode, the QR round-trip — is currently
+supported by synthetic evidence only: corpus vectors, a software decoder, and an
+emulator. All of it is *good* evidence. None of it is *consequential* evidence.
+
+**So the release is not the moment to be careful about; the first real spend is.**
+That is the operator's, it is deliberately not scheduled here, and the honest
+statement of readiness is: **the software is ready to be tried, not proven in
+use.**
+
+**The side-by-side walk is the closest rehearsal available** without real funds,
+which is why it happens BEFORE the tag rather than after.
