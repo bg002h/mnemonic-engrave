@@ -24,6 +24,21 @@ mt:          scripts/check-provenance.sh  -> every copied file matches its sourc
 both repos:  MTX1 in *.go/*.rs -> 0 files;  wtxid -> 1 doc comment, 0 code
 ```
 
+**Re-measured at the end of phase P3a**, logs read rather than exit codes:
+
+```
+me:    cargo nextest run --locked --no-fail-fast -> 366 tests run: 366 passed, 1 skipped
+       cargo clippy --all-targets --locked       -> 0 warnings
+fork:  gui-shard-test.sh ./gui/ 24 -> all 982 tests ran across 24 shards, ok
+       go test $(go list ./... | grep -v /gui$) -> every package ok
+sheet: scripts/acceptance-count.py -> §4.5's numbers, measured
+```
+
+**Two `me` gates that had been skipping silently** — `cross_lang` and
+`preview_cross_lang` return early when `go` is off `PATH`, and they also need
+`third_party/seedhammer`, which `git worktree add` does not create. Both RUN
+and pass in the figure above. Same class as G-P5.8.
+
 ---
 
 ## 1. THE LIVE RULE LIST — what the code actually enforces
@@ -138,9 +153,9 @@ Verdicts: **MET** · **MET-DIFF** (purpose satisfied another way, reason given) 
 | 2.2a | chunks path engraves TEXT ONLY; may not call `validateMdmk` | MET | `planTransactionTextPlates` (`gui/transaction.go:597-660`); `validateMdmk` is not called; QR is offered only for a confirmed candidate |
 | 3.1a | P4 owns the `txScan` case in `engraveObjectFlow` | MET-DIFF | the carrier type is `mtText` (`gui/scan.go:134`) with its case at `gui/gui.go:2492-2495`. No `txScan` exists because `tx:` never travels NFC |
 | 3.1a | all four lockstep sites | MET | `gui/gui.go:2056-2058`, `:2214-2215`, `:2442-2444`, `:2492-2495`. Test gap: G-P3.8 |
-| 3.2 | the compare screen must name `me sysw show` | NOT-MET (P3) | `gui/sysw_load.go:164-176` still says *"Compare this against what `me sysw pack` printed:"*; `me sysw show` is referenced nowhere in the fork |
-| 3.2 | the `me sysw pack` line must go | NOT-MET (P3) | same site; and `pack`'s own digest line (`main.rs:1250`) carries no pointer either |
-| 3.3 | menu gains content entries **and** boot invokes it | NOT-MET (P3) | `syswPayloadMenu` offers only `{LOAD AGAIN, UNLOAD}` (`gui/sysw_unload.go:42`); boot calls `syswLoadFlow` directly (`gui/gui.go:2019`) |
+| 3.2 | the compare screen must name `me sysw show` | **MET (P3a)** | G-P3.16; `TestTheCompareScreenNamesTheReadPath` |
+| 3.2 | the `me sysw pack` line must go | **MET (P3a)** | G-P3.16; the same test asserts its absence, and `pack` prints the pointer |
+| 3.3 | menu gains content entries **and** boot invokes it | **MET (P3a)** | G-P3.15, both halves; `TestTheBootLoadEndsAtThePayloadMenu` drives the real `uiFlow` |
 | 3.6b | extracting `chunk_set_id` without a decoder is P4's, and not zero | SUPERSEDED | ruling 2026-08-25b requires the device to compute confirmation itself, which needs the whole decoder — shipped as `mt/mt.go` + `codex32.ValidMT` |
 | 3.6b | R15: 20 bits refutes, never confirms | MET-DIFF | see R15 |
 | 3.6b | `chunk_set_id` is the BINDING mechanism | MET | grouping key in `sysw/mt.rs:97-121` and `sysw.MTUnconfirmed` |
@@ -150,8 +165,8 @@ Verdicts: **MET** · **MET-DIFF** (purpose satisfied another way, reason given) 
 | 4.2a | discard any configuration above 16 symbols | MET | plate search bounded at `txqr.MaxSymbols+1` (`gui/transaction.go:692-724`) |
 | 4.2a | a phase must own Structured Append | MET | `txqr` implements it through the vendored library's exported `Encoding` seam — **no fork of kortschak-qr** |
 | 4.2d | S0 cuts the SA pair; P5's gate has two halves | NOT-MET (P4) | fixture committed and pinned; **no gate consumes it**. Half (b)'s *decode* leg is met by ZXing; the module-for-module leg and the steel leg are not |
-| 4.3a | the per-plate instruction is a function of what is ON THAT PLATE | NOT-MET (P3) | the engraved legend is **job-level** (`gui/transaction.go:665-677`); a legend-only plate still reads *"scan all qr, any order"*; TEXT plates carry no instruction at all |
-| 4.3a | per plate it scans; per job `mt inspect` once; never on a partial set | NOT-MET (P3) | no post-cut screen exists; `mt inspect` is referenced nowhere in the fork. (The "never on a partial set" half holds vacuously) |
+| 4.3a | the per-plate instruction is a function of what is ON THAT PLATE | **MET-DIFF (P3a)** | G-P3.17(a): `transactionLegend(…, plateHasQR)`. TEXT plates still carry no on-plate instruction, deliberately — a line trades against the brief's own priority (fewest plates), and their instruction is the post-cut screen |
+| 4.3a | per plate it scans; per job `mt inspect` once; never on a partial set | **MET (P3a)** | G-P3.17(b): `transactionPostCutFlow`. The partial-set half is now live rather than vacuous — an unconfirmed set gets a different sentence |
 | 4.4a | reorder the emission, and the gate asserts the order | MET | `backup/backup.go:493-517`; knot-order tests both at mechanism and artifact level |
 | 4.5a | the reservation is computed PER PLATE from that plate's field set | NOT-MET (P4) | shipped legend is a fixed 3-line block plus a title row; no packed five-field reservation, no plate-1-vs-2..m split. The device has no wallet-level data source |
 | 5/R4′ | the XOR is PER TRANSACTION | MET-DIFF | a payload may hold both forms; the device merges byte-identical twins into one candidate |
@@ -177,14 +192,14 @@ Verdicts: **MET** · **MET-DIFF** (purpose satisfied another way, reason given) 
 | world-readable output refused + override, `me` and `mt` | MET | L13 |
 | sealing decided by content | **MET (P3a)** | `decide_sealing` (`main.rs`): seals iff some record is `Class::is_secret()`, and prints which way and why on **every** invocation. G-P3.6 |
 | overwriting the region is intended — a courier | MET | `me sysw wipe`, `--region`, `{LOAD AGAIN, UNLOAD}` |
-| the device names `me sysw show` under the digest | NOT-MET (P3) | §3.2 above |
-| the txid is for recognition, never claimed as proof | NOT-MET (P3) | the review screen shows the full txid with **no statement of its limit**; §3.5 requires the device carry the same caveat `mt verify` does |
-| show a total, allow skip | NOT-MET (P3) | no outputs, amounts or total exist: `mt.Tx` (`mt/mt.go:122-129`) carries only `Raw`, `TxidDisplay`, `Inputs`, `Outputs`, `SegWit` |
+| the device names `me sysw show` under the digest | **MET (P3a)** | §3.2 above |
+| the txid is for recognition, never claimed as proof | NOT-MET (P3, **G-P3.14 — not P3a's**) | the review screen shows the full txid with **no statement of its limit**; §3.5 requires the device carry the same caveat `mt verify` does. *P3a note:* the UNSIGNED review screen now does carry it — *"the txid above is the same one a signed version would have"* — so the shape exists; the confirmed screen still does not |
+| show a total, allow skip | NOT-MET (P3, **G-P3.14 — not P3a's**) | no outputs, amounts or total exist: `mt.Tx` carries only `Raw`, `TxidDisplay`, `Inputs`, `Outputs`, `SegWit`, `EveryInputSigned`, `UnsignedInputs`. A parser change, not a screen change |
 | the total is never spelled as a destination amount | MET-DIFF | satisfied by **absence** — there is no total to mislabel. It becomes live the moment the row above is built |
-| the device says "test the plate"; it never tests it | NOT-MET (P3) | no post-cut screen; the engraved legend carries a job-level *"scan, then broadcast"* |
+| the device says "test the plate"; it never tests it | **MET (P3a)** | the post-cut screen says TEST THEM NOW and says why the device cannot: it has no camera |
 | `mt inspect` gains a raw-transaction subject | NOT-MET (P5) | landed on `mnemonic-transaction@df8d6d0`, branch `p1/mt-inspect-raw`, **not merged to `main`** (`git branch --contains` → that branch only) |
 | the carousel is payload-independent | MET-DIFF | `engraveTransaction` is unconditional (`gui/gui.go:222`); applicability is expressed inside the program by `txNothingToEngrave` rather than by the payload menu |
-| the payload menu appears right after a successful load | NOT-MET (P3) | §3.3 above |
+| the payload menu appears right after a successful load | **MET (P3a)** | §3.3 above |
 | the picker is keyed on the txid; the prefix never verifies | MET | keyed on `TxidDisplay`, full 64 hex on screen (`gui/transaction.go:483`). An **unconfirmed** candidate is keyed on the 5-hex `csid` — honest, since no txid exists |
 | legend cut last; incomplete plates discarded; no resume | MET | L12; `gui/transaction.go:557-561` states a re-run starts at plate 1. It does not say *discard the plate* — G-P3.13 |
 | text+QR is never offered for a transaction | MET | the choice is TEXT **or** QR; no combined variant exists |
@@ -205,22 +220,38 @@ Verdicts: **MET** · **MET-DIFF** (purpose satisfied another way, reason given) 
 | `check-provenance.sh` green across both repos | MET-DIFF — green in `mnemonic-transaction`; the fork carries in-tree package pins plus `TestVendoredVectorsMatchTheirProvenancePin`. No such script exists in `me` or the fork |
 | refusal coverage is a bijection; every refusal test goes red without its check | NOT-MET (P5) — `refusals.toml` / `check-refusal-coverage.sh` / `mutate-refusals.sh` exist **only** in `mnemonic-transaction` |
 | the carried txid and R15 implemented; the chunks picker uses the ASSERTED voice | SUPERSEDED — nothing is carried, so there is no asserted voice to render (L6) |
-| all four lockstep sites, with the three silent ones asserted by test | NOT-MET (P3) — the four **sites** are all present (§4.2); the condition also demands the three silent ones be asserted by test, and they are not — G-P3.8 |
+| all four lockstep sites, with the three silent ones asserted by test | **MET (P3a)** — G-P3.8; each of the four was deleted in turn and reddens 1, 1, 2 and 2 tests |
 | both pipeline invariants asserted, each with a phase | NOT-MET (P5) — no test names *"`mt encode` writes nothing to stdout on a failure path"*; `decode`/`verify`/`inspect` have one (`decode_writes_nothing_to_stdout_on_failure`) |
 
 ### 4.5 Counts
 
-| | MET | MET-DIFF | NOT-MET | SUPERSEDED | total |
-| --- | --- | --- | --- | --- | --- |
-| §4.1 refusals | 8 | 5 | 2 | 2 | **17** |
-| §4.2 NORMATIVE | 10 | 5 | 7 | 2 | **24** |
-| §4.3 rulings | 12 | 7 | 10 | 1 | **30** |
-| §4.4 close conditions | 2 | 1 | 7 | 1 | **11** |
-| **spec items** | **32** | **18** | **26** | **6** | **82** |
-| §6 defects found by walking the code, not stated as spec lines | — | — | **19** | — | **19** |
-| **TOTAL** | **32** | **18** | **45** | **6** | **101** |
+**These are MEASURED, not hand-entered.** `scripts/acceptance-count.py` reads
+the tables above and prints them; the first recount after P3a got three of the
+five rows wrong before that script existed, which is what the standing rule
+about never hand-counting is for. Output, pasted:
 
-**NOT-MET by owning phase: P3 = 28, P4 = 8, P5 = 9.** No NOT-MET is unowned.
+```
+section                   MET  DIFF  NOT  SUP  rows
+4.1 refusals               10     5    0    2    17
+4.2 NORMATIVE              14     6    2    2    24
+4.3 rulings                18     7    4    1    30
+4.4 close conditions        3     1    6    1    11
+spec items                 45    19   12    6    82
+
+gates listed in §6: 36  (unique 36)
+gates marked CLOSED: 17
+gates still open:    19 -> G-P3.10 G-P3.14 G-P3.19
+                          G-P4.1..G-P4.6  G-P5.1..G-P5.10
+```
+
+**Every remaining §4 NOT-MET is owned by P4 or P5, or by one of the three P3
+gates held back for the operator's journey walk** (G-P3.10 the txid-collision
+picker, G-P3.14 the review screen's missing outputs/fee/network, G-P3.19 `me
+tx`'s exit 0 on an unsigned transaction). No NOT-MET is unowned.
+
+**P3a closed 17 gates** — G-P3.3…G-P3.9, G-P3.11…G-P3.13, G-P3.15…G-P3.18,
+G-P3.20 — and verified G-P3.1/G-P3.2, **completing the half of G-P3.1 that was
+still open**. §7 records six defects none of the gates asked for.
 
 *How the two halves join.* §6 lists **36** gates. **17** of them are the §4 NOT-METs
 regrouped — several spec lines say one thing, so e.g. G-P3.16 discharges three
@@ -239,7 +270,7 @@ artifact that passes every check and is worthless — or dangerous — in steel.
 
 | # | check | status |
 | --- | --- | --- |
-| 1 | signature-presence predicate, per input | **HOST ONLY** — `tx:` class guarded (L2). **The `mt1` chunk class is guarded by neither side** (`set_confirmed` never reads `every_input_signed`), and the **device has no predicate at all**. G-P3.1/G-P3.2 |
+| 1 | signature-presence predicate, per input | **MET, all four cells (P3a).** Host `tx:` (L2), host `mt1` (`sysw::mt::diagnose`), device `mt1` (`mt.Decode` → `ErrUnsignedInputs`), device `tx:` (`payloadTransactions`, the half G-P3.1 left open). Override `--allow-unsigned-inputs` names the failing inputs at pack, in `me sysw show`, on the device screen and on the plate |
 | 2 | strict admission, no BCH correction ever | **MET** — L3, both sides agree by construction |
 | 3 | semantic confirmation computed ON DEVICE | **MET** — L4/L5, conformance-tested with the Rust answers |
 | 4 | independent decode proof for every QR class emitted | **MET in the suite** (ZXing, k∈{1,2,3,6}, reverse order). Off steel: G-P4.1 |
@@ -281,26 +312,26 @@ host CLI and device screens both, because a journey starts at the host).
 
 | id | gate | done when |
 | --- | --- | --- |
-| G-P3.1 | the signature predicate has **no Go counterpart** (`grep` for `every_input_signed` over the fork: 0 hits; `mt/mt.go:263` skips the scriptSig without inspecting it) | `mt.ParseTx` returns a per-input signedness flag; a `tx:` record or reassembled set with an unsigned input reaches the device flagged with the mandatory legend substitution; RED-tested with the 113-byte stripped vector |
-| G-P3.2 | the predicate does not guard the **`mt1` chunk class** on either side — `sysw::mt::set_confirmed` (`sysw/mt.rs:124-138`) checks parse + binding only. (`mt encode` refuses unsigned input at §8.3 — but that is a different tool, not this container's admission boundary) | `set_confirmed` and `mt.Decode` both consult the predicate, or the sheet records a ruling that they deliberately do not |
+| **G-P3.1 — CLOSED (P3a; HALF of it was still open when P3a began)** | the signature predicate has **no Go counterpart** | **VERIFIED and COMPLETED.** The chunk half was done (`mt.Decode` → `ErrUnsignedInputs`). The **`tx:` RECORD half was not**, and the gate names it explicitly: `sysw.Classify` requires only a structural parse, so an unsigned `tx:` record was `ClassTx`, reached `payloadTransactions`, and became a candidate **with no flag of any kind** — with the honest transaction's txid, because stripping signatures is exactly what the txid ignores. §5 check 1 was unmet for the class that carries the QR path. Now flagged (not refused — it arrives only via `--allow-unsigned-inputs`) with `legendUnsigned` and the failing input named on screen and on the plate |
+| **G-P3.2 — CLOSED, verified (P3a)** | the predicate does not guard the **`mt1` chunk class** on either side | **VERIFIED.** Rust: `sysw::mt::diagnose` (the single implementation both `mt_unconfirmed` and `decode_confirmed` now ask — they were two copies of one walk, which is how the predicate came to be added to each separately). Go: `mt.Decode` → `ErrUnsignedInputs`. Mutation-tested on the collapsed Rust implementation: disabling it reddens 3 |
 | **G-P3.3 — CLOSED (P3a)** | `--allow-unsigned-inputs` (`FORWARD_PLAN` §2.1) does not exist — **measured:** clap rejects it. Overdue from P0 | **DONE.** `TxSummary::unsigned_inputs` carries the indices and `every_input_signed` is now *defined* from it, so the two cannot drift. `sysw::Admission` is the seam (`classify_with`/`pack_with`); the refusal, the override warning and `me sysw show` all name the failing inputs by number. **Scoped:** it loosens nothing else, is silent on a fully-signed transaction, and deliberately does NOT reach the `mt1` chunk class — nothing there refuses, and the device recomputes confirmation itself, so a host flag could only make the two disagree. Mutation-tested twice (per-input → whole-transaction reddens 4; flag ignored in `classify` reddens 3) |
 | **G-P3.4 — CLOSED (P3a)** | `me sysw pack` has **no stdin path**; the ruled pipeline `mt encode \| me sysw pack` cannot be typed | **DONE.** `main.rs:split_record_stream`/`read_records`; precedence `--in` > argv > stdin. Five tests in `tests/sysw_cli.rs`: stdin is read, blank lines skipped as with `--in`, empty and whitespace-only stdin exit 2, the message names stdin, argv still wins. Mutation-tested: removing the empty guard reddens 2 |
 | **G-P3.5 — CLOSED (P3a)** | a `tx:` record on **argv** is not refused (R2) | **DONE.** Exit 3 (policy refusal — the record is well-formed, the channel is not), raised in `read_records` before anything else `pack` does. Five tests: refused, located by argv index, echoes neither the body nor a generated passphrase, still packs from `--in` and stdin (byte-identical containers), and is scoped to the `tx:` class alone. The exit-code table gained a row. Mutation-tested: `if false &&` reddens 4 |
 | **G-P3.6 — CLOSED (P3a)** | sealing is **flag-decided**, not content-decided, and says nothing | **DONE.** `decide_sealing`; three verdicts, each naming its reason and the secret-carrying records BY CLASS (never by content — a `pass:` body is a passphrase). **A defect surfaced doing it, and it predates the gate:** `me sysw pack --passphrase-words 4 <md1>` minted a passphrase, told the operator to store it apart from the machine, and wrote `sealed: false, ct_len: 0` — `pack` encrypts only secret-class records, so the plaintext was empty, `sealed()` is `ct_len > 0`, and the 16-byte AEAD tag landed past `total_len()` unauthenticated. The flag is now reported IGNORED instead. Pinned by `what_pack_says_about_sealing_is_what_show_reads_back`, which makes a second program agree with the message rather than asserting its wording |
 | **G-P3.7 — CLOSED (P3a)** | the incomplete-set warning does not name **the set** or **every missing index** — ruling 2026-08-25 makes "loudly" normative | **DONE.** `sysw::mt::set_problems` groups once and diagnoses per set; `SetProblem` distinguishes **five** failures whose remedies are not close (missing / does-not-reassemble / not-a-transaction / txid-does-not-bind / unsigned-inputs). `pack` prints `mt1 set 2dcf2 (records 0, 1, 2 …) did NOT confirm … MISSING strings 2, 4 and 5 of 6`, and `me sysw show` prints `mt set 2dcf2: INCOMPLETE — … MISSING strings 2, 4 and 5 of 6`. Chunk numbers are **1-based**, `mt`'s operator-facing convention. `mt_unconfirmed` is now defined from the same grouping, and `the_diagnosis_and_the_verdict_are_one_answer` asserts the two never disagree. Mutation-tested: `.take(1)` on the missing list reddens 3 |
-| G-P3.8 | no scanner-level test drives an `mt1` string through `scanner.Scan`; the three silently-failing lockstep sites are asserted only indirectly | `gui/scan_test.go`'s table gains an `mt1` row; a test drives `engraveObjectFlow`'s `mtText` case |
-| G-P3.9 | the **NFC gather** drops a complete-but-non-decoding set (`gui/transaction.go:391-398`) while the **payload** path engraves it — two behaviours for one condition, and the drop contradicts ruling 2026-08-25b | both paths behave identically, or the divergence is ruled and recorded |
+| **G-P3.8 — CLOSED (P3a)** | no scanner-level test drives an `mt1` string through `scanner.Scan`; the three silently-failing lockstep sites are asserted only indirectly | **DONE.** `gui/scan_test.go` gains the `mt1` row; `gui/transaction_lockstep_test.go` adds five. `TestEveryNavigableProgramHasATitleAndAPlate` sweeps `0..lastNav()` rather than naming one program, so the next program added is covered. Mutation-tested by deleting each of the four sites: mtText case → 1 red, title case → 1, `layoutMainPlates` → 2, scanner `ValidMT` branch → 2 |
+| **G-P3.9 — CLOSED (P3a)** | the **NFC gather** drops a complete-but-non-decoding set while the **payload** path engraves it — two behaviours for one condition, and the drop contradicts ruling 2026-08-25b | **DONE.** `substitutionFor` is the one function both paths ask; the gather offers the set instead of dropping it. The gather's decision moved out of the frame loop into `txGather.offer`, which is why no test could reach it before. A **third** substitution fell out: a set that reassembles, parses and BINDS and still cannot be broadcast is not "DOES NOT DECODE" — `mt.ErrUnsignedInputs` is exported and earns `legendUnsigned`. **Scoped to COMPLETE sets**, and the scoping is recorded as a finding: an INCOMPLETE set is not a divergence (more scanning can fix it), but an operator holding 3 of 6 tags still has no way to engrave the three from the gather, though the payload path offers exactly that — that needs a button inside a live scanning loop and an operator ruling on what Back then means |
 | G-P3.10 | two byte-different transactions sharing a derived txid present as two identical picker rows | the picker distinguishes them (size, or a content digest) — or the case is ruled not-our-concern in writing |
-| G-P3.11 | R11′'s third branch ("payload not yet compared") is untested | the test table covers all three |
-| G-P3.12 | R16's message does not name the **module size**, which §4.1a requires | it names module size, byte count and the ceiling at that module |
-| G-P3.13 | the device never says to **discard** a plate abandoned mid-cut (§4.4) | the stop screen says so |
+| **G-P3.11 — CLOSED (P3a)** | R11′'s third branch ("payload not yet compared") is untested | **DONE.** `TestR11HasThreeDistinctMessages` plus `TestOrphanStringsAreASuffixNotAMessage`. **Recorded:** the branch is DEFENSIVE, not reachable from the load flow — `syswLoadFlow` nils an uncompared session — which is why it had no test: nobody could get to it to notice it was wrong |
+| **G-P3.12 — CLOSED (P3a)** | R16's message does not name the **module size**, which §4.1a requires | **DONE.** *"20064 bytes is too large for QR plates. At 0.6mm modules — the smallest this machine cuts — 16 Structured Append symbols at ECC M hold at most 17968 bytes. Use TEXT plates."* The ceiling is **measured by search**, not written down. **Two findings:** (a) the first draft printed a ceiling of **0**, because `EncodeSet` refuses a payload it cannot split into 16 non-empty parts, so a bottom-up search never leaves the ground; (b) **R16 is UNREACHABLE through the container** — the QR ceiling is 17,968 B and the largest `tx:` record a section can carry is (32,734−3)/2 = 16,365 B, so `pack` refuses first. `TestTheQRCeilingIsAboveWhatTheContainerCanDeliver` asserts the relation so the day it inverts is a failing test |
+| **G-P3.13 — CLOSED (P3a)** | the device never says to **discard** a plate abandoned mid-cut (§4.4) | **DONE.** The stop screen says DISCARD, says why (*"half cut and nothing will finish it"*), and says what keeping it costs: a re-run starts at plate 1, so the drawer ends up with two plates numbered n/m that are not the same, on a machine with no camera to tell them apart |
 | G-P3.14 | the review screen shows **no outputs, amounts, locktime, nSequence, fee, network or total**, and states no limit on the txid | §3.4/§3.5's derived/asserted split is built, or the reduction is ruled and this sheet amended. **The `mt.Tx` struct carries none of these fields, so this is a parser change, not a screen change** |
-| G-P3.15 | the payload menu gains no content-derived entries and the boot path does not invoke it | boot calls it on a successful load, and it lists what the payload holds |
-| G-P3.16 | the compare screen names `me sysw pack` (the re-pack path); `pack`'s digest line carries no pointer | the screen names `me sysw show <file>` and the `pack` line is gone; `pack` prints the same pointer |
-| G-P3.17 | no post-cut instruction screen; the engraved instruction is job-level even on a plate with no QR on it | the per-plate instruction is a function of that plate's contents; the per-job instruction names `mt inspect` once, after the last plate, and says order does not matter |
-| G-P3.18 | no cut-TIME estimate before commit, though `gui/transaction.go:530-532` claims the operator budgets by it | the confirm screen states plate count **and** time, or the comment is corrected |
+| **G-P3.15 — CLOSED (P3a)** | the payload menu gains no content-derived entries and the boot path does not invoke it | **DONE**, both halves. The lead reads *"Loaded. It holds: 6 mt1 chunk, 1 free text."*, and one content-derived entry (ENGRAVE TRANSACTION) appears only when the payload holds a class `progTransaction` admits — asked through the admission table, not a second list. `uiFlow` calls `syswPayloadMenu` on a successful boot load; BACK exits, as §3.3 requires. `TestTheBootLoadEndsAtThePayloadMenu` drives the REAL `uiFlow` from power-on over a real region, because calling the menu directly is exactly what cannot tell the two halves apart |
+| **G-P3.16 — CLOSED (P3a)** | the compare screen names `me sysw pack` (the re-pack path); `pack`'s digest line carries no pointer | **DONE.** The screen names `me sysw show <file>`; `pack` prints `re-print it with: me sysw show <path>` with the path filled in, and says *"the file you just wrote"* on stdout rather than inventing one. `the_named_command_prints_the_same_digest` RUNS the named command and compares — a pointer to a command that prints something else makes the operator read a mismatch as tampering |
+| **G-P3.17 — CLOSED (P3a)** | no post-cut instruction screen; the engraved instruction is job-level even on a plate with no QR on it | **DONE.** `transactionLegend` takes `plateHasQR`: the legend-only plate says where the symbols are, an inline one says scan these, a single-symbol plate does not mention order. `transactionPostCutFlow` runs once after the last plate, names ONE command per plate kind (`mt inspect` / `mt verify`+`mt decode`), and for an unconfirmed set says the set did not confirm rather than sending the operator to check a txid it never produced. **It was a modal and the modal TRUNCATED it** — `ErrorScreen` does not page, so *"this machine has no camera"* was unreachable with three assertions on its wording passing; it pages now and a test pages it. **Scoped, recorded:** TEXT plates gain no on-plate instruction — a line trades against the brief's own priority (fewest plates) and the `mt1` hrp is self-describing. **Depends on G-P5.7:** `mt inspect`'s raw subject is unmerged, so the named command is not yet on `main` |
+| **G-P3.18 — CLOSED (P3a)** | no cut-TIME estimate before commit, though the code claims the operator budgets by it | **DONE.** `transactionJobTime` sums `Plate.Duration` over `TicksPerSecond` — the same clock the live remaining-time readout uses, so two clocks cannot disagree in front of the operator — and says *"unknown"* at tps 0 rather than dividing by it on a confirm screen. The pinned vector reports *"about 30 min of cutting"* |
 | G-P3.19 | `me tx` emits a `tx:` record for an **unsigned** transaction at exit 0, and `pack` refuses the same bytes at exit 4 one step later | ruled in the journey walk: either `me tx` applies the predicate, or it warns and the sequencing is documented |
-| G-P3.20 | **no end-to-end UI walk exists** for the transaction program (`runUITouch` is used in 39 other test files, not this one) | the walk drives choice → review → plan-confirm → engrave loop for TEXT and QR, including the legend-substitution screens, with golden images and an emulator journey |
+| **G-P3.20 — CLOSED (P3a)** | **no end-to-end UI walk exists** for the transaction program (`runUITouch` is used in 39 other test files, not this one) | **DONE.** Five walks in `gui/transaction_walk_test.go` drive the real flow through real screens and finish the engrave through a real `EngraveScreen`: QR from a `tx:` record, TEXT from a confirmed set, the two legend-substitution paths, and the picker. Four **goldens** of the plates themselves (`tx-qr`, `tx-text`, `tx-unconfirmed`, `tx-unsigned-qr`) — mutation-proven to catch a lost warning at the artifact rather than at a string. **Journey:** `design/JOURNEY_engrave_transaction.md`, regenerated byte-identically by `scripts/gen-tx-journey.sh`; its device screens come from `TestCaptureTransactionJourney`, which is the walk instrumented, so document and test cannot drift. **Its one limit, stated in it:** the frames are the firmware's op tree, not the emulator's framebuffer — what the device SAYS, not how it LOOKS. That capture needs WASM + playwright and belongs with P4, beside a photograph of steel. **THREE DEFECTS THE WALK FOUND** are recorded in §7 |
 
 **P4 — S0, the hardware session.** *This gate cannot be simulated and the
 release does not ship before it.*
@@ -328,6 +359,42 @@ release does not ship before it.*
 | G-P5.8 | the ZXing round-trip `t.Skip`s when `ZXingReader` is absent, so fork CI proves nothing | CI installs the binary, or the skip fails the build on the CI runner |
 | G-P5.9 | three doc comments still claim an unconfirmed `mt` record "counts as SECRET" — `sysw/mt.rs:21,282`, `sysw/record.rs:45`; mirrored at `sysw/confirm.go:33,150` — contradicting ruling 2026-08-25b, which the **operator-facing message** was already fixed to match (`9a0427a`) | the prose matches the code and the ruling |
 | G-P5.10 | `mnemonic-engrave`'s CI does not exercise the fork's transaction packages (its submodule pin predates them); the fork's own CI does | stated, or the pin is advanced as part of the release |
+
+---
+
+---
+
+## 7. WHAT P3a FOUND THAT NO GATE ASKED FOR
+
+Six defects, none of them a gate row. Five were found by **executing** the
+thing rather than reading it; one by writing a message that would have had to
+be true.
+
+| # | severity | what | where it came from |
+| --- | --- | --- | --- |
+| F1 | **Critical** | **The `tx:` record path was inert.** `payloadTransactions` built the candidate without setting `confirmed`, whose zero value is false — so a signed transaction got the *"UNCONFIRMED SET / Set 00000, 0 string(s) / QR plates are unavailable"* screen, and then `transactionReviewAndEngrave` found no TEXT (no strings) and no QR (`!confirmed`), so `len(choices)==0` and it **returned silently**. `me tx \| me sysw pack` → device produced nothing, with no screen. 16 transaction tests green throughout; not one drove a `tx:` record past `payloadTransactions` | G-P3.20's walk |
+| F2 | **Critical** | **The program PANICKED** — `slice bounds out of range [:8] with length 0`. The picker built a row per candidate reading `c.tx.TxidDisplay[:8]`; an unconfirmed candidate has the zero-value `mt.Tx`. Rows are built for ALL candidates *before* `len(choices) > 1` decides whether to show the screen, so **one incomplete `mt1` set crashed the program with no picker ever displayed**. Live since the ruling-2026-08-25 fold; the triggering payload is the ordinary one that ruling exists FOR. This sheet recorded the row as MET | G-P3.20's walk |
+| F3 | **Critical** (funds-safety) | **No signature predicate on the `tx:` class on the device** — G-P3.1's other half. See its row | verifying a gate marked closed |
+| F4 | Important | **The BEARER warning was below the fold.** `confirmReviewScreen` pages, and the warning sat last, so page 1 held the question and the txid and nothing else: an operator pressing Continue from the screen showing the number they came to check never saw it. A **position**, not a wording — every assertion on the sentence passed | G-P3.20's walk |
+| F5 | Important | **`--passphrase-words` on a payload with nothing secret printed a passphrase, told the operator to store it apart from the machine, and wrote `sealed: false, ct_len: 0`.** `pack` encrypts only secret-class records, so the plaintext was empty and the 16-byte AEAD tag landed past `total_len()` unauthenticated. The passphrase protected nothing and opened nothing. Predates G-P3.6; the gate's new message would have asserted the protection in words | writing G-P3.6's message |
+| F6 | Important | **The post-cut screen was truncated by its own modal.** `ErrorScreen` does not page, so *"check the txid against…"* and *"this machine has no camera"* were unreachable — with three assertions on their wording passing. F-151's shape one step along: there, text submitted and not drawn; here, drawn and not shown | G-P3.20's walk |
+
+**Two things this sheet asserts that are FALSE, measured:**
+
+1. **§4.1 R10** — *"Duplicate candidates merge on **bytes**, not on the txid … so identical twins collapse safely and different ones stay two candidates"*, and **G-P3.10** — *"two byte-different transactions sharing a derived txid present as two identical picker rows"*. The merge reads `c.tx.TxidDisplay`. A byte-different transaction sharing a txid is **DROPPED, not duplicated**, and the pair that does it is not exotic — a transaction and its own signature-stripped form share a txid by construction. Pinned by `TestTheMergeIsKeyedOnTheTxidNotOnTheBytes` **without changing the behaviour**, so G-P3.10's operator ruling starts from what the code does. *(G-P3.10 is out of P3a's scope by instruction.)*
+2. **R16 is unreachable through the container.** See G-P3.12.
+
+**Two gates that skip silently, same class as G-P5.8.** `me`'s `cross_lang` and
+`preview_cross_lang` — the constellation's Rust↔Go seam tests — `return` early
+when `go` is not on `PATH`, and `go` is not on `PATH` on this box by default.
+They also need `third_party/seedhammer`, which `git worktree add` does not
+create. Both pass once present; neither runs otherwise.
+
+**One thing for P4.** The pinned 222-byte vector plans to **ECC H at 0.6 mm**,
+not 0.9 mm — L11 working as specified, since ECC outranks module size. But it
+means the default plate for the constellation's own reference transaction uses
+the smaller face, and 0.6 mm has never been read off steel. G-P4.1 should cut
+*this* plate.
 
 ---
 
