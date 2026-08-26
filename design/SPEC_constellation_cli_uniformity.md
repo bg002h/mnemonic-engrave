@@ -243,10 +243,14 @@ the main checkout's working tree during the fold: `me sysw pack` refuses secret
 remedy block that names per-shell purge commands. Its doc comment carries the
 operator's ruling of 2026-08-26: *"we want uniform behavior with secret bearing
 between ms1 and passwords and mt1 to the extent we can."* **P0 extracts that
-code; it does not re-derive it.** Note that this work is newer than the branch
-this spec is being folded on, so the shipped `me` binary is ahead of the fold
-branch's source — a plan reading only this branch would conclude, wrongly, that
-the gate is still bearer-only.
+code; it does not re-derive it.**
+
+*(An earlier revision warned that this work was newer than the branch the spec
+was folded on. That was true while the fold was in flight and is false now: the
+merge landed both, and `Class::is_argv_forbidden` is in this branch's source.
+Kept as a note rather than deleted, because it is the second branch-relative
+claim this spec has had to retract — a statement whose truth depends on which
+commit you are standing on does not belong in a spec.)*
 
 ## 6. The surface, after
 
@@ -536,7 +540,8 @@ report is secret material, and printing it before a refusal is not a defect.
 *A note on round 0's evidence for this point, since a later reader will check
 it.* I-2's quoted reproduction passes `--quiet` and then shows the report lines.
 The fold could not reproduce that: with `--quiet` those lines are suppressed
-(stderr is 82 lines, no `TX`/`CUT`/`PREFIX`), and the report appears only
+(on the corpus `even` vector, `--quiet` gives **70** stderr lines against
+**108** without it, and none of `TX`/`CUT`/`PREFIX` appear), and the report shows only
 **without** `--quiet`. **The finding is correct and is folded; its evidence
 command is not the one that demonstrates it.**
 
@@ -575,26 +580,35 @@ in the last row said otherwise — a table cannot assert more than its contents.
 | `mk` | 64 | **2** | 5 | 2 |
 | `ms` | 64 | 1 | **4** | 2 |
 | `mt` | 2 | 1 | n/a | n/a |
-| `mnemonic` | 64 | not measured | **not measured — see below** | not measured |
-
-**On `mnemonic repair` (round-1 B3).** That cell used to carry a number cited
-to the parity ruling rather than to a run — inferred, inside a table whose
-header claimed every cell had been executed. (Not quoted: writing the old cell
-out re-creates the very string this retracts, which has now happened six times
-in this cycle and is caught only by re-running the sweep, never by re-reading.)
-Round 1 reports measuring **4** on identical input, on the grounds that a
-single-string `md1` has no cross-chunk oracle. **That number is not adopted
-here**: the controller could not reproduce it (the input to hand was one chunk
-of a two-chunk set, which exits 2 in both tools for a different reason), and
-transcribing a reviewer's measurement as one's own is how a wrong figure
-travels.
-
-**It matters because the "repair codes are FROZEN" ruling rests on this cell.**
-If `mnemonic repair` really exits 4 where `md repair` exits 5, the parity that
-ruling asserts does not hold across all five CLIs, and D26 needs restating
-rather than citing. **P0 owes the measurement, on a single-chunk `md1` that
-actually repairs, before anything is frozen.**
+| `mnemonic` | 64 | not measured | **4** | not measured |
 | `me` | 2 | 4 = unplaceable record; 2 = terminal refusal | n/a | n/a |
+
+**On `mnemonic repair` — MEASURED at last, and it settles against the ruling
+(round-2 N3).** Round 0 inferred this cell from the parity ruling instead of
+running it. Round 1 measured 4; the round-1 fold declined to adopt that number
+because the controller could not reproduce it, and left the cell empty. **That
+refusal was right and the outcome was wrong** — declining to transcribe a
+reviewer's figure is discipline; leaving the cell unmeasured afterwards is just
+the defect with a different label. Round 2 supplied the input that repairs, and
+the controller reproduced it:
+
+```
+$ md repair       md1yqpqqzqq8xtwhw4xwn4qh   -> exit 5
+$ mnemonic repair md1yqpqqzqq8xtwhw4xwn4qh   -> exit 4
+```
+
+Corrupt one character of `md encode`'s own help example. **Both tools apply the
+IDENTICAL correction** — each returns `md1yqpqqxqq8xtwhw4xwn4qh` — and they
+disagree only on the exit code. `mnemonic` prints an UNVERIFIED banner
+explaining its 4: a single-string `md1` has no cross-chunk oracle, so the
+correction cannot be confirmed.
+
+**So D26's repair parity does NOT hold across five CLIs, and this spec must
+stop citing it as though it does.** The ruling was written when the
+constellation was four tools; `mnemonic` diverges, for a stated and defensible
+reason. **The codes cannot be declared FROZEN on the strength of a parity that
+is measurably false** — §6f's freeze is retracted below, and P0 owes a restated
+D26 that either admits `mnemonic`'s divergence as deliberate or changes it.
 
 Two collisions this table makes visible and the one-sentence version hid:
 
@@ -605,9 +619,16 @@ Two collisions this table makes visible and the one-sentence version hid:
 
 **What this spec rules, and what it hands to the plan:**
 
-- **The repair codes are FROZEN.** D26's 0/5/2 and `ms`'s reasoned 4 are not
-  touched by this cycle. A plan that renumbers them silently changes what
-  `mnemonic repair`'s callers read.
+- **The repair codes are NOT FROZEN, and the earlier claim that they were is
+  retracted (round-2 N3).** It rested on a five-CLI parity that is measurably
+  false: `md repair` exits 5 and `mnemonic repair` exits 4 on the same input,
+  applying the same correction. D26 was written when the constellation was four
+  tools. **What this cycle rules is narrower and true:** it does not renumber
+  any repair code, because a plan that renumbers them silently changes what
+  callers read. **P0 owes a restated D26** that either admits `mnemonic`'s
+  divergence as deliberate — it prints an UNVERIFIED banner and has a reason: a
+  single-string `md1` has no cross-chunk oracle — or changes it. Freezing is a
+  decision for that restatement, not for this spec.
 - **`mk`'s invalid-artifact 2 becomes 1**, converging on `md`/`ms`/`mt` and
   removing its collision with `md repair`'s atomic-fail 2. This is the only
   code this cycle changes.
@@ -615,8 +636,9 @@ Two collisions this table makes visible and the one-sentence version hid:
   is a clap convention difference, it breaks no pipeline measured, and
   normalising it would touch five CLIs for no safety gain. Filed with an owning
   phase, not folded into P0.
-- The plan **must fill the two unmeasured `mnemonic` cells** before P0 closes;
-  they are marked, not guessed.
+- The plan **must fill the two `mnemonic` cells still marked "not measured"**
+  — invalid-artifact and repair-uncorrectable — before P0 closes. The third,
+  repair-applied, is now measured at 4. They are marked, never guessed.
 
 ### 6g. `me sysw pack --expect <kinds>` — the C-1 contract
 
@@ -772,10 +794,10 @@ override is scoped to the posture pair and to nothing else.
 
 | phase | content | gate |
 | --- | --- | --- |
-| **P0** | the shared crate: `--in`/`--out`/`-`, argv guard with pre-parser ordering, write gate, exit codes, remedy text per §6h, the `--expect` kind vocabulary per §6g. Extracted FROM `mt`/`me`. Plus the distribution mechanism below. | its own tests + an R0 round closing 0C/0I + the two unmeasured `mnemonic` exit cells filled + the in-memory-history question of §6h measured |
+| **P0** | the shared crate: `--in`/`--out`/`-`, argv guard with pre-parser ordering, write gate, exit codes, remedy text per §6h, the `--expect` kind vocabulary per §6g. Extracted FROM `mt`/`me`. Plus the distribution mechanism below. | its own tests + an R0 round closing 0C/0I + the two `mnemonic` exit cells still marked "not measured" filled + D26 restated against the measured 5-vs-4 repair divergence + the in-memory-history question of §6h measured |
 | **P1** | `mt` adopts the crate, and gains `--out` (§6b) and `--allow-argv-secret` (§6d). | `mt`'s 236 tests pass, **with the diff to them enumerated and each edit justified by a named §6 ruling** |
 | **P2** | `ms` FIRST `-` on `combine` and `--in` on all eight verbs, THEN the argv refusal, THEN the 0600 `--out`. Plus this repo's journey drivers. **Highest safety value; do it before the cosmetic work.** | round-trip vectors; `ms combine` and `ms repair` each driven through the private channel; the 18 argv call sites migrated; `me`'s remedy text still naming only channels that exist |
-| **P3** | `md`, `mk` header off stdout, grouping to stderr, `--in`/`--out`. Plus `mnemonic`'s grouping surface AND its argv refusal across all five of its secret-material channels (`bundle`, `convert`, `derive-child`, `restore --passphrase`, `electrum-decrypt --decrypt-password`), and the GUI mirror. Plus golden regeneration. | `md encode` into `me sysw pack` runs with **no flags and no grep, on a CHUNKING policy**; `mnemonic-gui`'s schema mirror regenerated; the 7 goldens regenerated |
+| **P3** | `md`, `mk` header off stdout, grouping to stderr, `--in`/`--out`. Plus `mnemonic`'s grouping surface AND its argv refusal across all five of its secret-material channels (`bundle`, `convert`, `derive-child`, `restore --passphrase`, `electrum-decrypt --decrypt-password`), and the GUI mirror. Plus golden regeneration. | `md encode` into `me sysw pack` runs with **no flags and no grep, on a CHUNKING policy**; `mnemonic-gui`'s schema mirror regenerated; the 7 goldens regenerated; **`mnemonic`'s five secret-material argv channels each refused, named one by one** |
 | **P4** | the operator journey: several inputs of different kinds, one payload, `--expect` engaged. | a captured journey that regenerates, and that FAILS when one producer is made to refuse |
 
 **On `mnemonic`'s argv surface (round-1 B4).** The fold widened this spec from
@@ -872,8 +894,14 @@ all correctly at the moment each was taken: every new document that *discusses*
 the header increments it, and this spec and its own review reports are three of
 them. A self-referential count is a fact with a shelf life measured in commits.
 The actionable number is 7; the rest are prose about the format and are a
-documentation sweep whose size is `git ls-files design | xargs grep -l` at the
-time anyone does it.
+documentation sweep whose size is whatever this prints at the time anyone
+asks — **31 as of this commit**, and the command is written out because the
+previous revision replaced a wrong number with a command that silently printed
+a different wrong one (it had no pattern to grep for):
+
+```
+git ls-files design | xargs grep -l 'chunk-set-id:' | wc -l
+```
 
 ## 8. What is NOT verified, and must be before the plan closes
 
@@ -900,7 +928,8 @@ measurement** and struck.
   script outside these repos.
 - **STILL OPEN — the in-memory shell-history question in §6h.** No command is
   specified for it because none is verified.
-- **STILL OPEN — two `mnemonic` exit-code cells** in §6f.
+- **STILL OPEN — two `mnemonic` exit-code cells** in §6f: invalid-artifact
+  and repair-uncorrectable. The repair-applied cell is measured (4).
 - **RECORD HYGIENE, so the plan does not re-open closed work (N-2).** This spec
   cites F-246, F-250, F-251, F-252 and F-253 as settled, and the behaviour is
   present in the binaries — verified during the fold: `mt encode -` works
