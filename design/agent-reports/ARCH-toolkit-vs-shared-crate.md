@@ -7,13 +7,28 @@ instead of the m\* binaries."* **Scope:** D5 of
 constraints. Every load-bearing claim below was measured against the repos or
 the crates.io API during this ruling; the commands are in §7.
 
+**Mid-flight operator direction, folded before this report was finalised:** the
+target architecture is three tiers — `md`/`mk`/`ms`/`mt` dedicated to m\*1
+string encoding; `mnemonic-toolkit` for fancy processing (BIP-85, SLIP-39,
+Electrum crypto, …); `mnemonic-engrave` for payload prep and communication —
+with *"clean, organized, and relatively symmetric"* as a stated design value,
+and `mnemonic-gui` explicitly out of scope. The first draft of this ruling was
+re-tested against that model before committing; §1a records the test.
+
 ---
 
 ## 1. The ruling
 
 **D5 stands: the IO + safety layer lives in a new, small, dedicated crate — and
-`mnemonic-toolkit` becomes that crate's fifth consumer, not its home.** The
-toolkit is disqualified as the home by five verified facts: (1) it is **not on
+`mnemonic-toolkit` becomes that crate's fifth consumer, not its home.** Under
+the operator's three-tier architecture the layer fits **no tier** — it is not
+encoding, not fancy processing, not payload prep — and the clean answer is a
+**fourth, foundation-tier thing**: a dependency-light crate that all three
+tiers consume, which is exactly what D5 already specifies. Toolkit-as-home
+fails the tier model outright — every *encoding* binary would depend on the
+*fancy-processing* tier, inverting the stated order and dragging SLIP-39,
+Electrum crypto and address derivation into tools that encode a string — and it
+independently fails five verified facts: (1) it is **not on
 crates.io** — the API returns *"crate `mnemonic-toolkit` does not exist"*
 despite the manifest's docs.rs metadata — and it **cannot publish as it
 stands**, because it depends on `wc-codec` by bare `path` with no `version` key
@@ -49,20 +64,70 @@ P3 replaces its warning call sites with the shared refusal, keyed on the
 taxonomy predicate it already tests (`is_argv_secret_bearing` /
 `SECRET_NODE_TYPES_ARGV`), not on a hand-enumerated channel list.
 
-The new crate is a **workspace member of `mnemonic-engrave`** (beside `me-cli`),
-**published to crates.io at 0.1.0 when P0 closes GREEN**, and consumed by
-version everywhere. Rationale for the host: the extraction source (`me`'s write
-gate and argv guard) is in this repo, so P0 is an in-repo refactor plus one new
-crate rather than a three-repo migration; this repo already hosts the
-constellation's cross-cutting spec, FOLLOWUPS and journeys; and it gives the
-Rust-primary question a single unambiguous answer — `mnemonic-engrave` is the
-primary repo for the IO + safety layer, and the Go/GUI mirror ports downstream
-from it, per the standing rule. Runner-up considered and declined: a new member
-crate in the toolkit workspace would publish just as well, but it moves `me`'s
-code across repos for no gain, couples the layer to the constellation's
-heaviest-churn repo (0.97.0 — ninety-seven minor versions), and the precedent
-there (`wc-codec`) is a member crate that never got published and now blocks its
-host's publishability.
+The new crate is **foundation-tier by dependency structure regardless of which
+repo hosts it** — a Cargo edge binds consumers to the crate, never to its host
+workspace's other members — so the host choice is repo-level only, and it is
+**reversible**: once the crate is on crates.io, relocating its repo later costs
+consumers nothing (the crates.io identity is stable; the repository field
+updates on the next publish). The only irreversible choice is the crates.io
+name. On that basis the ruling hosts it, **this cycle**, as a **workspace
+member of `mnemonic-engrave`** (beside `me-cli`), **published to crates.io at
+0.1.0 when P0 closes GREEN**, and consumed by version everywhere. Rationale for
+the host: the extraction source (`me`'s write gate and argv guard) is in this
+repo, so P0 is an in-repo refactor plus one new crate rather than a three-repo
+migration; this repo already hosts the constellation's cross-cutting spec,
+FOLLOWUPS and journeys; and it gives the Rust-primary question a single
+unambiguous answer — the shared crate's host repo is primary for the IO +
+safety layer, and ports mirror downstream from it, per the standing rule.
+**Flagged against the symmetry criterion, deliberately:** this makes
+`mnemonic-engrave` special — the payload-prep repo also housing the
+constellation-facing foundation crate. If the operator wants the fourth tier to
+be a fourth *repo*, the move is the cheap, non-breaking follow-up named in §6;
+it is preference-shaped, not measurement-forced, and nothing in this cycle
+depends on it. Runner-up considered and declined: a new member crate in the
+toolkit workspace would publish just as well, but it moves `me`'s code across
+repos for no gain, couples the layer to the constellation's heaviest-churn repo
+(0.97.0 — ninety-seven minor versions), keeps the tier smell the operator just
+named, and the precedent there (`wc-codec`) is a member crate that never got
+published and now blocks its host's publishability.
+
+## 1a. The tier-model re-test, run before committing
+
+Per the mid-flight direction, the draft ruling was re-tested against the
+three-tier architecture rather than assumed compatible. Results:
+
+- **Toolkit-as-home fails the tier model independently of §1's five facts** —
+  encoders depending on fancy processing is the inversion the operator named.
+  The two failures are separate: fixing the toolkit's publishability would not
+  fix the tier inversion.
+- **"Which tier does the IO + safety layer belong to?" — none.** Refusing argv
+  secrets, 0600 writes and exit-code discipline are properties every tier must
+  have. A layer needed by all three tiers and owned by none is a foundation
+  crate by definition; giving it to any tier's *flagship crate* privileges that
+  tier. D5's small crate **is** the fourth thing; this ruling only pins its
+  weight (near-zero deps), its distribution (published), and its host.
+- **The clean-seam question (direction item 1): tested, and the seam is real
+  but the extraction is not this cycle's.** `display_grouping` is genuinely
+  pure and dependency-free (132 lines, no imports beyond core) and would lift
+  cleanly into the foundation crate — but its three siblings live in *published*
+  crates' trees (`md-codec/src/encode.rs:141-164` — a codec crate),
+  so collapsing the four copies means a `md-codec` release plus three CLI
+  releases for **zero behaviour change**, mid-cycle, while the checksum-gated
+  vectors file already holds them in provable lockstep (identical sha256 in all
+  four repos). `secret_taxonomy` is the opposite case: it is entangled with the
+  toolkit's `NodeType`/`SlotSubkey` universe (wif, bip38, electrum-phrase,
+  minikey) — that is per-tool domain knowledge and *should not* move.
+  `secret_advisory` is warning-grade and is superseded, not extracted.
+- **A symmetry defect the first draft under-flagged, now flagged (direction
+  item 3):** `md` alone keeps its grouping copy in its **codec** crate, where
+  `mk` and `ms` keep theirs bin-private and the toolkit keeps its own in its
+  lib. Presentation code in a codec tier is a tier smell in exactly the
+  operator's sense. The eventual collapse of display-grouping into the
+  foundation crate fixes it; filed as the ownerless follow-up in §6, not
+  smuggled into this cycle.
+- **`mnemonic-gui`:** nothing in this ruling adds GUI work beyond what P3
+  already carries ("the GUI mirror" regeneration). Noted and set aside per the
+  direction.
 
 ## 2. What moves, what stays, what is deleted
 
@@ -91,7 +156,10 @@ words):**
   (same sha256 in all four repos, checksum-gated in CI). D4/§6c are per-CLI
   *wiring* changes (which stream, which flags survive) using these existing
   functions. The new crate re-implementing grouping would create the fifth copy
-  §5 warns about.
+  §5 warns about. The foundation crate is the natural **future** home for this
+  layer — that collapse also cures the `md`-is-special asymmetry flagged in
+  §1a — but it costs a `md-codec` release for zero behaviour change and is
+  deferred (§6, question 5).
 - `me`'s terminal gate — C-3 scoped it to the binary container; it stays
   `me`-private and the shared crate must **not** export it, or someone will
   wire it into `ms`.
@@ -179,6 +247,11 @@ mechanism that works here:
   the toolkit for this one layer. Accepted deliberately — it is the direction
   the code maturity actually runs, and the alternative (toolkit upstream of the
   safety posture it currently fails) is worse.
+- **A symmetry debt, named rather than hidden**: hosting the foundation crate
+  in `mnemonic-engrave` makes that repo special under the operator's tier
+  model, and the four display-grouping copies (one of them in a codec crate)
+  remain asymmetric this cycle. Both are flagged in §1a with their reversal
+  paths in §6; neither blocks the cycle's value.
 - **What it does NOT cost**: no delay to P1/P2 relative to the spec as written
   — the crate was already P0; this ruling only pins where it lives and how it
   ships.
@@ -205,6 +278,18 @@ mechanism that works here:
    refusal-text goldens, the cross-repo lockstep mechanism (vectors + sha256,
    proven for grouping) should be reused rather than invented again. Settled
    by: P0's test plan.
+5. **Whether the fourth tier gets a fourth repo.** This ruling hosts the
+   foundation crate in `mnemonic-engrave` for extraction locality and flags
+   the resulting asymmetry (§1a). Relocating the crate to its own repo later
+   is non-breaking once it is published. Settled by: the operator's preference,
+   any time after P0's publish, at the cost of one repo move and one
+   repository-field update.
+6. **The display-grouping collapse** (four copies → the foundation crate,
+   including lifting the copy out of `md-codec`, where presentation code sits
+   in a codec crate). Behaviour-neutral, held in lockstep today by the
+   checksum-gated vectors, so it earns no place in this cycle. Settled by: an
+   ownerless follow-up filed for a later cycle, per the test-infra-is-polish
+   rule.
 
 ## 7. Facts verified during this ruling (commands, run 2026-08-26)
 
