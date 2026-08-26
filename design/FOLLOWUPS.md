@@ -11023,12 +11023,28 @@ never run, because it writes and the machine carries the burned OTP key.
 pipe does not fail — it silently reads NOTHING. `picotool load -` is separately
 rejected at argument parsing ("unexpected option: -").
 
-**The danger is the silence.** `load` takes the same file-sizing path, so
-`me sysw pack | picotool load /dev/stdin` should write nothing and report
-success — a silent no-op on a FLASHING operation, leaving the operator believing
-their payload is on the device. NOT tested directly: `load` writes, and the test
-device is the operator's own machine. The `verify` result and the shared sizing
-path are the evidence.
+**THE DANGER IS THE SILENCE — AND `load` WAS THEN TESTED DIRECTLY**, after the
+operator authorised writes to `0x10D00000` (the payload region; firmware was
+never a target). Piping 4,096 bytes of `0xAA` into
+`picotool load /dev/stdin -t bin -o 0x10D00000`:
+
+| stdout source | picotool exit | progress bar | flash |
+| --- | --- | --- | --- |
+| a pipe | **0** | frozen at `0%` | **byte-identical afterwards — nothing written** |
+| a regular file, same bytes | 0 | runs to completion | written (`aa aa aa …`) |
+
+Proved by reading the region back with `picotool save` before and after: after
+the piped load the region still began `MNEMSYSW`; after the file load it began
+`aa aa`. **A flashing command that reports success and writes nothing**, with the
+only distinguishing signal a progress bar that does not move. An operator
+running `me sysw pack | picotool load /dev/stdin` would have every reason to
+believe the payload was on the device.
+
+**A measurement trap worth keeping.** The first exit code read here was `tail`'s,
+not picotool's, because the command was piped into `tail` — the same defect this
+constellation has recorded before. The `0` above comes from
+`sh -c 'picotool …; echo PICOTOOL_EXIT=$?'`, with the flash readback as the real
+evidence rather than any exit code.
 
 **Two controls were run, and the first one mattered.** With NO device attached,
 a nonexistent path and a real path return the same "No accessible RP-series
