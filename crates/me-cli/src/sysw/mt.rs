@@ -169,16 +169,28 @@ fn diagnose(csid: u32, set: &[String]) -> Option<SetProblem> {
     let Ok(summary) = tx::parse(&decoded.bytes) else {
         return Some(SetProblem::NotATransaction);
     };
-    if !summary.every_input_signed {
-        return Some(SetProblem::UnsignedInputs {
-            txid: summary.txid_display.clone(),
-            inputs: summary.unsigned_inputs,
-        });
-    }
+    // P5 M-2 — BINDING FIRST, and the order is the finding.
+    //
+    // For a set that is complete, parses, carries an unsigned input AND fails
+    // the 20-bit binding, reporting UNSIGNED sends the operator to "re-export
+    // the FINALIZED transaction from your signer" — to re-sign a transaction
+    // THE STRINGS WERE NEVER MADE FROM — while hiding the binding failure,
+    // which is strictly stronger evidence: it says these bytes are not the ones
+    // this set encodes.
+    //
+    // The device (`seedhammer/mt/mt.go`) already checked binding first. This is
+    // the host agreeing, so the two halves cannot hand an operator
+    // contradictory diagnoses of one artifact.
     if summary.chunk_set_id() != csid {
         return Some(SetProblem::TxidDoesNotBind {
             txid: summary.txid_display,
             csid,
+        });
+    }
+    if !summary.every_input_signed {
+        return Some(SetProblem::UnsignedInputs {
+            txid: summary.txid_display.clone(),
+            inputs: summary.unsigned_inputs,
         });
     }
     None
@@ -493,4 +505,30 @@ mod tests {
         assert!(decode_confirmed(&set).is_none());
     }
 
+
+    /// **P5 M-2 — a binding failure OUTRANKS an unsigned input.**
+    ///
+    /// A set that is complete, parses, carries an unsigned input AND fails the
+    /// 20-bit binding used to be reported as UNSIGNED, whose remedy is
+    /// *"re-export the FINALIZED transaction from your signer"*. That sends the
+    /// operator to re-sign a transaction **the strings were never made from**,
+    /// and hides the binding failure — the strictly stronger evidence, because
+    /// it says these bytes are not the ones this set encodes.
+    ///
+    /// The DEVICE already checked binding first (`mt/mt.go`). This is the host
+    /// agreeing, so the two halves of the constellation cannot hand an operator
+    /// contradictory diagnoses of one artifact.
+    #[test]
+    fn a_binding_failure_outranks_an_unsigned_input() {
+        // Both faults at once: the witness-stripped (unsigned) bytes, encoded
+        // under a FOREIGN set id.
+        let bytes = crate::sysw::tx::tests::unhex(crate::sysw::tx::tests::EVEN_STRIPPED_HEX);
+        let forged_and_stripped =
+            mt_codec::pipeline::encode(&bytes, "00000feed").unwrap();
+        let got = set_problems(&forged_and_stripped)[0].2.clone();
+        assert!(
+            matches!(got, Some(SetProblem::TxidDoesNotBind { .. })),
+            "the forgery signal must win over the signature signal; got {got:?}"
+        );
+    }
 }
