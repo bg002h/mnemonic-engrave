@@ -134,6 +134,15 @@ fn set_confirmed(csid: u32, set: &[String]) -> bool {
     let Ok(summary) = tx::parse(&decoded.bytes) else {
         return false;
     };
+    // (G-P3.1) EVERY INPUT MUST CARRY A SIGNATURE, and this class needs the
+    // check as much as `tx:` does -- more, because a chunk set is the path a
+    // transaction takes when it is too large for one record, i.e. the usual
+    // one. Stripping the witnesses does not change the txid, so the binding
+    // below passes on a stripped set exactly as it does on the honest one:
+    // every other check in this function is blind to it.
+    if !summary.every_input_signed {
+        return false;
+    }
     summary.chunk_set_id() == csid
 }
 
@@ -146,6 +155,11 @@ pub fn decode_confirmed(set: &[String]) -> Option<(Vec<u8>, tx::TxSummary)> {
         return None;
     }
     let summary = tx::parse(&decoded.bytes).ok()?;
+    // (G-P3.1) Mirrors `set_confirmed`; the doc comment above promises these
+    // two agree exactly, and an unsigned set must not decode to a candidate.
+    if !summary.every_input_signed {
+        return None;
+    }
     if summary.chunk_set_id() != decoded.chunks.first()?.header.chunk_set_id {
         return None;
     }
@@ -281,5 +295,34 @@ mod tests {
         // not. Bearer-ness is a MESSAGING posture (mt-cli's), not a secrecy
         // class — but an UNCONFIRMED record still reads as secret via flags.
         assert!(!Class::Mt.is_secret());
+    }
+
+    /// RED FIRST (G-P3.1). The signature predicate guarded the `tx:` class and
+    /// NOT this one -- and the mt1 chunk set is the path a transaction takes
+    /// when it is too large for a single record, i.e. the primary one.
+    ///
+    /// A stripped set reassembles, parses, and binds to its chunk_set_id,
+    /// because the txid is UNCHANGED by stripping. Every check this module had
+    /// passes it.
+    #[test]
+    fn a_stripped_transaction_as_a_chunk_set_is_unconfirmed() {
+        use crate::sysw::tx::tests::{unhex, EVEN_STRIPPED_HEX};
+        let bytes = unhex(EVEN_STRIPPED_HEX);
+        let txid = crate::sysw::tx::parse(&bytes).unwrap().txid_display;
+        let set = mt_codec::pipeline::encode(&bytes, &txid).unwrap();
+
+        // The premise: every OTHER check passes. It is a real, complete,
+        // pristine set that reassembles to bytes that parse and bind.
+        for c in &set {
+            assert_eq!(crate::sysw::classify(c), Class::Mt, "each chunk is valid");
+        }
+
+        assert_eq!(
+            mt_unconfirmed(&set),
+            (0..set.len()).collect::<Vec<_>>(),
+            "a set carrying an UNSIGNED transaction must not confirm -- the txid \
+             is identical to the honest transaction's, so nothing else can tell"
+        );
+        assert!(decode_confirmed(&set).is_none());
     }
 }
