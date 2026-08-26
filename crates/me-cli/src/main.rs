@@ -7,8 +7,13 @@ use clap::{Parser, Subcommand};
 use mnemonic_engrave::{convert, ConvertError};
 use zeroize::Zeroizing;
 
-/// Convert a public constellation string (md1/mk1) to an NFC NDEF payload.
-/// Reads the string from stdin (or --in). Refuses secret ms1.
+/// Prepare wallet backups and signed transactions for a SeedHammer II.
+///
+/// `me sysw pack` builds the payload the machine engraves — from `mt1`
+/// strings or a `tx:` transaction record. With no subcommand, `me` is the
+/// NFC converter: it turns one public constellation string (`md1`, `mk1` or
+/// `mt1`) into an NDEF payload, reading it from stdin or `--in`. Refuses
+/// secret `ms1`.
 #[derive(Parser)]
 #[command(name = "me", version, about)]
 struct Cli {
@@ -65,7 +70,8 @@ enum Command {
         png: bool,
     },
 
-    /// Build, inspect or overwrite a SYSTEMWIDE payload.
+    /// Build, inspect or overwrite a SYSTEMWIDE payload — the flash image a
+    /// SeedHammer II engraves a transaction or a wallet backup from.
     ///
     /// A different container from `seal`, in a different flash region, read by
     /// a different set of programs — see design/SPEC_systemwide_payloads.md.
@@ -143,7 +149,14 @@ enum Command {
 
 #[derive(Subcommand)]
 enum SyswCmd {
-    /// Build a systemwide container.
+    /// Build the systemwide container: a `tx:` record (from `mt encode --qr`) becomes QR plates, `mt1` strings (from `mt encode`) become transaction TEXT plates.
+    ///
+    /// **That first line carries the route on purpose (F-251).** Clap renders
+    /// the first LINE for `-h` and the whole comment for `--help`. The routing
+    /// sentence used to sit four paragraphs down, so an operator holding a
+    /// `tx:` record and typing `-h` — which is what they type — never saw the
+    /// one line that told them where they were. Being first is the fix; the
+    /// short/long split itself is a sound convention and was not the defect.
     ///
     /// A record is a BIP-39 mnemonic, an md1/mk1/ms1/mt1 string, or one of the
     /// prefixed forms — which carry their bodies as LOWERCASE HEX.

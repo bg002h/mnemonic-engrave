@@ -1856,3 +1856,58 @@ fn a_private_redirect_still_receives_the_container() {
         "and it received the container"
     );
 }
+
+// ── F-251: the help tree must name the operator's goal ───────────────────────
+
+/// **The operator held a `tx:` record and typed `me -h` "because I want to
+/// start engraving a QR coded tx". Not one word on the screen matched.**
+///
+/// Measured across the tree at the time: `me -h` and `me sysw help` scored 0
+/// for both "transaction" and "QR"; `me sysw pack -h` scored 1 and 0. The one
+/// sentence that routes an operator to QR plates sat in paragraph 3 of `pack`'s
+/// doc comment, so clap rendered it under `--help` (73 lines) and never under
+/// `-h` (19). They typed `-h` twice.
+///
+/// **This asserts `-h`, deliberately.** Clap's short/long split is a sound
+/// convention and is not the defect; putting the load-bearing sentence outside
+/// the form everyone types is.
+#[test]
+fn the_help_tree_names_transactions_at_every_level_an_operator_types() {
+    let short = |args: &[&str]| -> String {
+        let mut c = me();
+        c.args(args);
+        let o = c.arg("-h").output().unwrap();
+        String::from_utf8_lossy(&o.stdout).to_lowercase()
+            + &String::from_utf8_lossy(&o.stderr).to_lowercase()
+    };
+
+    let top = short(&[]);
+    assert!(top.contains("transaction"), "`me -h` must name transactions: {top}");
+
+    let sysw = short(&["sysw"]);
+    assert!(
+        sysw.contains("transaction") || sysw.contains("engrav"),
+        "`me sysw -h` must connect to the operator's job: {sysw}"
+    );
+
+    let pack = short(&["sysw", "pack"]);
+    assert!(pack.contains("tx:"), "`me sysw pack -h` must name the record: {pack}");
+    assert!(
+        pack.contains("qr"),
+        "and the QR path -- this is the sentence that was only in --help: {pack}"
+    );
+    assert!(
+        pack.contains("mt encode --qr"),
+        "and the command that produces it: {pack}"
+    );
+}
+
+/// `me`'s one-liner said it converts `(md1/mk1)`. It accepts `mt1` too — the
+/// walk fed one through the bare converter and got NDEF bytes back — so the
+/// description was stale with respect to a capability this cycle added.
+#[test]
+fn the_one_liner_admits_the_string_kinds_me_actually_accepts() {
+    let o = me().arg("-h").output().unwrap();
+    let top = String::from_utf8_lossy(&o.stdout).to_lowercase();
+    assert!(top.contains("mt1"), "mt1 is accepted and must be named: {top}");
+}
