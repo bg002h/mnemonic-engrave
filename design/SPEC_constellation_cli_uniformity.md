@@ -145,11 +145,22 @@ its committed journey drivers. See §7 P2 and P3.
 The decisive measurement, and the reason this is a defect rather than a
 preference:
 
-| `ms encode …` | piped into `me sysw pack` |
+Every row below is `ms encode --phrase <the all-abandon BIP-39 test vector>
+<the flag in column one>` piped into `me sysw pack --no-passphrase`:
+
+| `ms encode …` | piped into `me sysw pack --no-passphrase` |
 | --- | --- |
 | **default** (grouped by 5, space separator) | **exit 4 — "not a form this container can place"** |
 | `--separator hyphen` | **exit 4** |
 | `--group-size 0` | **exit 0, 102-byte payload** |
+
+**`--no-passphrase` is load-bearing in that column and is stated because round 3
+(I-3) measured 118 without it and reported the 102 as wrong.** Both numbers are
+correct: an `ms1` record is secret-class, so `me sysw pack` SEALS by default —
+118 sealed, 102 unsealed. The finding was right about the defect and wrong about
+the cause. **The defect is that the row did not say which invocation it came
+from**, which is the third time this document has carried a number whose command
+was implicit (see also §6g and §6e).
 
 The same holds for `md`. Ungrouped and unchunked, `md encode --group-size 0`
 piped into `me sysw pack` gives exit 0. Add the `grep` that strips the header
@@ -603,12 +614,39 @@ disagree only on the exit code. `mnemonic` prints an UNVERIFIED banner
 explaining its 4: a single-string `md1` has no cross-chunk oracle, so the
 correction cannot be confirmed.
 
-**So D26's repair parity does NOT hold across five CLIs, and this spec must
-stop citing it as though it does.** The ruling was written when the
-constellation was four tools; `mnemonic` diverges, for a stated and defensible
-reason. **The codes cannot be declared FROZEN on the strength of a parity that
-is measurably false** — §6f's freeze is retracted below, and P0 owes a restated
-D26 that either admits `mnemonic`'s divergence as deliberate or changes it.
+**THE MEASUREMENT IS TRUE AND EVERY CONCLUSION THIS SPEC DREW FROM IT WAS
+WRONG (round-3 I-2).** The earlier text read the 5-vs-4 as a broken numeric
+parity, said D26 predated `mnemonic`, and put a "restate D26" item in P0's gate.
+All three are false, and the cause is that the spec concluded from a measurement
+without going and reading the rule it was measuring against.
+
+**D26 is a SEMANTIC rule, not a shared integer.** Its normative statement
+(`mnemonic-toolkit/docs/manual/src/40-cli-reference/42-md.md`): exit-5
+`REPAIR_APPLIED` means a correction is *verified now* — a cross-chunk
+reassembly or content-id check — *or verifiable-by-reassembly later*, and
+"never 'an oracle verified it' standing alone"; exit-4 `VERIFY-ME` means a
+bounded-distance substitution correction that spent the checksum's
+error-detection budget and **has no self-oracle**.
+
+**Under that rule `mnemonic`'s 4 CONFORMS**, and so does `ms`'s 4 — which this
+section already calls "reasoned and load-bearing" without noticing it is the
+same rule applied. A non-chunked single-string `md1` has no cross-chunk oracle,
+so a substitution correction on it cannot be verified now. **It is `md repair`'s
+unconditional 5 that is the outlier**, and this spec had the divergence pointed
+at the wrong tool.
+
+**D26 also named `mnemonic` from the start.** `md repair --help` says so in the
+text this section quotes forty lines above: *"D26 cross-CLI parity with `ms
+repair` / `mk repair` / `mnemonic repair`"*. `mt` has no `repair` verb, so D26
+never claimed five.
+
+**And the divergence is already filed, in the repo that owns the fix**:
+`md-cli-non-chunked-single-string-repair-demote`, recorded in
+`descriptor-mnemonic/design/FOLLOWUPS.md` and in the toolkit manual, with
+`mnemonic-toolkit/design/SPEC_followup_toolkit_v0860_demote.md` beside it.
+**This spec neither owns it nor re-opens it.** The P0 gate item that asked for a
+restated D26 is removed: it would have re-litigated filed work in another
+repository, on a reading of D26 that was wrong.
 
 Two collisions this table makes visible and the one-sentence version hid:
 
@@ -619,16 +657,18 @@ Two collisions this table makes visible and the one-sentence version hid:
 
 **What this spec rules, and what it hands to the plan:**
 
-- **The repair codes are NOT FROZEN, and the earlier claim that they were is
-  retracted (round-2 N3).** It rested on a five-CLI parity that is measurably
-  false: `md repair` exits 5 and `mnemonic repair` exits 4 on the same input,
-  applying the same correction. D26 was written when the constellation was four
-  tools. **What this cycle rules is narrower and true:** it does not renumber
-  any repair code, because a plan that renumbers them silently changes what
-  callers read. **P0 owes a restated D26** that either admits `mnemonic`'s
-  divergence as deliberate — it prints an UNVERIFIED banner and has a reason: a
-  single-string `md1` has no cross-chunk oracle — or changes it. Freezing is a
-  decision for that restatement, not for this spec.
+- **This cycle renumbers no repair code**, because a plan that renumbers them
+  silently changes what callers read. That is the whole of the rule, and it is
+  all this spec is entitled to say.
+
+  Two earlier versions of this bullet said more and were both wrong. The first
+  declared the codes FROZEN on a parity it had not read. The second retracted
+  the freeze on the grounds that the parity was measurably false — right about
+  the measurement, wrong about the rule, since D26 governs SEMANTICS and
+  `mnemonic`'s 4 conforms to it (see §6f above). **The observed 5-vs-4 is a
+  known divergence in `md`, filed as
+  `md-cli-non-chunked-single-string-repair-demote` in the repo that owns the
+  fix.** Whether to freeze is that follow-up's business, not this spec's.
 - **`mk`'s invalid-artifact 2 becomes 1**, converging on `md`/`ms`/`mt` and
   removing its collision with `md repair`'s atomic-fail 2. This is the only
   code this cycle changes.
@@ -794,8 +834,8 @@ override is scoped to the posture pair and to nothing else.
 
 | phase | content | gate |
 | --- | --- | --- |
-| **P0** | the shared crate: `--in`/`--out`/`-`, argv guard with pre-parser ordering, write gate, exit codes, remedy text per §6h, the `--expect` kind vocabulary per §6g. Extracted FROM `mt`/`me`. Plus the distribution mechanism below. | its own tests + an R0 round closing 0C/0I + the two `mnemonic` exit cells still marked "not measured" filled + D26 restated against the measured 5-vs-4 repair divergence + the in-memory-history question of §6h measured |
-| **P1** | `mt` adopts the crate, and gains `--out` (§6b) and `--allow-argv-secret` (§6d). | `mt`'s 236 tests pass, **with the diff to them enumerated and each edit justified by a named §6 ruling** |
+| **P0** | the shared crate: `--in`/`--out`/`-`, argv guard with pre-parser ordering, write gate, exit codes, remedy text per §6h, the `--expect` kind vocabulary per §6g. Extracted FROM `mt`/`me`. Plus the distribution mechanism below. | its own tests + an R0 round closing 0C/0I + the two `mnemonic` exit cells still marked "not measured" filled + the in-memory-history question of §6h measured |
+| **P1** | `mt` adopts the crate, and gains `--out` (§6b) and `--allow-argv-secret` (§6d). | `mt`'s 237 tests pass, **with the diff to them enumerated and each edit justified by a named §6 ruling** |
 | **P2** | `ms` FIRST `-` on `combine` and `--in` on all eight verbs, THEN the argv refusal, THEN the 0600 `--out`. Plus this repo's journey drivers. **Highest safety value; do it before the cosmetic work.** | round-trip vectors; `ms combine` and `ms repair` each driven through the private channel; the 18 argv call sites migrated; `me`'s remedy text still naming only channels that exist |
 | **P3** | `md`, `mk` header off stdout, grouping to stderr, `--in`/`--out`. Plus `mnemonic`'s grouping surface AND its argv refusal across all five of its secret-material channels (`bundle`, `convert`, `derive-child`, `restore --passphrase`, `electrum-decrypt --decrypt-password`), and the GUI mirror. Plus golden regeneration. | `md encode` into `me sysw pack` runs with **no flags and no grep, on a CHUNKING policy**; `mnemonic-gui`'s schema mirror regenerated; the 7 goldens regenerated; **`mnemonic`'s five secret-material argv channels each refused, named one by one** |
 | **P4** | the operator journey: several inputs of different kinds, one payload, `--expect` engaged. | a captured journey that regenerates, and that FAILS when one producer is made to refuse |
@@ -851,6 +891,20 @@ uses.** Two further facts it has to absorb:
   `me-cli` those are two different relative paths for one repo, and the worktree
   is transient. This is a further argument against `path =` on top of the
   fresh-checkout argument the existing Cargo.toml already records.
+- **ROUND 3 CAUGHT THIS SPEC DOING THE THING THAT PARAGRAPH WARNS ABOUT (I-1).**
+  Every `mnemonic-transaction` fact here — the test count, the refusal-site
+  count, two `main.rs` line citations, and a reproduction using `--qr` — was
+  measured in that transient worktree, on a branch merged nowhere. On `main` at
+  the time, `--qr` did not exist, `#[test]` counted **212** and `Refusal::new(`
+  **53**. A document that calls a tree transient and then measures it is citing
+  something no other reader can see.
+
+  **Resolved at the root, not by editing citations.** The work was
+  fast-forwarded onto `main` (`95ef842..cf17591`, 8 commits) and re-measured
+  there: **237 tests pass, 237 `#[test]`, 56 `Refusal::new(`, `--qr` present.**
+  Every figure in this spec now comes from `main`. Editing the numbers to match
+  the worktree would have made the spec internally consistent and still
+  unreproducible.
 
 **Mixed states are ACCEPTABLE and are stated so rather than left to be
 discovered.** A constellation where `ms` has the argv guard and `md` does not is
@@ -863,7 +917,7 @@ as a gate, would be met by weakening §6 rather than by proving the port — thr
 parts of §6 change `mt` regardless of the crate's correctness: `--out` (§6b),
 `--allow-argv-secret` (§6d), and the refusal text those imply. The count is
 right — `grep -rc "#\[test\]"` over `mnemonic-transaction/crates` totals
-**236**, re-run during the fold — but the gate is now *enumerate the diff and
+**237** on `main`, re-run after the merge — but the gate is now *enumerate the diff and
 justify each edit*.
 
 **P1 remains the least risk, for the reason the earlier draft gave badly.** `mt`
