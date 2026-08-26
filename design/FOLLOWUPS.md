@@ -10780,14 +10780,81 @@ never says **"stdin is already the default — drop the `-`."**
 **Trivially fixable** — accept an optional positional `-` and ignore it, or catch
 it and print the one sentence. Not chosen here.
 
-**THE PATTERN, and it is the real finding.** F-248, F-249 and F-250 came from
-three consecutive steps of one walk, and they are one defect wearing three faces:
+**THE PATTERN, and it is the real finding.** F-248, F-249, F-250 and F-251 came
+from four steps of one walk, and they are one defect wearing four faces:
 **every refusal on this path is correct, and none of them says what to do
 instead.** Pasting your own output gets a byte count; redirecting to a file gets
 a permission fact; using a standard idiom gets a parser error. The tool knows the
 answer in all three cases — it holds `ValidMT`, it knows `umask`, it knows stdin
 is its default — and says none of them.
 
-**Worth fixing as a class rather than three tickets**, and worth remembering that
+**Worth fixing as a class rather than four tickets**, and worth remembering that
 a correctness lens finds none of them: every one of these commands does exactly
-what the specification says.
+what the specification says. F-251 is the same shape one binary over — `me`
+holds `Class::Tx` and reports a bech32 HRP failure instead.
+---
+
+### F-251 — `me`'s help tree never names the operator's goal, and the one sentence that does is unreachable (owning phase: **post-ship polish**) `#me` `#ux`
+
+**Found in the side-by-side walk, 2026-08-25**, at the step after the `--qr`
+collapse landed. The operator had a `tx:` record in hand and typed `me -h`
+"because I want to start engraving a QR coded tx".
+
+**Measured across `me`'s help tree**, not read:
+
+| what the operator types | says "transaction" | says "QR" |
+| --- | --- | --- |
+| `me -h` | 0 | 0 |
+| `me sysw help` | 0 | 0 |
+| `me sysw pack -h` | 1 | **0** |
+| `me sysw pack --help` | 4 | **1** ← the answer |
+
+The sentence that answers the question exists and is good:
+
+> ``tx:<hex of the raw signed transaction>`` feeds the device's QR engraving
+> path — produce it with ``mt encode --qr``, which checks the bytes parse AND
+> that every input carries a signature.
+
+It is in **paragraph 3** of `pack`'s doc comment, so clap renders it only under
+`--help` (73 lines) and never under `-h` (19 lines). The operator typed `-h`
+twice and never saw it.
+
+**Silence is not the worst of it.** The top-level screen actively advertises the
+NFC converter — `--in`, `--out`, `--stdout`, `--hex`, `--base64` — which is the
+one path that does not apply: SPEC **§1.2** line 142 records that there is **no
+NFC reader for a `sysw` container**, and NFC is ruled later work. An operator who
+follows what is on screen feeds the record to the converter and gets:
+
+```
+$ me --in rec.txt --hex
+me: unrecognized HRP 'tx:0' (expected md, mk, ms, or mt)     (exit 4)
+```
+
+Correct, and a bech32 parse complaint about a thing `me` can identify perfectly
+well — `tx:` is `Class::Tx` in its own `sysw` code. **This is F-248/249/250's
+defect wearing a fourth face:** the tool knows the answer and reports the
+mechanism instead. Being told *nothing* at the top level would be better than
+what the menu currently implies, which is the test a journey divergence has to
+pass to earn a change.
+
+**Two smaller facts from the same measurement:**
+
+- `me`'s one-liner says it converts `(md1/mk1)`. It accepts `mt1` too —
+  verified by feeding one string through the bare converter and getting NDEF
+  bytes back. The description is stale with respect to a capability this cycle
+  added.
+- `sysw`'s summary — *"Build, inspect or overwrite a SYSTEMWIDE payload"* —
+  never connects to records, plates, or engraving. `SYSTEMWIDE payload` is the
+  container's name, not the operator's goal.
+
+**The fix is three doc comments and no behaviour:** name transactions in `me`'s
+one-liner, say what `sysw` is *for* in its summary, and move the `tx:`/QR
+sentence into `pack`'s **first** paragraph so it survives `-h`. Clap's
+short/long split is a fine convention and is not the defect — putting the
+load-bearing sentence outside the form everyone types is.
+
+**NOT a defect, and deliberately kept:** the HRP message lists `ms` among
+expected prefixes although `me` refuses `ms1`. Parsing it is what earns the real
+refusal — *"ms1 is secret seed entropy and must never be transmitted by radio"* —
+instead of a generic one. Verified by feeding an `ms1` string.
+
