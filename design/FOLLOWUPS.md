@@ -10697,3 +10697,58 @@ use.**
 
 **The side-by-side walk is the closest rehearsal available** without real funds,
 which is why it happens BEFORE the tag rather than after.
+
+---
+
+### F-248 — `mt encode` refuses its own output without recognising it (owning phase: **post-ship polish**) `#mt` `#ux`
+
+**Found in the side-by-side walk, 2026-08-25.** The operator ran `mt encode`,
+saw 22 `mt1` strings, decided to use the SeedHammer instead, re-ran with
+`--record --chunks` and **pasted the strings back in** — a plausible mistake,
+because they were the last thing on screen.
+
+```
+mt encode: REFUSED — §8.2e, input is not a PSBT or a raw transaction (1978 bytes)
+```
+
+**The refusal is correct and names the wrong thing.** `mt` has `ValidMT`: it can
+recognise an `mt1` string on sight, and it is looking at 22 of them. It knows the
+operator pasted its own output and reports a byte count.
+
+**What it could say:** *"that input is 22 `mt1` strings — my own output. To check
+them use `mt verify`; to turn them back into a transaction use `mt decode`; to
+re-encode, paste the PSBT or raw transaction instead."*
+
+**Same shape as R0 round 3's `Unrecognised` defect:** a refusal that is true and
+names the wrong thing, on a tool that already holds the information needed to
+name the right one.
+
+---
+
+### F-249 — `mt encode … > file` is refused, and the message gives no remedy (owning phase: **post-ship polish**) `#mt` `#ux` `#f-244`
+
+**Found in the same walk, and it caught the AUTHOR THREE TIMES in one session.**
+
+```
+$ mt encode --record --chunks < tx.hex > records.txt
+mt encode: REFUSED — §8.2h, stdout is a file of mode 0644 — readable by other
+users on this machine.
+```
+
+A pipe works; `>` does not. **The guard is right** — F-244 exists because a
+finalized transaction is bearer material and `>` creates a world-readable file
+under the default umask. Nothing here argues for weakening it.
+
+**The gap is that the message explains the PERMISSION and not the REMEDY**, and
+`mt encode` has no `--out` to redirect the operator to. `me sysw pack` has one;
+`mt encode` does not. So the operator's options are to know about `umask 077`, or
+to pipe, and the tool suggests neither.
+
+**Three candidate fixes, none chosen here:** name the remedies in the refusal
+(`umask 077 && …`, or pipe, or `--in`/`--out`); add `--out` to `mt encode` with
+the same 0600 creation `me` uses; or both.
+
+**Why it is worth more than its size suggests:** it is the FIRST thing an
+operator hits when they try to keep the output, and the author — who fixed
+F-244, wrote its follow-up, and quoted §8.2h earlier the same day — still
+tripped it three times.
