@@ -10752,3 +10752,40 @@ the same 0600 creation `me` uses; or both.
 operator hits when they try to keep the output, and the author — who fixed
 F-244, wrote its follow-up, and quoted §8.2h earlier the same day — still
 tripped it three times.
+
+---
+
+### F-250 — `mt encode -` is rejected as an unexpected argument (owning phase: **post-ship polish**) `#mt` `#ux`
+
+**Found in the side-by-side walk, 2026-08-25.** The operator typed the ordinary
+shell idiom:
+
+```
+$ cat file.psbt | mt encode --record --chunks -
+error: unexpected argument '-' found
+Usage: mt encode [OPTIONS]
+```
+
+`-` meaning *read stdin* is honoured by `cat`, `tar`, `curl`, `gpg`, `jq` and
+most of the tools an operator has in muscle memory. `mt` reads stdin **by
+default**, so the intent was already satisfied — the command failed for asking
+politely.
+
+The message is clap's generic one. The usage line implies the answer by showing
+`[OPTIONS]` with no positional, which is a deduction rather than an answer. It
+never says **"stdin is already the default — drop the `-`."**
+
+**Trivially fixable** — accept an optional positional `-` and ignore it, or catch
+it and print the one sentence. Not chosen here.
+
+**THE PATTERN, and it is the real finding.** F-248, F-249 and F-250 came from
+three consecutive steps of one walk, and they are one defect wearing three faces:
+**every refusal on this path is correct, and none of them says what to do
+instead.** Pasting your own output gets a byte count; redirecting to a file gets
+a permission fact; using a standard idiom gets a parser error. The tool knows the
+answer in all three cases — it holds `ValidMT`, it knows `umask`, it knows stdin
+is its default — and says none of them.
+
+**Worth fixing as a class rather than three tickets**, and worth remembering that
+a correctness lens finds none of them: every one of these commands does exactly
+what the specification says.
