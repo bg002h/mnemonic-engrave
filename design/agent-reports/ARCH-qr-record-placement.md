@@ -238,3 +238,27 @@ which spec's grammar moved.
 | `--qr` shipped today; alias philosophy | `mnemonic-transaction` 1282260 commit message |
 
 — architect agent, second ruling, same dispatch.
+
+---
+
+## 9. ADDENDUM — D7 landed while this ruling was being written (4c6ea7f)
+
+**D7 (operator): "This cycle makes the encoding tier UNIFORM and RELOCATES
+nothing. Tier placement is its own cycle."** That supersedes §5's scheduling,
+and only the scheduling — the ruling's substance (§1-§4, §6-§8) is the answer
+the placement cycle executes.
+
+- **This cycle's P0-P4 are unaffected in their entirety.** `mt encode --qr`
+  keeps emitting the `tx:` record until the placement cycle lands; every §6
+  rule is true of it where it stands (the spec's §9a says exactly this).
+- §5's P0 half (`me`'s bare-hex recognizer + pack-side prefix write) and P1
+  half (`mt`'s `--qr` → `--raw-tx`) become **the first two items of the
+  tier-placement cycle**, in that order — reader before writer, so the
+  intermediate state stays coherent exactly as §5 argued.
+- §4's C-1 restatement is likewise the placement cycle's fold: §6g's current
+  rationale ("`mt` emits both forms") remains TRUE for this whole cycle and
+  must not be edited early. The union `Mt | Tx` is correct in both worlds,
+  which is precisely why it ships in P0 unchanged.
+- §6's grammar-ownership test and history table should still fold into the
+  spec **now** — D7 defers the move, not the reason; recording the reason is
+  what prevents the third relocation.
