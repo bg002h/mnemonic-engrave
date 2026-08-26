@@ -92,6 +92,20 @@ pub enum TxError {
     NoOutputs,
     /// Marker byte 0x00 not followed by flag 0x01 (BIP-144).
     BadSegwitFlag,
+    /// P5 M-6 — the segwit marker and flag are present, and EVERY witness stack
+    /// is empty.
+    ///
+    /// Both this parser and the device's accepted that shape, and if every
+    /// scriptSig is non-empty it also passed the signature predicate — so a QR
+    /// plate could be cut, under a legend saying "raw signed bitcoin tx … then
+    /// broadcast", for bytes **no node will accept**. Bitcoin Core's
+    /// deserializer rejects it ("Superfluous witness record") and its legacy
+    /// re-parse then fails on the 0x00 input count.
+    ///
+    /// A transaction that carries the marker is claiming witness data. If it
+    /// has none, the honest serialization is the legacy one, without the
+    /// marker.
+    EmptyWitnessOnSegwitMarker,
     /// A declared length larger than the buffer could ever satisfy.
     LengthOverflow,
 }
@@ -105,6 +119,7 @@ impl std::fmt::Display for TxError {
             TxError::NoInputs => "transaction has no inputs",
             TxError::NoOutputs => "transaction has no outputs",
             TxError::BadSegwitFlag => "segwit marker without the 0x01 flag",
+            TxError::EmptyWitnessOnSegwitMarker => "the segwit marker is set but every witness stack is empty; no node will accept these bytes",
             TxError::LengthOverflow => "declared length exceeds the data",
         };
         f.write_str(s)
@@ -240,6 +255,14 @@ pub fn parse(bytes: &[u8]) -> Result<TxSummary, TxError> {
                 c.skip_bytes()?;
             }
             *slot = items > 0;
+        }
+        // P5 M-6 — the marker CLAIMS witness data. All-empty stacks means the
+        // bytes are neither a valid segwit transaction (Core: "Superfluous
+        // witness record") nor a legacy one (its re-parse hits the 0x00 input
+        // count). Accepting them lets a plate be cut for a transaction that
+        // cannot be broadcast, under a legend that says it can.
+        if input_has_witness.iter().all(|&w| !w) {
+            return Err(TxError::EmptyWitnessOnSegwitMarker);
         }
     }
     let locktime = c.take(4)?;
@@ -465,5 +488,46 @@ mod signature_predicate_tests {
         }
         assert_eq!(parse(&unhex(EVEN_STRIPPED_HEX)).unwrap().unsigned_inputs, vec![0]);
         assert!(parse(&unhex(EVEN_RAW_HEX)).unwrap().unsigned_inputs.is_empty());
+    }
+
+    /// P5 M-6 — a segwit-marked transaction whose every witness stack is empty
+    /// parses as well-formed in both implementations and, with non-empty
+    /// scriptSigs, passes the signature predicate too. Bitcoin Core rejects
+    /// exactly these bytes, so a plate cut from them could never be broadcast.
+    #[test]
+    fn a_segwit_marker_with_no_witness_data_is_refused() {
+        // version | 00 01 | 1 input (prevout, 1-byte scriptSig, sequence)
+        // | 1 output (value, 1-byte script) | empty witness stack | locktime
+        let mut b = Vec::new();
+        b.extend_from_slice(&[0x02, 0, 0, 0]); // version
+        b.extend_from_slice(&[0x00, 0x01]); // segwit marker + flag
+        b.push(0x01); // 1 input
+        b.extend_from_slice(&[0x11; 32]); // prevout txid
+        b.extend_from_slice(&[0, 0, 0, 0]); // prevout vout
+        b.push(0x01); // scriptSig length
+        b.push(0x51); // a non-empty scriptSig -> "signed" by the predicate
+        b.extend_from_slice(&[0xff, 0xff, 0xff, 0xff]); // sequence
+        b.push(0x01); // 1 output
+        b.extend_from_slice(&[0x10, 0x27, 0, 0, 0, 0, 0, 0]); // value
+        b.push(0x01); // scriptPubKey length
+        b.push(0x51);
+        b.push(0x00); // THE DEFECT: witness stack with ZERO items
+        b.extend_from_slice(&[0, 0, 0, 0]); // locktime
+
+        assert_eq!(
+            parse(&b),
+            Err(TxError::EmptyWitnessOnSegwitMarker),
+            "the marker claims witness data; with none, no node accepts these bytes"
+        );
+    }
+
+    /// THE CONTROL: the corpus's real segwit transaction, which DOES carry
+    /// witness data, must still parse. Without this, refusing every segwit
+    /// transaction would satisfy the test above.
+    #[test]
+    fn a_real_segwit_transaction_still_parses() {
+        let raw = unhex(EVEN_RAW_HEX);
+        let s = parse(&raw).expect("the pinned segwit vector must still parse");
+        assert!(s.every_input_signed, "and still report its inputs signed");
     }
 }
