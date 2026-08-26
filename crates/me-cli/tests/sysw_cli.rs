@@ -1531,3 +1531,70 @@ fn an_incomplete_set_still_packs_and_is_readable() {
         .success()
         .stdout(predicate::str::contains("pub_len:  175"));
 }
+
+// ─── G-P3.16 — one command, named on both sides of the air gap ──────────────
+
+/// SPEC §3.2. The DEVICE's compare screen used to say *"Compare this against
+/// what `me sysw pack` printed"* — the WRITE path. Re-running `pack` means
+/// re-supplying every record and re-running the ceremony, and on the sealed
+/// path it mints a fresh passphrase. The operator standing at the machine has
+/// the FILE. `me sysw show <file>` reads what they have.
+///
+/// So `pack` names the same command the device names. A pointer that exists on
+/// only one side of an air gap is a pointer the operator has to invent.
+#[test]
+fn pack_points_at_the_command_the_device_names() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    let res = me()
+        .args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap(), MD1])
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
+    assert!(
+        err.contains("me sysw show"),
+        "pack must name the command that re-prints the digest: {err}"
+    );
+    assert!(
+        err.contains(out.to_str().unwrap()),
+        "and the FILE, so it can be pasted: {err}"
+    );
+}
+
+/// On stdout there is no path to name, so it says so rather than printing a
+/// command that cannot be run.
+#[test]
+fn the_pointer_admits_it_does_not_know_the_path_on_stdout() {
+    let res = me()
+        .args(["sysw", "pack", "--no-passphrase", "--allow-world-readable", MD1])
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
+    assert!(err.contains("me sysw show"), "{err}");
+    assert!(
+        err.contains("the file you just wrote"),
+        "it must not invent a path it does not have: {err}"
+    );
+}
+
+/// AND THE COMMAND IT NAMES REALLY PRINTS THE SAME NUMBER. A pointer to a
+/// command that prints something else is worse than no pointer: the operator
+/// compares two numbers that were never meant to match and concludes the
+/// payload is tampered with.
+#[test]
+fn the_named_command_prints_the_same_digest() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    let packed = me()
+        .args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap(), MD1, TEXT])
+        .assert()
+        .success();
+    let from_pack = digest_line(&String::from_utf8_lossy(&packed.get_output().stderr))
+        .expect("pack prints a digest")
+        .to_string();
+    let shown = me().args(["sysw", "show", out.to_str().unwrap()]).assert().success();
+    let from_show = digest_line(&String::from_utf8_lossy(&shown.get_output().stderr))
+        .expect("show prints a digest")
+        .to_string();
+    assert_eq!(from_pack, from_show);
+}

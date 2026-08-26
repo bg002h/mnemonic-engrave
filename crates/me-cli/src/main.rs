@@ -1155,6 +1155,18 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // so a padded region yields the same number, and the operator has to
             // see the same value whichever form they wrote.
             print_digest(&blob);
+            // G-P3.16 / SPEC §3.2. The DEVICE tells the operator to compare
+            // this number against `me sysw show <file>`, so `pack` names the
+            // same command rather than leaving them to find it. Pointing back
+            // at `pack` would be pointing at the WRITE path: re-running it
+            // needs every record again and, on the sealed path, mints a fresh
+            // passphrase. The operator standing at the machine has the file.
+            match out.as_ref() {
+                Some(p) => eprintln!("          re-print it with: me sysw show {}", p.display()),
+                None => eprintln!(
+                    "          re-print it with: me sysw show <the file you just wrote>"
+                ),
+            }
             if *region {
                 let n = sysw::wire::REGION_LEN;
                 if blob.len() > n {
