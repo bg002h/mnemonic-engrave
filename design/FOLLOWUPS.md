@@ -10416,10 +10416,11 @@ pack. The rule that covers both: **no report line describing a container may be
 emitted until every gate that can abort the write has run.** Sealing, strength
 and digest all describe an artifact, so all three belong after the guard.
 
-**Not a defect, and better than its `mt` counterpart:** the refusal itself names
-three concrete ways on (`--out`, `umask 077`, `--allow-world-readable`). F-249
-records `mt` giving none. Whatever fixes F-249 should copy this message, not the
-other way round.
+**Not a defect:** the refusal itself names three concrete ways on (`--out`,
+`umask 077`, `--allow-world-readable`). *(An earlier version of this paragraph
+said `mt`'s equivalent offered none, citing F-249. That was wrong — `mt` names
+three too, and F-249 has been WITHDRAWN as false-as-filed. Both binaries print
+remedies here; neither needs to copy the other.)*
 ---
 
 ### F-247 — `mt encode --qr` does not say whether the record fits an NFC TAG (owning phase: **P2, and it needs an operator ruling FIRST**) `#mt` `#nfc`
@@ -10643,33 +10644,63 @@ name the right one.
 
 ---
 
-### F-249 — `mt encode … > file` is refused, and the message gives no remedy (owning phase: **post-ship polish**) `#mt` `#ux` `#f-244`
+### F-249 — WITHDRAWN 2026-08-25 — FALSE AS FILED; the message names three remedies (owning phase: **none — closed**) `#mt` `#ux` `#f-244`
 
-**Found in the same walk, and it caught the AUTHOR THREE TIMES in one session.**
+**WITHDRAWN before implementation, during the overnight burndown.** The claim
+was **false**, and the way it became false is the finding worth keeping.
+
+**What the entry asserted:** that the refusal explains the permission and not the
+remedy. **What `mt` actually prints**, captured unfiltered:
 
 ```
 $ mt encode < tx.hex > records.txt
 mt encode: REFUSED — §8.2h, stdout is a file of mode 0644 — readable by other
 users on this machine.
+
+  These strings ARE the engraving, and a finalized transaction is
+  BEARER: anyone who can read that file can broadcast it.
+
+  mt has no --out: stdout IS the strings, by design (§3b). So the
+  remedies are the shell's:
+
+  umask 077 then re-run; the shell creates it 0600
+  chmod 600 <file> then re-run -- `>` truncates but keeps the mode
+  --allow-world-readable proceed anyway
 ```
+
+**All three remedies are there, and `validate.rs`'s `with_remedy(...)` has carried
+them since F-244 closed.**
+
+**HOW THE FALSE FINDING WAS MANUFACTURED.** The walk captured that refusal through
+`grep -iE 'REFUSED|error|mt encode:'`. The grep matched the one line beginning
+`mt encode: REFUSED` and discarded the indented remedy block beneath it — so the
+transcript pasted into this entry was an artifact of the filter, not of the tool.
+**The observation instrument produced the defect.** This is the fourth time in one
+session that reading a stream through a pipe gave a wrong answer here (a `tail`
+exit code instead of `mt`'s, a `grep` that made stdout a pipe so the world-readable
+guard could not fire, an exit code from `tail` instead of `picotool`, and this).
+**Capture whole, then filter the capture — never filter the capture.**
+
+**Nothing to implement.** The guard is right, the message is right, and the
+original text below is kept only for what it says about the author tripping it.
 
 A pipe works; `>` does not. **The guard is right** — F-244 exists because a
 finalized transaction is bearer material and `>` creates a world-readable file
 under the default umask. Nothing here argues for weakening it.
 
-**The gap is that the message explains the PERMISSION and not the REMEDY**, and
-`mt encode` has no `--out` to redirect the operator to. `me sysw pack` has one;
-`mt encode` does not. So the operator's options are to know about `umask 077`, or
-to pipe, and the tool suggests neither.
+**WHAT SURVIVES THE WITHDRAWAL.** The author tripped this refusal three times in
+one session *despite* the remedies being printed every time — having fixed F-244,
+written its follow-up, and quoted §8.2h earlier the same day. That is worth
+keeping, because it is a different claim from the one filed: not *"the tool does
+not say"* but *"the operator does not read a wall of correct text at the moment
+they are mid-task."* Any future work here is about **prominence**, not content,
+and it should start by measuring whether the remedy block is even seen — the
+entry that follows the digest in F-246 is the same shape.
 
-**Three candidate fixes, none chosen here:** name the remedies in the refusal
-(`umask 077 && …`, or pipe, or `--in`/`--out`); add `--out` to `mt encode` with
-the same 0600 creation `me` uses; or both.
-
-**Why it is worth more than its size suggests:** it is the FIRST thing an
-operator hits when they try to keep the output, and the author — who fixed
-F-244, wrote its follow-up, and quoted §8.2h earlier the same day — still
-tripped it three times.
+**One thing genuinely absent, and still not chosen:** `mt encode` has no `--out`,
+so every remedy offered is the shell's rather than the tool's. `me sysw pack` has
+`--out` and creates it 0600. Adding one to `mt` remains a candidate; it was not
+adopted here because §3b rules that stdout IS the artifact.
 
 ---
 
@@ -10696,18 +10727,22 @@ never says **"stdin is already the default — drop the `-`."**
 **Trivially fixable** — accept an optional positional `-` and ignore it, or catch
 it and print the one sentence. Not chosen here.
 
-**THE PATTERN, and it is the real finding.** F-248, F-249, F-250 and F-251 came
-from four steps of one walk, and they are one defect wearing four faces:
-**every refusal on this path is correct, and none of them says what to do
-instead.** Pasting your own output gets a byte count; redirecting to a file gets
-a permission fact; using a standard idiom gets a parser error. The tool knows the
-answer in all three cases — it holds `ValidMT`, it knows `umask`, it knows stdin
-is its default — and says none of them.
+**THE PATTERN, and it is the real finding — CORRECTED 2026-08-25 when F-249 was
+withdrawn.** F-248, F-250 and F-251 came from one walk, and they are one defect
+wearing three faces: **every refusal on this path is correct, and none of them
+says what to do instead.** Pasting your own output gets a byte count; using a
+standard idiom gets a parser error; asking `me` for help gets a menu with no word
+for the job. The tool knows the answer in each case — it holds `ValidMT`, it knows
+stdin is its default, it holds `Class::Tx` — and says none of them.
 
-**Worth fixing as a class rather than four tickets**, and worth remembering that
+**F-249 was originally counted as a fourth face and is NOT one.** Its refusal
+names three remedies and always has; the entry was written from a `grep`-filtered
+transcript. It is left in place as WITHDRAWN rather than deleted, because how a
+filtered capture manufactured a finding is worth more than the finding was.
+
+**Worth fixing as a class rather than three tickets**, and worth remembering that
 a correctness lens finds none of them: every one of these commands does exactly
-what the specification says. F-251 is the same shape one binary over — `me`
-holds `Class::Tx` and reports a bech32 HRP failure instead.
+what the specification says.
 ---
 
 ### F-251 — `me`'s help tree never names the operator's goal, and the one sentence that does is unreachable (owning phase: **post-ship polish**) `#me` `#ux`
@@ -10821,9 +10856,10 @@ the aliased-away failure mode the retired R3 rule was built around; see
 `SPEC_engrave_transaction.md` §2.2.
 
 **Both repos.** `mt`'s §8.2h refusal carries the same sentence, and per the
-Rust-primary rule the wording should move together. F-249 already records that
-`mt`'s version of this refusal offers no remedy while `me`'s offers three, so
-these two are one edit on `mt`'s side.
+Rust-primary rule the wording should move together — the FALSE sentence is the
+same in both, so this is one edit applied twice, not a port. *(An earlier version
+of this paragraph leaned on F-249 to claim `mt`'s refusal offers no remedy. F-249
+is WITHDRAWN as false-as-filed: both binaries already name three remedies.)*
 
 
 
