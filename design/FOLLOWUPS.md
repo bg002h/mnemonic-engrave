@@ -10343,6 +10343,8 @@ accepts is its own defect.
 
 ### F-246 — `me sysw pack` generates and PRINTS a passphrase before it validates the records, so an invalid input still emits secret material
 
+**DONE 2026-08-25** — `mnemonic-engrave` `08c9c80` (both instances: admission hoisted out of `split` into `sysw::admit_check`, and the write gate hoisted above every report line) and `9952c7f` (the gate repositioned so R2 still outranks it).
+
 **Severity:** Minor. **Owning phase:** post-P1 UX (not P1 — P1 neither introduces
 this nor is scoped to fix it). **Found:** 2026-08-24, while verifying R0 round 4's
 C2 against the shipped binary.
@@ -10424,6 +10426,8 @@ remedies here; neither needs to copy the other.)*
 ---
 
 ### F-247 — `mt encode --qr` does not say whether the record fits an NFC TAG (owning phase: **P2, and it needs an operator ruling FIRST**) `#mt` `#nfc`
+
+**NOT DONE, and deliberately — operator, 2026-08-25: "skip nfc stuff for now."** It was in the burndown range but is the one item there that needs a ruling rather than an implementation, and its own text below forbids grafting the worked reference without one. Stays open at its stated owning phase.
 
 **Filed 2026-08-25 during P3b, deliberately NOT implemented.**
 
@@ -10619,6 +10623,8 @@ which is why it happens BEFORE the tag rather than after.
 
 ### F-248 — `mt encode` refuses its own output without recognising it (owning phase: **post-ship polish**) `#mt` `#ux`
 
+**DONE 2026-08-25** — `mnemonic-transaction` `24b8cef`. Two forms: `mt1` strings (with an exact count) and the `tx:` record, neither echoed.
+
 **Found in the side-by-side walk, 2026-08-25.** The operator ran `mt encode`,
 saw 22 `mt1` strings, decided to use the SeedHammer instead, re-ran for the
 record form and **pasted the strings back in** — a plausible mistake, because
@@ -10706,6 +10712,8 @@ adopted here because §3b rules that stdout IS the artifact.
 
 ### F-250 — `mt encode -` is rejected as an unexpected argument (owning phase: **post-ship polish**) `#mt` `#ux`
 
+**DONE 2026-08-25** — `mnemonic-transaction` `5c7d827`. A hidden positional whose `value_parser` admits only the literal `-`.
+
 **Found in the side-by-side walk, 2026-08-25.** The operator typed the ordinary
 shell idiom:
 
@@ -10746,6 +10754,8 @@ what the specification says.
 ---
 
 ### F-251 — `me`'s help tree never names the operator's goal, and the one sentence that does is unreachable (owning phase: **post-ship polish**) `#me` `#ux`
+
+**DONE 2026-08-25** — `mnemonic-engrave` `6c3289b`. The one-liner lives in `Cargo.toml`; clap renders the first LINE, not the first paragraph.
 
 **Found in the side-by-side walk, 2026-08-25**, at the step after the `--qr`
 collapse landed. The operator had a `tx:` record in hand and typed `me -h`
@@ -10811,6 +10821,8 @@ instead of a generic one. Verified by feeding an `ms1` string.
 ---
 
 ### F-252 — the world-readable refusal asserts reachability it never checked, and is FALSE under any 0700 ancestor (owning phase: **post-ship polish**) `#me` `#mt` `#ux`
+
+**DONE 2026-08-25** — `mnemonic-transaction` `54c6d54` and `mnemonic-engrave` `86854c6`. The sentence changed in both; the guard did not.
 
 **Found in the side-by-side walk, 2026-08-25**, when the operator read the
 refusal that had just blocked their `me sysw pack` and asked plainly: *"Is it
@@ -10982,6 +10994,8 @@ operator's own text — a warning the operator can turn off is not a control.
 ---
 
 ### F-253 — a bare `me sysw pack` writes the BEARER container to the terminal at exit 0, under an exemption justified by a false claim (owning phase: **post-ship polish**) `#me` `#security` `#ux`
+
+**DONE 2026-08-25** — `mnemonic-engrave` `9ef69ee`. Both gates now live in one pure `write_block()`; a pipe is unaffected.
 
 **Found in the side-by-side walk, 2026-08-25**, immediately after F-252 and from
 the same question. The operator typed the plain command and pasted one `tx:`
