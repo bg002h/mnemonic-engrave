@@ -898,6 +898,137 @@ fn stdout_world_readable_mode() -> Option<u32> {
 }
 
 /// The refusal F-244 asks for, with the override it names.
+/// Where a container's bytes are going — F-253.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Destination {
+    /// `--out`: `me` creates the file itself, owner-only.
+    File,
+    /// A pipe or a redirect. The ruled pipeline lives here.
+    Stream,
+    /// A terminal. **Not a destination for a bearer container.**
+    Terminal,
+}
+
+/// Decide where stdout is pointing, as a pure function of the two facts that
+/// matter — so it is testable without a pty, which no dev-dependency here can
+/// give us. `emit` supplies `std::io::IsTerminal`.
+fn destination(out_given: bool, stdout_is_tty: bool) -> Destination {
+    if out_given {
+        Destination::File
+    } else if stdout_is_tty {
+        Destination::Terminal
+    } else {
+        Destination::Stream
+    }
+}
+
+/// Why a write cannot proceed — **the single decision**, so the early check and
+/// `emit`'s cannot drift apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WriteBlock {
+    /// Nothing in the way.
+    None,
+    /// stdout is a terminal (F-253).
+    Terminal,
+    /// stdout is a file whose mode grants group/other read (F-252), carrying
+    /// the mode so the refusal can quote what it measured.
+    WorldReadable(u32),
+}
+
+/// **F-246 binds every gate, including ones added later.** The rule is that no
+/// line describing a container may print until every gate that can abort the
+/// write has run — so both gates are decided here, once, and consulted at the
+/// top of `pack` as well as inside `emit`.
+///
+/// Terminal is checked FIRST because the mode check structurally cannot see it:
+/// a TTY is a character device, and those are exempt there (that exemption is
+/// load-bearing for `/dev/null`, mode 0666).
+fn write_block(
+    out_given: bool,
+    allow_world_readable: bool,
+    stdout_is_tty: bool,
+    world_readable_mode: Option<u32>,
+) -> WriteBlock {
+    match destination(out_given, stdout_is_tty) {
+        // `--out`: `me` creates the file 0600 itself, so neither gate applies.
+        Destination::File => WriteBlock::None,
+        // `--allow-world-readable` does NOT override this. It says "this file's
+        // permissions are my problem"; it is not a request to paint a bearer
+        // container across a scrollback, and the message offers a file route.
+        Destination::Terminal => WriteBlock::Terminal,
+        Destination::Stream => match world_readable_mode {
+            Some(mode) if !allow_world_readable => WriteBlock::WorldReadable(mode),
+            _ => WriteBlock::None,
+        },
+    }
+}
+
+/// Report a [`WriteBlock`] and yield the exit code, or `None` to proceed.
+fn refuse_write_block(b: WriteBlock, len: usize) -> Option<i32> {
+    match b {
+        WriteBlock::None => None,
+        WriteBlock::Terminal => {
+            refuse_terminal_destination(len);
+            Some(EXIT_USAGE)
+        }
+        WriteBlock::WorldReadable(mode) => {
+            refuse_world_readable_stdout(mode);
+            Some(EXIT_USAGE)
+        }
+    }
+}
+
+/// F-253 — refuse to paint a bearer container across the operator's terminal,
+/// and say what to run instead.
+///
+/// **The char-device exemption in `stdout_world_readable_mode` cannot catch
+/// this, and its stated reason is false.** That comment justifies exempting
+/// character devices with *"a terminal and `/dev/null` persist nothing, so
+/// neither can leak"*. The `/dev/null` half is right and load-bearing —
+/// `/dev/null` is mode 0666, so a mode-only test would refuse
+/// `me … > /dev/null`. The terminal half is not: a terminal persists in
+/// scrollback, and sessions are routinely logged. This finding was itself
+/// captured through `script`.
+///
+/// **The shape is the operator's proposal, and `me seal` set the precedent** —
+/// it already prints `load:`/`wipe:` lines for its own region. `pack` printed
+/// none. So this is the sibling verb's behaviour, with `sysw`'s address.
+///
+/// **Piping into `picotool` is deliberately NOT offered.** Settled on hardware
+/// 2026-08-25: picotool sizes its input with `fstat`, a pipe reports `st_size`
+/// 0, and `picotool load /dev/stdin` therefore exits **0 having written
+/// nothing** — a silent no-op on a flashing operation. The file is the route.
+fn refuse_terminal_destination(len: usize) {
+    use mnemonic_engrave::sysw::wire::{REGION_ADDR, REGION_LEN};
+    // 0 means "not built, and never will be" -- the early gate refuses before
+    // the container exists. Naming a size there would be inventing one.
+    let size = if len == 0 {
+        String::new()
+    } else {
+        format!("{len} bytes of ")
+    };
+    eprintln!(
+        "me: stdout is a TERMINAL, and this payload is BEARER.\n\
+         \n\
+         Writing it here would paint {size}raw binary across your \
+         scrollback — and terminal sessions are often logged. Nothing was \
+         written.\n\
+         \n\
+         Give it a file, then flash that file:\n\
+         \n\
+           me sysw pack --region --out payload.bin  ...\n\
+           picotool load --verify payload.bin -t bin -o 0x{REGION_ADDR:08X}\n\
+         \n\
+         with the machine in BOOTSEL. To clear the region instead:\n\
+         \n\
+           picotool erase -r 0x{REGION_ADDR:08X} 0x{:08X}\n\
+         \n\
+         Do NOT pipe into picotool: it sizes its input with fstat, a pipe \
+         reports 0 bytes, and the load exits 0 having written nothing.",
+        REGION_ADDR as usize + REGION_LEN
+    );
+}
+
 fn refuse_world_readable_stdout(mode: u32) {
     eprintln!(
         "me: stdout is a file of mode {mode:04o} — its permissions grant read to \
@@ -989,13 +1120,24 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // copy: it is reached by `wipe` and by the region path too, and a
             // guard that exists only at one call site is one refactor from
             // being bypassed.
-            if let (true, false, Some(mode)) = (
-                out.is_none(),
-                *allow_world_readable,
-                stdout_world_readable_mode(),
-            ) {
-                refuse_world_readable_stdout(mode);
-                return EXIT_USAGE;
+            {
+                use std::io::IsTerminal;
+                // The length is not known yet -- the container has not been
+                // built -- and it does not need to be: this refusal is about
+                // WHERE, and the byte count only sharpens a message the
+                // operator sees when they retry. `emit` reports the real
+                // length; here 0 stands for "not built, and never will be".
+                if let Some(code) = refuse_write_block(
+                    write_block(
+                        out.is_some(),
+                        *allow_world_readable,
+                        std::io::stdout().is_terminal(),
+                        stdout_world_readable_mode(),
+                    ),
+                    0,
+                ) {
+                    return code;
+                }
             }
             let recs = match read_records(records, r#in.as_ref()) {
                 Ok(r) => r,
@@ -1810,19 +1952,31 @@ fn read_records(
 }
 
 fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>, allow_world_readable: bool) -> i32 {
-    use std::io::Write;
+    use std::io::{IsTerminal, Write};
     // F-244: this used to be `std::fs::write`, which creates at 0o666 & ~umask
     // -- so an UNSEALED container holding a BIP-39 mnemonic landed at 0644 while
     // `write_private` sat in this same file, documented for exactly this threat,
     // and used only for NDEF/manifest/uf2. The container was less protected than
     // the artifact that merely depicts key material.
-    if let (true, false, Some(mode)) = (
-        out.is_none(),
-        allow_world_readable,
-        stdout_world_readable_mode(),
+    // F-253 — a TERMINAL is not a destination for a bearer container. This runs
+    // BEFORE the mode check because the mode check cannot reach it: a TTY is a
+    // character device, and character devices are exempt there (that exemption
+    // is load-bearing for `/dev/null`, which is mode 0666).
+    //
+    // `--allow-world-readable` does NOT override this. It is the operator saying
+    // "this file's permissions are my problem"; it is not a request to paint the
+    // container across their scrollback, and there is a file-shaped route two
+    // lines away in the message.
+    if let Some(code) = refuse_write_block(
+        write_block(
+            out.is_some(),
+            allow_world_readable,
+            std::io::stdout().is_terminal(),
+            stdout_world_readable_mode(),
+        ),
+        bytes.len(),
     ) {
-        refuse_world_readable_stdout(mode);
-        return EXIT_USAGE;
+        return code;
     }
     let r = match out {
         Some(p) => write_private(p, bytes).map_err(|e| format!("{}: {e}", p.display())),
@@ -1909,7 +2063,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::is_plate_artifact;
+    use super::{destination, is_plate_artifact, write_block, Destination, WriteBlock};
 
     // A1/F8: is_plate_artifact must match the tool's own plate names and the
     // `plate-.svg` edge (a plate-artifact form), but never over-match near-misses.
@@ -1923,5 +2077,51 @@ mod tests {
         assert!(!is_plate_artifact("notes.txt")); // no prefix, no ext.
         assert!(!is_plate_artifact("plate.txt")); // no `plate-`, wrong ext.
         assert!(!is_plate_artifact("plateau.svg")); // no `-` after `plate`.
+    }
+
+    // ── F-253: a bearer container must not be dumped at a terminal ───────────
+
+    #[test]
+    fn a_terminal_is_never_a_destination_for_the_container() {
+        // --out wins over everything: `me` creates the file 0600 itself.
+        assert_eq!(destination(true, true), Destination::File);
+        assert_eq!(destination(true, false), Destination::File);
+        // No --out, and stdout is a TTY: REFUSE. The bytes would land in
+        // scrollback and in any logged session -- this finding was captured
+        // through `script`, which is exactly such a session.
+        assert_eq!(destination(false, true), Destination::Terminal);
+        // No --out, stdout redirected or piped: write. This is the ruled
+        // pipeline (`mt encode --qr | me sysw pack`) and must not regress.
+        assert_eq!(destination(false, false), Destination::Stream);
+    }
+
+    /// The COMBINED decision, exhaustively — both gates live here so the early
+    /// F-246 check and `emit`'s cannot drift apart, and drift is exactly what
+    /// this table pins.
+    #[test]
+    fn write_block_decides_both_gates_once() {
+        use WriteBlock as W;
+        // --out: me creates the file 0600, so NEITHER gate applies -- not even
+        // with a world-readable stdout behind it, which is the whole point of
+        // recommending --out as the remedy.
+        assert_eq!(write_block(true, false, true, Some(0o644)), W::None);
+        assert_eq!(write_block(true, false, false, Some(0o644)), W::None);
+
+        // A terminal is refused, and --allow-world-readable does NOT buy past
+        // it: that flag is about a FILE's permissions.
+        assert_eq!(write_block(false, false, true, None), W::Terminal);
+        assert_eq!(write_block(false, true, true, None), W::Terminal);
+
+        // A stream with a group/other-readable mode is refused, and the mode is
+        // carried so the message can quote what it measured.
+        assert_eq!(
+            write_block(false, false, false, Some(0o644)),
+            W::WorldReadable(0o644)
+        );
+        // ...unless the operator overrode it. Here the flag DOES apply.
+        assert_eq!(write_block(false, true, false, Some(0o644)), W::None);
+
+        // The ruled pipeline: a pipe, no mode concern. Must never be blocked.
+        assert_eq!(write_block(false, false, false, None), W::None);
     }
 }

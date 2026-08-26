@@ -1819,3 +1819,40 @@ fn the_world_readable_refusal_names_the_mode_and_claims_no_more() {
         assert!(err.contains(r), "remedy {r:?} lost: {err}");
     }
 }
+
+/// **THE CONTROL for F-253, and the one that matters most.** The ruled pipeline
+/// is `mt encode --qr | me sysw pack`, so a PIPE must still receive the
+/// container. If the terminal refusal were written as "refuse whenever there is
+/// no `--out`", this goes red — and the feature's whole reason for existing
+/// would be gone.
+#[test]
+fn a_pipe_still_receives_the_container() {
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase", TEXT])
+        .assert()
+        .success();
+    let out = &a.get_output().stdout;
+    assert!(!out.is_empty(), "a pipe must still get the bytes");
+    assert_eq!(&out[..8], b"MNEMSYSW", "and they must be the container");
+}
+
+/// A redirect to a 0600 file is a Stream too — not a terminal, and not refused
+/// by the mode guard either, so the bytes land.
+#[test]
+fn a_private_redirect_still_receives_the_container() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let sink = dir.path().join("p.bin");
+    let handle = std::fs::File::create(&sink).unwrap();
+    std::fs::set_permissions(&sink, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let o = std::process::Command::new(assert_cmd::cargo::cargo_bin("me"))
+        .args(["sysw", "pack", "--no-passphrase", TEXT])
+        .stdout(std::process::Stdio::from(handle))
+        .output()
+        .unwrap();
+    assert!(o.status.success(), "a 0600 redirect is fine");
+    assert!(
+        std::fs::metadata(&sink).unwrap().len() > 0,
+        "and it received the container"
+    );
+}
