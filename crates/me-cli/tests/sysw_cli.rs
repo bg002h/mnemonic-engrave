@@ -1773,3 +1773,49 @@ fn an_admissible_record_still_gets_its_passphrase_ceremony() {
     assert!(err.contains("write this down"), "ceremony missing: {err}");
     assert!(err.contains("strength:"), "strength missing: {err}");
 }
+
+// ── F-252: name the MODE; claim nothing about reachability ───────────────────
+
+/// **The guard measures a mode. The message asserted a FACT it never checked.**
+///
+/// `stdout_is_world_readable` is `fstat(1)` + `mode & 0o044`. POSIX requires
+/// search permission on every directory in a path, so a 0644 file beneath a
+/// 0700 ancestor cannot be opened by anyone else — and `$HOME` is 0700 on the
+/// operator's machine, which makes "world-readable" false for the commonest
+/// destination there is. Measured 2026-08-25: a `tempdir()` (0700) holding a
+/// 0644 file is unreachable, and `me` refused it anyway — as it does here.
+///
+/// **The guard is unchanged and must stay:** a 0644 file becomes readable the
+/// moment it is moved, copied, or its parent relaxed, and this is bearer
+/// material. Only the sentence changes.
+#[test]
+fn the_world_readable_refusal_names_the_mode_and_claims_no_more() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let sink = dir.path().join("blob.bin");
+    let handle = std::fs::File::create(&sink).unwrap();
+    std::fs::set_permissions(&sink, std::fs::Permissions::from_mode(0o644)).unwrap();
+    let o = std::process::Command::new(assert_cmd::cargo::cargo_bin("me"))
+        .args(["sysw", "pack", "--no-passphrase", TEXT])
+        .stdout(std::process::Stdio::from(handle))
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .unwrap();
+    assert!(!o.status.success());
+    let err = String::from_utf8_lossy(&o.stderr).to_string();
+
+    assert!(err.contains("0644"), "name the mode it measured: {err}");
+    assert!(
+        !err.contains("stdout is a world-readable file"),
+        "do not assert reachability the guard never established: {err}"
+    );
+    assert!(
+        err.contains("directory above"),
+        "say what was NOT checked, so the operator can judge: {err}"
+    );
+    // The three remedies survive — they are the part `mt` was measured against
+    // and found equal, and they are why this refusal is useful at all.
+    for r in ["--out", "umask 077", "--allow-world-readable"] {
+        assert!(err.contains(r), "remedy {r:?} lost: {err}");
+    }
+}

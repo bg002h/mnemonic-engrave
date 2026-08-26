@@ -405,8 +405,8 @@ fn run() -> i32 {
         // F-244: all three stdout modes carry the SAME bytes; gating raw and not
         // hex would teach the operator to reach for hex. `--out` was already
         // owner-only via write_private -- these were the paths that were not.
-        if !cli.allow_world_readable && stdout_is_world_readable() {
-            refuse_world_readable_stdout();
+        if let (false, Some(mode)) = (cli.allow_world_readable, stdout_world_readable_mode()) {
+            refuse_world_readable_stdout(mode);
             return EXIT_USAGE;
         }
         if cli.hex {
@@ -868,7 +868,7 @@ fn write_private(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
 /// A terminal and `/dev/null` persist nothing, so neither can leak. There are
 /// tests for the FIFO, for `/dev/null`, and for the anonymous pipe.
 #[cfg(unix)]
-fn stdout_is_world_readable() -> bool {
+fn stdout_world_readable_mode() -> Option<u32> {
     use std::mem::ManuallyDrop;
     use std::os::unix::fs::{FileTypeExt, PermissionsExt};
     use std::os::unix::io::FromRawFd;
@@ -878,25 +878,35 @@ fn stdout_is_world_readable() -> bool {
     match f.metadata() {
         Ok(md) => {
             if md.file_type().is_char_device() {
-                return false;
+                return None;
             }
-            md.permissions().mode() & 0o044 != 0
+            let mode = md.permissions().mode() & 0o777;
+            // F-252: the MODE is returned, not just a verdict, so the refusal
+            // can quote the number it measured instead of asserting a
+            // reachability fact it never established.
+            (mode & 0o044 != 0).then_some(mode)
         }
         // Unreadable stdout is not evidence of exposure; fail OPEN rather than
         // refusing a write for a reason we cannot state.
-        Err(_) => false,
+        Err(_) => None,
     }
 }
 
 #[cfg(not(unix))]
-fn stdout_is_world_readable() -> bool {
-    false
+fn stdout_world_readable_mode() -> Option<u32> {
+    None
 }
 
 /// The refusal F-244 asks for, with the override it names.
-fn refuse_world_readable_stdout() {
+fn refuse_world_readable_stdout(mode: u32) {
     eprintln!(
-        "me: stdout is a world-readable file, and this payload is BEARER.\n\
+        "me: stdout is a file of mode {mode:04o} — its permissions grant read to \
+         group or others — and this payload is BEARER.\n\
+         \n\
+         Only the file's OWN mode was checked (F-252). If a directory above it \
+         denies search to others — a 0700 home directory does — nobody else can \
+         open it today; the mode still becomes dangerous the moment the file is \
+         moved, copied, or its parent relaxed.\n\
          \n\
          Anyone who can read that file can use what is in it. Three ways on:\n\
          \n\
@@ -979,8 +989,12 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // copy: it is reached by `wipe` and by the region path too, and a
             // guard that exists only at one call site is one refactor from
             // being bypassed.
-            if out.is_none() && !*allow_world_readable && stdout_is_world_readable() {
-                refuse_world_readable_stdout();
+            if let (true, false, Some(mode)) = (
+                out.is_none(),
+                *allow_world_readable,
+                stdout_world_readable_mode(),
+            ) {
+                refuse_world_readable_stdout(mode);
                 return EXIT_USAGE;
             }
             let recs = match read_records(records, r#in.as_ref()) {
@@ -1802,8 +1816,12 @@ fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>, allow_world_readable: bo
     // `write_private` sat in this same file, documented for exactly this threat,
     // and used only for NDEF/manifest/uf2. The container was less protected than
     // the artifact that merely depicts key material.
-    if out.is_none() && !allow_world_readable && stdout_is_world_readable() {
-        refuse_world_readable_stdout();
+    if let (true, false, Some(mode)) = (
+        out.is_none(),
+        allow_world_readable,
+        stdout_world_readable_mode(),
+    ) {
+        refuse_world_readable_stdout(mode);
         return EXIT_USAGE;
     }
     let r = match out {
