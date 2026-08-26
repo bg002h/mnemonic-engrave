@@ -759,7 +759,26 @@ switches on the HRP character — `'d'` reassembles through `md_codec`, `'k'`
 decodes through `mk_codec`. So:
 
 - **`--expect`'s kind vocabulary resolves through the HRP for `md1`/`mk1`**, and
-  through `Class` for everything else.
+  through `Class` for everything else — **except that the kind `transaction` is
+  satisfied by `Class::Mt` OR `Class::Tx`, and the plan must implement it that
+  way.**
+
+  **This is not a convenience; leaving it unbound breaks the spec whichever
+  single class is chosen** (plan-draft C-1). `mt encode` emits `mt1` strings by
+  default and a `tx:` record under `--qr` — two distinct variants for one
+  operator intent. Bind it to `Tx` alone and the hand-engraving path, which §1,
+  §3, §4 and §6a are all about, takes a false refusal. Bind it to `Mt` alone and
+  §10's acceptance criterion — which uses `--qr`, and which this spec says must
+  be RUN rather than reasoned about — becomes unsatisfiable.
+
+  **The union is not toothless**, which is the obvious objection. C-1 exists to
+  catch a producer that refused and left nothing behind; with neither class
+  present, `--expect transaction` still refuses. What the union gives up is only
+  the ability to insist on a particular *form* of transaction, which no operator
+  has asked for and which §6g never claimed.
+
+  **Left unstated, this is first detectable at P4** — after the vocabulary has
+  shipped inside a released crate consumed by five CLIs.
 - **`mdmk_unconfirmed` already computes the incomplete-set predicate** the third
   bullet needs. `--expect` escalates its report to a refusal for named kinds; it
   does not need a second walk, and a second walk would be a second thing to
