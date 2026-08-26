@@ -31,7 +31,7 @@ pub const PASS_PREFIX: &str = "pass:";
 /// ([`crate::sysw::tx`]) -- the prefix is reserved either way, so a body that
 /// fails either check is [`Class::Unknown`], never demoted to free text.
 ///
-/// **`me` READS this class and does not WRITE it.** `mt encode --record --raw`
+/// **`me` READS this class and does not WRITE it.** `mt encode --qr`
 /// produces it, which is where the transaction vocabulary lives: `mt` refuses
 /// an input whose every satisfaction is empty (§8.3) before a record exists,
 /// so the producer cannot emit what [`classify`](crate::sysw::classify) would

@@ -153,7 +153,7 @@ enum SyswCmd {
     /// `pass:<hex of the UTF-8 bytes>` is a BIP-39 passphrase.
     ///
     /// `tx:<hex of the raw signed transaction>` feeds the device's QR
-    /// engraving path — produce it with `mt encode --record --raw`, which
+    /// engraving path — produce it with `mt encode --qr`, which
     /// checks the bytes parse AND that every input carries a signature. `me`
     /// consumes constellation strings; it manufactures none of them.
     ///
@@ -347,7 +347,7 @@ fn run() -> i32 {
     // with `me sysw pack`, which has always said "no ... given (pipe it in, or
     // --in FILE)" at exit 2 for the same situation. A new user's first action
     // is exactly this one. (The verb it used to agree with was `me tx`, which
-    // has since moved to `mt encode --record --raw`; the agreement is with the
+    // has since moved to `mt encode --qr`; the agreement is with the
     // remaining verbs, and it still has to hold.)
     if input.trim().is_empty() {
         eprintln!("me: no input given (pipe an md1/mk1 string in, or --in FILE)");
@@ -1647,7 +1647,7 @@ fn split_record_stream(raw: &str) -> Vec<String> {
 /// **It was implemented on stdin alone, and `--in` bypassed it.** R7's own
 /// reason is why that mattered: `fish` reports a pipeline's status as the LAST
 /// command's, so a failed upstream arrives as nothing at all — and a failed
-/// upstream also leaves a **0-byte file**. `mt encode --record --raw > rec.txt`
+/// upstream also leaves a **0-byte file**. `mt encode --qr > rec.txt`
 /// fails exactly that way on an operator's first try, because §8.2h refuses a
 /// world-readable stdout and `>` creates 0644 under the usual umask. The
 /// stdin half exited 2 and the `--in` half exited 0 for the same situation.
@@ -1669,7 +1669,7 @@ fn no_records_guard(
         format!(
             "{what}: pass them on argv, with --in, or on stdin.\n      \
              An EMPTY input is what a FAILED upstream command leaves behind -- \
-             `mt encode --record --raw > rec.txt` writes nothing when it refuses \
+             `mt encode --qr > rec.txt` writes nothing when it refuses \
              -- so it is refused here rather than packed into a container that \
              holds nothing and still flashes."
         ),
@@ -1720,7 +1720,7 @@ fn read_records(
                          read it can broadcast it -- and argv is public: /proc, `ps` and \
                          your shell history all keep a copy.\n      \
                          Use a private channel instead:\n      \
-                         \x20   mt encode --record --raw --in tx.hex | me sysw pack --out p.bin\n      \
+                         \x20   mt encode --qr --in tx.hex | me sysw pack --out p.bin\n      \
                          \x20   me sysw pack --in records.txt --out p.bin"
                     ),
                     // POLICY REFUSAL, not usage: the record is understood and
@@ -1802,7 +1802,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                     "record {i} (records count from 0) begins `tx:` and its body is hex, \
                      but the bytes are not one serialized Bitcoin transaction ({e}). The \
                      prefix is RESERVED for a raw signed transaction — produce the record \
-                     with `mt encode --record --raw` rather than by hand"
+                     with `mt encode --qr` rather than by hand"
                 ),
                 U::UnsignedInputs(idx) => format!(
                     "record {i} (records count from 0) is a `tx:` record whose transaction \

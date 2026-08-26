@@ -78,7 +78,7 @@ flash; a bare record goes on a tag. They enter the device by different doors and
 arrive with different guarantees.
 
 ```
-tx.final.psbt ─▶ mt encode --record --raw|--chunks ─▶ tx: record
+tx.final.psbt ─▶ mt encode [--qr] ─▶ tx: record | mt1 records
                         (mnemonic-transaction)            │
                           ┌───────────────────────────────┴───────────┐
                           ▼                                           ▼
@@ -103,7 +103,7 @@ nothing else.
 
 | owner | owns | gains |
 | --- | --- | --- |
-| `mt` | the transaction and the `mt1` codec | `--record`, and a **raw-transaction subject for `inspect`** (§6, finding O) |
+| `mt` | the transaction and the `mt1` codec | `--qr`, and a **raw-transaction subject for `inspect`** (§6, finding O) |
 | `me` | the `sysw` container | `ClassTransaction`; **a stdin path**; content-based sealing |
 | fork `sysw/` | reading the container | a port of the above, provenance-pinned |
 | fork `gui/` | comprehension and the plate | the program, and the payload menu |
@@ -159,7 +159,7 @@ different door entirely, `gui/scan.go`, which parses **records**, not containers
   `syswSourceAccept` naming the source (F3) and nothing else.
 - **§2.3's "which transports its output fits" is nearly meaningless as written**
   for a container, because a container has only one transport. What `me sysw
-  pack` should state is the **section-cap** fact; what `mt encode --record`
+  pack` should state is the **section-cap** fact; what `mt encode --qr`
   should state is whether its record fits an **NFC tag**, which is `gui/scan.go`'s
   8 KB buffer and not `MaxSectionLen`.
 - **R6 as first drafted would have `me` print "fits NFC" for a container that can
@@ -245,7 +245,7 @@ never fall through to free text and become a plate"*, citing `gui/scan.go:56-80`
 ```
 
 The hex check catches the **malformed** case only. A **well-formed** `tx:` record —
-valid lowercase hex, exactly what `mt encode --record` emits — reaches
+valid lowercase hex, exactly what `mt encode --qr` emits — reaches
 `gui/scan.go:79`'s default and becomes a `freeTextScan`, which
 `engraveObjectFlow` hands to `engraveTextFlowFrom`. **The transaction is engraved
 as free text**, bypassing every §3.4–§3.7 guarantee: no parse, no comprehension,
@@ -296,19 +296,24 @@ lowercase hex** (the reserved-prefix rule); what the hex *decodes to* is missing
 both.** This supersedes an earlier *"always decode and compare"* — with one form
 present there is nothing to compare.
 
-**RULED: no default.** `mt encode --record` refuses without `--raw` or
-`--chunks`, and **the refusal teaches**, because a bare blocking refusal is what
-gets aliased away:
+**RETRACTED 2026-08-25 (operator, mid-walk): "no default" and its teaching
+refusal are GONE, together with the pair they arbitrated.** The rule required
+`mt encode --record` to name a form because two forms existed to choose between.
+The chunks form then turned out to be a **byte-for-byte no-op** — measured
+identical to bare `mt encode` on stdout and stderr, with and without legend
+flags — because the *2026-08-24 bare-records ruling* deleted the `tx:` wrapper
+that had been its whole reason to exist. A choice with one side is not a choice,
+so the flag family collapsed:
 
 ```
-mt: --record needs a form. Say which:
-
-  --raw      the transaction's bytes. QR plates only.
-             The device needs no mt1 decoder.
-
-  --chunks   mt1 strings. Text plates.
-             The device engraves them verbatim.
+mt encode          mt1 strings   hand engraving, or text plates via me sysw pack
+mt encode --qr     tx: record    QR plates; the device needs no mt1 decoder
 ```
+
+`--record`, `--raw` and `--chunks` are now **unknown arguments**, never silent
+aliases: a stale script must fail loudly rather than quietly mean something else.
+`--qr` is named for what it produces, and was the flag the operator reached for
+cold. See `mnemonic-transaction` commit `1282260`.
 
 | payload | the device does | it needs |
 | --- | --- | --- |
@@ -447,7 +452,7 @@ character formula reproduces the three shipped vector lengths (79 / 85 / 87 at
    *"`me sysw pack` MUST say which transports its output fits"* — is close to
    meaningless: a container has exactly one transport. **What each tool must
    state is different:** `me sysw pack` states the **section cap** it is bound
-   by; `mt encode --record` states whether its **record** fits an NFC tag, which
+   by; `mt encode --qr` states whether its **record** fits an NFC tag, which
    is `gui/scan.go`'s 8 KB buffer and **not** `MaxSectionLen`. (R0 round 1 caught
    that the round-0 fold corrected §1.2 and left this sentence standing.)
 3. Rust-primary: `me`'s `sysw` first, with vectors.
@@ -1220,7 +1225,7 @@ measured witness in this document:
 | --- | --- | --- | --- |
 | several symbols **on one plate** (tiling) | **0.30 mm only**: 8,067 B → `3 pl, 9 qr, 4 up`. **At the ruled 0.60 mm there is NO tiling row at all** | "scan this plate" | the operator scans **one** of four and moves on; three are unchecked |
 | **one** symbol across **two** plates | **852 B → 2 pl, 1 qr** (the legend pushed the QR off plate 1) | "scan this plate" | **plate 1 has no QR on it at all**, so the instruction is unfollowable |
-| a **chunks/text** job | any `--chunks` payload | neither screen applies | zero symbols, no branch — the operator is told nothing after cutting a whole job, which is §4.3's own silent step |
+| a **chunks/text** job | any `mt1`-strings payload | neither screen applies | zero symbols, no branch — the operator is told nothing after cutting a whole job, which is §4.3's own silent step |
 
 > **R0 round 3, I3 — both of this table's original witnesses were RETRACTED by
 > the objective change and neither was updated.** It cited 742 B → 6 qr `4 up`
@@ -1531,7 +1536,7 @@ this machinery (`refusals.toml`, `check-refusal-coverage.sh`,
 | --- | --- | --- | --- |
 | R1 | a `tx:` record whose body is not lowercase hex | else it is claimed by a sniffer | 2.1 |
 | R2 | **a `tx:` record on argv** | argv is world-readable via `/proc` and lands in shell history; this material is bearer | 2.1 |
-| R3 | `mt encode --record` with neither `--raw` nor `--chunks` | no default, and the refusal teaches | 2.2 |
+| ~~R3~~ | ~~`mt encode --record` with neither form~~ | **RETRACTED 2026-08-25** — `--chunks` was a no-op, so the pair collapsed to `--qr`; see §2.2 | 2.2 |
 | R4 | **see R4′ below — the first draft of this was wrong** | | 2.2 |
 | R5 | a chunk set whose per-chunk BCH checksums do not hold *(proposed)* | catches garbage before ~21 min/plate of scrap | 2.2a |
 | R6 | a section exceeding `MaxSectionLen`, stating the **section cap** — **not** "which transports it fits" (§1.2) | 2.3 |
@@ -1553,7 +1558,7 @@ this machinery (`refusals.toml`, `check-refusal-coverage.sh`,
 chunks"*, reasoning that §2.2's XOR made both-present evidence of broken tooling.
 **§3.6 makes it legitimate:** a payload may hold **several transactions**, and
 nothing says they must share a form. A sensible operator packs a small transaction
-`--raw` (one QR plate) and a large one `--chunks`, and the payload then contains
+`--qr` (one QR plate) and a large one bare `mt encode`, and the payload then contains
 both — correctly.
 
 **NORMATIVE: the XOR is PER TRANSACTION, not per payload.** R4 refuses a **single
@@ -1616,7 +1621,7 @@ instances in this cycle now, the most recent two found while fixing F-244:
 | --- | --- | --- |
 | **S0** | this repo | **Cut the test plate.** QR blocks at 0.3 / 0.45 / 0.6 / 0.9 mm; one raw-octet and one base45 symbol; **the Structured-Append pair from `scripts/gen-sa-fixture.py` (§4.2d) — WRITTEN AND COMMITTED; 54.0 mm of the plate, no extra cut**; and **one legend line at each candidate face below 3.0 mm**. Read with an **external scanner** (§3.7). ~2 s per cut, no dependency on P5 |
 | **P1** | `me` (Rust) | `ClassTransaction`, the framed record **including the mandatory 32-byte carried txid (§2.1b, §3.6b)**, stdin, content-based sealing, `MaxSectionLen` → 32,734 — **with vectors** |
-| **P2** | `mt` (Rust) | `mt encode --record --raw\|--chunks`; **`mt inspect` gains a raw-transaction subject**; the record must state whether it fits an **NFC tag** (§1.2), which is `gui/scan.go`'s 8 KB buffer, not `MaxSectionLen` |
+| **P2** | `mt` (Rust) | `mt encode --qr`; **`mt inspect` gains a raw-transaction subject**; the record must state whether it fits an **NFC tag** (§1.2), which is `gui/scan.go`'s 8 KB buffer, not `MaxSectionLen` |
 | **P3** | fork (Go) | Port P1, provenance-pinned. **Includes the `tx:` branch in `gui/scan.go` (§2.1a) — the prefix without the branch is the C3 defect** |
 | **P4** | fork | The payload menu (§3.3) **and the boot-path call that invokes it**; the program (§3.4–3.7); **ALL FOUR lockstep sites (§3.1a)** — `uiFlow`, `StartScreen.draw`, `layoutMainPlates`, `engraveObjectFlow`; **R15's carried-txid cross-check and the asserted-voice rendering (§3.6b)**; **R16's empty-configuration refusal (§4.1a)** |
 | **P5** | fork | The plate: search (**with the 16-symbol cap as a hard bound, §4.2a**), **QR STRUCTURED APPEND over the vendored `coding` package — it does not exist today (§4.2a, I1)**, **the computed legend reservation (§4.5a)**, **the legend-emission REORDER (§4.4a)**, test-the-plate, plate count |
@@ -1712,7 +1717,7 @@ design's gates are hypotheses and S0 is two seconds of machine time each.
 | The journey walk is the review of this spec | operator |
 | `me sysw pack` gains stdin | walk A |
 | A `tx:` record on argv is refused | walk B |
-| No `--record` default; the refusal teaches | walk C |
+| ~~No `--record` default; the refusal teaches~~ **RETRACTED 2026-08-25** | walk C |
 | **Chunks are engraved verbatim — no `mt1` decoder in v1** | walk C |
 | World-readable output refused + override, across `me` **and** `mt` | walk E |
 | Sealing decided by content | walk F |

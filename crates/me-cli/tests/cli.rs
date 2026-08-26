@@ -1058,7 +1058,7 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
         Case { code: 4, args: s(&["sysw", "pack", "--no-passphrase"]),
                stdin: format!("tx:{STRIPPED}\n"), why: "a transaction with an unsigned input" },
         // WAS `me tx` over bytes that are not a transaction, at exit 4. That
-        // verb moved to `mt encode --record --raw` with P3b -- `me` no longer
+        // verb moved to `mt encode --qr` with P3b -- `me` no longer
         // manufactures any constellation string -- so the SITUATION is kept
         // here on the verb that survives, because what this table checks is
         // that every subcommand spells "the input is wrong" with the same

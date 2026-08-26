@@ -10,7 +10,7 @@ $ head -c 96 'work/tx.hex'; echo '...'
 ### The obvious two-step form: write the record to a file first
 
 ```console
-$ mt encode --record --raw --bitcoin-cli /nonexistent/bitcoin-cli --in 'work/tx.hex' > 'work/rec.txt'
+$ mt encode --qr --bitcoin-cli /nonexistent/bitcoin-cli --in 'work/tx.hex' > 'work/rec.txt'
 WARNING: nLockTime 96 is BELOW this build's reference height 963759.
 
   This transaction is not meaningfully time-locked -- its lock height
@@ -121,7 +121,7 @@ mt encode: REFUSED — §8.2h, stdout is a file of mode 0644 — readable by oth
 ### So it is a PIPE — mt owns transactions, me owns the container
 
 ```console
-$ mt encode --record --raw --bitcoin-cli /nonexistent/bitcoin-cli --in 'work/tx.hex' | me sysw pack --region --out 'work/region.bin'
+$ mt encode --qr --bitcoin-cli /nonexistent/bitcoin-cli --in 'work/tx.hex' | me sysw pack --region --out 'work/region.bin'
 WARNING: nLockTime 96 is BELOW this build's reference height 963759.
 
   This transaction is not meaningfully time-locked -- its lock height
@@ -232,7 +232,7 @@ $ me sysw pack --no-passphrase 'tx:<the 222-byte transaction, elided>'
 me: record 0, as given (records count from 0), is a `tx:` record on ARGV. Refused; nothing was read and nothing was written.
       A raw signed transaction is a BEARER instrument -- anyone who can read it can broadcast it -- and argv is public: /proc, `ps` and your shell history all keep a copy.
       Use a private channel instead:
-          mt encode --record --raw --in tx.hex | me sysw pack --out p.bin
+          mt encode --qr --in tx.hex | me sysw pack --out p.bin
           me sysw pack --in records.txt --out p.bin
 (exit 3)
 ```
@@ -275,7 +275,7 @@ digest:   c2af 6413 749c 2241 319b 95aa 0ee2 532e
 ### An unsigned transaction never becomes a record — the PRODUCER refuses
 
 ```console
-$ mt encode --record --raw --bitcoin-cli /nonexistent/bitcoin-cli --in 'work/stripped.hex' | me sysw pack --no-passphrase --out 'work/never.bin'
+$ mt encode --qr --bitcoin-cli /nonexistent/bitcoin-cli --in 'work/stripped.hex' | me sysw pack --no-passphrase --out 'work/never.bin'
 mt encode: REFUSED — §8.3, 1 of 1 inputs carry no signature (input 0)
 
   Each of these inputs has an empty scriptSig AND an empty witness, so
@@ -284,7 +284,7 @@ mt encode: REFUSED — §8.3, 1 of 1 inputs carry no signature (input 0)
 
   Sign it first — `walletprocesspsbt`, then `finalizepsbt`.
 me: no records on stdin: pass them on argv, with --in, or on stdin.
-      An EMPTY input is what a FAILED upstream command leaves behind -- `mt encode --record --raw > rec.txt` writes nothing when it refuses -- so it is refused here rather than packed into a container that holds nothing and still flashes.
+      An EMPTY input is what a FAILED upstream command leaves behind -- `mt encode --qr > rec.txt` writes nothing when it refuses -- so it is refused here rather than packed into a container that holds nothing and still flashes.
 (exit 2)
 ```
 

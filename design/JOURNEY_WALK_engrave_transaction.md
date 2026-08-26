@@ -554,6 +554,18 @@ way.
 **RULED (operator) 2026-08-24: no default. `mt encode --record` refuses without
 `--raw` or `--chunks`.**
 
+> **SUPERSEDED 2026-08-25 (operator, mid side-by-side walk).** The ruling below
+> stands as the record of what was decided and why — it is not edited. What
+> changed is its *subject*: `--chunks` was measured a **byte-for-byte no-op**,
+> identical to bare `mt encode` on stdout and stderr, because the same day's
+> bare-records ruling deleted the `tx:` wrapper that had been its only reason to
+> exist. A choice with one side is not a choice, so the pair collapsed to a
+> single **`--qr`** and the teaching refusal was retired with it. The concern
+> that produced this ruling — *a flag required on every invocation gets aliased
+> away* — is answered better by the collapse than by the refusal: there is now
+> nothing to alias, because the common path takes no flag at all. See
+> `SPEC_engrave_transaction.md` §2.2 and `mnemonic-transaction` `1282260`.
+
 The concern raised and overruled: a flag required on every invocation is the
 friction that gets aliased away, and the alias re-hides the choice — which is
 exactly how finding F happened. **Mitigation adopted: make the refusal TEACH.**

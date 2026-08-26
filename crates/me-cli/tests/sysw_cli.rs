@@ -682,7 +682,7 @@ fn pack_warns_on_an_incomplete_mt_set() {
     assert!(err.contains("of 6"), "must name the declared count: {err}");
 }
 
-/// THE RULED PIPELINE'S `me` HALF: the record `mt encode --record --raw`
+/// THE RULED PIPELINE'S `me` HALF: the record `mt encode --qr`
 /// emits packs, on stdin, and reads back.
 ///
 /// **The record is CONSTRUCTED here rather than produced.** The producer moved
@@ -889,7 +889,7 @@ fn empty_stdin_is_the_exit_2_path_not_an_empty_container() {
 /// held — so an EMPTY file packed an empty container at **exit 0** and wrote
 /// 52 bytes of header holding nothing, while the byte-identical situation on
 /// stdin exited 2. R7's own stated reason applies verbatim here: a failed
-/// upstream leaves a 0-byte file, and `mt encode --record --raw > rec.txt`
+/// upstream leaves a 0-byte file, and `mt encode --qr > rec.txt`
 /// fails that way for a reason an operator meets on their first try — §8.2h
 /// refuses a world-readable stdout, and `>` under the usual umask creates 0644.
 ///

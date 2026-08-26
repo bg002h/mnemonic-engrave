@@ -10506,7 +10506,7 @@ operator's own text — a warning the operator can turn off is not a control.
 
 ---
 
-### F-247 — `mt encode --record` does not say whether the record fits an NFC TAG (owning phase: **P2, and it needs an operator ruling FIRST**) `#mt` `#nfc`
+### F-247 — `mt encode --qr` does not say whether the record fits an NFC TAG (owning phase: **P2, and it needs an operator ruling FIRST**) `#mt` `#nfc`
 
 **Filed 2026-08-25 during P3b, deliberately NOT implemented.**
 
@@ -10649,7 +10649,7 @@ amount**, the wallet displayed those before signing, and fixing this is a
 encoding — not a screen change. The operator's identity check is the txid
 comparison, which §4.3 already builds. **Not a gap; a decision.**
 
-**Spec line 450 — `mt encode --record` stating whether its record fits an NFC
+**Spec line 450 — `mt encode --qr` stating whether its record fits an NFC
 tag.** **NOT BUILT, and it was already settled.** Operator: *"we long ago decided
 nfc comes later."*
 
@@ -10703,9 +10703,11 @@ which is why it happens BEFORE the tag rather than after.
 ### F-248 — `mt encode` refuses its own output without recognising it (owning phase: **post-ship polish**) `#mt` `#ux`
 
 **Found in the side-by-side walk, 2026-08-25.** The operator ran `mt encode`,
-saw 22 `mt1` strings, decided to use the SeedHammer instead, re-ran with
-`--record --chunks` and **pasted the strings back in** — a plausible mistake,
-because they were the last thing on screen.
+saw 22 `mt1` strings, decided to use the SeedHammer instead, re-ran for the
+record form and **pasted the strings back in** — a plausible mistake, because
+they were the last thing on screen. (The walk typed `--record --chunks`. That
+spelling was retired hours later — it was a no-op — and the defect is unchanged:
+bare `mt encode` reproduces it.)
 
 ```
 mt encode: REFUSED — §8.2e, input is not a PSBT or a raw transaction (1978 bytes)
@@ -10730,7 +10732,7 @@ name the right one.
 **Found in the same walk, and it caught the AUTHOR THREE TIMES in one session.**
 
 ```
-$ mt encode --record --chunks < tx.hex > records.txt
+$ mt encode < tx.hex > records.txt
 mt encode: REFUSED — §8.2h, stdout is a file of mode 0644 — readable by other
 users on this machine.
 ```
@@ -10761,7 +10763,7 @@ tripped it three times.
 shell idiom:
 
 ```
-$ cat file.psbt | mt encode --record --chunks -
+$ cat file.psbt | mt encode -
 error: unexpected argument '-' found
 Usage: mt encode [OPTIONS]
 ```

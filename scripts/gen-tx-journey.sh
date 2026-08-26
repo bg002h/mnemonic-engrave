@@ -120,9 +120,9 @@ run "The operator has a finalized transaction, as hex" \
 # and the record IS the engraving of a BEARER instrument. Shown before the form
 # that works, because meeting a refusal is part of this journey.
 run "The obvious two-step form: write the record to a file first" \
-    "'$MT' encode --record --raw ${OFFLINE[*]} --in '$WORK/tx.hex' > '$WORK/rec.txt'"
+    "'$MT' encode --qr ${OFFLINE[*]} --in '$WORK/tx.hex' > '$WORK/rec.txt'"
 run "So it is a PIPE — mt owns transactions, me owns the container" \
-    "'$MT' encode --record --raw ${OFFLINE[*]} --in '$WORK/tx.hex' | '$ME' sysw pack --region --out '$WORK/region.bin'"
+    "'$MT' encode --qr ${OFFLINE[*]} --in '$WORK/tx.hex' | '$ME' sysw pack --region --out '$WORK/region.bin'"
 run "The refusal that keeps it off argv" \
     "'$ME' sysw pack --no-passphrase 'tx:$EVEN_HEX'"
 run "What is in it, and the digest to compare on the machine" \
@@ -139,7 +139,7 @@ run "A set missing three of its six strings still packs, loudly" \
 # the CONSUMER said exit 4 one step later; now the producer refuses first and
 # contributes nothing to stdout, so `me` never sees a record at all.
 run "An unsigned transaction never becomes a record — the PRODUCER refuses" \
-    "'$MT' encode --record --raw ${OFFLINE[*]} --in '$WORK/stripped.hex' | '$ME' sysw pack --no-passphrase --out '$WORK/never.bin'"
+    "'$MT' encode --qr ${OFFLINE[*]} --in '$WORK/stripped.hex' | '$ME' sysw pack --no-passphrase --out '$WORK/never.bin'"
 run "…and the consumer still refuses it on its own, if one reaches it by hand" \
     "printf 'tx:%s\n' '$STRIPPED_HEX' | '$ME' sysw pack --no-passphrase --out /dev/null"
 
