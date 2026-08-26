@@ -2105,3 +2105,26 @@ fn argv_still_accepts_watch_only_and_free_text() {
     }
 }
 
+
+/// **P5 N-1 — the `sealing:` line printed before the `--iterations` gate could
+/// abort the run.** F-246's rule is that no line describing a container may
+/// print until every gate that can abort the write has run; the iterations
+/// range check was the one gate that had not been moved behind it.
+#[test]
+fn an_out_of_range_iterations_count_aborts_before_sealing_is_described() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("n.bin");
+    let a = me()
+        .args(["sysw", "pack", "--iterations", "5", "--passphrase-words", "12", "--out"])
+        .arg(&out)
+        .write_stdin(SEED)
+        .assert()
+        .failure();
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+    assert!(
+        !err.contains("sealing:"),
+        "nothing may describe the container before a gate that aborts: {err}"
+    );
+    assert!(err.contains("--iterations"), "the real refusal survives: {err}");
+    assert!(!out.exists(), "and no artifact");
+}

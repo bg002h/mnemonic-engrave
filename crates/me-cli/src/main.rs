@@ -1221,14 +1221,18 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // The flags still WIN when given: they are the operator saying
             // what they want, and the content default only decides when
             // nobody has. What §2.4 forbids is deciding SILENTLY.
-            let sealing = decide_sealing(&recs, *no_passphrase, *passphrase_ask, *passphrase_words);
-
-            // Before the passphrase ceremony, not after: generating a passphrase,
-            // telling the operator to write it down, and THEN refusing the
-            // container teaches them that the note they just made is worthless.
-            if sealing
-                && !(sysw::wire::MIN_ITERATIONS..=sysw::wire::MAX_ITERATIONS).contains(iterations)
-            {
+            // P5 N-1 — BEFORE `decide_sealing`, which PRINTS. F-246's rule is
+            // that no line describing a container may print until every gate
+            // that can abort the write has run, and this was the one gate still
+            // sitting behind it: `--iterations 5` printed `sealing: SEALED ...`
+            // and then exited 2.
+            //
+            // The `sealing &&` guard came off with the move, and it costs
+            // nothing: MIN_ITERATIONS is the clap default (100_000), so a value
+            // outside the range is ALWAYS one the operator typed. Refusing a
+            // mistyped flag on the unsealed path too is the honest reading --
+            // silently ignoring it was never the intent.
+            if !(sysw::wire::MIN_ITERATIONS..=sysw::wire::MAX_ITERATIONS).contains(iterations) {
                 eprintln!(
                     "me: --iterations {iterations} is outside {}..={} — a container built with \
                      it is one no conforming reader will open",
@@ -1240,6 +1244,8 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 // read yet; the operator mistyped a flag.
                 return EXIT_USAGE;
             }
+
+            let sealing = decide_sealing(&recs, *no_passphrase, *passphrase_ask, *passphrase_words);
 
             // Exactly one passphrase mode. clap enforces mutual exclusion; this
             // is the "none given" case, and the DEFAULT is to generate rather
