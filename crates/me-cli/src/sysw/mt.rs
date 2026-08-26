@@ -83,6 +83,107 @@ fn data_symbols(record: &str) -> Option<Vec<u8>> {
     Some(syms)
 }
 
+/// WHY a chunk set did not confirm — the operator-facing diagnosis.
+///
+/// Ruling 2026-08-25 made "loudly" NORMATIVE, and more than the md/mk sibling
+/// does: `mdmk_unconfirmed` returns indices and says nothing else. An mt1 set
+/// fails for five distinguishable reasons whose remedies are not close — find
+/// three more strings, re-encode from the transaction, or throw the payload
+/// away — and a message that says only "could not confirm" leaves the operator
+/// to guess which.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SetProblem {
+    /// The header declares `count` chunks and these 0-based indices are
+    /// absent. THE FIX IS CHEAP: pack the missing strings. This is the case
+    /// the ruling exists for — refusing would cost the operator a signing
+    /// ceremony over a set that is merely short.
+    Missing { count: usize, missing: Vec<usize> },
+    /// Every index is present and the strings still do not reassemble —
+    /// duplicates that disagree, or a chunk `mt_codec` reads as ambiguous.
+    DoesNotReassemble,
+    /// Reassembles, and the bytes are not one serialized transaction. The C3
+    /// smuggling channel, and the reason this walk parses at all.
+    NotATransaction,
+    /// Parses, and the derived txid does not carry the set id every chunk
+    /// declares. 1 in 2^20 by accident; deliberate the rest of the time.
+    TxidDoesNotBind { txid: String, csid: u32 },
+    /// Parses and binds, and an input carries neither a scriptSig nor a
+    /// witness. **Nothing else in this walk can see it**: stripping the
+    /// witnesses leaves the txid unchanged, so the binding still holds.
+    UnsignedInputs { txid: String, inputs: Vec<usize> },
+}
+
+/// Every mt1 chunk set in `records`, keyed by `chunk_set_id`, with the record
+/// indices that belong to it and — when it did not confirm — why.
+///
+/// ONE grouping, used by [`mt_unconfirmed`], by `pack`'s stderr report and by
+/// `me sysw show`. Three copies of "which sets are there" is how a report and
+/// a refusal come to disagree about the same payload.
+pub fn set_problems(records: &[String]) -> Vec<(u32, Vec<usize>, Option<SetProblem>)> {
+    use std::collections::BTreeMap;
+    let mut groups: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
+    for (i, r) in records.iter().enumerate() {
+        if super::classify(r) != super::record::Class::Mt {
+            continue;
+        }
+        if let Some(h) = header(r) {
+            groups.entry(h.chunk_set_id).or_default().push(i);
+        }
+    }
+    groups
+        .into_iter()
+        .map(|(csid, idxs)| {
+            let set: Vec<String> = idxs.iter().map(|&i| records[i].clone()).collect();
+            let problem = diagnose(csid, &set);
+            (csid, idxs, problem)
+        })
+        .collect()
+}
+
+/// `None` exactly when [`set_confirmed`] is true — asserted by
+/// `the_diagnosis_and_the_verdict_are_one_answer`, because two predicates over
+/// one condition is the defect shape this module already carries a note about.
+fn diagnose(csid: u32, set: &[String]) -> Option<SetProblem> {
+    // COMPLETENESS FIRST, from the headers alone. It needs no reassembly,
+    // which is the point: it is the one failure whose remedy is cheap, and it
+    // must not be reported as whatever `mt_codec` happens to say about a set
+    // that is merely short.
+    let mut count = 0usize;
+    let mut present: Vec<usize> = Vec::with_capacity(set.len());
+    for r in set {
+        if let Some(h) = header(r) {
+            count = count.max(h.count);
+            present.push(h.index);
+        }
+    }
+    let missing: Vec<usize> = (0..count).filter(|i| !present.contains(i)).collect();
+    if !missing.is_empty() {
+        return Some(SetProblem::Missing { count, missing });
+    }
+    let Ok(decoded) = mt_codec::pipeline::decode(set) else {
+        return Some(SetProblem::DoesNotReassemble);
+    };
+    if decoded.chunks.iter().any(|c| c.corrected != 0) || !decoded.unreadable.is_empty() {
+        return Some(SetProblem::DoesNotReassemble);
+    }
+    let Ok(summary) = tx::parse(&decoded.bytes) else {
+        return Some(SetProblem::NotATransaction);
+    };
+    if !summary.every_input_signed {
+        return Some(SetProblem::UnsignedInputs {
+            txid: summary.txid_display.clone(),
+            inputs: summary.unsigned_inputs,
+        });
+    }
+    if summary.chunk_set_id() != csid {
+        return Some(SetProblem::TxidDoesNotBind {
+            txid: summary.txid_display,
+            csid,
+        });
+    }
+    None
+}
+
 /// Indices of [`super::record::Class::Mt`] records that are NOT
 /// decode-confirmed — the `[mt-decode]` walk. Mirrors
 /// [`super::record::mdmk_unconfirmed`]'s contract exactly:
@@ -92,27 +193,17 @@ fn data_symbols(record: &str) -> Option<Vec<u8>> {
 /// - indices are into the CALLER'S slice, whatever else it holds,
 /// - nothing is refused — the caller flags, per §13 D6's demotion.
 pub fn mt_unconfirmed(records: &[String]) -> Vec<usize> {
-    use std::collections::BTreeMap;
-
-    let mut groups: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
     let mut out: Vec<usize> = Vec::new();
-
     for (i, r) in records.iter().enumerate() {
-        if super::classify(r) != super::record::Class::Mt {
-            continue;
-        }
-        match header(r) {
-            Some(h) => groups.entry(h.chunk_set_id).or_default().push(i),
-            // Fail closed. Unreachable today — classify and header run the
-            // same strict parse — but kept so a future classifier loosening
-            // cannot silently confirm what it cannot read.
-            None => out.push(i),
+        // Fail closed. Unreachable today — classify and header run the same
+        // strict parse — but kept so a future classifier loosening cannot
+        // silently confirm what it cannot read.
+        if super::classify(r) == super::record::Class::Mt && header(r).is_none() {
+            out.push(i);
         }
     }
-
-    for (csid, idxs) in groups {
-        let set: Vec<String> = idxs.iter().map(|&i| records[i].clone()).collect();
-        if !set_confirmed(csid, &set) {
+    for (_, idxs, problem) in set_problems(records) {
+        if problem.is_some() {
             out.extend(idxs);
         }
     }
@@ -297,6 +388,108 @@ mod tests {
         assert!(!Class::Mt.is_secret());
     }
 
+    /// G-P3.7. The DIAGNOSIS, per set, and it must distinguish the five
+    /// reasons a set fails — their remedies are not close (find three more
+    /// strings / re-encode from the transaction / throw the payload away) and
+    /// a message that says only "could not confirm" leaves the operator to
+    /// guess which one they are in.
+    #[test]
+    fn every_way_a_set_can_fail_is_named_separately() {
+        use crate::sysw::tx::tests::{unhex, EVEN_RAW_HEX, EVEN_STRIPPED_HEX};
+
+        // (0) Confirmed: no problem at all.
+        let ok = set_problems(&even_set());
+        assert_eq!(ok.len(), 1);
+        assert_eq!(ok[0].0, 0x2dcf2);
+        assert_eq!(ok[0].2, None);
+
+        // (1) MISSING, by index and against the header's own count. Two gone,
+        // not adjacent, so "the first missing one" is visibly not the answer.
+        let set = even_set();
+        let short: Vec<String> = vec![set[0].clone(), set[2].clone(), set[5].clone()];
+        let p = set_problems(&short);
+        assert_eq!(
+            p[0].2,
+            Some(SetProblem::Missing { count: 6, missing: vec![1, 3, 4] })
+        );
+
+        // (2) NOT A TRANSACTION — the C3 smuggling channel: 32 bytes of
+        // entropy as a complete 1-chunk set.
+        let smuggled = mt_codec::pipeline::encode(&[0xAB; 32], "deadbeef00").unwrap();
+        assert_eq!(set_problems(&smuggled)[0].2, Some(SetProblem::NotATransaction));
+
+        // (3) UNSIGNED — parses, and binds, because stripping the witnesses
+        // leaves the txid alone. Nothing else in the walk can see it.
+        let bytes = unhex(EVEN_STRIPPED_HEX);
+        let txid = tx::parse(&bytes).unwrap().txid_display;
+        let stripped = mt_codec::pipeline::encode(&bytes, &txid).unwrap();
+        assert_eq!(
+            set_problems(&stripped)[0].2,
+            Some(SetProblem::UnsignedInputs { txid: txid.clone(), inputs: vec![0] })
+        );
+
+        // (4) TXID DOES NOT BIND — a real signed transaction under a foreign
+        // set id.
+        let forged = mt_codec::pipeline::encode(&unhex(EVEN_RAW_HEX), "00000feed").unwrap();
+        assert_eq!(
+            set_problems(&forged)[0].2,
+            Some(SetProblem::TxidDoesNotBind {
+                txid: crate::sysw::tx::tests::EVEN_TXID.to_string(),
+                csid: 0x00000,
+            })
+        );
+    }
+
+    /// The diagnosis and the verdict are ONE answer. Two predicates over one
+    /// condition is how a report and a refusal come to disagree about the same
+    /// payload, and this module already carries a note about that shape.
+    #[test]
+    fn the_diagnosis_and_the_verdict_are_one_answer() {
+        use crate::sysw::tx::tests::{unhex, EVEN_RAW_HEX, EVEN_STRIPPED_HEX};
+        let stripped = unhex(EVEN_STRIPPED_HEX);
+        let stripped_txid = tx::parse(&stripped).unwrap().txid_display;
+        let corpora: Vec<Vec<String>> = vec![
+            even_set(),
+            even_set()[..3].to_vec(),
+            mt_codec::pipeline::encode(&[0xAB; 32], "deadbeef00").unwrap(),
+            mt_codec::pipeline::encode(&stripped, &stripped_txid).unwrap(),
+            mt_codec::pipeline::encode(&unhex(EVEN_RAW_HEX), "00000feed").unwrap(),
+        ];
+        for set in corpora {
+            let unconfirmed = mt_unconfirmed(&set);
+            for (csid, idxs, problem) in set_problems(&set) {
+                assert_eq!(
+                    problem.is_none(),
+                    set_confirmed(csid, &idxs.iter().map(|&i| set[i].clone()).collect::<Vec<_>>()),
+                    "diagnosis and set_confirmed disagree about set {csid:05x}"
+                );
+                // ...and mt_unconfirmed reports exactly the sets with problems.
+                for i in &idxs {
+                    assert_eq!(unconfirmed.contains(i), problem.is_some());
+                }
+            }
+        }
+    }
+
+    /// Two sets in one payload are diagnosed SEPARATELY. A report that folds
+    /// them into one line cannot tell the operator which strings to go find.
+    #[test]
+    fn two_broken_sets_are_two_diagnoses() {
+        let mut records = even_set()[..4].to_vec();
+        let other = mt_codec::pipeline::encode(&[0x01; 80], "fffff00000").unwrap();
+        assert!(other.len() >= 2);
+        records.push(other[0].clone());
+        let p = set_problems(&records);
+        assert_eq!(p.len(), 2, "two chunk_set_ids, two diagnoses");
+        let by_id: std::collections::BTreeMap<u32, &Option<SetProblem>> =
+            p.iter().map(|(c, _, pr)| (*c, pr)).collect();
+        assert_eq!(
+            by_id[&0x2dcf2],
+            &Some(SetProblem::Missing { count: 6, missing: vec![4, 5] })
+        );
+        assert!(matches!(by_id[&0xfffff], Some(SetProblem::Missing { .. })));
+    }
+
     /// RED FIRST (G-P3.1). The signature predicate guarded the `tx:` class and
     /// NOT this one -- and the mt1 chunk set is the path a transaction takes
     /// when it is too large for a single record, i.e. the primary one.
@@ -325,4 +518,5 @@ mod tests {
         );
         assert!(decode_confirmed(&set).is_none());
     }
+
 }

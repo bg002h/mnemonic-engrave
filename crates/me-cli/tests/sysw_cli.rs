@@ -674,10 +674,12 @@ fn pack_warns_on_an_incomplete_mt_set() {
         .assert()
         .success();
     let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
-    assert!(
-        err.contains("record 0") && err.contains("could not confirm"),
-        "{err}"
-    );
+    // The report is PER SET since G-P3.7, and it names the set, the record
+    // indices in it, and every missing string against the header's own count.
+    assert!(err.contains("record"), "{err}");
+    assert!(err.contains("2dcf2"), "must name the set: {err}");
+    assert!(err.contains("did NOT"), "{err}");
+    assert!(err.contains("of 6"), "must name the declared count: {err}");
 }
 
 /// `me tx` builds the record, and the record round-trips through pack + show.
@@ -1384,4 +1386,148 @@ fn what_pack_says_about_sealing_is_what_show_reads_back() {
             args.join(" ")
         );
     }
+}
+
+// ─── G-P3.7 — "loudly" is NORMATIVE (ruling 2026-08-25) ──────────────────────
+
+/// The ruling says the report MUST name the set and **every** missing index,
+/// not the first — r7-M1 — and `me sysw show` must do the same. Measured
+/// before this gate: one line per record saying only *"an mt1 chunk whose set
+/// this tool could not confirm"*, with no set id and no indices, so an
+/// operator holding 201 of 202 strings was told nothing about which one to go
+/// and find.
+///
+/// Two gone and NOT adjacent, so "the first missing one" is visibly not the
+/// answer. Chunk numbers are 1-based on every operator-facing surface, which
+/// is `mt`'s own convention (SPEC_mt §1.1) — the wire index is 0-based and
+/// appears in no message.
+#[test]
+fn the_incomplete_report_names_the_set_and_every_missing_string() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    let res = me()
+        .args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
+        .write_stdin(format!("{}\n{}\n{}\n", MT_EVEN[0], MT_EVEN[2], MT_EVEN[5]))
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
+    assert!(err.contains("mt1 set 2dcf2"), "must name the chunk_set_id: {err}");
+    // 0-based 1, 3, 4 are absent -> strings 2, 4 and 5 of 6, 1-BASED, which is
+    // `mt`'s own operator-facing convention (the wire index appears in no
+    // message). Asserted as ONE PHRASE rather than as four digits: "2", "4",
+    // "5" and "6" all occur in "set 2dcf2 (records 0, 1, 2" too, so a
+    // digit-at-a-time check passes a report that names only the first missing
+    // string -- which is exactly the r7-M1 defect the ruling calls out.
+    assert!(
+        err.contains("MISSING strings 2, 4 and 5 of 6"),
+        "the report must name EVERY missing string against the header's count: {err}"
+    );
+
+    // AND `me sysw show` says the same thing, because a stderr line is gone in
+    // a week and `show` is the one that can be re-run.
+    let shown = me().args(["sysw", "show", out.to_str().unwrap()]).assert().success();
+    let stdout = String::from_utf8_lossy(&shown.get_output().stdout).to_string();
+    assert!(
+        stdout.contains("mt set 2dcf2: INCOMPLETE"),
+        "the ruling requires show to mark the SET incomplete: {stdout}"
+    );
+    assert!(
+        stdout.contains("MISSING strings 2, 4 and 5 of 6"),
+        "show must carry the same indices pack printed: {stdout}"
+    );
+}
+
+/// The five failures are five different sentences, because the remedies are
+/// not close: find more strings / re-encode from the transaction / re-export
+/// from the signer / throw the payload away.
+#[test]
+fn the_report_distinguishes_why_a_set_did_not_confirm() {
+    let dir = tempfile::tempdir().unwrap();
+    let n = std::cell::Cell::new(0);
+    let say = |records: &str| -> String {
+        n.set(n.get() + 1);
+        let out = dir.path().join(format!("p{}.bin", n.get()));
+        let res = me()
+            .args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
+            .write_stdin(records.to_string())
+            .assert()
+            .success();
+        String::from_utf8_lossy(&res.get_output().stderr).to_string()
+    };
+
+    // (1) MISSING material. Cheap remedy: go and find the other five strings.
+    let incomplete = say(&format!("{}\n", MT_EVEN[0]));
+    assert!(incomplete.to_lowercase().contains("missing"), "{incomplete}");
+
+    // (2) WRONG material -- 32 bytes of entropy wrapped as a complete 1-chunk
+    // set. Reassembles; is not a transaction. The C3 smuggling channel.
+    let smuggled = say(&format!("{MT_SMUGGLED}\n"));
+    assert!(
+        smuggled.contains("NOT") && smuggled.contains("transaction"),
+        "the smuggling case must say the bytes are not a transaction: {smuggled}"
+    );
+
+    // (3) A REAL signed transaction under a FOREIGN set id: complete, parses,
+    // and the txid does not carry the set id every string declares.
+    let forged = say(&(MT_FORGED.join("\n") + "\n"));
+    assert!(forged.contains(MT_EVEN_TXID), "must name the txid it derived: {forged}");
+    assert!(forged.contains("00000"), "must name the declared set id: {forged}");
+
+    // (4) A set carrying an UNSIGNED transaction: complete, parses, and BINDS
+    // -- stripping the witnesses leaves the txid alone. Nothing else can see it.
+    let stripped = say(&(MT_STRIPPED.join("\n") + "\n"));
+    assert!(
+        stripped.contains("scriptSig") && stripped.contains("input 0"),
+        "must name the unsigned input: {stripped}"
+    );
+
+    // FOUR FAILURES, FOUR SENTENCES. The collapse this exists to prevent is
+    // one message serving all of them.
+    let all = [&incomplete, &smuggled, &forged, &stripped];
+    for i in 0..all.len() {
+        for j in i + 1..all.len() {
+            assert_ne!(all[i], all[j], "reports {i} and {j} are the same sentence");
+        }
+    }
+}
+
+/// 32 bytes of entropy as a complete, BCH-valid 1-chunk mt1 set. Reassembles;
+/// is not a transaction.
+const MT_SMUGGLED: &str =
+    "mt1pm6kmqqqqqq4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w4sqxxtg7uwrnug7";
+
+/// The EVEN transaction re-encoded under set id 0x00000 — every string valid,
+/// the set complete, and the txid binds to 0x2dcf2 instead.
+const MT_FORGED: [&str; 6] = [
+    "mt1pqqqqqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023shuayazhuzld98",
+    "mt1pqqqqqq9qqphgdqqqqqqqq0mllllupyqj6vqqqqqqqqzcqpfsw7ph2rt5w54kt768636clsxsd4wuqyhcptq",
+    "mt1pqqqqqq9qqzj8yqpnzw4vl2rwffqyqqqqqkqq282yyhc2vavd20hvk94pz39hts3u5s9a0qv42n3emlhy0y4",
+    "mt1pqqqqqq9qqrqfrnq3qzyp77h37cnxzvwutegzmzy5zrrrfvrpykdfsckvk03dcq6rcjtvlsg2rzd3lsate9r",
+    "mt1pqqqqqq9qqylgpzqmhcwhuupdvnrc82rncvzzdahpgjsdwgu52jd7vmxsve9x3w5ujeqyssa7xs8rnk2rg5c",
+    "mt1pqqqqqq9qq9qdcc7h75twfxyf340c4sgqzhfdq6xtgt7zhxngpwa049l0z59l6jqcqqqqqq4ylettyzmk6ug",
+];
+
+/// The 113-byte SIGNATURE-STRIPPED EVEN transaction as a complete 3-chunk set.
+/// It parses, and it BINDS -- its txid is the honest transaction's, because
+/// stripping the witness is exactly what the txid ignores.
+const MT_STRIPPED: [&str; 3] = [
+    "mt1p9h8jqqzqqqqgqqqqqp0jx6jfd0wrjf5y4se6nmvwwl2qmus7ml5c0jv2ux4sevg74rhgdqqhgq73ru3s5kep",
+    "mt1p9h8jqqzqqpqqqqqq8allll7qjqfdxqqqqqqqqpvqq5c80qm4p46822m9ldragav0u3eqqvcwzfhcyyza74xq",
+    "mt1p9h8jqqzqqzf64nagde9yqsqqqqzcqpgagsjlpfn434f7ajck5y2ykawz8jjqh4ucqqqqqq774jy98z3xll2",
+];
+
+/// The ruling's THIRD requirement, and the one that makes the other two worth
+/// having: it still PACKS. Nothing in the chunk path refuses.
+#[test]
+fn an_incomplete_set_still_packs_and_is_readable() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    me().args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
+        .write_stdin(format!("{}\n{}\n", MT_EVEN[0], MT_EVEN[2]))
+        .assert()
+        .success();
+    me().args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pub_len:  175"));
 }

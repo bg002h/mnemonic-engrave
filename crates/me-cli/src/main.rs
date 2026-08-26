@@ -1311,19 +1311,78 @@ fn report_unconfirmed(records: &[String]) {
              could not decode; the device will treat it as a SECRET"
         );
     }
-    // `[mt-decode]` — the same rule for mt1 chunk sets: incomplete, or the
-    // bytes do not parse as a transaction whose txid matches the set id.
-    for i in mnemonic_engrave::sysw::mt::mt_unconfirmed(records) {
+    // `[mt-decode]` — the same rule for mt1 chunk sets, but PER SET rather
+    // than per record. G-P3.7: ruling 2026-08-25 makes "loudly" normative and
+    // more than the md/mk sibling does, because the five ways an mt1 set fails
+    // have five different remedies.
+    for (csid, idxs, problem) in mnemonic_engrave::sysw::mt::set_problems(records) {
+        let Some(p) = problem else { continue };
         eprintln!(
-            "me: record {i}, as given (records count from 0): an mt1 chunk whose set \
-             this tool could not confirm as one signed transaction.\n      \
-             It is PACKED and ENGRAVEABLE anyway (ruling 2026-08-25) -- every mt1 \
-             string is independently valid, so the strings you have are worth \
-             cutting and a missing one can be added later.\n      \
-             The device will REPLACE your plate legend with a re-encode warning, \
-             and QR plates will be unavailable: a set that does not reassemble has \
-             no transaction bytes to encode."
+            "me: mt1 set {csid:05x} (records {}, as given; records count from 0) did NOT \n      \
+             confirm as one signed transaction. {}",
+            idxs.iter().map(usize::to_string).collect::<Vec<_>>().join(", "),
+            describe_set_problem(&p)
         );
+        eprintln!(
+            "      It is PACKED and ENGRAVEABLE anyway (ruling 2026-08-25) -- every mt1 \n      \
+             string is independently valid, so the strings you have are worth cutting \n      \
+             and a missing one can be added later.\n      \
+             The device will REPLACE your plate legend with a re-encode warning, and \n      \
+             QR plates will be unavailable: a set that does not reassemble has no \n      \
+             transaction bytes to encode."
+        );
+    }
+}
+
+/// One sentence per [`SetProblem`], naming the remedy — which is the whole
+/// point of distinguishing them.
+///
+/// **Chunk numbers are 1-BASED here and everywhere an operator reads them**,
+/// which is `mt`'s own convention (SPEC_mt §1.1: the wire index is 0-based and
+/// appears in no message). Printing the wire index would send someone counting
+/// the strings on their desk and finding the wrong one.
+fn describe_set_problem(p: &mnemonic_engrave::sysw::mt::SetProblem) -> String {
+    use mnemonic_engrave::sysw::mt::SetProblem as P;
+    match p {
+        P::Missing { count, missing } => {
+            let names: Vec<String> = missing.iter().map(|i| (i + 1).to_string()).collect();
+            format!(
+                "MISSING string{} {} of {count}. Pack every string of the set -- \n      \
+                 `mt encode` emits them all, and `--elide-prefix` output is refused here.",
+                if names.len() == 1 { "" } else { "s" },
+                match names.len() {
+                    1 => names[0].clone(),
+                    _ => format!(
+                        "{} and {}",
+                        names[..names.len() - 1].join(", "),
+                        names[names.len() - 1]
+                    ),
+                }
+            )
+        }
+        P::DoesNotReassemble => "Every string of the set is here and they still do not \n      \
+             reassemble -- duplicates that disagree, or a chunk the codec reads as \n      \
+             ambiguous. Re-encode the transaction with `mt encode`."
+            .into(),
+        P::NotATransaction => "The set is COMPLETE and reassembles, and the bytes are NOT \n      \
+             one serialized Bitcoin transaction. Whatever produced these strings did not \n      \
+             encode a transaction; re-encode from the signed transaction itself."
+            .into(),
+        P::TxidDoesNotBind { txid, csid } => format!(
+            "The set is complete and parses, and the transaction's txid is {txid}, whose \n      \
+             top 20 bits are {:05x} -- not the {csid:05x} every string declares. These \n      \
+             strings were not made from this transaction.",
+            u32::from_str_radix(&txid[..5], 16).unwrap_or(0)
+        ),
+        P::UnsignedInputs { txid, inputs } => format!(
+            "The set is complete, reassembles, parses and binds to its set id -- and {} \n      \
+             carr{} NEITHER a scriptSig NOR a witness. Nothing else here can see that: \n      \
+             stripping the signatures leaves the txid ({txid}) unchanged, which is \n      \
+             precisely what the txid is defined to ignore. Re-export the FINALIZED \n      \
+             transaction from your signer.",
+            name_inputs(inputs),
+            if inputs.len() == 1 { "ies" } else { "y" }
+        ),
     }
 }
 
@@ -1414,9 +1473,7 @@ fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header
 /// the operator can check against `mt encode`'s own report.
 fn print_mt_confirmation(records: &[String]) {
     use mnemonic_engrave::sysw;
-    use std::collections::BTreeMap;
     let unconfirmed = sysw::mt::mt_unconfirmed(records);
-    let mut sets: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
     for (i, r) in records.iter().enumerate() {
         if sysw::classify(r) != sysw::record::Class::Mt {
             continue;
@@ -1427,9 +1484,6 @@ fn print_mt_confirmation(records: &[String]) {
             "confirmed"
         };
         println!("public record {i}: mt1 chunk — {state}");
-        if let Some(h) = sysw::mt::header(r) {
-            sets.entry(h.chunk_set_id).or_default().push(i);
-        }
     }
     for (i, r) in records.iter().enumerate() {
         // Keyed on the PREFIX, not on `classify`. `classify` is strict, so a
@@ -1465,17 +1519,31 @@ fn print_mt_confirmation(records: &[String]) {
             );
         }
     }
-    for idxs in sets.values() {
+    // PER SET, and the unconfirmed ones say WHY -- ruling 2026-08-25 requires
+    // `show` to carry the same diagnosis `pack` printed, because a stderr line
+    // is gone in a week and this is the one an operator can re-run.
+    for (csid, idxs, problem) in sysw::mt::set_problems(records) {
         let set: Vec<String> = idxs.iter().map(|&i| records[i].clone()).collect();
-        if let Some((_, t)) = sysw::mt::decode_confirmed(&set) {
-            println!(
-                "  mt set: txid {} — {} bytes, {} input(s), {} output(s), {} string(s)",
-                t.txid_display,
-                t.size,
-                t.inputs,
-                t.outputs,
-                set.len()
-            );
+        match problem {
+            None => {
+                let Some((_, t)) = sysw::mt::decode_confirmed(&set) else {
+                    continue;
+                };
+                println!(
+                    "  mt set {csid:05x}: txid {} — {} bytes, {} input(s), {} output(s), \
+                     {} string(s)",
+                    t.txid_display,
+                    t.size,
+                    t.inputs,
+                    t.outputs,
+                    set.len()
+                );
+            }
+            Some(p) => println!(
+                "  mt set {csid:05x}: INCOMPLETE — {} string(s) present. {}",
+                set.len(),
+                describe_set_problem(&p)
+            ),
         }
     }
 }
