@@ -10512,6 +10512,25 @@ rows were never the problem.
 
 ## RULING 2026-08-25d — S0 (P4) is DEFERRED UNTIL AFTER SHIP, and its purpose changes
 
+
+**P5 M-7 IS LUMPED IN HERE — operator, 2026-08-26: "M7: lump with s0."**
+
+The post-cut instruction tells the operator to *"Scan every QR with a phone,
+join the hex, and run `mt inspect`"* (`gui/transaction.go`), and `mt`'s own
+`verify_the_steel(RawRecord)` says the same. **The symbols carry raw transaction
+BYTES.** Generic phone camera apps render byte-mode content as text, and a raw
+transaction contains `0x00` and non-UTF-8 bytes that many apps truncate or
+replace — so "join the hex" describes a presentation layer nothing in this cycle
+has measured. The ZXing decode gate proved byte-level decodability; it did not
+prove that a phone hands those bytes to a human as joinable hex.
+
+**It belongs to S0 because only S0 can settle it**: it needs a cut plate and a
+real phone. Until then the instruction is unverified rather than known-wrong —
+and S0's first plate is exactly where it gets tested, at no extra cost.
+
+**What S0 must record:** which scanner app, what it produced for a byte-mode
+symbol, and whether the hex was joinable as written. If it was not, the
+instruction changes and this becomes a defect rather than a gap.
 **Operator ruling:**
 
 > *"P4 will be deferred until after ship. The results are essentially already
