@@ -76,6 +76,20 @@ impl Class {
             Class::Mnemonic | Class::Codex32Secret | Class::Passphrase
         )
     }
+
+    /// BEARER: whoever reads it can spend with it, without needing anything
+    /// else. Distinct from [`Class::is_secret`] — a secret is key material, a
+    /// bearer record is an already-signed instrument — but the two share the
+    /// property that matters at a public channel: **neither may appear on argv**
+    /// (P5 I-1).
+    ///
+    /// `MdMk`, `Descriptor` and `Address` are deliberately NOT bearer: they are
+    /// watch-only, a leak costs privacy rather than funds, and the sibling CLIs
+    /// take them positionally by design (`md verify <STRINGS>…`).
+    pub fn is_bearer(self) -> bool {
+        matches!(self, Class::Mt | Class::Tx)
+    }
+
 }
 
 #[derive(Debug, PartialEq, Eq)]

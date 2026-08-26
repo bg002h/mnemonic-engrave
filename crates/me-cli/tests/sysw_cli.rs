@@ -645,10 +645,14 @@ const MT_EVEN_TXID: &str = "2dcf2b973d52044b1e58c988a5a59d388073ff05598b0a1e93ee
 fn pack_accepts_a_complete_mt_set_and_show_confirms_it() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.bin");
-    let mut args = vec!["sysw", "pack", "--no-passphrase", "--out"];
-    args.push(out.to_str().unwrap());
-    args.extend(MT_EVEN);
-    let a = me().args(&args).assert().success();
+    // Via stdin, not argv: mt1 strings are BEARER and argv is public (P5 I-1).
+    // What this test is about is what `pack` does with a complete set.
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase", "--out"])
+        .arg(&out)
+        .write_stdin(MT_EVEN.join("\n"))
+        .assert()
+        .success();
     let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
     assert!(
         !err.contains("could not confirm"),
@@ -669,8 +673,10 @@ fn pack_accepts_a_complete_mt_set_and_show_confirms_it() {
 /// to mdmk) — but pack WARNS and show reports it unconfirmed.
 #[test]
 fn pack_warns_on_an_incomplete_mt_set() {
+    // Via stdin, not argv: mt1 strings are BEARER and argv is public (P5 I-1).
     let a = me()
-        .args(["sysw", "pack", "--no-passphrase", MT_EVEN[0]])
+        .args(["sysw", "pack", "--no-passphrase"])
+        .write_stdin(MT_EVEN[0])
         .assert()
         .success();
     let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
@@ -1945,3 +1951,81 @@ fn a_bearer_record_on_argv_outranks_the_write_gate() {
         "the destination complaint must not pre-empt the bearer one: {err}"
     );
 }
+
+// ── P5 I-1: argv refuses every SECRET and BEARER class, not just `tx:` ───────
+
+/// **The argv gate covered ONE of the classes it should.** Measured 2026-08-26:
+/// `me sysw pack` refused a `tx:` record on argv at exit 3 — and accepted, at
+/// exit 0 with no complaint, the SAME transaction carried as `mt1` strings.
+///
+/// argv is public: `/proc/<pid>/cmdline` without hidepid, `ps` for every user on
+/// the box, and a shell history file that outlives the machine.
+#[test]
+fn argv_refuses_every_bearer_class() {
+    let dir = tempfile::tempdir().unwrap();
+    let cases: Vec<(&str, String)> = vec![
+        ("a tx: record", "tx:0100".to_string()),
+        ("an mt1 string", MT_EVEN[0].to_string()),
+    ];
+    for (what, rec) in cases {
+        let out = dir.path().join("nope.bin");
+        let a = me()
+            .args(["sysw", "pack", "--no-passphrase", "--out"])
+            .arg(&out)
+            .arg(&rec)
+            .write_stdin("")
+            .assert()
+            .failure();
+        let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+        assert!(err.contains("ARGV"), "{what} must be refused for the argv reason: {err}");
+        assert!(!out.exists(), "{what}: nothing may be written");
+        // NEVER echoed: printing it back puts the material in a SECOND public
+        // place, which is the defect the refusal exists to name.
+        assert!(
+            !err.contains(&rec[..rec.len().min(24)]),
+            "{what}: the refusal must not echo the body: {err}"
+        );
+    }
+}
+
+/// **PINNED GAP, not an endorsement.** Secret-class records — a BIP-39 mnemonic,
+/// an `ms1` string, a `pass:` record — are still ACCEPTED on argv today, at exit
+/// 0, in silence. That is arguably worse than the bearer hole this commit
+/// closed: a seed phrase spends everything, forever.
+///
+/// It is not fixed here because refusing it is the same decision as the
+/// CLI-uniformity spec's D3 (refuse, with an override), it breaks 13 shipped
+/// invocations in this repo's own tests, and it is the operator's ruling to
+/// make. This test asserts the CURRENT shape so the change is deliberate: when
+/// the ruling lands, this test flips, and its failure is the reminder.
+#[test]
+fn argv_still_accepts_secret_classes_which_is_the_open_gap() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("seed.bin");
+    me().args(["sysw", "pack", "--no-passphrase", "--out"])
+        .arg(&out)
+        .arg(SEED)
+        .write_stdin("")
+        .assert()
+        .success();
+    assert!(out.exists(), "today a seed phrase on argv still packs");
+}
+
+/// THE CONTROL: watch-only public material stays usable on argv. `md verify
+/// <STRINGS>` and `mk verify [MK1]…` take theirs positionally by design — a
+/// leak there costs privacy, not funds — so this gate must not swallow them.
+#[test]
+fn argv_still_accepts_watch_only_and_free_text() {
+    let dir = tempfile::tempdir().unwrap();
+    for (what, rec) in [("an md1 string", MD1), ("a text: record", TEXT)] {
+        let out = dir.path().join(format!("ok{what}.bin").replace(' ', "_"));
+        me().args(["sysw", "pack", "--no-passphrase", "--out"])
+            .arg(&out)
+            .arg(rec)
+            .write_stdin("")
+            .assert()
+            .success();
+        assert!(out.exists(), "{what} must still pack from argv");
+    }
+}
+

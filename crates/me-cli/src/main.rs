@@ -1928,20 +1928,57 @@ fn read_records(
         // refused here for the BEARER reason rather than three screens later
         // for a formatting one. Neither message may name the body.
         for (i, r) in argv.iter().enumerate() {
-            if r.trim_start()
-                .to_ascii_lowercase()
-                .starts_with(mnemonic_engrave::sysw::record::TX_PREFIX)
-            {
+            use mnemonic_engrave::sysw::record::Class;
+            let trimmed = r.trim_start().to_ascii_lowercase();
+
+            // The `tx:` PREFIX check stays, and stays FIRST, for the reason
+            // above: a near-miss like ` TX:<hex>` is refused here for the
+            // BEARER reason rather than three screens later for a formatting
+            // one. `classify` would call that shape `Unknown`.
+            let by_prefix = trimmed.starts_with(mnemonic_engrave::sysw::record::TX_PREFIX);
+
+            // P5 I-1 — AND THE CLASS CHECK, because the prefix covered ONE of
+            // five. Measured 2026-08-26: this gate refused a `tx:` record and
+            // accepted, at exit 0 in silence, an `ms1` string (seed entropy), a
+            // raw BIP-39 mnemonic, a `pass:` record, and the same transaction
+            // carried as `mt1` strings. It refused a TRANSACTION while accepting
+            // a SEED PHRASE.
+            //
+            // Keyed on the CLASS, not on a list of prefixes, so a class added
+            // later is covered by `is_argv_forbidden` rather than by whoever
+            // remembers to extend a match arm here.
+            let class = mnemonic_engrave::sysw::classify(r);
+            // SCOPED TO BEARER, deliberately. `is_secret()` classes -- a BIP-39
+            // mnemonic, an `ms1` string, a `pass:` record -- are ALSO accepted
+            // on argv today at exit 0 in silence, which is arguably worse. That
+            // is a real defect and it is FILED, not fixed here: refusing it is
+            // the same decision as the CLI-uniformity spec's D3 (refuse with an
+            // override), it breaks 13 shipped invocations in this repo's own
+            // tests, and it is the operator's ruling to make. Widening this
+            // condition to `is_secret() || is_bearer()` is the whole change once
+            // that ruling exists.
+            if by_prefix || class.is_bearer() {
+                // NAME THE CLASS, NEVER THE BODY. Printing it back would put the
+                // material in a SECOND public place -- the defect this refusal
+                // exists to name.
+                let (what, why) = if by_prefix || class == Class::Tx {
+                    ("a `tx:` record", "A raw signed transaction is a BEARER instrument -- anyone who can read it can broadcast it")
+                } else if class == Class::Mt {
+                    ("an `mt1` string", "An mt1 set carries a signed transaction -- anyone who can read the set can broadcast it")
+                } else {
+                    ("SECRET key material", "It can spend everything derived from it, forever")
+                };
                 return Err((
                     format!(
-                        "record {i}, as given (records count from 0), is a `tx:` record on \
+                        "record {i}, as given (records count from 0), is {what} on \
                          ARGV. Refused; nothing was read and nothing was written.\n      \
-                         A raw signed transaction is a BEARER instrument -- anyone who can \
-                         read it can broadcast it -- and argv is public: /proc, `ps` and \
+                         {why} -- and argv is public: /proc, `ps` and \
                          your shell history all keep a copy.\n      \
                          Use a private channel instead:\n      \
                          \x20   mt encode --qr --in tx.hex | me sysw pack --out p.bin\n      \
-                         \x20   me sysw pack --in records.txt --out p.bin"
+                         \x20   me sysw pack --in records.txt --out p.bin\n      \
+                         To purge what already leaked: remove the line from your \
+                         shell history, and `shred -u` any file you pasted it from."
                     ),
                     // POLICY REFUSAL, not usage: the record is understood and
                     // well-formed, and this tool will never accept it here.
