@@ -1649,3 +1649,127 @@ fn the_named_command_prints_the_same_digest() {
         .to_string();
     assert_eq!(from_pack, from_show);
 }
+
+// ── F-246: no line describing a container may print before the write gate ────
+
+/// **A DIGEST FOR A PAYLOAD THAT WAS NEVER WRITTEN.**
+///
+/// The walk typed a bare `me sysw pack`, pasted a record, and got `sealing:`,
+/// `strength:`, `digest:` and *"re-print it with: me sysw show &lt;the file you
+/// just wrote&gt;"* — and only then the §8.2h refusal, exit 2, with a 0-byte
+/// file. The digest is the value the operator verifies the PLATE against on the
+/// device, so recording it means carrying a checksum for a payload that does
+/// not exist, under a line that is false as it prints.
+///
+/// This is the rule the passphrase ceremony already follows two screens up
+/// (*"generating a passphrase, telling the operator to write it down, and THEN
+/// refusing the container teaches them that the note they just made is
+/// worthless"*), applied to the gate that can abort the write.
+#[test]
+fn a_refused_write_prints_no_line_describing_the_container() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let sink = dir.path().join("blob.bin");
+    let handle = std::fs::File::create(&sink).unwrap();
+    std::fs::set_permissions(&sink, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+    let o = std::process::Command::new(assert_cmd::cargo::cargo_bin("me"))
+        .args(["sysw", "pack", "--no-passphrase", TEXT])
+        .stdout(std::process::Stdio::from(handle))
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .unwrap();
+
+    assert!(!o.status.success(), "§8.2h must refuse a 0644 stdout");
+    assert_eq!(
+        std::fs::metadata(&sink).unwrap().len(),
+        0,
+        "a refusal must leave no artifact"
+    );
+    let err = String::from_utf8_lossy(&o.stderr).to_string();
+
+    for described in ["digest:", "sealing:", "strength:"] {
+        assert!(
+            !err.contains(described),
+            "{described:?} describes a container that was never written: {err}"
+        );
+    }
+    assert!(
+        !err.contains("the file you just wrote"),
+        "and nothing may refer to a file that does not exist: {err}"
+    );
+    // The refusal ITSELF must still be there and still be useful.
+    assert!(err.contains("world-readable"), "the refusal survives: {err}");
+    assert!(err.contains("--out"), "with its remedies: {err}");
+}
+
+/// THE CONTROL: on a run that actually writes, every one of those lines is
+/// still printed. Without this, deleting the report entirely would pass above.
+#[test]
+fn a_successful_pack_still_reports_everything() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase", "--out"])
+        .arg(&out)
+        .arg(TEXT)
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+    for described in ["digest:", "sealing:", "strength:"] {
+        assert!(err.contains(described), "{described:?} missing: {err}");
+    }
+    assert!(out.exists(), "and the file exists");
+}
+
+/// **F-246's ORIGINAL instance: a passphrase generated, printed, and told to
+/// the operator to "write down and store APART from the machine" — for a run
+/// that then refuses and produces nothing.**
+///
+/// The passphrase is meant to be shown; that is not the defect. The defect is
+/// showing it for a run that produces NOTHING, so the operator is handed
+/// material to record off-machine that protects no artifact, immediately above
+/// an error saying the run failed.
+#[test]
+fn an_unpackable_record_is_refused_before_a_passphrase_is_minted() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("t.bin");
+    let a = me()
+        .args(["sysw", "pack", "--passphrase-words", "12", "--out"])
+        .arg(&out)
+        .arg("this is not a record of any class")
+        .assert()
+        .failure();
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+
+    assert!(
+        !err.contains("write this down"),
+        "no passphrase ceremony for a run that produces nothing: {err}"
+    );
+    assert!(
+        !err.contains("strength:"),
+        "and nothing describing the container either: {err}"
+    );
+    assert!(
+        err.contains("not a form this container can place"),
+        "the real refusal must still be the one shown: {err}"
+    );
+    assert!(!out.exists(), "and no artifact");
+}
+
+/// THE CONTROL: a run whose records ARE admissible still mints and prints the
+/// passphrase. Without this, never minting one would pass the test above.
+#[test]
+fn an_admissible_record_still_gets_its_passphrase_ceremony() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("ok.bin");
+    let a = me()
+        .args(["sysw", "pack", "--passphrase-words", "12", "--out"])
+        .arg(&out)
+        .arg(SEED)
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+    assert!(err.contains("write this down"), "ceremony missing: {err}");
+    assert!(err.contains("strength:"), "strength missing: {err}");
+}

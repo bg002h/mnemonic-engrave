@@ -956,6 +956,33 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                      rather than refusing (spec §13 D3)"
                 );
             }
+
+            // F-246 — THE WRITE GATE RUNS BEFORE ANYTHING DESCRIBES A CONTAINER.
+            //
+            // `emit` checks this too, and that is where it used to be checked
+            // ONLY. By then `sealing:`, `strength:`, `digest:` and "re-print it
+            // with: me sysw show <the file you just wrote>" had all been
+            // printed -- for a run that then exited 2 leaving a 0-byte file.
+            // The digest is the value the operator verifies the PLATE against
+            // on the device, so recording it means carrying a checksum for a
+            // payload that does not exist, beneath a line that is false as it
+            // prints.
+            //
+            // This is the rule the passphrase ceremony already follows a few
+            // lines below -- "generating a passphrase, telling the operator to
+            // write it down, and THEN refusing the container teaches them that
+            // the note they just made is worthless". It simply had not been
+            // applied to the gate that aborts the WRITE.
+            //
+            // The condition is `emit`'s, character for character, so the two
+            // cannot disagree about when a write is refused. `emit` keeps its
+            // copy: it is reached by `wipe` and by the region path too, and a
+            // guard that exists only at one call site is one refactor from
+            // being bypassed.
+            if out.is_none() && !*allow_world_readable && stdout_is_world_readable() {
+                refuse_world_readable_stdout();
+                return EXIT_USAGE;
+            }
             let recs = match read_records(records, r#in.as_ref()) {
                 Ok(r) => r,
                 Err((msg, code)) => {
@@ -973,6 +1000,22 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             };
             if *allow_unsigned_inputs {
                 report_unsigned_overrides(&recs);
+            }
+
+            // F-246 — ADMISSION BEFORE THE CEREMONY.
+            //
+            // `pack_with` rejects an unplaceable record, but it runs AFTER the
+            // passphrase has been generated, printed, and captioned "write this
+            // down and store it APART from the machine". The operator who obeys
+            // that instruction is left holding twelve words that protect no
+            // artifact, immediately above an error saying the run failed.
+            //
+            // `admit_check` is the same rule `split` applies -- it was lifted
+            // out of it, and `split` now calls it first -- so this is an
+            // ordering change, not a second implementation of admission.
+            if let Err(e) = sysw::admit_check(&recs, admission) {
+                eprintln!("me: {}", sysw_error(&e));
+                return EXIT_INVALID;
             }
 
             // G-P3.6 / SPEC §2.4 — SEALING IS DECIDED BY CONTENT.

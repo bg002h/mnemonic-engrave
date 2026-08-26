@@ -353,16 +353,41 @@ pub fn pack_deterministic_with(
     seal_with(payload, pub_bytes, header, pass, iterations, salt, iv)
 }
 
+/// Admission, and **the only place it is decided** (F-246).
+///
+/// Split out of [`split`] so a caller can run it BEFORE anything expensive or
+/// irreversible-looking happens — specifically before `me sysw pack` generates
+/// a passphrase and tells the operator to write it down and store it apart from
+/// the machine. Refusing after that ceremony hands them material to record
+/// off-machine that protects nothing, directly above an error saying the run
+/// failed.
+///
+/// It borrows, so hoisting it costs no clone of records that may be secret.
+/// [`split`] calls it first and then partitions, which is why `split`'s loop no
+/// longer matches `Unknown` — one rule, one implementation, per this module's
+/// own note about `pack`/`pack_deterministic` drifting apart.
+pub fn admit_check(records: &[String], adm: Admission) -> Result<(), SyswError> {
+    for (i, r) in records.iter().enumerate() {
+        if matches!(classify_with(r, adm), record::Class::Unknown) {
+            return Err(SyswError::Unclassifiable(i, unknown_reason(r)));
+        }
+    }
+    Ok(())
+}
+
 fn split(
     records: Vec<String>,
     adm: Admission,
 ) -> Result<(Payload, Vec<u8>, wire::Header), SyswError> {
+    // Admission first, so the partition below is total: every record is either
+    // secret or public by the time it runs.
+    admit_check(&records, adm)?;
     let mut payload = Payload::default();
-    for (i, r) in records.into_iter().enumerate() {
-        match classify_with(&r, adm) {
-            record::Class::Unknown => return Err(SyswError::Unclassifiable(i, unknown_reason(&r))),
-            c if c.is_secret() => payload.secret.push(Zeroizing::new(r)),
-            _ => payload.public.push(r),
+    for r in records {
+        if classify_with(&r, adm).is_secret() {
+            payload.secret.push(Zeroizing::new(r));
+        } else {
+            payload.public.push(r);
         }
     }
     let pub_bytes = payload.public.join("\n").into_bytes();
