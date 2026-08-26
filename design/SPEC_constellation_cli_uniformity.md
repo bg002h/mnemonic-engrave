@@ -519,8 +519,8 @@ wrong:
   false for all four CLIs.**
 - **`mt`, the tool this spec generalises FROM, deliberately prints to a
   terminal.** Measured on a pty, naming the input because a count without one is
-  not a measurement (round-1 B6, same defect as B2): `mt encode --quiet --in
-  <the corpus `even` vector>` prints all **six** of that vector's strings and exits **0**. Its bearer-exposure warning fires on the *opposite*
+  not a measurement (round-1 B6, same defect as B2): `mt encode --quiet --in <file>`, on the corpus
+  "even" vector, prints all **six** of that vector's strings and exits **0**. Its bearer-exposure warning fires on the *opposite*
   condition — it warns that stdout is **not** a terminal, so the strings went
   somewhere that keeps them. `mt` treats the terminal as the **safe** disposal
   and the file as the dangerous one. The earlier draft inverted that for its own
@@ -552,7 +552,7 @@ report is secret material, and printing it before a refusal is not a defect.
 it.* I-2's quoted reproduction passes `--quiet` and then shows the report lines.
 The fold could not reproduce that: with `--quiet` those lines are suppressed
 (on the corpus `even` vector, `--quiet` gives **70** stderr lines against
-**108** without it, and none of `TX`/`CUT`/`PREFIX` appear), and the report shows only
+**108** without it, and none of `TX`/`CUT`/`PREFIX` appear), and the report appears only
 **without** `--quiet`. **The finding is correct and is folded; its evidence
 command is not the one that demonstrates it.**
 
@@ -582,8 +582,10 @@ exit **4** rather than 5, because a corrected `ms1` is an unverified candidate
 that cannot self-verify. **The non-uniformity is reasoned and load-bearing.**
 
 **Measured where the cell says a number; cells that say "not measured" were
-not run.** The header previously claimed every cell was run while three cells
-in the last row said otherwise — a table cannot assert more than its contents.
+not run.** An earlier header claimed every cell was run while cells in the table said
+otherwise — a table cannot assert more than its contents. (How many such cells
+is deliberately not quoted: it changed when a row moved, and a pointer naming
+"the last row" was falsified by the very edit that repaired the row.)
 
 | CLI | clap usage error | invalid artifact | repair applied | repair uncorrectable |
 | --- | --- | --- | --- | --- |
@@ -686,7 +688,12 @@ Two collisions this table makes visible and the one-sentence version hid:
 `me sysw pack`. When *one* producer refuses, the group still exits 0, `pack`
 still exits 0, and the operator gets a payload with a record silently missing.
 Reproduced: identical pipelines differing only in whether `mt`'s input is valid
-produced payloads of **1794 B and 102 B**, and **both exited 0**. `me sysw show`
+produced payloads of **1794 B and 102 B**, and **both exited 0**. (Both runs
+were `{ ms encode --phrase <the all-abandon vector> --group-size 0; mt encode
+--qr --in <hex> } | me sysw pack --no-passphrase --out <file>`, differing only
+in whether `mt`'s input held the reference transaction or four junk bytes.
+Stated because a payload size without its producers is the fourth number in
+this document to have carried an implicit command.) `me sysw show`
 gives no hint that a record was expected. Substitute `mk` for `mt` and the
 missing record is a cosigner card — a backup the operator believes is complete
 and that cannot restore the wallet.
@@ -949,7 +956,7 @@ the header increments it, and this spec and its own review reports are three of
 them. A self-referential count is a fact with a shelf life measured in commits.
 The actionable number is 7; the rest are prose about the format and are a
 documentation sweep whose size is whatever this prints at the time anyone
-asks — **31 as of this commit**, and the command is written out because the
+asks. The command is written out rather than its output, because the
 previous revision replaced a wrong number with a command that silently printed
 a different wrong one (it had no pattern to grep for):
 
@@ -988,11 +995,17 @@ measurement** and struck.
   cites F-246, F-250, F-251, F-252 and F-253 as settled, and the behaviour is
   present in the binaries — verified during the fold: `mt encode -` works
   through a pipe, `mt`'s world-readable refusal carries the F-252 wording about
-  only the file's own mode, and `me`'s terminal refusal fires at exit 2. **None
-  of those five carries a `CLOSED` marker in `design/FOLLOWUPS.md`**, while
-  F-244 does. The citations are correct about the code and stale about the
-  record. Not a spec defect; a sweep the plan performs before it schedules
-  anything against those numbers.
+  only the file's own mode, and `me`'s terminal refusal fires at exit 2. **All five ARE
+  closed, and an earlier revision of this bullet said the opposite (round-3
+  M-1).** It grepped for the token `CLOSED`, found it on F-244 alone, and
+  concluded the other five records were stale. The grep was true and the
+  conclusion backwards: F-246, F-250, F-251, F-252 and F-253 each carry a dated
+  `DONE` marker with commit SHAs.
+
+  **The real finding is that this repo closes follow-ups in TWO vocabularies** —
+  `CLOSED` and `DONE` — so a single-token sweep reports half the truth with
+  total confidence. **P0 must not read an absent `CLOSED` as open work**: grep
+  both, or the plan will schedule work that is already finished.
 
 ## 8a. What the structure gates say
 
@@ -1029,7 +1042,19 @@ is how a real finding hides.
   gate is evidence about the references it could resolve, never about the ones
   it resolved to the wrong place.** That site is now de-sigilled, and the sweep
   that finds this class is to list EVERY sigil in the file and read each one,
-  not to trust the exit code.
+  not to trust the exit code:
+
+  ```
+  grep -oE 'SECTION-SIGIL[0-9][0-9a-z.]*' design/SPEC_constellation_cli_uniformity.md \
+    | sort | uniq -c | sort -rn
+  ```
+
+  (with the real sigil character in place of `SECTION-SIGIL`, which is written
+  out that way here so this instruction does not itself become a hit.)
+  **The command is given because a claim about this class is otherwise
+  unverifiable** — a round-2 fold commit asserted a count of resolving
+  references and reproduced nothing anybody could check (round-2 N-2). Today it
+  reports **16 distinct sigils over 50 occurrences**, and each was read.
 
 ## 9. Out of scope, explicitly
 
