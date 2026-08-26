@@ -10341,7 +10341,7 @@ accepts is its own defect.
 
 ---
 
-## F-246 — `me sysw pack` generates and PRINTS a passphrase before it validates the records, so an invalid input still emits secret material
+### F-246 — `me sysw pack` generates and PRINTS a passphrase before it validates the records, so an invalid input still emits secret material
 
 **Severity:** Minor. **Owning phase:** post-P1 UX (not P1 — P1 neither introduces
 this nor is scoped to fix it). **Found:** 2026-08-24, while verifying R0 round 4's
@@ -10386,6 +10386,41 @@ ran (spec §1.5's *what runs before it*).
 **What would close it.** Validate and classify every record **before** generating
 or printing any passphrase. Cheap: the classification pass already exists and
 already runs; it simply runs second.
+---
+
+**SECOND INSTANCE, found in the side-by-side walk 2026-08-25 — the DIGEST, on a
+different trigger.** The operator typed the bare command and pasted one `tx:`
+record:
+
+```
+$ me sysw pack                       (paste the record, Ctrl-D)
+sealing:  NOT SEALED — no record in this payload is secret material ...
+strength: no passphrase — BELOW the threshold
+digest:   7981 04fa 8223 f3fc 8839 6701 2f0b 5a8e
+          re-print it with: me sysw show <the file you just wrote>
+me: stdout is a world-readable file, and this payload is BEARER.
+    --out <FILE> / umask 077 / --allow-world-readable
+exit 2, and the redirected file is 0 bytes.
+```
+
+**Same defect, and the artifact handed over is worse.** A passphrase protects
+nothing when no container exists; a **digest is the value the operator verifies
+the plate against on the device.** Recording this one means carrying a checksum
+for a payload that was never written — and the line directly beneath it says
+*"the file you just wrote"*, which is false at the moment it prints.
+
+**This widens what would close it.** The original fix — classify records before
+printing the passphrase — does not reach here, because the trigger is not record
+validity but the **world-readable stdout guard**, which fires after a wholly valid
+pack. The rule that covers both: **no report line describing a container may be
+emitted until every gate that can abort the write has run.** Sealing, strength
+and digest all describe an artifact, so all three belong after the guard.
+
+**Not a defect, and better than its `mt` counterpart:** the refusal itself names
+three concrete ways on (`--out`, `umask 077`, `--allow-world-readable`). F-249
+records `mt` giving none. Whatever fixes F-249 should copy this message, not the
+other way round.
+
 
 ---
 
