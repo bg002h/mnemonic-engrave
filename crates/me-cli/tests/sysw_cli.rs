@@ -689,8 +689,13 @@ fn me_tx_builds_a_record_that_packs() {
     let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
     assert!(err.contains(MT_EVEN_TXID), "summary must name the txid: {err}");
 
+    // THE RULED PIPELINE, end to end: `me tx` writes the record on stdout and
+    // `me sysw pack` reads it on stdin. argv is refused for this class
+    // (G-P3.5), so this is the whole join -- and it is the invocation §1.1
+    // said must work.
     me()
-        .args(["sysw", "pack", "--no-passphrase", &record])
+        .args(["sysw", "pack", "--no-passphrase"])
+        .write_stdin(format!("{record}\n"))
         .assert()
         .success();
 }
@@ -699,15 +704,21 @@ fn me_tx_builds_a_record_that_packs() {
 /// the structural reason, and non-hex with the hex reason.
 #[test]
 fn pack_refuses_a_tx_record_that_is_not_a_transaction() {
+    // Delivered on STDIN. The argv channel is refused for the whole class
+    // (G-P3.5) BEFORE anything looks at the body, so these two messages are
+    // only reachable through a private channel -- which is also where a real
+    // operator meets them.
     me()
-        .args(["sysw", "pack", "--no-passphrase", "tx:abab"])
+        .args(["sysw", "pack", "--no-passphrase"])
+        .write_stdin("tx:abab\n")
         .assert()
-        .failure()
+        .code(4)
         .stderr(predicate::str::contains("not one serialized Bitcoin transaction"));
     me()
-        .args(["sysw", "pack", "--no-passphrase", "tx:zz"])
+        .args(["sysw", "pack", "--no-passphrase"])
+        .write_stdin("tx:zz\n")
         .assert()
-        .failure()
+        .code(4)
         .stderr(predicate::str::contains("not lowercase hex"));
 }
 
@@ -745,7 +756,8 @@ fn show_names_a_tx_record() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.bin");
     let rec = format!("tx:{MT_EVEN_RAW_HEX}");
-    me().args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap(), &rec])
+    me().args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
+        .write_stdin(format!("{rec}\n"))
         .assert()
         .success();
     me().args(["sysw", "show", out.to_str().unwrap()])
@@ -916,4 +928,120 @@ fn argv_records_win_over_stdin() {
         .success()
         // The md1 arrived on stdin and must NOT be in the container.
         .stdout(predicate::str::contains("md1/mk1").not());
+}
+
+// ─── G-P3.5 / R2 — a `tx:` record on argv is REFUSED ─────────────────────────
+
+/// The "even" vector: a real signed 222-byte transaction, as a `tx:` record.
+const TX_RECORD: &str = "tx:020000000001017c8da925af70e49a12b0cea7b639df5037c87b7fa61f262b86ac32c47aa3ba1a0000000000fdffffff02404b4c0000000000160014c1de0dd435d1d4ad97ed1f51d63f91c800cc4eab3ea1b92901000000160014751097c299d6354fbb2c5a84512dd708f2902f5e0247304402207debc7d89984c7717940b622504318d2c184966a618b32cf8b700d0f125b3ffa02206ef875f9c0b5931e0ea1cf0c109bdb8512835c8e51526f99b3419929a2ea7259012103718f5fd45b926226357e2b0400574b41a32d0bf0ae69a02eebea5fbc542ff52060000000";
+
+/// R2. argv is world-readable through `/proc/<pid>/cmdline`, `ps` shows it to
+/// every user on the box, and the shell writes it to a history file that
+/// outlives the machine. A raw signed transaction is a BEARER instrument, so
+/// "prefer --in" is not enough — `mt` already refuses one as an argument for
+/// exactly this reason and `me` must agree.
+#[test]
+fn a_tx_record_on_argv_is_refused() {
+    me().args(["sysw", "pack", "--no-passphrase", TX_RECORD])
+        .assert()
+        .code(3)
+        .stdout(predicate::str::is_empty());
+}
+
+/// THE POINT OF THE REFUSAL IS THAT NOTHING IS EMITTED FIRST. A guard placed
+/// downstream of the work it exists to prevent has already lost: this exact
+/// shape (output emitted before the validation that would have made it
+/// unnecessary) is why `mt`'s §8.2f was bypassed by the invocation it refused.
+///
+/// So: no container on stdout, no generated passphrase on stderr, and above
+/// all NOT ONE BYTE OF THE TRANSACTION anywhere in either stream.
+#[test]
+fn the_argv_refusal_echoes_neither_the_transaction_nor_a_passphrase() {
+    let body = TX_RECORD.strip_prefix("tx:").unwrap();
+    // No --no-passphrase: the DEFAULT path generates one and prints it. The
+    // refusal must beat that ceremony, or the operator writes down a
+    // passphrase for a container that was never built.
+    let out = me()
+        .args(["sysw", "pack", TX_RECORD])
+        .assert()
+        .code(3)
+        .get_output()
+        .clone();
+    let err = String::from_utf8_lossy(&out.stderr).to_string();
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    assert!(
+        !err.contains(body) && !stdout.contains(body),
+        "the refusal echoed the transaction:\nstderr: {err}\nstdout: {stdout}"
+    );
+    // A 32-character prefix would be enough to identify the artifact too.
+    assert!(!err.contains(&body[..32]), "the refusal echoed a prefix: {err}");
+    assert!(
+        !err.contains("write this down"),
+        "a passphrase was generated before the refusal ran: {err}"
+    );
+    assert!(
+        err.contains("--in") || err.contains("stdin"),
+        "the refusal must name the private channel that works: {err}"
+    );
+}
+
+/// The private channels still take it — the refusal is about the CHANNEL, not
+/// about the record. Both, because a refusal that also broke `--in` would make
+/// the class unpackable rather than safely packable.
+#[test]
+fn the_same_tx_record_packs_from_in_and_from_stdin() {
+    let dir = tempfile::tempdir().unwrap();
+    let recs = dir.path().join("recs.txt");
+    std::fs::write(&recs, format!("{TX_RECORD}\n")).unwrap();
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--in",
+        recs.to_str().unwrap(),
+        "--out",
+        dir.path().join("a.bin").to_str().unwrap(),
+    ])
+    .assert()
+    .success();
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--out",
+        dir.path().join("b.bin").to_str().unwrap(),
+    ])
+    .write_stdin(format!("{TX_RECORD}\n"))
+    .assert()
+    .success();
+    assert_eq!(
+        std::fs::read(dir.path().join("a.bin")).unwrap(),
+        std::fs::read(dir.path().join("b.bin")).unwrap(),
+        "the two private channels must build the same container"
+    );
+}
+
+/// A `tx:` record hidden among ordinary ones is still refused, and the refusal
+/// names WHICH argv position — the operator has to be able to find it.
+#[test]
+fn a_tx_record_anywhere_on_argv_is_refused_and_located() {
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", TEXT, MD1, TX_RECORD])
+        .assert()
+        .code(3)
+        .get_output()
+        .clone();
+    let err = String::from_utf8_lossy(&out.stderr).to_string();
+    assert!(err.contains("record 2"), "the refusal must locate it: {err}");
+}
+
+/// NOT over-broad: `text:`/`pass:`/md1/mnemonic records on argv keep working,
+/// because argv there is a documented convenience and only the transaction
+/// class is bearer-by-construction. A guard that swept up everything would be
+/// a different (and unruled) change.
+#[test]
+fn the_argv_refusal_is_scoped_to_the_transaction_class() {
+    me().args(["sysw", "pack", "--no-passphrase", TEXT, MD1])
+        .assert()
+        .success();
 }

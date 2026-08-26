@@ -1013,9 +1013,9 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             }
             let recs = match read_records(records, r#in.as_ref()) {
                 Ok(r) => r,
-                Err(e) => {
-                    eprintln!("me: {e}");
-                    return EXIT_USAGE;
+                Err((msg, code)) => {
+                    eprintln!("me: {msg}");
+                    return code;
                 }
             };
 
@@ -1422,12 +1422,52 @@ fn split_record_stream(raw: &str) -> Vec<String> {
 fn read_records(
     argv: &[String],
     in_path: Option<&std::path::PathBuf>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, (String, i32)> {
     if let Some(p) = in_path {
-        let raw = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
+        let raw = std::fs::read_to_string(p)
+            .map_err(|e| (format!("{}: {e}", p.display()), EXIT_USAGE))?;
         return Ok(split_record_stream(&raw));
     }
     if !argv.is_empty() {
+        // R2 / G-P3.5. THIS RUNS BEFORE ANYTHING ELSE `pack` DOES, and that is
+        // the whole gate: a guard placed downstream of the work it exists to
+        // prevent has already lost. Before it, `me sysw pack tx:<hex>` wrote
+        // the container to stdout at exit 0 -- and on the DEFAULT path it also
+        // generated a passphrase and told the operator to write it down first.
+        //
+        // argv is a PUBLIC channel: /proc/<pid>/cmdline is world-readable
+        // without hidepid, `ps` shows it to every user on the box, and the
+        // shell records it in a history file that outlives the machine. A raw
+        // signed transaction is a BEARER instrument -- whoever reads it can
+        // broadcast it -- so "prefer --in" is not enough. `mt` already refuses
+        // a transaction as an argument for exactly this reason.
+        //
+        // Matched on the TRIMMED, case-folded prefix rather than through
+        // `classify`, deliberately: a near-miss like ` TX:<hex>` is then
+        // refused here for the BEARER reason rather than three screens later
+        // for a formatting one. Neither message may name the body.
+        for (i, r) in argv.iter().enumerate() {
+            if r.trim_start()
+                .to_ascii_lowercase()
+                .starts_with(mnemonic_engrave::sysw::record::TX_PREFIX)
+            {
+                return Err((
+                    format!(
+                        "record {i}, as given (records count from 0), is a `tx:` record on \
+                         ARGV. Refused; nothing was read and nothing was written.\n      \
+                         A raw signed transaction is a BEARER instrument -- anyone who can \
+                         read it can broadcast it -- and argv is public: /proc, `ps` and \
+                         your shell history all keep a copy.\n      \
+                         Use a private channel instead:\n      \
+                         \x20   me tx --in tx.hex | me sysw pack --no-passphrase --out p.bin\n      \
+                         \x20   me sysw pack --in records.txt --out p.bin"
+                    ),
+                    // POLICY REFUSAL, not usage: the record is understood and
+                    // well-formed, and this tool will never accept it here.
+                    EXIT_REFUSED,
+                ));
+            }
+        }
         return Ok(argv.to_vec());
     }
     // A TTY here is the "looks like a hang" case: an operator who typed
@@ -1446,14 +1486,17 @@ fn read_records(
     let mut raw = String::new();
     std::io::stdin()
         .read_to_string(&mut raw)
-        .map_err(|e| format!("stdin: {e}"))?;
+        .map_err(|e| (format!("stdin: {e}"), EXIT_USAGE))?;
     let recs = split_record_stream(&raw);
     if recs.is_empty() {
         // R7. EMPTY stdin joins this exit-2 path rather than packing an empty
         // container: `fish` reports a pipeline's status as the LAST command's,
         // so `mt encode` failing upstream arrives here as nothing at all, and
         // a container built from nothing would be a silent success.
-        return Err("no records: pass them on argv, with --in, or on stdin".into());
+        return Err((
+            "no records: pass them on argv, with --in, or on stdin".into(),
+            EXIT_USAGE,
+        ));
     }
     Ok(recs)
 }

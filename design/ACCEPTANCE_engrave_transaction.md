@@ -78,6 +78,7 @@ conformance corpus — has **zero** `mt1`/`tx:` rows on either side (G-P5.3).
 
 | condition | host | device | authority |
 | --- | --- | --- | --- |
+| `tx:` record **on argv** | **REFUSE** exit 3, naming `--in`/stdin | n/a | R2, G-P3.5 |
 | `tx:` body not lowercase hex | **REFUSE** exit 4 | `ClassUnknown` | R1 |
 | `tx:` body hex but not a transaction | **REFUSE** exit 4 | `ClassUnknown` | R9 |
 | `tx:` body parses, an input unsigned | **REFUSE** exit 4 | **nothing — no predicate exists** | L2 / G-P3.1 |
@@ -110,7 +111,7 @@ Verdicts: **MET** · **MET-DIFF** (purpose satisfied another way, reason given) 
 | # | verdict | evidence / reason |
 | --- | --- | --- |
 | R1 | MET | `sysw/mod.rs:152-167`; `an_uppercase_hex_body_is_still_a_non_hex_body` |
-| R2 | NOT-MET (P3) | **measured:** `me sysw pack --no-passphrase "tx:<hex>"` packs at exit 0. `read_records` (`main.rs:1400-1416`) accepts argv unconditionally |
+| R2 | **MET (P3a)** | `read_records` refuses any argv record whose trimmed, case-folded form begins `tx:`, at **exit 3**, before the passphrase ceremony and before any output; `a_tx_record_on_argv_is_refused`, `the_argv_refusal_echoes_neither_the_transaction_nor_a_passphrase` |
 | R3 | MET-DIFF | `mt encode --record` was never built. The form is chosen by **which tool you run** — `mt encode` → `mt1` chunks → TEXT plates; `me tx` → `tx:` record → QR plates. There is no defaultable flag, so the refusal R3 exists to teach cannot arise |
 | R4′ | MET-DIFF | there is no `form` byte and no combined record: the two forms are distinct record **classes** (`Class::Mt`, `Class::Tx`). "One record carrying both" is unrepresentable, so the comparison R4′ prescribes has nothing to compare |
 | R5 | MET | strict admission both sides (L3); **measured:** an elided `mt1` string is refused at exit 4 |
@@ -170,7 +171,7 @@ Verdicts: **MET** · **MET-DIFF** (purpose satisfied another way, reason given) 
 | the QR's byte encoding stays a parameter until the test plate | MET-DIFF | byte mode is now fixed and **proven decodable by an independent decoder**; the steel half is still S0's (G-P4.1) |
 | the journey walk is the review of this spec | MET | `design/JOURNEY_WALK_engrave_transaction.md` |
 | `me sysw pack` gains stdin | **MET (P3a)** | G-P3.4. `pack_reads_records_from_stdin_when_neither_argv_nor_in_is_given`; the sentence now names three channels (`the_no_records_message_names_stdin`). A TTY stdin prints what it is waiting for rather than looking like a hang |
-| a `tx:` record on argv is refused | NOT-MET (P3) | R2 |
+| a `tx:` record on argv is refused | **MET (P3a)** | R2 / G-P3.5 |
 | no `--record` default; the refusal teaches | MET-DIFF | R3 |
 | chunks engraved verbatim — **no `mt1` decoder in v1** | SUPERSEDED | ruling 2026-08-25b requires the device to compute the confirmation, so the decoder was ported. Chunks are still engraved verbatim |
 | world-readable output refused + override, `me` and `mt` | MET | L13 |
@@ -281,7 +282,7 @@ host CLI and device screens both, because a journey starts at the host).
 | G-P3.2 | the predicate does not guard the **`mt1` chunk class** on either side — `sysw::mt::set_confirmed` (`sysw/mt.rs:124-138`) checks parse + binding only. (`mt encode` refuses unsigned input at §8.3 — but that is a different tool, not this container's admission boundary) | `set_confirmed` and `mt.Decode` both consult the predicate, or the sheet records a ruling that they deliberately do not |
 | G-P3.3 | `--allow-unsigned-inputs` (`FORWARD_PLAN` §2.1) does not exist — **measured:** clap rejects it. Overdue from P0 | the flag exists, names the failing input indices, and has a test |
 | **G-P3.4 — CLOSED (P3a)** | `me sysw pack` has **no stdin path**; the ruled pipeline `mt encode \| me sysw pack` cannot be typed | **DONE.** `main.rs:split_record_stream`/`read_records`; precedence `--in` > argv > stdin. Five tests in `tests/sysw_cli.rs`: stdin is read, blank lines skipped as with `--in`, empty and whitespace-only stdin exit 2, the message names stdin, argv still wins. Mutation-tested: removing the empty guard reddens 2 |
-| G-P3.5 | a `tx:` record on **argv** is not refused (R2) | argv carrying a `tx:` record exits non-zero **before** the record is echoed anywhere |
+| **G-P3.5 — CLOSED (P3a)** | a `tx:` record on **argv** is not refused (R2) | **DONE.** Exit 3 (policy refusal — the record is well-formed, the channel is not), raised in `read_records` before anything else `pack` does. Five tests: refused, located by argv index, echoes neither the body nor a generated passphrase, still packs from `--in` and stdin (byte-identical containers), and is scoped to the `tx:` class alone. The exit-code table gained a row. Mutation-tested: `if false &&` reddens 4 |
 | G-P3.6 | sealing is **flag-decided**, not content-decided, and says nothing | `pack` seals iff some record is `Class::is_secret()`, and prints which way it went and why, every time |
 | G-P3.7 | the incomplete-set warning does not name **the set** or **every missing index** — ruling 2026-08-25 makes "loudly" normative | the stderr line names the `chunk_set_id` and every missing index against the header's `count`; `me sysw show` does the same |
 | G-P3.8 | no scanner-level test drives an `mt1` string through `scanner.Scan`; the three silently-failing lockstep sites are asserted only indirectly | `gui/scan_test.go`'s table gains an `mt1` row; a test drives `engraveObjectFlow`'s `mtText` case |
