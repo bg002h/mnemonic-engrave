@@ -275,9 +275,26 @@ fits **none** of them, which is precisely why it is a fourth, foundation-tier
 thing — a small crate that the toolkit becomes the **fifth consumer** of, not
 the home of.
 
-**So:** a new crate, hosted this cycle as a workspace member of
+**So:** a new crate — **`m-cli-io`** — hosted this cycle as a workspace member of
 `mnemonic-engrave` for extraction locality, **published to crates.io at 0.1.0
-when P0 closes GREEN**, publication operator-gated. Hosting it here is recorded
+when P0 closes GREEN**, publication operator-gated.
+
+**The name is proposed here rather than left to the plan (C-d)**, because it is
+baked into five `Cargo.toml`s, every `use` site, and a registry publish that
+cannot be taken back. It follows the `mt-codec` / `wc-codec` precedent —
+hyphenated, scope-first, saying what the crate holds rather than which binary it
+came from. **P0 must confirm the name is free on crates.io before publishing**;
+an unavailable name is a rename across five manifests if it is discovered after
+the code is written, and one line of the plan if it is discovered before.
+
+**All six binaries are consumers, `me` included (C-d).** `me` is the donor of
+`write_private` and `is_argv_forbidden`, and donating is not the same as being
+exempt: if `me` keeps its own copies, the two implementations diverge on the day
+the crate ships, which is the exact condition D5 exists to prevent. Concretely,
+§6d rules the argv override's own parse must run on raw argv, and `me` currently
+ships it as an ordinary clap flag (`me-cli/src/main.rs:252`, `#[arg(long)]
+allow_argv_secret`) — so `me` is not already compliant, and no phase owned that
+fix until now. **P0 owns it.** Hosting it here is recorded
 as **symmetry debt with a non-breaking reversal path** — once the crate is on
 crates.io its repository may move at zero cost to consumers.
 
@@ -348,9 +365,12 @@ Measured stdout, per verb:
   Measured per verb: `mk` documents `-` on all five artifact verbs *and* on
   `--keys -`; `ms` documents it on seven of eight, with `decode`, `verify`,
   `inspect` and `derive` reading stdin even when the positional is omitted;
-  `md` documents it on `repair` alone. **So the real `-` gap is `md`'s four
-  other verbs** — one targeted addition plus a `combine` DOC fix, not a constellation
-  rollout. `--in FILE` is the genuinely missing channel: only `mt` has it, and
+  `md` documents it on `repair` alone. **So the gap is `md`'s four other verbs PLUS
+  `mt`'s `decode`, `verify` and `inspect`** — measured, each `error: unexpected
+  argument '-' found` at exit 2, where F-250's `mt encode -` exits 1 because it
+  accepts `-` and then rejects empty input. Seven verbs plus a `combine` DOC fix,
+  not a constellation rollout. §7 P1:980 already scoped it this way and §6b did
+  not; an author scoping `-` from §6b alone would have built four of seven. `--in FILE` is the genuinely missing channel: only `mt` has it, and
   `mk` has `--keys FILE` for one flag.
 - `--out FILE` — write the artifact to a file, **created 0600 by `me`'s
   `write_private`**, never `std::fs::write` (F-244).
@@ -482,8 +502,9 @@ lands correctly, and `me sysw pack`, which already implements the widened form:
   success and purges nothing. Its fish branch says
   `history delete --contains <tx>`, inviting the operator to type the bearer
   material into history **a second time**. `me`'s text matches on the COMMAND
-  name and says outright that zsh's `history -d` is not a solution. **So §6h's
-  "from `mt`/`me`" is wrong as written**: from `mt` it ships the trap.
+  name and says outright that zsh's `history -d` is not a solution. **§6h is already correct** — it names
+  `me` alone as the reference. The site that is wrong is **§7 P0, which extracts
+  the text from `mt` and `me` jointly**: from `mt` it ships the trap.
 - `--allow-argv-secret` proceeds. It is greppable in a script, so a reviewer can
   find it. **This is the name already shipped on `me sysw pack`.**
 
@@ -701,16 +722,36 @@ is deliberately not quoted: it changed when a row moved, and a pointer naming
 | `mk` | 64 | **2** | 5 | 2 |
 | `ms` | 64 | 1 | **4** | 2 |
 | `mt` | 2 | 1 | n/a | n/a |
-| `mnemonic` | 64 | **64** | **4** | **2** |
+| `mnemonic` | 64 | **1 or 2 — by input shape (see below)** | **4** | **2** |
 | `me` | 2 | 4 = unplaceable record; 2 = terminal refusal | n/a | n/a |
 
 **`mnemonic`'s two remaining cells are now measured too**, with the verb each
-was taken from, because a cell without one is what §6f already had to retract:
-`mnemonic decode md1nonsense` → **64** (invalid artifact), and
-`mnemonic repair <an uncorrectable md1>` → **2**. **Neither needs changing.**
-The 64 does not collide with `mk`'s invalid-artifact 2 — it is clap's usage
-code, the split §9b already files as out of scope — and the 2 matches
-`md`/`mk`/`ms`. **`mk`'s 2 → 1 remains the only code this cycle changes.**
+was taken from, because a cell without one is what §6f already had to retract.
+**`mnemonic` has no `decode` verb** — its m-format reading verbs are `inspect`,
+`convert` and `repair`, and an earlier revision of this cell reported a `decode`
+run at 64, which was clap's *unrecognised-subcommand* code rather than anything
+the program decided. Measured under verbs that exist, absolute paths, stdin at
+`/dev/null`:
+
+```
+$ mnemonic inspect notanartifact   -> 2      (unknown HRP)
+$ mnemonic inspect md1nonsense     -> 1      (md1 HRP, decode failure)
+$ mnemonic repair <uncorrectable>  -> 2
+```
+
+**So the invalid-artifact cell is 1 or 2 depending on the input's shape, and the
+2 DOES collide with `mk`'s invalid-artifact 2.** That is the collision C-c asked
+to be ruled in advance rather than discovered in P0.
+
+**RULING: the collision stands and `mnemonic` is not changed by this cycle.** The
+two 2s do not mean the same thing — `mk`'s is *this artifact is invalid*, while
+`mnemonic`'s is *this string is not an m-format artifact at all*, a distinction it
+can draw because it is the only binary that accepts every HRP. Collapsing them
+would lose that. `mnemonic` also sits in a different tier (§9a) and is out of the
+shared crate's scope, so P0 has no mechanism to change it. **`mk`'s 2 → 1 remains
+the only code this cycle changes** — for the separate reason that `mk` disagrees
+with `md` and `ms` on the SAME question, which is a uniformity defect where this
+is a tier boundary.
 
 **On `mnemonic repair` — MEASURED at last, and it settles against the ruling
 (round-2 N3).** Round 0 inferred this cell from the parity ruling instead of
@@ -794,9 +835,15 @@ Two collisions this table makes visible and the one-sentence version hid:
   is a clap convention difference, it breaks no pipeline measured, and
   normalising it would touch five CLIs for no safety gain. Filed with an owning
   phase, not folded into P0.
-- The plan **must fill the two `mnemonic` cells still marked "not measured"**
-  — invalid-artifact and repair-uncorrectable — before P0 closes. The third,
-  repair-applied, is now measured at 4. They are marked, never guessed.
+- **All four `mnemonic` cells are now measured** — usage 64, invalid-artifact
+  1-or-2 by input shape, repair-applied 4, repair-uncorrectable 2 — so nothing
+  here is left for the plan to fill. The invalid-artifact cell is the one to
+  distrust: it was twice reported from **a `mnemonic` verb that does not exist**,
+  whose 64 was clap's unrecognised-subcommand code rather than a decision the
+  program made. (The verb is not named here on purpose — quoting a retracted
+  string re-creates it, which is how this document has re-minted seven of them.) P0's gate re-runs it
+  under `inspect`. A cell is marked, never guessed — and the verb it was taken
+  from is named, because a number alone cannot show it came from a real command.
 
 ### 6g. `me sysw pack --expect <kinds>` — the C-1 contract
 
@@ -976,7 +1023,7 @@ override is scoped to the posture pair and to nothing else.
 
 | phase | content | gate |
 | --- | --- | --- |
-| **P0** | the shared crate: `--in`/`--out`/`-`, argv guard with pre-parser ordering, write gate, exit codes, remedy text per §6h, **and `me sysw pack --expect` in full — the kind vocabulary, the flag, and §6g's refusal on an incomplete chunk set of a named kind (I-6)**. Extracted FROM `mt`/`me`. Plus the distribution mechanism below. | its own tests + an R0 round closing 0C/0I + the two `mnemonic` exit cells still marked "not measured" filled + the in-memory-history question of §6h measured + **`--expect descriptor,transaction` REFUSES a stream missing a transaction, and REFUSES an incomplete `md1` set, both asserted** |
+| **P0** | the shared crate: `--in`/`--out`/`-`, argv guard with pre-parser ordering, write gate, exit codes, remedy text per §6h (**from `me` ALONE — `mt`'s zsh branch is superseded, §6d**), **and `me sysw pack --expect` in full — the kind vocabulary, the flag, and §6g's refusal on an incomplete chunk set of a named kind (I-6)**. Extracted FROM `me`; `mt`'s purge text is NOT a source. Plus the distribution mechanism below. | its own tests + an R0 round closing 0C/0I + **§6f's `mnemonic` invalid-artifact cell re-measured under a verb that EXISTS — `inspect`, not `decode` (I-3)** + the in-memory-history question of §6h measured + **`--expect descriptor,transaction` REFUSES a stream missing a transaction, and REFUSES an incomplete `md1` set, both asserted** |
 | **P1** | `mt` adopts the crate, and gains `--out` (§6b), `--allow-argv-secret` (§6d), **and `-` on `decode`, `verify` and `inspect` — F-250 fixed `encode` ALONE, and the other three still exit 2 (I-3)**. | `mt`'s 237 tests pass, **with the diff to them enumerated and each edit justified by a named §6 ruling** + **`mt decode -`, `mt verify -` and `mt inspect -` each read stdin at exit 0** |
 | **P2** | `ms` FIRST `--in` on all eight verbs, THEN the argv refusal, THEN the 0600 `--out`, **THEN `--group-size 0` as the stdout default and the whitespace-only separator (I-1) — §3's decisive measurement is `ms`'s and belonged to no phase**. Plus this repo's journey drivers. **Highest safety value; do it before the cosmetic work.** | round-trip vectors; **`ms encode --phrase <a BIP-39 phrase>` REFUSES for the argv reason and `--allow-argv-secret` proceeds (I-5)**; **`ms encode --in <file>` piped into `me sysw pack` runs with NO flags and exits 0 (I-1)**; the 18 argv call sites migrated; `me`'s remedy text still naming only channels that exist |
 | **P3** | `md`, `mk` header off stdout, grouping to stderr, `--in`/`--out`, **and `mk`'s invalid-artifact 2 → 1, which §6f calls the only code this cycle changes and which no phase owned (I-4)**. Plus `mnemonic`'s grouping surface AND its argv refusal across all five of its secret-material channels (`bundle`, `convert`, `derive-child`, `restore --passphrase`, `electrum-decrypt --decrypt-password`), and the GUI mirror. Plus golden regeneration. | `md encode` into `me sysw pack` runs with **no flags and no grep, on a CHUNKING policy**; **`mk` on an invalid artifact exits 1, and `mk encode` piped into `me sysw pack` runs with no flags**; `mnemonic-gui`'s schema mirror regenerated; the 7 goldens regenerated; **`mnemonic`'s refusal keyed on its EXISTING `is_argv_secret_bearing` predicate (not a second implementation), with the five named channels asserted as spot checks** |
@@ -1027,7 +1074,9 @@ less.
 **P2 before P3 is deliberate**: the seed-phrase-on-argv hole is the finding with
 funds behind it; the grouped default is a usability defect.
 
-**P0 — the distribution mechanism, which no earlier draft named (I-5).** D5's
+**P0 — the distribution mechanism, RULED in §5a (crates.io, `0.1.0`, published
+when P0 closes GREEN). This section is the reasoning behind that ruling, not an
+open question (I-5, B-3).** D5's
 crate becomes a cross-repo dependency that must be released or re-pinned before
 any of P1/P2/P3 can consume a change to it. The constellation already uses
 **both** mechanisms and they are not interchangeable:
@@ -1041,9 +1090,10 @@ any of P1/P2/P3 can consume a change to it. The constellation already uses
 
 An earlier draft cited `mt-codec` as the precedent for D5. It is a real
 precedent for *consuming a crate across repos* and the **opposite** of what D5
-needs for *shipping a change to four consumers* — the rev pin exists precisely
-to avoid a release step, and D5 needs one. **P0 must name which mechanism it
-uses.** Two further facts it has to absorb:
+needs for *shipping a change to all five consumers* — the rev pin exists
+precisely to avoid a release step, and D5 needs one. (**Five**, matching D5 and
+§5a, which counts the toolkit as the fifth; an earlier revision said four here.)
+**§5a names the mechanism; P0 implements it.** Two further facts P0 must absorb:
 
 - **The code being extracted is not in a library.** `write_private` is at
   `crates/me-cli/src/main.rs` (line 856 at the time of writing — a line number
@@ -1225,9 +1275,12 @@ is how a real finding hides.
   **The command is given because a claim about this class is otherwise
   unverifiable** — a round-2 fold commit asserted a count of resolving
   references and reproduced nothing anybody could check (round-2 N-2). Today it
-  reported **16 distinct sigils over 50 occurrences** when it was written and
-  **18 over 64** now — a count that moves with every edit, which is exactly why
-  the command is given rather than the number relied on. Each was read.
+  reported **16 distinct sigils over 50 occurrences** when it was written.
+  **No current count is quoted here, deliberately.** Every edit moves it, so a
+  number written into this paragraph is false by the next fold — it has been
+  wrong three times, including once in the same fold that added the sentence
+  warning about it. The command is the claim; run it and read each hit. Note it
+  does not normalise trailing dots, so `§6h.` and `§6h` count as two.
 
 ## 9. Out of scope, explicitly
 
