@@ -233,6 +233,28 @@ pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
 /// payload the DEVICE was handed, so an `ms1` reaching it is a disagreement
 /// between `classify` and `validate_record`, not an impossibility. Delegating
 /// that arm would turn a defensive `None` into a panic on the device.
+/// The HRP discriminant of a card record — `'d'` for `md1`, `'k'` for `mk1` —
+/// or `None` for anything that is not a readable card.
+///
+/// **`--expect descriptor` and `--expect cosigner` MUST resolve through this
+/// and NOT through [`Class`].** `Class` has a single `MdMk` variant covering
+/// both, so a `Class`-keyed test cannot tell a descriptor card from a cosigner
+/// card — and that is the funds case: `--expect descriptor,cosigner` would be
+/// satisfied by the `md1` records alone, so a refusing `mk encode` still yields
+/// exit 0 with the cosigner card missing, and the operator believes a backup is
+/// complete when it is not.
+///
+/// **This is the deliberate widening of a narrow access path.** The HRP is
+/// reachable only through `seal::record::chunk_key`, whose `Ms` arm is
+/// `unreachable!()`. Exposing THAT to a new call site is how a panic ships. So
+/// the wrapper below — which maps `Ms` to a defensive `None` — is what gets
+/// widened, and callers get the HRP alone rather than the whole `chunk_key`
+/// pair, because the chunk-set id has no reader outside this module.
+pub fn card_hrp(record: &str) -> Option<char> {
+    let kind = crate::seal::record::validate_record(record).ok()?;
+    chunk_key(record, kind).map(|(hrp, _)| hrp)
+}
+
 fn chunk_key(s: &str, kind: crate::seal::record::RecordKind) -> Option<(char, Option<u32>)> {
     use crate::seal::record::RecordKind;
     match kind {

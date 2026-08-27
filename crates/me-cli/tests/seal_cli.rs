@@ -4,6 +4,26 @@ use predicates::prelude::*;
 const MD1: &str = "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3";
 const MD1B: &str = "md1fv9wjpqg0yq82l0czvx85ae43vtfd26hsmngjecmqy44k2pgttqh74qwxlawq374";
 const MD1C: &str = "md1fv9wjpqsp2026hh65xpvugtfhd9792zxgunymm0a82pdju6442q0jskj9gzfaqmz";
+/// **P0 row 6.** `me`'s pre-parser argv guard refuses any argv-forbidden class
+/// on any surface, before `Cli::parse()` runs, because clap's own error echoes
+/// the offending VALUE to stderr (F-266). `seal`'s `payload` positional is a
+/// deliberately retained channel — *"Kept for FIXTURES AND TESTS only"* — so
+/// `seal` DECLARES the same explicit override `sysw pack` does, and these
+/// fixtures are exactly the callers it was retained for.
+///
+/// **It is not a substitute for `--seal-secret` and does not overlap it.**
+/// `--seal-secret` says *encrypting seed material is what I meant*; this says
+/// *argv is safe where I am*. Each still refuses on its own, which is why the
+/// two "without the opt-in flag" tests below still fail for the reason they
+/// were written for rather than for this one.
+///
+/// **Adding it here is not weakening these tests — it is what keeps them
+/// testing anything.** Two of them assert only `.failure()`, so the guard's
+/// exit 3 would have satisfied them while the iteration-range check and the
+/// secret-in-the-public-section check went unexercised: green tests measuring
+/// a refusal they were not written for.
+const ARGV_OK: &str = "--allow-argv-secret";
+
 const MS1: &str = "ms10entrsqqg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9q5f042qmrw90mw";
 
 fn me() -> Command {
@@ -32,7 +52,7 @@ fn seals_and_prints_the_passphrase_to_stderr_only() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.uf2");
     let a = me()
-        .args(["seal", MS1, "--seal-secret", "--out", out.to_str().unwrap()])
+        .args(["seal", ARGV_OK, MS1, "--seal-secret", "--out", out.to_str().unwrap()])
         .assert()
         .success()
         // §9 is "stderr only", and the name of this test claims it. Finding the
@@ -88,7 +108,7 @@ fn there_is_no_addr_flag() {
 fn refuses_ms1_without_the_opt_in_flag() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.uf2");
-    me().args(["seal", MS1, "--out", out.to_str().unwrap()])
+    me().args(["seal", ARGV_OK, MS1, "--out", out.to_str().unwrap()])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--seal-secret"));
@@ -112,6 +132,7 @@ fn refuses_an_ms1_too_long_for_the_seed_plate() {
     let out = dir.path().join("p.uf2");
     me().args([
         "seal",
+        ARGV_OK,
         MS1_91,
         "--seal-secret",
         "--out",
@@ -138,7 +159,7 @@ fn refuses_a_bip39_mnemonic_without_the_opt_in_flag() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.uf2");
 
-    me().args(["seal", &bacon24, "--out", out.to_str().unwrap()])
+    me().args(["seal", ARGV_OK, &bacon24, "--out", out.to_str().unwrap()])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--seal-secret"))
@@ -148,6 +169,7 @@ fn refuses_a_bip39_mnemonic_without_the_opt_in_flag() {
     // The deliberate path is unaffected — this is a speed bump, not a wall.
     me().args([
         "seal",
+        ARGV_OK,
         &bacon24,
         "--seal-secret",
         "--out",
@@ -190,7 +212,7 @@ fn public_only_payload_prints_no_passphrase() {
 fn refuses_a_secret_in_the_public_section() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.uf2");
-    me().args(["seal", "--plaintext", MS1, "--out", out.to_str().unwrap()])
+    me().args(["seal", ARGV_OK, "--plaintext", MS1, "--out", out.to_str().unwrap()])
         .assert()
         .failure();
     assert!(!out.exists());
@@ -209,6 +231,7 @@ fn refuses_out_of_range_iterations() {
     for bad in ["5", "3000000000"] {
         me().args([
             "seal",
+            ARGV_OK,
             MS1,
             "--seal-secret",
             "--out",
@@ -336,6 +359,7 @@ fn mixed_payload_prints_the_sealed_hash_not_the_unsealed_one() {
     let a = me()
         .args([
             "seal",
+            ARGV_OK,
             MS1,
             "--seal-secret",
             "--plaintext",

@@ -11,6 +11,9 @@
 //! normalisation would be a second answer to that question.
 
 pub mod coverage;
+/// `--expect <kinds>` -- §6g's assertion that a container holds what the
+/// operator believes it holds.
+pub mod expect;
 pub mod identity;
 pub mod mt;
 pub mod overwrite;

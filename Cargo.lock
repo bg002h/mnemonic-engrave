@@ -594,6 +594,7 @@ dependencies = [
  "clap",
  "md-codec",
  "mk-codec",
+ "mnemonic-io-lib",
  "ms-codec",
  "mt-codec",
  "pbkdf2",
@@ -606,6 +607,13 @@ dependencies = [
  "sha2",
  "tempfile",
  "zeroize",
+]
+
+[[package]]
+name = "mnemonic-io-lib"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
 ]
 
 [[package]]

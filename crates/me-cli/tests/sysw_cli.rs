@@ -1098,9 +1098,23 @@ fn the_same_tx_record_packs_from_in_and_from_stdin() {
 }
 
 /// A `tx:` record hidden among ordinary ones is still refused, and the refusal
-/// names WHICH argv position — the operator has to be able to find it.
+/// names WHICH position — the operator has to be able to find it.
+///
+/// **NOW COVERS BOTH GATES, where it used to reach only one.** P0 added a
+/// pre-parser argv guard that decides before `Cli::parse()`, so a
+/// classifier-recognisable `tx:` record is refused there and located by its
+/// **argv position**. The donor's post-parse gate is still reachable and still
+/// locates by **record index**: its `tx:` PREFIX arm catches a body the
+/// classifier cannot decode, which is deliberate — a near-miss is refused for
+/// the BEARER reason rather than three screens later for a formatting one.
+///
+/// Asserting both is strictly more coverage than the single `"record 2"` this
+/// test carried before, and it is what keeps the post-parse arm from rotting
+/// unnoticed now that the guard shadows it for every well-formed record.
 #[test]
 fn a_tx_record_anywhere_on_argv_is_refused_and_located() {
+    // The PRE-PARSER guard: a decodable transaction, located by argv position.
+    // `me sysw pack --no-passphrase TEXT MD1 TX_RECORD` puts it at argv 6.
     let out = me()
         .args(["sysw", "pack", "--no-passphrase", TEXT, MD1, TX_RECORD])
         .assert()
@@ -1108,7 +1122,29 @@ fn a_tx_record_anywhere_on_argv_is_refused_and_located() {
         .get_output()
         .clone();
     let err = String::from_utf8_lossy(&out.stderr).to_string();
-    assert!(err.contains("record 2"), "the refusal must locate it: {err}");
+    assert!(
+        err.contains("argument 6"),
+        "the pre-parser refusal must locate it: {err}"
+    );
+    assert!(
+        !err.contains(&TX_RECORD[..40]),
+        "and must never echo the body back: {err}"
+    );
+
+    // The POST-PARSE gate, still reached: `tx:0100` does not decode, so
+    // `classify` calls it Unknown and only the prefix arm sees it. Located by
+    // RECORD index, which is what the operator counts when passing records.
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", TEXT, MD1, "tx:0100"])
+        .assert()
+        .code(3)
+        .get_output()
+        .clone();
+    let err = String::from_utf8_lossy(&out.stderr).to_string();
+    assert!(
+        err.contains("record 2"),
+        "the post-parse refusal must locate it by record index: {err}"
+    );
 }
 
 /// NOT over-broad: `text:`/`pass:`/md1/mnemonic records on argv keep working,

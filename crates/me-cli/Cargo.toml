@@ -19,6 +19,10 @@ name = "mnemonic_engrave"
 path = "src/lib.rs"
 
 [dependencies]
+# The shared IO/safety MECHANISM, extracted from this crate's own main.rs.
+# A PATH dependency: `cargo publish mnemonic-io-lib` is irreversible and
+# operator-gated, and nothing here needs it published to build or test.
+mnemonic-io-lib = { path = "../mnemonic-io-lib" }
 md-codec = "0.42"
 mk-codec = "0.4"
 clap = { version = "4", features = ["derive"] }

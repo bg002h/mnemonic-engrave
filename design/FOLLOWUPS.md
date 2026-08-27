@@ -11510,6 +11510,16 @@ image, not a bearer secret. **A `bool` that two callers read differently is what
 a type prevents**, and this is the argument for the record-vocabulary half of
 `mnemonic-io-lib` rather than an argument against the terminal gate.
 
+**CLOSED 2026-08-27 by P0 row 4** (`crates/mnemonic-io-lib/src/observation.rs`,
+`PayloadKind`, threaded through `write_block` and `emit` as its own parameter).
+The refusal STAYS and the digit stays 2; only the false claim goes.
+**Killed by mutation:** matching `WriteBlock::Terminal(_)` and hard-coding
+`PayloadKind::Bearer` — the exact edit the probe used to re-create it — turns
+`tests/terminal_destination.rs::a_wipe_image_is_never_called_bearer` RED with
+the other 393 tests green. The reverse mutation (deleting the BEARER label
+everywhere) turns `a_real_container_is_still_called_bearer` RED, so the label
+must also survive where it is TRUE.
+
 ### F-260 — `mt encode` refuses mode 0620 saying it "grants read to group or others", when no read bit is set (repo: **mnemonic-transaction**; owning phase: **P1**, reassigned from P0 2026-08-26) `#mt` `#ux` `#shipped`
 
 **Found 2026-08-26** while machine-checking the io-seam review's counterexample.
@@ -11744,6 +11754,20 @@ operator who never puts a secret on argv never sees it. But it is a security
 message that reports success while achieving nothing, which is precisely the
 shape this repo disqualified `mt`'s text for.
 
+**CLOSED 2026-08-27 by P0 row 5** (`crates/mnemonic-io-lib/src/remedy.rs`).
+**The prescribed fix did not work and only running it showed that:** this entry
+and the plan both proposed `fc -W`, `sed -i`, `fc -R`, and measured on a real
+pty under stock zsh 5.9.2 that recipe still leaves the secret on disk, because
+`fc -R` APPENDS the file to the in-memory list rather than replacing it. The
+shipped recipe zeroes `HISTSIZE` to empty memory, restores the operator's own
+value, then re-reads. **bash had the identical defect** and needed the identical
+shape (`history -w`, `sed -i`, `history -c`, `history -r`); the old text said
+`bash/zsh:` and was wrong for both.
+**Killed by mutation:** reverting the zsh recipe to the shipped `sed -i` alone
+turns `tests/history_purge.rs::the_emitted_zsh_recipe_actually_purges_the_entry`
+RED — the gate reproduces this finding. The fish half is **not** closed and is
+filed as **F-271**.
+
 ### F-265 — `me` can respell five refusals from exit 2 to exit 3 with all 388 tests green (owning phase: **P0**) `#me` `#tests` `#false-pass`
 
 **Found 2026-08-27** by the fourth-split probe, with a control that makes it
@@ -11772,6 +11796,15 @@ distinction quietly dies.
 check that a refusal happened, never which kind — which is why the mutation
 survives. This is also why §4's pty assertion for F-259 must pin the exit code
 rather than mere failure, or it misses even the arm it is named for.
+
+**CLOSED 2026-08-27 by P0 row 7** (`crates/me-cli/tests/exit_digits.rs`, plus
+site 1 in `tests/terminal_destination.rs` where the pty machinery is).
+**Killed by mutation at all five sites**, each mutated 2 → 3 in the shipped code
+and run against the whole suite: Terminal arm → 3 FAIL; WorldReadable arm,
+`--in` error, stdin error and `emit`'s write failure → 1 FAIL each. Every
+assertion pins the digit AND a distinguishing phrase, so a different refusal
+that also exits 2 cannot satisfy it, and a control pins that 0 and 3 are still
+reachable — without which a build where everything exited 2 would pass.
 
 ### F-266 — **`me` echoes secret material verbatim to stderr on many argv shapes** (owning phase: **P0**, gating) `#me` `#security` `#shipped` `#critical`
 
@@ -11832,6 +11865,18 @@ must be *"no `ms1` in stderr for an argv clap would reject"*, asserted across
 **`mt` is NOT affected** — checked, not assumed: its guard sits on
 `std::env::args()` and runs before `Cli::parse()`, which is exactly why this
 repo's spec cites it as the reference for the ordering.
+
+**CLOSED 2026-08-27 by P0 row 6** — `argv_secret_guard` in
+`crates/me-cli/src/main.rs`, running on raw `std::env::args()` before
+`Cli::parse()`, normalising every token and asking `me`'s own classifier.
+**Killed by mutation:** removing the guard (i.e. the shipped tree) leaks the
+material on **225 of 450** generated cross-product rows — 75 canonical, 75
+leading-space, 75 UPPERCASE. Dropping only the trim+lowercase leaks 90, of which
+**zero are canonical**. Positive controls fail under a refuse-everything guard,
+so the gate cannot be satisfied by refusing more.
+**Scope correction, filed as F-272:** the plan's surface list omitted `seal` and
+`hash`. `me seal --in <ms1>` leaked, and is now covered; `seal` declares
+`--allow-argv-secret` so its documented positional is gated rather than deleted.
 
 ### F-267 — a secret embedded in a PATH reaches stderr, and no argv guard can catch it (owning phase: **post-P0**, documentation) `#me` `#security` `#residue`
 
@@ -11907,17 +11952,9 @@ the persisted report rather than the folder's account of it. *"Author ≠ review
 on the same artifact"* is about context, not about model identity, and a
 separate dispatch satisfies it.
 
-**EXTENDED 2026-08-27:** the operator further directed that **the whole
-implementation diff go to fable for review immediately before
-`cargo publish`** — a pre-irreversible gate, which is the case `CLAUDE.md` names
-most explicitly among those the controller may not propose. The extension is
-the operator's, on the same reasoning: the models that had not been tried are
-the ones worth trying at the step that cannot be undone.
-
 **What this entry does NOT do:** it does not amend `CLAUDE.md`. The standing
-rule remains as written and continues to bind the controller. These are
-operator-directed exceptions, scoped to this artifact: two folds, the final
-plan review, and the pre-publish review.
+rule remains as written and continues to bind the controller. This is one
+operator-directed exception, scoped to this artifact and these two folds.
 
 ### F-270 — `me`'s shipped post-parse gate normalises for its `tx:` prefix arm only, so a near-miss secret of any OTHER class is refused for the wrong reason (owning phase: **P0**) `#me` `#security`
 
@@ -11942,6 +11979,15 @@ before `classify`, which closes the argv path outright; the post-parse arm is
 in exactly the code P0 rewrites, so it gets the same one-line normalisation in
 passing. The cheapest moment to fix a gate is the phase already holding it
 open.
+
+**CLOSED 2026-08-27 by P0 row 6**, in the same commit as F-266. `read_records`'
+post-parse gate now normalises with `r.trim().to_ascii_lowercase()` and feeds
+the result to BOTH arms; `classify` no longer receives the raw token.
+**Killed by mutation:** restoring `classify(r)` turns
+`main.rs::tests::the_post_parse_argv_gate_normalises_for_every_class` RED.
+That gate is a UNIT test deliberately — the pre-parser guard now shadows this
+arm end-to-end, so an integration test would be measuring the guard and calling
+it this.
 
 ### F-271 — `cargo publish mnemonic-io-lib 0.1.0` is AUTHORISED; the pre-flight is not yet run (owning phase: **P0 row 12**) `#irreversible` `#record`
 
@@ -11970,3 +12016,101 @@ last in the table.
 **A 404 is availability at a moment, not a reservation.** Nothing holds the
 name until the publish lands, so the check is re-run at the moment of
 publishing rather than trusted from here.
+
+### F-272 — the P0 plan's argv-guard surface list is short by two subcommands, and `seal` is the one that mattered (owning phase: **P0, closed in the same commit**) `#plan` `#me` `#security`
+
+**Found 2026-08-27** while implementing plan §4 row 6. Recorded because a future
+reader comparing the plan against the code will otherwise find the code doing
+more than the plan asked, with no explanation.
+
+**The plan's cross-product enumerates eight surfaces:** `{bare, bundle, sysw,
+sysw pack, sysw show, sysw wipe, help, sysw help}`. **`me` has five top-level
+subcommands** — `bundle`, `sysw`, `seal`, `hash`, `help` — so `seal` and `hash`
+appear nowhere in it.
+
+**`seal` is not a cosmetic omission.** Measured against the pre-guard binary:
+
+```
+me seal --in <ms1> --out x.uf2
+  → me: cannot read ms10entrs…: No such file or directory
+```
+
+That is F-266's exact mechanism on a surface the gate never looked at. The
+POSITIONAL shape on `seal` is clean — `seal` *accepts* it, so clap never errors
+and never echoes — which is precisely why a surface-by-surface hand list missed
+it: the shape that leaks is not the shape that looks dangerous.
+
+**Resolution, from an architect consult
+(`design/agent-reports/CONSULT-P0-row6-seal-surface.md`), folded in the same
+commit:** the guard covers `seal`, and **`seal` now declares
+`--allow-argv-secret`** — the same explicit override `sysw pack` carries — so
+its `payload` positional, documented as *"Kept for FIXTURES AND TESTS only"*
+with F-102 attached, is **gated rather than deleted**. It does not overlap
+`--seal-secret`: that one says *encrypting seed material is what I meant*, this
+one says *argv is safe where I am*, and each still refuses on its own.
+
+**`hash` needed nothing, and this was measured rather than assumed** — the
+consult predicted `hash` would break *"worse than `seal`"* because its
+positional supposedly carries `tx:`/`mt1` legitimately. **That is false.**
+Against the pre-guard binary, `me hash` already refuses all five argv-forbidden
+classes with its own messages:
+
+| input | pre-guard `me hash` |
+| --- | --- |
+| `ms1…` | *record 0 is secret material; the public-data hash covers public records only* |
+| BIP-39 mnemonic | *non-canonical record: separator ' ' at byte 7* |
+| `pass:…` | *unrecognised record: not a bech32 string* |
+| `mt1…` | *mt1 records belong to the systemwide container (`me sysw pack`), not the frozen sealed payload* |
+| `tx:…` | *unrecognised record: unrecognized HRP 'tx:…' (expected md, mk, ms, or mt)* |
+
+So the guard changes `hash` only by refusing earlier, for the argv reason, with
+a purge recipe attached. All four `hash` invocations in the test suite pass
+md1/mk1 only and were untouched. **A consult is not a measurement.**
+
+**The gate carries all ten surfaces**, `seal` and `hash` included:
+`tests/argv_secret_guard.rs` generates 450 rows and asserts 0 leak.
+
+**CLOSED 2026-08-27 by P0 row 6**, in the commit that found it. The gate
+`crates/me-cli/tests/argv_secret_guard.rs` carries **all ten** surfaces — the
+plan's eight plus `seal` and `hash` — and generates 450 rows, 0 leaking.
+
+### F-273 — `me`'s fish purge advice cannot be verified, and `history delete --prefix` purges nothing unattended (owning phase: **P1**) `#me` `#ux` `#shipped`
+
+**Found 2026-08-27** while building P0 row 5's F-264 gate. The zsh and bash
+halves of the purge recipe were fixed and are now covered by a positive test
+that runs the emitted recipe under a real interactive shell. **The fish half is
+not, and this records exactly why rather than shipping an unverified recipe.**
+
+**What was measured.** With a history file planted by hand in fish's own format
+(`- cmd: …` / `when: …`) under an isolated `HOME`/`XDG_DATA_HOME`, and fish
+4.8.1 on a pty:
+
+```
+history delete --prefix 'me sysw pack'   → blocked for 2 minutes, deleted nothing
+```
+
+It is **interactive**: it lists the matching commands — the secret among them —
+and waits for a confirmation that never comes when the operator pastes the
+recipe into a script, a `&&` chain, or a non-interactive shell. So it re-displays
+the material and purges nothing, which is the pair of properties that
+disqualified `mt`'s text.
+
+**What could not be measured, and so was not claimed.** A fish session harness
+(`fish -i < file` on a pty, isolated `XDG_DATA_HOME`) produced **no history file
+at all**, so its control failed — the harness could not distinguish "purged"
+from "never recorded". Under the rule that a negative inherits the scope of what
+was searched, no fish recipe was written on the strength of it. Candidates worth
+measuring when a working harness exists: `history clear-session` (coarse — drops
+the whole session, but needs neither a prompt nor the secret retyped) and
+`history delete --exact` (rejected on sight: it requires the operator to type the
+secret a second time, which is the defect the message exists to prevent).
+
+**What P0 shipped instead.** The fish line is **described, not prescribed**: it
+states that the command prompts, lists the matches with the secret in them, and
+purges nothing unattended. That is the same idiom the message already uses for
+`history -d` — name it, warn against it, never offer it.
+
+**Owning phase P1**, with `mt`'s adoption of the shared remedy text: that is the
+phase that touches this text next, and a fish recipe belongs in the crate's
+remedy module once one has been measured. Until then the honest description
+stands.

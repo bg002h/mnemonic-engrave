@@ -124,6 +124,27 @@ enum Command {
         #[arg(long)]
         seal_secret: bool,
 
+        /// Proceed even though a record on ARGV is secret or bearer material.
+        ///
+        /// **Declared here because the pre-parser argv guard covers `seal`
+        /// too**, and the `payload` positional above is a DELIBERATELY retained
+        /// channel — "Kept for FIXTURES AND TESTS only" — with a follow-up
+        /// number already attached to it (F-102). Guarding the surface without
+        /// offering the override would delete a documented path rather than
+        /// gate it; this is the same explicit opt-in `sysw pack` uses, applied
+        /// to the sibling surface with the same shape.
+        ///
+        /// **It is NOT `--seal-secret`, and the two do not substitute.**
+        /// `--seal-secret` says *encrypting seed material is what I meant*;
+        /// this one says *argv is safe where I am*. A fixture run on an
+        /// air-gapped box needs both, and each still refuses on its own.
+        ///
+        /// Consumed by the guard, which reads raw argv before `Cli::parse()` —
+        /// so clap's only job here is to ACCEPT the flag rather than reject it
+        /// as unexpected and echo the record it precedes.
+        #[arg(long)]
+        allow_argv_secret: bool,
+
         /// PBKDF2 iterations. 300,000 = 30.9 s on device, from the measured
         /// 9,715 iters/sec (§7.1, measured 2026-08-07 on real RP2350).
         #[arg(long, default_value_t = 300_000)]
@@ -231,6 +252,24 @@ enum SyswCmd {
         /// confirmation the DEVICE recomputes for itself.
         #[arg(long)]
         allow_unsigned_inputs: bool,
+        /// Refuse unless the container holds every kind listed here —
+        /// comma-separated: descriptor, cosigner, transaction, mnemonic,
+        /// secret.
+        ///
+        /// **§6g.** A backup can be silently incomplete: `mk encode` refuses,
+        /// the pipeline carries on, and `me sysw pack` builds a container from
+        /// the `md1` records alone at exit 0. A plate is then cut from a wallet
+        /// nobody can restore. `--expect descriptor,cosigner` turns that into a
+        /// refusal.
+        ///
+        /// It checks COMPLETENESS as well as presence: a half-transmitted
+        /// `md1` or `mt1` set is present and still cannot be restored from.
+        ///
+        /// `address` and `passphrase` are deliberately not in the vocabulary —
+        /// neither can ever be satisfied here, and a kind that cannot be
+        /// satisfied turns a gate into a permanent refusal.
+        #[arg(long, value_name = "KINDS")]
+        expect: Option<String>,
         /// Proceed even though stdout is a world-readable file (F-244).
         ///
         /// `me` refuses by default: a container is BEARER, and `>` creates a
@@ -297,11 +336,183 @@ const EXIT_USAGE: i32 = 2;
 const EXIT_REFUSED: i32 = 3;
 const EXIT_INVALID: i32 = 4;
 
+/// Every string a token could plausibly BE, normalised for classification.
+///
+/// **`classify` neither trims nor case-folds**, so ` TX:<hex>`, `TX:<hex>` and
+/// an uppercase `MS1…` all come back `Unknown` and leak — measured on 4 and 2
+/// surfaces respectively. Normalising here is what makes the pre-parser guard
+/// deliberately STRONGER than the donor's shipped post-parse gate, which
+/// normalises for its `tx:` PREFIX arm only (F-270, fixed in the same commit).
+///
+/// `=`-joined tokens are split, because `--in=<ms1>` is one argv token and the
+/// secret is the right-hand half of it. Splitting on every `=` rather than the
+/// first costs nothing and cannot miss a shape.
+fn argv_candidates(token: &str) -> Vec<String> {
+    let norm = |s: &str| s.trim().to_ascii_lowercase();
+    let mut v = vec![norm(token)];
+    if token.contains('=') {
+        v.extend(token.split('=').map(norm));
+    }
+    v
+}
+
+/// Is this argv asking for `--allow-argv-secret`, **on a surface that declares
+/// it**?
+///
+/// **The override's own parse has to run here too** (round-9 I-3): otherwise it
+/// cannot be honoured without parsing the very argv the guard exists to protect.
+///
+/// **And it binds only where the flag is DECLARED** (round-11 M-2). `me`
+/// declares `allow_argv_secret` on `sysw pack` alone — one `#[arg(long)]` in
+/// the whole CLI — so on `me`, `bundle`, `sysw show`, `sysw wipe` and the helps
+/// the guard refuses even when argv carries the flag. Today those surfaces make
+/// clap reject it as an unexpected argument at exit 2; the guard reaching its
+/// answer first is the point of §6d's ordering.
+fn argv_override_applies(argv: &[String]) -> bool {
+    if !argv.iter().any(|t| t == "--allow-argv-secret") {
+        return false;
+    }
+    // The surface is the leading run of non-flag tokens. This is a
+    // deliberately small parse -- it decides ONE bool -- because anything
+    // larger is `Cli::parse()`, which is what must not run yet.
+    let words: Vec<&str> = argv
+        .iter()
+        .skip(1)
+        .filter(|t| !t.starts_with('-'))
+        .map(String::as_str)
+        .collect();
+    // The two surfaces that DECLARE the flag. `sysw pack` and `seal` are the
+    // only ones whose positionals are records the operator may legitimately
+    // intend to be secret; everywhere else an argv-forbidden token is an
+    // accident, and there is nothing to opt into.
+    matches!(words.first().copied(), Some("seal"))
+        || (words.len() >= 2 && words[0] == "sysw" && words[1] == "pack")
+}
+
+/// The invocation as a `sed`-safe pattern: `me`, plus the subcommand words that
+/// led it.
+///
+/// **The purge recipe matches on the COMMAND, never on the secret** — quoting
+/// the secret into a pattern is how an operator types it into history a second
+/// time — so this has to name the invocation without reproducing any of it.
+///
+/// **The words come from an ALLOWLIST, and that is the whole safety argument.**
+/// Deriving them instead — "leading tokens that classify as `Unknown`" — would
+/// admit a TRUNCATED or otherwise unparseable secret into the pattern, since
+/// `Unknown` is exactly what a near-miss returns. An allowlist of `me`'s own
+/// eight subcommand words cannot carry material at all.
+///
+/// The bare `me` surface yields `"me"` alone, and that is why the pattern is
+/// built rather than fixed at `"me"`: `sed '/me/d'` would delete `make`,
+/// `time` and `/home/me` from the operator's history. `me` is only ever the
+/// FIRST word here, so a two-word surface like `me bundle` is specific enough,
+/// and the recipes quote it as written.
+fn argv_surface(argv: &[String]) -> String {
+    const SUBCOMMANDS: [&str; 8] = [
+        "bundle", "sysw", "seal", "hash", "help", "pack", "wipe", "show",
+    ];
+
+    let mut s = String::from("me");
+    for t in argv.iter().skip(1).take(2) {
+        if !SUBCOMMANDS.contains(&t.as_str()) {
+            break;
+        }
+        s.push(' ');
+        s.push_str(t);
+    }
+    s
+}
+
+/// **THE PRE-PARSER argv GUARD (§6d, F-266).** Returns the refusal, or `None`.
+///
+/// **It runs before `Cli::parse()`, and that ordering is NORMATIVE.** A guard
+/// downstream of the parser has already lost: `mt`'s source records the same
+/// lesson from the other side — when its check lived inside the `encode`
+/// subcommand, clap rejected the unexpected positional first, **and clap's
+/// error echoed the entire bearer transaction to stderr.** `me` leaks exactly
+/// this way today, on 15 of 24 measured surface×shape combinations, including
+/// `--in <ms1>` and `--in=<ms1>` and the subcommand shapes.
+///
+/// **It does not invent a recogniser. It asks `me`'s own classifier** —
+/// `classify(token)`, then [`Class::is_argv_forbidden`], the union of
+/// `is_secret()` and `is_bearer()`, **five** classes with `pass:` among them.
+/// Two earlier drafts of this work enumerated first surfaces and then shapes,
+/// and both lists came up short; the classifier defines the set, so there is no
+/// list to be short.
+///
+/// **Granularity is the classifier's, and one direction is traded away
+/// knowingly.** A classifier DECODES rather than prefix-matches, so
+/// `mt1-2026-08-23-transfer.txt` is a filename and is not refused, and a single
+/// word is not a mnemonic — which is what keeps `bundle` and `help`, both BIP-39
+/// words, from being refused as subcommands. The cost: an UNQUOTED twelve-word
+/// mnemonic is twelve tokens, each `Unknown`, so the guard does not reach it.
+/// Only the quoted, single-token phrase is in its reach. A secret embedded in a
+/// PATH is out of reach for the same reason and is filed as **F-267**, not
+/// papered over: `--in /tmp/<ms1>.txt` classifies as `Unknown` because it IS a
+/// filename, and refusing it would refuse every legitimate path.
+///
+/// **Why it lives in `me` and not in the shared crate** (round-10 C-1): it asks
+/// `me`'s own `classify()`, and `me` depends on the crate — so siting it there
+/// is a reproduced `error: cyclic package dependency`, and it would break the
+/// crate's rule that nothing in it ever names a `Class` variant.
+fn argv_secret_guard(argv: &[String]) -> Option<String> {
+    if argv_override_applies(argv) {
+        return None;
+    }
+    for (i, token) in argv.iter().enumerate() {
+        for cand in argv_candidates(token) {
+            let class = mnemonic_engrave::sysw::classify(&cand);
+            if !class.is_argv_forbidden() {
+                continue;
+            }
+            // NAME THE CLASS, NEVER THE BODY. Printing it back would put the
+            // material in a SECOND public place -- the defect this refusal
+            // exists to name. The POSITION is named instead: it is derived
+            // from the argv we were handed and tells the operator which
+            // argument to stop passing.
+            let what = if class.is_bearer() {
+                "BEARER material -- a signed transaction, or the mt1 set carrying one. \
+                 Anyone who can read it can broadcast it"
+            } else {
+                "SECRET key material. It can spend everything derived from it, forever"
+            };
+            let purge = mnemonic_engrave::io::remedy::history_purge_block(&argv_surface(argv));
+            return Some(format!(
+                "argument {i} on ARGV (arguments count from 0, and 0 is `me` \
+                 itself) is {what}.\n      \
+                 Refused BEFORE the command line was parsed; nothing was read and \
+                 nothing was written.\n      \
+                 argv is public: /proc, `ps` and your shell history all keep a \
+                 copy, so the argument parser must not be allowed to echo it \
+                 back in an error message.\n      \
+                 Use a private channel instead:\n      \
+                 \x20   me sysw pack --in records.txt --out p.bin\n\n      \
+                 {purge}\n      \
+                 If argv is safe where you are -- a single-user air-gapped box, \
+                 an amnesic Tails session -- `me sysw pack --allow-argv-secret` \
+                 proceeds. That flag is declared on `sysw pack` alone, so it \
+                 does not buy past this refusal anywhere else."
+            ));
+        }
+    }
+    None
+}
+
 fn main() {
     std::process::exit(run());
 }
 
 fn run() -> i32 {
+    // §6d, and the ORDERING IS THE FIX. This must decide before
+    // `Cli::parse()`: clap names the offending VALUE in its error for every
+    // shape that has no declared flag to blame, so a guard placed one line
+    // lower has already lost. `me --nosuchflag <ms1>` is the test that tells
+    // the two apart -- via the guard it is exit 3 with this wording, via clap
+    // it is exit 2 naming the flag.
+    if let Some(msg) = argv_secret_guard(&std::env::args().collect::<Vec<_>>()) {
+        eprintln!("me: {msg}");
+        return EXIT_REFUSED;
+    }
     let cli = Cli::parse();
 
     if let Some(Command::Bundle {
@@ -322,6 +533,11 @@ fn run() -> i32 {
         plaintext,
         out,
         seal_secret,
+        // Read by `argv_secret_guard` off raw argv before `Cli::parse()` ever
+        // ran, so there is nothing left to consult here. Destructured by name
+        // rather than swallowed by `..` so that a reader of this match sees
+        // the flag exists and finds the comment above.
+        allow_argv_secret: _,
         in_path,
         iterations,
     }) = &cli.command
@@ -840,6 +1056,12 @@ fn is_plate_artifact(name: &str) -> bool {
     name.starts_with("plate-") && (name.ends_with(".svg") || name.ends_with(".png"))
 }
 
+// The P0 moving set now lives in the LIBRARY half (`src/io.rs`). The binary
+// keeps `read_records`, `emit`, `write_private` and every `refuse_*` -- the
+// acts and the announcements -- and consumes the decisions from here.
+use mnemonic_engrave::io::observation::PayloadKind;
+use mnemonic_engrave::io::{no_records_guard, split_record_stream, write_block, WriteBlock};
+
 /// Write `bytes` to `path`, creating/truncating it with owner-only permissions.
 ///
 /// F10 (D5-2): NDEF and manifest artifacts embed/depict md1/mk1 material, so on a
@@ -875,125 +1097,36 @@ fn write_private(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
     f.write_all(bytes)
 }
 
-/// Is this process's stdout a REGULAR FILE that others can read?
+/// **`me`'s POLICY, over `io::fd`'s MECHANISM — and the mask is the whole of
+/// the split.**
 ///
-/// F-244. `me sysw pack ... > payload.bin` hands the container to a file `me`
-/// never names -- but a process can `fstat` its own stdout, so the mode is
-/// visible even when the path is not.
+/// `io::fd::stdout_mode` hands back the raw `mode & 0o777` of a regular-file
+/// stdout, or `None` for a character device or a failed `fstat`. Deciding that
+/// `0o044` — read for group or other — is what disqualifies a destination is
+/// **`me`'s ruling and nobody else's**: `mt` rules `0o077`, refusing a
+/// group-WRITABLE destination too, because someone who can write the file can
+/// alter the strings before they are cut into metal.
 ///
-/// **KEYED ON MODE BITS, NOT ON `S_ISREG`** — R0 round 0, finding I3. The first
-/// version of this asked `is_file()`, and this comment claimed a FIFO "has no
-/// meaningful mode". **Measured false:** a NAMED fifo carries a mode (`mkfifo`
-/// gives 0666) and a third party reading it really does receive the bytes. Only
-/// the ANONYMOUS pipe behind `|` is 0600, which the mode test passes on its own.
-///
-/// **CHARACTER DEVICES ARE EXEMPT, and that exemption is load-bearing:**
-/// `/dev/null` is mode **0666**, so a mode-only check would refuse
-/// `me … > /dev/null` — one of the most ordinary things anyone does with a CLI.
-/// A terminal and `/dev/null` persist nothing, so neither can leak. There are
-/// tests for the FIFO, for `/dev/null`, and for the anonymous pipe.
-#[cfg(unix)]
+/// That disagreement is deliberate and P0 does not settle it. Keeping the mask
+/// **here** is what stops it being settled by accident: a `0o044` published as
+/// shared *mechanism* would let a later phase delete `mt`'s stricter refusal
+/// while citing a real uniformity ruling — silent reconciliation in favour of
+/// the weaker rule, on the path where the artifact is cut into metal.
 fn stdout_world_readable_mode() -> Option<u32> {
-    use std::mem::ManuallyDrop;
-    use std::os::unix::fs::{FileTypeExt, PermissionsExt};
-    use std::os::unix::io::FromRawFd;
-    // ManuallyDrop: fd 1 belongs to the process, and dropping the File would
-    // CLOSE stdout out from under everything downstream.
-    let f = unsafe { ManuallyDrop::new(std::fs::File::from_raw_fd(1)) };
-    match f.metadata() {
-        Ok(md) => {
-            if md.file_type().is_char_device() {
-                return None;
-            }
-            let mode = md.permissions().mode() & 0o777;
-            // F-252: the MODE is returned, not just a verdict, so the refusal
-            // can quote the number it measured instead of asserting a
-            // reachability fact it never established.
-            (mode & 0o044 != 0).then_some(mode)
-        }
-        // Unreadable stdout is not evidence of exposure; fail OPEN rather than
-        // refusing a write for a reason we cannot state.
-        Err(_) => None,
-    }
-}
-
-#[cfg(not(unix))]
-fn stdout_world_readable_mode() -> Option<u32> {
-    None
-}
-
-/// The refusal F-244 asks for, with the override it names.
-/// Where a container's bytes are going — F-253.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Destination {
-    /// `--out`: `me` creates the file itself, owner-only.
-    File,
-    /// A pipe or a redirect. The ruled pipeline lives here.
-    Stream,
-    /// A terminal. **Not a destination for a bearer container.**
-    Terminal,
-}
-
-/// Decide where stdout is pointing, as a pure function of the two facts that
-/// matter — so it is testable without a pty, which no dev-dependency here can
-/// give us. `emit` supplies `std::io::IsTerminal`.
-fn destination(out_given: bool, stdout_is_tty: bool) -> Destination {
-    if out_given {
-        Destination::File
-    } else if stdout_is_tty {
-        Destination::Terminal
-    } else {
-        Destination::Stream
-    }
-}
-
-/// Why a write cannot proceed — **the single decision**, so the early check and
-/// `emit`'s cannot drift apart.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum WriteBlock {
-    /// Nothing in the way.
-    None,
-    /// stdout is a terminal (F-253).
-    Terminal,
-    /// stdout is a file whose mode grants group/other read (F-252), carrying
-    /// the mode so the refusal can quote what it measured.
-    WorldReadable(u32),
-}
-
-/// **F-246 binds every gate, including ones added later.** The rule is that no
-/// line describing a container may print until every gate that can abort the
-/// write has run — so both gates are decided here, once, and consulted at the
-/// top of `pack` as well as inside `emit`.
-///
-/// Terminal is checked FIRST because the mode check structurally cannot see it:
-/// a TTY is a character device, and those are exempt there (that exemption is
-/// load-bearing for `/dev/null`, mode 0666).
-fn write_block(
-    out_given: bool,
-    allow_world_readable: bool,
-    stdout_is_tty: bool,
-    world_readable_mode: Option<u32>,
-) -> WriteBlock {
-    match destination(out_given, stdout_is_tty) {
-        // `--out`: `me` creates the file 0600 itself, so neither gate applies.
-        Destination::File => WriteBlock::None,
-        // `--allow-world-readable` does NOT override this. It says "this file's
-        // permissions are my problem"; it is not a request to paint a bearer
-        // container across a scrollback, and the message offers a file route.
-        Destination::Terminal => WriteBlock::Terminal,
-        Destination::Stream => match world_readable_mode {
-            Some(mode) if !allow_world_readable => WriteBlock::WorldReadable(mode),
-            _ => WriteBlock::None,
-        },
-    }
+    mnemonic_engrave::io::fd::stdout_mode().filter(|mode| mode & 0o044 != 0)
 }
 
 /// Report a [`WriteBlock`] and yield the exit code, or `None` to proceed.
 fn refuse_write_block(b: WriteBlock, len: usize) -> Option<i32> {
     match b {
         WriteBlock::None => None,
-        WriteBlock::Terminal => {
-            refuse_terminal_destination(len);
+        // F-259: the KIND is forwarded, not discarded. Matching this as
+        // `Terminal(_)` and hard-coding the wording is the exact edit that
+        // re-created the defect under a clean build, clean clippy and a green
+        // suite -- so `tests/terminal_destination.rs` asserts the emitted
+        // WORDS, which is the only thing that noticed.
+        WriteBlock::Terminal(kind) => {
+            refuse_terminal_destination(len, kind);
             Some(EXIT_USAGE)
         }
         WriteBlock::WorldReadable(mode) => {
@@ -1023,7 +1156,7 @@ fn refuse_write_block(b: WriteBlock, len: usize) -> Option<i32> {
 /// 2026-08-25: picotool sizes its input with `fstat`, a pipe reports `st_size`
 /// 0, and `picotool load /dev/stdin` therefore exits **0 having written
 /// nothing** — a silent no-op on a flashing operation. The file is the route.
-fn refuse_terminal_destination(len: usize) {
+fn refuse_terminal_destination(len: usize, kind: PayloadKind) {
     use mnemonic_engrave::sysw::wire::{REGION_ADDR, REGION_LEN};
     // 0 means "not built, and never will be" -- the early gate refuses before
     // the container exists. Naming a size there would be inventing one.
@@ -1032,6 +1165,15 @@ fn refuse_terminal_destination(len: usize) {
     } else {
         format!("{len} bytes of ")
     };
+    // F-259. The refusal is the same and so is its code; only the CLAIM about
+    // the operator's data is derived rather than asserted. A fill image is
+    // still refused -- 64 KB of binary in a scrollback is worth refusing
+    // whatever the secrecy -- but it is not bearer, and saying so taught
+    // operators that the label means nothing.
+    if kind == PayloadKind::CarriesNoSecret {
+        refuse_terminal_fill_image(len);
+        return;
+    }
     eprintln!(
         "me: stdout is a TERMINAL, and this payload is BEARER.\n\
          \n\
@@ -1050,6 +1192,65 @@ fn refuse_terminal_destination(len: usize) {
          \n\
          Do NOT pipe into picotool: it sizes its input with fstat, a pipe \
          reports 0 bytes, and the load exits 0 having written nothing.",
+        REGION_ADDR as usize + REGION_LEN
+    );
+}
+
+/// F-259's half of the terminal refusal: a fill image is refused for what it
+/// WOULD DO to the scrollback, and **nothing is claimed about what it holds.**
+///
+/// **Wording and exit digit are an architect consult's, folded verbatim** —
+/// `design/agent-reports/CONSULT-P0-row4-f259-refusal.md`. Its three
+/// load-bearing facts were machine-checked before folding: `--fill` really does
+/// default to `random` (`default_value = "random"`), `REGION_ADDR` is
+/// `0x10D0_0000` and `REGION_LEN` is `65_536`.
+///
+/// **The digit stays 2.** `me`'s vocabulary discriminates by the operator's
+/// next move, and 2 means *fix the command line* — which is exactly this
+/// remedy, one flag away. 3 would promise *this tool will never do that*, and
+/// that is false: `--out` is the sanctioned path to the same bytes. Forking the
+/// digit by payload kind would also assign the LESS sensitive payload the MORE
+/// severe code while the bearer arm stays at 2 for the identical condition.
+///
+/// **Every sentence is derived from something observed:**
+/// - *"a WIPE image, not a secret"* affirms the true classification instead of
+///   asserting the false one, which is the whole of F-259's ruling.
+/// - The byte count and the destination are both measured.
+/// - **`--fill ...` names no value**, because the fill defaults to `random` and
+///   this function is downstream of the single write decision, so it does not
+///   know which was asked for. Hard-coding `--fill zeros` would state a false
+///   command for two of the three invocations — F-260's exact shape, one line
+///   over. `wipe.bin` rather than `payload.bin` keeps a fill image from ever
+///   shadowing a real payload file.
+/// - **"terminal sessions are often logged" is DROPPED, not rephrased.**
+///   Logging is a secrecy rationale; keeping it for a no-secret image would be
+///   the same rule-name vestige F-259 exists to remove.
+/// - The erase route earns its place: 0xFF is the erased state of NOR flash, so
+///   `picotool erase` genuinely accomplishes the wipe with no image at all. The
+///   pipe warning stays because its false-success shape is WORST on a
+///   destruction op — a load that exits 0 having written nothing leaves the
+///   operator believing a payload destroyed that is still in flash.
+fn refuse_terminal_fill_image(len: usize) {
+    use mnemonic_engrave::sysw::wire::{REGION_ADDR, REGION_LEN};
+    eprintln!(
+        "me: stdout is a TERMINAL, and this payload is a WIPE image, not a \
+         secret.\n\
+         \n\
+         Writing it here would paint {len} bytes of raw binary across your \
+         scrollback. Nothing was written.\n\
+         \n\
+         Give it a file, then flash that file:\n\
+         \n\
+           me sysw wipe --fill ... --out wipe.bin\n\
+           picotool load --verify wipe.bin -t bin -o 0x{REGION_ADDR:08X}\n\
+         \n\
+         with the machine in BOOTSEL. Or wipe with no image at all:\n\
+         \n\
+           picotool erase -r 0x{REGION_ADDR:08X} 0x{:08X}\n\
+         \n\
+         Do NOT pipe into picotool: it sizes its input with fstat, a pipe \
+         reports 0 bytes, and the load exits 0 having written nothing -- a \
+         wipe that wiped nothing.",
         REGION_ADDR as usize + REGION_LEN
     );
 }
@@ -1112,6 +1313,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             no_passphrase,
             allow_weak,
             allow_unsigned_inputs,
+            expect,
             allow_world_readable,
             allow_argv_secret,
             iterations,
@@ -1141,6 +1343,37 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             };
             if *allow_unsigned_inputs {
                 report_unsigned_overrides(&recs);
+            }
+
+            // §6g — `--expect`, and it runs HERE for F-246's reason: before the
+            // passphrase ceremony, so an operator is never told to write down
+            // twelve words that protect an artifact this refusal then declines
+            // to build.
+            //
+            // It takes `admission`, and that parameter is the whole of probe
+            // C-2: built without it, `--allow-unsigned-inputs --expect
+            // transaction` refused at exit 4 saying NO record of that kind is in
+            // the stream -- for a record the SAME invocation packs at exit 0
+            // without `--expect`. A false refusal carrying a false message, on
+            // the funds path, inside the feature added to prevent exactly that.
+            if let Some(spec) = expect {
+                let kinds = match sysw::expect::parse_kinds(spec) {
+                    Ok(k) => k,
+                    Err(e) => {
+                        // A flag VALUE out of range is USAGE, not invalid: no
+                        // input has been read at the point it is caught, so
+                        // there is nothing yet for "invalid" to be about.
+                        eprintln!("me: {e}");
+                        return EXIT_USAGE;
+                    }
+                };
+                let unmet = sysw::expect::check(&recs, &kinds, admission);
+                if !unmet.is_empty() {
+                    for u in &unmet {
+                        eprintln!("me: {}", sysw::expect::describe(u));
+                    }
+                    return EXIT_INVALID;
+                }
             }
 
             // F-246 — ADMISSION BEFORE THE CEREMONY.
@@ -1199,6 +1432,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 if let Some(code) = refuse_write_block(
                     write_block(
                         out.is_some(),
+                        PayloadKind::Bearer,
                         *allow_world_readable,
                         std::io::stdout().is_terminal(),
                         stdout_world_readable_mode(),
@@ -1355,9 +1589,9 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     blob.len(),
                     sysw::wire::REGION_ADDR
                 );
-                return emit(&img, out.as_ref(), *allow_world_readable);
+                return emit(&img, out.as_ref(), PayloadKind::Bearer, *allow_world_readable);
             }
-            emit(&blob, out.as_ref(), *allow_world_readable)
+            emit(&blob, out.as_ref(), PayloadKind::Bearer, *allow_world_readable)
         }
 
         SyswCmd::Wipe { out, fill } => {
@@ -1376,17 +1610,25 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                      indistinguishable from one that was never written"
                 );
             }
-            // NOT GATED, and deliberately. `emit` is shared, so F-244's guard
-            // reached `wipe` too -- and a wipe image is 65,536 bytes of
-            // random/zeros/ones with NOTHING in it. Its purpose is to DESTROY a
-            // payload, so it is the opposite of bearer: refusing it buys no
-            // safety and costs the operator a working command. Caught by asking
-            // what else the new guard would catch; there is a test.
-            const WIPE_IMAGE_CARRIES_NO_SECRET: bool = true;
+            // A wipe image is 65,536 bytes of random/zeros/ones with NOTHING
+            // in it. Its purpose is to DESTROY a payload, so it is the opposite
+            // of bearer, and the world-readable gate must not fire on it:
+            // refusing it buys no safety and costs the operator a working
+            // command. (Caught by asking what else F-244's new guard would
+            // catch; there is a test.)
+            //
+            // **F-259: that fact now travels as a KIND, not as `true` in the
+            // `allow_world_readable` seat.** Passing it there bought the right
+            // answer from the one gate that reads that parameter and a FALSE
+            // MESSAGE from the one that does not -- the terminal arm, which
+            // called a zeros image BEARER. The flag's own value is `false`
+            // here because `sysw wipe` declares no such flag; nothing about
+            // this payload is the operator's permission problem.
             emit(
                 &sysw::overwrite::region_image(f),
                 out.as_ref(),
-                WIPE_IMAGE_CARRIES_NO_SECRET,
+                PayloadKind::CarriesNoSecret,
+                false,
             )
         }
 
@@ -1860,62 +2102,6 @@ fn report_strength(passphrase: Option<&str>, records: &[String]) {
     }
 }
 
-/// Split a newline-separated record stream. Blank lines are skipped, so a
-/// record's index is its position among the NON-blank lines and not its line
-/// number — the `--in` contract, applied to stdin too so the two channels
-/// cannot disagree about what record 3 is.
-fn split_record_stream(raw: &str) -> Vec<String> {
-    raw.lines()
-        .map(str::to_owned)
-        .filter(|l| !l.trim().is_empty())
-        .collect()
-}
-
-/// Where `me sysw pack` takes its records from, in precedence order:
-/// `--in`, then argv, then **stdin** (G-P3.4 / SPEC §1.1).
-///
-/// stdin is LAST rather than first so no existing invocation changes meaning,
-/// and it exists at all because the ruled pipeline is
-/// R7, for EVERY channel that can arrive empty — **not just stdin**.
-///
-/// An empty input is refused rather than packed, because a container built
-/// from nothing is a SILENT SUCCESS: 52 bytes of header, exit 0, and a file
-/// the operator can flash. The device then offers nothing, which is the same
-/// shape as P3's F1 reached from the host side.
-///
-/// **It was implemented on stdin alone, and `--in` bypassed it.** R7's own
-/// reason is why that mattered: `fish` reports a pipeline's status as the LAST
-/// command's, so a failed upstream arrives as nothing at all — and a failed
-/// upstream also leaves a **0-byte file**. `mt encode --qr > rec.txt`
-/// fails exactly that way on an operator's first try, because §8.2h refuses a
-/// world-readable stdout and `>` creates 0644 under the usual umask. The
-/// stdin half exited 2 and the `--in` half exited 0 for the same situation.
-///
-/// The message NAMES THE FILE when there is one: "pass them with --in" is
-/// advice to do the thing they just did.
-fn no_records_guard(
-    recs: Vec<String>,
-    from: Option<&std::path::Path>,
-) -> Result<Vec<String>, (String, i32)> {
-    if !recs.is_empty() {
-        return Ok(recs);
-    }
-    let what = match from {
-        Some(p) => format!("no records in {}", p.display()),
-        None => "no records on stdin".to_string(),
-    };
-    Err((
-        format!(
-            "{what}: pass them on argv, with --in, or on stdin.\n      \
-             An EMPTY input is what a FAILED upstream command leaves behind -- \
-             `mt encode --qr > rec.txt` writes nothing when it refuses \
-             -- so it is refused here rather than packed into a container that \
-             holds nothing and still flashes."
-        ),
-        EXIT_USAGE,
-    ))
-}
-
 /// `mt encode … | me sysw pack …` — a join an early draft claimed already
 /// worked and which measurably did not.
 fn read_records(
@@ -1927,7 +2113,7 @@ fn read_records(
         let raw = std::fs::read_to_string(p)
             .map_err(|e| (format!("{}: {e}", p.display()), EXIT_USAGE))?;
         // R7, and it applies to THIS channel too -- see `no_records`.
-        return no_records_guard(split_record_stream(&raw), Some(p));
+        return no_records_guard(split_record_stream(&raw), Some(p)).map_err(|e| (e, EXIT_USAGE));
     }
     if !argv.is_empty() {
         // R2 / G-P3.5. THIS RUNS BEFORE ANYTHING ELSE `pack` DOES, and that is
@@ -1949,7 +2135,15 @@ fn read_records(
         // for a formatting one. Neither message may name the body.
         for (i, r) in argv.iter().enumerate() {
             use mnemonic_engrave::sysw::record::Class;
-            let trimmed = r.trim_start().to_ascii_lowercase();
+            // F-270: TRIM AND CASE-FOLD, and feed the result to BOTH arms.
+            // This used to be `trim_start` only, and only the `tx:` prefix arm
+            // consumed it -- `classify` received the RAW token -- so the
+            // near-miss protection this gate's own comment describes existed
+            // for one class of five. Measured: an uppercase `MS1…` was refused
+            // as "not a form this container can place" at rc 4 rather than as
+            // SECRET key material at rc 3, pointing the operator at
+            // `sysw::classify` instead of at purging their history.
+            let trimmed = r.trim().to_ascii_lowercase();
 
             // The `tx:` PREFIX check stays, and stays FIRST, for the reason
             // above: a near-miss like ` TX:<hex>` is refused here for the
@@ -1975,7 +2169,7 @@ fn read_records(
             // Keyed on the CLASS, not on a list of prefixes, so a class added
             // later is covered by `is_argv_forbidden` rather than by whoever
             // remembers to extend a match arm here.
-            let class = mnemonic_engrave::sysw::classify(r);
+            let class = mnemonic_engrave::sysw::classify(&trimmed);
             if by_prefix || class.is_argv_forbidden() {
                 // NAME THE CLASS, NEVER THE BODY. Printing it back would put the
                 // material in a SECOND public place -- the defect this refusal
@@ -1992,6 +2186,11 @@ fn read_records(
                     // there is worse than no advice.
                     "    ms encode --phrase - < seed.txt | me sysw pack --out p.bin"
                 };
+                // F-264: the purge recipes are BUILT, not spelled inline, so a
+                // test can run the emitted one rather than a copy of it -- and
+                // so `history -d` can be NAMED in the warning while appearing
+                // in no recipe. See `io::remedy`.
+                let purge = mnemonic_engrave::io::remedy::history_purge_block("me sysw pack");
                 let (what, why) = if by_prefix || class == Class::Tx {
                     ("a `tx:` record", "A raw signed transaction is a BEARER instrument -- anyone who can read it can broadcast it")
                 } else if class == Class::Mt {
@@ -2008,15 +2207,7 @@ fn read_records(
                          Use a private channel instead:\n      \
                          {example}\n      \
                          \x20   me sysw pack --in records.txt --out p.bin\n\n      \
-                         TO PURGE WHAT ALREADY LEAKED -- match on the COMMAND, \
-                         never on the secret, or you type it into history a \
-                         second time:\n      \
-                         \x20   bash/zsh:  sed -i '/me sysw pack/d' \"$HISTFILE\"\n      \
-                         \x20   fish:      history delete --prefix 'me sysw pack'\n      \
-                         \x20   and `shred -u` any file you pasted it from.\n      \
-                         (On zsh, `history -d` does NOT delete -- -d prints \
-                         timestamps. It would report success and purge \
-                         nothing.)\n      \
+                         {purge}\n      \
                          If argv is safe where you are -- a single-user \
                          air-gapped box, an amnesic Tails session -- \
                          --allow-argv-secret proceeds."
@@ -2027,8 +2218,70 @@ fn read_records(
                 ));
             }
         }
+        // §6b — `-` MEANS STDIN, AND IT IS IMPLEMENTED RATHER THAN MERELY
+        // ACCEPTED. §6b's wording is permissive enough that an implementation
+        // could take the flag and do nothing with it, and the compliant
+        // implementation is then SILENTLY LOSSY: `… | me sysw pack --out b.bin
+        // - text:6869` packed ONE record instead of two, at exit 0, on the
+        // artifact that gets cut into metal. (Measured before this: exit 4,
+        // nothing written -- `-` was read as a record and refused as
+        // unclassifiable.)
+        //
+        // `sysw pack` is the ONLY surface that gains anything, because it is
+        // the only one with a positional RECORD list. `me` and `bundle`
+        // already default to stdin with no positional at all, `sysw show`'s
+        // positional is a container FILE path, and `sysw wipe` has no
+        // positional -- so `-` stays a clap or ENOENT error on all four, and
+        // that is asserted rather than assumed.
+        let dashes = argv.iter().filter(|r| r.as_str() == "-").count();
+        if dashes > 1 {
+            return Err((
+                format!(
+                    "`-` appears {dashes} times, and stdin can only be read once.\n      \
+                     Pass it once, or put the records in a file and use --in."
+                ),
+                EXIT_USAGE,
+            ));
+        }
+        if dashes == 1 {
+            let from_stdin = read_stdin_records()?;
+            // R7 again, and for the same reason: the operator ASKED for stdin,
+            // so nothing arriving there is the failed-upstream signal, not an
+            // instruction to pack the rest. Splicing zero records at exit 0
+            // would build a container missing exactly what the pipeline was
+            // supposed to supply.
+            if from_stdin.is_empty() {
+                return Err((
+                    no_records_guard(from_stdin, None).unwrap_err(),
+                    EXIT_USAGE,
+                ));
+            }
+            // Spliced IN PLACE. A record's position is the operator's, and
+            // appending stdin at the end would silently reorder the container
+            // relative to the command they typed.
+            let mut out = Vec::with_capacity(argv.len() + from_stdin.len() - 1);
+            for r in argv {
+                if r == "-" {
+                    out.extend(from_stdin.iter().cloned());
+                } else {
+                    out.push(r.clone());
+                }
+            }
+            return Ok(out);
+        }
         return Ok(argv.to_vec());
     }
+    // R7 for the stdin channel, through the same guard `--in` uses.
+    no_records_guard(read_stdin_records()?, None).map_err(|e| (e, EXIT_USAGE))
+}
+
+/// Read the record stream from stdin, unguarded.
+///
+/// Extracted so the `-` splice and the no-argv default read stdin THE SAME WAY
+/// — same tty note, same error, same splitting. Two readers of one channel is
+/// how `--in` and stdin came to disagree about an empty input in the first
+/// place.
+fn read_stdin_records() -> Result<Vec<String>, (String, i32)> {
     // A TTY here is the "looks like a hang" case: an operator who typed
     // `me sysw pack` and pressed Enter with nothing piped in otherwise sees a
     // blank line forever. Say what is being waited for, on stderr, before
@@ -2046,11 +2299,21 @@ fn read_records(
     std::io::stdin()
         .read_to_string(&mut raw)
         .map_err(|e| (format!("stdin: {e}"), EXIT_USAGE))?;
-    // R7 for the stdin channel, through the same guard `--in` uses.
-    no_records_guard(split_record_stream(&raw), None)
+    Ok(split_record_stream(&raw))
 }
 
-fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>, allow_world_readable: bool) -> i32 {
+/// **`kind` is its own parameter, and F-259 is why.** It used to travel in the
+/// `allow_world_readable` seat: `wipe` passed `WIPE_IMAGE_CARRIES_NO_SECRET:
+/// bool = true` there, meaning "this holds nothing", while the flag means "this
+/// file's permissions are my problem". The mode gate consulted it and behaved;
+/// the terminal gate never looks at that parameter, so it refused a zeros image
+/// as BEARER. **One `bool` that two callers read differently.**
+fn emit(
+    bytes: &[u8],
+    out: Option<&std::path::PathBuf>,
+    kind: PayloadKind,
+    allow_world_readable: bool,
+) -> i32 {
     use std::io::{IsTerminal, Write};
     // F-244: this used to be `std::fs::write`, which creates at 0o666 & ~umask
     // -- so an UNSEALED container holding a BIP-39 mnemonic landed at 0644 while
@@ -2069,6 +2332,7 @@ fn emit(bytes: &[u8], out: Option<&std::path::PathBuf>, allow_world_readable: bo
     if let Some(code) = refuse_write_block(
         write_block(
             out.is_some(),
+            kind,
             allow_world_readable,
             std::io::stdout().is_terminal(),
             stdout_world_readable_mode(),
@@ -2162,7 +2426,10 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{destination, is_plate_artifact, write_block, Destination, WriteBlock};
+    use super::{is_plate_artifact, write_block, PayloadKind, WriteBlock};
+    // `destination` and `Destination` are the library half's now, and only
+    // this test module consults them directly.
+    use mnemonic_engrave::io::{destination, Destination};
 
     // A1/F8: is_plate_artifact must match the tool's own plate names and the
     // `plate-.svg` edge (a plate-artifact form), but never over-match near-misses.
@@ -2194,33 +2461,127 @@ mod tests {
         assert_eq!(destination(false, false), Destination::Stream);
     }
 
+    /// **F-270 — the post-parse argv gate normalises for EVERY class, not just
+    /// for its `tx:` prefix arm.**
+    ///
+    /// It built a normalised copy of each record and fed it ONLY to the prefix
+    /// check; `classify` received the RAW token, and `classify` itself neither
+    /// trims nor case-folds. So the near-miss protection the gate's own comment
+    /// describes — refuse *"for the BEARER reason rather than three screens
+    /// later for a formatting one"* — existed for one class of five. Measured
+    /// before the fix: an uppercase `MS1…` was refused as *not a form this
+    /// container can place* at **rc 4**, pointing the operator at
+    /// `sysw::classify` rather than at purging their history.
+    ///
+    /// **Asserted HERE, as a unit test, and that is deliberate.** P0's
+    /// pre-parser guard now refuses these shapes before `Cli::parse()`, so no
+    /// end-to-end invocation can reach this arm with a near-miss any more — an
+    /// integration test would be measuring the guard and calling it this. The
+    /// gate is defence in depth; it has to be tested where it is. Verified by
+    /// mutation: putting the RAW token back into `classify` turns this RED.
+    #[test]
+    fn the_post_parse_argv_gate_normalises_for_every_class() {
+        const MS1: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
+
+        for (what, rec) in [
+            ("canonical", MS1.to_string()),
+            ("UPPERCASE", MS1.to_uppercase()),
+            ("leading space", format!("  {MS1}")),
+            ("trailing space", format!("{MS1}  ")),
+        ] {
+            let (msg, code) = super::read_records(std::slice::from_ref(&rec), None, false)
+                .expect_err(&format!("{what} must be refused"));
+            assert_eq!(
+                code,
+                super::EXIT_REFUSED,
+                "{what}: a POLICY refusal (3), not an invalid-input one (4) --                  the record is understood and this tool will never take it here"
+            );
+            assert!(
+                msg.contains("SECRET key material"),
+                "{what}: refused for the right reason, not a formatting one: {msg}"
+            );
+            assert!(
+                !msg.contains(&rec.trim()[..24]),
+                "{what}: the body must never be echoed back: {msg}"
+            );
+        }
+
+        // The control: a record that is genuinely nothing is NOT refused here.
+        // Without it, `Err` for every input would satisfy the loop above.
+        assert!(
+            super::read_records(&["text:6869".to_string()], None, false).is_ok(),
+            "a legitimate text: record must pass this gate"
+        );
+    }
+
     /// The COMBINED decision, exhaustively — both gates live here so the early
     /// F-246 check and `emit`'s cannot drift apart, and drift is exactly what
     /// this table pins.
     #[test]
     fn write_block_decides_both_gates_once() {
+        use PayloadKind::{Bearer, CarriesNoSecret};
         use WriteBlock as W;
+
         // --out: me creates the file 0600, so NEITHER gate applies -- not even
         // with a world-readable stdout behind it, which is the whole point of
         // recommending --out as the remedy.
-        assert_eq!(write_block(true, false, true, Some(0o644)), W::None);
-        assert_eq!(write_block(true, false, false, Some(0o644)), W::None);
+        assert_eq!(write_block(true, Bearer, false, true, Some(0o644)), W::None);
+        assert_eq!(
+            write_block(true, Bearer, false, false, Some(0o644)),
+            W::None
+        );
 
         // A terminal is refused, and --allow-world-readable does NOT buy past
         // it: that flag is about a FILE's permissions.
-        assert_eq!(write_block(false, false, true, None), W::Terminal);
-        assert_eq!(write_block(false, true, true, None), W::Terminal);
+        assert_eq!(
+            write_block(false, Bearer, false, true, None),
+            W::Terminal(Bearer)
+        );
+        assert_eq!(
+            write_block(false, Bearer, true, true, None),
+            W::Terminal(Bearer)
+        );
+
+        // ── F-259 — THE ROW THIS TEST USED TO BE MISSING ────────────────────
+        //
+        // The old version of this test asserted only the two rows above and
+        // argued, correctly, that the FLAG must not buy past a terminal. It
+        // never contemplated the second fact riding that same bool, so it read
+        // as deliberate while locking the defect in: `wipe` passed
+        // `WIPE_IMAGE_CARRIES_NO_SECRET: bool = true` in the flag's seat, this
+        // arm discarded it, and a 65,536-byte zeros image was refused as
+        // BEARER.
+        //
+        // A fill image is STILL refused at a terminal -- the refusal is about
+        // the scrollback, not about exposure -- but the decision now carries
+        // WHICH payload it refused, so the message can be derived from it.
+        assert_eq!(
+            write_block(false, CarriesNoSecret, false, true, None),
+            W::Terminal(CarriesNoSecret),
+            "the refusal stays; what changes is that the kind survives it"
+        );
 
         // A stream with a group/other-readable mode is refused, and the mode is
         // carried so the message can quote what it measured.
         assert_eq!(
-            write_block(false, false, false, Some(0o644)),
+            write_block(false, Bearer, false, false, Some(0o644)),
             W::WorldReadable(0o644)
         );
         // ...unless the operator overrode it. Here the flag DOES apply.
-        assert_eq!(write_block(false, true, false, Some(0o644)), W::None);
+        assert_eq!(
+            write_block(false, Bearer, true, false, Some(0o644)),
+            W::None
+        );
+        // ...or unless there is nothing to expose. This is the outcome `wipe`
+        // used to buy by passing `true` in the flag's seat -- same answer, now
+        // reached through the fact that actually justifies it, and reached
+        // WITHOUT claiming the operator waived anything.
+        assert_eq!(
+            write_block(false, CarriesNoSecret, false, false, Some(0o644)),
+            W::None
+        );
 
         // The ruled pipeline: a pipe, no mode concern. Must never be blocked.
-        assert_eq!(write_block(false, false, false, None), W::None);
+        assert_eq!(write_block(false, Bearer, false, false, None), W::None);
     }
 }

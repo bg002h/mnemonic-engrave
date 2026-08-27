@@ -1,0 +1,23 @@
+[package]
+name = "mnemonic-io-lib"
+version = "0.1.0"
+edition = "2021"
+description = "Shared IO and safety mechanism for the m-format constellation CLIs: destination classification, stdout mode measurement, record-stream shaping, refusal decisions and remedy text. Mechanism only -- it publishes no exit code and no disqualifying permission mask, because those are each binary's policy."
+license = "MIT OR Unlicense"
+repository = "https://github.com/bg002h/mnemonic-engrave"
+homepage = "https://github.com/bg002h/mnemonic-engrave"
+keywords = ["cli", "stdio", "permissions", "bitcoin"]
+categories = ["command-line-interface"]
+
+[lib]
+name = "mnemonic_io_lib"
+path = "src/lib.rs"
+
+# NO DEPENDENCIES, and that is a property worth keeping. The whole crate is
+# std: nothing here parses arguments, decodes a record, or decides an exit
+# code, so nothing here needs clap, a codec, or the constellation's own crates.
+# A dependency appearing in this table is a sign that policy has leaked in.
+[dependencies]
+
+[dev-dependencies]
+tempfile = "3"

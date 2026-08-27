@@ -4,6 +4,12 @@
 
 pub mod bundle;
 pub mod classify;
+/// Channel and destination IO — **now the `mnemonic-io-lib` crate**, re-exported
+/// under the name `me` already used it by so the seam is a dependency edge
+/// rather than a rename. Nothing in it may name a record `Class`: it is a
+/// dependency of this crate, so a `Class`-shaped item there is a cyclic package
+/// dependency, and an inherent `impl` on `Class` there is `error[E0116]`.
+pub use mnemonic_io_lib as io;
 pub mod manifest;
 pub mod ndef;
 pub mod preview;
