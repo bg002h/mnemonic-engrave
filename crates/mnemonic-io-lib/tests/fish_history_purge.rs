@@ -240,28 +240,50 @@ fn the_recipe_costs_the_whole_session_and_the_text_says_so() {
 /// **F-273's own finding, reproduced by an independent harness and kept.**
 ///
 /// `history delete --prefix` is the command an operator reaches for, and it is
-/// the reason fish shipped as prose. It prompts; the prompt lists the matching
-/// commands, **the secret among them**; and with nobody to answer, it purges
-/// nothing and never returns.
+/// the reason fish shipped as prose. **It purges nothing.** That is the whole
+/// finding, and it is what this test asserts.
 ///
-/// If this ever stops holding, fish's delete semantics changed and the recipe
-/// may be able to become a targeted one — re-measure before rewriting it.
+/// **It fails in two different ways, and the assertion deliberately covers
+/// both** — measured 2026-08-27 on two fish versions:
+///
+/// | fish | what `delete --prefix` does | secret afterwards |
+/// | --- | --- | --- |
+/// | 4.8.1 (this machine) | prompts, listing the matches **including the secret**, and never returns — killed at the harness timeout | still on disk |
+/// | 3.7.0 (ubuntu-noble, CI) | returns unattended, exit 0, no prompt | **still on disk** |
+///
+/// An earlier version of this test asserted the **hang**, and so it passed
+/// locally and went RED the first time CI ran it — not because the finding was
+/// wrong, but because the hang is a *mechanism* and the finding is *the secret
+/// survives*. Asserting the mechanism made the test version-specific and
+/// strictly weaker: it could not have caught the 3.7.0 behaviour at all, which
+/// is arguably the worse of the two. A command that hangs is visibly unfinished;
+/// one that returns 0 having done nothing looks exactly like success, and that
+/// is the shape this whole module exists to warn about.
+///
+/// **If this test ever fails, fish has started actually deleting** — and only
+/// then may the recipe become a targeted one. Re-measure before rewriting it.
 #[test]
-fn history_delete_prefix_hangs_and_purges_nothing() {
+fn history_delete_prefix_purges_nothing_however_it_fails() {
     let s = fish_session(Some(&format!("history delete --prefix '{COMMAND}'")));
     assert!(
-        s.timed_out,
-        "`history delete --prefix` returned on its own. It is supposed to be waiting \
-         at a prompt -- if it now completes unattended, re-measure whether it also \
-         DELETES before treating this as good news. fish_history was:\n{}",
+        s.history.contains(SECRET),
+        "`history delete --prefix` DELETED the entry. That is a behaviour change \
+         in fish, not a broken test: every version measured leaves the secret \
+         exactly where it was, whether it hangs at a prompt (4.8.1) or returns \
+         unattended at exit 0 (3.7.0). Re-measure both modes before making the \
+         emitted recipe a targeted delete. fish_history was:\n{}",
         s.history
     );
-    assert!(
-        s.history.contains(SECRET),
-        "the entry must still be on disk: the finding is that this command reports \
-         nothing, purges nothing, and leaves the secret exactly where it was. \
-         fish_history was:\n{}",
-        s.history
+    // Which of the two failure modes this fish took is recorded rather than
+    // asserted -- both leave the secret, and pinning one of them is exactly the
+    // mistake that sent this test RED in CI while the finding was sound.
+    println!(
+        "delete --prefix mode: {}",
+        if s.timed_out {
+            "hung at a prompt, killed at the timeout (the 4.8.1 shape)"
+        } else {
+            "returned unattended, purging nothing (the 3.7.0 shape)"
+        }
     );
 }
 
