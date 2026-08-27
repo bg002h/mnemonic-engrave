@@ -47,10 +47,13 @@ half:**
 | `stdout_world_readable_mode` | 25 | | |
 | `write_block` | 21 | | |
 
-**`read_records` IS THE SECOND SPLIT (probe C-2).** §3's table keeps its
-class-keyed arm in `me` — and that arm is **80 of its 131 lines, 61%**. Calling
-it a move understates the work by more than half, and an earlier draft of this
-section stated flatly that exactly one of the 11 was a split.
+**`read_records` STAYS WHOLE IN `me` — it is not a split, and an earlier draft
+saying so was what made "one signature change" arithmetically false (round-2
+C-2).** Its three `EXIT_*` references sit at `main.rs` lines **1928, 2026 and
+2048**, while the class-keyed arm §3 would have kept runs roughly **1932–2030**
+— so **two of the three fall OUTSIDE it**. Split it and the moving set carries
+three references, not one, and Variant B collapses. Keep it whole and the moving
+set carries exactly one. **The simpler reading is also the correct one.**
 
 **And the closure is larger than the six.** Those six call **five more**
 `main.rs`-local functions. Each must move or the extraction does not compile:
@@ -69,7 +72,7 @@ per-function figures above reproduce under no rule I can state
 column as indicative and the 461 as measured**; the probe's `git diff --stat`
 is the number that was observed rather than computed.
 
-**TWO OF THE 11 ARE SPLITS, NOT MOVES.** The first is the whole of C1.
+**EXACTLY ONE OF THE MOVING SET IS A SPLIT, and it is the whole of C1.**
 `stdout_world_readable_mode` is not mechanism. It applies **`& 0o044` INSIDE the
 function** (`crates/me-cli/src/main.rs:912`) and returns `Option<u32>` — a
 verdict, not a measurement. Moving it intact would publish `me`'s mask as the
@@ -458,9 +461,11 @@ and P0's value is in the decisions. Moving them is P1's question, not P0's.
 
 **TYPES AND CONSTANTS ARE PART OF THE CLOSURE TOO (I5) — and the probe measured
 which.** An earlier draft guessed at this list, naming `Admission`, which has
-**zero references in the 464 moved lines**, and omitting **all seven symbols
-that actually cross**: `EXIT_OK`, `EXIT_USAGE`, `EXIT_REFUSED`, `WriteBlock`,
-`Destination`, and the two enums travelling with them. **Guessing at a closure
+**zero references in the 464 moved lines**, and omitting **the symbols that actually cross**. That list was measured against the
+**rejected 464-line move** and named `EXIT_OK`/`EXIT_USAGE`/`EXIT_REFUSED` as
+crossing — **under Variant B they do NOT cross**, and citing them here pointed
+the implementer straight at the forbidden publish (round-2 I-1). Step 2
+enumerates the real set against the five-function move, in both directions. **Guessing at a closure
 is what step 1 exists to replace.** **Step 1 must enumerate every type and
 constant the 11 reference and confirm each is either moved or **reachable
 WITHOUT an inherent impl in the crate** — "already public" is NOT sufficient
@@ -493,16 +498,17 @@ Each step is RED first. No step begins until the previous is green.
 
 | # | step | the test that must fail first |
 | --- | --- | --- |
-| 1 | move the 11 into `me`'s lib half **intact — including the mask**, no behaviour change | **388 RUN, 388 passed, 1 skipped** (the run count, not the 389 `#[test]` attributes — N1). **The move necessarily edits 2 of them**, which the gate's earlier wording did not allow for; enumerate the diff to those two and justify each. **PLUS a pty assertion pinning the terminal arm (I1)** — see below |
-| 2 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 regular file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` returns `None`; `me`'s end-to-end behaviour is **still** unchanged |
-| 3 | `observation.rs` — types | a payload kind cannot be constructed from a permission bool (**F-259 cannot recur**) |
-| 4 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it (see below); and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry |
-| 5 | `records.rs` layer 1 — **pre-parser** flag-name guard on raw argv | **`me` ships NO secret-bearing flag**, so the RED gate cannot be an end-to-end refusal in the donor. It is a unit test on the crate's flag-name table plus a lockstep parity assertion against `mnemonic-toolkit`'s `NodeType::is_argv_secret_bearing`, whose flags DO exist |
-| 5b | `records.rs` layer 2 — value-shape, additive | the argv gate refuses by class, with the override, **as unit tests** (§2.4); `me sysw pack --nosuchflag <ms1…>` still does not echo the secret |
-| 5c | `--expect <kinds>` — the flag and the vocabulary | `--expect descriptor,transaction` **refuses a stream with no transaction**, and **refuses an incomplete `md1` set** (§6g). Both fail today: the flag does not exist |
-| 6 | **`exit.rs` FIRST, then `channel.rs`** (probe I-3 — the step-1 ordering shape, one file over) | `--out` overwrites; **`-` is IMPLEMENTED — taking the flag and discarding its input is NOT compliance**; every code `me` produces today is reproduced **byte-for-byte**, differentially, not by matching §6f |
-| 7 | `me` consumes the crate | all 388 tests pass, **with the diff to them enumerated and each edit justified by a named finding** — the shape §7 P1 already uses for `mt` |
-| 8 | publish `0.1.0` | **irreversible — §5** |
+| 1 | **`no_records_guard` returns `Result<Vec<String>, String>`** — the ONE signature change (Variant B). Nothing moves yet. | `me`'s **388 RUN, 388 passed, 1 skipped**, unchanged in meaning; `grep -c 'EXIT_' ` inside `no_records_guard` goes **1 → 0** |
+| 2 | **Move the five + the stub** into `me`'s lib half: `destination`, `stdout_world_readable_mode` (+ its `cfg(not(unix))` twin), `split_record_stream`, `no_records_guard`, `write_block`. **`read_records`, `emit`, `write_private` and every `refuse_*` STAY.** | builds with **`grep -c 'pub const EXIT' main.rs` == 0** and **`grep -c 'EXIT_' <lib module>` == 0** — a published constant fails the step. Callers enumerated in BOTH directions (four live outside the closure) |
+| 3 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` → `None`; `me`'s behaviour still unchanged |
+| 4 | `observation.rs` — the payload-kind type **and its pty assertion** | **the assertion is the gate, not the type**: `script -qec 'me sysw wipe --fill zeros'` must NOT emit the word BEARER, asserted on the **emitted words**, pinning the **exit digit** (F-265: `!success()` cannot fail here). Mutation-checked in both directions |
+| 5 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it; and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry. **Blocked on F-264** — see §6 condition 5 |
+| 6 | `records.rs` layer 1 — **pre-parser** flag-name guard on raw argv, **AND `me`'s `--allow-argv-secret` moved off clap** | the override's own parse is decided **before `Cli::parse()`**, asserted end-to-end in the donor — not only as a crate unit test (round-1 N-I3). Toolkit parity against `NodeType::is_argv_secret_bearing` in addition, never instead |
+| 7 | `records.rs` layer 2 — value-shape, additive | the argv gate refuses by class, with the override, **as unit tests**; `me sysw pack --nosuchflag <ms1…>` still does not echo the secret |
+| 8 | `--expect <kinds>` — the flag and the vocabulary | `--expect descriptor,cosigner` **refuses an `md1`-only payload**; `--expect descriptor,transaction` refuses a stream with no transaction; **refuses an incomplete `md1` set AND an incomplete `mt1` set** (three walks, §6g); `--allow-unsigned-inputs --expect transaction` **does NOT falsely refuse** |
+| 9 | **`exit.rs` FIRST, then `channel.rs`** | `--out` overwrites; **`-` is IMPLEMENTED**; every code `me` produces today reproduced **byte-for-byte**, differentially against the pre-change binary — not by matching a table |
+| 10 | `me` consumes the crate | all 388 pass, **with the diff to them enumerated and each edit justified by a named finding** |
+| 11 | publish `0.1.0` | **irreversible — §5. Operator-gated; this plan does not authorise it.** |
 
 **STEP 1's GATE IS BLIND TO 5 OF 8 EXIT DECISIONS (probe C-2), AND THE PTY
 ASSERTION MUST PIN THE DIGIT.** A control run against the **unmodified** binary
@@ -695,7 +701,18 @@ before publishing; do not trust a check from an earlier session.
 8. **The guard AND the override's own parse are both decided before
    `Cli::parse()`**, asserted at least in the donor (C2). A guard that reaches
    its decision by parsing first has reintroduced the leak §6d exists to stop.
-9. An R0 round closing **0C/0I**.
+9. **F-264 fixed, because step 5's gate cannot pass otherwise.** `me`'s zsh
+   recipe removes nothing when run immediately — the entry is still in memory
+   and `sed -i` edits a file that does not contain it. **Step 5 demands the
+   recipe actually work**, so P0 either fixes the recipe (`fc -W`, edit, `fc -R`)
+   or changes the message to say the shell must be exited first. Both are
+   honest; the present text is not. Owning phase in `FOLLOWUPS.md` is already P0.
+10. **F-265 fixed for the moving set at minimum.** Five refusals can swap exit
+   **2 for 3** with all 388 tests green, proven against the unmodified binary.
+   P0 moves these functions, and **a refactor over an untested distinction is
+   how the distinction dies.** Every gate in §4 that asserts a refusal pins the
+   **digit**.
+11. An R0 round closing **0C/0I**.
 
 ---
 
