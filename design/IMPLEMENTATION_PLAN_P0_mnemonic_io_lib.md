@@ -447,13 +447,50 @@ necessarily commits **`pub const EXIT_USAGE: i32 = 2`** into the donor's public
 API: the exact thing §3 spends a page ruling out. **No ordering avoids it. It is
 a language rule, like N-C2.**
 
-**So step 1 and step 2 SWAP.** `refuse_write_block` returns the DECISION first
-— a 17-line change across 2 call sites, with nothing outside the 11 depending on
-the `i32` (measured by the probe) — and only then does the move happen, with no
-constant to publish. **Two rounds of reading did not find this; one execution
-did.**
+**A SECOND PROBE EXECUTED THE OBVIOUS FIX AND IT DOES NOT WORK. Recorded here
+rather than replaced, because the wrong answer is the useful part.**
 
-**Steps are ordered this way on purpose.** Step 1 moves
+The fix was to swap steps 1 and 2 — have `refuse_write_block` return a DECISION
+first, then move with no constant left to publish. **It rests on a premise that
+is false: `refuse_write_block` is not where the exit integers live.** Counted
+across the closure:
+
+| function | `EXIT_*` references |
+| --- | --- |
+| `read_records` | **3** |
+| `emit` | **2** |
+| `refuse_write_block` | **2** |
+| `no_records_guard` | **1** |
+| `write_block`, `destination` | 0 |
+
+**Eight references across FOUR of the 11.** Changing one function removes at
+most two — and the probe found one of those two lands straight back inside
+`emit`, itself one of the 11. The move then fails with **seven
+`E0425: cannot find value EXIT_*`**, and step 1 still ends with
+`pub const EXIT_USAGE: i32 = 2;` in the donor.
+
+The swap also **grows** the published surface: `WriteRefusal` cannot stay
+private while `refuse_write_block` is `pub`. And a mutation swapping the two
+decision variants left all 388 tests green — **the decision type is inert, and
+nothing tests it.**
+
+**SO THE ORDERING QUESTION IS OPEN, and this plan does not answer it.** What the
+evidence supports is that **exit-code production is a fourth split, not a step**:
+the four functions above each decide something and then name a number, and only
+the naming has to stay in `me`. That is the same shape as
+`stdout_world_readable_mode` (C1) and `read_records` (probe C-2) — three splits
+already, and this would make the pattern the rule rather than the exception.
+
+**That is a direction, not a ruling.** It has not been executed, and the last
+two orderings written here both looked sound and both failed under execution.
+**The next probe tests it before this plan asserts it.**
+
+**§4's TABLE IS THE ONLY ORDERING OF RECORD (probe C-2).** An earlier fold
+introduced a prose "step 2" that is not the table's step 2 — the table's is the
+`fd.rs` mask split — leaving three inconsistent orderings within a few lines.
+**Prose must not number steps.** Where the sequence matters, amend the table.
+
+**Steps are ordered as the table states, and the reason follows.** Step 1 moves
 `stdout_world_readable_mode` *with* its `& 0o044` so nothing changes; step 2
 then splits it, pushing the mask back to `me`'s call site. Behaviour is
 unchanged at **both** steps, and at no point does a masked function sit inside
