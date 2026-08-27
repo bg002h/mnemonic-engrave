@@ -11934,3 +11934,30 @@ before `classify`, which closes the argv path outright; the post-parse arm is
 in exactly the code P0 rewrites, so it gets the same one-line normalisation in
 passing. The cheapest moment to fix a gate is the phase already holding it
 open.
+
+### F-271 — `cargo publish mnemonic-io-lib 0.1.0` is AUTHORISED; the pre-flight is not yet run (owning phase: **P0 row 12**) `#irreversible` `#record`
+
+**Operator authorisation given 2026-08-27**, recorded here because a
+one-sentence approval in conversation is lost when that context ends, and this
+is the only irreversible action in the phase.
+
+**Held until rows 1–11 are green.** Not a second guess — a sequencing fact. A
+published version cannot be replaced, only yanked, and a yanked version stays
+downloadable to anyone pinning it exactly. **The name is consumed
+permanently.** §5a already says *published when P0 closes GREEN*, and row 12 is
+last in the table.
+
+**PRE-FLIGHT — every item runs immediately before, not from this record:**
+
+| check | why |
+| --- | --- |
+| `curl -A 'name-check' …/crates/serde` → **200** | proves the request is being answered; without `-A`, crates.io returns **403 for every name**, free or taken |
+| `…/mnemonic-io-lib` → **404** | and `mnemonic_io_lib` → **404**; crates.io treats `-` and `_` as colliding |
+| `cargo publish --dry-run` | packages and verifies without publishing |
+| **no `path` or `git` dependency** in the manifest | crates.io **refuses** git deps outright, and `me-cli` already carries one pinned to a rev — if the new crate inherits anything like it, the publish fails at the last gate |
+| working tree clean, all rows committed | `cargo publish` packages the tree, not the commit |
+| rows 1–11 green, 388+ tests passing | the plan's own condition |
+
+**A 404 is availability at a moment, not a reservation.** Nothing holds the
+name until the publish lands, so the check is re-run at the moment of
+publishing rather than trusted from here.
