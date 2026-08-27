@@ -58,7 +58,7 @@ Measured, all cells re-run during the fold:
 | `--json` | yes | yes | yes | yes |
 | `--in FILE` | — | `--keys FILE` only | — | **yes** |
 | `--out FILE` | — | — | — | — |
-| `-` for stdin | **`repair` only** | all 5 artifact verbs, and `--keys -` | 7 of 8 verbs — **not `combine`** | default, plus bare `-` |
+| `-` for stdin | **`repair` only** | all 5 artifact verbs, and `--keys -` | **documented** on 7 of 8; `combine` implements it UNDOCUMENTED | default, plus bare `-` |
 | `--group-size` default | **5** | **5** | **5** | **off** |
 | separator choices | space, hyphen, comma | space, hyphen, comma | space, hyphen, comma | whitespace only |
 | non-artifact lines on stdout | **`chunk-set-id:`, chunked output ONLY** | **none, ever** | none | none |
@@ -349,11 +349,19 @@ Measured stdout, per verb:
   `--keys -`; `ms` documents it on seven of eight, with `decode`, `verify`,
   `inspect` and `derive` reading stdin even when the positional is omitted;
   `md` documents it on `repair` alone. **So the real `-` gap is `md`'s four
-  other verbs and `ms combine`** — two targeted additions, not a constellation
+  other verbs** — one targeted addition plus a `combine` DOC fix, not a constellation
   rollout. `--in FILE` is the genuinely missing channel: only `mt` has it, and
   `mk` has `--keys FILE` for one flag.
 - `--out FILE` — write the artifact to a file, **created 0600 by `me`'s
   `write_private`**, never `std::fs::write` (F-244).
+- **`--out` OVERWRITES an existing file. RULED by the operator 2026-08-26**
+  (*"--out should overwrite files"*), and stated because the spec previously
+  said nothing about it while instructing P0 to lift `write_private` — which is
+  `.truncate(true)`. An implementer would have shipped the clobber either way;
+  **an unstated behaviour is one a later reader "fixes"**, and a refusal added
+  here would break every re-run of a pipeline. The consequence is accepted and
+  now on the record: running the same command twice destroys the first artifact,
+  and `me sysw pack --out payload.bin` is exactly such a command.
 - **stdout is used when `--out` is not given.** An earlier draft said *"when
   neither is given"* after a three-item list (M-5); the antecedent is `--out`
   alone, and the input channel has no bearing on where output goes.
@@ -466,7 +474,16 @@ lands correctly, and `me sysw pack`, which already implements the widened form:
   material. This is NORMATIVE, not an implementation note (C-4).**
 - **Never echo the argument.** Report the CLASS and the LENGTH, not the value.
 - Name the private channels: `--in FILE`, `-` for stdin.
-- Give the purge commands, per §6h.
+- Give the purge commands, per §6h. **The text comes from `me`, and `mt`'s is
+  SUPERSEDED — P1 replaces it, and it is a gate item rather than a courtesy.**
+  Measured 2026-08-26: `mt`'s `purge_command()` (`mt-cli/src/validate.rs:541`)
+  tells a zsh operator `history -d $HISTCMD && fc -W`, and **`history -d` does
+  not delete on zsh** (5.9.2: `-d` is a timestamp display flag) — it reports
+  success and purges nothing. Its fish branch says
+  `history delete --contains <tx>`, inviting the operator to type the bearer
+  material into history **a second time**. `me`'s text matches on the COMMAND
+  name and says outright that zsh's `history -d` is not a solution. **So §6h's
+  "from `mt`/`me`" is wrong as written**: from `mt` it ships the trap.
 - `--allow-argv-secret` proceeds. It is greppable in a script, so a reviewer can
   find it. **This is the name already shipped on `me sysw pack`.**
 
@@ -539,16 +556,30 @@ has **eight** verbs, and `ms1` strings and codex32 shares are seed-equivalent �
 | `inspect` | positional, or `-`, or omitted | add `--in`; argv refused |
 | `repair` | `--ms1`, accepting `-` | add `--in`; argv refused |
 | `split` | `--phrase` / `--hex`, each accepting `-` | add `--in`; argv refused |
-| `combine` | **positionals ONLY — no `--in`, no `-`** | `-` and `--in` FIRST, then refuse |
+| `combine` | `-` WORKS but is undocumented; no `--in` | document `-`, add `--in`, then refuse |
 | `derive` | positional, or `-`, or omitted | add `--in`; argv refused |
 
-**`ms combine` is the ordering constraint that makes P2 non-negotiable, and
-the fold narrowed it to exactly one verb.** Round 0's I-3 reads as though the
-private channel is missing across `ms`; measured, it is present on seven of
-eight verbs. **`combine` is the exception, and it is the worst possible one to
-have.** Refusing argv there before `-` and `--in` exist removes the **only** way
-to recombine split shares — the recovery path, the one that matters when
-everything else has failed. §7 P2 is ordered accordingly. Note also that
+**`ms combine`'s gap is DOCUMENTATION, not capability, and three earlier
+revisions of this paragraph got that backwards (plan-draft I-2, close-round
+I-1).** Each concluded from `ms combine --help` — which mentions stdin zero
+times — that the verb had no private channel, and built P2's "non-negotiable"
+ordering on it. **Measured instead of read:**
+
+```
+ms split --phrase <vector> -k 2 -n 3 --group-size 0 | head -2 > shares.txt
+ms combine - < shares.txt     -> exit 0, secret recovered
+```
+
+`-` is **documented** on 7 of 8 verbs and **implemented on all 8**. So refusing
+argv on `combine` removes nothing: the recovery path already exists, and an
+operator can use it today if they happen to try. What P2 owes there is a `--help`
+line and `--in`, not a channel.
+
+**The ordering constraint therefore does not exist**, and P2 no longer rests on
+it. Sequencing within P2 is now a preference — do the argv refusal whenever it
+suits — rather than a safety requirement. **This is the third time a conclusion
+in this document was drawn from a tool's help text rather than the tool**; the
+rule that keeps catching it is to run the command. Note that
 `ms derive` already ships `--passphrase-stdin`, a second in-constellation
 precedent for D3's private channel alongside `mnemonic bundle`'s.
 
@@ -593,9 +624,10 @@ wrong:
   ASCII that a human must *read* in order to hand-engrave. **The predicate is
   false for all four CLIs.**
 - **`mt`, the tool this spec generalises FROM, deliberately prints to a
-  terminal.** Measured on a pty, naming the input because a count without one is
-  not a measurement (round-1 B6, same defect as B2): `mt encode --quiet --in <file>`, on the corpus
-  "even" vector, prints all **six** of that vector's strings and exits **0**. Its bearer-exposure warning fires on the *opposite*
+  terminal.** Measured with the input AND the condition named, because a count without both
+  is not a measurement (round-1 B6, round-3 M3): `mt encode --quiet
+  --bitcoin-cli /nonexistent --in <file>` on the corpus "even" vector, with
+  stderr piped, prints all **six** of that vector's strings and exits **0**. Its bearer-exposure warning fires on the *opposite*
   condition — it warns that stdout is **not** a terminal, so the strings went
   somewhere that keeps them. `mt` treats the terminal as the **safe** disposal
   and the file as the dangerous one. The earlier draft inverted that for its own
@@ -626,8 +658,9 @@ report is secret material, and printing it before a refusal is not a defect.
 *A note on round 0's evidence for this point, since a later reader will check
 it.* I-2's quoted reproduction passes `--quiet` and then shows the report lines.
 The fold could not reproduce that: with `--quiet` those lines are suppressed
-(on the corpus `even` vector, `--quiet` gives **70** stderr lines against
-**108** without it, and none of `TX`/`CUT`/`PREFIX` appear), and the report appears only
+(on the corpus `even` vector, `--quiet` gives **70** stderr lines against **108**
+without it — under that exact invocation; the offline flag and the pipe both
+move the number, which is why they are stated, and none of `TX`/`CUT`/`PREFIX` appear), and the report appears only
 **without** `--quiet`. **The finding is correct and is folded; its evidence
 command is not the one that demonstrates it.**
 
@@ -668,8 +701,16 @@ is deliberately not quoted: it changed when a row moved, and a pointer naming
 | `mk` | 64 | **2** | 5 | 2 |
 | `ms` | 64 | 1 | **4** | 2 |
 | `mt` | 2 | 1 | n/a | n/a |
-| `mnemonic` | 64 | not measured | **4** | not measured |
+| `mnemonic` | 64 | **64** | **4** | **2** |
 | `me` | 2 | 4 = unplaceable record; 2 = terminal refusal | n/a | n/a |
+
+**`mnemonic`'s two remaining cells are now measured too**, with the verb each
+was taken from, because a cell without one is what §6f already had to retract:
+`mnemonic decode md1nonsense` → **64** (invalid artifact), and
+`mnemonic repair <an uncorrectable md1>` → **2**. **Neither needs changing.**
+The 64 does not collide with `mk`'s invalid-artifact 2 — it is clap's usage
+code, the split §9b already files as out of scope — and the 2 matches
+`md`/`mk`/`ms`. **`mk`'s 2 → 1 remains the only code this cycle changes.**
 
 **On `mnemonic repair` — MEASURED at last, and it settles against the ruling
 (round-2 N3).** Round 0 inferred this cell from the parity ruling instead of
@@ -952,9 +993,17 @@ the drift D5 exists to prevent.
 2026-08-26:
 
 ```
-grep -rl 'secret_in_argv_warning' --include='*.rs' /scratch/code/shibboleth/mnemonic-toolkit
-  -> 26 files, 86 references
+cd mnemonic-toolkit
+git ls-files '*.rs' | xargs grep -l 'secret_in_argv_warning' | wc -l          # 26 files
+git ls-files '*.rs' | xargs grep -c 'secret_in_argv_warning' \
+  | grep -v ':0' | awk -F: '{s+=$2} END{print s}'                             # 86 references
 ```
+
+**Two commands, not one, and both scoped by `git ls-files`** — a plain
+`grep -rl` over the checkout descends into `target/` and prints **48**, and
+`-l` lists files so it cannot produce a reference count at all. The numbers were
+right and the command beside them was not, which is the same defect this
+document has now shipped five times.
 
 (The architect's own sweep reported 21 files / 66 references — a narrower scope;
 both are far above five, which is the point, and the command is given so the
@@ -1176,7 +1225,9 @@ is how a real finding hides.
   **The command is given because a claim about this class is otherwise
   unverifiable** — a round-2 fold commit asserted a count of resolving
   references and reproduced nothing anybody could check (round-2 N-2). Today it
-  reports **16 distinct sigils over 50 occurrences**, and each was read.
+  reported **16 distinct sigils over 50 occurrences** when it was written and
+  **18 over 64** now — a count that moves with every edit, which is exactly why
+  the command is given rather than the number relied on. Each was read.
 
 ## 9. Out of scope, explicitly
 
