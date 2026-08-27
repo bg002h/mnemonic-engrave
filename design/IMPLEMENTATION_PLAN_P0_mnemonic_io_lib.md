@@ -273,12 +273,15 @@ recognises material by **value shape**: `tx:` by prefix, `mt1`/`ms1` by HRP, a
 BIP-39 mnemonic by wordlist.
 
 **A flag-name layer is specified but has no observable HERE.** `me` declares no
-secret-bearing flag, so a gate written against one is **green on the untouched
-tree and cannot fail** — which is exactly how an earlier draft discharged §6d's
+flag that **CARRIES** secret material — the four whose names mention one
+(`allow_argv_secret`, `seal_secret`, `passphrase_ask`, `no_passphrase`) are all
+`bool`, so none can hold a value to leak. A gate written against a flag-name
+layer is therefore **green on the untouched tree and cannot fail** — which is exactly how an earlier draft discharged §6d's
 ordering with the guard absent. Measured: a real `ms1` on `--mnemonic`,
 `--seed` or `--passphrase` never reaches stderr, because clap names the flag.
-`mnemonic-toolkit` **does** declare such flags and proves the shape with
-`NodeType::is_argv_secret_bearing`; **the parity test is asserted there.**
+`mnemonic-toolkit` **does** declare such flags and proves the shape in
+`crates/mnemonic-toolkit/src/secret_taxonomy.rs`; **the parity test is asserted
+there.** (`ms` carries the same subsystem in its own `advisory` module.)
 
 **Every one of F-266's four leaking surfaces is an unexpected POSITIONAL**, so
 value-shape is the layer that closes them.
