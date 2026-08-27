@@ -13281,3 +13281,38 @@ workspace fails there first), and publishing `mnemonic-io-lib` to crates.io is
 explicitly out of scope for P2 (F-271 records the publish as authorised and its
 pre-flight as unrun). Publishing would dissolve this entry entirely, which is
 worth knowing when F-271 is next picked up.
+
+### F-360 — `plan-table-check.sh` only checks rows AFTER the separator, so a malformed table HEADER passes (repo: **mnemonic-engrave**; owning phase: **the gate-hardening residue**) `#tooling` `#gate`
+
+**Found 2026-08-27** by the P2 plan's fold, which hit it while writing a table
+and worked around it in the plan rather than in the gate. Recording it so the
+blind spot does not have to be re-discovered by the next author who trips on it.
+
+The gate walks a table's rows and checks each against the header's column count.
+It establishes that width **from** the header, and separately locates the
+separator row — so a header carrying an escaped pipe, or one whose column count
+disagrees with its own separator, is never itself checked. Every data row is
+then measured against a width that is already wrong, and they all agree with it,
+so the table reports clean.
+
+**The same fold hit a second, unrelated one**: two journey paths written without
+their directory prefix resolved nowhere, and were fixed in the plan rather than
+in the citation gate.
+
+**Neither was fixed in the gate.** The two plans are clean; the gates still have
+the holes. That is the wrong side of the ledger to leave them on — a workaround
+in one document does nothing for the next one, and the whole argument for these
+gates is that they catch what reading cannot.
+
+**What closing it looks like**, and it is small: check the header row against its
+own separator before measuring anything else, and mutation-test it both ways —
+a deliberately malformed header must go RED, and every existing plan must stay
+green. That second half matters as much as the first: a gate that starts
+reporting findings on documents already reviewed clean will be ignored within a
+day.
+
+**Related, and the reason this is worth doing rather than tolerating:** the
+citation gate's own defects (F-286, F-296, and a silently skipped extension)
+were each found by an author working around them, not by anyone auditing the
+gate. A gate's blind spots surface only when someone hits one — so each hit is
+the whole signal, and working around it in the document discards it.
