@@ -11582,3 +11582,56 @@ for indentation** so a silent zero becomes a visible one.
 excludes what you just changed is indistinguishable from a gate that passed on
 it. This was only caught because the row count was expected to rise by five and
 did not — **watching a number NOT move is a check, and it costs nothing.**
+
+### F-262 — fork B-0's root cause: the Go decoder DISCARDS what the Rust primary keeps, so the message cannot be fixed on its own (repo: **seedhammer**, Rust-primary convergence) `#fork` `#rust-primary` `#ux`
+
+**Traced 2026-08-26** while burning down the fork fold review's B-0 (*"the
+`ErrUnsignedInputs` case still reads 'does NOT reassemble'"*).
+
+**The screen contradicts the code's own comment.** `gui/transaction.go:186`
+says of this exact case:
+
+> *"The bytes ARE a transaction and the txid IS right. Calling that 'DOES NOT
+> DECODE' would send the operator to re-encode a payload that is encoded
+> perfectly well."*
+
+…while `gui/transaction.go:831` tells the operator **"This does NOT reassemble
+into a transaction."**
+
+**Two paths, and only one is broken.**
+
+| path | line | carries `tx`? | carries `unsigned`? | screen |
+| --- | --- | --- | --- | --- |
+| payload | 479–480 | yes | yes (`tx.UnsignedInputs`) | correct — takes the unsigned branch |
+| **mt1 set** | 441 | **no** | **no** | **falls through to "does NOT reassemble"** |
+
+The mt1-set path calls `substitutionFor(set, err)`, which *does* branch on
+`ErrUnsignedInputs` and return `legendUnsigned` — **so the legend is right while
+the screen above it is wrong, and only one of them can be true.**
+
+**Why the message cannot simply be reworded.** `mt/mt.go:259` returns
+**`Tx{}, ErrUnsignedInputs`** — a zero transaction. The set path has nothing to
+display because the decoder threw it away.
+
+**MANDATORY RUST CHECK — run, and it is the finding.** The primary does **not**
+discard it:
+
+| | Go (`mt/mt.go:259`) | Rust (`sysw/mt.rs:191`) |
+| --- | --- | --- |
+| on unsigned inputs | `return Tx{}, ErrUnsignedInputs` | `SetProblem::UnsignedInputs { txid, inputs }` |
+| txid retained | **no** | **yes** |
+| which inputs are unsigned | **no** | **yes** (`summary.unsigned_inputs`) |
+
+And Rust keeps them *deliberately* — `sysw/mod.rs:117` states the reason: **"a
+refusal that says only 'an input is unsigned' gives them nothing to look at."**
+
+**So this is a Go-port information loss against a correct Rust primary**, which
+makes it convergence rather than a behaviour change: exempt category (a) of the
+Rust-primary rule, fixable in Go directly, no Rust change owed. The Rust check
+was not skipped, and it is what turned a wording fix into a signature fix.
+
+**What closes it:** give the Go decoder a variant that returns the decoded `Tx`
+alongside `ErrUnsignedInputs` (the payload path at :479 already proves the data
+exists at that point), populate `unsigned` on the mt1-set candidate at :441, and
+let `transactionReviewLines` take the same unsigned branch both paths deserve.
+**Rewording line 831 alone would replace a false sentence with a vague one.**
