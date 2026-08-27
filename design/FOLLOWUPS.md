@@ -11207,3 +11207,58 @@ comment at the gate.
 
 **Answering D3 probably settles both.**
 
+
+### F-254 — the installed `me` is four minor versions stale (0.3.0 vs 0.7.0), so a bare `me` in the operator's shell is not the `me` under review (owning phase: **post-ship polish**) `#me` `#repro`
+
+**Found 2026-08-26** while building the tier-placement recon, by measuring rather
+than assuming. `~/.cargo/bin/me --version` → **me 0.3.0**, dated **Jun 16**;
+`mnemonic-engrave/target/debug/me --version` → **me 0.7.0**. The other four
+binaries are in sync (`md` 0.13.0, `mk` 0.13.0, `ms` 0.16.0, `mnemonic` 0.97.0
+all identical between installed and repo builds), so this is `me` alone.
+
+**The walk was NOT contaminated, and that is provable rather than assumed.** Two
+independent checks:
+
+- `~/.cargo/bin/me sysw --help` → **exit 2**, `error: unrecognized subcommand
+  'sysw'`. 0.3.0 has verbs `bundle help`; 0.7.0 has `bundle hash help seal sysw`.
+  Every `me sysw` observation in the walk is therefore impossible on 0.3.0.
+- The `-h` / `--help` divergence that the operator found exists **only** in
+  0.7.0: 0.3.0 gives 17 lines to both and they are byte-identical; 0.7.0 gives
+  **21 vs 42**.
+
+**Fix:** `cargo install --path crates/me-cli --force`. **The reason to file it
+rather than just run it** is that the drift is silent and re-accumulates — an
+installed binary keeps answering, confidently, as a version nobody is reviewing.
+
+### F-255 — `md` collides with a near-universal `mkdir -p` alias, and the collision fails as SILENT SUCCESS (owning phase: **constellation naming**, tier-placement cycle) `#md` `#constellation` `#ux`
+
+**Found 2026-08-26**, same sweep. In the operator's own shell, `type md` →
+**`md is an alias for mkdir -p`**, shadowing the real binary at
+`~/.cargo/bin/md`. Demonstrated, not reasoned:
+
+```
+$ md repair md1yqpqqzqq8xtwhw4xwn4qh
+  exit=0
+  dirs created:  md1yqpqqzqq8xtwhw4xwn4qh/  repair/
+```
+
+**Exit 0, two directories, no output.** The verb and the argument each became a
+directory name. A user checking `$?` sees success.
+
+**Why this is a constellation finding and not a dotfile complaint.** `md` for
+`mkdir -p` is one of the most common shell aliases in existence, so this is the
+default environment for a large share of users, not an idiosyncrasy. Of the six
+names, `md` is the only one that collides — `mk`, `ms`, `mt`, `me` and
+`mnemonic` all resolve to their binaries here. And the failure mode is the worst
+available: not "command not found", but **success with a side effect**.
+
+**This is why measurements in this cycle were taken by path.** Re-verified by
+path at filing time: `descriptor-mnemonic/target/debug/md repair <vector>` → **5**,
+`mnemonic-toolkit/target/debug/mnemonic repair <vector>` → **4** — the D26 pair
+the spec rests on, unchanged. Had those been taken by bare name they would both
+have read **0** and the whole D26 analysis would have been built on `mkdir`.
+
+**Ruling owed from the operator**, since renaming a shipped binary is not a
+change to make unilaterally. The options are to leave it and document, to ship a
+longer canonical name with `md` as an opt-in shim, or to detect the shadow at
+install time.
