@@ -63,8 +63,7 @@ section stated flatly that exactly one of the 11 was a split.
 | `refuse_world_readable_stdout` | 19 |
 | *(`emit`, already counted above)* | — |
 
-**Total: 11 functions plus the `cfg(not(unix))` stub. The probe measured the
-real shrink at 461 lines, not the ~431 this section derived** — and its
+**Total: 11 functions plus the `cfg(not(unix))` stub. NO LINE-COUNT GATE — three probes measured the shrink at 461, 459 and 442 depending on the order taken, so the number is ordering-dependent and was deleted rather than corrected** — and its
 per-function figures above reproduce under no rule I can state
 (`split_record_stream` is 6 lines of 10, not 29). **Treat the per-function
 column as indicative and the 461 as measured**; the probe's `git diff --stat`
@@ -219,7 +218,8 @@ are compiler-invisible. `me` reproduced **every current exit code byte-for-byte*
 do not contradict, and I2's ruling is executable.
 
 **`-` READS STDIN NOWHERE IN `me` TODAY** — five surfaces, four different exit
-codes — and §6b's *"accepted and ignored"* wording makes the compliant
+codes — and §6b's permissive wording, which lets an implementation take the
+flag and do nothing with it, makes the compliant
 implementation **silently lossy**: `… | me sysw pack --out b.bin - text:6869`
 packs **1 record instead of 2, at exit 0**, on the artifact that gets cut into
 metal. **Step 6 implements `-`; it does not accept and ignore it.**
@@ -493,16 +493,29 @@ Each step is RED first. No step begins until the previous is green.
 
 | # | step | the test that must fail first |
 | --- | --- | --- |
-| 1 | move the 11 into `me`'s lib half **intact — including the mask**, no behaviour change | **388 RUN, 388 passed, 1 skipped** (the run count, not the 389 `#[test]` attributes — N1). **The move necessarily edits 2 of them**, which the gate's earlier wording did not allow for; enumerate the diff to those two and justify each; `main.rs` shrinks by ~431 lines. **PLUS a pty assertion pinning the terminal arm (I1)** — see below |
+| 1 | move the 11 into `me`'s lib half **intact — including the mask**, no behaviour change | **388 RUN, 388 passed, 1 skipped** (the run count, not the 389 `#[test]` attributes — N1). **The move necessarily edits 2 of them**, which the gate's earlier wording did not allow for; enumerate the diff to those two and justify each. **PLUS a pty assertion pinning the terminal arm (I1)** — see below |
 | 2 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 regular file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` returns `None`; `me`'s end-to-end behaviour is **still** unchanged |
 | 3 | `observation.rs` — types | a payload kind cannot be constructed from a permission bool (**F-259 cannot recur**) |
 | 4 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it (see below); and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry |
 | 5 | `records.rs` layer 1 — **pre-parser** flag-name guard on raw argv | **`me` ships NO secret-bearing flag**, so the RED gate cannot be an end-to-end refusal in the donor. It is a unit test on the crate's flag-name table plus a lockstep parity assertion against `mnemonic-toolkit`'s `NodeType::is_argv_secret_bearing`, whose flags DO exist |
 | 5b | `records.rs` layer 2 — value-shape, additive | the argv gate refuses by class, with the override, **as unit tests** (§2.4); `me sysw pack --nosuchflag <ms1…>` still does not echo the secret |
 | 5c | `--expect <kinds>` — the flag and the vocabulary | `--expect descriptor,transaction` **refuses a stream with no transaction**, and **refuses an incomplete `md1` set** (§6g). Both fail today: the flag does not exist |
-| 6 | **`exit.rs` FIRST, then `channel.rs`** (probe I-3 — the step-1 ordering shape, one file over) | `--out` overwrites; **`-` is IMPLEMENTED, not "accepted and ignored"**; every code `me` produces today is reproduced **byte-for-byte**, differentially, not by matching §6f |
+| 6 | **`exit.rs` FIRST, then `channel.rs`** (probe I-3 — the step-1 ordering shape, one file over) | `--out` overwrites; **`-` is IMPLEMENTED — taking the flag and discarding its input is NOT compliance**; every code `me` produces today is reproduced **byte-for-byte**, differentially, not by matching §6f |
 | 7 | `me` consumes the crate | all 388 tests pass, **with the diff to them enumerated and each edit justified by a named finding** — the shape §7 P1 already uses for `mt` |
 | 8 | publish `0.1.0` | **irreversible — §5** |
+
+**STEP 1's GATE IS BLIND TO 5 OF 8 EXIT DECISIONS (probe C-2), AND THE PTY
+ASSERTION MUST PIN THE DIGIT.** A control run against the **unmodified** binary
+showed `me` today can respell five refusals from **2 to 3** with every one of
+388 tests still green — the lines proven to execute. So `!success()` is not
+enough: **§4's pty assertion must assert the exit code itself**, or it misses
+even the arm it is named for. (The hole is pre-existing, not introduced — filed
+as **F-265**.)
+
+**FOUR CALLERS LIVE OUTSIDE THE CLOSURE (probe I-2).** `write_private` has
+**three** and `refuse_world_readable_stdout` **one**, producing four `E0425`s
+that nothing in this plan predicted. Step 1 must enumerate **callers**, not just
+callees — the closure was computed one direction only.
 
 **I1 — STEP 1's GATE CANNOT FAIL FOR THE TERMINAL ARM, so it is not left as the
 only proof.** "The 388 still pass" is green whether or not the terminal refusal
@@ -534,43 +547,41 @@ necessarily commits **`pub const EXIT_USAGE: i32 = 2`** into the donor's public
 API: the exact thing §3 spends a page ruling out. **No ordering avoids it. It is
 a language rule, like N-C2.**
 
-**A SECOND PROBE EXECUTED THE OBVIOUS FIX AND IT DOES NOT WORK. Recorded here
-rather than replaced, because the wrong answer is the useful part.**
+**THE ORDERING IS SETTLED, AND THE ANSWER IS SMALLER THAN EITHER ATTEMPT.**
+Three orderings were tried; a probe executed each.
 
-The fix was to swap steps 1 and 2 — have `refuse_write_block` return a DECISION
-first, then move with no constant left to publish. **It rests on a premise that
-is false: `refuse_write_block` is not where the exit integers live.** Counted
-across the closure:
-
-| function | `EXIT_*` references |
+| attempt | result |
 | --- | --- |
-| `read_records` | **3** |
-| `emit` | **2** |
-| `refuse_write_block` | **2** |
-| `no_records_guard` | **1** |
-| `write_block`, `destination` | 0 |
+| move intact, then split | **NO** — publishing `EXIT_*` is unavoidable |
+| `refuse_write_block` returns a decision, then move | **NO** — it holds 2 of 8 refs; move still fails with 7 × `E0425` |
+| **split exit-code production across four functions** | **YES** — 8 refs → 0, nothing published |
+| **↳ and then: only ONE function needs it** | **ADOPTED** |
 
-**Eight references across FOUR of the 11.** Changing one function removes at
-most two — and the probe found one of those two lands straight back inside
-`emit`, itself one of the 11. The move then fails with **seven
-`E0425: cannot find value EXIT_*`**, and step 1 still ends with
-`pub const EXIT_USAGE: i32 = 2;` in the donor.
+**The four-function version solves a one-function problem, and §3's own table
+held the evidence.** Counted per function:
 
-The swap also **grows** the published surface: `WriteRefusal` cannot stay
-private while `refuse_write_block` is `pub`. And a mutation swapping the two
-decision variants left all 388 tests green — **the decision type is inert, and
-nothing tests it.**
+| §3 assigns to the crate | `EXIT_*` refs | | §3 keeps in `me` | refs |
+| --- | --- | --- | --- | --- |
+| `destination` | 0 | | `refuse_write_block` | 2 |
+| `stdout_world_readable_mode` | 0 | | `emit` | 2 |
+| `split_record_stream` | 0 | | `read_records` | 3 |
+| `write_block` | 0 | | | |
+| **`no_records_guard`** | **1** | | | |
 
-**SO THE ORDERING QUESTION IS OPEN, and this plan does not answer it.** What the
-evidence supports is that **exit-code production is a fourth split, not a step**:
-the four functions above each decide something and then name a number, and only
-the naming has to stay in `me`. That is the same shape as
-`stdout_world_readable_mode` (C1) and `read_records` (probe C-2) — three splits
-already, and this would make the pattern the rule rather than the exception.
+**Seven of the eight live in functions that stay behind.** The moving set is
+closed and holds exactly one, whose only callers stay in `me`.
 
-**That is a direction, not a ruling.** It has not been executed, and the last
-two orderings written here both looked sound and both failed under execution.
-**The next probe tests it before this plan asserts it.**
+**SO: ONE SIGNATURE CHANGE, NO NEW TYPE.**
+`no_records_guard -> Result<Vec<String>, String>`. Executed and green: a
+**160-line** move against 442, **8** public items against 15, and the decision
+type deferred to step 5b — the step that actually produces a second variant.
+**A smaller correct answer beats a larger elegant one**, and the larger one was
+about to be scheduled on the strength of a premise its own table refuted.
+
+**The decision type is NOT inert** — that conclusion came from attempt 2, whose
+type was inert *by construction* (both variants mapped to `EXIT_USAGE`). Here the
+two-variant swap goes **RED by 9 tests**, with every mutation site proven to run
+by observing the binary's exit code change.
 
 **§4's TABLE IS THE ONLY ORDERING OF RECORD (probe C-2).** An earlier fold
 introduced a prose "step 2" that is not the table's step 2 — the table's is the
