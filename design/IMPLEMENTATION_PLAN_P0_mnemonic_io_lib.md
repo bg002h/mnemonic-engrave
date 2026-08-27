@@ -436,7 +436,7 @@ stdout is not evidence of exposure*, and both tools say so in those words.
 **The mask is the only part that is not shared**, and it is the only part that
 stays behind.
 
-**THE 11 MAPPED ONTO THE FILES (M6)** — §3 lists seven files and §4 sequences
+**THE CLOSURE MAPPED ONTO THE FILES (M6)** — §3 lists seven files and §4 sequences
 six; without this table a reader cannot tell where a function lands:
 
 | file | functions |
@@ -533,7 +533,7 @@ Each step is RED first. No step begins until the previous is green.
 | # | step | the test that must fail first |
 | --- | --- | --- |
 | 1 | **`no_records_guard` returns `Result<Vec<String>, String>`** — the ONE signature change (Variant B). Nothing moves yet. | `me`'s **388 RUN, 388 passed, 1 skipped**, unchanged in meaning; the `EXIT_*` count inside `no_records_guard` goes **1 → 0** |
-| 2 | **Move the five + the stub** — carrying a **pty assertion pinning the terminal refusal BEFORE and AFTER — asserting the exit DIGIT, not `!success()`**, because this is F-265's own site #1 (`refuse_write_block`'s Terminal arm, proven respellable 2→3 with 388/388 green), since none of the 12 `world_readable_output.rs` tests reach it and it could otherwise be lost with every gate green (round-4 C-2) — into `me`'s lib half: `destination`, `stdout_world_readable_mode` (+ its `cfg(not(unix))` twin), `split_record_stream`, `no_records_guard`, `write_block`. **`read_records`, `emit`, `write_private` and every `refuse_*` STAY.** | builds with **`grep -c 'pub const EXIT' main.rs` == 0** and **`grep -c 'EXIT_' <lib module>` == 0** — a published constant fails the step. **Plus a real test, not only greps** (round-4 I-1: `cargo build` + two greps are already green on the untouched tree, so they cannot fail). Callers enumerated in BOTH directions. **What actually breaks is the private `Destination`/`WriteBlock` enums and `main.rs`'s `use super::` in `mod tests`; the "four callers outside the closure" figure was measured against the REJECTED move, and both those functions stay** |
+| 2 | **Move the five + the stub** — carrying a **pty assertion pinning the terminal refusal BEFORE and AFTER — asserting the exit DIGIT, not `!success()`**, because this is F-265's own site #1 (`refuse_write_block`'s Terminal arm, proven respellable 2→3 with 388/388 green), since none of the 12 `world_readable_output.rs` tests reach it and it could otherwise be lost with every gate green (round-4 C-2) — into `me`'s lib half: `destination`, `stdout_world_readable_mode` (+ its `cfg(not(unix))` twin), `split_record_stream`, `no_records_guard`, `write_block`. **`read_records`, `emit`, `write_private` and every `refuse_*` STAY.** | builds with **`grep -c 'pub const EXIT' main.rs` == 0** and **`grep -c 'EXIT_' `crates/me-cli/src/io.rs`` == 0** — a published constant fails the step. **Plus a real test, not only greps** (round-4 I-1: `cargo build` + two greps are already green on the untouched tree, so they cannot fail). Callers enumerated in BOTH directions. **What actually breaks is the private `Destination`/`WriteBlock` enums and `main.rs`'s `use super::` in `mod tests`; the "four callers outside the closure" figure was measured against the REJECTED move, and both those functions stay** |
 | 3 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` → `None`; `me`'s behaviour still unchanged |
 | 4 | `observation.rs` — the payload-kind type **and its pty assertion** | **the assertion is the gate, not the type**: `script -qec 'me sysw wipe --fill zeros'` must NOT emit the word BEARER, asserted on the **emitted words**, pinning the **exit digit** (F-265: `!success()` cannot fail here). Mutation-checked in both directions |
 | 5 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it; and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry. **Blocked on F-264** — see §6 condition 9 |
@@ -595,7 +595,7 @@ const EXIT_REFUSED: i32 = 3;  const EXIT_INVALID: i32 = 4;
 refusals return, and an earlier draft omitted it from every enumeration here
 while leaning on those enumerations being exhaustive (round-3 M-1).
 
-A lib module cannot see a binary's items, so moving the moving set into the lib half
+A lib module cannot see a binary's items, so moving those functions into the lib half
 **requires publishing them** — and an *"intact, no behaviour change"* move
 forbids the signature change that would avoid it. So the move as first written
 necessarily commits **`pub const EXIT_USAGE: i32 = 2`** into the donor's public
@@ -774,8 +774,8 @@ before publishing; do not trust a check from an earlier session.
    `me` — `refuse_write_block` ×2, `read_records` ×2, `emit` — so this is work P0
    does **in the donor**, and **the table carries a step that edits all five** —
    an earlier draft scheduled only site #1 and left four unscheduled, while a
-   sentence three lines below still said P0 moves these functions, which is the
-   opposite of what this condition rests on (round-6 I-1). Five refusals can swap exit
+   a sentence three lines below asserted the opposite of what this condition
+   rests on (round-6 I-1). Five refusals can swap exit
    **2 for 3** with all 388 tests green, proven against the unmodified binary.
    **P0 touches all five while extracting their neighbours**, and a refactor
    over an untested distinction is how the distinction dies. **Every gate in §4
