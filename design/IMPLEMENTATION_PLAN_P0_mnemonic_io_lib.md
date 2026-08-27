@@ -57,6 +57,15 @@ half:**
 
 **Total: 11 functions, 431 lines, 19% of `main.rs`'s 2,226.**
 
+**ONE OF THE 11 IS A SPLIT, NOT A MOVE — and it is the whole of C1.**
+`stdout_world_readable_mode` is not mechanism. It applies **`& 0o044` INSIDE the
+function** (`crates/me-cli/src/main.rs:912`) and returns `Option<u32>` — a
+verdict, not a measurement. Moving it intact would publish `me`'s mask as the
+crate's *mechanism* at the irreversible step, after which a later phase could
+delete `mt`'s stricter refusal while citing a real §6 ruling. **The risk is not
+that the two masks keep disagreeing; it is that they get reconciled silently in
+favour of the weaker one, on the path where the artifact is cut into metal.**
+
 **The closure is library-shaped.** Measured across all 431 lines: **0** hits for
 `std::process::exit`, the `Cli` struct, `clap`, or `std::env::args`. Nothing
 reaches for the binary's argument parser or for process exit, so the move is
@@ -152,7 +161,7 @@ buys unit-testability for the *argv and record* half, not the *fd* half.
 mnemonic-io-lib/
   src/lib.rs          — re-exports; no logic
   src/channel.rs      — --in / --out / `-`, destination classification
-  src/fd.rs           — MECHANISM: fstat, extract mode. No policy.
+  src/fd.rs           — MECHANISM only: see the contract below.
   src/observation.rs  — what was measured, as types (§2.3)
   src/records.rs      — record stream splitting, the argv gate, kind vocabulary
   src/exit.rs         — the exit-code table
@@ -162,6 +171,26 @@ mnemonic-io-lib/
 **`mt`'s purge text is NOT a source.** It advises zsh operators `history -d`,
 which does not delete on zsh 5.9.2, and tells fish operators to match on the
 bearer material — typing the secret into history a second time.
+
+**`fd.rs`'s CONTRACT, stated because "no policy" is not self-explaining:**
+
+- Return the **raw `mode & 0o777`** for a regular file. **No disqualifying mask
+  anywhere in the crate** — not `0o044`, not `0o077`.
+- Return `None` for a **character device**, and `None` on a **failed `fstat`**
+  (fail-open).
+
+**Those two `None`s ARE shared mechanism, and saying so is load-bearing.** Both
+binaries already implement both, identically, comment sentences included —
+`me` (`crates/me-cli/src/main.rs:906-917`) and `mt` — in the sibling repo, at
+**lines 645 to 655** of its `mt-cli` validate module, deliberately written
+without citation punctuation per the cross-repo note in §2.1, and verified by
+hand 2026-08-26. An implementer who reads "no policy" literally would push the
+char-device exemption out to callers, where it is **load-bearing for `/dev/null`
+(mode 0666)** and where a caller can forget it. Fail-open is the same: *unreadable
+stdout is not evidence of exposure*, and both tools say so in those words.
+
+**The mask is the only part that is not shared**, and it is the only part that
+stays behind.
 
 **Boundary lines, from §5a.** No display grouping (`mnemonic-toolkit` already
 owns it, and the four encoders' copies are checksum-gated). No record classes,
@@ -184,14 +213,23 @@ Each step is RED first. No step begins until the previous is green.
 
 | # | step | the test that must fail first |
 | --- | --- | --- |
-| 1 | move the 11 into `me`'s lib half, no behaviour change | `me`'s existing 388 tests still pass; `main.rs` shrinks by ~431 lines |
-| 2 | `fd.rs` — mechanism only | a mode is extracted from a real fd; **no** policy assertion |
+| 1 | move the 11 into `me`'s lib half **intact — including the mask**, no behaviour change | `me`'s existing tests still pass; `main.rs` shrinks by ~431 lines |
+| 2 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 regular file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` returns `None`; `me`'s end-to-end behaviour is **still** unchanged |
 | 3 | `observation.rs` — types | a payload kind cannot be constructed from a permission bool (**F-259 cannot recur**) |
 | 4 | `remedy.rs` | zsh remedy does **not** contain `history -d`; fish remedy does **not** contain the secret |
 | 5 | `records.rs` | the argv gate refuses by class, with the override, **as unit tests** (§2.4) |
 | 6 | `channel.rs` + `exit.rs` | `--out` overwrites; `-` reads stdin; codes match §6f |
 | 7 | `me` consumes the crate | all 388 tests still pass, unchanged |
 | 8 | publish `0.1.0` | **irreversible — §5** |
+
+**Steps 1 and 2 are ordered this way on purpose.** Step 1 moves
+`stdout_world_readable_mode` *with* its `& 0o044` so nothing changes; step 2
+then splits it, pushing the mask back to `me`'s call site. Behaviour is
+unchanged at **both** steps, and at no point does a masked function sit inside
+the crate. An earlier draft ordered step 1 to "move with no behaviour change"
+and step 2 to hold "no policy assertion" — **which cannot both be true of the
+same function**, and the reading that satisfied step 1 published `me`'s mask as
+the crate's mechanism.
 
 **Step 1 is not a refactor to skip.** It is the step that proves the closure is
 really 11 and not 12.
@@ -248,7 +286,11 @@ before publishing; do not trust a check from an earlier session.
   `address` move to the toolkit — **decided, not scheduled**. D7 holds: this
   cycle relocates nothing. Every verb keeps its home through P0–P4.
 - **Settling the `0o044` vs `0o077` disagreement.** §2.2. Each binary keeps its
-  policy; the crate holds the mechanism.
+  policy; the crate holds the mechanism. **And adoption never changes a
+  consumer's mask** — a later phase that deletes or widens `mt`'s `0o077`
+  refusal while citing a §6 uniformity ruling is out of scope for this cycle
+  and must be refused at review, not accepted as tidying. Changing what either
+  tool treats as a dangerous destination is a RULING, never a refactor.
 - **`mnemonic-toolkit`'s own adoption.** It is the sixth consumer, not P0's
   work.
 - Anything the nine prior spec rounds closed.
