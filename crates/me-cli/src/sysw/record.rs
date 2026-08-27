@@ -275,6 +275,11 @@ fn hex_lower(b: &[u8]) -> String {
 /// wire, so two spellings of one body would be two different digests.
 fn unhex_lower(s: &str) -> Option<Zeroizing<Vec<u8>>> {
     // `% 2 != 0` rather than `is_multiple_of` — unstable on CI's Rust.
+    // `manual_is_multiple_of` does not exist on CI's PINNED clippy (0.1.85)
+    // either, so naming it below is itself an unknown lint there under
+    // `-D warnings` (F-361) — `unknown_lints` must be allowed too, for the
+    // toolchain where the lint being allowed does not exist yet.
+    #[allow(unknown_lints)]
     #[allow(clippy::manual_is_multiple_of)]
     let odd = s.len() % 2 != 0;
     if odd {
