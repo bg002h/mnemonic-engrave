@@ -82,6 +82,28 @@ jobs:
           # go.sum lives in the preview/ module, not the repo root.
           cache-dependency-path: preview/go.sum
 
+      # The shell-history purge tests do not describe a recipe, they RUN it --
+      # under a real interactive shell on a pty -- because F-264 is precisely a
+      # recipe that reports success and purges nothing. That gate is worth
+      # nothing without the shells, and the tests are written to FAIL rather
+      # than skip when they are absent: a skip prints ok and exit 0, which is
+      # how an unrun gate passes for months.
+      #
+      # The tests require these EXACT paths, so the paths are asserted here
+      # rather than the package names. An install that succeeds while putting
+      # the binary somewhere else would otherwise fail identically to no
+      # install at all, one CI round later.
+      - name: Install the shells the history-purge gates execute
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh fish
+          for b in /usr/bin/zsh /usr/bin/fish /usr/bin/script /usr/bin/timeout; do
+            test -x "$b" || { echo "MISSING: $b"; exit 1; }
+            echo "ok $b"
+          done
+          /usr/bin/zsh --version
+          /usr/bin/fish --version
+
       - name: Rust test suite (locked; Go on PATH + ME_REQUIRE_GO=1 → oracles run)
         run: cargo test --locked
 
