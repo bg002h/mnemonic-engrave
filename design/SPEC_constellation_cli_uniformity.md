@@ -514,11 +514,15 @@ This settles what §5b parked. Applying §5b's criterion — a verb stays when i
 reversal is the useful part: it is the only one of the six that carries a
 cross-CLI normative rule. **D26's parity set is `md repair` / `mk repair` /
 `ms repair` / `mnemonic repair`**, quoted in `md repair --help`'s own shipped
-text and governing §6f's exit-code table, and `repair` is **the most-referenced
-verb in this document** (`grep -ic repair` — no figure is quoted, deliberately:
-the count is self-referential, so any prose stating it falsifies itself the
-moment that prose is written. Two earlier revisions each wrote a number that was
-already stale on arrival, the second inside the fold correcting the first). Moving it would have collapsed that set to one member and made
+text and governing §6f's exit-code table, and `repair` is **referenced throughout
+this document** — run `grep -ic repair` for the current figure.
+
+**No count and no ranking is quoted here, and the history is why.** The number is
+self-referential, so prose stating it falsifies itself as it is written: one
+revision said 31, its correction said 39 and was 41 on arrival, and the
+correction after *that* called `repair` the most-referenced verb — which is also
+false, `encode` is ahead of it. **Three wrong claims, each written inside the fix
+for the previous one.** The command is the claim. Moving it would have collapsed that set to one member and made
 three things false rather than outdated — the shipped help text, §6f's three
 encoder rows, and D26's normative statement.
 
