@@ -308,3 +308,152 @@ Per the dispatch brief, this file is committed **only after the final push
 has landed**. It did not land this attempt either, so — same as attempt 1 —
 this append is **left uncommitted** in the working tree for the operator to
 review and commit (or not) themselves.
+
+---
+
+## Attempt 3 (2026-08-27) — CI GREEN, master PUSHED, no bypass
+
+Third attempt. Attempt 1's zsh-absent gap (fixed in `00bb25e`) and attempt 2's
+fish 3.7.0 vs 4.8.1 behavioral mismatch in the delete-prefix test (fixed in
+`d91a515`, which asserts the outcome — the secret survives — rather than the
+`hangs` mechanism, plus `3954ddf` for the `dash_stdin.rs` race) were both
+believed fixed going in. Local pre-flight, as stated in the dispatch and not
+re-derived here: `cargo nextest run --locked` → 430 passed, 1 skipped;
+`cargo clippy --all-targets --locked -- -D warnings` → 0; `actionlint` → 0.
+
+### What happened
+
+1. Pre-staging freeze checkpoint: `git status --short` clean; `git rev-parse
+   master` = `6c24e62823e6c1ac02aa3862cd6020674bf58544`; confirmed **84
+   commits** ahead of freshly-fetched `origin/master`
+   (`990f75acb971b76bfd67028db9f02bf63190d43c`) via `git rev-list --left-right
+   --count origin/master...master` → `0	84`. (Dispatch stated 82; actual
+   measured count is 84 — noted, not corrected, since the load-bearing fact is
+   the SHA, which matched the dispatch exactly.)
+2. Staged it: `git push origin master:refs/heads/ci/staging` — succeeded,
+   created branch `ci/staging` at that exact SHA.
+3. Found the triggered run by full-SHA match (never truncated, always
+   `--repo bg002h/mnemonic-engrave`): `gh run list --repo
+   bg002h/mnemonic-engrave --branch ci/staging --json
+   databaseId,headSha,status,conclusion,event,workflowName,createdAt` → run
+   `33120450937`, `headSha` = `6c24e62823e6c1ac02aa3862cd6020674bf58544`
+   (exact match, `event: push`, `workflowName: release`).
+4. Watched to completion two independent ways: (a) `gh run watch 33120450937
+   --repo bg002h/mnemonic-engrave --exit-status`, backgrounded, exited `0`;
+   (b) a separate polling `Monitor` loop querying `gh run view 33120450937
+   --repo bg002h/mnemonic-engrave --json status,conclusion,jobs` directly,
+   which independently reported the same terminal per-job conclusions. Final
+   `gh run view --json status,conclusion,headSha,jobs`:
+
+   ```
+   status:   completed
+   conclusion: success
+   headSha:  6c24e62823e6c1ac02aa3862cd6020674bf58544
+
+   build me-preview (all targets): completed / success
+   build me (macos-aarch64):       completed / success
+   test (rust + go):               completed / success
+   build me (windows-x86_64):      completed / success
+   build me (macos-x86_64):        completed / success
+   build me (linux-x86_64):        completed / success
+   build me (linux-aarch64):       completed / success
+   assemble + sign + release:      completed / skipped
+   ```
+
+   `test (rust + go)` conclusion, verbatim: **`success`**. `assemble + sign +
+   release` correctly `skipped` (tag-gated on `refs/tags/v*`, not triggered by
+   a branch push — confirmed a third time).
+
+### The shell-install step — confirmed ran and passed, versions quoted
+
+Pulled `test (rust + go)`'s full step log (`gh run view --job 98685726693
+--repo bg002h/mnemonic-engrave --log`) for the "Install the shells the
+history-purge gates execute" step:
+
+```
+ok /usr/bin/zsh
+ok /usr/bin/fish
+ok /usr/bin/script
+ok /usr/bin/timeout
+zsh 5.9 (x86_64-ubuntu-linux-gnu)
+fish, version 3.7.0
+```
+
+Step conclusion **success** (job overall succeeded and the log shows no error
+in this step's region).
+
+### The renamed fish test — confirmed ran and passed
+
+From the same job log, the Rust test suite region:
+
+```
+test history_delete_prefix_purges_nothing_however_it_fails ... ok
+```
+
+This is attempt 2's fix under test: it asserts the finding (the secret
+survives the purge attempt) rather than the mechanism (`hangs`), and it now
+passes on the CI runner's fish 3.7.0 — the specific outcome attempt 2 could
+not achieve.
+
+### Full Rust suite — recomputed from the log, not assumed
+
+Summed every `test result: ok. N passed; 0 failed; ...` line across all test
+binaries in the job log: **430 passed, 0 failed** total (matches local
+pre-flight exactly), plus the `1 ignored` from the first binary's block — no
+`FAILED` or `panicked` lines anywhere in the job log. Go tests: `ok
+mnemonic-engrave/preview 0.192s`. No `dash_stdin` failures (attempt-3-relevant
+race from `3954ddf`) — job log shows a clean pass with no retries.
+
+### Freeze verification
+
+| Point | `git rev-parse master` (local) | `origin/master` |
+| --- | --- | --- |
+| Before staging | `6c24e62823e6c1ac02aa3862cd6020674bf58544` | `990f75acb971b76bfd67028db9f02bf63190d43c` |
+| Immediately before final push | `6c24e62823e6c1ac02aa3862cd6020674bf58544` | `990f75acb971b76bfd67028db9f02bf63190d43c` (re-fetched, unchanged) |
+| After final push | `6c24e62823e6c1ac02aa3862cd6020674bf58544` | `6c24e62823e6c1ac02aa3862cd6020674bf58544` (re-fetched) |
+
+Local `master` never moved during the whole window (staging push → CI wait →
+final push). `origin/master` stayed at `990f75a` through the entire CI wait
+and only advanced on the final push — the freeze held.
+
+### The final push
+
+`git push origin master` output:
+
+```
+To github.com:bg002h/mnemonic-engrave.git
+   990f75a..6c24e62  master -> master
+```
+
+A clean fast-forward. **No "Bypassed rule violations" message and no bypass
+message of any kind printed** — the required `test (rust + go)` context on
+this exact SHA is what satisfied branch protection, not `enforce_admins`.
+
+### Outcome
+
+- Staged SHA: `6c24e62823e6c1ac02aa3862cd6020674bf58544`
+- Final SHA pushed to `origin/master`: `6c24e62823e6c1ac02aa3862cd6020674bf58544`
+  — **identical to the staged SHA**, confirmed by the freeze table above.
+- `test (rust + go)` conclusion: **`success`** (verbatim from `gh run view
+  --json`)
+- Shell-install step: **`success`**; zsh `5.9 (x86_64-ubuntu-linux-gnu)`, fish
+  `3.7.0` (both quoted verbatim from the step's own printed output)
+- Renamed fish test (`history_delete_prefix_purges_nothing_however_it_fails`):
+  **`ok`**
+- Final push to `origin/master`: **landed**, no bypass message
+- `ci/staging`: deleted (`git push origin --delete ci/staging` printed `-
+  [deleted] ci/staging`; confirmed empty via `git ls-remote --heads origin
+  ci/staging`)
+- Branch protection: untouched, no workaround attempted, no `enforce_admins`
+  change
+
+### What this closes
+
+`master` and `origin/master` now agree at `6c24e62823e6c1ac02aa3862cd6020674bf58544`.
+Both defects found by attempts 1 and 2 (zsh absent on the runner; the
+fish-version-dependent `hangs` assertion) are confirmed fixed under real CI,
+not just locally. The downstream repo's `Cargo.toml` pin should be written
+against this SHA.
+
+Per the dispatch's mandatory-final-action instruction, this file is committed
+in the same window as the successful push, since the push landed.
