@@ -11382,3 +11382,46 @@ files** and `mnemonic-key` **1**, all design markdown (`cycle-prep-recon-*.md`,
 `SPEC_chunk_set_id_verification.md`). `cargo clean` never touches source, so
 these are unaffected — but they are uncommitted work sitting in a tree nobody is
 watching, which is a different exposure from the one this item was filed about.
+
+### F-258 — the `mnemonic-io-lib` extraction is **11 functions / 431 lines**, not the 3 the spec names (owning phase: **P0**, prep for the plan) `#P0` `#mnemonic-io-lib`
+
+**Measured 2026-08-26** while preparing the P0 plan, before writing it. §5a names
+three donated pieces — `write_private`, `is_argv_forbidden`,
+`stdout_world_readable_mode`. The real closure is larger, and the plan needs the
+inventory rather than the description.
+
+**Where the pieces live today.** `me-cli` is the only crate in the constellation
+with both `lib.rs` and `main.rs`, which reads like a head start. It is not:
+**6 of the 9 named IO/safety functions are in `main.rs`, the binary half.**
+
+| in `main.rs` (binary half) | in the lib half (`sysw/record.rs`) |
+| --- | --- |
+| `write_private` `stdout_world_readable_mode` `destination` `write_block` `refuse_write_block` `read_records` | `is_secret` `is_bearer` `is_argv_forbidden` |
+
+**And the closure is nearly double.** Those six call **five more** `main.rs`-local
+functions, each of which must move or the extraction does not compile:
+
+| function | lines | | function | lines |
+| --- | --- | --- | --- | --- |
+| `read_records` | 132 | | `refuse_terminal_destination` | 31 |
+| `emit` | 44 | | `split_record_stream` | 29 |
+| `write_private` | 40 | | `stdout_world_readable_mode` | 25 |
+| `refuse_write_block` | 34 | | `no_records_guard` | 25 |
+| `destination` | 31 | | `write_block` | 21 |
+| | | | `refuse_world_readable_stdout` | 19 |
+
+**431 lines of `main.rs`'s 2,226 — 19% of the file — across 11 functions.**
+
+**So P0's first move is inside `me` and is not small.** Nothing crosses a crate
+boundary until those 11 are a library; treating this as "donate three functions"
+would discover the other eight during implementation, one compile error at a time.
+
+**How this was measured, because the first attempt was wrong.** The dependency
+closure came from comparing the names the six *call* against `main.rs`'s
+top-level `fn` list. The first run returned **empty** — no transitive deps — and
+that was an artifact: the parse had left `fn` glued to each name
+(`fnwrite_private`), so the comparison could never match. **A planted positive
+control caught it**: searching for a name known to be in the file also returned
+nothing, which is impossible for a working list. After fixing the parse the
+control hit and the five extras appeared. **An empty result is only evidence when
+a control proves the search could have found something.**
