@@ -429,7 +429,38 @@ grows is the next drift:
   provably in lockstep via checksum-gated vectors. The new crate must not become
   the fifth copy.
 - **No container vocabulary.** Record classes, prefixes and payload grammar
-  belong to `me`; see §9a.
+  belong to `me`; see §9a. **This does NOT exclude the vocabulary for
+  describing what a write gate MEASURED** — the two are different things, and
+  the third line below is why.
+- **MECHANISM, not policy — corrected after the io-seam review
+  (`DESIGN-io-seam.md`, 2026-08-26).** The first draft of this crate assumed
+  policy was the valuable half. **It is backwards.** Measured:
+
+  | | `me` | `mt` |
+  | --- | --- | --- |
+  | disqualifying mask | `0o044` (`main.rs:912`) | `0o077` (`validate.rs:585`) |
+  | stdout at mode 0620 | **exit 0, 733 bytes written** | **exit 1, REFUSED** |
+  | stdout at mode 0600 (control) | exit 0 | exit 0 |
+
+  The `fstat`-and-extract-mode *mechanism* is duplicated near-byte-identically
+  between the two, comments included. The **policy** — which bits disqualify,
+  whether a terminal is refused, what remedy to offer — is where they have been
+  deliberately ruled to differ, and `mt` is arguably right that a
+  group-*writable* destination is a hazard `me` currently ignores.
+
+  **So the crate holds the mechanism and lets each binary keep its policy.**
+  Hoisting policy would force a disagreement neither tool has agreed to settle,
+  and would do it inside a shared dependency where the argument is hardest to
+  have.
+- **DO hold the vocabulary for what was measured**, and F-259/F-260 are the
+  argument. Both tools currently ship a message hard-coded to their rule's
+  *name* rather than derived from the observation: `me` calls a
+  declared-non-secret zeros image *BEARER*; `mt` calls mode 0620 a mode that
+  *"grants read to group or others"* when `0620 & 0o044 == 0` and no read bit
+  is set outside owner. **A message derived from the observed mode cannot make
+  either error; a hard-coded string can and does — twice, in two repos, found
+  the same day.** F-259 traces to a `bool` two callers read differently, which
+  is precisely what a shared type prevents.
 
 **D3 is already implemented in `me`, and that is the reference.** Measured in
 the main checkout's working tree during the fold: `me sysw pack` refuses secret
