@@ -386,6 +386,64 @@ the shell-purge remedy text. `mt encode` stays `mt encode`; only the plumbing it
 calls becomes common. Recorded because "shared crate" reads like somewhere things
 get moved to, and nothing moves.
 
+### 5c. What moves to the toolkit, decided (operator, 2026-08-26)
+
+**Ruled, verbatim:** *"Split combine compile and stuff like that go to toolkit"*,
+*"Derive should move to toolkit"*, *"Address stuff should move to toolkit"*, and
+*"Repair can stay with m\*-cli binary"*.
+
+This settles what §5b parked. Applying §5b's criterion — a verb stays when it is a
+**basic manipulation of an `m*1` string**:
+
+| verb | in | ruling |
+| --- | --- | --- |
+| `split` | `ms` | **→ toolkit** (secret sharing) |
+| `combine` | `ms` | **→ toolkit** (secret sharing) |
+| `compile` | `md` | **→ toolkit** (miniscript processing) |
+| `derive` | `mk`, `ms` | **→ toolkit** (key derivation) |
+| `address` | `md`, `mk` | **→ toolkit** (address derivation) |
+| `repair` | `md`, `mk`, `ms` | **STAYS** — repairing a damaged `m*1` string is a basic manipulation of one |
+
+**`repair` was ruled three times and settled on staying.** Recorded because the
+reversal is the useful part: it is the only one of the six that carries a
+cross-CLI normative rule. **D26's parity set is `md repair` / `mk repair` /
+`ms repair` / `mnemonic repair`**, quoted in `md repair --help`'s own shipped
+text and governing §6f's exit-code table, and `repair` appears **31 times** in
+this document. Moving it would have collapsed that set to one member and made
+three things false rather than outdated — the shipped help text, §6f's three
+encoder rows, and D26's normative statement.
+
+**So D26 is untouched by §5c, and no exit-code work is reopened.** The toolkit
+keeps its own `repair` as well; the two disagree by design (`md repair` → 5,
+`mnemonic repair` → 4 on the same input), which D26 permits because the codes are
+semantic rather than a shared integer. Both keep their verb.
+
+**Two verbs the rulings do not name, classified here under the criterion and
+flagged as a READING, not a ruling:**
+
+- **`md descriptor`** — *"Derive bitcoin addresses from a wallet-policy-mode
+  descriptor. Emit the CONCRETE output descriptor … for pasting into a
+  coordinator."* It **derives addresses**, which is the class just ruled to the
+  toolkit. Read as **→ toolkit**.
+- **`md bytecode`** — *"Dump the raw payload bits in an annotated layout."* That
+  is `inspect` at higher resolution: it describes the `m*1` string's own
+  encoding and nothing else. Read as **STAYS**.
+
+**A third class the criterion does not reach, and which cannot move.** `vectors`,
+`gui-schema` and `gen-man` are on all three of `md`, `mk` and `ms`. They are
+neither m-string manipulation nor fancy processing — they describe or maintain
+**the binary itself**:
+
+| verb | what it does | why it cannot move |
+| --- | --- | --- |
+| `gen-man` | roff man pages for the CLI tree | reflects that binary's own clap tree |
+| `gui-schema` | JSON of this CLI's flag surface, consumed by `mnemonic-gui` | describes that binary's own flags |
+| `vectors` | the SHA-pinned test-vector corpus (maintainer tool) | that format's corpus, pinned to that repo |
+
+Moving these would require the toolkit to hold every other binary's clap tree,
+which inverts the dependency. **They stay, structurally rather than by
+judgement** — recorded so a later reader does not re-open it as an oversight.
+
 ## 6. The surface, after
 
 ### 6a. Which verbs the stdout rule binds
