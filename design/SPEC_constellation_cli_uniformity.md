@@ -280,9 +280,11 @@ the home of.
 when P0 closes GREEN**, publication operator-gated.
 
 **The name is proposed here rather than left to the plan (C-d)**, because it is
-baked into five `Cargo.toml`s, every `use` site, and a registry publish that
-cannot be taken back. **The name below is NOT settled and does not yet follow the
-constellation's convention — see the measurement.**
+baked into **six** `Cargo.toml`s (D5's enumerated consumers), every `use` site,
+and a registry publish that
+cannot be taken back. **The name is RULED below (`mnemonic-io-lib`, operator,
+2026-08-26). It deliberately does not follow either existing suffix — see the
+measurement for why the convention needs a third.**
 
 The 21 first-party crates use `<format-prefix>-<layer>[-<qualifier>]`:
 
@@ -327,33 +329,50 @@ misusing either existing one. It already has `-codec` for the pure format
 transform and `-cli` for the runnable binary; this is shared runtime plumbing
 and is neither.
 
-### The name: `mnemonic-io-lib` (operator, 2026-08-26)
+### 5a-i. The name: `mnemonic-io-lib` (operator, 2026-08-26)
 
 **Two candidates were rejected on measurements, and the second reversed the
 author's own recommendation.**
 
-- **`m-cli-io` — rejected.** `-cli` marks a crate that builds a binary in 4 of 4
-  cases; this builds none. `m` names no format.
+- **`m-cli-io` — rejected.** `-cli` marks a crate that builds a binary in **5 of
+  5** cases; this builds none. `m` names no format.
 - **`mnemonic-io-codec` — rejected.** `-codec` does partition library-from-binary
-  perfectly today (5 of 5 `-codec` crates are `lib.rs` with no `main.rs`; 4 of 4
-  `-cli` crates are the reverse), so the instinct was sound. But `-codec` carries
+  perfectly today — **5 of 5 `-codec` crates are `lib.rs` with no `main.rs`; 4 of
+  the 5 `-cli` crates are the reverse, and the fifth, `me-cli`, is both** — so the
+  instinct was sound. (An earlier revision said "4 of 4", which reached the right
+  conclusion by quietly dropping the one crate that complicates it.) But `-codec` carries
   a second meaning — **purity** — and this crate is its negation.
 - **`mnemonic-io` — rejected**, and this is the one that overturned the
   recommendation. General Rust idiom treats `-lib` as redundant, but idiom is not
-  what a reader of *this* tree applies. Measured from the install records:
+  what a reader of *this* tree applies. Measured from the manifests:
 
 ```
-md-cli → md   mk-cli → mk   ms-cli → ms   mt-cli → mt
-mnemonic-engrave → me       mnemonic-toolkit → mnemonic
-mnemonic-gui → gui-render, mnemonic-gui
+$ grep -A2 '^\[lib\]' mnemonic-engrave/crates/me-cli/Cargo.toml
+  [lib]
+  name = "mnemonic_engrave"
+  path = "src/lib.rs"
 ```
 
-**Every `mnemonic-*` package produces an executable — 3 of 3. There is no
-`mnemonic-*` library.** So the prefix already signals *a program you can run*,
-and `mnemonic-io` would read as a fourth. Cargo would not be fooled — a crate is
-a library by having `src/lib.rs` and no `[[bin]]`, and `cargo install` would
-refuse it — but the name goes into six manifests and every `use` site, which are
-read by people.
+**No `mnemonic-*` package is library-ONLY — all three ship a binary**, and
+`mnemonic-engrave` and `mnemonic-toolkit` ship a lib target *as well*
+(`mnemonic-engrave` is published and renders at `docs.rs/mnemonic-engrave`). So
+the prefix reliably signals *a program you can run*, and `mnemonic-io` would
+read as a fourth.
+
+**An earlier revision asserted the prefix had no library at all — false, and its
+evidence could not have shown otherwise.** (The claim is described rather than
+quoted: quoting a retracted string re-mints it, which is how this document has
+re-created eight of them, every one caught by re-running a sweep and none by
+re-reading.) It cited `cargo install
+--list` — a command that enumerates installed **binaries by construction** and
+can therefore never exhibit a library. **A tool that cannot express the negative
+you are asserting is not evidence for it**; this is the same shape as an earlier
+cell in §6f measured with a subcommand that does not exist. The corrected fact
+still supports the suffix: *library-only* is what the prefix has never meant.
+
+Cargo itself would not be fooled — a crate is a library by having `src/lib.rs`
+and no `[[bin]]`, and `cargo install` would refuse it — but the name goes into
+**six** manifests and every `use` site, which are read by people.
 
 **`-lib` therefore does real work here rather than being noise**: it
 disambiguates against a prefix that currently means binary. That is a
@@ -363,11 +382,22 @@ error that produced `m-cli-io`.
 **APPROVED by the operator, 2026-08-26, and confirmed available the same day:**
 
 ```
-$ curl -s -o /dev/null -w '%{http_code}' https://crates.io/api/v1/crates/mnemonic-io-lib
+$ curl -s -o /dev/null -w '%{http_code}' -A 'name-check' \
+    https://crates.io/api/v1/crates/serde            # control: must be 200
+  200
+$ ... -A 'name-check' .../mnemonic-io-lib
   404
-$ ... /mnemonic_io_lib
+$ ... -A 'name-check' .../mnemonic_io_lib
   404
 ```
+
+**`-A` is load-bearing and the `serde` control is the gate, not decoration.**
+crates.io rejects a user-agent-less request with **403 — for every name, taken
+or free**. An earlier revision recorded the command without `-A` while having
+run it with, so as written it returned 403 for `mnemonic-io-lib` *and* for
+`serde`, and could not distinguish them. **Check the control first: if `serde`
+does not return 200, the request is not being answered and no 404 below it means
+anything.**
 
 **Both forms checked, and that is the point rather than thoroughness for its own
 sake:** crates.io treats `-` and `_` as colliding, so a name is only free when
@@ -377,7 +407,7 @@ line of this plan today and a rename across six manifests once the code exists.
 **A 404 is availability at a moment, not a reservation.** Nothing holds the name
 until P0 publishes, so P0 re-checks immediately before the irreversible step
 rather than trusting this line. **P0 must confirm the name is free on crates.io before publishing**;
-an unavailable name is a rename across five manifests if it is discovered after
+an unavailable name is a rename across six manifests if it is discovered after
 the code is written, and one line of the plan if it is discovered before.
 
 **All six binaries are consumers, `me` included (C-d).** `me` is the donor of
@@ -445,11 +475,12 @@ semantics, same channels, same exit codes. That is this spec's whole subject, an
 one of the four, or spelling it differently, is a defect. **P0's gate asserts all
 four exist on all four**, which is cheap and currently passes.
 
-**NOT settled, and explicitly out of this cycle:** whether the verbs in the right
+**SETTLED BELOW IN §5c** — the measurement here is the data §5c reasons from, and
+was written before it. The question it framed was whether the verbs in the right
 column belong where they are. `mt` carries exactly the four and is the shape the
 criterion describes; `md`, `mk` and `ms` have each accreted work that reads as
 fancy-processing tier — `split`/`combine` is secret sharing, `compile`/
-`descriptor`/`bytecode` is miniscript processing, `derive` is key derivation, and
+`descriptor` is miniscript processing, `derive` is key derivation, and
 `repair` is duplicated in the toolkit as well. **Whether those move is the tier
 cycle's question, not this spec's**, and it is recorded here so that cycle starts
 from a measurement instead of an impression.
@@ -482,8 +513,8 @@ This settles what §5b parked. Applying §5b's criterion — a verb stays when i
 reversal is the useful part: it is the only one of the six that carries a
 cross-CLI normative rule. **D26's parity set is `md repair` / `mk repair` /
 `ms repair` / `mnemonic repair`**, quoted in `md repair --help`'s own shipped
-text and governing §6f's exit-code table, and `repair` appears **31 times** in
-this document. Moving it would have collapsed that set to one member and made
+text and governing §6f's exit-code table, and `repair` appears on **39 lines** of
+this document (`grep -ic repair`, re-measured after §5c). Moving it would have collapsed that set to one member and made
 three things false rather than outdated — the shipped help text, §6f's three
 encoder rows, and D26's normative statement.
 
@@ -491,6 +522,29 @@ encoder rows, and D26's normative statement.
 keeps its own `repair` as well; the two disagree by design (`md repair` → 5,
 `mnemonic repair` → 4 on the same input), which D26 permits because the codes are
 semantic rather than a shared integer. Both keep their verb.
+
+**THESE MOVES ARE DECIDED, NOT SCHEDULED — and this is the sentence that keeps
+the plan writable.** D7 (§9a) still holds: **this cycle relocates nothing.**
+Every verb above keeps its current home through P0–P4 and receives §6's
+uniformity treatment there; **the tier cycle executes the move and carries that
+treatment with it.**
+
+Without this, §7 is unbuildable rather than merely imprecise. No phase owns the
+migration — across §7's phase rows, `split`, `combine`, `compile` and `address`
+appear **zero** times and so does `toolkit` — while §7 P2 *does* schedule
+`--in`/argv work **on** `ms split`, `combine` and `derive`. An author reading
+§5c as a work order would delete the verbs P2 is told to modify.
+
+**Operator ruling, 2026-08-26:** record the migration, do not absorb it. This
+spec is CLI *uniformity* — its decisions are IO and safety and its phases are
+structured around adopting the shared crate. Absorbing a verb-relocation
+program would roughly double the cycle and delay the shared safety layer, which
+is the part carrying security value.
+
+**"And stuff like that" is taken to cover nothing beyond the enumeration
+above.** Every subcommand on `md`, `mk` and `ms` is classified in this section —
+**12 + 10 + 11 = 33**, measured from each binary's own `--help` excluding
+`help` — leaving no residue for a plan author to guess at.
 
 **Two verbs the rulings do not name, classified here under the criterion and
 flagged as a READING, not a ruling:**
@@ -508,15 +562,21 @@ flagged as a READING, not a ruling:**
 neither m-string manipulation nor fancy processing — they describe or maintain
 **the binary itself**:
 
-| verb | what it does | why it cannot move |
-| --- | --- | --- |
-| `gen-man` | roff man pages for the CLI tree | reflects that binary's own clap tree |
-| `gui-schema` | JSON of this CLI's flag surface, consumed by `mnemonic-gui` | describes that binary's own flags |
-| `vectors` | the SHA-pinned test-vector corpus (maintainer tool) | that format's corpus, pinned to that repo |
+| verb | what it does | why it stays | strength |
+| --- | --- | --- | --- |
+| `gen-man` | roff man pages for the CLI tree | reflects that binary's own clap tree | **structural** |
+| `gui-schema` | JSON of this CLI's flag surface, consumed by `mnemonic-gui` | describes that binary's own flags | **structural** |
+| `vectors` | the SHA-pinned test-vector corpus (maintainer tool) | that format's corpus is pinned in that repo | **locality, not structure** |
 
-Moving these would require the toolkit to hold every other binary's clap tree,
-which inverts the dependency. **They stay, structurally rather than by
-judgement** — recorded so a later reader does not re-open it as an oversight.
+**The two strengths are different and the table now says so.** `gen-man` and
+`gui-schema` are structural: they reflect the binary's own clap tree and its own
+flags, so moving them would require the toolkit to hold every other binary's
+clap tree, inverting the dependency. **`vectors` is not — nothing prevents the
+toolkit from printing another repo's corpus.** It stays because the corpus is
+SHA-pinned where the format lives, which is a locality argument and a weaker
+one. An earlier revision grouped all three as structural; that overstated the
+case for `vectors`, and a reason stated stronger than it is invites exactly the
+re-litigation this paragraph exists to prevent.
 
 ## 6. The surface, after
 
@@ -1406,8 +1466,11 @@ measurement** and struck.
   script outside these repos.
 - **STILL OPEN — the in-memory shell-history question in §6h.** No command is
   specified for it because none is verified.
-- **STILL OPEN — two `mnemonic` exit-code cells** in §6f: invalid-artifact
-  and repair-uncorrectable. The repair-applied cell is measured (4).
+- **CLOSED — all four `mnemonic` exit-code cells are measured** (usage 64,
+  invalid-artifact 1-or-2 by input shape, repair-applied 4,
+  repair-uncorrectable 2). This bullet declared two of them open through three
+  folds after they were filled; it was the **third** site of that correction,
+  closed at two and missed here.
 - **RECORD HYGIENE, so the plan does not re-open closed work (N-2).** This spec
   cites F-246, F-250, F-251, F-252 and F-253 as settled, and the behaviour is
   present in the binaries — verified during the fold: `mt encode -` works
@@ -1493,7 +1556,10 @@ processing** (BIP-85, SLIP-39, Electrum crypto, seed XOR, address derivation);
 "clean, organized, and relatively symmetric" constellation.
 
 **This cycle makes the encoding tier UNIFORM. It does not RELOCATE anything.**
-Every rule in §6 applies to a feature already living where it belongs:
+Every rule in §6 applies to a feature already living where it belongs — **and
+that stays true after §5c, because §5c decides moves without scheduling them.
+Through P0–P4 all five relocating verbs remain in their current binaries and
+receive §6's treatment there.** The tier cycle carries it with them:
 
 | in scope, because it is already in the right tier | why |
 | --- | --- |
