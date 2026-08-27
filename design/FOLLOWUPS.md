@@ -11707,3 +11707,39 @@ five: `mnemonic-engrave`, `mnemonic-transaction`, `mnemonic-key`,
 
 **Related:** [[F-256]] is the disk half of this. The trees themselves are small;
 what makes them expensive is each carrying its own `target/`.
+
+### F-264 — `me`'s zsh purge recipe removes NOTHING when run immediately, under stock zsh defaults (owning phase: **P0**) `#me` `#security` `#shipped`
+
+**Found 2026-08-27** by the step-4 probe, which wrote the positive test §6
+condition 5 demands and then watched it fail. **The test was worth writing
+because it failed.**
+
+**The sequence, on this machine's own configuration** — stock zsh 5.9.2:
+
+1. The operator puts a secret on argv. `me` refuses and prints a purge recipe.
+2. They run it **immediately**, as the message invites.
+3. zsh is still holding that entry **in memory**. `HISTFILE` does not contain it
+   yet.
+4. `sed -i` edits a file the secret is not in, **exits 0, prints nothing**.
+5. At session exit, zsh writes its in-memory history — **including the secret** —
+   to disk.
+
+**The operator is told to purge, does exactly as told, sees success, and the
+secret lands on disk anyway.** That is the same class of defect as `history -d`,
+which this very message exists to warn against.
+
+**Fish is worse on three counts and disarmed on a fourth.** Its recipe is
+interactive, so it deletes nothing unattended; it **re-displays the secret**
+while asking for confirmation; its anchored `--prefix` misses path-qualified
+invocations; and on this operator's machine a `history` function in
+`config.fish:105` **drops all arguments**, disarming it entirely.
+
+**What would fix the zsh half:** the recipe must flush before it edits — `fc -W`
+(or `fc -AI`) first, then `sed -i`, then `fc -R` to reload — or the message must
+say plainly that the entry is still in memory and the shell must be exited
+first. **Either is honest; the current text is not.**
+
+**Not a regression and not urgent** — it is as old as the message, and an
+operator who never puts a secret on argv never sees it. But it is a security
+message that reports success while achieving nothing, which is precisely the
+shape this repo disqualified `mt`'s text for.
