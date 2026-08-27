@@ -12180,6 +12180,23 @@ mask out of P1. And `--out` alone would NOT close it: `--out` adds a private
 channel, it does not stop a plain `>` from creating 0644. Half a fix that reads
 as a whole one is worse here than the honest gap.
 
+**OPERATOR RULING 2026-08-27: WARN, do not refuse.** *"These are stupid minor
+details that don't warrant optimizing yet. Just print a warning, file an issue,
+and move on."*
+
+**So: `mt decode` prints a warning naming the mode it measured, and proceeds at
+exit 0.** It does not refuse, and `--out` is not added to close it.
+
+**The reason the cheap option is the right one here**, recorded so it is not
+re-litigated: the operator's umask is **022**, so a plain `mt decode > tx.hex`
+creates the file at **0644** — which an `encode`-style refusal would reject. On
+every default-configured machine, consistency would break the ordinary
+invocation on the first try. A warning costs nothing and says the true thing.
+
+**This entry stays open** as the record that the asymmetry is deliberate rather
+than overlooked. Whoever revisits it should know `encode` refuses and `decode`
+warns **by decision**, not by omission.
+
 ### F-276 — the shared crate's boundary is `me`-shaped in two places, found by the first second consumer (owning phase: **`mnemonic-io-lib` 0.2, before a third consumer**) `#mnemonic-io-lib` `#P1` `#design`
 
 **Found 2026-08-27** writing the P1 plan. `mt` adopts **5 of the crate's 11
