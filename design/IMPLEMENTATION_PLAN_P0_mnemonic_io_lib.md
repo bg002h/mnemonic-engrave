@@ -171,7 +171,11 @@ exactly what a shared type prevents.**
 132 lines, the largest by 3×, and **only 9 of them touch IO at all**
 (`std::fs`, `std::io`, `stdin`, `File::`, `read_to_string`, `BufRead`). Its argv
 gate performs no IO whatsoever, and it currently has **13 spawn tests and zero
-unit tests**. **This is where the seam actually pays.**
+unit tests**. **An earlier draft named this the place the seam paid off, and proposed
+splitting it. That is retracted** — two of its three `EXIT_*` references fall
+outside the arm a split would keep, so splitting it makes the moving set carry
+three references instead of one and collapses the single-signature-change
+result. **It stays whole.**
 
 *(An earlier draft claimed a "100 pure / 32 mechanism" split, transcribed from a
 design report without recomputation. It is not reproducible under any rule —
@@ -225,7 +229,7 @@ codes — and §6b's permissive wording, which lets an implementation take the
 flag and do nothing with it, makes the compliant
 implementation **silently lossy**: `… | me sysw pack --out b.bin - text:6869`
 packs **1 record instead of 2, at exit 0**, on the artifact that gets cut into
-metal. **Step 6 implements `-`; it does not accept and ignore it.**
+metal. **`-` is implemented, not merely accepted.**
 
 **STEP 4's ORIGINAL GATE WAS FALSE AGAINST THE CORRECT TEXT (probe, Critical).**
 It read *"the zsh remedy does not contain `history -d`"*. `me`'s refusal **does**
@@ -413,7 +417,7 @@ six; without this table a reader cannot tell where a function lands:
 | `exit.rs` | `write_block` — the DECISION only (N-I1) |
 | `remedy.rs` | the purge/remedy text |
 | `lib.rs` | re-exports only |
-| **stays in `me`** | `is_secret`, `is_bearer`, `is_argv_forbidden`, and `read_records`'s class-keyed arm (N-C2) |
+| **stays in `me`** | `is_secret`, `is_bearer`, `is_argv_forbidden`, and **`read_records` WHOLE** — not just its class-keyed arm (round-3 C-2) |
 | **stays in `me`** | **every `refuse_*`** — `refuse_write_block`, `refuse_terminal_destination`, `refuse_world_readable_stdout` (N-I1) |
 | *(caller-side)* | `emit`, `write_private` — see below |
 
@@ -447,7 +451,7 @@ fails to compile *and* contradicts §5a's boundary line four paragraphs above it
 1's own check would have passed it**: the earlier wording asked only whether a
 type was moved or public, and `Class` *is* public — in `me`. The cheapest edit that makes such
 a build succeed is to drag `me`'s container vocabulary into the shared crate at
-the irreversible step, with step 7's gate written to accept it under a citation.
+the irreversible step, with the adoption gate written to accept it under a citation.
 **That is C1's shape, one file over.**
 
 **So the split is by REPRESENTATION.** The crate's recognisers work on strings —
@@ -464,9 +468,9 @@ which.** An earlier draft guessed at this list, naming `Admission`, which has
 **zero references in the 464 moved lines**, and omitting **the symbols that actually cross**. That list was measured against the
 **rejected 464-line move** and named `EXIT_OK`/`EXIT_USAGE`/`EXIT_REFUSED` as
 crossing — **under Variant B they do NOT cross**, and citing them here pointed
-the implementer straight at the forbidden publish (round-2 I-1). Step 2
+the implementer straight at the forbidden publish (round-2 I-1). **The move**
 enumerates the real set against the five-function move, in both directions. **Guessing at a closure
-is what step 1 exists to replace.** **Step 1 must enumerate every type and
+is what this plan exists to replace.** **The move must enumerate every type and
 constant the 11 reference and confirm each is either moved or **reachable
 WITHOUT an inherent impl in the crate** — "already public" is NOT sufficient
 and is precisely what let N-C2 through: `Class` is public, and an inherent
@@ -520,7 +524,7 @@ as **F-265**.)
 
 **FOUR CALLERS LIVE OUTSIDE THE CLOSURE (probe I-2).** `write_private` has
 **three** and `refuse_world_readable_stdout` **one**, producing four `E0425`s
-that nothing in this plan predicted. Step 1 must enumerate **callers**, not just
+that nothing in this plan predicted. **The move** must enumerate **callers**, not just
 callees — the closure was computed one direction only.
 
 **I1 — STEP 1's GATE CANNOT FAIL FOR THE TERMINAL ARM, so it is not left as the
@@ -528,16 +532,16 @@ only proof.** "The 388 still pass" is green whether or not the terminal refusal
 survives the move — and the terminal arm is one of the 11, and the one carrying
 F-259's funds-adjacent behaviour. **All 12 tests in
 `crates/me-cli/tests/world_readable_output.rs` redirect to files, so none of them
-reaches it.** Step 1 therefore carries a **pty assertion** pinning the refusal
+reaches it.** **The move** therefore carries a **pty assertion** pinning the refusal
 (the repo already has the technique — `script -qec` reproduces it), and without
-that assertion step 1 proves nothing about the terminal path.
+that assertion the move proves nothing about the terminal path.
 
 **M5 — steps 1 and 7 do NOT have a test that must fail first, and the column
 header should not claim they do.** Both are refactors whose gate is *"the suite
 still passes"*, which is a regression gate, not a RED-first one. That is
 legitimate for a move; asserting it is TDD when it is not would hide which steps
 carry real proof. Steps 2, 3, 4, 5, 5b, 5c and 6 are RED-first; **1 and 7 are
-regression-gated**, and step 1's pty assertion is the one RED-first thing in it.
+regression-gated**, and the move's pty assertion is the one RED-first thing in it.
 
 **STEP 1 AS WRITTEN CANNOT BE DONE, and only executing it revealed why (probe
 C-1).** The three exit constants are **private** in `main.rs`:
@@ -547,8 +551,8 @@ const EXIT_OK: i32 = 0;  const EXIT_USAGE: i32 = 2;  const EXIT_REFUSED: i32 = 3
 ```
 
 A lib module cannot see a binary's items, so moving the 11 into the lib half
-**requires publishing them** — and step 1's *"intact, no behaviour change"*
-forbids the signature change that would avoid it. So step 1 as first written
+**requires publishing them** — and an *"intact, no behaviour change"* move
+forbids the signature change that would avoid it. So the move as first written
 necessarily commits **`pub const EXIT_USAGE: i32 = 2`** into the donor's public
 API: the exact thing §3 spends a page ruling out. **No ordering avoids it. It is
 a language rule, like N-C2.**
@@ -580,7 +584,7 @@ closed and holds exactly one, whose only callers stay in `me`.
 **SO: ONE SIGNATURE CHANGE, NO NEW TYPE.**
 `no_records_guard -> Result<Vec<String>, String>`. Executed and green: a
 **160-line** move against 442, **8** public items against 15, and the decision
-type deferred to step 5b — the step that actually produces a second variant.
+type deferred to the value-shape layer — the work that actually produces a second variant.
 **A smaller correct answer beats a larger elegant one**, and the larger one was
 about to be scheduled on the strength of a premise its own table refuted.
 
@@ -589,21 +593,24 @@ type was inert *by construction* (both variants mapped to `EXIT_USAGE`). Here th
 two-variant swap goes **RED by 9 tests**, with every mutation site proven to run
 by observing the binary's exit code change.
 
-**§4's TABLE IS THE ONLY ORDERING OF RECORD (probe C-2).** An earlier fold
-introduced a prose "step 2" that is not the table's step 2 — the table's is the
-`fd.rs` mask split — leaving three inconsistent orderings within a few lines.
-**Prose must not number steps.** Where the sequence matters, amend the table.
+**PROSE IN THIS PLAN NEVER NAMES A STEP NUMBER.** Twice now a fold has renumbered
+one half and left the other asserting the old sequence — round 2 found the table
+stale against the prose, round 3 found the prose stale against the table, **13
+sites**, including a tie-break paragraph whose own example about the table had
+become false. **The table is the only ordering of record**; rationale refers to
+work by NAME — *the mask split*, *the move*, *the signature change* — so a
+renumbering cannot falsify it.
 
-**Steps are ordered as the table states, and the reason follows.** Step 1 moves
-`stdout_world_readable_mode` *with* its `& 0o044` so nothing changes; step 2
-then splits it, pushing the mask back to `me`'s call site. Behaviour is
-unchanged at **both** steps, and at no point does a masked function sit inside
-the crate. An earlier draft ordered step 1 to "move with no behaviour change"
-and step 2 to hold "no policy assertion" — **which cannot both be true of the
-same function**, and the reading that satisfied step 1 published `me`'s mask as
-the crate's mechanism.
+**THE MASK SPLIT COMES AFTER THE MOVE, NOT BEFORE.** `stdout_world_readable_mode`
+travels **with** its `& 0o044` so the move changes nothing, and the split then
+pushes the mask back to `me`'s call site. Behaviour is unchanged at both points,
+and **at no moment does a masked function sit inside the crate** — which is the
+whole of C1. An earlier draft ordered the move to be "intact, no behaviour
+change" and the split to hold "no policy assertion" *of the same function*,
+which cannot both be true, and the reading that satisfied the first published
+`me`'s mask as the crate's mechanism.
 
-**Step 1 is not a refactor to skip.** It is the step that proves the closure is
+**The move is not a refactor to skip.** It is the step that proves the closure is
 really 11 and not more.
 
 **The `#[cfg(not(unix))]` stub of `stdout_world_readable_mode`
@@ -657,7 +664,7 @@ before publishing; do not trust a check from an earlier session.
    re-running a sweep and none by re-reading.) **The escape
    is exactly the failure mode `remedy.rs` exists to prevent** — `history -d`
    reports success and purges nothing, and "recorded as unanswerable" is the
-   documentation-shaped version of the same thing. **Step 4 therefore carries a
+   documentation-shaped version of the same thing. **The remedy work therefore carries a
    POSITIVE test: run the emitted recipe under an interactive shell and assert
    the entry is gone**, not that a command was printed.
 6. **F-259 and F-260 are caught by a TEST, not by construction — "by
@@ -701,13 +708,17 @@ before publishing; do not trust a check from an earlier session.
 8. **The guard AND the override's own parse are both decided before
    `Cli::parse()`**, asserted at least in the donor (C2). A guard that reaches
    its decision by parsing first has reintroduced the leak §6d exists to stop.
-9. **F-264 fixed, because step 5's gate cannot pass otherwise.** `me`'s zsh
+9. **F-264 fixed, because the remedy gate cannot pass otherwise.** `me`'s zsh
    recipe removes nothing when run immediately — the entry is still in memory
-   and `sed -i` edits a file that does not contain it. **Step 5 demands the
+   and `sed -i` edits a file that does not contain it. **That gate demands the
    recipe actually work**, so P0 either fixes the recipe (`fc -W`, edit, `fc -R`)
-   or changes the message to say the shell must be exited first. Both are
-   honest; the present text is not. Owning phase in `FOLLOWUPS.md` is already P0.
-10. **F-265 fixed for the moving set at minimum.** Five refusals can swap exit
+   **The remedy must make the recipe WORK** — flush, edit, reload (`fc -W`, `sed
+   -i`, `fc -R`). Merely rewording the message to say "exit the shell first"
+   is honest but **cannot make the gate green**, and under "no step begins
+   until the previous is green" that would stall everything after it
+   (round-3). If the recipe genuinely cannot be made to work, that is a
+   finding to raise, not a wording to settle for. Owning phase in `FOLLOWUPS.md` is already P0.
+10. **F-265 fixed at ALL FIVE SITES — "for the moving set" would be vacuous, since every one of them stays in `me`** (round-3). Five refusals can swap exit
    **2 for 3** with all 388 tests green, proven against the unmodified binary.
    P0 moves these functions, and **a refactor over an untested distinction is
    how the distinction dies.** Every gate in §4 that asserts a refusal pins the
