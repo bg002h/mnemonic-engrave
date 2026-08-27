@@ -12166,7 +12166,7 @@ comparing it against what they pasted a number that matches nothing.
 odd-length hex string is still below the recogniser's threshold and is still
 echoed. It remains the F-267 class.
 
-### F-275 — `mt decode` writes broadcastable bearer hex to a world-readable stdout at exit 0, while `mt encode` refuses the identical destination (repo: **mnemonic-transaction**; owning phase: **a ruling the operator owes**, before the phase that acts on it) `#mt` `#security` `#shipped`
+### F-275 — `mt decode` writes broadcastable bearer hex to a world-readable stdout at exit 0, while `mt encode` refuses the identical destination (repo: **mnemonic-transaction**; owning phase: **P1** — RULED 2026-08-27, and the plan's decode-warning row now builds it) `#mt` `#security` `#shipped`
 
 **Found 2026-08-27** while measuring which `mt` verbs `--out` should reach.
 
@@ -12282,7 +12282,7 @@ collision and each answer it differently — and the one who answers it by
 silently preferring argv has built the opposite of `mt`. The spec should rule it
 once. `mt`'s answer is offered as the candidate, not as precedent by seniority.
 
-### F-278 — F-275 is RULED but no plan row owns it, so the operator's decision is scheduled nowhere (owning phase: **the next `mt` cycle — it needs a row, not a ruling**) `#mt` `#plan` `#record`
+### F-278 — RESOLVED 2026-08-27: F-275 was RULED but no plan row owned it, so the operator's decision was scheduled nowhere (owning phase: **P1** — closed by adding the decode-warning row) `#mt` `#plan` `#record` `#resolved`
 
 **Found 2026-08-27** reconciling open follow-ups against P1's rows before
 starting the adoption work, per the per-phase burndown rule.
@@ -12305,3 +12305,48 @@ reader concludes correctly that it is *waiting on the operator*, which it is not
 **It is small and it is mt-local.** `file_mode_warning` already exists and
 already has exactly the shape the ruling asks for; what it lacks is a caller on
 the reading verbs and a stdout-side sibling. It needs a row, not a design.
+
+### F-279 — 14 of 15 `mt` line citations in the P1 plan are stale for the branch that will consume them, and the citation gate is green on every one (repo: **mnemonic-engrave**; owning phase: **P1**, at the merge of `impl/p1`) `#plan` `#tooling` `#gate`
+
+**Found 2026-08-27** while adding the decode-warning row, by checking a new
+citation against the worktree instead of against the live checkout.
+
+The plan's `crates/mt-cli/` line numbers are anchored at `cf17591`. Rows 1–4
+have since landed on `impl/p1`, moving them. Measured by comparing each cited
+line's *content* between `cf17591` and `a4cdefa`:
+
+```
+same = 1        drift = 14        (of 15 distinct mt-cli citations)
+```
+
+`plan-cite-check.sh` reports **41/41 resolved, 0 dangling** across the same
+document. It is not malfunctioning — its header states the blind spot exactly:
+*"WHAT IS ON THE LINE -- only that the line exists."*
+
+**The hazard is a wrong citation, not a dangling one.** The `validate.rs` line
+the plan describes as the `is_file()` keying comment now holds the opening of
+`fn looks_like_a_transaction` — a real function the plan cites separately
+elsewhere. A reader following the number lands somewhere plausible and wrong.
+A dangling-citation check structurally cannot see this: the line resolves.
+
+**Mitigated, not closed.** The plan now carries an anchor warning under its
+row table telling implementers to locate every site by SYMBOL and re-measure
+the line before quoting it, and the decode-warning row cites by symbol only.
+That is enough for the rows still to be built; it does not fix the other
+fourteen numbers.
+
+**What would close it**, in ascending cost:
+
+1. **Re-anchor at merge** — recompute the fifteen numbers once `impl/p1` is on
+   `mt`'s `main`. One pass, and correct until the next row moves them again.
+2. **Teach the gate content.** A citation written `path:line:anchor` where
+   `anchor` is a substring that must appear on that line. Cheap, and it turns
+   the whole class from "a reader must notice" into a command. This is the one
+   worth building — it generalises to every plan in the constellation, and the
+   same blind spot is in `mnemonic-toolkit`'s copy of the script.
+3. Cite by symbol everywhere and drop line numbers. Drift-proof, and worse to
+   read: the line number is what makes a citation checkable at all.
+
+**Do not read this as "the gate failed".** It caught nine bare-path defects on
+the P1 plan alone that no reading found. It reported its own limit in its
+output, and the limit is where the next defect lived.
