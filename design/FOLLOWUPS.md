@@ -11743,3 +11743,32 @@ first. **Either is honest; the current text is not.**
 operator who never puts a secret on argv never sees it. But it is a security
 message that reports success while achieving nothing, which is precisely the
 shape this repo disqualified `mt`'s text for.
+
+### F-265 — `me` can respell five refusals from exit 2 to exit 3 with all 388 tests green (owning phase: **P0**) `#me` `#tests` `#false-pass`
+
+**Found 2026-08-27** by the fourth-split probe, with a control that makes it
+unambiguous: mutating the **unmodified baseline's** own integers at five sites
+leaves **388/388 passing**, and each mutated line was **proven to execute** by
+watching the binary's exit code change.
+
+| site | mutation | suite |
+| --- | --- | --- |
+| `refuse_write_block`, Terminal arm | 2 → 3 | **green, missed** |
+| `refuse_write_block`, WorldReadable arm | 2 → 3 | **green, missed** |
+| `read_records`, `--in` error | 2 → 3 | **green, missed** |
+| `read_records`, stdin error | 2 → 3 | **green, missed** |
+| `emit`, write failure | 2 → 3 | **green, missed** |
+
+**Exit 2 is a usage error; exit 3 is a policy refusal.** They mean different
+things to a script, and five of `me`'s refusals can swap one for the other
+undetected.
+
+**This is not introduced by any pending work** — the control proves it is the
+state of the shipped binary. It is filed because P0 is about to move exactly
+these functions, and a refactor over an untested distinction is how the
+distinction quietly dies.
+
+**What closes it:** assert the **digit**, not `!success()`. The tests currently
+check that a refusal happened, never which kind — which is why the mutation
+survives. This is also why §4's pty assertion for F-259 must pin the exit code
+rather than mere failure, or it misses even the arm it is named for.
