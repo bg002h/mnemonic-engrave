@@ -12350,3 +12350,54 @@ fourteen numbers.
 **Do not read this as "the gate failed".** It caught nine bare-path defects on
 the P1 plan alone that no reading found. It reported its own limit in its
 output, and the limit is where the next defect lived.
+
+### F-280 — `mnemonic-engrave`'s tree is `cargo fmt --check` RED at 14 files, and CI cannot see it because CI never runs `fmt` (repo: **mnemonic-engrave**; owning phase: **after the P1 rev-pin push**) `#me` `#tooling` `#gate`
+
+**Found 2026-08-27** building P1 row 5, when the row's own `cargo fmt --check`
+gate came back RED on thirteen files the row had not touched.
+
+**Measured at `ba1f3ec`, before any P1-crate work**, by stashing the working
+tree and running CI's own pinned toolchain — not nightly, so this is not a
+rustfmt-version artifact:
+
+```
+cargo +1.85.0 fmt --check   ->  exit 1,  77 hunks,  14 files
+```
+
+The fourteen are `crates/me-cli/src/main.rs`, `src/sysw/{expect,mod,mt,tx}.rs`,
+seven files under `crates/me-cli/tests/`, and — the one that matters for the
+boundary work — `crates/mnemonic-io-lib/src/remedy.rs`, whose single hunk is on
+a line P1 row 5 did not write.
+
+**Why it accumulated: `.github/workflows/release.yml` runs `cargo test --locked`
+and the Go suites, and NOTHING else.** A grep for `fmt` or `clippy` across
+`.github/workflows/` in this repo returns **no hits at all** — not a weakened
+step, an absent one. So `cargo fmt --check` is a gate this project asserts in
+prose and its pipeline has never executed: a hypothesis, not a gate, which is
+exactly the shape the P1 plan's own closure rule warns about. Fourteen files
+drifted with every job reporting green.
+
+**Not fixed in P1's crate rows, deliberately.** Reformatting fourteen untouched
+files is a ~1200-line whitespace diff, and rows 5 and 6 are the last work before
+`master` is pushed to earn the SHA that `mt` will pin by rev. A churn commit in
+that window buys nothing and risks the pin. Both rows instead added **no new fmt
+debt**: `remedy.rs` still carries exactly its one pre-existing hunk, and every
+file the rows created is clean under both `1.85.0` and nightly `rustfmt`.
+
+**What would close it**, and the order matters:
+
+1. **Add the `fmt` and `clippy` steps to the `test (rust + go)` job first.** A
+   reformat without them re-drifts, and the required check is that job — so a
+   step added there is enforced on every SHA that earns its way onto `master`.
+2. **Then reformat, in its own commit, touching nothing else**, so the diff is
+   reviewable as whitespace and a future `git log -S` is not poisoned by it.
+
+Doing (2) before (1) is the version of this that gets done twice.
+
+**Sibling check owed.** `mnemonic-transaction`'s
+`.github/workflows/ci.yml:16` runs `cargo fmt --check`, and `:17`–`:18` run
+`cargo clippy --all-targets --locked -- -D warnings`. That is why P1's row 1
+could gate on both there, and why `mt`'s tree was merely *stale* rather than
+unmeasured. This repo is the one where the steps are missing, so the same audit
+is owed to any other constellation repo whose workflow was copied from this one
+rather than from `mt`'s.
