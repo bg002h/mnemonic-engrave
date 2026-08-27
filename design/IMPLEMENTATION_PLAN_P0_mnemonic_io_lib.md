@@ -232,7 +232,6 @@ as having the pre-parser guard**; P0 must not regress it while adding one.
 | `transaction` | `Class::Mt` ∪ `Class::Tx` | the union is deliberate |
 | `mnemonic` | `Class::Mnemonic` | BIP-39 wordlist |
 | `secret` | `Class::Codex32Secret` | `ms1` HRP |
-| `passphrase` | `Class::Passphrase` | flag-declared only |
 
 **`descriptor` and `cosigner` MUST NOT resolve through `Class` (N-C1).** `me`'s
 `Class` has a **single `MdMk` variant covering both**, so a `Class`-keyed
@@ -249,6 +248,42 @@ this table mapped `descriptor` to `Descriptor`+`MdMk` jointly and omitted
 `cosigner` entirely, which made §10's acceptance command
 `--expect descriptor,cosigner,transaction` **unsatisfiable** — and §10 says it
 must be RUN.
+
+**THE INCOMPLETE-SET CHECK NEEDS THREE WALKS, NOT ONE (probe I-1).** An earlier
+draft said `--expect` needs no second walk because `mdmk_unconfirmed` already
+groups by `(hrp, chunk_set_id)`. **Wrong twice:** that walk discards the HRP, and
+it is **blind to `mt1` entirely** — it filters on `Class::MdMk` and an `mt1`
+chunk is `Class::Mt`. Measured, not read:
+
+```
+mdmk_unconfirmed(3 of the 6 EVEN chunks) == []        ← "nothing wrong here"
+mt_unconfirmed  (the same 3)             == [0, 1, 2]
+```
+
+So §6g's incomplete-set half also needs `sysw::mt::mt_unconfirmed`
+(`crates/me-cli/src/sysw/mt.rs:207`) — a **third** walk, named in neither this
+plan nor §6g. **An implementer who follows the old sentence literally ships an
+`--expect transaction` that passes a half-transmitted transaction as complete**
+— §6g's own failure mode surviving inside §6g's own remedy.
+
+**THE HRP IS NOT DIRECTLY REACHABLE (probe I-2).** It comes only through
+`seal::record::chunk_key`, whose `Ms` arm is `unreachable!()`, and `me`'s
+defensive wrapper around it is module-private. **P0 must widen that access
+deliberately** — reaching for an `unreachable!()` arm from a new call site is
+how a panic ships.
+
+**THE `passphrase` ROW CONTRADICTS ITSELF (probe I-3)** and is unsatisfiable on
+the flag path. `--expect passphrase` is therefore **removed from the
+vocabulary**, on the same rule that removed `address`: a kind that cannot be
+satisfied turns a gate into a permanent refusal.
+
+**`--expect` MUST CONSULT `Admission`, and omitting it creates a false refusal
+on the funds path (probe C-2).** Built exactly as this table specified,
+`me sysw pack --allow-unsigned-inputs --expect transaction` **refuses at rc=4**
+saying *"NO record of that kind is in the stream"* — for a record the **same
+invocation packs at exit 0 without `--expect`**. A false refusal carrying a
+false message, which is C-1's shape reproduced inside the feature P0 is adding.
+**One parameter fixes it: the kind test takes the `Admission` flags.**
 
 **`address` is NOT in the vocabulary, deliberately.** `Class::Address` and
 `Class::Descriptor` are never produced by `classify` — `me sysw pack` refuses an
@@ -556,8 +591,29 @@ before publishing; do not trust a check from an earlier session.
    documentation-shaped version of the same thing. **Step 4 therefore carries a
    POSITIVE test: run the emitted recipe under an interactive shell and assert
    the entry is gone**, not that a command was printed.
-6. **F-259 and F-260 cannot recur by construction** — a payload kind is a type,
-   and a permission message is derived from the observed mode.
+6. **F-259 and F-260 are caught by a TEST, not by construction — "by
+   construction" was FALSE and a probe proved it.**
+
+   An earlier draft of this condition claimed a type made F-259 impossible. The
+   probe built those types in their **strongest** form —
+   `WriteBlock::Terminal(PayloadKind)`, message derived from the carried kind —
+   and then **re-wrote the bug** by changing one pattern to
+   `WriteBlock::Terminal(_)`. Clean `cargo build`, clean
+   `cargo clippy --all-targets`, **391/391 tests passing**, and
+   `me sysw wipe --fill zeros` on a pty printed *"this payload is BEARER"* at
+   exit 2 once more.
+
+   > **A type stops a value being CONFUSED for another value. It cannot stop a
+   > value being IGNORED.**
+
+   Only the literal bool-in-the-kind-seat mistake is blocked by a type — and
+   that is the only shape the old step-3 gate tested, so the gate would have
+   gone green over a live recurrence.
+
+   **What actually catches it: a pty assertion on the EMITTED WORDS**, with a
+   positive control, mutation-checked. The probe verified both directions — the
+   finding test FAILs on the bug and the control PASSes without it. **That
+   assertion is the gate; the types are a convenience.**
 
    **This REQUIRES test and signature changes, and condition 1 must not be read
    as forbidding them (C4).** `emit` and `write_block` change signature: the
