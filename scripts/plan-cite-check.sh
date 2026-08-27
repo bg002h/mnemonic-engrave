@@ -22,18 +22,41 @@
 # ─── WHAT THIS DOES NOT COVER — stated because a gate that hides its blind ────
 #     spot is worse than no gate at all.
 #
-#   * It proves a cited line EXISTS and shows what it says. It does NOT prove the
-#     doc's INTERPRETATION of that line is correct. Reading the printed line
-#     against the doc's claim is still a reviewer's job — but it is now a read,
-#     not a lookup.
+#   * THIS IS THE GATE'S MOST DANGEROUS GAP (F-279), because a clean run LOOKS
+#     identical whether it caught something or not: it proves a cited line
+#     EXISTS and shows what it says. It does NOT prove the doc's INTERPRETATION
+#     of that line is correct, and a stale-but-plausible line reads exactly
+#     like a correct one in the `ok` output. Measured on the P1 plan: 14 of 15
+#     `mt` citations had gone stale under that plan's own first four rows, and
+#     this script reported "41/41 resolved, 0 dangling" -- one citation had
+#     drifted onto a real function the plan cites elsewhere, which is a WORSE
+#     failure than dangling because nothing about the output flags it. Reading
+#     every printed line against the doc's claim is still a reviewer's job —
+#     this script only turns forty re-derivations into forty reads.
 #   * It cannot check claims of ABSENCE ("no test pins this label", "zero call
 #     sites"). Those are grep-negatives, and an empty result is also what a
 #     broken query looks like. Docs must carry the command that produced each
 #     negative, with a positive control.
 #   * It does not compile code blocks. Fragments against a package the
 #     implementer will edit remain a reviewer's execution pass.
-#   * It only resolves citations that LOOK like `path/file.ext:N`. A claim
-#     written as prose ("the flow derives unconditionally") is invisible to it.
+#   * It only resolves citations that LOOK like `path/file.ext:N`, for the
+#     specific extensions in the grep pattern below (currently go, rs, sh, md,
+#     toml, yml, yaml, tsv). A claim written as prose ("the flow derives
+#     unconditionally") is invisible to it -- and so, identically, is a real
+#     `path:line` citation to an UNTRACKED extension (.json, .py, .proto, ...):
+#     it is not reported dangling, it simply never appears in the output. That
+#     is exactly the failure `.tsv` had until this list grew a fourth-to-last
+#     entry; the class is general, not closed by covering `.tsv` specifically.
+#   * AMBIGUOUS only fires on a 2+-root collision AT CITATION TIME. It cannot
+#     see a citation that is already incomplete (missing its true directory)
+#     and was DANGLING for the honest reason "no root has this bare path" --
+#     adding a new root that happens to carry that same bare top-level name
+#     (F-297: `mnemonic-gui`'s `FOLLOWUPS.md`, `src/lib.rs`) turns that loud,
+#     correctly-negative DANGLING into a silent `ok` against an unrelated
+#     file in a different repo. Bare, unqualified citations to a generic
+#     top-level filename are exactly as trustworthy as the least-generic root
+#     that happens to share the name -- qualify them the same way the
+#     ambiguous-basename mechanism already asks you to.
 
 set -uo pipefail
 
@@ -76,6 +99,14 @@ ROOTS=(
   "/scratch/code/shibboleth/mnemonic-toolkit"
   "/scratch/code/shibboleth/mnemonic-key"
   "/scratch/code/shibboleth/mnemonic-secret"
+  # Added 2026-08-27 (F-296) for the P3 plan, which cites mnemonic-gui's Rust
+  # source directly. Checked before adding: mnemonic-gui shares no full
+  # relative path with any root above except the four already-generic,
+  # already-ambiguous top-of-repo names every sibling carries (Cargo.toml,
+  # CLAUDE.md, README.md, CHANGELOG.md) -- those were already AMBIGUOUS with
+  # 5-6 hits before this root existed, so adding a 6th or 7th hit changes no
+  # citation from resolving to ambiguous. No previously-unique path collides.
+  "/scratch/code/shibboleth/mnemonic-gui"
   # mnemonic-transaction is LAST, deliberately. It is the only sibling that
   # carries a copy of a design document this repo also owns
   # (design/SPEC_mt_v0_1.md exists in both), and resolution tries the roots in
@@ -133,7 +164,16 @@ for doc in "$@"; do
   # Pull out `some/path/file.ext:N`, `:N-M` and `:N,M,K` forms. The trailing
   # number group is expanded below, so one citation with three line numbers is
   # checked as three citations.
-  grep -oE '(\./)?[A-Za-z0-9_][A-Za-z0-9_./-]*\.(go|rs|sh|md|toml|yml|yaml):[0-9]+([,-][0-9]+)*' "$doc" \
+  #
+  # `(\./)?\.?` handles TWO different leading-dot shapes, in order: a `./`
+  # relative-path prefix, and a single leading `.` for hidden top-level dirs
+  # (`.github/workflows/x.yml:12`). Without the second group, POSIX ERE cannot
+  # match the leading `.` against the required first `[A-Za-z0-9_]` character,
+  # so grep silently starts the match one character later -- the `.` is
+  # dropped from the captured citation, not from the file on disk, and the
+  # downstream lookup then searches for a top-level `github/` dir that does
+  # not exist. That reports a real, existing file as DANGLING (F-286).
+  grep -oE '(\./)?\.?[A-Za-z0-9_][A-Za-z0-9_./-]*\.(go|rs|sh|md|toml|yml|yaml|tsv):[0-9]+([,-][0-9]+)*' "$doc" \
     | sort -u \
     | while IFS= read -r cite; do
         path="${cite%%:*}"
@@ -226,8 +266,14 @@ echo "─── citations resolved: $((total - bad)) / $total ; dangling: $((bad
 echo "─── resolved against fork root: ${ROOTS[0]}"
 echo "─── NOT covered: interpretation, absence-claims, code-block compilation,"
 echo "───              and WHAT IS ON THE LINE -- only that the line exists. A"
-echo "───              citation to unmerged work resolves against whatever is at"
-echo "───              that line in the root above; set CITE_FORK_ROOT to the"
-echo "───              worktree under review, or this prints ok for a wrong line."
+echo "───              STALE-BUT-PLAUSIBLE line reads as 'ok', identically to a"
+echo "───              correct one (F-279: 41/41 'resolved' hid 14 drifted"
+echo "───              citations) -- read every printed line against the doc's"
+echo "───              claim, do not just check this exited 0. A citation to an"
+echo "───              untracked extension is not dangling either -- it never"
+echo "───              appears above at all. A citation to unmerged work"
+echo "───              resolves against whatever is at that line in the root"
+echo "───              above; set CITE_FORK_ROOT to the worktree under review,"
+echo "───              or this prints ok for a wrong line."
 
 [ "$bad" -eq 0 ]

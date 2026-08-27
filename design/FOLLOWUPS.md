@@ -12558,3 +12558,68 @@ argument that added `descriptor-mnemonic` and the toolkit to `ROOTS`.
 **Workaround in use:** name the workflow and its line number in prose, with no
 `path:line` punctuation. **Fix:** allow a leading dot in the path pattern.
 Blocks nothing; it costs one sentence per citation until then.
+
+### F-297 — a new `ROOTS` entry can silently absorb an already-broken bare citation from a DIFFERENT repo, turning a loud DANGLING into a silent wrong-file `ok` (repo: **mnemonic-engrave**; owning phase: **ownerless residue**) `#tooling` `#gate`
+
+**Found 2026-08-27**, fixing F-286/F-296/the `.tsv` gap, by diffing
+`plan-cite-check.sh`'s full `design/*.md` corpus output before and after —
+required by the fix brief to confirm no *new* dangling citations, done wider
+than the three assigned plans as due diligence.
+
+Adding `mnemonic-gui` to `ROOTS` (F-296) was checked for collisions the way
+the script already knows how to detect them: does any relative path exist
+under two roots at once. It does not — the four names that DO recur
+(`Cargo.toml`, `CLAUDE.md`, `README.md`, `CHANGELOG.md`) were already
+ambiguous across 5-7 other roots before this addition, so a 6th-8th hit
+changes no citation's classification.
+
+**That check is not the whole hazard.** `mnemonic-gui` also carries two
+bare, TOP-LEVEL files no other root has at that exact relative path:
+`FOLLOWUPS.md` (1174 lines) and `src/lib.rs` (21 lines) — most siblings keep
+these under `design/FOLLOWUPS.md` and `crates/*/src/lib.rs`. The `AMBIGUOUS`
+check only fires on a 2+-root collision *at citation time*; it cannot see a
+citation that is *incomplete* (missing its true directory) and was
+previously DANGLING for the honest reason "no root has this bare path" —
+adding a root that coincidentally does have it flips that citation from a
+loud, correctly-negative DANGLING to a silent `ok` pointing at a wholly
+unrelated file in a different repo.
+
+**Measured live, not hypothetical:** `design/CONTINUITY_2026-08-07.md:86`
+cites the bare string `FOLLOWUPS.md` line 59 (missing its `design/` prefix —
+already a stale/incomplete citation before this session; written with a
+space above rather than a colon, deliberately, so quoting it here does not
+itself re-trigger the gate — the same care F-286's own entry took). Before
+F-296 it reported DANGLING; after, it reports `ok` against
+`mnemonic-gui/FOLLOWUPS.md:59`, an entry about `passphrasePlateHook` residue
+that has nothing to do with the slip39 KDF estimate the CONTINUITY doc is
+discussing. **Not fixed here** — correcting the prefix does not make the
+citation correct either, because `mnemonic-engrave/design/FOLLOWUPS.md:59`
+in *this* repo is a different followup again (the line has drifted, the
+F-279 blind spot); fixing it for real needs someone who knows which
+followup entry the 2026-08-07 estimate correction actually meant, which is
+content archaeology outside a script fix.
+
+Two more citations sit on the identical, currently-dormant version of this
+same landmine: `design/DESIGN_b2b_residency_zeroing.md:850` → the bare
+string `FOLLOWUPS.md` line 1762, and
+`mnemonic-engrave/design/FOLLOWUPS.md:4387` and `:4414` (this entry) → the
+bare string `src/lib.rs` line 503. Both still correctly report DANGLING
+today, purely because `mnemonic-gui`'s `FOLLOWUPS.md` and `src/lib.rs` are
+shorter than the cited line numbers — coincidence, not a property the gate
+enforces. A routine edit to either `mnemonic-gui` file crosses that line
+count and both become the same silent wrong-file `ok`, with no signal to
+anyone.
+
+**Not a reason to withhold F-296** — the three actively-maintained P-plans
+this cycle's fix was scoped to show zero citation-count change from adding
+`mnemonic-gui`, and the live instance found is a pre-existing, already-decayed
+citation in a historical continuity doc, not an active plan. Recorded because
+the class recurs on every future `ROOTS` addition and the script's own
+"NOT covered" block does not yet say so. **Fix, not built here (a design
+decision, not a patch):** either (a) require repo-qualification
+(`mnemonic-gui/FOLLOWUPS.md:59`) for bare filenames that are "generic" —
+same shape as the existing repo-qualified-prefix mechanism, extended to
+single-hit cases, not just multi-hit ones — or (b) accept the risk and add
+one more "NOT covered" line naming it explicitly, which is cheaper and
+matches this gate's existing philosophy of stating blind spots rather than
+chasing all of them.
