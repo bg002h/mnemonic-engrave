@@ -11315,3 +11315,35 @@ scope for the current cycle, and reclaiming it converts disk into rebuild time o
 whatever is next touched. The safe subset — the `_experiment/` pair, the size
 probe, and the finished scratch copies — is ~6.5G and needs its branches checked
 for uncommitted work first.
+
+### F-257 — `plan-glyph-check.sh` is red on a CLI spec it was never built for (owning phase: **tooling**, before the next spec fold) `#tooling` `#gates`
+
+**Filed 2026-08-26** during the verification fold. The gate exits 1 on
+`SPEC_constellation_cli_uniformity.md` at lines 699–700, and did so at `d31beed`
+too — it is **not** introduced by any recent fold.
+
+Both hits are inside a blockquote of **CLI exit-code help text**:
+
+```
+> ... 0 — every input was already valid (no corrections applied) 5 — at least
+> one chunk had corrections applied (REPAIR_APPLIED) 2 — atomic-fail […]: ...
+```
+
+The em dash and the ellipsis are flagged because the **SeedHammer II display
+font** does not carry them. That is the gate's stated purpose and it is correct
+about the font — but this text is **terminal output**, where both render fine.
+No string in this spec reaches the device.
+
+**Do not "fix" this by rewriting the prose.** The characters are right for the
+medium; the gate is out of domain. Correcting the text to satisfy it would make
+the document worse to satisfy a check that does not apply.
+
+**Why it matters enough to file.** A gate red for non-defects trains a reader to
+ignore it exactly as fast as a gate green for everything — and this one is
+currently red on every run, which means the next genuine undrawable string it
+catches will be indistinguishable from the noise it already prints.
+
+**The fix is scope, not suppression:** the gate should take the artifact class as
+input, or skip documents that declare themselves CLI-only, so that a red result
+means something again. Whatever the mechanism, it must keep printing what it does
+**not** cover — a gate that hides its blind spot is worse than no gate.
