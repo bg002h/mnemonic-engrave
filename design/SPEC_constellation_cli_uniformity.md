@@ -225,7 +225,7 @@ argv.** §6d enumerates what does not.
 | D2 | **Host-side only this cycle.** "Engravable as plaintext in a QR" for `md`/`mk`/`ms` needs new record classes and device rendering; it becomes its own spec with a firmware gate. | doing both at once; device first |
 | D3 | **Refuse secret/bearer material on argv, with `--allow-argv-secret`.** | refusing with no override; warning only; a declared-posture mechanism |
 | D4 | **stdout is canonical (ungrouped); the grouped form moves to the stderr engraving card.** | flipping the default only; teaching `me sysw pack` to strip separators |
-| D5 | **One shared crate owns the IO + safety layer**, depended on by all five. | spec + conformance vectors with copied code; a pure-logic crate with per-repo flag wiring |
+| D5 | **One shared crate owns the IO + safety layer**, depended on by **all six** — `md`, `mk`, `ms`, `mt`, `me`, and the toolkit. | spec + conformance vectors with copied code; a pure-logic crate with per-repo flag wiring |
 | D6 | **`me sysw pack --expect <kinds>` closes C-1**, opt-in, keyed on kinds. | a record COUNT; a conjunction-shaped acceptance form; `pack` running the producers itself |
 | D7 | **This cycle makes the encoding tier UNIFORM and RELOCATES nothing** (§9a). Tier placement is its own cycle. | bundling relocation into this cycle, which would make symmetry wait on placement |
 
@@ -272,7 +272,7 @@ than a preference:
 **And it fails the tier model outright:** every encoding binary would depend on
 the fancy-processing tier. Under the operator's three tiers the IO+safety layer
 fits **none** of them, which is precisely why it is a fourth, foundation-tier
-thing — a small crate that the toolkit becomes the **fifth consumer** of, not
+thing — a small crate that the toolkit becomes the **sixth consumer** of, not
 the home of.
 
 **So:** a new crate — **`m-cli-io`** — hosted this cycle as a workspace member of
@@ -1152,9 +1152,11 @@ any of P1/P2/P3 can consume a change to it. The constellation already uses
 
 An earlier draft cited `mt-codec` as the precedent for D5. It is a real
 precedent for *consuming a crate across repos* and the **opposite** of what D5
-needs for *shipping a change to all five consumers* — the rev pin exists
-precisely to avoid a release step, and D5 needs one. (**Five**, matching D5 and
-§5a, which counts the toolkit as the fifth; an earlier revision said four here.)
+needs for *shipping a change to all six consumers* — the rev pin exists
+precisely to avoid a release step, and D5 needs one. (**Six**, matching D5 and
+§5a: the four encoders, `me`, and the toolkit. Earlier revisions of this document
+said four here and five there while §5a said six — the count has now been wrong
+in three different places, so it is enumerated at D5 rather than totalled.)
 **§5a names the mechanism; P0 implements it.** Two further facts P0 must absorb:
 
 - **The code being extracted is not in a library.** `write_private` is at
