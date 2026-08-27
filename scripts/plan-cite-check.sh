@@ -76,6 +76,21 @@ ROOTS=(
   "/scratch/code/shibboleth/mnemonic-toolkit"
   "/scratch/code/shibboleth/mnemonic-key"
   "/scratch/code/shibboleth/mnemonic-secret"
+  # mnemonic-transaction is LAST, deliberately. It is the only sibling that
+  # carries a copy of a design document this repo also owns
+  # (design/SPEC_mt_v0_1.md exists in both), and resolution tries the roots in
+  # order -- so a `design/...` citation must land in THIS repo, not in the
+  # sibling's copy of it. Its own code lives under `crates/mt-cli/` and
+  # `crates/mt-codec/`, which collide with nothing above.
+  #
+  # Added 2026-08-27 for the P1 plan, whose subject IS `mt`: without this root
+  # every one of its citations came back DANGLING, and the P0 plan's answer --
+  # write sibling references as prose without `path:line` punctuation -- does
+  # not scale from a handful to a document where nearly every anchor is
+  # cross-repo. A gate that reports a false DANGLING trains the reader to skim
+  # its output, which is the argument that added descriptor-mnemonic and the
+  # toolkit above.
+  "/scratch/code/shibboleth/mnemonic-transaction"
 )
 
 # ─── WHY THIS GATE IS NOT IN CI, measured 2026-08-18 ──────────────────────────
