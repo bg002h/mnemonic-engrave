@@ -272,19 +272,34 @@ round-7 C-1).** It runs on raw `std::env::args()` **before `Cli::parse()`** and
 recognises material by **value shape**: `tx:` by prefix, `mt1`/`ms1` by HRP, a
 BIP-39 mnemonic by wordlist.
 
-**A flag-name layer is specified but has no observable HERE.** `me` declares no
-flag that **CARRIES** secret material — the four whose names mention one
-(`allow_argv_secret`, `seal_secret`, `passphrase_ask`, `no_passphrase`) are all
-`bool`, so none can hold a value to leak. A gate written against a flag-name
-layer is therefore **green on the untouched tree and cannot fail** — which is exactly how an earlier draft discharged §6d's
-ordering with the guard absent. Measured: a real `ms1` on `--mnemonic`,
-`--seed` or `--passphrase` never reaches stderr, because clap names the flag.
-`mnemonic-toolkit` **does** declare such flags and proves the shape in
-`crates/mnemonic-toolkit/src/secret_taxonomy.rs`; **the parity test is asserted
-there.** (`ms` carries the same subsystem in its own `advisory` module.)
+**A FLAG-NAME LAYER IS STILL NORMATIVE, AND NOTHING IN THE CONSTELLATION HAS
+ONE (round-8 I-2).** An earlier draft handed it to `mnemonic-toolkit`, citing a
+**node-type** predicate rather than a flag-name one. (The name is not repeated
+here: quoting a retracted citation re-mints it, which this cycle has done
+fourteen times.) — the toolkit's flag-name authority is `flag_is_secret` in its
+`secrets` module, whose own doc says node-type classification is not
+flag-name-level. And the toolkit's `env::args`/`args_os` count is **0**: it has
+no pre-parser guard either. So the parity test named there would have asserted
+intra-toolkit taxonomy drift while **nothing scheduled the layer §6d makes
+normative.**
 
-**Every one of F-266's four leaking surfaces is an unexpected POSITIONAL**, so
-value-shape is the layer that closes them.
+**P0 owns it, and the token scan above subsumes it.** A guard that inspects every
+token by value shape catches a secret whatever flag introduces it — which is
+strictly stronger than a flag-name list, and needs no list to be kept current.
+The flag-name layer stays specified in §6d as a *belt* for material a shape test
+cannot recognise; **P0 does not build it, and no gate here pretends to.**
+
+**AN EARLIER DRAFT MEASURED THE WRONG THING AND CONCLUDED FROM IT.** It reported
+that a secret on `--mnemonic`, `--seed` or `--passphrase` never leaks. **`me`
+declares none of those flags** — each is `0` occurrences — so clap was rejecting
+an *unknown flag* and naming the flag, not proving that flags are safe. On
+`--in`, which `me` **does** declare, a real `ms1` reaches stderr **both** as
+`--in <ms1>` and `--in=<ms1>`. **A negative inheriting too small a scope, in the
+fold that closed a finding about exactly that.**
+
+**F-266's leaks are not four and not all positional** — `--in` carries them too,
+and so do `me sysw <x>` and `me help <x>`. That is why the gate is a generated
+cross-product rather than a list.
 
 **The ordering is NORMATIVE, and `mt`'s source records why.** When the check
 lived inside the `encode` subcommand, clap rejected the unexpected positional
@@ -549,7 +564,7 @@ Each step is RED first. No step begins until the previous is green.
 | 3 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` → `None`; `me`'s behaviour still unchanged |
 | 4 | `observation.rs` — the payload-kind type **and its pty assertion** | **the assertion is the gate, not the type**: `script -qec 'me sysw wipe --fill zeros'` must NOT emit the word BEARER, asserted on the **emitted words**, pinning the **exit digit** (F-265: `!success()` cannot fail here). Mutation-checked in both directions |
 | 5 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it; and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry. **Blocked on F-264** — see §6 condition 9 |
-| 6 | **The argv guard, ONE layer not two.** `me` declares **no secret-bearing flag**, so a flag-name layer has no observable in this donor at all — that is why an earlier draft's gate for it could not fail (round-7 C-1). The guard runs on raw `std::env::args()` before `Cli::parse()`, and recognises material by **value shape**: `ms1`/`mt1` by HRP, `tx:` by prefix, a BIP-39 mnemonic by wordlist. **This is the layer F-266's leaks belong to** — every one is an unexpected positional. | **`no ms1 in stderr` across ALL surfaces** — bare `me`, `bundle`, `sysw wipe`, `sysw show`, `sysw pack` — which **FAILS on today's tree** (F-266). Plus `grep -c 'env::args'` over `main.rs` goes **0 → non-zero**: a guard that has not moved off clap cannot pass. The override's own parse is decided there too, and **`--allow-argv-secret` must still parse afterwards**. Flag-name parity against `mnemonic-toolkit`'s `NodeType::is_argv_secret_bearing` is asserted **there**, where such flags exist |
+| 6 | **The argv guard scans EVERY TOKEN of `std::env::args()` before `Cli::parse()`.** Not per-surface, not per-flag: any token that looks like secret material by **value shape** — `ms1`/`mt1` by HRP, `tx:` by prefix, a BIP-39 mnemonic by wordlist — refuses, wherever it sits. **`=`-joined tokens are split before matching** (`--in=<ms1>` is one token and an HRP match on the whole token fails). Enumerating surfaces is what produced round-8's Critical; a token scan has no surface list to be short. | **no `ms1` in stderr for ANY argv containing one** — asserted over a generated cross-product of `{bare, bundle, sysw, sysw pack, sysw show, sysw wipe, help, sysw help}` × `{positional, --in X, --in=X}`, **not a hand-written list**. It fails today: `me sysw pack --in <ms1>`, `--in=<ms1>`, `me sysw <ms1>` and `me help <ms1>` all leak, and a hand list missed every one. **Plus an ORDERING observable, not a presence one**: with the guard installed and `Cli::parse()` made to `panic!`, a secret-bearing argv still exits via the guard — an error-path guard cannot pass that (round-8 I-1) |
 | 7 | **F-265: pin the exit digit at ALL FIVE sites** — `refuse_write_block` ×2 (Terminal, WorldReadable), `read_records` ×2 (`--in` error, stdin error), `emit` (write failure). All five stay in `me`; this is donor work, and an earlier draft scheduled only site #1 while claiming the table covered all five (round-7 I-1). | each of the five, mutated 2→3 **in the shipped code**, turns the suite RED — proven today to leave it green at 388/388 with the line executing. `!success()` cannot discharge this |
 | 8 | `--expect <kinds>` — the flag and the vocabulary | **every refusal below pins its exit DIGIT** (round-6 I-2 — `--expect` is P0's newest funds-path refusal and nothing pinned its code): `--expect descriptor,cosigner` **refuses an `md1`-only payload**; `--expect descriptor,transaction` refuses a stream with no transaction; **refuses an incomplete `md1` set AND an incomplete `mt1` set** (three walks, §6g); `--allow-unsigned-inputs --expect transaction` **does NOT falsely refuse** |
 | 9 | **`exit.rs` FIRST, then `channel.rs`** | **`--out` overwrite is asserted where it LIVES — `write_private`, which stays in `me`** (round-3 M-3); `channel.rs` holds only `destination`, so gating the overwrite on it would gate nothing. **`-` is IMPLEMENTED**; every code `me` produces today reproduced **byte-for-byte**, differentially against the pre-change binary — not by matching a table |
