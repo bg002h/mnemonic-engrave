@@ -275,7 +275,7 @@ fits **none** of them, which is precisely why it is a fourth, foundation-tier
 thing — a small crate that the toolkit becomes the **sixth consumer** of, not
 the home of.
 
-**So:** a new crate — **`m-cli-io`** — hosted this cycle as a workspace member of
+**So:** a new crate — **`mnemonic-io-lib`** — hosted this cycle as a workspace member of
 `mnemonic-engrave` for extraction locality, **published to crates.io at 0.1.0
 when P0 closes GREEN**, publication operator-gated.
 
@@ -322,13 +322,47 @@ and process (exit codes). Naming it `-codec` would break the one property that
 makes the codec tier legible, and a reader who opened it expecting a pure
 transform would find `std::fs` on the first page.
 
-**So the convention needs a third layer, which is a smaller invention than
-misusing either existing one.** It already has two — `-codec` for the pure
-format transform, `-cli` for the runnable binary. This is shared runtime
-plumbing and is neither. `m-io` fits the two-segment shape (`m` being the family
-the operator already names — "m-format", "m*1 strings"), but the name remains a
-**proposal, not a ruling** — it is baked into six manifests, every `use` site,
-and a publish that cannot be undone. **P0 must confirm the name is free on crates.io before publishing**;
+**So the convention needs a third layer**, which is a smaller invention than
+misusing either existing one. It already has `-codec` for the pure format
+transform and `-cli` for the runnable binary; this is shared runtime plumbing
+and is neither.
+
+### The name: `mnemonic-io-lib` (operator, 2026-08-26)
+
+**Two candidates were rejected on measurements, and the second reversed the
+author's own recommendation.**
+
+- **`m-cli-io` — rejected.** `-cli` marks a crate that builds a binary in 4 of 4
+  cases; this builds none. `m` names no format.
+- **`mnemonic-io-codec` — rejected.** `-codec` does partition library-from-binary
+  perfectly today (5 of 5 `-codec` crates are `lib.rs` with no `main.rs`; 4 of 4
+  `-cli` crates are the reverse), so the instinct was sound. But `-codec` carries
+  a second meaning — **purity** — and this crate is its negation.
+- **`mnemonic-io` — rejected**, and this is the one that overturned the
+  recommendation. General Rust idiom treats `-lib` as redundant, but idiom is not
+  what a reader of *this* tree applies. Measured from the install records:
+
+```
+md-cli → md   mk-cli → mk   ms-cli → ms   mt-cli → mt
+mnemonic-engrave → me       mnemonic-toolkit → mnemonic
+mnemonic-gui → gui-render, mnemonic-gui
+```
+
+**Every `mnemonic-*` package produces an executable — 3 of 3. There is no
+`mnemonic-*` library.** So the prefix already signals *a program you can run*,
+and `mnemonic-io` would read as a fourth. Cargo would not be fooled — a crate is
+a library by having `src/lib.rs` and no `[[bin]]`, and `cargo install` would
+refuse it — but the name goes into six manifests and every `use` site, which are
+read by people.
+
+**`-lib` therefore does real work here rather than being noise**: it
+disambiguates against a prefix that currently means binary. That is a
+tree-specific fact, and applying general idiom without checking it is the same
+error that produced `m-cli-io`.
+
+**Still to confirm before P0 publishes:** that `mnemonic-io-lib` is free on
+crates.io. An unavailable name costs one line of the plan if found now, and a
+rename across six manifests if found after the code is written. **P0 must confirm the name is free on crates.io before publishing**;
 an unavailable name is a rename across five manifests if it is discovered after
 the code is written, and one line of the plan if it is discovered before.
 
