@@ -181,7 +181,7 @@ mnemonic-io-lib/
   src/fd.rs           — MECHANISM only: see the contract below.
   src/observation.rs  — what was measured, as types (§2.3)
   src/records.rs      — record stream splitting, the argv gate, kind vocabulary
-  src/exit.rs         — exit-code CONSTANTS and their meanings. NOT a per-binary table.
+  src/exit.rs         — refusal DECISION types + wording + ordering. NO integers.
   src/remedy.rs       — purge/remedy text, FROM `me` ALONE (§6h)
 ```
 
