@@ -39,7 +39,7 @@ weakest handling of it.**
 
 **Correction folded from round 0 (I-9).** An earlier draft of this table gave
 `mt`'s argv refusal as exit 3. It is **exit 1**. `mt` returns only
-`ExitCode::SUCCESS` and `ExitCode::FAILURE` (`mt-cli/src/main.rs:237,253,256`)
+`ExitCode::SUCCESS` and `ExitCode::FAILURE` (`mt-cli`'s main module, **lines 237, 253 and 256** (sibling repo))
 and no third code exists anywhere in `mnemonic-transaction/crates`. Reproduced:
 `mt encode --qr "$(cat tx.hex)"` prints the refusal and exits **1**. `mt`
 therefore has **no distinguishable exit code for a refusal**, which is an input
@@ -117,11 +117,11 @@ surface §6 changes, and its drift gate is scoped to exclude most of it.**
 Measured during the fold — wider than round 0 reported:
 
 - `const SEPARATORS: &[&str] = &["space", "hyphen", "comma"];` in **four**
-  schema files: `src/schema/md.rs:24`, `mk.rs:15`, `ms.rs:33`, `mnemonic.rs:47`.
+  schema files: `mnemonic-gui`'s `schema/md.rs`, **line 24**, `mnemonic-gui`'s `schema/mk.rs`, **line 15**, `mnemonic-gui`'s `schema/ms.rs`, **line 33**, `mnemonic-gui`'s `schema/mnemonic.rs`, **line 47**.
   Round 0 named two of the four.
 - `default_value: Some("5")` at **eight** sites across those same four files
-  (`md.rs:77`, `mk.rs:71`, `ms.rs:78`, `ms.rs:414`, and four in `mnemonic.rs`).
-  Round 0 counted seven and missed `md.rs:77`.
+  (`mnemonic-gui`'s `schema/md.rs`, **line 77**, `mnemonic-gui`'s `schema/mk.rs`, **line 71**, `mnemonic-gui`'s `schema/ms.rs`, **line 78**, `mnemonic-gui`'s `schema/ms.rs`, **line 414**, and four in `mnemonic.rs`).
+  Round 0 counted seven and missed `mnemonic-gui`'s `schema/md.rs`, **line 77**.
 - The drift gate disqualifies itself for exactly the CLIs this spec changes.
   `mnemonic-gui/tests/schema_mirror_defaults_drift.rs` states its scope as
   `mnemonic` only, and calls extending it to `md`/`ms`/`mk` a follow-on
@@ -216,6 +216,17 @@ watch-only — public keys only, cannot spend"*. **Watch-only material stays on
 argv.** §6d enumerates what does not.
 
 `mt` is the only tool that obeys the rule, and the only one that composes.
+
+> **On citations in this document.** `path:line` references are written in
+> citation form **only for files in this repo**, so `scripts/plan-cite-check.sh`
+> resolves them. References into sibling repos — `mnemonic-transaction`,
+> `mnemonic-gui` — name the module and line in prose instead. That is
+> deliberate: the gate resolves against this repo and the fork root, so a
+> citation-shaped sibling path reports DANGLING forever and trains a reader to
+> skim the gate's output. **They are verified by hand and must be re-verified by
+> hand.** (Established 2026-08-27, when this gate was first run against this
+> document and returned 4 of 19 resolving, 14 dangling — every one of them a
+> bare filename or a sibling path.)
 
 ## 5. Decisions taken (operator, 2026-08-26)
 
@@ -415,7 +426,7 @@ the code is written, and one line of the plan if it is discovered before.
 exempt: if `me` keeps its own copies, the two implementations diverge on the day
 the crate ships, which is the exact condition D5 exists to prevent. Concretely,
 §6d rules the argv override's own parse must run on raw argv, and `me` currently
-ships it as an ordinary clap flag (`me-cli/src/main.rs:252`, `#[arg(long)]
+ships it as an ordinary clap flag (`crates/me-cli/src/main.rs:252`, `#[arg(long)]
 allow_argv_secret`) — so `me` is not already compliant, and no phase owned that
 fix until now. **P0 owns it.** Hosting it here is recorded
 as **symmetry debt with a non-breaking reversal path** — once the crate is on
@@ -438,7 +449,7 @@ grows is the next drift:
 
   | | `me` | `mt` |
   | --- | --- | --- |
-  | disqualifying mask | `0o044` (`main.rs:912`) | `0o077` (`validate.rs:585`) |
+  | disqualifying mask | `0o044` (`crates/me-cli/src/main.rs:912`) | `0o077` (`mt-cli`'s validate module, **line 585** (sibling repo)) |
   | stdout at mode 0620 | **exit 0, 733 bytes written** | **exit 1, REFUSED** |
   | stdout at mode 0600 (control) | exit 0 | exit 0 |
 
@@ -789,7 +800,7 @@ lands correctly, and `me sysw pack`, which already implements the widened form:
 - Name the private channels: `--in FILE`, `-` for stdin.
 - Give the purge commands, per §6h. **The text comes from `me`, and `mt`'s is
   SUPERSEDED — P1 replaces it, and it is a gate item rather than a courtesy.**
-  Measured 2026-08-26: `mt`'s `purge_command()` (`mt-cli/src/validate.rs:541`)
+  Measured 2026-08-26: `mt`'s `purge_command()` (`mt-cli`'s validate module, **line 541** (sibling repo))
   tells a zsh operator `history -d $HISTCMD && fc -W`, and **`history -d` does
   not delete on zsh** (5.9.2: `-d` is a timestamp display flag) — it reports
   success and purges nothing. Its fish branch says
@@ -834,7 +845,7 @@ first has reintroduced the leak C-4 exists to stop.**
 
 **Why the ordering is normative and not an implementation detail.** `mt`'s guard
 is correct *only* because it precedes clap. Its own source says so at
-`mt-cli/src/main.rs:219-238`: the guard sits on `std::env::args()` and runs
+`mt-cli`'s main module, **lines 219-238** (sibling repo): the guard sits on `std::env::args()` and runs
 before `Cli::parse()`, because when the check lived inside the `encode`
 subcommand, clap rejected the unexpected positional first — **and clap's error
 message echoed the entire bearer transaction back to stderr.** The refusal
@@ -960,7 +971,7 @@ that a future reader does not "fix" it. If a terminal gate is ever wanted for
 *without* writing the secret to disk — neither of which exists today.
 
 **F-246 is restated narrowly, and the earlier generalisation is withdrawn.**
-F-246's actual title (`design/FOLLOWUPS.md:10344`) is that `me sysw pack`
+F-246's actual title (F-246 in this repo's `design/FOLLOWUPS.md`) is that `me sysw pack`
 generates and **prints a passphrase** before it validates the records — it is
 about emitting *secret material* early, not about any line that describes the
 artifact. The broad form would have been a real change to `mt`: measured, `mt
