@@ -12115,7 +12115,7 @@ phase that touches this text next, and a fish recipe belongs in the crate's
 remedy module once one has been measured. Until then the honest description
 stands.
 
-### F-274 — `mt`'s argv guard does not TRIM, so a whitespace-padded bearer artifact leaks verbatim through clap (repo: **mnemonic-transaction**; owning phase: **P1**) `#mt` `#security` `#shipped` `#critical`
+### F-274 — CLOSED 2026-08-27 (P1 step 3) — `mt`'s argv guard did not TRIM, so a whitespace-padded bearer artifact leaked verbatim through clap (repo: **mnemonic-transaction**; owning phase: **P1**) `#mt` `#security` `#shipped` `#critical`
 
 **Found 2026-08-27** while measuring `mt` for the P1 plan.
 `looks_like_a_transaction` (`crates/mt-cli/src/validate.rs:503`) lowercases the
@@ -12149,6 +12149,22 @@ a 99-character odd-length hex string is below `looks_like_a_transaction`'s
 `len >= 100 && len % 2 == 0` test, and clap echoes it. That is the same class as
 F-267 — material the guard cannot classify without refusing legitimate input —
 and trimming does not close it.
+
+**CLOSED 2026-08-27**, `mnemonic-transaction` `impl/p1` commit
+*"P1 step 3 (F-274): the argv guard normalises BEFORE it classifies"*. One
+`trim()` in `command_line_guard`, before the recogniser is consulted, plus a
+`debug_assert_eq!(a, a.trim())` inside the recogniser so a second caller that
+forgets it fails loudly rather than silently re-opening the leak. The generated
+32-row grid is committed as
+`no_spelling_of_a_bearer_argument_reaches_stderr` and is listed in
+`refusals.toml`, so `mutate-refusals.sh` covers it: neuter
+`command_line_guard` and all 32 rows leak. The refusal now reports the
+NORMALISED character count — quoting the padded length would give an operator
+comparing it against what they pasted a number that matches nothing.
+
+**The residue above is NOT closed** and was not touched: the 99-character
+odd-length hex string is still below the recogniser's threshold and is still
+echoed. It remains the F-267 class.
 
 ### F-275 — `mt decode` writes broadcastable bearer hex to a world-readable stdout at exit 0, while `mt encode` refuses the identical destination (repo: **mnemonic-transaction**; owning phase: **a ruling the operator owes**, before the phase that acts on it) `#mt` `#security` `#shipped`
 
@@ -12233,3 +12249,59 @@ wording in `mt` rather than reach for it.
 Both are cheap now: `mnemonic-io-lib` is unpublished (checked 2026-08-27 with a
 `serde` control: 200 for the control, **404** for both spellings of the name)
 and `me` is its only consumer.
+
+### F-277 — §6d rules the override's parse and its routing, and is SILENT on the collision with `--in`; `mt` had to invent an answer (owning phase: **the spec, before P2 gives a second tool the override**) `#spec` `#mt` `#ux`
+
+**Found 2026-08-27** implementing P1's override work — the row named *the
+override* in `IMPLEMENTATION_PLAN_P1_mt_adopts.md`.
+
+§6d rules two things about `--allow-argv-secret` and rules them well: the
+override's own parse runs on raw argv, and *"admitted material is passed to the
+tool through the same internal path as `--in` content, and never re-presented to
+clap as a positional"*. **It does not say what happens when BOTH are given.**
+
+```
+mt encode --allow-argv-secret <a raw transaction> --in tx.psbt
+```
+
+Two sources, one channel. Nothing in §6d picks one, and every silent choice is a
+defect: whichever source loses, the operator has no way to tell which of the two
+`mt` just turned into the thing they will cut into metal.
+
+**What `mt` does now, ruled at implementation time rather than deferred**, since
+the row could not be built without an answer: **`--in` wins** — it is the private
+channel and the explicitly named one — and a WARNING says so, naming the
+discarded material's LENGTH and the path that was read, never the material. Test:
+`material_on_argv_beside_an_in_file_is_warned_about_not_dropped`
+(`crates/mt-cli/tests/refusals.rs`).
+
+**Why this is filed rather than left as `mt`'s local answer.** §6d's override is
+scheduled onto every tool in the cycle, and `ms` alone has **eight** verbs with
+`--in` being added to all of them. Four more implementers will each meet this
+collision and each answer it differently — and the one who answers it by
+silently preferring argv has built the opposite of `mt`. The spec should rule it
+once. `mt`'s answer is offered as the candidate, not as precedent by seniority.
+
+### F-278 — F-275 is RULED but no plan row owns it, so the operator's decision is scheduled nowhere (owning phase: **the next `mt` cycle — it needs a row, not a ruling**) `#mt` `#plan` `#record`
+
+**Found 2026-08-27** reconciling open follow-ups against P1's rows before
+starting the adoption work, per the per-phase burndown rule.
+
+F-275 was filed with owning phase *"a ruling the operator owes, before the phase
+that acts on it"*. **The operator ruled it the same day** — WARN, do not refuse;
+`mt decode` prints a warning naming the mode it measured and proceeds at exit 0;
+`--out` is not added to close it. That ruling is recorded in F-275 in full,
+including why the cheap option is the right one (the default umask is 022, so
+`mt decode > tx.hex` creates 0644 and an `encode`-style refusal would break the
+ordinary invocation on every default-configured machine).
+
+**But P1's plan predates the ruling**, and its §7 still describes F-275 as a
+ruling the operator owes. **No row in the twelve-row table builds the warning**,
+and F-275's own heading still carries the pre-ruling owning phase. So the item
+now has a decision, an agreed shape, and no schedule — the state a burndown
+sweep is least likely to catch, because a grep for open items finds it and a
+reader concludes correctly that it is *waiting on the operator*, which it is not.
+
+**It is small and it is mt-local.** `file_mode_warning` already exists and
+already has exactly the shape the ruling asks for; what it lacks is a caller on
+the reading verbs and a stdout-side sibling. It needs a row, not a design.
