@@ -4,7 +4,12 @@
 //! evidence.** It advises zsh operators `history -d`, which does not delete on
 //! zsh 5.9.2 (`-d` prints timestamps), and it tells fish operators to match on
 //! the bearer material — typing the secret into history a second time, which is
-//! the very thing a purge is for.
+//! the very thing a purge is for. **That second half is measured rather than
+//! argued.** Under fish 4.8.1, `history delete --exact --case-sensitive '<the
+//! whole command line>'` does remove the planted entry and does leave the secret
+//! in the history file, because the recipe *is* a line containing it — and the
+//! spelling without `--case-sensitive` prints a complaint, **exits 0**, and
+//! deletes nothing at all. See `tests/fish_history_purge.rs`, where both are run.
 //!
 //! ## F-264 — the recipe that reported success and purged nothing
 //!
@@ -63,6 +68,14 @@
 /// plain `/me/d` left ONE line of six standing. `\bme\b` left four, removing
 /// only the invocation and `cd /home/me`. GNU `sed` is already assumed here:
 /// `-i` without an argument is GNU-only.
+///
+/// **fish ignores `command`, and that is the whole of F-273.** Every fish
+/// `history delete` spelling has to be handed the material to match on, at a
+/// prompt that records what is typed, so a targeted fish recipe removes one copy
+/// of the secret by writing a second. `history clear-session` is the one that
+/// purges unattended without being told what to look for — see
+/// [`history_purge_block`] for what that costs and `tests/fish_history_purge.rs`
+/// for the five spellings that were run before settling on it.
 pub fn history_purge_recipes(command: &str) -> Vec<(&'static str, String)> {
     vec![
         (
@@ -86,6 +99,13 @@ pub fn history_purge_recipes(command: &str) -> Vec<(&'static str, String)> {
                  history -c; history -r"
             ),
         ),
+        (
+            "fish",
+            // No `command` interpolation, deliberately -- see this function's
+            // doc comment. `clear-session` matches on nothing, needs to be told
+            // nothing, and so cannot re-type the secret at a recording prompt.
+            "history clear-session".to_string(),
+        ),
     ]
 }
 
@@ -104,12 +124,23 @@ pub fn history_purge_recipes(command: &str) -> Vec<(&'static str, String)> {
 /// correct text and can only be made green by deleting the warning — recreating
 /// the exact defect that disqualifies `mt`'s wording.
 ///
-/// **fish is described, not prescribed.** `history delete --prefix` PROMPTS:
-/// measured here, it blocked for a full two minutes on a planted history and
-/// deleted nothing, and the prompt lists the matching commands — the secret
-/// with them. A recipe that re-displays the secret and purges nothing
-/// unattended is not offered as one; what it does is stated so an operator at
-/// a fish prompt is not left to discover it.
+/// **fish is now PRESCRIBED, and its cost is printed with it — F-273.**
+///
+/// It shipped as prose because `history delete --prefix` prompts: reproduced by
+/// an independent harness, it is killed at a 30-second timeout with the entry
+/// still on disk, and the prompt lists the matching commands — the secret with
+/// them. `--contains` does the same. `--exact` is the spelling the manual says
+/// does not prompt, and without `--case-sensitive` it complains, **exits 0** and
+/// deletes nothing; with it, it works, and it works only by being handed the
+/// whole command line at a prompt that records it.
+///
+/// `history clear-session` purges unattended and never names the secret, so it
+/// is what is offered. **It clears the current session's entire history**, an
+/// operator's unrelated commands included, and reaches no earlier session —
+/// measured: an entry planted in one session survives `clear-session` run in the
+/// next. Both limits are stated in the emitted text rather than left to be
+/// discovered, because a remedy that silently destroys more than it was asked to
+/// is how an operator learns to ignore the next one.
 pub fn history_purge_block(command: &str) -> String {
     let mut s = String::new();
     s.push_str(
@@ -122,12 +153,14 @@ pub fn history_purge_block(command: &str) -> String {
     for (shell, recipe) in history_purge_recipes(command) {
         s.push_str(&format!("      \x20   {:<7} {recipe}\n", format!("{shell}:")));
     }
-    s.push_str(&format!(
-        "      \x20   {:<7} history delete --prefix '{command}'  -- but it \
-         PROMPTS, lists the matches with the secret in them, and purges \
-         nothing unattended.\n",
-        "fish:"
-    ));
+    s.push_str(
+        "      \x20   (fish's recipe clears the whole session's history, not \
+         just the leaked line -- unrelated commands from this shell go with it, \
+         and entries from EARLIER fish sessions are not reached, so run it in \
+         the shell that leaked. Every `history delete` spelling has to be handed \
+         the secret to match on at a prompt that records it, and --prefix blocks \
+         on that prompt without deleting anything.)\n",
+    );
     s.push_str("      \x20   and `shred -u` any file you pasted it from.\n");
     s.push_str(
         "      (On zsh, `history -d` does NOT delete -- -d prints timestamps. \
