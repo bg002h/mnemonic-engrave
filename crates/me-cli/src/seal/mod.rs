@@ -332,6 +332,7 @@ fn non_canonical_separator(s: &str) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt::Write as _;
 
     const PASS: &str = "beef beef beef beef beef beef beef beef beef beef beef beef";
 
@@ -418,7 +419,10 @@ mod tests {
     }
 
     fn hex(b: &[u8]) -> String {
-        b.iter().map(|x| format!("{x:02x}")).collect()
+        b.iter().fold(String::new(), |mut acc, x| {
+            let _ = write!(acc, "{x:02x}");
+            acc
+        })
     }
     fn sha(b: &[u8]) -> String {
         use sha2::{Digest, Sha256};

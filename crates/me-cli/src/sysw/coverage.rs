@@ -277,7 +277,7 @@ mod tests {
             COVERAGE
                 .iter()
                 .any(|(_, w)| matches!(w, Where::DeviceUnbuilt(_)))
-                == !unbuilt.is_empty(),
+                != unbuilt.is_empty(),
             "the unbuilt list must reflect the table"
         );
     }

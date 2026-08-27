@@ -28,6 +28,7 @@
 //! pairs were produced by a real node.
 
 use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 
 /// What a structural parse learns. Everything a review screen needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -285,7 +286,10 @@ pub fn parse(bytes: &[u8]) -> Result<TxSummary, TxError> {
     h.update(locktime);
     let d1 = h.finalize();
     let d2 = Sha256::digest(d1);
-    let txid_display: String = d2.iter().rev().map(|b| format!("{b:02x}")).collect();
+    let txid_display: String = d2.iter().rev().fold(String::new(), |mut acc, b| {
+        let _ = write!(acc, "{b:02x}");
+        acc
+    });
 
     Ok(TxSummary {
         txid_display,
@@ -361,7 +365,10 @@ pub(crate) mod tests {
         assert_eq!((t.inputs, t.outputs), (1, 1));
         // Legacy: the stripped form IS the wire form.
         let d = Sha256::digest(Sha256::digest(&b));
-        let want: String = d.iter().rev().map(|x| format!("{x:02x}")).collect();
+        let want: String = d.iter().rev().fold(String::new(), |mut acc, x| {
+            let _ = write!(acc, "{x:02x}");
+            acc
+        });
         assert_eq!(t.txid_display, want);
     }
 
@@ -486,8 +493,14 @@ mod signature_predicate_tests {
             assert_eq!(t.every_input_signed, t.unsigned_inputs.is_empty(), "{hex}");
             assert!(t.unsigned_inputs.iter().all(|&i| i < t.inputs), "{hex}");
         }
-        assert_eq!(parse(&unhex(EVEN_STRIPPED_HEX)).unwrap().unsigned_inputs, vec![0]);
-        assert!(parse(&unhex(EVEN_RAW_HEX)).unwrap().unsigned_inputs.is_empty());
+        assert_eq!(
+            parse(&unhex(EVEN_STRIPPED_HEX)).unwrap().unsigned_inputs,
+            vec![0]
+        );
+        assert!(parse(&unhex(EVEN_RAW_HEX))
+            .unwrap()
+            .unsigned_inputs
+            .is_empty());
     }
 
     /// P5 M-6 — a segwit-marked transaction whose every witness stack is empty

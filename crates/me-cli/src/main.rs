@@ -1,5 +1,6 @@
 //! `me` — convert a single md1/mk1 string to an NDEF payload (refuses ms1).
 
+use std::fmt::Write as _;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
@@ -652,7 +653,10 @@ fn run() -> i32 {
             return EXIT_USAGE;
         }
         if cli.hex {
-            let s: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+            let s: String = bytes.iter().fold(String::new(), |mut acc, b| {
+                let _ = write!(acc, "{b:02x}");
+                acc
+            });
             println!("{s}");
         } else if cli.base64 {
             println!("{}", base64_encode(&bytes));
@@ -1261,10 +1265,10 @@ fn base64_encode(data: &[u8]) -> String {
             *chunk.get(2).unwrap_or(&0),
         ];
         let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
-        out.push(T[(n >> 18 & 63) as usize] as char);
-        out.push(T[(n >> 12 & 63) as usize] as char);
+        out.push(T[((n >> 18) & 63) as usize] as char);
+        out.push(T[((n >> 12) & 63) as usize] as char);
         out.push(if chunk.len() > 1 {
-            T[(n >> 6 & 63) as usize] as char
+            T[((n >> 6) & 63) as usize] as char
         } else {
             '='
         });
@@ -1543,9 +1547,9 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // passphrase. The operator standing at the machine has the file.
             match out.as_ref() {
                 Some(p) => eprintln!("          re-print it with: me sysw show {}", p.display()),
-                None => eprintln!(
-                    "          re-print it with: me sysw show <the file you just wrote>"
-                ),
+                None => {
+                    eprintln!("          re-print it with: me sysw show <the file you just wrote>")
+                }
             }
             if *region {
                 let n = sysw::wire::REGION_LEN;
@@ -1566,9 +1570,19 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     blob.len(),
                     sysw::wire::REGION_ADDR
                 );
-                return emit(&img, out.as_ref(), PayloadKind::Bearer, *allow_world_readable);
+                return emit(
+                    &img,
+                    out.as_ref(),
+                    PayloadKind::Bearer,
+                    *allow_world_readable,
+                );
             }
-            emit(&blob, out.as_ref(), PayloadKind::Bearer, *allow_world_readable)
+            emit(
+                &blob,
+                out.as_ref(),
+                PayloadKind::Bearer,
+                *allow_world_readable,
+            )
         }
 
         SyswCmd::Wipe { out, fill } => {
@@ -1657,7 +1671,10 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
 }
 
 fn hex(b: &[u8]) -> String {
-    b.iter().map(|x| format!("{x:02x}")).collect()
+    b.iter().fold(String::new(), |mut acc, x| {
+        let _ = write!(acc, "{x:02x}");
+        acc
+    })
 }
 
 /// The digest goes to STDERR, so `me sysw pack > f.bin` still shows the operator
@@ -1720,7 +1737,10 @@ fn report_unconfirmed(records: &[String]) {
         eprintln!(
             "me: mt1 set {csid:05x} (records {}, as given; records count from 0) did NOT \n      \
              confirm as one signed transaction. {}",
-            idxs.iter().map(usize::to_string).collect::<Vec<_>>().join(", "),
+            idxs.iter()
+                .map(usize::to_string)
+                .collect::<Vec<_>>()
+                .join(", "),
             describe_set_problem(&p)
         );
         eprintln!(
@@ -1793,7 +1813,11 @@ fn name_inputs(idx: &[usize]) -> String {
     match n.len() {
         0 => "no input".into(),
         1 => format!("input {}", n[0]),
-        _ => format!("inputs {} and {}", n[..n.len() - 1].join(", "), n[n.len() - 1]),
+        _ => format!(
+            "inputs {} and {}",
+            n[..n.len() - 1].join(", "),
+            n[n.len() - 1]
+        ),
     }
 }
 
@@ -1827,7 +1851,11 @@ fn report_unsigned_overrides(records: &[String]) {
              stripping signatures is exactly what the txid ignores. If those inputs are \n      \
              not honestly empty, the plate you are about to cut can never be broadcast.",
             name_inputs(&t.unsigned_inputs),
-            if t.unsigned_inputs.len() == 1 { "ies" } else { "y" },
+            if t.unsigned_inputs.len() == 1 {
+                "ies"
+            } else {
+                "y"
+            },
             t.txid_display,
         );
     }
@@ -1915,7 +1943,11 @@ fn print_mt_confirmation(records: &[String]) {
                 t.txid_display,
                 t.size,
                 name_inputs(&t.unsigned_inputs),
-                if t.unsigned_inputs.len() == 1 { "ies" } else { "y" },
+                if t.unsigned_inputs.len() == 1 {
+                    "ies"
+                } else {
+                    "y"
+                },
             );
         }
     }
@@ -2173,7 +2205,10 @@ fn read_records(
                 } else if class == Class::Mt {
                     ("an `mt1` string", "An mt1 set carries a signed transaction -- anyone who can read the set can broadcast it")
                 } else {
-                    ("SECRET key material", "It can spend everything derived from it, forever")
+                    (
+                        "SECRET key material",
+                        "It can spend everything derived from it, forever",
+                    )
                 };
                 return Err((
                     format!(
@@ -2228,10 +2263,7 @@ fn read_records(
             // would build a container missing exactly what the pipeline was
             // supposed to supply.
             if from_stdin.is_empty() {
-                return Err((
-                    no_records_guard(from_stdin, None).unwrap_err(),
-                    EXIT_USAGE,
-                ));
+                return Err((no_records_guard(from_stdin, None).unwrap_err(), EXIT_USAGE));
             }
             // Spliced IN PLACE. A record's position is the operator's, and
             // appending stdin at the end would silently reorder the container

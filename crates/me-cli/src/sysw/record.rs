@@ -19,6 +19,7 @@
 //! its canonical LOWERCASE form, and hex is the only common encoding that
 //! survives lowercasing unchanged.
 
+use std::fmt::Write as _;
 use zeroize::Zeroizing;
 
 /// Prefixes are RESERVED. A record beginning with one whose body is not valid
@@ -267,7 +268,10 @@ fn chunk_key(s: &str, kind: crate::seal::record::RecordKind) -> Option<(char, Op
 }
 
 fn hex_lower(b: &[u8]) -> String {
-    b.iter().map(|x| format!("{x:02x}")).collect()
+    b.iter().fold(String::new(), |mut acc, x| {
+        let _ = write!(acc, "{x:02x}");
+        acc
+    })
 }
 
 /// Strictly lowercase, strictly even-length. Uppercase is rejected rather than
@@ -275,6 +279,11 @@ fn hex_lower(b: &[u8]) -> String {
 /// wire, so two spellings of one body would be two different digests.
 fn unhex_lower(s: &str) -> Option<Zeroizing<Vec<u8>>> {
     // `% 2 != 0` rather than `is_multiple_of` — unstable on CI's Rust.
+    // `manual_is_multiple_of` does not exist on CI's PINNED clippy (0.1.85)
+    // either, so naming it below is itself an unknown lint there under
+    // `-D warnings` (F-361) — `unknown_lints` must be allowed too, for the
+    // toolchain where the lint being allowed does not exist yet.
+    #[allow(unknown_lints)]
     #[allow(clippy::manual_is_multiple_of)]
     let odd = s.len() % 2 != 0;
     if odd {
@@ -291,7 +300,7 @@ fn unhex_lower(s: &str) -> Option<Zeroizing<Vec<u8>>> {
         // set bit and both operators yield the same byte for every input. Left
         // as `|` because it states the intent; recorded so the next run does not
         // spend a round rediscovering it.
-        out.push(hi << 4 | lo);
+        out.push((hi << 4) | lo);
     }
     Some(out)
 }

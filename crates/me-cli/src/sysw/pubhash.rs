@@ -11,6 +11,7 @@
 //! display a value matching the tampered data perfectly.
 
 use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 
 const LABEL: &[u8] = b"MNEMSYSW/pub/v1";
 
@@ -33,7 +34,10 @@ pub fn public_data_hash(records: &[&str], sealed: bool) -> [u8; 16] {
 
 /// Grouped in fours so a human can compare it without losing their place.
 pub fn format_hash(h: &[u8; 16]) -> String {
-    let hex: String = h.iter().map(|b| format!("{b:02x}")).collect();
+    let hex: String = h.iter().fold(String::new(), |mut acc, b| {
+        let _ = write!(acc, "{b:02x}");
+        acc
+    });
     (0..8)
         .map(|i| &hex[i * 4..i * 4 + 4])
         .collect::<Vec<_>>()

@@ -22,7 +22,8 @@ const MD1_A: &str = "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dh
 const MD1_B: &str = "md1fv9wjpqg0yq82l0czvx85ae43vtfd26hsmngjecmqy44k2pgttqh74qwxlawq374";
 const MD1_C: &str = "md1fv9wjpqsp2026hh65xpvugtfhd9792zxgunymm0a82pdju6442q0jskj9gzfaqmz";
 const MK1_A: &str = "mk1qpz63tpqqsq3dg4m5wdx5fvqqvzg3vs7mpf0rz2j43zpzpxk0rtjkqkhwreqp6hm7qnp3a8wdvtz6t2k4uxu6ykwxcp9vqugfjyx733cf59g";
-const MK1_B: &str = "mk1qpz63tppkeg9pdvqz5744004gvzecsknw6tu25yv3exfhkl6w5zm9e4t24aqdah5585wn3e4xdut8";
+const MK1_B: &str =
+    "mk1qpz63tppkeg9pdvqz5744004gvzecsknw6tu25yv3exfhkl6w5zm9e4t24aqdah5585wn3e4xdut8";
 const MT_EVEN: [&str; 6] = [
     "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax",
     "mt1p9h8jqq9qqphgdqqqqqqqq0mllllupyqj6vqqqqqqqqzcqpfsw7ph2rt5w54kt768636cls8zxg0najlzunp",
@@ -247,7 +248,8 @@ fn the_vocabulary_excludes_what_can_never_be_satisfied() {
             r.err
         );
         assert!(
-            r.err.contains("descriptor, cosigner, transaction, mnemonic, secret"),
+            r.err
+                .contains("descriptor, cosigner, transaction, mnemonic, secret"),
             "and it must list what IS available: {}",
             r.err
         );
@@ -265,11 +267,7 @@ fn expect_changes_nothing_when_it_is_met_or_absent() {
     let without = pack(dir.path(), &all, &[]);
     assert_eq!(without.code, 0, "{}", without.err);
 
-    let with = pack(
-        dir.path(),
-        &all,
-        &["--expect", "descriptor,cosigner"],
-    );
+    let with = pack(dir.path(), &all, &["--expect", "descriptor,cosigner"]);
     assert_eq!(with.code, 0, "{}", with.err);
     assert!(
         !with.err.contains("--expect"),

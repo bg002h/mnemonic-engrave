@@ -18,6 +18,7 @@
 //! code, which is exactly the tautology a golden file exists to avoid.
 
 use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
 
 use super::coverage::{FIXTURE_ITERATIONS, FIXTURE_IV, FIXTURE_SALT, VECTORS};
 use super::{identity, pack_deterministic, pubhash, wire};
@@ -54,7 +55,10 @@ pub struct Vector {
 }
 
 fn hex(b: &[u8]) -> String {
-    b.iter().map(|x| format!("{x:02x}")).collect()
+    b.iter().fold(String::new(), |mut acc, x| {
+        let _ = write!(acc, "{x:02x}");
+        acc
+    })
 }
 
 /// Build every vector from the current implementation.

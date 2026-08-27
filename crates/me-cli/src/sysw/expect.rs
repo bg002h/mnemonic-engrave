@@ -111,10 +111,7 @@ impl Kind {
             // as an mt1 SET of text plates or as a single `tx:` record for the
             // QR path, and an operator asking for "a transaction" means either.
             Kind::Transaction => {
-                matches!(
-                    super::classify_with(record, adm),
-                    Class::Mt | Class::Tx
-                )
+                matches!(super::classify_with(record, adm), Class::Mt | Class::Tx)
             }
             Kind::Mnemonic => super::classify_with(record, adm) == Class::Mnemonic,
             Kind::Secret => super::classify_with(record, adm) == Class::Codex32Secret,

@@ -52,7 +52,14 @@ fn seals_and_prints_the_passphrase_to_stderr_only() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.uf2");
     let a = me()
-        .args(["seal", ARGV_OK, MS1, "--seal-secret", "--out", out.to_str().unwrap()])
+        .args([
+            "seal",
+            ARGV_OK,
+            MS1,
+            "--seal-secret",
+            "--out",
+            out.to_str().unwrap(),
+        ])
         .assert()
         .success()
         // §9 is "stderr only", and the name of this test claims it. Finding the
@@ -212,9 +219,16 @@ fn public_only_payload_prints_no_passphrase() {
 fn refuses_a_secret_in_the_public_section() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.uf2");
-    me().args(["seal", ARGV_OK, "--plaintext", MS1, "--out", out.to_str().unwrap()])
-        .assert()
-        .failure();
+    me().args([
+        "seal",
+        ARGV_OK,
+        "--plaintext",
+        MS1,
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .assert()
+    .failure();
     assert!(!out.exists());
 }
 

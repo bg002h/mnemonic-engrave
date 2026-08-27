@@ -82,6 +82,11 @@ const _: () = assert!(PASSPHRASE_MAX > 100);
 // workflow builds with rejects it as unstable. The lint is silenced rather than
 // obeyed because CI is the constraint that matters -- obeying it broke every
 // cross-target build job.
+// `manual_is_multiple_of` does not exist on CI's PINNED clippy (0.1.85)
+// either, so naming it below is itself an unknown lint there under
+// `-D warnings` (F-361) — `unknown_lints` must be allowed too, for the
+// toolchain where the lint being allowed does not exist yet.
+#[allow(unknown_lints)]
 #[allow(clippy::manual_is_multiple_of)]
 const _: () = assert!(REGION_LEN % 4096 == 0);
 const _: () = assert!((REGION_ADDR as usize + REGION_LEN) <= 0x10E0_0000);

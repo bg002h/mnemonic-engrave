@@ -75,10 +75,14 @@ pub fn open_bytes(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt::Write as _;
 
     const PASS: &str = "beef beef beef beef beef beef beef beef beef beef beef beef";
     fn hex(b: &[u8]) -> String {
-        b.iter().map(|x| format!("{x:02x}")).collect()
+        b.iter().fold(String::new(), |mut acc, x| {
+            let _ = write!(acc, "{x:02x}");
+            acc
+        })
     }
 
     /// Vector A's derived key (SPEC §11.4). Both implementations bind to it.

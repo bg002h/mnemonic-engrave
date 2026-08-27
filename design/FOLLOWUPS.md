@@ -13456,3 +13456,128 @@ a state that does not exist.
 **And a note for the third branch:** `mk`'s repo should be checked for a
 committed `vendor/` tree and a `vendor-freshness` gate before its pin is called
 done. Two of three so far.
+### F-361 — ✅ CLOSED 2026-08-27 — F-280's new `clippy` CI step is RED on arrival: the CI-pinned toolchain's clippy disagrees with the repo's default clippy on pre-existing findings (repo: **mnemonic-engrave**; owning phase: **before `fix/f280-ci-fmt` merges to master** — non-deferrable, it is the required check) `#me` `#tooling` `#gate` `#clippy`
+
+**Found 2026-08-27 closing F-280.** F-280's own text measured only
+`cargo fmt --check` (77 hunks / 14 files at `ba1f3ec`; re-measured on this
+branch at `3609b0c` as 76 hunks / 13 files). It never ran `cargo clippy`
+under the pinned toolchain, and neither did the brief that dispatched the
+close — its verification recipe assumed `cargo clippy --all-targets
+--locked -- -D warnings` would exit 0 once the reformat landed. It does not,
+and never did; the reformat is unrelated (confirmed by diffing the finding
+list before and after reformatting — byte-identical).
+
+**Measured on `fix/f280-ci-fmt` at the commit that adds the CI steps:**
+
+```
+cargo +1.85.0 clippy --all-targets --locked -- -D warnings   ->  exit 101
+cargo        clippy --all-targets --locked -- -D warnings   ->  exit 0   (default toolchain)
+```
+
+`+1.85.0` is `.github/workflows/release.yml`'s `RUST_TOOLCHAIN` pin, clippy
+0.1.85 (2025-02-17). The repo's default toolchain here is nightly
+(rustc 1.97.0-nightly, clippy 0.1.97, 2026-04-27) — over a year of clippy
+lint churn apart. Nothing in CI has ever run clippy (F-280), so this drifted
+unnoticed the same way the formatting did.
+
+**13 distinct findings, 8 files**, all pre-existing (not introduced by
+F-280's reformat):
+
+- `crates/me-cli/src/sysw/record.rs:278` — `unknown lint:
+  clippy::manual_is_multiple_of`. The `#[allow(...)]` at that line already
+  carries the comment `// % 2 != 0 rather than is_multiple_of — unstable on
+  CI's Rust`, i.e. the code was deliberately written FOR the pinned
+  toolchain's rustc, but the `#[allow]` naming a not-yet-existent lint on
+  that same toolchain's clippy was authored/checked against the newer local
+  clippy instead — direct evidence of the same untested-against-pinned-CI
+  drift F-280 describes, manifesting via clippy rather than fmt.
+- `crates/me-cli/src/sysw/wire.rs:85` — same `unknown lint` shape.
+- `crates/me-cli/src/sysw/record.rs:294` — `clippy::precedence` ("operator
+  precedence can trip the unwary") on `hi << 4 | lo`. Checked: `<<` already
+  binds tighter than `|` in Rust, so this parses as intended per the
+  comment two lines above explaining the `|`/`^` equivalence; the lint asks
+  for explicit parens for readability, not a correctness fix — **not a
+  funds-safety defect**, confirmed by reading the surrounding
+  cargo-mutants note before filing this.
+- `crates/me-cli/src/sysw/coverage.rs:277` — two lints on one line,
+  `clippy::nonminimal_bool` + a "comparison might be written more
+  concisely" suggestion, on `assert!(... == !unbuilt.is_empty(), ...)`.
+- `clippy::format_collect` ("use of `format!` to build up a string from an
+  iterator") at: `crates/me-cli/src/seal/pubhash.rs:41`,
+  `crates/me-cli/src/seal/pubhash.rs:62`, `crates/me-cli/src/seal/crypto.rs:81`,
+  `crates/me-cli/src/seal/mod.rs:421`, `crates/me-cli/src/sysw/pubhash.rs:36`,
+  `crates/me-cli/src/sysw/record.rs:270`, `crates/me-cli/src/sysw/tx.rs:288`,
+  `crates/me-cli/src/sysw/tx.rs:364`, `crates/me-cli/src/sysw/vectors.rs:57`.
+
+**Not fixed on `fix/f280-ci-fmt`, deliberately.** F-280 measured and scoped
+only the fmt drift; these are real code edits (rewriting `map(...).collect()`
+patterns, an `#[allow]` fix, added parens, a bool simplification) across 8
+files, not a mechanical reflow, and the dispatch brief for F-280 scoped the
+branch to fmt + wiring the gate, not to fixing unrelated pre-existing lint
+debt. The `clippy` step is still wired into `test (rust + go)` on that
+branch (matching F-280's explicit ask and the sibling `mnemonic-transaction`
+shape) — so it is a real, exercised gate from the moment it lands, per the
+same "a gate that has never executed is a hypothesis" principle F-280 itself
+invokes. That means **the branch's tip is RED on the required check** until
+this closes.
+
+**What would close it, same order-matters shape as F-280:** the gate is
+already wired (this entry's job); fix the 13 findings in their own commit,
+verify `cargo nextest run --locked` still reports 430 passed / 1 skipped
+(no behaviour change), and confirm `cargo +1.85.0 clippy --all-targets
+--locked -- -D warnings` exits 0. Do this **before** `fix/f280-ci-fmt` is
+merged to `master` — merging first would make the required `test (rust +
+go)` context fail on every subsequent push until someone notices.
+
+**✅ CLOSED 2026-08-27, on `fix/f280-ci-fmt`.** Fixed in two commits: the
+two `unknown_lints` sites (`record.rs`, `wire.rs`) first, then the rest.
+
+**Correction to the count above: it was undercounted, not overcounted —
+the original 13/8 came from a build that never finished.** The lib
+target's compile errors were blocking cargo from ever reaching the
+`bin "me"` and integration-test targets, so clippy's first pass silently
+never checked them; fixing what it *could* see surfaced 6 more findings in
+two further rounds (1 in `crates/me-cli/tests/sysw_cli.rs`, reached only
+once the lib compiled; then 5 in `crates/me-cli/src/main.rs` — 3
+`clippy::precedence`, 2 `clippy::format_collect` — reached only once
+`bin "me"` did). **True total: 18 lint instances across 11 files**, not 13
+across 8. Re-run after each fix until a round introduced nothing new, per
+the "closure is lens-closure, not finding-closure" rule this repo already
+holds elsewhere — the same discipline would have caught this masking on
+the first pass had it been applied then.
+
+Breakdown of the 18: 2 `unknown lint: clippy::manual_is_multiple_of`
+(`record.rs`, `wire.rs` — fixed by stacking `#[allow(unknown_lints)]`
+above the existing `#[allow(clippy::manual_is_multiple_of)]`, which
+satisfies both toolchains at once: the pinned one no longer errors on a
+name it doesn't recognise, and the newer one's `allow` still suppresses
+the lint it does recognise); 4 `clippy::precedence` (`record.rs:294`'s
+`hi << 4 | lo`, and three in `main.rs`'s base64 encoder, `(n >> N) & 63`)
+— each checked against Rust's operator table and confirmed to already
+parse as intended, so the fix is parens for clarity only, not a
+correctness change; 2 `clippy::nonminimal_bool` + `clippy::bool_comparison`
+on one line in `coverage.rs` (`X == !Y` → `X != Y`, verified boolean-
+equivalent); 10 `clippy::format_collect` (`main.rs` ×2, `seal/{crypto,mod,
+pubhash}.rs`, `sysw/{pubhash,record,tx}.rs` (`tx.rs` ×2), `sysw/
+vectors.rs`, `tests/sysw_cli.rs` — clippy's own suggested `fold` + `write!`
+rewrite, each needing a local `use std::fmt::Write as _;`, placed inside
+`mod tests` for the two sites where the helper is test-only so a
+non-test `lib` build doesn't get a fresh unused-import error from the
+same masking effect).
+
+None of the 18 was a real defect — every precedence finding already
+parsed as intended, and `format_collect`/`bool_comparison`/
+`nonminimal_bool` are documented non-behavioural rewrites. Verified,
+final state on `fix/f280-ci-fmt`:
+
+```
+cargo +1.85.0 fmt --check                                    -> exit 0
+cargo +1.85.0 clippy --all-targets --locked -- -D warnings    -> exit 0
+cargo        clippy --all-targets --locked -- -D warnings    -> exit 0
+cargo nextest run --locked                                    -> 430 passed, 1 skipped
+actionlint .github/workflows/release.yml                      -> exit 0
+```
+
+`cargo nextest run --locked`'s count is unchanged from the F-280 baseline
+(430/1), confirming none of the 18 fixes altered behaviour. Full detail in
+`design/agent-reports/FIX-F280-ci-fmt.md`.
