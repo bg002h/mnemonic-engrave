@@ -13316,3 +13316,143 @@ citation gate's own defects (F-286, F-296, and a silently skipped extension)
 were each found by an author working around them, not by anyone auditing the
 gate. A gate's blind spots surface only when someone hits one — so each hit is
 the whole signal, and working around it in the document discards it.
+
+### F-331 — `md encode --policy-id-fingerprint` still writes a NON-ARTIFACT line to `encode`'s stdout, which §6a forbids and P3's closure condition 6 asserts is gone (repo: **descriptor-mnemonic**; owning phase: **whichever cycle rules whether §6a binds an opt-in diagnostic flag**) `#spec` `#stdout` `#pipeline`
+
+**Found 2026-08-27 by P3's `md` branch**, building the md ungrouping. The plan's
+§1.1 inventory says *"One emission site on stdout — `crates/md-cli/src/cmd/encode.rs`,
+`println!("chunk-set-id: 0x{csid:05x}")`"*. There is a **second**, and no row of
+the plan touches it.
+
+**Reproduced, and it is not theoretical:**
+
+```
+$ md encode 'wpkh(@0/<0;1>/*)' --policy-id-fingerprint
+md1yqpqqxqq8xtwhw4xwn4qh
+policy-id-fingerprint: 0x3ace1082
+
+$ me sysw pack --in <that stdout> --out payload.bin
+rc 4 — "record 1 ... is not a form this container can place"
+```
+
+So the exact failure P3 exists to remove survives behind one opt-in flag. §5's
+closure condition 6 — *"No line of `md`'s or `mk`'s stdout on `encode` is
+anything but the artifact"* — is **false** for this invocation.
+
+**Not fixed by the md branch, deliberately.** No row names it, it is opt-in
+rather than the default path, and `me sysw pack` never passes it — so the phase's
+own gate is genuinely green. Moving the line to stderr is a change to a shipped
+machine-readable surface, which is the class §6a explicitly refused to make for
+`mk decode` and said *"gets its own phase and its own gate"*. That decision is
+above an implementer.
+
+**The two candidate rulings**, so whoever picks this up is not starting cold:
+either §6a binds every line `encode` can be made to print (and the flag's output
+moves to stderr beside the engraving card, where the chunk-set-id now lives), or
+§6a binds the DEFAULT emission only (and the condition-6 wording needs the
+qualifier it currently lacks). `mk` has no counterpart flag, so this is `md`-only.
+
+### F-332 — `md`'s TERMINAL-write decline is asserted only indirectly; the pty half is unbuilt (repo: **descriptor-mnemonic**; owning phase: **the test-infra residue**) `#test` `#gap`
+
+**Found 2026-08-27 by P3's `md` branch** while writing row 20 (*the decline,
+asserted*). The row's gate reads *"`md`, `mk` and `mnemonic` each still write to
+a **terminal** without refusing, so an adoption of `exit::write_block` that
+imported `me`'s terminal gate goes RED."*
+
+**What was built**, in `crates/md-cli/tests/cli_p3_decline.rs`:
+
+- a source scan asserting the only path rooted at `mnemonic_io_lib::` anywhere
+  under `src/` is `write::write_private` — mutation-verified (adding a
+  `mnemonic_io_lib::exit::WriteBlock` return type reds it);
+- `md encode` into a shell-created **mode-0644** file exits 0 and does not
+  tighten it — the world-readable arm of the same gate.
+
+**What was NOT built:** an actual terminal. Asserting the `Destination::Terminal`
+arm needs a pty, and this suite runs on ubuntu / macos / windows plus an
+x86_64-musl leg and an aarch64-musl leg under QEMU. `openpty` lives in `libutil`;
+`posix_openpt` needs `/dev/pts` inside `cross`'s container. A test that silently
+does nothing on five of seven CI legs is worse than a named gap.
+
+**Why this is Minor rather than Important:** the source scan is the stronger of
+the two checks. `write_block` cannot refuse a terminal in a binary that never
+reaches `write_block`, and the scan fails closed (it asserts it found >10 files
+AND at least one crate path, so an empty scan cannot report clean).
+
+**What closing it looks like:** a `#[cfg(target_os = "linux")]` pty helper using
+`posix_openpt`/`grantpt`/`unlockpt`/`ptsname` (all in `libc` proper — NOT
+`openpty`, which needs `-lutil`), used by `md`, `mk` and `ms` alike. It is
+constellation-shaped, which is the other reason it did not belong inside one
+branch of P3.
+
+### F-333 — the `mnemonic-io-lib` git pin lands on a `descriptor-mnemonic` release recipe that was ALREADY broken by the miniscript pin; same class as F-324, one repo over (repo: **descriptor-mnemonic** + **mnemonic-toolkit**; owning phase: **before the next `descriptor-mnemonic-md-cli-v*` tag** — non-deferrable past it) `#ci` `#repro` `#deps` `#cross-repo`
+
+**Found 2026-08-27 by P3's `md` branch**, executing row 1 (*the pin*). The row
+says *"Three files, no other edit."* In this repo that is false, and the repo's
+own gate said so within one commit — `ci/repro/vendor-freshness.sh` failed
+CLOSED, naming the uncovered source and its own fix, exactly as its comment
+predicted. **This is the same defect P2 filed as F-324 for `mnemonic-secret`;
+the plan is now 2 for 2 on repos where "no other edit" was untrue.**
+
+**MEASURED THREE WAYS UNDER AN EMPTY `CARGO_HOME`** — the isolation is
+load-bearing, and F-324 records a false GREEN from omitting it. Each run is
+`cargo metadata --format-version 1 --locked --offline` with the named
+`--config` set:
+
+| `--config` form | rc | fails on |
+| --- | --- | --- |
+| TWO-block (crates-io + vendored-sources) — **what `man-pages.yml` passes today** | **101** | `miniscript` |
+| THREE-block (+ the miniscript git source) — what `vendor-freshness.sh` had | **101** | `mnemonic-io-lib` |
+| FOUR-block (+ the mnemonic-engrave git source) — what `vendor-freshness.sh` has now | **0** | — |
+
+**READ THE FIRST ROW: `md`'s tag-time reproducible build was already broken
+before P3 touched it.** The miniscript `[patch.crates-io]` git rev landed
+2026-08-20; `vendor-freshness.sh` was converted to the three-block form then and
+records the history in its own header, but `.github/workflows/man-pages.yml` was
+not, and still passes two blocks on both `musl-binaries` legs. P3 adds a
+**second** uncovered git source to a recipe that already could not resolve the
+first.
+
+**FIXED on the md branch** (commit *"P3 row 1, consequence"*): `cargo vendor
+vendor/` — which added exactly one directory, `vendor/mnemonic-io-lib/`, and
+moved nothing else in the 125-entry tree — and the mnemonic-engrave stanza in
+`ci/repro/vendor-freshness.sh`, with the rev derived from `Cargo.lock` so it
+tracks the pin, failing closed on an empty match. Green under an empty
+`CARGO_HOME`; negative control (`vendor/mnemonic-io-lib/` moved aside) reds; and
+a synthetic third `source = "git+…"` line in `Cargo.lock` still trips the
+fail-closed guard, so widening the cover for one dependency did not turn the
+guard off.
+
+**NOT fixed on the md branch, and this is where it differs from F-324.** P2
+converted `mnemonic-secret`'s `man-release.yml` legs as well. This branch left
+`man-pages.yml` alone, for three stated reasons:
+
+1. **It cannot be exercised from here.** It triggers on
+   `descriptor-mnemonic-md-cli-v*` tags only and needs docker + GHCR. *A gate
+   that has never executed is a hypothesis* — and so is an edit to one.
+2. **A correct edit still cannot produce a release.** The same workflow's
+   `repro:` job calls
+   `bg002h/mnemonic-toolkit/.github/workflows/reproducible-musl-build.yml`,
+   whose only git-source knob is `miniscript_rev` and whose three `--config`
+   lines hard-code the rust-miniscript URL. `md` passes `miniscript_rev: ""`.
+   That is the identical cross-repo blocker F-324 names, so `md` cannot tag
+   until the toolkit change lands either way.
+3. **P3 is not what makes it red** — row 1 of the table above.
+
+**So the fix is one change, not two:** generalise the toolkit's reusable workflow
+to a `git_source`/`git_rev` pair (or a list), re-pin the `uses:` SHA in **both**
+`mnemonic-secret`'s `man-release.yml` and `descriptor-mnemonic`'s
+`man-pages.yml`, and convert md's two `musl-binaries` legs to the four-block form
+in the same pass — miniscript AND mnemonic-io-lib, because md needs both and
+`ms` needs one. Then **exercise it**: one `workflow_dispatch` run per repo.
+
+**Doc consequence, unfixed for the same reason:**
+`descriptor-mnemonic/docs/verify-reproducibility.md` tells an external rebuilder
+`md` is *"fork-free"* and to pass *"the same two `--config` overrides"* (its §4
+and its §8 recipe). That instruction has been wrong since the miniscript pin and
+is now wrong twice over. It should be corrected in the same pass that fixes the
+workflow, so the doc and the recipe move together rather than the doc describing
+a state that does not exist.
+
+**And a note for the third branch:** `mk`'s repo should be checked for a
+committed `vendor/` tree and a `vendor-freshness` gate before its pin is called
+done. Two of three so far.
