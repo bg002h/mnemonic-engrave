@@ -1,3 +1,23 @@
+> # RETIRED 2026-08-26 — operator ruling. DO NOT BUILD FROM THIS DOCUMENT.
+>
+> *"I don't think encrypted_payload_deviceB is relevant any more."*
+>
+> **The post-wipe hang is known and deliberately accepted, not overlooked.**
+> `full unlock → wipe → re-enter Sealed Payload` hangs deterministically on real
+> hardware (`HARDWARE_RESULT_2026-08-09_phaseB2b.md`), and the phase's commits
+> ARE merged into the fork's `main`, so the behaviour is present in flashed
+> firmware. It was raised on 2026-08-26 and the operator ruled it closed the same
+> day, on the reasoning that **if it is real it will happen again** — a
+> deterministic hang does not hide, and it will return with a live
+> reproduction attached rather than as an entry in a retired plan.
+>
+> **Do not re-open it as a new discovery** — the point of this note is that
+> the next reader finds a decision rather than a defect.
+>
+> `DESIGN_b2b_payload_read_allocation.md` remains as the diagnosis
+> (`XIPReader.Read`'s 64 KiB allocation, `sysw/read_tinygo.go:31`) should the
+> feature ever be revived.
+
 # Encrypted Payload Delivery — Plan B Phase A (device, headless core) — Implementation Plan
 
 > **For agentic workers:** one implementer, own worktree, TDD, tasks in order.
