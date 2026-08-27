@@ -11347,3 +11347,38 @@ catches will be indistinguishable from the noise it already prints.
 input, or skip documents that declare themselves CLI-only, so that a red result
 means something again. Whatever the mechanism, it must keep printing what it does
 **not** cover — a gate that hides its blind spot is worse than no gate.
+
+**F-256 UPDATE 2026-08-26 — DONE, and the original figures were WRONG by ~3×.**
+
+Operator authorised the cleanup ("Can you trim the chaff?"). Reclaimed:
+
+| repo | logical removed | |
+| --- | --- | --- |
+| `mnemonic-gui` | 1.0 TiB | 485,444 files |
+| `mnemonic-toolkit` | 621.1 GiB | 1,287,799 files |
+| `descriptor-mnemonic` | 41.8 GiB | 83,607 files |
+| `mnemonic-secret` | 36.8 GiB | 118,283 files |
+| `mnemonic-key` | 22.5 GiB | 65,754 files |
+
+**~1.72 TiB logical — but only 645 GB of real disk.** `/scratch` went from 4.8T
+used (52%) to 4.2T used (45%).
+
+**The correction matters more than the cleanup.** `/scratch` is **btrfs mounted
+`compress=zstd:3`**. `du` reports *logical* bytes; `df` reports *allocated
+blocks*. Every figure in the original F-256 — the 1.8T working set, the 1.1T and
+648G headline repos — came from `du` and therefore overstated real consumption by
+roughly **3×**. The true working set was closer to 600 GB.
+
+The discrepancy was only visible because `cargo clean` printed its own total
+(1.0TiB) next to a `df` delta (347 GB) that disagreed with it. **Two measurements
+of the same action, disagreeing, is what exposed it** — one number alone would
+have shipped the error, and did, for a full day.
+
+Hardlinks were ruled out as the cause before compression was confirmed: `du` and
+`du -l` agree to within 1 GiB on the same tree.
+
+**Not done, and NOT a disk question:** `mnemonic-toolkit` holds **38 untracked
+files** and `mnemonic-key` **1**, all design markdown (`cycle-prep-recon-*.md`,
+`SPEC_chunk_set_id_verification.md`). `cargo clean` never touches source, so
+these are unaffected — but they are uncommitted work sitting in a tree nobody is
+watching, which is a different exposure from the one this item was filed about.
