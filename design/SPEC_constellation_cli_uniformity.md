@@ -300,9 +300,35 @@ nor a codec.
 
 **The convention has no slot for this crate**, because every existing one is
 either a format codec or a binary, and this is the first shared non-codec
-library. That is a real gap and an operator decision, not a detail to settle in
-P0. `m-io` fits the two-segment shape best (`m` being the family the operator
-already names — "m-format", "m*1 strings"), but it is a proposal, not a ruling. **P0 must confirm the name is free on crates.io before publishing**;
+library.
+
+**Could it be a codec instead? No — measured, not argued.** The operator asked,
+and the codec tier turns out to be defined by a property this crate is the exact
+negation of:
+
+```
+$ grep -rlE 'use std::io|std::fs|clap|stdin|stdout' <crate>/src | wc -l
+  mt-codec 0    md-codec 0    ms-codec 0    mk-codec 1
+```
+
+**The codec LIBRARIES are 4 for 4 pure** — no IO, no filesystem, no clap, no
+process. `mk-codec`'s single hit is `src/bin/gen_mk_vectors.rs`, a maintainer
+tool that happens to live in the crate, not the library. A codec here is a pure
+transform: bytes ↔ `m*1` string, and nothing else.
+
+**The IO + safety layer is entirely the things a codec contains none of** —
+channels (`--in`/`--out`/`-`), policy (argv refusal, world-readable refusal),
+and process (exit codes). Naming it `-codec` would break the one property that
+makes the codec tier legible, and a reader who opened it expecting a pure
+transform would find `std::fs` on the first page.
+
+**So the convention needs a third layer, which is a smaller invention than
+misusing either existing one.** It already has two — `-codec` for the pure
+format transform, `-cli` for the runnable binary. This is shared runtime
+plumbing and is neither. `m-io` fits the two-segment shape (`m` being the family
+the operator already names — "m-format", "m*1 strings"), but the name remains a
+**proposal, not a ruling** — it is baked into six manifests, every `use` site,
+and a publish that cannot be undone. **P0 must confirm the name is free on crates.io before publishing**;
 an unavailable name is a rename across five manifests if it is discovered after
 the code is written, and one line of the plan if it is discovered before.
 
