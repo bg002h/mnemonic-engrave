@@ -11806,7 +11806,15 @@ that structurally cannot leak**: `--nosuchflag` makes clap name the *flag*
 rather than the value. **A negative inheriting a scope of one, and the one
 chosen was the exception.**
 
-**This gates P0** and is now condition 8's real content. §6d's pre-parser
+**OPERATOR RULING 2026-08-27: deferred, not fixed now** — *"Nobody cares about
+leaks, we can file them for fixing later."* No emergency fix, no yank of v0.7.0.
+
+**It is still what condition 8 is FOR, and P0 fixes it as a side effect** —
+§6d's pre-parser guard is spec-normative for P0, and a guard running before
+`Cli::parse()` closes every row of the table above. So this is deferred in the
+sense of *not interrupting the cycle*, not in the sense of *unowned*.
+
+**What must change in the plan regardless of timing:** the gate. §6d's pre-parser
 ordering is not a tidiness requirement — it is the fix for this. The observable
 must be *"no `ms1` in stderr for an argv clap would reject"*, asserted across
 **every** surface, not one.
