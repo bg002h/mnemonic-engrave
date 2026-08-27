@@ -11869,3 +11869,34 @@ gap P0 opens; it is one P0 declines to close, deliberately and in writing.
 **Owning phase: whichever cycle first adds a secret-bearing flag to any m-format
 CLI.** At that moment the layer stops being theoretical, and this entry is what
 stops it being rediscovered.
+
+### F-269 — operator override: fable folds R11 and R12, and fable performs the final review (owning phase: **recorded, not work**) `#process` `#record`
+
+**Recorded 2026-08-27** so a later reader does not mistake the standing rule for
+the governing one.
+
+`CLAUDE.md` in this repo states, from the operator's own directive of
+2026-08-16, that **fable is not a reviewer tier** — *"we will not use fable for
+final review"*, with opus as the top of the ladder including for the final
+pre-irreversible review, and an explicit instruction not to propose fable for a
+gate.
+
+**On 2026-08-27 the operator overrode that**, directing that the next two folds
+go to fable and that the fold then go to fable for final review. **The
+controller did not propose this and is barred from doing so; the override is the
+operator's.**
+
+**Why it is a reasonable call.** Eleven review rounds had run, and **every
+Critical since round 2 was a defect the FOLD introduced**, not the plan. The
+design was settled by probes; the folding was the failure. Changing the model
+holding the pen tests the one variable that had not been varied.
+
+**How independence is preserved.** The reviewer is dispatched as a **fresh agent
+with no shared context** — it does not inherit the folder's reasoning and reads
+the persisted report rather than the folder's account of it. *"Author ≠ reviewer
+on the same artifact"* is about context, not about model identity, and a
+separate dispatch satisfies it.
+
+**What this entry does NOT do:** it does not amend `CLAUDE.md`. The standing
+rule remains as written and continues to bind the controller. This is one
+operator-directed exception, scoped to this artifact and these two folds.
