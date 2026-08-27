@@ -99,8 +99,10 @@ offer — was the valuable half to share. It is backwards.
 
 > **CROSS-REPO NOTE — these two live in `mnemonic-transaction`, not here.**
 > `crates/mt-cli/src/validate.rs`, at **line 627** (`world_readable_stdout_guard`,
-> taking `allow: bool` and `form: crate::blocks::Form`) and **line 585** (the
-> `if mode & 0o077 == 0` mask). They are written without the usual `path:line`
+> taking `allow: bool` and `form: crate::blocks::Form`), whose own mask is at
+> **line 653**. **Line 585 is NOT the guard** — it carries the same `0o077`
+> inside a different function returning `None` rather than a refusal, and an
+> earlier draft named it here as one of the guard's two sites (M3). They are written without the usual `path:line`
 > punctuation on purpose: `plan-cite-check.sh` resolves only against this repo
 > and the fork root, so a citation-shaped sibling path would be reported
 > DANGLING forever, training a reader to skim the gate's output. **Both were
@@ -255,9 +257,27 @@ invalid-artifact input: **`md` 1, `mk` 2, `ms` 1, `mnemonic` 2 (by input shape)*
 and for a clap usage error **`md` 2, `mk` 64, `ms` 64, `mt` 2, `me` 2**. The
 binaries do not agree, §9b rules the usage-code split **out of scope**, and §6f
 rules `mk`'s invalid-artifact 2 → 1 the only change this cycle makes. **So the
-crate holds the constants and their MEANINGS — what "2" signifies — and never a
-mapping from binary to code.** Publishing one table would do to the exit codes
-exactly what publishing `0o044` would do to the mask.
+crate publishes NO shared numeric exit constant at all.**
+
+**A CONSTANT IS A MAPPING, and "meanings, not a table" does not separate them
+(I2).** `refuse_write_block` returns `Some(EXIT_USAGE)` where `EXIT_USAGE = 2`
+(`crates/me-cli/src/main.rs:296`) — **the donor's number**. `ms` maps clap errors
+to **64** deliberately, with a comment citing its own spec's carve-out. So a
+published `EXIT_USAGE = 2` leaves `ms` two choices at P2: adopt it, which §9b
+rules out of scope; or ignore it, which is round 0's decorative table verbatim.
+**Enumerating the constants is what exposed this** — §6f's table shows the five
+binaries agree on almost nothing.
+
+| the crate holds | the crate does NOT hold |
+| --- | --- |
+| the refusal *decision* types (`WriteBlock` and kin) | any `EXIT_*` integer |
+| the wording of each refusal | any binary→code mapping |
+| the ordering rule — which gate outranks which | a "usage error" number |
+
+Each binary maps a decision onto its own code. **So `refuse_write_block` returns
+the DECISION, not `Some(i32)`** — that signature change belongs to P0, and it is
+what makes this boundary real rather than asserted. Publishing an integer would
+do to the exit codes exactly what publishing `0o044` would do to the mask.
 
 **`fd.rs`'s CONTRACT, stated because "no policy" is not self-explaining:**
 
@@ -286,15 +306,29 @@ six; without this table a reader cannot tell where a function lands:
 
 | file | functions |
 | --- | --- |
-| `channel.rs` | `destination`, `refuse_terminal_destination` |
+| `channel.rs` | `destination` — classification only (N-I1) |
 | `fd.rs` | `stdout_world_readable_mode` (**split**, C1), its `cfg(not(unix))` stub |
 | `records.rs` | `split_record_stream`, `no_records_guard`, the string-level recognisers (prefix / HRP / wordlist), and the pre-parser argv machinery |
 | `observation.rs` | the payload-kind and mode types (F-259, F-260) |
-| `exit.rs` | `write_block`, `refuse_write_block`, `refuse_world_readable_stdout` |
+| `exit.rs` | `write_block` — the DECISION only (N-I1) |
 | `remedy.rs` | the purge/remedy text |
 | `lib.rs` | re-exports only |
 | **stays in `me`** | `is_secret`, `is_bearer`, `is_argv_forbidden`, and `read_records`'s class-keyed arm (N-C2) |
+| **stays in `me`** | **every `refuse_*`** — `refuse_write_block`, `refuse_terminal_destination`, `refuse_world_readable_stdout` (N-I1) |
 | *(caller-side)* | `emit`, `write_private` — see below |
+
+**THE `refuse_*` FUNCTIONS STAY IN `me` TOO, and for the same reason as §3's
+stdio ruling (N-I1).** All four `eprintln!` in the closure live in them. An
+earlier draft of this table mapped three of the four into the crate while §3,
+one page above, ruled that **functions return what should be said and the caller
+emits it** — the plan contradicting itself one table apart, which is N-C2's
+shape a third time.
+
+**The split is decision from announcement.** `write_block` decides; `destination`
+classifies; the crate holds those and the *wording*. Announcing is the caller's,
+because a library six binaries share cannot be tested without capturing process
+stdio and cannot be redirected by a caller — doubly wrong in a crate whose whole
+purpose is controlling what reaches stdout.
 
 **THE THREE `Class` PREDICATES CANNOT MOVE — this is a language rule, not a
 preference (N-C2).** `is_secret`, `is_bearer` and `is_argv_forbidden` are
@@ -463,10 +497,16 @@ before publishing; do not trust a check from an earlier session.
    analysis says that test locks the defect in, so a fold that leaves it
    untouched has not closed the finding. "Unchanged in meaning" governs
    condition 1; it does not govern the tests this condition exists to fix.
-7. **The guard AND the override's own parse are both decided before
+7. **§8's `CLOSED`-grep discipline observed (M7).** §8 directs P0 not to read an
+   absent `CLOSED` marker as open work, and to **grep both markers**. The plan
+   cited §8 but never carried this item. Concretely: before scheduling any
+   follow-up, `grep -n 'CLOSED\|DONE' design/FOLLOWUPS.md` for it — F-259 and
+   F-260 were both filed the day this plan was written, so the practical risk is
+   near nil today and rises with every week that passes.
+8. **The guard AND the override's own parse are both decided before
    `Cli::parse()`**, asserted at least in the donor (C2). A guard that reaches
    its decision by parsing first has reintroduced the leak §6d exists to stop.
-8. An R0 round closing **0C/0I**.
+9. An R0 round closing **0C/0I**.
 
 ---
 
