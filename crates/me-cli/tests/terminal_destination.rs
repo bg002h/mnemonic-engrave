@@ -88,7 +88,10 @@ fn a_pty_with_out_still_packs_at_exit_0() {
     assert!(!p.contains('\'') && !p.contains(' '), "tempdir path: {p}");
 
     let (code, txt) = pty(&format!("sysw pack --no-passphrase --out '{p}' text:6869"));
-    assert_eq!(code, 0, "--out is a file destination, not a terminal: {txt}");
+    assert_eq!(
+        code, 0,
+        "--out is a file destination, not a terminal: {txt}"
+    );
     assert!(
         out.exists() && std::fs::metadata(&out).unwrap().len() > 0,
         "the container must actually have been written: {txt}"

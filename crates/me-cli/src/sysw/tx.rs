@@ -486,8 +486,14 @@ mod signature_predicate_tests {
             assert_eq!(t.every_input_signed, t.unsigned_inputs.is_empty(), "{hex}");
             assert!(t.unsigned_inputs.iter().all(|&i| i < t.inputs), "{hex}");
         }
-        assert_eq!(parse(&unhex(EVEN_STRIPPED_HEX)).unwrap().unsigned_inputs, vec![0]);
-        assert!(parse(&unhex(EVEN_RAW_HEX)).unwrap().unsigned_inputs.is_empty());
+        assert_eq!(
+            parse(&unhex(EVEN_STRIPPED_HEX)).unwrap().unsigned_inputs,
+            vec![0]
+        );
+        assert!(parse(&unhex(EVEN_RAW_HEX))
+            .unwrap()
+            .unsigned_inputs
+            .is_empty());
     }
 
     /// P5 M-6 — a segwit-marked transaction whose every witness stack is empty

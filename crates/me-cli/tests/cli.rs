@@ -1011,61 +1011,134 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
     let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
     let cases = vec![
         // ── 2, USAGE ────────────────────────────────────────────────────────
-        Case { code: 2, args: s(&["--stdout"]), stdin: "".to_string(),
-               why: "no input at all" },
-        Case { code: 2, args: s(&[]), stdin: MD1_VALID.to_string(),
-               why: "a valid string with no output mode chosen" },
-        Case { code: 2, args: s(&["sysw", "pack", "--no-passphrase"]), stdin: "".to_string(),
-               why: "no records on argv and no --in" },
-        Case { code: 2, args: s(&["sysw", "wipe", "--fill", "sideways"]), stdin: "".to_string(),
-               why: "a --fill value that does not exist" },
-        Case { code: 2, args: s(&["sysw", "show", "/nonexistent/payload.bin"]), stdin: "".to_string(),
-               why: "a file that is not there" },
+        Case {
+            code: 2,
+            args: s(&["--stdout"]),
+            stdin: "".to_string(),
+            why: "no input at all",
+        },
+        Case {
+            code: 2,
+            args: s(&[]),
+            stdin: MD1_VALID.to_string(),
+            why: "a valid string with no output mode chosen",
+        },
+        Case {
+            code: 2,
+            args: s(&["sysw", "pack", "--no-passphrase"]),
+            stdin: "".to_string(),
+            why: "no records on argv and no --in",
+        },
+        Case {
+            code: 2,
+            args: s(&["sysw", "wipe", "--fill", "sideways"]),
+            stdin: "".to_string(),
+            why: "a --fill value that does not exist",
+        },
+        Case {
+            code: 2,
+            args: s(&["sysw", "show", "/nonexistent/payload.bin"]),
+            stdin: "".to_string(),
+            why: "a file that is not there",
+        },
         // THE ONE THAT DISAGREED. `me seal --iterations 5` exits 2 and
         // `me sysw pack --iterations 5` exited 4, for the same typo on the
         // same flag with the same range in the same message. Both are usage:
         // no input has been read and nothing about the operator's DATA is
         // wrong. Fixed on the sysw side, because `seal` is the shipped one.
-        Case { code: 2,
-               args: s(&["seal", "--iterations", "5", "--out"]),
-               stdin: "".to_string(), why: "seal: --iterations below the floor" },
-        Case { code: 2,
-               args: s(&["sysw", "pack", "--allow-argv-secret", "--iterations", "5", "--passphrase-words", "12", SEED]),
-               stdin: "".to_string(), why: "sysw pack: --iterations below the floor" },
-        Case { code: 2,
-               args: s(&["sysw", "pack", "--allow-argv-secret", "--iterations", "2000001", "--passphrase-words", "12", SEED]),
-               stdin: "".to_string(), why: "sysw pack: --iterations above the ceiling" },
+        Case {
+            code: 2,
+            args: s(&["seal", "--iterations", "5", "--out"]),
+            stdin: "".to_string(),
+            why: "seal: --iterations below the floor",
+        },
+        Case {
+            code: 2,
+            args: s(&[
+                "sysw",
+                "pack",
+                "--allow-argv-secret",
+                "--iterations",
+                "5",
+                "--passphrase-words",
+                "12",
+                SEED,
+            ]),
+            stdin: "".to_string(),
+            why: "sysw pack: --iterations below the floor",
+        },
+        Case {
+            code: 2,
+            args: s(&[
+                "sysw",
+                "pack",
+                "--allow-argv-secret",
+                "--iterations",
+                "2000001",
+                "--passphrase-words",
+                "12",
+                SEED,
+            ]),
+            stdin: "".to_string(),
+            why: "sysw pack: --iterations above the ceiling",
+        },
         // ── 3, POLICY REFUSAL ───────────────────────────────────────────────
-        Case { code: 3, args: s(&["--stdout"]), stdin: MS1.to_string(),
-               why: "an ms1 secret: understood, well-formed, and never engraved" },
+        Case {
+            code: 3,
+            args: s(&["--stdout"]),
+            stdin: MS1.to_string(),
+            why: "an ms1 secret: understood, well-formed, and never engraved",
+        },
         // R2 / G-P3.5. Understood, well-formed, and refused on purpose: a raw
         // signed transaction is BEARER and argv is a public channel. Not
         // usage -- the command line is spelled correctly -- and not invalid
         // input, because the same record on --in or stdin packs fine.
-        Case { code: 3,
-               args: s(&["sysw", "pack", "--no-passphrase", &format!("tx:{STRIPPED}")]),
-               stdin: String::new(), why: "a tx: record on argv" },
+        Case {
+            code: 3,
+            args: s(&["sysw", "pack", "--no-passphrase", &format!("tx:{STRIPPED}")]),
+            stdin: String::new(),
+            why: "a tx: record on argv",
+        },
         // ── 4, INVALID INPUT ────────────────────────────────────────────────
-        Case { code: 4, args: s(&["--stdout"]), stdin: "md1notavalidstring".to_string(),
-               why: "a string that does not decode" },
-        Case { code: 4, args: s(&["sysw", "show"]), stdin: "".to_string(),
-               why: "a file that is not a container" },
-        Case { code: 4, args: s(&["sysw", "pack", "--no-passphrase", "not a record"]), stdin: "".to_string(),
-               why: "a record this container cannot place" },
+        Case {
+            code: 4,
+            args: s(&["--stdout"]),
+            stdin: "md1notavalidstring".to_string(),
+            why: "a string that does not decode",
+        },
+        Case {
+            code: 4,
+            args: s(&["sysw", "show"]),
+            stdin: "".to_string(),
+            why: "a file that is not a container",
+        },
+        Case {
+            code: 4,
+            args: s(&["sysw", "pack", "--no-passphrase", "not a record"]),
+            stdin: "".to_string(),
+            why: "a record this container cannot place",
+        },
         // ON STDIN, not argv: argv is refused at 3 before admission is even
         // considered (the case above), so the unsigned-input refusal can only
         // be reached through a private channel.
-        Case { code: 4, args: s(&["sysw", "pack", "--no-passphrase"]),
-               stdin: format!("tx:{STRIPPED}\n"), why: "a transaction with an unsigned input" },
+        Case {
+            code: 4,
+            args: s(&["sysw", "pack", "--no-passphrase"]),
+            stdin: format!("tx:{STRIPPED}\n"),
+            why: "a transaction with an unsigned input",
+        },
         // WAS `me tx` over bytes that are not a transaction, at exit 4. That
         // verb moved to `mt encode --qr` with P3b -- `me` no longer
         // manufactures any constellation string -- so the SITUATION is kept
         // here on the verb that survives, because what this table checks is
         // that every subcommand spells "the input is wrong" with the same
         // digit, and dropping the row would shrink the comparison instead.
-        Case { code: 4, args: s(&["sysw", "pack", "--no-passphrase"]),
-               stdin: "tx:abababab\n".to_string(),
-               why: "a tx: record whose body is hex but not a transaction" },
+        Case {
+            code: 4,
+            args: s(&["sysw", "pack", "--no-passphrase"]),
+            stdin: "tx:abababab\n".to_string(),
+            why: "a tx: record whose body is hex but not a transaction",
+        },
     ];
 
     for c in &cases {

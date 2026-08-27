@@ -53,7 +53,8 @@ const MS1: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
 const MNEMONIC: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon \
                         abandon abandon about";
 const PASS: &str = "pass:6869";
-const MT1: &str = "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax";
+const MT1: &str =
+    "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax";
 /// The repo's own signed-transaction fixture, as `tests/sysw_cli.rs` carries it.
 const TX: &str = "tx:020000000001017c8da925af70e49a12b0cea7b639df5037c87b7fa61f262b86ac32c47aa3ba1a0000000000fdffffff02404b4c0000000000160014c1de0dd435d1d4ad97ed1f51d63f91c800cc4eab3ea1b92901000000160014751097c299d6354fbb2c5a84512dd708f2902f5e0247304402207debc7d89984c7717940b622504318d2c184966a618b32cf8b700d0f125b3ffa02206ef875f9c0b5931e0ea1cf0c109bdb8512835c8e51526f99b3419929a2ea7259012103718f5fd45b926226357e2b0400574b41a32d0bf0ae69a02eebea5fbc542ff52060000000";
 
@@ -118,7 +119,10 @@ fn no_argv_forbidden_class_reaches_stderr_on_any_surface() {
         }
     }
 
-    assert_eq!(rows, 450, "the cross-product must be generated, not sampled");
+    assert_eq!(
+        rows, 450,
+        "the cross-product must be generated, not sampled"
+    );
     assert!(
         leaks.is_empty(),
         "{} of {rows} rows leaked the material to stderr:\n{}",

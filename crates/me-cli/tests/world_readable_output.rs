@@ -329,7 +329,11 @@ fn converter_does_not_refuse_a_pipe() {
 /// which opening write-only would.
 #[cfg(unix)]
 fn open_fifo_rdwr(p: &std::path::Path) -> fs::File {
-    fs::OpenOptions::new().read(true).write(true).open(p).unwrap()
+    fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(p)
+        .unwrap()
 }
 
 #[test]
@@ -361,7 +365,10 @@ fn refuses_a_world_readable_named_fifo() {
 /// nothing, so they are exempt.
 #[test]
 fn does_not_refuse_dev_null() {
-    let f = fs::OpenOptions::new().write(true).open("/dev/null").unwrap();
+    let f = fs::OpenOptions::new()
+        .write(true)
+        .open("/dev/null")
+        .unwrap();
     let res = Command::new(me_bin())
         .args(["sysw", "pack", "--no-passphrase", TEXT])
         .stdout(Stdio::from(f))

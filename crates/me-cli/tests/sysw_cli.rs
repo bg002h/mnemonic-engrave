@@ -265,7 +265,7 @@ fn region_and_container_have_the_same_digest_and_identity() {
 fn region_works_for_a_sealed_payload_too() {
     let out = me()
         .args(["sysw", "pack", "--region", "--passphrase-words", "12"])
-            .write_stdin(SEED)
+        .write_stdin(SEED)
         .assert()
         .success();
     assert_eq!(out.get_output().stdout.len(), 65_536);
@@ -339,7 +339,10 @@ fn pack_refuses_a_section_too_long_for_its_own_parser() {
     );
     // ...and it must stay INSIDE the region, or `bound` refuses it for the
     // other reason and this stops being a section-cap test at all.
-    assert!(52 + section_len < 65_536, "still a section refusal, not a region one");
+    assert!(
+        52 + section_len < 65_536,
+        "still a section refusal, not a region one"
+    );
     let recs: Vec<String> = (0..n)
         .map(|_| format!("text:{}", "61".repeat(400)))
         .collect();
@@ -361,7 +364,14 @@ fn everything_pack_emits_is_readable_by_show() {
         vec!["--no-passphrase", TEXT],
         vec!["--no-passphrase", MD1],
         vec!["--passphrase-words", "12", "--allow-argv-secret", SEED],
-        vec!["--iterations", "100000", "--passphrase-words", "2", "--allow-argv-secret", SEED],
+        vec![
+            "--iterations",
+            "100000",
+            "--passphrase-words",
+            "2",
+            "--allow-argv-secret",
+            SEED,
+        ],
     ]
     .iter()
     .enumerate()
@@ -675,7 +685,11 @@ fn pack_accepts_a_complete_mt_set_and_show_confirms_it() {
         .assert()
         .success();
     let stdout = String::from_utf8_lossy(&show.get_output().stdout).to_string();
-    assert_eq!(stdout.matches("mt1 chunk — confirmed").count(), 6, "{stdout}");
+    assert_eq!(
+        stdout.matches("mt1 chunk — confirmed").count(),
+        6,
+        "{stdout}"
+    );
     assert!(stdout.contains(MT_EVEN_TXID), "{stdout}");
     assert!(stdout.contains("222 bytes"), "{stdout}");
 }
@@ -716,8 +730,7 @@ fn pack_warns_on_an_incomplete_mt_set() {
 #[test]
 fn the_record_mt_emits_packs_on_stdin() {
     let record = format!("tx:{MT_EVEN_RAW_HEX}");
-    me()
-        .args(["sysw", "pack", "--no-passphrase"])
+    me().args(["sysw", "pack", "--no-passphrase"])
         .write_stdin(format!("{record}\n"))
         .assert()
         .success();
@@ -731,14 +744,14 @@ fn pack_refuses_a_tx_record_that_is_not_a_transaction() {
     // (G-P3.5) BEFORE anything looks at the body, so these two messages are
     // only reachable through a private channel -- which is also where a real
     // operator meets them.
-    me()
-        .args(["sysw", "pack", "--no-passphrase"])
+    me().args(["sysw", "pack", "--no-passphrase"])
         .write_stdin("tx:abab\n")
         .assert()
         .code(4)
-        .stderr(predicate::str::contains("not one serialized Bitcoin transaction"));
-    me()
-        .args(["sysw", "pack", "--no-passphrase"])
+        .stderr(predicate::str::contains(
+            "not one serialized Bitcoin transaction",
+        ));
+    me().args(["sysw", "pack", "--no-passphrase"])
         .write_stdin("tx:zz\n")
         .assert()
         .code(4)
@@ -752,8 +765,7 @@ fn pack_refuses_a_damaged_mt1_string() {
     let mut bad = MT_EVEN[0].to_string();
     bad.pop();
     bad.push(if MT_EVEN[0].ends_with('x') { 'y' } else { 'x' });
-    me()
-        .args(["sysw", "pack", "--no-passphrase", &bad])
+    me().args(["sysw", "pack", "--no-passphrase", &bad])
         .assert()
         .failure()
         .stderr(predicate::str::contains("record 0"));
@@ -767,10 +779,16 @@ fn show_names_a_tx_record() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.bin");
     let rec = format!("tx:{MT_EVEN_RAW_HEX}");
-    me().args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
-        .write_stdin(format!("{rec}\n"))
-        .assert()
-        .success();
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .write_stdin(format!("{rec}\n"))
+    .assert()
+    .success();
     me().args(["sysw", "show", out.to_str().unwrap()])
         .assert()
         .success()
@@ -805,7 +823,9 @@ fn a_payload_past_the_old_8191_cap_packs_and_reads_back() {
         section_len > 8191,
         "the test is vacuous unless the section is past the OLD cap"
     );
-    let body = std::iter::repeat_n(one.as_str(), n).collect::<Vec<_>>().join("\n");
+    let body = std::iter::repeat_n(one.as_str(), n)
+        .collect::<Vec<_>>()
+        .join("\n");
     std::fs::write(&recs_path, &body).unwrap();
 
     me().args([
@@ -919,11 +939,17 @@ fn an_empty_in_file_is_the_exit_2_path_too() {
     let empty = dir.path().join("rec.txt");
     let out = dir.path().join("p.bin");
     std::fs::write(&empty, "").unwrap();
-    me().args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
-        .args(["--in", empty.to_str().unwrap()])
-        .assert()
-        .code(2)
-        .stderr(predicate::str::contains("no records"));
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .args(["--in", empty.to_str().unwrap()])
+    .assert()
+    .code(2)
+    .stderr(predicate::str::contains("no records"));
     assert!(
         !out.exists(),
         "a refusal must leave no artifact — an empty container that exists is          one an operator can flash"
@@ -941,10 +967,16 @@ fn an_empty_in_file_is_the_exit_2_path_too() {
     // guard is about emptiness and not about `--in`.
     let good = dir.path().join("good.txt");
     std::fs::write(&good, format!("{TEXT}\n")).unwrap();
-    me().args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
-        .args(["--in", good.to_str().unwrap()])
-        .assert()
-        .success();
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .args(["--in", good.to_str().unwrap()])
+    .assert()
+    .success();
 }
 
 /// The refusal NAMES THE FILE when the records came from `--in`. "no records:
@@ -962,7 +994,10 @@ fn the_empty_in_refusal_names_the_file() {
         .assert()
         .code(2);
     let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
-    assert!(err.contains("rec.txt"), "name the file that was empty: {err}");
+    assert!(
+        err.contains("rec.txt"),
+        "name the file that was empty: {err}"
+    );
 }
 
 /// The sentence §1.1 quoted must have changed: it named two channels and there
@@ -1050,7 +1085,10 @@ fn the_argv_refusal_echoes_neither_the_transaction_nor_a_passphrase() {
         "the refusal echoed the transaction:\nstderr: {err}\nstdout: {stdout}"
     );
     // A 32-character prefix would be enough to identify the artifact too.
-    assert!(!err.contains(&body[..32]), "the refusal echoed a prefix: {err}");
+    assert!(
+        !err.contains(&body[..32]),
+        "the refusal echoed a prefix: {err}"
+    );
     assert!(
         !err.contains("write this down"),
         "a passphrase was generated before the refusal ran: {err}"
@@ -1183,7 +1221,10 @@ fn the_unsigned_refusal_names_the_failing_input_indices() {
         .get_output()
         .clone();
     let err = String::from_utf8_lossy(&out.stderr).to_string();
-    assert!(err.contains("input 1"), "must name the failing input: {err}");
+    assert!(
+        err.contains("input 1"),
+        "must name the failing input: {err}"
+    );
     assert!(
         !err.contains("input 0"),
         "input 0 IS signed and must not be named: {err}"
@@ -1217,7 +1258,10 @@ fn allow_unsigned_inputs_admits_the_record_and_names_what_it_admitted() {
     let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
     // Loud, and specific: which record, which inputs, and what it costs.
     assert!(err.contains("record 0"), "{err}");
-    assert!(err.contains("input 0"), "must name the input it let through: {err}");
+    assert!(
+        err.contains("input 0"),
+        "must name the input it let through: {err}"
+    );
     assert!(
         err.contains("--allow-unsigned-inputs"),
         "the warning must name the flag that caused it: {err}"
@@ -1257,10 +1301,16 @@ fn show_names_an_unsigned_tx_record_rather_than_omitting_it() {
     .write_stdin(format!("tx:{TX_MIXED_STRIPPED}\n"))
     .assert()
     .success();
-    let res = me().args(["sysw", "show", out.to_str().unwrap()]).assert().success();
+    let res = me()
+        .args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success();
     let stdout = String::from_utf8_lossy(&res.get_output().stdout).to_string();
     assert!(stdout.contains("public record 0"), "{stdout}");
-    assert!(stdout.contains("input 1"), "must name the failing input: {stdout}");
+    assert!(
+        stdout.contains("input 1"),
+        "must name the failing input: {stdout}"
+    );
     assert!(
         !stdout.contains("input 0"),
         "input 0 is signed and must not be named: {stdout}"
@@ -1375,12 +1425,28 @@ fn pack_states_which_way_sealing_went_and_why_every_time() {
     // flag-unsealed, flag-sealed.
     let cases: [(Vec<&str>, &str, &str); 5] = [
         (vec![MD1], "NOT SEALED", "no record"),
-        (vec!["--allow-argv-secret", SEED], "SEALED", "secret material"),
-        (vec!["--no-passphrase", "--allow-argv-secret", SEED], "NOT SEALED", "--no-passphrase"),
-        (vec!["--passphrase-words", "4", "--allow-argv-secret", SEED], "SEALED", "--passphrase-words"),
+        (
+            vec!["--allow-argv-secret", SEED],
+            "SEALED",
+            "secret material",
+        ),
+        (
+            vec!["--no-passphrase", "--allow-argv-secret", SEED],
+            "NOT SEALED",
+            "--no-passphrase",
+        ),
+        (
+            vec!["--passphrase-words", "4", "--allow-argv-secret", SEED],
+            "SEALED",
+            "--passphrase-words",
+        ),
         // The flag CANNOT seal a payload with nothing secret in it, and the
         // line must say so rather than claim a protection that does not exist.
-        (vec!["--passphrase-words", "4", MD1], "NOT SEALED", "IGNORED"),
+        (
+            vec!["--passphrase-words", "4", MD1],
+            "NOT SEALED",
+            "IGNORED",
+        ),
     ];
     for (extra, verdict, why) in cases {
         let dir = tempfile::tempdir().unwrap();
@@ -1419,8 +1485,18 @@ fn the_sealed_and_unsealed_lines_are_two_sentences() {
     let a = dir.path().join("a.bin");
     let b = dir.path().join("b.bin");
     let unsealed = grab(&["sysw", "pack", "--out", a.to_str().unwrap(), MD1]);
-    let sealed = grab(&["sysw", "pack", "--out", b.to_str().unwrap(), "--allow-argv-secret", SEED]);
-    assert!(!unsealed.is_empty() && !sealed.is_empty(), "{unsealed:?} {sealed:?}");
+    let sealed = grab(&[
+        "sysw",
+        "pack",
+        "--out",
+        b.to_str().unwrap(),
+        "--allow-argv-secret",
+        SEED,
+    ]);
+    assert!(
+        !unsealed.is_empty() && !sealed.is_empty(),
+        "{unsealed:?} {sealed:?}"
+    );
     assert_ne!(unsealed, sealed);
     assert!(unsealed.contains("NOT SEALED"), "{unsealed}");
     assert!(!sealed.contains("NOT SEALED"), "{sealed}");
@@ -1473,7 +1549,10 @@ fn what_pack_says_about_sealing_is_what_show_reads_back() {
         let res = me().args(&args).assert().success();
         let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
         let claimed_sealed = err.contains("sealing:  SEALED");
-        let shown = me().args(["sysw", "show", out.to_str().unwrap()]).assert().success();
+        let shown = me()
+            .args(["sysw", "show", out.to_str().unwrap()])
+            .assert()
+            .success();
         let stdout = String::from_utf8_lossy(&shown.get_output().stdout).to_string();
         let really_sealed = stdout.contains("sealed:   true");
         assert_eq!(
@@ -1511,12 +1590,21 @@ fn the_incomplete_report_names_the_set_and_every_missing_string() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.bin");
     let res = me()
-        .args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
+        .args([
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--out",
+            out.to_str().unwrap(),
+        ])
         .write_stdin(format!("{}\n{}\n{}\n", MT_EVEN[0], MT_EVEN[2], MT_EVEN[5]))
         .assert()
         .success();
     let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
-    assert!(err.contains("mt1 set 2dcf2"), "must name the chunk_set_id: {err}");
+    assert!(
+        err.contains("mt1 set 2dcf2"),
+        "must name the chunk_set_id: {err}"
+    );
     // 0-based 1, 3, 4 are absent -> strings 2, 4 and 5 of 6, 1-BASED, which is
     // `mt`'s own operator-facing convention (the wire index appears in no
     // message). Asserted as ONE PHRASE rather than as four digits: "2", "4",
@@ -1530,7 +1618,10 @@ fn the_incomplete_report_names_the_set_and_every_missing_string() {
 
     // AND `me sysw show` says the same thing, because a stderr line is gone in
     // a week and `show` is the one that can be re-run.
-    let shown = me().args(["sysw", "show", out.to_str().unwrap()]).assert().success();
+    let shown = me()
+        .args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success();
     let stdout = String::from_utf8_lossy(&shown.get_output().stdout).to_string();
     assert!(
         stdout.contains("mt set 2dcf2: INCOMPLETE"),
@@ -1553,7 +1644,13 @@ fn the_report_distinguishes_why_a_set_did_not_confirm() {
         n.set(n.get() + 1);
         let out = dir.path().join(format!("p{}.bin", n.get()));
         let res = me()
-            .args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
+            .args([
+                "sysw",
+                "pack",
+                "--no-passphrase",
+                "--out",
+                out.to_str().unwrap(),
+            ])
             .write_stdin(records.to_string())
             .assert()
             .success();
@@ -1562,7 +1659,10 @@ fn the_report_distinguishes_why_a_set_did_not_confirm() {
 
     // (1) MISSING material. Cheap remedy: go and find the other five strings.
     let incomplete = say(&format!("{}\n", MT_EVEN[0]));
-    assert!(incomplete.to_lowercase().contains("missing"), "{incomplete}");
+    assert!(
+        incomplete.to_lowercase().contains("missing"),
+        "{incomplete}"
+    );
 
     // (2) WRONG material -- 32 bytes of entropy wrapped as a complete 1-chunk
     // set. Reassembles; is not a transaction. The C3 smuggling channel.
@@ -1575,8 +1675,14 @@ fn the_report_distinguishes_why_a_set_did_not_confirm() {
     // (3) A REAL signed transaction under a FOREIGN set id: complete, parses,
     // and the txid does not carry the set id every string declares.
     let forged = say(&(MT_FORGED.join("\n") + "\n"));
-    assert!(forged.contains(MT_EVEN_TXID), "must name the txid it derived: {forged}");
-    assert!(forged.contains("00000"), "must name the declared set id: {forged}");
+    assert!(
+        forged.contains(MT_EVEN_TXID),
+        "must name the txid it derived: {forged}"
+    );
+    assert!(
+        forged.contains("00000"),
+        "must name the declared set id: {forged}"
+    );
 
     // (4) A set carrying an UNSIGNED transaction: complete, parses, and BINDS
     // -- stripping the witnesses leaves the txid alone. Nothing else can see it.
@@ -1627,10 +1733,16 @@ const MT_STRIPPED: [&str; 3] = [
 fn an_incomplete_set_still_packs_and_is_readable() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.bin");
-    me().args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap()])
-        .write_stdin(format!("{}\n{}\n", MT_EVEN[0], MT_EVEN[2]))
-        .assert()
-        .success();
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .write_stdin(format!("{}\n{}\n", MT_EVEN[0], MT_EVEN[2]))
+    .assert()
+    .success();
     me().args(["sysw", "show", out.to_str().unwrap()])
         .assert()
         .success()
@@ -1652,7 +1764,14 @@ fn pack_points_at_the_command_the_device_names() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.bin");
     let res = me()
-        .args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap(), MD1])
+        .args([
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--out",
+            out.to_str().unwrap(),
+            MD1,
+        ])
         .assert()
         .success();
     let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
@@ -1671,7 +1790,13 @@ fn pack_points_at_the_command_the_device_names() {
 #[test]
 fn the_pointer_admits_it_does_not_know_the_path_on_stdout() {
     let res = me()
-        .args(["sysw", "pack", "--no-passphrase", "--allow-world-readable", MD1])
+        .args([
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--allow-world-readable",
+            MD1,
+        ])
         .assert()
         .success();
     let err = String::from_utf8_lossy(&res.get_output().stderr).to_string();
@@ -1691,13 +1816,24 @@ fn the_named_command_prints_the_same_digest() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("p.bin");
     let packed = me()
-        .args(["sysw", "pack", "--no-passphrase", "--out", out.to_str().unwrap(), MD1, TEXT])
+        .args([
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--out",
+            out.to_str().unwrap(),
+            MD1,
+            TEXT,
+        ])
         .assert()
         .success();
     let from_pack = digest_line(&String::from_utf8_lossy(&packed.get_output().stderr))
         .expect("pack prints a digest")
         .to_string();
-    let shown = me().args(["sysw", "show", out.to_str().unwrap()]).assert().success();
+    let shown = me()
+        .args(["sysw", "show", out.to_str().unwrap()])
+        .assert()
+        .success();
     let from_show = digest_line(&String::from_utf8_lossy(&shown.get_output().stderr))
         .expect("show prints a digest")
         .to_string();
@@ -1753,7 +1889,10 @@ fn a_refused_write_prints_no_line_describing_the_container() {
         "and nothing may refer to a file that does not exist: {err}"
     );
     // The refusal ITSELF must still be there and still be useful.
-    assert!(err.contains("world-readable"), "the refusal survives: {err}");
+    assert!(
+        err.contains("world-readable"),
+        "the refusal survives: {err}"
+    );
     assert!(err.contains("--out"), "with its remedies: {err}");
 }
 
@@ -1936,7 +2075,10 @@ fn the_help_tree_names_transactions_at_every_level_an_operator_types() {
     };
 
     let top = short(&[]);
-    assert!(top.contains("transaction"), "`me -h` must name transactions: {top}");
+    assert!(
+        top.contains("transaction"),
+        "`me -h` must name transactions: {top}"
+    );
 
     let sysw = short(&["sysw"]);
     assert!(
@@ -1945,7 +2087,10 @@ fn the_help_tree_names_transactions_at_every_level_an_operator_types() {
     );
 
     let pack = short(&["sysw", "pack"]);
-    assert!(pack.contains("tx:"), "`me sysw pack -h` must name the record: {pack}");
+    assert!(
+        pack.contains("tx:"),
+        "`me sysw pack -h` must name the record: {pack}"
+    );
     assert!(
         pack.contains("qr"),
         "and the QR path -- this is the sentence that was only in --help: {pack}"
@@ -1963,7 +2108,10 @@ fn the_help_tree_names_transactions_at_every_level_an_operator_types() {
 fn the_one_liner_admits_the_string_kinds_me_actually_accepts() {
     let o = me().arg("-h").output().unwrap();
     let top = String::from_utf8_lossy(&o.stdout).to_lowercase();
-    assert!(top.contains("mt1"), "mt1 is accepted and must be named: {top}");
+    assert!(
+        top.contains("mt1"),
+        "mt1 is accepted and must be named: {top}"
+    );
 }
 
 /// **A refusal about the INPUT outranks one about the destination.**
@@ -1992,7 +2140,11 @@ fn a_bearer_record_on_argv_outranks_the_write_gate() {
         .unwrap();
     let err = String::from_utf8_lossy(&o.stderr).to_string();
 
-    assert_eq!(o.status.code(), Some(3), "R2's code, not the write gate's: {err}");
+    assert_eq!(
+        o.status.code(),
+        Some(3),
+        "R2's code, not the write gate's: {err}"
+    );
     assert!(err.contains("ARGV"), "R2 must be the refusal shown: {err}");
     assert!(
         !err.contains("its permissions grant read"),
@@ -2025,7 +2177,10 @@ fn argv_refuses_every_bearer_class() {
             .assert()
             .failure();
         let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
-        assert!(err.contains("ARGV"), "{what} must be refused for the argv reason: {err}");
+        assert!(
+            err.contains("ARGV"),
+            "{what} must be refused for the argv reason: {err}"
+        );
         assert!(!out.exists(), "{what}: nothing may be written");
         // NEVER echoed: printing it back puts the material in a SECOND public
         // place, which is the defect the refusal exists to name.
@@ -2083,12 +2238,18 @@ fn argv_refuses_every_secret_class_too() {
 fn allow_argv_secret_proceeds() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("ok.bin");
-    me().args(["sysw", "pack", "--no-passphrase", "--allow-argv-secret", "--out"])
-        .arg(&out)
-        .arg(SEED)
-        .write_stdin("")
-        .assert()
-        .success();
+    me().args([
+        "sysw",
+        "pack",
+        "--no-passphrase",
+        "--allow-argv-secret",
+        "--out",
+    ])
+    .arg(&out)
+    .arg(SEED)
+    .write_stdin("")
+    .assert()
+    .success();
     assert!(out.exists(), "the override must actually proceed");
 }
 
@@ -2141,7 +2302,6 @@ fn argv_still_accepts_watch_only_and_free_text() {
     }
 }
 
-
 /// **P5 N-1 — the `sealing:` line printed before the `--iterations` gate could
 /// abort the run.** F-246's rule is that no line describing a container may
 /// print until every gate that can abort the write has run; the iterations
@@ -2151,7 +2311,15 @@ fn an_out_of_range_iterations_count_aborts_before_sealing_is_described() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("n.bin");
     let a = me()
-        .args(["sysw", "pack", "--iterations", "5", "--passphrase-words", "12", "--out"])
+        .args([
+            "sysw",
+            "pack",
+            "--iterations",
+            "5",
+            "--passphrase-words",
+            "12",
+            "--out",
+        ])
         .arg(&out)
         .write_stdin(SEED)
         .assert()
@@ -2161,6 +2329,9 @@ fn an_out_of_range_iterations_count_aborts_before_sealing_is_described() {
         !err.contains("sealing:"),
         "nothing may describe the container before a gate that aborts: {err}"
     );
-    assert!(err.contains("--iterations"), "the real refusal survives: {err}");
+    assert!(
+        err.contains("--iterations"),
+        "the real refusal survives: {err}"
+    );
     assert!(!out.exists(), "and no artifact");
 }

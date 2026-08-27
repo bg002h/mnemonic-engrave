@@ -133,9 +133,7 @@ fn unknown_reason(record: &str) -> UnknownReason {
             Ok(b) => match tx::parse(&b) {
                 Err(e) => UnknownReason::NotATransaction(e),
                 // It parsed, so the refusal was the signature predicate.
-                Ok(t) if !t.every_input_signed => {
-                    UnknownReason::UnsignedInputs(t.unsigned_inputs)
-                }
+                Ok(t) if !t.every_input_signed => UnknownReason::UnsignedInputs(t.unsigned_inputs),
                 // classify refused it, so neither arm can be reached here; keep
                 // a total answer anyway rather than panic on a future skew.
                 Ok(_) => UnknownReason::Unrecognised,
@@ -276,7 +274,14 @@ pub fn pack_deterministic(
     salt: [u8; wire::SALT_LEN],
     iv: [u8; wire::IV_LEN],
 ) -> Result<Vec<u8>, SyswError> {
-    pack_deterministic_with(records, passphrase, iterations, salt, iv, Admission::default())
+    pack_deterministic_with(
+        records,
+        passphrase,
+        iterations,
+        salt,
+        iv,
+        Admission::default(),
+    )
 }
 
 /// [`pack_deterministic`] under a stated [`Admission`]. **Still the only

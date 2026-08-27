@@ -267,7 +267,11 @@ mod tests {
     fn even_set() -> Vec<String> {
         let bytes = crate::sysw::tx::tests::unhex(crate::sysw::tx::tests::EVEN_RAW_HEX);
         let set = mt_codec::pipeline::encode(&bytes, crate::sysw::tx::tests::EVEN_TXID).unwrap();
-        assert_eq!(set, EVEN.map(String::from).to_vec(), "encoder diverges from the pinned vector");
+        assert_eq!(
+            set,
+            EVEN.map(String::from).to_vec(),
+            "encoder diverges from the pinned vector"
+        );
         set
     }
 
@@ -395,13 +399,19 @@ mod tests {
         let p = set_problems(&short);
         assert_eq!(
             p[0].2,
-            Some(SetProblem::Missing { count: 6, missing: vec![1, 3, 4] })
+            Some(SetProblem::Missing {
+                count: 6,
+                missing: vec![1, 3, 4]
+            })
         );
 
         // (2) NOT A TRANSACTION — the C3 smuggling channel: 32 bytes of
         // entropy as a complete 1-chunk set.
         let smuggled = mt_codec::pipeline::encode(&[0xAB; 32], "deadbeef00").unwrap();
-        assert_eq!(set_problems(&smuggled)[0].2, Some(SetProblem::NotATransaction));
+        assert_eq!(
+            set_problems(&smuggled)[0].2,
+            Some(SetProblem::NotATransaction)
+        );
 
         // (3) UNSIGNED — parses, and binds, because stripping the witnesses
         // leaves the txid alone. Nothing else in the walk can see it.
@@ -410,7 +420,10 @@ mod tests {
         let stripped = mt_codec::pipeline::encode(&bytes, &txid).unwrap();
         assert_eq!(
             set_problems(&stripped)[0].2,
-            Some(SetProblem::UnsignedInputs { txid: txid.clone(), inputs: vec![0] })
+            Some(SetProblem::UnsignedInputs {
+                txid: txid.clone(),
+                inputs: vec![0]
+            })
         );
 
         // (4) TXID DOES NOT BIND — a real signed transaction under a foreign
@@ -471,7 +484,10 @@ mod tests {
             p.iter().map(|(c, _, pr)| (*c, pr)).collect();
         assert_eq!(
             by_id[&0x2dcf2],
-            &Some(SetProblem::Missing { count: 6, missing: vec![4, 5] })
+            &Some(SetProblem::Missing {
+                count: 6,
+                missing: vec![4, 5]
+            })
         );
         assert!(matches!(by_id[&0xfffff], Some(SetProblem::Missing { .. })));
     }
@@ -505,7 +521,6 @@ mod tests {
         assert!(decode_confirmed(&set).is_none());
     }
 
-
     /// **P5 M-2 — a binding failure OUTRANKS an unsigned input.**
     ///
     /// A set that is complete, parses, carries an unsigned input AND fails the
@@ -523,8 +538,7 @@ mod tests {
         // Both faults at once: the witness-stripped (unsigned) bytes, encoded
         // under a FOREIGN set id.
         let bytes = crate::sysw::tx::tests::unhex(crate::sysw::tx::tests::EVEN_STRIPPED_HEX);
-        let forged_and_stripped =
-            mt_codec::pipeline::encode(&bytes, "00000feed").unwrap();
+        let forged_and_stripped = mt_codec::pipeline::encode(&bytes, "00000feed").unwrap();
         let got = set_problems(&forged_and_stripped)[0].2.clone();
         assert!(
             matches!(got, Some(SetProblem::TxidDoesNotBind { .. })),
