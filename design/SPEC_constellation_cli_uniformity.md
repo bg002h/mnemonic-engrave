@@ -281,9 +281,28 @@ when P0 closes GREEN**, publication operator-gated.
 
 **The name is proposed here rather than left to the plan (C-d)**, because it is
 baked into five `Cargo.toml`s, every `use` site, and a registry publish that
-cannot be taken back. It follows the `mt-codec` / `wc-codec` precedent —
-hyphenated, scope-first, saying what the crate holds rather than which binary it
-came from. **P0 must confirm the name is free on crates.io before publishing**;
+cannot be taken back. **The name below is NOT settled and does not yet follow the
+constellation's convention — see the measurement.**
+
+The 21 first-party crates use `<format-prefix>-<layer>[-<qualifier>]`:
+
+| prefix | means | layers seen |
+| --- | --- | --- |
+| `md` `mk` `ms` `mt` `wc` | a **format**, not a binary (`wc` has no binary) | `-codec`, `-cli` |
+| qualifier | optional, always last | `-fuzz`, `-examples` |
+
+**`-cli` always means "this crate builds a binary"** — `md-cli`, `mk-cli`,
+`ms-cli`, `mt-cli` are the binary crates themselves. A shared *library* named
+`m-cli-io` would be the only `-cli` crate producing no binary, and `m` names no
+format. So the earlier claim that it followed the `mt-codec` / `wc-codec`
+precedent was wrong: those are format codecs, and this crate is neither a format
+nor a codec.
+
+**The convention has no slot for this crate**, because every existing one is
+either a format codec or a binary, and this is the first shared non-codec
+library. That is a real gap and an operator decision, not a detail to settle in
+P0. `m-io` fits the two-segment shape best (`m` being the family the operator
+already names — "m-format", "m*1 strings"), but it is a proposal, not a ruling. **P0 must confirm the name is free on crates.io before publishing**;
 an unavailable name is a rename across five manifests if it is discovered after
 the code is written, and one line of the plan if it is discovered before.
 
