@@ -13211,3 +13211,73 @@ are never suppressed, so `--quiet` does not silence it).
 refused. §6c places `--json` in P2, so P2 should decide. **`--json` is
 explicitly out of scope for the current cycle** per `§6b`'s own note, which is
 why this is filed rather than argued.
+
+### F-324 — pinning `mnemonic-io-lib` by git rev breaks `ms`'s tag-time reproducible musl build, and the only fix is in **another repo's** shared reusable workflow (repo: **mnemonic-toolkit** + **mnemonic-secret**; owning phase: **before the next `ms-cli-v*` tag** — non-deferrable past it) `#ci` `#repro` `#deps` `#cross-repo`
+
+**Found 2026-08-27 by P2's implementation**, executing row 4 ("PIN THE CRATE").
+The plan does not mention vendoring, `vendor-freshness`, or the reusable repro
+workflow, and §5's enumeration of *"`ms`'s WHOLE validation surface"* omits all
+three — so this is a plan defect as well as a CI one.
+
+**What the pin does.** `mnemonic-secret` commits a 101 MB `vendor/` tree and
+builds its release binaries `--locked --offline` from it. Pinning
+`mnemonic-io-lib` by GitHub rev puts the FIRST `source = "git+…"` line ever into
+its `Cargo.lock`. `source.crates-io` does not serve that key.
+
+**Measured, with an EMPTY `CARGO_HOME` so the cargo git cache could not supply
+the dependency** — the isolation is load-bearing and its absence produced a
+false GREEN on the first attempt:
+
+| `--config` form | `cargo build --locked --offline -p ms-cli` |
+| --- | --- |
+| three-block (crates-io + the mnemonic-engrave git source + vendored-sources) | **rc 0** |
+| two-block (crates-io + vendored-sources) — what every release step used | **rc 101**, `failed to load source for dependency mnemonic-io-lib` |
+
+With a POPULATED `CARGO_HOME` the two-block form also exits 0, resolving from
+`~/.cargo/git`. A check run without the empty-home isolation proves nothing.
+
+**Three sites, and only two of them are fixable from `mnemonic-secret`.** Both
+were fixed in P2's row-4 commit:
+
+- `ci/repro/vendor-freshness.sh` — a **push- and PR-triggered** gate. It failed
+  CLOSED the moment the pin landed, exactly as its own comment predicted, and
+  named its own fix. Converted to the three-block form, with the rev DERIVED
+  from `Cargo.lock` (mirroring the toolkit's `MINISCRIPT_REV` handling) so
+  moving the pin forward cannot leave the script on the old rev. Negative
+  control run: with `vendor/mnemonic-io-lib/` moved aside it exits 1.
+- `.github/workflows/man-release.yml`'s `musl-binaries` job, both legs
+  (aarch64 `cross build`, x86_64 re-homed `docker run`). Converted likewise.
+
+**THE ONE THAT CANNOT BE FIXED HERE.** The same workflow's `repro` job calls
+`bg002h/mnemonic-toolkit/.github/workflows/reproducible-musl-build.yml@6e37b18e50f9f857e439db1ebe2748fc91a54612`.
+Read at that SHA: its **only** git-source knob is an input named
+`miniscript_rev`, and the three `--config` lines it builds hard-code
+`https://github.com/rust-bitcoin/rust-miniscript` as the source URL. There is no
+input by which a caller can declare a different git source. `ms` passes
+`miniscript_rev: ""`, which selects the two-block form — the row that exits 101
+above.
+
+**So `ms` cannot cut a release tag until a change lands in `mnemonic-toolkit`.**
+`man-release.yml` triggers only on `ms-cli-v*` tags and `workflow_dispatch`, so
+nothing on the push path is red; the breakage is deferred to the next release.
+
+**The job is left CALLED rather than disabled or `if:`-guarded off.** A skipped
+gate prints ok and exit 0, which is how an unrun gate passes for months.
+
+**What the fix looks like.** A `git_source` / `git_rev` pair of inputs on the
+toolkit's reusable workflow (generalising the existing miniscript stanza rather
+than adding a second one), then re-pin the `uses:` SHA in `ms`'s
+`man-release.yml`. That workflow is shared by **md, mk and mt**, so the change
+needs its own review in `mnemonic-toolkit` under the Rust-primary rule.
+
+**It must then be EXERCISED, not merely edited** — one `workflow_dispatch` run
+of `man-release.yml` after the re-pin. A gate that has never executed is a
+hypothesis, not a gate, and this one has been demonstrated to fail.
+
+**Two alternatives were considered and both are closed by the frozen plan.**
+`path =` is forbidden (`freebsd-compile-gate` and both `musl-check` targets
+build from a clean checkout on foreign targets, so a path dep out of the
+workspace fails there first), and publishing `mnemonic-io-lib` to crates.io is
+explicitly out of scope for P2 (F-271 records the publish as authorised and its
+pre-flight as unrun). Publishing would dissolve this entry entirely, which is
+worth knowing when F-271 is next picked up.
