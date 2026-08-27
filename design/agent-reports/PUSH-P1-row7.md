@@ -118,3 +118,193 @@ final push having landed ("so the commit cannot violate the freeze") — since
 the push never landed, committing now would put a new commit on `master`
 without that anchor, so it is left as an uncommitted file in the working tree
 for the operator to review and commit (or not) themselves.
+
+---
+
+## Attempt 2 (2026-08-27) — CI FAILED AGAIN, a different defect, master NOT pushed
+
+Second attempt, after commit `00bb25e` ("ci: install the shells the
+history-purge gates actually execute") was believed to fix attempt 1's zsh
+gap. Pre-flight checks the dispatch cited as verified: `actionlint` exit 0,
+YAML parses with four jobs intact, all four hard-coded binary paths
+(`/usr/bin/{zsh,fish,script,timeout}`) exist locally, and `cargo nextest run
+--locked` gave **430 passed, 1 skipped** locally.
+
+### What happened
+
+1. Pre-staging freeze checkpoint: `git rev-parse master` =
+   `00bb25e3de9b7a5250d4a9f3385a27ff41a6b8d7`; confirmed **78 commits** ahead of
+   freshly-fetched `origin/master` (`990f75acb971b76bfd67028db9f02bf63190d43c`);
+   tree clean.
+2. Staged it: `git push origin master:refs/heads/ci/staging` — succeeded.
+3. Found the triggered run by full-SHA match (never truncated, always
+   `--repo bg002h/mnemonic-engrave`):
+   `gh run list --repo bg002h/mnemonic-engrave --branch ci/staging --json
+   databaseId,headSha,...` → run `33119300037`, `headSha` =
+   `00bb25e3de9b7a5250d4a9f3385a27ff41a6b8d7` (exact match).
+4. Watched to completion, then independently queried **per-job** conclusions
+   (not run-level status) via
+   `gh run view 33119300037 --repo bg002h/mnemonic-engrave --json
+   status,conclusion,jobs`:
+
+   ```
+   RUN_STATUS=completed CONCLUSION=failure
+   JOB: build me-preview (all targets) = success
+   JOB: build me (macos-aarch64)       = success
+   JOB: build me (windows-x86_64)      = success
+   JOB: build me (linux-x86_64)        = success
+   JOB: build me (macos-x86_64)        = success
+   JOB: test (rust + go)               = failure
+   JOB: build me (linux-aarch64)       = success
+   JOB: assemble + sign + release      = skipped
+   ```
+
+   `test (rust + go)` conclusion, verbatim: **`failure`**. `assemble + sign +
+   release` correctly `skipped` (tag-gated on `refs/tags/v*`, not triggered by
+   a branch push — confirmed again, same as attempt 1).
+
+5. Because the required check failed again, per the dispatch's explicit
+   instruction ("report it, do not fix it and do not retry") — **no fold, no
+   fix, no retry, and no push of `master` to `origin/master`.**
+
+### The install step DID run and DID pass this time — confirmed, not assumed
+
+Pulled `test (rust + go)`'s own step log
+(`gh run view --job 98681866200 --repo bg002h/mnemonic-engrave --log`) for the
+new "Install the shells the history-purge gates execute" step:
+
+```
+ok /usr/bin/zsh
+ok /usr/bin/fish
+ok /usr/bin/script
+ok /usr/bin/timeout
+zsh 5.9 (x86_64-ubuntu-linux-gnu)
+fish, version 3.7.0
+```
+
+All four asserted paths present; step conclusion **success**. Attempt 1's
+defect (zsh missing on `ubuntu-latest`) is closed — the zsh-dependent test
+(`the_emitted_zsh_recipe_actually_purges_the_entry`) now runs and **passes**
+in CI.
+
+### Root cause of THIS failure — a different test, a genuine finding
+
+`cargo test --locked`'s output shows the Rust test suite got to
+`crates/mnemonic-io-lib/tests/fish_history_purge.rs` (5 tests) and failed one:
+
+```
+running 5 tests
+test the_harness_records_history_at_all ... ok
+test history_delete_exact_reports_success_and_purges_nothing ... ok
+test history_delete_prefix_hangs_and_purges_nothing ... FAILED
+test the_emitted_fish_recipe_actually_purges_the_entry ... ok
+test the_recipe_costs_the_whole_session_and_the_text_says_so ... ok
+
+thread 'history_delete_prefix_hangs_and_purges_nothing' panicked at
+crates/mnemonic-io-lib/tests/fish_history_purge.rs:252:5:
+`history delete --prefix` returned on its own. It is supposed to be waiting
+at a prompt -- if it now completes unattended, re-measure whether it also
+DELETES before treating this as good news. fish_history was:
+- cmd: echo an-unrelated-neighbouring-command
+- cmd: example-cli pack ms1SECRETSECRETPLANTED
+- cmd: history save
+- cmd: history delete --prefix 'example-cli pack'
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered
+out; finished in 1.30s
+##[error]Process completed with exit code 101.
+```
+
+This is **not an infra gap like attempt 1** — fish is installed and its
+version is printed. It is the test's own documented behavioral assertion
+failing. Read at
+`crates/mnemonic-io-lib/tests/fish_history_purge.rs:248-256`, the test's own
+doc comment states the premise it depends on:
+
+> `history delete --prefix` is the command an operator reaches for, and it is
+> the reason fish shipped as prose. It prompts; the prompt lists the matching
+> commands, **the secret among them**; and with nobody to answer, it purges
+> nothing and never returns.
+>
+> If this ever stops holding, fish's delete semantics changed and the recipe
+> may be able to become a targeted one — re-measure before rewriting it.
+
+On the `ubuntu-latest` runner, `fish history delete --prefix` returned
+*unattended* (`s.timed_out` was false) instead of hanging at the interactive
+confirmation prompt the recipe (F-273) depends on. The assertion did exactly
+what its comment says it exists to do.
+
+**Verified this is a first-time-tested path, same pattern as attempt 1's
+defect:**
+- `crates/mnemonic-io-lib/tests/fish_history_purge.rs` was introduced in
+  commit `2efb1b9` ("P1 row 5: fish gets a purge recipe that was RUN, not
+  described (F-273)"), confirmed via `git log --oneline -- <path>` (single
+  hit).
+- `git merge-base --is-ancestor 2efb1b9 origin/master` → **not an ancestor**;
+  it sits inside `git log origin/master..master`, i.e. this exact test file
+  has never been run in CI before either. The fix commit's own message
+  predicted this outright: *"fish would have gone red on the very next
+  round — the fish purge recipe landed hours ago in row 5 and has never seen
+  CI either."* That prediction is exactly what happened, one layer deeper
+  than expected: the shell got installed correctly, but the *behavior* the
+  test depends on differs on this runner.
+
+**One concrete, unconfirmed hypothesis, offered as a lead and not a
+diagnosis:** local `fish --version` on this machine is **4.8.1**; the CI
+runner installed Ubuntu noble's packaged **3.7.0** (both versions quoted
+verbatim from their respective `--version` output above). The test's premise
+about `history delete --prefix` prompting interactively may be
+version-dependent fish behavior that held on 4.8.1 (where the plan/tests were
+presumably authored/verified) and does not hold on 3.7.0. This was **not**
+verified by installing fish 3.7.0 locally and reproducing — it is a lead for
+whoever investigates next, not a confirmed root cause. Equally unconfirmed:
+whether the CI runner's non-interactive/non-TTY-adjacent execution context
+(`script`/`timeout`-wrapped, no real controlling terminal the way a developer
+session has one) changes fish's decision to prompt at all, independent of
+version.
+
+### Freeze verification
+
+| Point | `git rev-parse master` |
+| --- | --- |
+| Before staging | `00bb25e3de9b7a5250d4a9f3385a27ff41a6b8d7` |
+| Immediately before final check (post-CI, pre-cleanup) | `00bb25e3de9b7a5250d4a9f3385a27ff41a6b8d7` |
+
+Identical — local `master` never moved during the window. `origin/master`
+re-fetched and confirmed still at `990f75acb971b76bfd67028db9f02bf63190d43c`
+(unchanged from before this attempt) — i.e. **no push to `origin/master` was
+made**, honestly reflecting the CI failure rather than a bypass.
+
+### Outcome
+
+- Staged SHA: `00bb25e3de9b7a5250d4a9f3385a27ff41a6b8d7`
+- Final SHA pushed to `origin/master`: **none — push did not happen.**
+- `test (rust + go)` conclusion: **`failure`** (verbatim from `gh run view
+  --json`)
+- Install step conclusion: **`success`**; zsh `5.9 (x86_64-ubuntu-linux-gnu)`,
+  fish `3.7.0` (both quoted verbatim from the step's own printed output)
+- Final push to `origin/master`: **not attempted** — no bypass message is
+  possible because no push was made; branch protection was neither satisfied
+  nor bypassed, correctly never tested against this SHA
+- `ci/staging`: deleted (`git push origin --delete ci/staging` succeeded,
+  confirmed by the `[deleted] ci/staging` line in the push output)
+- Branch protection: untouched, no workaround attempted, no `enforce_admins`
+  change
+
+### What this leaves for the operator
+
+`master` is still 78 commits ahead of `origin/master`, tree otherwise clean,
+tip unchanged at `00bb25e`. Attempt 1's defect (zsh absent on the runner) is
+now closed and verified closed — this is a genuinely new, second defect, not
+a recurrence. It is a behavioral assumption in a first-time-tested gate
+(F-273's fish purge test), not an environment-provisioning gap this time. The
+report does not choose a fix — that is an operator/implementation decision —
+but the concrete next step is almost certainly to run the F-273 recipe
+against fish 3.7.0 specifically (matching the CI runner's packaged version,
+not the locally-installed 4.8.1) to see whether the "hangs at a prompt"
+premise itself needs re-measuring, per the test's own doc comment.
+
+Per the dispatch brief, this file is committed **only after the final push
+has landed**. It did not land this attempt either, so — same as attempt 1 —
+this append is **left uncommitted** in the working tree for the operator to
+review and commit (or not) themselves.

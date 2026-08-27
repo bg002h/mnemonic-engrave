@@ -12401,3 +12401,160 @@ could gate on both there, and why `mt`'s tree was merely *stale* rather than
 unmeasured. This repo is the one where the steps are missing, so the same audit
 is owed to any other constellation repo whose workflow was copied from this one
 rather than from `mt`'s.
+### F-281 — should `ms` gate a world-readable stdout at all? §9a says the gate is in scope; P2's row does not carry it, so it has no owning phase (repo: **mnemonic-secret**; owning phase: **operator ruling, before the cycle closes**) `#ms` `#cli-uniformity` `#ruling-needed`
+
+**Found 2026-08-27** while writing the P2 plan, by measuring what `ms` does
+today instead of assuming it matched a sibling.
+
+`ms` has **no mode-checking machinery of any kind**. Measured, `git grep -n`
+over `crates/` for `fs::write`, `OpenOptions`, `set_permissions`, `0o600`,
+`0o077`, `0o044` and `st_mode` returns **zero hits**. It never fstats its
+stdout. `mt` refuses a stdout whose mode has any bit in `0o077`; `me` refuses
+`0o044`; `ms` refuses nothing, and `ms encode > backup.txt` under the default
+umask 022 creates **0644** at exit 0.
+
+**The scope is genuinely ambiguous and that is the finding.** §9a's in-scope
+table lists *"the world-readable and terminal gates — they guard the binary's
+own stdout"*. §7's P2 row and its gate both enumerate P2's content and neither
+names one. An item that is in the cycle's scope and in no phase's row is
+overdue rather than deferred, which is the shape the per-phase burndown rule
+exists to catch.
+
+**The P2 plan builds nothing, deliberately**, and records why: a REFUSAL is
+foreclosed three ways — §6e's own retraction argument names `ms encode` as the
+case where refusing makes the exposure strictly worse (the operator must then
+read the file to hand-engrave, so a screen-only exposure becomes screen plus
+disk); F-275 is the operator ruling the directly analogous `mt decode` case
+(human-read output, default umask 022) as **warn-and-proceed, not refuse**; and
+a refusal would reject the ordinary invocation on every default machine. A
+WARNING is weaker but still unspecified, and its marginal information is thin,
+because `ms` already prints *"warning: stdout carries private key material (can
+spend) — redirect or encrypt"* unconditionally on the same stream.
+
+**What is being asked for:** a ruling on whether §9a obliges any `ms` mode check
+at all, and if so whether that existing unconditional line already discharges
+it. **If anything is ever built here it is a warning, never a refusal** — F-275
+is the precedent and it is attached so the ruling is cheap.
+
+### F-282 — `ms gen-man --out <DIR>` collides with the `--out FILE` this cycle introduces: one binary, two meanings for one flag (repo: **mnemonic-secret**; owning phase: **a later cycle, not P2**) `#ms` `#cli-uniformity` `#ux`
+
+**Found 2026-08-27** measuring `ms`'s existing `--out` surface for the P2 plan.
+The sibling plan's equivalent measurement found `mt` had **one** `--out` in the
+whole repository and it was a refusal string. `ms` is different:
+
+```
+ms gen-man --out <DIR>
+      --out <DIR>   Directory to write the `*.1` man pages into (created if absent)
+```
+
+It is shipped, exampled twice in `--help` (`crates/ms-cli/src/main.rs:125`),
+driven by `crates/ms-cli/tests/gen_man.rs`, and invoked by CI — the
+`man-release.yml` workflow runs `./target/release/ms gen-man --out man` at its
+line 46 to build the `ms-man.tar.gz` release asset. A second consumer sits in
+**another repository**: `scripts/install.sh:305` in `mnemonic-toolkit` drives
+`<bin> gen-man --out` across every sibling that carries the verb.
+
+**`ms gen-man --help` points at the wrong repo for that installer**, saying
+*"`scripts/install.sh` invokes this post-`cargo install`"* — and
+`mnemonic-secret` has no `scripts/` directory at all. Believing the help text
+was one edit away from shipping a false path into the P2 plan; the file was
+located instead. That doc line is worth correcting whenever this is picked up.
+
+After P2, `--out` means **a directory of man pages** on `gen-man` and **a file
+holding the artifact** on `encode`, `split` and `repair`.
+
+**Not fixed in P2**, because renaming it breaks a release workflow for a
+cosmetic gain inside a phase whose row is funds-safety work. The two meanings
+coexist and the P2 plan's decline asserts that `gen-man --out` still writes a
+directory afterwards, so a later tidy-up cannot take it silently.
+
+### F-283 — `mnemonic-gui`'s schema mirror for `ms` goes stale in P2, while §7 gives its regeneration to P3 (repo: **mnemonic-gui**; owning phase: **P3**) `#ms` `#cli-uniformity` `#gui`
+
+**Found 2026-08-27** writing the P2 plan. `ms gui-schema` is clap-derived, so
+`ms`'s flag surface reaches the GUI's schema mirror automatically — and the
+mirror is a **third repository** with its own CI gate
+(`bg002h/mnemonic-gui`, `mnemonic-gui-schema-mirror`).
+
+Measured baseline today: `ms gui-schema` emits **10 subcommands carrying 36
+flags** — derive 9, encode 7, decode 2, inspect 1, verify 3, vectors 1,
+gen-man 1, repair 2, split 8, combine 2. P2 adds `--in` to eight verbs,
+`--allow-argv-secret` to eight, and `--out` to three, taking it to **55**.
+
+§7's P3 row says *"`mnemonic-gui`'s schema mirror regenerated"*, and §8 lists
+*"`mnemonic-gui`'s four schema files"* among the invocations this cycle breaks.
+**Neither says that the `ms` half goes stale one phase earlier.** P2 asserts
+only that `ms gui-schema` describes the new surface; the mirror itself is P3's,
+and this entry exists so P3 knows it inherited a drift rather than created one.
+
+### F-284 — after P2, `ms encode` and `ms split` disagree about their own stdout: one is ungrouped by default, the other still groups in fives (repo: **mnemonic-secret**; owning phase: **P3**, with the `md`/`mk` grouping work) `#ms` `#cli-uniformity` `#engraving`
+
+**Found 2026-08-27** while scoping P2's grouping work, by measuring whether §3's
+argument reaches `ms split` and finding that it does not.
+
+§6a rules *"the stdout rule binds `encode` only, this cycle"*, and §3's decisive
+measurement is `encode`'s. The obvious extension — that `split` has the same
+defect because it has the same flag with the same default of 5 — **is false, and
+was measured rather than assumed.** Feeding `me sysw pack` a `ms split` share:
+
+```
+grouped (default)      -> exit 4, "record 0 ... is not a form this container can place"
+--group-size 0         -> exit 4, same message
+```
+
+`me sysw` cannot place a codex32 **share** at all, grouped or flat, so grouping
+is not what blocks it and the packability argument that decides `encode` has no
+purchase on `split`. The share round-trips into `ms combine -` grouped, too —
+measured at exit 0, because `read_shares` strips display separators per line.
+
+**So P2 changes `encode`'s default and leaves `split`'s at 5**, and the result
+is an intra-tool inconsistency with no measured pipeline behind it either way.
+The separator rule DOES reach `split`, because one `parse_separator`
+(`crates/ms-cli/src/format.rs:41`) serves both verbs and cannot bind to one.
+
+**What P3 owes:** a ruling on `split`'s default, alongside the `md`/`mk`
+card-invention work §6c already gives it — and note `ms split` has stderr
+labels (`share 1 of 3:`) but **no `--no-engraving-card`**, so "move the grouped
+form to the card" is not free there either.
+
+### F-285 — `ms decode` and `ms combine` write a recovered seed phrase to an unprotected stdout, and gain no `--out` in P2 (repo: **mnemonic-secret**; owning phase: **operator ruling**, alongside F-281) `#ms` `#cli-uniformity` `#funds-safety`
+
+**Found 2026-08-27** scoping which `ms` verbs get `--out` in P2.
+
+`ms decode <ms1>` prints the BIP-39 mnemonic; `ms combine <shares>` prints the
+recovered secret. Both are the seed in plain text on stdout, and
+`ms decode <ms1> > recovered.txt` creates **0644** under the default umask.
+Neither gains `--out` in P2, so neither has a way to be written owner-only.
+
+**The exclusion is by the spec's own text, not by oversight.** §6a rules
+`decode`'s stdout a *"labelled multi-field report"* explicitly out of scope, and
+§6b's `--out` is *"write the ARTIFACT to a file"* — a three-line labelled report
+is not one. `combine` and `derive` are the same shape. So P2 scopes `--out` to
+`encode`, `split` and `repair`, the three verbs whose stdout IS a canonical
+`ms1` or share string.
+
+**The inconsistency is nonetheless the hazard**, in the same way F-275's was for
+`mt`: an operator who learns that `ms encode --out` writes 0600 will believe
+`ms decode` is protected too. This is filed with F-281 because both are the
+same question — how much of `ms`'s stdout the cycle is entitled to protect —
+and answering them separately is how one gets answered twice.
+
+### F-286 — `plan-cite-check.sh` strips a leading dot from a path, so every workflow-directory citation is a false DANGLING (repo: **mnemonic-engrave**; owning phase: **ownerless residue**) `#tooling` `#gate`
+
+**Found 2026-08-27** writing the P2 plan, which needed to cite a CI workflow.
+
+A citation whose path begins with a dot has the dot removed before lookup, so
+the gate searches for a path that exists under no root and reports
+*"no such file under any root"*. **Reproduced with a control:** a workflow file
+that exists in **this** repo, anchored at its line 1, is reported DANGLING. The
+probe string is deliberately not quoted in this entry, because quoting it makes
+the containing document fail the gate — which happened once while drafting the
+P2 plan, and is the same "writing it out re-creates it" shape
+`SPEC_constellation_cli_uniformity.md` §8a records for section sigils.
+
+It is a **false** DANGLING, and the script's own header argues that class is
+worse than no gate, because it teaches a reader to skim the output — the
+argument that added `descriptor-mnemonic` and the toolkit to `ROOTS`.
+
+**Workaround in use:** name the workflow and its line number in prose, with no
+`path:line` punctuation. **Fix:** allow a leading dot in the path pattern.
+Blocks nothing; it costs one sentence per citation until then.
