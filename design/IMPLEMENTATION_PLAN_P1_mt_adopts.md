@@ -270,7 +270,7 @@ until the previous is green. **This table is the only ordering of record**;
 prose refers to work by NAME — *the tree-greening*, *the dash*, *the
 normalisation*, *the override*, *the fish recipe*, *the private write*, *the
 pin*, *the purge swap*, *the fd adoption*, *the out channel*, *the wording*,
-*the decline* — so a renumbering cannot falsify it.
+*the decline*, *the decode warning* — so a renumbering cannot falsify it.
 
 | # | step | the gate that must fail first |
 | --- | --- | --- |
@@ -286,6 +286,26 @@ pin*, *the purge swap*, *the fd adoption*, *the out channel*, *the wording*,
 | 10 | **THE `--out` CHANNEL on `mt encode`** (§6b). `--out FILE` writes through the crate's `write_private`; `channel::destination` decides the route, with `mt` mapping `Terminal` onto its own permissive policy rather than `me`'s refusal. The §8.2h remedy gains `--out` and loses the sentence saying `mt` has none (`crates/mt-cli/src/validate.rs:680`) | `mt encode --out f` where `f` already exists at **0644** leaves `f` at **0600** holding the artifact; `--out` suppresses the §8.2h stdout gate entirely, since `me` creates the file owner-only; and the refusal's remedy names `--out`. **THE TEST THAT CHANGES IS `the_world_readable_refusal_names_the_artifact_this_run_made`** (`crates/mt-cli/tests/tx_record.rs:304`), which pins the substrings `stdout IS the record` (`:337`) and `stdout IS the strings` (`:346`) — fragments of the sentence being replaced. **A grep of the suite for `--out` does not find it**, so the edit must be located by the fragment, not by the flag. `refuses_a_world_readable_stdout` (`crates/mt-cli/tests/refusals.rs:1498`) asserts only that the override is named and does **not** change |
 | 11 | **THE WORDING, DERIVED FROM THE MODE — F-260, at BOTH sites.** The refusal at `crates/mt-cli/src/validate.rs:659` and the warning at `:589` each say the permissions grant read, hard-coded to the rule's name rather than computed from what was measured | at stdout mode **0620** the refusal must not claim read access — measured today it says *"its permissions grant read to group or others"* for a mode where `0620 & 0o044 == 0` and no read bit is set outside owner — while at **0644** it still must, and at **0600** it must not fire at all. **The same pair on the INPUT warning**, which F-260's entry does not name and which is worse there: at input mode 0620 it says *"grant read to group **and** others"*, false twice over. Both were reproduced with a 0600 control that passes, so the divergence is the mode and nothing else |
 | 12 | **THE DECLINE, ASSERTED.** No code. `mt` keeps its terminal policy, its `0o077`, its own reader and its own empty-input refusal, and the tests that pin them are named so a later phase cannot delete them as tidying. **Regression-gated, not RED-first** | `mt encode` to a **real pty** still exits **0** and still emits the strings — measured today at 1198 bytes, rc 0 — so an adoption of `exit::write_block` that imported `me`'s terminal refusal goes RED here. `mt <verb> --in <empty>` still exits **1** at §1.1e on all three reading verbs. `mt` still refuses stdout mode 0620, which a `0o044` mask would permit. **Plus the enumerated diff**: every edit to `mt`'s 237 tests listed, each justified by a named §6 ruling or a numbered finding |
+| 13 | **THE `decode` WARNING — F-275, the operator's ruling, WARN AND PROCEED.** `world_readable_stdout_guard` and `file_mode_warning` each have exactly one caller, both inside `encode` (`world_readable_stdout_guard` and `file_mode_warning`, cited by SYMBOL and not by line -- see the anchor warning below this table), so the three reading verbs have no gate and no warning at all. The ruling is **not** a refusal: the default umask here is 022, so a plain `mt decode > tx.hex` creates 0644, and an encode-style refusal would reject the ordinary invocation on every default machine. `decode` **warns, naming the measured mode, and still exits 0** — and `--out` is NOT added to close it | **fails today**: `mt decode > <a 0644 file>` is silent, measured at **679 bytes, rc 0, stderr empty**. After: the same run writes the same 679 bytes at **rc 0** — the exit code is asserted UNCHANGED, so a refusal smuggled in as a warning goes RED — with stderr naming the mode it measured. A **0600 control emits nothing**, so a warning that always fires cannot pass. The wording comes from `fd::stdout_mode`'s observation and not from a hard-coded rule name, exactly as the wording builds at both `encode` sites — at 0620 it must not claim read access |
+
+**EVERY `crates/mt-cli/` LINE NUMBER IN THIS PLAN IS ANCHORED AT `cf17591`, AND
+THE EARLY ROWS HAVE ALREADY MOVED THEM.** Measured 2026-08-27 against `impl/p1`
+at `a4cdefa`, comparing each cited line's *content* across the two revisions:
+**14 of the 15 had moved; 1 was unchanged.** The citation gate is **green on all
+15**, because it checks that a line exists and not what is on it — its own header
+says so in the "NOT covered" block.
+
+One of the fourteen is the dangerous shape rather than a merely stale one. The
+`validate.rs` line this plan describes as the `is_file()` keying comment holds,
+at the tip, the opening of **`fn looks_like_a_transaction`** — a real function
+this plan separately cites elsewhere. A reader following that number lands
+somewhere plausible and wrong, which no dangling-citation check can catch. Its
+number is deliberately not repeated here: writing it as a citation would make
+the gate report it green, which is the very failure being described.
+
+**So: LOCATE EVERY SITE BY SYMBOL, AND RE-MEASURE THE LINE BEFORE QUOTING IT.**
+The prose names the symbol beside every line number for exactly this reason.
+F-279 owns re-anchoring them when `impl/p1` merges.
 
 **FOUR PIECES OF WORK ARE REGRESSION-GATED RATHER THAN RED-FIRST**, and the
 column header must not claim otherwise: the tree-greening, the pin, the decline,
@@ -361,7 +381,9 @@ the validation surface**, see below.
     half the truth with total confidence. F-273 was filed the day before this
     plan was written and F-260 the day before that, so the practical risk is low
     today and rises weekly.
-13. **An R0 round closing 0C/0I.**
+14. **`mt decode` writing to a group- or other-readable stdout says so, and still exits 0.** F-275, as the operator ruled it on 2026-08-27 — a warning, never a refusal, and
+    `--out` is not what closes it. The decode warning builds this.
+15. **An R0 round closing 0C/0I.**
 
 ---
 
@@ -405,9 +427,12 @@ owning phase, per the per-phase burndown rule.
   stdout at exit 0 with no guard and no warning, while `mt encode` refuses the
   identical destination. Measured: 679 bytes written, rc 0. The inconsistency is
   itself the hazard, because an operator who learned that `mt` refuses a
-  world-readable output will believe `decode` is protected too. **Owning phase:
-  a ruling the operator owes before the phase that acts on it** — closing it
-  needs a new refusal, and `--out` alone would not.
+  world-readable output will believe `decode` is protected too. **RULED
+  2026-08-27, and now BUILT here rather than filed**: the operator ruled *warn,
+  do not refuse*, because the default umask is 022 and a refusal would reject
+  the ordinary `mt decode > tx.hex` on every default machine. **Owning phase:
+  P1**, and the decode warning builds it. This bullet is listed under FILED
+  because it began there; the ruling moved it, and F-278 records that move.
 - **F-276** — the crate's boundary is `me`-shaped in two places the second
   consumer could not use: `exit::write_block` encodes `me`'s terminal policy in
   its control flow, and `observation.rs` shipped F-259's half of its stated
