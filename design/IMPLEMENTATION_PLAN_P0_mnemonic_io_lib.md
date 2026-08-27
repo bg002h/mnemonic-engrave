@@ -67,9 +67,16 @@ that the two masks keep disagreeing; it is that they get reconciled silently in
 favour of the weaker one, on the path where the artifact is cut into metal.**
 
 **The closure is library-shaped.** Measured across all 431 lines: **0** hits for
-`std::process::exit`, the `Cli` struct, `clap`, or `std::env::args`. Nothing
-reaches for the binary's argument parser or for process exit, so the move is
-mechanical rather than a rewrite.
+`std::process::exit`, the `Cli` struct, or `clap`. Nothing reaches for the
+binary's argument parser or for process exit, so the move is mechanical.
+
+**But `std::env::args` is 0 too, and that is a GAP, not an achievement (C2).**
+§6d requires the argv guard to run **before `Cli::parse()`**, and a pre-parser
+guard is *defined* by reading raw argv. Zero hits means **the closure does not
+contain the guard the spec assigns to P0** — §7 P0's row says *"argv guard with
+pre-parser ordering"* and §6d says *"Both layers run pre-parser (C-4)"*. An
+earlier draft of this plan cited the 0 as evidence the work was easy. It is the
+symptom of the work being absent.
 
 **STEP ZERO IS INSIDE `me`.** Nothing crosses a crate boundary until those 11
 are a library. Treating this as "donate three functions" discovers the other
@@ -172,6 +179,46 @@ mnemonic-io-lib/
 which does not delete on zsh 5.9.2, and tells fish operators to match on the
 bearer material — typing the secret into history a second time.
 
+**`records.rs` — the PRE-PARSER argv guard (C2).** Two layers, both running on
+raw `std::env::args()` **before `Cli::parse()`**:
+
+1. **FLAG-NAME.** Match known secret-bearing flag names as strings. The names are
+   static, so this needs no parse. `mnemonic-toolkit` already proves the shape
+   with `NodeType::is_argv_secret_bearing` and a lockstep parity test — **P0
+   adopts that shape rather than inventing one.**
+2. **VALUE-SHAPE, additive.** For material arriving positionally where no flag
+   declares it: `tx:` by prefix, `mt1`/`ms1` by HRP, a BIP-39 mnemonic by
+   wordlist. `mt` and `me` have this today and it stays.
+
+**The ordering is NORMATIVE, and `mt`'s source records why.** When the check
+lived inside the `encode` subcommand, clap rejected the unexpected positional
+first — **and clap's error echoed the entire bearer transaction to stderr.** A
+guard downstream of the parser has already lost. **The override's own parse must
+also run pre-parser**, or `--allow-argv-secret` cannot be honoured without
+parsing the very argv the guard exists to protect.
+
+**`me` does not currently leak this way** — verified 2026-08-26,
+`me sysw pack --nosuchflag <ms1…>` exits 2 naming only the flag, with the secret
+absent from stderr. **That is the behaviour to preserve, and it is not the same
+as having the pre-parser guard**; P0 must not regress it while adding one.
+
+**`--expect` — THE KIND VOCABULARY, enumerated (C3).** `me sysw pack --expect
+<kinds>` does not exist yet and is P0's content:
+
+| kind | admits `Class` | recognised by |
+| --- | --- | --- |
+| `transaction` | **`Mt` ∪ `Tx`** — the union is deliberate | `mt1` HRP, or the `tx:` prefix |
+| `descriptor` | `Descriptor`, `MdMk` | `md1`/`mk1` HRP |
+| `mnemonic` | `Mnemonic` | BIP-39 wordlist |
+| `secret` | `Codex32Secret` | `ms1` HRP |
+| `passphrase` | `Passphrase` | flag-declared only |
+| `address` | `Address` | address parse |
+
+`Class` has ten variants — `Mnemonic`, `Codex32Secret`, `Passphrase`,
+`FreeText`, `Descriptor`, `MdMk`, `Mt`, `Tx`, `Address`, `Unknown`. **`FreeText`
+and `Unknown` are deliberately unnameable**: `--expect` states what must be
+present, and neither can be required of a stream.
+
 **`fd.rs`'s CONTRACT, stated because "no policy" is not self-explaining:**
 
 - Return the **raw `mode & 0o777`** for a regular file. **No disqualifying mask
@@ -217,9 +264,11 @@ Each step is RED first. No step begins until the previous is green.
 | 2 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 regular file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` returns `None`; `me`'s end-to-end behaviour is **still** unchanged |
 | 3 | `observation.rs` — types | a payload kind cannot be constructed from a permission bool (**F-259 cannot recur**) |
 | 4 | `remedy.rs` | zsh remedy does **not** contain `history -d`; fish remedy does **not** contain the secret |
-| 5 | `records.rs` | the argv gate refuses by class, with the override, **as unit tests** (§2.4) |
+| 5 | `records.rs` layer 1 — **pre-parser** flag-name guard on raw argv | a known secret-bearing flag name is refused **before `Cli::parse()`**; today nothing runs there, so the test fails for absence |
+| 5b | `records.rs` layer 2 — value-shape, additive | the argv gate refuses by class, with the override, **as unit tests** (§2.4); `me sysw pack --nosuchflag <ms1…>` still does not echo the secret |
+| 5c | `--expect <kinds>` — the flag and the vocabulary | `--expect descriptor,transaction` **refuses a stream with no transaction**, and **refuses an incomplete `md1` set** (§6g). Both fail today: the flag does not exist |
 | 6 | `channel.rs` + `exit.rs` | `--out` overwrites; `-` reads stdin; codes match §6f |
-| 7 | `me` consumes the crate | all 388 tests still pass, unchanged |
+| 7 | `me` consumes the crate | all 388 tests pass, **with the diff to them enumerated and each edit justified by a named finding** — the shape §7 P1 already uses for `mt` |
 | 8 | publish `0.1.0` | **irreversible — §5** |
 
 **Steps 1 and 2 are ordered this way on purpose.** Step 1 moves
@@ -276,7 +325,19 @@ before publishing; do not trust a check from an earlier session.
    unanswerable.
 6. **F-259 and F-260 cannot recur by construction** — a payload kind is a type,
    and a permission message is derived from the observed mode.
-7. An R0 round closing **0C/0I**.
+
+   **This REQUIRES test and signature changes, and condition 1 must not be read
+   as forbidding them (C4).** `emit` and `write_block` change signature: the
+   payload-kind fact stops travelling in the `allow_world_readable` bool that
+   caused F-259. **`write_block_decides_both_gates_once`
+   (`crates/me-cli/src/main.rs:2201`) is expected to change** — F-259's own
+   analysis says that test locks the defect in, so a fold that leaves it
+   untouched has not closed the finding. "Unchanged in meaning" governs
+   condition 1; it does not govern the tests this condition exists to fix.
+7. **The guard AND the override's own parse are both decided before
+   `Cli::parse()`**, asserted at least in the donor (C2). A guard that reaches
+   its decision by parsing first has reintroduced the leak §6d exists to stop.
+8. An R0 round closing **0C/0I**.
 
 ---
 
