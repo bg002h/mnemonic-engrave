@@ -363,8 +363,7 @@ fn argv_candidates(token: &str) -> Vec<String> {
 /// cannot be honoured without parsing the very argv the guard exists to protect.
 ///
 /// **And it binds only where the flag is DECLARED** (round-11 M-2). `me`
-/// declares `allow_argv_secret` on `sysw pack` alone — one `#[arg(long)]` in
-/// the whole CLI — so on `me`, `bundle`, `sysw show`, `sysw wipe` and the helps
+/// declares `allow_argv_secret` on `sysw pack` and `seal` — so on `me`, `bundle`, `sysw show`, `sysw wipe` and the helps
 /// the guard refuses even when argv carries the flag. Today those surfaces make
 /// clap reject it as an unexpected argument at exit 2; the guard reaching its
 /// answer first is the point of §6d's ordering.
@@ -372,15 +371,17 @@ fn argv_override_applies(argv: &[String]) -> bool {
     if !argv.iter().any(|t| t == "--allow-argv-secret") {
         return false;
     }
-    // The surface is the leading run of non-flag tokens. This is a
-    // deliberately small parse -- it decides ONE bool -- because anything
-    // larger is `Cli::parse()`, which is what must not run yet.
-    let words: Vec<&str> = argv
-        .iter()
-        .skip(1)
-        .filter(|t| !t.starts_with('-'))
-        .map(String::as_str)
-        .collect();
+    // The surface is the LITERAL leading tokens at argv[1..]. It is NOT "the
+    // leading run of non-flag tokens" -- that reading let a FLAG VALUE spoof the
+    // surface, because filtering out `-`-prefixed tokens keeps the value that
+    // follows one: `me --out seal <ms1> --allow-argv-secret` presented `seal` as
+    // the surface and granted the override on bare `me`, which does not declare
+    // the flag, after which clap echoed the whole secret (pre-publish review,
+    // Minor 1).
+    //
+    // Reading argv[1..] literally is also the smaller parse, and it is the one
+    // that matches how clap resolves a subcommand: the words come first.
+    let words: Vec<&str> = argv.iter().skip(1).map(String::as_str).collect();
     // The two surfaces that DECLARE the flag. `sysw pack` and `seal` are the
     // only ones whose positionals are records the operator may legitimately
     // intend to be secret; everywhere else an argv-forbidden token is an
