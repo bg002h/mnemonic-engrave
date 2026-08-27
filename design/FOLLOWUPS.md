@@ -11510,7 +11510,7 @@ image, not a bearer secret. **A `bool` that two callers read differently is what
 a type prevents**, and this is the argument for the record-vocabulary half of
 `mnemonic-io-lib` rather than an argument against the terminal gate.
 
-### F-260 — `mt encode` refuses mode 0620 saying it "grants read to group or others", when no read bit is set (repo: **mnemonic-transaction**; owning phase: **P0**) `#mt` `#ux` `#shipped`
+### F-260 — `mt encode` refuses mode 0620 saying it "grants read to group or others", when no read bit is set (repo: **mnemonic-transaction**; owning phase: **P1**, reassigned from P0 2026-08-26) `#mt` `#ux` `#shipped`
 
 **Found 2026-08-26** while machine-checking the io-seam review's counterexample.
 Reproduced with a valid transaction and a 0600 control that passes:
@@ -11556,6 +11556,15 @@ io-seam review's load-bearing counterexample: `mt` and `me` ship near-identical
 the **vocabulary for describing what was measured** — a message derived from the
 observed mode cannot say "read" about a mode with no read bits, whereas a
 hard-coded string can and does.
+
+
+**REASSIGNED P0 → P1, 2026-08-26**, during the P0 plan's R0 round 0 (I4). The
+reasoning that filed it against P0 still holds — a message *derived* from the
+observed mode cannot make this error — but **P0 does not touch `mt`**: §7 places
+`mt`'s adoption in P1, and a P0 that edited `mt`'s message would contradict its
+own scope. Under the per-phase burndown rule an item whose owning phase has
+passed is **overdue, not deferred**, so this moves rather than drifting.
+**P1 owns it.** F-259 stays with P0 — that one is `me`'s.
 
 ### F-261 — `plan-table-check.sh` silently skips INDENTED tables, and does not list that among its blind spots (owning phase: **tooling**, before the next spec fold) `#tooling` `#gates`
 

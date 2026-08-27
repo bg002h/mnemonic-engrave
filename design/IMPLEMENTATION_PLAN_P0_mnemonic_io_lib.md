@@ -5,7 +5,9 @@ written until this closes an R0 round at 0C/0I.
 
 **Source spec:** `SPEC_constellation_cli_uniformity.md` §5a (the crate and its
 four boundary lines), §5b (the four verbs), §6b/§6d/§6f/§6h (the rules being
-hoisted), §7 P0 (this phase's row and gate).
+hoisted), §7 P0 (this phase's row and gate), **and §8 — *"What is NOT verified,
+and must be before the plan is trusted"* (M7)**, whose items this plan
+inherits rather than supersedes.
 
 **Prior art this plan is downstream of:**
 `design/agent-reports/DESIGN-io-seam.md` — the review that inverted the seam.
@@ -27,9 +29,10 @@ would freeze a disagreement into a shared dependency.
 
 ## 1. THE INVENTORY — measured, not described
 
-`me-cli` is the **only** crate in the constellation with both `lib.rs` and
-`main.rs` (5 of 5 `-codec` crates are lib-only; 4 of the 5 `-cli` crates are
-main-only). That reads like a head start on extraction. **It is not.**
+**`me-cli` has both `lib.rs` and `main.rs`** — as does `mnemonic-toolkit`
+(M2: an earlier draft called `me-cli` the only such crate, from a search that
+looked at the toolkit's repo root, where its crate does not live). That reads
+like a head start on extraction. **It is not.**
 
 **Six of the nine named IO/safety functions are in `main.rs` — the binary
 half:**
@@ -151,9 +154,14 @@ exactly what a shared type prevents.**
 
 ### 2.4 `read_records` is not what its line count suggests
 
-132 lines, the largest by 3× — but it is **100 pure lines and 32 of
-mechanism**. Its argv gate performs no IO at all, and it currently has **13
-spawn tests and zero unit tests**. **This is where the seam actually pays.**
+132 lines, the largest by 3×, and **only 9 of them touch IO at all**
+(`std::fs`, `std::io`, `stdin`, `File::`, `read_to_string`, `BufRead`). Its argv
+gate performs no IO whatsoever, and it currently has **13 spawn tests and zero
+unit tests**. **This is where the seam actually pays.**
+
+*(An earlier draft claimed a "100 pure / 32 mechanism" split, transcribed from a
+design report without recomputation. It is not reproducible under any rule —
+M4. The 9-line figure is measured and the command is above.)*
 
 **And a correction to an earlier claim in this cycle:** the 12 tests in
 `world_readable_output.rs` do **not** convert to unit tests. They exercise real
@@ -171,7 +179,7 @@ mnemonic-io-lib/
   src/fd.rs           — MECHANISM only: see the contract below.
   src/observation.rs  — what was measured, as types (§2.3)
   src/records.rs      — record stream splitting, the argv gate, kind vocabulary
-  src/exit.rs         — the exit-code table
+  src/exit.rs         — exit-code CONSTANTS and their meanings. NOT a per-binary table.
   src/remedy.rs       — purge/remedy text, FROM `me` ALONE (§6h)
 ```
 
@@ -219,6 +227,16 @@ as having the pre-parser guard**; P0 must not regress it while adding one.
 and `Unknown` are deliberately unnameable**: `--expect` states what must be
 present, and neither can be required of a stream.
 
+**`exit.rs` HAS C1's PROBLEM IN A SECOND FILE (I2), and it is worse there.**
+Calling it "the exit-code table" implies one table. Measured on the same
+invalid-artifact input: **`md` 1, `mk` 2, `ms` 1, `mnemonic` 2 (by input shape)**,
+and for a clap usage error **`md` 2, `mk` 64, `ms` 64, `mt` 2, `me` 2**. The
+binaries do not agree, §9b rules the usage-code split **out of scope**, and §6f
+rules `mk`'s invalid-artifact 2 → 1 the only change this cycle makes. **So the
+crate holds the constants and their MEANINGS — what "2" signifies — and never a
+mapping from binary to code.** Publishing one table would do to the exit codes
+exactly what publishing `0o044` would do to the mask.
+
 **`fd.rs`'s CONTRACT, stated because "no policy" is not self-explaining:**
 
 - Return the **raw `mode & 0o777`** for a regular file. **No disqualifying mask
@@ -229,7 +247,9 @@ present, and neither can be required of a stream.
 **Those two `None`s ARE shared mechanism, and saying so is load-bearing.** Both
 binaries already implement both, identically, comment sentences included —
 `me` (`crates/me-cli/src/main.rs:906-917`) and `mt` — in the sibling repo, at
-**lines 645 to 655** of its `mt-cli` validate module, deliberately written
+**lines 645 to 655** of its `mt-cli` validate module — the guard's own mask is
+at **line 653**, not 585; 585 carries the same `0o077` inside a *different*
+function that returns `None` rather than a refusal (M3) — deliberately written
 without citation punctuation per the cross-repo note in §2.1, and verified by
 hand 2026-08-26. An implementer who reads "no policy" literally would push the
 char-device exemption out to callers, where it is **load-bearing for `/dev/null`
@@ -239,13 +259,41 @@ stdout is not evidence of exposure*, and both tools say so in those words.
 **The mask is the only part that is not shared**, and it is the only part that
 stays behind.
 
+**THE 11 MAPPED ONTO THE FILES (M6)** — §3 lists seven files and §4 sequences
+six; without this table a reader cannot tell where a function lands:
+
+| file | functions |
+| --- | --- |
+| `channel.rs` | `destination`, `refuse_terminal_destination` |
+| `fd.rs` | `stdout_world_readable_mode` (**split**, C1), its `cfg(not(unix))` stub |
+| `records.rs` | `read_records`, `split_record_stream`, `no_records_guard`, `is_secret`, `is_bearer`, `is_argv_forbidden` |
+| `observation.rs` | the payload-kind and mode types (F-259, F-260) |
+| `exit.rs` | `write_block`, `refuse_write_block`, `refuse_world_readable_stdout` |
+| `remedy.rs` | the purge/remedy text |
+| `lib.rs` | re-exports only |
+| *(caller-side)* | `emit`, `write_private` — see below |
+
+**`emit` and `write_private` stay in `me` for now.** `emit` writes the payload
+and `write_private` creates the 0600 file; both are the *act*, not the decision,
+and P0's value is in the decisions. Moving them is P1's question, not P0's.
+
+**TYPES AND CONSTANTS ARE PART OF THE CLOSURE TOO (I5).** §1 enumerates
+functions only, which understates it: `WriteBlock`, `Destination`, `Class`, and
+the `Admission` flags all cross with them. **Step 1 must enumerate every type and
+constant the 11 reference and confirm each is either moved or already public** —
+a function that compiles only because its enum is in scope has not been moved,
+it has been copied into a file that happens to see it.
+
 **Boundary lines, from §5a.** No display grouping (`mnemonic-toolkit` already
 owns it, and the four encoders' copies are checksum-gated). No record classes,
 prefixes or payload grammar — those stay with `me` per §9a. Describing a
 *measurement* is not owning the *grammar*.
 
-**The stdio question, answered.** The 431 lines contain 4 `eprintln!` and 4
-`println!`. A library six binaries share must not write to stdio
+**The stdio question, answered.** The 431 lines contain **4 `eprintln!` and ZERO
+bare `println!`** (M1 — an earlier draft said 4 of each; the grep was matching
+`println!` as a substring of `eprintln!`). **The closure's only write to stdout
+is `emit`'s payload `write_all`, and that must STAY a write** — it is the
+payload itself, not a message. A library six binaries share must not write to stdio
 unconditionally — it cannot be tested without capturing process stdio and a
 caller cannot redirect it, which is doubly wrong in a crate whose purpose is
 controlling what reaches stdout. **Functions return what should be said; the
@@ -260,7 +308,7 @@ Each step is RED first. No step begins until the previous is green.
 
 | # | step | the test that must fail first |
 | --- | --- | --- |
-| 1 | move the 11 into `me`'s lib half **intact — including the mask**, no behaviour change | `me`'s existing tests still pass; `main.rs` shrinks by ~431 lines |
+| 1 | move the 11 into `me`'s lib half **intact — including the mask**, no behaviour change | `me`'s existing tests still pass — **388 RUN, 1 skipped, out of 389 `#[test]` attributes (N1); the gate is the run count, not the attribute count**; `main.rs` shrinks by ~431 lines. **PLUS a pty assertion pinning the terminal arm (I1)** — see below |
 | 2 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 regular file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` returns `None`; `me`'s end-to-end behaviour is **still** unchanged |
 | 3 | `observation.rs` — types | a payload kind cannot be constructed from a permission bool (**F-259 cannot recur**) |
 | 4 | `remedy.rs` | zsh remedy does **not** contain `history -d`; fish remedy does **not** contain the secret |
@@ -270,6 +318,22 @@ Each step is RED first. No step begins until the previous is green.
 | 6 | `channel.rs` + `exit.rs` | `--out` overwrites; `-` reads stdin; codes match §6f |
 | 7 | `me` consumes the crate | all 388 tests pass, **with the diff to them enumerated and each edit justified by a named finding** — the shape §7 P1 already uses for `mt` |
 | 8 | publish `0.1.0` | **irreversible — §5** |
+
+**I1 — STEP 1's GATE CANNOT FAIL FOR THE TERMINAL ARM, so it is not left as the
+only proof.** "The 388 still pass" is green whether or not the terminal refusal
+survives the move — and the terminal arm is one of the 11, and the one carrying
+F-259's funds-adjacent behaviour. **All 12 tests in
+`crates/me-cli/tests/world_readable_output.rs` redirect to files, so none of them
+reaches it.** Step 1 therefore carries a **pty assertion** pinning the refusal
+(the repo already has the technique — `script -qec` reproduces it), and without
+that assertion step 1 proves nothing about the terminal path.
+
+**M5 — steps 1 and 7 do NOT have a test that must fail first, and the column
+header should not claim they do.** Both are refactors whose gate is *"the suite
+still passes"*, which is a regression gate, not a RED-first one. That is
+legitimate for a move; asserting it is TDD when it is not would hide which steps
+carry real proof. Steps 2, 3, 4, 5, 5b, 5c and 6 are RED-first; **1 and 7 are
+regression-gated**, and step 1's pty assertion is the one RED-first thing in it.
 
 **Steps 1 and 2 are ordered this way on purpose.** Step 1 moves
 `stdout_world_readable_mode` *with* its `& 0o044` so nothing changes; step 2
@@ -281,7 +345,12 @@ same function**, and the reading that satisfied step 1 published `me`'s mask as
 the crate's mechanism.
 
 **Step 1 is not a refactor to skip.** It is the step that proves the closure is
-really 11 and not 12.
+really 11 and not more.
+
+**The `#[cfg(not(unix))]` stub of `stdout_world_readable_mode`
+(`crates/me-cli/src/main.rs:921`) is a 12th definition and moves with its twin**
+(N2). It is named here because it appears in neither table above and a reader
+counting definitions will find it.
 
 ---
 
@@ -321,8 +390,17 @@ before publishing; do not trust a check from an earlier session.
    HRP that fails to decode.
 4. `--expect descriptor,transaction` refuses a stream missing a transaction,
    **and** refuses an incomplete `md1` set. Both asserted.
-5. The §6h in-memory-history question measured, or explicitly recorded as
-   unanswerable.
+5. **The §6h in-memory-history question MEASURED** (I3). An earlier draft of this
+   condition offered an escape hatch — measure it, **or** declare it
+   unanswerable — which weakened a spec gate the spec states without one. (The
+   wording is described rather than quoted: quoting a retracted phrase re-mints
+   it, which is how this cycle has re-created nine of them, every one found by
+   re-running a sweep and none by re-reading.) **The escape
+   is exactly the failure mode `remedy.rs` exists to prevent** — `history -d`
+   reports success and purges nothing, and "recorded as unanswerable" is the
+   documentation-shaped version of the same thing. **Step 4 therefore carries a
+   POSITIVE test: run the emitted recipe under an interactive shell and assert
+   the entry is gone**, not that a command was printed.
 6. **F-259 and F-260 cannot recur by construction** — a payload kind is a type,
    and a permission message is derived from the observed mode.
 
@@ -354,4 +432,13 @@ before publishing; do not trust a check from an earlier session.
   tool treats as a dangerous destination is a RULING, never a refactor.
 - **`mnemonic-toolkit`'s own adoption.** It is the sixth consumer, not P0's
   work.
+- **F-260 — REASSIGNED FROM P0 TO P1 (I4).** `mt`'s message calls mode 0620 one
+  that *"grants read to group or others"* when no read bit is set outside owner.
+  It was filed against P0, but **P0 does not touch `mt`** — §7 places `mt`'s
+  adoption in P1, and a P0 that edited `mt`'s message would contradict its own
+  scope. Under the constellation rule an item whose owning phase has passed is
+  **overdue, not deferred**, so this is re-assigned rather than left to drift:
+  **P1 owns it**, and `FOLLOWUPS.md` is updated in this same fold rather than
+  later. F-259 stays with P0 — it is `me`'s, and `observation.rs` is where it is
+  prevented.
 - Anything the nine prior spec rounds closed.
