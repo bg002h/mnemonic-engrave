@@ -11425,3 +11425,34 @@ control caught it**: searching for a name known to be in the file also returned
 nothing, which is impossible for a working list. After fixing the parse the
 control hit and the five extras appeared. **An empty result is only evidence when
 a control proves the search could have found something.**
+
+**F-258 ADDENDUM — the 11 are library-shaped, with exactly one design question.**
+
+Measured across all 431 extracted lines (control-checked: the block really does
+contain the functions named):
+
+| binary-only thing | hits |
+| --- | --- |
+| `std::process::exit` | **0** |
+| the `Cli` struct | **0** |
+| `clap` anything | **0** |
+| `std::env::args` | **0** |
+| `eprintln!` | **4** |
+| `println!` | **4** |
+
+**The first four zeros are the good news** — nothing in the closure reaches for
+the binary's argument parser, its `Cli` type, or process exit. The code is
+already library-shaped and the move is mechanical.
+
+**The eight prints are the design question, and P0 must answer it before writing
+code.** A library shared by six binaries that writes to `stdout`/`stderr`
+directly cannot be tested without capturing process stdio, and a caller cannot
+redirect or suppress it. That matters more here than usually: **the whole purpose
+of this crate is controlling what reaches stdout**, so a component that prints
+unconditionally is at odds with its own reason for existing.
+
+Two shapes, and the choice belongs in the plan rather than the implementation:
+return a value the caller emits, or take a `&mut impl Write`. The second keeps
+the call sites terse and makes the tests direct; the first is a larger diff at
+every call site. **Either is fine; discovering the question mid-implementation is
+not.**
