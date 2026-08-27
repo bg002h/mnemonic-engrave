@@ -245,8 +245,51 @@ looks like a separator"* is how a mangled string gets silently accepted.
 **On D5:** four copies of one rule is the shape that let `pack` and
 `pack_deterministic` drift until a vector round-trip caught it — that module's
 own comment records it. §6 of this document is a fifth copy risk in waiting.
-Round 0's I-5 correctly attacked the *precedent* originally cited for D5; §7 P0
-now names the distribution mechanism instead of gesturing at one.
+Round 0's I-5 correctly attacked the *precedent* originally cited for D5; the
+mechanism is now decided rather than gestured at, below.
+
+### 5a. The distribution mechanism, decided
+
+**Ruled by an architect consult 2026-08-26** (`design/agent-reports/ARCH-toolkit-vs-shared-crate.md`),
+after the operator asked whether `mnemonic-toolkit` should be the home instead
+of a new crate. **It should not**, and the reason is a hard constraint rather
+than a preference:
+
+- **`md-cli`, `mk-cli` and `ms-cli` are published crates.** A published crate
+  **cannot carry a git or path dependency**. So whatever they share must itself
+  be a published crates.io crate.
+- **`mnemonic-toolkit` is not on crates.io and cannot publish as it stands** — it
+  holds a bare `path` dependency on `wc-codec` (`crates/mnemonic-toolkit/Cargo.toml:37`,
+  no version), which `cargo publish` refuses. Verified locally.
+- Its dependency closure — miniscript, bitcoin, aes, bip38, bip322 — would be
+  dragged into `mt-cli`, which has three dependencies today.
+- It builds correctly only under a workspace `[patch.crates-io]` miniscript
+  git-rev pin, **and a patch does not propagate to dependents.**
+- **The coupling direction is backwards.** The toolkit's argv machinery is
+  *warning*-grade (`secret_in_argv_warning`, no refusal, no override); the
+  *refusal*-grade reference code D5 extracts lives in `me-cli` and `mt-cli`.
+
+**And it fails the tier model outright:** every encoding binary would depend on
+the fancy-processing tier. Under the operator's three tiers the IO+safety layer
+fits **none** of them, which is precisely why it is a fourth, foundation-tier
+thing — a small crate that the toolkit becomes the **fifth consumer** of, not
+the home of.
+
+**So:** a new crate, hosted this cycle as a workspace member of
+`mnemonic-engrave` for extraction locality, **published to crates.io at 0.1.0
+when P0 closes GREEN**, publication operator-gated. Hosting it here is recorded
+as **symmetry debt with a non-breaking reversal path** — once the crate is on
+crates.io its repository may move at zero cost to consumers.
+
+**Two boundary lines on what it may hold**, because a foundation crate that
+grows is the next drift:
+
+- **No display grouping.** The canonical layer already exists in
+  `mnemonic-toolkit::display_grouping`, and the four encoders' copies are
+  provably in lockstep via checksum-gated vectors. The new crate must not become
+  the fifth copy.
+- **No container vocabulary.** Record classes, prefixes and payload grammar
+  belong to `me`; see §9a.
 
 **D3 is already implemented in `me`, and that is the reference.** Measured in
 the main checkout's working tree during the fold: `me sysw pack` refuses secret
@@ -426,6 +469,37 @@ lands correctly, and `me sysw pack`, which already implements the widened form:
 - Give the purge commands, per §6h.
 - `--allow-argv-secret` proceeds. It is greppable in a script, so a reviewer can
   find it. **This is the name already shipped on `me sysw pack`.**
+
+**THE DETECTOR — specified, because the two reference implementations disagree
+and neither is sufficient (plan-draft C-2).** D5 says P0 extracts this guard
+from `mt` and `me`. They do not implement the same thing:
+
+| | detects by | runs | sees a bare passphrase? |
+| --- | --- | --- | --- |
+| `mt` `command_line_guard` | **shape** (`looks_like_a_transaction`) | pre-clap ✓ | no — arbitrary text has no shape |
+| `me` `read_records` | **class** (`classify`) | post-clap ✗ | no — arbitrary text has no class |
+
+So `mnemonic bundle --passphrase <arbitrary text>` is invisible to both, and
+`me`'s is post-parser, which C-4 forbids. **P0 cannot "extract" a thing that
+does not exist in either source; it must build the union.**
+
+**The detector is TWO layers, and the first is the one both references lack:**
+
+1. **FLAG-KEYED, and this is the primary layer.** A flag declares whether its
+   value is secret-bearing, and the value needs no recognisable shape. This is
+   how a passphrase — arbitrary text, indistinguishable from a filename — is
+   caught at all. **`mnemonic-toolkit` already proves the design**:
+   `NodeType::is_argv_secret_bearing` with a lockstep parity test. P0 adopts
+   that shape rather than inventing one.
+2. **VALUE-SHAPE, additive.** For material arriving positionally, where no flag
+   declares it: `tx:` by prefix, `mt1`/`ms1` by HRP, a BIP-39 mnemonic by
+   wordlist. This is what `mt` and `me` have today, and it stays — it catches
+   what layer 1 cannot, namely a bearer artifact pasted where no flag named it.
+
+**Both layers run pre-parser (C-4).** Layer 1 needs the flag *names*, which are
+static and known without parsing — matching `--phrase` in raw argv is a string
+comparison, not a parse. **An implementation that reaches layer 1 by parsing
+first has reintroduced the leak C-4 exists to stop.**
 
 **Why the ordering is normative and not an implementation detail.** `mt`'s guard
 is correct *only* because it precedes clap. Its own source says so at
@@ -864,8 +938,29 @@ override is scoped to the posture pair and to nothing else.
 | **P0** | the shared crate: `--in`/`--out`/`-`, argv guard with pre-parser ordering, write gate, exit codes, remedy text per §6h, **and `me sysw pack --expect` in full — the kind vocabulary, the flag, and §6g's refusal on an incomplete chunk set of a named kind (I-6)**. Extracted FROM `mt`/`me`. Plus the distribution mechanism below. | its own tests + an R0 round closing 0C/0I + the two `mnemonic` exit cells still marked "not measured" filled + the in-memory-history question of §6h measured + **`--expect descriptor,transaction` REFUSES a stream missing a transaction, and REFUSES an incomplete `md1` set, both asserted** |
 | **P1** | `mt` adopts the crate, and gains `--out` (§6b), `--allow-argv-secret` (§6d), **and `-` on `decode`, `verify` and `inspect` — F-250 fixed `encode` ALONE, and the other three still exit 2 (I-3)**. | `mt`'s 237 tests pass, **with the diff to them enumerated and each edit justified by a named §6 ruling** + **`mt decode -`, `mt verify -` and `mt inspect -` each read stdin at exit 0** |
 | **P2** | `ms` FIRST `--in` on all eight verbs, THEN the argv refusal, THEN the 0600 `--out`, **THEN `--group-size 0` as the stdout default and the whitespace-only separator (I-1) — §3's decisive measurement is `ms`'s and belonged to no phase**. Plus this repo's journey drivers. **Highest safety value; do it before the cosmetic work.** | round-trip vectors; **`ms encode --phrase <a BIP-39 phrase>` REFUSES for the argv reason and `--allow-argv-secret` proceeds (I-5)**; **`ms encode --in <file>` piped into `me sysw pack` runs with NO flags and exits 0 (I-1)**; the 18 argv call sites migrated; `me`'s remedy text still naming only channels that exist |
-| **P3** | `md`, `mk` header off stdout, grouping to stderr, `--in`/`--out`, **and `mk`'s invalid-artifact 2 → 1, which §6f calls the only code this cycle changes and which no phase owned (I-4)**. Plus `mnemonic`'s grouping surface AND its argv refusal across all five of its secret-material channels (`bundle`, `convert`, `derive-child`, `restore --passphrase`, `electrum-decrypt --decrypt-password`), and the GUI mirror. Plus golden regeneration. | `md encode` into `me sysw pack` runs with **no flags and no grep, on a CHUNKING policy**; **`mk` on an invalid artifact exits 1, and `mk encode` piped into `me sysw pack` runs with no flags**; `mnemonic-gui`'s schema mirror regenerated; the 7 goldens regenerated; **`mnemonic`'s five secret-material argv channels each refused, named one by one** |
+| **P3** | `md`, `mk` header off stdout, grouping to stderr, `--in`/`--out`, **and `mk`'s invalid-artifact 2 → 1, which §6f calls the only code this cycle changes and which no phase owned (I-4)**. Plus `mnemonic`'s grouping surface AND its argv refusal across all five of its secret-material channels (`bundle`, `convert`, `derive-child`, `restore --passphrase`, `electrum-decrypt --decrypt-password`), and the GUI mirror. Plus golden regeneration. | `md encode` into `me sysw pack` runs with **no flags and no grep, on a CHUNKING policy**; **`mk` on an invalid artifact exits 1, and `mk encode` piped into `me sysw pack` runs with no flags**; `mnemonic-gui`'s schema mirror regenerated; the 7 goldens regenerated; **`mnemonic`'s refusal keyed on its EXISTING `is_argv_secret_bearing` predicate (not a second implementation), with the five named channels asserted as spot checks** |
 | **P4** | the operator journey: several inputs of different kinds, one payload, `--expect` engaged. **`--expect` is BUILT in P0; P4 exercises it.** | a captured journey that regenerates, and that FAILS when one producer is made to refuse |
+
+**`mnemonic` CONFORMS; it does not invent (architect ruling, 2026-08-26).**
+`mnemonic-toolkit` already ships an argv-secret subsystem — `secret_taxonomy`,
+`secret_advisory::secret_in_argv_warning`, and a `NodeType::is_argv_secret_bearing`
+predicate with a lockstep parity test. **P3 keys `mnemonic`'s refusal off that
+existing predicate rather than building a second one**, which would be exactly
+the drift D5 exists to prevent.
+
+**The "five channels" figure below is a floor, not the boundary.** Measured
+2026-08-26:
+
+```
+grep -rl 'secret_in_argv_warning' --include='*.rs' /scratch/code/shibboleth/mnemonic-toolkit
+  -> 26 files, 86 references
+```
+
+(The architect's own sweep reported 21 files / 66 references — a narrower scope;
+both are far above five, which is the point, and the command is given so the
+number can be re-derived rather than believed.) **The five named channels are
+ASSERTIONS in P3's gate, not the sweep boundary**: the boundary is the
+predicate. A phase that satisfies only the five has done a fraction of the work.
 
 **On `mnemonic`'s argv surface (round-1 B4).** The fold widened this spec from
 four CLIs to five and ruled the override name uniform across all of them — then
@@ -949,7 +1044,14 @@ justify each edit*.
 
 **P1 remains the least risk, for the reason the earlier draft gave badly.** `mt`
 needs **zero** test changes for D3, D4 and §6c — it already implements all
-three. Its diff is confined to the two rulings above.
+three.
+
+*(An earlier revision closed this paragraph by calling `mt`'s diff confined to
+those two rulings. **The fold that added P1's third item falsified that sentence
+one paragraph above it** and left it standing — the exact incomplete-propagation
+shape this cycle keeps hitting, caught by `scripts/fold-propagation-check.sh`
+rather than by re-reading. P1 also owns `-` on `decode`, `verify` and `inspect`,
+which F-250 did not fix, so the diff is three items, not two.)*
 
 **P2 owns this repo's journey drivers, and that ordering was a latent blocker
 (I-10).** `mnemonic-engrave`'s own committed drivers shell out to `ms` with the
