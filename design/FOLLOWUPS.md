@@ -12623,3 +12623,166 @@ single-hit cases, not just multi-hit ones — or (b) accept the risk and add
 one more "NOT covered" line naming it explicitly, which is cheaper and
 matches this gate's existing philosophy of stating blind spots rather than
 chasing all of them.
+### F-291 — `mk`'s invalid-artifact 2 and its repair-uncorrectable 2 are the SAME `exit_code()` arm, so §6f's "2 → 1" as written also moves the repair code (repo: **mnemonic-key**; owning phase: **P3** — the plan's exit-code entry builds it) `#mk` `#spec` `#exit-codes`
+
+**Found 2026-08-27** while writing the P3 plan, by reading the mapping instead
+of the ruling.
+
+`CliError::exit_code` (`crates/mk-cli/src/error.rs:108`) sends
+`Codec(_)` and `MdCodec(_)` to **2** through one match arm. Both of §6f's
+distinct table columns come out of it:
+
+```
+mk decode <garbage>                 -> 2      # "invalid artifact"
+mk repair <BCH-uncorrectable card>  -> 2      # "repair uncorrectable"
+```
+
+§6f's table gives `md`, `ms` and `mnemonic` a **repair-uncorrectable of 2** and
+an **invalid artifact of 1**. `md` gets that split by an explicit bypass whose
+own comment says why (`crates/md-cli/src/cmd/repair.rs:109`): it returns
+`Ok(2)` at `crates/md-cli/src/cmd/repair.rs:124`, *"bypassing the
+`CliError::Codec → 1` default route so the repair exit-code contract is
+honored."* `mk` has no such bypass.
+
+**So the ruling as written closes one uniformity defect by opening another.**
+The obvious one-line edit — change the arm to 1 — moves `mk repair`'s
+uncorrectable to 1 and breaks a parity three other CLIs hold.
+
+**And the suite would not notice, in either direction.** A histogram of
+`.code(N)` across `crates/mk-cli/tests` gives 12 sites: four 0, four **2**,
+three 5, one 64. All four 2s are in `crates/mk-cli/tests/cli_mk1_repair_reverify.rs`
+(`:178`, `:194`, `:239`, `:259`) and every one pins `SetReassemblyMismatch`
+(`crates/mk-cli/src/cmd/repair.rs:380`), the funds fix — which also exits 2 and
+must **stay** 2. **Zero tests pin the invalid-artifact 2 by exit code.**
+
+**The fix is `md`'s mechanism, ported**: give `mk repair` the explicit `Ok(2)`
+bypass first, then move the shared arm to 1. Doing it in the other order leaves
+a window where the repair contract is wrong.
+
+**This is a defect in a GREEN spec's normative ruling, not only in code**, which
+is why it is filed as well as built. §6f calls `mk`'s 2 *"the only code this
+cycle changes"*; it is one of three codes that arm produces.
+
+### F-292 — `mnemonic`'s argv-secret surface is 48 call sites across 20 files naming 11 material shapes, against the 5 channels §7's row names (repo: **mnemonic-toolkit**; owning phase: **P3** — the plan's refusal entry builds it) `#mnemonic-toolkit` `#security` `#spec`
+
+**Measured 2026-08-27** for the P3 plan, with the spec's own two commands
+re-run and then narrowed to source.
+
+```
+git ls-files '*.rs' | xargs grep -l 'secret_in_argv_warning' | wc -l     # 26 files
+git ls-files '*.rs' | xargs grep -c 'secret_in_argv_warning' \
+  | grep -v ':0' | awk -F: '{s+=$2} END{print s}'                        # 86 references
+```
+
+Both reproduce §7's figures exactly. Narrowed to `crates/*/src/`: **21 files**
+carry it — `secret_advisory.rs` holds the definition
+(`crates/mnemonic-toolkit/src/secret_advisory.rs:40`) and the other **20**
+(nineteen `cmd/` modules plus `repair.rs`) hold **48 call sites**.
+
+The distinct argv-material shapes those sites warn about are **eleven**:
+`--from <node>=`, `--slot @N.phrase=`, `--share <node>=`, `--passphrase`,
+`--bip38-passphrase`, `--decrypt-password`, `--phrase`, `--ms1`, `--secret`,
+`--digits`, and a bare **positional `ms1`**.
+
+§7 already rules that *"the five named channels are ASSERTIONS in P3's gate,
+not the sweep boundary: the boundary is the predicate."* This entry records
+what the boundary measures to, so the row cannot be satisfied by refusing five
+sites out of forty-eight.
+
+**The predicate is reachable before clap, which is what makes it usable as the
+boundary.** `NodeType::is_argv_secret_bearing`
+(`crates/mnemonic-toolkit/src/cmd/convert.rs:117`) is mirrored by
+`secret_taxonomy::SECRET_NODE_TYPES_ARGV`
+(`crates/mnemonic-toolkit/src/secret_taxonomy.rs:95`), a `pub const &[&str]` of
+nine tokens. Matching a flag name in raw argv and splitting at `=` is string
+work; no parse is required to reach the decision, which is the whole of §6d's
+C-4. **Every one of the 48 existing sites is post-parse**, so the refusal is new
+code at a new place keyed off an old predicate — not a rewrite of the advisory
+layer.
+
+### F-293 — the argv advisory prints `--decrypt-password ` with a trailing space, at two call sites (repo: **mnemonic-toolkit**; owning phase: **P3** — fixed in passing by the plan's refusal entry) `#mnemonic-toolkit` `#ux` `#shipped`
+
+**Reproduced 2026-08-27** by running the binary, not by reading the source:
+
+```
+$ mnemonic electrum-decrypt --ciphertext <base64> --decrypt-password hunter2
+warning: secret material on argv (--decrypt-password ) — pipe via ...
+```
+
+Two sites pass the flag name with a space attached —
+`crates/mnemonic-toolkit/src/cmd/electrum_decrypt.rs:101` and
+`crates/mnemonic-toolkit/src/cmd/import_wallet.rs:2331`. The other 46 pass a
+clean name, so this is a typo rather than a convention. Cosmetic, in a security
+message, in shipped code.
+
+### F-294 — `records::no_records_guard`'s refusal text names `mt encode --qr`, another binary's flag, so no third consumer can adopt it (repo: **mnemonic-engrave**; owning phase: **`mnemonic-io-lib`'s next version, before a sixth consumer**) `#mnemonic-io-lib` `#P3` `#design`
+
+**Found 2026-08-27** while drawing P3's boundary, by reading the text the
+function would make `md` print.
+
+The message advises *"pass them on argv, with --in, or on stdin"* and then
+explains itself with *"An EMPTY input is what a FAILED upstream command leaves
+behind -- `mt encode --qr > rec.txt` writes nothing when it refuses"*. Printing
+`mt`'s flag out of `md`'s mouth is a defect nobody would file against the crate
+and everybody would file against `md`.
+
+**Both P3 tools already refuse an empty input correctly, in their own words**,
+and route it to **different** codes — `md` through `BadArg` to 2, `mk` through
+`UsageError` to 64. The crate is right to publish no integer; the callers are
+right to keep their own text.
+
+**This is a second instance of F-276's finding**, found by the third consumer
+rather than the second, and it points the same way: the crate's *mechanism* is
+reusable and its *prose* is `me`- and `mt`-shaped. The fix is to take the
+example out of the shared function and let the caller supply it, or to publish
+the guard as a predicate and leave all of the wording behind.
+
+### F-295 — `mnemonic bundle` writes 6 non-artifact lines out of 12 to stdout, and §6a's stdout rule does not reach it (repo: **mnemonic-toolkit**; owning phase: **whichever cycle extends §6a past `encode` on the four encoders**) `#mnemonic-toolkit` `#spec` `#deferred`
+
+**Measured 2026-08-27.** `mnemonic bundle --network mainnet --template bip84
+--slot "@0.phrase=<a BIP-39 phrase>" --passphrase <pw>` exits 0 and writes 12
+lines to stdout, of which 6 are non-artifact: three `# ms1 (entropy,
+BCH-checksummed)` / `# mk1 (xpub + origin)` / `# md1 (wallet policy)` comments
+and three blank separators. Each artifact line begins with its own HRP, so the
+comments are **redundant with the data**.
+
+**Ruled OUT of P3**, and consulted rather than assumed. §6a scopes the stdout
+rule by an explicit per-verb table covering `md`/`mk`/`ms`/`mt` only and binds
+it to `encode`, a verb `mnemonic` does not have; §2a enumerated `mnemonic`'s
+involvement as grouping and argv refusal with no header item; §9a places
+`mnemonic` in a tier that never feeds `me sysw pack`, which removes the
+packability motive. Stripping them would break a shipped machine-readable
+surface — the exact class §6a refused to break for `mk decode`, saying it
+*"gets its own phase and its own gate."*
+
+**What would reopen it:** an operator ruling that `bundle` counts as
+`mnemonic`'s `encode` for §6a's purposes.
+
+### F-296 — `plan-cite-check.sh` has no root for `mnemonic-gui`, the fourth repo P3 touches (repo: **mnemonic-engrave**; owning phase: **P3**, before the plan's GUI-mirror entry is written) `#tooling` `#gate` `#P3`
+
+**Found 2026-08-27** by probing the gate with the citations the P3 plan needed,
+before writing them.
+
+`ROOTS` carries `seedhammer`, this repo, `descriptor-mnemonic`,
+`mnemonic-toolkit`, `mnemonic-key`, `mnemonic-secret` and
+`mnemonic-transaction`. **`mnemonic-gui` is absent**, so every citation into it
+reports DANGLING and the P3 plan writes its GUI references as prose — the P0
+plan's workaround, which the script's own comments describe as not scaling.
+
+**The fix is one line**: add `"/scratch/code/shibboleth/mnemonic-gui"` to
+`ROOTS`.
+
+**It is collision-free, measured rather than asserted.** Of the GUI's 504
+tracked files, the only paths it shares with any existing root are top-level
+`Cargo.toml`, `CHANGELOG.md`, `CLAUDE.md` and `README.md` — every one of which
+is **already** ambiguous across the current roots and already reported as such,
+so adding the root changes nothing about them. Its `src/schema/` tree collides
+with nothing, because no other root has a top-level `src/` at all, checked
+across all eight.
+
+**Two smaller blind spots found by the same probe, recorded here rather than
+filed separately.** A leading-dot path loses its dot to the citation regex, so a
+bare `.github/workflows/ci.yml` dangles as `github/…` while the repo-qualified
+form resolves. And `.tsv` is not in the gate's extension list, so the
+display-grouping conformance corpus — byte-identical across four repos and
+sha256-pinned in three CI configs — is invisible to it.
