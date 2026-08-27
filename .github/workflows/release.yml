@@ -74,6 +74,16 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+
+      # fmt and clippy come before the Go setup and the test steps so a
+      # formatting or lint problem fails fast and cheaply (F-280), matching
+      # the sibling mnemonic-transaction repo's ci.yml ordering.
+      - name: fmt
+        run: cargo fmt --check
+
+      - name: clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
 
       - name: Set up Go
         uses: actions/setup-go@v5
