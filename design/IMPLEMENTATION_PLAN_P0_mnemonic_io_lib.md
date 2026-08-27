@@ -199,6 +199,58 @@ mnemonic-io-lib/
 which does not delete on zsh 5.9.2, and tells fish operators to match on the
 bearer material — typing the secret into history a second time.
 
+**§6f IS NOT SUFFICIENT AS STEP 6's AUTHORITY (probe, Critical).** Its `me` row
+listed only `2` and `4` and **never mentioned `3`** — the policy-refusal code
+`me` returns for a seed on argv, a `tx:` record, and the `ms1`-over-NFC refusal,
+used four times in its source. **An implementer mapping `ArgvSecret =>
+EXIT_USAGE` would have CONFORMED to §6f, collapsed the seed-on-argv refusal into
+the usage code, and passed the gate.** That distinction survives today only
+because it lives in code nobody was being asked to preserve. §6f is corrected in
+the same fold; the gate is now **differential against the current binary**, not
+a match against a table.
+
+**AND THE HARD PART HOLDS — the first clean structural result of this cycle.**
+The probe built `exit.rs` carrying refusal decisions, wording and the write-gate
+ordering with **zero integers**, in `me`'s lib half where `main.rs`'s constants
+are compiler-invisible. `me` reproduced **every current exit code byte-for-byte**
+— a 30-case differential matrix diffing to three hunks, all intended. **No
+`From<Decision> for i32` crept back**; the mapping is a 12-line
+`fn exit_code(&Refusal) -> i32` in the *binary*. So §6f and "no shared constant"
+do not contradict, and I2's ruling is executable.
+
+**`-` READS STDIN NOWHERE IN `me` TODAY** — five surfaces, four different exit
+codes — and §6b's *"accepted and ignored"* wording makes the compliant
+implementation **silently lossy**: `… | me sysw pack --out b.bin - text:6869`
+packs **1 record instead of 2, at exit 0**, on the artifact that gets cut into
+metal. **Step 6 implements `-`; it does not accept and ignore it.**
+
+**STEP 4's ORIGINAL GATE WAS FALSE AGAINST THE CORRECT TEXT (probe, Critical).**
+It read *"the zsh remedy does not contain `history -d`"*. `me`'s refusal **does**
+contain that literal string — deliberately, in the sentence warning that it does
+not delete (`crates/me-cli/src/main.rs:2017`). So the gate goes **RED against
+the correct donor**, and the only way to make it green is to **delete the
+warning** — re-creating the exact defect this plan cites to disqualify `mt`'s
+text.
+
+**The codebase already documented the trap**, in the donor's own test file:
+
+> *"NOT `!err.contains("history -d")` — the message deliberately NAMES that
+> command in order to warn against it, so the naive negative fails on the
+> warning itself. The requirement is that it is never OFFERED."*
+> — `crates/me-cli/tests/sysw_cli.rs:2080`
+
+**The gate was written without reading it.** The requirement is *never offered*,
+which is a different assertion from *never mentioned*.
+
+The fish half — *"does not contain the secret"* — is a **tautology**: `me`'s
+remedy is static text with the secret never in scope, so it passes for any
+string. A gate that cannot fail is not a gate.
+
+**Condition 5 IS satisfiable** — the probe wrote it, 8 tests, control and
+mutation both verified — **and running it found a live defect in `me`**, filed
+as **F-264**. That is the argument for condition 5 in one line: the test was
+worth writing because it failed.
+
 **`records.rs` — the PRE-PARSER argv guard (C2).** Two layers, both running on
 raw `std::env::args()` **before `Cli::parse()`**:
 
@@ -444,11 +496,11 @@ Each step is RED first. No step begins until the previous is green.
 | 1 | move the 11 into `me`'s lib half **intact — including the mask**, no behaviour change | **388 RUN, 388 passed, 1 skipped** (the run count, not the 389 `#[test]` attributes — N1). **The move necessarily edits 2 of them**, which the gate's earlier wording did not allow for; enumerate the diff to those two and justify each; `main.rs` shrinks by ~431 lines. **PLUS a pty assertion pinning the terminal arm (I1)** — see below |
 | 2 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 regular file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` returns `None`; `me`'s end-to-end behaviour is **still** unchanged |
 | 3 | `observation.rs` — types | a payload kind cannot be constructed from a permission bool (**F-259 cannot recur**) |
-| 4 | `remedy.rs` | zsh remedy does **not** contain `history -d`; fish remedy does **not** contain the secret |
+| 4 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it (see below); and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry |
 | 5 | `records.rs` layer 1 — **pre-parser** flag-name guard on raw argv | **`me` ships NO secret-bearing flag**, so the RED gate cannot be an end-to-end refusal in the donor. It is a unit test on the crate's flag-name table plus a lockstep parity assertion against `mnemonic-toolkit`'s `NodeType::is_argv_secret_bearing`, whose flags DO exist |
 | 5b | `records.rs` layer 2 — value-shape, additive | the argv gate refuses by class, with the override, **as unit tests** (§2.4); `me sysw pack --nosuchflag <ms1…>` still does not echo the secret |
 | 5c | `--expect <kinds>` — the flag and the vocabulary | `--expect descriptor,transaction` **refuses a stream with no transaction**, and **refuses an incomplete `md1` set** (§6g). Both fail today: the flag does not exist |
-| 6 | `channel.rs` + `exit.rs` | `--out` overwrites; `-` reads stdin; codes match §6f |
+| 6 | **`exit.rs` FIRST, then `channel.rs`** (probe I-3 — the step-1 ordering shape, one file over) | `--out` overwrites; **`-` is IMPLEMENTED, not "accepted and ignored"**; every code `me` produces today is reproduced **byte-for-byte**, differentially, not by matching §6f |
 | 7 | `me` consumes the crate | all 388 tests pass, **with the diff to them enumerated and each edit justified by a named finding** — the shape §7 P1 already uses for `mt` |
 | 8 | publish `0.1.0` | **irreversible — §5** |
 

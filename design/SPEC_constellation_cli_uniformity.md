@@ -1027,7 +1027,7 @@ is deliberately not quoted: it changed when a row moved, and a pointer naming
 | `ms` | 64 | 1 | **4** | 2 |
 | `mt` | 2 | 1 | n/a | n/a |
 | `mnemonic` | 64 | **1 or 2 — by input shape (see below)** | **4** | **2** |
-| `me` | 2 | 4 = unplaceable record; 2 = terminal refusal | n/a | n/a |
+| `me` | 2 | 4 = unplaceable record; 2 = terminal refusal; **3 = policy refusal (`EXIT_REFUSED`)** | n/a | n/a |
 
 **`mnemonic`'s two remaining cells are now measured too**, with the verb each
 was taken from, because a cell without one is what §6f already had to retract.
