@@ -11828,3 +11828,44 @@ must be *"no `ms1` in stderr for an argv clap would reject"*, asserted across
 **`mt` is NOT affected** — checked, not assumed: its guard sits on
 `std::env::args()` and runs before `Cli::parse()`, which is exactly why this
 repo's spec cites it as the reference for the ordering.
+
+### F-267 — a secret embedded in a PATH reaches stderr, and no argv guard can catch it (owning phase: **post-P0**, documentation) `#me` `#security` `#residue`
+
+**Found 2026-08-27** by R0 round 10, as the honest residue of P0's argv guard.
+`me sysw pack --in /tmp/<ms1>.txt` leaks on five measured invocations, and
+`classify()` correctly calls that token **`Unknown`** — because it *is* a
+filename.
+
+**Refusing it would refuse every legitimate path.** A guard that rejects any
+token containing an HRP substring rejects `~/backups/ms1-recovery-notes.txt`,
+which is a file the operator deliberately named. **This is not fixable by
+classification**; the token is a path, and the secret is in the operator's own
+naming choice.
+
+**So P0's gate says "as a token", not "anywhere in argv"** — the narrower claim
+is the true one, and an earlier draft promised the wider one it could not keep.
+
+**What would actually help** is documentation, not a refusal: say plainly that a
+filename containing key material puts that material in shell history, `/proc`,
+and any error message naming the path. That belongs with the purge guidance, not
+in a guard.
+
+### F-268 — the flag-name argv layer is normative in §6d and built by nobody (owning phase: **after P0**) `#constellation` `#security`
+
+**Filed 2026-08-27.** Spec §6d calls the flag-name layer **the primary layer**
+and assigns the union to P0. P0 builds the **value scan** — every token
+classified, five argv-forbidden classes — and **does not build the flag-name
+layer**, because `me` declares no flag that carries secret material, so it has
+no failing gate in this donor.
+
+**That is a fact about `me`, not a reason the layer is unnecessary.** §6d's own
+example is a `--passphrase <arbitrary text>` flag: **a flag can carry material no
+shape test recognises.** The value scan does not dominate it.
+
+**Nothing in the constellation has a pre-parser guard today** — `env::args` and
+`args_os` are **0** in `mnemonic-toolkit` as well as in `me`. So this is not a
+gap P0 opens; it is one P0 declines to close, deliberately and in writing.
+
+**Owning phase: whichever cycle first adds a secret-bearing flag to any m-format
+CLI.** At that moment the layer stops being theoretical, and this entry is what
+stops it being rediscovered.
