@@ -11661,3 +11661,49 @@ alongside `ErrUnsignedInputs` (the payload path at :479 already proves the data
 exists at that point), populate `unsigned` on the mt1-set candidate at :441, and
 let `transactionReviewLines` take the same unsigned branch both paths deserve.
 **Rewording line 831 alone would replace a false sentence with a vague one.**
+
+### F-263 — worktree hygiene: the branch outlives the tree, and the wrapper outlives both (owning phase: **standing discipline**) `#housekeeping` `#process`
+
+**Established 2026-08-27** at the operator's direction — *"Do not lose track of
+worktrees. We don't want dangling trees after merge."* — after one session
+created **seven** of them.
+
+**`git worktree remove` is only one third of the cleanup**, and the two thirds
+it leaves behind are silent:
+
+| what remains | how it shows up |
+| --- | --- |
+| the **branch** | `git branch --list` — 12 were found, six from cycles already closed |
+| the **parent wrapper** | an empty dir `git worktree list` no longer knows about — 14 were found |
+| the **registration**, if the dir was deleted by hand | `git worktree prune` |
+
+**The three-step ritual, in order:**
+
+```sh
+git worktree remove --force <path>     # 1. the tree
+git branch -D <branch>                 # 2. the branch  <-- the forgotten one
+rmdir <parent>                          # 3. the wrapper
+git worktree prune                      # 4. any stale registration
+```
+
+**Never step 2 before verifying the work reached `master`.** The check that
+matters is not "is the report committed" but **what does this branch ADD that
+master lacks**:
+
+```sh
+git diff --name-only --diff-filter=A master..<branch>
+```
+
+`<nothing>` means safe. Eleven of twelve returned exactly that; the twelfth held
+a probe's throwaway `io.rs`, disposable by design. **`git branch -d` will not
+help here** — a review branch's persist commit is never an ancestor of `master`
+when the controller lands the report by checking the file out, so `-d` refuses
+every one of them and the safety it offers is illusory.
+
+**Sweep the whole constellation, not one repo.** Worktrees were registered in
+five: `mnemonic-engrave`, `mnemonic-transaction`, `mnemonic-key`,
+`mnemonic-toolkit` (under `.claude/worktrees/`) and `seedhammer`. A per-repo
+`git worktree list` misses the other four.
+
+**Related:** [[F-256]] is the disk half of this. The trees themselves are small;
+what makes them expensive is each carrying its own `target/`.
