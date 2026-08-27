@@ -343,6 +343,49 @@ Kept as a note rather than deleted, because it is the second branch-relative
 claim this spec has had to retract — a statement whose truth depends on which
 commit you are standing on does not belong in a spec.)*
 
+### 5b. The four verbs, decided (operator, 2026-08-26)
+
+**`encode`, `decode`, `verify` and `inspect` live in every `m*-cli` binary.
+They are basic m-string manipulations.**
+
+That is the operator's wording, and the second sentence is the load-bearing half:
+it gives the **criterion**, not just the placement. A verb belongs in an encoding
+binary when it is a basic manipulation of an `m*1` string — parse it, emit it,
+check it, describe it. Anything that is not is a different tier's work.
+
+**This is already true and is now an invariant rather than a coincidence.**
+Measured across the four encoders:
+
+| binary | has all four? | verbs beyond the four |
+| --- | --- | --- |
+| `mt` | yes | **none** |
+| `md` | yes | `bytecode` `vectors` `compile` `descriptor` `address` `repair` `gui-schema` `gen-man` |
+| `mk` | yes | `vectors` `address` `derive` `repair` `gui-schema` `gen-man` |
+| `ms` | yes | `derive` `split` `combine` `vectors` `repair` `gui-schema` `gen-man` |
+
+**Two consequences follow, and only the first is settled.**
+
+**Settled:** the four are uniform across all four binaries — same names, same
+semantics, same channels, same exit codes. That is this spec's whole subject, and
+§6's tables now have a decided scope rather than an assumed one. A binary missing
+one of the four, or spelling it differently, is a defect. **P0's gate asserts all
+four exist on all four**, which is cheap and currently passes.
+
+**NOT settled, and explicitly out of this cycle:** whether the verbs in the right
+column belong where they are. `mt` carries exactly the four and is the shape the
+criterion describes; `md`, `mk` and `ms` have each accreted work that reads as
+fancy-processing tier — `split`/`combine` is secret sharing, `compile`/
+`descriptor`/`bytecode` is miniscript processing, `derive` is key derivation, and
+`repair` is duplicated in the toolkit as well. **Whether those move is the tier
+cycle's question, not this spec's**, and it is recorded here so that cycle starts
+from a measurement instead of an impression.
+
+**The shared crate holds none of these verbs.** It holds what sits underneath
+them — `--in`/`--out`/`-`, the argv guard, the write gate, the exit-code table,
+the shell-purge remedy text. `mt encode` stays `mt encode`; only the plumbing it
+calls becomes common. Recorded because "shared crate" reads like somewhere things
+get moved to, and nothing moves.
+
 ## 6. The surface, after
 
 ### 6a. Which verbs the stdout rule binds
@@ -1042,7 +1085,7 @@ override is scoped to the posture pair and to nothing else.
 
 | phase | content | gate |
 | --- | --- | --- |
-| **P0** | the shared crate: `--in`/`--out`/`-`, argv guard with pre-parser ordering, write gate, exit codes, remedy text per §6h (**from `me` ALONE — `mt`'s zsh branch is superseded, §6d**), **and `me sysw pack --expect` in full — the kind vocabulary, the flag, and §6g's refusal on an incomplete chunk set of a named kind (I-6)**. Extracted FROM `me`; `mt`'s purge text is NOT a source. Plus the distribution mechanism below. | its own tests + an R0 round closing 0C/0I + **§6f's `mnemonic` invalid-artifact cell re-measured under a verb that EXISTS — `inspect`, not `decode` (I-3)** + the in-memory-history question of §6h measured + **`--expect descriptor,transaction` REFUSES a stream missing a transaction, and REFUSES an incomplete `md1` set, both asserted** |
+| **P0** | the shared crate: `--in`/`--out`/`-`, argv guard with pre-parser ordering, write gate, exit codes, remedy text per §6h (**from `me` ALONE — `mt`'s zsh branch is superseded, §6d**), **and `me sysw pack --expect` in full — the kind vocabulary, the flag, and §6g's refusal on an incomplete chunk set of a named kind (I-6)**. Extracted FROM `me`; `mt`'s purge text is NOT a source. Plus the distribution mechanism below. | its own tests + an R0 round closing 0C/0I + **§5b's invariant asserted: `encode`, `decode`, `verify` and `inspect` all present on `md`, `mk`, `ms` and `mt` (16 checks; verified passing 2026-08-26)** + **§6f's `mnemonic` invalid-artifact cell re-measured under a verb that EXISTS — `inspect`, not `decode` (I-3)** + the in-memory-history question of §6h measured + **`--expect descriptor,transaction` REFUSES a stream missing a transaction, and REFUSES an incomplete `md1` set, both asserted** |
 | **P1** | `mt` adopts the crate, and gains `--out` (§6b), `--allow-argv-secret` (§6d), **and `-` on `decode`, `verify` and `inspect` — F-250 fixed `encode` ALONE, and the other three still exit 2 (I-3)**. | `mt`'s 237 tests pass, **with the diff to them enumerated and each edit justified by a named §6 ruling** + **`mt decode -`, `mt verify -` and `mt inspect -` each read stdin at exit 0** |
 | **P2** | `ms` FIRST `--in` on all eight verbs, THEN the argv refusal, THEN the 0600 `--out`, **THEN `--group-size 0` as the stdout default and the whitespace-only separator (I-1) — §3's decisive measurement is `ms`'s and belonged to no phase**. Plus this repo's journey drivers. **Highest safety value; do it before the cosmetic work.** | round-trip vectors; **`ms encode --phrase <a BIP-39 phrase>` REFUSES for the argv reason and `--allow-argv-secret` proceeds (I-5)**; **`ms encode --in <file>` piped into `me sysw pack` runs with NO flags and exits 0 (I-1)**; the 18 argv call sites migrated; `me`'s remedy text still naming only channels that exist |
 | **P3** | `md`, `mk` header off stdout, grouping to stderr, `--in`/`--out`, **and `mk`'s invalid-artifact 2 → 1, which §6f calls the only code this cycle changes and which no phase owned (I-4)**. Plus `mnemonic`'s grouping surface AND its argv refusal across all five of its secret-material channels (`bundle`, `convert`, `derive-child`, `restore --passphrase`, `electrum-decrypt --decrypt-password`), and the GUI mirror. Plus golden regeneration. | `md encode` into `me sysw pack` runs with **no flags and no grep, on a CHUNKING policy**; **`mk` on an invalid artifact exits 1, and `mk encode` piped into `me sysw pack` runs with no flags**; `mnemonic-gui`'s schema mirror regenerated; the 7 goldens regenerated; **`mnemonic`'s refusal keyed on its EXISTING `is_argv_secret_bearing` predicate (not a second implementation), with the five named channels asserted as spot checks** |
