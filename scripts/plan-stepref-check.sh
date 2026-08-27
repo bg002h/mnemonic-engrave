@@ -17,7 +17,9 @@
 # A negative inherits the scope of the search that produced it.
 #
 # COVERED since round-5 I-5: prose INSIDE a table cell, spelled-out numerals
-# (`step three`), and bare row ids (`Row 9b`). The row's own number is exempt.
+# (`step three`), bare row ids (`Row 9b`), and ORDINALS (`the 3rd step`, `the
+# third step`) -- the last of which a commit message once claimed were covered
+# when a planted probe showed they were not. The row's own number is exempt.
 #
 # NOT COVERED: a reference by NAME that has gone stale ("the move" pointing at a
 # row that no longer does the moving). That class is real -- round 4's C-2 was
@@ -40,14 +42,18 @@ for f in "$@"; do
       $probe =~ s/^\s*\|\s*\d+[a-z]?\s*\|// if $l[$i] =~ /^\s*\|/;
       if ($probe =~ /\bsteps?\s*-?\s*\d+[a-z]?/i
        || $probe =~ /\bsteps?\s+(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i
-       || $probe =~ /\brows?\s+\d+[a-z]?\b/i) { printf "%d:%s\n", $i+1, $l[$i]; }
+       || $probe =~ /\brows?\s+\d+[a-z]?\b/i
+       || $probe =~ /\b\d+(?:st|nd|rd|th)\s+step\b/i
+       || $probe =~ /\b(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)\s+step\b/i) { printf "%d:%s\n", $i+1, $l[$i]; }
     }' "$f")
   if [ -n "$hits" ]; then
     echo "$hits" | while IFS= read -r h; do
       echo "  STEP NUMBER IN PROSE  line ${h%%:*}"
       echo "     ${h#*:}" | cut -c1-96
     done
-    bad=$((bad + $(echo "$hits" | grep -c .)))
+    # Count DISTINCT lines. The wrap-join probe reports a hit on both the line
+    # carrying the reference and the one before it, so a raw count doubles.
+    bad=$((bad + $(echo "$hits" | cut -d: -f1 | sort -u | grep -c .)))
   fi
 done
 echo

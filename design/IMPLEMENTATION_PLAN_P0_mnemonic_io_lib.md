@@ -281,10 +281,36 @@ guard downstream of the parser has already lost. **The override's own parse must
 also run pre-parser**, or `--allow-argv-secret` cannot be honoured without
 parsing the very argv the guard exists to protect.
 
-**`me` does not currently leak this way** — verified 2026-08-26,
-`me sysw pack --nosuchflag <ms1…>` exits 2 naming only the flag, with the secret
-absent from stderr. **That is the behaviour to preserve, and it is not the same
-as having the pre-parser guard**; P0 must not regress it while adding one.
+**`me` DOES leak this way, on four of six surfaces — F-266, reproduced with a
+real fixture secret:**
+
+```
+me <ms1>            rc=2  SECRET IN STDERR
+me bundle <ms1>     rc=2  SECRET IN STDERR
+me sysw wipe <ms1>  rc=2  SECRET IN STDERR
+me sysw show <ms1>  rc=2  SECRET IN STDERR
+me sysw pack <ms1>  rc=3  clean — the only surface taking a positional
+```
+
+`grep -c 'env::args'` over `crates/me-cli/src/main.rs` → **0**. Nothing runs
+before `Cli::parse()`, so every surface without a positional lets clap name the
+value.
+
+**An earlier draft asserted the opposite**, on the strength of a single probe —
+`me sysw pack --nosuchflag <ms1…>` — which is the one invocation that
+structurally cannot leak, because the added flag makes clap name the *flag*
+instead of the value. **A negative inheriting a scope of one, and the one chosen
+was the exception** (round-6 C-1).
+
+**So the observable must be one that can FAIL TODAY**: *no `ms1` appears in
+stderr* asserted across **every surface** — bare `me`, `bundle`, `sysw wipe`,
+`sysw show`, `sysw pack` — not the single probe. The old observable was green on
+the untouched tree, which made the gate for §6d's ordering unfailable and let
+condition 8 be discharged with the guard absent.
+
+**And the leaking cases are UNEXPECTED POSITIONALS, not declared flags** — so
+they are the **value-shape** layer's business, not the flag-name layer's. `me`
+declares no secret-bearing flag at all.
 
 **`--expect` — THE KIND VOCABULARY, enumerated (C3).** `me sysw pack --expect
 <kinds>` does not exist yet and is P0's content:
@@ -475,7 +501,7 @@ crossing — **under Variant B they do NOT cross**, and citing them here pointed
 the implementer straight at the forbidden publish (round-2 I-1). **The move**
 enumerates the real set against the five-function move, in both directions. **Guessing at a closure
 is what this plan exists to replace.** **The move must enumerate every type and
-constant the 11 reference and confirm each is either moved or **reachable
+constant the moving set reference and confirm each is either moved or **reachable
 WITHOUT an inherent impl in the crate** — "already public" is NOT sufficient
 and is precisely what let N-C2 through: `Class` is public, and an inherent
 impl on it still cannot compile outside `me`** —
@@ -512,8 +538,8 @@ Each step is RED first. No step begins until the previous is green.
 | 4 | `observation.rs` — the payload-kind type **and its pty assertion** | **the assertion is the gate, not the type**: `script -qec 'me sysw wipe --fill zeros'` must NOT emit the word BEARER, asserted on the **emitted words**, pinning the **exit digit** (F-265: `!success()` cannot fail here). Mutation-checked in both directions |
 | 5 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it; and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry. **Blocked on F-264** — see §6 condition 9 |
 | 6 | `records.rs` layer 1 — **pre-parser** flag-name guard on raw argv, **AND `me`'s `--allow-argv-secret` moved off clap** | **the observable is that no `ms1` appears in stderr for an argv clap would otherwise reject** — that is what pre-parser ordering means from outside, and it is the only gate here whose whole content is an ordering claim (round-3 M-7). Asserted end-to-end in the donor, not only as a crate unit test (round-1 N-I3); toolkit parity against `NodeType::is_argv_secret_bearing` in addition, never instead. **`--allow-argv-secret` must still PARSE afterwards** — it is a clap field today (`crates/me-cli/src/main.rs:252`, consumed at `:1116` and `:1127`), and moving the decision off clap without leaving the flag declared turns a valid invocation into a usage error, regressing the very flag P0 is told not to regress |
-| 7 | `records.rs` layer 2 — value-shape, additive | the argv gate refuses by class, with the override, **as unit tests**; `me sysw pack --nosuchflag <ms1…>` still does not echo the secret |
-| 8 | `--expect <kinds>` — the flag and the vocabulary | `--expect descriptor,cosigner` **refuses an `md1`-only payload**; `--expect descriptor,transaction` refuses a stream with no transaction; **refuses an incomplete `md1` set AND an incomplete `mt1` set** (three walks, §6g); `--allow-unsigned-inputs --expect transaction` **does NOT falsely refuse** |
+| 7 | `records.rs` layer 2 — value-shape, additive. **This is the layer F-266's leaks belong to** — they are unexpected positionals, not declared flags | the argv gate refuses by class **pinning the exit digit**, with the override, **as unit tests**; **no `ms1` in stderr across ALL surfaces** — bare `me`, `bundle`, `sysw wipe`, `sysw show`, `sysw pack` — which fails on today's tree; `me sysw pack --nosuchflag <ms1…>` still does not echo the secret |
+| 8 | `--expect <kinds>` — the flag and the vocabulary | **every refusal below pins its exit DIGIT** (round-6 I-2 — `--expect` is P0's newest funds-path refusal and nothing pinned its code): `--expect descriptor,cosigner` **refuses an `md1`-only payload**; `--expect descriptor,transaction` refuses a stream with no transaction; **refuses an incomplete `md1` set AND an incomplete `mt1` set** (three walks, §6g); `--allow-unsigned-inputs --expect transaction` **does NOT falsely refuse** |
 | 9 | **`exit.rs` FIRST, then `channel.rs`** | **`--out` overwrite is asserted where it LIVES — `write_private`, which stays in `me`** (round-3 M-3); `channel.rs` holds only `destination`, so gating the overwrite on it would gate nothing. **`-` is IMPLEMENTED**; every code `me` produces today reproduced **byte-for-byte**, differentially against the pre-change binary — not by matching a table |
 | 9b | **CREATE `mnemonic-io-lib` and move the lib-half modules into it.** Until here everything lives in `me`'s lib half; this is the crate boundary, and it is a step because no earlier one created it (round-3 M-4). | the crate builds standalone; `me` depends on it by path; **no `EXIT_*` and no `Class` in it** |
 | 10 | `me` consumes the crate | **the 388 pre-existing tests still pass, plus every test added along the way** — an earlier draft said "all 388", which is wrong by construction once the intervening work adds tests (round-3 M-5); **with the diff to them enumerated and each edit justified by a named finding** |
@@ -538,7 +564,7 @@ the private `Destination`/`WriteBlock` enums, and the `use super::` in
 
 **I1 — THE MOVE'S GATE CANNOT FAIL FOR THE TERMINAL ARM, so it is not left as the
 only proof.** "The 388 still pass" is green whether or not the terminal refusal
-survives the move — and the terminal arm is one of the 11, and the one carrying
+survives the move — and the terminal arm is one of the moving set, and the one carrying
 F-259's funds-adjacent behaviour. **All 12 tests in
 `crates/me-cli/tests/world_readable_output.rs` redirect to files, so none of them
 reaches it.** **The move** therefore carries a **pty assertion** pinning the refusal
@@ -569,7 +595,7 @@ const EXIT_REFUSED: i32 = 3;  const EXIT_INVALID: i32 = 4;
 refusals return, and an earlier draft omitted it from every enumeration here
 while leaning on those enumerations being exhaustive (round-3 M-1).
 
-A lib module cannot see a binary's items, so moving the 11 into the lib half
+A lib module cannot see a binary's items, so moving the moving set into the lib half
 **requires publishing them** — and an *"intact, no behaviour change"* move
 forbids the signature change that would avoid it. So the move as first written
 necessarily commits **`pub const EXIT_USAGE: i32 = 2`** into the donor's public
@@ -667,9 +693,9 @@ before publishing; do not trust a check from an earlier session.
 ## 6. WHAT MUST BE TRUE TO CLOSE P0
 
 1. All of `me`'s tests pass, unchanged in meaning.
-2. **§5b's invariant**: `encode`, `decode`, `verify`, `inspect` present on `md`,
+2. **(assertion, not work — no step builds it; it is checked, not created)** **§5b's invariant**: `encode`, `decode`, `verify`, `inspect` present on `md`,
    `mk`, `ms`, `mt` — **16 checks**, passing as of 2026-08-26.
-3. **§6f's `mnemonic` invalid-artifact cell re-measured under a verb that
+3. **(assertion, not work — checked, not created)** **§6f's `mnemonic` invalid-artifact cell re-measured under a verb that
    EXISTS** — `inspect`, not the non-existent `decode` whose 64 was clap's
    unrecognised-subcommand code. Expect **2** for a bad HRP, **1** for an `md1`
    HRP that fails to decode.
@@ -739,21 +765,23 @@ before publishing; do not trust a check from an earlier session.
    recipe removes nothing when run immediately — the entry is still in memory
    and `sed -i` edits a file that does not contain it. **That gate demands the
    recipe actually work**, so P0 either fixes the recipe (`fc -W`, edit, `fc -R`)
-   **The remedy must make the recipe WORK** — flush, edit, reload (`fc -W`, `sed
-   -i`, `fc -R`). Merely rewording the message to say "exit the shell first"
+   **The remedy must make the recipe WORK** — flush, edit, reload (`fc -W`, `sed -i`, `fc -R`). Merely rewording the message to say "exit the shell first"
    is honest but **cannot make the gate green**, and under "no step begins
    until the previous is green" that would stall everything after it
    (round-3). If the recipe genuinely cannot be made to work, that is a
    finding to raise, not a wording to settle for. Owning phase in `FOLLOWUPS.md` is already P0.
 10. **F-265 fixed at ALL FIVE SITES, with a step that does it.** All five stay in
    `me` — `refuse_write_block` ×2, `read_records` ×2, `emit` — so this is work P0
-   does **in the donor**. An earlier draft asserted both that they stay and that
-   "P0 moves these functions" four lines apart, while no step edited any of them,
-   so the condition could not close (round-5 I-2). Five refusals can swap exit
+   does **in the donor**, and **the table carries a step that edits all five** —
+   an earlier draft scheduled only site #1 and left four unscheduled, while a
+   sentence three lines below still said P0 moves these functions, which is the
+   opposite of what this condition rests on (round-6 I-1). Five refusals can swap exit
    **2 for 3** with all 388 tests green, proven against the unmodified binary.
-   P0 moves these functions, and **a refactor over an untested distinction is
-   how the distinction dies.** Every gate in §4 that asserts a refusal pins the
-   **digit**.
+   **P0 touches all five while extracting their neighbours**, and a refactor
+   over an untested distinction is how the distinction dies. **Every gate in §4
+   that asserts a refusal pins the digit** — including `--expect`'s, which is
+   P0's newest funds-path refusal and whose exit code was pinned by nothing
+   (round-6 I-2).
 11. An R0 round closing **0C/0I**.
 
 ---
