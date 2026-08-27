@@ -267,9 +267,17 @@ mutation both verified — **and running it found a live defect in `me`**, filed
 as **F-264**. That is the argument for condition 5 in one line: the test was
 worth writing because it failed.
 
-**`records.rs` — the PRE-PARSER argv guard, ONE layer in this donor (C2, and
-round-7 C-1).** It runs on raw `std::env::args()` **before `Cli::parse()`** and
-recognises material by **value shape**: `tx:` by prefix, `mt1`/`ms1` by HRP, a
+**THE PRE-PARSER argv GUARD LIVES IN `me`, NOT IN THE CRATE (round-10 C-1).**
+It asks `me`'s own classifier, and `me` depends on the crate — so siting it in
+`records.rs` is a cycle, and it would also break the crate's own rule that
+**nothing in it ever names a `Class` variant**. `records.rs` keeps stream
+shaping; the guard is the donor's.
+
+**What the guard does (C2, round-7 C-1):** It runs on raw `std::env::args()` **before `Cli::parse()`** and
+recognises material by asking `me`'s own `classify()` and refusing anything
+`Class::is_argv_forbidden()` accepts — **five** classes, `pass:` included. An
+earlier draft here listed four shapes by hand and was short by one (round-9
+C-1); the classifier defines the set so there is no list to be short. A
 BIP-39 mnemonic by wordlist.
 
 **§6d MAKES THE FLAG-NAME LAYER PRIMARY AND ASSIGNS THE UNION TO P0** (spec
@@ -279,7 +287,11 @@ it, and justified that by claiming the value scan dominated it — which
 material no shape test recognises.** That justification was wrong
 (round-9 I-2).
 
-**P0 builds both, and the value scan is not a substitute.** The classifier scan
+**P0 builds the value scan; the flag-name layer is FILED, not built (F-268).** An
+earlier draft promised P0 would build the flag-name layer too, then scheduled no
+row, no condition and no
+follow-up for it — a promise with nothing behind it (round-10 I-3). The honest
+position: The classifier scan
 catches everything that *looks* like an artifact; the flag-name layer
 catches what a declared secret-bearing flag carries regardless of shape. **`me`
 declares no such flag today**, so the flag-name layer has no failing gate *in
@@ -471,12 +483,12 @@ six; without this table a reader cannot tell where a function lands:
 | --- | --- |
 | `channel.rs` | `destination` — classification only (N-I1) |
 | `fd.rs` | `stdout_world_readable_mode` (**split**, C1), its `cfg(not(unix))` stub |
-| `records.rs` | `split_record_stream`, `no_records_guard`, the string-level recognisers (prefix / HRP / wordlist), and the pre-parser argv machinery |
+| `records.rs` | `split_record_stream`, `no_records_guard` — **stream shaping only** |
 | `observation.rs` | the payload-kind and mode types (F-259, F-260) |
 | `exit.rs` | `write_block` — the DECISION only (N-I1) |
 | `remedy.rs` | the purge/remedy text |
 | `lib.rs` | re-exports only |
-| **stays in `me`** | `is_secret`, `is_bearer`, `is_argv_forbidden`, and **`read_records` WHOLE** — not just its class-keyed arm (round-3 C-2) |
+| **stays in `me`** | `is_secret`, `is_bearer`, `is_argv_forbidden`, **`read_records` WHOLE**, and **the entire pre-parser argv guard** — it calls `classify()`, so putting it in the crate while `me` depends on the crate is a **cyclic package dependency**, reproduced as `error: cyclic package dependency` (round-10 C-1) |
 | **stays in `me`** | **every `refuse_*`** — `refuse_write_block`, `refuse_terminal_destination`, `refuse_world_readable_stdout` (N-I1) |
 | *(caller-side)* | `emit`, `write_private` — see below |
 
@@ -513,7 +525,7 @@ the irreversible step, with the adoption gate written to accept it under a citat
 **That is C1's shape, one file over.**
 
 **So the split is by REPRESENTATION.** The crate's recognisers work on strings —
-a `tx:` prefix, an HRP character, a BIP-39 word — and return the crate's **own**
+**the crate holds no recognisers at all** — classification is the donor's, and the crate's**
 kind type. `me` maps that kind onto its `Class` and keeps the three predicates.
 Nothing in the crate ever names a `Class` variant.
 
@@ -565,7 +577,7 @@ Each step is RED first. No step begins until the previous is green.
 | 3 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` → `None`; `me`'s behaviour still unchanged |
 | 4 | `observation.rs` — the payload-kind type **and its pty assertion** | **the assertion is the gate, not the type**: `script -qec 'me sysw wipe --fill zeros'` must NOT emit the word BEARER, asserted on the **emitted words**, pinning the **exit digit** (F-265: `!success()` cannot fail here). Mutation-checked in both directions |
 | 5 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it; and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry. **Blocked on F-264** — see §6 condition 9 |
-| 6 | **The argv guard scans every token of `std::env::args()` before `Cli::parse()` and asks `me`'s OWN classifier** — `classify(token)` then `Class::is_argv_forbidden()`, the union of `is_secret()` and `is_bearer()`, **five** classes (`crates/me-cli/src/sysw/record.rs:105`). **It does not invent a recogniser.** Two earlier drafts enumerated first surfaces and then shapes; both lists came up short — the shape list missed `Class::Passphrase`, the `pass:` record, which `me` refuses at rc 3 as *SECRET key material on ARGV* and which leaks bare (round-9 C-1). A classifier DECODES rather than prefix-matches, so `mt1-2026-08-23-transfer.txt` classifies as a filename and is not refused (round-9 I-1). `=`-joined tokens are split first. **`--allow-argv-secret` still overrides, and its own parse runs here** (round-9 I-3). | **no secret material in stderr for ANY argv containing some** — a generated cross-product of `{bare, bundle, sysw, sysw pack, sysw show, sysw wipe, help, sysw help}` × `{positional, --in X, --in=X}` × **every argv-forbidden class, `pass:` included** — not a hand list on any axis. Fails today. **Plus a real ORDERING test**: `me --nosuchflag <ms1>` must exit via the GUARD (rc 3, its wording) and not via clap (rc 2, naming the flag). That distinguishes pre- from post-parse without needing to modify non-test code (round-9 I-4). **Plus POSITIVE CONTROLS, without which a refuse-everything guard passes every row** (round-9 M-4 — `fn guard(_) -> ! { exit(3) }` satisfies absence-of-secret and the ordering test alike): a filename containing an HRP is **packed, not refused**; `me bundle` and `me help` still work — **both are BIP-39 words**, so a per-token wordlist match would refuse them (round-9 M-2); and a legitimate `text:` record packs. **Granularity is the classifier's: a single word is not a mnemonic**, which is why reusing it settles M-2 and M-3 rather than needing a new rule |
+| 6 | **The argv guard scans every token of `std::env::args()` before `Cli::parse()` and asks `me`'s OWN classifier** — `classify(token)` then `Class::is_argv_forbidden()`, the union of `is_secret()` and `is_bearer()`, **five** classes (`crates/me-cli/src/sysw/record.rs:105`). **It does not invent a recogniser.** Two earlier drafts enumerated first surfaces and then shapes; both lists came up short — the shape list missed `Class::Passphrase`, the `pass:` record, which `me` refuses at rc 3 as *SECRET key material on ARGV* and which leaks bare (round-9 C-1). A classifier DECODES rather than prefix-matches, so `mt1-2026-08-23-transfer.txt` classifies as a filename and is not refused (round-9 I-1). `=`-joined tokens are split first, **and every token is TRIMMED AND LOWERCASED before classification** — `classify()` does neither, so ` TX:<hex>`, `TX:<hex>` and uppercase `MS1…` all return `Unknown` and leak, measured on 4 and 2 surfaces respectively. The donor's shipped post-parse gate already does trim+lowercase and its comment says why; the pre-parser guard must not be weaker (round-10 I-1). **`--allow-argv-secret` still overrides, its own parse runs here, and the gate asserts it** (round-9 I-3, round-10 I-4): `me sysw pack --allow-argv-secret <ms1>` must still exit **0**, which it does today — so the guard failing to carve it out is a regression the gate catches. | **no secret material in stderr for any argv carrying it AS A TOKEN** — a generated cross-product of `{bare, bundle, sysw, sysw pack, sysw show, sysw wipe, help, sysw help}` × `{positional, --in X, --in=X}` × **every argv-forbidden class, `pass:` included** — not a hand list on any axis. Fails today. **Plus a real ORDERING test**: `me --nosuchflag <ms1>` must exit via the GUARD (rc 3, its wording) and not via clap (rc 2, naming the flag). That distinguishes pre- from post-parse without needing to modify non-test code (round-9 I-4). **Plus POSITIVE CONTROLS, without which a refuse-everything guard passes every row** (round-9 M-4 — `fn guard(_) -> ! { exit(3) }` satisfies absence-of-secret and the ordering test alike): a filename containing an HRP is **packed, not refused**; `me bundle` and `me help` still work — **both are BIP-39 words**, so a per-token wordlist match would refuse them (round-9 M-2); and a legitimate `text:` record packs. **Granularity is the classifier's: a single word is not a mnemonic** (round-9 M-2). **A secret EMBEDDED IN A PATH is out of reach and the plan says so** — `--in /tmp/<ms1>.txt` classifies as `Unknown` because it IS a filename, and refusing it would refuse every legitimate path; that residue is filed as **F-267**, not papered over (round-10 I-2) |
 | 7 | **F-265: pin the exit digit at ALL FIVE sites** — `refuse_write_block` ×2 (Terminal, WorldReadable), `read_records` ×2 (`--in` error, stdin error), `emit` (write failure). All five stay in `me`; this is donor work, and an earlier draft scheduled only site #1 while claiming the table covered all five (round-7 I-1). | each of the five, mutated 2→3 **in the shipped code**, turns the suite RED — proven today to leave it green at 388/388 with the line executing. `!success()` cannot discharge this |
 | 8 | `--expect <kinds>` — the flag and the vocabulary | **every refusal below pins its exit DIGIT** (round-6 I-2 — `--expect` is P0's newest funds-path refusal and nothing pinned its code): `--expect descriptor,cosigner` **refuses an `md1`-only payload**; `--expect descriptor,transaction` refuses a stream with no transaction; **refuses an incomplete `md1` set AND an incomplete `mt1` set** (three walks, §6g); `--allow-unsigned-inputs --expect transaction` **does NOT falsely refuse** |
 | 9 | **`exit.rs` FIRST, then `channel.rs`** | **`--out` overwrite is asserted where it LIVES — `write_private`, which stays in `me`** (round-3 M-3); `channel.rs` holds only `destination`, so gating the overwrite on it would gate nothing. **`-` is IMPLEMENTED**; every code `me` produces today reproduced **byte-for-byte**, differentially against the pre-change binary — not by matching a table |
