@@ -47,6 +47,11 @@ half:**
 | `stdout_world_readable_mode` | 25 | | |
 | `write_block` | 21 | | |
 
+**`read_records` IS THE SECOND SPLIT (probe C-2).** §3's table keeps its
+class-keyed arm in `me` — and that arm is **80 of its 131 lines, 61%**. Calling
+it a move understates the work by more than half, and an earlier draft of this
+section stated flatly that exactly one of the 11 was a split.
+
 **And the closure is larger than the six.** Those six call **five more**
 `main.rs`-local functions. Each must move or the extraction does not compile:
 
@@ -58,9 +63,14 @@ half:**
 | `refuse_world_readable_stdout` | 19 |
 | *(`emit`, already counted above)* | — |
 
-**Total: 11 functions, 431 lines, 19% of `main.rs`'s 2,226.**
+**Total: 11 functions plus the `cfg(not(unix))` stub. The probe measured the
+real shrink at 461 lines, not the ~431 this section derived** — and its
+per-function figures above reproduce under no rule I can state
+(`split_record_stream` is 6 lines of 10, not 29). **Treat the per-function
+column as indicative and the 461 as measured**; the probe's `git diff --stat`
+is the number that was observed rather than computed.
 
-**ONE OF THE 11 IS A SPLIT, NOT A MOVE — and it is the whole of C1.**
+**TWO OF THE 11 ARE SPLITS, NOT MOVES.** The first is the whole of C1.
 `stdout_world_readable_mode` is not mechanism. It applies **`& 0o044` INSIDE the
 function** (`crates/me-cli/src/main.rs:912`) and returns `Option<u32>` — a
 verdict, not a measurement. Moving it intact would publish `me`'s mask as the
@@ -359,9 +369,12 @@ Nothing in the crate ever names a `Class` variant.
 and `write_private` creates the 0600 file; both are the *act*, not the decision,
 and P0's value is in the decisions. Moving them is P1's question, not P0's.
 
-**TYPES AND CONSTANTS ARE PART OF THE CLOSURE TOO (I5).** §1 enumerates
-functions only, which understates it: `WriteBlock`, `Destination`, `Class`, and
-the `Admission` flags all cross with them. **Step 1 must enumerate every type and
+**TYPES AND CONSTANTS ARE PART OF THE CLOSURE TOO (I5) — and the probe measured
+which.** An earlier draft guessed at this list, naming `Admission`, which has
+**zero references in the 464 moved lines**, and omitting **all seven symbols
+that actually cross**: `EXIT_OK`, `EXIT_USAGE`, `EXIT_REFUSED`, `WriteBlock`,
+`Destination`, and the two enums travelling with them. **Guessing at a closure
+is what step 1 exists to replace.** **Step 1 must enumerate every type and
 constant the 11 reference and confirm each is either moved or **reachable
 WITHOUT an inherent impl in the crate** — "already public" is NOT sufficient
 and is precisely what let N-C2 through: `Class` is public, and an inherent
@@ -393,7 +406,7 @@ Each step is RED first. No step begins until the previous is green.
 
 | # | step | the test that must fail first |
 | --- | --- | --- |
-| 1 | move the 11 into `me`'s lib half **intact — including the mask**, no behaviour change | `me`'s existing tests still pass — **388 RUN, 1 skipped, out of 389 `#[test]` attributes (N1); the gate is the run count, not the attribute count**; `main.rs` shrinks by ~431 lines. **PLUS a pty assertion pinning the terminal arm (I1)** — see below |
+| 1 | move the 11 into `me`'s lib half **intact — including the mask**, no behaviour change | **388 RUN, 388 passed, 1 skipped** (the run count, not the 389 `#[test]` attributes — N1). **The move necessarily edits 2 of them**, which the gate's earlier wording did not allow for; enumerate the diff to those two and justify each; `main.rs` shrinks by ~431 lines. **PLUS a pty assertion pinning the terminal arm (I1)** — see below |
 | 2 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 regular file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` returns `None`; `me`'s end-to-end behaviour is **still** unchanged |
 | 3 | `observation.rs` — types | a payload kind cannot be constructed from a permission bool (**F-259 cannot recur**) |
 | 4 | `remedy.rs` | zsh remedy does **not** contain `history -d`; fish remedy does **not** contain the secret |
@@ -420,7 +433,27 @@ legitimate for a move; asserting it is TDD when it is not would hide which steps
 carry real proof. Steps 2, 3, 4, 5, 5b, 5c and 6 are RED-first; **1 and 7 are
 regression-gated**, and step 1's pty assertion is the one RED-first thing in it.
 
-**Steps 1 and 2 are ordered this way on purpose.** Step 1 moves
+**STEP 1 AS WRITTEN CANNOT BE DONE, and only executing it revealed why (probe
+C-1).** The three exit constants are **private** in `main.rs`:
+
+```
+const EXIT_OK: i32 = 0;  const EXIT_USAGE: i32 = 2;  const EXIT_REFUSED: i32 = 3;
+```
+
+A lib module cannot see a binary's items, so moving the 11 into the lib half
+**requires publishing them** — and step 1's *"intact, no behaviour change"*
+forbids the signature change that would avoid it. So step 1 as first written
+necessarily commits **`pub const EXIT_USAGE: i32 = 2`** into the donor's public
+API: the exact thing §3 spends a page ruling out. **No ordering avoids it. It is
+a language rule, like N-C2.**
+
+**So step 1 and step 2 SWAP.** `refuse_write_block` returns the DECISION first
+— a 17-line change across 2 call sites, with nothing outside the 11 depending on
+the `i32` (measured by the probe) — and only then does the move happen, with no
+constant to publish. **Two rounds of reading did not find this; one execution
+did.**
+
+**Steps are ordered this way on purpose.** Step 1 moves
 `stdout_world_readable_mode` *with* its `& 0o044` so nothing changes; step 2
 then splits it, pushing the mask back to `me`'s call site. Behaviour is
 unchanged at **both** steps, and at no point does a masked function sit inside
