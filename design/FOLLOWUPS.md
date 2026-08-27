@@ -11210,6 +11210,12 @@ comment at the gate.
 
 ### F-254 — the installed `me` is four minor versions stale (0.3.0 vs 0.7.0), so a bare `me` in the operator's shell is not the `me` under review (owning phase: **post-ship polish**) `#me` `#repro`
 
+**DONE 2026-08-26**, operator authorised ("You can update local binaries").
+`cargo install --path crates/me-cli --force --locked` → *Replaced package
+`mnemonic-engrave v0.3.0` with `v0.7.0`*. `mt` was not installed at all and is
+now `mt-cli v0.1.0`. All six verified in sync against their repo builds:
+md 0.13.0, mk 0.13.0, ms 0.16.0, mt 0.1.0, me 0.7.0, mnemonic 0.97.0.
+
 **Found 2026-08-26** while building the tier-placement recon, by measuring rather
 than assuming. `~/.cargo/bin/me --version` → **me 0.3.0**, dated **Jun 16**;
 `mnemonic-engrave/target/debug/me --version` → **me 0.7.0**. The other four
