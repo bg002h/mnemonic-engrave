@@ -1058,45 +1058,21 @@ fn is_plate_artifact(name: &str) -> bool {
 }
 
 // The P0 moving set now lives in the LIBRARY half (`src/io.rs`). The binary
-// keeps `read_records`, `emit`, `write_private` and every `refuse_*` -- the
-// acts and the announcements -- and consumes the decisions from here.
+// keeps `read_records`, `emit` and every `refuse_*` -- the acts and the
+// announcements -- and consumes the decisions from here.
+//
+// `write_private` joined them in P1 row 6. It was 21 lines of pure mechanism
+// with no `Class`, no `EXIT_*` and no policy in it, and the second consumer
+// needs the same F-244 fix rather than its own copy of it -- a fix duplicated
+// across two repositories is one that gets applied in one of them.
+//
+// WHAT STAYS HERE IS THE REASON, because the reason is `me`'s: F10 (D5-2) --
+// NDEF and manifest artifacts embed or depict md1/mk1 material, so on a
+// multi-user host their at-rest copies must not be world- or group-readable.
+// The crate is told to create a file owner-only; it is not told what is in it.
 use mnemonic_engrave::io::observation::PayloadKind;
+use mnemonic_engrave::io::write::write_private;
 use mnemonic_engrave::io::{no_records_guard, split_record_stream, write_block, WriteBlock};
-
-/// Write `bytes` to `path`, creating/truncating it with owner-only permissions.
-///
-/// F10 (D5-2): NDEF and manifest artifacts embed/depict md1/mk1 material, so on a
-/// multi-user host their at-rest copies must not be world/group-readable. Under
-/// Unix we create the file at mode `0o600`; on other platforms we fall back to the
-/// same create+truncate semantics without a mode (mode bits differ there — the
-/// threat model is POSIX). `.truncate(true)` is load-bearing: it preserves
-/// `std::fs::write`'s behavior so a shrinking overwrite (a smaller manifest over a
-/// larger one) can't leave trailing stale bytes → invalid JSON.
-///
-/// Note: `0o600` binds on CREATE. Overwriting a pre-existing world-readable file
-/// keeps its old mode — accepted residual (NDEF/manifest targets are user-named;
-/// preview targets are forced-fresh by the dirty-dir refusal).
-fn write_private(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::fs::OpenOptions;
-    let mut opts = OpenOptions::new();
-    opts.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        opts.mode(0o600);
-    }
-    let mut f = opts.open(path)?;
-    // F-244: `0o600` binds on CREATE, so an existing world-readable target kept
-    // its old mode -- measured true, and it is the case an operator re-running a
-    // command actually hits. Tightening the OPEN file (rather than the path)
-    // cannot be raced onto a different file between the two calls.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
-    }
-    f.write_all(bytes)
-}
 
 /// **`me`'s POLICY, over `io::fd`'s MECHANISM — and the mask is the whole of
 /// the split.**
@@ -2318,9 +2294,10 @@ fn emit(
     use std::io::{IsTerminal, Write};
     // F-244: this used to be `std::fs::write`, which creates at 0o666 & ~umask
     // -- so an UNSEALED container holding a BIP-39 mnemonic landed at 0644 while
-    // `write_private` sat in this same file, documented for exactly this threat,
+    // `write_private` sat one screen away, documented for exactly this threat,
     // and used only for NDEF/manifest/uf2. The container was less protected than
-    // the artifact that merely depicts key material.
+    // the artifact that merely depicts key material. (`write_private` is in
+    // `mnemonic-io-lib`'s `write` module since P1 row 6; it is imported above.)
     // F-253 — a TERMINAL is not a destination for a bearer container. This runs
     // BEFORE the mode check because the mode check cannot reach it: a TTY is a
     // character device, and character devices are exempt there (that exemption

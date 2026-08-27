@@ -70,7 +70,14 @@ pub mod observation;
 pub mod records;
 /// Purge and remedy text.
 pub mod remedy;
+/// Creating the file a bearer artifact is written into, owner-only.
+pub mod write;
 
+// NOT re-exported at the root, and that is a choice rather than an omission.
+// The root set below is already partial -- `fd`, `observation` and `remedy` are
+// module-qualified only -- so adding `write_private` to it would not make the
+// crate consistent, it would move the inconsistency. The second consumer reaches
+// `fd` and `remedy` module-qualified already; `write` matches them.
 pub use channel::{destination, Destination};
 pub use exit::{write_block, WriteBlock};
 pub use records::{no_records_guard, split_record_stream};

@@ -50,10 +50,14 @@ fn out_creates_the_container_owner_only() {
     );
 }
 
-/// `write_private`'s own comment concedes *"0o600 binds on CREATE"*. Creating
-/// carefully is therefore NOT enough: an existing world-readable target keeps
-/// its mode, and that is the case an operator re-running a command actually
-/// hits.
+/// `0o600` binds on CREATE. Creating carefully is therefore NOT enough: an
+/// existing world-readable target keeps its mode, and that is the case an
+/// operator re-running a command actually hits.
+///
+/// `write_private` moved to `mnemonic-io-lib`'s `write` module in P1 row 6 and
+/// carries a unit test of the same shape. **This one stays**, because it is the
+/// only one that measures it end to end: it runs the real binary, so it also
+/// pins that `--out` still routes through that function at all.
 #[test]
 fn out_tightens_a_preexisting_world_readable_target() {
     let dir = tempfile::tempdir().unwrap();
@@ -223,10 +227,13 @@ fn does_not_refuse_a_wipe_image_which_carries_no_secret() {
 }
 
 // ---------------------------------------------------------------------------
-// The NDEF converter. `write_private`'s own comment (main.rs) already rules
-// these bytes worth protecting: "NDEF and manifest artifacts embed/depict
-// md1/mk1 material, so on a multi-user host their at-rest copies must not be
-// world/group-readable." `--out` honoured that; the stdout modes did not.
+// The NDEF converter. `me`'s own note above `write_private`'s import (main.rs)
+// already rules these bytes worth protecting: "NDEF and manifest artifacts
+// embed or depict md1/mk1 material, so on a multi-user host their at-rest
+// copies must not be world- or group-readable." `--out` honoured that; the
+// stdout modes did not. (The function moved to the shared crate in P1 row 6;
+// the REASON stayed here, because naming md1/mk1 is `me`'s job and not the
+// crate's.)
 // ---------------------------------------------------------------------------
 
 const MD1: &str = "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3";

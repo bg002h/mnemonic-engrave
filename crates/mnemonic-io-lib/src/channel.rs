@@ -6,9 +6,16 @@
 //!
 //! **The `--out` overwrite rule is NOT gated here, and saying so is
 //! load-bearing.** `0o600` binds on CREATE, so an existing world-readable
-//! target keeps its old mode; the fix is `write_private` tightening the OPEN
-//! file, and `write_private` stays in `me`. Gating that rule on `destination`
-//! would gate nothing at all, because `destination` never touches a path.
+//! target keeps its old mode; the fix is
+//! [`write_private`](super::write::write_private) tightening the OPEN file.
+//! Gating that rule on `destination` would gate nothing at all, because
+//! `destination` never touches a path.
+//!
+//! (`write_private` stayed in `me` through P0 and moved into this crate in P1
+//! row 6, when a second consumer needed the same fix. It is in
+//! [`super::write`] and not here **for the reason stated above** — this module
+//! never touches a path, and admitting an effectful write would be the first
+//! step in making that sentence untrue.)
 
 /// The refusal F-244 asks for, with the override it names.
 /// Where a container's bytes are going — F-253.
