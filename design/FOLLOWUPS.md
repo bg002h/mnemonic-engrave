@@ -11268,3 +11268,50 @@ have read **0** and the whole D26 analysis would have been built on `mkdir`.
 change to make unilaterally. The options are to leave it and document, to ship a
 longer canonical name with `md` as an opt-in shim, or to detect the shadow at
 install time.
+
+### F-256 — the constellation's working set is **1.8T**, and ~1.83T of it is `target/`; ten linked worktrees are still registered (owning phase: **housekeeping**, operator ruling owed) `#housekeeping`
+
+**Filed 2026-08-26** at the operator's direction ("We probably need to clean up
+extraneous trees eventually too"). Measured rather than estimated, because the
+answer was two orders of magnitude off what "extraneous trees" implies.
+
+**The trees are the small half.** Unregistered scratch directories total
+**~6.5G**:
+
+| dir | size |
+| --- | --- |
+| `_experiment/` (A and B, three repos each) | 5.0G |
+| `mt-size-probe/` | 1.4G |
+| `me-review-scratch/` | 36M |
+| `_work/` (**ACTIVE** — holds the running review worktree) | 26M |
+| `wt-s5-skeptic-copy/` | 18M |
+| `seedhammer-ref-v1.4.2/` | 3.1M |
+| `mk-v010-cross-update/` | 868K |
+| `me-impl-scratch/` | 32K |
+
+**Ten linked worktrees are registered** across five repos — `mnemonic-engrave` 3,
+`mnemonic-transaction` 2, `seedhammer` 2, `mnemonic-toolkit` 2, `mnemonic-key` 1.
+One of the three on `mnemonic-engrave` is live and must not be touched.
+
+**`target/` is the real number.**
+
+| repo | `target/` | `.claude/worktrees/` |
+| --- | --- | --- |
+| `mnemonic-gui` | **1.1T** | — |
+| `mnemonic-toolkit` | **623G** | 19G |
+| `descriptor-mnemonic` | 41G | 4.0K |
+| `mnemonic-secret` | 37G | 0 |
+| `mnemonic-key` | 22G | 0 |
+| `mnemonic-engrave` | 11G | 0 |
+
+`/scratch` is 9.4T at **52% used**, 4.6T free — so this is not urgent, and that
+is exactly why it has gone unnoticed. Rust `target/` directories never
+garbage-collect; they accumulate one incremental artifact set per toolchain, per
+profile, per feature combination, indefinitely.
+
+**Nothing deleted, and deliberately so.** Two reasons this needs a ruling rather
+than a `cargo clean`: `mnemonic-gui` is the 1.1T outlier and is explicitly out of
+scope for the current cycle, and reclaiming it converts disk into rebuild time on
+whatever is next touched. The safe subset — the `_experiment/` pair, the size
+probe, and the finished scratch copies — is ~6.5G and needs its branches checked
+for uncommitted work first.
