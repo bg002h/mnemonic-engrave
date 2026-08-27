@@ -11773,7 +11773,7 @@ check that a refusal happened, never which kind — which is why the mutation
 survives. This is also why §4's pty assertion for F-259 must pin the exit code
 rather than mere failure, or it misses even the arm it is named for.
 
-### F-266 — **`me` echoes a codex32 SECRET verbatim to stderr on four of six argv surfaces** (owning phase: **P0**, gating) `#me` `#security` `#shipped` `#critical`
+### F-266 — **`me` echoes secret material verbatim to stderr on many argv shapes** (owning phase: **P0**, gating) `#me` `#security` `#shipped` `#critical`
 
 **Found 2026-08-27** by R0 round 6, reproduced by the controller with a real
 `ms1` secret from the repo's own fixtures:
@@ -11787,9 +11787,15 @@ rather than mere failure, or it misses even the arm it is named for.
 | `me sysw pack <ms1>` | 3 | no — reaches the post-parse guard |
 | `me sysw pack --nosuchflag <ms1>` | 2 | no |
 
-**The mechanism is the one this repo already documented as `mt`'s.** `me sysw
-pack` is the only surface taking positional records, so it is the only one that
-reaches the guard. Every other surface takes no positional, so **clap rejects the
+**The table above is a SAMPLE, not the surface.** Later measurement found more:
+`me sysw pack --in <ms1>` and `--in=<ms1>` both leak, as do `me sysw <ms1>` and
+`me help <ms1>`, and the `pass:` record leaks on 7 of 8 shapes. **Do not treat
+the list as exhaustive** — it was assembled by hand twice and came up short
+both times.
+
+**The mechanism is the one this repo already documented as `mt`'s.** The guard
+runs after `Cli::parse()`, so any surface where clap rejects the argument first
+prints it. Every other surface takes no positional, so **clap rejects the
 argument and names it** — printing the secret. `grep -c 'env::args'` over
 `crates/me-cli/src/main.rs` returns **0**: nothing runs before `Cli::parse()`.
 
