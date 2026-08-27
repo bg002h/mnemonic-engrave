@@ -12114,3 +12114,105 @@ purges nothing unattended. That is the same idiom the message already uses for
 phase that touches this text next, and a fish recipe belongs in the crate's
 remedy module once one has been measured. Until then the honest description
 stands.
+
+### F-274 — `mt`'s argv guard does not TRIM, so a whitespace-padded bearer artifact leaks verbatim through clap (repo: **mnemonic-transaction**; owning phase: **P1**) `#mt` `#security` `#shipped` `#critical`
+
+**Found 2026-08-27** while measuring `mt` for the P1 plan.
+`looks_like_a_transaction` (`crates/mt-cli/src/validate.rs:503`) lowercases the
+token for its `mt1` arm and **never trims it**. A leading or trailing space
+therefore makes the material unrecognisable to the pre-clap guard, it falls
+through to `Cli::parse()`, and clap echoes the whole thing to stderr — which is
+the exact leak `command_line_guard` was moved before clap to prevent, recorded
+in `mt`'s own source at `crates/mt-cli/src/main.rs:234`.
+
+**Measured as a generated cross-product**, 4 verbs × 2 carrier classes (an `mt1`
+set, a raw transaction) × 4 spellings:
+
+| spelling | result on all four verbs, both classes |
+| --- | --- |
+| canonical | rc 1, refused by the guard, **no echo** |
+| UPPERCASE | rc 1, refused by the guard, **no echo** |
+| leading space | **rc 2, the material verbatim in stderr** |
+| trailing space | **rc 2, the material verbatim in stderr** |
+
+**16 of the 32 rows leak.** The canonical and uppercase rows are the positive
+control: the guard is not simply refusing everything, and a fix that trims must
+leave them exactly as they are.
+
+**THE SIBLING WAS CHECKED RATHER THAN ASSUMED.** `me` refuses all four spellings
+at rc 3 with no leak, measured against the built binary — P0's row 6 normalises
+every token before classifying, and closed the analogous `me` defect as F-270.
+So this is `mt`-only, and the fix converges on the donor rather than leading it.
+
+**Residue, stated rather than papered over.** The hex arm also has a threshold:
+a 99-character odd-length hex string is below `looks_like_a_transaction`'s
+`len >= 100 && len % 2 == 0` test, and clap echoes it. That is the same class as
+F-267 — material the guard cannot classify without refusing legitimate input —
+and trimming does not close it.
+
+### F-275 — `mt decode` writes broadcastable bearer hex to a world-readable stdout at exit 0, while `mt encode` refuses the identical destination (repo: **mnemonic-transaction**; owning phase: **a ruling the operator owes**, before the phase that acts on it) `#mt` `#security` `#shipped`
+
+**Found 2026-08-27** while measuring which `mt` verbs `--out` should reach.
+
+`world_readable_stdout_guard` has exactly one caller,
+`crates/mt-cli/src/main.rs:701`, inside `encode`. `mt decode` emits
+BROADCASTABLE HEX on stdout — its own `--help` says so in those words — and has
+no gate at all. Reproduced with a 0600 control that passes:
+
+```
+mt encode --qr  > <a 0644 file>   -> exit 1, REFUSED §8.2h, 0 bytes written
+mt decode       > <a 0644 file>   -> exit 0, 679 bytes of broadcastable hex
+```
+
+`file_mode_warning` is the same shape: one caller, also `encode`
+(`crates/mt-cli/src/main.rs:301`), so the reading verbs warn about nothing
+either.
+
+**The inconsistency is the hazard, not just the gap.** An operator who has met
+§8.2h on `encode` has been taught that `mt` refuses a world-readable output.
+Nothing tells them the lesson stops at one verb, and the artifact `decode`
+produces is the one that can be broadcast without any further step.
+
+**Why it is not P1's to fix.** Closing it needs a new refusal on a verb that has
+never had one, which the P0 plan's own out-of-scope rule calls a **ruling, never
+a refactor** — the same rule that keeps `mt`'s terminal policy and its `0o077`
+mask out of P1. And `--out` alone would NOT close it: `--out` adds a private
+channel, it does not stop a plain `>` from creating 0644. Half a fix that reads
+as a whole one is worse here than the honest gap.
+
+### F-276 — the shared crate's boundary is `me`-shaped in two places, found by the first second consumer (owning phase: **`mnemonic-io-lib` 0.2, before a third consumer**) `#mnemonic-io-lib` `#P1` `#design`
+
+**Found 2026-08-27** writing the P1 plan. `mt` adopts **5 of the crate's 11
+public items and 3 of its 7 modules**. Three of the six declines are ordinary —
+`mt` has its own record reader and its own empty-input refusal, and those are
+better. **Two are the crate's shape, and they are worth fixing while it is still
+unpublished.**
+
+**1. `exit::write_block` encodes `me`'s terminal policy in its control flow.**
+It carries no exit integer, which was P0's whole test for policy — and its
+`Destination::Terminal` arm still returns a refusal unconditionally. `mt` has no
+terminal refusal: measured under util-linux `script` on a real pty, `mt encode`
+exits **0** and paints 1198 bytes of `mt1` strings. So adopting the function
+would give `mt` a refusal no ruling authorises, and the only way to call it
+without that is to pass `stdout_is_tty: false` — a lie to a function about an
+observable fact, which the next reader repairs. `WriteBlock` goes with it: its
+`Terminal(PayloadKind)` variant would be unconstructible in `mt`, and a dead
+variant in a shared decision type is how the policy behind it gets adopted later
+by someone tidying up.
+
+**No integer and no mask is a NECESSARY test for policy, not a sufficient one.**
+Control flow is a mapping too.
+
+**2. `observation.rs` shipped half of its own argument.** The P0 plan argues for
+the module from F-259 **and** F-260 jointly — *"a message computed from the
+observed mode cannot say 'read' about a write-only mode"*. What shipped is
+F-259's half: `PayloadKind`, a payload-kind type. **There is no vocabulary for
+describing an observed mode anywhere in the crate.** `me` did not notice because
+its own mask is `0o044`, so its hard-coded *"grant read to group or others"* is
+true for every mode it refuses. `mt`'s is `0o077`, so the same sentence is false
+for the write-only modes it refuses — which is F-260, and P1 has to write that
+wording in `mt` rather than reach for it.
+
+Both are cheap now: `mnemonic-io-lib` is unpublished (checked 2026-08-27 with a
+`serde` control: 200 for the control, **404** for both spellings of the name)
+and `me` is its only consumer.
