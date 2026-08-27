@@ -13072,3 +13072,126 @@ workflows in the standard closure list that plans in this constellation copy
 from, so the surface is inherited rather than rediscovered. A plan that edits a
 CLI's output or its refusals is exactly the plan that breaks documented worked
 examples, and that is precisely when nobody is looking at `docs/`.
+
+### F-320 — `mt`'s new git dependency drags `third_party/seedhammer` onto every cold CI runner, because cargo fetches a git dep's SUBMODULES (repo: **mnemonic-transaction**; owning phase: **ownerless residue** — a CI-cost item) `#ci` `#deps`
+
+**Found 2026-08-27** while executing P1 row 7's own gate — a cold-`CARGO_HOME`
+resolve of the new dependency — rather than by reading anything.
+
+`crates/mt-cli/Cargo.toml` now takes `mnemonic-io-lib` from
+`bg002h/mnemonic-engrave` by rev. Cargo clones a git dependency's submodules
+**recursively**, and this repository has one:
+
+```
+    Updating crates.io index
+    Updating git repository `https://github.com/bg002h/mnemonic-engrave`
+    Updating git submodule `https://github.com/seedhammer/seedhammer.git`
+```
+
+Measured on an empty `CARGO_HOME`: 26 s wall, and 52 MB left in `git/`. So
+`mt`'s CI now pays for a submodule it will never compile, on every cold runner,
+and acquires a second upstream host as a build-time dependency —
+`github.com/seedhammer/seedhammer` being reachable is now a condition for `mt`
+to build.
+
+**Not a defect and not urgent.** It is stated because it is *invisible* from
+`mt`'s side: nothing in `mnemonic-transaction` mentions seedhammer, and the
+first person to debug a slow or failing CI fetch there will have no reason to
+look in this repository for the cause.
+
+**Options, none taken now:** publish `mnemonic-io-lib` to crates.io (F-271
+records the publish as authorised and its pre-flight as unrun), which removes
+the git dep entirely; or split the library into its own repository. Cargo has no
+per-dependency "do not fetch submodules" switch, so there is no cheap local fix.
+
+### F-321 — this repo's copy of `design/SPEC_mt_v0_1.md` is now stale against `mnemonic-transaction`'s, in four places P1 changed (repo: **mnemonic-engrave**; owning phase: **P1's merge**, with F-279's re-anchoring pass) `#docs` `#drift`
+
+**Found 2026-08-27** during P1 rows 8–13. The spec exists in **both**
+repositories, and the implementation edited the `mnemonic-transaction` copy
+because that is where the code and its tests are. This copy was deliberately not
+edited from an implementation worktree, so the two now differ:
+
+| § | what this copy still says | what shipped |
+| --- | --- | --- |
+| 8.2f | *"The purge command is **specific to the operator's shell**, detected from `$SHELL`"*, and shows `history -d 512 && fc -W` | every shell's recipe is printed, none is detected, and `history -d` does not delete on zsh 5.9.2 |
+| 8.2g | *"is mode 0644 — readable by every user on this machine"* | **already false before P1** — F-252 removed that reachability claim from the code on 2026-08-25 and never from this paragraph; now also derived from the mode |
+| 8.2h | *"THE REMEDIES ARE THE SHELL'S, because `mt encode` HAS NO `--out`"*, citing §3b | §6b gave `mt` `--out`, and the fold checked the citation: §3b does not say it |
+| 8.2h | says nothing about `mt decode` | F-275: `decode` warns at the same destination and still exits 0 |
+
+The §8.2g row is the one worth noticing: **a spec paragraph stayed false for two
+days after the code was corrected, and no gate could see it**, because nothing
+compares the two copies or compares either to the binary's output.
+
+**Fix:** take the `mnemonic-transaction` copy as authoritative when P1 merges —
+`git diff` the two files rather than re-reading them — and decide then whether
+one repo should stop carrying a copy at all.
+
+### F-322 — a mutation gate that restores the SOURCE leaves a MUTATED BINARY, and the next thing that runs measures a program with a check deleted (repo: **both**; owning phase: **ownerless residue** — fixed in `mnemonic-transaction`, unfixed here) `#gates` `#process`
+
+**Found 2026-08-27 by walking into it**, while measuring P1 row 9's stdout-mode
+differential.
+
+`mnemonic-transaction/scripts/mutate-refusals.sh` neuters a named check, runs
+one test, restores `src/` from a byte copy and touches it. It never rebuilt — so
+the **last** entry's `cargo nextest` left `target/debug/mt` linked from the
+mutated tree, the working tree was clean, `git status` agreed, and
+`./target/debug/mt` was a program with a refusal deleted. The last entry in
+`refusals.toml` names `world_readable_stdout_guard`, so straight after a GREEN
+gate run:
+
+```
+mt encode --in <finalized psbt> > <a 0644 file>   ->  rc 0, 796 bytes, no refusal
+```
+
+which reads exactly like a shipped §8.2h defect on a tree whose whole suite is
+green. About fifteen minutes went into looking for a bug in correct code.
+
+**It also concealed a second, real RED.** `mnemonic-transaction`'s CI order is
+refusal-coverage → refusal-mutation → **journeys**, so `scripts/journeys.sh` had
+been running against that mutated binary — and journey A's very first line is
+`mt encode … >"$WORK/a.out"`, which under the default umask 022 is a 0644
+destination that §8.2h correctly refuses. **The journeys gate had never once run
+against an unmutated binary.** Reproduced at the previous commit by rebuilding
+and re-running: exit 1 at the same line. Both are fixed there — `cleanup`
+rebuilds, and `journeys.sh` sets `umask 077`, which is the first remedy `mt`'s
+own refusal offers.
+
+**Why this is filed rather than closed:** the class is not specific to that
+script. `mnemonic-engrave/scripts/mutation-run.py` restores from a file copy the
+same way and likewise never rebuilds. It is **not** wired into CI here, so
+nothing downstream of it is currently being fooled — but anyone running it and
+then invoking `target/debug/me` is measuring a mutated binary, silently.
+
+**The general rule, worth having:** a gate that mutates a tree must restore the
+**artifact**, not only the source. Restoring source and touching it makes the
+*next build* correct and leaves the *current binary* wrong, and the gap between
+those two is exactly where a hand measurement lands.
+
+### F-323 — `mt decode --json --quiet` emits no JSON at all: `--quiet` silently disables `--json` (repo: **mnemonic-transaction**; owning phase: **P2**, which owns `--json`) `#cli` `#json`
+
+**Found 2026-08-27** while wiring F-275's warning into `decode`'s `--json` path.
+
+`decode`'s whole report block, the JSON document included, sits inside
+`if !args.quiet`. So:
+
+```
+mt decode --json --quiet --in typed.txt   ->  rc 0, stdout 445 bytes of hex,
+                                              stderr carries NO json document
+```
+
+A caller who asks for machine-readable output and also passes `--quiet` gets
+exit 0 and nothing to parse. **This is the defect class `mt` has already ruled
+on in the other direction**: `json_unsupported_guard` exists precisely because
+*"a flag that cannot work must REFUSE rather than sit inert"* — `--json` was
+once wired into `inspect` alone and parsed-and-did-nothing on three verbs.
+
+Pre-existing, and untouched by P1 — measured at `a4cdefa` as well, where the
+`if !args.quiet` wrapper is already there. P1 only made it visible, because the
+F-275 warning is now the *only* thing on stderr in that combination (warnings
+are never suppressed, so `--quiet` does not silence it).
+
+**Not fixed here** because the remedy is a ruling, not a repair: either
+`--json` wins over `--quiet` (the report is data, not chatter), or the pair is
+refused. §6c places `--json` in P2, so P2 should decide. **`--json` is
+explicitly out of scope for the current cycle** per `§6b`'s own note, which is
+why this is filed rather than argued.
