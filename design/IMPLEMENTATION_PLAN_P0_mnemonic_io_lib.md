@@ -3,6 +3,11 @@
 **Status:** DRAFT v1, written 2026-08-26. **NOT reviewed.** No code may be
 written until this closes an R0 round at 0C/0I.
 
+**Gates this plan is checked by** — run each **separately** from the commit:
+`scripts/plan-stepref-check.sh` (prose may not name a step number),
+`scripts/plan-table-check.sh`, `scripts/plan-cite-check.sh`,
+`scripts/fold-propagation-check.sh`.
+
 **Source spec:** `SPEC_constellation_cli_uniformity.md` §5a (the crate and its
 four boundary lines), §5b (the four verbs), §6b/§6d/§6f/§6h (the rules being
 hoisted), §7 P0 (this phase's row and gate), **and §8 — *"What is NOT verified,
@@ -93,7 +98,7 @@ pre-parser ordering"* and §6d says *"Both layers run pre-parser (C-4)"*. An
 earlier draft of this plan cited the 0 as evidence the work was easy. It is the
 symptom of the work being absent.
 
-**STEP ZERO IS INSIDE `me`.** Nothing crosses a crate boundary until those 11
+**THE FIRST WORK IS INSIDE `me`.** Nothing crosses a crate boundary until those 11
 are a library. Treating this as "donate three functions" discovers the other
 eight one compile error at a time.
 
@@ -502,7 +507,7 @@ Each step is RED first. No step begins until the previous is green.
 | # | step | the test that must fail first |
 | --- | --- | --- |
 | 1 | **`no_records_guard` returns `Result<Vec<String>, String>`** — the ONE signature change (Variant B). Nothing moves yet. | `me`'s **388 RUN, 388 passed, 1 skipped**, unchanged in meaning; the `EXIT_*` count inside `no_records_guard` goes **1 → 0** |
-| 2 | **Move the five + the stub** — carrying a **pty assertion pinning the terminal refusal BEFORE and AFTER**, since none of the 12 `world_readable_output.rs` tests reach it and it could otherwise be lost with every gate green (round-4 C-2) — into `me`'s lib half: `destination`, `stdout_world_readable_mode` (+ its `cfg(not(unix))` twin), `split_record_stream`, `no_records_guard`, `write_block`. **`read_records`, `emit`, `write_private` and every `refuse_*` STAY.** | builds with **`grep -c 'pub const EXIT' main.rs` == 0** and **`grep -c 'EXIT_' <lib module>` == 0** — a published constant fails the step. **Plus a real test, not only greps** (round-4 I-1: `cargo build` + two greps are already green on the untouched tree, so they cannot fail). Callers enumerated in BOTH directions. **What actually breaks is the private `Destination`/`WriteBlock` enums and `main.rs`'s `use super::` in `mod tests`; the "four callers outside the closure" figure was measured against the REJECTED move, and both those functions stay** |
+| 2 | **Move the five + the stub** — carrying a **pty assertion pinning the terminal refusal BEFORE and AFTER — asserting the exit DIGIT, not `!success()`**, because this is F-265's own site #1 (`refuse_write_block`'s Terminal arm, proven respellable 2→3 with 388/388 green), since none of the 12 `world_readable_output.rs` tests reach it and it could otherwise be lost with every gate green (round-4 C-2) — into `me`'s lib half: `destination`, `stdout_world_readable_mode` (+ its `cfg(not(unix))` twin), `split_record_stream`, `no_records_guard`, `write_block`. **`read_records`, `emit`, `write_private` and every `refuse_*` STAY.** | builds with **`grep -c 'pub const EXIT' main.rs` == 0** and **`grep -c 'EXIT_' <lib module>` == 0** — a published constant fails the step. **Plus a real test, not only greps** (round-4 I-1: `cargo build` + two greps are already green on the untouched tree, so they cannot fail). Callers enumerated in BOTH directions. **What actually breaks is the private `Destination`/`WriteBlock` enums and `main.rs`'s `use super::` in `mod tests`; the "four callers outside the closure" figure was measured against the REJECTED move, and both those functions stay** |
 | 3 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` → `None`; `me`'s behaviour still unchanged |
 | 4 | `observation.rs` — the payload-kind type **and its pty assertion** | **the assertion is the gate, not the type**: `script -qec 'me sysw wipe --fill zeros'` must NOT emit the word BEARER, asserted on the **emitted words**, pinning the **exit digit** (F-265: `!success()` cannot fail here). Mutation-checked in both directions |
 | 5 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it; and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry. **Blocked on F-264** — see §6 condition 9 |
@@ -522,10 +527,14 @@ enough: **§4's pty assertion must assert the exit code itself**, or it misses
 even the arm it is named for. (The hole is pre-existing, not introduced — filed
 as **F-265**.)
 
-**FOUR CALLERS LIVE OUTSIDE THE CLOSURE (probe I-2).** `write_private` has
-**three** and `refuse_world_readable_stdout` **one**, producing four `E0425`s
-that nothing in this plan predicted. **The move** must enumerate **callers**, not just
-callees — the closure was computed one direction only.
+**ENUMERATE CALLERS, NOT ONLY CALLEES** — the original closure was computed one
+direction only. **The specific "four callers outside the closure" figure is
+RETRACTED**: it was measured against the rejected 464-line move, and both
+functions it named (`write_private`, `refuse_world_readable_stdout`) stay in
+`me` under the adopted plan, so it contradicted the table's own cell twenty
+lines below (round-5 I-1). What actually breaks the move is what that cell says:
+the private `Destination`/`WriteBlock` enums, and the `use super::` in
+`mod tests`.
 
 **I1 — THE MOVE'S GATE CANNOT FAIL FOR THE TERMINAL ARM, so it is not left as the
 only proof.** "The 388 still pass" is green whether or not the terminal refusal
@@ -680,7 +689,7 @@ before publishing; do not trust a check from an earlier session.
    documentation-shaped version of the same thing. **The remedy work therefore carries a
    POSITIVE test: run the emitted recipe under an interactive shell and assert
    the entry is gone**, not that a command was printed.
-6. **F-259 and F-260 are caught by a TEST, not by construction — "by
+6. **F-259 is caught by a TEST, not by construction — "by
    construction" was FALSE and a probe proved it.**
 
    An earlier draft of this condition claimed a type made F-259 impossible. The
@@ -703,6 +712,11 @@ before publishing; do not trust a check from an earlier session.
    positive control, mutation-checked. The probe verified both directions — the
    finding test FAILs on the bug and the control PASSes without it. **That
    assertion is the gate; the types are a convenience.**
+
+   **F-260 is NOT part of this condition** — §7 reassigns it to P1 because P0
+   does not touch `mt`, and requiring a test for it here would contradict that
+   (round-5 I-3). The derived-message discipline is what stops it recurring
+   when P1 adopts.
 
    **This REQUIRES test and signature changes, and condition 1 must not be read
    as forbidding them (C4).** `emit` and `write_block` change signature: the
@@ -731,7 +745,11 @@ before publishing; do not trust a check from an earlier session.
    until the previous is green" that would stall everything after it
    (round-3). If the recipe genuinely cannot be made to work, that is a
    finding to raise, not a wording to settle for. Owning phase in `FOLLOWUPS.md` is already P0.
-10. **F-265 fixed at ALL FIVE SITES.** Every one of them stays in `me` — `refuse_write_block` ×2, `read_records` ×2, `emit` — so this is work P0 does **in the donor**, not in the crate, and "fixed for the moving set" would have discharged nothing (round-3 I-2). Five refusals can swap exit
+10. **F-265 fixed at ALL FIVE SITES, with a step that does it.** All five stay in
+   `me` — `refuse_write_block` ×2, `read_records` ×2, `emit` — so this is work P0
+   does **in the donor**. An earlier draft asserted both that they stay and that
+   "P0 moves these functions" four lines apart, while no step edited any of them,
+   so the condition could not close (round-5 I-2). Five refusals can swap exit
    **2 for 3** with all 388 tests green, proven against the unmodified binary.
    P0 moves these functions, and **a refactor over an untested distinction is
    how the distinction dies.** Every gate in §4 that asserts a refusal pins the

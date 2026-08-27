@@ -16,6 +16,9 @@
 #     line-wrap     step\n1's
 # A negative inherits the scope of the search that produced it.
 #
+# COVERED since round-5 I-5: prose INSIDE a table cell, spelled-out numerals
+# (`step three`), and bare row ids (`Row 9b`). The row's own number is exempt.
+#
 # NOT COVERED: a reference by NAME that has gone stale ("the move" pointing at a
 # row that no longer does the moving). That class is real -- round 4's C-2 was
 # exactly it -- and no lexical check can see it. It needs a reader.
@@ -29,8 +32,15 @@ for f in "$@"; do
     my @l = split /\n/, $_;
     for my $i (0..$#l) {
       my $probe = $l[$i] . " " . ($l[$i+1] // "");
-      next if $l[$i] =~ /^\s*\|/;              # the TABLE may number its rows
-      if ($probe =~ /\bsteps?\s*-?\s*\d+[a-z]?/i) { printf "%d:%s\n", $i+1, $l[$i]; }
+      # The TABLE may number its ROWS -- strip the leading `| N |` cell and keep
+      # checking the rest. Exempting the whole LINE left ~900 characters of
+      # rationale per cell unchecked, which is exactly where cross-step ordering
+      # claims get written (round-5 I-5: `done after step 3` planted in a cell
+      # passed at exit 0).
+      $probe =~ s/^\s*\|\s*\d+[a-z]?\s*\|// if $l[$i] =~ /^\s*\|/;
+      if ($probe =~ /\bsteps?\s*-?\s*\d+[a-z]?/i
+       || $probe =~ /\bsteps?\s+(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i
+       || $probe =~ /\brows?\s+\d+[a-z]?\b/i) { printf "%d:%s\n", $i+1, $l[$i]; }
     }' "$f")
   if [ -n "$hits" ]; then
     echo "$hits" | while IFS= read -r h; do
