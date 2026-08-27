@@ -11772,3 +11772,45 @@ distinction quietly dies.
 check that a refusal happened, never which kind — which is why the mutation
 survives. This is also why §4's pty assertion for F-259 must pin the exit code
 rather than mere failure, or it misses even the arm it is named for.
+
+### F-266 — **`me` echoes a codex32 SECRET verbatim to stderr on four of six argv surfaces** (owning phase: **P0**, gating) `#me` `#security` `#shipped` `#critical`
+
+**Found 2026-08-27** by R0 round 6, reproduced by the controller with a real
+`ms1` secret from the repo's own fixtures:
+
+| invocation | rc | secret in stderr |
+| --- | --- | --- |
+| `me <ms1>` | 2 | **YES** |
+| `me bundle <ms1>` | 2 | **YES** |
+| `me sysw wipe <ms1>` | 2 | **YES** |
+| `me sysw show <ms1>` | 2 | **YES** |
+| `me sysw pack <ms1>` | 3 | no — reaches the post-parse guard |
+| `me sysw pack --nosuchflag <ms1>` | 2 | no |
+
+**The mechanism is the one this repo already documented as `mt`'s.** `me sysw
+pack` is the only surface taking positional records, so it is the only one that
+reaches the guard. Every other surface takes no positional, so **clap rejects the
+argument and names it** — printing the secret. `grep -c 'env::args'` over
+`crates/me-cli/src/main.rs` returns **0**: nothing runs before `Cli::parse()`.
+
+**The secret then lands in the terminal scrollback, and in whatever captured
+that stderr.** It is already in the shell history and the process list by the
+time `me` runs; this adds a third copy in the one place the operator is most
+likely to screenshot or paste.
+
+**Why it was not caught.** The repo's no-leak tests (`crates/me-cli/tests/cli.rs:153`,
+`:177`) all use `write_stdin(...)` — **the argv path is tested nowhere**. And the
+P0 plan asserted *"`me` does not currently leak this way"* on the strength of a
+single probe, `me sysw pack --nosuchflag <ms1…>`, which is **the one invocation
+that structurally cannot leak**: `--nosuchflag` makes clap name the *flag*
+rather than the value. **A negative inheriting a scope of one, and the one
+chosen was the exception.**
+
+**This gates P0** and is now condition 8's real content. §6d's pre-parser
+ordering is not a tidiness requirement — it is the fix for this. The observable
+must be *"no `ms1` in stderr for an argv clap would reject"*, asserted across
+**every** surface, not one.
+
+**`mt` is NOT affected** — checked, not assumed: its guard sits on
+`std::env::args()` and runs before `Cli::parse()`, which is exactly why this
+repo's spec cites it as the reference for the ordering.
