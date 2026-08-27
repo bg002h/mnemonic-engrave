@@ -360,9 +360,23 @@ disambiguates against a prefix that currently means binary. That is a
 tree-specific fact, and applying general idiom without checking it is the same
 error that produced `m-cli-io`.
 
-**Still to confirm before P0 publishes:** that `mnemonic-io-lib` is free on
-crates.io. An unavailable name costs one line of the plan if found now, and a
-rename across six manifests if found after the code is written. **P0 must confirm the name is free on crates.io before publishing**;
+**APPROVED by the operator, 2026-08-26, and confirmed available the same day:**
+
+```
+$ curl -s -o /dev/null -w '%{http_code}' https://crates.io/api/v1/crates/mnemonic-io-lib
+  404
+$ ... /mnemonic_io_lib
+  404
+```
+
+**Both forms checked, and that is the point rather than thoroughness for its own
+sake:** crates.io treats `-` and `_` as colliding, so a name is only free when
+neither spelling is registered. Checked now because an unavailable name costs one
+line of this plan today and a rename across six manifests once the code exists.
+
+**A 404 is availability at a moment, not a reservation.** Nothing holds the name
+until P0 publishes, so P0 re-checks immediately before the irreversible step
+rather than trusting this line. **P0 must confirm the name is free on crates.io before publishing**;
 an unavailable name is a rename across five manifests if it is discovered after
 the code is written, and one line of the plan if it is discovered before.
 
