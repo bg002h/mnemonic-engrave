@@ -14,6 +14,7 @@
 //! compressions, not a key derivation, so 2^64 is $60k–$250k of rented GPU.
 
 use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 
 const LABEL: &[u8] = b"MNEMBLOB/pub/v1";
 
@@ -38,7 +39,10 @@ pub fn public_data_hash(records: &[&str], sealed: bool) -> [u8; 16] {
 
 /// `a26e d22b b747 dfd0 2367 06ad 14c1 9679` — grouped so a human can compare it.
 pub fn format_hash(h: &[u8; 16]) -> String {
-    let hex: String = h.iter().map(|b| format!("{b:02x}")).collect();
+    let hex: String = h.iter().fold(String::new(), |mut acc, b| {
+        let _ = write!(acc, "{b:02x}");
+        acc
+    });
     (0..8)
         .map(|i| &hex[i * 4..i * 4 + 4])
         .collect::<Vec<_>>()
@@ -59,7 +63,10 @@ mod tests {
         ]
     }
     fn hex(b: &[u8]) -> String {
-        b.iter().map(|x| format!("{x:02x}")).collect()
+        b.iter().fold(String::new(), |mut acc, x| {
+            let _ = write!(acc, "{x:02x}");
+            acc
+        })
     }
 
     /// §11.4 vectors D and E, asserted as LITERALS — not merely as differing.

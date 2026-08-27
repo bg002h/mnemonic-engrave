@@ -1,5 +1,6 @@
 //! `me` — convert a single md1/mk1 string to an NDEF payload (refuses ms1).
 
+use std::fmt::Write as _;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
@@ -652,7 +653,10 @@ fn run() -> i32 {
             return EXIT_USAGE;
         }
         if cli.hex {
-            let s: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+            let s: String = bytes.iter().fold(String::new(), |mut acc, b| {
+                let _ = write!(acc, "{b:02x}");
+                acc
+            });
             println!("{s}");
         } else if cli.base64 {
             println!("{}", base64_encode(&bytes));
@@ -1261,10 +1265,10 @@ fn base64_encode(data: &[u8]) -> String {
             *chunk.get(2).unwrap_or(&0),
         ];
         let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
-        out.push(T[(n >> 18 & 63) as usize] as char);
-        out.push(T[(n >> 12 & 63) as usize] as char);
+        out.push(T[((n >> 18) & 63) as usize] as char);
+        out.push(T[((n >> 12) & 63) as usize] as char);
         out.push(if chunk.len() > 1 {
-            T[(n >> 6 & 63) as usize] as char
+            T[((n >> 6) & 63) as usize] as char
         } else {
             '='
         });
@@ -1667,7 +1671,10 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
 }
 
 fn hex(b: &[u8]) -> String {
-    b.iter().map(|x| format!("{x:02x}")).collect()
+    b.iter().fold(String::new(), |mut acc, x| {
+        let _ = write!(acc, "{x:02x}");
+        acc
+    })
 }
 
 /// The digest goes to STDERR, so `me sysw pack > f.bin` still shows the operator

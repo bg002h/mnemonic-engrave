@@ -2,6 +2,7 @@
 
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::fmt::Write as _;
 
 const MD1: &str = "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3";
 const SEED: &str =
@@ -2206,10 +2207,13 @@ fn argv_refuses_every_bearer_class() {
 #[test]
 fn argv_refuses_every_secret_class_too() {
     let dir = tempfile::tempdir().unwrap();
-    let passhex: String = "correct horse battery staple"
-        .bytes()
-        .map(|b| format!("{b:02x}"))
-        .collect();
+    let passhex: String =
+        "correct horse battery staple"
+            .bytes()
+            .fold(String::new(), |mut acc, b| {
+                let _ = write!(acc, "{b:02x}");
+                acc
+            });
     for (what, rec) in [
         ("a BIP-39 mnemonic", SEED.to_string()),
         ("a pass: record", format!("pass:{passhex}")),

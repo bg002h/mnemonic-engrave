@@ -28,6 +28,7 @@
 //! pairs were produced by a real node.
 
 use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 
 /// What a structural parse learns. Everything a review screen needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -285,7 +286,10 @@ pub fn parse(bytes: &[u8]) -> Result<TxSummary, TxError> {
     h.update(locktime);
     let d1 = h.finalize();
     let d2 = Sha256::digest(d1);
-    let txid_display: String = d2.iter().rev().map(|b| format!("{b:02x}")).collect();
+    let txid_display: String = d2.iter().rev().fold(String::new(), |mut acc, b| {
+        let _ = write!(acc, "{b:02x}");
+        acc
+    });
 
     Ok(TxSummary {
         txid_display,
@@ -361,7 +365,10 @@ pub(crate) mod tests {
         assert_eq!((t.inputs, t.outputs), (1, 1));
         // Legacy: the stripped form IS the wire form.
         let d = Sha256::digest(Sha256::digest(&b));
-        let want: String = d.iter().rev().map(|x| format!("{x:02x}")).collect();
+        let want: String = d.iter().rev().fold(String::new(), |mut acc, x| {
+            let _ = write!(acc, "{x:02x}");
+            acc
+        });
         assert_eq!(t.txid_display, want);
     }
 
