@@ -52,13 +52,24 @@ for path in sys.argv[1:]:
 
     width = 0      # pipe count declared by the current table's separator row
     at = 0
+    ind = None     # indent of the current table; a change ends it (F-261)
     for n, l in enumerate(lines, 1):
-        if not l.startswith("|"):
-            width = 0                     # table ended
+        # INDENTED TABLES COUNT. Markdown nests a table inside a list item by
+        # indenting it, and this document does that deliberately to keep a table
+        # with the bullet it belongs to. Matching on a bare `|` skipped every
+        # such row -- silently, so "0 malformed" was reported over a set that
+        # excluded them, and a five-row table added to this repo's own P0 plan
+        # moved the count by zero.
+        stripped = l.lstrip()
+        if not stripped.startswith("|"):
+            width, ind = 0, None          # table ended
             continue
-        pipes = l.count("|")
-        if re.match(r'^\|[\s:\-|]+\|$', l):   # the |---|---| separator
-            width, at = pipes, n
+        lead = len(l) - len(stripped)
+        if width and lead != ind:         # indent shifted: a different table
+            width, ind = 0, None
+        pipes = stripped.count("|")
+        if re.match(r'^\|[\s:\-|]+\|$', stripped):   # the |---|---| separator
+            width, at, ind = pipes, n, lead
             continue
         if width:
             rows += 1
@@ -72,5 +83,6 @@ print()
 print(f"─── table rows checked: {rows} ; malformed: {bad}")
 print("─── NOT covered: cell CONTENT, intentionally-empty vs lost cells,")
 print("─── tables with no separator row, and pipes inside code spans.")
+print("─── COVERED since F-261: indented tables (nested in a list item).")
 sys.exit(1 if bad else 0)
 PY

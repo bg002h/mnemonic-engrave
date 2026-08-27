@@ -11566,7 +11566,7 @@ own scope. Under the per-phase burndown rule an item whose owning phase has
 passed is **overdue, not deferred**, so this moves rather than drifting.
 **P1 owns it.** F-259 stays with P0 — that one is `me`'s.
 
-### F-261 — `plan-table-check.sh` silently skips INDENTED tables, and does not list that among its blind spots (owning phase: **tooling**, before the next spec fold) `#tooling` `#gates`
+### F-261 — `plan-table-check.sh` silently skips INDENTED tables, and does not list that among its blind spots (owning phase: **tooling**) — **DONE 2026-08-27** `#tooling` `#gates`
 
 **Found 2026-08-26** by watching a number fail to move. A fold added a
 five-row table nested under a list item; the gate reported **82 rows, 0
@@ -11586,6 +11586,23 @@ not among them** — so a reader has no way to know coverage was partial.
 this document uses them deliberately, to keep a table inside the bullet it
 belongs to); or, if that is genuinely hard, **print the count of lines skipped
 for indentation** so a silent zero becomes a visible one.
+
+**DONE 2026-08-27.** The match is now on `l.lstrip()`, with the table's indent
+tracked so a shift still ends it. Measured on the artifact that has them:
+`SPEC_constellation_cli_uniformity.md` went **82 → 85 rows checked** — three
+rows the gate could not previously see. The script's footer now names indented
+tables as **covered** rather than leaving the omission for a reader to discover.
+
+**Mutation-tested, because a gate that cannot go red is a hypothesis.** Against
+an indented table with a short row it exits **1** and names the line
+(*"3 cells vs 4 declared"*); against the same table well-formed it exits **0**
+and reports nothing. Both directions checked — the second matters as much,
+since a gate red for non-defects is as corrosive as one green for everything.
+
+**It introduced nothing.** `FOLLOWUPS.md` reported 2 malformed before the patch
+(280 rows) and the same 2 after (284) — pipes inside cell content, which the
+script already declares as an uncovered class and which are unrelated to
+indentation.
 
 **The general rule this instance illustrates:** a gate whose scope silently
 excludes what you just changed is indistinguishable from a gate that passed on
