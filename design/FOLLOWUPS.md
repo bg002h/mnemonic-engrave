@@ -13282,7 +13282,7 @@ explicitly out of scope for P2 (F-271 records the publish as authorised and its
 pre-flight as unrun). Publishing would dissolve this entry entirely, which is
 worth knowing when F-271 is next picked up.
 
-### F-361 — F-280's new `clippy` CI step is RED on arrival: the CI-pinned toolchain's clippy disagrees with the repo's default clippy on 13 pre-existing findings across 8 files (repo: **mnemonic-engrave**; owning phase: **before `fix/f280-ci-fmt` merges to master** — non-deferrable, it is the required check) `#me` `#tooling` `#gate` `#clippy`
+### F-361 — ✅ CLOSED 2026-08-27 — F-280's new `clippy` CI step is RED on arrival: the CI-pinned toolchain's clippy disagrees with the repo's default clippy on pre-existing findings (repo: **mnemonic-engrave**; owning phase: **before `fix/f280-ci-fmt` merges to master** — non-deferrable, it is the required check) `#me` `#tooling` `#gate` `#clippy`
 
 **Found 2026-08-27 closing F-280.** F-280's own text measured only
 `cargo fmt --check` (77 hunks / 14 files at `ba1f3ec`; re-measured on this
@@ -13354,3 +13354,56 @@ verify `cargo nextest run --locked` still reports 430 passed / 1 skipped
 --locked -- -D warnings` exits 0. Do this **before** `fix/f280-ci-fmt` is
 merged to `master` — merging first would make the required `test (rust +
 go)` context fail on every subsequent push until someone notices.
+
+**✅ CLOSED 2026-08-27, on `fix/f280-ci-fmt`.** Fixed in two commits: the
+two `unknown_lints` sites (`record.rs`, `wire.rs`) first, then the rest.
+
+**Correction to the count above: it was undercounted, not overcounted —
+the original 13/8 came from a build that never finished.** The lib
+target's compile errors were blocking cargo from ever reaching the
+`bin "me"` and integration-test targets, so clippy's first pass silently
+never checked them; fixing what it *could* see surfaced 6 more findings in
+two further rounds (1 in `crates/me-cli/tests/sysw_cli.rs`, reached only
+once the lib compiled; then 5 in `crates/me-cli/src/main.rs` — 3
+`clippy::precedence`, 2 `clippy::format_collect` — reached only once
+`bin "me"` did). **True total: 18 lint instances across 11 files**, not 13
+across 8. Re-run after each fix until a round introduced nothing new, per
+the "closure is lens-closure, not finding-closure" rule this repo already
+holds elsewhere — the same discipline would have caught this masking on
+the first pass had it been applied then.
+
+Breakdown of the 18: 2 `unknown lint: clippy::manual_is_multiple_of`
+(`record.rs`, `wire.rs` — fixed by stacking `#[allow(unknown_lints)]`
+above the existing `#[allow(clippy::manual_is_multiple_of)]`, which
+satisfies both toolchains at once: the pinned one no longer errors on a
+name it doesn't recognise, and the newer one's `allow` still suppresses
+the lint it does recognise); 4 `clippy::precedence` (`record.rs:294`'s
+`hi << 4 | lo`, and three in `main.rs`'s base64 encoder, `(n >> N) & 63`)
+— each checked against Rust's operator table and confirmed to already
+parse as intended, so the fix is parens for clarity only, not a
+correctness change; 2 `clippy::nonminimal_bool` + `clippy::bool_comparison`
+on one line in `coverage.rs` (`X == !Y` → `X != Y`, verified boolean-
+equivalent); 10 `clippy::format_collect` (`main.rs` ×2, `seal/{crypto,mod,
+pubhash}.rs`, `sysw/{pubhash,record,tx}.rs` (`tx.rs` ×2), `sysw/
+vectors.rs`, `tests/sysw_cli.rs` — clippy's own suggested `fold` + `write!`
+rewrite, each needing a local `use std::fmt::Write as _;`, placed inside
+`mod tests` for the two sites where the helper is test-only so a
+non-test `lib` build doesn't get a fresh unused-import error from the
+same masking effect).
+
+None of the 18 was a real defect — every precedence finding already
+parsed as intended, and `format_collect`/`bool_comparison`/
+`nonminimal_bool` are documented non-behavioural rewrites. Verified,
+final state on `fix/f280-ci-fmt`:
+
+```
+cargo +1.85.0 fmt --check                                    -> exit 0
+cargo +1.85.0 clippy --all-targets --locked -- -D warnings    -> exit 0
+cargo        clippy --all-targets --locked -- -D warnings    -> exit 0
+cargo nextest run --locked                                    -> 430 passed, 1 skipped
+actionlint .github/workflows/release.yml                      -> exit 0
+```
+
+`cargo nextest run --locked`'s count is unchanged from the F-280 baseline
+(430/1), confirming none of the 18 fixes altered behaviour. Full detail in
+`design/agent-reports/FIX-F280-ci-fmt.md`.
