@@ -193,7 +193,8 @@ M4. The 9-line figure is measured and the command is above.)*
 **And a correction to an earlier claim in this cycle:** the 12 tests in
 `world_readable_output.rs` do **not** convert to unit tests. They exercise real
 file-descriptor types, which is irreducibly a process-level concern. The seam
-buys unit-testability for the *argv and record* half, not the *fd* half.
+buys unit-testability for the *record* half, not the *fd* half — the argv
+guard is `me`'s (§3), so the seam no longer touches the argv work at all.
 
 ---
 
@@ -205,7 +206,8 @@ mnemonic-io-lib/
   src/channel.rs      — --in / --out / `-`, destination classification
   src/fd.rs           — MECHANISM only: see the contract below.
   src/observation.rs  — what was measured, as types (§2.3)
-  src/records.rs      — record stream splitting, the argv gate, kind vocabulary
+  src/records.rs      — record stream splitting ONLY; the argv guard and all
+                        of `--expect` stay in `me` (both need `Class`)
   src/exit.rs         — refusal DECISION types + wording + ordering. NO integers.
   src/remedy.rs       — purge/remedy text, FROM `me` ALONE (§6h)
 ```
@@ -277,8 +279,7 @@ shaping; the guard is the donor's.
 recognises material by asking `me`'s own `classify()` and refusing anything
 `Class::is_argv_forbidden()` accepts — **five** classes, `pass:` included. An
 earlier draft here listed four shapes by hand and was short by one (round-9
-C-1); the classifier defines the set so there is no list to be short. A
-BIP-39 mnemonic by wordlist.
+C-1); the classifier defines the set so there is no list to be short.
 
 **§6d MAKES THE FLAG-NAME LAYER PRIMARY AND ASSIGNS THE UNION TO P0** (spec
 lines 824-841). An earlier draft here demoted it to a *belt*, declined to build
@@ -289,15 +290,14 @@ material no shape test recognises.** That justification was wrong
 
 **P0 builds the value scan; the flag-name layer is FILED, not built (F-268).** An
 earlier draft promised P0 would build the flag-name layer too, then scheduled no
-row, no condition and no
-follow-up for it — a promise with nothing behind it (round-10 I-3). The honest
-position: The classifier scan
-catches everything that *looks* like an artifact; the flag-name layer
-catches what a declared secret-bearing flag carries regardless of shape. **`me`
-declares no such flag today**, so the flag-name layer has no failing gate *in
-this donor* — that is a fact about `me`, not a reason to skip it, and it is why
-the layer's own conformance test is asserted against `mnemonic-toolkit`, which
-declares them. **Nothing in the constellation has a pre-parser guard today** —
+row, no condition and no follow-up for it — a promise with nothing behind it
+(round-10 I-3). The honest position: the classifier scan catches everything
+that *looks* like an artifact; the flag-name layer catches what a declared
+secret-bearing flag carries regardless of shape. **`me` declares no such flag
+today**, so the flag-name layer has no failing gate *in this donor* — that is a
+fact about `me`, not a reason to skip it. The conformance test asserted against
+`mnemonic-toolkit`, which declares such flags, is **F-268's test at P3, not
+P0's** (§7). **Nothing in the constellation has a pre-parser guard today** —
 the toolkit's `env::args`/`args_os` count is **0** as well.
 
 **AN EARLIER DRAFT MEASURED THE WRONG THING AND CONCLUDED FROM IT.** It reported
@@ -348,11 +348,12 @@ stderr* asserted across **every surface** — bare `me`, `bundle`, `sysw wipe`,
 the untouched tree, which made the gate for §6d's ordering unfailable and let
 condition 8 be discharged with the guard absent.
 
-**And the leaking cases are UNEXPECTED POSITIONALS, not declared flags** — so
-they are the **value-shape** layer's business, not the flag-name layer's. `me`
-declares no secret-bearing flag at all.
+**And every leaking case carries the material AS A CLASSIFIABLE TOKEN** —
+unexpected positionals, `sysw show`'s accepted `<FILE>` positional, and
+`--in`/`--in=` values alike — so they are the **value-shape** layer's business,
+not the flag-name layer's. `me` declares no secret-bearing flag at all.
 
-**`--expect` — THE KIND VOCABULARY, enumerated (C3).** `me sysw pack --expect
+**`--expect` — THE KINDS AND WHAT RESOLVES EACH, enumerated (C3).** `me sysw pack --expect
 <kinds>` does not exist yet and is P0's content:
 
 | kind | resolved by | note |
@@ -524,10 +525,10 @@ a build succeed is to drag `me`'s container vocabulary into the shared crate at
 the irreversible step, with the adoption gate written to accept it under a citation.
 **That is C1's shape, one file over.**
 
-**So the split is by REPRESENTATION.** The crate's recognisers work on strings —
-**the crate holds no recognisers at all** — classification is the donor's, and the crate's**
-kind type. `me` maps that kind onto its `Class` and keeps the three predicates.
-Nothing in the crate ever names a `Class` variant.
+**So the split is by CLASSIFICATION, and the crate holds NONE of it.** No
+recognisers, no kind type derived from a record's shape — deciding what a
+string IS is `me`'s job, done by `classify()` against `Class`, and the three
+predicates stay with them. Nothing in the crate ever names a `Class` variant.
 
 **`emit` and `write_private` stay in `me` for now.** `emit` writes the payload
 and `write_private` creates the 0600 file; both are the *act*, not the decision,
@@ -538,15 +539,18 @@ which.** An earlier draft guessed at this list, naming `Admission`, which has
 **zero references in the 464 moved lines**, and omitting **the symbols that actually cross**. That list was measured against the
 **rejected 464-line move** and named `EXIT_OK`/`EXIT_USAGE`/`EXIT_REFUSED` as
 crossing — **under Variant B they do NOT cross**, and citing them here pointed
-the implementer straight at the forbidden publish (round-2 I-1). **The move**
-enumerates the real set against the five-function move, in both directions. **Guessing at a closure
-is what this plan exists to replace.** **The move must enumerate every type and
-constant the moving set references and confirm each is either moved or **reachable
-WITHOUT an inherent impl in the crate** — "already public" is NOT sufficient
-and is precisely what let N-C2 through: `Class` is public, and an inherent
-impl on it still cannot compile outside `me`** —
-a function that compiles only because its enum is in scope has not been moved,
-it has been copied into a file that happens to see it.
+the implementer straight at the forbidden publish (round-2 I-1). The enumeration
+runs against the five-function move, in both directions — and it is DISCHARGED
+at the crate-creation step, not at the in-`me` move: the move lands everything
+beside `Class` in `me`'s own lib half, where `E0116` cannot occur, so only the
+crate boundary can prove it (round-8 M-6). **Guessing at a closure is what this
+plan exists to replace.** The crate-creation step must enumerate every type and
+constant the moving set references and confirm each is either moved or
+**reachable WITHOUT an inherent impl in the crate** — "already public" is NOT
+sufficient and is precisely what let N-C2 through: `Class` is public, and an
+inherent impl on it still cannot compile outside `me` — a function that
+compiles only because its enum is in scope has not been moved, it has been
+copied into a file that happens to see it.
 
 **Boundary lines, from §5a.** No display grouping (`mnemonic-toolkit` already
 owns it, and the four encoders' copies are checksum-gated). No record classes,
@@ -573,13 +577,13 @@ Each step is RED first. No step begins until the previous is green.
 | # | step | the test that must fail first |
 | --- | --- | --- |
 | 1 | **`no_records_guard` returns `Result<Vec<String>, String>`** — the ONE signature change (Variant B). Nothing moves yet. | `me`'s **388 RUN, 388 passed, 1 skipped**, unchanged in meaning; the `EXIT_*` count inside `no_records_guard` goes **1 → 0** |
-| 2 | **Move the five + the stub** — carrying a **pty assertion pinning the terminal refusal BEFORE and AFTER — asserting the exit DIGIT, not `!success()`**, because this is F-265's own site #1 (`refuse_write_block`'s Terminal arm, proven respellable 2→3 with 388/388 green), since none of the 12 `world_readable_output.rs` tests reach it and it could otherwise be lost with every gate green (round-4 C-2) — into `me`'s lib half: `destination`, `stdout_world_readable_mode` (+ its `cfg(not(unix))` twin), `split_record_stream`, `no_records_guard`, `write_block`. **`read_records`, `emit`, `write_private` and every `refuse_*` STAY.** | builds with **`grep -c 'pub const EXIT' main.rs` == 0** and **`grep -c 'EXIT_' `crates/me-cli/src/io.rs`` == 0** — a published constant fails the step. **Plus a real test, not only greps** (round-4 I-1: `cargo build` + two greps are already green on the untouched tree, so they cannot fail). Callers enumerated in BOTH directions. **What actually breaks is the private `Destination`/`WriteBlock` enums and `main.rs`'s `use super::` in `mod tests`; the "four callers outside the closure" figure was measured against the REJECTED move, and both those functions stay** |
+| 2 | **Move the five + the stub** — carrying a **pty assertion pinning the terminal refusal BEFORE and AFTER — asserting the exit DIGIT, not `!success()`**, because this is F-265's own site #1 (`refuse_write_block`'s Terminal arm, proven respellable 2→3 with 388/388 green), since none of the 12 `world_readable_output.rs` tests reach it and it could otherwise be lost with every gate green (round-4 C-2) — into `me`'s lib half, the NEW module `crates/me-cli/src/io.rs` this step creates (it is `me`'s file, so §3's crate tree does not list it): `destination`, `stdout_world_readable_mode` (+ its `cfg(not(unix))` twin), `split_record_stream`, `no_records_guard`, `write_block`. **`read_records`, `emit`, `write_private` and every `refuse_*` STAY.** | builds with **`grep -c 'pub const EXIT' main.rs` == 0** and **`grep -c 'EXIT_' crates/me-cli/src/io.rs` == 0** — a published constant fails the step. **Plus a real test, not only greps** (round-4 I-1: `cargo build` + two greps are already green on the untouched tree, so they cannot fail). Callers enumerated in BOTH directions. **What actually breaks is the private `Destination`/`WriteBlock` enums and `main.rs`'s `use super::` in `mod tests`; the "four callers outside the closure" figure was measured against the REJECTED move, and both those functions stay** |
 | 3 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` → `None`; `me`'s behaviour still unchanged |
 | 4 | `observation.rs` — the payload-kind type **and its pty assertion** | **the assertion is the gate, not the type**: `script -qec 'me sysw wipe --fill zeros'` must NOT emit the word BEARER, asserted on the **emitted words**, pinning the **exit digit** (F-265: `!success()` cannot fail here). Mutation-checked in both directions |
 | 5 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it; and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry. **Blocked on F-264** — see §6 condition 9 |
-| 6 | **The argv guard scans every token of `std::env::args()` before `Cli::parse()` and asks `me`'s OWN classifier** — `classify(token)` then `Class::is_argv_forbidden()`, the union of `is_secret()` and `is_bearer()`, **five** classes (`crates/me-cli/src/sysw/record.rs:105`). **It does not invent a recogniser.** Two earlier drafts enumerated first surfaces and then shapes; both lists came up short — the shape list missed `Class::Passphrase`, the `pass:` record, which `me` refuses at rc 3 as *SECRET key material on ARGV* and which leaks bare (round-9 C-1). A classifier DECODES rather than prefix-matches, so `mt1-2026-08-23-transfer.txt` classifies as a filename and is not refused (round-9 I-1). `=`-joined tokens are split first, **and every token is TRIMMED AND LOWERCASED before classification** — `classify()` does neither, so ` TX:<hex>`, `TX:<hex>` and uppercase `MS1…` all return `Unknown` and leak, measured on 4 and 2 surfaces respectively. The donor's shipped post-parse gate already does trim+lowercase and its comment says why; the pre-parser guard must not be weaker (round-10 I-1). **`--allow-argv-secret` still overrides, its own parse runs here, and the gate asserts it** (round-9 I-3, round-10 I-4): `me sysw pack --allow-argv-secret <ms1>` must still exit **0**, which it does today — so the guard failing to carve it out is a regression the gate catches. | **no secret material in stderr for any argv carrying it AS A TOKEN** — a generated cross-product of `{bare, bundle, sysw, sysw pack, sysw show, sysw wipe, help, sysw help}` × `{positional, --in X, --in=X}` × **every argv-forbidden class, `pass:` included** — not a hand list on any axis. Fails today. **Plus a real ORDERING test**: `me --nosuchflag <ms1>` must exit via the GUARD (rc 3, its wording) and not via clap (rc 2, naming the flag). That distinguishes pre- from post-parse without needing to modify non-test code (round-9 I-4). **Plus POSITIVE CONTROLS, without which a refuse-everything guard passes every row** (round-9 M-4 — `fn guard(_) -> ! { exit(3) }` satisfies absence-of-secret and the ordering test alike): a filename containing an HRP is **packed, not refused**; `me bundle` and `me help` still work — **both are BIP-39 words**, so a per-token wordlist match would refuse them (round-9 M-2); and a legitimate `text:` record packs. **Granularity is the classifier's: a single word is not a mnemonic** (round-9 M-2). **A secret EMBEDDED IN A PATH is out of reach and the plan says so** — `--in /tmp/<ms1>.txt` classifies as `Unknown` because it IS a filename, and refusing it would refuse every legitimate path; that residue is filed as **F-267**, not papered over (round-10 I-2) |
+| 6 | **The argv guard scans every token of `std::env::args()` before `Cli::parse()` and asks `me`'s OWN classifier** — `classify(token)` then `Class::is_argv_forbidden()`, the union of `is_secret()` and `is_bearer()`, **five** classes (`crates/me-cli/src/sysw/record.rs:105`). **It does not invent a recogniser.** Two earlier drafts enumerated first surfaces and then shapes; both lists came up short — the shape list missed `Class::Passphrase`, the `pass:` record, which `me` refuses at rc 3 as *SECRET key material on ARGV* and which leaks bare (round-9 C-1). A classifier DECODES rather than prefix-matches, so `mt1-2026-08-23-transfer.txt` classifies as a filename and is not refused (round-9 I-1). `=`-joined tokens are split first, **and every token is TRIMMED AND LOWERCASED before classification** — `classify()` does neither, so ` TX:<hex>`, `TX:<hex>` and uppercase `MS1…` all return `Unknown` and leak, measured on 4 and 2 surfaces respectively. The donor's shipped post-parse gate normalises for its `tx:` PREFIX ARM ONLY — `trimmed` (`crates/me-cli/src/main.rs:1952`) feeds `by_prefix` (`:1958`) while `classify` receives the RAW token (`:1978`) — so copying the donor's two lines still leaks an uppercase `MS1…`; the pre-parser guard normalises every token BEFORE `classify` and is deliberately STRONGER than the donor's shipped gate (round-10 I-1, round-11 I-1). **`--allow-argv-secret` still overrides, its own parse runs here, and the gate asserts it** (round-9 I-3, round-10 I-4): `me sysw pack --allow-argv-secret <ms1>` must still exit **0**, which it does today — so the guard failing to carve it out is a regression the gate catches. The override is honoured ONLY where the flag is DECLARED: `me` declares it on `sysw pack` alone (`crates/me-cli/src/main.rs:252`), so on every other surface the guard refuses even when argv carries the flag (round-11 M-2). | **no secret material in stderr for any argv carrying it AS A TOKEN** — a generated cross-product of `{bare, bundle, sysw, sysw pack, sysw show, sysw wipe, help, sysw help}` × `{positional, --in X, --in=X}` × **every argv-forbidden class, `pass:` included** × `{canonical, near-miss}` — the near-miss spelling of a carrier is its leading-space and UPPERCASE form (` TX:<hex>`, `MS1…`), both of which leak today, so a guard that skips trim+lowercase goes RED on those rows while every canonical row stays green (round-11 I-1) — not a hand list on any axis. Fails today. **Plus a real ORDERING test**: `me --nosuchflag <ms1>` must exit via the GUARD (rc 3, its wording) and not via clap (rc 2, naming the flag). That distinguishes pre- from post-parse without needing to modify non-test code (round-9 I-4). **Plus the override's SCOPE**: `me sysw pack --allow-argv-secret <ms1>` exits **0** and `me bundle --allow-argv-secret <ms1>` is **still refused by the guard** — rc 3 with the guard's wording, not clap's unknown-flag error — because the override binds only where the flag is declared (round-11 M-2). **Plus POSITIVE CONTROLS, without which a refuse-everything guard passes every row** (round-9 M-4 — `fn guard(_) -> ! { exit(3) }` satisfies absence-of-secret and the ordering test alike): a filename containing an HRP is **packed, not refused**; `me bundle`, `me help` and `me sysw help` are not refused by the guard — asserted as rc unchanged from today's (**2** for `bundle` with no input, **0** for both helps, measured) with stderr never carrying the guard's wording, NOT as bare `.success()`, which `bundle`'s 2 fails for an unrelated reason (round-10 M-4); **three of the eight subcommand shapes are BIP-39 words** (`bundle`, `help`, and `help` again inside `sysw help` — round-10 N-1), so a per-token wordlist match would refuse them (round-9 M-2); and a legitimate `text:` record packs. **Granularity is the classifier's: a single word is not a mnemonic** (round-9 M-2) — and the direction traded away is stated: an UNQUOTED twelve-word mnemonic is twelve tokens, each `Unknown` (measured), so the guard does NOT refuse it; only the quoted, single-token phrase is in its reach (round-10 M-5). **A secret EMBEDDED IN A PATH is out of reach and the plan says so** — `--in /tmp/<ms1>.txt` classifies as `Unknown` because it IS a filename, and refusing it would refuse every legitimate path; that residue is filed as **F-267**, not papered over (round-10 I-2) |
 | 7 | **F-265: pin the exit digit at ALL FIVE sites** — `refuse_write_block` ×2 (Terminal, WorldReadable), `read_records` ×2 (`--in` error, stdin error), `emit` (write failure). All five stay in `me`; this is donor work, and an earlier draft scheduled only site #1 while claiming the table covered all five (round-7 I-1). | each of the five, mutated 2→3 **in the shipped code**, turns the suite RED — proven today to leave it green at 388/388 with the line executing. `!success()` cannot discharge this |
-| 8 | `--expect <kinds>` — the flag and the vocabulary | **every refusal below pins its exit DIGIT** (round-6 I-2 — `--expect` is P0's newest funds-path refusal and nothing pinned its code): `--expect descriptor,cosigner` **refuses an `md1`-only payload**; `--expect descriptor,transaction` refuses a stream with no transaction; **refuses an incomplete `md1` set AND an incomplete `mt1` set** (three walks, §6g); `--allow-unsigned-inputs --expect transaction` **does NOT falsely refuse** |
+| 8 | `--expect <kinds>` — the flag and the vocabulary, implemented in `me`: the kinds resolve through `Class`, `Admission` and the HRP discriminant, none of which the crate may name (§3) | **every refusal below pins its exit DIGIT** (round-6 I-2 — `--expect` is P0's newest funds-path refusal and nothing pinned its code): `--expect descriptor,cosigner` **refuses an `md1`-only payload**; `--expect descriptor,transaction` refuses a stream with no transaction; **refuses an incomplete `md1` set AND an incomplete `mt1` set** (three walks, §6g); `--allow-unsigned-inputs --expect transaction` **does NOT falsely refuse** |
 | 9 | **`exit.rs` FIRST, then `channel.rs`** | **`--out` overwrite is asserted where it LIVES — `write_private`, which stays in `me`** (round-3 M-3); `channel.rs` holds only `destination`, so gating the overwrite on it would gate nothing. **`-` is IMPLEMENTED**; every code `me` produces today reproduced **byte-for-byte**, differentially against the pre-change binary — not by matching a table |
 | 9b | **CREATE `mnemonic-io-lib` and move the lib-half modules into it.** Until here everything lives in `me`'s lib half; this is the crate boundary, and it is a step because no earlier one created it (round-3 M-4). | the crate builds standalone; `me` depends on it by path; **no `EXIT_*` and no `Class` in it** |
 | 10 | `me` consumes the crate | **the 388 pre-existing tests still pass, plus every test added along the way** — an earlier draft said "all 388", which is wrong by construction once the intervening work adds tests (round-3 M-5); **with the diff to them enumerated and each edit justified by a named finding** |
@@ -695,8 +699,9 @@ change" and the split to hold "no policy assertion" *of the same function*,
 which cannot both be true, and the reading that satisfied the first published
 `me`'s mask as the crate's mechanism.
 
-**The move is not a refactor to skip.** It is the step that proves the closure is
-really 11 and not more.
+**The move is not a refactor to skip.** It is the step that proves the moving
+set's closure is complete — that the five functions and the stub reference
+nothing the enumeration missed.
 
 **The `#[cfg(not(unix))]` stub of `stdout_world_readable_mode`
 (`crates/me-cli/src/main.rs:921`) is a 12th definition and moves with its twin**
@@ -804,15 +809,15 @@ before publishing; do not trust a check from an earlier session.
 9. **F-264 fixed, because the remedy gate cannot pass otherwise.** `me`'s zsh
    recipe removes nothing when run immediately — the entry is still in memory
    and `sed -i` edits a file that does not contain it. **That gate demands the
-   recipe actually work**, so P0 fixes the recipe (`fc -W`, edit, `fc -R`)
-   **The remedy must make the recipe WORK** — flush, edit, reload (`fc -W`, `sed -i`, `fc -R`). Merely rewording the message to say "exit the shell first"
+   recipe actually WORK** — flush, edit, reload: `fc -W`, `sed -i`, `fc -R`.
+   Merely rewording the message to say "exit the shell first"
    is honest but **cannot make the gate green**, and under "no step begins
    until the previous is green" that would stall everything after it
    (round-3). If the recipe genuinely cannot be made to work, that is a
    finding to raise, not a wording to settle for. Owning phase in `FOLLOWUPS.md` is already P0.
 10. **F-265 fixed at ALL FIVE SITES, with a step that does it.** All five stay in
    `me` — `refuse_write_block` ×2, `read_records` ×2, `emit` — so this is work P0
-   does **in the donor**, and **the digit-pinning work edits all five.** An
+   does **in the donor**, and **the five-site digit pin edits all five.** An
    earlier draft scheduled only site #1; a later one then rewrote the sentence
    admitting that into a claim the table already covered all five, **turning an
    honest gap into a false statement about this plan's own table** (round-7
@@ -848,4 +853,24 @@ before publishing; do not trust a check from an earlier session.
   **overdue, not deferred**, so this is re-assigned rather than left to drift:
   **P1 owns it**, and `FOLLOWUPS.md` records that reassignment. F-259 stays with P0 — it is `me`'s, and `observation.rs` is where it is
   prevented.
+- **Three §7-P0 spec assignments land in `me`, not in the crate — recorded as
+  a DEPARTURE, not left implicit.** Spec §7 P0's row assigns to *the shared
+  crate* the argv guard with pre-parser ordering, `me sysw pack --expect` in
+  full, and §6d's flag-name layer. P0 builds the first two **in the donor**:
+  both resolve through `me`'s `Class` (and `--expect` also through `Admission`
+  and the HRP discriminant), and siting `Class`-dependent code in the crate is
+  the reproduced `error: cyclic package dependency` (round-10 C-1). **The
+  crate contributes NOTHING to the argv-guard or `--expect` work** — the
+  honest answer round 10 asked to see written; its P0 contribution is the seven
+  files §3's table assigns it, and later phases consume the guard and
+  `--expect` as donor precedent, not as crate API. The flag-name layer is not
+  built at all this phase: **P0 ships §6d's value-shape layer only; the
+  flag-name layer is F-268, owned by P3** — the phase whose own gate names
+  `restore --passphrase` and `electrum-decrypt --decrypt-password`, the flags
+  §6d rules the value scan cannot see. F-268's original trigger — the first
+  secret-bearing flag in any m-format CLI — was **already satisfied when it
+  was filed**: `mnemonic restore --passphrase` ships in the toolkit today, so
+  under the constellation rule the layer was overdue the moment it was
+  deferred. Naming P3 as owner is what makes it deferred rather than overdue
+  (round-11 I-2).
 - Anything the nine prior spec rounds closed.

@@ -11794,9 +11794,13 @@ the list as exhaustive** — it was assembled by hand twice and came up short
 both times.
 
 **The mechanism is the one this repo already documented as `mt`'s.** The guard
-runs after `Cli::parse()`, so any surface where clap rejects the argument first
-prints it. Every other surface takes no positional, so **clap rejects the
-argument and names it** — printing the secret. `grep -c 'env::args'` over
+runs after `Cli::parse()`, and only `me sysw pack`'s positional-records path
+reaches it. On a surface that declares no positional, **clap rejects the
+argument and names it** — printing the secret. `me sysw show` DOES declare one
+(`<FILE>`, `crates/me-cli/src/main.rs:275`), so there the token is accepted as
+a filename and reaches stderr through the file-open error instead (measured:
+rc 2, `No such file or directory`, naming the token). And `--in <ms1>` /
+`--in=<ms1>` leak as a DECLARED flag's value. `grep -c 'env::args'` over
 `crates/me-cli/src/main.rs` returns **0**: nothing runs before `Cli::parse()`.
 
 **The secret then lands in the terminal scrollback, and in whatever captured
@@ -11850,7 +11854,7 @@ filename containing key material puts that material in shell history, `/proc`,
 and any error message naming the path. That belongs with the purge guidance, not
 in a guard.
 
-### F-268 — the flag-name argv layer is normative in §6d and built by nobody (owning phase: **after P0**) `#constellation` `#security`
+### F-268 — the flag-name argv layer is normative in §6d and built by nobody (owning phase: **P3**) `#constellation` `#security`
 
 **Filed 2026-08-27.** Spec §6d calls the flag-name layer **the primary layer**
 and assigns the union to P0. P0 builds the **value scan** — every token
@@ -11866,9 +11870,15 @@ shape test recognises.** The value scan does not dominate it.
 `args_os` are **0** in `mnemonic-toolkit` as well as in `me`. So this is not a
 gap P0 opens; it is one P0 declines to close, deliberately and in writing.
 
-**Owning phase: whichever cycle first adds a secret-bearing flag to any m-format
-CLI.** At that moment the layer stops being theoretical, and this entry is what
-stops it being rediscovered.
+**Owning phase: P3 — corrected 2026-08-27 (R0 round 11, I-2).** The original
+trigger — the first secret-bearing flag in any m-format CLI — was already
+satisfied when this entry was filed: `mnemonic restore --passphrase
+<PASSPHRASE>` and `--passphrase-stdin` ship in the toolkit today (declared in
+its `cmd/slip39` module at line 101; its `flag_is_secret`, secrets module lines
+60-68, also lists `--bip38-passphrase` and `--decrypt-password`), and spec §7
+P3's gate names two of those flags. A trigger already met is an owning phase
+already due, so the layer is assigned to P3 — the phase whose gate needs it —
+rather than left on a condition that can never fire again.
 
 ### F-269 — operator override: fable folds R11 and R12, and fable performs the final review (owning phase: **recorded, not work**) `#process` `#record`
 
@@ -11900,3 +11910,27 @@ separate dispatch satisfies it.
 **What this entry does NOT do:** it does not amend `CLAUDE.md`. The standing
 rule remains as written and continues to bind the controller. This is one
 operator-directed exception, scoped to this artifact and these two folds.
+
+### F-270 — `me`'s shipped post-parse gate normalises for its `tx:` prefix arm only, so a near-miss secret of any OTHER class is refused for the wrong reason (owning phase: **P0**) `#me` `#security`
+
+**Filed 2026-08-27**, from R0 round 10's M-6 on the P0 plan, carried by round
+11. The post-parse argv gate builds a normalised copy of each record —
+`crates/me-cli/src/main.rs:1952` — but feeds it only to the `tx:` prefix arm
+(`:1958`); `classify` receives the RAW token (`:1978`), and `classify` itself
+neither trims nor case-folds. So the near-miss protection the gate's own
+comment describes — refuse "for the BEARER reason rather than three screens
+later for a formatting one" — exists for one class of five.
+
+**Measured 2026-08-27**, streams separated, rc taken directly: `me sysw pack`
+on ` pass:<hex>` (leading space) and on an uppercase `MS1…` record both
+classify `Unknown` and are refused as *not a form this container can place* at
+**rc 4**, not as *SECRET key material on ARGV* at rc 3 — the wrong reason at
+the wrong code, and the message points the operator at `sysw::classify` rather
+than at purging their history. (Neither message names the body; the leak
+surfaces are the clap-echo ones F-266 records, not this one.)
+
+**Owning phase: P0** — the pre-parser guard P0 builds normalises every token
+before `classify`, which closes the argv path outright; the post-parse arm is
+in exactly the code P0 rewrites, so it gets the same one-line normalisation in
+passing. The cheapest moment to fix a gate is the phase already holding it
+open.
