@@ -38,7 +38,24 @@ fn run(args: &[&str], stdin: &str) -> Output {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    c.stdin.as_mut().unwrap().write_all(stdin.as_bytes()).unwrap();
+    // A BROKEN PIPE HERE IS THE BEHAVIOUR UNDER TEST, NOT AN ERROR.
+    //
+    // Half these cases assert that `me` REFUSES a surface, and a refusal is
+    // supposed to arrive before anything is read -- so the child can exit while
+    // this write is still in flight, closing the pipe under it. Unwrapping made
+    // the helper lose a race it should never have been running: measured 8 of 8
+    // failures locally under nextest, which runs test binaries in parallel,
+    // against `ok` in CI, where `cargo test` runs them serially on a slower
+    // machine. That is a test that goes red on load rather than on a defect,
+    // and it sat inside the required status check.
+    //
+    // Any OTHER write error is still fatal -- a broken pipe is the one outcome
+    // the child is entitled to produce.
+    match c.stdin.as_mut().unwrap().write_all(stdin.as_bytes()) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => {}
+        Err(e) => panic!("writing {} bytes to `me {args:?}` stdin: {e}", stdin.len()),
+    }
     c.wait_with_output().unwrap()
 }
 
