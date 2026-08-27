@@ -6,7 +6,11 @@ written until this closes an R0 round at 0C/0I.
 **Gates this plan is checked by** — run each **separately** from the commit:
 `scripts/plan-stepref-check.sh` (prose may not name a step number),
 `scripts/plan-table-check.sh`, `scripts/plan-cite-check.sh`,
-`scripts/fold-propagation-check.sh`.
+`scripts/fold-propagation-check.sh <this file> '<phrase>'…` — **it takes the
+phrasings the fold RETRACTS as arguments**; with none it prints *nothing to
+check* and exits 2, which reads like a failure and checks nothing (round-7
+M-6). **Run each gate as its own command, never in the same shell line as the
+commit** — a red gate has failed to stop a commit three times in this cycle.
 
 **Source spec:** `SPEC_constellation_cli_uniformity.md` §5a (the crate and its
 four boundary lines), §5b (the four verbs), §6b/§6d/§6f/§6h (the rules being
@@ -263,16 +267,21 @@ mutation both verified — **and running it found a live defect in `me`**, filed
 as **F-264**. That is the argument for condition 5 in one line: the test was
 worth writing because it failed.
 
-**`records.rs` — the PRE-PARSER argv guard (C2).** Two layers, both running on
-raw `std::env::args()` **before `Cli::parse()`**:
+**`records.rs` — the PRE-PARSER argv guard, ONE layer in this donor (C2, and
+round-7 C-1).** It runs on raw `std::env::args()` **before `Cli::parse()`** and
+recognises material by **value shape**: `tx:` by prefix, `mt1`/`ms1` by HRP, a
+BIP-39 mnemonic by wordlist.
 
-1. **FLAG-NAME.** Match known secret-bearing flag names as strings. The names are
-   static, so this needs no parse. `mnemonic-toolkit` already proves the shape
-   with `NodeType::is_argv_secret_bearing` and a lockstep parity test — **P0
-   adopts that shape rather than inventing one.**
-2. **VALUE-SHAPE, additive.** For material arriving positionally where no flag
-   declares it: `tx:` by prefix, `mt1`/`ms1` by HRP, a BIP-39 mnemonic by
-   wordlist. `mt` and `me` have this today and it stays.
+**A flag-name layer is specified but has no observable HERE.** `me` declares no
+secret-bearing flag, so a gate written against one is **green on the untouched
+tree and cannot fail** — which is exactly how an earlier draft discharged §6d's
+ordering with the guard absent. Measured: a real `ms1` on `--mnemonic`,
+`--seed` or `--passphrase` never reaches stderr, because clap names the flag.
+`mnemonic-toolkit` **does** declare such flags and proves the shape with
+`NodeType::is_argv_secret_bearing`; **the parity test is asserted there.**
+
+**Every one of F-266's four leaking surfaces is an unexpected POSITIONAL**, so
+value-shape is the layer that closes them.
 
 **The ordering is NORMATIVE, and `mt`'s source records why.** When the check
 lived inside the `encode` subcommand, clap rejected the unexpected positional
@@ -537,8 +546,8 @@ Each step is RED first. No step begins until the previous is green.
 | 3 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` → `None`; `me`'s behaviour still unchanged |
 | 4 | `observation.rs` — the payload-kind type **and its pty assertion** | **the assertion is the gate, not the type**: `script -qec 'me sysw wipe --fill zeros'` must NOT emit the word BEARER, asserted on the **emitted words**, pinning the **exit digit** (F-265: `!success()` cannot fail here). Mutation-checked in both directions |
 | 5 | `remedy.rs` | the zsh remedy never **OFFERS** `history -d` — it must still NAME it to warn against it; and the emitted recipe, **RUN under a real interactive zsh**, actually removes the entry. **Blocked on F-264** — see §6 condition 9 |
-| 6 | `records.rs` layer 1 — **pre-parser** flag-name guard on raw argv, **AND `me`'s `--allow-argv-secret` moved off clap** | **the observable is that no `ms1` appears in stderr for an argv clap would otherwise reject** — that is what pre-parser ordering means from outside, and it is the only gate here whose whole content is an ordering claim (round-3 M-7). Asserted end-to-end in the donor, not only as a crate unit test (round-1 N-I3); toolkit parity against `NodeType::is_argv_secret_bearing` in addition, never instead. **`--allow-argv-secret` must still PARSE afterwards** — it is a clap field today (`crates/me-cli/src/main.rs:252`, consumed at `:1116` and `:1127`), and moving the decision off clap without leaving the flag declared turns a valid invocation into a usage error, regressing the very flag P0 is told not to regress |
-| 7 | `records.rs` layer 2 — value-shape, additive. **This is the layer F-266's leaks belong to** — they are unexpected positionals, not declared flags | the argv gate refuses by class **pinning the exit digit**, with the override, **as unit tests**; **no `ms1` in stderr across ALL surfaces** — bare `me`, `bundle`, `sysw wipe`, `sysw show`, `sysw pack` — which fails on today's tree; `me sysw pack --nosuchflag <ms1…>` still does not echo the secret |
+| 6 | **The argv guard, ONE layer not two.** `me` declares **no secret-bearing flag**, so a flag-name layer has no observable in this donor at all — that is why an earlier draft's gate for it could not fail (round-7 C-1). The guard runs on raw `std::env::args()` before `Cli::parse()`, and recognises material by **value shape**: `ms1`/`mt1` by HRP, `tx:` by prefix, a BIP-39 mnemonic by wordlist. **This is the layer F-266's leaks belong to** — every one is an unexpected positional. | **`no ms1 in stderr` across ALL surfaces** — bare `me`, `bundle`, `sysw wipe`, `sysw show`, `sysw pack` — which **FAILS on today's tree** (F-266). Plus `grep -c 'env::args'` over `main.rs` goes **0 → non-zero**: a guard that has not moved off clap cannot pass. The override's own parse is decided there too, and **`--allow-argv-secret` must still parse afterwards**. Flag-name parity against `mnemonic-toolkit`'s `NodeType::is_argv_secret_bearing` is asserted **there**, where such flags exist |
+| 7 | **F-265: pin the exit digit at ALL FIVE sites** — `refuse_write_block` ×2 (Terminal, WorldReadable), `read_records` ×2 (`--in` error, stdin error), `emit` (write failure). All five stay in `me`; this is donor work, and an earlier draft scheduled only site #1 while claiming the table covered all five (round-7 I-1). | each of the five, mutated 2→3 **in the shipped code**, turns the suite RED — proven today to leave it green at 388/388 with the line executing. `!success()` cannot discharge this |
 | 8 | `--expect <kinds>` — the flag and the vocabulary | **every refusal below pins its exit DIGIT** (round-6 I-2 — `--expect` is P0's newest funds-path refusal and nothing pinned its code): `--expect descriptor,cosigner` **refuses an `md1`-only payload**; `--expect descriptor,transaction` refuses a stream with no transaction; **refuses an incomplete `md1` set AND an incomplete `mt1` set** (three walks, §6g); `--allow-unsigned-inputs --expect transaction` **does NOT falsely refuse** |
 | 9 | **`exit.rs` FIRST, then `channel.rs`** | **`--out` overwrite is asserted where it LIVES — `write_private`, which stays in `me`** (round-3 M-3); `channel.rs` holds only `destination`, so gating the overwrite on it would gate nothing. **`-` is IMPLEMENTED**; every code `me` produces today reproduced **byte-for-byte**, differentially against the pre-change binary — not by matching a table |
 | 9b | **CREATE `mnemonic-io-lib` and move the lib-half modules into it.** Until here everything lives in `me`'s lib half; this is the crate boundary, and it is a step because no earlier one created it (round-3 M-4). | the crate builds standalone; `me` depends on it by path; **no `EXIT_*` and no `Class` in it** |
@@ -764,7 +773,7 @@ before publishing; do not trust a check from an earlier session.
 9. **F-264 fixed, because the remedy gate cannot pass otherwise.** `me`'s zsh
    recipe removes nothing when run immediately — the entry is still in memory
    and `sed -i` edits a file that does not contain it. **That gate demands the
-   recipe actually work**, so P0 either fixes the recipe (`fc -W`, edit, `fc -R`)
+   recipe actually work**, so P0 fixes the recipe (`fc -W`, edit, `fc -R`)
    **The remedy must make the recipe WORK** — flush, edit, reload (`fc -W`, `sed -i`, `fc -R`). Merely rewording the message to say "exit the shell first"
    is honest but **cannot make the gate green**, and under "no step begins
    until the previous is green" that would stall everything after it
@@ -772,10 +781,11 @@ before publishing; do not trust a check from an earlier session.
    finding to raise, not a wording to settle for. Owning phase in `FOLLOWUPS.md` is already P0.
 10. **F-265 fixed at ALL FIVE SITES, with a step that does it.** All five stay in
    `me` — `refuse_write_block` ×2, `read_records` ×2, `emit` — so this is work P0
-   does **in the donor**, and **the table carries a step that edits all five** —
-   an earlier draft scheduled only site #1 and left four unscheduled, while a
-   a sentence three lines below asserted the opposite of what this condition
-   rests on (round-6 I-1). Five refusals can swap exit
+   does **in the donor**, and **the digit-pinning work edits all five.** An
+   earlier draft scheduled only site #1; a later one then rewrote the sentence
+   admitting that into a claim the table already covered all five, **turning an
+   honest gap into a false statement about this plan's own table** (round-7
+   I-1). That work is in the table now. Five refusals can swap exit
    **2 for 3** with all 388 tests green, proven against the unmodified binary.
    **P0 touches all five while extracting their neighbours**, and a refactor
    over an untested distinction is how the distinction dies. **Every gate in §4
@@ -805,7 +815,6 @@ before publishing; do not trust a check from an earlier session.
   adoption in P1, and a P0 that edited `mt`'s message would contradict its own
   scope. Under the constellation rule an item whose owning phase has passed is
   **overdue, not deferred**, so this is re-assigned rather than left to drift:
-  **P1 owns it**, and `FOLLOWUPS.md` is updated in this same fold rather than
-  later. F-259 stays with P0 — it is `me`'s, and `observation.rs` is where it is
+  **P1 owns it**, and `FOLLOWUPS.md` records that reassignment. F-259 stays with P0 — it is `me`'s, and `observation.rs` is where it is
   prevented.
 - Anything the nine prior spec rounds closed.
