@@ -481,9 +481,10 @@ column belong where they are. `mt` carries exactly the four and is the shape the
 criterion describes; `md`, `mk` and `ms` have each accreted work that reads as
 fancy-processing tier — `split`/`combine` is secret sharing, `compile`/
 `descriptor` is miniscript processing, `derive` is key derivation, and
-`repair` is duplicated in the toolkit as well. **Whether those move is the tier
-cycle's question, not this spec's**, and it is recorded here so that cycle starts
-from a measurement instead of an impression.
+`repair` is duplicated in the toolkit as well. **§5c answers it: five move and
+`repair` stays — decided here, executed by the tier cycle.** This paragraph is
+the measurement that ruling reasons from, kept so the decision is traceable to
+data rather than impression.
 
 **The shared crate holds none of these verbs.** It holds what sits underneath
 them — `--in`/`--out`/`-`, the argv guard, the write gate, the exit-code table,
@@ -513,8 +514,11 @@ This settles what §5b parked. Applying §5b's criterion — a verb stays when i
 reversal is the useful part: it is the only one of the six that carries a
 cross-CLI normative rule. **D26's parity set is `md repair` / `mk repair` /
 `ms repair` / `mnemonic repair`**, quoted in `md repair --help`'s own shipped
-text and governing §6f's exit-code table, and `repair` appears on **39 lines** of
-this document (`grep -ic repair`, re-measured after §5c). Moving it would have collapsed that set to one member and made
+text and governing §6f's exit-code table, and `repair` is **the most-referenced
+verb in this document** (`grep -ic repair` — no figure is quoted, deliberately:
+the count is self-referential, so any prose stating it falsifies itself the
+moment that prose is written. Two earlier revisions each wrote a number that was
+already stale on arrival, the second inside the fold correcting the first). Moving it would have collapsed that set to one member and made
 three things false rather than outdated — the shipped help text, §6f's three
 encoder rows, and D26's normative statement.
 
