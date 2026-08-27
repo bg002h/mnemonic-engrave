@@ -11456,3 +11456,56 @@ return a value the caller emits, or take a `&mut impl Write`. The second keeps
 the call sites terse and makes the tests direct; the first is a larger diff at
 every call site. **Either is fine; discovering the question mid-implementation is
 not.**
+
+### F-259 — `me sysw wipe` tells the operator a zeros image is BEARER, because "carries no secret" rides the `--allow-world-readable` parameter and the terminal arm ignores it (owning phase: **P0**, or sooner) `#me` `#ux` `#shipped`
+
+**Found 2026-08-26** by the io-seam design review, in code **published as v0.7.0
+the same day**. Reproduced on a real pty:
+
+```
+$ script -qec "me sysw wipe --fill zeros" /dev/null
+me: stdout is a TERMINAL, and this payload is BEARER.
+Writing it here would paint 65536 bytes of raw binary across your scrollback — ...
+  exit 2
+```
+
+**The payload is a 65,536-byte zero fill image, and the code says so itself.**
+
+**The mechanism is a parameter carrying two different meanings.** `main.rs:1385`
+declares `const WIPE_IMAGE_CARRIES_NO_SECRET: bool = true` and passes it to
+`emit()` in the `allow_world_readable` position. That argument reaches
+`write_block(out_given, allow_world_readable, stdout_is_tty, world_readable_mode)`
+— whose terminal arm is unconditional:
+
+```rust
+// `--allow-world-readable` does NOT override this. It says "this file's
+// permissions are my problem"; it is not a request to paint a bearer
+// container across a scrollback, and the message offers a file route.
+Destination::Terminal => WriteBlock::Terminal,
+```
+
+So one `bool` means **"the operator accepts file-permission risk"** to the flag
+and **"this payload is not secret"** to `wipe`. The terminal arm deliberately
+discards the first — and in doing so silently discards the second, which it was
+never told about.
+
+**The refusal is arguably RIGHT; the stated reason is FALSE.** Painting 64 KB of
+binary across a scrollback is worth refusing whatever the secrecy. But the
+message asserts something untrue about the operator's data, and that costs twice:
+someone who wipes may believe they exposed a secret, and everyone learns the
+BEARER label is unreliable. **A guard that fires for a good reason while stating
+a false one is worse than one that says nothing.**
+
+**Why every test missed it.** `write_block`'s unit test at `main.rs:2212` asserts
+`write_block(false, true, true, None) == W::Terminal` — correct for the *flag's*
+meaning, and its comment argues exactly that case. It never contemplates the
+second meaning, so it locks the defect in while reading as deliberate. And all 12
+tests in `world_readable_output.rs` redirect to files, so **none reaches the
+terminal arm at all**.
+
+**The fix is a separate channel, not a changed rule.** `wipe`'s "carries no
+secret" needs its own parameter or a payload-kind enum; the terminal refusal
+should stay and its message should say *what is actually true* — a large binary
+image, not a bearer secret. **A `bool` that two callers read differently is what
+a type prevents**, and this is the argument for the record-vocabulary half of
+`mnemonic-io-lib` rather than an argument against the terminal gate.
