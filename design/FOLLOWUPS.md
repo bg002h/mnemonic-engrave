@@ -11509,3 +11509,50 @@ should stay and its message should say *what is actually true* — a large binar
 image, not a bearer secret. **A `bool` that two callers read differently is what
 a type prevents**, and this is the argument for the record-vocabulary half of
 `mnemonic-io-lib` rather than an argument against the terminal gate.
+
+### F-260 — `mt encode` refuses mode 0620 saying it "grants read to group or others", when no read bit is set (repo: **mnemonic-transaction**; owning phase: **P0**) `#mt` `#ux` `#shipped`
+
+**Found 2026-08-26** while machine-checking the io-seam review's counterexample.
+Reproduced with a valid transaction and a 0600 control that passes:
+
+```
+stdout mode 0600 -> mt encode exit 0, 796 bytes
+stdout mode 0620 -> mt encode exit 1:
+  "REFUSED — §8.2h, stdout is a file of mode 0620 — its permissions grant
+   read to group or others"
+```
+
+**Mode 0620 grants group WRITE. It grants read to nobody but the owner:**
+
+| | owner | group | other |
+| --- | --- | --- | --- |
+| 0620 | `rw-` | `-w-` | `---` |
+| group read bit (4) | | **not set** | |
+| `0620 & 0o044` (any read outside owner) | | **`0`** | |
+
+**The refusal is defensible; the reason is false.** `mt`'s gate masks `0o077`
+(`validate.rs:585,653`) — *every* group and other bit, including write — and a
+group-writable destination **is** a real hazard: someone else can alter the
+strings before they are cut. That is worth refusing. But the message names the
+one hazard that is **not** present.
+
+**This is F-259's exact shape in a second repo, found the same day** — a guard
+firing for a good reason while asserting something untrue about the operator's
+situation. F-259: `me` calls a zeros image BEARER. Here: `mt` calls a
+write-only mode readable. **The pattern is a message hard-coded to the rule's
+*name* rather than derived from what was actually measured**, and it costs the
+same twice over: the operator fixes the wrong thing, and learns the diagnostics
+are unreliable.
+
+**`me` is NOT affected on this axis** — checked, not assumed. Its mask is
+`0o044` (`main.rs:912`), read bits only, so its "world-readable" wording matches
+what it tests. The two tools disagree about the *rule*, and only `mt` misstates
+it.
+
+**Why this belongs to P0 rather than a `mt` patch.** The divergence is the
+io-seam review's load-bearing counterexample: `mt` and `me` ship near-identical
+*mechanism* (`fstat`, mask, extract mode) and deliberately different *policy*
+(which bits are disqualifying). The shared crate should carry the mechanism and
+the **vocabulary for describing what was measured** — a message derived from the
+observed mode cannot say "read" about a mode with no read bits, whereas a
+hard-coded string can and does.
