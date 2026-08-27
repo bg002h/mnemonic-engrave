@@ -13167,6 +13167,22 @@ then invoking `target/debug/me` is measuring a mutated binary, silently.
 *next build* correct and leaves the *current binary* wrong, and the gap between
 those two is exactly where a hand measurement lands.
 
+
+**CONTROLLER ASSESSMENT 2026-08-27, measured rather than assumed: LATENT here,
+not live.** `scripts/mutation-run.py` in this repo never rebuilds — zero hits for
+`cargo build` across the file — so it does leave a stale binary exactly as the
+sibling's shell script did. What differs is what runs next. In `mt` the order was
+coverage → mutation → journeys, and journeys executes a **prebuilt binary**, so
+the stale artifact was consumed and a real RED stayed hidden. This repo's CI runs
+`cargo test --locked` and the Go suites, all of which rebuild, and it has no
+prebuilt-binary gate after mutation at all. So the defect is present and
+currently unreachable.
+
+**That makes it a trap rather than a bug**: the day someone adds a journey script
+or any gate that runs `target/debug/me` after the mutation step, it becomes the
+`mt` defect with no warning. The fix is the same one-liner — rebuild after
+restoring — and it costs nothing to apply before that day rather than after.
+
 ### F-323 — `mt decode --json --quiet` emits no JSON at all: `--quiet` silently disables `--json` (repo: **mnemonic-transaction**; owning phase: **P2**, which owns `--json`) `#cli` `#json`
 
 **Found 2026-08-27** while wiring F-275's warning into `decode`'s `--json` path.
