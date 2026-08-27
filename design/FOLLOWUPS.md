@@ -11907,9 +11907,17 @@ the persisted report rather than the folder's account of it. *"Author ≠ review
 on the same artifact"* is about context, not about model identity, and a
 separate dispatch satisfies it.
 
+**EXTENDED 2026-08-27:** the operator further directed that **the whole
+implementation diff go to fable for review immediately before
+`cargo publish`** — a pre-irreversible gate, which is the case `CLAUDE.md` names
+most explicitly among those the controller may not propose. The extension is
+the operator's, on the same reasoning: the models that had not been tried are
+the ones worth trying at the step that cannot be undone.
+
 **What this entry does NOT do:** it does not amend `CLAUDE.md`. The standing
-rule remains as written and continues to bind the controller. This is one
-operator-directed exception, scoped to this artifact and these two folds.
+rule remains as written and continues to bind the controller. These are
+operator-directed exceptions, scoped to this artifact: two folds, the final
+plan review, and the pre-publish review.
 
 ### F-270 — `me`'s shipped post-parse gate normalises for its `tx:` prefix arm only, so a near-miss secret of any OTHER class is refused for the wrong reason (owning phase: **P0**) `#me` `#security`
 
@@ -11957,6 +11965,7 @@ last in the table.
 | **no `path` or `git` dependency** in the manifest | crates.io **refuses** git deps outright, and `me-cli` already carries one pinned to a rev — if the new crate inherits anything like it, the publish fails at the last gate |
 | working tree clean, all rows committed | `cargo publish` packages the tree, not the commit |
 | rows 1–11 green, 388+ tests passing | the plan's own condition |
+| **a fable review of the whole implementation diff, 0C/0I** | operator-directed (F-269, extended); runs **before** the pre-flight commands above, since a finding there changes what gets published |
 
 **A 404 is availability at a moment, not a reservation.** Nothing holds the
 name until the publish lands, so the check is re-run at the moment of
