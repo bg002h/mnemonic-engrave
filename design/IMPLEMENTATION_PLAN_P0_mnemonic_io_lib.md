@@ -213,14 +213,36 @@ as having the pre-parser guard**; P0 must not regress it while adding one.
 **`--expect` — THE KIND VOCABULARY, enumerated (C3).** `me sysw pack --expect
 <kinds>` does not exist yet and is P0's content:
 
-| kind | admits `Class` | recognised by |
+| kind | resolved by | note |
 | --- | --- | --- |
-| `transaction` | **`Mt` ∪ `Tx`** — the union is deliberate | `mt1` HRP, or the `tx:` prefix |
-| `descriptor` | `Descriptor`, `MdMk` | `md1`/`mk1` HRP |
-| `mnemonic` | `Mnemonic` | BIP-39 wordlist |
-| `secret` | `Codex32Secret` | `ms1` HRP |
-| `passphrase` | `Passphrase` | flag-declared only |
-| `address` | `Address` | address parse |
+| `descriptor` | **HRP `'d'`** (`md1`) | **NOT by `Class`** — see below |
+| `cosigner` | **HRP `'k'`** (`mk1`) | **NOT by `Class`** — see below |
+| `transaction` | `Class::Mt` ∪ `Class::Tx` | the union is deliberate |
+| `mnemonic` | `Class::Mnemonic` | BIP-39 wordlist |
+| `secret` | `Class::Codex32Secret` | `ms1` HRP |
+| `passphrase` | `Class::Passphrase` | flag-declared only |
+
+**`descriptor` and `cosigner` MUST NOT resolve through `Class` (N-C1).** `me`'s
+`Class` has a **single `MdMk` variant covering both**, so a `Class`-keyed
+`--expect descriptor,cosigner` cannot tell a descriptor card from a cosigner
+card — and that is the funds case §6g exists for: `--expect descriptor` would be
+satisfied by the `md1` records alone, so **a refusing `mk encode` still yields
+exit 0 with the cosigner card missing**, and the operator believes a backup is
+complete when it is not.
+
+The discriminant is one level down and P0 uses it: `mdmk_unconfirmed` already
+groups by `(hrp, chunk_set_id)` and switches on the HRP character — **`'d'`
+reassembles through `md_codec`, `'k'` through `mk_codec`.** An earlier draft of
+this table mapped `descriptor` to `Descriptor`+`MdMk` jointly and omitted
+`cosigner` entirely, which made §10's acceptance command
+`--expect descriptor,cosigner,transaction` **unsatisfiable** — and §10 says it
+must be RUN.
+
+**`address` is NOT in the vocabulary, deliberately.** `Class::Address` and
+`Class::Descriptor` are never produced by `classify` — `me sysw pack` refuses an
+address record at **rc=4**, *"Descriptors and addresses are not yet classifiable
+here"*. A kind that can never be satisfied is worse than an absent one: it turns
+a gate into a permanent refusal.
 
 `Class` has ten variants — `Mnemonic`, `Codex32Secret`, `Passphrase`,
 `FreeText`, `Descriptor`, `MdMk`, `Mt`, `Tx`, `Address`, `Unknown`. **`FreeText`
@@ -266,12 +288,38 @@ six; without this table a reader cannot tell where a function lands:
 | --- | --- |
 | `channel.rs` | `destination`, `refuse_terminal_destination` |
 | `fd.rs` | `stdout_world_readable_mode` (**split**, C1), its `cfg(not(unix))` stub |
-| `records.rs` | `read_records`, `split_record_stream`, `no_records_guard`, `is_secret`, `is_bearer`, `is_argv_forbidden` |
+| `records.rs` | `split_record_stream`, `no_records_guard`, the string-level recognisers (prefix / HRP / wordlist), and the pre-parser argv machinery |
 | `observation.rs` | the payload-kind and mode types (F-259, F-260) |
 | `exit.rs` | `write_block`, `refuse_write_block`, `refuse_world_readable_stdout` |
 | `remedy.rs` | the purge/remedy text |
 | `lib.rs` | re-exports only |
+| **stays in `me`** | `is_secret`, `is_bearer`, `is_argv_forbidden`, and `read_records`'s class-keyed arm (N-C2) |
 | *(caller-side)* | `emit`, `write_private` — see below |
+
+**THE THREE `Class` PREDICATES CANNOT MOVE — this is a language rule, not a
+preference (N-C2).** `is_secret`, `is_bearer` and `is_argv_forbidden` are
+**inherent methods** on `me`'s `Class` (`impl Class { … }`,
+`crates/me-cli/src/sysw/record.rs:65`). A different crate cannot define an
+inherent impl for a foreign type. Reproduced in a two-crate scratch project:
+
+```
+error[E0116]: cannot define inherent `impl` for a type outside of the
+              crate where the type is defined
+```
+
+**An earlier draft of this table put all three inside the crate**, which both
+fails to compile *and* contradicts §5a's boundary line four paragraphs above it
+— *record classes, prefixes and payload grammar stay with `me`*. Worse, **step
+1's own check would have passed it**: the earlier wording asked only whether a
+type was moved or public, and `Class` *is* public — in `me`. The cheapest edit that makes such
+a build succeed is to drag `me`'s container vocabulary into the shared crate at
+the irreversible step, with step 7's gate written to accept it under a citation.
+**That is C1's shape, one file over.**
+
+**So the split is by REPRESENTATION.** The crate's recognisers work on strings —
+a `tx:` prefix, an HRP character, a BIP-39 word — and return the crate's **own**
+kind type. `me` maps that kind onto its `Class` and keeps the three predicates.
+Nothing in the crate ever names a `Class` variant.
 
 **`emit` and `write_private` stay in `me` for now.** `emit` writes the payload
 and `write_private` creates the 0600 file; both are the *act*, not the decision,
@@ -280,7 +328,10 @@ and P0's value is in the decisions. Moving them is P1's question, not P0's.
 **TYPES AND CONSTANTS ARE PART OF THE CLOSURE TOO (I5).** §1 enumerates
 functions only, which understates it: `WriteBlock`, `Destination`, `Class`, and
 the `Admission` flags all cross with them. **Step 1 must enumerate every type and
-constant the 11 reference and confirm each is either moved or already public** —
+constant the 11 reference and confirm each is either moved or **reachable
+WITHOUT an inherent impl in the crate** — "already public" is NOT sufficient
+and is precisely what let N-C2 through: `Class` is public, and an inherent
+impl on it still cannot compile outside `me`** —
 a function that compiles only because its enum is in scope has not been moved,
 it has been copied into a file that happens to see it.
 
@@ -312,7 +363,7 @@ Each step is RED first. No step begins until the previous is green.
 | 2 | `fd.rs` — **SPLIT** `stdout_world_readable_mode`: the crate returns the raw mode, `me`'s call site regains `& 0o044` | `fd.rs` returns `Some(0o644)` for a 0644 regular file **and `Some(0o620)` for a 0620 one** — a masked implementation cannot do the second; `/dev/null` returns `None`; `me`'s end-to-end behaviour is **still** unchanged |
 | 3 | `observation.rs` — types | a payload kind cannot be constructed from a permission bool (**F-259 cannot recur**) |
 | 4 | `remedy.rs` | zsh remedy does **not** contain `history -d`; fish remedy does **not** contain the secret |
-| 5 | `records.rs` layer 1 — **pre-parser** flag-name guard on raw argv | a known secret-bearing flag name is refused **before `Cli::parse()`**; today nothing runs there, so the test fails for absence |
+| 5 | `records.rs` layer 1 — **pre-parser** flag-name guard on raw argv | **`me` ships NO secret-bearing flag**, so the RED gate cannot be an end-to-end refusal in the donor. It is a unit test on the crate's flag-name table plus a lockstep parity assertion against `mnemonic-toolkit`'s `NodeType::is_argv_secret_bearing`, whose flags DO exist |
 | 5b | `records.rs` layer 2 — value-shape, additive | the argv gate refuses by class, with the override, **as unit tests** (§2.4); `me sysw pack --nosuchflag <ms1…>` still does not echo the secret |
 | 5c | `--expect <kinds>` — the flag and the vocabulary | `--expect descriptor,transaction` **refuses a stream with no transaction**, and **refuses an incomplete `md1` set** (§6g). Both fail today: the flag does not exist |
 | 6 | `channel.rs` + `exit.rs` | `--out` overwrites; `-` reads stdin; codes match §6f |
