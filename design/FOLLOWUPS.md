@@ -12529,8 +12529,14 @@ Neither gains `--out` in P2, so neither has a way to be written owner-only.
 `decode`'s stdout a *"labelled multi-field report"* explicitly out of scope, and
 §6b's `--out` is *"write the ARTIFACT to a file"* — a three-line labelled report
 is not one. `combine` and `derive` are the same shape. So P2 scopes `--out` to
-`encode`, `split` and `repair`, the three verbs whose stdout IS a canonical
-`ms1` or share string.
+`encode`, `split` and `repair`, the three verbs whose stdout CARRIES a canonical
+`ms1` or share string. **Corrected 2026-08-27 in the R0 round-0 fold of the P2
+plan (its I-5):** this entry originally said their stdout *IS* the artifact, and
+on `repair` that is false — `ms repair --ms1 <an ms1 with one induced error>`
+exits **4** and prints two `#`-prefixed report lines before the corrected `ms1`.
+The plan now rules that `repair --out` receives the artifact line alone and the
+report stays on stdout; the exclusion of `decode` and `combine` recorded here is
+unaffected.
 
 **The inconsistency is nonetheless the hazard**, in the same way F-275's was for
 `mt`: an operator who learns that `ms encode --out` writes 0600 will believe
@@ -12786,3 +12792,169 @@ bare `.github/workflows/ci.yml` dangles as `github/…` while the repo-qualified
 form resolves. And `.tsv` is not in the gate's extension list, so the
 display-grouping conformance corpus — byte-identical across four repos and
 sha256-pinned in three CI configs — is invisible to it.
+
+### F-301 — `me`'s shipped private-channel remedy advises a pipeline that exits 4 and writes nothing, and a source comment asserts it is verified (repo: **mnemonic-engrave**; owning phase: **before P2's sibling-remedy entry**) `#me` `#ms` `#remedy` `#cli-uniformity`
+
+**Found 2026-08-27** by R0 round 0 on the P2 plan (its C-2), by running the line
+`me` prints instead of reading it. **Reproduced independently during the fold.**
+
+`me` refuses secret-class material on argv and prints a private-channel example.
+Run exactly as emitted, against `master`'s own build:
+
+```
+ms encode --phrase - < seed.txt | me sysw pack --out p.bin
+  -> rc 4
+     me: record 0 (records count from 0) is not a form this container can place:
+     not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not a
+     `text:`/`pass:`/`tx:` record.
+  -> p.bin does not exist
+```
+
+The cause is `ms encode`'s default **grouped** stdout —
+`ms10e ntrsq qqqqq …` — which `me sysw pack` cannot classify. The live control:
+the same pipeline with `--group-size 0` and `--no-passphrase` exits **0** and
+writes a **102-byte** payload at mode 0600.
+
+**A source comment beside the emitted literal asserts the opposite** — it states
+that `ms`'s stdin idiom *is verified to pipe into pack*. **Nothing verifies it.**
+Measured: `crates/me-cli/tests/` holds **14** `.rs` files with **33**
+`Command::new` sites, and **0** of them name an `ms` binary; `ms encode` appears
+in `crates/me-cli/src/` exactly twice, in that comment and in the emitted string;
+`seed.txt` appears once in the whole crate, inside the emitted string.
+
+**CLASS — this is NOT the secret-handling class and it still gates.** By the
+operator ruling of 2026-08-27 a defect whose harm is material becoming visible is
+logged rather than blocking. This one's harm is different: the tool reports a
+working path it does not have. An operator who is refused, follows the printed
+remedy verbatim, and gets exit 4 with no payload has been told something false by
+the tool, and the affordance the refusal still names is `--allow-argv-secret` —
+the channel it just refused. §6h of the spec exists because this was shipped once
+already; this is the second time.
+
+**Why it is filed rather than fixed in the P2 plan.** P2's sibling-remedy entry
+rewrites this line to the `--in` form, but that entry cannot land until P2's
+ungrouped-stdout work does, and neither has shipped. An operator meets the broken
+advice today. The interim repair is `me`-side and small — the advised line names
+`--group-size 0`, or the advice moves to a form `me sysw pack` accepts today —
+and it must be **gated by a test that RUNS the emitted line**, since the absence
+of that test is why this survived. When P2's entry lands, that test is retargeted
+rather than written twice.
+
+### F-302 — `ms`'s argv surface leaks through the `=`-joined flag spelling, and a guard gated only on space-joined spellings passes its own gate while leaking (repo: **mnemonic-secret**; owning phase: **P2**, with the argv guard) `#ms` `#cli-uniformity` `#funds-safety`
+
+**Found 2026-08-27** by R0 round 0 on the P2 plan (its C-1). Logged here per the
+operator ruling of the same day.
+
+Measured against `mnemonic-secret`'s own build at `7c12f66`, exit codes read
+directly:
+
+```
+ms encode  --phrase=<the all-abandon 12-word vector>   -> rc 0, prints the ms1
+ms encode  --hex=00000000000000000000000000000000      -> rc 0, prints the ms1
+ms derive  <ms1> --passphrase=hunter2                  -> rc 0, 2 argv advisories
+```
+
+The whole `--flag=value` construction is **one argv token**. Its left half is not
+the flag string, so a flag-keyed layer matching exact strings does not see it;
+its right half is not a positional, so a value-shape layer scoped to positionals
+is not even pointed at it. A cross-product built from the space-joined spellings
+alone therefore passes every row it generates while the leak is untouched.
+
+**The donor already solved it and names the case**: `argv_candidates`
+(`crates/me-cli/src/main.rs:350`) extends its candidate list with every `=`-split
+half at `crates/me-cli/src/main.rs:354`, and the doc comment at
+`crates/me-cli/src/main.rs:347` explains that the secret is the right-hand half
+of a token like `--in=<ms1>`. The P2 draft had taken three of that function's
+four normalisations — trim, case-fold, whole token — and dropped the fourth,
+which is the only one that is a **bypass** rather than a formatting variant.
+
+**CLASS — the logged class, by the operator ruling.** The harm is material
+becoming visible, so it holds no gate. **It is closed inside P2 anyway**, because
+closing it is one normalisation in a list the plan already specifies: the guard
+entry now requires `=`-splitting, and the generated gate grew from 56 rows to
+**92** (4 value spellings × 14 channels, with both join forms on the 9 flag
+channels and one on the 5 positional channels: 9×4×2 + 5×4). That cross-product
+was generated and run during the fold rather than extrapolated: **84 of 92 pass
+material at exit 0** — 58 silently, 26 with `derive`'s advisory — and **0 of 92**
+leak material into stderr today.
+
+**Not covered by the 92, and stated rather than implied**: the `--` end-of-options
+form (`ms decode -- <ms1>` exits **0** today) and any shape where the material is
+neither a whole token nor an `=`-delimited half. Two shapes were checked and do
+**not** exist on `ms`: abbreviated long flags (`ms encode --phr <seed>` exits
+**64**, `error: unexpected argument '--phr' found`) and short aliases carrying
+material (measured across all eight material verbs: only `-h`, plus `split`'s
+`-k`/`-n`).
+
+### F-303 — after P2, `ms derive` from a phrase PLUS a passphrase has no one-command private form (repo: **mnemonic-secret**; owning phase: **a later cycle**, with the remaining argv work) `#ms` `#cli-uniformity` `#funds-safety`
+
+**Found 2026-08-27** by R0 round 0 on the P2 plan (its I-3).
+
+`ms derive --phrase <seed> --passphrase <pass>` exits 0 today, with two argv
+advisories. P2's refusal closes both channels, and the private alternatives do
+not compose:
+
+- `--phrase -` with `--passphrase-stdin` hits `ms`'s existing contention refusal
+  — *one stdin per invocation* — measured at rc 1.
+- `--in` on `derive` reads an **`ms1`**, not a phrase. Measured:
+  `ms derive - < <a file holding a BIP-39 phrase>` exits **1**,
+  `error: string length 82 not in v0.1 set [50, 56, 62, 69, 75]`.
+
+**The round-0 report concluded that NO private form remains. That is too strong,
+and the counter was measured rather than argued.** A two-command private route
+exists after P2, because `ms` can convert the phrase into the kind `--in` reads:
+
+```
+ms encode --in seed.txt --out card.ms1
+ms derive --in card.ms1 --passphrase-stdin < pass.txt
+```
+
+Reproduced today in the closest form the binary supports — `--in`/`--out` do not
+exist yet, so the phrase came in on stdin and the card went to a variable:
+`ms encode --phrase - --group-size 0 < seed.txt` → rc 0, and
+`ms derive "$CARD" --passphrase-stdin < pass.txt` → rc 0,
+`master_fingerprint: ca2c62d2`.
+
+**So what P2 owes is the route being written down and asserted, and it does that**
+— the freed-stdin entry gates the two commands end-to-end against the fingerprint
+the one-command argv form produces today, and requires the refusal's own text to
+name the route. An operator who cannot find it reaches for
+`--allow-argv-secret`, which is the exposure the phase exists to close.
+
+**What is deferred here is the one-command form**: a `--passphrase-file`, or a
+phrase-shaped `--in` on `derive`. Either is a new channel, and §7's P2 row
+enumerates P2's content and includes none.
+
+### F-304 — `ms encode`'s standing stdout advisory recommends a redirect that lands at 0644, while P2 adds an `--out` that gives 0600 (repo: **mnemonic-secret** + **mnemonic-toolkit**; owning phase: **P3**) `#ms` `#cli-uniformity` `#remedy` `#funds-safety`
+
+**Found 2026-08-27** by R0 round 0 on the P2 plan (its I-8).
+
+`ms encode` prints, on **every** invocation, a warning that stdout carries
+private key material and should be redirected or encrypted, giving a plain `>`
+redirect as its first example. Measured under the default umask 022:
+
+```
+ms encode --phrase - < seed.txt > w.txt   -> rc 0
+stat -c '%a' w.txt                        -> 644
+```
+
+— 0644, holding an `ms1` that decodes to the seed. After P2's private-write
+entry, `ms encode --out w.txt` gives **0600** for the same artifact. So the
+tool's own standing advice points the operator at the weaker of two in-tool
+channels, and P2 is the phase that creates the better one.
+
+This is §6h's rule — remedy text names the channels that exist — applied to
+`ms`'s own text rather than the sibling's. It is **not** F-281 (whether to *gate*
+a world-readable stdout) and **not** F-285 (verbs that get no `--out` at all).
+
+**Why P2 does not act on it.** `fn byte_parity_advisory_lines`
+(`crates/ms-cli/tests/cli_output_class.rs:56`) pins all three advisory lines
+byte-for-byte against `mnemonic-toolkit`'s, so any rewording is joint cross-repo
+work, and under the Rust-primary rule the wording is not `ms`'s to change
+unilaterally. P3 already carries `mnemonic`'s own argv and advisory work, which
+is the cheapest place to reason about both sides at once.
+
+**CLASS — the logged class by the operator ruling** (the harm is material landing
+world-readable), but the round-0 finding's actual ask was that the gap have an
+**owning phase**, and this entry supplies it. Nothing was downgraded to avoid
+work.
