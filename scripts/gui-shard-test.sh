@@ -60,7 +60,13 @@ for i, n in enumerate(rest):
     buckets[(i + len(heavy)) % k].append(n)
 for i, b in enumerate(buckets):
     with open(os.path.join(out, f"shard{i}.txt"), "w") as f:
-        f.write("\n".join(b))
+        # Trailing newline is LOAD-BEARING: the shell counts these files
+        # with `wc -l`, which counts NEWLINES. Without it every shard
+        # under-reported by exactly 1, so 24 shards printed 968 for a
+        # verified-exhaustive 992. The gate was sound; its arithmetic was
+        # not, and a counter whose numbers do not add up is how a gate
+        # quietly loses its reader.
+        f.write("\n".join(b) + "\n")
 # EXHAUSTIVENESS: the union must equal the input, exactly.
 union = sorted(x for b in buckets for x in b)
 if union != sorted(names):
