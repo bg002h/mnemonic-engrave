@@ -12706,7 +12706,7 @@ C-4. **Every one of the 48 existing sites is post-parse**, so the refusal is new
 code at a new place keyed off an old predicate — not a rewrite of the advisory
 layer.
 
-### F-293 — the argv advisory prints `--decrypt-password ` with a trailing space, at two call sites (repo: **mnemonic-toolkit**; owning phase: **P3** — fixed in passing by the plan's refusal entry) `#mnemonic-toolkit` `#ux` `#shipped`
+### F-293 — the argv advisory prints a flag name with a trailing space, at **four** call sites on **two** different flags (repo: **mnemonic-toolkit**; owning phase: **P3** — fixed in passing by the plan's refusal entry) `#mnemonic-toolkit` `#ux` `#shipped`
 
 **Reproduced 2026-08-27** by running the binary, not by reading the source:
 
@@ -12715,11 +12715,26 @@ $ mnemonic electrum-decrypt --ciphertext <base64> --decrypt-password hunter2
 warning: secret material on argv (--decrypt-password ) — pipe via ...
 ```
 
-Two sites pass the flag name with a space attached —
-`crates/mnemonic-toolkit/src/cmd/electrum_decrypt.rs:101` and
-`crates/mnemonic-toolkit/src/cmd/import_wallet.rs:2331`. The other 46 pass a
-clean name, so this is a typo rather than a convention. Cosmetic, in a security
-message, in shipped code.
+**CORRECTED 2026-08-27 by the R0-P3 round-0 fold — the original said TWO sites
+and it was half the defect.** The first count took the *first* string argument
+of each call, but `secret_in_argv_warning`'s first argument is the writer and
+the flag name is the **second**
+(`crates/mnemonic-toolkit/src/secret_advisory.rs:40`). Re-derived from the
+correct position, **four** sites pass a flag name with a space attached, on two
+different flags:
+
+```
+crates/mnemonic-toolkit/src/cmd/electrum_decrypt.rs:101   "--decrypt-password "
+crates/mnemonic-toolkit/src/cmd/import_wallet.rs:507      "--decrypt-password "   <- missed
+crates/mnemonic-toolkit/src/cmd/import_wallet.rs:2331     "--decrypt-password "
+crates/mnemonic-toolkit/src/cmd/seedqr.rs:157             "--digits "             <- missed, different flag
+```
+
+**So the residue is 44, not 46** (48 call sites minus these four). Reproduced by
+running the binary: `mnemonic seedqr decode --digits <digits>` prints
+`warning: secret material on argv (--digits ) — pipe via ...`. A literal reading
+of the original entry leaves half the defect in place, including the one on a
+flag the entry never named. Cosmetic, in a security message, in shipped code.
 
 ### F-294 — `records::no_records_guard`'s refusal text names `mt encode --qr`, another binary's flag, so no third consumer can adopt it (repo: **mnemonic-engrave**; owning phase: **`mnemonic-io-lib`'s next version, before a sixth consumer**) `#mnemonic-io-lib` `#P3` `#design`
 
@@ -12764,7 +12779,7 @@ surface — the exact class §6a refused to break for `mk decode`, saying it
 **What would reopen it:** an operator ruling that `bundle` counts as
 `mnemonic`'s `encode` for §6a's purposes.
 
-### F-296 — `plan-cite-check.sh` has no root for `mnemonic-gui`, the fourth repo P3 touches (repo: **mnemonic-engrave**; owning phase: **P3**, before the plan's GUI-mirror entry is written) `#tooling` `#gate` `#P3`
+### F-296 — `plan-cite-check.sh` has no root for `mnemonic-gui`, the fourth repo P3 touches (repo: **mnemonic-engrave**; owning phase: **P3**, before the plan's GUI-mirror entry is written) — **DONE 2026-08-27** `#tooling` `#gate` `#P3`
 
 **Found 2026-08-27** by probing the gate with the citations the P3 plan needed,
 before writing them.
@@ -12958,3 +12973,102 @@ is the cheapest place to reason about both sides at once.
 world-readable), but the round-0 finding's actual ask was that the gap have an
 **owning phase**, and this entry supplies it. Nothing was downgraded to avoid
 work.
+**DONE 2026-08-27.** `ROOTS` gained `"/scratch/code/shibboleth/mnemonic-gui"`,
+the citation regex now keeps a leading dot (both the `./` prefix and a hidden
+top-level directory), and `.tsv` is in the extension list. Re-probed with the
+forms the P3 plan needed — the GUI's `src/schema/…` and `tests/…`, its
+`pinned-upstream.toml`, and the display-grouping corpus — **8 of 8 resolved, 0
+dangling, 0 ambiguous**, and the P3 plan now cites all four repos normally
+instead of writing the fourth as prose.
+
+**One residue is deliberately NOT fixed and is documented instead**: a bare
+top-level `Cargo.toml` citation is AMBIGUOUS across seven roots. That is the
+gate working as designed — it reports the ambiguity loudly rather than guessing
+a repo — so GUI manifest citations are written repo-qualified.
+
+### F-311 — `mk encode --keys` silently accepts a key file carrying the same BIP-380 record twice, at exit 0 (repo: **mnemonic-key**; owning phase: **NOT P3** — a `mk` admission ruling, outside P3's row) `#mk` `#admission` `#silent-accept`
+
+**Found 2026-08-27** by the R0-P3 round-0 fold, while testing the P3 plan's
+justification for deleting the blank line `mk encode` prints between cards —
+*"the card boundary is recoverable from each card's own chunk header"*. It is
+not, and the counterexample is an input `mk` accepts without complaint.
+
+**Reproduced**, with a key file holding one record twice:
+
+```
+$ mk encode --keys dup.keys --policy-id-stub 5b48af35 ; echo $?
+mk1qp d8cwp qqsq4 ... mfrjw 2
+mk1qp d8cwp p806l ... c36tw
+
+mk1qp d8cwp qqsq4 ... mfrjw 2
+mk1qp d8cwp p806l ... c36tw
+0
+```
+
+Two **byte-identical** cards sharing one chunk-set-id (`d8cwp`), separated by
+nothing except the blank line. Their headers are the same header, so once the
+blank line is gone the boundary is not recoverable from them at all — and the
+blank line was the only signal that a duplicate cosigner record had been
+accepted in the first place.
+
+**Deleting the blank line is still correct** under §6a of the CLI-uniformity
+spec, which admits the artifact and nothing else; the P3 plan withdraws the
+false justification and keeps the work. **What is filed here is the layer
+underneath**: `mk encode --keys` has no duplicate-record admission check. A
+2-of-2 authored with a copy-paste error produces a bundle that looks like two
+cosigners and is one, at exit 0, with no warning.
+
+**Not scheduled into P3** — P3's row is channels, presentation and one exit
+code, and adding an admission rule to `mk encode` is a ruling this phase does
+not get to make.
+
+### F-312 — `mnemonic-gui`'s drift gate carries a stale comment naming a `v0.75.0` pin that is really `v0.97.0`, and it propagated a false premise into a plan (repo: **mnemonic-gui**; owning phase: **P3**, with the toolkit release) `#mnemonic-gui` `#stale-comment` `#gate`
+
+**Found 2026-08-27** by the R0-P3 round-0 review, and the reason it is filed
+rather than fixed silently is what it cost.
+
+`tests/schema_mirror_defaults_drift.rs:36` says the CI job *"points
+`MNEMONIC_BIN` at the pinned v0.75.0 binary"*. Both real pins say otherwise:
+`pinned-upstream.toml:22` and the load-bearing dependency pin at
+`mnemonic-gui/Cargo.toml:76` are both `mnemonic-toolkit-v0.97.0`, and the
+measured toolkit is `mnemonic 0.97.0`. **The pin is exactly current.**
+
+**The cost.** The first draft of the P3 plan read that comment and concluded the
+drift gate's binary was *"far behind the CLI's current version"*, and from there
+that flipping the `--group-size` default would produce *"zero GUI test
+failures"*. Measured by running it — the four GUI default sites flipped, pin
+unchanged — the gate produces **four drift violations** and reds. The gate is a
+**lockstep** gate; the plan believed it was blind. That was one of the four
+Importants of the round.
+
+**This is the "comments outlive their conditions" class**, and the general
+lesson is in the specific: a reviewer who greps for the *mechanism* (the pin
+files) finds the truth, and a reader who trusts the *claim* (the comment) does
+not.
+
+**Fix:** delete or correct the version in that comment when the toolkit release
+moves the pin, which the P3 plan's release entry does anyway.
+
+### F-313 — a plan whose definition of green is `fmt + clippy + nextest + conformance` is structurally blind to `mnemonic-toolkit`'s 62 byte-compared doc transcripts (repo: **mnemonic-engrave**; owning phase: **ownerless residue** — a process item) `#process` `#gates` `#docs`
+
+**Found 2026-08-27** by the R0-P3 round-0 review, as the general shape behind a
+specific Important.
+
+`mnemonic-toolkit/docs/manual/transcripts/` holds **169 tracked files, 62 of
+them `.cmd`** — command scripts replayed against the real installed binaries and
+**byte-compared against golden `.out`/`.err`** by three workflows
+(`quickstart.yml`, `manual-gui.yml`, `technical-manual.yml`). **None of them is
+a `cargo` invocation**, so a closure list naming only the test runner cannot see
+any of them.
+
+The P3 plan's first draft defined green exactly that way and consequently placed
+**23 goldens it invalidates** — 19 needing their commands *rewritten* because a
+new refusal makes them fail, 4 needing regeneration after a default flip — in no
+entry, gate, closure condition or follow-up. P3 is the **second** cycle to
+define green with a runner-shaped list.
+
+**The generalisable fix is not to remember harder.** Name the doc-transcript
+workflows in the standard closure list that plans in this constellation copy
+from, so the surface is inherited rather than rediscovered. A plan that edits a
+CLI's output or its refusals is exactly the plan that breaks documented worked
+examples, and that is precisely when nobody is looking at `docs/`.
