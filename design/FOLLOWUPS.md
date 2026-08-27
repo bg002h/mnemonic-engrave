@@ -11556,3 +11556,29 @@ io-seam review's load-bearing counterexample: `mt` and `me` ship near-identical
 the **vocabulary for describing what was measured** — a message derived from the
 observed mode cannot say "read" about a mode with no read bits, whereas a
 hard-coded string can and does.
+
+### F-261 — `plan-table-check.sh` silently skips INDENTED tables, and does not list that among its blind spots (owning phase: **tooling**, before the next spec fold) `#tooling` `#gates`
+
+**Found 2026-08-26** by watching a number fail to move. A fold added a
+five-row table nested under a list item; the gate reported **82 rows, 0
+malformed** both before and after. The file contains **7 indented table lines**
+the gate never counted.
+
+The table was fine — verified by hand, 4 pipes on every row including the
+header. **The problem is that "0 malformed" was reported over a set that
+excluded it**, so the gate's clean result said nothing about the thing just
+added.
+
+**Its stated blind spots are cell CONTENT, intentionally-empty versus lost
+cells, tables with no separator row, and pipes inside code spans. Indentation is
+not among them** — so a reader has no way to know coverage was partial.
+
+**Fix, in preference order:** count indented tables (they are valid Markdown and
+this document uses them deliberately, to keep a table inside the bullet it
+belongs to); or, if that is genuinely hard, **print the count of lines skipped
+for indentation** so a silent zero becomes a visible one.
+
+**The general rule this instance illustrates:** a gate whose scope silently
+excludes what you just changed is indistinguishable from a gate that passed on
+it. This was only caught because the row count was expected to rise by five and
+did not — **watching a number NOT move is a check, and it costs nothing.**
