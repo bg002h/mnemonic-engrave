@@ -13986,3 +13986,59 @@ rather than an interruption.
 **Do not let this drift into the ownerless residue.** It has an owning phase —
 immediately post-release — and an item whose owning phase has passed is overdue,
 not deferred.
+
+### F-371 — the stale miniscript rev survives in FOUR more places F-355 does not enumerate, including the operator-facing rebuild procedure and a second independent pin (repo: **mnemonic-toolkit**; owning phase: **the same one that resolves F-354/F-355**) `#repro` `#docs` `#fuzz` `#miniscript`
+
+**Found 2026-08-27 while fixing F-354** (the re-vendor to `ff4732e5`), by grepping
+for the stale rev rather than by reading. **Reported, not fixed** — the operator's
+standing instruction is that both repos' status be recorded before either the
+toolkit's or `descriptor-mnemonic`'s repro `--config` surface is edited, and this
+is the same surface F-355 and `md`'s F-333 are parked on.
+
+F-355 enumerates `man-pages.yml`, `repro-drift.yml`, `ci/repro/double-build.sh`,
+`ci/repro/cc-validate.sh` and `ci/repro/remap-off-negative.sh`. A tree-wide grep
+(`grep -rn 95fdd1c5 --exclude-dir=vendor --exclude-dir=target --exclude-dir=design`)
+finds these **as well**:
+
+1. **`docs/verify-reproducibility.md` — 8 sites, and this one is operator-facing.**
+   It publishes the exact `cargo build --locked --offline` command an external
+   rebuilder is told to run, with all three `[source]` stanzas keyed on
+   `?rev=95fdd1c5…`. `Cargo.lock`'s actual source key is `?rev=ff4732e5…`, and a
+   stanza keyed on a rev that appears in no lockfile is **inert** — so the
+   published procedure leaves miniscript unmapped and cannot resolve offline.
+   Anyone following the documented verification steps fails to reproduce, and the
+   natural reading of that failure is "the binary does not match", not "the doc is
+   stale". Same mechanism F-355 measured (`$? -> 101`), but on the surface aimed
+   at people outside the project.
+
+2. **`fuzz/Cargo.toml` + `fuzz/Cargo.lock` — a SECOND, independent pin, still at
+   `95fdd1c5`.** `fuzz/` is its own `[workspace]`, and `[patch]` tables do not
+   cross workspace boundaries, so the pin is replicated there by hand. Its own
+   comment says it is *"Kept byte-identical to the toolkit root `Cargo.toml`
+   `[patch.crates-io]`"* — **and it is not**: root is `ff4732e5`, fuzz is
+   `95fdd1c5`. The invariant the comment asserts is false, which is the
+   comments-outlive-their-conditions class: the note reads as a guarantee and is
+   now the thing hiding the drift. Consequence is narrower than (1) — the fuzz
+   targets exercise a different miniscript from the one the toolkit ships — but it
+   means fuzz coverage does not apply to the shipped formatter.
+
+3. **`.github/workflows/reproducible-musl-build.yml`** — the callee's own
+   `miniscript_rev` default and its explanatory comments still name `95fdd1c5…`,
+   including the passage arguing why the git-fork block is mandatory. F-355 lists
+   the *callers*; this is the workflow they call.
+
+4. **`CHANGELOG.md` names `95fdd1c5…` too — leave it alone.** That entry records
+   what a past release actually pinned, so it is correct as history. Flagged only
+   so a scripted sweep does not "fix" it.
+
+**Why this is one item and not four.** All four are the same root cause F-354
+identified — advancing the `[patch.crates-io]` pin was never accompanied by
+updating anything that *restates* the rev — and they should be fixed in one pass
+by the phase that resolves F-355, ideally by **deriving the rev from `Cargo.lock`
+the way `ci/repro/vendor-freshness.sh` already does** rather than by editing six
+more literals. F-355 makes that same recommendation; this item is the evidence
+that its list is short.
+
+**Note the vendored tree itself is now correct** (F-354 fixed, `ff4732e5`), and
+`ci/repro/vendor-freshness.sh` is content-aware and would RED on a wrong-rev
+vendor tree. Neither of those touches the literals above.
