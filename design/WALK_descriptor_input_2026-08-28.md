@@ -235,3 +235,34 @@ passphrase prompt does appear (secret-carrying payloads; note for that walk);
 (b) `strength: no passphrase — BELOW the threshold` reads as a nag on a
 payload with nothing to encrypt — pre-existing sysw surface,
 secret-handling-adjacent, noted for the sysw backlog, not this cycle's.
+
+
+---
+
+## W8 — shown the materialised `<0;1>/*`, the operator asked "is this the
+## wrong derivation path?" — the confirmation shows it but does not explain it
+
+**The moment.** The §5.4 confirmation sketch put
+`wsh(sortedmulti(2,@0/<0;1>/*,…))` in front of the operator — a spelling
+their file never contained. Reaction: *"What was fought over for 3 rounds?
+Is this the wrong derivation path?"* Mild alarm, unresolvable from the
+screen. Alone at the terminal, that is either an uneasy proceed or an
+aborted CORRECT pack — both bad, at the journey's highest-stakes moment.
+
+**The gap.** §5.3(a′) requires the confirmation to print the template WITH
+the materialised `<0;1>/*` "so the operator sees it." Seeing is not
+understanding: the confirmation presents an unexplained novelty exactly
+where trust is being asked for. The walk's whole a′ debate (r1 C4 → r2 → r3:
+what does a childless file MEAN; answer: what the device derives) is
+invisible at the surface that needed it.
+
+**Classification: SPEC change (walk fold).** §5.4 gains: when (a′)
+materialisation occurred, the confirmation carries ONE annotation line, in
+operator terms, W5-compliant (no internal labels):
+
+    note: your file names no derivation below the key origins; <0;1>/* is
+    the receive/change convention the device uses for such files either
+    way. Addresses are unchanged by making it explicit.
+
+§5.3(a′)'s "so the operator sees it" clause is upgraded to "sees it and is
+told, in one line, why it is there and that addresses are unchanged."
