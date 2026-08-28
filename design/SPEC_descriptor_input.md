@@ -354,7 +354,7 @@ them:
    panic is reachable from the device's scan door (`gui/scan.go:87`). `me`
    requires exactly 8 hex characters — matching what `bip380.ParseKey` already
    requires of an inline origin — and §7 marks these rows
-   `device_probe: "panic"` so the Go test never feeds one to the parser.
+   `device_probe: "panic:parse"` so the Go test never feeds one to the parser.
 
 **NORMATIVE:** `me` **refuses** four shapes: a BlueWallet file with no
 `Format:` header; one with zero cosigner lines; one in which **any cosigner
@@ -654,7 +654,10 @@ conjunction, and §7's row list is derivable from it:
    (`OP_CHECKMULTISIG`'s consensus limit; in `sh(wsh(…))` the redeemScript is
    the 34-byte `OP_0 <sha256>`, so the 520-byte limit never binds the key
    count, and a 16-key `sh(wsh(sortedmulti(…)))` is a SPENDABLE wallet the
-   device derives addresses for — measured, `3HBBPgNtmPjjuRonQq7EWpurZt3zd4Xvtc`.
+   device derives addresses for — measured with a RECORDED construction, 16
+   unhardened children of the `dc567276` fixture key:
+   `39rQdUtKL2dUiiN3tqXYrwPijTMQudnd3Q` (r6; r2's original `3HBBPgNtm…` came
+   from unrecorded keys and is not reproducible — R0 r6's NEW-N1).
    R0 r2's NEW-I2: r1 prescribed "outermost script is sh" and the prescription
    was wrong). Measured on the refused side: the device ACCEPTS
    `sh(sortedmulti(2, 16 keys))` and `wsh(sortedmulti(2, 21 keys))` and
@@ -1036,7 +1039,11 @@ from §4.7's admission predicate or §5.3's representability limits fire from
 their own checks, after a successful parse — the rule never selects them
 (R0 r2's NEW-N1). And the `sortedmulti` rows below read over BOTH multi
 forms: §4.7 conjunct 1's md1-path `multi` twins hit the same conjuncts and
-get the same texts with the form name substituted (R0 r5's NEW-M2).
+get the same texts with the form name substituted (R0 r5's NEW-M2). The one
+exception is the single-key-wrapper row, whose `sortedmulti` mentions are in
+the REMEDY and do NOT transpose — all three `multi` twins are device REFUSE
+(measured) — so for a `multi` input that row's remedy names `--as md1`
+instead (R0 r6's NEW-M4).
 
 | the operator's input | what `me` says |
 | --- | --- |
@@ -1065,7 +1072,7 @@ get the same texts with the form name substituted (R0 r5's NEW-M2).
 | a bare `Zpub` / `Ypub` | *"a `Zpub`/`Ypub` declares a **multisig** account (`m/48'/0'/0'/2'` and `…/1'`). A multisig cosigner key is not a wallet — supply the full descriptor (`wsh(sortedmulti(…))` for `Zpub`, `sh(wsh(sortedmulti(…)))` for `Ypub`), or a BlueWallet setup file listing every cosigner."* (forms per `Script.DerivationPath()`, R0 r4's NEW-N1) |
 | a bare `tpub` | *"this is a testnet key. Its version byte would map to the **mainnet** path `m/44'/0'/0'`, which `me` will not assume. Supply the descriptor with its real origin."* §4.5. |
 | a **bitcoin address** | *"that is a bitcoin address, not a descriptor. No program on the device consumes an address record — see §10."* |
-| a **single-key script wrapping a multi** — `wpkh(sortedmulti(…))`, `pkh(sortedmulti(…))`, `sh(wpkh(sortedmulti(…)))` | *"a multisig policy cannot live inside a single-key script. The device's parser accepts this spelling and then cannot derive any address from it (measured: `address: multisig script: … unsupported descriptor`). The forms the device derives are `wsh(sortedmulti(…))`, `sh(wsh(sortedmulti(…)))` and `sh(sortedmulti(…))`."* §4.7 conjunct 1 (R0 r2's NEW-I4). |
+| a **single-key script wrapping a multi** — `wpkh(sortedmulti(…))`, `pkh(sortedmulti(…))`, `sh(wpkh(sortedmulti(…)))` | *"a multisig policy cannot live inside a single-key script. The device's parser accepts this spelling and then cannot derive any address from it (measured: `address: multisig script: … unsupported descriptor`). The forms the device derives are `wsh(sortedmulti(…))`, `sh(wsh(sortedmulti(…)))` and `sh(sortedmulti(…))`."* For a `multi` input the remedy is instead: *"keep `multi` and use `--as md1`, which carries it."* (R0 r6's NEW-M4.) §4.7 conjunct 1 (R0 r2's NEW-I4). |
 | a **bare key in a script slot** — `wsh(KEY)`, `sh(KEY)` | *"`wsh`/`sh` of a single key is not a wallet form the device can derive addresses for (measured: `Supported=false`, `address: singlesig script: … unsupported descriptor`). A single-key wallet is `pkh(…)`, `wpkh(…)`, `sh(wpkh(…))` or `tr(…)`."* §4.7 conjunct 1 (R0 r2's NEW-I4). |
 | a **hardened use-site component** — `…/<0;1>/*h` | *"a hardened use-site step cannot be derived from an xpub (BIP-32). The device would silently derive the UNhardened child and display addresses for a wallet that cannot exist, so this is refused on both `--as` paths."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
 | a **non-consecutive multipath** — `<0;2>`, `<1;3>` | *"the device derives only `<i;i+1>` pairs (receive; change). It accepts this descriptor and then errors on every address."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
@@ -1113,7 +1120,11 @@ approximately.
 
 1. **One file, `crates/me-cli/testdata/descriptor_seam_vectors.json`**, authored
    in the Rust primary (§3), vendored byte-identically to
-   `seedhammer/nonstandard/testdata/descriptor_seam_vectors.json`.
+   `seedhammer/nonstandard/testdata/descriptor_seam_vectors.json`. The Go
+   seam test is **`package nonstandard_test`** (external): once §5.2's arm
+   lands, `sysw` imports `nonstandard`, and an internal test importing `sysw`
+   for the `sysw_class` column would be an import cycle (R0 r6's NEW-N3,
+   import sets measured).
 2. **Its sha256 is pinned as a literal in BOTH tests.** Neither test reaches
    across repos; each reads its own copy and compares to the same constant, so
    the copies cannot drift without one suite going red.
@@ -1140,8 +1151,12 @@ approximately.
    transcription error inside an xpub.
 
 **Row schema.** `name`, `input`, `sha256`, `host_admits`, `device_admits`,
-`format` (one of `bluewallet` / `bip380` / `json` / `promoted-key` / `none`),
-`source` — plus three columns R0's I1 forced apart:
+`format` (the branch of §4's cascade that `me` MATCHED — `bluewallet` /
+`bip380` / `json` / `promoted-key` — or `none` where no branch matched;
+R0 r6's NEW-M3: on host/device-disagreeing rows any other reading gives a
+different answer), `source`, and the optional value fields `address_0` /
+`address_1` / `md_descriptor_contains` (asserted per the paragraph below;
+R0 r6's NEW-I1) — plus the columns later rounds forced apart:
 
 - **`device_admits` means `nonstandard.OutputDescriptor` accepts the INPUT** —
   the scan door, nothing else. The classifier is a different predicate with a
@@ -1149,13 +1164,27 @@ approximately.
   asserted by the Go test only on rows that carry it, against `sysw.Classify`
   once §5.2's arm lands. One column carrying both meanings is how §7 and §11
   contradicted each other in round 0.
+- **`host_admits` means §5.2's classification predicate**: `me` would pack
+  this input as a `Descriptor` record. NOT "`me`'s cascade parses it" (`me`
+  parses `multi`, and `multi` is `host_admits=false`) and NOT "some `--as`
+  succeeds" (`--as md1` succeeds on `multi`). Stated because §7's own history
+  shows what an undefined column grows into (R0 r6's NEW-M2).
 - **`canonical` is REQUIRED on every row where `host_admits` is true** — the
   re-encoded descriptor string both parsers must produce. Requirement 4 is
   stated over it.
-- **`device_probe: "panic"`** marks a row whose input PANICS the device parser
-  (§4.2 defect 4). The Go test asserts such rows are host-refused and must NOT
-  feed the input to `nonstandard.OutputDescriptor` — a panic would crash the
-  suite rather than fail it, a false-signal shape.
+- **`device_probe`** marks a row whose input PANICS the device, and names the
+  site (R0 r6's NEW-M6 — §4.2 records TWO panic sites): `"panic:parse"`
+  (§4.2 defect 4 — the Go test asserts the row is host-refused and must NOT
+  feed the input to `nonstandard.OutputDescriptor`) or `"panic:encode"`
+  (§4.2 defects 1–2 — parse ACCEPTS and `Descriptor.Encode()` panics; the Go
+  test may parse the input but must NOT call `Encode` on the result). On a
+  `"panic:parse"` row `device_admits` is OMITTED — the predicate cannot be
+  evaluated, so either boolean is a false claim — and requirement 5's
+  non-vacuity count skips such rows (R0 r6's NEW-M1). A panic would crash
+  the suite rather than fail it, a false-signal shape.
+- **`covers`** (REQUIRED, non-empty array of coverage-manifest tags): which
+  required-row bullets this row discharges; a row may carry two. §11 item 3
+  counts these against the manifest below the bullets (R0 r6's NEW-I2).
 - **`md1_admits`** (boolean, REQUIRED on every row — no default; R0 r4's
   NEW-M2 measured that a false default is backwards for most host-admitted
   rows, and a default that must be overridden on most rows is not a default):
@@ -1180,7 +1209,7 @@ approximately.
   is *for*. And one row on the ACCEPTED side that r1's prescription would
   have wrongly refused: `sh(wsh(sortedmulti(2, 16 keys)))` —
   `host_admits=true`, spendable, with its `canonical` and `address_0`
-  (R0 r2's NEW-I2);
+  (R0 r2's NEW-I2), authored fresh from r6's recorded construction (NEW-N1);
 - **the md1-representability splits of §5.3** — `/0/*` and `<0;1>`-without-
   wildcard (host-admitted, `md1_admits=false`) each with the device-route
   `address_0`, plus a CHILDLESS input (`md1_admits=true`) whose `address_0`
@@ -1192,13 +1221,15 @@ approximately.
 - **every shape §4.2 narrows** — BlueWallet with no `Format:`, with zero keys,
   with `Derivation:` after the keys, with **no `Derivation:` at all** (R0's C1
   — `device_admits=true` on the input, host refused, no `canonical`), and a
-  short-fingerprint file marked `device_probe: "panic"`;
+  short-fingerprint file marked `device_probe: "panic:parse"`; the
+  no-`Format:` and zero-key rows carry `device_probe: "panic:encode"`
+  (parse ACCEPTS, `Encode()` panics — measured, R0 r6's NEW-M6);
 - **`wsh(multi(…))`, a miniscript descriptor, and a full-origin `ypub`** —
   `false`/`false` on the host/device axes, the `neither` rows the vacuity
   check needs. The `multi` row additionally carries `md1_admits=true`, its md1-route
-  `address_0` AND `address_1`, and pins the `md descriptor` read-back as
-  containing `multi(` (measured: `#656zkmsn` — `multi` survives the round
-  trip un-normalised). `address_1` is load-bearing (R0 r5's NEW-I3): for
+  `address_0` AND `address_1`, and pins the read-back via
+  `md_descriptor_contains: "multi("` (measured: `#656zkmsn` — `multi`
+  survives the round trip un-normalised). `address_1` is load-bearing (R0 r5's NEW-I3): for
   these keys the sorted and unsorted orderings COINCIDE at index 0 (measured
   identical recv0, divergent recv1), so an index-0 assertion cannot catch
   the forbidden `multi` → `sortedmulti` rewrite — the gate must assert where
@@ -1210,13 +1241,39 @@ approximately.
   `_comment`, and a row where the host is wider and `canonical` is absent is a
   defect the tests must reject.
 
+**The coverage manifest — NORMATIVE; §11 item 3 counts against it (R0 r6's
+NEW-I2: without a countable anchor, dropping the childless+`<0;1>/*` mixed
+row — the row that gates R0 r3's NEW-C1 — left every countable property of
+the file intact).** Every required row carries `covers`; the test asserts
+every tag present with at least its minimum and no unknown tags. A row may
+carry two tags (the `xpub…\n` promotion near-miss is also a whitespace row
+and counts for both):
+
+| tag | bullet | min rows |
+| --- | --- | --- |
+| `formats-happy` | the four formats, happy path | 4 |
+| `promotion-near-miss` | §4.5's fifteen-row table | 15 |
+| `narrowed-4.7` | shapes §4.7 narrows | 14 |
+| `accepted-extreme` | `sh(wsh(sortedmulti(2, 16 keys)))` | 1 |
+| `narrowed-4.2` | BlueWallet shapes §4.2 narrows | 5 |
+| `neither` | `wsh(multi)`, miniscript, full-origin `ypub` | 3 |
+| `whitespace` | §4.6's rows | 3 |
+| `md1-splits` | §5.3's splits: `/0/*`, `<0;1>`, childless, three mixed | 6 |
+
 **A second, separate assertion, because §5.3 showed a string comparison is not
-enough.** Rows may carry `address_0`, the receive-address-0 the wallet
-derives. The Go test asserts it through `address.Receive` on every row where
-`device_admits` is true and it is present. The Rust test asserts it through
-the md1 round trip on every row where `md1_admits` is true — including
-`host_admits=false` rows like `multi`, whose ONLY address assertion is the
-md1 one. Where `md1_admits` is false on a row whose input is otherwise
+enough.** Rows may carry `address_0` and `address_1` — receive addresses at
+indices 0 and 1 — and `md_descriptor_contains`, a substring the
+`md descriptor` read-back of the encoded set must contain. EVERY such field a
+row carries is asserted (R0 r6's NEW-I1: r5's fold added the values to the
+`multi` row and left this paragraph naming `address_0` alone, so the
+`multi` → `sortedmulti` mutant still passed every stated assertion — a gate
+that cannot fail, twice). The Go test derives each carried `address_N`
+through `address.Receive(…, N)` on the parsed INPUT (the scan door's own
+string — the C1 row has no `canonical`; R0 r6's NEW-N2) wherever
+`device_admits` is true. The Rust test derives each through the md1 round
+trip wherever `md1_admits` is true — including `host_admits=false` rows like
+`multi`, whose address assertions run only through the md1 route — and
+asserts `md_descriptor_contains` against the round trip's read-back. Where `md1_admits` is false on a row whose input is otherwise
 ADMITTED (cascade AND §4.7 — every §5.3-split row is; the rows refused by
 §4.7's own conjuncts are not, and their assertion is the `host_admits=false`
 column's, citing their own conjunct — R0 r5's NEW-I1), the Rust test asserts that the md1 path REFUSES **citing
@@ -1284,12 +1341,13 @@ rest.
    — not "lightly tested". The first `ClassDescriptor` record in a `sysw` payload
    will be the first ever. *(Closure-is-lens-closure, second clause: a gate that
    has never executed is a hypothesis. This one has never executed.)*
-3. **The `--as md1` address equality was measured for ONE descriptor shape** —
-   `wsh(sortedmulti(2, …/<0;1>/*))`, 2 keys, mainnet, receive index 0. It was
-   **not** measured for single-sig, for `sh(wsh(…))`, for `tr(…)`, for change
-   addresses, for index > 0, or for testnet. §7's `address_0` requirement exists
-   to close that, and until it does, "md1 preserves the wallet" is a claim
-   supported by one data point.
+3. **The `--as md1` address equality now rests on ten descriptor shapes** —
+   all seven §4.7 forms including the 15/16/20-key extremes, `wsh(multi)`,
+   and the childless-mixed case — with Go and Rust agreeing at receive
+   index 0 on every one and at index 1 on seven (r6, measured; the original
+   "one data point" caveat is discharged). **Still unmeasured: change
+   addresses and testnet.** §7's `address_0`/`address_1` requirements cover
+   receive; change-chain and testnet rows remain the gap this item names.
 4. **`md-cli` at repo HEAD was used for the `md` measurements; `me` links the
    published `md-codec` 0.42.0.** They agree on version *string*. The `md`
    binary used was built `Aug 27 17:12` and HEAD is `Aug 27 19:41`; the two
@@ -1377,7 +1435,8 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
    container whose `me sysw show` reports one `Descriptor` record
    (single-document mode, §5.1), and the device's `sysw.Classify` — exercised
    by §7's Go test through the `sysw_class` column — classifies that record
-   `Descriptor`.
+   `Descriptor`. **S2's item** (F-418): it needs the device arm, so S1 and S3
+   close without it (R0 r6's NEW-M5).
 2. `me sysw pack --as md1 --in <each of the four formats>` produces a container
    (single-document mode, §5.1) whose records `md decode` reads back to the
    expected template — with §5.3(a′)'s materialised `<0;1>/*` where the input
@@ -1387,9 +1446,12 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
    which `--as md1` refuses per §5.3(a) (R0 r4, verified in passing).
 3. `descriptor_seam_vectors.json` exists in both repos with one sha256, both
    tests pin it, and both suites are green — **and the file's row set covers
-   every bullet of §7**, checked by a test that counts, not by reading.
+   every bullet of §7**, checked by a test that counts the `covers` tags
+   against §7's coverage manifest (per-tag minima met, no unknown tags, the
+   field present on every row), not by reading (R0 r6's NEW-I2).
 4. Every refusal in §6 has a test that reaches it and asserts the *text*, not
-   just the exit code.
+   just the exit code. The `--as descriptor`-only rows among them are S2's
+   (F-418); the rest bind S3 (R0 r6's NEW-M5).
 5. `--as` omitted with a descriptor input exits **2** and prints §5.1's block.
 6. §9's item 2 is discharged: a `ClassDescriptor` record has been loaded on a
    real device and displayed, at least once, before this is called shipped —
