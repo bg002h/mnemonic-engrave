@@ -121,6 +121,24 @@ pub enum UnknownReason {
     /// refusal that says only "an input is unsigned" gives them nothing to
     /// look at. [`Admission::allow_unsigned_inputs`] overrides this one arm.
     UnsignedInputs(Vec<usize>),
+    /// A string BIP-93 itself parses — correct codex32 checksum, HRP `ms` — that
+    /// the constellation `ms1` PROFILE refuses. Carries the character length.
+    ///
+    /// **A separate variant because [`Unrecognised`]'s message is FALSE here on
+    /// a plain reading.** It says "not an md1/mk1/ms1/mt1 string", and this
+    /// string *is* an `ms1` string — just not a constellation one. `ms1` is a
+    /// two-gate profile over codex32 (a length in the profile's own sets, then
+    /// the 4-character id `entr`), so plain BIP-93 secrets at 48 and 74
+    /// characters, and every BIP-93 *share*, land here. Pointing that operator
+    /// at the classifier costs them the hour it takes to work out that the
+    /// classifier was never the cause.
+    ///
+    /// The length is SHAPE, not content — the same thing
+    /// [`crate::seal::record::RecordError::MsTooLong`] already names — and it is
+    /// the one number that tells the operator which of the two gates they hit.
+    ///
+    /// [`Unrecognised`]: UnknownReason::Unrecognised
+    Bip93OutsideTheProfile(usize),
     /// No reserved prefix, not a BIP-39 mnemonic, and not a constellation
     /// string. This is the case the descriptor/address gap belongs to.
     Unrecognised,
@@ -145,6 +163,13 @@ fn unknown_reason(record: &str) -> UnknownReason {
         if record.starts_with(prefix) {
             return UnknownReason::NonHexBody(prefix);
         }
+    }
+    // The PROFILE gate, not the classifier. Last, because it is the narrowest
+    // question asked here and the only one that re-parses; every arm above is a
+    // prefix test on a record this one cannot match (an `ms1` string carries no
+    // reserved prefix).
+    if crate::seal::record::bip93_outside_the_profile(record) {
+        return UnknownReason::Bip93OutsideTheProfile(record.trim().chars().count());
     }
     UnknownReason::Unrecognised
 }
@@ -727,6 +752,76 @@ mod tests {
                     UnknownReason::NonHexBody(prefix)
                 )),
                 "{record}"
+            );
+        }
+    }
+
+    /// **A valid BIP-93 codex32 is refused for the PROFILE, not by the
+    /// classifier — and the refusal has to say which.** `Unrecognised`'s message
+    /// reads "not an md1/mk1/ms1/mt1 string", which is false here: these ARE
+    /// `ms1` strings. Constellation `ms1` is a two-gate profile over BIP-93, so
+    /// BIP-93's own vectors land outside it while being perfectly good codex32.
+    ///
+    /// The 90-character row carries the id `entr` and still fails, so a
+    /// diagnosis that blamed only the tag would be wrong about it.
+    #[test]
+    fn a_valid_bip93_codex32_names_the_profile_not_the_classifier() {
+        // BIP-93 test vectors 1, 4 and 3 (fork: codex32/codex32_test.go), then
+        // MS1_90 — `entr`, but 90 characters.
+        for (s, len) in [
+            ("ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlw", 48usize),
+            (
+                "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycma",
+                74,
+            ),
+            ("ms13cashsllhdmn9m42vcsamx24zrxgs3qqjzqud4m0d6nln", 48),
+            (
+                "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqutd7mdh2lc8h2",
+                90,
+            ),
+        ] {
+            assert_eq!(s.chars().count(), len, "vector is not {len} characters");
+            assert_eq!(
+                pack(vec![s.into()], None, ITER),
+                Err(SyswError::Unclassifiable(
+                    0,
+                    UnknownReason::Bip93OutsideTheProfile(len)
+                )),
+                "{s}"
+            );
+        }
+    }
+
+    /// **THE CONTROL, in both directions.** Without it, a predicate that
+    /// answered `true` for everything would pass the test above.
+    ///
+    /// Left: things that are not BIP-93 at all must stay `Unrecognised` — a
+    /// string with `ms1`'s letters and a bad checksum is not "outside the
+    /// profile", it is not codex32. Right: a real constellation `ms1` must still
+    /// PACK, which is what proves the diagnostic changed and the admission set
+    /// did not.
+    #[test]
+    fn the_profile_arm_is_gated_on_a_real_bip93_parse() {
+        for s in [
+            // BIP-93's own bad-checksum vector, and `ms1` + filler.
+            "ms10fauxsxxxxxxxxxxxxxxxxxxxxxxxxxxve740yyge2ghp",
+            "ms1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
+            "this is not a record of any class",
+        ] {
+            assert_eq!(
+                pack(vec![s.into()], None, ITER),
+                Err(SyswError::Unclassifiable(0, UnknownReason::Unrecognised)),
+                "{s}"
+            );
+        }
+        for s in [
+            "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f",
+            "ms10entrsqqg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9q5f042qmrw90mw",
+        ] {
+            assert_eq!(classify(s), record::Class::Codex32Secret, "{s}");
+            assert!(
+                pack(vec![s.into()], None, ITER).is_ok(),
+                "{s} must still pack"
             );
         }
     }
