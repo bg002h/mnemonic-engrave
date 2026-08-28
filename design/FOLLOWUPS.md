@@ -14533,6 +14533,17 @@ lines), the refusal names what the input is and refers to
 a referral to a flag that does not exist yet is the r5-NEW-I2 defect class
 across tools.
 
+### F-421 — `me`'s top-level NDEF converter half-captures the natural descriptor spelling and refuses without a referral (repo: **mnemonic-engrave**; owning phase: **with or after descriptor-input S1**) `#me` `#cli` `#cross-tool`
+
+Filed from the 2026-08-28 journey walk (W3). `me` owns a top-level
+`--in <FILE>` (the NDEF converter), so the operator's natural
+`me --in wallet.txt --as descriptor` half-parses and clap tips `--base64` —
+a flag from the OTHER program — while nothing names `sysw pack`. Fix: the
+converter's own refusal, when its input is descriptor-shaped (concrete key
+expression or `Key: value` lines), refers to
+`me sysw pack --as <descriptor|md1>`. In-tool twin of F-420, same
+sequencing: with or after S1, never before the flag exists.
+
 ### F-418 — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
 
 **Operator ruling 2026-08-28, in conversation:** *"I'm away from sh2 and it's

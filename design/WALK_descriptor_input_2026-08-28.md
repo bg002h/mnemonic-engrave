@@ -85,3 +85,54 @@ the referral never points at a flag that does not exist yet.
 **Within this spec's scope: nothing to change** — once `me` is reached, §5.1
 and §6 handle the rest. The operator's problem is REACHING it; the
 constellation-uniformity surface owns cross-tool discovery.
+
+
+---
+
+## W3 — the operator's natural spelling half-parses into a DIFFERENT program,
+## and clap's similarity tip points deeper into it
+
+**The moment.** Knowing the tool and wanting the QR plate, the operator
+typed: `me --in wallet.txt --as descriptor` — no subcommand. Natural: "tool,
+input, output form."
+
+**Measured.** `me`'s TOP LEVEL owns `--in <FILE>` — the original NDEF
+converter — so the spelling half-parses: clap accepts `--in`, trips on
+`--as`, and tips *"a similar argument exists: '--base64'"* (string
+similarity into the converter's flag set). Usage line shown:
+`me --in <FILE> --base64`. Nothing names `sysw pack`. And `me --in
+wallet.txt` alone RUNS the converter on the BlueWallet file (its refusal
+recorded in the commit adding this entry). The corrected spelling today
+(`me sysw pack --in … --as …`) tips `--no-passphrase` — pre-S1, expected.
+
+**Classification: remedy, filed as F-421 (in-tool twin of F-420).** When the
+top-level converter refuses an input that is descriptor-shaped, it refers to
+`me sysw pack --as <descriptor|md1>`. Same sequencing rule as F-420: lands
+with or after S1. The clap similarity tip is generic machinery and not worth
+fighting; the converter's own refusal is ours and can say the true thing.
+
+---
+
+## W4 — the corrected command, in the S3-only world the plan ships first,
+## has NO SPECIFIED OUTCOME — and it is the first command a real user runs
+
+**The moment.** The operator's corrected command is
+`me sysw pack --in wallet.txt --as descriptor` — and they chose
+`--as descriptor` deliberately (W1: they want the scannable QR plate).
+Under F-418, the first shipping build is S3-only. The spec defines
+`--as <descriptor|md1>` whole (§5.1) and parks S2 (§8, §11) — but nothing
+says what `--as descriptor` DOES in an S3-only build. Clap value error?
+Unknown-flag error? Both would be false or useless; neither is specified.
+
+**Classification: SPEC change (fold after the walk), Important-class for the
+plan.** §5.1 gains the window clause: in a build where S2 has not shipped,
+`--as descriptor` is a REFUSAL, `EXIT_REFUSED` (3), naming the true reason
+and the live alternative with the W1 modality difference the operator needs
+to decide: *"--as descriptor (the scannable QR plate) needs the device half
+of this feature (S2), which this build does not carry. --as md1 is
+available now: error-corrected TEXT cards, restored by transcription rather
+than scanning. If you need the QR plate, keep the export file; it packs the
+day S2 ships."* §6 gains the row; §11 item 5's sibling test pins it. This
+also discharges the interim-remedy question from the plan inputs: §6 rows
+that name `--as descriptor` stay honest in the window BECAUSE the flag's own
+refusal explains the window and preserves the operator's export-file path.
