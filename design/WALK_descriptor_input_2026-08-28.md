@@ -136,3 +136,39 @@ day S2 ships."* §6 gains the row; §11 item 5's sibling test pins it. This
 also discharges the interim-remedy question from the plan inputs: §6 rows
 that name `--as descriptor` stay honest in the window BECAUSE the flag's own
 refusal explains the window and preserves the operator's export-file path.
+
+
+---
+
+## W5 — the operator decoded the window refusal "through a convoluted
+## message"; the draft led with mechanism and leaked an internal phase label
+
+**The moment.** Shown W4's drafted refusal, the operator: *"Now I understand
+through a convoluted message that what I want to do is not possible yet."*
+Understood — but through effort. A refusal the operator must decode is
+half-failed, and their one-sentence summary IS the message's correct first
+line.
+
+**What was wrong with the draft.** It opened with the flag name, a
+parenthetical, and *"the device half of this feature (S2)"* — S2 is this
+cycle's internal phase label, meaningless to an operator. Mechanism first,
+verdict last; jargon in between.
+
+**The rewrite (outcome first, no internal vocabulary):**
+
+    me: --as descriptor is not available in this build.
+          The QR plate needs device firmware this release does not include.
+          Available now: --as md1 — error-corrected text cards, restored by
+          transcription instead of scanning. Your export file is all you
+          need to come back for the QR plate later; nothing is lost by
+          waiting.
+
+**Classification: spec fold (with W4's), plus a NORMATIVE rule and a sweep.**
+
+1. W4's window refusal uses the rewrite above.
+2. NEW RULE for §6's preamble: **operator-facing refusal text contains no
+   internal identifiers** — no phase labels (S1/S2/S3), no follow-up numbers
+   (F-4xx), no spec § references inside the quoted text. Those belong in the
+   row's annotation column, not in what the operator reads.
+3. Sweep §6's quoted texts for existing leaks: at least the multi-record
+   row's quoted message contains "(F-414)" today. Fix in the walk fold.
