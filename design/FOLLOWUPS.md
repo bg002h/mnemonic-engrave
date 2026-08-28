@@ -14508,6 +14508,23 @@ F-415: state the drift where it is created, amend the other document in its own
 cycle (one sentence plus a cross-reference) — two NORMATIVE contracts must not
 disagree silently.
 
+### F-418 — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
+
+**Operator ruling 2026-08-28, in conversation:** *"I'm away from sh2 and it's
+not connected. That should inform s2/3 ordering, I think."* — resolving the
+question `SPEC_descriptor_input.md` §8 deliberately left open.
+
+The measured asymmetry §8 records: S3 (`--as md1`) needs **no device change**
+(`ClassMDMK` already classifies and is already admitted) and can be
+demonstrated the day it compiles; S2 (`--as descriptor`) requires the
+`sysw.Classify` device arm — a firmware build and flash — before anything can
+be shown. With the device away and disconnected, S2 cannot even be
+demonstrated, let alone satisfy §11's item 6 (a `ClassDescriptor` record
+loaded on a real device before "shipped"). So: **S1 (shared cascade + vector
+gate) → S3 → S2**, with S2 parked until the SH2 is back on the bench. §8's
+text is folded to record this ruling as made (with the r4 fold, so the
+review target does not move mid-round).
+
 ### F-417 — RULING RECORD: md1's use-site-path narrowness is DELIBERATE; the wire format will NOT be widened to arbitrary paths (repo: **descriptor-mnemonic**; owning phase: **none — standing decision, not scheduled work**) `#md` `#wire-format` `#ruling`
 
 **Operator ruling 2026-08-28, in conversation, on the direct question "what is
