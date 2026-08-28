@@ -292,3 +292,38 @@ grounding as the leading rationale, and W8's confirmation annotation cites
 it in operator-checkable form: *"<0;1>/* is the standard receive/change
 continuation of your keys' BIP-48 origin (BIP-388's canonical tail)."* An
 authority the operator can verify beats "the device does this."
+
+
+---
+
+## W10 — the operator specifies the confirmation's missing lines: "a wallet
+## identifier and first address"
+
+**The moment.** Shown where the payload goes (measured on a pty: the shipped
+terminal guard refuses stdout — *"stdout is a TERMINAL, and this payload is
+BEARER … Nothing was written"* — with the `--out` + flash remedy), the
+operator said what they WANTED at this point on stderr: *"a wallet
+identifier and first address."*
+
+**Classification: SPEC change (walk fold) — §5.4's confirmation gains two
+lines, both from machinery the constellation already owns:**
+
+1. **`wallet-id:` the WalletPolicyId fingerprint** — the identifier that
+   exists "for cross-verifying digital copies of the policy against the
+   engraved Template Card." `me` parses host-side on BOTH paths, so one
+   identifier is shared across `--as md1` and `--as descriptor`: the same
+   wallet prints the same id whichever plate is cut. (F-212's lesson binds:
+   the id is cross-language, so the §7 vector rows should carry it too —
+   one more column, `wallet_id`, asserted by both suites.)
+2. **`address 0:` receive address 0, with the compare prompt** — one line:
+   *"compare against your wallet software's first receive address before
+   engraving."* This turns the confirmation into an EXECUTABLE check
+   against the coordinator the operator already trusts — the same equality
+   eight review rounds used as ground truth, handed to the operator.
+
+**Also logged from this beat's measurement (notes, not this cycle's):**
+(a) the terminal guard calls every payload "BEARER" — seconds after
+`sealing:` said "no record in this payload is secret material"; the two
+surfaces should agree (public-only payloads are not bearer). (b) The
+guard's remedy names raw `picotool`; the operator's own bench standard is
+`sh2-flash` — environment-specific, noted only.
