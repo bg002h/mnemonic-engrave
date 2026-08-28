@@ -13629,3 +13629,53 @@ A consumer that parses `md repair --json` gets nothing to parse and no signal ot
 It matters because stub order is **on the wire**: measured, the same eight md1 strings supplied A-then-B and B-then-A mint different `mk1` cards. Found because the first draft of `--from-md1-set`'s test asserted argv order and went red.
 
 Now stated in the flag's help text, in the source, and pinned by a test asserting both the order and that the two orders really do differ. `mk verify` compares stubs as a multiset, so a card minted in either order still verifies (with a note), which is why this is a Nit rather than a defect. Recorded so a later reader does not "fix" it into argv order without knowing a re-mint in a different order is a different card.
+
+### F-362 — `me`'s SECRET-class private-channel advice is UNREACHABLE: the pre-parser guard refuses every input that would select it (repo: **mnemonic-engrave**; owning phase: **a later cycle** — it blocks nothing, and the text is now correct either way) `#me` `#dead-code` `#remedy` `#gates`
+
+**Found 2026-08-27 by P2's row 11**, while building the test that RUNS the line
+`me` advises a secret-class operator.
+
+`read_records`'s argv refusal picks between two examples:
+
+```rust
+let example = if by_prefix || class.is_bearer() { BEARER… } else { SECRET… };
+```
+
+The `else` arm is selected only when `class.is_argv_forbidden()` holds — and
+`is_argv_forbidden()` is **exactly** what the pre-parser `argv_secret_guard`
+refuses on, at exit 3, before `read_records` is called. Both layers normalise
+identically (trim, ASCII-lowercase, `=`-split), so there is no spelling that
+gets past one and is caught by the other.
+
+**Measured over eleven argv shapes** — a BIP-39 phrase, an `ms1` in three
+spellings, `pass:`, `text:`, three `tx:` forms, `md1`, `mt1` — running
+`me sysw pack <shape>` and grepping stderr:
+
+| shape class | outcome | carries the `ms encode` advice |
+| --- | --- | --- |
+| secret / bearer classes | **rc 3**, pre-parser refusal | **0 of 11** |
+| `pass:` / `text:` malformed bodies | rc 4, body error | 0 |
+| `tx:` prefixes | rc 3, the record refusal — but via `by_prefix`, so the **BEARER** example | 0 |
+
+So the reachable half of that refusal always takes the bearer branch, and the
+secret branch has never printed.
+
+**The text was corrected anyway, and that is deliberate**: a dead branch that is
+also WRONG is one refactor away from being live and wrong, and §6h's standing
+instruction ("`me`'s `--phrase -` advice becomes the `--in` form when P2 ships
+one") fires on the text, not on its reachability.
+
+**A second measurement worth recording.** After P2 made `ms encode`'s stdout the
+canonical ungrouped `ms1`, the OLD advice
+(`ms encode --phrase - < seed.txt | me sysw pack --out p.bin`) **also runs** —
+verified as a mutation: swapping the constant back leaves
+`tests/ms_remedy_runs.rs` green. So F-301's live defect is closed by P2's `ms`
+rather than by this text change. The `--in` form is still the right advice (one
+private channel, no shell redirect), and two genuinely broken mutations
+(`--nosuchflag`, and dropping `--out p.bin`) both turn the test RED, so the gate
+is a gate.
+
+**What a fix looks like, if one is ever wanted.** Either delete the secret arm
+and let the bearer example serve the one reachable case, or give the pre-parser
+guard a reason to defer to the record layer for secret classes. Neither is P2's,
+and neither is urgent: nothing is wrong on any path an operator can walk.
