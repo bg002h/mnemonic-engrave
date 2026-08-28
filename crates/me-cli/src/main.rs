@@ -2400,6 +2400,25 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      exotica), pass --allow-unsigned-inputs.",
                     name_inputs(idx)
                 ),
+                // Named separately from Unrecognised because Unrecognised's
+                // text is FALSE here: it says "not an md1/mk1/ms1/mt1 string",
+                // and this string IS an ms1 string. The cause is the PROFILE,
+                // not the classifier, and the message says so. The length and
+                // the two length sets are shape, never content — the record
+                // itself is a seed and is never echoed.
+                U::Bip93OutsideTheProfile(len) => format!(
+                    "record {i} (records count from 0) is a VALID BIP-93 codex32 string — the \
+                     checksum is good — but not a constellation `ms1` record, so this \
+                     container cannot place it.\n      \
+                     `ms1` is a two-gate PROFILE over BIP-93: the whole string must be \
+                     {:?} characters (entropy) or {:?} (mnemonic), and the 4-character id must \
+                     be `entr`. This one is {len} characters.\n      \
+                     Plain BIP-93 secrets are 48 or 74 characters and BIP-93 SHARES carry \
+                     their own id, so neither is a constellation record — re-encode the \
+                     entropy as `ms1` rather than editing the string.",
+                    ms_codec::consts::VALID_STR_LENGTHS,
+                    ms_codec::consts::VALID_MNEM_STR_LENGTHS,
+                ),
                 U::Unrecognised => format!(
                     "record {i} (records count from 0) is not a form this container can \
                      place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not \

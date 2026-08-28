@@ -14149,3 +14149,38 @@ siblings, replacing the named-URL derivation with the unanchored-set assertion.
 `md` keeps exactly one grounded exemption (`miniscript`); `mk` needs **none** —
 after this change its `Cargo.lock` carries zero `source = "git+…"` entries, so
 every vendored crate there is registry-anchored and the exemption list is empty.
+
+### F-401 — `me sysw pack` cannot tell an over-cap `ms1` from an off-profile one: both get the profile message, and only `me seal` says "too long to engrave" (repo: **mnemonic-engrave**; owning phase: **ownerless residue**) `#cli` `#diagnostics` `#codex32`
+
+**Found 2026-08-28** while adding `UnknownReason::Bip93OutsideTheProfile` (see
+`design/agent-reports/FIX-codex32-seam.md`). Reported, not fixed — the brief
+scoped the change to one refusal arm.
+
+`seal::record::validate_record` distinguishes two failures for an `ms1` that
+BIP-93 parses: `MsTooLong(n)` above `MAX_ENGRAVEABLE_MS1_LEN = 90`, and
+`Invalid` otherwise. `me seal` renders both, and the split is the point —
+"intact but too long to cut" is a different fact from "unreadable".
+
+`me sysw pack` collapses them. `sysw::classify` sees only `Err(_)` from
+`validate_record`, and `unknown_reason` now answers
+`Bip93OutsideTheProfile(n)` for **both**, because the new arm's three clauses
+(HRP `ms`, `Codex32String::from_string` ok, `ms_codec::decode` err) hold at 91
+characters exactly as they do at 48. Measured on the two vectors this cycle
+pinned:
+
+| record | `me seal` | `me sysw pack` |
+| --- | --- | --- |
+| 48-char BIP-93 secret | `invalid record: string length 48 outside v0.1 set …` | profile message, "This one is 48 characters" |
+| 91-char `entr` (`MS1_91`) | `this codex32 secret is 91 characters; the machine can engrave at most 90` | profile message, "This one is 91 characters" |
+
+Both `sysw` messages are TRUE — 91 is in neither profile length set, and
+re-encoding at a profile length is the right move — so this is a lost
+distinction, not a false statement, which is why it is a follow-up and not a
+defect in the arm it was found in.
+
+**Fix, when a phase owns it:** have `unknown_reason` consult
+`validate_record`'s error rather than a standalone predicate, and add a
+`MsTooLongToEngrave(usize)` arm that names the 90-character cap the way
+`RecordError::MsTooLong` does. The vector is already in
+`crates/me-cli/testdata/codex32_seam_vectors.json`
+(`past-the-engraveable-cap-91`), so the test is a row, not a new fixture.

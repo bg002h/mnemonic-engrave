@@ -180,6 +180,34 @@ pub fn validate_record(s: &str) -> Result<RecordKind, RecordError> {
     }
 }
 
+/// Is `s` a string BIP-93 itself accepts, that the constellation `ms1` PROFILE
+/// does not?
+///
+/// The same two-layer parse `validate_record` uses above to tell `MsTooLong`
+/// from `Invalid`, exposed so a refusal can name the layer that actually
+/// refused. Constellation `ms1` is a two-gate profile *over* codex32 — the
+/// string length must be in [`ms_codec::consts::VALID_STR_LENGTHS`] ∪
+/// [`ms_codec::consts::VALID_MNEM_STR_LENGTHS`], and then the 4-character id
+/// must be `entr` — so plain BIP-93 secrets (48 and 74 characters) and BIP-93
+/// *shares* are perfectly valid codex32 and still not records this tool can
+/// place. Telling that operator "not an md1/mk1/ms1/mt1 string" is false on a
+/// plain reading, and points at the classifier when the cause is the profile.
+///
+/// **HRP-gated, exactly like the `MsTooLong` check above.**
+/// `Codex32String::from_string` pins no HRP, so without the `ms` gate a
+/// BCH-valid `md1`/`mk1` would answer `true` here and earn a message about
+/// seeds.
+///
+/// `Codex32String` derives `zeroize::ZeroizeOnDrop` and takes the `String` by
+/// value, so the copy this makes IS scrubbed on the success path — the only
+/// path that can return `true`.
+pub fn bip93_outside_the_profile(s: &str) -> bool {
+    let s = s.trim();
+    matches!(classify(s), Ok(Format::Ms))
+        && ms_codec::codex32::Codex32String::from_string(s.to_string()).is_ok()
+        && ms_codec::decode(s).is_err()
+}
+
 /// §6.3: every public record must belong to a card set that REASSEMBLES AND
 /// DECODES. Records are chunks, so this is necessarily a whole-set operation —
 /// a per-record decode rejects every legitimate payload.
@@ -402,6 +430,67 @@ mod tests {
             !matches!(validate_record(&junk), Err(RecordError::MsTooLong(_))),
             "a string that is not valid codex32 is unreadable, not too long"
         );
+    }
+
+    /// `bip93_outside_the_profile` answers the question the refusal needs: is
+    /// this BIP-93's string or the constellation's? BIP-93's own vectors are
+    /// `true`; real constellation records are `false`.
+    ///
+    /// The 90-character row is the one that matters most — its id IS `entr`, so
+    /// a predicate that only checked the tag would call it a constellation
+    /// record and the message would blame the wrong gate.
+    #[test]
+    fn bip93_outside_the_profile_separates_bip93_from_the_constellation() {
+        // BIP-93 test vectors 1, 4 and 3 (fork: codex32/codex32_test.go).
+        for s in [
+            "ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlw",
+            "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycma",
+            "ms13cashsllhdmn9m42vcsamx24zrxgs3qqjzqud4m0d6nln",
+            MS1_90,
+        ] {
+            assert!(bip93_outside_the_profile(s), "valid BIP-93, not ms1: {s}");
+        }
+        // Real constellation records are inside the profile, by definition.
+        for s in [MS1, "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f"] {
+            assert!(!bip93_outside_the_profile(s), "a constellation ms1: {s}");
+        }
+        // And a string BIP-93 itself refuses is not "outside the profile" — it
+        // is not codex32 at all. Both spellings: a bad checksum from BIP-93's
+        // own bad-checksum vectors, and `ms1` + filler.
+        for s in [
+            "ms10fauxsxxxxxxxxxxxxxxxxxxxxxxxxxxve740yyge2ghp",
+            "ms1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
+        ] {
+            assert!(!bip93_outside_the_profile(s), "not codex32 at all: {s}");
+        }
+    }
+
+    /// It must never fire on a wallet-policy or xpub record.
+    ///
+    /// **What actually keeps `md1` out today is MEASURED here, not assumed**,
+    /// because the measurement is the whole point: `md`/`mk` checksum under
+    /// DIFFERENT BCH constants from BIP-93, so a real `md1` is not a codex32
+    /// string at all and `Codex32String::from_string` rejects it. That makes
+    /// the HRP gate look redundant — and is exactly why it stays. The day a
+    /// codec change makes an `md1` parse as BIP-93, the first assertion below
+    /// fires and names what the gate is holding back, instead of an operator
+    /// getting a message about seeds for a wallet policy.
+    #[test]
+    fn bip93_outside_the_profile_never_fires_on_md_or_mk() {
+        for s in MD1 {
+            assert!(
+                (48..94).contains(&s.chars().count()),
+                "must be inside codex32's short band, or the rejection below is about \
+                 LENGTH and asserts nothing about BCH: {s}"
+            );
+            assert!(
+                ms_codec::codex32::Codex32String::from_string(s.to_string()).is_err(),
+                "md1 now parses as BIP-93 — the HRP gate is the only thing left: {s}"
+            );
+        }
+        for s in MD1.iter().chain(MK1.iter()) {
+            assert!(!bip93_outside_the_profile(s), "not an ms1: {s}");
+        }
     }
 
     /// Scope: `mdmkText` is deliberately NOT covered (§10.2.1a). md/mk records

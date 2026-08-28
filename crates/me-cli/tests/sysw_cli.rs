@@ -2339,3 +2339,78 @@ fn an_out_of_range_iterations_count_aborts_before_sealing_is_described() {
     );
     assert!(!out.exists(), "and no artifact");
 }
+
+// ── The refusal names the PROFILE, not the classifier ────────────────────────
+
+/// BIP-93 test vector 1 — a perfectly good 128-bit codex32 secret, and not a
+/// constellation `ms1`. Verbatim from the fork's `codex32/codex32_test.go`.
+const BIP93_SECRET: &str = "ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlw";
+
+fn refuse_one_record(record: &str) -> String {
+    let dir = tempfile::tempdir().unwrap();
+    let recs = dir.path().join("r.txt");
+    std::fs::write(&recs, format!("{record}\n")).unwrap();
+    let out = dir.path().join("p.bin");
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase", "--in"])
+        .arg(&recs)
+        .arg("--out")
+        .arg(&out)
+        .assert()
+        .failure();
+    assert!(!out.exists(), "a refused run must write nothing");
+    String::from_utf8_lossy(&a.get_output().stderr).to_string()
+}
+
+/// **The refusal named the wrong cause.**
+///
+/// A valid BIP-93 codex32 that is not a constellation `ms1` used to be refused
+/// with *"not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string"* — false on a
+/// plain reading, because the string IS an `ms1` string. It is not a
+/// *constellation* one, and the cause is the two-gate PROFILE, not the
+/// classifier the old sentence pointed at. Measured cost of that misdirection,
+/// once: an hour.
+///
+/// **The record is a SEED, so nothing of it may appear in the message** — the
+/// check is the whole string and every 12-character window of it, not a glance.
+#[test]
+fn a_valid_bip93_string_is_told_it_is_bip93_and_not_a_constellation_ms1() {
+    let err = refuse_one_record(BIP93_SECRET);
+    for want in [
+        "BIP-93",
+        "not a constellation `ms1` record",
+        "`entr`",
+        "This one is 48 characters",
+    ] {
+        assert!(err.contains(want), "{want:?} missing from: {err}");
+    }
+    // The sentence that was false about this input, gone.
+    assert!(
+        !err.contains("not an md1/mk1/ms1/mt1 string"),
+        "the classifier sentence is false for a BIP-93 string: {err}"
+    );
+    assert!(!err.contains(BIP93_SECRET), "the record is echoed: {err}");
+    for w in BIP93_SECRET.as_bytes().windows(12) {
+        let w = std::str::from_utf8(w).unwrap();
+        assert!(
+            !err.contains(w),
+            "a 12-character window {w:?} is echoed: {err}"
+        );
+    }
+}
+
+/// **THE CONTROL.** Without it, replacing the general refusal with the BIP-93
+/// one everywhere would pass the test above — and the descriptor/address gap,
+/// which is what that sentence is genuinely about, would stop being named.
+#[test]
+fn a_record_of_no_class_at_all_still_names_the_classifier() {
+    let err = refuse_one_record("this is not a record of any class");
+    assert!(
+        err.contains("not an md1/mk1/ms1/mt1 string"),
+        "the general refusal must survive: {err}"
+    );
+    assert!(
+        !err.contains("BIP-93"),
+        "and must not claim this is codex32: {err}"
+    );
+}
