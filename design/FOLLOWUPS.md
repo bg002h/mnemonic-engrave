@@ -14337,3 +14337,39 @@ naming the two forms that are representable. Accept `/**` as an alias for
 descriptor-input spec (§5.3(a)) already refuses this shape on the `--as md1`
 path — but that guards one new caller, not the shipped `md encode` surface every
 other caller uses.
+
+### F-411 — the F-410 origin note is scoped to an ALL-unhardened origin, so a MIXED one (`@0/84'/0'/0'/0/*`) and an all-unhardened `--path` are both silent (repo: **descriptor-mnemonic**; owning phase: **ownerless residue**) `#md` `#cli` `#diagnostics`
+
+**Filed while implementing F-410's two surviving items, as a record of a
+deliberate scope boundary — not as a claim that the boundary is wrong.**
+
+The F-410 ruling scoped the new `md encode` note to *"a parsed origin for a
+placeholder has **zero** hardened components"*, and the implementation matches
+that exactly. Measured on the 12-template matrix used to gate the change, the
+note fires on 7 templates and is silent on 5, including these two:
+
+```
+wpkh(@0/84'/0'/0'/0/<0;1>/*)   silent  (origin 84'/0'/0'/0 — has hardened components)
+md encode --path m/0 'wpkh(@0/*)'   silent  (note reads the TEMPLATE, not the override)
+```
+
+**The same misreading is reachable in both.** A user who writes
+`wpkh(@0/84'/0'/0'/0/*)` meaning "the BIP-84 account xpub, then receive chain
+`0`" gets origin `m/84'/0'/0'/0` with use site `/i` — so seating the *account*
+xpub (depth 3) backs `X/i` where they meant `X/0/i`, which is the identical
+divergence F-410 describes, one level down. `--path m/0` reaches it by another
+route.
+
+**Why the boundary is nonetheless defensible.** A trailing unhardened step under
+a hardened prefix is also how a legitimate origin ending at a chain level is
+spelled, so widening the predicate to "the LAST component is unhardened" would
+fire on templates the narrow rule correctly leaves alone — and the note's whole
+value is that a standard BIP-48/84 template stays silent. Widening needs a rule
+that separates the two, and nobody has written one; `--path` needs a separate
+decision about whether an override is the user's own words in the sense the note
+means.
+
+**What is owed:** a decision, not code. Either state that the narrow predicate is
+final and record why here, or produce the discriminating rule. Do not widen it by
+reflex — the ruling was explicit, and a note that fires on `48'/0'/0'/2'` is
+worse than no note.
