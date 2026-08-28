@@ -14437,3 +14437,32 @@ emitted line rather than a silence.
 the template text, full stop, and `--path` overriding it is the operator's
 business", or "no advisory fires about a declaration the card does not carry".
 Not a tier-2-only patch.
+
+**RESOLVED 2026-08-28 — ruled by an architect consult, third in the F-410/F-411
+line; ruling verbatim in `design/agent-reports/RULING_f412_path_override_note.md`;
+implemented at `5dbadb7b` in descriptor-mnemonic.**
+
+The advisory's predicate reads the template's declared-origin text and the
+seated keys, full stop — `--path` is invisible to it in both directions (never
+suppresses c1/c3/c5, never triggers c6), and F-411's exclusion of the
+override's own content is reaffirmed. The only `--path`-sensitivity is
+wording: when the override is present and a tier fired, one shared trailing
+line (both tiers, once per invocation, gated on presence only) states that
+`--path` replaced the cited spelling on the card and repeats the use-site-tail
+remedy.
+
+**Decisive measurement:** c1 and c2 derive the same first address — the excess
+step is inert with or without the override — so the divergence from the
+descriptor-style intent is invariant under `--path`, and an invariant harm
+demands an invariant note; only the note's card-facing evidence changes, so
+only wording changes. The c1 invocation shape (template path + `--path`) is
+the descriptor mental model verbatim ("derivation" + "origin"), i.e. the
+note's audience, not its fatigue case.
+
+**Implemented as authorized, nothing more:** `path_overridden: bool`
+parameter, the fixed trailing line as the function's last emission,
+doc-comment + CHANGELOG updates; predicates byte-for-byte unchanged; stderr
+only, stdout and exit codes untouched, `--json` parity automatic. Six pinned
+tests; each of the four named mutants reds its named test. The 6-invocation
+pre/post matrix delta is exactly the one trailing line on c1/c3/c5. Gates:
+869/869 nextest, clippy `-D warnings` and `fmt --check` clean.
