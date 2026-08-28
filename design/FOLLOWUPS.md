@@ -14466,3 +14466,35 @@ only, stdout and exit codes untouched, `--json` parity automatic. Six pinned
 tests; each of the four named mutants reds its named test. The 6-invocation
 pre/post matrix delta is exactly the one trailing line on c1/c3/c5. Gates:
 869/869 nextest, clippy `-D warnings` and `fmt --check` clean.
+
+### F-413 — should `me` normalise SLIP-132 keys host-side instead of refusing `ypub`? (repo: **mnemonic-engrave**; owning phase: **descriptor-input cycle, before S1 closes**) `#me` `#descriptor` `#ruling-needed`
+
+Filed from R0's C2 fold (`SPEC_descriptor_input.md` §4.3). The device admits
+exactly `{xpub, tpub, zpub, Ypub, Zpub}`; `ypub` — the commonest non-`xpub` a
+real operator holds — is refused even with a full origin. The spec matches the
+device and prints the converted `xpub` spelling in the refusal (executable
+remedy). The open question is whether `me` should DO that conversion instead
+of printing it: accepting `ypub` and canonicalising to `xpub` would be safe
+under §7's canonical-level invariant (the device reads the canonical, which
+carries `xpub`) and more "broadly accepting", but it widens the host beyond
+the device's own input set. **Operator decision; the spec deliberately took
+the narrow side pending it.**
+
+### F-414 — a descriptor cannot be packed TOGETHER with other records in one container (repo: **mnemonic-engrave**; owning phase: **post descriptor-input cycle**) `#me` `#descriptor` `#cli`
+
+Filed from R0's C6 fold (`SPEC_descriptor_input.md` §5.1). `--as` puts the
+invocation in single-document mode: one descriptor, one container. The Engrave
+Bundle program admits `Descr` + `MDMK` in ONE container, and that composition
+is unreachable from `me` under this cycle's contract. Needs its own flag
+design (e.g. a repeatable `--descriptor-file`, or per-record `--as` binding);
+deliberately not half-specified in the spec.
+
+### F-415 — `SPEC_systemwide_payloads` §3.3.2 has no Wallet Policy row, but `gui/sysw_admit.go:45` admits `ClassDescriptor` there (repo: **mnemonic-engrave**; owning phase: **ownerless residue**) `#sysw` `#spec-drift`
+
+Filed from R0's I8. The §3.3.2 admission table (lines 341–352, re-read
+2026-08-28) lists `Descr` cells for Engrave Bundle and Engrave Multisig only —
+no Wallet Policy row, no Engrave Transaction row — while the code admits
+`ClassDescriptor` in `progWalletPolicy` too. `SPEC_descriptor_input.md` §2.3
+now states the drift instead of claiming agreement. The reconciliation (add
+the missing rows, or remove the code cell) belongs to `SPEC_systemwide_payloads`'
+own next cycle, with the usual gate.

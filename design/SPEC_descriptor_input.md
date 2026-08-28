@@ -1,6 +1,8 @@
 # SPEC — descriptor input (`me sysw pack --as descriptor` / `--as md1`)
 
-**Status:** DRAFT, round 0. No R0 review has run. **No code may be written
+**Status:** DRAFT, round 1. R0 returned **6C / 8I / 7M / 2N**
+(`design/agent-reports/R0-descriptor-input-spec-r1.md`); every finding is
+folded at this revision; round-2 re-review pending. **No code may be written
 until a round closes 0C/0I** (project `CLAUDE.md` — this is risk-set work: it
 changes normative admission behaviour and it decides which wallet an operator
 engraves).
@@ -38,7 +40,7 @@ $ grep '^version' crates/me-cli/Cargo.toml                 -> version = "0.7.0"
 $ grep -n 'md-codec' crates/me-cli/Cargo.toml              -> md-codec = "0.42"
 $ grep -n 'name = "md-codec"' -A 3 Cargo.lock              -> 0.42.0, registry+crates.io
 $ cd /scratch/code/shibboleth/seedhammer && git rev-parse main
-  d402f18   (NOT pushed; origin/main is 0b656d7 — a permission block, not a code problem)
+  d402f18   (pushed 2026-08-28; origin/main agrees)
 $ git diff --stat 0b656d7 d402f18 -- nonstandard/ bip380/  -> (empty)
 ```
 
@@ -90,7 +92,13 @@ through `--path`.
 
 `gui/sysw_admit.go` admits `sysw.ClassDescriptor` in three programs — lines 37,
 39 and 45, i.e. `progBundle`, `progMultisig`, `progWalletPolicy`. `SPEC_systemwide_payloads.md`
-§3.3.2 is the normative source for that table and lists the same three rows.
+§3.3.2 is the normative source for that table — and it lists only **two**
+`Descr` cells, Engrave Bundle and Engrave Multisig
+(`SPEC_systemwide_payloads.md:341–352`, re-read at fold time). **It has no
+Wallet Policy row at all**, so `progWalletPolicy`'s `ClassDescriptor` cell is
+code-only drift with no normative source. Reconciling that table is
+`SPEC_systemwide_payloads`' own change (F-415); this spec builds against the
+code as measured and does not claim the two documents agree.
 
 **`sysw.Classify` never returns it.** `sysw/record.go:97` dispatches the three
 reserved prefixes and then calls `classifyConstellation`
@@ -98,7 +106,9 @@ reserved prefixes and then calls `classifyConstellation`
 `codex32.ValidMD || codex32.ValidMK`, `codex32.ValidMT` — and then
 `ClassUnknown`. There is no descriptor arm, and the comment at
 `sysw/record.go:94` says the omission is deliberate and mirrors the Rust
-primary.
+primary. `classifyConstellation` calls `strings.TrimSpace` before its arms
+(`sysw/classify.go:38`), so a future descriptor arm sits after the trim —
+relevant to §4.6 and §5.2.
 
 Measured, not read. A scratch Go module with `replace seedhammer.com =>
 /scratch/code/shibboleth/seedhammer` (the fork tree is never written to), built
@@ -170,7 +180,7 @@ BIP-380 descriptor into a template**, and this function is not a head start on
 it.
 
 **(b) The template parser is not reachable from `me`.** It lives in
-`descriptor-mnemonic/crates/md-cli/src/parse/template.rs` (2619 lines).
+`descriptor-mnemonic/crates/md-cli/src/parse/template.rs` (2747 lines).
 `md-cli/Cargo.toml` declares `[[bin]] name = "md"` and **no `[lib]`**, and
 `crates/md-cli/src/lib.rs` does not exist. It is a binary crate. `me` cannot
 call into it, and shelling out to `md` would make a process the dependency —
@@ -265,7 +275,7 @@ that is chosen and what it prints.
 
 ### 4.2 Format 1 — BlueWallet (`parseBlueWalletDescriptor`)
 
-A line-oriented `Key: value` format. `nonstandard/parse.go:74`.
+A line-oriented `Key: value` format. `nonstandard/parse.go:77`.
 
 - Lines that are empty or begin with `#` are skipped.
 - Every other line **must** split on the two-character separator `": "` — a
@@ -274,7 +284,9 @@ A line-oriented `Key: value` format. `nonstandard/parse.go:74`.
   giving threshold and expected key count; `Derivation` → a `bip32` path;
   `Format` → one of exactly `P2WSH`, `P2SH`, `P2WSH-P2SH`.
 - **Any other key is treated as a cosigner**: the key is a hex master
-  fingerprint (≤ 4 bytes), the value an extended key.
+  fingerprint — **for `me`, exactly 8 hex characters / 4 bytes** (defect 4
+  below; the Go parser checks only `len > 4` and panics below 4), the value an
+  extended key.
 - A repeated header with an identical value is skipped; a repeated header with a
   **different** value is an error (`inconsistent header value`).
 - The descriptor type is **always `SortedMulti`**, unconditionally
@@ -319,12 +331,37 @@ them:
    probe compared `KeyData` and `ChainCode` and they are unchanged — so this is
    a round-trip and display break, **not** a wrong-wallet break. Stated
    precisely because the over-claim is tempting.
+4. **A fingerprint shorter than 4 bytes PANICS the Go parser.**
+   `parseBlueWalletDescriptor` checks only `len(fp) > 4` before calling
+   `binary.BigEndian.Uint32(fp[:])` (`nonstandard/parse.go:136–149`), which
+   panics for fewer. Measured: a 1-byte (`ab`) and a 3-byte (`abcdef`)
+   fingerprint both panic `OutputDescriptor` (`index out of range`), and the
+   panic is reachable from the device's scan door (`gui/scan.go:87`). `me`
+   requires exactly 8 hex characters — matching what `bip380.ParseKey` already
+   requires of an inline origin — and §7 marks these rows
+   `device_probe: "panic"` so the Go test never feeds one to the parser.
 
-**NORMATIVE:** `me` **refuses** all three shapes: a BlueWallet file with no
-`Format:` header, a BlueWallet file with zero cosigner lines, and a BlueWallet
-file whose first cosigner line precedes its `Derivation:` header. Each refusal
-names its cause (§6). Refusing is free under §7's invariant — the host may be
-narrower than the device, never wider.
+**NORMATIVE:** `me` **refuses** four shapes: a BlueWallet file with no
+`Format:` header; one with zero cosigner lines; one in which **any cosigner
+key would carry an empty origin path** — the `Derivation:` header is missing
+entirely, or appears after a cosigner line; and one whose cosigner fingerprint
+is not exactly 8 hex characters. Each refusal names its cause (§6). Refusing
+is free under §7's invariant — the host may be narrower than the device, never
+wider.
+
+**The third rule is stated over the KEYS, not over line order — R0's C1.** The
+ordering case (defect 3) is one way to produce an origin-less key; a file with
+**no `Derivation:` header at all** is another, and no ordering clause catches
+it. Measured: such a file is ACCEPTED by the device (`script=Segwit`, 2 keys),
+its canonical re-encoding carries `[fp]xpub…` per key — and **that canonical
+string does not re-parse** (`nonstandard: unrecognized output descriptor
+format`; the control with `Derivation:` present re-parses clean). §5.2 packs
+the canonical string, so admitting this file would engrave a plate the
+device's own parser refuses — verbatim the harm §7 exists to prevent. The
+equivalent predicate, checkable on the canonical string:
+`MasterFingerprint != 0 ⇒ len(DerivationPath) > 0` (`Descriptor.encode` emits
+`[…]` iff `mfp != 0`, `bip380/bip380.go:225–232`; `ParseKey` requires
+`originAndPath[8] == '/'`, `bip380/bip380.go:368–372`).
 
 ### 4.3 Format 2 — plain BIP-380 (`bip380.Parse`)
 
@@ -340,6 +377,22 @@ narrower than the device, never wider.
   strict `[` … `]` origin (fingerprint exactly 8 hex characters followed by `/`)
   and children parsed by `parsePath` (child index, `*`, `*'`/`*h`, or a
   `<a;b;…>` range).
+- **Extended-key version bytes — the admitted set is exactly five:** `xpub`
+  (`0488b21e`), `tpub` (`043587cf`), `zpub` (`04b24746`), `Ypub` (`0295b43f`),
+  `Zpub` (`02aa7ed3`). `ParseKey` calls `ParseExtendedKey` unconditionally, on
+  every key in every branch, and the classification switch has **no `ypub`
+  case** — `ypub` (`049d7cb2`) is declared in the constants and named in the
+  later normalisation switch, but classification hits `default` and errors
+  (`bip380/bip380.go:428–466`, re-read at fold time). So `ypub`, `upub`,
+  `vpub`, `Upub`, `Vpub` are refused by the device **even with a full explicit
+  origin** — measured: `sh(wpkh([4bbaa801/49h/0h/0h]ypub…/<0;1>/*))` REFUSE,
+  its `xpub` twin ACCEPT. **NORMATIVE: `me` admits exactly the same five.** A
+  standard BIP-32 library accepts `ypub`, so a host built on one without this
+  gate is WIDER than the device on the commonest non-`xpub` key there is
+  (R0's C2). The `ypub` refusal prints the equivalent `xpub` spelling with the
+  operator's own key converted (§6). Whether `me` should instead normalise
+  SLIP-132 keys host-side is **F-413**, an operator question this spec does
+  not decide.
 
 Measured:
 
@@ -364,18 +417,22 @@ example is `wsh(multi(2,@0/<0;1>/*,@1/<0;1>/*))`, so the two tools' headline
 examples disagree about the only multi form the device takes. This is the
 sharpest single constraint on `--as descriptor`.
 
-Four shapes the Go parser **accepts and should not**, measured:
+Shapes the Go parser **accepts and should not**, measured:
 
 | input | Go verdict | why it is wrong |
 | --- | --- | --- |
-| `wsh(sortedmulti(0,…))` | ACCEPT, threshold 0 | unspendable-by-anyone / spendable-by-nobody-checked |
+| `wsh(sortedmulti(0,…))` | ACCEPT, threshold 0 | **zero required signatures — spendable by ANYONE** (R0's I6; see §6) |
+| `wsh(sortedmulti(-1,…))` | ACCEPT, threshold −1, derives an address | `strconv.Atoi` accepts a sign (`bip380/bip380.go:348`) |
 | `wsh(sortedmulti(5,…))` with 2 keys | ACCEPT, threshold 5 | **unsatisfiable — funds locked forever** |
-| `tr(sortedmulti(2,…))` | ACCEPT | taproot multisig is `multi_a`/`sortedmulti_a` (BIP-386); `tr(sortedmulti(…))` is not a descriptor |
+| `sh(sortedmulti(2, 16 keys))` | ACCEPT, derives an address | 547-byte redeemScript exceeds the 520-byte script-element limit — **unspendable** (BIP-383: ≤ 15 keys under `sh`) |
+| `wsh(sortedmulti(2, 21 keys))` | ACCEPT, derives an address | exceeds `OP_CHECKMULTISIG`'s 20-key limit — **unspendable** |
+| `sh(wpkh(sortedmulti(2,…)))` | ACCEPT (`P2SH_P2WPKH`, `SortedMulti`) | a single-key wrapper around a multi; the device cannot even derive an address from it (measured: `address: multisig script: Nested Segwit (P2SH-P2WPKH): unsupported descriptor`) |
+| `tr(sortedmulti(2,…))` | ACCEPT | taproot multisig is `multi_a`/`sortedmulti_a` (BIP-387); `tr(sortedmulti(…))` is not a descriptor |
 | `wpkh(sortedmulti(2,…))`, `pkh(sortedmulti(2,…))` | ACCEPT | a single-key script wrapping a multi |
 
 ### 4.4 Format 3 — `{label, descriptor}` JSON
 
-`nonstandard/parse.go:41`. `json.Unmarshal` into `struct{ Label, Descriptor
+`nonstandard/parse.go:44–55`. `json.Unmarshal` into `struct{ Label, Descriptor
 string }`, then `bip380.Parse(jsonDesc.Descriptor)`, then `desc.Title =
 jsonDesc.Label`.
 
@@ -392,6 +449,11 @@ Measured properties, all of which `me` must reproduce or consciously decline:
   whitespace**.
 - **The branch returns even on failure** (§4.1), which is why this is the one
   format with a useful error message today.
+- **The JSON branch does not promote a bare key.** Measured:
+  `{"label":"x","descriptor":"xpub…"}` is REFUSED (`bip380: script: missing
+  '('`) while the same key alone is promoted by branch 4. `me` reproduces
+  this: promotion is only for a bare key arriving bare. §6's wrapper row
+  carries the diagnostic.
 
 `me` accepts the same document shape. **NORMATIVE:** `me` matches field names
 case-insensitively, exactly as the device does — a host that required lowercase
@@ -400,7 +462,7 @@ rather than a safety one, but is still a needless divergence.
 
 ### 4.5 Format 4 — the promoted bare key, and why it needs its own scrutiny
 
-`nonstandard/parse.go:56`. `bip380.ParseKey(nil, enc)` on the **whole file**,
+`nonstandard/parse.go:58–73`. `bip380.ParseKey(nil, enc)` on the **whole file**,
 then:
 
 ```go
@@ -472,6 +534,18 @@ descriptor it inferred, in full, before packing anything — the operator suppli
 one line and is getting a wallet, and §5.4's host-side-first rule means they see
 it first.
 
+**The announcement echoes the operator's key AS SUPPLIED, alongside the
+inferred descriptor — R0's I5.** The canonical re-encoding rebuilds an xpub's
+depth and child-number bytes from the (invented) origin path
+(`Key.ExtendedKey()`, `bip380/bip380.go:94–105`), so for any key whose true
+depth is not 3 the inferred descriptor contains a base58 string the operator
+has never seen — measured: a depth-4 cosigner xpub promoted to `pkh(…)`
+re-serialises to a different `xpub6Bq…`. The one check the announcement exists
+for is "is that my key?", and printing only the normalised form makes that
+check fail on a correct result. So the announcement prints both — `key as
+supplied: <verbatim>` and `inferred wallet: <canonical>` — with one line
+stating the serialisation was normalised and the key material is unchanged.
+
 ### 4.6 Whitespace — where the host is deliberately more forgiving
 
 Measured across all four formats:
@@ -492,8 +566,10 @@ input, and normalises CRLF to LF, **before** the cascade runs.
 This does **not** violate §7's invariant, and the reason is mechanical rather
 than a judgement call: the record `me` packs is the **canonical re-encoded
 descriptor string**, never the operator's file. `sysw` records are LF-separated
-(`SPEC_systemwide_payloads` §6.4), so a record cannot contain a newline by
-construction. The device never sees the whitespace the host absorbed.
+(`SPEC_systemwide_payloads` §5.3.1, which itself cites the encrypted-payload
+spec's §6.4), so a record cannot contain a newline by construction. The device
+never sees the whitespace the host absorbed. "The whole input" is
+well-defined because a descriptor invocation is single-document (§5.1).
 
 ### 4.7 The admitted grammar — the narrowing profile, NORMATIVE
 
@@ -505,11 +581,34 @@ tr(KEY)                           wsh(sortedmulti(k, KEY…))
 sh(wsh(sortedmulti(k, KEY…)))     sh(sortedmulti(k, KEY…))
 ```
 
-…**and** `1 ≤ k ≤ n`, where `n` is the number of keys.
+…**and** every conjunct of the admission predicate below holds.
 
-**The list above is the closed accept set, and the rule is stated over it, not
-over an enumeration of exclusions:** anything the cascade produces that is not
-one of those seven shapes with `1 ≤ k ≤ n` is refused. The exclusions *measured*
+**The admission predicate — script shape is ONE conjunct, not the whole rule.**
+R0 found that every safety property that is not a script form had fallen out
+of this section (key version bytes, key-count bounds, network consistency,
+origin-path presence — C1/C2/C3/I4), so the predicate is stated as an explicit
+conjunction, and §7's row list is derivable from it:
+
+1. **Shape:** one of the seven forms above.
+2. **Threshold:** `1 ≤ k ≤ n`, where `n` is the number of keys.
+3. **Key count (BIP-383):** `n ≤ 15` when the outermost script is `sh(…)` (the
+   redeemScript is one script element, capped at 520 bytes; 16 compressed keys
+   need 547), `n ≤ 20` otherwise (`OP_CHECKMULTISIG`'s limit). Measured: the
+   device ACCEPTS `sh(sortedmulti(2, 16 keys))` and
+   `wsh(sortedmulti(2, 21 keys))` and derives payable-looking addresses for
+   both — scripts that can never be spent.
+4. **Version bytes:** every key's version is in §4.3's five-member set.
+5. **Network:** all keys share one network. Measured: a mixed `xpub`/`tpub`
+   `sortedmulti` is ACCEPTED by the device's parser and re-parses clean — and
+   `address.Receive` then refuses it (`address: multisig descriptor mixes
+   networks`, `address/address.go:105–107`), so the record would reach
+   programs whose whole job is deriving addresses they cannot derive.
+6. **Origins:** every key with a fingerprint carries a non-empty origin path
+   (§4.2's canonical-string predicate).
+
+**The list above plus the predicate is the closed accept set, and the rule is
+stated over them, not over an enumeration of exclusions:** anything the cascade
+produces that fails any conjunct is refused. The exclusions *measured*
 so far are `tr(sortedmulti(…))`, `wpkh(sortedmulti(…))`, `pkh(sortedmulti(…))`,
 `k = 0` and `k > n` — the four rows at the end of §4.3 plus a threshold check
 the Go parser does not make at all — and, by inspection of `bip380.Parse`'s
@@ -551,9 +650,11 @@ a wallet export does not know which they want:
 
 ```
 me: this input is a wallet descriptor, and `--as` decides how it is packed.
-      --as descriptor   pack the descriptor VERBATIM. The device's Engrave
-                        Bundle / Multisig / Wallet Policy programs read it
-                        directly. Keeps the exact key serialisation.
+      --as descriptor   pack the descriptor in CANONICAL form -- the same
+                        wallet, normalised spelling: SLIP-132 versions become
+                        xpub, ' becomes h, the checksum is recomputed. The
+                        device's Engrave Bundle / Multisig programs read it
+                        directly.
       --as md1          decompose to a BIP-388 template plus keys and pack an
                         md1 card set. Carries policies `--as descriptor`
                         cannot, and needs no firmware change.
@@ -565,6 +666,26 @@ This is the operator's ruling and it is the reason §5.4 exists: the two accept
 sets genuinely differ, in both directions, so an automatic fallback would
 silently change which of two different artefacts the operator engraves.
 
+**How a descriptor arrives — single-document mode. NORMATIVE (R0's C6).**
+`--in`'s shipped contract is newline-separated records
+(`SPEC_systemwide_payloads` §5.6), which can never carry a multi-line
+BlueWallet file or pretty-printed JSON — measured: the fork's own BlueWallet
+fixture via `--in` dies on `record 0` (`# BlueWallet Multisig setup file`)
+with rc=4. So `--as` changes the input contract of the invocation it appears
+in:
+
+> When `--as` is present, the invocation is **single-document**: exactly one
+> descriptor, read WHOLE — `--in <FILE>` is the entire file as one document
+> (§4.6's "the whole input"), a single argv operand is the document, stdin is
+> the entire stream. Supplying `--as` with more than one argv operand, or with
+> both argv and `--in`, is `EXIT_USAGE` (2): *"--as packs exactly one
+> descriptor per invocation."*
+
+One descriptor, one container, one invocation. Packing a descriptor TOGETHER
+with other records (the Engrave Bundle case — one container carrying `Descr`
+plus `MDMK`) is deliberately out of this cycle: it needs its own flag design
+and is filed as **F-414** rather than half-specified here.
+
 ### 5.2 `--as descriptor`
 
 Packs the **canonical re-encoded descriptor string** — `Descriptor::encode()`,
@@ -572,7 +693,12 @@ with its BIP-380 checksum — as one record of class `Descriptor`.
 
 The record is the canonical form, not the operator's bytes: it is single-line by
 construction (§4.6), it is what the device's own parser round-trips, and it is
-what §7's vectors are stated over.
+what §7's vectors are stated over. "Canonical" is a real transformation,
+measured four ways (R0's C5): SLIP-132 versions normalise (`zpub` → `xpub`),
+`'` → `h` (`bip32.Path.Encode`), the checksum is recomputed, and an xpub's
+depth/child-number bytes are rebuilt from the origin path — so the base58
+string itself can change. §5.1's help text says so: the operator is choosing
+between two artefacts and must not be told one of them is their bytes.
 
 **This path requires a device change, and the spec says so rather than
 discovering it in implementation.** From §2.3: `sysw.Classify` has no descriptor
@@ -645,6 +771,29 @@ contrivance.
 > fixed child index.** The refusal names `--as descriptor`, which carries that
 > shape exactly.
 
+**(a′) An ABSENT use-site path is the same representational hole, resolved the
+other way — R0's C4.** `UseSitePath` has no "no children" state either:
+`{ multipath: None, wildcard_hardened: false }` IS `/*`, and the measurement
+table above shows it (`wsh(sortedmulti(2,@0,@1))` and `…@0/*,@1/*…` share
+chunk-set-id `0x9bf18`). The device, by contrast, **defaults an empty children
+list to `<0;1>/*`** (`address/address.go:188–202`). Left alone, the two `--as`
+values would derive different wallets from every childless descriptor —
+measured: device `bc1qadgf37z…` vs the md1 route `bc1qu2cc6t7…`, the identical
+divergence as (a) — and every §4.5 promoted bare key is childless, so `--as
+md1` on a bare `zpub` would silently diverge from `--as descriptor` on the
+same input.
+
+> **NORMATIVE: when the parsed descriptor's use-site path is ABSENT, `--as
+> md1` materialises the device's default, `<0;1>/*`, into the encoding.** This
+> is not a rewrite of the operator's wallet: the device is the reader of both
+> artefacts, and `<0;1>/*` is what it already derives for a childless
+> descriptor, so materialising it is the only encoding that preserves the
+> wallet md1 claims to carry (the address-layer equality below). The §5.4
+> confirmation prints the template WITH the materialised `<0;1>/*`, so the
+> operator sees it. An EXPLICIT single fixed index (`/0/*`) remains a refusal
+> per (a): the device does not default that shape away — it derives it — and
+> md1 cannot represent it.
+
 **(b) The label is dropped, by both paths.** `md_codec::TlvSection`
 (`src/tlv.rs:24`) has fields for use-site overrides, fingerprints, pubkeys,
 origin overrides and unknown TLVs — **and no label or title**. The canonical
@@ -699,7 +848,7 @@ This table is why there are two flags and no default. Every cell was run.
 | `wsh(sortedmulti(k, …/0/*))` — single fixed chain | ✅ | **❌ §5.3(a)** |
 | `wsh(multi(k, …))` — unsorted | **❌ device refuses (§4.3)** | ✅ `md encode` takes it |
 | miniscript, e.g. `wsh(or_d(pk(…),and_v(v:pkh(…),older(…))))` | **❌ device refuses** | ❌ §10 — out of scope this cycle |
-| `pkh` / `wpkh` / `sh(wpkh)` single-sig | ✅ | ✅ |
+| `pkh` / `wpkh` / `sh(wpkh)` single-sig — childless inputs: §5.3(a′) materialises `<0;1>/*` | ✅ | ✅ |
 | `tr(KEY)` single-key | ✅ | ✅ |
 | carries a label | text only, dropped | dropped |
 | needs a firmware change to be readable | **yes, §5.2** | **no** |
@@ -725,25 +874,35 @@ order:
 1. input parses as JSON → report **branch 3**'s inner error;
 2. input's first non-comment line contains `": "` → report **branch 1**;
 3. input contains `(` → report **branch 2**;
-4. input parses as an extended key → report **branch 4**;
+4. input LOOKS like an extended key — its first non-whitespace character is
+   `[`, or it is a single base58check token whose payload is 78 bytes (an
+   extended-key envelope, ANY version) → report **branch 4**. A shape test,
+   not a parse-success test (R0's I2): the branch-4 rows below are all
+   `ParseKey` FAILURES — measured, `bip380.ParseKey(nil, "[4bbaa801]xpub…")`
+   errors — so a success test could never reach them;
 5. otherwise → "not a descriptor in any form I know", listing the four.
 
 | the operator's input | what `me` says |
 | --- | --- |
 | an unparseable file | *"this is not a wallet descriptor in any of the four forms `me` reads: a BlueWallet `Key: value` setup file, a plain BIP-380 descriptor, a `{"label":…,"descriptor":…}` JSON export, or a single extended key. It looks most like `<form>`, which failed because: `<that branch's error>`."* |
-| an **empty file** | *"the input is empty (0 bytes). If you meant to pipe a descriptor in, check the producing command's exit status — a failed producer contributes 0 bytes and this is what that looks like."* — the composition hazard `SPEC_constellation_cli_uniformity` §2 calls C-1. |
-| a file of only whitespace | as above, with *"the input is `N` bytes of whitespace only."* |
+| an **empty file** | the SHIPPED `me 0.7.0` refusal is kept verbatim (R0's I7) — *"no records in `<file>`: pass them on argv, with --in, or on stdin. An EMPTY input is what a FAILED upstream command leaves behind…"* — which already names the C-1 composition hazard. **`EXIT_USAGE` (2)**, measured at fold time (rc=2, 0 stdout bytes); this spec records the existing behaviour rather than silently regressing a tested surface. |
+| a file of only whitespace | reaches the same shipped "no records" path (blank records are skipped) — same message, **`EXIT_USAGE` (2)**. |
 | **`--as` omitted** | §5.1's text. **`EXIT_USAGE` (2)**, not 3 — nothing was refused, a choice was not made. |
 | a **wrapper whose inner descriptor is malformed** | the wrapper is named, then the inner error, then the position: *"the `{label, descriptor}` JSON parsed, and its `descriptor` field did not: `bip380: script: missing ')'`. The label was `"…"`. The problem is in the descriptor string, not the JSON."* |
 | a **BlueWallet file with no `Name:`** | *"this is a BlueWallet setup file — it has `Policy`, `Derivation` and `Format` headers and `N` cosigner lines — but no `Name:` header, and the device requires one. Add a line `Name: <anything>`."* This is the case §4.2 measured as producing the generic message today, with the real reason destroyed. |
 | a BlueWallet file with no `Format:` | *"…no `Format:` header, so the script type is undefined. Add `Format: P2WSH` (or `P2SH`, or `P2WSH-P2SH`)."* §4.2 defect 1. |
 | a BlueWallet `Policy: k of n` with a different key count | *"`Policy: 2 of 3` declares 3 cosigners; the file has 2. Cosigner lines are `<8-hex-fingerprint>: <xpub>`."* |
-| a BlueWallet file whose keys precede `Derivation:` | *"the `Derivation:` header appears after the cosigner lines, so those keys would be read with no origin path — a descriptor `me` cannot re-parse. Move `Derivation:` above the first cosigner line."* §4.2 defect 3. |
+| a BlueWallet file whose keys have **no origin path** (no `Derivation:` header at all, or one placed after cosigner lines) | *"cosigner `<fp>` has no derivation path — the `Derivation:` header is missing or appears after the cosigner lines. The descriptor this file produces cannot be re-read by the device. Put `Derivation: <path>` above the first cosigner line."* §4.2 rule 3 (R0's C1). |
+| a BlueWallet cosigner fingerprint that is not 8 hex characters | *"cosigner line `ab: xpub…` — a master fingerprint is exactly 8 hex characters (4 bytes)."* §4.2 defect 4; the device PANICS on fewer, so this file must never reach it. |
 | `wsh(multi(…))` under **`--as descriptor`** | *"the device's descriptor parser accepts `sortedmulti` and not `multi`. This wallet can still be engraved: `--as md1` encodes `multi` policies. (`sortedmulti` differs from `multi` only in key ordering at spend time — it is not a synonym, so `me` will not rewrite it for you.)"* |
 | a **miniscript** descriptor, either `--as` | *"`me` reads the descriptor family the device reads: single-sig and `sortedmulti`, optionally under `sh`. This descriptor uses miniscript fragments (`or_d`, `and_v`, …), which neither path handles in this release. `md encode` accepts miniscript **templates** — see §10."* |
 | a descriptor with **`/0/*`** under **`--as md1`** | *"md1 records a use-site path as either a multipath group (`<0;1>`) or a bare wildcard (`/*`) — a single fixed chain index has no representation, and encoding it would silently produce a DIFFERENT wallet. Use `--as descriptor`, which carries `/0/*` exactly."* §5.3(a). |
-| **`sortedmulti(k, …)` with `k > n` or `k = 0`** | *"threshold `k` with only `n` keys. A `k > n` policy can never be satisfied and the coins would be unspendable. Nothing was packed."* §4.7. |
-| `tr(sortedmulti(…))` | *"taproot multisig is `multi_a`/`sortedmulti_a` (BIP-386); `tr(sortedmulti(…))` is not a valid descriptor even though the device's parser accepts it. Check the export."* §4.3. |
+| **`sortedmulti(k, …)` with `k > n`** | *"threshold `k` of `n` keys can never be satisfied — no combination of signatures reaches `k`. Funds sent to this wallet would be unspendable. Nothing was packed."* §4.7 conjunct 2. |
+| **`sortedmulti(0, …)`** — or any `k < 1` | *"threshold 0 means NO signature is required: anyone who can see this script can spend from it. This is almost certainly not the wallet you meant — and if it already holds funds, treat them as at risk now. Nothing was packed."* §4.7 conjunct 2 (R0's I6 — the device derives a real address for `k = 0` and even `k = −1`, so the refusal is the host's alone). |
+| `sortedmulti` with **too many keys** | *"`sh(…)` multisig carries at most 15 keys (the 520-byte script-element limit, BIP-383); other forms at most 20 (`OP_CHECKMULTISIG`). This descriptor has `n`. The device would accept it and derive addresses whose coins cannot be spent."* §4.7 conjunct 3 (R0's C3). |
+| a multisig mixing **mainnet and testnet keys** | *"key `N` is `tpub` (testnet) while key 0 is `xpub` (mainnet). The device accepts this descriptor and then cannot derive any address from it. All keys must share one network."* §4.7 conjunct 5 (R0's I4). |
+| a descriptor or bare key using **`ypub`/`upub`/`vpub`/`Upub`/`Vpub`** | *"the device admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`; `ypub` (BIP-49 nested segwit, SLIP-132) is refused even with a full origin. The same key as the device reads it: `sh(wpkh([<fp/path>]xpub…/<0;1>/*))`"* — the equivalent spelling is printed with the operator's own key converted (the re-encode is mechanical), per the executable-remedy rule. §4.3 (R0's C2); F-413 tracks host-side normalisation. |
+| `tr(sortedmulti(…))` | *"taproot multisig is `multi_a`/`sortedmulti_a` (BIP-387); `tr(sortedmulti(…))` is not a valid descriptor even though the device's parser accepts it. Check the export."* §4.3. |
 | a **bare key whose path matches no script** | the path is quoted back and the three that qualify are listed: *"`[4bbaa801/86'/0'/0']xpub…` is a single extended key. `me` can infer a whole wallet from one only when its origin is `m/44'/0'/0'` (→ `pkh`), `m/84'/0'/0'` (→ `wpkh`) or `m/49'/0'/0'` (→ `sh(wpkh)`). This one is `m/86'/0'/0'` — taproot single-sig, which is not inferable. Supply the descriptor instead: `tr([4bbaa801/86'/0'/0']xpub…/<0;1>/*)`."* |
 | a bare key at **account ≠ 0** | *"…this one is `m/84'/0'/1'`. Only account 0 is inferable. Supply the descriptor: `wpkh([…/84'/0'/1']…/<0;1>/*)`."* — measured in §4.5 as a live near-miss. |
 | a bare key with a fingerprint and **no path** | *"`[4bbaa801]xpub…` gives a fingerprint with no derivation path, so there is nothing to match a script against. Either give the full origin — `[4bbaa801/84'/0'/0']xpub…` — or drop the brackets entirely, in which case the key's version byte decides."* |
@@ -798,8 +957,17 @@ approximately.
 3. **The Rust test asserts the host column; the Go test asserts the device
    column.** Neither implementation is ever compared to the other — both are
    compared to the file. That is why it has to be the same file.
-4. **Both tests assert the invariant `host_admits ⇒ device_admits`** per row,
-   with a message naming the dangerous direction.
+4. **The invariant is `host_admits(input) ⇒ device_admits(canonical(input))`,
+   asserted per row (R0's I1).** The input-level form is wrong twice over: the
+   §4.6 whitespace rows are host-wide by design (the device refuses the raw
+   input and reads only the canonical — an input-level assertion fails the
+   required rows), and C1's no-`Derivation:` file is device-ACCEPTED as input
+   while its canonical does not re-parse (an input-level assertion is blind to
+   the one row class the invariant exists for). So: for every row with
+   `host_admits=true`, the Go test runs `nonstandard.OutputDescriptor` on the
+   row's `canonical` and requires ACCEPT — and requires the re-encoding of
+   that parse to equal `canonical` (a fixed point) — with a message naming the
+   dangerous direction.
 5. **Both tests assert the row set is non-vacuous** — at least one `both`, one
    `device-only`, and one `neither` — or a mutant that refuses everything, or
    admits everything, passes.
@@ -810,8 +978,21 @@ approximately.
 
 **Row schema.** `name`, `input`, `sha256`, `host_admits`, `device_admits`,
 `format` (one of `bluewallet` / `bip380` / `json` / `promoted-key` / `none`),
-`source`, and — where both sides admit — `canonical`, the re-encoded descriptor
-string both parsers must produce.
+`source` — plus three columns R0's I1 forced apart:
+
+- **`device_admits` means `nonstandard.OutputDescriptor` accepts the INPUT** —
+  the scan door, nothing else. The classifier is a different predicate with a
+  different answer (§2.3), so it gets its own optional column, **`sysw_class`**,
+  asserted by the Go test only on rows that carry it, against `sysw.Classify`
+  once §5.2's arm lands. One column carrying both meanings is how §7 and §11
+  contradicted each other in round 0.
+- **`canonical` is REQUIRED on every row where `host_admits` is true** — the
+  re-encoded descriptor string both parsers must produce. Requirement 4 is
+  stated over it.
+- **`device_probe: "panic"`** marks a row whose input PANICS the device parser
+  (§4.2 defect 4). The Go test asserts such rows are host-refused and must NOT
+  feed the input to `nonstandard.OutputDescriptor` — a panic would crash the
+  suite rather than fail it, a false-signal shape.
 
 **The row set MUST include**, at minimum, one row for each of:
 
@@ -819,12 +1000,16 @@ string both parsers must produce.
   `nonstandard/parse_test.go` fixtures where one exists (provenance in `source`);
 - **the promotion near-misses of §4.5** — all **fifteen** rows of that table;
 - **every shape §4.7 narrows** — `tr(sortedmulti)`, `wpkh(sortedmulti)`,
-  `pkh(sortedmulti)`, `k=0`, `k>n`: `host_admits=false`, `device_admits=true`.
-  These are the rows the invariant is *for*;
+  `pkh(sortedmulti)`, `sh(wpkh(sortedmulti))`, `k=0`, `k=−1`, `k>n`, `n=16`
+  under `sh`, `n=21` under `wsh`, and a mixed mainnet/testnet multisig:
+  `host_admits=false`, `device_admits=true`. These are the rows the invariant
+  is *for*;
 - **every shape §4.2 narrows** — BlueWallet with no `Format:`, with zero keys,
-  with `Derivation:` after the keys: same shape, `false`/`true`;
-- **`wsh(multi(…))` and a miniscript descriptor** — `false`/`false`, and the
-  `neither` rows the vacuity check needs;
+  with `Derivation:` after the keys, with **no `Derivation:` at all** (R0's C1
+  — `device_admits=true` on the input, host refused, no `canonical`), and a
+  short-fingerprint file marked `device_probe: "panic"`;
+- **`wsh(multi(…))`, a miniscript descriptor, and a full-origin `ypub`** —
+  `false`/`false`, the `neither` rows the vacuity check needs;
 - **the whitespace rows of §4.6** — trailing `\n`, CRLF, leading space. These
   are the only rows where the host is *wider*, and they are permitted **only
   because `canonical` is what gets packed** (§4.6). The file states that in its
@@ -966,12 +1151,15 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
 **done** when, in addition:
 
 1. `me sysw pack --as descriptor --in <each of the four formats>` produces a
-   container whose `me sysw show` reports one `Descriptor` record, and the
-   device's `sysw.Classify` — exercised by §7's Go test — agrees.
+   container whose `me sysw show` reports one `Descriptor` record
+   (single-document mode, §5.1), and the device's `sysw.Classify` — exercised
+   by §7's Go test through the `sysw_class` column — classifies that record
+   `Descriptor`.
 2. `me sysw pack --as md1 --in <each of the four formats>` produces a container
-   whose records `md decode` reads back to the expected template, and whose
-   derived receive address 0 equals the one the Go `address` package derives
-   from the original descriptor.
+   (single-document mode, §5.1) whose records `md decode` reads back to the
+   expected template — with §5.3(a′)'s materialised `<0;1>/*` where the input
+   was childless — and whose derived receive address 0 equals the one the Go
+   `address` package derives from the original descriptor.
 3. `descriptor_seam_vectors.json` exists in both repos with one sha256, both
    tests pin it, and both suites are green — **and the file's row set covers
    every bullet of §7**, checked by a test that counts, not by reading.
