@@ -13679,3 +13679,34 @@ is a gate.
 and let the bearer example serve the one reachable case, or give the pre-parser
 guard a reason to defer to the record layer for secret classes. Neither is P2's,
 and neither is urgent: nothing is wrong on any path an operator can walk.
+
+### F-363 — the two `restore_test_*.py` journey drivers hard-bind `ms` to an absolute path, so no branch build can run them (repo: **mnemonic-engrave**; owning phase: **the ownerless residue** — one line each, and it blocks only a verification step) `#journeys` `#drivers` `#gates`
+
+**Found 2026-08-27 by P2's row 12.** The plan's §1.9 measured that seven of the
+eight SHELL drivers bind `MS=$C/mnemonic-secret/target/release/ms`
+non-overridably, and row 12 fixed those by following
+`derive-pathological-keys.sh`'s `${MS:-…}`. The two PYTHON drivers have the same
+defect and were outside that row's scope:
+
+```
+design/journeys/restore_test_pathological.py:32     MS = "/scratch/code/…/mnemonic-secret/target/release/ms"
+design/journeys/restore_test_tr_pathological.py:39  MS = C + "/mnemonic-secret/target/release/ms"
+```
+
+**Measured consequence.** `transcript_tr_pathological.sh` invokes
+`restore_test_tr_pathological.py`, which exits 1 with
+`FileNotFoundError: … /mnemonic-secret/target/release/ms`, and the transcript
+then reports `FATAL: a card-only-plus-seeds restore does NOT reproduce this
+wallet`. **Identically before and after P2's driver migration** — verified by
+stashing the migration and re-running: `rc=1` and two `FATAL`s either way. So it
+is a pre-existing precondition failure, not a regression.
+
+P2 deliberately did NOT edit these two, because row 12's control is *"they are
+NOT edited and still pass, because they already use `--phrase -`"* — and they do
+use `--phrase -`, so they carry no argv material and needed no migration. The
+control's *"still pass"* half could not be exercised without a release build in
+the live checkout.
+
+**The fix is one line each**, `os.environ.get("MS", <the default>)`, matching what
+row 12 did for the shell drivers. It is filed rather than done because editing
+them would have falsified row 12's own control in the same commit.
