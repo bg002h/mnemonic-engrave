@@ -14221,6 +14221,32 @@ collision in the encoding — the index reaches the payload and is dropped on th
 way back out. That makes it a decode-side loss on top of an encode-side
 admission error, and either fix alone leaves the other half standing.
 
+**CORRECTED 2026-08-28, and it changes the fix.** This entry first framed the
+loss as md1 being unable to represent a fixed use-site index. **That is wrong —
+the wire format holds it.** Measured with `md inspect` across three indices:
+
+```
+wpkh(@0/0/*)      md1-encoding-id 025da051…   template  wpkh(@0/*)
+wpkh(@0/1/*)      md1-encoding-id 9fd41abd…   template  wpkh(@0/*)
+wpkh(@0/5/*)      md1-encoding-id 6405b72a…   template  wpkh(@0/*)
+wpkh(@0/<0;1>/*)  md1-encoding-id 2334775c…   template  wpkh(@0/<0;1>/*)
+```
+
+Three distinct encodings, three distinct identity hashes — the index reaches the
+payload and the identity commits to it. Only the RENDERER drops it, emitting the
+wildcard form because it has no case for a fixed index. The multipath row proves
+the format is capable: it encodes distinctly *and* renders back exactly.
+
+**So it is a lossy `Display`, not a lossy format**, and the repair needs no wire
+change and no version bump. That is worse rather than better: a format that
+genuinely could not hold this would make refusal the whole answer, whereas here
+every `/0/*` artifact is internally consistent and merely *displays* as
+something else.
+
+**Two independent fixes now exist where the original entry implied one:** teach
+the renderer the fixed-index case, or refuse at encode. Refusing stays the
+conservative choice for the `--as md1` path; repair is on the table for `md`.
+
 **This is the [[success-is-not-round-trip]] class exactly**: making a tool accept
 input it confusingly rejected can silently drop data, and only a decode read-back
 catches it. `md encode` returning rc 0 proves nothing about whether the artifact
