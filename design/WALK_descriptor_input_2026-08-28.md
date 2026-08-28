@@ -266,3 +266,29 @@ operator terms, W5-compliant (no internal labels):
 
 §5.3(a′)'s "so the operator sees it" clause is upgraded to "sees it and is
 told, in one line, why it is there and that addresses are unchanged."
+
+
+---
+
+## W9 — "is a′ in keeping with a BIP?" — yes, three ways, and the spec argues
+## from the weaker authority
+
+**The moment.** Given W8's explanation, the operator asked whether §5.3(a′)'s
+materialisation is grounded in a BIP or is our invention.
+
+**The answer, and it is strong.** (1) BIP-48: the operator's own declared
+origin `m/48'/0'/0'/2'` is a BIP-48 path, and BIP-48 defines the next two
+levels as change (0 = receive, 1 = change) then index — the materialised
+tail is BIP-48's own continuation. (2) BIP-388: placeholders end `/**` or
+`/<NUM;NUM>/*`, and `/**` ≡ `/<0;1>/*` — an equivalence already
+machine-verified in this constellation (F-411: byte-identical md1 cards).
+a′ completes a childless file INTO a valid wallet policy. (3) BIP-389
+supplies the notation. The device's "convention" is these BIPs implemented.
+
+**Classification: documentation (walk fold), strengthening W8's fix.**
+§5.3(a′)'s rationale currently rests on measured device behaviour ("the
+device is the reader of both artefacts") — true but private. Add the BIP
+grounding as the leading rationale, and W8's confirmation annotation cites
+it in operator-checkable form: *"<0;1>/* is the standard receive/change
+continuation of your keys' BIP-48 origin (BIP-388's canonical tail)."* An
+authority the operator can verify beats "the device does this."
