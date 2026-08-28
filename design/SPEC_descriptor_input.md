@@ -1040,10 +1040,12 @@ their own checks, after a successful parse — the rule never selects them
 (R0 r2's NEW-N1). And the `sortedmulti` rows below read over BOTH multi
 forms: §4.7 conjunct 1's md1-path `multi` twins hit the same conjuncts and
 get the same texts with the form name substituted (R0 r5's NEW-M2). The one
-exception is the single-key-wrapper row, whose `sortedmulti` mentions are in
-the REMEDY and do NOT transpose — all three `multi` twins are device REFUSE
-(measured) — so for a `multi` input that row's remedy names `--as md1`
-instead (R0 r6's NEW-M4).
+exception is the single-key-wrapper row, where NEITHER the remedy's
+`sortedmulti` forms NOR the device-measurement parenthetical transposes —
+all three single-key `multi` twins are device REFUSE at PARSE (measured) and
+never reach address derivation — so for a `multi` input that row substitutes
+its own remedy, naming the mandatory wrapper change (R0 r6's NEW-M4; r7's
+NEW-I2).
 
 | the operator's input | what `me` says |
 | --- | --- |
@@ -1072,7 +1074,7 @@ instead (R0 r6's NEW-M4).
 | a bare `Zpub` / `Ypub` | *"a `Zpub`/`Ypub` declares a **multisig** account (`m/48'/0'/0'/2'` and `…/1'`). A multisig cosigner key is not a wallet — supply the full descriptor (`wsh(sortedmulti(…))` for `Zpub`, `sh(wsh(sortedmulti(…)))` for `Ypub`), or a BlueWallet setup file listing every cosigner."* (forms per `Script.DerivationPath()`, R0 r4's NEW-N1) |
 | a bare `tpub` | *"this is a testnet key. Its version byte would map to the **mainnet** path `m/44'/0'/0'`, which `me` will not assume. Supply the descriptor with its real origin."* §4.5. |
 | a **bitcoin address** | *"that is a bitcoin address, not a descriptor. No program on the device consumes an address record — see §10."* |
-| a **single-key script wrapping a multi** — `wpkh(sortedmulti(…))`, `pkh(sortedmulti(…))`, `sh(wpkh(sortedmulti(…)))` | *"a multisig policy cannot live inside a single-key script. The device's parser accepts this spelling and then cannot derive any address from it (measured: `address: multisig script: … unsupported descriptor`). The forms the device derives are `wsh(sortedmulti(…))`, `sh(wsh(sortedmulti(…)))` and `sh(sortedmulti(…))`."* For a `multi` input the remedy is instead: *"keep `multi` and use `--as md1`, which carries it."* (R0 r6's NEW-M4.) §4.7 conjunct 1 (R0 r2's NEW-I4). |
+| a **single-key script wrapping a multi** — `wpkh(sortedmulti(…))`, `pkh(sortedmulti(…))`, `sh(wpkh(sortedmulti(…)))` | *"a multisig policy cannot live inside a single-key script. The device's parser accepts this spelling and then cannot derive any address from it (measured: `address: multisig script: … unsupported descriptor`). The forms the device derives are `wsh(sortedmulti(…))`, `sh(wsh(sortedmulti(…)))` and `sh(sortedmulti(…))`."* For a `multi` input the remedy is instead: *"a multisig policy cannot live inside a single-key script on EITHER path. Change the wrapper — `wsh(multi(…))`, `sh(multi(…))` or `sh(wsh(multi(…)))` — and use `--as md1`, which carries those forms."* — and the device-measurement parenthetical above does NOT apply to `multi` inputs: all three single-key `multi` twins are device REFUSE at PARSE (measured, R0 r7) and never reach address derivation. (R0 r6's NEW-M4; the prior `multi` remedy named the invocation that had just refused — corrected per r7's NEW-I2.) §4.7 conjunct 1 (R0 r2's NEW-I4). |
 | a **bare key in a script slot** — `wsh(KEY)`, `sh(KEY)` | *"`wsh`/`sh` of a single key is not a wallet form the device can derive addresses for (measured: `Supported=false`, `address: singlesig script: … unsupported descriptor`). A single-key wallet is `pkh(…)`, `wpkh(…)`, `sh(wpkh(…))` or `tr(…)`."* §4.7 conjunct 1 (R0 r2's NEW-I4). |
 | a **hardened use-site component** — `…/<0;1>/*h` | *"a hardened use-site step cannot be derived from an xpub (BIP-32). The device would silently derive the UNhardened child and display addresses for a wallet that cannot exist, so this is refused on both `--as` paths."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
 | a **non-consecutive multipath** — `<0;2>`, `<1;3>` | *"the device derives only `<i;i+1>` pairs (receive; change). It accepts this descriptor and then errors on every address."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
@@ -1222,14 +1224,20 @@ R0 r6's NEW-I1) — plus the columns later rounds forced apart:
   with `Derivation:` after the keys, with **no `Derivation:` at all** (R0's C1
   — `device_admits=true` on the input, host refused, no `canonical`), and a
   short-fingerprint file marked `device_probe: "panic:parse"`; the
-  no-`Format:` and zero-key rows carry `device_probe: "panic:encode"`
-  (parse ACCEPTS, `Encode()` panics — measured, R0 r6's NEW-M6);
+  no-`Format:` row and the zero-key row carry `device_probe: "panic:encode"`
+  (parse ACCEPTS, `Encode()` panics — measured, R0 r6's NEW-M6; the zero-key
+  row is §4.2 defect 2's exact `Name: only` spelling — a zero-key file WITH
+  a `Format:` header encodes cleanly (`wsh(sortedmulti(0,))#w47tv00x`,
+  measured) and the marker does not apply to it, R0 r7's NEW-M2);
 - **`wsh(multi(…))`, a miniscript descriptor, and a full-origin `ypub`** —
   `false`/`false` on the host/device axes, the `neither` rows the vacuity
   check needs. The `multi` row additionally carries `md1_admits=true`, its md1-route
   `address_0` AND `address_1`, and pins the read-back via
-  `md_descriptor_contains: "multi("` (measured: `#656zkmsn` — `multi`
-  survives the round trip un-normalised). `address_1` is load-bearing (R0 r5's NEW-I3): for
+  `md_descriptor_contains: "wsh(multi("` (measured: `#656zkmsn` — `multi`
+  survives the round trip un-normalised; the pin is `"wsh(multi("` and NOT
+  `"multi("`, because `"sortedmulti("` CONTAINS `"multi("` and the shorter
+  pin passes on the mutant's own read-back — R0 r7's NEW-I1, both read-backs
+  measured). `address_1` is load-bearing (R0 r5's NEW-I3): for
   these keys the sorted and unsorted orderings COINCIDE at index 0 (measured
   identical recv0, divergent recv1), so an index-0 assertion cannot catch
   the forbidden `multi` → `sortedmulti` rewrite — the gate must assert where
@@ -1246,8 +1254,14 @@ NEW-I2: without a countable anchor, dropping the childless+`<0;1>/*` mixed
 row — the row that gates R0 r3's NEW-C1 — left every countable property of
 the file intact).** Every required row carries `covers`; the test asserts
 every tag present with at least its minimum and no unknown tags. A row may
-carry two tags (the `xpub…\n` promotion near-miss is also a whitespace row
-and counts for both):
+carry a second tag ONLY where its input genuinely discharges both bullets —
+in the required set exactly two rows qualify: the `xpub…\n` near-miss
+(`promotion-near-miss` + `whitespace`) and the bare-`xpub` happy path
+(`formats-happy` + `promotion-near-miss`). `covers` entries are distinct
+within a row, and the file carries at least **49 physical rows** (the minima
+sum to 51 tag-slots over the two permitted overlaps), asserted as a floor —
+so a dropped row cannot be counted around by retagging or by duplicate tags
+(R0 r7's NEW-M1):
 
 | tag | bullet | min rows |
 | --- | --- | --- |
@@ -1321,8 +1335,9 @@ SeedHammer II and it is not connected, which decides the question this
 section previously left open: S2 cannot even be demonstrated without a
 firmware build and flash, let alone satisfy §11 item 6's on-device
 acceptance, while S3 demonstrates the day it compiles. S2 is parked until
-the device is back on the bench; §11 item 6 binds S2's ship only, so S1 and
-S3 can plan, build, demonstrate and ship entirely at the desk.
+the device is back on the bench; §11 items 1, 4 (its `--as descriptor`
+rows) and 6 bind S2's ship, so S1 and S3 can plan, build, demonstrate and
+ship entirely at the desk.
 
 ---
 
@@ -1448,7 +1463,8 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
    tests pin it, and both suites are green — **and the file's row set covers
    every bullet of §7**, checked by a test that counts the `covers` tags
    against §7's coverage manifest (per-tag minima met, no unknown tags, the
-   field present on every row), not by reading (R0 r6's NEW-I2).
+   row floor met, and both `covers` and `md1_admits` present on every row),
+   not by reading (R0 r6's NEW-I2; r7's NEW-N1).
 4. Every refusal in §6 has a test that reaches it and asserts the *text*, not
    just the exit code. The `--as descriptor`-only rows among them are S2's
    (F-418); the rest bind S3 (R0 r6's NEW-M5).
