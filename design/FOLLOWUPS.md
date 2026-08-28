@@ -14508,6 +14508,17 @@ F-415: state the drift where it is created, amend the other document in its own
 cycle (one sentence plus a cross-reference) — two NORMATIVE contracts must not
 disagree silently.
 
+### F-419 — §4.2 refuses a zero-cosigner BlueWallet file and §6 has no row naming that cause (repo: **mnemonic-engrave**; owning phase: **descriptor-input plan — the §6 journey walk**) `#me` `#descriptor` `#refusals`
+
+Filed from R0 r8 (the round that closed the correctness lens). §4.2's
+NORMATIVE list refuses four BlueWallet shapes and says each refusal names its
+cause in §6 — but §6's 34 rows carry no zero-cosigner-lines row, so that
+refusal has no specified text and §11 item 4's per-row test cannot reach it.
+Pre-existing (the four-shape list dates to the r1 fold); surfaced only when
+r8 counted §6's rows against §4.2's promises. Owned by the journey walk,
+which is the §6-row generator: write the row there, with the walk's usual
+divergence classification.
+
 ### F-418 — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
 
 **Operator ruling 2026-08-28, in conversation:** *"I'm away from sh2 and it's

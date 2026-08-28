@@ -1,9 +1,13 @@
 # SPEC — descriptor input (`me sysw pack --as descriptor` / `--as md1`)
 
-**Status:** DRAFT, round 1. R0 returned **6C / 8I / 7M / 2N**
-(`design/agent-reports/R0-descriptor-input-spec-r1.md`); every finding is
-folded at this revision; round-2 re-review pending. **No code may be written
-until a round closes 0C/0I** (project `CLAUDE.md` — this is risk-set work: it
+**Status: GREEN — the correctness lens closed at round 8 (2026-08-28), 0
+Critical / 0 Important** (`design/agent-reports/R0-descriptor-input-spec-r1.md`
+… `-r8.md`: 23 → 10 → 8 → 7 → 7 → 11 → 6 → 0 blocking findings, every round's
+report persisted verbatim and every fold re-reviewed). Per §9 item 7, the §6
+journey walk with the operator is owed **before the implementation plan
+closes** — it is the lens that produced this cycle's sharpest findings and it
+has not run over the final text. **No code may be written before that plan
+passes its own gate** (project `CLAUDE.md` — this is risk-set work: it
 changes normative admission behaviour and it decides which wallet an operator
 engraves).
 
@@ -1185,8 +1189,9 @@ R0 r6's NEW-I1) — plus the columns later rounds forced apart:
   non-vacuity count skips such rows (R0 r6's NEW-M1). A panic would crash
   the suite rather than fail it, a false-signal shape.
 - **`covers`** (REQUIRED, non-empty array of coverage-manifest tags): which
-  required-row bullets this row discharges; a row may carry two. §11 item 3
-  counts these against the manifest below the bullets (R0 r6's NEW-I2).
+  required-row bullets this row discharges; a second tag is permitted only
+  for the two rows the manifest names (R0 r7's NEW-M1 — see the manifest
+  below the bullets, which §11 item 3 counts; R0 r6's NEW-I2).
 - **`md1_admits`** (boolean, REQUIRED on every row — no default; R0 r4's
   NEW-M2 measured that a false default is backwards for most host-admitted
   rows, and a default that must be overridden on most rows is not a default):
