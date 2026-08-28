@@ -14369,10 +14369,39 @@ that separates the two, and nobody has written one; `--path` needs a separate
 decision about whether an override is the user's own words in the sense the note
 means.
 
-**What is owed:** a decision, not code. Either state that the narrow predicate is
-final and record why here, or produce the discriminating rule. Do not widen it by
-reflex — the ruling was explicit, and a note that fires on `48'/0'/0'/2'` is
-worse than no note.
+**RESOLVED 2026-08-28 — a discriminating rule existed, and it is two-tier.**
+Ruled by an architect and implemented at `b6d8b515`.
+
+**Keyless: the narrow predicate is FINAL, and the reason is recorded here as
+this entry asked.** Without a seated key, a trailing-unhardened origin is
+indistinguishable from every ordinary single-chain template (`84'/0'/0'/0/*`).
+It is not that the mixed risk is lower — it is **undecidable**, so silence wins
+over note fatigue.
+
+**Keyed: one added clause.** For a slot whose key is seated, also note when
+`key.depth >= 1` (master excluded — the spellings provably agree there), the
+declared origin is **longer** than that depth, and every component past the
+depth is **unhardened**. That excess suffix is exactly what a descriptor-thinker
+meant as a derivation step and exactly what the xpub could derive; nothing else
+fires. `--path` was ruled OUT of scope: its own documentation declares it
+supplies an origin, so the misreading this note targets is not reachable
+through it.
+
+**All three conditions are mutation-proven**, not merely present: dropping
+condition 1 reds a depth-0 unit test, `>` → `>=` reds
+`matching_depth_origin_is_silent`, dropping condition 3 reds
+`excess_hardened_suffix_is_silent`.
+
+**One thing the ruling assumed that the CLI does not permit:** a master key
+cannot be seated at all — `parse_key` admits depth 3 or 4 only, so a depth-0 key
+exits 1 before any advisory runs. Condition 1 is still correct and is proven by a
+unit test reaching depth 0 directly, with a separate test pinning why the CLI
+path cannot.
+
+**What remains is F-412**, filed during implementation: `--path` can now emit a
+note about a declaration the card no longer carries. Suppressing it would be a
+*narrowing* nobody authorised, and tier 1 has always behaved this way, so one
+decision covering both tiers is owed rather than a tier-2 patch.
 
 ### F-412 — the F-411 keyed origin note fires on a template origin that `--path` has already replaced (repo: **descriptor-mnemonic**; owning phase: **ownerless residue**) `#md` `#cli` `#diagnostics`
 
