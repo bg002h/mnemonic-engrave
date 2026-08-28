@@ -199,3 +199,39 @@ step; no `md` invocation needed."* The W4 window refusal's alternative line
 gains the same three words ("me converts and packs in one step"). The
 bring-your-own-string path remains valid and needs no mention here — the
 confusion to cure is "must I?", not "may I?".
+
+
+---
+
+## W7 — the walk's own harness erred: there IS no passphrase prompt on this
+## journey, and the measured behavior is already right
+
+**The moment.** The walk told the operator "a passphrase prompt appears" and
+asked what they would do. They answered: *"passphrase — my wallet file isn't
+password protected. So I hit enter to skip decryption of wallet.txt"* — a
+DECRYPT-MY-INPUT reading of a prompt that, per the flag docs, would be about
+ENCRYPTING the output.
+
+**Then the measurement overturned the premise.** With a valid public-only
+record and no passphrase flag, `me sysw pack` does not prompt at all
+(`--passphrase-ask` is explicit opt-in). It states:
+
+    sealing:  NOT SEALED — no record in this payload is secret material, so
+              there is nothing to encrypt. The container is cleartext: anyone
+              holding the file can read it.
+    strength: no passphrase — BELOW the threshold
+
+and writes the payload. The walked beat was the walk harness's assertion
+from misremembered probes (every prior probe had passed `--no-passphrase`),
+not the tool's behavior. Corrected in the moment, per the read-the-whole-
+output discipline; also: the FIRST probe of this beat used the stale
+`target/release/md` (spaced stdout — §2's own stale-binary trap, third
+occurrence this cycle) and refused before reaching passphrase logic at all.
+
+**Classification: no spec change from the prompt confusion — the moment does
+not exist on this journey.** Two residues logged: (a) the operator's
+decrypt-my-input reading is REAL and waiting for any journey where a
+passphrase prompt does appear (secret-carrying payloads; note for that walk);
+(b) `strength: no passphrase — BELOW the threshold` reads as a nag on a
+payload with nothing to encrypt — pre-existing sysw surface,
+secret-handling-adjacent, noted for the sysw backlog, not this cycle's.
