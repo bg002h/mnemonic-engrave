@@ -14042,3 +14042,43 @@ that its list is short.
 **Note the vendored tree itself is now correct** (F-354 fixed, `ff4732e5`), and
 `ci/repro/vendor-freshness.sh` is content-aware and would RED on a wrong-rev
 vendor tree. Neither of those touches the literals above.
+
+### F-381 — `SPEC_vendor_freshness_ci_guard.md` still describes a ONE-check gate, while the script it governs now runs four (repo: **mnemonic-toolkit**; owning phase: **the same one that resolves F-354/F-355/F-371**) `#docs` `#ci` `#gates` `#vendor`
+
+**Found 2026-08-27 while merging F-354 into P3.** Reported, not fixed — the merge
+brief scoped the work to the merge itself, and this drift predates it on *both*
+parents, so it belongs to the phase that closes the F-354 family rather than to a
+merge commit.
+
+`ci/repro/vendor-freshness.sh:60` names
+`design/SPEC_vendor_freshness_ci_guard.md` as its spec. That spec is 122 lines
+and its `## 3. Design` section has exactly one subsection describing the check —
+`### 3.1 The check`, settled to `cargo metadata`. Measured: the spec contains
+**zero** occurrences of `INTEGRITY`, `REGISTRY PROVENANCE`, `GIT-FORK`,
+`grounding`, or the `(n/4)` progress labels the script now prints.
+
+F-354 rewrote that script into **four** checks — resolution, integrity (7490
+files across 169 crates against recorded sha256), registry provenance plus the
+unanchored-SET assertion, and a hand-grounded git-fork anchor carrying two
+constants (`EXPECTED_GIT_FORK_REV`, `EXPECTED_GIT_FORK_MANIFEST_SHA256`) that a
+human must re-derive whenever the `[patch.crates-io]` pin moves. None of that
+reaches the spec. The re-grounding procedure exists **only** as a comment in the
+script's own header.
+
+**Why it matters more than ordinary doc drift.** Check (4) is a
+trust-on-first-use anchor: its correctness rests entirely on a human having
+verified the vendored tree against upstream *once*, and on the next human
+repeating that verification rather than pasting the new digest in. That is a
+procedure, and it currently lives in one comment block inside the artifact it
+governs — so a reviewer who reads the spec to learn what the gate guarantees
+learns the pre-F-354 answer, and a maintainer who moves the pin has no
+spec-level statement that re-grounding is a verification step and not a
+transcription step. This is the `#docs`-shaped half of the same root cause F-371
+records: the pin advanced and everything that *restates* what the pin means
+stayed put.
+
+**Not urgent, and deliberately not bundled.** The gate itself is correct and
+green; nothing here changes behaviour. Fix it in the pass that already has the
+whole F-354 surface open, and prefer folding §3.1 into a `3.1 The four checks`
+that states each check's blind spot — the script's header already has that text,
+and it is better in the spec than duplicated.
