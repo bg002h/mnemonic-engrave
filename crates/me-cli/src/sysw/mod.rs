@@ -10,6 +10,7 @@
 //! host and device to produce byte-identical KDF input and a second
 //! normalisation would be a second answer to that question.
 
+pub mod advice;
 pub mod coverage;
 /// `--expect <kinds>` -- §6g's assertion that a container holds what the
 /// operator believes it holds.

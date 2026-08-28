@@ -2187,13 +2187,9 @@ fn read_records(
                 // `mt encode --qr | me sysw pack` to someone who pasted a seed
                 // phrase is advice for a different artifact entirely.
                 let example = if by_prefix || class.is_bearer() {
-                    "    mt encode --qr --in tx.hex | me sysw pack --out p.bin"
+                    mnemonic_engrave::sysw::advice::BEARER_PRIVATE_CHANNEL_EXAMPLE
                 } else {
-                    // `ms encode --in` DOES NOT EXIST (exit 64) -- caught by the
-                    // R0 fold. `--phrase -` is ms's shipped stdin idiom and is
-                    // verified to pipe into pack. Advice for a flag that is not
-                    // there is worse than no advice.
-                    "    ms encode --phrase - < seed.txt | me sysw pack --out p.bin"
+                    mnemonic_engrave::sysw::advice::SECRET_PRIVATE_CHANNEL_EXAMPLE
                 };
                 // F-264: the purge recipes are BUILT, not spelled inline, so a
                 // test can run the emitted one rather than a copy of it -- and
