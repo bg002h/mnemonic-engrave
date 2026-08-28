@@ -13581,3 +13581,51 @@ actionlint .github/workflows/release.yml                      -> exit 0
 `cargo nextest run --locked`'s count is unchanged from the F-280 baseline
 (430/1), confirming none of the 18 fixes altered behaviour. Full detail in
 `design/agent-reports/FIX-F280-ci-fmt.md`.
+
+### F-341 — `mk`'s tag-time reproducible musl build cannot be fixed by any input its shared workflow accepts, because that workflow can only ever redirect `rust-miniscript` (repo: **mnemonic-key** + **mnemonic-toolkit**; owning phase: **before the next `mk-cli-v*` tag** — non-deferrable past it) `#ci` `#repro` `#deps` `#cross-repo`
+
+**Third instance of the F-324 / F-333 class, and the sharpest of the three**, because `mk` has no block list the shared workflow is *capable* of emitting that works.
+
+`mnemonic-key/.github/workflows/musl-binaries.yml:68` calls
+`bg002h/mnemonic-toolkit/.github/workflows/reproducible-musl-build.yml@6e37b18e50f9f857e439db1ebe2748fc91a54612`
+with `miniscript_rev: ""` (line 80), selecting a TWO-block `--config` source list. That workflow builds its list by interpolating `MINISCRIPT_REV` into `source."git+https://github.com/rust-bitcoin/rust-miniscript?rev=…"` and has no other parameter, so `rust-miniscript` is the only git source it can ever redirect.
+
+P3 pinned `mnemonic-io-lib` by git rev, so `mnemonic-key/Cargo.lock` now carries one `source = "git+…bg002h/mnemonic-engrave…"` entry. Measured under an **empty `CARGO_HOME`** (so nothing could resolve from a warm registry cache), against that lock:
+
+| block list | rc |
+| --- | --- |
+| two-block — what the workflow passes today | **101**, `failed to get mnemonic-io-lib as a dependency of package mk-cli` |
+| three-block with a **miniscript** stanza — the only other list the workflow can emit | **101** |
+| three-block with the **mnemonic-engrave** stanza | **0** |
+
+The middle row is what makes this different from F-333. `md` needed a *fourth* block added to a list that already had a miniscript entry; `mk` has **no miniscript git source at all** (no `[patch.crates-io]` anywhere, `miniscript` resolves from crates.io), so passing a non-empty `miniscript_rev` does not help and is not even meaningful here. There is no value of any existing input that makes `mk`'s repro build resolve.
+
+**`mk` did NOT have the pre-existing breakage `md` found.** Before the pin, the two-block form resolved at **rc 0** under an empty `CARGO_HOME`. This gate was green and P3's pin is what broke it — unlike `descriptor-mnemonic`, where the miniscript pin had already broken it on 2026-08-20.
+
+**Deliberately not fixed**, matching the sibling branches' posture: the fix is in a fourth repo's shared reusable workflow that `descriptor-mnemonic`, `mnemonic-secret` and `mnemonic-toolkit` all consume, it cannot be exercised from a subject repo, and one coordinated change closes all three of F-324, F-333 and this. The generalisable fix is a **generic git-source input** on that workflow (a list of `url,rev` pairs) rather than a `miniscript_rev` scalar.
+
+**What IS fixed in `mnemonic-key`:** the PR-time gate. `ci/repro/vendor-freshness.sh` went two-block → three-block, deriving the rev from `Cargo.lock` so a pin bump needs no edit, and failing closed both when a git source exists that it cannot redirect and when a *second* one appears. Verified green under an empty `CARGO_HOME` and RED under two negative controls (vendor dir hidden; a second unknown git source).
+
+---
+
+### F-342 — `md repair --json` drops its error envelope on any codec failure, while `mk repair --json` keeps one (repo: **descriptor-mnemonic**; owning phase: **whichever cycle owns `--json` uniformity** — SPEC §6b puts it out of scope for this one) `#md` `#json` `#cli-uniformity`
+
+Found while transplanting `md`'s repair exit-code bypass into `mk` for P3's exit-code row, by checking §6b (*"`--json` is UNCHANGED and explicitly OUT OF SCOPE this cycle"*) against the transplant rather than assuming it held.
+
+`md repair`'s bypass is a bare `Err(e) => { eprintln!("md: repair: {e}"); return Ok(2); }`. It runs **before** the `--json` mode is consulted, so on any codec error out of the correcting decode `md repair --json` exits 2 with an **empty stdout** and a plain-text line on stderr. Measured: `md repair --json <a card the correcting decode rejects>` → exit 2, stdout empty, stderr `md: repair: codex32 decode error: …`.
+
+A consumer that parses `md repair --json` gets nothing to parse and no signal other than the exit code — while the same tool's other verbs emit a structured envelope on failure.
+
+**Why this is filed rather than fixed:** `descriptor-mnemonic` is another branch's repo this cycle, the defect is pre-existing rather than introduced by P3, and §6b puts `--json` out of scope. It is recorded because it nearly propagated: transplanting `md`'s shape verbatim into `mk` would have **deleted** `mk repair --json`'s existing envelope, making `mk` match `md` by losing behaviour. Measured before the P3 change, `mk repair --json <uncorrectable>` emitted `{"error":{"details":null,"exit_code":2,"kind":"BchUncorrectable",…},"schema_version":1}`; `mk`'s bypass now rebuilds that envelope with the code the bypass returns, and the result diffs byte-identical to the pre-change output.
+
+**When it is fixed**, the two CLIs should agree, and the envelope's `exit_code` field must carry the code the process actually exits with (2), not the `CliError`'s mapped 1 — otherwise a consumer reads one number and its shell reads another.
+
+---
+
+### F-343 — `mk encode` binds stubs in FLAG order, not argv order, and stub order is on the wire (repo: **mnemonic-key**; owning phase: **ownerless residue** — a documentation/UX item, already documented and pinned) `#mk` `#cli` `#nit`
+
+`--policy-id-stub`, then `--from-md1`, then `--from-md1-set`. clap does not preserve inter-flag argv position without `indices_of`, and the first two already had this ordering before P3 added the third.
+
+It matters because stub order is **on the wire**: measured, the same eight md1 strings supplied A-then-B and B-then-A mint different `mk1` cards. Found because the first draft of `--from-md1-set`'s test asserted argv order and went red.
+
+Now stated in the flag's help text, in the source, and pinned by a test asserting both the order and that the two orders really do differ. `mk verify` compares stubs as a multiset, so a card minted in either order still verifies (with a note), which is why this is a Nit rather than a defect. Recorded so a later reader does not "fix" it into argv order without knowing a re-mint in a different order is a different card.
