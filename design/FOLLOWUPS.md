@@ -14507,3 +14507,30 @@ stdin to whole-document reads when `--as` is present; `SPEC_systemwide_payloads`
 F-415: state the drift where it is created, amend the other document in its own
 cycle (one sentence plus a cross-reference) — two NORMATIVE contracts must not
 disagree silently.
+
+### F-417 — RULING RECORD: md1's use-site-path narrowness is DELIBERATE; the wire format will NOT be widened to arbitrary paths (repo: **descriptor-mnemonic**; owning phase: **none — standing decision, not scheduled work**) `#md` `#wire-format` `#ruling`
+
+**Operator ruling 2026-08-28, in conversation, on the direct question "what is
+the best thing to do? Change md1 wire format?" — decided NO, and recorded at
+the operator's request** (*"document now so I don't make the mistake of
+'fixing' the 'bug'"*).
+
+md1 cannot represent a single fixed use-site index (`/0/*`), a multipath group
+with no trailing wildcard (`<0;1>`), a deeper tail (`/0/1/*`), or an absent
+path as distinct from `/*`. **That is BIP-388's wallet-policy tail discipline,
+not a codec gap**: it is what buys an engraved plate compactness inside the
+BCH error-correction budget, an unambiguous restore decades later, and a
+policy a human can review. The demand for the missing shapes is thin — the one
+real-world case (`/0/*`, a single-chain coordinator export) is carried EXACTLY
+by `--as descriptor`, which is what the two-output ruling exists for; the rest
+are transcription slips or unmeasured rarities. A wire change is the
+constellation's costliest class (published crate, BIP draft, Go port, shared
+vectors, `WalletPolicyId` identity, plates already cut) for that thin benefit.
+
+**Consequences:** consumers meeting a valid-but-unrepresentable descriptor
+REFUSE and name the alternative (`SPEC_descriptor_input` §5.3(a)/(a″));
+`md-codec`'s `use_site_path.rs` module doc carries the tripwire comment. If a
+genuinely legitimate exotic wallet ever needs carrying, the extension seam is
+an **additive TLV tag with a criticality story**, not a wire change — and note
+md1 already carries `<0;2>` multipaths the DEVICE cannot derive, so the
+likelier future widening is device-side derivation, not this format.
