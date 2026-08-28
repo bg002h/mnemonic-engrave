@@ -14373,3 +14373,38 @@ means.
 final and record why here, or produce the discriminating rule. Do not widen it by
 reflex — the ruling was explicit, and a note that fires on `48'/0'/0'/2'` is
 worse than no note.
+
+### F-412 — the F-411 keyed origin note fires on a template origin that `--path` has already replaced (repo: **descriptor-mnemonic**; owning phase: **ownerless residue**) `#md` `#cli` `#diagnostics`
+
+**Filed while implementing the F-411 keyed clause, as a record of a boundary the
+ruling did not decide — not as a claim it is wrong.**
+
+The F-411 ruling put `--path` out of scope in one direction only: *"do not extend
+[the note] to it."* Both tiers of the note are keyed on the **template's own
+text**, which is deliberate (it is the spelling that gets misread). But `--path`
+replaces `descriptor.path_decl.paths` wholesale, so the origin the CARD carries
+and the origin the NOTE reads can differ — and after F-411 that gap can produce a
+note about a declaration the card no longer holds. Measured on the 18-invocation
+pre/post matrix used to gate F-411 (case 15):
+
+```
+md encode "wpkh(@0/84'/0'/0'/0/*)" --key @0=<depth-3 xpub> --path bip84
+  -> note: @0's declared origin runs DEEPER than the xpub seated there …
+```
+
+Here the card carries `m/84'/0'/0'` and the seated key is depth 3 — consistent,
+no misreading available — yet the note fires on the superseded `84'/0'/0'/0`.
+This is the note-fatigue direction the F-411 tiering exists to avoid.
+
+**Why it was not silently fixed.** Suppressing the note under `--path` is a
+narrowing the ruling did not authorise either, and tier 1 (F-410) has always
+behaved this way, so changing only tier 2 would split the two tiers on a rule
+nobody wrote. F-411's own entry already flags the underlying question — *"`--path`
+needs a separate decision about whether an override is the user's own words in the
+sense the note means"* — and this is the first case where the answer changes an
+emitted line rather than a silence.
+
+**What is owed:** a decision covering BOTH tiers at once — either "the note reads
+the template text, full stop, and `--path` overriding it is the operator's
+business", or "no advisory fires about a declaration the card does not carry".
+Not a tier-2-only patch.
