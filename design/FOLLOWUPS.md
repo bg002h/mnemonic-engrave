@@ -14185,7 +14185,55 @@ defect in the arm it was found in.
 `crates/me-cli/testdata/codex32_seam_vectors.json`
 (`past-the-engraveable-cap-91`), so the test is a row, not a new fixture.
 
-### F-410 — `md encode` accepts a non-BIP-388 use-site index and silently rewrites it, while refusing the valid `/**` shorthand (repo: **descriptor-mnemonic**; owning phase: **before the descriptor-input cycle ships**) `#md` `#funds` `#round-trip`
+### F-410 — ❌ RETRACTED 2026-08-28 (the encode/decode behaviour is CORRECT); what survives is `/**` sugar and one warning — originally filed as "accepts a non-BIP-388 use-site index and silently rewrites it" (repo: **descriptor-mnemonic**; owning phase: **before the descriptor-input cycle ships**) `#md` `#funds` `#round-trip`
+
+**RETRACTED. THE ORIGINAL FINDING WAS WRONG, THROUGH THREE SUCCESSIVE WRONG
+DIAGNOSES, AND THE MEASUREMENT BELOW SETTLES IT.**
+
+In md's template grammar, the path after a placeholder **IS the key's origin
+declaration** — the same grammatical slot as `@0/48'/0'/0'/2'/<0;1>/*`
+(`md-cli/src/parse/template.rs`, group 2: `((?:/\d+'?)*)`). So `@0/0/*` *means*
+"origin m/0, use-site `/*`". Nothing is relocated and nothing is dropped: origin
+is metadata, and derivation starts at the stored xpub, which is standard Core
+semantics.
+
+Measured with the same xpub and binary:
+
+```
+wpkh(@0/0/*)  ->  bc1qr932kkqd95r3chv9sh36wkjez4jvsmlf46xuc9
+wpkh(@0/*)    ->  bc1qr932kkqd95r3chv9sh36wkjez4jvsmlf46xuc9   IDENTICAL
+```
+
+The round-trip is exact. `md decode` also prints the origin it carries, in a
+`note:` line — I had read only the first line of its output and concluded it was
+silent.
+
+**Three diagnoses, each refuted by the next measurement, recorded because each is
+where a reader would plausibly stop:** md1 cannot represent it (refuted — the
+encodings differ); the renderer drops it (refuted — `UseSitePath` has no such
+field, so `render_key` is correct); the parser relocates it into the origin
+producing a different key (refuted — the addresses are identical). The error
+underneath all three was asserting past an unmade comparison.
+
+**WHAT SURVIVES, and it is not a refusal.** Two items, both in
+`descriptor-mnemonic/crates/md-cli` — `md-codec`'s wire format and derivation are
+correct as they stand:
+
+**(a) `@i/**` should be accepted as sugar for `@i/<0;1>/*`.** BIP-388 defines them
+as equivalent. It is refused today by lexer accident — the residue check fires
+and reports *"derivation steps"*, a wrong message, since there is no multipath
+group. Lossless, and it is the permissive direction the operator asked for.
+
+**(b) An encode-time NOTE — warning tier, never a refusal — when a parsed origin
+has zero hardened components.** This is the real risk, and it is a *user-intent*
+risk rather than a codec defect: `@0/0/*` and `@0/*` agree when the supplied key
+is a master xpub, because unhardened steps commute. They **diverge when a
+NON-MASTER xpub is supplied by someone reasoning in descriptor terms** — the
+plate then backs `X/i` where the user meant `X/0/i`. A one-line note at encode
+("`/0` read as @0's key ORIGIN, not a derivation step from the provided key")
+costs nothing and is the only place this is catchable.
+
+Genuine refusals — post-multipath steps, hardened multipath — stay.
 
 **Found 2026-08-28** while specifying the descriptor-input gap, and confirmed by
 round-trip rather than by reading the parser.
