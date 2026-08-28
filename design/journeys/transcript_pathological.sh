@@ -8,7 +8,9 @@ W="$(cd "$(dirname "$0")" && pwd)"
 C=/scratch/code/shibboleth
 MD=$C/descriptor-mnemonic/target/release/md
 MK=$C/mnemonic-key/target/release/mk
-MS=$C/mnemonic-secret/target/release/ms
+# Overridable, following derive-pathological-keys.sh: a P2 implementer must be
+# able to point a driver at a BRANCH build without editing it.
+MS="${MS:-$C/mnemonic-secret/target/release/ms}"
 ME=$C/mnemonic-engrave/target/release/me
 export PATH="$C/mnemonic-engrave/target/release:$PATH"
 
@@ -364,8 +366,8 @@ run "$MD" address $FULL --chain 1 --count 3
 
 echo "########## 10. the seed, and the refusal that still holds"
 run cat "$W/inputs-pathological/seeds/master-A.seed"
-run "$MS" encode --phrase "$(cat "$W/inputs-pathological/seeds/master-A.seed")"
-MS1=$("$MS" encode --phrase "$(cat "$W/inputs-pathological/seeds/master-A.seed")" --no-engraving-card 2>/dev/null | tr -d ' ')
+run "$MS" encode --in "$W/inputs-pathological/seeds/master-A.seed"
+MS1=$("$MS" encode --in "$W/inputs-pathological/seeds/master-A.seed" --no-engraving-card 2>/dev/null | tr -d ' ')
 run "$ME" --in <(printf '%s\n' "$MS1") --hex
 
 echo "########## 9c. THE RESTORE TEST — what a card-only restore actually recovers"

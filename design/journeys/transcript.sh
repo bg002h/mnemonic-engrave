@@ -8,7 +8,9 @@ W="$(cd "$(dirname "$0")" && pwd)"
 C=/scratch/code/shibboleth
 MD=$C/descriptor-mnemonic/target/release/md
 MK=$C/mnemonic-key/target/release/mk
-MS=$C/mnemonic-secret/target/release/ms
+# Overridable, following derive-pathological-keys.sh: a P2 implementer must be
+# able to point a driver at a BRANCH build without editing it.
+MS="${MS:-$C/mnemonic-secret/target/release/ms}"
 ME=$C/mnemonic-engrave/target/release/me
 
 # Keep the sidecar discoverable: `me` looks beside its own executable only.
@@ -134,7 +136,7 @@ run wc -l "$W/out/backup-strings.txt"
 echo "########## 3. one seed, from file (SECRET)"
 run cat "$W/inputs/seeds/cosigner-00.seed"
 runcap "$W/out/ms-encode.txt" '^ms1' \
-  "$MS" encode --phrase "$(cat "$W/inputs/seeds/cosigner-00.seed")"
+  "$MS" encode --in "$W/inputs/seeds/cosigner-00.seed"
 
 echo "########## 4. the bundle: validate + plate manifest + checklist"
 run head -3 "$W/out/backup-strings.txt"

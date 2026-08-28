@@ -15,7 +15,9 @@ C=/scratch/code/shibboleth
 MD=$C/descriptor-mnemonic/target/release/md
 MK=$C/mnemonic-key/target/release/mk
 ME=$C/mnemonic-engrave/target/release/me
-MS=$C/mnemonic-secret/target/release/ms
+# Overridable, following derive-pathological-keys.sh: a P2 implementer must be
+# able to point a driver at a BRANCH build without editing it.
+MS="${MS:-$C/mnemonic-secret/target/release/ms}"
 IN="$W/inputs-hashvault"
 OUT="$W/out/hashvault"
 mkdir -p "$OUT"
@@ -67,7 +69,9 @@ echo
 # m/270028'/coin'/account'/script' -- purpose 270028' reads bg002h in one
 # component, and level 4 is the script type with 0' = tr. Ruled 2026-08-18.
 # `ms derive --template bg002h-tr` is what implements it.
-run "$MS" derive --phrase "$(cat "$IN/seeds/key-0.seed")" --template bg002h-tr --account 0
+# `--in` on `derive` reads an ms1, not a phrase, so the phrase takes the freed
+# stdin instead. Two commands would be the alternative; one is enough here.
+run "$MS" derive --phrase - --template bg002h-tr --account 0 < "$IN/seeds/key-0.seed"
 echo "The six key files this produced:"
 echo
 for i in 0 1 2 3 4 5; do
@@ -206,8 +210,8 @@ echo
 # secret. The passphrase plates are TEXT+QR and carry no ms1 at all, which is
 # why tier 4 matters: with no key in that path, THE PASSPHRASE PLATE ALONE
 # spends the wallet after its timelock.
-run "$MS" encode --phrase "$(cat "$IN/seeds/key-0.seed")"
-MS1=$("$MS" encode --phrase "$(cat "$IN/seeds/key-0.seed")" --no-engraving-card 2>/dev/null | tr -d ' ')
+run "$MS" encode --in "$IN/seeds/key-0.seed"
+MS1=$("$MS" encode --in "$IN/seeds/key-0.seed" --no-engraving-card 2>/dev/null | tr -d ' ')
 run "$ME" --in <(printf '%s\n' "$MS1") --hex
 
 echo "=== 14. What goes on which plate, and why ==="

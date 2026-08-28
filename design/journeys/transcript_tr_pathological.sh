@@ -21,7 +21,9 @@ C=/scratch/code/shibboleth
 MD=$C/descriptor-mnemonic/target/release/md
 MK=$C/mnemonic-key/target/release/mk
 ME=$C/mnemonic-engrave/target/release/me
-MS=$C/mnemonic-secret/target/release/ms
+# Overridable, following derive-pathological-keys.sh: a P2 implementer must be
+# able to point a driver at a BRANCH build without editing it.
+MS="${MS:-$C/mnemonic-secret/target/release/ms}"
 IN="$W/inputs-pathological"
 # ITS OWN OUTPUT SUBTREE. The two wallet journeys previously shared out/, so one
 # could overwrite the other's intermediates and the second would "pass" against
@@ -277,8 +279,8 @@ echo
 # manifest and never rendered. That refusal is the reason the bundle above can
 # be previewed at all.
 run cat "$IN/seeds/master-A.seed"
-run "$MS" encode --phrase "$(cat "$IN/seeds/master-A.seed")"
-MS1=$("$MS" encode --phrase "$(cat "$IN/seeds/master-A.seed")" --no-engraving-card 2>/dev/null | tr -d ' ')
+run "$MS" encode --in "$IN/seeds/master-A.seed"
+MS1=$("$MS" encode --in "$IN/seeds/master-A.seed" --no-engraving-card 2>/dev/null | tr -d ' ')
 run "$ME" --in <(printf '%s\n' "$MS1") --hex
 echo
 

@@ -14,7 +14,9 @@ set -euo pipefail
 
 W="$(cd "$(dirname "$0")" && pwd)"
 C=/scratch/code/shibboleth
-MS=$C/mnemonic-secret/target/release/ms
+# Overridable, following derive-pathological-keys.sh: a P2 implementer must be
+# able to point a driver at a BRANCH build without editing it.
+MS="${MS:-$C/mnemonic-secret/target/release/ms}"
 IN="$W/inputs-hashvault"
 
 mkdir -p "$IN/seeds" "$IN/keys" "$IN/preimages"
@@ -32,14 +34,17 @@ ROLE=(
 echo "== seeds and keys =="
 for i in 0 1 2 3 4 5; do
   ent=$(printf '%063d%x' 0 $((i + 1)))
-  phrase=$("$MS" decode "$("$MS" encode --hex "$ent" --no-engraving-card 2>/dev/null | tr -d ' ')" 2>/dev/null \
-             | sed -n 's/^phrase: //p')
+  # Split from one nested line into two, because BOTH halves carried material on
+  # argv: the hex into `encode`, and the resulting ms1 into `decode`. Each now
+  # takes the stdin sentinel.
+  card=$("$MS" encode --hex - --no-engraving-card <<<"$ent" 2>/dev/null | tr -d ' ')
+  phrase=$("$MS" decode - <<<"$card" 2>/dev/null | sed -n 's/^phrase: //p')
   [ -n "$phrase" ] || { echo "FATAL: no phrase for key $i" >&2; exit 1; }
   printf '%s\n' "$phrase" > "$IN/seeds/key-$i.seed"
 
   # The constellation's own taproot path, ruled 2026-08-18:
   # m/270028'/coin'/account'/script' with 0' = tr.
-  out=$("$MS" derive --phrase "$phrase" --template bg002h-tr --account 0 2>/dev/null)
+  out=$("$MS" derive --phrase - --template bg002h-tr --account 0 <<<"$phrase" 2>/dev/null)
   fp=$(printf '%s\n' "$out" | sed -n 's/^master_fingerprint: *//p')
   xp=$(printf '%s\n' "$out" | sed -n 's/^account_xpub: *//p')
   path=$(printf '%s\n' "$out" | sed -n 's/^account_path: *//p')
