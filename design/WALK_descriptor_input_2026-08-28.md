@@ -172,3 +172,30 @@ verdict last; jargon in between.
    row's annotation column, not in what the operator reads.
 3. Sweep §6's quoted texts for existing leaks: at least the multi-record
    row's quoted message contains "(F-414)" today. Fix in the walk fold.
+
+
+---
+
+## W6 — told "--as md1 is available," the operator asks whether they must run
+## `md` FIRST to make the md1 string, or whether `me` converts
+
+**The moment.** *"Now I wonder if I have to use md command to convert
+wallet.txt to an md1 string or if me will handle it."*
+
+**Why the confusion is legitimate, twice over.** (1) `md encode` IS the md1
+encoder in this constellation, and the operator has used it — "as md1"
+plausibly means "as the thing `md` makes." (2) The bring-your-own-string
+pipeline genuinely exists: `me sysw pack` accepts md1 strings as records
+(`ClassMDMK`) today, so `md encode … ` then `me sysw pack <strings>` is a
+real, working path — the expert path §1 exists to obsolete. The spec's
+answer — `me` converts in-process, one step, no `md` involved — lives in
+§5.3's implementation notes, which no operator reads.
+
+**Classification: documentation, folded with the walk batch.** §5.1's
+`--as md1` help line gains the one-step fact and loses its spec-speak
+("decompose to a BIP-388 template plus keys" fails the W5 lens): *"--as md1
+— converts the descriptor and packs error-corrected md1 text cards in ONE
+step; no `md` invocation needed."* The W4 window refusal's alternative line
+gains the same three words ("me converts and packs in one step"). The
+bring-your-own-string path remains valid and needs no mention here — the
+confusion to cure is "must I?", not "may I?".
