@@ -13710,3 +13710,225 @@ the live checkout.
 **The fix is one line each**, `os.environ.get("MS", <the default>)`, matching what
 row 12 did for the shell drivers. It is filed rather than done because editing
 them would have falsified row 12's own control in the same commit.
+
+### F-351 — `ms-shares combine` and `slip39 combine` have NO multi-record private channel, so `--share` cannot be refused without advising an impossible remedy (repo: **mnemonic-toolkit**; owning phase: **whichever phase gives `mnemonic` an `--in`**) `#argv` `#channels` `#p3`
+
+**Found 2026-08-27 by P3's mnemonic branch, while building the argv refusal.**
+`--share` is one of the eleven argv-material shapes F-292 measured, and it is
+the one shape the refusal deliberately does **not** cover.
+
+Measured on the built binary:
+
+```
+$ printf '%s\n%s\n' "$SHARE0" "$SHARE1" | mnemonic ms-shares combine --share - --to ms1
+error: ms1 codex32: InvalidLength(100)
+$ mnemonic bundle ... --slot @0.phrase=- --slot @1.phrase=-
+error: at most one --slot @N.<secret>=- per invocation (single stdin per invocation)
+```
+
+So `--share -` reads exactly ONE share, and a K-of-N recovery needs K ≥ 2. A
+refusal on `--share` would therefore print `--share -` as the remedy for an
+invocation where that remedy cannot be followed — the one thing §6h forbids
+outright, and worse than the advisory it replaced, because it stops the operator
+without telling them what to do instead.
+
+`--slot` escapes this because `bundle` resolves `@env:` sentinels (verified: a
+three-cosigner bundle with three `@env:` slots exits 0). `--share` has no
+`@env:` path.
+
+**The fix is a channel, not a refusal**: either `--share -` accepting a stream of
+shares, or an `--in FILE`. Once one exists, add `--share` to
+`crates/mnemonic-toolkit/src/argv_guard.rs`'s `TABLE` and extend
+`channel_for`.
+
+### F-352 — clap ECHOES a stray positional verbatim, so a phrase pasted where no flag names it still reaches stderr (repo: **mnemonic-toolkit**; owning phase: **a later phase — §6d's SECOND, value-shape layer**) `#argv` `#leak` `#p3`
+
+**Found 2026-08-27 by P3's mnemonic branch, measured before the guard existed
+and re-measured after.** The refusal P3 built is §6d's *first*, flag-keyed layer.
+This is what only the second layer can reach.
+
+```
+$ mnemonic convert --to xpub --template bip84 "abandon abandon … about"
+error: unexpected argument 'abandon abandon abandon abandon abandon abandon
+abandon abandon abandon abandon abandon about' found
+$?  ->  64
+```
+
+The whole phrase is printed back. This is the exact defect `mt`'s source records
+from the other side, in a tool that now has a pre-parser guard — the guard sees
+no *flag* to key on, so the token reaches clap and clap names it.
+
+**Per the operator's 2026-08-27 severity ruling this is logged, not blocking.**
+The remedy is §6d layer 2: value-shape detection (a BIP-39 mnemonic by wordlist,
+an `ms1` by HRP) over raw argv, which `mt` and `me` both ship and `mnemonic` does
+not. Note the contrast measured in the same session: a declared flag's VALUE is
+**not** echoed (`--bogus-flag` after `--from phrase=<…>` names only the flag), so
+the exposure is positional-only.
+
+### F-353 — `--ms1` has no private channel on `verify-bundle` or `import-wallet`, so it is not refused there (repo: **mnemonic-toolkit**; owning phase: **whichever phase adds a second stdin channel or an `--in` to those two verbs**) `#argv` `#channels` `#p3`
+
+**Found 2026-08-27 by P3's mnemonic branch.** `--ms1` carries seed-equivalent
+material and is refused on `inspect`, `repair` and the three `xpub-search` verbs.
+It is exempt on the other two carriers, and the exemption is measured rather than
+assumed:
+
+| verb | `--ms1 -` | `--ms1-stdin` |
+| --- | --- | --- |
+| `inspect` | **works** | absent |
+| `repair` | **works** | absent |
+| `xpub-search *` | taken as a literal 1-char ms1, exit 1 | **exists** |
+| `verify-bundle` | not accepted | absent |
+| `import-wallet` | not accepted | absent |
+
+`verify-bundle` additionally needs `--slot @N.phrase=` at the same time, and only
+one input per invocation may be `-`, so even a working sentinel would name an
+impossible combination. Same shape as F-351.
+
+### F-354 — `vendor/miniscript` is NOT the rev `Cargo.toml` pins, and the freshness gate cannot see it (repo: **mnemonic-toolkit**; owning phase: **before the next release tag** — it decides what the shipped musl binary compiles) `#vendor` `#repro` `#miniscript`
+
+**Found 2026-08-27 by P3's mnemonic branch, while vendoring `mnemonic-io-lib`.**
+Running `cargo vendor vendor/` rewrote **16 files** under `vendor/miniscript/`
+that P3 had no business touching. Investigated rather than committed:
+
+```
+Cargo.toml [patch.crates-io] miniscript rev = ff4732e5f75aa555682343cb180fa72ee3e8e9d5
+Cargo.lock  source = git+…rust-miniscript?rev=ff4732e5…
+committed vendor/miniscript/nightly-version   -> nightly-2026-04-24
+a fresh clone at ff4732e5, nightly-version    -> nightly-2026-05-08
+```
+
+**So the committed vendored tree is a DIFFERENT miniscript from the one a normal
+`cargo build` resolves** — 296 insertions / 100 deletions apart, across
+`descriptor/tr/`, `miniscript/satisfy/` and `psbt/finalizer.rs`. The reproducible
+musl release binary compiles the vendored copy; every other build compiles
+`ff4732e5`.
+
+**`ci/repro/vendor-freshness.sh` is structurally blind to this.** It runs
+`cargo metadata`, which validates dependency RESOLUTION — names and versions —
+and never reads a source file. A vendored directory whose `.cargo-checksum.json`
+is internally consistent passes regardless of which commit produced it.
+
+P3 restored `vendor/miniscript` with `git checkout --` and vendored only
+`mnemonic-io-lib`, because re-vendoring would silently change what the release
+binary compiles in a funds-relevant dependency, outside P3's row. **Whoever fixes
+this must decide which rev is intended** and move the other side to match.
+See F-355: the repro scripts' own default names the *stale* rev, which is
+probably where the drift entered.
+
+### F-355 — the tag-time and scheduled reproducible builds are ALREADY broken, pre-P3, on the miniscript rev (repo: **mnemonic-toolkit**; owning phase: **the same one that resolves F-354**) `#repro` `#ci` `#miniscript`
+
+**Found 2026-08-27 by P3's mnemonic branch. Reported, not fixed** — P3 is not
+what broke it, and it cannot be exercised from a branch (the callers are
+tag-triggered and cron-triggered). Same class as **F-333** in
+`descriptor-mnemonic`, found by the `md` branch the same day.
+
+`man-pages.yml` and `repro-drift.yml` both pass
+`miniscript_rev: "95fdd1c5773bd918c574d2225787973f63e16a66"` to
+`reproducible-musl-build.yml`, and `ci/repro/double-build.sh`,
+`ci/repro/cc-validate.sh` and `ci/repro/remap-off-negative.sh` all default to the
+same value. `Cargo.lock`'s actual source key is `?rev=ff4732e5…`. A `[source]`
+stanza keyed on a rev that appears in no lockfile is inert, so miniscript is left
+unmapped and `--offline` cannot resolve it.
+
+Measured, cold `CARGO_HOME`, with a CORRECT `mnemonic-io-lib` stanza present so
+the failure is isolated to miniscript:
+
+```
+cargo metadata --locked --offline  (4-block config, MINISCRIPT_REV=95fdd1c5…)
+error: failed to load source for dependency `miniscript`
+$? -> 101
+```
+
+**Two things must move together when this is fixed**: the miniscript rev (see
+F-354), and a FOURTH source block for `mnemonic-io-lib` — P3 added one to
+`ci/repro/vendor-freshness.sh`, which derives both revs from `Cargo.lock` and
+fails closed; the other three scripts still take theirs from an env default.
+Deriving them the same way would have prevented this drift and would prevent the
+next one.
+
+**Cross-repo note recorded at the coordinator's request:** `descriptor-mnemonic`
+cannot cut a tag until a `mnemonic-toolkit` reusable-workflow change lands, so
+this repo is upstream of that sibling's release path. Neither side should be
+edited before both statuses are read together.
+
+### F-356 — ~39 prose command blocks still teach an argv invocation that P3 now refuses (repo: **mnemonic-toolkit**; owning phase: **the toolkit release** — the manual ships with it) `#docs` `#argv` `#p3`
+
+**Found 2026-08-27 by P3's mnemonic branch, by a machine sweep rather than by
+reading.** P3 rewrote the 24 command blocks that are *paired with a committed
+transcript* (those are byte-gated in CI and had to move), and added an
+authoritative reference section, *"Secret material on argv is REFUSED"*, at
+`docs/manual/src/40-cli-reference/41-mnemonic.md`. The rest of the workflow and
+reference chapters still show the old form.
+
+The sweep parses every fenced `sh` block under `docs/manual/src`,
+`docs/quickstart/src` and `docs/technical-manual/src`, and flags any block whose
+`mnemonic` invocation carries a flag/value pair the guard refuses. It reported
+**43 concrete recipe blocks** and **8 synopsis blocks**; four of the 43 are false
+positives (`--ms1` on `verify-bundle`, which is exempt per F-353), so the real
+figure is **~39**.
+
+Not fixed in P3 for a stated reason rather than by omission: it is a pedagogical
+rewrite of the workflow chapters that **no gate checks**, so a scripted pass
+could silently teach something wrong in a funds manual. The failure mode of
+leaving them is loud and self-correcting — an operator who copies one gets a
+refusal naming the class, the private channel and the override.
+
+The 8 synopsis blocks (`mnemonic repair [--ms1 <MS1>] …`) are a smaller item:
+they document a flag that still exists, and would read better as
+`--ms1 <MS1|->`.
+
+### F-357 — the doc-validation surface is FIVE things, not three, and no plan has yet named all of them (repo: **mnemonic-toolkit**; owning phase: **ownerless residue** — a process item, generalises F-313) `#ci` `#docs` `#gates`
+
+**Found 2026-08-27 by P3's mnemonic branch, by RUNNING each workflow rather than
+reading the plan's census.** F-313 recorded that `cargo`-shaped green is blind to
+the doc transcripts. This records what the surface actually measures to.
+
+| the plan said | measured |
+| --- | --- |
+| 3 replaying workflows: `quickstart.yml`, `manual-gui.yml`, `technical-manual.yml` | the three that replay against the **local** binary are `manual.yml`, `quickstart.yml`, `technical-manual.yml`. `manual-gui.yml` installs `mnemonic-toolkit-v0.74.0` from a tag and its transcripts are **unaffected** by a branch |
+| 19 goldens invalidated by the argv refusal | **24** — 19 under `docs/manual/transcripts/` plus 5 under `docs/technical-manual/transcripts/` |
+| 4 goldens invalidated by the grouping flip | **5** — the fifth is `docs/technical-manual/transcripts/mnemonic-bundle-bip84-abandon.out` |
+| (not named at all) | **`.examples-build/Examples.md`**, byte-gated by `examples.yml` with `git diff --exit-code` and shipped as `docs/Examples.pdf`. P3's argv row baked a REFUSAL into its worked multi-cosigner example before this was found |
+
+**The generalisable fix** is F-313's, widened: a standard closure list that names
+`manual.yml`, `quickstart.yml`, `technical-manual.yml` **and** `examples.yml`, so
+a future plan inherits the surface instead of rediscovering one piece of it per
+cycle. Two cycles have now each found a piece the previous one missed.
+
+### F-358 — there is no `make regen-examples`, so a drifted golden has to be regenerated by hand-reimplementing the verifier's capture semantics (repo: **mnemonic-toolkit**; owning phase: **ownerless residue**) `#docs` `#tooling`
+
+**Found 2026-08-27 by P3's mnemonic branch.** `docs/manual/tests/verify-examples.sh`
+replays a `.cmd` and byte-compares; nothing writes the result back. P3 needed a
+throwaway script that duplicated its substitution list, its per-`.cmd`
+`mktemp -d` cwd, and its pair-vs-triple format branch — and the duplicate had a
+bug the original does not: `$( )` strips trailing newlines, so it silently
+dropped a trailing blank line from `41-bundle-inheritance-cards.out`, which the
+manual includes as `lines="1-29"`. Caught by comparing line counts before and
+after; a `make regen-examples` sharing the verifier's own code path could not
+have had it.
+
+### F-359 — `vendor-freshness.sh` reports a FALSE GREEN on a warm `CARGO_HOME` (repo: **mnemonic-toolkit**; owning phase: **ownerless residue**) `#ci` `#gates` `#vendor`
+
+**Found 2026-08-27 by P3's mnemonic branch**, and it is the reason the branch
+caught its own vendor breakage at all.
+
+After the `mnemonic-io-lib` git dependency was added and BEFORE `cargo vendor`
+was run, on one unchanged tree:
+
+```
+bash ci/repro/vendor-freshness.sh                       -> exit 0   "OK"
+CARGO_HOME=<empty dir> bash ci/repro/vendor-freshness.sh -> exit 1
+    can't checkout from 'https://github.com/bg002h/mnemonic-engrave':
+    you are in the offline mode (--offline)
+```
+
+`--offline` stops the network; it does **not** stop cargo reading a git checkout
+that is already in `~/.cargo/git`. On CI that cache is empty, so the gate is
+sound there — but a developer running it locally to check their own work gets a
+pass on a tree that reds in CI, which is the worst direction for a gate to be
+wrong in.
+
+**The fix is small**: either point `CARGO_HOME` at a scratch dir inside the
+script, or make the script say in its output that it must be run cold. P3 added a
+comment at the `SRC_CONFIG` block recording the measurement, which is not the
+same as making the gate correct.
