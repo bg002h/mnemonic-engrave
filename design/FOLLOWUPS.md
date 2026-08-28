@@ -14221,6 +14221,37 @@ collision in the encoding — the index reaches the payload and is dropped on th
 way back out. That makes it a decode-side loss on top of an encode-side
 admission error, and either fix alone leaves the other half standing.
 
+**SECOND CORRECTION 2026-08-28 — the diagnosis below is also wrong, and this
+one is the real cause.** `md inspect --json` shows the fixed step is not lost at
+all: it is **relocated into the key ORIGIN**.
+
+```
+wpkh(@0/0/*)  ->  path_decl: { data: "m/0", tag: "Shared" }
+wpkh(@0/5/*)  ->  path_decl: { data: "m/5", tag: "Shared" }
+              ->  use_site_path_overrides: null   (in BOTH)
+```
+
+`UseSitePath` carries only `multipath` and `wildcard_hardened` — it has no field
+for a fixed step and never did, so `render_key` is correct on the structure it
+receives. The template parser, one layer earlier, moves the step from the USE
+SITE to the ORIGIN.
+
+**That is a different key, not a different rendering.** `m/5` means "derive the
+key from origin m/5, then wildcard"; the input said "derive from the key's own
+origin, then child 5, then wildcard". The identity hashes commit to the relocated
+origin, so the artifact is internally consistent and WRONG — nothing downstream
+can detect it, because there is no disagreement to detect.
+
+**So refusal at encode is the answer, not a renderer repair.** The earlier
+framing ("a lossy Display, fixable two ways") would send whoever picks this up
+into `render.rs:546`, which is behaving correctly. The defect is in the template
+parser's handling of a use-site step it cannot represent.
+
+**Recorded as three successive diagnoses because the path matters**: format
+cannot hold it (wrong) -> renderer drops it (wrong) -> parser relocates it into
+the origin (measured). Each was refuted by one more measurement, and the first
+two are exactly the plausible answers a reader would stop at.
+
 **CORRECTED 2026-08-28, and it changes the fix.** This entry first framed the
 loss as md1 being unable to represent a fixed use-site index. **That is wrong —
 the wire format holds it.** Measured with `md inspect` across three indices:
