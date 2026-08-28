@@ -14498,3 +14498,12 @@ no Wallet Policy row, no Engrave Transaction row — while the code admits
 now states the drift instead of claiming agreement. The reconciliation (add
 the missing rows, or remove the code cell) belongs to `SPEC_systemwide_payloads`'
 own next cycle, with the usual gate.
+
+### F-416 — `SPEC_systemwide_payloads` §5.6's `--in`/stdin contract needs the single-document amendment noted (repo: **mnemonic-engrave**; owning phase: **descriptor-input cycle, at ship**) `#sysw` `#spec-drift`
+
+Filed from R0 r2's NEW-M2. `SPEC_descriptor_input.md` §5.1 switches `--in` and
+stdin to whole-document reads when `--as` is present; `SPEC_systemwide_payloads`
+§5.6 still states the unconditional newline-separated contract. Same shape as
+F-415: state the drift where it is created, amend the other document in its own
+cycle (one sentence plus a cross-reference) — two NORMATIVE contracts must not
+disagree silently.
