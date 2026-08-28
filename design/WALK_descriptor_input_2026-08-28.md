@@ -48,3 +48,40 @@ instinct — scan-and-reimport — is the S2 artifact. In the S3-only window the
 scannable plate does not exist. The plan must decide what §5.1's help text
 says about `--as descriptor` while S2 is parked (see the earlier
 phase-boundary note in the plan inputs).
+
+
+---
+
+## W2 — the operator remembers the FLAG but not the TOOL, and the tool
+## whose NAME advertises descriptors is the wrong one
+
+**The moment.** Told "you want the QR plate — what do you type?", the
+operator typed nothing: *"I remember there as --as options, but I wonder was
+that the md-cli or the me command…"*
+
+**The finding.** The constellation has five CLIs, and the capability lives in
+`me` — but `md` is the tool literally named for descriptors
+(mnemonic-descriptor), so the name pulls the wrong way. Measured, both
+wrong-tool moves dead-end generically:
+
+```
+md encode "$(cat wallet.txt)"          -> md: template parse error: template contains no @i placeholders
+md encode 'wsh(sortedmulti(2,[dc…]xpub…/<0;1>/*,…))'  -> same message
+```
+
+No referral to `me`, no recognition that the input is a concrete export
+rather than a template. An operator who guesses `md` gets a message about
+`@i` placeholders they have never heard of, and can reasonably conclude the
+constellation cannot do this at all — worse than silence.
+
+**Classification: remedy in the SIBLING tool — filed as F-420 against
+descriptor-mnemonic, not a change to this spec** (§10 already declines `md`
+changes for this cycle). `md encode`'s template-parse refusal gains a
+referral when the input is descriptor-shaped (a concrete key expression, or
+`Key: value` BlueWallet lines): name what the input IS and where it goes —
+`me sysw pack --as <descriptor|md1>`. Sequenced to land with or after S1, so
+the referral never points at a flag that does not exist yet.
+
+**Within this spec's scope: nothing to change** — once `me` is reached, §5.1
+and §6 handle the rest. The operator's problem is REACHING it; the
+constellation-uniformity surface owns cross-tool discovery.

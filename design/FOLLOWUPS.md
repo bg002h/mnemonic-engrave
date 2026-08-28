@@ -14519,6 +14519,20 @@ r8 counted §6's rows against §4.2's promises. Owned by the journey walk,
 which is the §6-row generator: write the row there, with the walk's usual
 divergence classification.
 
+### F-420 — `md encode` dead-ends on concrete descriptors and BlueWallet files with a placeholder error and no referral to `me` (repo: **descriptor-mnemonic**; owning phase: **with or after descriptor-input S1**) `#md` `#cli` `#cross-tool`
+
+Filed from the 2026-08-28 journey walk (W2, live with the operator). The
+operator remembered `--as` but not its tool, and `md` — the tool NAMED for
+descriptors — was the natural wrong guess. Measured: `md encode` on a
+BlueWallet setup file and on a concrete BIP-380 descriptor both refuse with
+only *"template parse error: template contains no @i placeholders"* — no
+recognition, no referral. Fix: when the template parse fails AND the input is
+descriptor-shaped (a concrete key expression, or `Key: value` BlueWallet
+lines), the refusal names what the input is and refers to
+`me sysw pack --as <descriptor|md1>`. MUST NOT land before `me`'s S1 ships —
+a referral to a flag that does not exist yet is the r5-NEW-I2 defect class
+across tools.
+
 ### F-418 — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
 
 **Operator ruling 2026-08-28, in conversation:** *"I'm away from sh2 and it's
