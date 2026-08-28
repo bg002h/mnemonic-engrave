@@ -217,7 +217,16 @@ The never-widening clause binds the DEVICE-FACING admission: what may be
 packed as a `Descriptor` record and what §5.2's classification predicate
 answers. It does not bind the `--as md1` path, whose product is `MDMK`
 records the device's descriptor parser never reads — §4.7 conjunct 1 uses
-that boundary exactly once, for `multi` (R0 r4's NEW-I1).
+that boundary exactly once, for `multi` (R0 r4's NEW-I1). The boundary is
+mechanical, not aspirational: the device's descriptor model has no unsorted
+arm at all (`bip380.MultisigType` is `Singlesig`/`SortedMulti` only,
+`bip380/bip380.go:90–94`), and the md1 consumer never builds a
+`bip380.Descriptor` for `multi` at all: `gui/md1_expand.go:102`
+(`scriptForTemplate`) maps only the bip380-expressible template shapes to
+bip380 scalars and reports !ok for the rest (its own D2 comment), and the
+`multi` route derives from the template directly (R0 r5, measured: the
+device decodes an md1 `multi` set as `PolicyMulti` and derives the same
+addresses as the Rust side at indices 0 and 1).
 
 **NORMATIVE, from the moment this cycle's vectors land:**
 
@@ -637,7 +646,8 @@ conjunction, and §7's row list is derivable from it:
    never carry `multi` and §7's invariant is untouched (§3's boundary
    paragraph). All other conjuncts (2–7) apply to `multi` identically.
 2. **Threshold:** `1 ≤ k ≤ n`, where `n` is the number of keys.
-3. **Key count (BIP-383):** `n ≤ 15` when the `sortedmulti` is the DIRECT
+3. **Key count (BIP-383):** `n ≤ 15` when the `sortedmulti` — or its `multi`
+   twin (the bound is the redeemScript's, not the ordering's) — is the DIRECT
    argument of `sh(…)` — there the multi's own output script IS the
    redeemScript, one script element capped at 520 bytes, and 16 compressed
    keys need 547 — and `n ≤ 20` for `wsh(…)` and `sh(wsh(…))`
@@ -675,7 +685,9 @@ conjunction, and §7's row list is derivable from it:
    parse REFUSALS — measured; `bip380/bip380.go:476,489`. R0 r3's NEW-N1.) This conjunct gates BOTH `--as`
    values; which members of the admitted set md1 can carry is §5.3's
    per-`--as` split (`/i/*` and `<i;i+1>`-without-wildcard are
-   `--as descriptor`-only).
+   `--as descriptor`-only — and for a `multi` form, which has no
+   `--as descriptor` path, carried by NEITHER path; §5.3's refusals say so
+   rather than pointing at a flag that also refuses).
 
 **The list above plus the predicate is the closed accept set, and the rule is
 stated over them, not over an enumeration of exclusions:** anything the cascade
@@ -767,8 +779,10 @@ Two boundary rules that fall out of it (R0 r2):
   whole input through §4's cascade. If it parses as one descriptor — a
   WELL-FORMED BlueWallet file or pretty JSON does (measured: the fork's own
   `sh` fixture, 14 lines, read whole is ACCEPT, `#tk50fvpm`, a fixed point;
-  a malformed one — no `Name:`, no `Format:` — does not, and falls through
-  like any other unparseable input) — the
+  a malformed one does not: no `Name:` is a device REFUSE (measured), while
+  no `Format:` is refused by `me` at §4.2's NORMATIVE rule even though the
+  DEVICE parses it and then panics on re-encode (§4.2 defect 1) — either
+  way it falls through) — the
   input IS a descriptor and gets the "--as decides" block at `EXIT_USAGE`
   (2), which keeps §11's item 5 true for all four formats. Only when the
   whole input does NOT parse as one descriptor AND some individual record
@@ -805,7 +819,8 @@ under §3, lands in Rust first (as `mnemonic_engrave::sysw::classify`) with the
 The classification predicate is stated once, and both sides implement it:
 
 > A record is `ClassDescriptor` iff it parses under §4's cascade **and** matches
-> §4.7's grammar.
+> §4.7's grammar — the seven forms; conjunct 1's md1-path widening does not
+> apply here.
 
 ### 5.3 `--as md1`
 
@@ -863,7 +878,11 @@ contrivance.
 
 > **NORMATIVE: `--as md1` REFUSES a descriptor in which ANY key's use-site
 > path is a single fixed child index.** The refusal names the offending key
-> and `--as descriptor`, which carries that shape exactly.
+> and `--as descriptor`, which carries that shape exactly — UNLESS the
+> descriptor is a `multi` form (§4.7 conjunct 1), which `--as descriptor`
+> refuses too: there the refusal states that NO `me` path carries this
+> descriptor this release, and names the re-export remedy (R0 r5's NEW-I2 —
+> two refusals must never point at each other).
 
 **(a′) An ABSENT use-site path is the same representational hole, resolved the
 other way — R0's C4.** `UseSitePath` has no "no children" state either:
@@ -900,7 +919,9 @@ handles it; the hole is md1's alone.
 > **NORMATIVE: `--as md1` REFUSES a descriptor in which ANY key's use-site
 > path is a multipath group without a trailing wildcard.** The refusal names
 > the offending key and `--as descriptor`, which carries it exactly — the
-> same split as (a).
+> same split as (a), including (a)'s `multi` exception: for a `multi` form
+> the refusal states that no `me` path carries it and names the re-export
+> remedy.
 
 **Mixed use-site paths across keys — the quantifier is PER KEY, matching
 conjunct 7 (R0 r3's NEW-C1).** The three rules above bind key by key, because
@@ -1013,7 +1034,9 @@ order:
 The five-step rule ranks CASCADE (parse) failures only. Rows below that arise
 from §4.7's admission predicate or §5.3's representability limits fire from
 their own checks, after a successful parse — the rule never selects them
-(R0 r2's NEW-N1).
+(R0 r2's NEW-N1). And the `sortedmulti` rows below read over BOTH multi
+forms: §4.7 conjunct 1's md1-path `multi` twins hit the same conjuncts and
+get the same texts with the form name substituted (R0 r5's NEW-M2).
 
 | the operator's input | what `me` says |
 | --- | --- |
@@ -1027,9 +1050,9 @@ their own checks, after a successful parse — the rule never selects them
 | a BlueWallet `Policy: k of n` with a different key count | *"`Policy: 2 of 3` declares 3 cosigners; the file has 2. Cosigner lines are `<8-hex-fingerprint>: <xpub>`."* |
 | a BlueWallet file whose keys have **no origin path** (no `Derivation:` header at all, or one placed after cosigner lines) | *"cosigner `<fp>` has no derivation path — the `Derivation:` header is missing or appears after the cosigner lines. The descriptor this file produces cannot be re-read by the device. Put `Derivation: <path>` above the first cosigner line."* §4.2 rule 3 (R0's C1). |
 | a BlueWallet cosigner fingerprint that is not 8 hex characters | *"cosigner line `ab: xpub…` — a master fingerprint is exactly 8 hex characters (4 bytes)."* §4.2 defect 4; the device PANICS on fewer, so this file must never reach it. |
-| `wsh(multi(…))` under **`--as descriptor`** | *"the device's descriptor parser accepts `sortedmulti` and not `multi`. This wallet can still be engraved: `--as md1` encodes `multi` policies. (`sortedmulti` differs from `multi` only in key ordering at spend time — it is not a synonym, so `me` will not rewrite it for you.)"* |
+| `wsh(multi(…))` under **`--as descriptor`** | *"the device's descriptor parser accepts `sortedmulti` and not `multi`. This wallet can still be engraved: `--as md1` encodes `multi` policies (for md1-representable use-site paths — otherwise the §5.3 rows state that neither path carries it). (`sortedmulti` differs from `multi` only in key ordering at spend time — it is not a synonym, so `me` will not rewrite it for you.)"* |
 | a **miniscript** descriptor, either `--as` | *"`me` reads the descriptor family the device reads: single-sig and `sortedmulti`, optionally under `sh`. This descriptor uses miniscript fragments (`or_d`, `and_v`, …), which neither path handles in this release. `md encode` accepts miniscript **templates** — see §10."* |
-| a descriptor with **`/0/*`** under **`--as md1`** | *"key `@N` (`[<fp/path>]xpub…`) uses `/0/*` — md1 records a use-site path as either a multipath group (`<0;1>`) or a bare wildcard (`/*`), so a single fixed chain index has no representation, and encoding it would silently produce a DIFFERENT wallet. Use `--as descriptor`, which carries `/0/*` exactly."* §5.3(a); the offending key is named per §5.3's per-key rule (R0 r4's NEW-M4). A descriptor mixing an (a)-shaped and an (a″)-shaped key matches both this row and the next; both fire, both are true, and both name the same remedy — no precedence is needed. |
+| a descriptor with **`/0/*`** under **`--as md1`** | *"key `@N` (`[<fp/path>]xpub…`) uses `/0/*` — md1 records a use-site path as either a multipath group (`<0;1>`) or a bare wildcard (`/*`), so a single fixed chain index has no representation, and encoding it would silently produce a DIFFERENT wallet. Use `--as descriptor`, which carries `/0/*` exactly."* §5.3(a); the offending key is named per §5.3's per-key rule (R0 r4's NEW-M4). For a `multi`-form descriptor the remedy sentence is replaced: *"this is a `multi` policy, which only `--as md1` carries — and md1 cannot represent `/0/*`. No `me` path engraves this descriptor this release; re-export with `<0;1>/*`, or as a `sortedmulti` policy if sorted signing order is acceptable (a DIFFERENT policy — `me` will not rewrite it)."* (R0 r5's NEW-I2.) A descriptor mixing an (a)-shaped and an (a″)-shaped key matches both this row and the next; both fire, both are true, and both name the same remedy — no precedence is needed. |
 | **`sortedmulti(k, …)` with `k > n`** | *"threshold `k` of `n` keys can never be satisfied — no combination of signatures reaches `k`. Funds sent to this wallet would be unspendable. Nothing was packed."* §4.7 conjunct 2. |
 | **`sortedmulti(0, …)`** — or any `k < 1` | *"threshold 0 means NO signature is required: anyone who can see this script can spend from it. This is almost certainly not the wallet you meant — and if it already holds funds, treat them as at risk now. Nothing was packed."* §4.7 conjunct 2 (R0's I6 — the device derives a real address for `k = 0` and even `k = −1`, so the refusal is the host's alone). |
 | `sortedmulti` with **too many keys** | *"`sh(sortedmulti(…))` carries at most 15 keys — there the multi's output script IS the redeemScript, one 520-byte script element (BIP-383). `wsh(…)` and `sh(wsh(…))` carry at most 20 (`OP_CHECKMULTISIG`); their redeemScript is 34 bytes and the 520-byte limit never binds. This descriptor has `n` keys under `<form>`. The device would accept it and derive addresses whose coins cannot be spent."* §4.7 conjunct 3 (R0's C3, bound corrected by r2's NEW-I2). |
@@ -1047,7 +1070,7 @@ their own checks, after a successful parse — the rule never selects them
 | a **hardened use-site component** — `…/<0;1>/*h` | *"a hardened use-site step cannot be derived from an xpub (BIP-32). The device would silently derive the UNhardened child and display addresses for a wallet that cannot exist, so this is refused on both `--as` paths."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
 | a **non-consecutive multipath** — `<0;2>`, `<1;3>` | *"the device derives only `<i;i+1>` pairs (receive; change). It accepts this descriptor and then errors on every address."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
 | any **other use-site path shape** — a bare fixed index, `/0/1/*` | *"use-site paths `me` packs: absent, `/*`, `/i/*`, `<i;i+1>`, `<i;i+1>/*`. This one is outside the set the device is measured to handle."* §4.7 conjunct 7 (closed set). |
-| a **multipath with no trailing wildcard** (`<0;1>`) under **`--as md1`** | *"key `@N` (`[<fp/path>]xpub…`) uses `<0;1>` with no trailing wildcard — md1 cannot represent it; encoding it would silently produce the `<0;1>/*` wallet, which derives DIFFERENT addresses. Use `--as descriptor`, which carries `<0;1>` exactly."* §5.3(a″) (R0 r2's NEW-C1; key named per R0 r4's NEW-M4). |
+| a **multipath with no trailing wildcard** (`<0;1>`) under **`--as md1`** | *"key `@N` (`[<fp/path>]xpub…`) uses `<0;1>` with no trailing wildcard — md1 cannot represent it; encoding it would silently produce the `<0;1>/*` wallet, which derives DIFFERENT addresses. Use `--as descriptor`, which carries `<0;1>` exactly."* §5.3(a″) (R0 r2's NEW-C1; key named per R0 r4's NEW-M4; the `multi`-form remedy replacement of the previous row applies here identically). |
 | a **multi-record input whose records include a descriptor**, `--as` absent | *"record `N` is a wallet descriptor. A descriptor is packed ALONE: run `me sysw pack --as <descriptor\|md1>` with just the descriptor — one container cannot yet carry a descriptor plus other records (F-414). The other records pack without `--as`, as usual."* **`EXIT_INVALID` (4)**, as today. Applies ONLY when the whole input does not parse as one descriptor (§5.1's discriminator — a multi-line BlueWallet or JSON file parses whole and gets the "--as decides" block instead); naming `--as` here would send the operator to a whole-file read that refuses with a message false about the file (R0 r2's NEW-I5, measured). |
 
 **Two rules that bind every row above.** Both come from
@@ -1172,8 +1195,15 @@ approximately.
   short-fingerprint file marked `device_probe: "panic"`;
 - **`wsh(multi(…))`, a miniscript descriptor, and a full-origin `ypub`** —
   `false`/`false` on the host/device axes, the `neither` rows the vacuity
-  check needs. The `multi` row additionally carries `md1_admits=true` and its
-  md1-route `address_0` — the widening direction §4.7 conjunct 1 admits;
+  check needs. The `multi` row additionally carries `md1_admits=true`, its md1-route
+  `address_0` AND `address_1`, and pins the `md descriptor` read-back as
+  containing `multi(` (measured: `#656zkmsn` — `multi` survives the round
+  trip un-normalised). `address_1` is load-bearing (R0 r5's NEW-I3): for
+  these keys the sorted and unsorted orderings COINCIDE at index 0 (measured
+  identical recv0, divergent recv1), so an index-0 assertion cannot catch
+  the forbidden `multi` → `sortedmulti` rewrite — the gate must assert where
+  the orderings differ, and the next author should not reach for index 0
+  again;
 - **the whitespace rows of §4.6** — trailing `\n`, CRLF, leading space. These
   are the only rows where the host is *wider*, and they are permitted **only
   because `canonical` is what gets packed** (§4.6). The file states that in its
@@ -1186,8 +1216,10 @@ derives. The Go test asserts it through `address.Receive` on every row where
 `device_admits` is true and it is present. The Rust test asserts it through
 the md1 round trip on every row where `md1_admits` is true — including
 `host_admits=false` rows like `multi`, whose ONLY address assertion is the
-md1 one. Where `md1_admits` is false and the input parses under `me`'s
-cascade, the Rust test asserts that the md1 path REFUSES **citing
+md1 one. Where `md1_admits` is false on a row whose input is otherwise
+ADMITTED (cascade AND §4.7 — every §5.3-split row is; the rows refused by
+§4.7's own conjuncts are not, and their assertion is the `host_admits=false`
+column's, citing their own conjunct — R0 r5's NEW-I1), the Rust test asserts that the md1 path REFUSES **citing
 §5.3(a)/(a″)** (the citing clause is R0 r4's NEW-M2 second point — a refusal
 for an unrelated cause must not satisfy the assertion; this is what turns
 §5.3(a)/(a″) from prose into a gate). This is the check that would have
@@ -1360,4 +1392,6 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
    just the exit code.
 5. `--as` omitted with a descriptor input exits **2** and prints §5.1's block.
 6. §9's item 2 is discharged: a `ClassDescriptor` record has been loaded on a
-   real device and displayed, at least once, before this is called shipped.
+   real device and displayed, at least once, before this is called shipped —
+   binding **S2's ship only** (F-418): S1 and S3 close without it, and it is
+   parked with S2 until the device is back on the bench.
