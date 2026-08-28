@@ -13932,3 +13932,40 @@ wrong in.
 script, or make the script say in its output that it must be run cold. P3 added a
 comment at the `SRC_CONFIG` block recording the measurement, which is not the
 same as making the gate correct.
+
+### F-370 — P4, the operator journey, is DEFERRED until after release (operator ruling 2026-08-27) — and it is the FIRST post-release item, not "eventually" (repo: **mnemonic-engrave**; owning phase: **immediately post-release**) `#cli-uniformity` `#journey` `#scheduled`
+
+**Ruled 2026-08-27**: *"We will defer p4 until after release."*
+
+So the cycle ships on P0..P3. Each of those carries its own gates, its own R0
+GREEN and its own CI, and **nothing in them depends on P4 having run** —
+`--expect` is built and tested in P0; P4 only exercises it at operator level.
+
+**The consequence, named here so it is not discovered later.** The release is
+validated **per-tool and not across the seam where the tools meet**. Every
+individual guarantee is gated; the composition is not. That is precisely where
+a journey walk has historically found what correctness review could not — on the
+`mt` cycle, five clean correctness rounds closed and a step-by-step walk then
+found a Critical none of them could reach, because the defect was a *silence at
+a moment* rather than a *wrong thing in a section*.
+
+So this trades a known class of finding for schedule, deliberately, with the
+class named.
+
+**Half the seam is already measured**, which is why the trade is defensible.
+The `mk` branch ran `mk encode --from-md1-set` into
+`me sysw pack --expect descriptor,cosigner --out` and got **exit 0, a 589-byte
+payload**, once `md`'s header row lands — and **exit 4** with today's header, the
+refusal firing correctly. The seam is known to close. What is deferred is
+capturing it as a **journey that regenerates** and that **FAILS when one producer
+is made to refuse** — the negative half, which is the half that makes a journey a
+gate rather than a demo.
+
+**When it comes due**, the method is the one recorded constellation-wide: walk it
+WITH the operator rather than only dispatching a lens, because the operator
+diverges in ways an agent will not imagine, and their confusion is the finding
+rather than an interruption.
+
+**Do not let this drift into the ownerless residue.** It has an owning phase —
+immediately post-release — and an item whose owning phase has passed is overdue,
+not deferred.

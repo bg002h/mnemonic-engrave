@@ -1331,7 +1331,31 @@ override is scoped to the posture pair and to nothing else.
 | **P1** | `mt` adopts the crate, and gains `--out` (§6b), `--allow-argv-secret` (§6d), **and `-` on `decode`, `verify` and `inspect` — F-250 fixed `encode` ALONE, and the other three still exit 2 (I-3)**. | `mt`'s 237 tests pass, **with the diff to them enumerated and each edit justified by a named §6 ruling** + **`mt decode -`, `mt verify -` and `mt inspect -` each read stdin at exit 0** |
 | **P2** | `ms` FIRST `--in` on all eight verbs, THEN the argv refusal, THEN the 0600 `--out`, **THEN `--group-size 0` as the stdout default and the whitespace-only separator (I-1) — §3's decisive measurement is `ms`'s and belonged to no phase**. Plus this repo's journey drivers. **Highest safety value; do it before the cosmetic work.** | round-trip vectors; **`ms encode --phrase <a BIP-39 phrase>` REFUSES for the argv reason and `--allow-argv-secret` proceeds (I-5)**; **`ms encode --in <file>` piped into `me sysw pack` runs with NO flags and exits 0 (I-1)**; the 18 argv call sites migrated; `me`'s remedy text still naming only channels that exist |
 | **P3** | `md`, `mk` header off stdout, grouping to stderr, `--in`/`--out`, **and `mk`'s invalid-artifact 2 → 1, which §6f calls the only code this cycle changes and which no phase owned (I-4)**. Plus `mnemonic`'s grouping surface AND its argv refusal across all five of its secret-material channels (`bundle`, `convert`, `derive-child`, `restore --passphrase`, `electrum-decrypt --decrypt-password`), and the GUI mirror. Plus golden regeneration. | `md encode` into `me sysw pack` runs with **no flags and no grep, on a CHUNKING policy**; **`mk` on an invalid artifact exits 1, and `mk encode` piped into `me sysw pack` runs with no flags**; `mnemonic-gui`'s schema mirror regenerated; the 7 goldens regenerated; **`mnemonic`'s refusal keyed on its EXISTING `is_argv_secret_bearing` predicate (not a second implementation), with the five named channels asserted as spot checks** |
-| **P4** | the operator journey: several inputs of different kinds, one payload, `--expect` engaged. **`--expect` is BUILT in P0; P4 exercises it.** | a captured journey that regenerates, and that FAILS when one producer is made to refuse |
+| **P4** | **DEFERRED UNTIL AFTER RELEASE — operator ruling 2026-08-27.** the operator journey: several inputs of different kinds, one payload, `--expect` engaged. **`--expect` is BUILT in P0; P4 exercises it**, so nothing P0..P3 ships depends on P4 having run. | a captured journey that regenerates, and that FAILS when one producer is made to refuse |
+
+**P4 IS DEFERRED UNTIL AFTER RELEASE (operator ruling 2026-08-27), AND THE ONE
+CONSEQUENCE IS NAMED HERE RATHER THAN DISCOVERED LATER.** The cycle therefore
+ships on P0..P3, each of which carries its own gates, its own R0 GREEN and its
+own CI. What it does **not** carry is P4's end-to-end assertion — *several
+producers, one payload, `--expect` engaged* — so **the release is validated
+per-tool and not across the seam where the tools meet.**
+
+That is a real gap and a defensible one. Every individual guarantee is gated;
+what is untested is their composition, and the composition is exactly where a
+journey walk has historically found what correctness review could not. So the
+deferral trades a known class of finding for schedule, deliberately.
+
+**`--expect` still ships in P0 and is exercised by P0's own tests** — it is not
+untested code, merely code whose *operator-level* journey has not been walked.
+The `mk` branch measured one half of that seam already: `mk encode --from-md1-set`
+into `me sysw pack --expect descriptor,cosigner --out` exits 0 with a 589-byte
+payload once `md`'s header row lands. So the seam is known to close; what is
+deferred is capturing it as a regenerating journey that fails on a made-to-refuse
+producer.
+
+**P4 becomes due immediately after release**, not "eventually" — it is the first
+post-release item, and its owning phase in `FOLLOWUPS.md` is recorded that way.
+
 
 **`mnemonic` CONFORMS; it does not invent (architect ruling, 2026-08-26).**
 `mnemonic-toolkit` already ships an argv-secret subsystem — `secret_taxonomy`,
