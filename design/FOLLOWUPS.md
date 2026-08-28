@@ -14184,3 +14184,51 @@ defect in the arm it was found in.
 `RecordError::MsTooLong` does. The vector is already in
 `crates/me-cli/testdata/codex32_seam_vectors.json`
 (`past-the-engraveable-cap-91`), so the test is a row, not a new fixture.
+
+### F-410 — `md encode` accepts a non-BIP-388 use-site index and silently rewrites it, while refusing the valid `/**` shorthand (repo: **descriptor-mnemonic**; owning phase: **before the descriptor-input cycle ships**) `#md` `#funds` `#round-trip`
+
+**Found 2026-08-28** while specifying the descriptor-input gap, and confirmed by
+round-trip rather than by reading the parser.
+
+`md-codec` is a BIP-388 implementation — its own doc comments say
+*"canonicalizes BIP 388 placeholder"* and *"BIP 388 well-formedness"*. In
+BIP-388 a key placeholder is `@i/**` or `@i/<M;N>/*`: the receive/change pair.
+A fixed single index (`@0/0/*`) is a BIP-380 descriptor form and is **not**
+representable as a wallet-policy template.
+
+Measured, all with `--fingerprint '@0=00000000'`:
+
+```
+wpkh(@0/**)        REFUSED   "template parse error: @0: derivation steps"
+wpkh(@0/<0;1>/*)   accepted  -> round-trips exactly
+wpkh(@0/0/*)       accepted  -> decodes back as wpkh(@0/*)
+wpkh(@0/1/*)       accepted  -> encodes to a DIFFERENT md1 than /0/*
+```
+
+**Two defects, and the second is the one that costs money.**
+
+**(a) The valid shorthand is refused.** `/**` is BIP-388's own spelling for the
+same pair `<0;1>/*` expresses, and it does not parse.
+
+**(b) An out-of-domain form is accepted and silently rewritten.** `/0/*` is not
+representable, so the honest outcome is a refusal at encode. Instead it encodes,
+and decodes back as `/*` — a different derivation path, therefore **different
+addresses, with no warning at any step.** A plate cut from that md1 restores a
+wallet the operator did not back up.
+
+Note `/0/*` and `/1/*` produce *different* md1 strings, so this is not a
+collision in the encoding — the index reaches the payload and is dropped on the
+way back out. That makes it a decode-side loss on top of an encode-side
+admission error, and either fix alone leaves the other half standing.
+
+**This is the [[success-is-not-round-trip]] class exactly**: making a tool accept
+input it confusingly rejected can silently drop data, and only a decode read-back
+catches it. `md encode` returning rc 0 proves nothing about whether the artifact
+means what was typed.
+
+**What is owed.** Refuse `/0/*` and any other fixed use-site index at encode,
+naming the two forms that are representable. Accept `/**` as an alias for
+`<0;1>/*`. Both belong in the Rust primary with vectors, then port. The
+descriptor-input spec (§5.3(a)) already refuses this shape on the `--as md1`
+path — but that guards one new caller, not the shipped `md encode` surface every
+other caller uses.
