@@ -14082,3 +14082,70 @@ green; nothing here changes behaviour. Fix it in the pass that already has the
 whole F-354 surface open, and prefer folding §3.1 into a `3.1 The four checks`
 that states each check's blind spot — the script's header already has that text,
 and it is better in the spec than duplicated.
+
+---
+
+### F-391 — `md`'s and `mk`'s vendor gates disagree on shape, and BOTH are resolution-only: a one-byte corruption of a vendored file passes them at rc 0 (repo: **descriptor-mnemonic** + **mnemonic-key**; owning phase: **the same one that resolves F-354/F-355/F-371/F-381**) `#ci` `#gates` `#vendor` `#deps`
+
+**Found 2026-08-27** while moving `mnemonic-io-lib` from a git rev to the
+published registry version in both repos (see
+`design/agent-reports/FIX-io-lib-registry-md-mk.md`). Reported, not fixed — the
+brief scoped the work to the dependency change, and this drift predates it.
+
+**Two defects, one root cause: neither gate was ported from the shape
+`mnemonic-toolkit` actually settled on.**
+
+**(1) The gates assert the PRESENCE OF A NAMED GIT SOURCE, where the toolkit
+asserts an UNANCHORED SET.** `mnemonic-toolkit/ci/repro/vendor-freshness.sh:204`
+reads `unexpected = [d for d, _ in unanchored if d != fork_dir]` — it names the
+crates allowed to *lack* a registry anchor and fails closed on any other. That
+shape survives a git source being **removed**: the set simply shrinks. The two
+sibling gates instead derive a rev for a named URL and fail closed when the
+derivation is empty, so removing a git source **reds the gate**:
+
+| gate | zero io-lib git sources | why |
+| --- | --- | --- |
+| `mnemonic-key/ci/repro/vendor-freshness.sh:58-64` | **rc 0** | fail-closed branch is guarded by `[ "$GIT_SOURCES" != "0" ]`, and `SRC_CONFIG` is built inside `if [ -n "$IO_LIB_REV" ]` — it degrades to the two-block form |
+| `descriptor-mnemonic/ci/repro/vendor-freshness.sh:58-63` | **rc 1** | unconditional `if [ -z "$IOLIB_REV" ]; then … exit 1; fi` |
+
+Measured, both repos, after the registry change. `mk`'s gate needed **no edit at
+all** — `git diff` over the script across the change is empty — while `md`'s
+cannot pass without reverting the gate hunk of `9914ae41` (+29/-9). A gate that
+must be edited whenever a dependency stops being a git source is asserting the
+wrong thing: the property worth guarding is *"every vendored crate is anchored,
+or is on a grounded exemption list"*, not *"this named git URL is still present"*.
+
+**(2) Both gates are check (1) only, and check (1) cannot see file corruption.**
+Measured on `mnemonic-key`, one byte flipped inside a doc comment in
+`vendor/mnemonic-io-lib/src/write.rs` (same length, still valid Rust, so `rustc`
+alone would not notice):
+
+```
+bash ci/repro/vendor-freshness.sh                   -> rc 0   "OK — vendor/ satisfies Cargo.lock."
+cargo build -p mnemonic-io-lib (vendored config)    -> rc 101 "error: the listed checksum of
+                                                     …/vendor/mnemonic-io-lib/src/write.rs has changed"
+```
+
+**The PR-time gate is green on a tampered vendor tree; only the build reds.**
+This is exactly the hole `mnemonic-toolkit` closed with its checks (2) INTEGRITY,
+(3) REGISTRY PROVENANCE and (4) GIT-FORK PROVENANCE, whose header records that
+check (1) alone stayed green for two months over the F-354 mis-vendored tree.
+Both siblings commit a `vendor/` tree and both ship release binaries built
+`--offline` from it, so they carry the same latent defect the toolkit already
+paid for.
+
+**What the registry change did buy**, and it is worth recording because it is
+the only anchoring these gates currently have: tampering the `package` digest in
+`vendor/mnemonic-io-lib/.cargo-checksum.json` now reds `mk`'s gate at rc 1
+(`error: checksum for mnemonic-io-lib v0.1.0 changed between lock files`), because
+cargo compares it against `Cargo.lock`'s checksum during resolution. Under the
+git rev **both sides of that comparison were `null`** and the check did not
+exist. So the ruling converted one crate from unanchored to anchored — but the
+per-file integrity hole is orthogonal and still open in both repos.
+
+**Fix, when the F-354 family's phase runs it:** port
+`mnemonic-toolkit/ci/repro/vendor-freshness.sh`'s checks (2)-(4) into both
+siblings, replacing the named-URL derivation with the unanchored-set assertion.
+`md` keeps exactly one grounded exemption (`miniscript`); `mk` needs **none** —
+after this change its `Cargo.lock` carries zero `source = "git+…"` entries, so
+every vendored crate there is registry-anchored and the exemption list is empty.
