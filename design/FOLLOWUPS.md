@@ -13815,6 +13815,23 @@ this must decide which rev is intended** and move the other side to match.
 See F-355: the repro scripts' own default names the *stale* rev, which is
 probably where the drift entered.
 
+**ORIGIN FOUND 2026-08-27, while archiving the branch it came from.** The pin
+first advanced `95fdd1c` → `ff4732e` on `stale/experimental-taproot-depth-ge2`,
+in commit `24e3a029`. That commit changed `Cargo.toml`, `Cargo.lock`,
+`EXPERIMENTAL.md` and the two fuzz manifests — **and not `vendor/`. Zero commits
+on that branch touch `vendor/` at all.** Master later adopted the same bump the
+same way.
+
+So nobody skipped a step they knew about: **re-vendoring was never part of how a
+pin gets advanced here**, and the gate that should have said so compares
+`cargo metadata` resolution rather than vendored content. The branch is archived
+as `archive/experimental-taproot-depth-ge2` and its tag carries this history.
+
+**That makes the content-aware gate the actual fix, not the re-vendor.** The
+re-vendor corrects one instance; the gate is what stops the next pin bump from
+doing it again, and pins get bumped routinely.
+
+
 ### F-355 — the tag-time and scheduled reproducible builds are ALREADY broken, pre-P3, on the miniscript rev (repo: **mnemonic-toolkit**; owning phase: **the same one that resolves F-354**) `#repro` `#ci` `#miniscript`
 
 **Found 2026-08-27 by P3's mnemonic branch. Reported, not fixed** — P3 is not
