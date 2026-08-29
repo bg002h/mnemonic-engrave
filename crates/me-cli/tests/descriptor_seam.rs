@@ -42,7 +42,7 @@ use sha2::Digest as _;
 /// header, and `scripts/descriptor-seam-vectors/README.md` for the regenerate
 /// + re-pin recipe.
 const SEAM_VECTORS_SHA256: &str =
-    "0393592f234b0a5264eb7f49553ab3b3911085cd2d1cd8052690018c7fe80584";
+    "542cd492e35149b62c53f940fb755576e0ffd4d086b0e3fcda615fbc43f51974";
 
 const PATH: &str = "testdata/descriptor_seam_vectors.json";
 
