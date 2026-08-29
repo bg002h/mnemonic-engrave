@@ -961,3 +961,54 @@ fn the_encoder_produces_every_canonical_the_file_carries() {
     }
     assert_eq!(checked, POP.canonical, "canonical assertions run");
 }
+
+/// **The two derivations agree wherever both can derive.**
+///
+/// Two implementations of one answer is the F-212 divergence class, and §5.4's
+/// `address 0:` line now has two: `md_codec`'s whole-descriptor
+/// `derive_address` (the twin) and `descriptor::derive`'s per-key walk. The
+/// second exists only because the first cannot express a wallet whose keys want
+/// different receive indices (IMPL-S1S3-adversarial-review I1).
+///
+/// This is what stops them drifting: over every row the cascade parses, where
+/// BOTH can answer, the answers must be equal. Twenty of these rows carry a
+/// device-measured `address_0`, so agreement here is agreement with the device.
+#[test]
+fn the_two_derivations_agree_wherever_both_can_derive() {
+    let d = doc();
+    let (mut agreed, mut against_file) = (0usize, 0usize);
+    for r in rows(&d) {
+        let input = r["input"].as_str().unwrap();
+        let Ok(parsed) = mnemonic_engrave::descriptor::cascade::cascade(
+            &mnemonic_engrave::descriptor::cascade::normalise(input),
+        ) else {
+            continue;
+        };
+        let per_key = mnemonic_engrave::descriptor::derive::address_0(&parsed);
+        let twin = mnemonic_engrave::descriptor::md1::derivation_twin(&parsed)
+            .ok()
+            .and_then(|(b, i)| {
+                let net = mnemonic_engrave::descriptor::md1::network(&parsed);
+                mnemonic_engrave::descriptor::md1::address(&b, 0, i?, net).ok()
+            });
+        if let (Some(a), Some(b)) = (&per_key, &twin) {
+            assert_eq!(a, b, "{}: the two derivations disagree", name(r));
+            agreed += 1;
+        }
+        // And where the FILE carries a device-measured address, the per-key
+        // walk must land on it — the assertion that makes agreement mean
+        // "agrees with the device" rather than "agrees with itself".
+        if let (Some(a), Some(want)) = (&per_key, r.get("address_0").and_then(|v| v.as_str())) {
+            assert_eq!(a, want, "{}: per-key address_0 vs the device", name(r));
+            against_file += 1;
+        }
+    }
+    assert!(
+        agreed >= 25,
+        "only {agreed} rows exercised the differential — the loop has gone vacuous"
+    );
+    assert_eq!(
+        against_file, POP.address_0,
+        "every device-measured address_0 is reached by the per-key walk"
+    );
+}

@@ -47,6 +47,7 @@ pub mod as_flag;
 pub mod base58;
 pub mod cascade;
 pub mod checksum;
+pub mod derive;
 pub mod gate;
 pub mod identify;
 pub mod md1;

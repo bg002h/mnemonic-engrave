@@ -27,6 +27,7 @@
 
 use super::admit::{self, Path};
 use super::cascade::{Multi, Parsed, Script};
+use super::derive;
 use super::gate;
 use super::md1;
 
@@ -65,7 +66,13 @@ pub fn block(d: &Parsed, form: Option<Form>) -> String {
             ),
         }
         // 5: `address 0:` and the compare prompt — the executable check.
-        match address_0(d) {
+        //
+        // Derived KEY BY KEY (`super::derive`), which is what the device does.
+        // The whole-descriptor route this used to take could not express a
+        // wallet whose keys want different receive indices and printed a
+        // sentence claiming the address did not exist; it does, and the device
+        // derives it (IMPL-S1S3-adversarial-review I1).
+        match derive::address_0(d) {
             Some(a) => {
                 out.push(format!("address 0: {a}"));
                 out.push(
@@ -74,15 +81,15 @@ pub fn block(d: &Parsed, form: Option<Form>) -> String {
                         .to_string(),
                 );
             }
-            // Reachable only for a descriptor mixing a wildcard-less multipath
-            // at a non-zero start with a key of another shape: no single
-            // receive index serves every key, and a wrong address above a
-            // "compare this" prompt is the one failure this line exists to
-            // prevent.
+            // Unreachable in the FULL tier, and that is ASSERTED rather than
+            // argued: `every_full_tier_wallet_has_an_address_0` runs the walk
+            // over every parsed vector row whose conjuncts 2–8 hold. Kept
+            // because a panic on an operator path is never the right answer,
+            // and worded to claim nothing about the WALLET — the previous text
+            // made three claims about it and all three were false.
             None => out.push(
-                "address 0: not derived -- this wallet's keys take their first receive \
-                 address at different depths, so there is no single first address to \
-                 compare. Check the descriptor line against your wallet software instead."
+                "address 0: this build could not derive one. Check the descriptor line \
+                 above against your wallet software instead."
                     .to_string(),
             ),
         }
@@ -176,13 +183,6 @@ fn slot_map(b: &md1::Built) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-/// Receive address 0, through the DERIVATION TWIN — see [`md1::derivation_twin`]
-/// for why an (a)/(a″) wallet can be derived from without ever being encoded.
-fn address_0(d: &Parsed) -> Option<String> {
-    let (built, index) = md1::derivation_twin(d).ok()?;
-    md1::address(&built, 0, index?, md1::network(d)).ok()
 }
 
 /// The window refusal's TWO variants (§5.1), decided by md1-representability —

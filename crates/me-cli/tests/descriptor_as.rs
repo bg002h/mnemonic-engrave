@@ -628,3 +628,121 @@ fn as_descriptor_on_a_sound_multi_still_gets_conjunct_1s_permanent_refusal() {
         stderr(&packed)
     );
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// I1 — `address 0:` for a wallet whose keys want different receive indices
+// ───────────────────────────────────────────────────────────────────────────
+
+const IK1: &str = "[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan";
+const IK2: &str = "[f245ae38/48h/0h/0h/2h]xpub6DnT4E1fT8VxuAZW29avMjr5i99aYTHBp9d7fiLnpL5t4JEprQqPMbTw7k7rh5tZZ2F5g8PJpssqrZoebzBChaiJrmEvWwUTEMAbHsY39Ge";
+
+/// **I1.** The block used to decline to derive here, and to blame the keys'
+/// use-site depths for it. Every clause of that explanation was false — the
+/// address exists and the device derives it, the keys blamed were not at
+/// differing depths at all, and a pair that genuinely does differ in depth
+/// never reached the branch. The verbatim text is in
+/// `design/agent-reports/IMPL-S1S3-adversarial-review.md` (I1); it is
+/// deliberately NOT reproduced here, so that grepping the tree for it finds the
+/// record and not a live string.
+///
+/// The four addresses below were derived through the fork's own
+/// `address.Receive` (`scripts/descriptor-seam-vectors/goprobe` against
+/// `/scratch/code/shibboleth/_work/seam-fork` @ `1f09537`, Go 1.26.3) — the
+/// DEVICE, not this build and not `md_codec`. Two of them are the adversarial
+/// review's own constructions, re-derived here rather than transcribed.
+#[test]
+fn address_0_is_derived_for_keys_that_want_different_receive_indices() {
+    let cases = [
+        (
+            "the review's construction: <2;3> mixed with <0;1>/*",
+            format!("wsh(sortedmulti(2,{IK1}/<2;3>,{IK2}/<0;1>/*))"),
+            "bc1qv70wqy0t9vp4ftlku3yz845x53yqkgm5xlus47m3zq8xzzy503hscqluvy",
+        ),
+        (
+            "the review's second shape: <2;3> mixed with <0;1>, both wildcard-less",
+            format!("wsh(sortedmulti(2,{IK1}/<2;3>,{IK2}/<0;1>))"),
+            "bc1qlccgxwlhr0rp7xfedcau022p50ulf9r3e33anqqdrevvdrdeqj9s8leyuw",
+        ),
+        (
+            "uniform <2;3> — the twin already handled this, and must not regress",
+            format!("wsh(sortedmulti(2,{IK1}/<2;3>,{IK2}/<2;3>))"),
+            "bc1qxwcmdqhtvjp6uu6asj0vgz9yvylhwy3ky2y9r3r9lz68rgkwalgqq9dyds",
+        ),
+        (
+            "the genuinely different-DEPTH pair, which never reached the branch",
+            format!("wsh(sortedmulti(2,{IK1}/*,{IK2}/<0;1>/*))"),
+            "bc1qghwumhcahkfca7qktym7f3htf5wqakz2tyvxraf3fk5k8w0yrzwsg0m3sd",
+        ),
+    ];
+    let mut checked = 0;
+    for (what, document, want) in &cases {
+        let (out, _d) = pack_in(document, &["--as", "md1"]);
+        let err = stderr(&out);
+        assert!(
+            err.contains(&format!("address 0: {want}")),
+            "{what}: the block did not print the device's address 0.\nWANT: {want}\nGOT:  {err}"
+        );
+        assert!(
+            !err.contains("not derived"),
+            "{what}: the block still declines to derive:\n{err}"
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 4, "all four constructions are exercised");
+}
+
+/// The compare prompt is what `address 0:` exists FOR (walk W10/W13), so it has
+/// to survive with it — including on the refusal paths, which is where the walk
+/// ruled the verification worth the most.
+#[test]
+fn the_compare_prompt_survives_on_a_refusal_path() {
+    let document = format!("wsh(sortedmulti(2,{IK1}/<2;3>,{IK2}/<0;1>/*))");
+    for flags in [vec!["--as", "md1"], vec!["--as", "descriptor"]] {
+        let (out, _d) = pack_in(&document, &flags);
+        let err = stderr(&out);
+        assert_eq!(code(&out), 3, "this wallet is md1-unrepresentable\n{err}");
+        assert!(
+            err.contains(
+                "compare against your wallet software's first receive address before engraving."
+            ),
+            "{flags:?}: the compare prompt is missing:\n{err}"
+        );
+    }
+}
+
+/// **The FULL tier always yields an address.** §5.4's `wallet-id: none` line
+/// tells the operator to *"identify it … by address 0"*, so a FULL-tier block
+/// that cannot print one is a dead end. Asserted over every vector row rather
+/// than argued: if the per-key walk ever returns `None` in FULL tier, this reds.
+#[test]
+fn every_full_tier_wallet_has_an_address_0() {
+    let raw = std::fs::read(VECTORS).unwrap();
+    let doc: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+    let mut full = 0usize;
+    for r in doc["vectors"].as_array().unwrap() {
+        let input = r["input"].as_str().unwrap();
+        let Ok(parsed) = mnemonic_engrave::descriptor::cascade::cascade(
+            &mnemonic_engrave::descriptor::cascade::normalise(input),
+        ) else {
+            continue;
+        };
+        if mnemonic_engrave::descriptor::admit::admit(
+            &parsed,
+            mnemonic_engrave::descriptor::Path::Md1,
+        )
+        .is_err()
+        {
+            continue; // PARTIAL tier: no `address 0:` line at all.
+        }
+        assert!(
+            mnemonic_engrave::descriptor::derive::address_0(&parsed).is_some(),
+            "{}: FULL tier with no derivable address 0",
+            r["name"].as_str().unwrap()
+        );
+        full += 1;
+    }
+    assert!(
+        full >= 20,
+        "only {full} FULL-tier rows — the loop has gone vacuous"
+    );
+}
