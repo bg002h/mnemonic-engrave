@@ -112,10 +112,27 @@ and the fold ALSO closed an unnamed device-wider break (JSON
 \u0079-escaped ypub). r2's M1 (S5.2's arm composition gains the S4.6
 step) folded by controller on the engrave branch (`347b82e`); M2
 (interior-CRLF narrowing) disclosed+pinned, non-gating; the two Nits
-recorded in the report. **P4.2 IMPLEMENTER IN FLIGHT** (fork branch @
-0f92554: dense within-card bundlePlatePlan per the N=3 measurement,
-trial-fit seam, new arithmetic pinned, S5.5 plate-cell amendment on
-the engrave branch; report will land at IMPL-S2-P4.md). Then P5; (2) P4.1 measurement DONE:
+recorded in the report. **P4.2 DONE** (fork be79e3b+231b7c2,
+engrave b32305c spec + a128a88 report): plan-time trial-fit seam
+(forced by the census/restore readers), capacity 5x85-char strings per
+plate, 2->1 / 9->4 / W14->1; TWO false-PASS classes toPlate missed
+found+handled (footer budget via Text.FooterRow; QR paragraph overlay
+-> packed plates TEXT ONLY); five mutations load-bearing; gui shard
+1013/1013, TinyGo +2224B. **P5.1 DONE** (engrave 9e4ba47): FOLLOWUPS
+-- F-418 built-pending-handover, F-423 resolved-pending-physical,
+F-426 SPLIT (device done, host open, version-gap row = live witness),
+F-428 resolved (rev-qualified cite, never re-base), F-430 resolved by
+lint-gate.sh; NEW F-431 (inert cells) F-432 (goprobe re-point at
+merge) F-433 (packed=TEXT ONLY, operator ruling) F-434 (QR overlay
+trap) F-435 (FooterRow cleanup) F-436 (single-line JSON rows next
+regeneration); CHANGELOG S2 entry + S1+S3 clause updates. **P5.2 IN
+FLIGHT: the mandatory whole-diff execution review** (opus, both full
+branch diffs; round-trip hammering, cross-phase seams, journey re-runs
+W14/matrix/item-1, records audit, full suites; report
+REVIEW-S2-P5-whole-r1.md). GREEN unlocks P5.3 (engrave merge + push
+via scripts/push-via-staging.sh; fork main plain push) -- then P5.4
+operator handover (flash, S11 item 6 screen, F-423 physical plate,
+the one S9-item-2 cell on hardware); (2) P4.1 measurement DONE:
 **N = 3** md1 strings fit one plate side at the shipped 3.8mm font
 (analytic 34 chars x 20 lines = 680-char capacity; trial via
 backup.EngraveText paragraphs, 1mm gaps, no FontSize override; trial
