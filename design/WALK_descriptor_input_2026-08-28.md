@@ -478,3 +478,41 @@ hand-stamped backup format offers.
 **Journey 2 closes:** verified by address against the phone (W13's block),
 key line archived for the QR build, one md1 plate cut now, one hand-stamped
 copy at the friend's home. Watch-only throughout; the seed never appeared.
+
+
+---
+
+## W15 — the wallet OWNER asks "you won't spend my bitcoin, now that you've
+## seen my wallet?" — the tool never arms the operator with the answer
+
+**The moment.** The friend — the person whose wallet every artifact of this
+journey exists for — asked the operator: *"you won't spend my bitcoin, now
+that you've seen my wallet, will you?"* He is the one participant no
+surface of the pipeline ever addressed.
+
+**The finding.** `md` prints "watch-only — public keys only, cannot spend"
+as a tool note; `me`'s sealing line talks encryption; the plate says
+nothing. Nobody hands the OPERATOR an owner-quotable sentence at the moment
+they pack a third party's wallet — and the watch-only concept has two
+halves that both matter to the owner: cannot-spend (reassurance) and
+can-watch-forever (the real sharing consideration for a bequest card).
+
+**Classification: SPEC change (walk fold).** The identification block
+(W10/W13) gains one line, both halves, owner-quotable:
+
+    watch-only: public keys only — this artifact can SHOW the wallet's
+    addresses and balances; it cannot spend. Whoever holds it can watch
+    the wallet — share it accordingly.
+
+---
+
+# The walk closes: two journeys, fifteen findings
+
+Journeys walked: the BlueWallet 2-of-3 (J1, W1–W11 with W12 arising in
+J2's approach) and the bare-zpub bequest (J2, W12–W15). The last beats
+repeatedly landed on surfaces already found (window, identification,
+modality) — the walk ran out of new questions, which is the stop signal.
+Spec folds queued: W1+W14 (modality), W4+W11 (window), W5 (rule + sweep),
+W6, W8+W9 (a′ note), W10+W13+W15 (identification block + §7 wallet_id),
+F-419's row. Filed: F-420, F-421, F-422 (status quo, interim ruling).
+The fold lands as one gated batch with a proportional re-review.
