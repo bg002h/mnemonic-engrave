@@ -229,7 +229,11 @@ record displayed on the real device) and every flash remain operator-gated**
   flips; r4 I2 corrected r3's `:462` cite — the NORMATIVE sentence AT
   `:462` is about `me`, whose admission is unchanged, so that clause is
   CORRECT and untouched, the same shape as §5.2's predicate sentence);
-  §4.5's promotion-table prose
+  §5.2's operator-message quote at
+  `design/SPEC_descriptor_input.md:101` ("Descriptors and addresses are
+  not yet classifiable here" — the message P1.1's arm retired; found by
+  the P1 implementer, IMPL-S2-P1; owned by P2.7, sweep term "not yet
+  classifiable"); §4.5's promotion-table prose
   (`design/SPEC_descriptor_input.md:570-574` — "`ypub` … has no case in
   the switch", false of the device after P3.4, and the very paragraph
   P3.1 sends the porter to — its amendment must land so a §4.5 port and
