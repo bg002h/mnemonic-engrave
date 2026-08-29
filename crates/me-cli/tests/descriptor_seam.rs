@@ -785,3 +785,37 @@ fn the_md1_route_computes_every_carried_wallet_id() {
 fn the_md1_route_read_back_contains_every_pin() {
     unimplemented!("P2.2: `md descriptor`-equivalent read-back of the encoded set");
 }
+/// **The `canonical` column, on the side that PRODUCES it.**
+///
+/// §7 requirement 4 states the invariant over `canonical` and gives its
+/// assertion to the fork: the Go test parses each `canonical` and requires the
+/// re-encoding to equal it, a fixed point. What no test asserted is that `me`'s
+/// own encoder produces those 19 strings in the first place — and `me` is what
+/// packs them (§5.2), so a host encoder that drifted from the file would pack a
+/// record the Go half is still happily calling a fixed point.
+///
+/// Every value in the column was measured by P0 through the DEVICE route. This
+/// asserts the Rust route lands on the same 19 strings, checksum included.
+#[test]
+fn the_encoder_produces_every_canonical_the_file_carries() {
+    let d = doc();
+    let mut checked = 0;
+    for r in rows(&d) {
+        let Some(want) = r.get("canonical").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let input = r["input"].as_str().unwrap();
+        let parsed = mnemonic_engrave::descriptor::cascade::cascade(
+            &mnemonic_engrave::descriptor::cascade::normalise(input),
+        )
+        .unwrap_or_else(|e| {
+            panic!(
+                "{}: the cascade refused a host-admitted row: {e:?}",
+                name(r)
+            )
+        });
+        assert_eq!(parsed.encode(), want, "{}: canonical", name(r));
+        checked += 1;
+    }
+    assert_eq!(checked, POP.canonical, "canonical assertions run");
+}
