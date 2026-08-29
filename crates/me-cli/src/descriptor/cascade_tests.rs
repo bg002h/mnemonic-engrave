@@ -334,3 +334,50 @@ fn the_canonical_normalises_a_slip132_version_to_xpub() {
     let e = ok(ZPUB).encode();
     assert!(e.starts_with("wpkh(xpub"), "{e}");
 }
+
+// ── §6h: the remedy must be EXECUTABLE ─────────────────────────────────────
+
+/// **Every descriptor `me` tells the operator to supply is one `me` admits.**
+///
+/// `SPEC_constellation_cli_uniformity` §6h: where a row says "supply the
+/// descriptor", it prints the descriptor with the operator's own key and origin
+/// substituted in, not a placeholder. The constellation's own record of this
+/// rule is a remedy that named a pipeline which exited 4 when run — so this
+/// runs the generator's output back through the cascade instead of reading it.
+///
+/// A remedy carrying `<…>` is EXEMPT and the exemption is narrow: a multisig
+/// cosigner key has no single-key wallet, and the other cosigners are
+/// information the operator holds and `me` does not. §6's own text for those
+/// rows says so.
+#[test]
+fn every_promotion_remedy_me_prints_is_an_input_me_admits() {
+    const ZPUB: &str = "zpub6qpFgGWoG7bKmDDMvmwHBvg6inZAb2KF2Vg8h4fKJ2ickSZ71PsMmRg1FyRWAS6PqPCSzd5CB6PHixx64k6q5svZNZd9bEoCWJuMSkSRzJx";
+    let inputs = [
+        format!("[4bbaa801/86'/0'/0']{XPUB}"),
+        format!("[4bbaa801/84'/0'/1']{ZPUB}"),
+        format!("[4bbaa801/48'/0'/0'/2']{XPUB}"),
+        format!("[4bbaa801/84/0/0]{ZPUB}"),
+    ];
+    let mut executable = 0;
+    for input in &inputs {
+        let errs = cascade(&normalise(input)).expect_err(input);
+        let k = match errs.promotion.as_ref().expect(input) {
+            PromotionError::PathNotInferable(k) | PromotionError::AccountNotZero(k) => k.clone(),
+            other => panic!("{input}: {other:?}"),
+        };
+        let remedy = crate::descriptor::refusal::suggested_descriptor_for(&k.origin, &k);
+        if remedy.contains('<') && remedy.contains("cosigner") {
+            continue;
+        }
+        assert!(
+            crate::descriptor::host_admits(&remedy),
+            "the remedy is not an input `me` admits: {remedy}"
+        );
+        executable += 1;
+    }
+    // Without this the loop passes by skipping everything.
+    assert_eq!(
+        executable, 3,
+        "remedies actually run back through the cascade"
+    );
+}

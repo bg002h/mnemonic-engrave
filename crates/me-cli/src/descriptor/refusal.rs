@@ -210,9 +210,28 @@ pub fn origin_prefix(k: &Key) -> String {
     )
 }
 
+/// The key expression as the operator wrote it, with only the base58 payload
+/// elided: `[4bbaa801/86h/0h/0h]xpub6C9j4wAxxkW…coGnx`.
+///
+/// The origin block is kept VERBATIM and the use-site tail is dropped, because
+/// every §6 row that names a key names the offending path separately in the
+/// same sentence. Built from `as_supplied` rather than from the parsed fields
+/// so the operator sees their own spelling — a first draft prepended
+/// [`origin_prefix`] to the whole of `as_supplied` and printed the origin
+/// twice, caught by reading the emitted text rather than by any assertion.
+pub fn key_display(k: &Key) -> String {
+    let s = k.as_supplied.as_str();
+    let (origin, rest) = match s.strip_prefix('[').and_then(|r| r.split_once(']')) {
+        Some((o, rest)) => (format!("[{o}]"), rest),
+        None => (String::new(), s),
+    };
+    let key = rest.split('/').next().unwrap_or(rest);
+    format!("{origin}{}", short_key(key))
+}
+
 /// How a refusal names a key slot: `@N` plus enough of the key to recognise it.
 fn key_name(i: usize, k: &Key) -> String {
-    format!("@{i} ({}{})", origin_prefix(k), short_key(&k.as_supplied))
+    format!("@{i} ({})", key_display(k))
 }
 
 fn children_string(children: &[Derivation]) -> String {
@@ -396,7 +415,7 @@ pub fn unsupported_key_version(v: KeyVersion, converted: &str, origin: Option<&s
             None => format!("sh(wpkh({converted}/<0;1>/*))"),
         },
         KeyVersion::Vpub => match origin {
-            Some(o) => format!("wpkh({o}{converted}/<0;1>/*))"),
+            Some(o) => format!("wpkh({o}{converted}/<0;1>/*)"),
             None => format!("wpkh({converted}/<0;1>/*)"),
         },
         // `Upub`/`Vpub` are testnet MULTISIG accounts: no single-key remedy
@@ -431,7 +450,7 @@ pub fn unsupported_key_version(v: KeyVersion, converted: &str, origin: Option<&s
 
 /// §6 row 24. The path is quoted back and the three that qualify are listed,
 /// then the descriptor is printed with the operator's own key substituted in.
-pub fn promotion_path_not_inferable(supplied: &str, path: &[u32], suggested: &str) -> Refusal {
+pub fn promotion_path_not_inferable(k: &Key, suggested: &str) -> Refusal {
     Refusal::new(
         Row::PromotionPathNotInferable,
         format!(
@@ -439,21 +458,21 @@ pub fn promotion_path_not_inferable(supplied: &str, path: &[u32], suggested: &st
              only when its origin is `m/44h/0h/0h` (-> `pkh`), `m/84h/0h/0h` \
              (-> `wpkh`) or `m/49h/0h/0h` (-> `sh(wpkh)`). This one is `{}`, which is \
              not inferable. Supply the descriptor instead: {suggested}",
-            short_key(supplied),
-            super::cascade::path_string(path)
+            key_display(k),
+            super::cascade::path_string(&k.origin)
         ),
     )
 }
 
 /// §6 row 25 — §4.5's measured live near-miss.
-pub fn promotion_account_not_zero(supplied: &str, path: &[u32], suggested: &str) -> Refusal {
+pub fn promotion_account_not_zero(k: &Key, suggested: &str) -> Refusal {
     Refusal::new(
         Row::PromotionAccountNotZero,
         format!(
             "`{}` is a single extended key, and this one is `{}`. Only account 0 is \
              inferable. Supply the descriptor: {suggested}",
-            short_key(supplied),
-            super::cascade::path_string(path)
+            key_display(k),
+            super::cascade::path_string(&k.origin)
         ),
     )
 }
@@ -474,9 +493,8 @@ pub fn promotion_fingerprint_no_path(supplied: &str) -> Refusal {
         format!(
             "`[{fp}]{}` gives a fingerprint with no derivation path, so there is \
              nothing to match a script against. Either give the full origin -- \
-             `[{fp}/84h/0h/0h]{}` -- or drop the brackets entirely, in which case the \
-             key's version byte decides.",
-            short_key(&key),
+             `[{fp}/84h/0h/0h]{key}` -- or drop the brackets entirely, in which case \
+             the key's version byte decides.",
             short_key(&key)
         ),
     )
@@ -779,7 +797,21 @@ pub fn suggested_descriptor_for(path: &[u32], k: &Key) -> String {
         }
         _ => Script::P2PKH,
     };
-    let key = format!("{}{}/<0;1>/*", origin_prefix(k), short_key(&k.as_supplied));
+    // §6h: the remedy must be EXECUTABLE. It carries the operator's own key IN
+    // FULL — [`key_display`]'s elision is for text that NAMES a key, never for
+    // text they are told to run, and an elided key in a "supply the descriptor"
+    // line is a placeholder wearing their fingerprint.
+    let key = format!(
+        "{}{}/<0;1>/*",
+        origin_prefix(k),
+        k.as_supplied
+            .rsplit(']')
+            .next()
+            .unwrap_or(&k.as_supplied)
+            .split('/')
+            .next()
+            .unwrap_or_default()
+    );
     match script {
         Script::P2PKH => format!("pkh({key})"),
         Script::P2WPKH => format!("wpkh({key})"),

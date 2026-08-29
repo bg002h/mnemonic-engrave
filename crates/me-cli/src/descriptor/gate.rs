@@ -400,15 +400,12 @@ fn promotion_row(document: &str, e: &PromotionError) -> Refusal {
         }) => refusal::unsupported_key_version(*version, converted, origin.as_deref()),
         E::Key(other) => refusal::unparseable(Some((Branch::PromotedKey, describe_key(other)))),
         E::PathNotInferable(k) => refusal::promotion_path_not_inferable(
-            &k.as_supplied,
-            &k.origin,
+            k,
             &refusal::suggested_descriptor_for(&k.origin, k),
         ),
-        E::AccountNotZero(k) => refusal::promotion_account_not_zero(
-            &k.as_supplied,
-            &k.origin,
-            &refusal::suggested_descriptor_for(&k.origin, k),
-        ),
+        E::AccountNotZero(k) => {
+            refusal::promotion_account_not_zero(k, &refusal::suggested_descriptor_for(&k.origin, k))
+        }
         E::MultisigCosignerKey(v) => refusal::promotion_multisig_cosigner_key(*v),
         E::TestnetKey => refusal::promotion_testnet_key(),
     }
@@ -528,7 +525,7 @@ pub fn choice_block() -> String {
         "      --as descriptor (not available in this build)"
     };
     let md1_head = if MD1_PATH_SHIPPED {
-        "      --as md1         "
+        "      --as md1          "
     } else {
         "      --as md1 (not available in this build)"
     };
