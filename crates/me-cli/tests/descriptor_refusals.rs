@@ -199,6 +199,100 @@ fn row_as_omitted() {
     );
 }
 
+/// **§5.1's NORMATIVE block, VERBATIM — the whole thing, not its first line.**
+///
+/// `row_as_omitted` above pins the verdict sentence, which is what §6 requires
+/// of it; nothing pinned the sixteen lines under it, and that is how the head
+/// spent S1 and S3 rendered on its own line while §5.1's block puts the
+/// description INLINE on a padded head (IMPL-P1 review's M2, fixed in S2). A
+/// `contains` on one sentence cannot see a column, so this asserts the block
+/// as a whole and by equality.
+///
+/// The `me: ` prefix is the caller's, so the block itself starts at the verdict
+/// and every continuation line is indented to the description column.
+#[test]
+fn the_choice_block_is_section_5_1s_normative_text_verbatim() {
+    const BLOCK: &str = "\
+this input is a wallet descriptor, and `--as` decides how it is packed.
+      --as descriptor   the SCANNABLE plate. The device engraves the wallet
+                        as a QR that any phone or wallet app can read -- no
+                        special tooling to restore, ever. Packed in CANONICAL
+                        form (SLIP-132 versions become xpub, ' becomes h,
+                        checksum recomputed). The engraver itself cannot
+                        read the QR back (it has no camera).
+      --as md1          the HAND-COPYABLE plate. me converts the descriptor
+                        and packs error-corrected md1 text cards in ONE step
+                        (no md invocation needed). Restored by transcription;
+                        each string survives up to 4 MIS-STRUCK characters
+                        (substitutions -- a missing or extra strike is not
+                        correctable), so it can even be hand-stamped. Carries
+                        policies --as descriptor cannot. Restoring needs an
+                        md1 decoder (an open spec; the tooling today is this
+                        project's).
+    They are not interchangeable -- `me sysw pack --help` has the comparison.";
+
+    // The library's own rendering, and the one an operator actually sees.
+    assert_eq!(
+        mnemonic_engrave::descriptor::choice_block(),
+        BLOCK,
+        "§5.1's block changed"
+    );
+    let out = run(
+        &vector_input("formats-happy/bip380-sortedmulti-multipath"),
+        &[],
+    );
+    let err = String::from_utf8_lossy(&out.stderr).to_string();
+    assert_eq!(out.status.code().unwrap(), 2, "stderr:\n{err}");
+    assert!(
+        err.contains(&format!("me: {BLOCK}\n")),
+        "the binary does not print §5.1's block verbatim:\n{err}"
+    );
+
+    // Both descriptions start in ONE column, and it is the column §5.1 draws.
+    // Stated as an independent property rather than trusted to the literal
+    // above: a transcription error in the literal would otherwise be pinned as
+    // if it were the spec.
+    let mut heads = 0;
+    for l in BLOCK.lines().skip(1) {
+        if l.starts_with("    They are not") {
+            continue;
+        }
+        match l.strip_prefix("      --as ") {
+            // An entry head: `--as <value>` padded so the description starts in
+            // the description column, and unmarked, because this build carries
+            // both values.
+            Some(rest) => {
+                let value = rest.split_whitespace().next().unwrap();
+                assert_eq!(
+                    l.len() - l.trim_start().len(),
+                    6,
+                    "an entry head is indented six: {l:?}"
+                );
+                // Where the DESCRIPTION starts: the head's own length, which
+                // is the padding's whole job.
+                let after = &rest[value.len()..];
+                assert_eq!(
+                    l.len() - after.trim_start().len(),
+                    24,
+                    "`--as {value}`'s description does not start in column 24: {l:?}"
+                );
+                assert!(
+                    !l.contains("not available in this build"),
+                    "a value this build carries is build-marked: {l:?}"
+                );
+                heads += 1;
+            }
+            // A continuation line, in the same column.
+            None => assert_eq!(
+                l.len() - l.trim_start().len(),
+                24,
+                "a continuation line is out of column: {l:?}"
+            ),
+        }
+    }
+    assert_eq!(heads, 2, "§5.1's block offers exactly two values");
+}
+
 #[test]
 fn row_json_inner_malformed() {
     assert_row(

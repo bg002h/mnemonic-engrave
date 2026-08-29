@@ -559,28 +559,48 @@ fn describe_key(e: &KeyError) -> String {
 // §5.1's choice block
 // ───────────────────────────────────────────────────────────────────────────
 
+/// The column §5.1's NORMATIVE block starts each description in: six spaces of
+/// indent, `--as <value>`, then padding out to here.
+const DESCRIPTION_COL: usize = 24;
+
+/// One entry's head, laid out as §5.1's NORMATIVE block lays it out.
+///
+/// **A carried value's description sits INLINE on a padded head** — that is the
+/// block as §5.1 prints it, and rendering the head on its own line instead left
+/// a ragged stub above every description (IMPL-P1 review's M2). A BUILD-MARKED
+/// value cannot fit the column: its marking takes the head's whole line and the
+/// description starts on the padded continuation line below it.
+///
+/// Both arms are laid out here rather than at two call sites so neither can
+/// drift, and `the_choice_block_lays_both_arms_out_in_section_5_1s_columns`
+/// exercises the marked arm, which no build state reaches any more.
+fn head(flag: &str, shipped: bool) -> String {
+    let lead = format!("      --as {flag}");
+    if shipped {
+        format!("{lead:w$}", w = DESCRIPTION_COL)
+    } else {
+        format!(
+            "{lead} (not available in this build)\n{:w$}",
+            "",
+            w = DESCRIPTION_COL
+        )
+    }
+}
+
 /// §5.1's `--as`-omitted text, at `EXIT_USAGE`. **It states the CHOICE**,
 /// because an operator holding a wallet export does not know which they want.
 ///
 /// A value the BUILD does not carry is marked inline, so the block never offers
-/// a build-dead flag unmarked. A value this particular INPUT does not carry is
-/// deliberately left unmarked: the operator who picks it gets that path's own
-/// refusal, which names the working flag.
+/// a build-dead flag unmarked — since S2 both values ship, so nothing is marked.
+/// A value this particular INPUT does not carry is deliberately left unmarked:
+/// the operator who picks it gets that path's own refusal, which names the
+/// working flag.
 pub fn choice_block() -> String {
-    let descriptor_head = if DESCRIPTOR_PATH_SHIPPED {
-        "      --as descriptor"
-    } else {
-        "      --as descriptor (not available in this build)"
-    };
-    let md1_head = if MD1_PATH_SHIPPED {
-        "      --as md1          "
-    } else {
-        "      --as md1 (not available in this build)"
-    };
+    let descriptor_head = head("descriptor", DESCRIPTOR_PATH_SHIPPED);
+    let md1_head = head("md1", MD1_PATH_SHIPPED);
     format!(
         "this input is a wallet descriptor, and `--as` decides how it is packed.\n\
-{descriptor_head}\n\
-\x20                       the SCANNABLE plate. The device engraves the wallet\n\
+{descriptor_head}the SCANNABLE plate. The device engraves the wallet\n\
 \x20                       as a QR that any phone or wallet app can read -- no\n\
 \x20                       special tooling to restore, ever. Packed in CANONICAL\n\
 \x20                       form (SLIP-132 versions become xpub, ' becomes h,\n\
@@ -597,4 +617,31 @@ pub fn choice_block() -> String {
 \x20                       project's).\n\
 \x20   They are not interchangeable -- `me sysw pack --help` has the comparison."
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The BUILD-MARKED arm of §5.1's block, which no build state reaches now
+    /// that both paths ship — and which is exactly the layout that goes untested
+    /// and then rots. A marked value cannot fit the description column, so its
+    /// marking takes the head's whole line and the description starts on the
+    /// padded continuation line below.
+    #[test]
+    fn the_choice_block_lays_both_arms_out_in_section_5_1s_columns() {
+        assert_eq!(head("descriptor", true), "      --as descriptor   ");
+        assert_eq!(head("md1", true), "      --as md1          ");
+        assert_eq!(head("descriptor", true).len(), DESCRIPTION_COL);
+        assert_eq!(head("md1", true).len(), DESCRIPTION_COL);
+
+        let marked = head("descriptor", false);
+        let (first, rest) = marked.split_once('\n').expect("the marked head wraps");
+        assert_eq!(first, "      --as descriptor (not available in this build)");
+        assert_eq!(rest.len(), DESCRIPTION_COL);
+        assert!(
+            rest.chars().all(|c| c == ' '),
+            "the continuation is padding"
+        );
+    }
 }
