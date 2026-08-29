@@ -14688,6 +14688,12 @@ standing. Crate publishes are operator-gated — never overnight work.
 vector sha `542cd492…` in lockstep with the merged engrave copy). Unmerged,
 per the plan — the fork-main merge is the operator's decision.
 
+**RESOLVED (2026-08-29, operator's merge decision, same morning).** Fork
+`main` fast-forwarded `d402f18..a5e29b4`; the SHA carried green CI from its
+branch push (Test + both image builds), and the fork's `test.yml` runs on
+every push with its nothing-skips directive, so the seam gate is in fork CI
+from this commit on. Remote `seam/descriptor-vectors` deleted as merged.
+
 Filed from PLAN-r2's M7. P0.3 lands `nonstandard/descriptor_seam_test.go`
 and the vendored vector file on `seam/descriptor-vectors` (cut from `main`
 `d402f18`), pushed but deliberately NOT merged overnight — fork `main`
