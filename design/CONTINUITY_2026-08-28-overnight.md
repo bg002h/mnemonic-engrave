@@ -70,3 +70,12 @@ found six plan-side misses of the r2 fold (held for the r3 fold,
   dispatched (opus, round 8) — brief centres on derive.rs as new
   funds-path code, incl. constructing the unexercised 17–20-key push_int
   branch against an independent oracle.
+- **Re-review RED 0C/1I/1M/3N** (`171ec42`): code clean — derive.rs held
+  against an independent oracle + device on 91 wallets — but C1's reorder
+  left three RECORD sites stating the old conjunct order (spec §7 clause
+  8, §5.4 parenthetical, one vector `source` annotation, fork-pinned).
+  Fold-1's sweep was scoped to crates/, which is why. Fold-2 dispatched to
+  the same implementer: records amendment, vector-file byte change batched
+  with the parked F-2 annotation (one sha bump, both repos in lockstep),
+  M-A quote escaping, whole-repo sweep this time. N-c (N1's FOLLOWUPS
+  entry) is controller-owned at P3. Opus rounds used: 8.
