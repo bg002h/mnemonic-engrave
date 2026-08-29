@@ -1192,10 +1192,13 @@ and key counts, the refused version bytes and shapes, and the UNMEASURED
 closed-set residue (deeper tails and the like — refused as unmeasured, not
 as underivable). The class is defined by the conjuncts, not by an
 inventory, and a "compare before engraving" prompt would be a wrong
-instruction on every member. (A `multi` input in the window is FULL-tier —
+instruction on every member. (A conjunct-8-PASSING `multi` input in the window is FULL-tier —
 derivable, spendable, md1-packable when its use-site paths are
 md1-representable — and stripping its identification would blind the
-operator at the decision their refusal asks. But that refusal, under
+operator at the decision their refusal asks; a conjunct-8-FAILING `multi`,
+the colliding-origin twin, is PARTIAL like every conjunct-8 failure — the
+compare prompt would pass byte-identically on the impossible wallet
+(PLAN-r4's NEW-I1, aligning this parenthetical with the rule above it). But that refusal, under
 explicit `--as descriptor`, is conjunct 1's PERMANENT shape refusal naming
 `--as md1` — in EVERY build: the window text's "come back for the QR plate"
 would be false forever for a shape the descriptor record can never carry

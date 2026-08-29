@@ -161,7 +161,7 @@ P2.2 → P2.3 → P2.1's window text → P2.4** — the window refusal's variant
 ## P3 — acceptance, records, ship
 
 - **P3.1** §11's S3-bound items discharged and named (items 2, 3, 4 — all
-  34 rows —, 5); items 1/6 recorded as S2-parked (F-418).
+  36 rows —, 5); items 1/6 recorded as S2-parked (F-418).
 - **P3.2** F-416's cross-ref sentence in `SPEC_systemwide_payloads.md` §5.6.
 - **P3.3** CHANGELOG; FOLLOWUPS reconciliation: F-419 → P1, F-421 → P2,
   F-413 → discharged at P1.0, F-424 → parked (next publish,
@@ -185,7 +185,7 @@ rulings, spec-as-written meanwhile.
 
 `crates/me-cli/src/sysw/mod.rs:205` · `crates/me-cli/src/main.rs:335` ·
 `crates/me-cli/tests/codex32_seam.rs:60` · `crates/me-cli/tests/sysw_cli.rs:1928` ·
-`descriptor-mnemonic` `src/encode.rs:118` and `src/encode.rs:120` (the two
+`descriptor-mnemonic` `crates/md-codec/src/encode.rs:118` and `:120` (the two
 validator calls the published crate lacks) · fork `nonstandard/parse.go:36` ·
 fork `md/walletpolicyid.go:138` · fork `md/encode_multisig.go:112`. Each
 verified this cycle; the per-phase staleness re-check now has citations to
