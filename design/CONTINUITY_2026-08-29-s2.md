@@ -135,8 +135,13 @@ fit-measure re-pointed at fork main and verified building (`6996583`);
 final gates on MERGED trees: engrave 579/579 + lint-gate PASS, fork
 non-gui 0 + shard 1013/1013 exhaustive. Pushes: engrave via
 scripts/push-via-staging.sh + fork main plain push (this session's
-tail). **P5.4 IS THE OPERATOR'S, explicitly not autonomous**: flash
-the S2 firmware (sh2-flash), S11 item 6 (a ClassDescriptor record
+tail). **P5.4 IN PROGRESS**: FLASHED
+2026-08-29 evening at the operator's direction ("Sh2 now in bootsel",
+twice -- device re-entered BOOTSEL after a first bus drop):
+seedhammerii-v0.0.0-bge456970.signed.uf2, sha256 86f5402d..., load +
+verify 100%, rebooted. Boot to be judged on MACHINE power (laptop-port
+dark screen + BOOTSEL is the PD contract, not a rejection). REMAINING,
+the operator's eyes: S11 item 6 (a ClassDescriptor record
 DISPLAYED -- S2 is shipped when this is, not before), F-423's
 single-char test plate then a real cut, the walletPolicy S9-item-2
 cell on hardware, and the F-433 ruling (packed plates are TEXT ONLY:
