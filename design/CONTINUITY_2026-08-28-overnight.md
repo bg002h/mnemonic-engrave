@@ -99,3 +99,13 @@ found six plan-side misses of the r2 fold (held for the r3 fold,
   RESOLVED, F-420 marked eligible-open, F-425 push noted, F-427/F-428/
   F-429 filed; CHANGELOG Unreleased entry names §11 items 2–5 discharged,
   1/6 S2-parked (F-418).
+- **SHIPPED.** Staleness 0-drift ×3 repos; first staging run FAILED on
+  CI's pinned 1.85.0 clippy (`format_collect` in md1.rs — local nightly
+  never fires it; fixed to the crate's fold/write! idiom, F-430 filed);
+  second run green: **master pushed at `f244442` with the check earned**,
+  full CI green. **Fork branch `seam/descriptor-vectors` pushed at
+  `a5e29b4`, UNMERGED** — the fork-main merge is the operator's decision
+  (F-425). Memory updated. Worktrees left in place: `_work/impl-s1s3`
+  (branch merged), `_work/seam-fork` (branch pushed). The local
+  `review/p0-prepublish` branch is benign 2026-08-27 debris (F-271
+  cycle, never pushed) — operator's call to delete.
