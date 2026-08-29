@@ -18,7 +18,23 @@ key-identity row, §7's gate its clause 8 — moving the manifest arithmetic
 **34→37 gate / 85→88 slots / 68→71 floor**, the numbers every downstream
 artifact must re-pin (the propagation check's first target); found by
 PLAN-r1's C1, corrected by PLAN-r2, **under verification by the plan R0
-rounds in flight** (past-tense only when a round closes on it). §9 item 7 records the walk's
+rounds in flight** (past-tense only when a round closes on it). **Post-GREEN
+amendment 2026-08-29:** §6 gained the `multi`-class device-clause rule — the
+transposition carve-out generalised from one row to six, after IMPL-P1's review
+(M1) measured five §6 rows printing a device claim that is FALSE for a `multi`
+input — and the key-identity row's cause clause was restated over ENTRIES
+rather than BlueWallet LINES (M5: the row cannot fire for a BlueWallet file,
+measured). Neither changes a refusal, a cause or an operator's next action;
+both change what a row SAYS about the device, and P2.4's verbatim assertions
+are written from the AMENDED text. **Post-GREEN amendment 2026-08-29 (b):**
+§7's clause 8 and §5.4's tier parenthetical stated a CONJUNCT ORDER — conjunct
+1's `--as`-dependent `multi` arm ahead of conjuncts 2–8 — that the IMPL-S1S3
+adversarial review measured as the cause of a Critical: it short-circuited the
+flag-independent conjuncts, so an anyone-can-spend `wsh(multi(0,…))` heard
+"This wallet can still be engraved" under `--as descriptor`. Both sites now
+state the shipped order (the flag-dependent arm runs LAST), which is what makes
+§6's key-identity row's *"both `--as` paths"* true. No refusal TEXT changes;
+the ordering rule does. §9 item 7 records the walk's
 one narrow residual.
 **No code may be written before the implementation plan passes its own
 gate** (project `CLAUDE.md` — this is risk-set work: it changes normative
@@ -1198,12 +1214,18 @@ md1-representable — and stripping its identification would blind the
 operator at the decision their refusal asks; a conjunct-8-FAILING `multi`,
 the colliding-origin twin, is PARTIAL like every conjunct-8 failure — the
 compare prompt would pass byte-identically on the impossible wallet
-(PLAN-r4's NEW-I1, aligning this parenthetical with the rule above it). But that refusal, under
-explicit `--as descriptor`, is conjunct 1's PERMANENT shape refusal naming
-`--as md1` — in EVERY build: the window text's "come back for the QR plate"
+(PLAN-r4's NEW-I1, aligning this parenthetical with the rule above it).
+**Which FOLLOWER each of the two meets under explicit `--as descriptor`
+differs, and the distinction is the amendment of 2026-08-29:** the
+conjunct-8-PASSING `multi` meets conjunct 1's PERMANENT shape refusal naming
+`--as md1`, in EVERY build — the window text's "come back for the QR plate"
 would be false forever for a shape the descriptor record can never carry
-(§5.5, §10; R0 r15's new-I3). With `--as` omitted, the carriage rule
-governs as usual.)
+(§5.5, §10; R0 r15's new-I3) — while the conjunct-8-FAILING twin meets
+conjunct 8's own key-identity refusal, on both `--as` paths, because
+conjunct 1's flag-dependent arm runs AFTER the flag-independent conjuncts
+(§7 clause 8's amendment; IMPL-S1S3 adversarial review C1). The previous
+text applied the first of these to both, which was false for the twin. With
+`--as` omitted, the carriage rule governs as usual.)
 
 **The FOLLOWER** is decided independently by §5's own logic — the tier
 picks lines, not outcomes, and any tier may precede any follower. The
@@ -1330,7 +1352,28 @@ from §4.7's admission predicate or §5.3's representability limits fire from
 their own checks, after a successful parse — the rule never selects them
 (R0 r2's NEW-N1). And the `sortedmulti` rows below read over BOTH multi
 forms: §4.7 conjunct 1's md1-path `multi` twins hit the same conjuncts and
-get the same texts with the form name substituted (R0 r5's NEW-M2).
+get the same texts with the form name substituted (R0 r5's NEW-M2) — **with
+one class of clause excepted, which the amendment below states.**
+
+**AMENDED 2026-08-29 (IMPL-P1's review, M1): NO DEVICE-BEHAVIOUR CLAUSE
+TRANSPOSES TO A `multi` INPUT.** `bip380.Parse`'s script switch has a
+`sortedmulti` case and no `multi` case, so the device refuses EVERY `multi`
+form at PARSE and none of them ever reaches address derivation. The previous
+text carved exactly ONE row out for that reason (the single-key wrapper), and
+the reason was never specific to that row: it is a property of the whole
+`multi` class. Six rows carry a sentence about what the device does with the
+descriptor — the single-key-wrapper row plus `tr(sortedmulti(…))`, the mixed
+network, the hardened use-site, the non-consecutive multipath and the key
+count — and for a `multi` input five of those six were measurably FALSE, each
+asserting that the device accepts or derives from a file its parser rejects
+(constructed and run against `me 0.7.0`; the table is IMPL-P1-review §M1).
+
+So: **for a `multi` input, every such clause is REPLACED by** *"the device's
+parser refuses `multi` outright, so this file never reaches address derivation
+there."* The refusal, its cause and the operator's next action are unchanged in
+all six — only the device sentence moves. The single-key-wrapper row keeps its
+own additional substitution (its REMEDY transposes too, naming the wrapper
+change), which this amendment narrows rather than removes.
 
 **Scope: §5.1's gate is per-LINE; the five steps above are whole-INPUT — a
 deliberate divergence, not an alignment (r19's minor).** The gate decides
@@ -1358,12 +1401,10 @@ the verdict; contains NO internal identifiers — no phase labels, no F-numbers,
 no spec § references inside the quotes (those live in the row's annotation,
 outside the quotes); and names only next actions executable in the CURRENT
 build (walk W11). The one
-exception is the single-key-wrapper row, where NEITHER the remedy's
-`sortedmulti` forms NOR the device-measurement parenthetical transposes —
-all three single-key `multi` twins are device REFUSE at PARSE (measured) and
-never reach address derivation — so for a `multi` input that row substitutes
-its own remedy, naming the mandatory wrapper change (R0 r6's NEW-M4; r7's
-NEW-I2).
+exception is the single-key-wrapper row, where — on top of the device-clause
+substitution the whole `multi` class now takes (the amendment above) — the
+REMEDY's `sortedmulti` forms do not transpose either: for a `multi` input that
+row names the mandatory wrapper change instead (R0 r6's NEW-M4; r7's NEW-I2).
 
 | the operator's input | what `me` says |
 | --- | --- |
@@ -1385,7 +1426,7 @@ NEW-I2).
 | **`sortedmulti(k, …)` with `k > n`** | *"threshold `k` of `n` keys can never be satisfied — no combination of signatures reaches `k`. Funds sent to this wallet would be unspendable. Nothing was packed."* §4.7 conjunct 2. |
 | **`sortedmulti(0, …)`** — or any `k < 1` | *"threshold 0 means NO signature is required: anyone who can see this script can spend from it. This is almost certainly not the wallet you meant — and if it already holds funds, treat them as at risk now. Nothing was packed."* §4.7 conjunct 2 (R0's I6 — the device derives a real address for `k = 0` and even `k = −1`, so the refusal is the host's alone). |
 | `sortedmulti` with **too many keys** | *"`sh(sortedmulti(…))` carries at most 15 keys — there the multi's output script IS the redeemScript, one 520-byte script element (BIP-383). `wsh(…)` and `sh(wsh(…))` carry at most 20 (`OP_CHECKMULTISIG`); their redeemScript is 34 bytes and the 520-byte limit never binds. This descriptor has `n` keys under `<form>`. The device would accept it and derive addresses whose coins cannot be spent."* §4.7 conjunct 3 (R0's C3, bound corrected by r2's NEW-I2). |
-| two keys declaring **the same origin with different xpubs** | *"this wallet description contradicts itself: keys `N` and `M` both claim origin `<fp/path>` but name different keys — one origin identifies exactly one key, so no wallet matches this description. Check the export: a duplicated cosigner line carrying the wrong key is the usual cause."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (PLAN-r1's C1; row per PLAN-r2's NEW-C2; ordinals per PLAN-r3's N2). |
+| two keys declaring **the same origin with different xpubs** | *"this wallet description contradicts itself: keys `N` and `M` both claim origin `<fp/path>` but name different keys — one origin identifies exactly one key, so no wallet matches this description. Check the export: one of the two entries carries the wrong key, and a copied-and-edited cosigner is the usual cause."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (PLAN-r1's C1; row per PLAN-r2's NEW-C2; ordinals per PLAN-r3's N2). **AMENDED 2026-08-29 (IMPL-P1's review, M5):** the previous clause named *"a duplicated cosigner LINE"*, i.e. a BlueWallet file — and this row cannot fire for one. In a BlueWallet file every key shares the single `Derivation:` header, so two keys carry the same `(fingerprint, origin)` **iff** they carry the same header key, which the device's own `seenKeys` map catches FIRST as `inconsistent header value`; branch 1 then fails and §6 row 1 carries the reason (measured). The row is reachable from a plain BIP-380 descriptor and from the JSON wrapper, where two key expressions may carry one origin block and different keys — so the cause clause is now stated over ENTRIES rather than over BlueWallet lines. Conjunct 8's other half, the duplicate row below, IS BlueWallet-reachable (different fingerprints, same xpub) and is unaffected. |
 | the **same key at the same derivation in two slots** | *"keys `N` and `M` are the same key at the same derivation — a threshold that needs the same key twice is not the multisig this file describes. Remove the duplicate line, or supply the missing cosigner's key."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (split per PLAN-r3's I3 — the primary separates the two causes, and "no wallet matches" is false for a duplicate). |
 | a multisig mixing **mainnet and testnet keys** | *"key `N` is `tpub` (testnet) while key 0 is `xpub` (mainnet). The device accepts this descriptor and then cannot derive any address from it. All keys must share one network."* §4.7 conjunct 5 (R0's I4). |
 | a descriptor or bare key using **`ypub`/`upub`/`vpub`/`Upub`/`Vpub`** | *"the device admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`."* The remedy names the **per-version** target (R0 r2's NEW-I3 — one template cannot serve five): `ypub` → `xpub` (mainnet BIP-49, `sh(wpkh(…))`); `upub` → `tpub` (**testnet** BIP-49, `sh(wpkh(…))`); `vpub` → `tpub` (**testnet** BIP-84, `wpkh(…)`); `Upub`/`Vpub` → `tpub` (**testnet multisig** — no single-key remedy exists; supply the full multisig descriptor: `sh(wsh(sortedmulti(…)))` for `Upub`, `wsh(sortedmulti(…))` for `Vpub` — or a BlueWallet file). Four of the five are testnet keys, and an `xpub` remedy would name a mainnet wallet the operator does not hold — measured, mainnet `354hXbgw…` versus the real testnet `tb1qmj7qns4…`. For a key WITH an origin, the operator's own fingerprint/path is substituted in; for a BARE key the remedy is the origin-less descriptor spelling — `sh(wpkh(<converted key>/<0;1>/*))`, which the device admits (measured) — because handing back a bare converted key would PROMOTE to a different wallet (`pkh(…)`, measured). §4.3 (R0's C2); F-413 tracks host-side normalisation. |
@@ -1633,12 +1674,31 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
      colliding-origin `wsh(sortedmulti(…))` (two xpubs, one
      `(fingerprint, origin)`), a duplicate-`(xpub, use-site)` slot pair,
      and the colliding-origin `wsh(multi(…))` twin — whose conjunct-8
-     refusal binds the `--as md1` path ONLY: under `--as descriptor` a
-     `multi` gets conjunct 1's permanent refusal first, per the ruling
-     stated at §5.1, §6 and §11 (PLAN-r3's I2). Gate OPEN,
-     `descriptor-refusal` (`refusal_row: key-identity`, or
-     `key-identity-duplicate` for the slot row), exit 3 — the first two
-     rows on both `--as` paths.
+     refusal binds **BOTH `--as` paths, the `multi` twin included**
+     (AMENDED 2026-08-29; see below). Gate OPEN, `descriptor-refusal`
+     (`refusal_row: key-identity`, or `key-identity-duplicate` for the
+     slot row), exit 3 — all three rows on both `--as` paths.
+
+     **AMENDED 2026-08-29 (IMPL-S1S3 adversarial review, C1).** This clause
+     previously read *"whose conjunct-8 refusal binds the `--as md1` path
+     ONLY: under `--as descriptor` a `multi` gets conjunct 1's permanent
+     refusal first"*. That ordering is exactly what produced C1: running
+     conjunct 1's `--as`-DEPENDENT `multi` arm ahead of the flag-independent
+     conjuncts short-circuited them, so `wsh(multi(0,…))` — anyone-can-spend
+     — answered `--as descriptor` with conjunct 1's *"This wallet can still
+     be engraved"* while `--as md1` refused the same file permanently.
+     §5.4's carriage rule already said why that cannot be right: the no-path
+     determination *"quantifies over both paths, so it needs no flag"*.
+     **The shipped order is: conjunct 1's `--as`-INDEPENDENT shape half
+     first, then conjuncts 2–8, then conjunct 1's `multi`-under-
+     `--as descriptor` arm LAST.** Conjunct 1's referral is therefore reached
+     only when 2–8 hold — which is exactly when `--as md1` admits the wallet,
+     making the referral true by construction rather than by a text edit. A
+     `multi` that PASSES conjunct 8 still gets conjunct 1's permanent refusal
+     under `--as descriptor`; a `multi` that FAILS it gets the key-identity
+     refusal on both paths, which is what §6's key-identity row
+     (*"**`EXIT_REFUSED` (3)**, both `--as` paths"*) had always required and
+     the old order contradicted.
      `host_admits=false`, `md1_admits=false`, and **no address fields** —
      a colliding-origin wallet derives byte-identical addresses to a clean
      control (measured, r2's NEW-M5), so the refusal assertion itself is

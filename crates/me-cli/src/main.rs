@@ -301,6 +301,21 @@ enum SyswCmd {
         /// written. Zero-padding would be a WRITE of 65 KiB for nothing.
         #[arg(long)]
         region: bool,
+        /// How a wallet DESCRIPTOR is packed. Required whenever the input is a
+        /// descriptor; there is no default and no fallback.
+        ///
+        /// `descriptor` is the SCANNABLE plate -- a QR of the canonical
+        /// descriptor that any phone or wallet app can read. `md1` is the
+        /// HAND-COPYABLE plate -- error-corrected text cards, restored by
+        /// transcription. They are not interchangeable, and a path that cannot
+        /// work fails NAMING the other one rather than switching to it.
+        ///
+        /// Its presence makes the invocation SINGLE-DOCUMENT: exactly one
+        /// descriptor, read whole. A multi-line BlueWallet file or a
+        /// pretty-printed JSON export is one descriptor and stops being one the
+        /// moment it is split into newline-separated records.
+        #[arg(long = "as", value_name = "descriptor|md1")]
+        r#as: Option<AsForm>,
     },
     /// Emit a full-region overwrite image (spec §5.5).
     Wipe {
@@ -313,6 +328,61 @@ enum SyswCmd {
     },
     /// Print what a container holds, and its digest.
     Show { file: std::path::PathBuf },
+}
+
+/// `--as`'s two values (`SPEC_descriptor_input.md` §5.1). There is no third and
+/// no default: the two accept sets genuinely differ, in both directions, so an
+/// automatic fallback would silently change which of two different artefacts
+/// the operator engraves.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum AsForm {
+    /// The canonical re-encoded descriptor, as one `Descriptor` record.
+    Descriptor,
+    /// The BIP-388 decomposition, as md1 text cards (`MdMk` records).
+    Md1,
+}
+
+/// `ValueEnum` by hand, so the possible-value help can be BUILD-MARKED the same
+/// way §5.1's choice block marks it.
+///
+/// The derive cannot: its help text comes from the doc comments above, which are
+/// fixed at compile time in the wrong way — they cannot read
+/// `DESCRIPTOR_PATH_SHIPPED`. The choice block's last line sends the operator to
+/// `me sysw pack --help` for the comparison, so an unmarked value there loses
+/// them the one fact the block was careful to give (IMPL-S1S3-adversarial-review
+/// M1). Both markings are gated on the same two constants, so they cannot drift.
+impl clap::ValueEnum for AsForm {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Self::Descriptor, Self::Md1]
+    }
+
+    fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
+        use mnemonic_engrave::descriptor::{DESCRIPTOR_PATH_SHIPPED, MD1_PATH_SHIPPED};
+        const UNAVAILABLE: &str = " (not available in this build)";
+        Some(match self {
+            Self::Descriptor => clap::builder::PossibleValue::new("descriptor").help(format!(
+                "The canonical re-encoded descriptor, as one `Descriptor` record{}",
+                if DESCRIPTOR_PATH_SHIPPED {
+                    ""
+                } else {
+                    UNAVAILABLE
+                }
+            )),
+            Self::Md1 => clap::builder::PossibleValue::new("md1").help(format!(
+                "The BIP-388 decomposition, as md1 text cards (`MdMk` records){}",
+                if MD1_PATH_SHIPPED { "" } else { UNAVAILABLE }
+            )),
+        })
+    }
+}
+
+impl From<AsForm> for mnemonic_engrave::descriptor::Form {
+    fn from(f: AsForm) -> Self {
+        match f {
+            AsForm::Descriptor => Self::Descriptor,
+            AsForm::Md1 => Self::Md1,
+        }
+    }
 }
 
 /// THE EXIT-CODE VOCABULARY. Three failure codes, three different things, and
@@ -600,6 +670,13 @@ fn run() -> i32 {
     // Capture the plate-budget flag before the input is dropped.
     let too_long = mnemonic_engrave::exceeds_plate_budget(&input);
 
+    // F-421 — captured HERE, before the Zeroizing scrub, because the referral
+    // below needs the VERDICT and must never keep a copy of the bytes. It is a
+    // bool: nothing about the input escapes this line.
+    let descriptor_shaped = mnemonic_engrave::descriptor::gate_opens(
+        &mnemonic_engrave::descriptor::cascade::normalise(&input),
+    );
+
     let result = convert(&input);
 
     // Build the --echo line ONLY on the success path, where the input is a
@@ -626,6 +703,26 @@ fn run() -> i32 {
         }
         Err(e) => {
             eprintln!("me: {e}");
+            // F-421 — THE CONVERTER'S REFERRAL. `me` owns a top-level
+            // `--in FILE` (this, the NDEF converter), so the operator's natural
+            // `me --in wallet.txt --as descriptor` half-parses here and clap
+            // tips `--base64` — a flag from the OTHER program — while nothing
+            // names `sysw pack`. Filed from the 2026-08-28 journey walk (W3);
+            // the in-tool twin of F-420.
+            //
+            // The predicate is §5.1's OWN shape gate, not a second one: a
+            // concrete key expression, BlueWallet `Key: value` lines, or a JSON
+            // wrapper. Sharing it is what stops the two surfaces disagreeing
+            // about what "looks like a descriptor" means.
+            if descriptor_shaped {
+                eprintln!(
+                    "me: that looks like a wallet DESCRIPTOR, and this command converts one \
+                     md1/mk1/mt1 string to NFC bytes.\n      \
+                     A descriptor is packed by a different verb, which asks how you want it \
+                     on the plate:\n      \
+                     \x20   me sysw pack --as <descriptor|md1> --in <your export file>"
+                );
+            }
             return EXIT_INVALID;
         }
     };
@@ -1299,6 +1396,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             allow_argv_secret,
             iterations,
             region,
+            r#as,
         } => {
             if *allow_weak {
                 eprintln!(
@@ -1307,13 +1405,48 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 );
             }
 
-            let recs = match read_records(records, r#in.as_ref(), *allow_argv_secret) {
-                Ok(r) => r,
+            let (recs, document) = match read_records(records, r#in.as_ref(), *allow_argv_secret) {
+                Ok(r) => (r.records, r.document),
                 Err((msg, code)) => {
                     eprintln!("me: {msg}");
                     return code;
                 }
             };
+
+            // SPEC_descriptor_input.md §5.1/§5.3/§5.4 — THE `--as` PATH.
+            //
+            // It sits after `read_records` on purpose: the argv bearer/secret
+            // guard runs in there, and a flag-shape usage error must not
+            // pre-empt a refusal about material that is already in the shell's
+            // history. Everything below this point sees md1 RECORDS, so the
+            // passphrase ceremony, `--expect`, `--out` and the write gate are
+            // the shipped ones rather than a second implementation.
+            let mut recs = recs;
+            if let Some(form) = r#as {
+                if let Some(msg) = mnemonic_engrave::descriptor::as_flag::single_document_error(
+                    records.len(),
+                    r#in.is_some(),
+                ) {
+                    eprintln!("me: {msg}");
+                    return EXIT_USAGE;
+                }
+                let run = mnemonic_engrave::descriptor::as_flag::run((*form).into(), &document);
+                for n in &run.notes {
+                    eprintln!("me: {n}");
+                }
+                match run.decision {
+                    mnemonic_engrave::descriptor::as_flag::Decision::Refused(rs) => {
+                        for r in &rs {
+                            eprintln!("me: {r}");
+                        }
+                        return EXIT_REFUSED;
+                    }
+                    mnemonic_engrave::descriptor::as_flag::Decision::Pack(strings) => {
+                        recs = strings;
+                    }
+                }
+            }
+            let recs = recs;
 
             // G-P3.3. Stated BEFORE the passphrase ceremony for the same
             // reason the ceremony itself is ordered that way: a warning the
@@ -1369,6 +1502,50 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // out of it, and `split` now calls it first -- so this is an
             // ordering change, not a second implementation of admission.
             if let Err(e) = sysw::admit_check(&recs, admission) {
+                // SPEC_descriptor_input.md §5.1 — THE DISCRIMINATOR, and it sits
+                // exactly here for a reason: record classification has just
+                // failed, which is the only moment the question "is this a
+                // descriptor rather than a record?" is worth asking. Placed
+                // earlier it would second-guess a stream that classifies fine;
+                // placed later it would arrive after the passphrase ceremony.
+                //
+                // The gate's first invariant is that a record-shaped input
+                // never hears descriptor vocabulary or a changed exit code, and
+                // `Outcome::RecordRefusal` is that invariant: it falls straight
+                // through to the shipped refusal below, unchanged.
+                let outcome = mnemonic_engrave::descriptor::consult(&document, &recs);
+                // §5.4, NORMATIVE: the identification block prints on EVERY
+                // successful whole-input parse, BEFORE whatever follows -- and
+                // §5.1's choice block is one of the followers it enumerates,
+                // not an exception to it. `RecordRefusal` is the one outcome
+                // that never parsed a descriptor, and it is also the outcome
+                // invariant 1 forbids from hearing descriptor vocabulary.
+                if !matches!(
+                    outcome,
+                    mnemonic_engrave::descriptor::Outcome::RecordRefusal
+                ) {
+                    if let Some(b) =
+                        mnemonic_engrave::descriptor::identification_block(&document, None)
+                    {
+                        eprintln!("me: {b}");
+                    }
+                }
+                match outcome {
+                    mnemonic_engrave::descriptor::Outcome::RecordRefusal => {}
+                    mnemonic_engrave::descriptor::Outcome::AsDecides => {
+                        eprintln!("me: {}", mnemonic_engrave::descriptor::choice_block());
+                        // Nothing was refused; a choice was not made.
+                        return EXIT_USAGE;
+                    }
+                    mnemonic_engrave::descriptor::Outcome::DescriptorRefusal(r) => {
+                        eprintln!("me: {r}");
+                        return EXIT_REFUSED;
+                    }
+                    mnemonic_engrave::descriptor::Outcome::MultiRecord(r) => {
+                        eprintln!("me: {r}");
+                        return EXIT_INVALID;
+                    }
+                }
                 eprintln!("me: {}", sysw_error(&e));
                 return EXIT_INVALID;
             }
@@ -2111,18 +2288,41 @@ fn report_strength(passphrase: Option<&str>, records: &[String]) {
     }
 }
 
+/// What an invocation read, in BOTH shapes it is needed in.
+///
+/// `records` is the shipped newline-separated record stream. `document` is the
+/// same input read WHOLE, which is what `SPEC_descriptor_input.md` §4.6 means by
+/// "the whole input" and what §5.1's discriminator re-reads through the cascade:
+/// a multi-line BlueWallet file and a pretty-printed JSON export are ONE
+/// descriptor and stop being one the moment they are split into records.
+///
+/// For `--in` and stdin the document is the channel's own bytes. On argv it is
+/// the operands joined with newlines — §5.1 makes a single argv operand the
+/// document, and the join is the only reading of several that keeps a record's
+/// index meaning what it means everywhere else.
+#[derive(Debug)]
+struct Records {
+    records: Vec<String>,
+    document: String,
+}
+
 /// `mt encode … | me sysw pack …` — a join an early draft claimed already
 /// worked and which measurably did not.
 fn read_records(
     argv: &[String],
     in_path: Option<&std::path::PathBuf>,
     allow_argv_secret: bool,
-) -> Result<Vec<String>, (String, i32)> {
+) -> Result<Records, (String, i32)> {
     if let Some(p) = in_path {
         let raw = std::fs::read_to_string(p)
             .map_err(|e| (format!("{}: {e}", p.display()), EXIT_USAGE))?;
         // R7, and it applies to THIS channel too -- see `no_records`.
-        return no_records_guard(split_record_stream(&raw), Some(p)).map_err(|e| (e, EXIT_USAGE));
+        let records =
+            no_records_guard(split_record_stream(&raw), Some(p)).map_err(|e| (e, EXIT_USAGE))?;
+        return Ok(Records {
+            records,
+            document: raw,
+        });
     }
     if !argv.is_empty() {
         // R2 / G-P3.5. THIS RUNS BEFORE ANYTHING ELSE `pack` DOES, and that is
@@ -2272,12 +2472,24 @@ fn read_records(
                     out.push(r.clone());
                 }
             }
-            return Ok(out);
+            let document = out.join("\n");
+            return Ok(Records {
+                records: out,
+                document,
+            });
         }
-        return Ok(argv.to_vec());
+        return Ok(Records {
+            records: argv.to_vec(),
+            document: argv.join("\n"),
+        });
     }
     // R7 for the stdin channel, through the same guard `--in` uses.
-    no_records_guard(read_stdin_records()?, None).map_err(|e| (e, EXIT_USAGE))
+    let raw = read_stdin_raw()?;
+    let records = no_records_guard(split_record_stream(&raw), None).map_err(|e| (e, EXIT_USAGE))?;
+    Ok(Records {
+        records,
+        document: raw,
+    })
 }
 
 /// Read the record stream from stdin, unguarded.
@@ -2287,6 +2499,14 @@ fn read_records(
 /// how `--in` and stdin came to disagree about an empty input in the first
 /// place.
 fn read_stdin_records() -> Result<Vec<String>, (String, i32)> {
+    Ok(split_record_stream(&read_stdin_raw()?))
+}
+
+/// The stdin channel's bytes, before any splitting. Split out so the record
+/// stream and the whole-input document are the SAME read — stdin can only be
+/// read once, and two readers of one channel is how `--in` and stdin came to
+/// disagree about an empty input in the first place.
+fn read_stdin_raw() -> Result<String, (String, i32)> {
     // A TTY here is the "looks like a hang" case: an operator who typed
     // `me sysw pack` and pressed Enter with nothing piped in otherwise sees a
     // blank line forever. Say what is being waited for, on stderr, before
@@ -2304,7 +2524,7 @@ fn read_stdin_records() -> Result<Vec<String>, (String, i32)> {
     std::io::stdin()
         .read_to_string(&mut raw)
         .map_err(|e| (format!("stdin: {e}"), EXIT_USAGE))?;
-    Ok(split_record_stream(&raw))
+    Ok(raw)
 }
 
 /// **`kind` is its own parameter, and F-259 is why.** It used to travel in the

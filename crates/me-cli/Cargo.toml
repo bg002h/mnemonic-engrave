@@ -24,6 +24,18 @@ path = "src/lib.rs"
 # operator-gated, and nothing here needs it published to build or test.
 mnemonic-io-lib = { path = "../mnemonic-io-lib" }
 md-codec = "0.42"
+# §5.4's `address 0:` line -- the executable check the operator makes before
+# anything is engraved. `md_codec::Descriptor::derive_address` is the derivation
+# (md-codec's `derive` feature is default-on and already in this tree), and its
+# signature takes a `bitcoin::Network`, so the type has to be nameable here.
+#
+# NOT a parser dependency: §4.7 weighed `rust-miniscript` for PARSING and
+# rejected it, and that decision stands -- `descriptor::cascade` is still the
+# small seven-shape parser. This is the same use the constellation sibling makes
+# of it (`descriptor-mnemonic` `crates/md-cli/Cargo.toml:34`, `cmd/address.rs:44`).
+# It adds no crate to the tree: `bitcoin 0.32.101` is already in `Cargo.lock` as
+# md-codec's own dependency, so the lock gains only this package's edge to it.
+bitcoin = "0.32"
 mk-codec = "0.4"
 clap = { version = "4", features = ["derive"] }
 zeroize = "1.8"
