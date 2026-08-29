@@ -680,6 +680,22 @@ conjunction, and §7's row list is derivable from it:
    programs whose whole job is deriving addresses they cannot derive.
 6. **Origins:** every key with a fingerprint carries a non-empty origin path
    (§4.2's canonical-string predicate).
+7a. **Key identity (PLAN-r1's C1 — amended post-GREEN 2026-08-28):** no two
+   keys may declare the same `(fingerprint, origin path)` with different
+   xpubs (one origin identifies exactly one key — a card or plate violating
+   this describes a wallet that cannot exist), and no two placeholder slots
+   may carry the same xpub at the same origin (duplicate key slots). Both
+   checks are the F-217/F-218 refusals the Rust-primary `md-codec` enforces
+   ON ENCODE (`validate_origin_key_consistency`,
+   `validate_no_duplicate_key_slots`; measured: the tree's `md encode`
+   refuses the colliding-origin policy, the Go port refuses it at
+   `md/encode_multisig.go` and `md/expand.go`) — but the PUBLISHED 0.42.0
+   crate `me` links predates them (measured: eight files differ; the
+   functions and their error variants are absent), so `me` enforces both
+   HOST-SIDE as admission conjuncts, on both `--as` paths, with the tree's
+   own refusal wording. This is convergence with the Rust primary, not
+   leading. F-424 owns removing the host mirror when a newer `md-codec`
+   publishes (operator-gated).
 7. **Use-site path (R0 r2's NEW-C1/NEW-I1):** each key's children expression
    is one of **`{absent, /*, /i/*, <i;i+1>, <i;i+1>/*}`** — a closed set, like
    the shapes. The measured-broken classes it excludes: a HARDENED use-site
@@ -1592,6 +1608,12 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
      divergence §6 states explicitly);
   7. the **edge tokens** — a base58check token with a valid checksum and
      a 77-byte payload (gate CLOSED, `record-refusal`, exit 4); `[` alone
+  8. **the impossible-wallet pair (conjunct 7a, PLAN-r1's C1)** — a
+     colliding-origin descriptor (two xpubs, one `(fingerprint, origin)`)
+     and a duplicate-key-slot descriptor: gate OPEN, `descriptor-refusal`
+     citing conjunct 7a, exit 3, on BOTH `--as` paths — the rows that would
+     have caught the published-crate gap, `host_admits=false`,
+     `md1_admits=false`;
      (gate OPEN, `descriptor-refusal`, the unparseable-file row carrying
      branch 4's error, exit 3); and `xpub…/` with a trailing slash (gate
      OPEN, `descriptor-refusal`, the unparseable-file row carrying branch
@@ -1609,10 +1631,10 @@ a second tag; two of the fifteen carry a third, the original overlap pair
 (R0 r7's NEW-M1): the `xpub…\n` near-miss (`promotion-near-miss` +
 `whitespace` + `gate`) and the bare-`xpub` happy path (`formats-happy` +
 `promotion-near-miss` + `gate`). `covers` entries are distinct within a
-row, and the file carries at least **68 physical rows** (the minima sum to
-**85** tag-slots; the fifteen shared §4.5 rows absorb 15 of `gate`'s
-slots, and the original pair's two extra tags absorb 2 more: 85 − 17 =
-68), asserted as a floor — so a dropped row cannot be counted around by
+row, and the file carries at least **70 physical rows** (the minima sum to
+**87** tag-slots; the fifteen shared §4.5 rows absorb 15 of `gate`'s
+slots, and the original pair's two extra tags absorb 2 more: 87 − 17 =
+70), asserted as a floor — so a dropped row cannot be counted around by
 retagging or by duplicate tags (R0 r7's NEW-M1):
 
 | tag | bullet | min rows |
@@ -1625,7 +1647,7 @@ retagging or by duplicate tags (R0 r7's NEW-M1):
 | `neither` | `wsh(multi)`, miniscript, full-origin `ypub` | 3 |
 | `whitespace` | §4.6's rows | 3 |
 | `md1-splits` | §5.3's splits: `/0/*`, `<0;1>`, childless, three mixed | 6 |
-| `gate` | §5.1's gate — the seven adversarial clauses of the gate bullet | 34 |
+| `gate` | §5.1's gate — the eight adversarial clauses of the gate bullet | 36 |
 
 **A second, separate assertion, because §5.3 showed a string comparison is not
 enough.** Rows may carry `address_0` and `address_1` — receive addresses at
