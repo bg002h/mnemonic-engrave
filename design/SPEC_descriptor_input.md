@@ -1487,7 +1487,7 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   `host_admits=true, md1_admits=false`. §11 item 3's counting test asserts
   the field is present on every row.
 - **the gate fields** (REQUIRED on every `gate`-tagged row, absent
-  elsewhere — §5.1's gate states an intent and an invariant, and these
+  elsewhere — §5.1's gate states an intent and two invariants, and these
   rows are its executable precision; terminal fold): `gate_open`
   (boolean — after record classification fails, does §5.1's gate open?),
   `outcome` (one of `record-refusal` — the shipped exit-4 record surface,
@@ -1564,12 +1564,19 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
      11, 12, 15);
   2. **six records with hostile payloads** — `text: my wallet (2 of 3)`,
      `pass: hunter (2)`, `text: note: hello`, `seed: abandon abandon
-     abandoz`, `tx: zz`, and a `text:` record whose payload is a real
+     abandoz`, `tx: zz` (delivered via `--in` — on argv the shipped
+     bearer-transaction guard preempts at exit 3, R0 r20's M2), and a
+     `text:` record whose payload is a real
      `xpub…` token: parentheses, colons and base58 material inside a
      record payload must not open the gate — gate CLOSED,
      `record-refusal`, exit 4;
   3. a **mistyped bare mnemonic** — gate CLOSED, `record-refusal`, exit 4
-     (the operand class of the `sysw_cli.rs:1928` pin);
+     (the operand class of the `sysw_cli.rs:1928` pin); and
+     **`deadbeef: xpub…`** — an 8-hex key that is NOT a BlueWallet header
+     yet fronts a real xpub: gate OPEN on the fingerprint disjunct,
+     `descriptor-refusal` (r17's intended flip — the one previously
+     normative outcome the demotion lost, restored as a row per R0 r20's
+     M1; invariant-1 boundary witness);
   4. one **malformed string of each bech32 record class** — `md1…`,
      `mk1…`, `ms1…`, `mt1…`: gate CLOSED (the bech32 charset is not a
      base58check envelope), `record-refusal` naming the class, exit 4;
@@ -1602,10 +1609,10 @@ a second tag; two of the fifteen carry a third, the original overlap pair
 (R0 r7's NEW-M1): the `xpub…\n` near-miss (`promotion-near-miss` +
 `whitespace` + `gate`) and the bare-`xpub` happy path (`formats-happy` +
 `promotion-near-miss` + `gate`). `covers` entries are distinct within a
-row, and the file carries at least **67 physical rows** (the minima sum to
-**84** tag-slots; the fifteen shared §4.5 rows absorb 15 of `gate`'s
-slots, and the original pair's two extra tags absorb 2 more: 84 − 17 =
-67), asserted as a floor — so a dropped row cannot be counted around by
+row, and the file carries at least **68 physical rows** (the minima sum to
+**85** tag-slots; the fifteen shared §4.5 rows absorb 15 of `gate`'s
+slots, and the original pair's two extra tags absorb 2 more: 85 − 17 =
+68), asserted as a floor — so a dropped row cannot be counted around by
 retagging or by duplicate tags (R0 r7's NEW-M1):
 
 | tag | bullet | min rows |
@@ -1618,7 +1625,7 @@ retagging or by duplicate tags (R0 r7's NEW-M1):
 | `neither` | `wsh(multi)`, miniscript, full-origin `ypub` | 3 |
 | `whitespace` | §4.6's rows | 3 |
 | `md1-splits` | §5.3's splits: `/0/*`, `<0;1>`, childless, three mixed | 6 |
-| `gate` | §5.1's gate — the seven adversarial clauses of the gate bullet | 33 |
+| `gate` | §5.1's gate — the seven adversarial clauses of the gate bullet | 34 |
 
 **A second, separate assertion, because §5.3 showed a string comparison is not
 enough.** Rows may carry `address_0` and `address_1` — receive addresses at
