@@ -765,10 +765,15 @@ me: this input is a wallet descriptor, and `--as` decides how it is packed.
 
 In a build where the descriptor path has not shipped, the block marks that
 value inline — `--as descriptor (not available in this build)` —
-so the choice text itself never offers a dead flag (R0 r9's M6, ruling the
-interaction the walk assigned to the plan; the walk-W5 current-build rule
-now governs this block too). And when NEITHER value carries the input, the
-block does not fire at all — §5.4's carriage rule (r13's new-I2).
+so the choice text never offers a BUILD-dead flag unmarked (R0 r9's M6,
+ruling the interaction the walk assigned to the plan; the walk-W5
+current-build rule governs this block too). When NEITHER value carries the
+input, the block does not fire at all — §5.4's carriage rule (r13's
+new-I2). And when exactly ONE value carries this particular input, the
+block still offers both, unmarked, DELIBERATELY (r14's new-M2): the
+operator who picks the input-dead value gets that path's own refusal, which
+names the working flag — better guidance than a longer menu rule, and the
+journey rule's bar ("worse than silence") is not met.
 
 **A path that cannot work fails naming the other path. It never switches.**
 This is the operator's ruling and it is the reason §5.4 exists: the two accept
@@ -810,7 +815,7 @@ Two boundary rules that fall out of it (R0 r2):
   input IS a descriptor and gets the "--as decides" block at `EXIT_USAGE`
   (2) when at least one `--as` value carries it in this build — otherwise
   its own refusal, directly, per §5.4's carriage rule — matching §11 item
-  5's two tested cases across all four formats. Only when the
+  5's tested cases across all four formats. Only when the
   whole input does NOT parse as one descriptor AND some individual record
   does, the refusal names the split (§6's multi-record row) — naming `--as`
   there would send the operator to a whole-file read that refuses with a
@@ -829,6 +834,14 @@ text leads with the verdict and contains no internal phase labels (walk W5):
 
     me: --as descriptor is not available in this build.
           The QR plate needs device firmware this release does not include.
+
+**Ordering (R0 r14's new-I1): the §4.7 admission refusal PRECEDES the
+window refusal.** A wallet no path admits gets its admission refusal
+regardless of flag and build — its status is permanent, and possibly
+funds-urgent: `sortedmulti(0,…)` must hear "treat those funds as at risk
+now", never "nothing is lost by waiting". The window refusal fires only for
+wallets at least one path admits, and its two arms partition exactly those,
+by md1-representability:
 
 followed by ONE of two alternative clauses, decided by md1-representability
 (walk W11 — no refusal may point at a path that refuses in the CURRENT
@@ -1001,8 +1014,9 @@ handles it; the hole is md1's alone.
 
 **Window substitution — NORMATIVE (walk W11's symmetric half, folded per
 R0 r9's I4).** In a build where the descriptor path has not shipped, every
-remedy in this section and in §6 that names `--as descriptor` replaces that
-clause with: *"the scannable-plate path is not in this build — keep the
+remedy in this section and in §6 that ROUTES TO the descriptor path —
+naming the flag or otherwise (semantic, not lexical, per R0 r14's new-M3) —
+replaces that clause with: *"the scannable-plate path is not in this build — keep the
 export file; it packs when the device update ships."* No refusal names a
 flag that refuses in the current build.
 
@@ -1056,7 +1070,7 @@ the equality it actually has — same wallet, different serialisation — and th
 
 **NORMATIVE — the block prints on EVERY successful whole-input parse,
 BEFORE whatever follows, in TWO tiers (walk W13; R0 r9 I1, r10 new-I1,
-r12–r13: the three rules below, each stated once).**
+r11 new-M1/M2/N1, r12–r13: the three rules below, each stated once).**
 
 **The TIER** is decided by what does not depend on the flag: a wallet that
 passes conjuncts 2–7 AND whose shape at least one `--as` path admits gets
@@ -1229,7 +1243,7 @@ NEW-I2).
 | a BlueWallet cosigner fingerprint that is not 8 hex characters | *"cosigner line `ab: xpub…` — a master fingerprint is exactly 8 hex characters (4 bytes)."* §4.2 defect 4; the device PANICS on fewer, so this file must never reach it. |
 | `wsh(multi(…))` under **`--as descriptor`** | *"the device's descriptor parser accepts `sortedmulti` and not `multi`. This wallet can still be engraved: `--as md1` encodes `multi` policies (for use-site paths md1 can represent — otherwise no path carries it, and the refusal says so). (`sortedmulti` differs from `multi` only in key ordering at spend time — it is not a synonym, so `me` will not rewrite it for you.)"* |
 | a **miniscript** descriptor, either `--as` | *"`me` reads the descriptor family the device reads: single-sig and `sortedmulti`, optionally under `sh`. This descriptor uses miniscript fragments (`or_d`, `and_v`, …), which neither path handles in this release. `md encode` accepts miniscript **templates** — a different tool and input form."* (Deferral details: §10 — outside the quote per the walk-W5 rule.) |
-| a descriptor with **`/0/*`** under **`--as md1`** | *"md1 cannot carry this wallet as written: key `@N` (`[<fp/path>]xpub…`) uses `/0/*`, a single fixed chain index, which has no md1 form — encoding it would silently produce a DIFFERENT wallet. Use `--as descriptor`, which carries `/0/*` exactly."* Window substitution per §5.3. §5.3(a); the offending key is named per §5.3's per-key rule (R0 r4's NEW-M4). For a `multi`-form descriptor the remedy sentence is replaced: *"this is a `multi` policy, which only `--as md1` carries — and md1 cannot represent `/0/*`. No `me` path engraves this descriptor this release; re-export with `<0;1>/*`, or as a `sortedmulti` policy if sorted signing order is acceptable (a DIFFERENT policy — `me` will not rewrite it)."* (R0 r5's NEW-I2.) A descriptor mixing an (a)-shaped and an (a″)-shaped key matches both this row and the next; both fire, both are true, and both name the same remedy — no precedence is needed. |
+| a descriptor with **`/0/*`** under **`--as md1`** | *"md1 cannot carry this wallet as written: key `@N` (`[<fp/path>]xpub…`) uses `/0/*`, a single fixed chain index, which has no md1 form — encoding it would silently produce a DIFFERENT wallet. Use `--as descriptor`, which carries `/0/*` exactly."* Window substitution per §5.3. §5.3(a); the offending key is named per §5.3's per-key rule (R0 r4's NEW-M4). For a `multi`-form descriptor the remedy sentence is replaced: *"this is a `multi` policy, which only `--as md1` carries — and md1 cannot represent `/0/*`. No `me` path engraves this descriptor this release; re-export with `<0;1>/*` (works in every build), or as a `sortedmulti` policy if sorted signing order is acceptable (a DIFFERENT policy — `me` will not rewrite it; this alternative needs the descriptor path, so the window substitution applies to it, r14's new-M3)."* (R0 r5's NEW-I2.) A descriptor mixing an (a)-shaped and an (a″)-shaped key matches both this row and the next; both fire, both are true, and both name the same remedy — no precedence is needed. |
 | **`sortedmulti(k, …)` with `k > n`** | *"threshold `k` of `n` keys can never be satisfied — no combination of signatures reaches `k`. Funds sent to this wallet would be unspendable. Nothing was packed."* §4.7 conjunct 2. |
 | **`sortedmulti(0, …)`** — or any `k < 1` | *"threshold 0 means NO signature is required: anyone who can see this script can spend from it. This is almost certainly not the wallet you meant — and if it already holds funds, treat them as at risk now. Nothing was packed."* §4.7 conjunct 2 (R0's I6 — the device derives a real address for `k = 0` and even `k = −1`, so the refusal is the host's alone). |
 | `sortedmulti` with **too many keys** | *"`sh(sortedmulti(…))` carries at most 15 keys — there the multi's output script IS the redeemScript, one 520-byte script element (BIP-383). `wsh(…)` and `sh(wsh(…))` carry at most 20 (`OP_CHECKMULTISIG`); their redeemScript is 34 bytes and the 520-byte limit never binds. This descriptor has `n` keys under `<form>`. The device would accept it and derive addresses whose coins cannot be spent."* §4.7 conjunct 3 (R0's C3, bound corrected by r2's NEW-I2). |
@@ -1645,8 +1659,10 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
    CARRIES in this build exits **2** and prints §5.1's block; with an input
    nothing carries, the input's own refusal fires directly at **3** — the
    admission refusal, or the neither-path refusal (§5.4's carriage rule,
-   r12–r13). All three cases tested (carried; inadmissible; admitted but
-   uncarried). Its sibling (walk W4/W11): `--as descriptor` in a build where its
+   r12–r13). Four cases tested: carried; inadmissible with `--as` omitted;
+   admitted-but-uncarried; and inadmissible with explicit `--as descriptor`
+   in the window — the admission refusal, never the window text (r14's
+   new-I1 ordering). Its sibling (walk W4/W11): `--as descriptor` in a build where its
    path has not shipped exits **3** and prints §5.1's window refusal — BOTH
    alternative variants tested (an md1-representable input, and an
    (a)/(a″)-shaped one).
