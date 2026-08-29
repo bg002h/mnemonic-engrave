@@ -1,10 +1,10 @@
 # IMPLEMENTATION_PLAN_descriptor_input_S2 — `--as descriptor` end to end
 
-**Status: DRAFT — R0 rounds 1 (RED 4C/6I/7M/3N), 2 (RED 1C/2I/4M/3N —
-16 of r1's 20 verified resolved) and 3 (RED 1C/1I/4M/3N,
-`design/agent-reports/R0-S2-plan-r3.md` — 9 of r2's 10 verified resolved;
-the Critical was P3.4 colliding with the parity absolutes) folded
-2026-08-29.** Single author
+**Status: DRAFT — R0 rounds 1 (RED 4C/6I/7M/3N), 2 (RED 1C/2I/4M/3N),
+3 (RED 1C/1I/4M/3N) and 4 (RED 0C/2I/2M/0N,
+`design/agent-reports/R0-S2-plan-r4.md` — all 9 of r3's findings
+verified answered, C1's ruling executed in all five coordinated edits;
+both Importants were propagation gaps under it) folded 2026-08-29.** Single author
 per the R0 gate; this plan binds S2 of `SPEC_descriptor_input.md` (GREEN
 2026-08-28, amendments through the S1+S3 cycle). S1+S3 shipped 2026-08-29
 (engrave `f244442`, records through `4646fa2`); the SH2 is back on the bench
@@ -64,7 +64,21 @@ record displayed on the real device) and every flash remain operator-gated**
      true (r3 C1: P3.4's one case-arm makes the scan door accept the
      row's `ypub`-keyed descriptor — measured, the ONLY row that moves —
      so the boolean must flip in the SAME regeneration, under the same
-     measured-provenance rule as the short-fingerprint row below);
+     measured-provenance rule as the short-fingerprint row below) —
+     TOGETHER with everything on the row that the flip falsifies (r4 I2):
+     its `source` annotation ("refused even with a full explicit
+     origin"), its `name`/`covers`, the generator's line for that
+     annotation (`rows.py:327`) and the `_comment` manifest's `neither`
+     line (`comment.json:107`). **The `neither`-tag ruling:** the row is
+     RETAGGED out of `neither` (a false/true row contradicting the tag's
+     §7 definition may not keep it) and re-covers the
+     device-wider-than-host bullet its data now evidences (the class
+     `promotion/15-bare-tpub-host-refused` already covers); the NEW
+     witness row — itself false/false on both axes, the device parser
+     rejects `multi` (measured, r3) — takes the vacated `neither` slot,
+     so the floor of 3 holds, `MANIFEST`'s `("neither", 3)` does not
+     move, and §7's named-three sentence amends by SUBSTITUTION
+     (full-origin `ypub` out, `wsh(multi(…/0/*))` in);
    - F-428's citation fixes (the stale `:151` cite → the measured `nonstandard/parse.go:158`, in the
      two `source` annotations and the generator) — F-428's own entry names
      "the next vector-file byte change — realistically the S2/F-426 batch"
@@ -83,7 +97,15 @@ record displayed on the real device) and every flash remain operator-gated**
    `MANIFEST`, `TAG_SLOTS`, `ROW_FLOOR`, `SECOND_TAGGED`, `THIRD_TAGGED`
    (`crates/me-cli/tests/descriptor_seam.rs:50-69`), which move with
    a 72nd row and its `covers` tags (`SECOND_TAGGED`/`THIRD_TAGGED` only
-   if the new row is multiply tagged — r3 N3). BOTH device-behaviour
+   if the new row is multiply tagged — r3 N3), AND the `Pop` population
+   literal (`crates/me-cli/tests/descriptor_seam.rs:130-147` — r4 M1:
+   six of its fields move under this payload — `rows` 71→72,
+   `device_admits_true`, `device_admits_false`, `device_admits_absent`
+   1→0, `sysw_class` 4→0, `device_probe` 3→2 — and `gen.py` does not
+   emit them, so they are hand-updated against its printed row count;
+   its paired presence assertion at
+   `crates/me-cli/tests/descriptor_seam.rs:265-275` goes vacuous,
+   harmlessly). BOTH device-behaviour
    values in the regeneration are MEASURED, never predicted (r2 M3,
    extended by r3 C1): the P3 implementer's fork worktree
    (`s2/descriptor-arm`) authors P3.1's parse fix AND P3.4's `ypubVer`
@@ -162,14 +184,31 @@ record displayed on the real device) and every flash remain operator-gated**
   "the Go test asserts the device column" phrasing
   (`design/SPEC_descriptor_input.md:1496-1498` — P3.3's derived rule reads the
   host column; the never-compare-implementations half survives); §4.3's
-  five-version NORMATIVE sentence (`design/SPEC_descriptor_input.md:462`) and
-  the operator-facing "the device admits exactly" refusal text
-  (`crates/me-cli/src/descriptor/refusal.rs:583`, pinned by
-  `crates/me-cli/tests/descriptor_refusals.rs:466`, quoted in §6's table
-  at `design/SPEC_descriptor_input.md:1432`) — false of the scan door once
-  P3.4 lands. Each member carries its owning amendment task (P2.7 or
-  P3.5) and its grep token for the P2 sweep (the P1.0 pair's tokens:
-  `gate_open`, "record classification fails"). Output: a
+  DEVICE clauses (`design/SPEC_descriptor_input.md:453-461` — the
+  admitted-set-of-five, the "no `ypub` case" description, and the
+  measured REFUSE claim whose input is exactly the row invariant 1
+  flips; r4 I2 corrected r3's `:462` cite — the NORMATIVE sentence AT
+  `:462` is about `me`, whose admission is unchanged, so that clause is
+  CORRECT and untouched, the same shape as §5.2's predicate sentence);
+  §4.5's promotion-table prose
+  (`design/SPEC_descriptor_input.md:570-574` — "`ypub` … has no case in
+  the switch", false of the device after P3.4, and the very paragraph
+  P3.1 sends the porter to — its amendment must land so a §4.5 port and
+  a `cascade.rs` port stop meaning different predicates); §7's named
+  `neither` rows (`design/SPEC_descriptor_input.md:1610-1611` — the
+  full-origin `ypub` stops being a false/false row; see invariant 1's
+  `neither`-tag ruling); the host source comment asserting the device's
+  five (`crates/me-cli/src/descriptor/cascade.rs:58-62` — comments
+  outlive their conditions); and the operator-facing "the device admits
+  exactly" refusal text (`crates/me-cli/src/descriptor/refusal.rs:583`,
+  pinned by `crates/me-cli/tests/descriptor_refusals.rs:466`, quoted in
+  §6's table at `design/SPEC_descriptor_input.md:1432`) — false of the
+  scan door once P3.4 lands. Each member carries its owning amendment
+  task (P2.7, or P3.5 for every sentence describing DEVICE behaviour
+  that arrives with P3.4 — r4 M2) and its grep token for the P2 sweep
+  (the P1.0 pair's tokens: `gate_open`, "record classification fails";
+  the P3.4 members' token: `ypub` — the one term that reaches all of
+  them, r4 I2). Output: a
   checked-in inventory table in this plan (folded at P0's close) stating,
   per member, its post-S2 behaviour and which P-task flips it. **The §6
   row-test count after S2 is a MEASURED number recorded here** (expected 35
@@ -382,17 +421,22 @@ record displayed on the real device) and every flash remain operator-gated**
   classification fails" gate-trigger sentences (r3 I1 — P1.0 abolishes
   the precondition, and these are the exact sentences a future
   implementer re-reads before touching the pack path), §7 requirement
-  3's device-column phrasing, and §4.3's five-version sentence plus the
-  "device admits exactly" refusal text and its pinned §6 row (r3 C1 —
-  reworded to the two-door truth: `me`'s admission is unchanged at five;
+  3's device-column phrasing. The §4.3/§4.5 device clauses, the
+  "device admits exactly" refusal text and its pinned §6 row move to
+  **P3.5's ownership** (r4 M2: they describe scan-door behaviour that
+  arrives with P3.4 in P3, and the P2 gate must not close with the spec
+  asserting device behaviour fork `main` does not yet have — reworded
+  there to the two-door truth: `me`'s admission is unchanged at five;
   the scan door accepts `ypub` after P3.4; the SYSW classifier stays
   host-exact). The authoritative enumeration is P0.1's
   SPEC-FALSIFICATION section (r3 M4); a diff falsifies text it never
   touches, so the propagation sweep runs over the SPEC too — with the
   falsified sentences' OWN tokens (`sysw_class`, `panic:parse`, "PANICS
-  the Go parser", `gate_open`, "record classification fails") as sweep
-  terms, because they share no token with the S3-parked phrasings and a
-  sweep can only find what its terms name (r2 I1's failure mode).
+  the Go parser", `gate_open`, "record classification fails", `ypub` —
+  the last is the ONE term that reaches every P3.4-falsified site, r4
+  I2) as sweep terms, because they share no token with the S3-parked
+  phrasings and a sweep can only find what its terms name (r2 I1's
+  failure mode).
 - **P2 gate:** full engrave suites (lint-gate, `ME_REQUIRE_GO=1`);
   zero `#[ignore]`; the matrix witness green; propagation sweep whole-repo
   including the spec (the S3-parked phrasings must survive ONLY in
@@ -510,7 +554,16 @@ record displayed on the real device) and every flash remain operator-gated**
   recon Q5), with a test per direction (bare `ypub` classifies
   and normalises to `xpub`; the host's five-version admission is UNCHANGED
   in S2 — the convergence widening is F-426's later cycle, say so in the
-  test's comment). **This arm widens the SCAN DOOR, and S2 says so end
+  test's comment) — plus a THIRD, `sysw`-level negative (r4 I1, the
+  instrument for the bare-key half of the §4.3 check that no vector row
+  and no other gate can see): `sysw.Classify(<the bare ypub string, the
+  same key material as the vector row>) == ClassUnknown`, its comment
+  naming P3.4 as the reason it can fail — r4 measured that a §4.5
+  promotion-table port taken from the spec's own §4.5 paragraph
+  (post-P3.4, `ypubVer` is IN the mapping) classifies a bare `ypub`
+  `ClassDescriptor` while `me` refuses it at rc 3, with every other gate
+  green. This test costs no vector byte and makes P3.1's "on both the
+  descriptor-embedded and bare-key paths" sentence falsifiable. **This arm widens the SCAN DOOR, and S2 says so end
   to end rather than tripping over it** (r3 C1, measured: the one arm
   flips `neither/full-origin-ypub`'s `device_admits` and reds the
   shipped seam test unless the regeneration carries the flip). The
@@ -529,7 +582,16 @@ record displayed on the real device) and every flash remain operator-gated**
 - **P3.5** (new at the r1 fold — I3 device half; own commit, marked
   amendment) §9 item 2's "untested by construction" claim updates to the
   S2 truth: one cell executed (walletPolicy, by P3.2's walk), two declared
-  and inert with a named follow-up.
+  and inert with a named follow-up. Plus the P3.4 amendment batch moved
+  here from P2.7 (r4 M2): §4.3's device clauses
+  (`design/SPEC_descriptor_input.md:453-461`), §4.5's promotion prose
+  (`design/SPEC_descriptor_input.md:570-574`), §7's named `neither` rows
+  (`design/SPEC_descriptor_input.md:1610-1611`), the
+  `crates/me-cli/src/descriptor/cascade.rs:58-62` host comment, and the
+  `crates/me-cli/src/descriptor/refusal.rs:583` operator message with
+  its pinned test (`crates/me-cli/tests/descriptor_refusals.rs:466`) and
+  §6 table quote — the engrave-side text edits here are small and the
+  controller folds them inline per the tight-implementation rule.
 - **P3 gate:** `go test ./...` + gui shard + vet + gofmt + **the TinyGo
   device build** (r1 M3 — the command CI runs,
   `tinygo build -size full -print-stacks -o /dev/null -target pico-plus2
