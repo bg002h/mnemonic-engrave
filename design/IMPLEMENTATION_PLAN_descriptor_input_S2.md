@@ -1,10 +1,11 @@
 # IMPLEMENTATION_PLAN_descriptor_input_S2 — `--as descriptor` end to end
 
 **Status: DRAFT — R0 rounds 1 (RED 4C/6I/7M/3N), 2 (RED 1C/2I/4M/3N),
-3 (RED 1C/1I/4M/3N), 4 (RED 0C/2I/2M/0N) and 5 (RED 0C/2I/1M/2N,
-`design/agent-reports/R0-S2-plan-r5.md` — r4's I1/M1 and four of five
-M2 members verified resolved; both Importants were defects in r4's
-`neither`-tag ruling, re-ruled below) folded 2026-08-29.** Single author
+3 (RED 1C/1I/4M/3N), 4 (RED 0C/2I/2M/0N), 5 (RED 0C/2I/1M/2N) and 6
+(RED 0C/1I/3M/1N, `design/agent-reports/R0-S2-plan-r6.md` — all 5 of
+r5's findings verified resolved, the version-gap arithmetic recomputed
+exact; the one Important was `comment.json`'s ownership) folded
+2026-08-29.** Single author
 per the R0 gate; this plan binds S2 of `SPEC_descriptor_input.md` (GREEN
 2026-08-28, amendments through the S1+S3 cycle). S1+S3 shipped 2026-08-29
 (engrave `f244442`, records through `4646fa2`); the SH2 is back on the bench
@@ -107,7 +108,13 @@ record displayed on the real device) and every flash remain operator-gated**
      in, `neither`'s named three substituted, `promotion-near-miss`
      unchanged at 15); the NEW §7 bullet itself; and `comment.json`'s
      WHOLE manifest block (lines 101-113, not just the `neither` line —
-     r5 I1c: it is a third copy of the manifest);
+     r5 I1c: it is a third copy of the manifest). **`comment.json` is a
+     generator INPUT, not a description** (r6 NEW-I1: `gen.py:209`
+     embeds it verbatim into the emitted file, so the pinned sha is a
+     function of it) — it is edited AT P2.6 with `rows.py`, BEFORE
+     `gen.py` runs, or the shipped file carries a NORMATIVE manifest
+     that is false about itself with no test red (nothing reads
+     `_comment`, and CI never runs `gen.py`);
    - F-428's citation fixes (the stale `:151` cite → the measured `nonstandard/parse.go:158`, in the
      two `source` annotations and the generator) — F-428's own entry names
      "the next vector-file byte change — realistically the S2/F-426 batch"
@@ -212,7 +219,9 @@ record displayed on the real device) and every flash remain operator-gated**
   consulting the gate on EVERY omitted-`--as` pack; §7 requirement 3's
   "the Go test asserts the device column" phrasing
   (`design/SPEC_descriptor_input.md:1496-1498` — P3.3's derived rule reads the
-  host column; the never-compare-implementations half survives); §4.3's
+  host column; the never-compare-implementations half survives; owned
+  by P3.5 per the split rule — P3.3, a fork commit in P3, is the
+  falsifying diff, r6 M1); §4.3's
   DEVICE clauses (`design/SPEC_descriptor_input.md:453-461` — the
   admitted-set-of-five, the "no `ypub` case" description, and the
   measured REFUSE claim whose input is exactly the row invariant 1
@@ -226,11 +235,22 @@ record displayed on the real device) and every flash remain operator-gated**
   a `cascade.rs` port stop meaning different predicates); §7's named
   `neither` rows and manifest arithmetic
   (`design/SPEC_descriptor_input.md:1610-1615`, `:1719-1723`,
-  `:1728-1732`, plus `comment.json`'s manifest block — the full-origin
-  `ypub` stops being a false/false row and the 72nd row moves the
-  slots/floor derivation; see invariant 1's `neither`-tag ruling; owned
-  by P2.7 per the r5 I2 split rule, NOT P3.5 — P2.6 is the falsifying
-  diff); the host source comment asserting the device's
+  `:1728-1732` — the full-origin `ypub` stops being a false/false row
+  and the 72nd row moves the slots/floor derivation; see invariant 1's
+  `neither`-tag ruling; the three SPEC sites are owned by P2.7 per the
+  r5 I2 split rule, while `comment.json`'s manifest block is a
+  generator INPUT edited at P2.6 — r6 NEW-I1); the row-RENAME sites
+  (r6 M2 — the retag renames `neither/full-origin-ypub` to the
+  version-gap name, and every row name is `<tag>/<slug>`):
+  `crates/me-cli/tests/descriptor_refusals.rs:463` (`vector_input` by
+  name — reds loudly at P2.6 and is updated in the P2.6 commit;
+  distinct from `:466`'s refusal-text pin three lines below, which
+  stays P3.5's) and `crates/me-cli/src/descriptor/admit.rs:23` (a
+  SILENT source comment citing the row by name — edited at P2.6 with
+  the rename); `scripts/descriptor-seam-vectors/README.md:9` ("the 71
+  row DEFINITIONS" — r6 M3: edited at P2.6 with the regeneration; no
+  sweep term reaches it, so this named owner is its only finder); the
+  host source comment asserting the device's
   five (`crates/me-cli/src/descriptor/cascade.rs:58-62` — comments
   outlive their conditions); and the operator-facing "the device admits
   exactly" refusal text (`crates/me-cli/src/descriptor/refusal.rs:583`,
@@ -422,7 +442,8 @@ record displayed on the real device) and every flash remain operator-gated**
   vector-file regeneration: new witness row, `sysw_class` column
   retirement, `panic:parse` `device_probe` retirement, the ypub row's
   `device_admits` flip (r3 C1), F-428 citation fixes;
-  `scripts/descriptor-seam-vectors/rows.py` + JSON together, engrave
+  `scripts/descriptor-seam-vectors/rows.py` + `comment.json` (a
+  generator input, r6 NEW-I1) + JSON together, engrave
   copy + pin bumped, engrave-side seam assertions updated in the same
   commit. (The fork copy follows byte-identically at P3.3.) The two
   device-measured booleans come from the P3 implementer's
@@ -448,14 +469,20 @@ record displayed on the real device) and every flash remain operator-gated**
   the `sysw_class` column definition paragraph and the
   `device_probe`/panic-parse clauses ("the Go test never feeds one to the
   parser" — false once P3.1 lands and the row's probe retires), §4.2
-  defect 4's "PANICS the Go parser" sentence (false after the convergence
-  fix), §5.5's "needs a firmware change to be readable | yes, §5.2" row,
+  defect 4's FILE-half clauses ("§7 marks these rows `device_probe`" —
+  falsified by P2.6's marker retirement, so owned here; the "PANICS the
+  Go parser" DEVICE sentence itself moves to P3.5, whose P3.1 fix is
+  the falsifying diff — r6 M1), §5.5's "needs a firmware change to be
+  readable | yes, §5.2" row,
   §8's "S2 is parked" sentence, §5.1's and §7's "after record
   classification fails" gate-trigger sentences (r3 I1 — P1.0 abolishes
   the precondition, and these are the exact sentences a future
   implementer re-reads before touching the pack path), §7 requirement
   3's device-column phrasing. **The ownership split rule (r5 I2): a
-  member is owned by the phase whose diff falsifies it.** Falsified by
+  member is owned by the phase whose diff falsifies it — and a member
+  that is a generator INPUT rather than a description is not routed by
+  this rule at all: it is edited in the generating task itself, before
+  the generator runs (r6 NEW-I1, `comment.json`).** Falsified by
   P2.6's regeneration — they describe the VECTOR FILE, not the device —
   and therefore owned HERE, landing at P2's close so the P2 gate never
   runs against a spec contradicting the repo's own regenerated file:
@@ -485,7 +512,9 @@ record displayed on the real device) and every flash remain operator-gated**
 - **P2 gate:** full engrave suites (lint-gate, `ME_REQUIRE_GO=1`);
   zero `#[ignore]`; the matrix witness green; propagation sweep whole-repo
   including the spec (the S3-parked phrasings must survive ONLY in
-  `design/agent-reports/` and historical review text per P0's inventory);
+  `design/agent-reports/` and historical review text per P0's inventory;
+  completed sibling plans — e.g. the S1_S3 plan's manifest copy — are
+  RECORDS, so sweep hits there are triaged, not amended, r6 N1);
   staleness re-check; proportional opus review over P1+P2 before the Go
   port starts (Rust is the primary — the port must not begin from
   unreviewed semantics).
@@ -638,8 +667,12 @@ record displayed on the real device) and every flash remain operator-gated**
   `crates/me-cli/src/descriptor/cascade.rs:58-62` host comment, and the
   `crates/me-cli/src/descriptor/refusal.rs:583` operator message with
   its pinned test (`crates/me-cli/tests/descriptor_refusals.rs:466`) and
-  §6 table quote — the engrave-side text edits here are small and the
-  controller folds them inline per the tight-implementation rule.
+  §6 table quote — plus, per the same falsifying-diff rule (r6 M1): §7
+  requirement 3's device-column phrasing (P3.3 falsifies it) and §4.2
+  defect 4's "PANICS the Go parser" device sentence (P3.1 falsifies it;
+  its file-half stays P2.7's) — the engrave-side text edits here are
+  small and the controller folds them inline per the
+  tight-implementation rule.
 - **P3 gate:** `go test ./...` + gui shard + vet + gofmt + **the TinyGo
   device build** (r1 M3 — the command CI runs,
   `tinygo build -size full -print-stacks -o /dev/null -target pico-plus2
