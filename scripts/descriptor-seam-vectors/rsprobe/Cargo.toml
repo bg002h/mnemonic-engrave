@@ -1,0 +1,9 @@
+[package]
+name = "rsprobe"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+md-codec = "0.42"
+
+[workspace]
