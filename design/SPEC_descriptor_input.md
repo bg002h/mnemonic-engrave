@@ -1053,22 +1053,37 @@ BEFORE whatever follows, in TWO tiers (walk W13; follower set completed per
 R0 r9's I1; the tier boundary made `--as`-independent per R0 r10's new-I1).**
 The tier is decided by what does NOT depend on the flag: a wallet that
 passes conjuncts 2–7 AND whose shape at least one `--as` path admits gets
-the **FULL block**, whose followers are: a pack, the `--as`-omitted choice
-block, §5.1's window refusal, and §5.3's refusals; the PARTIAL block's one
-follower is a §4.7 admission refusal (partitioned per R0 r11's new-N1). (A `multi` input in the window is
+the **FULL block**; a wallet NO path admits gets the PARTIAL block. **The
+tier decides only WHICH LINES print; what FOLLOWS the block is decided
+independently by §5's own logic** — any tier may precede any follower, and
+the followers, enumerated once: the `--as`-omitted choice block, §5.1's
+window refusal, a §5.3 refusal, a §4.7 admission refusal, or the pack.
+(A full-tier `wsh(multi(…))` under `--as descriptor` meets a conjunct-1
+admission refusal; the two prior attempts to couple tier to follower each
+manufactured a false claim — R0 r11's new-N1, r12's new-I1.)
+
+**Precedence for `--as` omitted — the missing rule r12's contradiction
+exposed:** admission is `--as`-independent, so for an input NO path admits,
+the §4.7 admission refusal fires directly at `EXIT_REFUSED` (3) — asking
+the operator to choose a flag that cannot help is the W5/W11 defect class.
+The choice block (at `EXIT_USAGE` (2)) fires only for inputs at least one
+path admits. §6's `--as`-omitted row and §11 item 5 carry the same
+qualifier. (A `multi` input in the window is
 full-tier: its refusal is the window's, not admission's — the wallet is
 derivable and spendable, and md1-packable when its use-site paths are
 md1-representable; either way, stripping its identification would blind
 the operator at the decision the refusal asks of them — R0 r11's new-M2.) A
 wallet NO path admits — a conjunct failure — gets the **PARTIAL block**:
 the first three lines plus the watch-only line, no `wallet-id:`, no
-`address 0:`, no compare prompt. It covers exactly §6's
-admission-refusal rows — the underivable wallets (mixed network, hardened
-use-site, non-consecutive multipath, the wrapped and script-slot shapes,
-deeper tails), the unspendable and anyone-can-spend thresholds and key
-counts, and the refused version bytes and shapes; the class is defined by
-the conjuncts, not by an inventory (R0 r10's new-M3; r11's new-M1 — the
-count is the conjuncts' business) — a "compare before
+`address 0:`, no compare prompt. It covers the rows refused
+by the `--as`-independent conjuncts and the no-path-admits shapes — the
+underivable wallets (mixed network, hardened use-site, non-consecutive
+multipath, the wrapped and script-slot shapes), the unspendable and
+anyone-can-spend thresholds and key counts, the refused version bytes and
+shapes, and the UNMEASURED closed-set residue (deeper tails and the like —
+refused as unmeasured, not as underivable; R0 r12's new-M1a); the class is
+defined by the conjuncts, not by an inventory (R0 r10's new-M3; r11's
+new-M1; label made `--as`-independent per r12's new-M2b) — a "compare before
 engraving" prompt would be a wrong instruction on every one. §5.3(b)'s
 label warning, where it applies, follows the block. Neither path ships bytes the host has not
 understood. `me` prints to stderr:
@@ -1187,7 +1202,7 @@ NEW-I2).
 | an unparseable file | *"this is not a wallet descriptor in any of the four forms `me` reads: a BlueWallet `Key: value` setup file, a plain BIP-380 descriptor, a `{"label":…,"descriptor":…}` JSON export, or a single extended key. It looks most like `<form>`, which failed because: `<that branch's error>`."* |
 | an **empty file** | the SHIPPED `me 0.7.0` refusal is kept verbatim (R0's I7) — *"no records in `<file>`: pass them on argv, with --in, or on stdin. An EMPTY input is what a FAILED upstream command leaves behind…"* — which already names the C-1 composition hazard. **`EXIT_USAGE` (2)**, measured at fold time (rc=2, 0 stdout bytes); this spec records the existing behaviour rather than silently regressing a tested surface. |
 | a file of only whitespace | reaches the same shipped "no records" path (blank records are skipped) — same message, **`EXIT_USAGE` (2)**. |
-| **`--as` omitted** | §5.1's text. **`EXIT_USAGE` (2)**, not 3 — nothing was refused, a choice was not made. |
+| **`--as` omitted** (input at least one path admits) | §5.1's text. **`EXIT_USAGE` (2)**, not 3 — nothing was refused, a choice was not made. For an input NO path admits, the §4.7 admission refusal fires directly at (3) instead — a flag choice cannot help (R0 r12's new-I1 precedence rule). |
 | a **wrapper whose inner descriptor is malformed** | the wrapper is named, then the inner error, then the position: *"the `{label, descriptor}` JSON parsed, and its `descriptor` field did not: `bip380: script: missing ')'`. The label was `"…"`. The problem is in the descriptor string, not the JSON."* |
 | a **BlueWallet file with no `Name:`** | *"this is a BlueWallet setup file — it has `Policy`, `Derivation` and `Format` headers and `N` cosigner lines — but no `Name:` header, and the device requires one. Add a line `Name: <anything>`."* This is the case §4.2 measured as producing the generic message today, with the real reason destroyed. |
 | a BlueWallet file with no `Format:` | *"…no `Format:` header, so the script type is undefined. Add `Format: P2WSH` (or `P2SH`, or `P2WSH-P2SH`)."* §4.2 defect 1. |
@@ -1610,8 +1625,10 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
 4. Every refusal in §6 has a test that reaches it and asserts the *text*, not
    just the exit code. The `--as descriptor`-only rows among them are S2's
    (F-418); the rest bind S3 (R0 r6's NEW-M5).
-5. `--as` omitted with a descriptor input exits **2** and prints §5.1's
-   block. Its sibling (walk W4/W11): `--as descriptor` in a build where its
+5. `--as` omitted with a descriptor input AT LEAST ONE PATH ADMITS exits
+   **2** and prints §5.1's block; with an input no path admits, the §4.7
+   admission refusal fires directly at **3** (r12's precedence rule) — both
+   cases tested. Its sibling (walk W4/W11): `--as descriptor` in a build where its
    path has not shipped exits **3** and prints §5.1's window refusal — BOTH
    alternative variants tested (an md1-representable input, and an
    (a)/(a″)-shaped one).
