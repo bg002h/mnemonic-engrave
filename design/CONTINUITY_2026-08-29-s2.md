@@ -76,13 +76,27 @@ untouched -- second regeneration forbidden), expect_kinds pins literals
 CARRIED ITEMS: M-3 goprobe/go.mod re-points at fork main AT MERGE (+
 provenance paragraphs, needs a FOLLOWUPS entry at P5.1); N-2 F-428's
 :158 cite is rev-qualified to fork 1f09537 -- do NOT re-base it.
-**P3 IMPLEMENTER IN FLIGHT** (fork worktree s2/descriptor-arm @
-0abbf81: the arm with S4.3 string check + S4.5 narrowings + S4.7
-conjuncts, walletPolicy consumer + sim walk, vector-copy sync clearing
-the known red, F-426 tests; report will land at
-design/agent-reports/IMPL-S2-P3.md on the engrave branch). After P3:
-controller folds P3.5 (device-half spec amendments + refusal.rs:583 +
-cascade.rs comment) inline, then the P3 port review, then P4/P5.
+**P3 DONE + gated GREEN** (fork
+s2/descriptor-arm 0abbf81..fe9475c, 4 commits; report IMPL-S2-P3.md on
+the engrave branch @ 0096462): the arm as the PREDICATE (parity exact
+first try, 59/59 + 19/19), walletPolicy consumer + the first-ever
+execution of the admission cell (sim walk on a real 509-byte
+container), seam sync (known red cleared, pins equal e7a4160c), F-426
+tests; TinyGo +2616B flash / 0B RAM; gui shard 1008==1008; controller
+verified branch/sha/suites. **P3.5 FOLDED by controller** (engrave
+branch @ 781d10d): six spec amendments (S4.2 past-tense+fix, S4.3
+two-door truth, S4.5 ypub case, S9 item 2 one-cell-executed, S6 quote
+re-subjected to `me`), refusal.rs:584 + pin, cascade.rs comment;
+40/40 + lint-gate. **IN FLIGHT, parallel:** (1) P3 port review, opus
+(full fork branch + P3.5 diff; attack brief: S4.3 string-check
+false-positives incl. ypub-in-checksum/base58-body, S4.5 branch-4
+detection, conjunct fidelity, recover scoping, walk assertions;
+report REVIEW-S2-P3-r1.md, main repo); (2) P4.1 measurement, sonnet
+(F-423 fit: analytic bound + trial via the fork's own mechanism;
+FontSize floor stands; N=1 closes F-423 measured-no-gain and skips
+P4.2; report MEASURE-S2-P4-1.md + scripts/f423-fit-measure/ on the
+engrave branch). Then: P4.2 iff N>1, P5 records + the mandatory
+whole-diff execution review (P5.2), pushes only after it closes.
 Recon: `design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`).
 Scale: 5 expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
 propagation sweeps + generators; both clippy toolchains (F-430).
