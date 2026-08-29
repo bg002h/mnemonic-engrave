@@ -18,7 +18,15 @@ key-identity row, §7's gate its clause 8 — moving the manifest arithmetic
 **34→37 gate / 85→88 slots / 68→71 floor**, the numbers every downstream
 artifact must re-pin (the propagation check's first target); found by
 PLAN-r1's C1, corrected by PLAN-r2, **under verification by the plan R0
-rounds in flight** (past-tense only when a round closes on it). §9 item 7 records the walk's
+rounds in flight** (past-tense only when a round closes on it). **Post-GREEN
+amendment 2026-08-29:** §6 gained the `multi`-class device-clause rule — the
+transposition carve-out generalised from one row to six, after IMPL-P1's review
+(M1) measured five §6 rows printing a device claim that is FALSE for a `multi`
+input — and the key-identity row's cause clause was restated over ENTRIES
+rather than BlueWallet LINES (M5: the row cannot fire for a BlueWallet file,
+measured). Neither changes a refusal, a cause or an operator's next action;
+both change what a row SAYS about the device, and P2.4's verbatim assertions
+are written from the AMENDED text. §9 item 7 records the walk's
 one narrow residual.
 **No code may be written before the implementation plan passes its own
 gate** (project `CLAUDE.md` — this is risk-set work: it changes normative
@@ -1330,7 +1338,28 @@ from §4.7's admission predicate or §5.3's representability limits fire from
 their own checks, after a successful parse — the rule never selects them
 (R0 r2's NEW-N1). And the `sortedmulti` rows below read over BOTH multi
 forms: §4.7 conjunct 1's md1-path `multi` twins hit the same conjuncts and
-get the same texts with the form name substituted (R0 r5's NEW-M2).
+get the same texts with the form name substituted (R0 r5's NEW-M2) — **with
+one class of clause excepted, which the amendment below states.**
+
+**AMENDED 2026-08-29 (IMPL-P1's review, M1): NO DEVICE-BEHAVIOUR CLAUSE
+TRANSPOSES TO A `multi` INPUT.** `bip380.Parse`'s script switch has a
+`sortedmulti` case and no `multi` case, so the device refuses EVERY `multi`
+form at PARSE and none of them ever reaches address derivation. The previous
+text carved exactly ONE row out for that reason (the single-key wrapper), and
+the reason was never specific to that row: it is a property of the whole
+`multi` class. Six rows carry a sentence about what the device does with the
+descriptor — the single-key-wrapper row plus `tr(sortedmulti(…))`, the mixed
+network, the hardened use-site, the non-consecutive multipath and the key
+count — and for a `multi` input five of those six were measurably FALSE, each
+asserting that the device accepts or derives from a file its parser rejects
+(constructed and run against `me 0.7.0`; the table is IMPL-P1-review §M1).
+
+So: **for a `multi` input, every such clause is REPLACED by** *"the device's
+parser refuses `multi` outright, so this file never reaches address derivation
+there."* The refusal, its cause and the operator's next action are unchanged in
+all six — only the device sentence moves. The single-key-wrapper row keeps its
+own additional substitution (its REMEDY transposes too, naming the wrapper
+change), which this amendment narrows rather than removes.
 
 **Scope: §5.1's gate is per-LINE; the five steps above are whole-INPUT — a
 deliberate divergence, not an alignment (r19's minor).** The gate decides
@@ -1358,12 +1387,10 @@ the verdict; contains NO internal identifiers — no phase labels, no F-numbers,
 no spec § references inside the quotes (those live in the row's annotation,
 outside the quotes); and names only next actions executable in the CURRENT
 build (walk W11). The one
-exception is the single-key-wrapper row, where NEITHER the remedy's
-`sortedmulti` forms NOR the device-measurement parenthetical transposes —
-all three single-key `multi` twins are device REFUSE at PARSE (measured) and
-never reach address derivation — so for a `multi` input that row substitutes
-its own remedy, naming the mandatory wrapper change (R0 r6's NEW-M4; r7's
-NEW-I2).
+exception is the single-key-wrapper row, where — on top of the device-clause
+substitution the whole `multi` class now takes (the amendment above) — the
+REMEDY's `sortedmulti` forms do not transpose either: for a `multi` input that
+row names the mandatory wrapper change instead (R0 r6's NEW-M4; r7's NEW-I2).
 
 | the operator's input | what `me` says |
 | --- | --- |
@@ -1385,7 +1412,7 @@ NEW-I2).
 | **`sortedmulti(k, …)` with `k > n`** | *"threshold `k` of `n` keys can never be satisfied — no combination of signatures reaches `k`. Funds sent to this wallet would be unspendable. Nothing was packed."* §4.7 conjunct 2. |
 | **`sortedmulti(0, …)`** — or any `k < 1` | *"threshold 0 means NO signature is required: anyone who can see this script can spend from it. This is almost certainly not the wallet you meant — and if it already holds funds, treat them as at risk now. Nothing was packed."* §4.7 conjunct 2 (R0's I6 — the device derives a real address for `k = 0` and even `k = −1`, so the refusal is the host's alone). |
 | `sortedmulti` with **too many keys** | *"`sh(sortedmulti(…))` carries at most 15 keys — there the multi's output script IS the redeemScript, one 520-byte script element (BIP-383). `wsh(…)` and `sh(wsh(…))` carry at most 20 (`OP_CHECKMULTISIG`); their redeemScript is 34 bytes and the 520-byte limit never binds. This descriptor has `n` keys under `<form>`. The device would accept it and derive addresses whose coins cannot be spent."* §4.7 conjunct 3 (R0's C3, bound corrected by r2's NEW-I2). |
-| two keys declaring **the same origin with different xpubs** | *"this wallet description contradicts itself: keys `N` and `M` both claim origin `<fp/path>` but name different keys — one origin identifies exactly one key, so no wallet matches this description. Check the export: a duplicated cosigner line carrying the wrong key is the usual cause."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (PLAN-r1's C1; row per PLAN-r2's NEW-C2; ordinals per PLAN-r3's N2). |
+| two keys declaring **the same origin with different xpubs** | *"this wallet description contradicts itself: keys `N` and `M` both claim origin `<fp/path>` but name different keys — one origin identifies exactly one key, so no wallet matches this description. Check the export: one of the two entries carries the wrong key, and a copied-and-edited cosigner is the usual cause."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (PLAN-r1's C1; row per PLAN-r2's NEW-C2; ordinals per PLAN-r3's N2). **AMENDED 2026-08-29 (IMPL-P1's review, M5):** the previous clause named *"a duplicated cosigner LINE"*, i.e. a BlueWallet file — and this row cannot fire for one. In a BlueWallet file every key shares the single `Derivation:` header, so two keys carry the same `(fingerprint, origin)` **iff** they carry the same header key, which the device's own `seenKeys` map catches FIRST as `inconsistent header value`; branch 1 then fails and §6 row 1 carries the reason (measured). The row is reachable from a plain BIP-380 descriptor and from the JSON wrapper, where two key expressions may carry one origin block and different keys — so the cause clause is now stated over ENTRIES rather than over BlueWallet lines. Conjunct 8's other half, the duplicate row below, IS BlueWallet-reachable (different fingerprints, same xpub) and is unaffected. |
 | the **same key at the same derivation in two slots** | *"keys `N` and `M` are the same key at the same derivation — a threshold that needs the same key twice is not the multisig this file describes. Remove the duplicate line, or supply the missing cosigner's key."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (split per PLAN-r3's I3 — the primary separates the two causes, and "no wallet matches" is false for a duplicate). |
 | a multisig mixing **mainnet and testnet keys** | *"key `N` is `tpub` (testnet) while key 0 is `xpub` (mainnet). The device accepts this descriptor and then cannot derive any address from it. All keys must share one network."* §4.7 conjunct 5 (R0's I4). |
 | a descriptor or bare key using **`ypub`/`upub`/`vpub`/`Upub`/`Vpub`** | *"the device admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`."* The remedy names the **per-version** target (R0 r2's NEW-I3 — one template cannot serve five): `ypub` → `xpub` (mainnet BIP-49, `sh(wpkh(…))`); `upub` → `tpub` (**testnet** BIP-49, `sh(wpkh(…))`); `vpub` → `tpub` (**testnet** BIP-84, `wpkh(…)`); `Upub`/`Vpub` → `tpub` (**testnet multisig** — no single-key remedy exists; supply the full multisig descriptor: `sh(wsh(sortedmulti(…)))` for `Upub`, `wsh(sortedmulti(…))` for `Vpub` — or a BlueWallet file). Four of the five are testnet keys, and an `xpub` remedy would name a mainnet wallet the operator does not hold — measured, mainnet `354hXbgw…` versus the real testnet `tb1qmj7qns4…`. For a key WITH an origin, the operator's own fingerprint/path is substituted in; for a BARE key the remedy is the origin-less descriptor spelling — `sh(wpkh(<converted key>/<0;1>/*))`, which the device admits (measured) — because handing back a bare converted key would PROMOTE to a different wallet (`pkh(…)`, measured). §4.3 (R0's C2); F-413 tracks host-side normalisation. |
