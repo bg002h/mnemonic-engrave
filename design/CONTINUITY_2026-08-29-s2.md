@@ -26,8 +26,14 @@ classifier host-exact via string-level S4.3 check); r4 RED 0C/2I/2M
 (`46c20ce`/`d5a22aa` -- bare-ypub sysw negative test added; neither-tag
 RULED: ypub row retags out, new witness row takes the slot, floor of 3
 holds; P3.4 spec batch moved to P3.5; cite gate 117/117, lint clean).
-Round 5 in flight (opus, fold-vs-r4's-4-findings; report lands at
-`design/agent-reports/R0-S2-plan-r5.md`; clean CLOSES at GREEN).
+r5 RED 0C/2I/1M/2N (`9de0bc8`/`b5570a2` -- both Importants were in r4's
+neither-tag ruling; RE-RULED: the ypub row gets a NEW single-member S7
+bullet, the F-426 version-gap witness; TAG_SLOTS 88->89, ROW_FLOOR
+71->72, all three manifest copies enumerated; ownership split rule:
+owned by the phase whose diff falsifies it). Round 6 in flight (opus,
+fold-vs-r5's-5-findings; report lands at
+`design/agent-reports/R0-S2-plan-r6.md`; clean CLOSES at GREEN). Past
+the 5-round expected-good mark, still 0C since r4 and narrowing.
 Recon: `design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`).
 Scale: 5 expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
 propagation sweeps + generators; both clippy toolchains (F-430).
