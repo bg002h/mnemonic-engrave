@@ -104,10 +104,18 @@ DECLINED r1's suggested remedy with a constructed counterexample and
 closed an unnamed BlueWallet-header residual); C2 -> asciiNormalise
 guard in the arm only; I1 consumer parses the proved string; M1 quote;
 54-case probe 22 divergences -> 0; five load-bearing mutations; TinyGo
-+1664B/0 RAM. I2 folded by controller (`36fd0c3`). **RE-REVIEW r2 IN
-FLIGHT** (opus, scoped fold-vs-findings + branch-order parity +
-asciiNormalise-vs-host diff; report REVIEW-S2-P3-r2.md, main repo;
-clean round closes the P3 loop). Then P4.2, then P5; (2) P4.1 measurement DONE:
++1664B/0 RAM. I2 folded by controller (`36fd0c3`). **r2 GREEN 0C/0I/2M/2N --
+THE P3 LOOP CLOSED** (persisted `473c12e`): 187-case probe 0
+divergences, asciiNormalise byte-for-byte vs the host, branch-order
+parity structural, the declined C1 remedy justified by measurement,
+and the fold ALSO closed an unnamed device-wider break (JSON
+\u0079-escaped ypub). r2's M1 (S5.2's arm composition gains the S4.6
+step) folded by controller on the engrave branch (`347b82e`); M2
+(interior-CRLF narrowing) disclosed+pinned, non-gating; the two Nits
+recorded in the report. **P4.2 IMPLEMENTER IN FLIGHT** (fork branch @
+0f92554: dense within-card bundlePlatePlan per the N=3 measurement,
+trial-fit seam, new arithmetic pinned, S5.5 plate-cell amendment on
+the engrave branch; report will land at IMPL-S2-P4.md). Then P5; (2) P4.1 measurement DONE:
 **N = 3** md1 strings fit one plate side at the shipped 3.8mm font
 (analytic 34 chars x 20 lines = 680-char capacity; trial via
 backup.EngraveText paragraphs, 1mm gaps, no FontSize override; trial
