@@ -11,7 +11,7 @@ in `design/agent-reports/MEASURE-S2-P4-1.md`.
 `go.mod` pins the fork worktree via a local `replace` directive:
 
 ```
-replace seedhammer.com => /scratch/code/shibboleth/sh-worktrees/s2-descriptor-arm
+replace seedhammer.com => /scratch/code/shibboleth/seedhammer
 ```
 
 measured at fork rev `fe9475c` (branch `s2/descriptor-arm`). This mirrors the

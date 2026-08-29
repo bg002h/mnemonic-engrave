@@ -25,4 +25,4 @@ require (
 	golang.org/x/sys v0.45.0 // indirect
 )
 
-replace seedhammer.com => /scratch/code/shibboleth/sh-worktrees/s2-descriptor-arm
+replace seedhammer.com => /scratch/code/shibboleth/seedhammer

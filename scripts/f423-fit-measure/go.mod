@@ -23,4 +23,4 @@ require (
 	gonum.org/v1/gonum v0.17.0 // indirect
 )
 
-replace seedhammer.com => /scratch/code/shibboleth/sh-worktrees/s2-descriptor-arm
+replace seedhammer.com => /scratch/code/shibboleth/seedhammer
