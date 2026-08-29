@@ -4,6 +4,15 @@
 
 pub mod bundle;
 pub mod classify;
+/// Wallet-descriptor input — `SPEC_descriptor_input.md`, S1.
+///
+/// **`doc(hidden)` but lib-PUBLIC, deliberately** (PLAN-r1's C2): public so
+/// `tests/descriptor_seam.rs` can call the admission predicate and the gate
+/// directly, as the codex32 seam already calls `sysw::classify`; hidden so the
+/// published API surface stays a deliberate choice rather than a side effect of
+/// where the tests live.
+#[doc(hidden)]
+pub mod descriptor;
 /// Channel and destination IO — **now the `mnemonic-io-lib` crate**, re-exported
 /// under the name `me` already used it by so the seam is a dependency edge
 /// rather than a rename. Nothing in it may name a record `Class`: it is a

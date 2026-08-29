@@ -568,18 +568,182 @@ fn every_column_has_the_expected_population() {
 /// §5.2's classification predicate: `me` would pack this input as a
 /// `Descriptor` record. THE SAFE DIRECTION is asserted by the fork's half over
 /// `canonical`; this half asserts the column itself.
+///
+/// It asserts `format` in the same pass, and that is not padding: `format` is
+/// the column F-1 could not settle from the spec alone, and asserting it is
+/// what turns P0's "MATCHED = the branch that SUCCEEDED" reading from a comment
+/// in a JSON file into a claim a suite can refute. The two readings disagree on
+/// thirteen rows.
 #[test]
 fn the_host_column_matches_the_admission_predicate() {
-    unimplemented!("P1.1: mnemonic_engrave::descriptor::admit over every row");
+    let d = doc();
+    let (mut host_checked, mut format_checked) = (0usize, 0usize);
+    for r in rows(&d) {
+        let input = r["input"].as_str().unwrap();
+        assert_eq!(
+            mnemonic_engrave::descriptor::host_admits(input),
+            r["host_admits"].as_bool().unwrap(),
+            "{}: host_admits -- the host may be NARROWER than the device, never wider",
+            name(r)
+        );
+        host_checked += 1;
+        assert_eq!(
+            mnemonic_engrave::descriptor::format_of(input),
+            r["format"].as_str().unwrap(),
+            "{}: format -- the branch of the cascade that SUCCEEDED (`none` where \
+             `me` refuses AT the cascade), not the branch the input resembles",
+            name(r)
+        );
+        format_checked += 1;
+    }
+    // PLAN-r1's I7 applied to this test's own work: a loop that silently
+    // iterated zero rows would pass.
+    assert_eq!(host_checked, POP.rows, "host_admits assertions run");
+    assert_eq!(format_checked, POP.rows, "format assertions run");
+}
+
+/// The `refusal_row` vocabulary is one set, held in two places, and this is
+/// what stops them drifting: the file's `refusal_rows` map and the library's
+/// `Row` enum must name exactly the same 36 slugs (PLAN-r4's NEW-M6). P2.4's
+/// per-row text tests key to these.
+#[test]
+fn the_refusal_row_vocabulary_is_the_same_set_on_both_sides() {
+    let d = doc();
+    let on_disk: std::collections::BTreeSet<&str> = d["refusal_rows"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(|s| s.as_str())
+        .collect();
+    let in_code: std::collections::BTreeSet<&str> = mnemonic_engrave::descriptor::Row::ALL
+        .iter()
+        .map(|r| r.slug())
+        .collect();
+    assert_eq!(in_code.len(), 36, "the §6 vocabulary is 36 rows");
+    assert_eq!(
+        on_disk, in_code,
+        "the file's refusal_rows and `descriptor::Row` name different sets"
+    );
 }
 
 /// The four gate fields, asserted against the REAL `--as`-omitted invocation:
 /// gate verdict, outcome class, §6 row and exit code, for each of the 37 rows.
 /// §5.1's gate is NORMATIVE through these rows — where any reading of the
 /// prose disagrees with a row, the row is the answer.
+///
+/// **All four fields come from the real run**, and the link is the refusal TEXT
+/// rather than a marker: the row's expected `refusal_row` selects a `Refusal`
+/// from the library, and the binary's stderr must CONTAIN that refusal's text.
+/// A binary that took a different branch prints a different text and reds here,
+/// so this cannot degenerate into asserting the library against itself. The
+/// exit code and the outcome class are read straight off the process.
+///
+/// Every input is delivered with `--in` (r20's M2): on argv the shipped
+/// bearer-transaction guard preempts `tx: zz` at exit 3, before any of this
+/// runs.
 #[test]
 fn the_gate_rows_pin_the_real_invocation() {
-    unimplemented!("P1.2: run `me sysw pack` per gate row and assert all four fields");
+    let d = doc();
+    let dir = tempfile::tempdir().unwrap();
+    let mut checked = 0usize;
+    for (n, r) in rows(&d).iter().enumerate() {
+        if !covers(r).contains(&"gate") {
+            continue;
+        }
+        let input = r["input"].as_str().unwrap();
+        let path = dir.path().join(format!("gate{n}.txt"));
+        std::fs::write(&path, input).unwrap();
+
+        let out = assert_cmd::Command::cargo_bin("me")
+            .unwrap()
+            .args(["sysw", "pack", "--no-passphrase", "--in"])
+            .arg(&path)
+            .output()
+            .unwrap();
+        let code = out.status.code().unwrap();
+        let err = String::from_utf8_lossy(&out.stderr).to_string();
+        let name = name(r);
+
+        // (1) exit_code, straight off the process.
+        assert_eq!(
+            code,
+            r["exit_code"].as_u64().unwrap() as i32,
+            "{name}: exit code. stderr:\n{err}"
+        );
+        // (2) outcome, classified from what the run actually printed.
+        let outcome = classify_run(code, &err);
+        assert_eq!(
+            outcome,
+            r["outcome"].as_str().unwrap(),
+            "{name}: outcome. stderr:\n{err}"
+        );
+        // (3) gate_open. A CLOSED gate means the shipped record-classification
+        // refusal, unchanged and in record vocabulary — invariant 1. An OPEN
+        // one means it never fires.
+        let record_refusal = is_record_refusal(&err);
+        assert_eq!(
+            !record_refusal,
+            r["gate_open"].as_bool().unwrap(),
+            "{name}: gate_open. stderr:\n{err}"
+        );
+        // (4) refusal_row, tied to the run by the text the row prints.
+        match r.get("refusal_row").and_then(|v| v.as_str()) {
+            Some(slug) => {
+                let lib = mnemonic_engrave::descriptor::consult(input, &records_of(input));
+                assert_eq!(lib.refusal_row(), Some(slug), "{name}: refusal_row");
+                let text = &lib.refusal().unwrap().text;
+                assert!(
+                    err.contains(text.as_str()),
+                    "{name}: stderr does not carry the {slug} text.\n\
+                     WANT: {text}\nGOT: {err}"
+                );
+            }
+            None => assert!(
+                !err.contains("wallet descriptor in any of the four forms"),
+                "{name}: a row with no refusal_row printed a §6 refusal:\n{err}"
+            ),
+        }
+        checked += 1;
+    }
+    assert_eq!(checked, POP.gate_fields, "gate rows exercised");
+}
+
+/// **The shipped record-classification refusal, recognised by its own
+/// vocabulary.** Every arm of `sysw_error`'s unclassifiable case — the reserved
+/// prefixes, the unparseable transaction, the unsigned inputs, the BIP-93
+/// profile miss, the catch-all — opens `record N (records count from 0)`, and
+/// nothing else `me` prints does. Matching one arm's tail instead was the first
+/// version of this helper and it reported `unclassified` for five of the six
+/// hostile-payload rows: invariant 1 is about the SURFACE, not one message.
+fn is_record_refusal(err: &str) -> bool {
+    err.contains("(records count from 0)")
+}
+
+/// The outcome CLASS, read off the real run rather than asked of the library.
+fn classify_run(code: i32, err: &str) -> &'static str {
+    if is_record_refusal(err) {
+        return "record-refusal";
+    }
+    if code == 2 && err.contains("`--as` decides how it is packed") {
+        return "as-decides";
+    }
+    if code == 4 && err.contains("is a wallet descriptor. A descriptor is packed ALONE") {
+        return "multi-record";
+    }
+    if code == 3 {
+        return "descriptor-refusal";
+    }
+    "unclassified"
+}
+
+/// The record stream the shipped `--in` contract makes of an input: non-blank
+/// lines, which is what §6's multi-record row indexes into.
+fn records_of(input: &str) -> Vec<String> {
+    input
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(str::to_owned)
+        .collect()
 }
 
 /// `md1_admits` is an INDEPENDENT axis, not a qualifier on `host_admits`. Where

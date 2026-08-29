@@ -1307,8 +1307,8 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 );
             }
 
-            let recs = match read_records(records, r#in.as_ref(), *allow_argv_secret) {
-                Ok(r) => r,
+            let (recs, document) = match read_records(records, r#in.as_ref(), *allow_argv_secret) {
+                Ok(r) => (r.records, r.document),
                 Err((msg, code)) => {
                     eprintln!("me: {msg}");
                     return code;
@@ -1369,6 +1369,39 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // out of it, and `split` now calls it first -- so this is an
             // ordering change, not a second implementation of admission.
             if let Err(e) = sysw::admit_check(&recs, admission) {
+                // SPEC_descriptor_input.md §5.1 — THE DISCRIMINATOR, and it sits
+                // exactly here for a reason: record classification has just
+                // failed, which is the only moment the question "is this a
+                // descriptor rather than a record?" is worth asking. Placed
+                // earlier it would second-guess a stream that classifies fine;
+                // placed later it would arrive after the passphrase ceremony.
+                //
+                // The gate's first invariant is that a record-shaped input
+                // never hears descriptor vocabulary or a changed exit code, and
+                // `Outcome::RecordRefusal` is that invariant: it falls straight
+                // through to the shipped refusal below, unchanged.
+                match mnemonic_engrave::descriptor::consult(&document, &recs) {
+                    mnemonic_engrave::descriptor::Outcome::RecordRefusal => {}
+                    mnemonic_engrave::descriptor::Outcome::AsDecides { announcement } => {
+                        // §5.4: host-side FIRST. The operator supplied one line
+                        // and is being told they have a wallet, so they see the
+                        // inference before they see the choice.
+                        if let Some(a) = announcement {
+                            eprintln!("me: {a}");
+                        }
+                        eprintln!("me: {}", mnemonic_engrave::descriptor::choice_block());
+                        // Nothing was refused; a choice was not made.
+                        return EXIT_USAGE;
+                    }
+                    mnemonic_engrave::descriptor::Outcome::DescriptorRefusal(r) => {
+                        eprintln!("me: {r}");
+                        return EXIT_REFUSED;
+                    }
+                    mnemonic_engrave::descriptor::Outcome::MultiRecord(r) => {
+                        eprintln!("me: {r}");
+                        return EXIT_INVALID;
+                    }
+                }
                 eprintln!("me: {}", sysw_error(&e));
                 return EXIT_INVALID;
             }
@@ -2111,18 +2144,41 @@ fn report_strength(passphrase: Option<&str>, records: &[String]) {
     }
 }
 
+/// What an invocation read, in BOTH shapes it is needed in.
+///
+/// `records` is the shipped newline-separated record stream. `document` is the
+/// same input read WHOLE, which is what `SPEC_descriptor_input.md` §4.6 means by
+/// "the whole input" and what §5.1's discriminator re-reads through the cascade:
+/// a multi-line BlueWallet file and a pretty-printed JSON export are ONE
+/// descriptor and stop being one the moment they are split into records.
+///
+/// For `--in` and stdin the document is the channel's own bytes. On argv it is
+/// the operands joined with newlines — §5.1 makes a single argv operand the
+/// document, and the join is the only reading of several that keeps a record's
+/// index meaning what it means everywhere else.
+#[derive(Debug)]
+struct Records {
+    records: Vec<String>,
+    document: String,
+}
+
 /// `mt encode … | me sysw pack …` — a join an early draft claimed already
 /// worked and which measurably did not.
 fn read_records(
     argv: &[String],
     in_path: Option<&std::path::PathBuf>,
     allow_argv_secret: bool,
-) -> Result<Vec<String>, (String, i32)> {
+) -> Result<Records, (String, i32)> {
     if let Some(p) = in_path {
         let raw = std::fs::read_to_string(p)
             .map_err(|e| (format!("{}: {e}", p.display()), EXIT_USAGE))?;
         // R7, and it applies to THIS channel too -- see `no_records`.
-        return no_records_guard(split_record_stream(&raw), Some(p)).map_err(|e| (e, EXIT_USAGE));
+        let records =
+            no_records_guard(split_record_stream(&raw), Some(p)).map_err(|e| (e, EXIT_USAGE))?;
+        return Ok(Records {
+            records,
+            document: raw,
+        });
     }
     if !argv.is_empty() {
         // R2 / G-P3.5. THIS RUNS BEFORE ANYTHING ELSE `pack` DOES, and that is
@@ -2272,12 +2328,24 @@ fn read_records(
                     out.push(r.clone());
                 }
             }
-            return Ok(out);
+            let document = out.join("\n");
+            return Ok(Records {
+                records: out,
+                document,
+            });
         }
-        return Ok(argv.to_vec());
+        return Ok(Records {
+            records: argv.to_vec(),
+            document: argv.join("\n"),
+        });
     }
     // R7 for the stdin channel, through the same guard `--in` uses.
-    no_records_guard(read_stdin_records()?, None).map_err(|e| (e, EXIT_USAGE))
+    let raw = read_stdin_raw()?;
+    let records = no_records_guard(split_record_stream(&raw), None).map_err(|e| (e, EXIT_USAGE))?;
+    Ok(Records {
+        records,
+        document: raw,
+    })
 }
 
 /// Read the record stream from stdin, unguarded.
@@ -2287,6 +2355,14 @@ fn read_records(
 /// how `--in` and stdin came to disagree about an empty input in the first
 /// place.
 fn read_stdin_records() -> Result<Vec<String>, (String, i32)> {
+    Ok(split_record_stream(&read_stdin_raw()?))
+}
+
+/// The stdin channel's bytes, before any splitting. Split out so the record
+/// stream and the whole-input document are the SAME read — stdin can only be
+/// read once, and two readers of one channel is how `--in` and stdin came to
+/// disagree about an empty input in the first place.
+fn read_stdin_raw() -> Result<String, (String, i32)> {
     // A TTY here is the "looks like a hang" case: an operator who typed
     // `me sysw pack` and pressed Enter with nothing piped in otherwise sees a
     // blank line forever. Say what is being waited for, on stderr, before
@@ -2304,7 +2380,7 @@ fn read_stdin_records() -> Result<Vec<String>, (String, i32)> {
     std::io::stdin()
         .read_to_string(&mut raw)
         .map_err(|e| (format!("stdin: {e}"), EXIT_USAGE))?;
-    Ok(split_record_stream(&raw))
+    Ok(raw)
 }
 
 /// **`kind` is its own parameter, and F-259 is why.** It used to travel in the
