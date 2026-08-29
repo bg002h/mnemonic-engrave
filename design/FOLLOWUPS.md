@@ -1176,7 +1176,16 @@ holding all six chunks of one good card; seeding all six flips the screen to
 entry already names (a gatherer primable from an in-memory record set, the
 `takeAll` shape Build Policy uses) covers both routes — implement it once,
 for Inspect AND the two engrave programs. `--as descriptor` payloads are
-unaffected (one record, complete).
+unaffected (one record, complete). **Second widening, same walk, round 2:**
+(a) mk1 key cards hit the same wall (measured — a 2-chunk mk1 card counts
+`mk1 keys: 0` from a payload; all-seeded control counts 1); (b) the screen
+is not silent — pressing Done prints *"Dropped an incomplete card. Scan all
+its chunks to include it."* (NFC build) / *"…Rewrite it on the host with
+`me sysw pack`…"* (no-NFC build), both of which BLAME THE PAYLOAD, which
+carries all chunks. The no-NFC advice loops (re-packing yields a
+byte-identical container); the NFC advice sends the operator scanning tags
+that never existed. A refusal that misdiagnoses — worse than silence; the
+fix must correct the message in the same change that fixes the door.
 
 `mk1GatherFlow` (`gui/mk1_inspect.go:156`) and `md1GatherFlow`
 (`gui/md1_gather.go:79`) prime a fresh gatherer with the single string handed to
@@ -14825,3 +14834,14 @@ variant, matching-key-material labels) lives in named unit tests in both
 repos (fork `a785755`; comments carry the host verdicts). At the next
 regeneration add single-line JSON rows — happy, label-with-ypub, escaped —
 so the parity gate covers the branch from data.
+
+### F-437 — the Wallet Policy door's "ENTER IT" choice promises typing and delivers an NFC card gather (repo: **seedhammer fork**; owning phase: **next device-UX touch, batch with F-76's door fix**) `#fork` `#device` `#ux`
+
+Found by the S2 journey walk (round 2, F3): the door added with S2's
+Wallet Policy payload offer reads `Wallet policy from where? FROM PAYLOAD /
+ENTER IT`, and choosing ENTER IT lands in the md1 card gather waiting for
+NFC taps — there is no keyboard and no way to "enter" anything. A device
+with no camera and a payload in hand makes the choice strictly useless.
+Either rename the choice to what it does ("SCAN CARDS") or make the gather
+reachable-by-name honest some other way; batch with F-76's door fix since
+both edits touch the same flow.
