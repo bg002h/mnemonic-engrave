@@ -808,17 +808,21 @@ Two boundary rules that fall out of it (R0 r2):
   descriptor among OTHER records" is the WHOLE-INPUT parse (R0 r3's NEW-I2).**
   When `--as` is absent and record classification fails, `me` re-reads the
   whole input through §4's cascade ONLY when the input is DESCRIPTOR-SHAPED,
-  by these tests (aligned with §6's cause-selection steps; corrected per
-  R0 r16 and r17): an input whose first token is an identifier immediately
-  followed by `(` — a script expression, not any parenthesis: `text: my
-  wallet (2 of 3)` stays a record (r17's minor); a line whose `": "` key is
-  a BlueWallet header (`Name`/`Policy`/`Derivation`/`Format`) or an 8-hex
-  fingerprint — a bare `": "` is NOT enough, or `seed:`/`text:`/`pass:`-
-  style records would hear descriptor vocabulary (r16's new-I2); a single
-  token that begins with `[`, OR whose leading segment before any `/` is a
-  78-byte base58check payload — covering the origin-annotated key AND the
+  by these tests, each applied to EVERY line of the input — uniform
+  per-line scope, so a descriptor buried behind other records still opens
+  the gate and reaches §6's multi-record row (r18's new-I1) — (aligned with
+  §6's cause-selection steps; corrected per R0 r16–r18): a line whose first
+  token is an identifier immediately followed by `(` — a script expression,
+  not any parenthesis: `text: my wallet (2 of 3)` stays a record (r17's
+  minor); a line whose `": "` key is a BlueWallet header
+  (`Name`/`Policy`/`Derivation`/`Format`) or an 8-hex fingerprint — a bare
+  `": "` is NOT enough, or `seed:`/`text:`/`pass:`-style records would hear
+  descriptor vocabulary (r16's new-I2); a line that is a single token
+  beginning with `[`, OR whose leading segment before any `/` is a 78-byte
+  base58check payload — covering the origin-annotated key AND the
   keyed-no-origin spellings like `xpub…/<0;1>/*`, all fifteen §4.5 rows
-  (r16's new-I1; r17's new-I1); or JSON with a descriptor field. Otherwise
+  (r16's new-I1; r17's new-I1); or a whole input that is JSON with a
+  descriptor field. Otherwise
   the SHIPPED record-classification refusal stands unchanged — exit 4,
   record vocabulary, pinned by a green test of the record-refusal surface
   (`sysw_cli.rs:1928`): a mistyped RECORD must never hear descriptor
@@ -1227,8 +1231,10 @@ order:
 2. input's first non-comment line contains `": "` → report **branch 1**;
 3. input contains `(` → report **branch 2**;
 4. input LOOKS like an extended key — its first non-whitespace character is
-   `[`, or it is a single base58check token whose payload is 78 bytes (an
-   extended-key envelope, ANY version) → report **branch 4**. A shape test,
+   `[`, or it is a single token whose leading segment before any `/` is a
+   78-byte base58check payload (an extended-key envelope, ANY version, with
+   or without a use-site tail — mirrored from §5.1's gate per r18's new-I2)
+   → report **branch 4**. A shape test,
    not a parse-success test (R0's I2): the branch-4 rows below are all
    `ParseKey` FAILURES — measured, `bip380.ParseKey(nil, "[4bbaa801]xpub…")`
    errors — so a success test could never reach them;
