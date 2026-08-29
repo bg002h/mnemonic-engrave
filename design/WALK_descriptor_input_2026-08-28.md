@@ -451,6 +451,10 @@ cannot be done with it.** Refusals follow identification, never replace it.
 ## [ERRATUM — see "Corrections to this log" below: the one-plate claim was
 ## WRONG (one plate per STRING; the keyed card is TWO plates). Left in place
 ## as the record of what the walk asserted; R0 r11's new-N2.]
+## [AMENDED 2026-08-29 (S2 P4.2) — the erratum above is now itself superseded:
+## F-423 replaced the one-plate-per-string rule with greedy packing, and BOTH
+## bequest cards are one plate. See correction 4. The heading's original claim
+## is true again, for a reason the walk did not have.]
 
 **The moment.** Decision: *"Both. He'd be better off with qr encoding rather
 than being dependent upon our constellation, but he thinks he might hand
@@ -568,3 +572,43 @@ The fold lands as one gated batch with a proportional re-review.
    the first, a citation verified by a test's NAME rather than its fixture).
    The pattern is the same: the log recorded a claim about an artifact it did
    not re-read.
+
+# Corrections to this log (S2 P4.2, 2026-08-29)
+
+4. **Corrections 1 and 3's plate counts are superseded — both cards are ONE
+   plate.** They were correct against the `bundlePlatePlan` of the day, which
+   emitted one plate per string. F-423 (operator, 2026-08-28: *"1 plate per
+   string is something to be addressed, it's wasteful"*) replaced that rule
+   with greedy packing WITHIN a card, and the fork now packs as many of a
+   card's strings onto each plate side as fit — as separate paragraphs, never
+   reflowed into one another, so a reader still recovers per string.
+
+   Measured through the shipped packer (`bundleCardPlates`, production
+   `engrave.Params`, shipped font, packed against a worst-case plate marking):
+
+   ```
+   bare key      2 strings, 85 + 83 = 168 chars   -> 1 plate
+   keyed BIP-84  3 strings, 67 × 3  = 201 chars   -> 1 plate
+   ```
+
+   Five 85-character md1 strings fit one plate side (`bundlePlateMD1Capacity`,
+   pinned and re-derived by `TestBundlePlanPacksACardOntoFewerPlates`), so
+   neither card is close to the boundary. Correction 1's "TWO plates" and
+   correction 3's "three plates" both read ONE.
+
+   **So W14's original answer — the operator's hope that it "will be a short 1
+   plate engraving to get all the md1 strings" — is TRUE**, and the erratum on
+   the W14 heading is retained above rather than deleted: the walk was right
+   about the outcome and wrong about the mechanism, which is a different
+   record from having been right.
+
+   **One thing the operator's friend must still be told, and it is new:** a
+   PACKED plate is offered `TEXT ONLY`. On a multi-paragraph plate a
+   per-paragraph QR is drawn across the paragraphs after it (measured: with
+   three 85-char strings, paragraph 0's code spans y 67840..311040 while
+   paragraphs 1 and 2 start at 122880 and 202240), and a text-less
+   paragraph's code is centered on the PLATE so several stack on one spot —
+   both of which the plate-bounds check reports as a FIT. The engraver
+   therefore offers the code variants on single-string plates only. For this
+   bequest that costs nothing: the md1 plate was always the hand-copyable
+   half, and the QR half is the `--as descriptor` plate.
