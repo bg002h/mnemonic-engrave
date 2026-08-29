@@ -32,3 +32,9 @@ flash, §11 item 6 (ClassDescriptor DISPLAYED on the device), F-423's
 physical test plate + cut.** F-422 status quo stands — no transform.
 Fork `main` push only after the post-impl review closes green (the device
 boots main).
+
+## Resume protocol
+
+After a context clear: `/resume-s2` (command saved at
+`~/.claude/commands/resume-s2.md`). It points here, names the first action
+(persist any uncommitted R0 report), and restates the boundaries.
