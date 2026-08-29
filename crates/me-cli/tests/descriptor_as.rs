@@ -412,3 +412,85 @@ fn the_converter_refers_a_descriptor_to_sysw_pack() {
         "a non-descriptor was referred:\n{err}"
     );
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Where `--as` sits among the shipped gates
+// ───────────────────────────────────────────────────────────────────────────
+
+/// **The argv bearer guard PRECEDES §5.1's shape check.** `--as` with two argv
+/// operands is a usage error about the invocation's SHAPE; a `tx:` record on
+/// argv is bearer material already in `/proc`, `ps` and the shell history. The
+/// more urgent refusal, and the more specific one, has to win — so the `--as`
+/// driver sits after `read_records`, where that guard runs.
+///
+/// Pinned because it is a deliberate ordering, and because the constellation
+/// has already been bitten once by placing a new gate above `read_records` and
+/// pre-empting exactly this refusal.
+#[test]
+fn the_argv_bearer_guard_precedes_the_single_document_check() {
+    let out = assert_cmd::Command::cargo_bin("me")
+        .unwrap()
+        .args([
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--as",
+            "md1",
+            "tx:00",
+            "tx:00",
+        ])
+        .output()
+        .unwrap();
+    let err = stderr(&out);
+    assert_eq!(
+        code(&out),
+        3,
+        "the bearer refusal is a policy refusal\n{err}"
+    );
+    assert!(
+        err.contains("is a `tx:` record on ARGV"),
+        "the flag-shape usage error pre-empted the bearer refusal:\n{err}"
+    );
+    assert!(
+        !err.contains("--as packs exactly one descriptor per invocation."),
+        "{err}"
+    );
+}
+
+/// `--as md1` hands the shipped pipeline RECORDS, so every gate below it is the
+/// shipped one rather than a second implementation. `--expect` is the sharpest
+/// witness: the md1 cards ARE the descriptor, so `--expect descriptor` passes
+/// and `--expect transaction` refuses, with no `--as`-specific code in either.
+#[test]
+fn the_md1_records_reach_the_shipped_expect_gate() {
+    let doc = row_input("formats-happy/bluewallet-sh-fixture");
+    for (kinds, want_exit) in [("descriptor", 0), ("transaction", 4)] {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("document.txt");
+        let out_path = dir.path().join("container.bin");
+        std::fs::write(&path, &doc).unwrap();
+        let out = assert_cmd::Command::cargo_bin("me")
+            .unwrap()
+            .args([
+                "sysw",
+                "pack",
+                "--no-passphrase",
+                "--as",
+                "md1",
+                "--expect",
+                kinds,
+            ])
+            .arg("--in")
+            .arg(&path)
+            .arg("--out")
+            .arg(&out_path)
+            .output()
+            .unwrap();
+        assert_eq!(
+            code(&out),
+            want_exit,
+            "--expect {kinds}: stderr:\n{}",
+            stderr(&out)
+        );
+    }
+}
