@@ -50,11 +50,12 @@ assumed and nothing had built. §7's file regenerated ONCE, which retired the
 `sysw_class` sample column, retired the `panic:parse` marker with the parse
 panic it named, carried a new `neither` row and moved a `ypub` row into a
 new `version-gap` bullet: **89 tag-slots, 89 − 17 = 72 rows.** Every
-amendment below is marked `AMENDED 2026-08-29 (S2)`. What this amendment
-does NOT touch is the DEVICE: §4.3's and §4.5's device clauses, §9 item 2
-and §6's "the device admits exactly" quote describe fork `main`, which does
-not yet carry S2's arm; they amend in S2's P3.5, with the diff that
-falsifies them.
+amendment below is marked `AMENDED 2026-08-29 (S2)`. What P2.7 did
+NOT touch was the DEVICE: §4.3's and §4.5's device clauses, §9 item 2
+and §6's "the device admits exactly" quote described fork `main` before
+S2's arm. Those amended in S2's P3.5 (marked `AMENDED 2026-08-29 (S2
+P3.5)`), carrying the fork diff that falsified them (`0abbf81..fe9475c`
+on `s2/descriptor-arm`).
 **No code may be written before the implementation plan passes its own
 gate** (project `CLAUDE.md` — this is risk-set work: it changes normative
 admission behaviour and it decides which wallet an operator engraves).
@@ -408,13 +409,17 @@ them:
    probe compared `KeyData` and `ChainCode` and they are unchanged — so this is
    a round-trip and display break, **not** a wrong-wallet break. Stated
    precisely because the over-claim is tempting.
-4. **A fingerprint shorter than 4 bytes PANICS the Go parser.**
-   `parseBlueWalletDescriptor` checks only `len(fp) > 4` before calling
-   `binary.BigEndian.Uint32(fp[:])` (`nonstandard/parse.go:136–149`), which
-   panics for fewer. Measured: a 1-byte (`ab`) and a 3-byte (`abcdef`)
-   fingerprint both panic `OutputDescriptor` (`index out of range`), and the
-   panic is reachable from the device's scan door (`gui/scan.go:87`). `me`
-   requires exactly 8 hex characters — matching what `bip380.ParseKey` already
+4. **A fingerprint shorter than 4 bytes PANICKED the Go parser — fixed in
+   S2 as Rust convergence** *(AMENDED 2026-08-29 (S2 P3.5))*.
+   `parseBlueWalletDescriptor` checked only `len(fp) > 4` before calling
+   `binary.BigEndian.Uint32(fp[:])` (`nonstandard/parse.go:136–149` at the
+   pre-S2 tree), which panicked for fewer. Measured then: a 1-byte (`ab`)
+   and a 3-byte (`abcdef`) fingerprint both panicked `OutputDescriptor`
+   (`index out of range`), reachable from the device's scan door
+   (`gui/scan.go:87`). S2 tightened the guard to `len(fp) != 4` — the
+   parser now errors cleanly (measured: the seam suite feeds the input
+   with no panic), converging on `me`, which requires exactly 8 hex
+   characters — matching what `bip380.ParseKey` already
    requires of an inline origin.
    **AMENDED 2026-08-29 (S2), the FILE half only.** The previous clause said
    §7 marks these rows `device_probe: "panic:parse"` so the Go test never
@@ -486,16 +491,21 @@ would be noise.
   and children parsed by `parsePath` (child index, `*`, `*'`/`*h`, or a
   `<a;b>` PAIR — `parsePath` cuts on the first `;`, so a three-element group
   or a reversed pair is a parse error; `bip380/bip380.go:476,489`).
-- **Extended-key version bytes — the admitted set is exactly five:** `xpub`
+- **Extended-key version bytes** *(AMENDED 2026-08-29 (S2 P3.5) — F-426's
+  device half landed)*: **`me`'s admitted set is exactly five:** `xpub`
   (`0488b21e`), `tpub` (`043587cf`), `zpub` (`04b24746`), `Ypub` (`0295b43f`),
   `Zpub` (`02aa7ed3`). `ParseKey` calls `ParseExtendedKey` unconditionally, on
-  every key in every branch, and the classification switch has **no `ypub`
-  case** — `ypub` (`049d7cb2`) is declared in the constants and named in the
-  later normalisation switch, but classification hits `default` and errors
-  (`bip380/bip380.go:428–466`, re-read at fold time). So `ypub`, `upub`,
-  `vpub`, `Upub`, `Vpub` are refused by the device **even with a full explicit
-  origin** — measured: `sh(wpkh([4bbaa801/49h/0h/0h]ypub…/<0;1>/*))` REFUSE,
-  its `xpub` twin ACCEPT. **NORMATIVE: `me` admits exactly the same five.** A
+  every key in every branch. Before S2 the classification switch had **no
+  `ypub` case**; since S2 it has one (`ypub` → `P2SH_P2WPKH`, normalising
+  to `xpub`), so the device's SCAN DOOR now accepts six — measured: the
+  once-refused `sh(wpkh([4bbaa801/49h/0h/0h]ypub…/<0;1>/*))` now ACCEPTS
+  at the scan door (its seam row moved to the `version-gap` bullet), while
+  `upub`, `vpub`, `Upub`, `Vpub` stay refused. **NORMATIVE: `me` admits
+  exactly the five above — unchanged in S2** (the host widening is
+  F-426's own later convergence cycle), **and the device's sysw RECORD
+  classifier holds the same five** via a string-level version check, so a
+  `ypub`-keyed record classifies `ClassUnknown` on the device exactly as
+  `me` refuses it at the desk. A
   standard BIP-32 library accepts `ypub`, so a host built on one without this
   gate is WIDER than the device on the commonest non-`xpub` key there is
   (R0's C2). The `ypub` refusal prints the equivalent `xpub` spelling with the
@@ -605,9 +615,12 @@ The path compared is `k.DerivationPath`, which comes from one of two places:
 - the explicit `[fingerprint/path]` prefix, if present; **or**
 - if absent, `ParseKey` falls back to the **SLIP-132 version bytes**
   (`ParseExtendedKey`, `bip380.go:428`): `xpub`/`tpub` → `P2PKH`, `zpub` →
-  `P2WPKH`, `Ypub` → `P2SH_P2WSH`, `Zpub` → `P2WSH`. Note `ypub` is listed in
-  the version constants but **has no case in the switch**, so it hits `default`
-  and is refused.
+  `P2WPKH`, `ypub` → `P2SH_P2WPKH` *(the case S2 added — AMENDED
+  2026-08-29 (S2 P3.5); before S2 `ypub` hit `default` and was refused)*,
+  `Ypub` → `P2SH_P2WSH`, `Zpub` → `P2WSH`. `me` still refuses a bare
+  `ypub` promotion (§4.3's five, unchanged), and the sysw record
+  classifier refuses `ypub`-keyed records on the device for the same
+  reason.
 
 **The near-misses, measured. This is the table the spec exists to fix.**
 
@@ -1513,7 +1526,7 @@ row names the mandatory wrapper change instead (R0 r6's NEW-M4; r7's NEW-I2).
 | two keys declaring **the same origin with different xpubs** | *"this wallet description contradicts itself: keys `N` and `M` both claim origin `<fp/path>` but name different keys — one origin identifies exactly one key, so no wallet matches this description. Check the export: one of the two entries carries the wrong key, and a copied-and-edited cosigner is the usual cause."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (PLAN-r1's C1; row per PLAN-r2's NEW-C2; ordinals per PLAN-r3's N2). **AMENDED 2026-08-29 (IMPL-P1's review, M5):** the previous clause named *"a duplicated cosigner LINE"*, i.e. a BlueWallet file — and this row cannot fire for one. In a BlueWallet file every key shares the single `Derivation:` header, so two keys carry the same `(fingerprint, origin)` **iff** they carry the same header key, which the device's own `seenKeys` map catches FIRST as `inconsistent header value`; branch 1 then fails and §6 row 1 carries the reason (measured). The row is reachable from a plain BIP-380 descriptor and from the JSON wrapper, where two key expressions may carry one origin block and different keys — so the cause clause is now stated over ENTRIES rather than over BlueWallet lines. Conjunct 8's other half, the duplicate row below, IS BlueWallet-reachable (different fingerprints, same xpub) and is unaffected. |
 | the **same key at the same derivation in two slots** | *"keys `N` and `M` are the same key at the same derivation — a threshold that needs the same key twice is not the multisig this file describes. Remove the duplicate line, or supply the missing cosigner's key."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (split per PLAN-r3's I3 — the primary separates the two causes, and "no wallet matches" is false for a duplicate). |
 | a multisig mixing **mainnet and testnet keys** | *"key `N` is `tpub` (testnet) while key 0 is `xpub` (mainnet). The device accepts this descriptor and then cannot derive any address from it. All keys must share one network."* §4.7 conjunct 5 (R0's I4). |
-| a descriptor or bare key using **`ypub`/`upub`/`vpub`/`Upub`/`Vpub`** | *"the device admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`."* The remedy names the **per-version** target (R0 r2's NEW-I3 — one template cannot serve five): `ypub` → `xpub` (mainnet BIP-49, `sh(wpkh(…))`); `upub` → `tpub` (**testnet** BIP-49, `sh(wpkh(…))`); `vpub` → `tpub` (**testnet** BIP-84, `wpkh(…)`); `Upub`/`Vpub` → `tpub` (**testnet multisig** — no single-key remedy exists; supply the full multisig descriptor: `sh(wsh(sortedmulti(…)))` for `Upub`, `wsh(sortedmulti(…))` for `Vpub` — or a BlueWallet file). Four of the five are testnet keys, and an `xpub` remedy would name a mainnet wallet the operator does not hold — measured, mainnet `354hXbgw…` versus the real testnet `tb1qmj7qns4…`. For a key WITH an origin, the operator's own fingerprint/path is substituted in; for a BARE key the remedy is the origin-less descriptor spelling — `sh(wpkh(<converted key>/<0;1>/*))`, which the device admits (measured) — because handing back a bare converted key would PROMOTE to a different wallet (`pkh(…)`, measured). §4.3 (R0's C2); F-413 tracks host-side normalisation. |
+| a descriptor or bare key using **`ypub`/`upub`/`vpub`/`Upub`/`Vpub`** | *"`me` admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`."* *(quote AMENDED 2026-08-29 (S2 P3.5): the device's scan door takes `ypub` since F-426's device half, so `me` is the honest subject; the record classifier still holds the five.)* The remedy names the **per-version** target (R0 r2's NEW-I3 — one template cannot serve five): `ypub` → `xpub` (mainnet BIP-49, `sh(wpkh(…))`); `upub` → `tpub` (**testnet** BIP-49, `sh(wpkh(…))`); `vpub` → `tpub` (**testnet** BIP-84, `wpkh(…)`); `Upub`/`Vpub` → `tpub` (**testnet multisig** — no single-key remedy exists; supply the full multisig descriptor: `sh(wsh(sortedmulti(…)))` for `Upub`, `wsh(sortedmulti(…))` for `Vpub` — or a BlueWallet file). Four of the five are testnet keys, and an `xpub` remedy would name a mainnet wallet the operator does not hold — measured, mainnet `354hXbgw…` versus the real testnet `tb1qmj7qns4…`. For a key WITH an origin, the operator's own fingerprint/path is substituted in; for a BARE key the remedy is the origin-less descriptor spelling — `sh(wpkh(<converted key>/<0;1>/*))`, which the device admits (measured) — because handing back a bare converted key would PROMOTE to a different wallet (`pkh(…)`, measured). §4.3 (R0's C2); F-413 tracks host-side normalisation. |
 | `tr(sortedmulti(…))` | *"taproot multisig is `multi_a`/`sortedmulti_a` (BIP-387); `tr(sortedmulti(…))` is not a valid descriptor even though the device's parser accepts it. Check the export."* §4.3. |
 | a **bare key whose path matches no script** | the path is quoted back and the three that qualify are listed: *"`[4bbaa801/86'/0'/0']xpub…` is a single extended key. `me` can infer a whole wallet from one only when its origin is `m/44'/0'/0'` (→ `pkh`), `m/84'/0'/0'` (→ `wpkh`) or `m/49'/0'/0'` (→ `sh(wpkh)`). This one is `m/86'/0'/0'` — taproot single-sig, which is not inferable. Supply the descriptor instead: `tr([4bbaa801/86'/0'/0']xpub…/<0;1>/*)`."* |
 | a bare key at **account ≠ 0** | *"…this one is `m/84'/0'/1'`. Only account 0 is inferable. Supply the descriptor: `wpkh([…/84'/0'/1']…/<0;1>/*)`."* — measured in §4.5 as a live near-miss. |
@@ -1954,12 +1967,18 @@ rest.
    function called from a scratch module on this machine. No payload has been
    written to flash, no descriptor has been displayed on the screen, and no
    plate has been cut.
-2. **The three admission-table cells have never been exercised.** §2.3 shows no
-   input can reach them, so the code path from `admits(progWalletPolicy,
-   ClassDescriptor) == true` to a rendered screen is **untested by construction**
-   — not "lightly tested". The first `ClassDescriptor` record in a `sysw` payload
-   will be the first ever. *(Closure-is-lens-closure, second clause: a gate that
-   has never executed is a hypothesis. This one has never executed.)*
+2. **One of the three admission-table cells has now been exercised**
+   *(AMENDED 2026-08-29 (S2 P3.5))*: S2's P3.2 executed
+   `admits(progWalletPolicy, ClassDescriptor) == true` → rendered
+   `DescriptorScreen` for the FIRST time — a named headless walk drives a
+   real `me sysw pack --as descriptor` container through `walletPolicyFlow`
+   to the screen, no panic. The other two cells (`progBundle`,
+   `progMultisig`) remain declared and INERT — no consumer, records
+   unoffered — with a follow-up filed at S2's records phase. On-hardware
+   confirmation of the one built cell stays the operator's (§11 item 6).
+   *(Closure-is-lens-closure, second clause: a gate that has never
+   executed is a hypothesis. This one has now run, in the simulator;
+   the hardware run remains.)*
 3. **The `--as md1` address equality now rests on ten descriptor shapes** —
    all seven §4.7 forms including the 15/16/20-key extremes, `wsh(multi)`,
    and the childless-mixed case — with Go and Rust agreeing at receive

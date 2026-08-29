@@ -55,11 +55,13 @@ pub enum Network {
 
 /// Extended-key version bytes.
 ///
-/// The first five are the ones `ParseExtendedKey`'s classification switch
-/// admits (`bip380/bip380.go:428–466`) and therefore the ONLY five `me` admits
-/// (§4.3, NORMATIVE). The rest are the SLIP-132 spellings §6's remedy row must
-/// be able to NAME — `ypub` is declared in the device's constants and has no
-/// case in the switch, so it is refused there even with a full explicit origin.
+/// The first five are the ONLY five `me` admits (§4.3, NORMATIVE). Until S2
+/// they were exactly the set `ParseExtendedKey`'s classification switch
+/// admitted; since F-426's device half the device's SCAN DOOR also takes
+/// `ypub`, while `me`'s five are held pending F-426's host-convergence cycle
+/// and the device's sysw RECORD classifier mirrors `me`'s five with a
+/// string-level version check. The rest are the SLIP-132 spellings §6's
+/// remedy row must be able to NAME.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum KeyVersion {
     Xpub,

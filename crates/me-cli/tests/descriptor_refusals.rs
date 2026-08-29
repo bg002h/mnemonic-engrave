@@ -555,7 +555,7 @@ fn row_unsupported_key_version() {
         &vector_input("version-gap/full-origin-ypub"),
         &["--as", "md1"],
         3,
-        "the device admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`. This key is \
+        "`me` admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`. This key is \
          `ypub`, whose equivalent is `xpub`: sh(wpkh([4bbaa801/49h/0h/0h]",
     );
 }

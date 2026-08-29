@@ -581,7 +581,7 @@ pub fn unsupported_key_version(v: KeyVersion, converted: &str, origin: Option<&s
     Refusal::new(
         Row::UnsupportedKeyVersion,
         format!(
-            "the device admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`. This \
+            "`me` admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`. This \
              key is `{}`, whose equivalent is `{target}`: {remedy}",
             v.spelling()
         ),
