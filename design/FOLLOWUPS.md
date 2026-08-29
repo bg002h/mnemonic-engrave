@@ -14609,3 +14609,28 @@ genuinely legitimate exotic wallet ever needs carrying, the extension seam is
 an **additive TLV tag with a criticality story**, not a wire change — and note
 md1 already carries `<0;2>` multipaths the DEVICE cannot derive, so the
 likelier future widening is device-side derivation, not this format.
+
+### F-423 — `bundlePlatePlan` cuts one plate per md1 string; pack multiple strings per plate (repo: **seedhammer fork**; owning phase: **with S2's firmware build**) `#fork` `#engraving` `#efficiency`
+
+**Operator direction 2026-08-28, verbatim: "1 plate per string is something
+to be addressed, it's wasteful."** Surfaced by the journey walk's plate-count
+correction (walk log, corrections §1): a keyed single-sig card is 2 strings
+of ~84 chars each, and `bundlePlatePlan` (`gui/bundle_flow.go:386`,
+`plateTotal == len(strings)` pinned by `bundle_engrave_test.go:38`) cuts one
+plate per string — two plates for ~168 characters of text.
+
+Scope: fork-native GUI/engraving code (no Rust counterpart — fork-native
+exemption applies). Batch with **S2's firmware build** so one flash carries
+both the descriptor classifier arm and the denser plan.
+
+**Do not guess the fit — measure it.** The recon step computes, from
+`engrave.Params` and the shipped font metrics, how many md1 strings fit each
+plate size at the 2-stroke-width minimum feature rule (the engraving-font
+standing rules), then the plan packs greedily with per-string BCH integrity
+preserved (strings must remain visually distinct units — a reader recovers
+per-string, so layout must not run strings together). Physical validation
+per the single-character test-plate protocol before any real cut: layout
+changes are engraving changes. Update `TestBundlePlanSingleMD1OnePlate`'s
+siblings to pin the new plan's arithmetic; the spec's §5.5 plate cell (and
+the walk-log correction) then update to the measured new counts.
+
