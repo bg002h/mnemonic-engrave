@@ -91,12 +91,16 @@ re-subjected to `me`), refusal.rs:584 + pin, cascade.rs comment;
 (full fork branch + P3.5 diff; attack brief: S4.3 string-check
 false-positives incl. ypub-in-checksum/base58-body, S4.5 branch-4
 detection, conjunct fidelity, recover scoping, walk assertions;
-report REVIEW-S2-P3-r1.md, main repo); (2) P4.1 measurement, sonnet
-(F-423 fit: analytic bound + trial via the fork's own mechanism;
-FontSize floor stands; N=1 closes F-423 measured-no-gain and skips
-P4.2; report MEASURE-S2-P4-1.md + scripts/f423-fit-measure/ on the
-engrave branch). Then: P4.2 iff N>1, P5 records + the mandatory
-whole-diff execution review (P5.2), pushes only after it closes.
+report REVIEW-S2-P3-r1.md, main repo); (2) P4.1 measurement DONE:
+**N = 3** md1 strings fit one plate side at the shipped 3.8mm font
+(analytic 34 chars x 20 lines = 680-char capacity; trial via
+backup.EngraveText paragraphs, 1mm gaps, no FontSize override; trial
+scope 1-3 per the plan, so 3 is the trial ceiling not an N=4 refusal;
+probe scripts/f423-fit-measure/ + report MEASURE-S2-P4-1.md, engrave
+branch @ 0898cc3). **F-423 is real 3x waste -> P4.2 PROCEEDS**, to be
+dispatched AFTER the P3 review returns (it reads the fork worktree
+P4.2 would write). Then P5 records + the mandatory whole-diff
+execution review (P5.2), pushes only after it closes.
 Recon: `design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`).
 Scale: 5 expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
 propagation sweeps + generators; both clippy toolchains (F-430).
