@@ -53,10 +53,19 @@ message folded into the plan's falsification list (master `9ea9769`).
 (branch s2/descriptor-arm @ `0abbf81`)** carries the two pre-P3 fixes
 (parse guard != 4, ypubVer arm) authored early for P2.6's measured
 booleans; KNOWN single red there (ypub row vs the old vector copy)
-until P3.3. **P2 implementer IN FLIGHT** (same engrave worktree; P2.1
-flip → P2.7 spec amendments incl. THE single regeneration at P2.6;
-report will land at design/agent-reports/IMPL-S2-P2.md). After P2: the
-proportional opus review over P1+P2 BEFORE the P3 Go port.
+until P3.3. **P2 DONE + gated GREEN** (commits
+70f566e..dbcd6b0; report design/agent-reports/IMPL-S2-P2.md on the
+branch): --as descriptor SHIPS, the single regeneration landed (sha
+e7a4160c; 72 vectors / 35 refusal rows / sysw_class retired / 10 tags,
+89 slots / version-gap 1 with measured device_admits true), spec
+amendments host-half; 579/579; forced deviation: P2.1+P2.2+P2.4+P2.6
+one commit (set-equality assertion couples retirement to the byte
+change). Controller recomputed all counts independently — match.
+Items for P3/P5.1: goprobe/go.mod points at the transient S2 fork
+worktree (P3 re-points after merge); F-428's :158 cite drifts to :161
+once the fork merges the parse fix (record at P5.1). **P1+P2 opus
+EXECUTION REVIEW IN FLIGHT** (the gate before the P3 Go port; report
+lands at design/agent-reports/REVIEW-S2-P1P2-r1.md in the MAIN repo).
 Recon: `design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`).
 Scale: 5 expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
 propagation sweeps + generators; both clippy toolchains (F-430).
