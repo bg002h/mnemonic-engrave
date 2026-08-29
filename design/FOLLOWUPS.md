@@ -14659,8 +14659,10 @@ likelier future widening is device-side derivation, not this format.
 
 **Operator direction 2026-08-28, verbatim: "1 plate per string is something
 to be addressed, it's wasteful."** Surfaced by the journey walk's plate-count
-correction (walk log, corrections §1): a keyed single-sig card is 2 strings
-of ~84 chars each, and `bundlePlatePlan` (`gui/bundle_flow.go:386`,
+correction (walk log, corrections §1): a BARE single-sig card is 2 strings
+of ~84 chars each (P5.2 M3 re-fixed the label — the walk log's own
+correction 3; a KEYED card is 3 strings/~201 chars; both pack to 1
+plate), and `bundlePlatePlan` (`gui/bundle_flow.go:386`,
 `plateTotal == len(strings)` pinned by `bundle_engrave_test.go:38`) cuts one
 plate per string — two plates for ~168 characters of text.
 

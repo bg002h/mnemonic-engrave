@@ -2099,8 +2099,11 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
    (§7's `sysw_class` amendment), which asserts `sysw.Classify` over every row
    in the file rather than four sampled ones. The host half of this item —
    one record per format, classifying `Descriptor`, byte-equal to the
-   `canonical` the device measured — closes at the desk; the DEVICE half
-   still needs the flashed build.
+   `canonical` the device measured — closes at the desk, and the device
+   half is discharged by the derived rule just named (P5.2 M1: the
+   earlier "still needs the flashed build" clause was item 6's sentence,
+   not this item's — a `ClassDescriptor` record DISPLAYED on hardware is
+   item 6, and remains the operator's).
 2. `me sysw pack --as md1 --in <each of the four formats>` produces a container
    (single-document mode, §5.1) whose records `md decode` reads back to the
    expected template — with §5.3(a′)'s materialised `<0;1>/*` where the input
