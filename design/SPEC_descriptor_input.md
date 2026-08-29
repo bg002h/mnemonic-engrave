@@ -1,15 +1,20 @@
 # SPEC — descriptor input (`me sysw pack --as descriptor` / `--as md1`)
 
-**Status: GREEN — the correctness lens closed at round 8 (2026-08-28), 0
-Critical / 0 Important** (`design/agent-reports/R0-descriptor-input-spec-r1.md`
-… `-r8.md`: 23 → 10 → 8 → 7 → 7 → 11 → 6 → 0 blocking findings, every round's
-report persisted verbatim and every fold re-reviewed). Per §9 item 7, the §6
-journey walk with the operator is owed **before the implementation plan
-closes** — it is the lens that produced this cycle's sharpest findings and it
-has not run over the final text. **No code may be written before that plan
-passes its own gate** (project `CLAUDE.md` — this is risk-set work: it
-changes normative admission behaviour and it decides which wallet an operator
-engraves).
+**Status: GREEN — re-closed at round 19 (2026-08-28), 0 Critical / 0
+Important, with the walk lens complete and the 60-cell decision table
+single-valued at 60/60**
+(`design/agent-reports/R0-descriptor-input-spec-r1.md` … `-r19.md`: the
+correctness lens closed at r8 after 23 → 10 → 8 → 7 → 7 → 11 → 6 → 0
+blocking findings; rounds 9–19 opened further lenses — the operator walk,
+adversarial gate derivation — and re-closed at r19; every round's report
+persisted verbatim and every non-trivial fold re-reviewed). After the r19
+persist, a TERMINAL fold (this text) moved the §5.1 gate's precision out of
+prose into §7's executable gate rows and folded rounds 18–19's non-gating
+residue; **that fold awaits its own verification round — the GREEN above is
+r19's, not the fold's**. §9 item 7 records the walk's one narrow residual.
+**No code may be written before the implementation plan passes its own
+gate** (project `CLAUDE.md` — this is risk-set work: it changes normative
+admission behaviour and it decides which wallet an operator engraves).
 
 **Goal, in the operator's words:**
 
@@ -805,29 +810,70 @@ and is filed as **F-414** rather than half-specified here.
 Two boundary rules that fall out of it (R0 r2):
 
 - **The discriminator between "one descriptor in a multi-LINE file" and "a
-  descriptor among OTHER records" is the WHOLE-INPUT parse (R0 r3's NEW-I2).**
-  When `--as` is absent and record classification fails, `me` re-reads the
-  whole input through §4's cascade ONLY when the input is DESCRIPTOR-SHAPED,
-  by these tests, each applied to EVERY line of the input — uniform
-  per-line scope, so a descriptor buried behind other records still opens
-  the gate and reaches §6's multi-record row (r18's new-I1) — (aligned with
-  §6's cause-selection steps; corrected per R0 r16–r18): a line whose first
-  token is an identifier immediately followed by `(` — a script expression,
-  not any parenthesis: `text: my wallet (2 of 3)` stays a record (r17's
-  minor); a line whose `": "` key is a BlueWallet header
+  descriptor among OTHER records" is the WHOLE-INPUT parse (R0 r3's NEW-I2),
+  guarded by a shape GATE whose normative content is an intent, an
+  invariant, and §7's executable gate rows — not a prose shape test
+  (terminal fold: rounds 15–19 each repaired one disjunct of the prose test
+  and broke or half-fixed another — the precision now lives where a suite
+  can hold it).** When `--as` is absent and record classification fails,
+  `me` consults the gate, and re-reads the whole input through §4's cascade
+  ONLY when the gate opens — when the input is DESCRIPTOR-SHAPED.
+
+  **The gate's intent and invariant — NORMATIVE.** The gate keeps two
+  promises at once, and an implementation is conformant exactly when both
+  hold:
+
+  1. **No record-shaped input ever hears descriptor vocabulary or a
+     changed exit code.** An input whose lines are record material —
+     well-formed records of the six shapes the shipped classifier admits
+     (`crates/me-cli/src/sysw/mod.rs:211`), or mistyped attempts at them —
+     keeps the SHIPPED record-classification refusal unchanged: exit 4,
+     record vocabulary, pinned by a green test of the record-refusal
+     surface (`sysw_cli.rs:1928`) (R0 r15's new-I4; r17's nit — the pinned
+     operand is a record, not specifically a mnemonic). No well-formed
+     record line is descriptor-shaped, whatever its payload carries: none
+     of the six admitted shapes begins with an identifier followed by `(`
+     (r19's derivation — established against the classifier, not an
+     exemplar).
+  2. **Every admitted descriptor spelling reaches the descriptor
+     surfaces.** §4's four formats on their happy paths, all fifteen §4.5
+     rows, all five of conjunct 7's use-site spellings, and descriptor
+     content buried behind other records in a multi-record input each open
+     the gate and land where §11 item 5's cases and §6 put them — the
+     "--as decides" block, a §6 row, or §6's multi-record row — never the
+     record refusal.
+
+  **The precision is §7's `gate`-tagged vector rows, which are NORMATIVE:
+  each pins gate verdict, outcome class, §6 row and exit code for one
+  adversarial input, and where any reading of the guidance below disagrees
+  with a gate row, the row is the answer.** The required classes are
+  enumerated in §7's gate bullet.
+
+  **Implementation guidance — NON-normative, overridden by the gate
+  rows.** The shape tests that satisfied the invariant through round 19,
+  the first three applied to EVERY line of the input and the JSON test to
+  the WHOLE input (per-line except JSON — r19's minor; the per-line scope
+  is what lets a buried descriptor open the gate, r18's new-I1): (T1) a
+  line whose first token is an identifier immediately followed by `(` — a
+  script expression, not any parenthesis: `text: my wallet (2 of 3)` stays
+  a record (r17's minor). An identifier is `[A-Za-z][A-Za-z0-9_]*` (r18's
+  minor — decided, not inherited): the underscore is included so a bare
+  miniscript fragment (`or_d(…)`, `multi_a(…)`) reaches §6's miniscript
+  row rather than the record refusal, while the wrapper-prefixed
+  `v:pkh(…)` fails on every reading, its identifier being followed by `:`.
+  (T2) a line whose `": "` key is a BlueWallet header
   (`Name`/`Policy`/`Derivation`/`Format`) or an 8-hex fingerprint — a bare
-  `": "` is NOT enough, or `seed:`/`text:`/`pass:`-style records would hear
-  descriptor vocabulary (r16's new-I2); a line that is a single token
-  beginning with `[`, OR whose leading segment before any `/` is a 78-byte
-  base58check payload — covering the origin-annotated key AND the
+  `": "` is NOT enough, or `seed:`/`text:`/`pass:`-style records would
+  hear descriptor vocabulary (r16's new-I2). (T3) a line that is a single
+  token beginning with `[`, OR whose leading segment before any `/` is a
+  78-byte base58check payload — covering the origin-annotated key AND the
   keyed-no-origin spellings like `xpub…/<0;1>/*`, all fifteen §4.5 rows
-  (r16's new-I1; r17's new-I1); or a whole input that is JSON with a
-  descriptor field. Otherwise
-  the SHIPPED record-classification refusal stands unchanged — exit 4,
-  record vocabulary, pinned by a green test of the record-refusal surface
-  (`sysw_cli.rs:1928`): a mistyped RECORD must never hear descriptor
-  vocabulary (R0 r15's new-I4; r17's nit — the pinned operand is a record,
-  not specifically a mnemonic). If it parses as one descriptor — a
+  (r16's new-I1; r17's new-I1). (T4) a whole input that is JSON with a
+  descriptor field.
+
+  When the gate does not open, the SHIPPED record-classification refusal
+  stands unchanged (invariant 1). When it opens and the input parses as
+  one descriptor — a
   WELL-FORMED BlueWallet file or pretty JSON does (measured: the fork's own
   `sh` fixture, 14 lines, read whole is ACCEPT, `#tk50fvpm`, a fixed point;
   a malformed one does not: no `Name:` is a device REFUSE (measured), while
@@ -837,11 +883,15 @@ Two boundary rules that fall out of it (R0 r2):
   input IS a descriptor and gets the "--as decides" block at `EXIT_USAGE`
   (2) when at least one `--as` value carries it in this build — otherwise
   its own refusal, directly, per §5.4's carriage rule — matching §11 item
-  5's tested cases across all four formats. Only when the
+  5's tested cases across all four formats. When the
   whole input does NOT parse as one descriptor AND some individual record
   does, the refusal names the split (§6's multi-record row) — naming `--as`
   there would send the operator to a whole-file read that refuses with a
-  message false about the file (NEW-I5, measured).
+  message false about the file (NEW-I5, measured). And when the gate opens
+  and NEITHER parse succeeds — a refused promotion, a malformed
+  descriptor, a refused key buried among records — §6's cause selection
+  chooses the refusal, reading the WHOLE input; §6 states its scope, and
+  the buried-key outcome, explicitly (r19's minor).
 - **This section amends `--in`'s contract in `SPEC_systemwide_payloads` §5.6**
   for `--as` invocations only. That is a cross-document change of the same
   shape as F-415, filed as **F-416**, so §5.6 gains its note in its own cycle
@@ -1042,10 +1092,13 @@ NEITHER-PATH refusals are exempt: substituting "wait for the update" into
 a refusal whose truth is "never, in any build" would be false — r15's
 new-I2, reason corrected per r16's minor) —
 replaces that clause with: *"the scannable-plate path is not in this build — keep the
-export file; it packs when the device update ships."* No refusal names a
-flag that refuses in the current build; a neither-path refusal may DESCRIBE
-a different re-export's future path — describing routes nothing (r17's
-minor).
+export file; it packs when the device update ships."* No refusal points the
+operator at a flag that refuses in the current build; any refusal may
+DESCRIBE a path's future availability — describing routes nothing (r17's
+minor; stated unconditionally per r18's minor, which measured the stock
+replacement above and §5.1's window variant each DESCRIBING the
+scannable-plate path's future while routing nowhere — under the previous
+neither-path scoping, neither was covered and the absolute was false).
 
 **Mixed use-site paths across keys — the quantifier is PER KEY, matching
 conjunct 7 (R0 r3's NEW-C1).** The three rules above bind key by key, because
@@ -1233,7 +1286,8 @@ order:
 4. input LOOKS like an extended key — its first non-whitespace character is
    `[`, or it is a single token whose leading segment before any `/` is a
    78-byte base58check payload (an extended-key envelope, ANY version, with
-   or without a use-site tail — mirrored from §5.1's gate per r18's new-I2)
+   or without a use-site tail — the same leading-segment test as §5.1's
+   gate guidance, r18's new-I2)
    → report **branch 4**. A shape test,
    not a parse-success test (R0's I2): the branch-4 rows below are all
    `ParseKey` FAILURES — measured, `bip380.ParseKey(nil, "[4bbaa801]xpub…")`
@@ -1246,6 +1300,26 @@ their own checks, after a successful parse — the rule never selects them
 (R0 r2's NEW-N1). And the `sortedmulti` rows below read over BOTH multi
 forms: §4.7 conjunct 1's md1-path `multi` twins hit the same conjuncts and
 get the same texts with the form name substituted (R0 r5's NEW-M2).
+
+**Scope: §5.1's gate is per-LINE; the five steps above are whole-INPUT — a
+deliberate divergence, not an alignment (r19's minor).** The gate decides
+WHETHER an input that failed record classification hears descriptor
+vocabulary at all, so it must see a descriptor buried behind other records;
+the steps decide WHICH single cause is reported, and they read the whole
+input, because the refusal describes the file the operator gave. The two
+scopes part company on exactly one class, and its outcome is stated here
+rather than left to be discovered: a multi-record input whose only
+descriptor-shaped line is a bare key that promotion REFUSES — a bare
+`Zpub…`, a bare `tpub…`, a `[fp]xpub…` with no path — opens the gate, but
+the whole input does not parse as one descriptor and no individual record
+does either, so the multi-record row below does not fire; steps 1–4 then
+fail over the whole input, and **step 5 reports the generic four-forms text
+at `EXIT_REFUSED` (3)** — true of the whole input, if less specific than
+the dedicated bare-`Zpub`/`Ypub`, bare-`tpub` and fingerprint-no-path rows,
+which remain reachable for the key supplied alone. Whether cause selection
+should instead follow the LINE that opened the gate is a plan-phase design
+call; until it is made, the outcome above is the specified one, and §7's
+gate rows (clause 6) pin all three spellings.
 
 **Refusal text speaks OPERATOR language — NORMATIVE (walk W5, from the
 operator's own verdict "convoluted").** Every quoted text below: leads with
@@ -1400,8 +1474,8 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   non-vacuity count skips such rows (R0 r6's NEW-M1). A panic would crash
   the suite rather than fail it, a false-signal shape.
 - **`covers`** (REQUIRED, non-empty array of coverage-manifest tags): which
-  required-row bullets this row discharges; a second tag is permitted only
-  for the two rows the manifest names (R0 r7's NEW-M1 — see the manifest
+  required-row bullets this row discharges; additional tags are permitted
+  only for the rows the manifest names (R0 r7's NEW-M1 — see the manifest
   below the bullets, which §11 item 3 counts; R0 r6's NEW-I2).
 - **`md1_admits`** (boolean, REQUIRED on every row — no default; R0 r4's
   NEW-M2 measured that a false default is backwards for most host-admitted
@@ -1412,6 +1486,20 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   direction §5.5's two-flag argument rests on — and `/0/*` is
   `host_admits=true, md1_admits=false`. §11 item 3's counting test asserts
   the field is present on every row.
+- **the gate fields** (REQUIRED on every `gate`-tagged row, absent
+  elsewhere — §5.1's gate states an intent and an invariant, and these
+  rows are its executable precision; terminal fold): `gate_open`
+  (boolean — after record classification fails, does §5.1's gate open?),
+  `outcome` (one of `record-refusal` — the shipped exit-4 record surface,
+  unchanged; `as-decides` — §5.1's choice block at `EXIT_USAGE` (2);
+  `descriptor-refusal` — a §6 row at `EXIT_REFUSED` (3); `multi-record` —
+  §6's multi-record row at `EXIT_INVALID` (4)), `refusal_row` (on the
+  `descriptor-refusal` and `multi-record` outcomes only: a slug naming the
+  §6 row whose text the test asserts — the slug-to-text binding lives with
+  §11 item 4's per-row text tests), and `exit_code` (2, 3 or 4, asserted
+  against the real invocation). All four are asserted by the RUST test
+  only — the gate is `me`'s surface, and the device has no counterpart;
+  the Go test ignores these fields.
 
 **The row set MUST include**, at minimum, one row for each of:
 
@@ -1463,21 +1551,62 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   are the only rows where the host is *wider*, and they are permitted **only
   because `canonical` is what gets packed** (§4.6). The file states that in its
   `_comment`, and a row where the host is wider and `canonical` is absent is a
-  defect the tests must reject.
+  defect the tests must reject;
+- **the §5.1 gate's adversarial set (`gate`) — rounds 16–19's derivations
+  made executable; §5.1's gate is NORMATIVE through these rows.** Every
+  row carries the four gate fields, asserted by the Rust test against the
+  real `--as`-omitted invocation:
+  1. all **fifteen §4.5 rows** under `--as` omitted — the same fifteen
+     physical rows, second-tagged `gate`: gate OPEN on every one; outcome
+     `as-decides` at exit 2 on the seven rows promotion accepts (§4.5
+     rows 1, 2, 5, 6, 7, 13, 14), `descriptor-refusal` at exit 3, each
+     naming its §6 row, on the eight it refuses (rows 3, 4, 8, 9, 10,
+     11, 12, 15);
+  2. **six records with hostile payloads** — `text: my wallet (2 of 3)`,
+     `pass: hunter (2)`, `text: note: hello`, `seed: abandon abandon
+     abandoz`, `tx: zz`, and a `text:` record whose payload is a real
+     `xpub…` token: parentheses, colons and base58 material inside a
+     record payload must not open the gate — gate CLOSED,
+     `record-refusal`, exit 4;
+  3. a **mistyped bare mnemonic** — gate CLOSED, `record-refusal`, exit 4
+     (the operand class of the `sysw_cli.rs:1928` pin);
+  4. one **malformed string of each bech32 record class** — `md1…`,
+     `mk1…`, `ms1…`, `mt1…`: gate CLOSED (the bech32 charset is not a
+     base58check envelope), `record-refusal` naming the class, exit 4;
+  5. the **multi-record split, MNEMONIC FIRST** — a valid mnemonic line,
+     then a `wsh(sortedmulti(…))` line: gate OPEN on the second line,
+     outcome `multi-record`, exit 4. The ordering is load-bearing (r19's
+     plan note): a descriptor-first row passes with or without per-line
+     scope and witnesses nothing;
+  6. the **buried refused keys** — three records files, each a valid
+     record line followed by a bare `Zpub…`, a bare `tpub…`, or a
+     `[fp]xpub…` with no path: gate OPEN, outcome `descriptor-refusal`
+     over the WHOLE input — step 5's generic four-forms text, exit 3 (the
+     divergence §6 states explicitly);
+  7. the **edge tokens** — a base58check token with a valid checksum and
+     a 77-byte payload (gate CLOSED, `record-refusal`, exit 4); `[` alone
+     (gate OPEN, `descriptor-refusal`, the unparseable-file row carrying
+     branch 4's error, exit 3); and `xpub…/` with a trailing slash (gate
+     OPEN, `descriptor-refusal`, the unparseable-file row carrying branch
+     4's error, exit 3).
 
 **The coverage manifest — NORMATIVE; §11 item 3 counts against it (R0 r6's
 NEW-I2: without a countable anchor, dropping the childless+`<0;1>/*` mixed
 row — the row that gates R0 r3's NEW-C1 — left every countable property of
 the file intact).** Every required row carries `covers`; the test asserts
 every tag present with at least its minimum and no unknown tags. A row may
-carry a second tag ONLY where its input genuinely discharges both bullets —
-in the required set exactly two rows qualify: the `xpub…\n` near-miss
-(`promotion-near-miss` + `whitespace`) and the bare-`xpub` happy path
-(`formats-happy` + `promotion-near-miss`). `covers` entries are distinct
-within a row, and the file carries at least **49 physical rows** (the minima
-sum to 51 tag-slots over the two permitted overlaps), asserted as a floor —
-so a dropped row cannot be counted around by retagging or by duplicate tags
-(R0 r7's NEW-M1):
+carry MORE than one tag ONLY where its input genuinely discharges each
+bullet — in the required set the qualifying rows are exactly the fifteen
+§4.5 rows, which double as the gate bullet's clause 1 and carry `gate` as
+a second tag; two of the fifteen carry a third, the original overlap pair
+(R0 r7's NEW-M1): the `xpub…\n` near-miss (`promotion-near-miss` +
+`whitespace` + `gate`) and the bare-`xpub` happy path (`formats-happy` +
+`promotion-near-miss` + `gate`). `covers` entries are distinct within a
+row, and the file carries at least **67 physical rows** (the minima sum to
+**84** tag-slots; the fifteen shared §4.5 rows absorb 15 of `gate`'s
+slots, and the original pair's two extra tags absorb 2 more: 84 − 17 =
+67), asserted as a floor — so a dropped row cannot be counted around by
+retagging or by duplicate tags (R0 r7's NEW-M1):
 
 | tag | bullet | min rows |
 | --- | --- | --- |
@@ -1489,6 +1618,7 @@ so a dropped row cannot be counted around by retagging or by duplicate tags
 | `neither` | `wsh(multi)`, miniscript, full-origin `ypub` | 3 |
 | `whitespace` | §4.6's rows | 3 |
 | `md1-splits` | §5.3's splits: `/0/*`, `<0;1>`, childless, three mixed | 6 |
+| `gate` | §5.1's gate — the seven adversarial clauses of the gate bullet | 33 |
 
 **A second, separate assertion, because §5.3 showed a string comparison is not
 enough.** Rows may carry `address_0` and `address_1` — receive addresses at
@@ -1605,10 +1735,13 @@ rest.
    `md_codec::TlvSection`'s five declared fields and the `unknown` TLV
    passthrough; a caller could smuggle a label through `unknown`, which nothing
    does today.
-7. **The refusal texts in §6 have not been walked with the operator.** Per the
-   standing directive, a live journey walk finds what correctness review cannot,
-   and §6 is exactly the kind of section it finds things in. It should be walked
-   before the plan closes.
+7. **§6 has not been re-walked row-by-row since its final text landed.** The
+   operator journey walk RAN, and its findings are folded throughout — §6's
+   own rows cite walk W4/W5/W11/W13 and F-419 — with the walk lens closed
+   at r19. What remains unwalked is only the rows added or reworded after
+   the walk, which the closure rounds covered as text rather than as a
+   live journey. A systematic row-by-row walk of §6's final table is a
+   plan-phase option, not a gate this spec holds open.
 
 ---
 
@@ -1687,7 +1820,10 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
    not by reading (R0 r6's NEW-I2; r7's NEW-N1).
 4. Every refusal in §6 has a test that reaches it and asserts the *text*, not
    just the exit code. The `--as descriptor`-only rows among them are S2's
-   (F-418); the rest bind S3 (R0 r6's NEW-M5).
+   (F-418); the rest bind S3 (R0 r6's NEW-M5). The multi-record row's test
+   reaches it with the MNEMONIC-FIRST ordering (r19's plan note): a
+   descriptor-first input passes with or without the per-line gate scope
+   and is not a witness for r18's repair.
 5. `--as` omitted with a descriptor input at least one `--as` value
    CARRIES in this build exits **2** and prints §5.1's block; with an input
    nothing carries, the input's own refusal fires directly at **3** — the
