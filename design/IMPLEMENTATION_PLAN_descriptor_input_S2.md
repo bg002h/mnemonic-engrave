@@ -467,18 +467,21 @@ record displayed on the real device) and every flash remain operator-gated**
   (parse via `OutputDescriptor`, the cascade's single-line narrowings,
   §4.7's conjuncts), §7's OWN text that invariant 1 falsifies (r2 I1):
   the `sysw_class` column definition paragraph and the
-  `device_probe`/panic-parse clauses ("the Go test never feeds one to the
-  parser" — false once P3.1 lands and the row's probe retires), §4.2
-  defect 4's FILE-half clauses ("§7 marks these rows `device_probe`" —
-  falsified by P2.6's marker retirement, so owned here; the "PANICS the
+  `device_probe`/panic-parse clauses (r7 N1 corrected the quote's home —
+  "the Go test never feeds one to the parser" is §4.2's, at spec :390,
+  and belongs to the next member), §4.2
+  defect 4's FILE-half clauses ("§7 marks these rows `device_probe`" and
+  "the Go test never feeds one to the parser" — both falsified by
+  P2.6's marker retirement, so owned here; the "PANICS the
   Go parser" DEVICE sentence itself moves to P3.5, whose P3.1 fix is
   the falsifying diff — r6 M1), §5.5's "needs a firmware change to be
   readable | yes, §5.2" row,
   §8's "S2 is parked" sentence, §5.1's and §7's "after record
   classification fails" gate-trigger sentences (r3 I1 — P1.0 abolishes
   the precondition, and these are the exact sentences a future
-  implementer re-reads before touching the pack path), §7 requirement
-  3's device-column phrasing. **The ownership split rule (r5 I2): a
+  implementer re-reads before touching the pack path). (§7 requirement
+  3's device-column phrasing is P3.5's, not listed here — r7 M1 removed
+  the double owner.) **The ownership split rule (r5 I2): a
   member is owned by the phase whose diff falsifies it — and a member
   that is a generator INPUT rather than a description is not routed by
   this rule at all: it is edited in the generating task itself, before
