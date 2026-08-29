@@ -139,5 +139,7 @@ rulings, spec-as-written meanwhile.
 
 ## Stop-rules and boundaries (the overnight mandate)
 
-Per `CONTINUITY_2026-08-28-overnight.md`: loops > ~5 rounds park with a
-note; no tags/releases/publishes/on-device actions; pushes in scope.
+Per `CONTINUITY_2026-08-28-overnight.md` (operator, 2026-08-28): 5 review
+rounds expected and good; at 15 opus reviews the tier switches to fable;
+25 is a hard stop — park with a note. No tags/releases/publishes/on-device
+actions; pushes in scope.

@@ -14,9 +14,11 @@ state with a written note at whichever gate stopped it.
   consult substitutes for the operator only if it gates.
 - Gates: plan R0 loop, opus default, fable on the 2026-08-28 triggers;
   post-implementation adversarial review is mandatory and non-deferrable.
-- Stop-rules: any review loop > ~5 rounds without closing → park with a
-  written note; funds-risk decisions a consult cannot legitimately settle →
-  park.
+- Stop-rules (operator, mid-turn 2026-08-28, superseding the ~5 draft):
+  **5 rounds is expected and considered good; at 15 opus reviews the
+  reviewer tier SWITCHES TO FABLE; 25 rounds is a HARD STOP** — park with
+  a written note. Funds-risk decisions a consult cannot legitimately
+  settle → park.
 - Hard boundaries: NO tags, releases, crate publishes, or on-device
   actions. Pushes via `scripts/push-via-staging.sh` / agents are in scope.
 
