@@ -472,7 +472,11 @@ will be a short 1 plate engraving to get all the md1 strings."*
 
 **The measured answers.** The bequest card (keyed single-sig `wpkh`,
 materialised `<0;1>/*`, BIP-84 origin): **2 md1 strings, 85 + 83 = 168
-characters**; the fork's own `TestBundlePlanSingleMD1OnePlate` pins one md1
+characters**
+[ERRATUM 2 — see "Corrections to this log" below: the NUMBER is right and the
+PARENTHETICAL is wrong. 2 strings / 85 + 83 = 168 is the BARE `zpub` Journey 2
+actually holds; the keyed, BIP-84-origin spelling measures 3 strings /
+67 × 3 = 201. Left in place as the record of what the walk asserted.]; the fork's own `TestBundlePlanSingleMD1OnePlate` pins one md1
 card = exactly one plate. Hand-stamping bonus, worth a §5.5 sentence: each
 string independently corrects up to 4 character substitutions (BCH), so a
 mis-struck punch is inside the error budget — a property no other
@@ -537,3 +541,30 @@ The fold lands as one gated batch with a proportional re-review.
 2. **W9's `/**` byte-identity attribution:** verified in the F-410 cycle,
    not F-411 (commit `5465253b`, `cli_bip388_double_wildcard.rs`). The
    equivalence itself re-measured true (`0x880c7`, both spellings).
+
+# Corrections to this log (IMPL-S1S3 adversarial review, 2026-08-29)
+
+3. **W14's parenthetical names the wrong artifact for its own number.** The
+   log records the bequest card as *"keyed single-sig `wpkh`, materialised
+   `<0;1>/*`, BIP-84 origin: 2 md1 strings, 85 + 83 = 168 characters"*. The
+   NUMBER is exact and reproduces on this build; the DESCRIPTION does not
+   belong to it. Re-measured through `me sysw pack --as md1`:
+
+   ```
+   zpub6qpFgGWoG7bKm…          (bare — Journey 2's actual clipboard line)
+       -> 2 strings, 85 + 83 = 168 chars
+   [4bbaa801/84h/0h/0h]zpub…   (keyed, BIP-84 origin)
+       -> 3 strings, 67 + 67 + 67 = 201 chars
+   ```
+
+   So the walk measured the BARE key and wrote down the keyed one. Correcting
+   it matters because correction 1 above already re-derived the plate count
+   from this number — two plates, from 2 strings, which stands for the bare
+   card. The keyed card would be **three** plates. A future re-run following
+   the parenthetical would measure the wrong artifact and get a different
+   answer for both.
+
+   This is the second citation-by-description error in W14 (correction 1 was
+   the first, a citation verified by a test's NAME rather than its fixture).
+   The pattern is the same: the log recorded a claim about an artifact it did
+   not re-read.
