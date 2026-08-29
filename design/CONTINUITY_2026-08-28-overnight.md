@@ -52,3 +52,14 @@ found six plan-side misses of the r2 fold (held for the r3 fold,
 - **P2 implementer dispatched** (opus, same worktree) with all nine carry
   items enumerated. Next after its report: the MANDATORY post-implementation
   adversarial execution review over the whole S1+S3 diff, then P3.
+- **P2 built and gated** (branch `5b0007a`: 544/544, zero ignores, 36==36,
+  §6 amendment isolated at `de35e30`), then the MANDATORY adversarial
+  execution review came back **RED 1C/1I/3M/3N** (`32b94c4`,
+  `IMPL-S1S3-adversarial-review.md`). C1: `--as descriptor` on a `multi`
+  short-circuits conjuncts 2–8 → false "`--as md1` encodes multi" referral
+  on an anyone-can-spend `multi(0,…)`. I1: the different-depths address
+  line is false twice over. Round-trip, record surface (53-case baseline),
+  both walk journeys, §6 amendment: clean. Fold dispatched back to the one
+  P2 implementer with controller rulings: M3 = warning prints exactly on
+  paths that pack; N1 = deliberate divergence, stands. Re-review (opus,
+  round 8 of 15) follows the fold.
