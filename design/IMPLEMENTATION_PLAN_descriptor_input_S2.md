@@ -1,10 +1,10 @@
 # IMPLEMENTATION_PLAN_descriptor_input_S2 — `--as descriptor` end to end
 
 **Status: DRAFT — R0 rounds 1 (RED 4C/6I/7M/3N), 2 (RED 1C/2I/4M/3N),
-3 (RED 1C/1I/4M/3N) and 4 (RED 0C/2I/2M/0N,
-`design/agent-reports/R0-S2-plan-r4.md` — all 9 of r3's findings
-verified answered, C1's ruling executed in all five coordinated edits;
-both Importants were propagation gaps under it) folded 2026-08-29.** Single author
+3 (RED 1C/1I/4M/3N), 4 (RED 0C/2I/2M/0N) and 5 (RED 0C/2I/1M/2N,
+`design/agent-reports/R0-S2-plan-r5.md` — r4's I1/M1 and four of five
+M2 members verified resolved; both Importants were defects in r4's
+`neither`-tag ruling, re-ruled below) folded 2026-08-29.** Single author
 per the R0 gate; this plan binds S2 of `SPEC_descriptor_input.md` (GREEN
 2026-08-28, amendments through the S1+S3 cycle). S1+S3 shipped 2026-08-29
 (engrave `f244442`, records through `4646fa2`); the SH2 is back on the bench
@@ -69,16 +69,45 @@ record displayed on the real device) and every flash remain operator-gated**
      its `source` annotation ("refused even with a full explicit
      origin"), its `name`/`covers`, the generator's line for that
      annotation (`rows.py:327`) and the `_comment` manifest's `neither`
-     line (`comment.json:107`). **The `neither`-tag ruling:** the row is
-     RETAGGED out of `neither` (a false/true row contradicting the tag's
-     §7 definition may not keep it) and re-covers the
-     device-wider-than-host bullet its data now evidences (the class
-     `promotion/15-bare-tpub-host-refused` already covers); the NEW
-     witness row — itself false/false on both axes, the device parser
-     rejects `multi` (measured, r3) — takes the vacated `neither` slot,
-     so the floor of 3 holds, `MANIFEST`'s `("neither", 3)` does not
-     move, and §7's named-three sentence amends by SUBSTITUTION
-     (full-origin `ypub` out, `wsh(multi(…/0/*))` in);
+     line (`comment.json:107`). **The `neither`-tag ruling (re-ruled at
+     the r5 fold — r4's version pointed the retag at closed memberships,
+     r5 I1):** the row is RETAGGED out of `neither` (a false/true row
+     contradicting the tag's §7 definition may not keep it) into a NEW,
+     single-member §7 bullet — the **F-426 version-gap witness**: a
+     §4.3-version-refused, device-admitted descriptor row, the live
+     tracking witness for F-426's open host half (when the host's
+     admission widens in F-426's own later cycle, `host_admits` flips
+     and the bullet retires with it). NOT `promotion-near-miss` (§7's
+     closed fifteen-bare-key membership — this row is a wrapped
+     descriptor that never reaches §4.5's branch, and the "fifteen"
+     sentence at `design/SPEC_descriptor_input.md:1582` stays TRUE), NOT
+     `narrowed-4.7` (the refusal is §4.3's version byte, not a §4.7
+     narrowing), NOT `gate` (no gate fields — the row stays
+     single-tagged, so `SECOND_TAGGED` stays 15 and `POP.gate_fields`
+     stays 37, r5 I1a). The NEW witness row — itself false/false on both
+     axes, the device parser rejects `multi` (measured, r2 — r5 N1
+     corrected r4's mis-attribution; `bip380/bip380.go:335` cases
+     `sortedmulti` only) — takes the vacated `neither` slot, ALSO
+     single-tagged, so `MANIFEST`'s `("neither", 3)` does not move and
+     §7's named-three sentence amends by SUBSTITUTION (full-origin
+     `ypub` out, `wsh(multi(…/0/*))` in) — and the amendment
+     DISAMBIGUATES the next sentence's "The `multi` row" referent, which
+     stays `neither/wsh-multi` alone (r5 M1: the new row is
+     `md1_admits=false` and carries no address fields;
+     `design/SPEC_descriptor_input.md:1612-1615` is true of the existing
+     row only). **The manifest arithmetic that DOES move, in all three
+     copies (r5 I1c):** `MANIFEST` gains `("version-gap", 1)` (exact tag
+     name is P2.6's, stated in the inventory); `TAG_SLOTS` 88 → 89
+     (`assert_eq!` at `crates/me-cli/tests/descriptor_seam.rs:373`,
+     definition comment at `crates/me-cli/tests/descriptor_seam.rs:62`);
+     `ROW_FLOOR` 71 → 72 (overlap stays 17); §7's derivation
+     (`design/SPEC_descriptor_input.md:1719-1723`, "88 − 17 = 71"
+     becomes "89 − 17 = 72"); §7's floor table
+     (`design/SPEC_descriptor_input.md:1728-1732` — the new bullet's row
+     in, `neither`'s named three substituted, `promotion-near-miss`
+     unchanged at 15); the NEW §7 bullet itself; and `comment.json`'s
+     WHOLE manifest block (lines 101-113, not just the `neither` line —
+     r5 I1c: it is a third copy of the manifest);
    - F-428's citation fixes (the stale `:151` cite → the measured `nonstandard/parse.go:158`, in the
      two `source` annotations and the generator) — F-428's own entry names
      "the next vector-file byte change — realistically the S2/F-426 batch"
@@ -195,9 +224,13 @@ record displayed on the real device) and every flash remain operator-gated**
   the switch", false of the device after P3.4, and the very paragraph
   P3.1 sends the porter to — its amendment must land so a §4.5 port and
   a `cascade.rs` port stop meaning different predicates); §7's named
-  `neither` rows (`design/SPEC_descriptor_input.md:1610-1611` — the
-  full-origin `ypub` stops being a false/false row; see invariant 1's
-  `neither`-tag ruling); the host source comment asserting the device's
+  `neither` rows and manifest arithmetic
+  (`design/SPEC_descriptor_input.md:1610-1615`, `:1719-1723`,
+  `:1728-1732`, plus `comment.json`'s manifest block — the full-origin
+  `ypub` stops being a false/false row and the 72nd row moves the
+  slots/floor derivation; see invariant 1's `neither`-tag ruling; owned
+  by P2.7 per the r5 I2 split rule, NOT P3.5 — P2.6 is the falsifying
+  diff); the host source comment asserting the device's
   five (`crates/me-cli/src/descriptor/cascade.rs:58-62` — comments
   outlive their conditions); and the operator-facing "the device admits
   exactly" refusal text (`crates/me-cli/src/descriptor/refusal.rs:583`,
@@ -421,8 +454,19 @@ record displayed on the real device) and every flash remain operator-gated**
   classification fails" gate-trigger sentences (r3 I1 — P1.0 abolishes
   the precondition, and these are the exact sentences a future
   implementer re-reads before touching the pack path), §7 requirement
-  3's device-column phrasing. The §4.3/§4.5 device clauses, the
-  "device admits exactly" refusal text and its pinned §6 row move to
+  3's device-column phrasing. **The ownership split rule (r5 I2): a
+  member is owned by the phase whose diff falsifies it.** Falsified by
+  P2.6's regeneration — they describe the VECTOR FILE, not the device —
+  and therefore owned HERE, landing at P2's close so the P2 gate never
+  runs against a spec contradicting the repo's own regenerated file:
+  §7's `neither` bullet and named rows
+  (`design/SPEC_descriptor_input.md:1610-1615`, with the "The `multi`
+  row" referent disambiguated), §7's derivation
+  (`design/SPEC_descriptor_input.md:1719-1723`), §7's floor table
+  (`design/SPEC_descriptor_input.md:1728-1732`), and the NEW version-gap
+  bullet. Falsified by P3.4's arm — device behaviour — the §4.3/§4.5
+  device clauses, the "device admits exactly" refusal text and its
+  pinned §6 row move to
   **P3.5's ownership** (r4 M2: they describe scan-door behaviour that
   arrives with P3.4 in P3, and the P2 gate must not close with the spec
   asserting device behaviour fork `main` does not yet have — reworded
@@ -433,10 +477,11 @@ record displayed on the real device) and every flash remain operator-gated**
   touches, so the propagation sweep runs over the SPEC too — with the
   falsified sentences' OWN tokens (`sysw_class`, `panic:parse`, "PANICS
   the Go parser", `gate_open`, "record classification fails", `ypub` —
-  the last is the ONE term that reaches every P3.4-falsified site, r4
-  I2) as sweep terms, because they share no token with the S3-parked
-  phrasings and a sweep can only find what its terms name (r2 I1's
-  failure mode).
+  the term that reaches every P3.4-falsified site, r4 I2 — and
+  `tag-slots`, the term that reaches §7's derivation and `comment.json`'s
+  manifest block, which `ypub` does not, r5 I1c) as sweep terms, because
+  they share no token with the S3-parked phrasings and a sweep can only
+  find what its terms name (r2 I1's failure mode).
 - **P2 gate:** full engrave suites (lint-gate, `ME_REQUIRE_GO=1`);
   zero `#[ignore]`; the matrix witness green; propagation sweep whole-repo
   including the spec (the S3-parked phrasings must survive ONLY in
@@ -558,11 +603,13 @@ record displayed on the real device) and every flash remain operator-gated**
   instrument for the bare-key half of the §4.3 check that no vector row
   and no other gate can see): `sysw.Classify(<the bare ypub string, the
   same key material as the vector row>) == ClassUnknown`, its comment
-  naming P3.4 as the reason it can fail — r4 measured that a §4.5
-  promotion-table port taken from the spec's own §4.5 paragraph
-  (post-P3.4, `ypubVer` is IN the mapping) classifies a bare `ypub`
-  `ClassDescriptor` while `me` refuses it at rc 3, with every other gate
-  green. This test costs no vector byte and makes P3.1's "on both the
+  naming P3.4 as the reason it can fail — r4 CONSTRUCTED the
+  counterexample (a §4.5 promotion-table port taken from the spec's own
+  §4.5 paragraph, where post-P3.4 `ypubVer` is IN the mapping, would
+  classify a bare `ypub` `ClassDescriptor` with every other gate green)
+  and MEASURED its two halves: the P3.4-patched probe accepts the bare
+  `ypub`, and `me` refuses the identical string at rc 3 (r5 N2 —
+  provenance stated exactly). This test costs no vector byte and makes P3.1's "on both the
   descriptor-embedded and bare-key paths" sentence falsifiable. **This arm widens the SCAN DOOR, and S2 says so end
   to end rather than tripping over it** (r3 C1, measured: the one arm
   flips `neither/full-origin-ypub`'s `device_admits` and reds the
@@ -583,10 +630,11 @@ record displayed on the real device) and every flash remain operator-gated**
   amendment) §9 item 2's "untested by construction" claim updates to the
   S2 truth: one cell executed (walletPolicy, by P3.2's walk), two declared
   and inert with a named follow-up. Plus the P3.4 amendment batch moved
-  here from P2.7 (r4 M2): §4.3's device clauses
+  here from P2.7 (r4 M2, membership corrected by r5 I2 — §7's `neither`
+  rows went BACK to P2.7, whose P2.6 regeneration is what falsifies
+  them): §4.3's device clauses
   (`design/SPEC_descriptor_input.md:453-461`), §4.5's promotion prose
-  (`design/SPEC_descriptor_input.md:570-574`), §7's named `neither` rows
-  (`design/SPEC_descriptor_input.md:1610-1611`), the
+  (`design/SPEC_descriptor_input.md:570-574`), the
   `crates/me-cli/src/descriptor/cascade.rs:58-62` host comment, and the
   `crates/me-cli/src/descriptor/refusal.rs:583` operator message with
   its pinned test (`crates/me-cli/tests/descriptor_refusals.rs:466`) and
