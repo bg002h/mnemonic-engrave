@@ -45,7 +45,29 @@ pub enum Path {
 
 /// §4.7's predicate. `Ok(())` means every conjunct holds for `path`.
 pub fn admit(d: &Parsed, path: Path) -> Result<(), Refusal> {
-    conjunct_1_shape(d, path)?;
+    // Conjunct 1 is evaluated in TWO parts, and the split is load-bearing.
+    //
+    // Its SHAPE half is `--as`-independent and runs first, as it always has:
+    // `tr(multi(…))`, `wpkh(sortedmulti(…))` and `wsh(KEY)` are wrong whatever
+    // flag is given, and they name the wrongness better than a threshold does.
+    //
+    // Its `multi`-under-`--as descriptor` half is the ONE piece of this
+    // predicate that depends on the flag, and it runs LAST -- after every
+    // flag-independent conjunct. §5.4's carriage rule says why: *"the §4.7
+    // admission refusal where no path admits the wallet -- that determination
+    // quantifies over both paths, so it needs no flag"*. Running it first made
+    // `wsh(multi(0,K1,K2))` -- anyone-can-spend -- answer `--as descriptor`
+    // with "This wallet can still be engraved", swallowing conjunct 2's
+    // funds-at-risk refusal that the same file gets under both other flag
+    // states. Seven shapes were affected; the adversarial review constructed
+    // all seven (IMPL-S1S3-adversarial-review, C1).
+    //
+    // Ordering it last also makes conjunct 1's referral TRUE by construction:
+    // it is reached only when conjuncts 2-8 hold, which is exactly when
+    // `--as md1` admits the wallet. §6's row hedges the rest ("for use-site
+    // paths md1 can represent"), which is §5.3's business and not this
+    // predicate's.
+    conjunct_1_shape(d)?;
     conjunct_2_threshold(d)?;
     conjunct_3_key_count(d)?;
     conjunct_4_versions(d)?;
@@ -53,11 +75,26 @@ pub fn admit(d: &Parsed, path: Path) -> Result<(), Refusal> {
     conjunct_6_origins(d)?;
     conjunct_7_use_site(d)?;
     conjunct_8_key_identity(d)?;
+    conjunct_1_multi_under_descriptor(d, path)?;
     Ok(())
 }
 
-/// Conjunct 1. The seven forms, and on the md1 path the three `multi` twins.
-fn conjunct_1_shape(d: &Parsed, path: Path) -> Result<(), Refusal> {
+/// Conjunct 1's `--as`-DEPENDENT half: `multi` is admitted by the md1 path and
+/// refused PERMANENTLY by the descriptor path, in every build.
+///
+/// Last in `admit()`, deliberately -- see the note there.
+fn conjunct_1_multi_under_descriptor(d: &Parsed, path: Path) -> Result<(), Refusal> {
+    match (d.multi, path) {
+        (Some(Multi::Unsorted), Path::Descriptor) => Err(refusal::multi_under_descriptor()),
+        _ => Ok(()),
+    }
+}
+
+/// Conjunct 1's `--as`-INDEPENDENT half: the seven forms, plus the three
+/// `multi` twins, which are structurally fine in a multisig slot on BOTH paths.
+/// Which of the two paths will actually CARRY a `multi` is
+/// [`conjunct_1_multi_under_descriptor`]'s question, and it is asked last.
+fn conjunct_1_shape(d: &Parsed) -> Result<(), Refusal> {
     use Script::*;
     let single = matches!(d.script, P2PKH | P2WPKH | P2SH_P2WPKH | P2TR);
     let multisig_slot = matches!(d.script, P2WSH | P2SH_P2WSH | P2SH);
@@ -66,12 +103,10 @@ fn conjunct_1_shape(d: &Parsed, path: Path) -> Result<(), Refusal> {
         (None, true, _) => Ok(()),
         // wsh(sortedmulti) · sh(wsh(sortedmulti)) · sh(sortedmulti)
         (Some(Multi::Sorted), _, true) => Ok(()),
-        // The md1-path widening — and under `--as descriptor` the PERMANENT
-        // refusal, in every build.
-        (Some(Multi::Unsorted), _, true) => match path {
-            Path::Md1 => Ok(()),
-            Path::Descriptor => Err(refusal::multi_under_descriptor()),
-        },
+        // The md1-path widening. Structurally admitted here on BOTH paths so
+        // the flag-independent conjuncts below get to run; the descriptor
+        // path's permanent refusal fires at the END of `admit()`.
+        (Some(Multi::Unsorted), _, true) => Ok(()),
         // wsh(KEY) / sh(KEY) — `Parse` builds these as Singlesig, and they are
         // not descriptors: measured `Supported=false`, no derivable address.
         (None, _, true) => Err(refusal::key_in_script_slot()),

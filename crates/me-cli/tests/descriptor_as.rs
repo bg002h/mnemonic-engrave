@@ -494,3 +494,137 @@ fn the_md1_records_reach_the_shipped_expect_gate() {
         );
     }
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// C1 — `--as descriptor` on a `multi` input must not swallow conjuncts 2–8
+// ───────────────────────────────────────────────────────────────────────────
+
+/// The three flag states one file can be given. §5.4's carriage rule is
+/// explicit that the no-path determination *"quantifies over both paths, so it
+/// needs no flag"*, so a refusal earned by a FLAG-INDEPENDENT conjunct must be
+/// the same sentence in all three.
+fn under_all_three_flags(document: &str) -> [(String, i32); 3] {
+    [vec![], vec!["--as", "md1"], vec!["--as", "descriptor"]].map(|flags| {
+        let out = pack_in(document, &flags).0;
+        (stderr(&out), code(&out))
+    })
+}
+
+/// The `multi` twin of a vector row — the construction the adversarial review
+/// used to find C1, and the one the vector corpus cannot express (its `multi`
+/// rows are gate rows, and gate rows are `--as`-omitted by construction).
+fn multi_twin(row: &str) -> String {
+    row_input(row).replace("sortedmulti(", "multi(")
+}
+
+/// The refusal the flag-independent conjuncts earn, asserted to be identical
+/// under all three flag states, and asserted NOT to be conjunct 1's `multi`
+/// referral — which claims *"This wallet can still be engraved"* and is FALSE
+/// whenever 2–8 refuse, because `--as md1` refuses the same file permanently.
+fn assert_same_refusal_under_every_flag(document: &str, want: &str) {
+    for (err, rc) in under_all_three_flags(document) {
+        assert_eq!(rc, 3, "every flag state refuses. stderr:\n{err}");
+        assert!(
+            err.contains(want),
+            "a flag state lost the refusal conjuncts 2-8 earn.\nWANT: {want}\nGOT:  {err}"
+        );
+        assert!(
+            !err.contains("This wallet can still be engraved"),
+            "conjunct 1's `multi` referral suppressed a conjunct 2-8 refusal:\n{err}"
+        );
+    }
+}
+
+/// **C1, instance 1 — conjunct 2, the anyone-can-spend half.** The spec names
+/// this case as the reason the ordering rule exists: *"`sortedmulti(0,…)` must
+/// hear 'treat those funds as at risk now', never 'nothing is lost by
+/// waiting'."*
+#[test]
+fn as_descriptor_on_multi_still_reports_threshold_below_one() {
+    assert_same_refusal_under_every_flag(
+        &multi_twin("narrowed/threshold-zero"),
+        "threshold 0 means NO signature is required: anyone who can see this script can \
+         spend from it.",
+    );
+}
+
+/// **C1, instance 2 — conjunct 2, the unsatisfiable half.**
+#[test]
+fn as_descriptor_on_multi_still_reports_threshold_exceeds_keys() {
+    assert_same_refusal_under_every_flag(
+        &multi_twin("narrowed/threshold-exceeds-keys"),
+        "threshold 5 of 2 keys can never be satisfied",
+    );
+}
+
+/// **C1, instance 3 — conjunct 3, the unspendable key count.**
+#[test]
+fn as_descriptor_on_multi_still_reports_key_count_exceeded() {
+    assert_same_refusal_under_every_flag(
+        &multi_twin("narrowed/wsh-sortedmulti-21-keys"),
+        "carries at most 15 keys",
+    );
+}
+
+/// **C1, instance 4 — conjunct 5, the network mixture no address derives from.**
+#[test]
+fn as_descriptor_on_multi_still_reports_mixed_network() {
+    assert_same_refusal_under_every_flag(
+        &multi_twin("narrowed/mixed-network"),
+        "All keys must share one network.",
+    );
+}
+
+/// **C1, instance 5 — conjunct 7, the hardened use-site step.**
+#[test]
+fn as_descriptor_on_multi_still_reports_use_site_hardened() {
+    assert_same_refusal_under_every_flag(
+        &multi_twin("narrowed/use-site-hardened"),
+        "a hardened use-site step cannot be derived from an xpub (BIP-32).",
+    );
+}
+
+/// **C1, instance 6 — conjunct 7, the non-consecutive multipath.**
+#[test]
+fn as_descriptor_on_multi_still_reports_use_site_non_consecutive() {
+    assert_same_refusal_under_every_flag(
+        &multi_twin("narrowed/use-site-non-consecutive"),
+        "the device derives only `<i;i+1>` pairs (receive; change).",
+    );
+}
+
+/// **C1, instance 7 — conjunct 8, the impossible wallet.** This row is already
+/// a `multi` in the vector file, and it is `gate`-tagged — which is exactly why
+/// the corpus could not see C1: the gate row is `--as`-omitted, the path that
+/// was always right.
+#[test]
+fn as_descriptor_on_multi_still_reports_key_identity() {
+    assert_same_refusal_under_every_flag(
+        &row_input("gate/colliding-origin-multi"),
+        "this wallet description contradicts itself: keys 0 and 1 both claim origin",
+    );
+}
+
+/// The CONTROL, and it is what stops the fix from being "delete conjunct 1's
+/// `multi` arm". A `multi` wallet that passes conjuncts 2–8 must STILL get
+/// conjunct 1's permanent refusal under `--as descriptor` — and there the
+/// referral is true, because `--as md1` really does carry it.
+#[test]
+fn as_descriptor_on_a_sound_multi_still_gets_conjunct_1s_permanent_refusal() {
+    let document = row_input("neither/wsh-multi");
+    let (out, _d) = pack_in(&document, &["--as", "descriptor"]);
+    let err = stderr(&out);
+    assert_eq!(code(&out), 3, "stderr:\n{err}");
+    assert!(
+        err.contains("the device's descriptor parser accepts `sortedmulti` and not `multi`."),
+        "the sound `multi` lost conjunct 1's refusal:\n{err}"
+    );
+    // …and the referral it makes is TRUE: the same file packs under `--as md1`.
+    let (packed, _d) = pack_in(&document, &["--as", "md1"]);
+    assert_eq!(
+        code(&packed),
+        0,
+        "the referral claims `--as md1` carries this file, and it does not:\n{}",
+        stderr(&packed)
+    );
+}
