@@ -87,11 +87,24 @@ verified branch/sha/suites. **P3.5 FOLDED by controller** (engrave
 branch @ 781d10d): six spec amendments (S4.2 past-tense+fix, S4.3
 two-door truth, S4.5 ypub case, S9 item 2 one-cell-executed, S6 quote
 re-subjected to `me`), refusal.rs:584 + pin, cascade.rs comment;
-40/40 + lint-gate. **IN FLIGHT, parallel:** (1) P3 port review, opus
-(full fork branch + P3.5 diff; attack brief: S4.3 string-check
-false-positives incl. ypub-in-checksum/base58-body, S4.5 branch-4
-detection, conjunct fidelity, recover scoping, walk assertions;
-report REVIEW-S2-P3-r1.md, main repo); (2) P4.1 measurement DONE:
+40/40 + lint-gate. **P3 REVIEW RETURNED RED
+2C/2I/1M** (persisted `4286559`): the core port held (81/81 boundary
+cases, recover both directions, walk fails under 3 mutations, fixture
+byte-reproducible) but the attack brief's constructed classes hit --
+C1: the S4.3 check scans the WHOLE record, so a JSON label holding a
+ypub refuses an admitted record (refutes the implementer's Deviation
+2); C2: TrimSpace is Unicode vs the host's ASCII normalise, 20
+divergers, device-wider; I1: the "re-parsing cannot fail" comment is
+false (handled gracefully); I2: P3.5 missed the S7-req-3 amendment;
+M1: a fork test quotes the old refusal text. Both C's fail closed and
+are unreachable from me-written payloads (measured). **FOLD IN FLIGHT:
+the P3 implementer resumed via SendMessage for C1/C2/I1/M1** (scope
+the version check to cascade-consumed key material; ASCII-trim parity
+inside the arm only; consumer parses the trimmed string; quote fix;
+named counterexample tests, vector file FROZEN so they are unit tests
+not rows). **I2 folded by controller** (engrave branch `36fd0c3`).
+After the fold: scoped re-review r2 (Critical fixes = non-trivial
+fold), then P4.2, then P5; (2) P4.1 measurement DONE:
 **N = 3** md1 strings fit one plate side at the shipped 3.8mm font
 (analytic 34 chars x 20 lines = 680-char capacity; trial via
 backup.EngraveText paragraphs, 1mm gaps, no FontSize override; trial
