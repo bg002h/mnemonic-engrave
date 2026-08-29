@@ -243,6 +243,137 @@ fn exemplars() -> Vec<Exemplar> {
     ]
 }
 
+/// The four formats §11 item 1 names, for the DESCRIPTOR path.
+///
+/// They are not item 2's four. Item 2's JSON exemplar had to be constructed
+/// with a non-`/0/*` descriptor, because `--as md1` refuses `/0/*` per §5.3(a);
+/// `--as descriptor` carries `/0/*` exactly — that is the whole point of the
+/// path — so item 1 uses the fork's OWN shipped JSON fixture, label and all.
+struct Item1 {
+    what: &'static str,
+    row: &'static str,
+    /// §5.3(b)'s label warning: the label, where the input carries one. Named
+    /// expected output rather than tolerated noise.
+    label: Option<&'static str>,
+}
+
+const ITEM_1: [Item1; 4] = [
+    Item1 {
+        what: "§4.2 BlueWallet — the fork's own 14-line `sh` fixture",
+        row: "formats-happy/bluewallet-sh-fixture",
+        label: Some("sh"),
+    },
+    Item1 {
+        what: "§4.3 plain BIP-380",
+        row: "formats-happy/bip380-sortedmulti-multipath",
+        label: None,
+    },
+    Item1 {
+        what: "§4.4 the fork's own `{label, descriptor}` JSON export, `/0/*` and all",
+        row: "formats-happy/json-label-descriptor",
+        label: Some("Test Multisig 2-of-3"),
+    },
+    Item1 {
+        what: "§4.5 the promoted bare key",
+        row: "promotion/01-bare-xpub",
+        label: None,
+    },
+];
+
+/// **§11 item 1, host half.** `me sysw pack --as descriptor --in <each of the
+/// four formats>` produces a container holding ONE record, and that record is
+/// §5.2's: the canonical re-encode, which `sysw::classify` answers `Descriptor`
+/// on.
+///
+/// **The classify assertion is a RECORD-CLASSIFICATION check, not a fixed
+/// point.** It says the record `me` just packed is the record `me` would
+/// classify as a descriptor — the property that makes the container readable by
+/// the same predicate that admitted it. §7 requirement 4's real fixed point,
+/// `encode(parse(canonical)) == canonical`, is a different claim and is already
+/// asserted by the seam tests; conflating the two would let a broken re-encoder
+/// look verified.
+///
+/// The round trip goes through the CONTAINER: the record is read back out of
+/// the packed bytes with `sysw::open`, so a follower that agreed with itself
+/// while the pack dropped or rewrote the string could not pass. And the record
+/// is compared to the vector file's `canonical` column — a value MEASURED from
+/// the device's own parser — so "canonical" here is not `me` marking its own
+/// homework.
+#[test]
+fn item_1_every_format_packs_one_descriptor_record() {
+    let mut formats = std::collections::BTreeSet::new();
+    for e in &ITEM_1 {
+        let dir = tempfile::tempdir().unwrap();
+        let doc = dir.path().join("document.txt");
+        let out = dir.path().join("container.bin");
+        std::fs::write(&doc, row_input(e.row)).unwrap();
+
+        let run = assert_cmd::Command::cargo_bin("me")
+            .unwrap()
+            .args(["sysw", "pack", "--no-passphrase", "--as", "descriptor"])
+            .arg("--in")
+            .arg(&doc)
+            .arg("--out")
+            .arg(&out)
+            .output()
+            .unwrap();
+        let err = stderr(&run);
+        assert_eq!(code(&run), 0, "{}: pack. stderr:\n{err}", e.what);
+
+        // §5.3(b): the label is display-only and does not travel, and the
+        // operator hears so on the path that packs.
+        match e.label {
+            Some(l) => assert!(
+                err.contains(&format!(
+                    "warning: the label \"{l}\" is not carried by any record format and \
+                     will not appear on the device. Nothing else is lost."
+                )),
+                "{}: no label warning. stderr:\n{err}",
+                e.what
+            ),
+            None => assert!(
+                !err.contains("warning: the label"),
+                "{}: a label warning with no label. stderr:\n{err}",
+                e.what
+            ),
+        }
+
+        let blob = std::fs::read(&out).unwrap();
+        let payload = mnemonic_engrave::sysw::open(&blob, None).unwrap();
+        assert!(
+            payload.secret.is_empty(),
+            "{}: nothing here is secret",
+            e.what
+        );
+        assert_eq!(
+            payload.public.len(),
+            1,
+            "{}: §5.2's record is ONE record, got {:?}",
+            e.what,
+            payload.public
+        );
+        let record = &payload.public[0];
+        assert_eq!(
+            mnemonic_engrave::sysw::classify(record),
+            mnemonic_engrave::sysw::record::Class::Descriptor,
+            "{}: the packed record does not classify as a descriptor",
+            e.what
+        );
+        assert_eq!(
+            record,
+            &row_field(e.row, "canonical").expect("an admitted row carries a canonical"),
+            "{}: the packed record is not the canonical the device measured",
+            e.what
+        );
+        formats.insert(row_field(e.row, "format").unwrap());
+    }
+    assert_eq!(
+        formats.len(),
+        4,
+        "the four exemplars must be four FORMATS, not one format four times: {formats:?}"
+    );
+}
+
 /// **§11 item 2.** `me sysw pack --as md1 --in <each of the four formats>`
 /// produces a container whose records read back to the expected template — with
 /// §5.3(a′)'s materialised `<0;1>/*` where the input was childless — and whose
