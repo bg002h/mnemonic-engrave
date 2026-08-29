@@ -14,8 +14,11 @@ residue; **the r20 closure review verified that fold: GREEN STANDS (0C/0I,
 `R0-descriptor-input-spec-r20-closure.md`)**. **Post-GREEN amendment
 2026-08-28:** §4.7 gained conjunct 8 (key identity — the published
 `md-codec` 0.42.0 lacks the F-217/F-218 encode refusals), §6 its
-key-identity row, §7's gate its clause 8; found by PLAN-r1's C1, corrected
-by PLAN-r2, verified by the plan R0 rounds. §9 item 7 records the walk's
+key-identity row, §7's gate its clause 8 — moving the manifest arithmetic
+**34→37 gate / 85→88 slots / 68→71 floor**, the numbers every downstream
+artifact must re-pin (the propagation check's first target); found by
+PLAN-r1's C1, corrected by PLAN-r2, **under verification by the plan R0
+rounds in flight** (past-tense only when a round closes on it). §9 item 7 records the walk's
 one narrow residual.
 **No code may be written before the implementation plan passes its own
 gate** (project `CLAUDE.md` — this is risk-set work: it changes normative
@@ -1173,12 +1176,14 @@ BEFORE whatever follows, in TWO tiers (walk W13; R0 r9 I1, r10 new-I1,
 r11 new-M1/M2/N1, r12–r13: the three rules below, each stated once).**
 
 **The TIER** is decided by what does not depend on the flag: a wallet that
-passes conjuncts 2–7 AND whose shape at least one `--as` path admits gets
-(a conjunct-8 failure stays FULL-tier, DECIDED not accidental — its
-addresses derive, and identification is what shows the operator the
-contradiction; r2's NEW-M1)
+passes conjuncts 2–8 AND whose shape at least one `--as` path admits gets
 the FULL block — every line below. A wallet NO path admits gets the PARTIAL
-block: the first three lines plus the watch-only line — no `wallet-id:`, no
+block — including a conjunct-8 failure, RE-DECIDED per PLAN-r3's I4
+(reversing r2-M1's accidental FULL): its addresses derive but are
+byte-identical to a clean control (measured), so a compare prompt would
+PASS on an impossible wallet, actively reassuring, while the PARTIAL
+block's canonical line is what actually shows the operator the two
+colliding lines. The PARTIAL block: the first three lines plus the watch-only line — no `wallet-id:`, no
 `address 0:`, no compare prompt — because its class is the wallets refused
 by the `--as`-independent conjuncts and the no-path shapes: the underivable
 (mixed network, hardened use-site, non-consecutive multipath, the wrapped
@@ -1377,7 +1382,8 @@ NEW-I2).
 | **`sortedmulti(k, …)` with `k > n`** | *"threshold `k` of `n` keys can never be satisfied — no combination of signatures reaches `k`. Funds sent to this wallet would be unspendable. Nothing was packed."* §4.7 conjunct 2. |
 | **`sortedmulti(0, …)`** — or any `k < 1` | *"threshold 0 means NO signature is required: anyone who can see this script can spend from it. This is almost certainly not the wallet you meant — and if it already holds funds, treat them as at risk now. Nothing was packed."* §4.7 conjunct 2 (R0's I6 — the device derives a real address for `k = 0` and even `k = −1`, so the refusal is the host's alone). |
 | `sortedmulti` with **too many keys** | *"`sh(sortedmulti(…))` carries at most 15 keys — there the multi's output script IS the redeemScript, one 520-byte script element (BIP-383). `wsh(…)` and `sh(wsh(…))` carry at most 20 (`OP_CHECKMULTISIG`); their redeemScript is 34 bytes and the 520-byte limit never binds. This descriptor has `n` keys under `<form>`. The device would accept it and derive addresses whose coins cannot be spent."* §4.7 conjunct 3 (R0's C3, bound corrected by r2's NEW-I2). |
-| two keys declaring **the same origin with different xpubs**, or one `(xpub, use-site)` pair in two slots | *"this wallet description contradicts itself: keys `@N` and `@M` both claim origin `<fp/path>` but name different keys — one origin identifies exactly one key, so no wallet matches this description. Check the export: a duplicated cosigner line carrying the wrong key is the usual cause."* (The duplicate-pair variant substitutes its own sentence naming the two slots and the shared use-site.) **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (PLAN-r1's C1; row added per PLAN-r2's NEW-C2). |
+| two keys declaring **the same origin with different xpubs** | *"this wallet description contradicts itself: keys `N` and `M` both claim origin `<fp/path>` but name different keys — one origin identifies exactly one key, so no wallet matches this description. Check the export: a duplicated cosigner line carrying the wrong key is the usual cause."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (PLAN-r1's C1; row per PLAN-r2's NEW-C2; ordinals per PLAN-r3's N2). |
+| the **same key at the same derivation in two slots** | *"keys `N` and `M` are the same key at the same derivation — a threshold that needs the same key twice is not the multisig this file describes. Remove the duplicate line, or supply the missing cosigner's key."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (split per PLAN-r3's I3 — the primary separates the two causes, and "no wallet matches" is false for a duplicate). |
 | a multisig mixing **mainnet and testnet keys** | *"key `N` is `tpub` (testnet) while key 0 is `xpub` (mainnet). The device accepts this descriptor and then cannot derive any address from it. All keys must share one network."* §4.7 conjunct 5 (R0's I4). |
 | a descriptor or bare key using **`ypub`/`upub`/`vpub`/`Upub`/`Vpub`** | *"the device admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`."* The remedy names the **per-version** target (R0 r2's NEW-I3 — one template cannot serve five): `ypub` → `xpub` (mainnet BIP-49, `sh(wpkh(…))`); `upub` → `tpub` (**testnet** BIP-49, `sh(wpkh(…))`); `vpub` → `tpub` (**testnet** BIP-84, `wpkh(…)`); `Upub`/`Vpub` → `tpub` (**testnet multisig** — no single-key remedy exists; supply the full multisig descriptor: `sh(wsh(sortedmulti(…)))` for `Upub`, `wsh(sortedmulti(…))` for `Vpub` — or a BlueWallet file). Four of the five are testnet keys, and an `xpub` remedy would name a mainnet wallet the operator does not hold — measured, mainnet `354hXbgw…` versus the real testnet `tb1qmj7qns4…`. For a key WITH an origin, the operator's own fingerprint/path is substituted in; for a BARE key the remedy is the origin-less descriptor spelling — `sh(wpkh(<converted key>/<0;1>/*))`, which the device admits (measured) — because handing back a bare converted key would PROMOTE to a different wallet (`pkh(…)`, measured). §4.3 (R0's C2); F-413 tracks host-side normalisation. |
 | `tr(sortedmulti(…))` | *"taproot multisig is `multi_a`/`sortedmulti_a` (BIP-387); `tr(sortedmulti(…))` is not a valid descriptor even though the device's parser accepts it. Check the export."* §4.3. |
@@ -1623,9 +1629,13 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   8. **the impossible-wallet trio (conjunct 8, PLAN-r1's C1; r2)** — a
      colliding-origin `wsh(sortedmulti(…))` (two xpubs, one
      `(fingerprint, origin)`), a duplicate-`(xpub, use-site)` slot pair,
-     and the colliding-origin `wsh(multi(…))` twin (the md1-only path —
-     r2's NEW-C1): gate OPEN, `descriptor-refusal` citing conjunct 8
-     (`refusal_row: key-identity`), exit 3, on BOTH `--as` paths.
+     and the colliding-origin `wsh(multi(…))` twin — whose conjunct-8
+     refusal binds the `--as md1` path ONLY: under `--as descriptor` a
+     `multi` gets conjunct 1's permanent refusal first, per the ruling
+     stated at §5.1, §6 and §11 (PLAN-r3's I2). Gate OPEN,
+     `descriptor-refusal` (`refusal_row: key-identity`, or
+     `key-identity-duplicate` for the slot row), exit 3 — the first two
+     rows on both `--as` paths.
      `host_admits=false`, `md1_admits=false`, and **no address fields** —
      a colliding-origin wallet derives byte-identical addresses to a clean
      control (measured, r2's NEW-M5), so the refusal assertion itself is

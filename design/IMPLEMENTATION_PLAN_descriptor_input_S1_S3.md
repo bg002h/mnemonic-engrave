@@ -1,9 +1,11 @@
 # IMPLEMENTATION PLAN — descriptor input, S1 + S3
 
 **Status:** DRAFT, round 0. No code before this plan's R0 closes 0C/0I.
-**Spec:** `SPEC_descriptor_input.md`, FINAL GREEN at `b949d18` (20 rounds +
+**Spec:** `SPEC_descriptor_input.md`, FINAL GREEN (20 rounds +
 the 15-finding walk; closure verdict and leaves-open list in
-`design/agent-reports/R0-descriptor-input-spec-r20-closure.md`).
+`design/agent-reports/R0-descriptor-input-spec-r20-closure.md`), plus the
+post-GREEN conjunct-8 amendment under verification by this plan's own
+rounds — the plan tracks the spec's CURRENT tip, not a fixed SHA.
 **Phase order:** S1 → S3 per F-418; S2 and F-423 parked for the device.
 **Plan baseline revs** (for `scripts/plan-staleness-check.sh`):
 descriptor-mnemonic `6864f377` · seedhammer fork `d402f18` ·
@@ -23,11 +25,11 @@ against. Nothing in P1/P2 is specified in prose that a vector row can pin.
 Everything here is data + test scaffolding; no parser code.
 
 - **P0.1** Author `crates/me-cli/testdata/descriptor_seam_vectors.json` per
-  spec §7 AS AMENDED (conjunct 7a): ≥ **70** physical rows, 9 tags, **87**
+  spec §7 AS AMENDED (conjunct 8): ≥ **71** physical rows, 9 tags, **88**
   tag-slots, per-tag minima (`formats-happy` 4 · `promotion-near-miss` 15 ·
   `narrowed-4.7` 14 · `accepted-extreme` 1 · `narrowed-4.2` 5 · `neither` 3
-  · `whitespace` 3 · `md1-splits` 6 · `gate` **36**, incl. clause 8's
-  impossible-wallet pair), schema fields per §7 incl. `covers` and
+  · `whitespace` 3 · `md1-splits` 6 · `gate` **37**, incl. clause 8's
+  impossible-wallet trio), schema fields per §7 incl. `covers` and
   `md1_admits` (REQUIRED), `canonical` on every host-admitted row,
   `device_probe` markers, the value fields, per-row `sha256`. All measured
   values re-derived at authoring time (debug `md`, a Go scratch probe) —
@@ -41,7 +43,7 @@ Everything here is data + test scaffolding; no parser code.
   assertion is their witness (a colliding-origin wallet derives
   byte-identical addresses to a clean control — measured, PLAN-r2 M5).
 - **P0.2** Rust harness `crates/me-cli/tests/descriptor_seam.rs`: pins the
-  sha256; asserts the manifest arithmetic — tag minima, **87 slots, 70-row
+  sha256; asserts the manifest arithmetic — tag minima, **88 slots, 71-row
   floor, 17 overlap slots distributed as 15 second-tags on the §4.5 rows
   plus 2 third-tags on the named pair, `covers` entries distinct within a
   row** (PLAN-r1 I1); **rejects unknown row keys, and asserts per-column
@@ -98,21 +100,22 @@ Everything here is data + test scaffolding; no parser code.
   headers + exactly-8-hex fingerprints + the four normative refusals incl.
   F-419's zero-cosigner; the five version bytes; case-insensitive JSON;
   promotion with the key-as-supplied echo), `admit.rs` (the seven shapes +
-  the `multi` md1-path twins + conjuncts 2–7 **+ conjunct 7a's two
-  impossible-wallet checks (PLAN-r1 C1) with the tree's refusal wording —
-  convergence with the Rust primary**), errors carrying §6's cause
+  the `multi` md1-path twins + conjuncts 2–7 **+ conjunct 8's
+  impossible-wallet checks (PLAN-r1 C1), refusing with §6's TWO
+  key-identity rows (the tree's text names no next action; §6's rules
+  bind) — convergence with the Rust primary**), errors carrying §6's cause
   taxonomy. TDD: un-ignore host-column tests first, watch red, build green.
   No new deps.
 - **P1.2** Whitespace normalisation (§4.6); single-document mode + the
   whole-input discriminator with the descriptor-shape gate (§5.1),
-  implemented FROM the 36 gate rows. The shipped record refusal (exit 4)
+  implemented FROM the 37 gate rows. The shipped record refusal (exit 4)
   stays pinned by the existing `sysw_cli.rs` suite.
 - **P1 gate:** all P0-ignored host assertions un-ignored and green EXCEPT
   the enumerated `--as md1`-execution set (each remaining ignore names P2);
   full workspace `cargo nextest run --locked` + clippy `-D warnings` + fmt;
   Go seam re-run green; staleness re-check before P2 dispatch.
 - **P1 review:** proportional opus pass over the diff (cascade vs measured
-  device semantics; conjunct-7a wording vs the tree's).
+  device semantics; conjunct-8 wording vs §6's two key-identity rows).
 
 ## P2 — `--as md1` end to end (S3 proper)
 
@@ -127,22 +130,22 @@ P2.2 → P2.3 → P2.1's window text → P2.4** — the window refusal's variant
 - **P2.2** The md1 build path: `md_codec::encode::Descriptor` in-process
   (per-key (a)/(a′)/(a″), the `multi` twins, TLVs, divergent-path mode),
   `encode_md1_string`/`split`, records packed as **`Class::MdMk`**
-  (PLAN-r1 N1). Conjunct 7a refuses BEFORE encoding — the published-crate
+  (PLAN-r1 N1). Conjunct 8 refuses BEFORE encoding — the published-crate
   gap never reaches the codec.
 - **P2.3** The identification block (§5.4): two tiers, full line set —
   wallet-id (materialised base, `none` line), address 0 + compare prompt,
   watch-only, the (a′) annotation — **plus §5.3(b)'s label warning with
   its verbatim text and a test that J1's `Name: sh` fixture fires it
   (PLAN-r1 I5)**.
-- **P2.4** §6's refusal texts, one named test per row, **all 35 rows
-  (§6 gained the key-identity row, PLAN-r2) — the S2-parked set is EMPTY**
+- **P2.4** §6's refusal texts, one named test per row, **all 36 rows
+  (§6 gained the two key-identity rows, PLAN-r2, split per PLAN-r3 I3) — the S2-parked set is EMPTY**
   (PLAN-r1 I6: every §6 trigger is reachable in this build; the two
   `--as descriptor`-mentioning rows fire as conjunct 1's permanent refusal
   and the window refusal, whose two variants get their own tests alongside
   the five-case item-5 matrix). "Verbatim" means WHAT THIS BUILD PRINTS:
   the two window-substituted rows are asserted in their SUBSTITUTED form
   per §5.3's normative substitution (PLAN-r2 NEW-I2). The test file
-  asserts its own row-test count == 35. Where `md1_admits`
+  asserts its own row-test count == 36. Where `md1_admits`
   is false on an admitted row, the refusal assertion **cites
   §5.3(a)/(a″)** (PLAN-r1 M6).
 - **P2.5** F-421's converter referral — one refusal string + one test.
@@ -177,6 +180,16 @@ QR plates) — F-418, awaits the SH2. F-423 plate packing — with S2's
 firmware. F-420 (`md`'s referral) — descriptor-mnemonic, with-or-after S1;
 stretch if the night allows, own commit + own push. F-413/F-422 — operator
 rulings, spec-as-written meanwhile.
+
+## Load-bearing anchors (gives the citation and staleness gates material — PLAN-r3 I5)
+
+`crates/me-cli/src/sysw/mod.rs:205` · `crates/me-cli/src/main.rs:335` ·
+`crates/me-cli/tests/codex32_seam.rs:60` · `crates/me-cli/tests/sysw_cli.rs:1928` ·
+`descriptor-mnemonic` `src/encode.rs:118` and `src/encode.rs:120` (the two
+validator calls the published crate lacks) · fork `nonstandard/parse.go:36` ·
+fork `md/walletpolicyid.go:138` · fork `md/encode_multisig.go:112`. Each
+verified this cycle; the per-phase staleness re-check now has citations to
+examine.
 
 ## What the build gate does not cover here
 
