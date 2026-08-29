@@ -363,3 +363,29 @@ remedies, in a build where S2 has not shipped, append: *"(--as descriptor is
 not in this build yet — keep the file.)"* No refusal may point at a flag
 that refuses in the CURRENT build — the r5 rule, now stated over build
 windows, not just admission.
+
+
+---
+
+## W12 — "are we refusing a common wallet type?" — no permanently, yes in the
+## window; and the question yields an unruled option (F-422)
+
+**The moment.** Mid-journey-2, the operator: *"Did you say we are refusing a
+common wallet type (specter JSON)?"*
+
+**The precise state.** The type is fully carried by `--as descriptor`
+(admitted, parsed, canonical packed, device derives it — measured r1). Only
+`--as md1` refuses it, per F-417's ruled wire-format narrowness, with the
+carrying path named. The GAP is temporal: in the S3-only window the carrying
+path is unbuilt (W11), and pulling its host half forward would not help —
+the record needs S2's device classifier to be READABLE, so early packing
+mints payloads current firmware refuses at load.
+
+**The unruled option the question surfaced, filed as F-422.** A Specter-era
+`/0/*` is the pre-multipath spelling of the full receive+change wallet — the
+change branch was implied by convention. `me` could offer an EXPLICIT,
+consented, never-default transform ("pack the `<0;1>` wallet this
+receive-branch export denotes"), making the archival journey work under
+`--as md1` in the window. It packs a different literal descriptor than the
+file — the line this cycle refuses to cross silently — so it is an operator
+ruling, not a walk disposition.

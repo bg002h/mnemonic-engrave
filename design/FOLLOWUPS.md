@@ -14544,6 +14544,19 @@ expression or `Key: value` lines), refers to
 `me sysw pack --as <descriptor|md1>`. In-tool twin of F-420, same
 sequencing: with or after S1, never before the flag exists.
 
+### F-422 — RULING WANTED: should `--as md1` offer an explicit, consented transform for pre-multipath `/0/*` exports (receive-branch → the `<0;1>` wallet it denotes)? (repo: **mnemonic-engrave**; owning phase: **descriptor-input plan, before S1 closes**) `#me` `#descriptor` `#ruling-needed`
+
+Filed from the 2026-08-28 journey walk (W12). A Specter-era JSON export
+carries `/0/*` as that era's spelling of the full receive+change wallet; in
+the S3-only window (F-418) such a file is temporarily unpackable on any path
+(W11). An explicit opt-in flag — never a default, never silent, announced
+like §4.5's promotion — could pack the `<0;1>` wallet the export denotes.
+It transforms the operator's literal artifact, which this cycle has
+consistently refused to do silently; whether CONSENTED transformation is
+acceptable is the operator's call. If ruled yes: one flag, a §6 row, §7 rows
+(`md1_admits=true` under the flag), and the W11 window text names the flag
+as the third option. If ruled no: W11's honest neither-path text stands.
+
 ### F-418 — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
 
 **Operator ruling 2026-08-28, in conversation:** *"I'm away from sh2 and it's
