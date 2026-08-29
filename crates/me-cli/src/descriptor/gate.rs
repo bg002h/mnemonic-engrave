@@ -64,11 +64,11 @@ pub enum Outcome {
     RecordRefusal,
     /// §5.1's choice block: the input IS a descriptor and at least one `--as`
     /// value carries it in this build.
-    AsDecides {
-        /// §4.5's promotion announcement, where branch 4 inferred a wallet from
-        /// one key. Promotion is ANNOUNCED, not silent.
-        announcement: Option<String>,
-    },
+    ///
+    /// It carries no payload: §4.5's promotion announcement is the LAST element
+    /// of §5.4's identification block, which prints on every successful
+    /// whole-input parse and therefore precedes this follower too.
+    AsDecides,
     /// A §6 row.
     DescriptorRefusal(Refusal),
     /// §6's multi-record row — the whole input is not one descriptor, but one
@@ -81,7 +81,7 @@ impl Outcome {
     pub fn class(&self) -> &'static str {
         match self {
             Self::RecordRefusal => "record-refusal",
-            Self::AsDecides { .. } => "as-decides",
+            Self::AsDecides => "as-decides",
             Self::DescriptorRefusal(_) => "descriptor-refusal",
             Self::MultiRecord(_) => "multi-record",
         }
@@ -226,9 +226,7 @@ fn carriage(d: &Parsed) -> Outcome {
     let md1_carries = MD1_PATH_SHIPPED && md1_admits.is_ok() && representable.is_ok();
 
     if descriptor_carries || md1_carries {
-        return Outcome::AsDecides {
-            announcement: promotion_announcement(d),
-        };
+        return Outcome::AsDecides;
     }
     // §4.7's admission refusal PRECEDES anything about a flag or a build: a
     // wallet no path admits has a PERMANENT status, and possibly a funds-urgent
@@ -251,7 +249,7 @@ fn carriage(d: &Parsed) -> Outcome {
 
 /// §5.3's window substitution for the `/i/*` row. A refusal may not point at a
 /// path that refuses in the CURRENT build.
-fn remedy_fixed_index(d: &Parsed) -> String {
+pub fn remedy_fixed_index(d: &Parsed) -> String {
     if matches!(d.multi, Some(Multi::Unsorted)) {
         // §6's `multi`-form replacement: a neither-path refusal routes nowhere,
         // so "wait for the update" would be false forever for this file.
@@ -274,7 +272,7 @@ fn remedy_fixed_index(d: &Parsed) -> String {
 }
 
 /// §5.3's window substitution for the `<i;i+1>`-without-wildcard row.
-fn remedy_no_wildcard(d: &Parsed) -> String {
+pub fn remedy_no_wildcard(d: &Parsed) -> String {
     if matches!(d.multi, Some(Multi::Unsorted)) {
         return "This is a `multi` policy, which only `--as md1` carries -- and md1 \
                 cannot represent a multipath with no trailing wildcard. No `me` path \

@@ -43,10 +43,13 @@
 //! gate, and it is complete for both.
 
 pub mod admit;
+pub mod as_flag;
 pub mod base58;
 pub mod cascade;
 pub mod checksum;
 pub mod gate;
+pub mod identify;
+pub mod md1;
 pub mod refusal;
 pub mod secp;
 
@@ -54,4 +57,16 @@ pub use admit::{format_of, host_admits, Path};
 pub use gate::{
     choice_block, consult, gate_opens, Outcome, DESCRIPTOR_PATH_SHIPPED, MD1_PATH_SHIPPED,
 };
+pub use identify::Form;
 pub use refusal::{Refusal, Row};
+
+/// §5.4's identification block for a whole input, or `None` when the input is
+/// not one descriptor.
+///
+/// **NORMATIVE: the block prints on EVERY successful whole-input parse**, which
+/// is why this is reachable from the `--as`-OMITTED path too — §5.1's choice
+/// block is one of §5.4's enumerated followers, not an exception to it.
+pub fn identification_block(document: &str, form: Option<Form>) -> Option<String> {
+    let d = cascade::cascade(&cascade::normalise(document)).ok()?;
+    Some(identify::block(&d, form))
+}

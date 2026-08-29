@@ -296,27 +296,74 @@ fn origin_text(k: &Key) -> String {
 /// §5.3's window substitution — a build with no `--as descriptor` path must not
 /// point the operator at a flag that refuses.
 ///
-/// **One residual for P2.4:** §6 says a descriptor mixing an (a)-shaped and an
-/// (a″)-shaped key matches BOTH rows and both fire. This returns the first
-/// offender, because a gate row names exactly one `refusal_row`; emitting both
-/// belongs with P2.4's per-row texts.
+/// **The single-refusal form.** §6 says a descriptor mixing an (a)-shaped and
+/// an (a″)-shaped key matches BOTH rows and both fire; this returns the FIRST
+/// offender, because a §7 gate row names exactly one `refusal_row`. The
+/// `--as md1` path, where both are observable, uses [`md1_refusals`].
 pub fn md1_representable(d: &Parsed, remedy_a: &str, remedy_a2: &str) -> Result<(), Refusal> {
-    use Derivation::*;
-    for (i, k) in d.keys.iter().enumerate() {
-        match k.children.as_slice() {
-            [] => {}
-            [Wildcard { hardened: false }] => {}
-            [Range { .. }, Wildcard { hardened: false }] => {}
-            [Child { .. }, Wildcard { .. }] => {
-                return Err(refusal::md1_fixed_index(i, k, remedy_a))
-            }
-            [Range { .. }] => return Err(refusal::md1_no_wildcard(i, k, remedy_a2)),
-            // Unreachable after conjunct 7, and md1 carries no shape conjunct 7
-            // refuses, so the conservative answer is the closed set's own row.
-            other => return Err(refusal::use_site_out_of_set(other)),
-        }
+    match md1_refusals(d, remedy_a, remedy_a2).into_iter().next() {
+        Some(r) => Err(r),
+        None => Ok(()),
     }
-    Ok(())
+}
+
+/// EVERY key `--as md1` cannot carry, as `(slot, the path it uses)`.
+///
+/// §5.1's window refusal needs them all -- *"a mixed input repeats the key
+/// clause per offender"* -- and so does §6's both-rows-fire rule.
+pub fn md1_offenders(d: &Parsed) -> Vec<(usize, String)> {
+    use Derivation::*;
+    d.keys
+        .iter()
+        .enumerate()
+        .filter(|(_, k)| {
+            matches!(
+                k.children.as_slice(),
+                [Child { .. }, Wildcard { .. }] | [Range { .. }]
+            )
+        })
+        .map(|(i, k)| (i, k.children.iter().map(|c| c.encode()).collect::<String>()))
+        .collect()
+}
+
+/// EVERY §5.3 refusal this descriptor earns, in §6's own row order: the (a) row
+/// then the (a″) row, each naming ALL of its offending keys.
+///
+/// §6 states the mixed case explicitly -- *"both fire, both are true, and both
+/// name the same remedy -- no precedence is needed"* -- and a one-refusal API
+/// cannot express it.
+pub fn md1_refusals(d: &Parsed, remedy_a: &str, remedy_a2: &str) -> Vec<Refusal> {
+    use Derivation::*;
+    let slots = |f: fn(&[Derivation]) -> bool| -> Vec<usize> {
+        (0..d.keys.len())
+            .filter(|i| f(d.keys[*i].children.as_slice()))
+            .collect()
+    };
+    let fixed = slots(|c| matches!(c, [Child { .. }, Wildcard { .. }]));
+    let no_wildcard = slots(|c| matches!(c, [Range { .. }]));
+    // Everything outside conjunct 7's closed set: unreachable after admission,
+    // and md1 carries no shape conjunct 7 refuses, so the conservative answer is
+    // the closed set's own row.
+    let outside = slots(|c| {
+        !matches!(
+            c,
+            [] | [Wildcard { hardened: false }]
+                | [Range { .. }, Wildcard { hardened: false }]
+                | [Child { .. }, Wildcard { .. }]
+                | [Range { .. }]
+        )
+    });
+    if let Some(i) = outside.first() {
+        return vec![refusal::use_site_out_of_set(&d.keys[*i].children)];
+    }
+    let mut out = Vec::new();
+    if !fixed.is_empty() {
+        out.push(refusal::md1_fixed_index(&fixed, &d.keys, remedy_a));
+    }
+    if !no_wildcard.is_empty() {
+        out.push(refusal::md1_no_wildcard(&no_wildcard, &d.keys, remedy_a2));
+    }
+    out
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -345,5 +392,110 @@ pub fn format_of(input: &str) -> &'static str {
     match super::cascade::cascade(&super::cascade::normalise(input)) {
         Ok(d) => d.branch.format(),
         Err(_) => "none",
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Conjuncts 4 and 6, reached the only way they CAN be reached
+// ───────────────────────────────────────────────────────────────────────────
+
+/// **The close for IMPL-P1's F-1 — the round's only Important-class finding.**
+///
+/// Conjuncts 4 and 6 have no vector row that can red them, and that is
+/// structural rather than an omission: every `Key` P1 could build came through
+/// `cascade::parse_extended_key`, which refuses a non-admitted version first,
+/// and through branch 1, which refuses an origin-less BlueWallet key first. So
+/// deleting either conjunct left the whole 485-test suite green (measured, P1).
+///
+/// **P2.2 is the phase that changes the argument**, which is why the close
+/// lands here and not in P3: `descriptor::md1` builds a `md_codec::Descriptor`
+/// from a `Parsed`, so this crate now has a second place a descriptor is
+/// assembled, and any future caller that builds a `Parsed` by another route
+/// makes these two conjuncts the ONLY enforcement.
+///
+/// It is a UNIT test and deliberately not a vector row: no cascade-reachable
+/// input can produce either state, so a row asserting one would be a lie about
+/// what the two parsers do.
+#[cfg(test)]
+mod conjunct_reachability {
+    use super::*;
+    use crate::descriptor::cascade::{Branch, KeyVersion, Network};
+
+    /// A `Key` built with NO parser in the way. Every field is public, which is
+    /// what makes the bypass possible — and is exactly the risk F-1 names.
+    fn key(version: KeyVersion, fingerprint: u32, origin: Vec<u32>) -> Key {
+        Key {
+            as_supplied: "xpub-under-test".to_string(),
+            fingerprint,
+            origin,
+            origin_explicit: fingerprint != 0,
+            children: vec![Derivation::Wildcard { hardened: false }],
+            version,
+            network: Network::Mainnet,
+            parent_fingerprint: 0,
+            chain_code: [7u8; 32],
+            key_data: [2u8; 33],
+        }
+    }
+
+    fn single(k: Key) -> Parsed {
+        Parsed {
+            branch: Branch::Bip380,
+            title: None,
+            script: Script::P2WPKH,
+            multi: None,
+            threshold: 0,
+            keys: vec![k],
+            promoted: false,
+        }
+    }
+
+    #[test]
+    fn conjunct_4_refuses_a_version_outside_the_admitted_five() {
+        let h = |n: u32| crate::descriptor::cascade::HARDENED + n;
+        // The control FIRST: the identical descriptor with an admitted version
+        // is admitted, so a failure below is the version and nothing else.
+        let ok = single(key(KeyVersion::Xpub, 0x4bba_a801, vec![h(84), h(0), h(0)]));
+        assert!(
+            admit(&ok, Path::Md1).is_ok(),
+            "the control must be admitted"
+        );
+
+        for v in [
+            KeyVersion::Ypub,
+            KeyVersion::Upub,
+            KeyVersion::Vpub,
+            KeyVersion::UpubCap,
+            KeyVersion::VpubCap,
+        ] {
+            let d = single(key(v, 0x4bba_a801, vec![h(84), h(0), h(0)]));
+            let r = admit(&d, Path::Md1).expect_err("a non-admitted version must refuse");
+            assert_eq!(
+                r.row.slug(),
+                "unsupported-key-version",
+                "{v:?} refused, but by the wrong §6 row"
+            );
+        }
+    }
+
+    #[test]
+    fn conjunct_6_refuses_a_fingerprint_with_no_origin() {
+        // `Descriptor.encode` emits the `[…]` block iff the fingerprint is
+        // non-zero, and `ParseKey` then requires a `/` at offset 8 — so this
+        // state re-encodes to a string the DEVICE cannot read back.
+        let d = single(key(KeyVersion::Xpub, 0x4bba_a801, Vec::new()));
+        let r = admit(&d, Path::Md1).expect_err("a fingerprint with no origin must refuse");
+        assert_eq!(r.row.slug(), "bluewallet-no-origin");
+
+        // The all-zero fingerprint is the one case where a key legitimately
+        // carries no origin block: "master unknown" is not a claim about
+        // identity, and refusing it would reject files several coordinators
+        // emit. Without this half, a conjunct 6 that simply required a non-empty
+        // origin would pass the assertion above.
+        let d = single(key(KeyVersion::Xpub, 0, Vec::new()));
+        assert!(
+            admit(&d, Path::Md1).is_ok(),
+            "an all-zero fingerprint with no origin is a legal key"
+        );
     }
 }

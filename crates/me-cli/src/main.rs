@@ -301,6 +301,21 @@ enum SyswCmd {
         /// written. Zero-padding would be a WRITE of 65 KiB for nothing.
         #[arg(long)]
         region: bool,
+        /// How a wallet DESCRIPTOR is packed. Required whenever the input is a
+        /// descriptor; there is no default and no fallback.
+        ///
+        /// `descriptor` is the SCANNABLE plate -- a QR of the canonical
+        /// descriptor that any phone or wallet app can read. `md1` is the
+        /// HAND-COPYABLE plate -- error-corrected text cards, restored by
+        /// transcription. They are not interchangeable, and a path that cannot
+        /// work fails NAMING the other one rather than switching to it.
+        ///
+        /// Its presence makes the invocation SINGLE-DOCUMENT: exactly one
+        /// descriptor, read whole. A multi-line BlueWallet file or a
+        /// pretty-printed JSON export is one descriptor and stops being one the
+        /// moment it is split into newline-separated records.
+        #[arg(long = "as", value_name = "descriptor|md1")]
+        r#as: Option<AsForm>,
     },
     /// Emit a full-region overwrite image (spec §5.5).
     Wipe {
@@ -313,6 +328,27 @@ enum SyswCmd {
     },
     /// Print what a container holds, and its digest.
     Show { file: std::path::PathBuf },
+}
+
+/// `--as`'s two values (`SPEC_descriptor_input.md` §5.1). There is no third and
+/// no default: the two accept sets genuinely differ, in both directions, so an
+/// automatic fallback would silently change which of two different artefacts
+/// the operator engraves.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, clap::ValueEnum)]
+enum AsForm {
+    /// The canonical re-encoded descriptor, as one `Descriptor` record.
+    Descriptor,
+    /// The BIP-388 decomposition, as md1 text cards (`MdMk` records).
+    Md1,
+}
+
+impl From<AsForm> for mnemonic_engrave::descriptor::Form {
+    fn from(f: AsForm) -> Self {
+        match f {
+            AsForm::Descriptor => Self::Descriptor,
+            AsForm::Md1 => Self::Md1,
+        }
+    }
 }
 
 /// THE EXIT-CODE VOCABULARY. Three failure codes, three different things, and
@@ -1299,6 +1335,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             allow_argv_secret,
             iterations,
             region,
+            r#as,
         } => {
             if *allow_weak {
                 eprintln!(
@@ -1314,6 +1351,41 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     return code;
                 }
             };
+
+            // SPEC_descriptor_input.md §5.1/§5.3/§5.4 — THE `--as` PATH.
+            //
+            // It sits after `read_records` on purpose: the argv bearer/secret
+            // guard runs in there, and a flag-shape usage error must not
+            // pre-empt a refusal about material that is already in the shell's
+            // history. Everything below this point sees md1 RECORDS, so the
+            // passphrase ceremony, `--expect`, `--out` and the write gate are
+            // the shipped ones rather than a second implementation.
+            let mut recs = recs;
+            if let Some(form) = r#as {
+                if let Some(msg) = mnemonic_engrave::descriptor::as_flag::single_document_error(
+                    records.len(),
+                    r#in.is_some(),
+                ) {
+                    eprintln!("me: {msg}");
+                    return EXIT_USAGE;
+                }
+                let run = mnemonic_engrave::descriptor::as_flag::run((*form).into(), &document);
+                for n in &run.notes {
+                    eprintln!("me: {n}");
+                }
+                match run.decision {
+                    mnemonic_engrave::descriptor::as_flag::Decision::Refused(rs) => {
+                        for r in &rs {
+                            eprintln!("me: {r}");
+                        }
+                        return EXIT_REFUSED;
+                    }
+                    mnemonic_engrave::descriptor::as_flag::Decision::Pack(strings) => {
+                        recs = strings;
+                    }
+                }
+            }
+            let recs = recs;
 
             // G-P3.3. Stated BEFORE the passphrase ceremony for the same
             // reason the ceremony itself is ordered that way: a warning the
@@ -1380,15 +1452,26 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 // never hears descriptor vocabulary or a changed exit code, and
                 // `Outcome::RecordRefusal` is that invariant: it falls straight
                 // through to the shipped refusal below, unchanged.
-                match mnemonic_engrave::descriptor::consult(&document, &recs) {
+                let outcome = mnemonic_engrave::descriptor::consult(&document, &recs);
+                // §5.4, NORMATIVE: the identification block prints on EVERY
+                // successful whole-input parse, BEFORE whatever follows -- and
+                // §5.1's choice block is one of the followers it enumerates,
+                // not an exception to it. `RecordRefusal` is the one outcome
+                // that never parsed a descriptor, and it is also the outcome
+                // invariant 1 forbids from hearing descriptor vocabulary.
+                if !matches!(
+                    outcome,
+                    mnemonic_engrave::descriptor::Outcome::RecordRefusal
+                ) {
+                    if let Some(b) =
+                        mnemonic_engrave::descriptor::identification_block(&document, None)
+                    {
+                        eprintln!("me: {b}");
+                    }
+                }
+                match outcome {
                     mnemonic_engrave::descriptor::Outcome::RecordRefusal => {}
-                    mnemonic_engrave::descriptor::Outcome::AsDecides { announcement } => {
-                        // §5.4: host-side FIRST. The operator supplied one line
-                        // and is being told they have a wallet, so they see the
-                        // inference before they see the choice.
-                        if let Some(a) = announcement {
-                            eprintln!("me: {a}");
-                        }
+                    mnemonic_engrave::descriptor::Outcome::AsDecides => {
                         eprintln!("me: {}", mnemonic_engrave::descriptor::choice_block());
                         // Nothing was refused; a choice was not made.
                         return EXIT_USAGE;

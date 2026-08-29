@@ -751,9 +751,61 @@ fn records_of(input: &str) -> Vec<String> {
 /// assertion must cite §5.3(a)/(a″) — a refusal for an unrelated cause must not
 /// satisfy it, which is what turns §5.3 from prose into a gate.
 #[test]
-#[ignore = "P2: `--as md1` is not built"]
 fn the_md1_column_matches_the_representability_rules() {
-    unimplemented!("P2.2/P2.4: --as md1 per row, citing §5.3(a)/(a″) where it refuses");
+    let d = doc();
+    let (mut checked, mut cited) = (0usize, 0usize);
+    for r in rows(&d) {
+        let input = r["input"].as_str().unwrap();
+        let want = r["md1_admits"].as_bool().unwrap();
+        let parsed = mnemonic_engrave::descriptor::cascade::cascade(
+            &mnemonic_engrave::descriptor::cascade::normalise(input),
+        );
+        let got = match &parsed {
+            Ok(p) => {
+                mnemonic_engrave::descriptor::admit::admit(
+                    p,
+                    mnemonic_engrave::descriptor::Path::Md1,
+                )
+                .is_ok()
+                    && mnemonic_engrave::descriptor::admit::md1_offenders(p).is_empty()
+            }
+            Err(_) => false,
+        };
+        assert_eq!(got, want, "{}: md1_admits", name(r));
+        checked += 1;
+
+        // Where the CASCADE succeeded and md1 still refuses, the refusal has to
+        // be §5.3's own — a refusal for an unrelated cause must not satisfy the
+        // column. §5.3(a) is `md1-fixed-index`, §5.3(a″) is `md1-no-wildcard`.
+        if let (Ok(p), false) = (&parsed, want) {
+            if mnemonic_engrave::descriptor::admit::admit(
+                p,
+                mnemonic_engrave::descriptor::Path::Md1,
+            )
+            .is_ok()
+            {
+                let rs = mnemonic_engrave::descriptor::admit::md1_refusals(p, "", "");
+                let slugs: Vec<&str> = rs.iter().map(|x| x.row.slug()).collect();
+                assert!(
+                    !slugs.is_empty()
+                        && slugs
+                            .iter()
+                            .all(|s| *s == "md1-fixed-index" || *s == "md1-no-wildcard"),
+                    "{}: md1 refuses an ADMITTED descriptor for a non-§5.3 reason: {slugs:?}",
+                    name(r)
+                );
+                cited += 1;
+            }
+        }
+    }
+    assert_eq!(checked, POP.rows, "md1_admits assertions run");
+    // The four `md1-split` rows §7 carries for exactly this purpose, plus the
+    // shipped JSON fixture, whose `/0/*` is what makes §11 item 2 demand a
+    // non-`/0/*` JSON exemplar.
+    assert_eq!(
+        cited, 5,
+        "rows where §5.3 (not another conjunct) is the refusal"
+    );
 }
 
 /// Every carried `address_N`, derived through the md1 round trip wherever
@@ -762,18 +814,67 @@ fn the_md1_column_matches_the_representability_rules() {
 /// derives, the two routes must agree: that equality IS §5.3(a′)'s
 /// materialisation claim, at the layer where a string comparison cannot reach.
 #[test]
-#[ignore = "P2: `--as md1` is not built"]
 fn the_md1_route_derives_every_carried_address() {
-    unimplemented!("P2.2: encode, read back, derive address_0/address_1");
+    let d = doc();
+    let (mut a0, mut a1, mut both) = (0usize, 0usize, 0usize);
+    for r in rows(&d) {
+        if !r["md1_admits"].as_bool().unwrap() {
+            continue;
+        }
+        let built = build_md1(r);
+        let net = mnemonic_engrave::descriptor::md1::network(&parse(r));
+        if let Some(want) = r.get("address_0").and_then(|v| v.as_str()) {
+            let got = mnemonic_engrave::descriptor::md1::address(&built, 0, 0, net).unwrap();
+            assert_eq!(got, want, "{}: address_0 through the md1 route", name(r));
+            a0 += 1;
+            if r.get("device_admits").and_then(|v| v.as_bool()) == Some(true) {
+                both += 1;
+            }
+        }
+        // `address_N` is the RECEIVE address at INDEX N — the fork derives it
+        // with `address.Receive(d, N)` (`descriptor_seam_test.go:246`), so the
+        // chain stays 0 and the wildcard index moves. Reading it as the CHANGE
+        // address instead derives a real, wrong address that looks equally
+        // plausible: `bc1qs69gskx…` against the file's `bc1qnww8rje…`, measured.
+        if let Some(want) = r.get("address_1").and_then(|v| v.as_str()) {
+            let got = mnemonic_engrave::descriptor::md1::address(&built, 0, 1, net).unwrap();
+            assert_eq!(got, want, "{}: address_1 through the md1 route", name(r));
+            a1 += 1;
+        }
+    }
+    // The two carried-address columns minus the rows md1 does not carry: the
+    // JSON fixture and the four `md1-split` refusals hold addresses only the
+    // DEVICE route derives, and the fork's suite owns those.
+    assert_eq!(a0, 15, "address_0 assertions run through the md1 route");
+    assert_eq!(a1, 4, "address_1 assertions run through the md1 route");
+    assert_eq!(
+        both, POP.both_routes_address_0,
+        "rows where the device route and the md1 route are asserted to ONE address_0"
+    );
 }
 
 /// `wallet_id`, computed from `me`'s own implementation. The fork computes the
 /// same value from its own. A divergence is the F-212 class — an identity
 /// mismatch no per-repo test can see.
 #[test]
-#[ignore = "P2: the in-process md_codec build is not written"]
 fn the_md1_route_computes_every_carried_wallet_id() {
-    unimplemented!("P2.2/P2.3: compute_wallet_policy_id over the (a′)-materialised policy");
+    let d = doc();
+    let mut checked = 0usize;
+    for r in rows(&d) {
+        let Some(want) = r.get("wallet_id").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let built = build_md1(r);
+        let got = mnemonic_engrave::descriptor::md1::wallet_id(&built).unwrap();
+        assert_eq!(
+            got,
+            want,
+            "{}: WalletPolicyId — the two languages disagree on wallet IDENTITY,              the F-212 class",
+            name(r)
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, POP.wallet_id, "wallet_id assertions run");
 }
 
 /// `md_descriptor_contains`, asserted against the round trip's read-back. The
@@ -781,9 +882,50 @@ fn the_md1_route_computes_every_carried_wallet_id() {
 /// `sortedmulti(` CONTAINS `multi(` and the shorter pin passes on the
 /// `multi` → `sortedmulti` mutant's own read-back.
 #[test]
-#[ignore = "P2: `--as md1` is not built"]
 fn the_md1_route_read_back_contains_every_pin() {
-    unimplemented!("P2.2: `md descriptor`-equivalent read-back of the encoded set");
+    let d = doc();
+    let mut checked = 0usize;
+    for r in rows(&d) {
+        let Some(want) = r.get("md_descriptor_contains").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        // The READ-BACK, not the built descriptor: encode to md1 strings, decode
+        // them again, and render THAT. A builder that agreed with itself while
+        // the wire round trip lost the tag would pass a template comparison.
+        let built = build_md1(r);
+        let strings = mnemonic_engrave::descriptor::md1::strings(&built).unwrap();
+        let refs: Vec<&str> = strings.iter().map(String::as_str).collect();
+        let back = md_codec::reassemble(&refs).unwrap();
+        let template = md_codec::descriptor_to_template(&back).unwrap();
+        assert!(
+            template.contains(want),
+            "{}: the md1 read-back is {template:?}, which does not contain {want:?}",
+            name(r)
+        );
+        checked += 1;
+    }
+    assert_eq!(
+        checked, POP.md_descriptor_contains,
+        "md_descriptor_contains assertions run"
+    );
+}
+
+fn parse(r: &serde_json::Value) -> mnemonic_engrave::descriptor::cascade::Parsed {
+    let input = r["input"].as_str().unwrap();
+    mnemonic_engrave::descriptor::cascade::cascade(
+        &mnemonic_engrave::descriptor::cascade::normalise(input),
+    )
+    .unwrap_or_else(|e| {
+        panic!(
+            "{}: the cascade refused an md1-admitted row: {e:?}",
+            name(r)
+        )
+    })
+}
+
+fn build_md1(r: &serde_json::Value) -> mnemonic_engrave::descriptor::md1::Built {
+    mnemonic_engrave::descriptor::md1::build(&parse(r))
+        .unwrap_or_else(|e| panic!("{}: the md1 build refused an admitted row: {e}", name(r)))
 }
 /// **The `canonical` column, on the side that PRODUCES it.**
 ///

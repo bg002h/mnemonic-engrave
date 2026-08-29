@@ -591,6 +591,7 @@ dependencies = [
  "aes-gcm",
  "assert_cmd",
  "bip39",
+ "bitcoin",
  "clap",
  "md-codec",
  "mk-codec",

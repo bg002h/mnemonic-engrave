@@ -729,32 +729,48 @@ pub fn use_site_out_of_set(got: &[Derivation]) -> Refusal {
 /// §6 row 15 — §5.3(a). `remedy` is the window substitution: in a build with
 /// no `--as descriptor` path, "use `--as descriptor`" would point the operator
 /// at a flag that refuses.
-pub fn md1_fixed_index(i: usize, k: &Key, remedy: &str) -> Refusal {
+/// **Every offending slot is named**, per §5.3's per-key quantifier: a
+/// descriptor may mix admitted members, and a refusal naming only the first
+/// would send the operator back for a second refusal after one edit.
+pub fn md1_fixed_index(slots: &[usize], keys: &[Key], remedy: &str) -> Refusal {
     Refusal::new(
         Row::Md1FixedIndex,
         format!(
-            "md1 cannot carry this wallet as written: key {} uses `{}`, a single fixed \
-             chain index, which has no md1 form -- encoding it would silently produce \
-             a DIFFERENT wallet. {remedy}",
-            key_name(i, k),
-            children_string(&k.children)
+            "md1 cannot carry this wallet as written: {}, a single fixed chain index, \
+             which has no md1 form -- encoding it would silently produce a DIFFERENT \
+             wallet. {remedy}",
+            offending_keys(slots, keys)
         ),
     )
 }
 
 /// §6 row 35 — §5.3(a″). Encoding it would silently produce the `<0;1>/*`
 /// wallet, which derives DIFFERENT addresses.
-pub fn md1_no_wildcard(i: usize, k: &Key, remedy: &str) -> Refusal {
+pub fn md1_no_wildcard(slots: &[usize], keys: &[Key], remedy: &str) -> Refusal {
     Refusal::new(
         Row::Md1NoWildcard,
         format!(
-            "md1 cannot carry this wallet as written: key {} uses `{}` with no trailing \
-             wildcard, which has no md1 form -- encoding it would silently produce the \
-             `<0;1>/*` wallet, which derives DIFFERENT addresses. {remedy}",
-            key_name(i, k),
-            children_string(&k.children)
+            "md1 cannot carry this wallet as written: {} with no trailing wildcard, \
+             which has no md1 form -- encoding it would silently produce the `<0;1>/*` \
+             wallet, which derives DIFFERENT addresses. {remedy}",
+            offending_keys(slots, keys)
         ),
     )
+}
+
+/// `key @0 ([fp/path]xpub…) uses `/0/*`` — one clause per offender.
+fn offending_keys(slots: &[usize], keys: &[Key]) -> String {
+    slots
+        .iter()
+        .map(|i| {
+            format!(
+                "key {} uses `{}`",
+                key_name(*i, &keys[*i]),
+                children_string(&keys[*i].children)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", and ")
 }
 
 // ───────────────────────────────────────────────────────────────────────────
