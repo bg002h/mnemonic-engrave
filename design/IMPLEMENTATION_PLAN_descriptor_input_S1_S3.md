@@ -6,8 +6,11 @@ the 15-finding walk; closure verdict and leaves-open list in
 `design/agent-reports/R0-descriptor-input-spec-r20-closure.md`).
 **Phase order:** S1 → S3 per F-418; S2 and F-423 parked for the device.
 **Plan baseline revs** (for `scripts/plan-staleness-check.sh`):
-mnemonic-engrave `b949d18` · descriptor-mnemonic `6864f377` · seedhammer
-fork `d402f18`.
+descriptor-mnemonic `6864f377` · seedhammer fork `d402f18` ·
+mnemonic-engrave: **re-pinned at each phase gate to the spec's CURRENT
+tip** — the spec carries post-GREEN amendments verified by this plan's own
+rounds, and a fixed pre-amendment SHA aims the staleness gate at a tree
+without conjunct 8 (PLAN-r2 M2).
 
 **The one structuring decision, from the cycle's banked lesson:** the
 vector file is authored FIRST and is the failing test the parser is built
@@ -30,7 +33,13 @@ Everything here is data + test scaffolding; no parser code.
   values re-derived at authoring time (debug `md`, a Go scratch probe) —
   never transcribed from reports. Gate rows deliver via `--in` (r20-M2's
   clause); multi-line gate inputs are the LF-separated record stream
-  (r19's note). `wallet_id` computed over the (a′)-materialised policy.
+  (r19's note). `wallet_id` computed over the (a′)-materialised policy and **carried by
+  MULTISIG rows at the device-default use-site only** — the Go route's
+  measured domain (`EncodeMultisig` hard-codes `<0;1>/*`, no single-sig
+  arm; PLAN-r2 M4) — so the cross-language gate's scope is stated, not
+  authored ad hoc. Clause-8 rows carry NO address fields: the refusal
+  assertion is their witness (a colliding-origin wallet derives
+  byte-identical addresses to a clean control — measured, PLAN-r2 M5).
 - **P0.2** Rust harness `crates/me-cli/tests/descriptor_seam.rs`: pins the
   sha256; asserts the manifest arithmetic — tag minima, **87 slots, 70-row
   floor, 17 overlap slots distributed as 15 second-tags on the §4.5 rows
@@ -54,9 +63,10 @@ Everything here is data + test scaffolding; no parser code.
   `WalletPolicyIDStub` route) — the F-212 cross-language gate, both suites
   (PLAN-r1 I2)**; `device_probe` rows never fed to the panicking function;
   the same per-column count assertions as P0.2. `sysw_class` rows: skipped
-  with a named reason (S2's arm). **Push: the fork's own ritual with
-  `REQUIRED_CONTEXT=tests`** (the fork's job name — the script's default is
-  this repo's).
+  with a named reason (S2's arm). **Push: plain
+  `git push -u origin seam/descriptor-vectors`** — the fork's `main` has NO
+  branch protection (measured: 404) and its `tests` job runs on every
+  push, so the staging ritual has nothing to satisfy there (PLAN-r2 M3).
 - **P0 gate:** Go seam test green on the fork branch; Rust harness green on
   its non-parser assertions; sha256 pins byte-equal; column-count manifests
   agree across the two suites; baseline suites untouched-green.
@@ -73,7 +83,12 @@ Everything here is data + test scaffolding; no parser code.
   the executable-remedy refusal, the normalise-alternative's safety under
   the canonical invariant) and the interim default. Fold the ruling; either
   implement it in P1.1 or re-own the entry explicitly. The FOLLOWUPS entry
-  leaves `#ruling-needed` at this task, not at ship.
+  leaves `#ruling-needed` at this task, not at ship. The mandate's two
+  tests, applied (PLAN-r2 M6): it GATES (phase-owned, "before S1 closes",
+  not deferrable past its phase), and it is NOT an unsettleable funds risk
+  — both candidate behaviours are funds-safe; the consult chooses between
+  refuse-with-remedy and normalise, either of which the spec's invariants
+  license.
 - **P1.1** Module placement (PLAN-r1 C2): **`#[doc(hidden)] pub mod
   descriptor` in `crates/me-cli/src/lib.rs`** — lib-public so
   `tests/descriptor_seam.rs` can call the predicate directly (the codex32
@@ -101,8 +116,8 @@ Everything here is data + test scaffolding; no parser code.
 
 ## P2 — `--as md1` end to end (S3 proper)
 
-Build order within P2 (PLAN-r1 M3): **P2.2 → P2.3 → P2.1's window text →
-P2.4** — the window refusal's variant selection needs md1-representability
+Build order within P2 (PLAN-r1 M3; PLAN-r2 N3): **P2.1's flag skeleton →
+P2.2 → P2.3 → P2.1's window text → P2.4** — the window refusal's variant selection needs md1-representability
 (P2.2) and emits after the identification block (P2.3).
 
 - **P2.1** `--as <descriptor|md1>` flag surface: `md1` implemented;
@@ -119,12 +134,15 @@ P2.4** — the window refusal's variant selection needs md1-representability
   watch-only, the (a′) annotation — **plus §5.3(b)'s label warning with
   its verbatim text and a test that J1's `Name: sh` fixture fires it
   (PLAN-r1 I5)**.
-- **P2.4** §6's refusal texts, verbatim, one named test per row, **all 34
-  rows — the S2-parked set is EMPTY** (PLAN-r1 I6: every §6 trigger is
-  reachable in this build; the two `--as descriptor`-mentioning rows fire
-  as conjunct 1's permanent refusal and the window refusal, whose two
-  variants get their own tests alongside the five-case item-5 matrix).
-  The test file asserts its own row-test count == 34. Where `md1_admits`
+- **P2.4** §6's refusal texts, one named test per row, **all 35 rows
+  (§6 gained the key-identity row, PLAN-r2) — the S2-parked set is EMPTY**
+  (PLAN-r1 I6: every §6 trigger is reachable in this build; the two
+  `--as descriptor`-mentioning rows fire as conjunct 1's permanent refusal
+  and the window refusal, whose two variants get their own tests alongside
+  the five-case item-5 matrix). "Verbatim" means WHAT THIS BUILD PRINTS:
+  the two window-substituted rows are asserted in their SUBSTITUTED form
+  per §5.3's normative substitution (PLAN-r2 NEW-I2). The test file
+  asserts its own row-test count == 35. Where `md1_admits`
   is false on an admitted row, the refusal assertion **cites
   §5.3(a)/(a″)** (PLAN-r1 M6).
 - **P2.5** F-421's converter referral — one refusal string + one test.
@@ -147,9 +165,10 @@ P2.4** — the window refusal's variant selection needs md1-representability
   operator-gated), F-414/F-420 → parked with owners, **F-422 → standing
   decision, no owner (PLAN-r1 M5)**; continuity + memory.
 - **P3.4** Merge worktree → master; push via `scripts/push-via-staging.sh`;
-  fork branch pushed via the fork ritual (`REQUIRED_CONTEXT=tests`) and
+  fork branch pushed plain (no protection on the fork — PLAN-r2 M3) and
   left as a branch for the operator's merge decision (fork `main` merges
-  are not overnight work — it is another cycle's repo).
+  are not overnight work — it is another cycle's repo); the unmerged
+  branch's integration is owned by **F-425**.
 
 ## Out of scope (parked, with owners)
 
@@ -158,6 +177,15 @@ QR plates) — F-418, awaits the SH2. F-423 plate packing — with S2's
 firmware. F-420 (`md`'s referral) — descriptor-mnemonic, with-or-after S1;
 stretch if the night allows, own commit + own push. F-413/F-422 — operator
 rulings, spec-as-written meanwhile.
+
+## What the build gate does not cover here
+
+This plan carries zero fenced code blocks; its executable content is
+COMMANDS and FILE PATHS — the ungated class the constellation has measured
+at 5-of-22 false. The countermeasure is stated for every review brief:
+reviewers EXECUTE the commands and resolve the paths (four of PLAN-r2's
+five blockers were found exactly that way), and the citation gate covers
+`file:line` references mechanically.
 
 ## Stop-rules and boundaries (the overnight mandate)
 

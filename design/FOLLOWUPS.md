@@ -14646,3 +14646,11 @@ dependency, keep conjunct 7a's refusal (now double-enforced), and simplify
 the host mirror to a thin pre-check or drop it with the vector rows still
 standing. Crate publishes are operator-gated — never overnight work.
 
+### F-425 — the fork-side seam gate lives on an unmerged branch after S1; integrate it into fork CI (repo: **seedhammer fork**; owning phase: **the operator's fork-merge decision, at or before S2**) `#fork` `#vectors` `#ci`
+
+Filed from PLAN-r2's M7. P0.3 lands `nonstandard/descriptor_seam_test.go`
+and the vendored vector file on `seam/descriptor-vectors` (cut from `main`
+`d402f18`), pushed but deliberately NOT merged overnight — fork `main`
+merges are the operator's. Until merged, the cross-language seam gate runs
+in neither repo's default CI. The merge (or rebase onto whatever `main`
+becomes) closes this; S2's device work will need the branch anyway.
