@@ -187,13 +187,22 @@ rulings, spec-as-written meanwhile.
 
 ## Load-bearing anchors (gives the citation and staleness gates material — PLAN-r3 I5)
 
-`crates/me-cli/src/sysw/mod.rs:205` · `crates/me-cli/src/main.rs:335` ·
+`crates/me-cli/src/sysw/mod.rs:205` · `crates/me-cli/src/main.rs:371` ·
 `crates/me-cli/tests/codex32_seam.rs:60` · `crates/me-cli/tests/sysw_cli.rs:1928` ·
 `descriptor-mnemonic` `crates/md-codec/src/encode.rs:118` and `:120` (the two
 validator calls the published crate lacks) · fork `nonstandard/parse.go:36` ·
 fork `md/walletpolicyid.go:138` · fork `md/encode_multisig.go:112`. Each
 verified this cycle; the per-phase staleness re-check now has citations to
 examine.
+
+**Re-pinned at the P2 gate (2026-08-29):** the `main.rs` anchor moved from line
+335 to line **371** — P2.1 inserted `--as`'s value enum above the exit-code
+vocabulary, so `const EXIT_OK` shifted down 36 lines. The staleness check
+reported it as the phase's ONE drift, and re-pinning is what the plan's own
+"re-pinned at each phase gate" rule calls for. (The old number is written out
+here rather than as a `file:line` citation, so the checker does not read this
+sentence as a fifth anchor.) The other three mnemonic-engrave anchors and all
+four fork / descriptor-mnemonic anchors are unchanged.
 
 ## What the build gate does not cover here
 
