@@ -18,11 +18,15 @@ removed, F-420 shipped in descriptor-mnemonic.
 
 ## S2 cycle plan
 
-`design/IMPLEMENTATION_PLAN_descriptor_input_S2.md` @ `027629c` (cite gate
-26/26). Recon: `design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`).
-R0 loop in flight (opus round 1, report lands at
-`design/agent-reports/R0-S2-plan-r1.md`). Scale: 5 expected-good / fable at
-15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
+`design/IMPLEMENTATION_PLAN_descriptor_input_S2.md` @ `7877aa5` (r1 RED
+4C/6I/7M/3N persisted `191bfb7`, folded `7877aa5` -- all 20 findings ruled;
+cite gate 73/73, clippy both toolchains + fmt clean). Recon:
+`design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`). R0 loop in flight
+(opus round 2, scoped fold-vs-findings + the fold's new decisions: P1.0
+consult-first, derived parity rule, walletPolicy consumer, single vector
+regeneration, parse-fix convergence, P2.5 show surface, P4.1 font ruling;
+report lands at `design/agent-reports/R0-S2-plan-r2.md`). Scale: 5
+expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
 propagation sweeps + generators; both clippy toolchains (F-430).
 
 ## Boundaries
