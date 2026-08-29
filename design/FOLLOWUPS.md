@@ -14731,3 +14731,12 @@ to §5.1, unpinned by any gate row, and plausibly an operator's half-copied
 paste. Do NOT widen T4 without a gate row to pin the widening; the walk
 classifies the divergence first.
 
+### F-430 — every local gate linted with nightly clippy while CI pins 1.85.0; the mismatch cost a staging round (repo: **mnemonic-engrave**; owning phase: **next CI touch — decide: rust-toolchain.toml, or a gate script that runs `cargo +1.85.0 clippy`**) `#ci` `#toolchain`
+
+Filed 2026-08-29 at the S1+S3 push: the whole cycle's clippy gates ran on
+local nightly 1.97, CI's pinned 1.85.0 fired `clippy::format_collect` on
+`descriptor/md1.rs`, and the staging ritual correctly refused master. The
+CI-only-rules-are-traps class — the durable fix removes the conflict (pin
+the toolchain locally or run the pinned lint in the gate), not a note to
+remember harder.
+

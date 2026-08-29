@@ -36,6 +36,8 @@
 //! which is where conjunct 8 lives, and this module is never reached for one.
 //! F-424 owns the codec bump.
 
+use std::fmt::Write as _;
+
 use md_codec::encode::Descriptor as MdDescriptor;
 use md_codec::origin_path::{OriginPath, PathComponent, PathDecl, PathDeclPaths};
 use md_codec::tag::Tag;
@@ -396,11 +398,10 @@ pub fn strings(b: &Built) -> Result<Vec<String>, BuildError> {
 /// as 32 lowercase hex characters.
 pub fn wallet_id(b: &Built) -> Result<String, BuildError> {
     let id = md_codec::compute_wallet_policy_id(&b.descriptor)?;
-    Ok(id
-        .as_bytes()
-        .iter()
-        .map(|x| format!("{x:02x}"))
-        .collect::<String>())
+    Ok(id.as_bytes().iter().fold(String::new(), |mut acc, x| {
+        let _ = write!(acc, "{x:02x}");
+        acc
+    }))
 }
 
 /// The network every key shares — conjunct 5 has already refused a mixture.
