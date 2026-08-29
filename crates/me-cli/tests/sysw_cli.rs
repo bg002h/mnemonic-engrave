@@ -454,7 +454,7 @@ fn a_plain_text_pass_body_is_refused_by_body_and_never_echoed() {
         "THE PASSPHRASE MUST NOT REACH STDERR: {err}"
     );
     assert!(
-        !err.contains("Descriptors and addresses"),
+        !err.contains("Addresses are not classifiable here"),
         "and must not explain the gap that did not apply here: {err}"
     );
 }
@@ -2412,5 +2412,133 @@ fn a_record_of_no_class_at_all_still_names_the_classifier() {
     assert!(
         !err.contains("BIP-93"),
         "and must not claim this is codex32: {err}"
+    );
+}
+
+// ── S2: §5.2's record in `show` ─────────────────────────────────────────────
+
+const DESCRIPTOR_VECTORS: &str = "testdata/descriptor_seam_vectors.json";
+/// The mk1 pair `expect_kinds.rs` uses, so the capture covers `Class::MdMk`'s
+/// other HRP as well as `md1`.
+const MK1_A: &str = "mk1qpz63tpqqsq3dg4m5wdx5fvqqvzg3vs7mpf0rz2j43zpzpxk0rtjkqkhwreqp6hm7qnp3a8wdvtz6t2k4uxu6ykwxcp9vqugfjyx733cf59g";
+const MK1_B: &str =
+    "mk1qpz63tppkeg9pdvqz5744004gvzecsknw6tu25yv3exfhkl6w5zm9e4t24aqdah5585wn3e4xdut8";
+
+/// A row's `input` or `canonical`, by name.
+fn descriptor_field(name: &str, field: &str) -> String {
+    let raw = std::fs::read(DESCRIPTOR_VECTORS).unwrap();
+    let doc: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+    doc["vectors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["name"].as_str().unwrap() == name)
+        .and_then(|r| r[field].as_str().map(str::to_string))
+        .unwrap_or_else(|| panic!("{DESCRIPTOR_VECTORS}: no {field} on row {name:?}"))
+}
+
+/// `me sysw pack` over one document, then `me sysw show` over what it wrote.
+fn pack_then_show(dir: &std::path::Path, tag: &str, document: &str, extra: &[&str]) -> String {
+    let inp = dir.join(format!("{tag}.txt"));
+    let bin = dir.join(format!("{tag}.bin"));
+    std::fs::write(&inp, document).unwrap();
+    let packed = me()
+        .args(["sysw", "pack", "--no-passphrase"])
+        .args(extra)
+        .arg("--in")
+        .arg(&inp)
+        .arg("--out")
+        .arg(&bin)
+        .assert()
+        .success();
+    let _ = packed;
+    let shown = me().args(["sysw", "show"]).arg(&bin).assert().success();
+    String::from_utf8_lossy(&shown.get_output().stdout).into_owned()
+}
+
+/// **S2's `show` surface, ADDITIVE — asserted against a capture taken from the
+/// build BEFORE the block existed.**
+///
+/// The capture is `testdata/show_public_records_pre_s2.txt`, generated at
+/// `df00632` (S2's descriptor path shipped, the `show` block not yet written)
+/// over five containers covering every public class `show` reports on. If the
+/// new block could ever print for a non-descriptor record — or perturb the
+/// lines around it — this goes red rather than being argued about.
+#[test]
+fn the_descriptor_show_block_leaves_every_other_container_byte_identical() {
+    let dir = tempfile::tempdir().unwrap();
+    let mt = MT_EVEN.join("\n");
+    let cases: [(&str, String); 5] = [
+        ("md1 card and a text record", format!("{MD1}\n{TEXT}\n")),
+        ("a three-card md1 set", format!("{MD1}\n{MD1_B}\n{MD1_C}\n")),
+        ("an mk1 cosigner pair", format!("{MK1_A}\n{MK1_B}\n")),
+        ("a complete mt1 set", format!("{mt}\n")),
+        ("a BIP-39 mnemonic", format!("{SEED}\n")),
+    ];
+    let mut got = String::new();
+    for (i, (name, document)) in cases.iter().enumerate() {
+        let out = pack_then_show(dir.path(), &format!("c{i}"), document, &[]);
+        write!(got, "== {name} ==\n{out}").unwrap();
+        assert!(
+            !out.contains("descriptor —"),
+            "{name}: a non-descriptor container grew a descriptor line:\n{out}"
+        );
+    }
+    let want = include_str!("../testdata/show_public_records_pre_s2.txt");
+    assert_eq!(
+        got, want,
+        "`show` is no longer byte-identical on pre-S2 containers"
+    );
+}
+
+/// **§11 item 1's `show` half, over all four formats.** Each packs `--as
+/// descriptor` and each reports EXACTLY ONE `Descriptor` record — one, because
+/// a descriptor is packed alone and is not chunked.
+///
+/// The block carries §5.4's vocabulary, so the assertion is not "some line
+/// appeared": the canonical string in `show` must be the one the file's
+/// `canonical` column pins, which is the string the device will scan.
+#[test]
+fn show_reports_exactly_one_descriptor_record_for_each_of_the_four_formats() {
+    let dir = tempfile::tempdir().unwrap();
+    let rows = [
+        "formats-happy/bluewallet-sh-fixture",
+        "formats-happy/bip380-sortedmulti-multipath",
+        "formats-happy/json-label-descriptor",
+        "promotion/01-bare-xpub",
+    ];
+    let mut formats = std::collections::BTreeSet::new();
+    for (i, row) in rows.iter().enumerate() {
+        let document = descriptor_field(row, "input");
+        let canonical = descriptor_field(row, "canonical");
+        let out = pack_then_show(
+            dir.path(),
+            &format!("d{i}"),
+            &document,
+            &["--as", "descriptor"],
+        );
+        let lines: Vec<&str> = out
+            .lines()
+            .filter(|l| l.starts_with("public record "))
+            .collect();
+        assert_eq!(
+            lines,
+            vec!["public record 0: descriptor — complete in one record"],
+            "{row}: `show` must report exactly ONE descriptor record:\n{out}"
+        );
+        assert!(
+            out.contains(&format!("      descriptor: {canonical}")),
+            "{row}: `show` does not carry the canonical the file pins:\n{out}"
+        );
+        assert!(
+            out.contains("      watch-only: public keys only"),
+            "{row}: the block is not §5.4's:\n{out}"
+        );
+        formats.insert(descriptor_field(row, "format"));
+    }
+    assert_eq!(
+        formats.len(),
+        4,
+        "the four rows must cover the four formats, not one format four times: {formats:?}"
     );
 }

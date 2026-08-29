@@ -12,13 +12,14 @@
 //! 1. the host-side parse — nothing ships bytes the host has not understood;
 //! 2. §5.4's identification block, in its tier;
 //! 3. §5.3(b)'s label warning, where it applies;
-//! 4. the FOLLOWER — a §4.7 admission refusal, a §5.3 refusal, §5.1's window
-//!    refusal, or the pack.
+//! 4. the FOLLOWER — a §4.7 admission refusal, a §5.3 refusal, or the pack.
 //!
-//! **The admission refusal PRECEDES the window refusal.** A wallet no path
-//! admits has a PERMANENT status and possibly a funds-urgent one:
-//! `sortedmulti(0,…)` must hear "treat those funds as at risk now", never
-//! "nothing is lost by waiting".
+//! **The admission refusal PRECEDES the pack, in every build.** A wallet no
+//! path admits has a PERMANENT status and possibly a funds-urgent one:
+//! `sortedmulti(0,…)` must hear "treat those funds as at risk now", and
+//! conjunct 1's `multi` refusal is never dressed as a wait. §5.1's window
+//! refusal, which used to be the fourth follower, retired with S2 — no build
+//! state refuses `--as descriptor` any more.
 
 use super::admit::{self, Path};
 use super::cascade;
@@ -29,7 +30,9 @@ use super::refusal::{Refusal, Row};
 
 /// What the invocation does after the block has printed.
 pub enum Decision {
-    /// The md1 strings to pack, one record each — `Class::MdMk`.
+    /// The records to pack, one string each. `--as md1` yields the md1 text
+    /// cards (`Class::MdMk`); `--as descriptor` yields exactly one canonical
+    /// descriptor string (`Class::Descriptor`, §5.2).
     Pack(Vec<String>),
     /// One or more §6 rows, at `EXIT_REFUSED`. More than one is §6's
     /// both-rows-fire case: a descriptor mixing an (a)-shaped and an
@@ -129,11 +132,9 @@ fn descriptor_follower(d: &cascade::Parsed) -> Decision {
     if let Err(r) = admit::admit(d, Path::Descriptor) {
         return Decision::Refused(vec![r]);
     }
-    // The wallet the descriptor path WOULD carry in a full build. When
-    // `DESCRIPTOR_PATH_SHIPPED` becomes true (S2, F-418), this is where §5.2's
-    // canonical `Descriptor` record is packed instead.
-    Decision::Refused(vec![Refusal::new(
-        Row::WindowNotInBuild,
-        identify::window_refusal(d),
-    )])
+    // §5.2's record, and it is ONE record: the CANONICAL re-encode of the parse
+    // — the same string §5.4's identification block printed two lines above, so
+    // what the operator read is what gets packed. `sysw::classify` places it as
+    // `Class::Descriptor` by the same predicate `admit` just applied.
+    Decision::Pack(vec![d.encode()])
 }

@@ -14611,7 +14611,7 @@ fuller brief to the operator and a fresh ruling — until then this entry is
 a decision record, not scheduled work. Owning phase changed accordingly:
 **none — standing decision.**
 
-### F-418 — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
+### F-418 — **S2 BUILT 2026-08-29** (branches `impl/descriptor-s2` + `s2/descriptor-arm`; P1-P4 implemented, reviewed and closed; awaiting P5.2's whole-diff review, merge, and the OPERATOR ACCEPTANCE HANDOVER — flash, §11 item 6 on the screen, F-423's physical plate). Original ruling record below stands. — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
 
 **Operator ruling 2026-08-28, in conversation:** *"I'm away from sh2 and it's
 not connected. That should inform s2/3 ordering, I think."* — resolving the
@@ -14655,12 +14655,14 @@ an **additive TLV tag with a criticality story**, not a wire change — and note
 md1 already carries `<0;2>` multipaths the DEVICE cannot derive, so the
 likelier future widening is device-side derivation, not this format.
 
-### F-423 — `bundlePlatePlan` cuts one plate per md1 string; pack multiple strings per plate (repo: **seedhammer fork**; owning phase: **with S2's firmware build**) `#fork` `#engraving` `#efficiency`
+### F-423 — **RESOLVED-IN-BUILD 2026-08-29, pending physical validation (operator, P5.4)** — measured N=3 at the shipped font (MEASURE-S2-P4-1), packer landed (fork `231b7c2`): capacity 5×85-char strings/plate, the named keyed single-sig case 2→1 plates, full 2-of-3 build 9→4, W14 bequest → 1 plate. TRADEOFF the operator should see: a PACKED plate offers TEXT ONLY (no QR variant — F-433). Physical validation per the single-char test-plate protocol remains. — `bundlePlatePlan` cuts one plate per md1 string; pack multiple strings per plate (repo: **seedhammer fork**; owning phase: **with S2's firmware build**) `#fork` `#engraving` `#efficiency`
 
 **Operator direction 2026-08-28, verbatim: "1 plate per string is something
 to be addressed, it's wasteful."** Surfaced by the journey walk's plate-count
-correction (walk log, corrections §1): a keyed single-sig card is 2 strings
-of ~84 chars each, and `bundlePlatePlan` (`gui/bundle_flow.go:386`,
+correction (walk log, corrections §1): a BARE single-sig card is 2 strings
+of ~84 chars each (P5.2 M3 re-fixed the label — the walk log's own
+correction 3; a KEYED card is 3 strings/~201 chars; both pack to 1
+plate), and `bundlePlatePlan` (`gui/bundle_flow.go:386`,
 `plateTotal == len(strings)` pinned by `bundle_engrave_test.go:38`) cuts one
 plate per string — two plates for ~168 characters of text.
 
@@ -14710,7 +14712,7 @@ merges are the operator's. Until merged, the cross-language seam gate runs
 in neither repo's default CI. The merge (or rebase onto whatever `main`
 becomes) closes this; S2's device work will need the branch anyway.
 
-### F-426 — the device's `ParseExtendedKey` classification switch has no `ypub` case; add it (repo: **seedhammer fork**; owning phase: **with S2's firmware build**) `#fork` `#device` `#slip132`
+### F-426 — **DEVICE HALF RESOLVED-IN-BUILD 2026-08-29; ENTRY SPLIT** — the `ypubVer` case landed (fork `0abbf81`, tests `fe9475c`): the scan door accepts `ypub` → `P2SH_P2WPKH`, normalising to `xpub`; the seam row moved to the `version-gap` bullet as the LIVE WITNESS for the open half. **The HOST five-version widening stays OPEN as its own convergence cycle** (Rust-first: it lands in `me` with vectors, then the sysw classifier's five-version check widens to match; the `version-gap` row's `host_admits` flips then, retiring the bullet). — the device's `ParseExtendedKey` classification switch has no `ypub` case; add it (repo: **seedhammer fork**; owning phase: **with S2's firmware build**) `#fork` `#device` `#slip132`
 
 Filed from RULING_f413_slip132 (2026-08-29). The device already normalises
 the SLIP-132 versions it accepts (`zpub`, `Ypub`, `Zpub`) — `ypubVer` is
@@ -14728,7 +14730,7 @@ by controller ruling — the code's wording is the more executable, since the
 identification block labels the line `descriptor:` — and this entry is the
 declination's durable record. Documentation-only; nothing gates.
 
-### F-428 — two vector `source` annotations and the generator cite `parse.go:151`; the measured line is 158 (repo: **mnemonic-engrave** + **seedhammer fork**; owning phase: **next vector-file byte change — realistically the S2/F-426 batch**) `#vectors` `#records`
+### F-428 — **RESOLVED 2026-08-29 in S2's single vector regeneration** (engrave `70f566e`, fork copy `29cb930`; sha `e7a4160c…` both repos). NOTE, standing: the corrected `:158` cite is REV-QUALIFIED to fork `1f09537` in the annotation itself — do NOT re-base it on a later `main` (the S2 parse fix moves the line; the qualification is what keeps the cite true). — two vector `source` annotations and the generator cite `parse.go:151`; the measured line is 158 (repo: **mnemonic-engrave** + **seedhammer fork**; owning phase: **next vector-file byte change — realistically the S2/F-426 batch**) `#vectors` `#records`
 
 Filed from IMPL-S1S3-fold2-verify (2026-08-29): the fork's count-mismatch
 error fires at `parse.go:158`, not `:151` — a citation carried forward
@@ -14746,7 +14748,7 @@ to §5.1, unpinned by any gate row, and plausibly an operator's half-copied
 paste. Do NOT widen T4 without a gate row to pin the widening; the walk
 classifies the divergence first.
 
-### F-430 — every local gate linted with nightly clippy while CI pins 1.85.0; the mismatch cost a staging round (repo: **mnemonic-engrave**; owning phase: **next CI touch — decide: rust-toolchain.toml, or a gate script that runs `cargo +1.85.0 clippy`**) `#ci` `#toolchain`
+### F-430 — **RESOLVED 2026-08-29 by `scripts/lint-gate.sh`** (S2 P0.3, engrave `5deb88e`): one command running clippy on BOTH the CI-pinned 1.85.0 and nightly plus `cargo fmt --check`, `--locked`; every S2 gate ran it. The gate-script branch of the decision, taken. — every local gate linted with nightly clippy while CI pins 1.85.0; the mismatch cost a staging round (repo: **mnemonic-engrave**; owning phase: **next CI touch — decide: rust-toolchain.toml, or a gate script that runs `cargo +1.85.0 clippy`**) `#ci` `#toolchain`
 
 Filed 2026-08-29 at the S1+S3 push: the whole cycle's clippy gates ran on
 local nightly 1.97, CI's pinned 1.85.0 fired `clippy::format_collect` on
@@ -14755,3 +14757,61 @@ CI-only-rules-are-traps class — the durable fix removes the conflict (pin
 the toolchain locally or run the pinned lint in the gate), not a note to
 remember harder.
 
+### F-431 — two `ClassDescriptor` admission cells (`progBundle`, `progMultisig`) are declared and INERT; build their consumers or retire the cells (repo: **seedhammer fork**; owning phase: **a future device-UX cycle, operator-scoped**) `#fork` `#device` `#descriptor`
+
+Filed at S2's P5.1. S2 built ONE consumer (`walletPolicyFlow`, §9 item 2's
+cell, sim-walked and pending hardware confirmation). `gui/sysw_admit.go`
+still admits `ClassDescriptor` to `progBundle` and `progMultisig` with no
+consumer — records offered to those programs sit inert, exactly like
+`ClassUnknown`. Either give each a consumer (what should Engrave Bundle do
+with a descriptor record? supply Multisig's policy?) or remove the cells;
+the admission oracle cannot see a declared-but-unconsumed cell, so this
+entry is the only tracker.
+
+### F-432 — `goprobe/go.mod`'s `replace` points at the transient S2 fork worktree; re-point at fork `main` at the S2 merge (repo: **mnemonic-engrave**; owning phase: **the S2 merge/push window (P5.3) — same commit as the merge or immediately after**) `#vectors` `#tooling`
+
+Filed from REVIEW-S2-P1P2-r1 M-3. `scripts/descriptor-seam-vectors/goprobe/go.mod`
+points at `/scratch/code/shibboleth/sh-worktrees/s2-descriptor-arm` — the
+truthful pin for the corpus as measured, but a worktree with a defined end
+of life. Once the fork branch merges to `main`, re-point at the fork
+checkout and update the two provenance paragraphs (`comment.json`'s
+PROVENANCE is inside the frozen vector file — that half waits for the NEXT
+regeneration; the README's Baselines section can update at the merge).
+Failure mode is a loud build error, not silent drift.
+
+### F-433 — a PACKED bundle plate offers no QR variant; decide whether that is documentation or a fix (repo: **seedhammer fork**; owning phase: **operator decision at/after S2 acceptance (P5.4)**) `#fork` `#engraving` `#ux`
+
+Filed from IMPL-S2-P4 §5.1. Before F-423 every md1/mk1 plate offered
+`TEXT+QR`/`TEXT ONLY`/`QR ONLY`; a packed (multi-string) plate is
+`TEXT ONLY`, forced by `backup.EngraveText`'s paragraph advance (QRs of
+stacked paragraphs would overdraw — F-434). Costs nothing for the bequest
+journey (md1 is the hand-copyable half; `--as descriptor` is the scannable
+plate), but it is a real capability reduction the operator should rule on:
+accept + document, or fix F-434 and restore QR on packed plates.
+
+### F-434 — `backup.EngraveText` lays multi-paragraph QRs over one another and the fit check calls it a fit (repo: **seedhammer fork**; owning phase: **next `backup`/engrave touch — the cheap refusal first**) `#fork` `#engraving` `#latent`
+
+Filed from IMPL-S2-P4 §5.2. The paragraph advance counts text lines only,
+so a multi-paragraph plate with QRs draws them across neighbours; `toPlate`
+accepts the overlay. Unreachable in production today (both multi-paragraph
+callers are text-only) — a live trap for the next caller. Cheap fix:
+refuse a `Paragraph` carrying a QR when `len(Paragraphs) > 1` (turns a
+silent wrong plate into an immediate error); real fix: advance by
+`max(textLines, qrLines)` (moves goldens). Do the cheap one first.
+
+### F-435 — `Text.FooterRow` is a workaround for `EngraveText` having no body budget; give it one and delete the second fit check (repo: **seedhammer fork**; owning phase: **opportunistic — `backup.TestAPackedBodyCanCoverTheFooterRow` fails when done, announcing the cleanup**) `#fork` `#engraving` `#cleanup`
+
+Filed from IMPL-S2-P4 §5.3. The free-text path has `yBudget`; the paragraph
+path has nothing, so P4.2 added `FooterRow` + `bundlePlateTextFits`'s second
+check. Giving `EngraveText` the same budget deletes both; the named test is
+written to fail when that happens, so the cleanup announces itself.
+
+### F-436 — the seam corpus has no SINGLE-LINE JSON rows, so the classifier's JSON-branch scoping is gated by unit tests only; add rows at the next regeneration (repo: **mnemonic-engrave** + **seedhammer fork**; owning phase: **next vector-file byte change**) `#vectors` `#descriptor`
+
+Filed from REVIEW-S2-P3-r1 C1's coda. The corpus's only JSON row is
+multi-line, so the derived rule never exercises the JSON branch as a
+RECORD; the C1 class (a `ypub` in a JSON `label`, the `\u0079`-escape
+variant, matching-key-material labels) lives in named unit tests in both
+repos (fork `a785755`; comments carry the host verdicts). At the next
+regeneration add single-line JSON rows — happy, label-with-ypub, escaped —
+so the parity gate covers the branch from data.

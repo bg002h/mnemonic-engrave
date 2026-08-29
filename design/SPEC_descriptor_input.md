@@ -36,6 +36,26 @@ state the shipped order (the flag-dependent arm runs LAST), which is what makes
 §6's key-identity row's *"both `--as` paths"* true. No refusal TEXT changes;
 the ordering rule does. §9 item 7 records the walk's
 one narrow residual.
+**Post-GREEN amendment 2026-08-29 (c) — S2 SHIPPED `--as descriptor`, and
+this text was written while it had not.** The build-conditional half of the
+spec is now history: `--as descriptor` packs §5.2's record, so §5.1's window
+refusal has no build state to fire in and RETIRED with §6's
+`window-not-in-build` row (§6 is **35** rows), §5.3's window substitution
+never fires, and neither the choice block nor the clap help marks a value.
+The `--as`-omitted gate is consulted on IDENTIFICATION rather than after
+record classification fails, because `sysw::classify` now has a descriptor
+arm and an admitted descriptor no longer falls through to `Unknown`. `me
+sysw show` reports the record per §5.4's vocabulary — a surface §11 item 1
+assumed and nothing had built. §7's file regenerated ONCE, which retired the
+`sysw_class` sample column, retired the `panic:parse` marker with the parse
+panic it named, carried a new `neither` row and moved a `ypub` row into a
+new `version-gap` bullet: **89 tag-slots, 89 − 17 = 72 rows.** Every
+amendment below is marked `AMENDED 2026-08-29 (S2)`. What P2.7 did
+NOT touch was the DEVICE: §4.3's and §4.5's device clauses, §9 item 2
+and §6's "the device admits exactly" quote described fork `main` before
+S2's arm. Those amended in S2's P3.5 (marked `AMENDED 2026-08-29 (S2
+P3.5)`), carrying the fork diff that falsified them (`0abbf81..fe9475c`
+on `s2/descriptor-arm`).
 **No code may be written before the implementation plan passes its own
 gate** (project `CLAUDE.md` — this is risk-set work: it changes normative
 admission behaviour and it decides which wallet an operator engraves).
@@ -107,6 +127,16 @@ rc=4
 335–338). The message is emitted from `crates/me-cli/src/main.rs:2425`, and
 `mnemonic_engrave::sysw::classify` (`crates/me-cli/src/sysw/mod.rs:205`) has no
 descriptor arm — its own doc comment at line 201 says so.
+
+**AMENDED 2026-08-29 (S2): the transcript above is HISTORY, and is kept
+because it is the measurement this spec was written from.** It has been
+false since S1 shipped: that invocation reaches §5.1's gate and exits **2**
+with the choice block, not 4. Since S2 it is false twice over — `classify`
+HAS a descriptor arm, and the quoted sentence *"Descriptors and addresses
+are not yet classifiable here"* was retired with it (a descriptor the §4.7
+predicate refuses still lands on that message, in narrower words). Nothing
+about the ARGUMENT this section makes depends on the transcript being
+current: the gap it recorded is the gap S1–S3 closed.
 
 ### 2.2 `md encode` takes a template, never a descriptor
 
@@ -379,15 +409,26 @@ them:
    probe compared `KeyData` and `ChainCode` and they are unchanged — so this is
    a round-trip and display break, **not** a wrong-wallet break. Stated
    precisely because the over-claim is tempting.
-4. **A fingerprint shorter than 4 bytes PANICS the Go parser.**
-   `parseBlueWalletDescriptor` checks only `len(fp) > 4` before calling
-   `binary.BigEndian.Uint32(fp[:])` (`nonstandard/parse.go:136–149`), which
-   panics for fewer. Measured: a 1-byte (`ab`) and a 3-byte (`abcdef`)
-   fingerprint both panic `OutputDescriptor` (`index out of range`), and the
-   panic is reachable from the device's scan door (`gui/scan.go:87`). `me`
-   requires exactly 8 hex characters — matching what `bip380.ParseKey` already
-   requires of an inline origin — and §7 marks these rows
-   `device_probe: "panic:parse"` so the Go test never feeds one to the parser.
+4. **A fingerprint shorter than 4 bytes PANICKED the Go parser — fixed in
+   S2 as Rust convergence** *(AMENDED 2026-08-29 (S2 P3.5))*.
+   `parseBlueWalletDescriptor` checked only `len(fp) > 4` before calling
+   `binary.BigEndian.Uint32(fp[:])` (`nonstandard/parse.go:136–149` at the
+   pre-S2 tree), which panicked for fewer. Measured then: a 1-byte (`ab`)
+   and a 3-byte (`abcdef`) fingerprint both panicked `OutputDescriptor`
+   (`index out of range`), reachable from the device's scan door
+   (`gui/scan.go:87`). S2 tightened the guard to `len(fp) != 4` — the
+   parser now errors cleanly (measured: the seam suite feeds the input
+   with no panic), converging on `me`, which requires exactly 8 hex
+   characters — matching what `bip380.ParseKey` already
+   requires of an inline origin.
+   **AMENDED 2026-08-29 (S2), the FILE half only.** The previous clause said
+   §7 marks these rows `device_probe: "panic:parse"` so the Go test never
+   feeds one to the parser. S2's regeneration retired that marker with the
+   panic it named: the row carries a measured `device_admits: false` like any
+   other, and no row bars the Go test from `OutputDescriptor`. The DEVICE
+   sentence above — that the parser panics — describes fork `main`, which
+   does not yet carry the `!= 4` guard; it amends in P3.5, with the fix that
+   falsifies it.
 
 **NORMATIVE:** `me` **refuses** four shapes: a BlueWallet file with no
 `Format:` header; one with zero cosigner lines; one in which **any cosigner
@@ -450,16 +491,21 @@ would be noise.
   and children parsed by `parsePath` (child index, `*`, `*'`/`*h`, or a
   `<a;b>` PAIR — `parsePath` cuts on the first `;`, so a three-element group
   or a reversed pair is a parse error; `bip380/bip380.go:476,489`).
-- **Extended-key version bytes — the admitted set is exactly five:** `xpub`
+- **Extended-key version bytes** *(AMENDED 2026-08-29 (S2 P3.5) — F-426's
+  device half landed)*: **`me`'s admitted set is exactly five:** `xpub`
   (`0488b21e`), `tpub` (`043587cf`), `zpub` (`04b24746`), `Ypub` (`0295b43f`),
   `Zpub` (`02aa7ed3`). `ParseKey` calls `ParseExtendedKey` unconditionally, on
-  every key in every branch, and the classification switch has **no `ypub`
-  case** — `ypub` (`049d7cb2`) is declared in the constants and named in the
-  later normalisation switch, but classification hits `default` and errors
-  (`bip380/bip380.go:428–466`, re-read at fold time). So `ypub`, `upub`,
-  `vpub`, `Upub`, `Vpub` are refused by the device **even with a full explicit
-  origin** — measured: `sh(wpkh([4bbaa801/49h/0h/0h]ypub…/<0;1>/*))` REFUSE,
-  its `xpub` twin ACCEPT. **NORMATIVE: `me` admits exactly the same five.** A
+  every key in every branch. Before S2 the classification switch had **no
+  `ypub` case**; since S2 it has one (`ypub` → `P2SH_P2WPKH`, normalising
+  to `xpub`), so the device's SCAN DOOR now accepts six — measured: the
+  once-refused `sh(wpkh([4bbaa801/49h/0h/0h]ypub…/<0;1>/*))` now ACCEPTS
+  at the scan door (its seam row moved to the `version-gap` bullet), while
+  `upub`, `vpub`, `Upub`, `Vpub` stay refused. **NORMATIVE: `me` admits
+  exactly the five above — unchanged in S2** (the host widening is
+  F-426's own later convergence cycle), **and the device's sysw RECORD
+  classifier holds the same five** via a string-level version check, so a
+  `ypub`-keyed record classifies `ClassUnknown` on the device exactly as
+  `me` refuses it at the desk. A
   standard BIP-32 library accepts `ypub`, so a host built on one without this
   gate is WIDER than the device on the commonest non-`xpub` key there is
   (R0's C2). The `ypub` refusal prints the equivalent `xpub` spelling with the
@@ -569,9 +615,12 @@ The path compared is `k.DerivationPath`, which comes from one of two places:
 - the explicit `[fingerprint/path]` prefix, if present; **or**
 - if absent, `ParseKey` falls back to the **SLIP-132 version bytes**
   (`ParseExtendedKey`, `bip380.go:428`): `xpub`/`tpub` → `P2PKH`, `zpub` →
-  `P2WPKH`, `Ypub` → `P2SH_P2WSH`, `Zpub` → `P2WSH`. Note `ypub` is listed in
-  the version constants but **has no case in the switch**, so it hits `default`
-  and is refused.
+  `P2WPKH`, `ypub` → `P2SH_P2WPKH` *(the case S2 added — AMENDED
+  2026-08-29 (S2 P3.5); before S2 `ypub` hit `default` and was refused)*,
+  `Ypub` → `P2SH_P2WSH`, `Zpub` → `P2WSH`. `me` still refuses a bare
+  `ypub` promotion (§4.3's five, unchanged), and the sysw record
+  classifier refuses `ypub`-keyed records on the device for the same
+  reason.
 
 **The near-misses, measured. This is the table the spec exists to fix.**
 
@@ -800,16 +849,20 @@ me: this input is a wallet descriptor, and `--as` decides how it is packed.
                         (no md invocation needed). Restored by transcription;
                         each string survives up to 4 MIS-STRUCK characters
                         (substitutions -- a missing or extra strike is not
-                        correctable), so it can even be hand-stamped. Carries policies
-                        --as descriptor cannot. Restoring needs an md1
-                        decoder (an open spec; the tooling today is this
+                        correctable), so it can even be hand-stamped. Carries
+                        policies --as descriptor cannot. Restoring needs an
+                        md1 decoder (an open spec; the tooling today is this
                         project's).
-    They are not interchangeable — `me sysw pack --help` has the comparison.
+    They are not interchangeable -- `me sysw pack --help` has the comparison.
 ```
 
 In a build where the descriptor path has not shipped, the block marks that
 value inline — `--as descriptor (not available in this build)` —
 so the choice text never offers a BUILD-dead flag unmarked (R0 r9's M6,
+**and since S2 no build state reaches it: both values ship and the block, and
+`me sysw pack --help` with it, marks nothing**; the block above is what S2
+prints, verbatim, with each description INLINE on a head padded to the
+description column),
 ruling the interaction the walk assigned to the plan; the walk-W5
 current-build rule governs this block too). When NEITHER value carries the
 input, the block does not fire at all — §5.4's carriage rule (r13's
@@ -854,9 +907,20 @@ Two boundary rules that fall out of it (R0 r2):
   invariant, and §7's executable gate rows — not a prose shape test
   (terminal fold: rounds 15–19 each repaired one disjunct of the prose test
   and broke or half-fixed another — the precision now lives where a suite
-  can hold it).** When `--as` is absent and record classification fails,
-  `me` consults the gate, and re-reads the whole input through §4's cascade
-  ONLY when the gate opens — when the input is DESCRIPTOR-SHAPED.
+  can hold it).** When `--as` is absent, `me` consults the gate, and re-reads
+  the whole input through §4's cascade ONLY when the gate opens — when the
+  input is DESCRIPTOR-SHAPED.
+
+  **AMENDED 2026-08-29 (S2): the trigger is IDENTIFICATION, not
+  classification failure.** This clause used to read *"when `--as` is absent
+  and record classification fails"*, and that precondition was safe only
+  while no descriptor could classify. S2's `classify` arm places §5.2's
+  record, so an admitted single-line descriptor now classifies — and under
+  the old trigger the gate would be skipped, §5.4's identification block,
+  §5.1's choice block and every omitted-`--as` §6 refusal would silently die,
+  and the input would pack RAW at exit 0 (measured). The gate is consulted on
+  EVERY omitted-`--as` pack, immediately before record admission and after
+  `--expect` resolution, whose position does not move.
 
   **The gate's intent and invariant — NORMATIVE.** The gate keeps two
   promises at once, and an implementation is conformant exactly when both
@@ -936,6 +1000,14 @@ Two boundary rules that fall out of it (R0 r2):
   shape as F-415, filed as **F-416**, so §5.6 gains its note in its own cycle
   rather than drifting silently (NEW-M2).
 
+**The S3-only window — RETIRED 2026-08-29 (S2).** `--as descriptor` ships, so
+no build state reaches any of the text below and §6's `window-not-in-build`
+row retired with it. The section is kept, marked, because it is the ruling a
+future build-gated path would be read against — the ORDERING rule below
+(§4.7's admission refusal precedes anything about a flag or a build) is
+independent of the window and still binds: it is what makes conjunct 1's
+`multi` refusal permanent rather than a wait.
+
 **The S3-only window — NORMATIVE (walk W4/W11; F-418 ships S3 first).** In a
 build where the `--as descriptor` path has not shipped, `--as descriptor` is
 a REFUSAL at `EXIT_REFUSED` (3) — emitted AFTER the host-side parse and the
@@ -992,9 +1064,31 @@ between two artefacts and must not be told one of them is their bytes.
 discovering it in implementation.** From §2.3: `sysw.Classify` has no descriptor
 arm, so a `ClassDescriptor` record packed today would be `ClassUnknown` on the
 device and refused. `--as descriptor` is therefore not complete until
-`sysw.Classify` gains an arm that calls `nonstandard.OutputDescriptor` — which,
-under §3, lands in Rust first (as `mnemonic_engrave::sysw::classify`) with the
-§7 vectors, and is then ported.
+`sysw.Classify` gains that arm — which, under §3, lands in Rust first (as
+`mnemonic_engrave::sysw::classify`) with the §7 vectors, and is then ported.
+
+**AMENDED 2026-08-29 (S2): the arm is not a call to
+`nonstandard.OutputDescriptor`.** The previous sentence said it was, and that
+is measurably wider than the predicate below: over §7's own file,
+`device_admits` is TRUE and `host_admits` FALSE on **22 of 72** rows — **18
+of them single-line**, and a record cannot contain a newline, so those 18 are
+exactly what a scan-door-keyed classifier would place: anyone-can-spend
+`sortedmulti(0,…)`, `k > n`, 21 keys, mixed-network, hardened use-sites,
+conjunct-8 key-identity failures. Every one would reach a program and a
+screen through the already-live admission cells. (Counted from the file at
+sha `e7a4160c`; R0 r1 measured 17 against the pre-S2 file, before the `ypub`
+row's `device_admits` flipped.) The arm is the PREDICATE below, composed:
+§4.6's edge normalisation first (ASCII-whitespace parity with the host's
+`normalise` — the arm refuses a record it could only reach by stripping
+non-ASCII whitespace the host would not strip; AMENDED 2026-08-29 (S2,
+REVIEW-S2-P3-r1 C2's fold)), then parse via `nonstandard.OutputDescriptor`,
+then the single-line-reachable
+narrowings of §4's cascade (§4.5's promotion table, and §4.3's admitted
+versions as a STRING-level check over the key material each cascade branch
+actually consumed — `bip380.Key` has no version field and
+`ParseExtendedKey` normalises the version away), then §4.7's conjuncts over
+the parsed descriptor. The Rust side is `descriptor::host_admits`, which IS
+the predicate rather than a restatement of it.
 
 The classification predicate is stated once, and both sides implement it:
 
@@ -1131,7 +1225,15 @@ NEITHER-PATH refusals are exempt: substituting "wait for the update" into
 a refusal whose truth is "never, in any build" would be false — r15's
 new-I2, reason corrected per r16's minor) —
 replaces that clause with: *"the scannable-plate path is not in this build — keep the
-export file; it packs when the device update ships."* No refusal points the
+export file; it packs when the device update ships."*
+**AMENDED 2026-08-29 (S2): the rule stands, and its CONDITION can no longer
+occur.** The descriptor path shipped, so no remedy is substituted and the two
+§6 rows below print §6's own text, naming the flag that carries their shape.
+The rule is kept — marked, not deleted — because it is what a future
+build-gated path would be read against, and because the ordering it depends
+on (a refusal may DESCRIBE a path's future availability but may never ROUTE
+to a flag that refuses in the CURRENT build) is independent of any one build.
+No refusal points the
 operator at a flag that refuses in the current build; any refusal may
 DESCRIBE a path's future availability — describing routes nothing (r17's
 minor; stated unconditionally per r18's minor, which measured the stock
@@ -1310,8 +1412,8 @@ This table is why there are two flags and no default. Every cell was run.
 | `pkh` / `wpkh` / `sh(wpkh)` single-sig — childless inputs: §5.3(a′) materialises `<0;1>/*` | ✅ | ✅ |
 | `tr(KEY)` single-key | ✅ | ✅ |
 | carries a label | text only, dropped | dropped |
-| needs a firmware change to be readable | **yes, §5.2** | **no** |
-| on the plate (walk W1) | a QR — machine-scan only | text cards: 2 strings, ~168 chars for keyed single-sig = **TWO plates** (one plate per STRING — `bundlePlatePlan`'s rule, pinned `plateTotal == len(strings)`; the one-plate test covers single-STRING cards only. Corrects the walk's answer, R0 r10's new-I2) |
+| needs a firmware change to be readable | **yes, §5.2** — the HOST half shipped in S2 (`--as descriptor` packs the record and `me sysw show` reports it); the device arm and screen are S2's fork half, and until that build is flashed the record is `ClassUnknown` on the machine | **no** |
+| on the plate (walk W1) | a QR — machine-scan only | text cards: **ONE plate** for either single-sig shape — the bare key's 2 strings (85 + 83 = 168 chars) and the keyed BIP-84 card's 3 strings (67 × 3 = 201 chars) each pack onto one plate side. **AMENDED 2026-08-29 (S2 P4.2)**: this cell read *"2 strings … = **TWO plates** (one plate per STRING)"*, which was true of `bundlePlatePlan` until F-423 replaced the one-plate-per-string rule with greedy packing WITHIN a card. Measured, not inferred: five 85-character md1 strings fit one plate side at the shipped font (`bundlePlateMD1Capacity`, pinned and re-derived by the fork's `TestBundlePlanPacksACardOntoFewerPlates`); MEASURE-S2-P4-1 confirmed N = 3 by trial fit against `backup.EngraveText` → `toPlate` before the packer existed. A card's strings stay separate visually distinct paragraphs, never reflowed into one another. **One consequence the operator sees:** a PACKED plate is offered `TEXT ONLY` — a per-paragraph QR on a multi-paragraph plate is drawn across its neighbours, so the code variants are offered on single-string plates only |
 | restored by | scanning into any wallet app — no project tooling, ever | transcription + an md1 decoder (open spec; tooling is this project's) |
 | hand-copyable — letter punches (walk W14) | ❌ | ✅ — BCH corrects up to 4 mis-struck characters per string (substitutions only: a missing or extra strike is outside the budget, R0 r9's N1) |
 
@@ -1411,25 +1513,25 @@ row names the mandatory wrapper change instead (R0 r6's NEW-M4; r7's NEW-I2).
 | an unparseable file | *"this is not a wallet descriptor in any of the four forms `me` reads: a BlueWallet `Key: value` setup file, a plain BIP-380 descriptor, a `{"label":…,"descriptor":…}` JSON export, or a single extended key. It looks most like `<form>`, which failed because: `<that branch's error>`."* |
 | an **empty file** | the SHIPPED `me 0.7.0` refusal is kept verbatim (R0's I7) — *"no records in `<file>`: pass them on argv, with --in, or on stdin. An EMPTY input is what a FAILED upstream command leaves behind…"* — which already names the C-1 composition hazard. **`EXIT_USAGE` (2)**, measured at fold time (rc=2, 0 stdout bytes); this spec records the existing behaviour rather than silently regressing a tested surface. |
 | a file of only whitespace | reaches the same shipped "no records" path (blank records are skipped) — same message, **`EXIT_USAGE` (2)**. |
-| **`--as` omitted** (input at least one `--as` value CARRIES in this build) | §5.1's text. **`EXIT_USAGE` (2)**, not 3 — nothing was refused, a choice was not made. For an input nothing carries, the input's own refusal fires directly at (3) — the §4.7 admission refusal, or the neither-path refusal for admitted-but-uncarried wallets (§5.4's carriage rule, r12–r13). |
+| **`--as` omitted** (input at least one `--as` value CARRIES in this build) | §5.1's text. **`EXIT_USAGE` (2)**, not 3 — nothing was refused, a choice was not made. For an input nothing carries, the input's own refusal fires directly at (3) — the §4.7 admission refusal, or the neither-path refusal for admitted-but-uncarried wallets (§5.4's carriage rule, r12–r13). **AMENDED 2026-08-29 (S2): which inputs reach which arm MOVED, though the rule did not.** With `--as descriptor` shipped, every admitted descriptor is carried by at least one value, so the four `md1-split/*` rows §5.3 refuses — `/0/*`, `<0;1>`, and the two mixed shapes — exit **2** here rather than 3; their §5.3 refusals are still reachable, through an explicit `--as md1`. The "nothing carries it" arm now needs a wallet BOTH values refuse: `wsh(multi(…/0/*))` is §7's witness for it. |
 | a **wrapper whose inner descriptor is malformed** | the wrapper is named, then the inner error, then the position: *"the `{label, descriptor}` JSON parsed, and its `descriptor` field did not: `bip380: script: missing ')'`. The label was `"…"`. The problem is in the descriptor string, not the JSON."* |
 | a **BlueWallet file with no `Name:`** | *"this is a BlueWallet setup file — it has `Policy`, `Derivation` and `Format` headers and `N` cosigner lines — but no `Name:` header, and the device requires one. Add a line `Name: <anything>`."* This is the case §4.2 measured as producing the generic message today, with the real reason destroyed. |
 | a BlueWallet file with no `Format:` | *"…no `Format:` header, so the script type is undefined. Add `Format: P2WSH` (or `P2SH`, or `P2WSH-P2SH`)."* §4.2 defect 1. |
 | a BlueWallet file with **zero cosigner lines** | *"this BlueWallet file has headers but no cosigner lines (`<8-hex-fingerprint>: <xpub>`). There is no wallet here to pack — was the export truncated? Re-export from the coordinator."* §4.2 rule 2 (F-419, written from the walk). |
-| **`--as descriptor` in a build where its path has not shipped** | §5.1's window refusal, both variants — verdict first, alternative conditional on md1-representability. **`EXIT_REFUSED` (3)**, after the §5.4 identification block (walk W4/W11/W13). |
+| ~~**`--as descriptor` in a build where its path has not shipped**~~ | **RETIRED 2026-08-29 (S2).** The row was §5.1's window refusal, both variants, at `EXIT_REFUSED` (3). `--as descriptor` ships: no build state reaches the trigger, so the row has no test that could reach it and was struck rather than kept alive by a weaker assertion. **§6 is 35 data rows.** S2 subtracts one and adds none — the `--as descriptor`-only set S1 recorded as EMPTY was, measured, actually empty. |
 | a BlueWallet `Policy: k of n` with a different key count | *"`Policy: 2 of 3` declares 3 cosigners; the file has 2. Cosigner lines are `<8-hex-fingerprint>: <xpub>`."* |
 | a BlueWallet file whose keys have **no origin path** (no `Derivation:` header at all, or one placed after cosigner lines) | *"cosigner `<fp>` has no derivation path — the `Derivation:` header is missing or appears after the cosigner lines. The descriptor this file produces cannot be re-read by the device. Put `Derivation: <path>` above the first cosigner line."* §4.2 rule 3 (R0's C1). |
 | a BlueWallet cosigner fingerprint that is not 8 hex characters | *"cosigner line `ab: xpub…` — a master fingerprint is exactly 8 hex characters (4 bytes)."* §4.2 defect 4; the device PANICS on fewer, so this file must never reach it. |
 | `wsh(multi(…))` under **`--as descriptor`** | *"the device's descriptor parser accepts `sortedmulti` and not `multi`. This wallet can still be engraved: `--as md1` encodes `multi` policies (for use-site paths md1 can represent — otherwise no path carries it, and the refusal says so). (`sortedmulti` differs from `multi` only in key ordering at spend time — it is not a synonym, so `me` will not rewrite it for you.)"* |
 | a **miniscript** descriptor, either `--as` | *"`me` reads the descriptor family the device reads: single-sig and `sortedmulti`, optionally under `sh`. This descriptor uses miniscript fragments (`or_d`, `and_v`, …), which neither path handles in this release. `md encode` accepts miniscript **templates** — a different tool and input form."* (Deferral details: §10 — outside the quote per the walk-W5 rule.) |
-| a descriptor with **`/0/*`** under **`--as md1`** | *"md1 cannot carry this wallet as written: key `@N` (`[<fp/path>]xpub…`) uses `/0/*`, a single fixed chain index, which has no md1 form — encoding it would silently produce a DIFFERENT wallet. Use `--as descriptor`, which carries `/0/*` exactly."* Window substitution per §5.3. §5.3(a); the offending key is named per §5.3's per-key rule (R0 r4's NEW-M4). For a `multi`-form descriptor the remedy sentence is replaced: *"this is a `multi` policy, which only `--as md1` carries — and md1 cannot represent `/0/*`. No `me` path engraves this file as written, in any build. Re-export with `<0;1>/*` — carried in every build. (Re-exporting as a `sortedmulti` policy keeps `/0/*` but is a DIFFERENT policy — `me` will not rewrite it — and needs the scannable-plate path.)"* (R0 r5's NEW-I2; quote cleaned and the substitution exempted per r15's new-I1/new-I2 — a neither-path refusal routes nowhere, so the window substitution has nothing to replace in it, and "wait for the update" would be false forever for this file.) A descriptor mixing an (a)-shaped and an (a″)-shaped key matches both this row and the next; both fire, both are true, and both name the same remedy — no precedence is needed. |
+| a descriptor with **`/0/*`** under **`--as md1`** | *"md1 cannot carry this wallet as written: key `@N` (`[<fp/path>]xpub…`) uses `/0/*`, a single fixed chain index, which has no md1 form — encoding it would silently produce a DIFFERENT wallet. Use `--as descriptor`, which carries `/0/*` exactly."* **AMENDED 2026-08-29 (S2): this is what the row PRINTS now** — §5.3's window substitution has no build state left to fire in, so the remedy is §6's own and names the flag that carries this shape. The offending path is spelled as the encoder writes it, leading slash included. §5.3(a); the offending key is named per §5.3's per-key rule (R0 r4's NEW-M4). For a `multi`-form descriptor the remedy sentence is replaced: *"this is a `multi` policy, which only `--as md1` carries — and md1 cannot represent `/0/*`. No `me` path engraves this file as written, in any build. Re-export with `<0;1>/*` — carried in every build. (Re-exporting as a `sortedmulti` policy keeps `/0/*` but is a DIFFERENT policy — `me` will not rewrite it — and needs the scannable-plate path.)"* (R0 r5's NEW-I2; quote cleaned and the substitution exempted per r15's new-I1/new-I2 — a neither-path refusal routes nowhere, so the window substitution has nothing to replace in it, and "wait for the update" would be false forever for this file.) A descriptor mixing an (a)-shaped and an (a″)-shaped key matches both this row and the next; both fire, both are true, and both name the same remedy — no precedence is needed. |
 | **`sortedmulti(k, …)` with `k > n`** | *"threshold `k` of `n` keys can never be satisfied — no combination of signatures reaches `k`. Funds sent to this wallet would be unspendable. Nothing was packed."* §4.7 conjunct 2. |
 | **`sortedmulti(0, …)`** — or any `k < 1` | *"threshold 0 means NO signature is required: anyone who can see this script can spend from it. This is almost certainly not the wallet you meant — and if it already holds funds, treat them as at risk now. Nothing was packed."* §4.7 conjunct 2 (R0's I6 — the device derives a real address for `k = 0` and even `k = −1`, so the refusal is the host's alone). |
 | `sortedmulti` with **too many keys** | *"`sh(sortedmulti(…))` carries at most 15 keys — there the multi's output script IS the redeemScript, one 520-byte script element (BIP-383). `wsh(…)` and `sh(wsh(…))` carry at most 20 (`OP_CHECKMULTISIG`); their redeemScript is 34 bytes and the 520-byte limit never binds. This descriptor has `n` keys under `<form>`. The device would accept it and derive addresses whose coins cannot be spent."* §4.7 conjunct 3 (R0's C3, bound corrected by r2's NEW-I2). |
 | two keys declaring **the same origin with different xpubs** | *"this wallet description contradicts itself: keys `N` and `M` both claim origin `<fp/path>` but name different keys — one origin identifies exactly one key, so no wallet matches this description. Check the export: one of the two entries carries the wrong key, and a copied-and-edited cosigner is the usual cause."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (PLAN-r1's C1; row per PLAN-r2's NEW-C2; ordinals per PLAN-r3's N2). **AMENDED 2026-08-29 (IMPL-P1's review, M5):** the previous clause named *"a duplicated cosigner LINE"*, i.e. a BlueWallet file — and this row cannot fire for one. In a BlueWallet file every key shares the single `Derivation:` header, so two keys carry the same `(fingerprint, origin)` **iff** they carry the same header key, which the device's own `seenKeys` map catches FIRST as `inconsistent header value`; branch 1 then fails and §6 row 1 carries the reason (measured). The row is reachable from a plain BIP-380 descriptor and from the JSON wrapper, where two key expressions may carry one origin block and different keys — so the cause clause is now stated over ENTRIES rather than over BlueWallet lines. Conjunct 8's other half, the duplicate row below, IS BlueWallet-reachable (different fingerprints, same xpub) and is unaffected. |
 | the **same key at the same derivation in two slots** | *"keys `N` and `M` are the same key at the same derivation — a threshold that needs the same key twice is not the multisig this file describes. Remove the duplicate line, or supply the missing cosigner's key."* **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (split per PLAN-r3's I3 — the primary separates the two causes, and "no wallet matches" is false for a duplicate). |
 | a multisig mixing **mainnet and testnet keys** | *"key `N` is `tpub` (testnet) while key 0 is `xpub` (mainnet). The device accepts this descriptor and then cannot derive any address from it. All keys must share one network."* §4.7 conjunct 5 (R0's I4). |
-| a descriptor or bare key using **`ypub`/`upub`/`vpub`/`Upub`/`Vpub`** | *"the device admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`."* The remedy names the **per-version** target (R0 r2's NEW-I3 — one template cannot serve five): `ypub` → `xpub` (mainnet BIP-49, `sh(wpkh(…))`); `upub` → `tpub` (**testnet** BIP-49, `sh(wpkh(…))`); `vpub` → `tpub` (**testnet** BIP-84, `wpkh(…)`); `Upub`/`Vpub` → `tpub` (**testnet multisig** — no single-key remedy exists; supply the full multisig descriptor: `sh(wsh(sortedmulti(…)))` for `Upub`, `wsh(sortedmulti(…))` for `Vpub` — or a BlueWallet file). Four of the five are testnet keys, and an `xpub` remedy would name a mainnet wallet the operator does not hold — measured, mainnet `354hXbgw…` versus the real testnet `tb1qmj7qns4…`. For a key WITH an origin, the operator's own fingerprint/path is substituted in; for a BARE key the remedy is the origin-less descriptor spelling — `sh(wpkh(<converted key>/<0;1>/*))`, which the device admits (measured) — because handing back a bare converted key would PROMOTE to a different wallet (`pkh(…)`, measured). §4.3 (R0's C2); F-413 tracks host-side normalisation. |
+| a descriptor or bare key using **`ypub`/`upub`/`vpub`/`Upub`/`Vpub`** | *"`me` admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`."* *(quote AMENDED 2026-08-29 (S2 P3.5): the device's scan door takes `ypub` since F-426's device half, so `me` is the honest subject; the record classifier still holds the five.)* The remedy names the **per-version** target (R0 r2's NEW-I3 — one template cannot serve five): `ypub` → `xpub` (mainnet BIP-49, `sh(wpkh(…))`); `upub` → `tpub` (**testnet** BIP-49, `sh(wpkh(…))`); `vpub` → `tpub` (**testnet** BIP-84, `wpkh(…)`); `Upub`/`Vpub` → `tpub` (**testnet multisig** — no single-key remedy exists; supply the full multisig descriptor: `sh(wsh(sortedmulti(…)))` for `Upub`, `wsh(sortedmulti(…))` for `Vpub` — or a BlueWallet file). Four of the five are testnet keys, and an `xpub` remedy would name a mainnet wallet the operator does not hold — measured, mainnet `354hXbgw…` versus the real testnet `tb1qmj7qns4…`. For a key WITH an origin, the operator's own fingerprint/path is substituted in; for a BARE key the remedy is the origin-less descriptor spelling — `sh(wpkh(<converted key>/<0;1>/*))`, which the device admits (measured) — because handing back a bare converted key would PROMOTE to a different wallet (`pkh(…)`, measured). §4.3 (R0's C2); F-413 tracks host-side normalisation. |
 | `tr(sortedmulti(…))` | *"taproot multisig is `multi_a`/`sortedmulti_a` (BIP-387); `tr(sortedmulti(…))` is not a valid descriptor even though the device's parser accepts it. Check the export."* §4.3. |
 | a **bare key whose path matches no script** | the path is quoted back and the three that qualify are listed: *"`[4bbaa801/86'/0'/0']xpub…` is a single extended key. `me` can infer a whole wallet from one only when its origin is `m/44'/0'/0'` (→ `pkh`), `m/84'/0'/0'` (→ `wpkh`) or `m/49'/0'/0'` (→ `sh(wpkh)`). This one is `m/86'/0'/0'` — taproot single-sig, which is not inferable. Supply the descriptor instead: `tr([4bbaa801/86'/0'/0']xpub…/<0;1>/*)`."* |
 | a bare key at **account ≠ 0** | *"…this one is `m/84'/0'/1'`. Only account 0 is inferable. Supply the descriptor: `wpkh([…/84'/0'/1']…/<0;1>/*)`."* — measured in §4.5 as a live near-miss. |
@@ -1442,7 +1544,7 @@ row names the mandatory wrapper change instead (R0 r6's NEW-M4; r7's NEW-I2).
 | a **hardened use-site component** — `…/<0;1>/*h` | *"a hardened use-site step cannot be derived from an xpub (BIP-32). The device would silently derive the UNhardened child and display addresses for a wallet that cannot exist, so this is refused on both `--as` paths."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
 | a **non-consecutive multipath** — `<0;2>`, `<1;3>` | *"the device derives only `<i;i+1>` pairs (receive; change). It accepts this descriptor and then errors on every address."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
 | any **other use-site path shape** — a bare fixed index, `/0/1/*` | *"use-site paths `me` ACCEPTS: absent, `/*`, `/i/*`, `<i;i+1>`, `<i;i+1>/*`. This one is outside the set the device is measured to handle."* ("accepts" not "packs" — admission is build-independent; which flag packs which member is §5.3's and the window's business, R0 r9's I4.) §4.7 conjunct 7 (closed set). |
-| a **multipath with no trailing wildcard** (`<0;1>`) under **`--as md1`** | *"md1 cannot carry this wallet as written: key `@N` (`[<fp/path>]xpub…`) uses `<0;1>` with no trailing wildcard, which has no md1 form — encoding it would silently produce the `<0;1>/*` wallet, which derives DIFFERENT addresses. Use `--as descriptor`, which carries `<0;1>` exactly."* Window substitution per §5.3. §5.3(a″) (R0 r2's NEW-C1; key named per R0 r4's NEW-M4; the `multi`-form remedy replacement of the previous row applies here identically). |
+| a **multipath with no trailing wildcard** (`<0;1>`) under **`--as md1`** | *"md1 cannot carry this wallet as written: key `@N` (`[<fp/path>]xpub…`) uses `<0;1>` with no trailing wildcard, which has no md1 form — encoding it would silently produce the `<0;1>/*` wallet, which derives DIFFERENT addresses. Use `--as descriptor`, which carries `/<0;1>` exactly."* **AMENDED 2026-08-29 (S2):** as the row above — the substitution is gone and this is the shipped text, with the offender spelled as the encoder writes it (`/<0;1>`, leading slash included, matching the cause clause in the same sentence). §5.3(a″) (R0 r2's NEW-C1; key named per R0 r4's NEW-M4; the `multi`-form remedy replacement of the previous row applies here identically). |
 | a **multi-record input whose records include a descriptor**, `--as` absent | *"record `N` is a wallet descriptor. A descriptor is packed ALONE: run `me sysw pack --as <descriptor\|md1>` with just the descriptor — one container cannot yet carry a descriptor plus other records. The other records pack without `--as`, as usual."* (The capability gap is F-414 — named here, not in the quoted text, per the walk-W5 rule.) **`EXIT_INVALID` (4)**, as today. Applies ONLY when the whole input does not parse as one descriptor (§5.1's discriminator — a multi-line BlueWallet or JSON file parses whole and gets the "--as decides" block — or, if nothing carries it, its own direct refusal per §5.4's carriage rule — instead); naming `--as` here would send the operator to a whole-file read that refuses with a message false about the file (R0 r2's NEW-I5, measured). |
 
 **Two rules that bind every row above.** Both come from
@@ -1488,14 +1590,23 @@ approximately.
    `seedhammer/nonstandard/testdata/descriptor_seam_vectors.json`. The Go
    seam test is **`package nonstandard_test`** (external): once §5.2's arm
    lands, `sysw` imports `nonstandard`, and an internal test importing `sysw`
-   for the `sysw_class` column would be an import cycle (R0 r6's NEW-N3,
-   import sets measured).
+   to assert the classifier would be an import cycle (R0 r6's NEW-N3, import
+   sets measured; **AMENDED 2026-08-29 (S2)** — the reason survives the
+   `sysw_class` column's retirement, because the derived rule that replaced
+   it calls `sysw.Classify` from the same test).
 2. **Its sha256 is pinned as a literal in BOTH tests.** Neither test reaches
    across repos; each reads its own copy and compares to the same constant, so
    the copies cannot drift without one suite going red.
 3. **The Rust test asserts the host column; the Go test asserts the device
-   column.** Neither implementation is ever compared to the other — both are
-   compared to the file. That is why it has to be the same file.
+   column — and, since S2, BOTH tests also assert the derived
+   classification rule, which is COMPUTED from the host column**
+   *(AMENDED 2026-08-29 (S2 P3.5, completing r5 I2's ownership move):
+   `classify(input) == Descriptor` iff `host_admits` for single-line
+   rows, and `classify(canonical) == Descriptor` on admitted rows — so
+   the Go seam test now reads `host_admits`, as data, not as the other
+   implementation's answer)*. Neither implementation is ever compared
+   to the other — both are compared to the file. That is why it has to
+   be the same file.
 4. **The invariant is `host_admits(input) ⇒ device_admits(canonical(input))`,
    asserted per row (R0's I1).** The input-level form is wrong twice over: the
    §4.6 whitespace rows are host-wide by design (the device refuses the raw
@@ -1525,10 +1636,20 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
 
 - **`device_admits` means `nonstandard.OutputDescriptor` accepts the INPUT** —
   the scan door, nothing else. The classifier is a different predicate with a
-  different answer (§2.3), so it gets its own optional column, **`sysw_class`**,
-  asserted by the Go test only on rows that carry it, against `sysw.Classify`
-  once §5.2's arm lands. One column carrying both meanings is how §7 and §11
-  contradicted each other in round 0.
+  different answer (§2.3), and keeping the two apart is what stopped §7 and
+  §11 contradicting each other in round 0. **AMENDED 2026-08-29 (S2): the
+  `sysw_class` column is RETIRED.** It was a four-row SAMPLE of the
+  classifier's answer, hand-stated, and three of its four inputs were not even
+  single lines — so it could not be a population and its input-vs-canonical
+  basis was ambiguous. Both suites assert the classifier EXHAUSTIVELY (the Rust half since S2's P2; the Go half lands with the fork's copy at P3.3) and
+  DERIVE the expectation from columns already in the file: for every
+  single-line row, `Classify(input) == Descriptor` **iff** `host_admits` and
+  `== Unknown` otherwise (exact equality — which is also the per-row empirical
+  answer to "can a descriptor-shaped string collide with another class"), and
+  for every `host_admits: true` row, `Classify(canonical) == Descriptor`. Both
+  bases are asserted, separately. No hand-stated per-row class value survives
+  to drift, and a Go/Rust divergence anywhere in the file reds one of the two
+  suites.
 - **`host_admits` means §5.2's classification predicate**: `me` would pack
   this input as a `Descriptor` record. NOT "`me`'s cascade parses it" (`me`
   parses `multi`, and `multi` is `host_admits=false`) and NOT "some `--as`
@@ -1538,15 +1659,16 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   re-encoded descriptor string both parsers must produce. Requirement 4 is
   stated over it.
 - **`device_probe`** marks a row whose input PANICS the device, and names the
-  site (R0 r6's NEW-M6 — §4.2 records TWO panic sites): `"panic:parse"`
-  (§4.2 defect 4 — the Go test asserts the row is host-refused and must NOT
-  feed the input to `nonstandard.OutputDescriptor`) or `"panic:encode"`
-  (§4.2 defects 1–2 — parse ACCEPTS and `Descriptor.Encode()` panics; the Go
-  test may parse the input but must NOT call `Encode` on the result). On a
-  `"panic:parse"` row `device_admits` is OMITTED — the predicate cannot be
-  evaluated, so either boolean is a false claim — and requirement 5's
-  non-vacuity count skips such rows (R0 r6's NEW-M1). A panic would crash
-  the suite rather than fail it, a false-signal shape.
+  site (R0 r6's NEW-M6 — §4.2 recorded TWO panic sites). A panic would crash
+  the suite rather than fail it, a false-signal shape. **AMENDED 2026-08-29
+  (S2): only `"panic:encode"` survives** (§4.2 defects 1–2 — parse ACCEPTS and
+  `Descriptor.Encode()` panics; the Go test may parse the input but must NOT
+  call `Encode` on the result). S2 fixed §4.2 defect 4's parse panic as
+  Rust-convergence — the fingerprint guard is `!= 4` and the parser errors
+  cleanly — so `"panic:parse"` retired with it: that row carries a MEASURED
+  `device_admits` like any other, **`device_admits` is now present on every
+  row**, and requirement 5's non-vacuity count skips none. S2 does not touch
+  `Encode`, so the two `"panic:encode"` rows are unchanged.
 - **`covers`** (REQUIRED, non-empty array of coverage-manifest tags): which
   required-row bullets this row discharges; additional tags are permitted
   only for the rows the manifest names (R0 r7's NEW-M1 — see the manifest
@@ -1563,7 +1685,11 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
 - **the gate fields** (REQUIRED on every `gate`-tagged row, absent
   elsewhere — §5.1's gate states an intent and two invariants, and these
   rows are its executable precision; terminal fold): `gate_open`
-  (boolean — after record classification fails, does §5.1's gate open?),
+  (boolean — on an omitted-`--as` pack, does §5.1's gate open?
+  **AMENDED 2026-08-29 (S2):** this read *"after record classification
+  fails"*, the same precondition §5.1 carried and S2 abolished — the gate is
+  consulted on identification, so the question is asked on EVERY omitted-`--as`
+  pack, including inputs that classify),
   `outcome` (one of `record-refusal` — the shipped exit-4 record surface,
   unchanged; `as-decides` — §5.1's choice block at `EXIT_USAGE` (2);
   `descriptor-refusal` — a §6 row at `EXIT_REFUSED` (3); `multi-record` —
@@ -1601,15 +1727,29 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
 - **every shape §4.2 narrows** — BlueWallet with no `Format:`, with zero keys,
   with `Derivation:` after the keys, with **no `Derivation:` at all** (R0's C1
   — `device_admits=true` on the input, host refused, no `canonical`), and a
-  short-fingerprint file marked `device_probe: "panic:parse"`; the
+  short-fingerprint file (**AMENDED 2026-08-29 (S2):** it was marked
+  `device_probe: "panic:parse"`; the marker retired with the parse panic and
+  the row carries a measured `device_admits: false`); the
   no-`Format:` row and the zero-key row carry `device_probe: "panic:encode"`
   (parse ACCEPTS, `Encode()` panics — measured, R0 r6's NEW-M6; the zero-key
   row is §4.2 defect 2's exact `Name: only` spelling — a zero-key file WITH
   a `Format:` header encodes cleanly (`wsh(sortedmulti(0,))#w47tv00x`,
   measured) and the marker does not apply to it, R0 r7's NEW-M2);
-- **`wsh(multi(…))`, a miniscript descriptor, and a full-origin `ypub`** —
-  `false`/`false` on the host/device axes, the `neither` rows the vacuity
-  check needs. The `multi` row additionally carries `md1_admits=true`, its md1-route
+- **`wsh(multi(…/<0;1>/*))`, a miniscript descriptor, and
+  `wsh(multi(…/0/*))`** — `false`/`false` on the host/device axes, the
+  `neither` rows the vacuity check needs. **AMENDED 2026-08-29 (S2): the
+  named three changed by SUBSTITUTION.** The full-origin `ypub` left — the
+  device's parser accepts it after S2's `ypubVer` case, so `false`/`false` is
+  no longer true of it and a row contradicting the tag's own definition may
+  not keep the tag; it is the sole member of the new `version-gap` bullet
+  below. `wsh(multi(2,…/0/*))` took the vacated slot: §11 item 5's case-3
+  witness, refused by conjunct 1 under `--as descriptor` PERMANENTLY and by
+  §5.3(a) under `--as md1`, so NEITHER carrier admits it — the case the
+  shipped witness stopped covering when `--as descriptor` began carrying
+  `/0/*`. **`The multi row` in the sentences that follow means the
+  `<0;1>/*` one alone** (`neither/wsh-multi`): the new row is
+  `md1_admits=false` and carries no address or read-back fields. The
+  `<0;1>/*` `multi` row additionally carries `md1_admits=true`, its md1-route
   `address_0` AND `address_1`, and pins the read-back via
   `md_descriptor_contains: "wsh(multi("` (measured: `#656zkmsn` — `multi`
   survives the round trip un-normalised; the pin is `"wsh(multi("` and NOT
@@ -1621,6 +1761,20 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   the forbidden `multi` → `sortedmulti` rewrite — the gate must assert where
   the orderings differ, and the next author should not reach for index 0
   again;
+
+- **a full-origin `ypub`** — `host_admits=false`, `device_admits=true`: the
+  `version-gap` bullet, NEW 2026-08-29 (S2), and single-member by
+  construction. §4.3 refuses the version host-side while the device's scan
+  door accepts it, which is F-426's device half landing ahead of its host
+  half by that follow-up's own design (the seam-SAFE direction — the file's
+  invariant is `host_admits ⇒ device_admits`, and a device that accepts more
+  can never be handed an unreadable payload). It is the LIVE tracking witness
+  for F-426's open host half: when `me`'s admission widens in F-426's own
+  cycle, `host_admits` flips and this bullet retires with the row. It is NOT
+  `promotion-near-miss` — that is §4.5's closed fifteen-row membership and
+  this is a wrapped descriptor that never reaches the promotion branch — NOT
+  `narrowed-4.7` (the refusal is §4.3's version byte, not a §4.7 narrowing),
+  and NOT `gate` (it carries no gate fields);
 - **the whitespace rows of §4.6** — trailing `\n`, CRLF, leading space. These
   are the only rows where the host is *wider*, and they are permitted **only
   because `canonical` is what gets packed** (§4.6). The file states that in its
@@ -1716,11 +1870,13 @@ a second tag; two of the fifteen carry a third, the original overlap pair
 (R0 r7's NEW-M1): the `xpub…\n` near-miss (`promotion-near-miss` +
 `whitespace` + `gate`) and the bare-`xpub` happy path (`formats-happy` +
 `promotion-near-miss` + `gate`). `covers` entries are distinct within a
-row, and the file carries at least **71 physical rows** (the minima sum to
-**88** tag-slots; the fifteen shared §4.5 rows absorb 15 of `gate`'s
-slots, and the original pair's two extra tags absorb 2 more: 88 − 17 =
-71), asserted as a floor — so a dropped row cannot be counted around by
-retagging or by duplicate tags (R0 r7's NEW-M1):
+row, and the file carries at least **72 physical rows** (the minima sum to
+**89** tag-slots; the fifteen shared §4.5 rows absorb 15 of `gate`'s
+slots, and the original pair's two extra tags absorb 2 more: 89 − 17 =
+72), asserted as a floor — so a dropped row cannot be counted around by
+retagging or by duplicate tags (R0 r7's NEW-M1). **AMENDED 2026-08-29 (S2):**
+88 → 89 slots and 71 → 72 rows, the new `version-gap` bullet's single row;
+the overlap stays 17, because both rows S2 touched are single-tagged:
 
 | tag | bullet | min rows |
 | --- | --- | --- |
@@ -1729,7 +1885,8 @@ retagging or by duplicate tags (R0 r7's NEW-M1):
 | `narrowed-4.7` | shapes §4.7 narrows | 14 |
 | `accepted-extreme` | `sh(wsh(sortedmulti(2, 16 keys)))` | 1 |
 | `narrowed-4.2` | BlueWallet shapes §4.2 narrows | 5 |
-| `neither` | `wsh(multi)`, miniscript, full-origin `ypub` | 3 |
+| `neither` | `wsh(multi)` with `<0;1>/*`, miniscript, `wsh(multi)` with `/0/*` | 3 |
+| `version-gap` | a full-origin `ypub`: §4.3-refused, device-ADMITTED (F-426's witness) | 1 |
 | `whitespace` | §4.6's rows | 3 |
 | `md1-splits` | §5.3's splits: `/0/*`, `<0;1>`, childless, three mixed | 6 |
 | `gate` | §5.1's gate — the eight adversarial clauses of the gate bullet | 37 |
@@ -1798,10 +1955,18 @@ day it compiles.
 SeedHammer II and it is not connected, which decides the question this
 section previously left open: S2 cannot even be demonstrated without a
 firmware build and flash, let alone satisfy §11 item 6's on-device
-acceptance, while S3 demonstrates the day it compiles. S2 is parked until
-the device is back on the bench; §11 items 1, 4 (its `--as descriptor`
-rows) and 6 bind S2's ship, so S1 and S3 can plan, build, demonstrate and
-ship entirely at the desk.
+acceptance, while S3 demonstrates the day it compiles. §11 items 1, 4 (its
+`--as descriptor` rows) and 6 bind S2's ship, so S1 and S3 could plan,
+build, demonstrate and ship entirely at the desk.
+
+**AMENDED 2026-08-29 (S2): S2 is UNPARKED and building.** The SeedHammer II
+is back on the bench, which is the condition F-418 named. The order S1 → S3
+→ S2 stands as the record of what shipped when. §11 item 4's
+`--as descriptor` rows turned out to be EMPTY — the S3 build reached every
+§6 trigger, and S2 SUBTRACTS the one row (`window-not-in-build`) whose
+trigger it removed — so what actually binds S2's ship is item 1, and item 6,
+which no desk can discharge: a `ClassDescriptor` record loaded and DISPLAYED
+on the real device, the operator's eyes being the instrument.
 
 ---
 
@@ -1814,12 +1979,18 @@ rest.
    function called from a scratch module on this machine. No payload has been
    written to flash, no descriptor has been displayed on the screen, and no
    plate has been cut.
-2. **The three admission-table cells have never been exercised.** §2.3 shows no
-   input can reach them, so the code path from `admits(progWalletPolicy,
-   ClassDescriptor) == true` to a rendered screen is **untested by construction**
-   — not "lightly tested". The first `ClassDescriptor` record in a `sysw` payload
-   will be the first ever. *(Closure-is-lens-closure, second clause: a gate that
-   has never executed is a hypothesis. This one has never executed.)*
+2. **One of the three admission-table cells has now been exercised**
+   *(AMENDED 2026-08-29 (S2 P3.5))*: S2's P3.2 executed
+   `admits(progWalletPolicy, ClassDescriptor) == true` → rendered
+   `DescriptorScreen` for the FIRST time — a named headless walk drives a
+   real `me sysw pack --as descriptor` container through `walletPolicyFlow`
+   to the screen, no panic. The other two cells (`progBundle`,
+   `progMultisig`) remain declared and INERT — no consumer, records
+   unoffered — with a follow-up filed at S2's records phase. On-hardware
+   confirmation of the one built cell stays the operator's (§11 item 6).
+   *(Closure-is-lens-closure, second clause: a gate that has never
+   executed is a hypothesis. This one has now run, in the simulator;
+   the hardware run remains.)*
 3. **The `--as md1` address equality now rests on ten descriptor shapes** —
    all seven §4.7 forms including the 15/16/20-key extremes, `wsh(multi)`,
    and the childless-mixed case — with Go and Rust agreeing at receive
@@ -1915,10 +2086,24 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
 
 1. `me sysw pack --as descriptor --in <each of the four formats>` produces a
    container whose `me sysw show` reports one `Descriptor` record
-   (single-document mode, §5.1), and the device's `sysw.Classify` — exercised
-   by §7's Go test through the `sysw_class` column — classifies that record
-   `Descriptor`. **S2's item** (F-418): it needs the device arm, so S1 and S3
-   close without it (R0 r6's NEW-M5).
+   (single-document mode, §5.1), and the device's `sysw.Classify` classifies
+   that record `Descriptor`. **S2's item** (F-418): it needs the device arm,
+   so S1 and S3 close without it (R0 r6's NEW-M5).
+   **AMENDED 2026-08-29 (S2), both halves.** The `show` surface this item
+   assumed did not exist: `show` printed per-record lines for `Class::MdMk`
+   and `Class::Mt` and NOTHING for a `Descriptor` record. It is built —
+   one confirmation block per public `Descriptor` record, reusing §5.4's
+   identification block so `show` carries the same vocabulary `pack` printed
+   to a stderr that is gone a week later. And the mechanism clause died with
+   its column: the device side is exercised by the Go test's DERIVED rule
+   (§7's `sysw_class` amendment), which asserts `sysw.Classify` over every row
+   in the file rather than four sampled ones. The host half of this item —
+   one record per format, classifying `Descriptor`, byte-equal to the
+   `canonical` the device measured — closes at the desk, and the device
+   half is discharged by the derived rule just named (P5.2 M1: the
+   earlier "still needs the flashed build" clause was item 6's sentence,
+   not this item's — a `ClassDescriptor` record DISPLAYED on hardware is
+   item 6, and remains the operator's).
 2. `me sysw pack --as md1 --in <each of the four formats>` produces a container
    (single-document mode, §5.1) whose records `md decode` reads back to the
    expected template — with §5.3(a′)'s materialised `<0;1>/*` where the input
@@ -1934,7 +2119,13 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
    not by reading (R0 r6's NEW-I2; r7's NEW-N1).
 4. Every refusal in §6 has a test that reaches it and asserts the *text*, not
    just the exit code. The `--as descriptor`-only rows among them are S2's
-   (F-418); the rest bind S3 (R0 r6's NEW-M5). The multi-record row's test
+   (F-418); the rest bind S3 (R0 r6's NEW-M5).
+   **AMENDED 2026-08-29 (S2): that S2 set is EMPTY, measured, and S2
+   SUBTRACTED a row.** S3 shipped with all 36 §6 triggers reachable, so no
+   row was waiting on `--as descriptor`; S2 retired `window-not-in-build`,
+   whose trigger it removed, leaving **35**. The count is asserted in the
+   test file itself, against `descriptor::Row::ALL` and against the vector
+   file's own `refusal_rows` vocabulary, so the three cannot drift. The multi-record row's test
    reaches it with the MNEMONIC-FIRST ordering (r19's plan note): a
    descriptor-first input passes with or without the per-line gate scope
    and is not a witness for r18's repair.
@@ -1943,14 +2134,22 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
    nothing carries, the input's own refusal fires directly at **3** — the
    admission refusal, or the neither-path refusal (§5.4's carriage rule,
    r12–r13). Five cases tested: carried; inadmissible with `--as` omitted;
-   admitted-but-uncarried; inadmissible with explicit `--as descriptor` in
-   the window — the admission refusal, never the window text (r14's new-I1
-   ordering); and a `multi` form with explicit `--as descriptor` in the
-   window — conjunct 1's permanent refusal, never the window text (r15's
-   new-I3). Its sibling (walk W4/W11): `--as descriptor` in a build where its
-   path has not shipped exits **3** and prints §5.1's window refusal — BOTH
-   alternative variants tested (an md1-representable input, and an
-   (a)/(a″)-shaped one).
+   carried by NEITHER value; inadmissible with explicit `--as descriptor` —
+   the admission refusal (r14's new-I1 ordering); and a `multi` form with
+   explicit `--as descriptor` — conjunct 1's permanent refusal (r15's
+   new-I3).
+   **AMENDED 2026-08-29 (S2): the sibling case is GONE, and case 3 changed
+   witness.** The sibling was *"`--as descriptor` in a build where its path
+   has not shipped exits 3 and prints §5.1's window refusal, both alternative
+   variants"*; no build state reaches it, so it retired with the window and
+   with §6's `window-not-in-build` row. Case 3 was
+   `wsh(sortedmulti(2,…/0/*))` — admitted, and carried by nothing while the
+   descriptor path was parked. That input is now CARRIED and exits **2**, so
+   the witness is `wsh(multi(2,…/0/*))`: conjunct 1 refuses `multi` under
+   `--as descriptor` permanently and §5.3(a) refuses `/0/*` under `--as md1`,
+   which is what "carried by neither" means in a full build. The old witness
+   is kept as a sixth case pinning the 3 → 2 flip itself, so the exit code S2
+   changed is asserted rather than merely no longer asserted.
 6. §9's item 2 is discharged: a `ClassDescriptor` record has been loaded on a
    real device and displayed, at least once, before this is called shipped —
    binding **S2's ship only** (F-418): S1 and S3 close without it, and it is

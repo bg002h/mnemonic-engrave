@@ -18,20 +18,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   packing it prints the §5.4 identification block: wallet id, receive
   address 0 (derived key-by-key, verified against an independent BIP-32
   oracle and the device on 91 constructed wallets), and a watch-only owner
-  line. Every refusal is one of §6's 36 rows, each with a named test
-  asserting its text; `--as descriptor` is present but parked until the
-  device-side classifier arm ships (F-418) and answers with the window
-  refusal. The 71-row vector file is pinned byte-identical in the fork
-  (sha256 `542cd492…`), and the cross-language gate runs for real under
-  `ME_REQUIRE_GO=1`.
+  line. Every refusal is one of §6's rows, each with a named test
+  asserting its text; `--as descriptor` shipped parked behind the window
+  refusal (un-parked by the S2 entry below). The vector file is pinned
+  byte-identical in the fork, and the cross-language gate runs for real
+  under `ME_REQUIRE_GO=1`.
 - `me`'s top-level NDEF converter now refers descriptor-shaped input to
   `me sysw pack --as <descriptor|md1>` instead of dead-ending (F-421).
 
+- **`--as descriptor` end to end (S2, F-418).** `me sysw pack --as
+  descriptor` packs §5.2's canonical re-encoded descriptor as ONE
+  `Descriptor` record — admission first, the `multi` refusal permanent,
+  the §5.4 identification block printed on every path. The pack path's
+  §5.1 gate now keys on IDENTIFICATION rather than classification
+  failure, so the choice block survives the new classifier arm;
+  `sysw::classify` gains the `Descriptor` arm (delegating to the §5.2
+  predicate, `host_admits`) and `--expect descriptor` accepts either
+  carrier. `me sysw show` reports each `Descriptor` record with the
+  §5.4 block (previously silent). §6's table is 35 rows post-S2 (the
+  window row retired with the build state that produced it); the vector
+  file regenerated ONCE — 72 rows, the `sysw_class` sample column
+  replaced by an exhaustive derived classification rule asserted in
+  both languages, sha `e7a4160c…` pinned byte-identical in the fork.
+  Device side (fork `s2/descriptor-arm`): `sysw.Classify` gains the
+  same predicate (§4 cascade narrowings + §4.7 conjuncts, ASCII-edge
+  parity, key-material-scoped version check; 187-case parity probe, 0
+  divergences), Wallet Policy consumes a `Descriptor` record straight
+  to the descriptor screen (first execution of that admission cell,
+  sim-walked), the short-fingerprint parse panic is fixed as Rust
+  convergence, and F-426's `ypub` scan-door case lands (the sysw
+  classifier stays host-exact; host widening is F-426's later cycle).
+  F-423: bundle plates PACK — a card's strings share plates up to the
+  measured fit (keyed single-sig 2→1, full 2-of-3 build 9→4; packed
+  plates are TEXT ONLY, F-433).
+
 ### Acceptance (spec §11)
 
-Items 2, 3, 4 (all 36 rows) and 5 (five-case matrix + both window
-variants) are discharged by the merged suite; items 1 and 6 are S2's,
-parked with F-418 until the device is back on the bench.
+Items 1-5 are discharged by the suites (item 4's rows at the post-S2
+count of 35; item 5's five-case matrix on the full-build truth table).
+Item 6 — a `ClassDescriptor` record DISPLAYED on the real device — and
+every flash remain the operator's acceptance (P5.4), with F-423's
+physical test plate.
 
 ## [0.7.0] - 2026-08-19
 

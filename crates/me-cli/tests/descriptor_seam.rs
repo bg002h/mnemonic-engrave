@@ -34,6 +34,7 @@
 //! future implementer reaches for is to weaken the grep rather than to finish
 //! the work.
 
+use mnemonic_engrave::sysw::record::Class;
 use sha2::Digest as _;
 
 /// The sha256 of `testdata/descriptor_seam_vectors.json`, pinned IDENTICALLY
@@ -42,7 +43,7 @@ use sha2::Digest as _;
 /// header, and `scripts/descriptor-seam-vectors/README.md` for the regenerate
 /// + re-pin recipe.
 const SEAM_VECTORS_SHA256: &str =
-    "542cd492e35149b62c53f940fb755576e0ffd4d086b0e3fcda615fbc43f51974";
+    "e7a4160ce064a6cb7ca31dc530e079c861cf2c8a075d75f793ef0d935f583758";
 
 const PATH: &str = "testdata/descriptor_seam_vectors.json";
 
@@ -55,14 +56,20 @@ const MANIFEST: &[(&str, usize)] = &[
     ("accepted-extreme", 1),
     ("narrowed-4.2", 5),
     ("neither", 3),
+    // S2's F-426 witness, carved out of `neither` because the tag means NEITHER
+    // side admits and this row's device DOES: §4.3 refuses the `ypub` version
+    // host-side while the scan door accepts it (P3.4). Single-member by
+    // construction — when F-426's host half widens, `host_admits` flips and the
+    // bullet retires with it.
+    ("version-gap", 1),
     ("whitespace", 3),
     ("md1-splits", 6),
     ("gate", 37),
 ];
-/// The minima sum to 88 tag-slots.
-const TAG_SLOTS: usize = 88;
-/// 88 − 17 overlap slots = the physical-row floor.
-const ROW_FLOOR: usize = 71;
+/// The minima sum to 89 tag-slots.
+const TAG_SLOTS: usize = 89;
+/// 89 − 17 overlap slots = the physical-row floor.
+const ROW_FLOOR: usize = 72;
 /// The fifteen §4.5 rows carry `gate` as a second tag …
 const SECOND_TAGGED: usize = 15;
 /// … and exactly two of them carry a third (the original overlap pair).
@@ -81,7 +88,6 @@ const KNOWN_ROW_KEYS: &[&str] = &[
     "source",
     "covers",
     "canonical",
-    "sysw_class",
     "device_probe",
     "address_0",
     "address_1",
@@ -128,19 +134,24 @@ struct Pop {
     both_routes_address_0: usize,
 }
 const POP: Pop = Pop {
-    rows: 71,
+    rows: 72,
     host_admits_true: 19,
     md1_admits_true: 15,
-    device_admits_true: 37,
-    device_admits_false: 33,
-    device_admits_absent: 1,
+    device_admits_true: 38,
+    device_admits_false: 34,
+    // ZERO since S2: the one `panic:parse` row's parse panic is fixed (P3.1's
+    // `!= 4` fingerprint guard), so its `device_admits` is measurable and no row
+    // omits the column.
+    device_admits_absent: 0,
     canonical: 19,
     address_0: 20,
     address_1: 5,
     wallet_id: 4,
     md_descriptor_contains: 1,
-    sysw_class: 4,
-    device_probe: 3,
+    // ZERO since S2: the four-row `sysw_class` SAMPLE retired in favour of the
+    // derived rule below, which is exhaustive over every row in the file.
+    sysw_class: 0,
+    device_probe: 2,
     gate_fields: 37,
     refusal_row: 18,
     both_routes_address_0: 11,
@@ -343,7 +354,7 @@ fn the_row_schema_holds_on_every_row() {
     }
     // Every slug in the vocabulary is spelled once, and the vocabulary covers
     // §6's 36 data rows.
-    assert_eq!(slugs.len(), 36, "the §6 refusal vocabulary is 36 rows");
+    assert_eq!(slugs.len(), 35, "the §6 refusal vocabulary is 35 rows");
 }
 
 #[test]
@@ -602,10 +613,134 @@ fn the_host_column_matches_the_admission_predicate() {
     assert_eq!(format_checked, POP.rows, "format assertions run");
 }
 
+// ── §5.2's predicate at the RECORD layer ───────────────────────────────────
+// `host_admits` above IS the predicate; what follows asserts that
+// `sysw::classify` answers WITH it, per row, in both directions. The fork's
+// `TestDescriptorSeamSyswClass` asserts the same derived rule over the same
+// file, so a Go/Rust divergence reds one of the two instead of hiding in a
+// hand-stated column.
+
+/// Rows whose `input` is a single line — the only rows that can BE a record:
+/// the public section is split on LF (`sysw/open.go:67-74`), so a record
+/// cannot contain one. Measured from the file, not read off it.
+const SINGLE_LINE_ROWS: usize = 59;
+/// … of which this many are `host_admits: true`, so the derived rule is
+/// satisfiable in BOTH directions rather than vacuously one-sided.
+const SINGLE_LINE_ADMITTED: usize = 15;
+
+fn row<'a>(d: &'a serde_json::Value, want: &str) -> &'a serde_json::Value {
+    rows(d)
+        .iter()
+        .find(|r| name(r) == want)
+        .unwrap_or_else(|| panic!("{PATH}: no row named {want:?}"))
+}
+
+/// The canonical re-encode is the exact string §5.2's record carries, so this
+/// is the arm on the input that matters most.
+#[test]
+fn a_canonical_descriptor_classifies_as_a_descriptor_record() {
+    let d = doc();
+    let r = row(&d, "formats-happy/bip380-sortedmulti-multipath");
+    assert_eq!(
+        mnemonic_engrave::sysw::classify(r["canonical"].as_str().unwrap()),
+        Class::Descriptor
+    );
+}
+
+/// **The arm is §5.2's predicate, not "the cascade parsed it".** This row's
+/// `format` is `bip380` — the cascade parses it — while `host_admits` is
+/// false, because conjunct 1's `multi` refusal is permanent. A classifier
+/// keyed on the parse would place a record the device's own parser rejects.
+#[test]
+fn a_multi_policy_the_cascade_parses_is_not_a_descriptor_record() {
+    let d = doc();
+    let r = row(&d, "neither/wsh-multi");
+    assert_eq!(
+        r["format"].as_str().unwrap(),
+        "bip380",
+        "the cascade parses it"
+    );
+    assert!(!r["host_admits"].as_bool().unwrap(), "§4.7 refuses it");
+    assert_eq!(
+        mnemonic_engrave::sysw::classify(r["input"].as_str().unwrap()),
+        Class::Unknown
+    );
+}
+
+/// **The derived rule, over every single-line row, as EXACT equality.** Not
+/// `Descriptor`-or-anything: the equality is also the empirical, per-row
+/// answer to "can a descriptor-shaped string collide with another class",
+/// which no sampled column could give.
+#[test]
+fn every_single_line_input_classifies_by_the_admission_column() {
+    let d = doc();
+    let (mut descriptor, mut unknown) = (0usize, 0usize);
+    for r in rows(&d) {
+        let input = r["input"].as_str().unwrap();
+        if input.contains('\n') {
+            continue;
+        }
+        let admitted = r["host_admits"].as_bool().unwrap();
+        let want = if admitted {
+            Class::Descriptor
+        } else {
+            Class::Unknown
+        };
+        assert_eq!(
+            mnemonic_engrave::sysw::classify(input),
+            want,
+            "{}: classify must answer §5.2's predicate exactly, and host_admits is {admitted}",
+            name(r)
+        );
+        if admitted {
+            descriptor += 1;
+        } else {
+            unknown += 1;
+        }
+    }
+    assert_eq!(descriptor + unknown, SINGLE_LINE_ROWS, "single-line rows");
+    assert_eq!(
+        descriptor, SINGLE_LINE_ADMITTED,
+        "admitted single-line rows"
+    );
+    assert!(unknown > 0, "the refusing direction is untested");
+}
+
+/// The other basis, asserted separately so P0's input-vs-canonical ambiguity
+/// cannot come back: the canonical is always one line, and it is what `--as
+/// descriptor` packs — every admitted row's canonical must classify.
+#[test]
+fn every_admitted_rows_canonical_classifies_as_a_descriptor_record() {
+    let d = doc();
+    let mut checked = 0usize;
+    for r in rows(&d) {
+        if !r["host_admits"].as_bool().unwrap() {
+            continue;
+        }
+        let canonical = r["canonical"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{}: an admitted row carries no canonical", name(r)));
+        assert!(
+            !canonical.contains('\n'),
+            "{}: canonical is one line",
+            name(r)
+        );
+        assert_eq!(
+            mnemonic_engrave::sysw::classify(canonical),
+            Class::Descriptor,
+            "{}: the record `--as descriptor` packs must classify",
+            name(r)
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, POP.host_admits_true, "canonical assertions run");
+}
+
 /// The `refusal_row` vocabulary is one set, held in two places, and this is
 /// what stops them drifting: the file's `refusal_rows` map and the library's
-/// `Row` enum must name exactly the same 36 slugs (PLAN-r4's NEW-M6). P2.4's
-/// per-row text tests key to these.
+/// `Row` enum must name exactly the same 35 slugs (PLAN-r4's NEW-M6). §6's
+/// per-row text tests key to these. **S2 subtracted one** —
+/// `window-not-in-build`, whose build state no longer exists.
 #[test]
 fn the_refusal_row_vocabulary_is_the_same_set_on_both_sides() {
     let d = doc();
@@ -619,7 +754,7 @@ fn the_refusal_row_vocabulary_is_the_same_set_on_both_sides() {
         .iter()
         .map(|r| r.slug())
         .collect();
-    assert_eq!(in_code.len(), 36, "the §6 vocabulary is 36 rows");
+    assert_eq!(in_code.len(), 35, "the §6 vocabulary is 35 rows");
     assert_eq!(
         on_disk, in_code,
         "the file's refusal_rows and `descriptor::Row` name different sets"
@@ -799,11 +934,12 @@ fn the_md1_column_matches_the_representability_rules() {
         }
     }
     assert_eq!(checked, POP.rows, "md1_admits assertions run");
-    // The four `md1-split` rows §7 carries for exactly this purpose, plus the
+    // The four `md1-split` rows §7 carries for exactly this purpose, the
     // shipped JSON fixture, whose `/0/*` is what makes §11 item 2 demand a
-    // non-`/0/*` JSON exemplar.
+    // non-`/0/*` JSON exemplar, and S2's §11 item 5 case-3 witness
+    // (`neither/wsh-multi-fixed-path`), whose md1 refusal is §5.3(a)'s too.
     assert_eq!(
-        cited, 5,
+        cited, 6,
         "rows where §5.3 (not another conjunct) is the refusal"
     );
 }

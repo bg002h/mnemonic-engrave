@@ -85,11 +85,12 @@ fn as_md1_is_a_flag_the_binary_knows() {
     assert_eq!(code(&out), 0, "a carried wallet packs. stderr:\n{err}");
 }
 
-/// `descriptor` is a VALUE the flag accepts, even in a build whose descriptor
-/// path has not shipped: §5.1's window is a REFUSAL at 3, never a usage error
-/// about an unknown value.
+/// `descriptor` is a VALUE the flag accepts — and since S2 it PACKS. Before
+/// S2 this test pinned §5.1's window refusal at 3, which is what made the value
+/// "accepted but not carried"; the assertion moved with the build rather than
+/// being deleted, because "not an unknown value" is the half that never moves.
 #[test]
-fn as_descriptor_is_a_value_the_flag_accepts() {
+fn as_descriptor_is_a_value_the_flag_accepts_and_packs() {
     let (out, _d) = pack_in(
         &row_input("formats-happy/bip380-sortedmulti-multipath"),
         &["--as", "descriptor"],
@@ -99,7 +100,7 @@ fn as_descriptor_is_a_value_the_flag_accepts() {
         !err.contains("unexpected argument") && !err.contains("invalid value"),
         "`--as descriptor` is not an accepted value:\n{err}"
     );
-    assert_eq!(code(&out), 3, "the window is a refusal. stderr:\n{err}");
+    assert_eq!(code(&out), 0, "a carried wallet packs. stderr:\n{err}");
 }
 
 /// A value outside the two is USAGE — nothing about the data was judged.
@@ -240,6 +241,137 @@ fn exemplars() -> Vec<Exemplar> {
             label: None,
         },
     ]
+}
+
+/// The four formats §11 item 1 names, for the DESCRIPTOR path.
+///
+/// They are not item 2's four. Item 2's JSON exemplar had to be constructed
+/// with a non-`/0/*` descriptor, because `--as md1` refuses `/0/*` per §5.3(a);
+/// `--as descriptor` carries `/0/*` exactly — that is the whole point of the
+/// path — so item 1 uses the fork's OWN shipped JSON fixture, label and all.
+struct Item1 {
+    what: &'static str,
+    row: &'static str,
+    /// §5.3(b)'s label warning: the label, where the input carries one. Named
+    /// expected output rather than tolerated noise.
+    label: Option<&'static str>,
+}
+
+const ITEM_1: [Item1; 4] = [
+    Item1 {
+        what: "§4.2 BlueWallet — the fork's own 14-line `sh` fixture",
+        row: "formats-happy/bluewallet-sh-fixture",
+        label: Some("sh"),
+    },
+    Item1 {
+        what: "§4.3 plain BIP-380",
+        row: "formats-happy/bip380-sortedmulti-multipath",
+        label: None,
+    },
+    Item1 {
+        what: "§4.4 the fork's own `{label, descriptor}` JSON export, `/0/*` and all",
+        row: "formats-happy/json-label-descriptor",
+        label: Some("Test Multisig 2-of-3"),
+    },
+    Item1 {
+        what: "§4.5 the promoted bare key",
+        row: "promotion/01-bare-xpub",
+        label: None,
+    },
+];
+
+/// **§11 item 1, host half.** `me sysw pack --as descriptor --in <each of the
+/// four formats>` produces a container holding ONE record, and that record is
+/// §5.2's: the canonical re-encode, which `sysw::classify` answers `Descriptor`
+/// on.
+///
+/// **The classify assertion is a RECORD-CLASSIFICATION check, not a fixed
+/// point.** It says the record `me` just packed is the record `me` would
+/// classify as a descriptor — the property that makes the container readable by
+/// the same predicate that admitted it. §7 requirement 4's real fixed point,
+/// `encode(parse(canonical)) == canonical`, is a different claim and is already
+/// asserted by the seam tests; conflating the two would let a broken re-encoder
+/// look verified.
+///
+/// The round trip goes through the CONTAINER: the record is read back out of
+/// the packed bytes with `sysw::open`, so a follower that agreed with itself
+/// while the pack dropped or rewrote the string could not pass. And the record
+/// is compared to the vector file's `canonical` column — a value MEASURED from
+/// the device's own parser — so "canonical" here is not `me` marking its own
+/// homework.
+#[test]
+fn item_1_every_format_packs_one_descriptor_record() {
+    let mut formats = std::collections::BTreeSet::new();
+    for e in &ITEM_1 {
+        let dir = tempfile::tempdir().unwrap();
+        let doc = dir.path().join("document.txt");
+        let out = dir.path().join("container.bin");
+        std::fs::write(&doc, row_input(e.row)).unwrap();
+
+        let run = assert_cmd::Command::cargo_bin("me")
+            .unwrap()
+            .args(["sysw", "pack", "--no-passphrase", "--as", "descriptor"])
+            .arg("--in")
+            .arg(&doc)
+            .arg("--out")
+            .arg(&out)
+            .output()
+            .unwrap();
+        let err = stderr(&run);
+        assert_eq!(code(&run), 0, "{}: pack. stderr:\n{err}", e.what);
+
+        // §5.3(b): the label is display-only and does not travel, and the
+        // operator hears so on the path that packs.
+        match e.label {
+            Some(l) => assert!(
+                err.contains(&format!(
+                    "warning: the label \"{l}\" is not carried by any record format and \
+                     will not appear on the device. Nothing else is lost."
+                )),
+                "{}: no label warning. stderr:\n{err}",
+                e.what
+            ),
+            None => assert!(
+                !err.contains("warning: the label"),
+                "{}: a label warning with no label. stderr:\n{err}",
+                e.what
+            ),
+        }
+
+        let blob = std::fs::read(&out).unwrap();
+        let payload = mnemonic_engrave::sysw::open(&blob, None).unwrap();
+        assert!(
+            payload.secret.is_empty(),
+            "{}: nothing here is secret",
+            e.what
+        );
+        assert_eq!(
+            payload.public.len(),
+            1,
+            "{}: §5.2's record is ONE record, got {:?}",
+            e.what,
+            payload.public
+        );
+        let record = &payload.public[0];
+        assert_eq!(
+            mnemonic_engrave::sysw::classify(record),
+            mnemonic_engrave::sysw::record::Class::Descriptor,
+            "{}: the packed record does not classify as a descriptor",
+            e.what
+        );
+        assert_eq!(
+            record,
+            &row_field(e.row, "canonical").expect("an admitted row carries a canonical"),
+            "{}: the packed record is not the canonical the device measured",
+            e.what
+        );
+        formats.insert(row_field(e.row, "format").unwrap());
+    }
+    assert_eq!(
+        formats.len(),
+        4,
+        "the four exemplars must be four FORMATS, not one format four times: {formats:?}"
+    );
 }
 
 /// **§11 item 2.** `me sysw pack --as md1 --in <each of the four formats>`
@@ -692,22 +824,50 @@ fn address_0_is_derived_for_keys_that_want_different_receive_indices() {
 }
 
 /// The compare prompt is what `address 0:` exists FOR (walk W10/W13), so it has
-/// to survive with it — including on the refusal paths, which is where the walk
-/// ruled the verification worth the most.
+/// to survive with it whatever the follower does — including on the refusal
+/// paths, which is where the walk ruled the verification worth the most.
+///
+/// **Both flags reach both outcomes since S2**, so all three combinations are
+/// exercised: `--as md1` refusing an (a″) wallet, `--as descriptor` PACKING the
+/// same wallet (the carriage §5.3's window used to describe as future), and
+/// `--as descriptor` refusing a `multi` on conjunct 1's permanent ground.
 #[test]
-fn the_compare_prompt_survives_on_a_refusal_path() {
-    let document = format!("wsh(sortedmulti(2,{IK1}/<2;3>,{IK2}/<0;1>/*))");
-    for flags in [vec!["--as", "md1"], vec!["--as", "descriptor"]] {
+fn the_compare_prompt_survives_whatever_the_follower_does() {
+    let a2 = format!("wsh(sortedmulti(2,{IK1}/<2;3>,{IK2}/<0;1>/*))");
+    let cases = [
+        (
+            "--as md1, an (a″) refusal",
+            a2.clone(),
+            vec!["--as", "md1"],
+            3,
+        ),
+        (
+            "--as descriptor, the same wallet PACKED",
+            a2,
+            vec!["--as", "descriptor"],
+            0,
+        ),
+        (
+            "--as descriptor, conjunct 1's permanent multi refusal",
+            row_input("neither/wsh-multi-fixed-path"),
+            vec!["--as", "descriptor"],
+            3,
+        ),
+    ];
+    let mut checked = 0;
+    for (what, document, flags, exit) in cases {
         let (out, _d) = pack_in(&document, &flags);
         let err = stderr(&out);
-        assert_eq!(code(&out), 3, "this wallet is md1-unrepresentable\n{err}");
+        assert_eq!(code(&out), exit, "{what}\n{err}");
         assert!(
             err.contains(
                 "compare against your wallet software's first receive address before engraving."
             ),
-            "{flags:?}: the compare prompt is missing:\n{err}"
+            "{what}: the compare prompt is missing:\n{err}"
         );
+        checked += 1;
     }
+    assert_eq!(checked, 3, "all three follower outcomes are exercised");
 }
 
 /// **The FULL tier always yields an address.** §5.4's `wallet-id: none` line
@@ -751,29 +911,39 @@ fn every_full_tier_wallet_has_an_address_0() {
 // M1 / M2 / M3 / N2 — the review's minors and nits
 // ───────────────────────────────────────────────────────────────────────────
 
-/// **M1.** §5.1's choice block marks the build-dead value inline and then sends
-/// the operator to `me sysw pack --help` for the comparison. The help's
-/// possible-value list has to carry the same marking, or the pointer loses them
-/// the one fact the block was careful to give.
+/// **M1, flipped by S2.** §5.1's choice block marks a build-dead value inline
+/// and sends the operator to `me sysw pack --help` for the comparison, so the
+/// help's possible-value list has to carry the SAME marking — which since S2
+/// means neither of them marks anything, because both paths ship. The test is
+/// kept in the flipped direction rather than deleted: it is what would catch a
+/// marking that outlived its condition, in either surface, and the two are
+/// gated on the same two constants.
 #[test]
-fn the_help_marks_the_build_dead_as_value_like_the_choice_block_does() {
+fn neither_the_help_nor_the_choice_block_marks_a_value_this_build_carries() {
     let out = assert_cmd::Command::cargo_bin("me")
         .unwrap()
         .args(["sysw", "pack", "--help"])
         .output()
         .unwrap();
     let help = String::from_utf8_lossy(&out.stdout).to_string();
+    // Both values present and UNMARKED. The trailing newline on each is what
+    // makes "unmarked" an assertion rather than a substring that a marked line
+    // would also satisfy.
     assert!(
-        help.contains("- descriptor: The canonical re-encoded descriptor, as one `Descriptor` record (not available in this build)"),
-        "the help does not build-mark `descriptor`:\n{help}"
+        help.contains(
+            "- descriptor: The canonical re-encoded descriptor, as one `Descriptor` record\n"
+        ),
+        "the help does not carry `descriptor` unmarked:\n{help}"
     );
-    // …and md1, which IS in this build, is NOT marked. Without this half the
-    // assertion above would pass on a help that marked everything.
     assert!(
         help.contains(
             "- md1:        The BIP-388 decomposition, as md1 text cards (`MdMk` records)\n"
         ),
-        "the help marks `md1`, which this build carries:\n{help}"
+        "the help does not carry `md1` unmarked:\n{help}"
+    );
+    assert!(
+        !help.contains("(not available in this build)"),
+        "the help build-marks a value this build carries:\n{help}"
     );
     // The choice block's marking and the help's are gated on the same constants
     // — assert they agree rather than trusting that they do.
@@ -782,7 +952,7 @@ fn the_help_marks_the_build_dead_as_value_like_the_choice_block_does() {
         &[],
     );
     assert!(
-        stderr(&block).contains("--as descriptor (not available in this build)"),
+        !stderr(&block).contains("(not available in this build)"),
         "the choice block and the help disagree about what this build carries"
     );
 }
@@ -826,16 +996,22 @@ fn the_label_warning_neither_emits_control_bytes_nor_runs_long() {
 /// **M3 (controller ruling).** The label warning's text is a statement about
 /// what was just packed, so it prints EXACTLY on the paths that pack. One test,
 /// all three paths, presence and absence both pinned.
+///
+/// **S2 moved one path across the rule, not the rule.** `--as descriptor` used
+/// to be a window refusal and printed no warning; it packs now, so it prints
+/// one — which is §5.5's "carries a label | text only, dropped" stated at the
+/// moment it happens. The `--as`-omitted choice block still packs nothing and
+/// still says nothing, which is what keeps the assertion two-sided.
 #[test]
 fn the_label_warning_fires_exactly_on_the_paths_that_pack() {
     let document = row_input("formats-happy/bluewallet-sh-fixture");
     let cases = [
         ("--as md1 (packs)", vec!["--as", "md1"], 0, true),
         (
-            "--as descriptor (window refusal)",
+            "--as descriptor (packs, S2)",
             vec!["--as", "descriptor"],
-            3,
-            false,
+            0,
+            true,
         ),
         ("--as omitted (choice block)", vec![], 2, false),
     ];

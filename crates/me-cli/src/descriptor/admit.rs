@@ -20,7 +20,7 @@
 //! **Conjuncts 4 and 6 cannot fail here, and that is a measured fact rather
 //! than an oversight.** Every key reaches this predicate through
 //! [`super::cascade`], which refuses a non-admitted version inside
-//! `parse_extended_key` (which is why `neither/full-origin-ypub` carries
+//! `parse_extended_key` (which is why `version-gap/full-origin-ypub` carries
 //! `format: "none"` and not `format: "bip380"`), and refuses an origin-less
 //! BlueWallet key inside branch 1 (which is why all five `narrowed-4.2` rows
 //! carry `format: "none"`). They are stated here anyway because §4.7 is the

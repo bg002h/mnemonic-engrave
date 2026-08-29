@@ -237,13 +237,18 @@ pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
 /// The HRP discriminant of a card record — `'d'` for `md1`, `'k'` for `mk1` —
 /// or `None` for anything that is not a readable card.
 ///
-/// **`--expect descriptor` and `--expect cosigner` MUST resolve through this
-/// and NOT through [`Class`].** `Class` has a single `MdMk` variant covering
-/// both, so a `Class`-keyed test cannot tell a descriptor card from a cosigner
-/// card — and that is the funds case: `--expect descriptor,cosigner` would be
-/// satisfied by the `md1` records alone, so a refusing `mk encode` still yields
-/// exit 0 with the cosigner card missing, and the operator believes a backup is
-/// complete when it is not.
+/// **`--expect descriptor` and `--expect cosigner` resolve through this, and
+/// neither may resolve through [`Class::MdMk`].** That variant covers both
+/// card kinds, so an `MdMk`-keyed test cannot tell a descriptor card from a
+/// cosigner card — and that is the funds case: `--expect descriptor,cosigner`
+/// would be satisfied by the `md1` records alone, so a refusing `mk encode`
+/// still yields exit 0 with the cosigner card missing, and the operator
+/// believes a backup is complete when it is not.
+///
+/// Since S2 `--expect descriptor` carries a SECOND disjunct,
+/// [`Class::Descriptor`] — §5.2's single re-encoded record, the other route a
+/// descriptor takes to the device. It is exact where `MdMk` is ambiguous: no
+/// cosigner card can reach it.
 ///
 /// **This is the deliberate widening of a narrow access path.** The HRP is
 /// reachable only through `seal::record::chunk_key`, whose `Ms` arm is

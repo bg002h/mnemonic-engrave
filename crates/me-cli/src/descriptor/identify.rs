@@ -26,7 +26,7 @@
 //! lines, not outcomes, and any tier may precede any follower.
 
 use super::admit::{self, Path};
-use super::cascade::{Multi, Parsed, Script};
+use super::cascade::{Parsed, Script};
 use super::derive;
 use super::gate;
 use super::md1;
@@ -188,40 +188,4 @@ fn slot_map(b: &md1::Built) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-/// The window refusal's TWO variants (§5.1), decided by md1-representability —
-/// no refusal may point at a path that refuses in the CURRENT build.
-pub fn window_refusal(d: &Parsed) -> String {
-    let mut t = String::from(
-        "--as descriptor is not available in this build.\n      \
-         The QR plate needs device firmware this release does not include.\n      ",
-    );
-    // A `multi` form never reaches here: §4.7 conjunct 1 refuses it under
-    // `--as descriptor` PERMANENTLY, in every build, and the admission refusal
-    // precedes the window. The window text's "come back for the QR plate" would
-    // be false forever for a shape the descriptor record can never carry.
-    debug_assert!(!matches!(d.multi, Some(Multi::Unsorted)));
-    let offenders = admit::md1_offenders(d);
-    if offenders.is_empty() {
-        t.push_str(
-            "Available now: --as md1 -- me converts and packs in one step: error-corrected \
-             text cards, restored by transcription instead of scanning. Your export file is \
-             all you need to come back for the QR plate later; nothing is lost by waiting.",
-        );
-        return t;
-    }
-    t.push_str("--as md1 cannot carry this wallet either -- ");
-    t.push_str(
-        &offenders
-            .iter()
-            .map(|(i, path)| format!("key `@{i}` uses `{path}`"))
-            .collect::<Vec<_>>()
-            .join(", and "),
-    );
-    t.push_str(
-        ". No path in this build engraves this file. It loses nothing by waiting: keep it, \
-         and it packs the day the device update ships.",
-    );
-    t
 }
