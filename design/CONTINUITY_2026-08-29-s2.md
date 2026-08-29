@@ -125,14 +125,22 @@ F-428 resolved (rev-qualified cite, never re-base), F-430 resolved by
 lint-gate.sh; NEW F-431 (inert cells) F-432 (goprobe re-point at
 merge) F-433 (packed=TEXT ONLY, operator ruling) F-434 (QR overlay
 trap) F-435 (FooterRow cleanup) F-436 (single-line JSON rows next
-regeneration); CHANGELOG S2 entry + S1+S3 clause updates. **P5.2 IN
-FLIGHT: the mandatory whole-diff execution review** (opus, both full
-branch diffs; round-trip hammering, cross-phase seams, journey re-runs
-W14/matrix/item-1, records audit, full suites; report
-REVIEW-S2-P5-whole-r1.md). GREEN unlocks P5.3 (engrave merge + push
-via scripts/push-via-staging.sh; fork main plain push) -- then P5.4
-operator handover (flash, S11 item 6 screen, F-423 physical plate,
-the one S9-item-2 cell on hardware); (2) P4.1 measurement DONE:
+regeneration); CHANGELOG S2 entry + S1+S3 clause updates. **P5.2 GREEN 0C/0I/3M/2N**
+(persisted `17b4488`): round trip 19/19, bequest walk 14/14
+same-wallet, canonical idempotence 19/19, suites 6/6; the three
+wording Minors folded on both branches (`a239e28`, `01078e9`).
+**P5.3 EXECUTED**: engrave merge `fd60dcc` (4018 insertions, clean),
+fork merge `e456970` (2232 insertions, clean), F-432 goprobe +
+fit-measure re-pointed at fork main and verified building (`6996583`);
+final gates on MERGED trees: engrave 579/579 + lint-gate PASS, fork
+non-gui 0 + shard 1013/1013 exhaustive. Pushes: engrave via
+scripts/push-via-staging.sh + fork main plain push (this session's
+tail). **P5.4 IS THE OPERATOR'S, explicitly not autonomous**: flash
+the S2 firmware (sh2-flash), S11 item 6 (a ClassDescriptor record
+DISPLAYED -- S2 is shipped when this is, not before), F-423's
+single-char test plate then a real cut, the walletPolicy S9-item-2
+cell on hardware, and the F-433 ruling (packed plates are TEXT ONLY:
+accept+document, or fix F-434 to restore QR); (2) P4.1 measurement DONE:
 **N = 3** md1 strings fit one plate side at the shipped 3.8mm font
 (analytic 34 chars x 20 lines = 680-char capacity; trial via
 backup.EngraveText paragraphs, 1mm gaps, no FontSize override; trial
