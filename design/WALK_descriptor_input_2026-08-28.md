@@ -448,6 +448,9 @@ cannot be done with it.** Refusals follow identification, never replace it.
 
 ## W14 — "both," for two reasons that name modality dimensions W1 missed;
 ## and the one-plate hope is TRUE, measured
+## [ERRATUM — see "Corrections to this log" below: the one-plate claim was
+## WRONG (one plate per STRING; the keyed card is TWO plates). Left in place
+## as the record of what the walk asserted; R0 r11's new-N2.]
 
 **The moment.** Decision: *"Both. He'd be better off with qr encoding rather
 than being dependent upon our constellation, but he thinks he might hand

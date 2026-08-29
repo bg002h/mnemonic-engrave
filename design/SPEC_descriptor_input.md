@@ -834,9 +834,11 @@ build):
   all you need to come back for the QR plate later; nothing is lost by
   waiting."*
 - input (a)/(a″)-shaped: *"--as md1 cannot carry this wallet either — key
-  `@N` uses `<path>` (each offending key and path substituted; a mixed
-  input names all of them). No path in this build engraves this file. It loses nothing by
-  waiting: keep it, and it packs the day the device update ships."*
+  `@N` uses `<path>`. No path in this build engraves this file. It loses
+  nothing by waiting: keep it, and it packs the day the device update
+  ships."* (Each offending key and path is substituted; a mixed input
+  repeats the key clause per offender — directive outside the verbatim
+  span per R0 r11's new-I1.)
 
 Both walked journeys' FIRST commands reached this refusal (walk record) —
 it is the front door of the S3 release, and §11 item 5's sibling test pins
@@ -1051,18 +1053,22 @@ BEFORE whatever follows, in TWO tiers (walk W13; follower set completed per
 R0 r9's I1; the tier boundary made `--as`-independent per R0 r10's new-I1).**
 The tier is decided by what does NOT depend on the flag: a wallet that
 passes conjuncts 2–7 AND whose shape at least one `--as` path admits gets
-the **FULL block** — before a pack, the `--as`-omitted choice block, §5.1's
-window refusal, and §5.3's refusals. (A `multi` input in the window is
+the **FULL block**, whose followers are: a pack, the `--as`-omitted choice
+block, §5.1's window refusal, and §5.3's refusals; the PARTIAL block's one
+follower is a §4.7 admission refusal (partitioned per R0 r11's new-N1). (A `multi` input in the window is
 full-tier: its refusal is the window's, not admission's — the wallet is
-derivable, spendable, and md1-packable, and stripping its identification
-would blind exactly the operator whose refusal says md1 is available.) A
+derivable and spendable, and md1-packable when its use-site paths are
+md1-representable; either way, stripping its identification would blind
+the operator at the decision the refusal asks of them — R0 r11's new-M2.) A
 wallet NO path admits — a conjunct failure — gets the **PARTIAL block**:
 the first three lines plus the watch-only line, no `wallet-id:`, no
-`address 0:`, no compare prompt. The rows it covers describe wallets whose
-addresses are underivable (mixed network, single-key-wrapped multi, bare
-key in a script slot, hardened use-site, non-consecutive multipath — five
-rows, machine-counted per R0 r10's new-M3) or wallets unspendable or
-anyone-can-spend (the threshold and key-count rows) — a "compare before
+`address 0:`, no compare prompt. It covers exactly §6's
+admission-refusal rows — the underivable wallets (mixed network, hardened
+use-site, non-consecutive multipath, the wrapped and script-slot shapes,
+deeper tails), the unspendable and anyone-can-spend thresholds and key
+counts, and the refused version bytes and shapes; the class is defined by
+the conjuncts, not by an inventory (R0 r10's new-M3; r11's new-M1 — the
+count is the conjuncts' business) — a "compare before
 engraving" prompt would be a wrong instruction on every one. §5.3(b)'s
 label warning, where it applies, follows the block. Neither path ships bytes the host has not
 understood. `me` prints to stderr:
