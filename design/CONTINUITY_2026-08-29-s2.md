@@ -36,5 +36,8 @@ boots main).
 ## Resume protocol
 
 After a context clear: `/resume-s2` (command saved at
-`~/.claude/commands/resume-s2.md`). It points here, names the first action
-(persist any uncommitted R0 report), and restates the boundaries.
+`~/.claude/commands/resume-s2.md`). It reads this file, the PLAN and the
+RECON report FULLY into context, carries its own digest of the recon
+file:line map and the plan's edge cases (so nothing rests on one file),
+names the first action (persist any uncommitted R0 report), and restates
+the boundaries.
