@@ -751,13 +751,20 @@ me: this input is a wallet descriptor, and `--as` decides how it is packed.
       --as md1          the HAND-COPYABLE plate. me converts the descriptor
                         and packs error-corrected md1 text cards in ONE step
                         (no md invocation needed). Restored by transcription;
-                        each string survives up to 4 wrong characters, so it
-                        can even be hand-stamped. Carries policies
+                        each string survives up to 4 MIS-STRUCK characters
+                        (substitutions -- a missing or extra strike is not
+                        correctable), so it can even be hand-stamped. Carries policies
                         --as descriptor cannot. Restoring needs an md1
                         decoder (an open spec; the tooling today is this
                         project's).
     They are not interchangeable — `me sysw pack --help` has the comparison.
 ```
+
+In a build where the descriptor path has not shipped, the block marks that
+value inline — `--as descriptor (not available in this build — see below)` —
+so the choice text itself never offers a dead flag (R0 r9's M6, ruling the
+interaction the walk assigned to the plan; the walk-W5 current-build rule
+now governs this block too).
 
 **A path that cannot work fails naming the other path. It never switches.**
 This is the operator's ruling and it is the reason §5.4 exists: the two accept
@@ -821,12 +828,14 @@ followed by ONE of two alternative clauses, decided by md1-representability
 (walk W11 — no refusal may point at a path that refuses in the CURRENT
 build):
 
-- input md1-representable: *"Available now: --as md1 — error-corrected text
-  cards, restored by transcription instead of scanning. Your export file is
+- input md1-representable: *"Available now: --as md1 — me converts and
+  packs in one step: error-corrected text cards, restored by transcription
+  instead of scanning. Your export file is
   all you need to come back for the QR plate later; nothing is lost by
   waiting."*
-- input (a)/(a″)-shaped: *"--as md1 cannot carry this wallet's use-site path
-  either — no path in this build engraves this file. It loses nothing by
+- input (a)/(a″)-shaped: *"--as md1 cannot carry this wallet's `<the
+  operator's own path, substituted>` path either — no path in this build
+  engraves this file. It loses nothing by
   waiting: keep it, and it packs the day the device update ships."*
 
 Both walked journeys' FIRST commands reached this refusal (walk record) —
@@ -917,7 +926,8 @@ contrivance.
 
 > **NORMATIVE: `--as md1` REFUSES a descriptor in which ANY key's use-site
 > path is a single fixed child index.** The refusal names the offending key
-> and `--as descriptor`, which carries that shape exactly — UNLESS the
+> and `--as descriptor`, which carries that shape exactly (window
+> substitution applies) — UNLESS the
 > descriptor is a `multi` form (§4.7 conjunct 1), which `--as descriptor`
 > refuses too: there the refusal states that NO `me` path carries this
 > descriptor this release, and names the re-export remedy (R0 r5's NEW-I2 —
@@ -937,18 +947,29 @@ same input.
 
 > **NORMATIVE: for EVERY key whose use-site path is ABSENT, `--as md1`
 > materialises the device's default, `<0;1>/*`, into that key's encoding.** This
-> is not a rewrite of the operator's wallet: the device is the reader of both
-> artefacts, and `<0;1>/*` is what it already derives for a childless
-> descriptor, so materialising it is the only encoding that preserves the
-> wallet md1 claims to carry (the address-layer equality below). The §5.4
+> is not a rewrite of the operator's wallet, and not the device's private
+> convention (walk W9, moved here per R0 r9's M3): BIP-44/48/49/84 all
+> define the levels below an account origin as change (0 receive; 1 change)
+> then index; BIP-388 defines `/**` ≡ `/<0;1>/*` as the canonical tail —
+> machine-verified byte-identical in the F-411 cycle; BIP-389 supplies the
+> notation. The device implements these BIPs, and `<0;1>/*` is what it
+> already derives for a childless descriptor, so materialising it is the
+> only encoding that preserves the wallet md1 claims to carry (the
+> address-layer equality below). The §5.4
 > confirmation prints the template WITH the materialised `<0;1>/*` AND one
 > annotation line, in operator terms (walk W8 — an unexplained novelty at
 > steel-imminent stakes earns "is this the wrong derivation path?"; walk W9
 > — cite the BIPs, an authority the operator can check, not the device):
-> *"note: your file names no derivation below the key origins; `<0;1>/*` is
-> the standard receive/change continuation of your keys' BIP-48 origin
-> (BIP-388's canonical tail). Addresses are unchanged by making it
-> explicit."* An EXPLICIT single fixed index (`/0/*`) remains a refusal
+> *"note: your input names no derivation below the key origins; `<0;1>/*`
+> is the standard receive/change continuation below such origins — the
+> convention your wallet software already uses (in the standards: the
+> BIP-44 family's change level, and BIP-388's canonical tail). Addresses
+> are unchanged by making it explicit."*
+>
+> (Origin-family-neutral per R0 r9's I3: (a′) fires for BIP-44/49/84
+> promoted keys and BIP-48 cosigners alike — the walk's own journey 2 was
+> a BIP-84 `zpub`, and a note naming BIP-48 there invites a check that
+> fails, defeating W9's purpose.) An EXPLICIT single fixed index (`/0/*`) remains a refusal
 > per (a): the device does not default that shape away — it derives it — and
 > md1 cannot represent it.
 
@@ -963,10 +984,18 @@ handles it; the hole is md1's alone.
 
 > **NORMATIVE: `--as md1` REFUSES a descriptor in which ANY key's use-site
 > path is a multipath group without a trailing wildcard.** The refusal names
-> the offending key and `--as descriptor`, which carries it exactly — the
-> same split as (a), including (a)'s `multi` exception: for a `multi` form
+> the offending key and `--as descriptor`, which carries it exactly (window
+> substitution applies) — the same split as (a), including (a)'s `multi`
+> exception: for a `multi` form
 > the refusal states that no `me` path carries it and names the re-export
 > remedy.
+
+**Window substitution — NORMATIVE (walk W11's symmetric half, folded per
+R0 r9's I4).** In a build where the descriptor path has not shipped, every
+remedy in this section and in §6 that names `--as descriptor` replaces that
+clause with: *"the scannable-plate path is not in this build — keep the
+export file; it packs when the device update ships."* No refusal names a
+flag that refuses in the current build.
 
 **Mixed use-site paths across keys — the quantifier is PER KEY, matching
 conjunct 7 (R0 r3's NEW-C1).** The three rules above bind key by key, because
@@ -1016,19 +1045,36 @@ the equality it actually has — same wallet, different serialisation — and th
 
 ### 5.4 Both paths parse host-side first
 
-**NORMATIVE — and the block prints on EVERY successful host-side parse,
-BEFORE whatever follows: a pack, §5.1's window refusal, or a §5.3 refusal
-(walk W13: parse succeeded ⇒ identify the wallet, always; then say what can
-or cannot be done with it — refusals FOLLOW identification, never replace
-it).** Neither path ships bytes the host has not understood. `me` prints to
-stderr:
+**NORMATIVE — the block prints on EVERY successful whole-input parse,
+BEFORE whatever follows, in TWO tiers (walk W13; follower set completed per
+R0 r9's I1).** The FULL block precedes: a pack, the `--as`-omitted choice
+block, §5.1's window refusal, and §5.3's refusals — every case where the
+wallet is §4.7-ADMITTED. A PARTIAL block — the first three lines only, no
+`wallet-id:`, no `address 0:`, no watch-only line — precedes a §4.7
+admission refusal, which also follows a successful parse (§6's own scope
+note): four of those rows describe wallets whose addresses are underivable
+(mixed network, single-key-wrapped multi, bare key in a script slot,
+hardened use-site), and the threshold rows describe wallets that are
+unspendable or anyone-can-spend — a "compare before engraving" prompt would
+be a wrong instruction on every one of them. §5.3(b)'s label warning, where
+it applies, follows the block. Neither path ships bytes the host has not
+understood. `me` prints to stderr:
 
 - the format it matched (§4.1), by name;
 - the canonical descriptor, in full;
 - the script type, threshold and key count;
-- **`wallet-id:` the WalletPolicyId fingerprint** — the same identifier for
-  the same wallet under BOTH `--as` values, computed host-side (walk W10; it
-  exists for cross-verifying copies against the engraved card);
+- **`wallet-id:` the WalletPolicyId fingerprint, computed over the wallet's
+  md1 policy form with §5.3(a′)'s materialisation applied on BOTH paths**
+  (walk W10; that uniform base is what makes the id identical under both
+  `--as` values — computing over the literal childless input diverges per
+  flag, measured `24bcacf5…` vs `3bf32c0e…`, R0 r9's I2). **Emitted only
+  when the wallet HAS an md1 policy form.** For a wallet md1 cannot
+  represent — (a)/(a″) shapes, deeper tails — the line is instead:
+  *"wallet-id: none — this wallet has no md1 policy form; identify it by
+  the checksum in the canonical line and by address 0."* NEVER computed
+  over a collapsed encoding: the collapse mints a DIFFERENT wallet's id
+  (measured, `AltCountOutOfRange` then `3bf32c0e…` ≠ `24bcacf5…`, R0 r9's
+  C1) two lines above the compare prompt;
 - **`address 0:` receive address 0**, followed by: *"compare against your
   wallet software's first receive address before engraving."* — the
   executable check (walk W10; verified in journey 2 against the wallet
@@ -1041,9 +1087,9 @@ stderr:
   with §5.3(a′)'s annotation line whenever materialisation occurred (walk
   W8/W9);
 - for a promoted bare key (§4.5), the full §4.5 announcement — `key as
-  supplied` AND `inferred wallet`, with the normalisation named (R0 r3's
-  NEW-N2, citation corrected from r2 in the walk fold: this list and §4.5
-  describe the same stderr block and must agree).
+  supplied` AND `inferred wallet`, with the normalisation named (R0 r2's
+  NEW-N2: this list and §4.5 describe the same stderr block and must
+  agree).
 
 This follows the standing ruling that all verification is host-side, and it
 is what makes §5.1's no-fallback rule usable: the operator can see — and
@@ -1066,9 +1112,9 @@ This table is why there are two flags and no default. Every cell was run.
 | `tr(KEY)` single-key | ✅ | ✅ |
 | carries a label | text only, dropped | dropped |
 | needs a firmware change to be readable | **yes, §5.2** | **no** |
-| on the plate (walk W1) | a QR — machine-scan only | text cards (2 strings, ~168 chars for keyed single-sig; measured) |
+| on the plate (walk W1) | a QR — machine-scan only | text cards: 2 strings, ~168 chars for keyed single-sig = ONE plate (measured; the engraver's own plan test pins one md1 card → one plate) |
 | restored by | scanning into any wallet app — no project tooling, ever | transcription + an md1 decoder (open spec; tooling is this project's) |
-| hand-copyable — letter punches (walk W14) | ❌ | ✅ — BCH corrects up to 4 wrong characters per string, so a mis-struck punch is inside the budget |
+| hand-copyable — letter punches (walk W14) | ❌ | ✅ — BCH corrects up to 4 mis-struck characters per string (substitutions only: a missing or extra strike is outside the budget, R0 r9's N1) |
 
 The two `❌` columns are not the same shape, in either direction. That is the
 whole argument for the operator choosing.
@@ -1133,9 +1179,9 @@ NEW-I2).
 | a BlueWallet `Policy: k of n` with a different key count | *"`Policy: 2 of 3` declares 3 cosigners; the file has 2. Cosigner lines are `<8-hex-fingerprint>: <xpub>`."* |
 | a BlueWallet file whose keys have **no origin path** (no `Derivation:` header at all, or one placed after cosigner lines) | *"cosigner `<fp>` has no derivation path — the `Derivation:` header is missing or appears after the cosigner lines. The descriptor this file produces cannot be re-read by the device. Put `Derivation: <path>` above the first cosigner line."* §4.2 rule 3 (R0's C1). |
 | a BlueWallet cosigner fingerprint that is not 8 hex characters | *"cosigner line `ab: xpub…` — a master fingerprint is exactly 8 hex characters (4 bytes)."* §4.2 defect 4; the device PANICS on fewer, so this file must never reach it. |
-| `wsh(multi(…))` under **`--as descriptor`** | *"the device's descriptor parser accepts `sortedmulti` and not `multi`. This wallet can still be engraved: `--as md1` encodes `multi` policies (for md1-representable use-site paths — otherwise the §5.3 rows state that neither path carries it). (`sortedmulti` differs from `multi` only in key ordering at spend time — it is not a synonym, so `me` will not rewrite it for you.)"* |
-| a **miniscript** descriptor, either `--as` | *"`me` reads the descriptor family the device reads: single-sig and `sortedmulti`, optionally under `sh`. This descriptor uses miniscript fragments (`or_d`, `and_v`, …), which neither path handles in this release. `md encode` accepts miniscript **templates** — see §10."* |
-| a descriptor with **`/0/*`** under **`--as md1`** | *"key `@N` (`[<fp/path>]xpub…`) uses `/0/*` — md1 records a use-site path as either a multipath group (`<0;1>`) or a bare wildcard (`/*`), so a single fixed chain index has no representation, and encoding it would silently produce a DIFFERENT wallet. Use `--as descriptor`, which carries `/0/*` exactly."* §5.3(a); the offending key is named per §5.3's per-key rule (R0 r4's NEW-M4). For a `multi`-form descriptor the remedy sentence is replaced: *"this is a `multi` policy, which only `--as md1` carries — and md1 cannot represent `/0/*`. No `me` path engraves this descriptor this release; re-export with `<0;1>/*`, or as a `sortedmulti` policy if sorted signing order is acceptable (a DIFFERENT policy — `me` will not rewrite it)."* (R0 r5's NEW-I2.) A descriptor mixing an (a)-shaped and an (a″)-shaped key matches both this row and the next; both fire, both are true, and both name the same remedy — no precedence is needed. |
+| `wsh(multi(…))` under **`--as descriptor`** | *"the device's descriptor parser accepts `sortedmulti` and not `multi`. This wallet can still be engraved: `--as md1` encodes `multi` policies (for use-site paths md1 can represent — otherwise no path carries it, and the refusal says so). (`sortedmulti` differs from `multi` only in key ordering at spend time — it is not a synonym, so `me` will not rewrite it for you.)"* |
+| a **miniscript** descriptor, either `--as` | *"`me` reads the descriptor family the device reads: single-sig and `sortedmulti`, optionally under `sh`. This descriptor uses miniscript fragments (`or_d`, `and_v`, …), which neither path handles in this release. `md encode` accepts miniscript **templates** — a different tool and input form."* (Deferral details: §10 — outside the quote per the walk-W5 rule.) |
+| a descriptor with **`/0/*`** under **`--as md1`** | *"md1 cannot carry this wallet as written: key `@N` (`[<fp/path>]xpub…`) uses `/0/*`, a single fixed chain index, which has no md1 form — encoding it would silently produce a DIFFERENT wallet. Use `--as descriptor`, which carries `/0/*` exactly."* Window substitution per §5.3. §5.3(a); the offending key is named per §5.3's per-key rule (R0 r4's NEW-M4). For a `multi`-form descriptor the remedy sentence is replaced: *"this is a `multi` policy, which only `--as md1` carries — and md1 cannot represent `/0/*`. No `me` path engraves this descriptor this release; re-export with `<0;1>/*`, or as a `sortedmulti` policy if sorted signing order is acceptable (a DIFFERENT policy — `me` will not rewrite it)."* (R0 r5's NEW-I2.) A descriptor mixing an (a)-shaped and an (a″)-shaped key matches both this row and the next; both fire, both are true, and both name the same remedy — no precedence is needed. |
 | **`sortedmulti(k, …)` with `k > n`** | *"threshold `k` of `n` keys can never be satisfied — no combination of signatures reaches `k`. Funds sent to this wallet would be unspendable. Nothing was packed."* §4.7 conjunct 2. |
 | **`sortedmulti(0, …)`** — or any `k < 1` | *"threshold 0 means NO signature is required: anyone who can see this script can spend from it. This is almost certainly not the wallet you meant — and if it already holds funds, treat them as at risk now. Nothing was packed."* §4.7 conjunct 2 (R0's I6 — the device derives a real address for `k = 0` and even `k = −1`, so the refusal is the host's alone). |
 | `sortedmulti` with **too many keys** | *"`sh(sortedmulti(…))` carries at most 15 keys — there the multi's output script IS the redeemScript, one 520-byte script element (BIP-383). `wsh(…)` and `sh(wsh(…))` carry at most 20 (`OP_CHECKMULTISIG`); their redeemScript is 34 bytes and the 520-byte limit never binds. This descriptor has `n` keys under `<form>`. The device would accept it and derive addresses whose coins cannot be spent."* §4.7 conjunct 3 (R0's C3, bound corrected by r2's NEW-I2). |
@@ -1147,13 +1193,13 @@ NEW-I2).
 | a bare key with a fingerprint and **no path** | *"`[4bbaa801]xpub…` gives a fingerprint with no derivation path, so there is nothing to match a script against. Either give the full origin — `[4bbaa801/84'/0'/0']xpub…` — or drop the brackets entirely, in which case the key's version byte decides."* |
 | a bare `Zpub` / `Ypub` | *"a `Zpub`/`Ypub` declares a **multisig** account (`m/48'/0'/0'/2'` and `…/1'`). A multisig cosigner key is not a wallet — supply the full descriptor (`wsh(sortedmulti(…))` for `Zpub`, `sh(wsh(sortedmulti(…)))` for `Ypub`), or a BlueWallet setup file listing every cosigner."* (forms per `Script.DerivationPath()`, R0 r4's NEW-N1) |
 | a bare `tpub` | *"this is a testnet key. Its version byte would map to the **mainnet** path `m/44'/0'/0'`, which `me` will not assume. Supply the descriptor with its real origin."* §4.5. |
-| a **bitcoin address** | *"that is a bitcoin address, not a descriptor. No program on the device consumes an address record — see §10."* |
+| a **bitcoin address** | *"that is a bitcoin address, not a descriptor. No program on the device consumes an address record."* (Reasoning: §10 — outside the quote per the walk-W5 rule.) |
 | a **single-key script wrapping a multi** — `wpkh(sortedmulti(…))`, `pkh(sortedmulti(…))`, `sh(wpkh(sortedmulti(…)))` | *"a multisig policy cannot live inside a single-key script. The device's parser accepts this spelling and then cannot derive any address from it (measured: `address: multisig script: … unsupported descriptor`). The forms the device derives are `wsh(sortedmulti(…))`, `sh(wsh(sortedmulti(…)))` and `sh(sortedmulti(…))`."* For a `multi` input the remedy is instead: *"a multisig policy cannot live inside a single-key script on EITHER path. Change the wrapper — `wsh(multi(…))`, `sh(multi(…))` or `sh(wsh(multi(…)))` — and use `--as md1`, which carries those forms."* — and the device-measurement parenthetical above does NOT apply to `multi` inputs: all three single-key `multi` twins are device REFUSE at PARSE (measured, R0 r7) and never reach address derivation. (R0 r6's NEW-M4; the prior `multi` remedy named the invocation that had just refused — corrected per r7's NEW-I2.) §4.7 conjunct 1 (R0 r2's NEW-I4). |
 | a **bare key in a script slot** — `wsh(KEY)`, `sh(KEY)` | *"`wsh`/`sh` of a single key is not a wallet form the device can derive addresses for (measured: `Supported=false`, `address: singlesig script: … unsupported descriptor`). A single-key wallet is `pkh(…)`, `wpkh(…)`, `sh(wpkh(…))` or `tr(…)`."* §4.7 conjunct 1 (R0 r2's NEW-I4). |
 | a **hardened use-site component** — `…/<0;1>/*h` | *"a hardened use-site step cannot be derived from an xpub (BIP-32). The device would silently derive the UNhardened child and display addresses for a wallet that cannot exist, so this is refused on both `--as` paths."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
 | a **non-consecutive multipath** — `<0;2>`, `<1;3>` | *"the device derives only `<i;i+1>` pairs (receive; change). It accepts this descriptor and then errors on every address."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
-| any **other use-site path shape** — a bare fixed index, `/0/1/*` | *"use-site paths `me` packs: absent, `/*`, `/i/*`, `<i;i+1>`, `<i;i+1>/*`. This one is outside the set the device is measured to handle."* §4.7 conjunct 7 (closed set). |
-| a **multipath with no trailing wildcard** (`<0;1>`) under **`--as md1`** | *"key `@N` (`[<fp/path>]xpub…`) uses `<0;1>` with no trailing wildcard — md1 cannot represent it; encoding it would silently produce the `<0;1>/*` wallet, which derives DIFFERENT addresses. Use `--as descriptor`, which carries `<0;1>` exactly."* §5.3(a″) (R0 r2's NEW-C1; key named per R0 r4's NEW-M4; the `multi`-form remedy replacement of the previous row applies here identically). |
+| any **other use-site path shape** — a bare fixed index, `/0/1/*` | *"use-site paths `me` ACCEPTS: absent, `/*`, `/i/*`, `<i;i+1>`, `<i;i+1>/*`. This one is outside the set the device is measured to handle."* ("accepts" not "packs" — admission is build-independent; which flag packs which member is §5.3's and the window's business, R0 r9's I4.) §4.7 conjunct 7 (closed set). |
+| a **multipath with no trailing wildcard** (`<0;1>`) under **`--as md1`** | *"key `@N` (`[<fp/path>]xpub…`) uses `<0;1>` with no trailing wildcard — md1 cannot represent it; encoding it would silently produce the `<0;1>/*` wallet, which derives DIFFERENT addresses. Use `--as descriptor`, which carries `<0;1>` exactly."* Window substitution per §5.3. §5.3(a″) (R0 r2's NEW-C1; key named per R0 r4's NEW-M4; the `multi`-form remedy replacement of the previous row applies here identically). |
 | a **multi-record input whose records include a descriptor**, `--as` absent | *"record `N` is a wallet descriptor. A descriptor is packed ALONE: run `me sysw pack --as <descriptor\|md1>` with just the descriptor — one container cannot yet carry a descriptor plus other records. The other records pack without `--as`, as usual."* (The capability gap is F-414 — named here, not in the quoted text, per the walk-W5 rule.) **`EXIT_INVALID` (4)**, as today. Applies ONLY when the whole input does not parse as one descriptor (§5.1's discriminator — a multi-line BlueWallet or JSON file parses whole and gets the "--as decides" block instead); naming `--as` here would send the operator to a whole-file read that refuses with a message false about the file (R0 r2's NEW-I5, measured). |
 
 **Two rules that bind every row above.** Both come from
