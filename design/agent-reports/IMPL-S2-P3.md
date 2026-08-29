@@ -340,3 +340,177 @@ nonstandard/descriptor_seam_test.go:42            e7a4160c…
 **Not run, and deliberately:** the proportional opus review of the port named in
 the plan's P3 gate — that is the controller's dispatch, not the implementer's.
 Everything else in the gate is above.
+
+---
+
+# ADDENDUM — the REVIEW-S2-P3-r1 fold
+
+**Review:** `design/agent-reports/REVIEW-S2-P3-r1.md`, RED 2C/2I/1M against
+`a5e29b4..fe9475c`. The core port held: the reviewer's 81 constructed boundary
+cases over §4.7's conjuncts and §4.5's narrowing all agreed with the host, and
+`recover()` scoping, the first-execution walk and the fixture's provenance were
+all verified. **Both Criticals were periphery of the arm — which STRING each
+peripheral check runs over — and both are constructible single-line inputs,
+which is what a record is.**
+
+**Folded here: C1, C2, I1, M1.** I2 is the controller's (the P3.5 amendment
+batch) and landed at engrave `36fd0c3`.
+
+| finding | fork sha | one line |
+| --- | --- | --- |
+| C1 + C2 | `a785755` | `sysw: fold REVIEW-S2-P3-r1 C1 + C2 -- both parity breaks were about WHICH STRING` |
+| I1 + M1 | `0f92554` | `gui+bip380: fold REVIEW-S2-P3-r1 I1 + M1 -- a false safety argument, and a quote another repo falsified` |
+
+Fork `s2/descriptor-arm`, `fe9475c` → **`0f92554`**; diffstat 6 files,
++445 / −26. Nothing pushed; the engrave worktree read-only apart from this file.
+
+## Reproduced first, remedy chosen second
+
+Both defects were reproduced against the **shipped** `me` before anything was
+edited, with a 54-case probe pair: a Go module `replace`-ing the fork worktree
+for `sysw.Classify`, and `me sysw pack --no-passphrase --as descriptor` for the
+host verdict (rc 0 = admit, rc 3 = refuse).
+
+**Before the fold: 22 divergences over 54 cases. After: 0.**
+
+### C1 — the version scan's scope
+
+The §4.3 check scanned the WHOLE record for base58 runs. The cascade's **branch
+3** parses `{"label": …, "descriptor": …}` and copies `label` into `desc.Title`
+**without parsing it** (`nonstandard/parse.go:44-55`); `"`, `{`, `}`, `:` and `,`
+are all outside the base58 alphabet, so a label is its own maximal run. Naming a
+wallet after an extended key made the device refuse a record whose every KEY is
+an `xpub` — measured `ClassUnknown` against the host's rc 0.
+
+**The remedy is mine, not the review's, and I constructed the counterexample
+that rules the suggested one out.** The review offered "match each run's key
+MATERIAL against the parsed keys" as one option. A JSON label holding the `ypub`
+**spelling of a key that IS in the descriptor** defeats it: the material matches,
+so the run would be version-checked and refused, while `me` **admits** the record
+(measured rc 0) because it never looks at the label at all. That case is now
+`TestJSONLabelHoldingTheYpubTwinOfItsOwnKeyIsStillNotKeyMaterial`.
+
+So the fix scopes the **scan**, in `cascadeKeyText`, to what the cascade consumed
+as key material:
+
+| branch | key text |
+| --- | --- |
+| 3, `{label, descriptor}` JSON | the `descriptor` field alone |
+| 1, BlueWallet | the values of the headers the parser does NOT recognise |
+| 2, plain BIP-380 · 4, promoted bare key | the whole record — both grammars are closed and carry no free-text field |
+
+**JSON is tested BEFORE the header shape**, and that order is load-bearing: a
+single-line `{"label": "x", "descriptor": "y"}` is header-shaped under a `": "`
+split and branch 1 fails on it, so testing the shape first would scope a JSON
+record to a "header value" holding its own label. Where a record is header-shaped
+and branch 1 nevertheless failed, the scope cannot matter — branch 2 needs a
+known script name before the first `(` and a parseable descriptor contains no
+`": "`, branch 3 is already excluded, and branch 4's `ParseKey` rejects a `": "`
+— so `OutputDescriptor` errors and the arm has already returned.
+
+The branch-1 arm closes a residual the review did not name: a **multi-line**
+BlueWallet file whose `Name:` value is a `ypub`. Measured host ADMIT; device
+`ClassUnknown` before, `ClassDescriptor` after.
+
+**This also retires Deviation 2 of the original report.** Its load-bearing claim
+— *"a false REFUSAL … would require the parser to accept a ≥ 100-character
+base58 run that is not a key, which the grammar makes impossible"* — was false:
+branch 3's own titling field is exactly that. The ≥ 100-character floor and the
+`hdkeychain` decode are unchanged and sound; what was wrong was the scope they
+ran over.
+
+### C2 — §4.6 is ASCII, and the arm now answers for its own
+
+`classifyConstellation` trims with `strings.TrimSpace` (`unicode.IsSpace`); the
+host's `cascade::normalise` is `replace("\r\n","\n")` then a trim by
+`char::is_ascii_whitespace`. The sets differ by U+000B and the whole Zs category.
+**Measured: 20 divergences** — 5 characters × {leading, trailing} × {descriptor,
+bare key} — every one **device-wider**, the r1-C3 direction, a wallet `me`
+refuses at rc 3 reaching a screen through `walletPolicyFlow`'s door.
+
+The trim predates S2 and the md1/mk1 arms rely on it being Unicode, so the fix is
+inside the descriptor arm alone: `classifyConstellation` keeps the RAW record, and
+the arm refuses unless `asciiNormalise(raw)` reproduces the string it is about to
+parse. `asciiWhitespace` is `" \t\n\f\r"` — **U+000B deliberately absent**, which
+is the single character four of the twenty divergences turn on.
+
+### I1 — the consumer parses what classification proved
+
+`gui/wallet_policy.go` argued re-parsing "cannot fail here … over these exact
+bytes". Not the same bytes: classification parses `TrimSpace(record)`,
+`syswSession.take` returns `r.body` unmodified. The counterexample is already in
+the shipped corpus — `whitespace/leading-space-bip380` is `host_admits: true` and
+single-line, so `TestDescriptorSeamSyswClass` *requires* it to classify, and its
+raw bytes do not re-parse.
+
+The consumer now parses `strings.TrimSpace(body)`, so the two sides agree by
+construction. The comment states the argument that was always true and is the one
+that carries the safety: the record is **§4.7-admitted**, which is what keeps a
+§4.2 zero-Script descriptor out of `Descriptor.encode`'s panicking default arm.
+The error path stays, per the review, and is no longer guarding an impossibility.
+
+### M1 — a quote the other repo falsified
+
+`bip380/ypub_test.go` quoted *"the device admits exactly …"*. True at P3.4;
+P3.5 re-subjected the message to *"`me` admits exactly …"* without its diff
+touching the fork. Re-measured and quoted verbatim, with a line recording why it
+moved. Swept the tree for other copies of the old subject: **none**.
+
+## Named tests added, each carrying the HOST's measured verdict
+
+The vector file is **frozen** (invariant 1 gives S2 one regeneration and it has
+landed) and its only JSON row is multi-line — the blind spot C1 lived in — so
+these are unit tests, not corpus rows.
+
+| test | host verdict |
+| --- | --- |
+| `TestJSONLabelIsNotKeyMaterial` (the reviewer's case) | rc 0, ADMIT |
+| `TestJSONLabelHoldingTheYpubTwinOfItsOwnKeyIsStillNotKeyMaterial` | rc 0, ADMIT |
+| `TestJSONDescriptorFieldCarryingAYpubKeyClassifiesUnknown` | rc 3, REFUSE |
+| `TestJSONPlainLabelClassifiesAsADescriptor` (control) | rc 0, ADMIT |
+| `TestBlueWalletNameHoldingAnExtendedKeyIsNotKeyMaterial` | rc 0, ADMIT |
+| `TestASCIIEdgeWhitespaceStillClassifies` (20 cases) | rc 0, ADMIT |
+| `TestNonASCIIEdgeWhitespaceClassifiesUnknown` (20 cases) | rc 3, REFUSE |
+| `TestInteriorCRLFClassifiesUnknown` | REFUSE both sides |
+| `TestWalkWalletPolicyRendersARecordWithLeadingWhitespace` (I1, a real walk) | — |
+
+## Mutation checks — every fix is known to be load-bearing
+
+| mutation | result |
+| --- | --- |
+| revert C1's scoping (scan the whole record) | RED — both JSON label tests |
+| remove `cascadeKeyText`'s branch-1 arm | RED — the BlueWallet test |
+| remove C2's `asciiNormalise` guard | RED — all 20 whitespace cases |
+| add U+000B to `asciiWhitespace` (one character) | RED — the 4 vertical-tab cases |
+| revert I1 (parse the raw body) | RED — the walk, on the frame the operator would see: `"Couldn't read the wallet policy from the payload."` |
+
+## Gate at `0f92554`
+
+- **Parity probe:** 54 cases, **0 divergences** (22 before the fold).
+- **`gofmt -l`** — empty for every P3-touched file. Whole-tree list is the same
+  five pre-existing Go-1.26-vs-1.25.10 alignment files, unchanged.
+- **`go vet ./...`** — **41** findings, the same count as the `0abbf81` baseline;
+  none names a P3-touched file.
+- **`go test` on every package except `./gui/`** — exit 0, 52 packages `ok`.
+- **gui shard 24-way** — exit 0, `partition verified exhaustive: 1009 == 1009`,
+  `RESULT: ok -- all 1009 tests ran across 24 shards`, 65s wall. (1008 → 1009:
+  the new I1 walk.)
+- **TinyGo device build**, the exact CI command under `nix develop` — `EXIT=0`:
+
+  ```
+     code  rodata    data     bss |   flash     ram | package
+     1182     360       0       0 |    1542       0 | seedhammer.com/nonstandard
+     5120     429      80       0 |    5629      80 | seedhammer.com/sysw
+  1195975  268825   31612   30956 | 1496412   62568 | total
+  ```
+
+  **+1 664 B flash over `fe9475c`** (+4 280 B over the `0abbf81` baseline);
+  **RAM unchanged at 62 568**, as it has been throughout P3.
+- **Vector copies byte-identical**, both pins `e7a4160c…` — re-verified.
+- **Engrave suite**, `PATH=<go 1.26.3> ME_REQUIRE_GO=1 cargo nextest run
+  --locked` — exit 0, `579 tests run: 579 passed, 1 skipped`.
+- **Classify cost did not move materially.** Same corpora, same method
+  (`-benchtime 500x -count 6`), minima: 76-record 4.56 ms → 4.88 ms (**+7 %**),
+  13-record 10.82 µs → 10.97 µs (**+1.4 %**). The C2 guard is one `strings.Trim`
+  plus a `ReplaceAll` that returns its input unchanged when there is no CRLF, and
+  `cascadeKeyText` runs only after a successful parse.
