@@ -610,6 +610,14 @@ fn the_host_column_matches_the_admission_predicate() {
 // file, so a Go/Rust divergence reds one of the two instead of hiding in a
 // hand-stated column.
 
+/// Rows whose `input` is a single line — the only rows that can BE a record:
+/// the public section is split on LF (`sysw/open.go:67-74`), so a record
+/// cannot contain one. Measured from the file, not read off it.
+const SINGLE_LINE_ROWS: usize = 58;
+/// … of which this many are `host_admits: true`, so the derived rule is
+/// satisfiable in BOTH directions rather than vacuously one-sided.
+const SINGLE_LINE_ADMITTED: usize = 15;
+
 fn row<'a>(d: &'a serde_json::Value, want: &str) -> &'a serde_json::Value {
     rows(d)
         .iter()
@@ -647,6 +655,75 @@ fn a_multi_policy_the_cascade_parses_is_not_a_descriptor_record() {
         mnemonic_engrave::sysw::classify(r["input"].as_str().unwrap()),
         Class::Unknown
     );
+}
+
+/// **The derived rule, over every single-line row, as EXACT equality.** Not
+/// `Descriptor`-or-anything: the equality is also the empirical, per-row
+/// answer to "can a descriptor-shaped string collide with another class",
+/// which no sampled column could give.
+#[test]
+fn every_single_line_input_classifies_by_the_admission_column() {
+    let d = doc();
+    let (mut descriptor, mut unknown) = (0usize, 0usize);
+    for r in rows(&d) {
+        let input = r["input"].as_str().unwrap();
+        if input.contains('\n') {
+            continue;
+        }
+        let admitted = r["host_admits"].as_bool().unwrap();
+        let want = if admitted {
+            Class::Descriptor
+        } else {
+            Class::Unknown
+        };
+        assert_eq!(
+            mnemonic_engrave::sysw::classify(input),
+            want,
+            "{}: classify must answer §5.2's predicate exactly, and host_admits is {admitted}",
+            name(r)
+        );
+        if admitted {
+            descriptor += 1;
+        } else {
+            unknown += 1;
+        }
+    }
+    assert_eq!(descriptor + unknown, SINGLE_LINE_ROWS, "single-line rows");
+    assert_eq!(
+        descriptor, SINGLE_LINE_ADMITTED,
+        "admitted single-line rows"
+    );
+    assert!(unknown > 0, "the refusing direction is untested");
+}
+
+/// The other basis, asserted separately so P0's input-vs-canonical ambiguity
+/// cannot come back: the canonical is always one line, and it is what `--as
+/// descriptor` packs — every admitted row's canonical must classify.
+#[test]
+fn every_admitted_rows_canonical_classifies_as_a_descriptor_record() {
+    let d = doc();
+    let mut checked = 0usize;
+    for r in rows(&d) {
+        if !r["host_admits"].as_bool().unwrap() {
+            continue;
+        }
+        let canonical = r["canonical"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{}: an admitted row carries no canonical", name(r)));
+        assert!(
+            !canonical.contains('\n'),
+            "{}: canonical is one line",
+            name(r)
+        );
+        assert_eq!(
+            mnemonic_engrave::sysw::classify(canonical),
+            Class::Descriptor,
+            "{}: the record `--as descriptor` packs must classify",
+            name(r)
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, POP.host_admits_true, "canonical assertions run");
 }
 
 /// The `refusal_row` vocabulary is one set, held in two places, and this is
