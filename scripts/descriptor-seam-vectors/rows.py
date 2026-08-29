@@ -110,7 +110,7 @@ def R(**kw):
 R(name="formats-happy/bluewallet-sh-fixture", input=BW_SH_FIXTURE,
   host_admits=True, md1_admits=True, format="bluewallet",
   source=FORK_PARSE_TEST + " (the shipped `sh` happy path)",
-  covers=["formats-happy"], sysw_class="Descriptor",
+  covers=["formats-happy"],
   want_addr="01", want_wid=True,
   md1_route=("wsh(sortedmulti(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))",
              [BW0, BW1, BW2], ["5a0804e3", "dd4fadee", "9bacd5c0"], "m/48'/0'/0'/2'"))
@@ -118,7 +118,7 @@ R(name="formats-happy/bluewallet-sh-fixture", input=BW_SH_FIXTURE,
 R(name="formats-happy/bip380-sortedmulti-multipath", input=std(),
   host_admits=True, md1_admits=True, format="bip380",
   source=FORK_BIP380 + "; keys from " + FORK_PARSE_TEST,
-  covers=["formats-happy"], sysw_class="Descriptor",
+  covers=["formats-happy"],
   want_addr="01", want_wid=True,
   md1_route=("wsh(sortedmulti(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))",
              [K0, K1, K2], [F0, F1, F2], "m/48'/0'/0'/2'"))
@@ -126,7 +126,7 @@ R(name="formats-happy/bip380-sortedmulti-multipath", input=std(),
 R(name="formats-happy/json-label-descriptor", input=JSON_FIXTURE,
   host_admits=True, md1_admits=False, format="json",
   source=FORK_PARSE_TEST + " (the shipped JSON fixture; /0/* -- see md1-split/fixed-index)",
-  covers=["formats-happy"], sysw_class="Descriptor", want_addr="01")
+  covers=["formats-happy"], want_addr="01")
 
 # ---- promotion-near-miss: the fifteen rows of the S4.5 table, in order -----
 # Every one also carries `gate` (gate bullet clause 1).
@@ -134,7 +134,7 @@ R(name="promotion/01-bare-xpub", input=SK,
   host_admits=True, md1_admits=True, format="promoted-key",
   source=FORK_PARSE_TEST + " (bare-key promotion fixture)",
   covers=["formats-happy", "promotion-near-miss", "gate"],
-  sysw_class="Descriptor", gate=G(True, "as-decides", 2), want_addr="0",
+  gate=G(True, "as-decides", 2), want_addr="0",
   md1_route=("pkh(@0/<0;1>/*)", [SK], None, "m/44'/0'/0'"))
 
 R(name="promotion/02-bare-zpub", input=SKZL,
@@ -308,8 +308,11 @@ R(name="bluewallet/no-derivation-header",
 R(name="bluewallet/short-fingerprint",
   input="Name: shortfp\nPolicy: 1 of 1\nDerivation: m/48'/0'/0'/2'\nFormat: P2WSH\n\nab: %s\n" % K0,
   host_admits=False, md1_admits=False, format="none",
-  source=BW42 + " defect 4: binary.BigEndian.Uint32 panics below 4 bytes",
-  covers=["narrowed-4.2"], device_probe="panic:parse")
+  source=BW42 + " defect 4: a fingerprint shorter than 4 bytes used to reach "
+                "binary.BigEndian.Uint32 and PANIC; S2's convergence fix (P3.1) makes "
+                "the guard `!= 4` and the parser error cleanly, so device_admits is "
+                "MEASURABLE and the device_probe marker retired with it",
+  covers=["narrowed-4.2"])
 
 # ---- neither ---------------------------------------------------------------
 R(name="neither/wsh-multi", input=std(n=2, form="multi"),
@@ -321,11 +324,31 @@ R(name="neither/miniscript",
   input="wsh(or_d(pk(%s),and_v(v:pkh(%s),older(52560))))" % (K0, K1),
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S4.3/S10: miniscript is out of scope for both paths", covers=["neither"])
-R(name="neither/full-origin-ypub",
+# S11 item 5 case 3's witness: admitted by NEITHER carrier, so the S5.4 carriage
+# rule fires the input's own refusal directly rather than a two-option menu.
+# host_admits=false is conjunct 1's PERMANENT `multi` refusal; md1_admits=false
+# is the fixed `/0/*` use-site (F-417).  The shipped witness, md1-split/
+# fixed-index, became CARRIED when `--as descriptor` shipped in S2.
+R(name="neither/wsh-multi-fixed-path", input=std(tail="/0/*", n=2, form="multi"),
+  host_admits=False, md1_admits=False, format="bip380",
+  source=SPEC + " S4.7 conjunct 1 (multi: permanent) AND S5.3(a) (/0/* has no md1 "
+                "form): the S11 item 5 case-3 witness, admitted by neither carrier",
+  covers=["neither"])
+
+# ---- version-gap -----------------------------------------------------------
+# F-426's live witness: S4.3 REFUSES the version host-side while the device's
+# scan door accepts it (P3.4's ypubVer case).  A single-member bullet by
+# construction -- when F-426's host half widens, host_admits flips and the
+# bullet retires with it.  It cannot stay `neither`: S7 defines that tag as
+# rows NEITHER side admits, and this row's device_admits is true.
+R(name="version-gap/full-origin-ypub",
   input="sh(wpkh([%s/49h/0h/0h]%s/<0;1>/*))" % (SKFP, SKYL),
   host_admits=False, md1_admits=False, format="none",
-  source=SPEC + " S4.3: ypub has no case in the classification switch -- refused "
-                "even with a full explicit origin", covers=["neither"])
+  source=SPEC + " S4.3: `me` admits five versions and `ypub` is not one -- refused "
+                "even with a full explicit origin. The DEVICE's parser accepts it "
+                "after P3.4's ypubVer case (F-426 device half), which is why the row "
+                "is the version-gap witness rather than a `neither` row",
+  covers=["version-gap"])
 
 # ---- whitespace (2 new; the third is promotion/14) -------------------------
 R(name="whitespace/crlf-bip380", input=std().replace("\n", "") + "\r\n",
@@ -397,7 +420,7 @@ R(name="gate/deadbeef-fronts-an-xpub", input="deadbeef: " + SK,
                 "refusal_row is NOT the device's precedence -- measured at fork 1f09537, "
                 "parseBlueWalletDescriptor FAILS this file with `bluewallet: expected 0 "
                 "keys, but got 1` (no Policy: header, so nkeys=0 while one key was "
-                "appended; parse.go:151 fires before the Title gate at :37). "
+                "appended; parse.go:158 fires before the Title gate at :37). "
                 "bluewallet-no-name is nonetheless the right answer by S6's own standard: "
                 "the count row's text names a Policy: line this file does not have, so it "
                 "would be FALSE about the operator's file. Corrected per IMPL-P1-report F-2",

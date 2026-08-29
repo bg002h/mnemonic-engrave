@@ -1,8 +1,12 @@
 //! **§6, row by row — the TEXT, not the exit code.**
 //!
 //! `SPEC_descriptor_input.md` §11 item 4: *"Every refusal in §6 has a test that
-//! reaches it and asserts the text, not just the exit code."* All 36 rows, and
+//! reaches it and asserts the text, not just the exit code."* All 35 rows, and
 //! the S2-parked set is EMPTY — every §6 trigger is reachable in this build.
+//!
+//! **S2 SUBTRACTED a row.** `window-not-in-build` fired when `--as descriptor`
+//! had no path; the path shipped, so no build state reaches it and the row
+//! retired with §5.1's window refusal itself.
 //!
 //! # What "verbatim" means here
 //!
@@ -10,9 +14,10 @@
 //! applied. Three classes of row substitute, and each says so at its test:
 //!
 //! * the two **window-substituted** rows (§5.3's `/i/*` and `<i;i+1>` rows) —
-//!   in a build with no `--as descriptor` path, "use `--as descriptor`" would
-//!   point the operator at a flag that refuses, so §5.3's window substitution
-//!   replaces the remedy;
+//!   the substitution is conditional on the build, and since S2 the descriptor
+//!   path SHIPS, so what these two rows print is §6's own remedy naming the
+//!   flag. For a `multi`-form input the substitution is exempt in every build
+//!   and the neither-path replacement fires instead;
 //! * the **enumeration-substituted** row (`bluewallet-no-name`) — §6 spells the
 //!   enumeration as *"it has `Policy`, `Derivation` and `Format` headers and
 //!   `N` cosigner lines"*, and the input that reaches it is a ONE-LINE file
@@ -123,14 +128,15 @@ fn named_row_tests() -> std::collections::BTreeSet<String> {
 }
 
 /// **§11 item 4's own gate.** The plan's clause: *"The test file asserts its own
-/// row-test count == 36"*, and the S2-parked set is EMPTY.
+/// row-test count"* — 35 since S2 retired `window-not-in-build` — and the
+/// S2-parked set is EMPTY.
 #[test]
 fn the_file_carries_one_named_test_per_section_6_row() {
     let mine = named_row_tests();
     assert_eq!(
         mine.len(),
-        36,
-        "§6 is 36 data rows; this file names {mine:?}"
+        35,
+        "§6 is 35 data rows; this file names {mine:?}"
     );
     let vocabulary: std::collections::BTreeSet<String> = mnemonic_engrave::descriptor::Row::ALL
         .iter()
@@ -292,21 +298,13 @@ fn row_bluewallet_bad_fingerprint() {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// §5.1 — the window, the choice block's siblings
+// §5.1 — the choice block's siblings
+//
+// `row_window_not_in_build` lived here. §5.1's window refusal fired only "in a
+// build where the `--as descriptor` path has not shipped"; S2 shipped it, so
+// the row has no trigger and retired rather than being kept green by a weaker
+// assertion. `item_5_the_five_case_matrix` below carries what replaced it.
 // ───────────────────────────────────────────────────────────────────────────
-
-/// §5.1's window refusal, variant 1 (the input IS md1-representable). Both
-/// variants get their own test — see `the_window_refusal_has_two_variants`.
-#[test]
-fn row_window_not_in_build() {
-    assert_row(
-        "window-not-in-build",
-        &vector_input("formats-happy/bip380-sortedmulti-multipath"),
-        &["--as", "descriptor"],
-        3,
-        "--as descriptor is not available in this build.",
-    );
-}
 
 /// §6's multi-record row, reached with the MNEMONIC-FIRST ordering (§11 item
 /// 4's clause): a descriptor-FIRST input passes with or without the per-line
@@ -460,7 +458,7 @@ fn row_mixed_network() {
 fn row_unsupported_key_version() {
     assert_row(
         "unsupported-key-version",
-        &vector_input("neither/full-origin-ypub"),
+        &vector_input("version-gap/full-origin-ypub"),
         &["--as", "md1"],
         3,
         "the device admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`. This key is \
@@ -623,10 +621,10 @@ fn row_promotion_testnet_key() {
 // §5.3 — the md1 representability rows (WINDOW-SUBSTITUTED)
 // ───────────────────────────────────────────────────────────────────────────
 
-/// **WINDOW-SUBSTITUTED.** §6's remedy is *"Use `--as descriptor`, which
-/// carries `/0/*` exactly"*; in this build that flag REFUSES, so §5.3's window
-/// substitution replaces the clause with one that routes nowhere and describes
-/// the future instead. The verdict, the cause and the named key are §6's.
+/// **NOT window-substituted since S2.** §5.3's substitution fires only in a
+/// build where `--as descriptor` refuses; the path ships, so this row prints
+/// §6's own remedy — which names the flag that carries this exact shape. The
+/// verdict, the cause and the named key are §6's and did not move.
 #[test]
 fn row_md1_fixed_index() {
     assert_row(
@@ -638,12 +636,13 @@ fn row_md1_fixed_index() {
          xpub6DiYrfRwNn…EUhpan) uses `/0/*`, and key @1 \
          ([f245ae38/48h/0h/0h/2h]xpub6DnT4E1fT8…sY39Ge) uses `/0/*`, a single fixed \
          chain index, which has no md1 form -- encoding it would silently produce a \
-         DIFFERENT wallet. The scannable-plate path is not in this build -- keep the \
-         export file; it packs when the device update ships.",
+         DIFFERENT wallet. Use `--as descriptor`, which carries `/0/*` exactly.",
     );
 }
 
-/// **WINDOW-SUBSTITUTED**, the same way as the row above.
+/// **NOT window-substituted since S2**, the same way as the row above. The
+/// remedy names the offender as the encoder writes it (`/<0;1>`, leading slash
+/// included), which is the same spelling the cause clause above it uses.
 #[test]
 fn row_md1_no_wildcard() {
     assert_row(
@@ -655,9 +654,8 @@ fn row_md1_no_wildcard() {
          xpub6DiYrfRwNn…EUhpan) uses `/<0;1>`, and key @1 \
          ([f245ae38/48h/0h/0h/2h]xpub6DnT4E1fT8…sY39Ge) uses `/<0;1>` with no trailing \
          wildcard, which has no md1 form -- encoding it would silently produce the \
-         `<0;1>/*` wallet, which derives DIFFERENT addresses. The scannable-plate path \
-         is not in this build -- keep the export file; it packs when the device update \
-         ships.",
+         `<0;1>/*` wallet, which derives DIFFERENT addresses. Use `--as descriptor`, \
+         which carries `/<0;1>` exactly.",
     );
 }
 
@@ -773,52 +771,13 @@ fn a_mixed_a_and_a2_input_fires_both_section_5_3_rows() {
     );
 }
 
-/// **§11 item 5's sibling.** `--as descriptor` in a build where its path has not
-/// shipped exits 3 and prints §5.1's window refusal — BOTH alternative variants
-/// tested, since the variant is chosen by md1-representability and a refusal
-/// may never point at a path that refuses in the CURRENT build.
-#[test]
-fn the_window_refusal_has_two_variants() {
-    // Variant 1 — the input IS md1-representable, so `--as md1` is named and it
-    // works.
-    let out = run(
-        &vector_input("formats-happy/bip380-sortedmulti-multipath"),
-        &["--as", "descriptor"],
-    );
-    let err = String::from_utf8_lossy(&out.stderr).to_string();
-    assert_eq!(out.status.code().unwrap(), 3, "stderr:\n{err}");
-    assert!(
-        err.contains(
-            "--as descriptor is not available in this build.\n      The QR plate needs \
-             device firmware this release does not include.\n      Available now: --as \
-             md1 -- me converts and packs in one step: error-corrected text cards, \
-             restored by transcription instead of scanning. Your export file is all you \
-             need to come back for the QR plate later; nothing is lost by waiting."
-        ),
-        "variant 1:\n{err}"
-    );
-
-    // Variant 2 — the input is (a)-shaped, so `--as md1` cannot carry it either
-    // and the text says so, naming every offending key. It must NOT name a flag.
-    let out = run(
-        &vector_input("md1-split/fixed-index"),
-        &["--as", "descriptor"],
-    );
-    let err = String::from_utf8_lossy(&out.stderr).to_string();
-    assert_eq!(out.status.code().unwrap(), 3, "stderr:\n{err}");
-    assert!(
-        err.contains(
-            "--as md1 cannot carry this wallet either -- key `@0` uses `/0/*`, and key \
-             `@1` uses `/0/*`. No path in this build engraves this file. It loses \
-             nothing by waiting: keep it, and it packs the day the device update ships."
-        ),
-        "variant 2:\n{err}"
-    );
-    assert!(
-        !err.contains("Available now"),
-        "variant 2 names a path that refuses:\n{err}"
-    );
-}
+// `the_window_refusal_has_two_variants` lived here — §11 item 5's sibling case,
+// `--as descriptor` in a build where its path had not shipped, in both of the
+// variants md1-representability chose between. S2 shipped the path: the same
+// two inputs now PACK (`formats-happy/bip380-sortedmulti-multipath`) and REFUSE
+// on their own §4.7/§5.3 grounds (`md1-split/fixed-index` — §5.3(a), reached
+// through `--as md1`, `row_md1_fixed_index` above). Neither can reach a window
+// text, so the sibling retired with §5.1's window and the row that named it.
 
 /// **§11 item 5's five cases**, in one table so a missing case is visible.
 ///
@@ -826,6 +785,14 @@ fn the_window_refusal_has_two_variants() {
 /// block; with an input nothing carries, the input's OWN refusal fires directly
 /// at 3 — §5.4's carriage rule. A two-option menu whose options both refuse is
 /// the dead-flag defect the choice block was ruled never to be.
+///
+/// **The FULL-BUILD truth table since S2.** Both `--as` values carry now, so
+/// case 1's input is carried by both and case 3 needs a wallet NEITHER carries:
+/// `wsh(multi(…/0/*))` — conjunct 1 refuses `multi` under `--as descriptor`
+/// PERMANENTLY and md1 cannot represent a fixed `/0/*` (F-417). The shipped
+/// witness, `md1-split/fixed-index`, moved to case 1 when the descriptor path
+/// shipped: it is the exit-code flip S2 made, 3 → 2. Every `forbid` is the
+/// build marking, which no path here may ever print again.
 #[test]
 fn item_5_the_five_case_matrix() {
     struct Case {
@@ -843,7 +810,7 @@ fn item_5_the_five_case_matrix() {
             flags: vec![],
             exit: 2,
             want: "this input is a wallet descriptor, and `--as` decides how it is packed.",
-            forbid: "not available in this build.\n      The QR plate",
+            forbid: "not available in this build",
         },
         Case {
             what: "2. inadmissible, `--as` omitted -- the admission refusal, directly",
@@ -854,12 +821,20 @@ fn item_5_the_five_case_matrix() {
             forbid: "`--as` decides how it is packed",
         },
         Case {
-            what: "3. admitted but UNCARRIED -- the neither-path refusal, directly",
-            document: vector_input("md1-split/fixed-index"),
+            what: "3. carried by NEITHER value -- the input's own refusal, directly",
+            document: vector_input("neither/wsh-multi-fixed-path"),
             flags: vec![],
             exit: 3,
-            want: "md1 cannot carry this wallet as written",
+            want: "No `me` path engraves this file as written, in any build.",
             forbid: "`--as` decides how it is packed",
+        },
+        Case {
+            what: "3b. the S3 case-3 witness is CARRIED now -- the exit-code flip S2 made",
+            document: vector_input("md1-split/fixed-index"),
+            flags: vec![],
+            exit: 2,
+            want: "this input is a wallet descriptor, and `--as` decides how it is packed.",
+            forbid: "not available in this build",
         },
         Case {
             what: "4. inadmissible WITH `--as descriptor` -- admission precedes the window",
@@ -867,7 +842,7 @@ fn item_5_the_five_case_matrix() {
             flags: vec!["--as", "descriptor"],
             exit: 3,
             want: "threshold 0 means NO signature is required",
-            forbid: "--as descriptor is not available in this build",
+            forbid: "not available in this build",
         },
         Case {
             what: "5. a `multi` form WITH `--as descriptor` -- conjunct 1's PERMANENT refusal",
@@ -875,7 +850,7 @@ fn item_5_the_five_case_matrix() {
             flags: vec!["--as", "descriptor"],
             exit: 3,
             want: "the device's descriptor parser accepts `sortedmulti` and not `multi`.",
-            forbid: "--as descriptor is not available in this build",
+            forbid: "not available in this build",
         },
     ];
     let n = cases.len();
@@ -900,6 +875,16 @@ fn item_5_the_five_case_matrix() {
             c.what,
             c.forbid
         );
+        // A non-zero exit writes nothing to stdout, and case 4 and 5 in
+        // particular must not have packed anything before refusing.
+        if c.exit != 0 {
+            assert!(
+                out.stdout.is_empty(),
+                "{}: a refusal wrote {} bytes to stdout",
+                c.what,
+                out.stdout.len()
+            );
+        }
     }
-    assert_eq!(n, 5, "§11 item 5 names five cases");
+    assert_eq!(n, 6, "§11 item 5's five cases, plus S2's flipped witness");
 }

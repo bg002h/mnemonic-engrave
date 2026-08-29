@@ -2,8 +2,9 @@
 """Generate crates/me-cli/testdata/descriptor_seam_vectors.json.
 
 Authored host columns come from rows.py; EVERY device-side and value column is
-MEASURED here -- the Go probe (nonstandard/bip380/address/md at fork d402f18)
-and the debug `md` binary.  Nothing is transcribed from a report.
+MEASURED here -- the Go probe (nonstandard/bip380/address/md at the fork rev
+goprobe/go.mod's `replace` points at) and the debug `md` binary.  Nothing is
+transcribed from a report.
 """
 import hashlib, json, os, subprocess, sys
 
@@ -15,7 +16,8 @@ import rows as R
 # with. MD must be the DEBUG binary built from the descriptor-mnemonic tree --
 # the installed ~/.cargo/bin/md is stale and lacks `descriptor` (SPEC S2).
 # goprobe/go.mod carries `replace seedhammer.com => SEAM_FORK`; point it at the
-# fork worktree this corpus is pinned to (fork main d402f18).
+# fork worktree this corpus is pinned to (S2: the s2/descriptor-arm worktree at
+# 0abbf81, carrying P3.1's parse fix and P3.4's ypubVer case).
 GO = os.environ.get("SEAM_GO", "/nix/store/33fw5m31lfcnk4ff2f0df7j2bxnh8lgk-go-1.26.3/bin/go")
 MD = os.environ.get("SEAM_MD", "/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md")
 RSPROBE = os.path.join(SP, "rsprobe", "target", "debug", "rsprobe")
@@ -73,7 +75,7 @@ for r in R.ROWS:
     if r["input"] == "__B58_77__":
         r["input"] = B58_77
 
-# ---- 2. device pass A: device_admits + sysw_class on the raw input ---------
+# ---- 2. device pass A: device_admits on the raw input ----------------------
 passA = probe([{"name": r["name"], "input": r["input"],
                 "probe": r.get("device_probe") == "panic:parse"} for r in R.ROWS])
 A = {o["name"]: o for o in passA}
@@ -190,8 +192,6 @@ for r in R.ROWS:
 
     if r.get("device_probe"):
         row["device_probe"] = r["device_probe"]
-    if r.get("sysw_class"):
-        row["sysw_class"] = r["sysw_class"]
     if r.get("gate"):
         row.update(r["gate"])
     row["covers"] = r["covers"]

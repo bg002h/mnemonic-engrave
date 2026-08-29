@@ -6,7 +6,7 @@ measurement is re-run, so the file's provenance is a command rather than a
 claim. (Standing lesson: a reproduction path nobody re-runs rots while its
 artifact keeps vouching for it.)
 
-- `rows.py` — the 71 row DEFINITIONS. Host-side columns (`host_admits`,
+- `rows.py` — the 72 row DEFINITIONS. Host-side columns (`host_admits`,
   `md1_admits`, `format`, `covers`, the four gate fields) are AUTHORED from
   `design/SPEC_descriptor_input.md`. Nothing measured lives here.
 - `gen.py` — runs the probes, fills every measured column, cross-checks the
@@ -57,5 +57,8 @@ It exits non-zero, writing nothing, on any of:
 
 ## Baselines this corpus was measured against
 
-fork `main` **d402f18** · `descriptor-mnemonic` **6864f377** (debug `md`) ·
+fork **0abbf81** (the `s2/descriptor-arm` worktree, carrying P3.1's `!= 4`
+fingerprint guard and P3.4's `ypubVer` case — S2 measures two `device_admits`
+booleans from it before either fix reaches fork `main`) ·
+`descriptor-mnemonic` **6c4a56fd** (debug `md`) ·
 published **md-codec 0.42.0** · Go **1.26.3**.

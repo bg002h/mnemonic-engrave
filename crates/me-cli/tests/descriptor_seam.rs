@@ -43,7 +43,7 @@ use sha2::Digest as _;
 /// header, and `scripts/descriptor-seam-vectors/README.md` for the regenerate
 /// + re-pin recipe.
 const SEAM_VECTORS_SHA256: &str =
-    "542cd492e35149b62c53f940fb755576e0ffd4d086b0e3fcda615fbc43f51974";
+    "e7a4160ce064a6cb7ca31dc530e079c861cf2c8a075d75f793ef0d935f583758";
 
 const PATH: &str = "testdata/descriptor_seam_vectors.json";
 
@@ -56,14 +56,20 @@ const MANIFEST: &[(&str, usize)] = &[
     ("accepted-extreme", 1),
     ("narrowed-4.2", 5),
     ("neither", 3),
+    // S2's F-426 witness, carved out of `neither` because the tag means NEITHER
+    // side admits and this row's device DOES: §4.3 refuses the `ypub` version
+    // host-side while the scan door accepts it (P3.4). Single-member by
+    // construction — when F-426's host half widens, `host_admits` flips and the
+    // bullet retires with it.
+    ("version-gap", 1),
     ("whitespace", 3),
     ("md1-splits", 6),
     ("gate", 37),
 ];
-/// The minima sum to 88 tag-slots.
-const TAG_SLOTS: usize = 88;
-/// 88 − 17 overlap slots = the physical-row floor.
-const ROW_FLOOR: usize = 71;
+/// The minima sum to 89 tag-slots.
+const TAG_SLOTS: usize = 89;
+/// 89 − 17 overlap slots = the physical-row floor.
+const ROW_FLOOR: usize = 72;
 /// The fifteen §4.5 rows carry `gate` as a second tag …
 const SECOND_TAGGED: usize = 15;
 /// … and exactly two of them carry a third (the original overlap pair).
@@ -129,19 +135,24 @@ struct Pop {
     both_routes_address_0: usize,
 }
 const POP: Pop = Pop {
-    rows: 71,
+    rows: 72,
     host_admits_true: 19,
     md1_admits_true: 15,
-    device_admits_true: 37,
-    device_admits_false: 33,
-    device_admits_absent: 1,
+    device_admits_true: 38,
+    device_admits_false: 34,
+    // ZERO since S2: the one `panic:parse` row's parse panic is fixed (P3.1's
+    // `!= 4` fingerprint guard), so its `device_admits` is measurable and no row
+    // omits the column.
+    device_admits_absent: 0,
     canonical: 19,
     address_0: 20,
     address_1: 5,
     wallet_id: 4,
     md_descriptor_contains: 1,
-    sysw_class: 4,
-    device_probe: 3,
+    // ZERO since S2: the four-row `sysw_class` SAMPLE retired in favour of the
+    // derived rule below, which is exhaustive over every row in the file.
+    sysw_class: 0,
+    device_probe: 2,
     gate_fields: 37,
     refusal_row: 18,
     both_routes_address_0: 11,
@@ -344,7 +355,7 @@ fn the_row_schema_holds_on_every_row() {
     }
     // Every slug in the vocabulary is spelled once, and the vocabulary covers
     // §6's 36 data rows.
-    assert_eq!(slugs.len(), 36, "the §6 refusal vocabulary is 36 rows");
+    assert_eq!(slugs.len(), 35, "the §6 refusal vocabulary is 35 rows");
 }
 
 #[test]
@@ -613,7 +624,7 @@ fn the_host_column_matches_the_admission_predicate() {
 /// Rows whose `input` is a single line — the only rows that can BE a record:
 /// the public section is split on LF (`sysw/open.go:67-74`), so a record
 /// cannot contain one. Measured from the file, not read off it.
-const SINGLE_LINE_ROWS: usize = 58;
+const SINGLE_LINE_ROWS: usize = 59;
 /// … of which this many are `host_admits: true`, so the derived rule is
 /// satisfiable in BOTH directions rather than vacuously one-sided.
 const SINGLE_LINE_ADMITTED: usize = 15;
@@ -728,8 +739,9 @@ fn every_admitted_rows_canonical_classifies_as_a_descriptor_record() {
 
 /// The `refusal_row` vocabulary is one set, held in two places, and this is
 /// what stops them drifting: the file's `refusal_rows` map and the library's
-/// `Row` enum must name exactly the same 36 slugs (PLAN-r4's NEW-M6). P2.4's
-/// per-row text tests key to these.
+/// `Row` enum must name exactly the same 35 slugs (PLAN-r4's NEW-M6). §6's
+/// per-row text tests key to these. **S2 subtracted one** —
+/// `window-not-in-build`, whose build state no longer exists.
 #[test]
 fn the_refusal_row_vocabulary_is_the_same_set_on_both_sides() {
     let d = doc();
@@ -743,7 +755,7 @@ fn the_refusal_row_vocabulary_is_the_same_set_on_both_sides() {
         .iter()
         .map(|r| r.slug())
         .collect();
-    assert_eq!(in_code.len(), 36, "the §6 vocabulary is 36 rows");
+    assert_eq!(in_code.len(), 35, "the §6 vocabulary is 35 rows");
     assert_eq!(
         on_disk, in_code,
         "the file's refusal_rows and `descriptor::Row` name different sets"
@@ -923,11 +935,12 @@ fn the_md1_column_matches_the_representability_rules() {
         }
     }
     assert_eq!(checked, POP.rows, "md1_admits assertions run");
-    // The four `md1-split` rows §7 carries for exactly this purpose, plus the
+    // The four `md1-split` rows §7 carries for exactly this purpose, the
     // shipped JSON fixture, whose `/0/*` is what makes §11 item 2 demand a
-    // non-`/0/*` JSON exemplar.
+    // non-`/0/*` JSON exemplar, and S2's §11 item 5 case-3 witness
+    // (`neither/wsh-multi-fixed-path`), whose md1 refusal is §5.3(a)'s too.
     assert_eq!(
-        cited, 5,
+        cited, 6,
         "rows where §5.3 (not another conjunct) is the refusal"
     );
 }

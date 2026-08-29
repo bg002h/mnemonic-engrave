@@ -35,11 +35,13 @@ use super::refusal::{self, Refusal};
 // What THIS BUILD carries
 // ───────────────────────────────────────────────────────────────────────────
 
-/// Whether `--as descriptor` has shipped. **False for the whole S3 release**:
-/// §5.2's record needs a `sysw.Classify` descriptor arm the device does not
-/// have, so a `Descriptor` record packed today would be `ClassUnknown` on the
-/// machine. F-418 parks it with S2.
-pub const DESCRIPTOR_PATH_SHIPPED: bool = false;
+/// Whether `--as descriptor` has shipped. **True since S2**: §5.2's record is
+/// packed by `as_flag::descriptor_follower`, `sysw::classify` places it, and
+/// the device learns the same predicate in S2's fork half (F-418). Kept as a
+/// constant rather than deleted because §5.1's choice block and the clap help
+/// are both BUILD-marked from it, and a future path with the same shape would
+/// otherwise have to reinvent the marking.
+pub const DESCRIPTOR_PATH_SHIPPED: bool = true;
 
 /// Whether `--as md1` has shipped. True: it is what S3 IS.
 ///
@@ -238,13 +240,15 @@ fn carriage(d: &Parsed) -> Outcome {
     if let Err(r) = representable {
         return Outcome::DescriptorRefusal(r);
     }
-    // Admitted and representable, and still carried by nothing — reachable only
-    // in a build where the md1 path has not shipped either.
-    Outcome::DescriptorRefusal(Refusal::new(
-        refusal::Row::WindowNotInBuild,
-        "no `me` path in this build engraves this wallet. It loses nothing by \
-         waiting: keep your export file, and it packs the day the update ships.",
-    ))
+    // Admitted and representable, and carried by nothing: IMPOSSIBLE now that
+    // both paths ship. `md1_carries` is `MD1_PATH_SHIPPED && md1_admits.is_ok()
+    // && representable.is_ok()`, and the two returns above have just established
+    // both `is_ok()`s — so the first `if` returned. The arm stays a total
+    // function rather than a panic (a panic on an operator path is never the
+    // right answer to a surprise) and answers what the compiler cannot see it
+    // must: the choice block. S2 retired `Row::WindowNotInBuild`, which used to
+    // live here, because no build state refuses any more.
+    Outcome::AsDecides
 }
 
 /// §5.3's WINDOW SUBSTITUTION, both rows, stated once.

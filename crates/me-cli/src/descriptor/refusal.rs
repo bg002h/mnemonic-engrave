@@ -27,9 +27,13 @@ use super::cascade::{Branch, Derivation, Key, KeyVersion, Multi, Network, Parsed
 
 /// One row of §6's table.
 ///
-/// All 36 are named even though this phase constructs only the ones its own
-/// paths reach: the vocabulary is what P2.4 keys its per-row tests to, and a
-/// half-vocabulary is what PLAN-r4's NEW-M6 predicted would drift.
+/// All 35 are named, and each has a test in `tests/descriptor_refusals.rs` that
+/// reaches it and asserts its TEXT: the vocabulary and the row tests are one
+/// set, and a half-vocabulary is what PLAN-r4's NEW-M6 predicted would drift.
+///
+/// **S2 SUBTRACTED one.** `WindowNotInBuild` said "`--as descriptor` is not
+/// available in this build"; with the descriptor path shipped no build state
+/// refuses, so §5.1's window has no trigger left and the row retired with it.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Row {
     Unparseable,
@@ -40,7 +44,6 @@ pub enum Row {
     BlueWalletNoName,
     BlueWalletNoFormat,
     BlueWalletZeroCosigners,
-    WindowNotInBuild,
     BlueWalletPolicyCount,
     BlueWalletNoOrigin,
     BlueWalletBadFingerprint,
@@ -80,7 +83,6 @@ impl Row {
         Row::BlueWalletNoName,
         Row::BlueWalletNoFormat,
         Row::BlueWalletZeroCosigners,
-        Row::WindowNotInBuild,
         Row::BlueWalletPolicyCount,
         Row::BlueWalletNoOrigin,
         Row::BlueWalletBadFingerprint,
@@ -121,7 +123,6 @@ impl Row {
             Row::BlueWalletNoName => "bluewallet-no-name",
             Row::BlueWalletNoFormat => "bluewallet-no-format",
             Row::BlueWalletZeroCosigners => "bluewallet-zero-cosigners",
-            Row::WindowNotInBuild => "window-not-in-build",
             Row::BlueWalletPolicyCount => "bluewallet-policy-count",
             Row::BlueWalletNoOrigin => "bluewallet-no-origin",
             Row::BlueWalletBadFingerprint => "bluewallet-bad-fingerprint",
