@@ -822,7 +822,7 @@ Notes that belong in the spec rather than in a reviewer's head:
 ### 5.6 The `me` command surface — NORMATIVE
 
 ```
-me sysw pack   [--out FILE] [--in FILE] [--region] [--iterations N]
+me sysw pack   [--out FILE] [--in FILE] [--as descriptor|md1] [--region] [--iterations N]
                [--passphrase-words N | --passphrase-ask | --no-passphrase]
                [--allow-weak] RECORD...
 me sysw wipe   [--out FILE] [--fill random|zeros|ones]
@@ -835,7 +835,8 @@ me sysw show   FILE
 | `--passphrase-ask` | prompt for a user-supplied passphrase; **never** taken from argv or an env var, where it would land in shell history and `/proc`. **Since 2026-08-12 every token must be a BIP-39 English word** (`[passphrase-bounds]`, §12.5; §13 D4) — refused otherwise, naming the offending token |
 | `--no-passphrase` | plaintext container |
 | `--allow-weak` | **accepted and ignored**, kept so existing invocations keep working. §13 D3 demoted the refusal this flag once lifted: `me` warns and proceeds whatever the strength, so there is nothing left for it to gate. *(This row said "refuses with a non-zero exit" until 2026-08-12 — a stale pre-D3 sentence the code never followed; the review caught the row, not the code)* |
-| `--in FILE` | read newline-separated records from FILE instead of argv — argv is a public channel, the same reason `--passphrase-ask` never reads it |
+| `--in FILE` | read newline-separated records from FILE instead of argv — argv is a public channel, the same reason `--passphrase-ask` never reads it. **When `--as` is present this contract changes: `--in`/stdin are read as ONE whole document — a wallet descriptor in any of its four shapes — not newline-separated records. The single-document contract is `SPEC_descriptor_input.md` §5.1's, which governs (F-416, amended 2026-08-29)** |
+| `--as` | `descriptor` or `md1`: pack a wallet DESCRIPTOR read from `--in`/stdin instead of records — the descriptor seam, **added 2026-08-29**. Admission, refusals, the identification block and the omitted-`--as` choice block are `SPEC_descriptor_input.md`'s (NORMATIVE there). `descriptor` is S2-parked in this build (F-418) and answers with that spec's §5.1 window refusal |
 | `--iterations N` | PBKDF2 rounds, default 100,000 — mirrors `seal` |
 | `--region` | pad the container to a full `REGION_LEN` (65,536-byte) image, tail `0xFF` — the NOR erased state, so the image is byte-for-byte what the sector holds with only the container written. The only form the delivery step below can write |
 | `--fill` | §5.5; **default `random`** |
