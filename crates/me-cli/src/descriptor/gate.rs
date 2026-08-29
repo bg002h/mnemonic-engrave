@@ -1,8 +1,17 @@
 //! **§5.1 — the whole-input discriminator and the descriptor-shape gate.**
 //!
-//! When `--as` is absent and record classification fails, `me` consults this
-//! gate, and re-reads the whole input through §4's cascade ONLY when the gate
-//! opens — when the input is DESCRIPTOR-SHAPED.
+//! When `--as` is absent, `me` consults this gate, and re-reads the whole input
+//! through §4's cascade ONLY when the gate opens — when the input is
+//! DESCRIPTOR-SHAPED.
+//!
+//! **The trigger is IDENTIFICATION, not classification failure** (S2's P1.0,
+//! spec §5.1's 2026-08-29 amendment). This doc said "and record classification
+//! fails" while that was the shipped condition; it was safe only while no
+//! descriptor could classify. `sysw::classify` has a descriptor arm now, so an
+//! admitted single-line descriptor DOES classify — and under the old trigger
+//! the gate would be skipped and the input would pack RAW at exit 0, taking
+//! §5.4's identification block, §5.1's choice block and every omitted-`--as`
+//! §6 refusal with it.
 //!
 //! **The gate keeps two promises at once**, and an implementation is conformant
 //! exactly when both hold:
