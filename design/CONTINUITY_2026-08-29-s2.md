@@ -97,14 +97,17 @@ ypub refuses an admitted record (refutes the implementer's Deviation
 divergers, device-wider; I1: the "re-parsing cannot fail" comment is
 false (handled gracefully); I2: P3.5 missed the S7-req-3 amendment;
 M1: a fork test quotes the old refusal text. Both C's fail closed and
-are unreachable from me-written payloads (measured). **FOLD IN FLIGHT:
-the P3 implementer resumed via SendMessage for C1/C2/I1/M1** (scope
-the version check to cascade-consumed key material; ASCII-trim parity
-inside the arm only; consumer parses the trimmed string; quote fix;
-named counterexample tests, vector file FROZEN so they are unit tests
-not rows). **I2 folded by controller** (engrave branch `36fd0c3`).
-After the fold: scoped re-review r2 (Critical fixes = non-trivial
-fold), then P4.2, then P5; (2) P4.1 measurement DONE:
+are unreachable from me-written payloads (measured). **FOLD DONE** (fork
+fe9475c..0f92554, addendum 9be6bfc on engrave): C1 -> the scan runs
+over cascadeKeyText (the substring each branch consumed; implementer
+DECLINED r1's suggested remedy with a constructed counterexample and
+closed an unnamed BlueWallet-header residual); C2 -> asciiNormalise
+guard in the arm only; I1 consumer parses the proved string; M1 quote;
+54-case probe 22 divergences -> 0; five load-bearing mutations; TinyGo
++1664B/0 RAM. I2 folded by controller (`36fd0c3`). **RE-REVIEW r2 IN
+FLIGHT** (opus, scoped fold-vs-findings + branch-order parity +
+asciiNormalise-vs-host diff; report REVIEW-S2-P3-r2.md, main repo;
+clean round closes the P3 loop). Then P4.2, then P5; (2) P4.1 measurement DONE:
 **N = 3** md1 strings fit one plate side at the shipped 3.8mm font
 (analytic 34 chars x 20 lines = 680-char capacity; trial via
 backup.EngraveText paragraphs, 1mm gaps, no FontSize override; trial
