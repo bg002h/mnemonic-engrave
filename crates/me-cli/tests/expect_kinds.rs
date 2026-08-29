@@ -373,8 +373,8 @@ fn expect_descriptor_still_refuses_a_mnemonic_only_container() {
     let r = pack(dir.path(), &[MNEMONIC], &["--expect", "descriptor"]);
     assert_eq!(r.code, 4, "{}", r.err);
     assert!(
-        r.err
-            .contains(mnemonic_engrave::sysw::expect::Kind::Descriptor.describes()),
+        r.err.contains("an md1 descriptor card")
+            && r.err.contains("a descriptor record (`--as descriptor`)"),
         "the refusal must say what was looked for: {}",
         r.err
     );

@@ -836,11 +836,11 @@ me: this input is a wallet descriptor, and `--as` decides how it is packed.
                         (no md invocation needed). Restored by transcription;
                         each string survives up to 4 MIS-STRUCK characters
                         (substitutions -- a missing or extra strike is not
-                        correctable), so it can even be hand-stamped. Carries policies
-                        --as descriptor cannot. Restoring needs an md1
-                        decoder (an open spec; the tooling today is this
+                        correctable), so it can even be hand-stamped. Carries
+                        policies --as descriptor cannot. Restoring needs an
+                        md1 decoder (an open spec; the tooling today is this
                         project's).
-    They are not interchangeable — `me sysw pack --help` has the comparison.
+    They are not interchangeable -- `me sysw pack --help` has the comparison.
 ```
 
 In a build where the descriptor path has not shipped, the block marks that
@@ -1616,7 +1616,7 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   `sysw_class` column is RETIRED.** It was a four-row SAMPLE of the
   classifier's answer, hand-stated, and three of its four inputs were not even
   single lines — so it could not be a population and its input-vs-canonical
-  basis was ambiguous. Both suites now assert the classifier EXHAUSTIVELY and
+  basis was ambiguous. Both suites assert the classifier EXHAUSTIVELY (the Rust half since S2's P2; the Go half lands with the fork's copy at P3.3) and
   DERIVE the expectation from columns already in the file: for every
   single-line row, `Classify(input) == Descriptor` **iff** `host_admits` and
   `== Unknown` otherwise (exact equality — which is also the per-row empirical

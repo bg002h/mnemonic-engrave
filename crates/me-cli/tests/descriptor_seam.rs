@@ -88,7 +88,6 @@ const KNOWN_ROW_KEYS: &[&str] = &[
     "source",
     "covers",
     "canonical",
-    "sysw_class",
     "device_probe",
     "address_0",
     "address_1",
