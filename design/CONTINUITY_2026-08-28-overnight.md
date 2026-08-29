@@ -25,3 +25,10 @@ state with a written note at whichever gate stopped it.
 **Spec baseline:** `SPEC_descriptor_input.md` FINAL GREEN at `b949d18`
 (r20 closure verdict in `R0-descriptor-input-spec-r20-closure.md`, whose
 leaves-open list is the plan's input inventory).
+
+
+**Added mid-run (operator directive): before sending any fold to review,
+run the propagation check** — old forms grepped to zero, new rules checked
+for unpropagated siblings, arithmetic recomputed at every site. First run
+found six plan-side misses of the r2 fold (held for the r3 fold,
+`scratchpad/f412/held-fixes.md`, declared self-found).
