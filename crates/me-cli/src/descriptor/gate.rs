@@ -524,7 +524,10 @@ fn describe_key(e: &KeyError) -> String {
         KeyError::InvalidFingerprint => {
             "the origin block's fingerprint is not 8 hex characters".to_string()
         }
-        KeyError::InvalidOriginPath(p) => format!("the origin path is not a path: `{p}`"),
+        KeyError::InvalidOriginPath(p) => format!(
+            "the origin path is not a path: `{}`",
+            refusal::quote_operator(p)
+        ),
         // N1 (IMPL-P1's review): the offending tail can be the EMPTY string --
         // `xpub…/` -- and the general sentence then printed empty backticks:
         // "the use-site path is not a path: ``." Correct row, correct exit code,
@@ -532,7 +535,10 @@ fn describe_key(e: &KeyError) -> String {
         KeyError::InvalidChildrenPath(p) if p.is_empty() => {
             "the key ends in `/` with no use-site path after it".to_string()
         }
-        KeyError::InvalidChildrenPath(p) => format!("the use-site path is not a path: `{p}`"),
+        KeyError::InvalidChildrenPath(p) => format!(
+            "the use-site path is not a path: `{}`",
+            refusal::quote_operator(p)
+        ),
         KeyError::NotAnExtendedKey => "it is not an extended key".to_string(),
         KeyError::UnsupportedVersion { version, .. } => {
             format!(

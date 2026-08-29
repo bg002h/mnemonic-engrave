@@ -746,3 +746,142 @@ fn every_full_tier_wallet_has_an_address_0() {
         "only {full} FULL-tier rows — the loop has gone vacuous"
     );
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// M1 / M2 / M3 / N2 — the review's minors and nits
+// ───────────────────────────────────────────────────────────────────────────
+
+/// **M1.** §5.1's choice block marks the build-dead value inline and then sends
+/// the operator to `me sysw pack --help` for the comparison. The help's
+/// possible-value list has to carry the same marking, or the pointer loses them
+/// the one fact the block was careful to give.
+#[test]
+fn the_help_marks_the_build_dead_as_value_like_the_choice_block_does() {
+    let out = assert_cmd::Command::cargo_bin("me")
+        .unwrap()
+        .args(["sysw", "pack", "--help"])
+        .output()
+        .unwrap();
+    let help = String::from_utf8_lossy(&out.stdout).to_string();
+    assert!(
+        help.contains("- descriptor: The canonical re-encoded descriptor, as one `Descriptor` record (not available in this build)"),
+        "the help does not build-mark `descriptor`:\n{help}"
+    );
+    // …and md1, which IS in this build, is NOT marked. Without this half the
+    // assertion above would pass on a help that marked everything.
+    assert!(
+        help.contains(
+            "- md1:        The BIP-388 decomposition, as md1 text cards (`MdMk` records)\n"
+        ),
+        "the help marks `md1`, which this build carries:\n{help}"
+    );
+    // The choice block's marking and the help's are gated on the same constants
+    // — assert they agree rather than trusting that they do.
+    let (block, _d) = pack_in(
+        &row_input("formats-happy/bip380-sortedmulti-multipath"),
+        &[],
+    );
+    assert!(
+        stderr(&block).contains("--as descriptor (not available in this build)"),
+        "the choice block and the help disagree about what this build carries"
+    );
+}
+
+/// **M2.** The label warning echoes the operator's own `Name:` header, and it
+/// lands beside `address 0:` — the verification surface. A crafted export
+/// carrying cursor or clear-screen sequences must not be able to move that
+/// line.
+#[test]
+fn the_label_warning_neither_emits_control_bytes_nor_runs_long() {
+    let hostile = format!("\u{1b}[2J\u{1b}[31mRED\u{1b}[0m{}", "A".repeat(400));
+    let document = row_input("formats-happy/bluewallet-sh-fixture")
+        .replace("Name: sh", &format!("Name: {hostile}"));
+    let (out, _d) = pack_in(&document, &["--as", "md1"]);
+    let err = stderr(&out);
+    assert_eq!(code(&out), 0, "the wallet still packs\n{err}");
+
+    let warning = err
+        .lines()
+        .find(|l| l.contains("warning: the label"))
+        .unwrap_or_else(|| panic!("no label warning:\n{err}"));
+    assert!(
+        !warning.chars().any(|c| c.is_control()),
+        "a control byte reached the verification surface: {warning:?}"
+    );
+    assert!(
+        warning.contains("\\x1b"),
+        "the escape was stripped rather than shown -- the operator should see \
+         that something odd is in their file: {warning:?}"
+    );
+    assert!(
+        warning.chars().count() < 220,
+        "the warning is {} characters; a long label can push `address 0:` off \
+         the screen",
+        warning.chars().count()
+    );
+    // The line it protects is still there, after it.
+    assert!(err.contains("address 0: bc1qtahtpjkgtljxl20j"), "{err}");
+}
+
+/// **M3 (controller ruling).** The label warning's text is a statement about
+/// what was just packed, so it prints EXACTLY on the paths that pack. One test,
+/// all three paths, presence and absence both pinned.
+#[test]
+fn the_label_warning_fires_exactly_on_the_paths_that_pack() {
+    let document = row_input("formats-happy/bluewallet-sh-fixture");
+    let cases = [
+        ("--as md1 (packs)", vec!["--as", "md1"], 0, true),
+        (
+            "--as descriptor (window refusal)",
+            vec!["--as", "descriptor"],
+            3,
+            false,
+        ),
+        ("--as omitted (choice block)", vec![], 2, false),
+    ];
+    let mut checked = 0;
+    for (what, flags, exit, want_warning) in cases {
+        let (out, _d) = pack_in(&document, &flags);
+        let err = stderr(&out);
+        assert_eq!(code(&out), exit, "{what}: exit\n{err}");
+        assert_eq!(
+            err.contains("warning: the label"),
+            want_warning,
+            "{what}: the label warning's presence is wrong\n{err}"
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 3, "all three paths are exercised");
+}
+
+/// **N2.** A quoted fragment must not span a newline — the backtick pair has to
+/// close on the line it opened. The row and the exit code are unchanged; only
+/// the rendering moves.
+#[test]
+fn a_quoted_fragment_never_spans_a_newline() {
+    let one = row_input("neither/wsh-multi");
+    let document = format!("{one}\n{one}");
+    let (out, _d) = pack_in(&document, &["--as", "md1"]);
+    let err = stderr(&out);
+    assert_eq!(
+        code(&out),
+        3,
+        "two descriptors are one malformed document\n{err}"
+    );
+    assert!(
+        err.contains("not a wallet descriptor in any of the four forms"),
+        "{err}"
+    );
+    for line in err.lines() {
+        assert_eq!(
+            line.matches('`').count() % 2,
+            0,
+            "a backtick pair is left open across a line break: {line:?}"
+        );
+    }
+    assert!(
+        err.contains("\\n"),
+        "the newline inside the quoted fragment was neither escaped nor \
+         truncated away:\n{err}"
+    );
+}

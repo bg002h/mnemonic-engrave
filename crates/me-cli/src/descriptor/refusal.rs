@@ -197,6 +197,48 @@ pub fn short_key(s: &str) -> String {
     format!("{head}…{tail}")
 }
 
+/// **Operator-supplied bytes, rendered safe for a terminal and BOUNDED.**
+///
+/// Every refusal that quotes the operator's own file back at them runs the
+/// fragment through this. Two reasons, both measured:
+///
+/// * **M2** — the §5.3(b) label warning echoed a `Name:` header verbatim,
+///   ANSI escapes included, and it lands next to `address 0:`, the operator's
+///   verification surface. A crafted export carrying cursor or clear-screen
+///   sequences could scroll the address line away at the moment it is meant to
+///   be compared. Control bytes are escaped rather than stripped, so the
+///   operator still sees that something odd is in their file.
+/// * **N2** — a quoted use-site fragment could span a newline, leaving an
+///   apparently unterminated backtick across two lines. Escaping the newline
+///   keeps the backtick pair on one line.
+///
+/// This is output INTEGRITY, not secret handling: nothing here decides what is
+/// packed, and the bytes are public wallet-export text.
+pub fn quote_operator(s: &str) -> String {
+    /// Enough to recognise your own file; short enough that a hostile one
+    /// cannot push the verification lines off the screen.
+    const MAX: usize = 48;
+    let mut out = String::new();
+    let mut width = 0usize;
+    for c in s.chars() {
+        if width >= MAX {
+            out.push('…');
+            break;
+        }
+        let piece = match c {
+            '\n' => "\\n".to_string(),
+            '\r' => "\\r".to_string(),
+            '\t' => "\\t".to_string(),
+            c if c.is_control() && (c as u32) < 0x80 => format!("\\x{:02x}", c as u32),
+            c if c.is_control() => format!("\\u{{{:04x}}}", c as u32),
+            c => c.to_string(),
+        };
+        width += piece.chars().count();
+        out.push_str(&piece);
+    }
+    out
+}
+
 /// `[fp/path]` as the input spelled it, or the empty string for a key that
 /// declared no origin.
 pub fn origin_prefix(k: &Key) -> String {

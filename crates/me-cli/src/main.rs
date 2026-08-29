@@ -334,12 +334,46 @@ enum SyswCmd {
 /// no default: the two accept sets genuinely differ, in both directions, so an
 /// automatic fallback would silently change which of two different artefacts
 /// the operator engraves.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, clap::ValueEnum)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum AsForm {
     /// The canonical re-encoded descriptor, as one `Descriptor` record.
     Descriptor,
     /// The BIP-388 decomposition, as md1 text cards (`MdMk` records).
     Md1,
+}
+
+/// `ValueEnum` by hand, so the possible-value help can be BUILD-MARKED the same
+/// way §5.1's choice block marks it.
+///
+/// The derive cannot: its help text comes from the doc comments above, which are
+/// fixed at compile time in the wrong way — they cannot read
+/// `DESCRIPTOR_PATH_SHIPPED`. The choice block's last line sends the operator to
+/// `me sysw pack --help` for the comparison, so an unmarked value there loses
+/// them the one fact the block was careful to give (IMPL-S1S3-adversarial-review
+/// M1). Both markings are gated on the same two constants, so they cannot drift.
+impl clap::ValueEnum for AsForm {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Self::Descriptor, Self::Md1]
+    }
+
+    fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
+        use mnemonic_engrave::descriptor::{DESCRIPTOR_PATH_SHIPPED, MD1_PATH_SHIPPED};
+        const UNAVAILABLE: &str = " (not available in this build)";
+        Some(match self {
+            Self::Descriptor => clap::builder::PossibleValue::new("descriptor").help(format!(
+                "The canonical re-encoded descriptor, as one `Descriptor` record{}",
+                if DESCRIPTOR_PATH_SHIPPED {
+                    ""
+                } else {
+                    UNAVAILABLE
+                }
+            )),
+            Self::Md1 => clap::builder::PossibleValue::new("md1").help(format!(
+                "The BIP-388 decomposition, as md1 text cards (`MdMk` records){}",
+                if MD1_PATH_SHIPPED { "" } else { UNAVAILABLE }
+            )),
+        })
+    }
 }
 
 impl From<AsForm> for mnemonic_engrave::descriptor::Form {

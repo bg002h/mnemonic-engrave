@@ -73,16 +73,28 @@ pub fn run(form: Form, document: &str) -> Run {
         }
     };
 
-    // §5.4, then §5.3(b) — the block first, the warning after it.
     let mut notes = vec![identify::block(&d, Some(form))];
-    if let Some(label) = d.title.as_deref().filter(|l| !l.is_empty()) {
-        notes.push(identify::label_warning(label));
-    }
-
     let decision = match form {
         Form::Md1 => md1_follower(&d),
         Form::Descriptor => descriptor_follower(&d),
     };
+
+    // §5.3(b)'s label warning follows the block — and fires EXACTLY on the
+    // paths that pack (controller ruling, IMPL-S1S3-adversarial-review M3).
+    //
+    // Its own text is a statement about what was just packed: *"is not carried
+    // by any record format and will not appear on the device. Nothing else is
+    // lost."* On a refusal nothing was carried anywhere, so the sentence
+    // describes an event that did not happen — and "nothing else is lost" is
+    // actively wrong next to a refusal, where the whole wallet was lost. The
+    // implementation previously printed it on the `--as descriptor` window
+    // refusal too, and never on the `--as`-omitted choice block: three paths,
+    // three different answers. One rule now: it follows a PACK.
+    if matches!(decision, Decision::Pack(_)) {
+        if let Some(label) = d.title.as_deref().filter(|l| !l.is_empty()) {
+            notes.push(identify::label_warning(label));
+        }
+    }
     Run { notes, decision }
 }
 

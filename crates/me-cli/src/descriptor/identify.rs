@@ -30,6 +30,7 @@ use super::cascade::{Multi, Parsed, Script};
 use super::derive;
 use super::gate;
 use super::md1;
+use super::refusal;
 
 /// Which `--as` value the invocation named, if any. `None` is the
 /// `--as`-omitted path, whose follower is §5.1's choice block.
@@ -143,10 +144,14 @@ pub const MATERIALISED_NOTE: &str =
 /// §5.3(b)'s warning, verbatim. The label is display-only on the device, so
 /// this is a warning and not a refusal — and "nothing else is lost" is the
 /// sentence that stops it reading like a data-loss report.
+/// **The label is the operator's own bytes**, so it is quoted through
+/// [`refusal::quote_operator`]: escaped and bounded. This warning sits beside
+/// `address 0:` and must never be able to move it.
 pub fn label_warning(label: &str) -> String {
     format!(
-        "warning: the label \"{label}\" is not carried by any record format and will not \
-         appear on the device. Nothing else is lost."
+        "warning: the label \"{}\" is not carried by any record format and will not \
+         appear on the device. Nothing else is lost.",
+        refusal::quote_operator(label)
     )
 }
 
