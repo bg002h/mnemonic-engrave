@@ -569,7 +569,6 @@ fn every_column_has_the_expected_population() {
 /// `Descriptor` record. THE SAFE DIRECTION is asserted by the fork's half over
 /// `canonical`; this half asserts the column itself.
 #[test]
-#[ignore = "P1: the §4 cascade and the §4.7 admission predicate are not built"]
 fn the_host_column_matches_the_admission_predicate() {
     unimplemented!("P1.1: mnemonic_engrave::descriptor::admit over every row");
 }
@@ -579,7 +578,6 @@ fn the_host_column_matches_the_admission_predicate() {
 /// §5.1's gate is NORMATIVE through these rows — where any reading of the
 /// prose disagrees with a row, the row is the answer.
 #[test]
-#[ignore = "P1: §5.1's whole-input discriminator and descriptor-shape gate are not built"]
 fn the_gate_rows_pin_the_real_invocation() {
     unimplemented!("P1.2: run `me sysw pack` per gate row and assert all four fields");
 }
