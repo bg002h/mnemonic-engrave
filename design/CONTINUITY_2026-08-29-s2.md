@@ -18,15 +18,15 @@ removed, F-420 shipped in descriptor-mnemonic.
 
 ## S2 cycle plan
 
-`design/IMPLEMENTATION_PLAN_descriptor_input_S2.md` @ `7877aa5` (r1 RED
-4C/6I/7M/3N persisted `191bfb7`, folded `7877aa5` -- all 20 findings ruled;
-cite gate 73/73, clippy both toolchains + fmt clean). Recon:
-`design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`). R0 loop in flight
-(opus round 2, scoped fold-vs-findings + the fold's new decisions: P1.0
-consult-first, derived parity rule, walletPolicy consumer, single vector
-regeneration, parse-fix convergence, P2.5 show surface, P4.1 font ruling;
-report lands at `design/agent-reports/R0-S2-plan-r2.md`). Scale: 5
-expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
+`design/IMPLEMENTATION_PLAN_descriptor_input_S2.md` @ `142258b`. R0 loop:
+r1 RED 4C/6I/7M/3N (persisted `191bfb7`, folded `7877aa5`); r2 RED
+1C/2I/4M/3N (persisted `59915b8`, folded `142258b` -- key ruling: the Go
+arm ports S4's cascade narrowings AND S4.7, bare tpub is the witness,
+P3.3's derived rule never relaxes; cite gate 92/92, lint clean both
+toolchains). Round 3 in flight (opus, fold-vs-r2's-10-findings; report
+lands at `design/agent-reports/R0-S2-plan-r3.md`; a clean round CLOSES at
+GREEN). Recon: `design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`).
+Scale: 5 expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
 propagation sweeps + generators; both clippy toolchains (F-430).
 
 ## Boundaries
