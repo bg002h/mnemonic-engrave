@@ -1,0 +1,38 @@
+== md1 card and a text record ==
+sealed:   false
+pub_len:  99
+ct_len:   0
+identity: 8225dd34ec3542e9eb27e28d69217e16f504ce284a6791da8b76db7f73a273a3
+public record 0: md1/mk1 — unconfirmed — engraveable, but the device REPLACES the legend
+== a three-card md1 set ==
+sealed:   false
+pub_len:  203
+ct_len:   0
+identity: 5bac88420ba538db52b79e07e5ed6f8510f6696dcb6ef7ed83615d04217fe955
+public record 0: md1/mk1 — confirmed
+public record 1: md1/mk1 — confirmed
+public record 2: md1/mk1 — confirmed
+== an mk1 cosigner pair ==
+sealed:   false
+pub_len:  192
+ct_len:   0
+identity: 82b36252776b12f07146c6300115ca5e635fc6d4ceafc03bb64f7eeba97ce97c
+public record 0: md1/mk1 — confirmed
+public record 1: md1/mk1 — confirmed
+== a complete mt1 set ==
+sealed:   false
+pub_len:  527
+ct_len:   0
+identity: 06d6e19ed8d0ec9ebba94ec2bba4e16e3ec5d3db7f94dcbd4e125e54272d292b
+public record 0: mt1 chunk — confirmed
+public record 1: mt1 chunk — confirmed
+public record 2: mt1 chunk — confirmed
+public record 3: mt1 chunk — confirmed
+public record 4: mt1 chunk — confirmed
+public record 5: mt1 chunk — confirmed
+  mt set 2dcf2: txid 2dcf2b973d52044b1e58c988a5a59d388073ff05598b0a1e93eeb04c72ebf630 — 222 bytes, 1 input(s), 2 output(s), 6 string(s)
+== a BIP-39 mnemonic ==
+sealed:   false
+pub_len:  93
+ct_len:   0
+identity: 07413e737b629b711cb2c00d7629b04340bad2707b004d69d05e0038184dbb36

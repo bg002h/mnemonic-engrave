@@ -2086,6 +2086,42 @@ fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header
         println!("public record {i}: md1/mk1 — {state}");
     }
     print_mt_confirmation(&records);
+    print_descriptor_confirmation(&records);
+}
+
+/// §5.2's record in `show`, per record — the surface §11 item 1 assumes.
+///
+/// Before S2 a `Descriptor` record printed NOTHING here: `show` listed
+/// `Class::MdMk` and `Class::Mt` and went silent on the one record `--as
+/// descriptor` packs, so a container holding a wallet policy and a container
+/// holding nothing looked the same. A reader may disagree with the writer; it
+/// may not go quiet.
+///
+/// The vocabulary is §5.4's, reused rather than restated: the same
+/// identification block `pack` printed to stderr, which is what makes `show`
+/// re-runnable a week later when that stderr is gone. There is no
+/// confirmed/unconfirmed state to report — a descriptor is not chunked, so
+/// presence IS completeness for it (the same fact `--expect`'s completeness
+/// walk relies on).
+///
+/// **ADDITIVE.** Classification is the guard: a record that does not classify
+/// `Class::Descriptor` prints nothing, so every container that existed before
+/// S2 shows byte-identically.
+fn print_descriptor_confirmation(records: &[String]) {
+    use mnemonic_engrave::sysw;
+    for (i, r) in records.iter().enumerate() {
+        if sysw::classify(r) != sysw::record::Class::Descriptor {
+            continue;
+        }
+        // Classification proved the cascade parses it, so the block is always
+        // `Some` here; the `else` is a total function rather than an `unwrap`
+        // on an operator path.
+        let Some(block) = mnemonic_engrave::descriptor::identification_block(r, None) else {
+            println!("public record {i}: descriptor — this build could not re-read it");
+            continue;
+        };
+        println!("public record {i}: descriptor — complete in one record\n      {block}");
+    }
 }
 
 /// `[mt-decode]` in `show`: per mt1 record, whether its chunk set confirmed —
