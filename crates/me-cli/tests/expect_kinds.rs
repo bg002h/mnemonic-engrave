@@ -339,6 +339,33 @@ fn expect_descriptor_is_still_satisfied_by_an_md1_card() {
     assert!(r.out_exists);
 }
 
+/// **The invocation P1 could not run, and the one the P1.3 ruling was written
+/// for.** `me sysw pack --as descriptor --expect descriptor` builds §5.2's
+/// record and immediately asserts it is there: belt and braces on the funds
+/// path, at exit 0 with a container written. Before the widening it exited 4
+/// saying no record of that kind was in the stream — of the record it had just
+/// built. At P1 it could not be asserted at all, because `--as descriptor`
+/// refused with §5.1's window; pinning THAT would have pinned the parked
+/// behaviour, so P1 pinned the same defect through the pack-free route above
+/// and left this form to P2.1 (IMPL-S2-P1, DEVIATIONS 2).
+#[test]
+fn as_descriptor_with_expect_descriptor_packs() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = vector_field(HAPPY_ROW, "input");
+    let r = pack(
+        dir.path(),
+        &[&input],
+        &["--as", "descriptor", "--expect", "descriptor"],
+    );
+    assert!(
+        !r.err.contains("was not met"),
+        "the record it just packed did not satisfy the expectation: {}",
+        r.err
+    );
+    assert_eq!(r.code, 0, "{}", r.err);
+    assert!(r.out_exists, "a met expectation writes the container");
+}
+
 /// And it stays refusable. A kind that everything satisfies is not a gate.
 #[test]
 fn expect_descriptor_still_refuses_a_mnemonic_only_container() {
