@@ -1,6 +1,10 @@
 # IMPLEMENTATION PLAN — descriptor input, S1 + S3
 
-**Status:** DRAFT, round 0. No code before this plan's R0 closes 0C/0I.
+**Status: GREEN — round 5 (2026-08-28), 0C/0I** (`design/agent-reports/
+PLAN-descriptor-S1S3-r{1..5}.md`; 2C/7I → 2C/3I → 1C/5I → 0C/4I → 0C/0I,
+every fold swept for propagation per the standing directive). r4's six
+minors + two nits are open, non-blocking, recorded as implementer notes in
+r4's report. Implementation may begin.
 **Spec:** `SPEC_descriptor_input.md`, FINAL GREEN (20 rounds +
 the 15-finding walk; closure verdict and leaves-open list in
 `design/agent-reports/R0-descriptor-input-spec-r20-closure.md`), plus the
