@@ -808,18 +808,22 @@ Two boundary rules that fall out of it (R0 r2):
   descriptor among OTHER records" is the WHOLE-INPUT parse (R0 r3's NEW-I2).**
   When `--as` is absent and record classification fails, `me` re-reads the
   whole input through §4's cascade ONLY when the input is DESCRIPTOR-SHAPED,
-  by these tests (aligned with §6's cause-selection steps, corrected per
-  R0 r16): a `(`-bearing expression; a line whose `": "` key is a BlueWallet
-  header (`Name`/`Policy`/`Derivation`/`Format`) or an 8-hex fingerprint —
-  a bare `": "` is NOT enough, or `seed:`/`text:`/`pass:`-style records
-  would hear descriptor vocabulary (r16's new-I2); a single token that is a
-  78-byte base58check payload OR begins with `[` — the origin-annotated
-  bare key, §4.5's own ACCEPT rows (r16's new-I1); or JSON with a
-  descriptor field. Otherwise
+  by these tests (aligned with §6's cause-selection steps; corrected per
+  R0 r16 and r17): an input whose first token is an identifier immediately
+  followed by `(` — a script expression, not any parenthesis: `text: my
+  wallet (2 of 3)` stays a record (r17's minor); a line whose `": "` key is
+  a BlueWallet header (`Name`/`Policy`/`Derivation`/`Format`) or an 8-hex
+  fingerprint — a bare `": "` is NOT enough, or `seed:`/`text:`/`pass:`-
+  style records would hear descriptor vocabulary (r16's new-I2); a single
+  token that begins with `[`, OR whose leading segment before any `/` is a
+  78-byte base58check payload — covering the origin-annotated key AND the
+  keyed-no-origin spellings like `xpub…/<0;1>/*`, all fifteen §4.5 rows
+  (r16's new-I1; r17's new-I1); or JSON with a descriptor field. Otherwise
   the SHIPPED record-classification refusal stands unchanged — exit 4,
-  record vocabulary, pinned by a green test (`sysw_cli.rs:1928`): a
-  mistyped mnemonic word must never hear descriptor vocabulary (R0 r15's
-  new-I4). If it parses as one descriptor — a
+  record vocabulary, pinned by a green test of the record-refusal surface
+  (`sysw_cli.rs:1928`): a mistyped RECORD must never hear descriptor
+  vocabulary (R0 r15's new-I4; r17's nit — the pinned operand is a record,
+  not specifically a mnemonic). If it parses as one descriptor — a
   WELL-FORMED BlueWallet file or pretty JSON does (measured: the fork's own
   `sh` fixture, 14 lines, read whole is ACCEPT, `#tk50fvpm`, a fixed point;
   a malformed one does not: no `Name:` is a device REFUSE (measured), while
@@ -1035,7 +1039,9 @@ a refusal whose truth is "never, in any build" would be false — r15's
 new-I2, reason corrected per r16's minor) —
 replaces that clause with: *"the scannable-plate path is not in this build — keep the
 export file; it packs when the device update ships."* No refusal names a
-flag that refuses in the current build.
+flag that refuses in the current build; a neither-path refusal may DESCRIBE
+a different re-export's future path — describing routes nothing (r17's
+minor).
 
 **Mixed use-site paths across keys — the quantifier is PER KEY, matching
 conjunct 7 (R0 r3's NEW-C1).** The three rules above bind key by key, because
