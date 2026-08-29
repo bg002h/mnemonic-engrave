@@ -14557,6 +14557,15 @@ acceptable is the operator's call. If ruled yes: one flag, a §6 row, §7 rows
 (`md1_admits=true` under the flag), and the W11 window text names the flag
 as the third option. If ruled no: W11's honest neither-path text stands.
 
+**INTERIM RULING 2026-08-28 (operator, same walk session, verbatim): *"I'm
+inclined to say no to f-422 until i understand it better…file my desire for
+status quo on that one."* STATUS QUO stands:** no transform, consented or
+otherwise; W11's neither-path window text is the shipped behaviour; the
+filed question is NOT license to implement the flag. Reopening requires a
+fuller brief to the operator and a fresh ruling — until then this entry is
+a decision record, not scheduled work. Owning phase changed accordingly:
+**none — standing decision.**
+
 ### F-418 — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
 
 **Operator ruling 2026-08-28, in conversation:** *"I'm away from sh2 and it's

@@ -389,3 +389,9 @@ receive-branch export denotes"), making the archival journey work under
 `--as md1` in the window. It packs a different literal descriptor than the
 file — the line this cycle refuses to cross silently — so it is an operator
 ruling, not a walk disposition.
+
+
+**W12 addendum — interim ruling.** Mid-journey-2 the operator ruled F-422
+STATUS QUO ("no… until I understand it better"): no transform ships; W11's
+neither-path text stands; the entry is a decision record until the operator
+asks for a fuller brief.
