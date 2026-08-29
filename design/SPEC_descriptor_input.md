@@ -1593,8 +1593,15 @@ approximately.
    across repos; each reads its own copy and compares to the same constant, so
    the copies cannot drift without one suite going red.
 3. **The Rust test asserts the host column; the Go test asserts the device
-   column.** Neither implementation is ever compared to the other — both are
-   compared to the file. That is why it has to be the same file.
+   column — and, since S2, BOTH tests also assert the derived
+   classification rule, which is COMPUTED from the host column**
+   *(AMENDED 2026-08-29 (S2 P3.5, completing r5 I2's ownership move):
+   `classify(input) == Descriptor` iff `host_admits` for single-line
+   rows, and `classify(canonical) == Descriptor` on admitted rows — so
+   the Go seam test now reads `host_admits`, as data, not as the other
+   implementation's answer)*. Neither implementation is ever compared
+   to the other — both are compared to the file. That is why it has to
+   be the same file.
 4. **The invariant is `host_admits(input) ⇒ device_admits(canonical(input))`,
    asserted per row (R0's I1).** The input-level form is wrong twice over: the
    §4.6 whitespace rows are host-wide by design (the device refuses the raw
