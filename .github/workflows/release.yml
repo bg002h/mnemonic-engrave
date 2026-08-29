@@ -70,7 +70,35 @@ jobs:
         with:
           submodules: true
 
+      # Docs-only detection (operator direction 2026-08-28: "pushing design
+      # documents doesn't require tests"). The job ALWAYS runs and reports --
+      # this is the REQUIRED context, and this repo's standing rule is that a
+      # skipped gate is the default failure -- but when every changed file is
+      # documentation (design/** or a root *.md), the code tree is identical
+      # to the green parent and the expensive steps are gated off with an
+      # explicit verdict in the log. Every fallback is FULL TESTS: new refs,
+      # unknown before-SHA, empty diff, anything not provably docs-only.
+      - name: docs-only detection
+        id: detect
+        run: |
+          BEFORE="${{ github.event.before }}"
+          FULL() { echo "docs_only=false" >> "$GITHUB_OUTPUT"; echo "verdict: full tests ($1)"; }
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            FULL "new ref"; exit 0
+          fi
+          git cat-file -e "$BEFORE" 2>/dev/null || git fetch --no-tags --depth=1 origin "$BEFORE" || { FULL "before unavailable"; exit 0; }
+          CHANGED=$(git diff --name-only "$BEFORE" "$GITHUB_SHA") || { FULL "diff failed"; exit 0; }
+          echo "changed files:"; echo "$CHANGED"
+          if [ -z "$CHANGED" ]; then FULL "empty diff"; exit 0; fi
+          if echo "$CHANGED" | grep -qvE '^(design/|[^/]+\.md$)'; then
+            FULL "non-docs paths present"
+          else
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+            echo "verdict: docs-only"
+          fi
+
       - name: Install Rust toolchain
+        if: steps.detect.outputs.docs_only != 'true'
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -80,12 +108,15 @@ jobs:
       # formatting or lint problem fails fast and cheaply (F-280), matching
       # the sibling mnemonic-transaction repo's ci.yml ordering.
       - name: fmt
+        if: steps.detect.outputs.docs_only != 'true'
         run: cargo fmt --check
 
       - name: clippy
+        if: steps.detect.outputs.docs_only != 'true'
         run: cargo clippy --all-targets --locked -- -D warnings
 
       - name: Set up Go
+        if: steps.detect.outputs.docs_only != 'true'
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -104,6 +135,7 @@ jobs:
       # the binary somewhere else would otherwise fail identically to no
       # install at all, one CI round later.
       - name: Install the shells the history-purge gates execute
+        if: steps.detect.outputs.docs_only != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y zsh fish
@@ -115,13 +147,16 @@ jobs:
           /usr/bin/fish --version
 
       - name: Rust test suite (locked; Go on PATH + ME_REQUIRE_GO=1 → oracles run)
+        if: steps.detect.outputs.docs_only != 'true'
         run: cargo test --locked
 
       - name: Go tests (me-preview sidecar)
+        if: steps.detect.outputs.docs_only != 'true'
         working-directory: preview
         run: go test ./...
 
       - name: Go build + tests (ndef-roundtrip oracle)
+        if: steps.detect.outputs.docs_only != 'true'
         working-directory: firmware/ndef-roundtrip
         run: |
           go build ./...
@@ -132,6 +167,10 @@ jobs:
   # CGO_ENABLED=0 keeps it pure-Go (the only CGO in the seedhammer tree is the
   # tinygo/rp2350 OTP driver, which is unreachable here).
   # ---------------------------------------------------------------------------
+      - name: docs-only verdict
+        if: steps.detect.outputs.docs_only == 'true'
+        run: echo "docs-only push -- code tree identical to the green parent; test suite not applicable; required context reports success"
+
   go-build:
     name: build me-preview (all targets)
     runs-on: ubuntu-latest
