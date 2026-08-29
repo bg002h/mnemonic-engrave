@@ -63,3 +63,10 @@ found six plan-side misses of the r2 fold (held for the r3 fold,
   P2 implementer with controller rulings: M3 = warning prints exactly on
   paths that pack; N1 = deliberate divergence, stands. Re-review (opus,
   round 8 of 15) follows the fold.
+- **Fold-1 landed** (`83703b4`: C1 conjunct-1 split so the flag-dependent
+  arm runs last; I1 fixed by NEW `derive.rs` — key-by-key derivation, the
+  device's own address printed; M1/M2/M3/N2 folded; N1 declined per
+  controller ruling; W14 erratum 2). 560/560, controller re-ran. Re-review
+  dispatched (opus, round 8) — brief centres on derive.rs as new
+  funds-path code, incl. constructing the unexercised 17–20-key push_int
+  branch against an independent oracle.
