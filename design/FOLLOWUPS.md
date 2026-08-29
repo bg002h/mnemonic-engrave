@@ -14480,6 +14480,25 @@ carries `xpub`) and more "broadly accepting", but it widens the host beyond
 the device's own input set. **Operator decision; the spec deliberately took
 the narrow side pending it.**
 
+**F-413 — RESOLVED (ruling 2026-08-29, architect consult per the overnight
+mandate, fourth in the F-410/F-411/F-412 line;
+`design/agent-reports/RULING_f413_slip132.md`). REFUSE STANDS; entry
+closed.** The spec as written is confirmed: `me` admits exactly the device's
+five versions and refuses `ypub`/`upub`/`vpub`/`Upub`/`Vpub` with §6's
+per-version executable remedy. Decisive: the commonest SLIP-132 arrival is a
+BARE `ypub`, and there normalisation is not a byte swap — a bare converted
+key promotes to `pkh(…)`, a different wallet (§6's own measurement) — so the
+safe transform is a new §4.5 promotion row, not a spelling fix; meanwhile
+`upub`/`vpub` bare are barred by the standing testnet-promotion refusal and
+`Upub`/`Vpub` are cosigner keys, so a byte swap could only ever serve the
+rare in-descriptor shape, against reopening GREEN text. The refusal's
+printed conversion is the same transform with the operator's hands on it —
+consistent with F-422's status quo and F-417. The zpub/ypub asymmetry is the
+DEVICE's (one missing classification case, verified at source); its durable
+fix is device-side, filed as F-426. Reopening host-side normalisation
+requires measured operator friction, not re-argument. P1.0 discharged; P1.1
+builds spec-as-written.
+
 ### F-414 — a descriptor cannot be packed TOGETHER with other records in one container (repo: **mnemonic-engrave**; owning phase: **post descriptor-input cycle**) `#me` `#descriptor` `#cli`
 
 Filed from R0's C6 fold (`SPEC_descriptor_input.md` §5.1). `--as` puts the
@@ -14654,3 +14673,14 @@ and the vendored vector file on `seam/descriptor-vectors` (cut from `main`
 merges are the operator's. Until merged, the cross-language seam gate runs
 in neither repo's default CI. The merge (or rebase onto whatever `main`
 becomes) closes this; S2's device work will need the branch anyway.
+
+### F-426 — the device's `ParseExtendedKey` classification switch has no `ypub` case; add it (repo: **seedhammer fork**; owning phase: **with S2's firmware build**) `#fork` `#device` `#slip132`
+
+Filed from RULING_f413_slip132 (2026-08-29). The device already normalises
+the SLIP-132 versions it accepts (`zpub`, `Ypub`, `Zpub`) — `ypubVer` is
+declared in the constants and handled in the normalisation switch, but the
+CLASSIFICATION switch has no case, so `ypub` hits `default` and errors
+(`bip380/bip380.go`, verified at source). One case-arm makes the device
+symmetric (`ypub` → `P2SH_P2WPKH`, normalise to `xpub`), after which the
+host's five-version admission widens to match in its own convergence cycle.
+Batch with S2's firmware build; upstream-PR candidate per the fork rules.
