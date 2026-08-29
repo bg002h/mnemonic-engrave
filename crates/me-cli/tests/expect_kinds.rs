@@ -275,3 +275,81 @@ fn expect_changes_nothing_when_it_is_met_or_absent() {
         with.err
     );
 }
+
+// ── S2: `descriptor` names TWO carriers ─────────────────────────────────────
+
+const DESCRIPTOR_VECTORS: &str = "testdata/descriptor_seam_vectors.json";
+/// An md1-representable happy row, so BOTH carriers are reachable from it.
+const HAPPY_ROW: &str = "formats-happy/bip380-sortedmulti-multipath";
+const MNEMONIC: &str =
+    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
+fn vector_field(name: &str, field: &str) -> String {
+    let raw = std::fs::read(DESCRIPTOR_VECTORS).unwrap();
+    let doc: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+    doc["vectors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["name"].as_str().unwrap() == name)
+        .and_then(|r| r[field].as_str().map(str::to_string))
+        .unwrap_or_else(|| panic!("{DESCRIPTOR_VECTORS}: no {field} on row {name:?}"))
+}
+
+/// **The belt-and-braces invocation, which used to refuse the record it had
+/// just built.** `Kind::Descriptor` resolved by card HRP alone, so once
+/// `--as descriptor` packs §5.2's record, `--expect descriptor` alongside it
+/// would report that record absent — 100% reproducibly, on the funds path,
+/// inside the feature added to prevent exactly that class of false refusal.
+///
+/// The exit code here is 2, not 0, and that is §5.1 rather than `--expect`:
+/// `--expect` resolves FIRST and is MET, and the run then reaches the choice
+/// block because `--as` was omitted. What this pins is that it is not exit 4
+/// saying no record of that kind is in the stream.
+#[test]
+fn expect_descriptor_is_satisfied_by_a_descriptor_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let canonical = vector_field(HAPPY_ROW, "canonical");
+    let r = pack(dir.path(), &[&canonical], &["--expect", "descriptor"]);
+    assert!(
+        !r.err.contains("--expect descriptor was not met"),
+        "the record `--as descriptor` packs must satisfy `--expect descriptor`: {}",
+        r.err
+    );
+    assert_eq!(r.code, 2, "{}", r.err);
+    assert!(
+        r.err.contains("`--as` decides how it is packed"),
+        "{}",
+        r.err
+    );
+}
+
+/// The widening ADDS a carrier and removes none: an md1 descriptor card still
+/// satisfies the kind, which is the reading every shipped container depends on.
+#[test]
+fn expect_descriptor_is_still_satisfied_by_an_md1_card() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = vector_field(HAPPY_ROW, "input");
+    let r = pack(
+        dir.path(),
+        &[&input],
+        &["--as", "md1", "--expect", "descriptor"],
+    );
+    assert_eq!(r.code, 0, "{}", r.err);
+    assert!(r.out_exists);
+}
+
+/// And it stays refusable. A kind that everything satisfies is not a gate.
+#[test]
+fn expect_descriptor_still_refuses_a_mnemonic_only_container() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = pack(dir.path(), &[MNEMONIC], &["--expect", "descriptor"]);
+    assert_eq!(r.code, 4, "{}", r.err);
+    assert!(
+        r.err
+            .contains(mnemonic_engrave::sysw::expect::Kind::Descriptor.describes()),
+        "the refusal must say what was looked for: {}",
+        r.err
+    );
+    assert!(!r.out_exists, "nothing is written on an unmet expectation");
+}

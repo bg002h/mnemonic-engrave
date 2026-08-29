@@ -11,22 +11,30 @@
 //!
 //! | kind | resolved by |
 //! | --- | --- |
-//! | `descriptor` | **HRP `'d'`** (`md1`) — *not* by `Class` |
+//! | `descriptor` | **HRP `'d'`** (`md1`) **or** `Class::Descriptor` — never by `Class::MdMk` |
 //! | `cosigner` | **HRP `'k'`** (`mk1`) — *not* by `Class` |
 //! | `transaction` | `Class::Mt` ∪ `Class::Tx`, under the caller's `Admission` |
 //! | `mnemonic` | `Class::Mnemonic` |
 //! | `secret` | `Class::Codex32Secret` |
 //!
-//! **`descriptor` and `cosigner` must not resolve through `Class`.** `me`'s
-//! `Class` has a single `MdMk` variant covering both, so a `Class`-keyed
-//! `--expect descriptor,cosigner` cannot tell a descriptor card from a cosigner
-//! card — and it is exactly the funds case above that would slip through.
+//! **Neither `descriptor` nor `cosigner` may resolve through `Class::MdMk`.**
+//! That variant covers both card kinds, so a `Class::MdMk`-keyed `--expect
+//! descriptor,cosigner` is satisfied by the descriptor cards alone — exactly
+//! the funds case above. The HRP discriminant is what separates them.
 //!
-//! **`address` is NOT in the vocabulary, deliberately.** `Class::Address` and
-//! `Class::Descriptor` are never produced by `classify` — `me sysw pack`
-//! refuses an address record outright. A kind that can never be satisfied is
-//! worse than an absent one: it turns a gate into a permanent refusal.
-//! `passphrase` is out for the same reason.
+//! **`descriptor` names TWO carriers since S2**, because a wallet descriptor
+//! now reaches the device by two routes: split across `md1` cards (`--as
+//! md1`), or as §5.2's single re-encoded record (`--as descriptor`). Resolving
+//! it by HRP alone would refuse the record `--as descriptor --expect
+//! descriptor` had just built, 100% reproducibly, on the funds path. The
+//! second disjunct is `Class::Descriptor`, which is exact — it cannot be
+//! reached by a cosigner card.
+//!
+//! **`address` is NOT in the vocabulary, deliberately.** `Class::Address` is
+//! never produced by `classify` — `me sysw pack` refuses an address record
+//! outright. A kind that can never be satisfied is worse than an absent one:
+//! it turns a gate into a permanent refusal. `passphrase` is out for the same
+//! reason.
 //!
 //! **`FreeText` and `Unknown` are deliberately unnameable.** `--expect` states
 //! what must be PRESENT, and neither can be required of a stream.
@@ -93,7 +101,9 @@ impl Kind {
     /// What an operator is looking for when they name this kind.
     pub fn describes(self) -> &'static str {
         match self {
-            Kind::Descriptor => "an md1 descriptor card",
+            Kind::Descriptor => {
+                "an md1 descriptor card, or a descriptor record (`--as descriptor`)"
+            }
             Kind::Cosigner => "an mk1 cosigner card",
             Kind::Transaction => "a transaction (an mt1 set or a `tx:` record)",
             Kind::Mnemonic => "a BIP-39 mnemonic",
@@ -104,8 +114,13 @@ impl Kind {
     /// Does `record` satisfy this kind, under `adm`?
     fn matches(self, record: &str, adm: Admission) -> bool {
         match self {
-            // NOT through Class -- it cannot tell 'd' from 'k'.
-            Kind::Descriptor => card_hrp(record) == Some('d'),
+            // Two carriers, and neither is `Class::MdMk`: that variant cannot
+            // tell 'd' from 'k', while `Class::Descriptor` names §5.2's record
+            // exactly and no cosigner card can reach it.
+            Kind::Descriptor => {
+                card_hrp(record) == Some('d')
+                    || super::classify_with(record, adm) == Class::Descriptor
+            }
             Kind::Cosigner => card_hrp(record) == Some('k'),
             // The union is deliberate: a transaction reaches the device either
             // as an mt1 SET of text plates or as a single `tx:` record for the
@@ -202,6 +217,9 @@ pub fn check(records: &[String], kinds: &[Kind], adm: Admission) -> Vec<Unmet> {
         let broken: Vec<usize> = match kind {
             // Walk 2 discards the HRP, so its indices are mapped back through
             // the discriminant to learn WHICH card kind failed to reassemble.
+            // It only ever names `Class::MdMk` records, so §5.2's descriptor
+            // record cannot appear here -- correctly: it is not chunked, so
+            // presence IS completeness for it.
             Kind::Descriptor | Kind::Cosigner => {
                 let want = if kind == Kind::Descriptor { 'd' } else { 'k' };
                 mdmk_bad
