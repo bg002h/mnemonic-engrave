@@ -14553,6 +14553,15 @@ cosigner lines … was the export truncated?"), P2.4 implemented it
 open by the overnight cycle as the mandate's stretch item — descriptor-
 mnemonic's own cycle, one referral string + one test.
 
+**RESOLVED (2026-08-29, same morning, operator: "Do it now";
+descriptor-mnemonic `6c4a56fd`, pushed via its ci/staging ritual with both
+required contexts earned).** The no-placeholder refusal now names which of
+the two shapes it was handed (concrete descriptor / BlueWallet export) and
+refers to `me sysw pack --as <descriptor|md1>`; neither-shape inputs keep
+the terse refusal. Three unit + three CLI tests against the real binary,
+with a no-referral control. Suite 875/875; clippy clean on CI's pinned
+1.85.0 (the F-430 lesson applied).
+
 Filed from the 2026-08-28 journey walk (W2, live with the operator). The
 operator remembered `--as` but not its tool, and `md` — the tool NAMED for
 descriptors — was the natural wrong guess. Measured: `md encode` on a
