@@ -347,3 +347,68 @@ fn item_2_every_format_packs_reads_back_and_derives_the_device_address() {
     }
     assert_eq!(walked, 4, "§11 item 2 walks all four of §4's formats");
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// P2.5 — F-421's converter referral
+// ───────────────────────────────────────────────────────────────────────────
+
+/// **F-421**, filed from the 2026-08-28 journey walk (W3). `me` owns a
+/// top-level `--in FILE` — the NDEF converter — so the operator's natural
+/// `me --in wallet.txt --as descriptor` half-parses THERE and clap tips
+/// `--base64`, a flag from the other program, while nothing names `sysw pack`.
+///
+/// The referral fires on §5.1's OWN shape gate, shared rather than
+/// reimplemented, so the two surfaces cannot disagree about what looks like a
+/// descriptor. Three inputs: two that must refer, one that must not.
+#[test]
+fn the_converter_refers_a_descriptor_to_sysw_pack() {
+    const REFERRAL: &str =
+        "that looks like a wallet DESCRIPTOR, and this command converts one md1/mk1/mt1 \
+         string to NFC bytes.";
+    const NEXT: &str = "me sysw pack --as <descriptor|md1> --in <your export file>";
+
+    let mut referred = 0;
+    for row in [
+        "formats-happy/bluewallet-sh-fixture",
+        "formats-happy/bip380-sortedmulti-multipath",
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("wallet.txt");
+        std::fs::write(&path, row_input(row)).unwrap();
+        let out = assert_cmd::Command::cargo_bin("me")
+            .unwrap()
+            .arg("--in")
+            .arg(&path)
+            .output()
+            .unwrap();
+        let err = stderr(&out);
+        assert_eq!(code(&out), 4, "{row}: the converter's own exit code\n{err}");
+        assert!(err.contains(REFERRAL), "{row}: no referral\n{err}");
+        assert!(
+            err.contains(NEXT),
+            "{row}: the referral names no command\n{err}"
+        );
+        referred += 1;
+    }
+    assert_eq!(referred, 2, "both descriptor spellings refer");
+
+    // The control: an input that is NOT descriptor-shaped keeps the shipped
+    // refusal unchanged. A referral on everything would be noise, and it would
+    // be the same defect in the other direction.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("junk.txt");
+    std::fs::write(&path, "zzz1nonsense\n").unwrap();
+    let out = assert_cmd::Command::cargo_bin("me")
+        .unwrap()
+        .arg("--in")
+        .arg(&path)
+        .output()
+        .unwrap();
+    let err = stderr(&out);
+    assert_eq!(code(&out), 4, "{err}");
+    assert!(err.contains("unrecognized HRP"), "{err}");
+    assert!(
+        !err.contains("that looks like a wallet DESCRIPTOR"),
+        "a non-descriptor was referred:\n{err}"
+    );
+}

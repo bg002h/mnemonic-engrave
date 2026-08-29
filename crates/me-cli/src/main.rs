@@ -636,6 +636,13 @@ fn run() -> i32 {
     // Capture the plate-budget flag before the input is dropped.
     let too_long = mnemonic_engrave::exceeds_plate_budget(&input);
 
+    // F-421 — captured HERE, before the Zeroizing scrub, because the referral
+    // below needs the VERDICT and must never keep a copy of the bytes. It is a
+    // bool: nothing about the input escapes this line.
+    let descriptor_shaped = mnemonic_engrave::descriptor::gate_opens(
+        &mnemonic_engrave::descriptor::cascade::normalise(&input),
+    );
+
     let result = convert(&input);
 
     // Build the --echo line ONLY on the success path, where the input is a
@@ -662,6 +669,26 @@ fn run() -> i32 {
         }
         Err(e) => {
             eprintln!("me: {e}");
+            // F-421 — THE CONVERTER'S REFERRAL. `me` owns a top-level
+            // `--in FILE` (this, the NDEF converter), so the operator's natural
+            // `me --in wallet.txt --as descriptor` half-parses here and clap
+            // tips `--base64` — a flag from the OTHER program — while nothing
+            // names `sysw pack`. Filed from the 2026-08-28 journey walk (W3);
+            // the in-tool twin of F-420.
+            //
+            // The predicate is §5.1's OWN shape gate, not a second one: a
+            // concrete key expression, BlueWallet `Key: value` lines, or a JSON
+            // wrapper. Sharing it is what stops the two surfaces disagreeing
+            // about what "looks like a descriptor" means.
+            if descriptor_shaped {
+                eprintln!(
+                    "me: that looks like a wallet DESCRIPTOR, and this command converts one \
+                     md1/mk1/mt1 string to NFC bytes.\n      \
+                     A descriptor is packed by a different verb, which asks how you want it \
+                     on the plate:\n      \
+                     \x20   me sysw pack --as <descriptor|md1> --in <your export file>"
+                );
+            }
             return EXIT_INVALID;
         }
     };
