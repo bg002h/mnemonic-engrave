@@ -327,3 +327,39 @@ lines, both from machinery the constellation already owns:**
 surfaces should agree (public-only payloads are not bearer). (b) The
 guard's remedy names raw `picotool`; the operator's own bench standard is
 `sh2-flash` — environment-specific, noted only.
+
+
+---
+
+## W11 — the operator's QUESTION ("how would a JSON /0/* export arise?")
+## exposed a refusal loop in the S3 window, before any step was walked
+
+**The provenance answer, for the record.** A `{label, descriptor}` JSON with
+`/0/*` is a Specter-era wallet export — the fork's own `parse_test.go`
+fixture is one (`label`/`descriptor`/`blockheight`/`devices` keys). Pre-
+multipath software stored the RECEIVE-branch descriptor and derived change
+by convention, so every export of that era carries `/0/*`. Such files
+outlive their software — the archival user is the engraving tool's core
+clientele.
+
+**The composed loop.** For that user, in the S3-only window:
+
+1. `--as md1` → §5.3(a) refuses `/0/*`: "Use `--as descriptor`, which
+   carries `/0/*` exactly."
+2. `--as descriptor` → W4's window refusal: "not available in this build …
+   `--as md1` is available now" — FALSE for this input. Goto 1.
+
+The r5-NEW-I2 defect class (refusals pointing at each other), resurrected by
+the phase window. Neither text is wrong alone; the WINDOW composes them into
+a loop for exactly the archival journey.
+
+**Classification: SPEC change — amends W4's queued fold before it lands.**
+The window refusal's alternative clause is CONDITIONAL: offer `--as md1`
+only when the input is md1-representable; for an (a)/(a″)-shaped input it
+says instead: *"--as md1 cannot carry this wallet's /0/* path either — no
+path in this build engraves this file. It loses nothing by waiting: keep it,
+and it packs the day the device update ships."* Symmetrically, §5.3(a)/(a″)'s
+remedies, in a build where S2 has not shipped, append: *"(--as descriptor is
+not in this build yet — keep the file.)"* No refusal may point at a flag
+that refuses in the CURRENT build — the r5 rule, now stated over build
+windows, not just admission.
