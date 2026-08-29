@@ -742,14 +742,20 @@ a wallet export does not know which they want:
 
 ```
 me: this input is a wallet descriptor, and `--as` decides how it is packed.
-      --as descriptor   pack the descriptor in CANONICAL form -- the same
-                        wallet, normalised spelling: SLIP-132 versions become
-                        xpub, ' becomes h, the checksum is recomputed. The
-                        device's Engrave Bundle / Multisig programs read it
-                        directly.
-      --as md1          decompose to a BIP-388 template plus keys and pack an
-                        md1 card set. Carries policies `--as descriptor`
-                        cannot, and needs no firmware change.
+      --as descriptor   the SCANNABLE plate. The device engraves the wallet
+                        as a QR that any phone or wallet app can read -- no
+                        special tooling to restore, ever. Packed in CANONICAL
+                        form (SLIP-132 versions become xpub, ' becomes h,
+                        checksum recomputed). The engraver itself cannot
+                        read the QR back (it has no camera).
+      --as md1          the HAND-COPYABLE plate. me converts the descriptor
+                        and packs error-corrected md1 text cards in ONE step
+                        (no md invocation needed). Restored by transcription;
+                        each string survives up to 4 wrong characters, so it
+                        can even be hand-stamped. Carries policies
+                        --as descriptor cannot. Restoring needs an md1
+                        decoder (an open spec; the tooling today is this
+                        project's).
     They are not interchangeable — `me sysw pack --help` has the comparison.
 ```
 
@@ -800,6 +806,32 @@ Two boundary rules that fall out of it (R0 r2):
   for `--as` invocations only. That is a cross-document change of the same
   shape as F-415, filed as **F-416**, so §5.6 gains its note in its own cycle
   rather than drifting silently (NEW-M2).
+
+**The S3-only window — NORMATIVE (walk W4/W11; F-418 ships S3 first).** In a
+build where the `--as descriptor` path has not shipped, `--as descriptor` is
+a REFUSAL at `EXIT_REFUSED` (3) — emitted AFTER the host-side parse and the
+§5.4 identification block, so the refusal can be truthful about the
+alternative and the operator can still verify the wallet (walk W13). The
+text leads with the verdict and contains no internal phase labels (walk W5):
+
+    me: --as descriptor is not available in this build.
+          The QR plate needs device firmware this release does not include.
+
+followed by ONE of two alternative clauses, decided by md1-representability
+(walk W11 — no refusal may point at a path that refuses in the CURRENT
+build):
+
+- input md1-representable: *"Available now: --as md1 — error-corrected text
+  cards, restored by transcription instead of scanning. Your export file is
+  all you need to come back for the QR plate later; nothing is lost by
+  waiting."*
+- input (a)/(a″)-shaped: *"--as md1 cannot carry this wallet's use-site path
+  either — no path in this build engraves this file. It loses nothing by
+  waiting: keep it, and it packs the day the device update ships."*
+
+Both walked journeys' FIRST commands reached this refusal (walk record) —
+it is the front door of the S3 release, and §11 item 5's sibling test pins
+both variants.
 
 ### 5.2 `--as descriptor`
 
@@ -909,8 +941,14 @@ same input.
 > artefacts, and `<0;1>/*` is what it already derives for a childless
 > descriptor, so materialising it is the only encoding that preserves the
 > wallet md1 claims to carry (the address-layer equality below). The §5.4
-> confirmation prints the template WITH the materialised `<0;1>/*`, so the
-> operator sees it. An EXPLICIT single fixed index (`/0/*`) remains a refusal
+> confirmation prints the template WITH the materialised `<0;1>/*` AND one
+> annotation line, in operator terms (walk W8 — an unexplained novelty at
+> steel-imminent stakes earns "is this the wrong derivation path?"; walk W9
+> — cite the BIPs, an authority the operator can check, not the device):
+> *"note: your file names no derivation below the key origins; `<0;1>/*` is
+> the standard receive/change continuation of your keys' BIP-48 origin
+> (BIP-388's canonical tail). Addresses are unchanged by making it
+> explicit."* An EXPLICIT single fixed index (`/0/*`) remains a refusal
 > per (a): the device does not default that shape away — it derives it — and
 > md1 cannot represent it.
 
@@ -978,20 +1016,40 @@ the equality it actually has — same wallet, different serialisation — and th
 
 ### 5.4 Both paths parse host-side first
 
-**NORMATIVE.** Neither path ships bytes the host has not understood. Before any
-record is written, `me` prints to stderr what it read:
+**NORMATIVE — and the block prints on EVERY successful host-side parse,
+BEFORE whatever follows: a pack, §5.1's window refusal, or a §5.3 refusal
+(walk W13: parse succeeded ⇒ identify the wallet, always; then say what can
+or cannot be done with it — refusals FOLLOW identification, never replace
+it).** Neither path ships bytes the host has not understood. `me` prints to
+stderr:
 
 - the format it matched (§4.1), by name;
 - the canonical descriptor, in full;
 - the script type, threshold and key count;
-- for `--as md1`, the template and the placeholder-to-fingerprint map;
+- **`wallet-id:` the WalletPolicyId fingerprint** — the same identifier for
+  the same wallet under BOTH `--as` values, computed host-side (walk W10; it
+  exists for cross-verifying copies against the engraved card);
+- **`address 0:` receive address 0**, followed by: *"compare against your
+  wallet software's first receive address before engraving."* — the
+  executable check (walk W10; verified in journey 2 against the wallet
+  owner's own phone);
+- **the watch-only line, owner-quotable (walk W15):** *"watch-only: public
+  keys only — this artifact can SHOW the wallet's addresses and balances;
+  it cannot spend. Whoever holds it can watch the wallet — share it
+  accordingly."*;
+- for `--as md1`, the template and the placeholder-to-fingerprint map —
+  with §5.3(a′)'s annotation line whenever materialisation occurred (walk
+  W8/W9);
 - for a promoted bare key (§4.5), the full §4.5 announcement — `key as
-  supplied` AND `inferred wallet`, with the normalisation named (R0 r2's
-  NEW-N2: this list and §4.5 describe the same stderr block and must agree).
+  supplied` AND `inferred wallet`, with the normalisation named (R0 r3's
+  NEW-N2, citation corrected from r2 in the walk fold: this list and §4.5
+  describe the same stderr block and must agree).
 
-This follows the standing ruling that all verification is host-side, and it is
-what makes §5.1's no-fallback rule usable: the operator can see that the thing
-they are about to engrave is the wallet they meant.
+This follows the standing ruling that all verification is host-side, and it
+is what makes §5.1's no-fallback rule usable: the operator can see — and
+CHECK, by one address comparison — that the thing they are about to engrave
+is the wallet they meant, even when this build's answer is a refusal (walk
+W13: the wait-or-switch decision deserves a verified wallet).
 
 ### 5.5 The capability split, measured
 
@@ -1008,6 +1066,9 @@ This table is why there are two flags and no default. Every cell was run.
 | `tr(KEY)` single-key | ✅ | ✅ |
 | carries a label | text only, dropped | dropped |
 | needs a firmware change to be readable | **yes, §5.2** | **no** |
+| on the plate (walk W1) | a QR — machine-scan only | text cards (2 strings, ~168 chars for keyed single-sig; measured) |
+| restored by | scanning into any wallet app — no project tooling, ever | transcription + an md1 decoder (open spec; tooling is this project's) |
+| hand-copyable — letter punches (walk W14) | ❌ | ✅ — BCH corrects up to 4 wrong characters per string, so a mis-struck punch is inside the budget |
 
 The two `❌` columns are not the same shape, in either direction. That is the
 whole argument for the operator choosing.
@@ -1043,7 +1104,14 @@ from §4.7's admission predicate or §5.3's representability limits fire from
 their own checks, after a successful parse — the rule never selects them
 (R0 r2's NEW-N1). And the `sortedmulti` rows below read over BOTH multi
 forms: §4.7 conjunct 1's md1-path `multi` twins hit the same conjuncts and
-get the same texts with the form name substituted (R0 r5's NEW-M2). The one
+get the same texts with the form name substituted (R0 r5's NEW-M2).
+
+**Refusal text speaks OPERATOR language — NORMATIVE (walk W5, from the
+operator's own verdict "convoluted").** Every quoted text below: leads with
+the verdict; contains NO internal identifiers — no phase labels, no F-numbers,
+no spec § references inside the quotes (those live in the row's annotation,
+outside the quotes); and names only next actions executable in the CURRENT
+build (walk W11). The one
 exception is the single-key-wrapper row, where NEITHER the remedy's
 `sortedmulti` forms NOR the device-measurement parenthetical transposes —
 all three single-key `multi` twins are device REFUSE at PARSE (measured) and
@@ -1060,6 +1128,8 @@ NEW-I2).
 | a **wrapper whose inner descriptor is malformed** | the wrapper is named, then the inner error, then the position: *"the `{label, descriptor}` JSON parsed, and its `descriptor` field did not: `bip380: script: missing ')'`. The label was `"…"`. The problem is in the descriptor string, not the JSON."* |
 | a **BlueWallet file with no `Name:`** | *"this is a BlueWallet setup file — it has `Policy`, `Derivation` and `Format` headers and `N` cosigner lines — but no `Name:` header, and the device requires one. Add a line `Name: <anything>`."* This is the case §4.2 measured as producing the generic message today, with the real reason destroyed. |
 | a BlueWallet file with no `Format:` | *"…no `Format:` header, so the script type is undefined. Add `Format: P2WSH` (or `P2SH`, or `P2WSH-P2SH`)."* §4.2 defect 1. |
+| a BlueWallet file with **zero cosigner lines** | *"this BlueWallet file has headers but no cosigner lines (`<8-hex-fingerprint>: <xpub>`). There is no wallet here to pack — was the export truncated? Re-export from the coordinator."* §4.2 rule 2 (F-419, written from the walk). |
+| **`--as descriptor` in a build where its path has not shipped** | §5.1's window refusal, both variants — verdict first, alternative conditional on md1-representability. **`EXIT_REFUSED` (3)**, after the §5.4 identification block (walk W4/W11/W13). |
 | a BlueWallet `Policy: k of n` with a different key count | *"`Policy: 2 of 3` declares 3 cosigners; the file has 2. Cosigner lines are `<8-hex-fingerprint>: <xpub>`."* |
 | a BlueWallet file whose keys have **no origin path** (no `Derivation:` header at all, or one placed after cosigner lines) | *"cosigner `<fp>` has no derivation path — the `Derivation:` header is missing or appears after the cosigner lines. The descriptor this file produces cannot be re-read by the device. Put `Derivation: <path>` above the first cosigner line."* §4.2 rule 3 (R0's C1). |
 | a BlueWallet cosigner fingerprint that is not 8 hex characters | *"cosigner line `ab: xpub…` — a master fingerprint is exactly 8 hex characters (4 bytes)."* §4.2 defect 4; the device PANICS on fewer, so this file must never reach it. |
@@ -1084,7 +1154,7 @@ NEW-I2).
 | a **non-consecutive multipath** — `<0;2>`, `<1;3>` | *"the device derives only `<i;i+1>` pairs (receive; change). It accepts this descriptor and then errors on every address."* §4.7 conjunct 7 (R0 r2's NEW-I1). |
 | any **other use-site path shape** — a bare fixed index, `/0/1/*` | *"use-site paths `me` packs: absent, `/*`, `/i/*`, `<i;i+1>`, `<i;i+1>/*`. This one is outside the set the device is measured to handle."* §4.7 conjunct 7 (closed set). |
 | a **multipath with no trailing wildcard** (`<0;1>`) under **`--as md1`** | *"key `@N` (`[<fp/path>]xpub…`) uses `<0;1>` with no trailing wildcard — md1 cannot represent it; encoding it would silently produce the `<0;1>/*` wallet, which derives DIFFERENT addresses. Use `--as descriptor`, which carries `<0;1>` exactly."* §5.3(a″) (R0 r2's NEW-C1; key named per R0 r4's NEW-M4; the `multi`-form remedy replacement of the previous row applies here identically). |
-| a **multi-record input whose records include a descriptor**, `--as` absent | *"record `N` is a wallet descriptor. A descriptor is packed ALONE: run `me sysw pack --as <descriptor\|md1>` with just the descriptor — one container cannot yet carry a descriptor plus other records (F-414). The other records pack without `--as`, as usual."* **`EXIT_INVALID` (4)**, as today. Applies ONLY when the whole input does not parse as one descriptor (§5.1's discriminator — a multi-line BlueWallet or JSON file parses whole and gets the "--as decides" block instead); naming `--as` here would send the operator to a whole-file read that refuses with a message false about the file (R0 r2's NEW-I5, measured). |
+| a **multi-record input whose records include a descriptor**, `--as` absent | *"record `N` is a wallet descriptor. A descriptor is packed ALONE: run `me sysw pack --as <descriptor\|md1>` with just the descriptor — one container cannot yet carry a descriptor plus other records. The other records pack without `--as`, as usual."* (The capability gap is F-414 — named here, not in the quoted text, per the walk-W5 rule.) **`EXIT_INVALID` (4)**, as today. Applies ONLY when the whole input does not parse as one descriptor (§5.1's discriminator — a multi-line BlueWallet or JSON file parses whole and gets the "--as decides" block instead); naming `--as` here would send the operator to a whole-file read that refuses with a message false about the file (R0 r2's NEW-I5, measured). |
 
 **Two rules that bind every row above.** Both come from
 `SPEC_constellation_cli_uniformity`:
@@ -1161,8 +1231,8 @@ approximately.
 `bip380` / `json` / `promoted-key` — or `none` where no branch matched;
 R0 r6's NEW-M3: on host/device-disagreeing rows any other reading gives a
 different answer), `source`, and the optional value fields `address_0` /
-`address_1` / `md_descriptor_contains` (asserted per the paragraph below;
-R0 r6's NEW-I1) — plus the columns later rounds forced apart:
+`address_1` / `md_descriptor_contains` / `wallet_id` (asserted per the
+paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns later rounds forced apart:
 
 - **`device_admits` means `nonstandard.OutputDescriptor` accepts the INPUT** —
   the scan door, nothing else. The classifier is a different predicate with a
@@ -1300,9 +1370,13 @@ column's, citing their own conjunct — R0 r5's NEW-I1), the Rust test asserts t
 for an unrelated cause must not satisfy the assertion; this is what turns
 §5.3(a)/(a″) from prose into a gate). This is the check that would have
 caught the `/0/*` collapse, and no string-level comparison would have.
-Requirement 4's canonical-level invariant binds rows with `host_admits=true`
-— a `multi` row packs no `Descriptor` record, so the invariant is vacuous
-there by construction, not by exemption.
+Rows may also carry **`wallet_id`** — the WalletPolicyId fingerprint (walk
+W10): asserted by BOTH suites, each computing it from its own
+implementation — the F-212 class (a cross-language identity divergence no
+per-repo test can see) made into a standing gate. Requirement 4's
+canonical-level invariant binds rows with `host_admits=true` — a `multi`
+row packs no `Descriptor` record, so the invariant is vacuous there by
+construction, not by exemption.
 
 ---
 
@@ -1473,7 +1547,11 @@ This spec is GREEN when a review round returns 0 Critical / 0 Important. It is
 4. Every refusal in §6 has a test that reaches it and asserts the *text*, not
    just the exit code. The `--as descriptor`-only rows among them are S2's
    (F-418); the rest bind S3 (R0 r6's NEW-M5).
-5. `--as` omitted with a descriptor input exits **2** and prints §5.1's block.
+5. `--as` omitted with a descriptor input exits **2** and prints §5.1's
+   block. Its sibling (walk W4/W11): `--as descriptor` in a build where its
+   path has not shipped exits **3** and prints §5.1's window refusal — BOTH
+   alternative variants tested (an md1-representable input, and an
+   (a)/(a″)-shaped one).
 6. §9's item 2 is discharged: a `ClassDescriptor` record has been loaded on a
    real device and displayed, at least once, before this is called shipped —
    binding **S2's ship only** (F-418): S1 and S3 close without it, and it is
