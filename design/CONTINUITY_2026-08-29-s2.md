@@ -30,13 +30,13 @@ r5 RED 0C/2I/1M/2N (`9de0bc8`/`b5570a2` -- both Importants were in r4's
 neither-tag ruling; RE-RULED: the ypub row gets a NEW single-member S7
 bullet, the F-426 version-gap witness; TAG_SLOTS 88->89, ROW_FLOOR
 71->72, all three manifest copies enumerated; ownership split rule:
-owned by the phase whose diff falsifies it). r6 RED 0C/1I/3M/1N (`97fb400`/`d3f59cc`
--- version-gap arithmetic verified exact; the Important was
-comment.json being a generator INPUT, now edited at P2.6 before gen.py
-runs). Round 7 in flight (opus, fold-vs-r6's-5-findings; report lands
-at `design/agent-reports/R0-S2-plan-r7.md`; clean CLOSES at GREEN).
-Past the 5-round expected-good mark; 0C for three straight rounds,
-findings confined to each prior fold's diff.
+owned by the phase whose diff falsifies it). r6 RED 0C/1I/3M/1N (`97fb400`/`d3f59cc`);
+**r7 GREEN 0C/0I/1M/2N-ish (0C/0I/1M/1N) -- R0 CLOSED 2026-08-29**
+(persisted `beb3617`; Minor+Nit folded wording-only `f40fa81`; plan
+status flipped GREEN). Seven rounds, counts 20 -> 10 -> 9 -> 4 -> 5 ->
+5 -> 2, zero Criticals from r4 on. IMPLEMENTATION IS GO at P0 (flip
+inventory, baseline shas, lint-gate script, baseline suites), then ONE
+implementer per phase, P1 Rust arm reviewed before the P3 Go port.
 Recon: `design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`).
 Scale: 5 expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
 propagation sweeps + generators; both clippy toolchains (F-430).

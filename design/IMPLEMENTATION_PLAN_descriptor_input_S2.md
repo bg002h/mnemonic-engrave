@@ -1,11 +1,12 @@
 # IMPLEMENTATION_PLAN_descriptor_input_S2 — `--as descriptor` end to end
 
-**Status: DRAFT — R0 rounds 1 (RED 4C/6I/7M/3N), 2 (RED 1C/2I/4M/3N),
-3 (RED 1C/1I/4M/3N), 4 (RED 0C/2I/2M/0N), 5 (RED 0C/2I/1M/2N) and 6
-(RED 0C/1I/3M/1N, `design/agent-reports/R0-S2-plan-r6.md` — all 5 of
-r5's findings verified resolved, the version-gap arithmetic recomputed
-exact; the one Important was `comment.json`'s ownership) folded
-2026-08-29.** Single author
+**Status: GREEN — R0 closed 2026-08-29 at round 7 (0C/0I/1M/1N,
+`design/agent-reports/R0-S2-plan-r7.md`; the Minor and Nit folded
+wording-only post-closure). Rounds 1-6 ran RED and were each persisted
+and folded: r1 4C/6I/7M/3N, r2 1C/2I/4M/3N, r3 1C/1I/4M/3N,
+r4 0C/2I/2M, r5 0C/2I/1M/2N, r6 0C/1I/3M/1N — reports in
+`design/agent-reports/R0-S2-plan-r*.md`, one persist + one fold commit
+per round. Implementation may begin at P0.** Single author
 per the R0 gate; this plan binds S2 of `SPEC_descriptor_input.md` (GREEN
 2026-08-28, amendments through the S1+S3 cycle). S1+S3 shipped 2026-08-29
 (engrave `f244442`, records through `4646fa2`); the SH2 is back on the bench
