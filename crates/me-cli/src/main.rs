@@ -2657,8 +2657,8 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                 U::Unrecognised => format!(
                     "record {i} (records count from 0) is not a form this container can \
                      place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not \
-                     a `text:`/`pass:`/`tx:` record. Descriptors and addresses are not \
-                     yet classifiable here — see sysw::classify"
+                     a `text:`/`pass:`/`tx:` record. Addresses are not classifiable here, \
+                     and neither is a wallet descriptor `me` refuses — see sysw::classify"
                 ),
             }
         }

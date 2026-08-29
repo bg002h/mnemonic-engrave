@@ -140,7 +140,9 @@ pub enum UnknownReason {
     /// [`Unrecognised`]: UnknownReason::Unrecognised
     Bip93OutsideTheProfile(usize),
     /// No reserved prefix, not a BIP-39 mnemonic, and not a constellation
-    /// string. This is the case the descriptor/address gap belongs to.
+    /// string. This is the case the address gap belongs to — and, since S2,
+    /// the case a descriptor `me` REFUSES lands in: the descriptor arm places
+    /// only what §4.7 admits, so an inadmissible one still falls through here.
     Unrecognised,
 }
 

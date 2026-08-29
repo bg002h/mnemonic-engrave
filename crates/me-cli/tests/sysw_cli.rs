@@ -454,7 +454,7 @@ fn a_plain_text_pass_body_is_refused_by_body_and_never_echoed() {
         "THE PASSPHRASE MUST NOT REACH STDERR: {err}"
     );
     assert!(
-        !err.contains("Descriptors and addresses"),
+        !err.contains("Addresses are not classifiable here"),
         "and must not explain the gap that did not apply here: {err}"
     );
 }
