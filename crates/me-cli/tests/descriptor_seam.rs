@@ -14,7 +14,7 @@
 //! what makes that structural.
 //!
 //! **What is green in P0 and what is not.** The parser does not exist yet, so
-//! every assertion that would call it is `#[ignore]`d and each ignore string
+//! every assertion that would call it is ignore-tagged and each ignore reason
 //! names the phase that removes it. What runs today is the file's own
 //! integrity: the pin, the schema, the coverage manifest's arithmetic, the
 //! per-column population counts, and requirement 5's non-vacuity. Those are
@@ -22,7 +22,17 @@
 //! counted around, and the population counts are what make a mistyped field
 //! name red the suite instead of silently disabling an assertion.
 //!
-//! **ZERO `#[ignore]` is P2's gate** (`grep -c '#\[ignore' `on this file).
+//! **P2's gate is that this file carries ZERO ignore attributes:**
+//!
+//! ```text
+//! grep -c '^#.ignore' crates/me-cli/tests/descriptor_seam.rs   -> must be 0
+//! ```
+//!
+//! The anchor is load-bearing. Attributes sit at column 0 and comment lines
+//! never do, so the gate cannot match its own prose — a gate whose
+//! documentation matches its own grep can never reach zero, and the fix a
+//! future implementer reaches for is to weaken the grep rather than to finish
+//! the work.
 
 use sha2::Digest as _;
 
@@ -211,7 +221,16 @@ fn the_row_schema_holds_on_every_row() {
             );
         }
         // REQUIRED on every row, no defaults.
-        for k in ["name", "input", "sha256", "host_admits", "md1_admits", "format", "covers", "source"] {
+        for k in [
+            "name",
+            "input",
+            "sha256",
+            "host_admits",
+            "md1_admits",
+            "format",
+            "covers",
+            "source",
+        ] {
             assert!(has(r, k), "{n}: missing required key {k:?}");
         }
         assert!(r["host_admits"].is_boolean(), "{n}: host_admits");
@@ -260,7 +279,11 @@ fn the_row_schema_holds_on_every_row() {
         // elsewhere.
         let gated = c.contains(&"gate");
         for k in ["gate_open", "outcome", "exit_code"] {
-            assert_eq!(has(r, k), gated, "{n}: {k} must be present iff `gate`-tagged");
+            assert_eq!(
+                has(r, k),
+                gated,
+                "{n}: {k} must be present iff `gate`-tagged"
+            );
         }
         if gated {
             let outcome = r["outcome"].as_str().unwrap();
@@ -303,7 +326,10 @@ fn the_row_schema_holds_on_every_row() {
                 "{n}: gate_open and the outcome class disagree"
             );
         } else {
-            assert!(!has(r, "refusal_row"), "{n}: refusal_row outside a gate row");
+            assert!(
+                !has(r, "refusal_row"),
+                "{n}: refusal_row outside a gate row"
+            );
         }
 
         // The two value fields the Rust side owns are only meaningful on a row
@@ -345,7 +371,11 @@ fn the_coverage_manifest_is_met_by_count_not_by_reading() {
     );
     let slots: usize = got.values().sum();
     assert_eq!(slots, TAG_SLOTS, "tag-slot total");
-    assert!(rs.len() >= ROW_FLOOR, "{} rows, floor {ROW_FLOOR}", rs.len());
+    assert!(
+        rs.len() >= ROW_FLOOR,
+        "{} rows, floor {ROW_FLOOR}",
+        rs.len()
+    );
 
     // The 17 overlap slots, distributed EXACTLY as §7 states: 15 second-tags on
     // the §4.5 rows plus 2 third-tags on the named pair. Without this a dropped
@@ -358,7 +388,11 @@ fn the_coverage_manifest_is_met_by_count_not_by_reading() {
         rs.iter().filter(|r| covers(r).len() > 3).count() == 0,
         "no row may carry a fourth tag"
     );
-    assert_eq!(slots - rs.len(), SECOND_TAGGED + THIRD_TAGGED, "overlap slots");
+    assert_eq!(
+        slots - rs.len(),
+        SECOND_TAGGED + THIRD_TAGGED,
+        "overlap slots"
+    );
     // Every multi-tagged row is a §4.5 promotion row, and both three-tag rows
     // are the pair §7 names.
     for r in rs.iter().filter(|r| covers(r).len() > 1) {
@@ -419,7 +453,9 @@ fn the_row_set_is_not_vacuous() {
     // Every host-wider row is a whitespace row and carries a canonical.
     assert_eq!(host_wider, 3, "the §4.6 whitespace rows, and only those");
     for r in rows(&d) {
-        if r["host_admits"].as_bool().unwrap() && r.get("device_admits").and_then(|v| v.as_bool()) == Some(false) {
+        if r["host_admits"].as_bool().unwrap()
+            && r.get("device_admits").and_then(|v| v.as_bool()) == Some(false)
+        {
             assert!(
                 has(r, "canonical"),
                 "{}: host wider than the device with no canonical",
@@ -444,9 +480,17 @@ fn every_column_has_the_expected_population() {
             .count()
     };
     assert_eq!(rs.len(), POP.rows, "rows");
-    assert_eq!(truthy("host_admits"), POP.host_admits_true, "host_admits=true");
+    assert_eq!(
+        truthy("host_admits"),
+        POP.host_admits_true,
+        "host_admits=true"
+    );
     assert_eq!(truthy("md1_admits"), POP.md1_admits_true, "md1_admits=true");
-    assert_eq!(truthy("device_admits"), POP.device_admits_true, "device_admits=true");
+    assert_eq!(
+        truthy("device_admits"),
+        POP.device_admits_true,
+        "device_admits=true"
+    );
     assert_eq!(
         rs.iter()
             .filter(|r| r.get("device_admits").and_then(|v| v.as_bool()) == Some(false))
@@ -454,12 +498,20 @@ fn every_column_has_the_expected_population() {
         POP.device_admits_false,
         "device_admits=false"
     );
-    assert_eq!(rs.len() - count("device_admits"), POP.device_admits_absent, "device_admits absent");
+    assert_eq!(
+        rs.len() - count("device_admits"),
+        POP.device_admits_absent,
+        "device_admits absent"
+    );
     assert_eq!(count("canonical"), POP.canonical, "canonical");
     assert_eq!(count("address_0"), POP.address_0, "address_0");
     assert_eq!(count("address_1"), POP.address_1, "address_1");
     assert_eq!(count("wallet_id"), POP.wallet_id, "wallet_id");
-    assert_eq!(count("md_descriptor_contains"), POP.md_descriptor_contains, "md_descriptor_contains");
+    assert_eq!(
+        count("md_descriptor_contains"),
+        POP.md_descriptor_contains,
+        "md_descriptor_contains"
+    );
     assert_eq!(count("sysw_class"), POP.sysw_class, "sysw_class");
     assert_eq!(count("device_probe"), POP.device_probe, "device_probe");
     assert_eq!(count("gate_open"), POP.gate_fields, "gate_open");
@@ -509,8 +561,8 @@ fn every_column_has_the_expected_population() {
 
 // ───────────────────────────────────────────────────────────────────────────
 // HOST COLUMNS. Every test below calls code S1/S3 has not written yet. Each
-// ignore string names the phase that removes it; ZERO `#[ignore]` in this file
-// is P2's gate.
+// ignore reason names the phase that removes it, and this block being empty of
+// them is P2's gate (see the module doc for the exact command).
 // ───────────────────────────────────────────────────────────────────────────
 
 /// §5.2's classification predicate: `me` would pack this input as a
