@@ -1,0 +1,211 @@
+{
+  "_comment": [
+    "The record surface BEFORE S2's descriptor arm -- invariant 2's baseline.",
+    "Captured at P1.0 (the gate restructure), which is the last commit at which",
+    "`sysw::classify` cannot answer `Descriptor`, so the `class` column here is",
+    "pre-S2 by construction. `tests/record_corpus.rs` asserts every column of it;",
+    "the corpus itself is enumerated there, not stored here, so a source that goes",
+    "missing reds `the_capture_is_the_whole_corpus` instead of shrinking silently.",
+    "A diff to this file IS a change to invariant 2."
+  ],
+  "records": [
+    {
+      "origin": "sysw_vectors/S-A#0",
+      "record": "text:48656c6c6f2c20576f726c6421",
+      "class": "FreeText",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "sysw_vectors/S-B#0",
+      "record": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "class": "Mnemonic",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "sysw_vectors/S-C#0",
+      "record": "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3",
+      "class": "MdMk",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "sysw_vectors/S-G#0",
+      "record": "text:48656c6c6f2c20576f726c64210a7365636f6e64206c696e65",
+      "class": "FreeText",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "sysw_vectors/S-J#1",
+      "record": "md1fv9wjpqg0yq82l0czvx85ae43vtfd26hsmngjecmqy44k2pgttqh74qwxlawq374",
+      "class": "MdMk",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "sysw_vectors/S-J#2",
+      "record": "md1fv9wjpqsp2026hh65xpvugtfhd9792zxgunymm0a82pdju6442q0jskj9gzfaqmz",
+      "class": "MdMk",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "sysw_vectors/S-J#3",
+      "record": "md1fe4dazspq3m67zzqqvzrs3pstucnf4ztqz4pk6ujgjycfn6zhs79nmzdp9frd6dzth6asfu2za4mwgfkg6",
+      "class": "MdMk",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "sysw_vectors/S-J#4",
+      "record": "md1yqpqqxqq8xtwhw4xwn4qh",
+      "class": "MdMk",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "sysw_vectors/S-J#5",
+      "record": "mk1qpzg69pqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3kx98j76m4mjlwphf",
+      "class": "MdMk",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "sysw_vectors/S-J#6",
+      "record": "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x",
+      "class": "MdMk",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "sysw_vectors/S-J#7",
+      "record": "mk1qpykrepqqspjtpuhfqjc096gykrewjy6dgjcqpcy3zepaggqseet8ky6z2jxm56yh04m5mqslrmueekdmecm0js2h978k03jfvkwz2rxj8r8",
+      "class": "MdMk",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/bip93-secret-128",
+      "record": "ms10testsxxxxxxxxxxxxxxxxxxxxxxxxxx4nzvca9cmczlw",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/bip93-secret-256",
+      "record": "ms10leetsllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqtum9pgv99ycma",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/bip93-share",
+      "record": "ms13cashsllhdmn9m42vcsamx24zrxgs3qqjzqud4m0d6nln",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/constellation-entr-128",
+      "record": "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f",
+      "class": "Codex32Secret",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/constellation-entr-256",
+      "record": "ms10entrsqqg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9q5f042qmrw90mw",
+      "class": "Codex32Secret",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/entr-id-but-off-profile-length-90",
+      "record": "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqutd7mdh2lc8h2",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/past-the-engraveable-cap-91",
+      "record": "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq2uk6ly9a0dmw4",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/bip93-bad-checksum",
+      "record": "ms10fauxsxxxxxxxxxxxxxxxxxxxxxxxxxxve740yyge2ghp",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "mt.rs/even#0",
+      "record": "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax",
+      "class": "Mt",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "mt.rs/even#1",
+      "record": "mt1p9h8jqq9qqphgdqqqqqqqq0mllllupyqj6vqqqqqqqqzcqpfsw7ph2rt5w54kt768636cls8zxg0najlzunp",
+      "class": "Mt",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "mt.rs/even#2",
+      "record": "mt1p9h8jqq9qqzj8yqpnzw4vl2rwffqyqqqqqkqq282yyhc2vavd20hvk94pz39hts3u5s9a0qd8pwskxfl7ju5",
+      "class": "Mt",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "mt.rs/even#3",
+      "record": "mt1p9h8jqq9qqrqfrnq3qzyp77h37cnxzvwutegzmzy5zrrrfvrpykdfsckvk03dcq6rcjtvlsfcglv7zx43yaz",
+      "class": "Mt",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "mt.rs/even#4",
+      "record": "mt1p9h8jqq9qqylgpzqmhcwhuupdvnrc82rncvzzdahpgjsdwgu52jd7vmxsve9x3w5ujeqyssuvddxvwqze4ve",
+      "class": "Mt",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "mt.rs/even#5",
+      "record": "mt1p9h8jqq9qq9qdcc7h75twfxyf340c4sgqzhfdq6xtgt7zhxngpwa049l0z59l6jqcqqqqqq5k5y2ye5nv8yf",
+      "class": "Mt",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "argv_secret_guard.rs/TX",
+      "record": "tx:020000000001017c8da925af70e49a12b0cea7b639df5037c87b7fa61f262b86ac32c47aa3ba1a0000000000fdffffff02404b4c0000000000160014c1de0dd435d1d4ad97ed1f51d63f91c800cc4eab3ea1b92901000000160014751097c299d6354fbb2c5a84512dd708f2902f5e0247304402207debc7d89984c7717940b622504318d2c184966a618b32cf8b700d0f125b3ffa02206ef875f9c0b5931e0ea1cf0c109bdb8512835c8e51526f99b3419929a2ea7259012103718f5fd45b926226357e2b0400574b41a32d0bf0ae69a02eebea5fbc542ff52060000000",
+      "class": "Tx",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "argv_secret_guard.rs/PASS",
+      "record": "pass:6869",
+      "class": "Passphrase",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "ms_remedy_runs.rs/ms1-spaced-upper",
+      "record": " MS10ENTRSQQQQQQQQQQQQQQQQQQQQQQQQQQQQCJ9SXRAQ34V7F ",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "ms_remedy_runs.rs/pass-plain-body",
+      "record": "pass:hunter2 correct horse",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "ms_remedy_runs.rs/text-hello",
+      "record": "text:hello",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "ms_remedy_runs.rs/tx-truncated",
+      "record": "tx:0200000001",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "ms_remedy_runs.rs/tx-spaced-upper",
+      "record": " TX:0200000001",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "ms_remedy_runs.rs/tx-non-hex",
+      "record": "tx:zzznothex",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    }
+  ]
+}

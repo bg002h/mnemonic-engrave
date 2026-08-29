@@ -1490,29 +1490,30 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 }
             }
 
-            // F-246 — ADMISSION BEFORE THE CEREMONY.
+            // SPEC_descriptor_input.md §5.1 — THE DISCRIMINATOR, keyed on
+            // IDENTIFICATION rather than on record classification failing.
             //
-            // `pack_with` rejects an unplaceable record, but it runs AFTER the
-            // passphrase has been generated, printed, and captioned "write this
-            // down and store it APART from the machine". The operator who obeys
-            // that instruction is left holding twelve words that protect no
-            // artifact, immediately above an error saying the run failed.
+            // It used to sit inside the `admit_check` error branch below, which
+            // made it invisible to any input a classifier arm can place: once
+            // `classify` knows a descriptor, an admitted single-line descriptor
+            // classifies, that branch is never entered, and §5.4's
+            // identification block, §5.1's choice block and every
+            // omitted-`--as` §6 refusal die silently with the input packed raw
+            // at exit 0.
             //
-            // `admit_check` is the same rule `split` applies -- it was lifted
-            // out of it, and `split` now calls it first -- so this is an
-            // ordering change, not a second implementation of admission.
-            if let Err(e) = sysw::admit_check(&recs, admission) {
-                // SPEC_descriptor_input.md §5.1 — THE DISCRIMINATOR, and it sits
-                // exactly here for a reason: record classification has just
-                // failed, which is the only moment the question "is this a
-                // descriptor rather than a record?" is worth asking. Placed
-                // earlier it would second-guess a stream that classifies fine;
-                // placed later it would arrive after the passphrase ceremony.
-                //
-                // The gate's first invariant is that a record-shaped input
-                // never hears descriptor vocabulary or a changed exit code, and
-                // `Outcome::RecordRefusal` is that invariant: it falls straight
-                // through to the shipped refusal below, unchanged.
+            // Two positions are load-bearing. It runs only when `--as` is
+            // ABSENT: with the flag present `recs` are already the flag's
+            // output while `document` is still the descriptor, so consulting
+            // here would answer "`--as` decides" to an operator who has just
+            // decided. And it runs AFTER `--expect`: ahead of it, `--in
+            // <descriptor> --expect mnemonic` would exit 2 about a choice
+            // instead of 4 about the expectation that was actually stated.
+            //
+            // The gate's first invariant is that a record-shaped input never
+            // hears descriptor vocabulary or a changed exit code, and
+            // `Outcome::RecordRefusal` is that invariant: it falls straight
+            // through to the shipped admission below, unchanged.
+            if r#as.is_none() {
                 let outcome = mnemonic_engrave::descriptor::consult(&document, &recs);
                 // §5.4, NORMATIVE: the identification block prints on EVERY
                 // successful whole-input parse, BEFORE whatever follows -- and
@@ -1546,6 +1547,20 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                         return EXIT_INVALID;
                     }
                 }
+            }
+
+            // F-246 — ADMISSION BEFORE THE CEREMONY.
+            //
+            // `pack_with` rejects an unplaceable record, but it runs AFTER the
+            // passphrase has been generated, printed, and captioned "write this
+            // down and store it APART from the machine". The operator who obeys
+            // that instruction is left holding twelve words that protect no
+            // artifact, immediately above an error saying the run failed.
+            //
+            // `admit_check` is the same rule `split` applies -- it was lifted
+            // out of it, and `split` now calls it first -- so this is an
+            // ordering change, not a second implementation of admission.
+            if let Err(e) = sysw::admit_check(&recs, admission) {
                 eprintln!("me: {}", sysw_error(&e));
                 return EXIT_INVALID;
             }
