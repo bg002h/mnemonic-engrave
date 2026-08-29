@@ -1078,9 +1078,14 @@ conjunct-8 key-identity failures. Every one would reach a program and a
 screen through the already-live admission cells. (Counted from the file at
 sha `e7a4160c`; R0 r1 measured 17 against the pre-S2 file, before the `ypub`
 row's `device_admits` flipped.) The arm is the PREDICATE below, composed:
-parse via `nonstandard.OutputDescriptor`, then the single-line-reachable
+§4.6's edge normalisation first (ASCII-whitespace parity with the host's
+`normalise` — the arm refuses a record it could only reach by stripping
+non-ASCII whitespace the host would not strip; AMENDED 2026-08-29 (S2,
+REVIEW-S2-P3-r1 C2's fold)), then parse via `nonstandard.OutputDescriptor`,
+then the single-line-reachable
 narrowings of §4's cascade (§4.5's promotion table, and §4.3's admitted
-versions as a STRING-level check — `bip380.Key` has no version field and
+versions as a STRING-level check over the key material each cascade branch
+actually consumed — `bip380.Key` has no version field and
 `ParseExtendedKey` normalises the version away), then §4.7's conjuncts over
 the parsed descriptor. The Rust side is `descriptor::host_admits`, which IS
 the predicate rather than a restatement of it.
