@@ -79,3 +79,14 @@ found six plan-side misses of the r2 fold (held for the r3 fold,
   with the parked F-2 annotation (one sha bump, both repos in lockstep),
   M-A quote escaping, whole-repo sweep this time. N-c (N1's FOLLOWUPS
   entry) is controller-owned at P3. Opus rounds used: 8.
+- **Fold-2 landed** (engrave `e56ae1b`, fork `a5e29b4`; vector sha bumped
+  ONCE to `542cd492…`, byte-identical both repos, F-2 annotation batched
+  in). The whole-repo sweep found a 4th I-A site unnamed by the review:
+  the vector GENERATOR (rows.py) still carried both superseded strings —
+  a re-run would have silently reverted the fix; repaired + 71/71 verified.
+  P3 gains two items: (a) `cross_lang::rust_ndef_parses_in_seedhammer_go_reader`
+  passes-by-skip with `go` off PATH (every suite count this cycle measured
+  in that state; must RUN for real on master post-merge, submodule
+  populated); (b) N1's declination gets its FOLLOWUPS entry. Fold-2
+  verification dispatched to SONNET (mechanical fold-vs-findings). Opus
+  rounds still 8.
