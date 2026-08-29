@@ -807,9 +807,15 @@ Two boundary rules that fall out of it (R0 r2):
 - **The discriminator between "one descriptor in a multi-LINE file" and "a
   descriptor among OTHER records" is the WHOLE-INPUT parse (R0 r3's NEW-I2).**
   When `--as` is absent and record classification fails, `me` re-reads the
-  whole input through §4's cascade ONLY when the input is DESCRIPTOR-SHAPED
-  (§6's rule-4 shape tests: a `(`-bearing expression, `Key: value` lines, a
-  78-byte base58check token, or JSON with a descriptor field). Otherwise
+  whole input through §4's cascade ONLY when the input is DESCRIPTOR-SHAPED,
+  by these tests (aligned with §6's cause-selection steps, corrected per
+  R0 r16): a `(`-bearing expression; a line whose `": "` key is a BlueWallet
+  header (`Name`/`Policy`/`Derivation`/`Format`) or an 8-hex fingerprint —
+  a bare `": "` is NOT enough, or `seed:`/`text:`/`pass:`-style records
+  would hear descriptor vocabulary (r16's new-I2); a single token that is a
+  78-byte base58check payload OR begins with `[` — the origin-annotated
+  bare key, §4.5's own ACCEPT rows (r16's new-I1); or JSON with a
+  descriptor field. Otherwise
   the SHIPPED record-classification refusal stands unchanged — exit 4,
   record vocabulary, pinned by a green test (`sysw_cli.rs:1928`): a
   mistyped mnemonic word must never hear descriptor vocabulary (R0 r15's
@@ -1024,7 +1030,9 @@ handles it; the hole is md1's alone.
 R0 r9's I4).** In a build where the descriptor path has not shipped, every
 remedy in this section and in §6 that ROUTES TO the descriptor path —
 naming the flag or otherwise (semantic, not lexical, per R0 r14's new-M3;
-NEITHER-PATH refusals are exempt, routing nowhere — r15's new-I2) —
+NEITHER-PATH refusals are exempt: substituting "wait for the update" into
+a refusal whose truth is "never, in any build" would be false — r15's
+new-I2, reason corrected per r16's minor) —
 replaces that clause with: *"the scannable-plate path is not in this build — keep the
 export file; it packs when the device update ships."* No refusal names a
 flag that refuses in the current build.
