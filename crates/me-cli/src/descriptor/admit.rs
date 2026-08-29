@@ -127,7 +127,7 @@ fn conjunct_3_key_count(d: &Parsed) -> Result<(), Refusal> {
         _ => (20, "this script"),
     };
     if n > max {
-        return Err(refusal::key_count_exceeded(n, form));
+        return Err(refusal::key_count_exceeded(n, form, d.multi));
     }
     Ok(())
 }
@@ -158,7 +158,7 @@ fn conjunct_5_network(d: &Parsed) -> Result<(), Refusal> {
     };
     for (i, k) in d.keys.iter().enumerate().skip(1) {
         if k.network != first.network {
-            return Err(refusal::mixed_network(i, k, first));
+            return Err(refusal::mixed_network(i, k, first, d.multi));
         }
     }
     Ok(())
@@ -190,12 +190,12 @@ fn conjunct_6_origins(d: &Parsed) -> Result<(), Refusal> {
 /// `address.Supported` still returns true).
 fn conjunct_7_use_site(d: &Parsed) -> Result<(), Refusal> {
     for k in &d.keys {
-        use_site_ok(&k.children)?;
+        use_site_ok(&k.children, d.multi)?;
     }
     Ok(())
 }
 
-fn use_site_ok(children: &[Derivation]) -> Result<(), Refusal> {
+fn use_site_ok(children: &[Derivation], m: Option<Multi>) -> Result<(), Refusal> {
     use Derivation::*;
     let plain_wildcard = Wildcard { hardened: false };
     let ok = match children {
@@ -224,13 +224,13 @@ fn use_site_ok(children: &[Derivation]) -> Result<(), Refusal> {
         )
     });
     if hardened {
-        return Err(refusal::use_site_hardened());
+        return Err(refusal::use_site_hardened(m));
     }
     if children
         .iter()
         .any(|d| matches!(d, Range { start, end } if *end != start + 1))
     {
-        return Err(refusal::use_site_non_consecutive());
+        return Err(refusal::use_site_non_consecutive(m));
     }
     Err(refusal::use_site_out_of_set(children))
 }

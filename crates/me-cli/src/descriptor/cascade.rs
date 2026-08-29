@@ -1205,6 +1205,45 @@ pub fn looks_like_an_extended_key(token: &str) -> bool {
     base58::decode_check(head).is_some_and(|p| p.len() == 78)
 }
 
+/// **Is the whole input a bitcoin ADDRESS?** §6 gives an address its own row —
+/// *"that is a bitcoin address, not a descriptor"* — and step 5's generic
+/// four-forms text would bury the one fact the operator needs.
+///
+/// The test is narrow on purpose, and it is a SHAPE test rather than a checksum
+/// one: a mistyped address is still an address and earns the same sentence.
+///
+/// * a single token whose human-readable part is `bc`, `tb` or `bcrt` and whose
+///   body is bech32/bech32m charset — segwit v0 and v1, both cases; or
+/// * a single token that base58check-decodes to exactly 21 bytes under one of
+///   the four version bytes bitcoin uses for P2PKH and P2SH.
+///
+/// Nothing in §4's four formats can match either: an extended key's payload is
+/// 78 bytes, and no constellation record's HRP is one of the three.
+pub fn is_bitcoin_address(input: &str) -> bool {
+    let t = input.trim();
+    if t.is_empty() || t.split_whitespace().nth(1).is_some() {
+        return false;
+    }
+    // bech32 / bech32m — `bc1…`, `tb1…`, `bcrt1…`, either case, never mixed.
+    let lower = t.to_ascii_lowercase();
+    if t.chars()
+        .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+        || t.chars().all(|c| !c.is_ascii_uppercase())
+    {
+        for hrp in ["bc", "tb", "bcrt"] {
+            if let Some(body) = lower.strip_prefix(hrp).and_then(|r| r.strip_prefix('1')) {
+                const CHARSET: &str = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+                if body.len() >= 6 && body.chars().all(|c| CHARSET.contains(c)) {
+                    return true;
+                }
+            }
+        }
+    }
+    // base58check P2PKH / P2SH, mainnet and testnet.
+    matches!(base58::decode_check(t), Some(p)
+        if p.len() == 21 && matches!(p[0], 0x00 | 0x05 | 0x6f | 0xc4))
+}
+
 /// Which branch §6 reports for an input no branch admitted, by the fixed
 /// five-step rule. Whole-INPUT scope, deliberately unlike §5.1's per-LINE gate.
 pub fn most_resembled(input: &str) -> Option<Branch> {

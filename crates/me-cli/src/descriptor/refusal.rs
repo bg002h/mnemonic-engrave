@@ -241,6 +241,41 @@ fn children_string(children: &[Derivation]) -> String {
     children.iter().map(|d| d.encode()).collect()
 }
 
+/// **§6's `multi`-class device-clause rule (spec amendment 2026-08-29).**
+///
+/// `bip380.Parse`'s script switch has a `sortedmulti` case and NO `multi` case,
+/// so the device refuses every `multi` form at PARSE and none of them ever
+/// reaches address derivation. Six §6 rows carry a sentence about what the
+/// device does with the descriptor, and for a `multi` input each of those six
+/// says this instead.
+///
+/// The rows: the single-key wrapper, `tr(…(…))`, the mixed network, the
+/// hardened use-site, the non-consecutive multipath and the key count. Five of
+/// them printed a MEASURABLY FALSE claim before the amendment — IMPL-P1's
+/// review M1 constructed all six by rewriting `sortedmulti(` to `multi(` and
+/// ran them.
+const MULTI_AT_PARSE: &str =
+    "The device's parser refuses `multi` outright, so this file never reaches address derivation there.";
+
+/// Which device sentence a row prints, given the descriptor's multi form.
+/// `None` (single-key) and `Some(Sorted)` both take the measured sentence.
+fn device_clause(m: Option<Multi>, sorted: &str) -> String {
+    match m {
+        Some(Multi::Unsorted) => MULTI_AT_PARSE.to_string(),
+        _ => sorted.to_string(),
+    }
+}
+
+/// The replacement clause with its first letter lowered, for the rows that
+/// splice it mid-sentence.
+fn lower_first(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        Some(f) => f.to_lowercase().collect::<String>() + c.as_str(),
+        None => String::new(),
+    }
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // §4.2 — the BlueWallet rows
 // ───────────────────────────────────────────────────────────────────────────
@@ -400,8 +435,16 @@ pub fn miniscript(fragment: &str) -> Refusal {
 /// §6 row 22. **The remedy names the PER-VERSION target** (R0 r2's NEW-I3 — one
 /// template cannot serve five): four of the five are TESTNET keys, and an
 /// `xpub` remedy would name a mainnet wallet the operator does not hold.
-pub fn unsupported_key_version(v: KeyVersion, converted: &str, origin: Option<&str>) -> Refusal {
-    let remedy = match v {
+/// The per-version descriptor §6's SLIP-132 row tells the operator to run.
+/// Extracted for the same reason as [`remedy_full_origin`].
+///
+/// **The script is the VERSION's, never a guess**: `ypub` is BIP-49
+/// (`sh(wpkh)`), `vpub` is testnet BIP-84 (`wpkh`), and `Upub`/`Vpub` are
+/// testnet MULTISIG accounts with no single-key form at all. One template
+/// cannot serve five, and four of the five are testnet — an `xpub` remedy would
+/// name a mainnet wallet the operator does not hold.
+pub fn remedy_for_version(v: KeyVersion, converted: &str, origin: Option<&str>) -> String {
+    match v {
         KeyVersion::Ypub => match origin {
             // With an origin the operator's own fingerprint and path carry over.
             Some(o) => format!("sh(wpkh({o}{converted}/<0;1>/*))"),
@@ -429,7 +472,11 @@ pub fn unsupported_key_version(v: KeyVersion, converted: &str, origin: Option<&s
             origin.unwrap_or("")
         ),
         _ => converted.to_string(),
-    };
+    }
+}
+
+pub fn unsupported_key_version(v: KeyVersion, converted: &str, origin: Option<&str>) -> Refusal {
+    let remedy = remedy_for_version(v, converted, origin);
     let target = match v {
         KeyVersion::Ypub => "xpub",
         _ => "tpub",
@@ -450,14 +497,26 @@ pub fn unsupported_key_version(v: KeyVersion, converted: &str, origin: Option<&s
 
 /// §6 row 24. The path is quoted back and the three that qualify are listed,
 /// then the descriptor is printed with the operator's own key substituted in.
-pub fn promotion_path_not_inferable(k: &Key, suggested: &str) -> Refusal {
+pub fn promotion_path_not_inferable(k: &Key, suggested: Option<&str>) -> Refusal {
+    let tail = match suggested {
+        Some(d) => format!(
+            "{}, which is not inferable. Supply the descriptor instead: {d}",
+            purpose_gloss(&k.origin)
+        ),
+        // M2: no script is named, and the refusal says WHY rather than guessing
+        // one. An unrecognised purpose step carries no script `me` can infer,
+        // and the key's own version byte is not authority enough to invent one.
+        None => ", whose first step is not one `me` recognises -- it names no script, \
+             and `me` will not guess which wallet you meant. Supply the descriptor \
+             your wallet software shows, with this key and this origin in it."
+            .to_string(),
+    };
     Refusal::new(
         Row::PromotionPathNotInferable,
         format!(
             "`{}` is a single extended key. `me` can infer a whole wallet from one \
              only when its origin is `m/44h/0h/0h` (-> `pkh`), `m/84h/0h/0h` \
-             (-> `wpkh`) or `m/49h/0h/0h` (-> `sh(wpkh)`). This one is `{}`, which is \
-             not inferable. Supply the descriptor instead: {suggested}",
+             (-> `wpkh`) or `m/49h/0h/0h` (-> `sh(wpkh)`). This one is `{}`{tail}",
             key_display(k),
             super::cascade::path_string(&k.origin)
         ),
@@ -465,12 +524,19 @@ pub fn promotion_path_not_inferable(k: &Key, suggested: &str) -> Refusal {
 }
 
 /// §6 row 25 — §4.5's measured live near-miss.
-pub fn promotion_account_not_zero(k: &Key, suggested: &str) -> Refusal {
+pub fn promotion_account_not_zero(k: &Key, suggested: Option<&str>) -> Refusal {
+    // The purpose step is one of the inferable three by construction -- this
+    // error only fires after the purpose matched -- so the remedy is always
+    // nameable here and the `None` arm is defensive, not a second M2 case.
+    let tail = match suggested {
+        Some(d) => format!("Supply the descriptor: {d}"),
+        None => "Supply the descriptor your wallet software shows.".to_string(),
+    };
     Refusal::new(
         Row::PromotionAccountNotZero,
         format!(
             "`{}` is a single extended key, and this one is `{}`. Only account 0 is \
-             inferable. Supply the descriptor: {suggested}",
+             inferable. {tail}",
             key_display(k),
             super::cascade::path_string(&k.origin)
         ),
@@ -478,6 +544,22 @@ pub fn promotion_account_not_zero(k: &Key, suggested: &str) -> Refusal {
 }
 
 /// §6 row 26.
+/// The full-origin key §6's fingerprint-no-path row tells the operator to run.
+/// Extracted so the §6h gate can feed it back through the cascade rather than
+/// scraping it out of a sentence.
+pub fn remedy_full_origin(supplied: &str) -> String {
+    let fp = supplied
+        .strip_prefix('[')
+        .and_then(|s| s.split_once(']'))
+        .map(|(f, _)| f.to_string())
+        .unwrap_or_default();
+    let key = supplied
+        .split_once(']')
+        .map(|(_, k)| k.to_string())
+        .unwrap_or_else(|| supplied.to_string());
+    format!("[{fp}/84h/0h/0h]{key}")
+}
+
 pub fn promotion_fingerprint_no_path(supplied: &str) -> Refusal {
     let fp = supplied
         .strip_prefix('[')
@@ -493,9 +575,10 @@ pub fn promotion_fingerprint_no_path(supplied: &str) -> Refusal {
         format!(
             "`[{fp}]{}` gives a fingerprint with no derivation path, so there is \
              nothing to match a script against. Either give the full origin -- \
-             `[{fp}/84h/0h/0h]{key}` -- or drop the brackets entirely, in which case \
-             the key's version byte decides.",
-            short_key(&key)
+             `{}` -- or drop the brackets entirely, in which case the key's version \
+             byte decides.",
+            short_key(&key),
+            remedy_full_origin(supplied)
         ),
     )
 }
@@ -569,9 +652,16 @@ pub fn taproot_multisig(m: Multi) -> Refusal {
     Refusal::new(
         Row::TaprootMultisig,
         format!(
-            "taproot multisig is `multi_a`/`sortedmulti_a`; `tr({}(…))` is not a valid \
-             descriptor even though the device's parser accepts it. Check the export.",
-            m.spelling()
+            "taproot multisig is `multi_a`/`sortedmulti_a` (BIP-387); `tr({}(…))` is not \
+             a valid descriptor {}. Check the export.",
+            m.spelling(),
+            match m {
+                Multi::Sorted => "even though the device's parser accepts it".to_string(),
+                Multi::Unsorted => format!(
+                    "-- and {}",
+                    lower_first(MULTI_AT_PARSE.trim_end_matches('.'))
+                ),
+            }
         ),
     )
 }
@@ -619,43 +709,63 @@ pub fn threshold_below_one(k: i64) -> Refusal {
 /// §6 row 18 — conjunct 3, with the bound corrected per R0 r2's NEW-I2: the
 /// 520-byte limit binds only where the multi's own output script IS the
 /// redeemScript.
-pub fn key_count_exceeded(n: usize, form: &str) -> Refusal {
+pub fn key_count_exceeded(n: usize, form: &str, m: Option<Multi>) -> Refusal {
     Refusal::new(
         Row::KeyCountExceeded,
         format!(
-            "`sh(sortedmulti(…))` carries at most 15 keys -- there the multi's output \
-             script IS the redeemScript, one 520-byte script element. `wsh(…)` and \
-             `sh(wsh(…))` carry at most 20; their redeemScript is 34 bytes and the \
-             520-byte limit never binds. This descriptor has {n} keys under `{form}`. \
-             The device would accept it and derive addresses whose coins cannot be \
-             spent."
+            "`sh({}(…))` carries at most 15 keys -- there the multi's output \
+             script IS the redeemScript, one 520-byte script element (BIP-383). \
+             `wsh(…)` and `sh(wsh(…))` carry at most 20 (`OP_CHECKMULTISIG`); their \
+             redeemScript is 34 bytes and the 520-byte limit never binds. This \
+             descriptor has {n} keys under `{form}`. {}",
+            // §6's transposition rule: the form name substitutes. The BOUND
+            // does not -- it is the redeemScript's, not the ordering's (§4.7
+            // conjunct 3), which is why one sentence serves both forms.
+            m.map(|m| m.spelling()).unwrap_or("sortedmulti"),
+            device_clause(
+                m,
+                "The device would accept it and derive addresses whose coins cannot be spent."
+            )
         ),
     )
 }
 
 /// §6 row 21 — conjunct 5. The device accepts the descriptor and then cannot
 /// derive any address from it.
-pub fn mixed_network(i: usize, k: &Key, first: &Key) -> Refusal {
+pub fn mixed_network(i: usize, k: &Key, first: &Key, m: Option<Multi>) -> Refusal {
     let name = |k: &Key| {
         if k.network == Network::Testnet {
-            "tpub (testnet)"
+            "`tpub` (testnet)"
         } else {
-            "xpub (mainnet)"
+            "`xpub` (mainnet)"
         }
     };
     Refusal::new(
         Row::MixedNetwork,
         format!(
-            "key {i} is {} while key 0 is {}. The device accepts this descriptor and \
-             then cannot derive any address from it. All keys must share one network.",
+            "key {i} is {} while key 0 is {}. {} All keys must share one network.",
             name(k),
-            name(first)
+            name(first),
+            device_clause(
+                m,
+                "The device accepts this descriptor and then cannot derive any address \
+                 from it."
+            )
         ),
     )
 }
 
 /// §6 row 19 — conjunct 8's origin contradiction. One origin identifies exactly
 /// one key, so such a description matches no wallet at all.
+///
+/// **The cause clause is stated over ENTRIES, not over BlueWallet LINES** (spec
+/// amendment 2026-08-29, from IMPL-P1's review M5). This row cannot fire for a
+/// BlueWallet file: every key there shares the single `Derivation:` header, so
+/// two keys carry the same `(fingerprint, origin)` iff they carry the same
+/// header key — which the device's own `seenKeys` map catches FIRST as
+/// `inconsistent header value`, failing branch 1 into §6 row 1. It IS reachable
+/// from a BIP-380 descriptor and from the JSON wrapper, where two key
+/// expressions may carry one origin block and different keys.
 pub fn key_identity(i: usize, j: usize, origin: &str) -> Refusal {
     Refusal::new(
         Row::KeyIdentity,
@@ -663,7 +773,8 @@ pub fn key_identity(i: usize, j: usize, origin: &str) -> Refusal {
             "this wallet description contradicts itself: keys {i} and {j} both claim \
              origin `{origin}` but name different keys -- one origin identifies \
              exactly one key, so no wallet matches this description. Check the export: \
-             a duplicated cosigner line carrying the wrong key is the usual cause."
+             one of the two entries carries the wrong key, and a copied-and-edited \
+             cosigner is the usual cause."
         ),
     )
 }
@@ -689,22 +800,35 @@ pub fn key_identity_duplicate(i: usize, j: usize) -> Refusal {
 /// §6 row 32 — conjunct 7. Hardened derivation from an xpub is impossible; the
 /// device silently derives the UNhardened child and displays addresses for a
 /// wallet that cannot exist.
-pub fn use_site_hardened() -> Refusal {
+pub fn use_site_hardened(m: Option<Multi>) -> Refusal {
     Refusal::new(
         Row::UseSiteHardened,
-        "a hardened use-site step cannot be derived from an xpub. The device would \
-         silently derive the UNhardened child and display addresses for a wallet \
-         that cannot exist, so this is refused on both `--as` paths.",
+        format!(
+            "a hardened use-site step cannot be derived from an xpub (BIP-32). {}",
+            match m {
+                Some(Multi::Unsorted) =>
+                    format!("{MULTI_AT_PARSE} This is refused on both `--as` paths regardless."),
+                _ => "The device would silently derive the UNhardened child and display \
+                      addresses for a wallet that cannot exist, so this is refused on \
+                      both `--as` paths."
+                    .to_string(),
+            }
+        ),
     )
 }
 
 /// §6 row 33 — conjunct 7. The device parses it, and then errors on every
 /// address.
-pub fn use_site_non_consecutive() -> Refusal {
+pub fn use_site_non_consecutive(m: Option<Multi>) -> Refusal {
     Refusal::new(
         Row::UseSiteNonConsecutive,
-        "the device derives only `<i;i+1>` pairs (receive; change). It accepts this \
-         descriptor and then errors on every address.",
+        format!(
+            "the device derives only `<i;i+1>` pairs (receive; change). {}",
+            device_clause(
+                m,
+                "It accepts this descriptor and then errors on every address."
+            )
+        ),
     )
 }
 
@@ -773,6 +897,16 @@ fn offending_keys(slots: &[usize], keys: &[Key]) -> String {
         .join(", and ")
 }
 
+/// §6 row 29. The reasoning — why an address is not a thing to engrave — is
+/// §10's, and it stays OUTSIDE the quote per the walk-W5 rule.
+pub fn bitcoin_address() -> Refusal {
+    Refusal::new(
+        Row::BitcoinAddress,
+        "that is a bitcoin address, not a descriptor. No program on the device \
+         consumes an address record.",
+    )
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // §5.1 — the multi-record split
 // ───────────────────────────────────────────────────────────────────────────
@@ -794,25 +928,8 @@ pub fn multi_record_descriptor(index: usize) -> Refusal {
 
 /// The descriptor `me` suggests for a bare key its promotion refused — the
 /// executable half of §6's promotion rows.
-pub fn suggested_descriptor_for(path: &[u32], k: &Key) -> String {
-    let script = match path
-        .first()
-        .map(|e| e.wrapping_sub(super::cascade::HARDENED))
-    {
-        Some(44) => Script::P2PKH,
-        Some(49) => Script::P2SH_P2WPKH,
-        Some(84) => Script::P2WPKH,
-        Some(86) => Script::P2TR,
-        Some(45) => Script::P2SH,
-        Some(48) => {
-            if path.len() == 4 && path[3] == super::cascade::HARDENED + 1 {
-                Script::P2SH_P2WSH
-            } else {
-                Script::P2WSH
-            }
-        }
-        _ => Script::P2PKH,
-    };
+pub fn suggested_descriptor_for(path: &[u32], k: &Key) -> Option<String> {
+    let script = purpose_script(path)?;
     // §6h: the remedy must be EXECUTABLE. It carries the operator's own key IN
     // FULL — [`key_display`]'s elision is for text that NAMES a key, never for
     // text they are told to run, and an elided key in a "supply the descriptor"
@@ -828,7 +945,7 @@ pub fn suggested_descriptor_for(path: &[u32], k: &Key) -> String {
             .next()
             .unwrap_or_default()
     );
-    match script {
+    Some(match script {
         Script::P2PKH => format!("pkh({key})"),
         Script::P2WPKH => format!("wpkh({key})"),
         Script::P2SH_P2WPKH => format!("sh(wpkh({key}))"),
@@ -836,6 +953,56 @@ pub fn suggested_descriptor_for(path: &[u32], k: &Key) -> String {
         Script::P2WSH => format!("wsh(sortedmulti(<k>,{key},<the other cosigners>))"),
         Script::P2SH_P2WSH => format!("sh(wsh(sortedmulti(<k>,{key},<the other cosigners>)))"),
         Script::P2SH => format!("sh(sortedmulti(<k>,{key},<the other cosigners>))"),
+    })
+}
+
+/// **The script a purpose step implies, or `None` when `me` will not guess.**
+///
+/// The mapping is HARDENED-ONLY and the set is closed. The previous `_ =>
+/// P2PKH` fallback swallowed everything else — including an UNHARDENED purpose,
+/// a real coordinator export bug — and handed the operator a LEGACY P2PKH
+/// remedy for a native-segwit key (measured on
+/// `promotion/11-origin-unhardened-refused`: `[4bbaa801/84/0/0]zpub…` got
+/// `pkh(…)`). The remedy was executable and admitted, so §6h was satisfied and
+/// the one test that looks at these remedies passed.
+///
+/// Refusing to guess is the constellation's own precedent (F-417's md1-narrow
+/// ruling: refuse and name, rather than widen to fit a use site). The cost is
+/// one sentence; the alternative is a harder restore from a plate cut to a
+/// script nobody chose.
+fn purpose_script(path: &[u32]) -> Option<Script> {
+    let first = path.first()?;
+    // Unhardened purposes fall out here rather than through `wrapping_sub`:
+    // `m/84/0/0` is NOT `m/84h/0h/0h`, and treating them as one is the guess.
+    if *first < super::cascade::HARDENED {
+        return None;
+    }
+    Some(match first - super::cascade::HARDENED {
+        44 => Script::P2PKH,
+        49 => Script::P2SH_P2WPKH,
+        84 => Script::P2WPKH,
+        86 => Script::P2TR,
+        45 => Script::P2SH,
+        48 => {
+            if path.len() == 4 && path[3] == super::cascade::HARDENED + 1 {
+                Script::P2SH_P2WSH
+            } else {
+                Script::P2WSH
+            }
+        }
+        _ => return None,
+    })
+}
+
+/// §6's gloss on a recognised-but-not-inferable purpose — the spec's own
+/// *"— taproot single-sig"* on the `m/86'/0'/0'` row, generalised to the other
+/// two purposes that reach this refusal.
+fn purpose_gloss(path: &[u32]) -> &'static str {
+    match purpose_script(path) {
+        Some(Script::P2TR) => " -- taproot single-sig",
+        Some(Script::P2WSH) | Some(Script::P2SH_P2WSH) => " -- a multisig cosigner account",
+        Some(Script::P2SH) => " -- a legacy multisig account",
+        _ => "",
     }
 }
 

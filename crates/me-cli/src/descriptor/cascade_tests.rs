@@ -15,6 +15,11 @@ const FIXTURE: &str = "wsh(sortedmulti(2,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnje
 
 const XPUB: &str = "xpub6C9j4wAxxkWN4cq8G4N2mkV6NrGGhnLFCGdh8GsYY1xreEveW5YEXJMjDZWLAcnZ26xqVft5FmgBxPixdMGoVQZMdtEJRRADxrn4facoGnx";
 
+/// The vector file's own `promotion/15-bare-tpub-host-refused` key — four of
+/// §6's five SLIP-132 remedies name a TESTNET target, and an `xpub` standing in
+/// for them would test a mainnet wallet the operator does not hold.
+const TPUB: &str = "tpubDCXMbAzeg2TpLR1yiFM7yfpThyMvhAqJjuDzUpvgsvikPXbMaJPKfk2ZTbb7h7jnp1Vk7FPwnsWEeaDa2D83Nr1ehUyc6wpTYpNURb6Qt26";
+
 fn ok(input: &str) -> Parsed {
     cascade(&normalise(input)).unwrap_or_else(|e| panic!("{input}: {e:?}"))
 }
@@ -337,47 +342,191 @@ fn the_canonical_normalises_a_slip132_version_to_xpub() {
 
 // ── §6h: the remedy must be EXECUTABLE ─────────────────────────────────────
 
-/// **Every descriptor `me` tells the operator to supply is one `me` admits.**
+/// **§6h — every remedy `me` prints is an input `me` admits, on ALL THREE
+/// generators.**
 ///
 /// `SPEC_constellation_cli_uniformity` §6h: where a row says "supply the
 /// descriptor", it prints the descriptor with the operator's own key and origin
-/// substituted in, not a placeholder. The constellation's own record of this
-/// rule is a remedy that named a pipeline which exited 4 when run — so this
-/// runs the generator's output back through the cascade instead of reading it.
+/// substituted in, not a placeholder. An ELIDED key (`xpub6C9j4wAxxk…acoGnx`)
+/// is a placeholder wearing the operator's fingerprint, and it is not base58 —
+/// so feeding the remedy back through the cascade is what catches it.
 ///
-/// A remedy carrying `<…>` is EXEMPT and the exemption is narrow: a multisig
-/// cosigner key has no single-key wallet, and the other cosigners are
-/// information the operator holds and `me` does not. §6's own text for those
-/// rows says so.
+/// **M3 (IMPL-P1's review):** this covered ONE of the three generators. An
+/// elision introduced in either of the other two would have passed the whole
+/// 485-test suite. The loop now runs all three and its floor counts them, so a
+/// dropped generator reds the suite instead of shrinking the coverage silently.
 #[test]
-fn every_promotion_remedy_me_prints_is_an_input_me_admits() {
+fn every_remedy_me_prints_is_an_input_me_admits() {
     const ZPUB: &str = "zpub6qpFgGWoG7bKmDDMvmwHBvg6inZAb2KF2Vg8h4fKJ2ickSZ71PsMmRg1FyRWAS6PqPCSzd5CB6PHixx64k6q5svZNZd9bEoCWJuMSkSRzJx";
-    let inputs = [
+    let mut executable = 0;
+
+    // Generator 1 — `suggested_descriptor_for`, through the two promotion rows.
+    for input in [
         format!("[4bbaa801/86'/0'/0']{XPUB}"),
         format!("[4bbaa801/84'/0'/1']{ZPUB}"),
         format!("[4bbaa801/48'/0'/0'/2']{XPUB}"),
         format!("[4bbaa801/84/0/0]{ZPUB}"),
-    ];
-    let mut executable = 0;
-    for input in &inputs {
-        let errs = cascade(&normalise(input)).expect_err(input);
-        let k = match errs.promotion.as_ref().expect(input) {
+    ] {
+        let errs = cascade(&normalise(&input)).expect_err(&input);
+        let k = match errs.promotion.as_ref().expect(&input) {
             PromotionError::PathNotInferable(k) | PromotionError::AccountNotZero(k) => k.clone(),
             other => panic!("{input}: {other:?}"),
         };
-        let remedy = crate::descriptor::refusal::suggested_descriptor_for(&k.origin, &k);
-        if remedy.contains('<') && remedy.contains("cosigner") {
+        let Some(remedy) = crate::descriptor::refusal::suggested_descriptor_for(&k.origin, &k)
+        else {
+            // The unhardened purpose: `me` names NO script. Asserted for real
+            // below, in `an_unrecognised_purpose_names_no_script`.
+            continue;
+        };
+        // The multisig forms carry `<the other cosigners>`, information the
+        // operator holds and `me` does not. The exemption is narrow and stated:
+        // a multisig cosigner key has no single-key wallet to name.
+        if remedy.contains("<the other cosigners>") {
             continue;
         }
         assert!(
             crate::descriptor::host_admits(&remedy),
-            "the remedy is not an input `me` admits: {remedy}"
+            "generator 1: the remedy is not an input `me` admits: {remedy}"
         );
         executable += 1;
     }
-    // Without this the loop passes by skipping everything.
+
+    // Generator 2 — `promotion_fingerprint_no_path`'s full-origin key.
+    for supplied in [format!("[4bbaa801]{XPUB}"), format!("[4bbaa801]{ZPUB}")] {
+        let remedy = crate::descriptor::refusal::remedy_full_origin(&supplied);
+        assert!(
+            crate::descriptor::host_admits(&remedy),
+            "generator 2: the remedy is not an input `me` admits: {remedy}"
+        );
+        // And the row's own text must QUOTE the remedy it built, or the two can
+        // drift into an elided copy of an executable string.
+        let printed = crate::descriptor::refusal::promotion_fingerprint_no_path(&supplied);
+        assert!(
+            printed.text.contains(&remedy),
+            "generator 2: the row prints a remedy it did not build:\n{}",
+            printed.text
+        );
+        executable += 1;
+    }
+
+    // Generator 3 — `unsupported_key_version`'s FIVE per-version remedies.
+    for v in [
+        KeyVersion::Ypub,
+        KeyVersion::Upub,
+        KeyVersion::Vpub,
+        KeyVersion::UpubCap,
+        KeyVersion::VpubCap,
+    ] {
+        // The converted key is the row's own input re-serialised under the
+        // target version, which is what the real caller passes.
+        let converted = if matches!(v, KeyVersion::Ypub) {
+            XPUB
+        } else {
+            TPUB
+        };
+        let remedy = crate::descriptor::refusal::remedy_for_version(v, converted, None);
+        let printed = crate::descriptor::refusal::unsupported_key_version(v, converted, None);
+        assert!(
+            printed.text.contains(&remedy),
+            "generator 3: the row prints a remedy it did not build:\n{}",
+            printed.text
+        );
+        assert!(
+            !remedy.contains('…'),
+            "generator 3: an elided key in a remedy: {remedy}"
+        );
+        if remedy.contains("<the other cosigners>") {
+            // `Upub`/`Vpub` are testnet MULTISIG accounts: no single-key remedy
+            // exists, so the descriptor is necessarily incomplete. Skipped from
+            // the executable count, not from the elision check above.
+            continue;
+        }
+        assert!(
+            crate::descriptor::host_admits(&remedy),
+            "generator 3: the remedy is not an input `me` admits: {remedy}"
+        );
+        // §6's per-version SOUNDNESS, independently tabulated here rather than
+        // asked of the code that produced it: the script must be the VERSION's.
+        let want = match v {
+            KeyVersion::Ypub | KeyVersion::Upub => "sh(wpkh(",
+            _ => "wpkh(",
+        };
+        assert!(
+            remedy.starts_with(want),
+            "generator 3: {v:?} names {remedy}, which is not the script that version \
+             declares"
+        );
+        executable += 1;
+    }
+
+    // M3's floor, raised and re-derived rather than guessed: generator 1 runs 2
+    // (of 4 inputs, one is the multisig-cosigner exemption and one is M2's
+    // no-script case), generator 2 runs 2, generator 3 runs 3 (of 5 versions,
+    // `Upub`/`Vpub` are testnet MULTISIG accounts with no single-key form).
+    // P1's loop stood at 3. Without the floor the loop passes by skipping.
     assert_eq!(
-        executable, 3,
+        executable, 7,
         "remedies actually run back through the cascade"
+    );
+}
+
+/// **M2 (IMPL-P1's review) — `me` names no script for an unrecognised purpose.**
+///
+/// The previous `_ => P2PKH` fallback handed the operator a LEGACY P2PKH remedy
+/// for a NATIVE-SEGWIT key whenever the purpose step was unrecognised — an
+/// unhardened `84/0/0`, which is a real coordinator export bug. The remedy was
+/// executable and admitted, so §6h was satisfied and the §6h gate above passed
+/// on it: a gate that can only see elision cannot see an unsound guess.
+///
+/// This is the assertion that CAN fail on one. Restoring the fallback makes
+/// `suggested_descriptor_for` return `Some("pkh(…)")` and reds both halves.
+#[test]
+fn an_unrecognised_purpose_names_no_script() {
+    const ZPUB: &str = "zpub6qpFgGWoG7bKmDDMvmwHBvg6inZAb2KF2Vg8h4fKJ2ickSZ71PsMmRg1FyRWAS6PqPCSzd5CB6PHixx64k6q5svZNZd9bEoCWJuMSkSRzJx";
+    // Both halves of "unrecognised": the UNHARDENED purpose (a real coordinator
+    // export bug, and the one the review measured) and a HARDENED purpose
+    // outside the six. Each reaches a different `None` in `purpose_script`, and
+    // a mutation that restores the guess in only one place must still red.
+    let mut checked = 0;
+    for (input, why) in [
+        (
+            format!("[4bbaa801/84/0/0]{ZPUB}"),
+            "an unhardened `84/0/0` is not `m/84h/0h/0h`",
+        ),
+        (
+            format!("[4bbaa801/99'/0'/0']{ZPUB}"),
+            "purpose 99h is outside the six `me` maps",
+        ),
+    ] {
+        let errs = cascade(&normalise(&input)).expect_err(&input);
+        let k = match errs.promotion.as_ref().expect(&input) {
+            PromotionError::PathNotInferable(k) => k.clone(),
+            other => panic!("{input}: {other:?}"),
+        };
+        assert!(
+            crate::descriptor::refusal::suggested_descriptor_for(&k.origin, &k).is_none(),
+            "{why}, and naming a script for it is a guess"
+        );
+        let printed = crate::descriptor::refusal::promotion_path_not_inferable(
+            &k,
+            crate::descriptor::refusal::suggested_descriptor_for(&k.origin, &k).as_deref(),
+        );
+        for guess in ["pkh(", "wpkh(", "sh(wpkh(", "tr("] {
+            assert!(
+                !printed.text.contains(&format!(": {guess}")),
+                "{why}: the refusal hands back a guessed script:\n{}",
+                printed.text
+            );
+        }
+        assert!(
+            printed.text.contains("will not guess"),
+            "{why}: the refusal must SAY it is not guessing:\n{}",
+            printed.text
+        );
+        checked += 1;
+    }
+    assert_eq!(
+        checked, 2,
+        "both `None` arms of the purpose map are exercised"
     );
 }

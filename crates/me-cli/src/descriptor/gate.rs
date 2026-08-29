@@ -247,48 +247,73 @@ fn carriage(d: &Parsed) -> Outcome {
     ))
 }
 
-/// §5.3's window substitution for the `/i/*` row. A refusal may not point at a
-/// path that refuses in the CURRENT build.
-pub fn remedy_fixed_index(d: &Parsed) -> String {
+/// §5.3's WINDOW SUBSTITUTION, both rows, stated once.
+///
+/// Three texts, and which one fires is decided by two facts about the input and
+/// the build — never by a preference:
+///
+/// * a `multi` form is carried by NO path in ANY build (§4.7 conjunct 1 refuses
+///   it under `--as descriptor` permanently, and md1 cannot represent this
+///   use-site), so it gets §6's own neither-path replacement. The window
+///   substitution is EXEMPT here: "wait for the update" would be false forever,
+///   and a refusal that routes nowhere has nothing to replace;
+/// * with the descriptor path SHIPPED, §6's own remedy — it names the flag that
+///   carries this exact shape;
+/// * without it, §5.3's stock replacement, verbatim. It DESCRIBES the path's
+///   future availability without ROUTING to it, which is what the rule
+///   distinguishes.
+fn window_remedy(d: &Parsed, path: &str, sorted_alternative: &str) -> String {
     if matches!(d.multi, Some(Multi::Unsorted)) {
-        // §6's `multi`-form replacement: a neither-path refusal routes nowhere,
-        // so "wait for the update" would be false forever for this file.
-        return "This is a `multi` policy, which only `--as md1` carries -- and md1 \
-                cannot represent a single fixed chain index. No `me` path engraves \
-                this file as written, in any build. Re-export with `<0;1>/*` -- \
-                carried in every build. (Re-exporting as a `sortedmulti` policy keeps \
-                the fixed index but is a DIFFERENT policy -- `me` will not rewrite it \
-                -- and needs the scannable-plate path.)"
-            .to_string();
+        return format!(
+            "This is a `multi` policy, which only `--as md1` carries -- and md1 cannot \
+             represent `{path}`. No `me` path engraves this file as written, in any \
+             build. Re-export with `<0;1>/*` -- carried in every build. {sorted_alternative}"
+        );
     }
     if DESCRIPTOR_PATH_SHIPPED {
-        "Use `--as descriptor`, which carries it exactly.".to_string()
-    } else {
-        "The path that carries a fixed chain index exactly is the scannable QR plate, \
-         and it needs device firmware this release does not include. Nothing is lost \
-         by waiting: keep your export file, and it packs the day the update ships."
-            .to_string()
+        return format!("Use `--as descriptor`, which carries `{path}` exactly.");
     }
+    "The scannable-plate path is not in this build -- keep the export file; it packs \
+     when the device update ships."
+        .to_string()
 }
 
-/// §5.3's window substitution for the `<i;i+1>`-without-wildcard row.
+/// The offending path §5.3's remedy names — the FIRST offender's, matching the
+/// row text, which names every offender but takes one remedy.
+fn first_offender_path(d: &Parsed, want_fixed: bool) -> String {
+    use cascade::Derivation::*;
+    d.keys
+        .iter()
+        .find(|k| {
+            if want_fixed {
+                matches!(k.children.as_slice(), [Child { .. }, Wildcard { .. }])
+            } else {
+                matches!(k.children.as_slice(), [Range { .. }])
+            }
+        })
+        .map(|k| k.children.iter().map(|c| c.encode()).collect::<String>())
+        .unwrap_or_default()
+}
+
+/// §5.3(a) — the `/i/*` row's remedy.
+pub fn remedy_fixed_index(d: &Parsed) -> String {
+    window_remedy(
+        d,
+        &first_offender_path(d, true),
+        "(Re-exporting as a `sortedmulti` policy keeps the fixed index but is a \
+         DIFFERENT policy -- `me` will not rewrite it -- and needs the scannable-plate \
+         path.)",
+    )
+}
+
+/// §5.3(a″) — the `<i;i+1>`-without-wildcard row's remedy.
 pub fn remedy_no_wildcard(d: &Parsed) -> String {
-    if matches!(d.multi, Some(Multi::Unsorted)) {
-        return "This is a `multi` policy, which only `--as md1` carries -- and md1 \
-                cannot represent a multipath with no trailing wildcard. No `me` path \
-                engraves this file as written, in any build. Re-export with \
-                `<0;1>/*` -- carried in every build."
-            .to_string();
-    }
-    if DESCRIPTOR_PATH_SHIPPED {
-        "Use `--as descriptor`, which carries it exactly.".to_string()
-    } else {
-        "The path that carries a multipath with no wildcard exactly is the scannable \
-         QR plate, and it needs device firmware this release does not include. \
-         Nothing is lost by waiting: keep your export file, and it packs the day the \
-         update ships."
-            .to_string()
-    }
+    window_remedy(
+        d,
+        &first_offender_path(d, false),
+        "(Re-exporting as a `sortedmulti` policy keeps the multipath but is a DIFFERENT \
+         policy -- `me` will not rewrite it -- and needs the scannable-plate path.)",
+    )
 }
 
 /// §4.5, NORMATIVE: promotion is **announced, not silent**. The operator
@@ -327,6 +352,13 @@ pub fn promotion_announcement(d: &Parsed) -> Option<String> {
 /// row fires; where it does not, §6 row 1's four-forms text carries the
 /// branch's real reason — which is the diagnostic the device destroys.
 pub fn select_cause(document: &str, errs: &Errors) -> Refusal {
+    // §6's address row, ahead of the five-step rule: an address matches none of
+    // the four branches, so the rule would report step 5's generic four-forms
+    // text and bury the one fact the operator needs — that no program on the
+    // device consumes an address record at all.
+    if cascade::is_bitcoin_address(document) {
+        return refusal::bitcoin_address();
+    }
     match cascade::most_resembled(document) {
         Some(Branch::Json) => match &errs.json {
             Some(JsonError::Inner { label, inner }) => {
@@ -399,11 +431,12 @@ fn promotion_row(document: &str, e: &PromotionError) -> Refusal {
         E::Key(other) => refusal::unparseable(Some((Branch::PromotedKey, describe_key(other)))),
         E::PathNotInferable(k) => refusal::promotion_path_not_inferable(
             k,
-            &refusal::suggested_descriptor_for(&k.origin, k),
+            refusal::suggested_descriptor_for(&k.origin, k).as_deref(),
         ),
-        E::AccountNotZero(k) => {
-            refusal::promotion_account_not_zero(k, &refusal::suggested_descriptor_for(&k.origin, k))
-        }
+        E::AccountNotZero(k) => refusal::promotion_account_not_zero(
+            k,
+            refusal::suggested_descriptor_for(&k.origin, k).as_deref(),
+        ),
         E::MultisigCosignerKey(v) => refusal::promotion_multisig_cosigner_key(*v),
         E::TestnetKey => refusal::promotion_testnet_key(),
     }
@@ -492,6 +525,13 @@ fn describe_key(e: &KeyError) -> String {
             "the origin block's fingerprint is not 8 hex characters".to_string()
         }
         KeyError::InvalidOriginPath(p) => format!("the origin path is not a path: `{p}`"),
+        // N1 (IMPL-P1's review): the offending tail can be the EMPTY string --
+        // `xpub…/` -- and the general sentence then printed empty backticks:
+        // "the use-site path is not a path: ``." Correct row, correct exit code,
+        // and a sentence that reads as a bug.
+        KeyError::InvalidChildrenPath(p) if p.is_empty() => {
+            "the key ends in `/` with no use-site path after it".to_string()
+        }
         KeyError::InvalidChildrenPath(p) => format!("the use-site path is not a path: `{p}`"),
         KeyError::NotAnExtendedKey => "it is not an extended key".to_string(),
         KeyError::UnsupportedVersion { version, .. } => {
