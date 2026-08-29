@@ -516,3 +516,21 @@ Spec folds queued: W1+W14 (modality), W4+W11 (window), W5 (rule + sweep),
 W6, W8+W9 (a′ note), W10+W13+W15 (identification block + §7 wallet_id),
 F-419's row. Filed: F-420, F-421, F-422 (status quo, interim ruling).
 The fold lands as one gated batch with a proportional re-review.
+
+
+---
+
+# Corrections to this log (R0 r10, 2026-08-28)
+
+1. **W14's one-plate answer was WRONG.** `bundlePlatePlan` emits one plate
+   per STRING (`plateTotal == len(strings)`, pinned by the fork's own
+   tests); `TestBundlePlanSingleMD1OnePlate` covers single-STRING cards.
+   The keyed bequest card (2 strings, ~168 chars) is **TWO plates** on the
+   engraver. The operator's friend should be told: two plates from the
+   machine; the hand-stamped copy's layout on one sheet remains his own
+   choice. The walk asserted "measured TRUE" on a test whose name matched
+   the hope — the citation was verified by presence, not by reading its
+   fixture (r9's M5 repeated the miss; r10 caught it).
+2. **W9's `/**` byte-identity attribution:** verified in the F-410 cycle,
+   not F-411 (commit `5465253b`, `cli_bip388_double_wildcard.rs`). The
+   equivalence itself re-measured true (`0x880c7`, both spellings).
