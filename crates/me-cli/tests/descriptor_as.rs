@@ -854,9 +854,35 @@ fn the_label_warning_fires_exactly_on_the_paths_that_pack() {
     assert_eq!(checked, 3, "all three paths are exercised");
 }
 
-/// **N2.** A quoted fragment must not span a newline — the backtick pair has to
-/// close on the line it opened. The row and the exit code are unchanged; only
-/// the rendering moves.
+/// Backticks that DELIMIT, i.e. discounting the ones `quote_operator` escapes.
+///
+/// The naive count is not the property, and the first version of this test
+/// asserted the naive one and failed on its own fixture: `` `a\`b` `` carries
+/// three backticks and is correctly rendered — two delimiters plus one escaped
+/// literal. What has to pair up is the DELIMITERS.
+fn delimiting_backticks(line: &str) -> usize {
+    let b: Vec<char> = line.chars().collect();
+    (0..b.len())
+        .filter(|i| b[*i] == '`' && (*i == 0 || b[i - 1] != '\\'))
+        .count()
+}
+
+/// **N2, and its residual N-a.** A quoted fragment must not span a newline, and
+/// must not contain an unescaped copy of the delimiter it sits inside — the
+/// backtick pair has to close on the line it opened.
+///
+/// **Scope, stated because the fold-1 report over-claimed it:** the parity loop
+/// below runs over the stderr of the inputs THIS test drives, not over every
+/// line `me` can emit. A `quote_operator`-quoted fragment cannot unbalance a
+/// pair, because it now escapes `` ` `` — but other refusal texts carry
+/// backticks in fixed prose, and one surface still quotes an operator line
+/// through `elide_line` rather than through `quote_operator` (the cosigner-line
+/// row). The general property is NOT asserted here, and is not claimed.
+///
+/// And the property that IS asserted counts DELIMITING backticks, not all of
+/// them — see [`delimiting_backticks`].
+///
+/// The row and the exit code are unchanged in both cases; only the rendering.
 #[test]
 fn a_quoted_fragment_never_spans_a_newline() {
     let one = row_input("neither/wsh-multi");
@@ -874,7 +900,7 @@ fn a_quoted_fragment_never_spans_a_newline() {
     );
     for line in err.lines() {
         assert_eq!(
-            line.matches('`').count() % 2,
+            delimiting_backticks(line) % 2,
             0,
             "a backtick pair is left open across a line break: {line:?}"
         );
@@ -883,5 +909,88 @@ fn a_quoted_fragment_never_spans_a_newline() {
         err.contains("\\n"),
         "the newline inside the quoted fragment was neither escaped nor \
          truncated away:\n{err}"
+    );
+}
+
+/// The bare payload of the first I1 key, for constructing key expressions whose
+/// origin block is written inline.
+const IK1_BARE: &str = "xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan";
+
+/// **N-a** — the residual of N2. One backtick INSIDE the fragment falsified the
+/// same property N2 installed, from an operator-supplied path that
+/// `quote_operator` used to pass through untouched.
+#[test]
+fn a_backtick_inside_a_quoted_fragment_is_escaped() {
+    let document = format!("wpkh([dc567276/48h/0h/0h/2h]{IK1_BARE}/a`b)");
+    let (out, _d) = pack_in(&document, &["--as", "md1"]);
+    let err = stderr(&out);
+    assert_eq!(
+        code(&out),
+        3,
+        "the row and the exit code are unchanged\n{err}"
+    );
+    assert!(
+        err.contains("the use-site path is not a path: `a\\`b`."),
+        "the backtick inside the fragment is not escaped:\n{err}"
+    );
+    for line in err.lines() {
+        assert_eq!(
+            delimiting_backticks(line) % 2,
+            0,
+            "a backtick pair is left open: {line:?}"
+        );
+    }
+}
+
+/// **M-A.** `quote_operator` neutralised C0/C1 but not the two other classes
+/// that can rewrite the line it prints: the DELIMITER it is interpolated into,
+/// and Unicode `Cf` (bidi overrides and isolates), which `char::is_control()`
+/// does not reach. Both constructions are the fold-1 re-review's own.
+#[test]
+fn a_quoted_label_can_neither_close_the_quote_nor_reorder_the_line() {
+    let fixture = row_input("formats-happy/bluewallet-sh-fixture");
+    let label_of = |l: &str| fixture.replace("Name: sh", &format!("Name: {l}"));
+
+    // (a) A label that closes the quote and continues in `me`'s own voice.
+    let (out, _d) = pack_in(
+        &label_of("ok\" -- nothing is wrong with this wallet. \""),
+        &["--as", "md1"],
+    );
+    let err = stderr(&out);
+    assert!(
+        err.contains(
+            "the label \"ok\\\" -- nothing is wrong with this wallet. \\\"\" is not carried"
+        ),
+        "the label closed the quote and continued in me's voice:\n{err}"
+    );
+
+    // (b) Bidi overrides and isolates. `a\u{202e}KCATTA` renders as `aATTACK`
+    // in a bidi-aware terminal, and an unterminated override reorders the
+    // remainder of the line.
+    let (out, _d) = pack_in(
+        &label_of("a\u{202e}KCATTA\u{202c}b\u{200b}\u{2066}x\u{2069}"),
+        &["--as", "md1"],
+    );
+    let err = stderr(&out);
+    for bad in ['\u{202e}', '\u{202c}', '\u{200b}', '\u{2066}', '\u{2069}'] {
+        assert!(
+            !err.contains(bad),
+            "a raw U+{:04X} reached the terminal:\n{err}",
+            bad as u32
+        );
+    }
+    assert!(
+        err.contains("\\u{202e}") && err.contains("\\u{2066}"),
+        "the formatting characters were stripped rather than shown -- the \
+         operator should see that something odd is in their file:\n{err}"
+    );
+
+    // The CONTROL, and it is what stops the fix from being "escape everything":
+    // the operator's job here is to RECOGNISE their own label.
+    let (out, _d) = pack_in(&label_of("Grüße — Konto Nº1 ✓ 日本語"), &["--as", "md1"]);
+    let err = stderr(&out);
+    assert!(
+        err.contains("the label \"Grüße — Konto Nº1 ✓ 日本語\" is not carried"),
+        "a legitimate non-ASCII label was mangled:\n{err}"
     );
 }

@@ -200,28 +200,37 @@ pub fn short_key(s: &str) -> String {
 /// **Operator-supplied bytes, rendered safe for a terminal and BOUNDED.**
 ///
 /// Every refusal that quotes the operator's own file back at them runs the
-/// fragment through this. Two reasons, both measured:
+/// fragment through this. It escapes four classes and bounds the result at
+/// [`QUOTE_MAX`] CHARACTERS:
 ///
-/// * **M2** — the §5.3(b) label warning echoed a `Name:` header verbatim,
-///   ANSI escapes included, and it lands next to `address 0:`, the operator's
-///   verification surface. A crafted export carrying cursor or clear-screen
-///   sequences could scroll the address line away at the moment it is meant to
-///   be compared. Control bytes are escaped rather than stripped, so the
-///   operator still sees that something odd is in their file.
-/// * **N2** — a quoted use-site fragment could span a newline, leaving an
-///   apparently unterminated backtick across two lines. Escaping the newline
-///   keeps the backtick pair on one line.
+/// 1. **C0/C1 controls and DEL** — an ESC sequence next to `address 0:` could
+///    scroll away the very line the operator is being told to compare (M2).
+/// 2. **The two DELIMITERS this is interpolated into**, `"` and `` ` ``. A
+///    label of `ok" -- nothing is wrong with this wallet. "` closed the quote
+///    and continued in `me`'s own voice; a use-site fragment containing a
+///    backtick left an apparently unterminated pair on the line. Escaping both
+///    at the source is what makes ONE helper safe for BOTH call sites
+///    (fold-1 re-review M-A(a) and N-a).
+/// 3. **The escape character itself**, `\`, or a literal `\x1b` in a label
+///    would be indistinguishable from an escape this function emitted.
+/// 4. **Invisible and directional formatting** — Unicode `Cf` and the private
+///    use areas. `char::is_control()` covers `Cc` ONLY, so U+202E and friends
+///    passed through raw: `a\u{202E}KCATTA` renders as `aATTACK` in a
+///    bidi-aware terminal, and an unterminated override reorders the rest of
+///    the line (M-A(b)).
+///
+/// **What is deliberately NOT escaped:** ordinary non-ASCII. A wallet named
+/// `Grüße — Konto Nº1 ✓ 日本語` must come back recognisable, because the
+/// operator's job here is to recognise their own label. Escaping by CLASS
+/// rather than by an ASCII allowlist is what buys that.
 ///
 /// This is output INTEGRITY, not secret handling: nothing here decides what is
 /// packed, and the bytes are public wallet-export text.
 pub fn quote_operator(s: &str) -> String {
-    /// Enough to recognise your own file; short enough that a hostile one
-    /// cannot push the verification lines off the screen.
-    const MAX: usize = 48;
     let mut out = String::new();
     let mut width = 0usize;
     for c in s.chars() {
-        if width >= MAX {
+        if width >= QUOTE_MAX {
             out.push('…');
             break;
         }
@@ -229,14 +238,59 @@ pub fn quote_operator(s: &str) -> String {
             '\n' => "\\n".to_string(),
             '\r' => "\\r".to_string(),
             '\t' => "\\t".to_string(),
-            c if c.is_control() && (c as u32) < 0x80 => format!("\\x{:02x}", c as u32),
-            c if c.is_control() => format!("\\u{{{:04x}}}", c as u32),
+            '"' => "\\\"".to_string(),
+            '`' => "\\`".to_string(),
+            '\\' => "\\\\".to_string(),
+            c if (c.is_control() || is_invisible_or_directional(c)) && (c as u32) < 0x80 => {
+                format!("\\x{:02x}", c as u32)
+            }
+            c if c.is_control() || is_invisible_or_directional(c) => {
+                format!("\\u{{{:04x}}}", c as u32)
+            }
             c => c.to_string(),
         };
         width += piece.chars().count();
         out.push_str(&piece);
     }
     out
+}
+
+/// The bound on a quoted fragment, in CHARACTERS.
+///
+/// Not columns: `width` accumulates `chars().count()`, so 48 CJK glyphs occupy
+/// roughly 96 terminal columns (fold-1 re-review N-b — the doc said columns and
+/// the code counted chars). Still far short of a screen, and still enough to
+/// recognise your own file.
+pub const QUOTE_MAX: usize = 48;
+
+/// Unicode `Cf` (format) plus the private use areas — the characters that are
+/// invisible or that reorder what follows them, and which `char::is_control()`
+/// does not reach.
+///
+/// Hard-coded because `std` exposes no general-category table and this does not
+/// warrant a dependency. The list is the `Cf` ranges plus PUA; each line names
+/// what it is, so a reader can check it rather than trust it. Erring wide is
+/// safe here — a false positive escapes a character instead of hiding it.
+fn is_invisible_or_directional(c: char) -> bool {
+    matches!(c as u32,
+        0x00AD                          // SOFT HYPHEN
+        | 0x0600..=0x0605 | 0x061C | 0x06DD | 0x070F | 0x08E2  // Arabic format
+        | 0x180E                        // MONGOLIAN VOWEL SEPARATOR
+        | 0x200B..=0x200F               // ZWSP, ZWNJ, ZWJ, LRM, RLM
+        | 0x202A..=0x202E               // bidi embedding / override
+        | 0x2060..=0x2064               // word joiner, invisible operators
+        | 0x2066..=0x206F               // bidi ISOLATES, deprecated formats
+        | 0xFEFF                        // ZWNBSP / BOM
+        | 0xFFF9..=0xFFFB               // interlinear annotation
+        | 0x110BD | 0x110CD             // Kaithi number signs
+        | 0x13430..=0x1343F             // Egyptian hieroglyph format
+        | 0x1BCA0..=0x1BCA3             // Shorthand format
+        | 0x1D173..=0x1D17A             // Musical beam/slur/phrase
+        | 0xE0001 | 0xE0020..=0xE007F   // language tag, TAG characters
+        | 0xE000..=0xF8FF               // private use area
+        | 0xF0000..=0xFFFFD             // supplementary PUA-A
+        | 0x100000..=0x10FFFD           // supplementary PUA-B
+    )
 }
 
 /// `[fp/path]` as the input spelled it, or the empty string for a key that
