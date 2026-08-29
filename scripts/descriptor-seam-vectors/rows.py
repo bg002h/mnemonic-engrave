@@ -394,8 +394,13 @@ R(name="gate/mistyped-bare-mnemonic",
 R(name="gate/deadbeef-fronts-an-xpub", input="deadbeef: " + SK,
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S7 gate clause 3 (r17's intended flip; invariant-1 boundary witness). "
-                "refusal_row is the device's own precedence: parseBlueWalletDescriptor "
-                "succeeds and OutputDescriptor's Title != \"\" gate is what refuses",
+                "refusal_row is NOT the device's precedence -- measured at fork 1f09537, "
+                "parseBlueWalletDescriptor FAILS this file with `bluewallet: expected 0 "
+                "keys, but got 1` (no Policy: header, so nkeys=0 while one key was "
+                "appended; parse.go:151 fires before the Title gate at :37). "
+                "bluewallet-no-name is nonetheless the right answer by S6's own standard: "
+                "the count row's text names a Policy: line this file does not have, so it "
+                "would be FALSE about the operator's file. Corrected per IMPL-P1-report F-2",
   covers=["gate"], gate=G(True, "descriptor-refusal", 3, "bluewallet-no-name"))
 
 for nm, s in [
@@ -454,6 +459,10 @@ R(name="gate/duplicate-key-same-use-site",
 R(name="gate/colliding-origin-multi",
   input=sm(2, [key(F0, ORG, K0, "/<0;1>/*"), key(F0, ORG, K1, "/<0;1>/*")], form="multi"),
   host_admits=False, md1_admits=False, format="bip380",
-  source=SPEC + " S4.7 conjunct 8 / S7 clause 8: the multi twin; conjunct 8 binds the "
-                "--as md1 path, and under --as descriptor conjunct 1 refuses first",
+  source=SPEC + " S4.7 conjunct 8 / S7 clause 8 AS AMENDED 2026-08-29: the multi twin; "
+                "conjunct 8 binds BOTH --as paths. Conjunct 1's --as-dependent multi arm "
+                "runs AFTER conjuncts 2-8, so this row earns the key-identity refusal "
+                "under --as descriptor too -- measured. The previous note said conjunct 1 "
+                "refuses first, which was the ordering that produced the C1 Critical "
+                "(IMPL-S1S3-adversarial-review)",
   covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity"))
