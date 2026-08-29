@@ -1166,7 +1166,17 @@ Found by the B1 plan's R0 round 2, against a paragraph a previous fold had
 introduced. Gating for B2 rather than optional: without it §10.2.2's labels are
 unimplementable for any multisig payload.
 
-### F-76 — inspecting a payload-sourced card (owning phase: **after B2b**; NOT B2a)
+### F-76 — inspecting a payload-sourced card — **WIDENED 2026-08-29: the same wall binds the ENGRAVE path** (owning phase: **after B2b**; NOT B2a)
+
+**Widening, measured in the S2 journey walk (headless sim, fork `e456970`):**
+the payload door hands its gatherer ONE record on the engrave route too, so
+Wallet Policy and Engrave Bundle show `md1 descriptors: 0` for a payload
+holding all six chunks of one good card; seeding all six flips the screen to
+1, proving the cards are fine and the door is the constraint. The fix this
+entry already names (a gatherer primable from an in-memory record set, the
+`takeAll` shape Build Policy uses) covers both routes — implement it once,
+for Inspect AND the two engrave programs. `--as descriptor` payloads are
+unaffected (one record, complete).
 
 `mk1GatherFlow` (`gui/mk1_inspect.go:156`) and `md1GatherFlow`
 (`gui/md1_gather.go:79`) prime a fresh gatherer with the single string handed to
