@@ -40,11 +40,23 @@ folded into the plan (145/145 cites), shas 542cd492 both repos verified,
 committed + PASS, engrave 562/562 (cross_lang RAN; 1 pre-existing
 deliberate #[ignore] regenerator noted for P2's zero-ignore wording),
 fork go test ./... 53/53 ok (gui ran serial 310s this once; shard
-scripts/gui-shard-test.sh for future runs). NEXT: P1 implementer (ONE
-agent, worktree impl/descriptor-s2, TDD): P1.0 consult-first, P1.1 arm,
-P1.2 derived-rule tests + capture, P1.3 expect widening; matrix witness
-green at every commit boundary; then proportional review folds into
-P2's per the plan.
+scripts/gui-shard-test.sh for future runs). **P1 DONE + gated GREEN**
+(worktree /scratch/code/shibboleth/me-worktrees/impl-descriptor-s2,
+branch impl/descriptor-s2, commits b8f0538..5cf5c34, report
+design/agent-reports/IMPL-S2-P1.md on the branch): consult-first, the
+arm, the exhaustive derived rule, the --expect widening; 575/575, cost
++107ns/record (the arm only pays on real descriptors); controller
+verified sha/witness/log. Deviations recorded in the report; the
+--expect-descriptor exit-0 test is INHERITED BY P2.1. SPEC:101's stale
+message folded into the plan's falsification list (master `9ea9769`).
+**Fork worktree /scratch/code/shibboleth/sh-worktrees/s2-descriptor-arm
+(branch s2/descriptor-arm @ `0abbf81`)** carries the two pre-P3 fixes
+(parse guard != 4, ypubVer arm) authored early for P2.6's measured
+booleans; KNOWN single red there (ypub row vs the old vector copy)
+until P3.3. **P2 implementer IN FLIGHT** (same engrave worktree; P2.1
+flip → P2.7 spec amendments incl. THE single regeneration at P2.6;
+report will land at design/agent-reports/IMPL-S2-P2.md). After P2: the
+proportional opus review over P1+P2 BEFORE the P3 Go port.
 Recon: `design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`).
 Scale: 5 expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
 propagation sweeps + generators; both clippy toolchains (F-430).
