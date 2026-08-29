@@ -14634,3 +14634,15 @@ changes are engraving changes. Update `TestBundlePlanSingleMD1OnePlate`'s
 siblings to pin the new plan's arithmetic; the spec's §5.5 plate cell (and
 the walk-log correction) then update to the measured new counts.
 
+### F-424 — the published `md-codec` 0.42.0 lacks the F-217/F-218 encode refusals; bump `me`'s dependency and drop the host mirror on the next publish (repo: **descriptor-mnemonic** + **mnemonic-engrave**; owning phase: **next md-codec publish, operator-gated**) `#md-codec` `#funds` `#publish`
+
+Filed from PLAN-descriptor-S1S3-r1's C1 (measured: eight files differ
+between the registry 0.42.0 and the tree; `validate_origin_key_consistency`
+and `validate_no_duplicate_key_slots` and their error variants are absent
+from the published crate). Interim: spec conjunct 7a has `me` enforce both
+host-side (convergence with the Rust primary). When the operator next
+publishes `md-codec` (≥ 0.43.0, carrying the validators), bump `me`'s
+dependency, keep conjunct 7a's refusal (now double-enforced), and simplify
+the host mirror to a thin pre-check or drop it with the vector rows still
+standing. Crate publishes are operator-gated — never overnight work.
+
