@@ -442,3 +442,39 @@ with the compare prompt — prints on EVERY successful host-side parse,
 before whatever follows (pack, window refusal, §5.3 refusal). One rule:
 **parse succeeded ⇒ identify the wallet, always; then say what can or
 cannot be done with it.** Refusals follow identification, never replace it.
+
+
+---
+
+## W14 — "both," for two reasons that name modality dimensions W1 missed;
+## and the one-plate hope is TRUE, measured
+
+**The moment.** Decision: *"Both. He'd be better off with qr encoding rather
+than being dependent upon our constellation, but he thinks he might hand
+stamp a copy of it at home … using my letter punch set … we are hopeful it
+will be a short 1 plate engraving to get all the md1 strings."*
+
+**Two operator-named dimensions, folded into W1's modality table:**
+
+1. **Ecosystem dependence.** A descriptor QR is readable by ANY wallet
+   software, indefinitely — no constellation tooling in the restore path.
+   md1 requires an md1 decoder: the format is a published open spec
+   (decodable from the document alone), but the tooling today is this
+   constellation's. For a bequest, that asymmetry is the decision.
+2. **Hand-reproducibility.** md1 text is hand-stampable — literally the md
+   BIP's design case ("hand-transcription onto durable media") — and a QR
+   never is. Machine-readable vs hand-copyable is the honest axis; each
+   plate type is the other's complement, which is the real argument for
+   "both" and belongs in §5.5.
+
+**The measured answers.** The bequest card (keyed single-sig `wpkh`,
+materialised `<0;1>/*`, BIP-84 origin): **2 md1 strings, 85 + 83 = 168
+characters**; the fork's own `TestBundlePlanSingleMD1OnePlate` pins one md1
+card = exactly one plate. Hand-stamping bonus, worth a §5.5 sentence: each
+string independently corrects up to 4 character substitutions (BCH), so a
+mis-struck punch is inside the error budget — a property no other
+hand-stamped backup format offers.
+
+**Journey 2 closes:** verified by address against the phone (W13's block),
+key line archived for the QR build, one md1 plate cut now, one hand-stamped
+copy at the friend's home. Watch-only throughout; the seed never appeared.
