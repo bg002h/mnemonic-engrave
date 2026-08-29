@@ -31,12 +31,20 @@ neither-tag ruling; RE-RULED: the ypub row gets a NEW single-member S7
 bullet, the F-426 version-gap witness; TAG_SLOTS 88->89, ROW_FLOOR
 71->72, all three manifest copies enumerated; ownership split rule:
 owned by the phase whose diff falsifies it). r6 RED 0C/1I/3M/1N (`97fb400`/`d3f59cc`);
-**r7 GREEN 0C/0I/1M/2N-ish (0C/0I/1M/1N) -- R0 CLOSED 2026-08-29**
+**r7 GREEN 0C/0I/1M/1N -- R0 CLOSED 2026-08-29**
 (persisted `beb3617`; Minor+Nit folded wording-only `f40fa81`; plan
 status flipped GREEN). Seven rounds, counts 20 -> 10 -> 9 -> 4 -> 5 ->
-5 -> 2, zero Criticals from r4 on. IMPLEMENTATION IS GO at P0 (flip
-inventory, baseline shas, lint-gate script, baseline suites), then ONE
-implementer per phase, P1 Rust arm reviewed before the P3 Go port.
+5 -> 2, zero Criticals from r4 on. **P0 CLOSED GREEN same day**: inventory
+folded into the plan (145/145 cites), shas 542cd492 both repos verified,
+4 sysw_class rows + 36 refusal rows confirmed, scripts/lint-gate.sh
+committed + PASS, engrave 562/562 (cross_lang RAN; 1 pre-existing
+deliberate #[ignore] regenerator noted for P2's zero-ignore wording),
+fork go test ./... 53/53 ok (gui ran serial 310s this once; shard
+scripts/gui-shard-test.sh for future runs). NEXT: P1 implementer (ONE
+agent, worktree impl/descriptor-s2, TDD): P1.0 consult-first, P1.1 arm,
+P1.2 derived-rule tests + capture, P1.3 expect widening; matrix witness
+green at every commit boundary; then proportional review folds into
+P2's per the plan.
 Recon: `design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`).
 Scale: 5 expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
 propagation sweeps + generators; both clippy toolchains (F-430).

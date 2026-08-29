@@ -272,6 +272,30 @@ record displayed on the real device) and every flash remain operator-gated**
   supports retirement); expected disposition is that the row and its tests
   are retired to the §5.1 choice-block tests, but the spec text governs;
   cite §5.1's exact sentence in the inventory.
+- **P0.1 INVENTORY (folded at P0's close; measured at engrave `5deb88e`,
+  fork `a5e29b4`).** Grep evidence: `DESCRIPTOR_PATH_SHIPPED` = 9 hits
+  (5 behavioural / 2 comments / 2 inert); `WindowNotInBuild` = 5 sites +
+  2 producers; `not available in this build` = 3 source + 5 test sites;
+  the §5.3 remedy string = 1 source + 1 test site. **§6 row count
+  measured NOW: 36** (`Row::ALL`'s 36 slugs asserted at
+  `crates/me-cli/tests/descriptor_refusals.rs:28` and `:135`; the
+  vector file's `refusal_rows` = 36). Post-S2 EXPECTED 35; the number
+  recorded at P2.4 is the measurement.
+
+  | # | member (site, measured) | S3-parked behaviour | post-S2 behaviour | flips at |
+  |---|---|---|---|---|
+  | 1 | `crates/me-cli/src/descriptor/gate.rs:42` | `DESCRIPTOR_PATH_SHIPPED = false` | `true` | P2.1 |
+  | 2 | `carriage()`, `crates/me-cli/src/descriptor/gate.rs:223` | `descriptor_carries` always false | true for admitted inputs; the four `md1-split/*` rows exit 3 → 2 (choice block) | P2.1 flips, P2.2 retests |
+  | 3 | `window_remedy()`, `crates/me-cli/src/descriptor/gate.rs:273` (string at `:276`) | remedy = "The scannable-plate path is not in this build…" | "Use `--as descriptor`, which carries `/0/*` exactly."; pinned row test `crates/me-cli/tests/descriptor_refusals.rs:641` updates | P2.2 |
+  | 4 | `choice_block()` head, `crates/me-cli/src/descriptor/gate.rs:566-574` | `(not available in this build)`, unpadded + trailing `\n` (r1 M2) | padded inline head per §5.1's NORMATIVE block; verbatim block test ADDED (none exists — `grep SCANNABLE` = 0) | P2.2 |
+  | 5 | clap help conditional, `crates/me-cli/src/main.rs:361-365` | ` (not available in this build)` suffix; test `crates/me-cli/tests/descriptor_as.rs:767` | suffix dropped; test flips | P2.2 |
+  | 6 | `identify::window_refusal`, `crates/me-cli/src/descriptor/identify.rs:195-197` — §5.1's window, TWO variants (`the_window_refusal_has_two_variants`, `crates/me-cli/tests/descriptor_refusals.rs:781`; also `:307`, `:792`) | reachable | RETIRED — no build state refuses (§5.1 conditions the window on "a build where the `--as descriptor` path has not shipped", `design/SPEC_descriptor_input.md:940`; also `:810`, `:1127`) | P2.2 (code), P2.4 (tests) |
+  | 7 | `Row::WindowNotInBuild` — enum `crates/me-cli/src/descriptor/refusal.rs:43`, `Row::ALL` `:83`, slug `:124`; producers `crates/me-cli/src/descriptor/as_flag.rs:136` + `crates/me-cli/src/descriptor/gate.rs:244` | in the 36-row vocabulary | RETIRED; count + set-equality assertions update to the P2.4-measured number | P2.4 |
+  | 8 | §11 item 5's matrix, `crates/me-cli/tests/descriptor_refusals.rs:829-849` (case 1), `:846`/`:870` (forbid clauses), `:855-862` (case 3) | five cases incl. window sibling | full-build truth table; case 3's witness = invariant 1's new row | P2.2 (+P2.6 row) |
+  | 9 | Spec: §6's window row (`design/SPEC_descriptor_input.md:1419`, walk W4/W11/W13) + §11 item 5's sibling clause (`design/SPEC_descriptor_input.md:1951`) | present | amended per P2.7 | P2.7 |
+  | 10 | comments/inert: `crates/me-cli/src/descriptor/as_flag.rs:133`, `crates/me-cli/src/main.rs:350` (comments), `crates/me-cli/src/main.rs:360` (use), `crates/me-cli/src/descriptor/mod.rs:59` (re-export) | mention the constant | comments reworded opportunistically; no behaviour | P2.1 commit, no gate |
+  | 11 | SPEC-FALSIFICATION section (members and owners enumerated above in P0.1) | true today | amended by owner | P2.6 / P2.7 / P3.5 per the split rule |
+
 - **P0.2** Confirm the byte-change baseline: `sha256sum` of both vector-file
   copies == `542cd492…` (r1 verified both PASS at baseline), and
   `TestDescriptorSeamSyswClass` still counts 4 (`wantSyswClass`,
