@@ -26,7 +26,15 @@ input — and the key-identity row's cause clause was restated over ENTRIES
 rather than BlueWallet LINES (M5: the row cannot fire for a BlueWallet file,
 measured). Neither changes a refusal, a cause or an operator's next action;
 both change what a row SAYS about the device, and P2.4's verbatim assertions
-are written from the AMENDED text. §9 item 7 records the walk's
+are written from the AMENDED text. **Post-GREEN amendment 2026-08-29 (b):**
+§7's clause 8 and §5.4's tier parenthetical stated a CONJUNCT ORDER — conjunct
+1's `--as`-dependent `multi` arm ahead of conjuncts 2–8 — that the IMPL-S1S3
+adversarial review measured as the cause of a Critical: it short-circuited the
+flag-independent conjuncts, so an anyone-can-spend `wsh(multi(0,…))` heard
+"This wallet can still be engraved" under `--as descriptor`. Both sites now
+state the shipped order (the flag-dependent arm runs LAST), which is what makes
+§6's key-identity row's *"both `--as` paths"* true. No refusal TEXT changes;
+the ordering rule does. §9 item 7 records the walk's
 one narrow residual.
 **No code may be written before the implementation plan passes its own
 gate** (project `CLAUDE.md` — this is risk-set work: it changes normative
@@ -1206,12 +1214,18 @@ md1-representable — and stripping its identification would blind the
 operator at the decision their refusal asks; a conjunct-8-FAILING `multi`,
 the colliding-origin twin, is PARTIAL like every conjunct-8 failure — the
 compare prompt would pass byte-identically on the impossible wallet
-(PLAN-r4's NEW-I1, aligning this parenthetical with the rule above it). But that refusal, under
-explicit `--as descriptor`, is conjunct 1's PERMANENT shape refusal naming
-`--as md1` — in EVERY build: the window text's "come back for the QR plate"
+(PLAN-r4's NEW-I1, aligning this parenthetical with the rule above it).
+**Which FOLLOWER each of the two meets under explicit `--as descriptor`
+differs, and the distinction is the amendment of 2026-08-29:** the
+conjunct-8-PASSING `multi` meets conjunct 1's PERMANENT shape refusal naming
+`--as md1`, in EVERY build — the window text's "come back for the QR plate"
 would be false forever for a shape the descriptor record can never carry
-(§5.5, §10; R0 r15's new-I3). With `--as` omitted, the carriage rule
-governs as usual.)
+(§5.5, §10; R0 r15's new-I3) — while the conjunct-8-FAILING twin meets
+conjunct 8's own key-identity refusal, on both `--as` paths, because
+conjunct 1's flag-dependent arm runs AFTER the flag-independent conjuncts
+(§7 clause 8's amendment; IMPL-S1S3 adversarial review C1). The previous
+text applied the first of these to both, which was false for the twin. With
+`--as` omitted, the carriage rule governs as usual.)
 
 **The FOLLOWER** is decided independently by §5's own logic — the tier
 picks lines, not outcomes, and any tier may precede any follower. The
@@ -1660,12 +1674,31 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
      colliding-origin `wsh(sortedmulti(…))` (two xpubs, one
      `(fingerprint, origin)`), a duplicate-`(xpub, use-site)` slot pair,
      and the colliding-origin `wsh(multi(…))` twin — whose conjunct-8
-     refusal binds the `--as md1` path ONLY: under `--as descriptor` a
-     `multi` gets conjunct 1's permanent refusal first, per the ruling
-     stated at §5.1, §6 and §11 (PLAN-r3's I2). Gate OPEN,
-     `descriptor-refusal` (`refusal_row: key-identity`, or
-     `key-identity-duplicate` for the slot row), exit 3 — the first two
-     rows on both `--as` paths.
+     refusal binds **BOTH `--as` paths, the `multi` twin included**
+     (AMENDED 2026-08-29; see below). Gate OPEN, `descriptor-refusal`
+     (`refusal_row: key-identity`, or `key-identity-duplicate` for the
+     slot row), exit 3 — all three rows on both `--as` paths.
+
+     **AMENDED 2026-08-29 (IMPL-S1S3 adversarial review, C1).** This clause
+     previously read *"whose conjunct-8 refusal binds the `--as md1` path
+     ONLY: under `--as descriptor` a `multi` gets conjunct 1's permanent
+     refusal first"*. That ordering is exactly what produced C1: running
+     conjunct 1's `--as`-DEPENDENT `multi` arm ahead of the flag-independent
+     conjuncts short-circuited them, so `wsh(multi(0,…))` — anyone-can-spend
+     — answered `--as descriptor` with conjunct 1's *"This wallet can still
+     be engraved"* while `--as md1` refused the same file permanently.
+     §5.4's carriage rule already said why that cannot be right: the no-path
+     determination *"quantifies over both paths, so it needs no flag"*.
+     **The shipped order is: conjunct 1's `--as`-INDEPENDENT shape half
+     first, then conjuncts 2–8, then conjunct 1's `multi`-under-
+     `--as descriptor` arm LAST.** Conjunct 1's referral is therefore reached
+     only when 2–8 hold — which is exactly when `--as md1` admits the wallet,
+     making the referral true by construction rather than by a text edit. A
+     `multi` that PASSES conjunct 8 still gets conjunct 1's permanent refusal
+     under `--as descriptor`; a `multi` that FAILS it gets the key-identity
+     refusal on both paths, which is what §6's key-identity row
+     (*"**`EXIT_REFUSED` (3)**, both `--as` paths"*) had always required and
+     the old order contradicted.
      `host_admits=false`, `md1_admits=false`, and **no address fields** —
      a colliding-origin wallet derives byte-identical addresses to a clean
      control (measured, r2's NEW-M5), so the refusal assertion itself is
