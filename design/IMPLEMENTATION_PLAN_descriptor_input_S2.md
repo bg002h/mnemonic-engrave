@@ -1,8 +1,9 @@
 # IMPLEMENTATION_PLAN_descriptor_input_S2 — `--as descriptor` end to end
 
-**Status: DRAFT — R0 round 1 (RED, 4C/6I/7M/3N, r1 report) and round 2
-(RED, 1C/2I/4M/3N, `design/agent-reports/R0-S2-plan-r2.md` — 16 of r1's
-20 findings verified resolved, P1.0/P2.5/P2.6 measured sound) folded
+**Status: DRAFT — R0 rounds 1 (RED 4C/6I/7M/3N), 2 (RED 1C/2I/4M/3N —
+16 of r1's 20 verified resolved) and 3 (RED 1C/1I/4M/3N,
+`design/agent-reports/R0-S2-plan-r3.md` — 9 of r2's 10 verified resolved;
+the Critical was P3.4 colliding with the parity absolutes) folded
 2026-08-29.** Single author
 per the R0 gate; this plan binds S2 of `SPEC_descriptor_input.md` (GREEN
 2026-08-28, amendments through the S1+S3 cycle). S1+S3 shipped 2026-08-29
@@ -26,8 +27,9 @@ packs §5.2's **canonical re-encoded descriptor** as one record of class
 `Descriptor`; the pack path's §5.1 gate is restructured to key on
 **identification, not classification failure**, so the choice block survives
 the new arm (r1 C1); the device learns to **classify** that record with the
-SAME predicate as the host (`sysw.Classify` descriptor arm — a real §4.7
-port, Rust-first per §3/§5.2 and the standing Rust-primary rule) and to
+SAME predicate as the host (`sysw.Classify` descriptor arm — a real port
+of §4's cascade narrowings AND §4.7's conjuncts, Rust-first per §3/§5.2
+and the standing Rust-primary rule) and to
 **display** it (`walletPolicyFlow` consumes `ClassDescriptor` and routes to
 the existing `DescriptorScreen`); `me sysw show` grows the per-record
 confirmation line §11 item 1 assumes (r1 C4); the fork batches F-426 (the
@@ -58,6 +60,11 @@ record displayed on the real device) and every flash remain operator-gated**
      `device_admits` boolean and the "must NOT feed" harness rule for it is
      dropped from the header (the `panic:encode` rows are UNCHANGED — S2
      never touches `Encode`, and their scan-door behaviour stands);
+   - the `neither/full-origin-ypub` row's `device_admits` flip, false →
+     true (r3 C1: P3.4's one case-arm makes the scan door accept the
+     row's `ypub`-keyed descriptor — measured, the ONLY row that moves —
+     so the boolean must flip in the SAME regeneration, under the same
+     measured-provenance rule as the short-fingerprint row below);
    - F-428's citation fixes (the stale `:151` cite → the measured `nonstandard/parse.go:158`, in the
      two `source` annotations and the generator) — F-428's own entry names
      "the next vector-file byte change — realistically the S2/F-426 batch"
@@ -67,15 +74,26 @@ record displayed on the real device) and every flash remain operator-gated**
    named (r2 M2): Go half — `wantRows` (`nonstandard/descriptor_seam_test.go:66`),
    `wantDeviceFalse` (`nonstandard/descriptor_seam_test.go:68`), the
    retiring column/probe guards (`nonstandard/descriptor_seam_test.go:74-77`),
-   and the deviceTrue/deviceFalse assertion
-   (`nonstandard/descriptor_seam_test.go:157-159`); engrave half —
+   `wantDeviceTrue` (`nonstandard/descriptor_seam_test.go:67`, moved by
+   the ypub flip — r3 C1), and the deviceTrue/deviceFalse assertion
+   (`nonstandard/descriptor_seam_test.go:157-159`); the never-read
+   `wantDeviceAbsent` (`nonstandard/descriptor_seam_test.go:69`) retires
+   in the same commit (r3 N2: declared, zero use sites, and its
+   panic:parse population goes to 0); engrave half —
    `MANIFEST`, `TAG_SLOTS`, `ROW_FLOOR`, `SECOND_TAGGED`, `THIRD_TAGGED`
-   (`crates/me-cli/tests/descriptor_seam.rs:50-69`), which all move with
-   a 72nd row and its `covers` tags. The short-fingerprint row's new
-   `device_admits` value is MEASURED, never predicted (r2 M3): P3.1's
-   parse fix is authored in the fork worktree FIRST and P2.6 takes the
-   boolean from a run of that fixed parser, even though the fix's commit
-   lands in P3 — the regeneration stays single and byte-identical.
+   (`crates/me-cli/tests/descriptor_seam.rs:50-69`), which move with
+   a 72nd row and its `covers` tags (`SECOND_TAGGED`/`THIRD_TAGGED` only
+   if the new row is multiply tagged — r3 N3). BOTH device-behaviour
+   values in the regeneration are MEASURED, never predicted (r2 M3,
+   extended by r3 C1): the P3 implementer's fork worktree
+   (`s2/descriptor-arm`) authors P3.1's parse fix AND P3.4's `ypubVer`
+   arm FIRST, the controller takes the short-fingerprint row's
+   `device_admits` and the ypub row's flipped `device_admits` from runs
+   of that patched parser, and the fixes' commits land in P3 (r3 M3:
+   this cross-phase authoring is owned by the P3 implementer, scheduled
+   here by name, and self-correcting — a wrong boolean reds
+   `TestDescriptorSeamDeviceColumn` at P3.3) — the regeneration stays
+   single and byte-identical.
    Sequencing: the engrave copy updates at P2.6 (its Rust
    assertions land with it); the fork copy updates at P3.3 with the fork's
    test changes; between those commits the two copies transiently differ,
@@ -121,17 +139,37 @@ record displayed on the real device) and every flash remain operator-gated**
   - `crates/me-cli/src/main.rs:365` — the clap help conditional.
   (`crates/me-cli/src/descriptor/as_flag.rs:133` and
   `crates/me-cli/src/main.rs:350` mention the constant in COMMENTS only —
-  the grep returns exactly seven hits, five behavioural plus these two
-  (r2 N1); the stub at
+  the grep returns exactly NINE hits (recomputed this round, r3 M1: r2's
+  "seven" was transcribed, not measured): the five behavioural sites,
+  these two comments, plus two inert non-flip hits — the `use` at
+  `crates/me-cli/src/main.rs:360` and the re-export at
+  `crates/me-cli/src/descriptor/mod.rs:59`; the stub at
   `crates/me-cli/src/descriptor/as_flag.rs:126-138` is P2.1's edit site, not a
   flip-set member.) Also members: `Row::WindowNotInBuild`
   (`crates/me-cli/src/descriptor/refusal.rs:43`), §11 item 5's sibling
   cases (W4/W11), and the M1 build-marked clap help twin. The inventory
-  also carries a SPEC-FALSIFICATION section (r2 I1): every spec sentence
-  S2's decisions make false — §7's `sysw_class` and `device_probe`
-  paragraphs, §4.2 defect 4, §11 item 1's mechanism sentence, §5.5's
-  firmware row, §8's parked sentence — each with its owning amendment
-  task (P2.7 or P3.5) and its grep token for the P2 sweep. Output: a
+  also carries a SPEC-FALSIFICATION section (r2 I1), and this section is
+  the COMPLETE enumeration — P2.7 and P3.5 defer to it, not the reverse
+  (r3 M4). Its members: §7's `sysw_class` and `device_probe` paragraphs,
+  §4.2 defect 4, §11 item 1's mechanism sentence, §5.5's firmware row,
+  §8's parked sentence, §6's table rows and §11 item 5 (the P2.2 flips),
+  §5.2's implementation sentence — AND the sentences P1.0 and P3.4
+  falsify (r3 I1/C1): §5.1's "when `--as` is absent and record
+  classification fails" trigger (`design/SPEC_descriptor_input.md:857-859`) and
+  §7's `gate_open` definition with the same precondition
+  (`design/SPEC_descriptor_input.md:1563-1566`) — P1.0 abolishes that trigger,
+  consulting the gate on EVERY omitted-`--as` pack; §7 requirement 3's
+  "the Go test asserts the device column" phrasing
+  (`design/SPEC_descriptor_input.md:1496-1498` — P3.3's derived rule reads the
+  host column; the never-compare-implementations half survives); §4.3's
+  five-version NORMATIVE sentence (`design/SPEC_descriptor_input.md:462`) and
+  the operator-facing "the device admits exactly" refusal text
+  (`crates/me-cli/src/descriptor/refusal.rs:583`, pinned by
+  `crates/me-cli/tests/descriptor_refusals.rs:466`, quoted in §6's table
+  at `design/SPEC_descriptor_input.md:1432`) — false of the scan door once
+  P3.4 lands. Each member carries its owning amendment task (P2.7 or
+  P3.5) and its grep token for the P2 sweep (the P1.0 pair's tokens:
+  `gate_open`, "record classification fails"). Output: a
   checked-in inventory table in this plan (folded at P0's close) stating,
   per member, its post-S2 behaviour and which P-task flips it. **The §6
   row-test count after S2 is a MEASURED number recorded here** (expected 35
@@ -310,10 +348,17 @@ record displayed on the real device) and every flash remain operator-gated**
   unchanged against a committed capture.
 - **P2.6** (new at the r1 fold — invariant 1's engrave half) The single
   vector-file regeneration: new witness row, `sysw_class` column
-  retirement, `panic:parse` `device_probe` retirement, F-428 citation
-  fixes; `scripts/descriptor-seam-vectors/rows.py` + JSON together, engrave
+  retirement, `panic:parse` `device_probe` retirement, the ypub row's
+  `device_admits` flip (r3 C1), F-428 citation fixes;
+  `scripts/descriptor-seam-vectors/rows.py` + JSON together, engrave
   copy + pin bumped, engrave-side seam assertions updated in the same
-  commit. (The fork copy follows byte-identically at P3.3.)
+  commit. (The fork copy follows byte-identically at P3.3.) The two
+  device-measured booleans come from the P3 implementer's
+  `s2/descriptor-arm` worktree carrying P3.1's parse fix and P3.4's arm,
+  authored ahead of their P3 commits (r3 M3: named owner, named
+  worktree; those two fixes sit unreviewed until P3's review, which is
+  acceptable because a wrong boolean self-corrects — it reds
+  `TestDescriptorSeamDeviceColumn` the moment P3.3 un-skips).
 - **P2.7** (new at the r1 fold — I3; spec touches are their own commits,
   marked amendments) The host-truth spec amendments S2 forces: §6's table
   (row retirement, the two remedy-sentence rows, the md1-split rows'
@@ -333,12 +378,21 @@ record displayed on the real device) and every flash remain operator-gated**
   parser" — false once P3.1 lands and the row's probe retires), §4.2
   defect 4's "PANICS the Go parser" sentence (false after the convergence
   fix), §5.5's "needs a firmware change to be readable | yes, §5.2" row,
-  and §8's "S2 is parked" sentence. Enumerated in P0.1's inventory; a
-  diff falsifies text it never touches, so the propagation sweep runs
-  over the SPEC too — with the falsified sentences' OWN tokens
-  (`sysw_class`, `panic:parse`, "PANICS the Go parser") as sweep terms,
-  because they share no token with the S3-parked phrasings and a sweep
-  can only find what its terms name (r2 I1's failure mode).
+  §8's "S2 is parked" sentence, §5.1's and §7's "after record
+  classification fails" gate-trigger sentences (r3 I1 — P1.0 abolishes
+  the precondition, and these are the exact sentences a future
+  implementer re-reads before touching the pack path), §7 requirement
+  3's device-column phrasing, and §4.3's five-version sentence plus the
+  "device admits exactly" refusal text and its pinned §6 row (r3 C1 —
+  reworded to the two-door truth: `me`'s admission is unchanged at five;
+  the scan door accepts `ypub` after P3.4; the SYSW classifier stays
+  host-exact). The authoritative enumeration is P0.1's
+  SPEC-FALSIFICATION section (r3 M4); a diff falsifies text it never
+  touches, so the propagation sweep runs over the SPEC too — with the
+  falsified sentences' OWN tokens (`sysw_class`, `panic:parse`, "PANICS
+  the Go parser", `gate_open`, "record classification fails") as sweep
+  terms, because they share no token with the S3-parked phrasings and a
+  sweep can only find what its terms name (r2 I1's failure mode).
 - **P2 gate:** full engrave suites (lint-gate, `ME_REQUIRE_GO=1`);
   zero `#[ignore]`; the matrix witness green; propagation sweep whole-repo
   including the spec (the S3-parked phrasings must survive ONLY in
@@ -371,7 +425,14 @@ record displayed on the real device) and every flash remain operator-gated**
   single-line-reachable admission narrowings (at minimum §4.5's promotion
   table: which bare-key versions promote, and `tpub` does not; enumerate
   the §4.2 single-line narrowings while porting — conjunct 2 already
-  covers the measured titled-zero-key case) + a port of §4.7's conjuncts
+  covers the measured titled-zero-key case; AND §4.3's five-version
+  admitted set — `xpub`/`tpub`/`zpub`/`Ypub`/`Zpub` — as a STRING-LEVEL
+  check, r3 C1: it cannot be a conjunct over the parsed value because
+  `bip380.Key` has no version field and `ParseExtendedKey` normalises
+  the version away (`bip380/bip380.go:456-462`), and P3.4's arm makes
+  the parser itself accept `ypub`, so without this check the classifier
+  answers `ClassDescriptor` on a record the host refuses — on both the
+  descriptor-embedded and bare-key paths) + a port of §4.7's conjuncts
   over the parsed descriptor. The Rust-primary rule makes parity
   mandatory, and P3.3's derived rule stays EXACT — it is the gate that
   caught this row, and it is never relaxed to fit the arm.
@@ -416,7 +477,8 @@ record displayed on the real device) and every flash remain operator-gated**
   touch point — which at THIS site is a `why`-string update, not a
   registration (r2 M1): `syswConsumers` is keyed `file:fn` and
   `walletPolicyFlow` is already registered
-  (`gui/sysw_admit_oracle_test.go:64-68`), so the oracle stays green with
+  (`gui/sysw_admit_oracle_test.go:66-69` — r3 corrected r2's `:64-68`),
+  so the oracle stays green with
   nothing added; what goes stale is that entry's `why` string
   ("ClassMDMK only — … admits no seed class at all"), which the consumer
   commit updates. A consumer landing in a NEW function or file would need
@@ -448,7 +510,22 @@ record displayed on the real device) and every flash remain operator-gated**
   recon Q5), with a test per direction (bare `ypub` classifies
   and normalises to `xpub`; the host's five-version admission is UNCHANGED
   in S2 — the convergence widening is F-426's later cycle, say so in the
-  test's comment).
+  test's comment). **This arm widens the SCAN DOOR, and S2 says so end
+  to end rather than tripping over it** (r3 C1, measured: the one arm
+  flips `neither/full-origin-ypub`'s `device_admits` and reds the
+  shipped seam test unless the regeneration carries the flip). The
+  widening is the seam-SAFE direction — the file's own invariant is
+  `host_admits(input) => device_admits(canonical)`, and a device that
+  accepts more can never be handed an unreadable payload — and F-426's
+  entry states device-first sequencing as its design, with the host
+  widening in its own later cycle (Rust-primary is preserved where it
+  binds: the SYSW CLASSIFIER, the predicate S2 holds exact, refuses
+  `ypub` via P3.1's string-level §4.3 check on both paths). The
+  coordinated set: invariant 1's regeneration carries the row flip
+  (measured from this patched parser); P3.1 carries the classifier
+  check; P0.1's falsification section carries §4.3's sentence and the
+  refusal text; P5.1 records F-426 as device-half-resolved, entry
+  SPLIT, host half open.
 - **P3.5** (new at the r1 fold — I3 device half; own commit, marked
   amendment) §9 item 2's "untested by construction" claim updates to the
   S2 truth: one cell executed (walletPolicy, by P3.2's walk), two declared
@@ -462,7 +539,9 @@ record displayed on the real device) and every flash remain operator-gated**
   the sim-walk renders; vector-copy byte-equality + both pins; engrave's
   `ME_REQUIRE_GO=1` suite green against the updated fork worktree;
   proportional opus review of the port against P1/P2's reviewed semantics
-  (brief: predicate parity including the conjunct port, arm order, the
+  (brief: predicate parity including the CASCADE-NARROWING port — the
+  §4.5 promotion table and the §4.3 string-level version check, the
+  fragile half per r3 C1 — as well as the conjunct port, arm order, the
   containment fixes, the first-execution walk).
 
 ## P4 — F-423: `bundlePlatePlan` packs plates
@@ -506,7 +585,9 @@ record displayed on the real device) and every flash remain operator-gated**
 ## P5 — records, ship, and the operator-gated tail
 
 - **P5.1** FOLLOWUPS reconciliation: F-418 (S2 built — entry updated to
-  point at the acceptance handover), F-426 → resolved-in-build, F-423 →
+  point at the acceptance handover), F-426 → device half
+  resolved-in-build, entry SPLIT: the host's five-version widening stays
+  open as its own convergence cycle (r3 C1), F-423 →
   per P4.1's measured outcome (resolved-in-build-pending-physical-validation,
   or closed measured-no-gain), F-428 → RESOLVED by invariant 1's
   regeneration, F-430 → RESOLVED by P0.3's lint-gate script, and a NEW
