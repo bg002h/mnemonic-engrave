@@ -395,3 +395,50 @@ ruling, not a walk disposition.
 STATUS QUO ("no… until I understand it better"): no transform ships; W11's
 neither-path text stands; the entry is a decision record until the operator
 asks for a fuller brief.
+
+
+---
+
+# Journey 2: a bare `zpub` — watch-only bequest
+
+**Scene.** A friend's BlueWallet single-sig segwit wallet; the goal is a
+steel card their family could use to FIND the funds (watch-only), seed held
+elsewhere. In hand: one clipboard line, `zpub6rFR7y4…`. S3-era build.
+
+**Beat 1.** The operator's first move: *"paste the zpub into the terminal
+after me sysw pack --as descriptor"* — the SECOND journey whose natural
+first reach is the parked path, and here it is not habit: for a bequest the
+QR plate is genuinely right (the family scans; nobody transcribes at a
+funeral). Logged for the F-418 window record: both walked journeys hit the
+window on their first real command.
+
+**Beat 2.** Per the spec (with W11's ordering: parse first, so the window
+refusal can be truthful about its `--as md1` offer), the operator sees the
+§4.5 promotion announcement — `key as supplied` (their zpub), `inferred
+wallet` (`wpkh(xpub…)`, normalised), the version-byte reason — then the
+window refusal offering text cards now or QR later.
+
+---
+
+## W13 — the operator looked for W10's wallet-id and first address at the
+## refusal, and they are not there: identification was scoped to the
+## confirmation, which a refusal never reaches
+
+**The moment.** *"I would first look to see the first address and/or wallet
+identifier, like last time, but I don't see it."*
+
+**The gap.** W10 attached `wallet-id:` and `address 0:` to §5.4's
+confirmation — a surface that fires only when the pack proceeds. On the
+window path (and the md1-representability path), parse SUCCEEDS and the
+pack does not: the operator is asked to make the wait-or-switch decision
+about a wallet the tool has identified but not shown. The verification is
+worth the most exactly here: the friend's phone shows the receive tab;
+one address comparison proves the inferred wallet is theirs BEFORE they
+archive the key line and wait for the QR build.
+
+**Classification: SPEC change (walk fold), generalising W10.** The
+identification block — inferred/canonical wallet, `wallet-id`, `address 0`
+with the compare prompt — prints on EVERY successful host-side parse,
+before whatever follows (pack, window refusal, §5.3 refusal). One rule:
+**parse succeeded ⇒ identify the wallet, always; then say what can or
+cannot be done with it.** Refusals follow identification, never replace it.
