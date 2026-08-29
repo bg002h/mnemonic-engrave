@@ -63,9 +63,26 @@ one commit (set-equality assertion couples retirement to the byte
 change). Controller recomputed all counts independently — match.
 Items for P3/P5.1: goprobe/go.mod points at the transient S2 fork
 worktree (P3 re-points after merge); F-428's :158 cite drifts to :161
-once the fork merges the parse fix (record at P5.1). **P1+P2 opus
-EXECUTION REVIEW IN FLIGHT** (the gate before the P3 Go port; report
-lands at design/agent-reports/REVIEW-S2-P1P2-r1.md in the MAIN repo).
+once the fork merges the parse fix (record at P5.1). **P1+P2 REVIEW CLOSED**:
+REVIEW-S2-P1P2-r1 RED 0C/1I/3M/2N (persisted `da76719`); every executed
+surface matched the spec, the reviewer's own mutation reproduced r1's
+C1 collapse (the gate is real), 72/72 device booleans re-measured with
+0 mismatches. Fold `b9b7f42` on the branch: S5.1's block now matches
+the rendered output byte-for-byte (I-1 -- "verbatim" is TRUE and the
+test literal IS the spec text), KNOWN_ROW_KEYS drops sysw_class (M-1),
+spec-half present-tense hedge (M-2; comment.json half deliberately
+untouched -- second regeneration forbidden), expect_kinds pins literals
+(N-1). Wording-only fold, review closed without a re-round.
+CARRIED ITEMS: M-3 goprobe/go.mod re-points at fork main AT MERGE (+
+provenance paragraphs, needs a FOLLOWUPS entry at P5.1); N-2 F-428's
+:158 cite is rev-qualified to fork 1f09537 -- do NOT re-base it.
+**P3 IMPLEMENTER IN FLIGHT** (fork worktree s2/descriptor-arm @
+0abbf81: the arm with S4.3 string check + S4.5 narrowings + S4.7
+conjuncts, walletPolicy consumer + sim walk, vector-copy sync clearing
+the known red, F-426 tests; report will land at
+design/agent-reports/IMPL-S2-P3.md on the engrave branch). After P3:
+controller folds P3.5 (device-half spec amendments + refusal.rs:583 +
+cascade.rs comment) inline, then the P3 port review, then P4/P5.
 Recon: `design/agent-reports/RECON-S2-fork-seam.md` (`4646fa2`).
 Scale: 5 expected-good / fable at 15 / hard stop 25. Persist-before-fold; agent-persisted reports; whole-repo
 propagation sweeps + generators; both clippy toolchains (F-430).
