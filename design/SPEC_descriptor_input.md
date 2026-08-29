@@ -10,8 +10,13 @@ adversarial gate derivation — and re-closed at r19; every round's report
 persisted verbatim and every non-trivial fold re-reviewed). After the r19
 persist, a TERMINAL fold (this text) moved the §5.1 gate's precision out of
 prose into §7's executable gate rows and folded rounds 18–19's non-gating
-residue; **that fold awaits its own verification round — the GREEN above is
-r19's, not the fold's**. §9 item 7 records the walk's one narrow residual.
+residue; **the r20 closure review verified that fold: GREEN STANDS (0C/0I,
+`R0-descriptor-input-spec-r20-closure.md`)**. **Post-GREEN amendment
+2026-08-28:** §4.7 gained conjunct 8 (key identity — the published
+`md-codec` 0.42.0 lacks the F-217/F-218 encode refusals), §6 its
+key-identity row, §7's gate its clause 8; found by PLAN-r1's C1, corrected
+by PLAN-r2, verified by the plan R0 rounds. §9 item 7 records the walk's
+one narrow residual.
 **No code may be written before the implementation plan passes its own
 gate** (project `CLAUDE.md` — this is risk-set work: it changes normative
 admission behaviour and it decides which wallet an operator engraves).
@@ -653,7 +658,7 @@ conjunction, and §7's row list is derivable from it:
    classification predicate, which is `--as`-independent and device-facing —
    the shape conjunct remains the seven forms, so a `Descriptor` record can
    never carry `multi` and §7's invariant is untouched (§3's boundary
-   paragraph). All other conjuncts (2–7) apply to `multi` identically.
+   paragraph). All other conjuncts (2–8) apply to `multi` identically (r2's NEW-C1: 8 included — the `multi` twins exist only on the md1 path, the one path that reaches the published crate).
 2. **Threshold:** `1 ≤ k ≤ n`, where `n` is the number of keys.
 3. **Key count (BIP-383):** `n ≤ 15` when the `sortedmulti` — or its `multi`
    twin (the bound is the redeemScript's, not the ordering's) — is the DIRECT
@@ -680,22 +685,6 @@ conjunction, and §7's row list is derivable from it:
    programs whose whole job is deriving addresses they cannot derive.
 6. **Origins:** every key with a fingerprint carries a non-empty origin path
    (§4.2's canonical-string predicate).
-7a. **Key identity (PLAN-r1's C1 — amended post-GREEN 2026-08-28):** no two
-   keys may declare the same `(fingerprint, origin path)` with different
-   xpubs (one origin identifies exactly one key — a card or plate violating
-   this describes a wallet that cannot exist), and no two placeholder slots
-   may carry the same xpub at the same origin (duplicate key slots). Both
-   checks are the F-217/F-218 refusals the Rust-primary `md-codec` enforces
-   ON ENCODE (`validate_origin_key_consistency`,
-   `validate_no_duplicate_key_slots`; measured: the tree's `md encode`
-   refuses the colliding-origin policy, the Go port refuses it at
-   `md/encode_multisig.go` and `md/expand.go`) — but the PUBLISHED 0.42.0
-   crate `me` links predates them (measured: eight files differ; the
-   functions and their error variants are absent), so `me` enforces both
-   HOST-SIDE as admission conjuncts, on both `--as` paths, with the tree's
-   own refusal wording. This is convergence with the Rust primary, not
-   leading. F-424 owns removing the host mirror when a newer `md-codec`
-   publishes (operator-gated).
 7. **Use-site path (R0 r2's NEW-C1/NEW-I1):** each key's children expression
    is one of **`{absent, /*, /i/*, <i;i+1>, <i;i+1>/*}`** — a closed set, like
    the shapes. The measured-broken classes it excludes: a HARDENED use-site
@@ -716,6 +705,21 @@ conjunction, and §7's row list is derivable from it:
    `--as descriptor`-only — and for a `multi` form, which has no
    `--as descriptor` path, carried by NEITHER path; §5.3's refusals say so
    rather than pointing at a flag that also refuses).
+8. **Key identity (PLAN-r1's C1; corrected and renumbered per PLAN-r2):** no
+   two keys may declare the same `(fingerprint, origin path)` with DIFFERENT
+   xpubs — one origin identifies exactly one key, so such a description
+   matches no wallet — and no two slots may carry the same
+   `(xpub, use-site path)` pair. The duplicate rule is keyed on the USE
+   SITE, not the origin (r2's NEW-I1): the same xpub at `<0;1>/*` and
+   `<2;3>/*` is a legal two-chain wallet — measured, the tree's `md encode`
+   accepts it (`0xbc4ce`) and the device derives a distinct address. Both
+   checks are the F-217/F-218 refusals the Rust-primary `md-codec` enforces
+   ON ENCODE; the PUBLISHED 0.42.0 crate `me` links predates them
+   (measured: the validator functions and their error variants are absent
+   from the registry source), so `me` enforces both HOST-SIDE, on both
+   `--as` paths, refusing with §6's key-identity row. Convergence with the
+   Rust primary, not leading; F-424 owns the codec bump
+   (operator-gated).
 
 **The list above plus the predicate is the closed accept set, and the rule is
 stated over them, not over an enumeration of exclusions:** anything the cascade
@@ -1170,6 +1174,9 @@ r11 new-M1/M2/N1, r12–r13: the three rules below, each stated once).**
 
 **The TIER** is decided by what does not depend on the flag: a wallet that
 passes conjuncts 2–7 AND whose shape at least one `--as` path admits gets
+(a conjunct-8 failure stays FULL-tier, DECIDED not accidental — its
+addresses derive, and identification is what shows the operator the
+contradiction; r2's NEW-M1)
 the FULL block — every line below. A wallet NO path admits gets the PARTIAL
 block: the first three lines plus the watch-only line — no `wallet-id:`, no
 `address 0:`, no compare prompt — because its class is the wallets refused
@@ -1370,6 +1377,7 @@ NEW-I2).
 | **`sortedmulti(k, …)` with `k > n`** | *"threshold `k` of `n` keys can never be satisfied — no combination of signatures reaches `k`. Funds sent to this wallet would be unspendable. Nothing was packed."* §4.7 conjunct 2. |
 | **`sortedmulti(0, …)`** — or any `k < 1` | *"threshold 0 means NO signature is required: anyone who can see this script can spend from it. This is almost certainly not the wallet you meant — and if it already holds funds, treat them as at risk now. Nothing was packed."* §4.7 conjunct 2 (R0's I6 — the device derives a real address for `k = 0` and even `k = −1`, so the refusal is the host's alone). |
 | `sortedmulti` with **too many keys** | *"`sh(sortedmulti(…))` carries at most 15 keys — there the multi's output script IS the redeemScript, one 520-byte script element (BIP-383). `wsh(…)` and `sh(wsh(…))` carry at most 20 (`OP_CHECKMULTISIG`); their redeemScript is 34 bytes and the 520-byte limit never binds. This descriptor has `n` keys under `<form>`. The device would accept it and derive addresses whose coins cannot be spent."* §4.7 conjunct 3 (R0's C3, bound corrected by r2's NEW-I2). |
+| two keys declaring **the same origin with different xpubs**, or one `(xpub, use-site)` pair in two slots | *"this wallet description contradicts itself: keys `@N` and `@M` both claim origin `<fp/path>` but name different keys — one origin identifies exactly one key, so no wallet matches this description. Check the export: a duplicated cosigner line carrying the wrong key is the usual cause."* (The duplicate-pair variant substitutes its own sentence naming the two slots and the shared use-site.) **`EXIT_REFUSED` (3)**, both `--as` paths. §4.7 conjunct 8 (PLAN-r1's C1; row added per PLAN-r2's NEW-C2). |
 | a multisig mixing **mainnet and testnet keys** | *"key `N` is `tpub` (testnet) while key 0 is `xpub` (mainnet). The device accepts this descriptor and then cannot derive any address from it. All keys must share one network."* §4.7 conjunct 5 (R0's I4). |
 | a descriptor or bare key using **`ypub`/`upub`/`vpub`/`Upub`/`Vpub`** | *"the device admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`."* The remedy names the **per-version** target (R0 r2's NEW-I3 — one template cannot serve five): `ypub` → `xpub` (mainnet BIP-49, `sh(wpkh(…))`); `upub` → `tpub` (**testnet** BIP-49, `sh(wpkh(…))`); `vpub` → `tpub` (**testnet** BIP-84, `wpkh(…)`); `Upub`/`Vpub` → `tpub` (**testnet multisig** — no single-key remedy exists; supply the full multisig descriptor: `sh(wsh(sortedmulti(…)))` for `Upub`, `wsh(sortedmulti(…))` for `Vpub` — or a BlueWallet file). Four of the five are testnet keys, and an `xpub` remedy would name a mainnet wallet the operator does not hold — measured, mainnet `354hXbgw…` versus the real testnet `tb1qmj7qns4…`. For a key WITH an origin, the operator's own fingerprint/path is substituted in; for a BARE key the remedy is the origin-less descriptor spelling — `sh(wpkh(<converted key>/<0;1>/*))`, which the device admits (measured) — because handing back a bare converted key would PROMOTE to a different wallet (`pkh(…)`, measured). §4.3 (R0's C2); F-413 tracks host-side normalisation. |
 | `tr(sortedmulti(…))` | *"taproot multisig is `multi_a`/`sortedmulti_a` (BIP-387); `tr(sortedmulti(…))` is not a valid descriptor even though the device's parser accepts it. Check the export."* §4.3. |
@@ -1608,16 +1616,20 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
      divergence §6 states explicitly);
   7. the **edge tokens** — a base58check token with a valid checksum and
      a 77-byte payload (gate CLOSED, `record-refusal`, exit 4); `[` alone
-  8. **the impossible-wallet pair (conjunct 7a, PLAN-r1's C1)** — a
-     colliding-origin descriptor (two xpubs, one `(fingerprint, origin)`)
-     and a duplicate-key-slot descriptor: gate OPEN, `descriptor-refusal`
-     citing conjunct 7a, exit 3, on BOTH `--as` paths — the rows that would
-     have caught the published-crate gap, `host_admits=false`,
-     `md1_admits=false`;
      (gate OPEN, `descriptor-refusal`, the unparseable-file row carrying
      branch 4's error, exit 3); and `xpub…/` with a trailing slash (gate
      OPEN, `descriptor-refusal`, the unparseable-file row carrying branch
-     4's error, exit 3).
+     4's error, exit 3);
+  8. **the impossible-wallet trio (conjunct 8, PLAN-r1's C1; r2)** — a
+     colliding-origin `wsh(sortedmulti(…))` (two xpubs, one
+     `(fingerprint, origin)`), a duplicate-`(xpub, use-site)` slot pair,
+     and the colliding-origin `wsh(multi(…))` twin (the md1-only path —
+     r2's NEW-C1): gate OPEN, `descriptor-refusal` citing conjunct 8
+     (`refusal_row: key-identity`), exit 3, on BOTH `--as` paths.
+     `host_admits=false`, `md1_admits=false`, and **no address fields** —
+     a colliding-origin wallet derives byte-identical addresses to a clean
+     control (measured, r2's NEW-M5), so the refusal assertion itself is
+     the row's witness;
 
 **The coverage manifest — NORMATIVE; §11 item 3 counts against it (R0 r6's
 NEW-I2: without a countable anchor, dropping the childless+`<0;1>/*` mixed
@@ -1631,10 +1643,10 @@ a second tag; two of the fifteen carry a third, the original overlap pair
 (R0 r7's NEW-M1): the `xpub…\n` near-miss (`promotion-near-miss` +
 `whitespace` + `gate`) and the bare-`xpub` happy path (`formats-happy` +
 `promotion-near-miss` + `gate`). `covers` entries are distinct within a
-row, and the file carries at least **70 physical rows** (the minima sum to
-**87** tag-slots; the fifteen shared §4.5 rows absorb 15 of `gate`'s
-slots, and the original pair's two extra tags absorb 2 more: 87 − 17 =
-70), asserted as a floor — so a dropped row cannot be counted around by
+row, and the file carries at least **71 physical rows** (the minima sum to
+**88** tag-slots; the fifteen shared §4.5 rows absorb 15 of `gate`'s
+slots, and the original pair's two extra tags absorb 2 more: 88 − 17 =
+71), asserted as a floor — so a dropped row cannot be counted around by
 retagging or by duplicate tags (R0 r7's NEW-M1):
 
 | tag | bullet | min rows |
@@ -1647,7 +1659,7 @@ retagging or by duplicate tags (R0 r7's NEW-M1):
 | `neither` | `wsh(multi)`, miniscript, full-origin `ypub` | 3 |
 | `whitespace` | §4.6's rows | 3 |
 | `md1-splits` | §5.3's splits: `/0/*`, `<0;1>`, childless, three mixed | 6 |
-| `gate` | §5.1's gate — the eight adversarial clauses of the gate bullet | 36 |
+| `gate` | §5.1's gate — the eight adversarial clauses of the gate bullet | 37 |
 
 **A second, separate assertion, because §5.3 showed a string comparison is not
 enough.** Rows may carry `address_0` and `address_1` — receive addresses at
