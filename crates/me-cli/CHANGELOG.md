@@ -5,6 +5,34 @@ All notable changes to `mnemonic-engrave` (`me`) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **The descriptor seam (S1+S3).** `me sysw pack --as md1` reads a wallet
+  descriptor — a concrete descriptor, a BlueWallet `Key: value` export, a
+  JSON `{"descriptor": …}` wrapper, or a bare extended key — as one whole
+  document from `--in`/stdin, admits it through the §4 cascade measured
+  against the SeedHammer device's own parser plus the §4.7 eight-conjunct
+  predicate, and packs the BIP-388 decomposition as md1 text cards. Before
+  packing it prints the §5.4 identification block: wallet id, receive
+  address 0 (derived key-by-key, verified against an independent BIP-32
+  oracle and the device on 91 constructed wallets), and a watch-only owner
+  line. Every refusal is one of §6's 36 rows, each with a named test
+  asserting its text; `--as descriptor` is present but parked until the
+  device-side classifier arm ships (F-418) and answers with the window
+  refusal. The 71-row vector file is pinned byte-identical in the fork
+  (sha256 `542cd492…`), and the cross-language gate runs for real under
+  `ME_REQUIRE_GO=1`.
+- `me`'s top-level NDEF converter now refers descriptor-shaped input to
+  `me sysw pack --as <descriptor|md1>` instead of dead-ending (F-421).
+
+### Acceptance (spec §11)
+
+Items 2, 3, 4 (all 36 rows) and 5 (five-case matrix + both window
+variants) are discharged by the merged suite; items 1 and 6 are S2's,
+parked with F-418 until the device is back on the bench.
+
 ## [0.7.0] - 2026-08-19
 
 ### Added

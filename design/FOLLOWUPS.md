@@ -14527,6 +14527,10 @@ F-415: state the drift where it is created, amend the other document in its own
 cycle (one sentence plus a cross-reference) — two NORMATIVE contracts must not
 disagree silently.
 
+**RESOLVED (2026-08-29, S1+S3 ship, commit 9c88152).** §5.6's synopsis and
+flag table now carry `--as` and the single-document mode, deferring to
+`SPEC_descriptor_input.md` §5.1 as the governing contract.
+
 ### F-419 — §4.2 refuses a zero-cosigner BlueWallet file and §6 has no row naming that cause (repo: **mnemonic-engrave**; owning phase: **descriptor-input plan — the §6 journey walk**) `#me` `#descriptor` `#refusals`
 
 Filed from R0 r8 (the round that closed the correctness lens). §4.2's
@@ -14538,7 +14542,16 @@ r8 counted §6's rows against §4.2's promises. Owned by the journey walk,
 which is the §6-row generator: write the row there, with the walk's usual
 divergence classification.
 
+**RESOLVED (2026-08-29, S1+S3 ship).** The walk wrote the row (§6, "zero
+cosigner lines … was the export truncated?"), P2.4 implemented it
+(`refusal.rs` `bluewallet_zero_cosigners`) with a named row test among the
+36==36 set, and §11 item 4's per-row test reaches it.
+
 ### F-420 — `md encode` dead-ends on concrete descriptors and BlueWallet files with a placeholder error and no referral to `me` (repo: **descriptor-mnemonic**; owning phase: **with or after descriptor-input S1**) `#md` `#cli` `#cross-tool`
+
+**Eligible since 2026-08-29** (S1 shipped; `--as` exists to refer to). Left
+open by the overnight cycle as the mandate's stretch item — descriptor-
+mnemonic's own cycle, one referral string + one test.
 
 Filed from the 2026-08-28 journey walk (W2, live with the operator). The
 operator remembered `--as` but not its tool, and `md` — the tool NAMED for
@@ -14562,6 +14575,10 @@ converter's own refusal, when its input is descriptor-shaped (concrete key
 expression or `Key: value` lines), refers to
 `me sysw pack --as <descriptor|md1>`. In-tool twin of F-420, same
 sequencing: with or after S1, never before the flag exists.
+
+**RESOLVED (2026-08-29, S1+S3 ship, P2.5).** The top-level converter's
+refusal now refers descriptor-shaped input to
+`me sysw pack --as <descriptor|md1>`, with its own test.
 
 ### F-422 — RULING WANTED: should `--as md1` offer an explicit, consented transform for pre-multipath `/0/*` exports (receive-branch → the `<0;1>` wallet it denotes)? (repo: **mnemonic-engrave**; owning phase: **descriptor-input plan, before S1 closes**) `#me` `#descriptor` `#ruling-needed`
 
@@ -14667,6 +14684,10 @@ standing. Crate publishes are operator-gated — never overnight work.
 
 ### F-425 — the fork-side seam gate lives on an unmerged branch after S1; integrate it into fork CI (repo: **seedhammer fork**; owning phase: **the operator's fork-merge decision, at or before S2**) `#fork` `#vectors` `#ci`
 
+**Branch pushed 2026-08-29** (`seam/descriptor-vectors` at `a5e29b4`,
+vector sha `542cd492…` in lockstep with the merged engrave copy). Unmerged,
+per the plan — the fork-main merge is the operator's decision.
+
 Filed from PLAN-r2's M7. P0.3 lands `nonstandard/descriptor_seam_test.go`
 and the vendored vector file on `seam/descriptor-vectors` (cut from `main`
 `d402f18`), pushed but deliberately NOT merged overnight — fork `main`
@@ -14684,3 +14705,29 @@ CLASSIFICATION switch has no case, so `ypub` hits `default` and errors
 symmetric (`ypub` → `P2SH_P2WPKH`, normalise to `xpub`), after which the
 host's five-version admission widens to match in its own convergence cycle.
 Batch with S2's firmware build; upstream-PR candidate per the fork rules.
+
+### F-427 — §5.4 says "canonical line", the block labels it `descriptor:` and the code says "descriptor line"; align the spec's word at its next touch (repo: **mnemonic-engrave**; owning phase: **next SPEC_descriptor_input amendment, batch**) `#spec-drift` `#docs`
+
+Filed from the fold-1 re-review's N-c (2026-08-29): fold-1's N1 was DECLINED
+by controller ruling — the code's wording is the more executable, since the
+identification block labels the line `descriptor:` — and this entry is the
+declination's durable record. Documentation-only; nothing gates.
+
+### F-428 — two vector `source` annotations and the generator cite `parse.go:151`; the measured line is 158 (repo: **mnemonic-engrave** + **seedhammer fork**; owning phase: **next vector-file byte change — realistically the S2/F-426 batch**) `#vectors` `#records`
+
+Filed from IMPL-S1S3-fold2-verify (2026-08-29): the fork's count-mismatch
+error fires at `parse.go:158`, not `:151` — a citation carried forward
+unverified from the P1 reports despite being stated as measured. Annotation
+only; no test binds to `source`. Fix costs a two-repo sha bump, so batch it
+with the next byte change and fix `scripts/descriptor-seam-vectors/rows.py`
+in the same motion (the generator carries the same digit).
+
+### F-429 — a truncated or invalid-JSON export gets the record refusal, whose vocabulary is wrong for it (repo: **mnemonic-engrave**; owning phase: **a future journeys cycle** — walk it before widening T1–T4) `#me` `#descriptor` `#journeys`
+
+Filed from the adversarial review's M6 (2026-08-29): `{"label":"x"}` or a
+one-character-truncated JSON export matches none of §5.1's T1–T4, so the
+shipped record refusal answers ("see sysw::classify" vocabulary) — faithful
+to §5.1, unpinned by any gate row, and plausibly an operator's half-copied
+paste. Do NOT widen T4 without a gate row to pin the widening; the walk
+classifies the divergence first.
+

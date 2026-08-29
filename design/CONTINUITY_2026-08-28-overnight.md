@@ -90,3 +90,12 @@ found six plan-side misses of the r2 fold (held for the r3 fold,
   populated); (b) N1's declination gets its FOLLOWUPS entry. Fold-2
   verification dispatched to SONNET (mechanical fold-vs-findings). Opus
   rounds still 8.
+- **P2 CLOSED GREEN** at IMPL-S1S3-fold2-verify (sonnet, 0C/0I/1M — the
+  Minor is F-428). Rounds this cycle: 8 opus + 1 sonnet.
+- **P3 executed:** IMPL-P0-review's late persist owned (`ce8f8c1`); merge
+  `c9c3625`; the pass-by-skip cross_lang test RUN FOR REAL on master
+  (ME_REQUIRE_GO=1, go 1.26.7 via nix, PASS 0.29s) with the full suite
+  562/562; F-416 amendment (`9c88152`); FOLLOWUPS: F-416/F-419/F-421
+  RESOLVED, F-420 marked eligible-open, F-425 push noted, F-427/F-428/
+  F-429 filed; CHANGELOG Unreleased entry names §11 items 2–5 discharged,
+  1/6 S2-parked (F-418).
