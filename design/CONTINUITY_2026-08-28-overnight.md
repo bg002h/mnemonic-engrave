@@ -32,3 +32,23 @@ run the propagation check** — old forms grepped to zero, new rules checked
 for unpropagated siblings, arithmetic recomputed at every site. First run
 found six plan-side misses of the r2 fold (held for the r3 fold,
 `scratchpad/f412/held-fixes.md`, declared self-found).
+
+## Progress log (written as phases close)
+
+- **Plan GREEN at round 5** (`c3fefe4`), within the "5 is expected and good"
+  budget. Opus rounds used so far this overnight cycle: 6 of the 15 that
+  would trigger the fable switch.
+- **P0 closed** — 71-row vector file (sha256 `0393592f…`), both harnesses,
+  zero findings; branch `impl/descriptor-s1s3`.
+- **F-413 RESOLVED** (fable consult, `RULING_f413_slip132.md`): REFUSE
+  STANDS; bare-ypub normalisation is a promotion-table reopen, not a byte
+  swap. F-426 filed (device-side ypub case, with S2). Pushed at `1f634d5`.
+- **P1 closed GREEN at review round 1** (0C/0I/6M/2N, `IMPL-P1-review.md`,
+  persisted on the branch at `44e121a`). Cascade verified statement-by-
+  statement against the fork; 37/37 gate rows hand-reproduced. The six
+  Minors all carry into P2/P3 briefs (M1 = §6's five false `multi`
+  sentences → authorized spec amendment in P2.4; F-1's direct-construction
+  test → P2.2; annotation fix + M6 note → P3).
+- **P2 implementer dispatched** (opus, same worktree) with all nine carry
+  items enumerated. Next after its report: the MANDATORY post-implementation
+  adversarial execution review over the whole S1+S3 diff, then P3.
