@@ -34,6 +34,7 @@
 //! future implementer reaches for is to weaken the grep rather than to finish
 //! the work.
 
+use mnemonic_engrave::sysw::record::Class;
 use sha2::Digest as _;
 
 /// The sha256 of `testdata/descriptor_seam_vectors.json`, pinned IDENTICALLY
@@ -600,6 +601,52 @@ fn the_host_column_matches_the_admission_predicate() {
     // iterated zero rows would pass.
     assert_eq!(host_checked, POP.rows, "host_admits assertions run");
     assert_eq!(format_checked, POP.rows, "format assertions run");
+}
+
+// ── §5.2's predicate at the RECORD layer ───────────────────────────────────
+// `host_admits` above IS the predicate; what follows asserts that
+// `sysw::classify` answers WITH it, per row, in both directions. The fork's
+// `TestDescriptorSeamSyswClass` asserts the same derived rule over the same
+// file, so a Go/Rust divergence reds one of the two instead of hiding in a
+// hand-stated column.
+
+fn row<'a>(d: &'a serde_json::Value, want: &str) -> &'a serde_json::Value {
+    rows(d)
+        .iter()
+        .find(|r| name(r) == want)
+        .unwrap_or_else(|| panic!("{PATH}: no row named {want:?}"))
+}
+
+/// The canonical re-encode is the exact string §5.2's record carries, so this
+/// is the arm on the input that matters most.
+#[test]
+fn a_canonical_descriptor_classifies_as_a_descriptor_record() {
+    let d = doc();
+    let r = row(&d, "formats-happy/bip380-sortedmulti-multipath");
+    assert_eq!(
+        mnemonic_engrave::sysw::classify(r["canonical"].as_str().unwrap()),
+        Class::Descriptor
+    );
+}
+
+/// **The arm is §5.2's predicate, not "the cascade parsed it".** This row's
+/// `format` is `bip380` — the cascade parses it — while `host_admits` is
+/// false, because conjunct 1's `multi` refusal is permanent. A classifier
+/// keyed on the parse would place a record the device's own parser rejects.
+#[test]
+fn a_multi_policy_the_cascade_parses_is_not_a_descriptor_record() {
+    let d = doc();
+    let r = row(&d, "neither/wsh-multi");
+    assert_eq!(
+        r["format"].as_str().unwrap(),
+        "bip380",
+        "the cascade parses it"
+    );
+    assert!(!r["host_admits"].as_bool().unwrap(), "§4.7 refuses it");
+    assert_eq!(
+        mnemonic_engrave::sysw::classify(r["input"].as_str().unwrap()),
+        Class::Unknown
+    );
 }
 
 /// The `refusal_row` vocabulary is one set, held in two places, and this is

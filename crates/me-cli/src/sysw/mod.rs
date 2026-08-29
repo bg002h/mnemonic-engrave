@@ -197,11 +197,11 @@ pub struct Admission {
 
 /// Which section a record belongs in.
 ///
-/// **Descriptor and Address are deliberately absent**, and this is a known
-/// limitation rather than an oversight: classifying them needs a descriptor
-/// parser and an address decoder, neither of which is a dependency of this
-/// crate. An unclassifiable record is REFUSED at pack time with its index, so
-/// the failure is a named error at creation rather than a mis-filed secret.
+/// **Address is deliberately absent**, and this is a known limitation rather
+/// than an oversight: classifying one needs an address decoder, which is not a
+/// dependency of this crate. An unclassifiable record is REFUSED at pack time
+/// with its index, so the failure is a named error at creation rather than a
+/// mis-filed secret.
 pub fn classify(record: &str) -> record::Class {
     classify_with(record, Admission::default())
 }
@@ -252,6 +252,17 @@ pub fn classify_with(record: &str, adm: Admission) -> record::Class {
     match crate::seal::record::validate_record(record) {
         Ok(crate::seal::record::RecordKind::Ms) => Class::Codex32Secret,
         Ok(_) => Class::MdMk,
+        // SPEC_descriptor_input.md §5.2, and it is the LAST arm: only what fell
+        // through to `Unknown` can move, so no record any earlier arm placed
+        // changes class.
+        //
+        // The predicate is `descriptor::host_admits` rather than a second
+        // reading of §5.2 — the same function §7's `host_admits` column is
+        // asserted against row by row, so what `me` PACKS as a descriptor and
+        // what `me` CLASSIFIES as one cannot drift. It is NOT "the cascade
+        // parses it": the cascade parses `multi`, which conjunct 1 refuses
+        // permanently.
+        Err(_) if crate::descriptor::host_admits(record) => Class::Descriptor,
         Err(_) => Class::Unknown,
     }
 }
