@@ -14933,6 +14933,38 @@ the next poller's Close touches the device under an abandoned read,
 safe today only because multiplexI2C serialises and rp2 tx has no
 yield point: state that invariant where the redesign can rely on it.
 
+### F-445 — packed-plate layout: 21.5mm bottom margin measured on the F-423 validation plate; determine the slack's source and whether a 6th string fits at 3.8mm (repo: **seedhammer fork**; owning phase: **next fork engraving cycle, WITH F-444**)
+
+Operator measurements 2026-08-31, from the first real packed plate
+(5×~86-char md1 strings, sh face, 3.8mm — the F-423 validation cut):
+
+| where | measured | operator verdict |
+| --- | --- | --- |
+| top margin | 2.4mm | appropriate |
+| left margin | 3.4mm | generous but appropriate |
+| right margin | 4.0mm | generous but appropriate |
+| bottom margin | **21.5mm** | **too big** |
+| drill-hole extra indent (first two lines, each side) | +9.3mm | too generous, good enough for now |
+| trailing blank on each string's last wrapped line (strings 2-5) | 47mm | — (wrap remainder; string 1 differs because its first two lines carry the hole-band indent, shifting its wrap) |
+
+Hypothesis to test FIRST (code-supported): `bundlePlateTextFits`
+reserves BOTH screw-hole rows unconditionally (`Title:
+bundlePlateFitMark, Footer: bundlePlateFitMark`,
+`gui/bundle_flow.go:540-541`) while the real plate's rows come from
+`bundlePlateMark(p.kind, …)` and an EMPTY row consumes no vertical
+budget by spec (`backup/backup.go:48-51`) — so the fit may be computed
+against a smaller plate than the one actually cut, systematically
+under-packing. If confirmed: fit against the rows the plate will
+actually render; re-measure capacity (a 6th string at 3.8mm may fit
+inside 21.5mm); goldens; one validation cut can ride F-444's 3.0mm
+plate session. Also fold the found slack into F-444's capacity
+estimate — its ~6-7-at-3.0mm figure assumed the 5-at-3.8 bound was
+tight, and this measurement says it is not.
+
+The margin verdicts (top/left/right appropriate; hole-band indent
+generous-but-ruled-fine) are RECORDED RULINGS — do not re-open them
+without a new operator ruling.
+
 ### F-444 — packed md1 plates at 3.0mm: a density rung below the 3.8mm default (repo: **seedhammer fork**; owning phase: **next fork engraving cycle — operator-gated, needs one validation cut**)
 
 Filed 2026-08-31 at the bench, operator: "We can try 3.0mm font next"
