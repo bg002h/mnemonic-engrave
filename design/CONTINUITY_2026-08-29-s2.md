@@ -235,13 +235,23 @@ fully payload-restorable and correctly derived on hardware.**
   bound + ErrCloseTimeout, stopScanner abandons with 3s join, drain
   as hygiene). NOT merged, NOT pushed. Gated green by implementer
   (shard 1034/1034, TinyGo ok).
-- **REVIEW IN FLIGHT at pause**: opus pre-merge review of
-  a0c1615..4698223, report lands (uncommitted) at
-  design/agent-reports/REVIEW-F440-F441-r1.md. On resume: read it;
-  GREEN -> merge branch to fork main, push, resolve F-440/F-441 in
-  FOLLOWUPS, clean worktree/branch, push engrave. RED -> persist,
-  fold (implementer agent context is gone after pause -- fold
-  controller-inline or fresh agent), re-review, then merge.
+- **REVIEW RETURNED GREEN after the pause (0C/0I/4M/3N), report
+  PERSISTED**: no modal undismissable, no caller decision changes, no
+  wedge/crash; false-abandon impossible with ~20x margin (healthy
+  Close bounded ~88ms vs the 2s limit); post-abandon second visit
+  WORKS (one stolen cancellation ~50ms, ~8KB transient). On resume:
+  (1) optionally fold the Minors controller-inline (M-1's missing
+  join-timeout test -- the reviewer already wrote one and it passes;
+  M-2 comment wording ~5s composite; M-4 state the per-poller
+  invariant; M-3 is F-442's) -- wording/test-only, no re-review;
+  (2) merge f440/modal-back -> fork main, push; (3) resolve
+  F-440/F-441 in FOLLOWUPS -- AND add the reviewer's caveat to F-441:
+  the FIELD CAUSE remains unidentified (no >2s non-cancellable path
+  could be constructed either) -- the bound is right regardless, but
+  the entry must not claim the mechanism is closed; (4) clean
+  worktree/branch; (5) push engrave via staging. Nit worth a
+  follow-up entry at resume: sysw.DecodeBody accepts a truncated
+  pass:/text: record silently (pre-existing, tag-pull mid-read).
 - Engrave master: LOCAL commits ahead of origin (F-440/441/442
   filings + corrections, F-423 waiver, bug reports, IMPL-F440 note).
   Push via scripts/push-via-staging.sh at next session (freeze rule).
