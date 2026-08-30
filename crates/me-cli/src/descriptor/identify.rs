@@ -149,8 +149,9 @@ pub const MATERIALISED_NOTE: &str =
 /// `address 0:` and must never be able to move it.
 pub fn label_warning(label: &str) -> String {
     format!(
-        "warning: the label \"{}\" is not carried by any record format and will not \
-         appear on the device. Nothing else is lost.",
+        "warning: the wallet's name \"{}\" is only a label: it will not appear in \
+         the payload, on the device, or on the engraved plate. Nothing else is \
+         lost.",
         refusal::quote_operator(label)
     )
 }

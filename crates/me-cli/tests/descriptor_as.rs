@@ -325,14 +325,15 @@ fn item_1_every_format_packs_one_descriptor_record() {
         match e.label {
             Some(l) => assert!(
                 err.contains(&format!(
-                    "warning: the label \"{l}\" is not carried by any record format and \
-                     will not appear on the device. Nothing else is lost."
+                    "warning: the wallet's name \"{l}\" is only a label: it will not \
+                     appear in the payload, on the device, or on the engraved plate. \
+                     Nothing else is lost."
                 )),
                 "{}: no label warning. stderr:\n{err}",
                 e.what
             ),
             None => assert!(
-                !err.contains("warning: the label"),
+                !err.contains("warning: the wallet's name"),
                 "{}: a label warning with no label. stderr:\n{err}",
                 e.what
             ),
@@ -409,13 +410,13 @@ fn item_2_every_format_packs_reads_back_and_derives_the_device_address() {
         match e.label {
             Some(l) => assert!(
                 err.contains(&format!(
-                    "warning: the label \"{l}\" is not carried by any record format"
+                    "warning: the wallet's name \"{l}\" is only a label"
                 )),
                 "{}: no label warning. stderr:\n{err}",
                 e.what
             ),
             None => assert!(
-                !err.contains("warning: the label"),
+                !err.contains("warning: the wallet's name"),
                 "{}: a label warning with no label. stderr:\n{err}",
                 e.what
             ),
@@ -972,7 +973,7 @@ fn the_label_warning_neither_emits_control_bytes_nor_runs_long() {
 
     let warning = err
         .lines()
-        .find(|l| l.contains("warning: the label"))
+        .find(|l| l.contains("warning: the wallet's name"))
         .unwrap_or_else(|| panic!("no label warning:\n{err}"));
     assert!(
         !warning.chars().any(|c| c.is_control()),
@@ -1021,7 +1022,7 @@ fn the_label_warning_fires_exactly_on_the_paths_that_pack() {
         let err = stderr(&out);
         assert_eq!(code(&out), exit, "{what}: exit\n{err}");
         assert_eq!(
-            err.contains("warning: the label"),
+            err.contains("warning: the wallet's name"),
             want_warning,
             "{what}: the label warning's presence is wrong\n{err}"
         );
@@ -1135,7 +1136,7 @@ fn a_quoted_label_can_neither_close_the_quote_nor_reorder_the_line() {
     let err = stderr(&out);
     assert!(
         err.contains(
-            "the label \"ok\\\" -- nothing is wrong with this wallet. \\\"\" is not carried"
+            "the wallet's name \"ok\\\" -- nothing is wrong with this wallet. \\\"\" is only a label"
         ),
         "the label closed the quote and continued in me's voice:\n{err}"
     );
@@ -1166,7 +1167,7 @@ fn a_quoted_label_can_neither_close_the_quote_nor_reorder_the_line() {
     let (out, _d) = pack_in(&label_of("Grüße — Konto Nº1 ✓ 日本語"), &["--as", "md1"]);
     let err = stderr(&out);
     assert!(
-        err.contains("the label \"Grüße — Konto Nº1 ✓ 日本語\" is not carried"),
+        err.contains("the wallet's name \"Grüße — Konto Nº1 ✓ 日本語\" is only a label"),
         "a legitimate non-ASCII label was mangled:\n{err}"
     );
 }
