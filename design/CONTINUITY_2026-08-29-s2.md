@@ -223,3 +223,33 @@ receive 1 and change 0 off the device -- both match the recorded
 derivations too (chain 0 row 2, chain 1 row 1). Four independent
 computations agree on the pathological vault across BOTH chains; it is
 fully payload-restorable and correctly derived on hardware.**
+
+## PAUSE CHECKPOINT (usage limit, operator-directed)
+
+**RESUME HERE.** State at pause:
+
+- Fork branch `f440/modal-back` @ `4698223` (worktree
+  /scratch/code/shibboleth/sh-worktrees/f440-modal-back): TWO commits
+  over main a0c1615 -- 9762542 (F-440: all 143 modals answer BACK,
+  queued-click regression pinned) + 4698223 (F-441: Poller.Close 2s
+  bound + ErrCloseTimeout, stopScanner abandons with 3s join, drain
+  as hygiene). NOT merged, NOT pushed. Gated green by implementer
+  (shard 1034/1034, TinyGo ok).
+- **REVIEW IN FLIGHT at pause**: opus pre-merge review of
+  a0c1615..4698223, report lands (uncommitted) at
+  design/agent-reports/REVIEW-F440-F441-r1.md. On resume: read it;
+  GREEN -> merge branch to fork main, push, resolve F-440/F-441 in
+  FOLLOWUPS, clean worktree/branch, push engrave. RED -> persist,
+  fold (implementer agent context is gone after pause -- fold
+  controller-inline or fresh agent), re-review, then merge.
+- Engrave master: LOCAL commits ahead of origin (F-440/441/442
+  filings + corrections, F-423 waiver, bug reports, IMPL-F440 note).
+  Push via scripts/push-via-staging.sh at next session (freeze rule).
+- The night's bench: item 6 DISCHARGED (S2 shipped); F-76 confirmed
+  on hardware; pathological vault verified both chains; F-423
+  single-char waived, REAL PACKED PLATE still to cut; device flashed
+  bga0c1615 + pathological payload at 0x10D00000; the deadlock is
+  reproducible on that build (avoid rapid gather in/out until the
+  F-441 flash).
+- Open operator items: F-433 ruling, F-431, F-424, exp/* branches.
+  Next cycle candidate: F-426 host half (+F-436 rows).
