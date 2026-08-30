@@ -1166,7 +1166,7 @@ Found by the B1 plan's R0 round 2, against a paragraph a previous fold had
 introduced. Gating for B2 rather than optional: without it §10.2.2's labels are
 unimplementable for any multisig payload.
 
-### F-76 — inspecting a payload-sourced card — **WIDENED 2026-08-29: the same wall binds the ENGRAVE path** (owning phase: **after B2b**; NOT B2a)
+### F-76 — **RESOLVED (the reachable half) 2026-08-29, fork `f2007b7`** — `syswSession.cardSet` + `syswOfferCards` deliver whole cards at the three engrave doors, `syswPrimeCard` completes a tapped chunk from the payload, validation identical to the NFC path (reviewed: REVIEW-F76-F437-r1, cross-card isolation and parity refuted-by-construction), and the incomplete-card message is now TRUE for the one case that can reach it. **RESIDUE, kept open here:** no operator route reaches Inspect on a payload record — `unlockEngraveFlow` has no Inspect entry (its comment records this plainly); the primable machinery is built and unit-walked, the ENTRY POINT is not. Recorded non-gating notes from the review: SCAN CARDS draws without a `FeatureNFC` gate (latent — the SH2's reader is soldered on); the priming path draws no source-disclosure screen (2026-08-27 ruling class); `syswPrimeCard` sits outside the consumption oracle's sight, pinned behaviourally instead. — inspecting a payload-sourced card — **WIDENED 2026-08-29: the same wall binds the ENGRAVE path** (owning phase: **after B2b**; NOT B2a)
 
 **Widening, measured in the S2 journey walk (headless sim, fork `e456970`):**
 the payload door hands its gatherer ONE record on the engrave route too, so
@@ -14835,7 +14835,7 @@ repos (fork `a785755`; comments carry the host verdicts). At the next
 regeneration add single-line JSON rows — happy, label-with-ypub, escaped —
 so the parity gate covers the branch from data.
 
-### F-437 — the Wallet Policy door's "ENTER IT" choice promises typing and delivers an NFC card gather (repo: **seedhammer fork**; owning phase: **next device-UX touch, batch with F-76's door fix**) `#fork` `#device` `#ux`
+### F-437 — **RESOLVED 2026-08-29, fork `f2007b7`** — SCAN CARDS at the four card doors (the walk's mislabel existed at three md1 doors beyond the one filed), ENTER IT kept where a keyboard genuinely opens, guarded by a test PROVEN to red under the blanket rename (the first guard could not fail — REVIEW-F76-F437-r1 I1); the card doors' lead updated to "Cards from where?" in the same honesty class. — the Wallet Policy door's "ENTER IT" choice promises typing and delivers an NFC card gather (repo: **seedhammer fork**; owning phase: **next device-UX touch, batch with F-76's door fix**) `#fork` `#device` `#ux`
 
 Found by the S2 journey walk (round 2, F3): the door added with S2's
 Wallet Policy payload offer reads `Wallet policy from where? FROM PAYLOAD /

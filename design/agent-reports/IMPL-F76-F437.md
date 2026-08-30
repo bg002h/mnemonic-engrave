@@ -206,3 +206,117 @@ tinygo (target pico-plus2, -opt 2 -gc precise -scheduler tasks -stack-size 16kb)
    zero cards *and* nothing pending, where both its arms are still true.
 5. **No hardware, no plate.** Every walk stops at a rendered screen. Nothing here
    has been exercised on the real SeedHammer II.
+
+---
+
+# FOLD ADDENDUM — REVIEW-F76-F437-r1, findings I1 / M1 / N2
+
+**Commit** `03111ca` — `gui: fold REVIEW-F76-F437-r1 -- I1, M1, N2`, on
+`f76/payload-door` above `433d265`. One commit, as briefed. No production
+behaviour changed except M1's screen text.
+
+## I1 — the guard that could not fail (Important, closed)
+
+The reviewer applied the exact mutation `TestF437KeyboardDoorsKeepEnterIt`
+claimed to forbid — `syswAltEnter` `"ENTER IT"` → `"SCAN CARDS"` — and all 1028
+gui tests stayed green. The test walked `seedEntryFlow`, which routes through
+`syswSeedPickerTitled` (`gui/derive_xpub.go`), a picker that builds its own rows
+and never calls `syswChoose`; it draws `TYPE IT`, a string `syswAltEnter` does
+not control. The `ENTER IT` disjunct was dead, so the five doors that really use
+the constant were asserted by nothing.
+
+**Replaced** with a table walking two doors that actually draw it —
+`newInputFlow`'s seed door (`Seed from where?`) and `engraveTextFlowFrom`'s text
+door (`Text from where?`) — asserting the rendered string both ways: it must draw
+`ENTER IT` and must not draw `SCAN CARDS`.
+
+**Mutation proof, run before committing:**
+
+```
+=== I1 MUTATION APPLIED: syswAltEnter -> SCAN CARDS ===
+--- FAIL: TestF437KeyboardDoorsKeepEnterIt (0.00s)
+    --- FAIL: .../backup_wallet,_seed_door (0.00s)
+        the keyboard door no longer offers a typing route: this door DOES open a
+        keyboard when declined, and F-437's rename was supposed to reach the card
+        doors only.
+            Frame: "Seedfromwhere?FROMPAYLOADSCANCARDSInput"
+        a keyboard door now says SCAN CARDS -- F-437 in mirror image.
+    --- FAIL: .../engrave_text,_text_door (0.00s)
+            Frame: "Textfromwhere?FROMPAYLOADSCANCARDSInput"
+FAIL	seedhammer.com/gui	0.005s
+=== restoring ===
+ok  	seedhammer.com/gui	0.004s
+```
+
+The reviewer's finding was accurate and the shipped behaviour was never in
+doubt — only the guard was theatre. The mutation proof is quoted in the commit
+message and the reasoning is in the test's own header comment.
+
+## M1 — the lead now says what the door does (Minor, closed)
+
+`"First card from where?"` → `"Cards from where?"` at all three md1-card doors
+(`bundle_flow.go`, `wallet_policy.go`, `multisig.go`). Plural, and in the fork's
+existing `<noun> from where?` style (`Seed from where?`, `Password from where?`,
+`Wallet policy from where?`).
+
+**Three pins outside the diff moved with it rather than being edited around:**
+
+- `cmd/emu/needle_test.go`'s **decoy** entry and its two prose counts. The count
+  stays pinned at **3** — a rename that quietly took it to one would promote a
+  decoy to a needle by accident, which is exactly what that list exists to
+  prevent. `go test ./cmd/emu/` green.
+- `gui/sysw_cells_test.go`'s needle **and its comment**, which also claimed the
+  supplied path "offers ONE card and expects the operator to keep scanning". It
+  does not any more; the comment now says what that row is actually about — the
+  supplied path still *shows* the picker because it still has two answers, while
+  the built path has none.
+
+## N2 — `gui/unlock_platelist.go`'s half-false comment (Nit, closed)
+
+Corrected the falsified half ("prime a FRESH gatherer with only the single string
+handed to them") and **kept the conclusion**, which now rests on a sharper fact
+than the one it replaces: `syswPrimeCard` primes from `ctx.sysw`
+(`Platform.SyswReader`), while that list's records come from a decrypted sealed
+payload (`Platform.PayloadReader`) — two sources, and loading one does not
+populate the other.
+
+The comment now also states review **I2** plainly, as the load-bearing record:
+no operator route reaches Inspect on a payload record at all (`Inspect key` /
+`Inspect descriptor` exist only in `mdmkFlow` → `engraveObjectFlow` → a scan), so
+what F-76 delivered is the **reachable half** — an operator who taps one chunk of
+a card the systemwide payload also carries gets the rest from the payload — and
+the Inspect **entry point** for payload records remains unbuilt, still filed
+under F-76.
+
+## Not folded (coordinator's split)
+
+I2's records half (controller carries the residue into the F-76 entry at merge),
+M2 (SCAN CARDS drawn unconditionally — latent; hardware reports `FeatureNFC`
+unconditionally), M3 (priming discloses no source — non-gating by the 2026-08-27
+ruling), N1 (oracle blindness — behaviourally pinned by the `ClassMDMK` mutation),
+N3 (the report's `bundleRefusedSingleMK1` characterisation).
+
+**N3 stands as written by the reviewer**, and this report's earlier deviation
+note 3 is wrong on one word: it says that message fires on a non-chunked single
+mk1 "where it is correct". The reviewer measured that `feedback` is reached only
+from the scan loop, so its `!hasReader` arm is unreachable and its reachable arm
+tells the operator to scan chunks a card has none of. Pre-existing and untouched
+by this diff; the deferral stands, with the corrected description.
+
+## Gate tails after the fold (`03111ca`)
+
+```
+gui shard        1028 top-level tests, partition verified exhaustive: 1028 == 1028
+                 === wall: 24s ===  RESULT: ok -- all 1028 tests ran across 24 shards
+cmd/emu          ok  seedhammer.com/cmd/emu  1.391s   (the needle gate)
+go vet ./...     diff vs baseline: NO NEW FINDINGS
+gofmt -l         clean on all eight touched files
+non-gui          exit 0, 52 ok
+```
+
+TinyGo was not re-run: the fold changes two screen strings, comments and tests,
+and the device build was green at `433d265` (`exit 0`, `1498376` flash /
+`62568` ram).
+
+**Worktree clean** — `git status --short --untracked-files=all` empty; three
+commits above `e456970`, nothing pushed.
