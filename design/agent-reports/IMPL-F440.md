@@ -129,3 +129,18 @@ Appendix B identifies a **permanent, hardware-only device lock** on the same BAC
 edge (`stopScanner` → `Poller.Close` → a dropped `st25r3916` cancel token →
 an unbounded channel wait on the UI goroutine). That is a separate Critical, not
 implemented, awaiting your go-ahead.
+
+---
+
+## Follow-on: F-441 landed on the same branch (`4698223`)
+
+`Poller.Close` bounded (`ErrCloseTimeout`, device untouched on that path),
+`stopScanner` abandons instead of blocking, `Device.Interrupt` drains before
+signalling. Mutation-proved in both directions; the `d.cancel` sweep found no
+second site. **Correction carried in `BUG-wallet-policy-back-hang.md` Appendix
+C:** the dropped signal I named in Appendix B is *not* the cause — at capacity 1
+a stale token cancels the next waiter exactly as a fresh one would, checked
+executably — so the bound is the fix rather than a backstop.
+
+Both commits are on `f440/modal-back` for one review: `9762542` (F-440, a dead
+button on a live screen) and `4698223` (F-441, a live screen on a dead device).

@@ -383,3 +383,119 @@ base-point table while the device is built with `//go:build tinygo` →
 `scalarBaseMultNonConstSlow`, so any future MCU scaling of a derivation number
 must include that penalty on top of the CPU factor. It is not needed here: the
 lock is not arithmetic.
+
+---
+
+# APPENDIX C — F-441 implemented, and a CORRECTION to Appendix B
+
+**Commit** `4698223` — `nfc: F-441 -- a reader that will not stop must not take
+the device with it`, on `f440/modal-back` above `9762542`. Not pushed.
+
+## CORRECTION: the dropped signal was not the cause
+
+**Appendix B named `Device.Interrupt`'s dropped `d.cancel` send as the
+mechanism. That is wrong, and the claim did not survive being executed.**
+
+`d.cancel` has capacity 1, and a pending token is **indistinguishable from a
+fresh one to the next waiter** — both make `waitForInterrupt` return `io.EOF`.
+So a dropped send delivers the same cancellation the send would have. Exhausted
+rather than argued:
+
+```
+stale=false  bare delivers=true   drain-then-send delivers=true   same=true
+stale=true   bare delivers=true   drain-then-send delivers=true   same=true
+```
+
+The freeze therefore required an in-flight read that **never reaches
+`waitForInterrupt` again** — a stalled bus transaction, or a path with no
+cancel-covered wait — which no signal of either kind can rescue. Appendix B's
+call-graph, its edge-triggering, its "hardware-only because the sim stubs the
+reader", and its symptom mapping all stand. Only the named cause was wrong, and
+it was the one link I reasoned about instead of running.
+
+**What that changes about the fix:** the bound is not a safety net behind the
+real fix — it *is* the fix, because it holds whatever stalls the read. The drain
+is hygiene.
+
+## What landed
+
+1. **`Poller.Close` is bounded** (`nfc/poller/poller.go`). Waits at most
+   `CloseTimeout` (2 s), then returns `ErrCloseTimeout`. On that path it does
+   **not** touch the device: the read still owns the bus and `d.Close` writes a
+   register, so leaving the chip alone is the safe half of giving up.
+2. **`stopScanner` abandons** (`gui/nfc_scan.go`). On a Close error it logs,
+   leaves the goroutine and returns; its own join is bounded by
+   `scannerJoinTimeout` (3 s, above the scanner's 1 s worst-case sleep). A leaked
+   goroutine and a degraded reader beat a machine that needs unplugging.
+3. **`Device.Interrupt` drains before signalling** (`driver/st25r3916`). Kept as
+   hygiene — a no-op with no error and no way for the caller to know is a shape
+   defects hide in — with its comment now saying plainly that it is not the
+   cause.
+
+## The `d.cancel` sweep
+
+`d.cancel` was the **only cancellation** carried on a lossy channel. The other
+five capacity-1 channels are **doorbells** whose receivers re-read authoritative
+state, where dropping a duplicate is correct:
+
+| channel | receiver re-reads | verdict |
+| --- | --- | --- |
+| `d.interrupts` (pin ISR) | `interruptStatus()` after every wake; `resetInterruptMask` already drains one first — the idiom `d.cancel` lacked | safe |
+| `USBPD_INT` (`platform_sh2.go:486`) | `d.ReadStatus()`, `continue` if unchanged | safe |
+| `Platform.wakeups` | the frame loop re-evaluates on wake | safe |
+| `touch.ints` | `processTouch` reads the live panel | safe (its transient-tap loss is the separate finding in Appendix B) |
+| `engraver.busy` | blocking send used as a mutex; drops nothing | safe |
+
+Nothing else to fix.
+
+## Test evidence, red → green
+
+The stub whose absence made this hardware-only is now in the tree:
+`testPlatform.NFCReader()` returns nil and `startScanner` answers nil with a
+no-op stop, so the mechanism was unreachable from Go tests **by construction**.
+
+- `nfc/poller/poller_close_test.go` — a device that **cannot** be stopped (a
+  model of the only thing `Close` may assume, not of the ST chip).
+- `gui/nfc_scan_abandon_test.go` — the reader `stopScanner` must abandon. It
+  **arms** the condition rather than assuming it: the scanner checks its closer
+  at the top of each iteration, so a stop issued before the first `Read` joins
+  instantly and would pass without exercising a stall. Caught in review of my own
+  first draft, which did exactly that and stayed green under mutation.
+
+```
+bound removed      panic: test timed out after 25s
+                     running tests:
+                       TestCloseReturnsAnErrorWhenTheReadCannotBeStopped (25s)
+abandon removed    --- FAIL: TestStopScannerAbandonsAReaderThatWillNotStop (10.01s)
+both restored      ok seedhammer.com/nfc/poller 2.004s / ok seedhammer.com/gui
+```
+
+Healthy paths are pinned too: `Close` on a stoppable read returns nil well inside
+the timeout, `Close` on an idle poller never interrupts, and a well-behaved
+reader is joined without waiting out the bound.
+
+**`Interrupt` carries no Go test, by constraint not omission:**
+`driver/st25r3916` is `//go:build tinygo`, so nothing but the device build ever
+type-checks it. That is the *second* reason the suite could not see this defect,
+and it is now recorded beside the function.
+
+## Gate tails (`4698223`)
+
+```
+gui shard    1034 top-level tests, partition verified exhaustive
+             === wall: 22s ===  RESULT: ok -- all 1034 tests ran across 24 shards
+non-gui      exit 0, 53 ok  (was 52; nfc/poller gained tests)
+go vet ./... no new findings vs an a0c1615 baseline taken the same way
+gofmt -l     clean on all five touched files
+tinygo       pico-plus2, exit 0
+             1199608  269360  31628  30956 | 1500596  62584 | total
+```
+
+## Residue for F-442
+
+The "reader marked failed" half is **not** implemented: with a `Poller` built per
+screen entry there is nowhere durable to record it, and the next entry builds a
+fresh poller over the same device — so an abandoned read still owns the bus while
+a new one starts. That is strictly better than freezing (the UI stays alive) but
+it is a real degradation, and it is F-442's "one reader, not one per screen"
+change that gives the flag somewhere to live.
