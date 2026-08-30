@@ -284,3 +284,19 @@ F-423 packed-plate cut (single-char waived). The deadlock IS
 constructible on the flashed build -- avoid rapid gather in/out until
 reflashed.** Open: F-433 + F-431 rulings, F-424, F-426-host cycle
 (+F-436), F-442, F-443, F-76's Inspect residue, exp/* disposition.
+
+## OVERNIGHT AUTHORIZATION (operator, before sleep, 2026-08-29 ~23:30)
+
+Operator, verbatim: "Maybe you can do the real fix autonomously and
+flash at the end? Sh2 now in bootsel." then "Goodnight". SCOPE: the
+F-434 real fix (advance-by-full-paragraph-height; QR on packed
+plates), end to end -- measurement (MEASURE-F434, in flight) -> plan
+written from its numbers -> plan review -> ONE implementer -> goldens
+regenerated DELIBERATELY with diff inspection -> adversarial review ->
+merge fork main -> push -> **flash via sh2-flash -y (the device sits
+in BOOTSEL as the standing authorization)**. CONDITIONS HELD: the
+measurement gate decides (N=1 everywhere -> STOP, report, reboot the
+device unflashed... note picotool reboot only, no image); every review
+gate intact; flash only from green main. F-433 resolves with the
+outcome. Physical plate validation remains the operator's, in the
+morning.
