@@ -14895,19 +14895,26 @@ design/agent-reports/BUG-wallet-policy-back-hang.md.
 
 The night's real "hang", diagnosed from three field recipes plus sim
 tracing (design/agent-reports/BUG-wallet-policy-back-hang.md, Appendix
-B): on the BACK edge out of a gather-adjacent screen, `defer
-stopScanner()` → `Poller.Close` → `d.Interrupt()` is a NON-BLOCKING
-send on a cap-1 `d.cancel` channel — a stale token from a previous
-visit makes it a no-op — then `p.reading <- struct{}{}` blocks the UI
-goroutine forever: no frames, no input, checkmark dead, no timeout.
-Hardware-only (the sim's nil reader makes `stopScanner` a no-op);
-ARMED by repeated in/out visits, each building a fresh `Poller` over
-the one shared device — exactly the operator's cycling recipe. Field
+B, CORRECTED by Appendix C): on the BACK edge out of a
+gather-adjacent screen, `defer stopScanner()` → `Poller.Close` blocks
+the UI goroutine forever on `p.reading <- struct{}{}` when the scanner's
+read never reaches `waitForInterrupt` at all — **the initially-blamed
+stale-token/dropped-signal mechanism was REFUTED executably** (at cap 1
+a stale token cancels the next waiter exactly as a fresh one would;
+Appendix C carries the check). No signal rescues a read stuck before
+the interrupt select, so **the timeout BOUND is the fix itself**, and
+the drain-before-signal is retained as hygiene, labelled as such. No
+frames, no input, checkmark dead, no timeout — hardware-only (the
+sim's nil reader made `stopScanner` a no-op, and `driver/st25r3916`
+is `//go:build tinygo`: two independent reasons no suite could see
+it); armed by repeated in/out visits over the one shared device. Field
 signature matched end to end: responsive through 50 page presses, dead
 at the instant of BACK, dead buttons, no recovery at 6+ minutes.
-Fix in flight: the minimal pair — drain `d.cancel` before signalling,
-and bound `Poller.Close`'s wait so a stranded read is an error, not a
-brick. The architectural halves (never block the frame loop on
+Fixed (fork branch `4698223`, pending review): `Poller.Close` waits at
+most 2s and returns `ErrCloseTimeout` WITHOUT touching the device (the
+read still owns the bus); `stopScanner` abandons-and-continues with
+its own 3s join bound — the device lands on a live screen, never a
+frozen one. The architectural halves (never block the frame loop on
 teardown; ONE reader rather than one per screen entry) are follow-on:
 
 ### F-442 — teardown may not block the frame loop, and the NFC reader should be one long-lived poller, not one per gather entry (repo: **seedhammer fork**; owning phase: **next device-UX cycle**) `#fork` `#device` `#nfc` `#architecture`
