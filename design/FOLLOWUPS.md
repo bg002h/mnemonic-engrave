@@ -14798,7 +14798,7 @@ PROVENANCE is inside the frozen vector file — that half waits for the NEXT
 regeneration; the README's Baselines section can update at the merge).
 Failure mode is a loud build error, not silent drift.
 
-### F-433 — a PACKED bundle plate offers no QR variant; decide whether that is documentation or a fix (repo: **seedhammer fork**; owning phase: **operator decision at/after S2 acceptance (P5.4)**) `#fork` `#engraving` `#ux`
+### F-433 — **RULING IN MOTION 2026-08-29 night**: the operator asked to plan F-434's real fix (the fund-the-fix branch), gated on a measurement — how many string+QR pairs fit one plate (MEASURE-F434, in flight). N>=2 in any scannable configuration → the fix proceeds and this entry resolves with it; N=1 everywhere → packed stays TEXT ONLY documented, QR lives on single-string plates (the NDEF-tag loop, demonstrated same night). — a PACKED bundle plate offers no QR variant; decide whether that is documentation or a fix (repo: **seedhammer fork**; owning phase: **operator decision at/after S2 acceptance (P5.4)**) `#fork` `#engraving` `#ux`
 
 Filed from IMPL-S2-P4 §5.1. Before F-423 every md1/mk1 plate offered
 `TEXT+QR`/`TEXT ONLY`/`QR ONLY`; a packed (multi-string) plate is
