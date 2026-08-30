@@ -56,9 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Items 1-5 are discharged by the suites (item 4's rows at the post-S2
 count of 35; item 5's five-case matrix on the full-build truth table).
-Item 6 — a `ClassDescriptor` record DISPLAYED on the real device — and
-every flash remain the operator's acceptance (P5.4), with F-423's
-physical test plate.
+**Item 6 discharged 2026-08-29 on hardware**: firmware `bga0c1615`
+flashed, a `--as descriptor` payload loaded and digest-authenticated,
+and the Engrave Descriptor screen displayed the correct wallet with
+the correct receive address, confirmed by the operator's eyes. F-423's
+physical test plate remains its own follow-up.
 
 ## [0.7.0] - 2026-08-19
 

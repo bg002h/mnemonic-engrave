@@ -191,8 +191,11 @@ both repos; remotes carry only main/master. Engrave master `eb06906`.
 **Device REFLASHED 2026-08-29 late evening at the operator's direction
 ("Sh2 now in bootsel"): `v0.0.0-bga0c1615` = fork main tip -- S2 + the
 payload card doors (F-76/F-437) + the engraving guards (F-434/F-435),
-load + verify OK. Boot judged on MACHINE power; item 6 remains the
-operator's eyes.**
+load + verify OK. Boot CONFIRMED on machine power; payload loaded at
+0x10D00000 (digest d00f ad10 ... compared and confirmed on screen);
+**S11 ITEM 6 DISCHARGED — operator: "Correct engrave descriptor and
+address shown". S2 IS SHIPPED, end to end, desk to steel-adjacent.**
+Remaining operator items: F-423 plates, F-433/F-431 rulings, F-424.**
 
 STILL THE OPERATOR'S: item 6 screen (S2 "shipped" gate), F-423 physical
 plates, F-433 ruling (TEXT ONLY vs fund F-434's real fix), F-431

@@ -14630,7 +14630,7 @@ fuller brief to the operator and a fresh ruling — until then this entry is
 a decision record, not scheduled work. Owning phase changed accordingly:
 **none — standing decision.**
 
-### F-418 — **S2 BUILT 2026-08-29** (branches `impl/descriptor-s2` + `s2/descriptor-arm`; P1-P4 implemented, reviewed and closed; awaiting P5.2's whole-diff review, merge, and the OPERATOR ACCEPTANCE HANDOVER — flash, §11 item 6 on the screen, F-423's physical plate). Original ruling record below stands. — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
+### F-418 — **S2 SHIPPED 2026-08-29 (evening), §11 ITEM 6 DISCHARGED ON HARDWARE** — the operator flashed `bga0c1615`, loaded a `--as descriptor` payload (digest compared and confirmed), and saw the Engrave Descriptor screen render the correct wallet (2-of-3 multisig, P2WSH) with the correct address 0 via the addresses screen — operator, verbatim: "Correct engrave descriptor and address shown". Every desk gate had already closed (7-round R0, three review loops, the whole-diff execution review); this was the one check only eyes on the machine could make. F-423's physical plate validation remains its own entry. Original ruling record below stands. — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
 
 **Operator ruling 2026-08-28, in conversation:** *"I'm away from sh2 and it's
 not connected. That should inform s2/3 ordering, I think."* — resolving the
