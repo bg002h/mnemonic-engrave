@@ -14933,6 +14933,32 @@ the next poller's Close touches the device under an abandoned read,
 safe today only because multiplexI2C serialises and rp2 tx has no
 yield point: state that invariant where the redesign can rely on it.
 
+### F-444 — packed md1 plates at 3.0mm: a density rung below the 3.8mm default (repo: **seedhammer fork**; owning phase: **next fork engraving cycle — operator-gated, needs one validation cut**)
+
+Filed 2026-08-31 at the bench, operator: "We can try 3.0mm font next"
+— immediately after the FIRST 3.8mm packed plate (5×~86-char md1
+strings, sh face, 13:44 cut) came out "perfectly legible" (F-423's
+physical validation).
+
+What it is: mdmk/descriptor plates hardwire `FontSize: 0` →
+`plateFontSizeUR = 3.8` (`backup/backup.go:176`). A 3.0mm rung would
+raise packed capacity from 5 strings/plate to ~6-7 (CharsPerLine and
+LinesPerPlate both scale with F(fontMM); measure, don't assume — the
+F-423 rule).
+
+What is already proven: the sh FACE at 3.0mm — the freetext proof
+ladder's bottom rung (TEXTPROOF! plates) exists precisely to prove the
+faces at 3.0.
+
+What is NOT proven and needs one cut: the PACKED-LAYOUT at 3.0 —
+string separation, footer clearance, and per-string recoverability at
+the higher line density. Same acceptance as F-423: transcribe the
+middle string, per-chunk BCH + byte-compare.
+
+Cost: a fork change (size option or constant bump on the mdmk path —
+decide whether 3.0 becomes the default or an operator choice), a
+capacity re-measure, goldens, one ~11-min validation plate.
+
 ### F-443 — `sysw.DecodeBody` accepts a truncated `pass:`/`text:` record silently: no length or checksum (repo: **seedhammer fork** + check the Rust primary; owning phase: **next sysw touch — and the Rust check is mandatory before any Go fix**) `#fork` `#sysw` `#records`
 
 Filed from REVIEW-F440-F441-r1's N-3 (pre-existing, NOT introduced by
