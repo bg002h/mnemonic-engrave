@@ -14742,7 +14742,7 @@ symmetric (`ypub` → `P2SH_P2WPKH`, normalise to `xpub`), after which the
 host's five-version admission widens to match in its own convergence cycle.
 Batch with S2's firmware build; upstream-PR candidate per the fork rules.
 
-### F-427 — §5.4 says "canonical line", the block labels it `descriptor:` and the code says "descriptor line"; align the spec's word at its next touch (repo: **mnemonic-engrave**; owning phase: **next SPEC_descriptor_input amendment, batch**) `#spec-drift` `#docs`
+### F-427 — **RESOLVED 2026-08-29** — both spec sites ("canonical line", §5.4 prose + the quoted no-md1-form sentence) aligned to the code's "descriptor line", matching the shipped `identify.rs:65` text verbatim. — §5.4 says "canonical line", the block labels it `descriptor:` and the code says "descriptor line"; align the spec's word at its next touch (repo: **mnemonic-engrave**; owning phase: **next SPEC_descriptor_input amendment, batch**) `#spec-drift` `#docs`
 
 Filed from the fold-1 re-review's N-c (2026-08-29): fold-1's N1 was DECLINED
 by controller ruling — the code's wording is the more executable, since the

@@ -1300,7 +1300,7 @@ block — including a conjunct-8 failure, RE-DECIDED per PLAN-r3's I4
 (reversing r2-M1's accidental FULL): its addresses derive but are
 byte-identical to a clean control (measured), so a compare prompt would
 PASS on an impossible wallet, actively reassuring, while the PARTIAL
-block's canonical line is what actually shows the operator the two
+block's descriptor line is what actually shows the operator the two
 colliding lines. The PARTIAL block: the first three lines plus the watch-only line — no `wallet-id:`, no
 `address 0:`, no compare prompt — because its class is the wallets refused
 by the `--as`-independent conjuncts and the no-path shapes: the underivable
@@ -1368,7 +1368,7 @@ understood. `me` prints to stderr:
   represent — (a)/(a″) shapes; deeper tails never reach this line, being
   partial-tier (r13's M1b) — the line is instead:
   *"wallet-id: none — this wallet has no md1 policy form; identify it by
-  the checksum in the canonical line and by address 0."* NEVER computed
+  the checksum in the descriptor line and by address 0."* NEVER computed
   over a collapsed encoding: for an (a)-shaped wallet the honest attempt
   ERRORS (`AltCountOutOfRange` — the true id does not exist, R0 r9's C1),
   and encoding anyway collapses to the `/*` wallet (shared chunk-set-id
