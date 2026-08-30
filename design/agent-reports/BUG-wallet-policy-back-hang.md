@@ -212,3 +212,174 @@ aimed at nothing.
 - Whether the operator's device was additionally short of memory is not
   answerable from x86; what *is* answerable is that the largest candidate
   retainer is `!tinygo`-only and the per-cycle retention is ~0.
+
+---
+
+# APPENDIX A — report 2: "bundle at the top and just the last fp of a key"
+
+**Screen identified, exactly.** It is `bundleReviewFlow`'s LAST PAGE
+(`gui/bundle_flow.go`). For the pathological vault the review is 12 cards, and
+the final page holds one orphaned line. Measured, verbatim from the sim:
+
+```
+BUNDLE REVIEW page 1: "Bundle12cardsverified:1.md1descriptorOKP2WSHcomplex2.mk1keyOK…"
+  page 5: "Bundlemainnet|m/48h/0h/0h/2h|fp2864500611.mk1keyOKmainnet|m/48h/0h/1h/2h…"
+  page 6: "Bundle|fp28645006"          ← the operator's screen, word for word
+```
+
+**Its BACK is bound and it works.** `bundleReviewFlow` binds Button1→back,
+Button2→page, Button3/Center→continue, and back returns `false`, which
+`walletPolicyFlow` turns into `continue` → the gather. Measured from the last
+page:
+
+```
+=== on the last page, pressing BACK ===
+BACK: frame 0 after 799.614µs: "WalletPolicymd1descriptors:1mk1keys:11Done…"
+BACK went to the GATHER screen -- back works here
+```
+
+**So it is NOT a second BACK-deaf class.** It is not one of F-440's 143 sites
+either — it is its own paged screen. Checked: every paged screen on this route
+(`bundleReviewFlow`, `confirmReviewScreen`, `md1PolicyFlow`, `mk1DisplayFlow`,
+`addressListFlow`, the unlock plate list) binds Button1 and returns on it. The
+BACK-deaf class is `ErrorScreen` and only `ErrorScreen`.
+
+What this screen *does* have is a cosmetic defect worth a follow-up: a final
+page rendering a bare `| fp 28645006` with no card number and no context. The
+paging is gap-free by construction, so it is a presentation artifact, not a lost
+line.
+
+**The hang the operator hit from here is Appendix B's**, not this screen's.
+
+---
+
+# APPENDIX B — reports 1 & 3: a PERMANENT hardware lock on the BACK edge
+
+**This is a Critical, and it is a different defect from F-440.** F-440 is a
+dead button on a live screen. This is a live-looking screen with a **dead
+device**: no frames, no input, no recovery, power cycle only.
+
+## What the field facts constrain
+
+| field fact | what it excludes |
+| --- | --- |
+| "The screen updated every time I pressed right arrow" | derivation cost — the UI was fast right up to the edge |
+| "only hung the moment I hit back arrow" | anything gradual; the lock is EDGE-TRIGGERED on BACK |
+| "still locked at 2 minutes" … "at 3 minutes" | a backlog being drained |
+| "the CHECKMARK does nothing either" | a drawn-but-unwired screen; **the event loop is not running** |
+| sim returns from the same BACK in 0.8-10 ms | anything the sim's platform implements |
+
+Both halves of the last row matter: the lock is in something the sim **stubs**.
+`testPlatform.NFCReader()` returns `nil`, and `startScanner` answers a nil
+reader with `return scans, func() {}` — **a no-op stop function**. The entire
+mechanism below is unreachable in the sim by construction.
+
+## The call path, and the blocking site
+
+```
+walletPolicyFlow                                   (gui/wallet_policy.go)
+ └─ bundleGatherFlowResume                         (gui/bundle_flow.go)
+     ├─ scans, stopScanner := startScanner(ctx, ctx.Platform.NFCReader())
+     │                                              (gui/nfc_scan.go)
+     ├─ defer stopScanner()          ← RUNS ON THE FLOW'S RETURN = the BACK edge
+     └─ for { … ctx.Frame(…) }       ← the frame loop AND the event pump
+
+stopScanner:                                        (gui/nfc_scan.go)
+        close(closer)
+        r.Close()                    ← ***BLOCKS HERE***
+        <-closed
+
+Poller.Close:                                       (nfc/poller/poller.go:92)
+        select {
+        case p.reading <- struct{}{}:   // free? take it
+        default:                        // a Read is in flight:
+                p.d.Interrupt()         //   ask it to stop …
+                p.reading <- struct{}{} //   *** and WAIT, with no timeout ***
+        }
+
+Device.Interrupt:                       (driver/st25r3916/st25r3916.go:304)
+        select {
+        case d.cancel <- struct{}{}:    // d.cancel is make(chan struct{}, 1)
+        default:                        // *** ALREADY FULL: SIGNAL DROPPED ***
+        }
+```
+
+`d.cancel` is consumed in exactly one place — `waitInterrupt`'s select
+(`st25r3916.go:410`). **Any `Interrupt()` delivered while the reader is not
+parked in that select leaves a token in the channel.** The next `Interrupt()`
+then hits `default` and is dropped, the in-flight `Read` is never cancelled,
+`p.reading <- struct{}{}` blocks **forever**, and `stopScanner` never returns.
+
+The frame loop, the event pump (`pl.AppendEvents`) and the flow all live in the
+**same goroutine**, so blocking there means: no frame is drawn (the LCD keeps the
+last one — the addresses page, or the Bundle+fp page), no input is polled (every
+button dead, including the checkmark), and nothing times out (a bare channel
+send). That is every reported symptom, including the two that F-440 cannot
+explain.
+
+## Why it needs repeated in-and-out visits
+
+Every entry into the gather calls `ctx.Platform.NFCReader()`, which is
+`poller.New(p.nfc)` (`cmd/controller/platform_sh2.go:572`) — **a fresh `Poller`,
+with a fresh `reading` semaphore, over the ONE shared `st25r3916.Device`.** The
+`d.cancel` channel belongs to the device, so it persists across pollers. A stale
+token dropped by visit *n* is what poisons the `Close()` of visit *n+1*. That is
+exactly the operator's cycle, and exactly why the first pass is fine.
+
+## Fix proposals (NOT implemented — outside F-440's scope, awaiting go-ahead)
+
+1. **Drain before signalling.** In `Device.Interrupt`, empty `d.cancel` first,
+   then send — so the signal is never dropped:
+   `select { case <-d.cancel: default: }` before the send. Smallest change that
+   removes the wedge.
+2. **Bound the wait.** `Poller.Close` must not block unboundedly on a resource a
+   dropped signal can strand. Give the second `p.reading <- struct{}{}` a
+   timeout and return an error rather than hanging the UI goroutine.
+3. **Do not block the frame loop on teardown at all.** `stopScanner`'s
+   `<-closed` join runs on the UI goroutine; a scanner that cannot be stopped
+   should be abandoned (leak the goroutine, mark the device unusable) rather than
+   freeze the device. A frozen panel is strictly worse than a leaked poller.
+4. **One reader, not one per screen.** Re-opening a `Poller` per gather entry is
+   what makes stale device state reachable at all.
+
+(1)+(2) are the minimal pair: (1) removes the cause, (2) makes the symptom a
+recoverable error instead of a brick.
+
+## A bench prediction, if the device is still powered
+
+If the theory holds, the device is parked in `Poller.Close` **after**
+`p.d.Interrupt()` and after `close(closer)`. The scanner goroutine is inside
+`Read` → `waitInterrupt`, which also selects on `d.interrupts` — so **presenting
+any NFC tag or an active reader field should produce an interrupt, release the
+read, unblock `Close`, and the screen should immediately jump to the gather.**
+A tag waking a "dead" device confirms this diagnosis and refutes every
+alternative. (The operator reports no tag is available, so this stays a
+prediction.)
+
+## Item 3's original hypothesis, killed with evidence
+
+The backlog model does not survive contact with the input path:
+
+- `AppendEvents` (`platform_sh2.go:376`) is called **inside** `ctx.FrameCallback`
+  — i.e. only when the flow draws. Nothing accumulates while a frame is blocked.
+- Input is the **touch panel**, and `p.touch.ints` is `make(chan struct{}, 1)`
+  with a non-blocking send: interrupts **coalesce to at most one pending**.
+- `processTouch` reads the *current* point and suppresses no-change readings, so
+  a tap that begins and ends while the loop is blocked is **lost, not queued**.
+- `AppendEvents` returns after **one** event, so a frame can never deliver a
+  burst.
+
+Fifty rapid presses therefore cannot build a backlog on this hardware. Combined
+with the operator's own "the screen updated every time I pressed right arrow",
+the recompute-storm theory is dead twice over — and the consent screen, which is
+what actually pages here, re-derives **nothing**: its lines are computed once
+(8.9 ms on x86 for the whole 11-key miniscript consent surface, 1.2 ms per page
+press thereafter).
+
+For completeness, the derivation costs that *would* have mattered: the consent
+build performs **1 probe + 4 addresses = 5 derivations × 11 keys = 55 BIP-32
+child derivations**, 8.9 ms on x86. Note that x86 uses secp256k1's precomputed
+base-point table while the device is built with `//go:build tinygo` →
+`scalarBaseMultNonConstSlow`, so any future MCU scaling of a derivation number
+must include that penalty on top of the CPU factor. It is not needed here: the
+lock is not arithmetic.
