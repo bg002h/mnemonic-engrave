@@ -14808,7 +14808,7 @@ journey (md1 is the hand-copyable half; `--as descriptor` is the scannable
 plate), but it is a real capability reduction the operator should rule on:
 accept + document, or fix F-434 and restore QR on packed plates.
 
-### F-434 — `backup.EngraveText` lays multi-paragraph QRs over one another and the fit check calls it a fit (repo: **seedhammer fork**; owning phase: **next `backup`/engrave touch — the cheap refusal first**) `#fork` `#engraving` `#latent`
+### F-434 — **CHEAP HALF RESOLVED 2026-08-29, fork `a0c1615`** — `EngraveText` returns an error and refuses `ErrMultiParagraphQR` (mutation-proven on three arrangements); the silent overlay is now a clean refusal. **THE REAL FIX STAYS OPEN**: advance by max(textLines, qrLines) — it moves every golden, and it is the gate to any future QR-on-packed-plates decision (F-433's other branch). — `backup.EngraveText` lays multi-paragraph QRs over one another and the fit check calls it a fit (repo: **seedhammer fork**; owning phase: **next `backup`/engrave touch — the cheap refusal first**) `#fork` `#engraving` `#latent`
 
 Filed from IMPL-S2-P4 §5.2. The paragraph advance counts text lines only,
 so a multi-paragraph plate with QRs draws them across neighbours; `toPlate`
@@ -14818,7 +14818,7 @@ refuse a `Paragraph` carrying a QR when `len(Paragraphs) > 1` (turns a
 silent wrong plate into an immediate error); real fix: advance by
 `max(textLines, qrLines)` (moves goldens). Do the cheap one first.
 
-### F-435 — `Text.FooterRow` is a workaround for `EngraveText` having no body budget; give it one and delete the second fit check (repo: **seedhammer fork**; owning phase: **opportunistic — `backup.TestAPackedBodyCanCoverTheFooterRow` fails when done, announcing the cleanup**) `#fork` `#engraving` `#cleanup`
+### F-435 — **RESOLVED 2026-08-29, fork `a0c1615`** — the body is budgeted against the footer row by construction; `Text.FooterRow` and `bundlePlateTextFits`'s second check deleted; the announcing test replaced per its own instruction. Capacity 5 UNCHANGED and now held BY the budget (mutation: without it the packer fits 6). The budget binds on footered plates only — reviewed sound (REVIEW-F434-F435-r1): for footerless plates the limit is bit-for-bit `toPlate`'s own bound and `toPlate` tests ink, the true quantity; decision-identical to the deleted check over the reachable space, 0/1210 disagreements. — `Text.FooterRow` is a workaround for `EngraveText` having no body budget; give it one and delete the second fit check (repo: **seedhammer fork**; owning phase: **opportunistic** ) `#fork` `#engraving` `#cleanup`
 
 Filed from IMPL-S2-P4 §5.3. The free-text path has `yBudget`; the paragraph
 path has nothing, so P4.2 added `FooterRow` + `bundlePlateTextFits`'s second
@@ -14860,3 +14860,14 @@ unchanged), T4 not widened (no `--as` still gets the record refusal at
 exit 4, asserted). Pinned by `json_missing_descriptor_field_gets_its_own_sentence`,
 which also asserts the old sentence's ABSENCE so the lie cannot regress
 silently. Spec §6 row-5 cell amended.
+
+### F-439 — a QR-ONLY band can cross the footer row in principle; unreachable at real string sizes by ~4.2x (repo: **seedhammer fork**; owning phase: **with F-434's real fix, or any QR-size change**) `#fork` `#engraving` `#latent`
+
+Filed from REVIEW-F434-F435-r1, measured: the window opens at 77 modules
+(QR v17, ~459-char input), QR-ONLY only — TEXT+QR has no window at all
+(the F-435 text budget refuses from 61 modules up). Longest real strings:
+md1 85 chars → 37 modules (16.2mm clearance), mk1 111 chars → 41 modules
+(14.4mm clearance). Never covered by the deleted check either, so F-435
+regressed nothing. Binds only if inputs ~4.2x longer than today's ever
+reach QR-ONLY plates; fix alongside F-434's real advance fix, which
+touches the same layout arithmetic.
