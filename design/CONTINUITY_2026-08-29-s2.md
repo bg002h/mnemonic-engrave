@@ -214,4 +214,10 @@ operator saw 11 keys with fingerprints, keypaths, receive 0&1, change
 0&1, and the template id on the Wallet Policy consent surface --
 i.e. the consent derivation ran clean on the keyless miniscript
 template too (the caveat flagged pre-walk did not bite). Operator:
-"a lot of really good and helpful info".
+"a lot of really good and helpful info". **AND the address check
+closed: the device's receive 0 for the vault read
+bc1qkuknuy6dsm0fq44cyyhzqy9wl3ex2n6ed39zxhx867l9wlh4yhlsejms64 --
+character-identical to the journey's independently derived table row
+(journey_pathological.html:378, computed 2026-08-11). Four independent
+computations agree on the pathological vault; it is fully
+payload-restorable and correctly derived on hardware.**
