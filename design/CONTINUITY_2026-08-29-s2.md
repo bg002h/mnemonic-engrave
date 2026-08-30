@@ -218,6 +218,8 @@ template too (the caveat flagged pre-walk did not bite). Operator:
 closed: the device's receive 0 for the vault read
 bc1qkuknuy6dsm0fq44cyyhzqy9wl3ex2n6ed39zxhx867l9wlh4yhlsejms64 --
 character-identical to the journey's independently derived table row
-(journey_pathological.html:378, computed 2026-08-11). Four independent
-computations agree on the pathological vault; it is fully
-payload-restorable and correctly derived on hardware.**
+(journey_pathological.html:378, computed 2026-08-11). The operator then read
+receive 1 and change 0 off the device -- both match the recorded
+derivations too (chain 0 row 2, chain 1 row 1). Four independent
+computations agree on the pathological vault across BOTH chains; it is
+fully payload-restorable and correctly derived on hardware.**
