@@ -14977,9 +14977,15 @@ needs a second look. (b) Full-plate accounting closes: 2.4 (top) + 15×4.1
 bottom margin is ~5.2 line pitches, and a 6th 3-line string (12.3mm) fits
 with ~9mm spare IF the fit-reservation hypothesis confirms; the question is
 not marginal. (c) The measured pitch numerically equals the
-`plateFontSize = 4.1` constant (`backup/backup.go:175`) while the plate cut
-at `plateFontSizeUR = 3.8` — determine in the recon whether that is the
-line-advance formula showing through or coincidence; do not assume either.
+`plateFontSize = 4.1` constant — but that constant styles SEED plates
+(`engraveSeedString`) and is provably not in the mdmk plate's code path,
+which cuts at `plateFontSizeUR = 3.8` (upstream's Uniform-Resources
+descriptor-plate size, inherited via the FontSize-zero rule). So the 4.1mm
+pitch must come from the line-advance arithmetic; candidate mechanism to
+verify in the recon: sh metrics are Ascent 5000 / Height 6700, and
+3.8 × 6700/6200 ≈ 4.106mm — one code-read of EngraveText's advance
+settles whether the equality with 4.1 is a numeric accident (likely) or
+something load-bearing.
 
 The margin verdicts (top/left/right appropriate; hole-band indent
 generous-but-ruled-fine) are RECORDED RULINGS — do not re-open them
