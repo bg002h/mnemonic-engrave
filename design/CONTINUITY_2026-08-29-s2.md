@@ -202,3 +202,16 @@ plates, F-433 ruling (TEXT ONLY vs fund F-434's real fix), F-431
 consumer decision, F-424 publish, exp/* branch disposition. NEXT CYCLE
 CANDIDATE: F-426 host half (five-version widening; retires the
 version-gap row; carries F-436's corpus rows in its regeneration).
+
+## Hardware session, late evening (operator at the bench)
+
+Item 6 discharged (recorded above). THEN the pathological vault's full
+backup (36 strings: 1 md1 policy card in 5 chunks + 11 mk1 key cards,
+3146 B) packed and loaded at 0x10D00000 (digest 6836 74f1 ... confirmed
+on screen). **F-76 CONFIRMED ON HARDWARE**: the payload that would have
+counted 0 cards on this morning's firmware delivered all twelve --
+operator saw 11 keys with fingerprints, keypaths, receive 0&1, change
+0&1, and the template id on the Wallet Policy consent surface --
+i.e. the consent derivation ran clean on the keyless miniscript
+template too (the caveat flagged pre-walk did not bite). Operator:
+"a lot of really good and helpful info".
