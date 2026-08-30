@@ -188,9 +188,11 @@ HELD by it) at fork `a0c1615`. F-439 filed measured (QR-footer window
 at 77 modules, real strings 4.2x under). Branches/worktrees cleaned
 both repos; remotes carry only main/master. Engrave master `eb06906`.
 
-**Device note: the flashed build (`bge456970`) is now TWO merges behind
-fork main (`a0c1615`). One reflash picks up S2 + working payload card
-doors + the engraving guards together.**
+**Device REFLASHED 2026-08-29 late evening at the operator's direction
+("Sh2 now in bootsel"): `v0.0.0-bga0c1615` = fork main tip -- S2 + the
+payload card doors (F-76/F-437) + the engraving guards (F-434/F-435),
+load + verify OK. Boot judged on MACHINE power; item 6 remains the
+operator's eyes.**
 
 STILL THE OPERATOR'S: item 6 screen (S2 "shipped" gate), F-423 physical
 plates, F-433 ruling (TEXT ONLY vs fund F-434's real fix), F-431
