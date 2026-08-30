@@ -514,6 +514,29 @@ pub fn json_inner_malformed(label: &str, inner: &str) -> Refusal {
     )
 }
 
+/// §6 row 5's ABSENT-field half (F-438, from the F-429 journey walk). Its
+/// sibling above ends "the problem is in the descriptor string, not the JSON"
+/// -- for a missing key that sentence is FALSE (the absent key IS a JSON
+/// problem), and the walk measured it sending operators to inspect the one
+/// place the problem is not. Same row: the class is still a wrapper whose
+/// descriptor half is unusable; only the cause -- and so the remedy -- splits.
+pub fn json_missing_descriptor(label: &str, keys: &str) -> Refusal {
+    let keys_line = if keys.is_empty() {
+        "the object has no fields at all".to_string()
+    } else {
+        format!("its keys are: {keys}")
+    };
+    Refusal::new(
+        Row::JsonInnerMalformed,
+        format!(
+            "the `{{label, descriptor}}` JSON parsed and carries no `descriptor` \
+             field -- {keys_line}. The label was \"{label}\". The problem is the \
+             missing field, not a descriptor string: re-export from your wallet \
+             software with the descriptor included."
+        ),
+    )
+}
+
 /// §6 row 14. `md encode` accepts miniscript TEMPLATES — a different tool and
 /// input form, which is why the remedy names it and does not point at `me`.
 pub fn miniscript(fragment: &str) -> Refusal {

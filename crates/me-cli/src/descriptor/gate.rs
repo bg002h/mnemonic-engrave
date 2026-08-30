@@ -377,6 +377,9 @@ pub fn select_cause(document: &str, errs: &Errors) -> Refusal {
             Some(JsonError::Inner { label, inner }) => {
                 refusal::json_inner_malformed(label, &describe_bip380(inner))
             }
+            Some(JsonError::MissingDescriptor { label, keys }) => {
+                refusal::json_missing_descriptor(label, keys)
+            }
             _ => refusal::unparseable(Some((
                 Branch::Json,
                 "the document is not a `{label, descriptor}` object".to_string(),

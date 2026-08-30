@@ -220,14 +220,23 @@ fn json_fields_match_case_insensitively_and_unknown_fields_are_ignored() {
 }
 
 #[test]
-fn a_missing_label_is_fine_and_an_empty_object_reports_the_inner_reason() {
+fn a_missing_label_is_fine_and_a_missing_descriptor_key_is_named_as_missing() {
     let inner = format!("wpkh([4bbaa801/84h/0h/0h]{XPUB}/<0;1>/*)");
     assert!(cascade(&normalise(&format!("{{\"descriptor\":\"{inner}\"}}"))).is_ok());
+    // Before F-438 the absent key was coerced to "" and reported as an INNER
+    // parse error (MissingOpenParen) about a string nobody wrote.
     let errs = cascade(&normalise("{}")).unwrap_err();
+    assert!(
+        matches!(errs.json, Some(JsonError::MissingDescriptor { ref keys, .. }) if keys.is_empty()),
+        "{:?}",
+        errs.json
+    );
+    let errs = cascade(&normalise("{\"label\":\"my wallet\"}")).unwrap_err();
     assert!(
         matches!(
             errs.json,
-            Some(JsonError::Inner { ref inner, .. }) if **inner == Bip380Error::MissingOpenParen
+            Some(JsonError::MissingDescriptor { ref label, ref keys })
+                if label == "my wallet" && keys == "label"
         ),
         "{:?}",
         errs.json

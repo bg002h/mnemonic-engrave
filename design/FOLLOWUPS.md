@@ -14758,7 +14758,7 @@ only; no test binds to `source`. Fix costs a two-repo sha bump, so batch it
 with the next byte change and fix `scripts/descriptor-seam-vectors/rows.py`
 in the same motion (the generator carries the same digit).
 
-### F-429 — a truncated or invalid-JSON export gets the record refusal, whose vocabulary is wrong for it (repo: **mnemonic-engrave**; owning phase: **a future journeys cycle** — walk it before widening T1–T4) `#me` `#descriptor` `#journeys`
+### F-429 — **RESOLVED-AS-WALKED 2026-08-29, no change to the record refusal** — the walk its own entry demanded ran (six mangles, each both ways, f429-walk.log): nothing is ever silently packed, every clause of the record refusal is TRUE, `-h` names the `--as` route out, and widening T4 would put descriptor vocabulary on typo'd `text:`/`pass:` records (the exact cost the entry feared). One mangle DID cross the bar — the missing-`descriptor`-key misdiagnosis — split out and fixed as **F-438**. Opportunistic nit, recorded not gating: the record refusal ends "see sysw::classify", a Rust module path in operator-facing text; name something an operator can act on at its next touch. — a truncated or invalid-JSON export gets the record refusal, whose vocabulary is wrong for it (repo: **mnemonic-engrave**; owning phase: **a future journeys cycle** — walk it before widening T1–T4) `#me` `#descriptor` `#journeys`
 
 Filed from the adversarial review's M6 (2026-08-29): `{"label":"x"}` or a
 one-character-truncated JSON export matches none of §5.1's T1–T4, so the
@@ -14845,3 +14845,18 @@ with no camera and a payload in hand makes the choice strictly useless.
 Either rename the choice to what it does ("SCAN CARDS") or make the gather
 reachable-by-name honest some other way; batch with F-76's door fix since
 both edits touch the same flow.
+
+### F-438 — **FILED AND RESOLVED 2026-08-29** — `{"label":"…"}` (no `descriptor` key) was told "the problem is in the descriptor string, not the JSON" (repo: **mnemonic-engrave**) `#me` `#descriptor` `#refusals`
+
+Found by the F-429 journey walk, mangle (c): the JSON branch coerced an
+absent/null `descriptor` key to `""`, so the empty string failed the script
+parse and the operator got the sibling row's sentence — false twice over
+(there is no descriptor string; the missing key IS a JSON problem) — and
+was sent to inspect the one place the problem is not. Fixed same day:
+`JsonError::MissingDescriptor` splits the cause before the parse, the
+refusal names the present keys and the remedy ("re-export … with the
+descriptor included"), same §6 row (`json-inner-malformed`, count
+unchanged), T4 not widened (no `--as` still gets the record refusal at
+exit 4, asserted). Pinned by `json_missing_descriptor_field_gets_its_own_sentence`,
+which also asserts the old sentence's ABSENCE so the lie cannot regress
+silently. Spec §6 row-5 cell amended.

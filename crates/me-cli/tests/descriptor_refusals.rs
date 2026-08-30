@@ -306,6 +306,37 @@ fn row_json_inner_malformed() {
     );
 }
 
+/// §6 row 5's ABSENT-field half (F-438, measured in the F-429 journey walk):
+/// before the split, `{"label":"my wallet"}` coerced the missing key to `""`
+/// and answered with the sibling's sentence above — "the problem is in the
+/// descriptor string, not the JSON" — which for this input is false twice
+/// over: there is no descriptor string, and the missing key IS a JSON
+/// problem. Same row, split cause; the negation is asserted so the lie
+/// cannot regress silently.
+#[test]
+fn json_missing_descriptor_field_gets_its_own_sentence() {
+    assert_row(
+        "json-inner-malformed",
+        "{\"label\":\"my wallet\"}",
+        &["--as", "descriptor"],
+        3,
+        "the `{label, descriptor}` JSON parsed and carries no `descriptor` field -- \
+         its keys are: label. The label was \"my wallet\". The problem is the \
+         missing field, not a descriptor string: re-export from your wallet \
+         software with the descriptor included.",
+    );
+    let out = run("{\"label\":\"my wallet\"}", &["--as", "descriptor"]);
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !err.contains("not the JSON"),
+        "the sibling's false-for-this-input sentence is back: {err}"
+    );
+    // T4 is NOT widened: without --as the same input still gets the record
+    // refusal at exit 4, never descriptor vocabulary (F-429's invariant).
+    let out = run("{\"label\":\"my wallet\"}", &[]);
+    assert_eq!(out.status.code().unwrap(), 4);
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // §4.2 — the BlueWallet rows
 // ───────────────────────────────────────────────────────────────────────────

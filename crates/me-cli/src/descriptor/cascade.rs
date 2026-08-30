@@ -516,6 +516,11 @@ pub enum JsonError {
         label: String,
         inner: Box<Bip380Error>,
     },
+    /// The wrapper parsed and carries no `descriptor` key at all (F-438). Kept
+    /// apart from `Inner` because coercing the absent key to `""` produced a
+    /// refusal blaming a descriptor string that does not exist — measured
+    /// sending operators to inspect the one place the problem is not.
+    MissingDescriptor { label: String, keys: String },
 }
 
 #[derive(Clone, Debug)]
@@ -915,7 +920,16 @@ fn parse_json(input: &str) -> Result<Parsed, JsonError> {
         }
     };
     let label = as_string(field("label")?)?;
-    let descriptor = as_string(field("descriptor")?)?;
+    let desc_field = field("descriptor")?;
+    if matches!(desc_field, None | Some(serde_json::Value::Null)) {
+        // Absent and null both coerced to "" before F-438, so the parse error
+        // below spoke about an empty descriptor string nobody wrote.
+        let keys = obj
+            .map(|o| o.keys().cloned().collect::<Vec<_>>().join(", "))
+            .unwrap_or_default();
+        return Err(JsonError::MissingDescriptor { label, keys });
+    }
+    let descriptor = as_string(desc_field)?;
 
     match parse_bip380(&descriptor) {
         Ok(mut d) => {
