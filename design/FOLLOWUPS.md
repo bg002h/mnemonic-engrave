@@ -14890,3 +14890,31 @@ BACK-deaf). Fix: bind Button1 to dismiss in `ErrorScreen.Layout` and
 draw `IconBack` — one change, all 143 sites; plus a Minor wording note
 that the modal ends the program. Evidence:
 design/agent-reports/BUG-wallet-policy-back-hang.md.
+
+### F-441 — `Poller.Close` can deadlock the UI goroutine forever: a stale cancel token makes `Interrupt` a no-op (repo: **seedhammer fork**; owning phase: **immediate — found live at the bench 2026-08-29**) `#fork` `#device` `#nfc` `#deadlock`
+
+The night's real "hang", diagnosed from three field recipes plus sim
+tracing (design/agent-reports/BUG-wallet-policy-back-hang.md, Appendix
+B): on the BACK edge out of a gather-adjacent screen, `defer
+stopScanner()` → `Poller.Close` → `d.Interrupt()` is a NON-BLOCKING
+send on a cap-1 `d.cancel` channel — a stale token from a previous
+visit makes it a no-op — then `p.reading <- struct{}{}` blocks the UI
+goroutine forever: no frames, no input, checkmark dead, no timeout.
+Hardware-only (the sim's nil reader makes `stopScanner` a no-op);
+ARMED by repeated in/out visits, each building a fresh `Poller` over
+the one shared device — exactly the operator's cycling recipe. Field
+signature matched end to end: responsive through 50 page presses, dead
+at the instant of BACK, dead buttons, no recovery at 6+ minutes.
+Fix in flight: the minimal pair — drain `d.cancel` before signalling,
+and bound `Poller.Close`'s wait so a stranded read is an error, not a
+brick. The architectural halves (never block the frame loop on
+teardown; ONE reader rather than one per screen entry) are follow-on:
+
+### F-442 — teardown may not block the frame loop, and the NFC reader should be one long-lived poller, not one per gather entry (repo: **seedhammer fork**; owning phase: **next device-UX cycle**) `#fork` `#device` `#nfc` `#architecture`
+
+Filed from F-441's diagnosis, proposals 3+4: `stopScanner`'s join runs
+on the UI goroutine (a scanner that cannot stop should be abandoned
+and the device marked unusable — a leaked goroutine beats a frozen
+panel), and per-entry `Poller` construction over one shared device is
+what makes stale device state reachable at all. Both are design
+changes with wide blast radius; they wait for a cycle with a plan.
