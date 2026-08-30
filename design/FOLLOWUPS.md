@@ -14871,3 +14871,22 @@ md1 85 chars → 37 modules (16.2mm clearance), mk1 111 chars → 41 modules
 regressed nothing. Binds only if inputs ~4.2x longer than today's ever
 reach QR-ONLY plates; fix alongside F-434's real advance fix, which
 touches the same layout arithmetic.
+
+### F-440 — every `showError`/`showNotice` modal is BACK-deaf: 143 sites bind Button3 only, and a waiting modal reads as a hung device (repo: **seedhammer fork**; owning phase: **immediate — the operator hit it live, twice**) `#fork` `#device` `#ux`
+
+Filed from the bench session 2026-08-29 night. The operator, on the
+"Bundle Incomplete" screen, pressed BACK repeatedly and reported the
+device hung ("I'm hung on bundle incomplete screen"); measured in the
+sim: `ErrorScreen.Layout` (gui/gui.go:353-357) binds **Button3 only**,
+BACK is ignored — 30 presses, screen unchanged, Button3 dismisses
+instantly. 143 `showError`/`showNotice` sites share the trap. The
+sweep that cleared everything else: 25 walk cycles — NO state bug
+(records=36 after every pass, `takeAll` filters, never consumes;
+"going back should lose nothing" holds), NO leak (536 B/cycle noise,
+~800 cycles to heap exhaustion vs the observed 2-5 — three orders off;
+the one-time +1MB is host-only secp256k1 table, `!tinygo`), and the
+trap PREDATES F-76 (the old door dead-ends one modal earlier, equally
+BACK-deaf). Fix: bind Button1 to dismiss in `ErrorScreen.Layout` and
+draw `IconBack` — one change, all 143 sites; plus a Minor wording note
+that the modal ends the program. Evidence:
+design/agent-reports/BUG-wallet-policy-back-hang.md.
