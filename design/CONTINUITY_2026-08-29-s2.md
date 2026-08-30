@@ -263,3 +263,24 @@ fully payload-restorable and correctly derived on hardware.**
   F-441 flash).
 - Open operator items: F-433 ruling, F-431, F-424, exp/* branches.
   Next cycle candidate: F-426 host half (+F-436 rows).
+
+## RESUME COMPLETED (usage reset, same night)
+
+All checkpoint steps executed: r1's M-1 pin folded
+(TestStopScannerJoinTimeoutArmAbandons, mutation-proven FAIL-10s ->
+PASS-3.005s) + M-2/N-1 comments (fork b78e79c); shard 1035/1035;
+**merged to fork main `5f02773` and PUSHED** -- every modal answers
+BACK, teardown lands on a live screen (~5s worst case) whatever stalls
+the read. Ledger: F-440 + F-441 RESOLVED (F-441 keeps the honest
+caveat: field root cause unidentified, bound correct regardless);
+F-442 carries M-3/M-4 residue; **F-443 filed** (DecodeBody truncation,
+pre-existing, Rust check mandatory first). Engrave master `8d6d6ba`
+pushed, check earned. Branches/worktrees cleaned; remotes carry only
+main/master.
+
+**DEVICE: flashed `bga0c1615`, one merge behind main `5f02773` (the
+freeze fixes). Next bench visit: reflash to pick them up, then the
+F-423 packed-plate cut (single-char waived). The deadlock IS
+constructible on the flashed build -- avoid rapid gather in/out until
+reflashed.** Open: F-433 + F-431 rulings, F-424, F-426-host cycle
+(+F-436), F-442, F-443, F-76's Inspect residue, exp/* disposition.
