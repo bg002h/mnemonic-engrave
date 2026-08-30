@@ -300,3 +300,21 @@ device unflashed... note picotool reboot only, no image); every review
 gate intact; flash only from green main. F-433 resolves with the
 outcome. Physical plate validation remains the operator's, in the
 morning.
+
+## OVERNIGHT OUTCOME: the F-434 pipeline STOPPED at its gate, correctly
+
+MEASURE-F434 (committed `35384c3` -- note: a commit RACE bundled the
+measurement deliverables into the controller's continuity commit; both
+writers on engrave master, content verified byte-identical, nothing
+lost -- lesson: the one-writer rule applies to the MAIN repo too):
+**N=1 in all six configurations** against the governing footer-budgeted
+bound; N=2 only footerless and only md1. Per the recorded conditions:
+NO fix built, NO flash -- the device was rebooted out of BOOTSEL and
+runs the already-flashed `5f02773` (the freeze fixes), fully current
+with fork main. F-433 RESOLVED by measurement (packed = TEXT ONLY,
+documented); F-434-real re-scoped to
+reopen-only-on-geometry-change. QR for the pathological policy card =
+the six NDEF files + one rewritable tag (in the scratchpad,
+policy-qr/). Morning items for the operator: the F-423 packed-plate
+cut; freeze-fix verification (the deadlock recipe should now cost at
+most ~5s); F-431/F-424; the exp/* disposition.
