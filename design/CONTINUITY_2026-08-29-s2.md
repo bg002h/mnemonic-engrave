@@ -175,3 +175,25 @@ RECON report FULLY into context, carries its own digest of the recon
 file:line map and the plan's edge cases (so nothing rests on one file),
 names the first action (persist any uncommitted R0 report), and restates
 the boundaries.
+
+## Post-cycle burn-down (2026-08-29 evening, operator-directed)
+
+Journeys walked + PDF sent. Burned down and PUSHED: F-427 (spec word),
+F-429 (resolved-as-walked, record refusal measured sound), F-438
+(missing-descriptor-key misdiagnosis, found+fixed same day), F-76
+(reachable half -- whole-card payload doors, fork `f2007b7`; residue:
+Inspect entry point unbuilt), F-437 (SCAN CARDS, real guard), F-434
+cheap half (ErrMultiParagraphQR) + F-435 (body budget, capacity 5 now
+HELD by it) at fork `a0c1615`. F-439 filed measured (QR-footer window
+at 77 modules, real strings 4.2x under). Branches/worktrees cleaned
+both repos; remotes carry only main/master. Engrave master `eb06906`.
+
+**Device note: the flashed build (`bge456970`) is now TWO merges behind
+fork main (`a0c1615`). One reflash picks up S2 + working payload card
+doors + the engraving guards together.**
+
+STILL THE OPERATOR'S: item 6 screen (S2 "shipped" gate), F-423 physical
+plates, F-433 ruling (TEXT ONLY vs fund F-434's real fix), F-431
+consumer decision, F-424 publish, exp/* branch disposition. NEXT CYCLE
+CANDIDATE: F-426 host half (five-version widening; retires the
+version-gap row; carries F-436's corpus rows in its regeneration).
