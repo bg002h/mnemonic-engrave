@@ -14872,7 +14872,7 @@ regressed nothing. Binds only if inputs ~4.2x longer than today's ever
 reach QR-ONLY plates; fix alongside F-434's real advance fix, which
 touches the same layout arithmetic.
 
-### F-440 — every `showError`/`showNotice` modal is BACK-deaf: 143 sites bind Button3 only, and a waiting modal reads as a hung device (repo: **seedhammer fork**; owning phase: **immediate — the operator hit it live, twice**) `#fork` `#device` `#ux`
+### F-440 — **RESOLVED 2026-08-29 night, fork `5f02773`** — Button1 dismisses alongside Button3 with IconBack drawn, one Layout covering all 143 sites; force-ack surfaces (`ConfirmWarningScreen`, 6 sites) audited untouched; the queued-click-behind-dismiss regression the implementer introduced was shard-caught and pinned. Reviewed GREEN (REVIEW-F440-F441-r1: 7 adversarial input probes, no caller decision changes). — every `showError`/`showNotice` modal is BACK-deaf: 143 sites bind Button3 only, and a waiting modal reads as a hung device (repo: **seedhammer fork**; owning phase: **immediate — the operator hit it live, twice**) `#fork` `#device` `#ux`
 
 Filed from the bench session 2026-08-29 night. The operator, on the
 "Bundle Incomplete" screen, pressed BACK repeatedly and reported the
@@ -14891,7 +14891,7 @@ draw `IconBack` — one change, all 143 sites; plus a Minor wording note
 that the modal ends the program. Evidence:
 design/agent-reports/BUG-wallet-policy-back-hang.md.
 
-### F-441 — `Poller.Close` can deadlock the UI goroutine forever: a stale cancel token makes `Interrupt` a no-op (repo: **seedhammer fork**; owning phase: **immediate — found live at the bench 2026-08-29**) `#fork` `#device` `#nfc` `#deadlock`
+### F-441 — **RESOLVED 2026-08-29 night, fork `5f02773`** — the 2s Close bound + 3s join bound land the device on a live screen whatever stalls the read (~5s worst case, composed; healthy path ~50ms; false-abandon impossible with ~20x margin; post-abandon second visit works, measured). **CAVEAT, kept honest: the FIELD root cause remains unidentified** — the review could not construct a >2s non-cancellable path either; the bound is correct regardless, and the caveat stays until a field recurrence or F-442's redesign settles it. — `Poller.Close` can deadlock the UI goroutine forever: a stale cancel token makes `Interrupt` a no-op (repo: **seedhammer fork**; owning phase: **immediate — found live at the bench 2026-08-29**) `#fork` `#device` `#nfc` `#deadlock`
 
 The night's real "hang", diagnosed from three field recipes plus sim
 tracing (design/agent-reports/BUG-wallet-policy-back-hang.md, Appendix
@@ -14925,3 +14925,20 @@ and the device marked unusable — a leaked goroutine beats a frozen
 panel), and per-entry `Poller` construction over one shared device is
 what makes stale device state reachable at all. Both are design
 changes with wide blast radius; they wait for a cycle with a plan.
+Review residue recorded here (REVIEW-F440-F441-r1): M-3, a timed-out
+Close leaves a cancel token that crosses into the next Poller (one
+spurious io.EOF, ~50ms, self-healing — the one-reader redesign removes
+it); M-4, "do not touch the device" is per-poller, not per-device —
+the next poller's Close touches the device under an abandoned read,
+safe today only because multiplexI2C serialises and rp2 tx has no
+yield point: state that invariant where the redesign can rely on it.
+
+### F-443 — `sysw.DecodeBody` accepts a truncated `pass:`/`text:` record silently: no length or checksum (repo: **seedhammer fork** + check the Rust primary; owning phase: **next sysw touch — and the Rust check is mandatory before any Go fix**) `#fork` `#sysw` `#records`
+
+Filed from REVIEW-F440-F441-r1's N-3 (pre-existing, NOT introduced by
+the F-440/F-441 diff): a tag pulled mid-read can hand `DecodeBody` a
+truncated hex body and it decodes without complaint. Per the
+Rust-primary rule: check whether `me`'s record decode has the same
+acceptance FIRST; if so it is fixed in Rust with a vector before the
+Go convergence. Discovery route is NFC-read truncation, so the fix
+belongs wherever record integrity is normatively defined.
