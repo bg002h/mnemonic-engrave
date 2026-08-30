@@ -14961,6 +14961,26 @@ plate session. Also fold the found slack into F-444's capacity
 estimate — its ~6-7-at-3.0mm figure assumed the 5-at-3.8 bound was
 tight, and this measurement says it is not.
 
+
+**Vertical geometry, measured 2026-08-31 (operator, same plate):** top-of-'2'
+(string 2 line 1) to top-of-'2' (string 3 line 1) = 12.3mm over exactly 3
+line advances → **line pitch 4.1mm**; string ink extent (highest char to a
+'q' descender across its 3 lines) = 11.35mm → glyph extent 3.15mm inside
+the pitch. Every md1 string takes 3 lines. Consequences: (a) **paragraph
+breaks add ZERO extra leading** — inter-string distinctness rests entirely
+on the ragged trailing blanks (least marked at the string-1→2 boundary,
+whose last line wraps fuller under the hole-band indent); the operator has
+already ruled the plate perfectly legible, so this is an observation, not a
+defect — but if F-445's repack ever tightens the raggedness, distinctness
+needs a second look. (b) Full-plate accounting closes: 2.4 (top) + 15×4.1
+(text) + 21.5 (bottom) = 85.4mm ≈ the plate's stacking-axis extent — so the
+bottom margin is ~5.2 line pitches, and a 6th 3-line string (12.3mm) fits
+with ~9mm spare IF the fit-reservation hypothesis confirms; the question is
+not marginal. (c) The measured pitch numerically equals the
+`plateFontSize = 4.1` constant (`backup/backup.go:175`) while the plate cut
+at `plateFontSizeUR = 3.8` — determine in the recon whether that is the
+line-advance formula showing through or coincidence; do not assume either.
+
 The margin verdicts (top/left/right appropriate; hole-band indent
 generous-but-ruled-fine) are RECORDED RULINGS — do not re-open them
 without a new operator ruling.
