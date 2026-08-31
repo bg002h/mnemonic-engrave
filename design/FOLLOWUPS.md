@@ -15060,3 +15060,42 @@ the same stroke, Rust-primary as always. Also open on the fork side:
 whether the DEVICE's restore path wants the read-side warn for cards
 carrying refused shapes — decide when the fork next touches its
 restore surface, not before.
+
+### `me-cli-csid-warning-surface` — me bundle/seal/sysw adopt the R6 chunk-set-id mismatch warning
+
+- **Surfaced:** 2026-08-31, chunk_set_id-verification R0 r1 (mnemonic-key
+  `design/agent-reports/R0-csid-spec-r1.md` C1/C2, measured): `me bundle`,
+  `me seal` and `me sysw` all reassemble mk1 chunk sets via
+  `mk_codec::decode` and stay silent on a stamped-vs-derived mismatch —
+  and me-cli links mk-codec **0.4.1** (crates.io), which predates
+  derivation entirely (id from OsRng), so the warning is unimplementable
+  without a semver-breaking 0.4→0.5+ bump.
+- **What:** bump mk-codec to ≥0.5 (operator-gated publish path, F-424
+  class — never overnight work), then emit the same warning content as
+  mk decode (the (declared, derived) pair + remedy; spec "The
+  comparison" operand) on all three surfaces; regenerate the `0x12345`
+  golden fixtures (`tests/vectors/bundle-md1-mk1.json`, `manifest.rs`,
+  `bundle.rs` test module) or mark them expect-warning; add
+  mnemonic-engrave's suite to the cycle's acceptance list when this
+  lands.
+- **Owning phase:** post-cycle burndown of the chunk_set_id cycle
+  (operator ruling W12 shape; scheduled with the device leg).
+- **Status:** OPEN. **Tier:** `feature` / cross-repo (mk-codec publish
+  prerequisite).
+- **Companion:** `mnemonic-key/design/FOLLOWUPS.md` cycle records; spec
+  `design/SPEC_chunk_set_id_verification.md` Not-in-scope.
+
+### `go-mk-vector-corpus-ingestion` — fork consumes the mk vector corpus as JSON, not hand transcription
+
+- **Surfaced:** 2026-08-31, chunk_set_id-verification R0 r1 (I4,
+  measured): `seedhammer/mk/` has no testdata/, no go:embed, no JSON
+  reader — parity vectors are hand-transcribed into `mk_test.go`, all
+  of pre-0.5 vintage (csid `0x12345`). "Consume the same corpus" is a
+  new vendoring + lockstep seam, not a convergence step.
+- **What:** vendor the mk extension corpus JSON into the fork (F-425
+  descriptor-seam pattern: vendored file, dedicated seam test, SHA
+  gate, regeneration ownership), reading `derived_csid` rows so Rust
+  and Go can never drift silently. In-cycle interim: the
+  derivation-parity unit test over pinned clean rows (spec contract 8).
+- **Owning phase:** post-cycle burndown of the chunk_set_id cycle.
+- **Status:** OPEN. **Tier:** `test-infra` / fork leg.
