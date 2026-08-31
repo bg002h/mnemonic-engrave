@@ -15026,3 +15026,22 @@ Rust-primary rule: check whether `me`'s record decode has the same
 acceptance FIRST; if so it is fixed in Rust with a vector before the
 Go convergence. Discovery route is NFC-read truncation, so the fix
 belongs wherever record integrity is normatively defined.
+
+### F-446 — Go port: the N1 admission taxonomy has no convergence target today; the obligation binds if the port ever grows a mint path (repo: **seedhammer fork**; owning phase: **conditional — trigger recorded, no scheduled work**) `#fork` `#go-port` `#rust-primary`
+
+Filed 2026-08-31 from the mdcli-mini corpus sync (full record:
+`design/agent-reports/SYNC-go-corpus-mdcli-mini.md` §6; fork branch
+`mdcli-corpus-sync` at `8e564c5e`, 15 vector files re-vendored
+byte-for-byte from descriptor-mnemonic `8a71594a`, provenance pin
+updated, scoped `md` package tests 122/122 both sides of the swap).
+
+The Rust primary's N1 admission taxonomy (R-N1a/c/d refusals in
+`crates/md-cli/src/parse/reuse.rs`) was deliberately NOT ported: the
+Go port has NO encoder or template-mint path, so there is no behavior
+to converge — only the corpus bytes crossed. **The trigger:** if the
+Go port ever grows template-side admission (an encoder or a
+`--template` mint path), it must implement the taxonomy's refusals in
+the same stroke, Rust-primary as always. Also open on the fork side:
+whether the DEVICE's restore path wants the read-side warn for cards
+carrying refused shapes — decide when the fork next touches its
+restore surface, not before.
