@@ -14702,6 +14702,21 @@ the walk-log correction) then update to the measured new counts.
 
 ### F-424 — the published `md-codec` 0.42.0 lacks the F-217/F-218 encode refusals; bump `me`'s dependency and drop the host mirror on the next publish (repo: **descriptor-mnemonic** + **mnemonic-engrave**; owning phase: **next md-codec publish, operator-gated**) `#md-codec` `#funds` `#publish`
 
+**2026-08-31, twice-blocked and the remedy needs re-deriving.** (1) The
+publish half is BLOCKED: md-codec's default `derive` feature calls
+three miniscript APIs that exist only in the git-fork pin, so the
+crate cannot be published at all — see descriptor-mnemonic's
+`md-codec-derive-feature-depends-on-unpublished-miniscript-apis` and
+`design/agent-reports/publish-2026-08-31-md-codec-0.43.0.md` there.
+(2) Independent of that, the recorded remedy ("drop the host mirror")
+is likely WRONG: structural recon (this repo,
+`design/agent-reports/F424-me-mirror-drop.md`) found `--as
+descriptor`'s pack path never calls into `md_codec`, so the codec's
+validators would not backstop that path and the drop would fail its
+own surviving-tests check. When the publish blocker clears, RE-DERIVE
+the remedy from the call graph — do not execute this entry's original
+prescription as written.
+
 Filed from PLAN-descriptor-S1S3-r1's C1 (measured: eight files differ
 between the registry 0.42.0 and the tree; `validate_origin_key_consistency`
 and `validate_no_duplicate_key_slots` and their error variants are absent
