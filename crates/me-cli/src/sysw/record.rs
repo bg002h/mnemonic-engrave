@@ -166,6 +166,19 @@ pub fn decode_text(record: &str) -> Result<Zeroizing<String>, RecordError> {
 /// two share is §12.6's grouping, so
 /// [`tests::the_two_walks_agree_wherever_both_have_an_answer`] pins them against
 /// each other instead of leaving the copy unwatched.
+///
+/// **Also emits the R2/R6 chunk_set_id mismatch warning** (stderr) for a
+/// CONFIRMED `mk1` group whose stamped id was not derived from its content
+/// — the third of me-cli's three reassembly surfaces
+/// (`design/agent-reports/impl-me-cli-csid-warning.md`). This is the one
+/// characterization the doc comments elsewhere on this call chain
+/// (`sysw/mt.rs`, `sysw/expect.rs`) get slightly stale by: "returns indices
+/// and says nothing else" was true of the RETURN VALUE (still is — no new
+/// variant, no changed shape) but is no longer true of every side effect.
+/// Fires at most once per confirmed mismatching group, from whichever of
+/// `report_unconfirmed` (`pack`) or `print_mdmk_confirmation` (`show`)
+/// calls this in a given process — each calls it exactly once per
+/// invocation, so no surface double-warns.
 pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
     use std::collections::BTreeMap;
 
@@ -209,7 +222,21 @@ pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
         let confirmed = match (hrp, csid) {
             ('d', Some(_)) => md_codec::reassemble(&set).is_ok(),
             ('d', None) => md_codec::decode_md1_string(set[0]).is_ok(),
-            ('k', _) => mk_codec::decode(&set).is_ok(),
+            // R2/R6 (`design/agent-reports/impl-me-cli-csid-warning.md`):
+            // bind the card on success (`.is_ok()`'s CONTROL-FLOW meaning is
+            // unchanged -- still `true` iff decode succeeded) to
+            // recompute-and-warn on a stamped/derived chunk_set_id
+            // mismatch. The mutation gate for THIS surface is deleting the
+            // `warn_chunk_set_id_mismatch` line in the `Ok` arm.
+            ('k', _) => match mk_codec::decode(&set) {
+                Ok(card) => {
+                    crate::csid_warn::warn_chunk_set_id_mismatch(
+                        crate::csid_warn::chunk_set_id_comparison(&set, &card),
+                    );
+                    true
+                }
+                Err(_) => false,
+            },
             _ => false,
         };
         if !confirmed {

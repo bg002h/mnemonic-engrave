@@ -301,6 +301,14 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         let card = mk_codec::decode(&refs)
             .map_err(|e| BundleError::SetIncompleteMk(fmt_chunk_set_id(id), e))?;
 
+        // R2/R6 (`design/agent-reports/impl-me-cli-csid-warning.md`): the
+        // card just reassembled cleanly, so recompute-and-warn on a
+        // stamped/derived chunk_set_id mismatch. The mutation gate for THIS
+        // surface is deleting this one line.
+        crate::csid_warn::warn_chunk_set_id_mismatch(crate::csid_warn::chunk_set_id_comparison(
+            &refs, &card,
+        ));
+
         // Rendered to `String` right here, deliberately: `me-cli` has no
         // `bitcoin` dependency and needs none, because these values are only
         // ever displayed and `.to_string()` requires no type name.

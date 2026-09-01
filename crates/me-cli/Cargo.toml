@@ -36,7 +36,7 @@ md-codec = "0.42"
 # It adds no crate to the tree: `bitcoin 0.32.101` is already in `Cargo.lock` as
 # md-codec's own dependency, so the lock gains only this package's edge to it.
 bitcoin = "0.32"
-mk-codec = "0.4"
+mk-codec = "0.5"
 clap = { version = "4", features = ["derive"] }
 zeroize = "1.8"
 serde = { version = "1", features = ["derive"] }

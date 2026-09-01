@@ -250,8 +250,17 @@ pub fn decode_public_set(records: &[&str]) -> Result<(), RecordError> {
             ('d', None) => md_codec::decode_md1_string(set[0])
                 .map(|_| ())
                 .map_err(|e| e.to_string()),
+            // R2/R6 (`design/agent-reports/impl-me-cli-csid-warning.md`):
+            // the card just reassembled cleanly, so recompute-and-warn on a
+            // stamped/derived chunk_set_id mismatch before it is discarded.
+            // The mutation gate for THIS surface is deleting the
+            // `warn_chunk_set_id_mismatch` line inside this closure.
             ('k', _) => mk_codec::decode(&set)
-                .map(|_| ())
+                .map(|card| {
+                    crate::csid_warn::warn_chunk_set_id_mismatch(
+                        crate::csid_warn::chunk_set_id_comparison(&set, &card),
+                    )
+                })
                 .map_err(|e| e.to_string()),
             _ => unreachable!("secret records are refused above"),
         };

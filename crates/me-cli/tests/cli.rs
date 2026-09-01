@@ -5,6 +5,19 @@ const MS1: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
 const MK1_A: &str = "mk1qpzg69pqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3kx98j76m4mjlwphf";
 const MK1_B: &str =
     "mk1qpzg69ppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dpug2mmjtfel6x";
+// MK1_A/MK1_B's declared chunk_set_id is a LEGACY pin (0x12345, mk-codec
+// v0.1.json) that predates content-derivation -- measured (not assumed):
+// this content derives 0x83bb2, a genuine mismatch (csid_warn.rs's own
+// `comparison_detects_the_pinned_mismatch` pins the same pair/value).
+//
+// The corpus's CT1 twin (`mnemonic-key`
+// `crates/mk-codec/src/test_vectors/csid_ext_v0.1.json`,
+// `CT1_twin_of_V1_bip48_mainnet_1_stub_with_fp`): same key material as
+// MK1_A/MK1_B, minted WITHOUT a pinned id, so declared == derived ==
+// 0x83bb2 -- the clean control for the R2/R6 warning.
+const MK1_CLEAN_A: &str = "mk1qpswajpqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3k25gsrttm4zzk4z4";
+const MK1_CLEAN_B: &str =
+    "mk1qpswajppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dh520sknslwyt0";
 
 /// The crate version the sidecar must match (env at compile time).
 const CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -100,6 +113,58 @@ fn bundle_checklist_on_stderr() {
         .success();
     let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
     assert!(stderr.contains("TYPE ON DEVICE"), "{stderr}");
+}
+
+/// R2/R6: `me bundle` reassembles MK1_A/MK1_B via `mk_codec::decode` at
+/// `bundle.rs`'s set-verification step, and that card's stamped
+/// chunk_set_id (0x12345) does not match what its content derives
+/// (0x83bb2) -- the warning must fire on stderr, exit 0, and stdout must be
+/// byte-identical to `bundle_emits_manifest_json_on_stdout`'s (unchanged
+/// manifest).
+#[test]
+fn bundle_pinned_mk1_warns_chunk_set_id_mismatch_on_stderr() {
+    let assert = Command::cargo_bin("me")
+        .unwrap()
+        .arg("bundle")
+        .write_stdin(format!("{MD1_VALID}\n{MK1_A}\n{MK1_B}\n"))
+        .assert()
+        .success();
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON on stdout");
+    assert_eq!(v["wallet_plates"], 4, "stdout manifest must be unchanged");
+
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+    assert_eq!(
+        stderr
+            .lines()
+            .filter(|l| l.contains("was not derived from its content"))
+            .count(),
+        1,
+        "exactly one mismatch warning, for the one mismatching card: {stderr}"
+    );
+    let expected = mnemonic_engrave::csid_warn::chunk_set_id_mismatch_warning(0x12345, 0x83bb2);
+    assert!(
+        stderr.contains(&expected),
+        "stderr must carry the exact frozen R2/R6 warning text\nwant substring: {expected:?}\n\
+         got stderr: {stderr:?}"
+    );
+}
+
+/// The clean-twin control (contract 6): a card whose declared id was never
+/// pinned away from its content-derived value must stay silent.
+#[test]
+fn bundle_clean_mk1_card_is_silent_on_chunk_set_id() {
+    let assert = Command::cargo_bin("me")
+        .unwrap()
+        .arg("bundle")
+        .write_stdin(format!("{MD1_VALID}\n{MK1_CLEAN_A}\n{MK1_CLEAN_B}\n"))
+        .assert()
+        .success();
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+    assert!(
+        !stderr.contains("was not derived from its content"),
+        "clean card must not warn: {stderr}"
+    );
 }
 
 #[test]

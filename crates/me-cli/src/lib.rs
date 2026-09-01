@@ -4,6 +4,7 @@
 
 pub mod bundle;
 pub mod classify;
+pub mod csid_warn;
 /// Wallet-descriptor input — `SPEC_descriptor_input.md`, S1.
 ///
 /// **`doc(hidden)` but lib-PUBLIC, deliberately** (PLAN-r1's C2): public so
