@@ -15090,7 +15090,10 @@ restore surface, not before.
   lands.
 - **Owning phase:** post-cycle burndown of the chunk_set_id cycle
   (operator ruling W12 shape; scheduled with the device leg).
-- **Status:** OPEN. **Tier:** `feature` / cross-repo (mk-codec publish
+- **Status:** DONE 2026-08-31 — mk-codec bumped to 0.5.0, warning on all
+  three surfaces (bundle/seal/sysw), opus risk-set review 0C/0I (report
+  mnemonic-key/design/agent-reports/review-me-cli-csid-warning.md).
+  **Tier:** `feature` / cross-repo (mk-codec publish
   prerequisite).
 - **Companion:** `mnemonic-key/design/FOLLOWUPS.md` cycle records; spec
   `design/SPEC_chunk_set_id_verification.md` Not-in-scope.
@@ -15108,4 +15111,8 @@ restore surface, not before.
   and Go can never drift silently. In-cycle interim: the
   derivation-parity unit test over pinned clean rows (spec contract 8).
 - **Owning phase:** post-cycle burndown of the chunk_set_id cycle.
-- **Status:** OPEN. **Tier:** `test-infra` / fork leg.
+- **Status:** DONE 2026-08-31 — vendored mk/testdata/csid_ext_v0.1.json
+  (byte-identical, SHA-gated) + go:embed reader replaces hand-typed
+  literals; Rust<->Go drift is a red test (impl report
+  mnemonic-key/design/agent-reports/impl-go-corpus-ingestion.md).
+  **Tier:** `test-infra` / fork leg.
