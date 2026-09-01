@@ -15196,3 +15196,30 @@ into the spec amendment and the kept-but-commented `csidMarker(c)` calls).
   (releases + signing are irreversible-class).
 - **Status:** OPEN — RULED (both models), not yet scheduled.
   **Tier:** `release` / fork / risk-set.
+
+### `csid-acceptance-blocked-on-nfc-hardware` — the four-tap procedure assumes tags the operator does not have
+
+- **Surfaced:** 2026-09-01, at the flash gate. Operator, verbatim: "I
+  can't do the four taps because it's all NFC stuff, which I don't
+  have." The committed procedure (design/journeys/csid-tags/README.md)
+  ships .ndef payload FILES but assumes physical NFC tags + a writer to
+  put them on — equipment the operator lacks. A walk-class finding on
+  the acceptance design itself: an acceptance no one can execute is the
+  never-run-gate class in physical form.
+- **State at pause:** firmware bg169073c FLASHED and verified (sign +
+  load + verify all green); the warning is proven in the emulator with
+  real NFC injection and operator-approved screenshots; only the
+  physical-tap half of the acceptance is blocked. The
+  device-csid-mismatch-warning followup (mnemonic-key) stays at CODE
+  SHIPPED / acceptance pending.
+- **Unblock options (pick on resume):** (a) buy NTAG-class NFC tags +
+  write the four .ndef files (any USB/phone NFC writer); (b) a
+  phone-based NDEF presenter app tapping the phone to the machine, if
+  the SH2 reader accepts phone card-emulation (verify first — reader
+  vs emulation mode is not symmetric); (c) re-scope the acceptance to
+  what the emulator's real-NFC-injection run already proves, recording
+  the residual physical gap explicitly (operator ruling required —
+  the S6b lesson cuts both ways).
+- **Owning phase:** operator's return; blocks only the final acceptance
+  record, nothing else.
+- **Status:** OPEN. **Tier:** `acceptance` / hardware.
