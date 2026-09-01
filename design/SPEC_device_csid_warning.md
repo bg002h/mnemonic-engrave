@@ -84,7 +84,10 @@ The md1 sibling already routes its (REFUSING) mismatch to a distinct screen
   modal/marker-bearing bundle consumers (Engrave Bundle, Wallet Policy,
   Build Policy incl. census/inventory/payload lines, and the two verify
   readbacks' line-markers); the clean twin is silent everywhere;
-  `clsSingleMK1Refuse` pinned; the notice answers BACK and proceeds.
+  `clsSingleMK1Refuse` pinned; the Engrave-Multisig unconditional mk1
+  refusal pinned (contract 3's unreachability reason — the existing
+  TestExtractSuppliedMd1 subtest counts, r3 Minor); the notice answers
+  BACK and proceeds.
 - Parity: the contract-1 corpus extension test (every clean row).
 - Mutation: deleting the comparison fails the warning tests in both flows;
   mutated-line-RAN evidence.
