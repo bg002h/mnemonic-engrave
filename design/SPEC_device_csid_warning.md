@@ -92,8 +92,11 @@ The md1 sibling already routes its (REFUSING) mismatch to a distinct screen
 - Mutation: deleting the comparison fails the warning tests in both flows;
   mutated-line-RAN evidence.
 - **Simulator screenshot** (`cmd/emu` `shots_` driver, NFC-injected
-  mis-stamped set): a PNG of the warning screen — the OPERATOR GATE. The
-  wording/layout freezes only after operator approval.
+  mis-stamped set): a PNG of the warning screen — the OPERATOR GATE.
+  **CLOSED 2026-09-01 — operator, verbatim: "Screenshots perfect!"**
+  (both the inspect modal and the `[csid 12345!ef12f]` review marker,
+  `design/journeys/csid-warning-{modal,bundle-review}.png`). Wording
+  and marker form are FROZEN as rendered.
 - Suite: `go test ./mk/` + `./gui/` via `scripts/gui-shard-test.sh` (24);
   gofmt -l empty; go vet clean.
 - **On-device acceptance, DEFINED here (the S6b lesson), operator-executed
