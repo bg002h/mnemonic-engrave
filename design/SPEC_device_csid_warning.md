@@ -52,6 +52,11 @@ The md1 sibling already routes its (REFUSING) mismatch to a distinct screen
      `buildPlateCensusLines`, `buildPlateInventoryLines` (the RESTORE
      DOC — a mis-stamped id archived there is the name-drift hazard the
      host cycle documented) and `buildPayloadCardsLines`.**
+   - Engrave Multisig (`multisig.go:102`): NO marker, NO modal — its
+     `extractSuppliedMd1` refuses unconditionally on ANY mk1 presence
+     before a card could render (verified r2), so a csid warning is
+     unreachable there; silence is correct by prior refusal, and a test
+     pins that refusal so the reason cannot rot silently.
    - Verify readbacks (`multisig_verify.go:781`,
      `singlesig_verify.go:145`): line-marker only, NO modal — these
      screens are verdict-shaped and the verify verdict itself is
