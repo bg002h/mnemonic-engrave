@@ -9,6 +9,16 @@ const SEED: &str =
     "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 const TEXT: &str = "text:48656c6c6f2c20576f726c6421";
 
+// The corpus's CT1 twin (same key material as `MK1_A`/`MK1_B` declared
+// further down this file, minted WITHOUT a pinned id): declared == derived
+// == 0x83bb2, the clean control for the R2/R6 chunk-set-id warning.
+// `MK1_A`/`MK1_B` themselves (already in scope file-wide, Rust top-level
+// items are order-independent) are a LEGACY pin: declared 0x16a2b,
+// content-derives 0x7a06f (measured -- same two strings `seal_cli.rs` uses).
+const MK1_CLEAN_A: &str = "mk1qpswajpqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3k25gsrttm4zzk4z4";
+const MK1_CLEAN_B: &str =
+    "mk1qpswajppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dh520sknslwyt0";
+
 fn me() -> Command {
     Command::cargo_bin("me").unwrap()
 }
@@ -98,6 +108,84 @@ fn show_prints_the_same_digest_pack_did() {
         "pack and show must agree, or the comparison is worthless"
     );
     assert_eq!(a.split(' ').count(), 8, "grouped in fours for a human");
+}
+
+/// R2/R6: `mdmk_unconfirmed` (`src/sysw/record.rs`) decodes a chunked mk1
+/// group to confirm it, and `report_unconfirmed` calls it once at `pack`
+/// time. A pinned mismatch must warn on stderr; exit 0 and the digest line
+/// stay as `pack_separates_the_blob_from_the_digest` above.
+#[test]
+fn pack_pinned_mk1_warns_chunk_set_id_mismatch_on_stderr() {
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", MK1_A, MK1_B])
+        .assert()
+        .success();
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert_eq!(
+        err.lines()
+            .filter(|l| l.contains("was not derived from its content"))
+            .count(),
+        1,
+        "exactly one mismatch warning: {err}"
+    );
+    let expected = mnemonic_engrave::csid_warn::chunk_set_id_mismatch_warning(0x16a2b, 0x7a06f);
+    assert!(
+        err.contains(&expected),
+        "stderr must carry the exact frozen R2/R6 warning text\nwant substring: {expected:?}\n\
+         got stderr: {err:?}"
+    );
+}
+
+/// The same `mdmk_unconfirmed` call, reached instead through `me sysw show`'s
+/// `print_mdmk_confirmation` (the SECOND, independent call site).
+#[test]
+fn show_pinned_mk1_warns_chunk_set_id_mismatch_on_stderr() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("p.bin");
+    me().args(["sysw", "pack", "--no-passphrase", MK1_A, MK1_B, "--out"])
+        .arg(&f)
+        .assert()
+        .success();
+    let shown = me().args(["sysw", "show"]).arg(&f).assert().success();
+    let err = String::from_utf8_lossy(&shown.get_output().stderr).into_owned();
+    assert_eq!(
+        err.lines()
+            .filter(|l| l.contains("was not derived from its content"))
+            .count(),
+        1,
+        "exactly one mismatch warning from `show`: {err}"
+    );
+}
+
+/// The clean-twin control: a card whose declared id was never pinned away
+/// from its content-derived value stays silent, on BOTH `pack` and `show`.
+#[test]
+fn pack_and_show_are_silent_on_a_clean_mk1_card() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("p.bin");
+    let packed = me()
+        .args([
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            MK1_CLEAN_A,
+            MK1_CLEAN_B,
+            "--out",
+        ])
+        .arg(&f)
+        .assert()
+        .success();
+    let perr = String::from_utf8_lossy(&packed.get_output().stderr).into_owned();
+    assert!(
+        !perr.contains("was not derived from its content"),
+        "pack: clean card must not warn: {perr}"
+    );
+    let shown = me().args(["sysw", "show"]).arg(&f).assert().success();
+    let serr = String::from_utf8_lossy(&shown.get_output().stderr).into_owned();
+    assert!(
+        !serr.contains("was not derived from its content"),
+        "show: clean card must not warn: {serr}"
+    );
 }
 
 /// Spec §13 D3: `me` WARNS and proceeds. It once refused; a test asserting a

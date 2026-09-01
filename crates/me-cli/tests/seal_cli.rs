@@ -26,6 +26,20 @@ const ARGV_OK: &str = "--allow-argv-secret";
 
 const MS1: &str = "ms10entrsqqg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9q5f042qmrw90mw";
 
+// The pinned mk1 pair `mixed_payload_prints_the_sealed_hash_not_the_unsealed_one`
+// and `me_hash_reproduces_both_shapes` already reassemble below. Measured
+// (not assumed): declared chunk_set_id 0x16a2b, content-derives 0x7a06f -- a
+// genuine mismatch (same shape as `bundle.rs`'s MK1_A/MK1_B, a different
+// legacy-pinned card).
+const MK1_PINNED_A: &str = "mk1qpz63tpqqsq3dg4m5wdx5fvqqvzg3vs7mpf0rz2j43zpzpxk0rtjkqkhwreqp6hm7qnp3a8wdvtz6t2k4uxu6ykwxcp9vqugfjyx733cf59g";
+const MK1_PINNED_B: &str =
+    "mk1qpz63tppkeg9pdvqz5744004gvzecsknw6tu25yv3exfhkl6w5zm9e4t24aqdah5585wn3e4xdut8";
+// The corpus's CT1 twin (same key material as `bundle.rs`'s clean control):
+// declared == derived == 0x83bb2, the clean control for the R2/R6 warning.
+const MK1_CLEAN_A: &str = "mk1qpswajpqqsq3zg3ngj4thnxaq5zg3vs7zqsrqqdt4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4vp3k25gsrttm4zzk4z4";
+const MK1_CLEAN_B: &str =
+    "mk1qpswajppsnz4v7cjv3qfjhf76k4t5pt96u0psdrqfqvll8qh7h5athg837pmkf3dh520sknslwyt0";
+
 fn me() -> Command {
     Command::cargo_bin("me").unwrap()
 }
@@ -213,6 +227,68 @@ fn public_only_payload_prints_no_passphrase() {
     );
     let b = std::fs::read(&out).unwrap();
     assert_eq!(&b[48..52], &[0, 0, 0, 0], "ct_len must be zero");
+}
+
+/// R2/R6: `me seal`'s `decode_public_set` (`src/seal/record.rs`) reassembles
+/// a chunked mk1 card to prove the whole public section decodes. A pinned
+/// mismatch must warn on stderr while everything else (exit 0, no
+/// passphrase since nothing is encrypted) stays as
+/// `public_only_payload_prints_no_passphrase` above.
+#[test]
+fn seal_pinned_mk1_warns_chunk_set_id_mismatch_on_stderr() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.uf2");
+    let a = me()
+        .args([
+            "seal",
+            "--plaintext",
+            MK1_PINNED_A,
+            "--plaintext",
+            MK1_PINNED_B,
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    let err = String::from_utf8(a.get_output().stderr.clone()).unwrap();
+    assert_eq!(
+        err.lines()
+            .filter(|l| l.contains("was not derived from its content"))
+            .count(),
+        1,
+        "exactly one mismatch warning: {err}"
+    );
+    let expected = mnemonic_engrave::csid_warn::chunk_set_id_mismatch_warning(0x16a2b, 0x7a06f);
+    assert!(
+        err.contains(&expected),
+        "stderr must carry the exact frozen R2/R6 warning text\nwant substring: {expected:?}\n\
+         got stderr: {err:?}"
+    );
+}
+
+/// The clean-twin control: a card whose declared id was never pinned away
+/// from its content-derived value stays silent.
+#[test]
+fn seal_clean_mk1_card_is_silent_on_chunk_set_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.uf2");
+    let a = me()
+        .args([
+            "seal",
+            "--plaintext",
+            MK1_CLEAN_A,
+            "--plaintext",
+            MK1_CLEAN_B,
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    let err = String::from_utf8(a.get_output().stderr.clone()).unwrap();
+    assert!(
+        !err.contains("was not derived from its content"),
+        "clean card must not warn: {err}"
+    );
 }
 
 #[test]
