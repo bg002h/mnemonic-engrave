@@ -15160,3 +15160,39 @@ reading. **Do not** close this gap by routing gathered cosigner cards into
 the plate census/inventory as "the fix" — a restore doc must list only
 plates this device actually cut (the review's explicit warning, carried
 into the spec amendment and the kept-but-commented `csidMarker(c)` calls).
+
+### `firmware-dual-distribution` — fork firmware ships BOTH trust models
+
+- **Surfaced:** 2026-09-01, after the device-csid flash: the fork's only
+  GitHub pre-release (fork-v0.0.0-bga10d007, 2026-08-13) is 19 days
+  stale, and the signed/unsigned question surfaced the two possible
+  trust models. **Operator ruling, verbatim: "Both models should
+  exist."**
+- **What:** dual distribution for fork firmware releases:
+  - **Model A (sovereignty, today's default made accessible):** publish
+    the UNSIGNED UF2 per release + a user-facing burn-your-own-key
+    runbook (adapted from RUNBOOK_custom_boot_key.md) + local signing
+    instructions (sign-firmware.sh). No trust delegation; each owner's
+    OTP trusts only their own key.
+  - **Model B (vendor-signed, opt-in delegation):** publish the
+    operator's boot public key + fingerprint (846aa289..., recorded in
+    HARDWARE_INVENTORY.md) so users may PERMANENTLY burn it into their
+    own OTP slot, plus operator-SIGNED release artifacts. Requires,
+    before anything ships: a key-custody design (signing NEVER in CI
+    secrets; where/how the private key lives and signs), a
+    revocation/rotation story within RP2350 slot limits, release-
+    integrity procedure, and plain-language user documentation that the
+    burn is a permanent trust delegation.
+- **Precondition to verify:** that stock retail SH2 units permit an
+  owner-side OTP key burn as the operator's unit did (proven on one
+  hardware revision only).
+- **Process:** full RISK SET (firmware signing + releases + key
+  custody). Walk WITH the operator first (the user journeys: "I found
+  the fork on GitHub, I want it on my device" for both models), then
+  spec -> R0 -> implement -> review. The stale-pre-release refresh
+  (fork-v0.0.0-bg169073c) can ship as Model A's first artifact once the
+  csid on-device acceptance is recorded green.
+- **Owning phase:** next SeedHammer distribution cycle — operator-gated
+  (releases + signing are irreversible-class).
+- **Status:** OPEN — RULED (both models), not yet scheduled.
+  **Tier:** `release` / fork / risk-set.
