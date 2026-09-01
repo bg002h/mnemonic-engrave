@@ -15067,11 +15067,21 @@ restore surface, not before.
   `design/agent-reports/R0-csid-spec-r1.md` C1/C2, measured): `me bundle`,
   `me seal` and `me sysw` all reassemble mk1 chunk sets via
   `mk_codec::decode` and stay silent on a stamped-vs-derived mismatch —
-  and me-cli links mk-codec **0.4.1** (crates.io), which predates
-  derivation entirely (id from OsRng), so the warning is unimplementable
-  without a semver-breaking 0.4→0.5+ bump.
-- **What:** bump mk-codec to ≥0.5 (operator-gated publish path, F-424
-  class — never overnight work), then emit the same warning content as
+  me-cli links mk-codec **0.4.1** while the warning operand
+  (`derive_chunk_set_id` + `bytecode::encode_bytecode`) lives in 0.5+.
+- **CORRECTION 2026-08-31 (measured, supersedes the r1 C2 framing):** the
+  bump is NOT publish-gated and NOT a breaking cascade. mk-codec **0.5.0
+  is already published** (descriptor-mnemonic consumes it from crates.io),
+  so no new publish is needed. A throwaway probe bumped me-cli 0.4.1→0.5.0:
+  **src AND tests compile clean, and all 571 me-cli tests pass** — me-cli's
+  mk_codec surface (`decode`, `decode_string`, `StringLayerHeader`,
+  `Error`, `encode_with_chunk_set_id`) is compatible across the two. So the
+  real work is small: the trivial version bump, the warning on the 3
+  surfaces, and updating the `0x12345`-pinned fixture tests to expect the
+  new warning. It DOES touch funds-adjacent card reassembly, so it still
+  earns the risk-set gate — but it is not the operator-gated publish this
+  entry originally described.
+- **What:** bump mk-codec to 0.5.0 (already published), then emit the same warning content as
   mk decode (the (declared, derived) pair + remedy; spec "The
   comparison" operand) on all three surfaces; regenerate the `0x12345`
   golden fixtures (`tests/vectors/bundle-md1-mk1.json`, `manifest.rs`,
