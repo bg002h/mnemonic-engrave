@@ -49,9 +49,25 @@ The md1 sibling already routes its (REFUSING) mismatch to a distinct screen
      notice modal at set completion, PLUS the review-list marker.
    - **Build Policy cosigner gather (`multisig_build.go:184`) — the
      funds-most path: notice modal at set completion, and the marker in
-     `buildPlateCensusLines`, `buildPlateInventoryLines` (the RESTORE
-     DOC — a mis-stamped id archived there is the name-drift hazard the
-     host cycle documented) and `buildPayloadCardsLines`.**
+     `buildPayloadCardsLines` (the payload-review screen).
+     **AMENDED 2026-09-01 (whole-diff review C1, DOES NOT SHIP AS
+     ORIGINALLY WRITTEN):** the marker call also exists in
+     `buildPlateCensusLines`/`buildPlateInventoryLines` (the RESTORE DOC)
+     but is DEFENSIVE ONLY — no production path routes a gathered
+     cosigner card into either function. Build Policy's cosigner cards
+     are device-minted `bundleCard` literals from
+     `buildEngraveTail`/`multisigEngraveCardsMulti`, never the gathered
+     set `offerChunkedMK1` computed `csidMismatch` on, so the marker
+     cannot fire there on any reachable path (measured: deleting both
+     calls fails only the helper-level test that constructs the
+     mismatched card directly, nothing that drives a real flow). Kept
+     because it is free and lights up automatically if a future flow
+     ever does route a gathered card here — that is not a present
+     coverage claim, and routing gathered cosigner cards into the
+     restore doc must NOT be added as "the fix": a restore doc may list
+     only plates this device actually cut. The host→device premise that
+     produced this gap is recorded as follow-up
+     `device-csid-census-premise-gap` in `design/FOLLOWUPS.md`.**
    - Engrave Multisig (`multisig.go:102`): NO marker, NO modal — its
      `extractSuppliedMd1` refuses unconditionally on ANY mk1 presence
      before a card could render (verified r2), so a csid warning is
@@ -82,8 +98,12 @@ The md1 sibling already routes its (REFUSING) mismatch to a distinct screen
 - gui tests mirror the md1 R0-C1 pattern: the corpus's pinned row strings
   fire the warning in the inspect flow AND in each of the four
   modal/marker-bearing bundle consumers (Engrave Bundle, Wallet Policy,
-  Build Policy incl. census/inventory/payload lines, and the two verify
-  readbacks' line-markers); the clean twin is silent everywhere;
+  Build Policy incl. payload lines, and the two verify readbacks'
+  line-markers); the clean twin is silent everywhere. **AMENDED
+  2026-09-01 (whole-diff review C1):** the census/inventory (restore-doc)
+  marker is a HELPER-LEVEL PIN only, not a reachability claim — no
+  production path feeds `buildPlateCensusLines`/`buildPlateInventoryLines`
+  a gathered card (see Contract 3);
   `clsSingleMK1Refuse` pinned; the Engrave-Multisig unconditional mk1
   refusal pinned (contract 3's unreachability reason — the existing
   TestExtractSuppliedMd1 subtest counts, r3 Minor); the notice answers
@@ -103,10 +123,16 @@ The md1 sibling already routes its (REFUSING) mismatch to a distinct screen
   (r1 M2 — precise tap counts):** FOUR tags, two per card (each card is 2
   chunks; one tag per chunk; `me`-prepared payloads committed alongside,
   end-to-end parse verified by r1). Flash (sh2-flash), then: tap the
-  pinned card's two tags in either order (reassembly is order-tolerant)
-  → after the SECOND tap (set completion) the warning modal appears — the
-  first tap correctly shows only capture progress; tap the clean twin's
-  two tags → no warning at completion. Flashing and taps are the
+  pinned card's two tags in either order (reassembly is order-tolerant),
+  CONFIRMING the "mk1 key / Choose action" chooser into Inspect key on
+  the first tap → after the SECOND tap (set completion) the warning
+  modal appears — the first tap correctly shows only capture progress.
+  Dismiss the modal, Back out of the card display, Back AGAIN to the
+  home screen (a tag tapped from the chooser or card display does
+  nothing at all — do not read that as a dead build), then repeat the
+  same chooser-confirm sequence with the clean twin's two tags → no
+  warning at completion. The committed csid-tags README is the
+  authoritative step list. Flashing and taps are the
   operator's; the ready build + four tag payloads are this cycle's
   deliverable.
 

@@ -15116,3 +15116,47 @@ restore surface, not before.
   literals; Rust<->Go drift is a red test (impl report
   mnemonic-key/design/agent-reports/impl-go-corpus-ingestion.md).
   **Tier:** `test-infra` / fork leg.
+
+### F-447 — `device-csid-census-premise-gap`: the host cycle's "diagnostics that name plates by id" hazard did not transfer to the device's restore-doc surface, and a spec + a test both claimed it did (repo: **seedhammer fork**; owning phase: **recon for any future device-restore-doc cycle, before importing the same premise again**) `#fork` `#device` `#csid` `#spec-hygiene`
+
+Filed 2026-09-01 from the device-csid-warning whole-diff review C1
+(`design/agent-reports/whole-diff-device-csid-review.md`; fold record
+`design/agent-reports/impl-device-csid-fold.md`).
+
+**The gap, exactly.** The host chunk_set_id-verification cycle's stated
+hazard was "diagnostics that name plates by id" — a mis-stamped chunk-set id
+archived in a restore document is a name-drift hazard because the document
+outlives the operator who could explain it. `SPEC_device_csid_warning.md`
+Contract 3 imported that hazard onto the SH2 device's Build Policy restore
+doc (`buildPlateCensusLines`/`buildPlateInventoryLines`,
+`multisig_build_census.go:53,89`) across three R0 rounds, unexamined: **no
+device surface named a plate by chunk-set id at all before this diff**
+(`grep -rn 'ChunkSetID\|chunk-set id\|csid' gui/*.go | grep -v _test.go` on
+the pre-diff tree), so there was nothing on the device for the host's
+hazard to describe yet. The comparison this cycle ADDS lives entirely
+upstream of the restore doc: `csidMismatch` is set once, in
+`offerChunkedMK1`, from the bundle GATHERER's completed cards. Build
+Policy's cosigner cards never pass through that gatherer — they are
+device-minted `bundleCard` literals from
+`buildEngraveTail`/`multisigEngraveCardsMulti` — so `csidMarker(c)` at the
+two restore-doc call sites returns `""` on every production path, always.
+A test (`TestBuildPlateCensusLinesMarksCSIDMismatch`) and a committed
+operator README both asserted the marker reaches the restore doc; neither
+was true. Full mechanism, call-graph proof and mutation confirmation in the
+review report; both false claims are corrected as part of this fold
+(spec Contract 3 + Acceptance, the test's docstring, the README's closing
+paragraph) — this entry exists so the next cycle does not re-import the
+same unexamined premise.
+
+**What to do with this.** Nothing is scheduled. If a future device cycle
+ever gives the restore doc (or any other archival surface) a REAL route for
+a gathered card's provenance to reach it, re-derive the hazard from the
+device's own call graph at that time rather than assuming the host's
+framing transfers — it did not, once, and the failure mode (a false
+coverage claim on a load-bearing acceptance row, in a committed
+operator-facing document read at the flash gate) is exactly the kind of
+mistake that is cheap to avoid by checking and expensive to find by
+reading. **Do not** close this gap by routing gathered cosigner cards into
+the plate census/inventory as "the fix" — a restore doc must list only
+plates this device actually cut (the review's explicit warning, carried
+into the spec amendment and the kept-but-commented `csidMarker(c)` calls).

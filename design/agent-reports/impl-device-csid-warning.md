@@ -202,7 +202,14 @@ declared=derived=ef12f (mismatch=false) for the clean set — output:
   **exhaustive, asserted** 24-way partition; ~22s wall. Baseline (stashed
   diff) was 1028 `Test*` funcs; this cycle added exactly 21 — matches
   `grep -c '^func Test' gui/csid_warning_test.go`.
-- `gofmt -l` on every touched/new file: empty.
+- `gofmt -l` on every touched/new file (named explicitly, not `gofmt -l gui/`):
+  empty. **Clarified 2026-09-01 (whole-diff review N2):** a BARE
+  `gofmt -l gui/` is NOT empty on go1.26.7 — it also flags
+  `gui/transaction.go`, `gui/transaction_golden_test.go`,
+  `gui/transaction_txrecord_test.go`, none touched by this diff and none
+  present in `git diff --stat 2337ed3..HEAD`; same go1.26.7-vs-pinned-1.25.10
+  toolchain-artifact class as the `go vet` findings below. A future reader
+  running the bare package form should expect exactly those three, not zero.
 - `go vet ./mk/...`: clean. `go vet ./gui/`: 2 pre-existing findings
   (`testing.ArtifactDir requires go1.26 or later`) in
   `freetext_sizeproof_golden_test.go` / `transaction_golden_test.go` —
@@ -221,8 +228,12 @@ declared=derived=ef12f (mismatch=false) for the clean set — output:
    rather than merely asserted.
 2. **Verify-readback note scope** (Contract 3's "line-marker only"): applied
    to the PASS message and the comparator-FAIL messages in both flows
-   (5 sites total), not to the pre-gather refusals (empty expectation /
-   empty policy) or the mid-flow seed/passphrase retry screens in
+   (**7 sites total, corrected 2026-09-01 per the whole-diff review's N1** —
+   `singlesig_verify.go:225,229,231,235` (three comparator-FAIL variants +
+   PASS) and `multisig_verify.go:1171,1196,1208` (two comparator-FAIL +
+   PASS); the wiring was always correct, only this count was wrong), not to
+   the pre-gather refusals (empty expectation / empty policy) or the
+   mid-flow seed/passphrase retry screens in
    `multisigVerifyFlow`'s per-leg loop, since those refusals are about a
    DIFFERENT problem and occur before or independent of a specific card's
    content. This is a scope call, not a spec violation — Contract 3 names
