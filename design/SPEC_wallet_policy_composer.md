@@ -19,6 +19,11 @@ build gates have RUN.
 | `descriptor-mnemonic` | `790fc224` (md 0.14.0; md-codec 0.42.0 pinned by the fork) |
 | `mnemonic-toolkit` | `d8f06483` |
 
+Measurements in this document ran on the INSTALLED binaries `~/.cargo/bin/md`
+0.14.0, `~/.cargo/bin/mk` 0.13.0, `~/.cargo/bin/ms` 0.16.0 and this repo's
+`target/release/me` 0.7.0 unless a repo build is named (the repo's unreleased mk
+carries `--keys`; the installed one does not).
+
 Companions: `BRAINSTORM_wallet_policy_composer.md` (rulings + measurements),
 `HANDOFF_arbitrary_tr_wsh.md`, `STAGED_PLAN_tr_wsh_concrete_descriptors.md`
 (Stages 0-5 DONE; this is its D1 "compose later"), reviews
@@ -269,7 +274,7 @@ exactly 32 bytes. `now:` MUST match `^[0-9]{1,10}(,[0-9]{1,9})?$` with seconds i
 band). Uppercase hex anywhere is not valid hex (section 5.3). **Where the refusals
 live:** a malformed record is refused on the HOST by `me sysw pack`, which already
 walks the whole record vector and refuses an unclassifiable record by index
-(`crates/me-cli/src/sysw/mod.rs:288` `pack_with`); the per-failure lines of §8n
+(`crates/me-cli/src/sysw/mod.rs:288` `pack_with`, whose per-index refusal is `admit_check` at `:416`); the per-failure lines of §8n
 are its lines. On the DEVICE a record that fails classification goes INERT under
 the shipped contract (`sysw/descriptor.go:46-48`: "stays in the session, is offered
 to nobody, and reaches no screen"), so the door's "Keys loaded: N" (§7a) is the
@@ -319,9 +324,8 @@ dates (2027-02-31) are refused at entry.
 
 **Date floor, independent of `now:`:** any date whose 00:00:00 UTC value is below
 500,000,000 encodes as a block HEIGHT, not a time (1985-11-05 00:00 UTC is
-499,996,800); the entry refuses every date before 2009-01-03 with "Dates before
-2009 cannot be written as a time lock." The date-entry band is therefore strictly
-inside §4c's time row.
+499,996,800); the entry refuses every date before 2009-01-03 with §8t. The
+date-entry band is therefore strictly inside §4c's time row.
 
 **The bound line.** When `now:` is present its seconds field bounds dates and its
 height field bounds heights; a field that is absent bounds nothing. A date or
@@ -332,8 +336,7 @@ When the relevant field is ABSENT the echo carries instead: "This device cannot
 tell the time. Nothing here has checked that this is in the future." The copy
 never says "now".
 
-Refusals: blocks > 65535 or days > 388 → "Relative locks reach at most 455 days
-in blocks or 388 days in time. Use an absolute date."
+Refusals: blocks > 65535 or days > 388 → §8u.
 
 ### 6c. Hashlock entry (C25; r0 C-4)
 
@@ -385,7 +388,9 @@ per-frame budget with a pager, because the body grows one line per slot and the
 grammar admits 32 (§9 item 6; the per-frame capacity is a plan-time render
 measurement, §13). The template id is key-independent and origin-invariant but
 NOT shape-invariant: a path or wrapper change alters it, so the screen re-appears
-after every shape edit and says "The shape changed, so this id changed." After
+after every shape edit and says, per §8s, that the id changed and that cards
+already minted with the old stub will not seat into this template
+(`gui/key_card_seating.go:66-73`). After
 seating (§7d) the keyed policy's id and stub are added and the screen recommends
 stamping BOTH stubs on each key card (`--policy-id-stub` is repeatable). Labels,
 literally: `Template-ID:` and `Policy-ID:` for the 32-hex ids; `mk1 stub
@@ -482,7 +487,7 @@ payload mk1 is RE-MINTED with both stubs appended, a seed-derived slot is minted
 likewise. A keyless composition (no seated slots) has no form A and no cards: the
 choice collapses to "template only" and says so. For seed-derived slots: **Full
 (seed + keys)** or **Watch-only (keys)**; in Full mode the secret is cut as words,
-as a SeedQR, or as ms1 strings; a seed that filled several slots is cut ONCE.
+as a SeedQR, or as ms1 strings (`gui/codex32_polish.go:218` `engraveCodex32`); a seed that filled several slots is cut ONCE.
 Plate census before cutting, as Multisig Build does; the census REFUSES a
 concrete descriptor longer than the plate holds, naming the measured ceiling
 (§13 item 1). Recovery-time error detection differs by form and the census says so: md1/mk1
@@ -507,10 +512,10 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 | shape | edits the shape (paths OR wrapper) after a slot was assigned | WARNING before the edit; assignments discarded (§8j) |
 | shape | a 33rd slot | REFUSAL at the picker (§8m line 5) |
 | pack | a malformed `key:`/`hash:`/`now:` record | REFUSAL on the host (§8n); INERT on the device, visible only in the door's count (§6a) |
-| lock | date before 2009-01-03 | REFUSAL (§6b floor) |
+| lock | date before 2009-01-03 | REFUSAL (§8t) |
 | lock | date or height before the pack bound | REFUSAL (§6b) |
 | lock | no `now:` field for this lock kind | DEFAULT: the "cannot tell the time" line (§6b) |
-| lock | relative lock beyond 388/455 days | REFUSAL naming absolute date |
+| lock | relative lock beyond 388/455 days | REFUSAL (§8u) |
 | lock | impossible date | REFUSAL at entry |
 | seed | payload seed admitted for the first time at Wallet Policy | DEFAULT: the payload spec's F1/F2 flag screens fire before use (§6a) |
 | seating | wrong key for a slot | WARNING surface: mapping review; Back keeps choices |
@@ -518,7 +523,7 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 | seating | card origin script type disagrees with wrapper | DOCUMENTATION: the origin is declared as carried (§4f) |
 | seating | one seed fills two slots in ONE path | WARNING (C29, §8g) |
 | seating | one seed fills slots in two different paths | DEFAULT: informational line (C5, §8k) |
-| stub screen | operator wrote the stub down, then edits the shape | DEFAULT: screen re-shown, "This id changed with the shape." (§7c) |
+| stub screen | operator wrote the stub down, then edits the shape | DEFAULT: screen re-shown with §8s's changed-id body (§7c) |
 | consent | compares the shown id with a coordinator's | DOCUMENTATION: §8d line; a composed wallet is its own wallet |
 | consent | decoded shape or seating differs from the composed list | REFUSAL with an exit (§8q) |
 | engrave | keyless composition | DEFAULT: form choice collapses to template only (§7f) |
@@ -536,6 +541,7 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 ### 8b. EXPERIMENTAL, unsorted keys — confirm-to-proceed, fires once per key set where sorted was legal and declined
 
 > UNSORTED KEYS (EXPERIMENTAL)
+> You chose unsorted keys where sorted was possible.
 > Key order is part of this wallet. Anyone restoring
 > it must keep the same order. Sorted keys need none.
 
@@ -624,7 +630,7 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 
 > This wallet already has 32 key slots.
 
-### 8n. Host-side record refusals (`me sysw pack`, §6a), one line each
+### 8n. Host-side record refusals (`me sysw pack` stderr, §6a), one line each; host lines, not device modals, so the panel budget does not apply
 
 > record N: key: needs [fingerprint/path]xpub with
 > an origin; a bare xpub is not a key record
@@ -669,11 +675,22 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 
 ### 8s. Seating and stub-screen lines (§7c, §7d)
 
-> The shape changed, so this id changed.
+> The shape changed, so this id changed. Cards
+> minted with the old stub will not seat here.
 
 > Slot @2, Path 1 key 2 of 3: choose a key
 
 > Slot @0, key path (spends alone): choose a key
+
+### 8t. Date floor (§6b)
+
+> Dates before 2009 cannot be written as a
+> time lock.
+
+### 8u. Relative lock ceiling (§6b)
+
+> Relative locks reach at most 455 days in blocks
+> or 388 days in time. Use an absolute date.
 
 ## 9. Device work items (fork)
 
@@ -796,8 +813,8 @@ table, so the glyph and modal-fits gates cover it.
 5. **Copy gates:** `scripts/plan-glyph-check.sh`, the raster floor
    (`gui/raster_test.go`), AND the modal-fits assertion (`gui/modal_fits_test.go`,
    `assertModalBodyFits`) on every §8 body and every new screen; plus a
-   fires-on-condition test for each of §8a, §8b, §8f, §8g, §8h, §8j, §8k, §8l, §8o,
-   §8p, §8q, §8r, §8s and the §6b bound and no-bound lines; the variable-length
+   fires-on-condition test for each of §8a, §8b, §8f, §8g, §8h, §8j, §8k, §8l, §8m,
+   §8n (host), §8o, §8p, §8q, §8r, §8s, §8t, §8u and the §6b bound and no-bound lines; the variable-length
    screens (§7c stub screen, §7e consent, §7d pick list) are asserted by PAGING
    capacity at the measured per-frame budget, since a fits assertion cannot pin a
    body with no single source string.
@@ -870,7 +887,11 @@ Risk-set work on three counts (normative codec behaviour, funds/keys/addresses,
 spans repos). R0 to 0C/0I before code; reports persisted by the agents to
 `design/agent-reports/`; persist and fold are two commits; the build gate runs on
 every fold (`scripts/plan-build-gate.sh` for Rust blocks, `plan-build-gate-go.sh`
-for Go, `plan-cite-check.sh`, `plan-glyph-check.sh`, `spec-structure-check.sh`).
+for Go, `plan-cite-check.sh`, `plan-glyph-check.sh`, `spec-structure-check.sh`,
+`plan-table-check.sh`, `plan-stepref-check.sh`, `plan-wiring-check.sh`,
+`fold-propagation-check.sh` with each fold's superseded phrasings, and
+`plan-staleness-check.sh` against the heads table at the top of this document as
+its baseline).
 Rust first: `compose` and its vectors land in descriptor-mnemonic before the Go
 builder. UC is OFF for implementation. A plan's GREEN expires: re-validate the
 plan immediately before dispatching its implementer.
