@@ -477,3 +477,12 @@ ONE path = warning.
   transient). Round-1 fold DISPATCHED to the S0b author (iterate PRESET_NAMES;
   no `unreachable!` -- a CliError instead). THEN: commit + r2 verification
   (brief scratchpad/verify-brief-s0b-r2.md, targeted) → implementer.
+- S3 round-1 fold APPLIED by the author (uncommitted): A11 self-contained again
+  + a Part-A-only gate step (GATE_UNTIL + `handwire_s3.py --part-a`), which
+  found composer_discard.go mis-assigned (B3 → A5); I-2 wired; F-458 fixed;
+  C2 counts; Produces lines; N-1 destination; B5/B6/B9 steps; guards for the
+  six unguarded Importants and C-9/C-12/6b/8d; C-15 moot. Author's gate:
+  Part A 47 PASS with Part B absent; whole 110/95, gui 1168/1168, DEAD 1,
+  cite 241/241, staleness 0. Controller's independent re-gate RUNNING
+  (scratchpad/s3-gate-r2.log). THEN: commit (message scratchpad/s3-fold-r1.msg)
+  → r2 verification (brief scratchpad/verify-brief-s3-r2.md).
