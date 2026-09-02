@@ -14,18 +14,18 @@
 
 **Baselines (for `scripts/plan-staleness-check.sh`):** mnemonic-engrave `b44fb61`; mnemonic-secret `5f37b43` (ms-cli 0.16.0); descriptor-mnemonic `b19dca7b` (Stage 0 in flight on branch `composer-s0`); fork `169073c` (untouched by this stage).
 
-## Open question for the operator (recorded here, not decided here)
+## The `now:` default — RULED 2026-09-02 by a stand-in for the operator (revocable)
 
-Spec §6a and §10 item 2 make the pack-time `now:` record the DEFAULT for every `me sysw pack`, with `--no-now` as the opt-out. Measured consequence in the plan's scratch copy: EVERY payload's public section grows by one record, so every identity digest and `pub_len` changes, six pre-existing tests need `--no-now`, and a payload that held only secrets (a seed for Backup Wallet) now carries a public record that only Wallet Policy admits (payload spec section 3.3.2 after the Task 6 fold: `Now` is admitted at Wallet Policy alone) — at every other program's door it is a record that program refuses with a named reason, for an operator who never asked for it. Options: (a) keep the spec as written; (b) invert the default (`--now` opts IN; the composer's journey and its docs pass it); (c) append by default only when the payload already holds a composer-relevant record (`key:`, `hash:`, a descriptor or an md1/mk1 card), so a bare-seed payload stays as it was. This plan implements (a) because the spec says so; the controller's recommendation is (c), which keeps the composer journey unchanged and leaves every other program's payloads byte-identical to today. The choice changes one `if` in Task 4 and one sentence in spec §6a/§10 item 2; it does not change Tasks 1-3, 5-7.
+Spec §6a and §10 item 2 originally made the pack-time `now:` record the DEFAULT for every `me sysw pack`. Measured in this plan's scratch copy: every payload's public section grew by one record (+25 bytes, new identity digest, six pre-existing tests moved), and a seed-only payload gained a public record that only Wallet Policy admits — and the device shows a digest-compare screen for any payload with a public section. The stand-in ruling (`design/agent-reports/composer-S1-decision-now-default.md`; veto form "use (a)/(b)/(c-wide)"): **(c) narrowed** — `me sysw pack` appends `now:` by default ONLY when the operator's records include at least one `key:` or `hash:` record (the composer-only classes) and no `now:`; a new `--now` forces the append onto any payload; `--no-now` suppresses it; `--now` and `--no-now` conflict; a supplied `now:` always wins and appends nothing. Seeds, descriptors, md1/mk1 cards and `tx:` records do NOT trigger it, so every other program's payload packs byte-identically to today. Spec §6a, §10 item 2 and §7g carry the same words (folded with the S1 R0 round 0); brainstorm §3.12 item 21 records the supersession.
 
 ## Global Constraints
 
 - Rust first: the fork's `sysw.Classify`, `syswSession.load` and the vendored fixture are Stage 2's; nothing under the submodule changes here.
 - Record bodies are LOWERCASE hex after a reserved prefix, matched BEFORE the sniffers; a prefixed record whose body fails ANY rule is `Class::Unknown` and refused by `pack_with` with its own §8n line (spec §6a; payload spec section 5.3). None of the three classes is secret or bearer.
-- `key:` body (UTF-8 text `[fingerprint/path]xpub`): NON-EMPTY origin; fingerprint 8 lowercase hex; path components hardened with `'` or `h`; xpub depth 3 or 4; origin component count == xpub depth; the xpub's own child number == the origin's last component. `hash:` body: exactly 32 bytes. `now:` body (UTF-8 text `<seconds>[,<height>]`): seconds `1..=2147483647`, height `1..=499999999` when present, digits only, at most 10 and 9 digits respectively.
+- `key:` body (UTF-8 text `[fingerprint/path]xpub`): NON-EMPTY origin; fingerprint 8 lowercase hex; a path that parses as BIP-32 notation with `'` or `h` as the hardened marker (uppercase `H` is out of scope on BOTH sides — the fork's `bip32.ParsePathElement` accepts only `h` and `'` too — and is pinned as a refused fixture row); components need not be hardened, but the xpub's own child number must equal the origin's last component and the origin component count must equal the xpub depth, which is 3 or 4; `tpub` is admitted (the network is the xpub's own). `hash:` body: exactly 32 bytes. `now:` body (UTF-8 text `<seconds>[,<height>]`): seconds `1..=2147483647`, height `1..=499999999` when present, digits only, at most 10 and 9 digits respectively.
 - Payload-wide: at most ONE valid `now:` record; a second is a host refusal ("Remove one."), enforced where the whole payload is seen (`pack_with`'s split) — not in the per-record classifier.
-- `me sysw pack` auto-appends `now:<hex of pack seconds>` as the LAST record ONLY when the operator's records contain no `now:`; `--no-now` suppresses that auto-append; the library never appends anything.
-- The §8n lines are the operator-visible refusals; they are emitted by `me sysw pack` on stderr through `sysw_error()` in `main.rs`, prefixed `me: `, and name the record index the way the existing lines do ("record N (records count from 0) …" is the existing house style; §8n's shorter "record N:" is the spec's blockquote — the plan keeps the house style prefix and the §8n wording after it, so the spec's line is a SUBSTRING of what prints; §11's rule is satisfied).
+- `me sysw pack` auto-appends `now:<hex of pack seconds>` as the LAST record ONLY when the operator's records contain no `now:` AND at least one classifies as `Key` or `Hash`, or when `--now` is passed; `--no-now` suppresses that auto-append; `--now` conflicts with `--no-now`; the library never appends anything.
+- The §8n lines are the operator-visible refusals; `me sysw pack` emits them on stderr through `sysw_error()` in `main.rs`, prefixed `me: `. Every unclassifiable arm of `sysw_error` OPENS `record N (records count from 0)` — `tests/descriptor_seam.rs`'s `is_record_refusal` recognises the whole refusal surface by exactly that phrase — so the new arms open the same way and then carry the §8n blockquote VERBATIM on the next indented line: the spec's line is a substring of what prints, and the seam invariant stays true. Same shape for the second-`now:` refusal.
 - `ms derive --template bip48-p2tr` = `m/48'/coin'/account'/3'`, purpose 48, script type `3'`; the shipped negative test flips to a positive one and is RENAMED, not deleted; its expected xpubs are the two-implementation oracle recorded in this plan (Go btcsuite hdkeychain and an independent Python BIP-32, measured 2026-09-02).
 - The payload spec fold is a NORMATIVE artifact with its own R0 history: the controller performs it (Task 6) and runs its own review loop; the implementer does not touch `design/`.
 - Build gate before every fold: `scripts/plan-build-gate-me.sh design/IMPLEMENTATION_PLAN_composer_S1_host_inputs.md` assembles `crates/me-cli/src/sysw/composer_records.rs` and `crates/me-cli/tests/sysw_composer_*.rs` under the CI toolchain, builds, runs them, clippies. Fragments (`sysw/record.rs`, `sysw/mod.rs`, `main.rs`, `tests/record_corpus.rs`, `sysw/expect.rs`, ms-cli) are hand-wired in the gate's scratch copy by the controller before review, as Stage 0 did.
@@ -50,7 +50,7 @@ Modified files (fragments; a reviewer's execution pass, hand-wired by the contro
 | `crates/me-cli/src/sysw/mod.rs` | `pub mod composer_records;`; `classify_with` arms for the three prefixes; `UnknownReason::Composer(ComposerRecordError)`; `unknown_reason` arm; `SyswError::SecondNow(usize)`; the single-`now:` check in `split` |
 | `crates/me-cli/src/sysw/record.rs` | `Class::{Key, Hash, Now}` (not secret, not bearer) |
 | `crates/me-cli/src/main.rs` | `sysw_error` arms (§8n lines); `class_name` arms; `show` rendering for the three classes; `Pack { no_now }` and the auto-append |
-| `crates/me-cli/src/sysw/expect.rs`, `crates/me-cli/tests/record_corpus.rs` | exhaustive `match` arms for the new variants |
+| `crates/me-cli/tests/record_corpus.rs` | the one other exhaustive `match` on `Class` gains the three arms |
 | `crates/me-cli/testdata/record_class_vectors.json` | GENERATED by the regenerate test, sha256 pinned in the consumer test |
 | `crates/me-cli/CHANGELOG.md` | `[Unreleased]` entry |
 | `mnemonic-secret/crates/ms-cli/src/cmd/derive.rs` | `Template::Bip48P2tr`; the two stale doc comments rewritten |
@@ -160,8 +160,10 @@ fn a_bare_xpub_is_refused_naming_the_origin() {
 
 #[test]
 fn key_origin_rules_are_each_enforced() {
-    // Origin component count must equal the xpub's depth (4 here).
-    assert!(matches!(key_err(&format!("[73c5da0a/48'/0']{XPUB0}")), ComposerRecordError::Key(_)));
+    // Origin component count must equal the xpub's depth (4 here): last component 2' matches
+    // the child number and the count alone is wrong, so this isolates the count rule.
+    assert_eq!(key_err(&format!("[73c5da0a/48'/2']{XPUB0}")).detail(), "origin component count differs from the xpub's depth");
+    assert_eq!(key_err(&format!("[73c5da0a/48'/0'/0'/0'/2']{XPUB0}")).detail(), "origin component count differs from the xpub's depth");
     // The xpub's own child number (2') must equal the origin's last component.
     assert!(matches!(key_err(&format!("[73c5da0a/48'/0'/0'/3']{XPUB0}")), ComposerRecordError::Key(_)));
     // Fingerprint must be 8 lowercase hex.
@@ -506,7 +508,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 ### Task 2: Classes, classifier arms, refusals, the single-`now:` rule
 
 **Files:**
-- Modify: `crates/me-cli/src/sysw/record.rs` (`Class` variants), `crates/me-cli/src/sysw/mod.rs` (`classify_with`, `UnknownReason`, `unknown_reason`, `SyswError`, `split`), `crates/me-cli/src/main.rs` (`sysw_error`, `class_name`), `crates/me-cli/src/sysw/expect.rs` and `crates/me-cli/tests/record_corpus.rs` (exhaustive matches)
+- Modify: `crates/me-cli/src/sysw/record.rs` (`Class` variants), `crates/me-cli/src/sysw/mod.rs` (`classify_with`, `UnknownReason`, `unknown_reason`, `SyswError`, `split`), `crates/me-cli/src/main.rs` (`sysw_error`, `class_name`), `crates/me-cli/tests/record_corpus.rs` (the one other exhaustive match)
 - Test: `crates/me-cli/tests/sysw_composer_records.rs` (library-level), plus the unit tests inside `sysw/mod.rs`'s `mod tests`
 
 **Interfaces:**
@@ -655,6 +657,8 @@ In `crates/me-cli/src/sysw/mod.rs`:
     }
 ```
 
+(On the HOST this placement is unobservable: `me` has no free-text fallback — `Class::FreeText` exists only behind `text:` — so no later sniffer can claim a `key:`/`hash:`/`now:` string, and the R0 tests lens measured that moving the arm below the BIP-39 sniffer changes nothing. The rule matters on the DEVICE, whose `Classify` falls back to free text; the lockstep fixture is what pins it there.)
+
 4. In `unknown_reason`, directly after the `TX_PREFIX` block:
 
 ```text
@@ -680,19 +684,24 @@ In `crates/me-cli/src/main.rs`:
 
 ```text
                 U::Composer(e) => format!(
-                    "{} ({}). Build the record with `me sysw pack`'s helpers: a key record is \
-                     `key:` + the hex of `[fingerprint/path]xpub` exactly as `md decompose` \
-                     prints it; a hash record is `hash:` + the 32-byte digest as 64 lowercase \
-                     hex; a now record is `now:` + the hex of `<seconds>[,<height>]`.",
-                    e.line(*i),
-                    e.detail()
+                    "record {i} (records count from 0) is a `key:`/`hash:`/`now:` record whose \
+                     body fails its rule ({}).\n      {}\n      Build the record with `me sysw \
+                     pack`'s helpers: a key record is `key:` + the hex of `[fingerprint/path]xpub` \
+                     exactly as `md decompose` prints it; a hash record is `hash:` + the 32-byte \
+                     digest as 64 lowercase hex; a now record is `now:` + the hex of \
+                     `<seconds>[,<height>]`.",
+                    e.detail(),
+                    e.line(*i)
                 ),
 ```
 
 and a top-level arm beside `E::TooLarge(n)`:
 
 ```text
-        E::SecondNow(i) => format!("record {i}: a second now: record; only one is allowed. Remove one."),
+        E::SecondNow(i) => format!(
+            "record {i} (records count from 0) is a second now: record.\n      record {i}: a second \
+             now: record; only one is allowed. Remove one."
+        ),
 ```
 
 7. In `class_name`, add arms before `C::Unknown`:
@@ -703,7 +712,7 @@ and a top-level arm beside `E::TooLarge(n)`:
         C::Now => "pack time (now:)",
 ```
 
-8. Every other exhaustive `match` on `Class` gains the three arms: `crates/me-cli/src/sysw/expect.rs` (the `Kind` mapping: none of the three is a `--expect` kind, so they fall to the arm the `Address` variant uses — read the match and mirror `Address`), and `crates/me-cli/tests/record_corpus.rs:67-76` (the name table: `Class::Key => "Key"`, `Class::Hash => "Hash"`, `Class::Now => "Now"`). `cargo build --all-targets` names any other site.
+8. The repo has exactly TWO exhaustive matches on `Class` (measured: `main.rs`'s `class_name`, above, and `crates/me-cli/tests/record_corpus.rs:67-76`'s name table); the second gains `Class::Key => "Key"`, `Class::Hash => "Hash"`, `Class::Now => "Now"`. `crates/me-cli/src/sysw/expect.rs` has no match on `Class` (it uses `==`/`matches!`) and needs no change. `cargo build --all-targets` names any other site.
 
 - [ ] **Step 4: Run the library tests, the whole me test suite, and the corpus**
 
@@ -716,7 +725,7 @@ Run: `cargo fmt --all && cargo clippy --locked -p mnemonic-engrave --all-targets
 Expected: clean.
 
 ```bash
-git add crates/me-cli/src/sysw/record.rs crates/me-cli/src/sysw/mod.rs crates/me-cli/src/main.rs crates/me-cli/src/sysw/expect.rs crates/me-cli/tests/record_corpus.rs crates/me-cli/tests/sysw_composer_records.rs
+git add crates/me-cli/src/sysw/record.rs crates/me-cli/src/sysw/mod.rs crates/me-cli/src/main.rs crates/me-cli/tests/record_corpus.rs crates/me-cli/tests/sysw_composer_records.rs
 git commit -m "me sysw: Class::{Key,Hash,Now}, classifier arms, 8n refusals, the single-now rule (composer S1 task 2)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
@@ -750,7 +759,7 @@ use sha2::Digest as _;
 /// (Stage 2). Changing a row means changing this in both repos — the point.
 /// Measured 2026-09-02 by running the regenerate test over CASES in the plan's
 /// build-gate scratch copy; the regenerate test prints it again on every run.
-const FIXTURE_SHA256: &str = "2215285fad952316e8e190ca5563e55f06c0ae021328278accf341f841522eaf";
+const FIXTURE_SHA256: &str = "a894e619580db8ca0e06ebfe45576cc45722f695913bf46e9285201c95f146c3";
 const FIXTURE_PATH: &str = "testdata/record_class_vectors.json";
 
 fn fixture_path() -> std::path::PathBuf {
@@ -789,6 +798,24 @@ fn the_fixture_covers_every_class_and_every_8n_line_at_least_twice() {
         "now: must be <seconds>[,<height>] in range",
     ] {
         assert!(lines.get(l).copied().unwrap_or(0) >= 2, "line {l:?}: {lines:?}");
+    }
+    // §12 item 8: "each §6a malformation" — one named row per rule, so a Go port
+    // that ignores depth, hard-codes depth 4, reads the fingerprint
+    // case-insensitively (Go's hex.DecodeString does) or rejects tpub fails here.
+    let names: std::collections::BTreeSet<&str> = CASES.iter().map(|c| c.name).collect();
+    for required in [
+        "key-journey-cosigner-0", "key-h-spelling", "key-depth-3-valid", "key-testnet-tpub-valid",
+        "key-bare-xpub", "key-origin-no-path", "key-origin-shorter-than-depth", "key-origin-longer-than-depth",
+        "key-last-component-mismatch", "key-depth-2-refused", "key-depth-5-refused",
+        "key-fingerprint-uppercase", "key-fingerprint-7-hex", "key-origin-unterminated",
+        "key-body-not-hex", "key-body-uppercase-hex", "key-body-not-utf8", "key-body-empty",
+        "key-uppercase-H-marker-out-of-scope",
+        "hash-valid", "hash-valid-zeros", "hash-31-bytes", "hash-63-chars", "hash-66-chars", "hash-uppercase", "hash-empty",
+        "now-seconds-only", "now-seconds-and-height", "now-min", "now-max-both", "now-zero-seconds",
+        "now-seconds-2^31", "now-height-zero", "now-height-at-time-threshold", "now-trailing-comma",
+        "now-letters", "now-body-not-hex", "now-body-not-utf8", "now-body-uppercase-hex", "now-empty",
+    ] {
+        assert!(names.contains(required), "§6a rule without a fixture row: {required}");
     }
 }
 
@@ -845,8 +872,8 @@ pub struct Case {
 const KEY0_RECORD: &str = "key:5b37336335646130612f3438272f30272f30272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266";
 /// The same xpub with its origin at account 3 (component count 4 == depth, last component mismatch 3' vs 2').
 const KEY_LAST_MISMATCH: &str = "key:5b37336335646130612f3438272f30272f30272f33275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266";
-/// Two origin components for a depth-4 xpub.
-const KEY_SHORT_ORIGIN: &str = "key:5b37336335646130612f3438272f30275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266";
+/// Two origin components for a depth-4 xpub, last component 2' == the xpub's child number, so ONLY the component-count rule fires.
+const KEY_SHORT_ORIGIN: &str = "key:5b37336335646130612f3438272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266";
 /// The bare xpub (no `[origin]`).
 const KEY_BARE: &str = "key:7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266";
 
@@ -859,12 +886,25 @@ pub const CASES: &[Case] = &[
     Case { name: "key-body-not-hex", record: "key:zz", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
     Case { name: "key-body-uppercase-hex", record: "key:5B", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
     Case { name: "key-body-empty", record: "key:", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    // ---- every §6a rule has a row of its own (the coverage test below lists them by name)
+    Case { name: "key-depth-3-valid", record: "key:5b37336335646130612f3438272f30272f30275d7870756236434b5a7455614b3159487051626736434c6147526d734d4b4c514231694b7a73766d7874794844365837677a4c71434232564e5a596431584378726363516e453868684478745962523153616b6b76697379324a3443635478576565476a6d6b6173436f4e5339765a6d", class: "Key", host_line: None },
+    Case { name: "key-testnet-tpub-valid", record: "key:5b37336335646130612f3438272f31272f30272f32275d747075624446483964677a76657944387a5462505546754c72476d4379644e76786568794e6455584b4a41514e387834615a346a36555a7147666e71467244344e7179615456474b62764557353474737650544b32556f5362434331504a593869434e6977544c3352575a45686551", class: "Key", host_line: None },
+    Case { name: "key-depth-2-refused", record: "key:5b37336335646130612f3438272f30275d787075623639784456786235326d37484c693856346242556f7351646a41343771476b5142354b6738454b6867417737386e41615066625a3761765a544862506f58716a7a5743337761766b375a75524e7737325843533343795339587568594a7141764d457245644562366e3254", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    Case { name: "key-depth-5-refused", record: "key:5b37336335646130612f3438272f30272f30272f32272f305d78707562364767475a4369657850337170683533486a50694c7237476b5846746669635455677661706e4a32583275696737795a763578674538635163445367396f6538597062626f4b43476b68724742565a525973354776585a39366835556b32514845554d735a7250374d764c", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    Case { name: "key-fingerprint-uppercase", record: "key:5b37334335444130412f3438272f30272f30272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    Case { name: "key-fingerprint-7-hex", record: "key:5b373363356461302f3438272f30272f30272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    Case { name: "key-origin-no-path", record: "key:5b37336335646130615d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    Case { name: "key-origin-longer-than-depth", record: "key:5b37336335646130612f3438272f30272f30272f30272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    Case { name: "key-origin-unterminated", record: "key:5b37336335646130612f3438272f30272f30272f32277870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    Case { name: "key-body-not-utf8", record: "key:ff", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    Case { name: "key-uppercase-H-marker-out-of-scope", record: "key:5b37336335646130612f3438482f30482f30482f32485d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
     Case { name: "hash-valid", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Hash", host_line: None },
     Case { name: "hash-valid-zeros", record: "hash:0000000000000000000000000000000000000000000000000000000000000000", class: "Hash", host_line: None },
     Case { name: "hash-63-chars", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a", class: "Unknown", host_line: Some("record 0: hash: must be exactly 64 hex characters") },
     Case { name: "hash-66-chars", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Unknown", host_line: Some("record 0: hash: must be exactly 64 hex characters") },
     Case { name: "hash-uppercase", record: "hash:A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8", class: "Unknown", host_line: Some("record 0: hash: must be exactly 64 hex characters") },
     Case { name: "hash-empty", record: "hash:", class: "Unknown", host_line: Some("record 0: hash: must be exactly 64 hex characters") },
+    Case { name: "hash-31-bytes", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Unknown", host_line: Some("record 0: hash: must be exactly 64 hex characters") },
     Case { name: "now-seconds-only", record: "now:31373536363834383030", class: "Now", host_line: None },
     Case { name: "now-seconds-and-height", record: "now:313735363638343830302c393130303030", class: "Now", host_line: None },
     Case { name: "now-min", record: "now:31", class: "Now", host_line: None },
@@ -878,6 +918,7 @@ pub const CASES: &[Case] = &[
     Case { name: "now-body-not-hex", record: "now:zz", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
     Case { name: "now-body-not-utf8", record: "now:ff", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
     Case { name: "now-empty", record: "now:", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
+    Case { name: "now-body-uppercase-hex", record: "now:313735363638343830302C393130303030", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
 ];
 
 /// One JSON row of `testdata/record_class_vectors.json`.
@@ -908,13 +949,13 @@ The hex bodies above were GENERATED (Python `text.encode().hex()`, machine-check
 - [ ] **Step 4: Run the consumer test, regenerate, pin, run again**
 
 Run: `cargo nextest run --locked -p mnemonic-engrave --test sysw_composer_records 2>&1 | tail -6`
-Expected: `every_case_classifies_as_its_row_says_and_refuses_with_its_line` and the coverage test PASS; `the_committed_fixture_...` FAILS (no file). Then:
+Expected: `every_case_classifies_as_its_row_says_and_refuses_with_its_line` and the coverage test PASS (40 rows; the depth-2/3/5 xpubs and the `tpub` are two-implementation oracles: the fork's Go `hdkeychain` and a Python BIP-32 agree byte for byte, 2026-09-02); `the_committed_fixture_...` FAILS (no file). Then:
 
 ```bash
 cargo test --locked -p mnemonic-engrave --test sysw_composer_records regenerate -- --ignored --nocapture 2>&1 | grep -E 'wrote|sha256'
 ```
 
-The printed `sha256` must equal the `FIXTURE_SHA256` already in the test (`2215285f…22eaf`, measured when the plan was gated); if it does not, the table or the row type changed — find out why before re-pinning. Run the test file again: all PASS.
+The printed `sha256` must equal the `FIXTURE_SHA256` already in the test (`a894e619…46c3`, measured when the plan was gated); if it does not, the table or the row type changed — find out why before re-pinning. Run the test file again: all PASS.
 
 - [ ] **Step 5: Format, clippy, commit**
 
@@ -923,7 +964,7 @@ Expected: clean.
 
 ```bash
 git add crates/me-cli/src/sysw/composer_records.rs crates/me-cli/tests/sysw_composer_records.rs crates/me-cli/testdata/record_class_vectors.json
-git commit -m "me sysw: record_class_vectors.json -- the composer classes' lockstep fixture, 27 rows, sha256-pinned (composer S1 task 3)
+git commit -m "me sysw: record_class_vectors.json -- the composer classes' lockstep fixture, 40 rows (one per 6a rule), sha256-pinned (composer S1 task 3)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
@@ -931,15 +972,15 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 
 ---
 
-### Task 4: `me sysw pack --no-now`, the auto-appended pack time, `me sysw show`
+### Task 4: `me sysw pack --now`/`--no-now`, the auto-appended pack time, `me sysw show`
 
 **Files:**
-- Modify: `crates/me-cli/src/main.rs` (`SyswCmd::Pack { no_now }`, the auto-append between `read_records` and `pack_with`, `show`'s per-record lines)
+- Modify: `crates/me-cli/src/main.rs` (`SyswCmd::Pack { now, no_now }`, the auto-append between `read_records` and `pack_with`, `show`'s per-record lines)
 - Test: `crates/me-cli/tests/sysw_composer_cli.rs`
 
 **Interfaces:**
 - Consumes: Tasks 1-2.
-- Produces: the CLI contract of spec §10 item 2.
+- Produces: the CLI contract of spec §10 item 2 as RULED: default append only for a payload holding a `key:` or `hash:` record; `--now` forces; `--no-now` suppresses.
 
 - [ ] **Step 1: Write the failing CLI tests**
 
@@ -982,22 +1023,56 @@ fn shown(path: &std::path::Path) -> String {
     String::from_utf8(o.stdout).unwrap()
 }
 
+const SEED: &str =
+    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
 #[test]
-fn pack_appends_the_pack_time_when_no_now_record_is_given_and_says_so() {
+fn pack_appends_the_pack_time_when_a_composer_record_is_present_and_says_so() {
+    // The RULED default: a payload holding a key: or hash: record gets its bound.
     let dir = tempfile::tempdir().unwrap();
-    let (path, o) = pack_to(&dir, &[], &[TEXT]);
+    let hash = format!("hash:{}", "a8".repeat(32));
+    let (path, o) = pack_to(&dir, &[], &[TEXT, &hash]);
     assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
     let err = String::from_utf8_lossy(&o.stderr);
     assert!(err.contains("appended now:"), "{err}");
     assert!(err.contains("--no-now"), "{err}");
     let s = shown(&path);
-    assert!(s.contains("public record 1: pack time (now:)"), "{s}");
+    assert!(s.contains("public record 2: pack time (now:)"), "{s}");
+    // A key: record triggers it too.
+    let key = format!("key:{}", hex(KEY0_TEXT));
+    let (path, o) = pack_to(&dir, &[], &[&key]);
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    assert!(shown(&path).contains("public record 1: pack time (now:)"));
+}
+
+#[test]
+fn a_payload_without_a_composer_record_packs_byte_identically_to_before() {
+    // Seeds, text, cards: NO bound appended, no note; the six pre-existing pack
+    // tests stay untouched for exactly this reason.
+    let dir = tempfile::tempdir().unwrap();
+    for records in [vec![TEXT], vec![SEED]] {
+        let (path, o) = pack_to(&dir, &["--allow-argv-secret"], &records);
+        assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+        assert!(!String::from_utf8_lossy(&o.stderr).contains("appended now:"), "{records:?}");
+        assert!(!shown(&path).contains("now:"), "{records:?}");
+    }
+}
+
+#[test]
+fn now_forces_the_append_onto_any_payload_and_conflicts_with_no_now() {
+    let dir = tempfile::tempdir().unwrap();
+    let (path, o) = pack_to(&dir, &["--now"], &[TEXT]);
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    assert!(shown(&path).contains("public record 1: pack time (now:)"));
+    let (_, o) = pack_to(&dir, &["--now", "--no-now"], &[TEXT]);
+    assert!(!o.status.success(), "--now and --no-now must conflict");
 }
 
 #[test]
 fn no_now_suppresses_the_auto_append_so_a_fixture_is_a_pure_function_of_its_inputs() {
     let dir = tempfile::tempdir().unwrap();
-    let (a, o) = pack_to(&dir, &["--no-now"], &[TEXT]);
+    let hash = format!("hash:{}", "a8".repeat(32));
+    let (a, o) = pack_to(&dir, &["--no-now"], &[TEXT, &hash]);
     assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
     assert!(!String::from_utf8_lossy(&o.stderr).contains("appended now:"));
     let s = shown(&a);
@@ -1008,11 +1083,12 @@ fn no_now_suppresses_the_auto_append_so_a_fixture_is_a_pure_function_of_its_inpu
 fn an_operator_supplied_now_wins_silently_and_nothing_is_appended() {
     let dir = tempfile::tempdir().unwrap();
     let mine = format!("now:{}", hex("1756684800,910000"));
-    let (path, o) = pack_to(&dir, &[], &[TEXT, &mine]);
+    let hash = format!("hash:{}", "a8".repeat(32));
+    let (path, o) = pack_to(&dir, &[], &[TEXT, &hash, &mine]);
     assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
     assert!(!String::from_utf8_lossy(&o.stderr).contains("appended now:"));
     let s = shown(&path);
-    assert!(s.contains("public record 1: pack time (now:) — 1756684800,910000"), "{s}");
+    assert!(s.contains("public record 2: pack time (now:) — 1756684800 (seconds), height 910000"), "{s}");
     assert_eq!(s.matches("pack time (now:)").count(), 1, "{s}");
 }
 
@@ -1023,7 +1099,29 @@ fn two_operator_supplied_now_records_are_refused_naming_the_second() {
     let b = format!("now:{}", hex("1756684801"));
     let (_, o) = pack_to(&dir, &[], &[TEXT, &a, &b]);
     assert!(!o.status.success());
-    assert!(String::from_utf8_lossy(&o.stderr).contains("record 2: a second now: record; only one is allowed. Remove one."));
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.contains("record 2: a second now: record; only one is allowed. Remove one."), "{err}");
+    assert!(err.contains("(records count from 0)"), "the seam's refusal vocabulary: {err}");
+}
+
+#[test]
+fn a_second_now_is_refused_before_the_passphrase_ceremony() {
+    // F-246: an admission failure must never leave the operator holding a
+    // freshly printed passphrase for a payload that was then refused. A sealed
+    // pack (a secret record, no --no-passphrase) with two now: records must
+    // refuse WITHOUT printing "write this down".
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("payload.bin");
+    let a = format!("now:{}", hex("1756684800"));
+    let b = format!("now:{}", hex("1756684801"));
+    let o = me()
+        .args(["sysw", "pack", "--allow-argv-secret", "--out", out.to_str().unwrap(), SEED, &a, &b])
+        .output()
+        .unwrap();
+    assert!(!o.status.success());
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.contains("a second now: record"), "{err}");
+    assert!(!err.contains("write this down"), "the ceremony ran before the refusal: {err}");
 }
 
 #[test]
@@ -1050,7 +1148,7 @@ fn show_prints_each_class_legibly() {
     let s = shown(&path);
     assert!(s.contains(&format!("public record 0: cosigner key (key:) — {KEY0_TEXT}")), "{s}");
     assert!(s.contains("public record 1: sha256 hashlock (hash:) — a8a8a8a8..a8a8a8a8"), "{s}");
-    assert!(s.contains("public record 2: pack time (now:) — 1756684800 (the pack time; a lower bound the device echoes, never a locktime)"), "{s}");
+    assert!(s.contains("public record 2: pack time (now:) — 1756684800 (seconds): a lower bound on the present the device echoes beside a time lock; never a locktime"), "{s}");
 }
 ```
 
@@ -1059,32 +1157,67 @@ fn show_prints_each_class_legibly() {
 - [ ] **Step 2: Run to verify the tests fail**
 
 Run: `cargo nextest run --locked -p mnemonic-engrave --test sysw_composer_cli 2>&1 | tail -8`
-Expected: `no_now_suppresses...` FAILS (`--no-now` is an unknown flag); `pack_appends_...` FAILS (nothing is appended); the refusal tests PASS already (Task 2); `show_prints_each_class_legibly` FAILS (the show lines do not exist).
+Expected: `no_now_suppresses...` and `now_forces_...` FAIL (unknown flags); `pack_appends_...` FAILS (nothing is appended); `a_payload_without_a_composer_record_packs_byte_identically_to_before` PASSES already (nothing appends today) — it is the regression guard for the ruled default; the refusal tests PASS already (Task 2); `show_prints_each_class_legibly` FAILS (the show lines do not exist).
 
 - [ ] **Step 3: Add the flag, the auto-append, the show lines**
 
 In `crates/me-cli/src/main.rs`, in `SyswCmd::Pack { .. }`, add after `allow_unsigned_inputs: bool,`:
 
 ```text
-        /// Do NOT append the pack time as a trailing `now:` record. By default
-        /// `pack` appends `now:<hex of unix seconds>` as the LAST record when the
-        /// records hold no `now:` of their own, so the device can echo a lower
-        /// bound on the present next to a time lock (SPEC_wallet_policy_composer.md
-        /// §6a). A fixture whose output must be a pure function of its inputs
+        /// Append the pack time as a trailing `now:` record to THIS payload even
+        /// though it holds no `key:`/`hash:` record. By default `pack` appends
+        /// `now:<hex of unix seconds>` as the LAST record only when the records
+        /// include a composer-only record (`key:` or `hash:`) and no `now:` of
+        /// their own, so a Wallet Policy build gets a lower bound on the present
+        /// beside a time lock (SPEC_wallet_policy_composer.md §6a) while every
+        /// other program's payload packs exactly as before.
+        #[arg(long, conflicts_with = "no_now")]
+        now: bool,
+        /// Never append the pack time, even when a `key:`/`hash:` record is
+        /// present. A fixture whose output must be a pure function of its inputs
         /// passes this.
         #[arg(long)]
         no_now: bool,
 ```
 
-and destructure `no_now` in the `SyswCmd::Pack { .. } =>` arm. Then, directly before `report_strength(passphrase.as_deref(), &recs);`:
+and destructure `now, no_now` in the `SyswCmd::Pack { .. } =>` arm. Then, in TWO places. First, directly AFTER the F-246 block `if let Err(e) = sysw::admit_check(&recs, admission) { ... return EXIT_INVALID; }` (`main.rs:1563-1566`) and therefore BEFORE `decide_sealing` and the passphrase ceremony (`:1655-1682`):
 
 ```text
-            // §6a / §10 item 2: append the pack time ONLY when the operator gave
-            // no `now:`. An operator-supplied one wins silently (it pins a
-            // deliberate bound); two of them are refused by pack_with below.
+            // §6a's payload-wide single-`now:` rule, checked HERE as well as in
+            // `pack_with`: F-246 hoisted admission ahead of the passphrase ceremony
+            // so an operator is never told to write down twelve words that protect
+            // no artifact; a second `now:` is an admission failure and takes the
+            // same ordering. `split` keeps the library backstop. (A first draft put
+            // this beside the auto-append below, AFTER the ceremony; the plan's own
+            // test caught it: the passphrase printed before the refusal.)
+            {
+                let nows = mnemonic_engrave::sysw::composer_records::now_indices(&recs);
+                if nows.len() > 1 {
+                    eprintln!("me: {}", sysw_error(&mnemonic_engrave::sysw::SyswError::SecondNow(nows[1])));
+                    return EXIT_INVALID;
+                }
+            }
+```
+
+Second, directly before `report_strength(passphrase.as_deref(), &recs);`:
+
+```text
+            // §6a / §10 item 2 as RULED (composer-S1-decision-now-default): append
+            // the pack time ONLY when the operator gave no `now:` AND the payload
+            // holds a composer-only record (`key:`/`hash:`) or `--now` says so. An
+            // operator-supplied `now:` wins silently; two are refused by pack_with.
             // (`recs` was rebound immutably by the `--as` handling above.)
             let mut recs = recs;
-            if !*no_now && mnemonic_engrave::sysw::composer_records::now_indices(&recs).is_empty() {
+            let composer_record_present = recs.iter().any(|r| {
+                matches!(
+                    mnemonic_engrave::sysw::classify(r),
+                    mnemonic_engrave::sysw::record::Class::Key | mnemonic_engrave::sysw::record::Class::Hash
+                )
+            });
+            if !*no_now
+                && (*now || composer_record_present)
+                && mnemonic_engrave::sysw::composer_records::now_indices(&recs).is_empty()
+            {
                 let secs = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs())
@@ -1095,7 +1228,8 @@ and destructure `no_now` in the `SyswCmd::Pack { .. } =>` arm. Then, directly be
                         eprintln!(
                             "me: appended now:{s} as the last record (the pack time, a lower bound the \
                              device echoes next to a time lock; it is never a locktime). Pass --no-now \
-                             to omit it, or supply your own now: record to pin a different bound."
+                             to omit it, or supply your own now: record to pin a different bound. \
+                             Payloads without a key:/hash: record get none unless --now is passed."
                         );
                     }
                     _ => eprintln!("me: the system clock is outside the now: band; no now: record appended"),
@@ -1103,7 +1237,7 @@ and destructure `no_now` in the `SyswCmd::Pack { .. } =>` arm. Then, directly be
             }
 ```
 
-In the `show` path: `print_mdmk_confirmation` (`crates/me-cli/src/main.rs:2060`) slices the public section into `records` and calls `print_mt_confirmation(&records); print_descriptor_confirmation(&records);` (`:2117-2118`). Add a third call directly after those two:
+In the `show` path: `print_mdmk_confirmation` (`crates/me-cli/src/main.rs:2063`) slices the public section into `records` and calls `print_mt_confirmation(&records); print_descriptor_confirmation(&records);` (`:2088-2089`). Add a third call directly after those two:
 
 ```text
     print_composer_confirmation(&records);
@@ -1126,13 +1260,15 @@ fn print_composer_confirmation(records: &[String]) {
                 println!("public record {i}: sha256 hashlock (hash:) — {}..{}", &hx[..8], &hx[56..]);
             }
             ComposerRecord::Now { seconds, height } => {
+                // `show` cannot tell an auto-appended pack time from an
+                // operator-supplied bound, so it names neither provenance.
                 let when = match height {
-                    Some(h) => format!("{seconds},{h}"),
-                    None => seconds.to_string(),
+                    Some(h) => format!("{seconds} (seconds), height {h}"),
+                    None => format!("{seconds} (seconds)"),
                 };
                 println!(
-                    "public record {i}: pack time (now:) — {when} (the pack time; a lower bound the \
-                     device echoes, never a locktime)"
+                    "public record {i}: pack time (now:) — {when}: a lower bound on the present the \
+                     device echoes beside a time lock; never a locktime"
                 );
             }
         }
@@ -1145,7 +1281,7 @@ fn print_composer_confirmation(records: &[String]) {
 - [ ] **Step 4: Run the CLI tests and the whole suite**
 
 Run: `cargo nextest run --locked -p mnemonic-engrave 2>&1 | tail -8 && cargo test --locked -p mnemonic-engrave 2>&1 | tail -4`
-Expected: all PASS under both runners (CI uses the threaded `cargo test`), after SIX pre-existing tests gain `--no-now` on their `pack` invocations — measured in the plan's scratch copy, each fails today only because the auto-appended `now:` record adds 25 bytes (`\n` + `now:` + 20 hex) to the public section, which moves `pub_len`, the identity and the record count: `descriptor_as::item_1_every_format_packs_one_descriptor_record`, `descriptor_as::item_2_every_format_packs_reads_back_and_derives_the_device_address`, `sysw_cli::a_payload_past_the_old_8191_cap_packs_and_reads_back`, `sysw_cli::an_incomplete_set_still_packs_and_is_readable`, `sysw_cli::a_secrets_only_payload_reports_no_digest` (a secrets-only payload gains a PUBLIC record by default — see the open question below), `sysw_cli::the_descriptor_show_block_leaves_every_other_container_byte_identical`. Add the flag; do NOT weaken an assertion; name each in the commit. Any OTHER pre-existing failure is a finding: stop and record it.
+Expected: all PASS under both runners (CI uses the threaded `cargo test`) with NO pre-existing test changed. Under the plan's first draft (default-on append) six pre-existing tests failed because the appended `now:` record added 25 bytes (`\n` + `now:` + 20 hex) to the public section and moved `pub_len`, the identity and the record count: `descriptor_as::item_1_every_format_packs_one_descriptor_record`, `descriptor_as::item_2_every_format_packs_reads_back_and_derives_the_device_address`, `sysw_cli::a_payload_past_the_old_8191_cap_packs_and_reads_back`, `sysw_cli::an_incomplete_set_still_packs_and_is_readable`, `sysw_cli::a_secrets_only_payload_reports_no_digest`, `sysw_cli::the_descriptor_show_block_leaves_every_other_container_byte_identical` — and a SEVENTH the first draft missed, `sysw_cli::show_reports_exactly_one_descriptor_record_for_each_of_the_four_formats` (same mechanism; found by the R0 tests lens). None of those payloads holds a `key:` or `hash:` record, so under the RULED default they must pass untouched — that is the point of the ruling, and `a_payload_without_a_composer_record_packs_byte_identically_to_before` pins it. In particular `descriptor_as::item_1_every_format_packs_one_descriptor_record` keeps measuring `SPEC_descriptor_input.md`'s "one descriptor, one container, one invocation" on the command an operator types: a descriptor is NOT a composer-only record, so `--as descriptor` packs exactly one public record, as before. If any of the six still fails, the predicate is wrong: stop and record it. Any OTHER pre-existing failure is a finding too.
 
 - [ ] **Step 5: Format, clippy, commit**
 
@@ -1153,8 +1289,8 @@ Run: `cargo fmt --all && cargo clippy --locked -p mnemonic-engrave --all-targets
 Expected: clean.
 
 ```bash
-git add crates/me-cli/src/main.rs crates/me-cli/tests/sysw_composer_cli.rs crates/me-cli/tests/sysw_cli.rs
-git commit -m "me sysw pack: --no-now, the auto-appended pack time, show lines for key:/hash:/now: (composer S1 task 4)
+git add crates/me-cli/src/main.rs crates/me-cli/tests/sysw_composer_cli.rs
+git commit -m "me sysw pack: --now/--no-now, the pack time appended when a key:/hash: record is present, show lines for key:/hash:/now: (composer S1 task 4)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
@@ -1169,7 +1305,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 - Repo: `/scratch/code/shibboleth/mnemonic-secret` at `5f37b43`, in a worktree (`git worktree add /scratch/code/shibboleth/wt-ms-bip48-p2tr -b bip48-p2tr`)
 
 **Interfaces:**
-- Produces: `--template bip48-p2tr` deriving `m/48'/coin'/account'/3'`, labelled "3' p2tr (taproot multisig)", never annotated ASSUMED; JSON `account_path` accordingly.
+- Produces: `--template bip48-p2tr` deriving `m/48'/coin'/account'/3'`, never annotated ASSUMED; JSON `account_path` accordingly. (`script_type_label` gets an arm for completeness, but that label prints only for the DEFAULTED bare `bip48` — `derive.rs:504-518` — so it is unobservable for this template; the test asserts the path, not the label.)
 
 **The oracle (measured 2026-09-02, two independent implementations agreeing byte for byte — the fork's Go `btcutil/v2/hdkeychain` run inside the fork module, and a hand-rolled Python BIP-32 over `ecdsa`; seed = BIP-39 of "abandon" ×11 + "about", empty passphrase, master 73c5da0a):**
 
@@ -1182,9 +1318,9 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 
 (The shipped `P2WSH_ACCT0` for `m/48'/0'/0'/2'` shares the parent `m/48'/0'/0'`; the two differ only in the last component, which is exactly what the test must be able to see.)
 
-- [ ] **Step 1: Flip the negative test into the positive one, renamed**
+- [ ] **Step 1: Flip the negative test into the positive one, renamed; fix the module doc**
 
-In `mnemonic-secret/crates/ms-cli/tests/cli_derive_bip48.rs`, replace the whole `an_unregistered_script_type_is_refused` test (its doc comment included) with:
+In `mnemonic-secret/crates/ms-cli/tests/cli_derive_bip48.rs`, FIRST replace the module-doc sentences (lines 18-21) "There is no registered Taproot value, so none is offered here; inventing one would put funds at a path no other wallet looks at." with: "BIP-48 registers no Taproot value; `bip48-p2tr` (`3'`) is offered anyway because it is a live CONVENTION (Coldcard `bip48_3`, Liana `p2tr_deriv`) and the SeedHammer II composer's own origin for seed-derived taproot slots — see `derive.rs`'s type doc." (the same false claim the follow-up `ms-derive-taproot-justifications-stale` names at two other sites). THEN replace the whole `an_unregistered_script_type_is_refused` test (its doc comment included) with:
 
 ```text
 /// BIP-48 registers only 1' and 2', but the constellation's taproot multisig
@@ -1223,7 +1359,7 @@ fn bip48_p2tr_json_names_the_path_and_no_assumption() {
 }
 ```
 
-(`serde_json` is available to the test if it is a dependency of ms-cli; the existing `json_carries_the_assumption_flag` test shows how this file parses JSON — follow it.)
+(`serde_json = "1"` is a regular dependency of ms-cli, and Cargo puts regular dependencies in scope for integration tests, so `serde_json::Value` compiles here; the existing `json_carries_the_assumption_flag` test does substring matching instead — either style is fine, this one asserts the three keys `derive.rs:485-487` emits.)
 
 - [ ] **Step 2: Run to verify they fail**
 
@@ -1260,7 +1396,7 @@ In `mnemonic-secret/crates/ms-cli/src/cmd/derive.rs`:
     Bip48P2tr,
 ```
 
-3. In `purpose`, add `Template::Bip48P2tr` to the `=> 48` arm. In `script_type`, add `Template::Bip48P2tr => Some(3),`. In `script_type_label`, add `Template::Bip48P2tr => "3' p2tr (taproot multisig; Coldcard/Liana convention)",`. `script_type_defaulted` is unchanged (only the bare `bip48` defaults).
+3. In `purpose`, add `Template::Bip48P2tr` to the `=> 48` arm (exhaustive: the compiler enforces it). In `script_type`, add `Template::Bip48P2tr => Some(3),` and in `script_type_label` add `Template::Bip48P2tr => "3' p2tr (taproot multisig; Coldcard/Liana convention)",` — BOTH of those matches end in a wildcard arm (`_ => None`, `_ => ""`), so omitting either compiles and silently derives `m/48'/0'/0'` at depth 3; only the new test's `m/48'/0'/0'/3'` assertion catches it. `script_type_defaulted` is unchanged (only the bare `bip48` defaults).
 
 4. In the `Bg002hTr` variant's doc comment, replace the sentence "BIP-48 registers no taproot script type, so a `tr()` multisig key has no standard 4-level home -- and md requires depth 4 for any multisig script context." with:
 
@@ -1276,7 +1412,7 @@ In `mnemonic-secret/crates/ms-cli/src/cmd/derive.rs`:
 - [ ] **Step 4: Run the whole ms suite, format, clippy**
 
 Run: `cargo nextest run --locked -p ms-cli 2>&1 | tail -6 && cargo test --locked 2>&1 | tail -3 && cargo fmt --all --check && cargo clippy --locked --all-targets -- -D warnings 2>&1 | tail -3`
-Expected: all PASS; `the_single_sig_template_names_are_unchanged` and `bg002h_templates_derive_the_ruled_path` still PASS; clean. If `gui_schema`/`gen_man` snapshot tests enumerate template values and now differ, regenerate them the way their own doc comments say and name them in the commit.
+Expected: all PASS; `the_single_sig_template_names_are_unchanged`, `bg002h_templates_derive_the_ruled_path` and `bg002h_wsh_is_not_labelled_as_nested_segwit` still PASS; clean. Measured 2026-09-02: neither `gen_man.rs` nor `gui_schema_emits_spec_v7_json.rs` enumerates template values (the first derives its page set from the subcommand inventory, the second asserts `encode --language`'s choices), so no snapshot changes.
 
 - [ ] **Step 5: Changelog, follow-up, commit**
 
@@ -1306,7 +1442,9 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 
 ---
 
-### Task 6: The payload spec fold — CONTROLLER task, own R0
+### Task 6: The payload spec fold — CONTROLLER task, own R0 — DONE 2026-09-02
+
+**Status: executed and closed before this plan's R0.** Fold `12e0659`; its R0 round 0 (opus, 0C/3I/4M/5N, `bb49953`) folded at `44765d7` with F-450 filed at `72ac66d`; round 1 verification 11 FIXED / 1 PARTIAL (`de34664`), the partial closed at `fdf7671`. `SPEC_systemwide_payloads.md` now carries the three class rows, the CREATED Wallet Policy row with all ten cells and three new columns, the three prefixes in 5.3, and the dated departures in 3.3.2's "RULED AT FOLD" paragraph. The steps below are the record of what was done; the implementer skips this task.
 
 **Files:**
 - Modify: `design/SPEC_systemwide_payloads.md` sections 3.3.1, 3.3.2, 5.3 (and section 12's normative definitions if they enumerate classes or prefixes — check at fold time with `grep -n 'text:\|ClassFreeText' design/SPEC_systemwide_payloads.md`)
@@ -1362,7 +1500,18 @@ Expected: clean and green under both runners.
 Run: `git status --short crates/me-cli/testdata/ && cargo test --locked -p mnemonic-engrave --lib sysw::vectors 2>&1 | tail -3`
 Expected: only the NEW `record_class_vectors.json` is untracked-then-committed; `sysw_vectors.json` is unchanged (the library appends nothing).
 
-- [ ] **Step 3: Changelog and commit**
+- [ ] **Step 3: The sentences this stage makes false, corrected in the same commit**
+
+Four sites enumerate the reserved prefixes as three and become false when the three composer prefixes land (measured by the R0 fidelity lens, 2026-09-02):
+
+1. `design/SPEC_sh2_sysw_consumption.md:265`, N9 — "`text:`, `pass:` and `tx:` require **lowercase** hex bodies" → "`text:`, `pass:`, `tx:` and, since the composer's Stage 1, `key:`, `hash:` and `now:` require **lowercase** hex bodies" (one clause; that spec's own gates run on it: `plan-glyph-check.sh`, `plan-cite-check.sh`).
+2. `crates/me-cli/src/main.rs:2693-2698`, the `U::Unrecognised` message — "not a `text:`/`pass:`/`tx:` record" → "not a `text:`/`pass:`/`tx:`/`key:`/`hash:`/`now:` record".
+3. `crates/me-cli/src/main.rs:183-206`, `SyswCmd::Pack`'s `--help` doc — after the `tx:` paragraph add: "`key:<hex of \"[fingerprint/path]xpub\">`, `hash:<64 lowercase hex>` and `now:<hex of \"<seconds>[,<height>]\">` feed the SeedHammer II's Wallet Policy composer: a cosigner key for seating, a sha256 hashlock digest, and the pack time (a lower bound the device echoes beside a time lock; appended for you when a `key:`/`hash:` record is present — see `--now`/`--no-now`)."
+4. `crates/me-cli/src/sysw/record.rs:25-31`, the reserved-prefix doc paragraph — add one sentence: "Three more reserved prefixes — `key:`, `hash:`, `now:` — live in `composer_records.rs` with their own body rules; `decode_body` below strips only the three declared here, and every caller guards it with its own prefix test."
+
+Run `cargo nextest run --locked -p mnemonic-engrave 2>&1 | tail -3` again (the message edits touch two tests' expectations at most; fix the expectation only if the assertion was about the old wording).
+
+- [ ] **Step 4: Changelog and commit**
 
 Add under `## [Unreleased]` in `crates/me-cli/CHANGELOG.md`:
 
@@ -1370,33 +1519,39 @@ Add under `## [Unreleased]` in `crates/me-cli/CHANGELOG.md`:
 - `me sysw pack`: three new record classes for the SeedHammer II composer —
   `key:` (a cosigner `[fingerprint/path]xpub`), `hash:` (a 32-byte sha256
   digest), `now:` (the pack time and optional height). Bodies are lowercase
-  hex; a malformed body is refused with its own line. At most one `now:` per
-  payload. `pack` appends the pack time as a trailing `now:` unless the operator
-  supplied one; `--no-now` suppresses it. `me sysw show` prints the three.
-  `testdata/record_class_vectors.json` is the lockstep fixture the device's
-  classifier is measured against (composer spec §12 item 8).
+  hex; a malformed body is refused with its own line, before any passphrase is
+  printed. At most one `now:` per payload. When the records include a `key:`
+  or `hash:` record and no `now:`, `pack` appends the pack time as a trailing
+  `now:`; `--now` forces that onto any payload, `--no-now` suppresses it, and
+  a supplied `now:` always wins — payloads without a composer record pack
+  byte-identically to before. `me sysw show` prints the three.
+  `testdata/record_class_vectors.json` is the lockstep fixture (40 rows, one
+  per §6a rule) the device's classifier is measured against (composer spec §12
+  item 8).
 ```
 
 ```bash
-git add crates/me-cli/CHANGELOG.md
-git commit -m "me: changelog for the composer's record classes (composer S1 task 7)
+git add crates/me-cli/CHANGELOG.md design/SPEC_sh2_sysw_consumption.md crates/me-cli/src/main.rs crates/me-cli/src/sysw/record.rs
+git commit -m "me: changelog for the composer's record classes; the three-prefix sentences corrected (N9, the Unrecognised message, pack --help, record.rs) (composer S1 task 7)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 ```
 
-- [ ] **Step 4: Hand off**
+- [ ] **Step 5: Hand off**
 
-The stage is complete when: every task's commit exists (Tasks 1-4 and 7 on a mnemonic-engrave branch; Task 5 on the mnemonic-secret worktree branch); Task 6's payload-spec fold is GREEN under its own R0; the whole-diff independent review (opus execution review over each repo's diff, persisted to `design/agent-reports/composer-S1-exec-review-r0.md`) returns 0 Critical / 0 Important after folds; `me` and `ms` are released per each repo's release process (`crates/me-cli/CHANGELOG.md` + `.github/workflows/release.yml` here; `design/RELEASE_PROCESS.md` in mnemonic-secret). Stage 2 begins only then, and it vendors `record_class_vectors.json` with its pinned sha256.
+The stage is complete when: every task's commit exists (Tasks 1-4 and 7 on a mnemonic-engrave branch; Task 5 on the mnemonic-secret worktree branch); Task 6's payload-spec fold is GREEN under its own R0 (it is); the whole-diff independent review (opus execution review over each repo's diff, persisted to `design/agent-reports/composer-S1-exec-review-r0.md`) returns 0 Critical / 0 Important after folds; `me` and `ms` are released per each repo's release process (`crates/me-cli/CHANGELOG.md` + `.github/workflows/release.yml` here; `design/RELEASE_PROCESS.md` in mnemonic-secret). Stage 2 begins only then, and it vendors `record_class_vectors.json` with its pinned sha256 (vendoring is S2's first act, not S1's exit — the staged plan says the same).
 
 ---
 
 ## Self-review (run by the plan author before dispatch)
 
-1. **Spec coverage, Stage 1 scope:** §6a body rules → Task 1 parser + tests; §6a "matched before the sniffers" and "none is secret" → Task 2; §8n lines → Task 1 `line()` rendered by Task 2's `sysw_error` arm and Task 4's CLI tests; single-`now:` rule at `pack_with` → Task 2 `split`; auto-append and `--no-now` (§10 item 2) → Task 4; §12 item 8 host half → Task 3 fixture (device half: Stage 2 vendors it); §10 item 5 → Task 5; §10 item 6 → Task 6. Device-visible signals (§8r "Keys loaded", "not understood") are Stage 3's.
+1. **Spec coverage, Stage 1 scope:** §6a body rules → Task 1 parser + tests; §6a "matched before the sniffers" and "none is secret" → Task 2; §8n lines → Task 1 `line()` rendered by Task 2's `sysw_error` arm and Task 4's CLI tests; single-`now:` rule at `pack_with` → Task 2 `split`; auto-append as RULED (composer-only records trigger it; `--now`/`--no-now`) (§10 item 2) → Task 4; §12 item 8 host half → Task 3 fixture, one row per §6a rule (device half: Stage 2 vendors it); §10 item 5 → Task 5; §10 item 6 → Task 6. Device-visible signals (§8r "Keys loaded", "not understood") are Stage 3's.
 2. **Placeholder scan:** `FIXTURE_SHA256` carries the digest measured in the plan's scratch copy (the regenerate test re-derives it); the CHANGELOG date in Task 5's follow-up close is written as `2026-09-xx` because the closing date is the commit's — the implementer fills the day. No other TBD.
 3. **Type consistency:** `parse(&str) -> Option<Result<ComposerRecord, ComposerRecordError>>`, `ComposerRecordError::line(&self, usize) -> String`, `now_indices(&[String]) -> Vec<usize>`, `Case { name, record, class, host_line }`, `fixture_rows() -> Vec<FixtureRow>`, `SyswError::SecondNow(usize)`, `UnknownReason::Composer(ComposerRecordError)` are used with these shapes in every task.
 
 ## What the build gate covers, and does not
 
-`scripts/plan-build-gate-me.sh design/IMPLEMENTATION_PLAN_composer_S1_host_inputs.md` assembles `crates/me-cli/src/sysw/composer_records.rs` (Tasks 1 and 3), `crates/me-cli/tests/sysw_composer_records.rs` (Tasks 1-3) and `crates/me-cli/tests/sysw_composer_cli.rs` (Task 4) into a scratch copy of this repo under CI's toolchain, registers the module, builds all targets, runs the composer test binaries and clippies. Because Task 2's variants live in fragments the gate does not assemble, the Task 2 and Task 3 tests that reference `Class::Key`, `UnknownReason::Composer` or `SyswError::SecondNow` will not compile in the bare gate; the controller hand-wires the Task 2 and Task 4 fragments into the scratch copy (as Stage 0 did for its Task 8) and runs the whole `mnemonic-engrave` suite there before any reviewer sees the plan. mnemonic-secret's Task 5 is fragments only and was hand-checked the same way in a scratch copy of that repo (2026-09-02, toolchain 1.85.0): with the variant, the three arms and the flipped test applied, `cargo nextest run -p ms-cli` ran 310 tests, 308 passed including both new `bip48_p2tr_*` tests; the two failures are scratch artefacts (`format::conformance::conformance_vectors_pass` reads `design/display-grouping-vectors.tsv`, which the copy of `crates/` alone lacks; `the_display_grouping_conformance_pin_is_untouched` shells out to `sha256sum`, absent from the scratch PATH) and pass in the repo itself. The payload spec fold is prose and has its own gates.
+`scripts/plan-build-gate-me.sh design/IMPLEMENTATION_PLAN_composer_S1_host_inputs.md` assembles `crates/me-cli/src/sysw/composer_records.rs` (Tasks 1 and 3), `crates/me-cli/tests/sysw_composer_records.rs` (Tasks 1-3) and `crates/me-cli/tests/sysw_composer_cli.rs` (Task 4) into a scratch copy of this repo under CI's toolchain, registers the module, builds all targets, runs the composer test binaries and clippies. Because Task 2's variants live in fragments the gate does not assemble, the Task 2 and Task 3 tests that reference `Class::Key`, `UnknownReason::Composer` or `SyswError::SecondNow` will not compile in the bare gate; the controller hand-wires the Task 2 and Task 4 fragments into the scratch copy (as Stage 0 did for its Task 8) and runs the whole `mnemonic-engrave` suite there before any reviewer sees the plan. Re-measured 2026-09-02 with the RULED Task 4 (the `key:`/`hash:` predicate, `--now`, `--no-now`) hand-wired beside Task 2's fragments: `cargo nextest run -p mnemonic-engrave --locked --no-fail-fast` → 611 tests run, 611 passed, 2 skipped — the six tests the default-on draft had moved pass untouched, every composer test passes, and the regenerated fixture's sha256 is the pinned `a894e619…46c3`.
+
+mnemonic-secret's Task 5 is fragments only and was hand-checked the same way in a scratch copy of that repo (2026-09-02, toolchain 1.85.0): with the variant, the three arms and the flipped test applied, `cargo nextest run -p ms-cli` ran 310 tests, 308 passed including both new `bip48_p2tr_*` tests; the two failures are scratch artefacts (`format::conformance::conformance_vectors_pass` reads `design/display-grouping-vectors.tsv`, which the copy of `crates/` alone lacks; `the_display_grouping_conformance_pin_is_untouched` shells out to `sha256sum`, absent from the scratch PATH) and pass in the repo itself. The payload spec fold is prose and has its own gates.

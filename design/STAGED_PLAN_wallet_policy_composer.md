@@ -94,7 +94,7 @@ folded under its OWN R0: section 3.3.1 rows, the CREATED Wallet Policy row in
 §12 item 8 lockstep vectors (a JSON fixture of records × expected class the fork
 reads in S2).
 
-**Exit:** `me` and `ms` published; the lockstep fixture vendored into the fork.
+**Exit:** `me` and `ms` released per their release processes; the lockstep fixture (`crates/me-cli/testdata/record_class_vectors.json`, sha256-pinned) is READY for S2, whose first act vendors it into the fork with the same pin.
 
 ## S2 — fork codec: Go builder, `pk_h` emitter, `PolicyShape` split, minting (seedhammer `md/`, `mk/`)
 
