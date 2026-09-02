@@ -313,6 +313,36 @@ policy as `md compile` of the equivalent Concrete policy, and re-encodes through
 
 **(2) Same fingerprint at two accounts** — reports `composer-recon-same-fingerprint-two-accounts-import.md` + `-core-` + `-sparrow-` (`f7f0b27`). Controller re-ran: Core v25 (peerless mainnet, watch-only) imports W2 and W3 single-chain with `success: true` (checksums `g7tqcjhe`, `y6wdsq0v`) and refuses the same-KEY-twice control (miniscript sanity); Liana `LianaDescriptor::from_str`: W2 ACCEPT with `73c5da0a` in both paths, W1/W3 REFUSE (shape / same fp twice in ONE path = `DuplicateOriginSamePath`); Sparrow drongo HEAD via compiled Java: two keystores with one fingerprint accepted as VALID with no warning, `tr(NUMS,{multi_a…})` refused ("Cannot determine the multisig threshold"), miniscript wsh mis-parsed as a flat `sortedmulti` and failing at address derivation. Nobody dedupes on fingerprint. Beyond the brief: Nunchuk's per-tx `get_signers()` is a fingerprint-keyed `std::map<std::string,bool>` (`nunchuk.h:1174`, verified type) so two keys of one seed collapse to one signing-progress row; md's depth-0 xpub re-serialisation draws no objection from Core/Liana/Sparrow but is a live UNVERIFIED Ledger risk (`register_wallet.c` whole-xpub memcmp) — filed descriptor-mnemonic `md-descriptor-depth0-xpub-ledger-registration`. **Consequence for the composer (proposed default): WARN, never refuse, when one seed/fingerprint fills two slots INSIDE ONE spending path** ("Slots @0 and @2 are the same seed. This path's 2-of-3 can be satisfied by one person. Liana will refuse it."); the cross-path case (C5's normal shape) gets at most an informational line.
 
+### 3.12 R0 round 0 fold (2026-09-01) — controller defaults taken, for the operator's veto
+
+Four lenses, 14C/34I/31M/11N, all C and I folded by regenerating spec §4-§14
+(fold commit carries the gate output). Judgment calls the fold made that are
+NOT operator rulings:
+
+1. **Unseated slots (C26 template-only) declare the §4f origin with `account' =
+   emitted slot index` and no fingerprint** — the one form that both decodes on
+   the fork (F-166 pathless is refused) and seats at restore (identical origins
+   without fingerprints are `errSeatSlotContested`). Cost: a cosigner seated later
+   at slot i must supply a key at account i.
+2. **Date-entry floor = 2009-01-03** (adversarial C-2's suggestion) rather than
+   1985-11-06; the operand floor stays 500,000,000.
+3. **Every-path-hashed → WARNING (§8h), not refusal**; the composer never derives
+   or engraves a preimage (adversarial C-5).
+4. **Absent pack-time bound → the echo says the device cannot tell the time**
+   (journey I-2), rather than staying silent.
+5. **Edits after seating discard ALL assignments with a confirm (§8j)** rather
+   than the journey lens's finer per-slot survival rule; simpler and safer.
+6. **The composer does NOT reuse `seatKeyCards`**; slot-directed assignment is its
+   own routine; the consume path's rules coexist (coverage I-7).
+7. **Consent is derived from the DECODED md1 with a self-check against the path
+   list** (refuse on mismatch), not from UI state (journey C-2 / adversarial C-1).
+8. **`sh` (legacy) keeps the device's `2'` convention** in the origin table;
+   `sh(wsh)` corrected to `1'` (coverage C-1).
+9. **`me sysw pack` writes `now:` LAST by default with `--no-now` for fixtures**
+   (correctness I8).
+Minors and nits from the four reports are recorded in the reports and not yet
+folded; they do not gate.
+
 ## 4. Open questions, in the order they will be asked
 
 1. **Seating design.** RULED: C8 (payload pick list, slot-directed), C12 (seeds
