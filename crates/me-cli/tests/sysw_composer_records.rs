@@ -365,3 +365,148 @@ fn the_classes_pack_as_public_records_and_read_back() {
     assert_eq!(opened.public, recs);
     assert!(opened.secret.is_empty());
 }
+
+// ---- the lockstep fixture (spec §12 item 8) ---------------------------------------------
+
+use mnemonic_engrave::sysw::composer_records::{fixture_rows, FixtureRow, CASES};
+use sha2::Digest as _;
+
+/// Pinned IDENTICALLY in the fork's `sysw/composer_records_conformance_test.go`
+/// (Stage 2). Changing a row means changing this in both repos — the point.
+/// Measured 2026-09-02 by running the regenerate test over CASES in the plan's
+/// build-gate scratch copy; the regenerate test prints it again on every run.
+const FIXTURE_SHA256: &str = "a894e619580db8ca0e06ebfe45576cc45722f695913bf46e9285201c95f146c3";
+const FIXTURE_PATH: &str = "testdata/record_class_vectors.json";
+
+fn fixture_path() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(FIXTURE_PATH)
+}
+
+#[test]
+fn every_case_classifies_as_its_row_says_and_refuses_with_its_line() {
+    for c in CASES {
+        let got = classify(c.record);
+        assert_eq!(format!("{got:?}"), c.class, "{}: {}", c.name, c.record);
+        match parse(c.record) {
+            Some(Err(e)) => assert_eq!(
+                Some(e.line(0)),
+                c.host_line.map(str::to_string),
+                "{}",
+                c.name
+            ),
+            Some(Ok(_)) | None => assert_eq!(c.host_line, None, "{}", c.name),
+        }
+    }
+}
+
+#[test]
+fn the_fixture_covers_every_class_and_every_8n_line_at_least_twice() {
+    let mut classes = std::collections::BTreeMap::<&str, usize>::new();
+    let mut lines = std::collections::BTreeMap::<String, usize>::new();
+    for c in CASES {
+        *classes.entry(c.class).or_default() += 1;
+        if let Some(l) = c.host_line {
+            // The line without its index, so "record 0:" does not split the tally.
+            *lines
+                .entry(l.trim_start_matches("record 0: ").to_string())
+                .or_default() += 1;
+        }
+    }
+    for cls in ["Key", "Hash", "Now", "Unknown"] {
+        assert!(
+            classes.get(cls).copied().unwrap_or(0) >= 2,
+            "class {cls}: {classes:?}"
+        );
+    }
+    for l in [
+        "key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record",
+        "hash: must be exactly 64 hex characters",
+        "now: must be <seconds>[,<height>] in range",
+    ] {
+        assert!(
+            lines.get(l).copied().unwrap_or(0) >= 2,
+            "line {l:?}: {lines:?}"
+        );
+    }
+    // §12 item 8: "each §6a malformation" — one named row per rule, so a Go port
+    // that ignores depth, hard-codes depth 4, reads the fingerprint
+    // case-insensitively (Go's hex.DecodeString does) or rejects tpub fails here.
+    let names: std::collections::BTreeSet<&str> = CASES.iter().map(|c| c.name).collect();
+    for required in [
+        "key-journey-cosigner-0",
+        "key-h-spelling",
+        "key-depth-3-valid",
+        "key-testnet-tpub-valid",
+        "key-bare-xpub",
+        "key-origin-no-path",
+        "key-origin-shorter-than-depth",
+        "key-origin-longer-than-depth",
+        "key-last-component-mismatch",
+        "key-depth-2-refused",
+        "key-depth-5-refused",
+        "key-fingerprint-uppercase",
+        "key-fingerprint-7-hex",
+        "key-origin-unterminated",
+        "key-body-not-hex",
+        "key-body-uppercase-hex",
+        "key-body-not-utf8",
+        "key-body-empty",
+        "key-uppercase-H-marker-out-of-scope",
+        "hash-valid",
+        "hash-valid-zeros",
+        "hash-31-bytes",
+        "hash-63-chars",
+        "hash-66-chars",
+        "hash-uppercase",
+        "hash-empty",
+        "now-seconds-only",
+        "now-seconds-and-height",
+        "now-min",
+        "now-max-both",
+        "now-zero-seconds",
+        "now-seconds-2^31",
+        "now-height-zero",
+        "now-height-at-time-threshold",
+        "now-trailing-comma",
+        "now-letters",
+        "now-body-not-hex",
+        "now-body-not-utf8",
+        "now-body-uppercase-hex",
+        "now-empty",
+    ] {
+        assert!(
+            names.contains(required),
+            "§6a rule without a fixture row: {required}"
+        );
+    }
+}
+
+#[test]
+fn the_committed_fixture_is_what_the_table_generates_and_carries_the_pinned_digest() {
+    let bytes = std::fs::read(fixture_path())
+        .expect("testdata/record_class_vectors.json exists; run the regenerate test");
+    let digest = hex(&sha2::Sha256::digest(&bytes));
+    assert_eq!(
+        digest, FIXTURE_SHA256,
+        "the fixture changed: re-pin here AND in the fork"
+    );
+    let on_disk: Vec<FixtureRow> = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(
+        on_disk,
+        fixture_rows(),
+        "the committed file is not what CASES generates; regenerate"
+    );
+}
+
+/// Regenerate after an intentional change:
+/// `cargo test --locked -p mnemonic-engrave --test sysw_composer_records regenerate -- --ignored --nocapture`
+/// then paste the printed sha256 into FIXTURE_SHA256 (and, at Stage 2, the fork).
+#[test]
+#[ignore]
+fn regenerate() {
+    let rows = fixture_rows();
+    let json = serde_json::to_string_pretty(&rows).unwrap() + "\n";
+    std::fs::write(fixture_path(), &json).unwrap();
+    println!("wrote {} rows to {}", rows.len(), fixture_path().display());
+    println!("sha256 {}", hex(&sha2::Sha256::digest(json.as_bytes())));
+}
