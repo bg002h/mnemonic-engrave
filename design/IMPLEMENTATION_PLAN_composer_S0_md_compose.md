@@ -1778,7 +1778,12 @@ pub fn pl(w: Wrapper, paths: Vec<SpendPath>) -> PathList {
 /// fingerprint case, the spec's three: `fp:distinct` (four distinct declared
 /// fingerprints), `fp:one-seed-one-path` (one master fingerprint on two or
 /// more slots of ONE path), `fp:one-seed-two-paths` (one master fingerprint
-/// across two or more paths); `fp:none` marks the unkeyed vectors.
+/// across two or more paths); `fp:none` marks the unkeyed vectors. `no-corpus`
+/// marks an entry pinned by these tests and the §5b cross-check but NOT stored
+/// in `MANIFEST`: the exporter and the corpus tests parse under the MINTING
+/// disposition, which after Task 8 refuses a signature-free path unless
+/// `--experimental`, so the two keyless-wsh vectors cannot be exported. Stage 2
+/// mirrors them from this list directly.
 pub fn family() -> Vec<(&'static str, PathList, String, Vec<&'static str>)> {
     let tr32: Vec<SpendPath> = (0..8).map(|_| k(4, 4)).collect();
     vec![
@@ -1856,10 +1861,10 @@ pub fn family() -> Vec<(&'static str, PathList, String, Vec<&'static str>)> {
         // ---- unkeyed: EXPERIMENTAL shapes and the size boundaries (more slots than the four journey keys)
         ("compose_wsh_keyless_hash_path", pl(Wrapper::Wsh, vec![k(2, 3), kl(H, Some(Lock::AfterHeight(1_383_520)))]),
          format!("wsh(or_d(multi(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:sha256({HH}),after(1383520))))"),
-         vec!["w:wsh", "paths:2", "head:bare-multi", "keyless-wsh", "hash", "lock:height", "ik:none", "fp:none", "origins:default-wsh"]),
+         vec!["w:wsh", "paths:2", "head:bare-multi", "keyless-wsh", "hash", "lock:height", "ik:none", "fp:none", "origins:default-wsh", "no-corpus"]),
         ("compose_wsh_keyless_hash_only", pl(Wrapper::Wsh, vec![k(1, 1), kl(H, None)]),
          format!("wsh(or_i(pkh(@0/<0;1>/*),sha256({HH})))"),
-         vec!["w:wsh", "paths:2", "head:single", "keyless-wsh", "hash", "lock:none", "ik:none", "fp:none", "origins:default-wsh"]),
+         vec!["w:wsh", "paths:2", "head:single", "keyless-wsh", "hash", "lock:none", "ik:none", "fp:none", "origins:default-wsh", "no-corpus"]),
         ("compose_wsh_eight_paths", pl(Wrapper::Wsh, (0..8).map(|i| lk(k(1, 1), Lock::OlderBlocks(100 + i))).collect()),
          "wsh(or_i(and_v(v:pkh(@0/<0;1>/*),older(100)),or_i(and_v(v:pkh(@1/<0;1>/*),older(101)),or_i(and_v(v:pkh(@2/<0;1>/*),older(102)),or_i(and_v(v:pkh(@3/<0;1>/*),older(103)),or_i(and_v(v:pkh(@4/<0;1>/*),older(104)),or_i(and_v(v:pkh(@5/<0;1>/*),older(105)),or_i(and_v(v:pkh(@6/<0;1>/*),older(106)),and_v(v:pkh(@7/<0;1>/*),older(107))))))))))".to_string(),
          vec!["w:wsh", "paths:8", "head:locked", "lock:blocks", "ik:none", "fp:none", "origins:default-wsh"]),
@@ -1913,7 +1918,11 @@ fn every_family_entry_renders_as_listed() {
 fn every_compose_vector_in_the_manifest_is_exactly_what_compose_renders() {
     // MANIFEST templates carry inline origins (the parse-input form), so the
     // comparison is against `template_with_origins`.
-    for (name, list, _, _) in &family() {
+    for (name, list, _, tags) in &family() {
+        if tags.contains(&"no-corpus") {
+            assert!(MANIFEST.iter().all(|v| v.name != *name), "{name}: a no-corpus vector must not be in MANIFEST (the exporter would refuse it)");
+            continue;
+        }
         let v = MANIFEST.iter().find(|v| v.name == *name).unwrap_or_else(|| panic!("MANIFEST lacks {name}"));
         let c = compose(list).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(template_with_origins(&c).unwrap(), v.template, "{name}");
@@ -1991,7 +2000,10 @@ The MANIFEST form is `template_with_origins` (inline origins, the parse-input fo
 ```rust
 #[test]
 fn print_family_templates_for_the_manifest() {
-    for (name, list, _, _) in family() {
+    for (name, list, _, tags) in family() {
+        if tags.contains(&"no-corpus") {
+            continue;
+        }
         let c = compose(&list).unwrap();
         println!("{name}\t{}", template_with_origins(&c).unwrap());
     }
@@ -1999,9 +2011,9 @@ fn print_family_templates_for_the_manifest() {
 ```
 
 Run: `cargo nextest run --locked -p md-codec --test compose_vectors print_family --no-capture 2>&1 | grep -E 'compose_'`
-Expected: twenty-eight `name<TAB>template` lines.
+Expected: twenty-six `name<TAB>template` lines (the two `no-corpus` keyless-wsh vectors are not printed: they live in `family()` and the cross-check only).
 
-Add to `crates/md-codec/src/test_vectors.rs`, inside `MANIFEST` after the last existing entry, one `Vector { .. }` per printed line, `template` pasted verbatim. For every `keyed_compose_*` entry bind the journey keys to slots in emitted order with fingerprint `[0x73, 0xc5, 0xda, 0x0a]` on each (the origins are INLINE in the template, so `path: None`), EXCEPT the two `*_distinct_fingerprints` entries, which bind the same keys with fingerprints `(0, [0x11; 4]), (1, [0x22; 4]), (2, [0x33; 4]), (3, [0x44; 4])` (a master fingerprint is a declaration the xpub cannot contradict, so any value is legal). The six `compose_*` (unkeyed) entries keep their inline origins too (the composed policies have no canonical origin for the encoder to default to) and leave `keys: &[]`, `fingerprints: &[]`; they need no keys because `compose_wsh_eight_paths`, `compose_tr_seven_leaves`, `compose_wsh_thirty_two_slots` and `compose_tr_thirty_two_slots` exceed the four journey keys, and the two keyless-path vectors exist to pin the EXPERIMENTAL shape. Use `force_chunked: false` except where the exporter reports `PayloadTooLongForSingleString`, in which case set it `true`. The four journey xpubs, in slot order @0..@3, are the `XPUB` constants of Task 4 (copy them; the manifest is `&'static str`).
+Add to `crates/md-codec/src/test_vectors.rs`, inside `MANIFEST` after the last existing entry, one `Vector { .. }` per printed line, `template` pasted verbatim. For every `keyed_compose_*` entry bind the journey keys to slots in emitted order with fingerprint `[0x73, 0xc5, 0xda, 0x0a]` on each (the origins are INLINE in the template, so `path: None`), EXCEPT the two `*_distinct_fingerprints` entries, which bind the same keys with fingerprints `(0, [0x11; 4]), (1, [0x22; 4]), (2, [0x33; 4]), (3, [0x44; 4])` (a master fingerprint is a declaration the xpub cannot contradict, so any value is legal). The four `compose_*` (unkeyed) entries keep their inline origins too (the composed policies have no canonical origin for the encoder to default to) and leave `keys: &[]`, `fingerprints: &[]`; they need no keys because `compose_wsh_eight_paths`, `compose_tr_seven_leaves`, `compose_wsh_thirty_two_slots` and `compose_tr_thirty_two_slots` exceed the four journey keys. The two keyless-path vectors (`compose_wsh_keyless_hash_path`, `compose_wsh_keyless_hash_only`) are `no-corpus`: NOT pasted, because `md vectors` and the corpus tests parse every MANIFEST template under the minting disposition (`parse_template` passes `Disposition::Refuse`, `crates/md-cli/src/parse/template.rs:2618`), which after Task 8 refuses a signature-free path without `--experimental`. They stay pinned by `every_family_entry_renders_as_listed` and the §5b cross-check, and Stage 2 mirrors them from `family()`. Use `force_chunked: false` except where the exporter reports `PayloadTooLongForSingleString`, in which case set it `true`. The four journey xpubs, in slot order @0..@3, are the `XPUB` constants of Task 4 (copy them; the manifest is `&'static str`).
 
 Template example for the first entry, as the printer emits it (do not retype the others; paste them):
 
@@ -2021,7 +2033,7 @@ with `const XPUB_JOURNEY_0: &str = "xpub6DkFAXW...";` (and 1..3) declared above 
 - [ ] **Step 4: Run every corpus test and the exporter**
 
 Run: `cargo nextest run --locked -p md-codec 2>&1 | tail -8 && cargo run --locked -p md-cli -- vectors --out /tmp/compose-vectors >/dev/null && ls /tmp/compose-vectors | grep -c 'keyed_compose_.*conformance.json'`
-Expected: all md-codec tests PASS (including the pre-existing corpus tests that iterate `MANIFEST`: a compose vector that they reject is a defect to fix in the lowering, not in the test); the exporter writes 22 `keyed_compose_*.conformance.json` files (the keyed count in `family()`). Then `cargo nextest run --locked -p md-cli` must also PASS: `template_roundtrip.rs`, `vector_corpus.rs` and `corpus_origin_consistency.rs` iterate `MANIFEST` through the real parser and encoder.
+Expected: all md-codec tests PASS (including the pre-existing corpus tests that iterate `MANIFEST`: a compose vector that they reject is a defect to fix in the lowering, not in the test); the exporter writes 22 `keyed_compose_*.conformance.json` files (the keyed count in `family()`; 26 compose entries in MANIFEST, 28 in `family()`). Then `cargo nextest run --locked -p md-cli` must also PASS: `template_roundtrip.rs`, `vector_corpus.rs` and `corpus_origin_consistency.rs` iterate `MANIFEST` through the real parser and encoder.
 
 - [ ] **Step 5: Format, clippy, commit**
 
@@ -2030,7 +2042,7 @@ Expected: clean.
 
 ```bash
 git add crates/md-codec/src/test_vectors.rs crates/md-codec/tests/compose_support.rs crates/md-codec/tests/compose_vectors.rs crates/md-codec/tests/compose_crosscheck.rs
-git commit -m "md-codec: compose vector family -- 28 tagged vectors, every required tag twice, the 5b cross-check over all of them, keyed ones export conformance.json (composer S0 task 5)
+git commit -m "md-codec: compose vector family -- 28 tagged vectors (26 in MANIFEST), every required tag twice, the 5b cross-check over all of them, keyed ones export conformance.json (composer S0 task 5)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
@@ -2700,7 +2712,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 - Test: `crates/md-cli/tests/cli_compose_encode_gate.rs`
 
 **Interfaces:**
-- Consumes: `miniscript::Descriptor::sanity_check`, `Miniscript::ext_check(&ExtParams)`, `miniscript::descriptor::ShInner`, `Wsh::as_inner() -> &Miniscript<Pk, Segwitv0>`, `Sh::as_inner() -> &ShInner<Pk>` (all present at the pinned miniscript `ff4732e`).
+- Consumes: `miniscript::Descriptor::sanity_check`, `Miniscript::ext_check(&ExtParams) -> Result<(), AnalysisError>` (rust-miniscript's `analyzable.rs`, line 242 at the pinned `ff4732e`; a git dependency, so outside the cite gate's roots), `miniscript::descriptor::ShInner::{Wsh, Wpkh, Ms}`, `Wsh::as_inner() -> &Miniscript<Pk, Segwitv0>`, `Sh::as_inner() -> &ShInner<Pk>`.
 - Produces: `md encode` refusing "All spend paths must require a signature" for `wsh`/`sh(wsh)`/`sh` exactly as it already does for `tr`, and admitting the shape with `--experimental` plus the existing warning.
 
 **Why this is in Stage 0.** Measured at `3b0944fb` with `target/debug/md`: `md encode` on `wsh(or_d(multi(2,...),and_v(v:sha256(H),after(1383520))))` exits 0 with no warning, keyed (`--key @0..@2`) or unkeyed; the same shape under `tr` is refused with `template parse error: miniscript parse failed: All spend paths must require a signature`. Cause: `Descriptor::from_str` runs the sanity gate only for `tr` (the code's own comment at `crates/md-cli/src/parse/template.rs:2678` calls it "`from_str`'s tr-only sanity gate"), and `parse_template_ext` never calls `sanity_check()` itself. After Task 6, `md compose` refuses that shape without `--experimental` and then prints a template `md encode` accepts silently — the EXPERIMENTAL gate one command deep. Follow-up `md-encode-keyless-template-sigless-path-not-gated` in descriptor-mnemonic `design/FOLLOWUPS.md` is owned by this stage.
@@ -2794,21 +2806,30 @@ In `crates/md-cli/src/parse/template.rs`, `parse_template_ext`, replace the `let
         )
         .map_err(|e| CliError::TemplateParse(format!("miniscript parse failed: {e}")))?;
         let relaxed = miniscript::miniscript::analyzable::ExtParams::new().top_unsafe();
-        let relaxed_err = |e: miniscript::Error| {
+        // `ext_check` returns miniscript's analysis error, not `miniscript::Error`;
+        // a generic helper takes whatever it is.
+        fn relaxed_err<E: std::fmt::Display>(e: E) -> CliError {
             CliError::TemplateParse(format!(
                 "miniscript parse failed even with --experimental: {e} \
                  (--experimental relaxes ONLY the signature rule; malleability, \
                  resource limits, repeated keys and timelock mixing still apply)"
             ))
-        };
+        }
+        // MINTING verbs only (`Disposition::Refuse`: encode). Reading verbs
+        // (`Warn`: verify, inspect) must keep reading already-engraved plates
+        // whose shapes the sanity rules reject -- the N1 C1 placement
+        // constraint; measured: an unconditional check here made `md verify`
+        // refuse a legacy `sh(multi(1,@0/**,@0/**))` plate (repeated keys),
+        // failing n1_admission_taxonomy's two reading-verb tests.
+        let minting = matches!(reuse, crate::parse::reuse::Disposition::Refuse);
         match &d {
             MsDescriptor::Tr(inner) => {
                 for item in inner.leaves() {
                     item.miniscript().ext_check(&relaxed).map_err(relaxed_err)?;
                 }
             }
-            MsDescriptor::Wsh(w) => w.as_inner().ext_check(&relaxed).map_err(relaxed_err)?,
-            MsDescriptor::Sh(sh) => match sh.as_inner() {
+            MsDescriptor::Wsh(w) if minting => w.as_inner().ext_check(&relaxed).map_err(relaxed_err)?,
+            MsDescriptor::Sh(sh) if minting => match sh.as_inner() {
                 miniscript::descriptor::ShInner::Wsh(w) => w.as_inner().ext_check(&relaxed).map_err(relaxed_err)?,
                 miniscript::descriptor::ShInner::Ms(ms) => ms.ext_check(&relaxed).map_err(relaxed_err)?,
                 miniscript::descriptor::ShInner::Wpkh(_) => {}
@@ -2821,19 +2842,22 @@ In `crates/md-cli/src/parse/template.rs`, `parse_template_ext`, replace the `let
             .map_err(|e| CliError::TemplateParse(format!("miniscript parse failed: {e}")))?;
         // `from_str` runs the sanity gate for `tr` only; `md compose` refuses a
         // signature-free path under every wrapper, and `encode` must agree
-        // (follow-up md-encode-keyless-template-sigless-path-not-gated).
-        d.sanity_check()
-            .map_err(|e| CliError::TemplateParse(format!("miniscript parse failed: {e}")))?;
+        // (follow-up md-encode-keyless-template-sigless-path-not-gated). MINTING
+        // verbs only, for the reason given in the experimental branch above.
+        if matches!(reuse, crate::parse::reuse::Disposition::Refuse) {
+            d.sanity_check()
+                .map_err(|e| CliError::TemplateParse(format!("miniscript parse failed: {e}")))?;
+        }
         d
     };
 ```
 
-If `ext_check`'s error type is not `miniscript::Error` at the pinned revision, type the closure to whatever `item.miniscript().ext_check(&relaxed)` returns; the existing `tr` arm shows the working call.
+`ext_check` returns miniscript's analysis error type, not `miniscript::Error` (a typed closure fails with E0631 at the pinned revision, measured); the generic `relaxed_err` above accepts it. Machine-checked by the controller in the gate's scratch copy before this plan was committed: see the fold commit message for the md-cli suite result.
 
 - [ ] **Step 4: Run the md-cli suite WHOLE, and read any pre-existing failure as a finding**
 
 Run: `cargo nextest run --locked -p md-cli 2>&1 | tail -12`
-Expected: all PASS, including `cli_compose_encode_gate`, `cmd_encode`'s `experimental_admits_a_keyless_spend_path` (tr, unchanged) and every corpus test. **If a PRE-EXISTING test or corpus vector is now refused by `sanity_check` (malleability, timelock mixing, resource limits), STOP and report it: a shipped template that rust-miniscript's sanity rules reject is a finding for the operator, not something to relax here.** Then: `cargo nextest run --locked -p md-codec 2>&1 | tail -3` (unchanged, must stay green).
+Expected: all PASS, including `cli_compose_encode_gate`, `cmd_encode`'s `experimental_admits_a_keyless_spend_path` (tr, unchanged), `n1_admission_taxonomy`'s two reading-verb tests (`r_n1a_card_verifies_at_exit_0_with_a_warning`, `verify_template_warns_and_completes_on_a_refused_shape` — these are WHY the gate is minting-only; an unconditional gate failed both, measured in the plan's scratch copy) and every corpus test. **If a PRE-EXISTING test or corpus vector is now refused by `sanity_check` (malleability, timelock mixing, resource limits), STOP and report it: a shipped template that rust-miniscript's sanity rules reject is a finding for the operator, not something to relax here.** Then: `cargo nextest run --locked -p md-codec 2>&1 | tail -3` (unchanged, must stay green).
 
 - [ ] **Step 5: Format, clippy, commit**
 
@@ -2864,7 +2888,7 @@ Expected: fmt clean, clippy clean, every test PASS, doctests PASS. (`cargo test`
 - [ ] **Step 2: Regenerate and diff the vector corpus**
 
 Run: `cargo run --locked -p md-cli -- vectors --out crates/md-codec/tests/vectors 2>&1 | tail -2 && git status --short crates/md-codec/tests/vectors | head -30`
-Expected: only NEW `compose_*` / `keyed_compose_*` files appear; no existing vector file changes (a changed pre-existing file means the lowering or the exporter altered something it must not).
+Expected: only NEW `compose_*` / `keyed_compose_*` files appear (26 vectors' worth; the two `no-corpus` entries produce none); no existing vector file changes (a changed pre-existing file means the lowering or the exporter altered something it must not).
 
 - [ ] **Step 3: Record the release note and commit**
 
@@ -2898,4 +2922,6 @@ Result at the round-0 fold commit: md-codec builds; 51 of 52 compose tests pass 
 
 Two tests pass VACUOUSLY in the gate because `MANIFEST` holds no compose entry there: `every_compose_manifest_entry_is_in_the_family` and `keyed_compose_vectors_bind_at_most_the_four_journey_keys` (0 iterations). Task 5's paste makes both real; until then they prove nothing and are not counted as coverage.
 
-NOT covered, and therefore a reviewer's execution pass: the `main.rs` clap variant and dispatch arm (so `cli_compose.rs` compiles but its assertions never run against a wired binary); Task 8's `parse/template.rs` change and `cli_compose_encode_gate.rs`'s assertions (the file compiles; the behaviour needs the modified binary); the `test_vectors.rs` MANIFEST entries (pasted from the printer in Task 5); `lib.rs` beyond the module line; whether the pre-existing md-cli corpus tests accept the 28 new MANIFEST entries and the sanity gate (Task 5's and Task 8's steps that run `cargo nextest run --locked -p md-cli`); the `md vectors` export count; the Go port.
+NOT covered by the gate: the `main.rs` clap variant and dispatch arm; Task 8's `parse/template.rs` change; the `test_vectors.rs` MANIFEST entries (pasted from the printer in Task 5); `lib.rs` beyond the module line; the `md vectors` export count; the Go port.
+
+Checked BY HAND at the round-1 fold, in the gate's scratch copy with the `main.rs` fragments and Task 8's `parse/template.rs` fragment applied: `cargo nextest run -p md-cli --locked --no-fail-fast` → 761 passed, 0 failed, 1 skipped — every `cli_compose.rs` assertion, every `cli_compose_encode_gate.rs` assertion, and the pre-existing suite including `n1_admission_taxonomy`'s reading-verb tests (which the first, unconditional draft of Task 8 had failed). Still unchecked by anything but the implementer's Task 5 and Task 9 runs: the 26 pasted MANIFEST entries through the corpus tests and the exporter.

@@ -91,7 +91,9 @@ reads in S2).
 
 **Delivers (spec §9 items 1, 2, 8; §12 items 1, 6, 7, 8):** a Go tree BUILDER
 that constructs a `descriptor` from a path list and emits chunk-form md1 via
-`split`, byte-identical to every S0 vector; the `pk_h` emitter arm in both
+`split`, byte-identical to every S0 vector (the 26 in the corpus, plus the two
+`no-corpus` keyless-wsh entries of S0's `family()`, mirrored as Go test cases
+because the exporter cannot emit an EXPERIMENTAL shape); the `pk_h` emitter arm in both
 contexts with the address-changes mutation test; `md.PolicyShape` split of
 `or_i`/`or_d`/`andor` into separate branches carrying lock operands and digests;
 the `3'` origin arm; `mk.Encode` minting with appended stubs; the device-side
