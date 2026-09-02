@@ -343,6 +343,29 @@ NOT operator rulings:
 Minors and nits from the four reports are recorded in the reports and not yet
 folded; they do not gate.
 
+**Round 1 fold (2026-09-01, after fold-verification 46/48 FIXED, journey2 1C/9I,
+feasibility 1C/4I) — further controller defaults:**
+
+10. **A sixth preset, plain k-of-n multisig** (one unlocked `sortedmulti` path),
+    the Multisig Build shape C7 migrates; presets under legacy wrappers limited
+    to it; legacy wrappers are sorted-only (no §8b confirm there).
+11. **Malformed payload records are refused on the HOST** (`me sysw pack`,
+    `pack_with`) with named lines; on the device they go INERT under the shipped
+    contract and the door's key count is the only signal — the spec says so
+    instead of promising a device screen it cannot have.
+12. **Discard-on-edit fires on ANY shape change, wrapper included**, and only
+    once at least one slot is assigned (journey2 C-1, M-2).
+13. **Hash pick-list rows** are `hash <i>  <first8>..<last8>` in pack order;
+    typed hex must be exactly 64 valid hex characters.
+14. **Acceptance vectors are tagged coverage (each rule tag in ≥ 2 vectors,
+    ~50-60 vectors), not the 28,800-cell product** (feasibility I-4).
+15. **The total slot cap of 32** is now in the grammar (feasibility C-1; md1's
+    5-bit `path_decl.n`).
+16. Declined: feasibility M-1 said `mk encode --keys` does not exist — it exists
+    in the repo's unreleased build (`mnemonic-key/target/release/mk`) but not in
+    the installed 0.13.0; the spec now cites `md decompose`'s key form instead
+    and leans on neither.
+
 ## 4. Open questions, in the order they will be asked
 
 1. **Seating design.** RULED: C8 (payload pick list, slot-directed), C12 (seeds

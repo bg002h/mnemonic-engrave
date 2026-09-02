@@ -1,10 +1,11 @@
 # SPEC — Wallet Policy COMPOSER: on-device authoring of arbitrary tr/wsh wallet policies (spend-path grammar)
 
-**STATUS: DRAFT 2026-09-01, R0 ROUND 0 FOLDED (4 lenses, 14C/34I/31M/11N;
-reports `composer-spec-R0-r0-{correctness,adversarial,journey,coverage}.md`),
-RE-REVIEW NOT YET RUN.** Sections 4-14 were regenerated in the fold; controller
-defaults taken there are listed in the brainstorm record section 3.12 for the
-operator's veto.
+**STATUS: DRAFT 2026-09-01, R0 ROUNDS 0 AND 1 FOLDED.** Round 0: 4 lenses,
+14C/34I (`composer-spec-R0-r0-*.md`), all folded at `bc1c07c`. Round 1: fold
+verification (46 FIXED / 1 PARTIAL / 0 NOT FIXED), a second journey walk
+(1C/9I/6M/2N) and an implementation-feasibility lens (1C/4I/6M/2N)
+(`composer-spec-R0-r1-*.md`), all C/I and the applicable M/N folded here.
+Controller defaults are listed in the brainstorm record section 3.12.
 Every ruling cited as `Cn` is the operator's, recorded verbatim in
 `design/BRAINSTORM_wallet_policy_composer.md` section 2; every `file:line` was measured
 against the heads below on 2026-09-01. Nothing may be implemented from this
@@ -48,20 +49,20 @@ tapping, and the Rust-first definition of what that tapping produces.
 | C3 | firmware-resident vocabulary, defined Rust-first | §5, §10 |
 | C4 | template first: compose the keyless shape, then seat keys | §7 |
 | C5 | one slot, one path; a person in two paths holds two keys from two hardened accounts | §4b, §7d |
-| C6 | front door = "Build" inside Wallet Policy; the door becomes a choice in every state | §7a |
+| C6 | front door = "Build" inside Wallet Policy; the door becomes a choice in every state | §6a, §7a |
 | C7 | Multisig Build deprecated by COMMENT only, no enforcement | §8e, §9 |
 | C8 | seating is payload-first (NFC later): slot-directed pick list of the payload's keys | §7d |
 | C9 | teach the mk1 stub after authoring, unconditionally; both stubs after seating | §7c |
 | C10 | engraved FORM is the operator's choice: concrete policy (text / QR / keyed md1) or template + key cards | §7f |
 | C11 | timelock UI respects the very different ranges of the lock kinds | §6b |
-| C12 | seeds (BIP-39 words or ms1) are a key source, via the unsealed payload or the keyboard | §7d |
+| C12 | seeds (BIP-39 words or ms1) are a key source, via the unsealed payload or the keyboard | §6a, §7d |
 | C13 | seed-derived slots get Full / Watch-only modes; the secret's plate form is the operator's choice | §7f |
 | C14 | no Sealed-Payload-grade memory treatment; scrub on exit as Multisig Build does | §9 |
 | C15 | the lowering lives in md-codec as `compose`, surfaced as `md compose` | §10 |
 | C16 | grammar bounds approved; keyless paths and unsorted `multi` behind EXPERIMENTAL | §4 |
 | C17 | one key: `pkh` in wsh, `pk` in tr (F-448 filed) | §5 |
 | C18 | NUMS spelled raw `H` this cycle; BIP-388 gap documented; F-449 filed | §5c, §8f |
-| C19-C23 | review findings adopted: first-appearance numbering, `or_i(pkh)` head, `or_d` only for a bare multi head, keyless wsh-only, lock-only refused, ≥1 keyed path, first-listed single key as internal key, lock ranges sourced | §5 |
+| C19-C23 | review findings adopted (C22 withdrawn by C23): first-appearance numbering, `or_i(pkh)` head, `or_d` only for a bare multi head, keyless wsh-only, lock-only refused, ≥1 keyed path, first-listed single key as internal key, lock ranges sourced | §5 |
 | C24 | pack time reaches the device as a payload item, a LOWER bound on now | §6a, §6b |
 | C25 | entry UX adopted: kind → unit → digits → echo; digit pad; `hash:` record or typed hex | §6b, §6c |
 | C26 | Build with no payload is allowed: the result is a keyless TEMPLATE | §7b, §7e |
@@ -73,7 +74,7 @@ tapping, and the Rust-first definition of what that tapping produces.
 
 | capability | state | evidence |
 | --- | --- | --- |
-| Wallet Policy program: payload cards → gather → consent (summary, named id, receive+change) → review → engrave | shipped | `gui/wallet_policy.go:35-142` |
+| Wallet Policy program: payload cards → gather → consent (summary, named id, receive+change) → review → engrave | shipped | `gui/wallet_policy.go:35-300` |
 | Seat mk1 cards into a keyless template by declaration match | shipped | `gui/key_card_seating.go:53` |
 | Serialise any tree to md1 (keyed or keyless) | exists, not exposed as a builder | `md/encode.go:159`, `:374`, `:461` |
 | Emit Script for fragments | all but `andor`, `pk_h` | `md/script_emit.go` cases; `grep -c tagAndOr` = 0, `grep -c tagPkH` = 0 |
@@ -82,7 +83,7 @@ tapping, and the Rust-first definition of what that tapping produces.
 | Form-aware wallet id and stub | shipped | `md/template_id.go:122,163` |
 | Re-mint an mk1 card | exists | `mk/encode.go:39` `Encode` (deterministic) |
 | Seed entry: payload words / typed words | shipped; ms1 legs exist elsewhere | `gui/derive_xpub.go:104`, `gui/gui.go:1262`, `gui/gui.go:2856` |
-| Multisig Build: per-slot accounts by ordinal, passphrase per seed, Full/Watch-only | shipped | `gui/multisig_build.go:594-601`, `:738`, `gui/multisig_build_census.go:475` |
+| Multisig Build: per-slot accounts by ordinal, passphrase per seed, Full/Watch-only mode labels | shipped | `gui/multisig_build.go:594-601`, `:738`, `gui/multisig_build_census.go:475` (the Full label) |
 | Text plates (greedy packing) and 16-symbol structured-append QR plates | shipped in Engrave Transaction | `gui/transaction.go:1145`, `:1369`; `txqr.MaxSymbols = 16` |
 | Payload: prefixed records `text:`/`pass:` with hex bodies, matched before sniffers, reserved | shipped | `SPEC_systemwide_payloads.md` section 5.3 |
 | Payload region | 64 KiB | `sysw/wire.go:28` |
@@ -90,12 +91,17 @@ tapping, and the Rust-first definition of what that tapping produces.
 | Device clock | none; `time.Now` drives timeouts only | `gui/gui.go:128,139,442` |
 | Numeric entry widget | none; passphrase keyboard has a digits page mixed with punctuation | `gui/passphrase_keyboard.go:21` |
 | md admission: nested `sortedmulti`/`sortedmulti_a` | refused; whole script / whole leaf only | brainstorm record section 3.8 |
-| md admission: keyless tap leaf | refused ("All spend paths must require a signature") | brainstorm record section 3.7, review I2 |
+| md admission: keyless tap leaf | refused ("All spend paths must require a signature") | first review, I2 |
+| md1 TOTAL slot count | 1..=32 per descriptor (5-bit `path_decl.n`) | `md/md.go:215-221`; `crates/md-codec/src/error.rs:57-59`; measured: 36 slots refused, 32 encode |
+| Firmware headroom | 1,503,652 B flash / 62,592 B RAM (r1, TinyGo 0.41.1, pico2) | feasibility report point 6 |
 | md admission: `older(0x400000)` | ACCEPTED (defect, filed `md-older-zero-time-units-not-refused`) | brainstorm record, C20 |
 
 ## 4. The grammar — NORMATIVE
 
 A **policy** is an ordered list of 1 to 8 **spend paths** under one **wrapper**.
+"Path" below always means a spend path; a derivation path is always called an
+origin. One lock per spend path (§4b) is what discharges C11's mixing rule: a
+height lock and a time lock can never meet inside one `and_v` chain.
 
 ### 4a. Wrapper
 
@@ -115,7 +121,7 @@ A path is `KEYS` ∧ optional `HASH` ∧ optional `LOCK`, where:
 | `HASH` | at most one `sha256(H)`, H = 32 bytes, the SHA-256 of a 32-byte preimage (§6c) | both reference wallets use sha256 only; `hash256`/`ripemd160`/`hash160` stay decodable, not composable |
 | `LOCK` | at most one of `older` or `after`, values per §4c | C11, C20 |
 | keyless path | `HASH` with or without `LOCK`, no `KEYS`: **wsh only, EXPERIMENTAL, confirm-to-proceed** (C16) | a lock-only path (no keys, no hash) is REFUSED: anyone can spend after N |
-| policy | at least one path has `KEYS` (BIP-388 l.191); if EVERY path carries `HASH`, the §8h warning fires before consent | review r0 |
+| policy | at least one path has `KEYS` (BIP-388 l.191); if EVERY path carries `HASH`, the §8h warning fires before consent; the policy's TOTAL slot count is 1..=32 (the wire's 5-bit `path_decl.n`, `md/md.go:215-221`, `crates/md-codec/src/error.rs:57-59`; measured r1) | reviews r0, r1 |
 
 ### 4c. Lock values — SOURCED (C20)
 
@@ -136,7 +142,7 @@ is the acceptance that fails if it does not.
 
 The five toolkit archetypes — simple-timelocked-inheritance, kofn-recovery,
 tiered-recovery, hashlock-gated, decaying-multisig — are offered as one-tap
-presets that POPULATE a path list the operator then edits (§9 item 10). They are
+presets that POPULATE a path list the operator then edits (§9 item 5), plus a sixth, **plain k-of-n multisig** (one unlocked, unhashed `sortedmulti` path), which is the Multisig Build shape C7 migrates; presets are offered under `wsh` and `tr`; under `sh`/`sh(wsh)` only the plain k-of-n preset is offered. They are
 the same spend conditions as `mnemonic build-descriptor`'s goldens but NOT
 byte-identical to them (brainstorm record section 3.7). **This generalises:** the
 lowering is ONE fixed spelling, so any policy the operator also holds elsewhere in
@@ -148,11 +154,11 @@ so (§8d).
 
 | condition | outcome |
 | --- | --- |
-| no path with keys | REFUSE: "Every wallet needs at least one path with a key." |
-| a path with neither keys nor hash | REFUSE: "A path with only a time lock means anyone can spend after it. Add a key or a hash." |
-| keyless path under `tr` | REFUSE: "Taproot cannot hold a key-less path. Use wsh, or add a key." |
-| more than 8 paths, or n > 9 in a path, or n = 1 under `sh`/`sh(wsh)` | REFUSE at the picker (the picker does not offer the value) |
-| `sh`/`sh(wsh)` with anything other than ONE unlocked, unhashed path whose key set has n ≥ 2 | REFUSE: "Legacy wrappers hold one plain multisig only. Use wsh or tr." |
+| no path with keys | REFUSE, §8m line 1 |
+| a path with neither keys nor hash | REFUSE, §8m line 2 |
+| keyless path under `tr` | REFUSE, §8m line 3 (a policy choice of this build, not a taproot limit) |
+| more than 8 paths, or n > 9 in a path, or n = 1 under `sh`/`sh(wsh)`, or a 33rd slot | REFUSE at the picker (the picker does not offer the value); the slot cap says §8m line 5 |
+| `sh`/`sh(wsh)` with anything other than ONE unlocked, unhashed path whose key set has n ≥ 2 | REFUSE, §8m line 4; the legacy wrappers are sorted-only, so the §8b confirm is never offered under them (feasibility M-5) |
 | a taproot key-path slot that is also in a leaf | cannot occur (C5) |
 
 ### 4f. Key origins of slots (C28; corrected r0)
@@ -208,8 +214,9 @@ must produce byte-identical templates for every composable list.
   as the drop-in if C17 is ever revisited (C21).
 - `or_d` over a bare `multi(k)` head: −2 WU per head spend, +k WU per other
   spend, no key exposure (M3); kept (C23).
-- Conjunct order is byte-identical while LOCK is last; LOCK anywhere else costs
-  +1 byte (N1). Leaf text order at a node does not change the address (N2).
+- Conjunct order has identical witness-byte cost while LOCK is last; LOCK anywhere
+  else costs +1 script byte (N1). "Byte-identical" elsewhere in this spec means the
+  ENCODED artifact, chunk by chunk. Leaf text order at a node does not change the address (N2).
 - Nested `sortedmulti`/`sortedmulti_a` are refused by md and by BIP-383/388, so a
   locked or non-sole multi-key path is necessarily unsorted; the §8b confirm
   fires ONLY where sorted was legal and declined, never on a lowering-forced
@@ -248,7 +255,7 @@ secret.
 
 | record | body | decoded meaning | class |
 | --- | --- | --- | --- |
-| `key:<hex>` | hex of the UTF-8 text `[fingerprint/path]xpub` (BIP-380 key-origin notation, the same line `mk encode --keys` reads) | one candidate key for seating | `ClassKey` NEW |
+| `key:<hex>` | hex of the UTF-8 text `[fingerprint/path]xpub` (BIP-380 key-origin notation, the key form `md decompose` prints) | one candidate key for seating | `ClassKey` NEW |
 | `hash:<hex>` | the 32-byte digest itself, 64 lowercase hex | one candidate `sha256` hashlock | `ClassHash` NEW |
 | `now:<hex>` | hex of the UTF-8 text `<unix-seconds>[,<block-height>]` | the PACK time and optional height: a LOWER BOUND on the present (C24) | `ClassNow` NEW |
 
@@ -258,8 +265,19 @@ NON-EMPTY origin (an md1 slot carries a path; F-166 pathless is open), an xpub a
 depth 3 or 4 (md's own `--key` rule), and an origin whose component count equals
 the xpub's depth; a bare xpub is refused naming the fix. `hash:` MUST decode to
 exactly 32 bytes. `now:` MUST match `^[0-9]{1,10}(,[0-9]{1,9})?$` with seconds in
-`1..=2147483647`; at most ONE `now:` record per payload, two or more is a refusal.
-Uppercase hex anywhere is not valid hex (section 5.3).
+`1..=2147483647` and the height, when present, in `1..=499,999,999` (§4c's height
+band). Uppercase hex anywhere is not valid hex (section 5.3). **Where the refusals
+live:** a malformed record is refused on the HOST by `me sysw pack`, which already
+walks the whole record vector and refuses an unclassifiable record by index
+(`crates/me-cli/src/sysw/mod.rs:288` `pack_with`); the per-failure lines of §8n
+are its lines. On the DEVICE a record that fails classification goes INERT under
+the shipped contract (`sysw/descriptor.go:46-48`: "stays in the session, is offered
+to nobody, and reaches no screen"), so the door's "Keys loaded: N" (§7a) is the
+device's only signal and the spec says so rather than promising a screen. The
+payload-wide rule "at most ONE `now:` record" is enforced at the two sites that
+see the whole payload: host `pack_with` and device `syswSession.load`
+(`gui/sysw_session.go:80`); two or more is a host refusal (§8n) and, on the device,
+inert `now:` records with the door showing no bound.
 
 Why `key:` exists: today a bare xpub line packs as a `pkh(xpub)` single-sig
 WALLET and a `[fp/path]xpub` line is refused (brainstorm record section 3.6).
@@ -307,8 +325,8 @@ inside §4c's time row.
 
 **The bound line.** When `now:` is present its seconds field bounds dates and its
 height field bounds heights; a field that is absent bounds nothing. A date or
-height BELOW its bound → REFUSE: "That is before this payload was packed. Choose a
-later date." Above it → echo "at least N days after this payload was packed on
+height BELOW its bound → REFUSE with §8o (dates: "Choose a later date."; heights:
+"Choose a later height."). Above it → echo "at least N days after this payload was packed on
 <pack date>" (dates) or "at least N blocks after the packed height" (heights).
 When the relevant field is ABSENT the echo carries instead: "This device cannot
 tell the time. Nothing here has checked that this is in the future." The copy
@@ -319,8 +337,7 @@ in blocks or 388 days in time. Use an absolute date."
 
 ### 6c. Hashlock entry (C25; r0 C-4)
 
-Primary: pick from the payload's `hash:` records. Fallback: type 64 hex on the
-keyboard. At entry and at consent the device states the 32-byte rule:
+Primary: pick from the payload's `hash:` records, each row `hash <i>  <first 8>..<last 8>` in the host's pack order (28 characters, inside the 436 px label budget; a 64-hex row would be cut, not wrapped). Fallback: type 64 hex on the keyboard, accepted only when exactly 64 valid hex characters are present. At entry and at consent the device states the 32-byte rule:
 `sha256(H)` compiles to `OP_SIZE <32> OP_EQUALVERIFY OP_SHA256 <H> OP_EQUAL`, so
 the preimage MUST be exactly 32 bytes; a digest of a passphrase directly can never
 be spent (§8i; the reference wallet's own README records months of exactly that).
@@ -333,8 +350,8 @@ every path of the policy carries a hash, the §8h warning fires before consent.
 
 Wallet Policy opens on a ChoiceScreen in EVERY state (today the no-payload path
 drops straight into the NFC gather, `gui/wallet_policy.go:97`). Choices name the
-route they take (F-437): "Scan cards", "From payload" (only when a payload is
-loaded), "Build a new policy". Beneath Build the door states the key state:
+route they take (F-437, resolved): "Scan cards", "From payload" (only when the
+loaded payload holds a Descriptor or md1/mk1 record), "Build a new policy". Beneath Build the door states the key state:
 "Keys loaded: N" when a payload holds keys or seeds; "No keys loaded. This builds
 a key-less template." when it holds none or none is loaded; and, when a payload
 is present in flash but was skipped at boot, "A payload is in flash but not
@@ -355,18 +372,27 @@ confirm-to-proceed, neither is dismissible (C16).
 
 > Template-ID:  <32 hex>
 > mk1 stub (template):  <8 hex>
->    mk encode ... --policy-id-stub <8 hex>
-> Slot @0 expects a key at m/48'/0'/0'/3'
+>    mk encode --xpub <xpub> --origin-fingerprint <fp>
+>      --origin-path <path> --policy-id-stub <8 hex>
+> Slot @0 expects a key at m/48'/0'/0'/3'  (unseated slots only)
 
-The template id is key-independent and origin-invariant but NOT shape-invariant:
-a path added or removed changes it, so the screen re-appears after every shape
-edit and says "This id changed with the shape." After seating (§7d) the keyed
-policy's id and stub are added and the screen recommends stamping BOTH stubs on
-each key card (`--policy-id-stub` is repeatable). The id and the stub are labelled
-as different things; the shipped `Template-ID:` label ambiguity
-(`gui/wallet_policy.go:194` prints 16 bytes, `gui/template_engrave.go:70` prints
-4) is fixed in the same change (§9 item 6). The screen also carries §8d's line:
-a wallet composed here is its own wallet.
+The per-slot "expects a key at" line is shown ONLY for slots that will stay
+unseated (§4f's unseated rule); a slot seated from a record, card or seed
+carries that source's declared origin instead, and the line for it reads "Slot
+@i: <fingerprint> <origin>" once seated. The screen is a PAGED widget: the fixed
+header (id, stub, command, §8d) on the first frame, then slot lines at a stated
+per-frame budget with a pager, because the body grows one line per slot and the
+grammar admits 32 (§9 item 6; the per-frame capacity is a plan-time render
+measurement, §13). The template id is key-independent and origin-invariant but
+NOT shape-invariant: a path or wrapper change alters it, so the screen re-appears
+after every shape edit and says "The shape changed, so this id changed." After
+seating (§7d) the keyed policy's id and stub are added and the screen recommends
+stamping BOTH stubs on each key card (`--policy-id-stub` is repeatable). Labels,
+literally: `Template-ID:` and `Policy-ID:` for the 32-hex ids; `mk1 stub
+(template):` and `mk1 stub (policy):` for the 8-hex stubs; the shipped
+template-engrave screen's 4-byte `Template-ID:` (`gui/template_engrave.go:70`) is
+relabelled `mk1 stub (template):` in the same change (§9 item 6). The screen also
+carries §8d's line: a wallet composed here is its own wallet.
 
 ### 7d. Seating (C4, C8, C12, C26; r0 folds)
 
@@ -389,14 +415,22 @@ a pick list of the REMAINING sources:
   fills, in ascending emitted slot index (§4f), per-seed passphrase as Multisig
   Build offers; scrubbed on exit (C14).
 
-Each source is used at most once in the composer (C8 "remaining"); the consume
-path's "one card may fill several slots" rule (`gui/key_card_seating.go:28-30`)
-governs restore, not composition, and the two coexist. **Two slots resolving to
+"Used at most once" governs `key:` records and mk1 cards (C8 "remaining"); a
+SEED is a source of as many slots as the operator assigns to it (C12, §4f), so the
+shortfall test below counts ASSIGNABLE slots, not sources, and "keys available"
+(§7a, §7b) counts records plus cards plus, for each seed, "seed: any slots". The
+consume path's "one card may fill several slots" rule
+(`gui/key_card_seating.go:28-30`) governs restore, not composition, and the two
+coexist. The prompt for an extracted internal-key slot reads "Slot @0, key path
+(spends alone): choose a key". **Two slots resolving to
 the same xpub → REFUSE at the mapping review**, naming both slots (BIP-388 l.193,
-pairwise distinct; md refuses it only at encode). **Any change to the path list
-after seating began discards ALL assignments**; the operator is told so before the
-edit is accepted (§8j), because §5 renumbers slots by first appearance and a
-carried assignment would seat keys silently into the wrong slots.
+pairwise distinct; md refuses it only at encode). **Any change to the SHAPE, wrapper included, after
+at least one slot has been assigned discards ALL assignments**; the operator is
+told so before the edit is accepted (§8j), because §5 renumbers slots by first
+appearance in text that is a function of the wrapper as well as the path list (tr
+extracts an internal key as `@0`, wsh does not), and a carried assignment would
+seat keys silently into the wrong slots. With no slot yet assigned there is
+nothing to discard and §8j does not fire.
 
 A mapping-review screen (slot → fingerprint + origin) precedes consent; Back keeps
 assignments. When one seed or fingerprint fills two slots INSIDE ONE path the
@@ -404,17 +438,18 @@ review shows the C29 WARNING (§8g). The same fingerprint in two DIFFERENT paths
 C5's normal case and gets one informational line, plus the §8k line that a person
 in two paths needs two keys from two accounts.
 
-Seating is all-or-nothing: fewer sources than slots → REFUSE at the transition,
-naming both counts AND the cause ("Path 2 needs a second key from the same
-person: a second account, a second card"), offering Back-to-edit or "engrave as a
-keyless template" (§7f form B with no cards).
+Seating is all-or-nothing: fewer assignable slots than slots → REFUSE at the
+transition with §8p: the count line always ("N slots, M keys available"), the
+unfilled slots named, and the C5 cause line ONLY when a fingerprint the payload
+already holds appears in two paths of the composed shape; then Back-to-edit or
+"engrave as a keyless template" (§7f form B with no cards).
 
 ### 7e. Consent — a NEW surface for composed policies (r0 C-1/C-2)
 
 The shipped Wallet Policy consent (`walletPolicyConsentLines`) summarises from
 `md1Summary`, which prints "Complex policy - cannot display safely." for every
-shape the codec marks non-renderable — measured to be every shape this composer
-exists to author (`md/md_test.go:337,416`); and the one structural summary that
+shape the codec marks non-renderable — measured for every multi-path or taproot
+shape this composer exists to author (`md/md_test.go:337,416`); and the one structural summary that
 exists (`policySummaryLines`, one call site in `gui/template_engrave.go:86`)
 counts a multi-path wsh script as ONE branch (`md/policy_shape.go:43`). Neither
 may be the composer's consent.
@@ -427,9 +462,13 @@ and the EXPERIMENTAL marks; then the key-path line ("Key-path: A KEY CAN SPEND
 ALONE" for an extracted internal key, §8f's NUMS note otherwise); then the id
 NAMED by kind with both stubs (§7c); then receive and change addresses 0..1 when
 seated, or "Keyless template - no addresses" (D4). Before the screen is shown the
-device asserts that the decoded shape equals the composed path list and REFUSES
-to continue on mismatch ("The policy on this device does not match what you
-built."), so a builder defect cannot reach steel as a reviewed wallet. Then the
+device asserts that the decoded shape AND the slot assignment equal the composed
+path list and seating, and REFUSES to continue on mismatch with §8q ("... Go back
+and check the path list, or start again."), so a builder defect cannot reach
+steel as a reviewed wallet; this refusal is provoked by fault injection, not by
+an input (§12 item 4). The surface is `confirmReviewScreen`'s PAGED form
+(`gui/multisig_build.go:1908-1931`), which draws its pager only when a second page
+exists; eight paths plus four addresses do not fit one frame. Then the
 "nothing outside this device has checked this policy" warning (§8l), Multisig
 Build's, unskippable.
 
@@ -446,7 +485,7 @@ choice collapses to "template only" and says so. For seed-derived slots: **Full
 as a SeedQR, or as ms1 strings; a seed that filled several slots is cut ONCE.
 Plate census before cutting, as Multisig Build does; the census REFUSES a
 concrete descriptor longer than the plate holds, naming the measured ceiling
-(§13 item 1). Read-back integrity differs by form and the census says so: md1/mk1
+(§13 item 1). Recovery-time error detection differs by form and the census says so: md1/mk1
 carry BCH; a text or QR descriptor carries only its BIP-380 checksum. **This
 re-opens staged-plan 6d**, deferred 2026-08-20 for "unmeasured sizing plus an
 irreversible medium while content rules were still moving": §13 item 1 measures
@@ -465,7 +504,9 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 | shape | lock-only path | REFUSAL (§4e) |
 | shape | every path hashed | WARNING (§8h) |
 | shape | keyless path added / unsorted chosen | EXPERIMENTAL confirm, unskippable (§8a/§8b) |
-| shape | edits the shape after seating began | WARNING before the edit; assignments discarded (§8j) |
+| shape | edits the shape (paths OR wrapper) after a slot was assigned | WARNING before the edit; assignments discarded (§8j) |
+| shape | a 33rd slot | REFUSAL at the picker (§8m line 5) |
+| pack | a malformed `key:`/`hash:`/`now:` record | REFUSAL on the host (§8n); INERT on the device, visible only in the door's count (§6a) |
 | lock | date before 2009-01-03 | REFUSAL (§6b floor) |
 | lock | date or height before the pack bound | REFUSAL (§6b) |
 | lock | no `now:` field for this lock kind | DEFAULT: the "cannot tell the time" line (§6b) |
@@ -479,11 +520,11 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 | seating | one seed fills slots in two different paths | DEFAULT: informational line (C5, §8k) |
 | stub screen | operator wrote the stub down, then edits the shape | DEFAULT: screen re-shown, "This id changed with the shape." (§7c) |
 | consent | compares the shown id with a coordinator's | DOCUMENTATION: §8d line; a composed wallet is its own wallet |
-| consent | decoded shape differs from the composed list | REFUSAL (§7e self-check) |
+| consent | decoded shape or seating differs from the composed list | REFUSAL with an exit (§8q) |
 | engrave | keyless composition | DEFAULT: form choice collapses to template only (§7f) |
 | engrave | concrete descriptor longer than the plate holds | REFUSAL by census with the measured ceiling (§13 item 1) |
 
-## 8. Copy — operator-facing strings (blockquoted so `plan-glyph-check.sh` scans them; ASCII only; every body passes the modal-fits assertion, §12 item 5)
+## 8. Copy — operator-facing strings (blockquoted so `plan-glyph-check.sh` scans them; ASCII only; every FIXED body passes the modal-fits assertion, §12 item 5; every confirm-to-proceed screen is dismissed only by a tap on CONTINUE, and Back returns to the shape)
 
 ### 8a. EXPERIMENTAL, keyless path (wsh) — confirm-to-proceed, fires once per keyless path
 
@@ -495,17 +536,20 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 ### 8b. EXPERIMENTAL, unsorted keys — confirm-to-proceed, fires once per key set where sorted was legal and declined
 
 > UNSORTED KEYS (EXPERIMENTAL)
-> Key order is part of this wallet. Restoring a
-> key-less template of it needs the key order or a
-> permutation search. Prefer sorted keys.
+> Key order is part of this wallet. Anyone restoring
+> it must keep the same order. Sorted keys need none.
 
-### 8c. Lock echoes
+### 8c. Lock echoes (five separate bodies)
 
 > 90 days = 15188 units of 512 s (90.0 days)
+
 > Block 905000
+
 > 2027-03-01 00:00 UTC
->   at least 181 days after this payload was packed
->   on 2026-09-01
+
+> at least 181 days after this payload was packed
+> on 2026-09-01
+
 > This device cannot tell the time. Nothing here has
 > checked that this is in the future.
 
@@ -529,7 +573,7 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 ### 8g. Same seed twice in one path (C29)
 
 > SAME SEED, SAME PATH
-> Slots @0 and @2 are the same seed. This path's
+> Slots @1 and @2 are the same seed. This path's
 > 2-of-3 can be satisfied by one person.
 > Liana will refuse it.
 
@@ -547,7 +591,7 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 > hashed again. A hash of the passphrase itself can
 > never be spent.
 
-### 8j. Shape edit after seating
+### 8j. Shape edit after at least one slot was assigned
 
 > EDITING THE SHAPE CLEARS THE KEYS
 > Slot numbers change with the shape. Every key you
@@ -565,16 +609,85 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 > in your coordinator and compare your own first
 > receive address.
 
+### 8m. Structural refusals (§4e), one body each
+
+> Every wallet needs at least one path with a key.
+
+> A path with only a time lock means anyone can
+> spend after it. Add a key or a hash.
+
+> This build will not put a key-less path in
+> taproot. Use wsh, or add a key.
+
+> Legacy wrappers hold one plain multisig only.
+> Use wsh or tr.
+
+> This wallet already has 32 key slots.
+
+### 8n. Host-side record refusals (`me sysw pack`, §6a), one line each
+
+> record N: key: needs [fingerprint/path]xpub with
+> an origin; a bare xpub is not a key record
+
+> record N: hash: must be exactly 64 hex characters
+
+> record N: now: must be <seconds>[,<height>] in range
+
+> record N: a second now: record; only one is allowed
+
+### 8o. Below the pack bound (§6b)
+
+> That is before this payload was packed.
+> Choose a later date.
+
+> That is before this payload was packed.
+> Choose a later height.
+
+### 8p. Seating shortfall (§7d)
+
+> 4 slots, 3 keys available.
+> Unfilled: slot @3.
+
+> One person is in two paths and needs two keys:
+> a second account from the same seed, or a
+> second card.
+
+### 8q. Consent self-check (§7e)
+
+> The policy on this device does not match what
+> you built. Go back and check the path list, or
+> start again.
+
+### 8r. Door key-state lines (§7a)
+
+> Keys loaded: 4
+
+> No keys loaded. This builds a key-less template.
+
+> A payload is in flash but not loaded.
+> Load it from the carousel first.
+
+### 8s. Seating and stub-screen lines (§7c, §7d)
+
+> The shape changed, so this id changed.
+
+> Slot @2, Path 1 key 2 of 3: choose a key
+
+> Slot @0, key path (spends alone): choose a key
+
 ## 9. Device work items (fork)
 
 1. `md` tree BUILDER API and an extended `md.PolicyShape`: construct a
-   `descriptor` from a path list and emit keyless and keyed md1 through the
-   existing serialiser (`encodePayload`, `encodeMD1String`), byte-identical to the
-   Rust `compose` vectors (§10); split `or_i`/`or_d` (and `andor`, for consumed
+   `descriptor` from a path list and emit keyless and keyed md1 in CHUNK form
+   through the existing `split` (`md/chunk.go:121`), the artifact every consumer
+   accepts (`encodeMD1String`'s single-string form is rejected downstream with a
+   wire-version mismatch and is kept only for the corpus's single-string parity
+   leg), byte-identical to the Rust `compose` vectors (§10); split `or_i`/`or_d` (and `andor`, for consumed
    cards) into separate `Branch`es in `md/policy_shape.go` and carry the lock
    operand and the digest on `Branch` so §7e can render them.
 2. `pk_h` emitter arm in both script contexts (`md/script_emit.go`), with a
-   mutation check that the hash changes the address (C17).
+   mutation check that the hash changes the address (C17); a prerequisite for
+   every §7e and §12 item 1 address of a policy with a single-key wsh path.
 3. Lock entry (§6b): kind and unit pickers, the digit-pad widget with the
    eight-digit date field, days-to-units and date-to-Unix conversion, the
    floor/ceiling refusals, the bound line, and the device-side §4c range check
@@ -585,8 +698,9 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 5. Path-list screen with the slots/keys line and Back-preserves-everything (§7b);
    presets populating a path list (§4d); the §4e structural refusals and picker
    bounds.
-6. Stub-teaching screen with re-show on edit and the §8d line (§7c); the
-   id/stub label fix on both shipped screens.
+6. Stub-teaching screen as a PAGED widget with a stated per-frame slot budget,
+   re-show on edit, the conditional per-slot line and the §8d line (§7c); the
+   literal id/stub relabelling on both shipped screens.
 7. Seating pick list (§7d) as a PAGED widget with stated capacity (the shipped
    `ChoiceScreen` does not scroll, `gui/gui.go:1993-2026`; a payload may hold more
    rows than the 232 px content box shows), slot-directed assignment, the
@@ -597,8 +711,9 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
    (`gui/multisig_build_slots.go:125-130`, "the ONE site that decides it") and a
    taproot member on `md.MultisigScript`, or the composer's own origin function
    with the same table (§4f).
-9. Composer consent surface (§7e) with the decoded-shape self-check, and the
-   §8l warning; hashlock entry (§6c) with the §8i line; the §8h all-hashed
+9. Composer consent surface (§7e) on `confirmReviewScreen`'s paged form, with
+   the decoded-shape-and-seating self-check and its §8q exit, and the §8l
+   warning; hashlock entry (§6c) with the §8i line; the §8h all-hashed
    warning; the §8a/§8b confirms.
 10. Engrave form choice (§7f): keyed md1 and keyless md1 with fingerprints via
     item 1; card minting for `key:`-sourced and seed-derived slots and re-minting
@@ -611,15 +726,24 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 ## 10. Host work items (Rust first)
 
 1. md-codec `compose` module (C15): path list → template tree; `md compose`
-   subcommand beside `md compile` with the opposite contract. Vectors per §12
-   item 1, with the §5b cross-check, in the corpus the Go side consumes.
-2. `me sysw pack`: `key:`, `hash:`, `now:` classes with the §6a body rules;
-   `now:` appended last by default, `--no-now` for deterministic fixtures.
+   subcommand beside `md compile` with the opposite contract. `compose` is
+   UNCONDITIONAL (not behind `cli-compiler`; only §5b's compile leg needs that
+   feature, which CI supplies with `--all-features`). Vectors per §12 item 1,
+   with the §5b cross-check, in the corpus the Go side consumes; divergent
+   per-slot origins are written INLINE in the vector templates, since the corpus's
+   `path` field carries one shared path.
+2. `me sysw pack`: `key:`, `hash:`, `now:` classes with the §6a body rules and
+   the §8n refusal lines from `pack_with`; the payload-wide single-`now:` rule at
+   the same site; `now:` appended last by default, `--no-now` for deterministic
+   fixtures.
 3. The five presets as Concrete policies + expected templates (C2).
 4. `md-older-zero-time-units-not-refused` patch (independent; filed).
-5. mnemonic-secret: `ms derive --template bip48-p2tr` (= `m/48'/coin'/account'/3'`)
+5. mnemonic-secret: `ms derive --template bip48-p2tr` (= `m/48'/0'/account'/3'`)
    so host-derived taproot `key:` records match the device's C28 origin
-   (`ms-derive-taproot-justifications-stale`, second half).
+   (`ms-derive-taproot-justifications-stale`, second half); this flips the shipped
+   negative test asserting the template is refused
+   (`crates/ms-cli/tests/cli_derive_bip48.rs:174-178`), which is renamed, not
+   deleted.
 6. `SPEC_systemwide_payloads.md`: the section 3.3.1 rows, the CREATED Wallet
    Policy row in 3.3.2 (and, while there, the missing `progTransaction` row is
    noted for its own owner), the section 5.3 prefixes — a normative artifact with
@@ -634,17 +758,22 @@ table, so the glyph and modal-fits gates cover it.
 
 ## 12. Acceptance — NORMATIVE
 
-1. **Positive vectors, Rust first, Go byte-identical.** The product of: wrapper
-   ∈ {wsh, tr, sh, sh(wsh)}; path count ∈ {1, 2, 3, 4, 8}; head ∈ {bare multi,
-   single key, locked}; internal key ∈ {extracted first-listed, extracted not
-   first-listed with ≥ 4 paths, NUMS, none}; lock ∈ {none, blocks, 512-s units,
-   height, time}; hash ∈ {none, present}; key set ∈ {sorted, unsorted}; keyless
-   wsh path ∈ {absent, present}; fingerprints ∈ {declared, one seed at two slots
-   in one path, one seed across two paths}; origin per wrapper per §4f including
-   unseated-slot origins. Each vector: path list → template text → md1 chunks
-   (keyless and keyed) → addresses (receive 0..1, change 0..1) → both ids → the
-   consent lines. The §5b cross-check holds; the Go builder reproduces every
-   template, md1 and address byte for byte.
+1. **Positive vectors, Rust first, Go chunk-identical — TAGGED COVERAGE, not a
+   product.** Every vector names the §5 rows, §4c lock rows and §4f origin rows
+   it exercises, and a script asserts each tag appears in at least TWO vectors
+   (the full product is 28,800 cells and is not an acceptance anyone can build;
+   a pairwise covering array over the legal axes needs about 50-60 named
+   vectors). Required tags include: all four wrappers; path counts 1, 2, 3, 4
+   and the 32-slot maximum; taptree spine shapes m in {0, 1, 2, 3, 7}; the
+   extracted internal key first-listed AND not first-listed with ≥ 4 paths;
+   NUMS; the five lock encodings; hash present; sorted and unsorted; keyless
+   wsh; the three fingerprint cases (declared, one seed at two slots in one
+   path, one seed across two paths); unseated-slot origins per wrapper. Each
+   vector: path list → template text → md1 CHUNKS (keyless and keyed) → addresses
+   (receive 0..1, change 0..1) → both ids → the consent lines. The §5b
+   cross-check holds; the Go builder reproduces every template, every CHUNK and
+   every address byte for byte; a separate named leg compares the single-string
+   payload bytes.
 2. **Journey, EXECUTED.** The C8 workflow on the emulator: `me sysw pack` with
    `key:` records, a `hash:` record, a `now:` record and a seed; flash; Wallet
    Policy → Build → shape → stub screen → seating → mapping review → consent →
@@ -656,16 +785,22 @@ table, so the glyph and modal-fits gates cover it.
    collapsed, keyless-template engrave whose md1 decodes on the device and whose
    slots carry distinct-account origins.
 4. **Negative vectors: every refusal refuses.** For each §4e, §6a, §6b, §6c, §7d
-   and §7g refusal, an input that must be refused and the exact line shown;
+   and §7g refusal, an input that must be refused and the exact §8 line shown;
    including a lock operand outside §4c refused BY THE DEVICE on an md build that
-   still accepts it (`older(0x400000)`), a date before 2009-01-03, a date below the
-   pack bound, a `hash:` of 31 and 33 bytes, a bare-xpub `key:`, two `now:`
-   records, a same-xpub double seating, an edit after seating.
+   still accepts it (`older(0x400000)`), a date before 2009-01-03, a date and a
+   height below the pack bound, a `hash:` of 31 and 33 bytes, a bare-xpub `key:`,
+   a 33rd slot, two `now:` records (refused by host `pack_with`; inert on the
+   device via `syswSession.load`), a same-xpub double seating, a path edit AND a
+   wrapper change after a slot was assigned. The §7e self-check is exercised by
+   FAULT INJECTION (flip one builder output, assert §8q fires), not by an input.
 5. **Copy gates:** `scripts/plan-glyph-check.sh`, the raster floor
    (`gui/raster_test.go`), AND the modal-fits assertion (`gui/modal_fits_test.go`,
    `assertModalBodyFits`) on every §8 body and every new screen; plus a
-   fires-on-condition test for each of §8a, §8b, §8f, §8g, §8h, §8j, §8l and the
-   §6b bound and no-bound lines.
+   fires-on-condition test for each of §8a, §8b, §8f, §8g, §8h, §8j, §8k, §8l, §8o,
+   §8p, §8q, §8r, §8s and the §6b bound and no-bound lines; the variable-length
+   screens (§7c stub screen, §7e consent, §7d pick list) are asserted by PAGING
+   capacity at the measured per-frame budget, since a fits assertion cannot pin a
+   body with no single source string.
 6. **Seating and cards.** For every keyed vector: the re-minted or minted cards
    seat into the engraved keyless template through the shipped `seatKeyCards`
    (both stubs present, existing stubs preserved) and reproduce the keyed policy's
@@ -675,7 +810,9 @@ table, so the glyph and modal-fits gates cover it.
    md's acceptance: every §4c boundary value in and out, per kind.
 8. **Record classes, lockstep.** A cross-language vector set: each `key:`,
    `hash:`, `now:` record (valid and each §6a malformation) classifies identically
-   on the host and on the device.
+   on the host and on the device; for each malformation the host emits its §8n
+   line and the device leaves the record inert with the door's count reduced by
+   one.
 9. **Engrave surface.** Per journey: the form choice offered (A and B, B only,
    template only), Full versus Watch-only, the three secret forms, the census
    lines, the read-back-integrity line; the census refusal on the measured ceiling
@@ -690,15 +827,18 @@ table, so the glyph and modal-fits gates cover it.
 1. **Plate ceilings for a concrete descriptor.** 688 chars for the two-path
    wallet (brainstorm record, C10); text plates per default font and QR symbols per
    plate are measured on the emulator, not read off a constant
-   (`gui/transaction.go:1369`). The pick list's row capacity (§9 item 7) is the
-   same kind of plan-time measurement.
+   (`gui/transaction.go:1369`). The per-frame capacities of the three paged
+   screens (§7c stub screen, §7d pick list, §7e consent) are the same kind of
+   plan-time render measurement.
 2. **Ledger registration of md's depth-0 xpubs.** Core, Liana and Sparrow accept
    them (measured); Ledger's whole-xpub `memcmp` likely does not: UNVERIFIED,
    filed descriptor-mnemonic `md-descriptor-depth0-xpub-ledger-registration`.
 3. **Nunchuk UI** treatment of `or_i` vs `or_d` (library is Core's verbatim) and
    of custom-template miniscript imports.
 4. **Import tests** of composed outputs into Core, Nunchuk, Liana are import
-   tests, not emit tests, and belong to the journey (§12 item 2) or to F-449.
+   tests, not emit tests, and belong to the journey (§12 item 2) or to F-449;
+   Liana's import refuses any `after` or hashlock path regardless of head
+   (second lowering review), so F-449's acceptance wallet must be `older`-only.
 5. **Recon results folded here were verified against Core v25 (single-chain
    forms; the local build lacks BIP-389 multipath and tapscript miniscript),
    Liana master and drongo HEAD**: brainstorm record section 3.11. A newer Core
@@ -716,7 +856,8 @@ table, so the glyph and modal-fits gates cover it.
 | quantum framing of pk vs pkh in tr | F-448 |
 | NFC seating | C8: payload first; NFC hardware not yet in hand |
 | on-device preimage derivation, storage or engraving | C25; §6c |
-| removing or redirecting Multisig Build | C7: comment only |
+| removing or redirecting Multisig Build | C7: comment only; its dead-end (F-150 item 1) stays as filed and is not fixed by this cycle |
+| scrub timing at every abandon point of the composer's seed screens | secret-handling, non-gating by the 2026-08-27 ruling; filed as a follow-up for optimisation |
 | on-screen QR display of a descriptor | staged plan 6b, deferred |
 | BSMS / Nunchuk / Sparrow named backup formats | staged plan 6c and D8, deferred on-device |
 | Sealed-Payload memory discipline for seeds | C14 |
