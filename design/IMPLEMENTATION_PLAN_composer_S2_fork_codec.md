@@ -10,7 +10,7 @@
 
 **Spec:** `design/SPEC_wallet_policy_composer.md` (mnemonic-engrave) — §4c lock bands, §4f default origins and the pairwise invariant, §5 lowering, §7c/§7d stubs, §9 items 1, 2, 8, §12 items 1, 6, 7, 8. Staged plan: `design/STAGED_PLAN_wallet_policy_composer.md` §S2. The Rust primary this stage ports: descriptor-mnemonic `crates/md-codec/src/compose/{mod,lowering,tr}.rs` at `66bdf2f4` (S0 shipped) and mnemonic-engrave `crates/me-cli/src/sysw/composer_records.rs` (S1, per `IMPLEMENTATION_PLAN_composer_S1_host_inputs.md` Task 1).
 
-**Baselines (for `scripts/plan-staleness-check.sh`):** seedhammer fork `169073c` (the tree every `path:line` below cites); descriptor-mnemonic `66bdf2f4`; mnemonic-engrave: the S1 merge commit (record it in the fold that follows S1's ship).
+**Baselines (for `scripts/plan-staleness-check.sh`):** seedhammer fork `169073c` (the tree every `path:line` below cites); descriptor-mnemonic `66bdf2f4`; mnemonic-engrave: the S1 merge commit (record it in the fold that follows S1's ship). **PRECONDITION for Task 6: S1 has merged to mnemonic-engrave master**, so `crates/me-cli/testdata/record_class_vectors.json` exists there (at R0 round 0 it lived only on the unmerged `composer-s1` branch — fidelity I-2). Until then Task 6 cannot start; the plan's GREEN is re-validated at that moment anyway.
 
 ## Global Constraints
 
@@ -101,9 +101,10 @@ type composeVectorPin struct {
 }
 
 // composeVectorNames is the primary's compose corpus at the pinned commit.
-// Hand-maintained like singleStringVectorNames, and checked against the pin
-// below so a file copied in without a name here (or a name with no file)
-// fails rather than silently asserting nothing.
+// Hand-maintained like singleStringVectorNames, and checked both against the
+// pin and against the DIRECTORY below, so a file copied in without a name
+// here, a name with no file, or a compose-named file the pin does not list
+// all fail rather than silently asserting nothing.
 var composeVectorNames = []string{
 	"compose_tr_seven_leaves", "compose_tr_thirty_two_slots",
 	"compose_wsh_eight_paths", "compose_wsh_thirty_two_slots",
@@ -118,6 +119,12 @@ var composeVectorNames = []string{
 	"keyed_compose_wsh_single_head_or_i", "keyed_compose_wsh_sole_sortedmulti",
 	"keyed_compose_wsh_three_paths", "keyed_compose_wsh_two_path_distinct_fingerprints",
 	"keyed_compose_wsh_two_path_or_d", "keyed_compose_wsh_unsorted_sole",
+}
+
+// isComposeVectorFile: the corpus's file names, and nothing else in the
+// shared vectors directory (the MANIFEST's other vectors live beside them).
+func isComposeVectorFile(name string) bool {
+	return strings.HasPrefix(name, "compose_") || strings.HasPrefix(name, "keyed_compose_")
 }
 
 func loadComposeVectorPin(t *testing.T) composeVectorPin {
@@ -145,6 +152,7 @@ func TestComposeVectorsMatchTheirProvenancePin(t *testing.T) {
 	if len(p.Files) != 126 {
 		t.Fatalf("pin lists %d files, want 126", len(p.Files))
 	}
+	pinned := map[string]bool{}
 	seen := map[string]bool{}
 	for _, f := range p.Files {
 		raw, err := os.ReadFile(filepath.Join("testdata", "vectors", f.Name))
@@ -155,6 +163,7 @@ func TestComposeVectorsMatchTheirProvenancePin(t *testing.T) {
 		if got := hex.EncodeToString(sum[:]); got != f.SHA256 {
 			t.Errorf("%s: sha256 %s, pin says %s", f.Name, got, f.SHA256)
 		}
+		pinned[f.Name] = true
 		seen[strings.SplitN(f.Name, ".", 2)[0]] = true
 	}
 	for _, name := range composeVectorNames {
@@ -165,6 +174,18 @@ func TestComposeVectorsMatchTheirProvenancePin(t *testing.T) {
 	}
 	for stray := range seen {
 		t.Errorf("%s: pinned file whose vector is not named here", stray)
+	}
+	// The DIRECTORY, not just the pin: a compose-named file that reached the
+	// tree without an entry in the pin is the "copied in without a name" case
+	// (tests-lens C-1), and the pin alone cannot see it.
+	entries, err := os.ReadDir(filepath.Join("testdata", "vectors"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if isComposeVectorFile(e.Name()) && !pinned[e.Name()] {
+			t.Errorf("%s: in testdata/vectors but not in the provenance pin -- re-run scripts/vendor-compose-vectors.sh or remove it", e.Name())
+		}
 	}
 }
 
@@ -298,7 +319,7 @@ MSG
 
 **Interfaces:**
 - Consumes: `descriptor`, `pathDecl`, `originPath`, `pathComponent`, `useSitePath`, `alternative`, `tlvSection`, `idxFP`, `idxPub`, `node`, the tags and bodies (`md/md.go:42-138,190-269,523-533,816-822`); `split` (`md/chunk.go:121`); `encodePayload` (`md/encode.go:374`); `FormAwareStub` (`md/template_id.go:112`); `PathComponent` (`md/encode_singlesig.go:20`).
-- Produces (Stage 3 calls these): `type ComposeWrapper` (`ComposeTr|ComposeWsh|ComposeShWsh|ComposeSh`) with `ScriptType() uint32`; `type LockKind`, `type Lock{Kind, Value}` with `Check() error`; `type KeySet{K, N uint8; Sorted bool}`; `type SpendPath{Keys *KeySet; Hash *[32]byte; Lock *Lock}`; `type PathList{Wrapper; Paths []SpendPath}`; `type SlotOrigin{Origin []PathComponent; Fingerprint [4]byte; FpPresent bool}`; `type ComposeSlot{Index uint8; Path int; Ordinal uint8}`; `type ComposeExperimental{Kind ComposeExperimentalKind; Path int}`; `type Composed` with `Slots()`, `InternalKeyPath() (int, bool)`, `Experimental()`, `Chunks() ([]string, error)`, `Stub() ([4]byte, error)`, `TemplateID() ([16]byte, error)`, `Bind(pubkeys map[uint8][65]byte, fingerprints map[uint8][4]byte) error`; `func ValidatePathList(list PathList) (int, error)`; `func Compose(list PathList) (Composed, error)`; `func ComposeWith(list PathList, declared []*SlotOrigin) (Composed, error)`; `func DefaultOrigin(w ComposeWrapper, account uint32) []PathComponent`; the `ErrCompose*` sentinels.
+- Produces (Stage 3 calls these; for the §7c "Slot @i expects a key at …" line and §7e's self-check, read the RESOLVED per-slot origins from the emitted chunks -- `Chunks()` → `ExpandWalletPolicyChunks(chunks)` (`md/expand.go:102`) → `[]ExpandedKey{Index, OriginPath, Fingerprint, FingerprintPresent}` -- so the consent is derived from the decoded md1 and never from builder state): `type ComposeWrapper` (`ComposeTr|ComposeWsh|ComposeShWsh|ComposeSh`) with `ScriptType() uint32`; `type LockKind`, `type Lock{Kind, Value}` with `Check() error`; `type KeySet{K, N uint8; Sorted bool}`; `type SpendPath{Keys *KeySet; Hash *[32]byte; Lock *Lock}`; `type PathList{Wrapper; Paths []SpendPath}`; `type SlotOrigin{Origin []PathComponent; Fingerprint [4]byte; FpPresent bool}`; `type ComposeSlot{Index uint8; Path int; Ordinal uint8}`; `type ComposeExperimental{Kind ComposeExperimentalKind; Path int}`; `type Composed` with `Slots()`, `InternalKeyPath() (int, bool)`, `Experimental()`, `Chunks() ([]string, error)`, `Stub() ([4]byte, error)`, `TemplateID() ([16]byte, error)`, `Bind(pubkeys map[uint8][65]byte, fingerprints map[uint8][4]byte) error`; `func ValidatePathList(list PathList) (int, error)`; `func Compose(list PathList) (Composed, error)`; `func ComposeWith(list PathList, declared []*SlotOrigin) (Composed, error)`; `func DefaultOrigin(w ComposeWrapper, account uint32) []PathComponent`; the `ErrCompose*` sentinels.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -549,7 +570,11 @@ func TestComposeFamilyTagsAreCoveredTwice(t *testing.T) {
 		}
 	}
 	for tag, n := range count {
-		if tag == "spine:0" || tag == "no-corpus" {
+		if tag == "spine:0" {
+			// The primary's SINGULAR_TAGS: exactly one legal shape, so exactly one row.
+			if n != 1 {
+				t.Errorf("singular tag %q appears in %d vectors, want exactly 1", tag, n)
+			}
 			continue
 		}
 		if n < 2 {
@@ -719,6 +744,17 @@ func TestLockCheckIsTheDeviceSideRangeGate(t *testing.T) {
 	// The operand the wire carries: units get the 0x400000 type flag.
 	if tag, v, err := olderUnits(15188).operand(); err != nil || tag != tagOlder || v != 4209492 {
 		t.Fatalf("older units operand = %v %d %v", tag, v, err)
+	}
+	// And back: every in-range lock survives operand -> lockFromWire unchanged,
+	// so a decoded card names the same kind and value the operator entered.
+	for _, l := range ok {
+		tag, v, err := l.operand()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := lockFromWire(tag, v); got != l {
+			t.Errorf("%+v -> wire %v %d -> %+v", l, tag, v, got)
+		}
 	}
 }
 
@@ -958,7 +994,9 @@ const (
 )
 
 // The refusals, one sentinel per arm of the primary's ComposeError so callers
-// (and tests) match with errors.Is; the wrapped message carries the operands.
+// (and tests) match with errors.Is; the wrapped message carries the operands,
+// with paths numbered from 1 as the primary's Display does (and as §7d's
+// "Path N" prompts count).
 var (
 	ErrComposeNoPaths                = errors.New("md: compose: a wallet needs at least one spend path")
 	ErrComposeTooManyPaths           = errors.New("md: compose: more than 8 spend paths")
@@ -1005,6 +1043,23 @@ func (l Lock) operand() (tag, uint32, error) {
 func (l Lock) Check() error {
 	_, _, err := l.operand()
 	return err
+}
+
+// lockFromWire is operand's inverse: the kind and operator-unit value a
+// decoded older/after node denotes. older carries bit 22 for 512-second
+// units; after is a time at or above 500,000,000 and a height below it
+// (BIP-68 / BIP-65, the same split §4c's bands are built on).
+func lockFromWire(t tag, operand uint32) Lock {
+	if t == tagOlder {
+		if operand&sequenceTypeFlag != 0 {
+			return Lock{Kind: LockOlderUnits, Value: operand &^ sequenceTypeFlag}
+		}
+		return Lock{Kind: LockOlderBlocks, Value: operand}
+	}
+	if operand >= locktimeThreshold {
+		return Lock{Kind: LockAfterTime, Value: operand}
+	}
+	return Lock{Kind: LockAfterHeight, Value: operand}
 }
 
 // KeySet is k-of-n over FRESH slots (§4b). Sorted asks for sortedmulti /
@@ -1068,7 +1123,8 @@ type ComposeExperimental struct {
 }
 
 // Composed is a built, not-yet-keyed (or keyed via Bind) descriptor with its
-// slot map.
+// slot map. A copy of a Composed shares the underlying descriptor: Bind on one
+// keys them both (it is not copy-on-write). Compose again for a second artifact.
 type Composed struct {
 	d               *descriptor
 	slots           []ComposeSlot
@@ -1162,18 +1218,18 @@ func ValidatePathList(list PathList) (int, error) {
 	for i, p := range list.Paths {
 		if ks := p.Keys; ks != nil {
 			if ks.K == 0 || ks.N == 0 || ks.K > ks.N || ks.N > ComposeMaxKeysPerPath {
-				return 0, fmt.Errorf("%w: path %d has %d-of-%d", ErrComposeBadThreshold, i, ks.K, ks.N)
+				return 0, fmt.Errorf("%w: path %d has %d-of-%d", ErrComposeBadThreshold, i+1, ks.K, ks.N)
 			}
 			slots += int(ks.N)
 			anyKeyed = true
 		} else if p.Hash == nil {
-			return 0, fmt.Errorf("%w: path %d", ErrComposeLockOnlyPath, i)
+			return 0, fmt.Errorf("%w: path %d", ErrComposeLockOnlyPath, i+1)
 		} else if list.Wrapper == ComposeTr {
-			return 0, fmt.Errorf("%w: path %d", ErrComposeKeylessUnderTr, i)
+			return 0, fmt.Errorf("%w: path %d", ErrComposeKeylessUnderTr, i+1)
 		}
 		if p.Lock != nil {
 			if err := p.Lock.Check(); err != nil {
-				return 0, fmt.Errorf("%w: path %d: %v", ErrComposeLockOutOfRange, i, err)
+				return 0, fmt.Errorf("%w: path %d: %v", ErrComposeLockOutOfRange, i+1, err)
 			}
 		}
 	}
@@ -1551,6 +1607,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"os"
+	"strconv"
 	"testing"
 
 	btcaddr "github.com/btcsuite/btcd/address/v2"
@@ -1629,24 +1686,28 @@ func p2wshAddress(t *testing.T, script []byte) string {
 }
 
 // TestPkhWitnessScriptsReproduceRustsAddresses: for each pkh-bearing vector,
-// the emitted witness script's P2WSH address at receive index 0 and 1 equals
-// what the Rust primary derived for the same descriptor and keys.
+// the emitted witness script's P2WSH address at receive and change index 0
+// and 1 equals what the Rust primary derived for the same descriptor and keys.
 func TestPkhWitnessScriptsReproduceRustsAddresses(t *testing.T) {
 	for _, name := range pkhWshVectors {
 		t.Run(name, func(t *testing.T) {
 			rec := loadComposeConformance(t, name)
 			chunks := loadPhraseChunks(t, name)
-			want := rec.Chains["0"].Addresses
-			if len(want) < 2 {
-				t.Fatalf("record has %d receive addresses, want >= 2", len(want))
-			}
-			for i := uint32(0); i < 2; i++ {
-				script, err := EmitWitnessScriptChunks(chunks, derivedKeys(t, rec, 0, i))
-				if err != nil {
-					t.Fatalf("EmitWitnessScriptChunks(receive %d): %v", i, err)
+			// Receive (chain 0) AND change (chain 1), indices 0 and 1 each: §12
+			// item 1's "receive 0..1, change 0..1" (fidelity M-2).
+			for chain := uint32(0); chain < 2; chain++ {
+				want := rec.Chains[strconv.Itoa(int(chain))].Addresses
+				if len(want) < 2 {
+					t.Fatalf("record has %d chain-%d addresses, want >= 2", len(want), chain)
 				}
-				if got := p2wshAddress(t, script); got != want[i] {
-					t.Errorf("receive %d:\n  go:   %s\n  rust: %s", i, got, want[i])
+				for i := uint32(0); i < 2; i++ {
+					script, err := EmitWitnessScriptChunks(chunks, derivedKeys(t, rec, chain, i))
+					if err != nil {
+						t.Fatalf("EmitWitnessScriptChunks(chain %d index %d): %v", chain, i, err)
+					}
+					if got := p2wshAddress(t, script); got != want[i] {
+						t.Errorf("chain %d index %d:\n  go:   %s\n  rust: %s", chain, i, got, want[i])
+					}
 				}
 			}
 		})
@@ -1765,11 +1826,11 @@ and directly after the `case tagPkK:` arm's `return nil` (before `case tagCheck:
 - [ ] **Step 4: Run the tests**
 
 Run: `CGO_ENABLED=0 go test -count=1 -run 'TestPkh' -v ./md/ 2>&1 | grep -E '^(--- |\s+--- |ok|FAIL)'`
-Expected: all PASS -- ten receive addresses across five vectors equal Rust's; the key-dependence test passes; the tap leaf equals the hash160 form.
+Expected: all PASS -- twenty addresses (receive and change, indices 0 and 1) across five vectors equal Rust's; the key-dependence test passes; the tap leaf equals the hash160 form.
 
 - [ ] **Step 5: The opcode mutation, by hand, with the failing output kept**
 
-Temporarily change `opEQUALVERIFY` to `opEQUAL` in the NEW arm only, run `CGO_ENABLED=0 go test -count=1 -run 'TestPkhWitnessScriptsReproduceRustsAddresses' ./md/ 2>&1 | grep -c 'rust:'`, and paste the count into the implementation report: it must be `10` (every address moved). Revert the mutation (`git diff --stat` shows only the intended files afterwards) and re-run Step 4.
+Temporarily change `opEQUALVERIFY` to `opEQUAL` in the NEW arm only, run `CGO_ENABLED=0 go test -count=1 -run 'TestPkhWitnessScriptsReproduceRustsAddresses' ./md/ 2>&1 | grep -c 'rust:'`, and paste the count into the implementation report: it must be `20` (every address moved). Revert the mutation (`git diff --stat` shows only the intended files afterwards) and re-run Step 4.
 
 - [ ] **Step 6: Whole-package run, gofmt, commit**
 
@@ -1782,7 +1843,7 @@ git commit -s -F - <<'MSG'
 md: pk_h emitter arm in both script contexts, pinned to Rust's addresses for five pkh vectors (composer S2 task 3)
 
 DUP HASH160 <hash160(K)> EQUALVERIFY CHECKSIG; hand mutation of EQUALVERIFY
-moved all ten oracle addresses.
+moved all twenty oracle addresses.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
@@ -1794,14 +1855,14 @@ MSG
 ### Task 4: `PolicyShape` reports every alternative, with lock operands and digests
 
 **Files:**
-- Modify: `md/policy_shape.go:42-59` (two `Branch` fields), `:101-128` (call the splitter), `:134-154` (leaf → splitter), `:216-221` (record operands and digests)
+- Modify: `md/policy_shape.go:42-59` (three `Branch` fields), `:101-128` (call the splitter), `:134-154` (leaf → splitter), `:156-193` (`branchOf`/`plainMulti` carry `Sorted`), `:216-221` (record locks and digests)
 - Test: `md/compose_shape_test.go`
 
 **Interfaces:**
 - Consumes: `PolicyShape`, `Branch`, `policyShape`, `walkTapTree`, `branchOf`, `collect`, `plainMulti` (`md/policy_shape.go`); `PolicyShapeChunks` (`:74`); `timelockBody`, `hash256Body` (`md/md.go:120,122`).
-- Produces: `Branch.LockOperands []uint32` (every `older`/`after` operand in the branch, wire order) and `Branch.Sha256Digests [][32]byte` (every `sha256` digest); `or_b`/`or_c`/`or_d`/`or_i` split into one `Branch` per alternative and `andor(X,Y,Z)` into `and(X,Y)` plus `Z`; unchanged: `Complete`, `KeyPath`, `TapDepth`, `K`/`N`/`Keys`/`Timelock`/`Hashlock`/`Depth`, and every existing expectation in `md/policy_shape_test.go` (none of its vectors contains an `or_*` or `andor`; measured: `grep -c 'Or\|andor' md/policy_shape_test.go` = 0 at `169073c`).
+- Produces: `Branch.Locks []Lock` (every `older`/`after` in the branch, wire order, as Task 2's `Lock{Kind, Value}` in OPERATOR units -- the kind is recovered from the wire: `older` with bit 22 set is `LockOlderUnits`, else `LockOlderBlocks`; `after` at or above 500,000,000 is `LockAfterTime`, else `LockAfterHeight` -- because the bare operand cannot say which: §4c's bands overlap and `[26280]` is equally `older(26280)` and `after(26280)`, fidelity C-1), `Branch.Sha256Digests [][32]byte` (every `sha256` digest), `Branch.Sorted bool` (true when K/N came from `sortedmulti`/`sortedmulti_a`, so §7e's "unsorted where sorted was legal" mark is derivable from the decoded md1, fidelity I-1); `or_b`/`or_c`/`or_d`/`or_i` split into one `Branch` per alternative and `andor(X,Y,Z)` into `and(X,Y)` plus `Z`; unchanged: `Complete`, `KeyPath`, `TapDepth`, `K`/`N`/`Keys`/`Timelock`/`Hashlock`/`Depth`, and every existing expectation in `md/policy_shape_test.go`. The fork vendors three `or_*` cards -- `grep -l 'or_i\|or_d\|or_b\|or_c\|andor' md/testdata/vectors/*.template` → `keyed_wsh_or_b`, `keyed_wsh_or_d_degrading`, `keyed_wsh_timelock_hashlock` -- and NO shape test loads any of them (the seven vectors `md/policy_shape_test.go` names are all `or_*`-free), so the split moves no existing expectation; Step 1 pins all three, because the shipped consent screen (`gui/template_engrave.go:142` `policySummaryLines`, the only consumer of `Branches` outside `md/`) will show N lines for them where it showed one (fidelity I-3).
 
-Why: §7e's consent surface shows "Path 2: 1 key, after 26280 blocks" per alternative. Today `or_d(multi(2,...), and_v(v:pkh(@3),older(26280)))` is ONE `Branch{Keys:4, Timelock:true}` -- true, and useless to an operator deciding what they are committing to steel. `thresh(k, …)` with `k < n` is also a set of alternatives, but combinatorial; it stays one branch (the composer never emits it), and `Complete` stays honest because `collect` still understands it.
+Why: §7e's consent surface shows "Path 2: 1 key, older 26280 blocks" per alternative, in §6b's echo form. Today `or_d(multi(2,...), and_v(v:pkh(@3),older(26280)))` is ONE `Branch{Keys:4, Timelock:true}` -- true, and useless to an operator deciding what they are committing to steel. `thresh(k, …)` with `k < n` is also a set of alternatives, but combinatorial; it stays one branch (the composer never emits it), and `Complete` stays honest because `collect` still understands it.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1827,6 +1888,8 @@ func shapeOf(t *testing.T, name string) PolicyShape {
 	return s
 }
 
+func lk(kind LockKind, v uint32) []Lock { return []Lock{{Kind: kind, Value: v}} }
+
 func TestPolicyShapeSplitsAlternativesIntoBranches(t *testing.T) {
 	h := [32]byte{}
 	for i := range h {
@@ -1839,22 +1902,27 @@ func TestPolicyShapeSplitsAlternativesIntoBranches(t *testing.T) {
 		// or_d(multi(2,@0,@1,@2), and_v(v:pkh(@3), older(26280)))
 		{"keyed_compose_wsh_two_path_or_d", []Branch{
 			{K: 2, N: 3, Keys: 3},
-			{Keys: 1, Timelock: true, LockOperands: []uint32{26280}},
+			{Keys: 1, Timelock: true, Locks: lk(LockOlderBlocks, 26280)},
+		}},
+		// or_i(pkh(@0), and_v(v:pkh(@1), older(4209492))) -- 0x400000 + 15188 units
+		{"keyed_compose_wsh_single_head_or_i", []Branch{
+			{Keys: 1},
+			{Keys: 1, Timelock: true, Locks: lk(LockOlderUnits, 15188)},
 		}},
 		// or_i(pkh(@0), or_i(and_v(v:pkh(@1),older(4032)), and_v(v:pkh(@2),after(1000000))))
 		{"keyed_compose_wsh_three_paths", []Branch{
 			{Keys: 1},
-			{Keys: 1, Timelock: true, LockOperands: []uint32{4032}},
-			{Keys: 1, Timelock: true, LockOperands: []uint32{1_000_000}},
+			{Keys: 1, Timelock: true, Locks: lk(LockOlderBlocks, 4032)},
+			{Keys: 1, Timelock: true, Locks: lk(LockAfterHeight, 1_000_000)},
 		}},
 		// or_i(pkh(@0), and_v(v:multi(2,@1,@2), and_v(v:sha256(H), after(1893456000))))
 		{"keyed_compose_wsh_hash_and_time", []Branch{
 			{Keys: 1},
-			{Keys: 2, Timelock: true, Hashlock: true, LockOperands: []uint32{1_893_456_000}, Sha256Digests: [][32]byte{h}},
+			{Keys: 2, Timelock: true, Hashlock: true, Locks: lk(LockAfterTime, 1_893_456_000), Sha256Digests: [][32]byte{h}},
 		}},
 		// or_i(and_v(v:multi(2,@0,@1), after(905000)), pkh(@2))
 		{"keyed_compose_wsh_locked_head_or_i", []Branch{
-			{Keys: 2, Timelock: true, LockOperands: []uint32{905_000}},
+			{Keys: 2, Timelock: true, Locks: lk(LockAfterHeight, 905_000)},
 			{Keys: 1},
 		}},
 	} {
@@ -1870,27 +1938,102 @@ func TestPolicyShapeSplitsAlternativesIntoBranches(t *testing.T) {
 	}
 }
 
-// Eight or_i-chained paths: eight branches, each carrying its own operand.
+// The SHIPPED cards with alternatives (fidelity I-3): these are what the
+// template-engrave consent screen (gui/template_engrave.go policySummaryLines)
+// will now show as several spend paths instead of one. Pinned so that change
+// is a recorded decision, not a side effect.
+func TestPolicyShapeSplitsTheShippedOrCards(t *testing.T) {
+	var hh [32]byte
+	for i, b := range []byte{0xa8, 0x4d, 0xce, 0x40, 0x97, 0x57, 0x27, 0xc3, 0x98, 0x02, 0x3c, 0xfb, 0xd5, 0x0d, 0x5d, 0xb3, 0xb9, 0x66, 0x23, 0x75, 0x52, 0x1d, 0x0f, 0x1a, 0xc6, 0x2d, 0xbd, 0x82, 0x9b, 0x9a, 0x08, 0xad} {
+		hh[i] = b
+	}
+	for _, tc := range []struct {
+		vector string
+		want   []Branch
+	}{
+		// wsh(or_b(pk(@0), s:pk(@1)))
+		{"keyed_wsh_or_b", []Branch{{Keys: 1}, {Keys: 1}}},
+		// wsh(or_d(multi(2,@0,@1), and_v(v:older(65535), pk(@2))))
+		{"keyed_wsh_or_d_degrading", []Branch{
+			{K: 2, N: 2, Keys: 2},
+			{Keys: 1, Timelock: true, Locks: lk(LockOlderBlocks, 65535)},
+		}},
+		// wsh(or_i(and_v(v:after(1000000), and_v(v:sha256(H), multi(2,@0,@1,@2))), and_v(v:older(65535), multi(1,@1,@2))))
+		{"keyed_wsh_timelock_hashlock", []Branch{
+			{Keys: 3, Timelock: true, Hashlock: true, Locks: lk(LockAfterHeight, 1_000_000), Sha256Digests: [][32]byte{hh}},
+			{Keys: 2, Timelock: true, Locks: lk(LockOlderBlocks, 65535)},
+		}},
+	} {
+		t.Run(tc.vector, func(t *testing.T) {
+			s := shapeOf(t, tc.vector)
+			if !reflect.DeepEqual(s.Branches, tc.want) {
+				t.Fatalf("branches\n got %+v\nwant %+v", s.Branches, tc.want)
+			}
+		})
+	}
+}
+
+// Fidelity C-1 made concrete: the same operand under older and under after is
+// two different wallets, and the summary must say which.
+func TestPolicyShapeDistinguishesOlderFromAfterAtTheSameOperand(t *testing.T) {
+	a, err := Compose(cpl(ComposeWsh, ck(2, 3), clk(ck(1, 1), olderBlocks(26280))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := Compose(cpl(ComposeWsh, ck(2, 3), clk(ck(1, 1), afterHeight(26280))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sa, sb := policyShape(a.d.tree), policyShape(b.d.tree)
+	if reflect.DeepEqual(sa.Branches, sb.Branches) {
+		t.Fatalf("older(26280) and after(26280) summarize identically: %+v", sa.Branches)
+	}
+	if sa.Branches[1].Locks[0].Kind != LockOlderBlocks || sb.Branches[1].Locks[0].Kind != LockAfterHeight {
+		t.Fatalf("kinds: %+v / %+v", sa.Branches[1].Locks, sb.Branches[1].Locks)
+	}
+}
+
+// Fidelity I-1: sortedmulti and multi at the same k-of-n differ in Sorted, so
+// §7e's "unsorted where sorted was legal" mark comes from the decoded md1.
+func TestPolicyShapeCarriesSortedForThresholds(t *testing.T) {
+	sorted := shapeOf(t, "keyed_compose_wsh_sole_sortedmulti")
+	unsorted := shapeOf(t, "keyed_compose_wsh_unsorted_sole")
+	if !reflect.DeepEqual(sorted.Branches, []Branch{{K: 2, N: 3, Keys: 3, Sorted: true}}) {
+		t.Fatalf("sorted: %+v", sorted.Branches)
+	}
+	if !reflect.DeepEqual(unsorted.Branches, []Branch{{K: 2, N: 3, Keys: 3, Sorted: false}}) {
+		t.Fatalf("unsorted: %+v", unsorted.Branches)
+	}
+	tap := shapeOf(t, "keyed_compose_tr_sole_sortedmulti_a")
+	if len(tap.Branches) != 1 || !tap.Branches[0].Sorted || tap.Branches[0].K != 2 {
+		t.Fatalf("sortedmulti_a leaf: %+v", tap.Branches)
+	}
+}
+
+// Eight or_i-chained paths: eight branches, each carrying its own lock.
 func TestPolicyShapeWalksAnEightPathChain(t *testing.T) {
 	s := shapeOf(t, "compose_wsh_eight_paths")
 	if len(s.Branches) != 8 {
 		t.Fatalf("branches = %d, want 8 (%+v)", len(s.Branches), s.Branches)
 	}
 	for i, b := range s.Branches {
-		if b.Keys != 1 || !b.Timelock || len(b.LockOperands) != 1 || b.LockOperands[0] != uint32(100+i) {
-			t.Errorf("branch %d = %+v, want 1 key, older(%d)", i, b, 100+i)
+		if b.Keys != 1 || !b.Timelock || len(b.Locks) != 1 || b.Locks[0] != (Lock{Kind: LockOlderBlocks, Value: uint32(100 + i)}) {
+			t.Errorf("branch %d = %+v, want 1 key, older(%d) blocks", i, b, 100+i)
 		}
 	}
 }
 
 // A taproot leaf list is unchanged by the split (one leaf, one branch) but
-// now carries operands: tr(NUMS,{and_v(v:pk(@0),older(1)),{and_v(v:pk(@1),older(2)),and_v(v:multi_a(2,@2,@3),after(2))}}).
-func TestPolicyShapeTapLeavesCarryOperands(t *testing.T) {
+// now carries locks: tr(NUMS,{and_v(v:pk(@0),older(1)),{and_v(v:pk(@1),older(2)),and_v(v:multi_a(2,@2,@3),after(2))}}).
+func TestPolicyShapeTapLeavesCarryLocks(t *testing.T) {
 	s := shapeOf(t, "keyed_compose_tr_nums_three_leaves")
 	want := []Branch{
-		{Keys: 1, Timelock: true, LockOperands: []uint32{1}, Depth: 1},
-		{Keys: 1, Timelock: true, LockOperands: []uint32{2}, Depth: 2},
-		{Keys: 2, Timelock: true, LockOperands: []uint32{2}, Depth: 2},
+		{Keys: 1, Timelock: true, Locks: lk(LockOlderBlocks, 1), Depth: 1},
+		{Keys: 1, Timelock: true, Locks: lk(LockOlderBlocks, 2), Depth: 2},
+		// K/N stay ZERO here: the multi_a sits under and_v with the lock, and
+		// plainMulti reports a threshold only for a BARE one (the existing
+		// TestPolicyShapeNeverClaimsAPlainThresholdItCannotSee rule).
+		{Keys: 2, Timelock: true, Locks: lk(LockAfterHeight, 2), Depth: 2},
 	}
 	if s.KeyPath != KeyPathNUMS || s.TapDepth != 2 {
 		t.Fatalf("KeyPath=%v TapDepth=%d, want NUMS depth 2", s.KeyPath, s.TapDepth)
@@ -1911,7 +2054,7 @@ func TestPolicyShapeReportsAKeylessAlternativeHonestly(t *testing.T) {
 	if !s.Complete || len(s.Branches) != 2 {
 		t.Fatalf("Complete=%v branches=%d", s.Complete, len(s.Branches))
 	}
-	if b := s.Branches[1]; b.Keys != 0 || !b.Hashlock || !b.Timelock || len(b.Sha256Digests) != 1 || len(b.LockOperands) != 1 || b.LockOperands[0] != 1_383_520 {
+	if b := s.Branches[1]; b.Keys != 0 || !b.Hashlock || !b.Timelock || len(b.Sha256Digests) != 1 || !reflect.DeepEqual(b.Locks, lk(LockAfterHeight, 1_383_520)) {
 		t.Fatalf("keyless branch = %+v", b)
 	}
 }
@@ -1924,7 +2067,7 @@ func TestPolicyShapeSplitsAndOr(t *testing.T) {
 	z := node{tag: tagPkH, body: keyArgBody{index: 1}}
 	tree := node{tag: tagWsh, body: childrenBody{children: []node{{tag: tagAndOr, body: childrenBody{children: []node{x, y, z}}}}}}
 	s := policyShape(tree)
-	want := []Branch{{Keys: 1, Timelock: true, LockOperands: []uint32{144}}, {Keys: 1}}
+	want := []Branch{{Keys: 1, Timelock: true, Locks: lk(LockOlderBlocks, 144)}, {Keys: 1}}
 	if !s.Complete || !reflect.DeepEqual(s.Branches, want) {
 		t.Fatalf("Complete=%v branches\n got %+v\nwant %+v", s.Complete, s.Branches, want)
 	}
@@ -1933,26 +2076,54 @@ func TestPolicyShapeSplitsAndOr(t *testing.T) {
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `CGO_ENABLED=0 go test -count=1 -run 'TestPolicyShapeSplits|TestPolicyShapeWalksAnEight|TestPolicyShapeTapLeavesCarry|TestPolicyShapeReportsAKeyless' ./md/ 2>&1 | grep -E 'FAIL|unknown field|undefined' | head -5`
-Expected: compile error `unknown field LockOperands in struct literal of type Branch`.
+Run: `CGO_ENABLED=0 go test -count=1 -run 'TestPolicyShapeSplits|TestPolicyShapeWalksAnEight|TestPolicyShapeTapLeavesCarry|TestPolicyShapeReportsAKeyless|TestPolicyShapeDistinguishes|TestPolicyShapeCarriesSorted' ./md/ 2>&1 | grep -E 'FAIL|unknown field|undefined' | head -5`
+Expected: compile error `unknown field Locks in struct literal of type Branch`.
 
-- [ ] **Step 3: Extend `Branch`, record operands, split alternatives**
+- [ ] **Step 3: Extend `Branch`, record locks and digests, carry Sorted, split alternatives**
 
 In `md/policy_shape.go`, replace the `Branch` struct's `Timelock`/`Hashlock` block (lines 52-56) with:
 
 ```go
 	// Timelock/Hashlock report whether the branch requires one ANYWHERE within
-	// it. LockOperands and Sha256Digests carry the values, in wire order, so
-	// the composer's consent surface (SPEC_wallet_policy_composer.md §7e) can
-	// say "after 26280 blocks" instead of "time-locked"; a value is a fact from
-	// the decoded tree, not a rendering, so the no-text rule above still holds.
-	// Only sha256 digests are carried (the composer emits no other hash); the
-	// other hash tags still set Hashlock.
+	// it. Locks and Sha256Digests carry the values, in wire order, so the
+	// composer's consent surface (SPEC_wallet_policy_composer.md §7e) can say
+	// "older 26280 blocks" instead of "time-locked"; a value is a fact from the
+	// decoded tree, not a rendering, so the no-text rule above still holds. A
+	// Lock carries its KIND, because the bare operand cannot: §4c's bands
+	// overlap on the wire (blocks 1..65535 and units 4194305..4259839 both sit
+	// inside the height band 1..499999999), so 26280 alone is equally
+	// older(26280) and after(26280). Only sha256 digests are carried (the
+	// composer emits no other hash); the other hash tags still set Hashlock.
 	Timelock      bool
 	Hashlock      bool
-	LockOperands  []uint32
+	Locks         []Lock
 	Sha256Digests [][32]byte
+	// Sorted is set with K/N: true for sortedmulti/sortedmulti_a, false for
+	// multi/multi_a, so §7e's "unsorted where sorted was legal" mark is read
+	// from the decoded md1 rather than from builder state.
+	Sorted bool
 ```
+
+Replace `branchOf`'s threshold line and `plainMulti`'s signature so the sortedness travels:
+
+```go
+	// A bare threshold-over-keys, possibly wrapped: report k-of-N.
+	if k, nkeys, ok := plainMulti(n); ok {
+		br.K, br.N = k, nkeys
+	}
+```
+
+becomes
+
+```go
+	// A bare threshold-over-keys, possibly wrapped: report k-of-N and whether
+	// it was the sorted spelling.
+	if k, nkeys, sorted, ok := plainMulti(n); ok {
+		br.K, br.N, br.Sorted = k, nkeys, sorted
+	}
+```
+
+and in `plainMulti`, `func plainMulti(n node) (int, int, bool) {` becomes `func plainMulti(n node) (int, int, bool, bool) {`, its first arm returns `int(b.k), len(b.indices), n.tag == tagSortedMulti || n.tag == tagSortedMultiA, true` (else `0, 0, false, false`), the wrapper arm's `return 0, 0, false` and the default `return 0, 0, false` become `return 0, 0, false, false`.
 
 Replace the three `branchOf` call sites so alternatives split. In `policyShape`'s `case tagWsh, tagSh:` arm, replace
 
@@ -2065,7 +2236,7 @@ with
 	case tagAfter, tagOlder:
 		br.Timelock = true
 		if v, ok := n.body.(timelockBody); ok {
-			br.LockOperands = append(br.LockOperands, uint32(v))
+			br.Locks = append(br.Locks, lockFromWire(n.tag, uint32(v)))
 		}
 		return true
 	case tagSha256:
@@ -2082,7 +2253,7 @@ with
 - [ ] **Step 4: Run the new AND the existing shape tests**
 
 Run: `CGO_ENABLED=0 go test -count=1 -run 'TestPolicyShape' -v ./md/ 2>&1 | grep -E '^(--- |\s+--- |ok|FAIL)' | grep -v PASS; CGO_ENABLED=0 go test -count=1 -run 'TestPolicyShape' ./md/ 2>&1 | tail -1`
-Expected: no FAIL lines; `ok`. The four pre-existing tests (`TestPolicyShapeDescribesRealCards`, `…NeverClaimsAPlainThresholdItCannotSee`, `…RefusesAnUnknownTag`, `…ReportsEveryLeafOfADeepTree`) are UNTOUCHED and still pass; if one moves, the split changed a shape the shipped consent screen shows -- stop and record which.
+Expected: no FAIL lines; `ok`. The four pre-existing tests (`TestPolicyShapeDescribesRealCards`, `…NeverClaimsAPlainThresholdItCannotSee`, `…RefusesAnUnknownTag`, `…ReportsEveryLeafOfADeepTree`) are UNTOUCHED and still pass (their seven vectors carry no `or_*`/`andor`, so nothing there can move); the shipped-card change is pinned by `TestPolicyShapeSplitsTheShippedOrCards`, whose three expectations ARE the decision that `policySummaryLines` now shows those cards as 2, 2 and 2 spend paths.
 
 - [ ] **Step 5: Whole-package run, gofmt, commit**
 
@@ -2092,7 +2263,7 @@ Expected: gofmt prints nothing; `ok`.
 ```bash
 git add md/policy_shape.go md/compose_shape_test.go
 git commit -s -F - <<'MSG'
-md: PolicyShape splits or_*/andor into one Branch per alternative, carrying lock operands and sha256 digests (composer S2 task 4)
+md: PolicyShape splits or_*/andor into one Branch per alternative, carrying typed Locks, sha256 digests and Sorted (composer S2 task 4)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
@@ -2193,9 +2364,6 @@ func TestAppendStubsPreservesExistingAndAddsEachOnce(t *testing.T) {
 	if want := [][4]byte{existing, tmpl, pol}; !reflect.DeepEqual(got.Stubs, want) {
 		t.Fatalf("stubs = %x, want %x", got.Stubs, want)
 	}
-	if !reflect.DeepEqual(card.Stubs, [][4]byte{existing}) {
-		t.Fatal("AppendStubs mutated its input")
-	}
 	// A stub the card already carries is not repeated.
 	again := AppendStubs(got, existing)
 	if !reflect.DeepEqual(again.Stubs, got.Stubs) {
@@ -2212,6 +2380,31 @@ func TestAppendStubsPreservesExistingAndAddsEachOnce(t *testing.T) {
 	}
 	if !reflect.DeepEqual(back.Stubs, got.Stubs) || back.Xpub != composeTestXpub || back.Fingerprint != "73c5da0a" {
 		t.Fatalf("round trip: %+v", back)
+	}
+}
+
+// AppendStubs must not alias its input's backing array (tests-lens C-2: a
+// length/content check on the input cannot see aliasing, because append
+// never changes the caller's slice header). So: give the input SPARE
+// capacity, append through it afterwards, and the result must not change --
+// which it would if AppendStubs had appended into the same array.
+func TestAppendStubsDoesNotShareTheInputsBackingArray(t *testing.T) {
+	existing := make([][4]byte, 1, 4)
+	existing[0] = [4]byte{0xde, 0xad, 0xbe, 0xef}
+	card := Card{Network: "mainnet", Path: "m/48'/0'/0'/2'", Fingerprint: "73c5da0a", Stubs: existing, Xpub: composeTestXpub}
+	got := AppendStubs(card, [4]byte{1, 2, 3, 4})
+	want := [][4]byte{existing[0], {1, 2, 3, 4}}
+	if !reflect.DeepEqual(got.Stubs, want) {
+		t.Fatalf("stubs = %x, want %x", got.Stubs, want)
+	}
+	// Write through the ORIGINAL's spare capacity.
+	sentinel := [4]byte{0xff, 0xff, 0xff, 0xff}
+	_ = append(card.Stubs, sentinel)
+	if !reflect.DeepEqual(got.Stubs, want) {
+		t.Fatalf("appending to the input changed the result to %x: AppendStubs aliased the input's array", got.Stubs)
+	}
+	if got.Stubs[1] == sentinel {
+		t.Fatal("the result's second stub is the sentinel written through the input")
 	}
 }
 ```
@@ -2289,8 +2482,8 @@ func AppendStubs(card Card, stubs ...[4]byte) Card {
 
 - [ ] **Step 4: Run the tests**
 
-Run: `CGO_ENABLED=0 go test -count=1 -run 'TestComposerStubs' -v ./md/ 2>&1 | tail -3; CGO_ENABLED=0 go test -count=1 -run 'TestAppendStubs' -v ./mk/ 2>&1 | tail -3`
-Expected: both PASS; the two stubs equal the first eight hex characters of Rust's `wallet_descriptor_template_id` and `wallet_policy_id`.
+Run: `CGO_ENABLED=0 go test -count=1 -run 'TestComposerStubs' -v ./md/ 2>&1 | tail -3; CGO_ENABLED=0 go test -count=1 -run 'TestAppendStubs' -v ./mk/ 2>&1 | tail -4`
+Expected: all PASS; the two stubs equal the first eight hex characters of Rust's `wallet_descriptor_template_id` and `wallet_policy_id`; the aliasing probe passes only with the defensive copy (drop the `make`+`append` for `out.Stubs = card.Stubs` and it fails with "aliased the input's array").
 
 - [ ] **Step 5: gofmt, commit**
 
@@ -2315,18 +2508,20 @@ MSG
 - Test: `sysw/composer_records_test.go`
 
 **Interfaces:**
-- Consumes: `Class`, `Classify`, `classifyConstellation` (`sysw/record.go:24,100`, `sysw/classify.go:34`); `bip32.ParsePathElement`, `bip32.Path` (`bip32/bip32.go:69,18`); `hdkeychain.NewKeyFromString`; the host's `crates/me-cli/testdata/record_class_vectors.json` (40 rows, sha256 `a894e619580db8ca0e06ebfe45576cc45722f695913bf46e9285201c95f146c3`, S1 Task 3) with rows `{name, record, class, host_line}` and `class` in `Key|Hash|Now|Unknown`.
+- Consumes: `Class`, `Classify`, `classifyConstellation` (`sysw/record.go:24,100`, `sysw/classify.go:34`); `bip32.ParsePathElement`, `bip32.Path` (`bip32/bip32.go:69,18`); `hdkeychain.NewKeyFromString`; the host's `crates/me-cli/testdata/record_class_vectors.json` (45 rows, sha256 `eed6b177d1a3406a69c4a0102635f5d59c6412fa65e106f85b831c4736ac464e`, S1 Task 3 as folded after the S1 whole-diff review -- 40 rows at S1's R0, plus three rows from composer-S1-exec-review-r0 M-2 and two from composer-S2-plan-R0-r0-tests I-1) with rows `{name, record, class, host_line}` and `class` in `Key|Hash|Now|Unknown`.
 - Produces: `KeyPrefix = "key:"`, `HashPrefix = "hash:"`, `NowPrefix = "now:"`; `ClassKey`, `ClassHash`, `ClassNow` (appended after `ClassTx`; none secret); `type KeyRecord{Fingerprint [4]byte; Origin bip32.Path; Xpub string; Text string}`; `type NowRecord{Seconds uint32; Height uint32; HasHeight bool}`; `func ParseKeyRecord(record string) (KeyRecord, error)`, `func ParseHashRecord(record string) ([32]byte, error)`, `func ParseNowRecord(record string) (NowRecord, error)`; `func IsComposerRecord(record string) bool`. Every rule is the host's (`composer_records.rs`, S1 Task 1), ported predicate by predicate; the device emits NO line (§8n is host copy; the device leaves a malformed record inert, §12 item 8).
 
 Decisions stated: `DecodeBody` (`sysw/record.go:67`) is NOT widened to the three prefixes -- it decodes bodies for ENGRAVING (`text:`/`pass:`/`tx:`), and no composer record is engraved as text; the composer's parser owns its own lowercase-hex rule so the lockstep port is one unit (the same reasoning the host module states for not sharing `record.rs`'s helpers). `H` as a hardening marker is refused here as on the host (`bip32.ParsePathElement` accepts only `h` and `'`); a leading `+` or `-` in a path element is refused by an explicit digit check because `strconv.ParseInt` would accept it and rust-bitcoin does not.
 
 - [ ] **Step 1: Vendor the fixture and write the failing test**
 
+PRECONDITION (Baselines): S1 is merged to mnemonic-engrave master; `git -C /scratch/code/shibboleth/mnemonic-engrave log -1 --format=%H -- crates/me-cli/testdata/record_class_vectors.json` prints a commit on master. If the file is absent there, STOP: this task cannot run before S1 ships.
+
 ```bash
 cp /scratch/code/shibboleth/mnemonic-engrave/crates/me-cli/testdata/record_class_vectors.json sysw/testdata/
 sha256sum sysw/testdata/record_class_vectors.json
 ```
-Expected: `a894e619580db8ca0e06ebfe45576cc45722f695913bf46e9285201c95f146c3`. If it differs, the host fixture moved since S1 closed; stop and record both hashes.
+Expected: `eed6b177d1a3406a69c4a0102635f5d59c6412fa65e106f85b831c4736ac464e` (45 rows). If it differs, the host fixture moved since this plan was gated; stop and record both hashes.
 
 Create `sysw/testdata/record_class_vectors.provenance.json`:
 
@@ -2347,8 +2542,8 @@ Create `sysw/testdata/record_class_vectors.provenance.json`:
   "commit": "<git -C ../mnemonic-engrave rev-parse HEAD at vendoring>",
   "file_commit": "<git -C ../mnemonic-engrave log -1 --format=%H -- crates/me-cli/testdata/record_class_vectors.json>",
   "repo_clean_when_recorded": true,
-  "sha256": "a894e619580db8ca0e06ebfe45576cc45722f695913bf46e9285201c95f146c3",
-  "vectors": 40,
+  "sha256": "eed6b177d1a3406a69c4a0102635f5d59c6412fa65e106f85b831c4736ac464e",
+  "vectors": 45,
   "recorded_at": "2026-09-02"
 }
 ```
@@ -2412,8 +2607,8 @@ func loadRecordClassRows(t *testing.T) []recordClassRow {
 	if err := json.Unmarshal(raw, &rows); err != nil {
 		t.Fatalf("parsing fixture: %v", err)
 	}
-	if len(rows) != pin.Vectors || len(rows) != 40 {
-		t.Fatalf("fixture has %d rows, pin says %d, plan says 40", len(rows), pin.Vectors)
+	if len(rows) != pin.Vectors || len(rows) != 45 {
+		t.Fatalf("fixture has %d rows, pin says %d, plan says 45", len(rows), pin.Vectors)
 	}
 	return rows
 }
@@ -2457,6 +2652,7 @@ func TestComposerRecordParsersReturnTheHostsValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("key-journey-cosigner-0: %v", err)
 	}
+	// bip32.Path.String renders hardening as `h` (bip32/bip32.go:20-35).
 	if hex.EncodeToString(k.Fingerprint[:]) != "73c5da0a" || k.Origin.String() != "m/48h/0h/0h/2h" {
 		t.Errorf("key = fp %x origin %s", k.Fingerprint, k.Origin.String())
 	}
@@ -2520,6 +2716,25 @@ func TestComposerClassesArePrefixMatchedAndNotSecret(t *testing.T) {
 	}
 	if !IsComposerRecord("key:") || !IsComposerRecord("hash:zz") || !IsComposerRecord("now:") {
 		t.Error("a prefixed record is ours even when malformed (it is refused, not passed on)")
+	}
+}
+
+// §6a's digit-COUNT bound is independent of the range bound (composer-S2-plan-R0-r0-tests
+// I-1): an in-range value padded with leading zeros past 10 (seconds) or 9 (height) digits
+// refuses. The fixture rows now-seconds-eleven-digits / now-height-ten-digits are the
+// lockstep leg; this is the unit leg, so a mutation of digitsInRange's length check fails
+// here even if the fixture is re-pinned.
+func TestNowRecordDigitCountIsBoundedIndependentlyOfRange(t *testing.T) {
+	now := func(text string) string { return NowPrefix + hex.EncodeToString([]byte(text)) }
+	for _, ok := range []string{"1756684800", "0001756800", "1756684800,499999999", "1756684800,000000001"} {
+		if _, err := ParseNowRecord(now(ok)); err != nil {
+			t.Errorf("%q: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"01756684800", "00000000001", "1756684800,0499999999", "1756684800,0000000001"} {
+		if _, err := ParseNowRecord(now(bad)); err == nil {
+			t.Errorf("%q accepted: the digit count is not bounded", bad)
+		}
 	}
 }
 
@@ -2826,10 +3041,10 @@ func ParseKeyRecord(record string) (KeyRecord, error) {
 }
 ```
 
-- [ ] **Step 4: Run the tests -- every one of the 40 rows must agree**
+- [ ] **Step 4: Run the tests -- every one of the 45 rows must agree**
 
 Run: `CGO_ENABLED=0 go test -count=1 -run 'TestComposerRecord|TestComposerClasses|TestKeyRecordPath|TestClassify' -v ./sysw/ 2>&1 | grep -E '^(--- |ok|FAIL)'`
-Expected: all PASS, including the pre-existing `TestClassifyMatchesTheRustPrimary` and `TestClassifyRejectsMs1RustWouldRefuse`. A row that disagrees is a lockstep defect: quote the row's name, the host's class and Go's, and fix the Go predicate -- unless the fixture row itself looks wrong, in which case STOP (the fix lands in Rust first). `bip32.Path.String()` renders `m/48h/0h/0h/2h` (measured in the gate's scratch run; `bip32/bip32.go:103-110` writes `h`), which is what the assertion pins.
+Expected: all PASS, including the pre-existing `TestClassifyMatchesTheRustPrimary` and `TestClassifyRejectsMs1RustWouldRefuse`. A row that disagrees is a lockstep defect: quote the row's name, the host's class and Go's, and fix the Go predicate -- unless the fixture row itself looks wrong, in which case STOP (the fix lands in Rust first). `bip32.Path.String()` renders `m/48h/0h/0h/2h` (measured in the gate's scratch run; `bip32/bip32.go:20-35` writes `h`), which is what the assertion pins.
 
 - [ ] **Step 5: gofmt, whole-package run, commit**
 
@@ -2839,10 +3054,10 @@ Expected: nothing from gofmt; `ok`.
 ```bash
 git add sysw/record.go sysw/composer_records.go sysw/composer_records_test.go sysw/testdata/record_class_vectors.json sysw/testdata/record_class_vectors.provenance.json
 git commit -s -F - <<'MSG'
-sysw: key:/hash:/now: record classes, lockstep with the host's 40-row fixture (composer S2 task 6)
+sysw: key:/hash:/now: record classes, lockstep with the host's 45-row fixture (composer S2 task 6)
 
 Prefix-matched before the sniffers; body rules ported predicate by predicate
-from composer_records.rs; fixture vendored with a provenance pin (sha a894e619...).
+from composer_records.rs; fixture vendored with a provenance pin (sha eed6b177...).
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
@@ -2960,7 +3175,7 @@ Expected: a `code`/`data`/`bss`/`flash`/`RAM` line. Record flash and RAM beside 
 - [ ] **Step 1: The three packages plus the whole tree, CI's command**
 
 Run: `CGO_ENABLED=0 go test -timeout 20m ./... 2>&1 | grep -vE '^ok|no test files' ; echo "exit=$?"`
-Expected: no FAIL lines. (`./gui/` runs here as CI runs it; `scripts/gui-shard-test.sh ./gui/ 24` is the faster local equivalent -- either, but at least one.)
+Expected: no FAIL lines. (`./gui/` runs here as CI runs it; the sharded runner lives in mnemonic-engrave, not the fork: `/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24` from the fork root is the faster local equivalent -- either, but at least one.)
 
 - [ ] **Step 2: 32-bit, the oraclelive build, and the emulator vet**
 
@@ -2990,10 +3205,10 @@ Write the implementation report to `design/agent-reports/composer-S2-implementat
 - "the `sysw.Classify` half of the three record classes (lockstep with S1's fixture)" → Task 6 (§12 item 8).
 - Exit: "`go test ./md/ ./mk/ ./sysw/` green with the S0 vectors and the S1 fixture vendored; TinyGo device build green; flash/RAM delta recorded" → Tasks 8–9.
 
-**What this stage does NOT do (Stage 3/4, named so the reviewer does not look for it):** no screens, no `syswSession` consumption of the three classes ("Keys loaded" / "not understood" counts are §12 item 8's device half at the GUI), no seating through `seatKeyCards` (§12 item 6's card-seating leg needs the GUI's card list), no address derivation for taproot script trees in `address/` (the shipped port's Stage-3 gap; the composer's tr vectors are id-checked by the keyed conformance gate, not address-checked, and `TestPkhWitnessScriptsReproduceRustsAddresses` covers wsh only — said here rather than implied).
+**What this stage does NOT do (Stage 3/4, named so the reviewer does not look for it):** no preset vectors -- the five archetypes (`md-codec::compose::presets`, spec §4d) have no corpus entry and `md compose` exposes no `--preset`, so their Go path lists in Stage 3 would have no oracle; filed as a follow-up owned by S3 (fidelity M-5: add `md compose --preset` + one exported vector per archetype in descriptor-mnemonic FIRST, then vendor); no screens, no `syswSession` consumption of the three classes ("Keys loaded" / "not understood" counts are §12 item 8's device half at the GUI), no seating through `seatKeyCards` (§12 item 6's card-seating leg needs the GUI's card list), no address derivation for taproot script trees in `address/` (the shipped port's Stage-3 gap; the composer's tr vectors are id-checked by the keyed conformance gate, not address-checked, and `TestPkhWitnessScriptsReproduceRustsAddresses` covers wsh only — said here rather than implied).
 
 **Placeholder scan:** the record-class provenance JSON (Task 6, first step) carries two angle-bracket fields (`commit`, `file_commit`) that the implementer fills from the two named commands; both are checked for 40-character length by the test. No TBD/TODO elsewhere.
 
-**Type consistency:** `ComposeSlot{Index uint8; Path int; Ordinal uint8}` used identically in Tasks 2 and 3 tests; `Branch.LockOperands []uint32` / `Sha256Digests [][32]byte` in Task 4 test and code; `SlotOrigin{Origin []PathComponent; Fingerprint [4]byte; FpPresent bool}` in Task 2 code and tests; `DefaultOrigin(w, account) []PathComponent` consumed by `toComponents` in tests; `KeyRecord.Origin bip32.Path` and `.String()` in Task 6.
+**Type consistency:** `ComposeSlot{Index uint8; Path int; Ordinal uint8}` used identically in Tasks 2 and 3 tests; `Branch.Locks []Lock` / `Sha256Digests [][32]byte` / `Sorted bool` in Task 4 test and code (`Lock`, `LockKind`, `lockFromWire` from Task 2); `SlotOrigin{Origin []PathComponent; Fingerprint [4]byte; FpPresent bool}` in Task 2 code and tests; `DefaultOrigin(w, account) []PathComponent` consumed by `toComponents` in tests; `KeyRecord.Origin bip32.Path` and `.String()` in Task 6.
 
 **Gate coverage line for the review brief:** `scripts/plan-build-gate-go.sh` compiled and ran Tasks 1 (pin test), 2, 3 (test file), 4 (test file), 5, 6 (new files) with the fragments of `script_emit.go`, `policy_shape.go`, `record.go` hand-wired; the gate does not cover `gui/composer_origin_test.go` (Task 7, run by `-run` filter separately), the firmware build (Task 8) or the vendoring script's provenance output beyond the file count.
