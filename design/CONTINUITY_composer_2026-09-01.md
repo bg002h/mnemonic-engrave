@@ -498,3 +498,6 @@ ONE path = warning.
   (scratchpad/s0b-gate-r2.log). THEN: commit (scratchpad/s0b-fold-r1.msg) → r2
   verification (scratchpad/verify-brief-s0b-r2.md, targeted) → implementer
   (scratchpad/implementer-brief-s0b.md).
+- S0b round-1 fold COMMITTED (controller re-gate in the message; the
+  1302-vs-1340 count is the --all-features flag). r2 verification (sonnet,
+  targeted) dispatched next.
