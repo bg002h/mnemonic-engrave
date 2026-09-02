@@ -355,3 +355,7 @@ ONE path = warning.
 - Fidelity lens landed: `composer-S3-plan-R0-r0-fidelity.md` (opus) 1C/12I/11M/3N
   (7195a7c); C-1 = the same unjoined Part B. Forwarded to the author for the
   combined fold; tests lens still running.
+- Gate hardened (2f94f0d): `plan-build-gate-go.sh` step 8 counts DEAD-IN-PROD
+  functions among the plan's new production files (comments stripped); proven
+  on the wired S3 scratch: exactly the 14 the two lenses named. Prints, does not
+  fail (a later-stage API is a legitimate hit); the reviewer decides.
