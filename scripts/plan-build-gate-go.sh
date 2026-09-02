@@ -30,8 +30,10 @@
 #      testdata_test.go) are fragments and are NOT assembled -- the controller
 #      hand-wires them in the scratch copy before review, as Stage 0 and 1 did.
 #   4. `go vet ./md/ ./mk/ ./sysw/` then `go test -count=1 ./md/ ./mk/ ./sysw/`
-#      (the packages the plan touches; `./gui/` is Stage 3's and is sharded
-#      separately by scripts/gui-shard-test.sh).
+#      (the packages the plan touches); when the plan created any
+#      `gui/composer_*.go`, also `go vet ./gui/` and
+#      `go test -run '^TestComposer' ./gui/` (the whole gui package is sharded
+#      separately by scripts/gui-shard-test.sh and is a plan task, not this gate).
 #
 # EXTRACTING NOTHING IS A FAILURE, NOT A PASS (exit 3).
 #
@@ -112,4 +114,9 @@ echo "== 5 -- go vet ./md/ ./mk/ ./sysw/ =="
 "$GO" vet ./md/ ./mk/ ./sysw/ 2>&1 | tail -20
 echo "== 6 -- go test -count=1 ./md/ ./mk/ ./sysw/ =="
 "$GO" test -count=1 ./md/ ./mk/ ./sysw/ 2>&1 | tail -30
+if ls "$WORK"/gui/composer_*.go >/dev/null 2>&1; then
+  echo "== 7 -- gui: vet + the composer tests only (go test -run '^TestComposer' ./gui/; the whole package is sharded elsewhere) =="
+  "$GO" vet ./gui/ 2>&1 | tail -20
+  "$GO" test -count=1 -run '^TestComposer' ./gui/ 2>&1 | tail -30
+fi
 echo "== NOT covered: fragments of existing files (hand-wired by the controller before review); ./gui/ (Stage 3, sharded separately); the TinyGo firmware build and its size delta (a plan task); the real vendoring with provenance (a plan task). =="

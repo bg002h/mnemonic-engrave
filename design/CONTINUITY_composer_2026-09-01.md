@@ -253,3 +253,25 @@ ONE path = warning.
   and `wt-ms-bip48-p2tr` removed (branches `composer-s1`, `bip48-p2tr` kept).
 - **S2 implementer running** (opus) in fork worktree `wt-composer-s2`, plan
   38e3ed1; **S3 GUI recon** (sonnet, read-only) running → `composer-S3-recon-gui.md`.
+
+## In flight at 2026-09-02 (late)
+
+- **S2 implementer** (opus) in `wt-composer-s2` → `composer-S2-implementation-report.md`.
+  THEN: persist → re-run gates in the worktree (vet, go test ./md/ ./mk/ ./sysw/,
+  gui -run TestComposer, test-32bit, oraclelive build, js vet, gofmt, firmware
+  size) → opus whole-diff execution review → fold → sonnet verification →
+  merge into the fork main → fork push (its own CI: test.yml) → flash? (the
+  operator's call; S2 has no screens, nothing to see on device).
+- **F-324 fix** (sonnet) in mnemonic-toolkit worktree `wt-toolkit-f324` →
+  `f324-toolkit-git-source-report.md`. THEN: review diff → push toolkit master via
+  its staging ritual (contexts `examples`, `test (ubuntu-latest)`, `clippy`) →
+  re-pin `toolkit_ref` in ms `man-release.yml` (+ pass `git_source_url`/`git_source_rev`
+  from Cargo.lock) → ms push via staging → `workflow_dispatch` the gate once →
+  `gh run rerun 33621228397 --repo bg002h/mnemonic-secret --failed` to publish the
+  0.17.0 musl binaries.
+- **S3 plan author** (opus) → `design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md`
+  + `composer-S3-plan-author-report.md`. THEN: build gate (now also runs
+  `gui -run ^TestComposer`), cite/glyph/stepref checks, R0 lenses (fidelity opus,
+  tests sonnet, + a JOURNEY-WALK lens: the operator is not present, so an agent
+  walks §7's journey against the plan; the live walk with the operator remains
+  owed), fold, verification, then implementer after S2 ships.
