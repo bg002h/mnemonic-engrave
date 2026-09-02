@@ -1,6 +1,6 @@
 # SPEC — Wallet Policy COMPOSER: on-device authoring of arbitrary tr/wsh wallet policies (spend-path grammar)
 
-**STATUS: DRAFT 2026-09-01, R0 ROUNDS 0, 1 AND 2 FOLDED.** Round 2: fold verification (30 FIXED / 3 PARTIAL / 2 NOT FIXED, folded at `99463ac`) and an adversarial pass on the fold-added mechanisms (1C/7I/5M/1N, `composer-spec-R0-r2-adversarial.md`, folded here). Round 0: 4 lenses,
+**STATUS: 2026-09-01, R0 CLOSED UNDER LENS-CLOSURE (0 Critical / 0 Important open) AFTER ROUNDS 0-3.** Lenses run: correctness, adversarial (twice), journey (twice), spec-coverage, implementation-feasibility, fold-verification (three times); a LIVE operator journey walk has not been done and stays open as a lens the operator may run at any time. Round 3: fold verification of the round-2 fold (12 FIXED / 2 PARTIAL / 0 NOT FIXED, `composer-spec-R0-r3-fold-verification.md`); its two propagation gaps (the `now:` auto-append rule restated unconditionally in 6a; the door's key-count dispatch rule in 7a) and one imprecise citation folded here. Round 2: fold verification (30 FIXED / 3 PARTIAL / 2 NOT FIXED, folded at `99463ac`) and an adversarial pass on the fold-added mechanisms (1C/7I/5M/1N, `composer-spec-R0-r2-adversarial.md`, folded here). Round 0: 4 lenses,
 14C/34I (`composer-spec-R0-r0-*.md`), all folded at `bc1c07c`. Round 1: fold
 verification (46 FIXED / 1 PARTIAL / 0 NOT FIXED), a second journey walk
 (1C/9I/6M/2N) and an implementation-feasibility lens (1C/4I/6M/2N)
@@ -192,7 +192,7 @@ those fingerprints differ.** Why: a pathless slot is refused by the fork's decod
 (`errSeatSlotContested`); and two slots at one origin where only ONE declares a
 fingerprint let a single card fill both silently, because `slotMatchesCard` skips
 the fingerprint test when the template declares none
-(`gui/key_card_seating.go:117-140`): a mis-seated key presented as reviewed. A
+(`gui/key_card_seating.go:119-151`): a mis-seated key presented as reviewed. A
 seated pair that violates the invariant (two privacy-preserving cards at one
 origin) is REFUSED at the mapping review (§8v). The template screen (§7c) states
 the expected origin per unseated slot. No standard exists for taproot multisig origins (BIP-48 registers `1'`/`2'`
@@ -306,8 +306,9 @@ Why `key:` exists: today a bare xpub line packs as a `pkh(xpub)` single-sig
 WALLET and a `[fp/path]xpub` line is refused (brainstorm record section 3.6).
 Why `now:` is a lower bound: the device has no clock; the record affects ONLY
 echoes and refusals (§6b), never an encoded operand. `me sysw pack` appends `now:`
-as the LAST record by default; `--no-now` omits it so a fixture's pack output stays
-a pure function of its inputs (§10 item 2).
+as the LAST record ONLY when the operator's records hold none (the rule above, one
+statement of it); `--no-now` suppresses that auto-append so a fixture's pack output
+stays a pure function of its inputs (§10 item 2).
 
 **What the payload spec must receive (§10 item 6; its own R0-gated fold):**
 section 3.3.1 gains three class rows with `secret? = no`; section 3.3.2 has NO
@@ -375,8 +376,12 @@ Wallet Policy opens on a ChoiceScreen in EVERY state (today the no-payload path
 drops straight into the NFC gather, `gui/wallet_policy.go:97`). Choices name the
 route they take (F-437, resolved): "Scan cards", "From payload" (only when the
 loaded payload holds a Descriptor or md1/mk1 record), "Build a new policy". Beneath Build the door states the key state:
-"Keys loaded: N" when a payload holds keys or seeds; "No keys loaded. This builds
-a key-less template." when it holds none or none is loaded; and, when a payload
+"Keys loaded: N" when the payload holds N keys and no seed; "Keys loaded: N, plus
+M seed." when it holds N keys and M seeds (the noun pluralises with M, as the
+not-understood line's does); "A seed is loaded. It can fill any number of slots."
+when it holds seeds and no key (a seed fills any number of slots, so no count is
+printed for it); "No keys loaded. This builds a key-less template." when it holds
+neither or none is loaded; and, when a payload
 is present in flash but was skipped at boot, "A payload is in flash but not
 loaded. Load it from the carousel first." (F-152's future default would make that
 a button).
