@@ -555,3 +555,11 @@ ONE path = warning.
   fold -> verify -> push (<S0B_TIP>) -> record the S0b merge commit in A10 ->
   dispatch the S3 implementer. The hand-wire scripts are lost; S3's plan gate
   needs none further (A10 carries no go fence).
+- A10 fold VERIFIED (sonnet 0C/0I/0M/0N, report 084d7da). S0b whole-diff review
+  0C/0I/4M/4N (report 1736aca): M-1/M-2/M-3/N-3 folded inline in
+  wt-composer-s0b (uncommitted; gate running to .tmp/s0b-fold-gate.log), N-1/
+  N-2/N-4 filed F-459 (cffdccd), M-4 already closed by 0051be7. NEXT: commit
+  the S0b fold -> sonnet verification (design/agent-briefs/
+  composer-S0b-fold-verification-brief.md, <S0B_FOLD_SHA>) -> push
+  (composer-S0b-push-brief.md, <S0B_TIP>) -> record the merge commit in S3 A10
+  (that commit is <S3_GREEN_SHA>) -> dispatch the S3 implementer.
