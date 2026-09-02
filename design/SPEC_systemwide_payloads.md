@@ -3,7 +3,7 @@
 Status: **DRAFT, pre-R0.** Written 2026-08-11 from a brainstorm with the
 operator. No code has been written and none may be until this passes the R0
 gate at 0 Critical / 0 Important (project rule: risk-set work, and this is
-squarely in it — secrets, admission behaviour, eight programs, two repos).
+squarely in it — secrets, admission behaviour, eight programs as ruled in 2026-08 and a ninth since 2026-09-02, two repos).
 
 **Reference convention:** `EPD§` means a section of `SPEC_encrypted_payload_delivery.md`; a bare `§` means a section of THIS
 document. The two specs both have a §2.2, a §5.5 and an §8.1, and an
@@ -32,7 +32,11 @@ several overrule a documented prior decision and are marked where they do.
    program, and only one of them wipes."
 3. **Scope is all eight non-Sealed-Payload programs**: Backup Wallet, BIP-39
    Password, Engrave Text, Account Xpub, Engrave Bundle, Engrave Single-Sig,
-   Engrave Multisig, BIP-85 Child Seed.
+   Engrave Multisig, BIP-85 Child Seed. (Wallet Policy, shipped after this
+   list was ruled, is a NINTH program: its admission row was created
+   2026-09-02 by the composer cycle — §3.3.2 — and its seed step is the
+   composer spec's own seating, not §3.1's seam. "Eight" elsewhere in this
+   document is the 2026-08-11 count.)
 4. **The systemwide payload lives in its own flash region**, not the Sealed
    Payload region at `0x10E00000`.
 5. **Two container variants**: sealed (passphrase + KDF) and plaintext
@@ -234,8 +238,11 @@ mentions `seedEntryFlow` — rather than behavioural, which is what R0-C1 showed
 test 1 could not achieve at the store layer alone.
 
 **"One seam, not eight" is therefore false as originally written, and the spec
-says so rather than keeping the slogan.** The seam covers 4 of the 8 programs.
-The other four do not share a helper at all: `backupWallet` uses `newInputFlow`
+says so rather than keeping the slogan.** The seam covers 4 of the 8 programs
+ruled in decision 3 (Wallet Policy, the ninth, added 2026-09-02, takes a seed
+through the composer spec's §7d seating — mnemonic-engrave
+`SPEC_wallet_policy_composer.md` — not through this seam; it is neither of the
+two groups below). The other four do not share a helper at all: `backupWallet` uses `newInputFlow`
 (exactly one non-test caller, `gui.go:1704`), and BIP-39 Password, Engrave Text
 and Engrave Bundle each have their own entry path.
 
@@ -334,8 +341,10 @@ whether a **flag** is raised. So:
 **The three composer classes are NOT secret** (added 2026-09-02, composer Stage
 1): a cosigner's extended public key, a digest and a timestamp are public by
 construction. `ClassNow` is a LOWER BOUND on the present — the pack time — that
-the device, which has no clock, echoes beside a time lock and never encodes into
-anything (mnemonic-engrave `SPEC_wallet_policy_composer.md` §6a, C24). Their
+the device, which has no clock, echoes beside a time lock — and uses for its
+lock-entry refusals (a date below the bound, the 2009 floor: composer §6b) —
+and never encodes into anything (mnemonic-engrave
+`SPEC_wallet_policy_composer.md` §6a, C24). Their
 per-class body rules and refusal lines live in that spec (§6a, §8n); this
 document records only the classes, their admission and their prefixes.
 
@@ -382,30 +391,40 @@ reconstruct it:
   verify-address flow, which `engraveObjectFlow` deliberately has no case for
   (R0-M5). This spec does not change that.
 - **Wallet Policy (row CREATED 2026-09-02, composer Stage 1; F-415 named the
-  gap).** The fork has carried a `progWalletPolicy` admission map since S2
-  (`gui/sysw_admit.go`: `ClassDescriptor`, `ClassMDMK`) with no row here. The
+  gap).** The fork has carried a `progWalletPolicy` admission map since 2026-08-20
+  (`gui/sysw_admit.go` at `09c5f14`: `ClassDescriptor`, `ClassMDMK`; S2 added
+  the Descriptor cell's first consumer on 2026-08-29) with no row here. The
   row now records the COMPOSER's admission (mnemonic-engrave
   `SPEC_wallet_policy_composer.md` C12, §6a, §10 item 6): the three seed
   classes, so the device can fill slots from a seed exactly as Multisig Build
   does — this reverses `gui/sysw_admit.go`'s "NO seed class … least privilege"
   comment, which the composer spec rewrites — plus `Descriptor` and `MDMK` (the
   existing consume path) and the three composer classes, which no other
-  program admits. `FreeText` and `Address` stay refused. Because a seed becomes
+  program admits. `FreeText` and `Address` are refused. Because a seed becomes
   admitted at Wallet Policy for the first time, §3.3.3's F1 and F2 fire inside
   the composer's seed step exactly as they do in Multisig Build.
-- **`progTransaction` has an admission map in the fork and NO row here.** Noted
-  2026-09-02 while creating the Wallet Policy row; it belongs to the
-  transaction-engraving cycle's owner and is not created by this fold.
+- **`progTransaction` has an admission map in the fork and NO row here, and
+  §3.3.1 has no `ClassMt`/`ClassTx` rows** (`sysw/record.go` carries both, not
+  secret). Noted 2026-09-02 while creating the Wallet Policy row; F-415's
+  remaining half. Filed as mnemonic-engrave F-450 with the payload spec's next
+  cycle as owner; not created by this fold.
 - **Sealed Payload is dashes, not blanks** — it is out of scope entirely
   (decision 1), not a program whose every cell happens to be refused.
 
 **RULED AT FOLD, 2026-08-12 — the table is the normative RECORD; enforcement is
 per-site and structural (§13 D7).** The journeys review measured the
-implementation: the table is transcribed cell-perfectly into
-`gui/sysw_admit.go`, and its `admits()` has **zero non-test callers** — every
+implementation AS OF 2026-08-12: the table was transcribed cell-perfectly into
+`gui/sysw_admit.go`, and its `admits()` had **zero non-test callers** — every
 consumption site instead names exactly one class in its `take`/`syswOffer`
 call, and each named class is a `•` in its program's row (checked cell by
-cell). That is not the drift it looks like; it is the better mechanism, by this
+cell). Two dated departures since, both recorded rather than papered over: the
+Wallet Policy row and the `Key`/`Hash`/`Now` columns created 2026-09-02 are NOT
+yet transcribed (the fork's `progWalletPolicy` map carries `ClassDescriptor`
+and `ClassMDMK` only, and `sysw.Class` has no composer members yet) — the
+composer's device stages transcribe them; and the Engrave Transaction cycle
+(2026-08-25) gave `admits()` one production caller,
+`gui/sysw_unload.go:89` (`syswPayloadHasTransaction`), so "zero" is the
+2026-08-12 measurement. That is not the drift it looks like; it is the better mechanism, by this
 spec's own §3.1 argument. A run-time `admits()` call at those sites could never
 return false — each site's class is hard-coded and admitted — so wiring it in
 would add a check that cannot fail, while a wrong future site could simply omit
@@ -427,7 +446,13 @@ by any argument. So:
   optional-passphrase step, `passphraseFlow` at `gui/gui.go:654`, never offers
   the payload); `ClassMDMK` at Single-Sig and Multisig (the supplied-md1
   path). Plan stage 13 serves the cells that already have carriers; the plan's
-  journey map names the rest as open.
+  journey map names the rest as open. Added 2026-09-02 with the Wallet Policy
+  row: six of its eight admitted cells have no consumption path today (`Mnem`,
+  `Cdx32`, `Passph`, `Key`, `Hash`, `Now`; only `Descr` and `MDMK` are
+  consumed, `gui/sysw_admit_oracle_test.go`), and `Cdx32` there is a FIFTH
+  unservable-until-carried cell that the composer actively requires (its §7d:
+  "seeds — BIP-39 words or ms1"). The composer's device stages are their
+  carriers.
 - **A spec-internal inconsistency, found by the review and recorded rather than
   papered over:** §3.1's NORMATIVE seam signature returns `bip39.Mnemonic`,
   which cannot carry the `ClassCodex32Secret` this table admits to all four
@@ -546,17 +571,22 @@ must not be reported as one.
 ### 5.3 Widened admission — NORMATIVE, Rust first
 
 Today the public section admits **`ClassMDMK` only** (`seal/record.go`'s own
-fail-closed comment says so). Two changes:
+fail-closed comment says so). Two changes ruled 2026-08-11, and a third added
+2026-09-02:
 
 1. **A record class for free text**, so Engrave Text can be fed. None exists.
 2. **Secret classes permitted in a plaintext container.** An unsealed payload
    has no encrypted section, so a secret has nowhere else to live.
+3. **Three composer record classes** (`ClassKey`, `ClassHash`, `ClassNow`;
+   §3.3.1) so the Wallet Policy composer can be fed cosigner keys, hashlock
+   digests and the pack time.
 
-Both are wire/admission behaviour. Per the Rust-primary rule they land in
-`mnemonic-engrave`'s Rust **with test vectors first**; the fork's Go is a
-behaviour-faithful port and may never lead.
+All three are wire/admission behaviour. Per the Rust-primary rule they land in
+`mnemonic-engrave`'s Rust **with test vectors first** (the composer classes:
+`me sysw pack`, composer spec §10 item 2, with the cross-language fixture of its
+§12 item 8); the fork's Go is a behaviour-faithful port and may never lead.
 
-#### 5.3.1 The two new classes collide with EPD§6.4 — and are ENCODED, not exempted
+#### 5.3.1 The two new classes collide with EPD§6.4 — and are ENCODED, not exempted (the three composer classes inherit the encoding, see the end of this section)
 
 Writing this section specifically is what found the collision, and it is a hard
 one. EPD§6.4 is normative and emphatic:
@@ -573,7 +603,11 @@ an **`nl` key**, so free text can contain the exact byte used as the record
 separator. EPD§6.6 additionally hashes "canonical **LOWERCASE** records", so any
 encoding must also survive lowercasing.
 
-**The exemption is refused.** Relaxing EPD§6.4 for two classes would weaken the
+**The exemption is refused.** (The three composer classes of 2026-09-02 carry
+no interior space, hyphen or LF in their bodies, so they do not collide with
+EPD§6.4 at all; they take the hex encoding anyway, for the lowercasing and
+on-screen-comparison reasons below and so that one rule covers every prefixed
+record.) Relaxing EPD§6.4 for two classes would weaken the
 rule for all of them, and that rule is load-bearing for a reason EPD states at
 length: `mdmkFlow`/`bundleEngrave` engrave records **verbatim**, so a record
 carrying separator characters the BCH checksum never covered turns a scratch on
@@ -613,7 +647,7 @@ transaction-engraving cycle raised it; the 2× argument held at either value.)
 back to UTF-8 before it reaches Engrave Text, and a `ClassPassphrase` body before
 it reaches the KDF. R0 round 6 found journey (b) had no stated step doing this.
 
-**Classification order is normative:** the two prefixes are matched **before**
+**Classification order is normative:** the reserved prefixes are matched **before**
 the existing sniffers in `Classify`. Free text is the universal fallback — any
 string could be free text — so a sniffer that ran first would claim
 `text:...` records whose hex body happened to parse as something else. The
@@ -1258,7 +1292,7 @@ verify comparison.
 ### 8.2 The emulator gap — must be closed as part of this work
 
 `cmd/emu`'s `NFCReader()` returns nil: "this emulator has no tag source." If NFC
-becomes a first-class secret path for eight programs, **the tool used to qualify
+becomes a first-class secret path for the eight (now nine) programs, **the tool used to qualify
 screens is blind to the new path.** `platform.go` already sketches the fix — "a
 syscall/js read of `location.search` or a JS global set from the host page —
 nothing here forecloses that." Build it, so the path is walkable in a browser
