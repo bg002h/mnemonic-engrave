@@ -532,3 +532,6 @@ ONE path = warning.
   descriptor-mnemonic main → `scripts/push-via-staging.sh main` (contexts
   `cargo test (ubuntu-latest)` + `cargo clippy`; no tag, no publish) → re-vendor
   into the fork (S3 A10; 126 → 156 files, 26 → 32 names).
+- S3 round-2 fold COMMITTED (controller re-gate in the message: Part A alone 89,
+  whole 212, gui 1170/1170, DEAD 1, cite 241/241, staleness 0). r3 targeted
+  verification (sonnet) dispatched next (scratchpad/verify-brief-s3-r3.md).
