@@ -563,3 +563,54 @@ ONE path = warning.
   composer-S0b-fold-verification-brief.md, <S0B_FOLD_SHA>) -> push
   (composer-S0b-push-brief.md, <S0B_TIP>) -> record the merge commit in S3 A10
   (that commit is <S3_GREEN_SHA>) -> dispatch the S3 implementer.
+
+## RESUME POINT 2026-09-02 (context cleared here; resume with /resume-composer)
+
+State, all measured:
+- mnemonic-engrave master: S3 plan R0 GREEN (STATUS 9081222), Task A10 fold
+  0051be7 verified 0C/0I/0M/0N (084d7da). Briefs live in design/agent-briefs/.
+  master pushed through 1c7aac4; commits after it are records only.
+- descriptor-mnemonic: branch `composer-s0b` in worktree
+  /scratch/code/shibboleth/wt-composer-s0b, tip 1dc8d40 = whole-diff review
+  fold (M-1/M-2/M-3/N-3) on 87bc10ff (three implementer commits). Gate on the
+  fold: fmt/clippy/doc exit 0; nextest 1342/1342; threaded 1342/0; cli_compose*
+  32; compose_* 52. Review 0C/0I/4M/4N (report 1736aca); F-459 filed (cffdccd)
+  for N-1/N-2/N-4; M-4 closed by 0051be7. main = 66bdf2f4, untouched.
+- seedhammer fork main 321acb56 (S2). No S3 code exists yet.
+- S0b fold verification (sonnet): 0C/0I/0M/0N (report 361369b); the pre-fold cli_compose count was 30, not 31 -- the brief's figure was stale, the fold added two tests -> 32. Step 1 below is therefore DONE; start at step 2.
+
+Steps, in order:
+1. If the verification report (design/agent-reports/
+   composer-S0b-exec-review-r1-fold-verification.md) is not 0C/0I: fold on
+   composer-s0b, re-run the gate in the fold commit's form, re-verify.
+2. PUSH S0b: fill <S0B_TIP> (= `git -C /scratch/code/shibboleth/wt-composer-s0b
+   rev-parse HEAD`) in design/agent-briefs/composer-S0b-push-brief.md; dispatch
+   a sonnet push agent with it (ff-merge composer-s0b into main, then
+   scripts/push-via-staging.sh main; FREEZE main during the window; report to
+   design/agent-reports/composer-S0b-push-report.md). Verify origin/main
+   yourself; persist the report; note the merge commit.
+3. RECORD the S0b merge commit in S3 Task A10 (the blockquote that says the
+   controller records it; also FOLLOWUPS F-453 -> CLOSED with the commit).
+   One-line fold; plan checks (cite/glyph/table/stepref) in the message. That
+   commit is <S3_GREEN_SHA>.
+4. DISPATCH the S3 implementer (opus; UC off; ONE agent):
+   design/agent-briefs/composer-S3-implementer-brief.md with <S3_GREEN_SHA>
+   filled and the dispatch message stating "S0b has shipped at <merge commit>;
+   Task A10 is unblocked". Worktree /scratch/code/shibboleth/wt-composer-s3,
+   branch composer-s3. Expect hours; it reports to
+   design/agent-reports/composer-S3-implementation-report.md.
+5. After the implementer: persist its report; controller re-runs the fork
+   gates (scripts/gui-shard-test.sh ./gui/ 24, ./md ./mk ./sysw, gofmt, vet,
+   test-32bit.sh, build-firmware size line) on the worktree; then an opus
+   whole-diff execution review (brief to write in design/agent-briefs/, same
+   shape as composer-S2's: counterexamples, mutation-test the tests, what the
+   diff made false elsewhere, CI gates as CI runs them); fold; sonnet verify;
+   merge --no-ff into fork main, push, watch test.yml; flash via
+   ~/bin/sh/sh2-flash only when the operator says so.
+6. Engrave master: push the record commits via a sonnet push agent
+   (scripts/push-via-staging.sh master; freeze) whenever the tree is clean and
+   no commit is imminent.
+7. Owed to the operator (surface, do not block): three S3 defaults stand if
+   silent (Part A ships alone; §7f offers the device's two plate forms
+   (F-455); presets follow F-453's Rust half); F-457 narrows C10 this stage;
+   me 0.8.1 owed (F-454); the live journey walk with the operator.
