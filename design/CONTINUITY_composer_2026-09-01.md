@@ -296,3 +296,20 @@ ONE path = warning.
   (`pins` job derives the io-lib rev) → ms push via staging → `workflow_dispatch`
   gate → conclusion on the 0.17.0 binaries (likely needs a 0.17.1 tag; the
   controller decides) → `f324-close-report.md`.
+
+## S2 review loop CLOSED; merge dispatched (2026-09-02)
+
+- r1 fold verification (sonnet): 6/7 VERIFIED, V-1 = README note placement,
+  folded 7a4eeb5 (doc only). `composer-s2` tip 7a4eeb572ed9ea6a7fda0d6e0201a5df29a61fe8.
+  Sonnet merge+push agent dispatched (brief scratchpad/push-brief-s2.md, merge
+  message scratchpad/s2-merge.msg) → `composer-S2-push-report.md`. Fork main is
+  unprotected: merge --no-ff, push, watch test.yml.
+- S3 plan draft 2e61a98 + author report 236b1e7; mechanical checks clean (222/222
+  cites vs the S2 worktree, glyph 0, table 0, stepref 0); gate: new files compile,
+  md/mk/sysw ok, gui composer tests red until the six fragments are wired -- the
+  author is writing scratchpad/handwire_s3.py. THEN: green gate run → R0 lenses
+  (fidelity opus, tests sonnet, journey opus; briefs in scratchpad) → fold →
+  verification → implementer after S2 merges. Three operator questions in the
+  author report §5 (Part A ships alone? §7f two forms (F-455)? presets wait on
+  F-453?) -- surfaced to the operator; defaults if silent: yes / two forms /
+  blank-shape first.
