@@ -389,3 +389,11 @@ ONE path = warning.
   r1 verification (brief scratchpad/verify-brief-s3-r1.md; PRE_FOLD_SHA = 39f381b).
 - /tmp is a 32 GB tmpfs at ~76%: the session's scratchpad build cache
   (649 MB) was removed; run sharded gui tests with TMPDIR on /scratch.
+- Fold COMMITTED 3820a6a (message = the controller's independent re-gate: cite
+  238/238, staleness 0, glyph 0, tables 89/0, composer 181 PASS lines, gui
+  1158/1158, DEAD-IN-PROD 1 justified); author report update 5fbc5d8. r1 fold
+  verification (sonnet) DISPATCHED → `composer-S3-plan-R0-r1-fold-verification.md`.
+  A clean r1 closes R0 for S3 (lens-closure: fidelity, tests/mutation, journey,
+  fold verification -- the same set S2 closed on plus the journey walk).
+  Still owed to the operator before implementation: the three §5 questions
+  (defaults stand if silent) and F-457's narrowing of C10.
