@@ -1,7 +1,8 @@
 # SPEC — Wallet Policy COMPOSER: on-device authoring of arbitrary tr/wsh wallet policies (spend-path grammar)
 
-**STATUS: DRAFT 2026-09-01, R0 NOT YET RUN.** Two sections are marked PENDING
-RECON (C27) and are filled from the two recon reports before the R0 loop starts.
+**STATUS: DRAFT 2026-09-01, R0 NOT YET RUN.** Both C27 recon items are folded
+(C28, C29; brainstorm record section 3.11); the spec is ready for operator review
+and then the R0 loop.
 Every ruling cited as `Cn` is the operator's, recorded verbatim in
 `design/BRAINSTORM_wallet_policy_composer.md` section 2; every `file:line` was measured
 against the heads below on 2026-09-01. Nothing may be implemented from this
@@ -62,7 +63,9 @@ tapping, and the Rust-first definition of what that tapping produces.
 | C24 | pack time reaches the device as a payload item, a LOWER bound on now | §6a, §6b |
 | C25 | entry UX adopted: kind → unit → digits → echo; digit pad; `hash:` record or typed hex | §6b, §6c |
 | C26 | Build with no payload is allowed: the result is a keyless TEMPLATE | §7b, §7e |
-| C27 | recon fan-out: origin convention (1) and same-fingerprint import (2) dispatched; unhardened child (3) deferred | §13 |
+| C27 | recon fan-out: origin convention (1) and same-fingerprint import (2) done and verified; unhardened child (3) deferred | §4f, §7d, §13 |
+| C28 | seed-derived TAPROOT slots derive at `m/48'/coin'/account'/3'`; wsh at `.../2'` | §4f |
+| C29 | one seed at two slots INSIDE one path: warning; across paths: informational | §7d, §7g, §8g |
 
 ## 3. Measured inventory (what exists, so no section re-derives it)
 
@@ -144,6 +147,22 @@ to them (brainstorm record section 3.7): the composer's lowering (§5) applies u
 | more than 8 paths, or n > 9 in a path | REFUSE at the picker (the picker does not offer the value) |
 | `sh`/`sh(wsh)` with more than one path or any lock/hash | REFUSE: "Legacy wrappers hold one plain multisig only. Use wsh or tr." |
 | a taproot key-path slot that is also in a leaf | cannot occur (C5) |
+
+### 4f. Key origins for seed-derived slots (C28)
+
+| wrapper | origin of a slot derived from a seed on the device | account |
+| --- | --- | --- |
+| `wsh`, `sh(wsh)`, `sh` | `m/48'/coin'/account'/2'` (unchanged, `gui/multisig_build.go:1359`) | by ordinal among the slots that master fills (C5/C12) |
+| `tr` | `m/48'/coin'/account'/3'` | same |
+
+No standard exists for taproot multisig origins (BIP-48 registers `1'`/`2'` only;
+bips PR #1473 proposing `3'` closed unmerged 2024-05-14). `3'` is what Coldcard
+Edge exports (`shared/export.py:414`), what `mnemonic-toolkit` already sweeps as
+`bip48-tr-multi-a`, and it keeps a seed's tr and wsh keys disjoint at the same
+account. Nothing measured refuses or warns on any origin (BIP-388, Ledger, Nunchuk,
+Liana, md), so a `key:` record or card carrying another origin under `tr` is
+admitted as declared; the origin is provenance, not a rule. `ms derive` must gain a
+`bip48-p2tr` template so host-derived `key:` records match (§10).
 
 ## 5. The lowering — NORMATIVE (brainstorm record section 3.10; C19-C23)
 
@@ -253,11 +272,9 @@ days"). Back preserves everything ("going back should lose nothing").
 
 ### 7c. Teach the stub (C9) — shown UNCONDITIONALLY after the shape is complete
 
-```
-Template-ID:  <32 hex>
-mk1 stub (template):  <8 hex>
-   mk encode ... --policy-id-stub <8 hex>
-```
+> Template-ID:  <32 hex>
+> mk1 stub (template):  <8 hex>
+>    mk encode ... --policy-id-stub <8 hex>
 
 After seating (§7d) the keyed policy's id and stub are added, and the screen
 recommends stamping BOTH stubs on each key card (`--policy-id-stub` is
@@ -281,7 +298,13 @@ type a seed. Slot-directed: for each emitted slot index (§5, numbering), "Slot
   offers; scrubbed on exit (C14).
 
 Each key is used at most once. A mapping-review screen (slot → fingerprint +
-origin) precedes consent; Back keeps assignments. The F-216 rule "the operator
+origin) precedes consent; Back keeps assignments. When one seed or fingerprint
+fills two slots INSIDE ONE path the review shows the C29 WARNING (§8g): every
+measured coordinator accepts the wallet, but Sparrow does so silently as a
+nominal k-of-n that one person satisfies, Nunchuk's signing-progress view
+collapses the two keys to one row, and Liana refuses the shape. The same
+fingerprint in two DIFFERENT paths is C5's normal case and gets one
+informational line. The F-216 rule "the operator
 is never asked to assign a card to a slot" does not transfer: that rule seats a
 template that ALREADY declares its origins; a composed template has none, so
 the operator's choice IS the declaration (brainstorm record section 3.5(b)).
@@ -317,39 +340,35 @@ md1/mk1 carry BCH; a text or QR descriptor carries only its BIP-380 checksum.
 | lock | date before the pack date | REFUSAL (§6b) |
 | lock | relative lock beyond 388/455 days | REFUSAL naming absolute date |
 | seating | wrong key for a slot | WARNING surface: mapping review; Back keeps choices |
-| seating | card origin script type disagrees with wrapper | DOCUMENTATION pending recon C27-1 |
+| seating | card origin script type disagrees with wrapper (a `.../2'` key under tr) | DOCUMENTATION: nothing measured refuses or warns; the origin is declared as carried (C28) |
+| seating | one seed fills two slots in ONE path | WARNING (C29, §8g) |
+| seating | one seed fills slots in two different paths | DEFAULT: informational line (C5) |
 | consent | compares the shown id with a coordinator | DEFAULT: id kind named (shipped) |
 | engrave | concrete descriptor longer than the plate holds | REFUSAL by census with the measured ceiling (§13) |
 
-## 8. Copy — operator-facing strings (ASCII only; `plan-glyph-check.sh` clean)
+## 8. Copy — operator-facing strings (blockquoted so `plan-glyph-check.sh` scans them; ASCII only)
 
 ### 8a. EXPERIMENTAL, keyless path (wsh)
 
-```
-KEY-LESS PATH (EXPERIMENTAL)
-This path needs no signature. Whoever knows the
-preimage of its hash can spend it. If that preimage
-is ever engraved, the plate is bearer access.
-```
+> KEY-LESS PATH (EXPERIMENTAL)
+> This path needs no signature. Whoever knows the
+> preimage of its hash can spend it. If that preimage
+> is ever engraved, the plate is bearer access.
 
 ### 8b. EXPERIMENTAL, unsorted keys
 
-```
-UNSORTED KEYS (EXPERIMENTAL)
-Key order is part of this wallet. Restoring a
-key-less template of it needs the key order or a
-permutation search. Prefer sorted keys.
-```
+> UNSORTED KEYS (EXPERIMENTAL)
+> Key order is part of this wallet. Restoring a
+> key-less template of it needs the key order or a
+> permutation search. Prefer sorted keys.
 
 ### 8c. Lock echoes
 
-```
-90 days = 15188 units of 512 s (90.0 days)
-Block 905000
-2027-03-01 00:00 UTC
-  at least 181 days after this payload was packed
-  on 2026-09-01
-```
+> 90 days = 15188 units of 512 s (90.0 days)
+> Block 905000
+> 2027-03-01 00:00 UTC
+>   at least 181 days after this payload was packed
+>   on 2026-09-01
 
 ### 8d. Stub teaching — §7c.
 
@@ -359,12 +378,17 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 
 ### 8f. NUMS note (C18), shown when a tr policy falls back to NUMS
 
-```
-KEY PATH: NONE (NUMS)
-Spends use the script paths only. Bitcoin Core and
-Nunchuk import this form. Liana and BIP-388 signers
-need an unspendable xpub instead (see F-449).
-```
+> KEY PATH: NONE (NUMS)
+> Spends use the script paths only. Bitcoin Core and
+> Nunchuk import this form. Liana and BIP-388 signers
+> need an unspendable xpub instead (see F-449).
+
+### 8g. Same seed twice in one path (C29)
+
+> SAME SEED, SAME PATH
+> Slots @0 and @2 are the same seed. This path's
+> 2-of-3 can be satisfied by one person.
+> Liana will refuse it.
 
 ## 9. Device work items (fork)
 
@@ -396,6 +420,9 @@ need an unspendable xpub instead (see F-449).
    automatically at pack time.
 3. The five presets as Concrete policies + expected templates (C2).
 4. `md-older-zero-time-units-not-refused` patch (independent; filed).
+5. mnemonic-secret: `ms derive --template bip48-p2tr` (= `m/48'/coin'/account'/3'`)
+   so host-derived taproot `key:` records match the device's C28 origin
+   (`ms-derive-taproot-justifications-stale`, second half).
 
 ## 11. Refusals — what the operator SEES
 
@@ -423,23 +450,23 @@ none prints an encoding.
 6. **Cite gate:** `scripts/plan-cite-check.sh` on this spec before each R0 round;
    `CITE_FORK_ROOT` set to the working tree under review.
 
-## 13. What is NOT verified — PENDING RECON (C27)
+## 13. What is NOT verified
 
-1. **Origin convention for seed-derived slots under `tr`.** wsh keeps BIP-48
-   script_type 2' (`gui/multisig_build.go:1359`). For tr the composer must
-   declare SOMETHING; BIP-48 defines no taproot script type, the reference wallet
-   uses a custom purpose (`270028'`). Filled from
-   `agent-reports/composer-recon-taproot-multisig-origin-convention.md`.
-2. **Coordinator import of same-fingerprint two-account cosigners** (C5's normal
-   shape). Filled from
-   `agent-reports/composer-recon-same-fingerprint-two-accounts-import.md`; decides
-   §7g's "card origin disagrees with wrapper" class and any seating warning.
-3. **Plate ceilings for a concrete descriptor.** 688 chars for the two-path
-   wallet (brainstorm record, C10); text plates per default font and QR symbols per plate
-   are measured on the emulator, not read off a constant (`gui/transaction.go:1369`).
-4. **Nunchuk UI** treatment of `or_i` vs `or_d` (library is Core's verbatim).
-5. **Import tests** of composed outputs into Core, Nunchuk, Liana are import
-   tests, not emit tests, and belong to the journey (item 2) or to F-449.
+1. **Plate ceilings for a concrete descriptor.** 688 chars for the two-path
+   wallet (brainstorm record, C10); text plates per default font and QR symbols per
+   plate are measured on the emulator, not read off a constant
+   (`gui/transaction.go:1369`).
+2. **Ledger registration of md's depth-0 xpubs.** Core, Liana and Sparrow accept
+   them (measured); Ledger's whole-xpub `memcmp` likely does not: UNVERIFIED,
+   filed descriptor-mnemonic `md-descriptor-depth0-xpub-ledger-registration`.
+3. **Nunchuk UI** treatment of `or_i` vs `or_d` (library is Core's verbatim) and
+   of custom-template miniscript imports.
+4. **Import tests** of composed outputs into Core, Nunchuk, Liana are import
+   tests, not emit tests, and belong to the journey (§12 item 2) or to F-449.
+5. **Recon results folded here were verified against Core v25 (single-chain
+   forms; the local build lacks BIP-389 multipath and tapscript miniscript),
+   Liana master and drongo HEAD**: brainstorm record section 3.11. A newer Core
+   re-run on the multipath forms is a plan-time gate, not a spec question.
 
 ## 14. Out of scope, with reasons
 
