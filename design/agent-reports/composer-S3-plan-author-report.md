@@ -346,3 +346,93 @@ milestone builds on its own". Both are now commands -- the gate's DEAD-IN-PROD s
 | §6 cell 6b | the "Change the script" row had no behavioural test | **Task C0**: `TestComposerChangeTheScriptRowRewrapsAndDiscards` |
 | §6 cell 8d | `composerMintCards` never called with both slots seated | **Task C0**: `TestComposerMintCardsMintsOneCardPerSeatedSlot` |
 | §6 C-15 | **MOOT, not closed** -- `composerCensusRefusal` was removed outright with its deferred consumer (F-457), so there is nothing to wire up. It would need re-verifying if F-457's concrete-descriptor plate is ever built | recorded here, no code |
+
+
+## 11. R0 round 2 folded -- three guards that could not fail their own mutation
+
+`design/agent-reports/composer-S3-plan-R0-r2-fold-verification.md` returned **NOT GREEN**. It
+verified round 1's Critical by an independently-run Part-A-only gate (23 files, 47 `TestComposer*`
+PASS, Part B absent) and verified fidelity I-2, C-12, cell 6b and cell 8d under their named
+mutations. What it found open was **one class, three times**: a regression guard whose own named
+mutation, reproduced exactly, does not fail it.
+
+That is the third round in a row where my defect was a claim no command checked -- round 0's "these
+functions are called by something", round 1's "this milestone builds on its own", and now "this
+test would catch that regression". All three of the round-1 guards it names were written *in
+response to a finding of exactly that shape*, which is the part worth recording: writing a test
+about a defect is not the same as running the defect past the test.
+
+### Per item, with plan lines
+
+| r2 item | fix | plan line |
+| --- | --- | --- |
+| §3 journey I-6 / F-458: the guard called the pure date helpers and re-derived the dispatch inline; `composerLockEdit` had zero test callers | `TestComposerLockEditTellsAnImpossibleDateFromThePastCeilingDate` drives the REAL screen -- kind picker, absolute-kind picker, digit pad -- and reads the message the closure chooses | 11390 |
+| §4 tests I-1: the guard's 63-character input is ODD, so `hex.DecodeString` refused it for parity before the bound was consulted; and it read a return value the function never produces on a refusal | `TestComposerHexEntryItselfRefusesAnythingButSixtyFourCharacters` asserts on the error screen only the accept branch can draw, with an even twin at 62 for the opposite mutation | 11390 |
+| §4 tests C-9: the claimed closure rested on an unmodified pre-round-1 test that recomputes the comparison standalone and never calls `composerFlow` | `TestComposerFlowReShowsTheStubScreenOnlyAfterARealEdit` walks `composerFlow` twice through the stub screen, with and without a real key-count change | 11390 |
+| all three: the output, in the plan | each mutation applied in the wired scratch, its failing output pasted, then reverted | 11404 |
+| all three: the practice, as a step | Task C0 gains "Apply each guard's own named mutation and see it FAIL", with `REVERTED-CLEAN` as its Expected | 11448 |
+| §4 journey I-5's named mutation is a structural no-op | recorded, not re-fixed: `composerKeysEdit`'s decline paths never write `Keys` before its single success-path assignment. Round 0 and round 1 established the same | 184 |
+| §6 NEW Minor: Task C1's commit template said "three things" after the task gained a fourth | the template names four and its body carries the §7a item | 11613 |
+| §7 Task B11's "two named exemptions" wording | left as round 1 classified it, and the plan says why both numbers are right for different questions | -- |
+| counts | Task C0 12 -> **14**; Task C2 110/95/1168 -> **112/100/1170**, still labelled "the count at plan time" | 11402, 11637 |
+
+### The three mutation outputs, as pasted into the plan
+
+**(a) journey I-6 / F-458** -- restore the `u == 0` disjunct inside `composerLockEdit`'s date closure:
+
+```
+--- FAIL: TestComposerLockEditTellsAnImpossibleDateFromThePastCeilingDate
+    --- FAIL: .../an_impossible_date_inside_the_band
+        the date pad does not say "that date does not exist" for 20270231.
+        the date pad says "up to 2038-01-19" for 20270231, which is the WRONG message
+    --- FAIL: .../a_real_date_below_the_floor
+        the date pad does not say "before 2009" for 20081231.
+```
+
+**(b) tests I-1** -- `valid := len(frag) >= 63` in the real `composerHexEntry`:
+
+```
+--- FAIL: TestComposerHexEntryItselfRefusesAnythingButSixtyFourCharacters
+    --- FAIL: .../sixty-three_hex_characters
+        composerHexEntry ACCEPTED 63 characters (the exact length the named mutation
+        would admit): it reached the decode branch, which only a valid-length fragment does.
+        Frame: "Thatisnota32-bytedigest.Hashlock"
+```
+
+**(c) tests C-9** -- `changed := false && ...` in `composerFlow`:
+
+```
+--- FAIL: TestComposerFlowReShowsTheStubScreenOnlyAfterARealEdit
+    --- FAIL: .../back_out,_change_a_key_count,_Done_again
+        the stub screen was re-shown after a real key-count change and does NOT carry
+        section 8s: a card minted with the old stub will not seat here, and the
+        operator is not told.
+```
+
+Each was applied in `/scratch/code/shibboleth/.s3v`, run, reverted, and the tree confirmed
+`gofmt`-clean and green afterwards.
+
+### Gate output, all re-run after the fold
+
+| gate | result |
+| --- | --- |
+| **Part-A-only** (`GATE_UNTIL='^### Task B1'`, `handwire_s3.py --part-a`) | 23 files written, `go vet` clean but for the two pre-existing go1.25 findings, **47 `TestComposer*` PASS, `ok`** -- with Part B absent |
+| `plan-build-gate-go.sh` (fork `main` `321acb56`) | 43 files written, **0** gofmt changes, `./md/ ./mk/ ./sysw/` ok x3 |
+| DEAD-IN-PROD (wired) | **gui: 1**, `composerDescriptorCeilingChars` (F-457's deferred consumer) |
+| `go vet ./gui/` (wired) | clean but for the two pre-existing go1.25 `ArtifactDir` findings |
+| `go test -count=1 -run '^TestComposer' -v ./gui/` (wired) | **112 top-level PASS, 100 sub-tests, 0 FAIL** |
+| `gui-shard-test.sh ./gui/ 24` (wired) | **ok -- all 1170 tests ran across 24 shards** |
+| `plan-cite-check.sh` | 241/241, 0 dangling, 0 ambiguous |
+| `plan-glyph-check.sh` | 299 strings, 0 undrawable |
+| `plan-table-check.sh` | 126 rows, 0 malformed |
+| `plan-stepref-check.sh` | 0 step numbers in prose |
+| `plan-staleness-check.sh <plan> <fork> 321acb56` | 144 unchanged, **0 drifted** |
+| per-task structure | all 25 tasks carry >= 3 checkbox steps with at least one `Run:` and one `Expected:` |
+
+### What is still open, said plainly
+
+Journey I-5's named mutation remains a structural no-op -- `composerKeysEdit` cannot leave `Keys`
+nil on a decline in the current call graph, so there is nothing for the restore to restore. The test
+is real and drives the UI through Back; it is simply not effective for that one mutation, and three
+rounds have now established the same. I have not manufactured a call path to make the mutation
+meaningful, because that would be writing code so a test can fail.
