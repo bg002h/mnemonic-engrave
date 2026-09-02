@@ -507,3 +507,11 @@ ONE path = warning.
   main 66bdf2f4 unmoved. NEXT: dispatch the S0b implementer (opus, worktree
   wt-composer-s0b, brief scratchpad/implementer-brief-s0b.md), then whole-diff
   review (scratchpad/review-brief-s0b.md), staging push, re-vendor (S3 A10).
+- S3 r2 verification (d407109): NOT GREEN -- A11 standalone VERIFIED (independent
+  Part-A-only gate), I-2/C-12/6b/8d VERIFIED, but three claimed guards cannot
+  fail their own named mutation (F-458's guard never calls composerLockEdit; the
+  hex-bound guard uses 63 chars so the decoder masks the bound; C-9 rests on a
+  standalone test not exercising composerFlow) + one new Minor (Task C1).
+  Round-2 fold DISPATCHED to the S3 author: drive the real function/screen,
+  paste the failing mutation output into Expected. THEN: controller re-gate →
+  commit → r3 targeted verification (brief scratchpad/verify-brief-s3-r3.md).
