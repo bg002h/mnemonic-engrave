@@ -234,3 +234,22 @@ ONE path = warning.
   `composer-S2-plan-R0-r1-fold-verification.md` DISPATCHED. A clean r1 closes
   R0; re-validate ("what did S1's merge falsify?") immediately before
   dispatching the S2 implementer, with Task 6's precondition satisfied.
+
+## S1 SHIPPED 2026-09-02
+
+- mnemonic-engrave `master` 38e3ed13eb0d903ae2d24e64edc830a9484dcc6e pushed via
+  `ci/staging` (required check green, no bypass); tag `v0.8.0`; `assemble +
+  sign + release` green, release published with 7 assets:
+  https://github.com/bg002h/mnemonic-engrave/releases/tag/v0.8.0
+- mnemonic-secret `master` 1068f389116928e4cd22e5b0658749d09b06611d pushed via
+  the hand ritual (four required contexts green, no bypass); tag
+  `ms-cli-v0.17.0`; release published (`ms-man.tar.gz`) but `man-release.yml`'s
+  reproducibility jobs (`repro-substrate`, `repro-x86_64-musl`; NOT required
+  contexts) are RED: the repro Docker image's vendored cache predates the
+  `mnemonic-io-lib` git pin 6c24e628 and `cargo build --offline` cannot fetch
+  it; the musl-binary jobs were skipped in consequence. Filed in
+  mnemonic-secret `design/FOLLOWUPS.md` (see that repo); not this cycle's code.
+- Report: `composer-S1-push-report.md` (e155ca4). Worktrees `wt-composer-s1`
+  and `wt-ms-bip48-p2tr` removed (branches `composer-s1`, `bip48-p2tr` kept).
+- **S2 implementer running** (opus) in fork worktree `wt-composer-s2`, plan
+  38e3ed1; **S3 GUI recon** (sonnet, read-only) running → `composer-S3-recon-gui.md`.
