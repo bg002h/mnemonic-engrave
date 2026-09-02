@@ -420,3 +420,10 @@ ONE path = warning.
   ms-gate-target, gate-target, lianaprobe, mscheck, liana-src) removed; /tmp
   back to 58%. `/tmp/plan-build-gate-md-target` (6.3 GB) stays until the S0b
   gate rounds end; future gate runs should set TMPDIR=/scratch/code/shibboleth/.tmp.
+- S0b export in the wired scratch: 6 conformance files / 30 files for the six
+  `keyed_compose_preset_*` vectors; md-cli full suite 775/775; md-codec 518/519
+  -- the one red, `display_grouping_conformance::conformance_vectors_pass`, is a
+  GATE ARTEFACT (the md gate's copy omits `design/`, which that test reads via
+  `../../design/display-grouping-vectors.tsv`); it passes in the real checkout
+  and CI on main 66bdf2f4 is green. Tests lens (sonnet) DISPATCHED →
+  `composer-S0b-plan-R0-r0-tests.md`. Both S0b lenses running.
