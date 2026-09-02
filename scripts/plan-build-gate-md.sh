@@ -72,6 +72,10 @@ cp -r "$SRC/crates" "$SRC/Cargo.toml" "$WORK/"; [ -f "$SRC/Cargo.lock" ] && cp "
 # the repo builds.
 for f in rust-toolchain.toml rust-toolchain clippy.toml rustfmt.toml .rustfmt.toml; do [ -f "$SRC/$f" ] && cp "$SRC/$f" "$WORK/"; done
 [ -d "$SRC/.cargo" ] && cp -r "$SRC/.cargo" "$WORK/"
+# md-codec's display_grouping_conformance test reads ../../design/display-grouping-vectors.tsv
+# (a checksum-pinned copy of the toolkit's canonical vectors); without it the whole-crate run in
+# the copy is red for a reason that has nothing to do with the plan (measured 2026-09-02, S0b).
+mkdir -p "$WORK/design"; cp "$SRC"/design/display-grouping-vectors.tsv* "$WORK/design/" 2>/dev/null || true
 echo "   toolchain: $(cd "$WORK" && rustc --version 2>/dev/null)"
 echo "   $WORK  (target: $CARGO_TARGET_DIR)"
 echo "== 2 -- extract the plan's Rust =="
