@@ -12,7 +12,7 @@
 
 **Baseline revision (for `scripts/plan-staleness-check.sh`):** descriptor-mnemonic `66bdf2f4` (composer S0 shipped to `main`; `git status --short` clean at that revision when this plan was authored). Every `path:line` citation below was read at this revision.
 
-**STATUS: DRAFT — R0 review not yet run.** This plan has not been through the architect R0 loop; do not begin implementation before it reaches 0 Critical / 0 Important per `CLAUDE.md`'s R0 gate. Every code block below was, however, mechanically verified before this plan was written (see "What is already machine-verified" below) — that is a substitute for compiling the plan's Rust, never for reviewing its design.
+**STATUS: R0 round 0 folded, not yet re-reviewed.** Fidelity+design lens (opus, `design/agent-reports/composer-S0b-plan-R0-r0-fidelity.md`, 0C/4I/4M/2N) and tests lens (`design/agent-reports/composer-S0b-plan-R0-r0-tests.md`, 0C/0I/0M/2N, all 12 mutations caught) both persisted verbatim and folded here: I-1..I-4 resolved per the controller's decisions (defaults are also the device's shape and name S3 A10 as consumer; one vector per archetype pins parameter order/lowering, not a wrapper cross-product, with S3 A10's narrowing scheduled separately; six refusal-table rows added with one test each plus a name-first parse order fix; fork pin-test ownership stated on S3 Task A10 with its two current errors named); M-1..M-4 and N-1..N-2 (fidelity) and N-1..N-2 (tests) folded per their hypotheses. Re-verify per the build-gate note below before the next round; do not begin implementation before this plan reaches 0 Critical / 0 Important per `CLAUDE.md`'s R0 gate.
 
 ## What is already machine-verified (reviewer budget goes elsewhere)
 
@@ -20,7 +20,7 @@ Every claim in this plan that a tool can check was checked against a scratch cop
 
 - The six `presets::*` signatures, their `ComposeError` variants, and every refusal wording quoted below (`LegacyWrapperShape`, `LockOutOfRange`, `PresetShape`, `BadThreshold`) are read verbatim from `crates/md-codec/src/compose/mod.rs` and `crates/md-codec/src/compose/presets.rs` at `66bdf2f4` and additionally exercised through a throwaway example binary (`cargo run -p md-codec --example`) that printed each `Display` string live.
 - Every one of the six preset templates this plan pins (Task 1's family rows, Task 2's CLI tests) was produced by actually running the shipped `target/debug/md compose --wrapper ... --path ...` (the pre-`--preset` equivalent of what each archetype builds) and, separately, `md encode` → `md decode` → `md address` round trips with the four journey xpubs bound — not hand-derived from the lowering table. All six round-tripped byte-identically and one (`kofn_recovery` under `tr`) derived a real `bc1p...` address.
-- Every file this task creates or replaces (`crates/md-cli/src/cmd/compose.rs`, `crates/md-cli/tests/cli_compose_preset.rs`, `crates/md-codec/tests/compose_support.rs`) was written into a full scratch copy of the workspace and BUILT: `cargo build -p md-codec --all-targets` and `cargo build -p md-cli --all-targets` both succeed (the latter WITH `main.rs` hand-wired per Task 2 Step 4 — see the build-gate note below); `cargo nextest run -p md-codec -E 'binary(/^compose_/)'` is 52/52 green (no pinned red — the scratch copy had a hand-wired `test_vectors.rs`, exactly the fragment the real build gate does not assemble); `cargo nextest run -p md-cli -E 'binary(/^cli_compose/)'` is 23/23 green (9 pre-existing + 14 new, zero regressions); `cargo fmt --all -- --check` and `cargo clippy --all-targets --all-features -- -D warnings` are both clean on both crates. The corpus exporter was run for real: `md vectors` wrote exactly 30 new files (six vectors × five files each: `.bytes.hex`, `.phrase.txt`, `.descriptor.json`, `.template`, `.conformance.json`), the pre-existing `vectors_output_matches_committed_corpus` drift test went from failing ("drift detected") to passing once those files were written, and the full `-p md-cli` suite is 775/775 (761 pre-existing + 14 new). `-p md-codec --workspace` is unaffected at 1318/1318 as measured at HEAD before this plan's changes (the six new tuples in `family()` are DATA consumed by existing `#[test]` functions, not new test functions, so the md-codec test count does not move).
+- Every file this task creates or replaces (`crates/md-cli/src/cmd/compose.rs`, `crates/md-cli/tests/cli_compose_preset.rs`, `crates/md-codec/tests/compose_support.rs`) was written into a full scratch copy of the workspace and BUILT: `cargo build -p md-codec --all-targets` and `cargo build -p md-cli --all-targets` both succeed (the latter WITH `main.rs` hand-wired per Task 2 Step 4 — see the build-gate note below); `cargo nextest run -p md-codec -E 'binary(/^compose_/)'` is 52/52 green (no pinned red — the scratch copy had a hand-wired `test_vectors.rs`, exactly the fragment the real build gate does not assemble); `cargo nextest run -p md-cli -E 'binary(/^cli_compose/)'` is 31/31 green (9 pre-existing + 22 new across the original draft and the R0 fold, zero regressions); `cargo fmt --all -- --check` and `cargo clippy --all-targets --all-features -- -D warnings` are both clean on both crates. The corpus exporter was run for real: `md vectors` wrote exactly 30 new files (six vectors × five files each: `.bytes.hex`, `.phrase.txt`, `.descriptor.json`, `.template`, `.conformance.json`), the pre-existing `vectors_output_matches_committed_corpus` drift test went from failing ("drift detected") to passing once those files were written, and the full `-p md-cli` suite is 783/783 (761 pre-existing + 22 new). `-p md-codec --workspace` is unaffected at 1318/1318 as measured at HEAD before this plan's changes (the six new tuples in `family()` are DATA consumed by existing `#[test]` functions, not new test functions, so the md-codec test count does not move).
 - **`scripts/plan-build-gate-md.sh`, run for real against THIS plan file, does NOT complete unmodified — a genuine finding, not a re-derivation.** Steps 1-5 (scratch copy, extraction, md-codec build, the 52 compose tests with exactly the one pinned red, clippy) all pass exactly as predicted. Step 6 (`cargo test -p md-cli --locked --no-run`) FAILS to compile in the bare scratch copy, and the script's `set -euo pipefail` aborts on it — NOT a graceful "not covered", an actual halt. Cause: this is the first composer plan to CHANGE an EXISTING function's signature (`cmd::compose::run` gains a `preset: Option<&str>` parameter) that a live, un-hand-wired `main.rs` fragment already calls with the OLD 4-argument arity — S0's own Task 6 only ever ADDED a brand-new call site, so its bare gate runs never hit this class of break. Confirmed by hand-wiring ONLY Task 2 Step 4's `main.rs` diff into the same scratch copy afterward: `cargo test -p md-cli --locked --no-run` then compiles cleanly with zero errors. **Consequence for this plan's own build gate, stated plainly: run `scripts/plan-build-gate-md.sh` for steps 1-5 as-is, then hand-wire Task 2 Step 4's `main.rs` diff into the SAME scratch copy (`${TMPDIR:-/tmp}/plan-build-gate-md`) before judging step 6** — exactly the same hand-wiring S0's own Task 8/9 folds already needed for their `parse/template.rs` and CLI fragments. This is not a script bug to fix (the script correctly refuses to guess at fragment content); it is a real limitation this plan's authoring surfaced by actually running the gate rather than assuming reuse from reading the script's source alone.
 - `crates/md-cli/tests/cmd_gui_schema.rs` and `crates/md-cli/tests/cli_output_class.rs` were grepped for the string `compose` and neither references it (`grep -n compose` on both returns nothing) — adding `--preset` introduces no golden-schema fixture to update, unlike the caution S0 Task 6 recorded for its own `--wrapper`/`--path` addition.
 - The fork's `scripts/vendor-compose-vectors.sh` (`/scratch/code/shibboleth/seedhammer`, `main` at `321acb5`) globs `^(keyed_)?compose_` — `keyed_compose_preset_*` matches with NO script change, confirmed by reading the script, not assumed. The fork's `md/compose_vectors_pin_test.go` hardcodes both a 26-name list and the literal `126` file count (`:83-84`); both are fork-side follow-on work this plan does not touch (see Task 3).
@@ -65,7 +65,9 @@ No change to `crates/md-cli/src/error.rs` (the `Compose(String)` variant already
 - Consumes: `md_codec::compose::presets::{plain_multisig, simple_timelocked_inheritance, kofn_recovery, tiered_recovery, hashlock_gated, decaying_multisig}` (all shipped, `crates/md-codec/src/compose/presets.rs:28-140`); `family()`'s existing tuple shape `(&'static str, PathList, String, Vec<&'static str>)` (`crates/md-codec/tests/compose_support.rs:207`); `SINGULAR_TAGS: &[&str]` (`crates/md-codec/tests/compose_support.rs:306`).
 - Produces: six new `family()` rows and six new `MANIFEST` entries; no new function, no new test.
 
-**Default parameters (decided here; §4d fixes no defaults, so this plan sets them and says why):** every free parameter is `2-of-3` and `older=26280` — the journey's own canonical values, already used repeatedly in `family()` (`keyed_compose_wsh_two_path_or_d`, `keyed_compose_tr_two_path_nums`) and in S0's own `cli_compose.rs` example test — SHRUNK where an archetype's slot count would otherwise exceed the four journey xpubs (`plain_multisig` and `kofn_recovery` already fit at `2of3`/`2of3+1of1`; `tiered_recovery` is `2of2,1of2` instead of S0 Task 7's illustrative `2of2,2of3` — which sums to 5 slots, one over the 4-key budget every OTHER `keyed_compose_*` vector obeys; `decaying_multisig` is `2of2,1of1` with `older1=13140` (half of 26280) `older2=26280`, `after=1_000_000` (reusing `keyed_compose_wsh_three_paths`'s own `AfterHeight` value) instead of Task 7's `2of3,1of2` which sums to 6 slots). `hashlock_gated` and `simple_timelocked_inheritance` take no key-count parameter at all (always 1-of-1 on each side) so only `older=26280` is free there.
+**Default parameters (decided here) — R0 fidelity I-1's ruling: these are BOTH the vectors' parameters AND the device's offered default shape for each archetype, not fixture numbers that happen to land on screen.** SPEC §4d says presets "POPULATE a path list the operator then edits", and `IMPLEMENTATION_PLAN_composer_S3_fork_gui.md` Task A10 makes that binding: each Go preset entry's `list` is "transcribed from the primary's exported vector's `descriptor.json` path list… **Do not invent a shape here**" (`:4723`) — so whatever this plan picks IS what the operator sees first, by construction, not by accident. Every free parameter is `2-of-3` and `older=26280` — the journey's own canonical values, already used repeatedly in `family()` (`keyed_compose_wsh_two_path_or_d`, `keyed_compose_tr_two_path_nums`) and in S0's own `cli_compose.rs` example test. `tiered_recovery` is `2of2,1of2` and `decaying_multisig` is `2of2,1of1` — the SMALLEST legal shape of each archetype, and that smallness is a UX choice, not a test-fixture one: a preset is a starter the operator edits (§4d), so the smallest legal shape is the honest starter — a wider tier is one edit away, and a preset that starts wider than it needs to asks the operator to narrow it, which is backwards for a starter. That both shapes also fit inside the four journey xpubs every `keyed_compose_*` vector is bound by (`compose_vectors.rs`'s `keyed_compose_vectors_bind_at_most_the_four_journey_keys`) is a convenience of this choice, not its reason — if a later ruling decides an archetype's default should be wider, the FIXTURE is widened (more journey xpubs), never the archetype narrowed to fit it. `older1=13140` is half of `older2=26280`, and `after=1_000_000` reuses `keyed_compose_wsh_three_paths`'s own `AfterHeight` value — both chosen to land on already-used, already-cross-checked numbers rather than arbitrary ones. `hashlock_gated` and `simple_timelocked_inheritance` take no key-count parameter at all (always 1-of-1 on each side) so only `older=26280` is free there.
+
+**R0 fidelity I-2 — one wrapper per archetype, not a wrapper cross-product.** `kofn_recovery`'s vector is `Wrapper::Tr`; the other five are `Wrapper::Wsh`. F-453 asks for one vector per ARCHETYPE (`mnemonic-engrave/design/FOLLOWUPS.md:15411`), not one per (archetype, wrapper) pair, and this plan does not export twelve vectors to get both: the wrapper is a parameter of the `PathList` the operator or device picks, not an axis of the archetype itself, and a single vector already pins what does not vary by wrapper — the archetype's PARAMETER ORDER and LOWERING. `IMPLEMENTATION_PLAN_composer_S3_fork_gui.md` Task A10 currently drafts `TestComposerPresetsReproduceTheirVendoredVectors` as one loop over `composerPresets(md.ComposeWsh)` expecting all six presets to have a WSH vendored vector (`:4717`); since `kofn_recovery`'s is `Tr`, that loop needs narrowing to "each preset that HAS a vector at this wrapper, with the wrapper named in the assertion". That correction lands in the S3 plan, scheduled by the controller after S3's own r1 verification — NOT made here, since this plan touches only descriptor-mnemonic.
 
 - [ ] **Step 1: Add the family rows without the MANIFEST entries; run to see the expected, PINNED-shape failure**
 
@@ -393,7 +395,12 @@ pub fn family() -> Vec<(&'static str, PathList, String, Vec<&'static str>)> {
          vec!["w:wsh", "paths:2", "head:bare-multi", "lock:blocks", "ik:none", "fp:one-seed-one-path", "fp:one-seed-two-paths", "origins:default-wsh", "preset:tiered-recovery"]),
         ("keyed_compose_preset_hashlock_gated", presets::hashlock_gated(Wrapper::Wsh, H, 26280).unwrap(),
          format!("wsh(or_i(and_v(v:pkh(@0/<0;1>/*),sha256({HH})),and_v(v:pkh(@1/<0;1>/*),older(26280))))"),
-         vec!["w:wsh", "paths:2", "lock:blocks", "hash", "ik:none", "fp:one-seed-two-paths", "origins:default-wsh", "preset:hashlock-gated"]),
+         // R0 fidelity N-1: the head path is one key PLUS a hash, unlocked --
+         // neither head:bare-multi (n = 1), head:single (is_bare_single needs
+         // no hash), nor head:locked (no lock). `head:hashed` names this
+         // fourth shape; it joins SINGULAR_TAGS below since this is the only
+         // family vector with it.
+         vec!["w:wsh", "paths:2", "head:hashed", "lock:blocks", "hash", "ik:none", "fp:one-seed-two-paths", "origins:default-wsh", "preset:hashlock-gated"]),
         ("keyed_compose_preset_decaying_multisig", presets::decaying_multisig(Wrapper::Wsh, 2, 2, 1, 1, 13140, 26280, 1_000_000).unwrap(),
          "wsh(or_i(and_v(v:multi(2,@0/<0;1>/*,@1/<0;1>/*),older(13140)),or_i(and_v(v:pkh(@2/<0;1>/*),older(26280)),and_v(v:pkh(@3/<0;1>/*),after(1000000)))))".to_string(),
          vec!["w:wsh", "paths:3", "head:locked", "lock:blocks", "lock:height", "ik:none", "fp:one-seed-one-path", "fp:one-seed-two-paths", "origins:default-wsh", "preset:decaying-multisig"]),
@@ -410,6 +417,9 @@ pub fn family() -> Vec<(&'static str, PathList, String, Vec<&'static str>)> {
 /// names, so nothing there needs touching.
 pub const SINGULAR_TAGS: &[&str] = &[
     "spine:0",
+    // R0 fidelity N-1: the ONLY family vector whose head path is a single key
+    // plus a hash, unlocked (neither bare-multi, single, nor locked).
+    "head:hashed",
     "preset:plain-multisig",
     "preset:simple-timelocked-inheritance",
     "preset:kofn-recovery",
@@ -508,7 +518,9 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 | `hashlock-gated` | `sha256=<64 hex>,older=<n>` | `presets::hashlock_gated(wrapper, hash, older)` |
 | `decaying-multisig` | `<k1>of<n1>,<k2>of<n2>,older1=<n>,older2=<n>,after=<n>` | `presets::decaying_multisig(wrapper, k1, n1, k2, n2, older1, older2, after)` |
 
-Design decisions, stated once here rather than re-derived per preset: the `<k>of<n>` tokens are POSITIONAL (consumed in listed order — the only way to fill two key-set parameters unambiguously without inventing a second naming scheme); every `<param>=<value>` token is matched BY NAME, so it can appear in any order and a duplicate is refused; `older`/`older1`/`older2`/`after` all take PLAIN BLOCKS OR HEIGHT numbers, never `--path`'s `Nu`/`Ht` unit-suffix forms — every `presets::*` constructor's own lock parameter is a bare `u32` blocks/height count (`crates/md-codec/src/compose/presets.rs:18-25`'s `blocks()` helper always builds `Lock::OlderBlocks`, never `OlderUnits`; `decaying_multisig`'s `after_height` is always `Lock::AfterHeight`, never `AfterTime`), so there is no unit ambiguity to disambiguate and no suffix grammar to invent. `unsorted` is never a preset parameter: `presets::ks` hardcodes `sorted: true` in every key set it builds, so there is nothing for it to toggle — a `--path` list can ask for `unsorted`, a `--preset` never can. Two `<k>of<n>` parameters need distinct lock names (`older1`/`older2`) only where an archetype HAS two ambiguous locks (`decaying-multisig`); every other multi-lock-free archetype keeps the bare `older`.
+Design decisions, stated once here rather than re-derived per preset: the `<k>of<n>` tokens are POSITIONAL (consumed in listed order — the only way to fill two key-set parameters unambiguously without inventing a second naming scheme); every `<param>=<value>` token is matched BY NAME, so it can appear in any order and a duplicate is refused; `older`/`older1`/`older2`/`after` all take PLAIN BLOCKS OR HEIGHT numbers, never `--path`'s `Nu`/`Ht` unit-suffix forms — every `presets::*` constructor's own lock parameter is a bare `u32` blocks/height count (`crates/md-codec/src/compose/presets.rs:18-25`'s `blocks()` helper always builds `Lock::OlderBlocks`, never `OlderUnits`; `decaying_multisig`'s `after_height` is always `Lock::AfterHeight`, never `AfterTime`), so there is no unit ambiguity to disambiguate and no suffix grammar to invent. `unsorted` is never a preset parameter: `presets::ks` hardcodes `sorted: true` in every key set it builds, so there is nothing for it to toggle — a `--path` list can ask for `unsorted`, a `--preset` never can. Two `<k>of<n>` parameters need distinct lock names (`older1`/`older2`) only where an archetype HAS two ambiguous locks (`decaying-multisig`); every other multi-lock-free archetype keeps the bare `older`. **R0 fidelity M-1:** for `decaying-multisig`, `older1` locks the FIRST (primary) tier and `older2` the second — the primary tier does NOT spend immediately, only after `older1`; the grammar table above names this, and `--preset`'s own `--help` text (Task 2 Step 4) says so too, so an operator reading `decaying-multisig,2of2,1of1,older1=13140,...` does not assume the 2-of-2 spends today.
+
+**R0 fidelity I-3 and M-4, two more design notes before the refusal table:** first, `parse_preset` checks the preset NAME against `PRESET_NAMES` before parsing any `<k>of<n>`/`<param>=<value>` token, so an unknown name is ALWAYS reported as "expected one of …", even when a token given alongside it is also malformed — a malformed-token message never masks a name that was never a preset in the first place. Second, `PRESET_NAMES` and the six `match` arms inside `parse_preset` are two lists that could drift (a name added to one and not the other would compile and clippy-pass, and the "expected one of" line would then advertise a name that does not work); the final `match` arm is `other => unreachable!(...)` rather than a second "expected one of" formatter, and a test (Task 2 Step 1) runs every `PRESET_NAMES` entry through the real CLI with a valid parameter set, so a drift fails that test rather than shipping silently.
 
 **Refusals (one test each, Task 2 Step 1):**
 
@@ -520,6 +532,14 @@ Design decisions, stated once here rather than re-derived per preset: the `<k>of
 | a parameter the CONSTRUCTOR itself rejects | the `ComposeError`'s own `Display`, verbatim, e.g. `path 2: older in blocks needs 1..=65535` (`kofn-recovery,...,older=70000` — `presets::kofn_recovery`'s own `blocks()` guard, NOT the `--path` DSL's separate pre-check, which has different wording) | 1 |
 | a non-plain preset under `sh`/`sh(wsh)` (§4d: "under sh/sh(wsh) only the plain k-of-n preset is offered") | `legacy wrappers hold one plain sorted multisig only (n >= 2, no lock, no hash); use wsh or tr` — the SAME `ComposeError::LegacyWrapperShape` a hand-built `--path` list of the same shape gives; no CLI-side special case needed | 1 |
 | `--path` and `--preset` both given, or neither given | clap's own `ArgGroup` error (exit 2, not `CliError`) — measured: `error: the argument '--path <PATH>' cannot be used with '--preset <PRESET>'` / `error: the following required arguments were not provided:` then `<--path <PATH>` and `--preset <PRESET>` joined by a pipe on the next line (the pipe is omitted here because the table gate cannot see inside code spans) | 2 |
+| a named parameter given twice | `` preset <name>: `<key>=` given twice `` (R0 fidelity I-3) | 1 |
+| a `<k>of<n>` token that is not `<k>of<n>` (name already valid) | `` preset <name>: `<tok>` is not <k>of<n> `` (R0 fidelity I-3) | 1 |
+| a `<k>of<n>` value too large to fit a `u8` | `` preset <name>: k `<v>` is not a small number `` (or `n`) — a PARSE failure, distinct from `BadThreshold` above: nothing fits `u8` yet to name in "1 <= k <= n <= 9"; a value that DOES fit `u8` but violates that band (e.g. `2of15`) already reaches the real constructor and surfaces `BadThreshold`'s own text verbatim, so the two messages are right for two different failures (R0 fidelity I-3) | 1 |
+| a named value that does not parse as a number | `` preset <name> <param>: `<v>` is not a number in 0..=4294967295 `` (R0 fidelity I-3) | 1 |
+| `hashlock-gated` with `sha256=` missing, or not 64 lowercase hex characters | `preset <name> needs sha256=<64 hex>` / `sha256 needs 64 hex characters, lowercase` (R0 fidelity I-3) | 1 |
+| `decaying-multisig`'s `after=` at or above the Unix-time band | names `--path` as the only remedy, since the preset grammar has no `t` suffix: `` preset <name>: after=<v> is read as a block height and is above the height band (1..=499999999); presets cannot express a Unix time -- use --path with `after=<v>t` instead `` (R0 fidelity M-3) | 1 |
+
+**R0 fidelity N-2 — `--json`'s `SCHEMA` constant is NOT bumped for the new `preset` field, and stays that way.** `crates/md-cli/src/format/json.rs:6` (`pub const SCHEMA: &str = "md-cli/1";`) has never moved for an additive field on any subcommand's JSON, measured against this crate's own history — most directly, S0's OWN `md compose --json` shipped a brand-new subcommand's entire JSON shape without bumping it. `preset` is additive and always present (`null` for a `--path`-built policy, asserted by `path_json_names_no_preset`), so a consumer reading an unknown field is the worst case, not a broken one; bumping `SCHEMA` for one more optional field on one subcommand would be new practice invented for this plan, not applied practice.
 
 - [ ] **Step 1: Write the failing CLI tests**
 
@@ -731,33 +751,45 @@ fn preset_propagates_a_parameter_the_constructor_rejects() {
 }
 
 #[test]
-fn preset_kofn_recovery_refuses_under_legacy_wrappers_with_the_spec_4d_shape() {
+fn preset_every_non_plain_archetype_refuses_under_both_legacy_wrappers_spec_4d_shape() {
     // SPEC §4d: "under sh/sh(wsh) only the plain k-of-n preset is offered."
     // No CLI special-case is needed: every non-plain archetype's PathList
     // fails `validate`'s legacy-wrapper-shape check the same way a hand-built
-    // --path list with the same shape would.
-    md().args([
-        "compose",
-        "--wrapper",
-        "sh",
-        "--preset",
-        "kofn-recovery,2of3,older=100",
-    ])
-    .assert()
-    .failure()
-    .code(1)
-    .stderr(predicate::str::contains(
-        "legacy wrappers hold one plain sorted multisig only (n >= 2, no lock, no hash); use wsh or tr",
-    ));
-    md().args([
-        "compose",
-        "--wrapper",
-        "sh",
-        "--preset",
-        "plain-multisig,2of3",
-    ])
-    .assert()
-    .success();
+    // --path list with the same shape would. R0 fidelity M-2: this was tested
+    // for one of the ten (archetype, wrapper) pairs; all ten now run.
+    let non_plain: [(&str, &str); 5] = [
+        ("simple-timelocked-inheritance", "older=100"),
+        ("kofn-recovery", "2of3,older=100"),
+        ("tiered-recovery", "2of2,1of2,older=100"),
+        (
+            "hashlock-gated",
+            "sha256=a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8,older=100",
+        ),
+        (
+            "decaying-multisig",
+            "2of2,1of1,older1=100,older2=200,after=1000",
+        ),
+    ];
+    for wrapper in ["sh", "sh-wsh"] {
+        for (name, params) in &non_plain {
+            md().args(["compose", "--wrapper", wrapper, "--preset", &format!("{name},{params}")])
+                .assert()
+                .failure()
+                .code(1)
+                .stderr(predicate::str::contains(
+                    "legacy wrappers hold one plain sorted multisig only (n >= 2, no lock, no hash); use wsh or tr",
+                ));
+        }
+        md().args([
+            "compose",
+            "--wrapper",
+            wrapper,
+            "--preset",
+            "plain-multisig,2of3",
+        ])
+        .assert()
+        .success();
+    }
 }
 
 #[test]
@@ -788,6 +820,211 @@ fn preset_decaying_multisig_propagates_preset_shape_refusals() {
     .stderr(predicate::str::contains(
         "preset: a decaying multisig decays: the recovery threshold cannot exceed the primary threshold",
     ));
+}
+
+#[test]
+fn preset_unknown_name_wins_over_a_malformed_token() {
+    // R0 fidelity I-3: `parse_preset` checks the NAME before parsing any
+    // token, so an unknown name is reported even when a token is ALSO
+    // malformed -- not "`2/3` is not <k>of<n>" for a name that was never a
+    // preset in the first place.
+    md().args(["compose", "--wrapper", "wsh", "--preset", "multisig,2/3"])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "expected one of plain-multisig, simple-timelocked-inheritance, kofn-recovery, tiered-recovery, hashlock-gated, decaying-multisig",
+        ));
+}
+
+#[test]
+fn preset_refuses_a_duplicate_named_parameter() {
+    md().args([
+        "compose",
+        "--wrapper",
+        "wsh",
+        "--preset",
+        "kofn-recovery,2of3,older=100,older=200",
+    ])
+    .assert()
+    .failure()
+    .code(1)
+    .stderr(predicate::str::contains(
+        "preset kofn-recovery: `older=` given twice",
+    ));
+}
+
+#[test]
+fn preset_refuses_a_malformed_kofn_token() {
+    md().args([
+        "compose",
+        "--wrapper",
+        "wsh",
+        "--preset",
+        "plain-multisig,2/3",
+    ])
+    .assert()
+    .failure()
+    .code(1)
+    .stderr(predicate::str::contains(
+        "preset plain-multisig: `2/3` is not <k>of<n>",
+    ));
+}
+
+#[test]
+fn preset_refuses_a_kofn_magnitude_that_does_not_fit_a_small_number() {
+    // R0 fidelity I-3: this is a DIFFERENT failure class from BadThreshold --
+    // 300 does not fit u8 at all, so there is no (k, n) pair yet to name in
+    // BadThreshold's "1 <= k <= n <= 9" wording. A value that DOES fit u8 but
+    // violates that band (e.g. 2of15) already reaches the real constructor and
+    // surfaces BadThreshold's own text verbatim (asserted below).
+    md().args([
+        "compose",
+        "--wrapper",
+        "wsh",
+        "--preset",
+        "plain-multisig,300of3",
+    ])
+    .assert()
+    .failure()
+    .code(1)
+    .stderr(predicate::str::contains(
+        "preset plain-multisig: k `300` is not a small number",
+    ));
+    md().args([
+        "compose",
+        "--wrapper",
+        "wsh",
+        "--preset",
+        "plain-multisig,2of300",
+    ])
+    .assert()
+    .failure()
+    .code(1)
+    .stderr(predicate::str::contains(
+        "preset plain-multisig: n `300` is not a small number",
+    ));
+    md().args([
+        "compose",
+        "--wrapper",
+        "wsh",
+        "--preset",
+        "plain-multisig,2of15",
+    ])
+    .assert()
+    .failure()
+    .code(1)
+    .stderr(predicate::str::contains(
+        "2-of-15 is not admitted (1 <= k <= n <= 9)",
+    ));
+}
+
+#[test]
+fn preset_refuses_a_non_numeric_named_value() {
+    md().args([
+        "compose",
+        "--wrapper",
+        "wsh",
+        "--preset",
+        "kofn-recovery,2of3,older=soon",
+    ])
+    .assert()
+    .failure()
+    .code(1)
+    .stderr(predicate::str::contains(
+        "preset kofn-recovery older: `soon` is not a number in 0..=4294967295",
+    ));
+}
+
+#[test]
+fn preset_refuses_a_missing_or_malformed_sha256() {
+    md().args([
+        "compose",
+        "--wrapper",
+        "wsh",
+        "--preset",
+        "hashlock-gated,older=1",
+    ])
+    .assert()
+    .failure()
+    .code(1)
+    .stderr(predicate::str::contains(
+        "preset hashlock-gated needs sha256=<64 hex>",
+    ));
+    md().args([
+        "compose",
+        "--wrapper",
+        "wsh",
+        "--preset",
+        "hashlock-gated,sha256=ab,older=1",
+    ])
+    .assert()
+    .failure()
+    .code(1)
+    .stderr(predicate::str::contains(
+        "sha256 needs 64 hex characters, lowercase",
+    ));
+}
+
+#[test]
+fn preset_decaying_multisig_after_in_the_time_band_names_path_as_the_remedy() {
+    // R0 fidelity M-3: decaying-multisig's `after` always builds a HEIGHT lock
+    // (`presets::decaying_multisig` never emits `AfterTime`) and the preset
+    // grammar has no `t` suffix to ask for a time lock -- unlike --path's
+    // `after=<T>t`. A Unix-time-sized value therefore names --path, the only
+    // way to express it, rather than a bare band refusal with no remedy.
+    md().args([
+        "compose",
+        "--wrapper",
+        "wsh",
+        "--preset",
+        "decaying-multisig,2of2,1of1,older1=100,older2=200,after=1893456000",
+    ])
+    .assert()
+    .failure()
+    .code(1)
+    .stderr(predicate::str::contains(
+        "after=1893456000 is read as a block height and is above the height band (1..=499999999); presets cannot express a Unix time -- use --path with `after=1893456000t` instead",
+    ));
+}
+
+#[test]
+fn every_preset_name_parses_with_some_valid_parameters() {
+    // R0 fidelity M-4: PRESET_NAMES and the match arms in parse_preset are two
+    // lists that can drift -- a name added to one and not the other compiles
+    // and advertises a name that does not work. This runs every PRESET_NAMES
+    // entry through the real CLI with a valid parameter set and asserts it
+    // succeeds, so a drift fails a test rather than shipping silently.
+    let valid: [(&str, &str); 6] = [
+        ("plain-multisig", "2of3"),
+        ("simple-timelocked-inheritance", "older=26280"),
+        ("kofn-recovery", "2of3,older=26280"),
+        ("tiered-recovery", "2of2,1of2,older=26280"),
+        (
+            "hashlock-gated",
+            "sha256=a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8,older=26280",
+        ),
+        (
+            "decaying-multisig",
+            "2of2,1of1,older1=13140,older2=26280,after=1000000",
+        ),
+    ];
+    assert_eq!(
+        valid.len(),
+        6,
+        "one entry per PRESET_NAMES member; update this fixture if a preset is added"
+    );
+    for (name, params) in valid {
+        md().args([
+            "compose",
+            "--wrapper",
+            "wsh",
+            "--preset",
+            &format!("{name},{params}"),
+        ])
+        .assert()
+        .success();
+    }
 }
 
 #[test]
@@ -853,10 +1090,10 @@ fn path_json_names_no_preset() {
 }
 ```
 
-- [ ] **Step 2: Run to verify the tests fail to compile**
+- [ ] **Step 2: Run to verify the tests fail**
 
 Run: `cargo nextest run --locked -p md-cli --test cli_compose_preset 2>&1 | tail -8`
-Expected: FAIL to compile — `--preset` is not a recognised flag yet (clap rejects it at parse time in every test that uses it; the crate itself still builds since `cli_compose_preset.rs` is a separate test binary).
+Expected: FAIL (R0 tests-lens N-1: this is a clap RUNTIME parse rejection, not a `rustc` compile error — the workspace compiles cleanly at this point) — `--preset` is not a recognised flag yet, so every test using it fails immediately with clap's own `error: unexpected argument '--preset' found`, exit 2 (the crate itself still builds since `cli_compose_preset.rs` is a separate test binary).
 
 - [ ] **Step 3: Replace `crates/md-cli/src/cmd/compose.rs`**
 
@@ -1100,6 +1337,12 @@ fn parse_kofn(tok: &str, ctx: &str) -> Result<(u8, u8), CliError> {
 pub fn parse_preset(wrapper: Wrapper, s: &str) -> Result<(PresetParams, PathList), CliError> {
     let mut parts = s.split(',');
     let name = parts.next().unwrap_or("");
+    if !PRESET_NAMES.contains(&name) {
+        return Err(CliError::Compose(format!(
+            "--preset {name}: expected one of {}",
+            PRESET_NAMES.join(", ")
+        )));
+    }
     let ctx = format!("preset {name}");
     let mut ofs: Vec<(u8, u8)> = Vec::new();
     let mut named: std::collections::BTreeMap<&str, &str> = std::collections::BTreeMap::new();
@@ -1136,6 +1379,23 @@ pub fn parse_preset(wrapper: Wrapper, s: &str) -> Result<(PresetParams, PathList
             .get(k)
             .ok_or_else(|| CliError::Compose(format!("{ctx} needs {k}=<n>")))?;
         parse_u32(v, &format!("{ctx} {k}"))
+    };
+    // `presets::decaying_multisig`'s `after_height` argument always builds
+    // `Lock::AfterHeight` (never `AfterTime`), and the preset grammar has no
+    // `t`-suffix to ask for a time lock at all -- unlike `--path`'s
+    // `after=<H>|after=<T>t`. A value at or above the Unix-time band therefore
+    // cannot be satisfied by retyping it; the only remedy is `--path`, which
+    // this names, mirroring `--path`'s own "reads as a block height" wording
+    // (`parse_path`'s `after` arm, above) rather than propagating the bare
+    // `ComposeError::LockOutOfRange` text with no remedy.
+    let need_after_height = |k: &str| -> Result<u32, CliError> {
+        let v = need_u32(k)?;
+        if v >= md_codec::compose::LOCKTIME_THRESHOLD {
+            return Err(CliError::Compose(format!(
+                "{ctx}: {k}={v} is read as a block height and is above the height band (1..=499999999); presets cannot express a Unix time -- use --path with `after={v}t` instead"
+            )));
+        }
+        Ok(v)
     };
     let map_ce = |e: md_codec::compose::ComposeError| CliError::Compose(e.to_string());
     match name {
@@ -1208,7 +1468,7 @@ pub fn parse_preset(wrapper: Wrapper, s: &str) -> Result<(PresetParams, PathList
             let (k2, n2) = ofs[1];
             let older1 = need_u32("older1")?;
             let older2 = need_u32("older2")?;
-            let after_height = need_u32("after")?;
+            let after_height = need_after_height("after")?;
             let list =
                 presets::decaying_multisig(wrapper, k1, n1, k2, n2, older1, older2, after_height)
                     .map_err(map_ce)?;
@@ -1225,10 +1485,7 @@ pub fn parse_preset(wrapper: Wrapper, s: &str) -> Result<(PresetParams, PathList
                 list,
             ))
         }
-        other => Err(CliError::Compose(format!(
-            "--preset {other}: expected one of {}",
-            PRESET_NAMES.join(", ")
-        ))),
+        other => unreachable!("name already validated against PRESET_NAMES: {other}"),
     }
 }
 
@@ -1433,6 +1690,8 @@ Replace it with:
         /// One of the six named archetypes (SPEC_wallet_policy_composer.md
         /// §4d): `<name>[,<k>of<n>]*[,<param>=<value>]*`, e.g.
         /// `kofn-recovery,2of3,older=26280`. Mutually exclusive with --path.
+        /// For decaying-multisig, `older1` locks the FIRST (primary) tier and
+        /// `older2` the second -- the primary tier does not spend immediately.
         #[arg(long, value_name = "PRESET")]
         preset: Option<String>,
         /// Admit key-less paths and unsorted-where-sorted-was-legal, with a warning.
@@ -1476,10 +1735,10 @@ No change to `crates/md-cli/src/error.rs`: `CliError::Compose(String)` already e
 - [ ] **Step 5: Run the CLI tests and the full md-cli suite**
 
 Run: `cargo nextest run --locked -p md-cli --no-fail-fast -E 'binary(/^cli_compose/)' 2>&1 | tail -30`
-Expected: 23/23 PASS — the 9 pre-existing `cli_compose.rs`/`cli_compose_encode_gate.rs` tests plus the 14 new ones in `cli_compose_preset.rs` (measured live during this plan's authoring; zero regressions).
+Expected: 31/31 PASS — the 9 pre-existing `cli_compose.rs`/`cli_compose_encode_gate.rs` tests plus the 22 in `cli_compose_preset.rs` (14 from the original draft, 8 added folding R0 fidelity I-3/M-2/M-3/M-4; measured live, zero regressions).
 
 Run: `cargo nextest run --locked -p md-cli 2>&1 | tail -8`
-Expected: 775/775 PASS once Task 1's corpus is regenerated (Task 3); measured live during authoring at 774/775 with only the not-yet-regenerated `vectors_output_matches_committed_corpus` red — the pre-existing `gui-schema`/`cli_output_class` tests are unaffected (`grep -n compose` on both source files returns nothing, so `--preset` adds no golden fixture to update, unlike S0 Task 6's own caution about that class of test).
+Expected: 783/783 PASS once Task 1's corpus is regenerated (Task 3); measured live at 782/783 with only the not-yet-regenerated `vectors_output_matches_committed_corpus` red before that regeneration — the pre-existing `gui-schema`/`cli_output_class` tests are unaffected (`grep -n compose` on both source files returns nothing, so `--preset` adds no golden fixture to update, unlike S0 Task 6's own caution about that class of test).
 
 - [ ] **Step 6: Format, clippy, commit**
 
@@ -1505,7 +1764,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 - [ ] **Step 1: Run the whole workspace the way CI does**
 
 Run: `cd /scratch/code/shibboleth/descriptor-mnemonic && cargo fmt --all --check && cargo clippy --locked --workspace --all-targets --all-features -- -D warnings 2>&1 | tail -3 && cargo nextest run --locked --workspace --all-features 2>&1 | tail -6 && cargo test --locked --workspace --all-features --doc 2>&1 | tail -3`
-Expected: fmt clean, clippy clean, every test PASS, doctests PASS. Baseline measured at `66bdf2f4` before this plan's changes: `1318 tests run: 1318 passed, 3 skipped`. This plan adds 14 tests (`cli_compose_preset.rs`) and zero new `#[test]` functions in md-codec (the six new `family()` rows are data, consumed by pre-existing tests) — expect **1332 tests run: 1332 passed, 3 skipped**. Doctests: 0 for md-codec, unaffected either way (measured: this crate ships none).
+Expected: fmt clean, clippy clean, every test PASS, doctests PASS. Baseline measured at `66bdf2f4` before this plan's changes: `1318 tests run: 1318 passed, 3 skipped`. This plan adds 22 tests (`cli_compose_preset.rs`: 14 from the original draft plus 8 folding R0 fidelity I-3/M-2/M-3/M-4) and zero new `#[test]` functions in md-codec (the six new `family()` rows, and the `head:hashed` tag folding N-1, are data, consumed by pre-existing tests) — expect **1340 tests run: 1340 passed, 3 skipped**. (R0 tests-lens N-2: a scratch copy that has not been through the CURRENT `plan-build-gate-md.sh` -- specifically its `design/display-grouping-vectors.tsv*` copy step, added `a13feec` -- shows one extra red here, `md-codec::display_grouping_conformance::conformance_vectors_pass`, for the missing sidecar file; that is a scratch-setup gap already root-caused and fixed in the gate script, not a defect in this plan's diff, and does not reproduce when the current script is used.) Doctests: 0 for md-codec, unaffected either way (measured: this crate ships none).
 
 - [ ] **Step 2: Regenerate and diff the vector corpus**
 
@@ -1549,11 +1808,11 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 
 The stage is complete when: every task's commit exists; the workspace gate of this task is green; the whole-diff independent review (an opus execution review over `git diff <baseline>..HEAD`, persisted to `mnemonic-engrave/design/agent-reports/composer-S0b-exec-review-r0.md`) returns 0 Critical / 0 Important after folds; and the branch is merged to `main` via the `ci/staging` ritual (same as S0). The version bump + crates.io publish remain BLOCKED by the pre-existing `md-codec-derive-feature-depends-on-unpublished-miniscript-apis` follow-up (unaffected by this plan; `--preset` uses no miniscript API).
 
-**Fork re-vendoring (named here, NOT this plan's work — Rust first, the fork is untouched by this stage):** once this plan merges to `main`, the fork's `scripts/vendor-compose-vectors.sh` (`/scratch/code/shibboleth/seedhammer`, currently `main` at `321acb5`) re-run against the new `descriptor-mnemonic` revision picks up the six `keyed_compose_preset_*` names with NO script change (its glob is `^(keyed_)?compose_`, confirmed by reading `scripts/vendor-compose-vectors.sh:16` on the fork). The vendored file count moves from the currently-committed **126** (22 keyed × 5 + 4 unkeyed × 4, per the fork's own `md/compose_vectors_pin_test.go:82-84`) to **156** (28 keyed × 5 + 4 unkeyed × 4 — measured directly: this plan's own scratch run produced exactly 156 files in `crates/md-codec/tests/vectors/` after regeneration). Two things on the fork DO need a hand edit that re-running the script alone will not make: `md/compose_vectors_pin_test.go`'s hardcoded `composeVectorNames` list (26 names, `:56` area) needs the six new names added, and its hardcoded `126` (`:83-84`) needs to become `156` — both are one-line-each, fork-side, Stage 3 (or a dedicated F-453-follow-on) territory, not this plan's.
+**Fork re-vendoring (named here, NOT this plan's work — Rust first, the fork is untouched by this stage). R0 fidelity I-4: ownership decided, not left open.** Once this plan merges to `main`, the fork's `scripts/vendor-compose-vectors.sh` (`/scratch/code/shibboleth/seedhammer`, currently `main` at `321acb5`) re-run against the new `descriptor-mnemonic` revision picks up the six `keyed_compose_preset_*` names with NO script change (its glob is `^(keyed_)?compose_`, confirmed by reading `scripts/vendor-compose-vectors.sh:16` on the fork). The vendored file count moves from the currently-committed **126** (22 keyed × 5 + 4 unkeyed × 4, per the fork's own `md/compose_vectors_pin_test.go:82-84`) to **156** (28 keyed × 5 + 4 unkeyed × 4 — measured directly: this plan's own scratch run produced exactly 156 files in `crates/md-codec/tests/vectors/` after regeneration). **`IMPLEMENTATION_PLAN_composer_S3_fork_gui.md` Task A10 owns two hand edits that re-running the script alone will not make, and A10's own text currently gets both wrong** (a correction for the controller to schedule on the S3 plan, NOT made here): its `md/compose_vectors_pin_test.go`'s hardcoded `composeVectorNames` list (26 names) needs the six new names added, and its hardcoded `126` (`:83-84`) needs to become `156` — but A10 Step 1 (`:4709`) currently asserts the opposite, that the pin test "passes at the new counts (it asserts the file count, so the constant... moves with it)", which is false: both the name list and the `126` literal are Go constants that move only by hand. A10's own Files list (`:4686-4689`) does not name `compose_vectors_pin_test.go` and its `git add` (`:4736`) does not stage it, either. A10 also names the wrong vendored prefix (`preset_*` instead of the actual `keyed_compose_preset_*`) and omits the fifth vendored file per vector (`.conformance.json`, required by the fork's own `TestEveryKeyedComposeVectorHasAConformanceRecord`). This plan states the ownership and the exact expected counts (126 → 156, 26 → 32 names) so the S3-side fix is unambiguous; it does not itself touch the fork or `IMPLEMENTATION_PLAN_composer_S3_fork_gui.md`.
 
 ## Self-review (run by the plan author before dispatch)
 
-1. **Spec coverage:** §4d's six archetypes and their parameters → Task 1 (constructors already shipped; this plan adds the corpus) and Task 2 (the CLI grammar); §4d's "under sh/sh(wsh) only plain-multisig" rule → Task 2's refusal table and its `preset_kofn_recovery_refuses_under_legacy_wrappers_with_the_spec_4d_shape` test (no new code needed — the existing `ComposeError::LegacyWrapperShape` already covers it); §12 item 1's tagged-coverage requirement → Task 1's `family()` rows and `SINGULAR_TAGS` additions (verified NOT to break `every_tag_appears_in_at_least_two_vectors`'s required list, since no new tag STRING besides the six deliberately-singular `preset:*` ones is introduced). Not in this stage: any change to §5's lowering, §9's device work, or the fork (Stage 2 shipped the Go builder already; Stage 3's GUI picker is the eventual consumer of what this plan produces, named but not built here).
+1. **Spec coverage:** §4d's six archetypes and their parameters → Task 1 (constructors already shipped; this plan adds the corpus) and Task 2 (the CLI grammar); §4d's "under sh/sh(wsh) only plain-multisig" rule → Task 2's refusal table and its `preset_every_non_plain_archetype_refuses_under_both_legacy_wrappers_spec_4d_shape` test, covering all ten (archetype, wrapper) pairs (R0 fidelity M-2; no new code needed — the existing `ComposeError::LegacyWrapperShape` already covers it); §12 item 1's tagged-coverage requirement → Task 1's `family()` rows and `SINGULAR_TAGS` additions (verified NOT to break `every_tag_appears_in_at_least_two_vectors`'s required list: one new tag STRING is introduced beyond the six deliberately-singular `preset:*` ones — `head:hashed`, folding R0 fidelity N-1 — and it is added to `SINGULAR_TAGS` too, with exactly one vector, so the required list and the two-vector rule are unaffected). Not in this stage: any change to §5's lowering, §9's device work, or the fork (Stage 2 shipped the Go builder already; Stage 3's GUI picker is the eventual consumer of what this plan produces, named but not built here; Task 3 states which two fork-side edits Stage 3's Task A10 owns, per R0 fidelity I-4).
 2. **Placeholder scan:** no TBD/TODO; every code block is the ACTUAL content verified in a scratch build before this plan was written (see "What is already machine-verified"), not a description of what code should do.
 3. **Type consistency:** `presets::plain_multisig(Wrapper, u8, u8) -> Result<PathList, ComposeError>`, `presets::simple_timelocked_inheritance(Wrapper, u32) -> Result<PathList, ComposeError>`, `presets::kofn_recovery(Wrapper, u8, u8, u32) -> Result<PathList, ComposeError>`, `presets::tiered_recovery(Wrapper, u8, u8, u8, u8, u32) -> Result<PathList, ComposeError>`, `presets::hashlock_gated(Wrapper, [u8; 32], u32) -> Result<PathList, ComposeError>`, `presets::decaying_multisig(Wrapper, u8, u8, u8, u8, u32, u32, u32) -> Result<PathList, ComposeError>` are used with these EXACT shapes (read from `crates/md-codec/src/compose/presets.rs` at `66bdf2f4`) in every task. `cmd::compose::run`'s new signature `(wrapper: &str, paths: &[String], preset: Option<&str>, experimental: bool, json: bool) -> Result<u8, CliError>` is used identically in Task 2's `main.rs` dispatch arm.
 
