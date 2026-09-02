@@ -397,3 +397,9 @@ ONE path = warning.
   fold verification -- the same set S2 closed on plus the journey walk).
   Still owed to the operator before implementation: the three §5 questions
   (defaults stand if silent) and F-457's narrowing of C10.
+- S0b (F-453 presets) plan DRAFT 96dfff7 (sonnet author; report aaf13cc): 3 tasks,
+  `--preset <name>[,<k>of<n>]*[,<param>=<value>]*` over the six shipped
+  constructors, six `keyed_compose_preset_*` vectors. Controller's md gate
+  RUNNING (log scratchpad/s0b-gate-r0.log); the author warns step 6 halts on
+  main.rs's un-wired dispatch arm (run() gains a `preset` parameter) -- hand-wire
+  the main.rs fragment, re-run, then R0 (fidelity opus, tests sonnet).
