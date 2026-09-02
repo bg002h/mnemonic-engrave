@@ -12,7 +12,9 @@
 #
 # WHAT IT DOES
 #   1. Scratch copy of /scratch/code/shibboleth/descriptor-mnemonic (crates +
-#      Cargo.toml + Cargo.lock), with CARGO_TARGET_DIR kept OUTSIDE the copy so
+#      Cargo.toml + Cargo.lock + rust-toolchain.toml + .cargo/ + any clippy/
+#      rustfmt config, so the copy builds on the repo's PINNED toolchain and
+#      not on rustup's default), with CARGO_TARGET_DIR kept OUTSIDE the copy so
 #      dependency builds are cached across runs and /tmp (a 32 GB tmpfs) is not
 #      filled by a fresh target/ per run.
 #   2. Extracts every ```rust block that follows an anchor naming one of the
@@ -32,9 +34,17 @@
 #      need a reviewer's execution pass, and this script says so at the end.
 #   3. Synthesises `pub mod compose;` into md-codec's lib.rs and
 #      `pub mod compose;` into md-cli's cmd/mod.rs when those files were
-#      extracted (the plan states the one-line edits in prose).
+#      extracted, and the `miniscript = { workspace = true, features =
+#      ["compiler"] }` dev-dependency when compose_crosscheck.rs was, and the
+#      `CliError::Compose(String)` variant with its Display arm when
+#      cmd/compose.rs was (the plan states these one-line edits in prose).
 #   4. cargo build -p md-codec --all-targets; cargo nextest run -p md-codec
-#      -E 'test(compose)'; cargo clippy -p md-codec --all-targets -- -D warnings;
+#      -E 'binary(/^compose_/)' (the compose test BINARIES, not tests whose
+#      NAME contains "compose" -- the first draft filtered by name and ran 18
+#      of 46), with exactly one PINNED red accepted: the MANIFEST-comparison
+#      test failing with "MANIFEST lacks", because test_vectors.rs is a
+#      fragment this gate does not assemble; cargo clippy -p md-codec
+#      --all-targets -- -D warnings;
 #      cargo test -p md-cli --no-run (compile-check the CLI tests; their
 #      assertions run only against a real `md` with the subcommand wired, which
 #      needs the main.rs fragment a reviewer applies).
@@ -54,6 +64,15 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${TMPDIR:-/tmp}/plan-build-gate-md-
 echo "== 1 -- scratch copy of descriptor-mnemonic =="
 rm -rf "$WORK"; mkdir -p "$WORK"
 cp -r "$SRC/crates" "$SRC/Cargo.toml" "$WORK/"; [ -f "$SRC/Cargo.lock" ] && cp "$SRC/Cargo.lock" "$WORK/"
+# The toolchain PIN and cargo/lint config travel with the copy. Without
+# rust-toolchain.toml the scratch build ran on whatever rustup's default was
+# (a 1.97 nightly here, against the repo's pinned 1.85.0): everything built and
+# passed, and then clippy failed on a PRE-EXISTING test with a lint that did not
+# exist in 1.85 -- a red the repo itself can never see. A gate must build what
+# the repo builds.
+for f in rust-toolchain.toml rust-toolchain clippy.toml rustfmt.toml .rustfmt.toml; do [ -f "$SRC/$f" ] && cp "$SRC/$f" "$WORK/"; done
+[ -d "$SRC/.cargo" ] && cp -r "$SRC/.cargo" "$WORK/"
+echo "   toolchain: $(cd "$WORK" && rustc --version 2>/dev/null)"
 echo "   $WORK  (target: $CARGO_TARGET_DIR)"
 echo "== 2 -- extract the plan's Rust =="
 python3 - "$PLAN" "$WORK" <<'PY'
@@ -99,6 +118,21 @@ if any(p.startswith("crates/md-codec/src/compose") for p in blocks):
         s = s.replace("pub mod codex32;", "pub mod codex32;\npub mod compose;", 1); open(lib, "w").write(s); print("   registered pub mod compose in md-codec lib.rs")
     if os.path.isdir(os.path.join(work, "crates/md-codec/src/compose")) and os.path.exists(os.path.join(work, "crates/md-codec/src/compose.rs")):
         sys.stderr.write("plan-build-gate-md: both compose.rs and compose/ exist; pick one layout\n"); sys.exit(4)
+# synthesise the dev-dependency the plan states in prose for the compiler cross-check
+ctoml = os.path.join(work, "crates/md-codec/Cargo.toml")
+if "crates/md-codec/tests/compose_crosscheck.rs" in blocks and os.path.exists(ctoml):
+    s = open(ctoml).read()
+    if "[dev-dependencies]" in s and 'features = ["compiler"]' not in s:
+        s = s.replace("[dev-dependencies]", '[dev-dependencies]\nminiscript = { workspace = true, features = ["compiler"] }', 1)
+        open(ctoml, "w").write(s); print("   added dev-dependency miniscript/compiler to md-codec Cargo.toml")
+# synthesise the CliError::Compose variant the plan states in prose (error.rs is a fragment)
+errs = os.path.join(work, "crates/md-cli/src/error.rs")
+if "crates/md-cli/src/cmd/compose.rs" in blocks and os.path.exists(errs):
+    s = open(errs).read()
+    if "Compose(String)" not in s:
+        s = s.replace("    BadArg(String),\n", "    BadArg(String),\n    Compose(String),\n", 1)
+        s = s.replace('            CliError::BadArg(m) => write!(f, "{m}"),\n', '            CliError::BadArg(m) => write!(f, "{m}"),\n            CliError::Compose(m) => write!(f, "{m}"),\n', 1)
+        open(errs, "w").write(s); print("   added CliError::Compose(String) + Display arm to md-cli error.rs")
 cmdmod = os.path.join(work, "crates/md-cli/src/cmd/mod.rs")
 if "crates/md-cli/src/cmd/compose.rs" in blocks and os.path.exists(cmdmod):
     s = open(cmdmod).read()
@@ -110,8 +144,25 @@ PY
 cd "$WORK"
 echo "== 3 -- build md-codec (all targets) =="
 cargo build -p md-codec --all-targets --locked 2>&1 | tail -3
-echo "== 4 -- run the compose tests =="
-if command -v cargo-nextest >/dev/null 2>&1; then cargo nextest run -p md-codec --locked -E 'test(compose)' 2>&1 | tail -6; else cargo test -p md-codec --locked compose 2>&1 | tail -6; fi
+echo "== 4 -- run the compose test BINARIES (compose_*.rs) =="
+# ONE red is pinned, not skipped: the MANIFEST-comparison test fails with
+# "MANIFEST lacks" until the test_vectors.rs fragment is pasted (a fragment of
+# an existing file, which this gate does not assemble). Any other failure, or
+# that test failing for any other reason, fails the gate.
+TESTLOG="$(mktemp)"; trap 'rm -f "$TESTLOG"' EXIT
+set +e
+cargo nextest run -p md-codec --locked --no-fail-fast -E 'binary(/^compose_/)' >"$TESTLOG" 2>&1
+rc=$?
+set -e
+tail -8 "$TESTLOG"
+if [ "$rc" -ne 0 ]; then
+  fails="$(grep -E '^\s+FAIL \[' "$TESTLOG" | sed -E 's/.* md-codec::[a-z_]+ //' | sort -u)"
+  if [ "$fails" = "every_compose_vector_in_the_manifest_is_exactly_what_compose_renders" ] && grep -q 'MANIFEST lacks' "$TESTLOG"; then
+    echo "   PINNED RED: only the MANIFEST-comparison test failed, with 'MANIFEST lacks' (test_vectors.rs fragment not assembled) -- accepted"
+  else
+    echo "   compose tests FAILED (not the pinned red):"; echo "$fails" | sed 's/^/     /'; exit 100
+  fi
+fi
 echo "== 5 -- clippy md-codec =="
 cargo clippy -p md-codec --all-targets --locked -- -D warnings 2>&1 | tail -3
 echo "== 6 -- compile-check md-cli (tests --no-run; the compose subcommand's main.rs arm is a fragment) =="
