@@ -465,3 +465,8 @@ ONE path = warning.
   lack closing steps, six Importants unguarded by tests, two stale Produces
   lines, N-1's destination missing. Round-1 fold DISPATCHED to the S3 author
   with the controller's decisions (incl. a Part-A-only build step in A11).
+- Gate: `GATE_UNTIL='^### Task B1'` mode added to plan-build-gate-go.sh; on the
+  current S3 plan it reproduces the r1 Critical (`undefined: composerKeySources`
+  in Part A's composer_flow.go). The S3 author was told to make Task A11's
+  Part-A-only gate step use it. Scratch for that mode:
+  `.plan-build-gate-go-s3-partA`.
