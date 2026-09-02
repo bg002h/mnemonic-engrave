@@ -1,6 +1,6 @@
 # Wallet Policy Composer — Stage 2 (fork codec) Implementation Plan
 
-**STATUS: R0 GREEN 2026-09-02 (0 Critical / 0 Important open).** Round 0: fidelity+design (opus, `composer-S2-plan-R0-r0-fidelity.md`, 1C/3I/5M/2N) and tests/mutation (sonnet, `composer-S2-plan-R0-r0-tests.md`, 2C/1I/2M/1N), both folded at e2dc7e4 with the Go gate green in the hand-wired scratch; round 1 fold verification (sonnet, `composer-S2-plan-R0-r1-fold-verification.md`): all 16 findings VERIFIED, zero new defects. **This GREEN expires:** re-validate against "what did the S1 merge (and anything else) falsify here?" immediately before dispatching the implementer, and only with Task 6's precondition met (S1 merged: the fixture on mnemonic-engrave master at 45 rows, sha `eed6b177…464e`).
+**STATUS: R0 GREEN 2026-09-02 (0 Critical / 0 Important open).** Round 0: fidelity+design (opus, `composer-S2-plan-R0-r0-fidelity.md`, 1C/3I/5M/2N) and tests/mutation (sonnet, `composer-S2-plan-R0-r0-tests.md`, 2C/1I/2M/1N), both folded at e2dc7e4 with the Go gate green in the hand-wired scratch; round 1 fold verification (sonnet, `composer-S2-plan-R0-r1-fold-verification.md`): all 16 findings VERIFIED, zero new defects. **This GREEN expires:** re-validate against "what did the S1 merge (and anything else) falsify here?" immediately before dispatching the implementer, and only with Task 6's precondition met (S1 merged: the fixture on mnemonic-engrave master at 47 rows, sha `5b3960ca…b312`).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -2438,7 +2438,7 @@ func ComposerStubs(templateChunks, keyedChunks []string) ([][4]byte, error) {
 		return nil, err
 	}
 	out := [][4]byte{tmpl}
-	if keyedChunks != nil {
+	if len(keyedChunks) > 0 {
 		pol, err := FormAwareStubChunks(keyedChunks)
 		if err != nil {
 			return nil, err
@@ -2510,10 +2510,10 @@ MSG
 - Test: `sysw/composer_records_test.go`
 
 **Interfaces:**
-- Consumes: `Class`, `Classify`, `classifyConstellation` (`sysw/record.go:24,100`, `sysw/classify.go:34`); `bip32.ParsePathElement`, `bip32.Path` (`bip32/bip32.go:69,18`); `hdkeychain.NewKeyFromString`; the host's `crates/me-cli/testdata/record_class_vectors.json` (45 rows, sha256 `eed6b177d1a3406a69c4a0102635f5d59c6412fa65e106f85b831c4736ac464e`, S1 Task 3 as folded after the S1 whole-diff review -- 40 rows at S1's R0, plus three rows from composer-S1-exec-review-r0 M-2 and two from composer-S2-plan-R0-r0-tests I-1) with rows `{name, record, class, host_line}` and `class` in `Key|Hash|Now|Unknown`.
+- Consumes: `Class`, `Classify`, `classifyConstellation` (`sysw/record.go:24,100`, `sysw/classify.go:34`); `bip32.ParsePathElement`, `bip32.Path` (`bip32/bip32.go:69,18`); `hdkeychain.NewKeyFromString`; the host's `crates/me-cli/testdata/record_class_vectors.json` (47 rows, sha256 `5b3960cad7f924f6f1e7f19ef49599814733cee4874d0f5eb48c28af4cd8b312`, S1 Task 3 as folded after the S1 whole-diff review -- 40 rows at S1's R0, plus three rows from composer-S1-exec-review-r0 M-2, two from composer-S2-plan-R0-r0-tests I-1, and two from composer-S2-exec-review-r0 C-1/I-1: an unhardened component of 2^31 and a `+`-signed component, both refused on both sides) with rows `{name, record, class, host_line}` and `class` in `Key|Hash|Now|Unknown`.
 - Produces: `KeyPrefix = "key:"`, `HashPrefix = "hash:"`, `NowPrefix = "now:"`; `ClassKey`, `ClassHash`, `ClassNow` (appended after `ClassTx`; none secret); `type KeyRecord{Fingerprint [4]byte; Origin bip32.Path; Xpub string; Text string}`; `type NowRecord{Seconds uint32; Height uint32; HasHeight bool}`; `func ParseKeyRecord(record string) (KeyRecord, error)`, `func ParseHashRecord(record string) ([32]byte, error)`, `func ParseNowRecord(record string) (NowRecord, error)`; `func IsComposerRecord(record string) bool`. Every rule is the host's (`composer_records.rs`, S1 Task 1), ported predicate by predicate; the device emits NO line (§8n is host copy; the device leaves a malformed record inert, §12 item 8).
 
-Decisions stated: `DecodeBody` (`sysw/record.go:67`) is NOT widened to the three prefixes -- it decodes bodies for ENGRAVING (`text:`/`pass:`/`tx:`), and no composer record is engraved as text; the composer's parser owns its own lowercase-hex rule so the lockstep port is one unit (the same reasoning the host module states for not sharing `record.rs`'s helpers). `H` as a hardening marker is refused here as on the host (`bip32.ParsePathElement` accepts only `h` and `'`); a leading `+` or `-` in a path element is refused by an explicit digit check because `strconv.ParseInt` would accept it and rust-bitcoin does not.
+Decisions stated: `DecodeBody` (`sysw/record.go:67`) is NOT widened to the three prefixes -- it decodes bodies for ENGRAVING (`text:`/`pass:`/`tx:`), and no composer record is engraved as text; the composer's parser owns its own lowercase-hex rule so the lockstep port is one unit (the same reasoning the host module states for not sharing `record.rs`'s helpers). `H` as a hardening marker is refused here as on the host (`bip32.ParsePathElement` accepts only `h` and `'`); a leading `+` or `-` in a path element is refused by an explicit digit check because `strconv.ParseInt` would accept it -- and so did rust-bitcoin's `u32::from_str`, until the host tightened its own check (composer-S2-exec-review-r0 I-1, Rust first; fixture row `key-origin-component-plus-sign`); an index of 2^31 or more is refused because bip32's in-band hardening bit would re-read an unhardened 2147483648 as 0h (C-1; row `key-origin-component-unhardened-2^31`).
 
 - [ ] **Step 1: Vendor the fixture and write the failing test**
 
@@ -2523,7 +2523,7 @@ PRECONDITION (Baselines): S1 is merged to mnemonic-engrave master; `git -C /scra
 cp /scratch/code/shibboleth/mnemonic-engrave/crates/me-cli/testdata/record_class_vectors.json sysw/testdata/
 sha256sum sysw/testdata/record_class_vectors.json
 ```
-Expected: `eed6b177d1a3406a69c4a0102635f5d59c6412fa65e106f85b831c4736ac464e` (45 rows). If it differs, the host fixture moved since this plan was gated; stop and record both hashes.
+Expected: `5b3960cad7f924f6f1e7f19ef49599814733cee4874d0f5eb48c28af4cd8b312` (47 rows). If it differs, the host fixture moved since this plan was gated; stop and record both hashes.
 
 Create `sysw/testdata/record_class_vectors.provenance.json`:
 
@@ -2544,8 +2544,8 @@ Create `sysw/testdata/record_class_vectors.provenance.json`:
   "commit": "<git -C ../mnemonic-engrave rev-parse HEAD at vendoring>",
   "file_commit": "<git -C ../mnemonic-engrave log -1 --format=%H -- crates/me-cli/testdata/record_class_vectors.json>",
   "repo_clean_when_recorded": true,
-  "sha256": "eed6b177d1a3406a69c4a0102635f5d59c6412fa65e106f85b831c4736ac464e",
-  "vectors": 45,
+  "sha256": "5b3960cad7f924f6f1e7f19ef49599814733cee4874d0f5eb48c28af4cd8b312",
+  "vectors": 47,
   "recorded_at": "2026-09-02"
 }
 ```
@@ -2609,8 +2609,8 @@ func loadRecordClassRows(t *testing.T) []recordClassRow {
 	if err := json.Unmarshal(raw, &rows); err != nil {
 		t.Fatalf("parsing fixture: %v", err)
 	}
-	if len(rows) != pin.Vectors || len(rows) != 45 {
-		t.Fatalf("fixture has %d rows, pin says %d, plan says 45", len(rows), pin.Vectors)
+	if len(rows) != pin.Vectors || len(rows) != 47 {
+		t.Fatalf("fixture has %d rows, pin says %d, plan says 47", len(rows), pin.Vectors)
 	}
 	return rows
 }
@@ -2753,6 +2753,9 @@ func TestKeyRecordPathGrammarMatchesTheHost(t *testing.T) {
 		"73c5da0a/48H/0H/0H/2H", "73c5da0a/+48'/0'/0'/2'", "73c5da0a/-48'/0'/0'/2'", "73c5da0a/48'/0'/0'/2'/",
 		"73c5da0a/48'/0'//2'", "73c5da0a/ 48'/0'/0'/2'", "73c5da0a/48'/0'/0'/2147483648'", "73C5DA0A/48'/0'/0'/2'",
 		"73c5da0/48'/0'/0'/2'", "73c5da0a", "73c5da0a/", "73c5da0a/48'/0'/0'/3'", "73c5da0a/48'/0'/2'",
+		// An unhardened index of 2^31 would alias hardened 0 through bip32's in-band
+		// hardening bit (composer-S2-exec-review-r0 C-1); 2^31-1 is the last legal one.
+		"73c5da0a/2147483648/0'/0'/2'", "73c5da0a/48'/2147483648/0'/2'",
 	} {
 		if _, err := ParseKeyRecord(rec(bad)); err == nil {
 			t.Errorf("%q accepted", bad)
@@ -2956,9 +2959,14 @@ func ParseNowRecord(record string) (NowRecord, error) {
 	return out, nil
 }
 
-// parseOriginPath is the host's DerivationPath::from_str as applied to the
-// text between "fp/" and "]": one or more elements, each ASCII digits with an
-// optional ' or h hardening marker, no signs, no blanks, no empty element.
+// parseOriginPath is the host's key: path grammar as applied to the text
+// between "fp/" and "]": one or more elements, each ASCII digits with an
+// optional ' or h hardening marker, no signs, no blanks, no empty element, and
+// every index below 2^31. The range check is not decorative: bip32's in-band
+// hardening convention spells hardened 0 as 2147483648, so an UNHARDENED
+// component written "2147483648" would otherwise be re-read as 0h -- a
+// different origin from the one on the record (composer-S2-exec-review-r0 C-1;
+// the host refuses it via ChildNumber::from_normal_idx).
 func parseOriginPath(s string) (bip32.Path, bool) {
 	if s == "" {
 		return nil, false
@@ -2974,8 +2982,13 @@ func parseOriginPath(s string) (bip32.Path, bool) {
 		if digits == "" {
 			return nil, false
 		}
+		var idx uint64
 		for i := 0; i < len(digits); i++ {
 			if digits[i] < '0' || digits[i] > '9' {
+				return nil, false
+			}
+			idx = idx*10 + uint64(digits[i]-'0')
+			if idx >= 1<<31 {
 				return nil, false
 			}
 		}
@@ -3043,7 +3056,7 @@ func ParseKeyRecord(record string) (KeyRecord, error) {
 }
 ```
 
-- [ ] **Step 4: Run the tests -- every one of the 45 rows must agree**
+- [ ] **Step 4: Run the tests -- every one of the 47 rows must agree**
 
 Run: `CGO_ENABLED=0 go test -count=1 -run 'TestComposerRecord|TestComposerClasses|TestKeyRecordPath|TestClassify' -v ./sysw/ 2>&1 | grep -E '^(--- |ok|FAIL)'`
 Expected: all PASS, including the pre-existing `TestClassifyMatchesTheRustPrimary` and `TestClassifyRejectsMs1RustWouldRefuse`. A row that disagrees is a lockstep defect: quote the row's name, the host's class and Go's, and fix the Go predicate -- unless the fixture row itself looks wrong, in which case STOP (the fix lands in Rust first). `bip32.Path.String()` renders `m/48h/0h/0h/2h` (measured in the gate's scratch run; `bip32/bip32.go:20-35` writes `h`), which is what the assertion pins.
@@ -3056,10 +3069,10 @@ Expected: nothing from gofmt; `ok`.
 ```bash
 git add sysw/record.go sysw/composer_records.go sysw/composer_records_test.go sysw/testdata/record_class_vectors.json sysw/testdata/record_class_vectors.provenance.json
 git commit -s -F - <<'MSG'
-sysw: key:/hash:/now: record classes, lockstep with the host's 45-row fixture (composer S2 task 6)
+sysw: key:/hash:/now: record classes, lockstep with the host's 47-row fixture (composer S2 task 6)
 
 Prefix-matched before the sniffers; body rules ported predicate by predicate
-from composer_records.rs; fixture vendored with a provenance pin (sha eed6b177...).
+from composer_records.rs; fixture vendored with a provenance pin (sha 5b3960ca...).
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
