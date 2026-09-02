@@ -1,5 +1,7 @@
 # Wallet Policy Composer — Stage 2 (fork codec) Implementation Plan
 
+**STATUS: R0 GREEN 2026-09-02 (0 Critical / 0 Important open).** Round 0: fidelity+design (opus, `composer-S2-plan-R0-r0-fidelity.md`, 1C/3I/5M/2N) and tests/mutation (sonnet, `composer-S2-plan-R0-r0-tests.md`, 2C/1I/2M/1N), both folded at e2dc7e4 with the Go gate green in the hand-wired scratch; round 1 fold verification (sonnet, `composer-S2-plan-R0-r1-fold-verification.md`): all 16 findings VERIFIED, zero new defects. **This GREEN expires:** re-validate against "what did the S1 merge (and anything else) falsify here?" immediately before dispatching the implementer, and only with Task 6's precondition met (S1 merged: the fixture on mnemonic-engrave master at 45 rows, sha `eed6b177…464e`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give the SeedHammer fork's Go packages everything the Stage 3 GUI will call: a `md` tree BUILDER that lowers an ordered spend-path list to a `descriptor` byte-identically to the Rust primary, the `pk_h` emitter arm, a `PolicyShape` that reports every alternative spend path with its lock operands and digests, the stub helpers for re-minted key cards, the three composer record classes in `sysw.Classify` in lockstep with the host, and the taproot `3'` origin — all as package APIs and tests, with the firmware still building and its size delta recorded.
