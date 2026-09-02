@@ -24,12 +24,21 @@ branch `composer-s0`, nine commits `b19dca7b..9820e618`; report persisted
 `db0d729`; controller re-ran the gates independently: fmt + clippy clean,
 nextest 1318/1318, doctests ok, 126 new vector files / 22 conformance files,
 tree clean. Plan's Expected lines corrected to the measured facts (see `git log`).
-**IN FLIGHT:** (1) opus whole-diff execution review of `composer-s0` →
-`agent-reports/composer-S0-exec-review-r0.md`; (2) the payload-spec fold (S1 Task 6): r0 lens
-0C/3I/4M/5N (`bb49953`), folded at `44765d7` (I-1..I-3 + Minors/Nits; F-450
-filed at `72ac66d` for the Transaction rows, F-415's other half); sonnet fold
-verification in flight →
-`agent-reports/payload-spec-composer-fold-R0-r1-fold-verification.md`.
+**Whole-diff execution review of `composer-s0`:** 0C/1I/2M/3N (`976cc45`);
+folded ON THE BRANCH at `7c9b4fd7` (encode's signature refusal names
+--experimental; CHANGELOG states the gate's blast radius: descriptor/address/
+vectors --template share it, the first two without an opt-out; malleability +
+mixed timelocks newly enforced under wsh/sh; the round-trip test's `if let Ok`
+guard removed; --json documented) and `66bdf2f4` (follow-up
+`md-descriptor-address-template-lack-experimental`). Plan record updated.
+**IN FLIGHT:** gate re-run on the folded worktree, then a sonnet verification of
+that fold → `agent-reports/composer-S0-exec-review-r1-fold-verification.md`;
+when clean: fast-forward descriptor-mnemonic `main` to the branch tip and push
+via `scripts/push-via-staging.sh main` (sonnet push agent; main is 5 unpushed
+docs commits ahead of origin already, all ancestors of the branch).
+**Payload-spec fold (S1 Task 6) CLOSED under its own R0:** r0 0C/3I/4M/5N
+(`bb49953`) folded at `44765d7` (+ F-450 `72ac66d`); r1 verification 11 FIXED /
+1 PARTIAL (`de34664`), the partial folded at `fdf7671`.
 **After (1) is 0C/0I:** merge `composer-s0` into descriptor-mnemonic `main`
 (fast-forward), version bump + publish per `design/RELEASE_PROCESS.md` there,
 vendor nothing yet (S2 does), then S1's R0 (plan `273f414`+) right before its

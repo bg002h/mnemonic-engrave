@@ -910,9 +910,10 @@ fn composed_templates_encode_and_round_trip_through_the_wire() {
     let refs: Vec<&str> = chunks.iter().map(String::as_str).collect();
     let back = reassemble(&refs).unwrap();
     assert_eq!(back, c.descriptor);
-    if let Ok(s) = encode_md1_string(&c.descriptor) {
-        assert!(s.starts_with("md1"));
-    }
+    // Not `if let Ok`: a guard around an assertion is a PASS that stops running
+    // the day the shape outgrows one string (exec review M-2).
+    let s = encode_md1_string(&c.descriptor).expect("a two-path wsh fits one md1 string");
+    assert!(s.starts_with("md1"));
 }
 
 // ---- §4f declared origins and the invariant (wsh half) --------------------------
@@ -2430,6 +2431,8 @@ Add to `crates/md-cli/src/main.rs`, in the `Command` enum (`crates/md-cli/src/ma
         /// Admit key-less paths and unsorted-where-sorted-was-legal, with a warning.
         #[arg(long)]
         experimental: bool,
+        /// Emit JSON: the origin-less template, the inline-origin template, the
+        /// slot map, the taproot internal-key path and the EXPERIMENTAL marks.
         #[arg(long)]
         json: bool,
     },
@@ -2852,12 +2855,24 @@ In `crates/md-cli/src/parse/template.rs`, `parse_template_ext`, replace the `let
         // (follow-up md-encode-keyless-template-sigless-path-not-gated). MINTING
         // verbs only, for the reason given in the experimental branch above.
         if matches!(reuse, crate::parse::reuse::Disposition::Refuse) {
-            d.sanity_check()
-                .map_err(|e| CliError::TemplateParse(format!("miniscript parse failed: {e}")))?;
+            d.sanity_check().map_err(|e| {
+                // The signature rule is the one `--experimental` relaxes; say so,
+                // the way `md compose` does, instead of only the library's line.
+                let hint = if e.to_string().contains("require a signature") {
+                    " -- a spend path that needs no key. `md compose` refuses the same shape \
+                     without --experimental; pass --experimental here to encode it as \
+                     EXPERIMENTAL (whoever holds the preimage can spend: bearer access)"
+                } else {
+                    ""
+                };
+                CliError::TemplateParse(format!("miniscript parse failed: {e}{hint}"))
+            })?;
         }
         d
     };
 ```
+
+**Blast radius, measured at the whole-diff review (2026-09-02) and stated in the CHANGELOG:** the gate keys on the MINTING disposition, which every verb that parses an operator-supplied template passes — `md encode`, `md descriptor --template`, `md address --template`, `md vectors` — so the last two now refuse a signature-free template too and have no `--experimental` opt-out (follow-up `md-descriptor-address-template-lack-experimental`, filed on the branch; the card-input routes `md descriptor <chunks>`/`md address <chunks>` and every reading verb are unaffected, measured 55/55 corpus templates identical on `verify`/`inspect`). Because `wsh`/`sh` never ran the sanity gate before, two more classes are refused at mint for the first time — MALLEABLE scripts (30 of 7,980 generated shapes, e.g. `wsh(or_d(j:pk(@0/<0;1>/*),pk(@1/<0;1>/*)))`) and MIXED heightlock/timelock — and no flag relaxes them; both are defective wallets and `tr` refused them all along. Kept as the intended behaviour; the record says so.
 
 `ext_check` returns miniscript's analysis error type, not `miniscript::Error` (a typed closure fails with E0631 at the pinned revision, measured); the generic `relaxed_err` above accepts it. Machine-checked by the controller in the gate's scratch copy before this plan was committed: see the fold commit message for the md-cli suite result.
 
@@ -2899,7 +2914,7 @@ Expected: only NEW `compose_*` / `keyed_compose_*` files appear (26 vectors' wor
 
 - [ ] **Step 3: Record the release note and commit**
 
-Add a line under the unreleased section of the crate's changelog naming: `md_codec::compose` (new module, unconditional), `md compose` (new subcommand), the 28 compose vectors, the dev-dependency on miniscript's `compiler` feature, and the `md encode` behaviour change (a signature-free spend path is now refused under every wrapper unless `--experimental`; before, only under `tr`).
+Add a line under the unreleased section of the crate's changelog naming: `md_codec::compose` (new module, unconditional), `md compose` (new subcommand), the 28 compose vectors, the dev-dependency on miniscript's `compiler` feature, and the `md encode` behaviour change (a signature-free spend path is now refused under every wrapper unless `--experimental`; before, only under `tr`) WITH its blast radius: `md descriptor --template`, `md address --template` and `md vectors` share the gate (the first two without an opt-out yet), and malleable or mixed-timelock `wsh`/`sh` scripts are refused at mint for the first time.
 
 ```bash
 git add crates/md-codec/tests/vectors CHANGELOG.md
