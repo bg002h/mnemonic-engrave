@@ -15,7 +15,7 @@
 
 Heads at spec time: fork `169073c`, engrave `b452a79`, descriptor-mnemonic `3b0944fb` (md 0.14.0), toolkit `d8f06483`, mnemonic-secret `5f37b43`.
 
-## R0 ROUND 0 — FOLDED (`bc1c07c`, spec §4-§14 regenerated; gates: structure 0, glyph 55/0, cites 49/49). RE-REVIEW NOT DISPATCHED (operator: no new launches at low usage)
+## R0 ROUND 0 FOLDED (`bc1c07c`); ROUND 1 RUN AND FOLDED (see `git log`: reports aa022ae/12abf0f/1630465, fold commit after them; gates structure 0, glyph 87/0, cites 61/61). Lenses run so far: correctness, adversarial, journey x2, coverage, feasibility, fold-verification x1. NEXT: sonnet verification of the round-1 fold; then the operator decides closure (lens-closure) and the writing-plans skill follows.
 
 Each agent writes its own report (the controller never transcribes):
 
