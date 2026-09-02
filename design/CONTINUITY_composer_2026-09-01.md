@@ -53,12 +53,18 @@ Task 4 wired: 612/612, clippy clean, threaded runner clean; fixture 40 rows,
 sha256 `a894e619…46c3`. Two of the controller's own fold slips were caught by
 that run (a digits-only "uppercase hex" row; the F-246 pre-check placed after
 the ceremony) and are recorded in the plan.
-**IN FLIGHT / NEXT:** sonnet verification of the r0 fold →
-`agent-reports/composer-S1-plan-R0-r1-fold-verification.md`; when 0C/0I: S1
-GREEN → ONE implementer (opus, UC off) in two worktrees (mnemonic-engrave
-`wt-composer-s1` off master; mnemonic-secret `wt-ms-bip48-p2tr` off `5f37b43`),
-Tasks 1-5 and 7 (Task 6 is DONE); then whole-diff review, release per each
-repo's process, push via staging.
+**S1 PLAN R0 GREEN (2026-09-02):** r1 verification 29 FIXED / 1 PARTIAL / 0
+regressions (`ec29be8`), the partial + one prose slip folded at the closure
+commit (see `git log`). Records pushed to origin/master `b8e19ebb` before it.
+**IN FLIGHT:** ONE implementer (opus, UC off) in two worktrees (mnemonic-engrave
+`wt-composer-s1` off master, branch `composer-s1`; mnemonic-secret
+`wt-ms-bip48-p2tr` off `5f37b43`, branch `bip48-p2tr`), Tasks 1-5 and 7 (Task 6
+is DONE); report → `agent-reports/composer-S1-implementation-report.md`.
+**THEN:** persist → verify gates independently in both worktrees → whole-diff
+opus execution review (both diffs) → fold → sonnet verification → merge both
+via each repo's staging ritual → release `me` 0.8.0 and `ms` 0.17.0 per each
+repo's release process → Stage 2 plan (fork Go: builder, pk_h arm, PolicyShape,
+Classify lockstep, vendoring of both fixtures).
 **Payload-spec fold (S1 Task 6) CLOSED under its own R0:** r0 0C/3I/4M/5N
 (`bb49953`) folded at `44765d7` (+ F-450 `72ac66d`); r1 verification 11 FIXED /
 1 PARTIAL (`de34664`), the partial folded at `fdf7671`.
