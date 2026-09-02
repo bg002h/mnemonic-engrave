@@ -371,3 +371,21 @@ ONE path = warning.
   in; the fold is ONE author-driven rewrite (Part B expansion + wiring + every
   finding), then a fresh wired gate (DEAD-IN-PROD must read 0), then the r1
   verification (brief: scratchpad/verify-brief-s3-r1.md).
+
+## S3 R0 r0 fold applied by the author (2026-09-02, uncommitted until the controller's gate re-run)
+
+- The author applied the combined fold to the plan in the working tree: Part B
+  expanded to the step standard; Task B11 joins Part B to the flow; a
+  flow-level walk from a keyed payload to the engrave screen; every mutation
+  survivor's test replaced; three declines with citations (journey C-2 second
+  shape; fidelity I-10 → F-457; fidelity N-1 → spec fold); F-456 (date-ceiling
+  body) and F-457 (text/QR plates need a Rust-first renderer; form A = keyed
+  md1 this stage, C10 narrowed -- operator's call) filed on master (c418930).
+  Author-reported gate: DEAD-IN-PROD gui = 1 (`composerDescriptorCeilingChars`,
+  justified), composer tests 100 top-level / 81 sub-tests, gui 1158/1158, cites
+  238/238, staleness 0 vs 321acb56.
+- Controller's independent re-gate RUNNING (log scratchpad/s3-gate-r1.log).
+  THEN: commit the fold (message = gate output) + the report update; dispatch
+  r1 verification (brief scratchpad/verify-brief-s3-r1.md; PRE_FOLD_SHA = 39f381b).
+- /tmp is a 32 GB tmpfs at ~76%: the session's scratchpad build cache
+  (649 MB) was removed; run sharded gui tests with TMPDIR on /scratch.
