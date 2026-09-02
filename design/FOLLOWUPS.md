@@ -15348,3 +15348,35 @@ caller through `progTransaction`.
 class, and its row is correct without the two columns; the Transaction cycle
 shipped on 2026-08-25 and works. This is the document lagging the code, the
 shape F-415 was filed for.
+
+### F-451 — `sysw-pack-now-append-overflow-blames-records`: the auto-appended `now:` can push the public section past `MAX_SECTION_LEN`, and the refusal names the operator's records and a two-payload remedy instead of `--no-now` (owning phase: **composer S4 journey polish** — burn down before S4 closes) `#me-cli` `#sysw` `#composer`
+
+Filed 2026-09-02 from `composer-S1-exec-review-r0` M-1 (reproduced there:
+467 `hash:` records + one 23-byte `text:` = 32713 bytes; `--no-now` packs,
+the default appends 25 bytes and refuses at exit 4 with "these records are
+too long for one payload … Split them across two payloads"). Nothing is
+written, so no data is lost; reachability is ~32 KB of composer records
+inside a 25-byte window. Fix direction (a hypothesis, to verify): compute
+the would-be section length before pushing and either skip the append with a
+named warning or make the `SectionTooLong` branch say `--no-now` when the
+append fired; regression test from the reproduction.
+
+### F-452 — `sysw-pack-now-flag-silent-when-now-record-supplied`: `--now` appends nothing when the operator also supplies a `now:` record (spec-conformant: "a supplied `now:` always wins"), and nothing says so (owning phase: **documentation only unless the operator disagrees** — composer S4 journey) `#me-cli` `#sysw` `#composer` `#ux`
+
+Filed 2026-09-02 from `composer-S1-exec-review-r0` N-3. Below the journey
+rule's bar ("worse than telling the user nothing"): one stderr line ("a now:
+record was supplied, so --now appended nothing") would close it. Same review:
+N-1 — `F-301`'s reproduction block quotes the pre-composer Unrecognised
+message (a dated transcript; message text changed at composer S1); N-2 —
+`design/SPEC_descriptor_input.md:120` quotes it too and was ALREADY stale
+before this cycle ("Descriptors and addresses are not yet classifiable
+here"), charged to the descriptor-input spec's next fold, not to S1.
+
+### F-453 — `composer-preset-vectors-missing`: the five archetype presets (`md-codec::compose::presets`, composer spec §4d) have no corpus entry and `md compose` exposes no `--preset`, so Stage 3's Go path lists would be authored with no Rust oracle (owning phase: **composer S3 — Rust first: `md compose --preset <name>` + one exported vector per archetype in descriptor-mnemonic, then vendor into the fork before the S3 shape flow ships**) `#composer` `#rust-primary` `#md-cli`
+
+Filed 2026-09-02 from `composer-S2-plan-R0-r0-fidelity` M-5. A preset is a
+normative `PathList` shape; re-authoring it in Go with no pinned oracle is
+exactly the drift the Rust-primary rule exists to prevent (which tier unlocks
+when, which head is bare). `md compose --help` at 66bdf2f4 shows `--wrapper`,
+`--path`, `--experimental`, `--json` only.
+
