@@ -365,3 +365,9 @@ ONE path = warning.
   in a descriptor-mnemonic worktree, whole-diff review, push via staging, then
   re-vendor into the fork (`scripts/vendor-compose-vectors.sh`, 126 → 126+N files)
   so S3's preset task (A10) unblocks.
+- Tests lens landed: `composer-S3-plan-R0-r0-tests.md` (sonnet) 15C/1I -- 19 of 27
+  mutations NOT caught, two test files missing; "does not close under the tests
+  lens". Forwarded to the author for the combined fold. All three r0 reports are
+  in; the fold is ONE author-driven rewrite (Part B expansion + wiring + every
+  finding), then a fresh wired gate (DEAD-IN-PROD must read 0), then the r1
+  verification (brief: scratchpad/verify-brief-s3-r1.md).
