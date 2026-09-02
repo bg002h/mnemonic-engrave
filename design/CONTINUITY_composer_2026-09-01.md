@@ -486,3 +486,7 @@ ONE path = warning.
   cite 241/241, staleness 0. Controller's independent re-gate RUNNING
   (scratchpad/s3-gate-r2.log). THEN: commit (message scratchpad/s3-fold-r1.msg)
   → r2 verification (brief scratchpad/verify-brief-s3-r2.md).
+- S3 round-1 fold COMMITTED (controller re-gate in the message: Part A alone
+  89 PASS lines; whole 205; gui 1168/1168; DEAD-IN-PROD 1 justified; cite
+  241/241; staleness 0). r2 verification (sonnet) dispatched next
+  (brief scratchpad/verify-brief-s3-r2.md).
