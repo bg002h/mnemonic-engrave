@@ -449,3 +449,11 @@ ONE path = warning.
   descriptor-mnemonic worktree → whole-diff review → staging push → re-vendor
   (S3 A10: scratchpad/s3-a10-fold-notes.md).
 - tmpfs: old /tmp md gate scratch + 6.3 GB target removed; /tmp at 39%.
+- S0b fold COMMITTED 6c308b6 (controller re-gate in the message: cite 25/25,
+  md-codec compose 52/52, md-cli compose 31/31, workspace 1302/1302 in the
+  scratch vs the plan's Expected 1340 -- r1 reconciles). r1 verification
+  (sonnet) DISPATCHED → `composer-S0b-plan-R0-r1-fold-verification.md`. A clean
+  r1 closes S0b's R0 (lenses: fidelity, tests/mutation, fold verification);
+  then: implementer (single, descriptor-mnemonic worktree, UC off) → whole-diff
+  review → staging push (contexts `cargo test (ubuntu-latest)` + `cargo clippy`)
+  → re-vendor into the fork (S3 A10).
