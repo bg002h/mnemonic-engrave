@@ -403,3 +403,11 @@ ONE path = warning.
   RUNNING (log scratchpad/s0b-gate-r0.log); the author warns step 6 halts on
   main.rs's un-wired dispatch arm (run() gains a `preset` parameter) -- hand-wire
   the main.rs fragment, re-run, then R0 (fidelity opus, tests sonnet).
+- S0b plan: mechanical fixes b1a3225 (five bare-file cites qualified → 23/23;
+  the clap ArgGroup row reworded; glyph 0; tables 19/0). md gate halted at
+  step 6 as the author predicted (main.rs arm is a fragment); controller is
+  hand-wiring main.rs (scratchpad/handwire_s0b.py) + the MANIFEST fragment
+  into /tmp/plan-build-gate-md, exporting the six vectors and running the
+  compose suites (log scratchpad/s0b-gate-wired.log). THEN: R0 (fidelity opus
+  + tests sonnet; briefs in scratchpad), fold, verification, implementer in a
+  descriptor-mnemonic worktree, whole-diff review, staging push, re-vendor.
