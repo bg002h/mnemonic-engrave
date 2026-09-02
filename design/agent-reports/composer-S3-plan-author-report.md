@@ -88,3 +88,25 @@ One thing that is **not** an operator question but is worth the reviewer's eye: 
 ## 7. One signal passed on rather than fixed
 
 In the gate's scratch copy, `sysw`'s `TestComposerRecordsClassifyExactlyAsTheHost` and `TestComposerRecordParsersReturnTheHostsValues` **FAIL**: the record-class fixture on mnemonic-engrave master now hashes `5b3960cad7f924f6f1e7f19ef49599814733cee4874d0f5eb48c28af4cd8b312` while the S2 branch pins `eed6b177d1a3406a69c4a0102635f5d59c6412fa65e106f85b831c4736ac464e`. That is **S2's pin against a fixture that has moved under it**, not a Stage 3 concern, and it belongs in S2's own "what did the S1 merge falsify here?" re-validation before its implementer is dispatched. Flagging it rather than touching it: this pass is read-only outside its one plan file.
+
+## 8. Hand-wire script
+
+`/tmp/claude-1000/-scratch-code-shibboleth-mnemonic-engrave/702b37c9-e041-404f-8220-2456ff9c6bf3/scratchpad/handwire_s3.py`
+
+Python 3, one argument: the root of a scratch copy of the fork that already carries the S2 branch's `md`/`mk`/`sysw` and the plan's extracted `gui/composer_*.go`. It applies **the six fragments of shipped files the plan specifies**, plus **the five shipped-walk door steps** the same wiring step names:
+
+| file | what it applies |
+| --- | --- |
+| `gui/sysw_admit.go` | `progWalletPolicy` admits the composer's eight classes; the "NO seed class" comment retired (C12) |
+| `gui/gui.go` | the `walletPolicy` program comment: two doors, and the seed/census sentence retired rather than moved |
+| `gui/multisig_build.go` | C7's §8e deprecation comment, comment-only, inserted above the T6c banner |
+| `gui/sysw_admit_oracle_test.go` | BOTH edits: `classNames` gains the composer's three classes (and the two transaction classes the widened matcher now reaches), and the AST matcher grows `takeAll`/`cardSet` with the four sites that then need registering |
+| `gui/wallet_policy.go` | the door runs first and dispatches (two replacements: the head, and the closing brace) |
+| `gui/template_engrave.go` | both `Template-ID:` occurrences relabelled `mk1 stub (template):` |
+| `gui/wallet_policy_descriptor_walk_test.go`, `gui/modal_back_test.go`, `gui/payload_door_walk_test.go`, `gui/payload_door_label_test.go` | the five shipped walks gain their door step; the label table's is guarded to its two `wallet policy` rows |
+
+**Properties.** Every edit asserts its anchor occurs exactly once (twice for the one the plan says appears twice) and a mismatch is loud and non-zero; each edited file is printed; `gofmt -w` runs on the edited files (PATH, else the nix-store toolchain) so the result is formatted as well as compilable; and a tree that is **already wired is refused with exit 3 before anything is touched** — necessary because the deprecation edit anchors on a banner it inserts *above*, so an unguarded re-run would duplicate that comment while every other anchor failed.
+
+**Tested** on a fresh `cp -r` of the gate's own extraction (`SCRATCH=/scratch/code/shibboleth/.plan-build-gate-go-s3`), then removed. `go vet ./gui/` reports **only the two pre-existing `testing.ArtifactDir requires go1.26` findings**; `go test -count=1 -run '^TestComposer' ./gui/` is **`ok`**; `scripts/gui-shard-test.sh ./gui/ 24` is **`ok -- all 1125 tests ran across 24 shards`**; a second run exits 3 without touching the tree.
+
+**One plan defect it forced into the open, and the plan was edited to fix it.** The §8e deprecation comment as written wrapped `Wallet Policy > Build a new policy` across two lines, so two of the three substrings `TestComposerMultisigBuildCarriesTheDeprecationComment` requires were not contiguous — **the plan's own copy failed the plan's own test**, twice over, on line breaks alone. My earlier 1,125-green run had hidden it, because I had reflowed the comment in the scratch copy by hand rather than in the plan; making the script apply *exactly what the plan says* is what surfaced it. The fix puts §8e's sentence on its own unwrapped line with a comment saying why it must stay that way, in the plan and in the script identically (one hunk, +13/-4 against `88b4a4a`). That is the only repository edit this task made, and it was unavoidable: a script that applied the plan verbatim and a plan whose text failed its own gate cannot both be left standing.
