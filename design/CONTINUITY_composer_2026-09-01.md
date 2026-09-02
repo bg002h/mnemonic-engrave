@@ -457,3 +457,11 @@ ONE path = warning.
   then: implementer (single, descriptor-mnemonic worktree, UC off) → whole-diff
   review → staging push (contexts `cargo test (ubuntu-latest)` + `cargo clippy`)
   → re-vendor into the fork (S3 A10).
+- S3 r1 fold verification landed (8aeb6a7): NOT GREEN -- both r0 Criticals
+  VERIFIED, 12/15 tests-lens Criticals closed, but the fold overwrote Task
+  A11's fence with B11's joined body (Part A no longer builds alone: NEW
+  Critical), Task C2's counts went stale (NEW Important), fidelity I-2's fix
+  unreachable, journey I-6's fix a `u == 0` tautology (F-458 filed), B5/B6/B9
+  lack closing steps, six Importants unguarded by tests, two stale Produces
+  lines, N-1's destination missing. Round-1 fold DISPATCHED to the S3 author
+  with the controller's decisions (incl. a Part-A-only build step in A11).

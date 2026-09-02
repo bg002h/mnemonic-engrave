@@ -15455,3 +15455,11 @@ normative design — sizeable, not impossible. §13 item 1's plate-ceiling
 measurement (`composerDescriptorCeilingChars`) stays in the plan as the one
 DEAD-IN-PROD survivor, named and justified there.
 
+### F-458 — `composer-date-ceiling-dispatch-tautology`: the S3 plan's date-entry ceiling dispatch tested `u == 0` where it meant the impossible-date case, so "that date does not exist" was unreachable dead code for any impossible in-range date (owning phase: **composer S3 r1 fold — must be fixed with a failing test before the plan closes**) `#composer` `#seedhammer` `#copy`
+
+Filed 2026-09-02 from `composer-S3-plan-R0-r1-fold-verification` (journey I-6's
+fix was defective on its own terms). Distinct from F-456, which owns the §8
+BODY for a date past 2038-01-19; this entry owns the DISPATCH defect and its
+regression test. Closes when the S3 plan's r1 fold carries the test that fails
+under the tautology.
+
