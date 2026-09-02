@@ -23,6 +23,17 @@ defects / 0 false claims (`1827e1b`), range nit folded at the closure commit.
 `/scratch/code/shibboleth/wt-composer-s0`, branch `composer-s0` off
 descriptor-mnemonic `b19dca7b`; brief in the controller's scratchpad; report to
 `agent-reports/composer-S0-implementation-report.md`.
+**Stage 1 DRAFT written meanwhile (`273f414`, NOT R0-reviewed):**
+`design/IMPLEMENTATION_PLAN_composer_S1_host_inputs.md` + `scripts/plan-build-gate-me.sh`
+(`b44fb61`). Machine-checked in scratch copies (me suite 599/609 with the six
+named auto-append casualties; ms Task 5 check in flight). It carries an OPEN
+QUESTION for the operator: spec §6a's DEFAULT `now:` auto-append changes every
+payload's identity and adds a Wallet-Policy-only record to every other
+program's payload; controller recommends appending only when the payload holds
+a composer-relevant record. Oracle for bip48-p2tr measured by two independent
+BIP-32 implementations (scratchpad `oracle-bip48-p2tr.txt`; in the plan, Task 5).
+Its R0 runs right before its implementer, after S0 ships; Task 6 (payload-spec
+fold, controller, own R0) may start earlier.
 **NEXT after the implementer:** persist its report → verify its gate output
 independently (nextest workspace, clippy, fmt, vectors diff) → whole-diff opus
 execution review over `git diff b19dca7b..composer-s0` (report
