@@ -470,3 +470,10 @@ ONE path = warning.
   in Part A's composer_flow.go). The S3 author was told to make Task A11's
   Part-A-only gate step use it. Scratch for that mode:
   `.plan-build-gate-go-s3-partA`.
+- S0b r1 verification landed (1e96196): 0C/1I/1M -- I-1..I-4, M-1..M-3 VERIFIED
+  (mutations live); the Important is M-4's tautological test (a 7th unmatched
+  PRESET_NAMES entry passes every test and panics `unreachable!()` at runtime);
+  the plan's 1340 workspace count is right (the fold commit's 1302 was
+  transient). Round-1 fold DISPATCHED to the S0b author (iterate PRESET_NAMES;
+  no `unreachable!` -- a CliError instead). THEN: commit + r2 verification
+  (brief scratchpad/verify-brief-s0b-r2.md, targeted) → implementer.
