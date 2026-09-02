@@ -73,6 +73,9 @@ fn class_name(c: Class) -> &'static str {
         Class::Mt => "Mt",
         Class::Tx => "Tx",
         Class::Address => "Address",
+        Class::Key => "Key",
+        Class::Hash => "Hash",
+        Class::Now => "Now",
         Class::Unknown => "Unknown",
     }
 }

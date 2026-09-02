@@ -76,6 +76,9 @@ pub enum SyswError {
     Unclassifiable(usize, UnknownReason),
     /// Sections exceed what the region can hold.
     TooLarge(usize),
+    /// A second VALID `now:` record, at this index; the payload-wide rule
+    /// (§6a) is enforced where the whole payload is seen.
+    SecondNow(usize),
     Crypto,
     /// A sealed payload was handed no passphrase, or vice versa.
     PassphraseMismatch,
@@ -145,6 +148,9 @@ pub enum UnknownReason {
     /// the case a descriptor `me` REFUSES lands in: the descriptor arm places
     /// only what §4.7 admits, so an inadmissible one still falls through here.
     Unrecognised,
+    /// One of the composer's three prefixes with a body that fails §6a; the
+    /// error carries which class and, for `key:`, the detail.
+    Composer(composer_records::ComposerRecordError),
 }
 
 /// Which reason applies, decided where the record is still in hand.
@@ -161,6 +167,9 @@ fn unknown_reason(record: &str) -> UnknownReason {
                 Ok(_) => UnknownReason::Unrecognised,
             },
         };
+    }
+    if let Some(Err(e)) = composer_records::parse(record) {
+        return UnknownReason::Composer(e);
     }
     for prefix in [record::PASS_PREFIX, record::TEXT_PREFIX] {
         if record.starts_with(prefix) {
@@ -242,6 +251,14 @@ pub fn classify_with(record: &str, adm: Admission) -> record::Class {
             Class::FreeText
         } else {
             Class::Unknown
+        };
+    }
+    if let Some(parsed) = composer_records::parse(record) {
+        return match parsed {
+            Ok(composer_records::ComposerRecord::Key(_)) => Class::Key,
+            Ok(composer_records::ComposerRecord::Hash(_)) => Class::Hash,
+            Ok(composer_records::ComposerRecord::Now { .. }) => Class::Now,
+            Err(_) => Class::Unknown,
         };
     }
     if bip39::Mnemonic::parse_normalized(record).is_ok() {
@@ -430,6 +447,12 @@ fn split(
     // Admission first, so the partition below is total: every record is either
     // secret or public by the time it runs.
     admit_check(&records, adm)?;
+    // §6a: at most ONE `now:` record. The SECOND valid one is named; a
+    // malformed one was already refused above as Unknown.
+    let nows = composer_records::now_indices(&records);
+    if nows.len() > 1 {
+        return Err(SyswError::SecondNow(nows[1]));
+    }
     let mut payload = Payload::default();
     for r in records {
         if classify_with(&r, adm).is_secret() {

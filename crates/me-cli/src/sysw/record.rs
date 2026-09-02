@@ -60,6 +60,14 @@ pub enum Class {
     /// so no confirmation walk exists for it.
     Tx,
     Address,
+    /// `key:` — a cosigner `[fingerprint/path]xpub` for the composer's seating
+    /// (SPEC_wallet_policy_composer.md §6a). Not secret, not bearer.
+    Key,
+    /// `hash:` — a 32-byte sha256 digest for a hashlock. Not secret.
+    Hash,
+    /// `now:` — the pack time (and optional height), a lower bound the device
+    /// echoes. Not secret.
+    Now,
     Unknown,
 }
 

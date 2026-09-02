@@ -267,3 +267,101 @@ fn now_indices_counts_only_valid_now_records() {
     ];
     assert_eq!(now_indices(&recs), vec![1, 3]);
 }
+
+// ---- the classifier, admission and the single-now rule ----------------------------------
+
+use mnemonic_engrave::sysw::record::Class;
+use mnemonic_engrave::sysw::{classify, pack_deterministic, SyswError, UnknownReason};
+
+const ITER: u32 = 1;
+const SALT: [u8; mnemonic_engrave::sysw::wire::SALT_LEN] =
+    [7; mnemonic_engrave::sysw::wire::SALT_LEN];
+const IV: [u8; mnemonic_engrave::sysw::wire::IV_LEN] = [9; mnemonic_engrave::sysw::wire::IV_LEN];
+
+fn pack(records: Vec<String>) -> Result<Vec<u8>, SyswError> {
+    pack_deterministic(records, None, ITER, SALT, IV)
+}
+
+#[test]
+fn the_three_classes_classify_before_the_sniffers_and_are_not_secret() {
+    assert_eq!(classify(&key_record(KEY0)), Class::Key);
+    assert_eq!(classify(&hash_record(&H)), Class::Hash);
+    assert_eq!(classify(&now_record(1_756_684_800, None)), Class::Now);
+    for c in [Class::Key, Class::Hash, Class::Now] {
+        assert!(!c.is_secret(), "{c:?}");
+        assert!(!c.is_bearer(), "{c:?}");
+        assert!(!c.is_argv_forbidden(), "{c:?}");
+    }
+}
+
+#[test]
+fn a_malformed_prefixed_record_is_unknown_and_refused_with_its_8n_line() {
+    // A bare xpub as a key: body.
+    let bare = key_record(XPUB0);
+    assert_eq!(classify(&bare), Class::Unknown);
+    match pack(vec!["text:48656c6c6f".into(), bare]) {
+        Err(SyswError::Unclassifiable(1, UnknownReason::Composer(e))) => {
+            assert!(matches!(e, ComposerRecordError::Key(_)));
+            assert!(e
+                .line(1)
+                .starts_with("record 1: key: needs [fingerprint/path]xpub"));
+        }
+        other => panic!("{other:?}"),
+    }
+    // A 63-character hash.
+    let short = format!("hash:{}", "a8".repeat(31))
+        .trim_end_matches('8')
+        .to_string();
+    assert_eq!(classify(&short), Class::Unknown);
+    assert_eq!(
+        pack(vec![short]),
+        Err(SyswError::Unclassifiable(
+            0,
+            UnknownReason::Composer(ComposerRecordError::Hash)
+        ))
+    );
+    // now: out of range.
+    let zero = now_record(0, None);
+    assert_eq!(classify(&zero), Class::Unknown);
+    assert_eq!(
+        pack(vec![zero]),
+        Err(SyswError::Unclassifiable(
+            0,
+            UnknownReason::Composer(ComposerRecordError::Now)
+        ))
+    );
+}
+
+#[test]
+fn the_payload_holds_at_most_one_now_record() {
+    let one = now_record(1_756_684_800, None);
+    let two = now_record(1_756_684_801, Some(910_000));
+    assert!(pack(vec!["text:48656c6c6f".into(), one.clone()]).is_ok());
+    // The SECOND one is named, whatever sits between them.
+    assert_eq!(
+        pack(vec![one.clone(), "text:48656c6c6f".into(), two.clone()]),
+        Err(SyswError::SecondNow(2))
+    );
+    assert_eq!(pack(vec![one, two]), Err(SyswError::SecondNow(1)));
+}
+
+#[test]
+fn old_prefixes_and_unprefixed_records_classify_as_before() {
+    assert_eq!(classify("text:48656c6c6f"), Class::FreeText);
+    assert_eq!(classify("pass:48656c6c6f"), Class::Passphrase);
+    assert_eq!(classify("text:zz"), Class::Unknown);
+    assert_eq!(classify("not a record"), Class::Unknown);
+}
+
+#[test]
+fn the_classes_pack_as_public_records_and_read_back() {
+    let recs = vec![
+        key_record(KEY0),
+        hash_record(&H),
+        now_record(1_756_684_800, Some(910_000)),
+    ];
+    let blob = pack(recs.clone()).unwrap();
+    let opened = mnemonic_engrave::sysw::open(&blob, None).unwrap();
+    assert_eq!(opened.public, recs);
+    assert!(opened.secret.is_empty());
+}

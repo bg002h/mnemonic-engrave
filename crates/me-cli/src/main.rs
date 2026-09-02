@@ -2307,6 +2307,9 @@ fn class_name(c: mnemonic_engrave::sysw::record::Class) -> &'static str {
         C::Mt => "mt1 chunk",
         C::Tx => "raw transaction",
         C::Address => "address",
+        C::Key => "cosigner key (key:)",
+        C::Hash => "sha256 hashlock (hash:)",
+        C::Now => "pack time (now:)",
         C::Unknown => "unrecognised record",
     }
 }
@@ -2696,9 +2699,23 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      a `text:`/`pass:`/`tx:` record. Addresses are not classifiable here, \
                      and neither is a wallet descriptor `me` refuses — see sysw::classify"
                 ),
+                U::Composer(e) => format!(
+                    "record {i} (records count from 0) is a `key:`/`hash:`/`now:` record whose \
+                     body fails its rule ({}).\n      {}\n      Build the record with `me sysw \
+                     pack`'s helpers: a key record is `key:` + the hex of `[fingerprint/path]xpub` \
+                     exactly as `md decompose` prints it; a hash record is `hash:` + the 32-byte \
+                     digest as 64 lowercase hex; a now record is `now:` + the hex of \
+                     `<seconds>[,<height>]`.",
+                    e.detail(),
+                    e.line(*i)
+                ),
             }
         }
         E::TooLarge(n) => format!("{n} bytes exceeds the flash region"),
+        E::SecondNow(i) => format!(
+            "record {i} (records count from 0) is a second now: record.\n      record {i}: a second \
+             now: record; only one is allowed. Remove one."
+        ),
         E::PassphraseMismatch => "a sealed payload needs a passphrase".into(),
         E::NotEnterableOnDevice(w) => format!(
             "the passphrase contains {w:?}, which is not a BIP-39 word. The device \
