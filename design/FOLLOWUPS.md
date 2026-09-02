@@ -13317,6 +13317,20 @@ exercise once by `workflow_dispatch`, then re-run the tag workflow
 (`gh run rerun 33621228397 --repo bg002h/mnemonic-secret --failed`) so the
 binaries publish against the existing tag. Report:
 `design/agent-reports/composer-S1-push-report.md`.
+
+**2026-09-02, later — FIXED; closing on the 0.17.1 tag.** Toolkit
+`reproducible-musl-build.yml` gained `git_source_url`/`git_source_rev`
+(d39d96269ce352270189c11fabebf9ad070362b4, two commits, landed on toolkit
+master through a PR to carry the required checks -- report
+`f324-toolkit-git-source-report.md`, `f324-close-report.md`); mnemonic-secret
+re-pinned and passes them, deriving the rev from `Cargo.lock` in a `pins` job
+(a069c77c9ec98f6d0b6972d295c4da548db9d2fc, via staging); the gate EXECUTED
+green by `workflow_dispatch` (run 33624724552: `repro-substrate`,
+`repro-x86_64-musl` success). A tag run replays the workflow from the tag's
+commit, so 0.17.0 cannot be repaired in place: `ms-cli-v0.17.1`
+(release-infrastructure only, no code change) is being cut to ship the
+binaries; the 0.17.0 release body gets a pointer. This entry closes when the
+0.17.1 release shows the seven assets.
 ### F-360 — `plan-table-check.sh` only checks rows AFTER the separator, so a malformed table HEADER passes (repo: **mnemonic-engrave**; owning phase: **the gate-hardening residue**) `#tooling` `#gate`
 
 **Found 2026-08-27** by the P2 plan's fold, which hit it while writing a table
