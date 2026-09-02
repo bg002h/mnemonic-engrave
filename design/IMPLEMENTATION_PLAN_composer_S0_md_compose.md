@@ -2882,7 +2882,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 ### Task 9: Whole-stage gate, vendoring, release notes
 
 **Files:**
-- Modify: `descriptor-mnemonic/CHANGELOG.md` or the crate's release notes as the repo's release ritual requires (check `design/RELEASE_CHECKLIST.md` there first)
+- Modify: `descriptor-mnemonic/CHANGELOG.md` (repo root; its unreleased heading is `## md-cli [Unreleased]`, and md-codec gets a matching `## md-codec [Unreleased]` heading if none exists), per `descriptor-mnemonic/design/RELEASE_PROCESS.md` (there is no `RELEASE_CHECKLIST.md`; measured)
 - Vendor: copy `/tmp/compose-vectors/keyed_compose_*.{template,bytes.hex,phrase.txt,descriptor.json,conformance.json}` into the fork's `md/testdata/vectors/` in a SEPARATE commit on the fork, made by Stage 2's implementer, not here (Rust first; the fork is not touched by this stage).
 
 - [ ] **Step 1: Run the whole workspace the way CI does**
@@ -2909,7 +2909,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 
 - [ ] **Step 4: Hand off**
 
-The stage is complete when: every task's commit exists; the workspace gate of this task is green; the whole-diff independent review (an opus execution review over `git diff <baseline>..HEAD`, persisted to `mnemonic-engrave/design/agent-reports/composer-S0-exec-review-r0.md`) returns 0 Critical / 0 Important after folds; and the version bump + crates.io publish follow the repo's release checklist. Stage 1 begins only then, with its own detailed plan.
+The stage is complete when: every task's commit exists; the workspace gate of this task is green; the whole-diff independent review (an opus execution review over `git diff <baseline>..HEAD`, persisted to `mnemonic-engrave/design/agent-reports/composer-S0-exec-review-r0.md`) returns 0 Critical / 0 Important after folds; and the version bump + crates.io publish follow `descriptor-mnemonic/design/RELEASE_PROCESS.md`. Stage 1 begins only then, with its own detailed plan.
 
 ---
 
