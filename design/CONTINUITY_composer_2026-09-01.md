@@ -352,3 +352,6 @@ ONE path = warning.
   lenses, then ONE author-driven fold (expansion + wiring + all findings),
   re-gate wired, r1 verification lenses.
 - Engrave master pushed 67ffa3e1 (report 9a7939f).
+- Fidelity lens landed: `composer-S3-plan-R0-r0-fidelity.md` (opus) 1C/12I/11M/3N
+  (7195a7c); C-1 = the same unjoined Part B. Forwarded to the author for the
+  combined fold; tests lens still running.
