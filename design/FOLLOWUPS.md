@@ -13231,7 +13231,7 @@ refused. §6c places `--json` in P2, so P2 should decide. **`--json` is
 explicitly out of scope for the current cycle** per `§6b`'s own note, which is
 why this is filed rather than argued.
 
-### F-324 — pinning `mnemonic-io-lib` by git rev breaks `ms`'s tag-time reproducible musl build, and the only fix is in **another repo's** shared reusable workflow (repo: **mnemonic-toolkit** + **mnemonic-secret**; owning phase: **before the next `ms-cli-v*` tag** — non-deferrable past it) `#ci` `#repro` `#deps` `#cross-repo`
+### F-324 — CLOSED 2026-09-02 (ms-cli-v0.17.1) — pinning `mnemonic-io-lib` by git rev breaks `ms`'s tag-time reproducible musl build, and the only fix is in **another repo's** shared reusable workflow (repo: **mnemonic-toolkit** + **mnemonic-secret**; owning phase: **before the next `ms-cli-v*` tag** — non-deferrable past it) `#ci` `#repro` `#deps` `#cross-repo`
 
 **Found 2026-08-27 by P2's implementation**, executing row 4 ("PIN THE CRATE").
 The plan does not mention vendoring, `vendor-freshness`, or the reusable repro
@@ -13331,6 +13331,12 @@ commit, so 0.17.0 cannot be repaired in place: `ms-cli-v0.17.1`
 (release-infrastructure only, no code change) is being cut to ship the
 binaries; the 0.17.0 release body gets a pointer. This entry closes when the
 0.17.1 release shows the seven assets.
+
+**CLOSED 2026-09-02.** `ms-cli-v0.17.1` (release infrastructure only, no code
+change) released with all seven assets (`ms-0.17.1-{x86_64,aarch64}-linux-musl.tar.gz`,
+`ms-man.tar.gz`, PROVENANCE x2, SHA256SUMS x2); the tag run's repro gate and
+musl-binary legs green; the 0.17.0 release notes point to 0.17.1. Report:
+`design/agent-reports/ms-cli-v0.17.1-release-report.md`.
 ### F-360 — `plan-table-check.sh` only checks rows AFTER the separator, so a malformed table HEADER passes (repo: **mnemonic-engrave**; owning phase: **the gate-hardening residue**) `#tooling` `#gate`
 
 **Found 2026-08-27** by the P2 plan's fold, which hit it while writing a table
