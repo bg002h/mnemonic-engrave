@@ -12,7 +12,7 @@
 
 **Baseline revision (for `scripts/plan-staleness-check.sh`):** descriptor-mnemonic `66bdf2f4` (composer S0 shipped to `main`; `git status --short` clean at that revision when this plan was authored). Every `path:line` citation below was read at this revision.
 
-**STATUS: R0 round 0 folded, not yet re-reviewed.** Fidelity+design lens (opus, `design/agent-reports/composer-S0b-plan-R0-r0-fidelity.md`, 0C/4I/4M/2N) and tests lens (`design/agent-reports/composer-S0b-plan-R0-r0-tests.md`, 0C/0I/0M/2N, all 12 mutations caught) both persisted verbatim and folded here: I-1..I-4 resolved per the controller's decisions (defaults are also the device's shape and name S3 A10 as consumer; one vector per archetype pins parameter order/lowering, not a wrapper cross-product, with S3 A10's narrowing scheduled separately; six refusal-table rows added with one test each plus a name-first parse order fix; fork pin-test ownership stated on S3 Task A10 with its two current errors named); M-1..M-4 and N-1..N-2 (fidelity) and N-1..N-2 (tests) folded per their hypotheses. Re-verify per the build-gate note below before the next round; do not begin implementation before this plan reaches 0 Critical / 0 Important per `CLAUDE.md`'s R0 gate.
+**STATUS: R0 round 0 folded and round-1-verified with one Important returned; that Important is now folded too, not yet re-verified.** Round 0: fidelity+design lens (opus, `design/agent-reports/composer-S0b-plan-R0-r0-fidelity.md`, 0C/4I/4M/2N) and tests lens (`design/agent-reports/composer-S0b-plan-R0-r0-tests.md`, 0C/0I/0M/2N, all 12 mutations caught), both folded (I-1..I-4, M-1..M-4, N-1/N-2 fidelity, N-1/N-2 tests). Round 1: fold-verification lens (`design/agent-reports/composer-S0b-plan-R0-r1-fold-verification.md`, 0C/1I/1M) VERIFIED I-1..I-4 and M-1..M-3 live (including the name-first mutation and all ten legacy pairs), and found the round-0 fold of M-4 was a TAUTOLOGY: the added test asserted a hardcoded fixture's `.len() == 6` rather than iterating `PRESET_NAMES`, and a live mutation (a 7th, unmatched `PRESET_NAMES` entry) compiled, passed clippy, passed all 31 tests, and then PANICKED on a real CLI invocation (`unreachable!()`, exit 101) — worse than the original finding's failure mode. Folded here: the coverage test now iterates `PRESET_NAMES` itself and calls `parse_preset` directly (moved to a `#[cfg(test)] mod tests` unit test embedded in `compose.rs`, since `md-cli` ships no library target and the black-box `cli_compose_preset.rs` cannot reach either); the `match`'s `other` arm returns a preset-naming `CliError::Compose` instead of `unreachable!()`, so the CLI cannot panic on this table even mid-drift. Both fixes re-confirmed against the SAME mutation: the test now fails with a named message, and the CLI now exits 1 gracefully instead of panicking. The Minor (M-3's wording paraphrase) is also folded: `need_after_height`'s message now reads "reads as a block height", matching `--path`'s own wording verbatim rather than paraphrasing it. Re-verify per the build-gate note below before the next round; do not begin implementation before this plan reaches 0 Critical / 0 Important per `CLAUDE.md`'s R0 gate.
 
 ## What is already machine-verified (reviewer budget goes elsewhere)
 
@@ -20,7 +20,7 @@ Every claim in this plan that a tool can check was checked against a scratch cop
 
 - The six `presets::*` signatures, their `ComposeError` variants, and every refusal wording quoted below (`LegacyWrapperShape`, `LockOutOfRange`, `PresetShape`, `BadThreshold`) are read verbatim from `crates/md-codec/src/compose/mod.rs` and `crates/md-codec/src/compose/presets.rs` at `66bdf2f4` and additionally exercised through a throwaway example binary (`cargo run -p md-codec --example`) that printed each `Display` string live.
 - Every one of the six preset templates this plan pins (Task 1's family rows, Task 2's CLI tests) was produced by actually running the shipped `target/debug/md compose --wrapper ... --path ...` (the pre-`--preset` equivalent of what each archetype builds) and, separately, `md encode` → `md decode` → `md address` round trips with the four journey xpubs bound — not hand-derived from the lowering table. All six round-tripped byte-identically and one (`kofn_recovery` under `tr`) derived a real `bc1p...` address.
-- Every file this task creates or replaces (`crates/md-cli/src/cmd/compose.rs`, `crates/md-cli/tests/cli_compose_preset.rs`, `crates/md-codec/tests/compose_support.rs`) was written into a full scratch copy of the workspace and BUILT: `cargo build -p md-codec --all-targets` and `cargo build -p md-cli --all-targets` both succeed (the latter WITH `main.rs` hand-wired per Task 2 Step 4 — see the build-gate note below); `cargo nextest run -p md-codec -E 'binary(/^compose_/)'` is 52/52 green (no pinned red — the scratch copy had a hand-wired `test_vectors.rs`, exactly the fragment the real build gate does not assemble); `cargo nextest run -p md-cli -E 'binary(/^cli_compose/)'` is 31/31 green (9 pre-existing + 22 new across the original draft and the R0 fold, zero regressions); `cargo fmt --all -- --check` and `cargo clippy --all-targets --all-features -- -D warnings` are both clean on both crates. The corpus exporter was run for real: `md vectors` wrote exactly 30 new files (six vectors × five files each: `.bytes.hex`, `.phrase.txt`, `.descriptor.json`, `.template`, `.conformance.json`), the pre-existing `vectors_output_matches_committed_corpus` drift test went from failing ("drift detected") to passing once those files were written, and the full `-p md-cli` suite is 783/783 (761 pre-existing + 22 new). `-p md-codec --workspace` is unaffected at 1318/1318 as measured at HEAD before this plan's changes (the six new tuples in `family()` are DATA consumed by existing `#[test]` functions, not new test functions, so the md-codec test count does not move).
+- Every file this task creates or replaces (`crates/md-cli/src/cmd/compose.rs`, `crates/md-cli/tests/cli_compose_preset.rs`, `crates/md-codec/tests/compose_support.rs`) was written into a full scratch copy of the workspace and BUILT: `cargo build -p md-codec --all-targets` and `cargo build -p md-cli --all-targets` both succeed (the latter WITH `main.rs` hand-wired per Task 2 Step 4 — see the build-gate note below); `cargo nextest run -p md-codec -E 'binary(/^compose_/)'` is 52/52 green (no pinned red — the scratch copy had a hand-wired `test_vectors.rs`, exactly the fragment the real build gate does not assemble); `cargo nextest run -p md-cli -E "binary(/^cli_compose/) + test(every_preset_name_parses_with_some_valid_parameters)"` is 31/31 green (9 pre-existing + 22 new across the original draft and both R0 folds, zero regressions; the filter now spans two binaries since the R0 round-1 fold moved one test into a `#[cfg(test)]` unit test in `compose.rs`, run under `bin/md`, because the black-box `cli_compose_preset.rs` cannot call `parse_preset` or read `PRESET_NAMES` directly); `cargo fmt --all -- --check` and `cargo clippy --all-targets --all-features -- -D warnings` are both clean on both crates. The corpus exporter was run for real: `md vectors` wrote exactly 30 new files (six vectors × five files each: `.bytes.hex`, `.phrase.txt`, `.descriptor.json`, `.template`, `.conformance.json`), the pre-existing `vectors_output_matches_committed_corpus` drift test went from failing ("drift detected") to passing once those files were written, and the full `-p md-cli` suite is 783/783 (761 pre-existing + 22 new). `-p md-codec --workspace` is unaffected at 1318/1318 as measured at HEAD before this plan's changes (the six new tuples in `family()` are DATA consumed by existing `#[test]` functions, not new test functions, so the md-codec test count does not move).
 - **`scripts/plan-build-gate-md.sh`, run for real against THIS plan file, does NOT complete unmodified — a genuine finding, not a re-derivation.** Steps 1-5 (scratch copy, extraction, md-codec build, the 52 compose tests with exactly the one pinned red, clippy) all pass exactly as predicted. Step 6 (`cargo test -p md-cli --locked --no-run`) FAILS to compile in the bare scratch copy, and the script's `set -euo pipefail` aborts on it — NOT a graceful "not covered", an actual halt. Cause: this is the first composer plan to CHANGE an EXISTING function's signature (`cmd::compose::run` gains a `preset: Option<&str>` parameter) that a live, un-hand-wired `main.rs` fragment already calls with the OLD 4-argument arity — S0's own Task 6 only ever ADDED a brand-new call site, so its bare gate runs never hit this class of break. Confirmed by hand-wiring ONLY Task 2 Step 4's `main.rs` diff into the same scratch copy afterward: `cargo test -p md-cli --locked --no-run` then compiles cleanly with zero errors. **Consequence for this plan's own build gate, stated plainly: run `scripts/plan-build-gate-md.sh` for steps 1-5 as-is, then hand-wire Task 2 Step 4's `main.rs` diff into the SAME scratch copy (`${TMPDIR:-/tmp}/plan-build-gate-md`) before judging step 6** — exactly the same hand-wiring S0's own Task 8/9 folds already needed for their `parse/template.rs` and CLI fragments. This is not a script bug to fix (the script correctly refuses to guess at fragment content); it is a real limitation this plan's authoring surfaced by actually running the gate rather than assuming reuse from reading the script's source alone.
 - `crates/md-cli/tests/cmd_gui_schema.rs` and `crates/md-cli/tests/cli_output_class.rs` were grepped for the string `compose` and neither references it (`grep -n compose` on both returns nothing) — adding `--preset` introduces no golden-schema fixture to update, unlike the caution S0 Task 6 recorded for its own `--wrapper`/`--path` addition.
 - The fork's `scripts/vendor-compose-vectors.sh` (`/scratch/code/shibboleth/seedhammer`, `main` at `321acb5`) globs `^(keyed_)?compose_` — `keyed_compose_preset_*` matches with NO script change, confirmed by reading the script, not assumed. The fork's `md/compose_vectors_pin_test.go` hardcodes both a 26-name list and the literal `126` file count (`:83-84`); both are fork-side follow-on work this plan does not touch (see Task 3).
@@ -520,7 +520,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 
 Design decisions, stated once here rather than re-derived per preset: the `<k>of<n>` tokens are POSITIONAL (consumed in listed order — the only way to fill two key-set parameters unambiguously without inventing a second naming scheme); every `<param>=<value>` token is matched BY NAME, so it can appear in any order and a duplicate is refused; `older`/`older1`/`older2`/`after` all take PLAIN BLOCKS OR HEIGHT numbers, never `--path`'s `Nu`/`Ht` unit-suffix forms — every `presets::*` constructor's own lock parameter is a bare `u32` blocks/height count (`crates/md-codec/src/compose/presets.rs:18-25`'s `blocks()` helper always builds `Lock::OlderBlocks`, never `OlderUnits`; `decaying_multisig`'s `after_height` is always `Lock::AfterHeight`, never `AfterTime`), so there is no unit ambiguity to disambiguate and no suffix grammar to invent. `unsorted` is never a preset parameter: `presets::ks` hardcodes `sorted: true` in every key set it builds, so there is nothing for it to toggle — a `--path` list can ask for `unsorted`, a `--preset` never can. Two `<k>of<n>` parameters need distinct lock names (`older1`/`older2`) only where an archetype HAS two ambiguous locks (`decaying-multisig`); every other multi-lock-free archetype keeps the bare `older`. **R0 fidelity M-1:** for `decaying-multisig`, `older1` locks the FIRST (primary) tier and `older2` the second — the primary tier does NOT spend immediately, only after `older1`; the grammar table above names this, and `--preset`'s own `--help` text (Task 2 Step 4) says so too, so an operator reading `decaying-multisig,2of2,1of1,older1=13140,...` does not assume the 2-of-2 spends today.
 
-**R0 fidelity I-3 and M-4, two more design notes before the refusal table:** first, `parse_preset` checks the preset NAME against `PRESET_NAMES` before parsing any `<k>of<n>`/`<param>=<value>` token, so an unknown name is ALWAYS reported as "expected one of …", even when a token given alongside it is also malformed — a malformed-token message never masks a name that was never a preset in the first place. Second, `PRESET_NAMES` and the six `match` arms inside `parse_preset` are two lists that could drift (a name added to one and not the other would compile and clippy-pass, and the "expected one of" line would then advertise a name that does not work); the final `match` arm is `other => unreachable!(...)` rather than a second "expected one of" formatter, and a test (Task 2 Step 1) runs every `PRESET_NAMES` entry through the real CLI with a valid parameter set, so a drift fails that test rather than shipping silently.
+**R0 fidelity I-3 and M-4, two more design notes before the refusal table:** first, `parse_preset` checks the preset NAME against `PRESET_NAMES` before parsing any `<k>of<n>`/`<param>=<value>` token, so an unknown name is ALWAYS reported as "expected one of …", even when a token given alongside it is also malformed — a malformed-token message never masks a name that was never a preset in the first place. Second, `PRESET_NAMES` and the six `match` arms inside `parse_preset` are two lists that could drift (a name added to one and not the other would compile and clippy-pass, and the "expected one of" line would then advertise a name that does not work). **R0 round-1 fold-verification found the first attempt at closing this did not: a hardcoded `[(&str, &str); 6]` fixture asserting its own `.len() == 6` is a tautology that cannot fail under any such drift, confirmed live by adding a 7th, unmatched name to `PRESET_NAMES` — it compiled, passed clippy, passed all 31 tests, and then PANICKED (`unreachable!()`, exit 101) on a real `md compose --preset phantom-preset,2of3` invocation.** Two fixes, both machine-verified against that exact mutation: the final `match` arm is now `other => Err(CliError::Compose(...))`, naming the preset, instead of `unreachable!()` — the CLI must never panic on its own table, even mid-drift; and the coverage test is now a `#[cfg(test)] mod tests` UNIT test embedded in `compose.rs` itself (the established pattern this crate already uses for `seat::partition`/`format::text`, since `md-cli` ships no library target and a black-box `tests/cli_compose_preset.rs` integration test cannot call `parse_preset` or read `PRESET_NAMES` directly). That test iterates `PRESET_NAMES` ITSELF and calls `parse_preset` on each entry with a valid parameter set, so a 7th name with no matching fixture or `match` arm fails the test — re-confirmed against the SAME mutation: the test now fails with the message ``PRESET_NAMES gained `phantom-preset` with no valid-parameter fixture in this test``, and the CLI itself now exits 1 with `preset phantom-preset: internal error -- ...` instead of panicking.
 
 **Refusals (one test each, Task 2 Step 1):**
 
@@ -984,47 +984,8 @@ fn preset_decaying_multisig_after_in_the_time_band_names_path_as_the_remedy() {
     .failure()
     .code(1)
     .stderr(predicate::str::contains(
-        "after=1893456000 is read as a block height and is above the height band (1..=499999999); presets cannot express a Unix time -- use --path with `after=1893456000t` instead",
+        "after=1893456000 reads as a block height and is above the height band (1..=499999999); presets cannot express a Unix time -- use --path with `after=1893456000t` instead",
     ));
-}
-
-#[test]
-fn every_preset_name_parses_with_some_valid_parameters() {
-    // R0 fidelity M-4: PRESET_NAMES and the match arms in parse_preset are two
-    // lists that can drift -- a name added to one and not the other compiles
-    // and advertises a name that does not work. This runs every PRESET_NAMES
-    // entry through the real CLI with a valid parameter set and asserts it
-    // succeeds, so a drift fails a test rather than shipping silently.
-    let valid: [(&str, &str); 6] = [
-        ("plain-multisig", "2of3"),
-        ("simple-timelocked-inheritance", "older=26280"),
-        ("kofn-recovery", "2of3,older=26280"),
-        ("tiered-recovery", "2of2,1of2,older=26280"),
-        (
-            "hashlock-gated",
-            "sha256=a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8,older=26280",
-        ),
-        (
-            "decaying-multisig",
-            "2of2,1of1,older1=13140,older2=26280,after=1000000",
-        ),
-    ];
-    assert_eq!(
-        valid.len(),
-        6,
-        "one entry per PRESET_NAMES member; update this fixture if a preset is added"
-    );
-    for (name, params) in valid {
-        md().args([
-            "compose",
-            "--wrapper",
-            "wsh",
-            "--preset",
-            &format!("{name},{params}"),
-        ])
-        .assert()
-        .success();
-    }
 }
 
 #[test]
@@ -1392,7 +1353,7 @@ pub fn parse_preset(wrapper: Wrapper, s: &str) -> Result<(PresetParams, PathList
         let v = need_u32(k)?;
         if v >= md_codec::compose::LOCKTIME_THRESHOLD {
             return Err(CliError::Compose(format!(
-                "{ctx}: {k}={v} is read as a block height and is above the height band (1..=499999999); presets cannot express a Unix time -- use --path with `after={v}t` instead"
+                "{ctx}: {k}={v} reads as a block height and is above the height band (1..=499999999); presets cannot express a Unix time -- use --path with `after={v}t` instead"
             )));
         }
         Ok(v)
@@ -1485,7 +1446,9 @@ pub fn parse_preset(wrapper: Wrapper, s: &str) -> Result<(PresetParams, PathList
                 list,
             ))
         }
-        other => unreachable!("name already validated against PRESET_NAMES: {other}"),
+        other => Err(CliError::Compose(format!(
+            "preset {other}: internal error -- PRESET_NAMES advertises this name but no lowering rule exists for it (this is a bug in md, not a mistake in your command)"
+        ))),
     }
 }
 
@@ -1649,6 +1612,46 @@ fn wrapper_name(w: Wrapper) -> &'static str {
         Wrapper::Sh => "sh",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // R0 round-1 fold-verification (Important): the ORIGINAL version of this
+    // test iterated a hand-typed `[(&str, &str); 6]` fixture and asserted its
+    // `.len() == 6` -- a tautology that cannot fail under any edit to
+    // `PRESET_NAMES` or the `match` in `parse_preset`. Confirmed live: adding
+    // a 7th, unmatched name to `PRESET_NAMES` compiled, passed clippy, passed
+    // all 31 CLI tests, and then PANICKED (`unreachable!()`, exit 101) on a
+    // real `md compose --preset <name>,...` invocation. This version iterates
+    // `PRESET_NAMES` ITSELF and calls `parse_preset` directly (only possible
+    // from inside this crate -- `cli_compose_preset.rs` is a black-box
+    // integration test with no access to either), so a name added to
+    // `PRESET_NAMES` with no matching valid-parameter fixture or no matching
+    // `match` arm fails HERE, not in production.
+    #[test]
+    fn every_preset_name_parses_with_some_valid_parameters() {
+        fn valid_params(name: &str) -> &'static str {
+            match name {
+                "plain-multisig" => "2of3",
+                "simple-timelocked-inheritance" => "older=26280",
+                "kofn-recovery" => "2of3,older=26280",
+                "tiered-recovery" => "2of2,1of2,older=26280",
+                "hashlock-gated" => {
+                    "sha256=a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8,older=26280"
+                }
+                "decaying-multisig" => "2of2,1of1,older1=13140,older2=26280,after=1000000",
+                other => panic!(
+                    "PRESET_NAMES gained `{other}` with no valid-parameter fixture in this test"
+                ),
+            }
+        }
+        for name in PRESET_NAMES {
+            let spec = format!("{name},{}", valid_params(name));
+            parse_preset(Wrapper::Wsh, &spec).unwrap_or_else(|e| panic!("{name}: {e}"));
+        }
+    }
+}
 ```
 
 - [ ] **Step 4: Wire `--preset` into `main.rs`**
@@ -1734,8 +1737,8 @@ No change to `crates/md-cli/src/error.rs`: `CliError::Compose(String)` already e
 
 - [ ] **Step 5: Run the CLI tests and the full md-cli suite**
 
-Run: `cargo nextest run --locked -p md-cli --no-fail-fast -E 'binary(/^cli_compose/)' 2>&1 | tail -30`
-Expected: 31/31 PASS — the 9 pre-existing `cli_compose.rs`/`cli_compose_encode_gate.rs` tests plus the 22 in `cli_compose_preset.rs` (14 from the original draft, 8 added folding R0 fidelity I-3/M-2/M-3/M-4; measured live, zero regressions).
+Run: `cargo nextest run --locked -p md-cli --no-fail-fast -E "binary(/^cli_compose/) + test(every_preset_name_parses_with_some_valid_parameters)" 2>&1 | tail -30` (the second clause reaches the `#[cfg(test)]` unit test embedded in `compose.rs`, run under the `bin/md` binary, not a `cli_compose*` one)
+Expected: 31/31 PASS — the 9 pre-existing `cli_compose.rs`/`cli_compose_encode_gate.rs` tests, 21 in `cli_compose_preset.rs` (14 from the original draft, 8 added folding R0 fidelity I-3/M-2/M-3/M-4, minus 1 moved out in the R0 round-1 fold — see below), plus 1 `#[cfg(test)]` unit test embedded in `compose.rs` itself (`cmd::compose::tests::every_preset_name_parses_with_some_valid_parameters`, R0 round-1: the black-box integration test cannot call `parse_preset` or read `PRESET_NAMES`, so the real M-4 coverage moved to where those are visible); measured live, zero regressions.
 
 Run: `cargo nextest run --locked -p md-cli 2>&1 | tail -8`
 Expected: 783/783 PASS once Task 1's corpus is regenerated (Task 3); measured live at 782/783 with only the not-yet-regenerated `vectors_output_matches_committed_corpus` red before that regeneration — the pre-existing `gui-schema`/`cli_output_class` tests are unaffected (`grep -n compose` on both source files returns nothing, so `--preset` adds no golden fixture to update, unlike S0 Task 6's own caution about that class of test).
@@ -1764,7 +1767,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 - [ ] **Step 1: Run the whole workspace the way CI does**
 
 Run: `cd /scratch/code/shibboleth/descriptor-mnemonic && cargo fmt --all --check && cargo clippy --locked --workspace --all-targets --all-features -- -D warnings 2>&1 | tail -3 && cargo nextest run --locked --workspace --all-features 2>&1 | tail -6 && cargo test --locked --workspace --all-features --doc 2>&1 | tail -3`
-Expected: fmt clean, clippy clean, every test PASS, doctests PASS. Baseline measured at `66bdf2f4` before this plan's changes: `1318 tests run: 1318 passed, 3 skipped`. This plan adds 22 tests (`cli_compose_preset.rs`: 14 from the original draft plus 8 folding R0 fidelity I-3/M-2/M-3/M-4) and zero new `#[test]` functions in md-codec (the six new `family()` rows, and the `head:hashed` tag folding N-1, are data, consumed by pre-existing tests) — expect **1340 tests run: 1340 passed, 3 skipped**. (R0 tests-lens N-2: a scratch copy that has not been through the CURRENT `plan-build-gate-md.sh` -- specifically its `design/display-grouping-vectors.tsv*` copy step, added `a13feec` -- shows one extra red here, `md-codec::display_grouping_conformance::conformance_vectors_pass`, for the missing sidecar file; that is a scratch-setup gap already root-caused and fixed in the gate script, not a defect in this plan's diff, and does not reproduce when the current script is used.) Doctests: 0 for md-codec, unaffected either way (measured: this crate ships none).
+Expected: fmt clean, clippy clean, every test PASS, doctests PASS. Baseline measured at `66bdf2f4` before this plan's changes: `1318 tests run: 1318 passed, 3 skipped`. This plan adds 22 tests total (21 in `cli_compose_preset.rs` — 14 from the original draft plus 8 folding R0 fidelity I-3/M-2/M-3/M-4, minus 1 moved to `compose.rs` in the R0 round-1 fold — plus 1 `#[cfg(test)]` unit test embedded in `compose.rs` itself) and zero new `#[test]` functions in md-codec (the six new `family()` rows, and the `head:hashed` tag folding N-1, are data, consumed by pre-existing tests) — expect **1340 tests run: 1340 passed, 3 skipped**. (R0 tests-lens N-2: a scratch copy that has not been through the CURRENT `plan-build-gate-md.sh` -- specifically its `design/display-grouping-vectors.tsv*` copy step, added `a13feec` -- shows one extra red here, `md-codec::display_grouping_conformance::conformance_vectors_pass`, for the missing sidecar file; that is a scratch-setup gap already root-caused and fixed in the gate script, not a defect in this plan's diff, and does not reproduce when the current script is used.) Doctests: 0 for md-codec, unaffected either way (measured: this crate ships none).
 
 - [ ] **Step 2: Regenerate and diff the vector corpus**
 
