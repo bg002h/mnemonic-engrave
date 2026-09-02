@@ -34,14 +34,23 @@ guard removed; --json documented) and `66bdf2f4` (follow-up
 **S0 WHOLE-DIFF REVIEW CLOSED 0C/0I:** gate re-run on the folded worktree
 (fmt/clippy clean, 1318/1318, doctests ok); sonnet verification 4 FIXED / 1
 DECLINED (reason holds) / 0 regressions (`agent-reports/composer-S0-exec-review-r1-fold-verification.md`).
-**IN FLIGHT:** sonnet push agent: fast-forward descriptor-mnemonic `main` to
-`66bdf2f4` and push via `scripts/push-via-staging.sh main`; push
-mnemonic-engrave `master` via its staging ritual → report
-`agent-reports/composer-S0-push-report.md`. No tag, no version bump, no
-publish (blocked, see the staged plan's S0 exit).
-**THEN:** S0 is shipped-to-main. Next: the operator's two open decisions (the
-S1 `now:` auto-append default; the md-codec publish blocker), then S1's R0
-immediately before its implementer.
+**S0 SHIPPED TO MAIN (2026-09-02):** descriptor-mnemonic `origin/main` =
+`66bdf2f4` (staging run 33607451817: cargo test ubuntu + cargo clippy success,
+no bypass); mnemonic-engrave `origin/master` = `46fc91b8` (test (rust + go)
+success, no bypass); `agent-reports/composer-S0-push-report.md` (`8eda7c2`).
+No tag, no version bump, no publish (blocked, see the staged plan's S0 exit;
+the operator's decision). Worktree `wt-composer-s0` left in place.
+**S1 `now:` default — STAND-IN RULING (fable, revocable):** (c) narrowed —
+auto-append only when the payload holds a `key:` or `hash:` record; `--now`
+opt-in; `--no-now` opt-out; supplied `now:` wins (`agent-reports/composer-S1-decision-now-default.md`, `7612066`).
+Its fold (spec §6a ×2, §10 item 2, §7g row; brainstorm §3.12 item 21; S1 plan
+Task 4 + header) is applied together with the S1 R0 round-0 fold.
+**IN FLIGHT:** S1 R0 round 0, two lenses on the plan at `108fd4c`: opus
+fidelity + "what does it make false elsewhere" →
+`agent-reports/composer-S1-plan-R0-r0-fidelity.md`; sonnet mutation/claims →
+`agent-reports/composer-S1-plan-R0-r0-tests.md`. Then: persist → fold (with the
+ruling) → me gate + scratch hand-check → sonnet verification → S1 implementer
+(opus, UC off; two worktrees: engrave + mnemonic-secret).
 **Payload-spec fold (S1 Task 6) CLOSED under its own R0:** r0 0C/3I/4M/5N
 (`bb49953`) folded at `44765d7` (+ F-450 `72ac66d`); r1 verification 11 FIXED /
 1 PARTIAL (`de34664`), the partial folded at `fdf7671`.
