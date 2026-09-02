@@ -841,8 +841,9 @@ table, so the glyph and modal-fits gates cover it.
 
 1. **Positive vectors, Rust first, Go chunk-identical — TAGGED COVERAGE, not a
    product.** Every vector names the §5 rows, §4c lock rows and §4f origin rows
-   it exercises, and a script asserts each tag appears in at least TWO vectors
-   (the full product is 28,800 cells and is not an acceptance anyone can build;
+   it exercises, and a script asserts each tag appears in at least TWO vectors,
+   except a tag with exactly one legal shape, which is named as such in the
+   test (m = 0 is one unlocked single key and nothing else) (the full product is 28,800 cells and is not an acceptance anyone can build;
    a pairwise covering array over the legal axes needs about 50-60 named
    vectors). Required tags include: all four wrappers; path counts 1, 2, 3, 4
    and the 32-slot maximum; taptree spine shapes m in {0, 1, 2, 3, 7}; the
