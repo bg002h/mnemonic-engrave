@@ -411,3 +411,12 @@ ONE path = warning.
   compose suites (log scratchpad/s0b-gate-wired.log). THEN: R0 (fidelity opus
   + tests sonnet; briefs in scratchpad), fold, verification, implementer in a
   descriptor-mnemonic worktree, whole-diff review, staging push, re-vendor.
+- S0b wired gate GREEN (scratchpad/s0b-gate-wired.log): main.rs + MANIFEST
+  fragments wired, md-codec compose 52/52, md-cli compose 23/23, clippy + fmt
+  clean; the vector export + full suites running (s0b-export.log). Fidelity
+  lens (opus) DISPATCHED → `composer-S0b-plan-R0-r0-fidelity.md`; tests lens
+  (sonnet) next, after the export lands.
+- tmpfs hygiene: the session's stale scratch build targets (11 GB: f453-probe,
+  ms-gate-target, gate-target, lianaprobe, mscheck, liana-src) removed; /tmp
+  back to 58%. `/tmp/plan-build-gate-md-target` (6.3 GB) stays until the S0b
+  gate rounds end; future gate runs should set TMPDIR=/scratch/code/shibboleth/.tmp.
