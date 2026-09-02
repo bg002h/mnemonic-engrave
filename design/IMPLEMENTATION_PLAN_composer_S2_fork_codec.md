@@ -243,7 +243,7 @@ Run:
 chmod +x scripts/vendor-compose-vectors.sh && scripts/vendor-compose-vectors.sh /scratch/code/shibboleth/descriptor-mnemonic
 ls md/testdata/vectors | grep -cE '^(keyed_)?compose_'
 ```
-Expected: `vendored 126 files, 26 vectors, primary 66bdf2f4…`; the count line prints `126`.
+Expected: `vendored 126 files, 26 vectors, primary 66bdf2f47e7f`; the count line prints `126`.
 
 - [ ] **Step 4: Run the pin test and the keyed conformance gate**
 
