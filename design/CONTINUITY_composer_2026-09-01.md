@@ -515,3 +515,11 @@ ONE path = warning.
   Round-2 fold DISPATCHED to the S3 author: drive the real function/screen,
   paste the failing mutation output into Expected. THEN: controller re-gate →
   commit → r3 targeted verification (brief scratchpad/verify-brief-s3-r3.md).
+- S3 round-2 fold APPLIED by the author (uncommitted): the three guards now
+  drive the real surface with the failing mutation output pasted into
+  Expected; Task C0 makes "mutate, see it fail, revert" an explicit step; C1
+  template; I-5 recorded as a structural no-op. Author's gate: whole 112/100,
+  gui 1170/1170, DEAD 1, Part A alone 47 PASS, cite 241/241, staleness 0.
+  Controller re-gate RUNNING (scratchpad/s3-gate-r3.log). THEN: commit
+  (scratchpad/s3-fold-r2.msg) → r3 targeted verification
+  (scratchpad/verify-brief-s3-r3.md).
