@@ -212,3 +212,25 @@ ONE path = warning.
 - Transcription lesson re-learned: one of the two no-corpus chunk strings was
   mis-pasted (a 5-char group dropped); the machine-generated file was right.
   Read literals from files, never from a terminal echo.
+
+## State at 2026-09-02, later (both reviews folded, verifications running)
+
+- **S1**: opus whole-diff review `composer-S1-exec-review-r0` (0C/1I/3M/5N)
+  persisted 6183d94; folded on `composer-s1` at 5720e3c (spec 4.4 cell; five
+  fixture rows → 45 rows, sha `eed6b177d1a3406a69c4a0102635f5d59c6412fa65e106f85b831c4736ac464e`;
+  suffix detail; rename; changelog); gates re-run green (fmt, clippy,
+  nextest 622/622, threaded 622/0, propagation clean). Records on master:
+  S1 plan pin + F-451/F-452/F-453 (d36d7f4). Sonnet fold verification →
+  `composer-S1-exec-review-r1-fold-verification.md` DISPATCHED. THEN: bump
+  me 0.8.0 (`crates/me-cli/Cargo.toml`, CHANGELOG `## [0.8.0] - date`) and
+  ms-cli 0.17.0 (`crates/ms-cli/Cargo.toml`, CHANGELOG `## ms-cli [0.17.0] — date`)
+  on the branches → ff-merge → `scripts/push-via-staging.sh` per repo (sonnet
+  push agent) → annotated tags `v0.8.0` / `ms-cli-v0.17.0` on the pushed SHAs.
+- **S2 plan**: R0 r0 reports persisted (df78058 fidelity, a0bf11a tests);
+  fold e2dc7e4 (typed `Locks []Lock` + `Sorted` on `Branch`, `lockFromWire`,
+  Task 6 precondition + 45-row pin, shipped or_* cards pinned, change chain,
+  dir-scanning pin test, aliasing probe, digit-count test); gate green in the
+  hand-wired scratch (80 new sub-tests). Sonnet r1 verification →
+  `composer-S2-plan-R0-r1-fold-verification.md` DISPATCHED. A clean r1 closes
+  R0; re-validate ("what did S1's merge falsify?") immediately before
+  dispatching the S2 implementer, with Task 6's precondition satisfied.
