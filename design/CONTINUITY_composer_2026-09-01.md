@@ -15,7 +15,7 @@
 
 Heads at spec time: fork `169073c`, engrave `b452a79`, descriptor-mnemonic `3b0944fb` (md 0.14.0), toolkit `d8f06483`, mnemonic-secret `5f37b43`.
 
-## R0 ROUND 0 — ALL FOUR REPORTS PERSISTED; FOLD NOT STARTED (operator: "Wait before folding")
+## R0 ROUND 0 — FOLDED (`bc1c07c`, spec §4-§14 regenerated; gates: structure 0, glyph 55/0, cites 49/49). RE-REVIEW NOT DISPATCHED (operator: no new launches at low usage)
 
 Each agent writes its own report (the controller never transcribes):
 
@@ -35,7 +35,17 @@ Recurring themes across lenses: the consent surface cannot state a composed shap
 the stub re-mint must carry BOTH stubs (C9); the origin table row for sh(wsh);
 no acceptance item for refusals or lock ranges; date floor missing.
 
-**On resume, once the operator says fold:** (1) read all four persisted reports
+**Fold done 2026-09-01.** Controller defaults taken in the fold are listed in the
+brainstorm record section 3.12 for the operator's veto; Minors/Nits from the four
+reports are recorded there and NOT folded. **On resume, when launches are allowed:**
+(1) re-review the fold — sonnet: did the fold fix each C/I and introduce nothing
+(compare `git diff 80e6a72..bc1c07c -- design/SPEC_wallet_policy_composer.md`
+against the four reports); opus: one NEW lens not yet run (e.g. implementation
+feasibility of the Go builder + `md compose` against md-codec admission, or a
+second journey walk on the regenerated §7); (2) fold, gate, commit; (3) then fold
+the Minors/Nits; (4) the writing-plans skill. Original resume text follows.
+
+(1) read all four persisted reports
 (never the JSONL task output); dedupe findings across lenses; (2) fold all four into the spec together; run the gates and put
 their output in the fold commit message:
 
