@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `me sysw pack`: a `key:` record whose origin path has a `+`-signed component
+  (`[fp/+48'/0'/0'/2']xpub…`) is now refused like any other malformed path.
+  rust-bitcoin's path parser tolerated the sign; the SeedHammer device's does
+  not, and the lockstep fixture (`testdata/record_class_vectors.json`, now 47
+  rows) pins both that and an unhardened component of 2^31 on both sides
+  (composer Stage 2 whole-diff review, C-1/I-1).
+
 ## [0.8.0] - 2026-09-02
 
 ### Added

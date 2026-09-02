@@ -150,6 +150,16 @@ fn key_origin_rules_are_each_enforced() {
         ),
         "2 unhardened != 2' hardened child number"
     );
+    // A `+`-signed component is refused (rust-bitcoin would have admitted it; the device does
+    // not; composer-S2-exec-review-r0 I-1), and so is an unhardened component of 2^31 (C-1).
+    assert_eq!(
+        key_err(&format!("[73c5da0a/+48'/0'/0'/2']{XPUB0}")).detail(),
+        "path component is not digits with an optional ' or h"
+    );
+    assert!(matches!(
+        key_err(&format!("[73c5da0a/2147483648/0'/0'/2']{XPUB0}")),
+        ComposerRecordError::Key(_)
+    ));
     // `h` spelling of hardened is accepted.
     assert!(matches!(
         parse(&key_record(&format!("[73c5da0a/48h/0h/0h/2h]{XPUB0}"))),
@@ -386,7 +396,7 @@ use sha2::Digest as _;
 /// (Stage 2). Changing a row means changing this in both repos — the point.
 /// Measured 2026-09-02 by running the regenerate test over CASES in the plan's
 /// build-gate scratch copy; the regenerate test prints it again on every run.
-const FIXTURE_SHA256: &str = "eed6b177d1a3406a69c4a0102635f5d59c6412fa65e106f85b831c4736ac464e";
+const FIXTURE_SHA256: &str = "5b3960cad7f924f6f1e7f19ef49599814733cee4874d0f5eb48c28af4cd8b312";
 const FIXTURE_PATH: &str = "testdata/record_class_vectors.json";
 
 fn fixture_path() -> std::path::PathBuf {

@@ -232,6 +232,19 @@ fn parse_key(body: &str) -> Result<ComposerRecord, ComposerRecordError> {
     }
     let fingerprint =
         Fingerprint::from_str(fp_text).map_err(|_| K("fingerprint does not parse"))?;
+    // Each component must be ASCII digits with an optional `'` or `h`. rust-bitcoin's
+    // `DerivationPath::from_str` parses indices through `u32::from_str`, which tolerates a
+    // leading `+` (`+48'`); that is not BIP-380 key-origin notation, the device refuses it,
+    // and the lockstep fixture pins both sides (composer-S2-exec-review-r0 I-1, Rust first).
+    if !path_text.split('/').all(|c| {
+        let digits = c
+            .strip_suffix('\'')
+            .or_else(|| c.strip_suffix('h'))
+            .unwrap_or(c);
+        !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit())
+    }) {
+        return Err(K("path component is not digits with an optional ' or h"));
+    }
     let origin = DerivationPath::from_str(&format!("m/{path_text}"))
         .map_err(|_| K("path does not parse"))?;
     if origin.is_empty() {
@@ -344,6 +357,12 @@ pub const CASES: &[Case] = &[
     // the count (11 digits of seconds, 10 of height) must refuse even though it parses in range.
     Case { name: "now-seconds-eleven-digits", record: "now:3031373536363834383030", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
     Case { name: "now-height-ten-digits", record: "now:313735363638343830302c30343939393939393939", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
+    // Two rows from the S2 whole-diff review (composer-S2-exec-review-r0 C-1, I-1): the corpus
+    // varied a component's SHAPE but never its numeric RANGE or SIGN. An unhardened component of
+    // 2^31 is refused (the device's in-band hardening bit would re-read it as 0h); a `+`-signed
+    // component is refused on both sides now (the host used to admit it through u32::from_str).
+    Case { name: "key-origin-component-unhardened-2^31", record: "key:5b37336335646130612f323134373438333634382f30272f30272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    Case { name: "key-origin-component-plus-sign", record: "key:5b37336335646130612f2b3438272f30272f30272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
 ];
 
 /// One JSON row of `testdata/record_class_vectors.json`.
