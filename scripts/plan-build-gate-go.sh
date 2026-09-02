@@ -1,248 +1,115 @@
 #!/usr/bin/env bash
+# plan-build-gate-go.sh -- compile and run the Go that lives inside a seedhammer-fork
+# implementation plan (the wallet-policy COMPOSER's Stage 2), so a fold that does
+# not build never reaches a reviewer.
 #
-# plan-build-gate-go.sh -- compile the Go that lives inside an implementation
-# plan, so a fold that does not build never reaches a reviewer.
+# WHY THIS EXISTS. The two sibling gates (plan-build-gate-md.sh, plan-build-gate-me.sh)
+# cover the Rust repos. Stage 2 adds Go to the fork's `md/`, `mk/` and `sysw/`
+# packages, and its byte-parity tests need the Rust corpus vendored beside them.
+# Same shape as the siblings, different language and source tree.
 #
-# WHY THIS EXISTS (F-74)
-#   plan-build-gate.sh extracts ```rust and builds it. Plan B's documents carry
-#   GO, so every Go fragment in the B1 plan reached three R0 reviewers and one
-#   whole-diff reviewer UNCOMPILED. The B1 plan said so in its own gate-coverage
-#   section rather than letting the brief imply coverage it did not have -- but
-#   saying it is not checking it.
+# WHAT IT DOES
+#   1. Scratch copy of the fork WITHOUT .git (199 MB; on /scratch, not the tmpfs):
+#      $SCRATCH (default /scratch/code/shibboleth/.plan-build-gate-go/seedhammer).
+#      Go is the nix-store toolchain the fork's flake pins (GO env var overrides).
+#   2. VENDORS into the copy what the plan's tests read: every
+#      `compose_*` / `keyed_compose_*` vector file from descriptor-mnemonic
+#      `crates/md-codec/tests/vectors/` (MD_REPO, default the sibling checkout) into
+#      `md/testdata/vectors/`, and `crates/me-cli/testdata/record_class_vectors.json`
+#      from mnemonic-engrave (ME_REPO) into `sysw/testdata/`. The REAL vendoring is a
+#      plan task with provenance files; this is the gate's stand-in so the tests run.
+#   3. Extracts every ```go block that follows an anchor naming one of the NEW files
+#      a plan may create:
+#        md/compose*.go   mk/compose*.go   sysw/composer_*.go   gui/composer_*.go
+#      Anchor grammar as the siblings: `Create <path>`, `Prepend to <path>`,
+#      `Add to <path>`, `In <path>`, `Replace <path>` with the path in backticks;
+#      the NEXT ```go fence is that file's content; blocks for one path are
+#      concatenated in plan order (a block opening with `package ` goes first);
+#      `Replace` discards earlier blocks. Blocks anchored on EXISTING files
+#      (script_emit.go, policy_shape.go, record.go, multisig_build_slots.go,
+#      testdata_test.go) are fragments and are NOT assembled -- the controller
+#      hand-wires them in the scratch copy before review, as Stage 0 and 1 did.
+#   4. `go vet ./md/ ./mk/ ./sysw/` then `go test -count=1 ./md/ ./mk/ ./sysw/`
+#      (the packages the plan touches; `./gui/` is Stage 3's and is sharded
+#      separately by scripts/gui-shard-test.sh).
 #
-#   The exposure is measured, not theoretical. Continuity §4 recorded folds as
-#   the dominant defect source across this feature, and compile errors as a
-#   recurring class among them: round 3 of the Plan A review burned an entire
-#   opus round on FIVE of them, each one a `cargo build` away. Plan B had the
-#   same exposure with none of the coverage.
+# EXTRACTING NOTHING IS A FAILURE, NOT A PASS (exit 3).
 #
-# THE TWO TIERS, AND WHY THERE ARE TWO
-#   Go plans are mostly MODIFICATIONS -- a new `case` arm, a struct field, a
-#   function to insert into an existing file. Those cannot be assembled
-#   mechanically, because the surrounding file is not in the plan. So:
-#
-#   TIER 1 -- FULL TYPE CHECK, and it GATES.
-#     ```go blocks anchored to a NEW file ("create `gui/unlock_flow.go`") are
-#     assembled into a scratch copy of the fork and run through `go build` and
-#     `go vet`. This is a real compile against the real packages: undefined
-#     identifiers, wrong types, bad signatures and unused imports all fail here.
-#
-#   TIER 2 -- PARSE ONLY, and it is INFORMATIONAL.
-#     Every other ```go block is offered to `gofmt -e` under three wrappers
-#     (file scope, function body, struct body). If one parses, the block is at
-#     least syntactically Go. If none do, that is USUALLY FINE -- a bare `case`
-#     arm legitimately parses under none of them -- so it is reported, never
-#     failed on.
-#
-# WHAT IT DOES NOT DO -- state this in the review brief
-#   Tier 2 proves SYNTAX, never SEMANTICS. A fragment that names a function that
-#   does not exist, passes the wrong type, or returns the wrong arity will parse
-#   happily and is still a reviewer's execution pass. The script prints every
-#   such block with its line number so the brief can name them instead of
-#   implying they were checked.
-#
-#   A gate that hides its own blind spot is worse than no gate.
-#
-# Usage: scripts/plan-build-gate-go.sh <plan.md> [fork-root]
-set -uo pipefail
-
-PLAN="${1:?usage: plan-build-gate-go.sh <plan.md> [fork-root]}"
-FORK="${2:-/scratch/code/shibboleth/seedhammer}"
-WORK="${TMPDIR:-/tmp}/plan-build-gate-go"
-
-[ -f "$PLAN" ] || { echo "no plan at $PLAN" >&2; exit 2; }
-[ -d "$FORK" ] || { echo "no fork at $FORK" >&2; exit 2; }
-
-# `nix` is not reliably on PATH -- it resolves in an interactive shell and not
-# in the non-interactive one every agent and CI invocation runs. Same fix as
-# sh2-flash: prefer PATH, fall back to the profile.
-NIX="$(command -v nix 2>/dev/null || true)"
-[ -n "$NIX" ] || NIX=/nix/var/nix/profiles/default/bin/nix
-[ -x "$NIX" ] || { echo "no usable nix: not on PATH and $NIX is not executable" >&2; exit 2; }
-
-fail=0
-
-echo "== 1 -- scratch copy of the fork =="
-rm -rf "$WORK"
-mkdir -p "$WORK"
-# Copy tracked files only: a worktree carries build artefacts and .git noise.
-( cd "$FORK" && git ls-files -z | xargs -0 tar cf - ) | ( cd "$WORK" && tar xf - )
-echo "   $WORK  ($(find "$WORK" -name '*.go' | wc -l | tr -d ' ') .go files)"
-
-echo
-echo "== 2 -- extract the plan's Go =="
+# Usage:  scripts/plan-build-gate-go.sh design/IMPLEMENTATION_PLAN_composer_S2_fork_codec.md
+set -euo pipefail
+PLAN="${1:?plan path required}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FORK="${FORK_REPO:-/scratch/code/shibboleth/seedhammer}"
+MD_REPO="${MD_REPO:-/scratch/code/shibboleth/descriptor-mnemonic}"
+ME_REPO="${ME_REPO:-$HERE}"
+SCRATCH="${SCRATCH:-/scratch/code/shibboleth/.plan-build-gate-go}"
+WORK="$SCRATCH/seedhammer"
+GO="${GO:-$(ls -d /nix/store/*-go-1.2*/bin/go 2>/dev/null | sort | tail -1)}"
+[ -x "$GO" ] || { echo "no go toolchain found (set GO=/path/to/go)" >&2; exit 2; }
+[ -f "$HERE/$PLAN" ] || [ -f "$PLAN" ] || { echo "no plan at $PLAN" >&2; exit 2; }
+[ -f "$HERE/$PLAN" ] && PLAN="$HERE/$PLAN"
+echo "== 1 -- scratch copy of the fork (no .git) =="
+rm -rf "$WORK"; mkdir -p "$WORK"
+( cd "$FORK" && tar --exclude=.git -cf - . ) | ( cd "$WORK" && tar -xf - )
+echo "   $WORK  (go: $("$GO" version))"
+echo "== 2 -- vendor the corpus the plan's tests read =="
+mkdir -p "$WORK/md/testdata/vectors" "$WORK/sysw/testdata"
+n=$(ls "$MD_REPO"/crates/md-codec/tests/vectors/ 2>/dev/null | grep -cE '^(keyed_)?compose_' || true)
+[ "$n" -gt 0 ] && cp "$MD_REPO"/crates/md-codec/tests/vectors/*compose_* "$WORK/md/testdata/vectors/"
+echo "   compose vector files vendored: $n"
+if [ -f "$ME_REPO/crates/me-cli/testdata/record_class_vectors.json" ]; then
+  cp "$ME_REPO/crates/me-cli/testdata/record_class_vectors.json" "$WORK/sysw/testdata/"; echo "   record_class_vectors.json vendored"
+else
+  echo "   record_class_vectors.json NOT present in $ME_REPO (Stage 1 not merged yet); tests that read it will fail here"
+fi
+echo "== 3 -- extract the plan's Go =="
 python3 - "$PLAN" "$WORK" <<'PY'
-import re, sys, os, json, collections
-
+import re, sys, os, collections
 plan, work = sys.argv[1], sys.argv[2]
 lines = open(plan).read().split("\n")
-
-# An anchor names the file a following block belongs to. "create"/"new file"
-# mean the block is a WHOLE FILE and can be assembled; anything else means the
-# block is a fragment of a file that already exists.
-# Two anchor shapes, because plans write both:
-#   verb-first   "create `gui/unlock_flow.go`"      / "in `gui/gui.go`"
-#   path-first   "`gui/unlock_flow.go`, new file."  / "`gui/gui.go` — add a case"
-# Missing the path-first form is not hypothetical: it is how the B1 plan names
-# EVERY new file, so the first version of this gate type-checked nothing at all
-# while reporting success.
-anchor_vf = re.compile(r'(create|new file|add to|insert into|in|modify)\s+`([^`]*\.go)`', re.I)
-anchor_pf = re.compile(r'`([^`]*\.go)`[\s,—–-]*\(?(new file|new)\b', re.I)
-
-whole = collections.OrderedDict()   # path -> [code, ...]
-frags = []                          # (lineno, path-or-None, code)
-cur, is_new = None, False
+anchor = re.compile(r'\b(create|prepend to|add to|in|replace)\s+`([^`]*\.go)`', re.I)
+ok = re.compile(r'^md/compose[A-Za-z0-9_]*\.go$|^mk/compose[A-Za-z0-9_]*\.go$|^sysw/composer_[A-Za-z0-9_]+\.go$|^gui/composer_[A-Za-z0-9_]+\.go$')
+blocks = collections.OrderedDict(); cur = None; prepend = False; replace = False; fragments = set()
 i = 0
 while i < len(lines):
-    # An anchor binds only until the next heading. Without this, `cur` leaks
-    # across tasks and a later, unrelated block is assembled into the previous
-    # task's file -- which surfaced as "non-declaration statement outside
-    # function body" in a file the plan never claimed to be writing.
-    if lines[i].startswith("#"):
-        cur, is_new = None, False
-    m = anchor_vf.search(lines[i])
+    m = anchor.search(lines[i])
     if m:
-        verb, path = m.group(1).lower(), m.group(2)
-        cur, is_new = path, verb in ("create", "new file")
-    elif (m := anchor_pf.search(lines[i])):
-        cur, is_new = m.group(1), True
-    if lines[i].startswith("```go"):
-        start = i + 1
-        i += 1
-        buf = []
-        while i < len(lines) and not lines[i].startswith("```"):
-            buf.append(lines[i]); i += 1
-        code = "\n".join(buf)
-        # A block anchored as a NEW FILE but carrying an elision marker is a
-        # fragment wearing a whole-file label -- plans legitimately write `...`
-        # for "and the rest". Type-checking it fails on the elision, which says
-        # nothing about the plan. Demote it to TIER 2 and SAY SO, rather than
-        # failing for a reason that is not a defect.
-        elided = any(l.strip() in ("...", "…") for l in code.split("\n"))
-        if cur and is_new and not elided:
-            whole.setdefault(cur, []).append(code)
+        verb, path = m.group(1), m.group(2)
+        if ok.match(path): cur, prepend, replace = path, verb.lower().startswith("prepend"), verb.lower() == "replace"
         else:
-            if cur and is_new and elided:
-                print(f"   DEMOTED {cur} block at line {start+1}: contains `...`, "
-                      f"so it is NOT a whole file and is NOT type-checked")
-            frags.append((start + 1, cur, code))
+            cur = None
+            if path.endswith(".go"): fragments.add(path)
+    if lines[i].startswith("```go") and cur:
+        i += 1; buf = []
+        while i < len(lines) and not lines[i].startswith("```"): buf.append(lines[i]); i += 1
+        code = "\n".join(buf)
+        if replace:
+            dropped = len(blocks.get(cur, []))
+            blocks[cur] = []
+            if dropped: print("   replaced %s (dropped %d earlier block%s)" % (cur, dropped, "" if dropped==1 else "s"))
+            replace = False
+        blocks.setdefault(cur, []).append((prepend or code.lstrip().startswith("package "), code))
     i += 1
-
-for p, parts in whole.items():
-    dest = os.path.join(work, p)
-    os.makedirs(os.path.dirname(dest), exist_ok=True)
-    body = "\n\n".join(parts) + "\n"
-    # Plans omit the package clause -- they show the interesting code, not a
-    # compilable file. Synthesise it from the path, or the file is "expected
-    # 'package', found 'func'" and TIER 1 fails for a reason that says nothing
-    # about the plan.
-    if not re.match(r'\s*(//[^\n]*\n|/\*.*?\*/\s*)*\s*package\s', body, re.S):
-        d = os.path.dirname(p)
-        pkg = "main" if d.startswith("cmd/") else (os.path.basename(d) or "main")
-        body = f"package {pkg}\n\n" + body
-        print(f"           synthesised `package {pkg}`")
-    with open(dest, "w") as f:
-        f.write(body)
-    print(f"   TIER 1  {p}  ({len(parts)} block(s), {sum(c.count(chr(10))+1 for c in parts)} lines)")
-
-json.dump(frags, open(os.path.join(work, ".frags.json"), "w"))
-# Record what TIER 1 actually wrote, so step 3 tests THAT rather than guessing
-# from file mtimes. An earlier version guessed with `find -newer go.mod`, got it
-# wrong, and printed "SKIP: no whole-file blocks were extracted" one line under
-# a TIER 1 line saying it had extracted 34 -- extract-then-never-compile, the
-# exact bug plan-build-gate.sh had with tests/seal_cli.rs.
-with open(os.path.join(work, ".whole.txt"), "w") as f:
-    f.write("\n".join(whole) + ("\n" if whole else ""))
-print(f"   TIER 2  {len(frags)} fragment block(s) -- parse-only")
-if not whole:
-    print("   TIER 1  no whole-file blocks found; nothing to type-check")
+if not blocks:
+    sys.stderr.write("\nplan-build-gate-go: EXTRACTED NOTHING from %s\n  Recognised anchors: md/compose*.go, mk/compose*.go, sysw/composer_*.go, gui/composer_*.go.\n  Refusing rather than reporting a pass on an empty extraction.\n" % plan)
+    sys.exit(3)
+for path, parts in blocks.items():
+    parts.sort(key=lambda t: not t[0])
+    full = os.path.join(work, path); os.makedirs(os.path.dirname(full), exist_ok=True)
+    open(full, "w").write("\n\n".join(c for _, c in parts) + "\n")
+    print("   wrote %s (%d block%s)" % (path, len(parts), "" if len(parts)==1 else "s"))
+if fragments:
+    print("   NOT assembled (fragments of existing files; controller hand-wires, reviewer's execution pass): " + ", ".join(sorted(fragments)))
 PY
-
-echo
-echo "== 3 -- TIER 1: go build + go vet (GATES) =="
-if [ -s "$WORK/.whole.txt" ]; then
-    echo "   type-checking: $(tr '\n' ' ' < "$WORK/.whole.txt")"
-    # Build ONLY the packages the plan touched. `./...` drags in cmd/kdfbench
-    # and cmd/sealread, which are TinyGo-only (`machine` is not in host std) and
-    # fail by design -- sanctioned noise that would mask a real failure.
-    PKGS=$( sed 's|/[^/]*$||' "$WORK/.whole.txt" | sort -u | sed 's|^|./|' | tr '\n' ' ' )
-    echo "   packages: $PKGS"
-    out=$( cd "$WORK" && "$NIX" develop "$FORK" --command go build $PKGS 2>&1 )
-    if [ -n "$out" ]; then
-        echo "$out" | sed 's/^/   /'
-        echo "   FAIL: the plan's whole-file Go does not build"
-        fail=1
-    else
-        echo "   PASS: go build $PKGS clean"
-        # BASELINE the vet run against the UNMODIFIED fork and report only what
-        # the plan introduced. The repo carries pre-existing findings that have
-        # nothing to do with any plan -- e.g. "testing.ArtifactDir requires
-        # go1.26 or later (file is go1.25)" in gui/op/draw_test.go. A denylist of
-        # those would rot the first time one is fixed or another appears; a
-        # baseline diff cannot. Without this the gate FAILED ON CORRECT INPUT,
-        # which gets a gate ignored just as fast as crying wolf does.
-        base=$( cd "$FORK" && "$NIX" develop "$FORK" --command go vet $PKGS 2>&1 | sort )
-        now=$( cd "$WORK" && "$NIX" develop "$FORK" --command go vet $PKGS 2>&1 | sort )
-        vout=$( comm -13 <(printf '%s\n' "$base") <(printf '%s\n' "$now") )
-        if [ -n "$vout" ]; then
-            echo "$vout" | sed 's/^/   /'
-            echo "   FAIL: go vet reports findings the unmodified fork does not"
-            fail=1
-        else
-            echo "   PASS: go vet introduces nothing new (baselined against $FORK)"
-        fi
-    fi
-else
-    echo "   SKIP: no whole-file blocks were extracted"
-fi
-
-echo
-echo "== 4 -- TIER 2: gofmt -e parse check (INFORMATIONAL, never gates) =="
-python3 - "$WORK" "$NIX" "$FORK" <<'PY'
-import json, os, subprocess, sys
-work, nix, fork = sys.argv[1], sys.argv[2], sys.argv[3]
-frags = json.load(open(os.path.join(work, ".frags.json")))
-if not frags:
-    print("   no fragment blocks")
-    raise SystemExit(0)
-
-def parses(src):
-    p = subprocess.run([nix, "develop", fork, "--command", "gofmt", "-e"],
-                       input=src, capture_output=True, text=True)
-    return p.returncode == 0
-
-unparsed = []
-for lineno, path, code in frags:
-    wrappers = [
-        "package p\n" + code,                              # decls, whole funcs
-        "package p\nfunc _() {\n" + code + "\n}",          # statements
-        "package p\ntype _ struct {\n" + code + "\n}",     # struct fields
-        "package p\ntype _ interface {\n" + code + "\n}",  # interface methods
-    ]
-    if not any(parses(w) for w in wrappers):
-        unparsed.append((lineno, path))
-
-ok = len(frags) - len(unparsed)
-print(f"   {ok}/{len(frags)} fragment block(s) parse as Go under some wrapper")
-if unparsed:
-    print("   NOT mechanically parseable -- these need a reviewer's execution pass:")
-    for lineno, path in unparsed:
-        print(f"     plan line {lineno}  ({path or 'no file anchor'})")
-PY
-
-echo
-echo "== RESULT =="
-if [ "$fail" -eq 0 ]; then
-    echo "   TIER 1 clean (or nothing to check)"
-else
-    echo "   TIER 1 FAILED -- fix before review"
-fi
-cat <<'EOT'
-   NOT covered: TIER 2 proves SYNTAX only. A fragment naming a function that
-   does not exist, passing a wrong type, or returning the wrong arity parses
-   happily. Fragments are MODIFICATIONS to existing files and cannot be
-   assembled mechanically -- they remain a reviewer's execution pass. Say so in
-   the review brief; naming what is already machine-verified is what moves
-   reviewer budget onto what tools cannot reach.
-EOT
-exit "$fail"
+cd "$WORK"
+export CGO_ENABLED=0 GOFLAGS=-mod=mod GOPROXY=off GOTOOLCHAIN=local
+echo "== 4 -- gofmt on the extracted files =="
+GOFMT="$(dirname "$GO")/gofmt"
+for f in $(cd "$WORK" && find md mk sysw gui -maxdepth 1 \( -name 'compose*.go' -o -name 'composer_*.go' \) 2>/dev/null | sort); do
+  d=$("$GOFMT" -l "$WORK/$f" 2>&1 || true); [ -z "$d" ] || echo "   gofmt would change: $d"
+done
+echo "== 5 -- go vet ./md/ ./mk/ ./sysw/ =="
+"$GO" vet ./md/ ./mk/ ./sysw/ 2>&1 | tail -20
+echo "== 6 -- go test -count=1 ./md/ ./mk/ ./sysw/ =="
+"$GO" test -count=1 ./md/ ./mk/ ./sysw/ 2>&1 | tail -30
+echo "== NOT covered: fragments of existing files (hand-wired by the controller before review); ./gui/ (Stage 3, sharded separately); the TinyGo firmware build and its size delta (a plan task); the real vendoring with provenance (a plan task). =="
