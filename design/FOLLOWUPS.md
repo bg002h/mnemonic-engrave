@@ -15435,3 +15435,23 @@ goldens, not a wiring change. Fold §7f's wording at S4 or rule the split in —
 the operator's call (surfaced 2026-09-02; default: fold the wording to the two
 forms).
 
+### F-456 — `composer-spec-8-date-ceiling-body`: §6b's date entry needs a ceiling refusal body (a date past 2038-01-19) that §8 does not enumerate; the S3 plan adds `composerCopyDateCeiling` and this entry carries the spec fold (owning phase: **composer S4 spec fold** — add the body to §8 so the copy table's source stays the spec) `#composer` `#spec-hygiene` `#copy`
+
+Filed 2026-09-02 from `composer-S3-plan-R0-r0-journey` I-6 (a date past
+2038-01-19 was refused as "that date does not exist"). The plan's copy file is
+AST-scanned against a coverage table; a body with no §8 home would make the
+table the source instead of the spec. Text to fold: the plan's Task A1
+`composerCopyDateCeiling` (§8 addition, ASCII, modal-fits asserted).
+
+### F-457 — `composer-form-A-text-qr-plates-need-a-rust-first-renderer`: §7f's form A as plain-text or QR descriptor plates needs a descriptor RENDERER on the device, which `md` deliberately does not carry (its invariant: a rendering that cannot be re-parsed is the defect); S3 ships form A as the keyed md1 only and the census's descriptor-ceiling refusal went with it (owning phase: **a later cycle, Rust first** — port md-codec's renderer with vectors, then the plates; the operator may instead rule the text/QR forms out) `#composer` `#rust-primary` `#seedhammer` `#plates`
+
+Filed 2026-09-02 from `composer-S3-plan-R0-r0-fidelity` I-10 and
+`composer-S3-plan-R0-r0-tests` C-15 (a refusal nothing could trigger). Note for
+the operator: C10 ("engraved FORM is the operator's choice: concrete text/QR/keyed
+md1, or template + mk1") is NARROWED for this stage to keyed md1 + template/mk1;
+the Rust primary already has a renderer (`descriptor_to_template`,
+`template_with_origins`), so the Go half is a port with vectors, not new
+normative design — sizeable, not impossible. §13 item 1's plate-ceiling
+measurement (`composerDescriptorCeilingChars`) stays in the plan as the one
+DEAD-IN-PROD survivor, named and justified there.
+
