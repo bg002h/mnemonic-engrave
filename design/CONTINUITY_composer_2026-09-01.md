@@ -15,21 +15,28 @@
 
 Heads at spec time: fork `169073c`, engrave `b452a79`, descriptor-mnemonic `3b0944fb` (md 0.14.0), toolkit `d8f06483`, mnemonic-secret `5f37b43`.
 
-## In flight when usage ran low — R0 ROUND 0, four opus lenses, dispatched 2026-09-01
+## R0 ROUND 0 — ALL FOUR REPORTS PERSISTED; FOLD NOT STARTED (operator: "Wait before folding")
 
 Each agent writes its own report (the controller never transcribes):
 
 | lens | report path |
 | --- | --- |
-| correctness + internal consistency | `design/agent-reports/composer-spec-R0-r0-correctness.md` |
-| adversarial funds safety (counterexamples) | `design/agent-reports/composer-spec-R0-r0-adversarial.md` |
-| operator journey walk (J1 two-path tr, J2 RCW, J3 no-payload template) | `design/agent-reports/composer-spec-R0-r0-journey.md` |
-| coverage + traceability (rulings→spec, rules→acceptance, work items→sections) | `design/agent-reports/composer-spec-R0-r0-coverage.md` |
+| correctness + internal consistency: **1C/11I/10M/2N** | `design/agent-reports/composer-spec-R0-r0-correctness.md` |
+| adversarial funds safety (counterexamples): **5C/5I/2M/1N** | `design/agent-reports/composer-spec-R0-r0-adversarial.md` |
+| operator journey walk (J1 two-path tr, J2 RCW, J3 no-payload template): **6C/10I/8M/2N** | `design/agent-reports/composer-spec-R0-r0-journey.md` |
+| coverage + traceability (rulings→spec, rules→acceptance, work items→sections): **2C/8I/11M/6N** | `design/agent-reports/composer-spec-R0-r0-coverage.md` |
 
-**On resume:** (1) for each report that exists: read the PERSISTED file (never the
-JSONL task output), independently re-run every measurable claim, `git add` it in
-its OWN persist commit (short message: what it is, counts, what was verified,
-"nothing folded"). (2) Fold all four into the spec together; run the gates and put
+Persist commits: journey `4201b56`, coverage `85ec239`, adversarial `1154edc`,
+correctness (see `git log`). Controller spot-checks held on every top finding
+(consent copy for non-renderable shapes; single-stub re-mint vs seating; sh(wsh)
+at script_type 1'; the 1985-11-05 midnight boundary encodes as a HEIGHT; wsh
+summarised as one branch; `sysw.Classify` vs `seal.Classify`; single-leaf `{P1}`).
+Recurring themes across lenses: the consent surface cannot state a composed shape;
+the stub re-mint must carry BOTH stubs (C9); the origin table row for sh(wsh);
+no acceptance item for refusals or lock ranges; date floor missing.
+
+**On resume, once the operator says fold:** (1) read all four persisted reports
+(never the JSONL task output); dedupe findings across lenses; (2) fold all four into the spec together; run the gates and put
 their output in the fold commit message:
 
     scripts/spec-structure-check.sh design/SPEC_wallet_policy_composer.md
