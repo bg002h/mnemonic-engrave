@@ -15463,3 +15463,13 @@ BODY for a date past 2038-01-19; this entry owns the DISPATCH defect and its
 regression test. Closes when the S3 plan's r1 fold carries the test that fails
 under the tautology.
 
+
+### F-459 — `md-compose-preset-review-residue`: three nits from the S0b whole-diff review — lenient numeric parsing (`+2of3`, `02of03`, `older=+26280` accepted, inherited from `--path`), `ComposeError::PresetShape` not naming the archetype, and `--no-default-features` clippy red on pre-existing dead code (owning phase: none — md-cli residue) `#composer` `#md-cli`
+
+Filed 2026-09-02 from `composer-S0b-exec-review-r0` (N-1, N-2, N-4). None
+changes a result: the accepted spellings denote the value typed, the bare
+`preset:` message is unambiguous with one preset under invocation, and no CI
+job builds md-cli without `json`. Closes when the three are fixed or ruled
+won't-fix. The same review's M-1, M-2, M-3 and N-3 were folded on
+`composer-s0b` before it shipped; M-4 was already closed by the S3 plan's
+Task A10 fold (0051be7), which the reviewer read the plan too early to see.
