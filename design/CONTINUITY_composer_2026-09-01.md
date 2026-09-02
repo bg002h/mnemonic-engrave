@@ -359,3 +359,9 @@ ONE path = warning.
   functions among the plan's new production files (comments stripped); proven
   on the wired S3 scratch: exactly the 14 the two lenses named. Prints, does not
   fail (a later-stage API is a legitimate hit); the reviewer decides.
+- F-453 (presets, Rust first) mini-plan author DISPATCHED (sonnet) →
+  `design/IMPLEMENTATION_PLAN_composer_S0b_presets.md` + `composer-S0b-plan-author-report.md`.
+  THEN: plan-build-gate-md.sh, R0 (fidelity opus + tests sonnet), fold, implementer
+  in a descriptor-mnemonic worktree, whole-diff review, push via staging, then
+  re-vendor into the fork (`scripts/vendor-compose-vectors.sh`, 126 → 126+N files)
+  so S3's preset task (A10) unblocks.
