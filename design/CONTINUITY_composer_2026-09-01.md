@@ -19,10 +19,19 @@ clippy clean; md-cli compiles. Plan is now 9 tasks.
 (`5aa340b`) folded at `761ded7`; r2 verification of `fb65f2c`+`761ded7` 0 new
 defects / 0 false claims (`1827e1b`), range nit folded at the closure commit.
 **PLAN R0 GREEN.** Status line in the plan header.
-**IN FLIGHT:** ONE implementer (opus, UC OFF) in worktree
-`/scratch/code/shibboleth/wt-composer-s0`, branch `composer-s0` off
-descriptor-mnemonic `b19dca7b`; brief in the controller's scratchpad; report to
-`agent-reports/composer-S0-implementation-report.md`.
+**S0 IMPLEMENTED (2026-09-02):** worktree `/scratch/code/shibboleth/wt-composer-s0`,
+branch `composer-s0`, nine commits `b19dca7b..9820e618`; report persisted
+`db0d729`; controller re-ran the gates independently: fmt + clippy clean,
+nextest 1318/1318, doctests ok, 126 new vector files / 22 conformance files,
+tree clean. Plan's Expected lines corrected to the measured facts (see `git log`).
+**IN FLIGHT:** (1) opus whole-diff execution review of `composer-s0` →
+`agent-reports/composer-S0-exec-review-r0.md`; (2) opus correctness lens on the
+payload-spec fold `12e0659` (S1 Task 6) →
+`agent-reports/payload-spec-composer-fold-R0-r0-correctness.md`.
+**After (1) is 0C/0I:** merge `composer-s0` into descriptor-mnemonic `main`
+(fast-forward), version bump + publish per `design/RELEASE_PROCESS.md` there,
+vendor nothing yet (S2 does), then S1's R0 (plan `273f414`+) right before its
+implementer.
 **Stage 1 DRAFT written meanwhile (`273f414`, NOT R0-reviewed):**
 `design/IMPLEMENTATION_PLAN_composer_S1_host_inputs.md` + `scripts/plan-build-gate-me.sh`
 (`b44fb61`). Machine-checked in scratch copies (me suite 599/609 with the six
