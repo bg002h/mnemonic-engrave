@@ -1,6 +1,6 @@
 # Wallet Policy Composer — Stage 3 (fork GUI) Implementation Plan
 
-**STATUS: DRAFT, build-gated, R0 ROUND 1 FOLDED 2026-09-02.** Round 0: journey 2C/6I/6M/4N, fidelity 1C/12I/11M/3N, tests 15C/1I -- all three agreed on one Critical (Part B built and never joined to any flow), and **Task B11 is the join**. Round 1 fold verification (`composer-S3-plan-R0-r1-fold-verification.md`) returned NOT GREEN and is folded here: it found a **new Critical of the fold's own** -- Task A11's fence had been overwritten with Part B's joined body, so "Part A ships alone" was false of the artifact meant to deliver it -- plus fidelity I-2's fix never reaching production, journey I-6's dispatch tautology (**F-458**), Task C2's stale headline counts, six Importants with no regression test, and tests-lens C-9/C-12 and cells 6b/8d still open. **Task A11's fence is restored self-contained and proven by a `GATE_UNTIL='^### Task B1'` run**; twelve round-1 guards land in Task C0, each naming the mutation it fails under. Extraction, re-derived: **47 fences read, 1 dropped by Task B11's `Replace`, 46 kept across 43 files**. Reviews: `composer-S3-plan-R0-r0-{fidelity,tests,journey}.md`, `composer-S3-plan-R0-r1-fold-verification.md`.
+**STATUS: DRAFT, build-gated, R0 ROUND 2 FOLDED 2026-09-02.** Round 0 (journey 2C/6I/6M/4N, fidelity 1C/12I/11M/3N, tests 15C/1I) agreed on one Critical -- Part B built and never joined to any flow -- and **Task B11 is the join**. Round 1 found a **new Critical of the fold's own**: Task A11's fence had been overwritten with Part B's joined body, so "Part A ships alone" was false of the artifact; it is restored self-contained and **proven by a `GATE_UNTIL='^### Task B1'` run**, which then also caught `gui/composer_discard.go`'s task assignment. Round 2 verified that Critical and fidelity I-2, C-12, 6b and 8d, and found **three round-1 guards that could not fail their own named mutation** (journey I-6/F-458, tests I-1, tests C-9): all three are replaced with tests that drive the real function or screen, and **each one's failing output under its named mutation is pasted into Task C0**, which now carries applying-the-mutation as a step rather than a hope. Extraction: **47 fences read, 1 dropped by Task B11's `Replace`, 46 kept across 43 files**. Reviews: `composer-S3-plan-R0-r0-{fidelity,tests,journey}.md`, `composer-S3-plan-R0-r1-fold-verification.md`, `composer-S3-plan-R0-r2-fold-verification.md`.
 
 
 Nothing here may be implemented until this plan is GREEN (0 Critical / 0 Important) under the R0 loop. **S2 HAS MERGED: fork `main` is `321acb56`**, so PRECONDITION 1 below is SATISFIED and every citation resolves against that tree; five citations moved with the merge and are re-resolved (`gui/multisig_build_slots.go:125->128, :172->175, :238->241`; `md/policy_shape.go:60->53, :74->87`). **This plan's GREEN will expire:** re-validate immediately before dispatching the implementer, per the CLAUDE.md 2026-08-27 directive, with `scripts/plan-staleness-check.sh design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md /scratch/code/shibboleth/seedhammer 321acb56 gui/`.
@@ -180,6 +180,21 @@ Three lenses read the committed plan on 2026-09-02 and persisted verbatim to `de
 | §6 cell 6b | the "Change the script" row had no behavioural test | **Task C0**: `TestComposerChangeTheScriptRowRewrapsAndDiscards` |
 | §6 cell 8d | `composerMintCards` never called with both slots seated | **Task C0**: `TestComposerMintCardsMintsOneCardPerSeatedSlot` |
 | §6 C-15 | **MOOT, not closed** -- `composerCensusRefusal` was removed outright with its deferred consumer (F-457), so there is nothing to wire up. It would need re-verifying if F-457's concrete-descriptor plate is ever built | recorded here, no code |
+
+## R0 round 2: the three guards that could not fail, and where each is replaced
+
+`design/agent-reports/composer-S3-plan-R0-r2-fold-verification.md` returned **NOT GREEN**. It verified the round-1 Critical (Task A11 standalone) by an independently-run Part-A-only gate, and verified fidelity I-2, C-12, cell 6b and cell 8d under their named mutations. What it found open was one class, three times: **a regression guard whose own named mutation, reproduced exactly, does not fail it.**
+
+| # | round-2 finding | folded into |
+| --- | --- | --- |
+| §3 | journey I-6 / F-458's guard called the pure date helpers and re-derived the dispatch inline; `composerLockEdit` had zero test callers | **Task C0**: `TestComposerLockEditTellsAnImpossibleDateFromThePastCeilingDate` drives the real screen through the kind picker, the absolute-kind picker and the digit pad. Failing output pasted |
+| §4 | tests I-1's guard used an ODD 63-character input, so `hex.DecodeString` refused it for parity before the bound was consulted -- and read a return value the function never produces on a refusal | **Task C0**: `TestComposerHexEntryItselfRefusesAnythingButSixtyFourCharacters` asserts on the error screen the accept branch draws, with an even twin at 62 for the opposite mutation. Failing output pasted |
+| §4 | tests C-9's claimed closure rested on an unmodified pre-round-1 test that recomputes the comparison standalone and never calls `composerFlow` | **Task C0**: `TestComposerFlowReShowsTheStubScreenOnlyAfterARealEdit` walks `composerFlow` twice through the stub screen, with and without a real edit. Failing output pasted |
+| §4 | journey I-5's named mutation is a structural no-op | recorded, not re-fixed: `composerKeysEdit`'s decline paths never write `Keys` before its single success-path assignment, so nothing needs restoring in the current call graph. Round 0 and round 1 established the same; the test is real and drives the UI through Back, it is just not effective for that one mutation |
+| §6 | **NEW Minor** -- Task C1's own commit template still said "three things" and listed three after the task gained a fourth | **Task C1**: the template names four and its body carries the §7a item |
+| §7 | Task B11's "two named exemptions" wording (only one logs) | left as round 1 classified it: the reachability test exempts two by name, the gate's step counts references and reports one. Two numbers, two questions -- the plan says so where both appear |
+
+**The lesson, recorded once.** All three failures were tests that recomputed the rule beside the code instead of running the code, and each was written in response to a finding of exactly that shape. Task C0 now carries **applying each guard's named mutation and seeing it fail** as its own step, with the output in the plan.
 
 ---
 
@@ -10772,51 +10787,180 @@ func TestComposerConsentRestatesTheHashRule(t *testing.T) {
 	}
 }
 
-// TestComposerHexEntryItselfTakesExactlySixtyFourCharacters is the tests
-// lens's I-1, on the REAL function this time.
+// TestComposerHexEntryItselfRefusesAnythingButSixtyFourCharacters is the
+// tests lens's I-1, on the REAL function, with a boundary the DECODER cannot
+// refuse for it.
+//
 // MUTATION: `valid := len(frag) >= 63` in composerHexEntry.
-// The earlier test reimplemented the bound inline and never called the
-// function it was named for, so the mutation stayed green.
-func TestComposerHexEntryItselfTakesExactlySixtyFourCharacters(t *testing.T) {
+//
+// WHY THE RETURN VALUE CANNOT BE THE ASSERTION, measured in round 2: on a
+// rejected fragment the entry loop `continue`s and the function never
+// returns, so `ok` stays at its zero value -- which is the same `false` a
+// genuine refusal produces. A test reading `ok` therefore passes whether the
+// bound refused, the DECODER refused, or nothing happened at all, and the
+// round-1 version of this test passed under its own named mutation for
+// exactly that reason.
+//
+// WHAT IS OBSERVABLE INSTEAD: under the mutation a 63-character fragment is
+// `valid`, so Button3 enters the accept branch, `hex.DecodeString` fails on
+// the odd length, and the function draws "That is not a 32-byte digest." --
+// a screen that does not exist when the bound is correct. The 62-character
+// case is the even twin: `hex.DecodeString` SUCCEEDS on it, so with
+// `valid := true` the `len(raw) != 32` guard draws the same error. Between
+// them the two cases catch a loosened bound in either direction, and neither
+// leans on the decoder to do the refusing.
+func TestComposerHexEntryItselfRefusesAnythingButSixtyFourCharacters(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		typed string
-		want  bool
+		why   string
 	}{
-		{"sixty-three hex characters", strings.Repeat("a", 63), false},
-		{"sixty-four hex characters", strings.Repeat("a", 64), true},
+		{"sixty-two hex characters", strings.Repeat("a", 62),
+			"even, so hex.DecodeString accepts it and only the length bound can refuse it"},
+		{"sixty-three hex characters", strings.Repeat("a", 63),
+			"the exact length the named mutation would admit"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				p := newPlatform()
 				p.display = sh2DisplaySize
 				ctx := NewContext(p)
-				var got [32]byte
-				var ok bool
+				returned := false
 				frame, quit := runUI(ctx, func() {
-					got, ok = composerHexEntry(ctx, &descriptorTheme)
+					composerHexEntry(ctx, &descriptorTheme)
+					returned = true
 				})
 				defer quit()
 				frame()
-				// Type through the ROUTER, so the real Keyboard consumes the
+				// Typed through the ROUTER, so the real Keyboard consumes the
 				// runes and the real bound sees the real fragment.
 				for _, r := range tc.typed {
 					ctx.Router.Events(nil, RuneEvent{Rune: r}.Event())
 					frame()
 				}
 				click(&ctx.Router, Button3)
-				for i := 0; i < 6; i++ {
-					if _, more := frame(); !more {
+				last := ""
+				for i := 0; i < 8; i++ {
+					c, more := frame()
+					if !more {
 						break
 					}
+					last = c
+					if uiContains(c, "not a 32-byte digest") {
+						t.Fatalf("composerHexEntry ACCEPTED %d characters (%s): it reached "+
+							"the decode branch, which only a valid-length fragment does.\n"+
+							"Frame: %q", len(tc.typed), tc.why, c)
+					}
 				}
-				if ok != tc.want {
-					t.Fatalf("composerHexEntry accepted=%v for %d characters, want %v",
-						ok, len(tc.typed), tc.want)
+				if returned {
+					t.Fatalf("composerHexEntry RETURNED for %d characters; §6c accepts a "+
+						"digest only when exactly 64 valid hex characters are present",
+						len(tc.typed))
 				}
-				if tc.want && got == [32]byte{} {
-					t.Error("a 64-hex entry returned the zero digest, which is spendable by " +
-						"anyone who knows the preimage of zero")
+				if !uiContains(last, "of 64 hex") {
+					t.Errorf("the entry screen is no longer showing its count line, so this "+
+						"test is not measuring the entry any more.\nFrame: %q", last)
+				}
+			})
+		})
+	}
+	// AND THE ACCEPTING CASE, so the two refusals above are the bound and not
+	// a function that refuses everything.
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		var got [32]byte
+		var ok bool
+		frame, quit := runUI(ctx, func() { got, ok = composerHexEntry(ctx, &descriptorTheme) })
+		defer quit()
+		frame()
+		for _, r := range strings.Repeat("a", 64) {
+			ctx.Router.Events(nil, RuneEvent{Rune: r}.Event())
+			frame()
+		}
+		click(&ctx.Router, Button3)
+		for i := 0; i < 8 && !ok; i++ {
+			if _, more := frame(); !more {
+				break
+			}
+		}
+		if !ok {
+			t.Fatal("INCONCLUSIVE: 64 valid hex characters were not accepted, so the two " +
+				"refusals above prove nothing about the bound")
+		}
+		if got == [32]byte{} {
+			t.Error("a 64-hex entry returned the zero digest, which is spendable by anyone " +
+				"who knows the preimage of zero")
+		}
+	})
+}
+
+// TestComposerLockEditTellsAnImpossibleDateFromThePastCeilingDate is journey
+// I-6 / F-458's guard, driving the REAL screen.
+//
+// MUTATION: restore `if y > 2038 || u == 0` as the ceiling test inside
+// composerLockEdit's date closure.
+//
+// WHY THE PURE HELPERS ARE NOT ENOUGH, measured in round 2: the round-1 guard
+// called composerDateExists and composerDateToUnix directly and re-derived
+// the dispatch rule inline, so it passed under its own named mutation --
+// composerLockEdit had zero test callers anywhere in the tree. The defect
+// lives in the closure that CHOOSES the message, so the test has to reach the
+// closure.
+func TestComposerLockEditTellsAnImpossibleDateFromThePastCeilingDate(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		digits  string
+		want    string
+		notWant string
+	}{
+		{"an impossible date inside the band", "20270231",
+			"that date does not exist", "up to 2038-01-19"},
+		{"a real date past the ceiling", "20450601",
+			"up to 2038-01-19", "that date does not exist"},
+		{"a real date below the floor", "20081231",
+			"before 2009", "that date does not exist"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				p := newPlatform()
+				p.display = sh2DisplaySize
+				ctx := NewContext(p)
+				st := &composerState{list: composerTwoPathList(), reg: &seedRegistry{}}
+				frame, quit := runUI(ctx, func() {
+					composerLockEdit(ctx, &descriptorTheme, st, 0)
+				})
+				defer quit()
+				if got, ok := pumpUntil(frame, "What kind of time lock?", 16); !ok {
+					t.Fatalf("the lock-kind picker never drew.\nLast frame: %q", got)
+				}
+				click(&ctx.Router, Down, Down) // None -> After a wait -> After a date or height
+				click(&ctx.Router, Button3)
+				if got, ok := pumpUntil(frame, "Named how?", 16); !ok {
+					t.Fatalf("the absolute-kind picker never drew.\nLast frame: %q", got)
+				}
+				click(&ctx.Router, Button3) // A date
+				if got, ok := pumpUntil(frame, "Date as YYYYMMDD", 16); !ok {
+					t.Fatalf("the date pad never drew.\nLast frame: %q", got)
+				}
+				last := ""
+				for _, r := range tc.digits {
+					ctx.Router.Events(nil, RuneEvent{Rune: r}.Event())
+					c, more := frame()
+					if !more {
+						t.Fatal("the date pad stopped drawing mid-entry")
+					}
+					last = c
+				}
+				if !uiContains(last, tc.want) {
+					t.Errorf("the date pad does not say %q for %s.\nFrame: %q",
+						tc.want, tc.digits, last)
+				}
+				if uiContains(last, tc.notWant) {
+					t.Errorf("the date pad says %q for %s, which is the WRONG message: the "+
+						"three failures are told apart by what they ARE, not by reading the "+
+						"returned operand (F-458).\nFrame: %q", tc.notWant, tc.digits, last)
 				}
 			})
 		})
@@ -11095,6 +11239,130 @@ func TestComposerDateCeilingAndImpossibleDateAreToldApart(t *testing.T) {
 		t.Fatal("INCONCLUSIVE: 2045-06-01 is inside the entry band")
 	}
 }
+
+// TestComposerFlowReShowsTheStubScreenOnlyAfterARealEdit is tests-lens C-9,
+// driven through `composerFlow` itself.
+//
+// MUTATION: `changed := false && shown != nil && !slices.Equal(shown, template)`
+// in composerFlow.
+//
+// WHY THE PINNING TEST WAS NOT THE GUARD, measured in round 2:
+// TestComposerStubReshowSignalIsTheChunkSet declares its own local `changed`
+// and recomputes the comparison standalone -- it never calls composerFlow, so
+// the line carrying the signal is untouched by it. The only other direct call
+// to composerStubFlow in any test passes a HARDCODED false. So nothing
+// exercised the real decision, and forcing it false left the whole suite ok.
+//
+// This walks the flow twice through the stub screen: once with no edit in
+// between (§8s must be silent -- a false "this id changed" on the screen whose
+// job is to be copied onto steel trains the operator to discount the line that
+// will one day be true), and once after a real key-count change (§8s must
+// fire, because a card minted with the old stub will not seat here).
+func TestComposerFlowReShowsTheStubScreenOnlyAfterARealEdit(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit bool
+	}{
+		{"back out and Done again with no edit", false},
+		{"back out, change a key count, Done again", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				p := newPlatform()
+				p.display = sh2DisplaySize
+				ctx := NewContext(p)
+				frame, quit := runUI(ctx, func() { composerFlow(ctx, &descriptorTheme) })
+				defer quit()
+
+				// Wrapper -> wsh.
+				if got, ok := pumpUntil(frame, "Which script?", 24); !ok {
+					t.Fatalf("the wrapper picker never drew.\nLast frame: %q", got)
+				}
+				click(&ctx.Router, Down)
+				click(&ctx.Router, Button3)
+
+				// One 1-of-2 path.
+				if got, ok := pumpUntil(frame, "Add a spend path", 24); !ok {
+					t.Fatalf("the path list never drew.\nLast frame: %q", got)
+				}
+				click(&ctx.Router, Button3)
+				pumpUntil(frame, "What can spend on this path?", 24)
+				click(&ctx.Router, Button3) // Keys
+				pumpUntil(frame, "how many keys?", 24)
+				click(&ctx.Router, Down) // 1 -> 2
+				click(&ctx.Router, Button3)
+				pumpUntil(frame, "how many must sign?", 24)
+				click(&ctx.Router, Button3) // k = 1
+
+				composerFlowDone(t, ctx, frame)
+
+				// THE FIRST SHOWING carries no changed-id line: there is
+				// nothing it could be a change from.
+				got, ok := pumpUntil(frame, "mk1 stub (template)", 32)
+				if !ok {
+					t.Fatalf("the stub screen never drew.\nLast frame: %q", got)
+				}
+				if uiContains(got, "The shape changed") {
+					t.Errorf("the FIRST stub screen claims the id changed.\nFrame: %q", got)
+				}
+				click(&ctx.Router, Button1) // Back, to the path list
+
+				if got, ok = pumpUntil(frame, "Add a spend path", 32); !ok {
+					t.Fatalf("Back at the stub screen did not return to the path list.\n"+
+						"Last frame: %q", got)
+				}
+				if tc.edit {
+					// Path 1 -> Keys -> 3 keys, which moves a slot and so moves
+					// the emitted chunk set.
+					click(&ctx.Router, Button3)
+					pumpUntil(frame, "Path 1:", 24)
+					click(&ctx.Router, Button3) // Keys
+					pumpUntil(frame, "how many keys?", 24)
+					click(&ctx.Router, Down, Down) // 1 -> 3
+					click(&ctx.Router, Button3)
+					pumpUntil(frame, "how many must sign?", 24)
+					click(&ctx.Router, Button3) // k = 1
+					pumpUntil(frame, "Path 1:", 24)
+					click(&ctx.Router, Button1) // leave the path editor
+					pumpUntil(frame, "Add a spend path", 24)
+				}
+				composerFlowDone(t, ctx, frame)
+
+				got, ok = pumpUntil(frame, "mk1 stub (template)", 32)
+				if !ok {
+					t.Fatalf("the stub screen never re-drew.\nLast frame: %q", got)
+				}
+				if tc.edit && !uiContains(got, "The shape changed") {
+					t.Errorf("the stub screen was re-shown after a real key-count change and "+
+						"does NOT carry §8s: a card minted with the old stub will not seat "+
+						"here, and the operator is not told.\nFrame: %q", got)
+				}
+				if !tc.edit && uiContains(got, "The shape changed") {
+					t.Errorf("the stub screen claims the id changed after a Back with NO "+
+						"edit; §8s is then a false statement on the screen that gets copied "+
+						"onto steel.\nFrame: %q", got)
+				}
+			})
+		})
+	}
+}
+
+// composerFlowDone takes the path list's "Done" row and answers the key-order
+// question that follows it.
+//
+// The list's rows are the paths, then "Add a spend path", then "Change the
+// script", then "Done" -- so with one path that is three Downs. Dispatch is by
+// row NAME in the flow itself; the count here is the walk's own arithmetic and
+// is asserted by the screen it lands on.
+func composerFlowDone(t *testing.T, ctx *Context, frame func() (string, bool)) {
+	t.Helper()
+	click(&ctx.Router, Down, Down, Down)
+	click(&ctx.Router, Button3)
+	if got, ok := pumpUntil(frame, "Sorted keys, or your order?", 24); !ok {
+		t.Fatalf("Done did not reach the key-order question.\nLast frame: %q", got)
+	}
+	click(&ctx.Router, Button3) // Sorted (usual)
+}
 ```
 
 - [ ] **Step 2: Run to verify they fail**
@@ -11118,7 +11386,9 @@ Round 1 of the R0 loop found six Importants with a correct production fix and NO
 | `TestComposerBackInTheKeyEditorKeepsTheExistingKeySet` | journey I-5 | drop the snapshot/restore |
 | `TestComposerChangeTheScriptRowRewrapsAndDiscards` | fidelity I-4, cell 6b | delete the row, or nullify the discard at that call site |
 | `TestComposerConsentRestatesTheHashRule` | fidelity I-9 | delete the §8i block |
-| `TestComposerHexEntryItselfTakesExactlySixtyFourCharacters` | tests I-1 | `valid := len(frag) >= 63` in the REAL function |
+| `TestComposerHexEntryItselfRefusesAnythingButSixtyFourCharacters` | tests I-1 | `valid := len(frag) >= 63` in the REAL function |
+| `TestComposerLockEditTellsAnImpossibleDateFromThePastCeilingDate` | journey I-6 / F-458, at the REAL screen | restore the `u == 0` disjunct inside `composerLockEdit`'s date closure |
+| `TestComposerFlowReShowsTheStubScreenOnlyAfterARealEdit` | tests C-9, through `composerFlow` itself | `changed := false && ...` in `composerFlow` |
 | `TestComposerShortfallCountsSeatsNotSourcesOnAFixtureThatCanTellThemApart` | tests C-12 | pass `len(st.sources)` instead of the assignable seats |
 | `TestComposerMintCardsMintsOneCardPerSeatedSlot` | cell 8d | duplicate from the SECOND seated slot onward |
 | `TestComposerSection8mRefusalsAllDrawThroughTheRealPath` | fidelity I-8's §8m remainder | remove any one `showError` arm |
@@ -11128,12 +11398,61 @@ Round 1 of the R0 loop found six Importants with a correct production fix and NO
 
 **Two of them are fixture fixes, not new assertions, and that is the point.** C-12's earlier fixture used two plain `key:` sources against four slots, where `len(st.sources)` and `composerAssignableSlots(st)` both give 2 -- structurally incapable of telling the two counting rules apart; a SEED fills any number of slots (C12, §4f), so one seed makes them 1 and 4. Cell 8d's earlier test unseated one of its own two slots before calling `composerMintCards`, so any duplication needing two seated slots was invisible to it.
 
-Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerLockAndHash|^TestComposerInvariantIgnores|^TestComposerBackInTheKey|^TestComposerChangeTheScript|^TestComposerConsentRestates|^TestComposerHexEntryItself|^TestComposerShortfallCountsSeatsNot|^TestComposerMintCardsMintsOne|^TestComposerSection8mRefusalsAllDraw|^TestComposerDoorSaysAPayload|^TestComposerConsentFlowNumbers|^TestComposerDateCeilingAnd' -v ./gui/ 2>&1 | grep -cE '^--- PASS'`
-Expected: **`12`**, the count at plan time.
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerLockAndHash|^TestComposerInvariantIgnores|^TestComposerBackInTheKey|^TestComposerChangeTheScript|^TestComposerConsentRestates|^TestComposerHexEntryItself|^TestComposerShortfallCountsSeatsNot|^TestComposerMintCardsMintsOne|^TestComposerSection8mRefusalsAllDraw|^TestComposerDoorSaysAPayload|^TestComposerConsentFlowNumbers|^TestComposerDateCeilingAnd|^TestComposerLockEditTells|^TestComposerFlowReShows' -v ./gui/ 2>&1 | grep -cE '^--- PASS'`
+Expected: **`14`**, the count at plan time -- twelve round-1 guards plus the two round-2 replacements that drive `composerLockEdit` and `composerFlow`.
+
+**THREE OF THE ROUND-1 GUARDS COULD NOT FAIL THEIR OWN NAMED MUTATION, and round 2 found all three.** They are replaced above, and the failing output each replacement now produces is pasted below -- produced in the gate's wired scratch by applying the plan's own named mutation, then reverted, `gofmt` clean.
+
+**(a) journey I-6 / F-458.** The round-1 guard called `composerDateExists` and `composerDateToUnix` directly and re-derived the dispatch inline; `composerLockEdit` had zero test callers anywhere in the tree. The defect lives in the closure that CHOOSES the message, so the guard has to reach the closure -- through the kind picker, the absolute-kind picker and the digit pad. Under the named mutation:
+
+```text
+--- FAIL: TestComposerLockEditTellsAnImpossibleDateFromThePastCeilingDate
+    --- FAIL: .../an_impossible_date_inside_the_band
+        the date pad does not say "that date does not exist" for 20270231.
+        Frame: "...20270231DateasYYYYMMDDThisbuildwritesdatesupto2038-01-19.
+                Foralatertime,useablockheightinstead.Path1lock"
+        the date pad says "up to 2038-01-19" for 20270231, which is the WRONG message
+    --- FAIL: .../a_real_date_below_the_floor
+        the date pad does not say "before 2009" for 20081231.
+```
+
+The older `TestComposerDateCeilingAndImpossibleDateAreToldApart` stays: it pins `composerDateExists`, which is worth pinning. It is not the guard, and this table no longer says it is.
+
+**(b) tests I-1.** The round-1 guard used 63 as its "should fail" boundary, and 63 is ODD -- so `hex.DecodeString` refuses it for parity before the length bound is ever consulted, and the mutation was masked. Worse, the assertion read the function's RETURN value, and on a rejected fragment the entry loop `continue`s and never returns, leaving `ok` at its zero `false` -- the same answer a genuine refusal gives. The replacement asserts on what is OBSERVABLE: under the mutation a 63-character fragment is `valid`, so Button3 enters the decode branch and draws an error screen that cannot exist when the bound is correct. Under the named mutation:
+
+```text
+--- FAIL: TestComposerHexEntryItselfRefusesAnythingButSixtyFourCharacters
+    --- FAIL: .../sixty-three_hex_characters
+        composerHexEntry ACCEPTED 63 characters (the exact length the named mutation
+        would admit): it reached the decode branch, which only a valid-length fragment
+        does.
+        Frame: "Thatisnota32-bytedigest.Hashlock"
+```
+
+The 62-character case is its even twin, and it is there for a different mutation: `hex.DecodeString` SUCCEEDS on an even length, so with `valid := true` the `len(raw) != 32` guard draws the same error. Between them the two cases catch a bound loosened in either direction, and neither leans on the decoder to do the refusing.
+
+**(c) tests C-9.** The claimed closure rested on `TestComposerStubReshowSignalIsTheChunkSet`, which declares its own local `changed` and never calls `composerFlow`; the only other direct call to `composerStubFlow` in any test passes a HARDCODED `false`. So nothing exercised the real decision. The replacement walks `composerFlow` twice through the stub screen -- once with no edit (§8s must stay silent) and once after a real key-count change (§8s must fire). Under the named mutation:
+
+```text
+--- FAIL: TestComposerFlowReShowsTheStubScreenOnlyAfterARealEdit
+    --- FAIL: .../back_out,_change_a_key_count,_Done_again
+        the stub screen was re-shown after a real key-count change and does NOT carry
+        section 8s: a card minted with the old stub will not seat here, and the
+        operator is not told.
+```
+
+**The pattern, named so a later round does not re-learn it.** All three were tests that recomputed the rule beside the code instead of running the code -- and each was written IN RESPONSE to a finding of exactly that shape. A guard is only a guard once the mutation its own comment names has been applied and seen to fail it. That is now a step in this task, not a hope.
 
 **One measurement the ink instrument cannot make, recorded rather than worked around.** The §8m slot-cap body ("This wallet already has 32 key slots.", 37 characters) draws **5,380** ink pixels on a two-button modal, and `titleOnlyInk`'s floor is **5,482** -- the WORST case over one to three nav buttons, i.e. a three-button frame's chrome. The floor is above this whole frame, so no ink assertion can say anything about this body; the test logs both numbers and asserts the words reached the screen, which is the property that matters.
 
-- [ ] **Step 5: gofmt, commit**
+- [ ] **Step 5: Apply each guard's own named mutation and see it FAIL**
+
+**A guard is only a guard once its named mutation has been applied and seen to fail it.** Round 1 shipped three that could not, and every one of them was written in response to a finding of that exact shape. For each row of the table above: apply the mutation named in the row (and in the test's own comment), run only that test, confirm it FAILS, revert, and confirm the tree is byte-clean.
+
+Run, per row: `git stash list >/dev/null; <apply the mutation>; CGO_ENABLED=0 go test -count=1 -run '<that test>' ./gui/ 2>&1 | head -8; git checkout -- <the mutated file>; git diff --quiet && echo REVERTED-CLEAN`
+Expected: `--- FAIL` naming that test, then `REVERTED-CLEAN`. A mutation that leaves the suite green is a finding, not a formality: put the guard back on the workbench rather than the row in the table.
+
+- [ ] **Step 6: gofmt, commit**
 
 ```bash
 gofmt -l gui/ && CGO_ENABLED=0 go test -count=1 -run '^TestComposer' ./gui/ 2>&1 | tail -2
@@ -11291,14 +11610,15 @@ Expected: citations all resolved with 0 dangling; 0 undrawable strings; every ta
 ```bash
 git add design/SPEC_wallet_policy_composer.md design/FOLLOWUPS.md
 git commit -s -F - <<'MSG'
-spec: fold the three things S3 measured -- the paged capacities, the flag screens, the secret's plate form
+spec: fold the four things S3 measured -- the paged capacities, the door's key state, the flag screens, the secret's plate form
 
 Section 13 item 1's four numbers are now measured rather than deferred (the
-command and the fork revision are in the section). Section 6a said the flag
-screens fire in the composer's seed step; they fire at payload load, from
-syswLoadFlow's three call sites, and syswLoadWarnings consults no admission
-table. Section 7f offered three secret forms; the device has two plate
-designs, and F-455 owns the split.
+command and the fork revision are in the section). Section 7a said the door
+states the key state BENEATH Build; it is stated in the Lead, because the Lead
+wraps and the choice rows do not. Section 6a said the flag screens fire in the
+composer's seed step; they fire at payload load, from syswLoadFlow's three call
+sites, and syswLoadWarnings consults no admission table. Section 7f offered
+three secret forms; the device has two plate designs, and F-455 owns the split.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
@@ -11314,15 +11634,15 @@ MSG
 - [ ] **Step 1: The composer's own tests, then the whole package**
 
 Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposer' -v ./gui/ 2>&1 | tee /tmp/composer-tests.txt | grep -cE '^--- PASS'; grep -cE '^--- FAIL' /tmp/composer-tests.txt`
-Expected: **`110`** top-level PASS and **`0`** FAIL. **That is the count at plan time**, measured in the gate's wired scratch on the day this was written, not a threshold: a task that adds a test moves it and must move this line with it, and a count SMALLER than this one is a test that stopped running. **Capture once and grep twice**: re-running the suite for the second number doubles the cost of every measurement.
+Expected: **`112`** top-level PASS and **`0`** FAIL. **That is the count at plan time**, measured in the gate's wired scratch on the day this was written, not a threshold: a task that adds a test moves it and must move this line with it, and a count SMALLER than this one is a test that stopped running. **Capture once and grep twice**: re-running the suite for the second number doubles the cost of every measurement.
 
 Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposer' -v ./gui/ 2>&1 | grep -cE '^\s+--- PASS'`
-Expected: **`95`** sub-tests, again the count at plan time.
+Expected: **`100`** sub-tests, again the count at plan time.
 
 - [ ] **Step 2: The whole `gui` package, sharded, and then the way CI runs it**
 
 Run: `/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24 2>&1 | tail -2`
-Expected: `RESULT: ok -- all 1168 tests ran across 24 shards`, the count at plan time (1,125 on fork `main` before this stage, plus this plan's additions; the runner asserts its partition exhaustive before it runs anything, so a dropped test is a refusal rather than a green).
+Expected: `RESULT: ok -- all 1170 tests ran across 24 shards`, the count at plan time (1,125 on fork `main` before this stage, plus this plan's additions; the runner asserts its partition exhaustive before it runs anything, so a dropped test is a refusal rather than a green).
 
 Run: `CGO_ENABLED=0 go test -timeout 20m ./... 2>&1 | grep -vE '^ok|no test files'; echo "exit=$?"`
 Expected: no FAIL line. **Both**, not either: the shard runner is the fast local equivalent, and CI runs the plain command -- a suite that passes under process-per-shard isolation and fails under CI's runner is a shared-state defect, and this tree has had one.
