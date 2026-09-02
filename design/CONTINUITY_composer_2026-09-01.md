@@ -438,3 +438,14 @@ ONE path = warning.
   (sonnet, resumed) who is folding per scratchpad/fold-brief-s0b-r0.md; then
   the controller commits the fold with the gate output and dispatches the r1
   verification (brief scratchpad/verify-brief-s0b-r1.md). Master pushed 3611ca25.
+- S0b r0 fold APPLIED by the author (uncommitted): all fidelity findings folded
+  (N-2 declined: additive --json field, schema never bumped for that), both
+  tests-lens nits folded; author's gate: workspace nextest 1340/1340, md-cli
+  compose 31/31, md-codec compose 52/52, corpus 156 files, cite 25/25.
+  Controller's independent re-gate RUNNING on /scratch
+  (scratchpad/s0b-gate-r1.log; TMPDIR=/scratch/code/shibboleth/.tmp). THEN:
+  commit fold (message scratchpad/s0b-fold-r0.msg + gate lines) → r1
+  verification (brief scratchpad/verify-brief-s0b-r1.md) → implementer in a
+  descriptor-mnemonic worktree → whole-diff review → staging push → re-vendor
+  (S3 A10: scratchpad/s3-a10-fold-notes.md).
+- tmpfs: old /tmp md gate scratch + 6.3 GB target removed; /tmp at 39%.
