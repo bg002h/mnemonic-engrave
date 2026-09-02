@@ -65,10 +65,22 @@ else
   echo "   record_class_vectors.json NOT present in $ME_REPO (Stage 1 not merged yet); tests that read it will fail here"
 fi
 echo "== 3 -- extract the plan's Go =="
-python3 - "$PLAN" "$WORK" <<'PY'
+# GATE_UNTIL (optional): a regex; extraction STOPS at the first plan line matching it, so
+# a plan that claims an intermediate milestone ships alone ("Part A ships alone") can be
+# built exactly up to that point -- e.g. GATE_UNTIL='^### Task B1'. A whole-document,
+# Replace-wins extraction can only ever see a file's FINAL state; the S3 r1 verification
+# (2026-09-02) found a Part-A fence carrying Part-B code that only this mode can catch.
+echo "   GATE_UNTIL=${GATE_UNTIL:-<unset: whole document>}"
+python3 - "$PLAN" "$WORK" "${GATE_UNTIL:-}" <<'PY'
 import re, sys, os, collections
-plan, work = sys.argv[1], sys.argv[2]
+plan, work, until = sys.argv[1], sys.argv[2], sys.argv[3]
 lines = open(plan).read().split("\n")
+if until:
+    stop = next((i for i, l in enumerate(lines) if re.search(until, l)), None)
+    if stop is None:
+        sys.stderr.write("plan-build-gate-go: GATE_UNTIL %r matched no line; refusing\n" % until); sys.exit(3)
+    print("   extraction stops at line %d: %s" % (stop + 1, lines[stop][:80]))
+    lines = lines[:stop]
 anchor = re.compile(r'\b(create|prepend to|add to|in|replace)\s+`([^`]*\.go)`', re.I)
 ok = re.compile(r'^md/compose[A-Za-z0-9_]*\.go$|^mk/compose[A-Za-z0-9_]*\.go$|^sysw/composer_[A-Za-z0-9_]+\.go$|^gui/composer_[A-Za-z0-9_]+\.go$')
 blocks = collections.OrderedDict(); cur = None; prepend = False; replace = False; fragments = set()
