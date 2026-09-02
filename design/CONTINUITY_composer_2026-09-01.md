@@ -275,3 +275,24 @@ ONE path = warning.
   tests sonnet, + a JOURNEY-WALK lens: the operator is not present, so an agent
   walks §7's journey against the plan; the live walk with the operator remains
   owed), fold, verification, then implementer after S2 ships.
+
+## S2 implemented + folded, review dispatched (2026-09-02)
+
+- Implementer report persisted ae70d04 (tasks 1-8 green; Task 9 RED on three
+  pre-existing gui tests). Controller fold on `composer-s2` = 489d52e: the
+  `v:multi_a` verify-fold defect (pre-existing, WRONG taproot address for a
+  verify-wrapped multi_a leaf; Go-only convergence fix), the pk_h tripwire
+  converted to a positive test, the consent-absence test re-aimed at a new
+  `gap_wsh_andor` fixture. Gates after the fold: md/mk/sysw ok, gui 1059/1059
+  (24 shards, 38 s), 32-bit ok, oraclelive ok, js vet ok, gofmt clean. Plan
+  record folded on master 9f011ae (second address glob, Step 2a order,
+  `-mod=readonly`, gofmt baseline nit, Task 9 note).
+- Opus whole-diff execution review DISPATCHED → `composer-S2-exec-review-r0.md`.
+  THEN: persist → fold → sonnet verification → `git merge --no-ff composer-s2`
+  into the fork `main` → push (fork main is unprotected; CI test.yml runs on
+  push; watch it) → firmware size already measured +3,168 B flash (1,506,820 B),
+  RAM unchanged; flashing is the operator's call (no screens in S2).
+- F-324 close agent (sonnet) DISPATCHED: toolkit push via staging → ms re-pin
+  (`pins` job derives the io-lib rev) → ms push via staging → `workflow_dispatch`
+  gate → conclusion on the 0.17.0 binaries (likely needs a 0.17.1 tag; the
+  controller decides) → `f324-close-report.md`.
