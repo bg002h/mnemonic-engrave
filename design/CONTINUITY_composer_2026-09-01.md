@@ -501,3 +501,9 @@ ONE path = warning.
 - S0b round-1 fold COMMITTED (controller re-gate in the message; the
   1302-vs-1340 count is the --all-features flag). r2 verification (sonnet,
   targeted) dispatched next.
+- S0b r2 verification (a209572): 0C/1I -- one table row with the superseded
+  "is read as" wording. Folded by the controller as a one-word change,
+  propagation-checked (0 sites), STATUS R0 GREEN. Baseline descriptor-mnemonic
+  main 66bdf2f4 unmoved. NEXT: dispatch the S0b implementer (opus, worktree
+  wt-composer-s0b, brief scratchpad/implementer-brief-s0b.md), then whole-diff
+  review (scratchpad/review-brief-s0b.md), staging push, re-vendor (S3 A10).
