@@ -338,3 +338,17 @@ ONE path = warning.
 - S3 gate scratch copies (`.plan-build-gate-go-s3/{seedhammer,wired}`) were made
   from the S2 worktree; future gate runs use the default FORK_REPO (fork main now
   carries S2). At the r0 fold, re-baseline the S3 plan on fork main 321acb56.
+
+## S3 R0 r0: journey lens landed (2026-09-02)
+
+- `composer-S3-plan-R0-r0-journey.md` (opus): 2C/6I/6M/4N (7501564). C-1: Part B's
+  seating half is never joined to any flow (14 dead functions; plan line 4437
+  promises a `Replace gui/composer_flow.go` no task supplies) -- the
+  "can-a-user-do-the-thing" class. C-2: the Key-order question is asked while the
+  path is sole; adding a second path silently lowers sortedmulti to multi.
+- Controller's own structural finding: Part B tasks are compressed (no
+  Run/Expected; B8/B10 no steps). The author agent is preparing the expansion
+  in scratchpad/s3-partB-expansion.md. Fold plan: wait for fidelity + tests
+  lenses, then ONE author-driven fold (expansion + wiring + all findings),
+  re-gate wired, r1 verification lenses.
+- Engrave master pushed 67ffa3e1 (report 9a7939f).
