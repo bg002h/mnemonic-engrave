@@ -1801,7 +1801,7 @@ MSG
 - Consumes: `PolicyShape`, `Branch`, `policyShape`, `walkTapTree`, `branchOf`, `collect`, `plainMulti` (`md/policy_shape.go`); `PolicyShapeChunks` (`:74`); `timelockBody`, `hash256Body` (`md/md.go:120,122`).
 - Produces: `Branch.LockOperands []uint32` (every `older`/`after` operand in the branch, wire order) and `Branch.Sha256Digests [][32]byte` (every `sha256` digest); `or_b`/`or_c`/`or_d`/`or_i` split into one `Branch` per alternative and `andor(X,Y,Z)` into `and(X,Y)` plus `Z`; unchanged: `Complete`, `KeyPath`, `TapDepth`, `K`/`N`/`Keys`/`Timelock`/`Hashlock`/`Depth`, and every existing expectation in `md/policy_shape_test.go` (none of its vectors contains an `or_*` or `andor`; measured: `grep -c 'Or\|andor' md/policy_shape_test.go` = 0 at `169073c`).
 
-Why: §7e's consent surface shows "Path 2: 1 key, after 26280 blocks" per alternative. Today `or_d(multi(2,…), and_v(v:pkh(@3),older(26280)))` is ONE `Branch{Keys:4, Timelock:true}` -- true, and useless to an operator deciding what they are committing to steel. `thresh(k, …)` with `k < n` is also a set of alternatives, but combinatorial; it stays one branch (the composer never emits it), and `Complete` stays honest because `collect` still understands it.
+Why: §7e's consent surface shows "Path 2: 1 key, after 26280 blocks" per alternative. Today `or_d(multi(2,...), and_v(v:pkh(@3),older(26280)))` is ONE `Branch{Keys:4, Timelock:true}` -- true, and useless to an operator deciding what they are committing to steel. `thresh(k, …)` with `k < n` is also a set of alternatives, but combinatorial; it stays one branch (the composer never emits it), and `Complete` stays honest because `collect` still understands it.
 
 - [ ] **Step 1: Write the failing test**
 
