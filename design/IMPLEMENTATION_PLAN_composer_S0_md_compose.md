@@ -698,12 +698,12 @@ pub mod compose;
 - [ ] **Step 4: Run the refusal tests to verify they pass and the rest fail on the stub**
 
 Run: `cargo nextest run --locked -p md-codec --test compose_lowering 2>&1 | tail -15`
-Expected: the eight refusal tests and `lock_operand_bands_are_inclusive_at_both_ends` PASS (nothing reaches the stub); `compose_admits_exactly_thirty_two_slots` FAILS with `not implemented: the wsh lowering lands with its tests`.
+Expected: the nine refusal tests and `lock_operand_bands_are_inclusive_at_both_ends` PASS (10 passed; nothing reaches the stub); `compose_admits_exactly_thirty_two_slots` FAILS with `not implemented: the wsh lowering lands with its tests`.
 
 - [ ] **Step 5: Format, clippy, commit**
 
 Run: `cargo fmt --all && cargo clippy --locked -p md-codec --all-targets -- -D warnings 2>&1 | tail -3`
-Expected: clean.
+Expected (measured at implementation, 2026-09-02): fmt clean; clippy reports TRANSIENT dead code at this task and at Task 2 — `is_bare_single` (consumed by Task 3's `tr.rs`), `Numbered::path_index` (Task 3), and the Task 1 test file's imports that Task 2's tests consume. The plan's build gate assembles Tasks 1-3 together and never sees this state. Do not add `#[allow(dead_code)]` or reorder; commit with fmt clean and record the clippy output; clippy is clean from Task 3 onward and at Task 9's workspace run.
 
 ```bash
 git add crates/md-codec/src/compose/mod.rs crates/md-codec/src/compose/lowering.rs crates/md-codec/src/lib.rs crates/md-codec/tests/compose_lowering.rs
@@ -1207,7 +1207,7 @@ Expected: every test PASSES (no taproot test exists yet). If a rendered string d
 - [ ] **Step 5: Format, clippy, commit**
 
 Run: `cargo fmt --all && cargo clippy --locked -p md-codec --all-targets -- -D warnings 2>&1 | tail -3`
-Expected: clean.
+Expected: fmt clean; clippy still reports the Task 1 transient dead code (`is_bare_single`, `path_index`) until Task 3 lands — same handling as Task 1.
 
 ```bash
 git add crates/md-codec/src/compose/mod.rs crates/md-codec/src/compose/lowering.rs crates/md-codec/src/compose/tr.rs crates/md-codec/tests/compose_lowering.rs
@@ -2015,7 +2015,7 @@ fn print_family_templates_for_the_manifest() {
 Run: `cargo nextest run --locked -p md-codec --test compose_vectors print_family --no-capture 2>&1 | grep -E 'compose_'`
 Expected: twenty-six `name<TAB>template` lines (the two `no-corpus` keyless-wsh vectors are not printed: they live in `family()` and the cross-check only).
 
-Add to `crates/md-codec/src/test_vectors.rs`, inside `MANIFEST` after the last existing entry, one `Vector { .. }` per printed line, `template` pasted verbatim. For every `keyed_compose_*` entry bind the journey keys to slots in emitted order with fingerprint `[0x73, 0xc5, 0xda, 0x0a]` on each (the origins are INLINE in the template, so `path: None`), EXCEPT the two `*_distinct_fingerprints` entries, which bind the same keys with fingerprints `(0, [0x11; 4]), (1, [0x22; 4]), (2, [0x33; 4]), (3, [0x44; 4])` (a master fingerprint is a declaration the xpub cannot contradict, so any value is legal). The four `compose_*` (unkeyed) entries keep their inline origins too (the composed policies have no canonical origin for the encoder to default to) and leave `keys: &[]`, `fingerprints: &[]`; they need no keys because `compose_wsh_eight_paths`, `compose_tr_seven_leaves`, `compose_wsh_thirty_two_slots` and `compose_tr_thirty_two_slots` exceed the four journey keys. The two keyless-path vectors (`compose_wsh_keyless_hash_path`, `compose_wsh_keyless_hash_only`) are `no-corpus`: NOT pasted, because `md vectors` and the corpus tests parse every MANIFEST template under the minting disposition (`parse_template` passes `Disposition::Refuse`, `crates/md-cli/src/parse/template.rs:2618`), which after Task 8 refuses a signature-free path without `--experimental`. They stay pinned by `every_family_entry_renders_as_listed` and the §5b cross-check, and Stage 2 mirrors them from `family()`. Use `force_chunked: false` except where the exporter reports `PayloadTooLongForSingleString`, in which case set it `true`. The four journey xpubs, in slot order @0..@3, are the `XPUB` constants of Task 4 (copy them; the manifest is `&'static str`).
+Add to `crates/md-codec/src/test_vectors.rs`, inside `MANIFEST` after the last existing entry, one `Vector { .. }` per printed line, `template` pasted verbatim. For every `keyed_compose_*` entry bind the journey keys to slots in emitted order with fingerprint `[0x73, 0xc5, 0xda, 0x0a]` on each (the origins are INLINE in the template, so `path: None`), EXCEPT the two `*_distinct_fingerprints` entries, which bind the same keys with fingerprints `(0, [0x11; 4]), (1, [0x22; 4]), (2, [0x33; 4]), (3, [0x44; 4])` (a master fingerprint is a declaration the xpub cannot contradict, so any value is legal). The four `compose_*` (unkeyed) entries keep their inline origins too (the composed policies have no canonical origin for the encoder to default to) and leave `keys: &[]`, `fingerprints: &[]`; they need no keys because `compose_wsh_eight_paths`, `compose_tr_seven_leaves`, `compose_wsh_thirty_two_slots` and `compose_tr_thirty_two_slots` exceed the four journey keys. The two keyless-path vectors (`compose_wsh_keyless_hash_path`, `compose_wsh_keyless_hash_only`) are `no-corpus`: NOT pasted, because `md vectors` and the corpus tests parse every MANIFEST template under the minting disposition (`parse_template` passes `Disposition::Refuse`, `crates/md-cli/src/parse/template.rs:2618`), which after Task 8 refuses a signature-free path without `--experimental`. They stay pinned by `every_family_entry_renders_as_listed` and the §5b cross-check, and Stage 2 mirrors them from `family()`. Use `force_chunked: true` on EVERY compose entry (measured at implementation: the smallest keyed one, a single xpub, is already 131 data symbols against the codex32 regular code's 80 cap, and the unkeyed ones carry divergent inline origins that also exceed it; `test_vectors.rs`'s own note says all keyed entries are chunked for this reason). The four journey xpubs, in slot order @0..@3, are the `XPUB` constants of Task 4 (copy them; the manifest is `&'static str`).
 
 Template example for the first entry, as the printer emits it (do not retype the others; paste them):
 
@@ -2034,8 +2034,8 @@ with `const XPUB_JOURNEY_0: &str = "xpub6DkFAXW...";` (and 1..3) declared above 
 
 - [ ] **Step 4: Run every corpus test and the exporter**
 
-Run: `cargo nextest run --locked -p md-codec 2>&1 | tail -8 && cargo run --locked -p md-cli -- vectors --out /tmp/compose-vectors >/dev/null && ls /tmp/compose-vectors | grep -c 'keyed_compose_.*conformance.json'`
-Expected: all md-codec tests PASS (including the pre-existing corpus tests that iterate `MANIFEST`: a compose vector that they reject is a defect to fix in the lowering, not in the test); the exporter writes 22 `keyed_compose_*.conformance.json` files (the keyed count in `family()`; 26 compose entries in MANIFEST, 28 in `family()`). Then `cargo nextest run --locked -p md-cli` must also PASS: `template_roundtrip.rs`, `vector_corpus.rs` and `corpus_origin_consistency.rs` iterate `MANIFEST` through the real parser and encoder.
+Run: `cargo nextest run --locked -p md-codec 2>&1 | tail -8 && cargo run --locked -p md-cli --bin md -- vectors --out /tmp/compose-vectors >/dev/null && ls /tmp/compose-vectors | grep -c 'keyed_compose_.*conformance.json'` (`--bin md`: md-cli builds two binaries)
+Expected: all md-codec tests PASS (including the pre-existing corpus tests that iterate `MANIFEST`: a compose vector that they reject is a defect to fix in the lowering, not in the test); the exporter writes 22 `keyed_compose_*.conformance.json` files (the keyed count in `family()`; 26 compose entries in MANIFEST, 28 in `family()`). Then `cargo nextest run --locked -p md-cli`: `template_roundtrip.rs`, `vector_corpus.rs` and `corpus_origin_consistency.rs` iterate `MANIFEST` through the real parser and encoder and must PASS, EXCEPT the corpus-drift test, which fails until Task 9 regenerates the committed corpus (measured: 126 "Only in" lines for the new compose files and ZERO "differ" lines — any "differ" line is a finding, stop). Everything else green here; the drift test green after Task 9.
 
 - [ ] **Step 5: Format, clippy, commit**
 
@@ -2894,7 +2894,7 @@ Expected: fmt clean, clippy clean, every test PASS, doctests PASS. (`cargo test`
 
 - [ ] **Step 2: Regenerate and diff the vector corpus**
 
-Run: `cargo run --locked -p md-cli -- vectors --out crates/md-codec/tests/vectors 2>&1 | tail -2 && git status --short crates/md-codec/tests/vectors | head -30`
+Run: `cargo run --locked -p md-cli --bin md -- vectors --out crates/md-codec/tests/vectors 2>&1 | tail -2 && git status --short crates/md-codec/tests/vectors | head -30`
 Expected: only NEW `compose_*` / `keyed_compose_*` files appear (26 vectors' worth; the two `no-corpus` entries produce none); no existing vector file changes (a changed pre-existing file means the lowering or the exporter altered something it must not).
 
 - [ ] **Step 3: Record the release note and commit**
