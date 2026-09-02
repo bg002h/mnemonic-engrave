@@ -25,9 +25,11 @@ branch `composer-s0`, nine commits `b19dca7b..9820e618`; report persisted
 nextest 1318/1318, doctests ok, 126 new vector files / 22 conformance files,
 tree clean. Plan's Expected lines corrected to the measured facts (see `git log`).
 **IN FLIGHT:** (1) opus whole-diff execution review of `composer-s0` →
-`agent-reports/composer-S0-exec-review-r0.md`; (2) opus correctness lens on the
-payload-spec fold `12e0659` (S1 Task 6) →
-`agent-reports/payload-spec-composer-fold-R0-r0-correctness.md`.
+`agent-reports/composer-S0-exec-review-r0.md`; (2) the payload-spec fold (S1 Task 6): r0 lens
+0C/3I/4M/5N (`bb49953`), folded at `44765d7` (I-1..I-3 + Minors/Nits; F-450
+filed at `72ac66d` for the Transaction rows, F-415's other half); sonnet fold
+verification in flight →
+`agent-reports/payload-spec-composer-fold-R0-r1-fold-verification.md`.
 **After (1) is 0C/0I:** merge `composer-s0` into descriptor-mnemonic `main`
 (fast-forward), version bump + publish per `design/RELEASE_PROCESS.md` there,
 vendor nothing yet (S2 does), then S1's R0 (plan `273f414`+) right before its
