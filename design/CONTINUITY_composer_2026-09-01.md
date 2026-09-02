@@ -535,3 +535,7 @@ ONE path = warning.
 - S3 round-2 fold COMMITTED (controller re-gate in the message: Part A alone 89,
   whole 212, gui 1170/1170, DEAD 1, cite 241/241, staleness 0). r3 targeted
   verification (sonnet) dispatched next (scratchpad/verify-brief-s3-r3.md).
+- S0b implementation gate GREEN in wt-composer-s0b (fmt/clippy/nextest 1340/
+  threaded 1340/checksum/30 preset corpus files/probes). Opus whole-diff review
+  dispatched (scratchpad/review-brief-s0b.md -> design/agent-reports/
+  composer-S0b-exec-review-r0.md). S3 r3 verification still running.
