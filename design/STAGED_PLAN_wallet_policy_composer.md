@@ -98,6 +98,8 @@ reads in S2).
 
 ## S2 — fork codec: Go builder, `pk_h` emitter, `PolicyShape` split, minting (seedhammer `md/`, `mk/`)
 
+**STATUS: SHIPPED 2026-09-02** — fork `main` 321acb56 (merge of `composer-s2`, ten commits over 169073c); plan `IMPLEMENTATION_PLAN_composer_S2_fork_codec.md`; reports `composer-S2-{implementation-report,exec-review-r0,exec-review-r1-fold-verification,push-report}.md`. Exit met: `go test ./md/ ./mk/ ./sysw/` green with the corpus and the 47-row fixture vendored, whole gui 1125/1125, TinyGo build green, flash 1,503,652 → 1,506,820 B (+3,168 B), RAM unchanged. Two lockstep holes found by the whole-diff review were fixed Rust first (host c05074f1). Not flashed: S2 has no screens.
+
 **Delivers (spec §9 items 1, 2, 8; §12 items 1, 6, 7, 8):** a Go tree BUILDER
 that constructs a `descriptor` from a path list and emits chunk-form md1 via
 `split`, byte-identical to every S0 vector (the 26 in the corpus, plus the two
