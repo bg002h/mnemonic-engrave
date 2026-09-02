@@ -383,6 +383,15 @@ adversarial pass on fold-added mechanisms, 1C/7I/5M/1N) — further defaults:**
     a path's key count); lock/hash edits keep assignments and re-show the stub
     screen, whose id changes with every shape-screen edit (I-1). The §8p C5
     cause line is dropped; §8k teaches C5 at the shape step (M-4).
+21. **(2026-09-02, SUPERSEDES item 9 and the `now:` clause of item 19; a STAND-IN
+    ruling for the operator by a fable agent, revocable — `design/agent-reports/composer-S1-decision-now-default.md`.)**
+    `me sysw pack` auto-appends `now:` by default ONLY when the payload already
+    holds a `key:` or `hash:` record (the composer-only classes); a new `--now`
+    forces it onto any payload; `--no-now` suppresses it; a supplied `now:` wins.
+    Measured reason: the default-on rule changed every payload's public section
+    (+25 bytes, new identity digest, six pre-existing tests moved) and would
+    have put the device's digest-compare screen in front of every sealed seed
+    backup (`gui/sysw_load.go:164-190`). Veto form: "use (a)/(b)/(c-wide)".
 
 
 ## 4. Open questions, in the order they will be asked

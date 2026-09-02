@@ -292,10 +292,16 @@ understood" from the session's inert count (§8r), the one line that covers all
 three. The payload-wide rule "at most ONE `now:` record" is enforced at the two
 sites that see the whole payload: host `pack_with` and device `syswSession.load`
 (`gui/sysw_session.go:80`). `me sysw pack` auto-appends `now:` ONLY when the
-operator's records contain none, so an operator-supplied `now:` wins silently and
-pins a deliberate bound; two OPERATOR-supplied `now:` records are a host refusal
-with a remedy (§8n: "Remove one."), and on the device both go inert with the door
-showing no bound. **What a `key:` record's origin proves:** the xpub's depth and
+operator's records contain none AND at least one of them is a `key:` or `hash:`
+record — the two classes that, like `now:`, are admitted at Wallet Policy alone —
+or when `--now` is passed (stand-in ruling 2026-09-02,
+`design/agent-reports/composer-S1-decision-now-default.md`, revocable by the
+operator); so an operator-supplied `now:` wins silently and pins a deliberate
+bound, and a payload holding no composer-only record (a seed for Backup Wallet, a
+`tx:`, a descriptor or a card) packs byte-identically to today and carries no
+bound unless the operator asks; two OPERATOR-supplied `now:` records are a host
+refusal with a remedy (§8n: "Remove one."), and on the device both go inert with
+the door showing no bound. **What a `key:` record's origin proves:** the xpub's depth and
 its last component are checked against the declared path; the account and every
 interior component are declarations this device cannot verify (F-217; `mk`
 cannot either), so the mapping review prints each slot's origin verbatim beside
@@ -306,9 +312,12 @@ Why `key:` exists: today a bare xpub line packs as a `pkh(xpub)` single-sig
 WALLET and a `[fp/path]xpub` line is refused (brainstorm record section 3.6).
 Why `now:` is a lower bound: the device has no clock; the record affects ONLY
 echoes and refusals (§6b), never an encoded operand. `me sysw pack` appends `now:`
-as the LAST record ONLY when the operator's records hold none (the rule above, one
-statement of it); `--no-now` suppresses that auto-append so a fixture's pack output
-stays a pure function of its inputs (§10 item 2).
+as the LAST record ONLY when the operator's records hold none and include a `key:`
+or `hash:` record, or when `--now` is passed (the rule above, one statement of
+it); `--no-now` suppresses that auto-append so a fixture's pack output stays a
+pure function of its inputs (§10 item 2). A seed-only or card-only payload
+therefore carries no bound unless the operator asks; at lock entry the §6b
+"cannot tell the time" line then stands alone.
 
 **What the payload spec must receive (§10 item 6; its own R0-gated fold):**
 section 3.3.1 gains three class rows with `secret? = no`; section 3.3.2 has NO
@@ -555,6 +564,7 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 | shape | a 33rd slot | REFUSAL at the picker (§8m line 5) |
 | pack | a malformed `key:`/`hash:`/`now:` record | REFUSAL on the host (§8n); INERT on the device, visible in the door's "not understood" count and, for `key:`, in "Keys loaded" (§6a) |
 | pack | operator supplies their own `now:` | DEFAULT: it wins; `me sysw pack` appends none (§6a) |
+| pack | seed-only or card-only payload for Build, absolute lock intended | DEFAULT: no bound appended (no `key:`/`hash:` record); the §6b bare disclaimer at lock entry; `--now` adds one (§6a) |
 | lock | date before 2009-01-03 | REFUSAL (§8t) |
 | lock | date or height before the pack bound | REFUSAL (§6b) |
 | lock | no `now:` field for this lock kind | DEFAULT: the "cannot tell the time" line (§6b) |
@@ -815,8 +825,10 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 2. `me sysw pack`: `key:`, `hash:`, `now:` classes with the §6a body rules and
    the §8n refusal lines from `pack_with`; the payload-wide single-`now:` rule at
    the same site; `now:` appended last ONLY when the operator's records hold none
-   (an operator-supplied `now:` wins), `--no-now` suppresses the auto-append for
-   deterministic fixtures.
+   and include a `key:` or `hash:` record, or when `--now` is passed (an
+   operator-supplied `now:` wins; `--now` and `--no-now` conflict); `--no-now`
+   suppresses the auto-append for deterministic fixtures; a payload with no
+   composer-only record packs byte-identically to today.
 3. The five presets as Concrete policies + expected templates (C2).
 4. `md-older-zero-time-units-not-refused` patch (independent; filed).
 5. mnemonic-secret: `ms derive --template bip48-p2tr` (= `m/48'/0'/account'/3'`)
