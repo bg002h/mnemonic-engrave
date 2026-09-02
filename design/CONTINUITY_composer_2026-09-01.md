@@ -185,3 +185,30 @@ ONE path = warning.
   descriptor. Match the agent's environment before calling its claim wrong.
 - The compiler is a validity oracle, not a byte oracle; byte identity with the
   toolkit archetypes is impossible under any uniform rule.
+
+## State at 2026-09-02 (S1 implemented, S2 plan drafted)
+
+- **S1 implemented** in worktrees `wt-composer-s1` (`composer-s1`, 5 commits off
+  59e6f12) and `wt-ms-bip48-p2tr` (`bip48-p2tr`, 1 commit off 5f37b43). Report
+  persisted 97275c4. Controller re-ran independently: engrave fmt/clippy clean,
+  nextest 621/621, threaded `cargo test` all ok; ms 477/477. Whole-diff opus
+  execution review DISPATCHED (report → `composer-S1-exec-review-r0.md`).
+  THEN: persist → fold → sonnet verification → merge both via each repo's
+  `push-via-staging.sh` → release `me` 0.8.0 / `ms` 0.17.0.
+- **S2 plan drafted and build-gated** (`IMPLEMENTATION_PLAN_composer_S2_fork_codec.md`,
+  b95df91 + glyph fold): 9 tasks. New gate `scripts/plan-build-gate-go.sh`
+  (4659452) extracts the anchored Go into a scratch copy of the fork at
+  `/scratch/code/shibboleth/.plan-build-gate-go/seedhammer`; fragments of
+  existing files are hand-wired by `scratchpad/handwire_s2.py`. Measured with
+  fragments wired: `go test ./md/ ./mk/ ./sysw/` ok, 73 new sub-tests pass, all
+  28 family vectors byte- and chunk-identical (incl. the two no-corpus chunk
+  sets produced by `md compose`/`md encode` at 66bdf2f4), 5 pkh vectors' P2WSH
+  addresses equal Rust's, 40/40 record-class rows lockstep, keyed conformance
+  gate 14→36 sub-tests. Two latent LOADER bugs found by the gate (hex-string
+  pubkeys and hash bodies read as base64) → plan Task 2 Step 2a.
+  R0 round 0 DISPATCHED (fidelity opus + tests sonnet →
+  `composer-S2-plan-R0-r0-{fidelity,tests}.md`). GREEN expires: re-validate
+  immediately before dispatching the S2 implementer (after S1 ships).
+- Transcription lesson re-learned: one of the two no-corpus chunk strings was
+  mis-pasted (a 5-char group dropped); the machine-generated file was right.
+  Read literals from files, never from a terminal echo.
