@@ -21,7 +21,8 @@
 - Lowering rules verbatim from spec §5: `or_d(P, R)` iff P is a bare unlocked, unhashed `multi` with n ≥ 2, else `or_i(P, R)`; `and_v(v:KEYS, and_v(v:sha256(H), LOCK))`; sole unlocked unhashed multi-key path → `sortedmulti`/`sortedmulti_a`, any other multi-key path → `multi`/`multi_a`; one key → `pkh` in wsh, `pk` in tr; internal key = first-listed unlocked, unhashed one-key path, else NUMS; tr spine right, leaf j at depth min(j, m−1); m = 1 → bare leaf; m = 0 → no tree; use-site `/<0;1>/*`.
 - Origins, verbatim from spec §4f: `m/48'/0'/account'/T'` with T = 2 (wsh), 1 (sh(wsh)), 2 (sh), 3 (tr); an unseated slot takes the LOWEST account not already declared by any slot, in ascending emitted index; invariant: no two slots share an origin unless both declare distinct fingerprints.
 - The rendered template TEXT carries no origins: `render::descriptor_to_template` writes `@0/<0;1>/*` and the origins live in `path_decl` (descriptor-mnemonic F-219; `md decode` prints them on stderr). Every origin assertion in this plan reads `path_decl`; the inline-origin form `@0/48'/0'/0'/2'/<0;1>/*` is produced only by `compose::template_with_origins` and is what `md compose` prints and what the vector corpus stores as `template`.
-- Keyless paths are wsh-only and EXPERIMENTAL; unsorted where sorted was legal is EXPERIMENTAL; the library REPORTS both, the CLI requires `--experimental` to emit them (parity with `md encode --experimental`).
+- Keyless paths are wsh-only and EXPERIMENTAL; unsorted where sorted was legal is EXPERIMENTAL; the library REPORTS both, the CLI requires `--experimental` to emit them. `md encode --experimental` is the precedent, but at `3b0944fb` `md encode` gates a signature-free spend path ONLY under `tr` (`Descriptor::from_str`'s tr-only sanity gate); a `wsh` template with such a path encodes with exit 0, keyed or unkeyed (measured; descriptor-mnemonic follow-up `md-encode-keyless-template-sigless-path-not-gated`, owned by this stage). Task 8 closes that so `md compose` → `md encode` agree.
+- Exit codes: `main` prints `md: {e}` and exits 1 for every `CliError` EXCEPT `BadArg`, which has its own arm and exits 2 (`crates/md-cli/src/main.rs:787-800`). `CliError::Compose` takes the generic arm: exit 1.
 - `compose` is UNCONDITIONAL (not behind `cli-compiler`); only the compile cross-check test needs the `compiler` feature, as a dev-dependency.
 - Build gate before every fold: `scripts/plan-build-gate-md.sh design/IMPLEMENTATION_PLAN_composer_S0_md_compose.md` extracts every ```rust block anchored on the NEW files below (`Create`/`Add to` append, `Replace` supersedes), builds, runs the compose tests, clippies, and compile-checks md-cli. Fragments of existing files (`lib.rs`, `main.rs`, `cmd/mod.rs`, `test_vectors.rs`, `Cargo.toml`) are NOT assembled by it and are called out per task.
 - Commits: stage paths explicitly (no `git add -A`); one task, one commit; messages end with the standing trailers.
@@ -39,9 +40,11 @@ New files (mechanically assembled by the build gate):
 | `crates/md-codec/src/compose/tr.rs` | internal-key extraction, the right spine, NUMS |
 | `crates/md-codec/src/compose/presets.rs` | the five archetypes and plain k-of-n as path lists |
 | `crates/md-codec/tests/compose_lowering.rs` | text-level and tree-level tests of the lowering, numbering identity, refusals, round trip through the wire |
-| `crates/md-codec/tests/compose_crosscheck.rs` | keyed cross-check: miniscript parse + `sanity_check` (with `top_unsafe` for keyless wsh), `lift` equality against the compiler, address derivation |
+| `crates/md-codec/tests/compose_support.rs` | helpers shared by the compose test files via `#[path]`: journey xpubs, per-slot distinct keys, `keyed()`, `concrete_policy()`, and (from Task 5) the tagged vector `family()` |
+| `crates/md-codec/tests/compose_crosscheck.rs` | the §5b cross-check as one reusable `cross_check()`: convert, `sanity_check` (its documented failure for keyless wsh), an address, `lift` equality against the compiler; run over the reference wallets (Task 4), the whole family (Task 5) and every preset (Task 7) |
 | `crates/md-cli/src/cmd/compose.rs` | `md compose`: the path DSL, `--experimental` gating, text and `--json` output |
 | `crates/md-cli/tests/cli_compose.rs` | CLI tests: text round trip through `md encode` → `md decode`, refusals, JSON shape |
+| `crates/md-cli/tests/cli_compose_encode_gate.rs` | `md encode` refuses a signature-free spend path under `wsh` unless `--experimental`, keyed and unkeyed (Task 8) |
 
 Modified files (fragments; a reviewer's execution pass, and named in the task that touches them):
 
@@ -53,6 +56,7 @@ Modified files (fragments; a reviewer's execution pass, and named in the task th
 | `crates/md-cli/src/cmd/mod.rs` | `pub mod compose;` |
 | `crates/md-cli/src/main.rs` | the `Compose { .. }` clap variant and its dispatch arm |
 | `crates/md-cli/src/error.rs` | `CliError::Compose(String)` |
+| `crates/md-cli/src/parse/template.rs` | `parse_template_ext` runs `sanity_check()` for every wrapper, and the `--experimental` relaxed re-check for `wsh`/`sh` as it already does for `tr` leaves (Task 8) |
 
 ---
 
@@ -213,17 +217,18 @@ fn compose_refuses_legacy_wrappers_outside_the_single_sorted_multi_shape() {
 
 #[test]
 fn compose_refuses_lock_operands_outside_the_consensus_bands() {
+    // Each case pins the BAND NAMED in the refusal, not only that a refusal fired.
     let cases: &[(Lock, &str)] = &[
-        (Lock::OlderBlocks(0), "blocks 0"),
-        (Lock::OlderUnits(0), "units 0"),
-        (Lock::AfterHeight(0), "height 0"),
-        (Lock::AfterHeight(500_000_000), "height at the time threshold"),
-        (Lock::AfterTime(499_999_999), "time below the threshold"),
-        (Lock::AfterTime(2_147_483_648), "time above 2^31-1"),
+        (Lock::OlderBlocks(0), "older in blocks needs 1..=65535"),
+        (Lock::OlderUnits(0), "older in 512-second units needs 1..=65535"),
+        (Lock::AfterHeight(0), "after height needs 1..=499999999"),
+        (Lock::AfterHeight(500_000_000), "after height needs 1..=499999999"),
+        (Lock::AfterTime(499_999_999), "after time needs 500000000..=2147483647"),
+        (Lock::AfterTime(2_147_483_648), "after time needs 500000000..=2147483647"),
     ];
     for (lock, why) in cases {
         let err = compose(&list(Wrapper::Wsh, vec![with_lock(keys(1, 1), *lock)])).unwrap_err();
-        assert!(matches!(err, ComposeError::LockOutOfRange { path: 0, .. }), "{why}: {err:?}");
+        assert_eq!(err, ComposeError::LockOutOfRange { path: 0, why }, "{lock:?}");
     }
 }
 
@@ -505,6 +510,12 @@ pub enum ComposeError {
         /// The higher emitted slot index.
         b: u8,
     },
+    /// A preset's parameters do not form the archetype it is named for
+    /// (`presets`, spec §4d): e.g. decaying tiers that do not unlock later.
+    PresetShape {
+        /// What the archetype needs, in the words the operator sees.
+        why: &'static str,
+    },
 }
 
 impl core::fmt::Display for ComposeError {
@@ -549,6 +560,7 @@ impl core::fmt::Display for ComposeError {
                 f,
                 "slots @{a} and @{b} declare the same origin without two distinct fingerprints; a template like that cannot be restored"
             ),
+            ComposeError::PresetShape { why } => write!(f, "preset: {why}"),
         }
     }
 }
@@ -750,8 +762,18 @@ fn unseated_slots_take_ascending_default_accounts_under_the_wrapper_script_type(
     assert_eq!(origins(&c), vec![hardened(&[48, 0, 0, 1]), hardened(&[48, 0, 1, 1])]);
     let c = compose(&list(Wrapper::Sh, vec![keys(2, 2)])).unwrap();
     assert_eq!(origins(&c), vec![hardened(&[48, 0, 0, 2]), hardened(&[48, 0, 1, 2])]);
-    let c = compose(&list(Wrapper::Tr, vec![keys(2, 2)])).unwrap();
-    assert_eq!(origins(&c), vec![hardened(&[48, 0, 0, 3]), hardened(&[48, 0, 1, 3])]);
+    // tr's 3' is asserted in Task 3, once the taproot lowering exists.
+}
+
+#[test]
+fn template_with_origins_inlines_two_digit_slots_without_touching_their_prefixes() {
+    // Hand-written, NOT printer-generated: `@1/` must not be rewritten inside
+    // `@10/` or `@11/`. Twelve slots: a 9-of-9 head and a 3-of-3 tail.
+    let c = compose(&list(Wrapper::Wsh, vec![keys(9, 9), keys(3, 3)])).unwrap();
+    assert_eq!(
+        template_with_origins(&c).unwrap(),
+        "wsh(or_d(multi(9,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*,@3/48'/0'/3'/2'/<0;1>/*,@4/48'/0'/4'/2'/<0;1>/*,@5/48'/0'/5'/2'/<0;1>/*,@6/48'/0'/6'/2'/<0;1>/*,@7/48'/0'/7'/2'/<0;1>/*,@8/48'/0'/8'/2'/<0;1>/*),multi(3,@9/48'/0'/9'/2'/<0;1>/*,@10/48'/0'/10'/2'/<0;1>/*,@11/48'/0'/11'/2'/<0;1>/*)))"
+    );
 }
 
 #[test]
@@ -1228,7 +1250,7 @@ fn two_path_taproot_with_no_single_key_uses_nums_and_two_leaves() {
 }
 
 #[test]
-fn the_first_listed_unlocked_single_key_becomes_the_internal_key_and_slot_zero() {
+fn the_unlocked_single_key_becomes_the_internal_key_and_slot_zero() {
     // Path 1: 2-of-2 locked; path 2: single unlocked key; path 3: single locked key.
     let l = list(
         Wrapper::Tr,
@@ -1301,6 +1323,12 @@ fn taproot_templates_round_trip_through_the_wire() {
     let chunks = split(&c.descriptor).unwrap();
     let refs: Vec<&str> = chunks.iter().map(String::as_str).collect();
     assert_eq!(reassemble(&refs).unwrap(), c.descriptor);
+}
+
+#[test]
+fn tr_default_origins_use_script_type_three() {
+    let c = compose(&list(Wrapper::Tr, vec![keys(2, 2)])).unwrap();
+    assert_eq!(origins(&c), vec![hardened(&[48, 0, 0, 3]), hardened(&[48, 0, 1, 3])]);
 }
 
 #[test]
@@ -1379,7 +1407,7 @@ pub(super) fn lower_tr(list: &PathList, declared: &[Option<SlotOrigin>]) -> Resu
 - [ ] **Step 4: Run the whole compose test file**
 
 Run: `cargo nextest run --locked -p md-codec --test compose_lowering 2>&1 | tail -30`
-Expected: all tests PASS. Same renderer-authority rule as Task 2 for any string mismatch.
+Expected: all tests PASS. A string mismatch HERE comes from the tree (spine shape, `multi_a` vs `sortedmulti_a`, which key was extracted, numbering), which the spec fixes and the Go port copies; the renderer-authority rule of Task 2 applies only to a spelling the renderer owns, never to a tree difference. Fix the lowering, not the expectation.
 
 - [ ] **Step 5: Format, clippy, commit**
 
@@ -1400,72 +1428,86 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 
 **Files:**
 - Modify: `crates/md-codec/Cargo.toml` (under `[dev-dependencies]` add `miniscript = { workspace = true, features = ["compiler"] }`)
+- Create: `crates/md-codec/tests/compose_support.rs` (helpers; included by `#[path]` from the other compose test files, and compiled as an empty test binary of its own)
 - Test: `crates/md-codec/tests/compose_crosscheck.rs`
 
 **Interfaces:**
-- Consumes: `compose`, `compose_with`; `md_codec::to_miniscript::to_miniscript_descriptor(&Descriptor, chain: u32)`; `miniscript::policy::Concrete`, `miniscript::Descriptor::lift`, `Miniscript::from_str_ext` with `ExtParams::new().top_unsafe()`.
-- Produces: the §5b contract as executable tests, reused by the vector family in Task 5.
+- Consumes: `compose`, `compose_with`; `md_codec::to_miniscript::to_miniscript_descriptor(&Descriptor, chain: u32)`; `miniscript::policy::Concrete::{compile, compile_tr}`, `miniscript::Descriptor::{new_wsh, new_sh_wsh, new_sh, lift, iter_pk, derive_at_index}`, `Miniscript::from_str_ext` with `ExtParams::new().top_unsafe()`; `bitcoin::bip32::Xpub::derive_pub`.
+- Produces (in `compose_support.rs`): `XPUB`, `FP`, `NUMS`, `hardened()`, `slot_xpubs(n) -> Vec<Xpub>`, `xpub_bytes(&Xpub) -> [u8; 65]`, `keyed(&PathList) -> Descriptor`, `concrete_policy(&PathList, &Composed, &[String]) -> String`; (in `compose_crosscheck.rs`) `cross_check(name, &PathList, keyless_wsh: bool) -> String` — the whole §5b contract for one list, which Task 5 runs over the family and Task 7 over every preset.
 
 - [ ] **Step 1: Write the failing cross-check tests**
 
-Create `crates/md-codec/tests/compose_crosscheck.rs`:
+Create `crates/md-codec/tests/compose_support.rs`:
 
 ```rust
-//! Spec §5b: every composed template parses in its context, passes
-//! rust-miniscript's sanity check (keyless wsh via `top_unsafe`), lifts to the
-//! same semantic policy as the compiler where every path has a key, and derives
-//! addresses.
+//! Helpers shared by the compose integration tests. Included with
+//! `#[path = "compose_support.rs"] mod support;` from `compose_crosscheck.rs`
+//! and `compose_vectors.rs`; cargo also compiles this file as a test binary of
+//! its own (with no tests), hence the allows: the workspace lints `pub` items
+//! for docs, and an unused helper in one includer is dead code in that binary.
+#![allow(dead_code, missing_docs)]
 
 use std::str::FromStr;
 
-use md_codec::compose::{compose_with, KeySet, Lock, PathList, SlotOrigin, SpendPath, Wrapper};
+use md_codec::compose::{compose, compose_with, Composed, PathList, SlotOrigin};
+use md_codec::encode::Descriptor;
 use md_codec::origin_path::{OriginPath, PathComponent};
-use md_codec::render::descriptor_to_template;
-use md_codec::to_miniscript::to_miniscript_descriptor;
-use miniscript::bitcoin::bip32::Xpub;
-use miniscript::descriptor::DescriptorPublicKey;
-use miniscript::policy::{Concrete, Liftable};
-use miniscript::{Descriptor, ExtParams, Miniscript, Segwitv0};
+use md_codec::tag::Tag;
+use miniscript::bitcoin::bip32::{ChildNumber, Xpub};
+use miniscript::bitcoin::secp256k1::Secp256k1;
 
-// The wallet-policy journey's four cosigners: one master (73c5da0a) at
-// m/48'/0'/{0..3}'/2'. Real xpubs; nothing here is a secret.
-const XPUB: [&str; 4] = [
+/// The wallet-policy journey's four cosigners: one master (73c5da0a) at
+/// m/48'/0'/{0..3}'/2'. Real public keys; nothing here is a secret.
+pub const XPUB: [&str; 4] = [
     "xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf",
     "xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk",
     "xpub6EGx8sPr9FxPPE1rbZazhqWwpMXA3Hf5DYKtZbL7c4BSddzmQktp96UaTvecEkoCZysuaj79GMCFZYT1KKk7Ph2M3Kf5g8B82KZ8TZ9SKQR",
     "xpub6E6Z3Ss5TXJYNJp4U1q3NZ3pCn82i7KXQAKUtNnzLJ3cCdchQeSdFvXemizaHUF7wNwRQAB8mPdoZhGHLiv49cWPtCnoJY3Az3E8JKxH9Mq",
 ];
-const FP: [u8; 4] = [0x73, 0xc5, 0xda, 0x0a];
+pub const FP: [u8; 4] = [0x73, 0xc5, 0xda, 0x0a];
+pub const NUMS: &str = "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0";
+pub const H: [u8; 32] = [0xa8; 32];
+pub const HH: &str = "a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8";
 
-fn hardened(values: &[u32]) -> OriginPath {
+pub fn hardened(values: &[u32]) -> OriginPath {
     OriginPath {
         components: values.iter().map(|v| PathComponent { hardened: true, value: *v }).collect(),
     }
 }
 
-/// 65 wire bytes (chain code ‖ compressed point) for a base58 xpub.
-fn xpub_bytes(s: &str) -> [u8; 65] {
-    let x = Xpub::from_str(s).expect("fixture xpub parses");
+/// `n` DISTINCT xpubs: the journey's four for the first four slots, then
+/// unhardened children of the first one. BIP-32 makes a (fingerprint, path)
+/// pair name exactly ONE key, so binding one xpub at two declared origins would
+/// describe an impossible wallet (descriptor-mnemonic F-217,
+/// `corpus_origin_consistency.rs`); a 32-slot policy therefore needs 32 keys.
+pub fn slot_xpubs(n: usize) -> Vec<Xpub> {
+    let secp = Secp256k1::verification_only();
+    let base = Xpub::from_str(XPUB[0]).expect("fixture xpub parses");
+    (0..n)
+        .map(|i| {
+            if i < XPUB.len() {
+                Xpub::from_str(XPUB[i]).expect("fixture xpub parses")
+            } else {
+                let child = ChildNumber::from_normal_idx(i as u32).expect("small index");
+                base.derive_pub(&secp, &[child]).expect("unhardened derivation")
+            }
+        })
+        .collect()
+}
+
+/// 65 wire bytes (chain code ‖ compressed point).
+pub fn xpub_bytes(x: &Xpub) -> [u8; 65] {
     let mut out = [0u8; 65];
     out[..32].copy_from_slice(&x.chain_code[..]);
     out[32..].copy_from_slice(&x.public_key.serialize());
     out
 }
 
-fn keys(k: u8, n: u8) -> SpendPath {
-    SpendPath { keys: Some(KeySet { k, n, sorted: true }), hash: None, lock: None }
-}
-
-fn locked(k: u8, n: u8, lock: Lock) -> SpendPath {
-    SpendPath { keys: Some(KeySet { k, n, sorted: true }), hash: None, lock: Some(lock) }
-}
-
-/// Seat the journey keys at accounts 0..n under the wrapper's script type and
-/// bind the xpub bytes, giving a KEYED descriptor the converter can derive.
-fn keyed(list: &PathList) -> md_codec::encode::Descriptor {
-    let unseated = md_codec::compose::compose(list).expect("list is composable");
+/// Seat every slot at `m/48'/0'/<slot>'/T'` under one master fingerprint and
+/// bind distinct xpub bytes: a KEYED descriptor the converter can derive.
+pub fn keyed(list: &PathList) -> Descriptor {
+    let unseated = compose(list).expect("list is composable");
     let n = unseated.slots.len();
-    assert!(n <= XPUB.len(), "fixture holds four keys");
     let declared: Vec<Option<SlotOrigin>> = (0..n)
         .map(|i| {
             Some(SlotOrigin {
@@ -1475,66 +1517,173 @@ fn keyed(list: &PathList) -> md_codec::encode::Descriptor {
         })
         .collect();
     let mut c = compose_with(list, &declared).expect("declared origins compose");
-    c.descriptor.tlv.pubkeys = Some((0..n).map(|i| (i as u8, xpub_bytes(XPUB[i]))).collect());
+    let xs = slot_xpubs(n);
+    c.descriptor.tlv.pubkeys = Some(xs.iter().enumerate().map(|(i, x)| (i as u8, xpub_bytes(x))).collect());
     c.descriptor
+}
+
+fn hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        let _ = write!(out, "{b:02x}");
+    }
+    out
+}
+
+/// The rust-miniscript CONCRETE policy with the same spend conditions as
+/// `list`, over `keys` (one key string per emitted slot, in slot order). This is
+/// the compiler's input for the §5b lift-equality leg; it is built from the path
+/// list, not from the lowered tree, so it cannot inherit a lowering defect.
+pub fn concrete_policy(list: &PathList, c: &Composed, keys: &[String]) -> String {
+    let mut paths: Vec<String> = Vec::new();
+    for (pi, p) in list.paths.iter().enumerate() {
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(ks) = p.keys {
+            let pks: Vec<String> = c
+                .slots
+                .iter()
+                .filter(|slot| slot.path == pi)
+                .map(|slot| format!("pk({})", keys[usize::from(slot.index)]))
+                .collect();
+            parts.push(if ks.n == 1 { pks[0].clone() } else { format!("thresh({},{})", ks.k, pks.join(",")) });
+        }
+        if let Some(h) = p.hash {
+            parts.push(format!("sha256({})", hex(&h)));
+        }
+        if let Some(lock) = p.lock {
+            let (tag, v) = lock.operand().expect("validated");
+            let name = if matches!(tag, Tag::Older) { "older" } else { "after" };
+            parts.push(format!("{name}({v})"));
+        }
+        let mut acc = parts.pop().expect("a path has a part");
+        while let Some(x) = parts.pop() {
+            acc = format!("and({x},{acc})");
+        }
+        paths.push(acc);
+    }
+    let mut acc = paths.pop().expect("a list has a path");
+    while let Some(x) = paths.pop() {
+        acc = format!("or({x},{acc})");
+    }
+    acc
+}
+```
+
+Create `crates/md-codec/tests/compose_crosscheck.rs`:
+
+```rust
+//! Spec §5b: every composed template converts to a rust-miniscript descriptor,
+//! passes `sanity_check` (a keyless-wsh path fails it with exactly the
+//! signature rule, and parses under `top_unsafe`), derives an address, and —
+//! where every path has a key — lifts to the same semantic policy as the
+//! COMPILER's output for the same spend conditions. `cross_check` is the whole
+//! contract for one list; Task 5 runs it over the family, Task 7 over presets.
+
+use std::str::FromStr;
+
+#[path = "compose_support.rs"]
+mod support;
+use support::*;
+
+use md_codec::compose::{compose, KeySet, Lock, PathList, SpendPath, Wrapper};
+use md_codec::render::descriptor_to_template;
+use md_codec::to_miniscript::to_miniscript_descriptor;
+use miniscript::bitcoin::Network;
+use miniscript::descriptor::DescriptorPublicKey;
+use miniscript::policy::{Concrete, Liftable};
+use miniscript::{Descriptor, ExtParams, Legacy, Miniscript, Segwitv0};
+
+fn keys(k: u8, n: u8) -> SpendPath {
+    SpendPath { keys: Some(KeySet { k, n, sorted: true }), hash: None, lock: None }
+}
+
+fn locked(k: u8, n: u8, lock: Lock) -> SpendPath {
+    SpendPath { keys: Some(KeySet { k, n, sorted: true }), hash: None, lock: Some(lock) }
 }
 
 fn two_path(wrapper: Wrapper) -> PathList {
     PathList { wrapper, paths: vec![keys(2, 3), locked(1, 1, Lock::OlderBlocks(26280))] }
 }
 
-#[test]
-fn keyed_wsh_two_path_is_sane_and_derives_addresses() {
-    let d = keyed(&two_path(Wrapper::Wsh));
-    let ms = to_miniscript_descriptor(&d, 0).expect("converts");
-    ms.sanity_check().expect("sane");
-    let addr = ms.derive_at_index(0).unwrap().address(miniscript::bitcoin::Network::Bitcoin).unwrap();
-    assert!(addr.to_string().starts_with("bc1q"), "{addr}");
+/// The §5b legs for one list. Returns the index-0 address (empty for a
+/// keyless-wsh list, whose leg is the documented sanity FAILURE).
+pub fn cross_check(name: &str, list: &PathList, keyless_wsh: bool) -> String {
+    let d = keyed(list);
+    let c = compose(list).unwrap_or_else(|e| panic!("{name}: {e}"));
+    let conv = to_miniscript_descriptor(&d, 0).unwrap_or_else(|e| panic!("{name}: convert: {e}"));
+    if keyless_wsh {
+        let e = conv.sanity_check().expect_err("a signature-free path must fail the default sanity check");
+        assert!(e.to_string().contains("require a signature"), "{name}: {e}");
+        return String::new();
+    }
+    conv.sanity_check().unwrap_or_else(|e| panic!("{name}: sanity: {e}"));
+    let addr = conv
+        .derive_at_index(0)
+        .unwrap_or_else(|e| panic!("{name}: derive: {e}"))
+        .address(Network::Bitcoin)
+        .unwrap_or_else(|e| panic!("{name}: address: {e}"))
+        .to_string();
+    // The converter's own key strings, in traversal (= emitted) order, minus
+    // the NUMS internal key; the compiler gets the SAME key values, so the
+    // lifted policies differ only if the spend conditions do.
+    let key_strings: Vec<String> = conv.iter_pk().map(|k| k.to_string()).filter(|k| !k.starts_with(NUMS)).collect();
+    assert_eq!(key_strings.len(), c.slots.len(), "{name}: one key per slot");
+    let policy = concrete_policy(list, &c, &key_strings);
+    let concrete = Concrete::<DescriptorPublicKey>::from_str(&policy).unwrap_or_else(|e| panic!("{name}: {policy}: {e}"));
+    let theirs: Descriptor<DescriptorPublicKey> = match list.wrapper {
+        Wrapper::Wsh => Descriptor::new_wsh(concrete.compile::<Segwitv0>().unwrap()).unwrap(),
+        Wrapper::ShWsh => Descriptor::new_sh_wsh(concrete.compile::<Segwitv0>().unwrap()).unwrap(),
+        Wrapper::Sh => Descriptor::new_sh(concrete.compile::<Legacy>().unwrap()).unwrap(),
+        Wrapper::Tr => {
+            // Same internal-key decision as the lowering: NUMS when no path is
+            // an unlocked single key, else let the compiler extract one (the
+            // lifted OR is the same set whichever key sits on the key path).
+            let nums = c.internal_key_path.is_none().then(|| DescriptorPublicKey::from_str(NUMS).unwrap());
+            concrete.compile_tr(nums).unwrap_or_else(|e| panic!("{name}: compile_tr: {e}"))
+        }
+    };
+    let ours = conv.lift().unwrap().normalized().sorted();
+    let theirs = theirs.lift().unwrap().normalized().sorted();
+    assert_eq!(ours, theirs, "{name}: same spend conditions, whatever the fragments");
+    addr
 }
 
 #[test]
-fn keyed_tr_two_path_is_sane_and_derives_addresses() {
-    let d = keyed(&two_path(Wrapper::Tr));
-    let ms = to_miniscript_descriptor(&d, 0).expect("converts");
-    ms.sanity_check().expect("sane");
-    let addr = ms.derive_at_index(0).unwrap().address(miniscript::bitcoin::Network::Bitcoin).unwrap();
-    assert!(addr.to_string().starts_with("bc1p"), "{addr}");
+fn the_reference_two_path_wallets_pass_the_cross_check() {
+    let wsh = cross_check("two_path_wsh", &two_path(Wrapper::Wsh), false);
+    assert!(wsh.starts_with("bc1q"), "{wsh}");
+    let tr = cross_check("two_path_tr", &two_path(Wrapper::Tr), false);
+    assert!(tr.starts_with("bc1p"), "{tr}");
 }
 
 #[test]
-fn wsh_lowering_lifts_to_the_same_semantic_policy_as_the_compiler() {
-    // Compiler input: the same two paths as a Concrete policy over the SAME
-    // key values our converter produced (taken from the converted descriptor
-    // in emitted order), so the lifted policies differ only if the spend
-    // conditions do. Spelling the keys by hand would make the keys differ in
-    // representation (depth, parent fingerprint, single vs multipath) while
-    // meaning the same thing, and the equality below would fail for nothing.
-    let d = keyed(&two_path(Wrapper::Wsh));
-    let converted = to_miniscript_descriptor(&d, 0).unwrap();
-    let keys: Vec<String> = converted.iter_pk().map(|k| k.to_string()).collect();
-    assert_eq!(keys.len(), 4);
-    let ours = converted.lift().unwrap().normalized().sorted();
-    let policy = format!(
-        "or(thresh(2,pk({}),pk({}),pk({})),and(pk({}),older(26280)))",
-        keys[0], keys[1], keys[2], keys[3]
-    );
-    let concrete = Concrete::<DescriptorPublicKey>::from_str(&policy).unwrap();
-    let compiled: Miniscript<DescriptorPublicKey, Segwitv0> = concrete.compile().unwrap();
-    let theirs = Descriptor::new_wsh(compiled).unwrap().lift().unwrap().normalized().sorted();
-    assert_eq!(ours, theirs, "same spend conditions, whatever the fragments");
+fn the_cross_check_notices_a_wrong_lowering() {
+    // Mutation in the TEST, not the code: hand the compiler a DIFFERENT policy
+    // (threshold 1 instead of 2) and the lift equality must fail — a check that
+    // can fail is the only kind worth running over the family.
+    let list = two_path(Wrapper::Wsh);
+    let d = keyed(&list);
+    let c = compose(&list).unwrap();
+    let conv = to_miniscript_descriptor(&d, 0).unwrap();
+    let key_strings: Vec<String> = conv.iter_pk().map(|k| k.to_string()).collect();
+    let wrong = concrete_policy(&list, &c, &key_strings).replacen("thresh(2,", "thresh(1,", 1);
+    let concrete = Concrete::<DescriptorPublicKey>::from_str(&wrong).unwrap();
+    let theirs = Descriptor::new_wsh(concrete.compile::<Segwitv0>().unwrap()).unwrap().lift().unwrap().normalized().sorted();
+    let ours = conv.lift().unwrap().normalized().sorted();
+    assert_ne!(ours, theirs, "the lift comparison must be able to fail");
 }
 
 #[test]
 fn a_keyless_wsh_path_is_admitted_with_top_unsafe_and_refused_by_the_default_sanity() {
-    let h = [0xa8u8; 32];
     let list = PathList {
         wrapper: Wrapper::Wsh,
-        paths: vec![keys(2, 3), SpendPath { keys: None, hash: Some(h), lock: Some(Lock::AfterHeight(1_383_520)) }],
+        paths: vec![keys(2, 3), SpendPath { keys: None, hash: Some(H), lock: Some(Lock::AfterHeight(1_383_520)) }],
     };
+    assert_eq!(cross_check("keyless_wsh", &list, true), "");
+    // The inner miniscript the device would emit, parsed two ways.
     let d = keyed(&list);
     let text = descriptor_to_template(&d).unwrap();
-    // Substitute the placeholders with the concrete keys to obtain the inner
-    // miniscript the device would emit, then parse it two ways.
     // Strip exactly ONE `wsh(` and ONE `)`: `trim_end_matches(')')` would eat
     // every closing paren of the inner script.
     let mut inner = text
@@ -1570,8 +1719,8 @@ Run: `cargo fmt --all && cargo clippy --locked -p md-codec --all-targets --all-f
 Expected: clean.
 
 ```bash
-git add crates/md-codec/Cargo.toml crates/md-codec/tests/compose_crosscheck.rs
-git commit -m "md-codec: compose cross-check -- sanity, lift equality vs the compiler, top_unsafe for keyless wsh (composer S0 task 4)
+git add crates/md-codec/Cargo.toml crates/md-codec/tests/compose_support.rs crates/md-codec/tests/compose_crosscheck.rs
+git commit -m "md-codec: compose cross-check -- reusable 5b check (sanity, address, lift equality vs the compiler), top_unsafe for keyless wsh (composer S0 task 4)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
@@ -1582,54 +1731,40 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 ### Task 5: The compose vector family and its tag coverage
 
 **Files:**
-- Modify: `crates/md-codec/src/test_vectors.rs` (add `compose_*` entries to `MANIFEST`)
-- Test: `crates/md-codec/tests/compose_vectors.rs` (a new test file; its anchor below is `crates/md-codec/tests/compose_vectors.rs`, which the build gate recognises as `compose_*.rs`)
+- Modify: `crates/md-codec/src/test_vectors.rs` (add `compose_*` entries to `MANIFEST`), `crates/md-codec/tests/compose_support.rs` (the tagged `family()` and `SINGULAR_TAGS`), `crates/md-codec/tests/compose_crosscheck.rs` (the family-wide §5b test)
+- Test: `crates/md-codec/tests/compose_vectors.rs`
 
 **Interfaces:**
 - Consumes: `md_codec::test_vectors::{MANIFEST, Vector}`; the `md vectors` exporter (`crates/md-cli/src/cmd/vectors.rs:16`) which writes `.conformance.json` for every KEYED vector; the fork's `TestKeyedConformanceAgreesWithRust` globs `keyed_*.conformance.json`, so every keyed compose vector is named `keyed_compose_*`.
-- Produces: the vector names the Go builder (Stage 2) reproduces byte for byte, and the tag table §12 item 1 requires.
+- Produces: `family() -> Vec<(&'static str, PathList, String, Vec<&'static str>)>` and `SINGULAR_TAGS` in `compose_support.rs`; the vector names the Go builder (Stage 2) reproduces byte for byte; the tag table §12 item 1 requires; and the §5b cross-check run over every family member.
 
 - [ ] **Step 1: Write the failing tag-coverage test**
 
-Create `crates/md-codec/tests/compose_vectors.rs`:
+Add to `crates/md-codec/tests/compose_support.rs` (the family lives here so both `compose_vectors.rs` and `compose_crosscheck.rs` can iterate it):
 
 ```rust
-//! Spec §12 item 1: TAGGED coverage of the lowering. Every compose vector in
-//! `MANIFEST` is listed here with the spec rows it exercises; every tag must
-//! appear in at least two vectors; every listed vector's stored template must
-//! be exactly what `compose` renders for its path list.
+use md_codec::compose::{KeySet, Lock, SpendPath, Wrapper};
 
-use std::collections::BTreeMap;
-
-use md_codec::compose::{compose, template_with_origins, KeySet, Lock, PathList, SpendPath, Wrapper};
-use md_codec::render::descriptor_to_template;
-use md_codec::test_vectors::MANIFEST;
-
-fn k(k: u8, n: u8) -> SpendPath {
+pub fn k(k: u8, n: u8) -> SpendPath {
     SpendPath { keys: Some(KeySet { k, n, sorted: true }), hash: None, lock: None }
 }
-fn u(k: u8, n: u8) -> SpendPath {
+pub fn u(k: u8, n: u8) -> SpendPath {
     SpendPath { keys: Some(KeySet { k, n, sorted: false }), hash: None, lock: None }
 }
-fn lk(mut p: SpendPath, l: Lock) -> SpendPath {
+pub fn lk(mut p: SpendPath, l: Lock) -> SpendPath {
     p.lock = Some(l);
     p
 }
-fn hs(mut p: SpendPath, h: [u8; 32]) -> SpendPath {
+pub fn hs(mut p: SpendPath, h: [u8; 32]) -> SpendPath {
     p.hash = Some(h);
     p
 }
-fn kl(h: [u8; 32], l: Option<Lock>) -> SpendPath {
+pub fn kl(h: [u8; 32], l: Option<Lock>) -> SpendPath {
     SpendPath { keys: None, hash: Some(h), lock: l }
 }
-fn pl(w: Wrapper, paths: Vec<SpendPath>) -> PathList {
+pub fn pl(w: Wrapper, paths: Vec<SpendPath>) -> PathList {
     PathList { wrapper: w, paths }
 }
-
-const H: [u8; 32] = [0xa8; 32];
-
-const NUMS: &str = "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0";
-const HH: &str = "a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8";
 
 /// (vector name, path list, rendered text WITHOUT origins, tags). The text is
 /// the fixed spelling the Go builder reproduces; origins are added by
@@ -1637,109 +1772,133 @@ const HH: &str = "a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8
 /// `w:<wrapper>`, `paths:<n>`, `head:<bare-multi|single|locked>`,
 /// `ik:<extracted-first|extracted-later|nums|none>`,
 /// `lock:<none|blocks|units|height|time>`, `hash`, `sorted`, `unsorted`,
-/// `keyless-wsh`, `spine:<m>`, `slots:32`, and the MANIFEST binding's
-/// fingerprint case `fp:<one-seed|distinct|none>` (one master fingerprint on
-/// every slot; four distinct fingerprints; unkeyed).
-fn family() -> Vec<(&'static str, PathList, String, Vec<&'static str>)> {
+/// `keyless-wsh`, `spine:<m>`, `slots:32`; the §4f default-origin tag
+/// `origins:default-<wrapper>` (every family vector is unseated, so every one
+/// carries the wrapper's default origins); and the MANIFEST binding's
+/// fingerprint case, the spec's three: `fp:distinct` (four distinct declared
+/// fingerprints), `fp:one-seed-one-path` (one master fingerprint on two or
+/// more slots of ONE path), `fp:one-seed-two-paths` (one master fingerprint
+/// across two or more paths); `fp:none` marks the unkeyed vectors.
+pub fn family() -> Vec<(&'static str, PathList, String, Vec<&'static str>)> {
     let tr32: Vec<SpendPath> = (0..8).map(|_| k(4, 4)).collect();
     vec![
         // ---- wsh family
         ("keyed_compose_wsh_sole_sortedmulti", pl(Wrapper::Wsh, vec![k(2, 3)]),
          "wsh(sortedmulti(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))".to_string(),
-         vec!["w:wsh", "paths:1", "head:bare-multi", "lock:none", "sorted", "ik:none", "fp:one-seed"]),
+         vec!["w:wsh", "paths:1", "head:bare-multi", "lock:none", "sorted", "ik:none", "fp:one-seed-one-path", "origins:default-wsh"]),
         ("keyed_compose_wsh_two_path_or_d", pl(Wrapper::Wsh, vec![k(2, 3), lk(k(1, 1), Lock::OlderBlocks(26280))]),
          "wsh(or_d(multi(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:pkh(@3/<0;1>/*),older(26280))))".to_string(),
-         vec!["w:wsh", "paths:2", "head:bare-multi", "lock:blocks", "ik:none", "fp:one-seed"]),
+         vec!["w:wsh", "paths:2", "head:bare-multi", "lock:blocks", "ik:none", "fp:one-seed-one-path", "fp:one-seed-two-paths", "origins:default-wsh"]),
         // Same list as the previous entry; the MANIFEST binds four DISTINCT fingerprints.
         ("keyed_compose_wsh_two_path_distinct_fingerprints", pl(Wrapper::Wsh, vec![k(2, 3), lk(k(1, 1), Lock::OlderBlocks(26280))]),
          "wsh(or_d(multi(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:pkh(@3/<0;1>/*),older(26280))))".to_string(),
-         vec!["w:wsh", "paths:2", "head:bare-multi", "lock:blocks", "ik:none", "fp:distinct"]),
+         vec!["w:wsh", "paths:2", "head:bare-multi", "lock:blocks", "ik:none", "fp:distinct", "origins:default-wsh"]),
         ("keyed_compose_wsh_single_head_or_i", pl(Wrapper::Wsh, vec![k(1, 1), lk(k(1, 1), Lock::OlderUnits(15188))]),
          "wsh(or_i(pkh(@0/<0;1>/*),and_v(v:pkh(@1/<0;1>/*),older(4209492))))".to_string(),
-         vec!["w:wsh", "paths:2", "head:single", "lock:units", "ik:none", "fp:one-seed"]),
+         vec!["w:wsh", "paths:2", "head:single", "lock:units", "ik:none", "fp:one-seed-two-paths", "origins:default-wsh"]),
         ("keyed_compose_wsh_locked_head_or_i", pl(Wrapper::Wsh, vec![lk(k(2, 2), Lock::AfterHeight(905_000)), k(1, 1)]),
          "wsh(or_i(and_v(v:multi(2,@0/<0;1>/*,@1/<0;1>/*),after(905000)),pkh(@2/<0;1>/*)))".to_string(),
-         vec!["w:wsh", "paths:2", "head:locked", "lock:height", "ik:none", "fp:one-seed"]),
+         vec!["w:wsh", "paths:2", "head:locked", "lock:height", "ik:none", "fp:one-seed-one-path", "fp:one-seed-two-paths", "origins:default-wsh"]),
         ("keyed_compose_wsh_hash_and_time", pl(Wrapper::Wsh, vec![k(1, 1), lk(hs(k(2, 2), H), Lock::AfterTime(1_893_456_000))]),
          format!("wsh(or_i(pkh(@0/<0;1>/*),and_v(v:multi(2,@1/<0;1>/*,@2/<0;1>/*),and_v(v:sha256({HH}),after(1893456000)))))"),
-         vec!["w:wsh", "paths:2", "head:single", "lock:time", "hash", "ik:none", "fp:one-seed"]),
+         vec!["w:wsh", "paths:2", "head:single", "lock:time", "hash", "ik:none", "fp:one-seed-one-path", "fp:one-seed-two-paths", "origins:default-wsh"]),
         ("keyed_compose_wsh_three_paths", pl(Wrapper::Wsh, vec![k(1, 1), lk(k(1, 1), Lock::OlderBlocks(4032)), lk(k(1, 1), Lock::AfterHeight(1_000_000))]),
          "wsh(or_i(pkh(@0/<0;1>/*),or_i(and_v(v:pkh(@1/<0;1>/*),older(4032)),and_v(v:pkh(@2/<0;1>/*),after(1000000)))))".to_string(),
-         vec!["w:wsh", "paths:3", "head:single", "lock:blocks", "lock:height", "ik:none", "fp:one-seed"]),
+         vec!["w:wsh", "paths:3", "head:single", "lock:blocks", "lock:height", "ik:none", "fp:one-seed-two-paths", "origins:default-wsh"]),
         ("keyed_compose_wsh_unsorted_sole", pl(Wrapper::Wsh, vec![u(2, 3)]),
          "wsh(multi(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))".to_string(),
-         vec!["w:wsh", "paths:1", "head:bare-multi", "lock:none", "unsorted", "ik:none", "fp:one-seed"]),
+         vec!["w:wsh", "paths:1", "head:bare-multi", "lock:none", "unsorted", "ik:none", "fp:one-seed-one-path", "origins:default-wsh"]),
         // ---- legacy wrappers
         ("keyed_compose_sh_wsh_sole", pl(Wrapper::ShWsh, vec![k(2, 3)]),
          "sh(wsh(sortedmulti(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*)))".to_string(),
-         vec!["w:sh-wsh", "paths:1", "head:bare-multi", "lock:none", "sorted", "ik:none", "fp:one-seed"]),
+         vec!["w:sh-wsh", "paths:1", "head:bare-multi", "lock:none", "sorted", "ik:none", "fp:one-seed-one-path", "origins:default-sh-wsh"]),
         ("keyed_compose_sh_wsh_one_of_two", pl(Wrapper::ShWsh, vec![k(1, 2)]),
          "sh(wsh(sortedmulti(1,@0/<0;1>/*,@1/<0;1>/*)))".to_string(),
-         vec!["w:sh-wsh", "paths:1", "head:bare-multi", "lock:none", "sorted", "ik:none", "fp:one-seed"]),
+         vec!["w:sh-wsh", "paths:1", "head:bare-multi", "lock:none", "sorted", "ik:none", "fp:one-seed-one-path", "origins:default-sh-wsh"]),
         ("keyed_compose_sh_sole", pl(Wrapper::Sh, vec![k(2, 2)]),
          "sh(sortedmulti(2,@0/<0;1>/*,@1/<0;1>/*))".to_string(),
-         vec!["w:sh", "paths:1", "head:bare-multi", "lock:none", "sorted", "ik:none", "fp:one-seed"]),
+         vec!["w:sh", "paths:1", "head:bare-multi", "lock:none", "sorted", "ik:none", "fp:one-seed-one-path", "origins:default-sh"]),
         ("keyed_compose_sh_two_of_four", pl(Wrapper::Sh, vec![k(2, 4)]),
          "sh(sortedmulti(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*))".to_string(),
-         vec!["w:sh", "paths:1", "head:bare-multi", "lock:none", "sorted", "ik:none", "fp:one-seed"]),
+         vec!["w:sh", "paths:1", "head:bare-multi", "lock:none", "sorted", "ik:none", "fp:one-seed-one-path", "origins:default-sh"]),
         // ---- taproot family
         ("keyed_compose_tr_two_path_nums", pl(Wrapper::Tr, vec![k(2, 3), lk(k(1, 1), Lock::OlderBlocks(26280))]),
          format!("tr({NUMS},{{multi_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:pk(@3/<0;1>/*),older(26280))}})"),
-         vec!["w:tr", "paths:2", "ik:nums", "spine:2", "lock:blocks", "fp:one-seed"]),
+         vec!["w:tr", "paths:2", "ik:nums", "spine:2", "lock:blocks", "fp:one-seed-one-path", "fp:one-seed-two-paths", "origins:default-tr"]),
         // Same list as the previous entry; the MANIFEST binds four DISTINCT fingerprints.
         ("keyed_compose_tr_two_path_distinct_fingerprints", pl(Wrapper::Tr, vec![k(2, 3), lk(k(1, 1), Lock::OlderBlocks(26280))]),
          format!("tr({NUMS},{{multi_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:pk(@3/<0;1>/*),older(26280))}})"),
-         vec!["w:tr", "paths:2", "ik:nums", "spine:2", "lock:blocks", "fp:distinct"]),
+         vec!["w:tr", "paths:2", "ik:nums", "spine:2", "lock:blocks", "fp:distinct", "origins:default-tr"]),
         ("keyed_compose_tr_extracted_first", pl(Wrapper::Tr, vec![k(1, 1), lk(k(1, 1), Lock::OlderBlocks(65535))]),
          "tr(@0/<0;1>/*,and_v(v:pk(@1/<0;1>/*),older(65535)))".to_string(),
-         vec!["w:tr", "paths:2", "ik:extracted-first", "spine:1", "lock:blocks", "fp:one-seed"]),
+         vec!["w:tr", "paths:2", "ik:extracted-first", "spine:1", "lock:blocks", "fp:one-seed-two-paths", "origins:default-tr"]),
         ("keyed_compose_tr_extracted_later_four_paths", pl(Wrapper::Tr, vec![lk(k(1, 1), Lock::OlderBlocks(10)), lk(k(1, 1), Lock::AfterHeight(1_000_000)), k(1, 1), lk(k(1, 1), Lock::OlderUnits(100))]),
          "tr(@0/<0;1>/*,{and_v(v:pk(@1/<0;1>/*),older(10)),{and_v(v:pk(@2/<0;1>/*),after(1000000)),and_v(v:pk(@3/<0;1>/*),older(4194404))}})".to_string(),
-         vec!["w:tr", "paths:4", "ik:extracted-later", "spine:3", "lock:blocks", "lock:height", "lock:units", "fp:one-seed"]),
+         vec!["w:tr", "paths:4", "ik:extracted-later", "spine:3", "lock:blocks", "lock:height", "lock:units", "fp:one-seed-two-paths", "origins:default-tr"]),
         ("keyed_compose_tr_three_paths_extracted_later", pl(Wrapper::Tr, vec![lk(k(1, 1), Lock::OlderBlocks(10)), k(1, 1), lk(k(1, 1), Lock::OlderUnits(5))]),
          "tr(@0/<0;1>/*,{and_v(v:pk(@1/<0;1>/*),older(10)),and_v(v:pk(@2/<0;1>/*),older(4194309))})".to_string(),
-         vec!["w:tr", "paths:3", "ik:extracted-later", "spine:2", "lock:blocks", "lock:units", "fp:one-seed"]),
+         vec!["w:tr", "paths:3", "ik:extracted-later", "spine:2", "lock:blocks", "lock:units", "fp:one-seed-two-paths", "origins:default-tr"]),
         ("keyed_compose_tr_nums_three_leaves", pl(Wrapper::Tr, vec![lk(k(1, 1), Lock::OlderBlocks(1)), lk(k(1, 1), Lock::OlderBlocks(2)), lk(k(2, 2), Lock::AfterHeight(2))]),
          format!("tr({NUMS},{{and_v(v:pk(@0/<0;1>/*),older(1)),{{and_v(v:pk(@1/<0;1>/*),older(2)),and_v(v:multi_a(2,@2/<0;1>/*,@3/<0;1>/*),after(2))}}}})"),
-         vec!["w:tr", "paths:3", "ik:nums", "spine:3", "lock:blocks", "lock:height", "fp:one-seed"]),
+         vec!["w:tr", "paths:3", "ik:nums", "spine:3", "lock:blocks", "lock:height", "fp:one-seed-one-path", "fp:one-seed-two-paths", "origins:default-tr"]),
         ("keyed_compose_tr_sole_sortedmulti_a", pl(Wrapper::Tr, vec![k(2, 3)]),
          format!("tr({NUMS},sortedmulti_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))"),
-         vec!["w:tr", "paths:1", "ik:nums", "spine:1", "lock:none", "sorted", "fp:one-seed"]),
+         vec!["w:tr", "paths:1", "ik:nums", "spine:1", "lock:none", "sorted", "fp:one-seed-one-path", "origins:default-tr"]),
         ("keyed_compose_tr_key_path_only", pl(Wrapper::Tr, vec![k(1, 1)]),
          "tr(@0/<0;1>/*)".to_string(),
-         vec!["w:tr", "paths:1", "ik:extracted-first", "spine:0", "lock:none", "fp:one-seed"]),
+         vec!["w:tr", "paths:1", "ik:extracted-first", "spine:0", "lock:none", "origins:default-tr"]),
         ("keyed_compose_tr_unsorted_sole_leaf", pl(Wrapper::Tr, vec![u(2, 2)]),
          format!("tr({NUMS},multi_a(2,@0/<0;1>/*,@1/<0;1>/*))"),
-         vec!["w:tr", "paths:1", "ik:nums", "spine:1", "lock:none", "unsorted", "fp:one-seed"]),
+         vec!["w:tr", "paths:1", "ik:nums", "spine:1", "lock:none", "unsorted", "fp:one-seed-one-path", "origins:default-tr"]),
         ("keyed_compose_tr_hash_leaf", pl(Wrapper::Tr, vec![k(2, 2), lk(hs(k(1, 1), H), Lock::AfterTime(1_893_456_000))]),
          format!("tr({NUMS},{{multi_a(2,@0/<0;1>/*,@1/<0;1>/*),and_v(v:pk(@2/<0;1>/*),and_v(v:sha256({HH}),after(1893456000)))}})"),
-         vec!["w:tr", "paths:2", "ik:nums", "spine:2", "hash", "lock:time", "fp:one-seed"]),
+         vec!["w:tr", "paths:2", "ik:nums", "spine:2", "hash", "lock:time", "fp:one-seed-one-path", "fp:one-seed-two-paths", "origins:default-tr"]),
         // ---- unkeyed: EXPERIMENTAL shapes and the size boundaries (more slots than the four journey keys)
         ("compose_wsh_keyless_hash_path", pl(Wrapper::Wsh, vec![k(2, 3), kl(H, Some(Lock::AfterHeight(1_383_520)))]),
          format!("wsh(or_d(multi(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:sha256({HH}),after(1383520))))"),
-         vec!["w:wsh", "paths:2", "head:bare-multi", "keyless-wsh", "hash", "lock:height", "ik:none", "fp:none"]),
+         vec!["w:wsh", "paths:2", "head:bare-multi", "keyless-wsh", "hash", "lock:height", "ik:none", "fp:none", "origins:default-wsh"]),
         ("compose_wsh_keyless_hash_only", pl(Wrapper::Wsh, vec![k(1, 1), kl(H, None)]),
          format!("wsh(or_i(pkh(@0/<0;1>/*),sha256({HH})))"),
-         vec!["w:wsh", "paths:2", "head:single", "keyless-wsh", "hash", "lock:none", "ik:none", "fp:none"]),
+         vec!["w:wsh", "paths:2", "head:single", "keyless-wsh", "hash", "lock:none", "ik:none", "fp:none", "origins:default-wsh"]),
         ("compose_wsh_eight_paths", pl(Wrapper::Wsh, (0..8).map(|i| lk(k(1, 1), Lock::OlderBlocks(100 + i))).collect()),
          "wsh(or_i(and_v(v:pkh(@0/<0;1>/*),older(100)),or_i(and_v(v:pkh(@1/<0;1>/*),older(101)),or_i(and_v(v:pkh(@2/<0;1>/*),older(102)),or_i(and_v(v:pkh(@3/<0;1>/*),older(103)),or_i(and_v(v:pkh(@4/<0;1>/*),older(104)),or_i(and_v(v:pkh(@5/<0;1>/*),older(105)),or_i(and_v(v:pkh(@6/<0;1>/*),older(106)),and_v(v:pkh(@7/<0;1>/*),older(107))))))))))".to_string(),
-         vec!["w:wsh", "paths:8", "head:locked", "lock:blocks", "ik:none", "fp:none"]),
+         vec!["w:wsh", "paths:8", "head:locked", "lock:blocks", "ik:none", "fp:none", "origins:default-wsh"]),
         ("compose_tr_seven_leaves", pl(Wrapper::Tr, (0..8).map(|i| if i == 0 { k(1, 1) } else { lk(k(1, 1), Lock::OlderBlocks(100 + i)) }).collect()),
          "tr(@0/<0;1>/*,{and_v(v:pk(@1/<0;1>/*),older(101)),{and_v(v:pk(@2/<0;1>/*),older(102)),{and_v(v:pk(@3/<0;1>/*),older(103)),{and_v(v:pk(@4/<0;1>/*),older(104)),{and_v(v:pk(@5/<0;1>/*),older(105)),{and_v(v:pk(@6/<0;1>/*),older(106)),and_v(v:pk(@7/<0;1>/*),older(107))}}}}}})".to_string(),
-         vec!["w:tr", "paths:8", "ik:extracted-first", "spine:7", "lock:blocks", "fp:none"]),
+         vec!["w:tr", "paths:8", "ik:extracted-first", "spine:7", "lock:blocks", "fp:none", "origins:default-tr"]),
         ("compose_wsh_thirty_two_slots", pl(Wrapper::Wsh, vec![k(9, 9), k(9, 9), k(9, 9), k(5, 5)]),
          "wsh(or_d(multi(9,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*,@4/<0;1>/*,@5/<0;1>/*,@6/<0;1>/*,@7/<0;1>/*,@8/<0;1>/*),or_d(multi(9,@9/<0;1>/*,@10/<0;1>/*,@11/<0;1>/*,@12/<0;1>/*,@13/<0;1>/*,@14/<0;1>/*,@15/<0;1>/*,@16/<0;1>/*,@17/<0;1>/*),or_d(multi(9,@18/<0;1>/*,@19/<0;1>/*,@20/<0;1>/*,@21/<0;1>/*,@22/<0;1>/*,@23/<0;1>/*,@24/<0;1>/*,@25/<0;1>/*,@26/<0;1>/*),multi(5,@27/<0;1>/*,@28/<0;1>/*,@29/<0;1>/*,@30/<0;1>/*,@31/<0;1>/*)))))".to_string(),
-         vec!["w:wsh", "paths:4", "slots:32", "head:bare-multi", "lock:none", "ik:none", "fp:none"]),
+         vec!["w:wsh", "paths:4", "slots:32", "head:bare-multi", "lock:none", "ik:none", "fp:none", "origins:default-wsh"]),
         ("compose_tr_thirty_two_slots", pl(Wrapper::Tr, tr32),
          format!("tr({NUMS},{{multi_a(4,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*),{{multi_a(4,@4/<0;1>/*,@5/<0;1>/*,@6/<0;1>/*,@7/<0;1>/*),{{multi_a(4,@8/<0;1>/*,@9/<0;1>/*,@10/<0;1>/*,@11/<0;1>/*),{{multi_a(4,@12/<0;1>/*,@13/<0;1>/*,@14/<0;1>/*,@15/<0;1>/*),{{multi_a(4,@16/<0;1>/*,@17/<0;1>/*,@18/<0;1>/*,@19/<0;1>/*),{{multi_a(4,@20/<0;1>/*,@21/<0;1>/*,@22/<0;1>/*,@23/<0;1>/*),{{multi_a(4,@24/<0;1>/*,@25/<0;1>/*,@26/<0;1>/*,@27/<0;1>/*),multi_a(4,@28/<0;1>/*,@29/<0;1>/*,@30/<0;1>/*,@31/<0;1>/*)}}}}}}}}}}}}}})"),
-         vec!["w:tr", "paths:8", "slots:32", "ik:nums", "spine:7", "lock:none", "fp:none"]),
+         vec!["w:tr", "paths:8", "slots:32", "ik:nums", "spine:7", "lock:none", "fp:none", "origins:default-tr"]),
     ]
 }
 
 /// Tags with exactly ONE legal shape, exempt from the two-vector rule and said
 /// so here: a taptree with m = 0 leaves is one unlocked single key and nothing
 /// else (spec §12 item 1).
-const SINGULAR_TAGS: &[&str] = &["spine:0"];
+pub const SINGULAR_TAGS: &[&str] = &["spine:0"];
+```
+
+Create `crates/md-codec/tests/compose_vectors.rs`:
+
+```rust
+//! Spec §12 item 1: TAGGED coverage of the lowering. Every compose vector in
+//! `MANIFEST` is listed in `support::family()` with the spec rows it exercises;
+//! every non-singular tag must appear in at least two vectors; every listed
+//! vector's stored template must be exactly what `compose` renders (with
+//! origins inlined) for its path list.
+
+use std::collections::BTreeMap;
+
+#[path = "compose_support.rs"]
+mod support;
+use support::*;
+
+use md_codec::compose::{compose, template_with_origins};
+use md_codec::render::descriptor_to_template;
+use md_codec::test_vectors::MANIFEST;
 
 #[test]
 fn every_family_entry_renders_as_listed() {
@@ -1788,29 +1947,46 @@ fn every_tag_appears_in_at_least_two_vectors() {
         "w:tr", "w:wsh", "w:sh-wsh", "w:sh", "paths:1", "paths:2", "paths:3", "paths:4", "slots:32",
         "spine:0", "spine:1", "spine:2", "spine:3", "spine:7", "ik:extracted-first", "ik:extracted-later",
         "ik:nums", "lock:none", "lock:blocks", "lock:units", "lock:height", "lock:time", "hash", "sorted",
-        "unsorted", "keyless-wsh", "fp:one-seed", "fp:distinct",
+        "unsorted", "keyless-wsh", "fp:distinct", "fp:one-seed-one-path", "fp:one-seed-two-paths",
+        "origins:default-tr", "origins:default-wsh", "origins:default-sh-wsh", "origins:default-sh",
     ] {
         assert!(count.contains_key(required), "required tag missing from the family: {required}");
     }
 }
 
 #[test]
-fn keyed_compose_vectors_carry_four_journey_keys_or_fewer() {
+fn keyed_compose_vectors_bind_at_most_the_four_journey_keys() {
     for v in MANIFEST.iter().filter(|v| v.name.starts_with("keyed_compose_")) {
         assert!(!v.keys.is_empty(), "{}: a keyed_ vector must bind keys so md vectors emits .conformance.json", v.name);
+        assert!(v.keys.len() <= XPUB.len(), "{}: the journey fixture has four keys", v.name);
         assert_eq!(v.keys.len(), v.fingerprints.len(), "{}", v.name);
+    }
+}
+```
+
+Add to `crates/md-codec/tests/compose_crosscheck.rs` (spec §12 item 1: "the §5b cross-check holds" for EVERY vector, not for three hand-picked shapes):
+
+```rust
+#[test]
+fn every_family_entry_passes_the_5b_cross_check() {
+    for (name, list, _, tags) in family() {
+        let keyless = tags.contains(&"keyless-wsh");
+        let addr = cross_check(name, &list, keyless);
+        if !keyless {
+            assert!(addr.starts_with("bc1") || addr.starts_with('3'), "{name}: {addr}");
+        }
     }
 }
 ```
 
 - [ ] **Step 2: Run it to see which vectors the MANIFEST lacks**
 
-Run: `cargo nextest run --locked -p md-codec --test compose_vectors 2>&1 | tail -20`
-Expected: `every_family_entry_renders_as_listed` and `every_tag_appears_in_at_least_two_vectors` PASS (the listed texts were generated by the lowering and checked by the plan's build gate); `every_compose_vector_in_the_manifest_is_exactly_what_compose_renders` FAILS with `MANIFEST lacks keyed_compose_wsh_sole_sortedmulti`.
+Run: `cargo nextest run --locked -p md-codec --test compose_vectors --test compose_crosscheck 2>&1 | tail -20`
+Expected: `every_family_entry_renders_as_listed`, `every_tag_appears_in_at_least_two_vectors` and `every_family_entry_passes_the_5b_cross_check` PASS (the listed texts were generated by the lowering and checked by the plan's build gate); `every_compose_vector_in_the_manifest_is_exactly_what_compose_renders` FAILS with `MANIFEST lacks keyed_compose_wsh_sole_sortedmulti`. Two tests pass VACUOUSLY at this point because `MANIFEST` holds no compose entry yet: `every_compose_manifest_entry_is_in_the_family` and `keyed_compose_vectors_bind_at_most_the_four_journey_keys`; both become real once the entries are pasted below.
 
 - [ ] **Step 3: Generate the manifest entries from the lowering, never by hand**
 
-The MANIFEST form is `template_with_origins` (inline origins, the parse-input form the keyed corpus already uses); it is printed by a helper test, never typed. Add the printer (kept; `--no-capture` shows it) at the end of `crates/md-codec/tests/compose_vectors.rs`:
+The MANIFEST form is `template_with_origins` (inline origins, the parse-input form the keyed corpus already uses); it is printed by a helper test, never typed. Add to `crates/md-codec/tests/compose_vectors.rs`, at the end (the printer; kept, `--no-capture` shows it):
 
 ```rust
 #[test]
@@ -1853,8 +2029,8 @@ Run: `cargo fmt --all && cargo clippy --locked -p md-codec --all-targets --all-f
 Expected: clean.
 
 ```bash
-git add crates/md-codec/src/test_vectors.rs crates/md-codec/tests/compose_vectors.rs
-git commit -m "md-codec: compose vector family -- 28 tagged vectors, every required tag twice, keyed ones export conformance.json (composer S0 task 5)
+git add crates/md-codec/src/test_vectors.rs crates/md-codec/tests/compose_support.rs crates/md-codec/tests/compose_vectors.rs crates/md-codec/tests/compose_crosscheck.rs
+git commit -m "md-codec: compose vector family -- 28 tagged vectors, every required tag twice, the 5b cross-check over all of them, keyed ones export conformance.json (composer S0 task 5)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
@@ -1866,7 +2042,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 
 **Files:**
 - Create: `crates/md-cli/src/cmd/compose.rs`
-- Modify: `crates/md-cli/src/cmd/mod.rs` (append `pub mod compose;`), `crates/md-cli/src/error.rs` (add variant `Compose(String)` directly after `BadArg(String),` and a `Display` arm `CliError::Compose(m) => write!(f, "{m}")` directly after `BadArg`'s; every `CliError` exits 1 through `main`'s single `Err(e)` arm, which prints `md: {e}`), `crates/md-cli/src/main.rs` (the clap variant and dispatch arm below)
+- Modify: `crates/md-cli/src/cmd/mod.rs` (append `pub mod compose;`), `crates/md-cli/src/error.rs` (add variant `Compose(String)` directly after `BadArg(String),` and a `Display` arm `CliError::Compose(m) => write!(f, "{m}")` directly after `BadArg`'s; `Compose` takes `main`'s generic `Err(e)` arm, which prints `md: {e}` and exits 1 — `BadArg` alone has its own arm and exits 2), `crates/md-cli/src/main.rs` (the clap variant and dispatch arm below)
 - Test: `crates/md-cli/tests/cli_compose.rs`
 
 **Interfaces:**
@@ -1976,6 +2152,20 @@ fn compose_refuses_structural_defects_with_the_spec_wording() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("older in blocks needs 1..=65535"));
+    // A Unix time typed without its suffix is refused WITH the suffix named.
+    md().args(["compose", "--wrapper", "wsh", "--path", "1of1,after=1893456000"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("after=1893456000t"));
+}
+
+#[test]
+fn compose_says_when_unsorted_had_no_effect() {
+    md().args(["compose", "--wrapper", "wsh", "--path", "2of3,unsorted", "--path", "1of1,older=10"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("`unsorted` has no effect here"))
+        .stderr(predicate::str::contains("EXPERIMENTAL").not());
 }
 
 #[test]
@@ -2003,6 +2193,9 @@ Create `crates/md-cli/src/cmd/compose.rs`:
 //! `md compose` -- the FIXED lowering surface (SPEC_wallet_policy_composer.md
 //! §10 item 1). The opposite contract to `md compile`: no search, no cost
 //! model, the same answer from every implementation, forever.
+//!
+//! Not to be confused with `crate::seat::compose`, which SEATS keys into an
+//! existing keyless card; this module builds the card's policy from a path list.
 
 use crate::error::CliError;
 use md_codec::compose::{compose, template_with_origins, Experimental, KeySet, Lock, PathList, SpendPath, Wrapper};
@@ -2070,7 +2263,15 @@ pub fn parse_path(s: &str) -> Result<SpendPath, CliError> {
                 path.lock = Some(if let Some(t) = value.strip_suffix('t') {
                     Lock::AfterTime(parse_u32(t, "after time")?)
                 } else {
-                    Lock::AfterHeight(parse_u32(value, "after height")?)
+                    let h = parse_u32(value, "after height")?;
+                    if h >= md_codec::compose::LOCKTIME_THRESHOLD {
+                        // The band refusal alone never names the remedy; the
+                        // operator who typed a Unix time needs the suffix.
+                        return Err(CliError::Compose(format!(
+                            "path `{s}`: after={h} reads as a block height and is above the height band (1..=499999999); for a Unix time write after={h}t"
+                        )));
+                    }
+                    Lock::AfterHeight(h)
                 });
             }
             "older" | "after" => {
@@ -2119,6 +2320,19 @@ pub fn run(wrapper: &str, paths: &[String], experimental: bool, json: bool) -> R
     }
     for e in &composed.experimental {
         eprintln!("warning: EXPERIMENTAL: {}", describe(e));
+    }
+    // `unsorted` where sorted was never available is dropped by the lowering
+    // (spec §5a: the §8b confirm fires only where sorted was legal); say so
+    // rather than accept a typed request silently.
+    for (i, p) in list.paths.iter().enumerate() {
+        if matches!(p.keys, Some(KeySet { n, sorted: false, .. }) if n >= 2)
+            && !composed.experimental.contains(&Experimental::UnsortedKeys(i))
+        {
+            eprintln!(
+                "note: path {}: `unsorted` has no effect here; sorted keys are not available in this position, so it is multi either way",
+                i + 1
+            );
+        }
     }
     let template = descriptor_to_template(&composed.descriptor).map_err(CliError::Render)?;
     let with_origins = template_with_origins(&composed).map_err(CliError::Render)?;
@@ -2174,7 +2388,8 @@ Add to `crates/md-cli/src/error.rs`, directly after `BadArg(String),`:
 ```text
     /// `md compose` refusals: structural (§4e), lock band (§4c), DSL, or an
     /// EXPERIMENTAL shape without `--experimental`. The message is complete in
-    /// itself; `main` prefixes `md: ` and exits 1 like every other `CliError`.
+    /// itself; `main`'s generic arm prefixes `md: ` and exits 1 (`BadArg`,
+    /// above, is the one variant with its own arm, exiting 2).
     Compose(String),
 ```
 
@@ -2184,7 +2399,7 @@ and, directly after the `BadArg` arm of `impl fmt::Display for CliError`:
             CliError::Compose(m) => write!(f, "{m}"),
 ```
 
-Add to `crates/md-cli/src/main.rs`, in the `Commands` enum directly after the `Compile { .. }` variant:
+Add to `crates/md-cli/src/main.rs`, in the `Command` enum (`crates/md-cli/src/main.rs:96`) directly after the `Compile { .. }` variant:
 
 ```text
     /// Lower an ORDERED list of spend paths to a BIP-388 template by FIXED rules
@@ -2206,10 +2421,10 @@ Add to `crates/md-cli/src/main.rs`, in the `Commands` enum directly after the `C
     },
 ```
 
-and in the dispatch `match`, directly after the `Commands::Compile { .. }` arm:
+and in the dispatch `match`, directly after the `Command::Compile { .. }` arm:
 
 ```text
-        Commands::Compose { wrapper, paths, experimental, json } => {
+        Command::Compose { wrapper, paths, experimental, json } => {
             cmd::compose::run(&wrapper, &paths, experimental, json)
         }
 ```
@@ -2274,8 +2489,9 @@ fn presets_compose_and_carry_the_documented_shapes() {
     assert!(p.paths[0].hash.is_some());
     assert_eq!(p.paths[1].lock, Some(Lock::OlderBlocks(144)));
 
-    let p = presets::decaying_multisig(Wrapper::Wsh, 2, 2, 1000, 2000, 4_000_000).unwrap();
+    let p = presets::decaying_multisig(Wrapper::Wsh, 2, 3, 1, 2, 1000, 2000, 4_000_000).unwrap();
     assert_eq!(p.paths.len(), 3);
+    assert_eq!(p.paths[1].keys, Some(KeySet { k: 1, n: 2, sorted: true }), "the recovery quorum is SMALLER: that is the decay");
     assert_eq!(p.paths[2].lock, Some(Lock::AfterHeight(4_000_000)));
     for l in [
         presets::plain_multisig(Wrapper::Wsh, 2, 3).unwrap(),
@@ -2283,17 +2499,74 @@ fn presets_compose_and_carry_the_documented_shapes() {
         presets::kofn_recovery(Wrapper::Tr, 2, 3, 52560).unwrap(),
         presets::tiered_recovery(Wrapper::Wsh, 2, 2, 2, 3, 4032).unwrap(),
         presets::hashlock_gated(Wrapper::Wsh, H1, 144).unwrap(),
-        presets::decaying_multisig(Wrapper::Wsh, 2, 2, 1000, 2000, 4_000_000).unwrap(),
+        presets::decaying_multisig(Wrapper::Wsh, 2, 3, 1, 2, 1000, 2000, 4_000_000).unwrap(),
     ] {
         compose(&l).unwrap_or_else(|e| panic!("{l:?}: {e}"));
     }
 }
 
 #[test]
+fn presets_lower_to_their_pinned_templates() {
+    // Spec §10 item 3: "the five presets as Concrete policies + expected
+    // templates". The Concrete-policy half is the §5b cross-check in
+    // `compose_crosscheck.rs`; this is the expected-template half, pinned as
+    // literals so a preset that drifts in SHAPE (which tier carries the lock,
+    // which quorum is smaller) fails here.
+    let h = "a8".repeat(32);
+    let cases: Vec<(&str, PathList, String)> = vec![
+        ("plain_multisig", presets::plain_multisig(Wrapper::Wsh, 2, 3).unwrap(),
+         "wsh(sortedmulti(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))".to_string()),
+        ("simple_timelocked_inheritance", presets::simple_timelocked_inheritance(Wrapper::Wsh, 65535).unwrap(),
+         "wsh(or_i(pkh(@0/<0;1>/*),and_v(v:pkh(@1/<0;1>/*),older(65535))))".to_string()),
+        ("kofn_recovery", presets::kofn_recovery(Wrapper::Tr, 2, 3, 52560).unwrap(),
+         format!("tr({NUMS},{{multi_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:pk(@3/<0;1>/*),older(52560))}})")),
+        ("tiered_recovery", presets::tiered_recovery(Wrapper::Wsh, 2, 2, 2, 3, 4032).unwrap(),
+         "wsh(or_d(multi(2,@0/<0;1>/*,@1/<0;1>/*),and_v(v:multi(2,@2/<0;1>/*,@3/<0;1>/*,@4/<0;1>/*),older(4032))))".to_string()),
+        ("hashlock_gated", presets::hashlock_gated(Wrapper::Wsh, H1, 144).unwrap(),
+         format!("wsh(or_i(and_v(v:pkh(@0/<0;1>/*),sha256({h})),and_v(v:pkh(@1/<0;1>/*),older(144))))")),
+        ("decaying_multisig", presets::decaying_multisig(Wrapper::Wsh, 2, 3, 1, 2, 1000, 2000, 4_000_000).unwrap(),
+         "wsh(or_i(and_v(v:multi(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),older(1000)),or_i(and_v(v:multi(1,@3/<0;1>/*,@4/<0;1>/*),older(2000)),and_v(v:pkh(@5/<0;1>/*),after(4000000)))))".to_string()),
+    ];
+    for (name, list, expected) in cases {
+        assert_eq!(text(&list), expected, "{name}");
+    }
+}
+
+#[test]
 fn presets_refuse_parameters_the_grammar_refuses() {
-    assert!(presets::plain_multisig(Wrapper::Wsh, 3, 2).is_err());
-    assert!(presets::simple_timelocked_inheritance(Wrapper::Wsh, 0).is_err());
-    assert!(presets::kofn_recovery(Wrapper::Wsh, 2, 3, 70_000).is_err());
+    assert!(matches!(presets::plain_multisig(Wrapper::Wsh, 3, 2), Err(ComposeError::BadThreshold { .. })));
+    assert!(matches!(presets::simple_timelocked_inheritance(Wrapper::Wsh, 0), Err(ComposeError::LockOutOfRange { path: 1, .. })));
+    assert!(matches!(presets::kofn_recovery(Wrapper::Wsh, 2, 3, 70_000), Err(ComposeError::LockOutOfRange { path: 1, .. })));
+    // The refusal names the tier that carries the bad lock, not tier 1.
+    assert_eq!(
+        presets::tiered_recovery(Wrapper::Wsh, 2, 2, 2, 3, 70_000).unwrap_err().to_string(),
+        "path 2: older in blocks needs 1..=65535"
+    );
+    // Decay must be a decay: later tiers unlock LATER, and the recovery quorum is not larger.
+    assert!(matches!(presets::decaying_multisig(Wrapper::Wsh, 2, 3, 1, 2, 2000, 1000, 4_000_000), Err(ComposeError::PresetShape { .. })));
+    assert!(matches!(presets::decaying_multisig(Wrapper::Wsh, 1, 2, 2, 3, 1000, 2000, 4_000_000), Err(ComposeError::PresetShape { .. })));
+}
+```
+
+Add to `crates/md-codec/tests/compose_crosscheck.rs` (spec §10 item 3's Concrete-policy half: every preset through the §5b legs, with its own keys):
+
+```rust
+#[test]
+fn every_preset_passes_the_5b_cross_check() {
+    use md_codec::compose::presets;
+    let cases: Vec<(&str, PathList)> = vec![
+        ("plain_multisig", presets::plain_multisig(Wrapper::Wsh, 2, 3).unwrap()),
+        ("simple_timelocked_inheritance", presets::simple_timelocked_inheritance(Wrapper::Wsh, 65535).unwrap()),
+        ("kofn_recovery_tr", presets::kofn_recovery(Wrapper::Tr, 2, 3, 52560).unwrap()),
+        ("kofn_recovery_wsh", presets::kofn_recovery(Wrapper::Wsh, 2, 3, 52560).unwrap()),
+        ("tiered_recovery", presets::tiered_recovery(Wrapper::Wsh, 2, 2, 2, 3, 4032).unwrap()),
+        ("hashlock_gated", presets::hashlock_gated(Wrapper::Wsh, H, 144).unwrap()),
+        ("decaying_multisig", presets::decaying_multisig(Wrapper::Wsh, 2, 3, 1, 2, 1000, 2000, 4_000_000).unwrap()),
+    ];
+    for (name, list) in cases {
+        let addr = cross_check(name, &list, false);
+        assert!(addr.starts_with("bc1"), "{name}: {addr}");
+    }
 }
 ```
 
@@ -2318,12 +2591,14 @@ fn ks(k: u8, n: u8) -> SpendPath {
     SpendPath { keys: Some(KeySet { k, n, sorted: true }), hash: None, lock: None }
 }
 
-fn blocks(b: u32) -> Result<Lock, ComposeError> {
+/// `older` in blocks for the path at `path` (0-based), so a refusal names the
+/// tier that carries the bad lock.
+fn blocks(b: u32, path: usize) -> Result<Lock, ComposeError> {
     u16::try_from(b)
         .ok()
         .filter(|b| *b >= 1)
         .map(Lock::OlderBlocks)
-        .ok_or(ComposeError::LockOutOfRange { path: 0, why: "older in blocks needs 1..=65535" })
+        .ok_or(ComposeError::LockOutOfRange { path, why: "older in blocks needs 1..=65535" })
 }
 
 fn checked(list: PathList) -> Result<PathList, ComposeError> {
@@ -2339,21 +2614,21 @@ pub fn plain_multisig(wrapper: Wrapper, k: u8, n: u8) -> Result<PathList, Compos
 /// Primary key now; heir after `older_blocks`.
 pub fn simple_timelocked_inheritance(wrapper: Wrapper, older_blocks: u32) -> Result<PathList, ComposeError> {
     let mut heir = ks(1, 1);
-    heir.lock = Some(blocks(older_blocks)?);
+    heir.lock = Some(blocks(older_blocks, 1)?);
     checked(PathList { wrapper, paths: vec![ks(1, 1), heir] })
 }
 
 /// k-of-n now; one recovery key after `older_blocks`.
 pub fn kofn_recovery(wrapper: Wrapper, k: u8, n: u8, older_blocks: u32) -> Result<PathList, ComposeError> {
     let mut recovery = ks(1, 1);
-    recovery.lock = Some(blocks(older_blocks)?);
+    recovery.lock = Some(blocks(older_blocks, 1)?);
     checked(PathList { wrapper, paths: vec![ks(k, n), recovery] })
 }
 
 /// k1-of-n1 now; k2-of-n2 (distinct keys) after `older_blocks`.
 pub fn tiered_recovery(wrapper: Wrapper, k1: u8, n1: u8, k2: u8, n2: u8, older_blocks: u32) -> Result<PathList, ComposeError> {
     let mut tier2 = ks(k2, n2);
-    tier2.lock = Some(blocks(older_blocks)?);
+    tier2.lock = Some(blocks(older_blocks, 1)?);
     checked(PathList { wrapper, paths: vec![ks(k1, n1), tier2] })
 }
 
@@ -2362,16 +2637,35 @@ pub fn hashlock_gated(wrapper: Wrapper, hash: [u8; 32], older_blocks: u32) -> Re
     let mut gated = ks(1, 1);
     gated.hash = Some(hash);
     let mut later = ks(1, 1);
-    later.lock = Some(blocks(older_blocks)?);
+    later.lock = Some(blocks(older_blocks, 1)?);
     checked(PathList { wrapper, paths: vec![gated, later] })
 }
 
-/// k-of-n after `older1`; a second k-of-n after `older2`; one final key after `after_height`.
-pub fn decaying_multisig(wrapper: Wrapper, k: u8, n: u8, older1: u32, older2: u32, after_height: u32) -> Result<PathList, ComposeError> {
-    let mut t1 = ks(k, n);
-    t1.lock = Some(blocks(older1)?);
-    let mut t2 = ks(k, n);
-    t2.lock = Some(blocks(older2)?);
+/// k1-of-n1 after `older1`; a SMALLER recovery quorum k2-of-n2 (distinct keys)
+/// after `older2 > older1`; one final key after `after_height`. The toolkit's
+/// archetype takes the primary and recovery quorums as separate parameters and
+/// refuses tiers that do not unlock progressively later; so does this.
+#[allow(clippy::too_many_arguments)]
+pub fn decaying_multisig(
+    wrapper: Wrapper,
+    k1: u8,
+    n1: u8,
+    k2: u8,
+    n2: u8,
+    older1: u32,
+    older2: u32,
+    after_height: u32,
+) -> Result<PathList, ComposeError> {
+    if older2 <= older1 {
+        return Err(ComposeError::PresetShape { why: "decaying tiers must unlock progressively later (the second older must exceed the first)" });
+    }
+    if k2 > k1 {
+        return Err(ComposeError::PresetShape { why: "a decaying multisig decays: the recovery threshold cannot exceed the primary threshold" });
+    }
+    let mut t1 = ks(k1, n1);
+    t1.lock = Some(blocks(older1, 0)?);
+    let mut t2 = ks(k2, n2);
+    t2.lock = Some(blocks(older2, 1)?);
     let mut t3 = ks(1, 1);
     t3.lock = Some(Lock::AfterHeight(after_height));
     checked(PathList { wrapper, paths: vec![t1, t2, t3] })
@@ -2390,8 +2684,8 @@ Run: `cargo nextest run --locked -p md-codec 2>&1 | tail -5 && cargo fmt --all &
 Expected: all PASS, clean.
 
 ```bash
-git add crates/md-codec/src/compose/mod.rs crates/md-codec/src/compose/presets.rs crates/md-codec/tests/compose_lowering.rs
-git commit -m "md-codec: compose presets -- plain k-of-n and the five toolkit archetypes as path lists (composer S0 task 7)
+git add crates/md-codec/src/compose/mod.rs crates/md-codec/src/compose/presets.rs crates/md-codec/tests/compose_lowering.rs crates/md-codec/tests/compose_crosscheck.rs
+git commit -m "md-codec: compose presets -- plain k-of-n and the five toolkit archetypes as path lists, pinned templates, 5b-checked (composer S0 task 7)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
@@ -2399,7 +2693,164 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 
 ---
 
-### Task 8: Whole-stage gate, vendoring, release notes
+### Task 8: `md encode` gates a signature-free spend path under every wrapper, not only `tr`
+
+**Files:**
+- Modify: `crates/md-cli/src/parse/template.rs` (`parse_template_ext`, the `ms_desc` construction, `crates/md-cli/src/parse/template.rs:2677-2700`)
+- Test: `crates/md-cli/tests/cli_compose_encode_gate.rs`
+
+**Interfaces:**
+- Consumes: `miniscript::Descriptor::sanity_check`, `Miniscript::ext_check(&ExtParams)`, `miniscript::descriptor::ShInner`, `Wsh::as_inner() -> &Miniscript<Pk, Segwitv0>`, `Sh::as_inner() -> &ShInner<Pk>` (all present at the pinned miniscript `ff4732e`).
+- Produces: `md encode` refusing "All spend paths must require a signature" for `wsh`/`sh(wsh)`/`sh` exactly as it already does for `tr`, and admitting the shape with `--experimental` plus the existing warning.
+
+**Why this is in Stage 0.** Measured at `3b0944fb` with `target/debug/md`: `md encode` on `wsh(or_d(multi(2,...),and_v(v:sha256(H),after(1383520))))` exits 0 with no warning, keyed (`--key @0..@2`) or unkeyed; the same shape under `tr` is refused with `template parse error: miniscript parse failed: All spend paths must require a signature`. Cause: `Descriptor::from_str` runs the sanity gate only for `tr` (the code's own comment at `crates/md-cli/src/parse/template.rs:2678` calls it "`from_str`'s tr-only sanity gate"), and `parse_template_ext` never calls `sanity_check()` itself. After Task 6, `md compose` refuses that shape without `--experimental` and then prints a template `md encode` accepts silently — the EXPERIMENTAL gate one command deep. Follow-up `md-encode-keyless-template-sigless-path-not-gated` in descriptor-mnemonic `design/FOLLOWUPS.md` is owned by this stage.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `crates/md-cli/tests/cli_compose_encode_gate.rs`:
+
+```rust
+//! `md encode` and `md compose` must agree on the EXPERIMENTAL gate: a spend
+//! path that needs no signature is refused under EVERY wrapper unless
+//! `--experimental`, which then warns. Before this task only `tr` was gated.
+
+use assert_cmd::Command;
+use predicates::prelude::*;
+
+fn md() -> Command {
+    Command::cargo_bin("md").expect("md binary")
+}
+
+const H: &str = "a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8";
+const XPUB: [&str; 3] = [
+    "xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf",
+    "xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk",
+    "xpub6EGx8sPr9FxPPE1rbZazhqWwpMXA3Hf5DYKtZbL7c4BSddzmQktp96UaTvecEkoCZysuaj79GMCFZYT1KKk7Ph2M3Kf5g8B82KZ8TZ9SKQR",
+];
+
+fn sigless_wsh() -> String {
+    format!("wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*),and_v(v:sha256({H}),after(1383520))))")
+}
+
+#[test]
+fn encode_refuses_a_sigless_wsh_path_unkeyed_unless_experimental() {
+    md().args(["encode", &sigless_wsh()])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("must require a signature"));
+    md().args(["encode", "--experimental", &sigless_wsh()])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("relaxed the signature rule"));
+}
+
+#[test]
+fn encode_refuses_a_sigless_wsh_path_keyed_unless_experimental() {
+    let keyed = |extra: &[&str]| {
+        let mut args: Vec<String> = vec!["encode".into()];
+        args.extend(extra.iter().map(|s| s.to_string()));
+        args.push(sigless_wsh());
+        for (i, x) in XPUB.iter().enumerate() {
+            args.push("--key".into());
+            args.push(format!("@{i}={x}"));
+            args.push("--fingerprint".into());
+            args.push(format!("@{i}=73c5da0a"));
+        }
+        md().args(&args).assert()
+    };
+    keyed(&[]).failure().code(1).stderr(predicate::str::contains("must require a signature"));
+    keyed(&["--experimental"]).success().stderr(predicate::str::contains("relaxed the signature rule"));
+}
+
+#[test]
+fn encode_still_admits_a_signed_wsh_policy_without_the_flag() {
+    let two_path = "wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*),and_v(v:pkh(@3/48'/0'/3'/2'/<0;1>/*),older(26280))))";
+    md().args(["encode", two_path])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("signature").not());
+}
+```
+
+- [ ] **Step 2: Run to verify the two refusals fail today**
+
+Run: `cargo nextest run --locked -p md-cli --test cli_compose_encode_gate 2>&1 | tail -8`
+Expected: the two `*_unless_experimental` tests FAIL (the unflagged encode exits 0 today); the regression guard PASSES.
+
+- [ ] **Step 3: Run the sanity check for every wrapper, and the relaxed re-check for every wrapper**
+
+In `crates/md-cli/src/parse/template.rs`, `parse_template_ext`, replace the `let ms_desc = if experimental { ... } else { ... };` construction (`:2677-2700`) with:
+
+```text
+    let ms_desc = if experimental {
+        // Parse the tree WITHOUT `from_str`'s tr-only sanity gate, then re-apply
+        // every rule except `top_unsafe` ourselves -- per leaf for `tr`, on the
+        // one script for `wsh`, `sh(wsh)` and `sh`.
+        let tree = miniscript::expression::Tree::from_str(&substituted)
+            .map_err(|e| CliError::TemplateParse(format!("miniscript parse failed: {e}")))?;
+        let d = <MsDescriptor<DescriptorPublicKey> as miniscript::expression::FromTree>::from_tree(
+            tree.root(),
+        )
+        .map_err(|e| CliError::TemplateParse(format!("miniscript parse failed: {e}")))?;
+        let relaxed = miniscript::miniscript::analyzable::ExtParams::new().top_unsafe();
+        let relaxed_err = |e: miniscript::Error| {
+            CliError::TemplateParse(format!(
+                "miniscript parse failed even with --experimental: {e} \
+                 (--experimental relaxes ONLY the signature rule; malleability, \
+                 resource limits, repeated keys and timelock mixing still apply)"
+            ))
+        };
+        match &d {
+            MsDescriptor::Tr(inner) => {
+                for item in inner.leaves() {
+                    item.miniscript().ext_check(&relaxed).map_err(relaxed_err)?;
+                }
+            }
+            MsDescriptor::Wsh(w) => w.as_inner().ext_check(&relaxed).map_err(relaxed_err)?,
+            MsDescriptor::Sh(sh) => match sh.as_inner() {
+                miniscript::descriptor::ShInner::Wsh(w) => w.as_inner().ext_check(&relaxed).map_err(relaxed_err)?,
+                miniscript::descriptor::ShInner::Ms(ms) => ms.ext_check(&relaxed).map_err(relaxed_err)?,
+                miniscript::descriptor::ShInner::Wpkh(_) => {}
+            },
+            _ => {}
+        }
+        d
+    } else {
+        let d = MsDescriptor::<DescriptorPublicKey>::from_str(&substituted)
+            .map_err(|e| CliError::TemplateParse(format!("miniscript parse failed: {e}")))?;
+        // `from_str` runs the sanity gate for `tr` only; `md compose` refuses a
+        // signature-free path under every wrapper, and `encode` must agree
+        // (follow-up md-encode-keyless-template-sigless-path-not-gated).
+        d.sanity_check()
+            .map_err(|e| CliError::TemplateParse(format!("miniscript parse failed: {e}")))?;
+        d
+    };
+```
+
+If `ext_check`'s error type is not `miniscript::Error` at the pinned revision, type the closure to whatever `item.miniscript().ext_check(&relaxed)` returns; the existing `tr` arm shows the working call.
+
+- [ ] **Step 4: Run the md-cli suite WHOLE, and read any pre-existing failure as a finding**
+
+Run: `cargo nextest run --locked -p md-cli 2>&1 | tail -12`
+Expected: all PASS, including `cli_compose_encode_gate`, `cmd_encode`'s `experimental_admits_a_keyless_spend_path` (tr, unchanged) and every corpus test. **If a PRE-EXISTING test or corpus vector is now refused by `sanity_check` (malleability, timelock mixing, resource limits), STOP and report it: a shipped template that rust-miniscript's sanity rules reject is a finding for the operator, not something to relax here.** Then: `cargo nextest run --locked -p md-codec 2>&1 | tail -3` (unchanged, must stay green).
+
+- [ ] **Step 5: Format, clippy, commit**
+
+Run: `cargo fmt --all && cargo clippy --locked -p md-cli --all-targets --all-features -- -D warnings 2>&1 | tail -3`
+Expected: clean.
+
+```bash
+git add crates/md-cli/src/parse/template.rs crates/md-cli/tests/cli_compose_encode_gate.rs
+git commit -m "md-cli: encode runs the miniscript sanity gate for every wrapper, not only tr; --experimental relaxes the signature rule alike (composer S0 task 8)
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
+```
+
+---
+
+### Task 9: Whole-stage gate, vendoring, release notes
 
 **Files:**
 - Modify: `descriptor-mnemonic/CHANGELOG.md` or the crate's release notes as the repo's release ritual requires (check `design/RELEASE_CHECKLIST.md` there first)
@@ -2417,11 +2868,11 @@ Expected: only NEW `compose_*` / `keyed_compose_*` files appear; no existing vec
 
 - [ ] **Step 3: Record the release note and commit**
 
-Add a line under the unreleased section of the crate's changelog naming: `md_codec::compose` (new module, unconditional), `md compose` (new subcommand), the 28 compose vectors, and the dev-dependency on miniscript's `compiler` feature.
+Add a line under the unreleased section of the crate's changelog naming: `md_codec::compose` (new module, unconditional), `md compose` (new subcommand), the 28 compose vectors, the dev-dependency on miniscript's `compiler` feature, and the `md encode` behaviour change (a signature-free spend path is now refused under every wrapper unless `--experimental`; before, only under `tr`).
 
 ```bash
 git add crates/md-codec/tests/vectors CHANGELOG.md
-git commit -m "md-codec/md-cli: compose vector corpus regenerated; release note (composer S0 task 8)
+git commit -m "md-codec/md-cli: compose vector corpus regenerated; release note (composer S0 task 9)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
@@ -2435,14 +2886,16 @@ The stage is complete when: every task's commit exists; the workspace gate of th
 
 ## Self-review (run by the plan author before dispatch)
 
-1. **Spec coverage, Stage 0 scope:** §4 bounds → Task 1 `validate` + tests; §4c → `Lock::operand` + tests; §4f defaults and invariant → Task 2 `origins` + Task 3 tests; §5 rows → Tasks 2 and 3 (key set, conjunct order, or_d/or_i, spine, internal key, NUMS, numbering, use-site); §5b → Task 4; §4d presets → Task 7; §10 item 1 → Task 6; §12 items 1 and 7 (device half is Stage 2) → Task 5 tagged coverage and the lock tests. Not in this stage by design: §6 inputs (Stage 1), §7-§9 device work (Stages 2-3), §12 items 2-6, 8-11 (Stages 2-4).
+1. **Spec coverage, Stage 0 scope (matches `STAGED_PLAN` S0: §5, §10 items 1 and 3, §12 items 1, 4, 7):** §4 bounds → Task 1 `validate` + tests; §4c → `Lock::operand` + tests; §4f defaults and invariant → Task 2 `origins` + Task 3 tests; §5 rows → Tasks 2 and 3 (key set, conjunct order, or_d/or_i, spine, internal key, NUMS, numbering, use-site); §5b → Task 4's `cross_check`, run over the reference wallets (Task 4), the whole family (Task 5) and every preset (Task 7); §4d presets and §10 item 3 (Concrete policies = the preset cross-check; expected templates = `presets_lower_to_their_pinned_templates`) → Task 7; §10 item 1 → Task 6, and the `md encode` parity it needs → Task 8; §12 item 1 → Task 5 tagged coverage with the spec's required tag list asserted; §12 item 4's HOST half (every §4e refusal, the §4c bands in and out per kind including `older(0x400000)`, the 33rd slot, the one-fingerprint invariant) → Tasks 1-3 tests, its device half → Stage 3; §12 item 7's host half → the lock tests, its device half → Stage 2. Not in this stage by design: §6 inputs (Stage 1), §7-§9 device work (Stages 2-3), §12 items 2, 3, 5, 6, 8-11 (Stages 2-4).
 2. **Placeholder scan:** no TBD/TODO; every code step carries its code. The manifest entries in Task 5 are generated by the printer test and pasted, which is stated as the method rather than left implicit.
 3. **Type consistency:** `compose(&PathList) -> Result<Composed, ComposeError>`, `compose_with(&PathList, &[Option<SlotOrigin>])`, `Composed { descriptor, slots, internal_key_path, experimental }`, `Slot { index, path, ordinal }`, `Lock::operand() -> Result<(Tag, u32), &'static str>`, `Wrapper::script_type() -> u32`, `presets::*(..) -> Result<PathList, ComposeError>` are used with these exact shapes in every task.
 
 ## What the build gate covers, and does not
 
-`scripts/plan-build-gate-md.sh design/IMPLEMENTATION_PLAN_composer_S0_md_compose.md` copies descriptor-mnemonic WITH its `rust-toolchain.toml` (1.85.0) and `.cargo/`, assembles `crates/md-codec/src/compose/{mod,lowering,tr,presets}.rs` (Tasks 1-3 and 7 in plan order; a `Replace` anchor makes the stub `lowering.rs` and `tr.rs` give way to their full files, and the `mod tr;` / `pub mod presets;` additions to `mod.rs` are appended blocks), builds md-codec with all targets, runs the three compose test binaries (`compose_lowering.rs`, `compose_crosscheck.rs`, `compose_vectors.rs`) with `--no-fail-fast`, clippies md-codec with `-D warnings`, and compile-checks md-cli with `cmd/compose.rs` and `cli_compose.rs` present. It synthesises the one-line fragments the plan states in prose: `pub mod compose;` in both crates, the `miniscript` `compiler` dev-dependency, and the `CliError::Compose(String)` variant with its `Display` arm.
+`scripts/plan-build-gate-md.sh design/IMPLEMENTATION_PLAN_composer_S0_md_compose.md` copies descriptor-mnemonic WITH its `rust-toolchain.toml` (1.85.0) and `.cargo/`, assembles `crates/md-codec/src/compose/{mod,lowering,tr,presets}.rs` (Tasks 1-3 and 7 in plan order; a `Replace` anchor makes the stub `lowering.rs` and `tr.rs` give way to their full files, and the `mod tr;` / `pub mod presets;` additions to `mod.rs` are appended blocks), builds md-codec with all targets, runs the compose test binaries (`compose_lowering.rs`, `compose_crosscheck.rs`, `compose_vectors.rs`, and the test-less `compose_support.rs`) with `--no-fail-fast`, clippies md-codec with `-D warnings`, and compile-checks md-cli with `cmd/compose.rs`, `cli_compose.rs` and `cli_compose_encode_gate.rs` present. It synthesises the one-line fragments the plan states in prose: `pub mod compose;` in both crates, the `miniscript` `compiler` dev-dependency, and the `CliError::Compose(String)` variant with its `Display` arm.
 
-Result at plan commit time: md-codec builds; 47 of 48 compose tests pass and the 48th is the PINNED red (`every_compose_vector_in_the_manifest_is_exactly_what_compose_renders` failing with `MANIFEST lacks`, because `test_vectors.rs` is a fragment the gate does not assemble; the gate accepts exactly that failure and no other); clippy clean; md-cli compiles.
+Result at the round-0 fold commit: md-codec builds; 51 of 52 compose tests pass (the family-wide and preset §5b cross-checks among them) and the 52nd is the PINNED red (`every_compose_vector_in_the_manifest_is_exactly_what_compose_renders` failing with `MANIFEST lacks`, because `test_vectors.rs` is a fragment the gate does not assemble; the gate accepts exactly that failure and no other); clippy clean; md-cli compiles.
 
-NOT covered, and therefore a reviewer's execution pass: the `main.rs` clap variant and dispatch arm (so `cli_compose.rs` compiles but its assertions never run against a wired binary); the `test_vectors.rs` MANIFEST entries (pasted from the printer in Task 5); `lib.rs` beyond the module line; whether the pre-existing md-cli corpus tests accept the 28 new MANIFEST entries (Task 5's step that runs `cargo nextest run --locked -p md-cli`); the `md vectors` export count; the Go port.
+Two tests pass VACUOUSLY in the gate because `MANIFEST` holds no compose entry there: `every_compose_manifest_entry_is_in_the_family` and `keyed_compose_vectors_bind_at_most_the_four_journey_keys` (0 iterations). Task 5's paste makes both real; until then they prove nothing and are not counted as coverage.
+
+NOT covered, and therefore a reviewer's execution pass: the `main.rs` clap variant and dispatch arm (so `cli_compose.rs` compiles but its assertions never run against a wired binary); Task 8's `parse/template.rs` change and `cli_compose_encode_gate.rs`'s assertions (the file compiles; the behaviour needs the modified binary); the `test_vectors.rs` MANIFEST entries (pasted from the printer in Task 5); `lib.rs` beyond the module line; whether the pre-existing md-cli corpus tests accept the 28 new MANIFEST entries and the sanity gate (Task 5's and Task 8's steps that run `cargo nextest run --locked -p md-cli`); the `md vectors` export count; the Go port.

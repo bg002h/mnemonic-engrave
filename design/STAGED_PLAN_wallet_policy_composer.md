@@ -56,7 +56,11 @@ structural refusals and the §4c lock-range check as library errors, the tagged
 compose vector family in `test_vectors::MANIFEST` (exported by `md vectors` into
 `.conformance.json` for the Go gate), the §5b cross-check (parse, sanity with
 `top_unsafe` for keyless wsh, round-trip, `lift` equality against the compiler
-where a key exists on every path), and the five presets as path lists.
+where a key exists on every path, run over the reference wallets, the whole
+vector family and every preset), the five presets as path lists with pinned
+templates, and the `md encode` signature-rule parity fix (follow-up
+`md-encode-keyless-template-sigless-path-not-gated`: at `3b0944fb` only `tr`
+was gated; `md compose` and `md encode` must agree).
 
 **Gates:** `scripts/plan-build-gate-md.sh` on the plan (builds and runs the
 extracted Rust); `cargo nextest run --locked -p md-codec -p md-cli`; `cargo fmt
