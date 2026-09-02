@@ -313,3 +313,18 @@ ONE path = warning.
   author report §5 (Part A ships alone? §7f two forms (F-455)? presets wait on
   F-453?) -- surfaced to the operator; defaults if silent: yes / two forms /
   blank-shape first.
+
+## S3 plan gated green; R0 round 0 dispatched (2026-09-02)
+
+- Author's `scratchpad/handwire_s3.py <scratch-root>` applies the plan's six
+  fragments + four shipped-test updates (10 files; refuses to run twice). Wired
+  run: composer tests 118 sub-tests ok, whole gui 1125/1125, md/mk/sysw ok.
+  The script surfaced one plan defect (the 8e comment wrapped across two lines,
+  failing its own coverage test) -- fixed in the plan by the author; that hunk
+  rode the STATUS commit 39f381b (an author self-fold before any review).
+- R0 round 0 lenses DISPATCHED: fidelity (opus) → `composer-S3-plan-R0-r0-fidelity.md`,
+  tests (sonnet) → `…-tests.md`, journey (opus) → `…-journey.md`. Briefs in
+  scratchpad (`fidelity-lens-brief-s3.md`, `tests-lens-brief-s3.md`,
+  `journey-lens-brief-s3.md`). Scratch: `.plan-build-gate-go-s3/{seedhammer,wired}`.
+- Engrave master pushed 88b4a4aa via staging (report persisted). Fork merge of
+  `composer-s2` (7a4eeb5) in progress → `composer-S2-push-report.md`.
