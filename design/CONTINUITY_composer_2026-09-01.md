@@ -433,3 +433,8 @@ ONE path = warning.
   subset; fork pin-test ownership). Fold both S0b lenses into S0b AND a small
   A10 fold in S3 -- after S3's r1 verification lands (S3 must not move under
   its reviewer).
+- S0b tests lens landed: `composer-S0b-plan-R0-r0-tests.md` (sonnet) 0C/0I/0M/2N,
+  12/12 mutations caught (8a0f8bb). Both S0b lenses forwarded to the S0b author
+  (sonnet, resumed) who is folding per scratchpad/fold-brief-s0b-r0.md; then
+  the controller commits the fold with the gate output and dispatches the r1
+  verification (brief scratchpad/verify-brief-s0b-r1.md). Master pushed 3611ca25.
