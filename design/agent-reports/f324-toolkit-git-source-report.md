@@ -182,9 +182,108 @@ necessary before F-324 is actually closed by exercising `man-release.yml`'s
 (owning phase: before the `workflow_dispatch` exercise run F-324 requires)
 rather than letting it surface as a second red run.
 
+## Second commit — cc-validate.sh / remap-off-negative.sh (coordinator-requested follow-up)
+
+The finding above ("the fix is INCOMPLETE...") was addressed in a second
+commit on the same branch, per the coordinator's explicit instruction after
+reading this report. **Commit:** `d39d96269ce352270189c11fabebf9ad070362b4`
+(signed-off, second commit on `f324-git-source`, not amended, not pushed).
+
+### `git show --stat`
+
+```
+ ci/repro/cc-validate.sh        | 11 +++++++++++
+ ci/repro/remap-off-negative.sh | 11 +++++++++++
+ 2 files changed, 22 insertions(+)
+```
+
+### Sites changed
+
+`ci/repro/cc-validate.sh`:
+- After `MINISCRIPT_REV="${MINISCRIPT_REV-...}"` (L92): added
+  `GIT_SOURCE_URL="${GIT_SOURCE_URL:-}"` / `GIT_SOURCE_REV="${GIT_SOURCE_REV:-}"`
+  (plain `${VAR:-}`, matching `double-build.sh`'s F-324 addition — no
+  sensible non-empty default rev for an arbitrary caller dependency).
+- After the miniscript stanza's closing `fi` (originally L102, now shifted
+  by the 4 inserted lines above it) and before
+  `SRC_CONFIG+=( --config 'source.vendored-sources.directory="vendor"' )`:
+  added the identical `if [ -n "$GIT_SOURCE_URL" ] && [ -n "$GIT_SOURCE_REV" ]`
+  block with the same three `--config` lines (`.git=`, `.rev=`,
+  `.replace-with="vendored-sources"`), byte-for-byte the same construction
+  as the miniscript stanza and as `double-build.sh`'s F-324 block.
+
+`ci/repro/remap-off-negative.sh`: the identical two edits at the analogous
+points (its own `MINISCRIPT_REV` default line and its own miniscript
+stanza's closing `fi`, originally L80 and L90 respectively).
+
+Confirmed the two scripts' new blocks are **byte-identical** to each other
+(`diff` on the `MINISCRIPT_REV=...` through the closing `)` of
+`SRC_CONFIG+=(...vendored-sources.directory...)` span returned no output).
+
+No workflow YAML changes were needed for this commit: `cc-validate.sh` and
+`remap-off-negative.sh` are invoked (`.github/workflows/reproducible-musl-build.yml`
+lines 556, 573, 740, 754) only as steps inside the `repro-x86_64-musl` and
+`repro-aarch64-musl` jobs, and both jobs' `env:` blocks (L499–500, L662–663)
+already carry `GIT_SOURCE_URL`/`GIT_SOURCE_REV` from the first commit —
+job-level env is inherited by every step in the job, these two scripts
+included.
+
+### Validation run
+
+```
+$ bash -n ci/repro/double-build.sh && echo OK
+OK
+$ bash -n ci/repro/cc-validate.sh && echo OK
+OK
+$ bash -n ci/repro/remap-off-negative.sh && echo OK
+OK
+
+$ actionlint .github/workflows/reproducible-musl-build.yml
+(exit 0, no output — clean)
+```
+
+Dry-rendered the (now-shared, byte-identical) `SRC_CONFIG` logic used by
+both scripts via the same scratch-script-plus-`printf` method as the first
+commit, under the same three cases:
+
+**ms-shaped** (`MINISCRIPT_REV=""`,
+`GIT_SOURCE_URL=https://github.com/bg002h/mnemonic-engrave`,
+`GIT_SOURCE_REV=6c24e62823e6c1ac02aa3862cd6020674bf58544`) → four-block form,
+identical in shape to `double-build.sh`'s F-324 rendering:
+```
+--config source.crates-io.replace-with="vendored-sources"
+--config source."git+https://github.com/bg002h/mnemonic-engrave?rev=6c24e62823e6c1ac02aa3862cd6020674bf58544".git="https://github.com/bg002h/mnemonic-engrave"
+--config source."git+https://github.com/bg002h/mnemonic-engrave?rev=6c24e62823e6c1ac02aa3862cd6020674bf58544".rev="6c24e62823e6c1ac02aa3862cd6020674bf58544"
+--config source."git+https://github.com/bg002h/mnemonic-engrave?rev=6c24e62823e6c1ac02aa3862cd6020674bf58544".replace-with="vendored-sources"
+--config source.vendored-sources.directory="vendor"
+```
+
+**Toolkit default** (nothing set): unchanged three-block form
+(crates-io + miniscript fork + vendored-sources.directory).
+
+**Codec-today shape** (`MINISCRIPT_REV=""`, `git_source` unset, what
+`md`/`mk`/`ms` currently pass): unchanged two-block form — byte identical
+to pre-F-324.
+
+### Residual scope
+
+This closes the gap the first commit's report flagged: `repro-x86_64-musl`
+and `repro-aarch64-musl` now resolve a caller's extra git-sourced dependency
+consistently across `double-build`, `cc-validate`, and
+`remap-off-negative` — all three steps a real gate run exercises. What
+remains, unchanged from the first commit's report, is entirely outside this
+repo: `mnemonic-secret/.github/workflows/man-release.yml`'s `repro:` job
+still needs its `toolkit_ref` re-pinned to (at least)
+`d39d96269ce352270189c11fabebf9ad070362b4`, plus `git_source_url`/
+`git_source_rev` passed, then a `workflow_dispatch` exercise run per
+F-324's "must be EXERCISED, not merely edited."
+
 ## Report persisted; nothing folded, nothing pushed
 
 This file is the only thing written to `mnemonic-engrave` by this task, and
-it was not `git add`ed there. The toolkit worktree commit
-`21b6696e09159bc4b52259f32f5b13ca1f037d06` is the only commit made; it has
-not been pushed.
+it was not `git add`ed there. Two commits were made on the toolkit worktree
+branch `f324-git-source` (neither amended, neither pushed):
+`21b6696e09159bc4b52259f32f5b13ca1f037d06` (the generalized input +
+double-build.sh) and `d39d96269ce352270189c11fabebf9ad070362b4`
+(cc-validate.sh + remap-off-negative.sh, closing the gap the first commit's
+report flagged).
