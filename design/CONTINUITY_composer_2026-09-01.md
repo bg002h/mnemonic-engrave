@@ -539,3 +539,10 @@ ONE path = warning.
   threaded 1340/checksum/30 preset corpus files/probes). Opus whole-diff review
   dispatched (scratchpad/review-brief-s0b.md -> design/agent-reports/
   composer-S0b-exec-review-r0.md). S3 r3 verification still running.
+- S3 plan R0 GREEN: r3 (sonnet, targeted) 0C/0I persisted 3c8254f; STATUS set
+  9081222. Task A10 fold (opus, scratchpad/fold-brief-s3-a10.md, facts settled
+  by the controller: six keyed_compose_preset_* vectors, five wsh + kofn tr,
+  vendoring glob already covers them, pin test 26->32 names / 126->156 files)
+  IN PROGRESS; then sonnet verification (scratchpad/verify-brief-s3-a10.md,
+  <A10_FOLD_SHA>), then the implementer waits for S0b to ship (A10 unblocked).
+  S0b whole-diff review (opus) still running.
