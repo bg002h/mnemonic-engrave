@@ -45,12 +45,20 @@ auto-append only when the payload holds a `key:` or `hash:` record; `--now`
 opt-in; `--no-now` opt-out; supplied `now:` wins (`agent-reports/composer-S1-decision-now-default.md`, `7612066`).
 Its fold (spec §6a ×2, §10 item 2, §7g row; brainstorm §3.12 item 21; S1 plan
 Task 4 + header) is applied together with the S1 R0 round-0 fold.
-**IN FLIGHT:** S1 R0 round 0, two lenses on the plan at `108fd4c`: opus
-fidelity + "what does it make false elsewhere" →
-`agent-reports/composer-S1-plan-R0-r0-fidelity.md`; sonnet mutation/claims →
-`agent-reports/composer-S1-plan-R0-r0-tests.md`. Then: persist → fold (with the
-ruling) → me gate + scratch hand-check → sonnet verification → S1 implementer
-(opus, UC off; two worktrees: engrave + mnemonic-secret).
+**S1 R0 round 0 DONE:** fidelity (opus, 0C/6I/10M/3N, `85493a5`) and tests
+(sonnet, 0C/3I/2M, `343f17a`) persisted; folded together with the ruling at
+`e20eae1` (spec 6a/10 item 2/7g + brainstorm item 21) and `3919f1f` (+ cite
+fix after it). Machine-checked in the gate scratch copy with Task 2 + ruled
+Task 4 wired: 612/612, clippy clean, threaded runner clean; fixture 40 rows,
+sha256 `a894e619…46c3`. Two of the controller's own fold slips were caught by
+that run (a digits-only "uppercase hex" row; the F-246 pre-check placed after
+the ceremony) and are recorded in the plan.
+**IN FLIGHT / NEXT:** sonnet verification of the r0 fold →
+`agent-reports/composer-S1-plan-R0-r1-fold-verification.md`; when 0C/0I: S1
+GREEN → ONE implementer (opus, UC off) in two worktrees (mnemonic-engrave
+`wt-composer-s1` off master; mnemonic-secret `wt-ms-bip48-p2tr` off `5f37b43`),
+Tasks 1-5 and 7 (Task 6 is DONE); then whole-diff review, release per each
+repo's process, push via staging.
 **Payload-spec fold (S1 Task 6) CLOSED under its own R0:** r0 0C/3I/4M/5N
 (`bb49953`) folded at `44765d7` (+ F-450 `72ac66d`); r1 verification 11 FIXED /
 1 PARTIAL (`de34664`), the partial folded at `fdf7671`.
