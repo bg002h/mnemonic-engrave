@@ -25,6 +25,10 @@ use zeroize::Zeroizing;
 /// Prefixes are RESERVED. A record beginning with one whose body is not valid
 /// lowercase hex is [`Class::Unknown`] and refused — never quietly treated as
 /// free text, which would let a malformed record become an engraved plate.
+/// Three more reserved prefixes — `key:`, `hash:`, `now:` — live in
+/// `composer_records.rs` with their own body rules; `decode_body` below strips
+/// only the three declared here, and every caller guards it with its own prefix
+/// test.
 pub const TEXT_PREFIX: &str = "text:";
 pub const PASS_PREFIX: &str = "pass:";
 /// A raw signed Bitcoin transaction, lowercase hex, for QR engraving. The body

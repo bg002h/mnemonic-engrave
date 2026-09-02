@@ -262,7 +262,8 @@ the payload is rewritten by whoever rewrites the records.
 ciphertext's framing would let an attacker swap a public record for one encoding
 their xpub with the tag still verifying.
 
-**N9. Reserved prefixes fail closed.** `text:`, `pass:` and `tx:` require
+**N9. Reserved prefixes fail closed.** `text:`, `pass:`, `tx:` and, since the
+composer's Stage 1, `key:`, `hash:` and `now:` require
 **lowercase** hex bodies; a body that is not is `Unknown` and refused, never
 quietly treated as free text. Uppercase is rejected because the digest is taken
 over the record as it appears on the wire, so two spellings would be two digests.

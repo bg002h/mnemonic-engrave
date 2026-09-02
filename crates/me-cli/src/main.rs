@@ -192,6 +192,13 @@ enum SyswCmd {
     /// checks the bytes parse AND that every input carries a signature. `me`
     /// consumes constellation strings; it manufactures none of them.
     ///
+    /// `key:<hex of "[fingerprint/path]xpub">`, `hash:<64 lowercase hex>` and
+    /// `now:<hex of "<seconds>[,<height>]">` feed the SeedHammer II's Wallet
+    /// Policy composer: a cosigner key for seating, a sha256 hashlock digest,
+    /// and the pack time (a lower bound the device echoes beside a time lock;
+    /// appended for you when a `key:`/`hash:` record is present — see
+    /// `--now`/`--no-now`).
+    ///
     /// mt1 strings (from `mt encode`) feed its transaction TEXT plates; pack
     /// the COMPLETE set of FULL strings — never `--elide-prefix` output, whose
     /// shortened lines are not self-verifying and are refused here — or the
@@ -2805,7 +2812,8 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                 U::Unrecognised => format!(
                     "record {i} (records count from 0) is not a form this container can \
                      place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not \
-                     a `text:`/`pass:`/`tx:` record. Addresses are not classifiable here, \
+                     a `text:`/`pass:`/`tx:`/`key:`/`hash:`/`now:` record. Addresses are not \
+                     classifiable here, \
                      and neither is a wallet descriptor `me` refuses — see sysw::classify"
                 ),
                 U::Composer(e) => format!(

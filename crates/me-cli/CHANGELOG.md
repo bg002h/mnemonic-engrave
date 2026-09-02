@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `me sysw pack`: three new record classes for the SeedHammer II composer —
+  `key:` (a cosigner `[fingerprint/path]xpub`), `hash:` (a 32-byte sha256
+  digest), `now:` (the pack time and optional height). Bodies are lowercase
+  hex; a malformed body is refused with its own line, before any passphrase is
+  printed. At most one `now:` per payload. When the records include a `key:`
+  or `hash:` record and no `now:`, `pack` appends the pack time as a trailing
+  `now:`; `--now` forces that onto any payload, `--no-now` suppresses it, and
+  a supplied `now:` always wins — payloads without a composer record pack
+  byte-identically to before. `me sysw show` prints the three.
+  `testdata/record_class_vectors.json` is the lockstep fixture (40 rows, one
+  per §6a rule) the device's classifier is measured against (composer spec §12
+  item 8).
+
 - **The descriptor seam (S1+S3).** `me sysw pack --as md1` reads a wallet
   descriptor — a concrete descriptor, a BlueWallet `Key: value` export, a
   JSON `{"descriptor": …}` wrapper, or a bare extended key — as one whole
