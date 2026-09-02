@@ -366,6 +366,25 @@ feasibility 1C/4I) — further controller defaults:**
     the installed 0.13.0; the spec now cites `md decompose`'s key form instead
     and leans on neither.
 
+**Round 2 fold (2026-09-01, after r2 fold-verification 30/36 FIXED and the
+adversarial pass on fold-added mechanisms, 1C/7I/5M/1N) — further defaults:**
+
+17. **Unseated slots take the LOWEST account not already declared by any slot**
+    (not the slot index), and every emitted template satisfies the invariant "no
+    two slots share an origin unless both declare distinct fingerprints",
+    enforced before emit and by the consent self-check (adversarial C-1).
+18. **A partially seated composition engraves as the keyless template plus one
+    card per SEATED slot carrying the template stub only**; no form A; the policy
+    id does not exist until every slot is seated (I-2).
+19. **Malformed `hash:`/`now:` records surface as a door line "N payload records
+    were not understood"**; `me sysw pack` auto-appends `now:` only when the
+    operator supplied none (I-3, I-4).
+20. **Discard-on-edit narrowed to slot-NUMBERING changes** (wrapper, path count,
+    a path's key count); lock/hash edits keep assignments and re-show the stub
+    screen, whose id changes with every shape-screen edit (I-1). The §8p C5
+    cause line is dropped; §8k teaches C5 at the shape step (M-4).
+
+
 ## 4. Open questions, in the order they will be asked
 
 1. **Seating design.** RULED: C8 (payload pick list, slot-directed), C12 (seeds

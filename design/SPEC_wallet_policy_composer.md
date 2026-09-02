@@ -1,6 +1,6 @@
 # SPEC — Wallet Policy COMPOSER: on-device authoring of arbitrary tr/wsh wallet policies (spend-path grammar)
 
-**STATUS: DRAFT 2026-09-01, R0 ROUNDS 0 AND 1 FOLDED.** Round 0: 4 lenses,
+**STATUS: DRAFT 2026-09-01, R0 ROUNDS 0, 1 AND 2 FOLDED.** Round 2: fold verification (30 FIXED / 3 PARTIAL / 2 NOT FIXED, folded at `99463ac`) and an adversarial pass on the fold-added mechanisms (1C/7I/5M/1N, `composer-spec-R0-r2-adversarial.md`, folded here). Round 0: 4 lenses,
 14C/34I (`composer-spec-R0-r0-*.md`), all folded at `bc1c07c`. Round 1: fold
 verification (46 FIXED / 1 PARTIAL / 0 NOT FIXED), a second journey walk
 (1C/9I/6M/2N) and an implementation-feasibility lens (1C/4I/6M/2N)
@@ -181,13 +181,21 @@ card carries the origin the record or card DECLARES, verbatim; nothing measured
 refuses or warns on any origin (BIP-388, Ledger, Nunchuk, Liana, md; brainstorm
 record section 3.11), so an origin/wrapper mismatch is documentation only.
 
-**Unseated slots (a keyless template composed with no keys, C26) declare the §4f
-origin for the wrapper with `account' = the slot's emitted index`, and no
-fingerprint.** A pathless slot is refused by the fork's decoder (F-166, open) and
-identical origins with no fingerprints are unseatable at restore
-(`errSeatSlotContested`), so distinct accounts by slot index are the one form that
-both decodes and seats; the template screen (§7c) states the expected origin per
-slot. No standard exists for taproot multisig origins (BIP-48 registers `1'`/`2'`
+**Unseated slots (C26, or the unfilled slots of a partially seated template)
+declare the §4f origin for the wrapper with `account'` = the LOWEST account not
+already declared by any slot of this template, assigned in ascending emitted
+slot index, and no fingerprint.** **Invariant, enforced before any template is
+emitted and re-checked by §7e's self-check on the decoded md1: no two slots of a
+produced template declare the same origin unless BOTH declare a fingerprint and
+those fingerprints differ.** Why: a pathless slot is refused by the fork's decoder
+(F-166, open); two slots at one origin with no fingerprints are unseatable
+(`errSeatSlotContested`); and two slots at one origin where only ONE declares a
+fingerprint let a single card fill both silently, because `slotMatchesCard` skips
+the fingerprint test when the template declares none
+(`gui/key_card_seating.go:117-140`): a mis-seated key presented as reviewed. A
+seated pair that violates the invariant (two privacy-preserving cards at one
+origin) is REFUSED at the mapping review (§8v). The template screen (§7c) states
+the expected origin per unseated slot. No standard exists for taproot multisig origins (BIP-48 registers `1'`/`2'`
 only; bips PR #1473 proposing `3'` closed unmerged 2024-05-14); `3'` is what
 Coldcard Edge exports (`shared/export.py:414`) and what `mnemonic-toolkit` sweeps
 as `bip48-tr-multi-a`. `ms derive` must gain a `bip48-p2tr` template (§10 item 5).
@@ -277,12 +285,22 @@ walks the whole record vector and refuses an unclassifiable record by index
 (`crates/me-cli/src/sysw/mod.rs:288` `pack_with`, whose per-index refusal is `admit_check` at `:416`); the per-failure lines of §8n
 are its lines. On the DEVICE a record that fails classification goes INERT under
 the shipped contract (`sysw/descriptor.go:46-48`: "stays in the session, is offered
-to nobody, and reaches no screen"), so the door's "Keys loaded: N" (§7a) is the
-device's only signal and the spec says so rather than promising a screen. The
-payload-wide rule "at most ONE `now:` record" is enforced at the two sites that
-see the whole payload: host `pack_with` and device `syswSession.load`
-(`gui/sysw_session.go:80`); two or more is a host refusal (§8n) and, on the device,
-inert `now:` records with the door showing no bound.
+to nobody, and reaches no screen"). The device-visible signal is per class: a
+malformed `key:` reduces the door's "Keys loaded: N"; a malformed `hash:` or
+`now:` changes no count, so the door also carries "N payload records were not
+understood" from the session's inert count (§8r), the one line that covers all
+three. The payload-wide rule "at most ONE `now:` record" is enforced at the two
+sites that see the whole payload: host `pack_with` and device `syswSession.load`
+(`gui/sysw_session.go:80`). `me sysw pack` auto-appends `now:` ONLY when the
+operator's records contain none, so an operator-supplied `now:` wins silently and
+pins a deliberate bound; two OPERATOR-supplied `now:` records are a host refusal
+with a remedy (§8n: "Remove one."), and on the device both go inert with the door
+showing no bound. **What a `key:` record's origin proves:** the xpub's depth and
+its last component are checked against the declared path; the account and every
+interior component are declarations this device cannot verify (F-217; `mk`
+cannot either), so the mapping review prints each slot's origin verbatim beside
+its fingerprint with the note that the device cannot confirm the key was derived
+there.
 
 Why `key:` exists: today a bare xpub line packs as a `pkh(xpub)` single-sig
 WALLET and a `[fp/path]xpub` line is refused (brainstorm record section 3.6).
@@ -330,11 +348,13 @@ date-entry band is therefore strictly inside §4c's time row.
 **The bound line.** When `now:` is present its seconds field bounds dates and its
 height field bounds heights; a field that is absent bounds nothing. A date or
 height BELOW its bound → REFUSE with §8o (dates: "Choose a later date."; heights:
-"Choose a later height."). Above it → echo "at least N days after this payload was packed on
-<pack date>" (dates) or "at least N blocks after the packed height" (heights).
-When the relevant field is ABSENT the echo carries instead: "This device cannot
-tell the time. Nothing here has checked that this is in the future." The copy
-never says "now".
+"Choose a later height."). Above it → the echo ADDS the pack date and never
+withdraws the disclaimer: "This device cannot tell the time. The payload says it
+was packed on <pack date>, which may be long ago. Nothing here has checked that
+this is in the future." (§8c); heights read "the packed height was H". When the
+relevant field is ABSENT the echo carries the bare disclaimer. The copy never
+says "now"; a stale `now:` can only weaken the below-bound refusal, never invent
+one, which is why the refusal stands and no reassurance is given.
 
 Refusals: blocks > 65535 or days > 388 → §8u.
 
@@ -387,10 +407,11 @@ header (id, stub, command, §8d) on the first frame, then slot lines at a stated
 per-frame budget with a pager, because the body grows one line per slot and the
 grammar admits 32 (§9 item 6; the per-frame capacity is a plan-time render
 measurement, §13). The template id is key-independent and origin-invariant but
-NOT shape-invariant: a path or wrapper change alters it, so the screen re-appears
-after every shape edit and says, per §8s, that the id changed and that cards
-already minted with the old stub will not seat into this template
-(`gui/key_card_seating.go:66-73`). After
+NOT shape-invariant: the wrapper, the path list, every lock operand and every hash
+digest all enter it (measured: changing an operand or a digest moves the id), so
+the screen re-appears after EVERY edit made on the shape screen and says, per
+§8s, that the id changed and that cards already minted with the old stub will
+not seat into this template (`gui/key_card_seating.go:66-73`). After
 seating (§7d) the keyed policy's id and stub are added and the screen recommends
 stamping BOTH stubs on each key card (`--policy-id-stub` is repeatable). Labels,
 literally: `Template-ID:` and `Policy-ID:` for the 32-hex ids; `mk1 stub
@@ -429,25 +450,31 @@ consume path's "one card may fill several slots" rule
 coexist. The prompt for an extracted internal-key slot reads "Slot @0, key path
 (spends alone): choose a key". **Two slots resolving to
 the same xpub → REFUSE at the mapping review**, naming both slots (BIP-388 l.193,
-pairwise distinct; md refuses it only at encode). **Any change to the SHAPE, wrapper included, after
-at least one slot has been assigned discards ALL assignments**; the operator is
-told so before the edit is accepted (§8j), because §5 renumbers slots by first
-appearance in text that is a function of the wrapper as well as the path list (tr
-extracts an internal key as `@0`, wsh does not), and a carried assignment would
-seat keys silently into the wrong slots. With no slot yet assigned there is
-nothing to discard and §8j does not fire.
+pairwise distinct; md refuses it only at encode). **Any change that moves slot NUMBERING (the
+wrapper, the path count, or a path's key count) after at least one slot has been
+assigned discards ALL assignments**; the operator is told so before the edit is
+accepted (§8j), because §5 renumbers slots by first appearance in text that is a
+function of the wrapper as well as the path list (tr extracts an internal key as
+`@0`, wsh does not), and a carried assignment would seat keys silently into the
+wrong slots. A lock or hash edit moves no slot, keeps assignments, and re-shows
+the stub screen (§7c). With no slot yet assigned there is nothing to discard and
+§8j does not fire. "Path N" in every seating and mapping prompt is the OPERATOR's
+listed path index, never an emitted leaf index.
 
-A mapping-review screen (slot → fingerprint + origin) precedes consent; Back keeps
-assignments. When one seed or fingerprint fills two slots INSIDE ONE path the
+A mapping-review screen (slot → fingerprint + origin, the origin printed verbatim,
+with the note that the device cannot confirm the key was derived there) precedes
+consent; Back keeps assignments. Two slots that would declare the same origin with
+fewer than two distinct fingerprints violate §4f's invariant and are REFUSED here
+(§8v). When one seed or fingerprint fills two slots INSIDE ONE path the
 review shows the C29 WARNING (§8g). The same fingerprint in two DIFFERENT paths is
 C5's normal case and gets one informational line, plus the §8k line that a person
 in two paths needs two keys from two accounts.
 
 Seating is all-or-nothing: fewer assignable slots than slots → REFUSE at the
-transition with §8p: the count line always ("N slots, M keys available"), the
-unfilled slots named, and the C5 cause line ONLY when a fingerprint the payload
-already holds appears in two paths of the composed shape; then Back-to-edit or
-"engrave as a keyless template" (§7f form B with no cards).
+transition with §8p: the count line ("N slots, M keys available") and the unfilled
+slots named; no cause is guessed (the C5 lesson is taught at the shape step by
+§8k); then Back-to-edit or "engrave as a keyless template" (§7f, the partially
+seated form).
 
 ### 7e. Consent — a NEW surface for composed policies (r0 C-1/C-2)
 
@@ -467,11 +494,14 @@ and the EXPERIMENTAL marks; then the key-path line ("Key-path: A KEY CAN SPEND
 ALONE" for an extracted internal key, §8f's NUMS note otherwise); then the id
 NAMED by kind with both stubs (§7c); then receive and change addresses 0..1 when
 seated, or "Keyless template - no addresses" (D4). Before the screen is shown the
-device asserts that the decoded shape AND the slot assignment equal the composed
-path list and seating, and REFUSES to continue on mismatch with §8q ("... Go back
-and check the path list, or start again."), so a builder defect cannot reach
-steel as a reviewed wallet; this refusal is provoked by fault injection, not by
-an input (§12 item 4). The surface is `confirmReviewScreen`'s PAGED form
+device asserts that the decoded shape, the slot assignment, every slot's origin
+and fingerprint (against the mapping review), the fixed use-site, and §4f's
+pairwise-distinguishability invariant all hold on the DECODED md1, and REFUSES to
+continue on mismatch with §8q ("... Go back and check the path list, or start
+again."), so a builder defect in the shape, the seating, the origins, the
+fingerprints or the use-site cannot reach steel as a reviewed wallet (what stays
+outside the check: the key bytes themselves, which the addresses cover); this
+refusal is provoked by fault injection, not by an input (§12 item 4). The surface is `confirmReviewScreen`'s PAGED form
 (`gui/multisig_build.go:1908-1931`), which draws its pager only when a second page
 exists; eight paths plus four addresses do not fit one frame. Then the
 "nothing outside this device has checked this policy" warning (§8l), Multisig
@@ -485,10 +515,16 @@ per seated slot). Every seated slot yields a card in form B regardless of source
 a `key:` record is MINTED as an mk1 (fingerprint + origin + xpub + both stubs), a
 payload mk1 is RE-MINTED with both stubs appended, a seed-derived slot is minted
 likewise. A keyless composition (no seated slots) has no form A and no cards: the
-choice collapses to "template only" and says so. For seed-derived slots: **Full
+choice collapses to "template only" and says so. A PARTIALLY seated composition
+(the §8p fallback) offers no form A either; its form B is the keyless template,
+whose unseated slots take §4f's lowest-free accounts, plus one card per SEATED
+slot carrying the TEMPLATE stub only, and the screen says the policy id does not
+exist until every slot is seated. For seed-derived slots: **Full
 (seed + keys)** or **Watch-only (keys)**; in Full mode the secret is cut as words,
 as a SeedQR, or as ms1 strings (`gui/codex32_polish.go:218` `engraveCodex32`); a seed that filled several slots is cut ONCE.
-Plate census before cutting, as Multisig Build does; the census REFUSES a
+Plate census before cutting, as Multisig Build does, and it counts CARD chunks
+too: appending stubs can push a card into a third chunk (`mk/encode.go:26-29`);
+the census REFUSES a
 concrete descriptor longer than the plate holds, naming the measured ceiling
 (§13 item 1). Recovery-time error detection differs by form and the census says so: md1/mk1
 carry BCH; a text or QR descriptor carries only its BIP-380 checksum. **This
@@ -509,9 +545,11 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 | shape | lock-only path | REFUSAL (§4e) |
 | shape | every path hashed | WARNING (§8h) |
 | shape | keyless path added / unsorted chosen | EXPERIMENTAL confirm, unskippable (§8a/§8b) |
-| shape | edits the shape (paths OR wrapper) after a slot was assigned | WARNING before the edit; assignments discarded (§8j) |
+| shape | edits the wrapper, the path count or a path's key count after a slot was assigned | WARNING before the edit; assignments discarded (§8j) |
+| shape | edits a lock or a hash after a slot was assigned | DEFAULT: assignments kept; stub screen re-shown (§7c) |
 | shape | a 33rd slot | REFUSAL at the picker (§8m line 5) |
-| pack | a malformed `key:`/`hash:`/`now:` record | REFUSAL on the host (§8n); INERT on the device, visible only in the door's count (§6a) |
+| pack | a malformed `key:`/`hash:`/`now:` record | REFUSAL on the host (§8n); INERT on the device, visible in the door's "not understood" count and, for `key:`, in "Keys loaded" (§6a) |
+| pack | operator supplies their own `now:` | DEFAULT: it wins; `me sysw pack` appends none (§6a) |
 | lock | date before 2009-01-03 | REFUSAL (§8t) |
 | lock | date or height before the pack bound | REFUSAL (§6b) |
 | lock | no `now:` field for this lock kind | DEFAULT: the "cannot tell the time" line (§6b) |
@@ -520,6 +558,8 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 | seed | payload seed admitted for the first time at Wallet Policy | DEFAULT: the payload spec's F1/F2 flag screens fire before use (§6a) |
 | seating | wrong key for a slot | WARNING surface: mapping review; Back keeps choices |
 | seating | two slots resolve to the same xpub | REFUSAL at mapping review (§7d) |
+| seating | two slots at one origin with fewer than two distinct fingerprints | REFUSAL at mapping review (§8v; §4f invariant) |
+| seating | a `key:` record's account or interior origin components | DOCUMENTATION: unverifiable by the device (F-217), printed verbatim at the mapping review |
 | seating | card origin script type disagrees with wrapper | DOCUMENTATION: the origin is declared as carried (§4f) |
 | seating | one seed fills two slots in ONE path | WARNING (C29, §8g) |
 | seating | one seed fills slots in two different paths | DEFAULT: informational line (C5, §8k) |
@@ -527,6 +567,7 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 | consent | compares the shown id with a coordinator's | DOCUMENTATION: §8d line; a composed wallet is its own wallet |
 | consent | decoded shape or seating differs from the composed list | REFUSAL with an exit (§8q) |
 | engrave | keyless composition | DEFAULT: form choice collapses to template only (§7f) |
+| engrave | partially seated composition | DEFAULT: template plus cards for seated slots, template stub only, no form A (§7f) |
 | engrave | concrete descriptor longer than the plate holds | REFUSAL by census with the measured ceiling (§13 item 1) |
 
 ## 8. Copy — operator-facing strings (blockquoted so `plan-glyph-check.sh` scans them; ASCII only; every FIXED body passes the modal-fits assertion, §12 item 5; every confirm-to-proceed screen is dismissed only by a tap on CONTINUE, and Back returns to the shape)
@@ -553,8 +594,10 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 
 > 2027-03-01 00:00 UTC
 
-> at least 181 days after this payload was packed
-> on 2026-09-01
+> This device cannot tell the time. The payload
+> says it was packed on 2026-09-01, which may be
+> long ago. Nothing here has checked that this is
+> in the future.
 
 > This device cannot tell the time. Nothing here has
 > checked that this is in the future.
@@ -576,11 +619,16 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 > Nunchuk import this form. Liana and BIP-388 signers
 > need an unspendable xpub instead (see F-449).
 
-### 8g. Same seed twice in one path (C29)
+### 8g. Same seed twice in one path (C29): the first body when the shared seed's slots in that path reach the threshold, the second otherwise
 
 > SAME SEED, SAME PATH
 > Slots @1 and @2 are the same seed. This path's
 > 2-of-3 can be satisfied by one person.
+> Liana will refuse it.
+
+> SAME SEED, SAME PATH
+> Slots @1 and @2 are the same seed. One person
+> holds 2 of the 3 signatures this path needs.
 > Liana will refuse it.
 
 ### 8h. Every path needs a preimage
@@ -639,7 +687,8 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 
 > record N: now: must be <seconds>[,<height>] in range
 
-> record N: a second now: record; only one is allowed
+> record N: a second now: record; only one is
+> allowed. Remove one.
 
 ### 8o. Below the pack bound (§6b)
 
@@ -654,10 +703,6 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 > 4 slots, 3 keys available.
 > Unfilled: slot @3.
 
-> One person is in two paths and needs two keys:
-> a second account from the same seed, or a
-> second card.
-
 ### 8q. Consent self-check (§7e)
 
 > The policy on this device does not match what
@@ -667,6 +712,12 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 ### 8r. Door key-state lines (§7a)
 
 > Keys loaded: 4
+
+> Keys loaded: 4, plus 1 seed.
+
+> A seed is loaded. It can fill any number of slots.
+
+> 3 payload records were not understood.
 
 > No keys loaded. This builds a key-less template.
 
@@ -684,13 +735,19 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 
 ### 8t. Date floor (§6b)
 
-> Dates before 2009 cannot be written as a
-> time lock.
+> This build will not write a date before 2009
+> as a time lock.
 
 ### 8u. Relative lock ceiling (§6b)
 
 > Relative locks reach at most 455 days in blocks
 > or 388 days in time. Use an absolute date.
+
+### 8v. Same origin, too few fingerprints (§4f invariant, at the mapping review)
+
+> Two keys declare the same origin and not both
+> carry a fingerprint. This template could not be
+> restored. Use cards or records with fingerprints.
 
 ## 9. Device work items (fork)
 
@@ -721,8 +778,9 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 7. Seating pick list (§7d) as a PAGED widget with stated capacity (the shipped
    `ChoiceScreen` does not scroll, `gui/gui.go:1993-2026`; a payload may hold more
    rows than the 232 px content box shows), slot-directed assignment, the
-   same-xpub refusal, discard-on-edit with the §8j confirm, the mapping-review
-   screen with the C29 warning and the §8k line, ms1 legs wired into the seed
+   same-xpub refusal, the §4f invariant refusal (§8v), discard-on-numbering-change
+   with the §8j confirm, the mapping-review screen with verbatim origins, the
+   unverifiable-account note, the C29 warning and the §8k line, ms1 legs wired into the seed
    source picker, per-slot accounts via the Multisig Build machinery.
 8. Taproot origin arm: `3'` in `multisigScriptTypeComponent`
    (`gui/multisig_build_slots.go:125-130`, "the ONE site that decides it") and a
@@ -751,8 +809,9 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
    `path` field carries one shared path.
 2. `me sysw pack`: `key:`, `hash:`, `now:` classes with the §6a body rules and
    the §8n refusal lines from `pack_with`; the payload-wide single-`now:` rule at
-   the same site; `now:` appended last by default, `--no-now` for deterministic
-   fixtures.
+   the same site; `now:` appended last ONLY when the operator's records hold none
+   (an operator-supplied `now:` wins), `--no-now` suppresses the auto-append for
+   deterministic fixtures.
 3. The five presets as Concrete policies + expected templates (C2).
 4. `md-older-zero-time-units-not-refused` patch (independent; filed).
 5. mnemonic-secret: `ms derive --template bip48-p2tr` (= `m/48'/0'/account'/3'`)
@@ -806,30 +865,35 @@ table, so the glyph and modal-fits gates cover it.
    including a lock operand outside §4c refused BY THE DEVICE on an md build that
    still accepts it (`older(0x400000)`), a date before 2009-01-03, a date and a
    height below the pack bound, a `hash:` of 31 and 33 bytes, a bare-xpub `key:`,
-   a 33rd slot, two `now:` records (refused by host `pack_with`; inert on the
-   device via `syswSession.load`), a same-xpub double seating, a path edit AND a
-   wrapper change after a slot was assigned. The §7e self-check is exercised by
+   a 33rd slot, two OPERATOR `now:`
+   records (refused by host `pack_with`; inert on the device via `syswSession.load`), a same-xpub double seating, two slots at one
+   origin with one fingerprint (§8v), a path-count edit AND a wrapper change after
+   a slot was assigned (discard), and a lock edit after a slot was assigned (kept). The §7e self-check is exercised by
    FAULT INJECTION (flip one builder output, assert §8q fires), not by an input.
 5. **Copy gates:** `scripts/plan-glyph-check.sh`, the raster floor
    (`gui/raster_test.go`), AND the modal-fits assertion (`gui/modal_fits_test.go`,
    `assertModalBodyFits`) on every §8 body and every new screen; plus a
    fires-on-condition test for each of §8a, §8b, §8f, §8g, §8h, §8j, §8k, §8l, §8m,
-   §8n (host), §8o, §8p, §8q, §8r, §8s, §8t, §8u and the §6b bound and no-bound lines; the variable-length
+   §8n (host), §8o, §8p, §8q, §8r, §8s, §8t, §8u, §8v and the §6b bound and no-bound lines; the variable-length
    screens (§7c stub screen, §7e consent, §7d pick list) are asserted by PAGING
    capacity at the measured per-frame budget, since a fits assertion cannot pin a
    body with no single source string.
 6. **Seating and cards.** For every keyed vector: the re-minted or minted cards
    seat into the engraved keyless template through the shipped `seatKeyCards`
-   (both stubs present, existing stubs preserved) and reproduce the keyed policy's
-   addresses; a template with two same-origin slots and no fingerprints is never
-   produced.
+   (both stubs when a keyed policy exists, the template stub otherwise; existing
+   stubs preserved) and reproduce the keyed policy's addresses. §4f's invariant
+   holds for EVERY emitted template: no two slots share an origin unless both
+   declare distinct fingerprints; a named negative vector runs the asymmetric
+   one-card case (one slot with a fingerprint, one without, at one origin)
+   against `seatKeyCards` and asserts it is never produced; the partially seated
+   artifact (template + template-stub cards for seated slots) is a named vector.
 7. **Device-side lock range check** is a unit gate on the emitter's input, not on
    md's acceptance: every §4c boundary value in and out, per kind.
 8. **Record classes, lockstep.** A cross-language vector set: each `key:`,
    `hash:`, `now:` record (valid and each §6a malformation) classifies identically
    on the host and on the device; for each malformation the host emits its §8n
-   line and the device leaves the record inert with the door's count reduced by
-   one.
+   line and the device leaves the record inert, with "Keys loaded" reduced by one
+   for a `key:` and the "not understood" count raised by one for every class.
 9. **Engrave surface.** Per journey: the form choice offered (A and B, B only,
    template only), Full versus Watch-only, the three secret forms, the census
    lines, the read-back-integrity line; the census refusal on the measured ceiling
