@@ -6,17 +6,27 @@ The STAGED plan and the Stage 0 detailed plan are committed at `3a799fa` with
 the build gate GREEN (`scripts/plan-build-gate-md.sh`, toolchain 1.85.0: 48
 compose tests, 47 pass, one PINNED red for the un-assembled MANIFEST fragment;
 clippy clean; md-cli compiles). Gate tooling fixes: `e9c42c9`, `8382d69`.
-**IN FLIGHT:** plan R0 round 0, two lenses, agents persist their own reports:
-`agent-reports/composer-S0-plan-R0-r0-fidelity.md` (opus: plan-vs-spec fidelity
-and lowering correctness by constructed counterexample) and
-`agent-reports/composer-S0-plan-R0-r0-tests.md` (sonnet: mutation testing of the
-assembled code in a private scratch copy; false-PASS hunt; claim checks).
-**NEXT:** persist each report in its own commit → spot-check → fold → re-run
-`plan-build-gate-md.sh` + cite/table/stepref/glyph → fold commit with gate output
-→ sonnet fold verification → when 0C/0I: dispatch ONE implementer (UC OFF) in a
-descriptor-mnemonic worktree, Tasks 1-8 in order, then the whole-diff opus
-execution review, then publish per the repo's release checklist. Not done yet: a
-LIVE operator walk of the spec's journeys (the one lens the operator can run).
+**Plan R0 round 0 DONE:** fidelity lens (opus, 0C/4I/5M/3N, `b820b64`) and tests
+lens (sonnet, 0C/2I/4M/2N, 20 mutations / 19 caught, `f531cff`) persisted; folded
+at `891b17d` (six Importants: tag list, presets pinned + decaying signature,
+family-wide 5b cross-check, md encode parity = new Task 8, two-digit inlining,
+Task 2 sequencing) and `fb65f2c` (controller hand-check: Task 8 gate is
+MINTING-only after an unconditional draft broke two n1 reading-verb tests; the
+two keyless-wsh vectors are `no-corpus`; wired scratch copy ran the whole md-cli
+suite 761/761). Build gate at both: 52 compose tests, 51 pass, 1 pinned red;
+clippy clean; md-cli compiles. Plan is now 9 tasks.
+**IN FLIGHT:** round 1 = sonnet fold verification of `891b17d` against both
+reports → `agent-reports/composer-S0-plan-R0-r1-fold-verification.md`.
+**NEXT:** persist that report → fold any PARTIAL/NOT FIXED → one more sonnet
+verification covering `fb65f2c` + that fold → when 0C/0I: dispatch ONE
+implementer (UC OFF) in a descriptor-mnemonic worktree, Tasks 1-9 in order
+(Task 5 pastes 26 MANIFEST entries from the printer; Task 8 changes
+`parse_template_ext` for minting verbs only; Task 9 is the whole-workspace gate
++ corpus regeneration + release note), then the whole-diff opus execution review,
+then publish per the repo's release checklist. Not done yet: a LIVE operator walk
+of the spec's journeys (the one lens the operator can run). Repo side-commits
+this session: descriptor-mnemonic `480e54fe` + `b19dca7b` (follow-up
+`md-encode-keyless-template-sigless-path-not-gated`, owned by Task 8).
 
 Original note: usage ran low with R0 round 0 in flight; the operator ruled
 "finish what is in flight but don't launch anything new", later lifted.
