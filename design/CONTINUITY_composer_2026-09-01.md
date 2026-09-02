@@ -523,3 +523,12 @@ ONE path = warning.
   Controller re-gate RUNNING (scratchpad/s3-gate-r3.log). THEN: commit
   (scratchpad/s3-fold-r2.msg) → r3 targeted verification
   (scratchpad/verify-brief-s3-r3.md).
+- S0b IMPLEMENTED: `composer-s0b` (wt-composer-s0b) = 4793619b (vectors), 5002ebac
+  (--preset), 87bc10ff (corpus + notes) over 66bdf2f4; report d3d31ff (workspace
+  1340/1340; +30 files / 6 conformance; two Expected-line deviations, both
+  wording). Controller's independent CI-form gates RUNNING
+  (scratchpad/s0b-impl-gate.log). THEN: opus whole-diff review
+  (scratchpad/review-brief-s0b.md) → fold → sonnet verification → ff-merge into
+  descriptor-mnemonic main → `scripts/push-via-staging.sh main` (contexts
+  `cargo test (ubuntu-latest)` + `cargo clippy`; no tag, no publish) → re-vendor
+  into the fork (S3 A10; 126 → 156 files, 26 → 32 names).
