@@ -192,6 +192,13 @@ enum SyswCmd {
     /// checks the bytes parse AND that every input carries a signature. `me`
     /// consumes constellation strings; it manufactures none of them.
     ///
+    /// `key:<hex of "[fingerprint/path]xpub">`, `hash:<64 lowercase hex>` and
+    /// `now:<hex of "<seconds>[,<height>]">` feed the SeedHammer II's Wallet
+    /// Policy composer: a cosigner key for seating, a sha256 hashlock digest,
+    /// and the pack time (a lower bound the device echoes beside a time lock;
+    /// appended for you when a `key:`/`hash:` record is present — see
+    /// `--now`/`--no-now`).
+    ///
     /// mt1 strings (from `mt encode`) feed its transaction TEXT plates; pack
     /// the COMPLETE set of FULL strings — never `--elide-prefix` output, whose
     /// shortened lines are not self-verifying and are refused here — or the
@@ -253,6 +260,20 @@ enum SyswCmd {
         /// confirmation the DEVICE recomputes for itself.
         #[arg(long)]
         allow_unsigned_inputs: bool,
+        /// Append the pack time as a trailing `now:` record to THIS payload even
+        /// though it holds no `key:`/`hash:` record. By default `pack` appends
+        /// `now:<hex of unix seconds>` as the LAST record only when the records
+        /// include a composer-only record (`key:` or `hash:`) and no `now:` of
+        /// their own, so a Wallet Policy build gets a lower bound on the present
+        /// beside a time lock (SPEC_wallet_policy_composer.md §6a) while every
+        /// other program's payload packs exactly as before.
+        #[arg(long, conflicts_with = "no_now")]
+        now: bool,
+        /// Never append the pack time, even when a `key:`/`hash:` record is
+        /// present. A fixture whose output must be a pure function of its inputs
+        /// passes this.
+        #[arg(long)]
+        no_now: bool,
         /// Refuse unless the container holds every kind listed here —
         /// comma-separated: descriptor, cosigner, transaction, mnemonic,
         /// secret.
@@ -1391,6 +1412,8 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             no_passphrase,
             allow_weak,
             allow_unsigned_inputs,
+            now,
+            no_now,
             expect,
             allow_world_readable,
             allow_argv_secret,
@@ -1565,6 +1588,24 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 return EXIT_INVALID;
             }
 
+            // §6a's payload-wide single-`now:` rule, checked HERE as well as in
+            // `pack_with`: F-246 hoisted admission ahead of the passphrase ceremony
+            // so an operator is never told to write down twelve words that protect
+            // no artifact; a second `now:` is an admission failure and takes the
+            // same ordering. `split` keeps the library backstop. (A first draft put
+            // this beside the auto-append below, AFTER the ceremony; the plan's own
+            // test caught it: the passphrase printed before the refusal.)
+            {
+                let nows = mnemonic_engrave::sysw::composer_records::now_indices(&recs);
+                if nows.len() > 1 {
+                    eprintln!(
+                        "me: {}",
+                        sysw_error(&mnemonic_engrave::sysw::SyswError::SecondNow(nows[1]))
+                    );
+                    return EXIT_INVALID;
+                }
+            }
+
             // F-246 — THE WRITE GATE RUNS BEFORE ANYTHING DESCRIBES A CONTAINER,
             // AND AFTER EVERY REFUSAL ABOUT THE INPUT ITSELF.
             //
@@ -1687,6 +1728,45 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     }
                 }
             };
+
+            // §6a / §10 item 2 as RULED (composer-S1-decision-now-default): append
+            // the pack time ONLY when the operator gave no `now:` AND the payload
+            // holds a composer-only record (`key:`/`hash:`) or `--now` says so. An
+            // operator-supplied `now:` wins silently; two are refused by pack_with.
+            // (`recs` was rebound immutably by the `--as` handling above.)
+            let mut recs = recs;
+            let composer_record_present = recs.iter().any(|r| {
+                matches!(
+                    mnemonic_engrave::sysw::classify(r),
+                    mnemonic_engrave::sysw::record::Class::Key
+                        | mnemonic_engrave::sysw::record::Class::Hash
+                )
+            });
+            if !*no_now
+                && (*now || composer_record_present)
+                && mnemonic_engrave::sysw::composer_records::now_indices(&recs).is_empty()
+            {
+                let secs = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                match u32::try_from(secs) {
+                    Ok(s) if s >= 1 => {
+                        recs.push(mnemonic_engrave::sysw::composer_records::now_record(
+                            s, None,
+                        ));
+                        eprintln!(
+                            "me: appended now:{s} as the last record (the pack time, a lower bound the \
+                             device echoes next to a time lock; it is never a locktime). Pass --no-now \
+                             to omit it, or supply your own now: record to pin a different bound. \
+                             Payloads without a key:/hash: record get none unless --now is passed."
+                        );
+                    }
+                    _ => eprintln!(
+                        "me: the system clock is outside the now: band; no now: record appended"
+                    ),
+                }
+            }
 
             // The strength line is printed whatever the choice: the operator is
             // told, never blocked (spec decision 8).
@@ -2087,6 +2167,7 @@ fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header
     }
     print_mt_confirmation(&records);
     print_descriptor_confirmation(&records);
+    print_composer_confirmation(&records);
 }
 
 /// §5.2's record in `show`, per record — the surface §11 item 1 assumes.
@@ -2121,6 +2202,41 @@ fn print_descriptor_confirmation(records: &[String]) {
             continue;
         };
         println!("public record {i}: descriptor — complete in one record\n      {block}");
+    }
+}
+
+/// `key:`/`hash:`/`now:` records, one line each (SPEC_wallet_policy_composer.md
+/// §6a). Malformed ones never reach a container -- `pack` refuses them -- so a
+/// record that fails to parse here is simply not one of ours.
+fn print_composer_confirmation(records: &[String]) {
+    use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord};
+    for (i, r) in records.iter().enumerate() {
+        let Some(Ok(rec)) = parse(r) else { continue };
+        match rec {
+            ComposerRecord::Key(k) => {
+                println!("public record {i}: cosigner key (key:) — {}", k.text)
+            }
+            ComposerRecord::Hash(h) => {
+                let hx = hex(&h);
+                println!(
+                    "public record {i}: sha256 hashlock (hash:) — {}..{}",
+                    &hx[..8],
+                    &hx[56..]
+                );
+            }
+            ComposerRecord::Now { seconds, height } => {
+                // `show` cannot tell an auto-appended pack time from an
+                // operator-supplied bound, so it names neither provenance.
+                let when = match height {
+                    Some(h) => format!("{seconds} (seconds), height {h}"),
+                    None => format!("{seconds} (seconds)"),
+                };
+                println!(
+                    "public record {i}: pack time (now:) — {when}: a lower bound on the present the \
+                     device echoes beside a time lock; never a locktime"
+                );
+            }
+        }
     }
 }
 
@@ -2307,6 +2423,9 @@ fn class_name(c: mnemonic_engrave::sysw::record::Class) -> &'static str {
         C::Mt => "mt1 chunk",
         C::Tx => "raw transaction",
         C::Address => "address",
+        C::Key => "cosigner key (key:)",
+        C::Hash => "sha256 hashlock (hash:)",
+        C::Now => "pack time (now:)",
         C::Unknown => "unrecognised record",
     }
 }
@@ -2693,12 +2812,27 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                 U::Unrecognised => format!(
                     "record {i} (records count from 0) is not a form this container can \
                      place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not \
-                     a `text:`/`pass:`/`tx:` record. Addresses are not classifiable here, \
+                     a `text:`/`pass:`/`tx:`/`key:`/`hash:`/`now:` record. Addresses are not \
+                     classifiable here, \
                      and neither is a wallet descriptor `me` refuses — see sysw::classify"
+                ),
+                U::Composer(e) => format!(
+                    "record {i} (records count from 0) is a `key:`/`hash:`/`now:` record whose \
+                     body fails its rule ({}).\n      {}\n      Build the record with `me sysw \
+                     pack`'s helpers: a key record is `key:` + the hex of `[fingerprint/path]xpub` \
+                     exactly as `md decompose` prints it; a hash record is `hash:` + the 32-byte \
+                     digest as 64 lowercase hex; a now record is `now:` + the hex of \
+                     `<seconds>[,<height>]`.",
+                    e.detail(),
+                    e.line(*i)
                 ),
             }
         }
         E::TooLarge(n) => format!("{n} bytes exceeds the flash region"),
+        E::SecondNow(i) => format!(
+            "record {i} (records count from 0) is a second now: record.\n      record {i}: a second \
+             now: record; only one is allowed. Remove one."
+        ),
         E::PassphraseMismatch => "a sealed payload needs a passphrase".into(),
         E::NotEnterableOnDevice(w) => format!(
             "the passphrase contains {w:?}, which is not a BIP-39 word. The device \

@@ -1,6 +1,6 @@
 [package]
 name = "mnemonic-engrave"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 description = "Prepare wallet backups and signed transactions for a SeedHammer II: `me sysw pack` builds the payload it engraves, from mt1 strings or a tx: record; bare `me` converts one md1/mk1/mt1 string to an NFC NDEF payload. Refuses secret ms1."
 license = "MIT OR Unlicense"
