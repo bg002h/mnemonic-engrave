@@ -10,7 +10,9 @@
 
 **Spec:** `design/SPEC_wallet_policy_composer.md` (R0 rounds 0-3 folded). Stages: `design/STAGED_PLAN_wallet_policy_composer.md`. Rulings: `design/BRAINSTORM_wallet_policy_composer.md` §2, §3.12.
 
-**Baseline revision (for `scripts/plan-staleness-check.sh`):** descriptor-mnemonic `3b0944fb`.
+**Baseline revision (for `scripts/plan-staleness-check.sh`):** descriptor-mnemonic `3b0944fb` (docs-only commits `480e54fe`, `b19dca7b` since).
+
+**STATUS: R0 GREEN 2026-09-02 (0 Critical / 0 Important open).** Round 0: fidelity (opus, 0C/4I/5M/3N) and mutation/claims (sonnet, 0C/2I/4M/2N), folded at `891b17d` and `fb65f2c`; round 1: fold verification 20/20 FIXED, one new Minor folded at `761ded7`; round 2: verification of the post-round-1 folds, 0 new defects / 0 false claims. Build gate green at every fold (toolchain 1.85.0; 52 compose tests, 51 pass + the pinned MANIFEST red); the CLI and Task 8 fragments hand-wired in the gate's scratch copy ran the whole md-cli suite 761/761. Lenses run on this plan: fidelity-to-spec by constructed counterexample, can-every-test-fail by mutation, fold verification ×2. Implementation may begin: one implementer, UC off, in a descriptor-mnemonic worktree.
 
 ## Global Constraints
 
@@ -2713,7 +2715,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 ### Task 8: `md encode` gates a signature-free spend path under every wrapper, not only `tr`
 
 **Files:**
-- Modify: `crates/md-cli/src/parse/template.rs` (`parse_template_ext`, the `ms_desc` construction, `crates/md-cli/src/parse/template.rs:2677-2700`)
+- Modify: `crates/md-cli/src/parse/template.rs` (`parse_template_ext`, the `ms_desc` construction, `crates/md-cli/src/parse/template.rs:2677-2702`)
 - Test: `crates/md-cli/tests/cli_compose_encode_gate.rs`
 
 **Interfaces:**
@@ -2797,7 +2799,7 @@ Expected: the two `*_unless_experimental` tests FAIL (the unflagged encode exits
 
 - [ ] **Step 3: Run the sanity check for every wrapper, and the relaxed re-check for every wrapper**
 
-In `crates/md-cli/src/parse/template.rs`, `parse_template_ext`, replace the `let ms_desc = if experimental { ... } else { ... };` construction (`:2677-2700`) with:
+In `crates/md-cli/src/parse/template.rs`, `parse_template_ext`, replace the `let ms_desc = if experimental { ... } else { ... };` construction (`:2677-2702`) with:
 
 ```text
     let ms_desc = if experimental {
