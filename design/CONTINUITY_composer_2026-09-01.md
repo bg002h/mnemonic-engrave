@@ -546,3 +546,12 @@ ONE path = warning.
   IN PROGRESS; then sonnet verification (scratchpad/verify-brief-s3-a10.md,
   <A10_FOLD_SHA>), then the implementer waits for S0b to ship (A10 unblocked).
   S0b whole-diff review (opus) still running.
+- PROCESS EXIT mid-session wiped the scratchpad (all briefs, handwire_*.py,
+  gate logs). A10 fold had completed: report c677c6d, fold 0051be7 (checks in
+  its message). Briefs now live in design/agent-briefs/ (recreated from
+  context: S3 implementer, S0b push, A10 notes + verification brief). The S0b
+  reviewer was resumed from its transcript with the brief resent inline.
+  NEXT: A10 verification (sonnet) -> fill <S3_GREEN_SHA>; S0b review report ->
+  fold -> verify -> push (<S0B_TIP>) -> record the S0b merge commit in A10 ->
+  dispatch the S3 implementer. The hand-wire scripts are lost; S3's plan gate
+  needs none further (A10 carries no go fence).
