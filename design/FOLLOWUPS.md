@@ -15324,3 +15324,27 @@ independent of this item).
   the composer spec or plan. Until then the composer spells NUMS as raw `H`
   and its docs state that Liana and BIP-388-strict registration will refuse it.
 - **Status:** OPEN. **Tier:** `constellation` / `wire` / `interop`.
+
+### F-450 — `payload-spec-transaction-rows-missing`: `SPEC_systemwide_payloads.md` has no Engrave Transaction admission row (3.3.2) and no `ClassMt`/`ClassTx` class rows (3.3.1) while the fork's `sysw/record.go` and `gui/sysw_admit.go` carry both (owning phase: **the payload spec's next cycle — a dated fold under that document's own gate; does NOT gate the wallet-policy composer**) `#spec-hygiene` `#payload` `#seedhammer`
+
+Filed 2026-09-02 while folding the composer's classes into the payload spec
+(S1 Task 6, `12e0659` and its R0 fold). F-415 named two missing rows — Wallet
+Policy and Engrave Transaction; the composer cycle created the Wallet Policy
+row (its mandate, composer spec §10 item 6) and was told to NOTE the
+Transaction row for its owner. Measured: `design/SPEC_engrave_transaction.md`
+contains no `progTransaction`, `3.3.1` or `3.3.2`, and no FOLLOWUPS entry
+mentioned `progTransaction` — the "owner" had no vehicle. This is it.
+
+**What is missing.** 3.3.1: rows for `ClassMt` and `ClassTx` (`sysw/record.go:39`,
+`:43`, both NOT secret; `Class::is_bearer` on the Rust side). 3.3.2: an
+`Engrave Transaction` row (the fork's `progTransaction` map admits exactly the
+two transaction classes, per its own comment "consumes exactly the two
+transaction record forms"), which also means two more COLUMNS (`Mt`, `Tx`) on a
+table that just grew three. 3.3.2's "RULED AT FOLD" paragraph already records
+(2026-09-02) that `gui/sysw_unload.go:89` gave `admits()` its first production
+caller through `progTransaction`.
+
+**Why it does not gate the composer.** The composer admits neither transaction
+class, and its row is correct without the two columns; the Transaction cycle
+shipped on 2026-08-25 and works. This is the document lagging the code, the
+shape F-415 was filed for.
