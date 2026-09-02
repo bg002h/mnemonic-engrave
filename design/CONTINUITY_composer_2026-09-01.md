@@ -427,3 +427,9 @@ ONE path = warning.
   `../../design/display-grouping-vectors.tsv`); it passes in the real checkout
   and CI on main 66bdf2f4 is green. Tests lens (sonnet) DISPATCHED →
   `composer-S0b-plan-R0-r0-tests.md`. Both S0b lenses running.
+- S0b fidelity lens landed: `composer-S0b-plan-R0-r0-fidelity.md` (opus) 0C/4I/4M/2N
+  (32ba3f1): all four Importants are cross-plan statement gaps with S3 task A10
+  (defaults = the device's shape? wrapper coverage per archetype; refusal table
+  subset; fork pin-test ownership). Fold both S0b lenses into S0b AND a small
+  A10 fold in S3 -- after S3's r1 verification lands (S3 must not move under
+  its reviewer).
