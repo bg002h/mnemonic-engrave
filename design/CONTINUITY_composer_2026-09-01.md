@@ -15,11 +15,20 @@ MINTING-only after an unconditional draft broke two n1 reading-verb tests; the
 two keyless-wsh vectors are `no-corpus`; wired scratch copy ran the whole md-cli
 suite 761/761). Build gate at both: 52 compose tests, 51 pass, 1 pinned red;
 clippy clean; md-cli compiles. Plan is now 9 tasks.
-**IN FLIGHT:** round 1 = sonnet fold verification of `891b17d` against both
-reports → `agent-reports/composer-S0-plan-R0-r1-fold-verification.md`.
-**NEXT:** persist that report → fold any PARTIAL/NOT FIXED → one more sonnet
-verification covering `fb65f2c` + that fold → when 0C/0I: dispatch ONE
-implementer (UC OFF) in a descriptor-mnemonic worktree, Tasks 1-9 in order
+**Rounds 1 and 2 DONE (2026-09-02):** r1 verification 20/20 FIXED, one new Minor
+(`5aa340b`) folded at `761ded7`; r2 verification of `fb65f2c`+`761ded7` 0 new
+defects / 0 false claims (`1827e1b`), range nit folded at the closure commit.
+**PLAN R0 GREEN.** Status line in the plan header.
+**IN FLIGHT:** ONE implementer (opus, UC OFF) in worktree
+`/scratch/code/shibboleth/wt-composer-s0`, branch `composer-s0` off
+descriptor-mnemonic `b19dca7b`; brief in the controller's scratchpad; report to
+`agent-reports/composer-S0-implementation-report.md`.
+**NEXT after the implementer:** persist its report → verify its gate output
+independently (nextest workspace, clippy, fmt, vectors diff) → whole-diff opus
+execution review over `git diff b19dca7b..composer-s0` (report
+`composer-S0-exec-review-r0.md`) → fold → sonnet verification → merge to main,
+version bump + publish per descriptor-mnemonic `design/RELEASE_PROCESS.md` →
+Stage 1 plan. Tasks 1-9 in order
 (Task 5 pastes 26 MANIFEST entries from the printer; Task 8 changes
 `parse_template_ext` for minting verbs only; Task 9 is the whole-workspace gate
 + corpus regeneration + release note), then the whole-diff opus execution review,
