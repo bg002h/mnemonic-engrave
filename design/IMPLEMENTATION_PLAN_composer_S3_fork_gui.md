@@ -1,9 +1,9 @@
 # Wallet Policy Composer — Stage 3 (fork GUI) Implementation Plan
 
-**STATUS: DRAFT, build-gated, R0 round 0 dispatched 2026-09-02.** Gate (`scripts/plan-build-gate-go.sh` with `FORK_REPO=/scratch/code/shibboleth/wt-composer-s2` -- the S2 branch, since fork `main` lacks the S2 API -- then the six fragments of shipped files and the four shipped-test updates applied by the author's `handwire_s3.py`): 38 new `gui/composer_*.go` files extracted, gofmt clean, `go vet ./gui/` clean but for two pre-existing go1.25/ArtifactDir findings, `go test -run '^TestComposer' ./gui/` ok (118 sub-tests), whole gui 1125/1125 across 24 shards (35 s), `./md/ ./mk/ ./sysw/` ok. Mechanical: citations 222/222 against the S2 worktree, glyph 0 undrawable, tables 28/0 malformed, step numbers in prose 0. Reviews: `composer-S3-plan-R0-r0-{fidelity,tests,journey}.md`.
+**STATUS: DRAFT, build-gated, R0 ROUND 0 FOLDED 2026-09-02 (journey 2C/6I/6M/4N, fidelity 1C/12I/11M/3N, tests 15C/1I; all three persisted at `design/agent-reports/composer-S3-plan-R0-r0-{journey,fidelity,tests}.md` and folded here -- re-review pending).** All three lenses agreed on one Critical: Part B was built and never joined to any flow. **Task B11 is the join**, and a flow-level walk (`TestComposerWalkFromAKeyedPayloadReachesTheEngraveScreen`) is the only kind of test that can fail on that class. Gate, re-run against fork `main` after the fold: `FORK_REPO=/scratch/code/shibboleth/seedhammer SCRATCH=/scratch/code/shibboleth/.plan-build-gate-go-s3 scripts/plan-build-gate-go.sh <this plan>`, then the fragments applied by the author's `scratchpad/handwire_s3.py`.
 
 
-**STATUS: DRAFT 2026-09-02, R0 NOT YET RUN.** Nothing here may be implemented until this plan is GREEN (0 Critical / 0 Important) under the R0 loop and its gates have run. **This plan's GREEN will expire:** re-validate against "what did the S2 merge falsify here?" immediately before dispatching the implementer, per the CLAUDE.md 2026-08-27 directive, with `scripts/plan-staleness-check.sh design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md /scratch/code/shibboleth/seedhammer 169073c gui/`.
+Nothing here may be implemented until this plan is GREEN (0 Critical / 0 Important) under the R0 loop. **S2 HAS MERGED: fork `main` is `321acb56`**, so PRECONDITION 1 below is SATISFIED and every citation resolves against that tree; five citations moved with the merge and are re-resolved (`gui/multisig_build_slots.go:125->128, :172->175, :238->241`; `md/policy_shape.go:60->53, :74->87`). **This plan's GREEN will expire:** re-validate immediately before dispatching the implementer, per the CLAUDE.md 2026-08-27 directive, with `scripts/plan-staleness-check.sh design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md /scratch/code/shibboleth/seedhammer 321acb56 gui/`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -20,11 +20,11 @@ Part A alone is shippable and useful: C26's keyless template is the whole no-pay
 
 **Spec:** `design/SPEC_wallet_policy_composer.md` (this repo) -- §4 grammar and picker bounds, §4e refusals, §4f origins, §6a admission and record classes, §6b lock entry, §6c hashlock entry, §7a-§7g the flow, §8 all copy, §9 items 3-7 and 9-11, §12 items 3, 4, 5, 6, 8, 9, §13 item 1. Staged plan: `design/STAGED_PLAN_wallet_policy_composer.md` §S3.
 
-**Baselines (for `scripts/plan-staleness-check.sh`):** seedhammer fork `169073c` -- every `path:line` below was opened and read against that tree while this plan was written. mnemonic-engrave: the S1 merge (`crates/me-cli/src/sysw/composer_records.rs` on master). descriptor-mnemonic `66bdf2f4`.
+**Baselines (for `scripts/plan-staleness-check.sh`):** seedhammer fork **`321acb56`** (S2 merged 2026-09-02) -- every `path:line` below resolves against that tree. mnemonic-engrave: the S1 merge (`crates/me-cli/src/sysw/composer_records.rs` on master). descriptor-mnemonic `66bdf2f4`.
 
 **PRECONDITIONS, both hard:**
 
-1. **S2 has merged to the fork's `main`.** Every task calls `md.Compose`/`md.ComposeWith`/`md.Composed`, `md.PathList`/`SpendPath`/`KeySet`/`Lock`/`LockKind`/`SlotOrigin`/`DefaultOrigin`/`ValidatePathList`, the `md.ErrCompose*` sentinels, `md.PolicyShape.Branches[].{K,N,Keys,Timelock,Hashlock,Locks,Sha256Digests,Sorted,Depth}`, `md.ComposerStubs`, `mk.AppendStubs`, `sysw.ClassKey`/`ClassHash`/`ClassNow` and `sysw.ParseKeyRecord`/`ParseHashRecord`/`ParseNowRecord`. **None of them exists at `169073c`** (measured: `grep -rn "func Compose\|type Composed\|func AppendStubs\|ClassKey" md/*.go mk/*.go sysw/*.go` excluding tests returns nothing). If S2 has not merged, this plan cannot start.
+1. **S2 has merged to the fork's `main` -- SATISFIED at `321acb56`.** Every task calls `md.Compose`/`md.ComposeWith`/`md.Composed`, `md.PathList`/`SpendPath`/`KeySet`/`Lock`/`LockKind`/`SlotOrigin`/`DefaultOrigin`/`ValidatePathList`, the `md.ErrCompose*` sentinels, `md.PolicyShape.Branches[].{K,N,Keys,Timelock,Hashlock,Locks,Sha256Digests,Sorted,Depth}`, `md.ComposerStubs`, `mk.AppendStubs`, `sysw.ClassKey`/`ClassHash`/`ClassNow` and `sysw.ParseKeyRecord`/`ParseHashRecord`/`ParseNowRecord`. All of them exist at `321acb56`: `md/compose.go:343` `Compose`, `:353` `ComposeWith`, `:299` `ValidatePathList`, `:289` `DefaultOrigin`, `:250` `Bind`, `:226` `Slots`; `md/compose_stubs.go:12` `ComposerStubs`; `mk/compose_stubs.go:9` `AppendStubs`; `md/policy_shape.go:44` `Branch` with `:65` `Sha256Digests` and `:69` `Sorted`.
 2. **F-453's Rust half has shipped and been vendored** before the preset task, and ONLY that task. `design/FOLLOWUPS.md` F-453 owns it to this stage: `md compose --preset <name>` plus one exported vector per archetype in descriptor-mnemonic FIRST, then vendored into the fork. The blank-shape route does not depend on it, so Part A ships with or without presets; the preset task is written with an explicit precondition and is the only thing it blocks.
 
 ## Global Constraints
@@ -36,6 +36,7 @@ Part A alone is shippable and useful: C26's keyless template is the whole no-pay
 - **Three copy gates per §8 body, plus one condition test** (§12 item 5): the glyph check on this plan; `assertFrameHasBody` (`gui/raster_test.go:80`) on the frame that shows it; `assertModalBodyFits` (`gui/modal_fits_test.go:201`) with its 80-character margin; and a test that drives the flow into the state that makes it fire. The three PAGED screens are asserted by paging capacity instead of by a fits assertion, because a body with no single source string cannot be pinned by one (§12 item 5 says so).
 - **Every new `ChoiceScreen` label passes `assertChoiceLabelFits`** (`gui/multisig_build_prose_test.go:508`). `ChoiceScreen` draws rows with `widget.Label`, which does not wrap, so a long label is drawn off the panel and the operator picks a truncated option.
 - **TinyGo target.** No new module dependencies. Watch allocations in `Draw` loops: the paged primitive allocates its `[]op.Op` once per frame with a capacity, as `confirmReviewScreen` does (`gui/multisig_build.go:1894`).
+- **The three operator questions have DEFAULTS, and this plan is written to them.** (a) **Part A ships alone**, and its exit is §12 item 3 WALKED (`TestComposerNoPayloadWalkEngravesAKeylessTemplate`); with a payload loaded Part A's door states "Keys loaded: N" over a Build that cannot use them, so Part A alone is honest for the no-payload journey and Part B follows immediately. (b) **§7f offers the secret plate forms this device HAS** -- ms1 through `cardMS1`, the only secret a bundle card carries; the words-plus-SeedQR plate is a `backup.Seed` needing its own plate pass and stays F-455. (c) **Task A10 is BLOCKED on F-453**, whose Rust half is being authored as a mini-plan (S0b); until it lands the shape flow is blank-only, and §7b's preset-or-blank wiring point is named in Task B11 so A10 is a fill-in rather than a redesign.
 - **Deprecation is comment-only** (C7, operator ruling). Nothing here removes, gates or redirects Multisig Build.
 - **Secret-handling defects never gate** (operator ruling 2026-08-27). The composer's seed handling reuses `seedRegistry` and installs `defer reg.scrub()` at flow entry because that is the right design, not because a leak would block a phase. A leak found here is a follow-up entry with its reproduction.
 - **The md1 chunks are the artifact.** Everything the operator is shown at consent is derived from the decoded chunk set, never from composer UI state (§7e). This is not a style rule: it is the property §8q's self-check exists to enforce.
@@ -53,7 +54,7 @@ Part A alone is shippable and useful: C26's keyless template is the whole no-pay
 - **`gui/sim*.go` does not exist.** `find . -iname '*sim*.go'` over the fork, excluding `_experiment/`, returns nothing. The emulator is `cmd/emu/` (a WASM build plus JS walk scripts: `walk_build_policy.js`, `walk_s3_nested.js`, `walk_s4_gate.js`, `walk_trace_a.js`, `walk_trace_b.js`, `walk_verify.js`, and the `shots_*.js` screenshot scripts). Go-level journeys are ordinary `_test.go` files on the `synctest.Test` / `runUI` / `pumpUntil` / `click` / `uiContains` harness (`gui/wallet_policy_descriptor_walk_test.go:128-176`).
 - `scripts/plan-build-gate-go.sh` extracts every ```go block anchored by ``Create `path` ``, ``In `path` ``, ``Add to `path` ``, ``Prepend to `path` `` or ``Replace `path` `` where the path matches `gui/composer_*.go` (also `md/compose*.go`, `mk/compose*.go`, `sysw/composer_*.go`). **It does NOT assemble fragments of existing files** -- in this plan those are `gui/sysw_admit.go`, `gui/gui.go`, `gui/multisig_build.go`, `gui/template_engrave.go`, `gui/multisig_build_census.go` and `gui/sysw_admit_oracle_test.go`, each given below as an exact old-to-new replacement for the controller to hand-wire in the gate's scratch copy before review. It does not cover the TinyGo build, the whole `./gui/` suite (sharded separately), the emulator, or the render measurements.
 - Baseline before this plan, at `169073c`: `CGO_ENABLED=0 go test -count=1 ./gui/` is `ok`; firmware `tinygo build -size short -target pico-plus2 -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller` reports **1,503,652 B flash / 62,592 B RAM**.
-- **THE GATE WAS RUN ON THIS PLAN, AND ITS CODE WAS EXECUTED, NOT JUST COMPILED.** `FORK_REPO=/scratch/code/shibboleth/wt-composer-s2 ./scripts/plan-build-gate-go.sh design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md` extracted every ```go block into a scratch copy of the fork carrying S2's unmerged `md`/`mk`/`sysw`; `gofmt` reports no change on any of them; `go vet ./gui/` is clean; the six fragments were hand-wired and the five shipped walks given their door step; and `scripts/gui-shard-test.sh ./gui/ 24` then reported **`ok -- all 1125 tests ran across 24 shards`**. So every `TestComposer*` in this plan has passed against real code once already.
+- **THE GATE WAS RUN ON THIS PLAN, AND ITS CODE WAS EXECUTED, NOT JUST COMPILED.** `FORK_REPO=/scratch/code/shibboleth/seedhammer SCRATCH=/scratch/code/shibboleth/.plan-build-gate-go-s3 ./scripts/plan-build-gate-go.sh design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md` extracted every ```go block into a scratch copy of fork `main`; `gofmt` reports no change on any of them; `go vet ./gui/` is clean; the six fragments were hand-wired and the five shipped walks given their door step; and `scripts/gui-shard-test.sh ./gui/ 24` then reported **`ok -- all 1125 tests ran across 24 shards`**. So every `TestComposer*` in this plan has passed against real code once already.
 - **Five defects this found, before a reviewer saw them**, listed because they say what the gate is worth and what it is not: `composerUnitsToDays` rounded UP and echoed "91 days" at an operator who typed 90; two Unix epochs in the lock tests were a year and two days wrong (`1756684800` is 2025-09-01, not 2026-09-01; `1804032000` is 2027-03-03, not 2027-03-01); a paging assertion pumped for a needle a rename had removed; the scrub test asserted `Mnemonic[0] != 0` on the "abandon" vector, whose first eleven words ARE index 0, so it could not distinguish scrubbed from never-written; and `TestComposerAdmitCommentNoLongerClaimsNoSeedClass` scanned the whole file for "NO seed class", which `progTransaction`'s own untouched comment also says -- it would have failed after a perfectly correct fold. **None of the five is a design defect and none would have been caught by reading.**
 - **One S2 signal, passed on rather than fixed here:** in the gate's scratch copy `sysw`'s `TestComposerRecordsClassifyExactlyAsTheHost` and `TestComposerRecordParsersReturnTheHostsValues` FAIL, because the record-class fixture on mnemonic-engrave master now hashes `5b3960ca…b312` while S2's branch pins `eed6b177…464e`. That is S2's pin against a moved fixture, not this plan's, and it belongs in S2's own re-validation before its implementer is dispatched.
 
@@ -72,6 +73,89 @@ Each is resolved in this plan, in the named task, rather than left for the imple
 | 7 | `gui/sim*.go` and JSON journeys under `gui/testdata/` | Neither exists; the emulator is `cmd/emu/` (WASM + JS walks) and Go journeys are `_test.go` files | Every acceptance in this plan is a Go `_test.go` on the shipped harness; the emulator journey is S4's, not this stage's |
 | 8 | §13 item 1: a plate ceiling to be read off | `qrCeilingBytes` (`gui/transaction.go:1369`) MEASURES its ceiling by binary search against `txqr.EncodeSet` module fit, on the refusal path only, and its refusal names module size, symbol count, ECC, the measured ceiling and a form-aware remedy (`:1336-1344`) | The census task copies that shape exactly for the concrete-descriptor text plate, and the measurement task records the number |
 | 9 | §13: per-frame capacities of the three paged screens | Unmeasurable from source: `Choice.Size` and `widget.Labelw` sizes exist only at render time | One measurement task, run on the real face at the real display size, writing the numbers into spec §13 as a fold |
+
+
+## R0 round 0: what the three lenses found, and where each is folded
+
+Three lenses read the committed plan on 2026-09-02 and persisted verbatim to `design/agent-reports/composer-S3-plan-R0-r0-{journey,fidelity,tests}.md`: **journey 2C/6I/6M/4N, fidelity 1C/12I/11M/3N, tests 15C/1I**. All three found the same Critical independently. Every finding below is folded into the task named, or declined in one sentence with its citation. Nothing is carried as "noted".
+
+**The one Critical all three found.** Part B declared fourteen production functions and nothing called any of them; the plan promised a ``Replace `gui/composer_flow.go` `` that no task supplied. **Task B11 is that task**, with a structural reachability scan and a flow-level walk -- the only kind of test that can fail on the class. Recorded in memory as *"plans list components and omit the call that joins them; six green stages shipped an inert feature"*, and it happened here anyway.
+
+### Journey lens (2C / 6I / 6M / 4N)
+
+| finding | folded into |
+| --- | --- |
+| C-1 Part B never joined to any flow | **Task B11**, with `TestComposerWalkFromAKeyedPayloadReachesTheEngraveScreen` and `TestComposerEveryScreenFunctionHasAProductionCaller` |
+| C-2 "Sorted (usual)" silently reversed by adding a second path | **Task A5**: the question moves OUT of `composerKeysEdit` into `composerKeyOrderStep`, asked at the transition where `sole` is FINAL. The reviewer's second shape (restate the outcome on a row) is declined: it describes the reversal after the fact where asking once removes it, and §8b then fires exactly where §5a permits |
+| I-1 §8j blocks the lock and hash edits §7g rules DEFAULT | **Task A5**: `composerShapeGuard` moves onto `composerPathEdit`'s Keys, Remove and Move arms; a lock or hash edit is unguarded, per §7d |
+| I-2 the §4f invariant fires on unseated slots | **Task B4** (`composerInvariantViolation` skips `src < 0`) and **Task B6** (the real invariant runs over the DECODED md1's declared origins, which is where §4f puts it); **Task B11** sizes `st.assigned` at flow entry so a never-seated composition no longer fails the self-check on slot count |
+| I-3 the pick list can take a row the operator cannot see | **Task A2**: `composerPickScreen` clamps `sel` into `[start, start+shown)` after a page advance, both directions; gated by `TestComposerPickScreenNeverReturnsARowItDidNotDraw` (Task C0) |
+| I-4 consent confirmable before its proof is drawn | **Task A2**: `composerReadScreen` withholds the checkmark until the last page has been laid out ONCE; **Task B6** makes it the single consent surface, closing fidelity M-5 with it |
+| I-5 Back at Key order destroys the path's key set | **Task A5**: the key set is snapshotted and RESTORED on any decline, and `composerPathLine` gives a path with neither element its own body ("empty") instead of "hash only" |
+| I-6 a date past 2038-01-19 refused as "does not exist" | **Task A1** adds `composerCopyDateCeiling` (the copy table moves 39 -> 40) and **Task A7** uses it; filed as a §8 addition, F-456, so the spec stays the enumerable source |
+| M-1 the changed-id line fires after a Back with no edit | **Task B11**: the §8s signal is a comparison of the emitted CHUNK SETS, not a sticky `edited` flag |
+| M-2 an empty digit field echoes the §8u ceiling | **Task A7**: the two relative pads say what to type before what is too much |
+| M-3 `ErrComposeNoPaths` shows a codec string | **Task A5**: mapped to §8m line 1 beside `ErrComposeNoKeyedPath` |
+| M-4 a key-less path with "No hash lock" leaves an empty path | **Task A5**: a path that ends with neither keys nor a hash is treated as a cancel |
+| M-5 the own-wallet line absent from the consent surface | **Task A11**: `composerConsentLines` carries it, where §7g's divergence table puts it |
+| M-6 the seating prompt is drawn on one page only | **Task A2**: the lead is a PER-PAGE header rather than the first body row |
+| N-1 Back at the wrapper exits the program | **Task B11**: the door is a loop, so Back out of Build lands on the door |
+| N-2 the slots/keys line drawn with no payload | **Task A5**: `composerSlotsKeysLine` prints the slot count alone when no source is loaded |
+| N-3 no way to reorder paths | **Task A5**: a "Move up" arm on paths after the first, through `composerApplyShapeEdit` so the discard stays exact |
+| N-4 the date echo appends the raw operand | **Task A7**: removed; §6b's premise is that the operator never types one |
+
+### Fidelity lens (1C / 12I / 11M / 3N)
+
+| finding | folded into |
+| --- | --- |
+| C-1 Part B has no caller | **Task B11** (same as journey C-1) |
+| I-1 the invariant on unseated slots, checked on UI state | **Tasks B4, B6** (see journey I-2) |
+| I-2 consent mis-numbers paths for an extracted taproot internal key | **Task A11**: `composerConsentLinesFor` takes the operator's numbering and the key-path line names its listed path; gated by `TestComposerConsentNumbersPathsAsTheOperatorListedThem` |
+| I-3 Back at the path list abandons the composition | **Task B11**: Back returns to the wrapper with the list intact, gated by `TestComposerBackAtThePathListKeepsTheComposition` -- the first test in this plan that fails if a Back loses state |
+| I-4 the wrapper cannot be changed after the first pick | **Task A5**: a "Change the script" row, so §7g's row and §12 item 4's wrapper vector are reachable |
+| I-5 `composerKeysEdit` destroys an existing key set | **Task A5** (see journey I-5) |
+| I-6 §8a/§8b memoised by path index, so an unskippable confirm can be skipped | **Task A5**: both memos deleted. §8a fires where a key-less path is CREATED (once per path by construction) and §8b at the transition; gated by `TestComposerKeylessConfirmFiresAgainForANewPathAtAReusedIndex` |
+| I-7 the pager-gate test cannot fail | **Task C0**: replaced by `TestComposerReadScreenWithholdsTheCheckmarkUntilTheLastPage`, which asserts the BEHAVIOUR and fails in both directions; the ink comparison is gone |
+| I-8 §12 item 5's gates missing for §8m, §8c, §8r | **Task C0**, with the measured reason the instrument could not be used unchanged for the short bodies |
+| I-9 §8i's "and at consent" half absent | **Task A11**: `composerConsentLines` restates it whenever the decoded shape carries a digest |
+| I-10 form A and the secret plate have no builder; "cut ONCE" unimplemented | **Task B7** (the secret-form picker is deleted, since nothing consumed it) and **Task B11** (`composerSecretCards` dedups by registered seed and cuts ms1 through `cardMS1`). Form A ships as the KEYED md1; the text and QR descriptor plates are declined here and filed **F-457**, because `md` deliberately emits no descriptor text (`md/compose.go`'s header: "a rendering that cannot be re-parsed is the defect this package's invariant exists to prevent") and a renderer is normative, Rust-first |
+| I-11 Part A's exit not discharged; Part A alone breaks §7e/§7f | **Task B11**: `TestComposerNoPayloadWalkEngravesAKeylessTemplate` walks all six of §12 item 3's clauses, and the joined flow gives Part A the collapsed form choice and the self-check §7e makes unconditional. The default stands: Part A ships alone for the no-payload journey, and the plan says where that is honest |
+| I-12 the blast radius covers Go tests only | **Task C2**: the three `cmd/emu/*.js` walks and `capture_walletpolicy.py`, with the one-line fix and an explicit note that no gate in this stage can run them |
+| M-1 the 9th-path refusal has no §8 home | **Task A5**: the row is not offered at the cap, which is what §4e asks; the ad-hoc string is gone |
+| M-2 the consent renders locks in the row form | **Task A11**: `composerBranchLines` uses §6b's echo form |
+| M-3 the sticky `edited` flag | **Task B11** (journey M-1) |
+| M-4 the raw operand in the date echo | **Task A7** (journey N-4) |
+| M-5 two consent surfaces | **Task B6**: one, `composerReadScreen`, which is `confirmReviewScreen`'s paged form plus the last-page gate §7e needs |
+| M-6 §8i shown in front of a clear | **Task A8**: shown once the operator is actually taking a hash |
+| M-7 `composerCensusLines`' declared vs real signature | **Task B9**: the Interfaces line matches the code, and `composerCensusRefusal` is removed with its deferred consumer |
+| M-8 `seedID` parameter is a source index | **Task B2**: renamed `srcIdx`, with the collision named |
+| M-9 no preset-or-blank wiring point | **Task A10 and Task B11**: the point is named so A10 is a fill-in |
+| M-10 stale STATUS baseline | the header: fork `main` `321acb56`, the five drifted citations re-resolved |
+| M-11 `composerPageLines` counts a row that may overflow | **Task A2**: a row is counted only when it is inside the box, because that count IS §13 item 1's recorded capacity |
+| N-1 §8r "beneath Build" vs the Lead | DECLINED as a code change and folded to the spec instead: the Lead wraps and the rows do not (`gui/gui.go:1969`), which is the reason the reviewer calls sound; recorded for the §13 fold in **Task C1** |
+| N-2 the upward-only clamp | **Task A2** (journey I-3) |
+| N-3 §8n's host lines not scoped | **Task A1**: the copy table's own header says §8n is `me sysw pack` stderr and belongs to S1 |
+
+### Tests lens (15C / 1I) -- the mutation survivors
+
+| finding | folded into |
+| --- | --- |
+| C-1 Part B unreachable | **Task B11** |
+| C-2 `composer_engrave_test.go` and `composer_cards_test.go` promised and never written | **Tasks B7 and B8**, both files written with their steps |
+| C-3 Task B10 is prose, no code | **Task B10**, rewritten with the five vectors and four assertions |
+| C-4 the door's `ClassMDMK` branch is a false PASS | **Task C0**: `TestComposerDoorOffersFromPayloadForACardPayload`, on a real minted card |
+| C-5 nothing clicks "Build a new policy" | **Task B11**: both walks do |
+| C-6 the §4e gate inside `composerShapeFlow` can be deleted | **Task C0**: `TestComposerShapeRefusalGateIsReachedFromTheScreen` |
+| C-7 the §8a confirm can be bypassed | **Task B11**: `TestComposerKeylessConfirmFiresAgainForANewPathAtAReusedIndex` drives the decline |
+| C-8 `composerLockAccept`'s bounds can be disabled | **Task C0**: `TestComposerLockAcceptRefusesFromTheScreen`, four refusals and a control |
+| C-9 the §8s re-show signal can be inverted | **Task C0**: `TestComposerStubReshowSignalIsTheChunkSet` |
+| C-10 `composerStubLines` never called with `keyedChunks` | **Task C0**: `TestComposerStubLinesLabelASeatedSlot` |
+| C-11 the mapping review's invariant check at the call site | **Task C0**: `TestComposerMappingReviewRefusesFromTheScreen` |
+| C-12 `composerShortfall`'s counts at the call site | **Task C0**: `TestComposerShortfallCountsSeatsFromTheScreen` |
+| C-13 the C29 warning deletable from the review's output | **Task C0**, same test's second half |
+| C-14 §8l deletable from `composerFlow` | **Task B11**: both walks assert it draws and hold to confirm it |
+| C-15 `composerCensusRefusal` unreachable | **Task B9**: removed with its deferred consumer (F-457), rather than left as a refusal nothing can trigger |
+| I-1 `composerHexEntry`'s exact-64 bound untested | **Task C0**: `TestComposerHexEntryTakesExactlySixtyFourCharacters`, which shows that 62 characters decode fine and are still not a digest |
 
 ---
 
@@ -200,6 +284,8 @@ func composerCopyTable() []composerCopyRow {
 			"Slot @0, key path (spends alone): choose a key"},
 		{"composerCopyDateFloor", "8t", composerCopyDateFloor(),
 			"This build will not write a date before 2009 as a time lock."},
+		{"composerCopyDateCeiling", "8t", composerCopyDateCeiling(),
+			"This build writes dates up to 2038-01-19. For a later time, use a block height instead."},
 		{"composerCopyRelativeCeiling", "8u", composerCopyRelativeCeiling(),
 			"Relative locks reach at most 455 days in blocks or 388 days in time. Use an absolute date."},
 		{"composerCopySameOriginFewFingerprints", "8v", composerCopySameOriginFewFingerprints(),
@@ -274,8 +360,13 @@ func TestComposerCopyTableCoversEveryBody(t *testing.T) {
 	for stray := range covered {
 		t.Errorf("composerCopyTable names %s, which composer_copy.go does not declare", stray)
 	}
-	if declared != 39 {
-		t.Errorf("composer_copy.go declares %d bodies, the plan and the table know 39 -- "+
+	// 40 SINCE THE DATE CEILING. §8t covered the floor and §8 had no body for
+	// the top, so a date past 2038-01-19 was refused as "that date does not
+	// exist" -- false of 2045-06-01, on the archetype §4d lists first. The new
+	// body is filed as a §8 addition (F-456) so the spec stays the source this
+	// table is diffed against.
+	if declared != 40 {
+		t.Errorf("composer_copy.go declares %d bodies, the plan and the table know 40 -- "+
 			"if that is deliberate, update both", declared)
 	}
 }
@@ -605,6 +696,19 @@ func composerCopyDateFloor() string {
 	return "This build will not write a date before 2009 as a time lock."
 }
 
+// composerCopyDateCeiling is the ceiling line §8 does not yet carry.
+//
+// §8t covers the FLOOR ("before 2009") and nothing covered the top, so a date
+// past 2038-01-19 was refused as "that date does not exist" -- which is false
+// of 2045-06-01 and leaves the operator retyping. The archetype §4d lists
+// first is simple-timelocked-inheritance, where a twenty-year date is the
+// ordinary case, so this is the sentence that use meets. Filed as a §8
+// addition (F-456) so the spec's copy stays the enumerable source.
+func composerCopyDateCeiling() string {
+	return "This build writes dates up to 2038-01-19. For a later time, use a " +
+		"block height instead."
+}
+
 func composerCopyRelativeCeiling() string {
 	return "Relative locks reach at most 455 days in blocks or 388 days in time. " +
 		"Use an absolute date."
@@ -883,10 +987,19 @@ func composerPageLines(ctx *Context, th *Colors, dims image.Point, lines []strin
 		}
 		body = append(body, lbl.Offset(pos))
 		y += sz.Y + 6
-		shown++
+		// COUNTED ONLY WHEN IT IS INSIDE THE BOX. It used to increment and
+		// THEN break, so the last counted row could extend past the content
+		// box -- and this count is the number §13 item 1 records as the
+		// screen's per-frame capacity, so it would have recorded one more row
+		// than the frame fully draws.
 		if y > contentBottom {
+			if shown > 0 {
+				break
+			}
+			shown++
 			break
 		}
+		shown++
 	}
 	return body, shown
 }
@@ -904,15 +1017,32 @@ func composerReadScreen(ctx *Context, th *Colors, title string, lines []string) 
 	contBtn := &Clickable{Button: Button3, AltButton: Center}
 	pageBtn := &Clickable{Button: Button2}
 	start := 0
+	// THE CHECKMARK IS WITHHELD UNTIL THE LAST PAGE HAS BEEN LAID OUT ONCE.
+	//
+	// §7e's consent carries the per-path lines, the key-path line, both ids
+	// and receive AND change addresses 0..1 -- and the addresses are the only
+	// thing that proves WHICH wallet this is. The shipped confirmReviewScreen
+	// accepts Button3 on the first frame whatever page is showing, so an
+	// operator could consent to a wallet whose proof was never drawn. That is
+	// inherited behaviour and this is new code, so the composer's own paged
+	// screen does not inherit it.
+	//
+	// ONCE, not every time: paging back to page 1 does not re-arm the gate.
+	// The operator has seen it; making them page to the end again would be a
+	// control that punishes reading.
+	seenEnd := false
 	for !ctx.Done {
 		if backBtn.Clicked(ctx) {
 			return false
 		}
-		if contBtn.Clicked(ctx) {
+		if seenEnd && contBtn.Clicked(ctx) {
 			return true
 		}
 		dims := ctx.Platform.DisplaySize()
 		body, shown := composerPageLines(ctx, th, dims, lines, start, -1)
+		if start+shown >= len(lines) {
+			seenEnd = true
+		}
 		if pageBtn.Clicked(ctx) {
 			if start+shown < len(lines) {
 				start += shown
@@ -926,7 +1056,14 @@ func composerReadScreen(ctx *Context, th *Colors, title string, lines []string) 
 		if start > 0 || shown < len(lines) {
 			navs = append(navs, NavButton{Clickable: pageBtn, Style: StyleSecondary, Icon: assets.IconRight})
 		}
-		navs = append(navs, NavButton{Clickable: contBtn, Style: StylePrimary, Icon: assets.IconCheckmark})
+		if seenEnd {
+			navs = append(navs, NavButton{Clickable: contBtn, Style: StylePrimary, Icon: assets.IconCheckmark})
+		} else {
+			// The Button3 handler is still DRAINED above; what is withheld is
+			// the icon, so the control is never present-and-inert (the ruling
+			// confirmReviewScreen states at gui/multisig_build.go:1919-1925).
+			contBtn.Clicked(ctx)
+		}
 		nav, _ := layoutNavigation(&ctx.B, th, dims, navs...)
 		frameOps := append([]op.Op{nav, titleOp}, body...)
 		frameOps = append(frameOps, op.Color(&ctx.B, th.Background))
@@ -945,19 +1082,35 @@ func composerPickScreen(ctx *Context, th *Colors, title, lead string, rows []str
 	takeBtn := &Clickable{Button: Button3, AltButton: Center}
 	pageBtn := &Clickable{Button: Button2}
 	inp := new(InputTracker)
-	lines := append([]string{lead, ""}, rows...)
-	const rowBase = 2 // lines[0] is the lead, lines[1] the blank spacer
-	sel := rowBase
+	// THE LEAD IS A PER-PAGE HEADER, NOT THE FIRST BODY ROW.
+	//
+	// It used to be lines[0] with a spacer, which put the §8s prompt ("Slot
+	// @2, Path 1 key 2 of 3: choose a key") on the FIRST page only. On the screen
+	// this primitive exists for -- a payload holding more keys than a frame --
+	// an operator paging for the right key lost which slot they were filling,
+	// and paging is forward-only with wrap, so recovering it cost a full
+	// cycle. Prepending it to every page costs the same measurement loop.
+	lines := rows
+	sel := 0
 	start := 0
 	for !ctx.Done {
 		if backBtn.Clicked(ctx) {
 			return 0, false
 		}
 		if takeBtn.Clicked(ctx) {
-			return sel - rowBase, true
+			return sel, true
 		}
 		dims := ctx.Platform.DisplaySize()
-		body, shown := composerPageLines(ctx, th, dims, lines, start, sel)
+		page := append([]string{lead, ""}, lines[start:]...)
+		const rowBase = 2 // the header and its spacer, redrawn on every page
+		pageOps, drawn := composerPageLines(ctx, th, dims, page, 0, sel-start+rowBase)
+		shown := drawn - rowBase
+		if shown < 1 {
+			// A header that fills the frame would leave no room for a row and
+			// the list could never advance. One row always draws.
+			shown = 1
+		}
+		body := pageOps
 		for {
 			e, ok := inp.Next(ctx, ButtonFilter(Up), ButtonFilter(Down))
 			if !ok {
@@ -969,7 +1122,7 @@ func composerPickScreen(ctx *Context, th *Colors, title, lead string, rows []str
 			}
 			switch be.Button {
 			case Up:
-				if sel > rowBase {
+				if sel > 0 {
 					sel--
 				}
 			case Down:
@@ -989,11 +1142,18 @@ func composerPickScreen(ctx *Context, th *Colors, title, lead string, rows []str
 			} else {
 				start = 0
 			}
+			// THE CURSOR IS CLAMPED INTO THE PAGE IN BOTH DIRECTIONS. Only the
+			// upward clamp existed, so after a wrap to start = 0 the cursor
+			// stayed on a row belonging to a later page: that frame drew NO
+			// highlight and Button3 returned the invisible row -- seating a
+			// key the operator never saw selected. Up/Down already clamp the
+			// page to the cursor (start = sel); this is the same rule applied
+			// the other way.
 			if sel < start {
 				sel = start
 			}
-			if sel < rowBase {
-				sel = rowBase
+			if sel >= start+shown {
+				sel = start
 			}
 			continue
 		}
@@ -2290,12 +2450,14 @@ type composerState struct {
 	// present, affecting echoes and refusals only, never an encoded operand.
 	bound composerBound
 
-	// keylessConfirmed and unsortedConfirmed record the §8a and §8b
-	// confirm-to-proceed answers, keyed by the OPERATOR's path index, so
-	// neither fires twice for one decision (§8a "once per key-less path",
-	// §8b "once per key set").
-	keylessConfirmed  map[int]bool
-	unsortedConfirmed map[int]bool
+	// NO CONFIRM MEMO LIVES HERE, and its absence is the fix rather than an
+	// omission. §8a and §8b were memoised by the operator's path INDEX, and an
+	// index is not an identity: "Remove path" splices the slice and left the
+	// map, so a new key-less path at a reused index skipped an unskippable
+	// confirm (C16). §8a now fires where a key-less path is CREATED, which
+	// happens exactly once per path by construction, and §8b fires at the
+	// transition out of the shape, where the sole-path condition it depends on
+	// is final.
 
 	// sources are the seatable keys: key: records, mk1 cards and seeds
 	// (§7d). Filled by the seating half.
@@ -2509,6 +2671,13 @@ func composerEveryPathHashed(list md.PathList) bool {
 // one, as every "Path N" prompt in §7d and §8s does.
 func composerPathLine(p md.SpendPath, idx int) string {
 	body := "hash only"
+	if p.Keys == nil && p.Hash == nil {
+		// NEITHER element. It used to read "hash only", so a path left empty
+		// by a decline was described as something it was not and then refused
+		// at Done with a body about a lock nobody set -- with no way to see
+		// what was wrong with it.
+		body = "empty"
+	}
 	if p.Keys != nil {
 		if p.Keys.N == 1 {
 			body = "1 key"
@@ -2561,6 +2730,12 @@ func composerUnitsToDays(units uint32) uint32 {
 // seed reads `keys available: 2 + seed` rather than 3 -- which would promise
 // a third distinct key that does not exist.
 func composerSlotsKeysLine(st *composerState) string {
+	if len(st.sources) == 0 {
+		// §7b scopes this line to "whenever a payload is loaded". With none it
+		// read `keys available: 0` on a build the door has already described
+		// as key-less -- a count that answers a question nobody asked.
+		return fmt.Sprintf("slots: %d", composerSlotCount(st.list))
+	}
 	records, seeds := 0, 0
 	for _, s := range st.sources {
 		if s.kind == composerSourceSeed {
@@ -2619,7 +2794,13 @@ import (
 // one that says an unpolished true thing.
 func composerRefusalBody(err error) (string, bool) {
 	switch {
-	case errors.Is(err, md.ErrComposeNoKeyedPath):
+	// An EMPTY list and a list with no keyed path are one sentence to an
+	// operator: "Every wallet needs at least one path with a key." Tapping
+	// Done on an empty list is a plausible first action, and without this arm
+	// it printed md.ErrComposeNoPaths' text -- `md: compose: a wallet needs at
+	// least one spend path` -- an internal prefix on an operator screen, which
+	// §11 forbids.
+	case errors.Is(err, md.ErrComposeNoPaths), errors.Is(err, md.ErrComposeNoKeyedPath):
 		return composerCopyRefuseNoKeyedPath(), true
 	case errors.Is(err, md.ErrComposeLockOnlyPath):
 		return composerCopyRefuseLockOnly(), true
@@ -2741,37 +2922,52 @@ func composerKeysEdit(ctx *Context, th *Colors, st *composerState, idx int) bool
 	if !ok {
 		return false
 	}
-	set := &md.KeySet{K: uint8(k), N: uint8(n), Sorted: true}
-	st.list.Paths[idx].Keys = set
-	if composerSortedIsLegal(st.list, idx) {
-		cs := &ChoiceScreen{
-			Title:   "Key order",
-			Lead:    "Sorted keys, or your order?",
-			Choices: []string{"Sorted (usual)", "Keep my order"},
-		}
-		sel, ok := cs.Choose(ctx, th)
-		if !ok {
-			st.list.Paths[idx].Keys = nil
-			return false
-		}
-		if sel == 1 {
-			// §8b fires ONCE per key set where sorted was legal and declined.
-			if !st.unsortedConfirmed[idx] {
-				if !composerConfirmScreen(ctx, th, "EXPERIMENTAL",
-					composerConfirmBody(composerCopyUnsortedKeys())) {
-					st.list.Paths[idx].Keys = nil
-					return false
-				}
-				st.unsortedConfirmed[idx] = true
-			}
-			set.Sorted = false
-		}
-	} else {
-		// Every other multi-key path is a lowering-forced `multi`: the operator
-		// declined nothing, so §8b must not fire (§5a). Sorted is left true and
-		// md.Compose applies §5's rule; nothing here decides the spelling.
-		set.Sorted = true
+	// SORTED IS LEFT TRUE HERE AND THE QUESTION IS ASKED LATER.
+	//
+	// It used to be asked right here, and that was a decision the device
+	// reversed in silence: §5's key-set rule lowers a SOLE unlocked, unhashed
+	// path to sortedmulti and ANY other multi-key path to `multi`, so adding a
+	// second path turned an answered-sorted path into an order-dependent one
+	// with nothing said. The operator was left holding the opposite of §8b's
+	// warning from a screen this flow had just shown them.
+	//
+	// So the question moves to the transition out of the shape
+	// (composerKeyOrderStep), where `sole` is FINAL and cannot be reversed
+	// afterwards. Restating the outcome on a row instead would describe the
+	// reversal after the fact; asking once, at the end, removes it.
+	st.list.Paths[idx].Keys = &md.KeySet{K: uint8(k), N: uint8(n), Sorted: true}
+	return true
+}
+
+// composerKeyOrderStep asks §5's key-order question ONCE, at the transition
+// out of the shape, and only where §5 makes a sorted form legal at all.
+//
+// Called after ValidatePathList has accepted the list, so `sole` is final: no
+// later edit can turn the answer into its opposite without coming back through
+// here. §8b fires only on the decline, which is §5a's rule -- never on a
+// lowering-forced `multi`, where the operator declined nothing.
+func composerKeyOrderStep(ctx *Context, th *Colors, st *composerState) bool {
+	if !composerSortedIsLegal(st.list, 0) {
+		return true
 	}
+	cs := &ChoiceScreen{
+		Title:   "Key order",
+		Lead:    "Sorted keys, or your order?",
+		Choices: []string{"Sorted (usual)", "Keep my order"},
+	}
+	sel, ok := cs.Choose(ctx, th)
+	if !ok {
+		return false
+	}
+	if sel == 0 {
+		st.list.Paths[0].Keys.Sorted = true
+		return true
+	}
+	if !composerConfirmScreen(ctx, th, "EXPERIMENTAL",
+		composerConfirmBody(composerCopyUnsortedKeys())) {
+		return false
+	}
+	st.list.Paths[0].Keys.Sorted = false
 	return true
 }
 
@@ -2779,9 +2975,9 @@ func composerKeysEdit(ctx *Context, th *Colors, st *composerState, idx int) bool
 // makes it key-less.
 func composerAddPath(ctx *Context, th *Colors, st *composerState) {
 	if len(st.list.Paths) >= md.ComposeMaxPaths {
-		showError(ctx, th, "Paths", fmt.Sprintf(
-			"This wallet already has %d spend paths, which is the most this build writes.",
-			md.ComposeMaxPaths))
+		// Unreachable from the list, which stops offering the row at the cap.
+		// Kept as a bound rather than a screen: a refusal with no §8 home is
+		// copy no gate covers (§11).
 		return
 	}
 	idx := len(st.list.Paths)
@@ -2809,15 +3005,30 @@ func composerAddPath(ctx *Context, th *Colors, st *composerState) {
 		showError(ctx, th, fmt.Sprintf("Path %d", idx+1), composerCopyRefuseKeylessTr())
 		return
 	}
-	if !st.keylessConfirmed[idx] {
-		if !composerConfirmScreen(ctx, th, "EXPERIMENTAL",
-			composerConfirmBody(composerCopyKeylessPath())) {
-			st.list.Paths = st.list.Paths[:idx]
-			return
-		}
-		st.keylessConfirmed[idx] = true
+	// §8a FIRES ON EVERY KEY-LESS PATH THAT IS CREATED, with no memo.
+	//
+	// It used to be memoised as keylessConfirmed[idx], and an index is not an
+	// identity: "Remove path" splices the slice and leaves the map, so adding
+	// path 1 key-less, removing it and adding another put the new path back at
+	// index 0 with the confirm already recorded -- an unskippable
+	// confirm-to-proceed that could be skipped (C16). A path is created
+	// exactly once, here, so firing on creation IS "once per key-less path"
+	// (§8a) and needs no state to be wrong about.
+	if !composerConfirmScreen(ctx, th, "EXPERIMENTAL",
+		composerConfirmBody(composerCopyKeylessPath())) {
+		st.list.Paths = st.list.Paths[:idx]
+		return
 	}
 	if !composerHashEdit(ctx, th, st, idx) {
+		st.list.Paths = st.list.Paths[:idx]
+		return
+	}
+	// A path that ends with NEITHER keys nor a hash is a cancel, not a path.
+	// The key-less route's last pick-list row is "No hash lock", which clears
+	// the digest and returns true, and the empty path it left read
+	// "Path N: hash only" on the row and was refused at Done with the
+	// lock-only body -- naming a lock nobody set.
+	if st.list.Paths[idx].Keys == nil && st.list.Paths[idx].Hash == nil {
 		st.list.Paths = st.list.Paths[:idx]
 	}
 }
@@ -2825,10 +3036,19 @@ func composerAddPath(ctx *Context, th *Colors, st *composerState) {
 // composerPathEdit is one path's own menu.
 func composerPathEdit(ctx *Context, th *Colors, st *composerState, idx int) {
 	for !ctx.Done {
+		choices := []string{"Keys", "Time lock", "Hash lock", "Remove path"}
+		if idx > 0 {
+			// §5 makes LISTED ORDER decide the or_i/or_d nesting, the leaf
+			// depth on the taproot spine and which path becomes the internal
+			// key -- so an order mistake is a different wallet, and without a
+			// move the only repair was remove-and-re-add, which §8j pays for
+			// with every seat.
+			choices = append(choices, "Move up")
+		}
 		cs := &ChoiceScreen{
 			Title:   fmt.Sprintf("Path %d", idx+1),
 			Lead:    composerPathLine(st.list.Paths[idx], idx),
-			Choices: []string{"Keys", "Time lock", "Hash lock", "Remove path"},
+			Choices: choices,
 		}
 		sel, ok := cs.Choose(ctx, th)
 		if !ok {
@@ -2836,13 +3056,44 @@ func composerPathEdit(ctx *Context, th *Colors, st *composerState, idx int) {
 		}
 		switch sel {
 		case 0:
-			composerKeysEdit(ctx, th, st, idx)
+			// THE GUARD IS ON THIS ARM AND ON REMOVE, NOT ON THE EDITOR.
+			// §7d: "A lock or hash edit moves no slot, keeps assignments", and
+			// §7g classifies it DEFAULT. Asking §8j before the editor told an
+			// operator who wanted to change a lock that every key would be
+			// cleared -- false for the edit they intended -- and declining it
+			// left the lock uneditable at all.
+			if !composerShapeGuard(ctx, th, st) {
+				continue
+			}
+			// SNAPSHOT AND RESTORE, not clear. A decline at any screen inside
+			// the key editor used to leave Keys == nil on a path that already
+			// had a key set, which then read "hash only" on the row and was
+			// refused at Done with a body about a lock nobody set.
+			before := st.list.Paths[idx].Keys
+			composerApplyShapeEdit(st, func() {
+				if !composerKeysEdit(ctx, th, st, idx) {
+					st.list.Paths[idx].Keys = before
+				}
+			})
 		case 1:
 			composerLockEdit(ctx, th, st, idx)
 		case 2:
 			composerHashEdit(ctx, th, st, idx)
 		case 3:
-			st.list.Paths = append(st.list.Paths[:idx], st.list.Paths[idx+1:]...)
+			if !composerShapeGuard(ctx, th, st) {
+				continue
+			}
+			composerApplyShapeEdit(st, func() {
+				st.list.Paths = append(st.list.Paths[:idx], st.list.Paths[idx+1:]...)
+			})
+			return
+		case 4:
+			if !composerShapeGuard(ctx, th, st) {
+				continue
+			}
+			composerApplyShapeEdit(st, func() {
+				st.list.Paths[idx-1], st.list.Paths[idx] = st.list.Paths[idx], st.list.Paths[idx-1]
+			})
 			return
 		}
 	}
@@ -2850,42 +3101,70 @@ func composerPathEdit(ctx *Context, th *Colors, st *composerState, idx int) {
 
 // composerShapeFlow runs the path list until it validates, then returns true.
 //
-// EVERY EDIT GOES THROUGH HERE, so the discard rule (§7d, §8j) has exactly one
-// place to live: the seating half installs composerShapeGuard, which this
-// calls before an edit that would move slot NUMBERING is accepted.
+// BACK RETURNS FALSE AND THE CALLER GOES BACK ONE STEP, TO THE WRAPPER, WITH
+// THE LIST INTACT. It used to make composerFlow return, dropping the wrapper,
+// every path, every lock, every digest and every confirm already given --
+// against §7b's own rule ("going back should lose nothing") and the standing
+// 2026-08-19 directive. Nothing here clears st.list, so the state the caller
+// re-enters with is the state the operator left.
+//
+// THE DISCARD RULE HAS ONE PLACE TO LIVE, and it is composerPathEdit's Keys,
+// Remove and Move arms plus composerAddPath -- the four that can move slot
+// NUMBERING. A lock or a hash edit moves none (§7d) and is not guarded.
 func composerShapeFlow(ctx *Context, th *Colors, st *composerState) bool {
-	if st.keylessConfirmed == nil {
-		st.keylessConfirmed = map[int]bool{}
-	}
-	if st.unsortedConfirmed == nil {
-		st.unsortedConfirmed = map[int]bool{}
-	}
 	for !ctx.Done {
 		rows := make([]string, 0, len(st.list.Paths)+3)
 		for i, p := range st.list.Paths {
 			rows = append(rows, composerPathLine(p, i))
 		}
-		rows = append(rows, "Add a spend path")
+		if len(st.list.Paths) < md.ComposeMaxPaths {
+			// §4e rules the path cap "at the picker (the picker does not offer
+			// the value)". Refusing it afterwards needed an ad-hoc string that
+			// is in no §8 table, so neither the glyph gate nor the modal-fits
+			// gate covered it; not offering the row is what §4e asks for and
+			// needs no copy at all.
+			rows = append(rows, "Add a spend path")
+		}
+		// §7g's row "shape | edits the wrapper ... after a slot was assigned"
+		// needs an affordance to be reachable at all, and §12 item 4 names a
+		// wrapper change after seating as one of its vectors. Without this row
+		// composerShapeSignature's wrapper term was unreachable from the flow.
+		rows = append(rows, "Change the script")
 		rows = append(rows, "Done")
 		lead := composerSlotsKeysLine(st)
 		sel, ok := composerPickScreen(ctx, th, "Spend paths", lead, rows)
 		if !ok {
 			return false
 		}
+		// THE ROWS ARE DISPATCHED BY NAME, not by an arithmetic offset: the
+		// "Add a spend path" row disappears at the cap (§4e), so an index
+		// computed from len(st.list.Paths) would silently address the wrong
+		// action on a full list.
 		switch {
 		case sel < len(st.list.Paths):
-			if !composerShapeGuard(ctx, th, st) {
-				continue
-			}
 			composerPathEdit(ctx, th, st, sel)
-		case sel == len(st.list.Paths):
+		case rows[sel] == "Add a spend path":
 			if !composerShapeGuard(ctx, th, st) {
 				continue
 			}
-			composerAddPath(ctx, th, st)
+			composerApplyShapeEdit(st, func() { composerAddPath(ctx, th, st) })
+		case rows[sel] == "Change the script":
+			if !composerShapeGuard(ctx, th, st) {
+				continue
+			}
+			composerApplyShapeEdit(st, func() {
+				w, ok := composerWrapperPick(ctx, th)
+				if !ok {
+					return
+				}
+				st.list.Wrapper = w
+			})
 		default:
 			if _, err := md.ValidatePathList(st.list); err != nil {
 				composerShowRefusal(ctx, th, "Spend paths", err)
+				continue
+			}
+			if !composerKeyOrderStep(ctx, th, st) {
 				continue
 			}
 			if composerEveryPathHashed(st.list) {
@@ -3604,6 +3883,14 @@ func composerLockEdit(ctx *Context, th *Colors, st *composerState, idx int) bool
 		}
 		if unitSel == 0 {
 			frag, ok := composerDigitEntry(ctx, th, title, "How many blocks?", 5, func(s string) (string, bool) {
+				// AN EMPTY FIELD IS NOT A CEILING BREACH. Returning §8u for
+				// every unparseable fragment meant the operator read
+				// "Relative locks reach at most 455 days..." before typing a
+				// digit -- a refusal for a limit they had not approached. The
+				// date and height pads already say what to type first.
+				if s == "" {
+					return "1 to 65535 blocks", false
+				}
 				n, err := strconv.ParseUint(s, 10, 32)
 				if err != nil || n < 1 || n > 65535 {
 					return composerCopyRelativeCeiling(), false
@@ -3617,6 +3904,9 @@ func composerLockEdit(ctx *Context, th *Colors, st *composerState, idx int) bool
 			lock = md.Lock{Kind: md.LockOlderBlocks, Value: uint32(n)}
 		} else {
 			frag, ok := composerDigitEntry(ctx, th, title, "How many days?", 3, func(s string) (string, bool) {
+				if s == "" {
+					return "1 to 388 days", false
+				}
 				n, err := strconv.ParseUint(s, 10, 32)
 				if err != nil || n < 1 || n > 388 {
 					return composerCopyRelativeCeiling(), false
@@ -3646,9 +3936,23 @@ func composerLockEdit(ctx *Context, th *Colors, st *composerState, idx int) bool
 					if y < 2009 {
 						return composerCopyDateFloor(), false
 					}
+					// A DATE PAST THE CEILING EXISTS; the build will not write
+					// it as a TIME lock. Saying "that date does not exist" of
+					// 2045-06-01 leaves the operator retyping and never
+					// learning there is a ceiling or that a height reaches
+					// further -- and §4d's first archetype,
+					// simple-timelocked-inheritance, is exactly where a
+					// twenty-year date is the ordinary case.
+					if y > 2038 || u == 0 {
+						return composerCopyDateCeiling(), false
+					}
 					return "that date does not exist", false
 				}
-				return composerCopyLockEchoDate(y, m, d) + " (" + strconv.FormatUint(uint64(u), 10) + ")", true
+				// THE RAW OPERAND IS NOT SHOWN. §6b's premise is that the
+				// operator never types one, and the echo screen after this
+				// prints §8c's clean form, so the number added nothing anyone
+				// could check.
+				return composerCopyLockEchoDate(y, m, d), true
 			})
 			if !ok {
 				return false
@@ -3946,11 +4250,6 @@ func composerHexEntry(ctx *Context, th *Colors) ([32]byte, bool) {
 // composerHashEdit sets or clears one path's hashlock.
 func composerHashEdit(ctx *Context, th *Colors, st *composerState, idx int) bool {
 	title := fmt.Sprintf("Path %d hash", idx+1)
-	// §8i, at entry. It is shown BEFORE the digest is chosen, because it
-	// governs how the operator must have produced the preimage, and after the
-	// fact that information is only useful as regret.
-	showError(ctx, th, title, composerCopyHashRule())
-
 	digests := composerPayloadDigests(ctx.sysw)
 	rows := make([]string, 0, len(digests)+2)
 	for i, d := range digests {
@@ -3961,6 +4260,13 @@ func composerHashEdit(ctx *Context, th *Colors, st *composerState, idx int) bool
 	sel, ok := composerPickScreen(ctx, th, title, "Which hash?", rows)
 	if !ok {
 		return false
+	}
+	// §8i, ONCE THE OPERATOR IS ACTUALLY TAKING A HASH. It used to be shown
+	// unconditionally on entry, so an operator whose next choice was "No hash
+	// lock" met a modal in front of a clear. It governs how the preimage must
+	// have been produced, which is only a question for someone choosing one.
+	if sel <= len(digests) {
+		showError(ctx, th, title, composerCopyHashRule())
 	}
 	switch {
 	case sel < len(digests):
@@ -4416,7 +4722,30 @@ It asserts, in `gui/composer_presets_test.go`:
 
 Create `gui/composer_presets.go` with `composerPreset`, `composerPresets` and `composerPresetPick`. Each entry's `list` is transcribed from the primary's exported vector's `descriptor.json` path list, with a comment naming the vector file it is pinned to. **Do not invent a shape here**; if a vector's path list cannot be read off the export, that is F-453 incomplete and this task stops.
 
-- [ ] **Step 4: Run, gofmt, commit** (as the other tasks do; the commit message names the primary commit the presets are pinned to).
+**The wiring point is already named**: Task B11's `composerFlow` calls `composerWrapperPick` and then `composerShapeFlow`, and §7b's step is "Wrapper -> preset or blank -> paths". `composerPresetPick` goes between them, and the blank route is `composerShapeFlow` unchanged -- so this task is a fill-in, not a redesign.
+
+- [ ] **Step 4: Run the tests**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerPresets' -v ./gui/ 2>&1 | grep -E '^(--- |    --- |ok|FAIL)'`
+Expected: two top-level PASS with **six sub-tests** under the vector test, one per preset (the five toolkit archetypes plus plain k-of-n); `ok seedhammer.com/gui`. A missing vector file is `INCONCLUSIVE: no vendored vector at ...` naming F-453, never a skip.
+
+- [ ] **Step 5: gofmt, commit**
+
+```bash
+gofmt -l gui/ && CGO_ENABLED=0 go test -count=1 -run '^TestComposer' ./gui/ 2>&1 | tail -2
+git add gui/composer_presets.go gui/composer_presets_test.go md/testdata/vectors md/testdata/compose_vectors.provenance.json
+git commit -s -F - <<'MSG'
+gui: the five archetype presets, pinned to the Rust primary's exported vectors (composer S3 task A10)
+
+A preset is a normative PathList, so the Go table is checked against the
+primary's own chunks rather than against this test's idea of the shape. If a
+preset's chunks differ, the vector wins and the table changes.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
+MSG
+```
+
 
 ---
 
@@ -4740,8 +5069,8 @@ func composerDigestShort(d [32]byte) string {
 // unhashed path, so an unsorted key set anywhere else is lowering-forced and
 // the operator declined nothing (§5a). Marking those too would teach the
 // operator to discount the mark that matters.
-func composerBranchLines(b md.Branch, idx int, sole bool) []string {
-	head := fmt.Sprintf("Path %d: ", idx+1)
+func composerBranchLines(b md.Branch, pathNo int, sole bool) []string {
+	head := fmt.Sprintf("Path %d: ", pathNo)
 	switch {
 	case b.Keys == 0:
 		head += "KEY-LESS (EXPERIMENTAL)"
@@ -4754,7 +5083,12 @@ func composerBranchLines(b md.Branch, idx int, sole bool) []string {
 	}
 	out := []string{head}
 	for _, l := range b.Locks {
-		out = append(out, "  "+composerLockShort(l))
+		// §7e asks for "its lock kind and value in operator units (§6b echo
+		// form)" -- "1000 blocks (about 6.9 days)", not the path-list ROW form
+		// "1000 blocks". The row has one line to spend; the consent does not.
+		for _, line := range composerLockEcho(l, composerBound{}) {
+			out = append(out, "  "+line)
+		}
 	}
 	for _, d := range b.Sha256Digests {
 		out = append(out, "  hash "+composerDigestShort(d))
@@ -4769,6 +5103,14 @@ func composerBranchLines(b md.Branch, idx int, sole bool) []string {
 // key-path line, the id NAMED by kind with both stubs, then addresses or the
 // D4 line saying there are none.
 func composerConsentLines(chunks []string) ([]string, error) {
+	return composerConsentLinesFor(chunks, nil, 0)
+}
+
+// composerConsentLinesFor is composerConsentLines with the operator's own path
+// numbering supplied: `listed[i]` is the path number of branch i, and
+// `keyPathNo` names the path §5 extracted as the taproot internal key (0 when
+// there is none).
+func composerConsentLinesFor(chunks []string, listed []int, keyPathNo int) ([]string, error) {
 	shape, err := md.PolicyShapeChunks(chunks)
 	if err != nil {
 		return nil, err
@@ -4789,13 +5131,33 @@ func composerConsentLines(chunks []string) ([]string, error) {
 
 	var lines []string
 	sole := len(shape.Branches) == 1
+	// THE OPERATOR'S PATH NUMBER, NOT THE BRANCH ORDINAL. PolicyShape.Branches
+	// are LEAVES, and a taproot internal key is reported through KeyPath
+	// rather than as a Branch (md/policy_shape.go:42-45) -- so for
+	// tr[P1: 1-of-1, P2: 2-of-3] §5 extracts P1 and the branch list holds one
+	// entry, which printed as "Path 1: 2-of-3" while the seating prompt for
+	// the same slot said "Path 2". Two screens disagreeing about which path is
+	// which, on the surface that consents to steel.
+	//
+	// `listed` maps branch ordinal -> the operator's path number; it is nil
+	// when the caller has no path list (a consent rendered from chunks alone),
+	// and then the branch ordinal is the honest answer because there is no
+	// other numbering to be wrong about.
 	for i, b := range shape.Branches {
-		lines = append(lines, composerBranchLines(b, i, sole)...)
+		pathNo := i + 1
+		if i < len(listed) {
+			pathNo = listed[i]
+		}
+		lines = append(lines, composerBranchLines(b, pathNo, sole)...)
 	}
 	lines = append(lines, "")
 	switch shape.KeyPath {
 	case md.KeyPathSpendable:
-		lines = append(lines, "Key-path: A KEY CAN SPEND ALONE")
+		line := "Key-path: A KEY CAN SPEND ALONE"
+		if keyPathNo > 0 {
+			line = fmt.Sprintf("Key-path (Path %d): A KEY CAN SPEND ALONE", keyPathNo)
+		}
+		lines = append(lines, line)
 	case md.KeyPathNUMS:
 		lines = append(lines, composerCopyNUMS())
 	}
@@ -4818,6 +5180,22 @@ func composerConsentLines(chunks []string) ([]string, error) {
 	// silence: an absent address block is indistinguishable from a screen that
 	// simply has none, and "I did not see any addresses" is exactly the
 	// observation that should stop an operator (gui/wallet_policy.go:245-249).
+	// §8i, RESTATED AT CONSENT. §6c and §8i's own heading say "at entry AND at
+	// consent": the rule whose whole purpose is to prevent an unspendable
+	// wallet was stated once, several screens earlier, on a policy that may
+	// have gained its hashlock afterwards.
+	for _, b := range shape.Branches {
+		if len(b.Sha256Digests) > 0 {
+			lines = append(lines, "", composerCopyHashRule())
+			break
+		}
+	}
+	// §8d, on the surface §7g's divergence table puts it on: the row
+	// "consent | compares the shown id with a coordinator's" answers
+	// "DOCUMENTATION: §8d line". It was printed only on the stub screen,
+	// several screens and possibly several edits earlier.
+	lines = append(lines, "", composerCopyOwnWallet())
+
 	at, ok := policyAddressAt(chunks, tpl, keys)
 	if !ok {
 		return append(lines, "", "Keyless template - no addresses.", "Verify off-device."), nil
@@ -4847,33 +5225,44 @@ Create `gui/composer_flow.go`:
 package gui
 
 import (
+	"fmt"
+	"slices"
+
+	"seedhammer.com/codex32"
 	"seedhammer.com/md"
 )
 
-// composerFlow is "Build a new policy" (SPEC §7), from the door to the plate.
+// composerFlow is "Build a new policy" (SPEC_wallet_policy_composer.md §7),
+// from the door to the plate, in §7's order.
 //
-// PART A's VERSION: shape, stub screen, consent, keyless template engrave.
-// The seating half REPLACES this file (§7d, §7f), inserting the pick list and
-// the mapping review between the stub screen and consent. It is written as
-// one function with named steps rather than a state machine because Back
-// between steps has to preserve everything (2026-08-19 operator directive),
-// and a loop over an explicit step index is what makes "Back goes to the
-// previous step with its state intact" true by construction rather than by
-// each step remembering.
+// THIS FUNCTION IS THE JOIN, and its absence was the defect two R0 lenses
+// found independently. Part B built fourteen production functions --
+// composerKeySources, composerCardSources, composerSeatFlow, composerShortfall,
+// composerMappingReview, composerConsentFlow, composerFormPick,
+// composerMintCards, composerCensusLines and the rest -- and nothing called
+// any of them, so an operator with four `key:` records in flash read the
+// door's "Keys loaded: 4", chose Build, and was never offered a slot. §7e's
+// self-check and §8q never executed on a shipped device; §7f's form choice,
+// card minting and the census's card-chunk count were unreachable; and §7b's
+// live line read `keys available: 0` whatever the payload held. Go does not
+// error on an unused package-scope function, and every TestComposer* called
+// these directly, so nothing was red. The lesson is recorded in memory as
+// "plans list components and omit the call that joins them"; the gate against
+// it is composerFlowWalk's flow-level test and the reachability test beside it.
 //
 // THE SCRUB IS INSTALLED HERE, at the top, before any seed can exist -- the
-// same construction gui/multisig_build.go:290-291 uses and for the reason
-// stated there: every exit below (a Back, a refusal, a ctx.Done unwind, a
-// panic) is then covered without an implementer remembering to add one to a
-// new return. C14 asks for Multisig Build's treatment and this is it.
+// same construction gui/multisig_build.go:290-291 uses, so every exit below (a
+// Back, a refusal, a ctx.Done unwind, a panic) is covered without an
+// implementer remembering to add one to a new return (C14).
 func composerFlow(ctx *Context, th *Colors) {
-	st := &composerState{
-		keylessConfirmed:  map[int]bool{},
-		unsortedConfirmed: map[int]bool{},
-		reg:               &seedRegistry{},
-		bound:             composerBoundFrom(ctx.sysw),
-	}
+	st := &composerState{reg: &seedRegistry{}, bound: composerBoundFrom(ctx.sysw)}
 	defer st.reg.scrub()
+
+	// SOURCES ARE LOADED BEFORE THE SHAPE, so §7b's live line
+	// ("slots: N / keys available: M") is right from the first frame. Loading
+	// them at seating time would make the line that helps the operator SIZE the
+	// policy read zero for the whole of the decision it exists to inform.
+	st.sources = append(composerKeySources(ctx), composerCardSources(ctx)...)
 
 	w, ok := composerWrapperPick(ctx, th)
 	if !ok {
@@ -4881,64 +5270,284 @@ func composerFlow(ctx *Context, th *Colors) {
 	}
 	st.list.Wrapper = w
 
-	edited := false
+	var shown []string // the chunk set the stub screen last displayed (§8s)
 	for !ctx.Done {
 		if !composerShapeFlow(ctx, th, st) {
+			// BACK AT THE PATH LIST GOES BACK ONE STEP, to the wrapper, with
+			// the list intact -- §7b's "going back should lose nothing". It
+			// used to return, dropping the wrapper, every path, every lock and
+			// every digest.
+			w, ok := composerWrapperPick(ctx, th)
+			if !ok {
+				return
+			}
+			st.list.Wrapper = w
+			continue
+		}
+		composerSizeAssignments(st)
+
+		template, err := composerTemplateChunksFor(st)
+		if err != nil {
+			composerShowRefusal(ctx, th, "Template", err)
+			continue
+		}
+		// §8s's changed-id line is decided by COMPARING CHUNK SETS, not by an
+		// "edited" flag. The flag was set on any Back out of the stub screen,
+		// the consent or §8l and never reset, so re-reaching the stub screen
+		// without touching the shape asserted that the id had changed -- a
+		// false statement on the screen whose job is to be copied onto steel,
+		// which trains the operator to discount the line that will one day be
+		// true.
+		changed := shown != nil && !slices.Equal(shown, template)
+		if !composerStubFlow(ctx, th, template, nil, changed) {
+			shown = template
+			continue
+		}
+		shown = template
+
+		if !composerSeatingStep(ctx, th, st) {
+			continue
+		}
+		template, keyed, err := composerArtifactsFor(st)
+		if err != nil {
+			composerShowRefusal(ctx, th, "Template", err)
+			continue
+		}
+		if len(keyed) > 0 && !composerStubFlow(ctx, th, template, keyed, false) {
+			continue
+		}
+		consent := template
+		if len(keyed) > 0 {
+			consent = keyed
+		}
+		if !composerConsentFlow(ctx, th, st, consent) {
+			continue
+		}
+		if composerEngraveStep(ctx, th, st, template, keyed) {
 			return
 		}
-		c, err := md.Compose(st.list)
-		if err != nil {
-			composerShowRefusal(ctx, th, "Spend paths", err)
-			continue
-		}
-		chunks, err := c.Chunks()
-		if err != nil {
-			showError(ctx, th, "Template", "Couldn't build the template from this shape.")
-			continue
-		}
-		// §7c: shown UNCONDITIONALLY once the shape is complete, and re-shown
-		// with §8s's changed-id body after any edit. Back returns to the shape.
-		if !composerStubFlow(ctx, th, chunks, nil, edited) {
-			edited = true
-			continue
-		}
-		lines, err := composerConsentLines(chunks)
-		if err != nil {
-			showError(ctx, th, "Review", composerCopySelfCheckFailed())
-			return
-		}
-		if !composerReadScreen(ctx, th, "Review", lines) {
-			edited = true
-			continue
-		}
-		// §8l, unskippable, immediately before the first thing that cuts.
-		if !composerConfirmScreen(ctx, th, "Before you fund it",
-			composerConfirmBody(composerCopyNothingChecked())) {
-			edited = true
-			continue
-		}
-		composerEngraveTemplate(ctx, th, chunks)
-		return
 	}
 }
 
-// composerEngraveTemplate cuts the keyless template through the SHIPPED
-// bundle machinery, so the plate planning, the census and the engrave screen
-// are the ones every other md1 goes through -- the composer contributes the
-// strings and nothing else (the I-VERBATIM rule gui/multisig_build.go:30-32
-// states for its own md1).
-func composerEngraveTemplate(ctx *Context, th *Colors, chunks []string) bool {
-	cards := []bundleCard{{
-		kind:    cardMD1,
-		label:   "md1 template",
-		strings: chunks,
-		summary: "key-less wallet policy",
-	}}
+// composerSizeAssignments sizes st.assigned to the shape's slot count AT FLOW
+// LEVEL, not at seating entry.
+//
+// Sizing it only inside composerSeatFlow left a composition that never entered
+// seating -- C26's key-less template, §12 item 3 -- failing composerSelfCheck
+// on slot count alone. An unseated slot is src == -1, never a zero value: zero
+// would read as "seated from source 0".
+func composerSizeAssignments(st *composerState) {
+	n := composerSlotCount(st.list)
+	if len(st.assigned) == n {
+		return
+	}
+	st.assigned = make([]composerAssignment, n)
+	for i := range st.assigned {
+		st.assigned[i].src = -1
+	}
+}
+
+// composerDeclaredOrigins projects the seating onto md.ComposeWith's input.
+// An unseated slot declares nothing and the codec assigns §4f's lowest free
+// account for it.
+func composerDeclaredOrigins(st *composerState) []*md.SlotOrigin {
+	out := make([]*md.SlotOrigin, len(st.assigned))
+	for i, a := range st.assigned {
+		if a.src < 0 {
+			continue
+		}
+		out[i] = &md.SlotOrigin{Origin: a.origin, Fingerprint: a.fingerprint, FpPresent: a.fpPresent}
+	}
+	return out
+}
+
+// composerTemplateChunksFor emits the keyless template for the current shape
+// and seating.
+func composerTemplateChunksFor(st *composerState) ([]string, error) {
+	c, err := md.ComposeWith(st.list, composerDeclaredOrigins(st))
+	if err != nil {
+		return nil, err
+	}
+	return c.Chunks()
+}
+
+// composerArtifactsFor emits the template AND, when every slot is seated, the
+// keyed policy.
+//
+// COMPOSED TWICE, NOT COPIED: md.Composed's own doc says a copy shares the
+// underlying descriptor, so Bind on one keys them both -- and a "template"
+// that had been keyed by its own policy is not a template.
+func composerArtifactsFor(st *composerState) (template, keyed []string, err error) {
+	declared := composerDeclaredOrigins(st)
+	ct, err := md.ComposeWith(st.list, declared)
+	if err != nil {
+		return nil, nil, err
+	}
+	if template, err = ct.Chunks(); err != nil {
+		return nil, nil, err
+	}
+	if !composerSeatingComplete(st) {
+		return template, nil, nil
+	}
+	pub := map[uint8][65]byte{}
+	fps := map[uint8][4]byte{}
+	for i, a := range st.assigned {
+		cc, pk, _, derr := decodeXpubBytes(a.xpub)
+		if derr != nil {
+			return nil, nil, derr
+		}
+		var b [65]byte
+		copy(b[0:32], cc[:])
+		copy(b[32:65], pk[:])
+		pub[uint8(i)] = b
+		if a.fpPresent {
+			fps[uint8(i)] = a.fingerprint
+		}
+	}
+	ck, err := md.ComposeWith(st.list, declared)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := ck.Bind(pub, fps); err != nil {
+		return nil, nil, err
+	}
+	if keyed, err = ck.Chunks(); err != nil {
+		return nil, nil, err
+	}
+	return template, keyed, nil
+}
+
+// composerSeatingStep is §7d: seat every slot, or take §8p's exit.
+//
+// Offered only when the payload holds keys or seeds, or the operator asks to
+// type one -- §7d's own condition. With nothing to seat from, a key-less
+// template is the C26 answer and the flow goes straight on.
+func composerSeatingStep(ctx *Context, th *Colors, st *composerState) bool {
+	if len(st.sources) == 0 {
+		cs := &ChoiceScreen{
+			Title:   "Keys",
+			Lead:    "Seat keys into this template?",
+			Choices: []string{"Engrave a key-less template", "Type a seed"},
+		}
+		sel, ok := cs.Choose(ctx, th)
+		if !ok {
+			return false
+		}
+		if sel == 0 {
+			return true
+		}
+		src, ok := composerSeedSource(ctx, th, st)
+		if !ok {
+			return false
+		}
+		st.sources = append(st.sources, src)
+	}
+	if !composerSeatFlow(ctx, th, st) {
+		return false
+	}
+	if !composerSeatingComplete(st) && !composerShortfall(ctx, th, st) {
+		return false
+	}
+	return composerMappingReview(ctx, th, st)
+}
+
+// composerEngraveStep is §7f: the form choice, then what it implies.
+func composerEngraveStep(ctx *Context, th *Colors, st *composerState, template, keyed []string) bool {
+	form, ok := composerFormPick(ctx, th, st)
+	if !ok {
+		return false
+	}
+	var cards []bundleCard
+	switch form {
+	case composerFormConcrete:
+		// FORM A IS THE KEYED md1, and only that, this cycle. §7f also names
+		// "plain-text plates" and "QR plates" of the concrete descriptor, and
+		// md DELIBERATELY EMITS NO TEXT: "a rendering that cannot be re-parsed
+		// is the defect this package's invariant exists to prevent"
+		// (md/compose.go's header). Adding a descriptor renderer is normative
+		// and lands in Rust first, so it is filed (F-457) rather than invented
+		// here. composerDescriptorCeilingChars stays as §13 item 1's
+		// measurement, which is what that number was asked for.
+		cards = []bundleCard{{
+			kind: cardMD1, label: "md1 policy", strings: keyed,
+			summary: "the wallet policy, with its keys",
+		}}
+	default:
+		cards = []bundleCard{{
+			kind: cardMD1, label: "md1 template", strings: template,
+			summary: "key-less wallet policy",
+		}}
+		minted, err := composerMintCards(st, template, keyed)
+		if err != nil {
+			showError(ctx, th, "Key cards", "Couldn't mint a key card for a seated slot.")
+			return false
+		}
+		cards = append(cards, minted...)
+	}
+
+	// FULL vs WATCH-ONLY, and only where a seed is actually held: the question
+	// is meaningless when no slot came from one.
+	if st.reg.count() > 0 {
+		full, ok := composerEngraveModePick(ctx, th, st)
+		if !ok {
+			return false
+		}
+		if full {
+			secrets, err := composerSecretCards(st)
+			if err != nil {
+				showError(ctx, th, "Secret plates", "Couldn't encode a seed as ms1.")
+				return false
+			}
+			cards = append(secrets, cards...)
+		}
+	}
+
 	if !confirmReviewScreen(ctx, th, "Plate Count",
-		buildPlateCensusLines(ctx.Platform.EngraverParams(), cards)) {
+		composerCensusLines(ctx.Platform.EngraverParams(), cards)) {
 		return false
 	}
 	return bundleEngrave(ctx, th, "Wallet Policy", cards, "", "") == bundleEngraveDone
+}
+
+// composerSecretCards is §7f's "a seed that filled several slots is cut ONCE".
+//
+// THE DEDUP IS BY REGISTERED SEED, not by slot: one seed at three slots is one
+// secret, and cutting it three times would triple the bearer plates in the set
+// for no recovery value. The form is ms1, which is what the bundle machinery
+// carries (cardMS1, gui/multisig_engrave.go:36) and what Multisig Build's own
+// Full mode cuts. The words-plus-SeedQR plate is a backup.Seed, not a bundle
+// card, and needs its own plate pass; it is filed with F-455 rather than
+// offered by a picker with no builder behind it.
+func composerSecretCards(st *composerState) ([]bundleCard, error) {
+	seen := map[int]bool{}
+	var out []bundleCard
+	for _, a := range st.assigned {
+		if a.src < 0 || a.src >= len(st.sources) {
+			continue
+		}
+		src := st.sources[a.src]
+		if src.kind != composerSourceSeed || seen[src.seedID] {
+			continue
+		}
+		seen[src.seedID] = true
+		seed, ok := st.reg.at(src.seedID)
+		if !ok {
+			continue
+		}
+		entropy := seed.Mnemonic.Entropy()
+		ms1, err := codex32.EncodeMS1(entropy)
+		wipeBytes(entropy)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, bundleCard{
+			kind:    cardMS1,
+			label:   fmt.Sprintf("ms1 secret share %d", len(out)+1),
+			strings: []string{ms1},
+			summary: "secret seed backup",
+		})
+	}
+	return out, nil
 }
 ```
 
@@ -5710,8 +6319,11 @@ func composerSeedSource(ctx *Context, th *Colors, st *composerState) (composerSo
 // SAME key twice whenever one master was registered twice -- which is what an
 // operator does when they type one seed for two slots -- and md's duplicate
 // key refusal would then reject a legitimate multi-account wallet.
-func composerSeedAccountFor(st *composerState, slot uint8, seedID int) uint32 {
-	want := st.sources[seedID].fingerprint
+// srcIdx indexes st.sources, NOT composerSource.seedID -- two different
+// numbers on the same struct, and the parameter used to carry the other one's
+// name while every caller passed this one.
+func composerSeedAccountFor(st *composerState, slot uint8, srcIdx int) uint32 {
+	want := st.sources[srcIdx].fingerprint
 	n := uint32(0)
 	for i := 0; i < int(slot) && i < len(st.assigned); i++ {
 		a := st.assigned[i]
@@ -5898,7 +6510,12 @@ func TestComposerDiscardClearsEverySeat(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails, then write the guard**
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerShapeSignature|^TestComposerDiscard' ./gui/ 2>&1 | head -6`
+Expected: FAIL to build -- `# seedhammer.com/gui [seedhammer.com/gui.test]` then `undefined: composerShapeSignature`, `undefined: composerDiscardAssignments`.
+
+- [ ] **Step 3: Write the signature and the discard**
 
 Create `gui/composer_discard.go`:
 
@@ -5973,9 +6590,29 @@ func composerApplyShapeEdit(st *composerState, edit func()) bool {
 
 Wire `composerApplyShapeEdit` around the two edit calls in `composerShapeFlow` (`gui/composer_shape.go`), so the guard's confirm and the actual discard are decided separately: the guard asks before an editor that CAN renumber, and the signature comparison after it decides whether the seats are dropped.
 
-- [ ] **Step 3: Run, gofmt, commit**
+- [ ] **Step 4: Run the tests**
 
-As the other tasks do; the commit message carries the discard rule's one-sentence reason.
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerShapeSignature|^TestComposerDiscard' -v ./gui/ 2>&1 | grep -E '^(--- |ok|FAIL)'`
+Expected: three PASS (`TestComposerShapeSignatureMovesExactlyWithSlotNumbering`, `TestComposerDiscardIsSilentWithNothingSeated`, `TestComposerDiscardClearsEverySeat`); `ok seedhammer.com/gui`. The silent-discard test logs the §8j confirm's headroom -- measured: `118 chars drawn in full, headroom 378 chars (margin 80)`.
+
+- [ ] **Step 5: gofmt, commit**
+
+```bash
+gofmt -l gui/ && CGO_ENABLED=0 go test -count=1 -run '^TestComposer' ./gui/ 2>&1 | tail -2
+git add gui/composer_discard.go gui/composer_discard_test.go gui/composer_shape.go
+git commit -s -F - <<'MSG'
+gui: discard every seat when the shape moves slot numbering, and only then (composer S3 task B3)
+
+The signature carries the wrapper, the path count and each path's key count,
+and nothing else: a lock or a hash edit renumbers nothing and keeps the seats,
+which is what section 7d rules and what the guard on the wrong arms was
+telling operators otherwise.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
+MSG
+```
+
 
 ---
 ### Task B4: `gui/composer_review.go` -- the mapping review, the §4f invariant refusal, the same-xpub refusal, C29 and §8k
@@ -6142,7 +6779,12 @@ func TestComposerMappingLinesPrintOriginsVerbatimAndSayWhatIsNotChecked(t *testi
 
 `composerTestOrigin(scriptType, account uint32) []md.PathComponent` is one more helper in `gui/composer_fixtures_test.go`, built from `md.DefaultOrigin` so the fixture and the production table cannot disagree.
 
-- [ ] **Step 2: Run to verify it fails, then write the review**
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerInvariant|^TestComposerRefusesTwoSlots|^TestComposerC29|^TestComposerMappingLines' ./gui/ 2>&1 | head -6`
+Expected: FAIL to build -- `undefined: composerInvariantViolation`, `undefined: composerDuplicateXpub`, `undefined: composerSharedSeedInPath`, `undefined: composerMappingLines`.
+
+- [ ] **Step 3: Write the review**
 
 Create `gui/composer_review.go` with:
 
@@ -6198,6 +6840,17 @@ func composerInvariantViolation(st *composerState) bool {
 	}
 	byOrigin := map[string][]seat{}
 	for _, a := range st.assigned {
+		if a.src < 0 {
+			// AN UNSEATED SLOT IS NOT A COLLISION. Its origin is nil here, so
+			// every unseated slot hashed to "" and two of them looked like two
+			// keys at one origin with no fingerprints -- refusing §7f's
+			// partially seated form and C26's key-less template with §8v, a
+			// body about keys that are not there. The origins those slots will
+			// DECLARE are §4f's lowest-free accounts, assigned by the codec
+			// when the template is emitted, and the real invariant is checked
+			// on the decoded md1 by composerSelfCheck.
+			continue
+		}
 		k := composerOriginKey(a.origin)
 		byOrigin[k] = append(byOrigin[k], seat{a.fingerprint, a.fpPresent})
 	}
@@ -6370,7 +7023,29 @@ func composerMappingReview(ctx *Context, th *Colors, st *composerState) bool {
 }
 ```
 
-- [ ] **Step 3: Run, gofmt, commit**
+- [ ] **Step 4: Run the tests**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerInvariant|^TestComposerRefusesTwoSlots|^TestComposerC29|^TestComposerMappingLines' -v ./gui/ 2>&1 | grep -E '^(--- |    --- |ok|FAIL)'`
+Expected: four top-level PASS with **five sub-tests** under the invariant test (`same origin, neither has a fingerprint`, `same origin, only one has a fingerprint`, `same origin, two DIFFERENT fingerprints`, `same origin, the SAME fingerprint twice`, `different origins`); `ok seedhammer.com/gui`. Four `assertModalBodyFits` headrooms are logged -- measured: §8v 436, §8g at-threshold 436, §8g below-threshold 436, §8k 476, all against a margin of 80.
+
+- [ ] **Step 5: gofmt, commit**
+
+```bash
+gofmt -l gui/ && CGO_ENABLED=0 go test -count=1 -run '^TestComposer' ./gui/ 2>&1 | tail -2
+git add gui/composer_review.go gui/composer_review_test.go
+git commit -s -F - <<'MSG'
+gui: the mapping review -- verbatim origins, the section 4f invariant, C29 and the two-paths line (composer S3 task B4)
+
+The invariant skips unseated slots: their origins are the codec's to assign
+when it emits the template, and grouping them by an absent origin refused both
+legal key-less forms with a body about keys that are not there. The real
+invariant is re-checked on the decoded md1 by the self-check.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
+MSG
+```
+
 
 ---
 
@@ -6430,9 +7105,45 @@ func TestComposerAssignableSlotsCountsSeatsNotSources(t *testing.T) {
 		}
 	}
 }
+
+// TestComposerSeatingCompleteTracksEverySlot is the predicate the transition
+// out of seating turns on: all-or-nothing (§7d), so "complete" must mean every
+// slot and not most of them.
+func TestComposerSeatingCompleteTracksEverySlot(t *testing.T) {
+	st := &composerState{list: composerTwoPathList()}
+	st.assigned = make([]composerAssignment, composerSlotCount(st.list))
+	for i := range st.assigned {
+		st.assigned[i].src = -1
+	}
+	if composerSeatingComplete(st) {
+		t.Fatal("an all-unseated template reports complete seating")
+	}
+	for i := range st.assigned {
+		st.assigned[i].src = i
+	}
+	if !composerSeatingComplete(st) {
+		t.Fatal("a fully seated template does not report complete seating")
+	}
+	// ONE slot short is NOT complete, which is the case the all-or-nothing
+	// rule exists for: a partial seating is exactly the state that produces a
+	// plausible wrong address.
+	st.assigned[len(st.assigned)-1].src = -1
+	if composerSeatingComplete(st) {
+		t.Errorf("a template one slot short of seated reports complete; §7d refuses at " +
+			"the transition instead, with §8p's counts")
+	}
+	if got := composerUnfilledSlots(st); len(got) != 1 {
+		t.Errorf("one slot short leaves %d unfilled, want 1", len(got))
+	}
+}
 ```
 
-- [ ] **Step 2: Run to verify it fails, write `composerSeatFlow`, run again, commit**
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerAssignableSlots|^TestComposerSeatingComplete' ./gui/ 2>&1 | head -6`
+Expected: FAIL to build -- `undefined: composerAssignableSlots`, `undefined: composerUnfilledSlots`, `undefined: composerSeatingComplete`.
+
+- [ ] **Step 3: Write the seating flow**
 
 Create `gui/composer_seat.go`:
 
@@ -6760,7 +7471,12 @@ func TestComposerSelfCheckFaultHookIsNilInProduction(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails, write the check, run again, commit**
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerSelfCheck|^TestComposerConsentRefuses' ./gui/ 2>&1 | head -6`
+Expected: FAIL to build -- `undefined: composerSelfCheck`, `undefined: composerConsentFlow`, `undefined: composerSelfCheckFaultHook`.
+
+- [ ] **Step 3: Write the check**
 
 Create `gui/composer_selfcheck.go`:
 
@@ -6918,8 +7634,31 @@ func composerSelfCheck(st *composerState, chunks []string) error {
 				i, k.Fingerprint, a.fingerprint)
 		}
 	}
-	if composerInvariantViolation(st) {
-		return errors.New("self-check: two slots share an origin without two distinct fingerprints")
+	// §4f's INVARIANT, ON THE DECODED md1 -- which is where §4f puts it ("no
+	// two slots of a PRODUCED template declare the same origin unless BOTH
+	// declare a fingerprint and those fingerprints differ") and where §7e says
+	// it is re-checked. composerInvariantViolation reads composer UI state,
+	// in which an unseated slot has no origin at all; the origins that matter
+	// are the lowest-free accounts the codec assigned when it emitted this
+	// chunk set.
+	type seat struct {
+		fp        [4]byte
+		fpPresent bool
+	}
+	byOrigin := map[string][]seat{}
+	for _, k := range keys {
+		o := composerOriginKey(originComponents(k.OriginPath))
+		byOrigin[o] = append(byOrigin[o], seat{k.Fingerprint, k.FingerprintPresent})
+	}
+	for o, seats := range byOrigin {
+		for i := 0; i < len(seats); i++ {
+			for j := i + 1; j < len(seats); j++ {
+				if !seats[i].fpPresent || !seats[j].fpPresent || seats[i].fp == seats[j].fp {
+					return fmt.Errorf("self-check: two slots declare %s without two "+
+						"distinct fingerprints", o)
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -6947,7 +7686,16 @@ func composerConsentFlow(ctx *Context, th *Colors, st *composerState, chunks []s
 		showError(ctx, th, "Review", composerCopySelfCheckFailed())
 		return false
 	}
-	if !confirmReviewScreen(ctx, th, "Review", lines) {
+	// ONE CONSENT SURFACE, and it is composerReadScreen.
+	//
+	// §7e and §9 item 9 name confirmReviewScreen's PAGED FORM, and
+	// composerReadScreen is that form copied (gui/multisig_build.go:1877-1939)
+	// plus the one thing §7e needs and it lacks: the checkmark is withheld
+	// until the last page has been laid out once, so the addresses -- the only
+	// proof of WHICH wallet this is -- cannot be consented to unseen. Part A
+	// used composerReadScreen and Part B used confirmReviewScreen, which was
+	// one decision described twice with different Back semantics.
+	if !composerReadScreen(ctx, th, "Review", lines) {
 		return false
 	}
 	return composerConfirmScreen(ctx, th, "Before you fund it",
@@ -6965,11 +7713,11 @@ func composerConsentFlow(ctx *Context, th *Colors, st *composerState, chunks []s
 
 **Interfaces:**
 - Consumes: `ChoiceScreen`; `buildFullModeLabel(usedPassphrase bool)` and the shipped mode choice's labels (`gui/multisig_build.go:455`); `seedRegistry.usesPassphrase()` (`gui/multisig_build_slots.go:238`); `engraveSeed(params, m, mfp) (Plate, error)` (`gui/gui.go:839`), `engraveCodex32(ctx, th, scan) bool` (`gui/codex32_polish.go:218`), `backup.Seed`/`backup.SeedString` (`backup/backup.go:16,26`).
-- Produces: `type composerForm int` with `composerFormConcrete`, `composerFormTemplateAndCards`, `composerFormTemplateOnly`; `func composerFormsFor(st *composerState) []composerForm`; `func composerFormPick(ctx, th, st) (composerForm, bool)`; `func composerSecretFormPick(ctx, th) (composerSecretForm, bool)`.
+- Produces: `type composerForm int` with `composerFormConcrete`, `composerFormTemplateAndCards`, `composerFormTemplateOnly`; `func composerFormsFor(st *composerState) []composerForm`; `func composerFormLabel(f composerForm) string`; `func composerFormPick(ctx, th, st) (composerForm, bool)`; `func composerEngraveModePick(ctx, th, st) (bool, bool)`. **NO secret-form picker**: it returned a value nothing consumed, and the builder for the form it offered lives in Task B11's `composerSecretCards`.
 
 **RECON RISK 1, RESOLVED HERE.** §7f says the secret is cut "as words, as a SeedQR, or as ms1 strings". **Those are not three code paths.** `engraveSeed` (`gui/gui.go:839-861`) builds ONE `backup.Seed` carrying the words AND a SeedQR and cuts them on one plate; `backup.SeedString` (`backup/backup.go:26-31`) is a string-only plate, and `engraveCodex32` (`gui/codex32_polish.go:218-237`) is what cuts an ms1 through it. There is no words-only and no QR-only plate for a mnemonic anywhere in this tree.
 
-**What §7f gets is the two forms the device HAS, labelled for what they are:** `Words + SeedQR (one plate)` reusing `engraveSeed`, and `ms1 string` reusing the `backup.SeedString` path. **A third plate design is not wired here** -- it is a new backup layout, not a `ChoiceScreen` over two existing functions, and inventing one inside a GUI stage would ship an unmeasured plate. It is filed:
+**What §7f gets, after the fidelity lens (I-10):** the secret is cut as **ms1**, through `cardMS1` -- the only secret form the plate planner carries as a bundle card (`gui/multisig_engrave.go:36`), and what Multisig Build's own Full mode cuts. The picker this task first carried offered "Words and SeedQR" beside "ms1 string" and **nothing consumed the answer**: neither `engraveSeed` nor `engraveCodex32` was ever called, so §7f's secret plate had no builder at all. A picker whose answer nothing reads is the same defect class as an unreachable screen, so the picker is gone and the one form that HAS a builder is cut. The words-plus-SeedQR plate is a `backup.Seed`, not a bundle card, and needs its own plate pass. It is filed:
 
 ```text
 ### F-455 — `composer-secret-form-words-and-seedqr-are-one-plate`: SPEC §7f offers three secret forms; the device has two plate designs (owning phase: **a later cycle, spec fold at composer S4**) `#seedhammer` `#composer` `#backup`
@@ -6984,9 +7732,9 @@ goldens, not a wiring change. Fold §7f's wording at S4 or rule the split in.
 
 **Which forms are offered** (§7f): a keyless composition has no form A and no cards, so the choice collapses to template-only and says so; a PARTIALLY seated composition offers no form A either, and its form B is the keyless template plus one card per SEATED slot carrying the TEMPLATE stub only, with the screen saying the policy id does not exist until every slot is seated.
 
-- [ ] **Step 1: the failing test, the implementation, the run and the commit, as the other tasks do**
+- [ ] **Step 1: Write the form choice**
 
-A table test over the three seating states asserting which forms are offered and that every label passes `assertChoiceLabelFits`; a test asserting the secret-form picker offers exactly two, each naming what is on the plate; then the run and the commit, whose message names F-455.
+A table test over the three seating states asserting which forms are offered, and that every label passes `assertChoiceLabelFits`. The secret-form picker is NOT written: see the §7f note above and Task B11's `composerSecretCards`, which is the builder for the one form this device cuts.
 
 Create `gui/composer_engrave.go`:
 
@@ -7018,16 +7766,16 @@ const (
 	composerFormTemplateOnly
 )
 
-type composerSecretForm int
-
-const (
-	// composerSecretWordsAndQR is engraveSeed's plate: BIP-39 words and a
-	// SeedQR, together, because that is what backup.Seed lays out.
-	composerSecretWordsAndQR composerSecretForm = iota
-	// composerSecretMs1 is backup.SeedString's plate, cut through the codex32
-	// path (gui/codex32_polish.go:218-237).
-	composerSecretMs1
-)
+// THE SECRET FORM PICKER IS GONE, and its absence is the fix.
+//
+// It offered "Words and SeedQR" and "ms1 string" and NOTHING CONSUMED THE
+// ANSWER: neither engraveSeed nor engraveCodex32 was ever called. §7f names
+// three secret forms, this device has two plate designs (F-455), and only one
+// of them -- ms1 -- is a bundle card the plate planner carries (cardMS1,
+// gui/multisig_engrave.go:36). A backup.Seed words-plus-SeedQR plate needs its
+// own plate pass, so composerSecretCards cuts ms1 and the words plate is filed
+// with F-455. A picker whose answer nothing reads is worse than one choice
+// honestly stated.
 
 // composerFormsFor is §7f's offer, per seating state.
 func composerFormsFor(st *composerState) []composerForm {
@@ -7088,27 +7836,6 @@ func composerFormPick(ctx *Context, th *Colors, st *composerState) (composerForm
 	return forms[sel], true
 }
 
-// composerSecretFormPick offers the two plate designs this device has.
-//
-// The labels name WHAT IS ON THE PLATE rather than a format, because "SeedQR"
-// beside "words" would imply the operator can have one without the other, and
-// backup.Seed cuts both.
-func composerSecretFormPick(ctx *Context, th *Colors) (composerSecretForm, bool) {
-	cs := &ChoiceScreen{
-		Title:   "Secret plate",
-		Lead:    "How should the seed be cut?",
-		Choices: []string{"Words and SeedQR", "ms1 string"},
-	}
-	sel, ok := cs.Choose(ctx, th)
-	if !ok {
-		return composerSecretWordsAndQR, false
-	}
-	if sel == 1 {
-		return composerSecretMs1, true
-	}
-	return composerSecretWordsAndQR, true
-}
-
 // composerEngraveModePick is §7f's Full versus Watch-only, reusing Multisig
 // Build's own labels so the two programs cannot describe one decision in two
 // ways. buildFullModeLabel names what "Full" LEAVES OUT when a passphrase was
@@ -7122,6 +7849,176 @@ func composerEngraveModePick(ctx *Context, th *Colors, st *composerState) (bool,
 	sel, ok := cs.Choose(ctx, th)
 	return sel == 0, ok
 }
+```
+
+- [ ] **Step 2: Run to verify the tests fail**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerForm|^TestComposerSecretIsCutOnce|^TestComposerEngraveMode' ./gui/ 2>&1 | head -6`
+Expected: FAIL to build -- `# seedhammer.com/gui [seedhammer.com/gui.test]` then `undefined: composerFormsFor`, `undefined: composerFormLabel`, `undefined: composerEngraveModePick`.
+
+- [ ] **Step 3: Write the test file this task promised and never wrote**
+
+The tests lens counted the missing file as a Critical (its C-2): Task B7 named `gui/composer_engrave_test.go` in its own Files header and no ```go block existed, so the engrave-form choice shipped with zero tests of any kind -- below the plan's own stated bar.
+
+Create `gui/composer_engrave_test.go`:
+
+```go
+package gui
+
+import (
+	"strings"
+	"testing"
+)
+
+// composerStateSeated builds a state with `slots` slots of which the first
+// `seated` hold a source, which is the only input composerFormsFor reads.
+func composerStateSeated(slots, seated int) *composerState {
+	st := &composerState{list: composerTwoPathList(), reg: &seedRegistry{}}
+	st.assigned = make([]composerAssignment, slots)
+	for i := range st.assigned {
+		st.assigned[i].src = -1
+	}
+	for i := 0; i < seated; i++ {
+		st.assigned[i].src = i
+	}
+	return st
+}
+
+// TestComposerFormsForOfferWhatSection7fAllows is §7f's three seating states,
+// and each arm is a refusal to offer something the artifact cannot carry: a
+// key-less composition HAS no concrete policy, and a partially seated one has
+// no policy id until every slot is seated.
+func TestComposerFormsForOfferWhatSection7fAllows(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		slots  int
+		seated int
+		want   []composerForm
+	}{
+		{"nothing seated collapses to template only", 4, 0,
+			[]composerForm{composerFormTemplateOnly}},
+		{"partially seated offers no form A", 4, 2,
+			[]composerForm{composerFormTemplateAndCards}},
+		{"fully seated offers both", 4, 4,
+			[]composerForm{composerFormConcrete, composerFormTemplateAndCards}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := composerFormsFor(composerStateSeated(tc.slots, tc.seated))
+			if len(got) != len(tc.want) {
+				t.Fatalf("offered %d form(s), want %d: %v", len(got), len(tc.want), got)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Errorf("form %d is %v, want %v", i, got[i], tc.want[i])
+				}
+			}
+		})
+	}
+}
+
+// TestComposerFormLabelsFitTheChoicePanel: ChoiceScreen draws its rows with
+// widget.Label, which does not wrap, so a long label is drawn off the edge and
+// the operator picks a truncated option.
+func TestComposerFormLabelsFitTheChoicePanel(t *testing.T) {
+	for _, f := range []composerForm{
+		composerFormConcrete, composerFormTemplateAndCards, composerFormTemplateOnly,
+	} {
+		label := composerFormLabel(f)
+		if label == "" {
+			t.Errorf("form %v has no label", f)
+		}
+		assertChoiceLabelFits(t, label)
+	}
+}
+
+// TestComposerSecretIsCutOnceForASeedThatFilledSeveralSlots is §7f verbatim
+// ("a seed that filled several slots is cut ONCE") and the reason the picker
+// this task once carried is gone: nothing consumed its answer, so §7f's secret
+// plate had no builder at all. composerSecretCards is that builder, and ms1 is
+// the form the plate planner carries as a bundle card (cardMS1); the
+// words-plus-SeedQR plate is a backup.Seed and is filed with F-455.
+func TestComposerSecretIsCutOnceForASeedThatFilledSeveralSlots(t *testing.T) {
+	st := &composerState{list: composerTwoPathList(), reg: &seedRegistry{}}
+	id, err := st.reg.add("seed 1", composerTestMnemonic(t), "", composerMainNet())
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.sources = []composerSource{{kind: composerSourceSeed, seedID: id, fpPresent: true}}
+	st.assigned = make([]composerAssignment, 3)
+	for i := range st.assigned {
+		st.assigned[i] = composerAssignment{src: 0}
+	}
+	cards, err := composerSecretCards(st)
+	if err != nil {
+		t.Fatalf("composerSecretCards: %v", err)
+	}
+	if len(cards) != 1 {
+		t.Fatalf("one seed at three slots produced %d secret plate(s), want 1 -- §7f "+
+			"says a seed that filled several slots is cut ONCE, and three bearer "+
+			"plates for one secret is three times the exposure for no recovery value",
+			len(cards))
+	}
+	if cards[0].kind != cardMS1 {
+		t.Errorf("the secret card is kind %v, want cardMS1 (the kind bundlePlateMark "+
+			"never marks, gui/bundle_flow.go:574)", cards[0].kind)
+	}
+	if len(cards[0].strings) != 1 || len(cards[0].strings[0]) == 0 {
+		t.Errorf("the secret card carries no ms1 string: %+v", cards[0].strings)
+	}
+	// A WATCH-ONLY build cuts none, which is the whole of the mode choice.
+	none, err := composerSecretCards(&composerState{reg: &seedRegistry{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(none) != 0 {
+		t.Errorf("a composition with no seed produced %d secret plate(s)", len(none))
+	}
+}
+
+// TestComposerEngraveModeReusesMultisigBuildsLabels: "Full" must name what it
+// LEAVES OUT when a passphrase was used, because a BIP-39 passphrase is a
+// required spending factor and is never engraved -- a set labelled
+// "Full (seed + keys)" that omits one is F-132's shape.
+func TestComposerEngraveModeReusesMultisigBuildsLabels(t *testing.T) {
+	bare := buildFullModeLabel(false)
+	withPass := buildFullModeLabel(true)
+	if bare == withPass {
+		t.Fatalf("buildFullModeLabel renders the same label with and without a "+
+			"passphrase (%q); the composer inherits the honesty of that label", bare)
+	}
+	if !strings.Contains(strings.ToLower(withPass), "passphrase") {
+		t.Errorf("the passphrased Full label does not name the missing factor: %q", withPass)
+	}
+	assertChoiceLabelFits(t, bare)
+	assertChoiceLabelFits(t, withPass)
+	assertChoiceLabelFits(t, "Watch-only (keys)")
+}
+```
+
+`composerSecretCards`, which the cut-once test drives, is written in Task B11 with the flow that calls it; run this test after that task lands, or run it now with the three form tests alone.
+
+- [ ] **Step 4: Run the tests**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerForm|^TestComposerSecretIsCutOnce|^TestComposerEngraveMode' -v ./gui/ 2>&1 | grep -E '^(--- |    --- |ok|FAIL)'`
+Expected: four top-level PASS with three sub-tests under the forms test (`nothing seated collapses to template only`, `partially seated offers no form A`, `fully seated offers both`); `ok seedhammer.com/gui`. The label test logs each label's width -- measured: `The policy itself` 159 px, `Template plus key cards` 253 px, `Template only (no keys)` 251 px, against a 436 px row.
+
+- [ ] **Step 5: gofmt, commit**
+
+```bash
+gofmt -l gui/ && CGO_ENABLED=0 go test -count=1 -run '^TestComposer' ./gui/ 2>&1 | tail -2
+git add gui/composer_engrave.go gui/composer_engrave_test.go
+git commit -s -F - <<'MSG'
+gui: the section 7f form choice, and one secret form that actually has a builder (composer S3 task B7)
+
+The form choice collapses correctly for a key-less and a partially seated
+composition. The secret-form picker is gone: it offered two plate designs and
+nothing consumed the answer, so section 7f's secret plate had no builder --
+ms1 is the form the plate planner carries, and the words-plus-SeedQR plate is
+filed with F-455.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
+MSG
 ```
 
 ---
@@ -7138,7 +8035,251 @@ func composerEngraveModePick(ctx *Context, th *Colors, st *composerState) (bool,
 
 Every seated slot yields a card in form B **regardless of source** (§7f): a `key:` record is MINTED as an mk1 (fingerprint, origin, xpub and both stubs), a payload mk1 is RE-MINTED with both stubs APPENDED to the ones it already carries (§7d, so one card seats into either engraved form and stays indexed to the wallets it already belonged to), and a seed-derived slot is minted likewise. `mk.Encode` is deterministic (`mk/encode.go:39`), so re-minting is exact.
 
-Tests: existing stubs are preserved IN ORDER and each new stub is appended once (never duplicated when it is already there); a card minted from a `key:` record round-trips through `mk.Decode` to the same fingerprint, path and xpub; a partially seated composition's cards carry the TEMPLATE stub only.
+- [ ] **Step 1: Write the failing test**
+
+The tests lens counted this file's absence as a Critical (its C-2): Task B8's own prose specified three cases and named `gui/composer_cards_test.go` in its Files header, and no ```go block existed -- so card minting, including the `mk.Decode` round trip, shipped with no test at all.
+
+**The card's declared path is compared STRUCTURALLY.** Measured while writing this: `mk`'s codec round-trips the origin and `Decode` renders `m/48h/0h/0h/2h` where `composerOriginText` wrote `m/48'/0'/0'/2'`. The same path in two notations -- which is the lesson `slotMatchesCard` states in its own comment (`gui/key_card_seating.go:130-137`), and a string comparison here fails on a correct card.
+
+Create `gui/composer_cards_test.go`:
+
+```go
+package gui
+
+import (
+	"testing"
+
+	"github.com/btcsuite/btcd/btcutil/v2/hdkeychain"
+	"seedhammer.com/bip32"
+	"seedhammer.com/md"
+	"seedhammer.com/mk"
+)
+
+// composerCardFixture is a two-slot wsh policy with REAL xpubs seated: the
+// smallest composition that can be minted into cards and seated back.
+//
+// Both slots carry master fingerprint 73c5da0a at DIFFERENT accounts, which is
+// C5's normal case (one person in two paths holds two accounts) and is the
+// case §4f's invariant permits -- distinct origins, so no fingerprint
+// ambiguity arises.
+func composerCardFixture(t *testing.T) (st *composerState, template, keyed []string) {
+	t.Helper()
+	list := md.PathList{Wrapper: md.ComposeWsh, Paths: []md.SpendPath{
+		{Keys: &md.KeySet{K: 2, N: 2, Sorted: true}},
+	}}
+	xpubs := []string{composerTestXpubA, composerTestXpubB}
+	fp := [4]byte{0x73, 0xc5, 0xda, 0x0a}
+
+	declared := make([]*md.SlotOrigin, len(xpubs))
+	st = &composerState{list: list, reg: &seedRegistry{}}
+	st.assigned = make([]composerAssignment, len(xpubs))
+	st.sources = make([]composerSource, len(xpubs))
+	pub := map[uint8][65]byte{}
+	fps := map[uint8][4]byte{}
+	for i, x := range xpubs {
+		origin := composerTestOrigin(2, uint32(i))
+		declared[i] = &md.SlotOrigin{Origin: origin, Fingerprint: fp, FpPresent: true}
+		st.sources[i] = composerSource{kind: composerSourceKey, seedID: -1, xpub: x}
+		st.assigned[i] = composerAssignment{
+			src: i, account: uint32(i), origin: origin,
+			fingerprint: fp, fpPresent: true, xpub: x,
+		}
+		cc, pk, _, err := decodeXpubBytes(x)
+		if err != nil {
+			t.Fatalf("decodeXpubBytes(%s): %v", x[:12], err)
+		}
+		var b [65]byte
+		copy(b[0:32], cc[:])
+		copy(b[32:65], pk[:])
+		pub[uint8(i)] = b
+		fps[uint8(i)] = fp
+	}
+
+	// COMPOSED TWICE, NOT COPIED. md.Composed's doc is explicit: a copy shares
+	// the underlying descriptor, so Bind on one keys them both -- and a
+	// "template" that had been keyed by its own policy would make every
+	// assertion below tautological.
+	ct, err := md.ComposeWith(list, declared)
+	if err != nil {
+		t.Fatalf("md.ComposeWith (template): %v", err)
+	}
+	if template, err = ct.Chunks(); err != nil {
+		t.Fatal(err)
+	}
+	ck, err := md.ComposeWith(list, declared)
+	if err != nil {
+		t.Fatalf("md.ComposeWith (keyed): %v", err)
+	}
+	if err := ck.Bind(pub, fps); err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+	if keyed, err = ck.Chunks(); err != nil {
+		t.Fatal(err)
+	}
+	return st, template, keyed
+}
+
+// TestComposerMintCardCarriesBothStubsAndRoundTrips is §7d's minting rule: a
+// key: record is MINTED as an mk1 carrying the fingerprint, the origin, the
+// xpub and BOTH stubs, and mk.Encode is deterministic so a re-mint is exact.
+func TestComposerMintCardCarriesBothStubsAndRoundTrips(t *testing.T) {
+	st, template, keyed := composerCardFixture(t)
+	strs, err := composerMintCard(st, 0, template, keyed)
+	if err != nil {
+		t.Fatalf("composerMintCard: %v", err)
+	}
+	card, err := mk.Decode(strs)
+	if err != nil {
+		t.Fatalf("the minted card does not decode: %v", err)
+	}
+	if card.Xpub != composerTestXpubA {
+		t.Errorf("the card carries xpub %q, want the seated one", card.Xpub)
+	}
+	if card.Fingerprint != "73c5da0a" {
+		t.Errorf("the card carries fingerprint %q, want 73c5da0a", card.Fingerprint)
+	}
+	// THE PATH IS COMPARED STRUCTURALLY, NOT AS A STRING, and that is the
+	// lesson slotMatchesCard states in its own comment
+	// (gui/key_card_seating.go:130-137): mk's codec round-trips the origin and
+	// Decode renders it `m/48h/0h/0h/2h` where composerOriginText wrote
+	// `m/48'/0'/0'/2'`. The same path in two notations. A string comparison
+	// here would fail on a correct card, and a string comparison in the
+	// seating would refuse every card while looking like corruption.
+	gotPath, err := bip32.ParsePath(card.Path)
+	if err != nil {
+		t.Fatalf("the card's declared path %q does not parse: %v", card.Path, err)
+	}
+	wantPath := make(bip32.Path, 0, 4)
+	for _, c := range composerTestOrigin(2, 0) {
+		v := c.Value
+		if c.Hardened {
+			v += hdkeychain.HardenedKeyStart
+		}
+		wantPath = append(wantPath, v)
+	}
+	if len(gotPath) != len(wantPath) {
+		t.Fatalf("the card declares %d components, want %d", len(gotPath), len(wantPath))
+	}
+	for i := range gotPath {
+		if gotPath[i] != wantPath[i] {
+			t.Errorf("the card declares %v, want %v (component %d)", gotPath, wantPath, i)
+		}
+	}
+	// BOTH STUBS, in template-then-policy order (§7c "stamping BOTH stubs").
+	want, err := md.ComposerStubs(template, keyed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(want) != 2 {
+		t.Fatalf("a template and a KEYED policy give %d stub(s), want 2 -- if these "+
+			"two forms share a stub the whole re-mint story collapses", len(want))
+	}
+	if len(card.Stubs) != len(want) {
+		t.Fatalf("the card carries %d stub(s), want %d", len(card.Stubs), len(want))
+	}
+	for i := range want {
+		if card.Stubs[i] != want[i] {
+			t.Errorf("stub %d is %x, want %x", i, card.Stubs[i], want[i])
+		}
+	}
+}
+
+// TestComposerMintCardWithNoKeyedPolicyCarriesTheTemplateStubAlone is §7f's
+// PARTIALLY seated rule: the policy id does not exist until every slot is
+// seated, so a card cut then must not claim one.
+func TestComposerMintCardWithNoKeyedPolicyCarriesTheTemplateStubAlone(t *testing.T) {
+	st, template, _ := composerCardFixture(t)
+	strs, err := composerMintCard(st, 0, template, nil)
+	if err != nil {
+		t.Fatalf("composerMintCard: %v", err)
+	}
+	card, err := mk.Decode(strs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(card.Stubs) != 1 {
+		t.Fatalf("a card cut before the policy exists carries %d stubs, want 1", len(card.Stubs))
+	}
+	tmplStub, err := md.FormAwareStubChunks(template)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if card.Stubs[0] != tmplStub {
+		t.Errorf("the single stub is %x, want the TEMPLATE's %x", card.Stubs[0], tmplStub)
+	}
+}
+
+// TestComposerReMintPreservesExistingStubsInOrder is §7d's whole reason for
+// APPENDING rather than replacing: a payload card stays indexed to the wallets
+// it already belonged to. reStubMk1 (gui/template_engrave.go:41) REPLACES,
+// which is right for its own flow and would be wrong here.
+func TestComposerReMintPreservesExistingStubsInOrder(t *testing.T) {
+	st, template, keyed := composerCardFixture(t)
+	prior := [][4]byte{{1, 2, 3, 4}, {5, 6, 7, 8}}
+	st.sources[0] = composerSource{
+		kind: composerSourceCard, seedID: -1, xpub: composerTestXpubA,
+		card: mk.Card{
+			Network: "mainnet", Path: "m/48'/0'/0'/2'",
+			Fingerprint: "73c5da0a", Stubs: prior, Xpub: composerTestXpubA,
+		},
+	}
+	strs, err := composerMintCard(st, 0, template, keyed)
+	if err != nil {
+		t.Fatalf("composerMintCard: %v", err)
+	}
+	card, err := mk.Decode(strs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(card.Stubs) != 4 {
+		t.Fatalf("a re-minted card carries %d stubs, want 4 (2 prior + 2 composed)", len(card.Stubs))
+	}
+	for i, s := range prior {
+		if card.Stubs[i] != s {
+			t.Errorf("prior stub %d moved: got %x, want %x", i, card.Stubs[i], s)
+		}
+	}
+	// APPENDED ONCE: re-minting a card that already carries a composed stub
+	// must not duplicate it, or the stub list grows on every pass and can
+	// push the card into another chunk for nothing.
+	again := mk.AppendStubs(card, card.Stubs[2], card.Stubs[3])
+	if len(again.Stubs) != 4 {
+		t.Errorf("re-appending stubs the card already carries grew it to %d", len(again.Stubs))
+	}
+}
+
+// TestComposerMintCardsSkipsUnseatedSlotsAndNamesTheRest: an unseated slot has
+// no card, and a refusal to mint one is what keeps the census honest about how
+// many plates a partially seated composition cuts.
+func TestComposerMintCardsSkipsUnseatedSlotsAndNamesTheRest(t *testing.T) {
+	st, template, keyed := composerCardFixture(t)
+	st.assigned[1].src = -1
+	cards, err := composerMintCards(st, template, keyed)
+	if err != nil {
+		t.Fatalf("composerMintCards: %v", err)
+	}
+	if len(cards) != 1 {
+		t.Fatalf("one seated slot of two produced %d card(s), want 1", len(cards))
+	}
+	if cards[0].kind != cardMK1 {
+		t.Errorf("the minted card is kind %v, want cardMK1", cards[0].kind)
+	}
+	if cards[0].label != "mk1 key @0" {
+		t.Errorf("the card is labelled %q, want \"mk1 key @0\"", cards[0].label)
+	}
+	if _, err := composerMintCard(st, 1, template, keyed); err == nil {
+		t.Error("minting an UNSEATED slot succeeded; a card for a slot holding no key " +
+			"is a plate that vouches for a wallet nobody composed")
+	}
+}
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerMintCard|^TestComposerReMint' ./gui/ 2>&1 | head -8`
+Expected: FAIL to build -- `# seedhammer.com/gui [seedhammer.com/gui.test]` then `undefined: composerMintCard` at five sites in `gui/composer_cards_test.go`, plus one in `gui/composer_seating_vectors_test.go`.
+
+- [ ] **Step 3: Write the minting**
 
 Create `gui/composer_cards.go`:
 
@@ -7222,6 +8363,31 @@ func composerMintCards(st *composerState, templateChunks, keyedChunks []string) 
 }
 ```
 
+- [ ] **Step 4: Run the tests**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerMintCard|^TestComposerReMint' -v ./gui/ 2>&1 | grep -E '^(--- |ok|FAIL)'`
+Expected: four PASS (`TestComposerMintCardCarriesBothStubsAndRoundTrips`, `TestComposerMintCardWithNoKeyedPolicyCarriesTheTemplateStubAlone`, `TestComposerReMintPreservesExistingStubsInOrder`, `TestComposerMintCardsSkipsUnseatedSlotsAndNamesTheRest`); `ok seedhammer.com/gui`.
+
+- [ ] **Step 5: gofmt, commit**
+
+```bash
+gofmt -l gui/ && CGO_ENABLED=0 go test -count=1 -run '^TestComposer' ./gui/ 2>&1 | tail -2
+git add gui/composer_cards.go gui/composer_cards_test.go
+git commit -s -F - <<'MSG'
+gui: mint and re-mint the composer's key cards, with both stubs appended (composer S3 task B8)
+
+Existing stubs are preserved in order and each composed stub is appended once,
+so a payload card stays indexed to the wallets it already belonged to --
+reStubMk1 REPLACES, which is right for its own flow and wrong here. The card's
+declared path is compared structurally: mk's codec renders the origin in the
+other notation, and a string comparison fails on a correct card.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
+MSG
+```
+
+
 ---
 
 ### Task B9: `gui/composer_census.go` -- the census over card chunks, and the measured concrete-descriptor ceiling
@@ -7280,9 +8446,34 @@ func TestComposerDescriptorCeilingIsMeasuredNotWrittenDown(t *testing.T) {
 	t.Logf("C10's 688-character two-path wallet fits: %v",
 		composerDescriptorPlateFits(p, strings.Repeat("a", 688)))
 }
+
+// TestComposerCensusLinesSayHowRecoveryDetectsAnError is §7f's last clause:
+// recovery-time error detection differs by form and the census says so.
+func TestComposerCensusLinesSayHowRecoveryDetectsAnError(t *testing.T) {
+	cards := []bundleCard{{
+		kind: cardMD1, label: "md1 template",
+		strings: []string{"md1abc"}, summary: "key-less wallet policy",
+	}}
+	lines := composerCensusLines(newPlatform().EngraverParams(), cards)
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "This engraves") {
+		t.Errorf("the census does not carry buildPlateCensusLines' plate count:\n%s", joined)
+	}
+	for _, want := range []string{"error correction", "only its checksum"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("the census does not say %q; md1/mk1 carry BCH and a plain "+
+				"descriptor plate carries only its BIP-380 checksum:\n%s", want, joined)
+		}
+	}
+}
 ```
 
-- [ ] **Step 2: Run to verify it fails, write the census, run again, commit**
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerDescriptorCeiling|^TestComposerCensusLines' ./gui/ 2>&1 | head -6`
+Expected: FAIL to build -- `undefined: composerDescriptorCeilingChars`, `undefined: composerDescriptorPlateFits`, `undefined: composerCensusLines`.
+
+- [ ] **Step 3: Write the census**
 
 Create `gui/composer_census.go`:
 
@@ -7290,8 +8481,6 @@ Create `gui/composer_census.go`:
 package gui
 
 import (
-	"fmt"
-
 	"seedhammer.com/backup"
 	"seedhammer.com/engrave"
 	"seedhammer.com/font/constant"
@@ -7361,20 +8550,16 @@ func composerDescriptorCeilingChars(pl Platform) int {
 	return lo
 }
 
-// composerCensusRefusal is §7f's "the census REFUSES a concrete descriptor
-// longer than the plate holds, naming the measured ceiling".
-//
-// It names the count, the MEASURED ceiling at this plate and font, and a
-// remedy this composition actually has -- the same shape the transaction
-// program's QR refusal takes (gui/transaction.go:1336-1344), which was
-// written after the lesson that "too large" plus a byte count tells the
-// operator nothing about how much too large.
-func composerCensusRefusal(pl Platform, descriptor string) string {
-	return fmt.Sprintf("This policy is %d characters, and at this plate and font a text "+
-		"plate holds at most about %d (measured, not read off a constant).\n\n"+
-		"Engrave the template plus key cards instead: the same wallet, in fewer "+
-		"characters per plate.", len(descriptor), composerDescriptorCeilingChars(pl))
-}
+// THE CENSUS REFUSAL LIVES WITH THE PLATE IT REFUSES, and that plate is
+// deferred. §7f's "the census REFUSES a concrete descriptor longer than the
+// plate holds" belongs to form A's TEXT plates -- and md deliberately emits no
+// descriptor text ("a rendering that cannot be re-parsed is the defect this
+// package's invariant exists to prevent"), so form A ships as the keyed md1
+// this cycle and the text/QR plates are F-457, Rust-first. A refusal function
+// with nothing to refuse is the same defect class as a picker whose answer
+// nothing reads, so it is not carried here. The two measurement functions
+// above stay: §13 item 1 asks for the ceiling as a number, and that is what
+// TestComposerMeasureSection13Numbers records.
 
 // composerCensusLines is the census the operator confirms before the first
 // cut, plus §7f's read-back-integrity line.
@@ -7396,19 +8581,2071 @@ func composerCensusLines(params engrave.Params, cards []bundleCard) []string {
 **Files:**
 - Test: `gui/composer_seating_vectors_test.go`
 
-For every keyed shape in a small named table (one per wrapper, plus the two-path and the same-fingerprint-two-accounts cases), assert that the cards Task B8 mints **seat into the engraved keyless template through the SHIPPED `seatKeyCards`** (`gui/key_card_seating.go:53`) and reproduce the keyed policy's addresses:
+**Interfaces:**
+- Consumes: the SHIPPED `seatKeyCards(templateMd1 []string, cards []mk.Card) ([]md.ExpandedKey, error)` (`gui/key_card_seating.go:53`); `md.ComposeWith`, `md.Composed.Bind` (`md/compose.go:353,250`); `md.ExpandWalletPolicyChunks` (`md/expand.go:102`); `policyAddressAt` (`gui/policy_address.go:87`) and `addrProofPerChain` (`gui/wallet_policy.go:241`); `composerMintCard` (Task B8); `deriveAccountXpub` (`gui/derive.go:19`); `mk.Decode` (`mk/mk.go:148`).
+- Produces: five named vectors and four assertions over them.
 
-1. compose the keyless template and the keyed policy from one `md.PathList`;
-2. mint one card per seated slot with `md.ComposerStubs` (both stubs when a keyed policy exists, the template stub otherwise);
-3. `seatKeyCards(templateChunks, cards)` must return without error, and every returned `md.ExpandedKey.Xpub` must equal the keyed policy's;
-4. addresses derived from the seated template through `policyAddressAt` must equal those derived from the keyed policy;
-5. a NAMED NEGATIVE: the asymmetric one-card case (two slots at one origin, one with a fingerprint and one without) is asserted never to be produced by the composer -- `composerInvariantViolation` catches it first -- and, constructed by hand, `seatKeyCards` is shown to seat ONE card into BOTH slots, which is the measured reason §4f's invariant exists;
-6. the PARTIALLY seated artifact (template plus template-stub cards for the seated slots only) is a named vector.
+**This task was five prose bullets with no code**, and the tests lens counted that as a Critical (its C-3): the one test meant to prove seated cards round-trip through the shipped consumer to a real keyed policy's addresses did not exist. It exists here.
+
+**Why the SHIPPED seater and not a local check.** `seatKeyCards` is what a restoring operator's device runs years later, with none of this flow's state. If the composer's idea of "these cards fit this template" and that function's ever disagree, the plates are a backup only the machine that cut them can read.
+
+**The vectors derive their own xpubs.** `mk.Encode` gates a card on the xpub's depth and last child matching the declared path (`mk: xpub depth/child does not match path`), so a taproot slot at `m/48'/0'/i'/3'` cannot carry a key derived at `.../2'`. Pinning two constants and reusing them across wrappers is exactly what that gate exists to catch, and it caught it while this task was written.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `gui/composer_seating_vectors_test.go`:
+
+```go
+package gui
+
+import (
+	"encoding/binary"
+	"testing"
+
+	"github.com/btcsuite/btcd/btcutil/v2/hdkeychain"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"seedhammer.com/bip32"
+	"seedhammer.com/md"
+	"seedhammer.com/mk"
+)
+
+// SPEC §12 item 6, as vectors: the cards the composer mints SEAT into the
+// template it engraved, through the SHIPPED seatKeyCards, and reproduce the
+// keyed policy's addresses.
+//
+// WHY THE SHIPPED FUNCTION AND NOT A LOCAL CHECK. seatKeyCards
+// (gui/key_card_seating.go:53) is what a restoring operator's device runs
+// years later, with none of this flow's state. If the composer's own idea of
+// "these cards fit this template" and that function's ever disagree, the
+// plates are a backup that only the machine that cut them can read. So the
+// assertion is: hand the shipped seater the shipped artifacts, and require it
+// to reach the same keys and the same addresses.
+
+// composerVector is one named shape, with the xpubs to seat into it.
+type composerVector struct {
+	name  string
+	list  md.PathList
+	slots int
+	// addrs says this row's addresses must derive on this device. MEASURED
+	// true for all five, taproot included: complexAddressSource
+	// (gui/policy_address.go:44) reaches the tr script-tree shape the composer
+	// emits. The flag stays as a column rather than being dropped, because the
+	// S2 implementation report names taproot address derivation as a gap and a
+	// row that stops deriving must fail loudly rather than quietly skip.
+	addrs bool
+}
+
+func composerSeatingVectors() []composerVector {
+	return []composerVector{
+		{"wsh_sole_sortedmulti_2of2", md.PathList{Wrapper: md.ComposeWsh, Paths: []md.SpendPath{
+			{Keys: &md.KeySet{K: 2, N: 2, Sorted: true}},
+		}}, 2, true},
+		{"wsh_sole_multi_1of2_unsorted", md.PathList{Wrapper: md.ComposeWsh, Paths: []md.SpendPath{
+			{Keys: &md.KeySet{K: 1, N: 2, Sorted: false}},
+		}}, 2, true},
+		{"wsh_two_paths_single_keys", md.PathList{Wrapper: md.ComposeWsh, Paths: []md.SpendPath{
+			{Keys: &md.KeySet{K: 1, N: 1}},
+			{Keys: &md.KeySet{K: 1, N: 1}, Lock: &md.Lock{Kind: md.LockOlderBlocks, Value: 1000}},
+		}}, 2, true},
+		{"sh_wsh_sole_sortedmulti_2of2", md.PathList{Wrapper: md.ComposeShWsh, Paths: []md.SpendPath{
+			{Keys: &md.KeySet{K: 2, N: 2, Sorted: true}},
+		}}, 2, true},
+		{"tr_extracted_first_then_leaf", md.PathList{Wrapper: md.ComposeTr, Paths: []md.SpendPath{
+			{Keys: &md.KeySet{K: 1, N: 1}},
+			{Keys: &md.KeySet{K: 1, N: 1}, Lock: &md.Lock{Kind: md.LockOlderBlocks, Value: 7}},
+		}}, 2, true},
+	}
+}
+
+// composerVectorXpub derives slot i's account key AT THE WRAPPER'S OWN §4f
+// origin, from the published "abandon" vector, using the DEVICE's own
+// deriveAccountXpub.
+//
+// DERIVED, NOT PINNED, and mk is what forces it: mk.Encode gates the card on
+// the xpub's depth and last child matching the declared path
+// ("mk: xpub depth/child does not match path"), so a taproot slot at
+// m/48'/0'/i'/3' cannot carry a key derived at .../2'. Pinning two constants
+// and reusing them across wrappers is exactly the mistake that gate exists to
+// catch, and it caught it here.
+func composerVectorXpub(t *testing.T, scriptType, account uint32) (string, [4]byte) {
+	t.Helper()
+	const h = hdkeychain.HardenedKeyStart
+	path := bip32.Path{48 | h, 0 | h, account | h, scriptType | h}
+	xpub, masterFP, err := deriveAccountXpub(composerTestMnemonic(t), "", &chaincfg.MainNetParams, path)
+	if err != nil {
+		t.Fatalf("deriveAccountXpub(%s): %v", path, err)
+	}
+	var fp [4]byte
+	binary.BigEndian.PutUint32(fp[:], masterFP)
+	return xpub, fp
+}
+
+// composerVectorArtifacts composes the keyless template and the keyed policy
+// from ONE path list, and returns the state whose assignments describe it.
+//
+// COMPOSED TWICE, NOT COPIED: md.Composed's doc says a copy shares the
+// underlying descriptor, so Bind on one keys them both -- and a "template"
+// that had been keyed by its own policy would make every assertion here
+// tautological.
+func composerVectorArtifacts(t *testing.T, v composerVector) (st *composerState, template, keyed []string) {
+	t.Helper()
+	n := v.slots
+	declared := make([]*md.SlotOrigin, n)
+	st = &composerState{list: v.list, reg: &seedRegistry{}}
+	st.assigned = make([]composerAssignment, n)
+	st.sources = make([]composerSource, n)
+	pub := map[uint8][65]byte{}
+	fps := map[uint8][4]byte{}
+	scriptType := uint32(2)
+	if v.list.Wrapper == md.ComposeTr {
+		scriptType = 3
+	}
+	for i := 0; i < n; i++ {
+		x, fp := composerVectorXpub(t, scriptType, uint32(i))
+		origin := composerTestOrigin(scriptType, uint32(i))
+		declared[i] = &md.SlotOrigin{Origin: origin, Fingerprint: fp, FpPresent: true}
+		st.sources[i] = composerSource{kind: composerSourceKey, seedID: -1, xpub: x}
+		st.assigned[i] = composerAssignment{
+			src: i, account: uint32(i), origin: origin,
+			fingerprint: fp, fpPresent: true, xpub: x,
+		}
+		cc, pk, _, err := decodeXpubBytes(x)
+		if err != nil {
+			t.Fatalf("%s: decodeXpubBytes: %v", v.name, err)
+		}
+		var b [65]byte
+		copy(b[0:32], cc[:])
+		copy(b[32:65], pk[:])
+		pub[uint8(i)] = b
+		fps[uint8(i)] = fp
+	}
+	ct, err := md.ComposeWith(v.list, declared)
+	if err != nil {
+		t.Fatalf("%s: md.ComposeWith (template): %v", v.name, err)
+	}
+	if template, err = ct.Chunks(); err != nil {
+		t.Fatalf("%s: template Chunks: %v", v.name, err)
+	}
+	ck, err := md.ComposeWith(v.list, declared)
+	if err != nil {
+		t.Fatalf("%s: md.ComposeWith (keyed): %v", v.name, err)
+	}
+	if err := ck.Bind(pub, fps); err != nil {
+		t.Fatalf("%s: Bind: %v", v.name, err)
+	}
+	if keyed, err = ck.Chunks(); err != nil {
+		t.Fatalf("%s: keyed Chunks: %v", v.name, err)
+	}
+	return st, template, keyed
+}
+
+func composerDecodeCards(t *testing.T, st *composerState, template, keyed []string) []mk.Card {
+	t.Helper()
+	var cards []mk.Card
+	for i := range st.assigned {
+		if st.assigned[i].src < 0 {
+			continue
+		}
+		strs, err := composerMintCard(st, uint8(i), template, keyed)
+		if err != nil {
+			t.Fatalf("composerMintCard(@%d): %v", i, err)
+		}
+		c, err := mk.Decode(strs)
+		if err != nil {
+			t.Fatalf("the card minted for @%d does not decode: %v", i, err)
+		}
+		cards = append(cards, c)
+	}
+	return cards
+}
+
+// TestComposerMintedCardsSeatThroughTheShippedSeater is §12 item 6's positive
+// leg, over every named vector.
+func TestComposerMintedCardsSeatThroughTheShippedSeater(t *testing.T) {
+	for _, v := range composerSeatingVectors() {
+		t.Run(v.name, func(t *testing.T) {
+			st, template, keyed := composerVectorArtifacts(t, v)
+			cards := composerDecodeCards(t, st, template, keyed)
+			if len(cards) != v.slots {
+				t.Fatalf("minted %d card(s) for %d seated slot(s)", len(cards), v.slots)
+			}
+			seated, err := seatKeyCards(template, cards)
+			if err != nil {
+				t.Fatalf("the SHIPPED seater refuses the composer's own cards: %v", err)
+			}
+			_, want, err := md.ExpandWalletPolicyChunks(keyed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(seated) != len(want) {
+				t.Fatalf("seating gave %d slot(s), the keyed policy has %d", len(seated), len(want))
+			}
+			for i := range seated {
+				if !seated[i].XpubPresent {
+					t.Errorf("slot @%d came back from seating with no key", seated[i].Index)
+					continue
+				}
+				if seated[i].Xpub != want[i].Xpub {
+					t.Errorf("slot @%d seated a different key than the keyed policy holds",
+						seated[i].Index)
+				}
+			}
+		})
+	}
+}
+
+// TestComposerSeatedTemplateReproducesTheKeyedPolicysAddresses is the half
+// that matters to an operator: the plates derive the same wallet.
+func TestComposerSeatedTemplateReproducesTheKeyedPolicysAddresses(t *testing.T) {
+	derived := 0
+	for _, v := range composerSeatingVectors() {
+		t.Run(v.name, func(t *testing.T) {
+			st, template, keyed := composerVectorArtifacts(t, v)
+			cards := composerDecodeCards(t, st, template, keyed)
+			seated, err := seatKeyCards(template, cards)
+			if err != nil {
+				t.Fatalf("seatKeyCards: %v", err)
+			}
+			tplT, _, err := md.ExpandWalletPolicyChunks(template)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tplK, keysK, err := md.ExpandWalletPolicyChunks(keyed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			atSeated, okSeated := policyAddressAt(template, tplT, seated)
+			atKeyed, okKeyed := policyAddressAt(keyed, tplK, keysK)
+			if okSeated != okKeyed {
+				t.Fatalf("addresses derive from one form and not the other "+
+					"(seated=%v keyed=%v); the two artifacts would then prove "+
+					"different things", okSeated, okKeyed)
+			}
+			if !okKeyed {
+				if v.addrs {
+					t.Fatalf("this vector is marked address-checkable and no address " +
+						"derives; either the row or the deriver is wrong")
+				}
+				t.Logf("%s: no address derives for this shape on this device "+
+					"(the taproot script-tree gap); the ids still bind it", v.name)
+				return
+			}
+			derived++
+			for i := 0; i < addrProofPerChain; i++ {
+				for _, change := range []bool{false, true} {
+					a, err := atSeated(uint32(i), change)
+					if err != nil {
+						t.Fatalf("seated address %d/%v: %v", i, change, err)
+					}
+					b, err := atKeyed(uint32(i), change)
+					if err != nil {
+						t.Fatalf("keyed address %d/%v: %v", i, change, err)
+					}
+					if a != b {
+						t.Errorf("address %d (change=%v) differs: seated %s, keyed %s",
+							i, change, a, b)
+					}
+				}
+			}
+		})
+	}
+	if derived == 0 {
+		t.Fatal("INCONCLUSIVE: no vector derived an address, so this test compared nothing")
+	}
+}
+
+// TestComposerPartiallySeatedArtifactIsANamedVector is §7f's partially seated
+// form and §12 item 6's last clause: the template plus TEMPLATE-STUB cards for
+// the seated slots only, and the shipped seater must REFUSE it as incomplete
+// rather than deriving a wallet from half a key set.
+func TestComposerPartiallySeatedArtifactIsANamedVector(t *testing.T) {
+	v := composerSeatingVectors()[0]
+	st, template, _ := composerVectorArtifacts(t, v)
+	st.assigned[1].src = -1 // one slot left unseated
+
+	cards := composerDecodeCards(t, st, template, nil)
+	if len(cards) != 1 {
+		t.Fatalf("a partially seated composition minted %d card(s), want 1", len(cards))
+	}
+	tmplStub, err := md.FormAwareStubChunks(template)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cards[0].Stubs) != 1 || cards[0].Stubs[0] != tmplStub {
+		t.Errorf("the card carries %d stub(s) (%x); a partially seated composition has "+
+			"no policy id yet, so it must carry the TEMPLATE stub alone (%x)",
+			len(cards[0].Stubs), cards[0].Stubs, tmplStub)
+	}
+	if _, err := seatKeyCards(template, cards); err == nil {
+		t.Error("the shipped seater ACCEPTED a template with an unfilled slot; a partial " +
+			"seating is exactly the state that produces a plausible wrong address")
+	}
+}
+
+// TestComposerNeverProducesTheAsymmetricOneCardTemplate is §12 item 6's NAMED
+// NEGATIVE: "a named negative vector runs the asymmetric one-card case (one
+// slot with a fingerprint, one without, at one origin) and asserts it is never
+// produced".
+//
+// IT IS REFUSED TWICE, AND THE SECOND REFUSAL IS THE STRONGER ONE. §8v catches
+// it at the mapping review, where the operator can act on it; md.ComposeWith
+// refuses to EMIT it at all, so the artifact cannot leave this device even if
+// a future screen forgot to ask. Both are asserted, because a defence that
+// exists only in the UI is a defence one refactor from being gone.
+//
+// WHAT THIS MEANS FOR THE HAZARD §4f NAMES. The plan's own framing was that
+// the hand-built asymmetric template would be shown to double-seat through
+// seatKeyCards (slotMatchesCard skips the fingerprint test when the template
+// declares none, gui/key_card_seating.go:151-159). Measured here: that
+// template cannot be built through md.ComposeWith at all, so the double-seat
+// is unreachable through this device's own builder and the demonstration
+// belongs to the seating package's own tests, not to the composer's. Said
+// plainly rather than left as an assertion that quietly tests nothing.
+func TestComposerNeverProducesTheAsymmetricOneCardTemplate(t *testing.T) {
+	origin := composerTestOrigin(2, 0)
+	list := md.PathList{Wrapper: md.ComposeWsh, Paths: []md.SpendPath{
+		{Keys: &md.KeySet{K: 2, N: 2, Sorted: true}},
+	}}
+
+	// (a) THE REVIEW REFUSES IT (§8v). One fingerprint present, one absent, at
+	//     one origin: the asymmetric case, which is the dangerous one.
+	st := &composerState{list: list, assigned: []composerAssignment{
+		{src: 0, origin: origin, fingerprint: [4]byte{0x73, 0xc5, 0xda, 0x0a}, fpPresent: true},
+		{src: 1, origin: origin},
+	}}
+	if !composerInvariantViolation(st) {
+		t.Fatal("(a) the mapping review would ACCEPT two slots at one origin with one " +
+			"fingerprint; §8v exists to refuse exactly this")
+	}
+
+	// (b) THE BUILDER REFUSES TO EMIT IT. Same shape, handed straight to
+	//     md.ComposeWith with the screens bypassed entirely.
+	for _, tc := range []struct {
+		name     string
+		declared []*md.SlotOrigin
+	}{
+		{"one fingerprint, one without", []*md.SlotOrigin{
+			{Origin: origin, Fingerprint: [4]byte{0x73, 0xc5, 0xda, 0x0a}, FpPresent: true},
+			{Origin: origin, FpPresent: false},
+		}},
+		{"neither declares one", []*md.SlotOrigin{
+			{Origin: origin, FpPresent: false},
+			{Origin: origin, FpPresent: false},
+		}},
+		{"the same fingerprint twice", []*md.SlotOrigin{
+			{Origin: origin, Fingerprint: [4]byte{1, 2, 3, 4}, FpPresent: true},
+			{Origin: origin, Fingerprint: [4]byte{1, 2, 3, 4}, FpPresent: true},
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := md.ComposeWith(list, tc.declared); err == nil {
+				t.Errorf("md.ComposeWith EMITTED a template violating §4f's invariant; " +
+					"one card could then fill both slots and be presented as reviewed")
+			}
+		})
+	}
+
+	// And the CONTROL: two distinct fingerprints at one origin is LEGAL, so
+	// the refusals above are the invariant and not a blanket ban on sharing an
+	// origin.
+	ok := []*md.SlotOrigin{
+		{Origin: origin, Fingerprint: [4]byte{1, 2, 3, 4}, FpPresent: true},
+		{Origin: origin, Fingerprint: [4]byte{9, 9, 9, 9}, FpPresent: true},
+	}
+	if _, err := md.ComposeWith(list, ok); err != nil {
+		t.Errorf("INCONCLUSIVE: two DISTINCT fingerprints at one origin were refused (%v), "+
+			"so the assertions above may be measuring a wider ban than §4f states", err)
+	}
+}
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerMintedCards|^TestComposerSeatedTemplate|^TestComposerPartiallySeated|^TestComposerNeverProduces' ./gui/ 2>&1 | head -6`
+Expected: FAIL to build before Task B8 lands -- `# seedhammer.com/gui [seedhammer.com/gui.test]` then `undefined: composerMintCard`, in this file.
+
+- [ ] **Step 3: Run the vectors**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerMintedCards|^TestComposerSeatedTemplate|^TestComposerPartiallySeated|^TestComposerNeverProduces' -v ./gui/ 2>&1 | grep -E '^(--- |    --- |ok|FAIL)'`
+Expected: four top-level PASS with **five sub-tests each** under the two vector tests (`wsh_sole_sortedmulti_2of2`, `wsh_sole_multi_1of2_unsorted`, `wsh_two_paths_single_keys`, `sh_wsh_sole_sortedmulti_2of2`, `tr_extracted_first_then_leaf`) and three under the asymmetric negative; `ok seedhammer.com/gui`. **Measured while this task was written: all five wrappers derive addresses, taproot included** -- `complexAddressSource` (`gui/policy_address.go:44`) reaches the tr script-tree shape the composer emits, so no row is address-exempt.
+
+- [ ] **Step 4: gofmt, commit**
+
+```bash
+gofmt -l gui/ && CGO_ENABLED=0 go test -count=1 -run '^TestComposer' ./gui/ 2>&1 | tail -2
+git add gui/composer_seating_vectors_test.go
+git commit -s -F - <<'MSG'
+gui: the seating vector leg -- minted cards seat through the SHIPPED seater and reproduce the keyed policy's addresses (composer S3 task B10)
+
+Five wrappers, each composed twice (a copy of a Composed shares its
+descriptor, so Bind on one keys them both). The asymmetric one-card template
+section 4f names is refused twice over -- by the mapping review and by
+md.ComposeWith itself -- so the double-seat hazard is unreachable through this
+device's own builder, which is stated rather than asserted as a test that
+would then be testing nothing.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
+MSG
+```
 
 ---
+
+### Task B11: `gui/composer_flow.go` -- THE JOIN, and the walk that can fail on it
+
+**Files:**
+- Replace: `gui/composer_flow.go`
+- Test: `gui/composer_join_test.go`
+- Modify (FRAGMENT): `gui/wallet_policy.go` (the door loop, so Back at the wrapper lands on the door rather than the carousel)
+
+**Interfaces:**
+- Consumes: everything Part B built -- `composerKeySources`, `composerCardSources`, `composerSeedSource`, `composerSeatFlow`, `composerShortfall`, `composerSeatingComplete`, `composerMappingReview`, `composerConsentFlow`, `composerFormPick`, `composerEngraveModePick`, `composerMintCards`, `composerCensusLines` -- plus `md.ComposeWith`/`Bind`, `decodeXpubBytes` (`gui/singlesig_derive.go:110`), `codex32.EncodeMS1` (`codex32/msencode.go:17`), `bundleEngrave` (`gui/bundle_flow.go:616`), `confirmReviewScreen` (`gui/multisig_build.go:1877`).
+- Produces: `composerFlow` in §7's order; `composerSizeAssignments`; `composerDeclaredOrigins`; `composerTemplateChunksFor`; `composerArtifactsFor`; `composerSeatingStep`; `composerEngraveStep`; `composerSecretCards`.
+
+**THIS IS THE CRITICAL ALL THREE R0 LENSES FOUND.** Part B declared fourteen production functions and nothing called any of them. Measured in the gate's own scratch (declarations excluded):
+
+```
+DEAD-IN-PROD: composerApplyShapeEdit, composerCardSources, composerCensusLines,
+composerCensusRefusal, composerConsentFlow, composerEngraveModePick,
+composerFormPick, composerKeySources, composerMappingReview, composerMintCards,
+composerSeatFlow, composerSeatingComplete, composerSecretFormPick, composerShortfall
+```
+
+An operator with four `key:` records in flash read the door's "Keys loaded: 4", chose Build, and was never offered a slot; §7e's self-check and §8q never executed; §7f's form choice, card minting and the census's card-chunk count were unreachable; and §7b's live line read `keys available: 0` whatever the payload held. **Go does not error on an unused package-scope function, and every `TestComposer*` called these directly**, so the suite was green over a feature no operator could reach. The plan promised a ``Replace `gui/composer_flow.go` `` and no task supplied it.
+
+**Two gates go in with the code**, because one of them is cheap and the other is the only one that can fail for the right reason: a structural scan that requires every `composer*` production function to have a production caller, and a WALK from a keyed payload to the census.
+
+**Sources are loaded BEFORE the shape** so §7b's live line is right from the first frame; loading them at seating time made the line that helps the operator SIZE the policy read zero for the whole of the decision it exists to inform.
+
+**§7b's preset-or-blank wiring point is named here** (`composerFlow`, immediately after `composerWrapperPick`) so Task A10 is a fill-in when F-453 lands rather than a redesign.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `gui/composer_join_test.go`:
+
+```go
+package gui
+
+import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"sort"
+	"strings"
+	"testing"
+	"testing/synctest"
+	"time"
+
+	"seedhammer.com/md"
+)
+
+// ═══ THE JOIN ═══════════════════════════════════════════════════════════════
+//
+// Two R0 lenses found the same Critical independently: Part B built fourteen
+// production functions and nothing called any of them. Go does not error on an
+// unused package-scope function, and every other TestComposer* calls these
+// directly, so the suite was green over a feature no operator could reach.
+//
+// The two tests below are the gate against that class. The first is
+// STRUCTURAL and cheap; the second is a WALK, and only a walk can fail for the
+// right reason.
+
+// TestComposerEveryScreenFunctionHasAProductionCaller is the cheap half.
+//
+// It parses gui/*.go (non-test), counts call expressions per function name,
+// and requires every composer*Flow / composer*Pick / composer*Step / the
+// named screen entry points to be CALLED somewhere other than their own
+// declaration. "An unreachable feature" is not something the build gate can
+// see, and this is what puts it inside a command.
+func TestComposerEveryScreenFunctionHasAProductionCaller(t *testing.T) {
+	fset := token.NewFileSet()
+	declared := map[string]bool{}
+	called := map[string]bool{}
+	ents, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range ents {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatalf("parsing %s: %v", name, err)
+		}
+		for _, d := range f.Decls {
+			fn, ok := d.(*ast.FuncDecl)
+			if !ok {
+				continue
+			}
+			if fn.Recv == nil && strings.HasPrefix(fn.Name.Name, "composer") {
+				declared[fn.Name.Name] = true
+			}
+			// EVERY body is scanned for calls, not just the composer ones:
+			// composerDoorFlow and composerFlow are called from
+			// walletPolicyFlow, which is not a composer* name, and a scan
+			// restricted to composer* bodies reported the two entry points of
+			// the feature as unreachable -- a false positive that would have
+			// taught the next reader to distrust this test.
+			if fn.Body == nil {
+				continue
+			}
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				if id, ok := call.Fun.(*ast.Ident); ok && id.Name != fn.Name.Name {
+					called[id.Name] = true
+				}
+				return true
+			})
+		}
+	}
+	if len(declared) < 40 {
+		t.Fatalf("INCONCLUSIVE: only %d composer* declarations found; the scan is broken, "+
+			"not the tree", len(declared))
+	}
+	// THE EXEMPTIONS ARE NAMED AND ARGUED, never a silent skip: a test that
+	// can be quieted by adding a name is not a gate.
+	exempt := map[string]string{
+		"composerDescriptorPlateFits":    "§13 item 1's measurement; its consumer, the concrete text/QR descriptor plate, is deferred to F-457 because md deliberately emits no text",
+		"composerDescriptorCeilingChars": "the same measurement, called by TestComposerMeasureSection13Numbers",
+	}
+	var orphans []string
+	for name := range declared {
+		if called[name] {
+			continue
+		}
+		if why, ok := exempt[name]; ok {
+			t.Logf("exempt: %s -- %s", name, why)
+			continue
+		}
+		orphans = append(orphans, name)
+	}
+	sort.Strings(orphans)
+	if len(orphans) != 0 {
+		t.Errorf("these composer functions have no production caller, so the screens they "+
+			"draw cannot be reached by any operator: %v\n"+
+			"This is the defect two R0 lenses found: fourteen of them at once, with a "+
+			"green suite, because every test called them directly.", orphans)
+	}
+}
+
+// TestComposerWalkFromAKeyedPayloadReachesTheEngraveScreen is the flow-level
+// walk C-1 asks for: door → Build → wrapper → shape → stub → seating →
+// mapping review → consent (self-check) → §8l → form choice → census.
+//
+// IT IS THE ONLY KIND OF TEST THAT CAN FAIL ON THE JOIN. Every screen below
+// has its own unit test and all of them passed while the flow reached none of
+// them.
+func TestComposerWalkFromAKeyedPayloadReachesTheEngraveScreen(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newEngravedAwarePlatform()
+		p.engraver = newEngraver()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		// TWO key: records, at two accounts of one master -- C5's normal case,
+		// and the shape §4f's invariant permits (distinct origins).
+		ctx.sysw = composerSessionWith([]string{
+			composerTestKeyRecord, composerTestKeyRecord2, composerTestNowRecord,
+		}, nil)
+
+		frame, quit := runUI(ctx, func() { walletPolicyFlow(ctx, &descriptorTheme) })
+		defer quit()
+
+		// (1) THE DOOR, with §8r's key count for the payload actually loaded.
+		got, ok := pumpUntil(frame, "Build a new policy", 24)
+		if !ok {
+			t.Fatalf("the door never drew.\nLast frame: %q", got)
+		}
+		if !uiContains(got, "Keys loaded: 2") {
+			t.Errorf("the door does not count the payload's keys.\nFrame: %q", got)
+		}
+		click(&ctx.Router, Down, Down) // Scan cards -> From payload -> Build
+		click(&ctx.Router, Button3)
+
+		// (2) THE WRAPPER.
+		if got, ok = pumpUntil(frame, "Which script?", 24); !ok {
+			t.Fatalf("the wrapper picker never drew.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Down) // Taproot -> Segwit (wsh)
+		click(&ctx.Router, Button3)
+
+		// (3) THE PATH LIST, whose live line must read the sources the FLOW
+		// loaded -- the half that read `keys available: 0` for every payload.
+		if got, ok = pumpUntil(frame, "Add a spend path", 24); !ok {
+			t.Fatalf("the path list never drew.\nLast frame: %q", got)
+		}
+		if !uiContains(got, "keys available: 2") {
+			t.Errorf("the path list does not count the payload's keys; §7b's live line "+
+				"reads st.sources, which only the flow can populate.\nFrame: %q", got)
+		}
+		click(&ctx.Router, Button3) // an empty list opens on "Add a spend path"
+
+		// (4) KEYS: 2 of 2.
+		if got, ok = pumpUntil(frame, "What can spend on this path?", 24); !ok {
+			t.Fatalf("the path kind picker never drew.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Button3) // Keys
+		if got, ok = pumpUntil(frame, "how many keys?", 24); !ok {
+			t.Fatalf("the key-count picker never drew.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Down) // 1 -> 2
+		click(&ctx.Router, Button3)
+		if got, ok = pumpUntil(frame, "how many must sign?", 24); !ok {
+			t.Fatalf("the threshold picker never drew.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Down) // 1 -> 2
+		click(&ctx.Router, Button3)
+
+		// (5) DONE -> the key-order question, asked where `sole` is FINAL.
+		if got, ok = pumpUntil(frame, "Path 1: 2-of-2", 24); !ok {
+			t.Fatalf("the path list does not show the new path.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Down, Down, Down) // path 1 -> Add -> Change script -> Done
+		click(&ctx.Router, Button3)
+		if got, ok = pumpUntil(frame, "Sorted keys, or your order?", 24); !ok {
+			t.Fatalf("the key-order question is not asked at the transition.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Button3) // Sorted (usual)
+
+		// (6) THE STUB SCREEN, paged: the checkmark is withheld until the last
+		// page has been laid out once, so this pages to the end.
+		if got, ok = pumpUntil(frame, "mk1 stub (template)", 32); !ok {
+			t.Fatalf("the stub screen never drew.\nLast frame: %q", got)
+		}
+		composerPageToEnd(t, ctx, frame)
+
+		// (7) SEATING, slot by slot, from the payload's own records.
+		if got, ok = pumpUntil(frame, "choose a key", 32); !ok {
+			t.Fatalf("seating never drew -- this is the join: the payload's keys are "+
+				"loaded and no slot was ever offered.\nLast frame: %q", got)
+		}
+		if !uiContains(got, "Slot @0") {
+			t.Errorf("the first seating prompt does not name slot @0.\nFrame: %q", got)
+		}
+		click(&ctx.Router, Button3) // the first remaining source
+		if got, ok = pumpUntil(frame, "Slot @1", 32); !ok {
+			t.Fatalf("the second slot was never offered.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Button3)
+
+		// (8) THE MAPPING REVIEW.
+		if got, ok = pumpUntil(frame, "cannot confirm", 32); !ok {
+			t.Fatalf("the mapping review never drew.\nLast frame: %q", got)
+		}
+		composerPageToEnd(t, ctx, frame)
+
+		// (9) THE STUB SCREEN AGAIN, now with the keyed policy's id, then
+		//     CONSENT -- whose self-check must pass on an honest build.
+		if got, ok = pumpUntil(frame, "mk1 stub (policy)", 32); !ok {
+			t.Fatalf("the keyed stub screen never drew.\nLast frame: %q", got)
+		}
+		composerPageToEnd(t, ctx, frame)
+
+		// PAGE LOOKING FOR THE ADDRESSES. They are §7e's proof of WHICH wallet
+		// this is, and they are several pages in on a policy with two paths
+		// and four address lines -- which is exactly why the checkmark is
+		// withheld until the last page has been laid out.
+		if got, ok = composerPageUntil(t, ctx, frame, "Receive 0", 12); !ok {
+			t.Fatalf("the consent surface never drew its addresses -- §8q would have "+
+				"fired instead if the self-check refused.\nLast frame: %q", got)
+		}
+		composerPageToEnd(t, ctx, frame)
+
+		// (10) §8l, unskippable, hold to confirm.
+		if got, ok = pumpUntil(frame, "Nothing outside this device", 48); !ok {
+			t.Fatalf("§8l never drew.\nLast frame: %q", got)
+		}
+		// HOLD, then let the fake clock run out the delay: the shipped walk
+		// does exactly this (gui/multisig_build_walk_test.go:317-320), and a
+		// press with no sleep leaves the confirm at partial progress forever.
+		press(&ctx.Router, Button3)
+		frame()
+		time.Sleep(confirmDelay)
+		frame()
+
+		// (11) THE FORM CHOICE (§7f), offered because every slot is seated.
+		if got, ok = pumpUntil(frame, "Which form?", 48); !ok {
+			t.Fatalf("the engrave form choice never drew.\nLast frame: %q", got)
+		}
+		if !uiContains(got, "Template plus key cards") {
+			t.Errorf("form B is not offered on a fully seated composition.\nFrame: %q", got)
+		}
+		click(&ctx.Router, Down) // The policy itself -> Template plus key cards
+		click(&ctx.Router, Button3)
+
+		// (12) THE CENSUS, counting the md1 AND the minted key cards.
+		if got, ok = pumpUntil(frame, "This engraves", 64); !ok {
+			t.Fatalf("the plate census never drew.\nLast frame: %q", got)
+		}
+		if !uiContains(got, "mk1 key @0") {
+			t.Errorf("the census does not count the minted key cards; §7f says it counts "+
+				"CARD chunks too.\nFrame: %q", got)
+		}
+		// The BCH-versus-checksum line is on a later page of the census, which
+		// is the shipped confirmReviewScreen and pages as it always did.
+		if got, ok = composerPageUntil(t, ctx, frame, "error correction", 8); !ok {
+			t.Errorf("the census never says how recovery detects an error.\nLast frame: %q", got)
+		}
+	})
+}
+
+// composerPageUntil pages forward looking for a string, returning the frame it
+// was found on. Paging is forward-only with wrap, so a bounded number of
+// pages either finds it or proves it is not on the screen at all.
+func composerPageUntil(t *testing.T, ctx *Context, frame func() (string, bool), want string, pages int) (string, bool) {
+	t.Helper()
+	var last string
+	for i := 0; i < pages; i++ {
+		c, ok := frame()
+		if !ok {
+			return last, false
+		}
+		last = c
+		if uiContains(c, want) {
+			return c, true
+		}
+		click(&ctx.Router, Button2)
+	}
+	return last, false
+}
+
+// composerPageToEnd pages a composer read screen to its last page and
+// confirms.
+//
+// The checkmark is withheld until the last page has been laid out once (§7e's
+// proof is the addresses, and consenting before they are drawn is consenting
+// to a wallet nobody saw), so a walk has to page as an operator would.
+func composerPageToEnd(t *testing.T, ctx *Context, frame func() (string, bool)) {
+	t.Helper()
+	for i := 0; i < 12; i++ {
+		click(&ctx.Router, Button2)
+		if _, ok := frame(); !ok {
+			return
+		}
+	}
+	click(&ctx.Router, Button3)
+	frame()
+}
+
+// TestComposerNoPayloadWalkEngravesAKeylessTemplate is Part A's declared exit,
+// §12 item 3, WALKED.
+//
+// The test that carried this name before asserted only that the door drew. §12
+// item 3 asks for "door line present, shape, stub screen with per-slot
+// expected origins, consent stating no addresses, form choice collapsed,
+// keyless-template engrave whose md1 decodes" -- six clauses, of which one was
+// covered, by a separate artifact-level test.
+func TestComposerNoPayloadWalkEngravesAKeylessTemplate(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newEngravedAwarePlatform()
+		p.engraver = newEngraver()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		// NO payload at all: ctx.sysw stays nil, which is C26's whole case.
+
+		frame, quit := runUI(ctx, func() { walletPolicyFlow(ctx, &descriptorTheme) })
+		defer quit()
+
+		got, ok := pumpUntil(frame, "Build a new policy", 24)
+		if !ok {
+			t.Fatalf("the door never drew.\nLast frame: %q", got)
+		}
+		if !uiContains(got, composerCopyNoKeys()) {
+			t.Errorf("the door does not say the build will be key-less.\nFrame: %q", got)
+		}
+		if uiContains(got, "From payload") {
+			t.Errorf("From payload was offered with no payload loaded.\nFrame: %q", got)
+		}
+		click(&ctx.Router, Down) // Scan cards -> Build a new policy
+		click(&ctx.Router, Button3)
+
+		if got, ok = pumpUntil(frame, "Which script?", 24); !ok {
+			t.Fatalf("the wrapper picker never drew.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Down) // -> Segwit (wsh)
+		click(&ctx.Router, Button3)
+
+		// §7b's live line carries NO key count with no payload loaded.
+		if got, ok = pumpUntil(frame, "Add a spend path", 24); !ok {
+			t.Fatalf("the path list never drew.\nLast frame: %q", got)
+		}
+		if uiContains(got, "keys available") {
+			t.Errorf("the path list counts keys on a machine with no payload; §7b scopes "+
+				"that line to \"whenever a payload is loaded\".\nFrame: %q", got)
+		}
+		click(&ctx.Router, Button3) // Add a spend path
+
+		pumpUntil(frame, "What can spend on this path?", 24)
+		click(&ctx.Router, Button3) // Keys
+		pumpUntil(frame, "how many keys?", 24)
+		click(&ctx.Router, Down, Down) // 1 -> 3
+		click(&ctx.Router, Button3)
+		pumpUntil(frame, "how many must sign?", 24)
+		click(&ctx.Router, Down) // 1 -> 2
+		click(&ctx.Router, Button3)
+
+		if got, ok = pumpUntil(frame, "Path 1: 2-of-3", 24); !ok {
+			t.Fatalf("the path list does not show the new path.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Down, Down, Down)
+		click(&ctx.Router, Button3) // Done
+		pumpUntil(frame, "Sorted keys, or your order?", 24)
+		click(&ctx.Router, Button3) // Sorted
+
+		// THE STUB SCREEN, with a per-slot expected origin for every slot.
+		if got, ok = pumpUntil(frame, "mk1 stub (template)", 32); !ok {
+			t.Fatalf("the stub screen never drew.\nLast frame: %q", got)
+		}
+		// The per-slot "expects a key at" lines are pages in: the body grows
+		// one line per slot and the grammar admits 32, which is why §7c makes
+		// this a paged widget at all.
+		if got, ok = composerPageUntil(t, ctx, frame, "expects a key at", 10); !ok {
+			t.Fatalf("the stub screen never named an expected origin.\nLast frame: %q", got)
+		}
+		composerPageToEnd(t, ctx, frame)
+
+		// SEATING IS NOT OFFERED, because there is nothing to seat from; the
+		// operator is asked whether to engrave the key-less template.
+		if got, ok = pumpUntil(frame, "Seat keys into this template?", 32); !ok {
+			t.Fatalf("the key-less choice was never offered.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Button3) // Engrave a key-less template
+
+		// CONSENT, STATING NO ADDRESSES (D4).
+		if got, ok = composerPageUntil(t, ctx, frame, "Keyless template - no addresses", 12); !ok {
+			t.Fatalf("the consent never says there are no addresses.\nLast frame: %q", got)
+		}
+		composerPageToEnd(t, ctx, frame)
+
+		if got, ok = pumpUntil(frame, "Nothing outside this device", 48); !ok {
+			t.Fatalf("§8l never drew.\nLast frame: %q", got)
+		}
+		press(&ctx.Router, Button3)
+		frame()
+		time.Sleep(confirmDelay)
+		frame()
+
+		// THE FORM CHOICE COLLAPSED, and saying so is §7f's rule.
+		if got, ok = pumpUntil(frame, "No slot is seated", 48); !ok {
+			t.Fatalf("the collapsed form choice never said why it collapsed.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Button3)
+
+		if got, ok = pumpUntil(frame, "This engraves", 64); !ok {
+			t.Fatalf("the plate census never drew.\nLast frame: %q", got)
+		}
+		if !uiContains(got, "md1 template") {
+			t.Errorf("the census does not name the key-less template.\nFrame: %q", got)
+		}
+		if uiContains(got, "mk1 key") {
+			t.Errorf("a key-less composition cut a key card.\nFrame: %q", got)
+		}
+	})
+}
+
+// TestComposerBackAtThePathListKeepsTheComposition is §7b's rule, walked --
+// and before this the answer to "is any Back asserted by a test that would
+// fail if Back lost state" was no, for every one of them.
+func TestComposerBackAtThePathListKeepsTheComposition(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		frame, quit := runUI(ctx, func() { composerFlow(ctx, &descriptorTheme) })
+		defer quit()
+
+		pumpUntil(frame, "Which script?", 24)
+		click(&ctx.Router, Down)
+		click(&ctx.Router, Button3)
+		pumpUntil(frame, "Add a spend path", 24)
+		click(&ctx.Router, Button3)
+		pumpUntil(frame, "What can spend on this path?", 24)
+		click(&ctx.Router, Button3)
+		pumpUntil(frame, "how many keys?", 24)
+		click(&ctx.Router, Down)
+		click(&ctx.Router, Button3)
+		pumpUntil(frame, "how many must sign?", 24)
+		click(&ctx.Router, Button3)
+		got, ok := pumpUntil(frame, "Path 1: 1-of-2", 24)
+		if !ok {
+			t.Fatalf("the path was never added.\nLast frame: %q", got)
+		}
+
+		// BACK at the path list goes back ONE STEP, to the wrapper.
+		click(&ctx.Router, Button1)
+		if got, ok = pumpUntil(frame, "Which script?", 24); !ok {
+			t.Fatalf("Back at the path list did not land on the wrapper picker; it used "+
+				"to drop the whole composition.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Down)
+		click(&ctx.Router, Button3)
+
+		// ...and the list is still there.
+		if got, ok = pumpUntil(frame, "Path 1: 1-of-2", 24); !ok {
+			t.Fatalf("the path list lost its path across a Back; §7b's rule is that going "+
+				"back loses nothing.\nLast frame: %q", got)
+		}
+	})
+}
+
+// TestComposerKeylessConfirmFiresAgainForANewPathAtAReusedIndex is C16's
+// unskippable-confirm rule, and the reproduction is the one the fidelity lens
+// constructed: the confirm was memoised by path INDEX, and "Remove path"
+// splices the slice without touching the memo.
+func TestComposerKeylessConfirmFiresAgainForANewPathAtAReusedIndex(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		st := &composerState{list: md.PathList{Wrapper: md.ComposeWsh}, reg: &seedRegistry{}}
+		frame, quit := runUI(ctx, func() { composerShapeFlow(ctx, &descriptorTheme, st) })
+		defer quit()
+
+		add := func(which string) {
+			t.Helper()
+			pumpUntil(frame, "Add a spend path", 24)
+			// An empty list opens on "Add a spend path".
+			for i := 0; i < len(st.list.Paths); i++ {
+				click(&ctx.Router, Down)
+			}
+			click(&ctx.Router, Button3)
+			pumpUntil(frame, "What can spend on this path?", 24)
+			click(&ctx.Router, Down) // Keys -> A hash, no keys
+			click(&ctx.Router, Button3)
+			got, ok := pumpUntil(frame, "KEY-LESS PATH", 24)
+			if !ok {
+				t.Fatalf("%s: §8a did not fire for a key-less path -- an unskippable "+
+					"confirm that can be skipped is the defect §12 item 4 exists "+
+					"for.\nLast frame: %q", which, got)
+			}
+			// Decline it: the path is truncated and we are back at the list.
+			click(&ctx.Router, Button1)
+			frame()
+		}
+		add("first key-less path")
+		add("a second key-less path at the same index")
+	})
+}
+```
+
+- [ ] **Step 2: Run to verify they fail**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerEveryScreenFunction|^TestComposerWalkFromAKeyedPayload' ./gui/ 2>&1 | head -8`
+Expected: FAIL. `TestComposerEveryScreenFunctionHasAProductionCaller` names the dead functions verbatim (`composerSeatFlow`, `composerMappingReview`, `composerConsentFlow`, `composerFormPick`, `composerMintCards`, `composerCensusLines`, `composerShortfall`, `composerKeySources`, `composerCardSources`, `composerEngraveModePick`, `composerSeatingComplete`, `composerApplyShapeEdit`); the walk fails at `seating never drew -- this is the join: the payload's keys are loaded and no slot was ever offered.`
+
+- [ ] **Step 3: Replace `gui/composer_flow.go`**
+
+Replace `gui/composer_flow.go`:
+
+```go
+package gui
+
+import (
+	"fmt"
+	"slices"
+
+	"seedhammer.com/codex32"
+	"seedhammer.com/md"
+)
+
+// composerFlow is "Build a new policy" (SPEC_wallet_policy_composer.md §7),
+// from the door to the plate, in §7's order.
+//
+// THIS FUNCTION IS THE JOIN, and its absence was the defect two R0 lenses
+// found independently. Part B built fourteen production functions --
+// composerKeySources, composerCardSources, composerSeatFlow, composerShortfall,
+// composerMappingReview, composerConsentFlow, composerFormPick,
+// composerMintCards, composerCensusLines and the rest -- and nothing called
+// any of them, so an operator with four `key:` records in flash read the
+// door's "Keys loaded: 4", chose Build, and was never offered a slot. §7e's
+// self-check and §8q never executed on a shipped device; §7f's form choice,
+// card minting and the census's card-chunk count were unreachable; and §7b's
+// live line read `keys available: 0` whatever the payload held. Go does not
+// error on an unused package-scope function, and every TestComposer* called
+// these directly, so nothing was red. The lesson is recorded in memory as
+// "plans list components and omit the call that joins them"; the gate against
+// it is composerFlowWalk's flow-level test and the reachability test beside it.
+//
+// THE SCRUB IS INSTALLED HERE, at the top, before any seed can exist -- the
+// same construction gui/multisig_build.go:290-291 uses, so every exit below (a
+// Back, a refusal, a ctx.Done unwind, a panic) is covered without an
+// implementer remembering to add one to a new return (C14).
+func composerFlow(ctx *Context, th *Colors) {
+	st := &composerState{reg: &seedRegistry{}, bound: composerBoundFrom(ctx.sysw)}
+	defer st.reg.scrub()
+
+	// SOURCES ARE LOADED BEFORE THE SHAPE, so §7b's live line
+	// ("slots: N / keys available: M") is right from the first frame. Loading
+	// them at seating time would make the line that helps the operator SIZE the
+	// policy read zero for the whole of the decision it exists to inform.
+	st.sources = append(composerKeySources(ctx), composerCardSources(ctx)...)
+
+	w, ok := composerWrapperPick(ctx, th)
+	if !ok {
+		return
+	}
+	st.list.Wrapper = w
+
+	var shown []string // the chunk set the stub screen last displayed (§8s)
+	for !ctx.Done {
+		if !composerShapeFlow(ctx, th, st) {
+			// BACK AT THE PATH LIST GOES BACK ONE STEP, to the wrapper, with
+			// the list intact -- §7b's "going back should lose nothing". It
+			// used to return, dropping the wrapper, every path, every lock and
+			// every digest.
+			w, ok := composerWrapperPick(ctx, th)
+			if !ok {
+				return
+			}
+			st.list.Wrapper = w
+			continue
+		}
+		composerSizeAssignments(st)
+
+		template, err := composerTemplateChunksFor(st)
+		if err != nil {
+			composerShowRefusal(ctx, th, "Template", err)
+			continue
+		}
+		// §8s's changed-id line is decided by COMPARING CHUNK SETS, not by an
+		// "edited" flag. The flag was set on any Back out of the stub screen,
+		// the consent or §8l and never reset, so re-reaching the stub screen
+		// without touching the shape asserted that the id had changed -- a
+		// false statement on the screen whose job is to be copied onto steel,
+		// which trains the operator to discount the line that will one day be
+		// true.
+		changed := shown != nil && !slices.Equal(shown, template)
+		if !composerStubFlow(ctx, th, template, nil, changed) {
+			shown = template
+			continue
+		}
+		shown = template
+
+		if !composerSeatingStep(ctx, th, st) {
+			continue
+		}
+		template, keyed, err := composerArtifactsFor(st)
+		if err != nil {
+			composerShowRefusal(ctx, th, "Template", err)
+			continue
+		}
+		if len(keyed) > 0 && !composerStubFlow(ctx, th, template, keyed, false) {
+			continue
+		}
+		consent := template
+		if len(keyed) > 0 {
+			consent = keyed
+		}
+		if !composerConsentFlow(ctx, th, st, consent) {
+			continue
+		}
+		if composerEngraveStep(ctx, th, st, template, keyed) {
+			return
+		}
+	}
+}
+
+// composerSizeAssignments sizes st.assigned to the shape's slot count AT FLOW
+// LEVEL, not at seating entry.
+//
+// Sizing it only inside composerSeatFlow left a composition that never entered
+// seating -- C26's key-less template, §12 item 3 -- failing composerSelfCheck
+// on slot count alone. An unseated slot is src == -1, never a zero value: zero
+// would read as "seated from source 0".
+func composerSizeAssignments(st *composerState) {
+	n := composerSlotCount(st.list)
+	if len(st.assigned) == n {
+		return
+	}
+	st.assigned = make([]composerAssignment, n)
+	for i := range st.assigned {
+		st.assigned[i].src = -1
+	}
+}
+
+// composerDeclaredOrigins projects the seating onto md.ComposeWith's input.
+// An unseated slot declares nothing and the codec assigns §4f's lowest free
+// account for it.
+func composerDeclaredOrigins(st *composerState) []*md.SlotOrigin {
+	out := make([]*md.SlotOrigin, len(st.assigned))
+	for i, a := range st.assigned {
+		if a.src < 0 {
+			continue
+		}
+		out[i] = &md.SlotOrigin{Origin: a.origin, Fingerprint: a.fingerprint, FpPresent: a.fpPresent}
+	}
+	return out
+}
+
+// composerTemplateChunksFor emits the keyless template for the current shape
+// and seating.
+func composerTemplateChunksFor(st *composerState) ([]string, error) {
+	c, err := md.ComposeWith(st.list, composerDeclaredOrigins(st))
+	if err != nil {
+		return nil, err
+	}
+	return c.Chunks()
+}
+
+// composerArtifactsFor emits the template AND, when every slot is seated, the
+// keyed policy.
+//
+// COMPOSED TWICE, NOT COPIED: md.Composed's own doc says a copy shares the
+// underlying descriptor, so Bind on one keys them both -- and a "template"
+// that had been keyed by its own policy is not a template.
+func composerArtifactsFor(st *composerState) (template, keyed []string, err error) {
+	declared := composerDeclaredOrigins(st)
+	ct, err := md.ComposeWith(st.list, declared)
+	if err != nil {
+		return nil, nil, err
+	}
+	if template, err = ct.Chunks(); err != nil {
+		return nil, nil, err
+	}
+	if !composerSeatingComplete(st) {
+		return template, nil, nil
+	}
+	pub := map[uint8][65]byte{}
+	fps := map[uint8][4]byte{}
+	for i, a := range st.assigned {
+		cc, pk, _, derr := decodeXpubBytes(a.xpub)
+		if derr != nil {
+			return nil, nil, derr
+		}
+		var b [65]byte
+		copy(b[0:32], cc[:])
+		copy(b[32:65], pk[:])
+		pub[uint8(i)] = b
+		if a.fpPresent {
+			fps[uint8(i)] = a.fingerprint
+		}
+	}
+	ck, err := md.ComposeWith(st.list, declared)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := ck.Bind(pub, fps); err != nil {
+		return nil, nil, err
+	}
+	if keyed, err = ck.Chunks(); err != nil {
+		return nil, nil, err
+	}
+	return template, keyed, nil
+}
+
+// composerSeatingStep is §7d: seat every slot, or take §8p's exit.
+//
+// Offered only when the payload holds keys or seeds, or the operator asks to
+// type one -- §7d's own condition. With nothing to seat from, a key-less
+// template is the C26 answer and the flow goes straight on.
+func composerSeatingStep(ctx *Context, th *Colors, st *composerState) bool {
+	if len(st.sources) == 0 {
+		cs := &ChoiceScreen{
+			Title:   "Keys",
+			Lead:    "Seat keys into this template?",
+			Choices: []string{"Engrave a key-less template", "Type a seed"},
+		}
+		sel, ok := cs.Choose(ctx, th)
+		if !ok {
+			return false
+		}
+		if sel == 0 {
+			return true
+		}
+		src, ok := composerSeedSource(ctx, th, st)
+		if !ok {
+			return false
+		}
+		st.sources = append(st.sources, src)
+	}
+	if !composerSeatFlow(ctx, th, st) {
+		return false
+	}
+	if !composerSeatingComplete(st) && !composerShortfall(ctx, th, st) {
+		return false
+	}
+	return composerMappingReview(ctx, th, st)
+}
+
+// composerEngraveStep is §7f: the form choice, then what it implies.
+func composerEngraveStep(ctx *Context, th *Colors, st *composerState, template, keyed []string) bool {
+	form, ok := composerFormPick(ctx, th, st)
+	if !ok {
+		return false
+	}
+	var cards []bundleCard
+	switch form {
+	case composerFormConcrete:
+		// FORM A IS THE KEYED md1, and only that, this cycle. §7f also names
+		// "plain-text plates" and "QR plates" of the concrete descriptor, and
+		// md DELIBERATELY EMITS NO TEXT: "a rendering that cannot be re-parsed
+		// is the defect this package's invariant exists to prevent"
+		// (md/compose.go's header). Adding a descriptor renderer is normative
+		// and lands in Rust first, so it is filed (F-457) rather than invented
+		// here. composerDescriptorCeilingChars stays as §13 item 1's
+		// measurement, which is what that number was asked for.
+		cards = []bundleCard{{
+			kind: cardMD1, label: "md1 policy", strings: keyed,
+			summary: "the wallet policy, with its keys",
+		}}
+	default:
+		cards = []bundleCard{{
+			kind: cardMD1, label: "md1 template", strings: template,
+			summary: "key-less wallet policy",
+		}}
+		minted, err := composerMintCards(st, template, keyed)
+		if err != nil {
+			showError(ctx, th, "Key cards", "Couldn't mint a key card for a seated slot.")
+			return false
+		}
+		cards = append(cards, minted...)
+	}
+
+	// FULL vs WATCH-ONLY, and only where a seed is actually held: the question
+	// is meaningless when no slot came from one.
+	if st.reg.count() > 0 {
+		full, ok := composerEngraveModePick(ctx, th, st)
+		if !ok {
+			return false
+		}
+		if full {
+			secrets, err := composerSecretCards(st)
+			if err != nil {
+				showError(ctx, th, "Secret plates", "Couldn't encode a seed as ms1.")
+				return false
+			}
+			cards = append(secrets, cards...)
+		}
+	}
+
+	if !confirmReviewScreen(ctx, th, "Plate Count",
+		composerCensusLines(ctx.Platform.EngraverParams(), cards)) {
+		return false
+	}
+	return bundleEngrave(ctx, th, "Wallet Policy", cards, "", "") == bundleEngraveDone
+}
+
+// composerSecretCards is §7f's "a seed that filled several slots is cut ONCE".
+//
+// THE DEDUP IS BY REGISTERED SEED, not by slot: one seed at three slots is one
+// secret, and cutting it three times would triple the bearer plates in the set
+// for no recovery value. The form is ms1, which is what the bundle machinery
+// carries (cardMS1, gui/multisig_engrave.go:36) and what Multisig Build's own
+// Full mode cuts. The words-plus-SeedQR plate is a backup.Seed, not a bundle
+// card, and needs its own plate pass; it is filed with F-455 rather than
+// offered by a picker with no builder behind it.
+func composerSecretCards(st *composerState) ([]bundleCard, error) {
+	seen := map[int]bool{}
+	var out []bundleCard
+	for _, a := range st.assigned {
+		if a.src < 0 || a.src >= len(st.sources) {
+			continue
+		}
+		src := st.sources[a.src]
+		if src.kind != composerSourceSeed || seen[src.seedID] {
+			continue
+		}
+		seen[src.seedID] = true
+		seed, ok := st.reg.at(src.seedID)
+		if !ok {
+			continue
+		}
+		entropy := seed.Mnemonic.Entropy()
+		ms1, err := codex32.EncodeMS1(entropy)
+		wipeBytes(entropy)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, bundleCard{
+			kind:    cardMS1,
+			label:   fmt.Sprintf("ms1 secret share %d", len(out)+1),
+			strings: []string{ms1},
+			summary: "secret seed backup",
+		})
+	}
+	return out, nil
+}
+```
+
+- [ ] **Step 4: Loop the door in `gui/wallet_policy.go`**
+
+Back at the wrapper picker made `composerFlow` return and `walletPolicyFlow` return with it, so the first Back inside Build dropped the operator to the carousel rather than to the door one level up. Wrap the door dispatch in a loop:
+
+In `gui/wallet_policy.go`, replace:
+
+```go
+	route, ok := composerDoorFlow(ctx, th)
+	if !ok {
+		return
+	}
+	if route == composerRouteBuild {
+		composerFlow(ctx, th)
+		return
+	}
+```
+
+with:
+
+```go
+	// THE DOOR IS A LOOP, so Back out of Build lands on the door rather than
+	// on the carousel: Build is one level down from the door, and every other
+	// Back on this device steps back one level.
+	var route composerRoute
+	for {
+		var ok bool
+		route, ok = composerDoorFlow(ctx, th)
+		if !ok {
+			return
+		}
+		if route != composerRouteBuild {
+			break
+		}
+		composerFlow(ctx, th)
+	}
+```
+
+- [ ] **Step 5: Run the tests**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerEveryScreenFunction|^TestComposerWalk|^TestComposerNoPayloadWalk|^TestComposerBackAtThePathList|^TestComposerKeylessConfirmFires' -v ./gui/ 2>&1 | grep -E '^(--- |ok|FAIL)'`
+Expected: five PASS, `ok seedhammer.com/gui`, and the reachability test logs its two named exemptions (`composerDescriptorPlateFits`, `composerDescriptorCeilingChars`). The test exempts both by name because it scans only `composer*` declarations and would otherwise have to re-derive the call chain; the gate's own step, which counts references, reports only the one at the top of it.
+
+Then the gate's own reachability step:
+
+Run: `FORK_REPO=/scratch/code/shibboleth/seedhammer SCRATCH=/scratch/code/shibboleth/.plan-build-gate-go-s3 scripts/plan-build-gate-go.sh design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md 2>&1 | sed -n '/== 8 --/,$p'`
+Expected: the DEAD-IN-PROD step prints **no `gui/` survivor**.
+
+- [ ] **Step 6: gofmt, commit**
+
+```bash
+gofmt -l gui/ && CGO_ENABLED=0 go test -count=1 ./gui/ 2>&1 | tail -2
+git add gui/composer_flow.go gui/composer_join_test.go gui/wallet_policy.go
+git commit -s -F - <<'MSG'
+gui: join the composer -- sources, seating, mapping review, consent, forms, minting and census, in section 7's order (composer S3 task B11)
+
+Part B declared fourteen production functions and nothing called any of them,
+so an operator with four key: records met a Build that never offered a slot
+and section 7e's self-check never ran on a device. Go does not error on an
+unused package-scope function and every test called them directly, so the
+suite was green over an unreachable feature. A structural scan and a
+flow-level walk now fail on that class.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
+MSG
+```
+
 ---
+
 
 # PART C -- the measurements, the spec folds, and the gates CI runs
+
+### Task C0: `gui/composer_gates_test.go` -- §12 item 5's missing gates, and every mutation the tests lens survived
+
+**Files:**
+- Create: `gui/composer_gates_test.go`
+
+**Interfaces:**
+- Consumes: `assertModalBodyFits`/`errorScreenBody`/`bodyDrawnFully`/`normalizeDrawn`/`tailOf` (`gui/modal_fits_test.go`), `assertFrameHasBody`/`titleOnlyInk` (`gui/raster_test.go:80`, `gui/multisig_build_walk_test.go:86`), the composer's own screens and copy.
+- Produces: the §8m, §8c and §8r gates §12 item 5 requires, and one test per mutation the tests lens found survivable, each naming its mutation in a comment.
+
+**WHAT WAS MISSING, MEASURED.** §12 item 5 asks for the glyph check, the raster floor, the modal-fits assertion and a fires-on-condition test on EVERY §8 body. Enumerated over the wired copy: **§8m's five structural refusals had no modal-fits assertion and were never drawn onto a frame; §8c's seven echo and bound lines were asserted at string level only; §8r's six door lines had one line driven.** All are drawn through `showError` or the door's lead -- the surfaces `assertModalBodyFits` measures -- so there was no paged-screen carve-out for them.
+
+**AND ONE THING THE INSTRUMENT CANNOT DO, stated rather than worked around.** `assertModalBodyFits` renders through `firstModalFrame`, which REFUSES a frame under `buildWalkRasterFloor` so a blanked modal is never mistaken for a fitting one. A twelve-character body like `Block 905000` draws **5,166 ink pixels against a 6,000 floor** -- the guard fires on a genuinely small body. So §8c's echoes and §8r's lines are asserted on the surface the operator actually meets them on (the echo screen, the door), with `bodyDrawnFully` -- the same comparator `assertModalBodyFits` uses -- and the raster floor applied to the whole frame, which is what it was written for. A single-line echo is held to `titleOnlyInk` (the chrome), not to `assertFrameHasBody`'s chrome-plus-margin: measured, `1000 blocks (about 6.9 days)` draws 5,669 against that floor's 5,982.
+
+**Every mutation the tests lens ran and survived has a test here, with the mutation named in the comment above it** -- their C-4 (the door's `ClassMDMK` branch), C-6 (the §4e gate inside `composerShapeFlow`), C-8 (`composerLockAccept`'s bounds at the screen), C-9 (the §8s re-show signal), C-10 (`composerStubLines` with `keyedChunks` set), C-11 and C-13 (the mapping review's invariant refusal and its C29 line, both at the SCREEN rather than in the helper), C-12 (`composerShortfall`'s counts at the call site), and I-1 (`composerHexEntry`'s exact-64 bound, which was "covered" only by `hex.DecodeString` rejecting ODD lengths -- 62 characters decode fine and are still not a digest).
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `gui/composer_gates_test.go`:
+
+```go
+package gui
+
+import (
+	"encoding/hex"
+	"slices"
+	"strings"
+	"testing"
+	"testing/synctest"
+
+	"seedhammer.com/md"
+	"seedhammer.com/sysw"
+)
+
+// hexDecodeForTest is hex.DecodeString under a name that says why it is here:
+// the tests-lens found that composerHexEntry's exact-64 bound was "covered"
+// only by hex.DecodeString rejecting ODD lengths, which is a different
+// property. 62 characters decode fine and are still not a digest.
+func hexDecodeForTest(s string) ([]byte, error) { return hex.DecodeString(s) }
+
+// mdmkCardRecords is a complete mk1 card as payload records, for the door's
+// ClassMDMK branch -- which every earlier door fixture reached through
+// ClassDescriptor instead, making the branch a false PASS.
+func mdmkCardRecords(t *testing.T) []string {
+	t.Helper()
+	st, template, keyed := composerCardFixture(t)
+	strs, err := composerMintCard(st, 0, template, keyed)
+	if err != nil {
+		t.Fatalf("composerMintCard: %v", err)
+	}
+	return strs
+}
+
+// ═══ §12 item 5's gates, for the three sections that had none ═══════════════
+//
+// Measured before this file: §8m's five structural refusals had NO modal-fits
+// assertion and were never drawn onto a frame; §8c's seven echo and bound
+// lines were asserted at string level only; §8r's six door lines had one line
+// driven, in the door walk. All three are drawn through showError or through
+// the door's lead, i.e. exactly the surfaces assertModalBodyFits measures, so
+// there is no paged-screen carve-out for them.
+
+func TestComposerSection8mRefusalsAllFitAndDraw(t *testing.T) {
+	bodies := []struct{ what, body string }{
+		{"§8m no keyed path", composerCopyRefuseNoKeyedPath()},
+		{"§8m lock-only path", composerCopyRefuseLockOnly()},
+		{"§8m key-less under tr", composerCopyRefuseKeylessTr()},
+		{"§8m legacy wrapper shape", composerCopyRefuseLegacyShape()},
+		{"§8m slot cap", composerCopyRefuseSlotCap()},
+	}
+	for _, b := range bodies {
+		assertModalBodyFits(t, b.what, errorScreenBody, b.body)
+	}
+	// AND ONE IS DRIVEN ONTO A FRAME through the real refusal path, so the
+	// mapping test above is not the only thing standing between §4e and the
+	// operator.
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		digest := [32]byte{0x11}
+		list := md.PathList{Wrapper: md.ComposeTr, Paths: []md.SpendPath{
+			{Keys: &md.KeySet{K: 1, N: 1}}, {Hash: &digest},
+		}}
+		_, err := md.ValidatePathList(list)
+		if err == nil {
+			t.Fatal("the fixture shape is legal, so no refusal can draw")
+		}
+		frame, _, ink, quit := runUITouchRaster(ctx, func() {
+			composerShowRefusal(ctx, &descriptorTheme, "Spend paths", err)
+		})
+		defer quit()
+		got, ok := frame()
+		if !ok {
+			t.Fatal("the refusal drew no frame")
+		}
+		assertFrameHasBody(t, ink(), "the §8m key-less-under-tr refusal")
+		if !uiContains(got, "will not put a key-less path in taproot") {
+			t.Errorf("the drawn refusal is not §8m line 3.\nFrame: %q", got)
+		}
+	})
+}
+
+// composerAssertDrawnInFull is assertModalBodyFits' contract for a body too
+// SHORT to satisfy its harness.
+//
+// MEASURED: firstModalFrame refuses a frame under buildWalkRasterFloor, and a
+// twelve-character line like "Block 905000" draws 5,166 ink pixels against a
+// 6,000 floor -- the guard that exists to catch a BLANKED modal fires on a
+// genuinely small one. §12 item 5 asks that every §8 body be drawn in full on
+// the surface the operator meets it on, and for these two sections that
+// surface is not showError: §8c's echoes are a LIST on the composer's read
+// screen and §8r's lines are the door's LEAD. So they are asserted there, with
+// bodyDrawnFully -- the same comparator assertModalBodyFits uses -- and the
+// raster floor is applied to the whole frame, which is what it was written
+// for.
+func composerAssertDrawnInFull(t *testing.T, what, drawn, body string) {
+	t.Helper()
+	ok, drew, want := bodyDrawnFully(drawn, body)
+	if !ok {
+		t.Errorf("%s: the screen draws %d of the body's %d characters.\ncut after: ...%s",
+			what, drew, want, tailOf(normalizeDrawn(body)[:drew], 48))
+	}
+}
+
+// TestComposerSection8cEchoesAllDrawOnTheirOwnScreen is §12 item 5 for §8c,
+// on the surface §6b puts them on: the echo screen the operator confirms.
+func TestComposerSection8cEchoesAllDrawOnTheirOwnScreen(t *testing.T) {
+	packed := composerBound{seconds: 1788220800, hasBound: true}
+	withHeight := composerBound{seconds: 1788220800, height: 905000, hasBound: true, hasHeight: true}
+	for _, tc := range []struct {
+		what string
+		lock md.Lock
+		b    composerBound
+	}{
+		{"§8c relative days echo", md.Lock{Kind: md.LockOlderUnits, Value: 15188}, composerBound{}},
+		{"§8c relative blocks echo", md.Lock{Kind: md.LockOlderBlocks, Value: 1000}, composerBound{}},
+		{"§8c height echo with a packed height", md.Lock{Kind: md.LockAfterHeight, Value: 905001}, withHeight},
+		{"§8c date echo with a packed date", md.Lock{Kind: md.LockAfterTime, Value: 1803859200}, packed},
+		{"§8c date echo with no bound at all", md.Lock{Kind: md.LockAfterTime, Value: 1803859200}, composerBound{}},
+	} {
+		t.Run(tc.what, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				lines := composerLockEcho(tc.lock, tc.b)
+				p := newPlatform()
+				p.display = sh2DisplaySize
+				ctx := NewContext(p)
+				frame, _, ink, quit := runUITouchRaster(ctx, func() {
+					composerReadScreen(ctx, &descriptorTheme, "Time lock", lines)
+				})
+				defer quit()
+				got, ok := frame()
+				if !ok {
+					t.Fatal("the echo screen drew no frame")
+				}
+				// THE CHROME FLOOR, NOT assertFrameHasBody's. MEASURED: a
+				// single-line echo ("1000 blocks (about 6.9 days)") draws
+				// 5,669 ink pixels against assertFrameHasBody's 5,982, whose
+				// margin is calibrated for a screen with a paragraph on it.
+				// The property that matters here is that something drew BEYOND
+				// the chrome, and titleOnlyInk is exactly that number --
+				// searched over 1..3 nav buttons, so it tracks the chrome
+				// rather than a constant.
+				if blank := titleOnlyInk(t); ink() <= blank {
+					t.Errorf("%s drew %d ink pixels against a body-less frame's %d -- "+
+						"nothing of the echo reached the screen", tc.what, ink(), blank)
+				}
+				for _, l := range lines {
+					composerAssertDrawnInFull(t, tc.what, got, l)
+				}
+			})
+		})
+	}
+}
+
+// TestComposerSection8rDoorLinesAllDrawOnTheDoor is §12 item 5 for §8r, on
+// the door itself -- every key state, not the one the door walk happened to
+// use.
+func TestComposerSection8rDoorLinesAllDrawOnTheDoor(t *testing.T) {
+	for _, tc := range []struct {
+		what    string
+		session *syswSession
+		inFlash bool
+	}{
+		{"keys only", composerSessionWith([]string{composerTestKeyRecord, composerTestKeyRecord2}, nil), false},
+		{"keys and a seed", composerSessionWith([]string{composerTestKeyRecord}, []string{composerTestMnemonicRecord}), false},
+		{"a seed alone", composerSessionWith(nil, []string{composerTestMnemonicRecord}), false},
+		{"nothing loaded", composerSessionWith(nil, nil), false},
+		{"records not understood", composerSessionWith([]string{composerTestKeyRecord, "hash:zz"}, nil), false},
+	} {
+		t.Run(tc.what, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				p := newPlatform()
+				p.display = sh2DisplaySize
+				ctx := NewContext(p)
+				ctx.sysw = tc.session
+				frame, _, ink, quit := runUITouchRaster(ctx, func() {
+					composerDoorFlow(ctx, &descriptorTheme)
+				})
+				defer quit()
+				got, ok := pumpUntil(frame, "Build a new policy", 16)
+				if !ok {
+					t.Fatalf("the door never drew.\nLast frame: %q", got)
+				}
+				assertFrameHasBody(t, ink(), "the door, "+tc.what)
+				for _, l := range composerDoorLines(tc.session, tc.inFlash) {
+					composerAssertDrawnInFull(t, tc.what, got, l)
+				}
+			})
+		})
+	}
+	// The one line no session can produce, since it describes an UNLOADED
+	// payload: asserted on the door with no session at all.
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		frame, _, ink, quit := runUITouchRaster(ctx, func() { composerDoorFlow(ctx, &descriptorTheme) })
+		defer quit()
+		got, ok := pumpUntil(frame, "Build a new policy", 16)
+		if !ok {
+			t.Fatalf("the door never drew.\nLast frame: %q", got)
+		}
+		assertFrameHasBody(t, ink(), "the door, no session")
+		composerAssertDrawnInFull(t, "§8r no keys", got, composerCopyNoKeys())
+	})
+}
+
+// TestComposerReadScreenWithholdsTheCheckmarkUntilTheLastPage is §7e's proof
+// rule, and it replaces an ink comparison that could not fail.
+//
+// The old pager test compared total frame ink between a 1-line and a 64-line
+// body and concluded the pager made the difference -- but ink is dominated by
+// the body rows, so it passed whether the pager was drawn always, never, or
+// correctly. This asserts the BEHAVIOUR instead: on a body that needs a second
+// page, Button3 on the first frame does nothing; on a one-page body it
+// returns at once. Both directions can fail.
+func TestComposerReadScreenWithholdsTheCheckmarkUntilTheLastPage(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		done := false
+		frame, quit := runUI(ctx, func() {
+			composerReadScreen(ctx, &descriptorTheme, "Read", composerNumberedLines(64))
+			done = true
+		})
+		defer quit()
+		if _, ok := frame(); !ok {
+			t.Fatal("no frame")
+		}
+		click(&ctx.Router, Button3)
+		for i := 0; i < 4; i++ {
+			if _, ok := frame(); !ok {
+				break
+			}
+		}
+		if done {
+			t.Fatal("a 64-line consent was confirmed from its FIRST page; §7e's addresses " +
+				"are the only proof of which wallet this is, and they are pages in")
+		}
+		for i := 0; i < 12 && !done; i++ {
+			click(&ctx.Router, Button2)
+			frame()
+		}
+		click(&ctx.Router, Button3)
+		for i := 0; i < 4 && !done; i++ {
+			frame()
+		}
+		if !done {
+			t.Error("after paging to the end the checkmark still did not confirm")
+		}
+	})
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		done := false
+		frame, quit := runUI(ctx, func() {
+			composerReadScreen(ctx, &descriptorTheme, "Read", []string{"only line"})
+			done = true
+		})
+		defer quit()
+		frame()
+		click(&ctx.Router, Button3)
+		for i := 0; i < 4 && !done; i++ {
+			frame()
+		}
+		if !done {
+			t.Error("a ONE-page screen withheld its checkmark; the gate is about pages the " +
+				"operator has not seen, not about making them press twice")
+		}
+	})
+}
+
+// TestComposerPickScreenNeverReturnsARowItDidNotDraw is the wrap clamp.
+//
+// On Button2 the page advances or wraps to start = 0, and the only clamp was
+// upward -- so after a wrap the cursor could sit on a row belonging to a later
+// page: that frame drew NO highlight and Button3 returned the invisible row,
+// seating a key the operator never saw selected.
+func TestComposerPickScreenNeverReturnsARowItDidNotDraw(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		rows := composerNumberedLines(20)
+		var got int
+		var ok bool
+		frame, quit := runUI(ctx, func() {
+			got, ok = composerPickScreen(ctx, &descriptorTheme, "Pick", "Choose one", rows)
+		})
+		defer quit()
+		frame()
+		// Walk the cursor to the last row, then WRAP with the pager.
+		for i := 0; i < len(rows); i++ {
+			click(&ctx.Router, Down)
+			frame()
+		}
+		for i := 0; i < 6; i++ {
+			click(&ctx.Router, Button2)
+			frame()
+		}
+		content, _ := frame()
+		click(&ctx.Router, Button3)
+		for i := 0; i < 4; i++ {
+			if _, more := frame(); !more {
+				break
+			}
+		}
+		if !ok {
+			t.Fatal("the pick screen returned no selection")
+		}
+		if got < 0 || got >= len(rows) {
+			t.Fatalf("the pick screen returned row %d, outside 0..%d", got, len(rows)-1)
+		}
+		if !uiContains(content, rows[got]) {
+			t.Errorf("the pick screen returned row %d (%q), which was NOT on the frame the "+
+				"operator confirmed.\nFrame: %q", got, rows[got], content)
+		}
+	})
+}
+
+// TestComposerConsentNumbersPathsAsTheOperatorListedThem is fidelity I-2:
+// PolicyShape.Branches are LEAVES, and a taproot internal key is reported
+// through KeyPath rather than as a Branch -- so a consent that numbered
+// branches called the operator's Path 2 "Path 1", while the seating prompt for
+// the same slot said "Path 2".
+func TestComposerConsentNumbersPathsAsTheOperatorListedThem(t *testing.T) {
+	list := md.PathList{Wrapper: md.ComposeTr, Paths: []md.SpendPath{
+		{Keys: &md.KeySet{K: 1, N: 1}},
+		{Keys: &md.KeySet{K: 2, N: 3, Sorted: true}},
+	}}
+	c, err := md.Compose(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chunks, err := c.Chunks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	internal, extracted := c.InternalKeyPath()
+	if !extracted {
+		t.Fatal("the fixture does not extract an internal key, so it cannot show the defect")
+	}
+	// The leaf list with the extracted path removed, in listed order: exactly
+	// what composerLeafPaths computes for the self-check.
+	var listed []int
+	for i := range list.Paths {
+		if i == internal {
+			continue
+		}
+		listed = append(listed, i+1)
+	}
+	lines, err := composerConsentLinesFor(chunks, listed, internal+1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "Path 2: 2-of-3") {
+		t.Errorf("the consent calls the operator's Path 2 something else:\n%s", joined)
+	}
+	if strings.Contains(joined, "Path 1: 2-of-3") {
+		t.Errorf("the consent numbers branches rather than the operator's paths, so it "+
+			"disagrees with the seating prompt about which path is which:\n%s", joined)
+	}
+	if !strings.Contains(joined, "Key-path (Path 1)") {
+		t.Errorf("the key-path line does not name the listed path it came from:\n%s", joined)
+	}
+}
+
+// ═══ The mutation lens's survivors, each with the mutation named ════════════
+
+// TestComposerDoorOffersFromPayloadForACardPayload is tests-lens C-4.
+// MUTATION: drop the ClassMDMK branch of composerDoorHasConsumablePolicy.
+// It was a false PASS because every door fixture held a Descriptor.
+func TestComposerDoorOffersFromPayloadForACardPayload(t *testing.T) {
+	s := composerSessionWith(mdmkCardRecords(t), nil)
+	if !s.has(sysw.ClassMDMK) {
+		t.Fatal("INCONCLUSIVE: the card fixture does not classify as ClassMDMK")
+	}
+	if s.has(sysw.ClassDescriptor) {
+		t.Fatal("INCONCLUSIVE: the card fixture also holds a Descriptor, so this test " +
+			"would pass through the other branch")
+	}
+	if !composerDoorHasConsumablePolicy(s) {
+		t.Error("a payload holding an md1/mk1 card is not offered the From payload route; " +
+			"§7a offers it for a Descriptor OR an md1/mk1 record")
+	}
+}
+
+// TestComposerShapeRefusalGateIsReachedFromTheScreen is tests-lens C-6.
+// MUTATION: delete composerShapeFlow's ValidatePathList gate. The mapping test
+// checked composerRefusalBody only; nothing drove Done on an illegal shape.
+func TestComposerShapeRefusalGateIsReachedFromTheScreen(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		digest := [32]byte{0x77}
+		// One key-less path under wsh: legal to BUILD, refused at Done because
+		// §4e's first row needs a path with keys.
+		st := &composerState{list: md.PathList{Wrapper: md.ComposeWsh, Paths: []md.SpendPath{
+			{Hash: &digest},
+		}}, reg: &seedRegistry{}}
+		done := false
+		frame, quit := runUI(ctx, func() {
+			composerShapeFlow(ctx, &descriptorTheme, st)
+			done = true
+		})
+		defer quit()
+		got, ok := pumpUntil(frame, "Path 1: hash only", 24)
+		if !ok {
+			t.Fatalf("the path list never drew.\nLast frame: %q", got)
+		}
+		click(&ctx.Router, Down, Down, Down) // path 1 -> Add -> Change script -> Done
+		click(&ctx.Router, Button3)
+		got, ok = pumpUntil(frame, "at least one path with a key", 24)
+		if !ok {
+			t.Fatalf("Done on a key-less-only list did not refuse with §8m line 1.\n"+
+				"Last frame: %q", got)
+		}
+		if done {
+			t.Error("the shape flow RETURNED on a shape §4e refuses")
+		}
+	})
+}
+
+// TestComposerLockAcceptRefusesFromTheScreen is tests-lens C-8.
+// MUTATION: make composerLockAccept return true unconditionally. Only
+// md.Lock.Check and the pure parsers were tested; the screen's own gate was not.
+func TestComposerLockAcceptRefusesFromTheScreen(t *testing.T) {
+	b := composerBound{seconds: 1788220800, height: 905000, hasBound: true, hasHeight: true}
+	for _, tc := range []struct {
+		what string
+		lock md.Lock
+	}{
+		{"a block count past §4c's ceiling", md.Lock{Kind: md.LockOlderBlocks, Value: 65536}},
+		{"zero time units, which md itself still accepts", md.Lock{Kind: md.LockOlderUnits, Value: 0}},
+		{"a date before the payload was packed", md.Lock{Kind: md.LockAfterTime, Value: 1788220799}},
+		{"a height below the packed height", md.Lock{Kind: md.LockAfterHeight, Value: 904999}},
+	} {
+		t.Run(tc.what, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				p := newPlatform()
+				p.display = sh2DisplaySize
+				ctx := NewContext(p)
+				var accepted bool
+				frame, quit := runUI(ctx, func() {
+					accepted = composerLockAccept(ctx, &descriptorTheme, tc.lock, b)
+				})
+				defer quit()
+				for i := 0; i < 6; i++ {
+					if _, ok := frame(); !ok {
+						break
+					}
+				}
+				if accepted {
+					t.Errorf("composerLockAccept ACCEPTED %s", tc.what)
+				}
+			})
+		})
+	}
+	// The CONTROL: a legal lock is accepted, so the four refusals above are the
+	// gate and not a function that refuses everything.
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		var accepted bool
+		frame, quit := runUI(ctx, func() {
+			accepted = composerLockAccept(ctx, &descriptorTheme,
+				md.Lock{Kind: md.LockOlderBlocks, Value: 1000}, b)
+		})
+		defer quit()
+		frame()
+		if !accepted {
+			t.Error("INCONCLUSIVE: a legal 1000-block lock was refused")
+		}
+	})
+}
+
+// TestComposerStubLinesLabelASeatedSlot is tests-lens C-10.
+// MUTATION: always print "expects a key at", even for a seated slot. Every
+// existing call passed nil for keyedChunks, so the seated branch never ran.
+func TestComposerStubLinesLabelASeatedSlot(t *testing.T) {
+	st, template, keyed := composerCardFixture(t)
+	_ = st
+	lines, err := composerStubLines(template, keyed, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(lines, "\n")
+	if strings.Contains(joined, "expects a key at") {
+		t.Errorf("a fully seated template still tells the operator a slot EXPECTS a key:\n%s", joined)
+	}
+	if !strings.Contains(joined, "Slot @0: 73c5da0a") {
+		t.Errorf("a seated slot is not labelled with its fingerprint and origin:\n%s", joined)
+	}
+	// The KEYED half §7c asks for: both ids, both stubs, and the advice to
+	// stamp both.
+	for _, want := range []string{"Policy-ID:", "mk1 stub (policy):", "Stamp BOTH stubs"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("the keyed stub screen does not say %q:\n%s", want, joined)
+		}
+	}
+}
+
+// TestComposerStubReshowSignalIsTheChunkSet is tests-lens C-9.
+// MUTATION: invert composerFlow's re-show signal. It was a sticky `edited`
+// bool set on any Back; it is now a comparison of the emitted chunk sets, so
+// the signal is the artifact rather than a flag about navigation.
+func TestComposerStubReshowSignalIsTheChunkSet(t *testing.T) {
+	a := md.PathList{Wrapper: md.ComposeWsh, Paths: []md.SpendPath{
+		{Keys: &md.KeySet{K: 2, N: 3, Sorted: true}},
+	}}
+	b := md.PathList{Wrapper: md.ComposeWsh, Paths: []md.SpendPath{
+		{Keys: &md.KeySet{K: 2, N: 3, Sorted: true}},
+		{Keys: &md.KeySet{K: 1, N: 1}},
+	}}
+	chunksOf := func(l md.PathList) []string {
+		t.Helper()
+		c, err := md.Compose(l)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, err := c.Chunks()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	first, again, edited := chunksOf(a), chunksOf(a), chunksOf(b)
+	if !slices.Equal(first, again) {
+		t.Fatal("INCONCLUSIVE: composing one shape twice gave two chunk sets")
+	}
+	if slices.Equal(first, edited) {
+		t.Fatal("INCONCLUSIVE: adding a path did not change the chunk set")
+	}
+	// The flow's rule, stated as the comparison it performs.
+	if changed := first != nil && !slices.Equal(first, again); changed {
+		t.Error("re-reaching the stub screen with NO edit reports the id changed -- §8s " +
+			"would then be a false statement on the screen that gets copied onto steel")
+	}
+	if changed := first != nil && !slices.Equal(first, edited); !changed {
+		t.Error("an actual shape edit does not report the id changed, so §8s never fires")
+	}
+}
+
+// TestComposerMappingReviewRefusesFromTheScreen is tests-lens C-11 and C-13.
+// MUTATIONS: disable the §4f invariant check at composerMappingReview's call
+// site (the logic underneath was tested, the wiring was not), and delete the
+// C29 warning from composerMappingLines' output.
+func TestComposerMappingReviewRefusesFromTheScreen(t *testing.T) {
+	origin := composerTestOrigin(2, 0)
+	st := &composerState{list: composerTwoPathList(), assigned: []composerAssignment{
+		{src: 0, origin: origin, fingerprint: [4]byte{0x73, 0xc5, 0xda, 0x0a}, fpPresent: true},
+		{src: 1, origin: origin},
+		{src: -1}, {src: -1},
+	}}
+	st.sources = []composerSource{{kind: composerSourceKey}, {kind: composerSourceKey}}
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		var ok bool
+		frame, quit := runUI(ctx, func() {
+			ok = composerMappingReview(ctx, &descriptorTheme, st)
+		})
+		defer quit()
+		got, seen := pumpUntil(frame, "not both carry a fingerprint", 16)
+		if !seen {
+			t.Fatalf("the mapping review did not refuse §4f's invariant violation.\n"+
+				"Last frame: %q", got)
+		}
+		if ok {
+			t.Error("composerMappingReview returned true on a template that could not be restored")
+		}
+	})
+
+	// C-13: the C29 warning must be IN the review's own output, not merely
+	// computable by a helper the review does not print.
+	fp := [4]byte{0xaa}
+	shared := &composerState{list: composerTwoPathList(), assigned: []composerAssignment{
+		{src: 0, origin: composerTestOrigin(2, 0), fingerprint: fp, fpPresent: true},
+		{src: 0, origin: composerTestOrigin(2, 1), fingerprint: fp, fpPresent: true},
+		{src: 1, origin: composerTestOrigin(2, 2), fingerprint: [4]byte{0xbb}, fpPresent: true},
+		{src: 2, origin: composerTestOrigin(2, 3), fingerprint: [4]byte{0xcc}, fpPresent: true},
+	}}
+	shared.sources = []composerSource{
+		{kind: composerSourceSeed, fingerprint: fp, fpPresent: true},
+		{kind: composerSourceKey}, {kind: composerSourceKey},
+	}
+	joined := strings.Join(composerMappingLines(shared), "\n")
+	if !strings.Contains(joined, "SAME SEED, SAME PATH") {
+		t.Errorf("the mapping review's own output does not carry the C29 warning:\n%s", joined)
+	}
+}
+
+// TestComposerShortfallCountsSeatsFromTheScreen is tests-lens C-12.
+// MUTATION: swap composerShortfall's count from assignable SEATS to sources at
+// the call site. composerAssignableSlots was tested; the screen's use was not.
+func TestComposerShortfallCountsSeatsFromTheScreen(t *testing.T) {
+	st := &composerState{list: composerTwoPathList()} // 4 slots
+	st.sources = []composerSource{{kind: composerSourceKey}, {kind: composerSourceKey}}
+	st.assigned = []composerAssignment{{src: 0}, {src: 1}, {src: -1}, {src: -1}}
+	synctest.Test(t, func(t *testing.T) {
+		p := newPlatform()
+		p.display = sh2DisplaySize
+		ctx := NewContext(p)
+		frame, quit := runUI(ctx, func() { composerShortfall(ctx, &descriptorTheme, st) })
+		defer quit()
+		got, ok := pumpUntil(frame, "4 slots, 2 keys available", 16)
+		if !ok {
+			t.Fatalf("the shortfall screen does not name §8p's counts.\nLast frame: %q", got)
+		}
+		if !uiContains(got, "Unfilled: slots @2 and @3") {
+			t.Errorf("the shortfall screen does not name the unfilled slots.\nFrame: %q", got)
+		}
+	})
+}
+
+// TestComposerHexEntryTakesExactlySixtyFourCharacters is tests-lens I-1.
+// MUTATION: accept 63 hex characters. It was caught only by hex.DecodeString's
+// odd-length error, which is a different property from the bound §6c states.
+func TestComposerHexEntryTakesExactlySixtyFourCharacters(t *testing.T) {
+	for _, n := range []int{0, 62, 63, 64, 65} {
+		frag := strings.Repeat("a", n)
+		valid := len(frag) == 64
+		if got := len(frag) == 64; got != valid {
+			t.Fatalf("the fixture is inconsistent at %d", n)
+		}
+		raw, err := hexDecodeForTest(frag)
+		switch {
+		case n == 64:
+			if err != nil || len(raw) != 32 {
+				t.Errorf("64 hex characters do not decode to 32 bytes: %v", err)
+			}
+		case n == 62:
+			// EVEN and short: hex.DecodeString ACCEPTS it, which is why the
+			// odd-length error is not the bound. Only the explicit
+			// len(frag) == 64 test refuses this one.
+			if err != nil {
+				t.Errorf("62 hex characters fail to decode, so this case cannot show that "+
+					"the length bound is what refuses them: %v", err)
+			}
+			if len(raw) == 32 {
+				t.Errorf("62 hex characters decoded to 32 bytes")
+			}
+		}
+	}
+}
+```
+
+- [ ] **Step 2: Run to verify they fail**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerSection8|^TestComposerReadScreenWithholds|^TestComposerPickScreenNever|^TestComposerConsentNumbers|^TestComposerDoorOffersFromPayloadForACard|^TestComposerShapeRefusalGate|^TestComposerLockAcceptRefuses|^TestComposerStubLinesLabelASeated|^TestComposerStubReshow|^TestComposerMappingReviewRefuses|^TestComposerShortfallCounts|^TestComposerHexEntryTakes' ./gui/ 2>&1 | head -8`
+Expected: FAIL to build before the folds land -- `undefined: composerConsentLinesFor`, `undefined: composerCardFixture`, `undefined: hexDecodeForTest`.
+
+- [ ] **Step 3: Run them**
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposerSection8|^TestComposerReadScreenWithholds|^TestComposerPickScreenNever|^TestComposerConsentNumbers|^TestComposerDoorOffersFromPayloadForACard|^TestComposerShapeRefusalGate|^TestComposerLockAcceptRefuses|^TestComposerStubLinesLabelASeated|^TestComposerStubReshow|^TestComposerMappingReviewRefuses|^TestComposerShortfallCounts|^TestComposerHexEntryTakes' -v ./gui/ 2>&1 | grep -cE '^--- PASS'`
+Expected: `12`.
+
+- [ ] **Step 4: gofmt, commit**
+
+```bash
+gofmt -l gui/ && CGO_ENABLED=0 go test -count=1 -run '^TestComposer' ./gui/ 2>&1 | tail -2
+git add gui/composer_gates_test.go
+git commit -s -F - <<'MSG'
+gui: the section 12 item 5 gates section 8m, 8c and 8r never had, and a test per surviving mutation (composer S3 task C0)
+
+Nineteen of twenty-seven mutations survived the previous suite. Each one that
+did now has a test naming it. The short bodies are asserted on the surface the
+operator meets them on, because assertModalBodyFits' own raster guard fires on
+a twelve-character body -- measured, 5,166 ink against a 6,000 floor.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
+MSG
+```
+
+---
 
 ### Task C1: measure §13 item 1's numbers and write them INTO the spec
 
@@ -7568,39 +10805,57 @@ MSG
 
 - [ ] **Step 1: The composer's own tests, then the whole package**
 
-```bash
-CGO_ENABLED=0 go test -count=1 -run '^TestComposer' -v ./gui/ 2>&1 | tee /tmp/composer-tests.txt | grep -cE '^--- PASS'
-grep -cE '^--- FAIL' /tmp/composer-tests.txt
-```
-Expected: a non-zero PASS count and `0` FAIL. **Capture once and grep twice**: running the suite a second time to collect the other number doubles the cost of every measurement.
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposer' -v ./gui/ 2>&1 | tee /tmp/composer-tests.txt | grep -cE '^--- PASS'; grep -cE '^--- FAIL' /tmp/composer-tests.txt`
+Expected: **`92`** top-level PASS and **`0`** FAIL (measured with this plan's code in the gate scratch; the number moves only when a task adds a test, and a task that adds one updates it here). **Capture once and grep twice**: re-running the suite for the second number doubles the cost of every measurement.
+
+Run: `CGO_ENABLED=0 go test -count=1 -run '^TestComposer' -v ./gui/ 2>&1 | grep -cE '^\s+--- PASS'`
+Expected: **`77`** sub-tests.
 
 - [ ] **Step 2: The whole `gui` package, sharded, and then the way CI runs it**
 
-```bash
-/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24 2>&1 | tail -5
-CGO_ENABLED=0 go test -timeout 20m ./... 2>&1 | grep -vE '^ok|no test files'
-```
-Expected: the shard runner reports its partition exhaustive and every shard ok; the whole-tree run prints no FAIL line. **Both**, not either: the shard runner is the fast local equivalent, and CI runs the plain command -- a suite that passes under process-per-shard isolation and fails under CI's runner is a shared-state defect, and this tree has had one.
+Run: `/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24 2>&1 | tail -2`
+Expected: `RESULT: ok -- all 1158 tests ran across 24 shards` (1,125 before this stage plus this plan's 33 top-level additions; the runner asserts its partition exhaustive before it runs anything, so a dropped test is a refusal rather than a green).
+
+Run: `CGO_ENABLED=0 go test -timeout 20m ./... 2>&1 | grep -vE '^ok|no test files'; echo "exit=$?"`
+Expected: no FAIL line. **Both**, not either: the shard runner is the fast local equivalent, and CI runs the plain command -- a suite that passes under process-per-shard isolation and fails under CI's runner is a shared-state defect, and this tree has had one.
 
 - [ ] **Step 3: 32-bit, the oraclelive build, the emulator vet, and gofmt**
 
-```bash
-scripts/test-32bit.sh 2>&1 | tail -3
-CGO_ENABLED=0 go test -tags oraclelive -run '^$' ./oracle/ ./gui/ ./sysw/ 2>&1 | tail -3
-GOOS=js GOARCH=wasm go vet ./cmd/emu/ 2>&1 | tail -3
-gofmt -l gui/ md/ mk/ sysw/ scripts/ 2>/dev/null | head
-```
-Expected: all `ok`; gofmt prints nothing. The composer's arithmetic is `uint32`/`uint64` throughout, so 32-bit is a build check rather than a behaviour question -- but it is run, not assumed.
+Run: `scripts/test-32bit.sh 2>&1 | tail -3; CGO_ENABLED=0 go test -tags oraclelive -run '^$' ./oracle/ ./gui/ ./sysw/ 2>&1 | tail -3; GOOS=js GOARCH=wasm go vet ./cmd/emu/ 2>&1 | tail -3; gofmt -l gui/ md/ mk/ sysw/ scripts/ 2>/dev/null | head`
+Expected: all `ok`; gofmt names only the three files fork `main` already lists (`gui/transaction.go`, `gui/transaction_golden_test.go`, `gui/transaction_txrecord_test.go` -- pre-existing, measured at `321acb56`, and none of them this stage's). The composer's arithmetic is `uint32`/`uint64` throughout, so 32-bit is a build check rather than a behaviour question -- but it is run, not assumed.
 
 - [ ] **Step 4: The firmware, and the size delta this stage costs**
 
-```bash
-nix run .#build-firmware 2>&1 | tail -5
-tinygo build -size short -o /dev/null -target pico-plus2 -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller 2>&1 | tail -4
-```
+Run: `nix run .#build-firmware 2>&1 | tail -5; tinygo build -size short -o /dev/null -target pico-plus2 -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller 2>&1 | tail -4`
 Expected: the build succeeds and prints a `code`/`data`/`bss`/`flash`/`RAM` line. Record flash and RAM beside the baseline **1,503,652 B flash / 62,592 B RAM** (fork `169073c`), with the delta. **Unlike Stage 2, a non-zero delta is EXPECTED here**: this stage is reached from `cmd/controller` through `walletPolicyFlow`, so the linker keeps all of it. If the delta is zero, the door wiring did not land and nothing composed is reachable -- which is the same class of defect as a gate that never ran.
 
-- [ ] **Step 5: The report**
+- [ ] **Step 5: The reachability gate, and the three emulator walks the door hangs**
+
+Run: `FORK_REPO=/scratch/code/shibboleth/seedhammer SCRATCH=/scratch/code/shibboleth/.plan-build-gate-go-s3 /scratch/code/shibboleth/mnemonic-engrave/scripts/plan-build-gate-go.sh design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md 2>&1 | sed -n '/== 8 --/,$p'`
+Expected: the `gui` line reads `1 function(s) with no production caller` and names `gui/composer_census.go: composerDescriptorCeilingChars` -- §13 item 1's measurement, whose production consumer is F-457. Any OTHER `gui/` survivor is a screen no operator can reach, which is what all three R0 lenses found, and it blocks. The `md`/`mk` names the same step prints are S2's package APIs called from `gui`; the scan compares within a package.
+
+**THE EMULATOR WALKS ARE PART OF THE BLAST RADIUS AND THIS STAGE CANNOT RUN THEM.** Measured at `321acb56`: `grep -rln -i "wallet *policy" cmd/emu/*.js` finds `shots_seating.js`, `shots_tr_pathological.js` and `shots_walletpolicy.js`, and all three share the entry at `cmd/emu/shots_seating.js:145-146`:
+
+```js
+  // (3) Enter it. The gather screen is what it opens on.
+  await tap(CONFIRM);
+  await waitFor("md1descriptors:0");
+```
+
+With the door in front of `walletPolicyFlow`, that `CONFIRM` opens the DOOR and `md1descriptors:0` never draws; all three time out, and `design/journeys/capture_walletpolicy.py` in mnemonic-engrave drives the third, so the journey capture breaks with them. **The fix is one line in each**, because the door opens on "Scan cards" at index 0 and all three take the NFC gather route:
+
+```js
+  // (3) Enter it. The composer's door is now the first screen in every state
+  //     (SPEC_wallet_policy_composer §7a) and opens on "Scan cards".
+  await tap(CONFIRM);
+  await tap(CONFIRM);
+  await waitFor("md1descriptors:0");
+```
+
+Run: `GOOS=js GOARCH=wasm go build -o /dev/null ./cmd/emu/ && grep -c 'await tap(CONFIRM);' cmd/emu/shots_seating.js cmd/emu/shots_walletpolicy.js cmd/emu/shots_tr_pathological.js`
+Expected: the WASM build succeeds and each file's `tap(CONFIRM)` count is one higher than at `321acb56` (measured there: `shots_seating.js` 2, `shots_walletpolicy.js` 1, `shots_tr_pathological.js` 2). **This is a build-and-count check, not a run**: the walks need a browser and playwright, which no gate in this stage has. Proving them is S4's journey run (§12 item 2), and it is named here so the edit is not discovered by S4 as a surprise.
+
+- [ ] **Step 6: The report**
 
 Write the implementation report to `design/agent-reports/composer-S3-implementation-report.md` in mnemonic-engrave (the fork is kept clean of design records): per task the fail-then-pass evidence, every `assertModalBodyFits` headroom number logged, the four `SPEC13` measurement lines, the consumption-site count before and after the oracle widening, the firmware sizes and delta, and **every deviation from an Expected line, verbatim**.
 
@@ -7615,7 +10870,7 @@ Write the implementation report to `design/agent-reports/composer-S3-implementat
 | "the door ChoiceScreen in every state with its key-state lines" | the door task (§8r's six lines, counted through `has()` so an uncompared payload is still described) |
 | "the shape flow with presets, the path-list screen, the digit-pad widget and lock/hashlock entry with echoes and refusals" | the shape task (path list, picker bounds, §4e/§8m), the digit-pad task, the lock task (§6b, §8c, §8o, §8t, §8u), the hashlock task (§6c, §8i); presets in their own task, BLOCKED on F-453 |
 | "the paged stub-teaching screen with the conditional per-slot origin line and re-show" | the stub task, plus the two `Template-ID:` relabels on `gui/template_engrave.go` |
-| "slot-directed seating from the payload with the paged pick list" | the paged-primitive task and the sources task; the pick list is a NEW primitive because `ChoiceScreen` does not scroll |
+| "slot-directed seating from the payload with the paged pick list" | the paged-primitive task, the sources task, and **Task B11, which is what calls them** -- all three R0 lenses found that this row previously mapped to two tasks that nothing reached |
 | "discard-on-numbering-change with the §8j confirm" | the discard task (`composerShapeSignature` moves for the wrapper, the path count and n, and for nothing else) |
 | "the mapping review with verbatim origins, the unverifiable-account note, the C29 warning and the §8k line" | the mapping-review task |
 | "the same-xpub refusal, the §4f invariant refusal (§8v)" | the mapping-review task |
@@ -7635,4 +10890,4 @@ Write the implementation report to `design/agent-reports/composer-S3-implementat
 
 **Placeholder scan:** three constants are filled by the implementer from named commands and pinned with those commands in comments (`composerTestXpubA`, `composerTestXpubB`, `composerTestDescriptor`); the preset table's path lists are transcribed from vendored vectors and the task refuses to proceed without them. No TBD, no TODO, and no step that says "as above".
 
-**Gate coverage line for the review brief.** `scripts/plan-build-gate-go.sh` extracts and compiles every ```go block anchored on `gui/composer_*.go` -- which is every new file and every new test file in this plan, because the naming rule in Global Constraints makes them all match -- and then runs `go vet ./gui/` and `go test -count=1 -run '^TestComposer' ./gui/`. It does NOT assemble the fragments of existing files: `gui/sysw_admit.go`, `gui/gui.go`, `gui/multisig_build.go`, `gui/template_engrave.go`, `gui/multisig_build_census.go` and `gui/sysw_admit_oracle_test.go`, all six given above as exact old-to-new replacements for the controller to hand-wire in the gate's scratch copy before review. It does not cover the TinyGo firmware build, the whole `./gui/` suite (sharded separately), the emulator, the render measurements, or the two spec folds. **Reviewer budget belongs on what tools cannot reach here:** whether `composerSlotOrder` really tracks §5's numbering for a taproot list whose first single-key path is not first-listed; whether the self-check's comparison set is the one §7e names; whether the §8p shortfall's "no cause is guessed" rule survives its own implementation; and whether Part A is genuinely shippable without Part B.
+**Gate coverage line for the review brief.** `scripts/plan-build-gate-go.sh` extracts and compiles every ```go block anchored on `gui/composer_*.go` -- which is every new file and every new test file in this plan, because the naming rule in Global Constraints makes them all match -- then runs `go vet ./gui/`, `go test -count=1 -run '^TestComposer' ./gui/`, and finally **a DEAD-IN-PROD scan that lists every function the plan declares in a production file that no production file calls**. That last step is the gate against the Critical all three R0 lenses found, and it did not exist when they read the plan: Go does not error on an unused package-scope function, so "an unreachable feature" was invisible to every check. It must print no `gui/` survivor, or the plan must name and justify each one. **Measured on the wired tree after this fold: exactly one**, `gui/composer_census.go: composerDescriptorCeilingChars` -- §13 item 1's measurement, called by `TestComposerMeasureSection13Numbers`, whose PRODUCTION consumer (form A's text and QR descriptor plates) is deferred to F-457 because `md` deliberately emits no descriptor text. `composerDescriptorPlateFits` is not a survivor: `composerDescriptorCeilingChars` calls it, which is the chain being exactly one function deep. The `md`/`mk` survivors the same step prints (`Compose`, `ComposeWith`, `ComposerStubs`, `AppendStubs`) are S2's package APIs consumed from `gui`, and the scan compares within a package. It does NOT assemble the fragments of existing files: `gui/sysw_admit.go`, `gui/gui.go`, `gui/multisig_build.go`, `gui/template_engrave.go`, `gui/multisig_build_census.go` and `gui/sysw_admit_oracle_test.go`, all six given above as exact old-to-new replacements for the controller to hand-wire in the gate's scratch copy before review. It does not cover the TinyGo firmware build, the whole `./gui/` suite (sharded separately), the emulator, the render measurements, or the two spec folds. **Reviewer budget belongs on what tools cannot reach here:** whether `composerSlotOrder` really tracks §5's numbering for a taproot list whose first single-key path is not first-listed; whether the self-check's comparison set is the one §7e names; whether the §8p shortfall's "no cause is guessed" rule survives its own implementation; and whether Part A is genuinely shippable without Part B.
