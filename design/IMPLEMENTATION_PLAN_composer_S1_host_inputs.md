@@ -1157,7 +1157,7 @@ fn show_prints_each_class_legibly() {
 - [ ] **Step 2: Run to verify the tests fail**
 
 Run: `cargo nextest run --locked -p mnemonic-engrave --test sysw_composer_cli 2>&1 | tail -8`
-Expected: `no_now_suppresses...` and `now_forces_...` FAIL (unknown flags); `pack_appends_...` FAILS (nothing is appended); `a_payload_without_a_composer_record_packs_byte_identically_to_before` PASSES already (nothing appends today) — it is the regression guard for the ruled default; the refusal tests PASS already (Task 2); `show_prints_each_class_legibly` FAILS (the show lines do not exist).
+Expected: `no_now_suppresses...` and `now_forces_...` FAIL (unknown flags); `pack_appends_...` FAILS (nothing is appended); `a_payload_without_a_composer_record_packs_byte_identically_to_before` PASSES already (nothing appends today) — it is the regression guard for the ruled default; the refusal tests PASS already (Task 2) EXCEPT `a_second_now_is_refused_before_the_passphrase_ceremony`, which FAILS by design -- Task 2 refuses at `split`, AFTER the ceremony has printed the passphrase, and Step 3's hoisted pre-check is what moves the refusal in front of it (measured by the implementer, report `composer-S1-implementation-report.md`, deviation 1); `show_prints_each_class_legibly` FAILS (the show lines do not exist).
 
 - [ ] **Step 3: Add the flag, the auto-append, the show lines**
 
@@ -1341,8 +1341,19 @@ fn bip48_p2tr_derives_the_composer_taproot_origin() {
     assert!(s.contains("m/48'/0'/0'/3'"), "{s}");
     assert!(s.contains(P2TR_ACCT0), "{s}");
     assert!(!s.contains(P2WSH_ACCT0), "3' and 2' must not collapse: {s}");
-    assert!(!err(&o).contains("ASSUMED"), "an explicit script type is a choice, not an assumption");
-    let o = ms(&["derive", "--hex", ZEROS_HEX, "--template", "bip48-p2tr", "--account", "1"]);
+    assert!(
+        !err(&o).contains("ASSUMED"),
+        "an explicit script type is a choice, not an assumption"
+    );
+    let o = ms(&[
+        "derive",
+        "--hex",
+        ZEROS_HEX,
+        "--template",
+        "bip48-p2tr",
+        "--account",
+        "1",
+    ]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(out(&o).contains(P2TR_ACCT1), "{}", out(&o));
     assert!(out(&o).contains("m/48'/0'/1'/3'"), "{}", out(&o));
@@ -1350,7 +1361,14 @@ fn bip48_p2tr_derives_the_composer_taproot_origin() {
 
 #[test]
 fn bip48_p2tr_json_names_the_path_and_no_assumption() {
-    let o = ms(&["derive", "--hex", ZEROS_HEX, "--template", "bip48-p2tr", "--json"]);
+    let o = ms(&[
+        "derive",
+        "--hex",
+        ZEROS_HEX,
+        "--template",
+        "bip48-p2tr",
+        "--json",
+    ]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let v: serde_json::Value = serde_json::from_str(&out(&o)).unwrap();
     assert_eq!(v["account_path"], "m/48'/0'/0'/3'");
@@ -1477,7 +1495,7 @@ Section 5.3 — the reserved-prefix list gains `key:`, `hash:`, `now:` with the 
 - [ ] **Step 2: Gates**
 
 Run: `./scripts/spec-structure-check.sh design/SPEC_systemwide_payloads.md` (if the file uses the lettered-subsection structure; otherwise skip and say so), `./scripts/plan-table-check.sh design/SPEC_systemwide_payloads.md`, `./scripts/plan-cite-check.sh design/SPEC_systemwide_payloads.md`, `./scripts/plan-glyph-check.sh design/SPEC_systemwide_payloads.md`.
-Expected: all clean.
+Expected: both exit 0; the glyph gate prints 2 undrawable glyphs and the cite gate 1 dangling citation (`record.rs:74-108`), ALL PRE-EXISTING at 59e6f12 -- the implementer proved it by running both gates on the base file (identical findings, glyph lines shifted +1 by the N9 rewrap; report deviation 3). Nothing new from this edit is the pass condition.
 
 - [ ] **Step 3: Commit the fold, dispatch R0**
 
