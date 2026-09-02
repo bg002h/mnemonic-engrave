@@ -21,6 +21,11 @@
 # third step`) -- the last of which a commit message once claimed were covered
 # when a planted probe showed they were not. The row's own number is exempt.
 #
+# EXEMPT since 2026-09-01 (composer S0 plan): the checkbox step header itself,
+# `- [ ] **Step N: name**`, which is the writing-plans skill's step format and
+# names its own number exactly as a table row does. Prose anywhere else on that
+# line, or on the line before it, is still checked (probe below).
+#
 # NOT COVERED: a reference by NAME that has gone stale ("the move" pointing at a
 # row that no longer does the moving). That class is real -- round 4's C-2 was
 # exactly it -- and no lexical check can see it. It needs a reader.
@@ -40,6 +45,11 @@ for f in "$@"; do
       # claims get written (round-5 I-5: `done after step 3` planted in a cell
       # passed at exit 0).
       $probe =~ s/^\s*\|\s*\d+[a-z]?\s*\|// if $l[$i] =~ /^\s*\|/;
+      # A checkbox step HEADER (`- [ ] **Step 3: name**`, the writing-plans
+      # format) names its own number the way a table row does; strip the
+      # header token from the probe (it may sit on this line or the joined
+      # next one) and keep checking everything else on both lines.
+      $probe =~ s/-\s*\[[ xX]\]\s*\*\*Step\s+\d+[a-z]?:[^*]*\*\*//g;
       if ($probe =~ /\bsteps?\s*-?\s*\d+[a-z]?/i
        || $probe =~ /\bsteps?\s+(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i
        || $probe =~ /\brows?\s+\d+[a-z]?\b/i

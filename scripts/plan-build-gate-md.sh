@@ -20,11 +20,14 @@
 #        crates/md-codec/src/compose.rs   crates/md-codec/src/compose/*.rs
 #        crates/md-codec/tests/compose_*.rs
 #        crates/md-cli/src/cmd/compose.rs crates/md-cli/tests/cli_compose*.rs
-#      Anchor grammar (same as plan-build-gate.sh): a line containing
-#      `Create <path>`, `Prepend to <path>`, `Add to <path>` or `In <path>` with
-#      the path in backticks; the NEXT ```rust fence is that file's content.
-#      Several blocks for one path are concatenated in plan order; a block that
-#      opens with `//!` goes first. Blocks anchored on EXISTING files (lib.rs,
+#      Anchor grammar (same as plan-build-gate.sh, plus Replace): a line
+#      containing `Create <path>`, `Prepend to <path>`, `Add to <path>`,
+#      `In <path>` or `Replace <path>` with the path in backticks; the NEXT
+#      ```rust fence is that file's content. Several blocks for one path are
+#      concatenated in plan order; a block that opens with `//!` goes first;
+#      a `Replace` block DISCARDS every earlier block for that path, which is
+#      how a TDD plan's stub file (task N) gives way to its full file (task
+#      N+1) without the two being concatenated into a redefinition error. Blocks anchored on EXISTING files (lib.rs,
 #      main.rs, test_vectors.rs) are fragments and are NOT assembled -- they
 #      need a reviewer's execution pass, and this script says so at the end.
 #   3. Synthesises `pub mod compose;` into md-codec's lib.rs and
@@ -57,15 +60,15 @@ python3 - "$PLAN" "$WORK" <<'PY'
 import re, sys, os, collections
 plan, work = sys.argv[1], sys.argv[2]
 lines = open(plan).read().split("\n")
-anchor = re.compile(r'\b(create|prepend to|add to|in)\s+`([^`]*\.rs)`', re.I)
+anchor = re.compile(r'\b(create|prepend to|add to|in|replace)\s+`([^`]*\.rs)`', re.I)
 ok = re.compile(r'^crates/md-codec/src/compose(/[A-Za-z0-9_]+)?\.rs$|^crates/md-codec/tests/compose_[A-Za-z0-9_]+\.rs$|^crates/md-cli/src/cmd/compose\.rs$|^crates/md-cli/tests/cli_compose[A-Za-z0-9_]*\.rs$')
-blocks = collections.OrderedDict(); cur = None; prepend = False; fragments = set()
+blocks = collections.OrderedDict(); cur = None; prepend = False; replace = False; fragments = set()
 i = 0
 while i < len(lines):
     m = anchor.search(lines[i])
     if m:
         verb, path = m.group(1), m.group(2)
-        if ok.match(path): cur, prepend = path, verb.lower().startswith("prepend")
+        if ok.match(path): cur, prepend, replace = path, verb.lower().startswith("prepend"), verb.lower() == "replace"
         else:
             cur = None
             if path.endswith(".rs"): fragments.add(path)
@@ -73,6 +76,11 @@ while i < len(lines):
         i += 1; buf = []
         while i < len(lines) and not lines[i].startswith("```"): buf.append(lines[i]); i += 1
         code = "\n".join(buf)
+        if replace:
+            dropped = len(blocks.get(cur, []))
+            blocks[cur] = []
+            if dropped: print("   replaced %s (dropped %d earlier block%s)" % (cur, dropped, "" if dropped==1 else "s"))
+            replace = False
         blocks.setdefault(cur, []).append((prepend or code.lstrip().startswith("//!"), code))
     i += 1
 if not blocks:
