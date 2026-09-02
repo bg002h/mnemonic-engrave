@@ -1180,7 +1180,7 @@ In `crates/me-cli/src/main.rs`, in `SyswCmd::Pack { .. }`, add after `allow_unsi
         no_now: bool,
 ```
 
-and destructure `now, no_now` in the `SyswCmd::Pack { .. } =>` arm. Then, in TWO places. First, directly AFTER the F-246 block `if let Err(e) = sysw::admit_check(&recs, admission) { ... return EXIT_INVALID; }` (`main.rs:1563-1566`) and therefore BEFORE `decide_sealing` and the passphrase ceremony (`:1655-1682`):
+and destructure `now, no_now` in the `SyswCmd::Pack { .. } =>` arm. Then, in TWO places. First, directly AFTER the F-246 block `if let Err(e) = sysw::admit_check(&recs, admission) { ... return EXIT_INVALID; }` (`crates/me-cli/src/main.rs:1563-1566`) and therefore BEFORE `decide_sealing` and the passphrase ceremony (`:1655-1682`):
 
 ```text
             // §6a's payload-wide single-`now:` rule, checked HERE as well as in
@@ -1305,7 +1305,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 - Repo: `/scratch/code/shibboleth/mnemonic-secret` at `5f37b43`, in a worktree (`git worktree add /scratch/code/shibboleth/wt-ms-bip48-p2tr -b bip48-p2tr`)
 
 **Interfaces:**
-- Produces: `--template bip48-p2tr` deriving `m/48'/coin'/account'/3'`, never annotated ASSUMED; JSON `account_path` accordingly. (`script_type_label` gets an arm for completeness, but that label prints only for the DEFAULTED bare `bip48` — `derive.rs:504-518` — so it is unobservable for this template; the test asserts the path, not the label.)
+- Produces: `--template bip48-p2tr` deriving `m/48'/coin'/account'/3'`, never annotated ASSUMED; JSON `account_path` accordingly. (`script_type_label` gets an arm for completeness, but that label prints only for the DEFAULTED bare `bip48` — `mnemonic-secret/crates/ms-cli/src/cmd/derive.rs:504-518` — so it is unobservable for this template; the test asserts the path, not the label.)
 
 **The oracle (measured 2026-09-02, two independent implementations agreeing byte for byte — the fork's Go `btcutil/v2/hdkeychain` run inside the fork module, and a hand-rolled Python BIP-32 over `ecdsa`; seed = BIP-39 of "abandon" ×11 + "about", empty passphrase, master 73c5da0a):**
 
@@ -1359,7 +1359,7 @@ fn bip48_p2tr_json_names_the_path_and_no_assumption() {
 }
 ```
 
-(`serde_json = "1"` is a regular dependency of ms-cli, and Cargo puts regular dependencies in scope for integration tests, so `serde_json::Value` compiles here; the existing `json_carries_the_assumption_flag` test does substring matching instead — either style is fine, this one asserts the three keys `derive.rs:485-487` emits.)
+(`serde_json = "1"` is a regular dependency of ms-cli, and Cargo puts regular dependencies in scope for integration tests, so `serde_json::Value` compiles here; the existing `json_carries_the_assumption_flag` test does substring matching instead — either style is fine, this one asserts the three keys `mnemonic-secret/crates/ms-cli/src/cmd/derive.rs:485-487` emits.)
 
 - [ ] **Step 2: Run to verify they fail**
 
