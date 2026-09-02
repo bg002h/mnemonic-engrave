@@ -13301,6 +13301,22 @@ explicitly out of scope for P2 (F-271 records the publish as authorised and its
 pre-flight as unrun). Publishing would dissolve this entry entirely, which is
 worth knowing when F-271 is next picked up.
 
+
+**2026-09-02 — MATERIALIZED, now OVERDUE.** `ms-cli-v0.17.0` (mnemonic-secret
+1068f389) was tagged; `man-release.yml` run 33621228397: `repro-substrate` and
+`repro-x86_64-musl` FAILED exactly as this entry predicted (`cargo build
+--locked --offline` inside the toolkit's two-block config: "failed to get
+`mnemonic-io-lib` … can't checkout from 'https://github.com/bg002h/mnemonic-engrave':
+you are in the offline mode"), and BOTH `musl-binary` legs were therefore
+SKIPPED. The published release carries `ms-man.tar.gz` only — no
+`ms-0.17.0-{x86_64,aarch64}-linux-musl.tar.gz`, no PROVENANCE, no SHA256SUMS
+(0.16.0 had all seven). The tag stands; nothing was retried. Remedy unchanged:
+`git_source`/`git_rev` input on mnemonic-toolkit's reusable
+`reproducible-musl-build.yml`, re-pin `toolkit_ref` in ms's `man-release.yml`,
+exercise once by `workflow_dispatch`, then re-run the tag workflow
+(`gh run rerun 33621228397 --repo bg002h/mnemonic-secret --failed`) so the
+binaries publish against the existing tag. Report:
+`design/agent-reports/composer-S1-push-report.md`.
 ### F-360 — `plan-table-check.sh` only checks rows AFTER the separator, so a malformed table HEADER passes (repo: **mnemonic-engrave**; owning phase: **the gate-hardening residue**) `#tooling` `#gate`
 
 **Found 2026-08-27** by the P2 plan's fold, which hit it while writing a table
