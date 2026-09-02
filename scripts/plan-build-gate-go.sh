@@ -119,4 +119,35 @@ if ls "$WORK"/gui/composer_*.go >/dev/null 2>&1; then
   "$GO" vet ./gui/ 2>&1 | tail -20
   "$GO" test -count=1 -run '^TestComposer' ./gui/ 2>&1 | tail -30
 fi
-echo "== NOT covered: fragments of existing files (hand-wired by the controller before review); ./gui/ (Stage 3, sharded separately); the TinyGo firmware build and its size delta (a plan task); the real vendoring with provenance (a plan task). =="
+echo "== 8 -- DEAD-IN-PROD: functions the plan declares in production files that no production file calls =="
+# Go does not flag unused package-scope functions, and every plan test can call a
+# function directly, so a whole feature can be built, tested and never joined to
+# the flow while every gate above prints ok (composer S3 R0 r0, 2026-09-02: 14
+# such functions). This counts, per NEW production file the plan created, every
+# top-level `func name(` (methods excluded) whose name occurs in no OTHER
+# non-test .go file of the same package. A hit is not always a defect (an API for
+# a later stage is one), so it prints and does not fail; the reviewer decides.
+python3 - "$WORK" <<'PY2'
+import os, re, sys
+work = sys.argv[1]
+def code_only(src):
+    # drop // comments and /* */ blocks so a doc comment naming the function does not count as a caller
+    src = re.sub(r'/\*.*?\*/', '', src, flags=re.S)
+    return re.sub(r'//[^\n]*', '', src)
+for pkg in ("md", "mk", "sysw", "gui"):
+    d = os.path.join(work, pkg)
+    if not os.path.isdir(d): continue
+    new_files = [f for f in os.listdir(d) if (f.startswith("compose") or f.startswith("composer_")) and f.endswith(".go") and not f.endswith("_test.go")]
+    if not new_files: continue
+    prod = {f: code_only(open(os.path.join(d, f)).read()) for f in os.listdir(d) if f.endswith(".go") and not f.endswith("_test.go")}
+    dead = []
+    for f in new_files:
+        for m in re.finditer(r'^func ([A-Za-z_][A-Za-z0-9_]*)\(', prod[f], re.M):
+            name = m.group(1)
+            if name in ("init", "main"): continue
+            refs = sum(len(re.findall(r'\b' + re.escape(name) + r'\b', body)) for body in prod.values())
+            if refs <= 1: dead.append("%s/%s: %s" % (pkg, f, name))
+    print("   %s: %d new production file(s), %d function(s) with no production caller" % (pkg, len(new_files), len(dead)))
+    for x in dead: print("      DEAD-IN-PROD " + x)
+PY2
+echo "== NOT covered: fragments of existing files (hand-wired by the controller before review); the whole ./gui/ package (sharded separately); the TinyGo firmware build and its size delta (a plan task); the real vendoring with provenance (a plan task); whether a DEAD-IN-PROD function is a defect or a deliberate later-stage API (a reviewer's call). =="
