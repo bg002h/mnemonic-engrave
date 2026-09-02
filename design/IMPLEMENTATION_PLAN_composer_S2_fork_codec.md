@@ -48,7 +48,7 @@
 
 **Interfaces:**
 - Consumes: descriptor-mnemonic `crates/md-codec/tests/vectors/` at `66bdf2f4`; the fork's existing loaders `loadBytesHex`, `loadDescriptor` (`md/testdata_test.go:71,167`), `loadPhraseChunks` (`md/conformance_keyed_test.go:133`).
-- Produces: the 26 vector names as files; `md/testdata/compose_vectors.provenance.json` with `{repo, remote, commit, path, files:[{name, sha256}], vectors, recorded_at}`; the keyed conformance glob (`md/conformance_keyed_test.go:44`, `keyed_*.conformance.json`) picks up the 22 keyed vectors with no code change.
+- Produces: the 26 vector names as files; `md/testdata/compose_vectors.provenance.json` with `{repo, remote, commit, path, files:[{name, sha256}], vectors, recorded_at}`; TWO globs pick up the 22 keyed vectors with no code change: the keyed conformance glob (`md/conformance_keyed_test.go:44`, ids) AND `gui/policy_address_test.go:83` (`TestEveryKeyedVectorReachesAnAddress`, which derives an ADDRESS for every vendored keyed vector against Rust's). So this task alone turns the gui address gate RED for the pkh vectors (no `pk_h` arm yet; Task 3 closes them) and for `keyed_compose_tr_nums_three_leaves` (a pre-existing `v:multi_a` emitter defect the corpus exposed -- see the post-implementation note in Task 9). Run `go test -count=1 -run TestEveryKeyedVectorReachesAnAddress ./gui/` after vendoring and RECORD the red; it is expected and named, not a stop.
 
 The 26 names (22 keyed, 4 unkeyed), exactly the primary's `MANIFEST` compose entries:
 
@@ -825,7 +825,7 @@ func TestComposedStubMatchesTheChunks(t *testing.T) {
 Run: `CGO_ENABLED=0 go test -count=1 -run 'TestCompose|TestLockCheck' ./md/ 2>&1 | head -5`
 Expected: `undefined: Compose` (and the other new names).
 
-- [ ] **Step 2a: Fix the loader the compose vectors expose (measured in the gate's scratch run)**
+- [ ] **Step 2a: Fix the loader the compose vectors expose (measured in the gate's scratch run; NOTE the order -- with Step 1's test file present the package does not compile until Step 3, so the `illegal base64` observation below is what you see if you run Step 1's `TestComposeReproducesEveryVectorByteForByte` AFTER Step 3 with the loader unfixed; apply this step's edit before Step 3 and the observation is skipped, which is fine)**
 
 `loadDescriptor` had never been called on a KEYED vector or on one carrying a `sha256` node (the keyed conformance gate reads the phrase, and the shipped shape tests load their cards the same way). Three arms of its JSON shim unmarshal into `[]byte`, i.e. expect a JSON byte ARRAY -- but every vendored `.descriptor.json`, old and new, writes pubkeys, fingerprints AND hash bodies as hex STRINGS (`[0, "bba0c7ca…"]`, `"data": "a8a8…"`), exactly as the fingerprint arm already decodes them. Against the unmodified loader, Step 1's test fails all 22 keyed rows with `illegal base64 data at input byte 128`, and after the pubkey fix the two `sha256` rows still differ because `"a8a8…"` base64-decodes to `6b c6 bc …` without an error. In `md/testdata_test.go`:
 
@@ -1571,7 +1571,7 @@ Run: `gofmt -l md/ && CGO_ENABLED=0 go test -count=1 ./md/ 2>&1 | tail -2`
 Expected: gofmt prints nothing; `ok`.
 
 ```bash
-git add md/compose.go md/compose_test.go
+git add md/compose.go md/compose_test.go md/testdata_test.go
 git commit -s -F - <<'MSG'
 md: the composer's tree builder -- Compose/ComposeWith, FIXED lowering, 4f origins, byte parity with all 28 family vectors (composer S2 task 2)
 
@@ -3187,7 +3187,9 @@ CGO_ENABLED=0 go test -tags oraclelive -run '^$' ./oracle/ ./gui/ ./sysw/ 2>&1 |
 GOOS=js GOARCH=wasm go vet ./cmd/emu/ 2>&1 | tail -3
 gofmt -l md/ mk/ sysw/ gui/ scripts/ 2>/dev/null | head
 ```
-Expected: all `ok`; gofmt prints nothing. `md/compose.go` uses `uint32` arithmetic only (no `int` overflow on 32-bit); `sysw/composer_records.go`'s `digitsInRange` works in `uint64`.
+Expected: all `ok`; gofmt prints nothing for the plan's files -- three `gui/transaction*.go` files are unformatted at the baseline `169073c` (stray blank lines; CI has no gofmt job) and are outside this plan. `md/compose.go` uses `uint32` arithmetic only (no `int` overflow on 32-bit); `sysw/composer_records.go`'s `digitsInRange` works in `uint64`.
+
+**Post-implementation note (2026-09-02, `composer-S2-implementation-report.md`):** Step 1 was RED on three pre-existing `gui/` tests, none a defect in this plan's code: `TestEveryKeyedVectorReachesAnAddress/keyed_compose_tr_nums_three_leaves` (a pre-existing emitter defect -- `v:multi_a` appended `OP_VERIFY` after `OP_NUMEQUAL` instead of folding to `OP_NUMEQUALVERIFY`, a different leaf hash and a WRONG taproot address; Go-only convergence fix in `md/script_emit.go`'s `tagVerify` fold, pinned by `TestVerifyWrappedMultiAFoldsIntoNumEqualVerify`), `TestPkhTapLeafGapIsPinnedByShape` (a tripwire whose own message says to convert it to a positive test once `pk_h` lands -- now `TestThePkhTapLeafGapIsCLOSED`), and `TestWalletPolicyConsentNeverHidesTheAbsenceOfAddresses` (re-aimed at a new `gap_wsh_andor` fixture, the shape the emitter still cannot derive). All three folded by the controller on the branch.
 
 - [ ] **Step 3: Report**
 
