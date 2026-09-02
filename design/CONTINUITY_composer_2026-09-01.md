@@ -1,7 +1,25 @@
 # CONTINUITY — Wallet Policy COMPOSER cycle (arbitrary tr/wsh authoring on the SH2), 2026-09-01
 
-**Resume here.** Usage ran low with R0 round 0 in flight; the operator ruled
-"finish what is in flight but don't launch anything new" (2026-09-01).
+**Resume here (updated later on 2026-09-01, after "Proceed autonomously").**
+The spec's R0 is CLOSED under lens-closure at `49d2dae` (+ wording `0b56ed4`).
+The STAGED plan and the Stage 0 detailed plan are committed at `3a799fa` with
+the build gate GREEN (`scripts/plan-build-gate-md.sh`, toolchain 1.85.0: 48
+compose tests, 47 pass, one PINNED red for the un-assembled MANIFEST fragment;
+clippy clean; md-cli compiles). Gate tooling fixes: `e9c42c9`, `8382d69`.
+**IN FLIGHT:** plan R0 round 0, two lenses, agents persist their own reports:
+`agent-reports/composer-S0-plan-R0-r0-fidelity.md` (opus: plan-vs-spec fidelity
+and lowering correctness by constructed counterexample) and
+`agent-reports/composer-S0-plan-R0-r0-tests.md` (sonnet: mutation testing of the
+assembled code in a private scratch copy; false-PASS hunt; claim checks).
+**NEXT:** persist each report in its own commit → spot-check → fold → re-run
+`plan-build-gate-md.sh` + cite/table/stepref/glyph → fold commit with gate output
+→ sonnet fold verification → when 0C/0I: dispatch ONE implementer (UC OFF) in a
+descriptor-mnemonic worktree, Tasks 1-8 in order, then the whole-diff opus
+execution review, then publish per the repo's release checklist. Not done yet: a
+LIVE operator walk of the spec's journeys (the one lens the operator can run).
+
+Original note: usage ran low with R0 round 0 in flight; the operator ruled
+"finish what is in flight but don't launch anything new", later lifted.
 
 ## State
 
