@@ -261,3 +261,88 @@ Three lenses read the committed plan on 2026-09-02 and persisted verbatim to `de
 | C-14 §8l deletable from `composerFlow` | **Task B11**: both walks assert it draws and hold to confirm it |
 | C-15 `composerCensusRefusal` unreachable | **Task B9**: removed with its deferred consumer (F-457), rather than left as a refusal nothing can trigger |
 | I-1 `composerHexEntry`'s exact-64 bound untested | **Task C0**: `TestComposerHexEntryTakesExactlySixtyFourCharacters`, which shows that 62 characters decode fine and are still not a digest |
+
+
+## 10. R0 round 1 folded -- the fold's own Critical, and eight open items closed
+
+`design/agent-reports/composer-S3-plan-R0-r1-fold-verification.md` returned **NOT GREEN**. It
+verified both round-0 Criticals as correctly fixed and holding under mutation, and then found a
+**new Critical of the round-0 fold's own making**: Task A11's code fence had been overwritten with
+Task B11's joined body, so "Part A ships alone" -- one of three named operator-question defaults --
+was false of the artifact meant to deliver it. An implementer following the plan in its own order
+could not have compiled the milestone it promises there, and the build gate could not see it: a
+whole-document, `Replace`-wins extraction only ever builds a file's FINAL state.
+
+That is my defect, and it is the same shape as the one round 0 caught me on -- a claim about
+structure that no gate was asked to check. The answer this time is a command rather than a promise.
+
+### Per item, with plan lines
+
+| r1 item | fix | plan line |
+| --- | --- | --- |
+| §2 NEW CRITICAL: A11's fence overwritten | Task A11's `composerFlow` restored self-contained (`md.Compose` direct, ends at `composerEngraveTemplate`); Produces line and commit message corrected; the weak `TestComposerNoPayloadWalkReachesAKeylessTemplateThatDecodes` DELETED and the real C26 walk moved into Part A's own test file, written to pass with or without Part B's seating step | 4852 |
+| §2, same: prove it rather than assert it | a `GATE_UNTIL='^### Task B1'` step, plus `handwire_s3.py --part-a`; the gate's blind spot on incremental buildability is stated in the task | 5755 |
+| §2, found BY that step | `gui/composer_discard.go` moved from Task B3 to Task A5 -- `composerShapeFlow` calls `composerApplyShapeEdit`, and Part A failed `go vet` three times without it | 2157 |
+| §2, consequence | Task B3 restated as the rule's semantics and tests | 6567 |
+| §3 fidelity I-2: fix never reached production | the parameterless `composerConsentLines` wrapper DELETED (it hardcoded the very argument the fix was about); `composerConsentFlow` passes `composerListedPaths(st.list)` | 11110 (guard) |
+| §3 journey I-6: `u == 0` tautology | `composerDateExists` separates the three failures; F-458 cited | 11110 (guard) |
+| §3 six unguarded Importants + C-9, C-12, 6b, 8d | twelve guards in Task C0, each naming its mutation; two are FIXTURE fixes, because C-12's and 8d's old fixtures were structurally incapable of failing | 11110 |
+| §3 fidelity I-7 | the stale `longInk <= shortInk` test deleted from Task A2, with the reason in its place | -- |
+| §4 B5/B6/B9 never reached their closing steps | each now has Run/Expected and a `-s -F -` commit step | -- |
+| §4 five under-counted Expected lines | corrected to measured values, each saying why its filter nets more | -- |
+| §5a extraction count | STATUS: 47 fences read, 1 dropped by Task B11's `Replace`, 46 kept across 43 files | 3 |
+| §5c Task C2's stale headline counts | 110/95, and stated as **the count at plan time** rather than a threshold | 11317 |
+| §5f two stale Produces lines | Task B9 (`composerCensusLines`' real signature) and Task B2 (`srcIdx`) | -- |
+| §5h N-1's missing destination | Task C1 gains it as a fourth spec-fold item | 11274 |
+| §6 C-15 | **MOOT, not closed**, and the plan now says so: `composerCensusRefusal` was removed with its deferred consumer (F-457), so there is nothing to wire | -- |
+
+### Gate output, all re-run after the fold
+
+| gate | result |
+| --- | --- |
+| **Part-A-only** (`GATE_UNTIL='^### Task B1'`, `handwire_s3.py --part-a`) | **23 files extracted, `go vet` clean but for the two pre-existing go1.25 findings, `ok seedhammer.com/gui`, 47 `TestComposer*` PASS -- with Part B absent** |
+| `plan-build-gate-go.sh` (fork `main` `321acb56`) | 43 files written, gofmt clean, `./md/ ./mk/ ./sysw/` ok x3 |
+| DEAD-IN-PROD (wired tree) | **gui: 1**, `composerDescriptorCeilingChars` (F-457's deferred consumer), named and justified |
+| `go vet ./gui/` (wired) | clean but for the two pre-existing go1.25 `ArtifactDir` findings |
+| `go test -count=1 -run '^TestComposer' -v ./gui/` (wired) | **110 top-level PASS, 95 sub-tests, 0 FAIL** |
+| `gui-shard-test.sh ./gui/ 24` (wired) | **ok -- all 1168 tests ran across 24 shards** |
+| `plan-cite-check.sh` | 241/241, 0 dangling, 0 ambiguous |
+| `plan-glyph-check.sh` | 289 strings, 0 undrawable |
+| `plan-table-check.sh` | 118 rows, 0 malformed |
+| `plan-stepref-check.sh` | 0 step numbers in prose |
+| `plan-staleness-check.sh <plan> <fork> 321acb56` | 144 unchanged, **0 drifted** |
+| per-task structure | all 25 tasks carry >= 3 checkbox steps with at least one `Run:` and one `Expected:` |
+
+### What round 1 changed about how I check my own work
+
+The round-0 fold's Critical and round-1's were the same failure at two levels: a claim the gates were
+not asked to check. Round 0's was "these functions are called by something"; round 1's was "this
+milestone builds on its own". Both are now commands -- the gate's DEAD-IN-PROD step and its
+`GATE_UNTIL` mode -- and the second one paid for itself immediately, catching
+`gui/composer_discard.go`'s task assignment, which no reading would have found.
+
+### The plan's own round-1 table, as folded
+
+## R0 round 1: the fold verification, and where each item is folded
+
+`design/agent-reports/composer-S3-plan-R0-r1-fold-verification.md` returned **NOT GREEN**. Both round-0 Criticals were verified fixed and hold under mutation; what follows is everything it found open, and where round 1 closes it.
+
+| # | round-1 finding | folded into |
+| --- | --- | --- |
+| §2 | **NEW CRITICAL** -- Task A11's fence was overwritten with Task B11's joined body, so "Part A ships alone" was false of the plan's own artifact; the old weak walk test sat unretired beside its replacement | **Task A11**: the fence is restored self-contained (calls `md.Compose` directly, ends at `composerEngraveTemplate`), its Produces line and commit message match what it stages, the weak `TestComposerNoPayloadWalkReachesAKeylessTemplateThatDecodes` is DELETED, the real C26 walk moves into Part A's own test file, and a **`GATE_UNTIL='^### Task B1'` step proves the milestone builds with Part B absent**. The gate's blind spot is stated: a whole-document, Replace-wins extraction can only see a file's FINAL state |
+| §3 fidelity I-2 | the path-numbering fix never reached production -- the only reachable call site hardcoded `(nil, 0)` | **Task A11**: the parameterless `composerConsentLines` wrapper is DELETED, and **Task B6**'s `composerConsentFlow` passes `composerListedPaths(st.list)`. Guard: `TestComposerConsentFlowNumbersPathsFromTheOperatorsList` (Task C0) |
+| §3 journey I-6 | the ceiling dispatch's `u == 0` was a tautology, so "that date does not exist" was dead code and 2027-02-31 got the ceiling body | **Task A7**: `composerDateExists` tells the three failures apart. Filed **F-458**, distinct from F-456. Guard: `TestComposerDateCeilingAndImpossibleDateAreToldApart` |
+| §3 six Importants | journey I-1, I-2, I-5; fidelity I-4, I-9; tests I-1 -- correct production fix, zero regression test | **Task C0**'s round-1 guards, one per finding, each naming its mutation |
+| §3 fidelity I-7 | the fold's table claimed the `longInk <= shortInk` test was "gone"; it was still there | **Task A2** deletes it, with the reason in its place |
+| §3 fidelity I-8 | §8m 1/5 and §8r 5/6 driven onto a frame | **Task C0**: `TestComposerSection8mRefusalsAllDrawThroughTheRealPath` (all five, the slot cap through `composerKeysEdit`) and `TestComposerDoorSaysAPayloadIsInFlashButNotLoaded` |
+| §4 | Tasks B5, B6, B9 never reached their own closing Run/Expected/commit steps | each now has both, with measured counts |
+| §4 | five Expected lines under-counted | corrected to measured values, with the reason each filter nets more than it did |
+| §5a | the extraction count was 41; it is 47 read / 46 kept / 43 files | the STATUS line |
+| §5c | Task C2's headline counts were 92/77 against an actual 100/81 | corrected, and stated as **the count at plan time** rather than a threshold, so the claim stays true by saying what it is |
+| §5f | two `Interfaces > Produces` lines the round-0 table claimed fixed and were not | **Task B9** (`composerCensusLines`' real signature) and **Task B2** (`srcIdx`) |
+| §5h | fidelity N-1's declined-and-recorded destination did not exist | **Task C1** gains it as a fourth spec-fold item (§7a: the key state is stated WITH Build, and the Lead wraps where rows do not) |
+| §6 C-9 | the §8s re-show signal untested through `composerFlow` | **Task C0**: `TestComposerStubReshowSignalIsTheChunkSet` pins the comparison, and both flow walks drive the screen it feeds |
+| §6 C-12 | the shortfall fixture could not tell seats from sources | **Task C0**: a SEED fixture, where the two rules give 4 and 1 |
+| §6 cell 6b | the "Change the script" row had no behavioural test | **Task C0**: `TestComposerChangeTheScriptRowRewrapsAndDiscards` |
+| §6 cell 8d | `composerMintCards` never called with both slots seated | **Task C0**: `TestComposerMintCardsMintsOneCardPerSeatedSlot` |
+| §6 C-15 | **MOOT, not closed** -- `composerCensusRefusal` was removed outright with its deferred consumer (F-457), so there is nothing to wire up. It would need re-verifying if F-457's concrete-descriptor plate is ever built | recorded here, no code |
