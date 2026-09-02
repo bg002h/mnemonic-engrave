@@ -31,11 +31,17 @@ vectors --template share it, the first two without an opt-out; malleability +
 mixed timelocks newly enforced under wsh/sh; the round-trip test's `if let Ok`
 guard removed; --json documented) and `66bdf2f4` (follow-up
 `md-descriptor-address-template-lack-experimental`). Plan record updated.
-**IN FLIGHT:** gate re-run on the folded worktree, then a sonnet verification of
-that fold → `agent-reports/composer-S0-exec-review-r1-fold-verification.md`;
-when clean: fast-forward descriptor-mnemonic `main` to the branch tip and push
-via `scripts/push-via-staging.sh main` (sonnet push agent; main is 5 unpushed
-docs commits ahead of origin already, all ancestors of the branch).
+**S0 WHOLE-DIFF REVIEW CLOSED 0C/0I:** gate re-run on the folded worktree
+(fmt/clippy clean, 1318/1318, doctests ok); sonnet verification 4 FIXED / 1
+DECLINED (reason holds) / 0 regressions (`agent-reports/composer-S0-exec-review-r1-fold-verification.md`).
+**IN FLIGHT:** sonnet push agent: fast-forward descriptor-mnemonic `main` to
+`66bdf2f4` and push via `scripts/push-via-staging.sh main`; push
+mnemonic-engrave `master` via its staging ritual → report
+`agent-reports/composer-S0-push-report.md`. No tag, no version bump, no
+publish (blocked, see the staged plan's S0 exit).
+**THEN:** S0 is shipped-to-main. Next: the operator's two open decisions (the
+S1 `now:` auto-append default; the md-codec publish blocker), then S1's R0
+immediately before its implementer.
 **Payload-spec fold (S1 Task 6) CLOSED under its own R0:** r0 0C/3I/4M/5N
 (`bb49953`) folded at `44765d7` (+ F-450 `72ac66d`); r1 verification 11 FIXED /
 1 PARTIAL (`de34664`), the partial folded at `fdf7671`.
