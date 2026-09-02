@@ -15223,3 +15223,104 @@ into the spec amendment and the kept-but-commented `csidMarker(c)` calls).
 - **Owning phase:** operator's return; blocks only the final acceptance
   record, nothing else.
 - **Status:** OPEN. **Tier:** `acceptance` / hardware.
+
+### F-448 — `pkh-vs-pk-taproot-under-crqc`: investigate `pkh` vs `pk` in taproot wallets under the assumption that a cryptographically relevant quantum computer exists (owning phase: **recon, its own item — does NOT gate the wallet-policy composer**) `#seedhammer` `#mnemonic` `#funds-safety`
+
+Filed 2026-09-01 by operator direction during the wallet-policy composer
+brainstorm (`design/BRAINSTORM_wallet_policy_composer.md`, ruling C17).
+Operator, verbatim: "file a followup 'investigate pkh vs. Pk in taproot
+wallets under the assumption that a cryptographically relevant quantum
+computer exists'".
+
+**Context.** The composer's grammar (C16/C17) spells a single-key path `pkh`
+in wsh and `pk` in taproot leaves. The classical argument for `pk` in tr is
+that unspent leaves are never revealed, so hashing the key inside a leaf hides
+nothing. This item asks whether that argument survives a CRQC, which breaks
+the discrete log of any EXPOSED public key.
+
+**Starting hypothesis, UNVERIFIED — to be checked against BIP-341 text and
+the current quantum-migration proposals (e.g. BIP-360), not against memory:**
+
+1. A P2TR output places the 32-byte x-only OUTPUT key `Q` directly in the
+   scriptPubKey (BIP-341). A CRQC computing `dlog(Q)` can produce a valid
+   key-path Schnorr signature for `Q` regardless of what `Q` commits to — a
+   NUMS internal key provides no protection, because the attacker needs the
+   discrete log of `Q`, not of the internal key. If so, EVERY P2TR output is
+   spendable by a CRQC at rest, and `pk` vs `pkh` inside a leaf is moot for
+   taproot: the exposed key is `Q`, not the leaf keys.
+2. A P2WSH output exposes only `SHA256(witnessScript)` at rest; keys are
+   exposed only when the script is revealed on spend, and a `pkh` branch
+   exposes its key only when THAT branch spends. So under a CRQC the
+   relevant choice is the WRAPPER (wsh vs tr) more than `pk` vs `pkh`, and
+   inside wsh the C17 choice of `pkh` for single-key branches is the
+   quantum-conservative one as well as the privacy one.
+3. Consequence to evaluate for the composer's copy: whether the device should
+   say anything about taproot's at-rest key exposure when an operator picks
+   `tr`, or whether that belongs to documentation only (it is a property of
+   BIP-341, not of this design).
+
+**What the recon must do:** confirm or refute 1-2 from BIP-341 and BIP-360
+text with `file:line`; survey what current Bitcoin quantum-migration
+discussion says about taproot outputs; state whether any spelling INSIDE a
+tapleaf changes the at-rest exposure (expected: no); recommend copy or
+documentation, and whether the `pk`-in-tr default of C17 should change.
+
+- **Owning phase:** recon, scheduled independently; not a gate for the
+  composer spec or plan.
+- **Status:** OPEN. **Tier:** `recon` / `docs`.
+
+### F-449 — `liana-taproot-import-unspendable-xpub`: a device-composed taproot policy with an unspendable key path does not import into Liana, because md spells the NUMS internal key as raw `H` and Liana requires an xpub (owning phase: **its own constellation cycle in descriptor-mnemonic — a second internal-key KIND on the md1 wire; does NOT gate the wallet-policy composer**) `#mnemonic` `#seedhammer` `#codec` `#interop`
+
+Filed 2026-09-01 by operator direction ("File Liana wallet import followup")
+during the wallet-policy composer brainstorm, from finding I5 of the fable
+review `design/agent-reports/composer-lowering-rules-bitcoin-expert-review.md`
+and the survey in `design/BRAINSTORM_wallet_policy_composer.md` §3.9. Every
+source below was fetched and read that day.
+
+**The gap.** BIP-388 requires the `tr()` internal key to be a placeholder
+backed by an xpub; a non-placeholder key is an invalid policy (bip-0388 l.139,
+150-153, 310). md1 carries the unspendable key path as a FLAG (`is_nums`,
+`md-codec/src/tree.rs:51`) and both renderers spell it as the raw BIP-341 point
+`50929b74…e803ac0` (`render.rs:87-88`, `to_miniscript.rs:319-343`). Liana's
+importer requires an xpub internal key and refuses the raw hex
+(`liana/src/descriptors/analysis.rs:596-599`, `IncompatibleDesc`). Bitcoin
+Core accepts the raw hex (BIP-387 examples l.69-77). Nunchuk EMITS the raw hex
+itself (`libnunchuk src/descriptor.cpp:193,299,459`) and IMPORTS either the raw
+hex or any xpub whose pubkey is `H` (`IsUnspendableXpub`, `:750-753`).
+
+**There is no standard form to adopt.** Two recipes exist and produce
+DIFFERENT xpubs for the same wallet: (a) Liana — pubkey `H`, chaincode =
+sha256 of the leaf xpubs' pubkeys in left-to-right order, not sorted, not
+deduplicated (`analysis.rs:404-445`, delvingbitcoin thread 304 post #21);
+(b) bitcoin/bips PR #1746 `unspendable()` — sorted and deduplicated before
+hashing, to remove `sortedmulti_a` order dependence (draft l.42-47, 95) —
+**closed unmerged 2025-09-17**, author: "I am no longer working on this BIP
+draft". libnunchuk ships recipe (b) as `GetUnspendableXpub` with no in-library
+caller. Ledger's `doc/wallet.md` defines no unspendable form.
+
+**Why this is a WIRE item and not a rendering fix — the trap to avoid.** An
+`H`-xpub's per-index child is `H + tweak`, so raw `H` and any xpub form derive
+DIFFERENT ADDRESSES for the same tree. Substituting an xpub at export time
+(`md descriptor`) would therefore emit a descriptor for a DIFFERENT wallet than
+the plates define — the interop-twin trap already ruled out for the reference
+wallet ([[reasonably-complex-wallet-fixture]]). The form must be chosen when the
+wallet is CREATED and carried on the wire: a second internal-key kind (a flag
+value or an additive TLV with a criticality story — old decoders preserve-and-
+ignore unknown TLVs, so a silently ignored kind would derive wrong addresses;
+see F-417's extension seam). Existing NUMS plates keep meaning raw `H`.
+
+**What it needs, in order.** (1) A ruling on WHICH recipe, or a wait for the
+ecosystem to converge — building to (a) today means building to the variant
+the abandoned draft moved away from; (2) the wire kind, Rust-first in md-codec
+with vectors, then the Go port and on-device derivation (HMAC-SHA512 and the
+taproot tweak are already linked in the firmware); (3) `md encode`/the
+composer offering the form at creation; (4) ACCEPTANCE = an import test, not an
+emit test: a device-composed tr policy exported with `md descriptor` imports
+into Liana with success AND derives byte-identical addresses on the device, in
+md, and in Liana. Cross-ref F-448 (quantum framing of the exposed output key,
+independent of this item).
+
+- **Owning phase:** its own gated cycle in descriptor-mnemonic; not a gate for
+  the composer spec or plan. Until then the composer spells NUMS as raw `H`
+  and its docs state that Liana and BIP-388-strict registration will refuse it.
+- **Status:** OPEN. **Tier:** `constellation` / `wire` / `interop`.
