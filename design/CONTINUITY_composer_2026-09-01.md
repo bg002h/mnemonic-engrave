@@ -490,3 +490,11 @@ ONE path = warning.
   89 PASS lines; whole 205; gui 1168/1168; DEAD-IN-PROD 1 justified; cite
   241/241; staleness 0). r2 verification (sonnet) dispatched next
   (brief scratchpad/verify-brief-s3-r2.md).
+- S0b round-1 fold APPLIED by the author (uncommitted): the PRESET_NAMES drift
+  test is a unit test that iterates the list (a 7th unmatched name fails it);
+  `unreachable!()` → CliError (phantom preset exits 1); M-3 wording. Author's
+  gate: md-codec compose 52/52, md-cli compose 31/31 (+1 unit test), workspace
+  1340/1340, corpus 156, cite 25/25. Controller re-gate RUNNING
+  (scratchpad/s0b-gate-r2.log). THEN: commit (scratchpad/s0b-fold-r1.msg) → r2
+  verification (scratchpad/verify-brief-s0b-r2.md, targeted) → implementer
+  (scratchpad/implementer-brief-s0b.md).
