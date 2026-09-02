@@ -2503,7 +2503,9 @@ fn presets_compose_and_carry_the_documented_shapes() {
 
     let p = presets::decaying_multisig(Wrapper::Wsh, 2, 3, 1, 2, 1000, 2000, 4_000_000).unwrap();
     assert_eq!(p.paths.len(), 3);
-    assert_eq!(p.paths[1].keys, Some(KeySet { k: 1, n: 2, sorted: true }), "the recovery quorum is SMALLER: that is the decay");
+    assert_eq!(p.paths[1].keys, Some(KeySet { k: 1, n: 2, sorted: true }), "the recovery quorum is no harder than the primary: that is the decay");
+    // Same threshold over MORE keys is admitted: it is no harder to satisfy.
+    assert!(presets::decaying_multisig(Wrapper::Wsh, 2, 3, 2, 5, 1000, 2000, 4_000_000).is_ok());
     assert_eq!(p.paths[2].lock, Some(Lock::AfterHeight(4_000_000)));
     for l in [
         presets::plain_multisig(Wrapper::Wsh, 2, 3).unwrap(),
@@ -2653,10 +2655,13 @@ pub fn hashlock_gated(wrapper: Wrapper, hash: [u8; 32], older_blocks: u32) -> Re
     checked(PathList { wrapper, paths: vec![gated, later] })
 }
 
-/// k1-of-n1 after `older1`; a SMALLER recovery quorum k2-of-n2 (distinct keys)
-/// after `older2 > older1`; one final key after `after_height`. The toolkit's
+/// k1-of-n1 after `older1`; a recovery quorum k2-of-n2 (distinct keys) that is
+/// NO HARDER to satisfy than the primary (`k2 <= k1`; `n2` is free, since more
+/// keys at the same threshold only widen the ways to spend) after
+/// `older2 > older1`; one final key after `after_height`. The toolkit's
 /// archetype takes the primary and recovery quorums as separate parameters and
-/// refuses tiers that do not unlock progressively later; so does this.
+/// refuses tiers that do not unlock progressively later; so does this. What
+/// "decay" means here is exactly those two guards, nothing more.
 #[allow(clippy::too_many_arguments)]
 pub fn decaying_multisig(
     wrapper: Wrapper,
