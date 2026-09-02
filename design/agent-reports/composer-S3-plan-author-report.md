@@ -110,3 +110,154 @@ Python 3, one argument: the root of a scratch copy of the fork that already carr
 **Tested** on a fresh `cp -r` of the gate's own extraction (`SCRATCH=/scratch/code/shibboleth/.plan-build-gate-go-s3`), then removed. `go vet ./gui/` reports **only the two pre-existing `testing.ArtifactDir requires go1.26` findings**; `go test -count=1 -run '^TestComposer' ./gui/` is **`ok`**; `scripts/gui-shard-test.sh ./gui/ 24` is **`ok -- all 1125 tests ran across 24 shards`**; a second run exits 3 without touching the tree.
 
 **One plan defect it forced into the open, and the plan was edited to fix it.** The §8e deprecation comment as written wrapped `Wallet Policy > Build a new policy` across two lines, so two of the three substrings `TestComposerMultisigBuildCarriesTheDeprecationComment` requires were not contiguous — **the plan's own copy failed the plan's own test**, twice over, on line breaks alone. My earlier 1,125-green run had hidden it, because I had reflowed the comment in the scratch copy by hand rather than in the plan; making the script apply *exactly what the plan says* is what surfaced it. The fix puts §8e's sentence on its own unwrapped line with a comment saying why it must stay that way, in the plan and in the script identically (one hunk, +13/-4 against `88b4a4a`). That is the only repository edit this task made, and it was unavoidable: a script that applied the plan verbatim and a plan whose text failed its own gate cannot both be left standing.
+
+
+## 9. R0 round 0 folded, and the fold applied to the plan
+
+Three lenses read the committed plan on 2026-09-02 -- **journey 2C/6I/6M/4N**,
+**fidelity 1C/12I/11M/3N**, **tests 15C/1I** -- and all three found the same
+Critical independently: **Part B was built and never joined to any flow.**
+Fourteen production functions had no caller, so an operator with four `key:`
+records read the door's "Keys loaded: 4", chose Build, and was never offered a
+slot; §7e's self-check and §8q never executed on a device. Go does not error on
+an unused package-scope function and every `TestComposer*` called them directly,
+so the suite was green over a feature nobody could reach. That is the class
+recorded in memory as *"plans list components and omit the call that joins them;
+six green stages shipped an inert feature"*, and I shipped it again.
+
+The whole fold has been APPLIED to
+`design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md` (working tree, uncommitted;
+the only repository file touched). The plan grew **7,626 -> 10,893 lines** and
+**23 -> 25 tasks**: **Task B11** is the join, with a flow-level walk that is the
+only kind of test that can fail on that class, and **Task C0** carries §12 item
+5's missing gates plus one test per surviving mutation.
+
+**Every `gui/composer_*.go` fence in the plan was replaced with code that was
+compiled and run first** -- 41 fences. Nothing in the plan is code that has not
+executed.
+
+### Gate output, all re-run after the fold
+
+| gate | result |
+| --- | --- |
+| `plan-build-gate-go.sh` (fork `main` `321acb56`) | 41 fences extracted, gofmt clean, `./md/ ./mk/ ./sysw/` ok |
+| DEAD-IN-PROD reachability (the gate's last step, wired tree) | **gui: 1 survivor**, `composerDescriptorCeilingChars` -- §13 item 1's measurement, production consumer deferred to F-457; named and justified in the plan |
+| `go vet ./gui/` (wired) | clean but for two pre-existing go1.25 `ArtifactDir` findings on fork `main` |
+| `go test -count=1 -run '^TestComposer' ./gui/` (wired) | **100 top-level PASS, 81 sub-tests, 0 FAIL** |
+| `gui-shard-test.sh ./gui/ 24` (wired) | **ok -- all 1158 tests ran across 24 shards** |
+| `go test ./md/ ./mk/ ./sysw/` (wired) | ok x3 |
+| `plan-cite-check.sh` | 238/238 resolved, 0 dangling, 0 ambiguous |
+| `plan-glyph-check.sh` | 237 operator strings, 0 undrawable |
+| `plan-table-check.sh` | 89 rows, 0 malformed |
+| `plan-stepref-check.sh` | 0 step numbers in prose |
+| `plan-staleness-check.sh <plan> <fork> 321acb56` | 142 unchanged, **0 drifted** |
+
+**One false red worth recording:** the first sharded run failed with `no space
+left on device` on six payload-writing tests. `/tmp` is a 32 GB tmpfs at 81%,
+held mostly by other agents' Rust build caches in the shared session scratchpad.
+Green with `TMPDIR` on `/scratch`; nothing was deleted from another agent's tree.
+
+### Where the fold declined a fix
+
+Three, each with its citation:
+
+1. **Journey C-2's second shape** (restate the reversed key-order outcome on the
+   path-list row and consent line) -- declined for the first shape. Asking the
+   question at the transition, where `sole` is final, REMOVES the reversal;
+   restating it describes the reversal after the fact, and §8b then fires exactly
+   where §5a permits.
+2. **Fidelity I-10's form A** (concrete descriptor as text and QR plates) --
+   declined and filed **F-457**. `md` deliberately emits no descriptor text
+   (`md/compose.go`'s header: *"a rendering that cannot be re-parsed is the
+   defect this package's invariant exists to prevent"*), so a renderer is
+   normative and lands in Rust first. Form A ships as the keyed md1, which §7f
+   also names. `composerCensusRefusal` went with it rather than staying as a
+   refusal nothing could trigger (tests-lens C-15).
+3. **Fidelity N-1** (§8r's lines are "beneath Build" in the spec, in the Lead in
+   the code) -- declined as a code change and recorded for the §13 spec fold:
+   the Lead wraps with `widget.Labelw` (`gui/gui.go:1969`) and the choice rows do
+   not, which the reviewer calls sound.
+
+### The per-finding table, as folded into the plan
+
+## R0 round 0: what the three lenses found, and where each is folded
+
+Three lenses read the committed plan on 2026-09-02 and persisted verbatim to `design/agent-reports/composer-S3-plan-R0-r0-{journey,fidelity,tests}.md`: **journey 2C/6I/6M/4N, fidelity 1C/12I/11M/3N, tests 15C/1I**. All three found the same Critical independently. Every finding below is folded into the task named, or declined in one sentence with its citation. Nothing is carried as "noted".
+
+**The one Critical all three found.** Part B declared fourteen production functions and nothing called any of them; the plan promised a ``Replace `gui/composer_flow.go` `` that no task supplied. **Task B11 is that task**, with a structural reachability scan and a flow-level walk -- the only kind of test that can fail on the class. Recorded in memory as *"plans list components and omit the call that joins them; six green stages shipped an inert feature"*, and it happened here anyway.
+
+### Journey lens (2C / 6I / 6M / 4N)
+
+| finding | folded into |
+| --- | --- |
+| C-1 Part B never joined to any flow | **Task B11**, with `TestComposerWalkFromAKeyedPayloadReachesTheEngraveScreen` and `TestComposerEveryScreenFunctionHasAProductionCaller` |
+| C-2 "Sorted (usual)" silently reversed by adding a second path | **Task A5**: the question moves OUT of `composerKeysEdit` into `composerKeyOrderStep`, asked at the transition where `sole` is FINAL. The reviewer's second shape (restate the outcome on a row) is declined: it describes the reversal after the fact where asking once removes it, and §8b then fires exactly where §5a permits |
+| I-1 §8j blocks the lock and hash edits §7g rules DEFAULT | **Task A5**: `composerShapeGuard` moves onto `composerPathEdit`'s Keys, Remove and Move arms; a lock or hash edit is unguarded, per §7d |
+| I-2 the §4f invariant fires on unseated slots | **Task B4** (`composerInvariantViolation` skips `src < 0`) and **Task B6** (the real invariant runs over the DECODED md1's declared origins, which is where §4f puts it); **Task B11** sizes `st.assigned` at flow entry so a never-seated composition no longer fails the self-check on slot count |
+| I-3 the pick list can take a row the operator cannot see | **Task A2**: `composerPickScreen` clamps `sel` into `[start, start+shown)` after a page advance, both directions; gated by `TestComposerPickScreenNeverReturnsARowItDidNotDraw` (Task C0) |
+| I-4 consent confirmable before its proof is drawn | **Task A2**: `composerReadScreen` withholds the checkmark until the last page has been laid out ONCE; **Task B6** makes it the single consent surface, closing fidelity M-5 with it |
+| I-5 Back at Key order destroys the path's key set | **Task A5**: the key set is snapshotted and RESTORED on any decline, and `composerPathLine` gives a path with neither element its own body ("empty") instead of "hash only" |
+| I-6 a date past 2038-01-19 refused as "does not exist" | **Task A1** adds `composerCopyDateCeiling` (the copy table moves 39 -> 40) and **Task A7** uses it; filed as a §8 addition, F-456, so the spec stays the enumerable source |
+| M-1 the changed-id line fires after a Back with no edit | **Task B11**: the §8s signal is a comparison of the emitted CHUNK SETS, not a sticky `edited` flag |
+| M-2 an empty digit field echoes the §8u ceiling | **Task A7**: the two relative pads say what to type before what is too much |
+| M-3 `ErrComposeNoPaths` shows a codec string | **Task A5**: mapped to §8m line 1 beside `ErrComposeNoKeyedPath` |
+| M-4 a key-less path with "No hash lock" leaves an empty path | **Task A5**: a path that ends with neither keys nor a hash is treated as a cancel |
+| M-5 the own-wallet line absent from the consent surface | **Task A11**: `composerConsentLines` carries it, where §7g's divergence table puts it |
+| M-6 the seating prompt is drawn on one page only | **Task A2**: the lead is a PER-PAGE header rather than the first body row |
+| N-1 Back at the wrapper exits the program | **Task B11**: the door is a loop, so Back out of Build lands on the door |
+| N-2 the slots/keys line drawn with no payload | **Task A5**: `composerSlotsKeysLine` prints the slot count alone when no source is loaded |
+| N-3 no way to reorder paths | **Task A5**: a "Move up" arm on paths after the first, through `composerApplyShapeEdit` so the discard stays exact |
+| N-4 the date echo appends the raw operand | **Task A7**: removed; §6b's premise is that the operator never types one |
+
+### Fidelity lens (1C / 12I / 11M / 3N)
+
+| finding | folded into |
+| --- | --- |
+| C-1 Part B has no caller | **Task B11** (same as journey C-1) |
+| I-1 the invariant on unseated slots, checked on UI state | **Tasks B4, B6** (see journey I-2) |
+| I-2 consent mis-numbers paths for an extracted taproot internal key | **Task A11**: `composerConsentLinesFor` takes the operator's numbering and the key-path line names its listed path; gated by `TestComposerConsentNumbersPathsAsTheOperatorListedThem` |
+| I-3 Back at the path list abandons the composition | **Task B11**: Back returns to the wrapper with the list intact, gated by `TestComposerBackAtThePathListKeepsTheComposition` -- the first test in this plan that fails if a Back loses state |
+| I-4 the wrapper cannot be changed after the first pick | **Task A5**: a "Change the script" row, so §7g's row and §12 item 4's wrapper vector are reachable |
+| I-5 `composerKeysEdit` destroys an existing key set | **Task A5** (see journey I-5) |
+| I-6 §8a/§8b memoised by path index, so an unskippable confirm can be skipped | **Task A5**: both memos deleted. §8a fires where a key-less path is CREATED (once per path by construction) and §8b at the transition; gated by `TestComposerKeylessConfirmFiresAgainForANewPathAtAReusedIndex` |
+| I-7 the pager-gate test cannot fail | **Task C0**: replaced by `TestComposerReadScreenWithholdsTheCheckmarkUntilTheLastPage`, which asserts the BEHAVIOUR and fails in both directions; the ink comparison is gone |
+| I-8 §12 item 5's gates missing for §8m, §8c, §8r | **Task C0**, with the measured reason the instrument could not be used unchanged for the short bodies |
+| I-9 §8i's "and at consent" half absent | **Task A11**: `composerConsentLines` restates it whenever the decoded shape carries a digest |
+| I-10 form A and the secret plate have no builder; "cut ONCE" unimplemented | **Task B7** (the secret-form picker is deleted, since nothing consumed it) and **Task B11** (`composerSecretCards` dedups by registered seed and cuts ms1 through `cardMS1`). Form A ships as the KEYED md1; the text and QR descriptor plates are declined here and filed **F-457**, because `md` deliberately emits no descriptor text (`md/compose.go`'s header: "a rendering that cannot be re-parsed is the defect this package's invariant exists to prevent") and a renderer is normative, Rust-first |
+| I-11 Part A's exit not discharged; Part A alone breaks §7e/§7f | **Task B11**: `TestComposerNoPayloadWalkEngravesAKeylessTemplate` walks all six of §12 item 3's clauses, and the joined flow gives Part A the collapsed form choice and the self-check §7e makes unconditional. The default stands: Part A ships alone for the no-payload journey, and the plan says where that is honest |
+| I-12 the blast radius covers Go tests only | **Task C2**: the three `cmd/emu/*.js` walks and `capture_walletpolicy.py`, with the one-line fix and an explicit note that no gate in this stage can run them |
+| M-1 the 9th-path refusal has no §8 home | **Task A5**: the row is not offered at the cap, which is what §4e asks; the ad-hoc string is gone |
+| M-2 the consent renders locks in the row form | **Task A11**: `composerBranchLines` uses §6b's echo form |
+| M-3 the sticky `edited` flag | **Task B11** (journey M-1) |
+| M-4 the raw operand in the date echo | **Task A7** (journey N-4) |
+| M-5 two consent surfaces | **Task B6**: one, `composerReadScreen`, which is `confirmReviewScreen`'s paged form plus the last-page gate §7e needs |
+| M-6 §8i shown in front of a clear | **Task A8**: shown once the operator is actually taking a hash |
+| M-7 `composerCensusLines`' declared vs real signature | **Task B9**: the Interfaces line matches the code, and `composerCensusRefusal` is removed with its deferred consumer |
+| M-8 `seedID` parameter is a source index | **Task B2**: renamed `srcIdx`, with the collision named |
+| M-9 no preset-or-blank wiring point | **Task A10 and Task B11**: the point is named so A10 is a fill-in |
+| M-10 stale STATUS baseline | the header: fork `main` `321acb56`, the five drifted citations re-resolved |
+| M-11 `composerPageLines` counts a row that may overflow | **Task A2**: a row is counted only when it is inside the box, because that count IS §13 item 1's recorded capacity |
+| N-1 §8r "beneath Build" vs the Lead | DECLINED as a code change and folded to the spec instead: the Lead wraps and the rows do not (`gui/gui.go:1969`), which is the reason the reviewer calls sound; recorded for the §13 fold in **Task C1** |
+| N-2 the upward-only clamp | **Task A2** (journey I-3) |
+| N-3 §8n's host lines not scoped | **Task A1**: the copy table's own header says §8n is `me sysw pack` stderr and belongs to S1 |
+
+### Tests lens (15C / 1I) -- the mutation survivors
+
+| finding | folded into |
+| --- | --- |
+| C-1 Part B unreachable | **Task B11** |
+| C-2 `composer_engrave_test.go` and `composer_cards_test.go` promised and never written | **Tasks B7 and B8**, both files written with their steps |
+| C-3 Task B10 is prose, no code | **Task B10**, rewritten with the five vectors and four assertions |
+| C-4 the door's `ClassMDMK` branch is a false PASS | **Task C0**: `TestComposerDoorOffersFromPayloadForACardPayload`, on a real minted card |
+| C-5 nothing clicks "Build a new policy" | **Task B11**: both walks do |
+| C-6 the §4e gate inside `composerShapeFlow` can be deleted | **Task C0**: `TestComposerShapeRefusalGateIsReachedFromTheScreen` |
+| C-7 the §8a confirm can be bypassed | **Task B11**: `TestComposerKeylessConfirmFiresAgainForANewPathAtAReusedIndex` drives the decline |
+| C-8 `composerLockAccept`'s bounds can be disabled | **Task C0**: `TestComposerLockAcceptRefusesFromTheScreen`, four refusals and a control |
+| C-9 the §8s re-show signal can be inverted | **Task C0**: `TestComposerStubReshowSignalIsTheChunkSet` |
+| C-10 `composerStubLines` never called with `keyedChunks` | **Task C0**: `TestComposerStubLinesLabelASeatedSlot` |
+| C-11 the mapping review's invariant check at the call site | **Task C0**: `TestComposerMappingReviewRefusesFromTheScreen` |
+| C-12 `composerShortfall`'s counts at the call site | **Task C0**: `TestComposerShortfallCountsSeatsFromTheScreen` |
+| C-13 the C29 warning deletable from the review's output | **Task C0**, same test's second half |
+| C-14 §8l deletable from `composerFlow` | **Task B11**: both walks assert it draws and hold to confirm it |
+| C-15 `composerCensusRefusal` unreachable | **Task B9**: removed with its deferred consumer (F-457), rather than left as a refusal nothing can trigger |
+| I-1 `composerHexEntry`'s exact-64 bound untested | **Task C0**: `TestComposerHexEntryTakesExactlySixtyFourCharacters`, which shows that 62 characters decode fine and are still not a digest |
