@@ -70,7 +70,7 @@ fn pack_appends_the_pack_time_when_a_composer_record_is_present_and_says_so() {
 }
 
 #[test]
-fn a_payload_without_a_composer_record_packs_byte_identically_to_before() {
+fn a_payload_without_a_composer_record_gains_no_pack_time_record() {
     // Seeds, text, cards: NO bound appended, no note; the six pre-existing pack
     // tests stay untouched for exactly this reason.
     let dir = tempfile::tempdir().unwrap();

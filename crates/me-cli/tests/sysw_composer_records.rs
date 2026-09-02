@@ -181,6 +181,17 @@ fn key_origin_rules_are_each_enforced() {
 }
 
 #[test]
+fn a_descriptor_form_key_names_the_suffix_not_the_xpub() {
+    // Copied out of a descriptor rather than `md decompose --emit keys`: refused (the rule wants
+    // the account key alone), and the detail must say so rather than "not an extended public key".
+    let e = key_err(&format!("[73c5da0a/48'/0'/0'/2']{XPUB0}/<0;1>/*"));
+    assert_eq!(
+        e.detail(),
+        "the key carries a derivation suffix; give the account xpub alone, as `md decompose --emit keys` prints it"
+    );
+}
+
+#[test]
 fn hash_must_be_exactly_64_lowercase_hex() {
     assert_eq!(
         parse(&format!("hash:{}", "a8".repeat(31))),
@@ -375,7 +386,7 @@ use sha2::Digest as _;
 /// (Stage 2). Changing a row means changing this in both repos — the point.
 /// Measured 2026-09-02 by running the regenerate test over CASES in the plan's
 /// build-gate scratch copy; the regenerate test prints it again on every run.
-const FIXTURE_SHA256: &str = "a894e619580db8ca0e06ebfe45576cc45722f695913bf46e9285201c95f146c3";
+const FIXTURE_SHA256: &str = "eed6b177d1a3406a69c4a0102635f5d59c6412fa65e106f85b831c4736ac464e";
 const FIXTURE_PATH: &str = "testdata/record_class_vectors.json";
 
 fn fixture_path() -> std::path::PathBuf {

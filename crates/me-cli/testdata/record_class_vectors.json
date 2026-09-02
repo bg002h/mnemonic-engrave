@@ -238,5 +238,35 @@
     "record": "now:313735363638343830302C393130303030",
     "class": "Unknown",
     "host_line": "record 0: now: must be <seconds>[,<height>] in range"
+  },
+  {
+    "name": "now-unicode-digits",
+    "record": "now:d9a1d9a7d9a5d9a6d9a6d9a8d9a4d9a8d9a0d9a0",
+    "class": "Unknown",
+    "host_line": "record 0: now: must be <seconds>[,<height>] in range"
+  },
+  {
+    "name": "now-leading-zeros-valid",
+    "record": "now:30303031373536383030",
+    "class": "Now",
+    "host_line": null
+  },
+  {
+    "name": "key-body-odd-length",
+    "record": "key:5b3",
+    "class": "Unknown",
+    "host_line": "record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record"
+  },
+  {
+    "name": "now-seconds-eleven-digits",
+    "record": "now:3031373536363834383030",
+    "class": "Unknown",
+    "host_line": "record 0: now: must be <seconds>[,<height>] in range"
+  },
+  {
+    "name": "now-height-ten-digits",
+    "record": "now:313735363638343830302c30343939393939393939",
+    "class": "Unknown",
+    "host_line": "record 0: now: must be <seconds>[,<height>] in range"
   }
 ]

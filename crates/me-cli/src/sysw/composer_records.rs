@@ -237,6 +237,13 @@ fn parse_key(body: &str) -> Result<ComposerRecord, ComposerRecordError> {
     if origin.is_empty() {
         return Err(K("origin has no path components"));
     }
+    if xpub_text.contains('/') {
+        // The likeliest mis-paste: a key copied out of a descriptor, derivation suffix and
+        // all. It IS an extended public key with an origin, so "not an extended public key"
+        // would name the wrong problem (composer-S1-exec-review-r0 M-3). Class and §8n line
+        // are unchanged; only the detail says what actually went wrong.
+        return Err(K("the key carries a derivation suffix; give the account xpub alone, as `md decompose --emit keys` prints it"));
+    }
     let xpub = Xpub::from_str(xpub_text).map_err(|_| K("not an extended public key"))?;
     if !matches!(xpub.depth, 3 | 4) {
         return Err(K("xpub depth is not 3 or 4"));
@@ -325,6 +332,18 @@ pub const CASES: &[Case] = &[
     Case { name: "now-body-not-utf8", record: "now:ff", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
     Case { name: "now-empty", record: "now:", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
     Case { name: "now-body-uppercase-hex", record: "now:313735363638343830302C393130303030", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
+    // Three rows added at the S1 whole-diff review (composer-S1-exec-review-r0 M-2): the
+    // divergences a reasonable Go port would produce. Arabic-Indic digits are digits to
+    // `unicode.IsDigit` and not to `is_ascii_digit`; leading zeros are ADMITTED (the rule is
+    // ^[0-9]{1,10}$, and a base-0 strconv would read them as octal); odd-length hex is refused.
+    Case { name: "now-unicode-digits", record: "now:d9a1d9a7d9a5d9a6d9a6d9a8d9a4d9a8d9a0d9a0", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
+    Case { name: "now-leading-zeros-valid", record: "now:30303031373536383030", class: "Now", host_line: None },
+    Case { name: "key-body-odd-length", record: "key:5b3", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    // Two rows added at the S2 plan's tests lens (composer-S2-plan-R0-r0-tests I-1): the §6a
+    // digit-COUNT bound is independent of the range bound, so an in-range value padded past
+    // the count (11 digits of seconds, 10 of height) must refuse even though it parses in range.
+    Case { name: "now-seconds-eleven-digits", record: "now:3031373536363834383030", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
+    Case { name: "now-height-ten-digits", record: "now:313735363638343830302c30343939393939393939", class: "Unknown", host_line: Some("record 0: now: must be <seconds>[,<height>] in range") },
 ];
 
 /// One JSON row of `testdata/record_class_vectors.json`.

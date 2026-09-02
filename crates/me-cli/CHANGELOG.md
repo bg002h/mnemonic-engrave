@@ -17,8 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or `hash:` record and no `now:`, `pack` appends the pack time as a trailing
   `now:`; `--now` forces that onto any payload, `--no-now` suppresses it, and
   a supplied `now:` always wins — payloads without a composer record pack
-  byte-identically to before. `me sysw show` prints the three.
-  `testdata/record_class_vectors.json` is the lockstep fixture (40 rows, one
+  byte-identically to before. A sealed payload that gets a `now:` therefore
+  carries its pack time in cleartext: the class is public by design, because
+  the device reads the bound before any passphrase. `me sysw show` prints the
+  three.
+  `testdata/record_class_vectors.json` is the lockstep fixture (45 rows, one
   per §6a rule) the device's classifier is measured against (composer spec §12
   item 8).
 

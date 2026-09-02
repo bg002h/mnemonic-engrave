@@ -371,7 +371,7 @@ no such function and adding one to the port would be the port leading.
 | --- | --- | --- |
 | `--expect transaction,descriptor` on a tx-only payload | **4** | `me: --expect descriptor was not met: NO record of that kind is in the stream.` / `Looking for an md1 descriptor card.` / `Nothing was written -- a container built without it would flash and engrave, and the gap would only show when someone tried to restore.` |
 | `--expect transaction` on 5 of 6 `mt1` strings | **4** | `me: --expect transaction was not met: records of that kind ARE present, but the set does not reassemble.` / `Unconfirmed at record 0, 1, 2, 3, 4 (records count from 0).` / `A partial set is not a backup: it passes every checksum it carries and still cannot be restored from. Nothing was written.` |
-| an unclassifiable record | **4** | `me: record 0 (records count from 0) is not a form this container can place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not a `text:`/`pass:`/`tx:` record.` |
+| an unclassifiable record | **4** | `me: record 0 (records count from 0) is not a form this container can place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not a `text:`/`pass:`/`tx:`/`key:`/`hash:`/`now:` record.` |
 | `--expect transaction` on a complete set | **0** | — |
 
 ### 4.5 On the device, at the NFC record path
