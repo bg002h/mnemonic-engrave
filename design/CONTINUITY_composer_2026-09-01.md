@@ -328,3 +328,13 @@ ONE path = warning.
   `journey-lens-brief-s3.md`). Scratch: `.plan-build-gate-go-s3/{seedhammer,wired}`.
 - Engrave master pushed 88b4a4aa via staging (report persisted). Fork merge of
   `composer-s2` (7a4eeb5) in progress → `composer-S2-push-report.md`.
+
+## S2 SHIPPED (2026-09-02)
+
+- Fork `main` 321acb56f74ff60e81abcfa511b2013f3aeb0abc = merge --no-ff of
+  `composer-s2` (7a4eeb5); CI runs Test (tests + tinygo-device-build) and Build
+  image all success; origin/main confirmed. Report `composer-S2-push-report.md`
+  (e44fa12). Staged plan S2 marked SHIPPED (0b9a478). Worktree removed.
+- S3 gate scratch copies (`.plan-build-gate-go-s3/{seedhammer,wired}`) were made
+  from the S2 worktree; future gate runs use the default FORK_REPO (fork main now
+  carries S2). At the r0 fold, re-baseline the S3 plan on fork main 321acb56.
