@@ -15416,3 +15416,22 @@ exactly the drift the Rust-primary rule exists to prevent (which tier unlocks
 when, which head is bare). `md compose --help` at 66bdf2f4 shows `--wrapper`,
 `--path`, `--experimental`, `--json` only.
 
+### F-454 — `me-0.8.1-owed-plus-sign-path-tightening-unreleased`: the host refuses `+`-signed key: path components on master (c05074f1) but the released `me` v0.8.0 admits them, so host and device disagree for anyone on the release binary (owning phase: **before composer S4's journey runs with a release binary** — cut me 0.8.1 with the next host change or before S4) `#me-cli` `#release` `#composer`
+
+Filed 2026-09-02 from `composer-S2-exec-review-r0` I-1's Rust-first fold. Fixture
+is 47 rows (sha 5b3960ca…); the device (fork main 321acb56) matches master, not
+v0.8.0. Low reach: no `md` output ever writes a `+` into an origin; only a
+hand-typed record could. CHANGELOG [Unreleased] already carries the entry.
+
+### F-455 — `composer-secret-form-words-and-seedqr-are-one-plate`: SPEC §7f offers three secret forms; the device has two plate designs (owning phase: **a later cycle, spec fold at composer S4**) `#seedhammer` `#composer` `#backup`
+
+Filed 2026-09-02 by the S3 plan's author (`IMPLEMENTATION_PLAN_composer_S3_fork_gui.md`,
+Part B engrave task). `engraveSeed` (gui/gui.go:839) bakes BIP-39 words AND a
+SeedQR onto ONE `backup.Seed` plate; `backup.SeedString` (backup/backup.go:26)
+is the string-only form `engraveCodex32` cuts for ms1. A words-only or a QR-only
+plate for a mnemonic does not exist. S3 offers the two real forms with honest
+labels; splitting them is a new plate layout with its own sizing and its own
+goldens, not a wiring change. Fold §7f's wording at S4 or rule the split in —
+the operator's call (surfaced 2026-09-02; default: fold the wording to the two
+forms).
+
