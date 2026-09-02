@@ -2911,7 +2911,7 @@ Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA"
 
 - [ ] **Step 4: Hand off**
 
-The stage is complete when: every task's commit exists; the workspace gate of this task is green; the whole-diff independent review (an opus execution review over `git diff <baseline>..HEAD`, persisted to `mnemonic-engrave/design/agent-reports/composer-S0-exec-review-r0.md`) returns 0 Critical / 0 Important after folds; and the version bump + crates.io publish follow `descriptor-mnemonic/design/RELEASE_PROCESS.md`. Stage 1 begins only then, with its own detailed plan.
+The stage is complete when: every task's commit exists; the workspace gate of this task is green; the whole-diff independent review (an opus execution review over `git diff <baseline>..HEAD`, persisted to `mnemonic-engrave/design/agent-reports/composer-S0-exec-review-r0.md`) returns 0 Critical / 0 Important after folds; and the branch is merged to `main` via the `ci/staging` ritual. The version bump + crates.io publish that `descriptor-mnemonic/design/RELEASE_PROCESS.md` describes are BLOCKED by that repo's follow-up `md-codec-derive-feature-depends-on-unpublished-miniscript-apis` (measured 2026-08-31: `cargo publish --dry-run` of md-codec fails because the default `derive` feature uses git-fork-only miniscript APIs; nothing in this stage changes that, and `compose` itself uses no miniscript API); they wait for the operator's decision on that follow-up and are not a gate for Stage 1 or 2. Stage 1 begins after the merge, with its own detailed plan.
 
 ---
 

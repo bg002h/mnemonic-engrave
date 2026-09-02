@@ -69,9 +69,18 @@ extracted Rust); `cargo nextest run --locked -p md-codec -p md-cli`; `cargo fmt
 plan; a tag-coverage test asserting every §5 row / §4c lock row / §4f origin row
 tag appears in ≥ 2 vectors.
 
-**Exit:** md-codec and md-cli published to crates.io at the next minor; the
-compose vectors vendored into the fork's `md/testdata/vectors/` (S2 consumes
-them). Detailed plan: `IMPLEMENTATION_PLAN_composer_S0_md_compose.md`.
+**Exit (revised 2026-09-02):** `composer-s0` merged to descriptor-mnemonic
+`main` via the `ci/staging` ritual after the whole-diff review closes 0C/0I.
+crates.io publish of md-codec ≥ 0.43.0 (and therefore of an md-cli that pins it)
+is BLOCKED by descriptor-mnemonic's follow-up
+`md-codec-derive-feature-depends-on-unpublished-miniscript-apis` (the default
+`derive` feature calls git-fork-only miniscript APIs; filed 2026-08-31 from the
+halted 0.43.0 publish) — an operator decision (wait for upstream / rework
+`derive` / demote it) that predates this cycle. The publish is NOT a gate for
+S1 or S2: S1 touches `me`/`ms` only, and S2 vendors the compose vectors from
+the descriptor-mnemonic repo, not from crates.io. Versions and `[Unreleased]`
+headings stay as they are until the blocker clears. Detailed plan:
+`IMPLEMENTATION_PLAN_composer_S0_md_compose.md`.
 
 ## S1 — host inputs: `me sysw pack` classes and `ms derive --template bip48-p2tr` (mnemonic-engrave, mnemonic-secret)
 
