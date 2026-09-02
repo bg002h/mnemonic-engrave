@@ -327,6 +327,17 @@ whether a **flag** is raised. So:
 | `ClassDescriptor` | no | exists |
 | `ClassMDMK` | no | exists |
 | `ClassAddress` | no | exists |
+| `ClassKey` | no | **NEW** (§5.3; composer spec §6a): `key:<hex of "[fingerprint/path]xpub">`, a cosigner key for seating |
+| `ClassHash` | no | **NEW** (§5.3; composer spec §6a): `hash:<64 lowercase hex>`, a 32-byte sha256 digest for a hashlock |
+| `ClassNow` | no | **NEW** (§5.3; composer spec §6a): `now:<hex of "<seconds>[,<height>]">`, the pack time |
+
+**The three composer classes are NOT secret** (added 2026-09-02, composer Stage
+1): a cosigner's extended public key, a digest and a timestamp are public by
+construction. `ClassNow` is a LOWER BOUND on the present — the pack time — that
+the device, which has no clock, echoes beside a time lock and never encodes into
+anything (mnemonic-engrave `SPEC_wallet_policy_composer.md` §6a, C24). Their
+per-class body rules and refusal lines live in that spec (§6a, §8n); this
+document records only the classes, their admission and their prefixes.
 
 The secret column **extends `seal/session.go:17`**, which today reads
 `ClassCodex32Secret || ClassMnemonic`. It becomes those two plus
@@ -339,17 +350,18 @@ same over-claim F-123 was filed against.
 
 `•` = admitted. Blank = refused with a named reason.
 
-| program | Mnem | Cdx32 | Passph | FreeText | Descr | MDMK | Addr |
-| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| Backup Wallet | • | • | | | | | |
-| BIP-39 Password | | | • | | | | |
-| Engrave Text | | | | • | | | |
-| Account Xpub | • | • | • | | | | |
-| Engrave Bundle | | | | | • | • | |
-| Engrave Single-Sig | • | • | • | | | • | |
-| Engrave Multisig | • | • | • | | • | • | |
-| BIP-85 Child Seed | • | • | • | | | | |
-| *Sealed Payload* | — | — | — | — | — | — | — |
+| program | Mnem | Cdx32 | Passph | FreeText | Descr | MDMK | Addr | Key | Hash | Now |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| Backup Wallet | • | • | | | | | | | | |
+| BIP-39 Password | | | • | | | | | | | |
+| Engrave Text | | | | • | | | | | | |
+| Account Xpub | • | • | • | | | | | | | |
+| Engrave Bundle | | | | | • | • | | | | |
+| Engrave Single-Sig | • | • | • | | | • | | | | |
+| Engrave Multisig | • | • | • | | • | • | | | | |
+| Wallet Policy | • | • | • | | • | • | | • | • | • |
+| BIP-85 Child Seed | • | • | • | | | | | | | |
+| *Sealed Payload* | — | — | — | — | — | — | — | — | — | — |
 
 Rows that need their reason recorded, because a reviewer will otherwise have to
 reconstruct it:
@@ -369,6 +381,21 @@ reconstruct it:
 - **`ClassAddress` is admitted nowhere.** It is consumed only by the
   verify-address flow, which `engraveObjectFlow` deliberately has no case for
   (R0-M5). This spec does not change that.
+- **Wallet Policy (row CREATED 2026-09-02, composer Stage 1; F-415 named the
+  gap).** The fork has carried a `progWalletPolicy` admission map since S2
+  (`gui/sysw_admit.go`: `ClassDescriptor`, `ClassMDMK`) with no row here. The
+  row now records the COMPOSER's admission (mnemonic-engrave
+  `SPEC_wallet_policy_composer.md` C12, §6a, §10 item 6): the three seed
+  classes, so the device can fill slots from a seed exactly as Multisig Build
+  does — this reverses `gui/sysw_admit.go`'s "NO seed class … least privilege"
+  comment, which the composer spec rewrites — plus `Descriptor` and `MDMK` (the
+  existing consume path) and the three composer classes, which no other
+  program admits. `FreeText` and `Address` stay refused. Because a seed becomes
+  admitted at Wallet Policy for the first time, §3.3.3's F1 and F2 fire inside
+  the composer's seed step exactly as they do in Multisig Build.
+- **`progTransaction` has an admission map in the fork and NO row here.** Noted
+  2026-09-02 while creating the Wallet Policy row; it belongs to the
+  transaction-engraving cycle's owner and is not created by this fold.
 - **Sealed Payload is dashes, not blanks** — it is out of scope entirely
   (decision 1), not a program whose every cell happens to be refused.
 
@@ -558,7 +585,16 @@ error.
 ```
 text:<lowercase hex of the UTF-8 bytes>
 pass:<lowercase hex of the UTF-8 bytes>
+key:<lowercase hex of the UTF-8 bytes of "[fingerprint/path]xpub">   (composer, 2026-09-02)
+hash:<64 lowercase hex: the 32-byte digest itself>                    (composer, 2026-09-02)
+now:<lowercase hex of the UTF-8 bytes of "<seconds>[,<height>]">      (composer, 2026-09-02)
 ```
+
+The three composer prefixes follow the same rule as the first two (reserved,
+lowercase hex body, matched before the sniffers, a body that fails ANY rule is
+`ClassUnknown` and refused); their per-class body rules and the operator-facing
+lines are normative in mnemonic-engrave `SPEC_wallet_policy_composer.md` §6a and
+§8n, and `tx:` (the transaction cycle's prefix) is governed by that cycle's spec.
 
 **The digest label is `"MNEMSYSW/pub/v1"`, not `"MNEMBLOB/pub/v1"` (R0-M1).**
 EPD§6.6's label exists to stop cross-context collisions, and §4 insists the two
@@ -581,9 +617,9 @@ it reaches the KDF. R0 round 6 found journey (b) had no stated step doing this.
 the existing sniffers in `Classify`. Free text is the universal fallback — any
 string could be free text — so a sniffer that ran first would claim
 `text:...` records whose hex body happened to parse as something else. The
-prefixes are also **reserved**: a record beginning `text:` or `pass:` that is not
-valid lowercase hex is `ClassUnknown` and refused, never silently treated as
-free text.
+prefixes are also **reserved**: a record beginning `text:`, `pass:`, `key:`,
+`hash:` or `now:` that is not valid lowercase hex is `ClassUnknown` and refused,
+never silently treated as free text.
 
 #### 5.3.2 The card-set DECODE check — now a FLAG, not a refusal (R0-I1; demoted 2026-08-12, §13 D6)
 
