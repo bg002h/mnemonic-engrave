@@ -1,5 +1,8 @@
 # Wallet Policy Composer — Stage 3 (fork GUI) Implementation Plan
 
+**STATUS: DRAFT, build-gated, R0 round 0 dispatched 2026-09-02.** Gate (`scripts/plan-build-gate-go.sh` with `FORK_REPO=/scratch/code/shibboleth/wt-composer-s2` -- the S2 branch, since fork `main` lacks the S2 API -- then the six fragments of shipped files and the four shipped-test updates applied by the author's `handwire_s3.py`): 38 new `gui/composer_*.go` files extracted, gofmt clean, `go vet ./gui/` clean but for two pre-existing go1.25/ArtifactDir findings, `go test -run '^TestComposer' ./gui/` ok (118 sub-tests), whole gui 1125/1125 across 24 shards (35 s), `./md/ ./mk/ ./sysw/` ok. Mechanical: citations 222/222 against the S2 worktree, glyph 0 undrawable, tables 28/0 malformed, step numbers in prose 0. Reviews: `composer-S3-plan-R0-r0-{fidelity,tests,journey}.md`.
+
+
 **STATUS: DRAFT 2026-09-02, R0 NOT YET RUN.** Nothing here may be implemented until this plan is GREEN (0 Critical / 0 Important) under the R0 loop and its gates have run. **This plan's GREEN will expire:** re-validate against "what did the S2 merge falsify here?" immediately before dispatching the implementer, per the CLAUDE.md 2026-08-27 directive, with `scripts/plan-staleness-check.sh design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md /scratch/code/shibboleth/seedhammer 169073c gui/`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -1525,12 +1528,21 @@ with:
 In `gui/multisig_build.go`, insert immediately above line 22's banner (`// ─── T6c Phase B: the on-device "Build policy" authoring path ───`):
 
 ```go
-// DEPRECATED. Deprecated 2026-09-01 in favour of Wallet Policy > Build a new
-// policy. No enforcement by operator ruling (C7,
-// SPEC_wallet_policy_composer.md §8e): this flow keeps working, keeps its
-// tests, and is not gated, redirected or removed. What the composer does that
-// this cannot is author anything other than one sortedmulti k-of-n -- taproot,
-// several spend paths, timelocks, hashlocks, key-less paths.
+// DEPRECATED.
+//
+// Deprecated 2026-09-01 in favour of Wallet Policy > Build a new policy.
+// No enforcement by operator ruling (C7, SPEC_wallet_policy_composer.md §8e).
+//
+// THE SENTENCE ABOVE IS UNWRAPPED ON PURPOSE: it is §8e verbatim and
+// TestComposerMultisigBuildCarriesTheDeprecationComment matches substrings of
+// it, so a comment re-flow that splits "Build a new policy" across two lines
+// turns the suite red for a wording change. Reflow the paragraphs below it
+// freely; leave those two lines alone.
+//
+// This flow keeps working, keeps its tests, and is not gated, redirected or
+// removed. What the composer does that this cannot is author anything other
+// than one sortedmulti k-of-n -- taproot, several spend paths, timelocks,
+// hashlocks, key-less paths.
 //
 // A comment with no enforcement is the whole of the ruling. F-150 item 1's
 // dead end stays as filed and is not fixed here.
