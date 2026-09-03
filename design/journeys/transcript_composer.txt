@@ -21,7 +21,7 @@ go version go1.26.7 linux/amd64
 
 fork checkout: /scratch/code/shibboleth/wt-composer-s4-emu
 $ git -C /scratch/code/shibboleth/wt-composer-s4-emu rev-parse --short HEAD
-05d903b
+a6eb44e
 [exit 0]
 
 
@@ -459,28 +459,28 @@ total 56
 drwxr-xr-x 1 bcg bcg 452 Sep  3 01:06 .
 drwxr-xr-x 1 bcg bcg  16 Sep  3 01:06 ..
 drwxr-xr-x 1 bcg bcg  78 Sep  3 01:06 cards
--rw-r--r-- 1 bcg bcg 744 Sep  3 01:07 compose.json
--rw-r--r-- 1 bcg bcg 126 Sep  3 01:07 keyed.change.txt
--rw-r--r-- 1 bcg bcg 206 Sep  3 01:07 keyed.id.txt
--rw-r--r-- 1 bcg bcg 613 Sep  3 01:07 keyed.md1.txt
--rw-r--r-- 1 bcg bcg 126 Sep  3 01:07 keyed.receive.txt
--rw-r--r-- 1 bcg bcg 201 Sep  3 01:07 keyed.template
--rw-r--r-- 1 bcg bcg 172 Sep  3 01:07 keyed-template.md1.txt
--rw-r--r-- 1 bcg bcg 177 Sep  3 01:07 keyless-tr.id.txt
--rw-r--r-- 1 bcg bcg  57 Sep  3 01:07 keyless-tr.md1.txt
--rw-r--r-- 1 bcg bcg 158 Sep  3 01:07 keyless-tr.template
--rw------- 1 bcg bcg 782 Sep  3 01:07 payload.bin
--rw-r--r-- 1 bcg bcg  50 Sep  3 01:07 payload.digest.txt
--rw-r--r-- 1 bcg bcg 731 Sep  3 01:07 records-from-fork.txt
--rw-r--r-- 1 bcg bcg 731 Sep  3 01:07 records.txt
+-rw-r--r-- 1 bcg bcg 744 Sep  3 03:53 compose.json
+-rw-r--r-- 1 bcg bcg 126 Sep  3 03:53 keyed.change.txt
+-rw-r--r-- 1 bcg bcg 206 Sep  3 03:53 keyed.id.txt
+-rw-r--r-- 1 bcg bcg 613 Sep  3 03:53 keyed.md1.txt
+-rw-r--r-- 1 bcg bcg 126 Sep  3 03:53 keyed.receive.txt
+-rw-r--r-- 1 bcg bcg 201 Sep  3 03:53 keyed.template
+-rw-r--r-- 1 bcg bcg 172 Sep  3 03:53 keyed-template.md1.txt
+-rw-r--r-- 1 bcg bcg 177 Sep  3 03:53 keyless-tr.id.txt
+-rw-r--r-- 1 bcg bcg  57 Sep  3 03:53 keyless-tr.md1.txt
+-rw-r--r-- 1 bcg bcg 158 Sep  3 03:53 keyless-tr.template
+-rw------- 1 bcg bcg 782 Sep  3 03:53 payload.bin
+-rw-r--r-- 1 bcg bcg  50 Sep  3 03:53 payload.digest.txt
+-rw-r--r-- 1 bcg bcg 731 Sep  3 03:53 records-from-fork.txt
+-rw-r--r-- 1 bcg bcg 731 Sep  3 03:53 records.txt
 
 /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/cards:
 total 12
 drwxr-xr-x 1 bcg bcg  78 Sep  3 01:06 .
 drwxr-xr-x 1 bcg bcg 452 Sep  3 01:06 ..
--rw-r--r-- 1 bcg bcg 200 Sep  3 01:07 slot0.mk1.txt
--rw-r--r-- 1 bcg bcg 261 Sep  3 01:07 slot1.mk1.txt
--rw-r--r-- 1 bcg bcg 200 Sep  3 01:07 slot2.mk1.txt
+-rw-r--r-- 1 bcg bcg 200 Sep  3 03:53 slot0.mk1.txt
+-rw-r--r-- 1 bcg bcg 261 Sep  3 03:53 slot1.mk1.txt
+-rw-r--r-- 1 bcg bcg 200 Sep  3 03:53 slot2.mk1.txt
 [exit 0]
 
 ########## RESULT
