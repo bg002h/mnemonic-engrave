@@ -15473,3 +15473,14 @@ job builds md-cli without `json`. Closes when the three are fixed or ruled
 won't-fix. The same review's M-1, M-2, M-3 and N-3 were folded on
 `composer-s0b` before it shipped; M-4 was already closed by the S3 plan's
 Task A10 fold (0051be7), which the reviewer read the plan too early to see.
+
+### F-460 — `multisig-build-deprecated-in-favour-of-the-composer`: Engrave Multisig's "Build policy" path is deprecated by comment, with no enforcement (owning phase: **none; a record, not a task**) `#seedhammer` `#composer` `#c7`
+
+Deprecated 2026-09-01 in favour of Wallet Policy > Build a new policy. No
+enforcement by operator ruling (C7). The comment lives at the head of
+`gui/multisig_build.go` and is gated by
+`TestComposerMultisigBuildCarriesTheDeprecationComment`, which also asserts
+`buildMultisigPolicyFlow` still exists -- a deprecation, not a removal.
+Removing or redirecting Multisig Build is out of scope
+(`SPEC_wallet_policy_composer.md` §14), and F-150 item 1's dead end stays as
+filed.
