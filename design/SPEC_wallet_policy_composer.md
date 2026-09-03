@@ -983,18 +983,23 @@ table, so the glyph and modal-fits gates cover it.
    screens (§7c stub screen, §7d pick list, §7e consent) are the same kind of
    plan-time render measurement -- `Choice.Size` and `widget.Labelw`'s sizes
    exist only at render time, so no static read produces them. MEASURED at
-   composer S3 on fork `composer-s3` (parent `321acb56`) by
+   composer S3 on fork `composer-s3` (parent `321acb56`), re-measured at S4 on
+   `composer-s4c` `0b49f66`, by
    `CGO_ENABLED=0 go test -run '^TestComposerMeasureSection13Numbers' -v ./gui/`
    (`gui/composer_measure_test.go`), at the SeedHammer II display size:
 
    ```text
-   SPEC13 stub_screen    lines= 42 per_frame= 7 pages=6
+   SPEC13 stub_screen    lines= 42 per_frame= 6 pages=7
    SPEC13 pick_list      lines= 36 per_frame= 7 pages=6
    SPEC13 consent        lines= 17 per_frame= 7 pages=3
    SPEC13 descriptor_plate ceiling_chars=596  c10_688_fits=false
    ```
 
-   So all three paged screens hold **7 rows per frame**, and the concrete
+   So the pick list and the consent hold **7 rows per frame** and the stub screen
+   **6** (re-measured 2026-09-03 on fork `composer-s4c` `0b49f66`, after S4 walk
+   W-3 made every paged line wrap inside the band left of the navigation column:
+   `Template-ID: <32 hex>` now takes two lines instead of drawing its last digit
+   under the Back button; before W-3 all three held 7), and the concrete
    descriptor plate ceiling is **596 characters** at this platform's params --
    measured by binary search against a real `backup.Text` plate
    (`composerDescriptorCeilingChars`), never written down as a constant. C10's
