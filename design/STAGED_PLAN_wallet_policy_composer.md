@@ -136,6 +136,8 @@ three paged screens and the plate ceilings measured and written into spec §13.
 
 ## S4 — the journey, EXECUTED, and the records (mnemonic-engrave)
 
+**STATUS: JOURNEY EXECUTED 2026-09-03 — fork `main` `6fb90cb` (merge of `composer-s4-emu`: the third emulator payload, `shots_composer.js` + `shTargets()`, needle pins), mnemonic-engrave `master` `e3ee51c` (merge of `composer-s4-emu`: `transcript_composer.sh`, `capture_composer.py`), plus two device fixes the walk found before any plate: W-2 (pick lists untouchable, `3cc71d9b`) and W-3 (ids drawn under the buttons, `1ae0ffcb`). Plan `IMPLEMENTATION_PLAN_composer_S4_acceptance.md`; PDF `design/journeys/SeedHammer-II-composer-journey.pdf`. OPEN: the live device walk from step 3 and ONE physical plate (Task 4, at the operator's word after the flash), Part B on the device (Task 5, the operator's call).**
+
 **Delivers (spec §12 items 2, 3, 9; §13 item 1):** the composer journey on the
 emulator with a payload of `key:`, `hash:`, `now:` records and a seed, its
 capture refusing to finish on a mismatch and its negative control run; the

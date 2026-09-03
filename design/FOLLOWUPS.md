@@ -15485,11 +15485,15 @@ Removing or redirecting Multisig Build is out of scope
 (`SPEC_wallet_policy_composer.md` §14), and F-150 item 1's dead end stays as
 filed.
 
+Checked 2026-09-03 (S4 Task 6): the comment is present at `gui/multisig_build.go:22-24` ("DEPRECATED. ... Deprecated 2026-09-01 in favour of Wallet Policy > Build a new policy.") and `TestComposerMultisigBuildCarriesTheDeprecationComment` pins it. A record, as filed.
+
 ### F-461 — `composer-selfcheck-usesite-arm-has-no-reachable-input`: §7e's fixed-`<0;1>/*` use-site assertion cannot be driven by any artifact this tree can build, so its dispatch has no behavioural test (owning phase: **composer S3 residue; revisit when `md` exports a use-site override constructor, or at S4's journey run**) `#composer` `#seedhammer` `#tests`
 
 Filed 2026-09-02 from `composer-S3-exec-review-r0` I-2, while folding it. Five
 of the six arms that survived `if false {` now have a fault-injection row that
 fails under their own mutation; the sixth does not.
+
+Revisited 2026-09-03 at S4's journey run, as the heading asks: unchanged. The emulator journey builds every artifact through `md.Compose`, which emits the fixed use-site, so the arm is still unreachable by any input; stays filed for an `md` use-site override constructor.
 
 `composerSelfCheck` (`gui/composer_selfcheck.go`) refuses a slot whose use-site
 is not the fixed `<0;1>/*`. MEASURED while folding: nothing this tree can build

@@ -925,10 +925,25 @@ table, so the glyph and modal-fits gates cover it.
    engrave form → census, with the consent's ids and addresses compared against
    `md` output; the capture refuses to finish on a mismatch and the negative
    control is run. A plan may not close while this gate has never run.
+   **EXECUTED 2026-09-03** on the emulator: `design/journeys/capture_composer.py
+   --arm both` (fork `6fb90cb`, three legs, 50 shots) matched the payload
+   digest, both ids, both stubs, all four addresses and every engraved string
+   byte for byte; the negative control (`--prove-it-can-fail`) attributes its
+   failure to the address comparison, and the unchunked-string substitution is
+   caught (56 vs 47 chars). Records: `composer-S4-implementation-report.md`,
+   `composer-S4-exec-review-r0.md`, the journey
+   `SeedHammer-II-composer-journey.pdf`.
 3. **Emulator walk with NO payload** (C26): door line present, shape, stub screen
    with per-slot expected origins, consent stating no addresses, form choice
    collapsed, keyless-template engrave whose md1 decodes on the device and whose
    slots carry distinct-account origins.
+   **EXECUTED 2026-09-03**: the keyless arm of the same capture (`--arm
+   keyless`): the C26 door line, tr 2-of-3, the stub screen with per-slot
+   origins at accounts 0', 1', 2', consent "Keyless template - no addresses.",
+   the form choice collapsed, one plate whose string is
+   `md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3` (the device's
+   chunk form; `md decode` prints the three distinct-account origins). The
+   physical plate is the S4 device walk's (Task 4), pending.
 4. **Negative vectors: every refusal refuses.** For each §4e, §6a, §6b, §6c, §7d
    and §7g refusal, an input that must be refused and the exact §8 line shown;
    including a lock operand outside §4c refused BY THE DEVICE on an md build that
@@ -969,6 +984,11 @@ table, so the glyph and modal-fits gates cover it.
    is NOT asserted: §13 item 1 now carries the number (596 characters), but S3
    ships no concrete-descriptor plate for it to guard, so the refusal and its
    assertion both belong to F-457.
+    **EXECUTED 2026-09-03** per journey on the emulator: form A / form B offered
+    on the keyed arm, template-only on the keyless arm; Full versus Watch-only
+    asked when a seed-seated slot exists (Watch-only taken); the census lines
+    photographed (`shots/c12-census-A.png`, `c12-census-B.png`,
+    `k04-census.png`).
 10. **Multisig Build parity (optional, C7 comment-only):** the `sortedmulti`
     preset with seed-derived slots reproduces `gui/testdata/t6b_multisig_full.md1.txt`.
 11. **Cite gate:** `scripts/plan-cite-check.sh` on this spec before each R0 round;
