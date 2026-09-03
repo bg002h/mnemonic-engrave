@@ -15514,3 +15514,26 @@ Closes when `md` grows an exported way to build a descriptor with a use-site
 override (Rust first, with a vector, per the Rust-primary rule) and the arm
 gains a fault-injection row like the other five -- or when the operator rules
 that a use-site the device cannot construct needs no behavioural gate.
+
+### F-462 — `composer-stub-screen-origin-notation-h-vs-apostrophe`: the composer's stub screen prints slot origins as `m/48h/0h/0h/2h` while the mapping review, the census and the card summaries print `m/48'/0'/0'/2'` (owning phase: **post-S4 polish**) `#composer` `#seedhammer` `#ux`
+
+Filed 2026-09-03 from `composer-S4-plan-R0-r0-journey` M-1. The stub screen
+(`gui/composer_stub.go`) formats `ExpandedKey.OriginPath`, a `bip32.Path`,
+whose `String` uses `h`; `composerOriginText` (the mapping review, the census,
+the card rows) uses `'`. The stub screen is the one whose lines are meant to
+be copied into an `mk encode --origin-path` invocation, so the split is on the
+wrong screen. Nothing mis-seats: `key_card_seating` compares structurally.
+Fix is one formatter on the stub screen plus a test that the two screens
+agree; S4's plan quotes the shipped `h` form as-is.
+
+### F-463 — `composer-watch-only-engrave-shows-ms1-reminder`: after a composer engrave that cut no ms1 share (watch-only form A, form B, the keyless template) the flow still ends on "Bundle engraved. Also hand-engrave your ms1 share(s) - they are never sent over NFC." (owning phase: **post-S4 polish**) `#composer` `#seedhammer` `#ux`
+
+Filed 2026-09-03 from `composer-S4-plan-R0-r0-journey` N-2 and I-9.
+`bundleEngrave` ends with `showError(ctx, th, "Wallet Policy",
+bundleMs1ReminderText())` whenever no `cardMS1` is in the set, and
+`bundleShowMs1Reminder` is true for every composer form, so a run that
+produced no secret share is told to hand-engrave one. The composer's engrave
+loop also offers no verify step (the three flows that do are singlesig,
+multisig and multisig_build), so the S4 driver terminates on the door rather
+than on a verify offer. The S4 capture records the modal; the copy stays as
+shipped this stage.
