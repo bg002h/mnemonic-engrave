@@ -993,3 +993,12 @@ Steps, in order:
   -> resume the implementer -> persist -> fill + dispatch the r1 verification
   -> refill composer-S4-merge-push-brief.md's tip -> driver merge -> engrave
   merge -> Task 6 -> flash at the operator's word.
+- W-3 SHIPPED: fork main 1ae0ffcb (merge of composer-s4c 0b49f66; CI run
+  33750030577 green; report 6cddca0). Worktrees wt-composer-s4b and
+  wt-composer-s4c removed (branches merged). FLASH TARGET for the device walk
+  is now fork main 1ae0ffcb (W-2 + W-3; expected version line bg1ae0ffc
+  (UNLOCKED)) -- at the operator's word only. Implementer RESUMED for fold r1
+  (brief cf0acd5): merge main into composer-s4-emu, re-pin the stub page
+  counts -> composer-S4-fold-r1-report.md; then the r1 verification (brief
+  filled except the two tips) -> driver merge (refill
+  composer-S4-merge-push-brief.md's tip) -> engrave merge -> Task 6.
