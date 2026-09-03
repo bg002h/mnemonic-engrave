@@ -1,8 +1,8 @@
 You are the MERGE + PUSH agent for the SeedHammer fork (`/scratch/code/shibboleth/seedhammer`, branch `main`, remote `bg002h/seedhammer`; `main` is NOT branch-protected, so there is no ci/staging ritual here). You modify no source file; you write ONE report file at the end. Do not read any `.jsonl` file. Do NOT spawn sub-agents. Judge per-JOB conclusions; full 40-char SHAs in every `gh` query; always `--repo bg002h/seedhammer`.
 
 ## What to merge and push
-- Branch `composer-s3` (worktree `/scratch/code/shibboleth/wt-composer-s3`), tip `<S3_TIP>`, base `main` = `321acb56`. Verify in the main checkout: `git rev-parse main` = 321acb56..., `git status --short` empty, `git merge-base --is-ancestor main composer-s3` true; STOP if not.
-- `git merge --no-ff composer-s3 -m "<MERGE_MSG>"` in the main checkout (the merge commit message is given in the dispatch message; keep its trailer lines), then `git push origin main`, then `gh run list --repo bg002h/seedhammer --commit <merge sha> --json databaseId,name,status,conclusion` and `gh run watch <id> --exit-status` in the FOREGROUND on the `test` workflow; judge each job's conclusion.
+- Branch `composer-s3` (worktree `/scratch/code/shibboleth/wt-composer-s3`), tip `27afa9fadd9e2c5ad6c5c53143d711c1fcfaa84a`, base `main` = `321acb56`. Verify in the main checkout: `git rev-parse main` = 321acb56..., `git status --short` empty, `git merge-base --is-ancestor main composer-s3` true; STOP if not.
+- `git merge --no-ff composer-s3 -F /scratch/code/shibboleth/mnemonic-engrave/design/agent-briefs/composer-S3-merge-message.txt` in the main checkout (the merge commit message is given in the dispatch message; keep its trailer lines), then `git push origin main`, then `gh run list --repo bg002h/seedhammer --commit <merge sha> --json databaseId,name,status,conclusion` and `gh run watch <id> --exit-status` in the FOREGROUND on the `test` workflow; judge each job's conclusion.
 - Verify: `git fetch origin && git rev-parse origin/main` equals the merge commit.
 - Do NOT tag, do NOT flash, do NOT touch the worktree.
 

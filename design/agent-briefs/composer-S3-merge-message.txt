@@ -1,0 +1,19 @@
+Merge composer-s3: the Wallet Policy composer (composer S3, fork GUI)
+
+Stage 3 of the wallet-policy composer cycle, per mnemonic-engrave
+design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md (plan revision 722edbd,
+R0 GREEN) and design/SPEC_wallet_policy_composer.md. 29 commits: the single
+implementer's 25 (A1-A11, B1-B11, C0-C2), the controller's census-title fold
+(a63fd1e), and the whole-diff review fold (7edc863, 83e932a, 27afa9f; review
+design/agent-reports/composer-S3-exec-review-r0.md 1C/2I/5M/3N, fold report
+composer-S3-fold-r0-report.md, verification
+composer-S3-exec-review-r1-fold-verification.md 0C/0I).
+
+Gates on 27afa9f: go test ./... 54 packages ok; gui 1185 tests across 24
+shards; TestComposer 127 top-level / 150 sub-tests; 32-bit; oraclelive; js
+vet. Firmware (nix develop -c tinygo build -size short ...): 1,579,924 B
+flash / 62,800 B RAM, +73,040 / +208 over main 321acb56 (1,506,884 / 62,592).
+Not flashed.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
