@@ -57,6 +57,24 @@ This file is auto-loaded by Claude Code when starting a session in this reposito
   `ci/**` push cannot sign or publish — verified: it reported `skipped`. A push
   that prints "Bypassed rule violations" means the staging step was missed.
 
+## Toolchain on this machine (2026-09-02)
+
+- The box is **Omarchy** (Arch-based) since the 2026-09-02 distro hop; the hop
+  did not carry `/nix`, and Nix was reinstalled the same evening from
+  nixos.org (multi-user, flakes enabled). The Bash tool's shell does not
+  source the profile hook: put `/nix/var/nix/profiles/default/bin` on `PATH`
+  before any `nix` command.
+- Fork Go tests run on Go 1.26.7 at `/scratch/code/shibboleth/.toolchain/go`
+  (sha256 verified against go.dev; restored when `/nix` was missing). The
+  flake's own Go (in `/nix/store`, 1.26.3 at the time of writing) is what
+  `nix run .#build-firmware` and `nix develop` use; either satisfies the
+  fork's `go1.26` floor.
+- Firmware size recipe, from the fork checkout with nix on PATH:
+  `nix develop -c tinygo build -size short -o /dev/null -target pico-plus2
+  -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller`.
+  Measured 2026-09-02: fork main `321acb56` 1,506,884 B flash / 62,592 B RAM;
+  `b77449db` (composer S3) 1,579,924 / 62,800.
+
 ## Parallel execution — this machine has 24 CPU cores
 
 **Standing directive (2026-08-19): consider parallel execution for ALL tests,
