@@ -460,3 +460,243 @@ No regression from the third payload, the `case "composer"` arm or the
    present in flash it is `A payload is in flash but not loaded. Load it from
    the carousel first.` Both were photographed on the emulator; the second is
    what Task 4's device walk should expect to read first (r0 I-10).
+
+---
+
+# Task 3 — DONE
+
+**Resumed after W-2 was verified (0C/0I) and merged into fork `main` as
+`3cc71d9bbe0f211afe2a8e3facdf57f4a3a66d1b`.** Executed against the plan at
+mnemonic-engrave `fdce82f`, whose Task 3 preamble now requires rows to be
+selected by tapping at the frame's own geometry and never by injected
+`Up`/`Down`. Brief: `design/agent-briefs/composer-S4-task3-resume-brief.md`.
+
+## The merge
+
+```
+$ git -C /scratch/code/shibboleth/seedhammer rev-parse main
+3cc71d9bbe0f211afe2a8e3facdf57f4a3a66d1b
+$ git merge --no-ff main -F <msg>
+Merge made by the 'recursive' strategy.
+ gui/composer_measure_test.go | 2 +-  gui/composer_paged.go | 109 +++++++---
+ gui/composer_paged_test.go   | 4 +-  gui/composer_pick_touch_test.go | 185 +++++++++
+ gui/composer_stub_test.go    | 4 +-
+ 5 files changed, 288 insertions(+), 16 deletions(-)
+```
+
+**No conflict**, as predicted — Task 1 touched `cmd/` only, W-2 touched `gui/`
+only. `git status --porcelain` empty after.
+
+```
+$ git -C /scratch/code/shibboleth/wt-composer-s4-emu log --oneline main..HEAD
+86cec95 emu: the composer journey's walk -- shots_composer.js, and shTargets to tap rows by (S4 Task 3)
+a79a454 Merge main into composer-s4-emu: W-2, the pick screen's rows are touch targets (S4 Task 3 needs it)
+05d903b emu: a THIRD test payload carrying the composer's own record classes (S4 Task 1)
+
+$ git -C /scratch/code/shibboleth/wt-engrave-s4-emu log --oneline master..HEAD
+c6adac2 journeys: the composer's device half -- capture_composer.py (S4 Task 3)
+5040bb2 journeys: the composer's host half -- transcript_composer.sh (S4 Task 2)
+```
+
+Both trees clean. Nothing pushed, nothing flashed, no sub-agent, no `.jsonl`.
+
+## What was written
+
+- `cmd/emu/shots_composer.js` (762 lines) — both arms, every itinerary row an
+  assertion, the engrave loop with the `Bundle engraved` handler ending on the
+  door, paged screens read until the first page recurs.
+- `design/journeys/capture_composer.py` (317 lines) — `--arm keyed|keyless|both`
+  (a fresh page per leg), `--prove-it-can-fail`, `EMU`/`--emu` override,
+  shot-size checking.
+- `cmd/emu/screen.go` + `screen_js.go` — `window.shTargets()`, below.
+- `gui/composer_digitpad_geometry_test.go` — the digit-pad pin, below.
+
+### `shTargets()` — how a row is tapped, and why it is not a shortcut
+
+`walk_build_policy.js`'s `rowY = 160 − (n−1)·12 + i·24` is right for
+`ChoiceScreen` and **wrong for the composer's paged screens**, whose rows
+advance by each line's own measured height under a lead that wraps; re-deriving
+it in JavaScript means reimplementing the text layout without the font metrics.
+The brief permits "measure the row bands … **or read them from the layout**", so
+`screenRecorder.Frame` — which already builds an `op.Drawer` for `ExtractText` —
+now also probes it with `op.Drawer.Hit` down the centre line and keeps the
+rectangles, and `shTargets()` hands them to the page.
+
+It is a **reading** primitive, beside `shScreen`: it injects no event, reaches no
+flow, and lets a walk do nothing a hand could not — it says where the targets
+are, which is what the operator's eyes do. That is load-bearing rather than
+rhetorical: **on a pre-W-2 build it returns zero rows for a composer pick
+screen**, so a driver written against it fails with "no tappable rows" instead of
+quietly injecting `Up`/`Down` and reporting a walk the machine cannot perform.
+Measured on the door: two targets for two rows, and the navigation column
+correctly absent (it sits off the centre line).
+
+### The digit pad, pinned and mutation-tested
+
+The 12960-block lock is typed at coordinates, as `walk_trace_b.js` types the
+BIP-39 keyboard. `gui/composer_digitpad_geometry_test.go` reads
+`DIGIT_KEY_PITCH`/`DIGIT_KEY_ROWS` out of `shots_composer.js` and types `12960`
+with them through `op.Drawer.Hit`. The last row is **not** like the others —
+`NewKeyboard` appends its own backspace, so `"0"` is laid out as two centred
+keys starting one pitch right — and the naive mutation is caught:
+
+```
+  { digits: "0", x0: 206, y: 290 }        // "same as the rows above"
+  digit 5 (0): the walk taps (206,290) and there is no touch target there at all
+```
+
+## Every value the emulator printed, beside the plan's
+
+| what | plan / host | emulator |
+| --- | --- | --- |
+| payload digest (Payload Digest screen) | `dbe9 e774 e9a4 9231 0b62 626c 2b41 cf4b` | same |
+| door lead, payload loaded | `Keys loaded: 2, plus 1 seed.` | same |
+| door lead, reader off | `No keys loaded. This builds a key-less template.` | same |
+| Template-ID | `531ab9e1777f018ae53694387dd0d128` | same |
+| `mk1 stub (template)` | `531ab9e1` | same |
+| Policy-ID | `4dd749a8372af515a61d7104faf944ef` | same |
+| `mk1 stub (policy)` | `4dd749a8` | same |
+| Receive 0 | `bc1q8cf5g5fxfld9t22xguk7e0mg9mkjl2ujcxuux9napkw8cy89n3mqk0tp4l` | same |
+| Receive 1 | `bc1qkd729k2r3kvrewzgdtpj0quhrrv9u4jgndt2zsmy6ypnr7rslzwsfhmu9a` | same |
+| Change 0 | `bc1q9ms8tdk54dzaelef0rrg82fpm3s9nfgyr30aed96rnyuj02hhgrqy3dyru` | same |
+| Change 1 | `bc1q3cs923r9rdcv5s8zmwkd5strrh7svzzpg2yrl4hcue3f3fv4lyfsdp3tz9` | same |
+| key-less Template-ID | `e0863d3ccac31a64d3b5e14b85ccd6c0` / stub `e0863d3c` | same |
+| slot @2 unseated origin | `m/48h/0h/2h/2h` | same |
+| slot @2 seated origin | `@2: b8688df1 m/48'/0'/0'/2'` | same |
+
+**Census screens, verbatim from the device:**
+
+```
+form A   PlatesToCutThisengraves2plates.md1policy:2plates(thewalletpolicy,withitskeys)…
+form B   PlatesToCutThisengraves4plates.md1template:1plate(key-lesswalletpolicy)
+         mk1key@0:1plate(m/48'/0'/0'/2')mk1key@1:1plate(m/48'/0'/1'/2')
+         mk1key@2:1plate(m/48'/0'/0'/2')…
+keyless  PlatesToCutThisengraves1plate.md1template:1plate(key-lesswalletpolicy)…
+```
+
+Rows @0 and @2 differ only by the `@i` (A's account 0' and B's account 0'), as
+r0 M-5 predicted.
+
+**The engraved strings, byte for byte against the host.** Form A — 2 plates, 7
+chunks = `keyed.md1.txt`:
+
+```
+md1flv5xrq9qjtvyyy5jmpprjjtvyyy4qqxpxqcyy2v6tjv6a4w46h2at4w46h2at4w46h2at4gj8fq03ncnsuxv
+md1flv5xrqw46h2at4w46h2at4w46h2at4w4hqqqqe2qzlxrnchdq5h83w6p2hp5gmug4u83waqg8k6ntsjqqddg
+md1flv5xrqscl9pvz58pmltjs9tjrg0g2z0agd4urfpzanhaq3lcdlz64mrqgdrha0m7umapumg67jfj6m3fvh7y
+md1flv5xrqej075dhzfzvynh66n94j5lcxlmx9ayav9mj0jjejcxy50llpx82qfmryv7l68w6hqqhypxt9s9j68n
+md1flv5xrpzragnj3g5qrl85zeape8wq0vdczfyy55tqsd5576trsa3p40nfpd7hsyjyf7vlx6saxquqfv5er72p
+md1flv5xrp0k2j6ckr4wf0m36nn9pm0wkz5duhr4fq2pwsjch4zfmsclyyxap2w2ua7583pn5tsnkrk4cfxj37uw
+md1flv5xrpj7qeewyp4dfykwfkgg6fxyxetdcmythf4hsqzd3v879jprztejzs7ru967l2aj4n0rcs
+```
+
+Form B — 4 plates, 9 strings = `keyed-template.md1.txt` (2) + `cards/slot0` (2) +
+`slot1` (3) + `slot2` (2), the first two being
+`md1fxnz3qs9qjtvyyy…shlte30qvuhvrq` and `md1fxnz3qsw46h2at…f47peq533w`, then the
+three `mk1qp0tx8p…`, `mk1qpcqd3z…` and `mk1qpvyhfp…` sets. Key-less — 1 plate:
+
+```
+md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3      (56 chars, CHUNKED)
+```
+
+**Paging and variants, measured:** stub screens 2 then 3 pages, mapping review 2,
+consent 4, key-less stub 2 and consent 2. `Choose engraving` on a packed plate
+offers `TEXT ONLY` alone (`Card 1 of 4 | Plate 1 of 1`); on the key-less plate it
+offers `TEXT + QR`, `TEXT ONLY`, `QR ONLY` with `TEXT + QR` first — the plan's
+row 6, and the device has no camera to read a QR-only plate back.
+
+## Gates
+
+```
+$ python3 capture_composer.py --arm both
+0        three legs (keyed-A 60s, keyed-B 71s, keyless 28s), 50 shots,
+         "all legs matched the host."
+
+$ python3 capture_composer.py --arm keyed --prove-it-can-fail
+0        NEGATIVE CONTROL PASSED: the walk refused the corrupted address.
+         DRIVER FAILED on leg keyed-A: the device's proof does not match the host's:
+           address bc1q8cf5g5fxfld9t22xguk7e0mg9mkjl2ujcxuux9napkw8cy89n3mqk0tp4q
+```
+
+**The plan's named mutation** — the unchunked keyless string substituted into a
+copy of `out/composer/keyless-tr.md1.txt`, then restored:
+
+```
+$ printf 'md15zfdsssj6tvyywtfdssj5hqqxqujzyxaduyd9dp5v3xc\n' > out/composer/keyless-tr.md1.txt
+$ python3 capture_composer.py --arm keyless
+DRIVER FAILED on leg keyless: the key-less template plate: string 1 of 1 does not
+match the host's BYTE FOR BYTE.
+  device: "md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3" (56 chars)
+  host:   "md15zfdsssj6tvyywtfdssj5hqqxqujzyxaduyd9dp5v3xc" (47 chars)
+Every md verb accepts the chunked and the unchunked form of a short template
+identically, so this comparison is the only one that can tell them apart.
+MUTATION EXIT=1
+```
+
+| gate | result |
+| --- | --- |
+| `capture_walletpolicy.py` | exit 0, wallet id `4e67c6fd…` + 4 addresses |
+| `capture_seating.py` | exit 0, wallet id `c8fe87cd…` + 4 addresses |
+| `capture_tr_pathological.py` | exit 0, wallet id `590f3abc…` + 4 addresses |
+| `gofmt -l cmd/` | clean |
+| `GOOS=js GOARCH=wasm go vet ./cmd/emu/` | exit 0 |
+| `CGO_ENABLED=0 go test -count=1 ./cmd/emu/` | `ok  seedhammer.com/cmd/emu  1.415s` |
+| `gui-shard-test.sh ./gui/ 24` | `all 1188 tests ran across 24 shards`, 60s |
+
+`needle_test.go` pins no count this driver changes: `shots_composer.js` declares
+no `NEEDLE_*` constant, and that test binds only declared needles. The three
+shipped drivers were run **unmodified** against the fork worktree by staging a
+tree whose `seedhammer` symlinks to it, so each driver's own relative
+`../../../seedhammer/cmd/emu` resolves there; neither main checkout was written.
+
+## Deviations from the plan's Expected, verbatim
+
+**1. The lock's echo is a SCREEN, not the digit pad's line.** Plan row 11: *"→
+digits 12960 | -- | the echo screen is ONE line, `12960 blocks (about 90.0
+days)` … (shot)"*. The plan is right and my first draft was not: the pad's echo
+is live validation (`composerBlocksBandEcho`), and §6b's echo is a separate
+`composerReadScreen` drawn after `composerLockAccept`. The first run hung on the
+pad. Fixed in the driver; the shot is now `c04-lock-echo-p0.png` on the echo
+screen, and its one-line shape is asserted by paging it (1 page) plus the
+absence of `This device cannot tell the time.` — `composerLockBoundLine` returns
+`""` for `LockOlderBlocks`, which is r0 I-7 asserted against the production copy
+rather than a paraphrase.
+
+**2. A frame settles on the NEXT event.** After a flow transition the standing
+frame can be partial — measured at the lock accept, where the pad stopped
+drawing and the Path menu did not appear until another pointer event arrived.
+`waitFor` now nudges at `(5,5)`, inside the 44 px title band, above every
+content box and left of the navigation column. `walk_s3_nested.js` nudges the
+same way before reading the engrave screen; this is that behaviour, not a new
+one.
+
+**3. FIRMWARE SIZE — a finding, as §4 asks.** The recipe reads **1,580,580 B
+flash / 62,800 B RAM** against the plan's pinned `1,579,940 B / 62,800 B`.
+**+640 B flash, and it is W-2 entirely.** Measured rather than argued: building
+`composer-s4b` (W-2 alone on `60bee002`, no Task 3 change present) gives the
+same `1,580,580 / 62,800` byte for byte. Task 3 adds **zero** — `cmd/emu` and
+`cmd/buildpayloadcomposer` are outside `cmd/controller`, exactly as §4 says. The
+pin is simply the pre-W-2 number and wants updating to `1,580,580 / 62,800`;
+RAM is unchanged.
+
+## What I decided, and what I could not do
+
+1. **`shTargets()` is new emulator surface** the plan did not name. The brief
+   sanctioned it ("or read them from the layout"); it is a reader beside
+   `shScreen`, costs nothing (the Drawer already existed for `ExtractText`), and
+   is what makes "a row the driver cannot reach by tapping is a finding" true by
+   construction rather than by promise. It deliberately probes the centre line
+   only, so the navigation column is not mixed into the row list.
+2. **The keyed arm is two legs, not one run.** Plan row 19b says "(second run of
+   rows 1-18)", so form A and form B each get a fresh page and walk the whole
+   itinerary. `--arm both` is therefore three page loads.
+3. **Watch-only on both keyed forms.** `Full (seed + keys)` adds a BEARER plate
+   of master B's seed; the plan reserves that for the operator, and an automated
+   run must not cut one. The mode picker's presence is asserted (it is drawn
+   because a seed-seated slot exists, r0 I-1).
+4. **The stubs are derived in the capture, not pinned** — the first four bytes
+   of ids it already reads from the host. A separately written stub would be a
+   second source of truth for a value that has one.
+5. **Not done, and not mine:** Task 4 (the live device walk, which the plan now
+   gates on the W-2 fix being flashed), Task 5, Task 6, and merging or pushing
+   either branch.
