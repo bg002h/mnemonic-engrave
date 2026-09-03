@@ -981,3 +981,6 @@ Steps, in order:
   Task 6. The driver's fold-r0 verification (sonnet, on a6eb44e/651fa0e) is
   still running and stands for those tips. Flash: the main after (1) carries
   W-2 + W-3 and is the build for the device walk -- at the operator's word.
+- S4 driver fold-r0 VERIFIED (sonnet, 8/8, 0I/0M/0N; report persisted): the
+  driver branches a6eb44e / 651fa0e are review-closed. They still wait on the
+  merge order above (W-3 merge -> page-count re-pin -> driver merge).
