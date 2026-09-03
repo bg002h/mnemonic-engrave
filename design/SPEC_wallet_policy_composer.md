@@ -559,9 +559,15 @@ with its own sizing and its own goldens, and is filed as **F-455**. A seed that
 filled several slots is cut ONCE.
 Plate census before cutting, as Multisig Build does, and it counts CARD chunks
 too: appending stubs can push a card into a third chunk (`mk/encode.go:26-29`);
-the census REFUSES a
+the census WOULD refuse a
 concrete descriptor longer than the plate holds, naming the measured ceiling
-(§13 item 1). Recovery-time error detection differs by form and the census says so: md1/mk1
+(§13 item 1) -- but S3 ships form A as the keyed md1 ONLY, so there is no
+concrete-descriptor plate to refuse and the refusal is NOT IMPLEMENTED. It
+belongs to **F-457** with the renderer it depends on: `md` deliberately emits
+no descriptor text, so the plate needs a Rust-first renderer before the refusal
+guarding it can exist. The ceiling itself IS measured (596 characters, §13
+item 1) and `composerDescriptorCeilingChars` computes it by search, so the
+number is ready when the plate is. Recovery-time error detection differs by form and the census says so: md1/mk1
 carry BCH; a text or QR descriptor carries only its BIP-380 checksum. **This
 re-opens staged-plan 6d**, deferred 2026-08-20 for "unmeasured sizing plus an
 irreversible medium while content rules were still moving": §13 item 1 measures
@@ -604,7 +610,7 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 | consent | decoded shape or seating differs from the composed list | REFUSAL with an exit (§8q) |
 | engrave | keyless composition | DEFAULT: form choice collapses to template only (§7f) |
 | engrave | partially seated composition | DEFAULT: template plus cards for seated slots, template stub only, no form A (§7f) |
-| engrave | concrete descriptor longer than the plate holds | REFUSAL by census with the measured ceiling (§13 item 1) |
+| engrave | concrete descriptor longer than the plate holds | REFUSAL by census with the measured ceiling (§13 item 1) -- NOT IMPLEMENTED in S3, which ships no concrete-descriptor plate; deferred with the plate to F-457 |
 
 ## 8. Copy — operator-facing strings (blockquoted so `plan-glyph-check.sh` scans them; ASCII only; every FIXED body passes the modal-fits assertion, §12 item 5; every confirm-to-proceed screen is dismissed only by a tap on CONTINUE, and Back returns to the shape)
 
@@ -622,9 +628,19 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 > Key order is part of this wallet. Anyone restoring
 > it must keep the same order. Sorted keys need none.
 
-### 8c. Lock echoes (five separate bodies)
+### 8c. Lock echoes (SEVEN separate bodies)
+
+The blocks echo and the packed-HEIGHT bound were folded in at composer S3's
+review r0 (M-3). They shipped in `gui/composer_copy.go` tagged §8c while §8c
+blockquoted neither: the blocks echo is §6b's table row ("N blocks (about D
+days)") and the height bound is this section's date body spliced with §6b's
+"heights read `the packed height was H`". A copy row compared against text the
+spec does not carry is a self-consistency check, not a spec check, so both are
+here now and all of §8's bodies are diffable again.
 
 > 90 days = 15188 units of 512 s (90.0 days)
+
+> 1000 blocks (about 6.9 days)
 
 > Block 905000
 
@@ -632,6 +648,11 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 
 > This device cannot tell the time. The payload
 > says it was packed on 2026-09-01, which may be
+> long ago. Nothing here has checked that this is
+> in the future.
+
+> This device cannot tell the time. The payload
+> says the packed height was 905000, which may be
 > long ago. Nothing here has checked that this is
 > in the future.
 
@@ -769,10 +790,19 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 
 > Slot @0, key path (spends alone): choose a key
 
-### 8t. Date floor (§6b)
+### 8t. Date floor and ceiling (§6b)
+
+The CEILING body is F-456, folded in at composer S3's review r0 (M-3). §8t
+covered only the floor, so a date past 2038-01-19 was refused as "that date
+does not exist" -- false of 2045-06-01, and on the archetype §4d lists first a
+twenty-year date is the ordinary case. F-458 is the separate defect that the
+dispatch between the two could not tell them apart.
 
 > This build will not write a date before 2009
 > as a time lock.
+
+> This build writes dates up to 2038-01-19. For a
+> later time, use a block height instead.
 
 ### 8u. Relative lock ceiling (§6b)
 
@@ -936,7 +966,9 @@ table, so the glyph and modal-fits gates cover it.
 9. **Engrave surface.** Per journey: the form choice offered (A and B, B only,
    template only), Full versus Watch-only, the three secret forms, the census
    lines, the read-back-integrity line; the census refusal on the measured ceiling
-   is asserted once §13 item 1 has a number.
+   is NOT asserted: §13 item 1 now carries the number (596 characters), but S3
+   ships no concrete-descriptor plate for it to guard, so the refusal and its
+   assertion both belong to F-457.
 10. **Multisig Build parity (optional, C7 comment-only):** the `sortedmulti`
     preset with seed-derived slots reproduces `gui/testdata/t6b_multisig_full.md1.txt`.
 11. **Cite gate:** `scripts/plan-cite-check.sh` on this spec before each R0 round;
