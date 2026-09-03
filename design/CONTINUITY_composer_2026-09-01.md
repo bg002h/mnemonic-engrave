@@ -808,3 +808,22 @@ Steps, in order:
   Task 4 (the device plate) now cuts the 56-char string; Task 4 reads the
   device door's lead first (the Load Payload region may still be on the
   machine).
+- S4 PLAN R0 GREEN (2026-09-03): r1 fold verification (sonnet, 206807b)
+  20/20 folded, 0C/0I/0M/0N; STATUS set 5a5f3df (plan checks: cite 0/0,
+  glyph 47/0 -- the STATUS commit message says 46, the STATUS line added one
+  quoted string --, tables 29/0, stepref 23 cross-document/round-label/UI
+  indices). Implementer brief filled 7c475e5. S4 IMPLEMENTER (opus, ONE
+  agent, UC off) DISPATCHED against 5a5f3df for Tasks 1-3: worktrees
+  /scratch/code/shibboleth/wt-composer-s4-emu (fork, off 60bee002) and
+  /scratch/code/shibboleth/wt-engrave-s4-emu (engrave, off master), both on
+  branch composer-s4-emu; reports to composer-S4-implementation-report.md.
+  Whole-diff review brief drafted 3cb0b1f (placeholders <S4_FORK_TIP>,
+  <S4_ENGRAVE_TIP>, <S4_ENGRAVE_BASE>, <S4_GREEN_SHA>=5a5f3df,
+  <CONTROLLER_GATES>). NEXT when the implementer reports: persist -> controller
+  re-runs plan §4's gates on both worktrees (go test ./cmd/emu/, js vet, gofmt,
+  capture_composer.py --arm both + --prove-it-can-fail with the EMU override,
+  the three shipped drivers, firmware size unchanged 1,579,940/62,800) ->
+  fill the review brief -> opus whole-diff review -> fold -> sonnet verify ->
+  fork merge --no-ff + push + watch test.yml; engrave: the journeys diff
+  merges into master and pushes via staging. Engrave master push (records)
+  next, while the implementer runs.
