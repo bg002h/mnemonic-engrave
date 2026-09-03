@@ -614,3 +614,12 @@ Steps, in order:
    silent (Part A ships alone; §7f offers the device's two plate forms
    (F-455); presets follow F-453's Rust half); F-457 narrows C10 this stage;
    me 0.8.1 owed (F-454); the live journey walk with the operator.
+
+- 2026-09-02 (after the resume point): step 2 DONE -- S0b on descriptor-
+  mnemonic main 1dc8d409 (ff; run 33698441737 green; report 1b3c159). Step 3
+  DONE -- A10 records the merge commit, F-453 CLOSED (plan revision 722edbd
+  = <S3_GREEN_SHA>; brief 3725e7f). Step 4 IN PROGRESS -- S3 implementer
+  (opus, one agent) dispatched against 722edbd with A10 unblocked; worktree
+  /scratch/code/shibboleth/wt-composer-s3, branch composer-s3; reports to
+  design/agent-reports/composer-S3-implementation-report.md. Step 6 next
+  while it runs (engrave master push), then step 5 when it reports.
