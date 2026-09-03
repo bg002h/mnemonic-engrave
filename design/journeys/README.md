@@ -18,6 +18,7 @@ emulator draws from the driver's step stream.
 | `SeedHammer-II-load-payload-journey.pdf` | not a wallet — the **systemwide payload**: pack it, write it to `0x10D00000`, compare the digest across the air gap, use it, unload it, wipe it | host CLI + emulator |
 | `SeedHammer-II-wallet-policy-journey.pdf` | a wallet **someone else built** — a depth-2 taproot script tree, gathered over NFC and PROVED before engraving | host CLI + emulator, 8 md1 chunks over NFC |
 | `SeedHammer-II-tr-pathological-journey.pdf` | the **taproot pathological wallet** — the four-tier degrading vault as a depth-3 taproot tree, 11 cosigners across 3 masters | host CLI + emulator, 24 md1 chunks over NFC |
+| `SeedHammer-II-composer-journey.pdf` | a wallet **built on the device** — the Wallet Policy composer: paths, a wait, a hashlock, keys seated from a systemwide payload, proved and engraved; plus the key-less template plate | host CLI + emulator, a `key:`/`hash:`/`now:`/seed payload |
 
 Each has a matching `transcript*.sh` (regenerates every CLI block),
 `build_pdf*.py` (regenerates the PDF from the artifacts) and `inputs*/` (the
@@ -37,6 +38,39 @@ in two languages, from the same four xpubs.
 **The negative control was run**: corrupting one character of one expected
 address fails the capture with *"the device's proof does not match the host's"*.
 A comparison that has never been made to fail is not evidence.
+
+### The composer journey CHECKS ITSELF, and found two device defects first (2026-09-03)
+
+`transcript_composer.sh` mints the host oracle (`md compose`/`encode`/`inspect`/
+`address`, `me sysw pack`/`show`, `mk encode`; 27 exit-code-bearing gates) and
+`capture_composer.py --arm keyed|keyless|both` drives `cmd/emu/shots_composer.js`,
+which is handed the digest, both ids, both stubs, the four addresses and every
+engraved string and throws on any disagreement. Rows are tapped where the
+layout draws them (`shTargets()` reads the frame's hit regions; the walk injects
+no button the machine lacks). Two things this one does that its siblings did
+not:
+
+- **The negative control attributes its failure.** `--prove-it-can-fail` exits 0
+  only when the walk's failure NAMES the corrupted address; a walk that dies
+  earlier is reported INCONCLUSIVE (the review found the first version accepted
+  any failure).
+- **The comparison is byte-for-byte because verification cannot be.** The
+  device is chunk-form-always and a short template encodes unchunked on the
+  host by default; `md verify` accepts both. The plan's first draft pinned the
+  wrong form; only the byte comparison could tell.
+
+Before the walk could run, it found W-2 (the composer's pick lists had no touch
+targets, so only a page's first row was selectable on the device) and, from
+its own screenshots, W-3 (the Template-ID's last digits drawn under the Back
+button). Both are fixed on the fork and recorded in
+`design/S4_journey_walk_2026-09-02.md`.
+
+```
+bash transcript_composer.sh > transcript_composer.txt 2>&1
+python3 capture_composer.py --arm both
+python3 capture_composer.py --arm keyed --prove-it-can-fail
+python3 build_pdf_composer.py
+```
 
 ### The taproot pathological journey (2026-08-21)
 
