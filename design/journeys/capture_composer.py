@@ -21,7 +21,7 @@ THREE COMPARISONS, and the third is the one nothing else can make:
      `md verify`, `md inspect` and `md decode` accept both identically while the
      DEVICE is chunk-form-always. No verify step can tell them apart.
 
-    python3 capture_composer.py [--arm keyed|keyless|both] [--port 8793] [--shot-port 8734]
+    python3 capture_composer.py [--arm keyed|keyless|both] [--port 8803] [--shot-port 8744]
 
 Exits non-zero unless every expected shot arrived AND every comparison passed, so
 a partial or disagreeing capture cannot be mistaken for a complete one.
@@ -37,6 +37,12 @@ EMU = os.environ.get("EMU") or os.path.abspath(
     os.path.join(W, "..", "..", "..", "seedhammer", "cmd", "emu"))
 SHOTS = os.path.join(W, "shots")
 OUT = os.path.join(W, "out", "composer")
+
+# THE STRING THE ADDRESS COMPARISON THROWS, spelt once here and once in
+# cmd/emu/shots_composer.js's run(). --prove-it-can-fail requires it, so a
+# rename that broke the pairing turns the control INCONCLUSIVE -- loudly --
+# rather than leaving it passing for the wrong reason (review I-1).
+COMPARISON_FIRED = "the device's proof does not match the host's"
 
 # The fixed shots per arm. The paged screens contribute a shot per page and the
 # count is not known ahead of time, so the driver's own return value carries
@@ -82,6 +88,19 @@ def read_keyed():
     template = need("keyed-template.md1.txt")
     cards = [need(os.path.join("cards", f"slot{i}.mk1.txt")) for i in (0, 1, 2)]
 
+    addresses = recv[:2] + chg[:2]
+    # M-3: `need()` fails on a MISSING file, not an EMPTY one, and the driver's
+    # loop over an empty list compares nothing while the leg still prints "all
+    # legs matched the host." The count is pinned here, where it is read, so the
+    # half of THE COMPARISON the plan calls its point cannot silently become no
+    # comparison at all. It also pins what the consent screen must carry: two
+    # receive and two change.
+    if len(addresses) != 4:
+        sys.exit(f"the host wrote {len(addresses)} address(es) into out/composer/keyed."
+                 f"{{receive,change}}.txt, want 4 (receive 0-1 and change 0-1).\n"
+                 f"An empty or short file would make the consent comparison compare NOTHING "
+                 f"while the run still reported a match. Re-run ./transcript_composer.sh.")
+
     base = {
         "digest": digest,
         "templateId": template_id,
@@ -91,7 +110,7 @@ def read_keyed():
         "templateStub": template_id[:8],
         "policyId": policy_id,
         "policyStub": policy_id[:8],
-        "addresses": recv[:2] + chg[:2],
+        "addresses": addresses,
     }
     forms = {
         # Form A: the keyed policy alone. 7 chunks pack onto 2 plates (F-423).
@@ -148,6 +167,18 @@ def serve(directory, port):
     return httpd
 
 
+class Failure:
+    """What drive() returns when a leg threw: which leg, and the text it threw.
+
+    A class rather than a tuple so `res is None` cannot survive anywhere as a
+    stand-in for "the comparison fired" -- that conflation is review I-1.
+    """
+
+    def __init__(self, leg, text):
+        self.leg = leg
+        self.text = text
+
+
 async def drive(port, shot_port, legs):
     """Run each leg on a FRESH PAGE.
 
@@ -180,12 +211,19 @@ async def drive(port, shot_port, legs):
                      "arm": arm, "form": form, "expect": expect},
                 )
             except Exception as e:
+                # THE TEXT, NOT A BARE None (review I-1). `None` is the same
+                # value for "the comparison caught the corruption" and "the walk
+                # broke at step 2", and --prove-it-can-fail read it as the
+                # former -- so corrupting payload.digest.txt made the control
+                # print PASSED in 8 seconds, having never reached the consent
+                # screen where an address is compared. A control that passes for
+                # the wrong reason is the one thing a control must not do.
                 print(f"DRIVER FAILED on leg {name}:", e, file=sys.stderr)
                 if errors:
                     print("page errors:", errors[:5], file=sys.stderr)
                 await page.close()
                 await browser.close()
-                return None
+                return Failure(name, str(e))
             await page.close()
             if errors:
                 print("page errors (non-fatal):", errors[:5], file=sys.stderr)
@@ -202,8 +240,12 @@ def main():
     # and requires the walk to notice -- exit 0 only if the capture FAILED.
     ap.add_argument("--prove-it-can-fail", action="store_true",
                     help="corrupt one expected address; succeed only if the walk catches it")
-    ap.add_argument("--port", type=int, default=8797)
-    ap.add_argument("--shot-port", type=int, default=8738)
+    # 8803 / 8744: the first free pair. 8797/8738 is capture_seating.py's exactly
+    # and the docstring used to advertise capture_walletpolicy.py's 8793/8734
+    # (review M-4). serve() exits loudly on a collision, so this was noisy rather
+    # than silent -- but two drivers cannot then run back to back.
+    ap.add_argument("--port", type=int, default=8803)
+    ap.add_argument("--shot-port", type=int, default=8744)
     ap.add_argument("--emu", default=None, help="the fork's cmd/emu (default: the sibling checkout)")
     ap.add_argument("--no-build", action="store_true")
     a = ap.parse_args()
@@ -219,15 +261,17 @@ def main():
                  "run it with --arm keyed.")
 
     legs = []
+    corrupted_address = None
     if a.arm in ("keyed", "both"):
         forms = read_keyed()
         if a.prove_it_can_fail:
             # Flip the LAST character of the first address: a one-character lie
             # is the smallest thing the comparison must still catch.
             bad = forms["A"]["addresses"][0]
-            forms["A"] = dict(forms["A"], addresses=[
-                bad[:-1] + ("q" if bad[-1] != "q" else "p")] + forms["A"]["addresses"][1:])
-            print(f"NEGATIVE CONTROL: expecting {forms['A']['addresses'][0]} (corrupted)")
+            corrupted_address = bad[:-1] + ("q" if bad[-1] != "q" else "p")
+            forms["A"] = dict(forms["A"],
+                              addresses=[corrupted_address] + forms["A"]["addresses"][1:])
+            print(f"NEGATIVE CONTROL: expecting {corrupted_address} (corrupted)")
             legs.append(("keyed-A", "keyed", "A", forms["A"]))
         else:
             legs.append(("keyed-A", "keyed", "A", forms["A"]))
@@ -269,13 +313,22 @@ def main():
             print(out.strip())
 
     if a.prove_it_can_fail:
-        if res is None:
+        if res is None or not isinstance(res, Failure):
+            sys.exit("NEGATIVE CONTROL FAILED: the walk accepted an address the host never "
+                     "derived. The comparison proves nothing.")
+        # ATTRIBUTED, NOT MERELY COUNTED (review I-1). The plan's words are
+        # "exits 0 only if the walk CAUGHT it"; before this the code exited 0 if
+        # the walk merely STOPPED. So the failure text must name the comparison
+        # that was supposed to fire AND the corrupted value itself -- any other
+        # failure is a control that proved nothing, and says so.
+        if COMPARISON_FIRED in res.text and corrupted_address in res.text:
             print("\nNEGATIVE CONTROL PASSED: the walk refused the corrupted address.")
+            print(f"  it failed at the address comparison, naming {corrupted_address}")
             sys.exit(0)
-        sys.exit("NEGATIVE CONTROL FAILED: the walk accepted an address the host never derived. "
-                 "The comparison proves nothing.")
+        sys.exit(f"NEGATIVE CONTROL INCONCLUSIVE: the walk failed before the comparison -- "
+                 f"{res.text}")
 
-    if res is None:
+    if res is None or isinstance(res, Failure):
         sys.exit("capture failed: the driver did not return")
 
     # SIZE, NOT EXISTENCE. A canvas that fails to rasterise yields "data:," which
