@@ -15537,3 +15537,13 @@ loop also offers no verify step (the three flows that do are singlesig,
 multisig and multisig_build), so the S4 driver terminates on the door rather
 than on a verify offer. The S4 capture records the modal; the copy stays as
 shipped this stage.
+
+### F-464 — `composer-paged-geometry-test-covers-two-of-four-screens`: the W-3 geometry test (`gui/composer_paged_geometry_test.go`) renders the keyed and keyless Template screens only; the mapping review and the `Which hash?` pick list share `composerPageLines` and are asserted by nothing (owning phase: **post-S4 polish**) `#composer` `#seedhammer` `#tests`
+
+Filed 2026-09-03 from `composer-S4-W3-verification` M-1. The verifier drove
+both screens with a throwaway geometry check on `composer-s4c` `0b49f66`:
+correct after the fix, and the check would have caught the pre-fix defect
+(the mapping review's wrapped sentence lost "origin" under the page button,
+walk record W-3 second instance). Fold: extend the shipped test's table to
+every `composerPageLines` caller, so a new long line on any of them fails the
+build rather than the operator.
