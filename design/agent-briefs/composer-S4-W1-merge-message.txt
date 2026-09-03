@@ -1,0 +1,10 @@
+Merge composer-s4: S4 walk W-1 -- the preset picker's blank row (composer S4)
+
+First fix from the S4 journey walk on the device (mnemonic-engrave
+design/S4_journey_walk_2026-09-02.md, W-1): the blank route is a visible
+first row, "Build my own paths", and Back on the preset picker returns to
+the wrapper choice. One commit (bc9dd63) on b77449db; targeted verification
+design/agent-reports/composer-S4-W1-verification.md.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
