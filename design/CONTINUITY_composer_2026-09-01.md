@@ -729,3 +729,6 @@ Steps, in order:
   THEN: merge --no-ff composer-s4 into fork main, push, watch CI, sh2-flash
   (the device is in BOOTSEL, at the operator's word), record; resume the walk
   at "Add a spend path" when the operator is back.
+- Controller gates on composer-s4 bc9dd63 GREEN: go test ./... 54 ok; gui
+  1186/1186 (24 shards); 32-bit; oraclelive; js vet; firmware 1,579,940 B
+  flash / 62,800 B RAM (+16 B over b77449db). Log .tmp/s4-gate.log.
