@@ -915,3 +915,18 @@ Steps, in order:
   (spec §12 items 2/3/9 EXECUTED lines, staged plan §S4, README row +
   build_pdf_composer.py, F-460 checked present, F-461 note). Flash of
   3cc71d9b still at the operator's word.
+- S4 WHOLE-DIFF REVIEW (opus) 0C/1I/4M/4N persisted 93988cd. I-1: the
+  negative control accepted ANY driver failure as the address comparison
+  catching the corruption (a corrupted payload digest killed the walk at row
+  2 in 8 s and it printed PASSED). M-1 dead post-condition; M-2 "TEXT ONLY
+  alone" unasserted; M-3 empty address list compares nothing; M-4 port
+  collision with capture_seating.py; N-1 unreachable guard; N-3 transcript
+  rev line; N-4 no composer needle pinned. N-2 CORRECTS THE CONTROLLER'S
+  RECORD: my review-brief gate line said `gofmt -l cmd/ gui/` clean -- the
+  gate log (s4-impl-gate.log lines 3-5) lists gui/transaction.go,
+  transaction_golden_test.go, transaction_txrecord_test.go, unformatted at
+  60bee002 already and outside the diff; the plan's gate is `gofmt -l cmd/`,
+  which is clean. Recorded here; the brief stays as committed. Fold brief
+  composer-S4-fold-r0-brief.md; the implementer is RESUMED to fold ->
+  composer-S4-fold-r0-report.md. NEXT: persist -> controller re-runs the
+  changed gates -> sonnet fold verification (brief to write) -> merge both.
