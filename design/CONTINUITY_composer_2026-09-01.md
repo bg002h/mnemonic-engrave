@@ -1012,3 +1012,17 @@ Steps, in order:
   shots. Merge briefs refilled (2529b61): fork tip b481be7 on 1ae0ffcb,
   engrave tip 55db8e5. NEXT: gate4 green + shots legible -> fork driver merge
   -> engrave merge (fill <ENGRAVE_MASTER_TIP>) -> Task 6.
+- GATE4 GREEN on the merged driver tip (fork b481be7 / engrave 55db8e5;
+  .tmp/s4-impl-gate4.log): --arm both exit 0 (21+21+8 shots, all legs
+  matched), control exit 0; the controller LOOKED at k02-stub-p0.png on the
+  merged build: all 32 hex digits and both mk encode lines clear of the
+  buttons (W-3 holds). Fork driver merge DISPATCHED (brief 2529b61) ->
+  composer-S4-push-report.md. The post-W-3 capture artifacts (shots c*/k*,
+  composer-result.json, out/composer/) are copied into the main checkout's
+  design/journeys (untracked, as every journey's are) for the Task 6 PDF.
+  NEXT: persist the fork push report -> engrave merge (fill
+  <ENGRAVE_MASTER_TIP>; FREEZE) -> Task 6 (run build_pdf_composer.py in the
+  main checkout, commit builder + PDF + README row; spec §12 EXECUTED lines;
+  staged plan §S4; FOLLOWUPS F-460/F-461 notes) -> push -> flash at the
+  operator's word (target = fork main after the driver merge; firmware bytes
+  unchanged from 1ae0ffcb since cmd/emu is outside cmd/controller).
