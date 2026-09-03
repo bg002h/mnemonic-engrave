@@ -1,0 +1,11 @@
+Merge composer-s4-emu: the composer journey's host half and capture (composer S4)
+
+design/journeys/transcript_composer.sh (the host oracle: md compose/encode/
+inspect/address, me sysw pack/show, mk encode; 27 exit-code-bearing gates,
+FORK= override) and capture_composer.py (--arm keyed|keyless|both,
+--prove-it-can-fail with failure attribution, EMU override), driving
+cmd/emu/shots_composer.js on the fork. Spec §12 items 2 and 3 executed;
+whole-diff review composer-S4-exec-review-r0.md folded and verified.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA

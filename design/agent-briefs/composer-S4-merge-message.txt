@@ -1,0 +1,14 @@
+Merge composer-s4-emu: the composer journey EXECUTED on the emulator (composer S4)
+
+Spec §12 items 2 and 3, executed: a third emulator payload carrying the
+composer's own record classes (key:, hash:, now:, a seed); shots_composer.js
++ shTargets(), the walk that taps rows where the layout draws them and
+compares the device's digest, ids, stubs, addresses and every engraved string
+against the host byte for byte, with a negative control that attributes its
+own failure; needle pins for the composer's anchors. Whole-diff review
+design/agent-reports/composer-S4-exec-review-r0.md 0C/1I/4M/4N, folded and
+verified. Host half in mnemonic-engrave design/journeys (transcript_composer.sh,
+capture_composer.py).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
