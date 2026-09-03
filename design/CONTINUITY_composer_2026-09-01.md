@@ -652,3 +652,10 @@ Steps, in order:
   report -> controller gate -> sonnet verification (brief
   composer-S3-fold-verification-brief.md, fill <S3_FOLD_SHAS>/<S3_REVIEWED_TIP>
   = a63fd1e) -> merge/push brief -> fork main. Still no flash (no /nix).
+- NIX REINSTALLED by the operator (Omarchy; nixos.org multi-user, flakes on;
+  `nix run .#build-firmware` builds). The Bash tool needs
+  PATH=/nix/var/nix/profiles/default/bin. Firmware size BASELINE measured on
+  fork main 321acb56 via `nix develop -c tinygo build -size short ...`:
+  flash 1,506,884 B / RAM 62,592 B (plan's 169073c figure was 1,503,652 /
+  62,592; S2 accounts for the difference). Take the S3 measurement on the
+  fold's tip; the delta must be non-zero (plan C2 Step 4).
