@@ -327,8 +327,17 @@ all ten cells: Mnem •, Cdx32 •, Passph •, FreeText blank, Descr •, MDMK 
 blank, Key •, Hash •, Now •; section 5.3's reserved-prefix list gains the three
 prefixes. Because Mnemonic, Cdx32 and Passphrase become admitted at Wallet Policy
 for the first time, section 3.3.3's flag screens (F1 unencrypted-in-flash with its
-erase offer; F2 weak seal) fire inside the composer's seed step exactly as they do
-in Multisig Build; §7g classifies that as DEFAULT. Two comments are rewritten with
+erase offer; F2 weak seal) are the screens that cover them. MEASURED at fork
+`169073c` and unchanged at `321acb56`: they fire at payload LOAD, not in a seed
+step, and not per program. `syswLoadWarnings` (`gui/sysw_load.go:259`) is called
+from exactly one place, `syswLoadFlow` (`gui/sysw_load.go:210`), whose only call
+sites are `gui/gui.go:2074` (boot) and `gui/sysw_unload.go:36,75` (reload); it
+walks `s.records` and consults NO admission table, so a mnemonic in a payload
+already raises F1 whatever this row admits. Admitting the seed classes here
+therefore adds no flag-screen wiring, and none was added -- a test asserts that
+`syswLoadWarnings` gained no per-program caller. §7g's classification is
+unchanged and still DEFAULT: the operator meets the flags at load, which is
+before the composer consumes a seed. Two comments are rewritten with
 the change: `gui/gui.go:191-203` (the program "came from OUTSIDE this device";
 "would drag a seed requirement or a plate census into a flow that needs neither";
 "not a rename of Multisig") and `gui/sysw_admit.go:47-51` ("NO seed class ... least
@@ -384,7 +393,12 @@ every path of the policy carries a hash, the §8h warning fires before consent.
 Wallet Policy opens on a ChoiceScreen in EVERY state (today the no-payload path
 drops straight into the NFC gather, `gui/wallet_policy.go:97`). Choices name the
 route they take (F-437, resolved): "Scan cards", "From payload" (only when the
-loaded payload holds a Descriptor or md1/mk1 record), "Build a new policy". Beneath Build the door states the key state:
+loaded payload holds a Descriptor or md1/mk1 record), "Build a new policy". The
+door states the key state WITH Build, in the screen's Lead rather than beneath
+the row: `ChoiceScreen` draws its Lead through `widget.Labelw`, which WRAPS
+(`gui/gui.go:1969`), and its choice rows through `widget.Label`, which does not
+-- so a line as long as "A payload is in flash but not loaded. Load it from the
+carousel first." would be cut off the panel if it were a row. The state:
 "Keys loaded: N" when the payload holds N keys and no seed; "Keys loaded: N, plus
 M seed." when it holds N keys and M seeds (the noun pluralises with M, as the
 not-understood line's does); "A seed is loaded. It can fill any number of slots."
@@ -534,8 +548,15 @@ choice collapses to "template only" and says so. A PARTIALLY seated composition
 whose unseated slots take §4f's lowest-free accounts, plus one card per SEATED
 slot carrying the TEMPLATE stub only, and the screen says the policy id does not
 exist until every slot is seated. For seed-derived slots: **Full
-(seed + keys)** or **Watch-only (keys)**; in Full mode the secret is cut as words,
-as a SeedQR, or as ms1 strings (`gui/codex32_polish.go:218` `engraveCodex32`); a seed that filled several slots is cut ONCE.
+(seed + keys)** or **Watch-only (keys)**; in Full mode the secret is cut in one
+of the TWO plate forms this device has. MEASURED: `engraveSeed`
+(`gui/gui.go:839`) bakes the BIP-39 words AND a SeedQR onto ONE `backup.Seed`
+plate, and `backup.SeedString` (`backup/backup.go:26`) is the string-only form
+`engraveCodex32` (`gui/codex32_polish.go:218`) cuts for ms1. There is no
+words-only and no QR-only plate for a mnemonic, so "words" and "a SeedQR" are
+not separate choices -- they are one plate. Splitting them is a new plate layout
+with its own sizing and its own goldens, and is filed as **F-455**. A seed that
+filled several slots is cut ONCE.
 Plate census before cutting, as Multisig Build does, and it counts CARD chunks
 too: appending stubs can push a card into a third chunk (`mk/encode.go:26-29`);
 the census REFUSES a
@@ -928,7 +949,25 @@ table, so the glyph and modal-fits gates cover it.
    plate are measured on the emulator, not read off a constant
    (`gui/transaction.go:1369`). The per-frame capacities of the three paged
    screens (§7c stub screen, §7d pick list, §7e consent) are the same kind of
-   plan-time render measurement.
+   plan-time render measurement -- `Choice.Size` and `widget.Labelw`'s sizes
+   exist only at render time, so no static read produces them. MEASURED at
+   composer S3 on fork `composer-s3` (parent `321acb56`) by
+   `CGO_ENABLED=0 go test -run '^TestComposerMeasureSection13Numbers' -v ./gui/`
+   (`gui/composer_measure_test.go`), at the SeedHammer II display size:
+
+   ```text
+   SPEC13 stub_screen    lines= 42 per_frame= 7 pages=6
+   SPEC13 pick_list      lines= 36 per_frame= 7 pages=6
+   SPEC13 consent        lines= 17 per_frame= 7 pages=3
+   SPEC13 descriptor_plate ceiling_chars=596  c10_688_fits=false
+   ```
+
+   So all three paged screens hold **7 rows per frame**, and the concrete
+   descriptor plate ceiling is **596 characters** at this platform's params --
+   measured by binary search against a real `backup.Text` plate
+   (`composerDescriptorCeilingChars`), never written down as a constant. C10's
+   688-character two-path wallet therefore does NOT fit one text plate, which
+   is why §7f's form B (template plus key cards) is the form that carries it.
 2. **Ledger registration of md's depth-0 xpubs.** Core, Liana and Sparrow accept
    them (measured); Ledger's whole-xpub `memcmp` likely does not: UNVERIFIED,
    filed descriptor-mnemonic `md-descriptor-depth0-xpub-ledger-registration`.
