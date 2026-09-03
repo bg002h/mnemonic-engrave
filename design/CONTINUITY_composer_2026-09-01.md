@@ -867,3 +867,16 @@ Steps, in order:
   word -> resume the implementer for Task 3 (merge fork main into
   composer-s4-emu first) -> the device walk resumes at step 3 on the new
   build.
+- W-2 SHIPPED: fork main 3cc71d9b (merge of composer-s4b 2dff0ee; Test run
+  33735918679 green; report persisted); verification 0C/0I/0M/0N (cc1ba56);
+  controller firmware 1,580,580 B flash / 62,800 B RAM (+640 / +0 over
+  60bee002, .tmp/s4b-gate.log). NOT FLASHED -- the operator's word is owed;
+  the device walk cannot pass step 3 on bg60bee00. Implementer RESUMED for
+  Task 3 (brief composer-S4-task3-resume-brief.md: merge fork main into
+  composer-s4-emu, write shots_composer.js + capture_composer.py, run both
+  arms, the negative control, the named unchunked-string mutation, the
+  shipped drivers; append "Task 3 -- DONE" to the implementation report).
+  NEXT: sh2-flash 3cc71d9b at the operator's word (expected version line
+  bg3cc71d9 (UNLOCKED)); persist the Task 3 report -> controller gates ->
+  fill the review brief (composer-S4-exec-review-brief.md) -> opus whole-diff
+  review -> fold -> verify -> merge both; engrave push.
