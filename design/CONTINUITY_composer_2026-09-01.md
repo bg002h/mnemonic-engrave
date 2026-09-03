@@ -789,3 +789,22 @@ Steps, in order:
 5. Owed to the operator, unchanged: the three S3 defaults (implemented);
    F-457's C10 narrowing; me 0.8.1 (F-454); Task 5's payload write and plate
    count.
+- 2026-09-03 (after the resume point): engrave master pushed 746e7b5 via
+  staging (report c2424ba). S4 plan R0 r0 journey lens (opus) LANDED:
+  1C/12I/5M/2N, all in the plan's expected values, none in 60bee002; the
+  keyed oracle (Policy-ID 4dd749a8..., stubs 531ab9e1/4dd749a8, four
+  addresses, seed B at its own account 0') CONFIRMED on the harness. C-1: the
+  keyless plate string is the CHUNKED form
+  md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3 (56 chars, 0xb0884;
+  the device is chunk-form-always; md verify accepts both forms, so only the
+  byte comparison catches it). Report ac2014e; controller re-ran every
+  corrected value (keyless chunked, fingerprinted template 2 chunks 0x34c51,
+  cards 2/3/2, stdin pack identical); fold fda1d9e (checks in its message);
+  F-462/F-463 filed b431406; r1 verification (sonnet, targeted) DISPATCHED
+  (brief 43e37eb) -> composer-S4-plan-R0-r1-fold-verification.md. Implementer
+  brief drafted 54da69b with <S4_GREEN_SHA> to fill. NEXT: persist r1 -> if
+  clean, STATUS R0 GREEN (closure lenses: journey on the shipped code, fold
+  verification) -> fill the brief -> dispatch the implementer (Tasks 1-3).
+  Task 4 (the device plate) now cuts the 56-char string; Task 4 reads the
+  device door's lead first (the Load Payload region may still be on the
+  machine).
