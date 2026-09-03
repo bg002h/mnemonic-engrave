@@ -678,3 +678,32 @@ Steps, in order:
   1.26.3 in /nix/store now; tests run on /scratch/code/shibboleth/.toolchain
   go1.26.7), push engrave master, S4 (on-device acceptance + the journey walk
   WITH the operator; flash only at the operator's word via ~/bin/sh/sh2-flash).
+
+## RESUME POINT 2026-09-02 (evening) -- S3 SHIPPED; S4 next
+
+- S3 MERGED: fork main b77449db (Test run 33709139231 green; report 6cdeb27);
+  plan STATUS closed (b551da3); CLAUDE.md toolchain note added. NOT FLASHED.
+- Worktree /scratch/code/shibboleth/wt-composer-s3 (branch composer-s3,
+  27afa9f) can be removed: `git -C /scratch/code/shibboleth/seedhammer
+  worktree remove wt-composer-s3` (the branch is merged).
+- Open records: F-461 (self-check use-site arm unreachable), F-459 (S0b
+  nits), F-460 (Multisig Build comment-only deprecation), F-454 (me 0.8.1
+  owed), F-455/F-457 as the plan left them; the 57-vs-55 count mis-transcribed
+  in two reports (reports are verbatim; note only).
+
+Steps, in order:
+1. Push engrave master (sonnet push agent, ci/staging ritual, FREEZE) --
+   records only since ea64f86.
+2. S4 = on-device acceptance. It has NO plan yet. Before any flash: (a) walk
+   the Part-A journey WITH the operator on the emulator (cmd/emu walks +
+   shots) and classify every divergence per the journey method; (b) write a
+   short S4 acceptance plan (what is checked on the device, in what order,
+   with the abort criteria) and R0 it with one journey lens; (c) flash ONLY
+   at the operator's explicit word, via ~/bin/sh/sh2-flash, never picotool;
+   the device boots the operator's own key (slot 1) -- the build is
+   `nix run .#build-firmware` -> seedhammerii-v0.0.0-bg<sha>.uf2.
+3. Owed to the operator, unchanged: the three S3 defaults (Part A ships
+   alone; §7f offers the device's two plate forms (F-455); presets follow
+   F-453's Rust half) -- all now IMPLEMENTED as defaults, so a different
+   choice is a change request; F-457's C10 narrowing; me 0.8.1 (F-454); the
+   live journey walk (now step 2a).
