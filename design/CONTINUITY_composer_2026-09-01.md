@@ -739,3 +739,53 @@ Steps, in order:
   judgement pending on machine power: version line `bg60bee00 (UNLOCKED)`;
   W-1 check: Build a new policy -> script -> "Start from?" first row "Build my
   own paths", Back returns to the script choice. Walk resumes at step 3.
+
+## RESUME POINT 2026-09-03 -- S4 plan drafted, journey lens in flight; walk resumes at step 3
+
+State, all measured:
+- Fork main 60bee002 = origin/main = the flashed bg60bee00; boot judgement on
+  machine power still the operator's (W-1 check: Build a new policy -> script
+  -> "Start from?" first row "Build my own paths", Back returns to the
+  script choice). Worktree wt-composer-s4 already removed; branch composer-s4
+  merged.
+- The three shipped Wallet Policy emulator drivers (capture_walletpolicy /
+  _seating / _tr_pathological) RUN against a fresh emu.wasm of 60bee002: all
+  exit 0 (8/8/9 shots) -- the S3 plan's Task C2 Step 5 door edit, executed.
+  Walk record 7a008a6; runner /scratch/code/shibboleth/.tmp/s4-emu-regression.sh.
+- S4 plan DRAFT `design/IMPLEMENTATION_PLAN_composer_S4_acceptance.md` d640875:
+  Task 0 done; Tasks 1-3 = the emulator journey (third payload blob,
+  transcript_composer.sh, shots_composer.js + capture_composer.py, two arms +
+  negative control); Task 4 = the live device walk + ONE keyless tr 2-of-3
+  plate decoded back; Task 5 = Part B on the device (operator's call); Task 6
+  records. Host oracle measured and pinned in plan §2 (md 1dc8d409, me 0.8.0
+  at target/debug/me, ms 0.16.0): keyed wsh policy id 4dd749a8..., template
+  id 531ab9e1..., four addresses; keyless tr chunk
+  md15zfdsssj6tvyywtfdssj5hqqxqujzyxaduyd9dp5v3xc, template id e0863d3c...;
+  payload digest dbe9 e774 e9a4 9231 0b62 626c 2b41 cf4b. Plan checks in the
+  commit message. Scratch values in /scratch/code/shibboleth/.tmp/s4-*.
+- R0 = ONE journey lens (opus) DISPATCHED (brief 1e57f19,
+  design/agent-briefs/composer-S4-plan-R0-journey-brief.md) -> report
+  design/agent-reports/composer-S4-plan-R0-r0-journey.md.
+
+Steps, in order:
+1. When the lens lands: persist its report (own commit) -> fold the plan
+   (pin the ? cells; a Critical on the Policy-ID / seed-account rule changes
+   §2's oracle) -> plan checks in the fold commit -> sonnet fold verification
+   only if the fold is non-trivial -> STATUS R0 GREEN.
+2. Dispatch ONE implementer (opus, UC off) for Tasks 1-3: write
+   design/agent-briefs/composer-S4-implementer-brief.md (two worktrees:
+   /scratch/code/shibboleth/wt-composer-s4-emu off fork main, branch
+   composer-s4-emu; /scratch/code/shibboleth/wt-engrave-s4-emu off master,
+   same branch name); report composer-S4-implementation-report.md. Then:
+   controller re-runs the gates (plan §4) -> opus whole-diff review (both
+   diffs) -> fold -> sonnet verify -> fork merge --no-ff + push + watch
+   test.yml; engrave push via staging.
+3. The live walk WITH the operator (plan Task 4) whenever the operator is at
+   the machine: confirm the bg60bee00 boot first, then resume the walk record
+   at "Add a spend path" on the keyless tr 2-of-3 shape; then ONE plate with
+   the plan's abort criteria; decode back on the host.
+4. Push engrave master (sonnet push agent, ci/staging ritual, FREEZE) whenever
+   the tree is clean and no commit is imminent.
+5. Owed to the operator, unchanged: the three S3 defaults (implemented);
+   F-457's C10 narrowing; me 0.8.1 (F-454); Task 5's payload write and plate
+   count.
