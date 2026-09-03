@@ -1026,3 +1026,48 @@ Steps, in order:
   staged plan §S4; FOLLOWUPS F-460/F-461 notes) -> push -> flash at the
   operator's word (target = fork main after the driver merge; firmware bytes
   unchanged from 1ae0ffcb since cmd/emu is outside cmd/controller).
+
+## RESUME POINT 2026-09-03 -- S4 EMULATOR JOURNEY SHIPPED; the device walk is what remains
+
+State, all measured:
+- Fork main 6fb90cb18b3ec24050251a3cc01143bf8c022efd = origin/main: S3 +
+  W-1 (60bee002) + W-2 (3cc71d9b, pick lists tappable) + W-3 (1ae0ffcb, paged
+  lines clear of the buttons) + the S4 driver (composer-s4-emu: third
+  emulator payload, shots_composer.js + shTargets(), needle pins). Firmware
+  1,580,580 B flash / 62,800 B RAM (cmd/emu is outside cmd/controller, so
+  the driver merge changed no firmware byte). CI green on every merge.
+- The DEVICE still runs bg60bee00 (S3 + W-1). NOT FLASHED since: on it, step
+  3's "how many keys?" cannot take 3 (W-2) and the Template-ID is not fully
+  legible (W-3). Flash target = fork main (6fb90cb; version line
+  bg6fb90cb (UNLOCKED)) via ~/bin/sh/sh2-flash, ONLY at the operator's word.
+- mnemonic-engrave master: S4 plan STATUS closed for Tasks 0-3, 6; spec §12
+  items 2/3/9 EXECUTED; staged plan §S4 STATUS; journey PDF + README;
+  FOLLOWUPS F-462 (h vs ' notation), F-463 (ms1 reminder), F-464 (geometry
+  test coverage) filed; F-460 checked present; F-461 revisited unchanged.
+  All worktrees removed. Records pushed through 789a411 + the s4 merge
+  e3ee51c9; the commits after e3ee51c9 are records only (push next).
+- Walk record design/S4_journey_walk_2026-09-02.md: W-1 (shipped), W-2
+  (shipped), W-3 (shipped); paused at step 3.
+
+Steps, in order:
+1. Push engrave master (sonnet push agent, ci/staging, FREEZE) -- records only.
+2. At the operator's word: `~/bin/sh/sh2-flash -y` on fork main 6fb90cb with
+   the device in BOOTSEL; boot judgement on machine power is the operator's;
+   expected version line `bg6fb90cb (UNLOCKED)`. Check W-1 (Start from? row
+   0 = Build my own paths), W-2 (tap 3 on "how many keys?" selects it), W-3
+   (the Template screen's id shows all 32 hex digits) on the device.
+3. The live walk WITH the operator (plan Task 4): resume the walk record at
+   "Add a spend path" on Taproot 2-of-3; three questions per step; classify;
+   read the door's Lead first. Then ONE plate with the plan's abort criteria;
+   the string must equal md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
+   byte for byte (md verify accepts the unchunked form too, so bytes are the
+   check). Fixes, if any, batch on a fork branch composer-s4d with a test
+   that fails first, sonnet-verified, merged, flashed at the operator's word.
+4. Task 5 (Part B on the device) at the operator's call: me sysw pack
+   --region from design/journeys/out/composer/records.txt (regenerate with
+   transcript_composer.sh), picotool load at 0x10D00000 in BOOTSEL, digest
+   dbe9 e774 ..., the keyed itinerary by hand, form B (4 plates) or A (2).
+5. Close: walk record Part A/B closed -> staged plan §S4 OPEN items -> plan
+   STATUS -> continuity -> push. Then the residue: F-454 (me 0.8.1), F-455,
+   F-457, F-459, F-462/F-463/F-464 (post-S4 polish), the operator's three S3
+   defaults (implemented; a different choice is a change request).
