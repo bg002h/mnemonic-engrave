@@ -15484,3 +15484,33 @@ enforcement by operator ruling (C7). The comment lives at the head of
 Removing or redirecting Multisig Build is out of scope
 (`SPEC_wallet_policy_composer.md` §14), and F-150 item 1's dead end stays as
 filed.
+
+### F-461 — `composer-selfcheck-usesite-arm-has-no-reachable-input`: §7e's fixed-`<0;1>/*` use-site assertion cannot be driven by any artifact this tree can build, so its dispatch has no behavioural test (owning phase: **composer S3 residue; revisit when `md` exports a use-site override constructor, or at S4's journey run**) `#composer` `#seedhammer` `#tests`
+
+Filed 2026-09-02 from `composer-S3-exec-review-r0` I-2, while folding it. Five
+of the six arms that survived `if false {` now have a fault-injection row that
+fails under their own mutation; the sixth does not.
+
+`composerSelfCheck` (`gui/composer_selfcheck.go`) refuses a slot whose use-site
+is not the fixed `<0;1>/*`. MEASURED while folding: nothing this tree can build
+or read reaches that branch. `md.ComposeWith` always emits the fixed use-site;
+all 61 vendored compose vectors carry it; both readable
+`md/testdata/template/*.tmpl.md1.txt` fixtures carry it; and `md`'s per-slot
+`useSiteOverrides` are unexported with no exported constructor, so
+`composerSelfCheckFaultHook` -- which rewrites CHUNK STRINGS -- has nothing to
+rewrite them into. Reproduction: replace the arm's condition with `if false {`
+and run `go test -run '^TestComposerSelfCheck|^TestComposerUseSiteGuard|^TestComposerConsentRefuses' ./gui/`;
+it is `ok`.
+
+What DID land is `TestComposerUseSiteGuardRefusesEveryShapeButTheFixedOne`,
+which drives the predicate `composerUseSiteIsFixed` in both directions over
+seven shapes (no multipath, hardened wildcard, one alternative, three
+alternatives, wrong receive chain, wrong change chain, a hardened
+alternative). So the RULE is tested and the DISPATCH is not, and that
+distinction is written into the test's own comment rather than left for a
+later reviewer to rediscover.
+
+Closes when `md` grows an exported way to build a descriptor with a use-site
+override (Rust first, with a vector, per the Rust-primary rule) and the arm
+gains a fault-injection row like the other five -- or when the operator rules
+that a use-site the device cannot construct needs no behavioural gate.
