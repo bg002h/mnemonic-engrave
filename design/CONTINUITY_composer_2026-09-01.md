@@ -636,3 +636,9 @@ Steps, in order:
   plan's B11 fence folded to match (this commit). NEXT: controller gate re-run
   on a63fd1e -> opus whole-diff review (brief composer-S3-exec-review-brief.md;
   Go path is now the .toolchain one) -> fold -> verify -> merge to fork main.
+- Controller gates on a63fd1e GREEN (go test ./... 54 ok; gui 1174/1174;
+  composer 228 PASS lines; 32-bit; oraclelive; js vet; gofmt residue is
+  pre-existing on main). Opus whole-diff review DISPATCHED (brief 3f70311 ->
+  design/agent-reports/composer-S3-exec-review-r0.md). Firmware size gate
+  still UNRUN (no nix). NEXT: persist report -> fold on composer-s3 -> sonnet
+  verify -> merge --no-ff to fork main + push + watch test.yml; NO flash.
