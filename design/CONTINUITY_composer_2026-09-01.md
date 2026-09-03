@@ -827,3 +827,27 @@ Steps, in order:
   fork merge --no-ff + push + watch test.yml; engrave: the journeys diff
   merges into master and pushes via staging. Engrave master push (records)
   next, while the implementer runs.
+- S4 IMPLEMENTER REPORTED (9be1977): Tasks 1-2 DONE (fork composer-s4-emu
+  05d903b: third emulator payload, digest dbe9 e774 ... matched on the
+  emulator's digest screen; engrave composer-s4-emu 5040bb2:
+  transcript_composer.sh, 27 gates, every §2 oracle byte-identical; the three
+  shipped drivers exit 0 against the worktree). Task 3 STOPPED on a shipped
+  Critical: composerPickScreen (gui/composer_paged.go) has no per-row touch
+  target, so on the SH2 (touch only, no directional buttons) only a page's
+  first row is selectable -- n=2, n=3, Done, hash rows, seating rows all
+  unreachable; every composer test drives synthetic Down events. Recorded as
+  W-2 in the walk record + fix brief (bbb852f). The implementer is RESUMED
+  (same agent) on fork branch composer-s4b (worktree wt-composer-s4b, off
+  60bee002): per-row Clickable hit areas as ChoiceScreen has; regression test
+  on the touch harness through the real flow, failing first; emulator proof;
+  report composer-S4-W2-fix-report.md. NEXT: persist that report -> controller
+  gates on composer-s4b (gui shards, cmd/emu, js vet, firmware size delta) ->
+  sonnet verification (targeted; brief to write) -> merge --no-ff into fork
+  main + push + watch test.yml -> sh2-flash at the operator's word (the device
+  walk cannot pass step 3 without it) -> the implementer merges main into
+  composer-s4-emu and resumes Task 3 (the driver taps rows by geometry, as the
+  shipped ChoiceScreen walks do). Plan fold owed: Task 3 rows note that taps
+  select rows; §4 coverage line; the review brief's <CONTROLLER_GATES>.
+  Implementer additions to review at the whole-diff round: test.yml gained
+  ./cmd/emu/ in the oraclelive compile step; `me sysw show` prints digest: on
+  STDERR (transcript reads both streams).
