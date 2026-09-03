@@ -851,3 +851,19 @@ Steps, in order:
   Implementer additions to review at the whole-diff round: test.yml gained
   ./cmd/emu/ in the oraclelive compile step; `me sysw show` prints digest: on
   STDERR (transcript reads both streams).
+- W-2 FIXED on fork composer-s4b 2dff0ee (report 1daed7e): per-row Clickable
+  hit areas in composerPickScreen (composerPageLines now returns the row
+  bands; one Clickable per visible row, cap 24); touch-harness test
+  composer_pick_touch_test.go fails on 60bee002 ("how many must sign? 1"),
+  passes after, fails under the op.Input mutation; gui 1187/1187; emulator
+  paired control tap-3 -> "1 2 3", tap-Done -> "Sorted keys". Briefs filled
+  0caef53; sonnet targeted verification DISPATCHED ->
+  composer-S4-W2-verification.md; controller gates running
+  (.tmp/s4b-gate.log: gofmt/vet/TestComposer/cmd/emu/js vet done and clean,
+  shards/32-bit/oraclelive/firmware size pending). Plan folded fdce82f (rows
+  tapped by geometry; Task 4 prerequisite = the fix flashed). NEXT: persist
+  the verification -> merge/push agent (brief composer-S4-W2-merge-push-brief.md,
+  message composer-S4-W2-merge-message.txt) -> sh2-flash at the operator's
+  word -> resume the implementer for Task 3 (merge fork main into
+  composer-s4-emu first) -> the device walk resumes at step 3 on the new
+  build.
