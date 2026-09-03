@@ -1,0 +1,15 @@
+You are the INDEPENDENT fold-verification reviewer (targeted, small) for the composer Stage 4 driver's round-1 fold: after W-3 merged into fork `main` (`<W3_MERGE_SHA>`), the implementer merged `main` into fork branch `composer-s4-emu` and re-pinned `shots_composer.js`'s stub-screen page counts (decisions: `design/agent-briefs/composer-S4-fold-r1-brief.md`; report: `design/agent-reports/composer-S4-fold-r1-report.md` -- re-derive, do not trust). Tips: fork `composer-s4-emu` `<S4_R1_FORK_TIP>` (worktree `/scratch/code/shibboleth/wt-composer-s4-emu`; previously verified tip `a6eb44e`), mnemonic-engrave `composer-s4-emu` `<S4_R1_ENGRAVE_TIP>` (worktree `/scratch/code/shibboleth/wt-engrave-s4-emu`; previously verified `651fa0e`). One question: is the fold exactly the merge plus PINNED (never loosened) page counts and whatever the merge measurably moved, and does the capture still compare everything it compared before?
+
+Read-only; `cp -r` copies; no `git checkout` in a copied worktree; commit nothing; no sub-agents; read no `.jsonl` file; direct exit codes. Go `/scratch/code/shibboleth/.toolchain/go/bin` on PATH, `CGO_ENABLED=0 GOPROXY=off GOTOOLCHAIN=local`, `-mod=readonly`, `TMPDIR=/scratch/code/shibboleth/.tmp`; Playwright installed; run the capture against YOUR copy of the fork worktree (`EMU`/`--emu`; ports other than any in use).
+
+## Verify
+1. `git diff a6eb44e..<S4_R1_FORK_TIP> --stat` = the merge of `main` plus `cmd/emu/shots_composer.js` (and only what the report names); `git diff 651fa0e..<S4_R1_ENGRAVE_TIP> --stat` = only what the report names. Every changed assertion is an EQUALITY to a measured value (grep for `>=`, `<=`, `||` around the page-count checks: a loosened pin is Important).
+2. The measured counts: run `--arm both` yourself and read `stubPages` per leg from `shots/composer-result.json`; they must equal the pinned values.
+3. The comparison is intact: the unchunked keyless string substituted into a copy of `out/composer/keyless-tr.md1.txt` still makes the keyless arm exit non-zero naming 56 vs 47; `--prove-it-can-fail` exit 0 (PASSED) and its INCONCLUSIVE arm (corrupt `payload.digest.txt`) non-zero.
+4. LOOK at the merged build's stub shots (`c06-stub-p*.png`, `c10-stub2-p*.png`, `k02-stub-p*.png`): the Template-ID's 32 hex digits and the `mk encode` lines' tails are clear of the buttons (W-3 on the merged tree).
+5. Gates: fork `gofmt -l cmd/`, `go test -count=1 ./cmd/emu/`, `GOOS=js GOARCH=wasm go vet ./cmd/emu/`; the three shipped drivers exit 0.
+
+Severity: a loosened pin, a pin that does not equal the measurement, a comparison that no longer fails on its mutation, or a hunk outside the merge + the named files = Important; wording = Minor/Nit. Do not pad.
+
+## Report (your final action)
+Write `/scratch/code/shibboleth/mnemonic-engrave/design/agent-reports/composer-S4-fold-r1-verification.md` (create; must not exist): per item VERIFIED / NOT VERIFIED with output; the measured page counts; closing counts. Return a two-line summary plus the path.
