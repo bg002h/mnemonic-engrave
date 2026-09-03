@@ -55,3 +55,39 @@ device's consent screen), so all three passing means the door did not move
 what those journeys prove. The shots and `out/` intermediates are untracked
 (`git ls-files design/journeys/shots` is empty), so the run left the tree
 clean.
+
+## W-2 — the composer's pick lists cannot be operated by touch (found 2026-09-03 by the S4 emulator driver, before the device walk reached it)
+
+| step | in hand | device did | divergence | class |
+| --- | --- | --- | --- | --- |
+| 3 (emulator, `Path 1: how many keys?`) | the count picker `1 2 3 4 5` | a tap on any row changes nothing; only Button2 (page) moves the cursor, to the first row of the next page | on the SH2 only the first row of each page of a `composerPickScreen` can be taken: `n = 2`, `n = 3`, `Done` once a path exists, every hash row and every seating row but the first are unreachable | **W-2 CHANGE (Critical: a state the operator cannot complete)** |
+
+`gui/composer_paged.go` `composerPickScreen` moves its cursor only on
+`ButtonFilter(Up)` / `ButtonFilter(Down)` and registers no `op.Input` hit
+area per row; the SeedHammer II has no directional buttons (its only
+production input is the ft6x36 panel's `PointerEvent`s;
+`cmd/controller/debug_sh2.go` is the sole non-test source of `Down`). Four
+production call sites: `composerCountPick` (keys, threshold), the `Spend
+paths` list, `Which hash?`, `Seat keys`. Measured by the S4 implementer on the
+emulator at fork `05d903b` (`composer-S4-implementation-report.md` Task 3):
+a 205-tap sweep over the `n` picker never moved the cursor and the take gave
+`n = 1`; the positive control (a row-2 tap on `Which script?`, a
+`ChoiceScreen`, which starts the legacy wrapper's picker at 2) landed; paging
+reaches exactly the first row of each page; with one path on the list, four
+pages moved nothing and the take opened Path 1's editor, so `Done` is
+unreachable. Every composer test drives these screens with synthetic `Down`
+events -- the harness has an input the machine does not, the "a control can
+test the wrong layer" shape -- which is why 1186 green tests, three R0 lenses
+and the whole-diff review never saw it, and why the device walk paused one
+step short of it.
+
+Why the S4 walk record and not a plain bug: it is precisely the class the
+journey exists for (the operator at step 3 would have tapped `3` and watched
+nothing happen), and the emulator driver hit it first only because the
+operator was tired at step 2.
+
+Fix: fork branch `composer-s4b` (brief `composer-S4-W2-fix-brief.md`): every
+drawn row of `composerPickScreen` gets a `Clickable` hit area, as
+`ChoiceScreen`'s rows have, so a tap selects the row and Button3 takes it;
+Up/Down stay. Regression test on the TOUCH harness (`runUITouch` + `tap`,
+`gui/start_screen_touch_test.go`) through the real flow.
