@@ -964,3 +964,20 @@ Steps, in order:
   (sonnet, targeted; brief to write) -> merge composer-s4c -> flash the
   resulting main at the operator's word (W-2 + W-3 both matter for the
   device walk's step 3 and the stub screen).
+- W-3 FIXED on fork composer-s4c 0b49f66 (report e0c1d3d): composerPageLines
+  wraps+centres inside x 8..419; rasterising geometry test red on 3cc71d9b,
+  green after; gui 1189/1189; firmware unchanged 1,580,580/62,800. Spec §13
+  folded on master (stub screen 6 rows/frame, controller re-measured). Sonnet
+  W-3 verification DISPATCHED (brief bda683b) -> composer-S4-W3-verification.md.
+  MERGE ORDER FORCED by a dependency: W-3 changes the stub screens' page
+  counts, and shots_composer.js pins them (`pages.length !== 2`), so:
+  (1) W-3 verified -> merge composer-s4c into fork main (brief
+  composer-S4-W3-merge-push-brief.md) -> (2) resume the implementer with
+  composer-S4-fold-r1-brief.md (<W3_MERGE_SHA>): merge main into
+  composer-s4-emu, pin the measured page counts, re-run the captures ->
+  (3) targeted sonnet check of that fold (small) -> (4) merge composer-s4-emu
+  into fork main (composer-S4-merge-push-brief.md: its tip moves past
+  a6eb44e; refill) -> (5) engrave merge (engrave-merge-push-brief-s4.md) ->
+  Task 6. The driver's fold-r0 verification (sonnet, on a6eb44e/651fa0e) is
+  still running and stands for those tips. Flash: the main after (1) carries
+  W-2 + W-3 and is the build for the device walk -- at the operator's word.
