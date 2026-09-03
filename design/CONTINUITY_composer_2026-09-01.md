@@ -721,3 +721,11 @@ Steps, in order:
   to design/S4_journey_walk_2026-09-02.md as they are made (refusal / warning
   / default / not-our-concern / documentation-only, and a change only when
   the wrong outcome is worse than saying nothing).
+- S4 walk paused at step 3 (operator tired). W-1 FIXED on fork branch
+  composer-s4 bc9dd63 (blank row first; Back returns to the wrapper choice;
+  five walks retargeted; new test fails both mutations). Spec §7b + walk
+  record 34c92bf. Controller gates running (.tmp/s4-gate.log); sonnet
+  verification dispatched (brief composer-S4-W1-verification-brief.md).
+  THEN: merge --no-ff composer-s4 into fork main, push, watch CI, sh2-flash
+  (the device is in BOOTSEL, at the operator's word), record; resume the walk
+  at "Add a spend path" when the operator is back.
