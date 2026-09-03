@@ -5758,7 +5758,11 @@ func composerEngraveTemplate(ctx *Context, th *Colors, chunks []string) bool {
 	// and adds §7f's recovery-error line, which arrives with the cards it is
 	// about. Part A cuts one md1 and counts it through the same
 	// bundlePlatePlan every other plate goes through.
-	if !confirmReviewScreen(ctx, th, "Plate Count",
+	// The census carries the SUPPLY paths' title (gui/multisig.go,
+	// gui/singlesig.go), not Multisig Build's: the build title is a registered
+	// walk anchor (cmd/emu/needle_test.go) whose proof is that exactly one flow
+	// draws it, and the composer is a supply-shaped flow, not a build.
+	if !confirmReviewScreen(ctx, th, "Plates To Cut",
 		buildPlateCensusLines(ctx.Platform.EngraverParams(), cards)) {
 		return false
 	}
@@ -9823,7 +9827,11 @@ func composerEngraveStep(ctx *Context, th *Colors, st *composerState, template, 
 		}
 	}
 
-	if !confirmReviewScreen(ctx, th, "Plate Count",
+	// The census carries the SUPPLY paths' title (gui/multisig.go,
+	// gui/singlesig.go), not Multisig Build's: the build title is a registered
+	// walk anchor (cmd/emu/needle_test.go) whose proof is that exactly one flow
+	// draws it, and the composer is a supply-shaped flow, not a build.
+	if !confirmReviewScreen(ctx, th, "Plates To Cut",
 		composerCensusLines(ctx.Platform.EngraverParams(), cards)) {
 		return false
 	}

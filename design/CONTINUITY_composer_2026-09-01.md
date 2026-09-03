@@ -623,3 +623,16 @@ Steps, in order:
   /scratch/code/shibboleth/wt-composer-s3, branch composer-s3; reports to
   design/agent-reports/composer-S3-implementation-report.md. Step 6 next
   while it runs (engrave master push), then step 5 when it reports.
+- S3 IMPLEMENTED: composer-s3 tip b300a84 (25 commits; report d409c37). Two
+  facts from the run: (1) /nix is GONE from this machine -- Go 1.26.7 restored
+  at /scratch/code/shibboleth/.toolchain/go/bin/go (sha verified); TinyGo and
+  `nix run .#build-firmware` unavailable, so Task C2 Step 4 (firmware size
+  delta vs 1,503,652 B flash / 62,592 B RAM at 169073c) is UNRUN -- the plan
+  cannot close and nothing may be flashed until Nix is reinstalled (operator).
+  (2) CI's go test ./... failed two cmd/emu needle tests: the B11 fence titled
+  the composer census "Plate Count" (the Build walk's single-site anchor).
+  Controller fold a63fd1e on composer-s3: the census takes the supply paths'
+  title "Plates To Cut" (unpinned, 2 sites already); cmd/emu + gui ok. The
+  plan's B11 fence folded to match (this commit). NEXT: controller gate re-run
+  on a63fd1e -> opus whole-diff review (brief composer-S3-exec-review-brief.md;
+  Go path is now the .toolchain one) -> fold -> verify -> merge to fork main.
