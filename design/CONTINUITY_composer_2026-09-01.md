@@ -930,3 +930,20 @@ Steps, in order:
   composer-S4-fold-r0-brief.md; the implementer is RESUMED to fold ->
   composer-S4-fold-r0-report.md. NEXT: persist -> controller re-runs the
   changed gates -> sonnet fold verification (brief to write) -> merge both.
+- S4 REVIEW FOLDED by the implementer (report 095ee81): fork composer-s4-emu
+  a6eb44e (M-1, M-2, N-1, N-4 needle pins), engrave composer-s4-emu 651fa0e
+  (05a066a: I-1 control attribution INCONCLUSIVE arm proven both ways, M-3,
+  M-4 ports 8803/8744; 651fa0e: transcript regenerated at the tip). Controller
+  fast gates on a6eb44e: gofmt cmd/ clean, cmd/emu ok, js vet exit 0. Sonnet
+  fold verification DISPATCHED (brief bb795d7) ->
+  composer-S4-fold-r0-verification.md. Merge briefs ready:
+  composer-S4-merge-push-brief.md (fork, tip a6eb44e, message
+  composer-S4-merge-message.txt) and engrave-merge-push-brief-s4.md (engrave,
+  tip 651fa0e, message engrave-merge-message-s4.txt, <ENGRAVE_MASTER_TIP> to
+  fill at dispatch). NEXT: persist the verification -> if 0C/0I: fork merge
+  agent -> engrave merge agent (FREEZE master) -> Task 6 records (spec §12
+  items 2/3/9 EXECUTED, staged plan §S4, journeys README row +
+  build_pdf_composer.py, F-460 present (measured: gui/multisig_build.go:22-24
+  + a pinning test), F-461 note) -> the walk record -> flash 3cc71d9b (or the
+  S4 merge, which changes no firmware bytes) at the operator's word -> the
+  device walk from step 3 -> Task 4's plate -> Task 5 at the operator's call.
