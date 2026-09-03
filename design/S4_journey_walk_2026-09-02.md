@@ -32,3 +32,26 @@ real screens and fails under both named mutations (pasted in the commit). The
 label passes `assertChoiceLabelFits`. Spec §7b carries the row.
 
 Walk paused at step 3 (the operator was tired); resumes at "Add a spend path".
+
+## Emulator regression of the S3 door fix — 2026-09-03, fork main 60bee002 (controller)
+
+The S3 plan's Task C2 Step 5 changed the three shipped Wallet Policy walk
+drivers (`cmd/emu/shots_walletpolicy.js`, `shots_seating.js`,
+`shots_tr_pathological.js`: a second `await tap(CONFIRM)` for the composer's
+door) and could only count the edit, not run it -- "the walks need a browser
+and playwright, which no gate in this stage has". They have now run, against a
+fresh `emu.wasm` (10,788,612 bytes, Go 1.26.7) of fork main `60bee002`, from
+`/scratch/code/shibboleth/.tmp/s4-emu-regression.sh` (log
+`s4-emu-regression.log` beside it):
+
+| driver | exit | shots | wall |
+| --- | --- | --- | --- |
+| `capture_walletpolicy.py` | 0 | 8 | 15 s |
+| `capture_seating.py` | 0 | 8 | 9 s |
+| `capture_tr_pathological.py` | 0 | 9 | 12 s |
+
+Each capture is a comparison (the host's ids and addresses must appear on the
+device's consent screen), so all three passing means the door did not move
+what those journeys prove. The shots and `out/` intermediates are untracked
+(`git ls-files design/journeys/shots` is empty), so the run left the tree
+clean.
