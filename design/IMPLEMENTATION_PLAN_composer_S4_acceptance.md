@@ -1,6 +1,6 @@
 # IMPLEMENTATION PLAN — composer S4: the journey EXECUTED, and the device acceptance
 
-**STATUS: R0 GREEN 2026-09-03 (lens-closure: journey walk on the shipped code, fold verification). Round 0 = one journey lens (opus, `composer-S4-plan-R0-r0-journey.md`, 1C/12I/5M/2N -- every finding was in this plan's expected values, none in the shipped code; the keyed arm's oracle was confirmed on the Go harness byte for byte); folded at `fda1d9e` (the Critical was the keyless arm's md1 pinned in `md encode`'s UNCHUNKED form while the device is chunk-form-always). Round 1 = sonnet fold verification (`composer-S4-plan-R0-r1-fold-verification.md`): 20/20 folded, commands and check counts reproduce, 0C/0I/0M/0N open. Task 0 EXECUTED; every host-oracle value in §2 is measured, not transcribed. Implementer for Tasks 1-3 dispatched against this revision.**
+**STATUS: R0 GREEN 2026-09-03 (lens-closure: journey walk on the shipped code, fold verification). Round 0 = one journey lens (opus, `composer-S4-plan-R0-r0-journey.md`, 1C/12I/5M/2N -- every finding was in this plan's expected values, none in the shipped code; the keyed arm's oracle was confirmed on the Go harness byte for byte); folded at `fda1d9e` (the Critical was the keyless arm's md1 pinned in `md encode`'s UNCHUNKED form while the device is chunk-form-always). Round 1 = sonnet fold verification (`composer-S4-plan-R0-r1-fold-verification.md`): 20/20 folded, commands and check counts reproduce, 0C/0I/0M/0N open. Task 0 EXECUTED; every host-oracle value in §2 is measured, not transcribed. Implementer for Tasks 1-3 dispatched against this revision. Tasks 1-2 DONE (fork `05d903b`, engrave `5040bb2`, report `composer-S4-implementation-report.md`); Task 3 STOPPED on **W-2** (walk record): `composerPickScreen` had no per-row touch target, so on the touch-only device only a page's first row could be taken -- fixed on fork branch `composer-s4b` (`2dff0ee`, report `composer-S4-W2-fix-report.md`), verification and merge pending; Task 3 resumes on top of it.**
 
 Baseline, measured 2026-09-03: seedhammer fork `main` `60bee002` (= the flashed
 `bg60bee00`; boot judgement on machine power is the operator's, pending);
@@ -246,6 +246,14 @@ newline-joined** (`notifyPlateText`, r0 I-2): the driver splits each entry on
 file byte for byte -- AND asserts the entry count equals the census screen's
 plate count (the half that catches a packing change).
 
+**Rows are selected by TAPPING them** (W-2, fixed on `composer-s4b`: every drawn row of
+`composerPickScreen` is a `Clickable` hit area, as `ChoiceScreen`'s rows are; a tap selects,
+Button3 takes, Button2 pages). The driver taps a row at the frame's own geometry, as the
+shipped `ChoiceScreen` walks do (`walk_build_policy.js` measured its rows rather than deriving
+them), and NEVER injects `Up`/`Down` button events: `cmd/emu/walk_js.go` forbids a primitive
+that lets a walk do what the operator's hands cannot, and W-2 is exactly what such a primitive
+would have hidden. A row the driver cannot reach by tapping is a finding, not a workaround.
+
 **Paged screens wrap** (`composerReadScreen`, `composerPickScreen`: after the
 last page comes page 0 again; r0 M-3): the driver records the first page's
 text and stops paging when it recurs, as `readAllPages` in
@@ -312,8 +320,10 @@ proof does not match the host's"). Then the three shipped drivers again
 
 ### Task 4 — the live walk on the DEVICE, with the operator (no code)
 
-Resumes `design/S4_journey_walk_2026-09-02.md` at step 3 on the keyless arm's
-shape: at every step, what is in hand exactly, what the device does, what ELSE
+PREREQUISITE: the W-2 fix (`composer-s4b`) merged into fork `main` and FLASHED at the
+operator's word -- on `bg60bee00` step 3's `how many keys?` cannot take `3`, so the walk
+cannot pass it. Then it resumes `design/S4_journey_walk_2026-09-02.md` at step 3 on the
+keyless arm's shape: at every step, what is in hand exactly, what the device does, what ELSE
 the operator might do; each divergence refusal / warning / default /
 not-our-concern / documentation only, and a change ONLY when the wrong outcome
 is worse than saying nothing. Fixes batch into one fold on a fork branch
@@ -411,11 +421,15 @@ run; the emulator JS surface (`shTap`, `shPress`, `shRelease`, `shSysw`,
 `shScreen`, `shNFC`, `shToolpath`, `shPace` -- `cmd/emu/*_js.go`); the
 payload-load sequence (`walk_s4_gate.js`); every itinerary row's needle, order
 and Expected on the Go harness against `60bee002` (the r0 lens, with quoted
-frames). NOT verified, because no harness reaches it before Task 1 exists:
-the emulator-only rows (the boot offer, `Load Payload`, `shSysw`), the `SCAN`
-row at `Where from?` under the emulator's NFC feature, the exact rows of
-`Choose engraving` on a packed plate, the consent's page count, and that
-`shToolpath.strings()` splits exactly as `notifyPlateText` joins.
+frames). Verified on the EMULATOR by the Task 1-2 implementer (report Task 3 (a)): the boot
+offer, `Load Payload` with the composer blob (digest `dbe9 e774 ...` on screen), the
+F1 warning, KEEP, the door's `Keys loaded: 2, plus 1 seed.` (and the payload-present-
+but-unloaded lead when nothing is loaded), `Which script?`, `Start from?`, the path list's
+`slots: 0 / keys available: 2`, `What can spend on this path?` and the `n` picker; and the
+row-tap mechanism itself (a `ChoiceScreen` row-2 tap lands; the pick screen's did not until
+W-2's fix). NOT verified yet: the `SCAN` row at `Where from?` under the emulator's NFC
+feature, the exact rows of `Choose engraving` on a packed plate, the consent's page count,
+and that `shToolpath.strings()` splits exactly as `notifyPlateText` joins.
 
 ## 5. Order and ownership
 
