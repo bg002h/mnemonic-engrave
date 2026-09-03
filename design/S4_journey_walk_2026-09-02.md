@@ -91,3 +91,33 @@ drawn row of `composerPickScreen` gets a `Clickable` hit area, as
 `ChoiceScreen`'s rows have, so a tap selects the row and Button3 takes it;
 Up/Down stay. Regression test on the TOUCH harness (`runUITouch` + `tap`,
 `gui/start_screen_touch_test.go`) through the real flow.
+
+## W-3 — the Template screen's longest line runs under the navigation buttons (found 2026-09-03 in the S4 capture's screenshots, not by the driver)
+
+| step | in hand | device did | divergence | class |
+| --- | --- | --- | --- | --- |
+| Template (stub) screen, keyed and keyless arms | `Template-ID: 531ab9e1777f018ae53694387dd0d128` | draws the line centred across the full panel width, so its tail (`...dd0d12` **8**) lies under the Back button; the `mk encode ... --origin-fingerprint <f` line and `--policy-id-stub 531ab9e` (the stub's last hex) lie under the page button on the keyless-arm frame | the ONE screen whose lines exist to be copied (§7c) hides the last character(s) of the id and of the stub argument | **W-3 CHANGE (Important)** |
+
+Measured on the emulator's own framebuffer (`shots/c06-stub-p0.png`,
+`c10-stub2-p0.png`, `k02-stub-p0.png` from `capture_composer.py --arm both`
+at fork `a6eb44e`): `composerPageLines` (`gui/composer_paged.go`) centres each
+`widget.Labelw` line on the panel and wraps at a width that overlaps the
+navigation column (Back at the top right, page/confirm below), so a line long
+enough reaches under a button. The shipped `confirmReviewScreen` (the consent,
+`c11-consent-p0.png`) lays its `Policy-ID:` line below the buttons and shows
+all 32 hex; the composer's own paged widget does not. **The driver could not
+see it**: `shScreen()` extracts the drawn text, including text under a button,
+so every needle and byte comparison passed -- only the pixels show the loss.
+
+Wrong outcome: an operator comparing the Template-ID against the host by eye
+compares 31 digits and passes a mismatch in the 32nd; an operator copying the
+`--policy-id-stub` argument from the screen copies seven hex and `mk encode`
+refuses (recoverable, but the screen taught them the wrong value). Worse
+than saying nothing.
+
+Fix: fork branch `composer-s4c` (brief `composer-S4-W3-fix-brief.md`): the
+composer's paged widgets wrap and centre their lines inside the band LEFT of
+the navigation column (the same right bound the W-2 hit areas use), so no
+glyph is drawn under a button; a regression test asserts, from the frame's
+own layout, that every text op of the stub screen lies outside the nav
+rectangles -- a GEOMETRY test, since a text-presence test cannot fail on this.

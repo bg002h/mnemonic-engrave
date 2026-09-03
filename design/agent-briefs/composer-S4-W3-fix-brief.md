@@ -1,0 +1,19 @@
+You are the SAME single implementer, resumed, to fix W-3 in `/scratch/code/shibboleth/mnemonic-engrave/design/S4_journey_walk_2026-09-02.md`: the composer's paged widgets (`composerPageLines`, used by `composerReadScreen` and `composerPickScreen` in `gui/composer_paged.go`) draw lines centred across the full panel and wrap at a width that overlaps the navigation column, so the Template screen's `Template-ID: 531ab9e1777f018ae53694387dd0d128` loses its last hex digit under the Back button and the keyless arm's `mk encode` lines lose their tails under the page button (your own shots `c06-stub-p0.png`, `c10-stub2-p0.png`, `k02-stub-p0.png`). The consent screen (the shipped `confirmReviewScreen`) does not have this defect. The controller has decided the fix shape; execute it.
+
+## Where -- a THIRD branch, independent of composer-s4-emu
+```
+cd /scratch/code/shibboleth/seedhammer && git worktree add /scratch/code/shibboleth/wt-composer-s4c -b composer-s4c main
+```
+(`main` is `3cc71d9b`.) Do not touch `wt-composer-s4-emu` or `wt-engrave-s4-emu`. Same environment; commit signed-off with the trailer lines; never push, never flash; no sub-agents; read no `.jsonl` file; exit codes recorded directly.
+
+## The fix (decided)
+Every line `composerPageLines` lays out is wrapped AND centred within the band to the LEFT of the navigation column -- the right bound the W-2 hit areas already compute (`dims.X - assets.NavBtnPrimary.Bounds().Size().X`, minus the same margin `layoutNavigation` leaves) -- so no glyph is ever drawn under a button, on any page, for any line length. Long lines WRAP (as `widget.Labelw` does) rather than shrink; a 32-hex id with its label may become two lines, and the per-frame row budget then counts wrapped lines (re-measure the spec's per-frame capacities if they move: the §7c stub screen and §7d pick list capacities in `design/SPEC_wallet_policy_composer.md` §13, and `gui/composer_measure_test.go`'s pins -- update the pins to the measured values and say so). Do not change the consent screen, the navigation layout, or the hit-area computation beyond sharing the bound.
+
+## The test (must fail first)
+A GEOMETRY regression test in `gui/`: render the keyed stub screen (both stubs present, as `composerStubLines` builds it with the plan's fixture) and the keyless one through the real widget, then assert from the frame's own ops (`op.Drawer`, the way `shTargets`/`ExtractText` read the frame, or the drawer's hit machinery) that NO text op's rectangle intersects either navigation button's rectangle, on every page. Run it on `3cc71d9b` first and paste the failure naming the intersecting line (the Template-ID line); then make it pass. A text-presence assertion is NOT the test: `ExtractText` sees text under a button, which is why the capture passed.
+
+## Gates (paste real output)
+`gofmt -l gui/`; `go vet ./gui/` (two pre-existing ArtifactDir findings excepted); `go test -count=1 -run '^TestComposer' ./gui/`; the sharded gui runner (`/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24`); `CGO_ENABLED=0 go test -count=1 ./cmd/emu/`; `GOOS=js GOARCH=wasm go vet ./cmd/emu/`; the firmware size recipe vs `1,580,580 B flash / 62,800 B RAM`. Then the emulator proof: build `emu.wasm` from THIS worktree, drive the keyless arm's stub screen (the composer payload blob is NOT on this branch; the keyless arm needs none) and screenshot it: the Template-ID's 32nd hex digit and the `mk encode` line's tail must be visible clear of the buttons; attach the PNG path and its `shScreen()` text.
+
+## Report (your final action)
+Write `/scratch/code/shibboleth/mnemonic-engrave/design/agent-reports/composer-S4-W3-fix-report.md` (create; must not exist): worktree, branch, `git log --oneline main..HEAD`, the failing-then-passing test output, every gate, the measured capacities before/after, the emulator frame, anything you decided or could not do. Return a two-line summary plus the path.
