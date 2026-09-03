@@ -642,3 +642,13 @@ Steps, in order:
   design/agent-reports/composer-S3-exec-review-r0.md). Firmware size gate
   still UNRUN (no nix). NEXT: persist report -> fold on composer-s3 -> sonnet
   verify -> merge --no-ff to fork main + push + watch test.yml; NO flash.
+- S3 whole-diff review (opus) 1C/2I/5M/3N persisted 077c5f4. C-1: Back past
+  seating re-asks every slot with all sources filtered as used (keyed policy
+  unreachable); I-1: Move up leaves the shape signature unchanged so §8j clears
+  nothing; I-2: six self-check arms with no failing test. Fold brief 26a16e0
+  (controller decisions: resume seating + release sources; Move up discards
+  unconditionally; six fault rows). The implementer agent is RESUMED to fold
+  on composer-s3 -> report composer-S3-fold-r0-report.md. NEXT: persist that
+  report -> controller gate -> sonnet verification (brief
+  composer-S3-fold-verification-brief.md, fill <S3_FOLD_SHAS>/<S3_REVIEWED_TIP>
+  = a63fd1e) -> merge/push brief -> fork main. Still no flash (no /nix).
