@@ -127,3 +127,10 @@ wrapped line "This device cannot confirm a key was derived at the origin it
 declares." puts "origin" under the page button, so the sentence reads "...
 derived at the [ ] it declares." The fix brief's item 3 drives every
 `composerPageLines` screen, not only the Template screen.
+
+Third instance, the plate's own screen (`shots/k02-stub-p0.png`, the keyless
+arm): `Template-ID: e0863d3ccac31a64d3b5e14b85ccd6` -- TWO hex digits (`c0`)
+under the Back button, and `--policy-id-stub e0863d3` under the page button.
+This is the screen the operator photographs before cutting the S4 plate
+(plan Task 4 step 1), so the fix precedes the plate. The seating pick list
+(`c07-seat-slot0.png`) and the consent are unaffected.
