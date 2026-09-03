@@ -707,3 +707,10 @@ Steps, in order:
    F-453's Rust half) -- all now IMPLEMENTED as defaults, so a different
    choice is a change request; F-457's C10 narrowing; me 0.8.1 (F-454); the
    live journey walk (now step 2a).
+- FLASHED 2026-09-02 at the operator's word (device in BOOTSEL): sh2-flash -y
+  built fork main b77449d, signed it (signed uf2 sha256 f85bb1619a06...),
+  picotool load --verify 100%, reboot issued (log .tmp/sh2-flash-b77449d.log).
+  Boot judgement on MACHINE power is the operator's; expected version line
+  `bgb77449d (UNLOCKED)`. Engrave master pushed through 401697f.
+  S4 (device acceptance + journey walk WITH the operator) starts when the
+  boot is confirmed.
