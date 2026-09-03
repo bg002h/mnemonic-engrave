@@ -947,3 +947,20 @@ Steps, in order:
   + a pinning test), F-461 note) -> the walk record -> flash 3cc71d9b (or the
   S4 merge, which changes no firmware bytes) at the operator's word -> the
   device walk from step 3 -> Task 4's plate -> Task 5 at the operator's call.
+- W-3 FOUND (walk record 325a164) by LOOKING at the S4 capture's shots while
+  drafting the Task 6 PDF: the composer's paged widgets (composerPageLines)
+  centre lines across the full panel, so the Template-ID's 32nd hex digit is
+  under the Back button and the keyless mk encode tails under the page button;
+  the consent (confirmReviewScreen) is fine; shScreen() sees text under a
+  button, so the driver, the review and the verification all passed. Fix
+  brief composer-S4-W3-fix-brief.md; the implementer is RESUMED on fork branch
+  composer-s4c (worktree wt-composer-s4c, off 3cc71d9b): wrap+centre inside
+  the band left of the nav column, re-measure the §13 capacity pins, a
+  GEOMETRY test failing first, emulator proof -> composer-S4-W3-fix-report.md.
+  Task 6 PDF builder DRAFTED: design/journeys/build_pdf_composer.py
+  (untracked on master; developed and run in .tmp/s4run-ctl, 17 pages, no
+  missing assets) -- commits with Task 6 after the engrave merge. Memory:
+  text-extraction-cannot-see-clipping. NEXT unchanged, plus: W-3 verification
+  (sonnet, targeted; brief to write) -> merge composer-s4c -> flash the
+  resulting main at the operator's word (W-2 + W-3 both matter for the
+  device walk's step 3 and the stub screen).
