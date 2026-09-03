@@ -4793,13 +4793,13 @@ MSG
 ```
 
 ---
-### Task A10: the five presets (§4d) -- BLOCKED on F-453's Rust half (plan S0b), and the only task that is
+### Task A10: the five presets (§4d) -- was BLOCKED on F-453's Rust half (plan S0b, landed 1dc8d409 on 2026-09-02), and the only task that is
 
 **PRECONDITION, hard.** `design/FOLLOWUPS.md` F-453 (`composer-preset-vectors-missing`) owns the Rust half to this stage: `md compose --preset <name>` plus one exported vector per archetype in descriptor-mnemonic, FIRST. That half is authored as its own mini-plan, `design/IMPLEMENTATION_PLAN_composer_S0b_presets.md` (R0 GREEN), implemented on descriptor-mnemonic branch `composer-s0b` and under whole-diff review when this task was written. It is NOT on descriptor-mnemonic `main`: at `66bdf2f4`, `md compose --help` shows `--wrapper`, `--path`, `--experimental`, `--json` and no `--preset`, and the corpus carries no preset entry. **A preset is a normative `PathList` shape; re-authoring one in Go with no pinned oracle is exactly the drift the Rust-primary rule exists to prevent.** Until S0b has merged to descriptor-mnemonic `main`, this task does not start, and Part A ships without presets -- the blank route is unaffected, which is why this blocks one task rather than the stage.
 
 **The one fact this task cannot carry yet is S0b's merge commit, and it is not a placeholder for the implementer to fill.** The controller records it on the line below, on the day S0b merges to descriptor-mnemonic `main`. The implementer READS it and the precondition step below stops if the checkout is not at it; until that line names a SHA, this task is not dispatchable.
 
-> **S0b merge commit on descriptor-mnemonic `main`:** not yet landed. Recorded here by the controller when S0b merges.
+> **S0b merge commit on descriptor-mnemonic `main`:** `1dc8d409f6e8daa099226937f5f107f56b64dd97` (landed 2026-09-02 as a fast-forward of `composer-s0b`: 4793619b, 5002ebac, 87bc10ff, 1dc8d409; CI run 33698441737 green; report `composer-S0b-push-report.md`). Recorded by the controller.
 
 **Files:**
 - Create: `gui/composer_presets.go`

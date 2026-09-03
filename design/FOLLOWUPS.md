@@ -15408,7 +15408,7 @@ message (a dated transcript; message text changed at composer S1); N-2 —
 before this cycle ("Descriptors and addresses are not yet classifiable
 here"), charged to the descriptor-input spec's next fold, not to S1.
 
-### F-453 — `composer-preset-vectors-missing`: the five archetype presets (`md-codec::compose::presets`, composer spec §4d) have no corpus entry and `md compose` exposes no `--preset`, so Stage 3's Go path lists would be authored with no Rust oracle (owning phase: **composer S3 — Rust first: `md compose --preset <name>` + one exported vector per archetype in descriptor-mnemonic, then vendor into the fork before the S3 shape flow ships**) `#composer` `#rust-primary` `#md-cli`
+### F-453 — CLOSED 2026-09-02 (descriptor-mnemonic main 1dc8d409: `md compose --preset` + six `keyed_compose_preset_*` vectors; the Go half is S3 Task A10) — `composer-preset-vectors-missing`: the five archetype presets (`md-codec::compose::presets`, composer spec §4d) have no corpus entry and `md compose` exposes no `--preset`, so Stage 3's Go path lists would be authored with no Rust oracle (owning phase: **composer S3 — Rust first: `md compose --preset <name>` + one exported vector per archetype in descriptor-mnemonic, then vendor into the fork before the S3 shape flow ships**) `#composer` `#rust-primary` `#md-cli`
 
 Filed 2026-09-02 from `composer-S2-plan-R0-r0-fidelity` M-5. A preset is a
 normative `PathList` shape; re-authoring it in Go with no pinned oracle is
