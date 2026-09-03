@@ -732,3 +732,10 @@ Steps, in order:
 - Controller gates on composer-s4 bc9dd63 GREEN: go test ./... 54 ok; gui
   1186/1186 (24 shards); 32-bit; oraclelive; js vet; firmware 1,579,940 B
   flash / 62,800 B RAM (+16 B over b77449db). Log .tmp/s4-gate.log.
+- W-1 SHIPPED: fork main 60bee002 (merge of composer-s4 bc9dd63; CI run
+  33711458384 green; report 64675a2). FLASHED at the operator's word (device
+  in BOOTSEL): sh2-flash -y built + signed seedhammerii-v0.0.0-bg60bee00,
+  load verified, reboot issued (log .tmp/sh2-flash-60bee00.log). Boot
+  judgement pending on machine power: version line `bg60bee00 (UNLOCKED)`;
+  W-1 check: Build a new policy -> script -> "Start from?" first row "Build my
+  own paths", Back returns to the script choice. Walk resumes at step 3.
