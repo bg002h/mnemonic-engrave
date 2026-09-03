@@ -666,3 +666,7 @@ Steps, in order:
   measured firmware 1,579,924 B flash / 62,800 B RAM (delta +73,040 / +208);
   controller re-measuring. NEXT: sonnet verification (brief filled) -> merge/
   push brief (<S3_TIP> = 27afa9f or the verified tip) -> fork main.
+- Controller firmware measurement on 27afa9f (nix develop -c tinygo build
+  -size short ...): flash 1,579,924 B / RAM 62,800 B = the implementer's
+  figure; delta vs 321acb56 baseline +73,040 B flash / +208 B RAM (non-zero:
+  plan C2 Step 4 discharged). Log .tmp/fw-size-s3-27afa9f.log.
