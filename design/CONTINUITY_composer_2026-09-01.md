@@ -670,3 +670,11 @@ Steps, in order:
   -size short ...): flash 1,579,924 B / RAM 62,800 B = the implementer's
   figure; delta vs 321acb56 baseline +73,040 B flash / +208 B RAM (non-zero:
   plan C2 Step 4 discharged). Log .tmp/fw-size-s3-27afa9f.log.
+- S3 fold VERIFIED 0C/0I (sonnet, report 33420b0; both firmware numbers
+  reproduced by the verifier too). Merge/push agent DISPATCHED: merge --no-ff
+  composer-s3 (27afa9f, 29 commits) into fork main, push, watch test.yml;
+  report composer-S3-push-report.md. THEN: plan STATUS closing note (merge
+  SHA, gates, firmware delta), CLAUDE.md toolchain note (Go via the flake is
+  1.26.3 in /nix/store now; tests run on /scratch/code/shibboleth/.toolchain
+  go1.26.7), push engrave master, S4 (on-device acceptance + the journey walk
+  WITH the operator; flash only at the operator's word via ~/bin/sh/sh2-flash).
