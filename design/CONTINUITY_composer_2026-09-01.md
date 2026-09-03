@@ -659,3 +659,10 @@ Steps, in order:
   flash 1,506,884 B / RAM 62,592 B (plan's 169073c figure was 1,503,652 /
   62,592; S2 accounts for the difference). Take the S3 measurement on the
   fold's tip; the delta must be non-zero (plan C2 Step 4).
+- S3 FOLD r0 DONE by the resumed implementer: fork 7edc863 (C-1/I-1), 83e932a
+  (I-2 + a SECOND CRITICAL found by the control: self-check read K/N outside
+  their domain, 4/12 preset pairs unbuildable -- fixed), 27afa9f (Minors/Nits);
+  engrave db53513 (spec M-2/M-3), b1a1985 (F-461). Report 477b8ee. Implementer
+  measured firmware 1,579,924 B flash / 62,800 B RAM (delta +73,040 / +208);
+  controller re-measuring. NEXT: sonnet verification (brief filled) -> merge/
+  push brief (<S3_TIP> = 27afa9f or the verified tip) -> fork main.
