@@ -1002,3 +1002,13 @@ Steps, in order:
   counts -> composer-S4-fold-r1-report.md; then the r1 verification (brief
   filled except the two tips) -> driver merge (refill
   composer-S4-merge-push-brief.md's tip) -> engrave merge -> Task 6.
+- FOLD r1 was TRIVIAL (report a3138f2): the merge of main (W-3) into
+  composer-s4-emu = b481be7 changed no page count, no pin, no assertion;
+  only transcript_composer.txt's rev line (55db8e5). Per the proportional
+  re-review rule no r1 verification round is dispatched (the brief
+  composer-S4-fold-r1-verification-brief.md stays on record, unused); the
+  controller re-runs the capture on the merged tips instead
+  (.tmp/s4-impl-gate4.log: --arm both + the control) and looks at the stub
+  shots. Merge briefs refilled (2529b61): fork tip b481be7 on 1ae0ffcb,
+  engrave tip 55db8e5. NEXT: gate4 green + shots legible -> fork driver merge
+  -> engrave merge (fill <ENGRAVE_MASTER_TIP>) -> Task 6.
