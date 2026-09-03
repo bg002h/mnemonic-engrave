@@ -1,12 +1,6 @@
 # IMPLEMENTATION PLAN — composer S4: the journey EXECUTED, and the device acceptance
 
-**STATUS: DRAFT 2026-09-03, R0 ROUND 0 FOLDED. Task 0 EXECUTED; every host-oracle
-value in §2 is measured, not transcribed. R0 round 0 = one journey lens (opus,
-`composer-S4-plan-R0-r0-journey.md`, 1C/12I/5M/2N -- every finding was in this
-plan's expected values, none in the shipped code; the keyed arm's oracle was
-confirmed on the Go harness byte for byte). Folded here; the Critical was the
-keyless arm's md1 pinned in `md encode`'s UNCHUNKED form while the device is
-chunk-form-always. Round 1 = sonnet fold verification, pending.**
+**STATUS: R0 GREEN 2026-09-03 (lens-closure: journey walk on the shipped code, fold verification). Round 0 = one journey lens (opus, `composer-S4-plan-R0-r0-journey.md`, 1C/12I/5M/2N -- every finding was in this plan's expected values, none in the shipped code; the keyed arm's oracle was confirmed on the Go harness byte for byte); folded at `fda1d9e` (the Critical was the keyless arm's md1 pinned in `md encode`'s UNCHUNKED form while the device is chunk-form-always). Round 1 = sonnet fold verification (`composer-S4-plan-R0-r1-fold-verification.md`): 20/20 folded, commands and check counts reproduce, 0C/0I/0M/0N open. Task 0 EXECUTED; every host-oracle value in §2 is measured, not transcribed. Implementer for Tasks 1-3 dispatched against this revision.**
 
 Baseline, measured 2026-09-03: seedhammer fork `main` `60bee002` (= the flashed
 `bg60bee00`; boot judgement on machine power is the operator's, pending);
