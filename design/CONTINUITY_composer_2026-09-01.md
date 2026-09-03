@@ -880,3 +880,22 @@ Steps, in order:
   bg3cc71d9 (UNLOCKED)); persist the Task 3 report -> controller gates ->
   fill the review brief (composer-S4-exec-review-brief.md) -> opus whole-diff
   review -> fold -> verify -> merge both; engrave push.
+- S4 TASK 3 DONE (report appended 2becbcd): fork composer-s4-emu 86cec95
+  (= 05d903b + merge of main 3cc71d9b + shots_composer.js/shTargets), engrave
+  composer-s4-emu c6adac2 (capture_composer.py). --arm both exit 0 (three
+  legs, 50 shots; digest, both ids, both stubs, four addresses, every
+  engraved string byte for byte incl. the 56-char keyless plate); negative
+  control exit 0; the named unchunked mutation exit 1 ("56 chars" vs "47
+  chars"); shipped drivers exit 0; gui 1188/1188. New emulator surface:
+  window.shTargets() (read-only hit-region reader; zero rows on a pre-W-2
+  build). Firmware 1,580,580/62,800 = W-2 alone; plan §4's pin wants
+  updating to that number (Task 6). Controller gate run on both worktrees
+  RUNNING (.tmp/s4-impl-gate.sh -> s4-impl-gate.log: fork gates + firmware;
+  staged tree .tmp/s4run-ctl: transcript with FORK override, --arm both,
+  control, the named mutation, the three shipped drivers). Review brief
+  composer-S4-exec-review-brief.md filled except <CONTROLLER_GATES> (+ a
+  shTargets lens). NEXT: fill that from the log -> commit brief -> opus
+  whole-diff review -> persist -> fold -> sonnet verify -> fork merge --no-ff
+  (composer-s4-emu) + push + watch; engrave: merge composer-s4-emu into
+  master + staging push -> Task 6 records. Flash of 3cc71d9b still at the
+  operator's word.
