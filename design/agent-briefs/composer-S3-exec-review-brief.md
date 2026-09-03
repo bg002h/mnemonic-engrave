@@ -1,0 +1,27 @@
+You are the INDEPENDENT adversarial execution reviewer for the composer's Stage 3 implementation (the Wallet Policy program's composer flow in the SeedHammer fork GUI). You did not write it. Find defects the implementer and its tests missed, by EXECUTING, mutating and constructing counterexamples.
+
+## The one question
+Does the diff on fork branch `composer-s3` (worktree `/scratch/code/shibboleth/wt-composer-s3`, base fork `main` `321acb56`, tip `<S3_TIP>`) do exactly what `/scratch/code/shibboleth/mnemonic-engrave/design/IMPLEMENTATION_PLAN_composer_S3_fork_gui.md` at mnemonic-engrave `722edbd` (Tasks A1-A11, B1-B11, C1-C2) and `design/SPEC_wallet_policy_composer.md` §4-§9, §12, §13 require -- no more, no less -- and did it break anything the diff never touched? The implementer's report: `design/agent-reports/composer-S3-implementation-report.md` -- re-derive, do not trust.
+
+Read-only: no commits; every mutation reverted; `git status --porcelain` empty at the end. Go: `/nix/store/i77g9dmcd399rmxk8688qfr4g2wzgk37-go-1.26.7/bin/go`, `CGO_ENABLED=0 GOPROXY=off GOTOOLCHAIN=local`, default `-mod=readonly`, `TMPDIR=/scratch/code/shibboleth/.tmp`; the sharded gui runner is `/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24`. Do NOT spawn sub-agents; read no `.jsonl` file.
+
+## Already settled -- do not re-derive
+The plan's R0 closed 0C/0I (fidelity, tests/mutation, journey lenses; three fold-verification rounds; the A10 fold verified against the real S0b vectors). The controller re-ran on the worktree after the implementer finished (numbers in the dispatch message): <GATE_NUMBERS>.
+
+## Standing operator rulings that bind this review
+- "This wallet policy menu option does not get the same careful memory treatment as sealed payload program" -- do NOT file memory-hygiene findings against the composer as Critical/Important.
+- Secret-handling defects never gate (file them, severity Minor at most).
+- md1 wire format is not widened (F-417); the Go port never leads Rust (any codec behaviour the GUI needed and did not find in `md`/`mk` is a finding, not a licence).
+- "For deprecation, a comment with no enforcement is a feature, not a bug."
+
+## Lenses (say which found nothing)
+1. **Counterexamples through the real screens**: drive `composerFlow` and its sub-flows with scripted input (the gui test harness the plan's tests use) at every §4/§4e/§6b/§6c bound -- k and n at their limits and one past, `k > n`, zero, the lock bands' edges on the wire (older 65535/65536 blocks, units boundary, after 499,999,999 / 500,000,000, the 2^31-1 ceiling), a date past 2038-01-19, an impossible date (F-458), a hashlock digest of 63/64/65 hex characters, a duplicate slot, the pairwise-distinguishability invariant, sortedmulti-only shapes, pkh-in-wsh vs pk-in-tr. Each must refuse or warn as §4e/§8 says, with the exact §8 string. Any accepted-but-wrong shape, any panic, any state that cannot be left is Critical.
+2. **The end-to-end walk**: the Part-A acceptance (a keyless TEMPLATE composed on a device with no payload, engraved, whose md1 decodes on the device -- spec §12 item 3) and the Part-B walk (seat from payload sources, mapping review, consent self-check, engrave forms per §7f) -- run them the way the plan's Task A11/B11/C2 say, and additionally compare the composed template's chunks against `md compose` on the host for at least three shapes (one per wrapper) -- byte identity or Critical.
+3. **Mutation-test the tests**: for each new test file pick the assertion that guards the most (a §8 string, a refusal, a slot-numbering rule, a lock band, the join in B11), apply the plan's named mutation or one of your own, prove the mutated line RAN, and name the test that failed. A guard that cannot fail is Critical.
+4. **What did the diff make false elsewhere**: other programs' flows sharing `ChoiceScreen`/keyboard/date entry, the copy file's other strings, the spec numbers Task C1 folded (per-frame capacities, the plate ceiling -- re-measure), `design/FOLLOWUPS.md` items the plan claims to close (F-455, F-457, F-458 -- does the code close them as filed?), README/CHANGELOG lines.
+5. **Whole-repo gates as CI runs them** (`.github/workflows/test.yml`): `CGO_ENABLED=0 go test -timeout 20m ./...` (or the sharded runner with an exhaustive partition), `scripts/test-32bit.sh`, the oraclelive build, the js vet, `gofmt -l`, and the firmware size recipe (`nix run .#build-firmware`, then the `tinygo build -size short ...` line) against the plan's stated baseline -- report the numbers.
+
+Severity: Critical = wrong result / an accepted malformed shape / a state the operator cannot leave / a test that cannot fail / a firmware that does not build; Important = real defect, missing case, unsound assumption, a §8 string that differs from the plan; Minor/Nit recorded. Fixes as HYPOTHESES. Do not pad.
+
+## Report (your final action)
+Write `/scratch/code/shibboleth/mnemonic-engrave/design/agent-reports/composer-S3-exec-review-r0.md` (create; must not exist): per lens the commands + trimmed output and findings `C-n`/`I-n`/`M-n`/`N-n` with file:line, reproduction, hypothesis; closing counts. Return a two-line summary plus the path.
