@@ -1,0 +1,14 @@
+Merge composer-s4c: S4 walk W-3 -- the composer's paged screens keep their lines clear of the buttons (composer S4)
+
+Third fix from the S4 journey walk (mnemonic-engrave
+design/S4_journey_walk_2026-09-02.md, W-3, found in the S4 capture's own
+screenshots): composerPageLines centred every line across the full panel, so
+the Template screen's 32-hex Template-ID lost its last digit under the Back
+button and the mk encode lines lost their tails under the page button -- on
+the one screen whose lines exist to be copied. Lines now wrap and centre
+inside the band left of the navigation column; a geometry test asserts no
+text op intersects a button and fails on 3cc71d9b. Targeted verification
+design/agent-reports/composer-S4-W3-verification.md.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
