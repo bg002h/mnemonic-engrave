@@ -320,9 +320,11 @@ proof does not match the host's"). Then the three shipped drivers again
 
 ### Task 4 — the live walk on the DEVICE, with the operator (no code)
 
-PREREQUISITE: the W-2 fix (`composer-s4b`) merged into fork `main` and FLASHED at the
+PREREQUISITE: the W-2 fix (`composer-s4b`, merged as `3cc71d9b`) AND the W-3 fix
+(`composer-s4c`: the Template screen drew its id's last digits under the Back button --
+the screen step 1 below photographs) merged into fork `main` and FLASHED at the
 operator's word -- on `bg60bee00` step 3's `how many keys?` cannot take `3`, so the walk
-cannot pass it. Then it resumes `design/S4_journey_walk_2026-09-02.md` at step 3 on the
+cannot pass it, and on `3cc71d9b` the Template-ID is not fully legible. Then it resumes `design/S4_journey_walk_2026-09-02.md` at step 3 on the
 keyless arm's shape: at every step, what is in hand exactly, what the device does, what ELSE
 the operator might do; each divergence refusal / warning / default /
 not-our-concern / documentation only, and a change ONLY when the wrong outcome
@@ -340,8 +342,9 @@ line it was is part of the record.
 Then the plate, keyless tr 2-of-3, ONE plate:
 
 1. The census must read `This engraves 1 plate.` and the stub screen's
-   Template-ID `e0863d3ccac31a64d3b5e14b85ccd6c0` with `mk1 stub (template):
-   e0863d3c` -- photographed before the hold. At `Choose engraving` take
+   Template-ID `e0863d3ccac31a64d3b5e14b85ccd6c0` -- all 32 digits visible clear of
+   the buttons (W-3) -- with `mk1 stub (template): e0863d3c`, photographed before
+   the hold. At `Choose engraving` take
    `TEXT + QR` (row 0), never `QR ONLY`: the device has no camera and the
    read-back below is by eye.
 2. A single-character test cut first if the machine has been moved or idle
