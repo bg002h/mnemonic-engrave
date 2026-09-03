@@ -134,3 +134,12 @@ under the Back button, and `--policy-id-stub e0863d3` under the page button.
 This is the screen the operator photographs before cutting the S4 plate
 (plan Task 4 step 1), so the fix precedes the plate. The seating pick list
 (`c07-seat-slot0.png`) and the consent are unaffected.
+
+## The emulator journey is EXECUTED (2026-09-03); the device walk resumes at step 3
+
+Spec §12 items 2, 3 and 9 ran on the emulator (fork main `6fb90cb`, engrave
+master `e3ee51c9`; `design/journeys/SeedHammer-II-composer-journey.pdf`). The
+walk with the operator resumes at "Add a spend path" on the Taproot 2-of-3
+shape once fork main (`1ae0ffcb` or later: W-2 + W-3) is flashed at the
+operator's word; then ONE plate whose string must read
+`md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3` byte for byte.
