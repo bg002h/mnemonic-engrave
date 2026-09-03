@@ -1,7 +1,7 @@
 You are the MERGE + PUSH agent for the SeedHammer fork (`/scratch/code/shibboleth/seedhammer`, branch `main`, remote `bg002h/seedhammer`; `main` is NOT branch-protected, so there is no ci/staging ritual here). You modify no source file; you write ONE report file at the end. Do not read any `.jsonl` file. Do NOT spawn sub-agents. Judge per-JOB conclusions; full 40-char SHAs in every `gh` query; always `--repo bg002h/seedhammer`.
 
 ## What to merge and push
-- Branch `composer-s4-emu` (worktree `/scratch/code/shibboleth/wt-composer-s4-emu`), tip `<S4_FOLD_FORK_TIP>`, base `main` = `3cc71d9b`. Verify in the main checkout: `git rev-parse main` = 3cc71d9b..., `git status --short` empty, `git merge-base --is-ancestor main composer-s4-emu` true; STOP if not.
+- Branch `composer-s4-emu` (worktree `/scratch/code/shibboleth/wt-composer-s4-emu`), tip `a6eb44e794c3ee7bd6484d0125fc51a256401706`, base `main` = `3cc71d9b`. Verify in the main checkout: `git rev-parse main` = 3cc71d9b..., `git status --short` empty, `git merge-base --is-ancestor main composer-s4-emu` true; STOP if not.
 - `git merge --no-ff composer-s4-emu -F /scratch/code/shibboleth/mnemonic-engrave/design/agent-briefs/composer-S4-merge-message.txt` in the main checkout (the merge commit message is given in the dispatch message; keep its trailer lines), then `git push origin main`, then `gh run list --repo bg002h/seedhammer --commit <merge sha> --json databaseId,name,status,conclusion` and `gh run watch <id> --exit-status` in the FOREGROUND on the `test` workflow; judge each job's conclusion.
 - Verify: `git fetch origin && git rev-parse origin/main` equals the merge commit.
 - Do NOT tag, do NOT flash, do NOT touch the worktree.
