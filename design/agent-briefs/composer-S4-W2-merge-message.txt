@@ -1,0 +1,14 @@
+Merge composer-s4b: S4 walk W-2 -- the pick lists take a tap on any row (composer S4)
+
+Second fix from the S4 journey walk (mnemonic-engrave
+design/S4_journey_walk_2026-09-02.md, W-2, found by the S4 emulator driver):
+composerPickScreen registered no per-row touch target, so on the touch-only
+SeedHammer II only a page's first row could be taken -- n=2, n=3, Done, hash
+rows and seating rows past the first were unreachable, and every composer
+test drove synthetic Down events the machine has no source for. Each drawn
+row is now a Clickable hit area, as ChoiceScreen's rows are; a regression
+test on the touch harness drives the real flow and fails on 60bee002.
+Targeted verification design/agent-reports/composer-S4-W2-verification.md.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
