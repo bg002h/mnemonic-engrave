@@ -899,3 +899,19 @@ Steps, in order:
   (composer-s4-emu) + push + watch; engrave: merge composer-s4-emu into
   master + staging push -> Task 6 records. Flash of 3cc71d9b still at the
   operator's word.
+- CONTROLLER GATES on the S4 implementation (logs .tmp/s4-impl-gate{,2,3}.log;
+  staged tree .tmp/s4run-ctl with seedhammer -> wt-composer-s4-emu): fork
+  86cec95 gofmt/vet/cmd/emu/js vet/gui 1188 across 24 shards/32-bit/
+  oraclelive/firmware 1,580,580/62,800 all ok; engrave c6adac2 transcript
+  exit 0, --arm both exit 0 (21+21+8 shots, all legs matched), control exit 0,
+  the unchunked mutation exit 1 naming 56 vs 47 chars, three shipped drivers
+  exit 0. Two harness lessons on the way (memory): exit codes through a tail
+  pipe are tail's; a nohup child of a run_in_background Bash dies with it
+  (launch with setsid from a foreground call, wait with Monitor). Review brief
+  filled 9700ebf; OPUS WHOLE-DIFF REVIEW DISPATCHED ->
+  composer-S4-exec-review-r0.md. NEXT: persist -> fold (implementer resumed
+  or inline) -> sonnet verify -> fork merge --no-ff composer-s4-emu + push +
+  watch; engrave: merge composer-s4-emu into master + staging push -> Task 6
+  (spec §12 items 2/3/9 EXECUTED lines, staged plan §S4, README row +
+  build_pdf_composer.py, F-460 checked present, F-461 note). Flash of
+  3cc71d9b still at the operator's word.
