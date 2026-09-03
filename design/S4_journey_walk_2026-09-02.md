@@ -121,3 +121,9 @@ the navigation column (the same right bound the W-2 hit areas use), so no
 glyph is drawn under a button; a regression test asserts, from the frame's
 own layout, that every text op of the stub screen lies outside the nav
 rectangles -- a GEOMETRY test, since a text-presence test cannot fail on this.
+
+Second instance, same widget (`shots/c09-mapping-p0.png`): the mapping review's
+wrapped line "This device cannot confirm a key was derived at the origin it
+declares." puts "origin" under the page button, so the sentence reads "...
+derived at the [ ] it declares." The fix brief's item 3 drives every
+`composerPageLines` screen, not only the Template screen.
