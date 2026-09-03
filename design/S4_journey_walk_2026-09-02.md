@@ -24,8 +24,11 @@ does not return to the wrapper choice. Wrong outcome: the operator never finds
 the blank route, or reaches it by accident and cannot tell how. Worse than
 telling them nothing.
 
-Fix (S4 fold): a seventh row, last, "Build my own paths" (exact §8 wording to
-be set in the copy file), returning the empty list with ok=true; Back returns
-ok=false and `composerFlow` goes back to the wrapper choice instead of
-proceeding. Regression test: the walk above through the real screens, plus
-the row's label through `assertChoiceLabelFits`.
+Fix: fork branch `composer-s4` bc9dd63 -- the blank route is a row, FIRST ("Build my
+own paths", so the default selection commits to nothing), returning the empty
+list; Back returns to the wrapper choice. Regression test
+`TestComposerPresetPickerOffersBlankFirstAndBackReturnsToTheWrapper` drives the
+real screens and fails under both named mutations (pasted in the commit). The
+label passes `assertChoiceLabelFits`. Spec §7b carries the row.
+
+Walk paused at step 3 (the operator was tired); resumes at "Add a spend path".

@@ -411,7 +411,7 @@ a button).
 
 ### 7b. Shape
 
-Wrapper → preset or blank → paths. Per path: keys (n, k), lock (§6b), hash
+Wrapper → preset or blank → paths. The preset screen's FIRST row is the blank route, "Build my own paths" (S4 walk W-1, 2026-09-02: when Back alone was the blank route, the operator saw six presets and no way forward); Back on that screen returns to the wrapper choice. Per path: keys (n, k), lock (§6b), hash
 (§6c). A path list screen shows each path as one line ("Path 2: 2-of-3 + 90
 days") and, whenever a payload is loaded, a live line "slots: N / keys available:
 M". Back preserves everything ("going back should lose nothing"). The
