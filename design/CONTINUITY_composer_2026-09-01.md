@@ -984,3 +984,12 @@ Steps, in order:
 - S4 driver fold-r0 VERIFIED (sonnet, 8/8, 0I/0M/0N; report persisted): the
   driver branches a6eb44e / 651fa0e are review-closed. They still wait on the
   merge order above (W-3 merge -> page-count re-pin -> driver merge).
+- W-3 VERIFIED (sonnet 0C/0I/2M, report c9b8194; F-464 filed for the test
+  coverage gap; the fix report's shard count is 1187->1189 = +2, not +1).
+  Fork merge of composer-s4c DISPATCHED (brief composer-S4-W3-merge-push-
+  brief.md) -> composer-S4-W3-push-report.md. Fold-r1 verification brief
+  drafted (composer-S4-fold-r1-verification-brief.md, placeholders). NEXT
+  when the merge lands: fill <W3_MERGE_SHA> in composer-S4-fold-r1-brief.md
+  -> resume the implementer -> persist -> fill + dispatch the r1 verification
+  -> refill composer-S4-merge-push-brief.md's tip -> driver merge -> engrave
+  merge -> Task 6 -> flash at the operator's word.
