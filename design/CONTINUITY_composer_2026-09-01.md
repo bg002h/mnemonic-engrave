@@ -714,3 +714,10 @@ Steps, in order:
   `bgb77449d (UNLOCKED)`. Engrave master pushed through 401697f.
   S4 (device acceptance + journey walk WITH the operator) starts when the
   boot is confirmed.
+- BOOT CONFIRMED by the operator 2026-09-02: firmware bgb77449d boots on
+  machine power. S4 BEGINS: the journey walk WITH the operator on the device
+  (Part A first: no payload -> Wallet Policy -> Build a new policy -> shape ->
+  keyless template -> census -> engrave -> decode the plate back). Findings go
+  to design/S4_journey_walk_2026-09-02.md as they are made (refusal / warning
+  / default / not-our-concern / documentation-only, and a change only when
+  the wrong outcome is worse than saying nothing).
