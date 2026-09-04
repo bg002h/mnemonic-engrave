@@ -1534,3 +1534,22 @@ Command to resume: /resume-composer
   (b) the pad re-check and the Taproot 2-of-3 plate when a blank is on hand;
   (c) Task 5 at the operator's call; (d) the hashlock cycle, PAUSED before spec
   (L19).
+
+- **FLASHED 2026-09-04 at the operator's word** (device confirmed in BOOTSEL by
+  `lsusb`: `2e8a:000f Raspberry Pi RP2350 Boot`): `~/bin/sh/sh2-flash -y` built
+  fork main `839fa5a` in the devshell, signed it (key matched the burned OTP
+  fingerprint `846aa289…`), and loaded
+  `seedhammerii-v0.0.0-bg839fa5a.signed.uf2`, sha256
+  `986bf0ce98e1c1220c27a3dfadf462e316bb2e6693d0602589bfe97dc5d86955`;
+  `picotool load --verify` 100%, exit 0. Log
+  `.tmp/sh2-flash-839fa5a.log`.
+  **Boot judgement is on MACHINE power and is the operator's** -- Init() wants a
+  20-28 V USB-PD contract before it configures the LCD and reboots to BOOTSEL
+  without one, so a laptop port gives a dark screen that is indistinguishable
+  from a signature rejection. Expected version line `bg839fa5a (UNLOCKED)`.
+  Device checks once it boots: (1) Back at the path list lands on `Start from?`;
+  (2) Back again on the script choice; (3) re-picking a script shows
+  `Start from?` again; (4) the blank row keeps paths already built; and the
+  adversarial one -- seat a key, Back, pick a PRESET, and §8j must fire and
+  clear the seats (before this build it kept them silently, on slots serving
+  different paths).
