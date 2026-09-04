@@ -1467,3 +1467,35 @@ Command to resume: /resume-composer
   class one level inside the previous remedy. That is the argument for the
   committed census test: it turns "is the probe exact?" from a review question
   into a command.
+
+- **ROUND 3 (sonnet, targeted): MERGE, 0C/0I/1M** (report persisted `0605cae`).
+  I-2 and I-3 closed. The false-PASS hunt ran the experiment the brief named:
+  the census test FAILS against round 2's exact probe restored in a copy (156
+  false negatives / 288 false positives, matching the fold commit's figure) and
+  passes 0/0 on the fix; the oracle is structurally independent of the probe;
+  both call sites are pinned by tests that fail on either field swap. Its one
+  Minor was the M-2 comment fold listing the Move arm among the routes through
+  `composerApplyShapeEdit` -- it is not, `composerMoveUp` discards
+  unconditionally -- folded inline at `618f86f1` (a wording fold does not
+  re-trigger the gate).
+- **W-6 and W-7 CLOSED at fork `composer-s4e` `618f86f1`**, four commits over
+  `70008da`. Merge agent (sonnet) DISPATCHED with
+  `design/agent-briefs/composer-S4-W6-merge-push-brief.md` (message
+  `composer-S4-W6-merge-message.txt`) -> `composer-S4-W6-push-report.md`. If
+  that report exists on resume, persist it and verify `origin/main` yourself.
+- AFTER THE MERGE, in order: (1) persist the push report; (2) remove the
+  worktree `git -C /scratch/code/shibboleth/seedhammer worktree remove
+  wt-composer-s4e`; (3) push engrave master via
+  `scripts/push-via-staging.sh master` with the tree FROZEN (unpushed since
+  `9bebe05`: aeb29c8, e930ee7, e90b3c0, cb6b337, da1f812, 0605cae and the rest
+  of this session's records); (4) TELL THE OPERATOR the build is ready and
+  flash fork main at their word -- `~/bin/sh/sh2-flash -y`, device in BOOTSEL,
+  expected version line `bg<merge sha>` (UNLOCKED). That build carries W-2, W-3,
+  W-4, W-6 and W-7 and is the one the rest of the device walk needs; the device
+  is on `bgbb50775`, where the Back leg is still the shipped one.
+- Review tally for this fix, worth keeping: r1 (opus) 1C introduced by the W-6
+  fix; r2 (opus) 2I introduced by r1's fold; r3 (sonnet) 1M introduced by r2's
+  fold. Each round found the class one level inside the previous remedy and
+  each remedy was smaller than the last. The durable artifact is
+  `TestComposerEditCanRenumberIsExactOverEveryReachableShape`, which turns "is
+  the probe exact?" into a command.
