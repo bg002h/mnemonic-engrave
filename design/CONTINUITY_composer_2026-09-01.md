@@ -1127,3 +1127,34 @@ Steps, in order:
   Rust first). Measured: a 32-byte preimage encodes as an ms1 string and
   decodes back (indistinguishable from a seed backup -- a labelling
   question for the ms hashlock design).
+
+## RESUME POINT 2026-09-03 (evening) -- W-4 in verification; device on the branch build
+
+State: fork main 6fb90cb (S3 + W-1 + W-2 + W-3 + the S4 driver); branch
+composer-s4d bb50775 = the W-4 digit-pad fix (worktree
+/scratch/code/shibboleth/wt-composer-s4d), verified by the implementer,
+sonnet verification IN FLIGHT -> design/agent-reports/composer-S4-W4-verification.md
+(if that file exists on resume, persist it; if not, re-dispatch with
+design/agent-briefs/composer-S4-W4-verification-brief.md). The DEVICE runs
+the branch build bgbb50775 (flashed for the pad check). Firmware on bb50775:
+1,581,204 B flash / 62,800 B RAM (+624 over 6fb90cb). Records on engrave
+master are committed; unpushed since 6db0545 (push next).
+
+Steps, in order:
+1. Persist the W-4 verification. If 0C/0I: merge agent (sonnet) with
+   design/agent-briefs/composer-S4-W4-merge-push-brief.md (tip bb50775,
+   message composer-S4-W4-merge-message.txt) -> fork main; remove
+   wt-composer-s4d; plan §4 firmware pin -> 1,581,204 / 62,800 with the
+   merge SHA; walk record W-4 "shipped".
+2. Push engrave master (sonnet push agent, ci/staging, FREEZE).
+3. At the operator's word: sh2-flash fork main (replaces the branch build;
+   same bytes as bb50775 plus the merge commit).
+4. The device walk continues: the operator confirms the blocks and date
+   pads show two lines; the plate (Taproot 2-of-3, string
+   md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3) when a blank is
+   on hand; Task 5 at the operator's call.
+5. Next cycle (ruled 2026-09-03): F-465 `ms hashlock` (Rust first; the
+   preimage as an ms1 backup, labelling open) and F-466 on-device
+   hashlock-phrase entry (REQUIRED, Rust first; spec §6c/§14/C25 fold with
+   its own R0). Term: "hashlock phrase" (memory).
+Command to resume: /resume-composer
