@@ -24,10 +24,30 @@ path after seating. Both are now routed through composerStartStep, which asks
 §8j whenever the shape signature would move and applies the edit through
 composerApplyShapeEdit.
 
-Failing-first tests in gui/composer_backleg_test.go; four mutations of the fix
-each caught by their own named assertion. Spec §7b folded with the Back rule
-(it was silent, which is why no gate caught this). Independent verification:
-design/agent-reports/composer-S4-W6-verification.md.
+The first verification round (composer-S4-W6-verification.md, 1C/1I/1M) then
+found that the W-6 fix opened a SECOND door to W-7's own failure class, and
+that a third was already open. Both are one defect and it is W-7's mistake one
+level up: composerShapeSignature re-derived md's numbering rule -- §7d's
+enumeration of wrapper, path count and key counts -- while lowerTr picks the
+internal key with isBareSingle() and numbers it ahead of listed order. So a
+lock or a hash decides which path owns @0 under tr. A hand-built
+[2-of-2, 1 key, 1 key] and the decaying-multisig preset signed identically and
+disagreed on three of four slots, so the preset rows W-6 newly made reachable
+carried every seat onto slots serving other paths (C-1), and the path editor's
+lock arm did the same unguarded (I-1, already open at 70008da).
+
+The fold stops re-deriving: composerShapeSignature carries md.Composed.Slots()
+itself, composerEditCanRenumber asks the codec whether a lock/hash edit on a
+path can move the mapping, and the lock and hash arms are wrapped in
+composerApplyShapeEdit behind that answer -- so the confirm still does not fire
+on a wsh lock edit, which §7g calls DEFAULT.
+
+Failing-first tests in gui/composer_backleg_test.go for every finding; eight
+mutations across the two rounds, each caught by its own named assertion. Spec
+§7b folded with the Back rule (it was silent, which is why no gate caught W-6)
+and §7d's enumeration replaced by the codec's answer. Independent verification:
+design/agent-reports/composer-S4-W6-verification.md and
+design/agent-reports/composer-S4-W6-fold-verification.md.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA

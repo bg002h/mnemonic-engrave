@@ -1378,3 +1378,45 @@ Steps, in order:
 6. Owed to the operator: F-470's ruling (above), F-454 (me 0.8.1), F-455/F-457/
    F-459/F-462/F-463/F-464 polish, the three S3 defaults (implemented).
 Command to resume: /resume-composer
+
+- **VERIFICATION ROUND 1 (opus) SAID DO NOT MERGE: 1C/1I/1M** (report persisted
+  `cb6b337`). W-6 closed; W-7 closed for the wrapper; **C-1 was a Critical the
+  W-6 fix INTRODUCED** -- the preset rows it newly made reachable from the path
+  list carried every seat across a tr renumbering with no §8j, because
+  `composerShapeSignature` re-derived md's numbering rule (§7d's enumeration)
+  while `lowerTr` picks the internal key with `isBareSingle()` and numbers it
+  ahead of listed order. Controller re-derived it independently: hand-built
+  `[2-of-2, 1 key, 1 key]` and the `decaying-multisig` preset both sign
+  `w0/2,1,1,` and disagree on three of four slots. I-1 (Important,
+  pre-existing at `70008da`) is the same root cause on the path editor's lock
+  arm. M-1: the leg's sole exit was untested.
+- **FOLDED at fork `818220d8`** (records `ca66d0b`): `composerShapeSignature`
+  now carries `md.Composed.Slots()` itself, with the structural terms kept only
+  as the fallback for a list the codec refuses (an edit into or out of a refused
+  shape reads as a move, which discards -- the safe direction);
+  `composerEditCanRenumber` asks the CODEC whether a lock/hash edit on a path
+  can move the mapping, rather than restating `isBareSingle()`; the lock and
+  hash arms are wrapped in `composerApplyShapeEdit` behind that answer, so §8j
+  still does not fire on a wsh lock edit (§7g calls it DEFAULT, and the shipped
+  test pins it); M-1 pinned by a test. Spec §7d's enumeration replaced by the
+  codec's answer; §7b refined.
+- Gate on `818220d8` (`.tmp/s4e-gate2.log`): gofmt cmd/ clean, vet = the two
+  pre-existing lines, `go test ./...` 0 FAIL, **shards 1199** (1195 + 4 new),
+  32-bit exit 0 both, `go build ./cmd/...` 0, firmware **1,582,564 / 62,800 =
+  +1,360 B flash / +0 RAM over 70008da**. Four mutations of this fold each
+  caught by their own named assertion, including "ALWAYS ask on the lock arm",
+  which the shipped wsh test catches -- the guard must not over-fire.
+- **IN FLIGHT: verification round 2 (opus)**, brief
+  `design/agent-briefs/composer-S4-W6-fold-verification-brief.md` ->
+  `design/agent-reports/composer-S4-W6-fold-verification.md`. Its highest-value
+  item is the THIRD DOOR: the class is "the GUI decides something the codec
+  decides", now seen twice. If that report exists on resume, persist it (own
+  commit); if not, re-dispatch with the brief.
+- **THE OPERATOR PUT THE SH2 IN BOOTSEL 2026-09-04 and was told to take it out
+  again**: there was nothing safe to flash. `composer-s4e` carried the open C-1
+  at that moment, and C-1's route (Back -> `Start from?` -> a preset) is exactly
+  what the operator would walk to check W-6; fork main `70008da` is the same gui
+  bytes the device already runs as `bgbb50775`. Flash only after the merge, at
+  the operator's word.
+- Steps unchanged from the resume point above, except that step 1's merge waits
+  on ROUND 2 being 0C/0I, and the merge brief now points at tip `818220d8`.
