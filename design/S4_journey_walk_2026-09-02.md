@@ -184,3 +184,15 @@ Door lead, confirmed by the operator 2026-09-03 on bg6fb90cb: "A payload is
 in flash but not loaded. Load it from the carousel first." -- read, and
 called "that very helpful reminder". The documentation row above closes;
 §7a's lead does its job on a machine whose region is present but skipped.
+
+## W-4 — the digit pad overprints its prompt and its range line (found 2026-09-03 by the operator on bg6fb90cb)
+
+| step | in hand | device did | divergence | class |
+| --- | --- | --- | --- | --- |
+| Build a new policy -> tr -> decaying-multisig -> Path 1 -> Time lock -> After a wait -> Blocks | the digit entry for the wait | between the entry box and the 0-9 keyboard, two lines of text overlap with no newline between them: "How many blocks?" and "1 to 65535 (blocks)" drawn over each other | the prompt and the live range line share one row | **W-4 CHANGE (Important: the range hint is unreadable on the screen that exists to state it)** |
+
+Operator's words: "that screen has two overlapping lines of text between the
+text entry box and the keyboard. It looks like it reads 'How many blocks?'
+and '1 to 65535' but there is no newline in between. The keyboard is wisely
+a 0-9 type keyboard." Reached through a PRESET (decaying-multisig), then the
+path's Time lock. Reproduction and cause below.
