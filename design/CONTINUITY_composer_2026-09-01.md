@@ -1216,3 +1216,36 @@ Steps, in order:
    now also carrying me's ms1 classifier learning kind 0x03); F-455/F-457/
    F-459/F-462/F-463/F-464 polish.
 Command to resume: /resume-composer
+
+## RESUME POINT 2026-09-03 (late) -- brainstorm R0 closed; security-software review in flight; PAUSE BEFORE SPEC
+
+State, all measured:
+- Brainstorm `design/BRAINSTORM_hashlock_phrase.md` at 82433fd: rulings
+  L1-L19. R0 round 0 (opus crypto lens, 1C/6I/6M/2N, report d13819e) folded
+  d2e8f68 with three rulings in response (L12 sha256 warns always, never
+  refuses; L13 no --salt this cycle, F-469; L14 preimage singles carry id
+  `hash`); r1 sonnet fold verification (95e7423: 16 FIXED / 1 PARTIAL / 1 new
+  Important) folded d31d595 (decode/combine PRINT a preimage; only
+  verify/derive refuse). L15 no scrub discipline on the device; L16 4.4
+  agreed; L17 4.5 agreed; 4.6 (testing) PRESENTED, not ruled.
+- L18: a second lens, security software engineering (opus, single agent),
+  DISPATCHED against 82433fd (brief
+  `design/agent-briefs/hashlock-brainstorm-R0-r2-security-software-brief.md`)
+  -> `design/agent-reports/hashlock-brainstorm-R0-r2-security-software-expert.md`.
+  If that file exists on resume, persist it (own commit); if not, re-dispatch.
+- **L19 (operator, verbatim): "Pause before spec."** After the L18 review is
+  persisted, folded and walked with the operator, and 4.6 is ruled, STOP. No
+  `SPEC_ms_hashlock.md`, no composer spec fold, until the operator says so.
+- Engrave master pushed through d31d595 (report d7ff513); commits after it
+  are records only.
+
+Steps, in order:
+1. Persist the L18 report (own commit) -> machine-check its measurable claims
+   -> bring the findings to the operator (rulings are theirs; C/I on 4.6 or on
+   an agreed section get an operator disposition) -> fold (own commit) ->
+   sonnet fold verification if non-trivial -> record the operator's ruling on
+   4.6.
+2. STOP (L19). Report the state; wait for the operator's word on the spec.
+3. Push engrave master (sonnet push agent, ci/staging, FREEZE) whenever the
+   tree is clean and no commit is imminent.
+Command to resume: /resume-composer
