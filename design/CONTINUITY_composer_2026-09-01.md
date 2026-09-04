@@ -1702,3 +1702,12 @@ Command to resume: /resume-composer
   commit (gate output in the message) -> fill and commit
   `ms-hashlock-H1-plan-R0-r1-fold-verification-brief.md` (sonnet) -> dispatch
   -> STATUS R0 GREEN -> re-validate immediately before ONE opus implementer.
+- **H1 PLAN R0 FOLD COMMITTED (ms `3592532`) after gate run 13 GREEN** (75/75
+  hashlock tests, clippy + fmt clean, codeword distance 17, downgrade row exit
+  2, `MS-GATE EXIT: 0`); the fold message maps every C/I of both round-0
+  reports to its change and quotes the gate tail. Round-1 brief committed at
+  ms `11fb612`; sonnet fold-verification DISPATCHED (report will land at
+  `design/agent-reports/ms-hashlock-H1-plan-R0-r1-fold-verification.md`, its
+  own commit). NEXT: persist -> if GREEN, STATUS R0 GREEN on the plan (one
+  commit) -> push ms via the hand ritual -> re-validate immediately before
+  ONE opus implementer in an ms worktree (UC off), H0 first.
