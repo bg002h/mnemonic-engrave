@@ -1659,3 +1659,23 @@ Command to resume: /resume-composer
   immediately before ONE opus implementer (UC off, an ms worktree). H0's fork
   and `me` guards are their own small plans in their own repos and must SHIP
   before 0.18.0.
+- **H1 PLAN DRAFTED** (`mnemonic-secret/design/IMPLEMENTATION_PLAN_ms_hashlock_H1.md`,
+  committed as DRAFT at ms `dbccbe8` with `scripts/plan-build-gate-ms.sh` and
+  `scripts/plan-handwire-ms-hashlock.py`): Task 0 (the gate) + Tasks 1-11
+  (codec constants/errors; the kind, dispatch, accept set and tag/kind check;
+  the hashlock module; the corpus + the literal-constant three-way repro test;
+  the six-part guard; the byte-verbatim reader and phrase rule; the verb; the
+  other verbs + the catch-all count; the CLI test matrix; MIGRATION/CHANGELOG;
+  release with H0 first). Written with the writing-plans skill: files,
+  interfaces, failing test first, run + expected, commit, a mutation beside
+  every test; new behaviour in NEW files so the gate extracts them, edits to
+  existing files as FRAGMENTS carried verbatim in the hand-wire script.
+  **Gate iterating**: runs 1-3 fixed only anchors (envelope doc-comment
+  alignment, inspect.rs's real import/match, the two helper call shapes) and
+  the lockfile rule for new deps; run 4 (in flight) after adding the
+  `validate()` arm the fragments had missed -- a real plan gap the gate
+  caught, which is what it exists for. NEXT: gate green -> commit with the
+  gate output -> R0 (fidelity opus + tests sonnet, mutation beside every test)
+  -> fold -> verify -> re-validate immediately before ONE opus implementer in
+  an ms worktree (UC off). Both repos' records are pushed (engrave `2302b9c`,
+  ms `d4d6771`); commits after them are records + the plan draft.
