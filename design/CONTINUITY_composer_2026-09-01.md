@@ -1158,3 +1158,13 @@ Steps, in order:
    hashlock-phrase entry (REQUIRED, Rust first; spec §6c/§14/C25 fold with
    its own R0). Term: "hashlock phrase" (memory).
 Command to resume: /resume-composer
+- W-4 SHIPPED: fork main 70008da5 (merge of composer-s4d bb50775; CI run
+  33826231689 green; verification 0C/0I persisted 4f24459; push report
+  2d8487c). Plan §4 pin -> 1,581,204 / 62,800 (e405b12). wt-composer-s4d
+  removed. The device runs bgbb50775 (the branch build; identical gui bytes
+  to main 70008da5 apart from the merge commit) -- re-flashing main is
+  optional hygiene at the operator's word. Steps 1 of the evening RESUME
+  POINT DONE; step 2 (push) dispatched next; then CLEAR. On resume: step 3
+  (optional re-flash), step 4 (the operator's pad re-check -> record it; the
+  plate when a blank is on hand; Task 5 at the operator's call), step 5
+  (next cycle: F-465 ms hashlock, F-466 on-device hashlock-phrase entry).
