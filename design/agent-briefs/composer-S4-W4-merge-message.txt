@@ -1,0 +1,13 @@
+Merge composer-s4d: S4 walk W-4 -- the digit pad's prompt and range line are two lines again (composer S4)
+
+Fourth fix from the S4 journey walk (mnemonic-engrave
+design/S4_journey_walk_2026-09-02.md, W-4, found by the operator on the
+device): composerDigitEntry clamped each info line on its own to the band
+above the keyboard, so "How many blocks?" and "1 to 65535 blocks" -- and the
+days, date and height pads' lines -- were drawn over each other. The entry
+box, the prompt and the echo are now one vertically centred group; a
+rasterising geometry test over all four pads fails on 6fb90cb. Targeted
+verification design/agent-reports/composer-S4-W4-verification.md.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
