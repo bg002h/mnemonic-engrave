@@ -447,3 +447,28 @@ signature into the GUI's *probe of* the codec. Asking the codec is not enough �
 you have to ask it the question the operator's screen actually poses. A probe
 that varies a field the arm does not edit is the same defect wearing the
 remedy's clothes.
+
+### Round 3: MERGE
+
+`design/agent-reports/composer-S4-W6-fold-r2-verification.md` (sonnet,
+targeted, 0C/0I/1M) closed I-2 and I-3 and ran the experiment the brief asked
+for: the new census test **fails against round 2's exact probe restored in a
+copy** (156 false negatives / 288 false positives, matching the fold commit's
+own figure) and passes 0/0 on the fix, with an oracle structurally independent
+of the probe, a corpus reaching every relevant shape, a live shrink-guard, and
+both call sites pinned by tests that fail on either field swap. All CI gates
+and all four capture drivers reproduced exactly.
+
+Its one new Minor was mine again, and of the same family: the M-2 comment fold
+had listed the Move arm among the routes going through
+`composerApplyShapeEdit`, which it is not — `composerMoveUp` discards
+unconditionally, and its own comment fifteen lines down says so. Folded inline
+at `618f86f1` (a wording fold does not re-trigger the gate).
+
+**W-6 and W-7 closed at `618f86f1`, four commits over `70008da`, after three
+review rounds.** The tally is worth keeping: r1 (opus) found 1 Critical that
+the W-6 fix had introduced; r2 (opus) found 2 Importants that r1's fold had
+introduced; r3 (sonnet) found 1 Minor that r2's fold had introduced. Each round
+found the class one level inside the previous remedy, and each remedy was
+smaller than the last — which is what closure looks like when the thing being
+fixed is a *class* rather than a case.
