@@ -51,6 +51,9 @@ to that."
 | L17 | **Section 4.5 (process and homes) is agreed.** "Ok on 4.5" | Two specs, one plan per stage, the order in 4.5. |
 | L18 | **A second lens before ruling on 4.6.** On the 4.6 (testing) draft: "Ask security software expert for review" | Single opus agent, security-software-engineering lens, over the whole record with 4.6 as presented; brief `design/agent-briefs/hashlock-brainstorm-R0-r2-security-software-brief.md`, report `design/agent-reports/hashlock-brainstorm-R0-r2-security-software-expert.md`. 4.6 is PRESENTED, not agreed, until the operator rules after it. |
 | L19 | **"Pause before spec."** | After the L18 review is persisted, folded and walked with the operator, NO spec is started until the operator says so. The controller stops there. |
+| L20 | **`--in FILE` on `ms hashlock` means the preimage ms1**, like the six reading verbs (chosen over "phrase plus an ms1-shape refusal" and "no `--in`"), on review C-1. | The phrase has exactly two channels: `--hashlock-phrase` (argv-guarded) and `--hashlock-phrase-stdin` (redirect a file into it). An ms1-shaped phrase is refused on both, naming `--in`/`-`. |
+| L21 | **`--random` refuses unless `--out FILE` or `--json`** (chosen over "allow, the card is the copy"), on review C-3. | A preimage that reaches no persistent channel is data loss, so it gates; `--random --no-engraving-card` without either exits 64 naming `--out`. `--out`'s overwrite semantics stay as ruled 2026-08-26. |
+| L22 | **The classifier lands Rust-first as H1b; the fork mirrors it; no new class this cycle** (chosen over "the fork ships a new class, me catches up"), on review I-4 + C-2. | H1b (engrave, before H2): `me`'s ms1 classifier treats kind `0x03` as inert with a vector row, in me 0.8.1. H2: the fork's `isStrictMs1` gains the same prefix test; `DecodeMS1` keeps refusing `0x03` and a separate decoder serves the new consumer. |
 
 ## 3. Measured context (so no later section re-derives it)
 
@@ -213,13 +216,22 @@ in the device's confirm modal (section 5).
   adds `ms hashlock` plus the kind's arms in decode, inspect, split, combine and
   refusals in derive and verify. Vectors pin phrase -> X -> H for BOTH methods.
   Manual chapter in lockstep.
-- **H2 seedhammer fork (Go port).** The `0x03` arm in `DecodeMS1`, every seed
-  call site refusing it by name, a payload class for it that reaches no screen,
-  and the `Type a hashlock phrase` row in `Which hash?` with the method pick and
-  the confirm copy. Lockstep test against the vendored Rust vectors.
+- **H1b mnemonic-engrave (Rust, before H2; L22).** `me`'s ms1 classifier
+  (`crates/me-cli/src/seal/record.rs`, the strict-ms1 test the fork mirrors)
+  gains the prefix test: a kind-`0x03` string is INERT -- not a seed, not a
+  new class -- with a record-class vector row. Ships in me 0.8.1 (F-454).
+- **H2 seedhammer fork (Go port).** `DecodeMS1` KEEPS refusing `0x03`
+  (review C-2: its five callers all discard the prefix and would turn a
+  preimage into seed entropy); a separate `DecodeMS1Preimage` serves only the
+  new consumer, with the Go length rule restated (the shared `case 16, 20, 24,
+  28, 32` switch cannot be inherited). `isStrictMs1` mirrors H1b's prefix test
+  so a preimage string is inert and reaches no screen by the existing
+  absent-is-false admission rule. The `Type a hashlock phrase` row in
+  `Which hash?` with the method pick and the confirm copy, label-keyed (4.4).
+  Lockstep test against the vendored Rust vectors.
 - **H3 records.** Composer spec fold (§6c, §8 copy, §12 acceptance, §14 row,
-  C25) and a new ms spec for the kind and verb, each under its own R0. `me`'s
-  classifier learns the kind on the Rust side (rides the owed me 0.8.1, F-454).
+  C25) and a new ms spec for the kind and verb, each under its own R0; the
+  F-467 journey regeneration.
 - **H4 device acceptance.** Emulator capture arm, then the live walk: the
   operator types a phrase on the SH2 and its H is compared with the host's.
 
@@ -232,22 +244,42 @@ non-ASCII phrase; K-of-N shares of a preimage from the CLI (F-468).
 Sources, exactly one per invocation:
 
 - `--hashlock-phrase TEXT` (joins `SECRET_FLAGS`; refused on argv without
-  `--allow-argv-secret`), `--hashlock-phrase-stdin` (one trailing LF/CRLF
-  stripped), or `--in FILE` (the phrase from a file, same newline rule).
+  `--allow-argv-secret`) or `--hashlock-phrase-stdin` (one trailing LF/CRLF
+  stripped; a phrase file is redirected into it). These are the ONLY phrase
+  channels (L20). Joining the guard is a three-part edit the record names
+  (review I-1, I-2, M-3): `SUBCOMMANDS` (`[&str; 12]` -> 13) so the refusal
+  and the purge pattern name `hashlock`; `override_applies`'s verb match so
+  `--allow-argv-secret` works; `flag_class` so the refusal says "a hashlock
+  phrase", not "a BIP-39 passphrase"; and the verb's `Source` is built
+  `.on("--hashlock-phrase")` so the admitted value arrives through the side
+  channel instead of whatever stdin holds (the gate: the same invocation with
+  stdin at `/dev/null` still derives from the flag's value). With stdin at a
+  terminal, `--hashlock-phrase-stdin` prints one prompt line to stderr
+  ("Type the hashlock phrase, then Enter.") rather than blocking silently
+  (review M-7; the constellation's recorded `mt` finding).
 - `--hex HEX` or `--hex -`: an existing X, exactly 32 bytes (64 hex characters);
   anything else is refused naming §8i.
-- `<ms1>` or `-`: a preimage-kind ms1, to re-derive H from a plate. An entr or
+- `<ms1>`, `-`, or `--in FILE`: a preimage-kind ms1, to re-derive H from a
+  plate -- `--in` means the ms1 here as on the six reading verbs (L20; review
+  C-1: the argv guard's remedy for a refused plate string prints
+  `ms hashlock --in FILE`, so this channel MUST take the plate). An entr or
   mnem string is refused: "that is a seed backup, not a hashlock preimage".
 - `--random`: 32 bytes from the OS CSPRNG (the one shares use; `getrandom`,
   failing closed). No phrase exists, so nothing can be guessed -- and nothing
   can be remembered: the card says both halves (review M-5): "No phrase exists,
   so nothing can be guessed, and nothing can be remembered. This plate is the
-  only copy."
+  only copy." **`--random` REFUSES (exit 64, naming `--out`) unless `--out
+  FILE` or `--json` is given** (L21; r2 review C-3: with the card suppressed
+  or redirected to `/dev/null` the digest would reach a payload while its
+  preimage existed nowhere -- a data-loss rule, so it gates).
 
 Method (L5), for the phrase sources only: `--method hardened` = L4;
 `--method sha256` = X = sha256(phrase bytes). Default: `hardened`, announced on
 the card and in `--json` (section 5). `--hex`, `--random` and `<ms1>` take no
-method: X is given. **The two methods get different warnings (review C-1,
+method: X is given, so `--method` WITH any of them is refused at exit 64
+(review r2 M-6: a flag the operator set that does nothing is a defect), the
+card's method line reads "preimage supplied", and `--json` omits the `method`
+key for those sources. **The two methods get different warnings (review C-1,
 L12):** under `sha256` the card ALWAYS carries the brainwallet line -- "This is
 the brainwallet construction: anyone holding the digest tests 10^10 phrases per
 second. A phrase a person chose is not safe here; use six diceware words or
@@ -263,18 +295,32 @@ exactly as typed (no trimming, case folding or normalisation). Refusals name the
 rule and never echo the phrase. **A phrase that is exactly 64 characters, all
 hex digits, is refused** naming `--hex` as the remedy (review I-6: it is a
 preimage pasted into the wrong slot, and deriving from it silently yields a
-different X); the device's phrase screen applies the same check. No entropy is
-gained past 64 characters (section 3.4); the cap is a usability bound, not a
-security one.
+different X); the device's phrase screen applies the same check. **A phrase
+that is ms1-shaped is refused on both phrase channels** naming `--in`/`-`,
+reusing `argv_guard::is_ms1_shaped` so the two predicates cannot drift (r2
+review C-1: a plate string pasted as a phrase derives a preimage on no plate).
+**The phrase channels use a NEW byte-verbatim reader** -- bytes as given,
+exactly one trailing `\r?\n` stripped, nothing else -- and never
+`parse::read_input` (strips all whitespace plus `-` and `,`) or
+`parse::read_phrase_input` (trims and collapses runs) (r2 review I-3: either
+would silently change X and every codec vector would still pass). No entropy
+is gained past 64 characters (section 3.4); the cap is a usability bound, not
+a security one.
 
 Outputs:
 
 - stdout: one line, `hash:<64 hex>`, the record `me sysw pack --in -` consumes.
-  Public, so no stdout advisory.
+  Public, so no stdout advisory. **`--out` never suppresses it** (r2 review
+  I-5: `encode` suppresses its stdout artifact when `--out` is given because
+  both are the same secret; here the two channels carry different artifacts,
+  and copying encode's shape would hand `me sysw pack` an empty stream).
 - `--out FILE`: the preimage ms1, 0600, overwriting. `--out` is the preimage's
   channel; stdout is the digest's.
-- stderr card (off with `--no-engraving-card`): the digest; the `sha256=`
-  operand for `md compose --path`; the preimage as grouped ms1
+- stderr card (off with `--no-engraving-card`): its FIRST line names it as
+  carrying the preimage (r2 review M-1: on this verb the polarity is inverted,
+  stdout public and stderr secret, so `2>>log` or `2>&1 | tee` lands the
+  preimage in a 0644 file and nothing else labels it); then the digest; the
+  `sha256=` operand for `md compose --path`; the preimage as grouped ms1
   (`--group-size`/`--separator` apply) and as hex; the METHOD LINE to write
   down, verbatim, e.g.
   `preimage = PBKDF2-HMAC-SHA256(password = phrase, salt = "ms-hashlock-v1", iterations = 100000, dkLen = 32)`
@@ -349,7 +395,12 @@ ms-cli 0.18.0.
   `preimage_sha256`, `digest`, with the salt and iteration count as named
   constants. The kind and its derivation share one corpus and one SHA pin, and
   the Go port pins its provenance against one crate. ms-codec gains `pbkdf2`
-  and `sha2`, both pure Rust and already trusted by `me`. `ms-cli` reaches it
+  and `sha2`, both pure Rust and already trusted by `me`, spelled exactly as
+  `me` spells them (`pbkdf2 = { version = "0.12", default-features = false,
+  features = ["hmac"] }`, `sha2 = "0.10"`; no direct `hmac`, no
+  `password-hash` -- r2 review N-3, measured: pbkdf2 0.12.2's default feature
+  set is exactly `["hmac"]`, MSRV 1.60, pure Rust, no build script). `ms-cli`
+  reaches it
   through its existing path + version dependency (pin `=0.8.0`); `ms hashlock`
   is a thin verb: flags, private channels, refusal text, output shape.
 - **Vectors.** Encode/decode round trip, share round trip, inspect kind, and for
@@ -357,13 +408,20 @@ ms-cli 0.18.0.
   reproductions RUN as a test, not quoted (measured 2026-09-03 for the phrase
   `correct horse battery staple`: hardened X
   `c3e97525442520da4cffd5f57aae3f6273990017f2e0fa30c056e32172e22016`
-  byte-identical in both tools; sha256 X `c4bbcb1f...d4e39a8a`, H
-  `b867db87...edbc96cb` = the W-5 record). Length rows for `0x03` payloads of
+  byte-identical in both tools, hardened H
+  `3cf5d421caf2a9c8eb9de1d400866ea7d475e6ba978861bb0167a37cb70a4c12`; sha256
+  X `c4bbcb1f...d4e39a8a`, H `b867db87...edbc96cb` = the W-5 record; both
+  methods pin BOTH X and H, r2 review N-1). Length rows for `0x03` payloads of
   16, 32, 34 and 46 bytes, each refused by name (review I-2; BIP-93's bracket
   reaches 16..46 payload bytes). Lockstep rows a 100-character phrase derives
   byte-identically on host and device and a 101-character one is refused on
-  both (review M-6), plus the 64-hex refusal on both. The corpus SHA is
-  re-pinned, which is what forces the minor bump.
+  both (review M-6), plus the 64-hex refusal on both. The `python3` +
+  `openssl kdf` reproduction test lives in ms-codec and runs in the
+  `test (ms-codec)` job, which is Ubuntu-only; that job gains a preflight STEP
+  (`openssl kdf --help`, `python3 -c 'import hashlib'`) so a missing tool
+  fails the step, never a test someone can `#[ignore]` (r2 review I-6: the
+  ms-cli matrix includes macOS, whose stock `openssl` is LibreSSL without
+  `kdf`). The corpus SHA is re-pinned, which is what forces the minor bump.
 - **MIGRATION.md.** A 0.7 -> 0.8 section: readers that dispatch on the prefix
   byte MUST treat `0x03` as a 32-byte preimage and never as entropy; length no
   longer implies kind (I-4) and singles of the kind carry id `hash` (L14);
@@ -384,28 +442,55 @@ ms-cli 0.18.0.
   placed before `Type 64 hex`; the payload rows stay first. With no `hash:`
   record loaded, the screen's lead line names the host route: "No hash record
   in the payload. ms hashlock on the host makes one." (F-465's hint; ASCII,
-  within the modal-fits assertion.)
-- **Phrase screen.** The existing four-page printable-ASCII keyboard with
-  reveal toggle and counter, titled `Hashlock phrase`, counter `n/100`
-  against the dedicated `HASHLOCK_PHRASE_MAX_CHARS`. OK applies the host's
-  rule byte for byte: non-empty, ASCII only, at most 100, and the 64-hex
-  refusal naming the `Type 64 hex` row. Back returns to `Which hash?`.
+  within the modal-fits assertion.) **The row switch becomes label-keyed**
+  (named row indices computed once), the `default` arm is unreachable rather
+  than "clear the lock", and the §8i modal's condition is restated as "the
+  operator is taking a hash", not an index comparison (r2 review C-4: the
+  shipped `composerHashEdit` keys on `len(digests)` arithmetic and its
+  fallthrough clears the hash, so inserting a row makes `Type 64 hex` silently
+  remove the lock). Tests cover every row by label, the displaced ones
+  included.
+- **Phrase screen.** The existing four-page printable-ASCII keyboard, built
+  with `NewPassphraseKeyboard` (not `NewTextKeyboard`, which carries a settings
+  gear and a newline key, nor `NewLineKeyboard`), driven by a NEW flow
+  function rather than `passphraseEntryFlow` (r2 review M-4: that flow
+  hard-codes the "Passphrase" title, the pass-proof trigger and an over-length
+  message about plate legibility). Titled `Hashlock phrase`, counter `n/100`
+  against the dedicated `HASHLOCK_PHRASE_MAX_CHARS`, non-clamping as the
+  passphrase flow is (so `101/100` is visible and the lockstep row is
+  constructible). OK applies the host's rule byte for byte: non-empty, ASCII
+  only, at most 100, the 64-hex refusal naming the `Type 64 hex` row, and the
+  ms1-shape refusal. Back returns to `Which hash?`.
 - **Method pick.** A two-row pick after the phrase: `Hardened (about 10 s)`
   and `SHA-256`. SHA-256 shows the brainwallet modal before deriving; Hardened
   under 20 characters shows the 72-days modal. Both confirm-to-proceed, never
   refusals (L12).
 - **Derivation.** Hardened runs PBKDF2 on the countdown screen the sealed
   payload already uses (`gui/unlock_kdf.go:221-236`: "Unlocking. About N
-  seconds left.", driven by the measured rate; retitled). SHA-256 is instant.
+  seconds left.", driven by the measured rate; retitled) -- through a NEW
+  driver taking `salt []byte` and the iteration count, NOT `unlockDerive`'s
+  `seal.Header` (r2 review M-5: its `Salt [16]byte` would zero-pad the
+  14-byte salt and every device digest would silently diverge; only a
+  comparison against the vendored corpus CONSTANT catches it, never a value
+  recomputed by the same Go function). SHA-256 is instant.
 - **Confirm modal.** `hash  first8..last8`, the §8i line, the F-132 line, and
-  the section 3.7 lines. CONTINUE sets the path's hash; Back discards. The
+  the section 3.7 lines. CONTINUE sets the path's hash; Back discards (safe by
+  construction: nothing is assigned before CONTINUE, and Back or power loss
+  during the derivation leaves the composer state untouched -- r2 Q3). The
   digest shown must equal the host's for the same phrase and method: the
-  lockstep vector.
+  lockstep vector. The 64 visible bits are a transcription check, adequate
+  ONLY because the full-width lockstep vector runs in CI; the H4 walk records
+  both full digests, so nobody later drops the vector and keeps the walk (r2
+  review N-2).
 - **No scrub discipline** for the phrase or X beyond what the composer already
   does by construction (L15).
-- **Payload preimage strings.** An ms1 of kind `0x03` in a payload classifies
-  as a new secret class that reaches no screen; seed entry refuses it by name
-  instead of failing at decode.
+- **Payload preimage strings.** An ms1 of kind `0x03` in a payload is INERT
+  (L22): `isStrictMs1` gains the prefix test, mirroring H1b's Rust change, so
+  the string is never `ClassCodex32Secret` and reaches no screen by the
+  existing absent-is-false admission rule; no new class this cycle.
+  `DecodeMS1` keeps refusing `0x03` (r2 review C-2: all five callers discard
+  the prefix, and "Show secret" is gated on `err == nil`), so a typed or
+  scanned preimage string is refused everywhere a seed is expected, as today.
 - **Cost.** SHA-256 and PBKDF2 are already linked; the keyboard exists. A
   small firmware delta, measured at the gate.
 
@@ -428,10 +513,11 @@ ms-cli 0.18.0.
   verification -> merge through the ms staging ritual -> release ms-codec
   0.8.0 and ms-cli 0.18.0 per `design/RELEASE_PROCESS.md` (corpus SHA pin,
   CHANGELOG, MIGRATION, publish dry run, both tags), manual chapter in
-  lockstep -> composer spec fold R0 -> H2 plan -> one H2 implementer in a fork
-  worktree -> review -> merge -> flash at the operator's word -> the H4 walk
-  with the operator -> H3 closes the records (me 0.8.1 with the classifier
-  learning the kind; the F-467 journey regeneration).
+  lockstep -> H1b (engrave: `me`'s classifier treats kind `0x03` as inert,
+  vector row, me 0.8.1 via its staging ritual; L22) -> composer spec fold R0
+  -> H2 plan -> one H2 implementer in a fork worktree -> review -> merge ->
+  flash at the operator's word -> the H4 walk with the operator -> H3 closes
+  the records (the F-467 journey regeneration).
 - **Tiers and reports.** Opus for spec and plan lenses and whole-diff reviews,
   sonnet for fold verification and pushes, fable not a tier. Every agent
   writes its own report into the reviewed repo's `design/agent-reports/`.
@@ -478,6 +564,48 @@ ms-cli 0.18.0.
 - **Records (H3).** The regenerated hashvault journey's digests equal
   `ms hashlock`'s; the plan cite, glyph and step-reference checks; the
   composer spec's new §12 rows.
+- **Added by the r2 security-software review (each names the mutation it
+  catches).** H1: an ms1-shaped phrase on both phrase channels is refused
+  naming the ms1 route (mutation: delete the shape check on one channel);
+  `--random --no-engraving-card` without `--out`/`--json` exits 64 naming
+  `--out`, and `--random 2>/dev/null` likewise (mutation: drop the
+  persistent-channel rule); `--hashlock-phrase X --allow-argv-secret` derives
+  from X, and the same invocation with stdin at `/dev/null` still derives from
+  X (mutations: `hashlock` missing from `override_applies`; `.on()` missing);
+  `... --allow-argv-secret < other.txt` never derives from `other.txt`; the
+  guard's refusal text for `ms hashlock` says "hashlock" and "a hashlock
+  phrase" (mutations: `SUBCOMMANDS` not extended; `flag_class` arm missing);
+  byte-exact rows `"  a  b "` and `"a-b,c"` through `--hashlock-phrase-stdin`
+  equal the codec vector (mutation: swap in `read_phrase_input` or
+  `read_input` -- no codec vector can catch it); the stdin newline rows
+  `"p\n"`, `"p\r\n"`, `"p"`, `"p \n"` strip one `\r?\n` and nothing else,
+  `"p\n\n"` refused; NEGATIVE-CONTENT rows, one per refusal (empty,
+  non-ASCII, over 100, 64-hex, ms1-shaped, `--hex` wrong length, wrong ms1
+  kind, two sources, `--method` with a given X): the phrase and the preimage
+  appear in neither stdout, stderr, nor the `--json` error envelope on stdout
+  (mutation: a refusal built with `format!("... {phrase}")`); "stdout is
+  exactly the record line" runs WITH `--out` as well (mutation: copy encode's
+  suppression); the `--json` `method` shape per source; the downgrade row (a
+  `0x03` string on the 0.17.x-equivalent codec refuses, never panics); the CI
+  preflight step in `test (ms-codec)`. H1b: the record-class vector row for an
+  inert `0x03` string in `me`. H2: `DecodeMS1` length rows for `0x03` at 16,
+  20, 24, 28, 34 and 46 payload bytes each refused (mutation: let the arm fall
+  into the shared length switch); one test per `DecodeMS1` caller
+  (`gui/ms1_decode.go:22`, `gui/codex32_polish.go:106`,
+  `gui/singlesig_verify.go:185`, `gui/multisig_verify.go:1237`,
+  `bundle/verify.go:138`) that a `0x03` string is refused and "Show secret"
+  is not offered; `sysw.Classify` on a `0x03` ms1 is never
+  `ClassCodex32Secret` and `admits` is false for all ten programs (mutation:
+  leave `isStrictMs1` unchanged); every `Which hash?` row by label reaches its
+  own screen, `Type 64 hex` sets and never clears, the §8i modal fires for
+  the three take-a-hash rows and not for `No hash lock` (mutation: insert the
+  row without re-keying the switch); the device derivation test compares
+  against the vendored corpus CONSTANT (mutation: zero-pad the salt into a
+  16-byte header); widget identity (no gear, no newline key, title `Hashlock
+  phrase`, no "plate" in the over-length text); the 101-character and 64-hex
+  refusals driven through the real screen with the counter at `101/100`. H4:
+  the walk records both methods' full 64-hex digests, not only
+  `first8..last8`.
 
 ## 5. Defaults taken for the operator's veto
 
@@ -491,6 +619,10 @@ ms-cli 0.18.0.
 | a phrase of exactly 64 hex characters is REFUSED naming `--hex`, on host and device (review I-6) | deriving from a pasted preimage silently yields a different X and a valid-looking record | warn instead |
 | the card prints the phrase's character count beside the method line (review M-2) | the one signal that shows a stray space on the host; the device shows n/100 | drop |
 | `HASHLOCK_PHRASE_MAX_CHARS = 100` as its own constant on each side, lockstep-pinned (review M-6) | the device's `passphrase.MaxLen` is a plate-legibility number and can move for its own reasons | bind to `passphrase.MaxLen` |
+| the stderr card's first line names it as carrying the preimage (r2 M-1) | this verb inverts `ms`'s polarity (stdout public, stderr secret) and nothing else labels the stream; secret-handling class | drop |
+| `--hashlock-phrase-stdin` on a terminal prints one prompt line to stderr (r2 M-7) | the first `ms` input a human is meant to type must not look like a hang; pre-existing shape on `--passphrase-stdin` is left as is | drop, or refuse a tty |
+| `--method` with `--hex`/`--random`/`<ms1>` is refused at exit 64 (r2 M-6) | a flag the operator set that does nothing is a defect elsewhere in this codebase | ignore it silently |
+| `DecodeMS1` unchanged; `DecodeMS1Preimage` for the new consumer (r2 C-2) | five callers discard the prefix; one added function keeps all five fail-closed with no audit | an arm in `DecodeMS1` plus a five-site checklist |
 | `--out` carries the preimage ms1; stdout carries the digest | the secret goes to the private channel, the public record to the pipe | `--preimage-out` as a separate flag |
 | `--json` reuses the PrivateKeyMaterial advisory | byte-parity with the toolkit; a preimage on a keyless path can spend alone | a new class (toolkit change) |
 | `--random` included, its card saying both halves ("nothing can be guessed, and nothing can be remembered; this plate is the only copy"; review M-5) | one line over `getrandom`, failing closed; the strongest form and the worst loss profile | drop it, or drop the second half |
@@ -539,14 +671,55 @@ benchmarks and the ratio arithmetic reproduces.
 | reviewer question 2 (floor in bits + generator) | taken: the copy names the generator; the count stays in characters because that is what the device counts (5) |
 | reviewer question 5 (device 64-hex check) | taken: both sides (4.2) |
 
+### 7.1 Round 2: security software engineering lens (report `hashlock-brainstorm-R0-r2-security-software-expert.md`, persisted e9d7895; 4C/6I/7M/3N)
+
+Controller machine-checks before folding: `override_applies` matches a fixed
+list of eight shipped verbs and `SUBCOMMANDS` is `[&str; 12]`; `is_ms1_shaped`
+= `starts_with("ms1")` + bech32 charset after separator stripping; the guard's
+remedy prints `ms {verb} --in FILE`; `flag_class` falls through to "a BIP-39
+passphrase"; `parse.rs` has `read_input` (strips all whitespace, `-`, `,`),
+`read_phrase_input` (trims, collapses), `read_in_file` (strips nothing) and
+`Source` defaults `channel: ""`; `rust.yml`'s `test (ms-codec)` job is
+Ubuntu-only and the ms-cli matrix is ubuntu + macos; the fork's five non-test
+`DecodeMS1` callers all bind `_` for the prefix; `showSecret := f.Unshared &&
+msErr == nil`; `sysw/classify.go:48` tests `isStrictMs1` first; six
+`ClassCodex32Secret` admissions; `admits` is `admitted[p][c]` (absent = false);
+`unlockDerive(ctx, th, h seal.Header, pass)` with `SaltLen = 16`; the hardened
+H for the W-5 phrase is `3cf5d421...4c12`.
+
+| finding | disposition |
+| --- | --- |
+| C-1 `--in` ambiguity; the guard's own remedy routes a plate string into the phrase channel | RULED L20: `--in`/`-`/positional = the ms1; phrase via `--hashlock-phrase` and `--hashlock-phrase-stdin` only; ms1-shaped phrases refused on both (4.2) |
+| C-2 a `0x03` arm in `DecodeMS1` fails open at five prefix-discarding callers; `isStrictMs1` classifies a preimage as a seed | RULED L22 + default: `DecodeMS1` unchanged, `DecodeMS1Preimage` for the new consumer; `isStrictMs1` gains the prefix test mirroring H1b; Go length rows (4.1, 4.4, 5) |
+| C-3 `--random` can emit a digest whose preimage exists nowhere | RULED L21: refuse unless `--out` or `--json` (4.2) |
+| C-4 the new row shifts an index-keyed switch whose default clears the lock | label-keyed rows, unreachable default, §8i condition restated, tests for every row by label (4.4, 4.6) |
+| I-1 `--allow-argv-secret` inert on an unlisted verb; refusal names `encode` | the three `argv_guard.rs` edits named (4.2) |
+| I-2 the side channel must be opted into or stdin is read | `.on("--hashlock-phrase")` named; the `/dev/null` gate (4.2, 4.6) |
+| I-3 both shipped readers normalise; no test would notice | a new byte-verbatim reader; `read_input`/`read_phrase_input` forbidden; byte-exact CLI rows (4.2, 4.6) |
+| I-4 the fork's classifier would lead the Rust primary | RULED L22: H1b in engrave before H2; no new class (4.1) |
+| I-5 `--out` vs stdout unstated; encode's precedent inverts it | `--out` never suppresses the stdout digest (4.2, 4.6) |
+| I-6 the reproduction test's job unnamed; macOS lacks `openssl kdf` | ms-codec's Ubuntu job with a preflight step (4.3, 4.6) |
+| M-1 the card is unlabelled on a polarity-inverted verb | first line names the preimage (4.2, 5) |
+| M-2 JSON errors go to stdout | negative-content rows cover the envelope (4.6) |
+| M-3 `flag_class` misnames the material | with I-1 (4.2) |
+| M-4 keyboard constructor and flow unnamed | `NewPassphraseKeyboard` + a new flow (4.4) |
+| M-5 `unlockDerive` would zero-pad the salt | a new driver taking salt bytes; the constant-comparison rule (4.4, 4.6) |
+| M-6 `--method` with a given X unspecified | refused at exit 64; `--json` omits `method` (4.2, 5) |
+| M-7 a tty stdin blocks with no prompt | one stderr prompt line (4.2, 5) |
+| N-1 hardened H unpinned | pinned (4.3) |
+| N-2 64 visible bits | adequacy rests on the CI vector; the walk records full digests (4.4, 4.6) |
+| N-3 `hmac` not a direct dep | `me`'s spelling copied verbatim (4.3) |
+| reviewer question 5 (card first line) | taken (M-1) |
+
 Lenses run on this record: cryptography + Bitcoin programmer (opus, r0);
 fold verification (sonnet, r1: `hashlock-brainstorm-R0-r1-fold-verification.md`,
 persisted 95e7423 -- FIXED 16 / PARTIAL 1 / NOT 0, every recomputed number
 matched, one new Important: the first fold said all four `unreachable!` sites
-become refusals while 4.2 says `decode` prints a preimage; folded above). The
-r1 fold is wording only, so no r2 round (proportional re-review rule). The
-brainstorm's R0 closes under lens-closure; the journey lens belongs to the
-spec, which will carry the walks.
+become refusals while 4.2 says `decode` prints a preimage; folded above; the
+r1 fold was wording only, no round on it); security software engineering
+(opus, r2, above; folded with three rulings). Next: sonnet verification of
+the r2 fold (non-trivial), then the operator rules on 4.6, then STOP (L19).
+The journey lens belongs to the spec, which will carry the walks.
 
 ## 8. Follow-ups filed from this brainstorm
 
