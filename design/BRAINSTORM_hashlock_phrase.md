@@ -49,6 +49,8 @@ to that."
 | L15 | **No scrub discipline for the phrase or X on the device.** On the 4.4 draft's scrub bullet: "No. We don't need to scrub like we would for a sealed payload." | Consistent with C14 (no Sealed-Payload memory treatment for the composer's seeds); a phrase is less sensitive than a seed. The device leg adds no wiping beyond what the composer already does by construction; secret-handling is non-gating anyway (2026-08-27 ruling). |
 | L16 | **Section 4.4 (the device leg) is agreed** without the scrub bullet. "Yes." | 4.4 is the composer spec fold's input. |
 | L17 | **Section 4.5 (process and homes) is agreed.** "Ok on 4.5" | Two specs, one plan per stage, the order in 4.5. |
+| L18 | **A second lens before ruling on 4.6.** On the 4.6 (testing) draft: "Ask security software expert for review" | Single opus agent, security-software-engineering lens, over the whole record with 4.6 as presented; brief `design/agent-briefs/hashlock-brainstorm-R0-r2-security-software-brief.md`, report `design/agent-reports/hashlock-brainstorm-R0-r2-security-software-expert.md`. 4.6 is PRESENTED, not agreed, until the operator rules after it. |
+| L19 | **"Pause before spec."** | After the L18 review is persisted, folded and walked with the operator, NO spec is started until the operator says so. The controller stops there. |
 
 ## 3. Measured context (so no later section re-derives it)
 
@@ -437,6 +439,46 @@ ms-cli 0.18.0.
   provenance pin to the ms-codec 0.8.0 commit; the hashlock vector corpus is
   vendored into the fork with a pin test, as the compose vectors are.
 
+### 4.6 Testing (PRESENTED 2026-09-03; under the L18 review; not yet ruled)
+
+- **Codec vectors (H1), the corpus with its SHA pin.** Kind `0x03`
+  encode/decode/inspect; the share round trip through the codec API; length
+  rows 16, 32, 34 and 46 payload bytes each refused by name; id `hash` on
+  singles and its blocklist entry. Derivation rows for both methods: the W-5
+  phrase, a 1-character phrase, 20 characters, 64 and 65 (the HMAC block
+  boundary), 100 and 101, a phrase with leading, trailing and double spaces,
+  the 64-hex refusal, a non-ASCII refusal, empty. A test executes the
+  `python3` and `openssl kdf` reproductions and FAILS if either tool is
+  absent, so a skip can never print ok.
+- **CLI (H1).** Argv guard for `--hashlock-phrase` (refused without the allow
+  flag, the value never echoed); stdin stripping of exactly one LF or CRLF;
+  `--in FILE`; `--hex` at 63, 64 and 65 characters; entr and mnem strings
+  refused, kind 3 accepted; `--random` twice gives two records; two sources
+  exit 64; stdout is exactly the record line; `--out` is 0600 and overwrites;
+  the card's contents per method including both `--random` halves and the
+  section 3.7 lines; `--json` schema and advisory; `decode`, `inspect` and
+  `combine` on the kind; `derive` and `verify` refuse with the remedy; one
+  test per `unreachable!` site that panics on 0.17.x; MSRV, clippy, fmt; the
+  man page carries the verb; the toolkit manual's flag-coverage lint passes.
+- **Review gates.** The plan's tests lens mutates them before any code; the
+  whole-diff review's mutation pass proves each guard fails on its named
+  mutation with the output pasted.
+- **Fork (H2).** The `0x03` decoder arm and its length rule; every seed call
+  site refuses by name; the payload class row in the record-class vectors;
+  derivation lockstep against the vendored corpus for both methods including
+  the 100/101 and 64-hex rows; the phrase screen driven through the real flow
+  on the touch harness (tap the new row, type, pick the method, confirm; the
+  path's hash equals the vector's); geometry tests for the confirm modal and
+  the no-payload hint; firmware size at the gate; an emulator capture arm
+  that types a phrase and compares the digest row, with a negative control
+  that must fail on a different phrase.
+- **Device (H4).** The live walk with the operator: type the phrase on the SH2
+  under each method and compare `first8..last8` with `ms hashlock` on the
+  host; pack a record made by `ms hashlock` and see it offered as a row.
+- **Records (H3).** The regenerated hashvault journey's digests equal
+  `ms hashlock`'s; the plan cite, glyph and step-reference checks; the
+  composer spec's new §12 rows.
+
 ## 5. Defaults taken for the operator's veto
 
 | default | why | veto changes |
@@ -455,12 +497,12 @@ ms-cli 0.18.0.
 | the device asks the method AFTER the phrase, as a two-row pick `Hardened (about 10 s)` / `SHA-256` | mirrors the host flag; the wait is stated before it starts | ask before the phrase |
 | the section 3.7 lines on the host card and in the device's confirm modal: "One phrase per policy. Spending any path of a wsh wallet publishes this digest. Never use this phrase as a passphrase or a password anywhere else -- a spend publishes the preimage, and anyone can then test guesses at the phrase itself." (review I-5 sharpened the controller's addition) | the tool cannot detect reuse (it never sees other policies or passwords), so the copy is the whole defence | drop or reword |
 
-## 6. Sections still to walk with the operator (after the fold verification of section 7)
+## 6. What remains before the spec
 
-- 4.6 testing (vectors for both methods incl. `python3`/`openssl kdf`
-  reproductions machine-checked; argv-guard and newline tests; refusals; the
-  kind through decode/inspect/derive/verify/split/combine; Go lockstep; the
-  touch-harness screen test; capture arm; the live walk).
+- 4.6 (testing) is presented and under the L18 security-software review; the
+  operator rules on it after that review is persisted, folded and walked.
+- Then STOP (L19: "Pause before spec"). `SPEC_ms_hashlock.md` and the
+  composer spec fold start only at the operator's word.
 
 ## 7. R0 round 0 dispositions (report `hashlock-brainstorm-R0-r0-crypto-bitcoin-expert.md`, persisted d13819e)
 
