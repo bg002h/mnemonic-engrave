@@ -239,3 +239,9 @@ preimage X is what must be backed up (F-132). On-device entry: spec §14 row
 W-5 rulings (operator, 2026-09-03): `ms` owns the hashlock command (F-465);
 on-device hashlock-phrase entry is REQUIRED, Rust first (F-466 becomes a
 change request for the next cycle). Term: "hashlock phrase" (two words).
+
+W-4 SHIPPED: fork main `70008da5` (merge of `composer-s4d` `bb50775`; CI green;
+verification 0C/0I, `composer-S4-W4-verification.md`). Firmware 1,581,204 B
+flash / 62,800 B RAM. The device runs the branch build `bgbb50775`, the same
+gui bytes; the operator's re-check of the blocks and date pads is the record
+still owed.
