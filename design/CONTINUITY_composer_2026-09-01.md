@@ -1102,3 +1102,18 @@ Steps, in order:
   sonnet verification -> merge -> flash at the operator's word -> the
   operator re-checks the blocks and date pads; the plate still waits for a
   blank. The device walk otherwise continues on bg6fb90cb.
+- W-4 FIXED on fork composer-s4d bb50775 (report fcc661b): the digit pad's
+  box + prompt + echo are one centred group in the 86 px band; rasterising
+  test 12/12 red on 6fb90cb, green after; gui 1192; capture --arm both 0;
+  the diff also extracts the date validator in composer_lock.go (for the
+  test); firmware +624 B -> 1,581,204 / 62,800 (implementer; controller
+  measuring, .tmp/fw-size-s4d.log). Controller fast gates: gofmt clean,
+  TestComposer ok, cmd/emu ok, js vet 0. Sonnet W-4 verification DISPATCHED
+  (brief 34ff2c9) -> composer-S4-W4-verification.md. Also this session:
+  W-5 recorded (hashlock entry: the payload route is invisible without a
+  payload; F-465 `ms hashlock` proposed, F-466 on-device entry for a
+  ruling; the term "hashlock phrase" agreed and in memory). NEXT: persist
+  the verification -> merge composer-s4d (brief composer-S4-W4-merge-push-
+  brief.md) -> plan §4 pin to the measured size -> flash at the operator's
+  word -> the operator re-checks the blocks and date pads -> the plate when
+  a blank is on hand.
