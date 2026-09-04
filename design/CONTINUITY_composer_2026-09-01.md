@@ -1711,3 +1711,23 @@ Command to resume: /resume-composer
   own commit). NEXT: persist -> if GREEN, STATUS R0 GREEN on the plan (one
   commit) -> push ms via the hand ritual -> re-validate immediately before
   ONE opus implementer in an ms worktree (UC off), H0 first.
+- **H1 PLAN R0 GREEN (ms `4dbff0b`).** r1 sonnet fold verification (ms
+  `0c9efa1`): 16/16 C+I FIXED with both Criticals and all four tests-lens
+  Importants EXECUTED (mutations reverted), corpus rows re-derived (openssl
+  cross-check), the loader test fails on a placeholder; two new Importants,
+  both RECORDS — the fold message's Minor ledger was wrong for five items
+  (they WERE folded), and the C-1 arms were attributed to three different
+  tasks — folded as wording only (no gate re-run; lens-closure: fidelity,
+  tests/mutation, fold-verification). Open Minors after both rounds: M-4
+  (half), N-1, tests M-3, tests N-1.
+- **H0 PLAN DRAFTED + GATE GREEN (engrave `b0af794`)**:
+  `design/IMPLEMENTATION_PLAN_hashlock_H0_reader_guards.md`. Hand-wired into
+  both repos (no script recognises its paths): Rust 2/2 tests, fmt clean, the
+  pin test fails under the mutation; Go codex32/sysw/seal ok, gui TestUnlock
+  ok, three mutations each fail the right test — the gui one ends on the
+  "Engrave Plate" frame for a preimage plate, which is the whole reason H0
+  exists. Engrave pushed `917d4e3` (run 33927403159, no bypass; report
+  `e06e29d`). NEXT: push ms (11 commits, hand ritual, master frozen) -> H0 R0
+  (opus fidelity + sonnet tests) -> ONE opus H1 implementer in an ms worktree
+  (UC off; plan re-validated: staleness check below) -> H0 implementer after
+  its GREEN; flash H0 at the operator's word.
