@@ -48,6 +48,7 @@ to that."
 | L14 | **Preimage singles carry their own id `hash`** (chosen over keeping `entr` and mitigating in copy), on review I-4. | The plate reads `ms10hash...`, not `ms10entrsq...`; readers still dispatch on the prefix byte; `RESERVED_ID_BLOCKLIST` gains `hash`. |
 | L15 | **No scrub discipline for the phrase or X on the device.** On the 4.4 draft's scrub bullet: "No. We don't need to scrub like we would for a sealed payload." | Consistent with C14 (no Sealed-Payload memory treatment for the composer's seeds); a phrase is less sensitive than a seed. The device leg adds no wiping beyond what the composer already does by construction; secret-handling is non-gating anyway (2026-08-27 ruling). |
 | L16 | **Section 4.4 (the device leg) is agreed** without the scrub bullet. "Yes." | 4.4 is the composer spec fold's input. |
+| L17 | **Section 4.5 (process and homes) is agreed.** "Ok on 4.5" | Two specs, one plan per stage, the order in 4.5. |
 
 ## 3. Measured context (so no later section re-derives it)
 
@@ -406,6 +407,36 @@ ms-cli 0.18.0.
 - **Cost.** SHA-256 and PBKDF2 are already linked; the keyboard exists. A
   small firmware delta, measured at the gate.
 
+### 4.5 Process and homes (L17: "Ok on 4.5")
+
+- **Records.** This brainstorm stays the rulings ledger. Two specs follow it:
+  `mnemonic-secret/design/SPEC_ms_hashlock.md` (the `0x03` kind with id
+  `hash`, `ms_codec::hashlock`, the verb, the vector corpus) under its own R0
+  with correctness, adversarial and tests-vector lenses; and the composer spec
+  fold in this repo (§6c third row and method pick, §8 copy for the four new
+  modals, §12 acceptance rows, §14 row narrowed to storage, engraving and
+  sourcing, C25 updated) under its own R0 with a journey lens that re-walks
+  W-5 against the folded text.
+- **Plans, one per stage, each build-gated and re-validated immediately before
+  its implementer.** H1 gets a `plan-build-gate-ms.sh` sibling of the me and md
+  gates on the pinned toolchain. H2 uses `plan-build-gate-go.sh` with its
+  hand-wire script committed to the repo, not the scratchpad.
+- **Order.** ms spec R0 -> H1 plan R0 -> one H1 implementer (opus, UC off, a
+  mnemonic-secret worktree) -> whole-diff opus review -> fold -> sonnet
+  verification -> merge through the ms staging ritual -> release ms-codec
+  0.8.0 and ms-cli 0.18.0 per `design/RELEASE_PROCESS.md` (corpus SHA pin,
+  CHANGELOG, MIGRATION, publish dry run, both tags), manual chapter in
+  lockstep -> composer spec fold R0 -> H2 plan -> one H2 implementer in a fork
+  worktree -> review -> merge -> flash at the operator's word -> the H4 walk
+  with the operator -> H3 closes the records (me 0.8.1 with the classifier
+  learning the kind; the F-467 journey regeneration).
+- **Tiers and reports.** Opus for spec and plan lenses and whole-diff reviews,
+  sonnet for fold verification and pushes, fable not a tier. Every agent
+  writes its own report into the reviewed repo's `design/agent-reports/`.
+- **Rust-primary pins.** The fork's `0x03` arm and derivation carry a
+  provenance pin to the ms-codec 0.8.0 commit; the hashlock vector corpus is
+  vendored into the fork with a pin test, as the compose vectors are.
+
 ## 5. Defaults taken for the operator's veto
 
 | default | why | veto changes |
@@ -426,10 +457,6 @@ ms-cli 0.18.0.
 
 ## 6. Sections still to walk with the operator (after the fold verification of section 7)
 
-- 4.5 process and homes (brainstorm here; `mnemonic-secret/design/SPEC_ms_hashlock.md`
-  for the kind and verb; the composer spec fold; plans and gates per stage; one
-  implementer per stage, UC off; whole-diff review; staging pushes; releases;
-  flash at the operator's word).
 - 4.6 testing (vectors for both methods incl. `python3`/`openssl kdf`
   reproductions machine-checked; argv-guard and newline tests; refusals; the
   kind through decode/inspect/derive/verify/split/combine; Go lockstep; the
