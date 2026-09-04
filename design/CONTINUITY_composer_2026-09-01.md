@@ -1731,3 +1731,33 @@ Command to resume: /resume-composer
   (opus fidelity + sonnet tests) -> ONE opus H1 implementer in an ms worktree
   (UC off; plan re-validated: staleness check below) -> H0 implementer after
   its GREEN; flash H0 at the operator's word.
+- **H1 IMPLEMENTED on ms branch `hashlock-h1` (tip `a150ba7`, worktree
+  `ms-worktrees/hashlock-h1`), ONE opus implementer, Tasks 1-10 (Task 11 =
+  release, deliberately not run: H0 first). Controller re-ran the gates:
+  nextest 554/554, cargo test 555/0, clippy + fmt clean. Eight deviations
+  recorded in the branch's `ms-hashlock-H1-implementation-report.md`; D2 is a
+  real plan defect (encode.rs check order broke two shipped tests; moved
+  below the reserved-tag check, script moved with it), D5 a GUI-schema pin
+  the plan never mentioned (55 -> 67). Post-impl adversarial review (opus)
+  DISPATCHED against `design/agent-briefs/ms-hashlock-H1-post-impl-brief.md`
+  (ms `d9c1e36`); report lands in the MAIN ms checkout. ms master pushed
+  `4dbff0b` (four contexts, no bypass; report `c985f02`).
+- **H0 PLAN R0 ROUND 0 LANDED AND FOLDED** (fidelity opus 2C/5I/2M
+  `1b254c9`; tests sonnet 0C/1I/3M `a7aebdc`; fold `fdfb040`, gate re-run
+  green in both repos). The two Criticals were real and the gate could not
+  see either: (C-1) the NFC scan door and the typed M*1 STRING door both
+  reach `engraveCodex32` -> `EngraveSeedString` titled HASH with no guard --
+  the plan had guarded only the sealed path; (C-2) `IsPreimage` read ANY
+  string's first payload byte, so ~1/256 of legitimate shares and plain
+  BIP-93 secrets would go inert and one such share refuses a whole sealed
+  payload -- and none of the 82 ms1 fixtures in the fork has payload[0]==0x03,
+  so every gate stayed green. Fold: predicate = unshared && 33-byte payload
+  && 0x03 (id not consulted); Scan mirror narrowed; named refusal at the
+  choke point; corpus 9 -> 12 rows (sha f1f2fa6b...391c) built with
+  `codex32.NewSeed` -- a plain secret and a share beginning 0x03 (device
+  true), the shape under id `entr` (device false); a 33-byte 0x31 fixture
+  added when the `!= msPrefixEntr` mutation SURVIVED the first table; me's
+  diagnosis names the kind (`UnknownReason::PreimagePlate`). r1 sonnet fold
+  verification DISPATCHED. NEXT: H1 post-impl -> fold -> merge hashlock-h1
+  -> push ms; H0 r1 -> STATUS GREEN -> ONE opus implementer (fork branch
+  hashlock-h0 + engrave) -> post-impl -> flash at the operator's word.
