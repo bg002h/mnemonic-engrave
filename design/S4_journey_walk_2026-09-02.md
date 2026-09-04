@@ -179,3 +179,8 @@ can be repeated from the door in under a minute when a blank is on hand.
 Open question for the record: what the door's lead line read on a machine
 whose flash still carries the Load Payload journey's region (expected "A
 payload is in flash but not loaded. Load it from the carousel first.").
+
+Door lead, confirmed by the operator 2026-09-03 on bg6fb90cb: "A payload is
+in flash but not loaded. Load it from the carousel first." -- read, and
+called "that very helpful reminder". The documentation row above closes;
+§7a's lead does its job on a machine whose region is present but skipped.
