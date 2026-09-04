@@ -1679,3 +1679,26 @@ Command to resume: /resume-composer
   -> fold -> verify -> re-validate immediately before ONE opus implementer in
   an ms worktree (UC off). Both repos' records are pushed (engrave `2302b9c`,
   ms `d4d6771`); commits after them are records + the plan draft.
+- **H1 PLAN R0 ROUND 0 LANDED**: fidelity (opus) 2C/10I/9M/3N (ms `95f417c`),
+  tests (sonnet) 0C/4I/3M/1N (ms `2f4a93b`), both persisted verbatim. Both
+  Criticals sat where the gate cannot look, in fragment semantics: the three
+  new codec errors had no `From<ms_codec::Error>` arm (a `TagKindMismatch`
+  surfaced as `unhandled ms_codec::Error variant` at exit 1), and inspect's
+  rule-6 relaxation had no tag/kind check outside the `Entr` arm (a forged
+  `hash`-over-`0x00` string printed "OK: would decode"). The tests lens found
+  18/18 declared mutations caught and the gaps in DEPTH: no case-folding test,
+  9/10 corpus rows unfilled with nothing loading the file, a word-blocklist
+  "never words" check, the hex-looking-longer-phrase acceptance untested.
+  Every measurable claim re-derived by the controller. **ONE fold applied**
+  (parts A/B/C: the error arms; inspect's rule-6b check outside the arms; both
+  Cargo bumps in Task 1; the forward_compat loop; split.rs's arm; `create_new`
+  via O_EXCL; one shape predicate; `--hex` parsed by the verb with §8i and both
+  spellings; `--hashlock-phrase -` refused = a FOURTH controller default for
+  the operator; the corpus's eleven rows MEASURED (python3, two cross-checked
+  in openssl) plus a loader test that re-derives every row; the mixed-case
+  row; the structural three-line decode check; honest RED-step wording with
+  message assertions). Gate re-runs 12-13 in flight (r12: 75/75 tests, one
+  unused import at clippy; r13 after removing it). NEXT: r13 green -> fold
+  commit (gate output in the message) -> fill and commit
+  `ms-hashlock-H1-plan-R0-r1-fold-verification-brief.md` (sonnet) -> dispatch
+  -> STATUS R0 GREEN -> re-validate immediately before ONE opus implementer.
