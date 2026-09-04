@@ -1090,3 +1090,15 @@ Steps, in order:
   read the plate back = md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
   byte for byte; then Task 5 at the operator's call; then close the records
   and push (two record commits unpushed since 950f42e).
+- W-4 FOUND by the operator on the device (walk record ae9bf9c, cause
+  5ef61ae): composerDigitEntry overprints its prompt and its range/echo line
+  (per-line clamp to the band above the keyboard); all four pads. The
+  implementer is RESUMED on fork branch composer-s4d (worktree
+  wt-composer-s4d, off 6fb90cb): one vertically centred group, a rasterising
+  geometry test over the four pads failing first, emulator proof via the
+  operator's route, then capture --arm both -> composer-S4-W4-fix-report.md.
+  Briefs ready: composer-S4-W4-verification-brief.md, -merge-push-brief.md,
+  -merge-message.txt (<W4_FIX_SHA>). NEXT: persist -> controller gates ->
+  sonnet verification -> merge -> flash at the operator's word -> the
+  operator re-checks the blocks and date pads; the plate still waits for a
+  blank. The device walk otherwise continues on bg6fb90cb.
