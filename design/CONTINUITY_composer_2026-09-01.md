@@ -1553,3 +1553,64 @@ Command to resume: /resume-composer
   adversarial one -- seat a key, Back, pick a PRESET, and §8j must fire and
   clear the seats (before this build it kept them silently, on slots serving
   different paths).
+
+## RESUME POINT 2026-09-04 -- L19 LIFTED; SPEC_ms_hashlock DRAFTED; R0 round 0 (three opus lenses) IN FLIGHT
+
+State, all measured:
+- **The operator lifted L19**: "I want to pivot to the spec for ms1 string for
+  preimage backup" (2026-09-04, after W-6/W-7 shipped and `bg839fa5a` was
+  flashed). Then: "Switch to fable for coordination" -- the controller is Fable
+  from that message on; subagent tiering is unchanged (opus for spec/plan lenses
+  and whole-diff reviews, sonnet for fold verification and pushes).
+- **S4 residue, unchanged and at the operator's word**: the `bg839fa5a` boot
+  judgement on machine power; the four W-6 device checks and the W-7
+  adversarial one (seat, Back, pick a preset -> §8j fires and clears); the pad
+  re-check; the Taproot 2-of-3 plate when a blank is on hand; Task 5. Engrave
+  master pushed through `107839c` (S4 plan §4 firmware pin -> 1,582,628 /
+  62,800 at `839fa5aa`); the commits after it are records only.
+- **`mnemonic-secret/design/SPEC_ms_hashlock.md` DRAFTED at `5ba61ca`** (ms
+  master; briefs `e128be4`), fourteen sections in the house style of
+  `SPEC_ms_v0_2_kofn.md`, written by the controller from brainstorm 4.1-4.6 and
+  L1-L23. Machine-checked while writing, at `7fc1e58`: all fourteen §14
+  citations re-grepped; the four derivation values recomputed in `python3
+  hashlib` and cross-checked in `openssl kdf` (hardened X byte-identical; the
+  brainstorm's truncated sha256 pair now written in full: X
+  `c4bbcb1fbec99d65bf59d85c8cb62ee2db963f0fe106f483d9afa73bd4e39a8a`, H
+  `b867db875479bcc0287352cdaa4a1755689b8338777d0915e9acd9f6edbc96cb`); the
+  entr-32 single's shape (`ms10entrsq...`, 75 chars, first payload char `q`)
+  measured with the shipped `ms`. One brainstorm claim deliberately NOT
+  inherited: the >=9-character distance between the `entr` and `hash` id
+  codewords is marked MEASURE AT PLAN TIME. Engrave's spec-structure-check does
+  not parse `§`-style headings (0 sections), so it is not a gate for this spec;
+  it did surface two real things, both fixed before the commit (ambiguous
+  cross-document `§8i` references, now "the composer spec's §8i"; two table
+  rows with escaped pipes).
+- **IN FLIGHT: R0 round 0 = three opus lenses in parallel**, per brainstorm
+  4.5 (L17), briefs in `mnemonic-secret/design/agent-briefs/`:
+  `ms-hashlock-spec-R0-r0-{correctness,adversarial,tests}-brief.md` ->
+  `mnemonic-secret/design/agent-reports/ms-hashlock-spec-R0-r0-{correctness,adversarial,tests}.md`.
+  Each brief: one question, the machine-checked facts listed, the other two
+  lenses' scope forbidden, the report filename fixed. If a report exists on
+  resume, persist it (own commit, in mnemonic-secret); if not, re-dispatch
+  with its brief.
+
+Steps, in order:
+1. Persist each lens report as it lands (own commit each, verbatim, in
+   mnemonic-secret) -> read all three -> machine-check every measurable claim
+   -> dedupe across lenses -> bring any finding that touches a RULING to the
+   operator (rulings are theirs) -> ONE fold of the spec (own commit; re-run the
+   citation re-grep and the derivation recomputation, output in the message)
+   -> sonnet fold verification if the fold is non-trivial -> a new lens only
+   if a question remains unasked (the journey lens is assigned to the composer
+   spec fold, not this spec; enumerate before closing). Closure is lens-closure.
+2. Then the H1 plan (`mnemonic-secret/design/IMPLEMENTATION_PLAN_ms_hashlock_H1.md`)
+   with a `plan-build-gate-ms.sh` sibling of the me/md gates on the pinned
+   toolchain, its own R0 (fidelity opus + tests sonnet), re-validated
+   immediately before ONE opus implementer (UC off, a mnemonic-secret
+   worktree). The plan's build gate must MEASURE the id-codeword distance (§1).
+3. Push engrave master (sonnet, `scripts/push-via-staging.sh master`, FREEZE)
+   whenever the tree is clean and no commit is imminent; ms master has its own
+   staging ritual (four required contexts) for when the spec closes.
+4. The composer spec fold (§6c, §8, §12, §14, C25) under its own R0 with a
+   journey lens re-walking W-5 -- AFTER the ms spec closes, per 4.5's order.
+Command to resume: /resume-composer
