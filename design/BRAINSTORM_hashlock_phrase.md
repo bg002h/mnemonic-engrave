@@ -46,6 +46,8 @@ to that."
 | L12 | **`--method sha256` warns always, never refuses** (chosen over "warn always, refuse under 20" and "warn plus an acknowledgement flag"), on review C-1. | Every sha256 use prints the brainwallet line; the operator's choice stands at any length. The hardened method keeps its warning under 20 characters, with the corrected figure (section 3.4). |
 | L13 | **No `--salt` flag this cycle** (chosen over an optional operator salt), on review I-1. | The fixed salt stays; the shared-table consequence is recorded (section 3.4) and carried in the copy ("choose the phrase from a generator"); `--salt` filed as F-469. |
 | L14 | **Preimage singles carry their own id `hash`** (chosen over keeping `entr` and mitigating in copy), on review I-4. | The plate reads `ms10hash...`, not `ms10entrsq...`; readers still dispatch on the prefix byte; `RESERVED_ID_BLOCKLIST` gains `hash`. |
+| L15 | **No scrub discipline for the phrase or X on the device.** On the 4.4 draft's scrub bullet: "No. We don't need to scrub like we would for a sealed payload." | Consistent with C14 (no Sealed-Payload memory treatment for the composer's seeds); a phrase is less sensitive than a seed. The device leg adds no wiping beyond what the composer already does by construction; secret-handling is non-gating anyway (2026-08-27 ruling). |
+| L16 | **Section 4.4 (the device leg) is agreed** without the scrub bullet. "Yes." | 4.4 is the composer spec fold's input. |
 
 ## 3. Measured context (so no later section re-derives it)
 
@@ -292,8 +294,9 @@ never words; `inspect` reports the kind; `derive` and `verify` refuse it with th
 executable remedy `ms hashlock <ms1>`, **and the refusal sits on the
 `Ok((tag, payload))` arm BEFORE the shared `payload_entropy_and_language`
 helper** (review I-3: today that helper's `_ => unreachable!` would panic first);
-`combine` gains its own arm (review N-1; its `_ => unreachable!` is the fourth
-site); `encode --hex` stays entr, so `ms hashlock` is the only door into the
+`combine` gains its own FUNCTIONAL arm: a recovered preimage share set prints
+as `decode` does (review N-1; its `_ => unreachable!` is the fourth site);
+`encode --hex` stays entr, so `ms hashlock` is the only door that CREATES the
 kind; the codec supports shares of the kind and a test pins it (CLI source
 deferred, F-468).
 
@@ -332,8 +335,13 @@ ms-cli 0.18.0.
   `grep -rn '_ => unreachable' crates/ms-cli/src` = 4) absorb the new variant
   silently and panic at runtime, and `verify.rs:99` / `derive.rs:434` reach
   the last one before any refusal could run. The H1 plan carries the four as
-  an explicit checklist, each converted to a typed refusal with one test per
-  site.
+  an explicit checklist with one test per site, split by what the verb is FOR
+  (r1 verification, new finding 1): verbs that READ a secret print a preimage
+  as a preimage -- `decode.rs:107`/`:112` gain a `Payload::Preimage` arm that
+  prints kind, hex and digest, and `combine.rs:166` gains the same for a
+  recovered preimage share set -- while the verbs that need a SEED refuse:
+  `payload_lang.rs:61`, reached only from `verify` and `derive`, becomes the
+  typed refusal with the `ms hashlock <ms1>` remedy.
 - **Derivation lives in the codec.** `ms_codec::hashlock`: `preimage_hardened`,
   `preimage_sha256`, `digest`, with the salt and iteration count as named
   constants. The kind and its derivation share one corpus and one SHA pin, and
@@ -367,6 +375,37 @@ ms-cli 0.18.0.
   `errMSBadPrefix`, both traced by the review), so the failure is a refusal
   and never a seed.
 
+### 4.4 The device leg (F-466; L7 digest only; L15 no scrub; L16: "Yes")
+
+- **Entry point.** `Which hash?` gains one row, `Type a hashlock phrase`,
+  placed before `Type 64 hex`; the payload rows stay first. With no `hash:`
+  record loaded, the screen's lead line names the host route: "No hash record
+  in the payload. ms hashlock on the host makes one." (F-465's hint; ASCII,
+  within the modal-fits assertion.)
+- **Phrase screen.** The existing four-page printable-ASCII keyboard with
+  reveal toggle and counter, titled `Hashlock phrase`, counter `n/100`
+  against the dedicated `HASHLOCK_PHRASE_MAX_CHARS`. OK applies the host's
+  rule byte for byte: non-empty, ASCII only, at most 100, and the 64-hex
+  refusal naming the `Type 64 hex` row. Back returns to `Which hash?`.
+- **Method pick.** A two-row pick after the phrase: `Hardened (about 10 s)`
+  and `SHA-256`. SHA-256 shows the brainwallet modal before deriving; Hardened
+  under 20 characters shows the 72-days modal. Both confirm-to-proceed, never
+  refusals (L12).
+- **Derivation.** Hardened runs PBKDF2 on the countdown screen the sealed
+  payload already uses (`gui/unlock_kdf.go:221-236`: "Unlocking. About N
+  seconds left.", driven by the measured rate; retitled). SHA-256 is instant.
+- **Confirm modal.** `hash  first8..last8`, the §8i line, the F-132 line, and
+  the section 3.7 lines. CONTINUE sets the path's hash; Back discards. The
+  digest shown must equal the host's for the same phrase and method: the
+  lockstep vector.
+- **No scrub discipline** for the phrase or X beyond what the composer already
+  does by construction (L15).
+- **Payload preimage strings.** An ms1 of kind `0x03` in a payload classifies
+  as a new secret class that reaches no screen; seed entry refuses it by name
+  instead of failing at decode.
+- **Cost.** SHA-256 and PBKDF2 are already linked; the keyboard exists. A
+  small firmware delta, measured at the gate.
+
 ## 5. Defaults taken for the operator's veto
 
 | default | why | veto changes |
@@ -387,8 +426,6 @@ ms-cli 0.18.0.
 
 ## 6. Sections still to walk with the operator (after the fold verification of section 7)
 
-- 4.4 the device leg (rows, copy, the 10 s wait, scrub, the payload-ms1 class,
-  §14 narrowing, firmware delta).
 - 4.5 process and homes (brainstorm here; `mnemonic-secret/design/SPEC_ms_hashlock.md`
   for the kind and verb; the composer spec fold; plans and gates per stage; one
   implementer per stage, UC off; whole-diff review; staging pushes; releases;
@@ -416,8 +453,8 @@ benchmarks and the ratio arithmetic reproduces.
 | C-1 shared floor; sha256 is 124,060x cheaper to grind; the W-5 example is the brainwallet key | RULED L12: sha256 warns always, never refuses; hardened keeps the 20-character warning; copy names the rate and the generator (4.2, 5) |
 | I-1 "years per GPU" wrong (72 days); fixed salt makes the grind a shared table | number corrected (3.4); RULED L13: no `--salt` this cycle, consequence recorded and in copy; F-469 |
 | I-2 wrong-length `0x03` has no refusal path; obvious code panics | explicit length check before construction, `PreimageLengthMismatch`, `try_from`, rows 16/32/34/46 (4.3) |
-| I-3 `non_exhaustive` hides four `unreachable!` sites; verify/combine panic first | the four sites are an H1 checklist with typed refusals and one test each; refusal placed on the `Ok` arm; MIGRATION tells downstreams to sweep (4.2, 4.3) |
-| I-4 75-character/`entr`/`q` collision with a seed plate | RULED L14: id `hash` for preimage singles; "length no longer implies kind" stated in MIGRATION/spec/manual (4.3) |
+| I-3 `non_exhaustive` hides four `unreachable!` sites; verify/combine panic first | the four sites are an H1 checklist with one test each: functional arms in `decode` and `combine` (a preimage prints as a preimage), a typed refusal in `payload_lang` behind `verify`/`derive`, placed on the `Ok` arm; MIGRATION tells downstreams to sweep (4.2, 4.3; the r1 verification caught the first fold saying "refusal" for all four) |
+| I-4 75-character/`entr`/`q` collision with a seed plate | RULED L14: id `hash` for preimage singles; "length no longer implies kind" stated here for MIGRATION (4.3); the ms spec and the manual chapter carry it when H3 writes them (r1: PARTIAL against the first fold's wording, which claimed all three) |
 | I-5 H public at the first wsh spend of any path; a spent X is a phrase oracle | 3.7 extended to four consequences; card and modal copy (5) |
 | I-6 64 hex pasted into the phrase slot derives a different X silently | refusal naming `--hex`, host and device (4.2, 5) |
 | M-1 `[u8; 32]` unscrubbable under the caller-wrap contract | `Zeroizing<[u8; 32]>` (4.3); secret-handling class, taken anyway |
@@ -433,8 +470,13 @@ benchmarks and the ratio arithmetic reproduces.
 | reviewer question 2 (floor in bits + generator) | taken: the copy names the generator; the count stays in characters because that is what the device counts (5) |
 | reviewer question 5 (device 64-hex check) | taken: both sides (4.2) |
 
-Lenses run on this record: cryptography + Bitcoin programmer (opus). Not yet
-run: fold verification (sonnet, on this fold); the journey lens belongs to the
+Lenses run on this record: cryptography + Bitcoin programmer (opus, r0);
+fold verification (sonnet, r1: `hashlock-brainstorm-R0-r1-fold-verification.md`,
+persisted 95e7423 -- FIXED 16 / PARTIAL 1 / NOT 0, every recomputed number
+matched, one new Important: the first fold said all four `unreachable!` sites
+become refusals while 4.2 says `decode` prints a preimage; folded above). The
+r1 fold is wording only, so no r2 round (proportional re-review rule). The
+brainstorm's R0 closes under lens-closure; the journey lens belongs to the
 spec, which will carry the walks.
 
 ## 8. Follow-ups filed from this brainstorm
