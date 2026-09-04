@@ -212,3 +212,8 @@ lesson, again). Fix on fork branch `composer-s4d` (brief
 centred group inside the band, never clamped line by line; a rasterising
 geometry test over all four pads, empty and filled, asserts no two text
 rectangles intersect and fails on `6fb90cb`.
+
+Filled state, operator 2026-09-03: typing does produce the echo, partially
+visible, but the overlap with the prompt remains -- so both the empty and the
+filled pad overprint, which is what the fix brief's test asserts for every
+pad in both states.
