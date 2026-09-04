@@ -1420,3 +1420,50 @@ Command to resume: /resume-composer
   the operator's word.
 - Steps unchanged from the resume point above, except that step 1's merge waits
   on ROUND 2 being 0C/0I, and the merge brief now points at tip `818220d8`.
+
+- **VERIFICATION ROUND 2 (opus) ALSO SAID DO NOT MERGE: 0C/2I/2M/1N** (report
+  persisted `da1f812`). C-1, I-1 and M-1 all FIXED, and the signature's root
+  cause closed STRUCTURALLY (the reviewer: 0 equal-signature renumbering pairs
+  over 4,828 composable lists; 0 over 28,948 preset x hand-built pairs). But
+  both Importants were inside the fold's own new `composerEditCanRenumber` --
+  **the defect class had moved into the remedy.** It cleared the HASH in both
+  variants while varying only the lock, so it answered a question about a path
+  it had already changed: I-2, on a key-less path both variants collapse to the
+  same refused shape, so the hash arm asked nothing and the new
+  `composerApplyShapeEdit` wrapper discarded EVERY SEAT with no §8j and no
+  chance to decline (a regression against `05466727`); I-3, on a tr path
+  carrying a hash no lock can affect `isBareSingle`, so §8j fired, cleared
+  nothing, and declining left the lock uneditable. Measured over 14,092 pairs:
+  1,200 false negatives, 288 false positives.
+- **FOLDED at fork `177b4906`** (records `8553ce3`): the probe varies ONLY the
+  field its arm edits (`composerFieldLock`/`composerFieldHash`) and each arm
+  passes its own. The reviewer's census is COMMITTED as
+  `TestComposerEditCanRenumberIsExactOverEveryReachableShape` -- 3,708
+  (list, path, field) cases with an oracle independent of the probe (it sweeps
+  the values each SCREEN produces rather than comparing two points): 0/0 on the
+  fix, 156 false negatives / 288 false positives on the probe it replaced (the
+  288 match the reviewer's count exactly). The call-site wiring, which the
+  census cannot see, is pinned by
+  `TestComposerHashEditOnAKeylessPathAsksBeforeItDiscards`; both field-swap
+  mutations are caught. M-2/M-3 comment corrections;
+  `composerMoveUp`'s premise re-measured (`w1/1,1,|0.0/1.0/` before and after a
+  swap, so its unconditional discard is still load-bearing). N-1 filed as F-471.
+  Spec §7d refined again (the probe varies that field alone; a refused shape has
+  no mapping and an edit into or out of one counts as a move).
+- Gate on `177b4906` (`.tmp/s4e-gate3.log`): gofmt cmd/ clean, vet = the two
+  pre-existing lines, `go test ./...` 0 FAIL, **shards 1201**, 32-bit exit 0
+  both, `go build ./cmd/...` 0, firmware **1,582,628 / 62,800 = +1,424 B flash
+  / +0 RAM over 70008da**.
+- **IN FLIGHT: verification round 3 (SONNET, targeted)**, brief
+  `design/agent-briefs/composer-S4-W6-fold-r2-verification-brief.md` ->
+  `design/agent-reports/composer-S4-W6-fold-r2-verification.md`. Sonnet and not
+  opus because what is left is mechanical false-PASS hunting: the controller
+  wrote both the probe and its census test, so the decisive experiment is
+  running that test against round 2's probe restored in a copy -- it must FAIL
+  there. A clean round CLOSES this loop (do not keep looping for reassurance);
+  then merge with `composer-S4-W6-merge-push-brief.md` (tip `177b4906`).
+- Round tally, for the record: r1 opus 1C (introduced by the W-6 fix), r2 opus
+  2I (introduced by r1's fold), r3 sonnet pending. Each round found the defect
+  class one level inside the previous remedy. That is the argument for the
+  committed census test: it turns "is the probe exact?" from a review question
+  into a command.
