@@ -1614,3 +1614,48 @@ Steps, in order:
 4. The composer spec fold (§6c, §8, §12, §14, C25) under its own R0 with a
    journey lens re-walking W-5 -- AFTER the ms spec closes, per 4.5's order.
 Command to resume: /resume-composer
+- **R0 round 0 LANDED and FOLDED (2026-09-04).** Three opus lenses on
+  `SPEC_ms_hashlock.md`: tests 1C/11I/11M/4N (`d02185e`), correctness
+  1C/7I/6M/2N (`e6ef0a0`), adversarial 4C/4I/5M/1N (`4c59d8e`) -- all in
+  mnemonic-secret. Every measurable claim re-derived by the controller before
+  the fold (the fold commit lists the sites). The six Criticals, one line each:
+  the single-string accept set never admitted `hash`, so no preimage plate was
+  readable; `is_ms1_shaped` does not case-fold, so an UPPERCASE plate string
+  passed the phrase channel; `--random --json | jq` lost the only copy of X at
+  exit 0; `--out` truncates, so a second `--random` clobbered an irreproducible
+  preimage; **the flashed SH2 CUTS a preimage plate as a seed** (`isStrictMs1`
+  has no prefix test; `unlockEngraveCodex32` never calls `DecodeMS1`) and `me`
+  will classify one as a secret seed record on the ms-codec bump -- the
+  brainstorm's "older readers refuse" premise is measured false; `--hex`
+  accepts a seed's entropy as X with no warning able to fire. ONE fold at ms
+  `1a14a4d` (message = the machine-check record).
+- **r1 fold verification (sonnet) GREEN** (ms `afb5714`): 28/28 C+I fixed in
+  the text, three spot-checks reproduced, no new contradiction; its one Nit
+  (N-2 wording) folded inline with the STATUS line at ms `d4d6771`.
+  **SPEC_ms_hashlock R0 GREEN under lens-closure** (correctness, adversarial
+  with journeys, tests/vectors, fold-verification; the journey lens belongs to
+  the composer spec fold per 4.5).
+- **THREE CONTROLLER DEFAULTS AWAIT THE OPERATOR** (rulings are theirs; each
+  is labelled in the spec): (1) §1 rule 2 -- a single whose id and prefix
+  disagree is REFUSED (`TagKindMismatch`) rather than dispatched on the
+  prefix; (2) §4.1 -- `--random` requires `--out FILE`; `--json` alone no
+  longer satisfies the gate (narrows L21); (3) §9 -- **H0**: the fork's
+  `isStrictMs1` prefix test (flashed) and `me`'s classifier guard ship BEFORE
+  ms-cli 0.18.0 is released (reorders 4.5). A veto folds the section back and
+  re-verifies.
+- Also measured, unrelated to a ruling: `me sysw pack --in -` is NOT a stdin
+  sentinel (exit 2); the no-argument form reads stdin (exit 0) -- the spec had
+  it wrong three times. A stray empty `-` directory (Aug 26) was removed from
+  the engrave checkout. Process slip, corrected: the first draft of THIS entry
+  was appended to mnemonic-secret's hand-off COPY of the continuity file
+  (shell cwd) and reverted there (ms `53f6fd0`); this file is authoritative.
+- ms master has ~12 unpushed design-only commits (spec, briefs, reports, the
+  revert) -- push via the ms hand ritual (four required contexts) when the H1
+  plan's first commit is not imminent; engrave master unpushed since
+  `107839c`.
+- NEXT: the H1 plan, `mnemonic-secret/design/IMPLEMENTATION_PLAN_ms_hashlock_H1.md`
+  + `scripts/plan-build-gate-ms.sh` (measures §1's codeword distance), own
+  R0 (fidelity opus + tests sonnet, mutation beside every test), re-validated
+  immediately before ONE opus implementer (UC off, an ms worktree). H0's fork
+  and `me` guards are their own small plans in their own repos and must SHIP
+  before 0.18.0.
