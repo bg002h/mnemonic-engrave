@@ -155,3 +155,27 @@ operator's word; then ONE plate whose string must read
 (Operator note recorded as observed, not as a divergence: a ChoiceScreen's
 lead is drawn in the band at the BOTTOM of the panel, under the rows.)
 The walk resumes at step 3.
+
+## Part A walked to the cut on bg6fb90cb — 2026-09-03, WITH the operator (Taproot 2-of-3, key-less)
+
+| step | in hand | device did | divergence | class |
+| --- | --- | --- | --- | --- |
+| boot | the payload offer | SKIP taken | none | -- |
+| carousel | Wallet Policy, 8th entry | entered | none | -- |
+| door | title Wallet Policy; rows Scan cards, Build a new policy | Build taken | the operator reported the rows and not the lead line (see below) | documentation |
+| script | Which script? | Taproot (tr) | none | -- |
+| preset | Start from? | Build my own paths already selected; confirmed | none (W-1 holds) | -- |
+| shape | Add a spend path -> Keys -> 3 -> 2 -> Done -> Sorted (usual) | as the plan's keyless arm | none (W-2 holds: 3 and 2 taken by tap) | -- |
+| Template | `Template-ID: e0863d3ccac31a64d3b5e14b85ccd6c0`, `mk1 stub (template): e0863d3c` | equals the host's `md inspect` (plan §2) | none (W-3 holds: all 32 digits read) | -- |
+| seat / review / §8l / modal | Engrave a key-less template; Review paged; hold; "No slot is seated..." | as the plan | none | -- |
+| census | `1 plate (key-less wallet policy)` | as the plan | none | -- |
+| variant | Choose engraving | TEXT + QR confirmed | none | -- |
+| cut | hold to start | NOT CUT: no blank plate available | -- | deferred |
+
+The device, the emulator and the host now agree on the Template screen for
+this shape (`e0863d3c...`); the plate itself (`md1fkzyyqq...h5wvl3`, 56
+chars) waits for a blank. Nothing on the device holds state for it: the walk
+can be repeated from the door in under a minute when a blank is on hand.
+Open question for the record: what the door's lead line read on a machine
+whose flash still carries the Load Payload journey's region (expected "A
+payload is in flash but not loaded. Load it from the carousel first.").
