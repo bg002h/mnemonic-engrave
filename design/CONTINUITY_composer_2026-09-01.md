@@ -1071,3 +1071,13 @@ Steps, in order:
    STATUS -> continuity -> push. Then the residue: F-454 (me 0.8.1), F-455,
    F-457, F-459, F-462/F-463/F-464 (post-S4 polish), the operator's three S3
    defaults (implemented; a different choice is a change request).
+- FLASHED 2026-09-03 at the operator's word (device in BOOTSEL, picotool saw
+  RP2350 with the previous image's signature verified): sh2-flash -y built
+  fork main 6fb90cb, signed it (seedhammerii-v0.0.0-bg6fb90cb.signed.uf2,
+  sha256 dc5fd3cf59839209d222acc7e7420f5ecd8fe2181a2c94190b48034a01087887),
+  picotool load --verify 100%, reboot issued (log .tmp/sh2-flash-6fb90cb.log).
+  Boot judgement on MACHINE power is the operator's; expected version line
+  `bg6fb90cb (UNLOCKED)`. Device checks before the walk: W-1 (Start from? row
+  0 = Build my own paths), W-2 (a tap on 3 in "how many keys?" selects it),
+  W-3 (the Template screen shows all 32 hex digits). Then the walk from
+  "Add a spend path" (Taproot 2-of-3), the door's Lead read first.
