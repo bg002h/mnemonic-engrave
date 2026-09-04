@@ -143,3 +143,15 @@ walk with the operator resumes at "Add a spend path" on the Taproot 2-of-3
 shape once fork main (`1ae0ffcb` or later: W-2 + W-3) is flashed at the
 operator's word; then ONE plate whose string must read
 `md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3` byte for byte.
+
+## Device confirmation 2026-09-03 — bg6fb90cb boots; W-1, W-2, W-3 confirmed on hardware by the operator
+
+| fix | the operator saw |
+| --- | --- |
+| W-1 | "Build my own paths" is item 1 on the screen titled "New policy" whose lead "Start from?" sits at the bottom |
+| W-2 | the threshold screen offers 1, 2, 3 after tapping 3 on "how many keys?" |
+| W-3 | the Template screen shows all 32 hex digits of the Template-ID |
+
+(Operator note recorded as observed, not as a divergence: a ChoiceScreen's
+lead is drawn in the band at the BOTTOM of the panel, under the rows.)
+The walk resumes at step 3.
