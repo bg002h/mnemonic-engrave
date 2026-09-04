@@ -1249,3 +1249,15 @@ Steps, in order:
 3. Push engrave master (sonnet push agent, ci/staging, FREEZE) whenever the
    tree is clean and no commit is imminent.
 Command to resume: /resume-composer
+- 2026-09-03 (after): L18 review LANDED (opus security-software lens,
+  4C/6I/7M/3N, persisted e9d7895; every measurable claim reproduced by the
+  controller); rulings in response L20 (`--in` = the ms1; two phrase
+  channels; ms1-shaped phrases refused), L21 (`--random` requires `--out` or
+  `--json`), L22 (`me`'s classifier first as a new stage H1b; `DecodeMS1`
+  unchanged with a separate preimage decoder; no new class); fold c20ec9e
+  (checks in its message); r3 sonnet fold verification DISPATCHED (brief
+  f292f83) -> `hashlock-brainstorm-R0-r3-fold-verification.md`. **The
+  operator RULED 4.6 stands ("Yes, 4.6 stands") = L23; NOT yet written into
+  the record because the verifier is reading it -- write L23 and flip 4.6's
+  header from PRESENTED to agreed as soon as the r3 report is persisted.**
+  Then fold any r3 finding, commit, push, and STOP (L19).
