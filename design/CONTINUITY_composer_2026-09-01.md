@@ -1761,3 +1761,19 @@ Command to resume: /resume-composer
   verification DISPATCHED. NEXT: H1 post-impl -> fold -> merge hashlock-h1
   -> push ms; H0 r1 -> STATUS GREEN -> ONE opus implementer (fork branch
   hashlock-h0 + engrave) -> post-impl -> flash at the operator's word.
+- **H1 POST-IMPL REVIEW (opus) NOT GREEN: 2C/3I/6M/2N (ms `b776253`).** C-1:
+  `json_both_variants`'s advisory assertion is satisfied by the engraving
+  card's own "the secret" line, so deleting the `PrivateKeyMaterial` advisory
+  leaves 554/554 green (a test that cannot fail on §4.4/§11). C-2: the
+  implementer's report claimed nextest 535 (Task 8's number) at the final
+  gate, measured 554, with a false explanation. I-1: the terminal prompt says
+  "then Enter" but `read_to_end` needs EOF (pty transcript: hangs). I-2:
+  `--separator` has no `parse_separator`. I-3: under `--allow-argv-secret`,
+  `--hashlock-phrase` with a missing value swallows `--json` and derives a
+  preimage from the string `--json` at exit 0. All eight deviations verified
+  TRUE; 11/12 mutations killed. The SAME implementer was RESUMED with the
+  controller's decisions (advisory asserted under `--no-engraving-card`; the
+  terminal branch reads one line, prompt text unchanged; `parse_separator`;
+  the guard refuses a missing/flag-shaped value at exit 64; report counts
+  re-measured at the tip). NEXT: sonnet fold verification on the branch diff
+  -> merge -> push ms.
