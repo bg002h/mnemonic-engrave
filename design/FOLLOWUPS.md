@@ -15582,3 +15582,22 @@ Filed 2026-09-03 from the hashlock-phrase brainstorm (section 3.3). Measured: `c
 Filed 2026-09-03 from the hashlock-phrase brainstorm's R0 review (I-1, `agent-reports/hashlock-brainstorm-R0-r0-crypto-bitcoin-expert.md`). Measured: hashcat v6.2.6 PBKDF2-HMAC-SHA256 8,865.7 kH/s at 999 iterations on one RTX 4090 = 8.9e4 guesses/s at 100,000; `2**32 / 8.86e4 = 48,470 s`. A targeted attacker pays the same per target either way; the flag defeats only the shared table. RFC 8018 section 4.1 names precomputation as the salt's purpose. The record carries the consequence in its copy ("choose the phrase from a generator"). If taken up: `--salt <ASCII>` on `ms hashlock`, printed verbatim on the method line and in `--json`, refused on the device unless the device's phrase screen gains a second field; vectors for a non-default salt. Companion entry in mnemonic-secret `design/FOLLOWUPS.md` when H1 opens.
 
 F-467 addendum (review Q3(c)/Q7, 2026-09-03): BIP-174 bounds no preimage length in `PSBT_IN_SHA256`, so the journey's 40-byte "preimage" rides a well-formed PSBT and fails only at `OP_EQUALVERIFY`; rust-miniscript's `Preimage32 = [u8; 32]` cannot even express the wrong satisfaction. The transcript would have printed success right up to broadcast.
+
+### F-470 — `composer-preset-replaces-hand-built-paths-unasked`: on the Back leg's second pass through "Start from?", choosing a preset replaces the operator's own path list with no confirm when no slot is seated (owning phase: **post-S4 polish; an operator ruling, not a defect**) `#composer` `#seedhammer` `#ux`
+
+Found while fixing W-6 (2026-09-04). Back at the path list now returns to
+"Start from?" (spec §7b), so a preset row is reachable with paths already
+built. The blank row keeps them; a preset row REPLACES them, which is what
+"Start from?" means and what the row's name says. §8j fires only when a slot
+is ASSIGNED (`composerShapeGuard` → `composerAnySlotAssigned`), so a hand-built
+shape with nothing seated is replaced silently and the old list cannot be
+recovered — Back from the new list returns to "Start from?", whose blank row
+now keeps the NEW list.
+
+NOT fixed in `composer-s4e`, deliberately: the funds-safety half (carried
+seats) is guarded, the operator tapped a named archetype on a screen that says
+"Start from?", and a confirm here needs new §8 copy and its own spec line
+rather than being invented in a fix branch. The question for the operator is
+whether replacing N hand-built paths deserves a confirm of its own, or whether
+the row's name is the warning. If it earns one, it is one `composerConfirmScreen`
+call and a §8 copy row.

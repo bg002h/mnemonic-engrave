@@ -259,10 +259,92 @@ from' screen."
 | Build a new policy -> script (tr/wsh) -> `Start from?` -> any row -> ... -> Back | a chosen start (blank or a preset) | Back lands on the script choice, not on `Start from?` | W-1's fold (`composer-s4` bc9dd63) made Back FROM `Start from?` return to the script choice deliberately; Back from the NEXT screen apparently skips `Start from?` too | to classify (DEFAULT vs defect): a screen the operator cannot return to is the [[can-a-user-do-the-thing]] class if the only way to change the start is to discard the policy |
 | ... -> script choice -> pick tr or wsh again | the same policy state | `Start from?` is NOT shown; the flow continues past it | the start choice persists in the composer state and the picker is not re-offered on re-entry | to classify: if the operator wanted a different preset they now cannot reach it without Back-to-discard |
 
-Controller note (fable, low budget; not yet measured on the emulator): the
-likely site is the shape flow's re-entry after W-1 (`gui/composer_shape.go`,
-the wrapper -> preset-or-blank -> paths sequence; spec §7b). NOT measured, NOT
-fixed. Next: reproduce on the emulator with the shipped driver (a tap on Back
-from the paths list, then the script row again), classify per the method, and
-if it is a change, batch it on a fork branch `composer-s4e` with a test that
-fails first, sonnet-verified, merged, flashed at the operator's word.
+**CLASS: W-6 CHANGE (Important: a shipped screen becomes unreachable, and Back
+skips a step it should return to).**
+
+MEASURED 2026-09-04 on fork main `70008da` by a flow-level walk that drives the
+real `composerFlow` (`gui/composer_backleg_test.go`), both halves reproduced:
+
+| step | frame drawn |
+| --- | --- |
+| forward: script -> `Start from?` | `"Startfrom?Buildmyownpathsplain-multisig...decaying-multisig"` |
+| forward: pick a preset -> paths | `"Spendpathsslots:3Path1:2-of-3AddaspendpathChangethescriptDone"` |
+| **Back at the path list** | `"Whichscript?Taproot(tr)Segwit(wsh)Nested(sh-wsh)Legacy(sh)"` |
+| **pick a script again** | `"Spendpathsslots:3Path1:2-of-3Addaspendpath..."` -- `Start from?` never drew |
+
+Cause, read from the code and confirmed by the walk: the site is NOT
+`gui/composer_shape.go` (the earlier controller note's guess) but
+`gui/composer_flow.go`'s Back leg out of `composerShapeFlow`, which ran
+`composerWrapperPick` ALONE and then `continue`d straight into the path list.
+The preset picker sits in the ENTRY loop only, so it was passed exactly once
+per composition, in one direction. The shipped test
+`TestComposerBackAtThePathListKeepsTheComposition` had encoded that as
+intended, in a comment: "The re-pick after the Back below does NOT pass
+through it, which is why this step appears once."
+
+Why it earns a change rather than a documentation line: the six archetypes S0b
+shipped (a whole Rust-first cycle, F-453) are reachable only on that one
+screen, and the operator's only route back to it was to discard the whole
+composition -- the [[can-a-user-do-the-thing]] class, and the exact inverse of
+W-1, where Back meant forward. Spec §7b states Back's rule for the preset
+screen and is SILENT about Back at the path list, which is why no gate caught
+it: nothing was wrong in a section, a step was merely unreachable.
+
+FIXED on fork branch `composer-s4e` (`05466727`, on `70008da`): `composerStartStep` walks §7b's opening
+pair and IS the Back leg, entered at the preset screen. Back is now the
+inverse of the way in -- paths -> `Start from?` -> script -- and a script
+picked on the way out walks forward through `Start from?` again. The blank row
+("Build my own paths") KEEPS the current paths on re-entry rather than
+blanking them: it is the default row of a screen the operator reaches by
+pressing Back, and blanking there would have been a new data-loss trap of my
+own making (mutation-tested: making it blank the list fails the test that says
+so).
+
+## W-7 -- the Back leg changed the wrapper with seats held, unguarded (found 2026-09-04 while measuring W-6)
+
+| step | in hand | device did | divergence | class |
+| --- | --- | --- | --- | --- |
+| ... seat @0 and @1, leave @2 -> §8p -> "Back to the paths" -> **Back** -> pick a different script | a policy with two slots seated | the wrapper changed with NO §8j confirm, and both seats were CARRIED into the new numbering | the path list's own "Change the script" row asks §8j and discards; the Back leg one function away did neither | **W-7 CHANGE (Critical: an unmet guarantee, §7d/§8j; keys seated into slots they were never chosen for)** |
+
+MEASURED on fork main `70008da`, walked from a keyed payload:
+
+- Reachability: §8p's "What now?" offers "Back to the paths", which lands on
+  the path list with every seat still held. Back there, then a script, and the
+  edit is accepted with no confirm -- the frames after the change are the path
+  list, never `"EDITINGTHESHAPECLEARSTHEKEYS"`.
+- The seats survive it. The stub screen after the change reads
+  `"Slot@0:73c5da0am/48h/0h/0h/2h Slot@1:73c5da0am/48h/0h/1h/2h Slot@2expectsakeyat..."`.
+- And the numbering PERMUTES. `md.Composed.Slots()` for the shape
+  [Path 1: 2-of-2, Path 2: a single key], measured:
+  `wsh -> [{@0 path0 ord0} {@1 path0 ord1} {@2 path1 ord0}]`,
+  `tr  -> [{@0 path1 ord0} {@1 path0 ord0} {@2 path0 ord1}]`.
+  Same slot COUNT (3), so `composerSizeAssignments` left `st.assigned`
+  untouched -- and the key the operator seated as "Path 1 key 1 of 2" became
+  slot @0, which under tr is Path 2's sole spending key.
+
+Nothing on any screen says so: `composerMappingLines` prints a slot's index and
+origin, never its path, so the mapping review after the change shows the same
+two lines it showed before. This is the failure `gui/key_card_seating.go:24-27`
+refuses to allow anywhere on this device -- "a misassignment does not fail, it
+derives a different wallet's address and shows it to the operator as proof."
+
+Spec §7d states the rule the leg broke, verbatim: "Any change that moves slot
+NUMBERING (the wrapper, the path count, or a path's key count) after at least
+one slot has been assigned discards ALL assignments; the operator is told so
+before the edit is accepted (§8j)." The rule was met by the path list's
+"Change the script" row (`gui/composer_gates_test.go` walks it) and unmet by
+the Back leg, which assigned `st.list.Wrapper` directly -- bypassing both
+`composerShapeGuard` and `composerApplyShapeEdit`.
+
+FIXED with W-6, in the same commit (`05466727`) and the same `composerStartStep`: the choice is applied through
+`composerApplyShapeEdit`, and §8j is asked first whenever the shape signature
+would move. The confirm is asked AFTER the choice and BEFORE it is accepted --
+§7d's own wording -- rather than on entry as the path-list row asks it,
+because an operator on this leg is usually navigating, and re-picking the same
+script with the blank row moves no slot at all.
+
+Both fixes carry failing-first tests in `gui/composer_backleg_test.go`, and
+four mutations of the fix were each caught by their own named assertion:
+dropping §8j, blanking the list on the blank row, running the wrapper picker
+alone (the shipped defect), and assigning the list without
+`composerApplyShapeEdit`.

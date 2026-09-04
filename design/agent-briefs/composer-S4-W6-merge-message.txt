@@ -1,0 +1,33 @@
+Merge composer-s4e: S4 walk W-6/W-7 -- Back returns to "Start from?", and the wrapper change it makes is guarded (composer S4)
+
+Fifth and sixth fixes from the S4 journey walk (mnemonic-engrave
+design/S4_journey_walk_2026-09-02.md).
+
+W-6, reported by the operator on the device: composerFlow's Back leg out of
+the path list ran composerWrapperPick ALONE, so "Start from?" was passed once
+per composition and in one direction -- Back landed two screens away on the
+script choice, re-picking a script skipped the preset screen, and the six
+archetypes S0b shipped were unreachable without discarding the whole policy.
+Back is now the inverse of the way in: paths -> "Start from?" -> script, and
+a script picked on the way out walks forward through "Start from?" again. On
+that second pass the blank row keeps the operator's paths.
+
+W-7, found while measuring W-6 and the reason this is not a UX commit: the
+same leg assigned st.list.Wrapper DIRECTLY, bypassing composerShapeGuard
+(§8j's confirm) and composerApplyShapeEdit (the discard). §5 numbers slots by
+first appearance and tr extracts an internal key that wsh does not, so the
+same shape's slots permute at an UNCHANGED slot count -- measured on
+[2-of-2, single key]: wsh @0 serves path 1, tr @0 serves path 2 -- and
+composerSizeAssignments therefore kept every seat. A key seated as "Path 1
+key 1 of 2" became Path 2's sole spending key, and no screen names a slot's
+path after seating. Both are now routed through composerStartStep, which asks
+§8j whenever the shape signature would move and applies the edit through
+composerApplyShapeEdit.
+
+Failing-first tests in gui/composer_backleg_test.go; four mutations of the fix
+each caught by their own named assertion. Spec §7b folded with the Back rule
+(it was silent, which is why no gate caught this). Independent verification:
+design/agent-reports/composer-S4-W6-verification.md.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
