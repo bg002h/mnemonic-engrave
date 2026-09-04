@@ -15601,3 +15601,21 @@ rather than being invented in a fix branch. The question for the operator is
 whether replacing N hand-built paths deserves a confirm of its own, or whether
 the row's name is the warning. If it earns one, it is one `composerConfirmScreen`
 call and a §8 copy row.
+
+### F-471 — `composer-size-assignments-does-not-release-used-sources`: `composerSizeAssignments` rebuilds `st.assigned` without clearing `st.sources[i].used`, so a resize with seats held would take those sources out of every later pick list while nothing holds them (owning phase: **post-S4 hardening; unreachable today**) `#composer` `#seedhammer`
+
+Found by the S4 W-6 fold verification round 2 (N-1,
+`agent-reports/composer-S4-W6-fold-verification.md`). `composerDiscardAssignments`
+releases both halves — the assignment and the source flag — and that release is
+the half whose absence produced review r0's C-1 (an operator left with two
+`key:` records being offered only "Type a seed" and "Leave unseated").
+`composerSizeAssignments` rebuilds the slice without it.
+
+UNREACHABLE TODAY, and the reviewer established that by enumerating every
+production write to `st.list`: no route changes the slot count outside
+`composerApplyShapeEdit` (which calls `composerDiscardAssignments` first) or
+`composerMoveUp` (which discards unconditionally and keeps the path count). So
+this is hardening against a future writer, not a defect — recorded rather than
+fixed inside a merge that has already taken two review rounds on funds-relevant
+code. If taken up: release the flags in `composerSizeAssignments` too, with a
+test that seats a source, resizes, and asserts the source is offered again.

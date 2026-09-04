@@ -402,3 +402,48 @@ exit is now pinned by a test.
 **The lesson, recorded:** W-7 and C-1 are the same mistake one level apart. A
 GUI that restates a codec's rule will drift from it, and the drift shows up as
 keys seated onto the wrong paths. Ask the codec.
+
+### Round 2: the fold's own new probe was wrong in both directions
+
+`design/agent-reports/composer-S4-W6-fold-verification.md` (opus, 0C/2I/2M/1N)
+found C-1, I-1 and M-1 all FIXED, and the root cause closed structurally — 0
+equal-signature renumbering pairs over 4,828 composable lists, 0 over 28,948
+preset × hand-built pairs. Both Importants were in the one function the fold
+added, and the class had moved *inside my own fix*: `composerEditCanRenumber`
+cleared the HASH in both of its variants while varying only the lock, so it
+answered a question about a path it had already changed.
+
+- **I-2:** on a key-less path both variants collapse to the same refused
+  empty-path shape, so the probe said "no move", the hash arm asked nothing —
+  and the `composerApplyShapeEdit` wrapper the fold had just added then
+  discarded **every seat with no §8j and no chance to decline**. A regression
+  against `05466727`, where the same walk kept both seats.
+- **I-3:** on a tr path carrying a hash no lock can affect `isBareSingle`, yet
+  §8j drew "Every key you seated will be cleared", cleared nothing, and
+  declining it left the lock uneditable — verbatim the failure the function's
+  own comment says it exists to remove.
+
+Measured over 14,092 `(list, idx)` pairs: **1,200 false negatives, 288 false
+positives**.
+
+FOLDED at `177b4906`: the probe varies ONLY the field its arm edits
+(`composerFieldLock` / `composerFieldHash`), the two arms pass their own field,
+and the reviewer's census is committed as
+`TestComposerEditCanRenumberIsExactOverEveryReachableShape` — an enumeration
+over 3,708 `(list, path, field)` cases whose oracle is independent of the probe
+(it sweeps the values each SCREEN can produce, rather than comparing two
+points). It reports 0 and 0 on the fix and **156 false negatives / 288 false
+positives** on the probe it replaced; the 288 match the reviewer's count
+exactly. The call-site wiring, which the census cannot see, is pinned by
+`TestComposerHashEditOnAKeylessPathAsksBeforeItDiscards`, and both field-swap
+mutations are caught. M-2 and M-3 (two comments the fold had falsified) are
+corrected, `composerMoveUp`'s unconditional discard re-measured as still
+load-bearing (`w1/1,1,|0.0/1.0/` before and after a swap), and N-1 filed as
+F-471 rather than fixed inside a merge already two rounds deep in funds-relevant
+code.
+
+**The lesson sharpens:** the first fold moved the class from the GUI's
+signature into the GUI's *probe of* the codec. Asking the codec is not enough —
+you have to ask it the question the operator's screen actually poses. A probe
+that varies a field the arm does not edit is the same defect wearing the
+remedy's clothes.

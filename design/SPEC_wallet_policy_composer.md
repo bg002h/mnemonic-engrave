@@ -495,9 +495,14 @@ hand-built `[2-of-2, 1 key, 1 key]` and the `decaying-multisig` preset agree on
 all three terms and disagree on three of their four slots). The implementation
 therefore derives the comparison from `md.Composed.Slots()` itself, and §8j is
 asked wherever that mapping would move — for a lock or hash edit, exactly when
-the codec says that edit can renumber under this wrapper. A lock or hash edit
-that moves no slot — every such edit under wsh, and most under tr — keeps
-assignments, asks nothing, and re-shows the stub screen (§7c). With no slot yet assigned there is nothing to discard and
+the codec says that edit can renumber under this wrapper, asked by varying THAT
+field alone. A shape the codec refuses has no mapping at all, and an edit into
+or out of one counts as a move: clearing the hash on a key-less path (§4b)
+empties that path, so the list stops composing and the seating is discarded —
+and the operator is asked first, which is the same guarantee, because what §8j
+protects is the operator's seating rather than the mapping as such. A lock or
+hash edit that moves no slot — every such edit under wsh, and most under tr —
+keeps assignments, asks nothing, and re-shows the stub screen (§7c). With no slot yet assigned there is nothing to discard and
 §8j does not fire. "Path N" in every seating and mapping prompt is the OPERATOR's
 listed path index, never an emitted leaf index.
 
