@@ -36,13 +36,16 @@ to that."
 | L2 | **Terminology** (2026-09-03, agreed): the memorable text is the **hashlock phrase** (two words; never "passphrase"); the 32-byte value the script demands is the **preimage** X; H = sha256(X) is the **digest** the policy carries. | Flags `--hashlock-phrase*`; screens say "Hashlock phrase". |
 | L3 | **Derivation, first pass.** Asked "how should X be derived from the phrase": "Must be either sha256 or ripemd160 to work with bitcoin script." Then, on seeing that the phrase -> X step is off-chain: "I see I was misunderstanding your question ... that could in theory be quite different than sh256... I like your KDF idea, but can a bitcoin hardware wallet perform that operation? I think we can assume a bitcoin hardware wallet can do kdf iterations at 1/10th the performance of the sh2, but we should limit iterations to 100,000. But the the user should be encouraged to document or backup the method of hashlock phrase to pre-image as well but that backup will be external to our tool." | Iteration cap 100,000; a signer at 1/10th of the SH2's rate is the design margin; the tool must state the method so the operator can write it down outside the tool. ripemd160 cannot be X's derivation in any case: every miniscript hash fragment demands a 32-byte X (`OP_SIZE 32 EQUALVERIFY`), and ripemd160 yields 20. |
 | L4 | **KDF parameters** (chosen from three options): **PBKDF2-HMAC-SHA256, 100,000 iterations**, fixed salt, dkLen 32. | Reuses the primitive the SH2 already runs for the sealed payload and measured (section 3.4). |
-| L5 | **Two methods, the operator's choice.** "User should be allow to choose between hardened kdf as above or just sha256 to go from hashlock phrase to primate." | `--method hardened` (L4) or `--method sha256` (X = sha256(phrase bytes)); the device asks the same question as a two-row pick. The card and `--json` always name the method used. If the note is lost, try both: two derivations, two digests, one matches the policy. |
+| L5 | **Two methods, the operator's choice.** "User should be allow to choose between hardened kdf as above or just sha256 to go from hashlock phrase to primate." | `--method hardened` (L4) or `--method sha256` (X = sha256(phrase bytes)); the device asks the same question as a two-row pick. The card and `--json` always name the method used. If the method line is lost, try each method that shipped with the version named on the card: one derivation per method, one digest matches the policy (wording per review M-4). |
 | L6 | **The preimage gets its own ms1 kind byte** (chosen over "plain entr-32 plus a note" and "no ms1 form"). | ms-codec 0.8.0 claims prefix `0x03` = hashlock preimage, 32 bytes only; `ms decode` never prints it as words; the device never offers it as a seed. |
 | L7 | **Device scope this cycle = digest only** (chosen over "digest plus a preimage plate" and "digest plus preimage as a source"). | The SH2 derives H from a typed phrase, uses it, shows `first8..last8`, states §8i and F-132, and scrubs X. It never stores, shows, engraves or sources a preimage. |
 | L8 | **32 bytes = 64 hex characters.** "Do we mean 64 hex chars or 32?" Both spellings name the same value. | Every refusal and help line says "32 bytes (64 hex characters)". |
 | L9 | **The `ms hashlock` surface in section 4.2 is agreed as a form.** "Agree with form." | Section 4.2 is the spec's input; defaults in section 5 remain vetoable. |
 | L10 | **The preimage kind and the codec placement (section 4.3) are agreed.** Asked "If in codec, can cli use it?": yes, `ms-cli` already depends on `ms-codec` by path + pin and every verb calls the codec's public API; the pin moves to `=0.8.0`. "Looks good." | The derivation (`ms_codec::hashlock`) and the kind live in ms-codec; `ms hashlock` is a thin verb over them. |
-| L11 | **Review before anything else.** "Document brainstorm and send it to an opus cryptography bitcoin programmer expert for review -- single agent." | Brief: `design/agent-briefs/hashlock-brainstorm-R0-crypto-review-brief.md`; report: `design/agent-reports/hashlock-brainstorm-R0-r0-crypto-bitcoin-expert.md`. Sections 4.4-4.6 wait for it. |
+| L11 | **Review before anything else.** "Document brainstorm and send it to an opus cryptography bitcoin programmer expert for review -- single agent." | Brief: `design/agent-briefs/hashlock-brainstorm-R0-crypto-review-brief.md`; report: `design/agent-reports/hashlock-brainstorm-R0-r0-crypto-bitcoin-expert.md` (1C/6I/6M/2N; dispositions in section 7). |
+| L12 | **`--method sha256` warns always, never refuses** (chosen over "warn always, refuse under 20" and "warn plus an acknowledgement flag"), on review C-1. | Every sha256 use prints the brainwallet line; the operator's choice stands at any length. The hardened method keeps its warning under 20 characters, with the corrected figure (section 3.4). |
+| L13 | **No `--salt` flag this cycle** (chosen over an optional operator salt), on review I-1. | The fixed salt stays; the shared-table consequence is recorded (section 3.4) and carried in the copy ("choose the phrase from a generator"); `--salt` filed as F-469. |
+| L14 | **Preimage singles carry their own id `hash`** (chosen over keeping `entr` and mitigating in copy), on review I-4. | The plate reads `ms10hash...`, not `ms10entrsq...`; readers still dispatch on the prefix byte; `RESERVED_ID_BLOCKLIST` gains `hash`. |
 
 ## 3. Measured context (so no later section re-derives it)
 
@@ -60,7 +63,12 @@ to that."
 (spec §6c, §8i). The hashvault journey (`design/journeys/derive-hashvault-keys.sh:61-76`)
 derives its three hashlocks as sha256 of phrases of **40, 38 and 34 bytes**
 hashed ONCE (measured with `printf '%s' | wc -c`), so no 32-byte preimage exists
-and tiers 1-2 of that (never funded) policy can never be spent. Filed F-467.
+and tiers 1-2 of that (never funded) policy can never be spent. Filed F-467;
+confirmed by the review with digests (Q7). Two facts the review added: BIP-174
+puts NO length bound on `PSBT_IN_SHA256`'s preimage, so a coordinator carries a
+40-byte "preimage" in a well-formed PSBT and the failure surfaces only at script
+execution -- the PSBT layer is not a guard; and rust-miniscript's satisfier type
+is `Preimage32 = [u8; 32]`, so the wrong satisfaction cannot even be expressed.
 This is the defect class `ms hashlock` exists to make impossible.
 
 ### 3.3 What `ms` is today (mnemonic-secret `7fc1e58`)
@@ -109,12 +117,38 @@ flags): **9,715 PBKDF2-HMAC-SHA256 iterations/s at dkLen 32**
 Memory-hard KDFs are out: the RP2350 has 520 KB of RAM. SHA-512 as the HMAC
 hash would be 2-3x slower on a 32-bit core for no gain at dkLen 32.
 
+**Guessing rates (review I-1/C-1, from hashcat v6.2.6 on one RTX 4090:
+PBKDF2-HMAC-SHA256 8,865.7 kH/s at 999 iterations; SHA-256 21,975.5 MH/s).**
+At 100,000 iterations the hardened method is 8.9e4 guesses/s; the sha256 method
+is 1.1e10 guesses/s (two hashes per guess): a ratio of 124,060. Assuming 2 bits
+of entropy per character of a chosen English phrase:
+
+| phrase | bits | hardened, expected | sha256, expected |
+| --- | --- | --- | --- |
+| 20 characters | ~40 | 72 days on one GPU | 50 seconds |
+| 28 characters | ~56 | 12,900 years | 38 days |
+
+The controller's earlier "years per GPU at 40 bits" was wrong by an order of
+magnitude and is withdrawn. **The fixed salt (L4, L13) makes the grind
+shareable:** one GPU precomputes the top 2^32 candidates in 13.5 hours, and
+that table then breaks every ms1 hashlock ever made by lookup; a targeted
+attacker pays the same 13.5 hours per target either way. RFC 8018 section 4.1
+names precomputation as what a salt exists to prevent. The record carries this
+so the copy can say the only real defence: choose the phrase from a generator
+(six diceware words is ~77 bits) or use `--random`. Corollary from the review:
+HMAC-SHA256 keys a phrase longer than 64 bytes by its SHA-256, so no entropy is
+gained past 64 characters.
+
 ### 3.5 Who derives X at spend time
 
-No hardware signer sees a hashlock phrase today: the coordinator (Liana,
-Sparrow) places the 32-byte X in the PSBT's sha256-preimage field and the signer
-only signs. So the phrase -> X derivation runs on whatever host tool the
-operator has at spend time, which is why the method must be in the external
+No hardware signer sees a hashlock phrase today: a coordinator able to populate
+the PSBT's sha256-preimage field (BIP-174 `PSBT_IN_SHA256`, key type 0x0b: key =
+the hash, value = the preimage) places the 32-byte X there and the signer only
+signs. Ledger's app compiles the `sha256` fragment and has no preimage
+derivation surface; Liana's own wallet model admits no hash fragment and Sparrow
+has no documented preimage-entry UI (review N-2), so no coordinator is NAMED here
+until one is verified. So the phrase -> X derivation runs on whatever host tool
+the operator has at spend time, which is why the method must be in the external
 backup (L3). The 1/10th budget is margin for a future signer port.
 
 ### 3.6 The device today (fork `70008da5`)
@@ -135,16 +169,36 @@ backup (L3). The 1/10th budget is margin for a future signer port.
   secret seed; a preimage-kind string would be offered at seed entry and fail
   at decode. Both sides need the kind, Rust first.
 
-### 3.7 A spent preimage is public (controller's addition after L10, for review)
+### 3.7 A spent preimage is public (controller's addition after L10; confirmed and sharpened by review I-5)
 
-Spending through a hash path reveals X in the witness, on-chain, forever. Two
-consequences the record must carry: (1) one phrase per policy, never reused --
-a phrase used for two policies gives both the same X, and the first spend hands
-the second policy's hash path to everyone; (2) after a spend, that hash path is
-open to anyone until the funds move (for a keyed path, still gated by the keys;
-for a keyless wsh path, C22, by nothing). Neither is a codec question; both are
-copy: a card line on the host and a line in the device's confirm modal, listed
-in section 5. The reviewer is asked to confirm or sharpen this (section 6).
+Spending through a hash path reveals X in the witness, on-chain, forever.
+Confirmed and sharpened by the review (I-5); four consequences the record
+carries:
+
+1. **One phrase per policy, never reused.** A phrase used for two policies
+   gives both the same X, and the first spend hands the second policy's hash
+   path to everyone.
+2. **After a spend, that hash path is open to anyone** until the funds move
+   (for a keyed path, still gated by the keys; for a keyless wsh path, C22, by
+   nothing).
+3. **H is public at the FIRST spend of ANY wsh path, not the hash path**
+   (BIP-141: the whole witnessScript, every branch, is published). A wsh policy
+   with a 2-of-3 key path and a keyless hash path publishes H on its first
+   routine spend, and the grind against the phrase starts then. A `tr` leaf
+   reveals nothing until that leaf is used (BIP-341). `sh(wsh)` is moot: the
+   composer admits it only for a single unlocked, unhashed key set (spec §4a).
+4. **A spent X is a permanent public oracle for the PHRASE.** Anyone can test
+   candidate phrases against X directly, and a hit yields the text. So the
+   phrase must never double as a BIP-39 passphrase, a sealed-payload
+   passphrase or a password anywhere: the reverse direction is safe (the review
+   confirmed no pre-spend leak in either direction), this is the only leak
+   path. Copy: "Spending any path of a wsh wallet publishes this digest. Never
+   use this phrase as a passphrase or a password anywhere else -- a spend
+   publishes the preimage, and anyone can then test guesses at the phrase
+   itself."
+
+None is a codec question; all four are copy: card lines on the host and lines
+in the device's confirm modal (section 5).
 
 ## 4. Design agreed so far
 
@@ -179,19 +233,34 @@ Sources, exactly one per invocation:
   anything else is refused naming §8i.
 - `<ms1>` or `-`: a preimage-kind ms1, to re-derive H from a plate. An entr or
   mnem string is refused: "that is a seed backup, not a hashlock preimage".
-- `--random`: 32 bytes from the OS CSPRNG (the one shares use). No phrase
-  exists, so nothing can be guessed; the card says so.
+- `--random`: 32 bytes from the OS CSPRNG (the one shares use; `getrandom`,
+  failing closed). No phrase exists, so nothing can be guessed -- and nothing
+  can be remembered: the card says both halves (review M-5): "No phrase exists,
+  so nothing can be guessed, and nothing can be remembered. This plate is the
+  only copy."
 
 Method (L5), for the phrase sources only: `--method hardened` = L4;
 `--method sha256` = X = sha256(phrase bytes). Default: `hardened`, announced on
 the card and in `--json` (section 5). `--hex`, `--random` and `<ms1>` take no
-method: X is given.
+method: X is given. **The two methods get different warnings (review C-1,
+L12):** under `sha256` the card ALWAYS carries the brainwallet line -- "This is
+the brainwallet construction: anyone holding the digest tests 10^10 phrases per
+second. A phrase a person chose is not safe here; use six diceware words or
+--random" -- and never refuses. Under `hardened`, a phrase under 20 characters
+gets the warning "a 20-character phrase falls in about 72 days on one GPU;
+choose it from a generator", and the tool proceeds. Neither floor can see a
+dictionary phrase, so the copy carries the weight and names the generator.
 
 Phrase rule, identical on host and device: non-empty, printable ASCII only, at
-most 100 characters, bytes used exactly as typed (no trimming, case folding or
-normalisation). Refusals name the rule and never echo the phrase. Under 20
-characters the tool warns on stderr that anyone holding the template can guess
-it, and proceeds.
+most 100 characters (a dedicated `HASHLOCK_PHRASE_MAX_CHARS` on each side, not
+the device's plate-legibility `passphrase.MaxLen`; review M-6), bytes used
+exactly as typed (no trimming, case folding or normalisation). Refusals name the
+rule and never echo the phrase. **A phrase that is exactly 64 characters, all
+hex digits, is refused** naming `--hex` as the remedy (review I-6: it is a
+preimage pasted into the wrong slot, and deriving from it silently yields a
+different X); the device's phrase screen applies the same check. No entropy is
+gained past 64 characters (section 3.4); the cap is a usability bound, not a
+security one.
 
 Outputs:
 
@@ -205,8 +274,14 @@ Outputs:
   down, verbatim, e.g.
   `preimage = PBKDF2-HMAC-SHA256(password = phrase, salt = "ms-hashlock-v1", iterations = 100000, dkLen = 32)`
   or `preimage = SHA-256(phrase)`, with "write this next to your phrase; it is
-  on no plate; if unsure later, try both"; the §8i and F-132 lines; the source
-  kind without its value; the short-phrase warning when it applies.
+  on no plate; if the method line is lost, try each method that shipped with
+  the version named on this card" (review M-4: "try both" would outlive its
+  own precondition); the phrase's character count next to the method line
+  (review M-2: the one signal that makes a stray space visible on the host;
+  the device already shows n/100); the §8i and F-132 lines; the section 3.7
+  lines (one phrase per policy; any wsh spend publishes the digest; never a
+  passphrase or password elsewhere); the method's warning (sha256: always;
+  hardened: under 20 characters); the source kind without its value.
 - `--json`: digest, hash_record, sha256_operand, preimage_hex, preimage_ms1,
   source, method {kdf, hash, salt, iterations, dklen} or {hash}, phrase_chars.
   Carries the secret, so the private-key-material advisory fires, as
@@ -214,9 +289,13 @@ Outputs:
 
 The other verbs on the new kind: `decode` prints kind, preimage hex and digest,
 never words; `inspect` reports the kind; `derive` and `verify` refuse it with the
-executable remedy `ms hashlock <ms1>`; `encode --hex` stays entr, so
-`ms hashlock` is the only door into the kind; the codec supports shares of the
-kind and a test pins it (CLI source deferred, F-468).
+executable remedy `ms hashlock <ms1>`, **and the refusal sits on the
+`Ok((tag, payload))` arm BEFORE the shared `payload_entropy_and_language`
+helper** (review I-3: today that helper's `_ => unreachable!` would panic first);
+`combine` gains its own arm (review N-1; its `_ => unreachable!` is the fourth
+site); `encode --hex` stays entr, so `ms hashlock` is the only door into the
+kind; the codec supports shares of the kind and a test pins it (CLI source
+deferred, F-468).
 
 Versions: ms-codec 0.8.0 (new kind, corpus SHA re-pinned, MIGRATION section),
 ms-cli 0.18.0.
@@ -224,17 +303,37 @@ ms-cli 0.18.0.
 ### 4.3 The preimage kind in ms1 (L10: "Looks good")
 
 - **Wire.** Payload `[0x03][X:32]`, 33 bytes, so the string is 75 characters,
-  the same as entr-32; the prefix byte alone tells them apart, exactly as `0x02`
-  mnem is told apart today. Any other length under `0x03` is refused with the
-  existing payload-length error. The share axis is untouched: a K-of-N set of a
-  preimage recovers to a `0x03` payload. Singles keep the legacy `entr` id, as
-  mnem does.
-- **Codec API (ms-codec 0.8.0).** `Payload::Preimage([u8; 32])` (the enum is
-  `non_exhaustive`, so downstream matches keep compiling), with matching
-  `PayloadKind` and `InspectKind` variants and arms in `dispatch_payload`,
-  `payload_wire_bytes` and `validate`. A fixed-size array makes the 32-byte rule
-  structural. `ReservedPrefixViolation` stops firing for `0x03`; any test that
-  pinned it as reserved flips and is machine-checked at plan time.
+  the same as entr-32. **Length no longer implies kind** (review I-4): entr and
+  mnem never share a length (50/56/62/69/75 vs 51/58/64/70/77), the preimage is
+  the first kind that collides with entr on length and on the first payload
+  character (`q`, since 0x00/0x02/0x03 share their top five bits). So preimage
+  SINGLES carry their own id `hash` (L14): the plate reads `ms10hash...`, a
+  seed plate `ms10entr...`, and the eye can tell a bearer instrument from a
+  share. Readers still dispatch on the prefix byte; `RESERVED_ID_BLOCKLIST`
+  gains `hash`. No misread converts one into the other: the codewords are at
+  least nine characters apart and BIP-93 corrects at most four. A `0x03`
+  payload of any length other than 33 bytes is refused by an explicit check
+  BEFORE the variant is built (review I-2), with a new
+  `Error::PreimageLengthMismatch { got }`; the entr length error would name a
+  legal entr length as illegal, and the obvious `data[1..33]` indexing panics.
+  The share axis is untouched: a K-of-N set of a preimage recovers to a `0x03`
+  payload.
+- **Codec API (ms-codec 0.8.0).** `Payload::Preimage(Zeroizing<[u8; 32]>)`
+  (review M-1: a bare array has no `Drop` and is memcpy'd on every move, so the
+  crate's caller-wrap recipe cannot scrub it; the wrapper keeps the length rule
+  structural and scrubs on drop), built with `<[u8; 32]>::try_from(&data[1..])`
+  after the length check, never slice indexing. Matching `PayloadKind` and
+  `InspectKind` variants and arms in `dispatch_payload`, `payload_wire_bytes`
+  and `validate`. `ReservedPrefixViolation` stops firing for `0x03`; any test
+  that pinned it as reserved flips and is machine-checked at plan time.
+  **`non_exhaustive` is a hazard here, not a help** (review I-3): ms-cli's
+  four `_ => unreachable!` arms over `Payload` (`cmd/combine.rs:166`,
+  `cmd/decode.rs:107` and `:112`, `cmd/payload_lang.rs:61`, measured
+  `grep -rn '_ => unreachable' crates/ms-cli/src` = 4) absorb the new variant
+  silently and panic at runtime, and `verify.rs:99` / `derive.rs:434` reach
+  the last one before any refusal could run. The H1 plan carries the four as
+  an explicit checklist, each converted to a typed refusal with one test per
+  site.
 - **Derivation lives in the codec.** `ms_codec::hashlock`: `preimage_hardened`,
   `preimage_sha256`, `digest`, with the salt and iteration count as named
   constants. The kind and its derivation share one corpus and one SHA pin, and
@@ -244,28 +343,49 @@ ms-cli 0.18.0.
   is a thin verb: flags, private channels, refusal text, output shape.
 - **Vectors.** Encode/decode round trip, share round trip, inspect kind, and for
   each method phrase -> X -> H with the `python3` and `openssl kdf`
-  reproductions RUN as a test, not quoted. The corpus SHA is re-pinned, which is
-  what forces the minor bump.
+  reproductions RUN as a test, not quoted (measured 2026-09-03 for the phrase
+  `correct horse battery staple`: hardened X
+  `c3e97525442520da4cffd5f57aae3f6273990017f2e0fa30c056e32172e22016`
+  byte-identical in both tools; sha256 X `c4bbcb1f...d4e39a8a`, H
+  `b867db87...edbc96cb` = the W-5 record). Length rows for `0x03` payloads of
+  16, 32, 34 and 46 bytes, each refused by name (review I-2; BIP-93's bracket
+  reaches 16..46 payload bytes). Lockstep rows a 100-character phrase derives
+  byte-identically on host and device and a 101-character one is refused on
+  both (review M-6), plus the 64-hex refusal on both. The corpus SHA is
+  re-pinned, which is what forces the minor bump.
 - **MIGRATION.md.** A 0.7 -> 0.8 section: readers that dispatch on the prefix
-  byte MUST treat `0x03` as a 32-byte preimage and never as entropy. Older
-  readers, including every flashed SH2 before H2, reject the string as a bad
-  prefix, so the failure is a refusal and never a seed.
+  byte MUST treat `0x03` as a 32-byte preimage and never as entropy; length no
+  longer implies kind (I-4) and singles of the kind carry id `hash` (L14);
+  every downstream crate MUST sweep its `_ => unreachable!` arms over `Payload`
+  because `non_exhaustive` means the compiler will not (I-3); and the pre-tool
+  recipe this project documented everywhere (spec §8i, W-5, F-465: "hash the
+  passphrase to 32 bytes, then hash again") is `--method sha256`, NOT the
+  default, so a digest made by hand before 0.18.0 reproduces only with that
+  flag (review M-3; the same note goes in the manual chapter and F-465's
+  `Which hash?` hint). Older readers, including every flashed SH2 before H2,
+  reject the string as a bad prefix (`ReservedPrefixViolation` /
+  `errMSBadPrefix`, both traced by the review), so the failure is a refusal
+  and never a seed.
 
 ## 5. Defaults taken for the operator's veto
 
 | default | why | veto changes |
 | --- | --- | --- |
 | `--method` defaults to `hardened`, announced loudly (the bip48 precedent: permissive on input, expressive on output) | an unstated default is one a later reader "fixes"; requiring the flag adds friction to the safer route | a required flag, or `sha256` as default |
-| salt `"ms-hashlock-v1"` | ASCII, short, domain-separated from BIP-39's `"mnemonic"`; must be copyable by hand | any fixed ASCII string; changing it after any vector ships is a new method |
+| salt `"ms-hashlock-v1"`, fixed, no `--salt` flag (RULED L13 after review I-1) | ASCII, short, domain-separated from BIP-39's `"mnemonic"` (different PRF, count, dkLen and role) and from `me`'s 16-byte random seal salt (different length, so `S || INT(i)` never coincides); must be copyable by hand; the shared-table cost is recorded in section 3.4 | the spelling only; changing it after any vector ships is a new method |
 | prefix byte `0x03` | the next unallocated value after `0x02`; `0x01` stays unallocated as MIGRATION.md records | `0x01` or higher |
-| 20-character warning floor | ~40 bits of English is years per GPU at 100,000 iterations; below it a warning, never a refusal (the operator's choice) | a different floor, or none |
+| 20-character warning floor for the HARDENED method only; the sha256 method warns at every length (L12) | ~40 bits of chosen English is 72 days on one GPU at 100,000 iterations (section 3.4; the earlier "years" was wrong); below it a warning, never a refusal (the operator's choice) | a different floor, or none |
+| the brainwallet line under sha256 names the rate (10^10 per second) and the generator (six diceware words, or `--random`) | a floor cannot see a dictionary phrase; the copy is the defence | reword |
+| a phrase of exactly 64 hex characters is REFUSED naming `--hex`, on host and device (review I-6) | deriving from a pasted preimage silently yields a different X and a valid-looking record | warn instead |
+| the card prints the phrase's character count beside the method line (review M-2) | the one signal that shows a stray space on the host; the device shows n/100 | drop |
+| `HASHLOCK_PHRASE_MAX_CHARS = 100` as its own constant on each side, lockstep-pinned (review M-6) | the device's `passphrase.MaxLen` is a plate-legibility number and can move for its own reasons | bind to `passphrase.MaxLen` |
 | `--out` carries the preimage ms1; stdout carries the digest | the secret goes to the private channel, the public record to the pipe | `--preimage-out` as a separate flag |
 | `--json` reuses the PrivateKeyMaterial advisory | byte-parity with the toolkit; a preimage on a keyless path can spend alone | a new class (toolkit change) |
-| `--random` included | one line over `getrandom`; the strongest form | drop it |
+| `--random` included, its card saying both halves ("nothing can be guessed, and nothing can be remembered; this plate is the only copy"; review M-5) | one line over `getrandom`, failing closed; the strongest form and the worst loss profile | drop it, or drop the second half |
 | the device asks the method AFTER the phrase, as a two-row pick `Hardened (about 10 s)` / `SHA-256` | mirrors the host flag; the wait is stated before it starts | ask before the phrase |
-| a reuse line on the host card and in the device's confirm modal: "One phrase per policy. Spending reveals the preimage on-chain; a phrase used twice opens the other policy." (section 3.7; controller's addition) | the tool cannot detect reuse (it never sees other policies), so the warning is the whole defence | drop or reword |
+| the section 3.7 lines on the host card and in the device's confirm modal: "One phrase per policy. Spending any path of a wsh wallet publishes this digest. Never use this phrase as a passphrase or a password anywhere else -- a spend publishes the preimage, and anyone can then test guesses at the phrase itself." (review I-5 sharpened the controller's addition) | the tool cannot detect reuse (it never sees other policies or passwords), so the copy is the whole defence | drop or reword |
 
-## 6. Sections still to walk with the operator (after the L11 review lands)
+## 6. Sections still to walk with the operator (after the fold verification of section 7)
 
 - 4.4 the device leg (rows, copy, the 10 s wait, scrub, the payload-ms1 class,
   §14 narrowing, firmware delta).
@@ -278,12 +398,52 @@ ms-cli 0.18.0.
   kind through decode/inspect/derive/verify/split/combine; Go lockstep; the
   touch-harness screen test; capture arm; the live walk).
 
-## 7. Follow-ups filed from this brainstorm
+## 7. R0 round 0 dispositions (report `hashlock-brainstorm-R0-r0-crypto-bitcoin-expert.md`, persisted d13819e)
+
+Controller machine-checks before folding: the W-5 digest `b867db87..edbc96cb`
+IS sha256(sha256("correct horse battery staple")); the hardened X for that
+phrase reproduces byte-identically in `python3 hashlib.pbkdf2_hmac` and
+`openssl kdf`; sha256 of that phrase is the private key of
+`1JwSSubhmg6iPtRjtyqhUYYH7bZg3Lfy1T` (pure-Python secp256k1, reproduced); the
+four `_ => unreachable!` sites and the two callers exist at the cited lines;
+`seal/wire.rs` has `SALT_LEN = 16`, `MIN_ITERATIONS = 100_000`; the device
+keyboard's four pages plus space are exactly the 95 printable ASCII characters.
+The hashcat figures were not fetched independently; they match public
+benchmarks and the ratio arithmetic reproduces.
+
+| finding | disposition |
+| --- | --- |
+| C-1 shared floor; sha256 is 124,060x cheaper to grind; the W-5 example is the brainwallet key | RULED L12: sha256 warns always, never refuses; hardened keeps the 20-character warning; copy names the rate and the generator (4.2, 5) |
+| I-1 "years per GPU" wrong (72 days); fixed salt makes the grind a shared table | number corrected (3.4); RULED L13: no `--salt` this cycle, consequence recorded and in copy; F-469 |
+| I-2 wrong-length `0x03` has no refusal path; obvious code panics | explicit length check before construction, `PreimageLengthMismatch`, `try_from`, rows 16/32/34/46 (4.3) |
+| I-3 `non_exhaustive` hides four `unreachable!` sites; verify/combine panic first | the four sites are an H1 checklist with typed refusals and one test each; refusal placed on the `Ok` arm; MIGRATION tells downstreams to sweep (4.2, 4.3) |
+| I-4 75-character/`entr`/`q` collision with a seed plate | RULED L14: id `hash` for preimage singles; "length no longer implies kind" stated in MIGRATION/spec/manual (4.3) |
+| I-5 H public at the first wsh spend of any path; a spent X is a phrase oracle | 3.7 extended to four consequences; card and modal copy (5) |
+| I-6 64 hex pasted into the phrase slot derives a different X silently | refusal naming `--hex`, host and device (4.2, 5) |
+| M-1 `[u8; 32]` unscrubbable under the caller-wrap contract | `Zeroizing<[u8; 32]>` (4.3); secret-handling class, taken anyway |
+| M-2 no character count on the card | printed beside the method line (4.2, 5) |
+| M-3 the default diverges from the only documented recipe | MIGRATION + manual + `Which hash?` hint name `--method sha256` as the pre-tool recipe (4.3) |
+| M-4 "try both" outlives its precondition | reworded to "each method that shipped with the version named on this card" (4.2) |
+| M-5 `--random`'s card states half | both halves (4.2, 5) |
+| M-6 the cap is a plate-legibility constant, independently editable | `HASHLOCK_PHRASE_MAX_CHARS` on each side, lockstep rows (4.2, 4.3, 5) |
+| N-1 4.2's verb list omits split/combine | `combine` named with its arm (4.2) |
+| N-2 Liana/Sparrow unverified | 3.5 names no coordinator; the PSBT field cited |
+| Q3(c) PSBT bounds no preimage length | 3.2 |
+| Q3(d) `sh(wsh)` moot | 3.7 |
+| reviewer question 2 (floor in bits + generator) | taken: the copy names the generator; the count stays in characters because that is what the device counts (5) |
+| reviewer question 5 (device 64-hex check) | taken: both sides (4.2) |
+
+Lenses run on this record: cryptography + Bitcoin programmer (opus). Not yet
+run: fold verification (sonnet, on this fold); the journey lens belongs to the
+spec, which will carry the walks.
+
+## 8. Follow-ups filed from this brainstorm
 
 - F-467 `hashvault-journey-hashlocks-unspendable` (section 3.2).
 - F-468 `ms-split-no-preimage-source` (section 3.3).
+- F-469 `ms-hashlock-optional-salt` (section 3.4; L13).
 
-## 8. Lessons
+## 9. Lessons
 
 - A question about a layer the operator does not usually touch needs the layer
   named in the question: "how is X derived" read as "which script hash" until
@@ -292,3 +452,10 @@ ms-cli 0.18.0.
 - A number the project already measured on silicon (9,715 it/s) is worth more
   than any estimate; look for the benchmark before estimating
   ([[records-are-the-weak-half]]).
+- The controller's own guessing-cost estimate ("years per GPU") was off by an
+  order of magnitude because it assumed a GPU rate from memory; the reviewer
+  cited a published benchmark. A security floor gets a cited rate and a stated
+  entropy-per-character, or it is not a floor.
+- The operator's own hand measurement (W-5) used the canonical brainwallet
+  phrase without anyone noticing, which is the whole argument for the tool
+  carrying the warning rather than the operator carrying the knowledge.
