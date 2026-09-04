@@ -245,3 +245,24 @@ verification 0C/0I, `composer-S4-W4-verification.md`). Firmware 1,581,204 B
 flash / 62,800 B RAM. The device runs the branch build `bgbb50775`, the same
 gui bytes; the operator's re-check of the blocks and date pads is the record
 still owed.
+
+## W-6 -- "Start from?" cannot be returned to; re-picking the script skips it (operator, 2026-09-03, on bgbb50775)
+
+Operator's observation, verbatim: "In the wallet policy program on sh2, after
+build new policy, which script (tr or wsh), any selection on the 'start from'
+screen and not be returned to via the back button. Going back jumps to the
+which scripts screen and picking a script (tr or wsh) skips over the 'start
+from' screen."
+
+| step | in hand | device did | divergence | class |
+| --- | --- | --- | --- | --- |
+| Build a new policy -> script (tr/wsh) -> `Start from?` -> any row -> ... -> Back | a chosen start (blank or a preset) | Back lands on the script choice, not on `Start from?` | W-1's fold (`composer-s4` bc9dd63) made Back FROM `Start from?` return to the script choice deliberately; Back from the NEXT screen apparently skips `Start from?` too | to classify (DEFAULT vs defect): a screen the operator cannot return to is the [[can-a-user-do-the-thing]] class if the only way to change the start is to discard the policy |
+| ... -> script choice -> pick tr or wsh again | the same policy state | `Start from?` is NOT shown; the flow continues past it | the start choice persists in the composer state and the picker is not re-offered on re-entry | to classify: if the operator wanted a different preset they now cannot reach it without Back-to-discard |
+
+Controller note (fable, low budget; not yet measured on the emulator): the
+likely site is the shape flow's re-entry after W-1 (`gui/composer_shape.go`,
+the wrapper -> preset-or-blank -> paths sequence; spec §7b). NOT measured, NOT
+fixed. Next: reproduce on the emulator with the shipped driver (a tap on Back
+from the paths list, then the script row again), classify per the method, and
+if it is a change, batch it on a fork branch `composer-s4e` with a test that
+fails first, sonnet-verified, merged, flashed at the operator's word.

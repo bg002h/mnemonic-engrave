@@ -1261,3 +1261,21 @@ Command to resume: /resume-composer
   the record because the verifier is reading it -- write L23 and flip 4.6's
   header from PRESENTED to agreed as soon as the r3 report is persisted.**
   Then fold any r3 finding, commit, push, and STOP (L19).
+- **W-6 (operator, 2026-09-03, on the device bgbb50775; walk record):** in
+  Wallet Policy -> Build a new policy -> script (tr/wsh) -> `Start from?`,
+  any selection made there cannot be returned to with Back: Back jumps to the
+  script choice, and picking a script again SKIPS `Start from?`. Recorded
+  verbatim in `design/S4_journey_walk_2026-09-02.md` W-6 with a controller
+  note (likely the shape flow's re-entry after W-1's Back change,
+  `gui/composer_shape.go`; NOT measured, NOT fixed). Next for W-6: reproduce
+  on the emulator with the shipped driver, classify, and if it is a change,
+  a fork branch `composer-s4e` with a failing-first test, sonnet-verified,
+  merged, flashed at the operator's word. W-6 is S4 residue, independent of
+  the hashlock cycle's pause (L19).
+- **HAND-OFF NOTE (the operator is switching to opus; fable budget low):**
+  everything above is on disk and committed except L23 in the brainstorm
+  record (pending the r3 verifier). An opus session resumes with
+  `/resume-composer`; the rules that bind hardest: persist and fold are two
+  commits; the agent writes its own report; push only via
+  `scripts/push-via-staging.sh` with master frozen; sonnet verifies folds;
+  no spec until the operator says so (L19).
