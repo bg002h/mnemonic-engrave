@@ -1081,3 +1081,12 @@ Steps, in order:
   0 = Build my own paths), W-2 (a tap on 3 in "how many keys?" selects it),
   W-3 (the Template screen shows all 32 hex digits). Then the walk from
   "Add a spend path" (Taproot 2-of-3), the door's Lead read first.
+- BOOT CONFIRMED bg6fb90cb; W-1/W-2/W-3 confirmed on the device (9c96b78).
+  Part A WALKED with the operator through the census and the variant pick:
+  no divergence; Template-ID/stub on the device = the host's (100ff8d). The
+  plate is DEFERRED: no blank available. Open: the door's lead line wording
+  on this machine (payload region present, not loaded). NEXT when a blank is
+  on hand: repeat from the door (under a minute), TEXT + QR, hold to cut,
+  read the plate back = md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
+  byte for byte; then Task 5 at the operator's call; then close the records
+  and push (two record commits unpushed since 950f42e).
