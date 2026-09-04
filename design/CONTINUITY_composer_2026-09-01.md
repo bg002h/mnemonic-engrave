@@ -1117,3 +1117,13 @@ Steps, in order:
   brief.md) -> plan §4 pin to the measured size -> flash at the operator's
   word -> the operator re-checks the blocks and date pads -> the plate when
   a blank is on hand.
+- FLASHED 2026-09-03 at the operator's word (device in BOOTSEL) the UNMERGED
+  W-4 branch build composer-s4d bb50775 (built in the worktree with
+  `nix run .#build-firmware`, signed and loaded by sh2-flash, verify 100%;
+  log .tmp/sh2-flash-bb50775.log) so the operator can check the pads while
+  the verification runs; expected version line `bgbb50775 (UNLOCKED)`. A
+  second flash of fork main follows the merge. Operator rulings recorded
+  ce9e5c5 (F-465 home = ms; F-466 on-device hashlock-phrase entry REQUIRED,
+  Rust first). Measured: a 32-byte preimage encodes as an ms1 string and
+  decodes back (indistinguishable from a seed backup -- a labelling
+  question for the ms hashlock design).
