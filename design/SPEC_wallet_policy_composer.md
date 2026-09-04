@@ -411,7 +411,7 @@ a button).
 
 ### 7b. Shape
 
-Wrapper → preset or blank → paths. The preset screen's FIRST row is the blank route, "Build my own paths" (S4 walk W-1, 2026-09-02: when Back alone was the blank route, the operator saw six presets and no way forward); Back on that screen returns to the wrapper choice. **BACK AT THE PATH LIST RETURNS TO THE PRESET SCREEN**, so Back is the inverse of the way in — paths → "Start from?" → wrapper — and a wrapper picked on the way out is followed by the preset screen again (S4 walk W-6, 2026-09-03: the leg ran the wrapper picker alone in both directions, so the preset screen was passed exactly once per composition and the six archetypes were unreachable afterwards without discarding the whole policy). On that second pass the blank row KEEPS the current paths — it is the default row of a screen the operator reached by pressing Back — and a preset chosen there replaces them. A wrapper or preset change taken on this leg moves slot numbering, so it is subject to §7d/§8j in full: the operator is asked before it is accepted, and every assignment is discarded (S4 walk W-7, 2026-09-04: the leg assigned the wrapper directly, bypassing both the confirm and the discard, and carried seats across a numbering permutation). Per path: keys (n, k), lock (§6b), hash
+Wrapper → preset or blank → paths. The preset screen's FIRST row is the blank route, "Build my own paths" (S4 walk W-1, 2026-09-02: when Back alone was the blank route, the operator saw six presets and no way forward); Back on that screen returns to the wrapper choice. **BACK AT THE PATH LIST RETURNS TO THE PRESET SCREEN**, so Back is the inverse of the way in — paths → "Start from?" → wrapper — and a wrapper picked on the way out is followed by the preset screen again (S4 walk W-6, 2026-09-03: the leg ran the wrapper picker alone in both directions, so the preset screen was passed exactly once per composition and the six archetypes were unreachable afterwards without discarding the whole policy). On that second pass the blank row KEEPS the current paths — it is the default row of a screen the operator reached by pressing Back — and a preset chosen there replaces them. A wrapper or preset change taken on this leg is subject to §7d/§8j in full, and the preset rows are the reason this matters as much as the wrapper: whenever the change moves the codec's slot numbering the operator is asked before it is accepted, and every assignment is discarded (S4 walk W-7, 2026-09-04: the leg assigned the wrapper directly, bypassing both the confirm and the discard, and carried seats across a numbering permutation; its verification then found the preset rows doing the same thing at an identical §7d signature — see §7d's correction). Per path: keys (n, k), lock (§6b), hash
 (§6c). A path list screen shows each path as one line ("Path 2: 2-of-3 + 90
 days") and, whenever a payload is loaded, a live line "slots: N / keys available:
 M". Back preserves everything ("going back should lose nothing"). The
@@ -478,14 +478,26 @@ consume path's "one card may fill several slots" rule
 coexist. The prompt for an extracted internal-key slot reads "Slot @0, key path
 (spends alone): choose a key". **Two slots resolving to
 the same xpub → REFUSE at the mapping review**, naming both slots (BIP-388 l.193,
-pairwise distinct; md refuses it only at encode). **Any change that moves slot NUMBERING (the
-wrapper, the path count, or a path's key count) after at least one slot has been
-assigned discards ALL assignments**; the operator is told so before the edit is
-accepted (§8j), because §5 renumbers slots by first appearance in text that is a
-function of the wrapper as well as the path list (tr extracts an internal key as
-`@0`, wsh does not), and a carried assignment would seat keys silently into the
-wrong slots. A lock or hash edit moves no slot, keeps assignments, and re-shows
-the stub screen (§7c). With no slot yet assigned there is nothing to discard and
+pairwise distinct; md refuses it only at encode). **Any change that moves slot NUMBERING after at
+least one slot has been assigned discards ALL assignments**; the operator is
+told so before the edit is accepted (§8j), because §5 renumbers slots by first
+appearance in text that is a function of the wrapper as well as the path list
+(tr extracts an internal key as `@0`, wsh does not), and a carried assignment
+would seat keys silently into the wrong slots. **WHAT MOVES THE NUMBERING IS
+THE CODEC'S ANSWER, NOT A LIST OF EDIT KINDS.** This section used to enumerate
+it — "the wrapper, the path count, or a path's key count" — and that
+enumeration is incomplete under tr, where the internal key is the FIRST path
+that is a bare single (one key, no lock, no hash) and is numbered `@0` ahead of
+listed order: adding or clearing a LOCK or a HASH can therefore hand `@0` to a
+different path while the wrapper, the path count and every key count stay
+identical (S4 walk W-7 verification C-1/I-1, 2026-09-04; measured — a
+hand-built `[2-of-2, 1 key, 1 key]` and the `decaying-multisig` preset agree on
+all three terms and disagree on three of their four slots). The implementation
+therefore derives the comparison from `md.Composed.Slots()` itself, and §8j is
+asked wherever that mapping would move — for a lock or hash edit, exactly when
+the codec says that edit can renumber under this wrapper. A lock or hash edit
+that moves no slot — every such edit under wsh, and most under tr — keeps
+assignments, asks nothing, and re-shows the stub screen (§7c). With no slot yet assigned there is nothing to discard and
 §8j does not fire. "Path N" in every seating and mapping prompt is the OPERATOR's
 listed path index, never an emitted leaf index.
 

@@ -348,3 +348,57 @@ four mutations of the fix were each caught by their own named assertion:
 dropping §8j, blanking the list on the blank row, running the wrapper picker
 alone (the shipped defect), and assigning the list without
 `composerApplyShapeEdit`.
+
+### The verification found the first fix incomplete, and a third door open
+
+`design/agent-reports/composer-S4-W6-verification.md` (opus, 1C/1I/1M) closed
+W-6 and closed W-7 **for the wrapper only**, and reported that the fix had
+opened a second door to W-7's own failure class. Both findings are one defect,
+and it is the same shape as W-7 itself: **the GUI was re-deriving the codec's
+numbering rule instead of asking it.**
+
+`composerShapeSignature` carried the wrapper, the path count and each path's
+key count — §7d's own enumeration — while md's `lowerTr` numbers slots from an
+internal key chosen by `isBareSingle()` (one key, no lock, no hash) and places
+it ahead of listed order. So a LOCK or a HASH decides which path owns slot `@0`
+under tr. Re-derived by the controller before folding:
+
+| shape | §7d signature | slots |
+| --- | --- | --- |
+| hand-built `[2-of-2, 1 key, 1 key]` | `w0/2,1,1,` | `[{@0 p1 o0} {@1 p0 o0} {@2 p0 o1} {@3 p2 o0}]` |
+| `decaying-multisig` preset | `w0/2,1,1,` | `[{@0 p0 o0} {@1 p0 o1} {@2 p1 o0} {@3 p2 o0}]` |
+
+Identical signatures, three of four slots moved. So:
+
+- **C-1 (Critical, introduced by the W-6 fix):** the preset rows that fix newly
+  makes reachable from the path list replaced a seated shape with **no §8j**
+  and carried every seat. Reproduced end to end on the operator's own route,
+  with no lock or hash screen involved — `Add a spend path` and the key-count
+  pickers alone. Pre-fix this was unreachable, because `composerPresetPick` was
+  entry-only.
+- **I-1 (Important, pre-existing on `70008da`):** the path editor's lock arm
+  runs `composerLockEdit` with neither guard nor `composerApplyShapeEdit`,
+  deliberately, on §7d's "a lock or hash edit moves no slot" — a premise that
+  is true under wsh and false under tr.
+
+FOLDED at `818220d8`: `composerShapeSignature` now carries
+`md.Composed.Slots()`, the mapping itself, keeping the structural terms only as
+the fallback for a list the codec refuses (so an edit into or out of a refused
+shape reads as a move, which discards — the safe direction). The lock and hash
+arms are wrapped in `composerApplyShapeEdit`, and §8j is asked on them exactly
+when `composerEditCanRenumber` — which asks the CODEC, with the lock cleared
+and set, rather than naming `lowerTr`'s predicate a second time — says the edit
+can move the mapping. Spec §7d corrected: the enumeration is replaced by the
+codec's answer.
+
+Four mutations of this second fold, each caught by its own named assertion: the
+signature back to structural-only (C-1 and I-1 both return), never asking on
+the lock arm (I-1 returns), **always** asking on the lock arm (the shipped wsh
+test `TestComposerLockAndHashEditsAreNotGuardedByTheDiscardConfirm` fails,
+which is what keeps §8j from firing where nothing is at stake), and the lock
+arm applying outside `composerApplyShapeEdit`. M-1 closed too: the leg's sole
+exit is now pinned by a test.
+
+**The lesson, recorded:** W-7 and C-1 are the same mistake one level apart. A
+GUI that restates a codec's rule will drift from it, and the drift shows up as
+keys seated onto the wrong paths. Ask the codec.
