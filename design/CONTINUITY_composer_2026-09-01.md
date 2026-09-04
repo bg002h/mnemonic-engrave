@@ -1499,3 +1499,24 @@ Command to resume: /resume-composer
   each remedy was smaller than the last. The durable artifact is
   `TestComposerEditCanRenumberIsExactOverEveryReachableShape`, which turns "is
   the probe exact?" into a command.
+
+- **W-6/W-7 SHIPPED 2026-09-04: fork main `839fa5aa719b8ec6970655530b74e1e3a3b73a36`**
+  (merge --no-ff of `composer-s4e` `618f86f1`; runs 33896299380 Test and
+  33896299483 Build image both success; report persisted). Controller verified
+  `origin/main` == local main independently. Worktree `wt-composer-s4e` removed
+  (branch kept, merged). Walk record marks W-6 and W-7 SHIPPED.
+- **FLASH TARGET is now fork main `839fa5aa`** -- it carries W-2, W-3, W-4, W-6
+  and W-7 and is the build the rest of the device walk needs. The device runs
+  `bgbb50775`, on which the Back leg is still the shipped (defective) one.
+  `~/bin/sh/sh2-flash -y` with the device in BOOTSEL, at the OPERATOR'S WORD
+  only; expected version line `bg839fa5a (UNLOCKED)`. Firmware on this main:
+  1,582,628 B flash / 62,800 B RAM (+1,424 B flash / +0 RAM over 70008da).
+  After the boot is confirmed, the device checks worth making are: Back at the
+  path list lands on `Start from?`; Back again on the script choice; picking a
+  script shows `Start from?` again; and the blank row keeps the paths already
+  built.
+- NEXT: push engrave master via `scripts/push-via-staging.sh master` (FREEZE),
+  then the device walk resumes -- the pad re-check, the Taproot 2-of-3 plate
+  when a blank is on hand (string
+  `md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3`, byte for byte),
+  Task 5 at the operator's call. The hashlock cycle stays PAUSED (L19).

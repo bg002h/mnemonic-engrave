@@ -246,7 +246,7 @@ flash / 62,800 B RAM. The device runs the branch build `bgbb50775`, the same
 gui bytes; the operator's re-check of the blocks and date pads is the record
 still owed.
 
-## W-6 -- "Start from?" cannot be returned to; re-picking the script skips it (operator, 2026-09-03, on bgbb50775)
+## W-6 -- "Start from?" cannot be returned to; re-picking the script skips it (operator, 2026-09-03, on bgbb50775) -- SHIPPED fork main 839fa5aa
 
 Operator's observation, verbatim: "In the wallet policy program on sh2, after
 build new policy, which script (tr or wsh), any selection on the 'start from'
@@ -300,7 +300,7 @@ pressing Back, and blanking there would have been a new data-loss trap of my
 own making (mutation-tested: making it blank the list fails the test that says
 so).
 
-## W-7 -- the Back leg changed the wrapper with seats held, unguarded (found 2026-09-04 while measuring W-6)
+## W-7 -- the Back leg changed the wrapper with seats held, unguarded (found 2026-09-04 while measuring W-6) -- SHIPPED fork main 839fa5aa
 
 | step | in hand | device did | divergence | class |
 | --- | --- | --- | --- | --- |
