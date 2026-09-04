@@ -1293,3 +1293,88 @@ Command to resume: /resume-composer
   commits; the agent writes its own report; push only via
   `scripts/push-via-staging.sh` with master frozen; sonnet verifies folds;
   no spec until the operator says so (L19).
+
+## RESUME POINT 2026-09-04 -- W-6 MEASURED, W-7 (Critical) FOUND AND FIXED; verification in flight
+
+State, all measured this session:
+- The hashlock cycle is UNCHANGED and still PAUSED BEFORE SPEC (L19). Nothing
+  was started there. This session took the S4 residue instead, which L19 does
+  not gate.
+- **W-6 reproduced** on fork main `70008da` by a flow-level walk that drives
+  the real `composerFlow` (no emulator needed to see it; the operator had
+  already seen it on the device). Both halves: Back at the path list draws
+  `Which script?`, and re-picking a script draws the path list with
+  `Start from?` never drawn. The site is `gui/composer_flow.go`'s Back leg,
+  NOT `gui/composer_shape.go` as the earlier controller note guessed. Class:
+  **W-6 CHANGE (Important)** -- the preset screen (six archetypes, F-453/S0b)
+  is reachable once per composition and the only route back was to discard.
+- **W-7 found while measuring it (Critical, funds-relevant).** The same leg
+  assigned `st.list.Wrapper` directly, bypassing `composerShapeGuard` (§8j)
+  and `composerApplyShapeEdit` (the discard). Measured with
+  `md.Composed.Slots()` on [Path 1: 2-of-2, Path 2: a single key]:
+  `wsh -> [{@0 p0 o0} {@1 p0 o1} {@2 p1 o0}]`,
+  `tr -> [{@0 p1 o0} {@1 p0 o0} {@2 p0 o1}]` -- equal COUNT, permuted mapping,
+  so `composerSizeAssignments` kept every seat and the key seated as "Path 1
+  key 1 of 2" became Path 2's sole spending key. Reachable via §8p's "What
+  now?" -> "Back to the paths", which lands on the path list with seats held.
+  No screen says so (`composerMappingLines` prints index and origin, never the
+  path). §7d's rule was met by the path list's own "Change the script" row and
+  unmet one function away.
+- **Both FIXED** on fork branch `composer-s4e` = `05466727` (worktree
+  `/scratch/code/shibboleth/wt-composer-s4e`, off `70008da`): `composerStartStep`
+  walks §7b's opening pair and IS the Back leg, entered at the preset screen.
+  Back is now the inverse of the way in; the blank row KEEPS the paths on the
+  second pass; the choice goes through `composerApplyShapeEdit` after §8j is
+  asked whenever the shape signature would move.
+- Failing-first tests in `gui/composer_backleg_test.go`; four mutations of the
+  fix each caught by their own named assertion (drop §8j; blank the list on the
+  blank row; wrapper picker alone; assign without `composerApplyShapeEdit`).
+  Audited mechanically: every other production assignment to `st.list` goes
+  through `composerApplyShapeEdit` except `composerMoveUp`, which discards
+  unconditionally on purpose -- the Back leg was the ONLY unguarded one.
+- Controller gate GREEN on `05466727` (`.tmp/s4e-gate.log`): gofmt -l cmd/
+  clean (gui/ residue = the three pre-existing transaction*.go, review r0 N-2);
+  vet = the two pre-existing go1.25 ArtifactDir lines only; `go test ./...`
+  0 FAIL; gui shards **1195** (1192 + 3 new); 32-bit exit 0 both; `go build
+  ./cmd/...` 0; firmware **1,581,428 B flash / 62,800 B RAM = +224 / +0** over
+  `70008da`.
+- Engrave records `e930ee7`: walk record (W-6 measured + classified, W-7 its
+  own entry), spec §7b folded with the Back rule (it was SILENT about Back at
+  the path list, which is why no gate caught either), F-470 filed (a preset row
+  replacing hand-built paths with nothing seated is unconfirmed -- the
+  operator's call, deliberately not invented in a fix branch). Spec gates:
+  structure OK 56/49, glyph 114/0, cite ok.
+- **IN FLIGHT:** the independent verification, **opus** (not sonnet: W-7 is a
+  Critical about which key seats into which slot, and the controller authored
+  the fix with no independent implementer, so this is design-level adversarial
+  review on risk-set work). Brief
+  `design/agent-briefs/composer-S4-W6-verification-brief.md` ->
+  `design/agent-reports/composer-S4-W6-verification.md`. If that file exists on
+  resume, persist it (own commit); if not, re-dispatch with the brief.
+
+Steps, in order:
+1. Persist the verification report (own commit, verbatim). If 0C/0I: dispatch
+   the merge agent (sonnet) with
+   `design/agent-briefs/composer-S4-W6-merge-push-brief.md` (tip `05466727`,
+   message `composer-S4-W6-merge-message.txt`) -> fork main; then remove the
+   worktree (`git -C /scratch/code/shibboleth/seedhammer worktree remove
+   wt-composer-s4e`) and mark W-6/W-7 shipped in the walk record. If it is not
+   0C/0I: fold on `composer-s4e`, re-gate, re-verify.
+2. Push engrave master (sonnet push agent, `scripts/push-via-staging.sh
+   master`, FREEZE) -- unpushed since `9bebe05`: `aeb29c8`, `e930ee7` and the
+   records after them.
+3. Flash at the operator's word only: after the merge, fork main carries W-2 +
+   W-3 + W-4 + W-6 + W-7 and is the build for the rest of the device walk
+   (`~/bin/sh/sh2-flash -y`, device in BOOTSEL, expected version line
+   `bg<sha>` (UNLOCKED)). The device currently runs `bgbb50775` (W-4 branch
+   build), on which the Back leg is still the shipped one.
+4. The rest of the S4 residue, unchanged, all at the operator's word: the pad
+   re-check on the blocks/date pads, the Taproot 2-of-3 plate when a blank is
+   on hand (string
+   `md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3`, byte for byte),
+   Task 5 (Part B on the device).
+5. The hashlock cycle stays PAUSED (L19) until the operator gives the word for
+   `mnemonic-secret/design/SPEC_ms_hashlock.md`.
+6. Owed to the operator: F-470's ruling (above), F-454 (me 0.8.1), F-455/F-457/
+   F-459/F-462/F-463/F-464 polish, the three S3 defaults (implemented).
+Command to resume: /resume-composer
