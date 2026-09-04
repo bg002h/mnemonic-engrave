@@ -1,10 +1,12 @@
 # Brainstorm — the HASHLOCK PHRASE (`ms hashlock` + on-device entry)
 
-**STATUS: BRAINSTORM IN PROGRESS, 2026-09-03.** Rulings below are the operator's
-and are final; everything else is measured context, agreed design, or a default
-taken for the operator's veto. No R0 review, no gates, nothing may be
-implemented from it. Written mid-session so the rulings outlive the context
-([[decisions-must-outlive-the-agent]]).
+**STATUS: BRAINSTORM COMPLETE 2026-09-03; PAUSED BEFORE SPEC (L19).** Rulings
+below are the operator's and are final; everything else is measured context,
+agreed design (4.1-4.6), or a default taken for the operator's veto (section
+5). Two review lenses ran on it (section 7), each fold sonnet-verified. This
+is a brainstorm record, not a spec: nothing may be implemented from it, and
+the specs start only at the operator's word. Written mid-session so the
+rulings outlive the context ([[decisions-must-outlive-the-agent]]).
 
 Companions: `SPEC_wallet_policy_composer.md` (§6c, §8h, §8i, §14 row
 "on-device preimage derivation"; C25), `S4_journey_walk_2026-09-02.md` (W-5),
@@ -49,11 +51,12 @@ to that."
 | L15 | **No scrub discipline for the phrase or X on the device.** On the 4.4 draft's scrub bullet: "No. We don't need to scrub like we would for a sealed payload." | Consistent with C14 (no Sealed-Payload memory treatment for the composer's seeds); a phrase is less sensitive than a seed. The device leg adds no wiping beyond what the composer already does by construction; secret-handling is non-gating anyway (2026-08-27 ruling). |
 | L16 | **Section 4.4 (the device leg) is agreed** without the scrub bullet. "Yes." | 4.4 is the composer spec fold's input. |
 | L17 | **Section 4.5 (process and homes) is agreed.** "Ok on 4.5" | Two specs, one plan per stage, the order in 4.5. |
-| L18 | **A second lens before ruling on 4.6.** On the 4.6 (testing) draft: "Ask security software expert for review" | Single opus agent, security-software-engineering lens, over the whole record with 4.6 as presented; brief `design/agent-briefs/hashlock-brainstorm-R0-r2-security-software-brief.md`, report `design/agent-reports/hashlock-brainstorm-R0-r2-security-software-expert.md`. 4.6 is PRESENTED, not agreed, until the operator rules after it. |
+| L18 | **A second lens before ruling on 4.6.** On the 4.6 (testing) draft: "Ask security software expert for review" | Single opus agent, security-software-engineering lens, over the whole record with 4.6 as presented; brief `design/agent-briefs/hashlock-brainstorm-R0-r2-security-software-brief.md`, report `design/agent-reports/hashlock-brainstorm-R0-r2-security-software-expert.md`. 4.6 was presented, not agreed, until the operator ruled after it (L23). |
 | L19 | **"Pause before spec."** | After the L18 review is persisted, folded and walked with the operator, NO spec is started until the operator says so. The controller stops there. |
 | L20 | **`--in FILE` on `ms hashlock` means the preimage ms1**, like the six reading verbs (chosen over "phrase plus an ms1-shape refusal" and "no `--in`"), on review C-1. | The phrase has exactly two channels: `--hashlock-phrase` (argv-guarded) and `--hashlock-phrase-stdin` (redirect a file into it). An ms1-shaped phrase is refused on both, naming `--in`/`-`. |
 | L21 | **`--random` refuses unless `--out FILE` or `--json`** (chosen over "allow, the card is the copy"), on review C-3. | A preimage that reaches no persistent channel is data loss, so it gates; `--random --no-engraving-card` without either exits 64 naming `--out`. `--out`'s overwrite semantics stay as ruled 2026-08-26. |
 | L22 | **The classifier lands Rust-first as H1b; the fork mirrors it; no new class this cycle** (chosen over "the fork ships a new class, me catches up"), on review I-4 + C-2. | H1b (engrave, before H2): `me`'s ms1 classifier treats kind `0x03` as inert with a vector row, in me 0.8.1. H2: the fork's `isStrictMs1` gains the same prefix test; `DecodeMS1` keeps refusing `0x03` and a separate decoder serves the new consumer. |
+| L23 | **Section 4.6 (testing) stands**, with the r2 review's additions. "Yes, 4.6 stands." | The brainstorm is complete: sections 4.1-4.6 agreed, two lenses run and folded, each fold sonnet-verified. L19 now binds: STOP before any spec. |
 
 ## 3. Measured context (so no later section re-derives it)
 
@@ -525,7 +528,7 @@ ms-cli 0.18.0.
   provenance pin to the ms-codec 0.8.0 commit; the hashlock vector corpus is
   vendored into the fork with a pin test, as the compose vectors are.
 
-### 4.6 Testing (PRESENTED 2026-09-03; under the L18 review; not yet ruled)
+### 4.6 Testing (L23: "Yes, 4.6 stands", after the L18 review's additions)
 
 - **Codec vectors (H1), the corpus with its SHA pin.** Kind `0x03`
   encode/decode/inspect; the share round trip through the codec API; length
@@ -549,10 +552,12 @@ ms-cli 0.18.0.
 - **Review gates.** The plan's tests lens mutates them before any code; the
   whole-diff review's mutation pass proves each guard fails on its named
   mutation with the output pasted.
-- **Fork (H2).** The `0x03` decoder arm and its length rule; every seed call
-  site refuses by name; the payload class row in the record-class vectors;
-  derivation lockstep against the vendored corpus for both methods including
-  the 100/101 and 64-hex rows; the phrase screen driven through the real flow
+- **Fork (H2).** `DecodeMS1` unchanged (a `0x03` string still refused at all
+  five callers, one test each); the new `DecodeMS1Preimage` and its own
+  length rule; `isStrictMs1`'s prefix test with the record-class vector row
+  asserting an INERT classification (never `ClassCodex32Secret`, no new
+  class; L22); derivation lockstep against the vendored corpus for both
+  methods including the 100/101 and 64-hex rows; the phrase screen driven through the real flow
   on the touch harness (tap the new row, type, pick the method, confirm; the
   path's hash equals the vector's); geometry tests for the confirm modal and
   the no-payload hint; firmware size at the gate; an emulator capture arm
@@ -575,9 +580,11 @@ ms-cli 0.18.0.
   `... --allow-argv-secret < other.txt` never derives from `other.txt`; the
   guard's refusal text for `ms hashlock` says "hashlock" and "a hashlock
   phrase" (mutations: `SUBCOMMANDS` not extended; `flag_class` arm missing);
-  byte-exact rows `"  a  b "` and `"a-b,c"` through `--hashlock-phrase-stdin`
-  equal the codec vector (mutation: swap in `read_phrase_input` or
-  `read_input` -- no codec vector can catch it); the stdin newline rows
+  byte-exact rows `"  a  b "` and `"a-b,c"` through BOTH phrase channels --
+  `--hashlock-phrase-stdin`, and `--hashlock-phrase` under
+  `--allow-argv-secret` via the admitted side channel -- equal the codec
+  vector (mutation: swap in `read_phrase_input` or `read_input` on either
+  channel -- no codec vector can catch it; r3 verification finding 3); the stdin newline rows
   `"p\n"`, `"p\r\n"`, `"p"`, `"p \n"` strip one `\r?\n` and nothing else,
   `"p\n\n"` refused; NEGATIVE-CONTENT rows, one per refusal (empty,
   non-ASCII, over 100, 64-hex, ms1-shaped, `--hex` wrong length, wrong ms1
@@ -588,9 +595,11 @@ ms-cli 0.18.0.
   suppression); the `--json` `method` shape per source; the downgrade row (a
   `0x03` string on the 0.17.x-equivalent codec refuses, never panics); the CI
   preflight step in `test (ms-codec)`. H1b: the record-class vector row for an
-  inert `0x03` string in `me`. H2: `DecodeMS1` length rows for `0x03` at 16,
-  20, 24, 28, 34 and 46 payload bytes each refused (mutation: let the arm fall
-  into the shared length switch); one test per `DecodeMS1` caller
+  inert `0x03` string in `me`. H2: `DecodeMS1Preimage` length rows for `0x03`
+  at 16, 20, 24, 28, 34 and 46 payload bytes each refused (mutation: reuse
+  `DecodeMS1`'s shared length switch instead of the 32-only rule; `DecodeMS1`
+  itself stays untouched and refuses every `0x03` string, r3 verification
+  finding 2); one test per `DecodeMS1` caller
   (`gui/ms1_decode.go:22`, `gui/codex32_polish.go:106`,
   `gui/singlesig_verify.go:185`, `gui/multisig_verify.go:1237`,
   `bundle/verify.go:138`) that a `0x03` string is refused and "Show secret"
@@ -631,10 +640,10 @@ ms-cli 0.18.0.
 
 ## 6. What remains before the spec
 
-- 4.6 (testing) is presented and under the L18 security-software review; the
-  operator rules on it after that review is persisted, folded and walked.
-- Then STOP (L19: "Pause before spec"). `SPEC_ms_hashlock.md` and the
-  composer spec fold start only at the operator's word.
+- Nothing in this record: 4.1-4.6 are agreed (L9, L10, L16, L17, L23), both
+  lenses are folded and verified (section 7).
+- STOP (L19: "Pause before spec"). `SPEC_ms_hashlock.md` and the composer
+  spec fold start only at the operator's word.
 
 ## 7. R0 round 0 dispositions (report `hashlock-brainstorm-R0-r0-crypto-bitcoin-expert.md`, persisted d13819e)
 
@@ -717,9 +726,17 @@ persisted 95e7423 -- FIXED 16 / PARTIAL 1 / NOT 0, every recomputed number
 matched, one new Important: the first fold said all four `unreachable!` sites
 become refusals while 4.2 says `decode` prints a preimage; folded above; the
 r1 fold was wording only, no round on it); security software engineering
-(opus, r2, above; folded with three rulings). Next: sonnet verification of
-the r2 fold (non-trivial), then the operator rules on 4.6, then STOP (L19).
-The journey lens belongs to the spec, which will carry the walks.
+(opus, r2, above; folded with three rulings); fold verification (sonnet, r3:
+`hashlock-brainstorm-R0-r3-fold-verification.md`, persisted e06dd15 -- FIXED
+20 / PARTIAL 1 / NOT 0, every citation and number matched; the PARTIAL and
+two Importants were one stale 4.6 fork bullet still describing the
+pre-review H2, a length-row test naming `DecodeMS1` instead of
+`DecodeMS1Preimage`, and the byte-exact row naming one phrase channel; all
+three folded above, wording only, no further round). The controller's
+propagation grep after the r2 fold had scoped itself to one section; this
+fold's grep ran over the whole record. The operator ruled 4.6 stands (L23).
+Lens-closure holds; the journey lens belongs to the spec, which will carry
+the walks. STOP (L19).
 
 ## 8. Follow-ups filed from this brainstorm
 
