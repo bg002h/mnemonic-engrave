@@ -196,3 +196,19 @@ text entry box and the keyboard. It looks like it reads 'How many blocks?'
 and '1 to 65535' but there is no newline in between. The keyboard is wisely
 a 0-9 type keyboard." Reached through a PRESET (decaying-multisig), then the
 path's Time lock. Reproduction and cause below.
+
+Cause, read from `gui/composer_digitpad.go` `composerDigitEntry`: the info
+lines (`lead`, then the echo `line`) are laid out under the entry box at
+`lineY`, and EACH is clamped on its own -- `if lim := top.Max.Y - sz.Y; y >
+lim { y = lim }` -- to the band above the keyboard. When the second line does
+not fit it is moved up to the band's bottom, which is where the first line
+already is; the two are drawn over each other. Every pad shares the code, so
+"How many blocks?", "How many days?", "Date as YYYYMMDD" and "Block height"
+all overprint their range line, as the operator saw on the blocks and the
+date-or-height routes. The S4 capture typed 12960 through this pad and read
+its text through `shScreen()`, which cannot see an overprint (the W-3
+lesson, again). Fix on fork branch `composer-s4d` (brief
+`composer-S4-W4-fix-brief.md`): the box and its lines are one vertically
+centred group inside the band, never clamped line by line; a rasterising
+geometry test over all four pads, empty and filled, asserts no two text
+rectangles intersect and fails on `6fb90cb`.
