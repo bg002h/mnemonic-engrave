@@ -1272,6 +1272,20 @@ Command to resume: /resume-composer
   a fork branch `composer-s4e` with a failing-first test, sonnet-verified,
   merged, flashed at the operator's word. W-6 is S4 residue, independent of
   the hashlock cycle's pause (L19).
+- **BRAINSTORM COMPLETE (2026-09-03, late):** r3 sonnet verification of the
+  r2 fold (e06dd15: FIXED 20 / PARTIAL 1 / NOT 0; two Importants + one Minor,
+  all wording: the 4.6 fork bullet still described the pre-review H2, a
+  length-row test named `DecodeMS1` instead of `DecodeMS1Preimage`, the
+  byte-exact row named one phrase channel) folded 0f9bb99 with L23 ("Yes,
+  4.6 stands") written and the record's STATUS set to COMPLETE; PAUSED
+  BEFORE SPEC (L19). Engrave master pushed through 203f3bb (report 643a119);
+  the commits after it (643a119, e06dd15, 0f9bb99, this one) are records
+  only -- push next. NOTHING is in flight. On resume: (1) if the operator has
+  given the word, start `mnemonic-secret/design/SPEC_ms_hashlock.md` per
+  brainstorm 4.5 (spec first, own R0: correctness + adversarial + tests-vector
+  lenses; then the H1 plan with a `plan-build-gate-ms.sh`); (2) otherwise the
+  S4 residue: W-6 (reproduce on the emulator, classify), the pad re-check,
+  the plate, Task 5 -- all at the operator's word.
 - **HAND-OFF NOTE (the operator is switching to opus; fable budget low):**
   everything above is on disk and committed except L23 in the brainstorm
   record (pending the r3 verifier). An opus session resumes with
