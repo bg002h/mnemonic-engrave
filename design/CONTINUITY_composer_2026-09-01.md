@@ -1168,3 +1168,51 @@ Command to resume: /resume-composer
   (optional re-flash), step 4 (the operator's pad re-check -> record it; the
   plate when a blank is on hand; Task 5 at the operator's call), step 5
   (next cycle: F-465 ms hashlock, F-466 on-device hashlock-phrase entry).
+
+## RESUME POINT 2026-09-03 (night) -- HASHLOCK PHRASE cycle opened; brainstorm under opus review
+
+State, all measured:
+- Engrave push a8af7a0 DONE (report 51b7c69). The device still runs the
+  W-4 branch build bgbb50775 (same gui bytes as fork main 70008da5); the
+  operator's pad re-check, the Taproot 2-of-3 plate (blank pending) and Task 5
+  remain the S4 residue, all at the operator's word. S4 is otherwise closed.
+- The operator pivoted to the hashlock phrase (F-465/F-466). Brainstorm
+  record `design/BRAINSTORM_hashlock_phrase.md` (fb64091, 72081c5): rulings
+  L1-L11 verbatim -- two methods, the operator's choice: hardened =
+  PBKDF2-HMAC-SHA256, 100,000 iterations, salt "ms-hashlock-v1", 32 bytes,
+  or plain sha256; a new ms1 kind byte 0x03 for the preimage, derivation in
+  ms-codec (`ms_codec::hashlock`), `ms hashlock` a thin verb; device = digest
+  only; 32 bytes = 64 hex. Sections 4.1-4.3 agreed; 4.4 (device leg), 4.5
+  (process/homes), 4.6 (testing) still to walk WITH the operator after the
+  review. Defaults for veto in section 5 (method default hardened; salt; 20-char
+  warning floor; --out = preimage; --json advisory; --random; method asked
+  after the phrase; the reuse line from 3.7). F-467 (hashvault journey
+  hashlocks unspendable: 40/38/34-byte phrases hashed once) and F-468 (ms
+  split has no preimage source) filed.
+- R0 round 0 = ONE opus reviewer, cryptography + Bitcoin programmer lens,
+  DISPATCHED against 72081c5 (brief
+  `design/agent-briefs/hashlock-brainstorm-R0-crypto-review-brief.md`) ->
+  `design/agent-reports/hashlock-brainstorm-R0-r0-crypto-bitcoin-expert.md`.
+  If that file exists on resume, persist it (own commit); if not, re-dispatch
+  with the brief.
+
+Steps, in order:
+1. Persist the review (own commit) -> read it -> machine-check every
+   measurable claim -> walk its findings WITH the operator (rulings are the
+   operator's; a Critical on the KDF/salt/method rule changes section 2) ->
+   fold the brainstorm record (own commit) -> re-review only if the fold is
+   non-trivial (sonnet verification of the fold; a new lens only if a question
+   remains unasked).
+2. Walk sections 4.4-4.6 with the operator, one at a time; record; then the
+   writing-plans path per the constellation workflow: spec(s) first --
+   `mnemonic-secret/design/SPEC_ms_hashlock.md` (kind 0x03 + `ms_codec::hashlock`
+   + `ms hashlock`; own R0) and the composer spec fold (§6c, §8, §12, §14,
+   C25; own R0 with a journey lens) -- then plans per stage (H1 ms, H2 fork,
+   H3 records, H4 device), each build-gated and R0'd immediately before its
+   implementer. Implementation UC off, one implementer per stage.
+3. Push engrave master (sonnet push agent, ci/staging, FREEZE) whenever the
+   tree is clean and no commit is imminent.
+4. Owed to the operator, unchanged: the S4 residue above; F-454 (me 0.8.1,
+   now also carrying me's ms1 classifier learning kind 0x03); F-455/F-457/
+   F-459/F-462/F-463/F-464 polish.
+Command to resume: /resume-composer
