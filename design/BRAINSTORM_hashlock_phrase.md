@@ -41,6 +41,8 @@ to that."
 | L7 | **Device scope this cycle = digest only** (chosen over "digest plus a preimage plate" and "digest plus preimage as a source"). | The SH2 derives H from a typed phrase, uses it, shows `first8..last8`, states §8i and F-132, and scrubs X. It never stores, shows, engraves or sources a preimage. |
 | L8 | **32 bytes = 64 hex characters.** "Do we mean 64 hex chars or 32?" Both spellings name the same value. | Every refusal and help line says "32 bytes (64 hex characters)". |
 | L9 | **The `ms hashlock` surface in section 4.2 is agreed as a form.** "Agree with form." | Section 4.2 is the spec's input; defaults in section 5 remain vetoable. |
+| L10 | **The preimage kind and the codec placement (section 4.3) are agreed.** Asked "If in codec, can cli use it?": yes, `ms-cli` already depends on `ms-codec` by path + pin and every verb calls the codec's public API; the pin moves to `=0.8.0`. "Looks good." | The derivation (`ms_codec::hashlock`) and the kind live in ms-codec; `ms hashlock` is a thin verb over them. |
+| L11 | **Review before anything else.** "Document brainstorm and send it to an opus cryptography bitcoin programmer expert for review -- single agent." | Brief: `design/agent-briefs/hashlock-brainstorm-R0-crypto-review-brief.md`; report: `design/agent-reports/hashlock-brainstorm-R0-r0-crypto-bitcoin-expert.md`. Sections 4.4-4.6 wait for it. |
 
 ## 3. Measured context (so no later section re-derives it)
 
@@ -133,6 +135,17 @@ backup (L3). The 1/10th budget is margin for a future signer port.
   secret seed; a preimage-kind string would be offered at seed entry and fail
   at decode. Both sides need the kind, Rust first.
 
+### 3.7 A spent preimage is public (controller's addition after L10, for review)
+
+Spending through a hash path reveals X in the witness, on-chain, forever. Two
+consequences the record must carry: (1) one phrase per policy, never reused --
+a phrase used for two policies gives both the same X, and the first spend hands
+the second policy's hash path to everyone; (2) after a spend, that hash path is
+open to anyone until the funds move (for a keyed path, still gated by the keys;
+for a keyless wsh path, C22, by nothing). Neither is a codec question; both are
+copy: a card line on the host and a line in the device's confirm modal, listed
+in section 5. The reviewer is asked to confirm or sharpen this (section 6).
+
 ## 4. Design agreed so far
 
 ### 4.1 Scope and stages (presented; not objected to)
@@ -208,6 +221,36 @@ kind and a test pins it (CLI source deferred, F-468).
 Versions: ms-codec 0.8.0 (new kind, corpus SHA re-pinned, MIGRATION section),
 ms-cli 0.18.0.
 
+### 4.3 The preimage kind in ms1 (L10: "Looks good")
+
+- **Wire.** Payload `[0x03][X:32]`, 33 bytes, so the string is 75 characters,
+  the same as entr-32; the prefix byte alone tells them apart, exactly as `0x02`
+  mnem is told apart today. Any other length under `0x03` is refused with the
+  existing payload-length error. The share axis is untouched: a K-of-N set of a
+  preimage recovers to a `0x03` payload. Singles keep the legacy `entr` id, as
+  mnem does.
+- **Codec API (ms-codec 0.8.0).** `Payload::Preimage([u8; 32])` (the enum is
+  `non_exhaustive`, so downstream matches keep compiling), with matching
+  `PayloadKind` and `InspectKind` variants and arms in `dispatch_payload`,
+  `payload_wire_bytes` and `validate`. A fixed-size array makes the 32-byte rule
+  structural. `ReservedPrefixViolation` stops firing for `0x03`; any test that
+  pinned it as reserved flips and is machine-checked at plan time.
+- **Derivation lives in the codec.** `ms_codec::hashlock`: `preimage_hardened`,
+  `preimage_sha256`, `digest`, with the salt and iteration count as named
+  constants. The kind and its derivation share one corpus and one SHA pin, and
+  the Go port pins its provenance against one crate. ms-codec gains `pbkdf2`
+  and `sha2`, both pure Rust and already trusted by `me`. `ms-cli` reaches it
+  through its existing path + version dependency (pin `=0.8.0`); `ms hashlock`
+  is a thin verb: flags, private channels, refusal text, output shape.
+- **Vectors.** Encode/decode round trip, share round trip, inspect kind, and for
+  each method phrase -> X -> H with the `python3` and `openssl kdf`
+  reproductions RUN as a test, not quoted. The corpus SHA is re-pinned, which is
+  what forces the minor bump.
+- **MIGRATION.md.** A 0.7 -> 0.8 section: readers that dispatch on the prefix
+  byte MUST treat `0x03` as a 32-byte preimage and never as entropy. Older
+  readers, including every flashed SH2 before H2, reject the string as a bad
+  prefix, so the failure is a refusal and never a seed.
+
 ## 5. Defaults taken for the operator's veto
 
 | default | why | veto changes |
@@ -220,10 +263,10 @@ ms-cli 0.18.0.
 | `--json` reuses the PrivateKeyMaterial advisory | byte-parity with the toolkit; a preimage on a keyless path can spend alone | a new class (toolkit change) |
 | `--random` included | one line over `getrandom`; the strongest form | drop it |
 | the device asks the method AFTER the phrase, as a two-row pick `Hardened (about 10 s)` / `SHA-256` | mirrors the host flag; the wait is stated before it starts | ask before the phrase |
+| a reuse line on the host card and in the device's confirm modal: "One phrase per policy. Spending reveals the preimage on-chain; a phrase used twice opens the other policy." (section 3.7; controller's addition) | the tool cannot detect reuse (it never sees other policies), so the warning is the whole defence | drop or reword |
 
-## 6. Sections still to walk with the operator
+## 6. Sections still to walk with the operator (after the L11 review lands)
 
-- 4.3 the kind byte in detail (codec API, vectors, MIGRATION, versions).
 - 4.4 the device leg (rows, copy, the 10 s wait, scrub, the payload-ms1 class,
   §14 narrowing, firmware delta).
 - 4.5 process and homes (brainstorm here; `mnemonic-secret/design/SPEC_ms_hashlock.md`
