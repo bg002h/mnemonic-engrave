@@ -235,3 +235,7 @@ No dedicated command exists yet (two `sha256sum` calls and `xxd`); the
 preimage X is what must be backed up (F-132). On-device entry: spec §14 row
 "on-device preimage derivation, storage or engraving" (C25, adversarial C-5)
 -- deferred, not refused; a ruling to revisit it is the operator's.
+
+W-5 rulings (operator, 2026-09-03): `ms` owns the hashlock command (F-465);
+on-device hashlock-phrase entry is REQUIRED, Rust first (F-466 becomes a
+change request for the next cycle). Term: "hashlock phrase" (two words).
