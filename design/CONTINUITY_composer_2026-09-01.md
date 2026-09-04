@@ -1520,3 +1520,17 @@ Command to resume: /resume-composer
   when a blank is on hand (string
   `md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3`, byte for byte),
   Task 5 at the operator's call. The hashlock cycle stays PAUSED (L19).
+
+- Engrave master pushed **`3d55279`** via ci/staging (required context green,
+  no bypass, staging ref deleted; report persisted). Controller verified
+  `origin/master` itself. The commits after `3d55279` are records only.
+- **NOTHING IS IN FLIGHT.** The session's remaining work all needs the operator
+  or is paused: (a) flash fork main `839fa5aa` at their word (device in
+  BOOTSEL, `~/bin/sh/sh2-flash -y`, expected `bg839fa5a (UNLOCKED)`), then the
+  four W-6/W-7 device checks -- Back at the path list lands on `Start from?`;
+  Back again on the script choice; re-picking a script shows `Start from?`
+  again; the blank row keeps the built paths -- plus the adversarial one: seat
+  a key, Back, pick a PRESET, and confirm §8j fires and the seats are cleared;
+  (b) the pad re-check and the Taproot 2-of-3 plate when a blank is on hand;
+  (c) Task 5 at the operator's call; (d) the hashlock cycle, PAUSED before spec
+  (L19).
