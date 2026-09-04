@@ -217,3 +217,21 @@ Filled state, operator 2026-09-03: typing does produce the echo, partially
 visible, but the overlap with the prompt remains -- so both the empty and the
 filled pad overprint, which is what the fix brief's test asserts for every
 pad in both states.
+
+## W-5 — typing a hashlock's 64 hex on the device is very hard (operator, 2026-09-03)
+
+| step | in hand | device did | divergence | class |
+| --- | --- | --- | --- | --- |
+| Path -> Hash lock -> Which hash? with NO payload loaded | rows `Type 64 hex`, `No hash lock` | the fallback keyboard for 64 hex characters | the primary route (§6c, C25: a `hash:` payload record picked as one row) is invisible on a machine with no payload, and the screen does not say it exists | DEFAULT + DOCUMENTATION: the host path exists and works (measured below); the screen should name it -- filed F-465 with the host helper; on-device preimage entry is C25's deferred item, re-raised by the operator -- filed F-466 for a ruling |
+
+Operator's questions: (1) is there a host method to type a preimage, hash it
+doubly and pack it? (2) can the operator enter the preimage on the SH2
+directly? Measured on the host 2026-09-03 (`me` 0.8.0): `X = sha256(passphrase)`
+is the 32-byte preimage, `H = sha256(X)` the digest;
+`printf 'hash:%s\n' "$H" | me sysw pack --no-passphrase --no-now --in - ...`
+packs and `me sysw show` prints `sha256 hashlock (hash:) — b867db87..edbc96cb`;
+the device's `Which hash?` then offers it as `hash 1  b867db87..edbc96cb`.
+No dedicated command exists yet (two `sha256sum` calls and `xxd`); the
+preimage X is what must be backed up (F-132). On-device entry: spec §14 row
+"on-device preimage derivation, storage or engraving" (C25, adversarial C-5)
+-- deferred, not refused; a ruling to revisit it is the operator's.
