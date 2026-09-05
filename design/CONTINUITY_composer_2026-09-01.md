@@ -1899,3 +1899,17 @@ Command to resume: /resume-composer
   `RecordError::PreimagePlate` arm for `me seal`; N-1 pin-test
   discrimination). NEXT: sonnet fold verification -> merge both branches
   -> push engrave -> flash at the operator's word.
+- **H0 FOLD DONE (engrave `hashlock-h0` 95cd48a; fork `hashlock-h0`
+  83fbc17; seven commits, same implementer).** C-1 closed at the root (the
+  guard at the top of `engraveCodex32`'s loop; a Recover-arm test that
+  reproduced the reviewer's frame byte for byte, shares driven UPPERCASE
+  because codex32 needs one case across a set); I-1 words + the 13th
+  corpus row `bip93-plain-33-byte-payload-0x03` (host false / device
+  false; capture 38; sha re-pinned both sides); I-2 `RecordError::
+  PreimagePlate` so `me seal` names the kind (N-1 closed with it); M-1/
+  M-3/M-4 wording. 14 mutations, no survivors. Gates: engrave 617/614
+  (history_purge trio), fork green with 1205 gui tests; firmware
+  1,583,132 / 62,800 (+504 B vs main). Implementer's correction: the
+  corpus flip that bites the RUST seam test is `host_admits`, not
+  `device_admits` (the Rust test cannot call Go). Sonnet fold verification
+  brief committed; dispatch next; controller gate re-run in flight.
