@@ -1,0 +1,18 @@
+You are the ONE implementer for hashlock stage H1b (`me` bumps to ms-codec 0.8). Execute the GREEN plan `/scratch/code/shibboleth/mnemonic-engrave/design/IMPLEMENTATION_PLAN_hashlock_H1b_me_bump.md` (engrave master `eece8a3`, STATUS R0 GREEN) task by task, test-first, exactly as written. Spec: `/scratch/code/shibboleth/mnemonic-secret/design/SPEC_ms_hashlock.md` §1 rule 2, §3, §9; follow-up F-473 in `design/FOLLOWUPS.md`. Use the superpowers `executing-plans` discipline inline; do NOT spawn sub-agents.
+
+Setup — one worktree, one branch, nothing pushed, no `master` commits:
+- `git -C /scratch/code/shibboleth/mnemonic-engrave worktree add -b hashlock-h1b /scratch/code/shibboleth/me-worktrees/hashlock-h1b master`; work ONLY there.
+- Cargo env for EVERY command: `PATH=$HOME/.cargo/bin:$PATH TMPDIR=/scratch/code/shibboleth/.tmp CARGO_TARGET_DIR=/scratch/code/shibboleth/.tmp/hashlock-h1b-target` (its OWN target dir). Package is `-p mnemonic-engrave`. Whole-crate runs use `--no-fail-fast`; the three `history_purge` failures are box-local and expected. `cargo update -p ms-codec` ONLY — never a bare `cargo update`; the repo has no `vendor/` tree.
+- Never touch `/scratch/code/shibboleth/me-worktrees/h1b-gate` (the controller's scratch).
+
+Rules:
+- TDD per step: Task 1's Step 3 is a RED step that must be SEEN (six failures at the bare bump, the mechanism the plan names) before Task 2 turns it green; Tasks 1+2 land in one commit as the plan says. Every `MUTATION:` claim in the plan's tests is re-run once (mutate, quote the failing line, revert with `touch`). Commit per task with the plan's commit messages. Every commit message ends with:
+  `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` and
+  `Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA`
+  Stage paths explicitly (no `git add -A`).
+- Task 4: `version = "0.8.1"`, one `[Unreleased]` CHANGELOG section (the file's style), F-473 closed with the Task 2 SHA, F-454 advanced as the plan says, the M-6 seam-prose correction FILED with owning phase H2 (do not edit the seam corpus). The `me` 0.8.1 release (tag) is NOT yours.
+- If a step is wrong (an anchor moved, an Expected differs, a test text is off), do the MINIMAL correct thing and record the deviation — what the plan said, what you did, why. Never silently diverge. If genuinely blocked, stop and report.
+- Every count in your report comes from a run at the tip you report, captured once to a file under `/scratch/code/shibboleth/.tmp/` and quoted from there. Before your final commit run: `cargo nextest run --locked -p mnemonic-engrave --no-fail-fast`, `cargo clippy --locked -p mnemonic-engrave --all-targets -- -D warnings` (the local nightly's `is_multiple_of` lint in `composer_records.rs:114` is pre-existing and not yours — say so, do not fix it), `cargo fmt -p mnemonic-engrave -- --check`, and `cargo build --locked -p mnemonic-engrave --bin me` then `printf '%s\n' "$PLATE" | me sysw pack --out /tmp-dir/h.bin` and `| me seal --seal-secret --out /tmp-dir/h.uf2` for the plate `ms10hashsqw46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kzv2ncy60u7z9c` (both name the kind, exit 4).
+- Never read any `.jsonl` file.
+
+FINAL ACTION (mandatory): write `/scratch/code/shibboleth/me-worktrees/hashlock-h1b/design/agent-reports/hashlock-H1b-implementation-report.md` (create): per task — the commit SHA, the RED evidence, the PASS counts; every mutation re-run with its failing line; every deviation with its reason; the verbatim tails of the final gate runs; anything left undone and why. Commit that report on the branch as its last commit. Return a two-line summary, the branch tip SHA, and the report path.
