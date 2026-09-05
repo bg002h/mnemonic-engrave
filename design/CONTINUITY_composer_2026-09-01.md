@@ -2406,3 +2406,18 @@ Command to resume: /resume-composer
   agent finished against the green staged SHA. Memory
   `freeze-means-empty-your-hands-first` gains the rule: while a push agent is
   running against a repo, its default branch is read-only for the controller.
+- **H3 CLOSED (records).** F-477, F-478, F-479 closed by the h3-composer-spec
+  merge (657f40f); F-482 folded into the H2 spec (§4.1 lead replaces; §4.2
+  two-sentence lead) at 8d5139d and closed; F-486 closed by the merged manual
+  (host `hash:3cf5d421...b70a4c12` beside device `3cf5d421..b70a4c12`); F-475
+  closed (059833f / fork 245eee1); F-474, F-481 closed in H2. Re-scheduled off
+  H3 with reasons (records-only stage; code needs its own gate): F-480
+  (per-path hash provenance), F-484 (lead ink in the Back margin), F-485 (walk
+  assertions), F-488 (refusal next-step copy). Still open elsewhere: F-483
+  (secret handling), F-487 (reconcile timing, spec design), F-489 (`me seal`
+  record index). No follow-up names H3 as its owning phase. **THE HASHLOCK
+  PHRASE CYCLE IS SHIPPED: H0 + H1 + H1b + H2 + H3.** Remaining for the
+  operator: the flash (`~/bin/sh/sh2-flash .../seedhammerii-v0.0.0-bgb9a9a30.signed.uf2`
+  with the SH2 in BOOTSEL) and the H4 device walk (spec §8), recorded as
+  ASSUMED at their word until then. Toolkit push 00980f9b in flight; engrave
+  records since e77b097 to push after it.

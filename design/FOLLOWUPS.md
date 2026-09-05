@@ -15868,7 +15868,7 @@ Remedy when taken up: a `Class` for the kind (H0 rejected one) or a shape test
 in the guard that does not route through `Class` (`seal::record::preimage_plate`
 is that test). Severity capped at Minor by the operator ruling of 2026-08-27.
 
-### F-477 — `composer-spec-still-says-the-device-never-derives-a-preimage`: H2's phrase route falsifies `SPEC_wallet_policy_composer.md` §6c line 386 and its §14 out-of-scope row (owning phase: **H3**) `#composer` `#seedhammer` `#hashlock` `#records`
+### F-477 — ~~`composer-spec-still-says-the-device-never-derives-a-preimage`~~ **CLOSED 2026-09-05 by `657f40f`** (h3-composer-spec merge: §6c line 386 and the §14 row take H2's wording, provenance paragraph added): H2's phrase route falsifies `SPEC_wallet_policy_composer.md` §6c line 386 and its §14 out-of-scope row (owning phase: **H3**) `#composer` `#seedhammer` `#hashlock` `#records`
 
 Filed 2026-09-05 during the H2 device implementation
 (`IMPLEMENTATION_PLAN_hashlock_H2_device.md` Task 6). Two sentences in the
@@ -15932,7 +15932,7 @@ and to §4.5's bullet list, after the relation-line bullet:
 Measured with it present: the longest §4.5 variant draws 337 characters with 107
 of headroom, above `assertModalBodyFits`'s margin of 80.
 
-### F-480 — `hash-provenance-is-composition-wide-not-per-path`: `composerState.hashByPhrase` is one bool for a whole policy, so §8h's phrase form can outlive the phrase-set hash that earned it (owning phase: **H3**) `#composer` `#seedhammer` `#hashlock`
+### F-480 — `hash-provenance-is-composition-wide-not-per-path`: `composerState.hashByPhrase` is one bool for a whole policy, so §8h's phrase form can outlive the phrase-set hash that earned it (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; per-path provenance is a state-model change with its own gate) `#composer` `#seedhammer` `#hashlock`
 
 Filed 2026-09-05 from H2's R0 round 0 (adversarial I-2, tests I-4), where the
 per-path variant was the reviewers' preferred remedy and was **declined for H2
