@@ -2378,3 +2378,12 @@ Command to resume: /resume-composer
   conflicts resolved by hand: F-475 CLOSED + the H2->H3 line); H2 plan
   IMPLEMENTATION RECORD; push engrave (staging), fork (plain), toolkit
   (staging-PR) ; sh2-flash -b on the fork merge tip; H4 ASSUMED.
+- **H2 SHIPPED TO FORK MAIN (`c284484` = merge of hashlock-h2 a1fd139; then
+  `b9a9a30` = merge of h3-seam-corpus 245eee1).** r2 lens-fold verification
+  GREEN (402611a). Engrave master: ccad644 (hashlock-h2 records), 657f40f
+  (h3-composer-spec), 059833f (h3-seam-corpus; FOLLOWUPS conflict resolved --
+  F-475 CLOSED header kept over the H2->H3 line; seam test passes on master).
+  H2 plan IMPLEMENTATION RECORD written. Toolkit: h3-hashlock-device-manual
+  6b2b4048 to merge + push (staging-PR). NEXT (this turn): fork push (plain),
+  sh2-flash -b on b9a9a30, engrave push via staging (agent), toolkit merge +
+  push (agent). Then H4 ASSUMED at the operator's word; the flash is theirs.
