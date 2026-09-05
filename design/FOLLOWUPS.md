@@ -15932,7 +15932,7 @@ and to §4.5's bullet list, after the relation-line bullet:
 Measured with it present: the longest §4.5 variant draws 337 characters with 107
 of headroom, above `assertModalBodyFits`'s margin of 80.
 
-### F-480 — `hash-provenance-is-composition-wide-not-per-path`: `composerState.hashByPhrase` is one bool for a whole policy, so §8h's phrase form can outlive the phrase-set hash that earned it (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; per-path provenance is a state-model change with its own gate) `#composer` `#seedhammer` `#hashlock`
+### F-480 — ~~`hash-provenance-is-composition-wide-not-per-path`~~ **CLOSED 2026-09-05 by fork `<FORK_MERGE_SHA>`** (hashlock H5 -- the next device code cycle these five were owned to, not overdue; gate `gui/composer_provenance_test.go`'s six tests, `composerState.phraseDigests` replacing `hashByPhrase`): `composerState.hashByPhrase` is one bool for a whole policy, so §8h's phrase form can outlive the phrase-set hash that earned it (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; per-path provenance is a state-model change with its own gate) `#composer` `#seedhammer` `#hashlock`
 
 Filed 2026-09-05 from H2's R0 round 0 (adversarial I-2, tests I-4), where the
 per-path variant was the reviewers' preferred remedy and was **declined for H2
@@ -16019,7 +16019,7 @@ wipe, and a wipe of the OK copy after derivation. The idle-timer item stays as i
 kept; not pulled into the next device code cycle, which spends its slots on F-487 and
 F-480 (what the operator sees).
 
-### F-484 — `hashlock-phrase-lead-paints-inside-the-back-button-margin`: the phrase screen's lead wraps at `dims.X-2*8` centred on the whole panel and paints 152 px of ink inside the Back button's rectangle (its empty margin; 0 px of glyph or chip lost), where `composerPageLines` uses a narrower band for exactly this (W-3) (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#geometry`
+### F-484 — ~~`hashlock-phrase-lead-paints-inside-the-back-button-margin`~~ **CLOSED 2026-09-05 by fork `<FORK_MERGE_SHA>`** (hashlock H5 -- the next device code cycle these five were owned to, not overdue; gate `gui/composer_hashlock_geometry_test.go`, asserting the lead's ink stays out of the nav button rects): the phrase screen's lead wraps at `dims.X-2*8` centred on the whole panel and paints 152 px of ink inside the Back button's rectangle (its empty margin; 0 px of glyph or chip lost), where `composerPageLines` uses a narrower band for exactly this (W-3) (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#geometry`
 
 Filed 2026-09-05 from the ultracode geometry lens (`hashlock-H2-post-impl-lens-geometry.md` M-1),
 measured by raster: lead (440,44) at (20,44), nav column from x=427, 152 px of lead ink
@@ -16027,7 +16027,7 @@ inside (427,44)-(480,97), overlap with chip ink 0 px, z-order lead on top. Not f
 the F-481 fix because narrowing the lead band can add a wrapped line and take the readout
 height back; fold it with a re-measurement of both.
 
-### F-485 — `hashlock-walk-does-not-assert-hold-order-or-stored-vs-displayed`: `cmd/emu/walk_hashlock_phrase.js` passes when the hash is assigned BEFORE the hold and when the stored digest differs from the displayed one (CI's gui tests catch both); it picks the phrase row by INDEX; `out.ok` restates assertions that already threw (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#walk` `#tests`
+### F-485 — ~~`hashlock-walk-does-not-assert-hold-order-or-stored-vs-displayed`~~ **CLOSED 2026-09-05 by fork `<FORK_MERGE_SHA>`** (hashlock H5 -- the next device code cycle these five were owned to, not overdue; gate the rewritten `cmd/emu/walk_hashlock_phrase.js` plus `gui/composer_state_hook_test.go` / `ComposerPathHashes()`, asserting the post-hold stored hash against the displayed token and picking the row by label): `cmd/emu/walk_hashlock_phrase.js` passes when the hash is assigned BEFORE the hold and when the stored digest differs from the displayed one (CI's gui tests catch both); it picks the phrase row by INDEX; `out.ok` restates assertions that already threw (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#walk` `#tests`
 
 Filed 2026-09-05 from the walk-control lens (`hashlock-H2-post-impl-lens-walk-control.md`
 M-1, M-2, N-1, N-2). The walk DOES fail under a mutated digest display and a mutated
@@ -16041,7 +16041,7 @@ Filed 2026-09-05 from the host-device e2e lens (`hashlock-H2-post-impl-lens-host
 M-1). The H3 toolkit-manual draft describes the confirm modal; make sure it states the
 abbreviation rule and shows one host/device pair side by side.
 
-### F-487 — `hashlock-reconciliation-is-asked-after-the-digest-left-the-screen`: the reconcile screen asks the operator to compare against the host after the confirm modal (which held the digest) has been dismissed, and the write-down instruction does not tell them to write the digest (owning phase: **the next device code cycle** -- RULED 2026-09-05) `#hashlock` `#seedhammer` `#ux` `#spec`
+### F-487 — ~~`hashlock-reconciliation-is-asked-after-the-digest-left-the-screen`~~ **CLOSED 2026-09-05 by fork `<FORK_MERGE_SHA>`** (hashlock H5 -- the next device code cycle this was owned to, not overdue; gate the `composerCopyHashlockReconcile` row in `gui/composer_copy_test.go` and `assertModalBodyFits` in `gui/modal_fits_test.go`; H2 spec §4.5/§4.7 folded in this same commit): the reconcile screen asks the operator to compare against the host after the confirm modal (which held the digest) has been dismissed, and the write-down instruction does not tell them to write the digest (owning phase: **the next device code cycle** -- RULED 2026-09-05) `#hashlock` `#seedhammer` `#ux` `#spec`
 
 Filed 2026-09-05 from the host-device e2e lens M-2. Options: repeat the abbreviated digest
 on the reconcile screen, or add "and this digest" to the write-down copy. A spec change;
@@ -16057,7 +16057,7 @@ headroom the other lines need). Spec §4.5/§4.7 fold first, then code with the 
 measurement; bundled with F-480/F-484/F-485/F-488 in the next device code cycle unless the
 operator pulls it forward.
 
-### F-488 — `f474-refusal-names-the-record-but-not-the-next-step`: the unlock KDF's new refusal says which record and what it is, but not what to do (remove the record on the host and re-seal) (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#ux`
+### F-488 — ~~`f474-refusal-names-the-record-but-not-the-next-step`~~ **CLOSED 2026-09-05 by fork `<FORK_MERGE_SHA>`** (hashlock H5 -- the next device code cycle these five were owned to, not overdue; gate `TestUnlockNotPermittedBodyNamesTheRecordAndTheKind`, `gui/unlock_preimage_test.go`): the unlock KDF's new refusal says which record and what it is, but not what to do (remove the record on the host and re-seal) (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#ux`
 
 Filed 2026-09-05 from the host-device e2e lens M-3. One more sentence in the arm's copy,
 re-measured for fit.
@@ -16079,3 +16079,11 @@ Filed 2026-09-05 from the controller's whole-gui run on the H5 gated tree (shard
 under load. H5 does not touch the file. Same class as the toolkit's wall-clock ceiling test:
 make the job completion deterministic (inject the clock or wait on the state transition), or
 move the KDF-heavy tests to their own shard.
+
+### F-491 — `h2-spec-reuse-block-drift-not-shipped-two-sentence-form`: H2 spec §4.5's reuse block quotes the four-sentence pre-drop-order form ("One phrase per policy. Spending any path of a wsh wallet publishes this digest. Never use this phrase as a passphrase or a password anywhere else -- a spend publishes the preimage, and anyone can then test guesses at the phrase itself."), while the shipped `composerCopyHashlockConfirm` (`gui/composer_copy.go:421-422` at fork main `b9a9a30`) has always drawn the drop order's two-sentence form: "One phrase per policy. Never use this phrase as a passphrase or a password anywhere else." (owning phase: **H2 spec hygiene**) `#hashlock` `#seedhammer` `#docs` `#records`
+
+Filed 2026-09-05 from hashlock H5 Task 6 Step 1 (`IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md`), which declines to fold it alongside the write-down/reconcile edit so `git diff` on that commit is H5's change and nothing else. Real and pre-existing, not one of H5's five follow-ups. Fix: quote the shipped two-sentence text verbatim in §4.5's fenced block in place of the four-sentence form -- a transcription, not a re-decision.
+
+### F-492 — `no-manual-section-documents-the-re-sealed-payloads-new-passphrase`: H5 spec §5's documentation-only item (journey M-5) asks that "the manual's unlock section" state the re-sealed payload has a new passphrase, but no such section exists -- `docs/manual/src/40-cli-reference/` holds only `41-mnemonic.md`, `42-md.md`, `43-ms.md` and `44-mk-cli.md`, and a grep of the whole tree for the refusal's own words ("Nothing was opened", "cannot be unlocked here", "not a seed") returns nothing at toolkit `46b40bb` (owning phase: **the `me`/sysw manual chapter**) `#hashlock` `#seedhammer` `#docs` `#unlock`
+
+Filed 2026-09-05 from hashlock H5 Task 6 Step 3 (`IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md`), which measured the grep before filing rather than inventing a target: writing an unlock chapter is a documentation deliverable of its own, several screens wide, and a free-floating sentence in the `ms hashlock` chapter would sit where nobody reading about unlocking would find it. The device's own refusal text already carries the instruction (H5 spec §5); this follow-up is only the manual-side gap.
