@@ -2600,3 +2600,14 @@ Command to resume: /resume-composer
   post-impl (brief tips filled) -> fold -> merge fork main --no-ff -> fill
   <FORK_MERGE_SHA> in h5-records, merge h5-records + h5-manual -> pushes ->
   signed image (one flash covers H0+H2+H5).
+- **H5 SHIPPED.** Post-impl (opus, 55c2260): code GREEN (24 mutations 0
+  survivors; nine wallet shapes; five bodies byte-exact; firmware 1,599,208 B
+  = +1,804 vs b9a9a30, hook -16 B; every implementer count reproduced); the
+  one Important was records (F-485's header said 'by label' -- withdrawn by
+  spec §4.3) -> folded on h5-records at 4ce77040 with the SHA fill and the
+  M-2 citation pin (records-only, no re-review). **Fork main fb0dd04 = merge
+  of hashlock-h5 8e605e1, PUSHED.** Engrave master merged h5-records at
+  d26bbfa0; toolkit master merged h5-manual at 13f78a26. H5 plan
+  IMPLEMENTATION RECORD written. Signed image at fb0dd04 building
+  (sh2-flash -b). NEXT: push engrave (staging) + toolkit (staging-PR);
+  record the image sha + the operator's one flash command; H4 ASSUMED.
