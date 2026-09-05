@@ -2734,3 +2734,14 @@ Command to resume: /resume-composer
   body renders near-blank on the harness (ASCII-only rule); the QR raise
   needs `constantTimeQRModules` capacity entries for the new dimensions (§7.2
   deliverable missing). Fidelity + journey lenses in flight; fold after both.
+- H6 spec R0 r0: journey lens landed (c524e5f5, 1C/7I/7M/2N). **C-1: the fork has
+  no ms1 PREIMAGE encoder** (`codex32.EncodeMS1` is entr-only), so decision 1's
+  default form cannot be produced for a device-derived preimage. Two exits
+  put to the operator: (a) add `EncodeMS1Preimage` Rust-first (ms-codec/me
+  with corpus rows: id hash, kind 0x03, 75 chars, decode(encode(x)) == x) then
+  the Go port; (b) the string form is payload-only; device-derived preimages
+  cut the phrase form. Importants for the fold: census screen read-only vs
+  four per-plate interactions; the flow's silent ~10 s derive; orphan check
+  misses phrase records; collision copy dead-ends; PREIMAGE REQUIRED also
+  marks mk1 cards; invisible Password refusal; no copy for the new abort
+  window. Fidelity lens in flight.
