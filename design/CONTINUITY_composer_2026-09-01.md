@@ -2725,3 +2725,7 @@ Command to resume: /resume-composer
   (briefs f6c696d3): fidelity (opus), journey (opus), tests + citations
   (sonnet). Spec presented to the operator for review in parallel. NEXT:
   persist -> fold (with operator feedback) -> verification -> GREEN -> plan.
+- **OPERATOR: "Proceed"** on the H6 spec at a0f832d0 (no changes requested; the
+  three corrected premises and the two measurements accepted). R0 round 0
+  lenses in flight (fidelity, journey, tests). NEXT: persist -> fold ->
+  verification -> GREEN -> plan (author + per-task gate) -> implementers.
