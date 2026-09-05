@@ -64,7 +64,18 @@ pub struct Sealed {
 
 #[derive(Debug)]
 pub enum SealError {
+    /// A record-level error with no single record to point at (the public set
+    /// as a whole failed to decode).
     Record(record::RecordError),
+    /// A record-level error at a known position: `index` counts from 0 within
+    /// `section` (`"public"` or `"secret"`), the way `me sysw pack` counts
+    /// (F-489) -- so an operator holding a multi-record file knows which line
+    /// to remove.
+    RecordAt {
+        section: &'static str,
+        index: usize,
+        source: record::RecordError,
+    },
     Container(container::ContainerError),
     Passphrase(String),
     Crypto(CryptoError),
@@ -78,6 +89,14 @@ impl std::fmt::Display for SealError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SealError::Record(e) => write!(f, "{e}"),
+            SealError::RecordAt {
+                section,
+                index,
+                source,
+            } => write!(
+                f,
+                "record {index} (records count from 0) in the {section} section: {source}"
+            ),
             SealError::Container(e) => write!(f, "{e}"),
             SealError::Passphrase(e) => write!(f, "{e}"),
             SealError::Crypto(e) => write!(f, "{e}"),
@@ -163,7 +182,13 @@ fn check_public(public: &[String]) -> Result<(), SealError> {
         match record::validate_record(r) {
             Ok(k) if k.is_secret() => return Err(SealError::SecretInPublic(i)),
             Err(record::RecordError::MsTooLong(_)) => return Err(SealError::SecretInPublic(i)),
-            Err(e) => return Err(SealError::Record(e)),
+            Err(e) => {
+                return Err(SealError::RecordAt {
+                    section: "public",
+                    index: i,
+                    source: e,
+                })
+            }
             Ok(_) => {}
         }
     }
@@ -216,8 +241,17 @@ pub(crate) fn seal_deterministic(
         ));
     }
     check_public(&payload.public)?;
-    for r in &payload.secret {
-        record_or_mnemonic(r)?;
+    for (i, r) in payload.secret.iter().enumerate() {
+        // F-489: name the record the way `sysw pack` does. `record_or_mnemonic`
+        // knows nothing about position, so the index is attached here.
+        record_or_mnemonic(r).map_err(|e| match e {
+            SealError::Record(source) => SealError::RecordAt {
+                section: "secret",
+                index: i,
+                source,
+            },
+            other => other,
+        })?;
     }
 
     let pubsec: Zeroizing<String> = if payload.public.is_empty() {
@@ -1166,7 +1200,7 @@ mod tests {
     ///   "record 0 is secret material and cannot ride in the public section"
     ///
     /// Mutation this pins: delete the `classify(r) == Format::Ms` guard from
-    /// `check_public` — the assertion then sees `SealError::Record` instead.
+    /// `check_public` — the assertion then sees `SealError::RecordAt` instead.
     #[test]
     fn an_overlong_ms1_in_public_is_reported_as_a_secret_not_as_too_long() {
         // 91 characters: one past §10.2.1a's engraveable limit, and a secret.
@@ -1245,7 +1279,10 @@ mod tests {
                 iv([0xba, 0xc0]),
                 PASS
             ),
-            Err(SealError::Record(record::RecordError::NotLowercase(_)))
+            Err(SealError::RecordAt {
+                source: record::RecordError::NotLowercase(_),
+                ..
+            })
         ));
     }
 
