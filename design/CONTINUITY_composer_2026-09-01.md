@@ -1982,3 +1982,17 @@ Command to resume: /resume-composer
   ruling L26). The hashlock-phrase cycle's H1 is SHIPPED; H0 merged; H2
   (device: 0x03 arm + "Type a hashlock phrase" row + method pick) is the
   next stage, unplanned.
+- **ms-codec 0.8.0 PUBLISHED to crates.io (2026-09-05T03:28:43Z).** The
+  operator said "Proceed autonomously, asking fable architect for blocking
+  questions"; the publish was the one blocking decision, routed to a fable
+  architect (decision report ms `a4e3b4a`: YES, from the tag's tree,
+  --locked, ms-codec only, verify via the API). Done exactly so, from a
+  detached worktree at `ms-codec-v0.8.0` (cd0a60f); `max_version 0.8.0`
+  confirmed. Follow-up filed in ms: RELEASE_PROCESS.md gets the real
+  publish step. Records pushed: engrave `1b0ec7e`, ms `1990648` (+3 record
+  commits since, unpushed). Toolkit manual: `ms hashlock` section written,
+  `cli-subcommands.list` gains the verb, mk chapter mirrors four post-0.13.0
+  encode flags the lint flagged; lint passes flag-coverage; one cspell word
+  (`sysw`) being added; toolkit push next. UNBLOCKED: H1b (me bumps to
+  ms-codec 0.8 with an explicit Payload::Preimage refusal arm and
+  preimage_plate re-pointed; F-473) -- planning next, risk set.
