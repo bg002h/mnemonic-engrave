@@ -1,6 +1,6 @@
 # Hashlock H2 — Device Leg Implementation Plan (SeedHammer fork)
 
-**STATUS: DRAFT -- R0 round 0 folded; r1 fold verification pending.**
+**STATUS: R0 GREEN 2026-09-05 (0 Critical / 0 Important open).** Round 0 (plan `02abee6`): five lenses in parallel -- fidelity (opus, `hashlock-H2-plan-R0-r0-fidelity.md`, 0C/6I/7M/4N), tests/mutation (sonnet, `-tests.md`, 1C/6I/2M/1N), journey walk (opus, `-journey.md`, 0C/5I/3M/2N), adversarial failure states (opus, `-adversarial.md`, 2C/4I/7M/5N), coverage + comprehension (sonnet, `-coverage.md`, 0C/1I/3M/1N) -- then a refute pass (sonnet, `-refute.md`: 25 C/I -> 24 CONFIRMED + 1 PARTIAL, 16 distinct defects), ONE fold (`f60c2df`, opus fold agent, plan and gated tree together, 21 mutations RED->GREEN), r1 fold verification (sonnet, `hashlock-H2-plan-R0-r1-fold-verification.md`) **GREEN** with two citation Nits folded at the commit after it. Lens-closure: fidelity, tests, journey, adversarial, coverage, refute, fold-verification. The one gate not yet executed is Task 5 Step 1's emulator walk -- the implementer writes and runs it, the controller re-runs it before the post-implementation review.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -2762,7 +2762,7 @@ func hashlockDeriveFlow(ctx *Context, th *Colors, phrase []byte, m hashlockMetho
 		// AFTER Frame governs the NEXT frame and frame 1 inherits Run's own
 		// ctx.WakeupAt(idleWakeup) -- three minutes. Without KeepAwake, Run
 		// refreshes a.idle.start only on `effectiveInput(evts, &a.pressed) ||
-		// (ctx.keepAwake && !armed)` (run_flow.go:350-351) and a derivation
+		// (ctx.keepAwake && !armed)` (run_flow.go:349-350) and a derivation
 		// produces no events, so once idleTimeout (3 min,
 		// gui/gui.go:3584) is crossed the screensaver takes the screen and its
 		// branch `continue`s without breaking (run_flow.go:401-406) -- ctx.Frame
@@ -3084,7 +3084,7 @@ since the gate's own run; the verdict has not):
           IMPLEMENTATION_PLAN_hashlock_H2_device.md:1150  ```bash
           IMPLEMENTATION_PLAN_hashlock_H2_device.md:2887  ```bash
           IMPLEMENTATION_PLAN_hashlock_H2_device.md:2905  ``` (no info string)
-          IMPLEMENTATION_PLAN_hashlock_H2_device.md:2929  ```bash
+          IMPLEMENTATION_PLAN_hashlock_H2_device.md:2930  ```bash
       * every PROSE claim: expected test names, mutation outcomes, headroom and
         firmware numbers, spec references, file:line citations.
       * whether the tree is GREEN -- this compares TEXT only; `go test` and the
