@@ -2250,3 +2250,17 @@ Command to resume: /resume-composer
   fold verification DISPATCHED** (sonnet, brief f43a8ad; executes both
   Criticals' RED itself). If GREEN: fill PLAN_SHA in the implementer brief ->
   ONE opus implementer on fork branch hashlock-h2.
+- **H2 PLAN R0 GREEN (`1cb05b8`).** r1 fold verification (sonnet, 536fa79) GREEN:
+  both Criticals' RED/GREEN reproduced in a fresh scratch, declined remedies
+  verified by execution, whole suite + vet + gofmt + checker re-run (1220/1220,
+  26/0). Two Nits folded (a citation off by one -- in a Go comment, so the
+  gated tree's composer_hashlock.go got the same edit; the embedded checker
+  line number). STATUS carries the lens list and names the one un-executed
+  gate (the walk). **ONE opus implementer DISPATCHED** (brief
+  hashlock-H2-implementer-brief.md at 1cb05b8): fork worktree
+  .tmp/seedhammer-hashlock-h2 (branch hashlock-h2 off c4a64fc) + engrave
+  records worktree me-worktrees/hashlock-h2. NEXT: implementation report ->
+  controller gate re-run + emulator walk (fresh port, playwright) -> opus
+  post-impl (brief hashlock-H2-post-impl-brief.md, fill tips) -> fold ->
+  merge fork main --no-ff -> push -> pre-build signed image -> H4 ASSUMED at
+  the operator's word; flash at their word only.
