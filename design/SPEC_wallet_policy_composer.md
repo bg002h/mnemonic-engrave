@@ -383,8 +383,16 @@ Primary: pick from the payload's `hash:` records, each row `hash <i>  <first 8>.
 `sha256(H)` compiles to `OP_SIZE <32> OP_EQUALVERIFY OP_SHA256 <H> OP_EQUAL`, so
 the preimage MUST be exactly 32 bytes; a digest of a passphrase directly can never
 be spent (§8i; the reference wallet's own README records months of exactly that).
-The composer never derives, stores or engraves a preimage this cycle (§14). When
+From H2 the composer derives a preimage in RAM for the length of one screen and
+never stores, shows or engraves it; it puts a digest in a script (§14). When
 every path of the policy carries a hash, the §8h warning fires before consent.
+
+(H2, fork `hashlock-h2` `a1fd139`, the leg reviewed at `17b3979`:
+`SPEC_hashlock_H2_device.md` §4.1 adds a `Type a hashlock phrase` row ahead of
+`Type 64 hex`; the phrase route derives X on the stack and drops it when the
+route returns (`gui/composer_hashlock.go:19-20`), assigning only
+`hashlock.Digest(&x)` to `Paths[idx].Hash` (`gui/composer_hashlock.go:64-69`).
+The fork's own record is `gui/composer_hash.go:27-28`.)
 
 ## 7. The flow — the C8 workflow, walked
 
@@ -1067,7 +1075,7 @@ table, so the glyph and modal-fits gates cover it.
 | unspendable-xpub NUMS form | F-449, its own cycle |
 | quantum framing of pk vs pkh in tr | F-448 |
 | NFC seating | C8: payload first; NFC hardware not yet in hand |
-| on-device preimage derivation, storage or engraving | C25; §6c |
+| on-device preimage storage, display or engraving | C25; §6c. Derivation is no longer out of scope: from H2 the device derives one in RAM for the length of one screen (`SPEC_hashlock_H2_device.md` §1 item 5) |
 | removing or redirecting Multisig Build | C7: comment only; its dead-end (F-150 item 1) stays as filed and is not fixed by this cycle |
 | scrub timing at every abandon point of the composer's seed screens | secret-handling, non-gating by the 2026-08-27 ruling; filed as a follow-up for optimisation |
 | on-screen QR display of a descriptor | staged plan 6b, deferred |

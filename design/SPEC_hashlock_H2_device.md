@@ -33,12 +33,13 @@ discipline beyond what the composer does by construction; L16 §4.4 agreed; L22
 
 **One sentence this stage makes false, in two places:** the composer spec's §14
 (and its §6c line, `SPEC_wallet_policy_composer.md:386`) and the fork's
-`gui/composer_hash.go:27-28` say the composer "never derives, stores or engraves a
-preimage this cycle". From H2 the composer DERIVES one, in RAM, for the length of
-one screen; it still never stores, shows or engraves it. The fork comment is
-rewritten by THIS stage's implementation commit (§1 item 5); the composer spec's
-two sentences are H3's (the records stage) and stay as they are until then —
-they are named here so H3 cannot miss them (fidelity I-5; r1 NF-C).
+`gui/composer_hash.go:27-28` SAID the composer "never derives, stores or
+engraves a preimage this cycle"; all three are now rewritten. From H2 the
+composer DERIVES one, in RAM, for the length of one screen; it still never
+stores, shows or engraves it. The fork comment is rewritten by THIS stage's
+implementation commit (§1 item 5); the composer spec's two sentences are H3's
+(the records stage) — they are named here so H3 cannot miss them (fidelity
+I-5; r1 NF-C), and H3 has now folded both (`## H3 fold`).
 
 ---
 
@@ -246,6 +247,8 @@ the operator HOLDS to confirm and presses Back to decline (fidelity M-4). Title
 hash  <first8>..<last8>
 method: hardened   chars: <n>        (or: method: sha256   chars: <n>)
 <relation line, only when the payload holds hash: records>
+<other-path line, only when another path of this policy already carries a different
+hash: "another path has a different hash: back up every phrase">
 Write down this phrase and the method now. They are
 not on this device and not on your plates. Without
 both, this path can never be spent.
@@ -265,6 +268,12 @@ matches.
 - The relation line (journey C-2): when the payload holds `hash:` records,
   `matches hash <i> in the payload` if the digest equals record *i*, else
   `no hash: record in the payload has this digest`; omitted when there are none.
+- The other-path line (journey I-1): when any OTHER path of the same policy
+  already carries a `Hash` that differs from this digest, the modal says so,
+  because `md.ValidatePathList` has no clause about two paths' `Hash` values and
+  "One phrase per policy" is advice — a second phrase is legal, and a second
+  backup burden the operator must choose knowingly. Omitted when no other path
+  carries a hash, or when the hashes are equal.
 - The backup line (journey C-1) is unconditional: this is the first flow on the
   device that takes a secret, uses it and forgets it, and nothing else on the
   route says so. The reuse lines are the brainstorm's §3.7 copy in full
@@ -278,8 +287,11 @@ matches.
   uncertain because the 18-character digest token does not wrap): first shorten
   the reuse block to the brainstorm's two sentences ("One phrase per policy.
   Never use this phrase as a passphrase or a password anywhere else."), then
-  move the reconciliation line into the phrase-route §8h at Done (§4.7). The
-  backup line and the relation line are never dropped.
+  move the reconciliation line out of the confirm modal and onto its own
+  dismissible screen shown immediately after HOLD, where it is reachable for
+  every policy that has a phrase-set hash — NOT into the phrase-route §8h at
+  Done, whose `composerEveryPathHashed` guard is false for any policy with one
+  un-hashed path. The backup line and the relation line are never dropped.
 
 The 64 visible bits (`first8..last8`) are a transcription check, adequate ONLY
 because the full-width lockstep vector runs in CI (§7.1); the H4 walk records
@@ -537,3 +549,39 @@ phrase screen's lead and the verb in both modals; I-3 → "Even a 20-character
 phrase … shorter ones fall sooner"; I-4/I-5 → §4.6; I-6 → §4.7; M-1 the
 no-payload lead; M-2 the fit assertion on the longest variant; M-3 the
 zero-state lead; M-4 the power-loss sentence; M-5 `chars: <n>`; N-1 §8i once.
+
+---
+
+## H3 fold
+
+The two spec departures the H2 implementation plan recorded rather than folded
+are applied above, at H3 (the records stage). Both are quoted verbatim in
+`IMPLEMENTATION_PLAN_hashlock_H2_device.md` under `## R0 round 0 folded here`,
+committed at `f60c2df` ("2 spec departures recorded as H3 items"); the plan is
+NOT edited by this fold.
+
+1. **§4.5's drop order, last clause.** The plan's `## R0 round 0 folded here`
+   item 3 moved the reconciliation line onto its own `showError` screen right
+   after HOLD, because §8h's `composerEveryPathHashed` guard
+   (`gui/composer_state.go:244` on `hashlock-h2`; `:239` at the fork baseline
+   `c4a64fc`) is false for any policy with one un-hashed path, so the drop
+   order's original destination was unreachable on the ordinary mixed wallet.
+   §4.5's clause now names the new destination. The removal from the modal
+   stands; only the destination changed.
+2. **§4.5's line list gains the other-path line** (journey I-1). The plan's
+   second H3 record item; `hashlockOtherPathLine` compares the new digest
+   against every OTHER path's `*p.Hash` and the confirm body draws the line
+   between the relation line and the backup line
+   (`gui/composer_hashlock.go:64-66`, `gui/composer_copy.go:409-417`).
+
+**One quote differs from the plan's prescription, deliberately.** The plan
+prescribed the line's copy as `"another path has a different hash: two phrases
+to back up"`, which was the string at `17b3979`. The ultracode-lens fold at
+`a1fd139` made it count-free — `composerCopyHashlockOtherPath` now returns
+`"another path has a different hash: back up every phrase"`
+(`gui/composer_copy.go:454-456`) — so §4.5 quotes the live string. Everything
+else in both departures is the plan's wording verbatim.
+
+The composer spec's own two sentences (`SPEC_wallet_policy_composer.md` §6c and
+its §14 row), which this spec's opening paragraph and §1 item 5 name as H3's,
+are folded in the same commit.
