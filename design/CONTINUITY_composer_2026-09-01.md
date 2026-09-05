@@ -2108,3 +2108,22 @@ Command to resume: /resume-composer
   + walk), its build gate (Go, hand-wired), R0, ONE implementer, post-impl,
   emulator walk, fork merge, flash at the operator's word (H4). H1b
   implementer still running.
+- **H1b IMPLEMENTED (engrave branch `hashlock-h1b`, tip `278a0e4`: 51f25c9
+  Tasks 1+2, 2bb3f3b Task 3, 6f4edf8 records, 278a0e4 report).** RED seen as
+  predicted (six F-473 failures + the history trio); four mutations
+  reproduced; me 0.8.1 with ms-codec 0.8.0; F-473 closed, F-454 advanced,
+  F-475 filed (the seam-prose correction, owning phase H2; measured:
+  UnknownTag, not TagKindMismatch). Two recorded deviations (a witness
+  comment corrected to the measured fact; Task 2's git add widened to the
+  gated tree). Observation: main.rs's UnknownReason match is exhaustive, so
+  a new refusal reason without operator words does not compile -- a free
+  structural guard. Controller re-run at 278a0e4: 619/616, fmt clean,
+  clippy only the pre-existing lint, lockfile moved ms-codec only, both
+  verbs exit 4 on the plate. Opus post-impl DISPATCHED (brief 38509a9).
+- **H2 PLAN DRAFTED (`38509a9`)**: six tasks (hashlock package on
+  seal.NewDeriver + vendored corpus; DecodeMS1Preimage; label-keyed Which
+  hash?; the phrase route as one loop with both copy gates; the emulator
+  arm; records). Build gate delegated to a sonnet gate agent (hand-wire
+  into .tmp/h2-gate, run, report every fix as a finding). OPERATOR (mid-turn):
+  "You may use up to 5 agents to help with questions or folds or anything"
+  -- concurrency budget 5; two in flight now.
