@@ -2069,3 +2069,11 @@ Command to resume: /resume-composer
   derives a preimage" records are named for folding. r1 sonnet fold
   verification DISPATCHED. Also in flight: H1b r1 verification; the toolkit
   staging-PR push.
+- **TOOLKIT MANUAL PUSHED (`7e07088c`, PR #69, staging-PR ritual):** the
+  `ms hashlock` section, `cli-subcommands.list`, the mk mirror rows and the
+  two follow-ups are on origin; `examples`/`test (ubuntu-latest)`/`clippy`
+  green on the SHA via the unfiltered pull_request triggers, master
+  fast-forwarded with no bypass, PR merged by the fast-forward, ci/staging
+  deleted; report committed in the toolkit (`67090e2a`, unpushed record).
+  The H1b implementer brief is drafted (`hashlock-H1b-implementer-brief.md`,
+  uncommitted, `<PLAN_SHA>` pending r1 GREEN).
