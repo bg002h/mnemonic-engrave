@@ -1,0 +1,673 @@
+package gui
+
+import (
+	"strings"
+	"testing"
+	"testing/synctest"
+	"time"
+
+	"seedhammer.com/gui/layout"
+	"seedhammer.com/gui/op"
+	"seedhammer.com/gui/widget"
+	"seedhammer.com/md"
+)
+
+// ---------------------------------------------------------------------------
+// Post-implementation review lens: INTERRUPTION AND STATE.
+//
+// These tests drive interruptions of the §4 phrase route that the branch's own
+// tests do not: a Back at the phrase screen followed by a RE-ENTRY (the branch
+// backs out and stops, so "the phrase is dropped" is never observed), an
+// abandoned hardened derivation that is RE-ENTERED (the branch abandons and
+// then picks SHA-256 instead), an EDIT of the restored fragment after a Back
+// from the method pick (the branch restores it and immediately takes OK), a
+// Back at the reconcile screen, and the screensaver crossing the phrase screen
+// while a phrase is held.
+// ---------------------------------------------------------------------------
+
+// hashlockEnterPhraseRow walks composerAddPath as far as the phrase screen:
+// key-less path -> EXPERIMENTAL hold -> `Which hash?` -> the phrase row -> the
+// §8i rule modal -> OK. Identical to the opening of every test in
+// composer_hashlock_test.go, factored so these tests can re-enter the row.
+func hashlockEnterPhraseRow(t *testing.T, h *sessionHarness) {
+	t.Helper()
+	h.mustReach("Type a hashlock phrase")
+	h.tapRow(0, 3)
+	h.mustReach("32-byte value") // the §8i rule modal (composerCopyHashRule)
+	h.tapNav(Button3)
+	h.mustReach("Hashlock phrase")
+}
+
+// I-lens 1. §4.2: "Back returns to `Which hash?` and drops the phrase."
+//
+// TestHashlockBackContractKeepsThePath reaches `Which hash?` by Back from the
+// phrase screen and then immediately Backs out of the whole editor, so the word
+// "drops" is asserted nowhere: a hashlockPhraseRoute that kept the bytes across
+// the outer loop would leave that test green. This re-enters the row and reads
+// the counter, which is the one signal §4.2 gives the operator.
+//
+// MUTATION (measured, see the report): hoist `var phrase []byte` out of
+// hashlockPhraseRoute into a package-level cache, or make composerHashEdit's
+// phrase arm re-call hashlockPhraseRoute with the previous phrase -> the
+// re-entered screen reads 28/100 and this fails.
+func TestHashlockBackAtThePhraseScreenActuallyDropsThePhrase(t *testing.T) {
+	st := composerStateForTest(t)
+	h := runComposerAddPath(t, st, composerSessionWith(nil, nil))
+	h.mustReach("What can spend on this path?")
+	h.choose(1) // A hash, no keys
+	h.mustReach("EXPERIMENTAL")
+	h.holdConfirm()
+	hashlockEnterPhraseRow(t, h)
+	typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
+	h.mustReach("28/100")
+	h.tapNav(Button1) // Back at the phrase screen -> Which hash?, phrase dropped
+	h.mustReach("Type a hashlock phrase")
+	if st.list.Paths[0].Hash != nil {
+		t.Fatal("a hash was assigned by a Back at the phrase screen")
+	}
+	// Re-enter the same row.
+	hashlockEnterPhraseRow(t, h)
+	c := h.content
+	if uiContains(c, "28/100") {
+		t.Fatalf("the phrase survived a Back to `Which hash?`: the re-entered "+
+			"screen reads 28/100 (spec §4.2 drops it). Frame: %q", c)
+	}
+	if !uiContains(c, "0/100") {
+		t.Fatalf("the re-entered phrase screen does not read 0/100: %q", c)
+	}
+}
+
+// I-lens 2. §4.4: "Back during the derivation abandons it and nothing is
+// assigned, returning to the method pick with the phrase intact."
+//
+// TestHashlockBackContractKeepsThePath abandons a hardened derivation and then
+// picks SHA-256; nothing in the branch re-enters Deriving after abandoning it.
+// This one does, and checks the second run produces the corpus digest -- i.e.
+// the abandoned run leaves no state behind it (hashlockDeriveFlow's `start`,
+// `abandoned` and the seal.Deriver are all per-call, and this is the test that
+// says so).
+func TestHashlockAbandonedDerivationReEntersCleanly(t *testing.T) {
+	st := composerStateForTest(t)
+	h := runComposerAddPath(t, st, composerSessionWith(nil, nil))
+	h.mustReach("What can spend on this path?")
+	h.choose(1)
+	h.mustReach("EXPERIMENTAL")
+	h.holdConfirm()
+	hashlockEnterPhraseRow(t, h)
+	typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase) // 28 chars: no hardened warning
+	h.tapNav(Button3)
+	h.mustReach("Which method?")
+
+	// First run: abandon a few slices in, well before the 201st frame.
+	h.tapRow(0, 2)
+	h.mustReach("Deriving")
+	for i := 0; i < 5; i++ {
+		h.next("mid-countdown")
+	}
+	if !uiContains(h.content, "Deriving") || uiContains(h.content, "100%") {
+		t.Fatalf("the derivation finished before it could be abandoned: %q", h.content)
+	}
+	t.Logf("abandoning mid-countdown at frame: %q", h.content)
+	h.tapNav(Button1) // abandon
+	h.mustReach("Which method?")
+	if st.list.Paths[0].Hash != nil {
+		t.Fatal("a hash was assigned by an abandoned derivation (spec §4.4: nothing is assigned)")
+	}
+	if st.hashByPhrase {
+		t.Fatal("hashByPhrase was set by an abandoned derivation")
+	}
+
+	// Second run: the same method, the same phrase, no re-typing.
+	h.tapRow(0, 2)
+	h.mustReach("Deriving")
+	h.mustReach("Write down this phrase")
+	if uiContains(h.content, "chars:29") || !uiContains(h.content, "chars:28") {
+		t.Fatalf("the confirm modal does not report chars: 28 -- the phrase changed "+
+			"across the abandoned run: %q", h.content)
+	}
+	if !uiContains(h.content, "method:hardened") {
+		t.Fatalf("the confirm modal does not report method: hardened: %q", h.content)
+	}
+	h.holdConfirm()
+	h.mustReach("run ms hashlock with this phrase")
+	if got := st.list.Paths[0].Hash; got == nil || hashlockHashHex(got) != hashlockAnchorHardH {
+		t.Fatalf("hash after the re-entered derivation = %v, want the hardened anchor %s",
+			got, hashlockAnchorHardH)
+	}
+	if n := len(st.list.Paths); n != 1 {
+		t.Fatalf("%d paths after one abandoned and one completed derivation, want 1", n)
+	}
+	if !st.hashByPhrase {
+		t.Fatal("hashByPhrase not set after the completed run")
+	}
+}
+
+// I-lens 3. §4.6: "Back from the method pick -> the phrase screen (phrase
+// intact, via `initial`)."
+//
+// The branch asserts the RESTORED COUNTER (28/100) and then takes OK. It never
+// edits the restored fragment, so a restore that only echoed the bytes into the
+// drawn label -- rather than back into kbd.Fragment, which is what OK reads --
+// would pass. This types 29 characters, Backs, backspaces ONE, and checks the
+// digest is the 28-character anchor's: the restored fragment is the live one.
+func TestHashlockRestoredPhraseIsEditable(t *testing.T) {
+	st := composerStateForTest(t)
+	h := runComposerAddPath(t, st, composerSessionWith(nil, nil))
+	h.mustReach("What can spend on this path?")
+	h.choose(1)
+	h.mustReach("EXPERIMENTAL")
+	h.holdConfirm()
+	hashlockEnterPhraseRow(t, h)
+	typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase+"x") // 29 chars
+	h.mustReach("29/100")
+	h.tapNav(Button3)
+	h.mustReach("Which method?")
+	h.tapNav(Button1) // Back -> phrase screen, phrase intact via `initial`
+	h.mustReach("Hashlock phrase")
+	if !uiContains(h.content, "29/100") {
+		t.Fatalf("the restored phrase screen does not read 29/100: %q", h.content)
+	}
+	h.tapBackspace()
+	h.mustReach("28/100")
+	h.tapNav(Button3)
+	h.mustReach("Which method?")
+	h.tapRow(1, 2) // SHA-256: instant
+	h.mustReach("brainwallet")
+	h.holdConfirm()
+	h.mustReach("Write down this phrase")
+	if !uiContains(h.content, "chars:28") {
+		t.Fatalf("the confirm modal does not report chars: 28: %q", h.content)
+	}
+	h.holdConfirm()
+	h.mustReach("run ms hashlock with this phrase")
+	if got := st.list.Paths[0].Hash; got == nil || hashlockHashHex(got) != hashlockAnchorSHA_H {
+		t.Fatalf("hash = %v, want the 28-character anchor's sha256 digest %s -- the "+
+			"backspace did not reach the restored fragment", got, hashlockAnchorSHA_H)
+	}
+}
+
+// tapBackspace taps the passphrase keyboard's backspace key (the function row's
+// fourth key, ppBackspace). Modelled on tapPassphraseKey, which can only find
+// ppRune keys.
+func (h *sessionHarness) tapBackspace() {
+	h.t.Helper()
+	kbd, ok := hashlockKbdFor[h]
+	if !ok {
+		h.t.Fatal("no *PassphraseKeyboard was registered for this harness")
+	}
+	tag := ppTagFor(kbd, func(k ppKey) bool { return k.action == ppBackspace })
+	if tag == nil {
+		h.t.Fatalf("no backspace key on keyboard page %d", kbd.page)
+	}
+	h.tapAt(h.point(tag, "backspace key"))
+	h.next("after backspace")
+}
+
+// I-lens 4. The reconcile screen (hashlockPhraseRoute's showError, §4.5's
+// drop-order step 2 relocated) is the LAST screen of the route, and it is drawn
+// AFTER st.list.Paths[idx].Hash has been set. An operator who presses Back
+// there rather than OK must keep the hash they just held to confirm.
+//
+// ErrorScreen.Layout binds Button1 and Button3 to the same single dismissal
+// (gui/gui.go:400-404, F-440), so this is a PASS by construction -- and it is
+// worth pinning, because "Back undoes the last thing" is the rest of this
+// route's contract and it does NOT hold here.
+func TestHashlockReconcileScreenBackKeepsTheAssignedHash(t *testing.T) {
+	st := composerStateWithPaths(t, 1)
+	var ret bool
+	h := runComposerHashEdit(t, st, composerSessionWith(nil, nil), 0, &ret)
+	hashlockEnterPhraseRow(t, h)
+	typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
+	h.tapNav(Button3)
+	h.mustReach("Which method?")
+	h.tapRow(1, 2) // SHA-256
+	h.mustReach("brainwallet")
+	h.holdConfirm()
+	h.mustReach("Write down this phrase")
+	h.holdConfirm() // HOLD assigns
+	h.mustReach("run ms hashlock with this phrase")
+	h.tapNav(Button1) // BACK at the reconcile screen
+	h.waitDone()
+	if !ret {
+		t.Fatal("composerHashEdit returned false after a completed phrase route")
+	}
+	if n := len(st.list.Paths); n != 1 {
+		t.Fatalf("%d paths after Back at the reconcile screen, want 1", n)
+	}
+	if got := st.list.Paths[0].Hash; got == nil || hashlockHashHex(got) != hashlockAnchorSHA_H {
+		t.Fatalf("hash = %v after Back at the reconcile screen, want the anchor's "+
+			"sha256 digest %s", got, hashlockAnchorSHA_H)
+	}
+	if !st.hashByPhrase {
+		t.Fatal("hashByPhrase cleared by a Back at the reconcile screen")
+	}
+}
+
+// I-lens 5. The screensaver crossing the PHRASE screen.
+//
+// TestHashlockDeriveKeepsAwakeUnderTheScreensaver covers exactly one screen of
+// this route -- Deriving, which calls ctx.KeepAwake() because a parked KDF
+// never resumes. Every OTHER screen of the route is left to Run's ordinary idle
+// path, and no test in the branch drives one of them through Run at all (the
+// touch harness sets ctx.FrameCallback directly and never runs Run's idle
+// loop). This drives hashlockPhraseFlow through the real Run with a phrase
+// already held, and asserts the three things §4.6 depends on:
+//
+//  1. the saver DOES activate (the phrase screen does not KeepAwake -- correct:
+//     a walk-away with a secret held must not hold the screen on);
+//  2. a touch un-parks it and the flow resumes -- the phrase screen is not
+//     permanently parked;
+//  3. the counter still reads 28/100 after the saver, i.e. the phrase survived.
+//
+// It also checks (4) that no frame Run drew, before or after the saver, carries
+// the phrase itself: PassphraseKeyboard masks the fragment unless `show` is
+// pressed (gui/passphrase_keyboard.go:435-437) and nothing here presses it.
+func TestHashlockPhraseScreenSurvivesTheScreensaver(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newDeadlinePlatform()
+		// The phrase screen never calls ctx.WakeupAt, so Run schedules the idle
+		// deadline itself and ONE AppendEvents sleeps the whole 3 minutes; the
+		// floor only bounds the saver's own 40 ms frames.
+		p.tickFloor = 10 * time.Millisecond
+		woken := false
+		p.onDirty = func(n int) {
+			// saver.State.Draw makes two Dirty calls per frame; 40 is ~20 saver
+			// frames, unambiguously past the idle crossing.
+			if !woken && n > 40 {
+				woken = true
+				p.tap() // un-parks Run; the edge tick's event is swallowed
+			}
+		}
+		var out []byte
+		var ok bool
+		flow := func(ctx *Context, _ string) {
+			out, ok = hashlockPhraseFlow(ctx, &descriptorTheme, []byte(hashlockAnchorPhrase))
+			ctx.Done = true
+		}
+		var beforeSaver, afterSaver []string
+		backSent := false
+		drawn := mustFinish(t, p, flow, func(_ op.Op, text string) {
+			if !woken {
+				beforeSaver = append(beforeSaver, text)
+				return
+			}
+			afterSaver = append(afterSaver, text)
+			if !backSent {
+				backSent = true
+				p.queued = append(p.queued,
+					ButtonEvent{Button: Button1, Pressed: true}.Event(),
+					ButtonEvent{Button: Button1, Pressed: false}.Event())
+			}
+		})
+		if !woken {
+			t.Fatal("the screensaver never activated on the phrase screen -- this test " +
+				"is no longer driving the idle path it was written for")
+		}
+		if len(afterSaver) == 0 {
+			t.Fatal("the flow drew no frame after the screensaver was dismissed: the " +
+				"phrase screen is permanently parked")
+		}
+		if !uiContains(afterSaver[0], "28/100") {
+			t.Errorf("the first frame after the screensaver reads %q, not 28/100 -- the "+
+				"held phrase did not survive the idle crossing", afterSaver[0])
+		}
+		if !uiContains(afterSaver[0], "Hashlock phrase") {
+			t.Errorf("the first frame after the screensaver is not the phrase screen: %q",
+				afterSaver[0])
+		}
+		if ok || out != nil {
+			t.Errorf("Back at the phrase screen returned (%v, %v); spec §4.2 drops the phrase",
+				out != nil, ok)
+		}
+		if len(beforeSaver) == 0 {
+			t.Fatal("no frame was drawn before the saver activated")
+		}
+		if !uiContains(beforeSaver[len(beforeSaver)-1], "28/100") {
+			t.Errorf("the last frame before the saver reads %q, not 28/100",
+				beforeSaver[len(beforeSaver)-1])
+		}
+		t.Logf("frames: %d total, %d before the saver, %d after; saver Dirty calls: %d",
+			len(drawn), len(beforeSaver), len(afterSaver), p.dirties)
+		t.Logf("first frame after the saver: %q", afterSaver[0])
+		// (4) the phrase itself is never in a drawn frame.
+		needle := strings.ReplaceAll(hashlockAnchorPhrase, " ", "")
+		for i, f := range drawn {
+			if uiContains(f, needle) {
+				t.Errorf("frame %d of %d drew the phrase itself", i, len(drawn))
+				break
+			}
+		}
+	})
+}
+
+// runComposerHashEditStoppable is runComposerHashEdit with the iterator's stop
+// exposed, so a test can end the SESSION under the route.
+//
+// It is not enough to assign h.ctx.Done = true between frames: runUITouch's
+// FrameCallback is `ctx.Done = ctx.Done || !yield(content)`, and Go evaluates
+// the left operand BEFORE the call, so the assignment writes back the value
+// Done had at the START of the suspended frame and silently clobbers an
+// externally-set true. (Measured: twelve frames of `Which hash?` drawn with
+// h.ctx.Done set, done=false on every one.) stop() is the harness's real
+// end-of-session seam -- yield returns false, Done becomes true, and iter.Pull
+// PANICS if the flow yields another frame instead of unwinding.
+func runComposerHashEditStoppable(t *testing.T, st *composerState, sess *syswSession, idx int, ret *bool) (*sessionHarness, func()) {
+	t.Helper()
+	p := newPlatform()
+	p.display = sh2DisplaySize
+	ctx := NewContext(p)
+	ctx.sysw = sess
+	returned := false
+	h := &sessionHarness{t: t, ctx: ctx, done: &returned}
+	passphraseWidgetHook = func(name string, w any) {
+		if name != "kbd" {
+			return
+		}
+		if k, ok := w.(*PassphraseKeyboard); ok {
+			hashlockKbdFor[h] = k
+		}
+	}
+	frame, drawer, quit := runUITouch(ctx, func() {
+		*ret = composerHashEdit(ctx, &descriptorTheme, st, idx)
+		returned = true
+	})
+	h.frame, h.drawer = frame, drawer
+	stopped := false
+	// A WATCHDOG, not decoration. A screen that ignores ctx.Done keeps yielding
+	// after stop() and the call never returns -- measured: `for !ctx.Done` ->
+	// `for {` in hashlockPhraseFlow turns this subtest into a 2-minute `go test`
+	// timeout instead of a failure. Bounding it here turns that class into a
+	// named failure, which is the point of the test.
+	stop := func() {
+		if stopped {
+			return
+		}
+		stopped = true
+		fin := make(chan struct{})
+		go func() {
+			// A stuck flow is resumed by quit() and may then fault inside
+			// iter.Pull; that must not take the whole test binary down while
+			// the failure below is being reported.
+			defer func() { recover() }()
+			quit()
+			close(fin)
+		}()
+		select {
+		case <-fin:
+		case <-time.After(15 * time.Second):
+			t.Fatal("the flow did not unwind when the session ended: a screen of the " +
+				"phrase route is still drawing frames after ctx.Done")
+		}
+	}
+	t.Cleanup(func() {
+		stop()
+		passphraseWidgetHook = nil
+		delete(hashlockKbdFor, h)
+	})
+	return h, stop
+}
+
+// I-lens 6. THE SESSION ENDING UNDER THE ROUTE.
+//
+// §4.4: "A power loss ends the composition, as it does at any other point in
+// this flow -- composerState is RAM." A power loss is untestable, but its
+// in-process twin is not: Run sets ctx.Done and unwinds the flow on a §10.2.4
+// wipe (gui/run_flow.go:363-368, 375-380), and every screen of this route spins
+// on `for !ctx.Done`. hashlockPhraseRoute nests THREE loops -- the outer phrase
+// loop, the `pick` loop and composerHashEdit's own -- and each inner exit is a
+// `continue` or a `break` back into an enclosing one, so a Done that is not
+// propagated all the way out draws frames forever instead of unwinding.
+// Nothing in the branch drives a Done through this route.
+//
+// Two assertions per screen: the flow UNWINDS (a flow that drew one more frame
+// after stop() panics inside iter.Pull, which fails this test rather than
+// hanging it), and NOTHING is assigned on the way out -- §4.5 assigns on HOLD
+// and nowhere else, and a session that ends at the confirm modal is the closest
+// in-process analogue of the power cycle §4.4 describes.
+func TestHashlockRouteUnwindsWhenTheSessionEnds(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		walk func(t *testing.T, h *sessionHarness)
+	}{
+		{"at the phrase screen", func(t *testing.T, h *sessionHarness) {
+			hashlockEnterPhraseRow(t, h)
+			typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
+			h.mustReach("28/100")
+		}},
+		{"at the method pick", func(t *testing.T, h *sessionHarness) {
+			hashlockEnterPhraseRow(t, h)
+			typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
+			h.tapNav(Button3)
+			h.mustReach("Which method?")
+		}},
+		{"mid-derivation", func(t *testing.T, h *sessionHarness) {
+			hashlockEnterPhraseRow(t, h)
+			typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
+			h.tapNav(Button3)
+			h.mustReach("Which method?")
+			h.tapRow(0, 2)
+			h.mustReach("Deriving")
+		}},
+		{"at the confirm modal, before the hold", func(t *testing.T, h *sessionHarness) {
+			hashlockEnterPhraseRow(t, h)
+			typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
+			h.tapNav(Button3)
+			h.mustReach("Which method?")
+			h.tapRow(1, 2) // SHA-256: instant
+			h.mustReach("brainwallet")
+			h.holdConfirm()
+			h.mustReach("Write down this phrase")
+		}},
+		{"at the reconcile screen, after the hold", func(t *testing.T, h *sessionHarness) {
+			hashlockEnterPhraseRow(t, h)
+			typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
+			h.tapNav(Button3)
+			h.mustReach("Which method?")
+			h.tapRow(1, 2)
+			h.mustReach("brainwallet")
+			h.holdConfirm()
+			h.mustReach("Write down this phrase")
+			h.holdConfirm() // HOLD: the digest IS assigned here
+			h.mustReach("run ms hashlock with this phrase")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			st := composerStateWithPaths(t, 1)
+			var ret bool
+			h, stop := runComposerHashEditStoppable(t, st, composerSessionWith(nil, nil), 0, &ret)
+			tc.walk(t, h)
+			stop() // the session ends under the operator's hands
+			if !*h.done {
+				t.Fatal("composerHashEdit did not return when the session ended")
+			}
+			afterHold := tc.name == "at the reconcile screen, after the hold"
+			got := st.list.Paths[0].Hash
+			if afterHold {
+				if got == nil || hashlockHashHex(got) != hashlockAnchorSHA_H {
+					t.Errorf("the HELD digest did not survive the unwind: %v", got)
+				}
+				if !st.hashByPhrase {
+					t.Error("hashByPhrase lost by the unwind after a completed hold")
+				}
+			} else {
+				if got != nil {
+					t.Errorf("a hash (%s) was assigned by a session unwind -- §4.5 assigns "+
+						"on HOLD and nowhere else", hashlockHashHex(got))
+				}
+				if st.hashByPhrase {
+					t.Error("hashByPhrase was set by a session unwind")
+				}
+			}
+			if n := len(st.list.Paths); n != 1 {
+				t.Errorf("%d paths after the unwind, want 1", n)
+			}
+		})
+	}
+}
+
+// I-lens 7 (adjacent to the lens, found while auditing what clears composer
+// state). composerHashByPhraseSync's own godoc calls itself the sync for "the
+// one event after which no phrase-set hash can still be in the composition",
+// but it has exactly ONE call site -- composer_hash.go:237, the `No hash lock`
+// row -- and composerPathEdit's Remove arm (composer_shape.go:353) splices the
+// path away without it. Removing the only phrase-hashed path therefore leaves
+// st.hashByPhrase set, and §8h at Done then draws the PHRASE form for a
+// composition that holds no phrase-set hash at all.
+//
+// The direction is the safe one the fold argued for (the operator is told to
+// back up one artifact too many), which is why this is recorded rather than
+// gated -- but the copy names an artifact that does not exist.
+func TestHashlockByPhraseFlagSurvivesRemovePath(t *testing.T) {
+	// A phrase-set hash on the only path, through the real route.
+	st := composerStateWithPaths(t, 1)
+	var ret bool
+	h := runComposerHashEdit(t, st, composerSessionWith(nil, nil), 0, &ret)
+	hashlockEnterPhraseRow(t, h)
+	typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
+	h.tapNav(Button3)
+	h.mustReach("Which method?")
+	h.tapRow(1, 2) // SHA-256
+	h.mustReach("brainwallet")
+	h.holdConfirm()
+	h.mustReach("Write down this phrase")
+	h.holdConfirm()
+	h.mustReach("run ms hashlock with this phrase")
+	h.tapNav(Button3) // dismiss the reconcile screen
+	h.waitDone()
+	if !st.hashByPhrase {
+		t.Fatal("the route did not set hashByPhrase")
+	}
+
+	// "Remove path", verbatim as composerPathEdit case 3 splices it
+	// (gui/composer_shape.go:353) with idx = 0.
+	const idx = 0
+	st.list.Paths = append(st.list.Paths[:idx], st.list.Paths[idx+1:]...)
+	if len(st.list.Paths) != 0 {
+		t.Fatalf("%d paths after the removal, want 0", len(st.list.Paths))
+	}
+	if !st.hashByPhrase {
+		t.Fatal("hashByPhrase was cleared by the removal -- the gap below is CLOSED; " +
+			"invert this test back into the assertion it documents")
+	}
+
+	// A replacement path whose hash did NOT come from a phrase (the `Type 64
+	// hex` or payload-row outcome).
+	hex64 := hashlockMustHex(t, "1111111111111111111111111111111111111111111111111111111111111111")
+	st.list.Paths = append(st.list.Paths, md.SpendPath{Hash: &hex64})
+	if !composerEveryPathHashed(st.list) {
+		t.Fatal("this test needs a composition §8h fires on")
+	}
+	// PINNED, NOT ASSERTED (the "pin the gap" rule): this is what the branch
+	// does today, and the finding is that it is wrong. The moment the Remove
+	// arm learns to call composerHashByPhraseSync this test fails, and the
+	// right response is to flip both halves into the assertions they document.
+	if got := composerCopyHashEveryPathFor(st); got != composerCopyHashEveryPathPhrase() {
+		t.Fatalf("§8h no longer draws the PHRASE form here -- the gap is CLOSED; "+
+			"invert this test. Got %q", got)
+	}
+	t.Logf("PINNED DEFECT (Minor, safe direction): §8h at Done draws the PHRASE "+
+		"form for a composition holding no phrase-set hash: %q",
+		composerCopyHashEveryPathFor(st))
+}
+
+// I-lens 8 -- THE FINDING. The phrase screen draws NO readout: not the masked
+// '*'x n, not the revealed cleartext. Its only feedback is the n/100 counter.
+//
+// Why this belongs to an INTERRUPTION lens. §4.6 preserves the typed phrase
+// across four of the five interruptions on this route (Back from the method
+// pick, a declined method modal, Back from the derivation, Back from the
+// confirm modal), and Run's screensaver preserves it across the fifth. At every
+// one of those resumptions the operator's only way to check WHAT was preserved
+// is a character count -- and the reveal key §4.2 says is "inherited as-is" is
+// inert, because there is nothing for it to reveal.
+//
+// The mechanism, measured (TestHashlockPhraseScreenReadoutBudget below):
+// PassphraseKeyboard.Layout clamps the readout to
+// `MaxHeight - grid.Y - readoutGap` and binary-searches away leading runes
+// until it fits (gui/passphrase_keyboard.go:448-472). hashlockPhraseFlow cuts a
+// LEAD BAND out of the content that passphraseEntryFlow does not
+// (composer_hashlock.go:169 vs passphrase_flow.go:129), so its budget is 11 px
+// against a 19 px line and every rune is dropped.
+//
+// ExtractText collects runes regardless of occlusion (passphrase_flow.go:126),
+// so an empty extraction here means the readout was never DRAWN -- not that it
+// was covered.
+//
+// PINNED, NOT ASSERTED: this documents today's behaviour. When the budget is
+// fixed both halves flip into the assertions they describe.
+func TestHashlockPhraseScreenDrawsNoReadout(t *testing.T) {
+	st := composerStateWithPaths(t, 1)
+	var ret bool
+	h := runComposerHashEdit(t, st, composerSessionWith(nil, nil), 0, &ret)
+	hashlockEnterPhraseRow(t, h)
+	typeOnPassphraseKeyboard(t, h, "abcd")
+	masked := h.mustReach("4/100")
+	if uiContains(masked, "****") {
+		t.Fatalf("the masked readout is DRAWN now -- the gap is closed, invert this "+
+			"test: %q", masked)
+	}
+	kbd := hashlockKbdFor[h]
+	if kbd.Fragment != "abcd" {
+		t.Fatalf("kbd.Fragment = %q, want \"abcd\" -- the four taps did not land", kbd.Fragment)
+	}
+	t.Logf("PINNED DEFECT: 4 characters are in kbd.Fragment and the frame draws no "+
+		"'****': %q", masked)
+
+	tag := ppTagFor(kbd, func(k ppKey) bool { return k.action == ppReveal })
+	if tag == nil {
+		t.Fatal("no reveal key on the phrase keyboard")
+	}
+	h.tapAt(h.point(tag, "show key"))
+	h.next("after reveal")
+	revealed := h.mustReach("4/100")
+	if !kbd.revealed {
+		t.Fatal("the reveal key did not toggle `revealed`")
+	}
+	if uiContains(revealed, "abcd") {
+		t.Fatalf("the revealed readout is DRAWN now -- the gap is closed, invert this "+
+			"test: %q", revealed)
+	}
+	if !uiContains(revealed, "hide") {
+		t.Fatalf("the reveal cap did not flip to `hide`: %q", revealed)
+	}
+	t.Logf("PINNED DEFECT: revealed=true, the cap reads `hide`, and the frame still "+
+		"draws nothing: %q", revealed)
+}
+
+// The arithmetic behind I-lens 8, as numbers rather than a screenshot -- the
+// class "text extraction cannot see clipping" needs a rectangle, not a string.
+func TestHashlockPhraseScreenReadoutBudget(t *testing.T) {
+	p := newPlatform()
+	p.display = sh2DisplaySize
+	ctx := NewContext(p)
+	th := &descriptorTheme
+	dims := ctx.Platform.DisplaySize()
+	screen := layout.Rectangle{Max: dims}
+	_, content := screen.CutTop(leadingSize)
+	content, _ = content.CutBottom(8)
+
+	_, leadSz := widget.Labelw(&ctx.B, ctx.Styles.lead, dims.X-2*8, th.Text,
+		composerCopyHashlockPhraseLead())
+	_, cntSz := widget.Labelf(&ctx.B, ctx.Styles.subtitle, th.Text, "%d/%d", 4, 100)
+	kbd := NewPassphraseKeyboard(ctx)
+	grid := kbd.size[0]
+	const readoutGap = 8 // gui/passphrase_keyboard.go:448
+	oneLine := ctx.Styles.word.Measure(grid.X, "%s", "****").Y
+
+	// hashlockPhraseFlow cuts the lead band; passphraseEntryFlow does not.
+	hashlockAvail := content.Dy() - leadSz.Y - cntSz.Y - grid.Y - readoutGap
+	passAvail := content.Dy() - cntSz.Y - grid.Y - readoutGap
+	t.Logf("panel %v, content %d px; lead band %d, counter band %d, grid %v, "+
+		"one readout line %d", dims, content.Dy(), leadSz.Y, cntSz.Y, grid, oneLine)
+	t.Logf("hashlockPhraseFlow readout budget = %d px; passphraseEntryFlow = %d px",
+		hashlockAvail, passAvail)
+	if passAvail < oneLine {
+		t.Fatalf("the CONTROL has no room either (%d < %d) -- this measurement is not "+
+			"isolating the lead band", passAvail, oneLine)
+	}
+	if hashlockAvail >= oneLine {
+		t.Fatalf("the phrase screen now has room for a readout (%d >= %d) -- the gap "+
+			"is closed, invert this test", hashlockAvail, oneLine)
+	}
+	t.Logf("PINNED DEFECT: %d px of readout budget against a %d px line", hashlockAvail, oneLine)
+}
