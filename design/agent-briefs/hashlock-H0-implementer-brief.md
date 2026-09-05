@@ -1,0 +1,18 @@
+You are the ONE implementer for hashlock stage H0 (reader guards). Execute the GREEN plan `/scratch/code/shibboleth/mnemonic-engrave/design/IMPLEMENTATION_PLAN_hashlock_H0_reader_guards.md` (engrave master `e7af98a`, STATUS R0 GREEN) task by task, test-first, exactly as written. The spec is `/scratch/code/shibboleth/mnemonic-secret/design/SPEC_ms_hashlock.md` §1 and §9. Use the superpowers `executing-plans` discipline inline; do NOT spawn sub-agents.
+
+Two repos, two worktrees, nothing pushed, no `master`/`main` commits:
+- mnemonic-engrave (Task 1): `git -C /scratch/code/shibboleth/mnemonic-engrave worktree add -b hashlock-h0 /scratch/code/shibboleth/me-worktrees/hashlock-h0 master`. Cargo env for EVERY command: `PATH=$HOME/.cargo/bin:$PATH TMPDIR=/scratch/code/shibboleth/.tmp CARGO_TARGET_DIR=/scratch/code/shibboleth/.tmp/hashlock-h0-target` (its OWN target dir — the plan's Global Constraints say why). Package is `-p mnemonic-engrave`. Whole-crate runs use `--no-fail-fast`; the three `history_purge` failures the plan names are box-local and expected.
+- seedhammer fork (Task 2): `git -C /scratch/code/shibboleth/seedhammer worktree add -b hashlock-h0 /scratch/code/shibboleth/.tmp/seedhammer-hashlock-h0 main` (the fork's worktrees live outside the repo). Go is `/scratch/code/shibboleth/.toolchain/go/bin/go`, first on PATH. Fork commits are `git commit -s` (DCO), author Brian Goss, plus the trailer lines below. Run `../mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24` from the fork worktree for the whole gui package (the plan's Task 2 Step 9); if the script's relative path does not resolve from that location, call it by absolute path `/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh`.
+- Task 3 Step 1 (firmware size) needs nix on PATH: `export PATH=/nix/var/nix/profiles/default/bin:$PATH` first. Task 3 Steps 2-3 (emulator walk, merge, flash) are NOT yours: stop after Step 1 and record the numbers.
+- Task 4: file the three FOLLOWUPS entries (numbers continue the file's sequence), the CHANGELOG lines, and the post-impl review is the controller's; do not run it.
+
+Rules:
+- TDD per step: the plan's RED steps quote the failure text they expect — reproduce it, then implement, then PASS; every `MUTATION:` comment in the plan's tests is a claim you re-run once (mutate, see the named failure, revert — `touch` a file you restore from a backup). Commit per task with the plan's commit messages. Every commit message ends with:
+  `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` and
+  `Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA`
+  Stage paths explicitly (no `git add -A`).
+- If a step is wrong (an anchor has moved, an Expected line differs, a test's text is off), do the MINIMAL correct thing and record the deviation — what the plan said, what you did, why — in your report. Never silently diverge. If genuinely blocked, stop and report.
+- Every count you write in the report comes from a run at the tip you report, captured once to a file under `/scratch/code/shibboleth/.tmp/` and quoted from there.
+- Never read any `.jsonl` file.
+
+FINAL ACTION (mandatory): write `/scratch/code/shibboleth/me-worktrees/hashlock-h0/design/agent-reports/hashlock-H0-implementation-report.md` (create) containing: per task — the commit SHA(s) in each repo, the RED evidence, the PASS counts; every mutation re-run with its failing line; every deviation with its reason; the firmware size numbers; the verbatim tails of the final gate runs in both repos; anything left undone and why. Commit that report on the engrave branch as its last commit. Return a two-line summary, both branch tip SHAs, and the report path.
