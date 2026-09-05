@@ -2519,3 +2519,16 @@ Command to resume: /resume-composer
   plan lenses: tests 0C/0I/1M (50e1425), journey 0C/2I/5M/2N (55e3356);
   fidelity in flight. NEXT: fold plan + spec once -> sonnet verification ->
   four implementers.
+- **H5 PLAN R0 ROUND 0 -- three reports persisted** (tests 50e1425 0C/0I/1M;
+  journey 55e3356 0C/2I/5M/2N; fidelity c4e1564 0C/3I/4M/4N). Every plan
+  measurement reproduced by all three. Importants: the walk's
+  stored-vs-displayed assertion compares two file constants (tautology --
+  parse the drawn token); the `ok` guard reads only the first assignment; two
+  inserted comment blocks steal `composerFlow`'s and `composerPageLines`'
+  doc comments; the write-down's second sentence false of the digest
+  (operator-agreed repair 343/107); §8h plain form singular (133/397).
+  **ROUND-0 FOLD DISPATCHED to an opus fold author** (brief 84d80e8: plan +
+  gated tree + spec; RED/GREEN, mutations, whole gates, checker; every number
+  re-measured). r1 brief pre-written (125efd3). NEXT: fold lands -> checker
+  re-run -> commits (plan, spec, report) -> r1 sonnet verification -> GREEN
+  -> four implementers (briefs 6f69a13, fill PLAN_GREEN_SHA).
