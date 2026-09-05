@@ -1,6 +1,12 @@
 # Hashlock H5 — Device Polish Implementation Plan (SeedHammer fork)
 
-**STATUS: DRAFT 2026-09-05 — build gate RUN, R0 review pending.** Every code block
+**STATUS: DRAFT — R0 round 0 folded; r1 fold verification pending.** Round 0 ran
+three lenses at engrave `0c2b13e`: fidelity + design (opus,
+`design/agent-reports/hashlock-H5-plan-R0-r0-fidelity.md`, 0C/3I/4M/4N), tests +
+mutations (sonnet, `-tests.md`, 0C/0I/1M), journey walk (opus, `-journey.md`,
+0C/2I/5M/2N). Every finding folded or declined with a reason in
+`## R0 round 0 folded here`; the fold re-ran every gate below and re-measured
+every number it touched, including the five firmware builds. Every code block
 below was hand-wired into a scratch copy of fork main `b9a9a30` at
 `/scratch/code/shibboleth/.tmp/h5-gate` and built and tested **at every task
 boundary** (not once at the end — the H2 plan's gate wired all six tasks at once
@@ -103,12 +109,13 @@ tests, §7 acceptance. Parent: `design/SPEC_hashlock_H2_device.md`.
 | `gui/composer_state_hook.go` | Create | 5 | `//go:build !tinygo`: `composerStateHook`, `setComposerStateHook`, `clearComposerStateHook`, `ComposerPathHashes` |
 | `gui/composer_state_hook_tinygo.go` | Create | 5 | `//go:build tinygo`: the empty twin, with the measured sizes |
 | `gui/composer_state_hook_test.go` | Create | 5 | the seam's lifetime and read contract |
+| `gui/composer_doc_comment_test.go` | Create | 5 | r0 fidelity I-3: the inserted helpers must not steal a doc comment |
 | `gui/composer_flow.go` | Modify | 5 | `composerFlowExit`: ONE defer for the scrub and the hook |
 | `gui/tinygo_split_test.go` | Modify | 5 | `nonInterfaceHookPairs`, told out loud, and still scanned |
 | `cmd/emu/composer_js.go` | Create | 5 | `//go:build js`: `window.shComposerPathHashes()` |
 | `cmd/emu/platform.go` | Modify (one line) | 5 | `installComposerAPI()` |
 | `cmd/emu/walk_hashlock_phrase.js` | Modify | 5 | the order and stored-versus-displayed assertions; `ok` set, not recomputed |
-| `cmd/emu/needle_test.go` | Modify | 5 | the `ok` guard reads the assignment shape (the baseline red) |
+| `cmd/emu/needle_test.go` | Modify | 5 | the `ok` guard reads EVERY assignment (the baseline red), plus its own table test |
 | engrave `design/SPEC_hashlock_H2_device.md` | Modify | 6 | §4.5 and §4.7 folds |
 | engrave `design/FOLLOWUPS.md` | Modify | 6 | five closures with owning-phase reconciliation |
 | toolkit `docs/manual/src/40-cli-reference/43-ms.md` | Modify | 6 | re-quote the two changed screens |
@@ -150,7 +157,10 @@ also edits, and `gui/composer_copy_test.go:144`, a row Task 2 also edits. Landin
 the state change first means every later task edits a file that already compiles;
 the reverse order does not build at any intermediate commit.
 
-- [ ] **Step 1: The failing tests.** Create `gui/composer_provenance_test.go`:
+- [ ] **Step 1: The failing tests.** Create `gui/composer_provenance_test.go` —
+six tests: the zero-value HOLD, the predicate table, F-480's own edit-to-a-payload-row
+scenario, the same digest re-entered by another route (r0 fidelity M-1), and the
+two §8h banner forms (r0 journey I-2 gives the plain one its own):
 
 ```go file=gui/composer_provenance_test.go mode=whole
 package gui
@@ -241,6 +251,11 @@ func TestComposerPhraseRouteHoldsOnTheZeroValueState(t *testing.T) {
 func TestComposerAnyPathByPhraseIsPerDigest(t *testing.T) {
 	phrase := hashlockMustHex(t, hashlockAnchorSHA_H)
 	other := hashlockMustHex(t, strings.Repeat("5a", 32))
+	// A DIFFERENT POINTER holding the SAME 32 bytes: what every re-entry arm of
+	// composerHashEdit writes (the hex pad, a payload row), never the pointer the
+	// set was built from. The row below would otherwise be byte-identical to
+	// "one phrase path" and exercise nothing (r0 fidelity M-1).
+	retyped := phrase
 
 	for _, tc := range []struct {
 		name string
@@ -255,7 +270,7 @@ func TestComposerAnyPathByPhraseIsPerDigest(t *testing.T) {
 		{"the phrase path was removed", [][32]byte{phrase}, []*[32]byte{nil}, false},
 		{"a mixed wallet: one phrase path, one other", [][32]byte{phrase}, []*[32]byte{&phrase, &other}, true},
 		{"two paths share one phrase digest", [][32]byte{phrase}, []*[32]byte{&phrase, &phrase}, true},
-		{"the same digest re-typed as 64 hex is still by phrase", [][32]byte{phrase}, []*[32]byte{&phrase}, true},
+		{"the same digest re-typed as 64 hex is still by phrase", [][32]byte{phrase}, []*[32]byte{&retyped}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			st := composerFlowShapedState(t, len(tc.hash))
@@ -269,6 +284,49 @@ func TestComposerAnyPathByPhraseIsPerDigest(t *testing.T) {
 				t.Errorf("composerAnyPathByPhrase = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestReassigningTheSameDigestStaysByPhrase drives spec §2 item 4's second
+// clause through production: a path whose phrase-derived digest is written
+// AGAIN, by another route, is still by phrase.
+//
+// The hex pad is the route §2 item 4 names, and typing 64 characters on it has
+// no harness helper; the payload row is the same arm of composerHashEdit
+// (composer_hash.go writes a fresh *[32]byte either way) carrying the same 32
+// bytes, so it exercises the property the pad would: the pointer in p.Hash is
+// NOT the one composerNotePhraseDigest was given, and the predicate compares
+// VALUES.
+//
+// MUTATION: compare p.Hash pointers instead of the digest value in
+// composerAnyPathByPhrase -> this fails; so does every positive row of
+// TestComposerAnyPathByPhraseIsPerDigest.
+func TestReassigningTheSameDigestStaysByPhrase(t *testing.T) {
+	st := composerFlowShapedState(t, 1)
+	phrase := hashlockMustHex(t, hashlockAnchorSHA_H)
+	st.list.Paths[0].Hash = &phrase
+	composerNotePhraseDigest(st, phrase)
+
+	var ret bool
+	h := runComposerHashEdit(t, st, composerSessionWith([]string{"hash:" + hashlockAnchorSHA_H}, nil), 0, &ret)
+	h.mustReach("Which hash?")
+	h.tapRow(0, 4) // the payload row, carrying the SAME digest
+	h.mustReach("32-byte value")
+	h.tapNav(Button3)
+	h.waitDone()
+	if !ret {
+		t.Fatal("composerHashEdit returned false after a payload row")
+	}
+	if got := st.list.Paths[0].Hash; got == &phrase {
+		t.Fatal("the payload row reused the ORIGINAL pointer, so this test proves nothing " +
+			"a pointer comparison would not also pass")
+	}
+	if got := hashlockHashHex(st.list.Paths[0].Hash); got != hashlockAnchorSHA_H {
+		t.Fatalf("path 1 hash = %s, want the same digest %s", got, hashlockAnchorSHA_H)
+	}
+	if !composerAnyPathByPhrase(st) {
+		t.Error("the digest was derived from a phrase in this composition and re-entered " +
+			"unchanged; the backup burden is the same and the predicate says otherwise")
 	}
 }
 
@@ -346,6 +404,41 @@ func TestComposerMixedWalletBannerNamesEveryPhraseAndEveryPlate(t *testing.T) {
 	}
 	if strings.Contains(body, "method, or the") {
 		t.Errorf("§8h's phrase form still offers a CHOICE of backups:\n%q", body)
+	}
+}
+
+// TestTwoPlateWalletBannerCountsEveryPreimage is journey I-2: §8h's PLAIN form
+// carries the same count the phrase form does.
+//
+// H5 §2 item 5 made the phrase form say "every ... and every" because a choice
+// is an undercount at the one screen whose job is to say what spending needs.
+// Its sibling had the identical defect and would have been left standing: two
+// paths, two DIFFERENT digests, two different preimages the operator must hold
+// -- and the shipped sentence named one ("Back the preimage up separately").
+//
+// The fixture is the mixed wallet of the test above with the phrase path
+// replaced by a second plate, so §8h fires and the predicate is false.
+//
+// MUTATION: restore "Back the preimage up separately." -> both assertions fail.
+func TestTwoPlateWalletBannerCountsEveryPreimage(t *testing.T) {
+	st := composerFlowShapedState(t, 2)
+	first := hashlockMustHex(t, strings.Repeat("ab", 32))
+	second := hashlockMustHex(t, strings.Repeat("5a", 32))
+	st.list.Paths[0].Hash = &first
+	st.list.Paths[1].Hash = &second
+
+	if !composerEveryPathHashed(st.list) {
+		t.Fatal("this test needs a composition §8h's guard ACCEPTS")
+	}
+	if composerAnyPathByPhrase(st) {
+		t.Fatal("this test needs the PLAIN form: no digest here came from a phrase")
+	}
+	body := composerCopyHashEveryPathFor(st)
+	if !strings.Contains(body, "Back up every preimage separately.") {
+		t.Errorf("§8h's plain form does not count the preimages:\n%q", body)
+	}
+	if strings.Contains(body, "Back the preimage up") {
+		t.Errorf("§8h's plain form still names ONE preimage on a two-plate wallet:\n%q", body)
 	}
 }
 ```
@@ -477,19 +570,51 @@ func composerStateByPhraseForCopyTable() *composerState {
 
 - [ ] **Step 4: RED.**
 
-Run: `go test -count=1 -run 'TestComposerPhraseRouteHoldsOnTheZeroValueState|TestComposerAnyPathByPhraseIsPerDigest|TestComposerHashEditToAPayloadRowDropsThePhraseForm|TestComposerMixedWalletBannerNamesEveryPhraseAndEveryPlate|TestRemovePathThenAHexHashDrawsThePlainBanner' ./gui/`
+Run: `go test -gcflags=-e -count=1 -run 'TestComposerPhraseRouteHoldsOnTheZeroValueState|TestComposerAnyPathByPhraseIsPerDigest|TestComposerHashEditToAPayloadRowDropsThePhraseForm|TestComposerMixedWalletBannerNamesEveryPhraseAndEveryPlate|TestTwoPlateWalletBannerCountsEveryPreimage|TestReassigningTheSameDigestStaysByPhrase|TestRemovePathThenAHexHashDrawsThePlainBanner' ./gui/`
 
-Measured:
+`-gcflags=-e` IS PART OF THE COMMAND, and the r0 fold added it: without it Go
+stops at ten errors with `too many errors`, and the first draft of this block
+quoted six lines from one file while the same run against the same tree also
+surfaces four from the two OTHER test files this task edits (r0 tests M-1). A
+quoted RED that is not the whole of what a rerun prints teaches a reviewer to
+assume enumeration where there is truncation.
+
+Measured, complete, every line — and every one of the twenty is in a TEST file,
+which is the point: at this step Steps 5–8 have not run, so the production files
+are still `b9a9a30`'s and compile:
 
 ```
+# seedhammer.com/gui [seedhammer.com/gui.test]
+gui/composer_copy_test.go:167:2: undefined: composerNotePhraseDigest
+gui/composer_hashlock_test.go:712:3: undefined: composerNotePhraseDigest
+gui/composer_hashlock_test.go:730:6: undefined: composerAnyPathByPhrase
+gui/composer_hashlock_test.go:928:6: undefined: composerAnyPathByPhrase
+gui/composer_hashlock_test.go:1116:3: undefined: composerNotePhraseDigest
+gui/composer_hashlock_test.go:1128:6: undefined: composerAnyPathByPhrase
 gui/composer_provenance_test.go:35:8: st.phraseDigests undefined (type *composerState has no field or method phraseDigests)
 gui/composer_provenance_test.go:70:17: st.phraseDigests undefined (type *composerState has no field or method phraseDigests)
 gui/composer_provenance_test.go:71:80: st.phraseDigests undefined (type *composerState has no field or method phraseDigests)
 gui/composer_provenance_test.go:73:6: undefined: composerAnyPathByPhrase
-gui/composer_provenance_test.go:108:5: undefined: composerNotePhraseDigest
-gui/composer_provenance_test.go:108:5: too many errors
+gui/composer_provenance_test.go:113:5: undefined: composerNotePhraseDigest
+gui/composer_provenance_test.go:118:14: undefined: composerAnyPathByPhrase
+gui/composer_provenance_test.go:143:2: undefined: composerNotePhraseDigest
+gui/composer_provenance_test.go:162:6: undefined: composerAnyPathByPhrase
+gui/composer_provenance_test.go:184:2: undefined: composerNotePhraseDigest
+gui/composer_provenance_test.go:186:6: undefined: composerAnyPathByPhrase
+gui/composer_provenance_test.go:206:5: undefined: composerAnyPathByPhrase
+gui/composer_provenance_test.go:228:2: undefined: composerNotePhraseDigest
+gui/composer_provenance_test.go:231:43: undefined: composerAnyPathByPhrase
+gui/composer_provenance_test.go:268:5: undefined: composerAnyPathByPhrase
 FAIL	seedhammer.com/gui [build failed]
 ```
+
+**How it was captured, so it can be rerun.** The gated tree copied to
+`.tmp/h5-red`, with Step 5's field and two helpers deleted from
+`gui/composer_state.go` and their three PRODUCTION uses removed with them
+(Step 6's `composerNotePhraseDigest(st, d)`, and Step 8's
+`composerAnyPathByPhrase(st)` call in `composerCopyHashEveryPathFor`). That
+leaves exactly the state Step 4 describes — the identifiers do not exist and
+only test files name them — without reconstructing the whole task boundary.
 
 - [ ] **Step 5: The state.** Replace `composerState.hashByPhrase` (`gui/composer_state.go:35-38` at `b9a9a30`) with the set:
 
@@ -567,10 +692,26 @@ func composerAnyPathByPhrase(st *composerState) bool {
 				composerNotePhraseDigest(st, d)
 ```
 
-`hashlockOtherPathLine`'s doc comment names the removed field and is corrected in the same edit:
+`hashlockOtherPathLine`'s doc comment names the removed field and is corrected in
+the same edit. TWO lines, not one: the first draft stopped short of the clause
+that made the sentence true, leaving "unaffected by that flag's own staleness"
+pointing at a flag that no longer exists (r0 fidelity M-3).
 
 ```go file=gui/composer_hashlock.go mode=fragment
 // It reads *p.Hash directly rather than the phrase set, so it is unaffected by
+// that set's own history, and it skips idx because the path being edited may
+// already hold the hash it is about to replace.
+```
+
+And the HOLD comment three lines above loses the `composer_state.go:239` line
+number Task 2 Step 4 drops from the identical claim in `composer_copy.go` — one
+or the other, not both (r0 fidelity N-4):
+
+```go file=gui/composer_hashlock.go mode=fragment
+				// by composerEveryPathHashed (composer_state.go at the fork
+				// baseline c4a64fc), which is false the moment ONE path is keyed
+				// -- so on the ordinary mixed wallet the line was drawn nowhere
+				// at all. §4.5's own statement
 ```
 
 - [ ] **Step 7: Delete `composerHashByPhraseSync` and BOTH call sites.** In
@@ -602,7 +743,36 @@ call and the comment that justified it:
 			})
 ```
 
-- [ ] **Step 8: The copy — the predicate, and §8h's sentence (spec §2 item 5).**
+- [ ] **Step 8: The copy — the predicate, and BOTH §8h sentences (spec §2 item 5,
+r0 journey I-2).**
+
+§2 item 5 changes the phrase form; the r0 journey walk constructed the wallet the
+PLAIN form gets wrong in exactly the same way — two paths, two different digests,
+two different preimages the operator must hold, and one named — and this stage is
+the one that makes the two forms disagree, because `composerCopyHashEveryPathFor`
+below is what chooses between them. So the plain form is counted too. Measured on
+`errorScreenBody` at `sh2DisplaySize`: 133 characters drawn in full, headroom 397
+(was 131/397), logged by `TestComposerEveryPathHashedWarns`.
+
+```go file=gui/composer_copy.go mode=fragment
+// §8h, the plain form: every path is hashed and NO current path's digest came
+// from a phrase typed here (composerCopyHashEveryPathFor).
+//
+// "EVERY PREIMAGE", NOT "THE PREIMAGE" (r0 journey I-2). Two paths can carry two
+// DIFFERENT digests, which is two different preimages the operator must hold,
+// and the shipped sentence named one. That is the same undercount H5 §2 item 5
+// removed from the phrase form above, on the sibling body that chooses against
+// it -- leaving one counted and one not would make the two forms disagree about
+// what spending needs.
+func composerCopyHashEveryPath() string {
+	return "HASH ON EVERY PATH\n" +
+		"Every way to spend this wallet needs the preimage of a hash. It is not " +
+		"on this device and not on these plates. Back up every preimage separately."
+}
+```
+
+And the phrase form, whose overcount on the two pure wallets is now recorded as a
+decision rather than left for the next reader to re-open (r0 journey M-4):
 
 ```go file=gui/composer_copy.go mode=fragment
 // §8h, the phrase-route form (SPEC_hashlock_H2_device §4.7 as H5 §2 folds it).
@@ -615,25 +785,26 @@ call and the comment that justified it:
 // and another needs a preimage plate, so BOTH backups are required, one per
 // path. The shipped sentence offered a choice between them, and a choice is an
 // undercount at the one screen whose job is to say what spending needs.
+//
+// IT OVERCOUNTS ON THE TWO PURE WALLETS, DELIBERATELY (r0 journey M-4). An
+// all-phrase wallet has no preimage PLATE and a phrase re-typed as 64 hex has
+// none either, and both are named one anyway. Counting exactly would need three
+// variants of this body; overcounting asks the operator to look for a backup
+// they do not have, and undercounting lets them stop looking for one they do.
+// The safe direction is the one that keeps looking, so this stays as written --
+// recorded here so the next reader does not re-open it.
 func composerCopyHashEveryPathPhrase() string {
 	return "HASH ON EVERY PATH\n" +
 		"Every way to spend this wallet needs a hashlock preimage. It is not on " +
 		"this device and not on these plates. Back up every phrase and its " +
 		"method, and every preimage plate, separately."
 }
-
-func composerCopyHashEveryPathFor(st *composerState) string {
-	if composerAnyPathByPhrase(st) {
-		return composerCopyHashEveryPathPhrase()
-	}
-	return composerCopyHashEveryPath()
-}
 ```
 
 - [ ] **Step 9: GREEN, then every mutation.**
 
-Run: `go test -count=1 -run 'TestComposerPhraseRouteHoldsOnTheZeroValueState|TestComposerAnyPathByPhraseIsPerDigest|TestComposerHashEditToAPayloadRowDropsThePhraseForm|TestComposerMixedWalletBannerNamesEveryPhraseAndEveryPlate|TestRemovePathThenAHexHashDrawsThePlainBanner|TestComposerCopy|TestModals|TestHashlock' ./gui/`
-Expected: `ok  	seedhammer.com/gui	38.162s` (measured).
+Run: `go test -count=1 -run 'TestComposerPhraseRouteHoldsOnTheZeroValueState|TestComposerAnyPathByPhraseIsPerDigest|TestComposerHashEditToAPayloadRowDropsThePhraseForm|TestComposerMixedWalletBannerNamesEveryPhraseAndEveryPlate|TestTwoPlateWalletBannerCountsEveryPreimage|TestReassigningTheSameDigestStaysByPhrase|TestRemovePathThenAHexHashDrawsThePlainBanner|TestComposerCopy|TestModals|TestHashlock' ./gui/`
+Expected: `ok  	seedhammer.com/gui	38.766s` (measured on the folded tree).
 
 | Mutation | Measured failure |
 | --- | --- |
@@ -641,14 +812,26 @@ Expected: `ok  	seedhammer.com/gui	38.162s` (measured).
 | `composerAnyPathByPhrase` returns `len(st.phraseDigests) > 0` | four tests: `TestComposerHashEditDispatchesByRowLabel/none_row_clears…`: `the phrase form survived the last hash being cleared`; `TestRemovePathThenAHexHashDrawsThePlainBanner`: `the only phrase-set path was removed and the phrase form is still chosen`; `TestComposerAnyPathByPhraseIsPerDigest/the_phrase_path_was_edited_to_a_payload_row` and `…/the_phrase_path_was_removed`: `composerAnyPathByPhrase = true, want false`; `TestComposerHashEditToAPayloadRowDropsThePhraseForm`: `no path carries a phrase-derived digest and the predicate still says one does` **and** `§8h names a phrase this composition no longer has`. |
 | delete `composerNotePhraseDigest(st, d)` from `hashlockPhraseRoute` | `TestHashlockReconcileScreenIsReachableOnAMixedPolicy`: `the phrase route did not record that this hash was set by phrase`; `TestComposerPhraseRouteHoldsOnTheZeroValueState`: `the anchor's digest is not in the phrase set (0 entries)` |
 | restore `"Back up the phrase and its method, or the preimage plate, separately."` | `TestComposerCopyIsVerbatimFromTheSpec` on BOTH §8h rows, and `TestComposerMixedWalletBannerNamesEveryPhraseAndEveryPlate`: `does not carry "every phrase and its method"`, `does not carry "every preimage plate"`, `still offers a CHOICE of backups` |
+| restore the PLAIN form's `"Back the preimage up separately."` | `TestComposerCopyIsVerbatimFromTheSpec`: `composerCopyHashEveryPath (SPEC §8h) does not match the spec.`; `TestTwoPlateWalletBannerCountsEveryPreimage`: `§8h's plain form does not count the preimages` **and** `§8h's plain form still names ONE preimage on a two-plate wallet` |
+| `composerAnyPathByPhrase` compares `p.Hash` POINTERS instead of the digest value (`for d := range st.phraseDigests { if p.Hash == &d }`) | `TestComposerAnyPathByPhraseIsPerDigest` on all four positive rows: `composerAnyPathByPhrase = false, want true` — including `the_same_digest_re-typed_as_64_hex_is_still_by_phrase`, which the r0 fold gave a DISTINCT pointer holding the same bytes so that the row stops being a byte-identical copy of `one_phrase_path` (r0 fidelity M-1); and `TestReassigningTheSameDigestStaysByPhrase`: `the digest was derived from a phrase in this composition and re-entered unchanged; the backup burden is the same and the predicate says otherwise` |
 
 - [ ] **Step 10: The whole `gui` package.**
 
 Run: `/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24`
-Measured: **1229 top-level tests, `partition verified exhaustive: 1229 == 1229`,
-all 24 shards ok, 22 s wall.** `b9a9a30` has 1225 by the same count
-(`go test ./gui/ -list '.*' | grep -cE '^(Test|Example|Fuzz)'`), so this task adds
-the four tests of Step 1 and renames one.
+Expected: **1231 top-level tests, `partition verified exhaustive: 1231 == 1231`,
+all 24 shards ok.** `b9a9a30` has 1225 by the same count
+(`go test ./gui/ -list '.*' | grep -cE '^(Test|Example|Fuzz)'`, measured), so this
+task adds the six tests of Step 1 and renames one.
+
+**Provenance of the number 1231, stated because it is not a shard run.** The plan
+author ran the shards at this boundary and measured **1229** with Step 1's four
+tests. The r0 fold adds two more to the same file, and the shard script's count is
+just the package's top-level `Test`/`Example`/`Fuzz` functions, so the boundary
+figure is 1225 + `grep -c '^func Test' gui/composer_provenance_test.go` = 1225 + 6
+= **1231** — each term measured, the sum not re-run, because reconstructing a
+Task-1-only tree is a revert of four later tasks and the whole-tree shard run at
+the end (1239, measured) is what actually gates. The implementer's own run at this
+boundary is the check.
 
 - [ ] **Step 11: Commit.**
 
@@ -686,12 +869,12 @@ sentence:
 ```go file=gui/composer_copy_test.go mode=fragment
 		{"composerCopyHashlockReconcile", "H2-4.5", composerCopyHashlockReconcile("b867db87..edbc96cb", "hardened", 100),
 			"hash  b867db87..edbc96cb method: hardened   chars: 100 " +
-				"Before you fund this wallet, run ms hashlock with this phrase and method on the host and check the digest matches. " +
+				"Before you cut plates, run ms hashlock with this phrase and method on the host and check the digest matches. " +
 				"If they differ, do not fund this wallet: build it again."},
 ```
 
 ```go file=gui/composer_copy_test.go mode=fragment
-				"Write down this phrase, the method and this digest now. They are not on this device and not on your plates. Without both, this path can never be spent. " +
+				"Write down this phrase, the method and this digest now. The phrase and method are not on this device. Without both, this path can never be spent. " +
 				"One phrase per policy. Never use this phrase as a passphrase or a password anywhere else."},
 ```
 
@@ -793,11 +976,17 @@ func TestHashlockReconcileHeaderIsSpelledLikeTheConfirmModal(t *testing.T) {
 
 - [ ] **Step 3: RED.**
 
-Run: `go test -count=1 -run 'TestHashlockReconcileScreenCarriesTheDigestMethodAndChars|TestHashlockReconcileHeaderIsSpelledLikeTheConfirmModal' ./gui/`
+Run: `go test -gcflags=-e -count=1 -run 'TestHashlockReconcileScreenCarriesTheDigestMethodAndChars|TestHashlockReconcileHeaderIsSpelledLikeTheConfirmModal' ./gui/`
 
-Measured:
+Measured, complete — THREE call sites, not the two the first draft quoted: the
+copy table's row is edited by this task's own Step 1 and fails in the same run
+(r0 tests M-1).
 
 ```
+# seedhammer.com/gui [seedhammer.com/gui.test]
+gui/composer_copy_test.go:141:77: too many arguments in call to composerCopyHashlockReconcile
+	have (string, string, number)
+	want ()
 gui/composer_hashlock_test.go:992:39: too many arguments in call to composerCopyHashlockReconcile
 	have (string, string, number)
 	want ()
@@ -806,6 +995,11 @@ gui/modal_fits_test.go:344:34: too many arguments in call to composerCopyHashloc
 	want ()
 FAIL	seedhammer.com/gui [build failed]
 ```
+
+Captured on a copy of the gated tree (`.tmp/h5-red2`) with
+`composerCopyHashlockReconcile` reverted to its no-argument one-sentence form and
+its single production call site in `hashlockPhraseRoute` reverted with it, so
+every remaining error is a test file's.
 
 - [ ] **Step 4: The copy.** The confirm modal's write-down sentence, and the
 headroom claim its neighbour got wrong (spec §6 records: the fork comment claimed
@@ -822,8 +1016,8 @@ headroom claim its neighbour got wrong (spec §6 records: the fork comment claim
 ```
 
 ```go file=gui/composer_copy.go mode=fragment
-		"Write down this phrase, the method and this digest now. They are not on " +
-		"this device and not on your plates. Without both, this path can never be spent.\n" +
+		"Write down this phrase, the method and this digest now. The phrase and " +
+		"method are not on this device. Without both, this path can never be spent.\n" +
 ```
 
 Then the reconcile body itself, replacing the one-sentence version:
@@ -854,14 +1048,22 @@ Then the reconcile body itself, replacing the one-sentence version:
 // could never have been spent; the remedy is to build the policy again, before
 // it is funded, and not to fund it and hope.
 //
+// "BEFORE YOU CUT PLATES", NOT "BEFORE YOU FUND" (r0 journey M-2). This screen
+// is drawn inside composerShapeFlow, and the stub screen, seating and engraving
+// all follow it in the same composerFlow -- roughly 21 minutes per plate. The
+// digest is IN the engraved md1, so a divergence found after the plates are cut
+// costs every plate. Funding is the funds-safety deadline and the mismatch
+// sentence keeps it; the operator standing here is at the cheapest moment to
+// act, and the first sentence now names that one instead of a later one.
+//
 // Measured on errorScreenBody at sh2DisplaySize, longest variant (`hardened`,
 // `chars: 100`): see the row in TestModalsThisBlockTouchesAreDrawnInFull.
 func composerCopyHashlockReconcile(first8last8, method string, chars int) string {
 	return "hash  " + first8last8 + "\n" +
 		fmt.Sprintf("method: %s   chars: %d", method, chars) + "\n" +
-		"Before you fund this wallet, run ms hashlock with this phrase and " +
-		"method on the host and check the digest matches. If they differ, do " +
-		"not fund this wallet: build it again."
+		"Before you cut plates, run ms hashlock with this phrase and method on " +
+		"the host and check the digest matches. If they differ, do not fund this " +
+		"wallet: build it again."
 }
 ```
 
@@ -875,21 +1077,27 @@ func composerCopyHashlockReconcile(first8last8, method string, chars int) string
 - [ ] **Step 6: GREEN, the measured fits, then every mutation.**
 
 Run: `go test -count=1 -run 'TestHashlockReconcile|TestHashlockPhraseRouteSetsTheCorpusDigest|TestComposerCopy|TestModals|TestConfirmScreens' ./gui/`
-Expected: `ok  	seedhammer.com/gui	8.827s` (measured). The fit gates log their
-numbers; measured on this tree at `sh2DisplaySize`:
+Expected: `ok  	seedhammer.com/gui	8.643s` (measured). The fit gates log their
+numbers; measured on this tree at `sh2DisplaySize`, AFTER the r0 fold's two copy
+changes:
 
 ```
-modal_fits_test.go:352: the hashlock reconciliation screen (H2 §4.5, H5 §1): 186 chars drawn in full, headroom 339 chars (margin 80)
+modal_fits_test.go:352: the hashlock reconciliation screen (H2 §4.5, H5 §1): 181 chars drawn in full, headroom 339 chars (margin 80)
 modal_fits_test.go:352: HASH ON EVERY PATH, phrase-route form (H2 §4.7): 165 chars drawn in full, headroom 378 chars (margin 80)
-modal_fits_test.go:395: the hashlock confirm modal, longest variant (H2 §4.5): 347 chars drawn in full, headroom 107 chars (margin 80)
+modal_fits_test.go:395: the hashlock confirm modal, longest variant (H2 §4.5): 343 chars drawn in full, headroom 107 chars (margin 80)
 ```
 
-Those are spec §1.1's 186/339, spec §2.5's 165/378 and spec §1.2's 347/107 —
-reproduced independently here, not copied from the spec.
+Those are spec §1.1's 181/339, spec §2.5's 165/378 and spec §1.2's 343/107 —
+measured here on the text as written, not copied from the spec. The reconcile body
+lost 5 characters to *"Before you cut plates,"* and the confirm body lost 4 to
+*"The phrase and method are not on this device."*; the headroom is a LINE budget,
+so neither moved it.
 
 | Mutation | Measured failure |
 | --- | --- |
 | return the old one-sentence reconcile body | `TestHashlockReconcileScreenCarriesTheDigestMethodAndChars`: `does not carry "hash  3cf5d421..b70a4c12"`, `does not carry "method: hardened   chars: 28"`, `does not carry "If they differ, …"`; and `TestHashlockReconcileHeaderIsSpelledLikeTheConfirmModal`: `the reconcile body does not open with the shared header` |
+| restore `"Before you fund this wallet, run ms hashlock …"` as the FIRST sentence (r0 journey M-2) | `TestComposerCopyIsVerbatimFromTheSpec`: `composerCopyHashlockReconcile (SPEC §H2-4.5) does not match the spec.` — measured verbatim, with the whole body on both sides. `TestHashlockReconcileScreenCarriesTheDigestMethodAndChars` stays GREEN, because its three needles are the token, the method/chars line and the mismatch sentence, none of which move: the copy table is the gate for this sentence and the flow test is the gate for the screen carrying its operand. |
+| restore the confirm modal's `"They are not on this device and not on your plates."` (r0 journey I-1) | `TestComposerCopyIsVerbatimFromTheSpec`: `composerCopyHashlockConfirm (SPEC §H2-4.5) does not match the spec.`, quoting both bodies in full |
 | drop the mismatch sentence only | `TestHashlockReconcileScreenCarriesTheDigestMethodAndChars`: `does not carry "If they differ, do not fund this wallet: build it again."`; `TestComposerCopyIsVerbatimFromTheSpec`: `composerCopyHashlockReconcile (SPEC §H2-4.5) does not match the spec.` |
 | restore `"Write down this phrase and the method now."` | `TestHashlockPhraseRouteSetsTheCorpusDigest`, BOTH cases: `the confirm modal's write-down line does not name the digest: "hash3cf5d421..b70a4c12method:hardenedchars:28writedownthisphraseandthemethodnow.…"`; and `TestComposerCopyIsVerbatimFromTheSpec` on the confirm row |
 | `"method: %s chars: %d"` — one space instead of three | `TestHashlockReconcileHeaderIsSpelledLikeTheConfirmModal`: `the reconcile body does not open with the shared header`. **`TestHashlockReconcileScreenCarriesTheDigestMethodAndChars` stays GREEN under it** — measured — because `normalizeDrawn` strips whitespace before comparing, so no frame assertion in this package can see a spacing change. That is exactly why the header-equality test exists as a separate gate. |
@@ -897,8 +1105,12 @@ reproduced independently here, not copied from the spec.
 - [ ] **Step 7: The whole `gui` package.**
 
 Run: `/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24`
-Measured: **1231 top-level tests, `partition verified exhaustive: 1231 == 1231`,
-all 24 shards ok, 32 s wall** — Task 1's 1229 plus this task's two.
+Expected: **1233 top-level tests, `partition verified exhaustive: 1233 == 1233`,
+all 24 shards ok** — Task 1's 1231 plus this task's two
+(`grep -c '^func Test' gui/composer_hashlock_test.go` is 18 against `b9a9a30`'s
+16, measured). The plan author's shard run at this boundary measured **1231**
+before the r0 fold added two tests to Task 1's file; see Task 1 Step 10 for why
+the boundary figure is enumerated rather than re-run.
 
 - [ ] **Step 8: Commit.**
 
@@ -935,6 +1147,21 @@ paragraph.
 - [ ] **Step 1: Factor the band out of `composerPageLines`.** The arithmetic
 already existed inline (`gui/composer_paged.go:88-91` at `b9a9a30`); a second
 screen needs it, and a copy would be a second answer to "where does text stop".
+
+**WHERE THE BLOCK GOES, because `mode=fragment` cannot say it and getting it
+wrong costs a record (r0 fidelity I-3).** Put this comment and function ABOVE
+`composerPageLines`' own doc comment, with a blank line between the closing brace
+and it. Written directly beneath that doc comment instead — which is where the
+first draft put it — Go merges the two into ONE comment block, so
+`composerTextBand` gets documented with `composerPageLines`' text and
+`composerPageLines` is left with none: `go doc -u ./gui composerPageLines` printed
+nothing at all, and the "THE ONE MEASURE SITE" record behind every SPEC §13
+capacity number went with it. `gofmt`, `go vet`, every test and
+`scripts/h5-plan-blocks-vs-tree.sh` are all satisfied either way. Task 5's
+`gui/composer_doc_comment_test.go` is the gate; after this step, `go doc -u ./gui
+composerPageLines` must print `composerPageLines lays out lines[start:] …` and
+`go doc -u ./gui composerTextBand` must print `composerTextBand is the ONE
+horizontal band …` — measured, both do.
 
 ```go file=gui/composer_paged.go mode=fragment
 // composerTextBand is the ONE horizontal band composer text wraps inside: the
@@ -1199,7 +1426,7 @@ same evidence. With the panel-wide layout restored in `hashlockPhraseLead`:
 Note the lead's measured width under the mutation: 440 px against the band's 411.
 
 Run: `go test -count=1 -run 'TestHashlockPhraseLead|TestHashlockPhraseScreen|TestComposerPaged|TestPassphraseKeyboard|TestTextKeyboard|TestComposerPickTouch|TestFreetext' ./gui/`
-Expected: `ok  	seedhammer.com/gui	1.110s` (measured).
+Expected: `ok  	seedhammer.com/gui	1.117s` (measured).
 
 | Mutation | Measured failure |
 | --- | --- |
@@ -1230,7 +1457,20 @@ git commit -s -m "composer: the hashlock phrase lead wraps inside the page band,
 **Interfaces:**
 - Changed text, unchanged signature: `unlockNotPermittedBody(e *seal.RecordNotPermittedError) string` (`gui/unlock_kdf.go:390-393` at `b9a9a30`).
 - Consumes: `seal.RecordNotPermittedError{Index int, Class seal.Classification, Section, Preimage bool}`; `unlockRecordNoun(e)` (`gui/unlock_kdf.go:404-424`), whose longest arm is `"not a format this machine reads"`.
-- The body has NO `composerCopy*` row, because it is not composer copy: its fit gate is the `assertModalBodyFits(t, tc.name, errorScreenBody, body)` call inside `TestUnlockNotPermittedBodyNamesTheRecordAndTheKind` (`gui/unlock_preimage_test.go:139` at `b9a9a30`), and this task adds the longest-noun row to that table. `gui/s6b_p7_modal_fit_sweep_test.go` covers the codex32-too-long refusal, a different body (`gui/unlock_kdf.go:502` at `b9a9a30`; that sweep's row LABEL still reads `unlock_kdf.go:448`, which is stale and not this stage's to fix), and is not touched.
+- The body has NO `composerCopy*` row, because it is not composer copy: its fit gate is the `assertModalBodyFits(t, tc.name, errorScreenBody, body)` call inside `TestUnlockNotPermittedBodyNamesTheRecordAndTheKind` (`gui/unlock_preimage_test.go:139` at `b9a9a30`), and this task adds the longest-noun row to that table. `gui/s6b_p7_modal_fit_sweep_test.go` covers the codex32-too-long refusal, a different body (`gui/unlock_kdf.go:502` at `b9a9a30`; that sweep's row LABEL still reads `unlock_kdf.go:448`, which is stale and not this stage's to fix), and is not touched. Spec §5's "the copy-table row updated" therefore names a row
+that CANNOT exist, and Task 6 Step 3 files the one-line H5-spec erratum saying so
+rather than leaving a future reader to diff §5 against the code and find one
+unmet item with its explanation living only in this paragraph (r0 fidelity M-4).
+
+**The sentence also contemplates more than one offender (r0 journey M-3).**
+`seal.AdmitSection` returns on the FIRST refused record, so a payload carrying two
+preimage plates is refused once per plate — another ~31 s KDF and another host
+re-seal each round — and the index MOVES between rounds. Constructed on
+`[seed, plate, seed, plate]`: round 1 names `Record 1`, round 2 names `Record 2`,
+round 3 admits. An operator applying round 2's number to their ORIGINAL listing
+deletes a seed. So the body says *"Remove that record -- and any others like it --
+(records count from 0) …"*; it costs 22 characters and the longest-noun row still
+measures 175 drawn / **headroom 378** (was 153/397), well over the 80 margin.
 
 - [ ] **Step 1: The tests (RED).** The flow-level assertions:
 
@@ -1248,6 +1488,14 @@ git commit -s -m "composer: the hashlock phrase lead wraps inside the page band,
 	if !uiContains(got, "records count from 0") {
 		t.Errorf("the screen must say the index is 0-based; got %q", got)
 	}
+	// MUTATION: drop "-- and any others like it --" -> this fails. AdmitSection
+	// returns on the FIRST refused record, so a payload with two plates is
+	// refused twice and the index MOVES between rounds; an operator applying the
+	// second refusal's number to their original listing deletes a record the
+	// device never named (r0 journey M-3).
+	if !uiContains(got, "and any others like it") {
+		t.Errorf("the screen must say there may be more than one; got %q", got)
+	}
 ```
 
 The table's three existing rows gain the sentence, and a fourth row is added for
@@ -1255,7 +1503,7 @@ the fit measurement at the longest noun and a two-digit index:
 
 ```go file=gui/unlock_preimage_test.go mode=fragment
 			[]string{"Record 1", "hashlock preimage", "not a seed", "Nothing was opened",
-				"Remove that record (records count from 0) on the host and seal the payload again."},
+				"Remove that record -- and any others like it -- (records count from 0) on the host and seal the payload again."},
 ```
 
 ```go file=gui/unlock_preimage_test.go mode=fragment
@@ -1267,21 +1515,31 @@ the fit measurement at the longest noun and a two-digit index:
 			"the longest noun at a two-digit index",
 			&seal.RecordNotPermittedError{Index: 13, Class: seal.ClassUnknown, Section: seal.SectionEncrypted},
 			[]string{"Record 13", "not a format this machine reads",
-				"Remove that record (records count from 0) on the host and seal the payload again."},
+				"Remove that record -- and any others like it -- (records count from 0) on the host and seal the payload again."},
 			[]string{"hashlock preimage"},
 		},
 ```
 
 Run: `go test -count=1 -run 'TestUnlockNamesARefusedPreimageInsteadOfCallingItUnreadable|TestUnlockNotPermittedBodyNamesTheRecordAndTheKind' ./gui/`
 
-Measured RED:
+Measured RED (the pre-H5 one-sentence body):
 
 ```
 --- FAIL: TestUnlockNamesARefusedPreimageInsteadOfCallingItUnreadable (0.18s)
     unlock_preimage_test.go:69: the screen must say what to do next; got "Record1isahashlockpreimage,notaseed.Thispayloadcannotbeunlockedhere.Nothingwasopened.SealedPayload"
     unlock_preimage_test.go:76: the screen must say the index is 0-based; got "Record1isahashlockpreimage,notaseed.…"
 --- FAIL: TestUnlockNotPermittedBodyNamesTheRecordAndTheKind (0.37s)
-    … body "Record 13 is not a format this machine reads. This payload cannot be unlocked here. Nothing was opened." does not carry "Remove that record (records count from 0) on the host and seal the payload again."
+    … body "Record 13 is not a format this machine reads. This payload cannot be unlocked here. Nothing was opened." does not carry "Remove that record -- and any others like it -- (records count from 0) on the host and seal the payload again."
+```
+
+And, measured separately, the plural clause alone is load-bearing — with the rest
+of the sentence in place and only `-- and any others like it --` dropped:
+
+```
+--- FAIL: TestUnlockNamesARefusedPreimageInsteadOfCallingItUnreadable (0.10s)
+    unlock_preimage_test.go:84: the screen must say there may be more than one; got "Record1isahashlockpreimage,notaseed.Thispayloadcannotbeunlockedhere.Nothingwasopened.Removethatrecord(recordscountfrom0)onthehostandsealthepayloadagain.SealedPayload"
+--- FAIL: TestUnlockNotPermittedBodyNamesTheRecordAndTheKind (0.15s)
+    [all four rows] does not carry "Remove that record -- and any others like it -- (records count from 0) on the host and seal the payload again."
 ```
 
 - [ ] **Step 2: The body.**
@@ -1298,13 +1556,23 @@ Measured RED:
 // reading removes the record ABOVE the plate -- which in this package's own
 // fixture (gui/unlock_preimage_test.go's blob, the plate at record 1) is a seed.
 //
+// "AND ANY OTHERS LIKE IT" IS THE PLURAL CASE (r0 journey M-3). AdmitSection
+// returns on the FIRST refused record (seal/record.go, pass 2), so a payload
+// carrying two preimage plates is refused once per plate -- each round costing
+// another ~31 s derivation and another host re-seal -- and THE INDEX MOVES
+// between rounds, because removing record 1 renumbers everything after it.
+// Naming only "that record" invites an operator to apply round 2's number to
+// their ORIGINAL listing, which deletes a different record than the one the
+// device refused; on [seed, plate, seed, plate] that is a seed. The clause
+// costs 22 characters and leaves headroom 378 at the longest noun, measured.
+//
 // The body is shared by every unlockRecordNoun arm below, so this reaches all of
 // them; the fit is measured at the longest noun and a two-digit index in
 // TestUnlockNotPermittedBodyNamesTheRecordAndTheKind.
 func unlockNotPermittedBody(e *seal.RecordNotPermittedError) string {
 	return fmt.Sprintf("Record %d is %s. This payload cannot be unlocked here. "+
-		"Nothing was opened. Remove that record (records count from 0) on the "+
-		"host and seal the payload again.",
+		"Nothing was opened. Remove that record -- and any others like it -- "+
+		"(records count from 0) on the host and seal the payload again.",
 		e.Index, unlockRecordNoun(e))
 }
 ```
@@ -1316,22 +1584,24 @@ Measured:
 
 ```
 --- PASS: TestUnlockNamesARefusedPreimageInsteadOfCallingItUnreadable (0.10s)
-    unlock_preimage_test.go:166: a preimage plate at record 1: 152 chars drawn in full, headroom 397 chars (margin 80)
-    unlock_preimage_test.go:166: a preimage plate at record 0 -- records count from 0: 152 chars drawn in full, headroom 397 chars (margin 80)
-    unlock_preimage_test.go:166: a codex32 secret in the public section: 140 chars drawn in full, headroom 418 chars (margin 80)
-    unlock_preimage_test.go:166: the longest noun at a two-digit index: 153 chars drawn in full, headroom 397 chars (margin 80)
-    unlock_preimage_test.go:166: a record this machine does not read at all: 152 chars drawn in full, headroom 397 chars (margin 80)
---- PASS: TestUnlockNotPermittedBodyNamesTheRecordAndTheKind (0.16s)
+    unlock_preimage_test.go:174: a preimage plate at record 1: 174 chars drawn in full, headroom 378 chars (margin 80)
+    unlock_preimage_test.go:174: a preimage plate at record 0 -- records count from 0: 174 chars drawn in full, headroom 378 chars (margin 80)
+    unlock_preimage_test.go:174: a codex32 secret in the public section: 162 chars drawn in full, headroom 397 chars (margin 80)
+    unlock_preimage_test.go:174: the longest noun at a two-digit index: 175 chars drawn in full, headroom 378 chars (margin 80)
+    unlock_preimage_test.go:174: a record this machine does not read at all: 174 chars drawn in full, headroom 378 chars (margin 80)
+--- PASS: TestUnlockNotPermittedBodyNamesTheRecordAndTheKind (0.15s)
 ok  	seedhammer.com/gui	0.272s
 ```
 
-397 at the longest noun and a two-digit index, which is spec §5's number
-reproduced here.
+**378 at the longest noun and a two-digit index**, which is what spec §5's number
+becomes with the plural clause — 397 was the sentence without it. Both are far
+above the 80 margin, which is the gate; the spec carries 378.
 
 | Mutation | Measured failure |
 | --- | --- |
-| drop the whole new sentence | `TestUnlockNamesARefusedPreimageInsteadOfCallingItUnreadable`: `the screen must say what to do next` and `the screen must say the index is 0-based`; `TestUnlockNotPermittedBodyNamesTheRecordAndTheKind`: all four rows `does not carry "Remove that record (records count from 0) …"` |
+| drop the whole new sentence | `TestUnlockNamesARefusedPreimageInsteadOfCallingItUnreadable`: `the screen must say what to do next` and `the screen must say the index is 0-based`; `TestUnlockNotPermittedBodyNamesTheRecordAndTheKind`: all four rows `does not carry "Remove that record -- and any others like it -- (records count from 0) on the host and seal the payload again."` |
 | drop `"(records count from 0)"` only | `TestUnlockNamesARefusedPreimageInsteadOfCallingItUnreadable`: `the screen must say the index is 0-based; got "…Removethatrecordonthehostandsealthepayloadagain.SealedPayload"`; and all four table rows |
+| drop `" -- and any others like it -- "` only (r0 journey M-3) | `TestUnlockNamesARefusedPreimageInsteadOfCallingItUnreadable`: `the screen must say there may be more than one; got "…Removethatrecord(recordscountfrom0)onthehostandsealthepayloadagain.SealedPayload"`; and all four table rows `does not carry "Remove that record -- and any others like it -- (records count from 0) on the host and seal the payload again."` |
 
 - [ ] **Step 4: Commit.**
 
@@ -1467,23 +1737,36 @@ package gui
 // only consumer for it lives in a browser. A variable the image does not
 // contain cannot be assigned by accident.
 //
-// WHAT IT COSTS, MEASURED: nothing. Not one byte. Built at the production
-// settings (-target pico-plus2 -stack-size 16kb -gc precise -opt 2
-// -scheduler tasks) on the H5 gate tree, against the SAME tree with this file
-// and composerFlow's hook lines deleted -- so the number is the hook's own
-// share and not a delta inherited from frame_hook's measurement, which is a
-// different call in a different place and was measured on a different day:
+// WHAT IT COSTS, MEASURED: nothing. Built at the production settings
+// (-target pico-plus2 -stack-size 16kb -gc precise -opt 2 -scheduler tasks) on
+// the H5 gate tree, against the SAME tree with this file, composerFlow's
+// setComposerStateHook call and composerFlowExit's clearComposerStateHook call
+// deleted -- so the number is the hook's own share and not a delta inherited
+// from frame_hook's measurement, which is a different call in a different place
+// and was measured on a different day:
 //
-//	with the hook, one defer                1,599,164 B flash / 62,856 B RAM
-//	the hook deleted from the tinygo view   1,599,164 B flash / 62,856 B RAM
+//	with the hook, one defer                1,599,208 B flash / 62,856 B RAM
+//	the hook deleted from the tinygo view   1,599,224 B flash / 62,856 B RAM
+//
+// THE HOOK'S SHARE IS -16 B, WHICH IS ZERO PLUS LAYOUT NOISE, and saying so is
+// the honest form of the claim. The image WITHOUT the hook is 16 bytes LARGER;
+// nothing here can cost negative flash, so what the pair measures is that the
+// hook contributes nothing the compiler does not reclaim elsewhere, to within
+// the granularity of a whole-image build. The r0 fold is what showed this:
+// before it, on a tree differing only in four operator-facing string literals,
+// the same pair measured 1,599,164 and 1,599,164 -- an exact 0. A delta that
+// moves from 0 to -16 when unrelated copy changes shift the layout is not a
+// structural zero, and a spec that asserts "0 bytes" of it is asserting the
+// noise. It is asserted as "no measurable cost", not as an exact 0.
 //
 // AND THE ZERO IS NOT AN ARTEFACT OF A BUILD THAT IGNORED THE EDIT. Giving this
-// stub a body the compiler cannot drop -- one println -- moves the image to
-// 1,599,388 B, +224 B. Edits here reach the image; this one costs nothing.
+// stub a body the compiler cannot drop -- `println("hook")` inside
+// setComposerStateHook, exactly that -- moves the image to 1,599,368 B, +160 B.
+// Edits here reach the image; this one costs nothing.
 //
-// WHAT IT COST BEFORE THE SHAPE WAS FIXED: 112 B. composerFlow first cleared the
+// WHAT IT COST BEFORE THE SHAPE WAS FIXED: 96 B. composerFlow first cleared the
 // hook through a SECOND `defer clearComposerStateHook()` beside the seed
-// scrub's own defer, and that measured 1,599,276 B -- TinyGo elides the empty
+// scrub's own defer, and that measured 1,599,304 B -- TinyGo elides the empty
 // call and not the defer record around it. Folding both into the one deferred
 // composerFlowExit call the flow already had is what makes it free. Measured,
 // because a guess about the compiler in plate_hook_tinygo.go's first version
@@ -1499,8 +1782,16 @@ func clearComposerStateHook() {}
 - [ ] **Step 2: One defer, not two.** `composerFlow` installs the hook and leaves
 through the deferred call it already had. Writing a second
 `defer clearComposerStateHook()` beside `defer st.reg.scrub()` compiles and works
-and costs **112 B of firmware flash** (Step 7) — TinyGo elides the empty stub's
+and costs **96 B of firmware flash** (Step 9) — TinyGo elides the empty stub's
 CALL but not the defer record around it.
+
+**WHERE THE `composerFlowExit` BLOCK GOES (r0 fidelity I-3, the same defect as
+Task 3 Step 1).** Above `composerFlow`'s doc comment, with a blank line between
+its closing brace and that comment. Written directly beneath `composerFlow`'s doc
+comment, Go merges the two: `composerFlowExit` is documented with
+`composerFlow`'s text and `go doc -u ./gui composerFlow` prints nothing — and what
+is lost is the written record of the "plans list components and omit the call that
+joins them" Critical. Step 3a's test is the gate.
 
 ```go file=gui/composer_flow.go mode=fragment
 // composerFlowExit is everything one composition must undo, in one deferred
@@ -1508,9 +1799,10 @@ CALL but not the defer record around it.
 // hook.
 //
 // ONE DEFER, DELIBERATELY, and measured: a second `defer clearComposerStateHook()`
-// costs 112 B of firmware flash against this shape's 0, because TinyGo removes
-// the empty stub's CALL but not the defer bookkeeping around it. Both numbers
-// are in IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md Task 5.
+// costs 96 B of firmware flash against this shape's nothing, because TinyGo
+// removes the empty stub's CALL but not the defer bookkeeping around it. Both
+// numbers are in IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md Task 5, and
+// composer_state_hook_tinygo.go says why "nothing" is the claim and not "0 B".
 func composerFlowExit(st *composerState) {
 	st.reg.scrub()
 	clearComposerStateHook()
@@ -1525,9 +1817,9 @@ func composerFlowExit(st *composerState) {
 	// written this way: every exit below is covered without an implementer
 	// remembering to add a clear to a new return, and on the machine the shape
 	// costs nothing. A `defer clearComposerStateHook()` beside the scrub's own
-	// defer measured +112 B of flash even though the tinygo stub is empty --
+	// defer measured +96 B of flash even though the tinygo stub is empty --
 	// TinyGo elides the empty CALL and not the defer record around it. One
-	// defer, as there has always been, is 0.
+	// defer, as there has always been, costs no measurable flash.
 	setComposerStateHook(st)
 	defer composerFlowExit(st)
 ```
@@ -1657,6 +1949,125 @@ func TestComposerStateHookReportsEachPathAndHandsOutCopies(t *testing.T) {
 	}
 }
 ```
+
+- [ ] **Step 3a: The doc-comment gate.** Two `//go:build`-free files, two
+inserted helpers, two stolen doc comments — a systematic placement error, not a
+slip, and nothing in the suite could see it (r0 fidelity I-3). Create
+`gui/composer_doc_comment_test.go`. It lands in Task 5 because it names
+`composerFlowExit`, which Step 2 above is the first step to declare;
+`composerTextBand` and `composerPageLines` have existed since Task 3.
+
+```go file=gui/composer_doc_comment_test.go mode=whole
+package gui
+
+import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"strings"
+	"testing"
+)
+
+// ─── r0 fidelity I-3: an inserted helper must not steal a doc comment ────────
+//
+// Go attaches a comment block to the declaration that follows it, so a new
+// function whose own comment is written directly beneath an existing doc
+// comment -- with no blank line between them -- MERGES the two: the new
+// function is documented with the old one's text and the old one is left with
+// nothing. H5 inserted two helpers exactly that way, in two different files,
+// and took `composerFlow`'s comment (the written record of the "plans list
+// components and omit the call that joins them" Critical) and
+// `composerPageLines`'s (the "ONE MEASURE SITE" record behind every SPEC §13
+// capacity number) with them.
+//
+// NOTHING ELSE IN THE SUITE CAN SEE IT. gofmt is clean either way, go vet says
+// nothing, every test passes, and scripts/h5-plan-blocks-vs-tree.sh matches
+// fragments by substring, which is satisfied whichever side of the blank line
+// the block sits on. A merged block is not a syntax error; it is a silent
+// change of owner.
+//
+// This is deliberately a NAMED LIST rather than a whole-package rule. Plenty of
+// doc comments in this package legitimately open with something other than the
+// symbol's name (composerCopyHashlockReconcile opens "§4.5's reconciliation
+// screen"), so a package-wide "must start with the name" check would be noise.
+// What is asserted here is narrow and exact: these symbols have a doc comment,
+// and it is THEIR doc comment.
+var composerDocOwners = map[string]string{
+	"composerFlow":      "composer_flow.go",
+	"composerFlowExit":  "composer_flow.go",
+	"composerPageLines": "composer_paged.go",
+	"composerTextBand":  "composer_paged.go",
+}
+
+// TestComposerHelpersDidNotStealADocComment is the gate for the above.
+//
+// MUTATION: move composerFlowExit's comment and func back BETWEEN composerFlow's
+// doc comment and composerFlow (the arrangement fidelity I-3 found) ->
+// "composerFlow has NO doc comment in composer_flow.go" and "composerFlowExit's
+// doc comment ... opens \"composerFlow is ...\"". Same for composerTextBand and
+// composerPageLines.
+//
+// NOT a mutation, MEASURED: deleting the blank line between composerFlowExit's
+// closing brace and composerFlow's doc comment does NOT break the attachment and
+// this test stays green -- go/ast binds a comment group to the declaration on the
+// line after it, whatever precedes the group. The defect is the ORDER, not the
+// whitespace, which is why the fix moves the helper above the doc block rather
+// than inserting a blank line inside the sandwich.
+func TestComposerHelpersDidNotStealADocComment(t *testing.T) {
+	fset := token.NewFileSet()
+	seen := map[string]bool{}
+	for name, file := range composerDocOwners {
+		f, err := parser.ParseFile(fset, file, nil, parser.ParseComments)
+		if err != nil {
+			t.Fatalf("parsing %s: %v", file, err)
+		}
+		var fn *ast.FuncDecl
+		for _, d := range f.Decls {
+			fd, ok := d.(*ast.FuncDecl)
+			if ok && fd.Recv == nil && fd.Name.Name == name {
+				fn = fd
+				break
+			}
+		}
+		if fn == nil {
+			t.Errorf("%s declares no func %s; this list is stale", file, name)
+			continue
+		}
+		seen[name] = true
+		if fn.Doc == nil {
+			t.Errorf("%s has NO doc comment in %s -- a block inserted beneath it with no "+
+				"blank line between takes it, and the record it carried goes with it "+
+				"(r0 fidelity I-3)", name, file)
+			continue
+		}
+		first := strings.TrimSpace(strings.TrimPrefix(fn.Doc.List[0].Text, "//"))
+		if !strings.HasPrefix(first, name+" ") {
+			t.Errorf("%s's doc comment in %s opens %q -- it is documenting %s with another "+
+				"symbol's text", name, file, first, name)
+		}
+	}
+	if len(seen) != len(composerDocOwners) {
+		t.Fatalf("checked %d of %d symbols", len(seen), len(composerDocOwners))
+	}
+}
+```
+
+GREEN, and the mutation that bites — measured by putting `composerFlowExit`'s
+comment and function back BETWEEN `composerFlow`'s doc comment and `composerFlow`:
+
+```
+--- FAIL: TestComposerHelpersDidNotStealADocComment (0.00s)
+    composer_doc_comment_test.go:78: composerFlow has NO doc comment in composer_flow.go -- a block inserted beneath it with no blank line between takes it, and the record it carried goes with it (r0 fidelity I-3)
+    composer_doc_comment_test.go:85: composerFlowExit's doc comment in composer_flow.go opens "composerFlow is \"Build a new policy\" (SPEC_wallet_policy_composer.md §7)," -- it is documenting composerFlowExit with another symbol's text
+```
+
+**A NEGATIVE RESULT WORTH RECORDING, because the obvious mutation does NOT bite.**
+Deleting the blank line between `composerFlowExit`'s closing brace and
+`composerFlow`'s doc comment leaves this test GREEN — measured — because `go/ast`
+binds a comment group to the declaration on the line after it, whatever precedes
+the group. The defect is the ORDER, not the whitespace, which is why the fix moves
+the helper above the doc block rather than inserting a blank line inside the
+sandwich, and why the test's own MUTATION note says so.
 
 - [ ] **Step 4: The `js` glue.** Create `cmd/emu/composer_js.go`:
 
@@ -1853,7 +2264,34 @@ FAIL	seedhammer.com/cmd/emu	1.094s
 Spec §4.4 requires this walk's `ok` to be SET rather than recomputed, so the
 guard has to read the assignment shape whatever else H5 does. Teach it both, and
 treat a bare boolean right-hand side as the STRONGEST form of the property rather
-than as an exemption from it:
+than as an exemption from it.
+
+**EVERY ASSIGNMENT, NOT THE FIRST (r0 fidelity I-2).** The first draft of this
+branch took `okAssignRe.FindStringSubmatch` — the FIRST match — and a walk's
+verdict is its LAST assignment. So a walk shaped like
+
+```javascript
+export async function run() {
+  const out = { plates: null, ok: false };
+  out.ok = false;
+  out.plates = window.shPlates();
+  out.ok = out.plates === 3;
+  return out;
+}
+```
+
+cleared the guard, was counted as checked, and was LOGGED as restating nothing —
+the exact defect I-1/F-170 exists to catch, reported as absent. That is worse than
+the INCONCLUSIVE it replaced, because INCONCLUSIVE said so. Constructed as
+`cmd/emu/walk_zzz_probe.js` and run against the fixed guard, it fails:
+
+```
+needle_test.go:638: walk_zzz_probe.js's `ok` contains `plates`, which the CALLER supplies (I-1/F-170):
+    out.plates === 3
+```
+
+(the probe was removed immediately; `ls cmd/emu/walk_*.js | wc -l` is 8 again,
+measured.)
 
 ```go file=cmd/emu/needle_test.go mode=fragment
 // Blind spot, stated: this reads the `ok` expression textually. A driver that
@@ -1870,52 +2308,150 @@ than as an exemption from it:
 // been failing for two stages while the guard's own doc claimed it covered
 // "BOTH walk scripts".
 //
+// EVERY ASSIGNMENT IS READ, NOT THE FIRST (r0 fidelity I-2). A walk's verdict is
+// its LAST `ok` assignment, and the first draft of this branch took
+// FindStringSubmatch -- the first match -- so a walk that opened
+// `out.ok = false;` and closed `out.ok = out.plates === 3;` cleared the guard,
+// was counted as checked, and was LOGGED as restating nothing. That is worse
+// than the INCONCLUSIVE it replaced, because INCONCLUSIVE said so. The `plates`
+// check now runs on every right-hand side, so the position of the offending one
+// does not matter; walkOkAssignments below is separated out for exactly one
+// reason, that TestWalkOkGuardReadsEveryAssignment can feed it that shape.
+//
 // The assignment regex captures the right-hand side EXACTLY, anchored on the
 // `.ok =` it is looking for, so unlike the property span it cannot grab a
 // neighbouring literal -- which is why the census/verdict floor below is
 // required of the property shape and not of this one.
-var (
-	okPropRe   = regexp.MustCompile(`(?ms)^\s*ok:.*?\n  \};`)
-	okAssignRe = regexp.MustCompile(`(?ms)^\s*\w+\.ok\s*=\s*(.*?);\s*$`)
-	// A bare boolean right-hand side: `out.ok = true;`. This is the STRONGEST
-	// form of the property under test, not an exemption from it -- an `ok` that
-	// is SET after the last assertion contains no term at all, so it cannot
-	// contain one the driver supplied, and there is nothing left for the
-	// `plates` check to find. H5 §4.4 requires exactly this of the hashlock
-	// walk, and a guard that called the strongest shape INCONCLUSIVE would push
-	// the next author back to a recomputation.
-	okSetRe = regexp.MustCompile(`^(true|false)$`)
-)
 ```
 
 ```go file=cmd/emu/needle_test.go mode=fragment
 		src := string(b)
 		// The ASSIGNMENT shape first: its span is exact, so it needs no floor.
-		if m := okAssignRe.FindStringSubmatch(src); m != nil {
-			rhs := strings.TrimSpace(m[1])
+		if rhs := walkOkAssignments(src); len(rhs) > 0 {
 			checked++
-			if okSetRe.MatchString(rhs) {
-				t.Logf("%s sets `ok` to %s after its last assertion, so it restates nothing "+
-					"(H5 §4.4)", f, rhs)
-				continue
-			}
-			if strings.Contains(rhs, "plates") {
+			bad, allConst := walkOkDriverSupplied(rhs)
+			for _, r := range bad {
 				t.Errorf("%s's `ok` contains `plates`, which the CALLER supplies (I-1/F-170):\n%s\n"+
 					"A walk cannot derive, so a caller-supplied count in `ok` is content the walk "+
-					"never observed — a run that cut N WRONG strings is green.", f, rhs)
+					"never observed — a run that cut N WRONG strings is green.", f, r)
 			}
-			continue
-		}
-		expr := okPropRe.FindString(src)
-		if expr == "" {
-			t.Errorf("INCONCLUSIVE: %s has neither an `ok:` property nor an `x.ok =` assignment "+
-				"this test can read, so nothing was checked for it — the walk's return shape "+
-				"changed and this guard did not", f)
+			if allConst {
+				// SAYS ONLY WHAT IS CHECKED (r0 journey N-1). Nothing here
+				// measures where the assignment sits relative to the last
+				// assertion; what is measured is that every right-hand side is a
+				// constant, which is what makes it restate nothing.
+				t.Logf("%s assigns `ok` nothing but the constant(s) %s, so it restates no assertion "+
+					"(H5 §4.4)", f, strings.Join(rhs, ", "))
+			}
 			continue
 		}
 ```
 
-- [ ] **Step 7: The walk.** `cmd/emu/walk_hashlock_phrase.js`, whole:
+The two helpers that branch calls, and the table test that feeds them the shape a
+real walk file cannot — the guard's own blind spot, gated:
+
+```go file=cmd/emu/needle_test.go mode=fragment
+// walkOkAssignments returns the right-hand side of EVERY `x.ok = <rhs>;` in src,
+// in source order, trimmed.
+//
+// Separated from the test so the guard's own blind spot has a test: see
+// TestWalkOkGuardReadsEveryAssignment.
+func walkOkAssignments(src string) []string {
+	ms := okAssignRe.FindAllStringSubmatch(src, -1)
+	out := make([]string, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, strings.TrimSpace(m[1]))
+	}
+	return out
+}
+
+// walkOkDriverSupplied returns the right-hand sides of assignments that name a
+// term the CALLER supplies (I-1/F-170), and whether every assignment was a bare
+// boolean constant.
+func walkOkDriverSupplied(rhs []string) (bad []string, allConst bool) {
+	allConst = true
+	for _, r := range rhs {
+		if okSetRe.MatchString(r) {
+			continue
+		}
+		allConst = false
+		if strings.Contains(r, "plates") {
+			bad = append(bad, r)
+		}
+	}
+	return bad, allConst
+}
+
+// TestWalkOkGuardReadsEveryAssignment is the guard's own gate (r0 fidelity I-2).
+//
+// The shape that matters is row 3: a walk whose LAST assignment is the defect
+// and whose FIRST is innocent. Reading one match passes it.
+//
+// MUTATION: make walkOkAssignments use FindStringSubmatch (the first match only)
+// -> the row "the verdict is the last assignment" fails on both counts, measured:
+// `walkOkDriverSupplied found 0 caller-supplied term(s) [] in ["false"], want 1`
+// and `allConst = true over ["false"], want false`. The row after it survives that
+// mutation BY CONSTRUCTION -- its offender IS the first assignment -- which is why
+// both rows are here: one pins the position, the other pins that position is not
+// what the check depends on.
+func TestWalkOkGuardReadsEveryAssignment(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		src      string
+		wantBad  int
+		wantAllC bool
+	}{
+		{"set after the last assertion", "  out.ok = false;\n  must(x);\n  out.ok = true;\n", 0, true},
+		{"the verdict is the last assignment",
+			"  const out = { plates: null, ok: false };\n  out.ok = false;\n" +
+				"  out.plates = window.shPlates();\n  out.ok = out.plates === 3;\n", 1, false},
+		{"an early offender with a bare verdict after it",
+			"  out.ok = out.plates === 3;\n  out.ok = true;\n", 1, false},
+		{"a derived verdict that names nothing the caller supplies",
+			"  out.ok = census.length > 0;\n", 0, false},
+		{"no assignment at all", "  const out = { ok: false };\n", 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rhs := walkOkAssignments(tc.src)
+			bad, allConst := walkOkDriverSupplied(rhs)
+			if len(bad) != tc.wantBad {
+				t.Errorf("walkOkDriverSupplied found %d caller-supplied term(s) %q in %q, want %d",
+					len(bad), bad, rhs, tc.wantBad)
+			}
+			if allConst != tc.wantAllC {
+				t.Errorf("allConst = %v over %q, want %v", allConst, rhs, tc.wantAllC)
+			}
+		})
+	}
+}
+```
+
+- [ ] **Step 7: The walk.** `cmd/emu/walk_hashlock_phrase.js`, whole.
+
+**The stored-versus-displayed assertion reads the FRAME, and runs BEFORE the
+corpus check (r0 fidelity I-1 = r0 journey I-7 unmet).** The first draft compared
+`short8(stored)` against `ANCHOR_HARD_H` — a file constant that is
+`short8(ANCHOR_HARD_FULL)`, the very constant the line above had just compared
+`stored` against. Once the corpus assertion passes, that comparison holds by
+construction: **it cannot fail under any device behaviour**, and the run spec
+§4.5(c) adds to make it falsifiable trips the CORPUS assertion instead. So the
+walk parses the token the confirm modal actually painted (`drawnToken`), keeps it
+in `out.displayed`, and compares the stored digest against THAT first; the corpus
+check stays as the oracle for what the value should have been.
+
+Verified by replaying the walk's own assertion text — sliced verbatim out of this
+file — for the three runs of spec §4.5 plus an independence control:
+
+```
+(a) unmutated          : PASSED all post-hold assertions; out={"storedBeforeHold":null,"stored":"3cf5d421…b70a4c12"}
+(b) assigned pre-hold  : FAILED -> the path ALREADY holds a hash while the confirm modal is up: the digest is assigned before the hold, so Back after reading it would leave it set (F-485).
+(c) stored perturbed   : FAILED -> the stored digest does not abbreviate to the token the confirm modal drew: the screen showed one digest and the policy holds another.
+(d) agree, wrong corpus: FAILED -> the STORED digest is not the corpus's hardened digest for this phrase.
+```
+
+(c) and (d) are what prove the two assertions are INDEPENDENT rather than one
+restating the other: (c) fires only the screen comparison, (d) — screen and policy
+agreeing on a digest the corpus does not hold — fires only the corpus one.
 
 ```javascript file=cmd/emu/walk_hashlock_phrase.js mode=whole
 // H2 acceptance walk (IMPLEMENTATION_PLAN_hashlock_H2_device.md Task 5 Step 1):
@@ -1992,7 +2528,13 @@ var (
 // Helpers are inlined from walk_h0_preimage.js / shots_composer.js (they are
 // not exported there).
 //
-// THE KEYBOARD GRID WAS PROBED, NOT DERIVED (2026-09-05, this emulator build).
+// THE KEYBOARD GRID WAS PROBED, NOT DERIVED -- during H2, on the emulator build
+// of e1bf137, and NOT re-probed for H5. Nothing in this stage moves it: H5 §3
+// narrows the lead's band and the lead stays two lines (44 px) at both widths,
+// so kbd.MaxHeight is 209 before and after (gui/composer_hashlock_geometry_test
+// .go logs it on every run) and the grid the centres below belong to is the
+// same one. Run (a) of the three-run acceptance re-proves it end to end anyway:
+// a moved key mistypes the phrase and trial 1 misses its digest.
 // window.shTargets() is no help here: it hit-tests only the CENTRE COLUMN, and
 // on the 10-key `qwertyuiop` row x=240 lands in the 8 px gap BETWEEN two keys,
 // so that row is missing from its output entirely. The phrase screen has no
@@ -2229,6 +2771,31 @@ function pathHashes(where) {
 /** first8..last8 of a 64-hex digest -- the abbreviation gui.hashlockFirst8Last8 draws. */
 const short8 = (hex64) => `${hex64.slice(0, 8)}..${hex64.slice(-8)}`;
 
+/**
+ * The first8..last8 token a frame DREW, read out of the frame itself.
+ *
+ * THIS IS WHAT MAKES THE STORED-VERSUS-DISPLAYED ASSERTION FALSIFIABLE. Comparing
+ * short8(stored) against a constant this file also compares the stored value
+ * against is a tautology: once the corpus check has passed, the abbreviation
+ * check cannot fail under any device behaviour, so the assertion spec §4.5(c)
+ * exists to exercise would have no failing input. Reading the token the screen
+ * actually painted makes "the screen showed one digest and the policy holds
+ * another" a claim about two independent sources.
+ *
+ * The confirm modal and the reconcile screen both open `hash  <first8>..<last8>`
+ * (gui/composer_copy.go), and squash() removes the two spaces, so the first
+ * match is the header token. Throws rather than returning null: a walk that
+ * silently skipped this comparison would report the same PASS as one that ran it.
+ */
+function drawnToken(frame, where) {
+  const m = squash(frame).match(/hash([0-9a-f]{8}\.\.[0-9a-f]{8})/);
+  if (m === null) {
+    throw new Error(`${where}: no \`hash <first8>..<last8>\` token in the frame, so there is ` +
+      `nothing to compare the STORED digest against.\nScreen: ${JSON.stringify(frame)}`);
+  }
+  return m[1];
+}
+
 /** Back out of the confirm modal to `Which hash?`, dropping the phrase (§4.6). */
 async function backToWhichHash() {
   await tap(BACK, 400);                       // confirm  -> method pick
@@ -2243,7 +2810,7 @@ export async function run() {
   for (const fn of ["shScreen", "shTargets", "shTap", "shPress", "shRelease", "shSysw",
                     "shComposerPathHashes"]) {
     if (typeof window[fn] !== "function") {
-      throw new Error(`${fn} missing -- stale or wrong emu.wasm; rebuild from the hashlock-h2 branch and serve on a FRESH port`);
+      throw new Error(`${fn} missing -- stale or wrong emu.wasm; rebuild from the hashlock-h5 branch and serve on a FRESH port`);
     }
   }
   const out = { typed: null, control: null, mixed: null, hardened: null, ok: false };
@@ -2296,6 +2863,11 @@ export async function run() {
   mustNot(hardened, "b867db87", "hardened produced the SHA-256 digest -- the method pick did nothing");
   out.hardened = squash(hardened).slice(0, 220);
   out.hardenedFirstFrame = firstFrame;
+  // The token the modal DREW, parsed from its own frame -- not a constant. The
+  // must() above has already pinned it to the corpus; this is the value the
+  // stored digest is compared against after the hold.
+  const displayed = drawnToken(hardened, "the hardened confirm modal");
+  out.displayed = displayed;
 
   // ── the ORDER assertion, pinned to the confirm-modal frame ───────────────
   // The modal is up and the hold has not happened. Nothing may be stored yet:
@@ -2315,22 +2887,38 @@ export async function run() {
 
   await hold(CONFIRM);
 
-  // ── stored versus displayed, in FULL hex ─────────────────────────────────
+  // ── stored versus displayed, then stored versus the corpus ───────────────
+  //
+  // ORDER IS LOAD-BEARING. The screen comparison runs FIRST, against the token
+  // parsed out of the modal's own frame, so spec §4.5(c) -- the stored hash
+  // perturbed by one byte after assignment -- fails HERE and not at the corpus
+  // check. The corpus check then stays as the oracle for what the value should
+  // have been. Reversed, or compared against ANCHOR_HARD_H, this assertion has
+  // no failing input at all: it would restate the corpus check.
   const after = pathHashes("after the hold");
+  if (typeof after[0] !== "string") {
+    throw new Error("the path holds NO hash after the hold: the digest the confirm modal " +
+      `displayed was never assigned.\n  stored: ${JSON.stringify(after[0])}`);
+  }
+  if (short8(after[0]) !== displayed) {
+    throw new Error("the stored digest does not abbreviate to the token the confirm modal drew: " +
+      "the screen showed one digest and the policy holds another.\n" +
+      `  displayed: ${displayed}\n  stored:    ${after[0]} -> ${short8(after[0])}`);
+  }
   if (after[0] !== ANCHOR_HARD_FULL) {
     throw new Error("the STORED digest is not the corpus's hardened digest for this phrase.\n" +
       `  stored:   ${JSON.stringify(after[0])}\n  corpus:   ${ANCHOR_HARD_FULL}`);
-  }
-  if (short8(after[0]) !== ANCHOR_HARD_H) {
-    throw new Error("the stored digest does not abbreviate to the token the confirm modal drew " +
-      `(${ANCHOR_HARD_H}): the screen showed one digest and the policy holds another.\n` +
-      `  stored: ${after[0]} -> ${short8(after[0])}`);
   }
   out.stored = after[0];
 
   const reconcile = await waitFor("run ms hashlock with this phrase", 20000);
   must(reconcile, "check the digest matches", "the reconciliation screen (§4.5)");
   // §1.5: the screen that asks for the comparison carries the operands.
+  if (drawnToken(reconcile, "the reconciliation screen") !== displayed) {
+    throw new Error("the reconciliation screen draws a DIFFERENT token than the confirm modal, " +
+      "so the operator is asked to compare against a value they were never shown.\n" +
+      `  confirm modal: ${displayed}\n  reconcile:     ${drawnToken(reconcile, "the reconciliation screen")}`);
+  }
   must(reconcile, ANCHOR_HARD_H, "the reconciliation screen repeats the confirm modal's token");
   must(reconcile, "chars: " + ANCHOR.length, "the reconciliation screen repeats the confirm modal's char count");
   must(reconcile, "If they differ", "the reconciliation screen says what a mismatch means");
@@ -2351,17 +2939,23 @@ export async function run() {
 
 - [ ] **Step 8: GREEN, and the mutations the gui half can run.**
 
-Run: `go test -count=1 -run 'TestComposerStateHook|TestBuildTaggedHooks' ./gui/ && go test -count=1 ./cmd/emu/`
-Expected: both `ok`. Measured, the `ok`-guard now reports what it could not read before:
+Run: `go test -count=1 -run 'TestComposerStateHook|TestBuildTaggedHooks|TestComposerHelpersDidNotStealADocComment' ./gui/ && go test -count=1 ./cmd/emu/`
+Expected: both `ok` (measured: `0.040s` and `1.032s`). The `ok`-guard now reports
+what it could not read before, and says only what it checked:
 
 ```
-needle_test.go:554: walk_hashlock_phrase.js sets `ok` to true after its last assertion, so it restates nothing (H5 §4.4)
-needle_test.go:606: 8 walk script(s) checked; no driver-supplied plate count in any `ok`
+needle_test.go:647: walk_hashlock_phrase.js assigns `ok` nothing but the constant(s) true, so it restates no assertion (H5 §4.4)
+needle_test.go:693: 8 walk script(s) checked; no driver-supplied plate count in any `ok`
 --- PASS: TestWalkOkContainsNoDriverSuppliedPlateCount (0.00s)
 ```
 
 Eight scripts checked where six were before: `walk_h0_preimage.js` and
 `walk_hashlock_phrase.js` are the two the guard had been silently skipping.
+`walk_h0_preimage.js` draws no log line because its `ok` is DERIVED
+(`squash(out.typed.refusal).includes(…) && …`) rather than a constant — it is
+still checked, and it names nothing the caller supplies. The log line no longer
+claims the assignment sits after the last assertion, because nothing here measures
+that (r0 journey N-1).
 
 | Mutation | Measured failure |
 | --- | --- |
@@ -2371,6 +2965,8 @@ Eight scripts checked where six were before: `walk_h0_preimage.js` and
 | the hook skips paths with no hash instead of leaving a hole | the same test: `the hook reports 1 entries for a 2-path composition` |
 | `composer_state_hook_tinygo.go` exports anything | `TestBuildTaggedHooksAreAbsentFromTheFirmwareImage`: `composer_state_hook_tinygo.go exports ComposerPathHashesOnDevice -- that file IS the firmware, so the host-only surface of this pair is in the image` |
 | `ComposerPathHashes` named in another `gui` file | the same test: `composer_flow.go uses ComposerPathHashes in code but is not composer_state_hook.go` |
+| `composerFlowExit`'s comment and func put back BETWEEN `composerFlow`'s doc comment and `composerFlow` | `TestComposerHelpersDidNotStealADocComment`: `composerFlow has NO doc comment in composer_flow.go` **and** `composerFlowExit's doc comment in composer_flow.go opens "composerFlow is \"Build a new policy\" …"` |
+| `walkOkAssignments` reads only the first match (`FindStringSubmatch`) | `TestWalkOkGuardReadsEveryAssignment/the_verdict_is_the_last_assignment`: `walkOkDriverSupplied found 0 caller-supplied term(s) [] in ["false"], want 1` and `allConst = true over ["false"], want false` |
 
 - [ ] **Step 9: Firmware size, with the hook and without it.**
 
@@ -2379,38 +2975,66 @@ export PATH=/nix/var/nix/profiles/default/bin:$PATH
 nix develop -c tinygo build -size short -o /dev/null -target pico-plus2 -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller
 ```
 
-Measured on this tree and on the pristine fork checkout, same command, same day:
+Measured on this tree and on a `git ls-files` copy of the pristine fork checkout,
+same command, same box, five builds — **re-measured by the r0 fold, because it
+changed four operator-facing string literals and string literals are in the
+image**:
 
 | build | code | data | bss | flash | ram |
 | --- | --- | --- | --- | --- | --- |
 | fork main `b9a9a30` (baseline) | 1,565,552 | 31,852 | 31,004 | **1,597,404** | **62,856** |
-| H5, this tree | 1,567,312 | 31,852 | 31,004 | **1,599,164** | **62,856** |
-| H5 with the hook deleted from the tinygo view (`composer_state_hook_tinygo.go` removed, `composerFlow`'s hook lines removed) | 1,567,312 | 31,852 | 31,004 | **1,599,164** | **62,856** |
-| H5 with a SECOND `defer clearComposerStateHook()` instead of `composerFlowExit` — **the shape NOT used** | 1,567,424 | 31,852 | 31,004 | 1,599,276 | 62,856 |
-| positive control: the tinygo stub given one `println` | 1,567,536 | 31,852 | 31,004 | 1,599,388 | 62,856 |
+| H5, this tree | 1,567,356 | 31,852 | 31,004 | **1,599,208** | **62,856** |
+| H5 with the hook deleted from the tinygo view (`composer_state_hook_tinygo.go` removed, `composerFlow`'s `setComposerStateHook` call and `composerFlowExit`'s `clearComposerStateHook` call removed) | 1,567,372 | 31,852 | 31,004 | **1,599,224** | **62,856** |
+| H5 with a SECOND `defer clearComposerStateHook()` beside the scrub's own defer — **the shape NOT used** | 1,567,452 | 31,852 | 31,004 | 1,599,304 | 62,856 |
+| positive control: the tinygo stub's `setComposerStateHook` given `println("hook")` | 1,567,516 | 31,852 | 31,004 | 1,599,368 | 62,856 |
 
-**The hook's share is 0 B of flash and 0 B of RAM** — spec §4.1's assertion,
-measured rather than inherited from `frame_hook`'s number. **And the zero is not
-an artefact of a build that ignored the edit:** the positive control moves the
-image by +224 B, so edits to that stub do reach it. The 112 B row is why the
-single-defer shape exists at all; both numbers are recorded in
-`composer_state_hook_tinygo.go` as well, where the next reader will look.
+**The hook costs no measurable flash and 0 B of RAM: its share measures −16 B**,
+because the image WITHOUT it is 16 bytes LARGER. Nothing can cost negative flash,
+so what the pair says is that the hook contributes nothing the compiler does not
+reclaim elsewhere, to within the granularity of a whole-image build.
 
-Whole stage against the baseline: **+1,760 B flash (+0.11%), +0 B RAM** for all
+**AND THAT IS WHY THE CLAIM IS "NO MEASURABLE COST" AND NOT "0 B".** Before the r0
+fold, on a tree differing only in four operator-facing string literals, the same
+pair measured 1,599,164 and 1,599,164 — an exact 0. A delta that moves from 0 to
+−16 when unrelated copy changes shift the layout was never a structural zero, and
+spec §4.1/§6's "asserted 0 bytes" was asserting the noise. The spec is folded to
+the claim the measurement supports; the plan carries both numbers so the next
+reader can see the reasoning rather than a bare assertion.
+
+**The zero is not an artefact of a build that ignored the edit:** the positive
+control — `println("hook")` inside the stub's `setComposerStateHook`, exactly that
+recipe, which the first draft did not state (r0 fidelity N-3) — moves the image by
+**+160 B**, so edits to that stub do reach it. The **+96 B** second-defer row is
+why the single-defer shape exists at all; both numbers are recorded in
+`composer_state_hook_tinygo.go` and `composer_flow.go` as well, where the next
+reader will look.
+
+Whole stage against the baseline: **+1,804 B flash (+0.113%), +0 B RAM** for all
 five follow-ups. No numeric ceiling is asserted, because neither the spec nor this
 plan sets one; the acceptance is the delta against the named baseline.
+
+**Per CHANGE, and why this plan states the delta per STAGE (r0 fidelity M-2).**
+Spec §6 asked for the delta "stated per change". Four of the five follow-ups are
+copy-string edits, and the pair above measures the resolution of the instrument:
+the same unchanged hook measured 0 B on one tree and −16 B on another that
+differed only in four string literals. A per-change attribution at that
+granularity would report layout noise as a cost. What is measurable and worth
+asserting is the STAGE delta against a named baseline and the one structural
+question — does the new build-tagged pair put anything in the image — and that is
+measured twice, subtractively and with a positive control. Spec §6 is folded to
+say so.
 
 - [ ] **Step 10: Build the emulator.**
 
 ```bash
 ./cmd/emu/build.sh
 ```
-Measured: `built emu.wasm (10873113 bytes)`. `GOOS=js GOARCH=wasm go vet ./cmd/emu/` is clean.
+Measured: `built emu.wasm (10873125 bytes)`. `GOOS=js GOARCH=wasm go vet ./cmd/emu/` is clean.
 
 - [ ] **Step 11: Commit.**
 
 ```bash
-git add gui/composer_state_hook.go gui/composer_state_hook_tinygo.go gui/composer_state_hook_test.go gui/composer_flow.go gui/tinygo_split_test.go cmd/emu/composer_js.go cmd/emu/platform.go cmd/emu/walk_hashlock_phrase.js cmd/emu/needle_test.go
+git add gui/composer_state_hook.go gui/composer_state_hook_tinygo.go gui/composer_state_hook_test.go gui/composer_doc_comment_test.go gui/composer_flow.go gui/tinygo_split_test.go cmd/emu/composer_js.go cmd/emu/platform.go cmd/emu/walk_hashlock_phrase.js cmd/emu/needle_test.go
 git commit -s -m "emu: the hashlock walk proves hold ORDER and stored-versus-displayed -- a !tinygo composition-state seam (0 firmware bytes), shComposerPathHashes, ok set not recomputed; and the ok-shape guard reads the assignment form it has been silently skipping since 45f3d4c (hashlock H5, F-485)"
 ```
 
@@ -2419,16 +3043,38 @@ git commit -s -m "emu: the hashlock walk proves hold ORDER and stored-versus-dis
 Serve a FRESH port (the browser caches `emu.wasm` and a cache-buster on
 `index.html` does not help), drive with playwright, and record each run WITH the
 assertion that failed. The two mutations are exact one-line edits to
-`gui/composer_hashlock.go`, each rebuilt with `./cmd/emu/build.sh`:
+`gui/composer_hashlock.go`, each rebuilt with `./cmd/emu/build.sh`.
+
+**RESTORE BETWEEN RUNS, and prove it (r0 journey M-1).** Nothing in the first
+draft of this step reverted a mutation, and with (b) still applied when (c) is
+added the walk throws at the PRE-HOLD assertion and never reaches the
+stored-versus-displayed one — a contaminated run (c) that would be recorded as a
+FAIL, satisfying spec §7's "all three walk runs recorded" while leaving §4.5(c)'s
+assertion exactly as unproven as before. So, before each mutation and again after
+run (c):
+
+```bash
+git checkout -- gui/composer_hashlock.go && git diff --quiet gui/composer_hashlock.go
+```
+
+and after the FINAL restore, `./cmd/emu/build.sh` again, so the served `emu.wasm`
+is the unmutated one the branch ships. `git diff --quiet` is the whole point: it
+turns "at NO earlier one" from something the controller has to notice into
+something the shell refuses to proceed without.
 
 | run | edit | must |
 | --- | --- | --- |
 | (a) unmutated | — | PASS, `ok: true` |
 | (b) the assignment moved before the confirm | replace `\t\t\th := hashlock.Digest(&x)` with `\t\t\th := hashlock.Digest(&x); st.list.Paths[idx].Hash = &h` | FAIL at §4.2's pre-hold read: `the path ALREADY holds a hash while the confirm modal is up` |
-| (c) the stored hash perturbed by one byte | replace `\t\t\t\td := h` with `\t\t\t\td := h; d[0] ^= 1` | FAIL at the stored-versus-displayed assertion — `the STORED digest is not the corpus's hardened digest for this phrase` — and at NO earlier one: the confirm modal still draws `3cf5d421..b70a4c12` from the unperturbed `h`, and the pre-hold `null` read still passes |
+| (c) the stored hash perturbed by one byte | replace `\t\t\t\td := h` with `\t\t\t\td := h; d[0] ^= 1` | FAIL at the stored-versus-displayed assertion — `the stored digest does not abbreviate to the token the confirm modal drew: the screen showed one digest and the policy holds another.` — and at NO earlier one: the confirm modal still draws `3cf5d421..b70a4c12` from the unperturbed `h`, so `displayed` is that token, the pre-hold `null` read still passes, and the CORPUS assertion below is never reached |
 
 Run (c) is what makes the stored-versus-displayed assertion falsifiable; without
-it that assertion has never been shown able to fail (journey I-7).
+it that assertion has never been shown able to fail (journey I-7). The r0 fold is
+what made run (c) actually reach it: against the first draft's constant-versus-
+constant comparison, (c) tripped the corpus assertion instead and the table named
+the wrong one (r0 fidelity I-1). Step 7's four-scenario replay is the standing
+evidence that the order is right; these three runs are the evidence on real
+frames.
 
 ---
 
@@ -2461,19 +3107,38 @@ the confirm modal's line list and into the post-HOLD paragraph beneath it:
 
 ```
 Write down this phrase, the method and this digest
-now. They are not on this device and not on your
-plates. Without both, this path can never be spent.
+now. The phrase and method are not on this device.
+Without both, this path can never be spent.
 ```
 
 ```
 hash  <first8>..<last8>
 method: <m>   chars: <n>
-Before you fund this wallet, run ms hashlock with this
+Before you cut plates, run ms hashlock with this
 phrase and method on the host and check the digest
 matches. If they differ, do not fund this wallet:
 build it again.
 ```
 
+**Two sentences here are the r0 journey walk's, not the first draft's, and both
+are the operator's ruled remedy re-scoped rather than replaced.** The write-down
+line is byte-identical; what changed is the sentence after it. *"They are not on
+this device and not on your plates"* was true while the list had two items and
+became FALSE the moment "and this digest" joined it: the digest is compiled into
+the descriptor as `sha256(H)` (`md/compose.go`), the wire encoder writes all 32
+bytes, and the md1 this composer engraves carries them — so the one item that IS
+recoverable from the plates was being called absent from them, on the screen whose
+job is to define the backup burden. And *"Without both"* acquired a three-item
+antecedent, where the nearest-pair reading ("the method and this digest") makes
+the PHRASE look optional. Naming the two subjects fixes both at once, and measures
+343 drawn / headroom 107 — identical headroom to the three-item form (r0 journey
+I-1). The reconcile screen's *"Before you cut plates"* is r0 journey M-2: this
+screen is drawn inside `composerShapeFlow`, with the stub screen, seating and
+~21 minutes per plate of engraving still ahead of it, and the digest is IN the
+engraved md1 — so a divergence found after the plates are cut costs every plate.
+Funding stays the deadline in the mismatch sentence; the first sentence names the
+threshold the operator is actually standing at. Measured 181 drawn / headroom 339,
+and the needle `run ms hashlock with this phrase` is kept verbatim.
 **Do not touch §4.5's reuse block in the same edit.** Its lines `:267-271` still
 carry the pre-drop-order wording ("One phrase per policy. Spending any path of a
 wsh wallet publishes this digest…") while the shipped body carries the two-sentence
@@ -2481,11 +3146,17 @@ form §4.5's own drop order prescribes. That drift is REAL, PRE-EXISTING and
 outside H5's five follow-ups — file it (Step 3) rather than fixing it here, so
 `git diff` on this commit is H5's change and nothing else.
 
-- [ ] **Step 2: H2 spec §4.7 — the phrase form's last sentence only.** The
-blockquote at `:337-341` ends *"Back up the phrase and its method, or the /
-preimage plate, separately."*; it becomes *"Back up every phrase and its method,
-and every preimage plate, separately."* Nothing else in §4.7 changes — §1.4 is
-explicit that §4.7 receives only §2.5's sentence.
+- [ ] **Step 2: H2 spec §4.7 — BOTH forms' last sentence.** The blockquote at
+`:337-341` ends *"Back up the phrase and its method, or the / preimage plate,
+separately."*; it becomes *"Back up every phrase and its method, and every
+preimage plate, separately."* The paragraph beneath it quotes the PLAIN form's
+`composerCopyHashEveryPath` (*"the shipped text names only 'the preimage'…"*, with
+its `gui/composer_copy.go:169-173` citation); that form's last sentence becomes
+*"Back up every preimage separately."* too, for the reason r0 journey I-2 gives —
+two paths can carry two different digests, so two different preimages, and the
+sibling of the sentence H5 §2 item 5 is fixing had the identical undercount.
+Nothing else in §4.7 changes — §1.4 is explicit that §4.7 receives only §2.5's
+sentences.
 
 - [ ] **Step 3: engrave `design/FOLLOWUPS.md` — five closures, and one new entry.**
 Close F-480, F-484, F-485, F-487 and F-488 in the file's own heading convention
@@ -2507,8 +3178,8 @@ The manual quotes device copy this leg changed, in two places (toolkit `46b40bb`
 and `:501-502`, the reconciliation blockquote. First:
 
 ```text
-Write down this phrase, the method and this digest now. They are not on this
-device and not on your plates. Without both, this path can never be spent.
+Write down this phrase, the method and this digest now. The phrase and method
+are not on this device. Without both, this path can never be spent.
 ```
 
 Then the blockquote, which now carries the digest lines the screen repeats:
@@ -2516,14 +3187,40 @@ Then the blockquote, which now carries the digest lines the screen repeats:
 ```text
 > hash  3cf5d421..b70a4c12
 > method: hardened   chars: 28
-> Before you fund this wallet, run ms hashlock with this phrase and method on
-> the host and check the digest matches. If they differ, do not fund this
-> wallet: build it again.
+> Before you cut plates, run ms hashlock with this phrase and method on the
+> host and check the digest matches. If they differ, do not fund this wallet:
+> build it again.
 ```
 
 The sentence beneath it — *"That is the reconciliation… its first and last eight
 characters are what the confirm screen showed"* — is now also true of the
-reconcile screen itself, and reads correctly either way; leave it.
+reconcile screen itself, and reads correctly either way; leave the sentence, and
+add ONE clause to it naming the host counterpart of the field the reconcile screen
+newly carries (r0 journey N-2). Verified in `mnemonic-secret` at `504ff46`:
+`ms hashlock` writes `phrase_chars` into its JSON
+(`crates/ms-cli/src/cmd/hashlock.rs:329-331`) and a `phrase:` line reporting
+`28 characters` on the engraving card it prints to **stderr** (`:351-352`), while
+the passage above quotes only the `hash:` line from stdout — so `chars: 28` has a
+documented counterpart and the manual does not say where.
+
+**And the `#### What Back does` table gains a row (r0 journey M-5).** The section
+is at `:512-524` (toolkit `46b40bb`, re-grepped): its heading at `:512`, its lead
+sentence at `:514-515` — *"Every Back inside the route moves one step back within
+it and keeps the phrase. Only Back at the phrase screen leaves."* — and its table
+at `:517-524`. Back at the reconcile screen does neither: it DISMISSES, exactly
+as the checkmark does, `composerHashEdit` returns `true`, and the hash stays
+assigned — correct and deliberate (F-440: `back` dismisses like `ok` on every
+dismiss-only modal), and uncovered. H5 is what gives the operator a reason to
+press Back there, because the screen now ends *"do not fund this wallet: build it
+again"* and the reflex after reading that is to look for an undo. Qualify the lead
+sentence — *"Every Back inside the route, before the hold, moves one step back
+within it and keeps the phrase"* — and add:
+
+```text
+| the reconcile screen | the spend-path list | dropped; the hash is already assigned |
+```
+
+Same commit, same `make lint`.
 
 **Spec §5's documentation-only item (journey M-5) has no target that exists, so
 it is FILED, not invented.** §5 asks that "the manual's unlock section" say the
@@ -2572,6 +3269,16 @@ with a build and a test run at every boundary and the whole `gui` package sharde
 after Tasks 1, 2 and 5. Nothing was wired ahead of its task, which is the defect
 the H2 gate could not see.
 
+**The r0 fold re-ran all of it on the same tree** — the four packages, `gofmt`,
+both `go vet`s, `./cmd/emu/build.sh`, the 24 `gui` shards, CI's own
+`CGO_ENABLED=0 go test ./...`, `node`'s module load of the walk, the checker, and
+all five tinygo builds — and every RED and every `MUTATION:` it touched. What it
+did NOT re-run is the two intermediate SHARD runs at the Task 1 and Task 2
+boundaries: reconstructing those trees is a revert of the later tasks, and the
+counts are enumerated from the measured per-file test-function counts instead (see
+Task 1 Step 10). The end-of-tree shard run is measured, and it is the one that
+gates.
+
 **The whole tree, at the end (Go 1.26.7, `/scratch/code/shibboleth/.toolchain/go`):**
 
 Spec §6's "four packages" first, run at the Task 5 boundary:
@@ -2599,17 +3306,20 @@ gui/transaction_golden_test.go:104:13: testing.ArtifactDir requires go1.26 or la
 === GOOS=js GOARCH=wasm go vet ./cmd/emu/ ===
 (clean)
 === ./cmd/emu/build.sh ===
-built emu.wasm (10873113 bytes); serve this directory and open index.html
+built emu.wasm (10873125 bytes); serve this directory and open index.html
 === gui shards ===
-    1236 top-level tests
-    partition verified exhaustive: 1236 == 1236
-=== wall: 31s ===
-RESULT: ok -- all 1236 tests ran across 24 shards
+    1239 top-level tests
+    partition verified exhaustive: 1239 == 1239
+=== wall: 32s ===
+RESULT: ok -- all 1239 tests ran across 24 shards
 ```
 
 Both `gofmt` and `go vet` findings are PRE-EXISTING and reproduce on the pristine
 fork checkout at `b9a9a30` — verified, not assumed. `b9a9a30`'s `gui` package has
-1225 top-level tests by the shard script's own count; this plan adds 11.
+1225 top-level tests by the shard script's own count; this plan adds **14** (11
+before the r0 fold, which adds two §8h/provenance tests to Task 1's file and the
+doc-comment gate to Task 5). `cmd/emu` gains one, `TestWalkOkGuardReadsEveryAssignment`
+(`grep -c '^func Test' cmd/emu/needle_test.go` is 9 against `b9a9a30`'s 8).
 
 `CGO_ENABLED=0 go test -timeout 20m ./...` — CI's exact command — is GREEN on the
 wired tree: **55 packages `ok`, exit code 0**, no `FAIL` line. On the pristine
@@ -2624,38 +3334,47 @@ tree as arguments) compares every headed block above against that tree:
 plan: design/IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md
 tree: /scratch/code/shibboleth/.tmp/h5-gate
 
-PASS IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:155  whole          gui/composer_provenance_test.go               (195 lines, identical)
-PASS IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:358  fragment       gui/composer_hashlock_test.go                 (7 lines, verbatim substring)
-PASS IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:372  fragment       gui/composer_hashlock_test.go                 (2 lines, verbatim substring)
-  ... 48 more PASS lines ...
-51 blocks checked, 0 FAIL
+PASS IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:165  whole          gui/composer_provenance_test.go               (278 lines, identical)
+PASS IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:451  fragment       gui/composer_hashlock_test.go                 (7 lines, verbatim substring)
+PASS IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:465  fragment       gui/composer_hashlock_test.go                 (2 lines, verbatim substring)
+  ... 52 more PASS lines ...
+55 blocks checked, 0 FAIL
 
 NOT COVERED by this script:
-  * 23 fenced blocks carry no file= header (bash recipes, illustrative
+  * 32 fenced blocks carry no file= header (bash recipes, illustrative
     snippets); nothing here runs or checks them:
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:484  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:655  ```bash
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:799  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:880  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:904  ```bash
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:926  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1190  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1217  ```bash
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1278  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1316  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1337  ```bash
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1842  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2356  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2376  ```bash
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2404  ```bash
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2411  ```bash
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2461  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2467  ``` (no info string)
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2506  ```text
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2513  ```text
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2527  ```bash
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2536  ```bash
-      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2561  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:586  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:838  ```bash
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:985  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1084  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1117  ```bash
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1139  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1418  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1445  ```bash
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1527  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1538  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1585  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:1608  ```bash
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2058  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2254  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2273  ```javascript
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2288  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2445  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2946  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:2973  ```bash
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3029  ```bash
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3036  ```bash
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3056  ```bash
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3108  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3114  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3180  ```text
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3187  ```text
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3219  ```text
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3240  ```bash
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3249  ```bash
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3286  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3296  ``` (no info string)
+      IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md:3333  ``` (no info string)
   * every PROSE claim: expected test names, mutation outcomes, headroom and
     firmware numbers, spec references, file:line citations.
   * whether the tree is GREEN -- this compares TEXT only; `go test` and the
@@ -2674,8 +3393,10 @@ the fork tree.
 ## Self-review
 
 - **Every number here was measured on the wired tree, not copied from the spec.**
-  186/339, 165/378, 347/107, 397, the 19 px readout budget, the 2-line lead, the
-  five firmware sizes, and every test count. Where the spec and the measurement
+  181/339, 165/378, 343/107, 133/397, 175/378, the 19 px readout budget, the
+  2-line lead, the five firmware sizes and every test count — all re-measured by
+  the r0 fold on the text as it now reads, because a number quoted from a report
+  is only as good as the body it measured. Where the spec and the measurement
   agree it is because two independent runs produced the same number.
 - **The mutation for every test in this plan was RUN**, and the quoted failure is
   what the run printed. One of them (Task 5's pointer-copy row) came back GREEN
@@ -2688,11 +3409,195 @@ the fork tree.
 - **The riskiest thing in this plan is the seam**, because it is new surface in a
   package whose whole discipline is about what the firmware may contain. It is
   gated four ways: the split test (told about the pair, and still scanning it),
-  the lifetime and copy tests, the 0-byte size measurement, and a positive control
-  proving that measurement can move.
-- **What a reviewer should attack first:** whether `composerAnyPathByPhrase`
-  walking the paths on every §8h draw is the right shape when a composition can
-  hold `md.ComposeMaxPaths` paths (it is O(paths) on a screen draw, and the map
-  lookup is by value on a 32-byte key); whether the reconcile screen repeating the
-  digest gives an operator a false sense of having checked it against the host;
-  and whether Task 5's `ok`-guard change widens a gate that was narrow on purpose.
+  the lifetime and copy tests, the subtractive size measurement, and a positive
+  control proving that measurement can move. The r0 fold sharpened the third: the
+  hook's share is not an exact 0 but −16 B, and the pair is quoted as "no
+  measurable cost" rather than "0 bytes" because the same unchanged hook measured
+  exactly 0 on a tree that differed only in four string literals.
+- **What a reviewer should attack first**, revised after round 0 closed the first
+  and third: `md.ComposeMaxPaths = 8`, so the predicate's walk is eight map
+  lookups on a screen draw and is not a concern (fidelity, verified); the
+  `ok`-guard DID widen a gate that was narrow on purpose, and the fix plus
+  `TestWalkOkGuardReadsEveryAssignment` is what closed it (fidelity I-2). What is
+  still open to attack: whether the reconcile screen repeating the digest gives an
+  operator a false sense of having checked it against the host; whether *"Before
+  you cut plates"* trades a funds-safety deadline for a cheaper one in a way the
+  mismatch sentence does not fully recover; whether *"and any others like it"*
+  reads as an instruction to hunt rather than a warning that the index moves; and
+  whether Task 5 Step 12's `git diff --quiet` restore is enough, given that the
+  three runs are still a human procedure with a browser in the loop.
+
+---
+
+## R0 round 0 folded here
+
+Three lenses at engrave `0c2b13e`, all persisted verbatim in
+`design/agent-reports/`: **fidelity + design** (opus,
+`hashlock-H5-plan-R0-r0-fidelity.md`, 0C/3I/4M/4N), **tests + mutations** (sonnet,
+`-tests.md`, 0C/0I/1M), **journey walk** (opus, `-journey.md`, 0C/2I/5M/2N). No
+Criticals in any of them. Every finding below was folded into BOTH this plan and
+the gated tree `/scratch/code/shibboleth/.tmp/h5-gate`, and every gate re-run.
+
+### Important
+
+- **fidelity I-1 = journey I-7 unmet — the walk's stored-versus-displayed
+  assertion was a tautology.** `short8(after[0]) !== ANCHOR_HARD_H` compared the
+  stored digest against a constant that is `short8(ANCHOR_HARD_FULL)`, the
+  constant the line above had just compared it against; once the corpus check
+  passed it could not fail under any device behaviour, and spec §4.5(c)'s run
+  tripped the CORPUS assertion instead — which Step 12's table then named wrong.
+  **Folded:** the walk parses the token the confirm modal actually drew
+  (`drawnToken`, a `/hash([0-9a-f]{8}\.\.[0-9a-f]{8})/` match on the squashed
+  frame), keeps it in `out.displayed`, and compares the stored digest against THAT
+  **before** the corpus check; the reconcile screen's token assertion reads the
+  frame too. Step 12's run-(c) row now names the assertion that fires. Evidence:
+  the walk's own assertion text, sliced out of the file and replayed for four
+  scenarios — (a) passes, (b) fails at the pre-hold read, (c) fails at
+  stored-versus-displayed, and (d) (screen and policy AGREEING on a digest the
+  corpus does not hold) fails only at the corpus check, which is what proves the
+  two assertions independent rather than one restating the other.
+- **fidelity I-2 — the `ok`-shape guard read only the FIRST `.ok =`.** A walk's
+  verdict is its LAST assignment, so `out.ok = false; … out.ok = out.plates === 3;`
+  cleared the guard, was counted as checked, and was logged as restating nothing.
+  **Folded:** `walkOkAssignments` takes every match (`FindAllStringSubmatch`), the
+  `plates` check runs on every right-hand side, and the "restates nothing" exit is
+  taken only when every assignment is a bare boolean. The counterexample was built
+  as `cmd/emu/walk_zzz_probe.js` and now FAILS the guard (quoted in Task 5 Step
+  6), and `TestWalkOkGuardReadsEveryAssignment` gates the blind spot with five
+  rows — including one whose offender is the LAST assignment (fails under the
+  first-match mutation) and one whose offender is the FIRST (survives it by
+  construction, and the plan says so, because the r0 fold measured it).
+- **fidelity I-3 — two production doc comments were silently reattached.**
+  `composerFlowExit` and `composerTextBand` were inserted directly beneath the doc
+  comments of `composerFlow` and `composerPageLines`, so Go merged each pair:
+  `go doc -u ./gui composerFlow` and `… composerPageLines` printed nothing, taking
+  the written record of the "plans list components and omit the call that joins
+  them" Critical and of the "ONE MEASURE SITE" behind every SPEC §13 capacity
+  number with them. **Folded:** each helper moved ABOVE the doc block it had
+  captured; all four symbols now print their own comment (measured). Gated by a
+  new `gui/composer_doc_comment_test.go` — and the plan records the NEGATIVE
+  result the fold measured, that deleting the blank line does **not** break the
+  attachment, because `go/ast` binds a comment group to the declaration after it:
+  the defect is the order, not the whitespace.
+- **journey I-1 (operator's ruled remedy re-scoped) — the write-down edit made the
+  next sentence false about the digest.** *"They are not on this device and not on
+  your plates"* was true of a two-item list and false the moment "and this digest"
+  joined it: the digest is compiled into the descriptor as `sha256(H)` and
+  engraved verbatim in the md1. *"Without both"* also acquired a three-item
+  antecedent whose nearest-pair reading makes the phrase look optional.
+  **Folded:** the second sentence becomes *"The phrase and method are not on this
+  device."*; the first is byte-identical. Measured **343 drawn / headroom 107** —
+  the same headroom as the three-item form, re-measured here, not quoted.
+  Propagated to the copy table, the fit row, Task 6's H2 §4.5 fold text, the
+  toolkit manual quote and H5 spec §1.2.
+- **journey I-2 — §8h's PLAIN form kept the singular undercount.** Two paths can
+  carry two different digests, so two different preimages, and the sibling of the
+  sentence §2 item 5 fixes said "Back the preimage up separately." **Folded:**
+  *"Back up every preimage separately."*, measured **133 drawn / headroom 397**,
+  with `TestTwoPlateWalletBannerCountsEveryPreimage` and its mutation beside the
+  phrase-form test; H5 spec §2.5 and Task 6's §4.7 fold now cover both forms.
+
+### Minor and Nit
+
+- **journey M-1 — Step 12 never reverted a mutation.** With (b) still applied,
+  (c) throws at the pre-hold assertion and §4.5(c) stays unproven while being
+  recorded as a FAIL. **Folded:** `git checkout -- gui/composer_hashlock.go &&
+  git diff --quiet gui/composer_hashlock.go` before each mutation and after run
+  (c), with `./cmd/emu/build.sh` re-run after the final restore.
+- **journey M-2 — the reconcile screen named the funding threshold.** The plates
+  are cut first, ~21 minutes each, and the digest is in the engraved md1.
+  **Folded:** *"Before you cut plates, run ms hashlock …"*, measured **181 drawn /
+  headroom 339**, keeping the substring `run ms hashlock with this phrase`
+  verbatim (the flow test's and the walk's needle); the mismatch sentence keeps
+  funding as the deadline. H5 spec §1.1, the copy table and the manual follow.
+- **journey M-3 — the unlock refusal is one record at a time and the index moves.**
+  `AdmitSection` returns on the first offender, so `[seed, plate, seed, plate]`
+  refuses `Record 1`, then `Record 2`, then admits; an operator applying round 2's
+  number to their original listing deletes a seed. **Folded** (the gate is
+  headroom ≥ 80, and the r0 fold re-measured it): *"Remove that record -- and any
+  others like it -- (records count from 0) …"*, **175 drawn / headroom 378** at
+  the longest noun and a two-digit index, with a frame assertion and its mutation.
+- **journey M-4 — the phrase form names "every preimage plate" on wallets with
+  none.** Declined as a copy change and RECORDED instead, in a comment beside the
+  sentence: overcounting asks for a backup that does not exist, undercounting lets
+  an operator stop looking for one that does, and counting exactly needs three
+  variants.
+- **journey M-5 / N-2 — the manual.** Task 6 Step 4 gains the Back-table row for
+  the reconcile screen (`| the reconcile screen | the spend-path list | dropped;
+  the hash is already assigned |`) and qualifies the lead sentence with "before
+  the hold"; and one clause naming `phrase: 28 characters` on `ms hashlock`'s
+  stderr card as what `chars: 28` reconciles against (verified in `mnemonic-secret`
+  at `504ff46`, `crates/ms-cli/src/cmd/hashlock.rs:329-331` and `:351-352`).
+  Citations re-grepped at toolkit `46b40bb`: `:482-483`, `:501-502`, and the Back
+  section at `:512-524` (heading `:512`, lead `:514-515`, table `:517-524`) — the
+  journey report's `:514-525` was one row wide.
+- **journey N-1 — the guard logged a claim it did not check.** The log line said
+  the assignment sits "after its last assertion"; nothing measures that. **Folded:**
+  it now says the walk "assigns `ok` nothing but the constant(s) …, so it restates
+  no assertion".
+- **fidelity M-1 — the "re-typed as 64 hex" table row was byte-identical to "one
+  phrase path".** **Folded:** the row now uses a DISTINCT pointer holding the same
+  32 bytes (what every re-entry arm actually writes), and a new
+  `TestReassigningTheSameDigestStaysByPhrase` drives the case through production
+  via a payload row carrying the same digest — asserting first that the pointer
+  really did change, so the test cannot pass for the reason the pointer-compare
+  mutation would. Both go red under that mutation (quoted in Task 1 Step 9). The
+  hex PAD itself is not driven: there is no harness helper for 64 hex taps, and
+  the payload row is the same arm of `composerHashEdit`; said so in the test.
+- **fidelity M-2 — spec §6 asked for the firmware delta "per change".** **Folded
+  the other way, with a measurement as the reason:** the same unchanged hook
+  measured **0 B** on the pre-fold tree and **−16 B** on this one, which differs
+  only in four operator-facing string literals. Per-change attribution at that
+  granularity reports layout noise as cost. The spec now asks for the STAGE delta
+  against a named baseline plus the structural question — does the pair put
+  anything in the image — measured subtractively and with a positive control.
+- **fidelity M-3 — `hashlockOtherPathLine`'s corrected comment still said "that
+  flag".** **Folded:** "…unaffected by that set's own history…", one line further
+  than the first correction reached.
+- **fidelity M-4 — spec §5's "the copy-table row updated" is unsatisfiable.**
+  **Folded:** a one-line erratum in H5 spec §5 saying the body is not composer
+  copy, so no `composerCopyTable` row can exist and the `assertModalBodyFits` row
+  at the longest noun is what stands in its place; Task 4's Interfaces points at
+  it.
+- **fidelity N-1** — the walk's prelude said "rebuild from the hashlock-h2
+  branch"; now `hashlock-h5`. **fidelity N-2** — "THE KEYBOARD GRID WAS PROBED …
+  (2026-09-05, this emulator build)" was inherited verbatim from `b9a9a30`
+  (verified by diffing the block against the read-only fork checkout); it now says
+  it was probed during H2 on `e1bf137`'s build and NOT re-probed for H5, with the
+  reason it did not move. **fidelity N-3** — the positive control's recipe is now
+  stated exactly (`println("hook")` inside the stub's `setComposerStateHook`) and
+  re-measured at **+160 B**. **fidelity N-4** — `composer_hashlock.go`'s HOLD
+  comment loses the `composer_state.go:239` line number, as `composer_copy.go`
+  already had.
+- **tests M-1 — two "Measured:" RED quotes were incomplete transcriptions.**
+  **Folded:** both are re-captured with `-gcflags=-e` so Go prints every error
+  instead of stopping at ten. Task 1's is now twenty lines, all in test files;
+  Task 2's is three call sites, not two. Both steps say how the tree was built so
+  the capture can be re-run.
+
+### Not folded
+
+- **The two intermediate SHARD runs** (Task 1 Step 10, Task 2 Step 7) were not
+  re-executed: reconstructing a Task-1-only or Tasks-1-2 tree is a revert of the
+  later tasks in four shared files, and the counts are enumerated instead from
+  measured per-file test-function counts (1225 + 6 = 1231; + 2 = 1233). The
+  end-of-tree run is measured: **1239, partition verified exhaustive**.
+- **fidelity's note that a scrub-only `composerFlowExit` wrapper measures a
+  different counterfactual** is not added as a table row; the row this plan
+  measures is the strict one (the whole pair deleted), which is the number spec
+  §4.1 is about.
+
+### Gates re-run after the fold, all on `/scratch/code/shibboleth/.tmp/h5-gate`
+
+```
+go test ./hashlock/ ./codex32/ ./sysw/ ./seal/ ./cmd/emu/   -> 5 ok
+gofmt -l .                                                  -> the same 5 pre-existing files
+go vet ./gui/ ./cmd/emu/                                    -> the same 2 pre-existing go1.26 findings
+GOOS=js GOARCH=wasm go vet ./cmd/emu/                       -> clean, exit 0
+./cmd/emu/build.sh                                          -> built emu.wasm (10873125 bytes)
+node: import('./cmd/emu/walk_hashlock_phrase.js')           -> MODULE PARSES + LOADS: function
+gui-shard-test.sh ./gui/ 24                                 -> 1239 tests, partition exhaustive, 32s
+CGO_ENABLED=0 go test -timeout 20m ./...                    -> exit 0, 55 ok, 0 FAIL
+tinygo x5 (baseline, H5, hook removed, second defer, println) -> 1,597,404 / 1,599,208 / 1,599,224 / 1,599,304 / 1,599,368
+scripts/h5-plan-blocks-vs-tree.sh                           -> 55 blocks checked, 0 FAIL
+```
