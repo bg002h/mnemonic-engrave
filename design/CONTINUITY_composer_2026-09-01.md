@@ -2218,3 +2218,17 @@ Command to resume: /resume-composer
   04:55 on 2026-09-05 after the operator's "Proceed"; reports pending. Engrave
   origin/master = 1e61916 (pushed, no bypass). Pre-written: r1 fold-verification
   brief (cda41ac, FOLD_SHA pending).
+- **H2 R0 ROUND 0 -- all five reports persisted** (fidelity 2b2bee5 0C/6I/7M/4N;
+  tests e2b5735 1C/6I/2M/1N; journey 636c671 0C/5I/3M/2N; adversarial f9d3921
+  2C/4I/7M/5N NOT GREEN; coverage d4d5861 0C/1I/3M/1N). Headline Criticals:
+  the hardened derive flow never arms a wakeup (idleWakeup = 3 min blocks
+  AppendEvents; the touch harness is blind to it; unlock_kdf.go:295-336 fixed
+  the same thing once); the DecodeMS1Preimage / kind-row tests cannot fail on
+  a wrong preimage or digest (corpus values unread). Recurring Importants
+  across lenses: reconciliation line moved behind composerEveryPathHashed is
+  unreachable for a mixed wallet; hashByPhrase never reset; Type-64-hex Back
+  change untested though the plan claims a test; Deriving zero-state lead
+  dead. Refute pass (sonnet) in flight over all five. NEXT: persist refute ->
+  ONE opus fold agent (brief hashlock-H2-plan-R0-r0-fold-brief.md: plan AND
+  gated tree, RED/GREEN, shards, checker) -> persist fold report -> fold commit
+  -> r1 sonnet fold verification (brief cda41ac).
