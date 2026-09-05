@@ -1836,3 +1836,20 @@ Command to resume: /resume-composer
   BEFORE a push; the ritual does not stop on a non-required check). The H1
   plan's Task 1 never said "re-vendor" -- records commit after the push
   window.
+- **H0 IMPLEMENTED (engrave `hashlock-h0` tip `265dc8e`: be72e75 corpus +
+  pin + diagnosis, 19b2a58 records F-472/473/474 + CHANGELOG, 265dc8e the
+  report; fork `hashlock-h0` tip `14afdff`, ONE commit).** Every plan RED
+  reproduced verbatim; all nine MUTATION claims re-run and failed on their
+  line; engrave 616/613 (the 3 box-local history_purge), fork vet clean,
+  three packages ok, 1204 gui tests via the shard script; firmware
+  1,583,100 flash (+472 B), 62,800 RAM. Five minor deviations (absolute
+  vendoring path; gofmt column realignment; trailer order after `-s`; a
+  whitespace-only frame quote; the local clippy lint). NOT done, by design:
+  emulator walk, merge, flash, post-impl review. Controller re-run of both
+  gates and the emulator build from the fork branch IN FLIGHT; post-impl
+  brief committed (`fbc66bc`); walk script drafted at
+  `.tmp/h0/walk_h0_preimage.js` (typed door -> "Hashlock preimage"; NFC ->
+  "Unknown format"; guarded against any engrave screen). NEXT: dispatch
+  the opus post-impl; run the walk (serve cmd/emu on a FRESH port, drive
+  via playwright); fold; merge both branches; push engrave; fork PR/merge;
+  flash at the operator's word; then ms-cli 0.18.0 (Task 11).
