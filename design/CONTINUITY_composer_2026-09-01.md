@@ -2561,3 +2561,8 @@ Command to resume: /resume-composer
   pre-hold null; c perturbed stored hash must fail stored-equals-displayed,
   Step 12 revert discipline) -> opus post-impl -> merge fork main -> engrave
   h5-records + toolkit h5-manual merges (fill the SHA) -> push -> signed image.
+- **H5 implementer B done** (fork h5-b c1f0237, Task 4; report 82108dc: RED->GREEN,
+  three mutations, gui 1225/1225). Integration branch `hashlock-h5` created
+  off b9a9a30 (worktree .tmp/seedhammer-hashlock-h5); h5-b merged --no-ff at
+  6bc777d. A (Tasks 1-3), C (Task 5), D (records) still running. Engrave
+  origin/master 583c59f.
