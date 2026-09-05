@@ -2547,3 +2547,17 @@ Command to resume: /resume-composer
   PLAN_GREEN_SHA into the four implementer briefs -> dispatch A/B/C/D in
   parallel -> merge h5-a..d into `hashlock-h5` -> gates + three walk runs ->
   post-impl -> merge fork main -> push -> signed image.
+- **H5 PLAN R0 GREEN (`5b77367`).** r1 sonnet verification GREEN (f1e3bb5): 5/5
+  Importants re-proven by mutation, checker 55/0, 1239/1239, sizes rebuilt.
+  **FOUR IMPLEMENTERS DISPATCHED IN PARALLEL** (briefs 58261e6; operator's
+  2026-09-05 allowance; disjoint files): A opus Tasks 1-3 (fork branch h5-a,
+  worktree .tmp/seedhammer-h5-a); B sonnet Task 4 (h5-b); C opus Task 5
+  (h5-c: hook + emu glue + walk + needle guard; measures size, does not run
+  the walk); D sonnet Task 6 records (engrave h5-records + toolkit h5-manual;
+  FOLLOWUPS closures carry <FORK_MERGE_SHA>). NEXT: reports -> controller
+  merges h5-a, h5-b, h5-c into `hashlock-h5` (off b9a9a30; expect no
+  conflicts -- disjoint files) -> whole gates at the merged tip -> the THREE
+  emulator walk runs (a unmutated PASS; b HOLD-before-confirm must fail the
+  pre-hold null; c perturbed stored hash must fail stored-equals-displayed,
+  Step 12 revert discipline) -> opus post-impl -> merge fork main -> engrave
+  h5-records + toolkit h5-manual merges (fill the SHA) -> push -> signed image.
