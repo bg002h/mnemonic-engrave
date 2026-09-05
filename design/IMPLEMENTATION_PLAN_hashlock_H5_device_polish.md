@@ -1,6 +1,6 @@
 # Hashlock H5 — Device Polish Implementation Plan (SeedHammer fork)
 
-**STATUS: DRAFT — R0 round 0 folded; r1 fold verification pending.** Round 0 ran
+**STATUS: R0 GREEN 2026-09-05 (0 Critical / 0 Important open).** Build gate run at every task boundary by the plan author (opus, `hashlock-H5-plan-author-report.md`); round 0 (plan `0c2b13e`): fidelity + design (opus, `hashlock-H5-plan-R0-r0-fidelity.md`, 0C/3I/4M/4N), tests/mutation (sonnet, `-tests.md`, 0C/0I/1M), journey walk (opus, `-journey.md`, 0C/2I/5M/2N); fold `a85c9fb` (+ spec `61a47e4`) by an opus fold author, plan and gated tree together; r1 fold verification (sonnet, `hashlock-H5-plan-R0-r1-fold-verification.md`) **GREEN**. Lens-closure: build gate per task, fidelity, tests, journey, fold-verification. Baseline fork `b9a9a30`; gated tree `.tmp/h5-gate`; checker `scripts/h5-plan-blocks-vs-tree.sh` 55/55. Round 0 ran
 three lenses at engrave `0c2b13e`: fidelity + design (opus,
 `design/agent-reports/hashlock-H5-plan-R0-r0-fidelity.md`, 0C/3I/4M/4N), tests +
 mutations (sonnet, `-tests.md`, 0C/0I/1M), journey walk (opus, `-journey.md`,
