@@ -15638,6 +15638,16 @@ up, the change is `isStrictMs1` plus `seal.Classify` plus the scan mirror, and
 the corpus rows flip to `device_admits: false` in both repos at once — which
 is what makes it a single reviewable diff rather than a drift.
 
+**Correction (post-implementation review I-1, 2026-09-04).** The inventory
+above was incomplete when filed: H0 already removed one plain-BIP-93 population
+from the device, namely a **33-byte unshared payload beginning `0x03`** — 75
+characters, indistinguishable from a preimage plate by construction, refused on
+both sides and now pinned by the corpus row
+`bip93-plain-33-byte-payload-0x03`. So the device's remaining divergence is
+"plain BIP-93 secrets at 48 and 74 characters **and 75-character ones whose
+payload does not begin `0x03`**, plus shares of foreign ids". The convergence
+question this entry asks is unchanged; only the starting inventory was wrong.
+
 ### F-473 — `ms-codec-0.8-bump-needs-a-preimage-refusal-arm`: at the 0.8 bump `validate_record` must gain an explicit `Payload::Preimage` refusal, and `seal::record::preimage_plate` must be re-pointed at it (owning phase: **H1b**) `#hashlock` `#me` `#gating`
 
 Filed with hashlock H0 (2026-09-04). At the pinned ms-codec `0.7`, `me` refuses
