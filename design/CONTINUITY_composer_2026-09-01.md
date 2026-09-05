@@ -2495,3 +2495,17 @@ Command to resume: /resume-composer
   verification -> split implementers by disjoint files (h5-a: Tasks 1-3;
   h5-b: Task 4; h5-c: Task 5; h5-d: Task 6 records) -> merge -> whole gates +
   three walk runs -> post-impl -> merge fork main -> push -> signed image.
+- **H5 PLAN COMMITTED (`0c2b13e`; checker 9416fa4; author report 54172c4).**
+  Opus plan author: 2,698 lines, six tasks, 51 blocks, gate run at EVERY task
+  boundary (1229 -> 1231 -> ... -> 1236 gui tests), 20 mutations executed,
+  `go test ./...` 55 packages ok, firmware +1,760 B / +0 B with the hook's
+  share measured 0 B (one `composerFlowExit` defer; a separate defer costs
+  +112 B; positive control +224 B). Four spec departures folded with
+  measurements (hook shape; a pre-existing RED `TestWalkOkContainsNo...`
+  guard fixed in Task 5; no unlock manual section; no copy-table row for the
+  unlock body). Controller re-run: checker 51/0; four packages ok; 1236 / 24
+  shards ok; vet clean. **PLAN R0 ROUND 0 DISPATCHED** (briefs 3f1a7ef):
+  fidelity (opus), tests/mutation (sonnet), journey (opus). NEXT: persist ->
+  fold (spec departures -> spec fold or record) -> verification -> parallel
+  implementers by disjoint files -> merge -> gates + three walk runs ->
+  post-impl -> merge fork main -> push -> image.
