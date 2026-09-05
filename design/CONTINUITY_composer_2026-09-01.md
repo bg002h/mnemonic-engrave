@@ -2360,3 +2360,21 @@ Command to resume: /resume-composer
   persist refutes + H3 reports -> ONE sonnet verification of a1fd139 (+ refute
   reconciliation) -> merge fork main --no-ff + engrave master -> push -> signed
   image -> merge verified H3 branches.
+- **WORKFLOW wf_7b02c125-9b9 COMPLETE (19 agents, 0 errors, 2.76M tokens,
+  57 min).** Refutes: 7 CONFIRMED + 1 PARTIAL (e2e I-1: defect reproduced,
+  scope note) -- all four refuted findings are folded (26fd1dd, a1fd139);
+  persisted adb8e4b. H3 drafts, each verified GREEN by a sonnet agent
+  (c3ea750): engrave `h3-composer-spec` 2627c4b (composer spec §6c/§14 "never
+  derives" -> H2 wording; H2 spec's two recorded departures applied; it
+  already carries the count-free other-path line); engrave `h3-seam-corpus`
+  29499b1 (743da17 corpus prose + pin re-pinned, F-475 CLOSED) + fork
+  `h3-seam-corpus` 245eee1 off c4a64fc; toolkit `h3-hashlock-device-manual`
+  6b2b4048 (2c5f31cd the section, verified; 6b2b4048 my replacement of the
+  "Known limitation: no readout" paragraph, false since 26fd1dd, with the
+  drafter's prepared prose; `make lint` OK). **r2 sonnet verification of the
+  lens fold (a1fd139 / e879123) IN FLIGHT** (brief 8fce3a7). NEXT on GREEN:
+  fork main <- hashlock-h2 --no-ff, then <- h3-seam-corpus; engrave master <-
+  hashlock-h2 --no-ff, then h3-composer-spec, h3-seam-corpus (FOLLOWUPS
+  conflicts resolved by hand: F-475 CLOSED + the H2->H3 line); H2 plan
+  IMPLEMENTATION RECORD; push engrave (staging), fork (plain), toolkit
+  (staging-PR) ; sh2-flash -b on the fork merge tip; H4 ASSUMED.
