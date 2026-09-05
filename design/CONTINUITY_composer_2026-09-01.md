@@ -1793,3 +1793,23 @@ Command to resume: /resume-composer
   identical on untouched master (no /usr/bin/zsh). Memory:
   shared-target-dir-across-worktrees-bakes-paths. r2 (sonnet, narrow)
   dispatched against `hashlock-H0-plan-R0-r2-fold-verification-brief.md`.
+- **H1 FOLD DONE (ms `hashlock-h1` tip `447eb09`, nine commits, same
+  implementer):** every C/I reproduced before its fix; C-1's advisory test
+  now fails when the advisory is deleted; I-1's terminal branch reads one
+  line (prompt text unchanged); I-2 binds `parse_separator`; I-3's guard
+  refuses a flag-shaped value at exit 64 (`Decision::Usage`); M-3(c) closed a
+  real hole (`mode(0o600)` mutation now fails one test); M-1/M-2 filed as
+  follow-ups (secret-handling ruling). Controller re-ran CI's commands at the
+  tip in an ISOLATED target dir: nextest 559/559, cargo test 560/0, clippy
+  0, fmt 0 on both toolchains. Sonnet fold verification DISPATCHED (brief ms
+  `81beaec`). The implementer also hit the shared-target trap (three tests
+  red at a150ba7 from a reviewer's deleted worktree; `cargo clean -p` fixed it).
+- **H0 PLAN R0 GREEN (engrave `e7af98a`)**: r2 sonnet GREEN (`b4c4090`), one
+  wording fold (the PreimagePlate message no longer asserts `id hash`).
+  Lens-closure: fidelity, tests/mutation, fold-verification x2. ONE opus H0
+  IMPLEMENTER DISPATCHED (brief `60b4cfb`): branches `hashlock-h0` in
+  `me-worktrees/hashlock-h0` (own target dir) and
+  `.tmp/seedhammer-hashlock-h0`; stops after the firmware size; the emulator
+  walk, merge and flash are the controller's/operator's. NEXT: H1 r1 ->
+  merge hashlock-h1 -> push ms; H0 impl -> post-impl (opus) -> emulator walk
+  -> fork PR/merge -> flash at the operator's word -> then ms-cli 0.18.0.
