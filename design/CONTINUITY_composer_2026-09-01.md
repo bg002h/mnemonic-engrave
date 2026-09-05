@@ -2280,3 +2280,27 @@ Command to resume: /resume-composer
   d3a9d86); F-475 re-scheduled to H3 (records in Task 7). 12 deviations
   recorded. NEXT: Task 7 tips -> controller gate re-run + walk re-run (fresh
   port) -> opus post-impl (fill tips) -> fold -> merge -> push -> signed image.
+- **H2 TASK 7 DONE (fork `hashlock-h2` 17b3979, 6 commits; engrave `hashlock-h2`
+  2fc2051, 5 commits).** `seal.RecordNotPermittedError{Index, Class, Section,
+  Preimage}` unwraps to the sentinel; unlock_kdf.go names the record ("Record
+  1 is a hashlock preimage, not a seed. This payload cannot be unlocked here.
+  Nothing was opened."); REDs reproduced; 6 mutations; an H0 test caught the
+  first draft (kind instead of class). F-474 CLOSED; F-475 -> H3; no
+  follow-up names H2 as owner any more. The fork has no CHANGELOG file (never
+  had one) -- the line lives in the commit message, as the plan says.
+  **CONTROLLER GATE at 17b3979** (implementer's worktree): hashlock/codex32/
+  seal/sysw ok; gofmt -l lists only three transaction*.go files that are
+  identical at c4a64fc (pre-existing); vet clean apart from the go1.25
+  ArtifactDir notes; gui-shard-test 24 shards: all 1222 tests ran, ok (30 s);
+  checker 26 blocks / 0 FAIL against the worktree.
+  **CONTROLLER EMULATOR WALK PASSED** (emu.wasm built from 17b3979, served on
+  fresh port 8791, playwright, 48.3 s, ok:true): typed `b867db87..edbc96cb
+  method: sha256 chars: 28`; control (27 chars) `c8043156..253e7389` differs;
+  mixed-case `95d44470..2297a7ff` (nothing normalises); hardened
+  `3cf5d421..b70a4c12 method: hardened`; reconcile frame "Before you fund this
+  wallet, run ms hashlock with this phrase and method on the host and check
+  the digest matches."; path row "Path 1: hash only". Server stopped (lesson:
+  `pkill -f <pattern>` matches the calling shell's own command line -- kill by
+  PID from `ss -ltnp`). NEXT: opus post-impl (brief tips filled) -> fold ->
+  merge fork main --no-ff + engrave master -> push both -> signed image -> H4
+  ASSUMED.
