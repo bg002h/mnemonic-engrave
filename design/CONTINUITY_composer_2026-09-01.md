@@ -1867,3 +1867,17 @@ Command to resume: /resume-composer
   both tips: engrave 613/616 (history_purge x3, box-local), fmt clean,
   seam sha f1f2fa6b...391c; fork vet + three packages + gui subset ok,
   vendored corpus identical. Post-impl (opus) IN FLIGHT.
+- **H0 WALK CONTROL DONE -- the walk can fail.** Same `walk_h0_preimage.js`
+  against emu.wasm built from unguarded fork main 839fa5aa: the typed door
+  ends on "Confirm Codex32 Secret / id HASH / Unshared secret (S) / 75
+  chars" (the walk fails with waitFor("Hashlock preimage") timed out, screen
+  reads exactly that), and the NFC door on main goes from the start screen
+  straight to the SAME confirm frame (trail: SeedHammer -> Confirm Codex32
+  Secret id HASH Unshared secret (S) 75 chars). That is the spec §9 reader
+  table's "NOT a refusal", now measured at both doors: on the flashed
+  device today a preimage plate is one button from being cut as a seed.
+  Fork branch: 14afdff + 45f3d4c (the walk). Servers stopped. NEXT:
+  post-impl (opus, in flight) -> fold -> merge engrave hashlock-h0 (merge
+  commit; master moved) + fork hashlock-h0 -> push engrave -> flash at the
+  operator's word (sh2-flash -y, BOOTSEL) -> boot judgement -> ms-cli
+  0.18.0 (Task 11).
