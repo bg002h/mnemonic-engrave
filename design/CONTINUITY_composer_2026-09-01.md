@@ -2232,3 +2232,9 @@ Command to resume: /resume-composer
   ONE opus fold agent (brief hashlock-H2-plan-R0-r0-fold-brief.md: plan AND
   gated tree, RED/GREEN, shards, checker) -> persist fold report -> fold commit
   -> r1 sonnet fold verification (brief cda41ac).
+- **Refute pass persisted (7e698de):** 25 C/I findings -> 24 CONFIRMED, 1 PARTIAL
+  (fit-gate renderer LABEL wrong, capacity delta measured 0 -- journey's
+  "re-run the drop order" remedy refuted), 16 distinct defects, three severity
+  disputes for the fold. **Round-0 FOLD DISPATCHED** (opus, brief 35310dd):
+  plan + gated tree together, RED/GREEN per new test, shards, checker.
+  Memory: `harness-ignores-the-wakeup-deadline`.
