@@ -15739,7 +15739,7 @@ class. Owned by H2 because that is when the device learns the preimage kind and
 the copy can say something useful about it rather than only that it was
 refused.
 
-### F-475 — `seam-corpus-33-byte-collision-row-names-the-wrong-0.8-error`: the `bip93-plain-33-byte-payload-0x03` row's `source` prose says `me` refuses it "0.8 as a TagKindMismatch"; at 0.8 it is `UnknownTag` (owning phase: **H2**) `#hashlock` `#seam-corpus` `#records`
+### F-475 — ~~`seam-corpus-33-byte-collision-row-names-the-wrong-0.8-error`~~ **CLOSED 2026-09-05** — the `bip93-plain-33-byte-payload-0x03` row's `source` prose said `me` refuses it "0.8 as a TagKindMismatch"; at 0.8 it is `UnknownTag` (owning phase: **H2**) `#hashlock` `#seam-corpus` `#records`
 
 Filed 2026-09-04 from `hashlock-H1b-plan-R0-r0-fidelity` M-6, and MEASURED
 against ms-codec 0.8.0 before filing (a throwaway crate calling
@@ -15768,6 +15768,67 @@ repos, and H2 vendors the corpus into the fork anyway. Fold the correction with
 that re-vendoring. Suggested replacement for the parenthetical: *(ms-codec 0.7
 at the prefix gate; 0.8 as an `UnknownTag` — the shape predicate, not the codec
 error, is what names it)*.
+
+**CLOSED 2026-09-05 (hashlock H3, records only).** Fixed as suggested, and the
+suggestion was re-MEASURED before it was written down rather than carried across
+from the table above: a throwaway crate calling `ms_codec::decode` on this row's
+string against ms-codec 0.8.0 (`mnemonic-secret` `504ff46`) returns
+`Err: unknown tag "test"; not a member of RESERVED_TAG_TABLE`. That is the only
+reachable outcome in that tree — 75 characters is in both `VALID_STR_LENGTHS`
+and `VALID_PREIMAGE_STR_LENGTHS` (`ms-codec/src/consts.rs:33`, `:45`), so neither
+length gate fires (`decode.rs:48`, `:63`); `test` is not in
+`RESERVED_NOT_EMITTED_V01` (`consts.rs:71`), so the rule-7 gate at `decode.rs:71`
+does not fire; and the tag match at `decode.rs:86` routes anything that is
+neither `TAG_ENTR` nor `TAG_HASH` to `_ => Error::UnknownTag` (`decode.rs:126`),
+past the rule-6b `TagKindMismatch` arm at `decode.rs:91`, which only tests tags
+that ARE `entr` or `hash`. The 0.7 half was checked too and kept unchanged: at
+ms-codec 0.7.0 (`mnemonic-secret` `853a6ed`) a `0x03` prefix hits
+`any other prefix -> Err(Error::ReservedPrefixViolation)` in `src/envelope.rs`
+(documented `:117`, raised `:216`).
+
+The committed replacement is ASCII, matching the corpus (the file has no
+non-ASCII byte), so the em dash in the suggestion above is a `--` on disk:
+
+> (ms-codec 0.7 at the prefix gate; 0.8 as an `UnknownTag` -- the shape predicate, not the codec error, is what names it)
+
+The claim the new wording makes about the HOST was checked against the code, not
+just against F-475: `seal::record::preimage_plate`
+(`crates/me-cli/src/seal/record.rs:287`) short-circuits on an id/kind mismatch
+and on `PreimageLengthMismatch`, neither of which this string produces, and then
+names it by SHAPE alone — unshared header characters plus
+`d.len() == 33 && d[0] == 0x03` at `record.rs:310-320`. Its own doc comment
+independently corroborates the 0.7 clause: *"0.7 refused the kind with
+`ReservedPrefixViolation { got: 3 }`, 0.8 decodes it or names its length; both
+answer `true` here"* (`record.rs:284-286`).
+
+Nothing else moved: the row's verdict, every other row, and both seam tests'
+logic are untouched. Editing the corpus re-pinned it in both repos —
+`bb703f60…ac78b` → `2c2fbb3f…d541b`:
+
+- engrave `743da17259e9edecef30376d710376bd14c390ba` (branch `h3-seam-corpus`) —
+  the prose plus `SEAM_VECTORS_SHA256` in `crates/me-cli/tests/codex32_seam.rs:26`.
+- fork `245eee1a53fd16a56e2c06cd9bfcd7dd7568282e` (branch `h3-seam-corpus` off
+  fork main `c4a64fc`) — the byte-identical vendored copy plus
+  `seamVectorsSHA256` in `sysw/codex32_seam_test.go:30`.
+
+Gates: `cargo nextest run --locked -p mnemonic-engrave --no-fail-fast` → 619 run,
+616 passed, 3 failed, 2 skipped, with
+`codex32_seam::the_host_never_admits_what_the_device_would_refuse` **PASS** on
+the new pin; the three failures are the box-local `history_purge` trio, all
+panicking at the `/usr/bin/zsh is required` precondition
+(`crates/me-cli/tests/history_purge.rs:35`) on a machine that has no
+`/usr/bin/zsh`. Fork: `go test ./codex32/... ./sysw/...` → both `ok`, and
+`go test ./sysw/ -run TestCodex32Seam -v -count=1` shows the pin gate actually
+running (`--- PASS`), not cached.
+
+**For whoever merges:** branch `hashlock-h2` carries the OLD corpus bytes and the
+OLD pin — verified at both `17b3979` (`git show 17b3979:sysw/codex32_seam_test.go`
+→ `bb703f60…ac78b` at line 30, and that revision's JSON hashes to the same) and
+at its CURRENT tip `a1fd1398f7189aae1b6fb62f80599122e982f06c`, which is two
+commits further on (`26fd1dd`, `a1fd139`) and touches neither file. So a merge of
+both branches touches the vendored JSON and `codex32_seam_test.go:30` together —
+take this branch's bytes AND this branch's literal, or the pin gate goes red on
+the merge commit.
 
 ### F-476 — `argv-secret-guard-does-not-cover-a-preimage-plate`: `me <plate>` on argv is echoed whole by clap's "unrecognized subcommand", because `argv_secret_guard` asks `sysw::classify` and a preimage plate is `Class::Unknown` (owning phase: **a later follow-up; secret-handling, never gating**) `#me-cli` `#secret-handling` `#hashlock`
 
