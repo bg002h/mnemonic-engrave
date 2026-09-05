@@ -2387,3 +2387,22 @@ Command to resume: /resume-composer
   6b2b4048 to merge + push (staging-PR). NEXT (this turn): fork push (plain),
   sh2-flash -b on b9a9a30, engrave push via staging (agent), toolkit merge +
   push (agent). Then H4 ASSUMED at the operator's word; the flash is theirs.
+- **FORK MAIN PUSHED (c4a64fc..b9a9a30).** Signed H2 image pre-built per
+  fable's allowance: `seedhammer/seedhammerii-v0.0.0-bgb9a9a30.signed.uf2`
+  (sha256 ec28314a4a24501195fa2ee2a725573c85e00af80f520917e4693a37addb47fd;
+  not an identity across signings). **Operator's flash command when the SH2 is
+  in BOOTSEL (one flash, newest tip):**
+  `~/bin/sh/sh2-flash /scratch/code/shibboleth/seedhammer/seedhammerii-v0.0.0-bgb9a9a30.signed.uf2`
+  -- carries H0 + H2. Toolkit master merged the h3 manual at 00980f9b. Pushes
+  in flight: engrave e77b097 (staging), toolkit 00980f9b (staging-PR). Merged
+  worktrees removed (fork hashlock-h2, h3-seam-corpus; engrave hashlock-h2,
+  h3-composer-spec, h3-seam-corpus, hashlock-h1b; toolkit h3 manual); stale
+  review scratch and build caches under .tmp removed (44G -> 3.6G);
+  `.tmp/h2-gate` kept as the H2 plan's gated tree.
+- **Engrave master pushed at e77b097** (run 33974963880, no bypass). The
+  staging script REFUSED its first final push because the controller had
+  committed d05fa7f (this continuity note) mid-window -- a freeze violation the
+  script caught by design; the commit was soft-reset within a minute and the
+  agent finished against the green staged SHA. Memory
+  `freeze-means-empty-your-hands-first` gains the rule: while a push agent is
+  running against a repo, its default branch is read-only for the controller.
