@@ -15722,7 +15722,7 @@ admitted a 0x03 preimage plate as Ms". At the fold: 619 run, 616 passed, 3
 failed (`history_purge` x3). Both halves were mutation-checked; see
 `design/agent-reports/hashlock-H1b-implementation-report.md`.
 
-### F-474 — `unlock-kdf-names-the-refused-record`: `ErrRecordNotPermitted` renders as "Payload unreadable." with no record index or class (owning phase: **H2**) `#seedhammer` `#ux` `#seal`
+### F-474 — ~~`unlock-kdf-names-the-refused-record`~~ **CLOSED 2026-09-05 by fork `17b3979`** (H2 Task 7: the refusal carries the record index and kind, and the unlock screen names them) `#seedhammer` `#ux` `#seal`
 
 Filed with hashlock H0 (2026-09-04). `seal.AdmitSection` refuses an encrypted
 section WHOLE when any record is not on the allow-list, and
@@ -15739,7 +15739,30 @@ class. Owned by H2 because that is when the device learns the preimage kind and
 the copy can say something useful about it rather than only that it was
 refused.
 
-### F-475 — `seam-corpus-33-byte-collision-row-names-the-wrong-0.8-error`: the `bip93-plain-33-byte-payload-0x03` row's `source` prose says `me` refuses it "0.8 as a TagKindMismatch"; at 0.8 it is `UnknownTag` (owning phase: **H2**) `#hashlock` `#seam-corpus` `#records`
+**CLOSED in-phase, fork `17b3979`.** `seal.RecordNotPermittedError` now carries
+`Index` (0-based, as `me` counts records), `Class`, `Section` and `Preimage`,
+and `Unwrap`s to `ErrRecordNotPermitted` so every existing `errors.Is` caller is
+untouched — the message alone was never enough, because `gui/unlock_kdf.go`
+matches with `errors.Is` and cannot take a message apart. `gui/unlock_kdf.go`
+gained the named arm: *"Record 1 is a hashlock preimage, not a seed. This
+payload cannot be unlocked here. Nothing was opened."*
+
+It carries **no record bytes**: index, class and section are authenticated
+plaintext and naming them leaks nothing (§6.4's own argument for the record
+count), and the record itself is what must not travel. `Preimage` is a FIELD
+rather than a `Classification`, because H0 rejected a class for the kind — a
+preimage plate stays `ClassUnknown` and inert on every classifier, and the flag
+only lets the screen say *which* unknown it was.
+
+Gated by `seal/record_not_permitted_test.go` (a plate at record 1 of the
+encrypted section, and a codex32 share at record 2 of the public section — two
+indices and two kinds, so neither field can be a constant) and
+`gui/unlock_preimage_test.go` (the whole flow to the drawn frame, plus the body
+as a pure function over four rows, each measured with `assertModalBodyFits`).
+The RED was reproduced first: `never reached "hashlock preimage"; last frame
+"Payloadunreadable.SealedPayload"`. Six mutations run and reverted.
+
+### F-475 — `seam-corpus-33-byte-collision-row-names-the-wrong-0.8-error`: the `bip93-plain-33-byte-payload-0x03` row's `source` prose says `me` refuses it "0.8 as a TagKindMismatch"; at 0.8 it is `UnknownTag` (owning phase: **H3** — re-scheduled from H2, see below) `#hashlock` `#seam-corpus` `#records`
 
 Filed 2026-09-04 from `hashlock-H1b-plan-R0-r0-fidelity` M-6, and MEASURED
 against ms-codec 0.8.0 before filing (a throwaway crate calling
@@ -15762,6 +15785,11 @@ plate whatever its id — asserted since H1b (`51f25c9`) by this exact string in
 `sysw::tests::a_preimage_plate_is_named_not_misdiagnosed`. Only the prose
 explaining the 0.8 mechanism is wrong.
 
+**RE-SCHEDULED H2 → H3 on 2026-09-05**, at the H2 plan's own direction and
+confirmed against what H2 actually did: H2 vendors `hashlock-v0.8.json`, a
+DIFFERENT file, and never touches `codex32_seam_vectors.json`, so the
+re-vendoring this correction was meant to ride along with did not happen in H2.
+(Original scheduling, and still the reason to fold it with a re-vendoring:)
 **Owned by H2, not H1b**, and deliberately not fixed here: editing
 `testdata/codex32_seam_vectors.json` re-pins `SEAM_VECTORS_SHA256` in BOTH
 repos, and H2 vendors the corpus into the fork anyway. Fold the correction with
@@ -15778,3 +15806,183 @@ exactly what keeps a preimage out of `Class::is_argv_forbidden`'s five classes.
 Remedy when taken up: a `Class` for the kind (H0 rejected one) or a shape test
 in the guard that does not route through `Class` (`seal::record::preimage_plate`
 is that test). Severity capped at Minor by the operator ruling of 2026-08-27.
+
+### F-477 — `composer-spec-still-says-the-device-never-derives-a-preimage`: H2's phrase route falsifies `SPEC_wallet_policy_composer.md` §6c line 386 and its §14 out-of-scope row (owning phase: **H3**) `#composer` `#seedhammer` `#hashlock` `#records`
+
+Filed 2026-09-05 during the H2 device implementation
+(`IMPLEMENTATION_PLAN_hashlock_H2_device.md` Task 6). Two sentences in the
+composer spec were true of the S-series cycle and are false as of H2, which
+derives a preimage in RAM for one screen:
+
+- **§6c, line 386:** *"The composer never derives, stores or engraves a preimage
+  this cycle (§14)."* Replacement: *"The composer DERIVES a preimage in RAM for
+  one screen (H2, `SPEC_hashlock_H2_device` §4) and never stores, shows or
+  engraves it; what reaches a script is the digest."*
+- **§14's out-of-scope table row:** `| on-device preimage derivation, storage or
+  engraving | C25; §6c |`. Replacement: split it — derivation is now IN scope
+  (H2), while *storage, display and engraving* of a preimage stay out, for the
+  same C25 reason.
+
+The code comment that said the same thing is already corrected in the fork
+(`gui/composer_hash.go`, H2 Task 3: *"THE COMPOSER DERIVES A PREIMAGE IN RAM FOR
+ONE SCREEN (H2) AND NEVER STORES, SHOWS OR ENGRAVES IT."*), so the fork and this
+spec now disagree until this is folded. Deliberately not fixed in H2: editing
+the composer spec is a separate artifact from the one H2 was reviewed against.
+
+### F-478 — `h2-spec-4.5-drop-order-names-an-unreachable-destination`: §4.5 step 2 sends the reconciliation line to the phrase-route §8h at Done, which `composerEveryPathHashed` guards (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec`
+
+Filed 2026-09-05. `SPEC_hashlock_H2_device` §4.5's drop order ends *"then move
+the reconciliation line into the phrase-route §8h at Done (§4.7)"*. The build
+gate did exactly that and three R0 lenses traced the loss (r0 adversarial I-1 =
+fidelity I-2 = journey I-3): §8h is guarded by `composerEveryPathHashed`
+(`gui/composer_state.go`), false the moment ONE path is keyed, so on the ordinary
+mixed wallet the line was then drawn NOWHERE. The plan departs from the spec and
+gives the line its own `showError` immediately after HOLD in
+`hashlockPhraseRoute`; that is what shipped, and
+`TestHashlockReconcileScreenIsReachableOnAMixedPolicy` gates it.
+
+Replacement sentence for that clause, for whoever folds the spec:
+
+> then move the reconciliation line out of the confirm modal and onto its own
+> dismissible screen shown immediately after HOLD, where it is reachable for
+> every policy that has a phrase-set hash — NOT into the phrase-route §8h at
+> Done, whose `composerEveryPathHashed` guard is false for any policy with one
+> un-hashed path.
+
+### F-479 — `h2-spec-4.5-line-list-has-no-other-path-line`: the confirm modal draws a cross-path warning §4.5 does not enumerate (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec`
+
+Filed 2026-09-05. §4.5 enumerates the confirm modal's lines "in order" and has
+no clause for r0 journey I-1's cross-path warning, which the plan added and which
+shipped as `composerCopyHashlockOtherPath` / `hashlockOtherPathLine`. Text to add
+to that list, after the relation line:
+
+> `<other-path line, only when another path of this policy already carries a
+> different hash: "another path has a different hash: two phrases to back up">`
+
+and to §4.5's bullet list, after the relation-line bullet:
+
+> - The other-path line (journey I-1): when any OTHER path of the same policy
+>   already carries a `Hash` that differs from this digest, the modal says so,
+>   because `md.ValidatePathList` has no clause about two paths' `Hash` values
+>   and "One phrase per policy" is advice — a second phrase is legal, and a
+>   second backup burden the operator must choose knowingly. Omitted when no
+>   other path carries a hash, or when the hashes are equal.
+
+Measured with it present: the longest §4.5 variant draws 337 characters with 107
+of headroom, above `assertModalBodyFits`'s margin of 80.
+
+### F-480 — `hash-provenance-is-composition-wide-not-per-path`: `composerState.hashByPhrase` is one bool for a whole policy, so §8h's phrase form can outlive the phrase-set hash that earned it (owning phase: **H3**) `#composer` `#seedhammer` `#hashlock`
+
+Filed 2026-09-05 from H2's R0 round 0 (adversarial I-2, tests I-4), where the
+per-path variant was the reviewers' preferred remedy and was **declined for H2
+with its reason**. `composerHashByPhraseSync` drops the flag on the one event
+after which no phrase-set hash can still be in the composition — no path carries
+a hash at all — and deliberately NOT when THIS path's hash is replaced by a
+payload row or a hex digest, because another path may still be phrase-set and
+clearing on that narrower event would drop §8h's phrase form while a phrase-set
+hash is live (the C16 shape: a composition-wide fact edited as though it were
+per-path).
+
+The residual staleness runs the SAFE way: `composerCopyHashEveryPathPhrase` names
+"the phrase and its method, **or** the preimage plate", so an over-sticky flag
+tells the operator to back up one artifact too many, never one too few. Severity
+resolved MINOR on that reasoning.
+
+A per-path array needs the same splicing discipline `composerAddPath` and
+"Remove path" already apply to `Paths` — a change to the composer's state model
+rather than to this route, which is why it is scheduled rather than bolted on.
+
+### F-481 — ~~`hashlock-phrase-screen-draws-no-readout-and-show-does-nothing`~~ **CLOSED 2026-09-05 by fork `26fd1dd`** (post-impl I-2 graded it gating; the 8 px CutBottom removed; TestHashlockPhraseScreenDrawsTheMaskedReadout): the phrase screen's `show` key is drawn, is tappable, toggles to `hide`, and reveals nothing, because the readout is height-clamped to empty (owning phase: **H3**) `#hashlock` `#seedhammer` `#ux`
+
+Filed 2026-09-05, MEASURED on the emulator during H2's Task 5 walk (fork
+`hashlock-h2`, emu.wasm from that branch, served on a fresh port). On the
+`Hashlock phrase` screen:
+
+- with 20 characters typed and reveal OFF, the frame carries **no `*` at all**;
+- tapping `show` flips the label to `hide` and the frame still carries **no
+  characters** — the whole probe had to fall back to the `n/100` counter as its
+  only oracle, and the walk's key-grid mapping had to be proved by the DIGEST
+  instead.
+
+Mechanism: `hashlockPhraseFlow` cuts a lead band and a counter band out of the
+content rectangle and passes what is left as `kbd.MaxHeight`, and
+`PassphraseKeyboard.Layout` then binary-searches leading runes off the readout
+until it fits `MaxHeight - grid - 8`. On this screen that budget is smaller than
+one line, so every rune is dropped and `shown` is "".
+
+Why it is worth fixing rather than documenting: the fork's own
+`passphrase_keyboard.go` argues the case against exactly this shape when it
+explains why the gear key was REMOVED rather than left inert — *"a live-looking
+control that swallows the press, on the machine where the next thing the
+operator approves is cut into steel"*. `show` is now that control on this screen.
+Either give the readout its line (the lead could be shortened or the counter
+merged into it) or drop the reveal key from this keyboard.
+
+**Not gating H2 and not argued as such:** nothing is mis-derived, the counter
+reports the true length, and the confirm modal shows the digest, the method and
+the character count before anything is assigned. It is an affordance defect on a
+new screen, and the post-implementation review is where its severity is ruled.
+
+### F-482 — `hashlock-two-more-spec-4-copy-departures-unrecorded`: §4.1's no-payload lead REPLACES "Which hash?" instead of adding a second lead line, and §4.2's lead is prefixed with "This screen does that hashing for you." — both decided in the plan, neither recorded as a spec departure (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec` `#records`
+
+Filed 2026-09-05 from `hashlock-H2-post-impl` M-1. F-478 and F-479 record two
+§4.5 departures; these two have no record because
+`TestComposerCopyIsVerbatimFromTheSpec` compares the code against a table the
+implementer transcribed, so it cannot see a departure from the spec text.
+
+| spec | spec says | code does (fork `17b3979`) |
+| --- | --- | --- |
+| §4.1 | lead "No hash record in the payload…" as a SECOND lead line when `len(digests) == 0` | `composerHashRows` replaces "Which hash?" outright (`gui/composer_hash.go:169-171`; build-gate fix 9) |
+| §4.2 | lead "Use a phrase you have never used anywhere else." | `composerCopyHashlockPhraseLead` prepends "This screen does that hashing for you." (`gui/composer_copy.go:369`; plan line ~1187) |
+
+Both are defensible (the §4.2 prefix answers the §8i modal just dismissed).
+H3 folds the spec to the shipped copy, or records the departure beside
+F-478/F-479, with the replacement text.
+
+### F-483 — `hashlock-phrase-lives-in-an-unwipeable-go-string`: the typed phrase is `kbd.Fragment` (an immutable Go string) for the life of the phrase screen and across every Back via `initial`; `[]byte(kbd.Fragment)` copies it once more per OK; `seal.isPreimageRecord` stringifies a record a second time on the refusal path (owning phase: **a later follow-up; secret-handling, never gating**) `#hashlock` `#seedhammer` `#secret-handling`
+
+Filed 2026-09-05 from `hashlock-H2-post-impl` M-3, per the operator ruling of
+2026-08-27 (secret-handling defects are logged, never gating) and consistent
+with ruling L15 (no scrub discipline beyond what the composer does by
+construction). Remedy when taken up: a byte-slice fragment in the passphrase
+keyboard with an explicit wipe, and a classify path that does not re-stringify.
+The interruption lens (M-3) adds: the phrase route holds a secret with §10.2.4's
+idle wipe timer disarmed, and arming it would discard the composition -- same
+class, same ruling.
+
+### F-484 — `hashlock-phrase-lead-paints-inside-the-back-button-margin`: the phrase screen's lead wraps at `dims.X-2*8` centred on the whole panel and paints 152 px of ink inside the Back button's rectangle (its empty margin; 0 px of glyph or chip lost), where `composerPageLines` uses a narrower band for exactly this (W-3) (owning phase: **H3**) `#hashlock` `#seedhammer` `#geometry`
+
+Filed 2026-09-05 from the ultracode geometry lens (`hashlock-H2-post-impl-lens-geometry.md` M-1),
+measured by raster: lead (440,44) at (20,44), nav column from x=427, 152 px of lead ink
+inside (427,44)-(480,97), overlap with chip ink 0 px, z-order lead on top. Not folded with
+the F-481 fix because narrowing the lead band can add a wrapped line and take the readout
+height back; fold it with a re-measurement of both.
+
+### F-485 — `hashlock-walk-does-not-assert-hold-order-or-stored-vs-displayed`: `cmd/emu/walk_hashlock_phrase.js` passes when the hash is assigned BEFORE the hold and when the stored digest differs from the displayed one (CI's gui tests catch both); it picks the phrase row by INDEX; `out.ok` restates assertions that already threw (owning phase: **H3**) `#hashlock` `#seedhammer` `#walk` `#tests`
+
+Filed 2026-09-05 from the walk-control lens (`hashlock-H2-post-impl-lens-walk-control.md`
+M-1, M-2, N-1, N-2). The walk DOES fail under a mutated digest display and a mutated
+hardened derivation (measured on two mutated emulators); these are the gaps that remain.
+Add a post-hold read of the path's stored hash and assert it equals the displayed
+token, and pick the row by label as the production code now does.
+
+### F-486 — `first8-last8-digest-form-is-documented-nowhere-the-operator-reads`: the device shows `first8..last8` of the digest; `ms hashlock` prints only the full 64 hex and no manual page explains the abbreviation the operator must compare (owning phase: **H3**, toolkit manual + ms manual) `#hashlock` `#docs` `#reconciliation`
+
+Filed 2026-09-05 from the host-device e2e lens (`hashlock-H2-post-impl-lens-host-device-e2e.md`
+M-1). The H3 toolkit-manual draft describes the confirm modal; make sure it states the
+abbreviation rule and shows one host/device pair side by side.
+
+### F-487 — `hashlock-reconciliation-is-asked-after-the-digest-left-the-screen`: the reconcile screen asks the operator to compare against the host after the confirm modal (which held the digest) has been dismissed, and the write-down instruction does not tell them to write the digest (owning phase: **next device cycle; spec §4.5/§4.7 design**) `#hashlock` `#seedhammer` `#ux` `#spec`
+
+Filed 2026-09-05 from the host-device e2e lens M-2. Options: repeat the abbreviated digest
+on the reconcile screen, or add "and this digest" to the write-down copy. A spec change;
+walk it with the operator.
+
+### F-488 — `f474-refusal-names-the-record-but-not-the-next-step`: the unlock KDF's new refusal says which record and what it is, but not what to do (remove the record on the host and re-seal) (owning phase: **H3**) `#hashlock` `#seedhammer` `#ux`
+
+Filed 2026-09-05 from the host-device e2e lens M-3. One more sentence in the arm's copy,
+re-measured for fit.
+
+### F-489 — `me-seal-does-not-name-the-record-index-where-sysw-pack-does`: `me seal --seal-secret` refuses a preimage plate by kind but without the record index that `me sysw pack` prints (owning phase: **the next me code cycle**) `#me-cli` `#ux` `#hashlock`
+
+Filed 2026-09-05 from the host-device e2e lens N-1. Same message shape on both verbs.
