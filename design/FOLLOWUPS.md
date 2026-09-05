@@ -15946,3 +15946,43 @@ Filed 2026-09-05 from `hashlock-H2-post-impl` M-3, per the operator ruling of
 with ruling L15 (no scrub discipline beyond what the composer does by
 construction). Remedy when taken up: a byte-slice fragment in the passphrase
 keyboard with an explicit wipe, and a classify path that does not re-stringify.
+The interruption lens (M-3) adds: the phrase route holds a secret with §10.2.4's
+idle wipe timer disarmed, and arming it would discard the composition -- same
+class, same ruling.
+
+### F-484 — `hashlock-phrase-lead-paints-inside-the-back-button-margin`: the phrase screen's lead wraps at `dims.X-2*8` centred on the whole panel and paints 152 px of ink inside the Back button's rectangle (its empty margin; 0 px of glyph or chip lost), where `composerPageLines` uses a narrower band for exactly this (W-3) (owning phase: **H3**) `#hashlock` `#seedhammer` `#geometry`
+
+Filed 2026-09-05 from the ultracode geometry lens (`hashlock-H2-post-impl-lens-geometry.md` M-1),
+measured by raster: lead (440,44) at (20,44), nav column from x=427, 152 px of lead ink
+inside (427,44)-(480,97), overlap with chip ink 0 px, z-order lead on top. Not folded with
+the F-481 fix because narrowing the lead band can add a wrapped line and take the readout
+height back; fold it with a re-measurement of both.
+
+### F-485 — `hashlock-walk-does-not-assert-hold-order-or-stored-vs-displayed`: `cmd/emu/walk_hashlock_phrase.js` passes when the hash is assigned BEFORE the hold and when the stored digest differs from the displayed one (CI's gui tests catch both); it picks the phrase row by INDEX; `out.ok` restates assertions that already threw (owning phase: **H3**) `#hashlock` `#seedhammer` `#walk` `#tests`
+
+Filed 2026-09-05 from the walk-control lens (`hashlock-H2-post-impl-lens-walk-control.md`
+M-1, M-2, N-1, N-2). The walk DOES fail under a mutated digest display and a mutated
+hardened derivation (measured on two mutated emulators); these are the gaps that remain.
+Add a post-hold read of the path's stored hash and assert it equals the displayed
+token, and pick the row by label as the production code now does.
+
+### F-486 — `first8-last8-digest-form-is-documented-nowhere-the-operator-reads`: the device shows `first8..last8` of the digest; `ms hashlock` prints only the full 64 hex and no manual page explains the abbreviation the operator must compare (owning phase: **H3**, toolkit manual + ms manual) `#hashlock` `#docs` `#reconciliation`
+
+Filed 2026-09-05 from the host-device e2e lens (`hashlock-H2-post-impl-lens-host-device-e2e.md`
+M-1). The H3 toolkit-manual draft describes the confirm modal; make sure it states the
+abbreviation rule and shows one host/device pair side by side.
+
+### F-487 — `hashlock-reconciliation-is-asked-after-the-digest-left-the-screen`: the reconcile screen asks the operator to compare against the host after the confirm modal (which held the digest) has been dismissed, and the write-down instruction does not tell them to write the digest (owning phase: **next device cycle; spec §4.5/§4.7 design**) `#hashlock` `#seedhammer` `#ux` `#spec`
+
+Filed 2026-09-05 from the host-device e2e lens M-2. Options: repeat the abbreviated digest
+on the reconcile screen, or add "and this digest" to the write-down copy. A spec change;
+walk it with the operator.
+
+### F-488 — `f474-refusal-names-the-record-but-not-the-next-step`: the unlock KDF's new refusal says which record and what it is, but not what to do (remove the record on the host and re-seal) (owning phase: **H3**) `#hashlock` `#seedhammer` `#ux`
+
+Filed 2026-09-05 from the host-device e2e lens M-3. One more sentence in the arm's copy,
+re-measured for fit.
+
+### F-489 — `me-seal-does-not-name-the-record-index-where-sysw-pack-does`: `me seal --seal-secret` refuses a preimage plate by kind but without the record index that `me sysw pack` prints (owning phase: **the next me code cycle**) `#me-cli` `#ux` `#hashlock`
+
+Filed 2026-09-05 from the host-device e2e lens N-1. Same message shape on both verbs.

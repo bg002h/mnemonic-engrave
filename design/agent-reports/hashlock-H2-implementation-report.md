@@ -147,7 +147,7 @@ This is deviation **D5**: the plan's Expected line says the package COMPILES and
 
 ## Task 5 — the emulator walk and the firmware size
 
-**Fork commit `e1bf137`** — `cmd/emu/walk_hashlock_phrase.js` (297 lines).
+**Fork commit `e1bf137`** — `cmd/emu/walk_hashlock_phrase.js` (331 lines).
 
 ### Step 1: the walk, written and RUN
 
@@ -430,3 +430,18 @@ fails closed in `DeriveHardened`/`PreimageHardened`; **N-1**
 fails it); **N-2** `IsMS1Shaped` folds case ASCII-only. **M-1** filed as F-482,
 **M-3** as F-483. Gates at `26fd1dd`: four packages ok; gui 1224 tests / 24
 shards ok; gofmt and vet unchanged from `c4a64fc` (pre-existing notes only).
+
+## Ultracode-lens fold (controller, fork `a1fd139`)
+
+Five disjoint lenses ran in parallel with the opus review (`hashlock-H2-post-impl-lens-{interruption,geometry,walk-control,host-device-e2e,records-claims}.md`).
+Geometry C-1 and interruption I-1 are F-481 (fixed at `26fd1dd`; geometry I-1's 8 px
+overflow is the same cut -- MaxHeight now 209 = the keyboard block). Folded at `a1fd139`:
+**host-device e2e I-1** the other-path line was a hard-coded "two phrases", wrong on the
+three-hashlock wallet -- now count-free, with a three-other-paths row and a no-digit
+assertion (RED with "two" restored); **interruption M-1** Remove path re-syncs
+`hashByPhrase` (`TestRemovePathReSyncsHashByPhrase`, RED with the call deleted). Filed:
+F-484 (lead ink in the Back margin), F-485 (walk gaps), F-486 (digest abbreviation
+undocumented), F-487 (reconcile after the digest left the screen), F-488 (F-474 copy's next
+step), F-489 (`me seal` record index); F-483 gains the timer note. Records lens: 0C/0I, one
+Nit (stale self-review line numbers in the plan). Walk-control M-3: the walk is 331 lines,
+not 297 -- corrected above. Gates at `a1fd139`: four packages ok; gui 1225 / 24 shards ok.
