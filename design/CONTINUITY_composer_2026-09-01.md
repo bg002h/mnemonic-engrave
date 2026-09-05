@@ -2611,3 +2611,16 @@ Command to resume: /resume-composer
   IMPLEMENTATION RECORD written. Signed image at fb0dd04 building
   (sh2-flash -b). NEXT: push engrave (staging) + toolkit (staging-PR);
   record the image sha + the operator's one flash command; H4 ASSUMED.
+- **Engrave master pushed at 1fb24566** (run 33988590572, no bypass). **Signed H5
+  image built:** `seedhammer/seedhammerii-v0.0.0-bgfb0dd04.signed.uf2` (sha256
+  e695c9e28998cae12cda328f8fca1744cefc9dfdd7a483d5cde90c090843fcbe; not an
+  identity across signings). **Operator's ONE flash command when the SH2 is in
+  BOOTSEL (covers H0 + H2 + H5):**
+  `~/bin/sh/sh2-flash /scratch/code/shibboleth/seedhammer/seedhammerii-v0.0.0-bgfb0dd04.signed.uf2`
+  Then the H4 device walk (H2 spec §8) -- ASSUMED until measured. Merged
+  worktrees removed (fork h5-a/b/c, hashlock-h5; engrave h5-records; toolkit
+  h5-manual); `.tmp/h5-gate` kept as the H5 plan's gated tree. Toolkit push
+  13f78a26 in flight. Open follow-ups: F-483 (secret handling, logged),
+  F-489 (me seal record index, next host change), F-490 (fork test flake).
+  **THE HASHLOCK PHRASE CYCLE INCLUDING H5 IS SHIPPED; nothing waits on the
+  controller.**
