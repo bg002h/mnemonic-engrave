@@ -2729,3 +2729,8 @@ Command to resume: /resume-composer
   three corrected premises and the two measurements accepted). R0 round 0
   lenses in flight (fidelity, journey, tests). NEXT: persist -> fold ->
   verification -> GREEN -> plan (author + per-task gate) -> implementers.
+- H6 spec R0 r0: tests lens landed (76c8fc60, 0C/3I/1M/1N): the 5.0 mm rung
+  advance number wrong (3.3333, contained); a non-ASCII "§" inside a refusal
+  body renders near-blank on the harness (ASCII-only rule); the QR raise
+  needs `constantTimeQRModules` capacity entries for the new dimensions (§7.2
+  deliverable missing). Fidelity + journey lenses in flight; fold after both.
