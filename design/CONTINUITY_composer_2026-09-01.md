@@ -1824,3 +1824,15 @@ Command to resume: /resume-composer
   master frozen). Engrave pushed `423b276` (run 33932528219, no bypass;
   report `92f2ec1`). Worktree `ms-worktrees/hashlock-h1` removed; branch
   kept. H0 implementer still running.
+- **ms PUSHED `1e3d6df` (27 commits; four required contexts green, no
+  bypass; report `351a75e`) -- and the NON-required `vendor/ satisfies
+  Cargo.lock (offline)` check went RED** (`no matching package named
+  pbkdf2`): H1's dependency bump rewrote Cargo.lock and nobody re-vendored.
+  Reproduced locally with `bash ci/repro/vendor-freshness.sh`; fixed with
+  `cargo vendor vendor/` (eleven new crate dirs, nothing modified), gate OK,
+  committed as its own commit (ms `8796d69`); second push DISPATCHED with
+  the instruction that vendor-freshness must ALSO be green on the staged
+  SHA. Memory: ms-cargo-lock-change-needs-cargo-vendor (run the script
+  BEFORE a push; the ritual does not stop on a non-required check). The H1
+  plan's Task 1 never said "re-vendor" -- records commit after the push
+  window.
