@@ -1,4 +1,4 @@
-You are the INDEPENDENT tests + citations reviewer (sonnet tier) for round 0 of the R0 gate on `design/SPEC_hashlock_H6_preimage_plates.md` (engrave master `<SPEC_SHA>`).
+You are the INDEPENDENT tests + citations reviewer (sonnet tier) for round 0 of the R0 gate on `design/SPEC_hashlock_H6_preimage_plates.md` (engrave master `a0f832d0`).
 
 ONE QUESTION: is every file:line, number and mechanism the spec cites true at the named revisions (fork `fb0dd04`, engrave master, ms `504ff46`), are the fit/geometry/QR numbers reproducible when YOU measure them (write throwaway probes in your worktree: QR module counts with the fork's `qr.Encode` at ECC-L for every specified payload; plate line counts with `backup.CharsPerLine`; `assertModalBodyFits` for every new modal body), and can every test in the tests section be executed as stated and fail on what it names?
 

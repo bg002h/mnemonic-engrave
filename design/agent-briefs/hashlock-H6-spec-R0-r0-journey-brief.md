@@ -1,4 +1,4 @@
-You are the INDEPENDENT journey-walk reviewer (opus tier) for round 0 of the R0 gate on `design/SPEC_hashlock_H6_preimage_plates.md` (engrave master `<SPEC_SHA>`). The brainstorm's journey walk (`design/agent-reports/hashlock-H6-brainstorm-journey-questions.md`) produced 14 questions that are now settled; walk the SPEC, not the brainstorm.
+You are the INDEPENDENT journey-walk reviewer (opus tier) for round 0 of the R0 gate on `design/SPEC_hashlock_H6_preimage_plates.md` (engrave master `a0f832d0`). The brainstorm's journey walk (`design/agent-reports/hashlock-H6-brainstorm-journey-questions.md`) produced 14 questions that are now settled; walk the SPEC, not the brainstorm.
 
 ONE QUESTION: walk the operator through every journey the spec defines and find where the spec is SILENT -- a step whose wrong outcome is worse than telling the operator nothing. At each step: what they have in hand exactly; what the device or host does as specified; what ELSE they might do and what happens then; classify refusal / warning / default / not our concern / documentation only.
 
