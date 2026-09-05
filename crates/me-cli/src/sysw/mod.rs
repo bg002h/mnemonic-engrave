@@ -143,11 +143,18 @@ pub enum UnknownReason {
     ///
     /// [`Unrecognised`]: UnknownReason::Unrecognised
     Bip93OutsideTheProfile(usize),
-    /// A hashlock PREIMAGE plate (SPEC_ms_hashlock §1, kind `0x03`, id
-    /// `hash`): inside the profile's lengths, refused for its KIND. Named so
+    /// A string of the hashlock PREIMAGE kind (SPEC_ms_hashlock §1, kind
+    /// `0x03`): inside the profile's lengths, refused for its KIND. Named so
     /// the operator is not told to "re-encode the entropy as `ms1`" — the
     /// string is a constellation record, just not one this container places
-    /// yet (H0, §9). Carries no number: 75 characters is the only shape.
+    /// yet (H0, §9).
+    ///
+    /// Carries no number because none would be true of every case: a
+    /// well-formed plate is 75 characters with the id `hash`, and a malformed
+    /// `0x03` string (a 34-byte payload at 77 characters, §1's
+    /// `PreimageLengthMismatch`) is named the same way — the predicate asks
+    /// the codec about the KIND, not about a length or an id
+    /// (post-implementation review M-1).
     PreimagePlate,
     /// No reserved prefix, not a BIP-39 mnemonic, and not a constellation
     /// string. This is the case the address gap belongs to — and, since S2,

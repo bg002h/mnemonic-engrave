@@ -233,9 +233,18 @@ pub fn bip93_outside_the_profile(s: &str) -> bool {
         && ms_codec::decode(s).is_err()
 }
 
-/// Is `s` a hashlock PREIMAGE plate (SPEC_ms_hashlock §1: kind byte `0x03`,
-/// id `hash`, 75 characters) — the one `ms1` string that is inside the
-/// profile's lengths and is still not a seed?
+/// Is `s` a string of the hashlock PREIMAGE KIND (SPEC_ms_hashlock §1: kind
+/// byte `0x03`) — the one `ms1` shape that is inside the profile's lengths and
+/// is still not a seed?
+///
+/// **Keyed on the codec's kind refusal, not on a length or an id.** A
+/// well-formed plate is 75 characters with the id `hash`, but this asks only
+/// whether `ms_codec` refuses the string for its PREFIX BYTE, so a malformed
+/// `0x03` string — a 77-character one carrying a 34-byte payload, say, which
+/// §1 calls a `PreimageLengthMismatch` — is named the same way. That is the
+/// intended direction: the refusal is correct and the advice is right for
+/// both, and a predicate that checked the length would let the malformed one
+/// fall through to "outside the profile" (post-implementation review M-1).
 ///
 /// H0 (SPEC_ms_hashlock §9). At ms-codec 0.7 the codec refuses the kind with
 /// `ReservedPrefixViolation { got: 3 }`, and this asks for exactly that, so
