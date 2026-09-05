@@ -2084,3 +2084,18 @@ Command to resume: /resume-composer
   dir; stops before the me 0.8.1 release. Gate worktree h1b-gate removed.
   NEXT: implementation -> opus post-impl -> fold -> merge -> push engrave;
   the me 0.8.1 release is a fable/operator decision. H2 spec r1 in flight.
+- **H2 SPEC r1 NOT GREEN -> r1 FOLD (`c06a760`) -> r2 DISPATCHED.** The r1
+  verifier (`040e85f`) confirmed 5/5 C and 10/11 I fixed and found two
+  Importants the round-0 fold introduced: a false mutation claim (the
+  separators row is a fixed point of seal.NormalisePassphrase =
+  ToLower(Join(Fields))) and a wrong fit-gate citation (the "588" is a
+  historical filler measurement in a comment of modal_fits_test.go; the real
+  gate is assertModalBodyFits, per-body render + headroom, margin 80, no
+  capacity constant). Fold: §2/§7.1 credit the normaliser mutation to the
+  case and whitespace rows and give the separators row its own fold; §4/§4.5/
+  §7.2/§10 cite the real gate and require every new body in its table with a
+  drop order; I-5 completed (the fork comment is this stage's, the composer
+  spec sentences are H3's); HOLD not CONTINUE on the confirm surface. Engrave
+  pushed `d723cac` (report `79a05a6`). Lesson: two of my own folds now put a
+  number or a claim into a spec that a grep would have falsified -- re-grep
+  every NEW citation a fold adds, not only the ones the draft carried.
