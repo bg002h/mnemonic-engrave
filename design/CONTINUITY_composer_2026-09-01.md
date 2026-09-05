@@ -2675,3 +2675,11 @@ Command to resume: /resume-composer
   report.md) and journey walker (opus, hashlock-H6-brainstorm-journey-
   questions.md) DISPATCHED (briefs 07a92e9b). NEXT: merge their question
   lists -> present to the operator -> spec -> R0.
+- H6 brainstorm: journey walker landed (e45dffcf) -- 14 questions (Q1 cut order +
+  abort copy; Q2 review/census contract; Q3 validateMdmkStrings would QR the
+  ms1 string -> backup.Passphrase pattern; Q4 orphaned device-derived preimage;
+  Q5 QR toggle warning; Q6 locator id (mk1 stub?); Q7 payload phrase derive
+  eager/lazy; Q8 PREIMAGE REQUIRED marking on md1 plates (F-132); Q9 retention
+  shape; Q10 provenance-aware copy; Q11 admission at progWalletPolicy only;
+  Q12 cap/bundling; Q13 phrase display masked; Q14 free-text warning names
+  the route). Design author in flight; merge then present.
