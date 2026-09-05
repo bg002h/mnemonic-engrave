@@ -47,9 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pin-independent and keyed on the device's own SHAPE (an `ms`-HRP, unshared,
   codex32-valid single with a 33-byte payload whose first byte is `0x03`, the
   same test as the fork's `codex32.IsPreimage`), so a `0x03` single under any
-  id — or with a wrong X length, which the codec names
-  `PreimageLengthMismatch` — is named a preimage plate on both host verbs
-  rather than falling through to "outside the profile".
+  id — or with a wrong X length the codec can name (`PreimageLengthMismatch`,
+  which it reaches only when the string length sits in the profile's length
+  sets, i.e. X ∈ {16, 17, 20, 21, 24, 25, 28, 29, 32, 33}) — is named a preimage
+  plate on both host verbs rather than falling through to "outside the
+  profile". Any other X (18, 19, 22, …) is outside the profile's length sets and
+  is refused as exactly that (post-impl M-1).
 - An **id/kind mismatch** (`SPEC_ms_hashlock` §1 rule 2, ruling L24) — an `ms1`
   single whose 4-character id and kind byte disagree — is diagnosed as what it
   is on both verbs (`UnknownReason::TagKindMismatch`,

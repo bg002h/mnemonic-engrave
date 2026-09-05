@@ -907,6 +907,27 @@ mod tests {
             ),
             Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
         );
+        // Post-impl M-3: the `unshared` conjunct and the case-insensitive share
+        // index are load-bearing. A 2-of-N SHARE whose SSS point begins 0x03
+        // (seam corpus `bip93-share-payload-0x03`) is NOT a plate --
+        // MUTATION: drop `unshared` -> PreimagePlate. The UPPERCASE plate (the
+        // QR-alphanumeric form) IS one -- MUTATION: make the share-index test
+        // case-sensitive -> Unrecognised.
+        assert!(!matches!(
+            pack(
+                vec![
+                    "ms12testaqv0qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqdq7pl8qdc5tsp"
+                        .into()
+                ],
+                None,
+                ITER
+            ),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate))
+        ));
+        assert_eq!(
+            pack(vec![PLATE.to_ascii_uppercase()], None, ITER),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+        );
         // The control: an entr string of the same length is still a seed.
         assert!(matches!(
             classify("ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqcwugpdxtfme2w"),

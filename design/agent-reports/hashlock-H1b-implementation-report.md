@@ -134,7 +134,7 @@ only error is the pre-existing `manual_is_multiple_of`.
 `6 failed, 0 passed` — the tests lens's exact measurement. Failing lines:
 
 - `a_preimage_plate_is_not_a_seed_record` → `validate_record admitted a 0x03 preimage plate as Ms`
-- `the_codec_decodes_the_plate_and_me_still_refuses_it` → panicked at `crates/me-cli/tests/preimage_plate_is_not_a_seed.rs:136:5`, which is `assert!(matches!(` — **the second assertion** (see D-1)
+- `the_codec_decodes_the_plate_and_me_still_refuses_it` → panicked at `crates/me-cli/tests/preimage_plate_is_not_a_seed.rs:137:5`, which is `assert!(matches!(` — **the second assertion** (see D-1)
 - `the_host_never_admits_what_the_device_would_refuse` → `preimage-plate-0x03: host verdict`, `left: true` / `right: false`
 - `a_preimage_plate_is_named_not_misdiagnosed` → `left: Ok([77, 78, 69, …])` / `right: Err(Unclassifiable(0, PreimagePlate))`
 - `sysw_pack_names_…` → `preimage_plate_is_not_a_seed.rs:61:5`; `seal_names_…` → `:104:5`
@@ -260,7 +260,7 @@ editing it re-pins `SEAM_VECTORS_SHA256` in both repos and H2 vendors the corpus
 The plan's Task 2 Step 3 test text reads `delete the arm) -> this fails on `decoded`, and`.
 Measured under mutation (a): `decoded` still succeeds — the codec is unchanged by a
 `validate_record` mutation — and the failure is at
-`preimage_plate_is_not_a_seed.rs:136`, the **second** assertion. The plan's own Step 4 prose
+`preimage_plate_is_not_a_seed.rs:137`, the **second** assertion. The plan's own Step 4 prose
 says the same thing ("the witness FAILS on its second assertion"), so the comment
 contradicts the plan's other half. Minimal correction applied to the comment only:
 

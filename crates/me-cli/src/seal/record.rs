@@ -278,8 +278,10 @@ pub fn id_kind_mismatch(s: &str) -> bool {
 /// Is `s` a hashlock PREIMAGE plate — an `ms`-HRP, codex32-valid, UNSHARED
 /// single whose kind byte is `0x03` (SPEC_ms_hashlock §1)? A well-formed plate
 /// is 75 characters with id `hash`; a `0x03` single under any other id, or with
-/// a wrong X length, is named the same way, because the KIND is the prefix byte
-/// (the device's `codex32.IsPreimage` tests the same shape). Pin-independent
+/// a wrong X length the codec can name (`PreimageLengthMismatch`, reached only
+/// when the string length sits in the profile's length sets), is named the same
+/// way, because the KIND is the prefix byte (the device's `codex32.IsPreimage`
+/// tests the same shape); any other length is outside the profile. Pin-independent
 /// (H1b, F-473): 0.7 refused the kind with `ReservedPrefixViolation { got: 3 }`,
 /// 0.8 decodes it or names its length; both answer `true` here.
 pub fn preimage_plate(s: &str) -> bool {

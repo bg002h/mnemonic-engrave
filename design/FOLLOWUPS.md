@@ -15758,3 +15758,13 @@ repos, and H2 vendors the corpus into the fork anyway. Fold the correction with
 that re-vendoring. Suggested replacement for the parenthetical: *(ms-codec 0.7
 at the prefix gate; 0.8 as an `UnknownTag` — the shape predicate, not the codec
 error, is what names it)*.
+
+### F-476 — `argv-secret-guard-does-not-cover-a-preimage-plate`: `me <plate>` on argv is echoed whole by clap's "unrecognized subcommand", because `argv_secret_guard` asks `sysw::classify` and a preimage plate is `Class::Unknown` (owning phase: **a later follow-up; secret-handling, never gating**) `#me-cli` `#secret-handling` `#hashlock`
+
+Filed 2026-09-04 from `hashlock-H1b-post-impl` M-2. Not a regression -- at
+ms-codec 0.7 the plate was also `Unknown` and also uncovered -- but H0/H1b make
+the reason permanent: "inert, never `Codex32Secret`, no class of its own" is
+exactly what keeps a preimage out of `Class::is_argv_forbidden`'s five classes.
+Remedy when taken up: a `Class` for the kind (H0 rejected one) or a shape test
+in the guard that does not route through `Class` (`seal::record::preimage_plate`
+is that test). Severity capped at Minor by the operator ruling of 2026-08-27.

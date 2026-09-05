@@ -2814,8 +2814,8 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      container cannot place it.\n      \
                      `ms1` is a two-gate PROFILE over BIP-93: the whole string must be \
                      {:?} characters (entropy) or {:?} (mnemonic), and the 4-character id must \
-                     be `entr` (a seed) or `hash` (a hashlock preimage plate). This one is {len} \
-                     characters.\n      \
+                     be `entr` (a seed) or `hash` (a hashlock preimage plate, which is refused \
+                     for its kind). This one is {len} characters.\n      \
                      Plain BIP-93 secrets are usually 48 or 74 characters and BIP-93 SHARES carry \
                      their own id, so neither is a constellation record — re-encode the \
                      entropy as `ms1` rather than editing the string.",
