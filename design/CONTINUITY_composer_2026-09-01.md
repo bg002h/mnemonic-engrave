@@ -1919,3 +1919,16 @@ Command to resume: /resume-composer
   in BOTH repos, 13 rows, capture 38; fork 83fbc17 vet ok, three packages
   ok, gui subset ok, gofmt clean, corpus byte-identical. Sonnet fold
   verification in flight.
+- **H0 MERGED. READY TO FLASH AT THE OPERATOR'S WORD.** r1 sonnet fold
+  verification GREEN (`7c68daf`). Engrave: `hashlock-h0` merged to master
+  `024dd08` (--no-ff), plan record `0c9d005`. Fork: `hashlock-h0` merged to
+  main `c4a64fc` (--no-ff; tree identical to the tested branch 83fbc17) and
+  PUSHED to origin (unprotected, plain push). Firmware at fork main
+  1,583,132 flash / 62,800 RAM (+504 B vs 839fa5aa). Worktrees and scratch
+  removed. NEXT: push engrave master via the ritual (dispatching); then
+  `~/bin/sh/sh2-flash -y` with the SH2 in BOOTSEL -- ONLY at the operator's
+  word; boot judgement is the operator's; then ms-cli 0.18.0 (H1 Task 11:
+  ms-codec 0.8.0 + ms-cli 0.18.0 release) and the FOUR controller defaults
+  still await the operator (TagKindMismatch refusal; --random requires
+  --out; H0-before-0.18.0 ordering, now honoured; --hashlock-phrase -
+  refused).
