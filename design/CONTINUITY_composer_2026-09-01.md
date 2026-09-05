@@ -2570,3 +2570,11 @@ Command to resume: /resume-composer
   five FOLLOWUPS closure headers carrying <FORK_MERGE_SHA>; toolkit h5-manual
   b48af1c1: manual re-quote, make lint OK; report 28d2d3d). Both branches wait
   for the fork merge SHA. A and C still running.
+- **H5 implementer C done and merged** (fork h5-c 122a121 -> hashlock-h5 bff7499;
+  report 57a8229): seam + twin + one exit defer; emu glue; walk rewrite;
+  ok-guard; hook share -32 B / 0 B; 7/8 mutations bit. C flags:
+  `gui/composer_doc_comment_test.go` (plan Task 5 Step 3a) was in no brief --
+  the controller adds it at the merged tip (extracted from the plan to
+  jobs tmp); the gate tree's `tinygo_split_test.go` had the var under the
+  test's doc comment (stolen) -- C's placement is the right one; Step 12's
+  anchors are unique at :64 and :68 on the merged tree. Waiting on A.
