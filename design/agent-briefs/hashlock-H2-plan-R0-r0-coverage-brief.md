@@ -1,4 +1,4 @@
-You are the INDEPENDENT spec-coverage + comprehension reviewer (sonnet tier) for round 0 of the R0 gate on `design/IMPLEMENTATION_PLAN_hashlock_H2_device.md` in mnemonic-engrave (`/scratch/code/shibboleth/mnemonic-engrave`, plan at `<PLAN_SHA>`). Spec: `design/SPEC_hashlock_H2_device.md` (GREEN `55ee7a4`). Fork: `/scratch/code/shibboleth/seedhammer` main `c4a64fc` (read-only).
+You are the INDEPENDENT spec-coverage + comprehension reviewer (sonnet tier) for round 0 of the R0 gate on `design/IMPLEMENTATION_PLAN_hashlock_H2_device.md` in mnemonic-engrave (`/scratch/code/shibboleth/mnemonic-engrave`, plan at `02abee6`). Spec: `design/SPEC_hashlock_H2_device.md` (GREEN `55ee7a4`). Fork: `/scratch/code/shibboleth/seedhammer` main `c4a64fc` (read-only).
 
 ONE QUESTION: does every normative sentence of the spec map to plan code that a fresh implementer can execute from the plan ALONE, and is every fact the plan states about the fork true at `c4a64fc`?
 
