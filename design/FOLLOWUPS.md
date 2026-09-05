@@ -16011,6 +16011,14 @@ The interruption lens (M-3) adds: the phrase route holds a secret with §10.2.4'
 idle wipe timer disarmed, and arming it would discard the composition -- same
 class, same ruling.
 
+**RULING 2026-09-05 (operator, walked live: option 1).** Stays logged, not scheduled.
+Revisit in a fork-wide secret-hygiene pass that also covers the passphrase keyboard
+(the shared root of the string-fragment items): a byte-slice fragment with an explicit
+wipe, and a wipe of the OK copy after derivation. The idle-timer item stays as is
+(arming it costs the composition). Not closed as accepted risk, so the measurement is
+kept; not pulled into the next device code cycle, which spends its slots on F-487 and
+F-480 (what the operator sees).
+
 ### F-484 — `hashlock-phrase-lead-paints-inside-the-back-button-margin`: the phrase screen's lead wraps at `dims.X-2*8` centred on the whole panel and paints 152 px of ink inside the Back button's rectangle (its empty margin; 0 px of glyph or chip lost), where `composerPageLines` uses a narrower band for exactly this (W-3) (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#geometry`
 
 Filed 2026-09-05 from the ultracode geometry lens (`hashlock-H2-post-impl-lens-geometry.md` M-1),
