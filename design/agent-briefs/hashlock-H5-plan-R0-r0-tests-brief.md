@@ -1,4 +1,4 @@
-You are the INDEPENDENT tests/mutation reviewer (sonnet tier) for round 0 of the R0 gate on `design/IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md` (engrave master `<PLAN_SHA>`), spec `design/SPEC_hashlock_H5_device_polish.md` (`<SPEC_SHA>`).
+You are the INDEPENDENT tests/mutation reviewer (sonnet tier) for round 0 of the R0 gate on `design/IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md` (engrave master `<PLAN_SHA>`), spec `design/SPEC_hashlock_H5_device_polish.md` (`e03d8e7`).
 
 ONE QUESTION: can every test the plan adds actually FAIL on the defect it names, does every RED and every declared MUTATION reproduce when YOU run it from the plan's text, and which mutations of the new guards survive?
 
