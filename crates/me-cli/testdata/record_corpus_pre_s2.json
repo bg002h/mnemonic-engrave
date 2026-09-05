@@ -124,6 +124,36 @@
       "consult": "record-refusal"
     },
     {
+      "origin": "codex32_seam/preimage-plate-0x03",
+      "record": "ms10hashsqw46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kzv2ncy60u7z9c",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/bip93-plain-payload-0x03",
+      "record": "ms10testsqv0qqqqqqqqqqqqqqqqqqqqqqq8mzk8tjfdnjn5",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/bip93-share-payload-0x03",
+      "record": "ms12testaqv0qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqdq7pl8qdc5tsp",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/preimage-shape-entr-id",
+      "record": "ms10entrsqv0qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5gz69g08wwtz9",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/bip93-plain-33-byte-payload-0x03",
+      "record": "ms10testsqvrsu9guyv4rzwplgex4gkmzd9c8wl593jfe4gdg47mtm3xt6tv7qh3pm4xrfdlvvp",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
       "origin": "mt.rs/even#0",
       "record": "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax",
       "class": "Mt",

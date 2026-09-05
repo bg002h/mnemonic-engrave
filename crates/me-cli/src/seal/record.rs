@@ -69,6 +69,16 @@ pub enum RecordError {
     /// and too long to cut. Collapsing the two tells an operator with a
     /// perfectly good backup that it has been tampered with.
     MsTooLong(usize),
+    /// A hashlock PREIMAGE plate (SPEC_ms_hashlock §1, kind byte `0x03`).
+    ///
+    /// A SEPARATE variant for the same reason as `MsTooLong`: the record is
+    /// intact and its checksum is good — it is the wrong KIND, not corrupt —
+    /// and `Invalid`'s "invalid record: {codec error}" handed the operator the
+    /// raw `reserved-prefix byte was 0x03, expected 0x00` with no kind name and
+    /// no guidance. `me sysw pack` named the kind from H0's first commit; this
+    /// is the same diagnosis for `me seal`, the other verb that reaches
+    /// `validate_record` (post-implementation review I-2).
+    PreimagePlate,
 }
 
 impl std::fmt::Display for RecordError {
@@ -106,6 +116,13 @@ impl std::fmt::Display for RecordError {
                  {MAX_ENGRAVEABLE_MS1_LEN} (§10.2.1a). The record is INTACT — it is too long \
                  to cut, not unreadable. `me seal` refuses it here so the device does not \
                  refuse it after a ~31 s key derivation."
+            ),
+            RecordError::PreimagePlate => write!(
+                f,
+                "this record is a hashlock PREIMAGE plate (kind 0x03), not a seed record; \
+                 this container cannot place one yet. A preimage backs a hashlock spend \
+                 path, not a wallet — keep it with the policy it unlocks, and do not \
+                 re-encode it as entropy."
             ),
         }
     }
@@ -173,9 +190,17 @@ pub fn validate_record(s: &str) -> Result<RecordKind, RecordError> {
             }
             // ms_codec::decode, NOT decode_with_correction — a seed that needed
             // repair must be fixed at source, not engraved.
-            ms_codec::decode(s)
-                .map(|_| RecordKind::Ms)
-                .map_err(|e| RecordError::Invalid(e.to_string()))
+            ms_codec::decode(s).map(|_| RecordKind::Ms).map_err(|e| {
+                // H0 (SPEC_ms_hashlock §9), post-impl review I-2: name the KIND
+                // before falling back to the codec's own words. `me seal` and
+                // `me sysw pack` both land here, so the diagnosis has to live
+                // at the shared refusal rather than in one verb's Display.
+                if preimage_plate(s) {
+                    RecordError::PreimagePlate
+                } else {
+                    RecordError::Invalid(e.to_string())
+                }
+            })
         }
     }
 }
@@ -206,6 +231,34 @@ pub fn bip93_outside_the_profile(s: &str) -> bool {
     matches!(classify(s), Ok(Format::Ms))
         && ms_codec::codex32::Codex32String::from_string(s.to_string()).is_ok()
         && ms_codec::decode(s).is_err()
+}
+
+/// Is `s` a string of the hashlock PREIMAGE KIND (SPEC_ms_hashlock §1: kind
+/// byte `0x03`) — the one `ms1` shape that is inside the profile's lengths and
+/// is still not a seed?
+///
+/// **Keyed on the codec's kind refusal, not on a length or an id.** A
+/// well-formed plate is 75 characters with the id `hash`, but this asks only
+/// whether `ms_codec` refuses the string for its PREFIX BYTE, so a malformed
+/// `0x03` string — a 77-character one carrying a 34-byte payload, say, which
+/// §1 calls a `PreimageLengthMismatch` — is named the same way. That is the
+/// intended direction: the refusal is correct and the advice is right for
+/// both, and a predicate that checked the length would let the malformed one
+/// fall through to "outside the profile" (post-implementation review M-1).
+///
+/// H0 (SPEC_ms_hashlock §9). At ms-codec 0.7 the codec refuses the kind with
+/// `ReservedPrefixViolation { got: 3 }`, and this asks for exactly that, so
+/// the diagnosis names the kind instead of the profile. At the 0.8 bump the
+/// codec DECODES the kind and this arm must be re-pointed at the refusing
+/// arm `validate_record` gains then; `preimage_plate_is_not_a_seed.rs` is
+/// what goes red if either half is forgotten.
+pub fn preimage_plate(s: &str) -> bool {
+    let s = s.trim();
+    matches!(classify(s), Ok(Format::Ms))
+        && matches!(
+            ms_codec::decode(s),
+            Err(ms_codec::Error::ReservedPrefixViolation { got: 0x03 })
+        )
 }
 
 /// §6.3: every public record must belong to a card set that REASSEMBLES AND

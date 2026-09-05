@@ -23,7 +23,7 @@ use sha2::Digest as _;
 /// the fork's `sysw/codex32_seam_test.go`. Changing a row means changing this
 /// in both repos, which is the point — see the file's own header.
 const SEAM_VECTORS_SHA256: &str =
-    "3d53ef88a474f02c15aa60a839f4a31071598a26c853463122a847515926eb6a";
+    "bb703f608215bb00ccc677de4a282772016e774dd2d1d0f5c828ea38f5eac78b";
 
 const PATH: &str = "testdata/codex32_seam_vectors.json";
 

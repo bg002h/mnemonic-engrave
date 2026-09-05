@@ -15619,3 +15619,79 @@ this is hardening against a future writer, not a defect — recorded rather than
 fixed inside a merge that has already taken two review rounds on funds-relevant
 code. If taken up: release the flags in `composerSizeAssignments` too, with a
 test that seats a source, resizes, and asserts the source is offered again.
+
+### F-472 — `device-full-constellation-profile-convergence`: should the SeedHammer II refuse plain BIP-93 (48/74 characters) and shares of foreign ids, as `me` does? (owning phase: **none — an operator decision**) `#seedhammer` `#codex32` `#hashlock`
+
+Filed with hashlock H0 (2026-09-04, `IMPLEMENTATION_PLAN_hashlock_H0_reader_guards.md`
+Task 4). H0 narrowed the device by exactly one shape — the kind-`0x03`
+preimage SINGLE — and deliberately nothing else. The device still admits what
+the host refuses: plain BIP-93 secrets at 48 and 74 characters, and BIP-93
+shares carrying their own id. That divergence is now MEASURED rather than
+assumed: `codex32_seam_vectors.json` carries six `host_admits: false /
+device_admits: true` rows, two of them (`bip93-plain-payload-0x03`,
+`bip93-share-payload-0x03`) with payloads that begin `0x03`, precisely so a
+future widening of the guard turns them red.
+
+The question is whether the device should converge fully on the `ms1` profile.
+Arguments both ways are already in the corpus rows' `source` fields. If taken
+up, the change is `isStrictMs1` plus `seal.Classify` plus the scan mirror, and
+the corpus rows flip to `device_admits: false` in both repos at once — which
+is what makes it a single reviewable diff rather than a drift.
+
+**Correction (post-implementation review I-1, 2026-09-04).** The inventory
+above was incomplete when filed: H0 already removed one plain-BIP-93 population
+from the device, namely a **33-byte unshared payload beginning `0x03`** — 75
+characters, indistinguishable from a preimage plate by construction, refused on
+both sides and now pinned by the corpus row
+`bip93-plain-33-byte-payload-0x03`. So the device's remaining divergence is
+"plain BIP-93 secrets at 48 and 74 characters **and 75-character ones whose
+payload does not begin `0x03`**, plus shares of foreign ids". The convergence
+question this entry asks is unchanged; only the starting inventory was wrong.
+
+### F-473 — `ms-codec-0.8-bump-needs-a-preimage-refusal-arm`: at the 0.8 bump `validate_record` must gain an explicit `Payload::Preimage` refusal, and `seal::record::preimage_plate` must be re-pointed at it (owning phase: **H1b**) `#hashlock` `#me` `#gating`
+
+Filed with hashlock H0 (2026-09-04). At the pinned ms-codec `0.7`, `me` refuses
+a kind-`0x03` string at the codec's own prefix gate
+(`ReservedPrefixViolation { got: 3 }`), so H0's host half is a PIN, not a new
+refusal. Two things break the day `me` bumps to `0.8`:
+
+1. `ms_codec::decode` DECODES the string as `Payload::Preimage`, so
+   `validate_record`'s `.map(|_| RecordKind::Ms)` would call a preimage a seed.
+   `crates/me-cli/tests/preimage_plate_is_not_a_seed.rs::a_preimage_plate_is_not_a_seed_record`
+   is what goes red that day, and the seam row `preimage-plate-0x03` is the
+   second witness.
+2. `seal::record::preimage_plate` asks for `ReservedPrefixViolation { got: 3 }`
+   BY NAME. At `0.8` that error no longer occurs for `0x03`, so the predicate
+   silently answers `false` and `me sysw pack` goes back to misdiagnosing the
+   plate as "outside the profile". The unit test
+   `sysw::tests::a_preimage_plate_is_named_not_misdiagnosed` and the binary
+   tests `sysw_pack_names_a_preimage_plate_and_never_echoes_it` and
+   `seal_names_a_preimage_plate_and_never_echoes_it` are the tripwires.
+
+**BOTH host verbs, not just `sysw pack`** (post-implementation review I-2,
+folded 2026-09-04). `me seal` and `me sysw pack` both reach `validate_record`,
+so both lose their refusal at the bump and both must be re-pointed. Since the
+fold, the named diagnosis lives in `RecordError::PreimagePlate` — one arm,
+reached by both verbs — so the re-pointing is one edit; the two binary tests
+above are one witness each.
+
+Both halves must land in the same commit as the bump. Neither is optional: (1)
+is funds-relevant (a preimage engraved as a seed), (2) is a diagnosis
+regression only.
+
+### F-474 — `unlock-kdf-names-the-refused-record`: `ErrRecordNotPermitted` renders as "Payload unreadable." with no record index or class (owning phase: **H2**) `#seedhammer` `#ux` `#seal`
+
+Filed with hashlock H0 (2026-09-04). `seal.AdmitSection` refuses an encrypted
+section WHOLE when any record is not on the allow-list, and
+`gui/unlock_kdf.go`'s `default:` arm renders that as **"Payload unreadable."**
+after a *successful* passphrase — the operator has proved they hold the secret
+and is told nothing about why. With H0 that path is now reachable in principle
+for a payload carrying a preimage plate (only by a hand-built blob today: `me`
+at `0.7` cannot pack the record).
+
+The neighbouring arms already carry the argument: `ErrTooManyRecords` and
+`ErrCodex32TooLong` each get a named arm that says what was wrong. This asks
+for the same for `ErrRecordNotPermitted`, naming the record index and its
+class. Owned by H2 because that is when the device learns the preimage kind and
+the copy can say something useful about it rather than only that it was
+refused.
