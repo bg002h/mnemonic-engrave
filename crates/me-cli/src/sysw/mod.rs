@@ -157,6 +157,10 @@ pub enum UnknownReason {
     /// the codec about the KIND, not about a length or an id
     /// (post-implementation review M-1).
     PreimagePlate,
+    /// An ms1 string whose 4-character id and kind byte disagree (SPEC_ms_hashlock
+    /// §1 rule 2, `TagKindMismatch`, ruling L24 — refused, never read by either
+    /// field). Damaged or forged: re-encode from the source rather than editing.
+    TagKindMismatch,
     /// No reserved prefix, not a BIP-39 mnemonic, and not a constellation
     /// string. This is the case the address gap belongs to — and, since S2,
     /// the case a descriptor `me` REFUSES lands in: the descriptor arm places
@@ -196,6 +200,12 @@ fn unknown_reason(record: &str) -> UnknownReason {
     // reserved prefix).
     // Before the profile arm: a preimage plate is INSIDE the profile's lengths
     // and would otherwise be reported as outside them (H0, SPEC_ms_hashlock §9).
+    // Before the preimage and profile arms: a mismatch is inside the profile's
+    // lengths and is neither a plate nor outside the profile (H1b, ruling L24).
+    // The HRP gate lives in the helper, as in its two siblings (fidelity N-1).
+    if crate::seal::record::id_kind_mismatch(record) {
+        return UnknownReason::TagKindMismatch;
+    }
     if crate::seal::record::preimage_plate(record) {
         return UnknownReason::PreimagePlate;
     }
@@ -902,6 +912,21 @@ mod tests {
             classify("ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqcwugpdxtfme2w"),
             record::Class::Codex32Secret
         ));
+    }
+
+    /// H1b: an id/kind MISMATCH (SPEC_ms_hashlock §1 rule 2, ruling L24) is named
+    /// as such, not as "outside the profile". The string is the seam corpus's
+    /// `preimage-shape-entr-id` row: kind byte 0x03 under the id `entr`.
+    /// MUTATION: remove the TagKindMismatch arm -> `Bip93OutsideTheProfile(75)`.
+    #[test]
+    fn an_id_kind_mismatch_is_named_not_misdiagnosed() {
+        const MISMATCH: &str =
+            "ms10entrsqv0qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5gz69g08wwtz9";
+        assert_eq!(MISMATCH.chars().count(), 75);
+        assert_eq!(
+            pack(vec![MISMATCH.into()], None, ITER),
+            Err(SyswError::Unclassifiable(0, UnknownReason::TagKindMismatch)),
+        );
     }
 
     /// **THE CONTROL, in both directions.** Without it, a predicate that

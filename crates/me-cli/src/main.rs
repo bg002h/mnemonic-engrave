@@ -2796,6 +2796,12 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                 // not the classifier, and the message says so. The length and
                 // the two length sets are shape, never content — the record
                 // itself is a seed and is never echoed.
+                U::TagKindMismatch => format!(
+                    "record {i} (records count from 0) is an ms1 string whose 4-character \
+                     id and kind byte disagree; it is refused rather than read by either \
+                     field (SPEC_ms_hashlock §1 rule 2). A damaged or forged plate — \
+                     re-encode it from the source rather than editing the string."
+                ),
                 U::PreimagePlate => format!(
                     "record {i} (records count from 0) is a hashlock PREIMAGE plate (kind \
                      0x03), not a seed record; this container cannot place one yet. A \
