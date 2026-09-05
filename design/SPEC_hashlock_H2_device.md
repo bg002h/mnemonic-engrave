@@ -1,17 +1,20 @@
 # SPEC — Hashlock H2: the device leg (SeedHammer II fork)
 
-**STATUS: DRAFT 2026-09-05 — citations measured at fork main `c4a64fc`, ms `cd0a60f`
-(ms-codec 0.8.0 as published), engrave `02193cb`; R0 not yet dispatched.**
+**STATUS: DRAFT 2026-09-05 — R0 round 0 FOLDED (fidelity opus 3C/5I/6M/2N
+`hashlock-H2-spec-R0-r0-fidelity.md`; journey opus 2C/6I/5M/1N
+`hashlock-H2-spec-R0-r0-journey.md`); round 1 (sonnet fold verification) pending.
+Citations measured at fork main `c4a64fc`, ms `cd0a60f`, engrave `1d54dc6`.**
+Previous STATUS: DRAFT, citations machine-checked, R0 dispatched (`bfd042e`).
 
 This is stage H2 of the hashlock-phrase cycle (`design/BRAINSTORM_hashlock_phrase.md`
 §4.1; SPEC_ms_hashlock §9's sequence). H0 (reader guards) is merged in both repos;
-H1 (`ms hashlock`, ms-codec 0.8.0) is released. H2 gives the device what the
-brainstorm's §4.4 agreed (L7, L15, L16) and the r2 security review sharpened:
-**type a hashlock phrase on the SH2, pick the method, and set a spend path's hash
-to the SAME digest the host derives** — deriving, using and dropping the preimage,
-never storing, showing or engraving it. The Go derivation is a strict port of
-`ms_codec::hashlock` with the ms-codec 0.8.0 corpus vendored and pinned
-(Rust-primary rule; nothing is decided in Go).
+H1 (`ms hashlock`, ms-codec 0.8.0) is released and published. H2 gives the device
+what the brainstorm's §4.4 agreed (L7, L15, L16) and the r2 security review
+sharpened: **type a hashlock phrase on the SH2, pick the method, and set a spend
+path's hash to the SAME digest the host derives** — deriving, using and dropping
+the preimage, never storing, showing or engraving it. The Go derivation is a
+strict port of `ms_codec::hashlock` with the ms-codec 0.8.0 corpus vendored and
+pinned (Rust-primary rule; nothing is decided in Go).
 
 Rulings that bind (operator, verbatim in the brainstorm): L5 two methods, the
 operator chooses; L7 the device derives H, uses it, scrubs X, never stores/shows/
@@ -19,23 +22,29 @@ engraves a preimage this cycle; L12 both warnings warn, never refuse; L15 no scr
 discipline beyond what the composer does by construction; L16 §4.4 agreed; L22
 `0x03` inert, no new class (shipped in H0); L24 `TagKindMismatch` refused.
 
+**One sentence this stage makes false, and folds:** the composer spec's §14 and
+`gui/composer_hash.go:27-28` say the composer "never derives, stores or engraves a
+preimage this cycle". From H2 the composer DERIVES one, in RAM, for the length of
+one screen; it still never stores, shows or engraves it. Both records are folded to
+say exactly that (fidelity I-5).
+
 ---
 
 ## §1. Scope
 
 In:
 1. `Which hash?` gains the row **`Type a hashlock phrase`** before `Type 64 hex`
-   (§4), with the row switch re-keyed by LABEL (§5) — the shipped switch is
+   (§4.1), with the row switch re-keyed by LABEL (§5) — the shipped switch is
    index-keyed and its fallthrough clears the lock (r2 C-4).
 2. The phrase screen (§4.2), the method pick (§4.3), the derivation (§3, §4.4),
-   the confirm modal (§4.5). Back at any step returns to `Which hash?` with the
-   path unchanged.
+   the confirm modal (§4.5), and the Back contract that binds all four (§4.6).
 3. `hashlock` — a new fork package porting `ms_codec::hashlock` (§3) with the
    corpus `hashlock-v0.8.json` vendored under `hashlock/testdata/` and a
    provenance pin (§7.1).
 4. `codex32.DecodeMS1Preimage` (§6): the `0x03` arm as its OWN function with its
    own length rule; `DecodeMS1` unchanged (r2 C-2). No screen calls it this cycle;
    it exists so the kind has one decoder and one test, Rust-first.
+5. The two records above; a phrase-route form of §8h at Done (§4.7).
 
 Out (§9): storing, displaying or engraving a preimage; reading a preimage plate
 into any flow; a scrub discipline; `ms split` of preimages; salt/iteration
@@ -52,20 +61,37 @@ typed bytes, in this order, and refuses with a modal (never silently):
 1. **non-empty**;
 2. **printable ASCII only**, every byte in `0x20..=0x7E` (the keyboard cannot
    produce anything else — the test still pins it);
-3. **ms1-shaped is refused** — the string, trimmed and case-folded, starts
-   `ms1` and is BCH-valid codex32 (`codex32.New` accepts it): *"That is an ms1
-   string, not a phrase. Load it from the payload instead."* (a plate is not a
-   phrase; there is no device route for a preimage plate this cycle — §6);
+3. **ms1-shaped is refused, by the HOST's shape test, not by a parse** (fidelity
+   C-2). The host's `looks_like_ms1` (ms-cli `crates/ms-cli/src/argv_guard.rs:148-164`)
+   is: trim; lowercase; strip the display separators (space, `-`, `,`); the
+   result is at least `MIN_MS1_LEN` characters, starts `ms1`, and every
+   remaining character is in the bech32 charset. **No checksum.** A checksum
+   parse (`codex32.New`) is strictly narrower — a grouped or mistyped plate the
+   host refuses would be derived from on the device, and the two would disagree
+   on what a phrase is. The refusal names the route that exists (fidelity I-3,
+   journey I-1): *"That is a preimage plate, not a phrase. On the host, run
+   ms hashlock with it and load the hash: record it prints."*;
 4. **at most 100 characters** — the counter reads `n/100`, is NOT clamped (so
    `101/100` is visible and the lockstep row is constructible), and OK is
-   refused above 100: *"A hashlock phrase is at most 100 characters."*;
+   refused above 100: *"A hashlock phrase is at most 100 characters."* The shape
+   test (rule 3) precedes the cap, as on the host (the corpus's "grouped by 2,
+   112 characters" row pins the order);
 5. **exactly 64 hex characters is refused**, either case: *"That is a preimage
    in hex, not a phrase. Use the Type 64 hex row."*
 
-The bytes are used VERBATIM: no trimming, no case folding, no normalisation
-(rule 3 folds only to DETECT a plate; the phrase itself is never changed).
-`Correct Horse` and `correct horse` are different phrases — the corpus row
-`Correct Horse Battery Staple` pins it.
+**The bytes are used VERBATIM — and this is a rule with a named forbidden
+mechanism, not a description** (fidelity C-1). The device already has a one-line
+template that normalises a passphrase before a KDF (`sysw/open.go:55`:
+`seal.DeriveKey(seal.NormalisePassphrase(passphrase), h.Salt[:], …)`, and
+`seal/open.go:231` the same shape). **`seal.NormalisePassphrase`, and any
+`strings.TrimSpace`, `strings.Fields`, `strings.ToLower`/`ToUpper` or Unicode
+normalisation on the phrase, is forbidden on this path.** Rule 3 folds a COPY
+only to detect a plate; the phrase itself is never changed. `Correct Horse` and
+`correct horse` are different phrases. Because the anchor phrase is a fixed
+point of every one of those folds, §7.1 and §7.2 MUST drive the corpus rows
+that are not: `Correct Horse Battery Staple` (case), `  a  b ` (leading,
+trailing and doubled spaces), `correct-horse,battery staple` (the separators a
+plate would strip). A screen-layer fold ships green against the anchor alone.
 
 The limit is a named constant, `hashlock.PhraseMaxChars = 100`, the ONLY source
 of the counter's denominator and the rule's bound; a test asserts both read it.
@@ -79,100 +105,182 @@ of the counter's denominator and the rule's bound; a test asserts both read it.
 
 | name | value | Rust |
 | --- | --- | --- |
-| `Salt` | the 14 bytes `ms-hashlock-v1` | `HASHLOCK_SALT` |
-| `Iterations` | 100000 | `HASHLOCK_ITERATIONS` |
-| `PreimageLen` | 32 | `HASHLOCK_DKLEN` |
+| `Salt` | the 14 bytes `ms-hashlock-v1` | `HASHLOCK_SALT` (`hashlock.rs:27`) |
+| `Iterations` | 100000 | `HASHLOCK_ITERATIONS` (`:30`) |
+| `PreimageLen` | 32 | `HASHLOCK_DKLEN` (`:32`) |
 | `PhraseMaxChars` | 100 | ms-cli `HASHLOCK_PHRASE_MAX_CHARS` (`crates/ms-cli/src/hashlock_phrase.rs:24`; the codec carries no cap — the rule is the CLI's and the device's, §4.3) |
 | `PreimageHardened(phrase []byte) [32]byte` | PBKDF2-HMAC-SHA256(phrase, Salt, Iterations, 32) | `preimage_hardened` |
 | `PreimageSHA256(phrase []byte) [32]byte` | SHA-256(phrase) | `preimage_sha256` |
 | `Digest(x *[32]byte) [32]byte` | SHA-256(x) | `digest` |
 
-**The salt is passed as its own 14-byte slice through a NEW driver**, never
-through `unlockDerive`'s `seal.Header` (its `Salt [16]byte` would zero-pad to 16
-bytes and every device digest would silently diverge — r2 M-5). The only test
-that can see that class is a comparison against the vendored corpus CONSTANT,
-never against a value recomputed by the same Go function (§7.1).
+**The driver is new and its signature is part of this spec** (fidelity M-2):
+`hashlock.DeriveHardened(phrase []byte, progress func(done, total int) bool) [32]byte`
+— it passes `Salt` as its own 14-byte slice and `Iterations` as the count, calls
+`progress` every `kdfStepIterations` (500) and stops if it returns false (Back).
+**`unlockDerive` and `seal.Header` are NOT used**: `Header.Salt [16]byte` would
+zero-pad the 14-byte salt and every device digest would silently diverge (r2
+M-5). The only test that can see that class is a comparison against the
+vendored corpus CONSTANT, never against a value recomputed by the same Go
+function (§7.1).
 
-Both methods run on the countdown screen the sealed payload already uses
-(`gui/unlock_kdf.go:236`, "Unlocking. About N seconds left.", driven by the
-measured rate), retitled `Deriving`; SHA-256 is instant and shows no countdown.
-The measured device rate is 9,715 PBKDF2 iterations/s (brainstorm §3.4), so
-hardened takes about 10 s — the method row says so.
+Hardened runs on the countdown screen the sealed payload already uses
+(`gui/unlock_kdf.go:219-236`), retitled `Deriving`, with a zero-state lead of its
+own: *"Deriving. This takes about 10 seconds."* (the sealed payload's
+`unlockKDFLead` says "about 30 seconds" until the first slice completes — that
+string and its fallback are calibrated for the payload's iteration count, not
+this one's; fidelity M-6, journey M-3). The measured device rate is 9,715 PBKDF2
+iterations/s (brainstorm §3.4), so hardened takes about 10 s — the method row
+says so. SHA-256 is instant and shows no countdown.
 
 **The preimage lives on the stack for the derivation and the confirm modal and
 is dropped after CONTINUE or Back** (L7; L15: no scrub beyond that). The digest
-is what the composer stores (`st.list.Paths[idx].Hash`, a `[32]byte`), exactly
-as `Type 64 hex` stores one today.
+is what the composer stores (`st.list.Paths[idx].Hash`, a `*[32]byte` —
+`md/compose.go:167`, fidelity M-1), exactly as `Type 64 hex` stores one today.
 
 ---
 
 ## §4. Screens and copy
 
-All copy ASCII, inside the modal-fits assertion the composer's copy tests use.
+All copy ASCII, inside the modal-fits gate the composer's copy tests enforce
+(`gui/composer_copy_test.go`: normalised capacity 588 with an 80-character
+margin). The confirm modal (§4.5) is the largest body this stage adds; §4.5
+states its drop order.
 
 ### §4.1 `Which hash?`
 
 Rows, in order: the payload's `hash:` records (`hash <i>  <first8>..<last8>`,
 unchanged), **`Type a hashlock phrase`**, `Type 64 hex`, `No hash lock`. With no
-`hash:` record loaded, the screen's lead reads:
+`hash:` record loaded, the screen's lead reads (journey M-1):
 
-> No hash record in the payload. ms hashlock on the host makes one.
+> No hash record in the payload. Type a phrase below, or make one with
+> ms hashlock on the host.
 
-(the F-465 hint; second lead line only when `len(digests) == 0`).
+(second lead line only when `len(digests) == 0`).
 
 ### §4.2 The phrase screen
 
-Title **`Hashlock phrase`**. The four-page printable-ASCII keyboard built with
+Title **`Hashlock phrase`**, lead (journey I-2): *"Use a phrase you have never
+used anywhere else."* The four-page printable-ASCII keyboard built with
 `NewPassphraseKeyboard` (`gui/passphrase_keyboard.go:76`) — not `NewTextKeyboard`
 (:92, settings gear + newline) nor `NewLineKeyboard` (:112). A NEW flow function
-`hashlockPhraseFlow(ctx, th) ([]byte, bool)`, not `passphraseEntryFlow`
-(`gui/passphrase_flow.go:74`: it hard-codes the "Passphrase" title, the
-pass-proof trigger and an over-length message about plate legibility — r2 M-4).
-Counter `n/100` from `hashlock.PhraseMaxChars`. OK applies §2; Back returns to
-`Which hash?`.
+`hashlockPhraseFlow(ctx, th, initial []byte) ([]byte, bool)`, not
+`passphraseEntryFlow` (`gui/passphrase_flow.go:74`: it hard-codes the
+"Passphrase" title, the pass-proof trigger and an over-length message about
+plate legibility — r2 M-4). `initial` is what the operator typed before a Back
+from the method pick (§4.6). Counter `n/100` from `hashlock.PhraseMaxChars`. OK
+applies §2; Back returns to `Which hash?` and drops the phrase. The keyboard's
+reveal (`show`) key is inherited as-is: secret-handling, non-gating (fidelity N-2).
 
 ### §4.3 The method pick
 
 A two-row `composerPickScreen` titled `Hashlock method`, lead `Which method?`:
 
-1. **`Hardened (about 10 s)`** — under 20 characters, a confirm modal first:
-   > A 20-character phrase falls in about 72 days on one GPU. Choose it from a
-   > generator. Continue?
+1. **`Hardened (about 10 s)`** — under 20 characters, a confirm modal first
+   (journey I-3):
+   > Even a 20-character phrase falls in about 72 days
+   > on one GPU, and shorter ones fall sooner. Choose it
+   > from a generator. If you have used this phrase
+   > anywhere else, press Back and choose another.
+   > Continue?
 2. **`SHA-256`** — always, a confirm modal first:
-   > This is the brainwallet construction: anyone holding the digest tests
-   > 10^10 phrases per second. A phrase a person chose is not safe here; use
-   > six diceware words. Continue?
+   > This is the brainwallet construction: anyone
+   > holding the digest tests 10^10 phrases per second.
+   > A phrase a person chose is not safe here; use six
+   > diceware words. If you have used this phrase
+   > anywhere else, press Back and choose another.
+   > Continue?
 
-Both are confirm-to-proceed (L12: never refusals). The method is a permanent
-property of the policy; the confirm modal (§4.5) prints it.
+Both are confirm-to-proceed (L12: never refusals). **Declining either modal
+returns to the method pick with the phrase intact** (journey I-5): the warning
+exists to move the operator from SHA-256 to Hardened, which needs the phrase to
+survive. The method is a permanent property of the policy; the confirm modal
+(§4.5) prints it.
 
 ### §4.4 Deriving
 
-Hardened: the countdown screen, title `Deriving`, body `About N seconds left.`
-from the measured rate. Back during the derivation abandons it: nothing was
-assigned (r2 Q3) and the composer state is untouched; power loss likewise.
+Hardened: the countdown screen, title `Deriving`, zero-state lead *"Deriving.
+This takes about 10 seconds."*, then `About N seconds left.` from the measured
+rate. Back during the derivation abandons it and nothing is assigned (r2 Q3),
+returning to the method pick with the phrase intact. A power loss ends the
+composition, as it does at any other point in this flow — `composerState` is RAM
+(journey M-4).
 
 ### §4.5 The confirm modal
 
-Title `Hash lock`. Lines, in order:
+Title `Hash lock`. Lines, in order (drop order for the fit gate, journey M-2:
+none — this is the whole body; §8i and §8h are NOT here, see §4.7 and §5):
 
 ```
 hash  <first8>..<last8>
-method: hardened            (or: method: sha256)
+method: hardened   chars: <n>        (or: method: sha256   chars: <n>)
+<relation line, only when the payload holds hash: records>
+Write down this phrase and the method now. They are
+not on this device and not on your plates. Without
+both, this path can never be spent.
+One phrase per policy. Spending any path of a wsh
+wallet publishes this digest. Never use this phrase
+as a passphrase or a password anywhere else -- a
+spend publishes the preimage, and anyone can then
+test guesses at the phrase itself.
+Before you fund this wallet, run ms hashlock with this
+phrase and method on the host and check the digest
+matches.
 ```
-then the §8i rule (composer spec §8i, unchanged), then:
 
-> One phrase per policy. Spending any path of a wsh
-> wallet publishes this digest. Never use this phrase
-> as a passphrase or a password anywhere else.
+- `chars: <n>` is the phrase's byte count — the one signal that shows a stray
+  space when the operator later reconciles against the host card's
+  `phrase_chars` (journey M-5).
+- The relation line (journey C-2): when the payload holds `hash:` records,
+  `matches hash <i> in the payload` if the digest equals record *i*, else
+  `no hash: record in the payload has this digest`; omitted when there are none.
+- The backup line (journey C-1) is unconditional: this is the first flow on the
+  device that takes a secret, uses it and forgets it, and nothing else on the
+  route says so. The reuse lines are the brainstorm's §3.7 copy in full
+  (fidelity M-5). The reconciliation line converts a divergence discovered at
+  spend time into a five-minute check.
+- **CONTINUE** sets `st.list.Paths[idx].Hash` to the digest and returns to the
+  path; **Back** returns to the method pick with the phrase intact, nothing
+  assigned (§4.6).
 
-then the F-132 line the composer already prints when every path is hashed
-(§8h). **CONTINUE** sets `st.list.Paths[idx].Hash` to the digest and returns to
-the path; **Back** discards (nothing was assigned before CONTINUE).
+The 64 visible bits (`first8..last8`) are a transcription check, adequate ONLY
+because the full-width lockstep vector runs in CI (§7.1); the H4 walk records
+both full digests (r2 N-2). §7.2 asserts the fit of this exact body with the
+relation line present and `chars: 100`.
 
-The 64 visible bits (`first8..last8`) are a transcription check for the operator,
-adequate ONLY because the full-width lockstep vector runs in CI (§7.1); the H4
-walk records both full digests (r2 N-2).
+### §4.6 The Back contract (fidelity I-1, journey I-4, I-5)
+
+Normative, stated once: `composerHashEdit` runs the phrase route as a LOOP.
+Back from the confirm modal → the method pick (phrase intact); Back from a
+declined method modal → the method pick (phrase intact); Back from the method
+pick → the phrase screen (phrase intact, via `initial`); Back from the phrase
+screen → `Which hash?` (phrase dropped); Back during the derivation → the method
+pick (phrase intact). **`composerHashEdit` returns `false` ONLY for Back at
+`Which hash?` itself.** Today, at path creation, `false` REMOVES the path
+(`gui/composer_shape.go:269`) — the `Type 64 hex` route does that, and a phrase
+route that copied its sibling would delete a path, and the EXPERIMENTAL key-less
+consent already given, because the operator read a digest they did not expect
+and pressed Back. §7.2's Back tests run through the CREATION entry point
+(`composerAddPath`) and assert the path still exists, not only that `Hash` is
+unchanged.
+
+### §4.7 §8h on the phrase route (journey C-1, fidelity I-2, journey I-6)
+
+§8h stays at Done (`gui/composer_shape.go:443`, guarded by
+`composerEveryPathHashed(st.list)`), where its predicate is true; it is NOT shown
+in the per-path confirm modal, where the shape is partial and the banner would be
+false most times it appears. Its copy gains a phrase-route form: when every path
+is hashed and at least one hash was set by phrase, the text reads
+
+> HASH ON EVERY PATH
+> Every way to spend this wallet needs a hashlock
+> preimage. It is not on this device and not on these
+> plates. Back up the phrase and its method, or the
+> preimage plate, separately.
+
+(the shipped text names only "the preimage", an artifact this route cannot
+produce; `composerCopyHashEveryPath` at `gui/composer_copy.go:169-173`). The
+§8i rule modal fires at the pick (§5) as today, once; it is not repeated in the
+confirm modal (journey N-1, fidelity M-4).
 
 ---
 
@@ -191,7 +299,8 @@ programming error (`panic` naming the index), never "clear the lock". The §8i
 modal fires when the operator is TAKING a hash (payload row, phrase row or hex
 row), stated as that predicate, not as `sel <= len(digests)`. Tests cover every
 row by label, with 0, 1 and 2 payload digests loaded (the displaced rows
-included).
+included). `composerPickScreenMaxRows` is checked against the longest row set
+(two payload digests + three fixed rows) in a test.
 
 ---
 
@@ -203,12 +312,15 @@ this stage adds the decoder and nothing that calls it from a screen:
 `codex32.DecodeMS1Preimage(s String) (preimage [32]byte, err error)` — accepts
 ONLY an unshared string whose data is exactly 33 bytes beginning `0x03` (the
 shape `IsPreimage` already tests) and returns the 32 bytes; every other input
-returns `errMSBadPrefix` or `errMSBadLength` (the same errors `DecodeMS1` uses).
-`DecodeMS1` is UNCHANGED and keeps refusing `0x03` at all five callers
+returns `errMSBadPrefix` (wrong first byte, or a SHARE — fidelity N-1) or
+`errMSBadLength` (unshared, `0x03`, not 33 bytes), the same errors `DecodeMS1`
+uses. `DecodeMS1` is UNCHANGED and keeps refusing `0x03` at all five callers
 (`gui/ms1_decode.go:22`, `gui/codex32_polish.go:106`, `gui/singlesig_verify.go:185`,
 `gui/multisig_verify.go:1237`, `bundle/verify.go:138`) — r2 C-2 — and "Show
 secret" stays gated on `err == nil`. A typed or scanned preimage string is
-refused everywhere a seed is expected, as H0 measured.
+refused everywhere a seed is expected, as H0 measured; the only device-side
+signpost to the host route is §2 rule 3's refusal text, and H3's manual chapter
+must say the same.
 
 The returned preimage is secret: the doc comment says the caller scrubs, exactly
 as `DecodeMS1`'s does.
@@ -222,57 +334,73 @@ as `DecodeMS1`'s does.
 `hashlock/testdata/hashlock-v0.8.json` = ms `crates/ms-codec/tests/vectors/hashlock-v0.8.json`
 byte for byte, sha256 `a46c197a3640fe8af4ca4370b46a9637466649227163ce6761bb032354811d30`,
 with `hashlock-v0.8.provenance.json` in the shape of `sysw/testdata/record_class_vectors.provenance.json`
-(repo, remote, path, commit `cd0a60f`, sha256, row count, recorded_at). Tests:
+(repo, remote, path, commit `cd0a60f`, sha256, row count, recorded_at). The
+corpus's own `lockstep` array names what the fork must drive, in BOTH directions
+where it says so (fidelity I-4). Tests:
 
 - the file hashes to the pinned literal (drift on either side reds one suite);
 - every `derivation` row (11): `PreimageHardened(phrase)` == `hardened_x`,
   `Digest` == `hardened_h`, `PreimageSHA256(phrase)` == `sha256_x`, `Digest` ==
   `sha256_h` — compared against the JSON's CONSTANTS, never against a value the
-  Go code recomputed (mutation: zero-pad the salt to 16 bytes → every hardened
-  row fails; mutation: 99,999 iterations → every hardened row fails; mutation:
-  lowercase the phrase → the `Correct Horse Battery Staple` row fails);
-- the 100- and 101-character rows: 100 accepted by the rule, 101 refused with
-  the §2 message (the lockstep row);
-- the 64-hex rows: a 64-hex phrase refused naming `Type 64 hex`; 63 and 65 hex
-  accepted as phrases;
+  Go code recomputed (mutations: zero-pad the salt to 16 bytes → every hardened
+  row fails; 99,999 iterations → every hardened row fails; **fold the phrase
+  through `seal.NormalisePassphrase` before deriving → the `Correct Horse
+  Battery Staple`, `  a  b ` and `correct-horse,battery staple` rows fail** —
+  fidelity C-1; the anchor row alone would not);
+- every `refusals` row (15) through the §2 rule: empty, TAB/DEL/0xFF, ` ~`
+  accepted, 64-hex both cases refused naming `Type 64 hex`, `beef` accepted,
+  the plate lowercase / UPPERCASE / grouped by 5 / with leading and trailing
+  spaces / grouped by 2 (112 characters — the shape test precedes the cap), the
+  100-character row accepted and the 101-character row refused with the §2 message;
+- the `kind` row: `DecodeMS1Preimage` on `kind[0].ms1` returns
+  `kind[0].preimage_hex`; the entr-32 pair row → `errMSBadPrefix`;
 - `PhraseMaxChars` is read by both the counter and the rule (mutation: change one
   → a test that types 100 characters and expects OK fails).
 
 ### §7.2 The screens, on the touch harness
 
-Driven through the real flow (`runUITouch`, as `walk_h0_preimage.js`'s Go twin
-tests do): tap `Type a hashlock phrase`, type the anchor phrase, pick each
-method, confirm — the path's `Hash` equals the corpus's `hardened_h` /
-`sha256_h`. Back at each step leaves `Hash` unchanged. The §2 refusals driven
-through the screen with the counter at `101/100`, with a 64-hex phrase, with an
-ms1-shaped phrase. The two method modals appear when their condition holds and
-not otherwise (19 vs 20 characters; SHA-256 always). Geometry: the confirm
-modal and the no-payload hint fit (the composer's modal-fits assertion).
+Driven through the real flow (`runUITouch`, as the H0 door tests do), entered
+through `composerAddPath` (the CREATION entry point): tap `Type a hashlock
+phrase`, type a phrase, pick each method, confirm — the path's `Hash` equals the
+corpus's `hardened_h` / `sha256_h` **for the three non-fixed-point rows as well
+as the anchor** (typed with their exact case, spaces and separators). Back at
+each step per §4.6, asserting the path still EXISTS and `Hash` is unchanged;
+decline SHA-256, choose Hardened, and the resulting `Hash` equals `hardened_h`
+for the phrase typed ONCE. The §2 refusals driven through the screen with the
+counter at `101/100`, with a 64-hex phrase, with an ms1-shaped phrase (grouped
+and ungrouped). The two method modals appear when their condition holds and not
+otherwise (19 vs 20 characters; SHA-256 always). The confirm modal's relation
+line with 0, 1 and 2 payload records (matching and not). Geometry: the confirm
+modal fits with the relation line present and `chars: 100` (the longest
+variant), and the no-payload lead fits.
 
 ### §7.3 The switch
 
 Every `Which hash?` row by label with 0, 1, 2 payload digests: each row does
 what its label says; `Type 64 hex` never clears the lock (the C-4 regression
-test); the §8i modal fires for the three taking rows and not for `No hash lock`.
+test); the §8i modal fires for the three taking rows and not for `No hash lock`;
+the longest row set fits `composerPickScreenMaxRows`.
 
 ### §7.4 The decoder
 
-`DecodeMS1Preimage`: the corpus plate (`ms10hashsq0p7jaf…` from the acceptance
-record, or any row's plate produced by `ms hashlock --out`) → 32 bytes equal to
-that row's `hardened_x`; an entr string → `errMSBadPrefix`; a share → error; the
-`preimage-shape-entr-id` seam row → 32 bytes (the kind is the prefix byte; the
-id is not consulted here either — the HOST refuses the mismatch, ruling L24).
-`DecodeMS1` on the plate → `errMSBadPrefix` still (one test per caller site is
-H0's; one here on the function).
+`DecodeMS1Preimage`: the corpus's `kind[0].ms1` → its `preimage_hex`; the
+acceptance record's plate (`ms10hashsq0p7jaf…`, `ms-hashlock-H1-acceptance.md`)
+→ the corpus anchor row's `hardened_x`; an entr string → `errMSBadPrefix`; a share
+→ `errMSBadPrefix`; the `preimage-shape-entr-id` seam row → 32 bytes (the kind is
+the prefix byte; the id is not consulted here either — the HOST refuses the
+mismatch, ruling L24); an unshared `0x03` string with 17 bytes → `errMSBadLength`.
+`DecodeMS1` on the plate → `errMSBadPrefix` still.
 
 ### §7.5 The emulator arm
 
 `cmd/emu/walk_hashlock_phrase.js`: from the composer, take a path to `Which
 hash?`, tap the phrase row, type the anchor phrase, pick SHA-256 (instant),
 confirm, and read the `hash first8..last8` line: it must equal
-`b867db87..dbc96cb` (`sha256_h` of the anchor row); the negative control types a
-different phrase and must NOT match. Hardened is walked once (about 10 s) and
-compared to `3cf5d421..b70a4c12`.
+**`b867db87..edbc96cb`** (`sha256_h` of the anchor row; fidelity C-3); the
+negative control types a different phrase and must NOT match; a second run types
+`Correct Horse Battery Staple` and must show the corpus's mixed-case digests, not
+the anchor's. Hardened is walked once (about 10 s) and compared to
+`3cf5d421..b70a4c12`.
 
 ### §7.6 Firmware size
 
@@ -287,10 +415,12 @@ exists; expect a small delta over `c4a64fc`'s 1,583,132 / 62,800.
 H2 is done when, on the flashed device: the operator types the anchor phrase
 under each method and the `first8..last8` shown equals `ms hashlock`'s on the
 host for the same phrase and method (`3cf5d421..b70a4c12` hardened,
-`b867db87..dbc96cb` sha256), records both full 64-hex digests in the continuity;
-a `hash:` record packed by `ms hashlock … | me sysw pack` is offered as a payload
-row; and a preimage plate presented to the device is still refused (H0's walk).
-Until the operator walks it, §7.5's emulator arm is the acceptance.
+**`b867db87..edbc96cb`** sha256), then types `Correct Horse Battery Staple` and
+sees a different pair, records all full 64-hex digests in the continuity; a
+`hash:` record packed by `ms hashlock … | me sysw pack` is offered as a payload
+row and the confirm modal's relation line says `matches hash 1`; and a preimage
+plate presented to the device is still refused (H0's walk). Until the operator
+walks it, §7.5's emulator arm is the acceptance.
 
 ---
 
@@ -300,7 +430,10 @@ Storing, displaying or engraving a preimage on the device; reading a preimage
 plate into any flow (§6 adds the decoder only); a scrub discipline (L15); the
 salt/iteration parameters (F-469); `ms split` of a preimage (F-468); the host's
 0.8 bump (H1b, `IMPLEMENTATION_PLAN_hashlock_H1b_me_bump.md`); the flash of H0
-(the operator's).
+(the operator's); the seam-corpus prose correction the H1b fidelity lens filed
+with this stage (`bip93-plain-33-byte-payload-0x03`'s `source` says 0.8 refuses
+it as `TagKindMismatch`; it is `UnknownTag`) — to be folded when H2 re-vendors
+the corpus and re-pins both sha literals.
 
 ---
 
@@ -308,18 +441,45 @@ salt/iteration parameters (F-469); `ms split` of a preimage (F-468); the host's
 
 | claim | where |
 | --- | --- |
-| `composerHashEdit` builds rows and dispatches by index; `default` clears | `gui/composer_hash.go:140-172` (`rows = append(rows, "Type 64 hex")` at :147; `composerPickScreen(ctx, th, title, "Which hash?", rows)` at :149; `default: st.list.Paths[idx].Hash = nil`) |
+| `composerHashEdit` builds rows and dispatches by index; `default` clears | `gui/composer_hash.go:140-172` (`rows = append(rows, "Type 64 hex")` at :147; `composerPickScreen(ctx, th, title, "Which hash?", rows)` at :149; `default: st.list.Paths[idx].Hash = nil` at :172) |
+| the header comment this stage makes false | `gui/composer_hash.go:27-28` |
+| `false` from `composerHashEdit` removes the path at creation; §8h fires at Done | `gui/composer_shape.go:269`, `:443` (`composerEveryPathHashed`) |
 | `composerPickScreen(ctx, th, title, lead string, rows []string) (int, bool)` | `gui/composer_paged.go:259` |
-| `composerHexEntry`, `composerHashRow`, `composerPayloadDigests`, `composerCopyHashRule` | `gui/composer_hash.go:69, :38, :47`; `gui/composer_copy.go:175` |
+| `composerHexEntry`, `composerHashRow`, `composerPayloadDigests`, `composerCopyHashRule`, `composerCopyHashEveryPath` | `gui/composer_hash.go:69, :38, :47`; `gui/composer_copy.go:175`, `:169-173` |
+| `Hash *[32]byte` | `md/compose.go:167` |
 | the three keyboards | `gui/passphrase_keyboard.go:76` (`NewPassphraseKeyboard`), `:92` (`NewTextKeyboard`), `:112` (`NewLineKeyboard`) |
 | `passphraseEntryFlow` hard-codes its title and messages | `gui/passphrase_flow.go:74` |
-| the countdown copy and `unlockDerive(ctx, th, h seal.Header, pass []byte)` | `gui/unlock_kdf.go:236`, `:242` |
+| the countdown copy, its zero-state lead and step size; `unlockDerive(ctx, th, h seal.Header, pass []byte)` | `gui/unlock_kdf.go:26` (`kdfStepIterations = 500`), `:219-221` (`unlockKDFLead`, "about 30 seconds"), `:236`, `:242` |
+| the normalising template that is forbidden here | `sysw/open.go:55` (`seal.NormalisePassphrase`), `seal/open.go:231` |
 | PBKDF2 and SHA-256 already linked | `seal/pbkdf2.go`, `seal/crypto.go`, `gui/unlock_kdf.go` |
 | `DecodeMS1` and its five callers | `codex32/mspayload.go:35`; `gui/ms1_decode.go:22`, `gui/codex32_polish.go:106`, `gui/singlesig_verify.go:185`, `gui/multisig_verify.go:1237`, `bundle/verify.go:138` |
-| `IsPreimage` (H0) | `codex32/mspayload.go` (appended by H0; unshared, 33-byte payload, `0x03`) |
+| `IsPreimage` (H0) | `codex32/mspayload.go:94` (unshared, 33-byte payload, `0x03`) |
+| the modal-fits gate | `gui/composer_copy_test.go` (normalised capacity 588, margin 80) |
 | vendored-corpus convention | `sysw/testdata/record_class_vectors.provenance.json`, `sysw/codex32_seam_test.go` (sha pinned as a literal) |
-| the corpus and its sha | ms `crates/ms-codec/tests/vectors/hashlock-v0.8.json` at `cd0a60f`, `a46c197a…1d30` (CHANGELOG ms-codec 0.8.0) |
-| the derivation constants | ms `crates/ms-codec/src/hashlock.rs:27,30,32` at `cd0a60f` (`HASHLOCK_SALT`, `HASHLOCK_ITERATIONS`, `HASHLOCK_DKLEN`); the phrase cap ms-cli `crates/ms-cli/src/hashlock_phrase.rs:24` |
-| the phrase rule and both warnings' copy | SPEC_ms_hashlock §4.3, §7 |
+| the corpus, its sha, its `lockstep` and `refusals` arrays | ms `crates/ms-codec/tests/vectors/hashlock-v0.8.json` at `cd0a60f`, `a46c197a…1d30` (CHANGELOG ms-codec 0.8.0) |
+| the derivation constants; the phrase cap | ms `crates/ms-codec/src/hashlock.rs:27,30,32`; ms-cli `crates/ms-cli/src/hashlock_phrase.rs:24` |
+| the host's shape-only ms1 predicate | ms-cli `crates/ms-cli/src/argv_guard.rs:148-164` (`looks_like_ms1` → `is_ms1_shaped`; `format::strip_display_separators`) |
+| the phrase rule and both warnings' copy; the reuse lines | SPEC_ms_hashlock §4.3, §7; brainstorm §3.7 |
 | measured KDF rate 9,715 it/s | brainstorm §3.4 |
+| the anchor row's digests | `ms-hashlock-H1-acceptance.md` (hardened `3cf5d421…4c12`, sha256 `b867db87…96cb`) |
 | ruling L22 and H0's guards | `codex32.IsPreimage`, `sysw.isStrictMs1`, `seal.Classify`, `gui/scan.go`, `engraveCodex32`, `unlockEngraveCodex32` at `c4a64fc` |
+
+---
+
+## R0 round 0 folded here
+
+Fidelity: C-1 → §2's forbidden-mechanism rule and the non-fixed-point rows in
+§7.1/§7.2/§7.5; C-2 → §2 rule 3 restated as the host's shape test; C-3 →
+`b867db87..edbc96cb`; I-1 → §4.6 (the loop, `false` only at `Which hash?`, tests
+through `composerAddPath`); I-2 → §4.7 (§8h at Done only, with a phrase-route
+form); I-3 → the refusal names the host route; I-4 → §7.1 drives `refusals`,
+`kind` and `lockstep`; I-5 → the two records named up front and in §1; M-1
+`*[32]byte`; M-2 the driver's signature; M-3 "the acceptance record's plate";
+M-4 §8i once; M-5 the full reuse clause; M-6 the zero-state lead and the
+100,000-iteration calibration; N-1 shares → `errMSBadPrefix`; N-2 recorded.
+Journey: C-1 → the backup line in §4.5 and the phrase-route §8h; C-2 → the
+relation line and the reconciliation line; I-1 → the refusal text; I-2 → the
+phrase screen's lead and the verb in both modals; I-3 → "Even a 20-character
+phrase … shorter ones fall sooner"; I-4/I-5 → §4.6; I-6 → §4.7; M-1 the
+no-payload lead; M-2 the fit assertion on the longest variant; M-3 the
+zero-state lead; M-4 the power-loss sentence; M-5 `chars: <n>`; N-1 §8i once.
