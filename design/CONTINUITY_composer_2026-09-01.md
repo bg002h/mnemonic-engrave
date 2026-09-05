@@ -1777,3 +1777,19 @@ Command to resume: /resume-composer
   the guard refuses a missing/flag-shaped value at exit 64; report counts
   re-measured at the tip). NEXT: sonnet fold verification on the branch diff
   -> merge -> push ms.
+- **H0 PLAN r1 NOT GREEN -> r1 FOLD (`64a6e0d`) -> r2 DISPATCHED.** The r1
+  verifier (`97dab8c`) confirmed all 8 C+I fixed and found ONE new Important
+  that was MINE: the round-0 fold message claimed "whole crate 615/616" when
+  the true state was 610/616 -- the four seam rows are enumerated by
+  `tests/record_corpus.rs` (S2's invariant-2 capture, 33 records) and red
+  three of its tests; nextest without `--no-fail-fast` stopped at the first
+  failing binary and my grep cut the output at three lines. Fold: Task 1 Step
+  1b extends the capture 33 -> 37 (class Unknown, consult record-refusal, the
+  invariant-2 argument: added, not moved); a Global Constraint fixes the
+  measurement method (`--no-fail-fast`, OWN target dir per worktree -- a
+  shared target handed the run seven vector-test binaries compiled from a
+  reviewer's deleted worktree -- `touch` after restoring a backup). Measured
+  clean: 616 run, 613 passed, the 3 failures all `history_purge` and
+  identical on untouched master (no /usr/bin/zsh). Memory:
+  shared-target-dir-across-worktrees-bakes-paths. r2 (sonnet, narrow)
+  dispatched against `hashlock-H0-plan-R0-r2-fold-verification-brief.md`.
