@@ -2683,3 +2683,32 @@ Command to resume: /resume-composer
   shape; Q10 provenance-aware copy; Q11 admission at progWalletPolicy only;
   Q12 cap/bundling; Q13 phrase display masked; Q14 free-text warning names
   the route). Design author in flight; merge then present.
+- **H6 BRAINSTORM -- Group A rulings (operator, one question at a time, 2026-09-05):**
+  (A1) constant-time QR KEPT; the constant-time encoder (`engrave.ConstantQR` /
+  `bitmapForQRStatic`, 37-module cap = 106 B) is RAISED to fit the decided QR
+  text (v7+, module ceiling stated, goldens, fresh constant-time argument);
+  (A2) QR only with the phrase form (string form stays text-only); (A3) QR
+  BELOW the text (passphrase-plate precedent; "right" leaves a 14-char column);
+  (A4) form-specific bands: HASHLOCK PREIMAGE / NOT A SEED (string form),
+  HASHLOCK PHRASE / NOT A SEED (phrase form, method line beneath); (A5) locator
+  = the 8-hex `mk1 stub (policy)` when seated else `mk1 stub (template)`,
+  labelled as the stub screen does; the payload flow prints it only when it
+  can compute it from an md1 in the payload; digest stays the fallback; (A6)
+  the preimage/phrase classes ARE SECRET: `sysw pack` seals by default and
+  WARNS that the device cannot unlock a sealed payload carrying a preimage
+  (F-474 arm); the existing no-seal flag yields the cleartext payload the
+  Hashlock plates flow reads; (A7) H6 admission requires the `hash` id as well
+  as the kind byte (the 1-in-256 33-byte-seed collision must not reach a
+  NOT-A-SEED plate); H0's shape-only inertness elsewhere untouched; (A8) the
+  free-text/passphrase warning names the route ("... a marked hashlock plate
+  comes from the Wallet Policy program, from a phrase typed there or a preimage
+  packed on the host") and still cuts as typed. Group B (cut first + abort
+  arm; backup.Passphrase-pattern layout, own census line, excluded from the
+  completeness claim; retention keyed by digest scrubbed at flow exit; lazy
+  derive of payload phrases; review at the engrave Done census; PREIMAGE
+  REQUIRED marking on md1 plates; provenance-aware §8h/reconcile copy; admit
+  the phrase record at progWalletPolicy only, masked with show; QR-toggle
+  warning; Rust-first wire shape; ms corpus owns the QR text) taken on the
+  recommendations, no objection. Brainstorm doc: BRAINSTORM_hashlock_H6_
+  preimage_plates.md (7a5dfc0f); reports 7a5dfc0f / e45dffcf. NEXT: write
+  SPEC_hashlock_H6_preimage_plates.md -> self-review -> operator review -> R0.
