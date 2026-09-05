@@ -1881,3 +1881,21 @@ Command to resume: /resume-composer
   commit; master moved) + fork hashlock-h0 -> push engrave -> flash at the
   operator's word (sh2-flash -y, BOOTSEL) -> boot judgement -> ms-cli
   0.18.0 (Task 11).
+- **H0 POST-IMPL (opus) NOT GREEN: 1C/2I/4M/1N (`87771f6`).** C-1 is real
+  and the emulator walk could not see it: `engraveCodex32`'s guard runs
+  ONCE before the loop, and the Recover arm reassigns `scan` from
+  `Interpolate(shares, 'S')` inside it -- a preimage single recovered from
+  K-of-N shares walks to "Confirm Codex32 Secret" and "Engrave Plate"
+  (reproduced in the gui harness; no test drove Recover). I-1: a plain
+  BIP-93 33-byte seed beginning 0x03 is refused while the doc comment says
+  16..32-byte seeds are untouched -- the BEHAVIOUR stands (that shape IS a
+  preimage plate by construction; me refuses the same string), the WORDS
+  and a corpus row change. I-2: `me seal` still refuses with the raw codec
+  error (the named diagnosis was wired only into `sysw pack`). All 13
+  mutations killed their tests; firmware byte-identical; corpus identical;
+  the 0.8-bump simulation gave five witnesses (plan claimed three). SAME
+  implementer RESUMED with the decisions (guard at the top of the loop +
+  a Recover test; honest wording + the collision row + capture 38; a
+  `RecordError::PreimagePlate` arm for `me seal`; N-1 pin-test
+  discrimination). NEXT: sonnet fold verification -> merge both branches
+  -> push engrave -> flash at the operator's word.
