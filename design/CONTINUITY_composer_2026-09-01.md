@@ -1996,3 +1996,15 @@ Command to resume: /resume-composer
   (`sysw`) being added; toolkit push next. UNBLOCKED: H1b (me bumps to
   ms-codec 0.8 with an explicit Payload::Preimage refusal arm and
   preimage_plate re-pointed; F-473) -- planning next, risk set.
+- **H1b PLANNED** (`design/IMPLEMENTATION_PLAN_hashlock_H1b_me_bump.md`,
+  uncommitted until its gate runs): me's pin 0.7 -> 0.8 (crates.io);
+  `validate_record` matches the decoded payload (`Payload::Preimage` ->
+  `RecordError::PreimagePlate` on the SUCCESS path; wildcard arm for the
+  `#[non_exhaustive]` enum); `preimage_plate` pin-independent (Ok Preimage
+  | ReservedPrefixViolation 0x03); a `TagKindMismatch` diagnosis arm
+  (ruling L24) for the `preimage-shape-entr-id` row; me 0.8.1 + CHANGELOG;
+  F-473 closes. RED = H0's three tripwires + the seam row going red at the
+  bump. Gate (worktree me-worktrees/h1b-gate, own target) IN FLIGHT. Toolkit:
+  local master had diverged from origin (two F-324 ci commits from
+  2026-09-02 absent locally); the push agent STOPPED correctly (report
+  committed); rebased, lint OK, re-dispatched.
