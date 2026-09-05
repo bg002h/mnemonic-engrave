@@ -318,3 +318,99 @@ All three are the pre-existing Go-version complaints; the plan names the latter 
 The merge to fork `main`, any push, the flash, H4 acceptance with the operator, and the post-implementation review are the controller's and the operator's. The controller re-runs the walk independently; the emulator's HTTP server on port 8791 has been stopped and the baseline build worktree removed.
 
 Secret handling: no phrase and no preimage was written to any log, file, or commit kept by this work. The phrases that appear here are the corpus's own public test vectors, already committed in `hashlock/hashlock_test.go` and `hashlock/testdata/hashlock-v0.8.json`.
+
+---
+
+## Task 7 — F-474 burned down in-phase, F-475 reconciled
+
+Added by the controller after this report's first version flagged that two open follow-ups named **H2** as their owning phase while the H2 plan scheduled neither. Both are now settled, and **no follow-up in the file names H2 any more** — the phase reconciles clean.
+
+**Fork commit `17b3979`** — `seal/record.go`, `seal/record_not_permitted_test.go` (new), `seal/record_test.go`, `gui/unlock_kdf.go`, `gui/unlock_preimage_test.go` (new).
+**Engrave commit `141788d`** — `design/FOLLOWUPS.md`.
+
+### What was wrong
+
+`seal.ErrRecordNotPermitted` already named the record index and the classification **in its message**, and that was never reachable: `gui/unlock_kdf.go` matches with `errors.Is` and cannot take a message apart, so every allow-list refusal fell through to the `default:` arm — **"Payload unreadable."** — after a *successful* authentication and a ~31 s derivation, on a payload that is intact. §2.2 item 4 has taught the operator to read "unreadable" as *someone replaced my payload*, so the screen sent them chasing a compromise that did not happen. `ErrTooManyRecords` and `ErrCodex32TooLong` already have named arms for exactly this reason, and §6.4 requires the machine to distinguish it.
+
+### The change
+
+`seal` gained `RecordNotPermittedError{Index, Class, Section, Preimage}`, returned by `AdmitSection`'s allow-list arm and `Unwrap`ing to `ErrRecordNotPermitted` so every existing `errors.Is` call site is untouched — the type is **additive**.
+
+Two decisions worth naming, because both could have gone the other way:
+
+- **It carries no record bytes.** Index, class and section are authenticated plaintext, so naming them leaks nothing — the argument §6.4 already won for the record count — while the record itself may be seed material. Asserted, not just intended: the seal test checks the rendered message does not contain the plate, and the gui test checks the same of the body.
+- **`Preimage` is a field, not a `Classification`.** H0 considered a class for the kind and rejected one; a preimage plate stays `ClassUnknown` and inert on every classifier, and the reason it is refused here is that it is not on the allow-list, not that it is special. The flag only lets the screen say *which* unknown it was. `isPreimageRecord` runs only on the refusal path, which returns immediately, so the happy path pays nothing for it.
+
+`gui/unlock_kdf.go` gained a named arm and two functions: `unlockNotPermittedBody` (`Record N is <kind>. This payload cannot be unlocked here. Nothing was opened.`) and `unlockRecordNoun`, which names a record for an *operator* rather than for a log — `seal.Classification.String()` says "unknown format", which is true of a preimage plate and useless to someone holding one. For a preimage the noun is H0's own reader words, **"a hashlock preimage, not a seed"**, and "not a seed" is the half that stops the operator re-cutting it as one. "Nothing was opened." is true and load-bearing: `AdmitSection` wipes every record it copied and returns none.
+
+### RED, before the arm existed
+
+    --- FAIL: TestUnlockNamesARefusedPreimageInsteadOfCallingItUnreadable (0.15s)
+        unlock_preimage_test.go:46: never reached "hashlock preimage"; last frame "Payloadunreadable.SealedPayload"
+
+The seal half was RED first as a compile failure (`undefined: RecordNotPermittedError`, three sites).
+
+### A pre-existing test caught a defect in the first draft
+
+The first `Error()` said `record 1 classifies as a hashlock preimage plate` — the kind **instead of** the class. `TestAdmitSectionRefusesAPreimagePlateAsUnknown` (H0's own) failed:
+
+    record_test.go:470: error "...record 0 classifies as a hashlock preimage plate, which the encrypted section does not permit" does not name the class unknown
+
+That test exists to pin that H0 keeps the plate `ClassUnknown`, and the new message had erased the fact it holds. `Error()` now names both — `unknown format (a hashlock preimage plate)` — and that test's own stale parenthetical ("the unlock screen renders this as *Payload unreadable.*; a named arm is an H2 follow-up") was updated in the same commit, because this **is** that arm.
+
+### Six mutations, each run once and reverted
+
+| Mutation | Measured failure |
+| --- | --- |
+| `Index: 0` in place of `Index: i` | `record 0, want 1 (records count from 0…)` **and** `record 0, want 2` — both rows, because they sit at different indices |
+| `isPreimageRecord` always false | `the refusal does not report the record as a hashlock preimage` |
+| drop `Unwrap()` | all three seal tests fail, incl. `the typed error no longer matches ErrRecordNotPermitted -- every existing caller is broken` |
+| delete the `errors.As` arm from `unlockSealedFlow` | the RED again: `never reached "hashlock preimage"; last frame "Payloadunreadable.SealedPayload"` |
+| hardcode `Record 1` in the body | the record-0, record-7 and record-2 rows fail (`does not carry "Record 0"`, `carries "Record 1" and must not`) — the flow test alone could **not** see this, which is why the body is table-tested |
+| ignore the `Preimage` flag | both preimage rows report `not a format this machine reads` where `a hashlock preimage` is wanted |
+
+The fit gate ran on all four body rows: **85 characters drawn in full, headroom 476 (margin 80)** for the longest.
+
+### Records
+
+`design/FOLLOWUPS.md`: **F-474 CLOSED** by fork `17b3979`, with what closed it and what gates it; **F-475's owning phase moved H2 → H3** with the reason in place — the H2 plan re-scheduled it on the condition that H2 does not touch `codex32_seam_vectors.json`, and it did not (H2 vendors `hashlock-v0.8.json`, a different file). Its original scheduling paragraph is kept rather than overwritten, since that argument is unchanged.
+
+**The CHANGELOG line lives in the fork commit message, because the fork has no CHANGELOG file** — verified rather than assumed: `find -iname CHANGELOG*` returns nothing, and `git log --all --diff-filter=A -- 'CHANGELOG*'` shows the fork has never had one on any branch. The H2 plan says so too and names the commit message as the record. Creating a repo-wide CHANGELOG on a feature branch to hold one line is a decision for the operator, not this task; the line is in `17b3979`'s message under a `CHANGELOG` heading, ready to move.
+
+### Final gate runs at fork `17b3979` — verbatim tails
+
+`go test -count=1 ./hashlock/... ./codex32/... ./seal/... ./sysw/...`
+
+    ok  	seedhammer.com/hashlock	0.230s
+    ok  	seedhammer.com/codex32	0.003s
+    ok  	seedhammer.com/seal	11.824s
+    ok  	seedhammer.com/sysw	0.037s
+
+`scripts/gui-shard-test.sh ./gui/ 24`
+
+        1222 top-level tests
+        partition verified exhaustive: 1222 == 1222
+    === wall: 30s ===
+    RESULT: ok -- all 1222 tests ran across 24 shards
+
+**1222 = 1220 + 2**, the two new `gui` tests (`TestUnlockNamesARefusedPreimageInsteadOfCallingItUnreadable`, `TestUnlockNotPermittedBodyNamesTheRecordAndTheKind`); `seal`'s three new tests are a separate package and outside the count.
+
+`go vet ./hashlock/... ./codex32/... ./seal/... ./sysw/... ./gui/... ./cmd/emu/`
+
+    gui/op/draw_test.go:176:24: testing.ArtifactDir requires go1.26 or later (file is go1.25)
+    gui/freetext_sizeproof_golden_test.go:111:13: testing.ArtifactDir requires go1.26 or later (file is go1.25)
+    gui/transaction_golden_test.go:104:13: testing.ArtifactDir requires go1.26 or later (file is go1.25)
+
+`gofmt -l .` (minus `third_party`)
+
+    gui/transaction.go
+    gui/transaction_golden_test.go
+    gui/transaction_txrecord_test.go
+    mt/mt.go
+    mt/mt_test.go
+
+Both the same as before Task 7, and both verified pre-existing at `c4a64fc`. `git status` clean at the tip, so no mutation survives.
+
+### Not re-run, and why
+
+The emulator walk and the firmware size were **not** re-measured for Task 7. The walk drives the composer's phrase route and never enters the unlock flow, so nothing it asserts is reachable from this diff. The size delta is not claimed for `17b3979`; if the controller wants a number for the merge, it should be re-measured at the merge tip, since this commit adds a struct, a method and two functions to code that is linked either way.
