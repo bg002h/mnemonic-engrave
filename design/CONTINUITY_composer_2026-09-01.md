@@ -2452,3 +2452,18 @@ Command to resume: /resume-composer
   fidelity + design (opus), journey walk (opus), tests + citations (sonnet).
   NEXT: persist -> fold -> sonnet verification -> plan (+ gate) -> ONE
   implementer -> post-impl -> merge -> push -> signed image.
+- **H5 SPEC R0 ROUND 0 -- three reports persisted** (fidelity 28fd8eb 1C/5I/4M/4N;
+  tests 94236ae 0C/3I/1M/2N; journey 68602dd 0C/7I/5M/2N). Real findings: the
+  new `phraseDigests` map was never initialised (nil-map panic at HOLD); my
+  fit argument against the ruled write-down remedy was wrong (the ruled edit
+  keeps headroom 107 -- headroom is a line budget; only my extra clause cost
+  43); `shTargets` has no labels; the composer state needs a `!tinygo` gui
+  seam (frame_hook model); the reconcile screen said nothing about a
+  mismatch and dropped `chars: n`; the mixed-wallet §8h banner said "or";
+  the refusal's 0-based index became a delete instruction; a third walk run
+  for stored-vs-displayed. **Folded at `d36ede5`** (one commit; every number
+  quoted from the reports, none re-derived). **r1 sonnet fold verification
+  DISPATCHED** (brief e40add3). NEXT: GREEN -> H5 plan (single author, tasks
+  per §; build gate per TASK boundary this time -- memory
+  `a-gate-that-wires-all-tasks-at-once-cannot-see-order`) -> R0 lenses ->
+  ONE implementer -> three walk runs -> post-impl -> merge -> push -> image.
