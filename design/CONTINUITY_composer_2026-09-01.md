@@ -2166,3 +2166,33 @@ Command to resume: /resume-composer
   -> ONE opus implementer on fork branch `hashlock-h2` -> controller
   emulator walk -> opus post-impl -> merge fork main -> push -> flash per the
   fable rule -> H4.
+- **me v0.8.1 RELEASED (`f94c903`)** on the fable decision (a30f7c3: release
+  now; no unattended flash). Sonnet release agent: master pushed via
+  ci/staging (no bypass), tag at f94c903, run 33946853992 all 8 jobs success,
+  7/7 assets, minisign + sha256 verified, downloaded me 0.8.1 refuses the
+  plate by name. F-454 CLOSED. Engrave origin/master = f94c903; the records
+  since are unpushed (batch with the next window).
+- **OPERATOR (mid-turn): "Not in boot sel but don't wait on device." and
+  "Proceed as if device tests passed for now."** Device acceptances (H0 boot,
+  H4 walk) are recorded as ASSUMED at the operator's word, never measured; the
+  emulator walk is the measured device gate. Signed H0 image pre-built per
+  fable's allowance: `seedhammer/seedhammerii-v0.0.0-bgc4a64fc.signed.uf2`
+  (sha256 3df72ebc22b61c5112c02989514f186f7c1d060ac66aa4649894f0d7a382b67c
+  -- a signed sha is not an identity across signings). Operator's command
+  when ready: `~/bin/sh/sh2-flash /scratch/code/shibboleth/seedhammer/seedhammerii-v0.0.0-bgc4a64fc.signed.uf2`
+  (or the H2 merge tip's image, whichever is newest; one flash, not two).
+- **H2 PLAN BUILD GATE: GREEN WITH FIXES (12)** (`hashlock-H2-plan-build-gate.md`,
+  persisted 6597832). Real findings: the copy-table AST gate needs a row per
+  new composerCopy* func (the plan under-counted its own by 4); the confirm
+  modal needed spec §4.5's drop-order steps 1 AND 2 (headroom 64 -> 186);
+  the §8i modal's title is "Path N hash", not "Hash lock"; a zero-payload
+  session swaps the lead, so "Which hash?" is absent from that frame; the
+  harness's hold() never releases and EventRouter is ONE global pointer, so
+  sequential holds stall silently (new holdConfirm with an explicit release;
+  memory `harness-hold-never-releases`); fix #12 a pre-existing test
+  (composer_gates_test.go) asserting the old lead -- found only by the whole
+  shard set. Firmware 1,595,236 / 62,856 (+12,104 / +56). Fold delegated to
+  an opus fold agent (brief `hashlock-H2-plan-gate-fold-brief.md`) with a
+  checker script `scripts/h2-plan-blocks-vs-tree.sh` (plan blocks == gated
+  tree) as the re-gate. NEXT: fold commit -> fill PLAN_SHA in six briefs ->
+  five lenses + refute -> fold -> ONE implementer.

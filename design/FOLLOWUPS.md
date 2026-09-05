@@ -15416,7 +15416,7 @@ exactly the drift the Rust-primary rule exists to prevent (which tier unlocks
 when, which head is bare). `md compose --help` at 66bdf2f4 shows `--wrapper`,
 `--path`, `--experimental`, `--json` only.
 
-### F-454 — `me-0.8.1-owed-plus-sign-path-tightening-unreleased`: the host refuses `+`-signed key: path components on master (c05074f1) but the released `me` v0.8.0 admits them, so host and device disagree for anyone on the release binary (owning phase: **before composer S4's journey runs with a release binary** — cut me 0.8.1 with the next host change or before S4) `#me-cli` `#release` `#composer`
+### F-454 — ~~`me-0.8.1-owed-plus-sign-path-tightening-unreleased`~~ **CLOSED 2026-09-04 by `f94c903`** (me v0.8.1 released; fable decision a30f7c3): the host refuses `+`-signed key: path components on master (c05074f1) but the released `me` v0.8.0 admits them, so host and device disagree for anyone on the release binary (owning phase: **before composer S4's journey runs with a release binary** — cut me 0.8.1 with the next host change or before S4) `#me-cli` `#release` `#composer`
 
 Filed 2026-09-02 from `composer-S2-exec-review-r0` I-1's Rust-first fold. Fixture
 is 47 rows (sha 5b3960ca…); the device (fork main 321acb56) matches master, not
@@ -15431,6 +15431,16 @@ version bump is not a release. This closes only when the `v0.8.1` tag exists and
 NOT in the H1b plan's scope (the operator's call, or a fable decision, recorded
 when taken). Until then a release-binary operator still admits `+`-signed paths.
 Owning phase is unchanged: before composer S4's journey runs with a release binary.
+
+**CLOSED 2026-09-04 by `f94c903`** (release commit "me 0.8.1 -- ms-codec 0.8; a
+kind-0x03 preimage plate refused BY NAME ..."): tag `v0.8.1` at `f94c903`, pushed
+via ci/staging (required `test (rust + go)` success, no bypass); tag-event run
+33946853992, all 8 jobs success including `assemble + sign + release`; 7/7 assets;
+minisign and sha256 verified; the downloaded linux-amd64 `me` reports 0.8.1 and
+refuses the preimage plate by kind at exit 4. https://github.com/bg002h/mnemonic-engrave/releases/tag/v0.8.1. Report
+`design/agent-reports/push-me-v0.8.1-release.md`. The host and the device
+(fork main 839fa5aa+) now agree on `+`-signed path components for anyone on the
+release binary.
 
 ### F-455 — `composer-secret-form-words-and-seedqr-are-one-plate`: SPEC §7f offers three secret forms; the device has two plate designs (owning phase: **a later cycle, spec fold at composer S4**) `#seedhammer` `#composer` `#backup`
 
