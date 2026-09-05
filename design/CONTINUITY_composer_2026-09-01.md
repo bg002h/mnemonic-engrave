@@ -2127,3 +2127,42 @@ Command to resume: /resume-composer
   into .tmp/h2-gate, run, report every fix as a finding). OPERATOR (mid-turn):
   "You may use up to 5 agents to help with questions or folds or anything"
   -- concurrency budget 5; two in flight now.
+- **OPERATOR (mid-turn, before sleeping): "You may use up to 10 agents and
+  have all permissions"; "Use ultracode effort"; "Proceed autonomously and
+  try hard not to wait on me. I must sleep"; "Consult fable if needed";
+  "Fable may answer for me".** Budget 10 concurrent agents; pushes,
+  publishes, tags and releases proceed without a confirmation round; every
+  operator-shaped decision goes to a fable decision agent (report in
+  agent-reports); the flash still needs a device state only the operator can
+  establish unless fable rules otherwise. Ultracode here = five DISJOINT
+  lenses in parallel on the H2 plan (fidelity, tests/mutation, journey walk,
+  adversarial failure states, coverage/comprehension) then a refute pass,
+  then ONE fold -- via Agent dispatches, not the Workflow tool.
+- **H1b GREEN AND MERGED (engrave master `8c83e4e`, record `bf80390`).**
+  Opus post-impl (`hashlock-H1b-post-impl.md`, persisted `5f4b634`):
+  0C/0I/3M/2N; 19 kind-space families through both verbs (6 place, 13
+  refuse exit 4), 6 killing mutations, 4 wording-only survivors. Minors
+  folded on the branch at `4d5b6b7` (controller, inline): M-1 the CHANGELOG
+  and `preimage_plate` doc over-claimed -- `PreimageLengthMismatch` is
+  reached only when the string length sits in the profile's length sets
+  (X in {16,17,20,21,24,25,28,29,32,33}); X = 18 is
+  `Bip93OutsideTheProfile(53)`; claim narrowed, behaviour unchanged. M-3 two
+  assertions added (0x03 2-of-N share is NOT a plate; UPPERCASE plate IS).
+  N-1 `:137`. N-2 the widened profile sentence says a `hash` id is refused
+  for its kind. M-2 (argv guard does not cover a plate; secret-handling)
+  filed as F-476. Gate at 4d5b6b7: fmt clean; 619/616/3 box-local
+  history_purge/2 skipped; clippy only `is_multiple_of`. me 0.8.1 is
+  UNRELEASED on master; the release order is a fable decision in flight
+  (`decision-me-0.8.1-release-and-flash-rule.md`, also rules on unattended
+  flashing).
+- **Pushes**: ms `e96676c` pushed via ci/staging (13 contexts green, run
+  33946142767, no bypass; report commit 504ff46 local). Toolkit `67090e2a`
+  push (staging-PR form) in flight. Engrave master NOT pushed since
+  `d723cac` -- batch with the me 0.8.1 release window (freeze applies).
+- **H2 R0 r0 briefs committed** (`da8d9ba`, `fede50f`): fidelity, tests,
+  journey, adversarial, coverage, refute -- all with `<PLAN_SHA>` pending the
+  gate fold. NEXT: gate report -> fold plan -> commit with gate output ->
+  fill SHAs -> dispatch five lenses -> refute -> fold -> sonnet verification
+  -> ONE opus implementer on fork branch `hashlock-h2` -> controller
+  emulator walk -> opus post-impl -> merge fork main -> push -> flash per the
+  fable rule -> H4.
