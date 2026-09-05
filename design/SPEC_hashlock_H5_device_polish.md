@@ -1,6 +1,6 @@
 # SPEC — Hashlock H5: device polish (F-487, F-480, F-484, F-485, F-488)
 
-**STATUS: DRAFT 2026-09-05 -- R0 round 0 folded; r1 fold verification NOT GREEN (0C/4I/4M, all introduced by the fold) folded here; r2 verification pending.** Base: seedhammer fork main `b9a9a30`
+**STATUS: R0 GREEN 2026-09-05 (0 Critical / 0 Important open).** Round 0 (spec `f6dd437`): fidelity + design (opus, `hashlock-H5-spec-R0-r0-fidelity.md`, 1C/5I/4M/4N), tests + citations (sonnet, `-tests.md`, 0C/3I/1M/2N), journey walk (opus, `-journey.md`, 0C/7I/5M/2N); fold `d36ede5`; r1 fold verification (sonnet) NOT GREEN 0C/4I/4M -- all four introduced by the fold (two numbers composed from other bodies' measurements, a §4.7 contradiction, an unlisted test site) -- folded at `44b1690` + `d206a2e`; r2 fold verification (sonnet, `hashlock-H5-spec-R0-r2-fold-verification.md`) **GREEN**. Lens-closure: fidelity, tests/citations, journey, fold-verification x2. Every number in this spec is a measurement of the text as written. Base: seedhammer fork main `b9a9a30`
 (H2 merged at c284484; H3 seam corpus at b9a9a30). Parent spec: `SPEC_hashlock_H2_device.md`
 (GREEN 55ee7a4, H3-folded at 657f40f/8d5139d). Every citation below was measured at
 `b9a9a30`; re-grep at plan time.
@@ -199,7 +199,7 @@ passphrase; the manual's unlock section says so.
   The confirm-modal test gains "and this digest" -- MUTATION: old write-down line -> fails.
   `TestHashlockReconcileScreenIsReachableOnAMixedPolicy` keeps its :909 needle by construction
   (the substring is kept) and has its :916 assertion rewritten to `composerAnyPathByPhrase(st)`
-  in Task 1 (it does not compile otherwise); the walk's :318 needle stays -- run both.
+  in the plan's provenance task, the first to land (it does not compile otherwise); the walk's :318 needle stays -- run both.
 - §2: a zero-value-state HOLD test (`composerState{}` as `composerFlow` builds it; one phrase
   route to HOLD; no panic; the digest is in the set) -- MUTATION: assign into the map without
   the nil check -> panics. `TestRemovePathReSyncsHashByPhrase` becomes the value-set test
