@@ -16033,11 +16033,21 @@ Filed 2026-09-05 from the host-device e2e lens (`hashlock-H2-post-impl-lens-host
 M-1). The H3 toolkit-manual draft describes the confirm modal; make sure it states the
 abbreviation rule and shows one host/device pair side by side.
 
-### F-487 — `hashlock-reconciliation-is-asked-after-the-digest-left-the-screen`: the reconcile screen asks the operator to compare against the host after the confirm modal (which held the digest) has been dismissed, and the write-down instruction does not tell them to write the digest (owning phase: **next device cycle; spec §4.5/§4.7 design**) `#hashlock` `#seedhammer` `#ux` `#spec`
+### F-487 — `hashlock-reconciliation-is-asked-after-the-digest-left-the-screen`: the reconcile screen asks the operator to compare against the host after the confirm modal (which held the digest) has been dismissed, and the write-down instruction does not tell them to write the digest (owning phase: **the next device code cycle** -- RULED 2026-09-05) `#hashlock` `#seedhammer` `#ux` `#spec`
 
 Filed 2026-09-05 from the host-device e2e lens M-2. Options: repeat the abbreviated digest
 on the reconcile screen, or add "and this digest" to the write-down copy. A spec change;
 walk it with the operator.
+
+**RULING 2026-09-05 (operator, walked live: "I agree with your recommendation").**
+Both: (1) the reconcile screen repeats `hash <first8>..<last8>  method: <m>` above its
+sentence, so the check it asks for can be performed while it is asked; (2) the confirm
+modal's write-down line becomes "Write down this phrase, the method and this digest now."
+(about 16 characters into a modal with 107 characters of headroom -- re-measure with
+`assertModalBodyFits`). Not option 3 (moving the sentence back before HOLD; it costs the
+headroom the other lines need). Spec §4.5/§4.7 fold first, then code with the fit
+measurement; bundled with F-480/F-484/F-485/F-488 in the next device code cycle unless the
+operator pulls it forward.
 
 ### F-488 — `f474-refusal-names-the-record-but-not-the-next-step`: the unlock KDF's new refusal says which record and what it is, but not what to do (remove the record on the host and re-seal) (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#ux`
 
