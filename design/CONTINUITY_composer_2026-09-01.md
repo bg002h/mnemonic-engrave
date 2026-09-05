@@ -2427,3 +2427,14 @@ Command to resume: /resume-composer
   origin/main b9a9a30. ms origin/master e96676c (report 504ff46 local). No
   agents running. The cycle ends here; the next moves are the operator's
   (flash + H4) or a new cycle (F-480/484/485/488; F-487 spec walk).
+- **OPERATOR WALK OF THE OPEN FOLLOW-UPS (live, 2026-09-05):** F-487 ruled --
+  both remedies (reconcile screen repeats digest + method; write-down line adds
+  "and this digest"), next device code cycle, spec §4.5/§4.7 first (aed3399).
+  F-483 ruled -- stays logged; fork-wide secret-hygiene pass later (43919b3).
+  F-489 ruled -- `me seal` names the record index like `sysw pack`; bundle
+  with the next host change (f071d00). Closed list (F-474/475/477/478/479/481/
+  482/486) and rescheduled list (F-480/484/485/488) walked; nothing reopened
+  or pulled forward. Operator: "No. Proceed" -> START THE NEXT DEVICE CODE
+  CYCLE (stage H5, device polish): F-487, F-480, F-484, F-485, F-488. Spine:
+  short spec (single author) -> R0 lenses in parallel -> plan + gate -> ONE
+  implementer -> post-impl -> merge -> push -> signed image.
