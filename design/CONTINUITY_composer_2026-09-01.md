@@ -2760,3 +2760,10 @@ Command to resume: /resume-composer
   with corpus rows: id hash, kind 0x03, 75 chars, round trip; never emits
   `entr`), then the Go port under a provenance pin with lockstep. Fold author
   DISPATCHED (brief e95a1e21 + ruling).
+- **C-1 scope corrected (operator: "Are you sure me doesn't already have a preimage
+  encoder?"):** the Rust encoder EXISTS (`ms_codec::encode` with
+  `Payload::Preimage`, used by `ms hashlock`) and the corpus `kind` row is the
+  vector; `me` decodes only and needs nothing. The gap is the fork only:
+  `codex32.EncodeMS1` is entr-only; `NewSeed("ms",0,"hash",'s',[0x03||x])` is
+  the primitive. Deliverable shrinks to a Go wrapper `EncodeMS1Preimage` +
+  lockstep vs the corpus row + a never-emits-entr test. Fold author messaged.
