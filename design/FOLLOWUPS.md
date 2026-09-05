@@ -16065,3 +16065,9 @@ re-measured for fit.
 ### F-489 — `me-seal-does-not-name-the-record-index-where-sysw-pack-does`: `me seal --seal-secret` refuses a preimage plate by kind but without the record index that `me sysw pack` prints (owning phase: **the next me code cycle**) `#me-cli` `#ux` `#hashlock`
 
 Filed 2026-09-05 from the host-device e2e lens N-1. Same message shape on both verbs.
+
+**RULING 2026-09-05 (operator, walked live: option 1).** Align the shape: `me seal` names
+the refused record's index as `me sysw pack` does ("record N (records count from 0) is a
+hashlock PREIMAGE plate ..."), with a test that fails without it. Low priority; bundle with
+the next host change, not a cycle of its own. Same rule as the fork's Task 7 unlock
+refusal: name what was refused and where.
