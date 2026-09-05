@@ -43,6 +43,17 @@ I-5; r1 NF-C), and H3 has now folded both (`## H3 fold`).
 
 ---
 
+3. **§4.1's no-payload lead** (F-482, from the post-impl review's M-1): the plan
+   (build-gate fix 9) has `composerHashRows` REPLACE the "Which hash?" lead with
+   the no-payload lead when `len(digests) == 0`, rather than adding a second lead
+   line; §4.1's parenthetical now says so.
+4. **§4.2's lead** (F-482): the shipped lead prepends "This screen does that
+   hashing for you." -- the R0 round-0 answer to journey I-5 (the §8i modal the
+   operator has just dismissed); §4.2 now quotes the two-sentence lead. The
+   layout consequence (a 44 px lead band) was what starved the readout until
+   fork `26fd1dd` removed the 8 px cut (F-481).
+
+
 ## §1. Scope
 
 In:
@@ -184,12 +195,13 @@ unchanged), **`Type a hashlock phrase`**, `Type 64 hex`, `No hash lock`. With no
 > No hash record in the payload. Type a phrase below, or make one with
 > ms hashlock on the host.
 
-(second lead line only when `len(digests) == 0`).
+(this lead REPLACES the screen's default lead when `len(digests) == 0`, so the literal
+"Which hash?" is absent from that frame -- as shipped, build-gate fix 9; H3 fold, F-482).
 
 ### §4.2 The phrase screen
 
-Title **`Hashlock phrase`**, lead (journey I-2): *"Use a phrase you have never
-used anywhere else."* The four-page printable-ASCII keyboard built with
+Title **`Hashlock phrase`**, lead (journey I-2, and the §8i answer folded at R0 round 0): *"This screen does that
+hashing for you. Use a phrase you have never used anywhere else."* The four-page printable-ASCII keyboard built with
 `NewPassphraseKeyboard` (`gui/passphrase_keyboard.go:76`) — not `NewTextKeyboard`
 (:92, settings gear + newline) nor `NewLineKeyboard` (:112). A NEW flow function
 `hashlockPhraseFlow(ctx, th, initial []byte) ([]byte, bool)`, not

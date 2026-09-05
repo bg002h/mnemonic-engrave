@@ -15890,7 +15890,7 @@ ONE SCREEN (H2) AND NEVER STORES, SHOWS OR ENGRAVES IT."*), so the fork and this
 spec now disagree until this is folded. Deliberately not fixed in H2: editing
 the composer spec is a separate artifact from the one H2 was reviewed against.
 
-### F-478 — `h2-spec-4.5-drop-order-names-an-unreachable-destination`: §4.5 step 2 sends the reconciliation line to the phrase-route §8h at Done, which `composerEveryPathHashed` guards (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec`
+### F-478 — ~~`h2-spec-4.5-drop-order-names-an-unreachable-destination`~~ **CLOSED 2026-09-05 by `657f40f`** (h3-composer-spec merge: §4.5's drop-order clause names the post-HOLD screen): §4.5 step 2 sends the reconciliation line to the phrase-route §8h at Done, which `composerEveryPathHashed` guards (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec`
 
 Filed 2026-09-05. `SPEC_hashlock_H2_device` §4.5's drop order ends *"then move
 the reconciliation line into the phrase-route §8h at Done (§4.7)"*. The build
@@ -15910,7 +15910,7 @@ Replacement sentence for that clause, for whoever folds the spec:
 > Done, whose `composerEveryPathHashed` guard is false for any policy with one
 > un-hashed path.
 
-### F-479 — `h2-spec-4.5-line-list-has-no-other-path-line`: the confirm modal draws a cross-path warning §4.5 does not enumerate (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec`
+### F-479 — ~~`h2-spec-4.5-line-list-has-no-other-path-line`~~ **CLOSED 2026-09-05 by `657f40f`** (h3-composer-spec merge: §4.5's line list gains the other-path line, count-free wording): the confirm modal draws a cross-path warning §4.5 does not enumerate (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec`
 
 Filed 2026-09-05. §4.5 enumerates the confirm modal's lines "in order" and has
 no clause for r0 journey I-1's cross-path warning, which the plan added and which
@@ -15984,7 +15984,7 @@ reports the true length, and the confirm modal shows the digest, the method and
 the character count before anything is assigned. It is an affordance defect on a
 new screen, and the post-implementation review is where its severity is ruled.
 
-### F-482 — `hashlock-two-more-spec-4-copy-departures-unrecorded`: §4.1's no-payload lead REPLACES "Which hash?" instead of adding a second lead line, and §4.2's lead is prefixed with "This screen does that hashing for you." — both decided in the plan, neither recorded as a spec departure (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec` `#records`
+### F-482 — ~~`hashlock-two-more-spec-4-copy-departures-unrecorded`~~ **CLOSED 2026-09-05 by the H3 spec fold at the commit after `3aec2aa`** (§4.1's lead replaces; §4.2 quotes the two-sentence lead): §4.1's no-payload lead REPLACES "Which hash?" instead of adding a second lead line, and §4.2's lead is prefixed with "This screen does that hashing for you." — both decided in the plan, neither recorded as a spec departure (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec` `#records`
 
 Filed 2026-09-05 from `hashlock-H2-post-impl` M-1. F-478 and F-479 record two
 §4.5 departures; these two have no record because
