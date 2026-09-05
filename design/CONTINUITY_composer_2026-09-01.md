@@ -2642,3 +2642,8 @@ Command to resume: /resume-composer
 - F-489: branch tip now 768fb12f -- the PUBLIC section's locator gets its own CLI
   test (corrupted md1 at public index 1; mutation fails it, run). Reviewer
   messaged to include the commit. NEXT: review GREEN -> merge --no-ff -> push.
+- **F-489 SHIPPED to engrave master** (merge of f489-seal-record-index 6e8246ae; review
+  GREEN; the Minor comment folded). me seal now says "record N (records count
+  from 0) in the {public|secret} section: ..." on both per-record loops; the
+  public set decode keeps the section-less form. CHANGELOG [Unreleased]; no
+  release cut (rides with the next me release). NEXT: push engrave.
