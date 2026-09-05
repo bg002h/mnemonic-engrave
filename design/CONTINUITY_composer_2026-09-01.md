@@ -2238,3 +2238,15 @@ Command to resume: /resume-composer
   disputes for the fold. **Round-0 FOLD DISPATCHED** (opus, brief 35310dd):
   plan + gated tree together, RED/GREEN per new test, shards, checker.
   Memory: `harness-ignores-the-wakeup-deadline`.
+- **H2 PLAN R0 ROUND 0 FOLDED (`f60c2df`)**: 16/16 confirmed defects, both
+  Criticals closed by EXECUTED tests (the derive flow keeps awake under the
+  screensaver, proven on a Run-level synctest harness -- not deferred to the
+  walk; decoder/digest tests compare the corpus's full 32 bytes and digest);
+  21 mutations RED->GREEN; TrimSpace declined-as-redundant REFUTED by
+  measurement (\v \f U+0085 U+00A0 U+2003 flip; matches the host's
+  raw.trim()); 2 spec departures recorded as H3 items with replacement
+  sentences (no spec edit). Controller re-run: checker 26 blocks / 0 FAIL;
+  four packages ok; gui hashlock selection ok. Fold report 2234f04. **r1
+  fold verification DISPATCHED** (sonnet, brief f43a8ad; executes both
+  Criticals' RED itself). If GREEN: fill PLAN_SHA in the implementer brief ->
+  ONE opus implementer on fork branch hashlock-h2.
