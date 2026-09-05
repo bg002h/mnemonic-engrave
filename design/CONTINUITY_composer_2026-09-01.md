@@ -2578,3 +2578,25 @@ Command to resume: /resume-composer
   jobs tmp); the gate tree's `tinygo_split_test.go` had the var under the
   test's doc comment (stolen) -- C's placement is the right one; Step 12's
   anchors are unique at :64 and :68 on the merged tree. Waiting on A.
+- **H5 MERGED ON `hashlock-h5` at `8e605e1`** (b9a9a30 <- h5-b 6bc777d <- h5-c bff7499 <-
+  h5-a 26de1a9; + 8e605e1 the controller-added `composer_doc_comment_test.go`
+  from the plan's Task 5 Step 3a, which no brief carried). Implementer A
+  report b7b51aa. Controller gates at the tip: hashlock/codex32/seal/sysw/
+  cmd/emu ok; gofmt clean (transaction*.go pre-existing); vet + GOOS=js vet
+  clean; gui 1239 / 24 shards ok; checker 55 blocks / 0 FAIL against the
+  merged tree. **THREE WALK RUNS (spec §4.5, plan Step 12), fresh port each,
+  restore proven with git diff --quiet between them:** (a) 8792 unmutated --
+  PASS ok:true, storedBeforeHold null, stored
+  3cf5d421caf2a9c8eb9de1d400866ea7d475e6ba978861bb0167a37cb70a4c12,
+  displayed 3cf5d421..b70a4c12, reconcile frame "hash 3cf5d421..b70a4c12
+  method: hardened chars: 28 Before you cut plates, run ms hashlock ... If they
+  differ, do not fund this wallet: build it again.", write-down line as
+  specified (48.3 s); (b) 8793 assignment before the confirm -- FAILED at the
+  PRE-HOLD assertion: "the path ALREADY holds a hash while the confirm modal
+  is up ... (F-485)" (44.6 s); (c) 8794 stored hash perturbed (d[0] ^= 1) --
+  FAILED at STORED-VERSUS-DISPLAYED: "displayed: 3cf5d421..b70a4c12 / stored:
+  3df5d421... -> 3df5d421..b70a4c12", pre-hold read still null (47.9 s).
+  Tree restored and emu.wasm rebuilt unmutated; servers stopped. NEXT: opus
+  post-impl (brief tips filled) -> fold -> merge fork main --no-ff -> fill
+  <FORK_MERGE_SHA> in h5-records, merge h5-records + h5-manual -> pushes ->
+  signed image (one flash covers H0+H2+H5).
