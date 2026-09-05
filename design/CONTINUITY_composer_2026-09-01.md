@@ -2712,3 +2712,16 @@ Command to resume: /resume-composer
   recommendations, no objection. Brainstorm doc: BRAINSTORM_hashlock_H6_
   preimage_plates.md (7a5dfc0f); reports 7a5dfc0f / e45dffcf. NEXT: write
   SPEC_hashlock_H6_preimage_plates.md -> self-review -> operator review -> R0.
+- **H6 SPEC DRAFTED (`a0f832d0`; author report 1c4ac5e9)** by the resumed design
+  author: 15 sections, 168 citations, every copy string measured as written.
+  Three ruling premises corrected by measurement (stated in the spec): the QR
+  ceiling is v9 / 53 modules (not v7); the sysw container runs no admission at
+  unlock (`sysw/open.go:36-73`), so A6's warning says the Hashlock plates flow
+  reads an UNSEALED payload (not "the device cannot unlock it"); the abort arm
+  reads "The phrase dies with this composition." (headroom 121). A7's hash-id
+  check applies on BOTH sides (host `preimage_plate` shares the blind spot).
+  Worst-case phrase plate + QR fits at exactly one rung/scale (3.0 mm text +
+  scale-2 QR = 63.80 of 65 mm; 1.20 mm spare). **R0 ROUND 0 DISPATCHED**
+  (briefs f6c696d3): fidelity (opus), journey (opus), tests + citations
+  (sonnet). Spec presented to the operator for review in parallel. NEXT:
+  persist -> fold (with operator feedback) -> verification -> GREEN -> plan.
